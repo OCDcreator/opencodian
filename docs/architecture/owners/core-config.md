@@ -47,3 +47,5 @@ The new core.backend-pi owner isolates the external Pi process service. core.con
 ## Startup non-blocking invariant (2026-09-10)
 
 `ModelPricingService.load()` must only read the local cache synchronously; the 24h models.dev auto-refresh runs fire-and-forget in the background. Never `await` a network catalog fetch inside plugin `onload` — it once blocked startup for ~3.5s on a slow link. Explicit user-triggered `refresh()` (settings pricing modal) stays awaited.
+
+Concurrent automatic and manual `refresh()` calls share one Promise through fetch and persistence; clear that Promise on either success or failure. `onCatalogUpdated` exposes a disposable event over the canonical in-memory catalog. Publish before persistence so consumers see usable prices even if saving fails; listener and diagnostic failures cannot break refresh or other consumers. Views own subscriptions and update current unavailable estimates without rewriting already priced history.

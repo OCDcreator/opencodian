@@ -1,4 +1,6 @@
 /* eslint-disable max-lines -- Probe test file accumulates focused tests for each readback/pass diagnostic surface. */
+import * as path from 'node:path';
+
 import {
   ClaudeCodeAdapter,
   type ClaudeCodeSdkFacade,
@@ -2309,7 +2311,7 @@ describe('runOutputStyleLiveProbe', () => {
     expect(result.nonceRecalled).toBe(true);
     expect(result.outputStyleOptionWired).toBe(true);
     expect(result.styleName).toContain('opencodian-proof-');
-    expect(result.tempStylePath).toContain('/.claude/output-styles/');
+    expect(result.tempStylePath).toContain(`${path.sep}${path.join('.claude', 'output-styles')}${path.sep}`);
     expect(result.responsePreview).toContain(expectedNonce);
     expect(result.cleanup.fileRemoved).toBe(true);
   });
@@ -2790,6 +2792,12 @@ describe('runMcpElicitationLiveProbe scanner', () => {
 });
 
 describe('runMcpElicitationLiveProbe integration', () => {
+  const processResolver = jest.requireActual<typeof import('../../../../../src/core/agents/backend/ClaudeCodeProcessResolver')>('../../../../../src/core/agents/backend/ClaudeCodeProcessResolver');
+  const nodePath = path.resolve('/probe-node/bin', process.platform === 'win32' ? 'node.exe' : 'node');
+  beforeEach(() => {
+    jest.spyOn(processResolver, 'resolveExecutableCandidate').mockReturnValue(nodePath);
+  });
+  afterEach(() => { jest.restoreAllMocks(); });
   it('returns wiring when tool_result has isError:true with error preview', async () => {
     const adapter = new ClaudeCodeAdapter({
       vaultPath: '/vault',
@@ -2890,7 +2898,7 @@ describe('runMcpElicitationLiveProbe integration', () => {
             // Round 21: command should be an absolute path resolved via
             // resolveExecutableCandidate, not process.execPath (which in
             // Electron points to the renderer, not Node.js).
-            command: expect.stringMatching(/^\//),
+            command: nodePath,
             alwaysLoad: true,
           }),
         }),
@@ -2931,22 +2939,9 @@ describe('runMcpElicitationLiveProbe integration', () => {
 
     const callArgs = runDiagnosticPromptSpy.mock.calls[0][0];
     const mcpServer = callArgs._diagnosticMcpServers.elicit_live as Record<string, unknown>;
-    // Round 21 fix (corrected): the probe must resolve `node` to an absolute path
-    // using the same PATH-search logic as ClaudeCodeProcessResolver. Using
-    // process.execPath is WRONG in Electron/Obsidian where it points to the
-    // renderer process, not Node.js. The command must be an absolute path
-    // (starts with / on macOS/Linux) and must NOT be the Electron renderer.
-    expect(typeof mcpServer.command).toBe('string');
-    expect(mcpServer.command).not.toBe('node');
-    // The command must be an absolute path (starts with / on macOS/Linux),
-    // proving resolveExecutableCandidate was called rather than blindly
-    // using the bare 'node' string. In Electron, process.execPath points
-    // to the renderer binary — but in a pure Node test environment it
-    // may legitimately resolve to the same absolute path via PATH search,
-    // so asserting !== process.execPath is environment-brittle. The
-    // absolute-path check plus not-bare-'node' check together prove
-    // the resolver ran correctly.
-    expect(mcpServer.command).toMatch(/^\//);
+    expect(processResolver.resolveExecutableCandidate).toHaveBeenCalledWith('node', expect.any(Object));
+    expect(mcpServer.command).toBe(nodePath);
+    expect(path.isAbsolute(mcpServer.command as string)).toBe(true);
   });
 
   it('falls back to bare node when PATH resolution fails', async () => {

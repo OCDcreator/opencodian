@@ -2,7 +2,7 @@
 
 import type { App } from 'obsidian';
 
-import { type Conversation, createEmptyTabContextState } from '../../../../src/core/types';
+import { type Conversation, createEmptyTabContextState, type TabContextState } from '../../../../src/core/types';
 import { ContextUsageService } from '../../../../src/features/chat/services/ContextUsageService';
 import { ContextDetailModal } from '../../../../src/features/chat/ui/ContextDetailModal';
 import { setLocale } from '../../../../src/i18n';
@@ -15,6 +15,31 @@ describe('ContextDetailModal', () => {
 
   afterEach(() => {
     document.body.innerHTML = '';
+  });
+
+  it('updates only costs for its original session and unsubscribes on close', () => {
+    const { contextState, conversation } = createValidContext();
+    const state = { ...contextState, sessionId: 'original-session', totalCost: null };
+    let publish!: (next: TabContextState) => void;
+    const dispose = jest.fn();
+    const loader = jest.fn().mockResolvedValue([]);
+    const modal = new ContextDetailModal({} as App, {
+      conversation, contextState: state, rawMessageLoader: loader,
+      priceSnapshotCost: () => ({ totalCost: 10 }),
+      subscribeToPricingUpdates: (listener) => { publish = listener; return { dispose }; },
+    });
+    modal.onOpen();
+    const rawSection = modal.contentEl.querySelector('.opencodian-context-raw-messages');
+    publish({ ...state, sessionId: 'other-session', totalCost: 99 });
+    expect(modal.contentEl.textContent).not.toContain('$99');
+    publish({ ...state, totalCost: 10 });
+    expect(modal.contentEl.textContent).toContain('$10.00');
+    expect(modal.contentEl.querySelector('.opencodian-context-raw-messages')).toBe(rawSection);
+    expect(loader).toHaveBeenCalledTimes(1);
+    modal.onClose();
+    expect(dispose).toHaveBeenCalledTimes(1);
+    publish({ ...state, totalCost: 20 });
+    expect(modal.contentEl.textContent).toBe('');
   });
 
   it('adds a dedicated modal class so the width can exceed the default Obsidian shell', () => {

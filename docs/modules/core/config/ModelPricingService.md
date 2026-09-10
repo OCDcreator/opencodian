@@ -33,7 +33,8 @@
 | 方法 | 说明 |
 |---|---|
 | `load()` | 只读取本地目录即返回；首次或超过 24 小时会在后台触发自动更新，网络慢或离线都不阻塞插件启动 |
-| `refresh()` | 请求 models.dev、规范化有价格模型并持久化缓存 |
+| `refresh()` | 请求 models.dev、规范化有价格模型并持久化缓存；自动更新与手动调用共享同一个进行中的 Promise，成功或失败后都允许重新请求 |
+| `onCatalogUpdated(listener)` | 目录在内存中可用时通知消费者，返回可 `dispose()` 的订阅；读取本地缓存和网络更新均可触发，不等待磁盘缓存写入 |
 | `getStatus()` / `getCatalogEntry()` | 给设置 UI 展示缓存状态与 provider/model 匹配提示 |
 | `upsertOverride()` / `removeOverride()` | 管理持久化于插件设置的 per-provider/model 覆盖 |
 | `enrichContextUsageSnapshot(snapshot)` | 计算并附加 `totalCost` / `costDetails`，不改变 backend 原始 token 真值 |
@@ -44,6 +45,7 @@
 首次/过期自动更新（或用户手动刷新）
   -> models.dev API
   -> ModelPricingCatalog
+  -> onCatalogUpdated (当前可用内存目录)
   -> StorageService (.opencodian/model-pricing.models-dev.json)
 
 backend token snapshot + modelPricingOverrides
@@ -58,3 +60,5 @@ backend token snapshot + modelPricingOverrides
 - Base URL 只构成计费身份，永不参与 Claude Code 或 Codex 的连接配置；端点精确覆盖的空费率字段会逐类回退 Provider 通用覆盖与 models.dev。
 - 覆盖只影响之后计算的本地估算；已持久化的历史 snapshot 会保留当时的来源与费率说明，目录刷新不会改写历史金额。
 - OpenCode 自身 `opencode.json` 的 `cost` 与它上报的 session cost 仍优先；插件本地表只补足未上报成本的情况。
+- 目录更新先发布内存状态，再持久化；磁盘写入失败仍可用于本次会话估算，但 `refresh()` 会拒绝并允许重试。单个订阅者或诊断日志失败不能阻止其他订阅者和缓存写入。
+- 冷启动目录晚于 token snapshot 到达时，消费者通过订阅补算当前尚不可用的费用；已计价历史保留原值。消费端关闭时必须取消订阅。

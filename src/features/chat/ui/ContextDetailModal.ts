@@ -1,6 +1,6 @@
 import { App, Modal } from 'obsidian';
 
-import type { ContextBreakdownSegment, Conversation, TabContextState } from '../../../core/types';
+import type { ContextBreakdownSegment, ContextUsageSnapshot, Conversation, TabContextState } from '../../../core/types';
 import { getLocale, t } from '../../../i18n';
 import { ContextUsageService } from '../services/ContextUsageService';
 import {
@@ -16,6 +16,7 @@ export interface ContextRawMessageItem {
 }
 
 export type { ContextDetailModalCompactionCoordinator } from './ContextCompactionActionController';
+type SnapshotCost = Pick<ContextUsageSnapshot, 'totalCost' | 'costDetails'>;
 
 export class ContextDetailModal extends Modal {
   private isClosed = false;
@@ -30,6 +31,8 @@ export class ContextDetailModal extends Modal {
       systemPrompt?: string | null;
       rawMessageLoader?: () => Promise<ContextRawMessageItem[]>;
       compactionCoordinator?: ContextDetailModalCompactionCoordinator;
+      subscribeToPricingUpdates?: (listener: (state: TabContextState) => void) => { dispose(): void };
+      priceSnapshotCost?: (state: TabContextState) => SnapshotCost | null;
     },
   ) {
     super(app);
@@ -37,19 +40,35 @@ export class ContextDetailModal extends Modal {
     this.contextState = options.contextState;
     this.systemPrompt = options.systemPrompt;
     this.rawMessageLoader = options.rawMessageLoader;
+    this.subscribeToPricingUpdates = options.subscribeToPricingUpdates;
+    this.priceSnapshotCost = options.priceSnapshotCost;
     this.compactionController = options.compactionCoordinator
       ? new ContextCompactionActionController(options.compactionCoordinator, () => this.isClosed)
       : undefined;
   }
 
   private readonly conversation: Conversation | null;
-  private readonly contextState: TabContextState | null;
+  private contextState: TabContextState | null;
+  private readonly subscribeToPricingUpdates?: (listener: (state: TabContextState) => void) => { dispose(): void };
+  private pricingSubscription?: { dispose(): void };
+  private readonly priceSnapshotCost?: (state: TabContextState) => SnapshotCost | null;
+  private costValueEl: HTMLElement | null = null;
+  private costSourceEl: HTMLElement | null = null;
   private readonly systemPrompt?: string | null;
   private readonly rawMessageLoader?: () => Promise<ContextRawMessageItem[]>;
   private readonly compactionController?: ContextCompactionActionController;
 
   onOpen(): void {
     this.isClosed = false;
+    this.pricingSubscription?.dispose();
+    this.pricingSubscription = this.subscribeToPricingUpdates?.((state) => {
+      if (this.isClosed || !this.contextState || state.sessionId !== this.contextState.sessionId) return;
+      const cost = this.priceSnapshotCost?.(this.contextState);
+      if (!cost) return;
+      this.contextState = { ...this.contextState, totalCost: cost.totalCost, costDetails: cost.costDetails ?? null };
+      this.costValueEl?.setText(ContextUsageService.formatCurrency(cost.totalCost));
+      this.costSourceEl?.setText(this.formatCostDetails());
+    });
     this.compactionController?.dispose();
     this.modalEl.addClass(ContextDetailModal.MODAL_CLASS);
     this.contentEl.addClass(ContextDetailModal.CONTENT_CLASS);
@@ -109,6 +128,10 @@ export class ContextDetailModal extends Modal {
 
   onClose(): void {
     this.isClosed = true;
+    this.pricingSubscription?.dispose();
+    this.pricingSubscription = undefined;
+    this.costValueEl = null;
+    this.costSourceEl = null;
     this.contentEl.empty();
     this.contentEl.removeClass(ContextDetailModal.CONTENT_CLASS);
     this.modalEl.removeClass(ContextDetailModal.MODAL_CLASS);
@@ -151,8 +174,8 @@ export class ContextDetailModal extends Modal {
     this.renderRow(gridEl, t('context.usage.outputTokens'), usageValues.output);
     this.renderRow(gridEl, t('context.usage.reasoningTokens'), usageValues.reasoning);
     this.renderRow(gridEl, t('context.usage.cacheTokens'), usageValues.cache);
-    this.renderRow(gridEl, t('context.usage.cost'), ContextUsageService.formatCurrency(this.contextState?.totalCost));
-    this.renderRow(gridEl, t('context.usage.costSource'), this.formatCostDetails());
+    this.costValueEl = this.renderRow(gridEl, t('context.usage.cost'), ContextUsageService.formatCurrency(this.contextState?.totalCost));
+    this.costSourceEl = this.renderRow(gridEl, t('context.usage.costSource'), this.formatCostDetails());
     this.renderRow(gridEl, t('context.usage.createdAt'), this.formatTimestamp(options.createdAt));
     this.renderRow(gridEl, t('context.usage.lastActivity'), this.formatTimestamp(options.updatedAt));
   }
@@ -230,10 +253,10 @@ export class ContextDetailModal extends Modal {
     };
   }
 
-  private renderRow(containerEl: HTMLElement, label: string, value: string): void {
+  private renderRow(containerEl: HTMLElement, label: string, value: string): HTMLElement {
     const rowEl = containerEl.createDiv({ cls: 'opencodian-context-modal-row' });
     rowEl.createDiv({ cls: 'opencodian-context-modal-label', text: label });
-    rowEl.createDiv({ cls: 'opencodian-context-modal-value', text: value });
+    return rowEl.createDiv({ cls: 'opencodian-context-modal-value', text: value });
   }
 
   private formatOptionalTokenCount(value: number | null): string {

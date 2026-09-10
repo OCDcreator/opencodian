@@ -55,7 +55,7 @@ describe('ClaudeSettingsSourceService platform managed settings', () => {
       const inventory = await service.inventory();
       const managed = inventory.find((candidate) => candidate.origin === 'managed-file');
       expect(managed).toMatchObject({
-        path: managedFile,
+        path: platform === 'win32' ? managedFile : path.normalize(managedFile),
         scope: 'managed',
         format: 'json',
         editable: false,
@@ -63,7 +63,7 @@ describe('ClaudeSettingsSourceService platform managed settings', () => {
       expect(inventory
         .filter((candidate) => candidate.origin.startsWith('managed-plist-'))
         .map((candidate) => candidate.path))
-        .toEqual(plistPaths);
+        .toEqual(plistPaths.map((candidate) => path.resolve(candidate)));
 
       const write = await service.write({
         targetPath: managedFile,

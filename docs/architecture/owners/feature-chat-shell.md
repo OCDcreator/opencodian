@@ -1,5 +1,7 @@
 # Owner: feature.chat-shell
 
+Pricing readiness (2026-09-10): the shell supplies catalog subscription and per-tab billing identity ports; ActiveTabContextUsageCoordinator owns recomputation and listener lifecycle. Details callbacks remain pinned to the originating tab/session.
+
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
 
 - **Layer:** `feature` (may import layers: shared, core, feature)

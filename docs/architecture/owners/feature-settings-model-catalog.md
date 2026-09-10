@@ -1,5 +1,7 @@
 # Owner: feature.settings-model-catalog
 
+Pricing readiness (2026-09-10): the pricing modal subscribes only while open, refreshes catalog metadata and match hints in place, and fences manual-refresh completion against close/reopen so drafts and focus survive background updates.
+
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
 
 - **Layer:** `feature` (may import layers: shared, core, feature)

@@ -1,5 +1,7 @@
 # ChatPluginPort
 
+2026-09-10：定价端口增加 `onCatalogUpdated` 订阅；聊天消费者通过该窄端口接收本地目录就绪信号。
+
 > **源码**: `src/features/chat/ChatPluginPort.ts`
 > **状态**: [REVIEW]
 > **最近更新**: ChatPluginPort slice — 为 `OpenCodianView` 提供 consumer-owned、窄化的插件依赖契约

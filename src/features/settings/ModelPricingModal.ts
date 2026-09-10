@@ -39,6 +39,9 @@ export class ModelPricingModal extends Modal {
   private endpointInputEl: HTMLInputElement | null = null;
   private modelInputEl: HTMLInputElement | null = null;
   private sourceHintEl: HTMLElement | null = null;
+  private catalogStatusEl: HTMLElement | null = null;
+  private catalogSubscription: { dispose(): void } | null = null;
+  private openToken: object | null = null;
   private readonly rateInputs = new Map<PriceField, HTMLInputElement>();
 
   constructor(app: App, private readonly plugin: OpenCodianPlugin) {
@@ -46,22 +49,35 @@ export class ModelPricingModal extends Modal {
   }
 
   onOpen(): void {
+    const openToken = {};
+    this.openToken = openToken;
+    this.catalogSubscription?.dispose();
+    this.catalogSubscription = this.plugin.modelPricingService?.onCatalogUpdated?.(() => {
+      if (this.openToken === openToken) {
+        this.refreshCatalogMetadata();
+      }
+    }) ?? null;
     this.modalEl.addClass('opencodian-model-pricing-modal');
     this.render();
   }
 
   onClose(): void {
+    this.openToken = null;
+    this.catalogSubscription?.dispose();
+    this.catalogSubscription = null;
     this.rateInputs.clear();
     this.providerInputEl = null;
     this.endpointInputEl = null;
     this.modelInputEl = null;
     this.sourceHintEl = null;
+    this.catalogStatusEl = null;
     this.contentEl.empty();
     this.modalEl.removeClass('opencodian-model-pricing-modal');
   }
 
   private render(): void {
     this.contentEl.empty();
+    this.catalogStatusEl = null;
     const service = this.plugin.modelPricingService;
     this.contentEl.createEl('h2', { text: t('settings.cost.modal.title') });
     this.contentEl.createEl('p', {
@@ -77,12 +93,12 @@ export class ModelPricingModal extends Modal {
       return;
     }
 
-    this.renderCatalogStatus(service.getStatus());
+    this.renderCatalogStatus();
     this.renderOverrideEditor();
     this.renderOverrides();
   }
 
-  private renderCatalogStatus(status: { fetchedAt: number | null; entryCount: number }): void {
+  private renderCatalogStatus(): void {
     const sectionEl = this.contentEl.createDiv({ cls: 'opencodian-model-pricing-section' });
     const headerEl = sectionEl.createDiv({ cls: 'opencodian-model-pricing-section-header' });
     headerEl.createEl('h3', { text: t('settings.cost.catalog.title') });
@@ -95,7 +111,18 @@ export class ModelPricingModal extends Modal {
       void this.refreshCatalog(refreshButtonEl);
     });
 
-    const statusEl = sectionEl.createDiv({ cls: 'opencodian-model-pricing-status' });
+    this.catalogStatusEl = sectionEl.createDiv({ cls: 'opencodian-model-pricing-status' });
+    this.refreshCatalogMetadata();
+  }
+
+  private refreshCatalogMetadata(): void {
+    const service = this.plugin.modelPricingService;
+    const statusEl = this.catalogStatusEl;
+    if (!service || !statusEl) {
+      return;
+    }
+    const status = service.getStatus();
+    statusEl.empty();
     statusEl.createDiv({
       text: t('settings.cost.catalog.source', { source: 'models.dev' }),
     });
@@ -105,6 +132,7 @@ export class ModelPricingModal extends Modal {
     statusEl.createDiv({
       text: t('settings.cost.catalog.entryCount', { count: String(status.entryCount) }),
     });
+    this.refreshSourceHint();
   }
 
   private renderOverrideEditor(): void {
@@ -273,19 +301,26 @@ export class ModelPricingModal extends Modal {
 
   private async refreshCatalog(buttonEl: HTMLButtonElement): Promise<void> {
     const service = this.plugin.modelPricingService;
-    if (!service) {
+    const openToken = this.openToken;
+    if (!service || !openToken) {
       return;
     }
     buttonEl.disabled = true;
     buttonEl.setText(t('settings.cost.catalog.refreshing'));
     try {
       await service.refresh();
-      this.editingOverride = null;
-      this.render();
+      if (this.openToken === openToken) {
+        this.refreshCatalogMetadata();
+      }
     } catch {
-      new Notice(t('settings.cost.catalog.refreshFailed'));
-      buttonEl.disabled = false;
-      buttonEl.setText(t('settings.cost.catalog.refresh'));
+      if (this.openToken === openToken) {
+        new Notice(t('settings.cost.catalog.refreshFailed'));
+      }
+    } finally {
+      if (this.openToken === openToken) {
+        buttonEl.disabled = false;
+        buttonEl.setText(t('settings.cost.catalog.refresh'));
+      }
     }
   }
 

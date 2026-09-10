@@ -51,6 +51,7 @@
 
 ## 注意事项
 
+- history 的 lexical `lstat` / descriptor `stat` 使用 `{ bigint: true }`，token 中 `dev` / `ino` 保存为严格非负十进制字符串。Windows NTFS 文件 ID 可超过 `Number.MAX_SAFE_INTEGER`，不得先转为 Number 再验证或比较；这既避免合法恢复随机失败，也避免相邻大整数 inode 被舍入为同一 identity。token 是每次 catalog 派生的选择凭据，旧数字型 token 需重新列出 history，归档 manifest/文件不迁移。
 - mutation 归档操作（archiveOverwrite/archiveDeleted）**抛出**以中止 mutation；`clearDeleted` 是**永不抛出**的类型化 API——两者契约刻意不同且诚实。
 - `readLatestDeletedContent` 返回原始内容；调用方（`safeRestoreFile`）在写入前用 `archive.format` 校验。
 - `readHistoryEntryContent` 同样只返回经 archive 完整性验证的原始 bytes；selected restore 的格式校验、expectedRevision、archive-current-before-replace 与安全 commit 仍由 `ProjectResourceSecureWrite` 统一拥有。

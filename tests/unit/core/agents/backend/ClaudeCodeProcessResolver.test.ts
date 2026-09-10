@@ -1,7 +1,21 @@
 import { resolveClaudeCodeProcess } from '../../../../../src/core/agents/backend';
 import { getDefaultClaudeCodeBackendSettings } from '../../../../../src/core/types';
 
+jest.mock('path', () => {
+  const actual = jest.requireActual<typeof import('path')>('path');
+  let pathApi = actual.posix;
+  return {
+    ...actual,
+    setPlatform: (platform: 'posix' | 'win32') => { pathApi = actual[platform]; },
+    join: (...parts: string[]) => pathApi.join(...parts),
+    isAbsolute: (candidate: string) => pathApi.isAbsolute(candidate),
+    extname: (candidate: string) => pathApi.extname(candidate),
+    get delimiter() { return pathApi.delimiter; },
+  };
+});
+
 describe('ClaudeCodeProcessResolver', () => {
+  beforeEach(() => { jest.requireMock('path').setPlatform('posix'); });
   it('discovers the external Claude CLI from the augmented PATH by default', () => {
     const resolution = resolveClaudeCodeProcess({
       settings: getDefaultClaudeCodeBackendSettings(),
@@ -79,6 +93,7 @@ describe('ClaudeCodeProcessResolver', () => {
   });
 
   it('resolves the default Windows npm wrapper from augmented PATH and uses shell for cmd files', () => {
+    jest.requireMock('path').setPlatform('win32');
     const resolution = resolveClaudeCodeProcess({
       settings: {
         ...getDefaultClaudeCodeBackendSettings(),
@@ -89,11 +104,11 @@ describe('ClaudeCodeProcessResolver', () => {
         APPDATA: 'C:\\Users\\test\\AppData\\Roaming',
         USERPROFILE: 'C:\\Users\\test',
       },
-      existsSync: (candidate) => candidate === 'C:\\Users\\test\\AppData\\Roaming/npm/claude.cmd',
+      existsSync: (candidate) => candidate === 'C:\\Users\\test\\AppData\\Roaming\\npm\\claude.cmd',
     });
 
     expect(resolution.mode).toBe('external');
-    expect(resolution.pathToClaudeCodeExecutable).toBe('C:\\Users\\test\\AppData\\Roaming/npm/claude.cmd');
+    expect(resolution.pathToClaudeCodeExecutable).toBe('C:\\Users\\test\\AppData\\Roaming\\npm\\claude.cmd');
     expect(resolution.shell).toBe(true);
   });
 

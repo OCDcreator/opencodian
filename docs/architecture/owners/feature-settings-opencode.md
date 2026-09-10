@@ -1,5 +1,7 @@
 # Owner: feature.settings-opencode
 
+Pricing readiness (2026-09-10): CostEstimateSettingsRow can refresh backend-specific catalog descriptions without reconstructing settings controls; subscription ownership remains in the settings shell.
+
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
 
 - **Layer:** `feature` (may import layers: shared, core, feature)

@@ -2078,15 +2078,22 @@ export class OpenCodianView extends ItemView {
         return adapter.compactForegroundThread(sessionId, options);
       },
       hasTab: (tabId) => Boolean(this.tabManager?.getTab(tabId)),
+      getContextUsageTabIds: () => this.tabManager?.getAllTabs().map((tab) => tab.id) ?? [],
+      onPricingCatalogUpdated: (listener) => this.plugin.modelPricingService?.onCatalogUpdated(listener),
       getTabContextUsage: (tabId) => this.tabManager?.getTabContextUsage(tabId) ?? null,
       setTabContextUsage: (tabId, contextUsage) => {
         this.tabManager?.setTabContextUsage(tabId, contextUsage);
       },
       getActiveTabId: () => this.getActiveTabId(),
       openContextUsageDetailsModal: (contextState) => {
+        const detailTabId = this.getActiveTabId();
         new ContextDetailModal(this.app, {
           conversation: this.currentConversation,
           contextState,
+          priceSnapshotCost: (state) => this.activeTabContextUsageCoordinator.priceSnapshotCost(detailTabId, state),
+          subscribeToPricingUpdates: (listener) => this.activeTabContextUsageCoordinator.onPricingUpdated((tabId, state) => {
+            if (tabId === detailTabId && state.sessionId === contextState?.sessionId) listener(state);
+          }),
           systemPrompt: this.plugin.settings.systemPrompt,
           rawMessageLoader: () => {
             const conversation = this.currentConversation;
@@ -2118,9 +2125,9 @@ export class OpenCodianView extends ItemView {
         conversation.lastContextUsage = snapshot;
         await this.plugin.saveConversation(conversation);
       },
-      enrichContextUsageSnapshot: (snapshot) => {
+      enrichContextUsageSnapshot: (snapshot, tabId) => {
         const service = this.plugin.modelPricingService;
-        const backend = this.currentConversation?.backend ?? 'opencode';
+        const backend = this.getConversationForTab(tabId ?? this.getActiveTabId())?.backend ?? 'opencode';
         return service?.enrichContextUsageSnapshot(
           snapshot,
           service.getBackendPricingIdentityHint(backend, this.plugin.settings.backendSettings),
@@ -2602,6 +2609,7 @@ export class OpenCodianView extends ItemView {
   }
 
   async onOpen() {
+    this.activeTabContextUsageCoordinator.connectPricingUpdates();
     const startedAt = getPerformanceTimestampMs();
     const stepSummaries: string[] = [];
     const measureStep = async <T>(step: string, operation: () => Promise<T> | T): Promise<T> => {
@@ -2667,6 +2675,7 @@ export class OpenCodianView extends ItemView {
   }
 
   async onClose() {
+    this.activeTabContextUsageCoordinator.dispose();
     this.plugin.unregisterConversationCachePinProvider(this.conversationCachePinProvider);
     this.persistTabState({ flush: true });
     this.clearSlashCommandMenuPreload();

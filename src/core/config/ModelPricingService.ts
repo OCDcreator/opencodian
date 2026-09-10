@@ -1,5 +1,6 @@
 import { requestUrl } from 'obsidian';
 
+import { createLogger } from '../../shared/logger';
 import type { StorageService } from '../storage';
 import type { BackendSettings, ContextUsageSnapshot } from '../types';
 import type { AgentBackendKind } from '../types/chat';
@@ -14,6 +15,7 @@ import type {
 
 const MODELS_DEV_CATALOG_URL = 'https://models.dev/api.json';
 const AUTO_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const logger = createLogger('ModelPricingService');
 
 type JsonRecord = Record<string, unknown>;
 
@@ -137,35 +139,11 @@ function inferProviderId(modelId: string | null): string | null {
   return null;
 }
 
-function buildUnavailableCostDetails(
-  providerId: string | null,
-  endpoint: string | null,
-  modelId: string | null,
-): ContextCostDetails {
+function buildUnpricedCostDetails(identity: PricingIdentity, source: 'unavailable' | 'backend-reported'): ContextCostDetails {
   return {
-    source: 'unavailable',
-    completeness: 'unavailable',
-    providerId,
-    endpoint,
-    modelId,
-    rates: null,
-    catalogFetchedAt: null,
-    usesBaseTier: false,
-    unavailableTokenKinds: [],
-  };
-}
-
-function buildBackendReportedCostDetails(
-  providerId: string | null,
-  endpoint: string | null,
-  modelId: string | null,
-): ContextCostDetails {
-  return {
-    source: 'backend-reported',
-    completeness: 'complete',
-    providerId,
-    endpoint,
-    modelId,
+    ...identity,
+    source,
+    completeness: source === 'backend-reported' ? 'complete' : 'unavailable',
     rates: null,
     catalogFetchedAt: null,
     usesBaseTier: false,
@@ -202,11 +180,16 @@ function addPricedTokens(
  */
 export class ModelPricingService {
   private catalog: ModelPricingCatalog | null = null;
+  private refreshPromise: Promise<ModelPricingStatus> | null = null;
+  private readonly catalogListeners = new Set<() => void>();
 
   constructor(private readonly options: ModelPricingServiceOptions) {}
 
   async load(): Promise<void> {
     this.catalog = await this.options.storage.loadModelPricingCatalog();
+    if (this.catalog) {
+      this.notifyCatalogUpdated();
+    }
     if (!this.shouldAutoRefresh()) {
       return;
     }
@@ -217,6 +200,12 @@ export class ModelPricingService {
       // Cost estimates stay optional: an offline startup retains a stale cache
       // or shows unavailable pricing instead of failing plugin initialization.
     });
+  }
+
+  /** Announces usable in-memory pricing, independently of cache persistence. */
+  onCatalogUpdated(listener: () => void): { dispose(): void } {
+    this.catalogListeners.add(listener);
+    return { dispose: () => { this.catalogListeners.delete(listener); } };
   }
 
   getStatus(): ModelPricingStatus {
@@ -313,7 +302,16 @@ export class ModelPricingService {
     );
   }
 
-  async refresh(): Promise<ModelPricingStatus> {
+  refresh(): Promise<ModelPricingStatus> {
+    // Startup and manual refreshes share the entire fetch/save operation, so an
+    // older response cannot later replace the catalog another caller awaited.
+    this.refreshPromise ??= this.refreshCatalog().finally(() => {
+      this.refreshPromise = null;
+    });
+    return this.refreshPromise;
+  }
+
+  private async refreshCatalog(): Promise<ModelPricingStatus> {
     const payload = await (this.options.fetchCatalog ?? this.fetchCatalog)();
     const catalog: ModelPricingCatalog = {
       schemaVersion: 1,
@@ -321,8 +319,23 @@ export class ModelPricingService {
       entries: this.parseCatalog(payload),
     };
     this.catalog = catalog;
+    this.notifyCatalogUpdated();
     await this.options.storage.saveModelPricingCatalog(catalog);
     return this.getStatus();
+  }
+
+  private notifyCatalogUpdated(): void {
+    for (const listener of [...this.catalogListeners]) {
+      try {
+        listener();
+      } catch (error) {
+        try {
+          logger.warn('Pricing catalog listener failed', error);
+        } catch {
+          // Diagnostics must not interrupt another consumer or cache saving.
+        }
+      }
+    }
   }
 
   enrichContextUsageSnapshot(
@@ -333,11 +346,7 @@ export class ModelPricingService {
     if (this.hasBackendReportedCost(snapshot)) {
       return {
         ...snapshot,
-        costDetails: snapshot.costDetails ?? buildBackendReportedCostDetails(
-          identity.providerId,
-          identity.endpoint,
-          identity.modelId,
-        ),
+        costDetails: snapshot.costDetails ?? buildUnpricedCostDetails(identity, 'backend-reported'),
       };
     }
 
@@ -422,7 +431,7 @@ export class ModelPricingService {
       return {
         ...snapshot,
         totalCost: null,
-        costDetails: buildUnavailableCostDetails(identity.providerId, identity.endpoint, identity.modelId),
+        costDetails: buildUnpricedCostDetails(identity, 'unavailable'),
       };
     }
 

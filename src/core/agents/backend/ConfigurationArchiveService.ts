@@ -29,7 +29,7 @@
  */
 /* eslint-disable max-lines -- Cohesive high-risk archive owner (confined layout, manifest integrity, retention, atomic I/O, honest clear). Splitting would scatter the security boundary. */
 import { createHash, randomBytes } from 'node:crypto';
-import { constants, type Dirent, type Stats } from 'node:fs';
+import { type BigIntStats, constants, type Dirent } from 'node:fs';
 import { link, lstat, mkdir, open, readdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises';
 import * as path from 'node:path';
 
@@ -163,8 +163,8 @@ interface ArchiveEntryPreflight {
 }
 
 interface ArchiveHistoryFileState {
-  readonly dev: number;
-  readonly ino: number;
+  readonly dev: string;
+  readonly ino: string;
   readonly mode: number;
   readonly size: number;
   readonly mtimeMs: number;
@@ -279,15 +279,16 @@ function archiveEntriesMatch(a: ArchiveEntry, b: ArchiveEntry): boolean {
     && a.size === b.size;
 }
 
-function archiveHistoryFileState(stats: Stats): ArchiveHistoryFileState {
+function archiveHistoryFileState(stats: BigIntStats): ArchiveHistoryFileState {
   return {
-    dev: stats.dev,
-    ino: stats.ino,
-    mode: stats.mode,
-    size: stats.size,
-    mtimeMs: stats.mtimeMs,
-    ctimeMs: stats.ctimeMs,
-    birthtimeMs: stats.birthtimeMs,
+    // NTFS file IDs may exceed 2^53: never round them through Number.
+    dev: stats.dev.toString(),
+    ino: stats.ino.toString(),
+    mode: Number(stats.mode),
+    size: Number(stats.size),
+    mtimeMs: Number(stats.mtimeNs) / 1e6,
+    ctimeMs: Number(stats.ctimeNs) / 1e6,
+    birthtimeMs: Number(stats.birthtimeNs) / 1e6,
   };
 }
 
@@ -295,7 +296,7 @@ function archiveHistoryDescriptorIdentityMatches(
   a: ArchiveHistoryFileState,
   b: ArchiveHistoryFileState,
 ): boolean {
-  const inodeIdentityAvailable = a.dev !== 0 || b.dev !== 0 || a.ino !== 0 || b.ino !== 0;
+  const inodeIdentityAvailable = a.dev !== '0' || b.dev !== '0' || a.ino !== '0' || b.ino !== '0';
   if (inodeIdentityAvailable) return a.dev === b.dev && a.ino === b.ino;
   return a.birthtimeMs === b.birthtimeMs
     && a.ctimeMs === b.ctimeMs
@@ -316,13 +317,14 @@ function archiveHistoryDescriptorStateMatches(
 
 function decodeArchiveHistoryFileState(value: unknown): ArchiveHistoryFileState | null {
   if (!isPlainObject(value)) return null;
-  const integerFields = [value.dev, value.ino, value.mode];
-  if (integerFields.some((field) => !Number.isSafeInteger(field) || (field as number) < 0)) return null;
+  const identityFields = [value.dev, value.ino];
+  if (identityFields.some((field) => typeof field !== 'string' || !/^(0|[1-9]\d{0,19})$/.test(field))) return null;
+  if (!Number.isSafeInteger(value.mode) || (value.mode as number) < 0) return null;
   const numericFields = [value.size, value.mtimeMs, value.ctimeMs, value.birthtimeMs];
   if (numericFields.some((field) => typeof field !== 'number' || !Number.isFinite(field) || field < 0)) return null;
   return {
-    dev: value.dev as number,
-    ino: value.ino as number,
+    dev: value.dev as string,
+    ino: value.ino as string,
     mode: value.mode as number,
     size: value.size as number,
     mtimeMs: value.mtimeMs as number,
@@ -914,7 +916,7 @@ export class ConfigurationArchiveService {
     let handle: Awaited<ReturnType<typeof open>> | undefined;
     try {
       await this.confinedPath(lexicalEntryPath);
-      const initialLexicalStats = await lstat(lexicalEntryPath);
+      const initialLexicalStats = await lstat(lexicalEntryPath, { bigint: true });
       if (initialLexicalStats.isSymbolicLink() || !initialLexicalStats.isFile()) {
         return { status: 'invalid', reason: `${entry.fileName}: archive entry is not a regular lexical file` };
       }
@@ -927,12 +929,12 @@ export class ConfigurationArchiveService {
         handle = await open(lexicalEntryPath, constants.O_RDONLY);
       }
 
-      const beforeReadStats = await handle.stat();
+      const beforeReadStats = await handle.stat({ bigint: true });
       if (!beforeReadStats.isFile()) {
         return { status: 'invalid', reason: `${entry.fileName}: opened archive entry is not a regular file` };
       }
       await this.confinedPath(lexicalEntryPath);
-      const beforeReadLexicalStats = await lstat(lexicalEntryPath);
+      const beforeReadLexicalStats = await lstat(lexicalEntryPath, { bigint: true });
       if (beforeReadLexicalStats.isSymbolicLink() || !beforeReadLexicalStats.isFile()) {
         return { status: 'invalid', reason: `${entry.fileName}: archive entry changed type before descriptor read` };
       }
@@ -953,7 +955,7 @@ export class ConfigurationArchiveService {
       }
 
       const contentBuffer = await handle.readFile();
-      const afterReadStats = await handle.stat();
+      const afterReadStats = await handle.stat({ bigint: true });
       const afterReadState = archiveHistoryFileState(afterReadStats);
       if (!afterReadStats.isFile() || !archiveHistoryDescriptorStateMatches(beforeReadState, afterReadState)) {
         return { status: 'invalid', reason: `${entry.fileName}: archive entry descriptor changed during read` };
@@ -964,7 +966,7 @@ export class ConfigurationArchiveService {
       }
 
       await this.confinedPath(lexicalEntryPath);
-      const afterReadLexicalStats = await lstat(lexicalEntryPath);
+      const afterReadLexicalStats = await lstat(lexicalEntryPath, { bigint: true });
       if (afterReadLexicalStats.isSymbolicLink() || !afterReadLexicalStats.isFile()) {
         return { status: 'invalid', reason: `${entry.fileName}: archive entry changed type during descriptor read` };
       }

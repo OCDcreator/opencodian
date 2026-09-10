@@ -1,5 +1,7 @@
 # ActiveTabContextUsageCoordinator
 
+2026-09-10：`connectPricingUpdates()` 订阅目录更新并立即补算已经存在的无金额状态；`syncIdentity()` 同样补算之后恢复的无金额快照，覆盖目录早于 view/restore 的时序。只更新 live tab 的缺失费用，保留已有金额（含零）、token ledger 和活动时间；后台标签页使用自身 tab ID 解析计费身份。`onPricingUpdated()` 向固定 tab/session 的详情弹窗推送结果。`dispose()` 取消订阅和计时器，并提交尚未写入的最后快照。
+
 > **源码**: `src/features/chat/services/ActiveTabContextUsageCoordinator.ts`
 > **状态**: [REVIEW]
 

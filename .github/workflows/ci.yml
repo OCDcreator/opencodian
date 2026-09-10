@@ -8,6 +8,25 @@ permissions:
   contents: read
 
 jobs:
+  desktop-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Test desktop paths, process boundaries, and filesystem identities
+        run: npm test
+
   # Architecture gates use the same unified scope in local verify, pre-push,
   # PR and push. The base ref is resolved from the GitHub event: for a PR it is
   # the PR base ref; for a push it is the event 'before' SHA (the previous tip),

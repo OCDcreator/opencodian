@@ -1,15 +1,25 @@
 import { EventEmitter } from 'node:events';
+import * as path from 'node:path';
 import { PassThrough } from 'node:stream';
 
 import { PiRpcClient, resolvePiCommand } from '../../../../../../src/core/agents/backend/pi/PiRpcClient';
 
 const mockSpawn = jest.fn();
 jest.mock('node:child_process', () => ({ spawn: (...args: unknown[]) => mockSpawn(...args) }));
-jest.mock('node:fs', () => ({
-  existsSync: (file: string) => ['/bin/pi', '/bin/node', '/pkg/dist/cli.js', '/pkg/dist/index.js', '/plugin/assets/pi/service.mjs'].includes(file),
-  realpathSync: () => '/pkg/dist/cli.js',
-  readFileSync: (file: string) => { if (file !== '/pkg/package.json') throw new Error('ENOENT'); return '{"name":"@mariozechner/pi-coding-agent","bin":{"pi":"dist/cli.js"}}'; },
-}));
+jest.mock('node:fs', () => {
+  const nativePath = jest.requireActual<typeof import('node:path')>('node:path');
+  const nodeName = process.platform === 'win32' ? 'node.exe' : 'node';
+  const files = ['/bin/pi', `/bin/${nodeName}`, '/pkg/dist/cli.js', '/pkg/dist/index.js', '/plugin/assets/pi/service.mjs']
+    .map((file) => nativePath.resolve(file));
+  return {
+    existsSync: (file: string) => files.includes(file),
+    realpathSync: () => nativePath.resolve('/pkg/dist/cli.js'),
+    readFileSync: (file: string) => {
+      if (file !== nativePath.resolve('/pkg/package.json')) throw new Error('ENOENT');
+      return '{"name":"@mariozechner/pi-coding-agent","bin":{"pi":"dist/cli.js"}}';
+    },
+  };
+});
 
 describe('Pi RPC process boundary', () => {
   let process: EventEmitter & { stdin: PassThrough; stdout: PassThrough; stderr: PassThrough; kill: jest.Mock; exitCode: number | null };
@@ -23,14 +33,15 @@ describe('Pi RPC process boundary', () => {
     process.kill.mockImplementation(() => { process.exitCode = 0; process.emit('exit', 0, null); return true; });
     process.stdin.on('data', (buffer: Buffer) => commands.push(JSON.parse(buffer.toString())));
     mockSpawn.mockReturnValue(process);
-    client = new PiRpcClient({ workingDirectory: '/vault with spaces', executablePath: '/bin/pi', sessionDirectory: '/sessions', servicePath: '/plugin/assets/pi/service.mjs' });
+    client = new PiRpcClient({ workingDirectory: '/vault with spaces', executablePath: path.resolve('/bin/pi'), sessionDirectory: '/sessions', servicePath: path.resolve('/plugin/assets/pi/service.mjs') });
   });
 
-  afterEach(() => { client.close(); jest.useRealTimers(); });
+  afterEach(() => { client?.close(); jest.useRealTimers(); });
 
   it('uses an external Node process with shell disabled and keeps arguments separate', () => {
-    expect(resolvePiCommand('/bin/pi')).toEqual({ command: '/bin/node', prefix: ['/pkg/dist/cli.js'] });
-    expect(mockSpawn).toHaveBeenLastCalledWith('/bin/node', ['/plugin/assets/pi/service.mjs', '/pkg/dist/index.js', expect.any(String)], expect.objectContaining({ shell: false, cwd: '/vault with spaces' }));
+    const nodePath = path.resolve('/bin', globalThis.process.platform === 'win32' ? 'node.exe' : 'node');
+    expect(resolvePiCommand(path.resolve('/bin/pi'))).toEqual({ command: nodePath, prefix: [path.resolve('/pkg/dist/cli.js')] });
+    expect(mockSpawn).toHaveBeenLastCalledWith(nodePath, [path.resolve('/plugin/assets/pi/service.mjs'), path.resolve('/pkg/dist/index.js'), expect.any(String)], expect.objectContaining({ shell: false, cwd: '/vault with spaces' }));
   });
 
   it('correlates concurrent responses and preserves UTF-8 and Unicode line separators', async () => {

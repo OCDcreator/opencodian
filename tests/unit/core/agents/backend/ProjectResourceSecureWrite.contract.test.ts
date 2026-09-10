@@ -32,6 +32,8 @@ import {
   validateConfigurationContent,
 } from '../../../../../src/core/agents/backend/ProjectResourceSecureWrite';
 
+jest.mock('node:fs/promises', () => ({ ...jest.requireActual('node:fs/promises') }));
+
 function tmpDir(prefix: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
@@ -54,7 +56,6 @@ function computeFileRevisionSync(target: string): FileRevision | null {
 const sha = (s: string): string => createHash('sha256').update(s, 'utf8').digest('hex');
 
 const ARCHIVE = { backend: 'test', kind: 'config', format: 'json' as const };
-const isRoot = typeof process.getuid === 'function' && process.getuid() === 0;
 
 describe('assertWithinAllowlistedRoot — multi-root + escape protection', () => {
   let globalRoot: string;
@@ -538,9 +539,9 @@ describe('clearDeletedArchives — honest typed contract', () => {
     await safeDeleteFile({ targetPath: target, expectedRevision: rev(target), allowlist, archive: { ...ARCHIVE, archiveRootPath: archiveRoot } });
     const deletedDir = findDir(archiveRoot, 'deleted');
     expect(deletedDir).not.toBeNull();
+    const nativeFs = jest.requireMock<typeof import('node:fs/promises')>('node:fs/promises');
+    const removeSpy = jest.spyOn(nativeFs, 'rm').mockRejectedValue(Object.assign(new Error('denied'), { code: 'EACCES' }));
     try {
-      fs.chmodSync(deletedDir as string, 0o555); // physical removal fails; manifest commit (in hashDir) still works
-      if (isRoot) return; // chmod ineffective as root
       const result = await clearDeletedArchives({ archiveRootPath: archiveRoot, backend: 'test' });
       expect(result.ok).toBe(false);
       const failed = result as { cleared: number; orphanedFiles: readonly unknown[]; manifestWriteFailed: boolean };
@@ -548,8 +549,10 @@ describe('clearDeletedArchives — honest typed contract', () => {
       expect(failed.cleared).toBe(0);
       expect(failed.orphanedFiles.length).toBe(1);
       expect(failed.manifestWriteFailed).toBe(false);
+      expect(removeSpy).toHaveBeenCalled();
+      expect(fs.readdirSync(deletedDir as string)).toHaveLength(1);
     } finally {
-      fs.chmodSync(deletedDir as string, 0o755);
+      removeSpy.mockRestore();
     }
   });
 
@@ -559,16 +562,20 @@ describe('clearDeletedArchives — honest typed contract', () => {
     await safeDeleteFile({ targetPath: target, expectedRevision: rev(target), allowlist, archive: { ...ARCHIVE, archiveRootPath: archiveRoot } });
     const hashDir = findHashDir(archiveRoot);
     expect(hashDir).not.toBeNull();
+    const manifestPath = path.join(hashDir as string, 'manifest.json');
+    const manifestBefore = fs.readFileSync(manifestPath, 'utf8');
+    const nativeFs = jest.requireMock<typeof import('node:fs/promises')>('node:fs/promises');
+    const writeSpy = jest.spyOn(nativeFs, 'writeFile').mockRejectedValue(Object.assign(new Error('denied'), { code: 'EACCES' }));
     try {
-      fs.chmodSync(hashDir as string, 0o555); // manifest temp+rename fails
-      if (isRoot) return;
       const result = await clearDeletedArchives({ archiveRootPath: archiveRoot, backend: 'test' });
       expect(result.ok).toBe(false);
       const failed = result as { cleared: number; manifestWriteFailed: boolean };
       expect(failed.cleared).toBe(0);
       expect(failed.manifestWriteFailed).toBe(true);
+      expect(writeSpy).toHaveBeenCalled();
+      expect(fs.readFileSync(manifestPath, 'utf8')).toBe(manifestBefore);
     } finally {
-      fs.chmodSync(hashDir as string, 0o755);
+      writeSpy.mockRestore();
     }
   });
 });

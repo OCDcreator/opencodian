@@ -18,6 +18,8 @@ import * as path from 'path';
 
 import { ClaudeSettingsSourceService } from '../../../../../src/core/agents/backend/ClaudeSettingsSourceService';
 
+jest.mock('node:fs/promises', () => ({ ...jest.requireActual('node:fs/promises') }));
+
 const sha256 = (s: string): string => createHash('sha256').update(s, 'utf8').digest('hex');
 
 const VALID_EVIDENCE_STATUS = new Set([
@@ -187,26 +189,32 @@ describe('ClaudeSettingsSourceService inventory', () => {
     await fs.mkdir(home, { recursive: true });
     await fs.mkdir(vault, { recursive: true });
 
-    // A single path component longer than NAME_MAX (255) raises ENAMETOOLONG
-    // on macOS — a non-ENOENT root error that must fail closed instead of
-    // masquerading as a benign absent source.
-    const overlongManagedDir = path.join(sandbox, 'x'.repeat(300));
-    const managedPath = path.join(overlongManagedDir, 'managed-settings.json');
+    const managedDir = path.join(sandbox, 'unreadable-managed');
+    const managedPath = path.join(managedDir, 'managed-settings.json');
+    const nativeFs = jest.requireMock<typeof import('node:fs/promises')>('node:fs/promises');
+    const realStat = nativeFs.stat;
+    const statSpy = jest.spyOn(nativeFs, 'stat').mockImplementation((...args) => {
+      if (args[0] === managedDir) return Promise.reject(Object.assign(new Error('denied'), { code: 'EACCES' }));
+      return Reflect.apply(realStat, nativeFs, args);
+    });
 
-    const inventory = (await new ClaudeSettingsSourceService(vault, {
-      home,
-      managedConfigDir: overlongManagedDir,
-    }).inventory()) as Candidate[];
+    try {
+      const inventory = (await new ClaudeSettingsSourceService(vault, {
+        home,
+        managedConfigDir: managedDir,
+      }).inventory()) as Candidate[];
 
-    const managed = findManagedBase(inventory, managedPath);
-    expect(managed).toBeDefined();
-    expect(managed!.exists).toBe(false);
-    expect(managed!.revision).toBeNull();
-    // A real I/O failure is not a missing source: persistence must be 'failed',
-    // never 'not-applicable'.
-    expect(managed!.evidence.persistence).toBe('failed');
-    expect(managed!.evidence.runtime).not.toBe('verified');
-
-    await fs.rm(sandbox, { recursive: true, force: true });
+      const managed = findManagedBase(inventory, managedPath);
+      expect(managed).toBeDefined();
+      expect(managed!.exists).toBe(false);
+      expect(managed!.revision).toBeNull();
+      // A real I/O failure is not a missing source: persistence must be 'failed',
+      // never 'not-applicable'.
+      expect(managed!.evidence.persistence).toBe('failed');
+      expect(managed!.evidence.runtime).not.toBe('verified');
+    } finally {
+      statSpy.mockRestore();
+      await fs.rm(sandbox, { recursive: true, force: true });
+    }
   });
 });

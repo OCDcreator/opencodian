@@ -1,5 +1,13 @@
 # 测试框架
 
+## Windows 与异步价格回归（2026-09-10）
+
+- CI 增加 Windows/macOS、Node 24 全量测试矩阵；Ubuntu 原有验证链保留。远端执行结果须以实际 CI run 为准。
+- 模拟平台的 CLI resolver 测试同时选择对应的 path API；原生路径断言使用 `path.join`，进程边界以 mock 提供 Node/Pi 路径与 taskkill 完成事件。
+- 权限失败通过文件系统调用注入 EACCES/EPERM，避免依赖 Windows 不支持的 POSIX chmod 行为或 root 权限差异。配置测试使用隔离临时 vault/home。
+- 归档身份回归使用超过 2^53 的 bigint inode，并验证相邻大整数不会混同。
+- 价格回归覆盖共享刷新 Promise、失败后重试、保存失败后的内存通知、草稿和焦点保留、所有 live tab 的缺失金额补算、迟到订阅、恢复快照、固定会话详情以及关闭清理。
+
 > **源码**: `jest.config.js`, `tests/setup.ts`, `tests/__mocks__/`
 > **状态**: [REVIEW]
 

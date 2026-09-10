@@ -11,6 +11,12 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-10 v1.1.20 异步价格就绪同步与桌面平台验证修复
+
+- 自动与手动价格刷新共用进行中的请求；目录就绪通知聊天和设置消费者，当前缺失费用按各 tab 的计费身份补算，已有历史金额保持不变。价格弹窗原位更新目录状态，保留输入和焦点；费用详情固定原 tab/session，关闭时释放订阅。
+- 修复 Windows NTFS 大 inode 被 Number 舍入、导致归档历史恢复拒绝合法身份的问题：使用 bigint stat 和十进制字符串，并增加大整数及碰撞拒绝回归。
+- 清理 Windows 测试中的 Unix 路径、chmod、真实用户目录和未完成 taskkill mock 假设；CI 增加 Windows/macOS 全量测试矩阵。修改前本机干净 HEAD 实测为 15 个失败套件、29 个失败测试，包含 settings 和 opencode/config，不能统称为本机 CLI 环境问题。
+
 ## 2026-09-10 启动阻塞修复：价格目录自动更新转后台
 
 - 实测启动报告中 OpenCodian onload 耗时 4.2s，启动性能快照显示 `loadModelPricingCatalog` 占 3.49s（95%）：目录缺失或超过 24 小时时，`load()` 会在 onload 内同步 `await` 拉取数 MB 的 models.dev 目录，网络慢即阻塞整个插件加载。

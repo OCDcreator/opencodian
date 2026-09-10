@@ -3,6 +3,7 @@ import { Modal, Setting } from 'obsidian';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import {
   type CostEstimateBackend,
+  refreshCostEstimateSettingsRows,
   renderCostEstimateSettingsRow,
 } from '../../../../src/features/settings/CostEstimateSettingsRow';
 import { setLocale, t } from '../../../../src/i18n';
@@ -48,6 +49,29 @@ describe('renderCostEstimateSettingsRow', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  it('refreshes only catalog descriptions while keeping the existing controls', () => {
+    (Setting.prototype.setDesc as jest.Mock).mockImplementation(function (this: Setting, value: string) {
+      const description = document.createElement('div');
+      description.className = 'setting-item-description';
+      description.textContent = value;
+      this.settingEl.appendChild(description);
+      return this;
+    });
+    let fetchedAt: number | null = null;
+    const plugin = {
+      app: {}, settings: DEFAULT_SETTINGS,
+      modelPricingService: { getStatus: () => ({ fetchedAt, entryCount: fetchedAt ? 3 : 0 }) },
+    } as unknown as OpenCodianPlugin;
+    const container = document.createElement('div');
+    renderCostEstimateSettingsRow(container, plugin, 'opencode');
+    const control = container.querySelector('.setting-item-control');
+    expect(container.textContent).toContain(t('settings.cost.row.catalogMissing'));
+    fetchedAt = 100;
+    refreshCostEstimateSettingsRows(container, plugin);
+    expect(container.textContent).toContain(t('settings.cost.row.catalogReady', { count: '3' }));
+    expect(container.querySelector('.setting-item-control')).toBe(control);
   });
 
   it('exposes the shared management entry from OpenCode, Claude Code, and Codex settings with backend-specific disclosure', () => {

@@ -99,7 +99,9 @@ export interface ActiveTabContextUsageCoordinatorHost {
   openContextUsageDetailsModal(contextState: TabContextState | null): void;
   persistContextUsageSnapshot(tabId: TabId | null, snapshot: ContextUsageSnapshot): Promise<void>;
   /** Adds local cost provenance after a backend emits an authoritative token snapshot. */
-  enrichContextUsageSnapshot?(snapshot: ContextUsageSnapshot): ContextUsageSnapshot;
+  enrichContextUsageSnapshot?(snapshot: ContextUsageSnapshot, tabId?: TabId | null): ContextUsageSnapshot;
+  onPricingCatalogUpdated?(listener: () => void): { dispose(): void } | undefined;
+  getContextUsageTabIds?(): Array<TabId | null>;
   getForegroundCompactionAvailability(
     sessionId: string,
   ): ForegroundCompactionAvailability;
@@ -110,6 +112,8 @@ export interface ActiveTabContextUsageCoordinatorHost {
 }
 
 export class ActiveTabContextUsageCoordinator {
+  private pricingSubscription: { dispose(): void } | undefined;
+  private readonly pricingListeners = new Set<(tabId: TabId | null, state: TabContextState) => void>();
   private readonly lastPersistedAtBySession = new Map<string, number>();
   private readonly pendingSnapshotsBySession = new Map<
     string,
@@ -117,6 +121,56 @@ export class ActiveTabContextUsageCoordinator {
   >();
 
   constructor(private readonly host: ActiveTabContextUsageCoordinatorHost) {}
+
+  connectPricingUpdates(): void {
+    this.pricingSubscription?.dispose();
+    this.pricingSubscription = this.host.onPricingCatalogUpdated?.(() => this.refreshUnavailableCosts());
+    this.refreshUnavailableCosts();
+  }
+
+  onPricingUpdated(listener: (tabId: TabId | null, state: TabContextState) => void): { dispose(): void } {
+    this.pricingListeners.add(listener);
+    return { dispose: () => { this.pricingListeners.delete(listener); } };
+  }
+
+  dispose(): void {
+    this.pricingSubscription?.dispose();
+    this.pricingSubscription = undefined;
+    this.pricingListeners.clear();
+    for (const pending of this.pendingSnapshotsBySession.values()) {
+      if (pending.timer !== null) window.clearTimeout(pending.timer);
+      void this.host.persistContextUsageSnapshot(pending.tabId, pending.snapshot)
+        .catch((error) => logger.warn('Final context snapshot persistence failed', error));
+    }
+    this.pendingSnapshotsBySession.clear();
+    this.lastPersistedAtBySession.clear();
+  }
+
+  private refreshUnavailableCosts(): void {
+    const tabIds = this.host.getContextUsageTabIds?.() ?? [this.host.getActiveTabId()];
+    for (const tabId of tabIds) {
+      const state = this.host.getTabContextUsage(tabId);
+      if (!this.host.hasTab(tabId ?? '') || !state) continue;
+      const enriched = this.priceSnapshotCost(tabId, state);
+      // Price readiness must not change token truth or the conversation activity time.
+      const next = enriched ? { ...state, totalCost: enriched.totalCost, costDetails: enriched.costDetails ?? null } : state;
+      if (enriched) {
+        this.commitTabState(tabId, next);
+        this.scheduleSnapshotPersistence(tabId, enriched);
+      }
+      for (const listener of this.pricingListeners) {
+        try { listener(tabId, next); } catch (error) { logger.warn('Pricing view update failed', error); }
+      }
+    }
+  }
+
+  priceSnapshotCost(tabId: TabId | null, state: TabContextState): ContextUsageSnapshot | null {
+    if (typeof state.totalCost === 'number' || (!state.preciseTokens && !state.billingUsage)) return null;
+    const snapshot = ContextUsageService.createUsageSnapshot(state);
+    if (!snapshot) return null;
+    const enriched = this.enrichSnapshot(snapshot, state, tabId);
+    return typeof enriched.totalCost === 'number' ? enriched : null;
+  }
 
   syncIdentity(): void {
     if (!this.host.hasActiveTab()) {
@@ -126,6 +180,7 @@ export class ActiveTabContextUsageCoordinator {
 
     const conversation = this.host.getCurrentConversation();
     this.commitState(this.restorePersistedSnapshot(this.createIdentityState(conversation), conversation));
+    this.refreshUnavailableCosts();
   }
 
   private createIdentityState(
@@ -180,22 +235,19 @@ export class ActiveTabContextUsageCoordinator {
     const expectedBackend = conversation?.backend ?? 'opencode';
     const startedAt = getPerformanceTimestampMs();
     let requestElapsedMs: number | null = null;
-    let outcome = 'skipped';
+    const report = (outcome: string, snapshot?: ContextUsageSnapshot | null): void => {
+      this.logRefreshFromServerOutcome({
+        outcome, startedAt, conversationId: expectedConversationId,
+        sessionId: expectedSessionId, requestElapsedMs, snapshot,
+      });
+    };
     if (
       !expectedConversationId
       || !expectedSessionId
-      || !this.canRefreshPreciseUsageFromServer(expectedBackend)
+      || !['opencode', 'claude-code', 'codex', 'pi'].includes(expectedBackend)
       || !this.host.hasActiveTab()
     ) {
-      this.logRefreshFromServerOutcome(
-        {
-          outcome,
-          startedAt,
-          conversationId: expectedConversationId,
-          sessionId: expectedSessionId,
-          requestElapsedMs,
-        },
-      );
+      report('skipped');
       return;
     }
 
@@ -209,46 +261,27 @@ export class ActiveTabContextUsageCoordinator {
       || (currentConversation ? getConversationBackendSessionId(currentConversation) ?? null : null) !== expectedSessionId
       || !this.host.hasActiveTab()
     ) {
-      outcome = snapshot ? 'stale' : 'empty';
-      this.logRefreshFromServerOutcome(
-        {
-          outcome,
-          startedAt,
-          conversationId: expectedConversationId,
-          sessionId: expectedSessionId,
-          requestElapsedMs,
-          snapshot,
-        },
-      );
+      report(snapshot ? 'stale' : 'empty', snapshot);
       return;
     }
 
     const enrichedSnapshot = this.enrichSnapshot(snapshot, this.getCurrentState());
-    outcome = 'committed';
     this.commitState(ContextUsageService.applyUsageSnapshot(this.getCurrentState(), enrichedSnapshot));
-    this.logRefreshFromServerOutcome(
-      {
-        outcome,
-        startedAt,
-        conversationId: expectedConversationId,
-        sessionId: expectedSessionId,
-        requestElapsedMs,
-          snapshot: enrichedSnapshot,
-      },
-    );
+    report('committed', enrichedSnapshot);
   }
 
   private getCurrentState(): TabContextState {
     return this.host.getActiveTabContextUsage() ?? createEmptyTabContextState();
   }
 
-  private canRefreshPreciseUsageFromServer(backend: string): boolean {
-    return backend === 'opencode' || backend === 'claude-code' || backend === 'codex' || backend === 'pi';
-  }
-
   private commitState(contextUsage: TabContextState): void {
     this.host.setActiveTabContextUsage(contextUsage);
     this.host.renderContextUsageIndicator(contextUsage);
+  }
+
+  private commitTabState(tabId: TabId | null, state: TabContextState): void {
+    this.host.setTabContextUsage(tabId, state);
+    if (tabId === this.host.getActiveTabId()) this.host.renderContextUsageIndicator(state);
   }
 
   beginTabContextUsageStream(tabId: TabId | null): void {
@@ -259,10 +292,7 @@ export class ActiveTabContextUsageCoordinator {
     const nextState = ContextUsageService.beginStream(
       this.host.getTabContextUsage(tabId) ?? createEmptyTabContextState(),
     );
-    this.host.setTabContextUsage(tabId, nextState);
-    if (tabId === this.host.getActiveTabId()) {
-      this.refreshContextUsageIndicator();
-    }
+    this.commitTabState(tabId, nextState);
   }
 
   completeTabContextUsageStream(tabId: TabId | null): void {
@@ -273,10 +303,7 @@ export class ActiveTabContextUsageCoordinator {
     const nextState = ContextUsageService.completeStream(
       this.host.getTabContextUsage(tabId) ?? createEmptyTabContextState(),
     );
-    this.host.setTabContextUsage(tabId, nextState);
-    if (tabId === this.host.getActiveTabId()) {
-      this.refreshContextUsageIndicator();
-    }
+    this.commitTabState(tabId, nextState);
   }
 
   applyUsageChunkToTab(
@@ -295,15 +322,12 @@ export class ActiveTabContextUsageCoordinator {
       nextState = ContextUsageService.applyBillingUsage(nextState, chunk.billingUsage);
       const usageSnapshot = ContextUsageService.createUsageSnapshot(nextState);
       if (usageSnapshot) {
-        const estimatedSnapshot = this.enrichSnapshot(usageSnapshot, nextState);
+        const estimatedSnapshot = this.enrichSnapshot(usageSnapshot, nextState, tabId);
         nextState = ContextUsageService.applyCostSnapshot(nextState, estimatedSnapshot);
         this.scheduleSnapshotPersistence(tabId, estimatedSnapshot);
       }
     }
-    this.host.setTabContextUsage(tabId, nextState);
-    if (tabId === this.host.getActiveTabId()) {
-      this.refreshContextUsageIndicator();
-    }
+    this.commitTabState(tabId, nextState);
   }
 
   applyContextUsageSnapshotToTab(
@@ -315,19 +339,17 @@ export class ActiveTabContextUsageCoordinator {
     }
 
     const currentState = this.host.getTabContextUsage(tabId) ?? createEmptyTabContextState();
-    const enrichedSnapshot = this.enrichSnapshot(snapshot, currentState);
+    const enrichedSnapshot = this.enrichSnapshot(snapshot, currentState, tabId);
     const nextState = ContextUsageService.applyUsageSnapshot(
       currentState,
       enrichedSnapshot,
     );
-    this.host.setTabContextUsage(tabId, nextState);
-    if (tabId === this.host.getActiveTabId()) {
-      this.refreshContextUsageIndicator();
-    }
+    this.commitTabState(tabId, nextState);
     this.scheduleSnapshotPersistence(tabId, enrichedSnapshot);
   }
 
   openContextUsageDetails(): void {
+    this.refreshUnavailableCosts();
     const contextState = this.host.getActiveTabContextUsage() ?? null;
     this.host.openContextUsageDetailsModal(contextState);
   }
@@ -416,12 +438,7 @@ export class ActiveTabContextUsageCoordinator {
     this.host.renderContextUsageIndicator(state);
   }
 
-  private captureForegroundCompactionIdentity(): {
-    tabId: TabId | null;
-    conversationId: string | null;
-    sessionId: string | null;
-    backend: string;
-  } {
+  private captureForegroundCompactionIdentity() {
     const conversation = this.host.getCurrentConversation();
     return {
       tabId: this.host.getActiveTabId(),
@@ -431,12 +448,7 @@ export class ActiveTabContextUsageCoordinator {
     };
   }
 
-  private isCurrentForegroundCompactionIdentity(expected: {
-    tabId: TabId | null;
-    conversationId: string | null;
-    sessionId: string | null;
-    backend: string;
-  }): boolean {
+  private isCurrentForegroundCompactionIdentity(expected: ReturnType<ActiveTabContextUsageCoordinator['captureForegroundCompactionIdentity']>): boolean {
     if (!this.host.hasActiveTab() || this.host.getActiveTabId() !== expected.tabId) {
       return false;
     }
@@ -489,10 +501,11 @@ export class ActiveTabContextUsageCoordinator {
   private enrichSnapshot(
     snapshot: ContextUsageSnapshot,
     state?: TabContextState | null,
+    tabId: TabId | null = this.host.getActiveTabId(),
   ): ContextUsageSnapshot {
-    const billingUsage = snapshot.billingUsage ?? state?.billingUsage ?? this.getCurrentState().billingUsage;
+    const billingUsage = snapshot.billingUsage ?? state?.billingUsage;
     const enrichedInput = billingUsage ? { ...snapshot, billingUsage } : snapshot;
-    return this.host.enrichContextUsageSnapshot?.(enrichedInput) ?? enrichedInput;
+    return this.host.enrichContextUsageSnapshot?.(enrichedInput, tabId) ?? enrichedInput;
   }
 
   private logRefreshFromServerOutcome({

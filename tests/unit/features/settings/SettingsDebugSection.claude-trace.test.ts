@@ -2,6 +2,7 @@
 
 import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
+import { tmpdir } from 'os';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { createClaudeTraceDiagnosticsPort } from '../../../../src/features/settings/debug/types';
@@ -327,7 +328,8 @@ describe('SettingsDebugSection Claude session trace block', () => {
 
   it('supports smart report copy, latest export, clear-all, and row copy/delete actions', async () => {
     const summaries = Array.from({ length: 25 }, (_, index) => summary(index));
-    const plugin = createPlugin({ debugLogPaths: { unix: '/tmp' } });
+    const exportDirectory = tmpdir();
+    const plugin = createPlugin({ debugLogPaths: { unix: exportDirectory, windows: exportDirectory } });
     const service = createTraceService(summaries);
     plugin.claudeTraceService = service;
     const { containerEl } = renderTabbed('claude-code', plugin);
@@ -345,7 +347,7 @@ describe('SettingsDebugSection Claude session trace block', () => {
     exportButton?.click();
     await Promise.resolve();
     await Promise.resolve();
-    expect(service.exportTrace).toHaveBeenCalledWith('trace-0', '/tmp');
+    expect(service.exportTrace).toHaveBeenCalledWith('trace-0', exportDirectory);
 
     const catalog = containerEl.querySelector('[data-claude-trace-catalog="true"]') as HTMLElement;
     const rows = catalog.querySelectorAll('.opencodian-debug-trace-row');

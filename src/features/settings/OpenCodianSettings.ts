@@ -11,6 +11,7 @@ import { App, PluginSettingTab, Setting } from 'obsidian';
 import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
+import { refreshCostEstimateSettingsRows } from './CostEstimateSettingsRow';
 import {
   createClaudeTraceDiagnosticsPort,
   createCodexTraceDiagnosticsPort,
@@ -79,6 +80,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private userSection: SettingsUserSection | null = null;
   private dropdownsEnhancer: SettingsDropdownsEnhancerHandle | null = null;
   private pluginUpdateExpanded = false;
+  private pricingSubscription?: { dispose(): void };
 
   constructor(app: App, plugin: OpenCodianPlugin) {
     super(app, plugin);
@@ -291,6 +293,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
    * SAME container the user is looking at — never the stale tab container.
    */
   displayInto(containerEl: HTMLElement): void {
+    this.pricingSubscription?.dispose();
+    this.pricingSubscription = this.plugin.modelPricingService?.onCatalogUpdated?.(() => {
+      refreshCostEstimateSettingsRows(containerEl, this.plugin);
+    });
     this.activeSettingsContainer = containerEl;
     this.sectionCoordinator.reattachTo(containerEl);
     this.dropdownsEnhancer?.destroy();
@@ -673,6 +679,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   // ─── Shared helpers ────────────────────────────────────────────────
 
   hide(): void {
+    this.pricingSubscription?.dispose();
+    this.pricingSubscription = undefined;
     this.pluginUpdateExpanded = false;
     this.sectionCoordinator.hide();
     this.dropdownsEnhancer?.destroy();

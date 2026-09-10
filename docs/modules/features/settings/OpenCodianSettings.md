@@ -1,5 +1,7 @@
 # OpenCodianSettings
 
+2026-09-10：`displayInto()` 为当前（包括 declarative）设置容器注册价格目录订阅；再次渲染或 `hide()` 清理旧订阅，目录就绪仅更新价格说明，不重建设置页。
+
 > **源码**: `src/features/settings/OpenCodianSettings.ts`
 > **状态**: [REVIEW]
 

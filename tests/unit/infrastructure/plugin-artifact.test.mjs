@@ -139,9 +139,13 @@ describe('plugin artifact packaging', () => {
     expect(giteaWorkflow).toContain('opencodian-plugin-${{ gitea.sha }}');
     expect(giteaWorkflow).toContain('OPENCODIAN_BUILD_ID: ci-${{ gitea.sha }}');
 
-    expect(githubCiWorkflow.match(/actions\/checkout@v7/g)).toHaveLength(2);
-    expect(githubCiWorkflow.match(/actions\/setup-node@v7/g)).toHaveLength(2);
-    expect(githubCiWorkflow.match(/node-version: 24/g)).toHaveLength(2);
+    expect(githubCiWorkflow.match(/actions\/checkout@v7/g)).toHaveLength(3);
+    expect(githubCiWorkflow.match(/actions\/setup-node@v7/g)).toHaveLength(3);
+    expect(githubCiWorkflow.match(/node-version: 24/g)).toHaveLength(3);
+    const desktopJob = githubCiWorkflow.match(/  desktop-tests:\n([\s\S]*?)(?=\n  [a-z][\w-]*:)/)?.[1];
+    expect(desktopJob).toContain('os: [windows-latest, macos-latest]');
+    expect(desktopJob).toContain('runs-on: ${{ matrix.os }}');
+    expect(desktopJob).toContain('run: npm test');
     expect(githubWorkflow).toContain('actions/upload-artifact@v7');
     expect(githubWorkflow).not.toContain('actions/upload-artifact@v3');
     expect(giteaWorkflow).toContain('https://gitea.com/actions/gitea-upload-artifact@v7');

@@ -29,11 +29,27 @@ interface ArchiveReadSwapState {
 }
 
 let mockArchiveReadSwap: ArchiveReadSwapState | null = null;
+let mockArchiveInode: bigint | null = null;
 
 jest.mock('node:fs/promises', () => {
   const actual = jest.requireActual<typeof import('node:fs/promises')>('node:fs/promises');
   const actualFs = jest.requireActual<typeof import('node:fs')>('node:fs');
   const actualPath = jest.requireActual<typeof import('node:path')>('node:path');
+  const withArchiveInode = <T extends import('node:fs').Stats | import('node:fs').BigIntStats>(stats: T): T => (
+    mockArchiveInode === null ? stats : new Proxy(stats, {
+      get(target, property) {
+        if (property === 'ino') return typeof target.ino === 'bigint' ? mockArchiveInode : Number(mockArchiveInode);
+        return Reflect.get(target, property, target);
+      },
+    })
+  );
+  const withHandleInode = (handle: Awaited<ReturnType<typeof actual.open>>) => new Proxy(handle, {
+    get(target, property) {
+      if (property === 'stat') return async (...args: unknown[]) => withArchiveInode(await Reflect.apply(target.stat, target, args));
+      const value = Reflect.get(target, property, target);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
   const canonicalizeExisting = (candidate: string): string => {
     try {
       return actualFs.realpathSync(candidate);
@@ -53,6 +69,7 @@ jest.mock('node:fs/promises', () => {
   };
   return {
     ...actual,
+    lstat: async (...args: unknown[]) => withArchiveInode(await Reflect.apply(actual.lstat, actual, args)),
     readFile: async (...args: unknown[]): Promise<unknown> => {
       const state = mockArchiveReadSwap;
       const entryRead = state !== null && isEntryPath(args[0], state);
@@ -64,7 +81,7 @@ jest.mock('node:fs/promises', () => {
     open: async (...args: unknown[]): Promise<unknown> => {
       const state = mockArchiveReadSwap;
       if (state === null || !isEntryPath(args[0], state)) {
-        return Reflect.apply(actual.open, actual, args);
+        return withHandleInode(await Reflect.apply(actual.open, actual, args));
       }
       swapLeaf(state);
       const handle = await Reflect.apply(actual.open, actual, args);
@@ -170,6 +187,7 @@ describe('configuration archive history public contract', () => {
   });
 
   afterEach(() => {
+    mockArchiveInode = null;
     fs.rmSync(projectRoot, { recursive: true, force: true });
     fs.rmSync(archiveRoot, { recursive: true, force: true });
   });
@@ -243,6 +261,24 @@ describe('configuration archive history public contract', () => {
     });
     expect(restored.status).toBe('success');
     expect(fs.readFileSync(targetPath, 'utf8')).toBe('{"version":1}');
+  });
+
+  it('restores a listed entry whose filesystem inode exceeds Number.MAX_SAFE_INTEGER', async () => {
+    mockArchiveInode = BigInt('9007199254740993');
+    const { targetPath, identity } = await createDeletedHistory();
+    const result = await safeRestoreArchivedEntry({ entryIdentity: identity, expectedRevision: null, allowlist, archiveRootPath: archiveRoot });
+    expect(result.status).toBe('success');
+    expect(fs.readFileSync(targetPath, 'utf8')).toBe('{"version":1}');
+    const payload = JSON.parse(Buffer.from(identity, 'base64url').toString('utf8'));
+    expect(payload.fileState.ino).toBe('9007199254740993');
+  });
+
+  it('rejects different 64-bit inodes even when their Number representations collide', async () => {
+    mockArchiveInode = BigInt('9007199254740992');
+    const { identity } = await createDeletedHistory();
+    mockArchiveInode = BigInt('9007199254740993');
+    const result = await safeRestoreArchivedEntry({ entryIdentity: identity, expectedRevision: null, allowlist, archiveRootPath: archiveRoot });
+    expect(result.status).toBe('archive-failed');
   });
 
   it('catalogs a deleted target after its narrow allowlist root is removed without recreating that root', async () => {

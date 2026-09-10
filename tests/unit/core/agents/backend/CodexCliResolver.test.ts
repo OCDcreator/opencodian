@@ -1,5 +1,8 @@
 import { resolveCodexCli } from '../../../../../src/core/agents/backend/CodexCliResolver';
 
+// Exercise both platform branches without inheriting the Jest host's path API.
+jest.mock('path', () => jest.requireActual<typeof import('path')>('path').posix);
+
 describe('CodexCliResolver', () => {
   it('prefers a valid configured path over the GUI-visible PATH', () => {
     const resolution = resolveCodexCli({

@@ -12,6 +12,25 @@ const BACKEND_DESCRIPTION_KEYS: Record<CostEstimateBackend, 'settings.cost.backe
   codex: 'settings.cost.backend.codex',
 };
 
+function costDescription(plugin: OpenCodianPlugin, backend: CostEstimateBackend): string {
+  const status = plugin.modelPricingService?.getStatus();
+  return [
+    t(BACKEND_DESCRIPTION_KEYS[backend]),
+    status?.fetchedAt
+      ? t('settings.cost.row.catalogReady', { count: String(status.entryCount) })
+      : t('settings.cost.row.catalogMissing'),
+  ].join(' ');
+}
+
+/** Updates only pricing descriptions, preserving settings controls and focus. */
+export function refreshCostEstimateSettingsRows(containerEl: HTMLElement, plugin: OpenCodianPlugin): void {
+  for (const row of Array.from(containerEl.querySelectorAll<HTMLElement>('[data-cost-estimate-backend]'))) {
+    const backend = row.dataset.costEstimateBackend;
+    if (backend !== 'opencode' && backend !== 'claude-code' && backend !== 'codex') continue;
+    row.querySelector<HTMLElement>('.setting-item-description')?.setText(costDescription(plugin, backend));
+  }
+}
+
 function getBackendPricingSettings(
   plugin: OpenCodianPlugin,
   backend: Exclude<CostEstimateBackend, 'opencode'>,
@@ -67,17 +86,9 @@ export function renderCostEstimateSettingsRow(
   if (backend !== 'opencode') {
     renderThirdPartyPricingIdentity(containerEl, plugin, backend);
   }
-  const status = plugin.modelPricingService?.getStatus();
-  const description = [
-    t(BACKEND_DESCRIPTION_KEYS[backend]),
-    status?.fetchedAt
-      ? t('settings.cost.row.catalogReady', { count: String(status.entryCount) })
-      : t('settings.cost.row.catalogMissing'),
-  ].join(' ');
-
-  new Setting(containerEl)
+  const setting = new Setting(containerEl)
     .setName(t('settings.cost.row.name'))
-    .setDesc(description)
+    .setDesc(costDescription(plugin, backend))
     .addButton((button) => {
       button
         .setButtonText(t('settings.cost.row.manage'))
@@ -85,4 +96,5 @@ export function renderCostEstimateSettingsRow(
           new ModelPricingModal(plugin.app, plugin).open();
         });
     });
+  setting.settingEl.dataset.costEstimateBackend = backend;
 }

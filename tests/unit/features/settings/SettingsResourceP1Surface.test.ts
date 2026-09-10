@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, max-lines, max-lines-per-function -- The contract suite keeps the cross-backend P1 surface scenarios together. */
 
 import { MarkdownRenderer, Modal, Setting } from 'obsidian';
+import * as path from 'path';
 
 import {
   getClaudeResourceEditorMode,
@@ -107,10 +108,10 @@ describe('P1 resource settings surface', () => {
   });
 
   it('defaults create targets to Project and requires explicit Global selection', () => {
-    expect(getClaudeResourceTargetPath('command', 'project', '/vault', '/Users/test')).toBe('/vault/.claude/commands/example.md');
-    expect(getClaudeResourceTargetPath('command', 'global', '/vault', '/Users/test')).toBe('/Users/test/.claude/commands/example.md');
-    expect(getCodexResourceTargetPath('skill', 'project', '/vault', '/Users/test')).toBe('/vault/.agents/skills/example/SKILL.md');
-    expect(getCodexResourceTargetPath('skill', 'global', '/vault', '/Users/test')).toBe('/Users/test/.agents/skills/example/SKILL.md');
+    expect(getClaudeResourceTargetPath('command', 'project', '/vault', '/Users/test')).toBe(path.join('/vault', '.claude', 'commands', 'example.md'));
+    expect(getClaudeResourceTargetPath('command', 'global', '/vault', '/Users/test')).toBe(path.join('/Users/test', '.claude', 'commands', 'example.md'));
+    expect(getCodexResourceTargetPath('skill', 'project', '/vault', '/Users/test')).toBe(path.join('/vault', '.agents', 'skills', 'example', 'SKILL.md'));
+    expect(getCodexResourceTargetPath('skill', 'global', '/vault', '/Users/test')).toBe(path.join('/Users/test', '.agents', 'skills', 'example', 'SKILL.md'));
 
     expect(resolveClaudeResourceScopeStatus({ readonly: false, scope: 'project' }, false).label).toContain('Project');
     expect(resolveClaudeResourceScopeStatus({ readonly: false, scope: 'global' }, false).label).toContain('Global');

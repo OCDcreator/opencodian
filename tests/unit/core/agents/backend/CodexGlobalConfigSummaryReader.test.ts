@@ -29,7 +29,7 @@ describe('resolveGlobalCodexConfigPath', () => {
 
   it('honors CODEX_HOME when set to a non-empty value', () => {
     process.env.CODEX_HOME = '/custom/codex/home';
-    expect(resolveGlobalCodexConfigPath()).toBe('/custom/codex/home/config.toml');
+    expect(resolveGlobalCodexConfigPath()).toBe(path.join('/custom/codex/home', 'config.toml'));
   });
 
   it('ignores whitespace-only CODEX_HOME', () => {
@@ -251,23 +251,11 @@ name = "broken
 
   describe('read failure', () => {
     it('returns read-failed for permission errors without leaking content', async () => {
-      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-cfg-'));
-      const filePath = path.join(dir, 'config.toml');
-      fs.writeFileSync(filePath, 'model = "secret-value"', 'utf8');
-      fs.chmodSync(filePath, 0o000);
-      try {
-        // Skip on platforms where root can always read.
-        if (process.getuid?.() === 0) {
-          return;
-        }
-        const summary = await readGlobalCodexConfigSummary({ filePath });
-        expect(['read-failed', 'parse-failed']).toContain(summary.fileState);
-        const serialized = JSON.stringify(summary);
-        expect(serialized).not.toContain('secret-value');
-      } finally {
-        fs.chmodSync(filePath, 0o644);
-        await fsPromises.rm(dir, { recursive: true, force: true });
-      }
+      const readFile = jest.fn().mockRejectedValue(Object.assign(new Error('secret-value'), { code: 'EACCES' }));
+      const summary = await readGlobalCodexConfigSummary({ filePath: path.join(os.tmpdir(), 'config.toml'), readFile });
+      expect(summary.fileState).toBe('read-failed');
+      expect(readFile).toHaveBeenCalledTimes(1);
+      expect(JSON.stringify(summary)).not.toContain('secret-value');
     });
   });
 

@@ -134,7 +134,7 @@ export interface ChatPluginPort extends TabRuntimePluginSource {
   > | null;
   modelPricingService: Pick<
     ModelPricingService,
-    'enrichContextUsageSnapshot' | 'getBackendPricingIdentityHint'
+    'enrichContextUsageSnapshot' | 'getBackendPricingIdentityHint' | 'onCatalogUpdated'
   > | null;
   settingsTab?: Pick<
     OpenCodianSettingTab,

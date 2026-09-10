@@ -2,6 +2,7 @@
  * ServerManager runtime seam unit tests
  */
 
+import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -52,6 +53,12 @@ type LocalSidecarLauncherTestAccess = LocalSidecarLauncher & {
 
 function getLocalSidecarLauncher(manager: ServerManager): LocalSidecarLauncher {
   return (manager as unknown as { localSidecarLauncher: LocalSidecarLauncher }).localSidecarLauncher;
+}
+
+function createFailedTaskkillProcess(): EventEmitter {
+  const killer = new EventEmitter();
+  queueMicrotask(() => killer.emit('exit', 1));
+  return killer;
 }
 
 function getLocalSidecarLauncherTestAccess(manager: ServerManager): LocalSidecarLauncherTestAccess {
@@ -429,6 +436,10 @@ function registerLaunchLifecycleTests(context: ServerManagerRuntimeContext): voi
 
       const { spawn: mockSpawn } = jest.requireMock('child_process') as { spawn: jest.Mock };
       mockSpawn.mockReturnValueOnce(spawnedProcess);
+      if (process.platform === 'win32') {
+        // The native cleanup process also needs to settle; exercise SIGTERM fallback.
+        mockSpawn.mockImplementationOnce(createFailedTaskkillProcess);
+      }
       jest.spyOn(getProcessProbe(manager), 'canBindLocalEndpoint').mockResolvedValue(true);
       jest.spyOn(manager, 'checkHealth').mockResolvedValue(false);
       jest.spyOn(getProcessProbe(manager), 'waitForPortAvailability').mockResolvedValue(true);

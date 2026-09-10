@@ -1,5 +1,7 @@
 # CostEstimateSettingsRow
 
+2026-09-10：价格行标记所属 backend，`refreshCostEstimateSettingsRows()` 在目录就绪时只更新已渲染的描述文字，保留控件、输入和焦点。订阅生命周期由 settings shell 管理。
+
 > **源码**: `src/features/settings/CostEstimateSettingsRow.ts`
 > **状态**: [REVIEW]
 

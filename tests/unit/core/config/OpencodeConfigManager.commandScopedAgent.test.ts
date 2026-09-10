@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 
 import { getCommandScopedAgentId } from '../../../../src/core/config/commandScopedAgent';
@@ -8,14 +9,15 @@ jest.mock('obsidian', () => ({
   Notice: jest.fn(),
 }));
 
-const testVaultPath = path.join(__dirname, 'test-vault-command-agent');
+let testVaultPath: string;
 let manager: OpencodeConfigManager;
 
 beforeEach(() => {
-  fs.rmSync(testVaultPath, { recursive: true, force: true });
-  fs.mkdirSync(testVaultPath, { recursive: true });
+  testVaultPath = fs.mkdtempSync(path.join(os.tmpdir(), 'opencodian-command-agent-'));
   manager = new OpencodeConfigManager(testVaultPath, {
     archiveRootPath: path.join(testVaultPath, '.opencodian-test-archive'),
+    homePath: path.join(testVaultPath, 'home'),
+    xdgConfigHome: null,
   });
 });
 

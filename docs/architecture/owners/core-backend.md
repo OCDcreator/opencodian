@@ -40,6 +40,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 - Do not cross `forbiddenDependencies`.
 - Do not replicate canonical state in another owner.
 - Changes here must update the matching `docs/modules/**` page (via `module-docs.config.json`).
+- Archive history descriptor identity preserves exact filesystem device/inode IDs using bigint stats and decimal-string tokens; Windows NTFS IDs must never be rounded through JavaScript Number. Confinement, state and content integrity checks remain mandatory before restore.
 - Run `npm run inspect:owner -- <this owner or a path>` for an always-fresh summary.
 
 ## SDK upgrade notes

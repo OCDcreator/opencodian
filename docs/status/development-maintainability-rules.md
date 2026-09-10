@@ -1,5 +1,7 @@
 # Development Maintainability Rules
 
+2026-09-10: catalog readiness is a core.config event, current usage recomputation belongs to the existing chat coordinator, and settings/details subscribe through their lifecycle. Keep numeric historical costs stable and use explicit tab billing identity. Windows tests must model native path/process/permission behavior deterministically; archive file identity uses exact bigint-derived strings.
+
 > **Status**: active development guardrail.
 > **Purpose**: keep routine feature work at the high-maintainability checkpoint reached after `R162`.
 

@@ -61,7 +61,20 @@ const payload = {
     },
 };
 
-function createService(overrides: ModelPricingOverride[] = []) {
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+function createService(
+  overrides: ModelPricingOverride[] = [],
+  fetchCatalog: () => Promise<unknown> = jest.fn().mockResolvedValue(payload),
+) {
   const storage = {
     loadModelPricingCatalog: jest.fn().mockResolvedValue(null),
     saveModelPricingCatalog: jest.fn().mockResolvedValue(undefined),
@@ -69,7 +82,7 @@ function createService(overrides: ModelPricingOverride[] = []) {
   const service = new ModelPricingService({
     storage,
     getOverrides: () => overrides,
-    fetchCatalog: jest.fn().mockResolvedValue(payload),
+    fetchCatalog,
   });
   return { service, storage };
 }
@@ -126,6 +139,124 @@ describe('ModelPricingService', () => {
     expect(service.getStatus()).toMatchObject({ entryCount: 0 });
   });
 
+  it('shares a pending automatic refresh with every manual caller, including cache persistence', async () => {
+    const fetch = deferred<unknown>();
+    const save = deferred<void>();
+    const fetchCatalog = jest.fn().mockReturnValueOnce(fetch.promise).mockResolvedValue(payload);
+    const { service, storage } = createService([], fetchCatalog);
+    storage.saveModelPricingCatalog.mockReturnValueOnce(save.promise);
+
+    await service.load();
+    const first = service.refresh();
+    const second = service.refresh();
+    expect(first).toBe(second);
+    expect(fetchCatalog).toHaveBeenCalledTimes(1);
+
+    fetch.resolve(payload);
+    await Promise.resolve();
+    expect(service.refresh()).toBe(first);
+    expect(storage.saveModelPricingCatalog).toHaveBeenCalledTimes(1);
+
+    save.resolve(undefined);
+    const results = await Promise.all([first, second]);
+    expect(results).toEqual([
+      expect.objectContaining({ entryCount: 3 }),
+      expect.objectContaining({ entryCount: 3 }),
+    ]);
+    const next = service.refresh();
+    expect(next).not.toBe(first);
+    await next;
+    expect(fetchCatalog).toHaveBeenCalledTimes(2);
+    expect(storage.saveModelPricingCatalog).toHaveBeenCalledTimes(2);
+  });
+
+  it('allows a new refresh after a shared network failure without publishing a catalog', async () => {
+    const fetch = deferred<unknown>();
+    const fetchCatalog = jest.fn().mockReturnValueOnce(fetch.promise).mockResolvedValue(payload);
+    const { service } = createService([], fetchCatalog);
+    const listener = jest.fn();
+    service.onCatalogUpdated(listener);
+    const first = service.refresh();
+    const second = service.refresh();
+    const rejection = Promise.allSettled([first, second]);
+
+    fetch.reject(new Error('offline'));
+    expect(await rejection).toEqual([
+      { status: 'rejected', reason: new Error('offline') },
+      { status: 'rejected', reason: new Error('offline') },
+    ]);
+
+    expect(listener).not.toHaveBeenCalled();
+    expect(service.getStatus().entryCount).toBe(0);
+    await service.refresh();
+    expect(fetchCatalog).toHaveBeenCalledTimes(2);
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('publishes the available in-memory catalog even when persistence fails, and permits retry', async () => {
+    const { service, storage } = createService();
+    const save = deferred<void>();
+    storage.saveModelPricingCatalog.mockReturnValueOnce(save.promise);
+    const listener = jest.fn(() => service.getStatus().entryCount);
+    service.onCatalogUpdated(listener);
+    const refresh = service.refresh();
+    const rejection = Promise.allSettled([refresh]);
+
+    await Promise.resolve();
+    expect(listener).toHaveReturnedWith(3);
+    expect(service.getCatalogEntry('openai', 'gpt-test')).not.toBeNull();
+    save.reject(new Error('disk full'));
+    expect(await rejection).toEqual([{ status: 'rejected', reason: new Error('disk full') }]);
+
+    expect(service.getStatus().entryCount).toBe(3);
+    await service.refresh();
+    expect(storage.saveModelPricingCatalog).toHaveBeenCalledTimes(2);
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([false, true])('isolates failing listeners and honors disposal when logging fails: %s', async (loggingFails) => {
+    const { service, storage } = createService();
+    const disposed = jest.fn();
+    const failing = jest.fn(() => { throw new Error('consumer failed'); });
+    const healthy = jest.fn();
+    const subscription = service.onCatalogUpdated(disposed);
+    service.onCatalogUpdated(failing);
+    service.onCatalogUpdated(healthy);
+    subscription.dispose();
+    subscription.dispose();
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {
+      if (loggingFails) throw new Error('diagnostics failed');
+    });
+    try {
+      await expect(service.refresh()).resolves.toMatchObject({ entryCount: 3 });
+
+      expect(disposed).not.toHaveBeenCalled();
+      expect(failing).toHaveBeenCalledTimes(1);
+      expect(healthy).toHaveBeenCalledTimes(1);
+      expect(storage.saveModelPricingCatalog).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('publishes a fresh local cache without starting a network refresh', async () => {
+    const fetchCatalog = jest.fn().mockResolvedValue(payload);
+    const { service, storage } = createService([], fetchCatalog);
+    const catalog = { schemaVersion: 1, fetchedAt: Date.now(), entries: [] };
+    storage.loadModelPricingCatalog.mockResolvedValue(catalog);
+    const listener = jest.fn();
+    service.onCatalogUpdated(listener);
+
+    await service.load();
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(service.getStatus().fetchedAt).toBe(catalog.fetchedAt);
+    expect(fetchCatalog).not.toHaveBeenCalled();
+  });
+});
+
+describe('ModelPricingService cost estimates', () => {
   it('uses all reported token categories and keeps tiered price estimates explicitly approximate', async () => {
     const { service } = createService();
     await service.refresh();

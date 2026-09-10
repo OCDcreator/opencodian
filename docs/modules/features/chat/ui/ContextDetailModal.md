@@ -1,5 +1,7 @@
 # ContextDetailModal
 
+2026-09-10：可选 `subscribeToPricingUpdates` 作为就绪信号，调用 `priceSnapshotCost` 对弹窗打开时的原始用量重新定价，只更新对应金额和来源文本；不复制后来用量的金额，也不重建 raw-message、压缩操作或其它详情区域。关闭时取消订阅，迟到回调被忽略。
+
 > **源码**: `src/features/chat/ui/ContextDetailModal.ts`
 > **状态**: [REVIEW]
 

@@ -1,5 +1,7 @@
 # OpenCodianView
 
+2026-09-10：view 在 open/close 时连接、清理 context coordinator 的价格订阅；host 提供所有标签页 ID，并按目标 tab 的 conversation backend 解析价格身份。费用详情订阅固定打开时的 tab/session，切换标签页不会重定向已打开弹窗。运行逻辑仍由 coordinator 所有。
+
 > 2026-07-30: The OpenCode diagnostics header refresh seam accepts an explicit changed tab and updates DOM only when it is still the active tab.
 > 2026-07-30: Claude Code chat diagnostics use a backend-specific host adapter; the view supplies only chat/UI callbacks and forwards the adapter operations through existing header, send, and tab-lifecycle ports.
 > 2026-07-31: `ChatDiagnosticsCoordinator` owns OpenCode diagnostics logic and the Codex/Claude host adapters. The view creates one coordinator through the injected factory and supplies only settings, current conversation/tab, and UI callbacks; all three backend routes use coordinator operations. This module note records the current slice and does not infer overall Phase 3/Task 12 closure or review status.

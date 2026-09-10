@@ -22,6 +22,8 @@ import {
 import type { AllowlistMatch, FileRevision } from '../../../../../src/core/agents/backend/ProjectResourceSecureWrite';
 import { safeRestoreFile } from '../../../../../src/core/agents/backend/ProjectResourceSecureWrite';
 
+jest.mock('node:fs/promises', () => ({ ...jest.requireActual('node:fs/promises') }));
+
 function tmpDir(prefix: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
@@ -323,7 +325,6 @@ describe('ConfigurationArchiveService — restore honesty (not-found vs archive-
   let target: string;
   let match: AllowlistMatch;
   let ctx: ArchiveContext;
-  const isRoot = typeof process.getuid === 'function' && process.getuid() === 0;
 
   beforeEach(() => {
     projectRoot = tmpDir('arc-rh-p-');
@@ -367,15 +368,16 @@ describe('ConfigurationArchiveService — restore honesty (not-found vs archive-
   });
 
   it('non-ENOENT manifest read error (EACCES) => archive-failed', async () => {
-    if (isRoot) return; // chmod ineffective as root
     const service = new ConfigurationArchiveService(archiveRoot);
     await service.archiveDeleted(ctx, revisionOf(target));
     const manifestPath = path.join(findHashDir(archiveRoot) as string, 'manifest.json');
-    fs.chmodSync(manifestPath, 0o000);
+    const nativeFs = jest.requireMock<typeof import('node:fs/promises')>('node:fs/promises');
+    const readSpy = jest.spyOn(nativeFs, 'readFile').mockRejectedValue(Object.assign(new Error('denied'), { code: 'EACCES' }));
     try {
       expect((await service.readLatestDeletedContent(ctx)).status).toBe('archive-failed');
+      expect(readSpy).toHaveBeenCalledWith(fs.realpathSync(manifestPath), 'utf8');
     } finally {
-      fs.chmodSync(manifestPath, 0o644);
+      readSpy.mockRestore();
     }
   });
 
