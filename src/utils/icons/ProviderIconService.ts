@@ -26,7 +26,7 @@ import {
 import {
   type BuiltinIconOption,
   getBuiltinPreviewCandidates,
-  getPreviewUrlForLobehubIcon,
+  getPreviewUrlForEntry,
   getSelectedBuiltinSource,
   getSelectedBuiltinVariant,
   listBuiltinIconOptions,
@@ -39,6 +39,7 @@ import {
   splitCustomIconSourcesInput,
 } from './providerIconCustomSources';
 import {
+  getDefaultProviderIconEntry,
   getEffectiveProviderEntries,
   getProviderIconId,
   hasProviderIcon,
@@ -58,13 +59,18 @@ export type { BuiltinIconOption } from './providerIconBuiltinSelection';
 const logger = createLogger('ProviderIconService');
 
 export class ProviderIconService {
-  static getIconUrl(providerId: string): string | null {
-    const iconId = this.getIconId(providerId);
-    if (!iconId) {
+  /**
+   * Synchronous preview URL for a provider's default icon. Runs the same staged
+   * resolution as the async cache path (local alias -> LobeHub -> models.dev ->
+   * fuzzy), so this never disagrees with `hasIcon()`.
+   */
+  static getIconUrl(app: App, providerId: string): string | null {
+    const defaultEntry = getDefaultProviderIconEntry(providerId);
+    if (!defaultEntry) {
       return null;
     }
 
-    return getPreviewUrlForLobehubIcon(iconId, 'auto')?.previewUrl ?? null;
+    return getPreviewUrlForEntry(app, defaultEntry);
   }
 
   static async resolveIconUrl(
@@ -188,8 +194,8 @@ export class ProviderIconService {
     return warmCachedProviderIcons(app, providerIds, library);
   }
 
-  static createIconElement(providerId: string, size: number = 16): HTMLElement | null {
-    const iconUrl = this.getIconUrl(providerId);
+  static createIconElement(app: App, providerId: string, size: number = 16): HTMLElement | null {
+    const iconUrl = this.getIconUrl(app, providerId);
     if (!iconUrl) {
       return null;
     }

@@ -1,3 +1,5 @@
+import type { App } from 'obsidian';
+
 import type { ModelCatalogBundle } from '../../../../src/core/config';
 import type { ModelCatalogProvider } from '../../../../src/core/config/modelConfig';
 import type { ClaudeCodePermissionMode, ModelSourceMode, PermissionMode } from '../../../../src/core/types/settings';
@@ -123,6 +125,7 @@ async function createFixture(options: FixtureOptions = {}) {
     registerEscapeHandler: jest.fn((handler) => {
       escapeHandler = handler;
     }),
+    getApp: () => ({} as unknown as App),
     loadModelCatalogData: jest.fn(async () => loadModelCatalogData),
     getActiveTabModelOverride: jest.fn(() => activeTabModelOverride),
     setActiveTabModelOverride: jest.fn((selection) => {
@@ -630,6 +633,7 @@ describe('ChatSelectionControlsCoordinator', () => {
     function createMinimalHost(): ChatSelectionControlsCoordinatorHost {
       return {
         registerEscapeHandler: jest.fn(),
+        getApp: () => ({} as unknown as App),
         loadModelCatalogData: jest.fn(async () => ({
           catalogBundle: null,
           providers: [],
@@ -997,6 +1001,7 @@ describe('ChatSelectionControlsCoordinator', () => {
 
       const host = {
         registerEscapeHandler: jest.fn(),
+        getApp: () => ({} as unknown as App),
         loadModelCatalogData: jest.fn(async () => ({ catalogBundle: null, providers: [] })),
         getActiveTabModelOverride: jest.fn(() => null),
         setActiveTabModelOverride: jest.fn(() => true),
@@ -1055,6 +1060,7 @@ describe('ChatSelectionControlsCoordinator', () => {
 
       const host = {
         registerEscapeHandler: jest.fn(),
+        getApp: () => ({} as unknown as App),
         loadModelCatalogData: jest.fn(async () => ({ catalogBundle: null, providers: [] })),
         getActiveTabModelOverride: jest.fn(() => null),
         setActiveTabModelOverride: jest.fn(() => true),
@@ -1116,6 +1122,7 @@ describe('ChatSelectionControlsCoordinator', () => {
 
       const host = {
         registerEscapeHandler: jest.fn(),
+        getApp: () => ({} as unknown as App),
         loadModelCatalogData: jest.fn(async () => ({ catalogBundle: null, providers: [] })),
         getActiveTabModelOverride: jest.fn(() => null),
         setActiveTabModelOverride: jest.fn(() => true),
@@ -1181,6 +1188,7 @@ describe('ChatSelectionControlsCoordinator', () => {
 
       const host = {
         registerEscapeHandler: jest.fn(),
+        getApp: () => ({} as unknown as App),
         loadModelCatalogData: jest.fn(async () => ({ catalogBundle: null, providers: [] })),
         getActiveTabModelOverride: jest.fn(() => null),
         setActiveTabModelOverride: jest.fn(() => true),
@@ -1243,6 +1251,7 @@ describe('ChatSelectionControlsCoordinator', () => {
 
       const host = {
         registerEscapeHandler: jest.fn(),
+        getApp: () => ({} as unknown as App),
         loadModelCatalogData: jest.fn(async () => ({ catalogBundle: null, providers: [] })),
         getActiveTabModelOverride: jest.fn(() => null),
         setActiveTabModelOverride: jest.fn(() => true),
@@ -1282,6 +1291,7 @@ describe('ChatSelectionControlsCoordinator', () => {
 
       const host = {
         registerEscapeHandler: jest.fn(),
+        getApp: () => ({} as unknown as App),
         loadModelCatalogData: jest.fn(async () => ({ catalogBundle: null, providers: [] })),
         getActiveTabModelOverride: jest.fn(() => null),
         setActiveTabModelOverride: jest.fn(() => true),

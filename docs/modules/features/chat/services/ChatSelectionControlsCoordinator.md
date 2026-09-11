@@ -15,7 +15,7 @@
 - 在 runtime overflow `⋯` 中集成 Claude Code additional directories configured-scope badge，用于显示额外目录请求状态
 - 在 runtime overflow `⋯` 中集成 sandbox badge 容器（仅 Claude Code backend），用于显示 Claude Code sandbox 配置摘要
 - 在 runtime overflow `⋯` 中集成 Codex runtime defaults badge 容器（仅 Codex backend），用于显示网络、网页搜索与额外目录等非默认 Codex 运行默认项
-- 把 Model 的 search-first controls 与 scroll list 挂到共享 `ComposerPopoverFrame` content slot，维护每实例唯一的 combobox/listbox/option id、仅在打开态写入的 active-descendant、keyboard navigation、sticky header cleanup 与 provider icon 刷新，并保留 280px 列表视口
+- 把 Model 的 search-first controls 与 scroll list 挂到共享 `ComposerPopoverFrame` content slot，维护每实例唯一的 combobox/listbox/option id、仅在打开态写入的 active-descendant、keyboard navigation、sticky header cleanup 与 provider icon 刷新，并保留 280px 列表视口；列表渲染时通过 `host.getApp()` 把 app 传给 renderer，用于解析 models.dev / LobeHub / 本地 bundled 三类图标 URL
 - 为 configured-only option 提供本地化 badge/tooltip 文案；鼠标与 Enter 选择、上下键导航均由 renderer/interaction helper 按禁用语义处理
 - model dropdown 通过共享 `AnchoredOverlayLayoutController` 按 Chat 容器边界同步 340px 首选宽度、280px 最小宽度与 8px 安全区
 - 统一更新当前模型显示、unavailable / unconfigured class、switch-model override 写回结果、unavailable notice 文案与 effort selector 连动；trigger tooltip 明确这是当前标签的发送覆盖，不是持久化 `ConversationSessionSettings`
@@ -27,6 +27,8 @@
 ```typescript
 export interface ChatSelectionControlsCoordinatorHost extends ModelSelectionRuntimeHost {
   registerEscapeHandler(handler: () => boolean): void;
+  /** Obsidian app，用于解析本地 provider 图标资源路径。 */
+  getApp(): App;
   resolveProviderIconUrl(providerId: string): Promise<string | null>;
   updateEffortSelectorDisplay(): void;
   restoreComposerInputFocus(): void;

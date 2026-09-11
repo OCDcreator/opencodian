@@ -1136,6 +1136,7 @@ export class OpenCodianView extends ItemView {
 
   private createChatSelectionControlsCoordinatorHost(): ChatSelectionControlsCoordinatorHost {
     return {
+      getApp: () => this.app,
       registerEscapeHandler: (handler) => {
         this.escapeHandlers.push(handler);
       },

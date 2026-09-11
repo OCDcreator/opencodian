@@ -1,3 +1,4 @@
+import type { App } from 'obsidian';
 import { setIcon } from 'obsidian';
 
 import { ProviderIconService } from '../../../../utils/icons/ProviderIconService';
@@ -12,6 +13,8 @@ import type {
 export interface RenderModelListOptions {
   scrollContainer: HTMLElement;
   optionIdPrefix: string;
+  /** Resolves local provider icon resource paths for the provider group headers. */
+  app: App;
   providers: readonly ModelSelectorProvider[];
   hasLoadedModelCatalog: boolean;
   filterQuery: string;
@@ -34,6 +37,7 @@ function buildModelOptionId(prefix: string, value: string): string {
 export function renderModelList({
   scrollContainer,
   optionIdPrefix,
+  app,
   providers,
   hasLoadedModelCatalog,
   filterQuery,
@@ -104,7 +108,7 @@ export function renderModelList({
       cls: 'opencodian-model-provider-header',
     });
 
-    const iconEl = ProviderIconService.createIconElement(provider.id, 14);
+    const iconEl = ProviderIconService.createIconElement(app, provider.id, 14);
     if (iconEl) {
       iconEl.classList.add('opencodian-model-provider-header-icon');
       iconEl.setAttribute('aria-hidden', 'true');

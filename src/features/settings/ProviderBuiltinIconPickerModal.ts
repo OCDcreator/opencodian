@@ -85,6 +85,10 @@ export class ProviderBuiltinIconPickerModal extends Modal {
       text: t('settings.model.iconCache.builtinPicker.library.opencode'),
     });
     opencodeOptionEl.value = 'opencode';
+    const modelsDevOptionEl = filterEl.createEl('option', {
+      text: t('settings.model.iconCache.builtinPicker.library.modelsdev'),
+    });
+    modelsDevOptionEl.value = 'modelsdev';
     filterEl.addEventListener('change', () => {
       this.libraryFilter = (filterEl.value as '' | BuiltinIconLibraryId) ?? '';
       this.renderGrid();

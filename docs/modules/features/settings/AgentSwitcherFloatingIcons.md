@@ -15,6 +15,7 @@
 - 优先从 `lobehubIconManifest.ts` 为 OpenCode、Claude Code、Codex、Copilot 和 Pi 渲染静态 LobeHub 图标，并分别写入 light/dark 图片资源
 - `renderAgentSwitcherBackendIcon()` 为其他 settings surfaces 提供同源 backend 图标渲染入口，例如 ACP preset buttons 可以复用标题行/后端选择器的 LobeHub 图标身份，而不是重新指定一套 provider SVG 资产
 - 当 LobeHub manifest 缺少可用静态资源时，回退到 Obsidian `setIcon()` 的 Lucide 图标
+- 回退到 `setIcon()` 前会移除 `.opencodian-agent-switcher-icon--lobehub`；该 class 会把容器内所有 svg 置为 `display:none`，因此复用容器（例如聊天头部状态徽章）从 LobeHub 图标切到 Pi 时必须清除，否则回退图标不可见
 - 将图标组 portal 到 `document.body`，并根据设置页容器 `getBoundingClientRect().left` 写入 `--opencodian-agent-switcher-fixed-left`，让图标组固定在当前设置 pane 左边缘，不随正文滚动
 - editor-area 设置页可能先在 detached DOM 中完成渲染、随后才接入 workspace；floating rail 会等待锚点第一次真正连接后再启用断开销毁判定，并在首次连接时重新同步左边缘位置，避免初始化阶段被 MutationObserver 误清理
 - editor-area 容器和每个 Obsidian 原生 `.modal.mod-settings` 容器各自拥有独立的 floating rail；modal owner 不再跳过渲染，因此 modal 内容内会保留自己的 hover-zone anchor 和 backend 按钮

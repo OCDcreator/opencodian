@@ -56,3 +56,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 ## Pi owner boundary review (2026-09-08)
 
 PiModelSelectionBinding owns Pi selector policy; send preparation and slash dispatch route Pi explicitly. Pi catalog reads do not use OpenCode runtime resources.
+
+## Model selector icon host port (2026-09-11)
+
+`ChatSelectionControlsCoordinatorHost` gained `getApp(): App`, and `ChatSelectionControlsCoordinator` forwards it as the new `app` field when rendering the model list, so provider group header icons resolve through the same route as the async icon cache. Resolution rules stay with `shared.utils-icons`; this owner only passes the host through.

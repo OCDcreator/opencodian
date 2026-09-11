@@ -10,7 +10,7 @@
 ## 责任边界
 
 - runtime state：维护 `loggedIconUrls`、`resolvedIconUrls`、`inFlightIconLoads`、`failedIconIds`
-- asset resolution：按 mapped/LobeHub builtin、bundled builtin、custom entry 三类入口装配 candidate 并执行统一加载流程
+- asset resolution：按 mapped/LobeHub builtin、bundled builtin、models.dev builtin、custom entry 四类入口装配 candidate 并执行统一加载流程
 - cache runtime：处理 cache hit、cache miss 下载、vault 写回、cache-only preview fallback
 - cache operations：提供 cache summary、warm-up 与 clear-cache 入口
 

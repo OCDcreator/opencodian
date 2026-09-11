@@ -11,6 +11,24 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-11 图标来源扩充：LobeHub 版本对齐 + models.dev 兜底 + 碰撞匹配
+
+- 升级 `@lobehub/icons` 5.4.0 → 5.18.0 并重跑 `sync:lobehub-icons`，清单从 296 个图标增至 322 个。5.18 的 `es/toc.js` 改为 `import data from "./toc.json"`，Node 22 会因缺少 import attribute 拒绝加载；同步脚本改为直接读取 `es/toc.json`，仅在旧 inline-array 布局时回退模块导入。
+- 新增 models.dev 作为第三个图标来源：`sync:modelsdev-icons` 抓取 `api.json` 生成 213 个 provider id 词汇表，图标运行时按 `https://models.dev/logos/<id>.svg` 引用（不打包），asset 层新增远程下载与缓存分支，内置图标选择器新增 models.dev 过滤项。
+- provider id 解析改为分阶段：别名表 / 本地 bundled → LobeHub → models.dev 精确 id → 后缀剥离重试 → identity token 碰撞匹配。实测 `zai-coding-cn` → `opencode:zai-coding-plan`、`agentrouter` → `modelsdev:agentrouter`、`krill-gpt` → `lobehub:openai`；`krill`、`my-super-gateway`、`totally-unknown-thing` 保持无图标，避免凭通用词乱认品牌。
+- models.dev 默认只参与精确 id 匹配（`includeModelsDev` 显式开启才进入搜索）：其 id 较长且含通用词，参与子串搜索会误命中 `provider`、`gateway` 之类的普通单词。
+- 模型选择器 provider 分组标题改用与异步缓存路径相同的解析（`getIconUrl(app, providerId)` 取 default entry + preview URL），修掉 `hasIcon()` 为 true 而 `getIconUrl()` 为 null 的分歧，并让本地 bundled 图标能在下拉里显示；`ChatSelectionControlsCoordinatorHost` 因此新增 `getApp()`。
+- 门禁：lint 0/0、tsc 通过、755 套件 / 7293 用例全绿、`check:module-docs`（606 模块 / 17 目标）与 `check:graphify` 通过。
+
+## 2026-09-10 Codex 静默推理误中断与用户消息操作行
+
+- 实测 Codex app-server 已连接、turn/start 成功，但共享 router 在 60 秒无可见输出时经 detachStream 发送 turn/interrupt。将后台同步超时限于 OpenCode；Codex、Claude Code、Pi 等 CLI 后端等待自身完成/错误或用户停止，避免长推理被自动取消。
+- 展开/收起按钮与上下文附件合并为可换行操作行，短文本无附件时不占空行；保留正文、图片、OMO 独立区域以及附件打开事件。
+
+## 2026-09-10 聊天上下留白对齐
+
+- 实测底部空白来自 Obsidian `app.css` 的 view-content 底部 32px 与插件输入区底部 16px 叠加；不是 CSS 片段造成。聊天视图使用对称宿主留白，头部/输入区共用 12px 间距，将桌面上下视觉留白统一为约 24px，保留设备安全区域。
+
 ## 2026-09-10 v1.1.21 安装过程反馈与稳定版历史分页
 
 - 安装和还原过程中显示持续活动进度条，以及下载文件、已完成文件数、备份、写入、校验和回滚等真实阶段；完成或失败保留状态提示。检查与安装互斥，阶段订阅不会引发重入；关闭设置后异步完成不重新打开设置页。

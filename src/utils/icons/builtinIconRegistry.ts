@@ -3,8 +3,12 @@ import {
   LOBEHUB_ICON_MANIFEST,
   type LobehubManifestEntry,
 } from './lobehubIconManifest';
+import { MODELS_DEV_PROVIDER_ICONS } from './modelsDevIconManifest';
 
-export type BuiltinIconLibraryId = 'lobehub' | 'opencode';
+export type BuiltinIconLibraryId = 'lobehub' | 'opencode' | 'modelsdev';
+
+/** Every models.dev provider logo is served from `<base>/<provider-id>.svg`. */
+export const MODELS_DEV_LOGO_BASE_URL = 'https://models.dev/logos';
 
 export interface BuiltinIconLobehubMetadata {
   color: string;
@@ -25,6 +29,11 @@ export interface BuiltinIconDefinition {
   aliases: string[];
   normalizedAliases: string[];
   tokens: string[];
+  /**
+   * Tokens from the icon id and curated aliases only. Fuzzy provider-id matching
+   * scores against these so descriptive display names cannot win a brand match.
+   */
+  identityTokens: string[];
   searchText: string;
   source: string;
   lobehub?: BuiltinIconLobehubMetadata;
@@ -33,6 +42,11 @@ export interface BuiltinIconDefinition {
 export interface SearchBuiltinIconsOptions {
   libraryId?: BuiltinIconLibraryId;
   limit?: number;
+  /**
+   * models.dev ids are exact-match-only by default: their long, wordy ids would
+   * otherwise substring-match generic query words such as `provider` or `gateway`.
+   */
+  includeModelsDev?: boolean;
 }
 
 export interface ParsedBuiltinSource {
@@ -455,6 +469,7 @@ const OPENCODE_ICON_IDS = [
 const libraryOrder: Record<BuiltinIconLibraryId, number> = {
   lobehub: 0,
   opencode: 1,
+  modelsdev: 2,
 };
 
 function titleCaseSegment(segment: string): string {
@@ -523,7 +538,7 @@ function buildLobehubDefinitions(): BuiltinIconDefinition[] {
   }
 
   return LOBEHUB_ICON_MANIFEST
-    .map((entry) => createDefinition('lobehub', entry.iconId, aliasesByIconId.get(entry.iconId) ?? [], entry))
+    .map((entry) => createDefinition('lobehub', entry.iconId, aliasesByIconId.get(entry.iconId) ?? [], { manifestEntry: entry }))
     .sort(sortDefinitions);
 }
 
@@ -541,13 +556,20 @@ function buildOpencodeDefinitions(): BuiltinIconDefinition[] {
     .map((iconId) => createDefinition('opencode', iconId, aliasesByIconId.get(iconId) ?? []));
 }
 
+function buildModelsDevDefinitions(): BuiltinIconDefinition[] {
+  return [...MODELS_DEV_PROVIDER_ICONS]
+    .map((provider) => createDefinition('modelsdev', provider.id, [], { displayName: provider.name }))
+    .sort(sortDefinitions);
+}
+
 function createDefinition(
   libraryId: BuiltinIconLibraryId,
   iconId: string,
   aliases: string[],
-  manifestEntry?: LobehubManifestEntry,
+  meta: { manifestEntry?: LobehubManifestEntry; displayName?: string } = {},
 ): BuiltinIconDefinition {
-  const displayName = manifestEntry?.fullTitle ?? getDisplayName(iconId);
+  const { manifestEntry } = meta;
+  const displayName = manifestEntry?.fullTitle ?? meta.displayName ?? getDisplayName(iconId);
   const searchValues = [
     iconId,
     displayName,
@@ -557,6 +579,7 @@ function createDefinition(
     ...aliases,
   ].filter((value): value is string => Boolean(value));
   const values = Array.from(new Set(searchValues));
+  const identityValues = Array.from(new Set([iconId, ...aliases]));
   return {
     libraryId,
     iconId,
@@ -564,6 +587,7 @@ function createDefinition(
     aliases,
     normalizedAliases: values.map((value) => normalizeSearchValue(value)).filter(Boolean),
     tokens: Array.from(new Set(values.flatMap((value) => tokenize(value)))),
+    identityTokens: Array.from(new Set(identityValues.flatMap((value) => tokenize(value)))),
     searchText: values.join(' ').toLowerCase(),
     source: formatBuiltinSource(libraryId, iconId),
     lobehub: manifestEntry ? {
@@ -585,7 +609,11 @@ function createDefinition(
   };
 }
 
-const BUILTIN_ICON_DEFINITIONS = [...buildLobehubDefinitions(), ...buildOpencodeDefinitions()];
+const BUILTIN_ICON_DEFINITIONS = [
+  ...buildLobehubDefinitions(),
+  ...buildOpencodeDefinitions(),
+  ...buildModelsDevDefinitions(),
+];
 const BUILTIN_ICON_BY_SOURCE = new Map(BUILTIN_ICON_DEFINITIONS.map((definition) => [definition.source, definition]));
 
 function computeMatchScore(definition: BuiltinIconDefinition, query: string): number {
@@ -629,7 +657,11 @@ function sortDefinitions(left: BuiltinIconDefinition, right: BuiltinIconDefiniti
 }
 
 export function isBuiltinIconLibraryId(value: string): value is BuiltinIconLibraryId {
-  return value === 'lobehub' || value === 'opencode';
+  return value === 'lobehub' || value === 'opencode' || value === 'modelsdev';
+}
+
+export function getModelsDevLogoUrl(iconId: string): string {
+  return `${MODELS_DEV_LOGO_BASE_URL}/${iconId}.svg`;
 }
 
 export function formatBuiltinSource(libraryId: BuiltinIconLibraryId, iconId: string): string {
@@ -661,10 +693,16 @@ export function getBuiltinIcon(libraryId: BuiltinIconLibraryId, iconId: string):
   return findBuiltinIcon(formatBuiltinSource(libraryId, iconId));
 }
 
-export function listBuiltinIcons(options: { libraryId?: BuiltinIconLibraryId } = {}): BuiltinIconDefinition[] {
-  const items = options.libraryId
-    ? BUILTIN_ICON_DEFINITIONS.filter((definition) => definition.libraryId === options.libraryId)
-    : BUILTIN_ICON_DEFINITIONS;
+export function listBuiltinIcons(
+  options: { libraryId?: BuiltinIconLibraryId; includeModelsDev?: boolean } = {},
+): BuiltinIconDefinition[] {
+  const items = BUILTIN_ICON_DEFINITIONS.filter((definition) => {
+    if (options.libraryId) {
+      return definition.libraryId === options.libraryId;
+    }
+
+    return options.includeModelsDev === true || definition.libraryId !== 'modelsdev';
+  });
   return [...items].sort(sortDefinitions);
 }
 
@@ -672,7 +710,10 @@ export function searchBuiltinIcons(
   query: string,
   options: SearchBuiltinIconsOptions = {},
 ): BuiltinIconDefinition[] {
-  const definitions = listBuiltinIcons({ libraryId: options.libraryId });
+  const definitions = listBuiltinIcons({
+    libraryId: options.libraryId,
+    includeModelsDev: options.includeModelsDev,
+  });
   const trimmedQuery = query.trim();
   if (!trimmedQuery) {
     return options.limit ? definitions.slice(0, options.limit) : definitions;
@@ -693,16 +734,131 @@ export function searchBuiltinIcons(
   return options.limit ? matched.slice(0, options.limit) : matched;
 }
 
-export function resolveBuiltinIconMatch(providerId: string): BuiltinIconDefinition | null {
+const FUZZY_MIN_TOKEN_LENGTH = 3;
+
+/** Segments that describe a plan, region or deployment shape rather than a brand. */
+const FUZZY_DROPPABLE_SEGMENTS = new Set([
+  'alpha', 'api', 'app', 'beta', 'chat', 'client', 'cloud', 'coding', 'core',
+  'dev', 'edge', 'eu', 'fast', 'free', 'gateway', 'global', 'go', 'hub', 'intl',
+  'jp', 'lab', 'labs', 'lite', 'llm', 'max', 'mini', 'official', 'plan', 'plus',
+  'preview', 'pro', 'proxy', 'relay', 'router', 'sdk', 'server', 'sg', 'token',
+  'us', 'v0', 'v1', 'v2', 'v3',
+]);
+
+/** Generic words that must never be the only evidence for a brand match. */
+const FUZZY_GENERIC_TOKENS = new Set([
+  'agent', 'agents', 'ai', 'api', 'app', 'base', 'chat', 'client', 'cloud', 'code',
+  'coding', 'core', 'data', 'dev', 'edge', 'fast', 'flow', 'free', 'gateway', 'group',
+  'hub', 'llm', 'llms', 'labs', 'lite', 'max', 'mini', 'model', 'models', 'node',
+  'official', 'open', 'plan', 'plans', 'platform', 'plus', 'preview', 'pro', 'provider',
+  'providers', 'proxy', 'relay', 'router', 'run', 'runner', 'runtime', 'sdk', 'server',
+  'service', 'services', 'space', 'stack', 'token', 'tokens', 'tool', 'tools',
+]);
+
+function resolveDirectIconMatch(providerId: string): BuiltinIconDefinition | null {
+  const trimmedProviderId = providerId.trim().toLowerCase();
   const normalizedProviderId = normalizeSearchValue(providerId);
-  if (!normalizedProviderId) {
+  if (!trimmedProviderId || !normalizedProviderId) {
     return null;
   }
 
   const opencodeAliasTarget = OPENCODE_ICON_ALIAS_MAP[normalizedProviderId];
   if (opencodeAliasTarget) {
-    return getBuiltinIcon('opencode', opencodeAliasTarget);
+    const localMatch = getBuiltinIcon('opencode', opencodeAliasTarget);
+    if (localMatch) {
+      return localMatch;
+    }
   }
 
-  return searchBuiltinIcons(providerId, { limit: 1 })[0] ?? null;
+  // Curated aliases and exact ids from LobeHub and the bundled set. sortDefinitions
+  // keeps ties ordered LobeHub -> bundled.
+  const searchMatch = searchBuiltinIcons(trimmedProviderId, { limit: 1 })[0];
+  if (searchMatch) {
+    return searchMatch;
+  }
+
+  // models.dev only ever answers an exact provider id; its wordy ids must not
+  // take part in substring or fuzzy matching.
+  return getBuiltinIcon('modelsdev', trimmedProviderId);
+}
+
+function buildFuzzyProviderIdCandidates(providerId: string): string[] {
+  const segments = tokenize(providerId);
+  if (segments.length < 2) {
+    return [];
+  }
+
+  const candidates: string[] = [];
+  const push = (value: string) => {
+    // Short derived fragments ("my", "cn") are not brand evidence on their own.
+    if (value.length < FUZZY_MIN_TOKEN_LENGTH || candidates.includes(value)) {
+      return;
+    }
+
+    candidates.push(value);
+  };
+
+  for (let end = segments.length - 1; end >= 1; end -= 1) {
+    push(segments.slice(0, end).join('-'));
+  }
+
+  const withoutDroppable = segments.filter((segment) => !FUZZY_DROPPABLE_SEGMENTS.has(segment));
+  push(withoutDroppable.join('-'));
+  for (let end = withoutDroppable.length - 1; end >= 1; end -= 1) {
+    push(withoutDroppable.slice(0, end).join('-'));
+  }
+
+  return candidates;
+}
+
+/**
+ * Last resort for provider ids no library publishes (third-party gateways such
+ * as `krill-gpt`): keep the longest shared brand-ish token and use its icon.
+ */
+function resolveTokenOverlapMatch(providerId: string): BuiltinIconDefinition | null {
+  const queryTokens = Array.from(new Set(
+    tokenize(providerId).filter((token) => (
+      token.length >= FUZZY_MIN_TOKEN_LENGTH && !FUZZY_GENERIC_TOKENS.has(token)
+    )),
+  ));
+  if (queryTokens.length === 0) {
+    return null;
+  }
+
+  let best: { definition: BuiltinIconDefinition; score: number } | null = null;
+  for (const definition of BUILTIN_ICON_DEFINITIONS) {
+    for (const token of queryTokens) {
+      if (!definition.identityTokens.includes(token)) {
+        continue;
+      }
+
+      const score = token.length;
+      if (!best || score > best.score || (score === best.score && sortDefinitions(definition, best.definition) < 0)) {
+        best = { definition, score };
+      }
+    }
+  }
+
+  return best?.definition ?? null;
+}
+
+/**
+ * Resolve a provider id to a builtin icon: direct match first (local alias,
+ * curated aliases, exact ids, then models.dev), then a fuzzy pass that strips
+ * plan/region segments before falling back to token overlap.
+ */
+export function resolveBuiltinIconMatch(providerId: string): BuiltinIconDefinition | null {
+  const directMatch = resolveDirectIconMatch(providerId);
+  if (directMatch) {
+    return directMatch;
+  }
+
+  for (const candidate of buildFuzzyProviderIdCandidates(providerId)) {
+    const candidateMatch = resolveDirectIconMatch(candidate);
+    if (candidateMatch) {
+      return candidateMatch;
+    }
+  }
+
+  return resolveTokenOverlapMatch(providerId);
 }

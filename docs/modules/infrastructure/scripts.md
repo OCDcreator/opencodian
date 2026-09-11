@@ -158,6 +158,12 @@ Node.js 脚本形式的 Jest 启动包装器。`run-jest-options.js` 只在当�
 
 从 `@lobehub/icons` 包读取 provider icon 目录（toc），按 variant（mono/color/brand/brand-color/text/text-cn/text-color/combine/avatar）生成 TypeScript manifest 文件 `src/utils/icons/lobehubIconManifest.ts`。每个 provider entry 包含可用 variant 列表、静态 SVG CDN URL 和 CDN base URL。生成的 manifest 供 `ProviderIconService` 和 `lobehubIconManifest.ts` 消费，避免运行时动态 import 整个 LobeHub 图标包。
 
+`@lobehub/icons >= 5.5` 的 `es/toc.js` 是 `import data from "./toc.json"`，Node 22 会因缺少 import attribute 拒绝加载，因此脚本改为直接读取 `es/toc.json`，仅在旧的 inline-array 布局下回退到模块导入。升级依赖版本后必须重跑本脚本，否则图标 id/变体枚举会停留在旧版本。
+
+### sync-modelsdev-icons.mjs — models.dev provider 词汇表同步
+
+抓取 `https://models.dev/api.json` 的 provider keys，生成 `src/utils/icons/modelsDevIconManifest.ts`（provider id + 展示名，按 id 升序）。图标本体不打包，运行时按 `https://models.dev/logos/<provider-id>.svg` 直接引用。该词汇表让图标解析与碰撞匹配在离线状态下也能判断 models.dev 认识哪些 provider。
+
 ## 关键方法
 
 | 脚本 | npm 命令 | 说明 |
@@ -183,6 +189,7 @@ Node.js 脚本形式的 Jest 启动包装器。`run-jest-options.js` 只在当�
 | `run-jest-options.js` | — | 按 Node runtime capability 安全解析 Jest 子进程的 `NODE_OPTIONS` |
 | `sync-version.js` | — | 版本同步 |
 | `sync-lobehub-icons.mjs` | `npm run sync:lobehub-icons` | 从 `@lobehub/icons` 生成 provider icon manifest |
+| `sync-modelsdev-icons.mjs` | `npm run sync:modelsdev-icons` | 从 models.dev 生成 provider id 词汇表 |
 
 ## 数据流
 

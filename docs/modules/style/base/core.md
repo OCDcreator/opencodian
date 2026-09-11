@@ -1,5 +1,7 @@
 # Core Styles
 
+2026-09-10：聊天 view-content 单独使用对称上下间距，覆盖 Obsidian 通用视图默认的 32px 底部留白；头部与输入区共享 `--opencodian-chat-edge-gap`（默认 12px），同时保留设备 safe-area。仅作用于 `data-type="opencodian-view"`，不改变主题或其它视图。
+
 > 2026-07-29: Added OpenCode diagnostic header-button visibility and state colors.
 
 > **源码**: `src/style/base/core.css`

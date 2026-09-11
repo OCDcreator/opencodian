@@ -92,7 +92,7 @@ module.exports = {
       },
     },
     {
-      files: ['src/utils/icons/lobehubIconManifest.ts'],
+      files: ['src/utils/icons/lobehubIconManifest.ts', 'src/utils/icons/modelsDevIconManifest.ts'],
       rules: {
         'max-lines': 'off',
         'max-lines-per-function': 'off',

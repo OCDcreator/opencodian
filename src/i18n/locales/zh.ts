@@ -1550,6 +1550,7 @@ export const zhTranslations = {
   'settings.model.iconCache.builtinPicker.library.all': '全部图库',
   'settings.model.iconCache.builtinPicker.library.lobehub': 'LobeHub',
   'settings.model.iconCache.builtinPicker.library.opencode': 'OpenCode',
+  'settings.model.iconCache.builtinPicker.library.modelsdev': 'models.dev',
   'settings.model.iconCache.builtinPicker.searchPlaceholder': '搜索图标 ID、别名或 provider 名称',
   'settings.model.iconCache.builtinPicker.empty': '当前搜索条件下没有匹配的内置图标。',
   'settings.model.iconCache.builtinPicker.recommended': '推荐',

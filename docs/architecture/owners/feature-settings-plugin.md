@@ -45,3 +45,7 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 ## Auto-install toggle (2026-09-09)
 
 `SettingsPluginUpdateSection` renders the startup auto-install toggle bound to `settings.pluginUpdateAutoInstall` inside the status panel; toggling persists through the normal settings save path. Release validation, package writes and rollback remain with `core.update`.
+
+## Builtin icon picker: models.dev library filter (2026-09-11)
+
+`ProviderBuiltinIconPickerModal`'s library filter now offers `modelsdev` alongside `lobehub` and `opencode`, so the remote models.dev icon set can be browsed per library. Icon resolution itself stays in `shared.utils-icons`; the modal only renders and filters.

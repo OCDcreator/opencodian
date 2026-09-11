@@ -10,7 +10,8 @@
 ## 责任边界
 
 - provider icon id 解析：保留原有 5 级 `PROVIDER_ICON_MAP` 匹配策略
-- default entry 决策：先走 mapped LobeHub 图标，再回退 builtin alias/search 命中
+- default entry 决策：先走 mapped LobeHub 图标，再回退 builtin alias/search 命中（含 models.dev 与碰撞匹配）
+- source 标签：builtin 条目的来源标签按 library 显示为 LobeHub / OpenCode / models.dev
 - library key 归一化：复用 canonical provider key，避免 `code xzh` / `codexzh` 之类的重复存储
 - entry 持久化：统一处理 default-entry 持久化、去空、去重与删除
 

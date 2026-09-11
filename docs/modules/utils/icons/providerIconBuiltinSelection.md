@@ -12,6 +12,7 @@
 - builtin picker 数据：生成推荐项、搜索结果、preview candidates 与 selected 状态
 - LobeHub variant 选择：结合显式 variant、全局默认 variant、color mode 与 theme 推导静态资源候选
 - preview 解析：统一 mapped / builtin entry 的 preview URL 与 previewCandidates
+- models.dev preview：`modelsdev` builtin entry 直接返回 `getModelsDevLogoUrl()`，不需要 vault adapter
 - builtin 持久化：选择 builtin 图标时，统一完成 entry 置顶、去重与 variant 落盘
 
 ## 公开接口

@@ -291,7 +291,11 @@ export function getProviderIconEntrySourceLabel(entry: ProviderIconEntry): strin
       return entry.source;
     }
 
-    return `${builtinIcon.libraryId === 'lobehub' ? 'LobeHub' : 'OpenCode'} / ${builtinIcon.iconId}`;
+    return `${builtinIcon.libraryId === 'lobehub'
+      ? 'LobeHub'
+      : builtinIcon.libraryId === 'modelsdev'
+        ? 'models.dev'
+        : 'OpenCode'} / ${builtinIcon.iconId}`;
   }
 
   return entry.source;

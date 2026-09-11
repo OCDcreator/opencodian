@@ -32,6 +32,7 @@ coverage/
 data.json
 
 # AI coding assistants
+.agents/
 .claude/
 .copilot/
 .gemini/

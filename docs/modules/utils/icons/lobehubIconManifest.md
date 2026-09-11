@@ -53,3 +53,5 @@ npm run sync:lobehub-icons
 
 - 不要手工编辑此文件；更新时运行 `npm run sync:lobehub-icons`。
 - 变更该文件会影响 provider icon 搜索、展示和缓存行为，通常需要跑 icon registry 相关测试。
+- 生成结果取决于 `package.json` 里 `@lobehub/icons` 的固定版本；升级依赖后必须重跑同步脚本，否则"有哪些图标 id/变体"会一直停留在旧版本（资源 URL 用的是 unpkg `@latest`，所以已存在 id 的图片本身不会旧）。
+- `@lobehub/icons >= 5.5` 的 `es/toc.js` 是 `import data from "./toc.json"`，Node 22 会因缺少 import attribute 拒绝加载；`scripts/sync-lobehub-icons.mjs` 因此改为直接读取 `es/toc.json`，仅对旧的 inline-array 布局回退到模块导入。

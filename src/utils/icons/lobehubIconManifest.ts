@@ -412,6 +412,83 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     }
   },
   {
+    "iconId": "agnesai",
+    "componentId": "AgnesAI",
+    "docsUrl": "agnes-ai",
+    "title": "Agnes AI",
+    "fullTitle": "Agnes AI",
+    "group": "application",
+    "color": "#000",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": false,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/agnesai.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/agnesai.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/agnesai.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/agnesai.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/agnesai.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/agnesai-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/agnesai-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/agnesai-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/agnesai-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/agnesai-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/agnesai.webp"
+        }
+      }
+    }
+  },
+  {
     "iconId": "agui",
     "componentId": "Agui",
     "docsUrl": "agui",
@@ -1190,6 +1267,103 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     }
   },
   {
+    "iconId": "airjelly",
+    "componentId": "AirJelly",
+    "docsUrl": "air-jelly",
+    "title": "AirJelly",
+    "fullTitle": "AirJelly",
+    "group": "application",
+    "color": "#00C8FF",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": true,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/airjelly.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/airjelly.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/airjelly.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/airjelly.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/airjelly.webp"
+          }
+        }
+      },
+      "color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/airjelly-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/airjelly-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/airjelly-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/airjelly-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/airjelly-color.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/airjelly-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/airjelly-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/airjelly-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/airjelly-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/airjelly-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/airjelly.webp"
+        }
+      }
+    }
+  },
+  {
     "iconId": "aistudio",
     "componentId": "AiStudio",
     "docsUrl": "ai-studio",
@@ -1450,7 +1624,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     "color": "#FF6003",
     "capabilities": {
       "hasAvatar": true,
-      "hasBrand": true,
+      "hasBrand": false,
       "hasBrandColor": true,
       "hasColor": true,
       "hasCombine": false,
@@ -1496,26 +1670,6 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           "webp": {
             "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/alibaba-color.webp",
             "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/alibaba-color.webp"
-          }
-        }
-      },
-      "brand": {
-        "supported": true,
-        "staticSupport": true,
-        "formats": [
-          "svg",
-          "png",
-          "webp"
-        ],
-        "urls": {
-          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/alibaba-brand.svg",
-          "png": {
-            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/alibaba-brand.png",
-            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/alibaba-brand.png"
-          },
-          "webp": {
-            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/alibaba-brand.webp",
-            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/alibaba-brand.webp"
           }
         }
       },
@@ -1806,6 +1960,123 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     }
   },
   {
+    "iconId": "anspire",
+    "componentId": "Anspire",
+    "docsUrl": "anspire",
+    "title": "Anspire",
+    "fullTitle": "Anspire",
+    "group": "provider",
+    "color": "#514BFD",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": true,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": true
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/anspire.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/anspire.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/anspire.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/anspire.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/anspire.webp"
+          }
+        }
+      },
+      "color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/anspire-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/anspire-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/anspire-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/anspire-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/anspire-color.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/anspire-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/anspire-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/anspire-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/anspire-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/anspire-text.webp"
+          }
+        }
+      },
+      "text-color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/anspire-text-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/anspire-text-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/anspire-text-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/anspire-text-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/anspire-text-color.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/anspire.webp"
+        }
+      }
+    }
+  },
+  {
     "iconId": "antgroup",
     "componentId": "AntGroup",
     "docsUrl": "ant-group",
@@ -1815,7 +2086,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     "color": "#1677ff",
     "capabilities": {
       "hasAvatar": true,
-      "hasBrand": true,
+      "hasBrand": false,
       "hasBrandColor": true,
       "hasColor": true,
       "hasCombine": false,
@@ -1861,26 +2132,6 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           "webp": {
             "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/antgroup-color.webp",
             "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/antgroup-color.webp"
-          }
-        }
-      },
-      "brand": {
-        "supported": true,
-        "staticSupport": true,
-        "formats": [
-          "svg",
-          "png",
-          "webp"
-        ],
-        "urls": {
-          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/antgroup-brand.svg",
-          "png": {
-            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/antgroup-brand.png",
-            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/antgroup-brand.png"
-          },
-          "webp": {
-            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/antgroup-brand.webp",
-            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/antgroup-brand.webp"
           }
         }
       },
@@ -2870,7 +3121,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     "color": "#222F3E",
     "capabilities": {
       "hasAvatar": true,
-      "hasBrand": true,
+      "hasBrand": false,
       "hasBrandColor": true,
       "hasColor": true,
       "hasCombine": true,
@@ -2916,26 +3167,6 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           "webp": {
             "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/aws-color.webp",
             "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/aws-color.webp"
-          }
-        }
-      },
-      "brand": {
-        "supported": true,
-        "staticSupport": true,
-        "formats": [
-          "svg",
-          "png",
-          "webp"
-        ],
-        "urls": {
-          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/aws-brand.svg",
-          "png": {
-            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/aws-brand.png",
-            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/aws-brand.png"
-          },
-          "webp": {
-            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/aws-brand.webp",
-            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/aws-brand.webp"
           }
         }
       },
@@ -3473,7 +3704,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     "color": "#2932E1",
     "capabilities": {
       "hasAvatar": true,
-      "hasBrand": true,
+      "hasBrand": false,
       "hasBrandColor": true,
       "hasColor": true,
       "hasCombine": false,
@@ -3519,26 +3750,6 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           "webp": {
             "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/baidu-color.webp",
             "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/baidu-color.webp"
-          }
-        }
-      },
-      "brand": {
-        "supported": true,
-        "staticSupport": true,
-        "formats": [
-          "svg",
-          "png",
-          "webp"
-        ],
-        "urls": {
-          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/baidu-brand.svg",
-          "png": {
-            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/baidu-brand.png",
-            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/baidu-brand.png"
-          },
-          "webp": {
-            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/baidu-brand.webp",
-            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/baidu-brand.webp"
           }
         }
       },
@@ -4333,6 +4544,200 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     }
   },
   {
+    "iconId": "bocha",
+    "componentId": "Bocha",
+    "docsUrl": "bocha",
+    "title": "Bocha",
+    "fullTitle": "Bocha (博查)",
+    "group": "provider",
+    "color": "#006EFF",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": true,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/bocha.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/bocha.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/bocha.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/bocha.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/bocha.webp"
+          }
+        }
+      },
+      "color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/bocha-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/bocha-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/bocha-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/bocha-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/bocha-color.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/bocha-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/bocha-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/bocha-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/bocha-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/bocha-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/bocha.webp"
+        }
+      }
+    }
+  },
+  {
+    "iconId": "brave",
+    "componentId": "Brave",
+    "docsUrl": "brave",
+    "title": "Brave",
+    "fullTitle": "Brave",
+    "group": "provider",
+    "color": "#FF4000",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": true,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/brave.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/brave.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/brave.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/brave.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/brave.webp"
+          }
+        }
+      },
+      "color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/brave-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/brave-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/brave-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/brave-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/brave-color.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/brave-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/brave-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/brave-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/brave-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/brave-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/brave.webp"
+        }
+      }
+    }
+  },
+  {
     "iconId": "briaai",
     "componentId": "BriaAI",
     "docsUrl": "bria-ai",
@@ -4425,6 +4830,83 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
         ],
         "urls": {
           "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/briaai.webp"
+        }
+      }
+    }
+  },
+  {
+    "iconId": "browserless",
+    "componentId": "Browserless",
+    "docsUrl": "browserless",
+    "title": "Browserless",
+    "fullTitle": "Browserless",
+    "group": "provider",
+    "color": "#fff",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": false,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/browserless.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/browserless.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/browserless.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/browserless.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/browserless.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/browserless-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/browserless-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/browserless-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/browserless-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/browserless-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/browserless.webp"
         }
       }
     }
@@ -4536,7 +5018,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     "color": "#325AB4",
     "capabilities": {
       "hasAvatar": true,
-      "hasBrand": true,
+      "hasBrand": false,
       "hasBrandColor": true,
       "hasColor": true,
       "hasCombine": false,
@@ -4582,26 +5064,6 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           "webp": {
             "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/bytedance-color.webp",
             "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/bytedance-color.webp"
-          }
-        }
-      },
-      "brand": {
-        "supported": true,
-        "staticSupport": true,
-        "formats": [
-          "svg",
-          "png",
-          "webp"
-        ],
-        "urls": {
-          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/bytedance-brand.svg",
-          "png": {
-            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/bytedance-brand.png",
-            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/bytedance-brand.png"
-          },
-          "webp": {
-            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/bytedance-brand.webp",
-            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/bytedance-brand.webp"
           }
         }
       },
@@ -4755,6 +5217,103 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     }
   },
   {
+    "iconId": "celestoai",
+    "componentId": "CelestoAI",
+    "docsUrl": "celesto-ai",
+    "title": "CelestoAI",
+    "fullTitle": "CelestoAI",
+    "group": "application",
+    "color": "#000",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": true,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/celestoai.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/celestoai.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/celestoai.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/celestoai.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/celestoai.webp"
+          }
+        }
+      },
+      "color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/celestoai-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/celestoai-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/celestoai-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/celestoai-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/celestoai-color.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/celestoai-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/celestoai-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/celestoai-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/celestoai-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/celestoai-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/celestoai.webp"
+        }
+      }
+    }
+  },
+  {
     "iconId": "centml",
     "componentId": "CentML",
     "docsUrl": "cent-ml",
@@ -4764,7 +5323,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     "color": "#004331",
     "capabilities": {
       "hasAvatar": true,
-      "hasBrand": true,
+      "hasBrand": false,
       "hasBrandColor": true,
       "hasColor": true,
       "hasCombine": true,
@@ -4810,26 +5369,6 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           "webp": {
             "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/centml-color.webp",
             "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/centml-color.webp"
-          }
-        }
-      },
-      "brand": {
-        "supported": true,
-        "staticSupport": true,
-        "formats": [
-          "svg",
-          "png",
-          "webp"
-        ],
-        "urls": {
-          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/centml-brand.svg",
-          "png": {
-            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/centml-brand.png",
-            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/centml-brand.png"
-          },
-          "webp": {
-            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/centml-brand.webp",
-            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/centml-brand.webp"
           }
         }
       },
@@ -4901,7 +5440,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     "color": "#F15A29",
     "capabilities": {
       "hasAvatar": true,
-      "hasBrand": true,
+      "hasBrand": false,
       "hasBrandColor": true,
       "hasColor": true,
       "hasCombine": true,
@@ -4947,26 +5486,6 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           "webp": {
             "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/cerebras-color.webp",
             "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/cerebras-color.webp"
-          }
-        }
-      },
-      "brand": {
-        "supported": true,
-        "staticSupport": true,
-        "formats": [
-          "svg",
-          "png",
-          "webp"
-        ],
-        "urls": {
-          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/cerebras-brand.svg",
-          "png": {
-            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/cerebras-brand.png",
-            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/cerebras-brand.png"
-          },
-          "webp": {
-            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/cerebras-brand.webp",
-            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/cerebras-brand.webp"
           }
         }
       },
@@ -5239,7 +5758,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
       "hasCombine": true,
       "hasText": true,
       "hasTextCn": false,
-      "hasTextColor": false
+      "hasTextColor": true
     },
     "variants": {
       "mono": {
@@ -5299,6 +5818,26 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           "webp": {
             "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/civitai-text.webp",
             "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/civitai-text.webp"
+          }
+        }
+      },
+      "text-color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/civitai-text-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/civitai-text-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/civitai-text-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/civitai-text-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/civitai-text-color.webp"
           }
         }
       },
@@ -5421,7 +5960,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     "iconId": "claudecode",
     "componentId": "ClaudeCode",
     "docsUrl": "claude-code",
-    "title": "Antigravity",
+    "title": "Claude Code",
     "fullTitle": "Claude Code",
     "group": "application",
     "color": "#D97757",
@@ -5761,6 +6300,104 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
         ],
         "urls": {
           "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/cloudflare.webp"
+        }
+      }
+    }
+  },
+  {
+    "iconId": "codebuddy",
+    "componentId": "CodeBuddy",
+    "docsUrl": "code-buddy",
+    "title": "CodeBuddy",
+    "fullTitle": "CodeBuddy",
+    "group": "application",
+    "color": "#6c4dff",
+    "colorGradient": "radial-gradient(66.67% 66.67% at 87.5% 102.08%, #2EA99D 0%, #6C4DFF 100%)",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": true,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/codebuddy.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/codebuddy.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/codebuddy.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/codebuddy.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/codebuddy.webp"
+          }
+        }
+      },
+      "color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/codebuddy-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/codebuddy-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/codebuddy-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/codebuddy-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/codebuddy-color.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/codebuddy-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/codebuddy-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/codebuddy-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/codebuddy-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/codebuddy-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/codebuddy.webp"
         }
       }
     }
@@ -6356,6 +6993,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     "fullTitle": "Colab (Google)",
     "group": "application",
     "color": "#F9AB00",
+    "colorGradient": "linear-gradient(-45deg, #E8710A, #F9AB00)",
     "capabilities": {
       "hasAvatar": true,
       "hasBrand": false,
@@ -7600,7 +8238,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     "color": "#EE3D2C",
     "capabilities": {
       "hasAvatar": true,
-      "hasBrand": true,
+      "hasBrand": false,
       "hasBrandColor": true,
       "hasColor": true,
       "hasCombine": true,
@@ -7646,26 +8284,6 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           "webp": {
             "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/dbrx-color.webp",
             "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/dbrx-color.webp"
-          }
-        }
-      },
-      "brand": {
-        "supported": true,
-        "staticSupport": true,
-        "formats": [
-          "svg",
-          "png",
-          "webp"
-        ],
-        "urls": {
-          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/dbrx-brand.svg",
-          "png": {
-            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/dbrx-brand.png",
-            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/dbrx-brand.png"
-          },
-          "webp": {
-            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/dbrx-brand.webp",
-            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/dbrx-brand.webp"
           }
         }
       },
@@ -8290,6 +8908,103 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     }
   },
   {
+    "iconId": "devin",
+    "componentId": "Devin",
+    "docsUrl": "devin",
+    "title": "Devin",
+    "fullTitle": "Devin",
+    "group": "application",
+    "color": "#fff",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": true,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/devin.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/devin.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/devin.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/devin.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/devin.webp"
+          }
+        }
+      },
+      "color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/devin-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/devin-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/devin-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/devin-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/devin-color.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/devin-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/devin-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/devin-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/devin-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/devin-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/devin.webp"
+        }
+      }
+    }
+  },
+  {
     "iconId": "dify",
     "componentId": "Dify",
     "docsUrl": "dify",
@@ -8305,7 +9020,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
       "hasCombine": true,
       "hasText": true,
       "hasTextCn": false,
-      "hasTextColor": false
+      "hasTextColor": true
     },
     "variants": {
       "mono": {
@@ -8365,6 +9080,26 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           "webp": {
             "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/dify-text.webp",
             "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/dify-text.webp"
+          }
+        }
+      },
+      "text-color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/dify-text-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/dify-text-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/dify-text-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/dify-text-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/dify-text-color.webp"
           }
         }
       },
@@ -9564,6 +10299,103 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
         ],
         "urls": {
           "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/figma.webp"
+        }
+      }
+    }
+  },
+  {
+    "iconId": "firecrawl",
+    "componentId": "Firecrawl",
+    "docsUrl": "firecrawl",
+    "title": "Firecrawl",
+    "fullTitle": "Firecrawl",
+    "group": "application",
+    "color": "#ff4d00",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": true,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/firecrawl.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/firecrawl.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/firecrawl.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/firecrawl.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/firecrawl.webp"
+          }
+        }
+      },
+      "color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/firecrawl-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/firecrawl-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/firecrawl-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/firecrawl-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/firecrawl-color.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/firecrawl-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/firecrawl-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/firecrawl-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/firecrawl-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/firecrawl-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/firecrawl.webp"
         }
       }
     }
@@ -10828,7 +11660,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     "color": "#fff",
     "capabilities": {
       "hasAvatar": true,
-      "hasBrand": true,
+      "hasBrand": false,
       "hasBrandColor": true,
       "hasColor": true,
       "hasCombine": false,
@@ -10877,26 +11709,6 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           }
         }
       },
-      "brand": {
-        "supported": true,
-        "staticSupport": true,
-        "formats": [
-          "svg",
-          "png",
-          "webp"
-        ],
-        "urls": {
-          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/google-brand.svg",
-          "png": {
-            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/google-brand.png",
-            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/google-brand.png"
-          },
-          "webp": {
-            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/google-brand.webp",
-            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/google-brand.webp"
-          }
-        }
-      },
       "brand-color": {
         "supported": true,
         "staticSupport": true,
@@ -10939,7 +11751,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     "color": "#fff",
     "capabilities": {
       "hasAvatar": true,
-      "hasBrand": true,
+      "hasBrand": false,
       "hasBrandColor": true,
       "hasColor": true,
       "hasCombine": false,
@@ -10985,26 +11797,6 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           "webp": {
             "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/googlecloud-color.webp",
             "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/googlecloud-color.webp"
-          }
-        }
-      },
-      "brand": {
-        "supported": true,
-        "staticSupport": true,
-        "formats": [
-          "svg",
-          "png",
-          "webp"
-        ],
-        "urls": {
-          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/googlecloud-brand.svg",
-          "png": {
-            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/googlecloud-brand.png",
-            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/googlecloud-brand.png"
-          },
-          "webp": {
-            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/googlecloud-brand.webp",
-            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/googlecloud-brand.webp"
           }
         }
       },
@@ -11641,6 +12433,83 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     }
   },
   {
+    "iconId": "happyhorse",
+    "componentId": "HappyHorse",
+    "docsUrl": "happy-horse",
+    "title": "Hedra",
+    "fullTitle": "HappyHorse",
+    "group": "model",
+    "color": "#000",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": false,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/happyhorse.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/happyhorse.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/happyhorse.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/happyhorse.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/happyhorse.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/happyhorse-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/happyhorse-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/happyhorse-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/happyhorse-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/happyhorse-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/happyhorse.webp"
+        }
+      }
+    }
+  },
+  {
     "iconId": "hedra",
     "componentId": "Hedra",
     "docsUrl": "hedra",
@@ -11718,6 +12587,83 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     }
   },
   {
+    "iconId": "hermesagent",
+    "componentId": "HermesAgent",
+    "docsUrl": "hermes-agent",
+    "title": "Hermes Agent",
+    "fullTitle": "Hermes Agent",
+    "group": "application",
+    "color": "#fff",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": false,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/hermesagent.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/hermesagent.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/hermesagent.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/hermesagent.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/hermesagent.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/hermesagent-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/hermesagent-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/hermesagent-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/hermesagent-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/hermesagent-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/hermesagent.webp"
+        }
+      }
+    }
+  },
+  {
     "iconId": "higress",
     "componentId": "Higress",
     "docsUrl": "higress",
@@ -11734,7 +12680,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
       "hasCombine": true,
       "hasText": true,
       "hasTextCn": false,
-      "hasTextColor": false
+      "hasTextColor": true
     },
     "variants": {
       "mono": {
@@ -11794,6 +12740,26 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           "webp": {
             "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/higress-text.webp",
             "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/higress-text.webp"
+          }
+        }
+      },
+      "text-color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/higress-text-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/higress-text-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/higress-text-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/higress-text-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/higress-text-color.webp"
           }
         }
       },
@@ -13399,6 +14365,83 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     }
   },
   {
+    "iconId": "kagi",
+    "componentId": "Kagi",
+    "docsUrl": "kagi",
+    "title": "Kagi",
+    "fullTitle": "Kagi",
+    "group": "provider",
+    "color": "#FEB219",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": false,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/kagi.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/kagi.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/kagi.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/kagi.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/kagi.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/kagi-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/kagi-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/kagi-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/kagi-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/kagi-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/kagi.webp"
+        }
+      }
+    }
+  },
+  {
     "iconId": "kilocode",
     "componentId": "KiloCode",
     "docsUrl": "kilo-code",
@@ -13568,6 +14611,103 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
         ],
         "urls": {
           "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/kimi.webp"
+        }
+      }
+    }
+  },
+  {
+    "iconId": "kiro",
+    "componentId": "Kiro",
+    "docsUrl": "kiro",
+    "title": "Kiro",
+    "fullTitle": "Kiro",
+    "group": "application",
+    "color": "#9046ff",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": true,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/kiro.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/kiro.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/kiro.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/kiro.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/kiro.webp"
+          }
+        }
+      },
+      "color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/kiro-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/kiro-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/kiro-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/kiro-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/kiro-color.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/kiro-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/kiro-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/kiro-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/kiro-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/kiro-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/kiro.webp"
         }
       }
     }
@@ -13958,7 +15098,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
       "hasCombine": true,
       "hasText": true,
       "hasTextCn": false,
-      "hasTextColor": false
+      "hasTextColor": true
     },
     "variants": {
       "mono": {
@@ -13998,6 +15138,26 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           "webp": {
             "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/kwaikat-text.webp",
             "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/kwaikat-text.webp"
+          }
+        }
+      },
+      "text-color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/kwaikat-text-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/kwaikat-text-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/kwaikat-text-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/kwaikat-text-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/kwaikat-text-color.webp"
           }
         }
       },
@@ -14297,7 +15457,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     "title": "Langfuse",
     "fullTitle": "Langfuse",
     "group": "application",
-    "color": "#000",
+    "color": "#1B1917",
     "capabilities": {
       "hasAvatar": true,
       "hasBrand": false,
@@ -16375,7 +17535,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
       "hasAvatar": true,
       "hasBrand": false,
       "hasBrandColor": false,
-      "hasColor": false,
+      "hasColor": true,
       "hasCombine": true,
       "hasText": true,
       "hasTextCn": false,
@@ -16399,6 +17559,26 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           "webp": {
             "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/menlo.webp",
             "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/menlo.webp"
+          }
+        }
+      },
+      "color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/menlo-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/menlo-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/menlo-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/menlo-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/menlo-color.webp"
           }
         }
       },
@@ -16441,6 +17621,103 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     }
   },
   {
+    "iconId": "meshy",
+    "componentId": "Meshy",
+    "docsUrl": "meshy",
+    "title": "Meshy",
+    "fullTitle": "Meshy",
+    "group": "model",
+    "color": "#000",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": true,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/meshy.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/meshy.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/meshy.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/meshy.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/meshy.webp"
+          }
+        }
+      },
+      "color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/meshy-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/meshy-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/meshy-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/meshy-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/meshy-color.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/meshy-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/meshy-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/meshy-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/meshy-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/meshy-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/meshy.webp"
+        }
+      }
+    }
+  },
+  {
     "iconId": "meta",
     "componentId": "Meta",
     "docsUrl": "meta",
@@ -16451,7 +17728,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     "colorGradient": "linear-gradient(45deg, #007FF8, #0668E1, #007FF8)",
     "capabilities": {
       "hasAvatar": true,
-      "hasBrand": true,
+      "hasBrand": false,
       "hasBrandColor": true,
       "hasColor": true,
       "hasCombine": true,
@@ -16497,26 +17774,6 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           "webp": {
             "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/meta-color.webp",
             "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/meta-color.webp"
-          }
-        }
-      },
-      "brand": {
-        "supported": true,
-        "staticSupport": true,
-        "formats": [
-          "svg",
-          "png",
-          "webp"
-        ],
-        "urls": {
-          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/meta-brand.svg",
-          "png": {
-            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/meta-brand.png",
-            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/meta-brand.png"
-          },
-          "webp": {
-            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/meta-brand.webp",
-            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/meta-brand.webp"
           }
         }
       },
@@ -17491,6 +18748,103 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     }
   },
   {
+    "iconId": "moxt",
+    "componentId": "Moxt",
+    "docsUrl": "moxt",
+    "title": "Moxt",
+    "fullTitle": "Moxt",
+    "group": "application",
+    "color": "#29C16A",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": true,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/moxt.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/moxt.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/moxt.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/moxt.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/moxt.webp"
+          }
+        }
+      },
+      "color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/moxt-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/moxt-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/moxt-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/moxt-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/moxt-color.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/moxt-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/moxt-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/moxt-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/moxt-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/moxt-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/moxt.webp"
+        }
+      }
+    }
+  },
+  {
     "iconId": "myshell",
     "componentId": "MyShell",
     "docsUrl": "my-shell",
@@ -18110,7 +19464,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     "title": "NousResearch",
     "fullTitle": "NousResearch (Hermes)",
     "group": "provider",
-    "color": "#2D6376",
+    "color": "#fff",
     "capabilities": {
       "hasAvatar": true,
       "hasBrand": false,
@@ -19266,18 +20620,95 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     }
   },
   {
+    "iconId": "openhuman",
+    "componentId": "OpenHuman",
+    "docsUrl": "open-human",
+    "title": "OpenHuman",
+    "fullTitle": "OpenHuman",
+    "group": "application",
+    "color": "#000",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": false,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/openhuman.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/openhuman.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/openhuman.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/openhuman.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/openhuman.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/openhuman-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/openhuman-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/openhuman-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/openhuman-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/openhuman-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/openhuman.webp"
+        }
+      }
+    }
+  },
+  {
     "iconId": "openrouter",
     "componentId": "OpenRouter",
     "docsUrl": "open-router",
     "title": "OpenRouter",
     "fullTitle": "OpenRouter",
     "group": "provider",
-    "color": "#6566F1",
+    "color": "#C8FF00",
     "capabilities": {
       "hasAvatar": true,
       "hasBrand": false,
       "hasBrandColor": false,
-      "hasColor": false,
+      "hasColor": true,
       "hasCombine": true,
       "hasText": true,
       "hasTextCn": false,
@@ -19301,6 +20732,26 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           "webp": {
             "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/openrouter.webp",
             "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/openrouter.webp"
+          }
+        }
+      },
+      "color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/openrouter-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/openrouter-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/openrouter-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/openrouter-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/openrouter-color.webp"
           }
         }
       },
@@ -19865,6 +21316,83 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     }
   },
   {
+    "iconId": "pi",
+    "componentId": "Pi",
+    "docsUrl": "pi",
+    "title": "Pi",
+    "fullTitle": "Pi Agent",
+    "group": "provider",
+    "color": "#000",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": false,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/pi.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/pi.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/pi.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/pi.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/pi.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/pi-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/pi-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/pi-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/pi-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/pi-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/pi.webp"
+        }
+      }
+    }
+  },
+  {
     "iconId": "pika",
     "componentId": "Pika",
     "docsUrl": "pika",
@@ -19948,8 +21476,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     "title": "PixVerse",
     "fullTitle": "PixVerse",
     "group": "application",
-    "color": "#9727ef",
-    "colorGradient": "linear-gradient(45deg, #3961f1, #9727ef, #ff601a)",
+    "color": "#000",
     "capabilities": {
       "hasAvatar": true,
       "hasBrand": false,
@@ -20306,6 +21833,103 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
         ],
         "urls": {
           "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/pollinations.webp"
+        }
+      }
+    }
+  },
+  {
+    "iconId": "poolside",
+    "componentId": "Poolside",
+    "docsUrl": "poolside",
+    "title": "Poolside",
+    "fullTitle": "Poolside",
+    "group": "model",
+    "color": "#4137FF",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": true,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/poolside.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/poolside.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/poolside.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/poolside.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/poolside.webp"
+          }
+        }
+      },
+      "color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/poolside-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/poolside-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/poolside-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/poolside-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/poolside-color.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/poolside-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/poolside-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/poolside-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/poolside-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/poolside-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/poolside.webp"
         }
       }
     }
@@ -21252,11 +22876,11 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     "color": "#EA2805",
     "capabilities": {
       "hasAvatar": true,
-      "hasBrand": true,
+      "hasBrand": false,
       "hasBrandColor": false,
       "hasColor": false,
       "hasCombine": false,
-      "hasText": true,
+      "hasText": false,
       "hasTextCn": false,
       "hasTextColor": false
     },
@@ -21278,46 +22902,6 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           "webp": {
             "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/replicate.webp",
             "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/replicate.webp"
-          }
-        }
-      },
-      "brand": {
-        "supported": true,
-        "staticSupport": true,
-        "formats": [
-          "svg",
-          "png",
-          "webp"
-        ],
-        "urls": {
-          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/replicate-brand.svg",
-          "png": {
-            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/replicate-brand.png",
-            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/replicate-brand.png"
-          },
-          "webp": {
-            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/replicate-brand.webp",
-            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/replicate-brand.webp"
-          }
-        }
-      },
-      "text": {
-        "supported": true,
-        "staticSupport": true,
-        "formats": [
-          "svg",
-          "png",
-          "webp"
-        ],
-        "urls": {
-          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/replicate-text.svg",
-          "png": {
-            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/replicate-text.png",
-            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/replicate-text.png"
-          },
-          "webp": {
-            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/replicate-text.webp",
-            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/replicate-text.webp"
           }
         }
       },
@@ -22128,6 +23712,103 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     }
   },
   {
+    "iconId": "searxng",
+    "componentId": "SearXNG",
+    "docsUrl": "sear-xng",
+    "title": "SearXNG",
+    "fullTitle": "SearXNG",
+    "group": "provider",
+    "color": "#3050FF",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": true,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/searxng.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/searxng.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/searxng.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/searxng.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/searxng.webp"
+          }
+        }
+      },
+      "color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/searxng-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/searxng-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/searxng-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/searxng-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/searxng-color.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/searxng-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/searxng-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/searxng-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/searxng-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/searxng-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/searxng.webp"
+        }
+      }
+    }
+  },
+  {
     "iconId": "sensenova",
     "componentId": "SenseNova",
     "docsUrl": "sense-nova",
@@ -22137,7 +23818,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     "color": "#5B2AD8",
     "capabilities": {
       "hasAvatar": true,
-      "hasBrand": true,
+      "hasBrand": false,
       "hasBrandColor": true,
       "hasColor": true,
       "hasCombine": true,
@@ -22183,26 +23864,6 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           "webp": {
             "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/sensenova-color.webp",
             "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/sensenova-color.webp"
-          }
-        }
-      },
-      "brand": {
-        "supported": true,
-        "staticSupport": true,
-        "formats": [
-          "svg",
-          "png",
-          "webp"
-        ],
-        "urls": {
-          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/sensenova-brand.svg",
-          "png": {
-            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/sensenova-brand.png",
-            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/sensenova-brand.png"
-          },
-          "webp": {
-            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/sensenova-brand.webp",
-            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/sensenova-brand.webp"
           }
         }
       },
@@ -22362,6 +24023,103 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     }
   },
   {
+    "iconId": "sillytavern",
+    "componentId": "SillyTavern",
+    "docsUrl": "silly-tavern",
+    "title": "SillyTavern",
+    "fullTitle": "SillyTavern",
+    "group": "application",
+    "color": "#333",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": true,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/sillytavern.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/sillytavern.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/sillytavern.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/sillytavern.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/sillytavern.webp"
+          }
+        }
+      },
+      "color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/sillytavern-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/sillytavern-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/sillytavern-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/sillytavern-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/sillytavern-color.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/sillytavern-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/sillytavern-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/sillytavern-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/sillytavern-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/sillytavern-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/sillytavern.webp"
+        }
+      }
+    }
+  },
+  {
     "iconId": "skywork",
     "componentId": "Skywork",
     "docsUrl": "skywork",
@@ -22454,6 +24212,83 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
         ],
         "urls": {
           "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/skywork.webp"
+        }
+      }
+    }
+  },
+  {
+    "iconId": "slock",
+    "componentId": "Slock",
+    "docsUrl": "slock",
+    "title": "Slock",
+    "fullTitle": "Slock",
+    "group": "application",
+    "color": "#ffd440",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": false,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/slock.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/slock.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/slock.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/slock.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/slock.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/slock-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/slock-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/slock-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/slock-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/slock-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/slock.webp"
         }
       }
     }
@@ -22945,6 +24780,103 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     }
   },
   {
+    "iconId": "speedai",
+    "componentId": "SpeedAI",
+    "docsUrl": "speed-ai",
+    "title": "SpeedAI",
+    "fullTitle": "SpeedAI",
+    "group": "provider",
+    "color": "#6366F1",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": true,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/speedai.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/speedai.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/speedai.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/speedai.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/speedai.webp"
+          }
+        }
+      },
+      "color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/speedai-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/speedai-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/speedai-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/speedai-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/speedai-color.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/speedai-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/speedai-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/speedai-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/speedai-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/speedai-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/speedai.webp"
+        }
+      }
+    }
+  },
+  {
     "iconId": "stability",
     "componentId": "Stability",
     "docsUrl": "stability",
@@ -22955,7 +24887,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     "colorGradient": "linear-gradient(to bottom, #9D39FF,  #A380FF)",
     "capabilities": {
       "hasAvatar": true,
-      "hasBrand": true,
+      "hasBrand": false,
       "hasBrandColor": true,
       "hasColor": true,
       "hasCombine": true,
@@ -23001,26 +24933,6 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           "webp": {
             "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/stability-color.webp",
             "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/stability-color.webp"
-          }
-        }
-      },
-      "brand": {
-        "supported": true,
-        "staticSupport": true,
-        "formats": [
-          "svg",
-          "png",
-          "webp"
-        ],
-        "urls": {
-          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/stability-brand.svg",
-          "png": {
-            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/stability-brand.png",
-            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/stability-brand.png"
-          },
-          "webp": {
-            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/stability-brand.webp",
-            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/stability-brand.webp"
           }
         }
       },
@@ -23183,16 +25095,15 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     "iconId": "stepfun",
     "componentId": "Stepfun",
     "docsUrl": "stepfun",
-    "title": "Stepfun",
+    "title": "StepFun",
     "fullTitle": "Stepfun (阶跃星辰)",
     "group": "model",
-    "color": "#005AFF",
-    "colorGradient": "linear-gradient(-45deg, #0160FF, #01A9FF)",
+    "color": "#000",
     "capabilities": {
       "hasAvatar": true,
       "hasBrand": false,
       "hasBrandColor": false,
-      "hasColor": true,
+      "hasColor": false,
       "hasCombine": true,
       "hasText": true,
       "hasTextCn": false,
@@ -23216,26 +25127,6 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           "webp": {
             "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/stepfun.webp",
             "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/stepfun.webp"
-          }
-        }
-      },
-      "color": {
-        "supported": true,
-        "staticSupport": true,
-        "formats": [
-          "svg",
-          "png",
-          "webp"
-        ],
-        "urls": {
-          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/stepfun-color.svg",
-          "png": {
-            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/stepfun-color.png",
-            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/stepfun-color.png"
-          },
-          "webp": {
-            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/stepfun-color.webp",
-            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/stepfun-color.webp"
           }
         }
       },
@@ -23926,7 +25817,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
     "color": "#0052D9",
     "capabilities": {
       "hasAvatar": true,
-      "hasBrand": true,
+      "hasBrand": false,
       "hasBrandColor": true,
       "hasColor": true,
       "hasCombine": false,
@@ -23972,26 +25863,6 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           "webp": {
             "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/tencent-color.webp",
             "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/tencent-color.webp"
-          }
-        }
-      },
-      "brand": {
-        "supported": true,
-        "staticSupport": true,
-        "formats": [
-          "svg",
-          "png",
-          "webp"
-        ],
-        "urls": {
-          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/tencent-brand.svg",
-          "png": {
-            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/tencent-brand.png",
-            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/tencent-brand.png"
-          },
-          "webp": {
-            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/tencent-brand.webp",
-            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/tencent-brand.webp"
           }
         }
       },
@@ -24818,7 +26689,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
       "hasBrand": false,
       "hasBrandColor": false,
       "hasColor": true,
-      "hasCombine": false,
+      "hasCombine": true,
       "hasText": true,
       "hasTextCn": false,
       "hasTextColor": false
@@ -24884,6 +26755,12 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           }
         }
       },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
       "avatar": {
         "supported": true,
         "staticSupport": true,
@@ -24892,6 +26769,103 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
         ],
         "urls": {
           "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/udio.webp"
+        }
+      }
+    }
+  },
+  {
+    "iconId": "unsloth",
+    "componentId": "Unsloth",
+    "docsUrl": "unsloth",
+    "title": "Unsloth",
+    "fullTitle": "Unsloth",
+    "group": "provider",
+    "color": "#16B88A",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": true,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/unsloth.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/unsloth.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/unsloth.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/unsloth.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/unsloth.webp"
+          }
+        }
+      },
+      "color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/unsloth-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/unsloth-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/unsloth-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/unsloth-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/unsloth-color.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/unsloth-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/unsloth-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/unsloth-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/unsloth-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/unsloth-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/unsloth.webp"
         }
       }
     }
@@ -25215,6 +27189,103 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
         ],
         "urls": {
           "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/vectorizerai.webp"
+        }
+      }
+    }
+  },
+  {
+    "iconId": "venice",
+    "componentId": "Venice",
+    "docsUrl": "venice",
+    "title": "Venice",
+    "fullTitle": "Venice",
+    "group": "application",
+    "color": "#E05A2D",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": true,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/venice.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/venice.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/venice.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/venice.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/venice.webp"
+          }
+        }
+      },
+      "color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/venice-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/venice-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/venice-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/venice-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/venice-color.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/venice-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/venice-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/venice-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/venice-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/venice-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/venice.webp"
         }
       }
     }
@@ -26121,6 +28192,83 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
         ],
         "urls": {
           "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/workersai.webp"
+        }
+      }
+    }
+  },
+  {
+    "iconId": "worldrouter",
+    "componentId": "WorldRouter",
+    "docsUrl": "world-router",
+    "title": "WorldRouter",
+    "fullTitle": "WorldRouter",
+    "group": "provider",
+    "color": "#000",
+    "capabilities": {
+      "hasAvatar": true,
+      "hasBrand": false,
+      "hasBrandColor": false,
+      "hasColor": false,
+      "hasCombine": true,
+      "hasText": true,
+      "hasTextCn": false,
+      "hasTextColor": false
+    },
+    "variants": {
+      "mono": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/worldrouter.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/worldrouter.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/worldrouter.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/worldrouter.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/worldrouter.webp"
+          }
+        }
+      },
+      "text": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/worldrouter-text.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/worldrouter-text.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/worldrouter-text.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/worldrouter-text.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/worldrouter-text.webp"
+          }
+        }
+      },
+      "combine": {
+        "supported": true,
+        "staticSupport": false,
+        "formats": [],
+        "urls": {}
+      },
+      "avatar": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "avatar"
+        ],
+        "urls": {
+          "avatar": "https://unpkg.com/@lobehub/icons-static-avatar@latest/avatars/worldrouter.webp"
         }
       }
     }
@@ -27363,7 +29511,7 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
       "hasAvatar": true,
       "hasBrand": false,
       "hasBrandColor": false,
-      "hasColor": false,
+      "hasColor": true,
       "hasCombine": true,
       "hasText": true,
       "hasTextCn": false,
@@ -27387,6 +29535,26 @@ export const LOBEHUB_ICON_MANIFEST: LobehubManifestEntry[] = [
           "webp": {
             "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/zeroone.webp",
             "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/zeroone.webp"
+          }
+        }
+      },
+      "color": {
+        "supported": true,
+        "staticSupport": true,
+        "formats": [
+          "svg",
+          "png",
+          "webp"
+        ],
+        "urls": {
+          "svg": "https://unpkg.com/@lobehub/icons-static-svg@latest/icons/zeroone-color.svg",
+          "png": {
+            "light": "https://unpkg.com/@lobehub/icons-static-png@latest/light/zeroone-color.png",
+            "dark": "https://unpkg.com/@lobehub/icons-static-png@latest/dark/zeroone-color.png"
+          },
+          "webp": {
+            "light": "https://unpkg.com/@lobehub/icons-static-webp@latest/light/zeroone-color.webp",
+            "dark": "https://unpkg.com/@lobehub/icons-static-webp@latest/dark/zeroone-color.webp"
           }
         }
       },

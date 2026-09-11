@@ -1,5 +1,7 @@
 # Chat Assistant Styles
 
+2026-09-10：输入区底部使用与头部一致的 `--opencodian-chat-edge-gap`，不再额外固定 16px。与 core.css 的宿主对称留白配合，桌面聊天表面的上下视觉留白均为约 24px。
+
 > **源码**: `src/style/features/chat-assistant.css`
 > **状态**: [FINAL]
 
@@ -8,6 +10,8 @@
 定义助手消息主视图样式，包括助手气泡、通知卡、复制按钮、时间/模型元信息、问题停靠区、会话 TODO 面板、slash autocomplete menu 与输入区整体布局。
 
 ## 关键类名 / CSS 变量
+
+- 用户消息操作行：`.opencodian-user-message-controls` 使用可换行 flex，将展开/收起按钮与上下文 chips 居中对齐。内部 `.opencodian-user-context-list` 使用 `display: contents`，避免附件作为整组被推到第二行；只有隐藏 toggle 时整行不占空间，正文、图片与 OMO 面板维持独立块。
 
 - 助手消息：`.opencodian-message--assistant`、`.opencodian-message-time-row`、`.opencodian-message-model-id`。
 - 用户消息高亮：`.opencodian-message-highlight-agent`（`@agent`）、`.opencodian-message-highlight-command`（普通 `/command`）与 `.opencodian-message-highlight-skill`（direct `/skill`、`/skills skill`）。

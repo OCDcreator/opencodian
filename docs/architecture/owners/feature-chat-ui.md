@@ -41,3 +41,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 ## Pi owner boundary review (2026-09-08)
 
 The new core.backend-pi owner isolates the external Pi process service. feature.chat-ui retains its existing responsibilities; Pi process lifecycle, RPC compatibility and native history must not be added to this owner.
+
+## Model selector provider header icons (2026-09-11)
+
+`RenderModelListOptions` gained a required `app: App`, and provider group headers now call `ProviderIconService.createIconElement(app, provider.id, 14)`. This removed the divergence where `hasIcon()` was true but `getIconUrl()` returned null, and lets local bundled icons render in the dropdown headers. Keep provider icon resolution in `shared.utils-icons`.

@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "digest": "1678ce8c5c2fdcc99db737c85fb0831ebc3a6021b276b83f09a71cf0c3af8872",
-  "recordCount": 619,
+  "digest": "145352f966e9cfb11d5967ecca32f174214a8c6017f35db76ed2bcaa2a2ad422",
+  "recordCount": 620,
   "records": [
     {
       "kind": "ignore",
       "key": ".gitignore",
-      "sha256": "5d26dd48749dba52060f67a20804a600c2e3f0ef485ee14215f35a14da238dd2"
+      "sha256": "db8b3ce8d3eb661b66c3539fbd38c84cc0746fa3bd7b8a284141af324eb1da9e"
     },
     {
       "kind": "ignore",
@@ -16,12 +16,12 @@
     {
       "kind": "package",
       "key": "package-lock.json",
-      "sha256": "76c635bf3e5823460ffbbd2643be2e6d906e4ecfe01720b3a25edda350533225"
+      "sha256": "519609cdd514735194616760538c85f267ef78964a6fb188e441d5334e110409"
     },
     {
       "kind": "package",
       "key": "package.json",
-      "sha256": "5c7cf6bdd378101dcb8edea6c047c6eadff44476072ab5317efa9b777f4760ca"
+      "sha256": "88599f1fe2826ffb4fe85261522d7166bc3e8f885cfc3e0a2d9e776785ea2de7"
     },
     {
       "kind": "src",
@@ -891,7 +891,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
-      "sha256": "2a437538cf74c49145bede48eb4840647b9e95c1a49e64e51b0360e4e8a1459e"
+      "sha256": "d98005cdd621e901b6ccaae82a9f7abd97618db41ba16f7adfb4fcc99d1c3781"
     },
     {
       "kind": "src",
@@ -1071,7 +1071,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/StreamChunkRouter.ts",
-      "sha256": "cb22b7696d502ccf3a3cdab5ac64c6a4d82363201305363421fdb6a5be47e0ae"
+      "sha256": "e072893d12b63142795e3a7c53465273864182c70c786f2c20c6cec2ca14b1e8"
     },
     {
       "kind": "src",
@@ -1121,7 +1121,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/UserMessageContentRenderer.ts",
-      "sha256": "1fadb7ec8c0ce2c37adf17f49cff2535608222676c87884d4fb32394e364995c"
+      "sha256": "8471093dea2991120b7394ba593f881763e75aac91e99d8adafc68a36daddade"
     },
     {
       "kind": "src",
@@ -1211,7 +1211,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ChatSelectionControlsCoordinator.ts",
-      "sha256": "adb1f84c5c20fe356ff34875f87bf3e6606dd6a5afa3ea4d8692e4f39a8b0706"
+      "sha256": "38ed6abebb7c649a3989d5506c1383594161a28a6d025db01f59e1577099fe78"
     },
     {
       "kind": "src",
@@ -1961,7 +1961,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/ui/modelSelector/ModelSelectorRenderer.ts",
-      "sha256": "043c00c1c43432ad444e120ca62cec58cc1e07d9b38ac965cf3d56fc46c997b7"
+      "sha256": "0a9b51127a52c0b6e792f0cf44acce20de0acd1504ae678af194e2320a12dbc9"
     },
     {
       "kind": "src",
@@ -2021,7 +2021,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/AgentSwitcherFloatingIcons.ts",
-      "sha256": "78f5ba156feee6e320ebaa967e845167fb01ba9ea6c5f2179687f09d5481512a"
+      "sha256": "da936430015ec637788a36f74b256d83e190f3ae5633f2e4692efcae50b2ff3b"
     },
     {
       "kind": "src",
@@ -2251,7 +2251,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/ProviderBuiltinIconPickerModal.ts",
-      "sha256": "0968256e503ec3aaa7bcc111811cdfc73c0484abd2e6b5048ad7a416ec665a73"
+      "sha256": "fb194021501ff7f857b4e1e237f762e74b4c61851f3671bc9f2dbd61e2dce521"
     },
     {
       "kind": "src",
@@ -2586,7 +2586,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "583099d5874743911672c4c4c7d0f8b5e5ebe5522cd7cfa271e9ba499e751dc3"
+      "sha256": "91eab5252356b443af31d599cf5498422755170c7480041512a66fc3b3f9e90d"
     },
     {
       "kind": "src",
@@ -2596,7 +2596,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "9180cb482783e6efa8fac2a0589f99bd0f5f4be3c77a2edc681a68fae627020a"
+      "sha256": "b83eeac4a7e34eec681c99f494f018c164bbe16ed3cb7ecc6f84043ad2a4a476"
     },
     {
       "kind": "src",
@@ -2696,7 +2696,7 @@
     {
       "kind": "src",
       "key": "src/style/base/core.css",
-      "sha256": "a8a29d6fc6bc3525cd123bae131bd5970253ee5e004d9ad5020f329ac59501a9"
+      "sha256": "d9f6a7335515e70e345a363fc54be0b6053790c9c92ddad69910ddf8da8b5d8a"
     },
     {
       "kind": "src",
@@ -2836,7 +2836,7 @@
     {
       "kind": "src",
       "key": "src/style/features/chat-assistant.css",
-      "sha256": "3e9bf4090a8d3cfb6880b97f7e900e93c16e4d5cc87682cf9636acdd3c39503f"
+      "sha256": "476a7160cc901748456f74f93ecd8b1eea631211b6b6ebd19c59d6bb35a195f5"
     },
     {
       "kind": "src",
@@ -2926,7 +2926,7 @@
     {
       "kind": "src",
       "key": "src/utils/icons/builtinIconRegistry.ts",
-      "sha256": "ce052234cc61bc23927fedb51e6485980f7107a81dd9c7fd32dd9493b0c8433f"
+      "sha256": "eabda9a8fb59d43d373d95752fd503a2f891fbc38ef5a1c08b1a825e29d49553"
     },
     {
       "kind": "src",
@@ -2936,17 +2936,22 @@
     {
       "kind": "src",
       "key": "src/utils/icons/lobehubIconManifest.ts",
-      "sha256": "d84b471ddf5ec39a6ed51a10b82f5b8a377758d3550783feb6f622b4d396d834"
+      "sha256": "546c4237c5e8f587a6840c836d28702b9af6adbbf6b82e8412f75dd223bdac81"
+    },
+    {
+      "kind": "src",
+      "key": "src/utils/icons/modelsDevIconManifest.ts",
+      "sha256": "a70a70e15b8f782b9c8aef85ea37b7f13a681fd9531e113d89c181d55988ce7d"
     },
     {
       "kind": "src",
       "key": "src/utils/icons/providerIconAssetCache.ts",
-      "sha256": "64d56c3a4083c234d8b0edad6cffa49832fd0d175231f2e5feba9cd430717f81"
+      "sha256": "df9d085795c68b7663792d8cb9e7ae0fcecea01c510d769e68a3f22c2021bdbb"
     },
     {
       "kind": "src",
       "key": "src/utils/icons/providerIconBuiltinSelection.ts",
-      "sha256": "cb0b7c29fdc10d4e9b58be5f23373e8ab47adbd39a788465996dd847d665a71c"
+      "sha256": "641d4f92985380ee60a945c68143e8ffc935ff945ae48d5df50fba85f497fe44"
     },
     {
       "kind": "src",
@@ -2956,12 +2961,12 @@
     {
       "kind": "src",
       "key": "src/utils/icons/providerIconEntryResolution.ts",
-      "sha256": "965a4e7075621c560a3ed8471474f6c936e75f4ebfef922379a34ba96c33477e"
+      "sha256": "4ba61a57daf6c628ee266d0f4ac5128da43f30c01243a7b5c0257957ff70fbbf"
     },
     {
       "kind": "src",
       "key": "src/utils/icons/ProviderIconService.ts",
-      "sha256": "ed94ef8fa440d37849ce5f057accd2b3fe00b714c6e40190ac29dc7ea5263a89"
+      "sha256": "c42b023f7b5d96a8ded36161625bef39ce29aa9b9231b00879af414351c66aab"
     },
     {
       "kind": "src",
@@ -3099,7 +3104,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-10T11:18:31.296Z",
-  "headShaAtGeneration": "bd538f5afb51bfe017c48c49531c764fec3694f0",
+  "generatedAt": "2026-09-11T04:13:06.484Z",
+  "headShaAtGeneration": "9da31b3ddb260efe31ccc5c83fb7249c7c751e85",
   "graphifyVersion": "graphify 0.9.31"
 }

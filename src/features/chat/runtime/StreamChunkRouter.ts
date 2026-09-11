@@ -350,6 +350,13 @@ export class StreamChunkRouter {
 
   private scheduleStreamTimeout(): void {
     this.clearStreamTimeout();
+    // Only OpenCode can detach its local stream and recover via background
+    // sync. Native CLI backends cancel the actual turn on detach; silence
+    // during reasoning must not interrupt them. Their transport and explicit
+    // user cancellation own termination instead.
+    if (this.getBackend() !== 'opencode') {
+      return;
+    }
     const timeoutMs = this.receivedMeaningfulChunk
       ? STREAM_IDLE_TIMEOUT_MS
       : STREAM_NO_VISIBLE_CONTENT_TIMEOUT_MS;

@@ -232,6 +232,55 @@ describe('StreamChunkRouter timeout handling', () => {
     document.body.innerHTML = '';
   });
 
+  it.each(['codex', 'claude-code', 'pi'] as const)('keeps a silent %s turn alive until a late reply arrives', async (backend) => {
+    const host = createHost();
+    host.convertToStreamingChunk.mockImplementation((chunk) =>
+      chunk.type === 'text' ? { type: 'text', content: chunk.content } : null,
+    );
+    const preparedSend = createPreparedSend();
+    preparedSend.conversation.backend = backend;
+    preparedSend.conversation.backendSessionId = 'native-session';
+    const runtime: SendPipelineTabRuntime = {
+      isStreaming: true,
+      streamingMessageEl: null,
+      streamingContentEl: null,
+      pendingEditedFiles: new Set(),
+      pendingQuestionResolution: null,
+      isConversationSyncInFlight: false,
+    };
+    const streamController: SendPipelineStreamController = {
+      startStream: jest.fn(),
+      handleChunk: jest.fn().mockResolvedValue(undefined),
+      cancelStream: jest.fn(),
+      getContentBlocks: jest.fn(() => []),
+    };
+    let reply!: () => void;
+    const waiting = new Promise<void>((resolve) => { reply = resolve; });
+    async function* stream() {
+      yield { type: 'message_start' } as const;
+      await waiting;
+      yield { type: 'text', content: 'Late reply' } as const;
+      yield { type: 'message_stop' } as const;
+    }
+    const router = new StreamChunkRouter({ host, preparedSend, runtime, stream: stream(), streamController, contentEl: document.body.createDiv() });
+    const pendingResult = router.consume();
+
+    await jest.advanceTimersByTimeAsync(0);
+    jest.advanceTimersByTime(60_000);
+    expect(runtime.isStreaming).toBe(true);
+    expect(host.detachStream).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(300_000);
+    expect(streamController.cancelStream).not.toHaveBeenCalled();
+
+    reply();
+    const result = await pendingResult;
+    expect(streamController.handleChunk).toHaveBeenCalledWith({ type: 'text', content: 'Late reply' });
+    expect(result.streamCompleted).toBe(true);
+    expect(result.streamTimedOut).toBe(false);
+    result.resetStreamingState();
+    result.cleanupPendingIndicator();
+  });
+
   it('detaches silent streams after 60 seconds when no visible content arrives', async () => {
     const host = createHost();
     const runtime: SendPipelineTabRuntime = {

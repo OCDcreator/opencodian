@@ -53,3 +53,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`, `npm run build`.
 ## Pi owner boundary review (2026-09-08)
 
 The shell supplies the Pi slash-catalog discriminator only. All Pi runtime lifecycle remains behind the registered AgentService adapter.
+
+## Model selection host app seam (2026-09-11)
+
+`createChatSelectionControlsCoordinatorHost()` now supplies `getApp: () => this.app` so the selection controls can resolve local bundled provider icon resource paths. This is a host port only — the shell does not gain icon-resolution logic.

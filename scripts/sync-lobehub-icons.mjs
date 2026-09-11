@@ -9,11 +9,25 @@ const GENERATED_PATH = path.join(process.cwd(), 'src', 'utils', 'icons', 'lobehu
 const packageJsonPath = require.resolve('@lobehub/icons/package.json');
 const packageRoot = path.dirname(packageJsonPath);
 const tocModulePath = path.join(packageRoot, 'es', 'toc.js');
+const tocJsonPath = path.join(packageRoot, 'es', 'toc.json');
 const getLobeIconCDNModulePath = path.join(packageRoot, 'es', 'features', 'getLobeIconCDN', 'index.js');
 
-const tocModule = await import(pathToFileURL(tocModulePath).href);
+function readTocValue(value) {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  return Array.isArray(value?.toc) ? value.toc : [];
+}
+
+// @lobehub/icons >= 5.5 ships `es/toc.js` as `import data from "./toc.json"`
+// without an import attribute, which Node >= 22 refuses to load. Read the JSON
+// directly and fall back to the module only for older inline-array layouts.
+const toc = fs.existsSync(tocJsonPath)
+  ? readTocValue(JSON.parse(fs.readFileSync(tocJsonPath, 'utf8')))
+  : readTocValue((await import(pathToFileURL(tocModulePath).href)).default);
+
 const { getLobeIconCDN } = await import(pathToFileURL(getLobeIconCDNModulePath).href);
-const toc = Array.isArray(tocModule.default) ? tocModule.default : Array.isArray(tocModule.toc) ? tocModule.toc : [];
 
 const VARIANT_CONFIG = [
   { variant: 'mono', capabilityKey: null, staticSupport: true },

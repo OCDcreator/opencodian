@@ -37,3 +37,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 The new core.backend-pi owner isolates the external Pi process service. feature.settings-agents retains its existing responsibilities; Pi process lifecycle, RPC compatibility and native history must not be added to this owner.
 
 Pi图标由AgentSwitcherFloatingIcons单处注册用户SVG形状，三种后端图标入口共用，其他后端图标不变。
+
+## Agent switcher icon modifier cleanup (2026-09-11)
+
+`AgentSwitcherFloatingIcons` now removes the `opencodian-agent-switcher-icon--lobehub` modifier class before falling back to `fallbackIcon`. That class only applies to LobeHub glyphs, so a reused button container kept hiding the fallback icon after a backend lost its LobeHub icon. Pi icon registration stays single-sourced in this owner.

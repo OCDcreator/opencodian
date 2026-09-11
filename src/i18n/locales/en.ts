@@ -1550,6 +1550,7 @@ export const enTranslations = {
   'settings.model.iconCache.builtinPicker.library.all': 'All libraries',
   'settings.model.iconCache.builtinPicker.library.lobehub': 'LobeHub',
   'settings.model.iconCache.builtinPicker.library.opencode': 'OpenCode',
+  'settings.model.iconCache.builtinPicker.library.modelsdev': 'models.dev',
   'settings.model.iconCache.builtinPicker.searchPlaceholder': 'Search icon IDs, aliases, and provider names',
   'settings.model.iconCache.builtinPicker.empty': 'No built-in icons match the current search.',
   'settings.model.iconCache.builtinPicker.recommended': 'Recommended',

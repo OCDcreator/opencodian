@@ -210,6 +210,14 @@ body[data-opencodian-provider-icon-mode="color"] {
   filter: var(--lobehub-icon-filter, none);
 }
 
+/* Own the chat view's vertical gutters instead of stacking Obsidian's generic
+   32px bottom padding with the composer's inset. Keep device safe areas. */
+.workspace-leaf-content[data-type="opencodian-view"] > .view-content {
+  --opencodian-chat-edge-gap: var(--size-4-3, 12px);
+  padding-top: max(var(--safe-area-inset-top, 0px), var(--opencodian-chat-edge-gap));
+  padding-bottom: max(var(--safe-area-inset-bottom, 0px), var(--opencodian-chat-edge-gap));
+}
+
 .opencodian-container {
   --interactive-accent: var(--opencodian-accent);
   --interactive-accent-hover: var(--opencodian-accent-hover);
@@ -412,7 +420,7 @@ body[data-opencodian-provider-icon-mode="color"] {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: var(--opencodian-chat-edge-gap, 12px) 16px;
 }
 
 .opencodian-title {
@@ -16461,11 +16469,35 @@ img.opencodian-model-provider-header-icon {
   margin: 4px 0;
 }
 
+.opencodian-user-message-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.opencodian-user-message-controls:not(:has(> .opencodian-collapsible-toggle:not([hidden]), > .opencodian-user-context-list)) {
+  display: none;
+}
+
+.opencodian-user-message-controls > .opencodian-collapsible-toggle {
+  align-self: center;
+}
+
+.opencodian-user-message-controls > .opencodian-collapsible-toggle[hidden] {
+  display: none;
+}
+
 .opencodian-user-context-list {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 0;
+}
+
+.opencodian-user-message-controls > .opencodian-user-context-list {
+  display: contents;
 }
 
 .opencodian-user-context-chip {
@@ -17562,7 +17594,7 @@ img.opencodian-model-provider-header-icon {
   bottom: 0;
   left: 0;
   z-index: 40;
-  padding: 0 0 16px;
+  padding: 0 0 var(--opencodian-chat-edge-gap, 12px);
   display: flex;
   flex-direction: column;
   gap: 8px;

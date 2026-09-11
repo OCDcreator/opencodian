@@ -8,7 +8,7 @@ import type {
   ProviderIconLibrary,
 } from '../../core/types';
 import { createLogger } from '../../shared';
-import { parseBuiltinSource } from './builtinIconRegistry';
+import { getModelsDevLogoUrl, parseBuiltinSource } from './builtinIconRegistry';
 import {
   getActiveColorMode,
   getActiveDefaultVariant,
@@ -21,6 +21,7 @@ import {
   getResolvedFormatForMimeType,
   isLobehubBackedEntry,
   isLobehubBuiltinEntry,
+  isModelsDevBuiltinEntry,
 } from './providerIconBuiltinSelection';
 import {
   getMimeTypeFromPath,
@@ -313,7 +314,9 @@ async function loadEntryAsset(
     const asset = entry.type === 'mapped' || isLobehubBuiltinEntry(entry)
       ? await loadLobehubEntryAsset(app, entry, options.cacheOnly ?? false)
       : entry.type === 'builtin'
-        ? await loadBundledBuiltinEntryAsset(app, providerId, entry, options.cacheOnly ?? false)
+        ? await (isModelsDevBuiltinEntry(entry)
+          ? loadModelsDevEntryAsset(app, providerId, entry, options.cacheOnly ?? false)
+          : loadBundledBuiltinEntryAsset(app, providerId, entry, options.cacheOnly ?? false))
         : await loadCustomEntryAsset(app, entry, options.cacheOnly ?? false);
 
     if (!asset?.iconUrl && !options.cacheOnly) {
@@ -416,6 +419,38 @@ async function loadBundledBuiltinEntryAsset(
       loadAsset: () => loadBundledOpencodeAsset(app, parsed.iconId, providerId),
       previewResolvedFormat: 'svg',
       previewUrl: getPreviewUrlForEntry(app, entry),
+      requestedVariant: 'auto',
+      resolvedFormat: 'svg',
+      resolvedVariant: 'mono',
+      sourceLabel: getProviderIconEntrySourceLabel(entry),
+    }],
+    cacheOnly,
+  );
+}
+
+async function loadModelsDevEntryAsset(
+  app: App,
+  providerId: string,
+  entry: ProviderIconEntry,
+  cacheOnly: boolean,
+): Promise<ResolvedProviderIconAsset | null> {
+  const parsed = parseBuiltinSource(entry.source);
+  if (!parsed) {
+    return null;
+  }
+
+  const remoteUrl = getModelsDevLogoUrl(parsed.iconId);
+  const cachePath = getCachePathForEntry(entry);
+  return resolveAssetFromCandidates(
+    app,
+    [{
+      cacheMimeType: 'image/svg+xml',
+      cachePath,
+      fallbackUsed: false,
+      iconId: parsed.iconId,
+      loadAsset: () => loadRemoteImageAsset(remoteUrl),
+      previewResolvedFormat: 'svg',
+      previewUrl: remoteUrl,
       requestedVariant: 'auto',
       resolvedFormat: 'svg',
       resolvedVariant: 'mono',

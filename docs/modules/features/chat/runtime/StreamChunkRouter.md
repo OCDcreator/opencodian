@@ -11,7 +11,7 @@
 
 - 启动 `StreamController`
 - 显示和清理 1 秒延迟 pending indicator
-- 维护无可见内容 60 秒 / 已有内容后 5 分钟的 idle timeout，并在超时后 detach 本地 stream
+- 仅对 OpenCode 维护无可见内容 60 秒 / 已有内容后 5 分钟的 idle timeout，并在超时后 detach 本地 stream
 - 消费 OpenCode stream chunk
 - 记录发送链路调试 trace 与 progress checkpoint
 - 返回 stream 完成/中断/超时/error/metadata 状态，供 `StreamLocalFinalizer` 使用
@@ -65,7 +65,9 @@ export class StreamChunkRouter {
 
 ### 超时策略
 
-- 在没有任何 meaningful / 可见 chunk 到达前，router 使用 60 秒 no-visible-content timeout，避免 prompt 被服务端接受但长期没有 assistant 输出时让用户持续等待。
+- Codex、Claude Code、Pi 的本地流由 CLI 持有，detach 会取消真实后端请求，不能套用 OpenCode 的后台同步超时策略。它们保持流订阅，等待后端完成、传输错误或用户主动停止；长时间推理不会因 60 秒 / 5 分钟无内容而自动中断。
+
+- 对 OpenCode，在没有任何 meaningful / 可见 chunk 到达前，router 使用 60 秒 no-visible-content timeout，避免 prompt 被服务端接受但长期没有 assistant 输出时让用户持续等待。
 - 一旦 text / thinking / tool / question / permission 等 meaningful chunk 到达，router 切回 5 分钟 idle timeout，保留长任务和工具调用的耐心窗口。
 - timeout log 会记录 `timeoutReason`，区分 `no-visible-content` 与 `idle-after-content`。
 - timeout detach 使用 `getConversationBackendSessionId()` 解析 session id；这让本地 stream 取消路径不再硬依赖 `openCodeSessionId`，但最终 sync/history 仍按各 backend capability 分阶段迁移。

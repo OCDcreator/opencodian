@@ -209,6 +209,14 @@ body[data-opencodian-provider-icon-mode="color"] {
   filter: var(--lobehub-icon-filter, none);
 }
 
+/* Own the chat view's vertical gutters instead of stacking Obsidian's generic
+   32px bottom padding with the composer's inset. Keep device safe areas. */
+.workspace-leaf-content[data-type="opencodian-view"] > .view-content {
+  --opencodian-chat-edge-gap: var(--size-4-3, 12px);
+  padding-top: max(var(--safe-area-inset-top, 0px), var(--opencodian-chat-edge-gap));
+  padding-bottom: max(var(--safe-area-inset-bottom, 0px), var(--opencodian-chat-edge-gap));
+}
+
 .opencodian-container {
   --interactive-accent: var(--opencodian-accent);
   --interactive-accent-hover: var(--opencodian-accent-hover);
@@ -411,7 +419,7 @@ body[data-opencodian-provider-icon-mode="color"] {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: var(--opencodian-chat-edge-gap, 12px) 16px;
 }
 
 .opencodian-title {

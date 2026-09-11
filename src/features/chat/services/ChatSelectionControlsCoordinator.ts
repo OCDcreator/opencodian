@@ -1,3 +1,4 @@
+import type { App } from 'obsidian';
 import { Notice, setIcon } from 'obsidian';
 
 import {
@@ -50,6 +51,8 @@ import { SandboxConfigBadgeCoordinator } from './SandboxConfigBadgeCoordinator';
 
 export interface ChatSelectionControlsCoordinatorHost extends ModelSelectionRuntimeHost {
   registerEscapeHandler(handler: () => boolean): void;
+  /** Obsidian app, used to resolve local provider icon resource paths. */
+  getApp(): App;
   resolveProviderIconUrl(providerId: string): Promise<string | null>;
   updateEffortSelectorDisplay(): void;
   restoreComposerInputFocus(): void;
@@ -984,6 +987,7 @@ export class ChatSelectionControlsCoordinator {
     const renderResult = renderModelSelectorList({
       scrollContainer: this.modelSelectorScrollContainer,
       optionIdPrefix: this.modelSelectorInstanceId + '-option',
+      app: this.host.getApp(),
       providers: this.getAvailableProviders(),
       hasLoadedModelCatalog: this.hasLoadedModelCatalog(),
       filterQuery: this.modelFilterQuery,

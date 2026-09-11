@@ -1,5 +1,6 @@
 import type { AgentBackendKind } from '../../../../src/core/types/chat';
 import {
+  renderAgentSwitcherBackendIcon,
   renderAgentSwitcherFloatingIcons,
   renderAgentSwitcherHeaderIcons,
 } from '../../../../src/features/settings/AgentSwitcherFloatingIcons';
@@ -234,5 +235,22 @@ describe('renderAgentSwitcherHeaderIcons', () => {
 
     buttons[0]?.click();
     expect(onSelect).toHaveBeenCalledWith('opencode' satisfies AgentBackendKind);
+  });
+});
+
+describe('renderAgentSwitcherBackendIcon', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('drops the stale LobeHub modifier when a reused container falls back to the Pi glyph', () => {
+    const iconEl = document.createElement('span');
+    renderAgentSwitcherBackendIcon(iconEl, 'opencode');
+    expect(iconEl.classList.contains('opencodian-agent-switcher-icon--lobehub')).toBe(true);
+
+    renderAgentSwitcherBackendIcon(iconEl, 'pi');
+
+    expect(iconEl.classList.contains('opencodian-agent-switcher-icon--lobehub')).toBe(false);
+    expect(iconEl.querySelector('.opencodian-agent-switcher-lobehub-icon')).toBeNull();
   });
 });

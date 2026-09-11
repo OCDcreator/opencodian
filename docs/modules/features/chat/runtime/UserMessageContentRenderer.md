@@ -13,6 +13,8 @@
 
 ## 公开接口
 
+- 正文和图片之后的 `.opencodian-user-message-controls` 将展开/收起按钮与上下文附件放在同一行；空间不足时每个附件可独立换行。短正文没有可见 toggle 且无附件时整行隐藏，OMO 原文折叠仍使用独立容器。
+
 - `UserMessageContentRenderer.renderUserMessageContent(container, message)`：在指定 content 容器内组装 user message body，返回 visible text
 - `UserMessageContentRenderer.renderCompactionDivider(messageEl, divider)`：在指定 message element 内渲染 compaction divider 分割线
 

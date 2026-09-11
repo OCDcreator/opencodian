@@ -47,6 +47,7 @@ export class UserMessageContentRenderer {
 
   async renderUserMessageContent(container: HTMLElement, message: ChatMessage): Promise<string> {
     const visibleText = this.getVisibleUserMessageText(message);
+    let collapseToggleEl: HTMLButtonElement | undefined;
     if (visibleText) {
       const textEl = container.createDiv({ cls: 'opencodian-message-text' });
       const renderUserMarkupAsCodeBlocks = this.host.getRenderUserMarkupAsCodeBlocks();
@@ -55,7 +56,7 @@ export class UserMessageContentRenderer {
         : visibleText;
       await this.host.renderMarkdownInto(textEl, displayText);
       this.applyInlineInvocationHighlights(textEl, visibleText, message.parts);
-      const collapseToggleEl = container.createEl('button');
+      collapseToggleEl = container.createEl('button');
       const collapsibleState: CollapsibleState = {
         isExpanded: false,
         isCollapsible: false,
@@ -77,8 +78,14 @@ export class UserMessageContentRenderer {
       this.renderUserMessageImages(container, message.images);
     }
 
-    if (message.contextAttachments && message.contextAttachments.length > 0) {
-      this.renderUserContextAttachments(container, message.contextAttachments);
+    if (collapseToggleEl || message.contextAttachments?.length) {
+      const controlsEl = container.createDiv({ cls: 'opencodian-user-message-controls' });
+      if (collapseToggleEl) {
+        controlsEl.appendChild(collapseToggleEl);
+      }
+      if (message.contextAttachments?.length) {
+        this.renderUserContextAttachments(controlsEl, message.contextAttachments);
+      }
     }
 
     if (message.omo?.kind === 'user-injection') {

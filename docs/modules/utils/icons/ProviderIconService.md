@@ -33,7 +33,7 @@ AI 模型提供商图标服务的公开入口。`M4` 后，`ProviderIconService.
 
 ### 公开入口
 
-- `getIconUrl()` / `createIconElement()`：继续为简单 UI 预览提供 mapped LobeHub preview URL
+- `getIconUrl(app, providerId)` / `createIconElement(app, providerId, size)`：为简单 UI 预览提供同步 URL；走与异步缓存路径完全相同的分阶段解析（别名表 → 本地/LobeHub → models.dev 精确 id → 后缀剥离 → 碰撞匹配），因此不会再出现 `hasIcon()` 为 true 而 `getIconUrl()` 为 null 的分歧
 - `resolveIconUrl()` / `getProviderCacheState()` / `warmProviderIcons()` / `clearCache()`：直接转发到 `providerIconAssetCache.ts`
 - `listBuiltinIconOptions()` / `selectBuiltinIcon()` / `getSelectedBuiltinVariant()`：直接转发到 `providerIconBuiltinSelection.ts`
 - `addCustomIconSource()` / `splitCustomIconSourcesInput()`：组合 `providerIconEntryResolution.ts`、`providerIconCustomSources.ts` 与 cache writer 完成写回
@@ -48,7 +48,7 @@ AI 模型提供商图标服务的公开入口。`M4` 后，`ProviderIconService.
 
 | 方法 | 说明 |
 |------|------|
-| `getIconUrl(providerId)` | 获取 mapped LobeHub preview URL |
+| `getIconUrl(app, providerId)` | 取 default entry 并解析 preview URL（LobeHub CDN / models.dev 远程 / 本地 bundled 资源路径） |
 | `resolveIconUrl(app, providerId, library, options)` | 委托 asset/cache runtime 解析图标 |
 | `listBuiltinIconOptions(app, providerId, library, options?)` | 委托 builtin bundle 生成选择列表 |
 | `addCustomIconSource(app, providerId, source, library)` | 组合 resolution + custom cache bootstrap + library 写回 |
@@ -88,4 +88,5 @@ ProviderIconService.addCustomIconSource()
 
 - 所有对外方法仍保持静态 API，不需要上层改为实例化调用
 - 需要改 provider icon 行为时，优先落到四个 coarse module owner，而不是把实现重新塞回 `ProviderIconService.ts`
-- fallback 顺序仍然保持：mapped/LobeHub 或 builtin 预览 → custom / cache runtime → 上层 `<img>` 显示
+- fallback 顺序仍然保持：别名表 / 本地 bundled / LobeHub / models.dev 精确 id → 后缀剥离 → 碰撞匹配 → custom / cache runtime → 上层 `<img>` 显示
+- `getIconUrl()` / `createIconElement()` 需要 `App`：本地 bundled 条目要用 `getResourcePath`，models.dev 与 LobeHub 条目则只用远程 URL

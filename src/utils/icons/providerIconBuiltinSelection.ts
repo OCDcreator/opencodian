@@ -16,6 +16,7 @@ import {
   findBuiltinIcon,
   formatBuiltinSource,
   getBuiltinIcon,
+  getModelsDevLogoUrl,
   parseBuiltinSource,
   resolveBuiltinIconMatch,
   searchBuiltinIcons,
@@ -87,10 +88,11 @@ export function listBuiltinIconOptions(
   const definitions = query
     ? searchBuiltinIcons(query, {
         libraryId: options.libraryId,
+        includeModelsDev: true,
       })
     : [
         ...recommended,
-        ...searchBuiltinIcons('', { libraryId: options.libraryId }),
+        ...searchBuiltinIcons('', { libraryId: options.libraryId, includeModelsDev: true }),
       ].filter((definition, index, collection) =>
         collection.findIndex((candidate) => candidate.source === definition.source) === index,
       );
@@ -200,6 +202,7 @@ export function getPreviewUrlForEntry(app: App, entry: ProviderIconEntry): strin
       aliases: [],
       normalizedAliases: [],
       tokens: [],
+      identityTokens: [],
       searchText: parsed.iconId,
       source: entry.source,
     }, entry.variant ?? 'auto').previewUrl;
@@ -220,6 +223,10 @@ export function getBuiltinPreviewCandidates(
 ): string[] {
   if (libraryId === 'lobehub') {
     return getPreviewUrlForLobehubIcon(iconId, requestedVariant)?.previewCandidates ?? [];
+  }
+
+  if (libraryId === 'modelsdev') {
+    return [getModelsDevLogoUrl(iconId)];
   }
 
   const adapter = app.vault.adapter;
@@ -312,6 +319,10 @@ export function getResolvedFormatForMimeType(mimeType?: string): ProviderIconRes
 
 export function isLobehubBuiltinEntry(entry: ProviderIconEntry): boolean {
   return entry.type === 'builtin' && parseBuiltinSource(entry.source)?.libraryId === 'lobehub';
+}
+
+export function isModelsDevBuiltinEntry(entry: ProviderIconEntry): boolean {
+  return entry.type === 'builtin' && parseBuiltinSource(entry.source)?.libraryId === 'modelsdev';
 }
 
 export function isLobehubBackedEntry(entry: ProviderIconEntry): boolean {

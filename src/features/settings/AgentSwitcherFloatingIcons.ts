@@ -219,6 +219,9 @@ function isUnrelatedSettingsModalOpen(ownerDocument: Document, containerEl: HTML
 function renderAgentSwitcherIcon(buttonEl: HTMLElement, icon: AgentSwitcherIconConfig): void {
   const urls = resolveLobehubAgentIconUrls(icon);
   if (!urls) {
+    // The modifier class hides non-lobehub glyphs, so it must not survive on a
+    // reused container after the backend loses its lobehub icon.
+    buttonEl.removeClass('opencodian-agent-switcher-icon--lobehub');
     setIcon(buttonEl, icon.fallbackIcon);
     return;
   }

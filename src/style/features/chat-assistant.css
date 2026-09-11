@@ -132,11 +132,35 @@
   margin: 4px 0;
 }
 
+.opencodian-user-message-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.opencodian-user-message-controls:not(:has(> .opencodian-collapsible-toggle:not([hidden]), > .opencodian-user-context-list)) {
+  display: none;
+}
+
+.opencodian-user-message-controls > .opencodian-collapsible-toggle {
+  align-self: center;
+}
+
+.opencodian-user-message-controls > .opencodian-collapsible-toggle[hidden] {
+  display: none;
+}
+
 .opencodian-user-context-list {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 0;
+}
+
+.opencodian-user-message-controls > .opencodian-user-context-list {
+  display: contents;
 }
 
 .opencodian-user-context-chip {
@@ -1233,7 +1257,7 @@
   bottom: 0;
   left: 0;
   z-index: 40;
-  padding: 0 0 16px;
+  padding: 0 0 var(--opencodian-chat-edge-gap, 12px);
   display: flex;
   flex-direction: column;
   gap: 8px;
