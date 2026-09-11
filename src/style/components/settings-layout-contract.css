@@ -37,7 +37,7 @@
   --opencodian-settings-inline-border:
     color-mix(in srgb, var(--background-modifier-border) 64%, transparent);
   --opencodian-settings-nav-bg:
-    color-mix(in srgb, var(--background-secondary) 54%, transparent);
+    color-mix(in srgb, var(--background-secondary) 54%, var(--background-primary));
   --opencodian-settings-nav-border:
     color-mix(in srgb, var(--background-modifier-border) 72%, transparent);
   --opencodian-settings-nav-active-bg:

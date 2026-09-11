@@ -11,6 +11,28 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-11 设置快速导航不透明化修复卡片顶边透印
+
+- 根因：设置页 sticky 快速导航 `.opencodian-settings-quick-nav` 背景半透明——布局契约 token `--opencodian-settings-nav-bg` 为 `color-mix(in srgb, var(--background-secondary) 54%, transparent)`（仅 54% 不透明，且无 backdrop blur），基础规则里为 94% 透明 + blur(24px)。滚动时设置卡片（`.opencodian-style-section`）从导航下方滑过，卡片上边框线透过导航显现，用户看到「卡片上面框的线被遮住了」的透印。
+- 修复点一（`src/style/components/settings-layout-contract.css`）：`--opencodian-settings-nav-bg` 改为 `color-mix(in srgb, var(--background-secondary) 54%, var(--background-primary))`——54% secondary 混入 46% primary，与原来在默认面板底色上的合成色完全一致，但变为不透明；该变量只有这一处消费。
+- 修复点二（`src/style/components/model-selector.css`）：`.opencodian-settings-quick-nav` 基础规则背景改为不透明 `var(--background-secondary)`，并删除随之成为死代码的 `backdrop-filter: blur(24px) saturate(1.01)` 与 `-webkit-backdrop-filter` 两行（布局契约里本已置 none）；border、box-shadow、border-radius、padding 等其余声明保持不变。
+- 验证：`npm run build:css` 重新生成 styles.css 后，用 puppeteer 像素复现脚本重跑——卡片 1 top=75.9 位于导航 bottom=82 之下的被遮位置，修复后导航区域只剩纯色导航，卡片顶边透印线消失；设置相关 3 个 jest 套件 59 用例、样式契约 6 个套件 42 用例全绿。
+
+## 2026-09-11 修复输入框透明度上限、徽标截断与 CDN 字体加载
+
+- 「已中断」徽标被截断：sticky-mask 模式下 `.opencodian-turn-header::before` 的不透明遮罩带向上负外延 `--opencodian-messages-pad-top`（12px），header 未吸附时也常驻，越过 8px 轮间距盖住上一轮助手消息底部约 4px，恰好切掉元信息行里徽标的下缘。吸附时该外延本就被滚动口裁掉、毫无作用，故改为 `top: 0`。用 puppeteer 按真实样式像素复现了截断现场（遮罩带几何重叠 4px），修复后徽标完整、吸附态遮罩行为不变。
+- 输入框背景强度 100% 仍透明：`.opencodian-composer-shell` 的混合端点 `--opencodian-composer-lens-bg-strong` 本身半透明（dark alpha 0.18 / light 82%），滑杆到头也只有约 18% 有效不透明度。新增不透明端点 `--opencodian-composer-lens-bg-solid`（dark：88% background-secondary 混入 #040810；light：background-secondary；旧 var 保留定义供用户自定义 CSS 引用），滑杆全程线性 透明→不透明。新装默认值 72 → 32 以保住原玻璃观感；存量设置的数值在新映射下偏实，可手动下调。
+- 霞鹜文楷等 CDN 字体的 CSP 报错与加载失败：Obsidian 渲染进程 CSP 只放行 `fonts.googleapis.com` 的外联样式表，`InputFontLoader` 原先一律 `<link>` 注入，cdnfonts/jsdelivr/onlinewebfonts 全部被拦。现按 origin 分流：Google Fonts 仍走 `<link>`；其余经 `requestUrl` 抓 CSS 文本（绕过渲染进程 CSP），递归展平 `@import`（lxgw-wenkai 的 6 张子表）、相对 `url(...)` 绝对化后注入内联 `<style>`（'unsafe-inline' 放行）；字体二进制无 `font-src` 限制仍直链按需下载。失败仅告警并保持未加载态，允许重选重试；`ensureLoaded` 对异步路径返回 Promise（调用点 fire-and-forget）。
+- 门禁：焦点套件 152 用例全绿（字体加载器重写 8 用例、默认值断言同步）、样式契约测试全过、像素复现确认 0%→全透明 / 100%→不透明、徽标完整渲染。
+
+## 2026-09-11 用户气泡纯色样式成为默认
+
+- 用户气泡新增渲染样式维度 `chatAppearance.user.style`（`'solid' | 'glass'`）：solid 为主题背景色派生的不透明气泡（`--opencodian-chat-surface` 混入 text-normal 自适应明暗），不带 `backdrop-filter`；glass 为原毛玻璃方案（渐变 + 12px 背景模糊 + 扫光）。默认与未知值一律归一化为 solid（`normalizeUserBubbleStyleId`），存量配置升级后即切换到纯色。
+- 样式实现：玻璃视觉整体收编到 `.opencodian-container[data-opencodian-user-bubble-style="glass"]` 选择器下，无属性时按 solid 渲染；`ChatSurfaceAppearanceCoordinator.syncAppearanceState()` 按设置打 data 属性（与 contextRingStyle 同链路）。纯色气泡无每帧背景模糊采样，顺带消除长会话滚动时毛玻璃的合成开销。
+- 设置 UI（样式 → 用户）：新增「气泡样式」下拉；用户组正文抽为 `renderUserStyleGroupBody()`，切换样式或分组 reset 后重渲染，毛玻璃专属的「气泡模糊」滑块仅在 glass 模式出现（`createStyleResetSetting` 新增可选 `onAfterReset`）。
+- 主题预设不再固定气泡样式：预设切换把气泡样式重置为基线 solid，玻璃模糊半径等参数保留为预设值，选 glass 后即按预设参数生效。
+- 门禁：focused 套件 84 用例全绿（含新增 normalize/coordinator data 属性用例）、lint 0/0、tsc 通过、puppeteer 像素复现验证 solid（无属性/显式）与 glass 三态渲染。
+
 ## 2026-09-11 图标来源扩充：LobeHub 版本对齐 + models.dev 兜底 + 碰撞匹配
 
 - 升级 `@lobehub/icons` 5.4.0 → 5.18.0 并重跑 `sync:lobehub-icons`，清单从 296 个图标增至 322 个。5.18 的 `es/toc.js` 改为 `import data from "./toc.json"`，Node 22 会因缺少 import attribute 拒绝加载；同步脚本改为直接读取 `es/toc.json`，仅在旧 inline-array 布局时回退模块导入。

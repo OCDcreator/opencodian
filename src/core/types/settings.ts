@@ -1320,6 +1320,16 @@ export function getInputPanelGlassRefractionVariantId(
   }
 }
 
+export function normalizeUserBubbleStyleId(value: unknown): UserBubbleStyleId {
+  switch (value) {
+    case 'solid':
+    case 'glass':
+      return value;
+    default:
+      return 'solid';
+  }
+}
+
 export function normalizeInputPanelActionButtonStyleId(value: unknown): InputPanelActionButtonStyleId {
   switch (value) {
     case 'default':
@@ -1801,7 +1811,15 @@ export interface ChatAppearanceBackgroundSettings {
   focusY: number;
 }
 
+/**
+ * User bubble rendering mode. `solid` derives an opaque background from the
+ * theme surface color; `glass` is the legacy glassmorphism bubble with
+ * backdrop blur and layered gradients.
+ */
+export type UserBubbleStyleId = 'solid' | 'glass';
+
 export interface ChatAppearanceUserSettings {
+  style: UserBubbleStyleId;
   radius: number;
   tailRadius: number;
   blur: number;
@@ -1967,6 +1985,7 @@ export function getDefaultChatAppearanceSettings(): ChatAppearanceSettings {
       focusY: 50,
     },
     user: {
+      style: 'solid',
       radius: 16,
       tailRadius: 4,
       blur: 12,
@@ -1991,7 +2010,10 @@ export function getDefaultChatAppearanceSettings(): ChatAppearanceSettings {
     },
     input: {
       radius: 12,
-      backgroundOpacity: 72,
+      // Slider now mixes against the opaque per-theme lens endpoint
+      // (--opencodian-composer-lens-bg-solid), so 32% here keeps the previous
+      // glass character that 72% produced against the old translucent endpoint.
+      backgroundOpacity: 32,
       blur: 18,
       shadowBlur: 28,
       actionButtonStyle: 'default',
@@ -2596,6 +2618,7 @@ function normalizeChatAppearanceUserSettings(
   return {
     ...defaults,
     ...(user ?? {}),
+    style: normalizeUserBubbleStyleId(user?.style),
     timeFontSize: normalizeFiniteNumberInRange(user?.timeFontSize, defaults.timeFontSize, 6, 36),
     timeFontWeight: normalizeFontWeightValue(user?.timeFontWeight, defaults.timeFontWeight),
     timeColor: normalizeCssColorValue(user?.timeColor, defaults.timeColor),

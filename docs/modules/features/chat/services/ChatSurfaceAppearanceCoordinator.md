@@ -12,6 +12,7 @@
 - 主题背景图异步加载
 - 自定义 CSS `<style>` 元素生命周期
 - 上下文圆环样式的 chat-container data attribute
+- 用户气泡样式的 chat-container data attribute（`data-opencodian-user-bubble-style`，solid 默认 / glass，2026-09-11）
 - 滚动模式类切换
 - 粘性遮罩颜色同步（含 rAF/timeout 调度）
 
@@ -20,7 +21,7 @@
 ```text
 上游:
 - ../../../core/theme (getThemePresetDefinition, THEME_PRESET_CSS_VARIABLE_NAMES, THEME_STYLE_CONTAINER_CLASSES)
-- ../../../core/types (ChatAppearanceSettings)
+- ../../../core/types (ChatAppearanceSettings, normalizeContextRingStyleId, normalizeUserBubbleStyleId)
 - ../../../core/types/settings (ThemePresetId)
 - ../chatAppearance (getChatAppearanceCssVariables, buildChatAppearanceCustomCss)
 - ./ChildSessionGraphCoordinator (SESSION_TREE_BASE_CSS)

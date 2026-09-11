@@ -1,3 +1,5 @@
+import { requestUrl, type RequestUrlResponse } from 'obsidian';
+
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import {
   findFontOptionById,
@@ -6,6 +8,42 @@ import {
   resolveFontCssFamily,
   UNIFIED_FONT_OPTIONS,
 } from '../../../../src/features/settings/InputFontRegistry';
+
+const mockRequestUrl = requestUrl as jest.MockedFunction<typeof requestUrl>;
+
+function cssResponse(text: string): RequestUrlResponse {
+  return {
+    status: 200,
+    text,
+    headers: {},
+    arrayBuffer: new ArrayBuffer(0),
+    json: null,
+  } as unknown as RequestUrlResponse;
+}
+
+const LXGW_ROOT_URL = 'https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.1.0/style.css';
+const LXGW_ROOT_CSS = [
+  "@import url('./lxgwwenkai-light.css');",
+  "@import url('./lxgwwenkai-regular.css');",
+  '',
+].join('\n');
+const LXGW_CHILD_CSS = [
+  '@font-face {',
+  "  font-family: 'LXGW WenKai';",
+  '  font-weight: 400;',
+  "  src: url('./files/lxgwwenkai-regular-subset-4.woff2') format('woff2');",
+  '}',
+  '',
+].join('\n');
+
+function mockLxgwStylesheets(): void {
+  mockRequestUrl.mockImplementation(async (request) => {
+    const url = typeof request === 'string' ? request : request.url;
+    if (url === LXGW_ROOT_URL) return cssResponse(LXGW_ROOT_CSS);
+    if (url.includes('lxgwwenkai-')) return cssResponse(LXGW_CHILD_CSS);
+    throw new Error(`unexpected requestUrl: ${url}`);
+  });
+}
 
 describe('InputFontRegistry', () => {
   it('uses bundled Newsreader as the default composer primary font', () => {
@@ -130,6 +168,7 @@ describe('InputFontRegistry', () => {
 
     beforeEach(() => {
       document.head.replaceChildren();
+      mockRequestUrl.mockReset();
       const originalCreateElement = document.createElement.bind(document);
       createElementSpy = jest.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
         return originalCreateElement(tagName, options);
@@ -164,36 +203,80 @@ describe('InputFontRegistry', () => {
       expect(appendChildSpy).not.toHaveBeenCalled();
     });
 
-    it('ensureLoaded injects a link element for CDN fonts', () => {
+    it('ensureLoaded injects a link element for Google Fonts stylesheets', () => {
       const loader = new InputFontLoader();
 
-      loader.ensureLoaded('gotham');
+      loader.ensureLoaded('poppins');
 
-      const linkEl = document.head.querySelector<HTMLLinkElement>('link[data-opencodian-font="gotham"]');
+      const linkEl = document.head.querySelector<HTMLLinkElement>('link[data-opencodian-font="poppins"]');
       expect(createElementSpy).toHaveBeenCalledWith('link');
       expect(appendChildSpy).toHaveBeenCalledTimes(1);
       expect(linkEl?.rel).toBe('stylesheet');
-      expect(linkEl?.href).toBe('https://fonts.cdnfonts.com/css/gotham-9');
+      expect(linkEl?.href).toContain('https://fonts.googleapis.com/');
+      expect(mockRequestUrl).not.toHaveBeenCalled();
     });
 
-    it('ensureLoaded only injects once per font id', () => {
+    it('ensureLoaded fetches CSP-blocked CDN stylesheets and inlines them as <style>', async () => {
+      mockLxgwStylesheets();
       const loader = new InputFontLoader();
 
-      loader.ensureLoaded('gotham');
-      loader.ensureLoaded('gotham');
+      await loader.ensureLoaded('lxgw-wenkai');
 
-      expect(appendChildSpy).toHaveBeenCalledTimes(1);
-      expect(document.head.querySelectorAll('link[data-opencodian-font="gotham"]')).toHaveLength(1);
+      expect(document.head.querySelector('link[data-opencodian-font="lxgw-wenkai"]')).toBeNull();
+      const styleEl = document.head.querySelector<HTMLStyleElement>('style[data-opencodian-font="lxgw-wenkai"]');
+      expect(styleEl).toBeTruthy();
+      // @import graph flattened, relative font binaries absolutized against the CDN URL.
+      expect(styleEl?.textContent).not.toContain('@import');
+      expect(styleEl?.textContent).toContain(
+        'https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.1.0/files/lxgwwenkai-regular-subset-4.woff2',
+      );
+      expect(loader.isLoaded('lxgw-wenkai')).toBe(true);
     });
 
-    it('ensureBothLoaded loads both en and cn fonts', () => {
+    it('ensureLoaded only injects once per font id, including in-flight loads', async () => {
+      mockLxgwStylesheets();
+      const loader = new InputFontLoader();
+
+      const first = loader.ensureLoaded('lxgw-wenkai');
+      const second = loader.ensureLoaded('lxgw-wenkai');
+      expect(second).toBeUndefined();
+      await first;
+      await loader.ensureLoaded('lxgw-wenkai');
+
+      expect(appendChildSpy).toHaveBeenCalledTimes(1);
+      expect(document.head.querySelectorAll('style[data-opencodian-font="lxgw-wenkai"]')).toHaveLength(1);
+    });
+
+    it('ensureLoaded warns and stays unloaded when the CDN fetch fails', async () => {
+      mockRequestUrl.mockRejectedValue(new Error('network down'));
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const loader = new InputFontLoader();
+
+      await loader.ensureLoaded('gotham');
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('gotham'),
+        expect.any(Error),
+      );
+      expect(loader.isLoaded('gotham')).toBe(false);
+      expect(document.head.querySelector('[data-opencodian-font="gotham"]')).toBeNull();
+
+      // A later retry is allowed because the in-flight marker was cleared.
+      mockRequestUrl.mockResolvedValue(cssResponse('/* gotham */'));
+      await loader.ensureLoaded('gotham');
+      expect(loader.isLoaded('gotham')).toBe(true);
+    });
+
+    it('ensureBothLoaded loads both en and cn fonts', async () => {
+      mockLxgwStylesheets();
       const loader = new InputFontLoader();
 
       loader.ensureBothLoaded('poppins', 'lxgw-wenkai');
+      // ensureBothLoaded is fire-and-forget; flush the inline-load microtask chain.
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(appendChildSpy).toHaveBeenCalledTimes(2);
       expect(document.head.querySelector('link[data-opencodian-font="poppins"]')).toBeTruthy();
-      expect(document.head.querySelector('link[data-opencodian-font="lxgw-wenkai"]')).toBeTruthy();
+      expect(document.head.querySelector('style[data-opencodian-font="lxgw-wenkai"]')).toBeTruthy();
     });
 
     it('isLoaded returns true for system and local fonts without injection', () => {

@@ -8,6 +8,8 @@
 > **状态**: [REVIEW]
 > **Updated**: 2026-07-24 — added `CodexApprovalPolicy` type (`'inherit'|'untrusted'|'on-request'|'never'`), `CodexBackendSettings.approvalPolicy` (default `'inherit'`), and normalization (missing/unknown → `'inherit'`, no migration to `on-request`).
 > **Updated**: 2026-07-28 — `CodexBackendSettings.executablePath` defaults to `''` and is trim-normalized; an empty string means automatic user-CLI discovery.
+> **Updated**: 2026-09-11 — `getDefaultChatAppearanceSettings().input.backgroundOpacity` retuned 72 → 32: the composer shell now mixes against the opaque `--opencodian-composer-lens-bg-solid` endpoint, so the previous glass character is preserved while 100% finally means fully opaque.
+> **Updated**: 2026-09-11 — added `UserBubbleStyleId` (`'solid'|'glass'`) and `ChatAppearanceUserSettings.style` (default `'solid'`, unknown values normalize to `'solid'` via `normalizeUserBubbleStyleId`); theme presets no longer pin a bubble style.
 
 ## 概述
 
@@ -123,7 +125,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `ChatAppearanceLayoutSettings` | 布局（`messagesPaddingTop`, `messagesPaddingX`） |
 | `ChatAppearanceStickySettings` | 吸顶区（`headerGap`, `maskHeight`, `maskBlur`） |
 | `ChatAppearanceBackgroundSettings` | 背景图（`imagePath`, `fitMode`, `opacity`, `blur`, `depth`, `dim`, `edgeFade`, `saturation`, `brightness`, `focusX`, `focusY`） |
-| `ChatAppearanceUserSettings` | 用户消息气泡，现含时间样式（`timeFontSize`, `timeFontWeight`, `timeColor`） |
+| `ChatAppearanceUserSettings` | 用户消息气泡，含渲染样式 `style`（`'solid'` 默认 / `'glass'`）与时间样式（`timeFontSize`, `timeFontWeight`, `timeColor`） |
 | `ChatAppearanceAssistantSettings` | 助手消息气泡，现含 meta/time/modelId 样式（字号、字重、颜色） |
 | `ChatAppearanceInputSettings` | 输入面板（`radius`, `backgroundOpacity`, `blur`, `shadowBlur`, `actionButtonStyle`, `contextRingStyle`, `enFontFamily`, `cnFontFamily`） |
 | `ChatAppearanceScrollbarSettings` | 滚动条（`width`, `radius`, `trackOpacity`, `thumbOpacity`, `thumbHoverOpacity`, `edgePadding`, `shadowOpacity`） |

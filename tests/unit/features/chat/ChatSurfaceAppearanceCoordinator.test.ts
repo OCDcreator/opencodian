@@ -64,6 +64,32 @@ describe('ChatSurfaceAppearanceCoordinator', () => {
       expect(host.getChatContainerEl().dataset.opencodianContextRingStyle).toBe('segmented');
     });
 
+    it('applies the user bubble style data attribute to the chat container', () => {
+      const settings = getDefaultChatAppearanceSettings();
+      settings.user.style = 'glass';
+      const host = createHost({
+        getChatAppearanceSettings: jest.fn().mockReturnValue(settings),
+      });
+      const coordinator = new ChatSurfaceAppearanceCoordinator(host);
+
+      coordinator.syncAppearanceState();
+
+      expect(host.getChatContainerEl().dataset.opencodianUserBubbleStyle).toBe('glass');
+    });
+
+    it('falls back to the solid user bubble style for invalid values', () => {
+      const settings = getDefaultChatAppearanceSettings();
+      (settings.user as { style: unknown }).style = 'frosted';
+      const host = createHost({
+        getChatAppearanceSettings: jest.fn().mockReturnValue(settings),
+      });
+      const coordinator = new ChatSurfaceAppearanceCoordinator(host);
+
+      coordinator.syncAppearanceState();
+
+      expect(host.getChatContainerEl().dataset.opencodianUserBubbleStyle).toBe('solid');
+    });
+
     it('applies theme preset class and CSS variables when preset is active', () => {
       const host = createHost({
         getActiveThemePresetId: jest.fn().mockReturnValue('dark'),

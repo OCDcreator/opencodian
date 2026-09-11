@@ -1,5 +1,7 @@
 # Core Styles
 
+2026-09-11：新增 `--opencodian-composer-lens-bg-solid`（dark/light/:root 三处），作为输入框背景强度滑杆的不透明混合端点，替代半透明的 `--opencodian-composer-lens-bg-strong`（保留定义供用户自定义 CSS 引用，插件自身不再消费）；滑杆 100% 现在真正得到不透明输入框。同时修复 sticky-mask 模式下 `.opencodian-turn-header::before` 的 `top` 负外延（原 `-1 * --opencodian-messages-pad-top`）：该不透明遮罩带在 header 未吸附时也会盖住上一轮助手消息底部约 4px（截断「已中断」徽标下缘），吸附时外延部分本就被滚动口裁掉，故改为 `top: 0`。
+
 2026-09-10：聊天 view-content 单独使用对称上下间距，覆盖 Obsidian 通用视图默认的 32px 底部留白；头部与输入区共享 `--opencodian-chat-edge-gap`（默认 12px），同时保留设备 safe-area。仅作用于 `data-type="opencodian-view"`，不改变主题或其它视图。
 
 > 2026-07-29: Added OpenCode diagnostic header-button visibility and state colors.

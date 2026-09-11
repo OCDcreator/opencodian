@@ -1,7 +1,7 @@
 import type { App } from 'obsidian';
 import { Notice, Setting } from 'obsidian';
 
-import { isValidChatAppearanceCustomCssDeclarations } from '../../core/types';
+import { isValidChatAppearanceCustomCssDeclarations, normalizeUserBubbleStyleId } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
@@ -292,6 +292,36 @@ export class SettingsStyleSection {
       t('settings.style.groups.user.title'),
       t('settings.style.groups.user.desc'),
     );
+    this.renderUserStyleGroupBody(userGroupEl);
+  }
+
+  private renderUserStyleGroupBody(userGroupEl: HTMLElement): void {
+    this.styleControls.clearStyleControlBindings('user');
+    userGroupEl.empty();
+
+    const bubbleStyle = normalizeUserBubbleStyleId(this.plugin.settings.chatAppearance.user.style);
+
+    new Setting(userGroupEl)
+      .setName(t('settings.style.user.style.name'))
+      .setDesc(t('settings.style.user.style.desc'))
+      .addDropdown((dropdown) => {
+        const syncFromSettings = () => {
+          dropdown.setValue(normalizeUserBubbleStyleId(this.plugin.settings.chatAppearance.user.style));
+        };
+        this.styleControls.registerStyleControlBinding('user', syncFromSettings);
+        dropdown
+          .addOption('solid', t('settings.style.user.style.option.solid'))
+          .addOption('glass', t('settings.style.user.style.option.glass'))
+          .setValue(bubbleStyle)
+          .onChange((value) => {
+            this.plugin.updateChatAppearance((appearance) => {
+              appearance.user.style = normalizeUserBubbleStyleId(value);
+            });
+            this.applyAndScheduleStyleUpdate();
+            this.renderUserStyleGroupBody(userGroupEl);
+          });
+      });
+
     this.addNumericStyleControl(userGroupEl, {
       group: 'user',
       name: t('settings.style.user.radius.name'),
@@ -320,20 +350,22 @@ export class SettingsStyleSection {
         appearance.user.tailRadius = value;
       },
     });
-    this.addNumericStyleControl(userGroupEl, {
-      group: 'user',
-      name: t('settings.style.user.blur.name'),
-      desc: t('settings.style.user.blur.desc'),
-      min: 0,
-      max: 24,
-      step: 1,
-      unit: 'px',
-      value: () => this.plugin.settings.chatAppearance.user.blur,
-      resetValue: () => this.plugin.getChatAppearanceBaseline().user.blur,
-      setValue: (appearance, value) => {
-        appearance.user.blur = value;
-      },
-    });
+    if (bubbleStyle === 'glass') {
+      this.addNumericStyleControl(userGroupEl, {
+        group: 'user',
+        name: t('settings.style.user.blur.name'),
+        desc: t('settings.style.user.blur.desc'),
+        min: 0,
+        max: 24,
+        step: 1,
+        unit: 'px',
+        value: () => this.plugin.settings.chatAppearance.user.blur,
+        resetValue: () => this.plugin.getChatAppearanceBaseline().user.blur,
+        setValue: (appearance, value) => {
+          appearance.user.blur = value;
+        },
+      });
+    }
     this.addNumericStyleControl(userGroupEl, {
       group: 'user',
       name: t('settings.style.user.shadowBlur.name'),
@@ -386,7 +418,7 @@ export class SettingsStyleSection {
         appearance.user.timeColor = value;
       },
     });
-    this.createStyleResetSetting(userGroupEl, 'user');
+    this.createStyleResetSetting(userGroupEl, 'user', () => this.renderUserStyleGroupBody(userGroupEl));
   }
 
   private addAssistantStyleGroup(containerEl: HTMLElement): void {
@@ -781,8 +813,9 @@ export class SettingsStyleSection {
   private createStyleResetSetting(
     containerEl: HTMLElement,
     group: ChatAppearanceStyleGroup,
+    onAfterReset?: () => void,
   ): void {
-    this.styleControls.createStyleResetSetting(containerEl, group);
+    this.styleControls.createStyleResetSetting(containerEl, group, onAfterReset);
   }
 
   private registerStyleControlBinding(

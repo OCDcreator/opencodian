@@ -1,5 +1,7 @@
 # Settings Layout Contract Styles
 
+> 2026-09-11：快速导航背景 token `--opencodian-settings-nav-bg` 由 `54% secondary + transparent` 改为 `54% secondary + 46% primary` 的不透明合成，修复滚动时设置卡片（`.opencodian-style-section`）顶边透过 sticky 导航显现的问题；54% secondary 混入 primary 后的不透明色与原来在默认面板底色上的合成色完全一致，仅去掉了透明通道。
+
 > 2026-07-29: Added token-aligned OpenCode trace status and recent-trace layouts.
 
 > **源码**: `src/style/components/settings-layout-contract.css`

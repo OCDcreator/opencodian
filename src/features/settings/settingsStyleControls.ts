@@ -375,6 +375,7 @@ export class SettingsStyleControls {
   createStyleResetSetting(
     containerEl: HTMLElement,
     group: ChatAppearanceStyleGroup,
+    onAfterReset?: () => void,
   ): void {
     new Setting(containerEl)
       .setName(t('settings.style.groupReset.name'))
@@ -387,6 +388,7 @@ export class SettingsStyleControls {
             this.plugin.resetChatAppearanceGroup(group);
             this.applyAndScheduleStyleUpdate();
             this.refreshStyleControlValues(group);
+            onAfterReset?.();
           });
       });
   }

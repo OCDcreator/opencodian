@@ -38,3 +38,7 @@ PiBackendSettings is a separate settings branch normalized by normalizePiBackend
 ## Auto-install startup update (2026-09-09)
 
 新增 `OpenCodianSettings.pluginUpdateAutoInstall: boolean`（默认 `false`），由 `settingsLoadNormalization` 在最终 merge 边界做布尔归一化，缺失或非布尔持久化值回退为默认。
+
+## User bubble style setting (2026-09-11)
+
+`ChatAppearanceUserSettings.style: UserBubbleStyleId`（`'solid' | 'glass'`）控制用户气泡渲染模式。默认与未知值归一化为 `'solid'`（`normalizeUserBubbleStyleId`）；主题预设不再各自固定气泡样式，预设切换会把气泡样式重置为基线（solid），glass 变为用户显式选择。

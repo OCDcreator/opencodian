@@ -409,10 +409,10 @@ export class SettingsStyleInputPanelSection {
     const input = this.plugin.settings.chatAppearance.input;
     if (kind === 'en') {
       input.enFontFamily = fontId;
-      this.fontLoader.ensureLoaded(fontId);
+      void this.fontLoader.ensureLoaded(fontId);
     } else {
       input.cnFontFamily = fontId;
-      this.fontLoader.ensureLoaded(fontId);
+      void this.fontLoader.ensureLoaded(fontId);
     }
     this.applyAndScheduleStyleUpdate();
   }

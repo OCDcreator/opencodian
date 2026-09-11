@@ -3,6 +3,8 @@
  * for the composer input area font settings.
  */
 
+import { requestUrl } from 'obsidian';
+
 export type FontCategory =
   | 'system'
   | 'serif'
@@ -355,29 +357,106 @@ export function resolveComposerFontFamily(
 // ── Dynamic Font Loader ─────────────────────────────────────────
 
 /**
- * Loads font CSS on-demand by injecting <link> elements into the document head.
- * Each font is loaded at most once per session.
+ * Obsidian's renderer CSP allows external stylesheets only from
+ * fonts.googleapis.com (`style-src 'unsafe-inline' 'self' https://fonts.googleapis.com`).
+ * Stylesheets on other CDN hosts are fetched through `requestUrl` (not subject
+ * to renderer CSP) and injected as an inline <style>, which 'unsafe-inline'
+ * permits. @import statements inside fetched CSS are flattened recursively and
+ * relative url(...) references are absolutized, because the inline sheet no
+ * longer has a base URL of its own. Font binaries referenced by the flattened
+ * @font-face rules still load directly: the CSP does not restrict font-src.
+ */
+const CSP_LINK_ALLOWED_ORIGINS: ReadonlySet<string> = new Set(['https://fonts.googleapis.com']);
+const MAX_STYLESHEET_IMPORT_DEPTH = 4;
+
+function canInjectAsLink(loadUrl: string): boolean {
+  try {
+    return CSP_LINK_ALLOWED_ORIGINS.has(new URL(loadUrl).origin);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Loads font CSS on-demand. Each font is loaded at most once per session.
  */
 export class InputFontLoader {
   private loaded = new Set<string>();
+  private loading = new Set<string>();
 
   /**
    * Ensure a font's CDN stylesheet is loaded.
-   * No-op for system/local fonts or already-loaded fonts.
+   * No-op for system/local fonts or already-loaded fonts. Returns a promise
+   * for the inline-injection path so callers that care can await completion;
+   * CSP-allowed <link> loads resolve synchronously and return undefined.
    */
-  ensureLoaded(fontId: string): void {
-    if (this.loaded.has(fontId)) return;
+  ensureLoaded(fontId: string): Promise<void> | undefined {
+    if (this.loaded.has(fontId) || this.loading.has(fontId)) return undefined;
 
     const option = ALL_FONT_OPTIONS.find(o => o.id === fontId);
-    if (!option || !option.loadUrl) return;
+    if (!option || !option.loadUrl) return undefined;
 
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = option.loadUrl;
-    link.setAttribute('data-opencodian-font', fontId);
-    document.head.appendChild(link);
+    if (canInjectAsLink(option.loadUrl)) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = option.loadUrl;
+      link.setAttribute('data-opencodian-font', fontId);
+      document.head.appendChild(link);
 
+      this.loaded.add(fontId);
+      return undefined;
+    }
+
+    this.loading.add(fontId);
+    return this.injectInlineStylesheet(fontId, option.loadUrl)
+      .catch((error: unknown) => {
+        console.warn(`[OpenCodian] Failed to load font stylesheet "${fontId}" from ${option.loadUrl}`, error);
+      })
+      .finally(() => {
+        this.loading.delete(fontId);
+      });
+  }
+
+  private async injectInlineStylesheet(fontId: string, url: string): Promise<void> {
+    const cssText = await this.fetchFlattenedStylesheet(url, 0, new Set());
+    const styleEl = document.createElement('style');
+    styleEl.textContent = cssText;
+    styleEl.setAttribute('data-opencodian-font', fontId);
+    document.head.appendChild(styleEl);
     this.loaded.add(fontId);
+  }
+
+  /** Fetch a stylesheet, inline its @import graph, and absolutize relative urls. */
+  private async fetchFlattenedStylesheet(url: string, depth: number, visited: Set<string>): Promise<string> {
+    if (depth > MAX_STYLESHEET_IMPORT_DEPTH || visited.has(url)) {
+      return '';
+    }
+    visited.add(url);
+
+    const response = await requestUrl({ url });
+    if (response.status >= 400) {
+      throw new Error(`HTTP ${response.status} fetching font stylesheet ${url}`);
+    }
+
+    const importUrls: string[] = [];
+    let cssText = response.text.replace(
+      /@import\s+(?:url\(\s*)?['"]?([^'"\s)]+)['"]?\s*\)?\s*;/g,
+      (_match, importPath: string) => {
+        importUrls.push(new URL(importPath, url).href);
+        return '';
+      },
+    );
+
+    // Relative url(...) references resolve against the stylesheet's own URL.
+    cssText = cssText.replace(
+      /url\(\s*(['"]?)(?!data:|https?:|#)([^'")]+)\1\s*\)/g,
+      (_match, quote: string, resourcePath: string) => `url(${quote}${new URL(resourcePath, url).href}${quote})`,
+    );
+
+    for (const importUrl of importUrls) {
+      cssText = `${await this.fetchFlattenedStylesheet(importUrl, depth + 1, visited)}\n${cssText}`;
+    }
+    return cssText;
   }
 
   /**

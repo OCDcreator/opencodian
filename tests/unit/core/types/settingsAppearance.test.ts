@@ -211,6 +211,17 @@ describe('chat appearance settings', () => {
     expect(normalized.user.timeColor).toBe('#7f8c9f');
   });
 
+  it('defaults the user bubble style to solid', () => {
+    expect(getDefaultChatAppearanceSettings().user.style).toBe('solid');
+    expect(normalizeChatAppearanceSettings(undefined).user.style).toBe('solid');
+  });
+
+  it('normalizes the user bubble style, keeping glass opt-in and rejecting unknown values', () => {
+    expect(normalizeChatAppearanceSettings({ user: { style: 'glass' } }).user.style).toBe('glass');
+    expect(normalizeChatAppearanceSettings({ user: { style: 'solid' } }).user.style).toBe('solid');
+    expect(normalizeChatAppearanceSettings({ user: { style: 'frosted' as never } }).user.style).toBe('solid');
+  });
+
   it('uses the legacy shared metadata font size as a fallback for separate time/model sizes', () => {
     const normalized = normalizeChatAppearanceSettings({
       assistant: {

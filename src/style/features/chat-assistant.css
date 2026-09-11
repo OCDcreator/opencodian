@@ -1293,7 +1293,7 @@
   overflow: visible;
   isolation: isolate;
   border-radius: calc(var(--opencodian-input-radius) + 2px);
-  background: color-mix(in srgb, var(--opencodian-composer-lens-bg-strong) var(--opencodian-input-bg-opacity), transparent);
+  background: color-mix(in srgb, var(--opencodian-composer-lens-bg-solid) var(--opencodian-input-bg-opacity), transparent);
   backdrop-filter: blur(var(--opencodian-input-blur)) saturate(118%) contrast(102%);
   -webkit-backdrop-filter: blur(var(--opencodian-input-blur)) saturate(118%) contrast(102%);
   box-shadow: 0 12px var(--opencodian-input-shadow-blur) color-mix(in srgb, var(--opencodian-composer-lens-shadow) 18%, transparent);

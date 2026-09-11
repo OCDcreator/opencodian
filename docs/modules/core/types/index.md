@@ -6,6 +6,7 @@
 > **状态**: [REVIEW]
 > **Updated**: 2026-07-23 — added Claude project provider preset types and normalization exports; provider credentials are projected only to project-local Claude settings.
 > **Updated**: 2026-07-29 — re-exports OpenCode desktop-style current-context usage type.
+> **Updated**: 2026-09-11 — re-exports `UserBubbleStyleId` and `normalizeUserBubbleStyleId` for the user bubble style setting.
 
 ## 概述
 

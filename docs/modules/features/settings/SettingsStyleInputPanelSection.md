@@ -1,5 +1,7 @@
 # SettingsStyleInputPanelSection
 
+2026-09-11：`applyFontSelection` 对 `InputFontLoader.ensureLoaded` 改为 `void` 调用——该方法对 CSP 受限 CDN 字体返回异步注入 Promise，这里只需 fire-and-forget。
+
 > **源码**: `src/features/settings/SettingsStyleInputPanelSection.ts`
 > **状态**: [REVIEW]
 

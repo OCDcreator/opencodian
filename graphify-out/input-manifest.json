@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "145352f966e9cfb11d5967ecca32f174214a8c6017f35db76ed2bcaa2a2ad422",
+  "digest": "fb5c97b197aff1b00cd5fdc0803b9aea28c4d297a99336754169b480bb1b0928",
   "recordCount": 620,
   "records": [
     {
@@ -791,7 +791,7 @@
     {
       "kind": "src",
       "key": "src/core/types/index.ts",
-      "sha256": "bce03c17d99f5a7825b561114ee289abc04b7303e0d149b73b037f96d0ad74c6"
+      "sha256": "d6192273e82c197d64032769082b493a656a0a57762024480b446e1cc331b43e"
     },
     {
       "kind": "src",
@@ -816,7 +816,7 @@
     {
       "kind": "src",
       "key": "src/core/types/settings.ts",
-      "sha256": "78a94a4aa6b945d99c5b139d6200c82b15bda9d52b93d530991c307b93ec31dd"
+      "sha256": "612871e1f3db6a8759cb59dae92b9cf26168ec790be0b5953c3df3228149c2c9"
     },
     {
       "kind": "src",
@@ -1216,7 +1216,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ChatSurfaceAppearanceCoordinator.ts",
-      "sha256": "e066e27abc6c8ee3038fb850b77592fe48a00e3c3a8ea0e550725e6fc8e9d7ed"
+      "sha256": "bdf329b5f4177c9c1c829145b4130c958c59ceb718e35ad7a5f217c95d72a187"
     },
     {
       "kind": "src",
@@ -2126,7 +2126,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/InputFontRegistry.ts",
-      "sha256": "f79716856930e39b673a2b989d2901b6730544947b852b9d2317e91c6d54136c"
+      "sha256": "54f4252934cc586ff62de345a65207c3371a3730295e5bd332d613de402819a7"
     },
     {
       "kind": "src",
@@ -2501,12 +2501,12 @@
     {
       "kind": "src",
       "key": "src/features/settings/settingsStyleControls.ts",
-      "sha256": "5e65d734b79d3aecc263720c46a154739dcd996dddd8db58dfe824d26bf2d64a"
+      "sha256": "822cdd9e0c6e8daaa186f0f85f377495cae9751b8ac9c49ce2593aece8ad3d80"
     },
     {
       "kind": "src",
       "key": "src/features/settings/SettingsStyleInputPanelSection.ts",
-      "sha256": "957b257864a59f07a451180d07ff607833d022776dc44d07882511d295b9d861"
+      "sha256": "155544322f0fac9d47ff4148f3a2cfecdb3fabd897dfe25b56bc404d1e557b7c"
     },
     {
       "kind": "src",
@@ -2521,7 +2521,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsStyleSection.ts",
-      "sha256": "fa14555e8108631c6bf8cd58f9d7c3edd791c10379f09c8b92b35a4a96ed630d"
+      "sha256": "9031d173e5d74fcced6d0300ae37ab6c0eb6c80680cda0fc48071b802e0970ca"
     },
     {
       "kind": "src",
@@ -2586,7 +2586,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "91eab5252356b443af31d599cf5498422755170c7480041512a66fc3b3f9e90d"
+      "sha256": "a15698675cc75ca269105e49ebf5059e60ddb1432019e8d22e2ca4db52dabcf2"
     },
     {
       "kind": "src",
@@ -2596,7 +2596,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "b83eeac4a7e34eec681c99f494f018c164bbe16ed3cb7ecc6f84043ad2a4a476"
+      "sha256": "9a7be89f6ba49a944a06846e0fbd090f9481c4daa5e4bc03cf751f135c454cde"
     },
     {
       "kind": "src",
@@ -2696,7 +2696,7 @@
     {
       "kind": "src",
       "key": "src/style/base/core.css",
-      "sha256": "d9f6a7335515e70e345a363fc54be0b6053790c9c92ddad69910ddf8da8b5d8a"
+      "sha256": "e904bd6aac6b5a7c193c3a7eb467a04a3a2c09c6625ed366294e44bdd758771e"
     },
     {
       "kind": "src",
@@ -2746,7 +2746,7 @@
     {
       "kind": "src",
       "key": "src/style/components/model-selector.css",
-      "sha256": "e4e8333405bbc0d23d9ac3ea6427f9bf253714d4f125a6aff774a99d404b10ba"
+      "sha256": "0a856255fc52e404aa160a58153928d43376f9683e0fa9d8843280f54f75cb85"
     },
     {
       "kind": "src",
@@ -2811,7 +2811,7 @@
     {
       "kind": "src",
       "key": "src/style/components/settings-layout-contract.css",
-      "sha256": "42f3aedf52ae8a84a462f872f5e678c014ab9feabba583d02f4503222f6ccfce"
+      "sha256": "ef43dd24084287c0d7d3215f5b301c764f340caa91712acde786ba9274a4bd4c"
     },
     {
       "kind": "src",
@@ -2836,12 +2836,12 @@
     {
       "kind": "src",
       "key": "src/style/features/chat-assistant.css",
-      "sha256": "476a7160cc901748456f74f93ecd8b1eea631211b6b6ebd19c59d6bb35a195f5"
+      "sha256": "84fffa41eb58fa7362a3fd0cdbf30d5b565da95d44983a33d6c0ef0dab7708e2"
     },
     {
       "kind": "src",
       "key": "src/style/features/chat-user.css",
-      "sha256": "6a05206dd66a9bfddad24b6acb45de471794b1c79abee7783b089cf7dae8e6bd"
+      "sha256": "e2abf3c9e84a42c69588696f99a9b1f3c42901f6b75830388328a01cf2a3a8f3"
     },
     {
       "kind": "src",
@@ -3104,7 +3104,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-11T04:13:06.484Z",
-  "headShaAtGeneration": "9da31b3ddb260efe31ccc5c83fb7249c7c751e85",
+  "generatedAt": "2026-09-11T15:33:47.974Z",
+  "headShaAtGeneration": "1b016bb43aec00aeaebf4681af5b4d83c043895a",
   "graphifyVersion": "graphify 0.9.31"
 }

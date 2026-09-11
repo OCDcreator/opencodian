@@ -26,7 +26,7 @@
 ### Binding 与 reset
 
 - `registerStyleControlBinding()` / `refreshStyleControlValues()` 维护 preset / reset 后的统一控件同步
-- `createStyleResetSetting()` 继续沿用 `resetChatAppearanceGroup()` + apply/save + binding refresh 这条既有链路
+- `createStyleResetSetting()` 继续沿用 `resetChatAppearanceGroup()` + apply/save + binding refresh 这条既有链路；可选 `onAfterReset` 回调（2026-09-11）供需要重渲染的分组（如用户气泡样式组）在 reset 后重建控件
 - `clampStyleNumber()` 保留 min/max/step 的统一夹取与步进归一化规则
 
 ## 关键方法
@@ -36,7 +36,7 @@
 | `addNumericControl()` | 渲染通用数值控件并处理 draft / slider commit 语义 |
 | `addNumericStyleControl()` | 把数值控件接到 `chatAppearance` 写回与 binding 注册 |
 | `addColorStyleControl()` | 渲染颜色选择控件并统一 follow-theme 行为 |
-| `createStyleResetSetting()` | 创建样式分组 reset 行，并同步控件值 |
+| `createStyleResetSetting()` | 创建样式分组 reset 行，并同步控件值；支持可选 `onAfterReset` 重渲染回调 |
 | `refreshStyleControlValues()` | 在 preset/reset 后统一刷新已注册控件 |
 
 ## 与其他模块的交互

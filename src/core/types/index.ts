@@ -187,6 +187,7 @@ export {
   normalizeThemeSettings,
   normalizeThinkingBudget,
   normalizeTitleMode,
+  normalizeUserBubbleStyleId,
   OPENCODE_LEGACY_LOCAL_DEFAULT_PORT,
   OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST,
   OPENCODIAN_LOCAL_SIDECAR_DEFAULT_PORT,
@@ -222,6 +223,7 @@ export {
   type ThemeSettings,
   type ThemeStyleId,
   type TitleMode,
+  type UserBubbleStyleId,
 } from './settings';
 
 // Tool types

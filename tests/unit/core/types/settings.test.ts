@@ -164,7 +164,7 @@ import { DEBUG_MODULE_REGISTRY, DEFAULT_DEBUG_REFRESH_INTERVAL_MS } from '../../
       expect(DEFAULT_SETTINGS.chatAppearance.assistant.modelIdFontSize).toBe(10);
       expect(DEFAULT_SETTINGS.chatAppearance.assistant.modelIdFontWeight).toBe(400);
       expect(DEFAULT_SETTINGS.chatAppearance.assistant.modelIdColor).toBe('var(--text-faint, var(--text-muted))');
-      expect(DEFAULT_SETTINGS.chatAppearance.input.backgroundOpacity).toBe(72);
+      expect(DEFAULT_SETTINGS.chatAppearance.input.backgroundOpacity).toBe(32);
       expect(DEFAULT_SETTINGS.chatAppearance.input.shadowBlur).toBe(28);
       expect(DEFAULT_SETTINGS.chatAppearance.input.actionButtonStyle).toBe('default');
       expect(DEFAULT_SETTINGS.inputPanelGlassRefraction).toEqual(getDefaultInputPanelGlassRefractionSettings());

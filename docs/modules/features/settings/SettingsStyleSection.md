@@ -66,7 +66,7 @@ Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings
 - `presets` — renders theme preset cards + scheme chips
 - `background` — renders background upload/preview/fit controls
 - `layout` — renders layout settings
-- `user` — renders user message bubble appearance
+- `user` — renders user message bubble appearance（2026-09-11 起含「气泡样式」下拉：solid 默认 / glass；body 抽为 `renderUserStyleGroupBody()`，切换样式或分组 reset 时重渲染，毛玻璃专属的「气泡模糊」滑块仅 glass 模式渲染）
 - `assistant` — renders assistant message bubble appearance
 - `input` — renders input panel theme + glass refraction settings
 - `scrollbar` — renders scrollbar appearance

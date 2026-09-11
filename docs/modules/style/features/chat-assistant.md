@@ -1,5 +1,7 @@
 # Chat Assistant Styles
 
+2026-09-11：`.opencodian-composer-shell` 的背景混合端点从半透明的 `--opencodian-composer-lens-bg-strong` 换成不透明的 `--opencodian-composer-lens-bg-solid`，输入框背景强度滑杆全程线性覆盖 透明→不透明（100% 即实色面板）；新装默认值从 72 重调到 32 以保住原来的玻璃观感，已存设置里的数值在新映射下会偏实，用户可按需下调。
+
 2026-09-10：输入区底部使用与头部一致的 `--opencodian-chat-edge-gap`，不再额外固定 16px。与 core.css 的宿主对称留白配合，桌面聊天表面的上下视觉留白均为约 24px。
 
 > **源码**: `src/style/features/chat-assistant.css`
