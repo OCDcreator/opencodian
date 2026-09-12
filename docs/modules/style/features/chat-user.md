@@ -5,12 +5,13 @@
 
 ## 职责
 
-定义用户消息气泡（右对齐玻璃态）、折叠长文本行为、文本选区高亮以及消息入场动画。
+定义用户消息气泡（右对齐）、折叠长文本行为、文本选区高亮以及消息入场动画。气泡有两种渲染模式，通过 `.opencodian-container` 上的 `data-opencodian-user-bubble-style` 选择：`solid`（默认，属性缺失时同样生效）使用主题派生的不透明表面色、无 `backdrop-filter`；`glass` 保留旧的玻璃态渐变 + 模糊背景。
 
 ## 关键类名 / CSS 变量
 
 - `.opencodian-message--user`：用户消息容器与右对齐布局。
-- `.opencodian-message--user .opencodian-message-content`：玻璃态气泡本体。
+- `.opencodian-message--user .opencodian-message-content`：气泡本体，默认即 solid 模式（`--opencodian-user-bubble-bg` / `--opencodian-user-bubble-border`，hover 用 `-hover` 变量）。
+- `.opencodian-container[data-opencodian-user-bubble-style="glass"] .opencodian-message--user .opencodian-message-content`：玻璃态覆盖层，只在显式选择 glass 时生效。
 - `.opencodian-collapsible*`：长内容折叠遮罩与"展开/收起"按钮。
 - `.opencodian-selection-highlight` 与 `::highlight(opencodian-selection)`：选区高亮。
 - `.opencodian-message--compaction-divider`：全宽居中 compaction 分割线容器，区别于用户气泡与 notice 卡片。
@@ -28,5 +29,6 @@
 ## 修改注意点
 
 - 折叠逻辑依赖 `--opencodian-collapsible-max-height`，CSS 与 `collapsible.ts` 需保持契合。
-- 用户气泡的玻璃态层次和 hover 动效与助手消息不同，不建议直接复用助手样式。
+- solid 是默认模式：基础规则不能依赖 `data-opencodian-user-bubble-style` 属性存在，glass 只能作为叠加覆盖层，否则默认样式会整体失效。
+- 用户气泡的层次和 hover 动效与助手消息不同，不建议直接复用助手样式。
 - 修改后执行 `npm run build:css`（或完整 `npm run build`）。

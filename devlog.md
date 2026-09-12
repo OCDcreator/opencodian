@@ -11,6 +11,14 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-12 自动更新跳过缺资产的 Release，修复 v1.1.22 永久 404
+
+- 根因：v1.1.22 的发布 push（d7a4517d5）卡在 `check:module-docs:diff`——`src/style/features/chat-user.css` 改了但 `docs/modules/style/features/chat-user.md` 未同步，Plugin Package workflow 在 `Verify repository` 失败，后面的 `Publish GitHub release` 没有执行，GitHub/Gitea 都没有 v1.1.22 的 Release 资产。但同一次 push 已经把 `versions.json` 写成含 `"1.1.22"`，于是已装 1.1.21 的库每次启动都去下载 `releases/download/v1.1.22/main.js`，拿到 404 后报 `PackageValidationError: main.js download returned 404.`，自动更新永久失败（每次启动重试、每次弹失败 notice）。
+- 修复（`src/core/update/PluginUpdateService.ts`）：新增 `ReleaseAssetsUnavailableError`，把“缺资产 / 404 / 410”这类永远装不上的下载失败与可重试的 5xx 区分开（5xx 仍是普通校验错误，下次检查重试）；新增 `installNewestInstallable()` 作为自动更新入口，从新到旧挑选“比当前版本新且真的能下载”的版本，被跳过的版本就地标记 `installable: false` + `unavailableReason`、并把 `latestRelease` 重算为最新可安装版本。标记只存内存：下次 `checkForUpdates()` 重读 `versions.json`，资产补传后该版本自动恢复可安装，无需清缓存。显式 `installRelease(version)` 仍然只装用户点选的那一版，但下载失败时同样标记该版本不可用，UI 不再继续提供。
+- 修复（`src/app/runtime/PluginRuntimeCoordinator.ts`）：`autoInstallReleaseOnStartup()` 改调 `installNewestInstallable()`；返回 `null`（没有更新的可安装版本）时只写 info 日志、不弹 notice，避免“广告了一个装不上的版本”演变成每次启动的失败提示。
+- 版本处理：1.1.22 的 bump push 门禁失败即被烧掉（`detect-release-version.mjs` 比较 push 前后 `manifest.json`，版本未变则 `changed=false`，重推也发不出 Release），故 bump 到 1.1.23，并从 `versions.json` 删除无 Release 的 `"1.1.22"` 条目（与同样被烧掉的 1.1.18 惯例一致）。同时补上 1.1.22 遗留的 `chat-user.md` 文档缺口（solid/glass 双模式）。
+- 门禁：更新相关 2 个套件 31 用例全绿（新增 5 个 service 用例 + 1 个 coordinator 用例，覆盖跳过 404 装下一版、显式安装标记不可用、全部跳过时报错并保留现网包、5xx 不退役可重试、无更新返回 null）。
+
 ## 2026-09-11 设置快速导航不透明化修复卡片顶边透印
 
 - 根因：设置页 sticky 快速导航 `.opencodian-settings-quick-nav` 背景半透明——布局契约 token `--opencodian-settings-nav-bg` 为 `color-mix(in srgb, var(--background-secondary) 54%, transparent)`（仅 54% 不透明，且无 backdrop blur），基础规则里为 94% 透明 + blur(24px)。滚动时设置卡片（`.opencodian-style-section`）从导航下方滑过，卡片上边框线透过导航显现，用户看到「卡片上面框的线被遮住了」的透印。

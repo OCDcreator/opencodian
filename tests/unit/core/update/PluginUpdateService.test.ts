@@ -316,6 +316,72 @@ describe('PluginUpdateService', () => {
     })).toBe(true);
   });
 
+  it('skips an advertised release whose assets are missing and installs the next installable version', async () => {
+    const request = githubRequest({ '1.2.0': '1.4.5', '1.1.0': '1.4.5' }, {
+      ...releasePackage('1.2.0', { main: response(404, 'Not Found') }),
+      ...releasePackage('1.1.0'),
+    });
+    const { service, adapter } = createService({ request });
+    await service.checkForUpdates();
+
+    await expect(service.installNewestInstallable()).resolves.toMatchObject({
+      previousVersion: '1.0.0',
+      installedVersion: '1.1.0',
+    });
+
+    expect(text(adapter.files.get(`${PLUGIN_DIR}/main.js`)!)).toBe('main-new');
+    const snapshot = service.getSnapshot();
+    expect(snapshot.releases.find((release) => release.version === '1.2.0')).toMatchObject({
+      installable: false,
+      unavailableReason: expect.stringContaining('main.js download returned 404'),
+    });
+    expect(snapshot.latestRelease).toMatchObject({ version: '1.1.0' });
+  });
+
+  it('marks a version with missing assets unavailable when installed explicitly', async () => {
+    const request = githubRequest({ '1.2.0': '1.4.5' }, releasePackage('1.2.0', { styles: response(404) }));
+    const { service, adapter } = createService({ request });
+    await service.checkForUpdates();
+
+    await expect(service.installRelease('1.2.0')).rejects.toThrow('styles.css download returned 404');
+
+    expect(text(adapter.files.get(`${PLUGIN_DIR}/main.js`)!)).toBe('main-old');
+    expect(service.getSnapshot().releases[0]).toMatchObject({
+      version: '1.2.0',
+      installable: false,
+      unavailableReason: expect.stringContaining('Release assets are unavailable'),
+    });
+    expect(service.getSnapshot().backups).toEqual([]);
+  });
+
+  it('reports every skipped version when no advertised release can be downloaded', async () => {
+    const request = githubRequest({ '1.2.0': '1.4.5' }, releasePackage('1.2.0', { main: response(404, 'Not Found') }));
+    const { service, adapter } = createService({ request });
+    await service.checkForUpdates();
+
+    await expect(service.installNewestInstallable()).rejects.toThrow('No plugin release could be downloaded (skipped 1.2.0)');
+
+    expect(text(adapter.files.get(`${PLUGIN_DIR}/main.js`)!)).toBe('main-old');
+  });
+
+  it('does not retire a version when the asset host fails transiently', async () => {
+    const request = githubRequest({ '1.2.0': '1.4.5' }, releasePackage('1.2.0', { styles: response(503) }));
+    const { service } = createService({ request });
+    await service.checkForUpdates();
+
+    await expect(service.installNewestInstallable()).rejects.toThrow('styles.css download returned 503');
+
+    expect(service.getSnapshot().releases[0]).toMatchObject({ version: '1.2.0', installable: true });
+  });
+
+  it('returns null when no checked release is newer than the installed version', async () => {
+    const request = githubRequest({ '1.0.0': '1.4.5' });
+    const { service } = createService({ request });
+    await service.checkForUpdates();
+
+    await expect(service.installNewestInstallable()).resolves.toBeNull();
+  });
+
   it('serializes concurrent version changes', async () => {
     let resolveMainDownload: ((value: RequestUrlResponse) => void) | undefined;
     const request = jest.fn(async (input: RequestUrlParam | string) => {

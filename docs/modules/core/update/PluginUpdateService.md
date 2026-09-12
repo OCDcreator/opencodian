@@ -2,7 +2,7 @@
 
 > **源码**: `src/core/update/PluginUpdateService.ts`
 > **状态**: [REVIEW]
-> **Updated**: 2026-07-27 — added static compatibility-index discovery, transactional self-update, and local rollback backups.
+> **Updated**: 2026-09-12 — version index entries whose release assets are missing are now retired and skipped instead of blocking auto-update.
 
 ## 概述
 
@@ -17,6 +17,7 @@ The service is deliberately internal: it has no configurable release URL and nev
 - The selected source's stable entries are sorted descending. The fixed `vX.Y.Z` Release URL convention supplies the three asset URLs without querying the GitHub or Gitea Releases APIs.
 - Every installation stages `main.js`, `manifest.json`, and `styles.css` before write. The downloaded manifest must match `opencodian`, the selected version, and the selected `versions.json` minimum version.
 - Incompatible versions remain visible with `installable: false`; the service calls `requireApiVersion()` through an injectable seam for that decision.
+- A version entry can be published to `versions.json` before its Release assets exist. A missing asset or a `404`/`410` download is classified as `ReleaseAssetsUnavailableError`, which means that candidate can never install; other non-2xx statuses stay plain validation errors so a transient `5xx` is retried on a later check.
 
 ## Public state and operations
 
@@ -24,8 +25,13 @@ The service is deliberately internal: it has no configurable release URL and nev
 - `getSnapshot()` supplies the settings owner with current version, release/backup history, operation state, and a display-safe error.
 - `onProgress(listener)` returns a disposable snapshot subscription. It reports check start/completion and installation progress; a failing listener cannot interrupt other consumers, installation, or rollback. New UI instances read `getSnapshot()` before subscribing, so an active or terminal operation remains visible after reopening settings.
 - `installLatestStable()` and `installRelease(version)` only operate on the verified snapshot catalogue.
+- `installNewestInstallable()` is the auto-update entry point. It walks the catalogue newest-first, ignores versions that are not newer than the running plugin, and returns the first package that actually downloads. It returns `null` when no newer installable release exists, and rejects with the skipped version list when every newer entry is undownloadable.
 - `restoreBackup(id)` works offline from an already verified backup.
 - `markVersionNotified(version)` persists the once-per-version startup-notice marker.
+
+## Unavailable release assets
+
+An advertised version whose assets were never uploaded (or were removed) must not block every later update, so a failed candidate is retired in place: it is republished as `installable: false` with `unavailableReason` describing the missing asset, and `latestRelease` is recomputed to the newest release that can still be installed. The retirement is intentionally in-memory only — the next `checkForUpdates()` re-reads `versions.json`, so a version whose assets are uploaded later becomes installable again without any cache to clear.
 
 ## Transaction and recovery
 
@@ -43,4 +49,4 @@ Backup, install, verification, and automatic restoration phases are published be
 
 ## Testing seams
 
-`request`, `isApiVersionSupported`, `now`, and `persistState` are injectable. Unit tests use these seams with an in-memory `DataAdapter` to prove one-request static-index discovery, source fallback boundaries, index/manifest validation rejection, compatibility gating, complete staging, rollback recovery, retention, deferred-download progress, exact phase order, subscription disposal/failure isolation, and concurrent/reentrant-operation rejection.
+`request`, `isApiVersionSupported`, `now`, and `persistState` are injectable. Unit tests use these seams with an in-memory `DataAdapter` to prove one-request static-index discovery, source fallback boundaries, index/manifest validation rejection, compatibility gating, complete staging, rollback recovery, retention, deferred-download progress, exact phase order, subscription disposal/failure isolation, and concurrent/reentrant-operation rejection. They also cover the missing-assets path: skipping a `404` release and installing the next version, retiring an explicitly requested version, reporting the skipped list when nothing can be downloaded, leaving a `5xx` candidate installable for a later retry, and returning `null` when nothing newer exists.

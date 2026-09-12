@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "fb5c97b197aff1b00cd5fdc0803b9aea28c4d297a99336754169b480bb1b0928",
+  "digest": "90315357735b32f4e0c97fb173489d3b2c4c775440fa44fb2312f07410609b7a",
   "recordCount": 620,
   "records": [
     {
@@ -16,12 +16,12 @@
     {
       "kind": "package",
       "key": "package-lock.json",
-      "sha256": "519609cdd514735194616760538c85f267ef78964a6fb188e441d5334e110409"
+      "sha256": "8ff710476a34f641e4446d161a76694ca013b5f5f026967c102884c114fdeaf6"
     },
     {
       "kind": "package",
       "key": "package.json",
-      "sha256": "88599f1fe2826ffb4fe85261522d7166bc3e8f885cfc3e0a2d9e776785ea2de7"
+      "sha256": "ecdf9850cb3e0a7665804d522e0465b17901a191675d4310cbc29c889e546772"
     },
     {
       "kind": "src",
@@ -41,7 +41,7 @@
     {
       "kind": "src",
       "key": "src/app/runtime/PluginRuntimeCoordinator.ts",
-      "sha256": "d5861639e113c292757fe35fc471b932e9c19535842eb6a68faa40223c9fa031"
+      "sha256": "3ab85a5f22f0c20a385a766756373bb3334e77522390ce0d15757ca770c73198"
     },
     {
       "kind": "src",
@@ -831,7 +831,7 @@
     {
       "kind": "src",
       "key": "src/core/update/PluginUpdateService.ts",
-      "sha256": "a6f850bf3e2b173b6e3a8d21dc94255aad819e3f92b2f075d33b471a7b4aed39"
+      "sha256": "bc90da9705bfdef418b01349189d3bb65022b938f44ab79a791c077de15de0ba"
     },
     {
       "kind": "src",
@@ -3104,7 +3104,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-11T15:33:47.974Z",
-  "headShaAtGeneration": "1b016bb43aec00aeaebf4681af5b4d83c043895a",
+  "generatedAt": "2026-09-12T00:39:01.866Z",
+  "headShaAtGeneration": "d7a4517d5141b8e54f2f306f5364232c19840ad2",
   "graphifyVersion": "graphify 0.9.31"
 }

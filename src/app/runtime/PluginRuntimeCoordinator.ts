@@ -115,7 +115,11 @@ export class PluginRuntimeCoordinator {
    */
   private async autoInstallReleaseOnStartup(service: PluginUpdateService, version: string): Promise<void> {
     try {
-      const result = await service.installRelease(version);
+      const result = await service.installNewestInstallable();
+      if (!result) {
+        logger.info('[startup] no installable plugin update to install');
+        return;
+      }
       await service.markVersionNotified(result.installedVersion);
       logger.info(`[startup] auto-installed plugin update ${result.previousVersion} -> ${result.installedVersion}; reload required`);
       new Notice(t('settings.pluginUpdate.autoInstallSuccess', { version: result.installedVersion }));

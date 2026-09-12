@@ -136,6 +136,15 @@ class SourceUnavailableError extends Error {}
 
 class PackageValidationError extends Error {}
 
+/**
+ * A version index entry whose release assets cannot be downloaded, for example a
+ * version published to the index before its release assets were uploaded. Such a
+ * candidate can never install, so auto-update marks it unavailable and moves on
+ * instead of failing hard on every startup. Transient host failures (5xx) stay
+ * PackageValidationError so the version is retried later.
+ */
+class ReleaseAssetsUnavailableError extends PackageValidationError {}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -392,12 +401,54 @@ export class PluginUpdateService {
     if (!candidate.installable) {
       throw new Error(candidate.unavailableReason ?? `Release ${version} cannot be installed.`);
     }
-    return this.runExclusive(version, async () => {
-      const packageToInstall = await this.downloadReleasePackage(candidate);
-      const result = await this.applyPackage(packageToInstall, candidate.source);
-      await this.refreshBackups();
-      return result;
-    });
+    return this.downloadAndApplyRelease(candidate);
+  }
+
+  /**
+   * Auto-update entry point: installs the newest release that is both newer than
+   * the running version and actually downloadable. Version index entries whose
+   * release assets are unavailable are marked unavailable and skipped, so one
+   * broken index entry cannot block every future update. Returns null when no
+   * newer installable release exists.
+   */
+  async installNewestInstallable(): Promise<PluginUpdateInstallResult | null> {
+    const candidates = [...this.candidates.values()]
+      .filter((candidate) => candidate.installable)
+      .filter((candidate) => comparePluginVersions(candidate.version, this.manifest.version) > 0)
+      .sort((left, right) => comparePluginVersions(right.version, left.version));
+    if (candidates.length === 0) return null;
+
+    const skipped: string[] = [];
+    let lastError: unknown = null;
+    for (const candidate of candidates) {
+      try {
+        return await this.installRelease(candidate.version);
+      } catch (error) {
+        if (!(error instanceof ReleaseAssetsUnavailableError)) throw error;
+        skipped.push(candidate.version);
+        lastError = error;
+      }
+    }
+    throw new Error(`No plugin release could be downloaded (skipped ${skipped.join(', ')}): ${formatError(lastError)}`);
+  }
+
+  private async downloadAndApplyRelease(candidate: ReleaseCandidate): Promise<PluginUpdateInstallResult> {
+    try {
+      return await this.runExclusive(candidate.version, async () => {
+        const packageToInstall = await this.downloadReleasePackage(candidate);
+        const result = await this.applyPackage(packageToInstall, candidate.source);
+        await this.refreshBackups();
+        return result;
+      });
+    } catch (error) {
+      // The version index can advertise a version whose release assets were never
+      // uploaded. Remember it as unavailable so the UI and auto-update move on
+      // instead of retrying a download that can never succeed.
+      if (error instanceof ReleaseAssetsUnavailableError) {
+        this.markReleaseUnavailable(candidate.version, `Release assets are unavailable: ${formatError(error)}`);
+      }
+      throw error;
+    }
   }
 
   async restoreBackup(id: string): Promise<PluginUpdateInstallResult> {
@@ -412,6 +463,25 @@ export class PluginUpdateService {
       await this.refreshBackups();
       return result;
     });
+  }
+
+  /**
+   * Mark a version index entry as permanently undownloadable and republish the
+   * snapshot, so the UI stops offering it and latestRelease points at the newest
+   * release that can still be installed.
+   */
+  private markReleaseUnavailable(version: string, reason: string): void {
+    const candidate = this.candidates.get(version);
+    if (!candidate || !candidate.installable) return;
+    this.candidates.set(version, { ...candidate, installable: false, unavailableReason: reason });
+    const publicReleases = [...this.candidates.values()]
+      .map(toPublicRelease)
+      .sort((left, right) => comparePluginVersions(right.version, left.version));
+    const latestRelease = publicReleases.find((release) => release.installable)
+      ?? publicReleases[0]
+      ?? null;
+    this.snapshot = { ...this.snapshot, latestRelease, releases: publicReleases };
+    this.notifyProgress();
   }
 
   private async checkForUpdatesInternal(): Promise<PluginUpdateSnapshot> {
@@ -492,7 +562,7 @@ export class PluginUpdateService {
     let completedFiles = 0;
     for (const assetName of REQUIRED_ASSET_NAMES) {
       const asset = candidate.assets.get(assetName);
-      if (!asset) throw new PackageValidationError(`Release ${candidate.version} is missing ${assetName}.`);
+      if (!asset) throw new ReleaseAssetsUnavailableError(`Release ${candidate.version} is missing ${assetName}.`);
       const progress = {
         phase: 'downloading' as const, version: candidate.version, assetName,
         totalFiles: REQUIRED_ASSET_NAMES.length,
@@ -500,7 +570,11 @@ export class PluginUpdateService {
       this.setProgress({ ...progress, completedFiles });
       const response = await this.request({ url: asset.url, method: 'GET', throw: false });
       if (response.status < 200 || response.status >= 300) {
-        throw new PackageValidationError(`${assetName} download returned ${response.status}.`);
+        const message = `${assetName} download returned ${response.status}.`;
+        if (response.status === 404 || response.status === 410) {
+          throw new ReleaseAssetsUnavailableError(message);
+        }
+        throw new PackageValidationError(message);
       }
       if (assetName === 'main.js' && response.arrayBuffer.byteLength === 0) {
         throw new PackageValidationError('main.js cannot be empty.');
