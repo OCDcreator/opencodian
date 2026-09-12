@@ -13,7 +13,6 @@ import {
   buildExtractionUserPrompt,
   evaluateExtractionGate,
   extractionSourceTag,
-  type ExtractionTranscriptLine,
   formatTranscriptForPrompt,
   parseExtractionResponse,
   toExtractionLines,
@@ -236,7 +235,20 @@ export class MemoryBackendService {
     /** Message count at the previous extraction for this conversation. */
     lastExtractedMessageCount: number;
   }): Promise<MemoryExtractionOutcome> {
-    const skipped = async (reason: string, detail: string): Promise<MemoryExtractionOutcome> => {
+    /**
+     * Steady-state skips (disabled, transcript-not-grown, prose threshold)
+     * are not events: they must not write metrics on every turn or a dark
+     * memory backend performs per-turn disk churn. Eventful outcomes
+     * (turn-wrote-memory, model-returned-empty, written, error) persist.
+     */
+    const steadySkip = (reason: string): MemoryExtractionOutcome => ({
+      status: 'skipped',
+      skipReason: reason,
+      writtenCount: 0,
+      writtenFiles: [],
+      modelCalls: 0,
+    });
+    const skipped = async (reason: string): Promise<MemoryExtractionOutcome> => {
       await this.appendMetric({
         ts: Date.now(),
         kind: 'extraction-skipped',
@@ -244,12 +256,12 @@ export class MemoryBackendService {
         detail: reason,
         bytes: 0,
       });
-      return { status: 'skipped', skipReason: reason, writtenCount: 0, writtenFiles: [], modelCalls: 0, ...(detail ? {} : {}) };
+      return steadySkip(reason);
     };
 
     try {
       if (!input.settings.memoryBackendEnabled || !input.settings.memoryExtractionEnabled) {
-        return await skipped('extraction-disabled', '');
+        return steadySkip('extraction-disabled');
       }
       const lines = toExtractionLines(input.messages);
       const gate = evaluateExtractionGate({
@@ -259,7 +271,9 @@ export class MemoryBackendService {
         memoryRootNative: this.memoryRootNative(),
       });
       if (!gate.proceed) {
-        return await skipped(gate.skipReason ?? 'gate', '');
+        const reason = gate.skipReason ?? 'gate';
+        if (reason === 'turn-wrote-memory') return await skipped(reason);
+        return steadySkip(reason);
       }
 
       const [indexContent, manifest] = await Promise.all([
@@ -420,20 +434,6 @@ export class MemoryBackendService {
     }
   }
 
-  /**
-   * Detect that the conversation gained a compaction marker since the last
-   * seen marker count (backend-neutral compaction signal, D-O6).
-   */
-  static compactionMarkerCount(
-    messages: ReadonlyArray<MemoryTranscriptMessage>,
-  ): number {
-    let count = 0;
-    for (const m of messages) {
-      if (m.summary || m.compactionDivider) count++;
-    }
-    return count;
-  }
-
   /** Read-only lint report (secret hits, missing importance, stray files). */
   async lint(): Promise<MemoryLintReport> {
     const [indexContent, manifest] = await Promise.all([
@@ -527,14 +527,22 @@ export class MemoryBackendService {
     return outcome;
   }
 
-  /** Append-only metrics journal under the store root. */
+  /** Metrics journal retention cap (append-only, oldest entries dropped). */
+  private static readonly METRICS_MAX_ENTRIES = 500;
+
+  /** Append-only metrics journal under the store root (bounded). */
   async appendMetric(event: MemoryMetricEvent): Promise<void> {
     try {
       if (!(await this.fs.exists(MEMORY_STORE_ROOT))) {
         await this.fs.mkdir(MEMORY_STORE_ROOT);
       }
       const current = (await this.fs.readFile(METRICS_PATH)) ?? '';
-      await this.fs.writeFile(METRICS_PATH, `${current}${JSON.stringify(event)}\n`);
+      const lines = current.split('\n').filter((line) => line.trim().length > 0);
+      lines.push(JSON.stringify(event));
+      const kept = lines.length > MemoryBackendService.METRICS_MAX_ENTRIES
+        ? lines.slice(lines.length - MemoryBackendService.METRICS_MAX_ENTRIES)
+        : lines;
+      await this.fs.writeFile(METRICS_PATH, `${kept.join('\n')}\n`);
     } catch {
       // metrics are diagnostics; never fail a turn for them
     }
@@ -557,8 +565,4 @@ export class MemoryBackendService {
       .filter((e): e is MemoryMetricEvent => e !== null);
   }
 
-  /** Lines type re-export for callers building transcripts. */
-  static toExtractionLines(messages: ReadonlyArray<MemoryTranscriptMessage>): ExtractionTranscriptLine[] {
-    return toExtractionLines(messages);
-  }
 }

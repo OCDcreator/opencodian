@@ -51,7 +51,7 @@ export function buildMemoryProtocol(memoryRootDisplay: string): string {
     '',
     '## Lane Split (where to store what)',
     '',
-    '- **This memory directory** — durable workspace facts: user preferences for this work, feedback, project decisions, references. Use your file-writing tool here.',
+    '- **This memory directory** — durable workspace facts: user preferences for this work, feedback, project decisions, references. When the user asks you to remember something durable, write the file here with your file-writing tool — do NOT route it into any other memory or knowledge tool (lean-ctx ctx_knowledge, session stores, note-taking tools, …); those are different lanes for different data.',
     '- **AGENTS.md / CLAUDE.md** — checked-in project rules that travel with git; do not dump transient chat facts there.',
     '',
     'Do not cross-write unless the user explicitly asks for another store.',

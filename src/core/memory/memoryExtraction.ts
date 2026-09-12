@@ -45,6 +45,21 @@ export const MIN_MEMORY_WRITE_CHARS = 160;
 
 export type ExtractionMemory = DistilledMemory;
 
+/**
+ * Count persisted compaction markers in a transcript — the backend-neutral
+ * compaction signal (D-O6): a new marker since the last observation means
+ * the conversation compacted and a reflection pass is due.
+ */
+export function compactionMarkerCount(
+  messages: ReadonlyArray<MemoryTranscriptMessage>,
+): number {
+  let count = 0;
+  for (const m of messages) {
+    if (m.summary || m.compactionDivider) count++;
+  }
+  return count;
+}
+
 /** Structural transcript line the gates operate on. */
 export type ExtractionTranscriptLine = MemoryTranscriptMessage & {
   text: string;
@@ -222,6 +237,7 @@ export function buildExtractionUserPrompt(input: {
     'Respond with JSON only: {"memories":[{"name":"short-kebab-case-slug","description":"one-line summary","type":"user|feedback|project|reference","body":"markdown body"}]}',
     'Rules:',
     '- Return {"memories":[]} when nothing is durable — that is the common case and a valid answer.',
+    '- A direct user preference or correction ("以后回答先给结论再给细节，因为上次……" / "from now on do X because Y") IS a durable feedback memory — distill it the turn it is given. A greeting, a one-off question, or a task instruction for this conversation is not.',
     "- Save user corrections and confirmed preferences as `feedback`; save who the user is (role, expertise, preferences) as `user`; ongoing project facts, decisions and constraints as `project`; external pointers as `reference`.",
     '- The last user turn must contain the evidence; do not mine older turns, and do not promote a throwaway remark into a memory.',
     '- Skip anything derivable from the repo, git history, or AGENTS.md/CLAUDE.md, and anything that only matters inside this conversation.',

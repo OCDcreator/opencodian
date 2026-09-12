@@ -14,9 +14,10 @@
 import * as nodeFs from 'node:fs';
 import * as nodePath from 'node:path';
 
-import { App, Modal, normalizePath,Notice, Setting } from 'obsidian';
+import { App, Modal, normalizePath, Notice, Setting } from 'obsidian';
 
 import {
+  compactionMarkerCount,
   MemoryBackendService,
   type MemoryFileSystem,
   type MemoryLintReport,
@@ -174,7 +175,7 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
     latestUserText: string;
   }): Promise<{ text: string } | null> {
     try {
-      const epoch = MemoryBackendService.compactionMarkerCount(input.messages);
+      const epoch = compactionMarkerCount(input.messages);
       const alreadyInjected = this.injectedEpochs.get(input.conversationId) === epoch;
       const outcome = await this.service.planInjection({
         conversationId: input.conversationId,
@@ -336,7 +337,7 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
 
       // Backend-neutral compaction signal (D-O6): a new persisted marker
       // since the last observation triggers one reflection pass.
-      const markers = MemoryBackendService.compactionMarkerCount(messages);
+      const markers = compactionMarkerCount(messages);
       const lastMarkers = this.compactionCounts.get(input.conversationId) ?? 0;
       this.compactionCounts.set(input.conversationId, markers);
       if (markers > lastMarkers && settings.memoryExtractionEnabled) {
