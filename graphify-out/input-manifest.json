@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "561e92b5c40d8cbcc05a1db9a264576962cdcd4f2f9e02c3316fe55bfeef676f",
+  "digest": "bc47dabcacca5cc7bf38933524a9a18a092913d5c7d32adc8e35c3c383df3eab",
   "recordCount": 638,
   "records": [
     {
@@ -46,7 +46,7 @@
     {
       "kind": "src",
       "key": "src/app/memory/MemoryRuntimeCoordinator.ts",
-      "sha256": "9af7ed2282cbef807006c7fb89d54915bbefd7ea66bf063b061c85de8862e9c6"
+      "sha256": "ba7b73a9903a717ed43b58dff2fc16e8447dad3422c49aeef960b0dc9179d547"
     },
     {
       "kind": "src",
@@ -501,12 +501,12 @@
     {
       "kind": "src",
       "key": "src/core/memory/MemoryBackendService.ts",
-      "sha256": "1aabc8d02528ab9eda3a2516b9ad6b76e119726fc6f4281b6009cb48f0507157"
+      "sha256": "cd7ee449d04769c8ecfa07e8fb58af101fd9d1fc66c172dac052c8162985e7da"
     },
     {
       "kind": "src",
       "key": "src/core/memory/memoryExtraction.ts",
-      "sha256": "02cf51faf52002798505230d86329e50a5f0fa9c7aeeb0d896709e8782d09cba"
+      "sha256": "14fdcbbffc87080673793d4aee8ac721621b417c1579003e4f3667a4aa58e42e"
     },
     {
       "kind": "src",
@@ -546,7 +546,7 @@
     {
       "kind": "src",
       "key": "src/core/memory/memoryProtocol.ts",
-      "sha256": "0a1b6b2ff5218468ac709e646cf700d7c83f76cbd435ab8028364fedca4b25d7"
+      "sha256": "bcb75a88989c2ca2d04bb1c77e06b2957d4ebf9d1896700c396aeefc600c9d87"
     },
     {
       "kind": "src",
@@ -3194,7 +3194,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-12T17:06:59.385Z",
-  "headShaAtGeneration": "929cfb417e0f8b4ab1dc8efdaa8c80f4318ffbf2",
+  "generatedAt": "2026-09-12T19:39:32.176Z",
+  "headShaAtGeneration": "f819553b1d902e46e608a282581fae0081bad67d",
   "graphifyVersion": "graphify 0.9.31"
 }

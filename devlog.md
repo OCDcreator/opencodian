@@ -11,6 +11,28 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-13 通用记忆后端：真实模型循环测试全绿（A–E 31/31 + pi 中立性）
+
+用真实 opencode server（1.18.30，`OPENCODE_PURE` 隔离全局插件）+ 真实 `opencode-go/deepseek-flash` 跑完整循环（harness：`.tmp/memory-backend/loop/run-loop.mts`，复用仓库 `src/core/memory` 核心 + 同一 HTTP 面 `POST /session/{id}/message`）。三轮循环后的最终轮（cycle 3，原始日志 `/tmp/loop-full-3.log`，产物 `.tmp/memory-backend/loop-artifacts/`）：
+
+| 场景 | 主调用 | 额外调用 | 记忆作者 | MEMORY.md 行/字节 | 注入字节 | 延迟 | 检查 |
+|------|-------|---------|---------|------------------|---------|------|------|
+| A 偏好纠正 | 1 | 0 | main-agent | 9 / 137B | 5067 | 43.5s | 7/7 |
+| A2 抽取兜底 | 2 | 2 | plugin-extraction | 3 / 172B | 5079(仅首回合) | ~5.7s+ | 6/6 |
+| B 项目事实 | 1 | 0 | main-agent | 11 / 224B | 5066 | 13.9s | 4/4 |
+| C 负样本×2 | 2 | **0** | main-agent(C2) | 4 / 129B | 5067 | ~17.4s | 6/6 |
+| D 召回 | 2 | 0 | main-agent(build) | 4 / 150B | 5428 | 2.8s(召回回合) | 4/4 |
+| E 降级 | 1 | 0 | — | 0 / 0B | **0** | ~3s | 3/3 |
+
+关键发现与修复（每轮证据都在 artifacts）：
+- **两条写入路径都被真实模型走通**：A/B/D-build 中模型按注入协议自主 write 记忆文件（frontmatter `node_type: memory` + Trigger/Why/How + 分区索引行）；A2 第二回合（同纪元无注入）由插件抽取兜底写入（`source: extracted`）。
+- **闸门即省钱**：C1 "hi" 0 次抽取调用；C2 模型自写后 0 次抽取调用；「该回合模型调用数 == 回合数」在 C 全程成立。
+- **D 召回生效**：新会话注入索引后，回答以一句话结论开头（记忆内容被遵守）。
+- **全局 zmem 插件双重注入事故**：未隔离时全局 opencode-zmem 在 system 层注入了自己的协议，模型写到 `~/.local/share/opencode/zmem/` 去——zmem 文档警告的 lane 冲突真实复现。harness 用 `OPENCODE_PURE` 隔离；同时给本插件协议的 Lane Split 段恢复了「禁止路由到其它知识工具（lean-ctx ctx_knowledge 等）」的警告（C2 曾被 ctx_knowledge 截胡，修复后模型正确走文件写工具）。
+- **稳态零写**：禁用/纪元跳过原先每回合写 metrics.jsonl，已改为不落盘；metrics journal 封顶 500 条。
+- **后端中立性（pi）5/5 PASS**：同一记忆库（opencode 后端建立）、同一注入文本（5468B）、pi 后端 prepend 接缝，召回回合 4.9s，回答以「**一句话结论：**」开头（`/tmp/loop-f4.log`、`.tmp/memory-backend/loop-artifacts/scenario-neutrality-pi.json`）。调试记录：harness spawn 版曾因 stdin 管道挂起（pi -p 等 stdin EOF），改 `stdio:['ignore',…]` 后秒级返回。
+- undici 默认 300s headers 超时会杀长工具回合（>5min），harness 用自定义 Agent 提升；`format:{type:'text'}` 会污染 opencode 服务端消息 schema 导致 GET 消息列表 500——插件侧仅临时会话使用，不受影响，已在 harness 移除。
+
 ## 2026-09-13 通用记忆后端：设置/接线/运行时/维护命令全链路（D-O 系列落地）
 
 继 `feat(memory)` 核心提交后，完成记忆后端的全部接线与运行时闭环。`npm run verify` 15 项全绿（原始日志 `/tmp/opencodian-verify-memory-wiring.log`）。
