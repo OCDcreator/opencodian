@@ -131,6 +131,49 @@
       "risk": "high"
     },
     {
+      "id": "app.memory-runtime",
+      "layer": "app",
+      "include": [
+        "src/app/memory/**"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "compose the backend-neutral memory runtime: vault filesystem adapter, settings snapshot, OpenCode-backed extraction/reflection model invoker",
+        "observe turn-settled and compaction signals and schedule fail-soft per-turn extraction and compaction reflection",
+        "register memory maintenance commands (status/lint/list/forget) against the coordinator"
+      ],
+      "canonicalState": [
+        "MemoryRuntimeCoordinator instance (owns extraction debounce state and transcript watermarks)"
+      ],
+      "entrypoints": [
+        "MemoryRuntimeCoordinator"
+      ],
+      "allowedOwnerDependencies": [
+        "shared.foundation",
+        "shared.i18n",
+        "core.memory",
+        "core.opencode",
+        "core.storage",
+        "core.types"
+      ],
+      "forbiddenDependencies": [
+        "feature.chat-runtime",
+        "feature.chat-services",
+        "core.backend",
+        "core.backend-pi"
+      ],
+      "adjacentOwners": [
+        "app.composition",
+        "core.memory"
+      ],
+      "overviewDoc": "docs/architecture/owners/app-memory-runtime.md",
+      "requiredGates": [
+        "typecheck",
+        "module-docs"
+      ],
+      "risk": "medium"
+    },
+    {
       "id": "app.diagnostics-runtime",
       "layer": "app",
       "include": [
@@ -948,6 +991,52 @@
         "tests/unit/core/storage/**"
       ],
       "overviewDoc": "docs/architecture/owners/core-storage.md",
+      "requiredGates": [
+        "typecheck",
+        "module-docs"
+      ],
+      "risk": "medium"
+    },
+    {
+      "id": "core.memory",
+      "layer": "core",
+      "include": [
+        "src/core/memory/**"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "backend-neutral workspace memory core: path identity, Markdown topic store, MEMORY.md index formatting and injection planning",
+        "per-turn extraction and compaction reflection gates, prompts, parsers and provenance-stamped write plans",
+        "credential scan guard, hygiene notices and index-only recall assembly with lexical semantic fallback"
+      ],
+      "canonicalState": [
+        "workspace memory store layout rules and index budget caps",
+        "injection/extraction/reflection planning contracts"
+      ],
+      "entrypoints": [
+        "src/core/memory/index.ts",
+        "src/core/memory/MemoryBackendService.ts"
+      ],
+      "allowedOwnerDependencies": [],
+      "forbiddenDependencies": [
+        "core.opencode",
+        "core.opencode-diagnostics",
+        "core.agents",
+        "core.backend",
+        "core.backend-pi",
+        "core.backend-diagnostics",
+        "feature",
+        "app"
+      ],
+      "adjacentOwners": [
+        "app.memory-runtime",
+        "feature.chat-runtime",
+        "feature.chat-services"
+      ],
+      "tests": [
+        "tests/unit/core/memory/**"
+      ],
+      "overviewDoc": "docs/architecture/owners/core-memory.md",
       "requiredGates": [
         "typecheck",
         "module-docs"
