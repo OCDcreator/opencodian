@@ -201,13 +201,34 @@
   border-radius: var(--opencodian-settings-form-row-radius);
   background: var(--opencodian-settings-form-row-bg);
   box-shadow: var(--opencodian-settings-form-row-shadow);
-  transition: background-color 120ms ease, border-color 120ms ease;
+  /* Border color is deliberately not transitioned: the hover accent is the row's
+     primary feedback, and fading it (plus the settings modal's `backdrop-filter`
+     re-compositing on every animated frame) reads as the highlight arriving late.
+     The background tint keeps its ease so the cards still feel soft. */
+  transition: background-color 120ms ease;
 }
 
 .opencodian-settings .opencodian-settings-section .setting-item:hover,
 .opencodian-settings .opencodian-settings-content-shell .setting-item:hover {
   border-color: var(--opencodian-settings-form-row-hover-border);
   background: var(--opencodian-settings-form-row-hover-bg);
+}
+
+/* Obsidian ships a row divider for setting rows inside `.setting-group`: an
+   absolutely positioned `::before` at `top: -1px`, inset by
+   `--setting-items-padding-x`, with a 1px `--background-modifier-border` top
+   border. That line lands exactly on our card's top border and paints over it,
+   so the card's top edge — including the hover highlight — reads as missing
+   while the other three sides keep their color. Our rows are self-bordered
+   cards, so the divider is dropped. Note the ancestor order: Obsidian's
+   `.setting-group` wraps the plugin root (`.setting-group > .setting-items >
+   .setting-item.opencodian-settings-direct-host > .opencodian-settings`), so the
+   selector has to hang off `.opencodian-settings` the same way the row-card rule
+   does; the resulting (0,3,1) ties Obsidian's divider rule and wins on load
+   order. */
+.opencodian-settings .opencodian-settings-section .setting-item::before,
+.opencodian-settings .opencodian-settings-content-shell .setting-item::before {
+  content: none;
 }
 
 .opencodian-settings .opencodian-settings-section .setting-item + .setting-item,

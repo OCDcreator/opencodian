@@ -1,5 +1,7 @@
 # Settings Layout Contract Styles
 
+> 2026-09-12：普通设置 row-card 顶边被 Obsidian 的 group 分隔线盖住。Obsidian 1.13 的 `app.css` 会给 `.setting-group` 内的 setting row 加一条绝对定位的 `::before` 分隔线（`top: -1px`、左右内缩 `--setting-items-padding-x`、1px `--background-modifier-border`），它正好压在本文件定义的 row-card 顶边上，于是悬停高亮时只有左/右/下三边变色、顶边仍是分隔线的暗色（未悬停时两者颜色接近，因此不易察觉）。新增 `.opencodian-settings .opencodian-settings-section .setting-item::before, .opencodian-settings .opencodian-settings-content-shell .setting-item::before { content: none }`：选择器必须沿用 row-card 规则的形状——Obsidian 的 `.setting-group` 包在插件根外面（`.setting-group > .setting-items > .setting-item.opencodian-settings-direct-host > .opencodian-settings`），写成 `.opencodian-settings .setting-group …` 的前后顺序永远匹配不到；这样写特异性为 (0,3,1)，与 Obsidian 的分隔线规则持平，而插件样式表（`styleSheets[29]`）晚于 `app.css`（`styleSheets[1]`）加载，因此稳定生效。OpenCodian 的 row 都是自带边框的卡片，不需要这条分隔线；`.setting-item.opencodian-settings-direct-host` 那层宿主行 Obsidian 自己已经不下发分隔线，无需额外覆盖。
+
 > 2026-09-11：快速导航背景 token `--opencodian-settings-nav-bg` 由 `54% secondary + transparent` 改为 `54% secondary + 46% primary` 的不透明合成，修复滚动时设置卡片（`.opencodian-style-section`）顶边透过 sticky 导航显现的问题；54% secondary 混入 primary 后的不透明色与原来在默认面板底色上的合成色完全一致，仅去掉了透明通道。
 
 > 2026-07-29: Added token-aligned OpenCode trace status and recent-trace layouts.
@@ -56,6 +58,8 @@ Rule: never apply one hierarchy rule globally across both layout modes. In class
 - 状态表达应落在 badge、文字、focus ring、低调 border 或 `.opencodian-settings-inline-empty` / owner-specific alert 上。比如 Tools 的 ask/deny/override 只能改边框或 badge，不再给整行铺 accent 背景。
 - Server > Connection 的连接模式、自动启动、OpenCode 可执行路径、host、port，以及 General 的设置界面模式、界面语言、在编辑区打开设置都继承同一 row-card contract。
 - `.opencodian-wide-text-setting` 只是 Field/control column 宽度变体，不是另一套视觉样式。
+- Card 的顶边由 row 自己的 border 负责，不允许被 Obsidian 的 settings-group 分隔线覆盖：`.opencodian-settings .opencodian-settings-section .setting-item::before, .opencodian-settings .opencodian-settings-content-shell .setting-item::before { content: none }` 会屏蔽 Obsidian 那条 `top: -1px` 的 `::before` 分隔线，否则悬停时顶边不会跟着 `--opencodian-settings-form-row-hover-border` 变色。选择器顺序必须与 row-card 规则一致（`.opencodian-settings` 在最外层），因为 Obsidian 的 `.setting-group` 是插件根的外层容器。
+- Row-card 只对 `background-color` 做 `120ms` 过渡，**不对 `border-color` 做过渡**：悬停强调色是这一行最主要的反馈，而 `.modal.mod-settings` 自带 `backdrop-filter`，每帧渐变都要重新合成背景模糊，实测观感就是高亮「来晚了」。边框即时切换、背景仍然缓入，是这条 hover 契约的固定取向，不要改回双属性过渡。
 - 不迁移 readback/proof/status panels、真正的 alert/empty、modal editor cards、chat/composer、permission dialog 或 streaming error blocks。
 
 ## Visible Unification Slice

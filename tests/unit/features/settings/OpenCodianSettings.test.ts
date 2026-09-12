@@ -1060,6 +1060,11 @@ describe('OpenCodianSettingTab layout shell', () => {
 
     expect(ordinaryRowBlock).toContain('grid-template-columns: minmax(min(160px, 45%), 1fr) minmax(min(180px, 50%), max-content)');
     expect(ordinaryRowBlock).toContain('background: var(--opencodian-settings-form-row-bg)');
+    // The hover accent must appear immediately: fading border-color (next to the
+    // settings modal's backdrop-filter) reads as the highlight arriving late, so
+    // only the background tint keeps its ease.
+    expect(ordinaryRowBlock).toContain('transition: background-color 120ms ease');
+    expect(ordinaryRowBlock).not.toContain('border-color 120ms ease');
     expect(contractCss).toMatch(/\.opencodian-settings\s+\.opencodian-settings-content-shell\s+\.setting-item/);
     expect(contractCss).not.toMatch(/\.opencodian-settings\s+\.opencodian-settings-content-shell\s*>\s*\.setting-item/);
     expect(contractCss).toMatch(
@@ -1093,6 +1098,24 @@ describe('OpenCodianSettingTab layout shell', () => {
     expect(contractCss).toMatch(
       /\.opencodian-settings\s+\.opencodian-skill-card,\s*[\s\S]*\.opencodian-settings\s+\.opencodian-acp-agent-row-card\s*\{[\s\S]*background:\s*var\(--opencodian-settings-form-row-bg\)/,
     );
+  });
+
+  it('drops the Obsidian settings-group row divider so card top borders stay visible', () => {
+    const contractCss = readFileSync(
+      join(process.cwd(), 'src/style/components/settings-layout-contract.css'),
+      'utf8',
+    );
+
+    // Obsidian paints a `.setting-group .setting-item::before` divider at top: -1px
+    // over the row's own top border, which made card top edges (and the hover
+    // highlight) look cut in the middle. The row-card contract must suppress it.
+    // The selector intentionally mirrors the row-card rule: Obsidian's
+    // `.setting-group` wraps the plugin root, so the plugin root cannot be written
+    // outside a `.setting-group` ancestor.
+    expect(contractCss).toMatch(
+      /\.opencodian-settings\s+\.opencodian-settings-section\s+\.setting-item::before,\s*\.opencodian-settings\s+\.opencodian-settings-content-shell\s+\.setting-item::before\s*\{[^}]*content:\s*none;[^}]*\}/,
+    );
+    expect(contractCss).not.toMatch(/\.opencodian-settings\s+\.setting-group\s/);
   });
 
   it('documents mode-aware settings hierarchy rules after the regression audit', () => {

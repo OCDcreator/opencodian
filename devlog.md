@@ -11,6 +11,21 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-12 设置行悬停高亮改为即时切换
+
+- 症状：设置行卡片悬停时高亮「来得有点晚」（用户预估约半秒，实际体感轻微）。
+- 排查：用 Obsidian CLI 读运行中的设置窗口——row 自身过渡是 `background-color 0.12s ease, border-color 0.12s ease` 且 `transition-delay` 为 0，祖先链上没有任何别的 transition/delay，popout 也未节流（25 帧 rAF ≈ 390ms）。真正的额外开销来自 `.modal.mod-settings` 自带的 `backdrop-filter: blur(20px) saturate(1.8)`（不在插件 CSS / Phycat / 用户 snippet 中，属 Obsidian 自身）：弹窗内每帧颜色渐变都要重新合成背景模糊，于是 0.12s 的边框渐入被放大成可感知的延迟。
+- 修复（`src/style/components/settings-layout-contract.css`）：row-card 过渡改为只保留 `transition: background-color 120ms ease`，`border-color` 不再过渡——强调色即时到位，背景 tint 仍缓入；同时也省掉了渐变动画期间的多帧背景模糊重合成。
+- 门禁：`OpenCodianSettings.test.ts` 的 row-card 契约用例新增断言（必须含 `transition: background-color 120ms ease`、不得含 `border-color 120ms ease`）；模块文档把该取向写成固定契约，避免回退。
+
+## 2026-09-12 设置行卡片顶边被 Obsidian 分组分隔线覆盖
+
+- 症状：设置页普通 setting row-card 的悬停高亮边框只有左/右/下三边完整，顶边仍是暗色分隔线；未悬停时分隔线色与卡片边框色几乎相同，只有出现强调色时才看得出来，因此表现为「很多卡片顶边缺一截」。
+- 根因：Obsidian 1.13 `app.css` 给 `.setting-group` 内的 setting row 加了一条绝对定位分隔线 `.setting-group .setting-item:not(.setting-item-heading)::before`（`top: -1px`、左右内缩 `--setting-items-padding-x`（20px）、1px `--background-modifier-border`）。插件把同一批 row 渲染成自带四边边框的卡片，这条线正好落在卡片顶边上：未悬停时它画 `#1f2233`(100%)、卡片边框是 `color-mix(... 88%, transparent)`≈`#1d2030`（肉眼等同），悬停时卡片三边变为 `--opencodian-settings-form-row-hover-border`，顶边却仍被分隔线压住。
+- 定位方式：用 Obsidian CLI（`obsidian eval` / `dev:dom`）在真实 Obsidian 1.13.7 + Phycat `theme-dark-abyss` 下读取运行中的设置窗口。`::before` 计算样式为 `top:-1px; left/right:20px; border-top:1px solid rgb(31,34,51)`、宽 529.67px，与截图里那条内缩 37px 的暗线（颜色 `1f2233`、953px、方头）逐项吻合；`document.styleSheets[29]`（插件）晚于 `[1]`（`app://obsidian.md/app.css`）加载，确认同等特异性即可覆盖。
+- 修复（`src/style/components/settings-layout-contract.css`）：新增 `.opencodian-settings .opencodian-settings-section .setting-item::before, .opencodian-settings .opencodian-settings-content-shell .setting-item::before { content: none }`。选择器必须沿用 row-card 规则的形状：真实 DOM 里 Obsidian 的 `.setting-group` 包在插件根外面（`.setting-group > .setting-items > .setting-item.opencodian-settings-direct-host > .opencodian-settings`），所以 `.opencodian-settings .setting-group …` 这种前后顺序永远匹配不到（第一版就踩了这个坑，靠运行时实测才发现）。这样写特异性 (0,3,1) 与 Obsidian 分隔线规则持平，而插件样式表（`styleSheets[29]`）晚于 `app.css`（`styleSheets[1]`）加载，因此稳定生效。
+- 验证：在运行中的设置窗口注入该规则前后对比，10 个 setting row 的 `::before` 命中数从 8 个变为 0 个（修复后已在用户库 网文写作 直接复核）；`tests/unit/features/settings/OpenCodianSettings.test.ts` 新增契约用例锁定选择器形状与 `content: none`。
+
 ## 2026-09-12 自动更新跳过缺资产的 Release，修复 v1.1.22 永久 404
 
 - 根因：v1.1.22 的发布 push（d7a4517d5）卡在 `check:module-docs:diff`——`src/style/features/chat-user.css` 改了但 `docs/modules/style/features/chat-user.md` 未同步，Plugin Package workflow 在 `Verify repository` 失败，后面的 `Publish GitHub release` 没有执行，GitHub/Gitea 都没有 v1.1.22 的 Release 资产。但同一次 push 已经把 `versions.json` 写成含 `"1.1.22"`，于是已装 1.1.21 的库每次启动都去下载 `releases/download/v1.1.22/main.js`，拿到 404 后报 `PackageValidationError: main.js download returned 404.`，自动更新永久失败（每次启动重试、每次弹失败 notice）。
