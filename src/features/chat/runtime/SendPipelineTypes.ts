@@ -83,6 +83,13 @@ export interface SendPipelineFinalizationPort {
 }
 
 export interface SendPipelineViewPort {
+  /** Optional fail-soft observer fired after a user turn fully settles. */
+  onTurnSettled?(info: {
+    conversationId: string;
+    tabId: import('../tabs').TabId | null;
+    sessionId?: string;
+    backend: string;
+  }): void;
   getTabRuntimeState(tabId: TabId | null): SendPipelineTabRuntime | null;
   getActiveTabId(): TabId | null;
   shouldAutoScroll(tabId: TabId | null): boolean;
@@ -212,6 +219,7 @@ export interface SendPipelineHost extends
 export type SendPipelineExecutionHost =
   Pick<
     SendPipelineViewPort,
+    | 'onTurnSettled'
     | 'getTabRuntimeState'
     | 'getOrCreateTabStreamController'
     | 'claimOpenCodeDiagnosticRunToken'

@@ -132,3 +132,5 @@ Claude Code 现在声明 `AgentCapability.Images`，因此共享 composer 会显
 - `onUserDialog` + `supportedDialogKinds`（adapter options）：透传到 SDK `Options`；宿主回调缺省时不声明任何 dialog kind（CLI fail-closed，行为与升级前一致）。
 - 2026-09-08 SDK 0.3.263：`reloadSkills()` 对全部活动 query 调用 SDK 控制请求，并触发 commands-changed 订阅者，使斜杠菜单立即刷新。
 - 2026-09-08 SDK 0.3.263：Capability Lab 的 `resumeSessionAt` 截断探针必须同时传入从被丢弃 BETA turn 提取的 `resumeDropsTurn` user UUID；缺失 UUID 时 fail closed。
+
+- 2026-09-13: sendMessage 以 prependMemoryInjection 在消息文本前置记忆注入块（Claude 无 per-turn system 接缝，settings.systemPrompt append 保持不动）。

@@ -48,3 +48,5 @@
 - 纯 notice message 构造优先放在 `AssistantNoticeRenderer.ts` 这类 helper，而不是继续塞回 shell port。
 - 新的发送 helper 应优先扩展这里的类型，而不是继续在实现文件里发散匿名结构。
 - `SendPipelineTabRuntime` 只收录发送链路真正关心的字段；不要把整个 view runtime 状态无差别搬进来。
+
+- 2026-09-13: SendPipelineViewPort 增加 onTurnSettled?；ExecutionHost Pick 纳入该键。

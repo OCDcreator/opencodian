@@ -1,8 +1,8 @@
 import {
+  buildReflectionUserPrompt,
   parseReflectionResponse,
   planReflectionWrites,
   reflectionSourceTag,
-  buildReflectionUserPrompt,
 } from '../../../../src/core/memory/memoryReflection';
 
 describe('parseReflectionResponse (defensive, ≤3 per compaction)', () => {

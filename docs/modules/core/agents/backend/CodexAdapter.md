@@ -64,3 +64,5 @@
 - `updateModel()` 接收模型字符串，空字符串会清除为 SDK 默认，仅对后续新建/恢复的 thread 生效
 - Approval bridge 维护约束（Round 5）：仅 wire 了 `execCommandApproval` / `applyPatchApproval` 两种最窄的审批形状，不覆盖 v2 `item/*/requestApproval` 变体或 `mcpServer/elicitation/request`；`CodexApprovalDecision.decision` 仅支持四个标量值，`ReviewDecision` 的对象变体（`approved_execpolicy_amendment` / `network_policy_amendment`）超出本切片范围；host 回调在调用时动态读取 `this.approvalHost.collectApproval`，因此 `setApprovalHost({})` 后已注册的 handler 会安全降级为 `denied`；运行时审批触发证明仍待有效 auth 恢复后针对真正触发审批的 permission profile 验证（当前分类：wiring tested，runtime unproven）
 - 2026-09-08：SDK fallback 新线程通过 `ThreadOptions.threadSource = "opencodian"` 标记来源；`modelReasoningEffort` 接受 SDK 0.153.4 的 `max`、`ultra`、`persistent`。结构化插件设置继续拥有配置权，不暴露原始 `configOverrides`。
+
+- 2026-09-13: sendMessage 以 prependMemoryInjection 在输入文本前置记忆注入块（app-server turn options 无 instructions 字段）。

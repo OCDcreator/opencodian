@@ -13,3 +13,5 @@ AgentService 的聊天、模型、会话/分叉、上下文和费用入口；白
 tests/unit/core/agents/backend/pi/，scripts/pi-sdk-acceptance.mjs，scripts/pi-rpc-smoke.mjs。只引用共享接口和 Pi 模块，不能导入其他后端实现。
 
 2026-09-09：配置操作路由到configurationOnly进程，不构造Agent和扩展；坏模型默认值不能阻止打开配置。其他命令/历史仍由每会话服务处理。
+
+- 2026-09-13: sendMessage 以 prependMemoryInjection（core.memory 共享契约，Pi 边界测试已加白）在 prompt 前置记忆注入块。

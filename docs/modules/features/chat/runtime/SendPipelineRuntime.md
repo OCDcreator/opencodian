@@ -156,3 +156,5 @@ chunk router 现在由 `runtime/StreamChunkRouter.ts` 承接，并继续下钻�
 - 不能把 queued follow-up 扩展成全局或无上限队列；它只是一条 per-tab send-intent
 - 不能改变 pending indicator / idle timeout / interrupted notice 的优先级
 - 不能把 `MessageSendPreparationService` 或 `MessageFinalizationService` 的职责重新回灌进 runtime host
+
+- 2026-09-13: sendMessage finally 块触发可选 onTurnSettled 观察者（fire-and-forget，记忆抽取的回合结束信号）。

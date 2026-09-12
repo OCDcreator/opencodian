@@ -1,3 +1,4 @@
+import { InMemoryMemoryFileSystem } from '../../../../src/core/memory/memoryFileSystem';
 import {
   appendIndexLines,
   buildProvenanceMemoryFile,
@@ -11,7 +12,6 @@ import {
   writeMemoryWrites,
   yamlScalar,
 } from '../../../../src/core/memory/memoryStore';
-import { InMemoryMemoryFileSystem } from '../../../../src/core/memory/memoryFileSystem';
 
 describe('sanitizeMemorySlug', () => {
   it('produces kebab-case slugs capped at 48 chars', () => {

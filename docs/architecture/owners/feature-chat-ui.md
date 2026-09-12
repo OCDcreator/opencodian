@@ -3,6 +3,7 @@
 Pricing readiness (2026-09-10): ContextDetailModal accepts scoped readiness and pricing callbacks, prices its captured token snapshot instead of copying a newer snapshot's cost, and releases the subscription on close without resetting raw messages or compaction state.
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
+- 2026-09-13 (universal memory backend): owner manifest gained `core.memory` and `app.memory-runtime`; this owner's boundary itself is unchanged (no source touched, allowlist untouched).
 
 - **Layer:** `feature` (may import layers: shared, core, feature)
 - **Risk:** medium

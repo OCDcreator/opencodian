@@ -33,6 +33,7 @@ import { OpenCodeService, SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from './core/openc
 import { OpenCodeSessionTraceService } from './core/opencode/diagnostics';
 import { ClaudeSessionTraceService, collectClaudeCodeKnownSecrets, CodexSessionTraceService } from './core/agents/backend/diagnostics';
 import { DiagnosticsRuntimeCoordinator } from './app/diagnostics';
+import { MemoryRuntimeCoordinator } from './app/memory';
 import { migrateOpenCodeCapabilitySettings } from './core/opencode/OpenCodeCapabilitySettingsMigration';
 import { OpenCodianSettingsRuntimeCoordinator } from './core/runtime/OpenCodianSettingsRuntimeCoordinator';
 import { OpenCodianStartupCoordinator } from './core/runtime/OpenCodianStartupCoordinator';
@@ -110,6 +111,8 @@ export default class OpenCodianPlugin extends Plugin {
    * 12/13 migrate the consumers and then these shims are removed.
    */
   private diagnosticsCoordinator: DiagnosticsRuntimeCoordinator | null = null;
+  /** Backend-neutral memory runtime (app.memory-runtime owner). Constructed during onload. */
+  memoryRuntime: MemoryRuntimeCoordinator | null = null;
   /**
    * Delegating getters returning the coordinator's typed backend ports. The
    * declared types are non-nullable to match the prior stored fields (so
@@ -378,6 +381,23 @@ export default class OpenCodianPlugin extends Plugin {
       }
       setAgentServiceRegistry(this.agentServiceRegistry);
 
+      // MemoryRuntimeCoordinator owns construction of the backend-neutral
+      // memory runtime on the plugin's behalf (app.memory-runtime owner).
+      this.memoryRuntime = new MemoryRuntimeCoordinator({
+        app: this.app,
+        openCodeService: this.openCodeService,
+        getSettings: () => this.settings.memory,
+        getConversationMessages: async (conversationId) => {
+          try {
+            const conversation = await this.storage.loadFullConversation(conversationId);
+            return conversation?.messages ?? null;
+          } catch {
+            return null;
+          }
+        },
+      });
+      this.memoryRuntime.registerCommands(this);
+
       // Wire the Codex approval bridge host to the mutable context the chat
       // view populates on mount.  Mirrors the Claude permission host wiring.
       const codexAdapter = this.agentServiceRegistry.get('codex');
@@ -638,6 +658,7 @@ export default class OpenCodianPlugin extends Plugin {
 
   onunload() {
     this.runtimeCoordinator.dispose();
+    this.memoryRuntime?.dispose();
     // Stop the OpenCode server (async, best-effort)
     void this.openCodeService?.stop().catch((error) => {
       logger.warn('Failed to asynchronously stop OpenCode service during unload:', error);

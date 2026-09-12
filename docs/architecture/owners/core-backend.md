@@ -1,6 +1,7 @@
 # Owner: core.backend
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
+- 2026-09-13 (universal memory backend): OpenCodeAdapter/ClaudeCodeAdapter/CodexAdapter/PiAdapter consumed the new memory-injection seam (opencode: synthetic text part; claude/codex/pi: prompt prefix).
 
 - **Layer:** `core` (may import layers: shared, core)
 - **Risk:** high

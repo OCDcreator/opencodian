@@ -2941,6 +2941,12 @@ export interface OpenCodianSettings {
   /** When enabled, a newer compatible stable release is installed automatically during the startup update check. */
   pluginUpdateAutoInstall: boolean;
 
+  /**
+   * Backend-neutral workspace memory (core.memory). Master switch ships
+   * dark for safe rollout; the nested knobs mirror MemorySettingsSnapshot.
+   */
+  memory: MemoryBackendUserSettings;
+
   // Language
   locale: string;
 
@@ -2982,6 +2988,38 @@ export function normalizeSettingsLayoutMode(value: unknown): SettingsLayoutMode 
 /** Anything but a real boolean falls back to the safe default (auto-install off). */
 export function normalizePluginUpdateAutoInstall(value: unknown): boolean {
   return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.pluginUpdateAutoInstall;
+}
+
+/** User-facing memory backend settings (mirrors core MemorySettingsSnapshot). */
+export interface MemoryBackendUserSettings {
+  /** Master switch. Default false — the memory backend ships dark. */
+  memoryBackendEnabled: boolean;
+  /** Per-turn background extraction while the master switch is on. Default true. */
+  memoryExtractionEnabled: boolean;
+  /** Opt-in semantic recall (lexical body injection). Default false. */
+  memorySemanticRecallEnabled: boolean;
+  /** Optional extraction model as `provider/model`. Empty string = session default. */
+  memoryExtractionModel: string;
+}
+
+/** Unknown shapes fall back field-by-field to the safe defaults. */
+export function normalizeMemoryBackendUserSettings(value: unknown): MemoryBackendUserSettings {
+  const candidate = (typeof value === 'object' && value !== null ? value : {}) as Partial<MemoryBackendUserSettings>;
+  const fallback = DEFAULT_SETTINGS.memory;
+  return {
+    memoryBackendEnabled: typeof candidate.memoryBackendEnabled === 'boolean'
+      ? candidate.memoryBackendEnabled
+      : fallback.memoryBackendEnabled,
+    memoryExtractionEnabled: typeof candidate.memoryExtractionEnabled === 'boolean'
+      ? candidate.memoryExtractionEnabled
+      : fallback.memoryExtractionEnabled,
+    memorySemanticRecallEnabled: typeof candidate.memorySemanticRecallEnabled === 'boolean'
+      ? candidate.memorySemanticRecallEnabled
+      : fallback.memorySemanticRecallEnabled,
+    memoryExtractionModel: typeof candidate.memoryExtractionModel === 'string'
+      ? candidate.memoryExtractionModel.trim().slice(0, 200)
+      : fallback.memoryExtractionModel,
+  };
 }
 
 export function normalizeSettingsTabbedPrimaryTab(value: unknown, fallback: string): string {
@@ -3129,6 +3167,13 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
     lastSource: null,
   },
   pluginUpdateAutoInstall: false,
+
+  memory: {
+    memoryBackendEnabled: false,
+    memoryExtractionEnabled: true,
+    memorySemanticRecallEnabled: false,
+    memoryExtractionModel: '',
+  },
 
   locale: 'en',
 

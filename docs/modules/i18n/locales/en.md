@@ -540,3 +540,5 @@ Added `chat.diffNotice.fileCount` (`{count}` accessible name for the header coun
 ## 2026-09-08 Pi 独立服务接入
 
 新增 Pi 设置文案：独立安装、路径、默认提供商/模型、思考等级、连接检查和实际权限/扩展对话框行为。
+
+- 2026-09-13: 新增 settings.conversation.tab.memory、settings.conversation.memory.* 与 commands.memory.* 键。

@@ -1,6 +1,7 @@
 # Owner: app.composition
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
+- 2026-09-13 (universal memory backend): main.ts constructs MemoryRuntimeCoordinator and registers the memory maintenance commands.
 
 - **Layer:** `app` (may import layers: shared, core, feature, app)
 - **Risk:** high

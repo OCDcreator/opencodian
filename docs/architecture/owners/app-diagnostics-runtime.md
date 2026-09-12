@@ -1,4 +1,5 @@
 # app.diagnostics-runtime
+- 2026-09-13 (universal memory backend): owner manifest gained `core.memory` and `app.memory-runtime`; this owner's boundary itself is unchanged (no source touched, allowlist untouched).
 
 > **Layer:** app
 > **Risk:** high

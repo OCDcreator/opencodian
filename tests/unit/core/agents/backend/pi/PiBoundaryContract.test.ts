@@ -18,7 +18,9 @@ describe('Pi backend isolation contract', () => {
       }
     }
     expect(imports.length).toBeGreaterThan(0);
-    const allowed = ['../AgentService', '../../AgentCapability', '../../../types/chat', '../../../types/settings'];
+    // '../../../memory' is the backend-neutral memory contract (core.memory),
+    // a shared contract like types/chat — not another backend implementation.
+    const allowed = ['../AgentService', '../../AgentCapability', '../../../types/chat', '../../../types/settings', '../../../memory'];
     expect(imports.filter((specifier) => !specifier.startsWith('node:') && !specifier.startsWith('./') && !allowed.includes(specifier))).toEqual([]);
   });
 

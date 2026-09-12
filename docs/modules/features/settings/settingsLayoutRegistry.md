@@ -72,3 +72,5 @@ Plugins 的二级标签 `overview` / `config-sources` / `project-plugins` / `omo
 新增backendRequired=pi的主标签，默认connection；providers/model/execution/resources/account/sessions/advanced二级页。切换后端自动定位Pi，现有后端tab定义保持不变。
 
 Pi主标签使用用户SVG注册图标opencodian-pi，与后端状态和切换入口一致。
+
+- 2026-09-13: conversation 主标签新增后端无关的 memory 次级标签。

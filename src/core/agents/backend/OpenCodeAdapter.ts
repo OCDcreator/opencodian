@@ -11,6 +11,8 @@
  * See docs/requirements/multi-agent-foundation/03-opencode-adapter.md.
  */
 
+import { extractMemoryInjection } from '../../memory';
+import type { PromptSyntheticTextPartInput } from '../../opencode/OpenCodePromptRequestBuilder';
 import type { OpenCodeService } from '../../opencode/OpenCodeService';
 import type { AgentBackendKind } from '../../types/chat';
 import {
@@ -158,8 +160,25 @@ export class OpenCodeAdapter
   // -------------------------------------------------------------------------
 
   async *sendMessage(request: { sessionId: string; content: string; options?: Record<string, unknown> }) {
+    const options = { ...(request.options ?? {}) };
+    // Backend-neutral memory seam: translate the injection into a synthetic
+    // text part so it reaches the model as context, not user prose.
+    const memoryInjection = extractMemoryInjection(options);
+    const syntheticParts = [
+      ...(Array.isArray(options.syntheticTextParts)
+        ? (options.syntheticTextParts as PromptSyntheticTextPartInput[])
+        : []),
+      ...(memoryInjection
+        ? [{
+            text: memoryInjection,
+            ignored: false,
+            metadata: { kind: 'memory-injection' },
+          } satisfies PromptSyntheticTextPartInput]
+        : []),
+    ];
     yield* this.service.sendMessage(request.content, {
-      ...(request.options ?? {}),
+      ...options,
+      ...(syntheticParts.length > 0 ? { syntheticTextParts: syntheticParts } : {}),
       sessionId: request.sessionId,
     });
   }

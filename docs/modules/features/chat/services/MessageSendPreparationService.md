@@ -144,3 +144,5 @@ export function createMessageSendPreparationHost(
 ## 2026-09-08 Pi 独立服务接入
 
 Pi 发送启用自身模型目录校验并跳过 OpenCode skill 展开，原始 Pi /skill 和模板交给外部服务；其余后端条件不变。
+
+- 2026-09-13: prepareMessageSend 调用可选 planMemoryInjection 并把结果并入 modelOptions.memoryInjection（fail-soft）。

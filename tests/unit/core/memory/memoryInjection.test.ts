@@ -1,8 +1,8 @@
 import { planMemoryInjection, transcriptHasInjectionThisEpoch } from '../../../../src/core/memory/memoryInjection';
-import { MEMORY_INJECTION_OPEN_MARKER } from '../../../../src/core/memory/memoryProtocol';
-import type { MemorySettingsSnapshot, MemoryTranscriptMessage } from '../../../../src/core/memory/memoryTypes';
-import type { SelectedMemory } from '../../../../src/core/memory/memoryRecall';
 import type { TopicManifestEntry } from '../../../../src/core/memory/memoryManifest';
+import { MEMORY_INJECTION_OPEN_MARKER } from '../../../../src/core/memory/memoryProtocol';
+import type { SelectedMemory } from '../../../../src/core/memory/memoryRecall';
+import type { MemorySettingsSnapshot, MemoryTranscriptMessage } from '../../../../src/core/memory/memoryTypes';
 
 const settings = (over: Partial<MemorySettingsSnapshot> = {}): MemorySettingsSnapshot => ({
   memoryBackendEnabled: true,

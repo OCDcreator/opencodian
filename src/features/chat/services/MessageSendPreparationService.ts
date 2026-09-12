@@ -136,6 +136,14 @@ export function buildOptimisticUserMessage(
 
 export interface MessageSendPreparationHost {
   ensureConversationReady(): Promise<Conversation | null>;
+  /**
+   * Plan the backend-neutral memory injection for this turn (per context
+   * epoch). Optional and fail-soft: null when the memory backend is off.
+   */
+  planMemoryInjection?(
+    conversation: Conversation,
+    latestUserText: string,
+  ): Promise<{ text: string } | null>;
   getActiveTabId(): TabId | null;
   ensureTabRuntime(tabId: TabId | null): boolean;
   isTabForegroundBusy(tabId: TabId | null): boolean;
@@ -358,6 +366,12 @@ export class MessageSendPreparationService {
     if (options.outputFormat) {
       modelOptions.outputFormat = options.outputFormat;
     }
+    // Backend-neutral memory injection rides the options bag to each
+    // adapter seam (opencode: synthetic part; others: prompt prefix).
+    const memoryInjection = await this.planTurnMemoryInjection(conversation, options.content);
+    if (memoryInjection) {
+      (modelOptions as Record<string, unknown>).memoryInjection = memoryInjection;
+    }
     const activeModelId = this.host.formatModelId(modelOptions);
     const persistentContextItems = await this.composerSendContext.resolvePersistentContextItems(conversation.externalContextPaths);
     const contextItems = this.mergeContextItems(persistentContextItems, draftContextItems);
@@ -491,6 +505,19 @@ export class MessageSendPreparationService {
 
   private isFirstUserMessage(conversation: Conversation): boolean {
     return conversation.messages.filter((message) => message.role === 'user').length === 1;
+  }
+
+  private async planTurnMemoryInjection(
+    conversation: Conversation,
+    latestUserText: string,
+  ): Promise<{ text: string } | null> {
+    try {
+      return (
+        (await this.host.planMemoryInjection?.(conversation, latestUserText)) ?? null
+      );
+    } catch {
+      return null; // fail-soft: memory must never block a user turn
+    }
   }
 
   private async prepareModelOptions(tabId: TabId): Promise<SendMessageModelOptions | null> {

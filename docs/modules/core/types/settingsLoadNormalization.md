@@ -84,3 +84,5 @@ Ownership facts:
 `normalizeLoadedPluginSettings()` now also normalizes `settingsTabbedPrimaryTab` (with `'server'` fallback) and `settingsTabbedSecondaryTabByPrimary` from saved snapshots during bootstrap.
 
 It also migrates the old `Server > MCP` remembered location into the new top-level `MCP` tab. A saved snapshot like `{ settingsTabbedPrimaryTab: 'server', settingsTabbedSecondaryTabByPrimary: { server: 'mcp' } }` now becomes `settingsTabbedPrimaryTab: 'mcp'` with `settingsTabbedSecondaryTabByPrimary.mcp = 'overview'`.
+
+- 2026-09-13: 加载归一化接入 memory: normalizeMemoryBackendUserSettings。

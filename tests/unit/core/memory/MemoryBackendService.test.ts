@@ -62,7 +62,7 @@ describe('MemoryBackendService injection flow', () => {
     expect(second.skippedReason).toBe('already-injected-this-epoch');
   });
 
-  it('disabled master switch yields null and records an injection-skipped metric', async () => {
+  it('disabled master switch and epoch skips yield null with ZERO vault writes', async () => {
     const fs = new InMemoryMemoryFileSystem('/vault');
     const service = new MemoryBackendService(fs, '/vault/my-vault');
     const out = await service.planInjection({
@@ -72,8 +72,16 @@ describe('MemoryBackendService injection flow', () => {
       settings: settings({ memoryBackendEnabled: false }),
     });
     expect(out.text).toBeNull();
-    const metrics = await service.readMetrics();
-    expect(metrics.some((m) => m.kind === 'injection-skipped')).toBe(true);
+    expect(await service.readMetrics()).toEqual([]); // no residual writes when dark
+
+    const skipped = await service.planInjection({
+      conversationId: 'c1',
+      messages: [msg({ role: 'user', content: 'turn', parts: [{ text: MEMORY_INJECTION_OPEN_MARKER }] })],
+      latestUserText: 'turn',
+      settings: settings(),
+    });
+    expect(skipped.skippedReason).toBe('already-injected-this-epoch');
+    expect(await service.readMetrics()).toEqual([]);
   });
 
   it('re-injects after a compaction divider (new epoch)', async () => {

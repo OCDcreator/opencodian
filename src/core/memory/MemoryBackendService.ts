@@ -144,19 +144,33 @@ export class MemoryBackendService {
     try {
       const settings = input.settings;
       if (!settings.memoryBackendEnabled) {
-        return await this.recordInjectionMetric(input.conversationId, {
+        // Disabled is the steady state, not an event: return without a
+        // metric so a dark memory backend performs zero vault writes.
+        return {
           text: null,
           skippedReason: 'disabled',
           indexBytes: 0,
           protocolBytes: 0,
           recalledPaths: [],
           skippedSecretGuard: [],
-        }, 'memory disabled');
+        };
       }
 
       const already =
         input.alreadyInjectedThisEpochOverride === true ||
         transcriptHasInjectionThisEpoch(input.messages);
+      if (already) {
+        // Same reasoning as disabled: per-turn epoch skips must not grow
+        // the metrics journal.
+        return {
+          text: null,
+          skippedReason: 'already-injected-this-epoch',
+          indexBytes: 0,
+          protocolBytes: 0,
+          recalledPaths: [],
+          skippedSecretGuard: [],
+        };
+      }
       const [indexContent, manifest] = await Promise.all([
         this.readIndex(),
         this.buildManifest(),

@@ -548,3 +548,5 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 ## 2026-09-08 Pi 独立服务接入
 
 新增与英文对应的 Pi 设置文案，并去除 Pi 即将推出占位描述。
+
+- 2026-09-13: 新增 settings.conversation.tab.memory、settings.conversation.memory.* 与 commands.memory.* 键。

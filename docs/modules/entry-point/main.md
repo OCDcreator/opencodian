@@ -316,3 +316,5 @@ After settings load, `OpenCodianPlugin` constructs `PluginUpdateService` with th
 ## 2026-09-08 Pi 独立服务接入
 
 bootstrap 仅向注册入口注入 getPiSettings 读取回调，不在入口拥有 Pi 进程、协议或会话逻辑。
+
+- 2026-09-13: 构造并暴露 memoryRuntime（app.memory-runtime 组合），注册记忆维护命令，onunload 时 dispose。

@@ -1,3 +1,5 @@
+import type { TopicManifestEntry } from '../../../../src/core/memory/memoryManifest';
+import type { SelectedMemory } from '../../../../src/core/memory/memoryRecall';
 import {
   assembleRelevantMemory,
   formatRecalledTopicFile,
@@ -5,8 +7,6 @@ import {
   rankLexically,
   tokenize,
 } from '../../../../src/core/memory/memoryRecall';
-import type { TopicManifestEntry } from '../../../../src/core/memory/memoryManifest';
-import type { SelectedMemory } from '../../../../src/core/memory/memoryRecall';
 
 function entry(overrides: Partial<TopicManifestEntry> & { filename: string }): TopicManifestEntry {
   return {

@@ -803,7 +803,8 @@
       "allowedOwnerDependencies": [
         "shared.foundation",
         "shared.diagnostics",
-        "core.types"
+        "core.types",
+        "core.memory"
       ],
       "forbiddenDependencies": [
         "feature",
@@ -1469,7 +1470,8 @@
         "core.types",
         "core.agents",
         "core.opencode",
-        "feature.chat-services"
+        "feature.chat-services",
+        "core.memory"
       ],
       "forbiddenDependencies": [
         "app"

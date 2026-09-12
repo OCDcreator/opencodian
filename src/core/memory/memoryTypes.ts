@@ -87,6 +87,24 @@ export interface MemoryModelInvoker {
   }): Promise<string>;
 }
 
+/**
+ * The runtime surface feature layers may call (implemented by
+ * `app.memory-runtime`, type declared here so features never import the
+ * app layer). Every method is fire-and-forget fail-soft.
+ */
+export interface MemoryRuntimePort {
+  /** Plan the per-epoch injection for an outgoing turn. */
+  planInjection(input: {
+    conversationId: string;
+    messages: ReadonlyArray<MemoryTranscriptMessage>;
+    latestUserText: string;
+  }): Promise<{ text: string } | null>;
+  /** Signal that a user turn settled (background extraction / reflection). */
+  onTurnSettled(input: { conversationId: string; sessionId?: string }): void;
+  /** Settings changed — clears cached state. */
+  onSettingsChanged(): void;
+}
+
 /** One metric event appended to `metrics.jsonl` under the store root. */
 export interface MemoryMetricEvent {
   readonly ts: number;

@@ -27,6 +27,7 @@ import { Notice } from 'obsidian';
 
 import { AgentCapability, hasCapability } from '../../../core/agents';
 import { getConversationChatBackendService } from '../../../core/agents/backend/AgentBackendRouting';
+import type { MemoryRuntimePort } from '../../../core/memory';
 import { OpenCodeService } from '../../../core/opencode';
 import type { ChatMessage, Conversation } from '../../../core/types';
 import { getTurnDiffNoticeMeta } from '../../../core/types';
@@ -306,6 +307,7 @@ export interface ChatRuntimeCompositionHost {
     createConversationFromSession(sessionId: string, initial: unknown): unknown;
     deleteConversation(conversationId: string): unknown;
     readonly agentServiceRegistry: unknown;
+    readonly memoryRuntime: MemoryRuntimePort | null;
   };
 
   // --- lazily-read live state (resolves after the view destructures the result) ---
@@ -978,6 +980,15 @@ export class ChatRuntimeComposition {
     );
     const messageSendPreparationService = new MessageSendPreparationService(
       createMessageSendPreparationHost({
+        planMemoryInjection: async (conversation: Conversation, latestUserText: string) => (
+          host.plugin.memoryRuntime
+            ? host.plugin.memoryRuntime.planInjection({
+              conversationId: conversation.id,
+              messages: conversation.messages ?? [],
+              latestUserText,
+            })
+            : null
+        ),
         getCurrentConversation: () => host.currentConversation,
         createNewConversation: async () => {
           await host.createNewConversation();
@@ -1105,6 +1116,14 @@ export class ChatRuntimeComposition {
   ): SendPipelineHostDependencies {
     const host = this.host;
     return {
+      onTurnSettled: (info: {
+        conversationId: string;
+        tabId: TabId | null;
+        sessionId?: string;
+        backend: string;
+      }) => {
+        host.plugin.memoryRuntime?.onTurnSettled(info);
+      },
       getTabRuntimeState: (tabId: TabId) => host.getTabRuntimeState(tabId),
       getActiveTabId: () => host.getActiveTabId(),
       shouldAutoScroll: (tabId: TabId | null) => host.shouldAutoScroll(tabId),

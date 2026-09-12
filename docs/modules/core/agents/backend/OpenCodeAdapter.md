@@ -33,3 +33,5 @@
 - 保持 `underlying` 作为过渡访问口，避免在 Phase 0 一次性重写所有 OpenCode 特有调用路径
 - adapter 只做形状转换和委托，不改变 OpenCode session id、stream chunk 或历史同步语义
 - 2026-09-08：移除 deprecated `respondToSessionPermission` adapter 透传；保留 `respondToPermission` 作为唯一权限回应能力。
+
+- 2026-09-13: sendMessage 把 options.memoryInjection 翻译为 synthetic text part（kind: memory-injection），经 OpenCodePromptRequestBuilder 进入请求部件（记忆注入接缝 D-O2）。

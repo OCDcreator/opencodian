@@ -12,6 +12,7 @@ import type {
 import { spawn } from 'child_process';
 
 import { createLogger, sanitizeDiagnosticReport } from '../../../shared';
+import { prependMemoryInjection } from '../../memory';
 import type { AgentBackendKind, ContextUsageSnapshot, StreamChunk } from '../../types/chat';
 import type { ClaudeCodeBackendSettings, ClaudeCodeEffort } from '../../types/settings';
 import { AgentCapability, type BackendCapabilities } from '../AgentCapability';
@@ -4731,7 +4732,14 @@ export class ClaudeCodeAdapter
     return resultingSessionId;
   }
 
-  async *sendMessage(request: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
+  async *sendMessage(rawRequest: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
+    // Claude's per-turn options expose no system-prompt override; the
+    // backend-neutral memory injection rides at the front of the message
+    // text (its runtime systemPrompt append stays a settings-level seam).
+    const request: AgentChatSendRequest = {
+      ...rawRequest,
+      content: prependMemoryInjection(rawRequest.content, rawRequest.options),
+    };
     const session = this.getOrRestoreSession(request.sessionId);
     runtimeLogger.debug('sendMessage start', {
       sessionId: request.sessionId,

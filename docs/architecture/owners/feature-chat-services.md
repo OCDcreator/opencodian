@@ -3,6 +3,7 @@
 Pricing readiness (2026-09-10): the context usage coordinator fills unavailable live-tab costs on catalog updates and snapshot restoration. Existing numeric costs, token ledgers and activity timestamps remain unchanged. Closing the view unsubscribes and flushes pending snapshots before discarding timers.
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
+- 2026-09-13 (universal memory backend): MessageSendPreparationService plans the per-epoch memory injection and merges it into the send options bag.
 
 - **Layer:** `feature` (may import layers: shared, core, feature)
 - **Risk:** high

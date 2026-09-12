@@ -441,3 +441,5 @@ New normalize functions added:
 ## 2026-09-08 Pi 独立服务接入
 
 新增 PiBackendSettings 与 normalizePiBackendSettings，独立保存 executablePath/provider/model/thinkingLevel；既有 backendSettings 分支原样归一化。
+
+- 2026-09-13: 新增 MemoryBackendUserSettings（memory.memoryBackendEnabled 默认 false / memoryExtractionEnabled / memorySemanticRecallEnabled / memoryExtractionModel）与 normalizeMemoryBackendUserSettings。

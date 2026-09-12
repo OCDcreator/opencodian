@@ -97,6 +97,13 @@ function extractStructuredOutputTrigger(content: string): { cleanContent: string
 }
 
 export interface SendPipelineHostDependencies {
+  /** Optional fail-soft observer fired after a user turn fully settles. */
+  onTurnSettled?(info: {
+    conversationId: string;
+    tabId: TabId | null;
+    sessionId?: string;
+    backend: string;
+  }): void;
   getTabRuntimeState(tabId: import('../tabs').TabId | null): SendPipelineTabRuntime | null;
   getActiveTabId(): import('../tabs').TabId | null;
   shouldAutoScroll(tabId: import('../tabs').TabId | null): boolean;
@@ -137,6 +144,7 @@ export interface SendPipelineHostDependencies {
 
 export function createSendPipelineRuntimeHost(deps: SendPipelineHostDependencies): SendPipelineHost {
   const viewPort: SendPipelineViewPort = {
+    onTurnSettled: (info) => deps.onTurnSettled?.(info),
     getTabRuntimeState: (tabId) => deps.getTabRuntimeState(tabId),
     getActiveTabId: () => deps.getActiveTabId(),
     shouldAutoScroll: (tabId) => deps.shouldAutoScroll(tabId),
@@ -281,6 +289,16 @@ export class SendPipelineRuntime {
       } else if ((preparedSend.conversation.backend ?? 'opencode') === 'claude-code') {
         this.safeTrace(() => this.host.refreshClaudeDiagnosticsState?.(preparedSend.tabId), undefined);
       }
+      // Backend-neutral memory observation: fire-and-forget, never blocks
+      // the turn (the coordinator debounces and fail-softs internally).
+      this.safeTrace(() => {
+        this.host.onTurnSettled?.({
+          conversationId: preparedSend.conversation.id,
+          tabId: preparedSend.tabId,
+          sessionId: getConversationBackendSessionId(preparedSend.conversation) || undefined,
+          backend: preparedSend.conversation.backend ?? 'opencode',
+        });
+      }, undefined);
     }
     await this.sendQueuedFollowUp(preparedSend.tabId);
   }

@@ -284,6 +284,7 @@ export class SettingsConversationSection {
           ]
         : []),
       { id: 'display', render: (el) => this.renderDisplayTabBlock(el) },
+      { id: 'memory', render: (el) => this.renderMemoryBlock(el) },
       ...(this.isOpenCodeActive()
         ? [{ id: 'questions', render: (el: HTMLElement) => this.renderQuestionsBlock(el) }]
         : []),
@@ -334,6 +335,62 @@ export class SettingsConversationSection {
     } else {
       this.addClaudeAutoTitleSetting(containerEl);
     }
+  }
+
+  private renderMemoryBlock(containerEl: HTMLElement): void {
+    const blockEl = this.createSettingsBlock(containerEl, {
+      title: t('settings.conversation.memory.title'),
+      description: t('settings.conversation.memory.desc'),
+      defaultOpen: true,
+    });
+    new Setting(blockEl)
+      .setName(t('settings.conversation.memory.enableName'))
+      .setDesc(t('settings.conversation.memory.enableDesc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.memory.memoryBackendEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.memory.memoryBackendEnabled = value;
+            await this.plugin.saveSettings();
+            this.plugin.memoryRuntime?.onSettingsChanged();
+          });
+      });
+    new Setting(blockEl)
+      .setName(t('settings.conversation.memory.extractionName'))
+      .setDesc(t('settings.conversation.memory.extractionDesc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.memory.memoryExtractionEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.memory.memoryExtractionEnabled = value;
+            await this.plugin.saveSettings();
+            this.plugin.memoryRuntime?.onSettingsChanged();
+          });
+      });
+    new Setting(blockEl)
+      .setName(t('settings.conversation.memory.semanticRecallName'))
+      .setDesc(t('settings.conversation.memory.semanticRecallDesc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.memory.memorySemanticRecallEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.memory.memorySemanticRecallEnabled = value;
+            await this.plugin.saveSettings();
+            this.plugin.memoryRuntime?.onSettingsChanged();
+          });
+      });
+    new Setting(blockEl)
+      .setName(t('settings.conversation.memory.extractionModelName'))
+      .setDesc(t('settings.conversation.memory.extractionModelDesc'))
+      .addText((text) => {
+        text
+          .setPlaceholder('opencode-go/deepseek-flash')
+          .setValue(this.plugin.settings.memory.memoryExtractionModel)
+          .onChange(async (value) => {
+            this.plugin.settings.memory.memoryExtractionModel = value.trim();
+            await this.plugin.saveSettings();
+          });
+      });
   }
 
   private renderCompactionBlock(containerEl: HTMLElement): void {

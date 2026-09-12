@@ -158,3 +158,5 @@ The classic `attach()` method remains the full-list owner, but both classic and 
 ### Experimental background-session gate
 
 后台会话有独立 `conversation-experimental` target。开关默认关闭、保存后刷新 capability snapshot；支持未知或不支持时仍保留 toggle 和脱敏原因/minimum-server hint，但不会让 Chat 提前暴露操作。
+
+- 2026-09-13: 新增 memory 次级标签块（总开关/每轮抽取/语义召回/抽取模型 4 行设置）。

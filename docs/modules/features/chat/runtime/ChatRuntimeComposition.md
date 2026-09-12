@@ -35,3 +35,5 @@ owner: `feature.chat-runtime`（layer features）。依赖 `feature.chat`（serv
 
 - 装配的 coordinator 列表见 inventory §2（surface 17、background 4、conversation ~14、interaction 8）。
 - disposal 顺序契约见 inventory §4。
+
+- 2026-09-13: 组合层接线 planMemoryInjection（host.plugin.memoryRuntime）与 onTurnSettled；plugin 形状新增 memoryRuntime 端口。

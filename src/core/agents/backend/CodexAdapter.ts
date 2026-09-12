@@ -20,6 +20,7 @@ import { join } from 'node:path';
 import type { Codex, Thread, ThreadEvent, ThreadOptions, UserInput } from '@openai/codex-sdk';
 
 import { createLogger } from '../../../shared';
+import { prependMemoryInjection } from '../../memory';
 import type { AgentBackendKind, ContextUsageSnapshot, ImageAttachment, StreamChunk } from '../../types/chat';
 import type { CodexApprovalPolicy } from '../../types/settings';
 import { AgentCapability, type BackendCapabilities } from '../AgentCapability';
@@ -1451,7 +1452,13 @@ export class CodexAdapter
   // AgentChatCapability
   // -------------------------------------------------------------------------
 
-  async *sendMessage(request: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
+  async *sendMessage(rawRequest: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
+    // Codex exposes no per-turn instructions seam; the backend-neutral
+    // memory injection rides at the front of the message text.
+    const request: AgentChatSendRequest = {
+      ...rawRequest,
+      content: prependMemoryInjection(rawRequest.content, rawRequest.options),
+    };
     if (!this.codex) {
       yield { type: 'error', content: 'Codex adapter not started' };
       return;

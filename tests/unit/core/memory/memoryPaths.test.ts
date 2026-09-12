@@ -1,11 +1,11 @@
 import {
   hashWorkspacePath,
+  MEMORY_STORE_ROOT,
   memoryIndexPath,
   memoryProjectDir,
   memoryProjectFile,
   modelMemoryRootDisplay,
   sanitizeProjectSlug,
-  MEMORY_STORE_ROOT,
 } from '../../../../src/core/memory/memoryPaths';
 
 describe('memoryPaths', () => {

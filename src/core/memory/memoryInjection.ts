@@ -185,6 +185,35 @@ export function planMemoryInjection(input: {
   };
 }
 
+/**
+ * Read the memory injection text out of a backend send-options bag (D-O2
+ * contract). The key is inert for backends that do not consume it; adapters
+ * that do translate it at their own seam (opencode: synthetic text part;
+ * claude/codex/pi: prompt prefix).
+ */
+export function extractMemoryInjection(
+  options: Record<string, unknown> | undefined | null,
+): string | null {
+  const raw = (options as { memoryInjection?: unknown } | undefined)?.memoryInjection;
+  if (!raw || typeof raw !== 'object') return null;
+  const text = (raw as { text?: unknown }).text;
+  return typeof text === 'string' && text.trim().length > 0 ? text : null;
+}
+
+/**
+ * Prefix a prompt content with the memory injection (claude/codex/pi seam:
+ * these backends expose no per-turn system-prompt parameter, so the
+ * NOT-a-request framed block rides at the front of the message text).
+ */
+export function prependMemoryInjection(
+  content: string,
+  options: Record<string, unknown> | undefined | null,
+): string {
+  const injection = extractMemoryInjection(options);
+  if (!injection) return content;
+  return `${injection}\n\n${content}`;
+}
+
 /** Structural shape a chat turn passes to the memory runtime (D-O2 contract). */
 export interface MemoryInjectionRequest {
   readonly conversationId: string;

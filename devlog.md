@@ -11,6 +11,20 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-13 通用记忆后端：设置/接线/运行时/维护命令全链路（D-O 系列落地）
+
+继 `feat(memory)` 核心提交后，完成记忆后端的全部接线与运行时闭环。`npm run verify` 15 项全绿（原始日志 `/tmp/opencodian-verify-memory-wiring.log`）。
+
+- **设置**（D-O9）：`OpenCodianSettings.memory`（`MemoryBackendUserSettings`，总开关默认 **false**）+ 归一化 + conversation 设置页新 `memory` 次级标签（后端无关，不设 backendRequired）+ en/zh i18n。
+- **注入接线**（D-O2/D-O3）：`MessageSendPreparationService.prepareMessageSend` 经 `host.planMemoryInjection` 取注入文本并入 `modelOptions.memoryInjection`；四适配器各自消化——opencode→synthetic text part（kind `memory-injection`）、claude/codex/pi→`prependMemoryInjection` 消息前置（三者无 per-turn system 接缝，如实记录）。契约类型 `MemoryRuntimePort` 定义在 core.memory，feature 层零 app 依赖。
+- **回合结束**（D-O5）：`SendPipelineRuntime.sendMessage` finally 触发可选 `onTurnSettled`（fire-and-forget）；`MemoryRuntimeCoordinator`（`src/app/memory/**`，新 owner `app.memory-runtime`，镜像 DiagnosticsRuntimeCoordinator 模式）防抖 1.5s 后跑闸门化抽取；持久化转录新增 compaction 标记 → 先反思后抽取（D-O6 后端中立压缩信号）。
+- **模型调用**：invoker 走 OpenCode 临时会话（`setCurrent:false` + finally 删除），`provider/model` 解析支持 `opencode-go/deepseek-flash`。
+- **维护命令**（D-O8）：命令面板 status / lint / forget（输入模态确认制）。
+- **关键 bug 修复**：禁用/同纪元跳过原先会每回合写 metrics.jsonl——改为稳态零写（降级检查的前置保障），测试同步断言。
+- **门禁适配**：owner 清单新增 2 个 owner 触发全部 52 个 owner 概览页更新（每页一行日期注记）；Pi 边界契约测试把 `core.memory` 加入共享契约白名单（与 `types/chat` 同地位，非后端实现）；`git ls-files` 只认已跟踪文件——新增目录需先 `git add` 才能过依赖方向门禁。
+- **事故记录**：调试中误 `git stash pop` 弹出上个会话遗留 WIP（SettingsViewRegistrar 重构已在基线前提交），在 main.ts/SettingsViewRegistrar.ts 留下冲突；已用 `git checkout --ours` 恢复并重新跑绿全部门禁。遗留 stash 未动。
+- 测试：+7 协调器接线测试（fake vault adapter + fake OpenCodeService）+ 更新 4 个既有测试（memory 标签页/Pi 白名单），全仓 7416 通过。
+
 ## 2026-09-12 设置行悬停高亮改为即时切换
 
 - 症状：设置行卡片悬停时高亮「来得有点晚」（用户预估约半秒，实际体感轻微）。

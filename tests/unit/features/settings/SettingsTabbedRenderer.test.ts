@@ -259,10 +259,10 @@ describe('SettingsTabbedRenderer', () => {
 
     renderer.renderDisplay(containerEl);
 
-    // title and display are backend-agnostic, so they remain visible
+    // title, display and memory are backend-agnostic, so they remain visible
     const secondaryTabs = containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-secondary');
-    expect(secondaryTabs).toHaveLength(2);
-    expect(Array.from(secondaryTabs).map((tab) => tab.dataset.tabId)).toEqual(['title', 'display']);
+    expect(secondaryTabs).toHaveLength(3);
+    expect(Array.from(secondaryTabs).map((tab) => tab.dataset.tabId)).toEqual(['title', 'display', 'memory']);
     // compaction is OpenCode-only and filtered out; falls back to first visible secondary tab (title)
     expectSingleContentShell(containerEl, 'conversation', 'title');
   });
@@ -652,7 +652,7 @@ describe('SettingsTabbedRenderer tab content routing', () => {
 
     renderer.renderDisplay(containerEl);
 
-    // title and display are backend-agnostic, so they remain visible
+    // title, display and memory are backend-agnostic, so they remain visible
     const secondaryTabs = containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-secondary');
     const secondaryIds = Array.from(secondaryTabs).map((tab) => tab.dataset.tabId);
     expect(secondaryIds).toContain('title');

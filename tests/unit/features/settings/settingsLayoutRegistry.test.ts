@@ -89,6 +89,7 @@ describe('SETTINGS_PRIMARY_TABS', () => {
       'sharing',
       'display',
       'questions',
+      'memory',
     ]);
   });
 
