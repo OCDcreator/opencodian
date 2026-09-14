@@ -12,6 +12,8 @@ const settings = (over: Partial<MemorySettingsSnapshot> = {}): MemorySettingsSna
   memoryExtractionEnabled: true,
   memorySemanticRecallEnabled: false,
   memoryExtractionModel: 'opencode-go/deepseek-flash',
+  memoryExternalRoot: '',
+  memorySyncRemoteUrl: '',
   ...over,
 });
 

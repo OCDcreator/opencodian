@@ -64,7 +64,25 @@
 2. 新会话重复 §1/§4：注入文本相同（同一存储桶），仅交付通道不同（opencode 用 synthetic part，其余为消息前置）。
 3. 已知限制：claude/codex/pi 的注入显示在发送的消息文本前部（这些后端无 per-turn system 接缝）；压缩反思依赖转录里的 compaction 标记。
 
-## 9. 已知限制（如实记录）
+## 9. 共享存储模式（zmem / ZCode 共用一棵树）
+
+1. 设置 → 会话 → 工作区记忆 → 共享记忆根目录，填 `~/.zcode/cli/memories`（开头的 `~` 按各机展开，同步设置的多台机器通用）。
+2. 期望：桶落到 `<root>/projects/<slug>-<hash16>/memory/`（与 opencode-zmem、ZCode workspace memory 完全同构；同一工作区路径哈希出同一桶名）。
+3. metrics.jsonl 仍写 vault 内 `.opencodian/memory/`，共享树不被诊断文件污染。
+4. 验证三方互通：zmem 侧把其 `storageRoot` 指到同一根；ZCode 侧无需任何配置（该路径就是它的原生记忆树）。任一方写入的记忆文件 + MEMORY.md 索引行，其余两方下一次注入/会话即读取。
+5. 防双写：同一工作区只保留一个抽取者（vault 内用 `.opencode/opencode-zmem.jsonc` 关闭 zmem，由插件负责；vault 外由 zmem 负责）。
+6. 已知限制：同一 vault 在不同机器上路径不同 → 各机各桶，同一 vault 的记忆不跨机跟随。
+
+## 10. git 整树同步（跨机记忆流动）
+
+1. 前置：共享记忆根目录已设置；「记忆同步远程仓库（git）」填入私有仓库地址（SSH 或 HTTPS；zmem 侧同名配置 `syncRemoteUrl`）。
+2. 插件加载后约 5 秒首拉；抽取/遗忘写入后 5 秒防抖推送；每 5 分钟周期同步。状态命令（`记忆：工作区记忆状态`）末尾显示 `Git 同步: ok (commit=… pull=… push=…)`。
+3. 检查远程仓库：记忆文件入库，`.last-injection.json` / `metrics.jsonl` 被 `.gitignore` 排除。
+4. 跨机：另一台机器同配置（同远程）→ 首次同步 unborn 分支自动收编远程历史 → 对方机器写的记忆文件出现在本地树，下一次注入即读取。
+5. 冲突语义：`pull --rebase --autostash` 冲突时 abort 并保留本地（下轮重试）；两插件/两机同时写不同文件不冲突（各自成 commit，rebase 串联）；并发追加 `MEMORY.md` 由 `.gitattributes` union merge 自动合并。
+6. 安全护栏（2026-09-14 审查修复）：误指根目录（home/盘符根/无 `projects/` 的非空目录）被拒绝，状态命令显示原因；疑似含密钥的 `.md` 被自动拦在远程外（状态显示 `secrets-blocked=N`），删除或改写该文件后下轮自动恢复同步；出现未解决合并条目时拒绝提交冲突标记，需在树根手工 `git status` 处理。协议全文见 `docs/status/memory-sync-protocol.md`。
+
+## 11. 已知限制（如实记录）
 
 - codex / pi / claude-code 的注入走消息前置（适配器内完成，聊天 UI 不显示，但后端侧转录会包含该前缀）。
 - 压缩反思的触发以持久化转录出现 compaction 标记为准；OpenCode `session.compacted` 事件当前为 no-op，未单独接线。

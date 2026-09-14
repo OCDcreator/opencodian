@@ -21,3 +21,5 @@
 ## 边界与约束
 
 - 任何字节预算判断必须用 `byteLength()`，禁止 `String.length`（CJK 3 字节/字符）。
+- `MemorySettingsSnapshot.memoryExternalRoot`：可选共享存储根（空 = vault 本地）；开头的 `~` 由 app 层 `expandHomeDir` 展开。
+- `MemorySettingsSnapshot.memorySyncRemoteUrl`：可选 git 远程地址（空 = 同步关闭），需与外部根同时设置。

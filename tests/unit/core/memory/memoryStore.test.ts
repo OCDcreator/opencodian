@@ -16,6 +16,9 @@ import {
 describe('sanitizeMemorySlug', () => {
   it('produces kebab-case slugs capped at 48 chars', () => {
     expect(sanitizeMemorySlug('User Prefers Dark Theme!')).toBe('user-prefers-dark-theme');
+    // Models sometimes echo the filename as the name; never double the extension.
+    expect(sanitizeMemorySlug('release-window-friday-3pm.md')).toBe('release-window-friday-3pm');
+    expect(sanitizeMemorySlug('Node.JS Notes.MD')).toBe('node.js-notes');
     expect(sanitizeMemorySlug('')).toBe('');
     expect(sanitizeMemorySlug('中文记忆')).toBe('');
     expect(sanitizeMemorySlug('a'.repeat(60)).length).toBe(48);

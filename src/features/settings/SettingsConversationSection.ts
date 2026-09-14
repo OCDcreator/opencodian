@@ -391,6 +391,32 @@ export class SettingsConversationSection {
             await this.plugin.saveSettings();
           });
       });
+    new Setting(blockEl)
+      .setName(t('settings.conversation.memory.externalRootName'))
+      .setDesc(t('settings.conversation.memory.externalRootDesc'))
+      .addText((text) => {
+        text
+          .setPlaceholder('~/.zcode/cli/memories')
+          .setValue(this.plugin.settings.memory.memoryExternalRoot)
+          .onChange(async (value) => {
+            this.plugin.settings.memory.memoryExternalRoot = value.trim();
+            await this.plugin.saveSettings();
+            this.plugin.memoryRuntime?.onSettingsChanged();
+          });
+      });
+    new Setting(blockEl)
+      .setName(t('settings.conversation.memory.syncRemoteName'))
+      .setDesc(t('settings.conversation.memory.syncRemoteDesc'))
+      .addText((text) => {
+        text
+          .setPlaceholder('git@gitea.example.com:memories.git')
+          .setValue(this.plugin.settings.memory.memorySyncRemoteUrl)
+          .onChange(async (value) => {
+            this.plugin.settings.memory.memorySyncRemoteUrl = value.trim();
+            await this.plugin.saveSettings();
+            this.plugin.memoryRuntime?.onSettingsChanged();
+          });
+      });
   }
 
   private renderCompactionBlock(containerEl: HTMLElement): void {

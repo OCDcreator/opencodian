@@ -18,6 +18,9 @@ import type { MemoryFileSystem } from './memoryTypes';
 export function sanitizeMemorySlug(name: string): string {
   return name
     .toLowerCase()
+    // Models sometimes return the filename ("...-3pm.md") as the name; strip
+    // the extension so `${slug}.md` cannot double it (inherited zmem bug).
+    .replace(/\.md$/u, '')
     .replace(/[^a-z0-9._-]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 48);

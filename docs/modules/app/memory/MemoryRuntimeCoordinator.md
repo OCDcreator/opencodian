@@ -27,3 +27,6 @@ SendPipelineRuntime(finally) ──onTurnSettled──> 防抖 ──> runExtrac
 
 - 禁止 import 任何 feature 层与后端适配器；聊天接线反向经宿主端口流入。
 - `VaultMemoryFileSystem.mtimeMs` 经 node fs stat（dotfile 不被 Obsidian 索引），失败返回 null。
+- `VaultMemoryFileSystem.listFiles` 消费 Obsidian `DataAdapter.list()` 的 `ListedFiles`（`files` 为全路径字符串数组，非 TFile 对象），映射为 basename 返回。
+- git 同步：`ensureService()` 在（外部根, 远程 URL）接线变化时重建 `MemoryGitSyncService`；抽取/反思写入成功与 forget 删除后 `scheduleSync()`（5s 防抖），状态命令末尾附同步行。
+- 共享存储模式：设置 `memoryExternalRoot` 非空时，`ensureService()` 用 `ExternalMemoryFileSystem` + `externalMemoryProjectDir`（`<root>/projects/<桶>/memory`，zmem / ZCode 同构）重建服务，metrics 仍写 vault 内的 `VaultMemoryFileSystem`；根切换会清空注入纪元 / 抽取水位 / 压缩计数（协议文本指向新存储，每会话应重新注入一次）。

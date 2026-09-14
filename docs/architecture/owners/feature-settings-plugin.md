@@ -50,3 +50,4 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 ## Builtin icon picker: models.dev library filter (2026-09-11)
 
 `ProviderBuiltinIconPickerModal`'s library filter now offers `modelsdev` alongside `lobehub` and `opencode`, so the remote models.dev icon set can be browsed per library. Icon resolution itself stays in `shared.utils-icons`; the modal only renders and filters.
+- 2026-09-13: 会话设置的工作区记忆块新增「共享记忆根目录」文本项（`memoryExternalRoot`），保存后立即通知 memoryRuntime 重建服务。

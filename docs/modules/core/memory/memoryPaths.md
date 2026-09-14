@@ -20,3 +20,5 @@
 ## 边界与约束
 
 - opencodian 的所有后端 cwd 都锚定 vault，因此工作区键 = vault 路径；桶在 vault 内保证四个后端的文件写工具都无需额外授权即可写入。
+
+- `externalMemoryProjectDir(root, workspace)`：共享存储模式的绝对桶目录 `<root>/projects/<slug>-<hash16>/memory`；桶名与 vault 本地映射完全一致（同一 `hashWorkspacePath`），尾部 `memory` 段与 opencode-zmem / ZCode workspace memory 布局对齐，三方可共用一棵物理树。

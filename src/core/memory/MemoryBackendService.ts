@@ -31,7 +31,6 @@ import {
 } from './memoryManifest';
 import {
   MEMORY_STORE_ROOT,
-  memoryIndexPath,
   memoryProjectDir,
   modelMemoryRootDisplay,
 } from './memoryPaths';
@@ -85,13 +84,25 @@ export type MemoryExtractionOutcome = {
 export class MemoryBackendService {
   readonly projectDir: string;
   readonly indexPath: string;
+  private readonly metricsFs: MemoryFileSystem;
 
+  /**
+   * Store-layout overrides for shared-store mode: `projectDir` points the
+   * service at an absolute external bucket (opencode-zmem / ZCode layout)
+   * while `metricsFs` keeps the metrics journal on a different filesystem —
+   * the vault — so diagnostics never pollute the shared tree.
+   */
   constructor(
     private readonly fs: MemoryFileSystem,
     private readonly workspacePath: string,
+    overrides?: {
+      projectDir?: string;
+      metricsFs?: MemoryFileSystem;
+    },
   ) {
-    this.projectDir = memoryProjectDir(workspacePath);
-    this.indexPath = memoryIndexPath(workspacePath);
+    this.projectDir = overrides?.projectDir ?? memoryProjectDir(workspacePath);
+    this.indexPath = `${this.projectDir}/MEMORY.md`;
+    this.metricsFs = overrides?.metricsFs ?? fs;
   }
 
   /** Native absolute memory dir for protocol text / logging. */
@@ -533,16 +544,16 @@ export class MemoryBackendService {
   /** Append-only metrics journal under the store root (bounded). */
   async appendMetric(event: MemoryMetricEvent): Promise<void> {
     try {
-      if (!(await this.fs.exists(MEMORY_STORE_ROOT))) {
-        await this.fs.mkdir(MEMORY_STORE_ROOT);
+      if (!(await this.metricsFs.exists(MEMORY_STORE_ROOT))) {
+        await this.metricsFs.mkdir(MEMORY_STORE_ROOT);
       }
-      const current = (await this.fs.readFile(METRICS_PATH)) ?? '';
+      const current = (await this.metricsFs.readFile(METRICS_PATH)) ?? '';
       const lines = current.split('\n').filter((line) => line.trim().length > 0);
       lines.push(JSON.stringify(event));
       const kept = lines.length > MemoryBackendService.METRICS_MAX_ENTRIES
         ? lines.slice(lines.length - MemoryBackendService.METRICS_MAX_ENTRIES)
         : lines;
-      await this.fs.writeFile(METRICS_PATH, `${kept.join('\n')}\n`);
+      await this.metricsFs.writeFile(METRICS_PATH, `${kept.join('\n')}\n`);
     } catch {
       // metrics are diagnostics; never fail a turn for them
     }
@@ -550,7 +561,7 @@ export class MemoryBackendService {
 
   /** Test/inspection helper: read every metric event. */
   async readMetrics(): Promise<MemoryMetricEvent[]> {
-    const raw = await this.fs.readFile(METRICS_PATH).catch(() => null);
+    const raw = await this.metricsFs.readFile(METRICS_PATH).catch(() => null);
     if (!raw) return [];
     return raw
       .split('\n')

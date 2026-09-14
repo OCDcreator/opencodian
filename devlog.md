@@ -11,6 +11,48 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-14 记忆同步加固：审查驱动的安全护栏（双仓同修）
+
+对昨日 git 整树同步做了一轮严格代码审查（两仓未提交更改），协议实现本身逐字节同构、6 条设计不变量全部成立；本轮落地审查发现的全部 P1/P2 修复，两端保持逐字节一致（归一化 diff 验证）：
+
+- **根护栏** `checkMemorySyncTreeRoot`/`checkSyncTreeRoot`：任何 `git init`/`add -A` 之前拒绝 home 目录、文件系统根、不存在的路径、以及无 `projects/` 的非空目录——误指根不再可能把整个 home 提交推送。
+- **密钥门**：commit 前对已暂存 `.md` 跑现有 `scanForSecrets`，命中即撤出暂存（有 HEAD 用 `restore --staged`，unborn 分支用 `rm --cached`——前者在 unborn 上必然报 "could not resolve HEAD"，实现期实测发现）并记入 `blockedSecrets`；撤出失败整轮中止（宁缺毋推）。召回侧 guard 只挡注入，这道门挡远程。
+- **unmerged 门**：`ls-files -u` 必须在 `add -A` **之前**检查（`add` 会清除 unmerged 证据并把冲突标记 stage 进去）——autostash pop 冲突不再可能把 `<<<<<<<` 标记推送到所有机器。
+- **锁安全**：`tryAcquire` 的非 EEXIST 错误（根被删/权限）被接住返回 `ok:false` 而不是逃逸出 fail-soft 网（zmem 侧原路径会产生未处理 rejection）。
+- **index.lock 自愈**：20s 超时 kill 遗留的 `.git/index.lock` 龄期 >60s 时在错误路径上清除，下轮恢复（新锁不动）。
+- **unborn 可见性**：unborn 分支 fetch 失败（远程 URL 错误）如实写入 `detail`，不再静默假成功。
+- **`.gitattributes` 新增** `MEMORY.md merge=union`：append-only 索引的跨机并发追加自动并集合并，消解绝大多数真实冲突；预存 `.gitignore` 只追加缺失行不覆盖。
+- **协议防漂移**：`docs/status/memory-sync-protocol.md` 与 zmem `docs/memory-sync-protocol.md` 存同一文本；两端测试新增 "shared protocol shape" 漂移守卫（锁名/ignore 逐字节/commit 消息形状/分支名）。
+- zmem 顺带：`storageRoot` 支持 `~` 展开（与 OpenCodian `memoryExternalRoot` 同契约，此前照抄文档值会在 cwd 下建字面量 `~/` 目录）；`scheduleSync` 写入防抖合并；README 补 `syncRemoteUrl` 与 git 同步章节。
+- 审查还确认一个顺带修复的真实线上 bug：`VaultMemoryFileSystem.listFiles` 旧实现对 Obsidian `ListedFiles.files`（`string[]`）误取 `f.path` 必抛、被上层 catch 吞掉——1.1.25 的 vault 模式 topic manifest 恒为空，本次已修并有契约测试。
+
+验证：OpenCodian 同步测试 14/14（新增根护栏/锁持有与 stale 接管/密钥门/unmerged 门/index.lock 双态/不可达远程/ignore 补全/协议形状 8 例）+ 记忆设置归一化新套件 3/3；zmem 232/232 全量（镜像同套 + `~` 展开 path 测试）。
+
+## 2026-09-13 记忆同步：git 整树同步（zmem + OpenCodian 同协议）
+
+在共享树基础上增加 git 远程同步，记忆跨机流动（也覆盖 ZCode 写入的文件——`add -A` 整树入库）。
+
+- OpenCodian：`MemoryGitSyncService`（app.memory-runtime）——纯函数周期 `syncMemoryTree`（取跨插件锁 → bootstrap → add -A → commit-if-changed → `pull --rebase --autostash` → push；unborn 分支 fetch+`checkout -B` 收编远程历史；空远程容忍；rebase 冲突 abort 保本地）+ 运行时包装（加载首拉 5s 防抖 / 写后 5s 防抖 / 5min 周期）。新设置 `memorySyncRemoteUrl`（需与 `memoryExternalRoot` 同设；建议私有仓库）；状态命令附 `Git 同步:` 行。
+- opencode-zmem：`src/sync.ts` 同协议（同锁文件 `.memory-sync.lock`、同 `main` 分支、同 ignore、同 commit 形状），配置键 `syncRemoteUrl`，加载 5s 首同步 + 300s 周期 + 两处写后防抖。
+- `.gitignore` 排除每机诊断（`.last-injection.json`/`metrics.jsonl`）；commit 身份每命令注入（`opencodian-memory@<host>` / `zmem-memory@<host>`），不依赖全局 git 配置。
+- 修复两个实现期发现的边界：空远程 `pull` 报 couldn't find remote ref（容忍）；零提交仓库 `push -u` 报 src refspec 不存在（unborn 分支改为收编远程）。
+
+验证：OpenCodian 120/120 memory 单测（5 个真 git 裸仓库推拉/收编/锁测试）；zmem 219/219（含 5 个同步测试）；双端实机验证见 devlog 后续记录。
+
+## 2026-09-13 记忆共享：外部记忆根（zmem / ZCode 同构共享树，双端）
+
+三方核查结论：OpenCodian 记忆后端与 opencode-zmem 是同一冻结行为集（D1–D29）的移植，且 zmem 自述为 "ZCode Workspace Memory twin"；三者桶命名方案完全一致（`sanitizeProjectSlug` + `sha256(win32 小写 resolve 路径).slice(0,16)`，实测本仓库三方同为 `opencodian-a5ed3a8fc8cdec21`）。唯一结构差：OpenCodian 桶少一层 `memory/` 且根在 vault 内。
+
+本次落地（D-O2）：
+
+- 新增设置 `memoryExternalRoot`（默认空 = 现状 vault 本地存储）。非空时桶映射为 `<root>/projects/<slug>-<hash16>/memory`（`externalMemoryProjectDir`），与 zmem / ZCode workspace memory 布局完全同构 → 三方共用一棵物理树，零格式迁移。
+- 新增 `src/app/memory/ExternalMemoryFileSystem.ts`：node fs 适配器（绝对路径、递归建父目录、ListedFiles basename 契约）；`expandHomeDir` 展开开头 `~`，使同步 vault 设置的多台机器（Windows/macOS）用同一个设置值（如 `~/.zcode/cli/memories`）。
+- `MemoryBackendService` 构造器可选 `projectDir` + `metricsFs` 覆盖：共享模式下 metrics 诊断始终留在 vault 内，不污染共享树。协调器 `ensureService()` 按设置即时重建服务，根切换清空注入纪元/抽取水位/压缩计数（修复了 planInjection 先查纪元后重建服务的时序问题）。
+- 设置 UI（会话 → 工作区记忆 → 共享记忆根目录）+ en/zh i18n；`writeMemoryWrites` 追加式更新索引，不重排 ZCode 手写行。
+- 已知限制：桶按工作区绝对路径哈希命名，同一 vault 在 Windows / macOS 上路径不同 → 各机各桶；跨工具共享在每台机器内完整成立，同一 vault 的记忆不跨机跟随（zmem/ZCode 血统的既定设计，跨机需未来另做桶别名/合并）。
+
+验证：115/115 memory 单测（新增 ExternalMemoryFileSystem 10 例、externalProjectDir 桶名 parity、协调器共享模式路由/metrics 分离/根切换纪元重置）、eslint 0/0、模块文档与 owner 概览同步。
+
 ## 2026-09-13 通用记忆后端：真实模型循环测试全绿（A–E 31/31 + pi 中立性）
 
 用真实 opencode server（1.18.30，`OPENCODE_PURE` 隔离全局插件）+ 真实 `opencode-go/deepseek-flash` 跑完整循环（harness：`.tmp/memory-backend/loop/run-loop.mts`，复用仓库 `src/core/memory` 核心 + 同一 HTTP 面 `POST /session/{id}/message`）。三轮循环后的最终轮（cycle 3，原始日志 `/tmp/loop-full-3.log`，产物 `.tmp/memory-backend/loop-artifacts/`）：

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "bc47dabcacca5cc7bf38933524a9a18a092913d5c7d32adc8e35c3c383df3eab",
-  "recordCount": 638,
+  "digest": "a2f75af73fc23e5d01ee1db706eb509d286f3bab2aa9a1c09d253de132c74231",
+  "recordCount": 640,
   "records": [
     {
       "kind": "ignore",
@@ -16,12 +16,12 @@
     {
       "kind": "package",
       "key": "package-lock.json",
-      "sha256": "8647c2e71606fa83e3f2484b153b5f5d47da1456f3d2bc6d5b12d26cdb5fc601"
+      "sha256": "4fb5b5fcc2dc46e5de87e82dfd07f98a8547330647a62444cf0e49df11903af0"
     },
     {
       "kind": "package",
       "key": "package.json",
-      "sha256": "7f9de9e5f4f1e7d924feca6b9d9b9da36b77c0ab663531a81a2a84bed89d0266"
+      "sha256": "de2d20941d65eac0b48b8f2ae6782eaeb1738ca88fe18d5d6c96345361678b07"
     },
     {
       "kind": "src",
@@ -40,13 +40,23 @@
     },
     {
       "kind": "src",
+      "key": "src/app/memory/ExternalMemoryFileSystem.ts",
+      "sha256": "31716bdd6086502291d99864426cfcc20bdfc551e2a7196e79d6da9305c280cc"
+    },
+    {
+      "kind": "src",
       "key": "src/app/memory/index.ts",
-      "sha256": "3c5d1f59f7ea402051771aeb3ad1f9ab64d210ebf87579829494fa0088cba694"
+      "sha256": "b8778f7199e503af583dd80a8a6691309a60911508b1562432a4fdd432e5c05e"
+    },
+    {
+      "kind": "src",
+      "key": "src/app/memory/MemoryGitSyncService.ts",
+      "sha256": "3d37fd437e5e349d51e6e1622c1ed10aef57a85b0f4a537b4c4de4242928dc04"
     },
     {
       "kind": "src",
       "key": "src/app/memory/MemoryRuntimeCoordinator.ts",
-      "sha256": "ba7b73a9903a717ed43b58dff2fc16e8447dad3422c49aeef960b0dc9179d547"
+      "sha256": "78c53202c74a8fe0009b6624fda15891498905dfd1ee64acde2e0ad3101b4019"
     },
     {
       "kind": "src",
@@ -501,7 +511,7 @@
     {
       "kind": "src",
       "key": "src/core/memory/MemoryBackendService.ts",
-      "sha256": "cd7ee449d04769c8ecfa07e8fb58af101fd9d1fc66c172dac052c8162985e7da"
+      "sha256": "182e3ab233338e072c7603fb1c169a0f38bcd3883c445011cf41fee79d6adcf1"
     },
     {
       "kind": "src",
@@ -541,7 +551,7 @@
     {
       "kind": "src",
       "key": "src/core/memory/memoryPaths.ts",
-      "sha256": "03dfea3e7279fbfcda41bef0b7b05ae24ce7b2cc24ca25e4ec521e8be805e463"
+      "sha256": "b2d3ae8bd7b13f3840def0c16933dc4b87869efd7bec7d9030992a649f903251"
     },
     {
       "kind": "src",
@@ -566,12 +576,12 @@
     {
       "kind": "src",
       "key": "src/core/memory/memoryStore.ts",
-      "sha256": "9d0d23e0ecfc4ee1ba62b0dc567b9ad1f506cd76640b426e84abe673f73f96f4"
+      "sha256": "67b0b28a4ddf09bc55bbfbf91d1b446c9826e4cf4df928c927f199180108023f"
     },
     {
       "kind": "src",
       "key": "src/core/memory/memoryTypes.ts",
-      "sha256": "b197a2d2092089303d80a02ad9ebc05b34898e7c1564f1744679b808957ce236"
+      "sha256": "c6a7900cd75273071443485bba7431b35d0b74bbfb7d3bc1f6705af1195e32b2"
     },
     {
       "kind": "src",
@@ -906,7 +916,7 @@
     {
       "kind": "src",
       "key": "src/core/types/settings.ts",
-      "sha256": "a3e024ca0b5f09bc5c382233deb563a2245bf2b33ea280dcd6333fe38818d7e1"
+      "sha256": "875c47d59fe76bb960932674827ec31e24148de4ae45e8108ed8b5c2caa14ba3"
     },
     {
       "kind": "src",
@@ -2451,7 +2461,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsConversationSection.ts",
-      "sha256": "2f6d3bc849891ba9767cad0d2d693878e08df5f7db8a5cd07cf1d2c26227ec32"
+      "sha256": "7d5def62a14173b19d57b3b668d2b05a55cb25c37e4efd7d03f8aed0a1af9cab"
     },
     {
       "kind": "src",
@@ -2676,7 +2686,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "af7cb98a76689017784282ebc914e17402021a0fb2e9185c3c5e419c190c0e75"
+      "sha256": "d6ecde704f4347f98aaecb2906b0094c54bf8abe475e97d70b19c97237153f10"
     },
     {
       "kind": "src",
@@ -2686,7 +2696,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "abec258ee2f0debeea3562bdfaf101150f3b368f91c83eaf6ceb605c71639743"
+      "sha256": "e5dcd8de78358d55e293df9579adfe9b3eecf47735d9e11bc899c381e83d4804"
     },
     {
       "kind": "src",
@@ -3194,7 +3204,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-12T19:39:32.176Z",
-  "headShaAtGeneration": "f819553b1d902e46e608a282581fae0081bad67d",
+  "generatedAt": "2026-09-14T12:19:37.435Z",
+  "headShaAtGeneration": "4bc9631219c8c085056e70737c65bfeb80a3b56e",
   "graphifyVersion": "graphify 0.9.31"
 }

@@ -1,4 +1,7 @@
+import * as nodePath from 'node:path';
+
 import {
+  externalMemoryProjectDir,
   hashWorkspacePath,
   MEMORY_STORE_ROOT,
   memoryIndexPath,
@@ -43,5 +46,16 @@ describe('memoryPaths', () => {
       '/vault/x/memory/projects/b/',
     );
     expect(modelMemoryRootDisplay('/vault/b/')).toBe('/vault/b/');
+  });
+
+  it('maps an external root to the shared zmem/ZCode bucket layout with bucket-name parity', () => {
+    const workspace = '/data/workspaces/my-project';
+    const external = externalMemoryProjectDir('/data/shared-root', workspace);
+    const vaultBucket = memoryProjectDir(workspace).split('/').pop()!;
+    // Absolute native path: <root>/projects/<bucket>/memory, where the bucket
+    // name equals the vault-local layout for the same workspace — pointing
+    // the external root at a zmem/ZCode tree hits their exact bucket.
+    expect(external).toBe(nodePath.join(nodePath.resolve('/data/shared-root'), 'projects', vaultBucket, 'memory'));
+    expect(nodePath.basename(nodePath.dirname(external))).toBe(vaultBucket);
   });
 });

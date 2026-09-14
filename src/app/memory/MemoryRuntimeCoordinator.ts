@@ -18,6 +18,7 @@ import { App, Modal, normalizePath, Notice, Setting } from 'obsidian';
 
 import {
   compactionMarkerCount,
+  externalMemoryProjectDir,
   MemoryBackendService,
   type MemoryFileSystem,
   type MemoryLintReport,
@@ -29,6 +30,8 @@ import {
 } from '../../core/memory';
 import type { OpenCodeService } from '../../core/opencode/OpenCodeService';
 import { t } from '../../i18n';
+import { expandHomeDir, ExternalMemoryFileSystem } from './ExternalMemoryFileSystem';
+import { MemoryGitSyncService } from './MemoryGitSyncService';
 
 /** Debounce between turn settle and background distillation (ms). */
 const TURN_SETTLE_DELAY_MS = 1_500;
@@ -47,7 +50,7 @@ export class VaultMemoryFileSystem implements MemoryFileSystem {
     read(path: string): Promise<string>;
     write(path: string, data: string): Promise<void>;
     mkdir(path: string): Promise<void>;
-    list(path: string): Promise<{ files: { path: string }[] }>;
+    list(path: string): Promise<{ files: string[]; folders: string[] }>;
     remove(path: string): Promise<void>;
   } {
     return this.app.vault.adapter as never;
@@ -87,8 +90,10 @@ export class VaultMemoryFileSystem implements MemoryFileSystem {
   }
 
   async listFiles(relativePath: string): Promise<string[]> {
+    // Obsidian's DataAdapter.list() returns full vault-relative path strings
+    // (ListedFiles), not TFile objects.
     const listing = await this.adapter().list(normalizePath(relativePath));
-    return listing.files.map((f) => nodePath.basename(f.path));
+    return listing.files.map((f) => nodePath.basename(f));
   }
 
   async mkdir(relativePath: string): Promise<void> {
@@ -140,7 +145,13 @@ export interface MemoryRuntimeCoordinatorOptions {
 
 export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
   private readonly fs: VaultMemoryFileSystem;
-  private readonly service: MemoryBackendService;
+  private readonly vaultBasePath: string;
+  private service: MemoryBackendService | null = null;
+  /** Root identity the current service was built for ('' = vault-local). */
+  private serviceRootKey = '__unset__';
+  private sync: MemoryGitSyncService | null = null;
+  /** Identity the sync service was built for (root + remote url). */
+  private syncKey = '__unset__';
   private readonly invoker: MemoryModelInvoker;
 
   /** Per-conversation transcript watermark already distilled. */
@@ -158,11 +169,66 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
   constructor(private readonly options: MemoryRuntimeCoordinatorOptions) {
     this.turnSettleDelayMs = options.turnSettleDelayMs ?? TURN_SETTLE_DELAY_MS;
     this.fs = new VaultMemoryFileSystem(options.app);
-    const vaultBasePath = (options.app.vault.adapter as { basePath?: string }).basePath ?? '.';
-    this.service = new MemoryBackendService(this.fs, vaultBasePath);
+    this.vaultBasePath = (options.app.vault.adapter as { basePath?: string }).basePath ?? '.';
     this.invoker = {
       invoke: (input) => this.invokeModel(input),
     };
+    // Plugin load with a pre-configured sync remote starts syncing without
+    // waiting for the first memory operation.
+    this.ensureSyncService((this.settings().memoryExternalRoot ?? '').trim());
+  }
+
+  /**
+   * Build (or rebuild) the store service for the currently configured root.
+   * Empty root = vault-local `.opencodian/memory`; non-empty = the shared
+   * external tree (`<root>/projects/<bucket>/memory`, zmem / ZCode layout)
+   * with the metrics journal kept in the vault either way. Switching roots
+   * resets per-conversation epoch state — the injected protocol text names a
+   * different store, so every conversation deserves one fresh epoch.
+   */
+  private ensureService(): MemoryBackendService {
+    const root = (this.settings().memoryExternalRoot ?? '').trim();
+    const rootKey = root.toLowerCase();
+    if (this.service && this.serviceRootKey === rootKey) return this.service;
+    if (root) {
+      const expandedRoot = expandHomeDir(root);
+      const externalFs = new ExternalMemoryFileSystem(expandedRoot);
+      this.service = new MemoryBackendService(externalFs, this.vaultBasePath, {
+        projectDir: externalMemoryProjectDir(expandedRoot, this.vaultBasePath),
+        metricsFs: this.fs,
+      });
+    } else {
+      this.service = new MemoryBackendService(this.fs, this.vaultBasePath);
+    }
+    this.serviceRootKey = rootKey;
+    this.extractionWatermarks.clear();
+    this.injectedEpochs.clear();
+    this.compactionCounts.clear();
+    this.ensureSyncService(root);
+    return this.service;
+  }
+
+  /**
+   * Rebuild the git sync service when the (root, remoteUrl) wiring changes.
+   * The service no-ops internally when either value is empty, so it can be
+   * constructed eagerly whenever an external root is configured.
+   */
+  private ensureSyncService(rawRoot: string): void {
+    const remoteUrl = (this.settings().memorySyncRemoteUrl ?? '').trim();
+    const key = `${rawRoot.toLowerCase()};;${remoteUrl.toLowerCase()}`;
+    if (this.syncKey === key) return;
+    this.sync?.dispose();
+    if (rawRoot && remoteUrl) {
+      const expandedRoot = expandHomeDir(rawRoot);
+      this.sync = new MemoryGitSyncService(
+        () => expandedRoot,
+        () => (this.settings().memorySyncRemoteUrl ?? ''),
+      );
+      this.sync.start();
+    } else {
+      this.sync = null;
+    }
+    this.syncKey = key;
   }
 
   // -------------------------------------------------------------------------
@@ -175,9 +241,12 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
     latestUserText: string;
   }): Promise<{ text: string } | null> {
     try {
+      // Resolve the service first: a root switch resets epoch state, and the
+      // already-injected check below must observe that reset.
+      const service = this.ensureService();
       const epoch = compactionMarkerCount(input.messages);
       const alreadyInjected = this.injectedEpochs.get(input.conversationId) === epoch;
-      const outcome = await this.service.planInjection({
+      const outcome = await service.planInjection({
         conversationId: input.conversationId,
         messages: input.messages,
         latestUserText: input.latestUserText,
@@ -212,6 +281,9 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
       this.injectedEpochs.clear();
       this.compactionCounts.clear();
     }
+    // Re-wire the sync service eagerly: setting the remote URL must start
+    // syncing without waiting for the next memory operation.
+    this.ensureSyncService((this.settings().memoryExternalRoot ?? '').trim());
   }
 
   // -------------------------------------------------------------------------
@@ -219,17 +291,19 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
   // -------------------------------------------------------------------------
 
   async status(): Promise<MemoryStatusReport> {
-    await this.service.ensureRoot();
-    return this.service.status();
+    await this.ensureService().ensureRoot();
+    return this.ensureService().status();
   }
 
   async lint(): Promise<MemoryLintReport> {
-    await this.service.ensureRoot();
-    return this.service.lint();
+    await this.ensureService().ensureRoot();
+    return this.ensureService().lint();
   }
 
   async forget(name: string): Promise<{ removed: string[] }> {
-    return this.service.forget(name);
+    const { removed } = await this.ensureService().forget(name);
+    if (removed.length > 0) this.sync?.scheduleSync();
+    return { removed };
   }
 
   /** Register the palette commands on the plugin (idempotent). */
@@ -257,6 +331,16 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
     });
   }
 
+  private syncStateText(): string {
+    const status = this.sync?.getStatus();
+    if (!status || !status.active) return 'off';
+    if (!status.last) return 'idle';
+    const r = status.last;
+    if (!r.ok) return `error (${r.detail ?? 'unknown'})`;
+    const blocked = r.blockedSecrets?.length ? ` secrets-blocked=${r.blockedSecrets.length}` : '';
+    return `ok (commit=${r.committed} pull=${r.pulled} push=${r.pushed})${blocked}`;
+  }
+
   private async runStatusCommand(): Promise<void> {
     try {
       const report = await this.status();
@@ -270,6 +354,7 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
         Object.entries(report.byType)
           .map(([type, count]) => `${type}: ${count}`)
           .join(', '),
+        t('commands.memory.statusSync', { state: this.syncStateText() }),
       ];
       new Notice(lines.join('\n'), 10_000);
     } catch (error) {
@@ -311,6 +396,8 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
 
   dispose(): void {
     this.disposed = true;
+    this.sync?.dispose();
+    this.sync = null;
     this.extractionWatermarks.clear();
     this.injectedEpochs.clear();
     this.compactionCounts.clear();
@@ -359,7 +446,7 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
     if (this.extractionInFlight) return;
     this.extractionInFlight = true;
     try {
-      await this.service.runExtraction({
+      const outcome = await this.ensureService().runExtraction({
         conversationId: input.conversationId,
         sessionId: input.sessionId ?? input.conversationId,
         settings: this.settings(),
@@ -367,6 +454,7 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
         lastExtractedMessageCount: this.extractionWatermarks.get(input.conversationId) ?? 0,
         messages,
       });
+      if (outcome.status === 'written') this.sync?.scheduleSync();
     } finally {
       this.extractionWatermarks.set(input.conversationId, messages.length);
       this.extractionInFlight = false;
@@ -380,13 +468,14 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
     if (this.reflectionInFlight) return;
     this.reflectionInFlight = true;
     try {
-      await this.service.runReflection({
+      const outcome = await this.ensureService().runReflection({
         conversationId: input.conversationId,
         sessionId: input.sessionId ?? input.conversationId,
         settings: this.settings(),
         invoker: this.invoker,
         messages,
       });
+      if (outcome.status === 'written') this.sync?.scheduleSync();
     } finally {
       this.reflectionInFlight = false;
     }

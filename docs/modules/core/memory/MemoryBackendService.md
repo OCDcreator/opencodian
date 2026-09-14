@@ -29,3 +29,4 @@
 ## 边界与约束
 
 - 本类不 import 任何后端；语义召回 shipped 路径为词法选择（≤3 条正文注入），无每回合模型调用。
+- 构造器可选覆盖 `{ projectDir, metricsFs }`：共享存储模式下 `projectDir` 指向外部绝对桶目录（zmem/ZCode 布局），`metricsFs` 让 metrics 日志留在 vault 内的文件系统上。

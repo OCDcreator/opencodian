@@ -19,6 +19,21 @@ export interface MemorySettingsSnapshot {
   readonly memorySemanticRecallEnabled: boolean;
   /** Optional extraction model as `provider/model`. Empty string = session model. */
   readonly memoryExtractionModel: string;
+  /**
+   * Optional shared store root (absolute path). Empty = vault-local
+   * `.opencodian/memory`. When set, buckets map to
+   * `<root>/projects/<slug>-<hash16>/memory` — the same layout opencode-zmem
+   * and ZCode workspace memory use, so the three systems can operate on one
+   * physical tree without migration.
+   */
+  readonly memoryExternalRoot: string;
+  /**
+   * Optional git remote URL for whole-tree memory sync (shared protocol
+   * with opencode-zmem). Empty = sync disabled. Only meaningful together
+   * with `memoryExternalRoot`; use a private remote — memory content is
+   * personal.
+   */
+  readonly memorySyncRemoteUrl: string;
 }
 
 export const DEFAULT_MEMORY_SETTINGS: MemorySettingsSnapshot = {
@@ -26,6 +41,8 @@ export const DEFAULT_MEMORY_SETTINGS: MemorySettingsSnapshot = {
   memoryExtractionEnabled: true,
   memorySemanticRecallEnabled: false,
   memoryExtractionModel: '',
+  memoryExternalRoot: '',
+  memorySyncRemoteUrl: '',
 };
 
 /** Structural slice of a persisted chat message the memory core needs. */
@@ -50,9 +67,10 @@ export interface MemoryTranscriptMessage {
 
 /**
  * Filesystem port for the memory store. Paths are vault-relative, posix-style,
- * rooted at the vault base (for example `.opencodian/memory/projects/x/MEMORY.md`).
- * The app layer binds this to the Obsidian vault adapter; tests bind an
- * in-memory implementation.
+ * rooted at the vault base (for example `.opencodian/memory/projects/x/MEMORY.md`)
+ * — or, in shared-store mode, absolute native paths under the configured
+ * external root. The app layer binds this to the Obsidian vault adapter or a
+ * node-fs adapter; tests bind an in-memory implementation.
  */
 export interface MemoryFileSystem {
   readFile(relativePath: string): Promise<string | null>;

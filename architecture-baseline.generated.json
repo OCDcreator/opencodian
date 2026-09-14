@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-08T14:29:25.739Z",
-  "headShaAtGeneration": "478ecffee882b6abeede394d86c60f55e82c1f9e",
+  "generatedAt": "2026-09-13T12:38:58.001Z",
+  "headShaAtGeneration": "4bc9631219c8c085056e70737c65bfeb80a3b56e",
   "edges": [
     {
       "id": "src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts|src/app/diagnostics/types.ts|type-only|./types",
@@ -79,6 +79,69 @@
       "to": "src/core/opencode/diagnostics/OpenCodeSessionTraceService.ts",
       "kind": "type-only",
       "specifier": "../../core/opencode/diagnostics/OpenCodeSessionTraceService"
+    },
+    {
+      "id": "src/app/memory/ExternalMemoryFileSystem.ts|src/core/memory/index.ts|type-only|../../core/memory",
+      "from": "src/app/memory/ExternalMemoryFileSystem.ts",
+      "to": "src/core/memory/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/memory"
+    },
+    {
+      "id": "src/app/memory/index.ts|src/app/memory/ExternalMemoryFileSystem.ts|re-export|./ExternalMemoryFileSystem",
+      "from": "src/app/memory/index.ts",
+      "to": "src/app/memory/ExternalMemoryFileSystem.ts",
+      "kind": "re-export",
+      "specifier": "./ExternalMemoryFileSystem"
+    },
+    {
+      "id": "src/app/memory/index.ts|src/app/memory/MemoryGitSyncService.ts|re-export|./MemoryGitSyncService",
+      "from": "src/app/memory/index.ts",
+      "to": "src/app/memory/MemoryGitSyncService.ts",
+      "kind": "re-export",
+      "specifier": "./MemoryGitSyncService"
+    },
+    {
+      "id": "src/app/memory/index.ts|src/app/memory/MemoryRuntimeCoordinator.ts|re-export|./MemoryRuntimeCoordinator",
+      "from": "src/app/memory/index.ts",
+      "to": "src/app/memory/MemoryRuntimeCoordinator.ts",
+      "kind": "re-export",
+      "specifier": "./MemoryRuntimeCoordinator"
+    },
+    {
+      "id": "src/app/memory/MemoryRuntimeCoordinator.ts|src/app/memory/ExternalMemoryFileSystem.ts|runtime-static|./ExternalMemoryFileSystem",
+      "from": "src/app/memory/MemoryRuntimeCoordinator.ts",
+      "to": "src/app/memory/ExternalMemoryFileSystem.ts",
+      "kind": "runtime-static",
+      "specifier": "./ExternalMemoryFileSystem"
+    },
+    {
+      "id": "src/app/memory/MemoryRuntimeCoordinator.ts|src/app/memory/MemoryGitSyncService.ts|runtime-static|./MemoryGitSyncService",
+      "from": "src/app/memory/MemoryRuntimeCoordinator.ts",
+      "to": "src/app/memory/MemoryGitSyncService.ts",
+      "kind": "runtime-static",
+      "specifier": "./MemoryGitSyncService"
+    },
+    {
+      "id": "src/app/memory/MemoryRuntimeCoordinator.ts|src/core/memory/index.ts|runtime-static|../../core/memory",
+      "from": "src/app/memory/MemoryRuntimeCoordinator.ts",
+      "to": "src/core/memory/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/memory"
+    },
+    {
+      "id": "src/app/memory/MemoryRuntimeCoordinator.ts|src/core/opencode/OpenCodeService.ts|type-only|../../core/opencode/OpenCodeService",
+      "from": "src/app/memory/MemoryRuntimeCoordinator.ts",
+      "to": "src/core/opencode/OpenCodeService.ts",
+      "kind": "type-only",
+      "specifier": "../../core/opencode/OpenCodeService"
+    },
+    {
+      "id": "src/app/memory/MemoryRuntimeCoordinator.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/app/memory/MemoryRuntimeCoordinator.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
     },
     {
       "id": "src/app/runtime/PluginRuntimeCoordinator.ts|src/core/opencode/index.ts|runtime-static|../../core/opencode",
@@ -226,6 +289,20 @@
       "to": "src/core/agents/backend/diagnostics/types.ts",
       "kind": "type-only",
       "specifier": "./diagnostics/types"
+    },
+    {
+      "id": "src/core/agents/backend/AgentAdapterWiring.ts|src/core/agents/backend/pi/PiAdapter.ts|runtime-static|./pi/PiAdapter",
+      "from": "src/core/agents/backend/AgentAdapterWiring.ts",
+      "to": "src/core/agents/backend/pi/PiAdapter.ts",
+      "kind": "runtime-static",
+      "specifier": "./pi/PiAdapter"
+    },
+    {
+      "id": "src/core/agents/backend/AgentAdapterWiring.ts|src/core/agents/backend/pi/PiProtocol.ts|type-only|./pi/PiProtocol",
+      "from": "src/core/agents/backend/AgentAdapterWiring.ts",
+      "to": "src/core/agents/backend/pi/PiProtocol.ts",
+      "kind": "type-only",
+      "specifier": "./pi/PiProtocol"
     },
     {
       "id": "src/core/agents/backend/AgentAdapterWiring.ts|src/core/types/settings.ts|type-only|../../types/settings",
@@ -401,6 +478,13 @@
       "to": "src/core/agents/backend/promptSuggestionSink.ts",
       "kind": "runtime-static",
       "specifier": "./promptSuggestionSink"
+    },
+    {
+      "id": "src/core/agents/backend/ClaudeCodeAdapter.ts|src/core/memory/index.ts|runtime-static|../../memory",
+      "from": "src/core/agents/backend/ClaudeCodeAdapter.ts",
+      "to": "src/core/memory/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../memory"
     },
     {
       "id": "src/core/agents/backend/ClaudeCodeAdapter.ts|src/core/types/chat.ts|type-only|../../types/chat",
@@ -695,6 +779,13 @@
       "to": "src/core/agents/backend/diagnostics/types.ts",
       "kind": "type-only",
       "specifier": "./diagnostics/types"
+    },
+    {
+      "id": "src/core/agents/backend/CodexAdapter.ts|src/core/memory/index.ts|runtime-static|../../memory",
+      "from": "src/core/agents/backend/CodexAdapter.ts",
+      "to": "src/core/memory/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../memory"
     },
     {
       "id": "src/core/agents/backend/CodexAdapter.ts|src/core/types/chat.ts|type-only|../../types/chat",
@@ -1187,6 +1278,20 @@
       "specifier": "./AgentService"
     },
     {
+      "id": "src/core/agents/backend/OpenCodeAdapter.ts|src/core/memory/index.ts|runtime-static|../../memory",
+      "from": "src/core/agents/backend/OpenCodeAdapter.ts",
+      "to": "src/core/memory/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../memory"
+    },
+    {
+      "id": "src/core/agents/backend/OpenCodeAdapter.ts|src/core/opencode/OpenCodePromptRequestBuilder.ts|type-only|../../opencode/OpenCodePromptRequestBuilder",
+      "from": "src/core/agents/backend/OpenCodeAdapter.ts",
+      "to": "src/core/opencode/OpenCodePromptRequestBuilder.ts",
+      "kind": "type-only",
+      "specifier": "../../opencode/OpenCodePromptRequestBuilder"
+    },
+    {
       "id": "src/core/agents/backend/OpenCodeAdapter.ts|src/core/opencode/OpenCodeService.ts|type-only|../../opencode/OpenCodeService",
       "from": "src/core/agents/backend/OpenCodeAdapter.ts",
       "to": "src/core/opencode/OpenCodeService.ts",
@@ -1199,6 +1304,132 @@
       "to": "src/core/types/chat.ts",
       "kind": "type-only",
       "specifier": "../../types/chat"
+    },
+    {
+      "id": "src/core/agents/backend/pi/PiAdapter.ts|src/core/agents/AgentCapability.ts|runtime-static|../../AgentCapability",
+      "from": "src/core/agents/backend/pi/PiAdapter.ts",
+      "to": "src/core/agents/AgentCapability.ts",
+      "kind": "runtime-static",
+      "specifier": "../../AgentCapability"
+    },
+    {
+      "id": "src/core/agents/backend/pi/PiAdapter.ts|src/core/agents/backend/AgentService.ts|type-only|../AgentService",
+      "from": "src/core/agents/backend/pi/PiAdapter.ts",
+      "to": "src/core/agents/backend/AgentService.ts",
+      "kind": "type-only",
+      "specifier": "../AgentService"
+    },
+    {
+      "id": "src/core/agents/backend/pi/PiAdapter.ts|src/core/agents/backend/pi/PiProtocol.ts|runtime-static|./PiProtocol",
+      "from": "src/core/agents/backend/pi/PiAdapter.ts",
+      "to": "src/core/agents/backend/pi/PiProtocol.ts",
+      "kind": "runtime-static",
+      "specifier": "./PiProtocol"
+    },
+    {
+      "id": "src/core/agents/backend/pi/PiAdapter.ts|src/core/agents/backend/pi/PiProtocol.ts|type-only|./PiProtocol",
+      "from": "src/core/agents/backend/pi/PiAdapter.ts",
+      "to": "src/core/agents/backend/pi/PiProtocol.ts",
+      "kind": "type-only",
+      "specifier": "./PiProtocol"
+    },
+    {
+      "id": "src/core/agents/backend/pi/PiAdapter.ts|src/core/agents/backend/pi/PiRpcClient.ts|runtime-static|./PiRpcClient",
+      "from": "src/core/agents/backend/pi/PiAdapter.ts",
+      "to": "src/core/agents/backend/pi/PiRpcClient.ts",
+      "kind": "runtime-static",
+      "specifier": "./PiRpcClient"
+    },
+    {
+      "id": "src/core/agents/backend/pi/PiAdapter.ts|src/core/agents/backend/pi/PiSessionRuntime.ts|runtime-static|./PiSessionRuntime",
+      "from": "src/core/agents/backend/pi/PiAdapter.ts",
+      "to": "src/core/agents/backend/pi/PiSessionRuntime.ts",
+      "kind": "runtime-static",
+      "specifier": "./PiSessionRuntime"
+    },
+    {
+      "id": "src/core/agents/backend/pi/PiAdapter.ts|src/core/agents/backend/pi/PiSessionStore.ts|runtime-static|./PiSessionStore",
+      "from": "src/core/agents/backend/pi/PiAdapter.ts",
+      "to": "src/core/agents/backend/pi/PiSessionStore.ts",
+      "kind": "runtime-static",
+      "specifier": "./PiSessionStore"
+    },
+    {
+      "id": "src/core/agents/backend/pi/PiAdapter.ts|src/core/agents/backend/pi/PiStreamMapper.ts|runtime-static|./PiStreamMapper",
+      "from": "src/core/agents/backend/pi/PiAdapter.ts",
+      "to": "src/core/agents/backend/pi/PiStreamMapper.ts",
+      "kind": "runtime-static",
+      "specifier": "./PiStreamMapper"
+    },
+    {
+      "id": "src/core/agents/backend/pi/PiAdapter.ts|src/core/memory/index.ts|runtime-static|../../../memory",
+      "from": "src/core/agents/backend/pi/PiAdapter.ts",
+      "to": "src/core/memory/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../memory"
+    },
+    {
+      "id": "src/core/agents/backend/pi/PiAdapter.ts|src/core/types/chat.ts|type-only|../../../types/chat",
+      "from": "src/core/agents/backend/pi/PiAdapter.ts",
+      "to": "src/core/types/chat.ts",
+      "kind": "type-only",
+      "specifier": "../../../types/chat"
+    },
+    {
+      "id": "src/core/agents/backend/pi/PiAdapter.ts|src/core/types/settings.ts|type-only|../../../types/settings",
+      "from": "src/core/agents/backend/pi/PiAdapter.ts",
+      "to": "src/core/types/settings.ts",
+      "kind": "type-only",
+      "specifier": "../../../types/settings"
+    },
+    {
+      "id": "src/core/agents/backend/pi/PiSessionRuntime.ts|src/core/agents/backend/pi/PiProtocol.ts|runtime-static|./PiProtocol",
+      "from": "src/core/agents/backend/pi/PiSessionRuntime.ts",
+      "to": "src/core/agents/backend/pi/PiProtocol.ts",
+      "kind": "runtime-static",
+      "specifier": "./PiProtocol"
+    },
+    {
+      "id": "src/core/agents/backend/pi/PiSessionRuntime.ts|src/core/agents/backend/pi/PiRpcClient.ts|runtime-static|./PiRpcClient",
+      "from": "src/core/agents/backend/pi/PiSessionRuntime.ts",
+      "to": "src/core/agents/backend/pi/PiRpcClient.ts",
+      "kind": "runtime-static",
+      "specifier": "./PiRpcClient"
+    },
+    {
+      "id": "src/core/agents/backend/pi/PiSessionRuntime.ts|src/core/types/settings.ts|type-only|../../../types/settings",
+      "from": "src/core/agents/backend/pi/PiSessionRuntime.ts",
+      "to": "src/core/types/settings.ts",
+      "kind": "type-only",
+      "specifier": "../../../types/settings"
+    },
+    {
+      "id": "src/core/agents/backend/pi/PiSessionStore.ts|src/core/agents/backend/pi/PiRpcClient.ts|runtime-static|./PiRpcClient",
+      "from": "src/core/agents/backend/pi/PiSessionStore.ts",
+      "to": "src/core/agents/backend/pi/PiRpcClient.ts",
+      "kind": "runtime-static",
+      "specifier": "./PiRpcClient"
+    },
+    {
+      "id": "src/core/agents/backend/pi/PiStreamMapper.ts|src/core/agents/backend/AgentService.ts|type-only|../AgentService",
+      "from": "src/core/agents/backend/pi/PiStreamMapper.ts",
+      "to": "src/core/agents/backend/AgentService.ts",
+      "kind": "type-only",
+      "specifier": "../AgentService"
+    },
+    {
+      "id": "src/core/agents/backend/pi/PiStreamMapper.ts|src/core/agents/backend/pi/PiRpcClient.ts|runtime-static|./PiRpcClient",
+      "from": "src/core/agents/backend/pi/PiStreamMapper.ts",
+      "to": "src/core/agents/backend/pi/PiRpcClient.ts",
+      "kind": "runtime-static",
+      "specifier": "./PiRpcClient"
+    },
+    {
+      "id": "src/core/agents/backend/pi/PiStreamMapper.ts|src/core/types/chat.ts|type-only|../../../types/chat",
+      "from": "src/core/agents/backend/pi/PiStreamMapper.ts",
+      "to": "src/core/types/chat.ts",
+      "kind": "type-only",
+      "specifier": "../../../types/chat"
     },
     {
       "id": "src/core/agents/backend/ProjectResourceSecureWrite.ts|src/core/agents/backend/ConfigurationArchiveService.ts|re-export|./ConfigurationArchiveService",
@@ -1684,6 +1915,13 @@
       "specifier": "../types/pricing"
     },
     {
+      "id": "src/core/config/ModelPricingService.ts|src/shared/logger.ts|runtime-static|../../shared/logger",
+      "from": "src/core/config/ModelPricingService.ts",
+      "to": "src/shared/logger.ts",
+      "kind": "runtime-static",
+      "specifier": "../../shared/logger"
+    },
+    {
       "id": "src/core/config/OpencodeConfigManager.ts|src/core/agents/backend/ProjectResourceSecureWrite.ts|type-only|../agents/backend/ProjectResourceSecureWrite",
       "from": "src/core/config/OpencodeConfigManager.ts",
       "to": "src/core/agents/backend/ProjectResourceSecureWrite.ts",
@@ -1787,6 +2025,391 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/core/memory/index.ts|src/core/memory/MemoryBackendService.ts|re-export|./MemoryBackendService",
+      "from": "src/core/memory/index.ts",
+      "to": "src/core/memory/MemoryBackendService.ts",
+      "kind": "re-export",
+      "specifier": "./MemoryBackendService"
+    },
+    {
+      "id": "src/core/memory/index.ts|src/core/memory/memoryExtraction.ts|re-export|./memoryExtraction",
+      "from": "src/core/memory/index.ts",
+      "to": "src/core/memory/memoryExtraction.ts",
+      "kind": "re-export",
+      "specifier": "./memoryExtraction"
+    },
+    {
+      "id": "src/core/memory/index.ts|src/core/memory/memoryFileSystem.ts|re-export|./memoryFileSystem",
+      "from": "src/core/memory/index.ts",
+      "to": "src/core/memory/memoryFileSystem.ts",
+      "kind": "re-export",
+      "specifier": "./memoryFileSystem"
+    },
+    {
+      "id": "src/core/memory/index.ts|src/core/memory/memoryHygiene.ts|re-export|./memoryHygiene",
+      "from": "src/core/memory/index.ts",
+      "to": "src/core/memory/memoryHygiene.ts",
+      "kind": "re-export",
+      "specifier": "./memoryHygiene"
+    },
+    {
+      "id": "src/core/memory/index.ts|src/core/memory/memoryIndexFormat.ts|re-export|./memoryIndexFormat",
+      "from": "src/core/memory/index.ts",
+      "to": "src/core/memory/memoryIndexFormat.ts",
+      "kind": "re-export",
+      "specifier": "./memoryIndexFormat"
+    },
+    {
+      "id": "src/core/memory/index.ts|src/core/memory/memoryInjection.ts|re-export|./memoryInjection",
+      "from": "src/core/memory/index.ts",
+      "to": "src/core/memory/memoryInjection.ts",
+      "kind": "re-export",
+      "specifier": "./memoryInjection"
+    },
+    {
+      "id": "src/core/memory/index.ts|src/core/memory/memoryMaintenance.ts|re-export|./memoryMaintenance",
+      "from": "src/core/memory/index.ts",
+      "to": "src/core/memory/memoryMaintenance.ts",
+      "kind": "re-export",
+      "specifier": "./memoryMaintenance"
+    },
+    {
+      "id": "src/core/memory/index.ts|src/core/memory/memoryManifest.ts|re-export|./memoryManifest",
+      "from": "src/core/memory/index.ts",
+      "to": "src/core/memory/memoryManifest.ts",
+      "kind": "re-export",
+      "specifier": "./memoryManifest"
+    },
+    {
+      "id": "src/core/memory/index.ts|src/core/memory/memoryPaths.ts|re-export|./memoryPaths",
+      "from": "src/core/memory/index.ts",
+      "to": "src/core/memory/memoryPaths.ts",
+      "kind": "re-export",
+      "specifier": "./memoryPaths"
+    },
+    {
+      "id": "src/core/memory/index.ts|src/core/memory/memoryProtocol.ts|re-export|./memoryProtocol",
+      "from": "src/core/memory/index.ts",
+      "to": "src/core/memory/memoryProtocol.ts",
+      "kind": "re-export",
+      "specifier": "./memoryProtocol"
+    },
+    {
+      "id": "src/core/memory/index.ts|src/core/memory/memoryRecall.ts|re-export|./memoryRecall",
+      "from": "src/core/memory/index.ts",
+      "to": "src/core/memory/memoryRecall.ts",
+      "kind": "re-export",
+      "specifier": "./memoryRecall"
+    },
+    {
+      "id": "src/core/memory/index.ts|src/core/memory/memoryReflection.ts|re-export|./memoryReflection",
+      "from": "src/core/memory/index.ts",
+      "to": "src/core/memory/memoryReflection.ts",
+      "kind": "re-export",
+      "specifier": "./memoryReflection"
+    },
+    {
+      "id": "src/core/memory/index.ts|src/core/memory/memorySecretScan.ts|re-export|./memorySecretScan",
+      "from": "src/core/memory/index.ts",
+      "to": "src/core/memory/memorySecretScan.ts",
+      "kind": "re-export",
+      "specifier": "./memorySecretScan"
+    },
+    {
+      "id": "src/core/memory/index.ts|src/core/memory/memoryStore.ts|re-export|./memoryStore",
+      "from": "src/core/memory/index.ts",
+      "to": "src/core/memory/memoryStore.ts",
+      "kind": "re-export",
+      "specifier": "./memoryStore"
+    },
+    {
+      "id": "src/core/memory/index.ts|src/core/memory/memoryTypes.ts|re-export|./memoryTypes",
+      "from": "src/core/memory/index.ts",
+      "to": "src/core/memory/memoryTypes.ts",
+      "kind": "re-export",
+      "specifier": "./memoryTypes"
+    },
+    {
+      "id": "src/core/memory/MemoryBackendService.ts|src/core/memory/memoryExtraction.ts|runtime-static|./memoryExtraction",
+      "from": "src/core/memory/MemoryBackendService.ts",
+      "to": "src/core/memory/memoryExtraction.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryExtraction"
+    },
+    {
+      "id": "src/core/memory/MemoryBackendService.ts|src/core/memory/memoryInjection.ts|runtime-static|./memoryInjection",
+      "from": "src/core/memory/MemoryBackendService.ts",
+      "to": "src/core/memory/memoryInjection.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryInjection"
+    },
+    {
+      "id": "src/core/memory/MemoryBackendService.ts|src/core/memory/memoryMaintenance.ts|runtime-static|./memoryMaintenance",
+      "from": "src/core/memory/MemoryBackendService.ts",
+      "to": "src/core/memory/memoryMaintenance.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryMaintenance"
+    },
+    {
+      "id": "src/core/memory/MemoryBackendService.ts|src/core/memory/memoryManifest.ts|runtime-static|./memoryManifest",
+      "from": "src/core/memory/MemoryBackendService.ts",
+      "to": "src/core/memory/memoryManifest.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryManifest"
+    },
+    {
+      "id": "src/core/memory/MemoryBackendService.ts|src/core/memory/memoryPaths.ts|runtime-static|./memoryPaths",
+      "from": "src/core/memory/MemoryBackendService.ts",
+      "to": "src/core/memory/memoryPaths.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryPaths"
+    },
+    {
+      "id": "src/core/memory/MemoryBackendService.ts|src/core/memory/memoryRecall.ts|runtime-static|./memoryRecall",
+      "from": "src/core/memory/MemoryBackendService.ts",
+      "to": "src/core/memory/memoryRecall.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryRecall"
+    },
+    {
+      "id": "src/core/memory/MemoryBackendService.ts|src/core/memory/memoryReflection.ts|runtime-static|./memoryReflection",
+      "from": "src/core/memory/MemoryBackendService.ts",
+      "to": "src/core/memory/memoryReflection.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryReflection"
+    },
+    {
+      "id": "src/core/memory/MemoryBackendService.ts|src/core/memory/memoryStore.ts|runtime-static|./memoryStore",
+      "from": "src/core/memory/MemoryBackendService.ts",
+      "to": "src/core/memory/memoryStore.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryStore"
+    },
+    {
+      "id": "src/core/memory/MemoryBackendService.ts|src/core/memory/memoryTypes.ts|runtime-static|./memoryTypes",
+      "from": "src/core/memory/MemoryBackendService.ts",
+      "to": "src/core/memory/memoryTypes.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryTypes"
+    },
+    {
+      "id": "src/core/memory/MemoryBackendService.ts|src/core/memory/memoryTypes.ts|type-only|./memoryTypes",
+      "from": "src/core/memory/MemoryBackendService.ts",
+      "to": "src/core/memory/memoryTypes.ts",
+      "kind": "type-only",
+      "specifier": "./memoryTypes"
+    },
+    {
+      "id": "src/core/memory/memoryExtraction.ts|src/core/memory/memoryIndexFormat.ts|runtime-static|./memoryIndexFormat",
+      "from": "src/core/memory/memoryExtraction.ts",
+      "to": "src/core/memory/memoryIndexFormat.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryIndexFormat"
+    },
+    {
+      "id": "src/core/memory/memoryExtraction.ts|src/core/memory/memoryStore.ts|runtime-static|./memoryStore",
+      "from": "src/core/memory/memoryExtraction.ts",
+      "to": "src/core/memory/memoryStore.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryStore"
+    },
+    {
+      "id": "src/core/memory/memoryExtraction.ts|src/core/memory/memoryTypes.ts|type-only|./memoryTypes",
+      "from": "src/core/memory/memoryExtraction.ts",
+      "to": "src/core/memory/memoryTypes.ts",
+      "kind": "type-only",
+      "specifier": "./memoryTypes"
+    },
+    {
+      "id": "src/core/memory/memoryFileSystem.ts|src/core/memory/memoryTypes.ts|type-only|./memoryTypes",
+      "from": "src/core/memory/memoryFileSystem.ts",
+      "to": "src/core/memory/memoryTypes.ts",
+      "kind": "type-only",
+      "specifier": "./memoryTypes"
+    },
+    {
+      "id": "src/core/memory/memoryHygiene.ts|src/core/memory/memoryManifest.ts|type-only|./memoryManifest",
+      "from": "src/core/memory/memoryHygiene.ts",
+      "to": "src/core/memory/memoryManifest.ts",
+      "kind": "type-only",
+      "specifier": "./memoryManifest"
+    },
+    {
+      "id": "src/core/memory/memoryHygiene.ts|src/core/memory/memoryTypes.ts|runtime-static|./memoryTypes",
+      "from": "src/core/memory/memoryHygiene.ts",
+      "to": "src/core/memory/memoryTypes.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryTypes"
+    },
+    {
+      "id": "src/core/memory/memoryIndexFormat.ts|src/core/memory/memoryManifest.ts|type-only|./memoryManifest",
+      "from": "src/core/memory/memoryIndexFormat.ts",
+      "to": "src/core/memory/memoryManifest.ts",
+      "kind": "type-only",
+      "specifier": "./memoryManifest"
+    },
+    {
+      "id": "src/core/memory/memoryIndexFormat.ts|src/core/memory/memoryTypes.ts|runtime-static|./memoryTypes",
+      "from": "src/core/memory/memoryIndexFormat.ts",
+      "to": "src/core/memory/memoryTypes.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryTypes"
+    },
+    {
+      "id": "src/core/memory/memoryInjection.ts|src/core/memory/memoryHygiene.ts|runtime-static|./memoryHygiene",
+      "from": "src/core/memory/memoryInjection.ts",
+      "to": "src/core/memory/memoryHygiene.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryHygiene"
+    },
+    {
+      "id": "src/core/memory/memoryInjection.ts|src/core/memory/memoryIndexFormat.ts|runtime-static|./memoryIndexFormat",
+      "from": "src/core/memory/memoryInjection.ts",
+      "to": "src/core/memory/memoryIndexFormat.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryIndexFormat"
+    },
+    {
+      "id": "src/core/memory/memoryInjection.ts|src/core/memory/memoryManifest.ts|type-only|./memoryManifest",
+      "from": "src/core/memory/memoryInjection.ts",
+      "to": "src/core/memory/memoryManifest.ts",
+      "kind": "type-only",
+      "specifier": "./memoryManifest"
+    },
+    {
+      "id": "src/core/memory/memoryInjection.ts|src/core/memory/memoryProtocol.ts|runtime-static|./memoryProtocol",
+      "from": "src/core/memory/memoryInjection.ts",
+      "to": "src/core/memory/memoryProtocol.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryProtocol"
+    },
+    {
+      "id": "src/core/memory/memoryInjection.ts|src/core/memory/memoryRecall.ts|runtime-static|./memoryRecall",
+      "from": "src/core/memory/memoryInjection.ts",
+      "to": "src/core/memory/memoryRecall.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryRecall"
+    },
+    {
+      "id": "src/core/memory/memoryInjection.ts|src/core/memory/memoryTypes.ts|type-only|./memoryTypes",
+      "from": "src/core/memory/memoryInjection.ts",
+      "to": "src/core/memory/memoryTypes.ts",
+      "kind": "type-only",
+      "specifier": "./memoryTypes"
+    },
+    {
+      "id": "src/core/memory/memoryMaintenance.ts|src/core/memory/memoryManifest.ts|runtime-static|./memoryManifest",
+      "from": "src/core/memory/memoryMaintenance.ts",
+      "to": "src/core/memory/memoryManifest.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryManifest"
+    },
+    {
+      "id": "src/core/memory/memoryMaintenance.ts|src/core/memory/memoryPaths.ts|runtime-static|./memoryPaths",
+      "from": "src/core/memory/memoryMaintenance.ts",
+      "to": "src/core/memory/memoryPaths.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryPaths"
+    },
+    {
+      "id": "src/core/memory/memoryMaintenance.ts|src/core/memory/memorySecretScan.ts|runtime-static|./memorySecretScan",
+      "from": "src/core/memory/memoryMaintenance.ts",
+      "to": "src/core/memory/memorySecretScan.ts",
+      "kind": "runtime-static",
+      "specifier": "./memorySecretScan"
+    },
+    {
+      "id": "src/core/memory/memoryMaintenance.ts|src/core/memory/memoryStore.ts|runtime-static|./memoryStore",
+      "from": "src/core/memory/memoryMaintenance.ts",
+      "to": "src/core/memory/memoryStore.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryStore"
+    },
+    {
+      "id": "src/core/memory/memoryMaintenance.ts|src/core/memory/memoryTypes.ts|runtime-static|./memoryTypes",
+      "from": "src/core/memory/memoryMaintenance.ts",
+      "to": "src/core/memory/memoryTypes.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryTypes"
+    },
+    {
+      "id": "src/core/memory/memoryMaintenance.ts|src/core/memory/memoryTypes.ts|type-only|./memoryTypes",
+      "from": "src/core/memory/memoryMaintenance.ts",
+      "to": "src/core/memory/memoryTypes.ts",
+      "kind": "type-only",
+      "specifier": "./memoryTypes"
+    },
+    {
+      "id": "src/core/memory/memoryManifest.ts|src/core/memory/memoryStore.ts|runtime-static|./memoryStore",
+      "from": "src/core/memory/memoryManifest.ts",
+      "to": "src/core/memory/memoryStore.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryStore"
+    },
+    {
+      "id": "src/core/memory/memoryManifest.ts|src/core/memory/memoryTypes.ts|type-only|./memoryTypes",
+      "from": "src/core/memory/memoryManifest.ts",
+      "to": "src/core/memory/memoryTypes.ts",
+      "kind": "type-only",
+      "specifier": "./memoryTypes"
+    },
+    {
+      "id": "src/core/memory/memoryProtocol.ts|src/core/memory/memoryIndexFormat.ts|runtime-static|./memoryIndexFormat",
+      "from": "src/core/memory/memoryProtocol.ts",
+      "to": "src/core/memory/memoryIndexFormat.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryIndexFormat"
+    },
+    {
+      "id": "src/core/memory/memoryRecall.ts|src/core/memory/memoryManifest.ts|type-only|./memoryManifest",
+      "from": "src/core/memory/memoryRecall.ts",
+      "to": "src/core/memory/memoryManifest.ts",
+      "kind": "type-only",
+      "specifier": "./memoryManifest"
+    },
+    {
+      "id": "src/core/memory/memoryRecall.ts|src/core/memory/memorySecretScan.ts|runtime-static|./memorySecretScan",
+      "from": "src/core/memory/memoryRecall.ts",
+      "to": "src/core/memory/memorySecretScan.ts",
+      "kind": "runtime-static",
+      "specifier": "./memorySecretScan"
+    },
+    {
+      "id": "src/core/memory/memoryRecall.ts|src/core/memory/memoryTypes.ts|runtime-static|./memoryTypes",
+      "from": "src/core/memory/memoryRecall.ts",
+      "to": "src/core/memory/memoryTypes.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryTypes"
+    },
+    {
+      "id": "src/core/memory/memoryReflection.ts|src/core/memory/memoryIndexFormat.ts|runtime-static|./memoryIndexFormat",
+      "from": "src/core/memory/memoryReflection.ts",
+      "to": "src/core/memory/memoryIndexFormat.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryIndexFormat"
+    },
+    {
+      "id": "src/core/memory/memoryReflection.ts|src/core/memory/memoryStore.ts|runtime-static|./memoryStore",
+      "from": "src/core/memory/memoryReflection.ts",
+      "to": "src/core/memory/memoryStore.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryStore"
+    },
+    {
+      "id": "src/core/memory/memoryStore.ts|src/core/memory/memoryManifest.ts|type-only|./memoryManifest",
+      "from": "src/core/memory/memoryStore.ts",
+      "to": "src/core/memory/memoryManifest.ts",
+      "kind": "type-only",
+      "specifier": "./memoryManifest"
+    },
+    {
+      "id": "src/core/memory/memoryStore.ts|src/core/memory/memoryTypes.ts|type-only|./memoryTypes",
+      "from": "src/core/memory/memoryStore.ts",
+      "to": "src/core/memory/memoryTypes.ts",
+      "kind": "type-only",
+      "specifier": "./memoryTypes"
     },
     {
       "id": "src/core/opencode/createSdkClient.ts|src/core/opencode/diagnostics/index.ts|type-only|./diagnostics",
@@ -4393,13 +5016,6 @@
       "specifier": "../../../core/types"
     },
     {
-      "id": "src/features/chat/runtime/AssistantShellViewHostAdapter.ts|src/features/chat/rendering/ExpansionStateRegistry.ts|runtime-static|../rendering/ExpansionStateRegistry",
-      "from": "src/features/chat/runtime/AssistantShellViewHostAdapter.ts",
-      "to": "src/features/chat/rendering/ExpansionStateRegistry.ts",
-      "kind": "runtime-static",
-      "specifier": "../rendering/ExpansionStateRegistry"
-    },
-    {
       "id": "src/features/chat/runtime/AssistantShellViewHostAdapter.ts|src/features/chat/runtime/AssistantErrorRenderer.ts|runtime-static|./AssistantErrorRenderer",
       "from": "src/features/chat/runtime/AssistantShellViewHostAdapter.ts",
       "to": "src/features/chat/runtime/AssistantErrorRenderer.ts",
@@ -4671,6 +5287,13 @@
       "to": "src/core/agents/index.ts",
       "kind": "runtime-static",
       "specifier": "../../../core/agents"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/core/memory/index.ts|type-only|../../../core/memory",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/core/memory/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/memory"
     },
     {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/core/opencode/index.ts|runtime-static|../../../core/opencode",
@@ -6836,6 +7459,13 @@
       "specifier": "../../../core/agents/backend/BackendModelCatalog"
     },
     {
+      "id": "src/features/chat/services/ChatSelectionControlsCoordinator.ts|src/core/agents/backend/pi/PiAdapter.ts|type-only|../../../core/agents/backend/pi/PiAdapter",
+      "from": "src/features/chat/services/ChatSelectionControlsCoordinator.ts",
+      "to": "src/core/agents/backend/pi/PiAdapter.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/agents/backend/pi/PiAdapter"
+    },
+    {
       "id": "src/features/chat/services/ChatSelectionControlsCoordinator.ts|src/core/config/modelConfig.ts|type-only|../../../core/config/modelConfig",
       "from": "src/features/chat/services/ChatSelectionControlsCoordinator.ts",
       "to": "src/core/config/modelConfig.ts",
@@ -6897,6 +7527,13 @@
       "to": "src/features/chat/services/PermissionModeSelectorCoordinator.ts",
       "kind": "runtime-static",
       "specifier": "./PermissionModeSelectorCoordinator"
+    },
+    {
+      "id": "src/features/chat/services/ChatSelectionControlsCoordinator.ts|src/features/chat/services/PiModelSelectionBinding.ts|runtime-static|./PiModelSelectionBinding",
+      "from": "src/features/chat/services/ChatSelectionControlsCoordinator.ts",
+      "to": "src/features/chat/services/PiModelSelectionBinding.ts",
+      "kind": "runtime-static",
+      "specifier": "./PiModelSelectionBinding"
     },
     {
       "id": "src/features/chat/services/ChatSelectionControlsCoordinator.ts|src/features/chat/services/SandboxConfigBadgeCoordinator.ts|runtime-static|./SandboxConfigBadgeCoordinator",
@@ -9508,6 +10145,34 @@
       "to": "src/features/chat/tabs/index.ts",
       "kind": "type-only",
       "specifier": "../tabs"
+    },
+    {
+      "id": "src/features/chat/services/PiExtensionUiHost.ts|src/core/agents/backend/pi/PiProtocol.ts|type-only|../../../core/agents/backend/pi/PiProtocol",
+      "from": "src/features/chat/services/PiExtensionUiHost.ts",
+      "to": "src/core/agents/backend/pi/PiProtocol.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/agents/backend/pi/PiProtocol"
+    },
+    {
+      "id": "src/features/chat/services/PiModelSelectionBinding.ts|src/core/agents/backend/pi/PiAdapter.ts|type-only|../../../core/agents/backend/pi/PiAdapter",
+      "from": "src/features/chat/services/PiModelSelectionBinding.ts",
+      "to": "src/core/agents/backend/pi/PiAdapter.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/agents/backend/pi/PiAdapter"
+    },
+    {
+      "id": "src/features/chat/services/PiModelSelectionBinding.ts|src/features/chat/services/ModelSelectionRuntime.ts|type-only|./ModelSelectionRuntime",
+      "from": "src/features/chat/services/PiModelSelectionBinding.ts",
+      "to": "src/features/chat/services/ModelSelectionRuntime.ts",
+      "kind": "type-only",
+      "specifier": "./ModelSelectionRuntime"
+    },
+    {
+      "id": "src/features/chat/services/PiModelSelectionBinding.ts|src/features/chat/ui/modelSelector/types.ts|type-only|../ui/modelSelector/types",
+      "from": "src/features/chat/services/PiModelSelectionBinding.ts",
+      "to": "src/features/chat/ui/modelSelector/types.ts",
+      "kind": "type-only",
+      "specifier": "../ui/modelSelector/types"
     },
     {
       "id": "src/features/chat/services/PostSyncQuestionTodoRefreshFacade.ts|src/features/chat/services/PostSyncQuestionTodoRefreshPlanBuilder.ts|type-only|./PostSyncQuestionTodoRefreshPlanBuilder",
@@ -12485,6 +13150,13 @@
       "specifier": "../../core/types/chat"
     },
     {
+      "id": "src/features/settings/OpenCodianSettings.ts|src/features/settings/CostEstimateSettingsRow.ts|runtime-static|./CostEstimateSettingsRow",
+      "from": "src/features/settings/OpenCodianSettings.ts",
+      "to": "src/features/settings/CostEstimateSettingsRow.ts",
+      "kind": "runtime-static",
+      "specifier": "./CostEstimateSettingsRow"
+    },
+    {
       "id": "src/features/settings/OpenCodianSettings.ts|src/features/settings/debug/types.ts|runtime-static|./debug/types",
       "from": "src/features/settings/OpenCodianSettings.ts",
       "to": "src/features/settings/debug/types.ts",
@@ -12574,6 +13246,13 @@
       "to": "src/features/settings/SettingsPanelChrome.ts",
       "kind": "runtime-static",
       "specifier": "./SettingsPanelChrome"
+    },
+    {
+      "id": "src/features/settings/OpenCodianSettings.ts|src/features/settings/SettingsPiSection.ts|runtime-static|./SettingsPiSection",
+      "from": "src/features/settings/OpenCodianSettings.ts",
+      "to": "src/features/settings/SettingsPiSection.ts",
+      "kind": "runtime-static",
+      "specifier": "./SettingsPiSection"
     },
     {
       "id": "src/features/settings/OpenCodianSettings.ts|src/features/settings/SettingsPluginSection.ts|runtime-static|./SettingsPluginSection",
@@ -12765,6 +13444,13 @@
       "specifier": "./SettingsPanelChrome"
     },
     {
+      "id": "src/features/settings/OpenCodianSettingsView.ts|src/features/settings/SettingsPiSection.ts|runtime-static|./SettingsPiSection",
+      "from": "src/features/settings/OpenCodianSettingsView.ts",
+      "to": "src/features/settings/SettingsPiSection.ts",
+      "kind": "runtime-static",
+      "specifier": "./SettingsPiSection"
+    },
+    {
       "id": "src/features/settings/OpenCodianSettingsView.ts|src/features/settings/SettingsPluginSection.ts|runtime-static|./SettingsPluginSection",
       "from": "src/features/settings/OpenCodianSettingsView.ts",
       "to": "src/features/settings/SettingsPluginSection.ts",
@@ -12854,6 +13540,34 @@
       "to": "src/main.ts",
       "kind": "type-only",
       "specifier": "../../main"
+    },
+    {
+      "id": "src/features/settings/PiWorkbenchActions.ts|src/core/agents/backend/pi/PiProtocol.ts|type-only|../../core/agents/backend/pi/PiProtocol",
+      "from": "src/features/settings/PiWorkbenchActions.ts",
+      "to": "src/core/agents/backend/pi/PiProtocol.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/backend/pi/PiProtocol"
+    },
+    {
+      "id": "src/features/settings/PiWorkbenchModal.ts|src/core/agents/backend/pi/PiAdapter.ts|type-only|../../core/agents/backend/pi/PiAdapter",
+      "from": "src/features/settings/PiWorkbenchModal.ts",
+      "to": "src/core/agents/backend/pi/PiAdapter.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/backend/pi/PiAdapter"
+    },
+    {
+      "id": "src/features/settings/PiWorkbenchModal.ts|src/core/agents/backend/pi/PiRpcClient.ts|type-only|../../core/agents/backend/pi/PiRpcClient",
+      "from": "src/features/settings/PiWorkbenchModal.ts",
+      "to": "src/core/agents/backend/pi/PiRpcClient.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/backend/pi/PiRpcClient"
+    },
+    {
+      "id": "src/features/settings/PiWorkbenchModal.ts|src/features/settings/PiWorkbenchActions.ts|runtime-static|./PiWorkbenchActions",
+      "from": "src/features/settings/PiWorkbenchModal.ts",
+      "to": "src/features/settings/PiWorkbenchActions.ts",
+      "kind": "runtime-static",
+      "specifier": "./PiWorkbenchActions"
     },
     {
       "id": "src/features/settings/projectAgentEditorConfig.ts|src/core/config/modelConfig.ts|runtime-static|../../core/config/modelConfig",
@@ -14529,6 +15243,111 @@
       "specifier": "../../shared/brandingWordmark"
     },
     {
+      "id": "src/features/settings/SettingsPiConfigurationSection.ts|src/core/agents/backend/pi/PiAdapter.ts|type-only|../../core/agents/backend/pi/PiAdapter",
+      "from": "src/features/settings/SettingsPiConfigurationSection.ts",
+      "to": "src/core/agents/backend/pi/PiAdapter.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/backend/pi/PiAdapter"
+    },
+    {
+      "id": "src/features/settings/SettingsPiConfigurationSection.ts|src/core/agents/backend/pi/PiProtocol.ts|type-only|../../core/agents/backend/pi/PiProtocol",
+      "from": "src/features/settings/SettingsPiConfigurationSection.ts",
+      "to": "src/core/agents/backend/pi/PiProtocol.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/backend/pi/PiProtocol"
+    },
+    {
+      "id": "src/features/settings/SettingsPiConfigurationSection.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/features/settings/SettingsPiConfigurationSection.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/SettingsPiProvidersSection.ts|src/core/agents/backend/pi/PiAdapter.ts|type-only|../../core/agents/backend/pi/PiAdapter",
+      "from": "src/features/settings/SettingsPiProvidersSection.ts",
+      "to": "src/core/agents/backend/pi/PiAdapter.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/backend/pi/PiAdapter"
+    },
+    {
+      "id": "src/features/settings/SettingsPiProvidersSection.ts|src/core/agents/backend/pi/PiProtocol.ts|type-only|../../core/agents/backend/pi/PiProtocol",
+      "from": "src/features/settings/SettingsPiProvidersSection.ts",
+      "to": "src/core/agents/backend/pi/PiProtocol.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/backend/pi/PiProtocol"
+    },
+    {
+      "id": "src/features/settings/SettingsPiProvidersSection.ts|src/core/agents/backend/pi/PiRpcClient.ts|runtime-static|../../core/agents/backend/pi/PiRpcClient",
+      "from": "src/features/settings/SettingsPiProvidersSection.ts",
+      "to": "src/core/agents/backend/pi/PiRpcClient.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/agents/backend/pi/PiRpcClient"
+    },
+    {
+      "id": "src/features/settings/SettingsPiProvidersSection.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/features/settings/SettingsPiProvidersSection.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/SettingsPiSection.ts|src/core/agents/backend/pi/PiAdapter.ts|type-only|../../core/agents/backend/pi/PiAdapter",
+      "from": "src/features/settings/SettingsPiSection.ts",
+      "to": "src/core/agents/backend/pi/PiAdapter.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/backend/pi/PiAdapter"
+    },
+    {
+      "id": "src/features/settings/SettingsPiSection.ts|src/core/agents/backend/pi/PiStreamMapper.ts|runtime-static|../../core/agents/backend/pi/PiStreamMapper",
+      "from": "src/features/settings/SettingsPiSection.ts",
+      "to": "src/core/agents/backend/pi/PiStreamMapper.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/agents/backend/pi/PiStreamMapper"
+    },
+    {
+      "id": "src/features/settings/SettingsPiSection.ts|src/core/types/settings.ts|runtime-static|../../core/types/settings",
+      "from": "src/features/settings/SettingsPiSection.ts",
+      "to": "src/core/types/settings.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/types/settings"
+    },
+    {
+      "id": "src/features/settings/SettingsPiSection.ts|src/core/types/settings.ts|type-only|../../core/types/settings",
+      "from": "src/features/settings/SettingsPiSection.ts",
+      "to": "src/core/types/settings.ts",
+      "kind": "type-only",
+      "specifier": "../../core/types/settings"
+    },
+    {
+      "id": "src/features/settings/SettingsPiSection.ts|src/features/settings/PiWorkbenchModal.ts|runtime-static|./PiWorkbenchModal",
+      "from": "src/features/settings/SettingsPiSection.ts",
+      "to": "src/features/settings/PiWorkbenchModal.ts",
+      "kind": "runtime-static",
+      "specifier": "./PiWorkbenchModal"
+    },
+    {
+      "id": "src/features/settings/SettingsPiSection.ts|src/features/settings/SettingsPiConfigurationSection.ts|runtime-static|./SettingsPiConfigurationSection",
+      "from": "src/features/settings/SettingsPiSection.ts",
+      "to": "src/features/settings/SettingsPiConfigurationSection.ts",
+      "kind": "runtime-static",
+      "specifier": "./SettingsPiConfigurationSection"
+    },
+    {
+      "id": "src/features/settings/SettingsPiSection.ts|src/features/settings/SettingsPiProvidersSection.ts|runtime-static|./SettingsPiProvidersSection",
+      "from": "src/features/settings/SettingsPiSection.ts",
+      "to": "src/features/settings/SettingsPiProvidersSection.ts",
+      "kind": "runtime-static",
+      "specifier": "./SettingsPiProvidersSection"
+    },
+    {
+      "id": "src/features/settings/SettingsPiSection.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/features/settings/SettingsPiSection.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
+    },
+    {
       "id": "src/features/settings/SettingsPluginEvidenceCoordinator.ts|src/core/opencode/OpenCodeEventSubscriptionCoordinator.ts|type-only|../../core/opencode/OpenCodeEventSubscriptionCoordinator",
       "from": "src/features/settings/SettingsPluginEvidenceCoordinator.ts",
       "to": "src/core/opencode/OpenCodeEventSubscriptionCoordinator.ts",
@@ -15369,6 +16188,13 @@
       "specifier": "./SettingsModelSection"
     },
     {
+      "id": "src/features/settings/SettingsTabbedRenderer.ts|src/features/settings/SettingsPiSection.ts|runtime-static|./SettingsPiSection",
+      "from": "src/features/settings/SettingsTabbedRenderer.ts",
+      "to": "src/features/settings/SettingsPiSection.ts",
+      "kind": "runtime-static",
+      "specifier": "./SettingsPiSection"
+    },
+    {
       "id": "src/features/settings/SettingsTabbedRenderer.ts|src/features/settings/SettingsPluginSection.ts|runtime-static|./SettingsPluginSection",
       "from": "src/features/settings/SettingsTabbedRenderer.ts",
       "to": "src/features/settings/SettingsPluginSection.ts",
@@ -15670,6 +16496,13 @@
       "specifier": "./app/diagnostics"
     },
     {
+      "id": "src/main.ts|src/app/memory/index.ts|runtime-static|./app/memory",
+      "from": "src/main.ts",
+      "to": "src/app/memory/index.ts",
+      "kind": "runtime-static",
+      "specifier": "./app/memory"
+    },
+    {
       "id": "src/main.ts|src/app/runtime/PluginRuntimeCoordinator.ts|runtime-static|./app/runtime/PluginRuntimeCoordinator",
       "from": "src/main.ts",
       "to": "src/app/runtime/PluginRuntimeCoordinator.ts",
@@ -15885,6 +16718,13 @@
       "to": "src/features/chat/services/ChatDiagnosticsCoordinator.ts",
       "kind": "runtime-static",
       "specifier": "./features/chat/services/ChatDiagnosticsCoordinator"
+    },
+    {
+      "id": "src/main.ts|src/features/chat/services/PiExtensionUiHost.ts|runtime-static|./features/chat/services/PiExtensionUiHost",
+      "from": "src/main.ts",
+      "to": "src/features/chat/services/PiExtensionUiHost.ts",
+      "kind": "runtime-static",
+      "specifier": "./features/chat/services/PiExtensionUiHost"
     },
     {
       "id": "src/main.ts|src/features/settings/OpenCodianSettings.ts|runtime-static|./features/settings/OpenCodianSettings",
@@ -16200,6 +17040,13 @@
       "to": "src/utils/icons/lobehubIconManifest.ts",
       "kind": "runtime-static",
       "specifier": "./lobehubIconManifest"
+    },
+    {
+      "id": "src/utils/icons/builtinIconRegistry.ts|src/utils/icons/modelsDevIconManifest.ts|runtime-static|./modelsDevIconManifest",
+      "from": "src/utils/icons/builtinIconRegistry.ts",
+      "to": "src/utils/icons/modelsDevIconManifest.ts",
+      "kind": "runtime-static",
+      "specifier": "./modelsDevIconManifest"
     },
     {
       "id": "src/utils/icons/index.ts|src/utils/icons/builtinIconRegistry.ts|re-export|./builtinIconRegistry",
@@ -16806,6 +17653,13 @@
       "members": [
         "src/core/agents/backend/diagnostics/CodexSessionTraceService.ts",
         "src/core/agents/backend/diagnostics/CodexWireTraceBridge.ts"
+      ]
+    },
+    {
+      "id": "src/core/memory/memoryManifest.ts;;src/core/memory/memoryStore.ts",
+      "members": [
+        "src/core/memory/memoryManifest.ts",
+        "src/core/memory/memoryStore.ts"
       ]
     },
     {

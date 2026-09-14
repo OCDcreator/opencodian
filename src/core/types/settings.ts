@@ -3000,6 +3000,18 @@ export interface MemoryBackendUserSettings {
   memorySemanticRecallEnabled: boolean;
   /** Optional extraction model as `provider/model`. Empty string = session default. */
   memoryExtractionModel: string;
+  /**
+   * Optional shared store root. Empty = vault-local `.opencodian/memory`.
+   * A leading `~` expands against the user home dir so one value (e.g.
+   * `~/.zcode/cli/memories`) resolves correctly on every host that syncs
+   * the vault settings.
+   */
+  memoryExternalRoot: string;
+  /**
+   * Optional git remote URL for whole-tree memory sync (shared protocol
+   * with opencode-zmem; empty = off). Requires `memoryExternalRoot`.
+   */
+  memorySyncRemoteUrl: string;
 }
 
 /** Unknown shapes fall back field-by-field to the safe defaults. */
@@ -3019,6 +3031,12 @@ export function normalizeMemoryBackendUserSettings(value: unknown): MemoryBacken
     memoryExtractionModel: typeof candidate.memoryExtractionModel === 'string'
       ? candidate.memoryExtractionModel.trim().slice(0, 200)
       : fallback.memoryExtractionModel,
+    memoryExternalRoot: typeof candidate.memoryExternalRoot === 'string'
+      ? candidate.memoryExternalRoot.trim().slice(0, 300)
+      : fallback.memoryExternalRoot,
+    memorySyncRemoteUrl: typeof candidate.memorySyncRemoteUrl === 'string'
+      ? candidate.memorySyncRemoteUrl.trim().slice(0, 500)
+      : fallback.memorySyncRemoteUrl,
   };
 }
 
@@ -3173,6 +3191,8 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
     memoryExtractionEnabled: true,
     memorySemanticRecallEnabled: false,
     memoryExtractionModel: '',
+    memoryExternalRoot: '',
+    memorySyncRemoteUrl: '',
   },
 
   locale: 'en',

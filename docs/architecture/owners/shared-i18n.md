@@ -58,3 +58,4 @@ English and Chinese Pi settings copy describe the external CLI, connection check
 ## Builtin icon picker library label (2026-09-11)
 
 中英文 locale 同步新增 `settings.model.iconCache.builtinPicker.library.modelsdev`（`models.dev`），对应内置图标选择器库过滤下拉新增的 models.dev 图标来源。
+- 2026-09-13: 新增 `settings.conversation.memory.externalRootName/externalRootDesc`（en/zh 同步）。

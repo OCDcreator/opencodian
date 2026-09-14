@@ -52,6 +52,21 @@ export function memoryIndexPath(workspacePath: string): string {
 }
 
 /**
+ * Absolute project bucket dir under a shared external root:
+ * `<root>/projects/<slug>-<hash16>/memory`. The bucket name uses the same
+ * `hashWorkspacePath` as the vault-local layout, and the trailing `memory`
+ * segment matches the opencode-zmem / ZCode workspace-memory tree exactly —
+ * pointing the external root at either system's store base makes all three
+ * operate on one physical tree.
+ */
+export function externalMemoryProjectDir(externalRoot: string, workspacePath: string): string {
+  const resolvedRoot = nodePath.resolve(externalRoot);
+  const resolved = nodePath.resolve(workspacePath);
+  const slug = sanitizeProjectSlug(nodePath.basename(resolved) || 'project');
+  return nodePath.join(resolvedRoot, 'projects', `${slug}-${hashWorkspacePath(workspacePath)}`, 'memory');
+}
+
+/**
  * Model-facing native absolute memory dir (with trailing separator, the
  * protocol's canonical spelling). `nativeAbsolute` comes from the filesystem
  * port so Windows vaults render backslashes.

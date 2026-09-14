@@ -1,9 +1,13 @@
+import * as nodeFs from 'node:fs';
+import * as nodeOs from 'node:os';
+import * as nodePath from 'node:path';
+
 import {
   MemoryRuntimeCoordinator,
   VaultMemoryFileSystem,
 } from '../../../../src/app/memory';
 import type { MemorySettingsSnapshot } from '../../../../src/core/memory';
-import { MEMORY_STORE_ROOT } from '../../../../src/core/memory';
+import { hashWorkspacePath, MEMORY_STORE_ROOT } from '../../../../src/core/memory';
 
 /**
  * Minimal fake of the Obsidian App surface the coordinator touches:
@@ -31,13 +35,15 @@ function createFakeApp(vaultPath = '/vault') {
       dirs.add(p);
     },
     async list(p: string) {
-      const names: { path: string }[] = [];
+      // Mirror Obsidian's DataAdapter.list(): full vault-relative path
+      // strings, not objects (ListedFiles.files is string[]).
+      const names: string[] = [];
       for (const key of files.keys()) {
         const idx = key.lastIndexOf('/');
         const dir = idx === -1 ? '' : key.slice(0, idx);
-        if (dir === p) names.push({ path: key });
+        if (dir === p) names.push(key);
       }
-      return { files: names };
+      return { files: names, folders: [] };
     },
     async remove(p: string) {
       files.delete(p);
@@ -82,6 +88,8 @@ const settings = (over: Partial<MemorySettingsSnapshot> = {}): MemorySettingsSna
   memoryExtractionEnabled: true,
   memorySemanticRecallEnabled: false,
   memoryExtractionModel: 'opencode-go/deepseek-flash',
+  memoryExternalRoot: '',
+  memorySyncRemoteUrl: '',
   ...over,
 });
 
@@ -120,7 +128,97 @@ describe('VaultMemoryFileSystem', () => {
     expect(await fs.listFiles('.opencodian/memory/projects/b')).toEqual(['MEMORY.md']);
     await fs.remove('.opencodian/memory/projects/b/MEMORY.md');
     expect(await fs.readFile('.opencodian/memory/projects/b/MEMORY.md')).toBeNull();
-    expect(fs.nativeAbsolutePath('.opencodian/memory')).toBe('/vault/.opencodian/memory');
+    // Native paths use platform separators by design (Windows vaults render
+    // backslashes; the memory core normalizes before comparing).
+    expect(fs.nativeAbsolutePath('.opencodian/memory')).toBe(
+      process.platform === 'win32' ? '\\vault\\.opencodian\\memory' : '/vault/.opencodian/memory',
+    );
+  });
+
+  it('listFiles maps Obsidian adapter path strings to basenames (ListedFiles contract)', async () => {
+    const { app } = createFakeApp();
+    const fs = new VaultMemoryFileSystem(app as never);
+    await fs.writeFile('.opencodian/memory/projects/b/MEMORY.md', '# Memory Index');
+    await fs.writeFile('.opencodian/memory/projects/b/team-prefs.md', 'body');
+    expect(await fs.listFiles('.opencodian/memory/projects/b')).toEqual([
+      'MEMORY.md',
+      'team-prefs.md',
+    ]);
+  });
+});
+
+describe('MemoryRuntimeCoordinator shared-store mode', () => {
+  function tmpRoot(): string {
+    return nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), 'opencodian-extmem-e2e-'));
+  }
+
+  it('routes the store to the external zmem/ZCode layout and keeps metrics in the vault', async () => {
+    const tmp = tmpRoot();
+    try {
+      const { app, files } = createFakeApp();
+      let snapshot = settings({ memoryExternalRoot: tmp });
+      const coordinator = new MemoryRuntimeCoordinator({
+        app: app as never,
+        openCodeService: fakeOpenCodeService('{}') as never,
+        getSettings: () => snapshot,
+        getConversationMessages: async () => null,
+        turnSettleDelayMs: 0,
+      });
+      const out = await coordinator.planInjection({
+        conversationId: 'c-ext',
+        messages: [{ id: 'm1', role: 'user', content: '以后回答先给结论再给细节，因为上次我等了很久' }],
+        latestUserText: '以后回答先给结论再给细节，因为上次我等了很久',
+      });
+      expect(out).not.toBeNull();
+      // Store artifacts landed under <root>/projects/<bucket>/memory (the
+      // shared zmem/ZCode layout), bucket named like the vault-local one.
+      const bucket = `vault-${hashWorkspacePath('/vault')}`;
+      const memoryDir = nodePath.join(tmp, 'projects', bucket, 'memory');
+      expect(nodeFs.existsSync(nodePath.join(memoryDir, '.last-injection.json'))).toBe(true);
+      // Metrics stayed vault-local; the vault never saw a projects/ store dir.
+      expect(files.has(`${MEMORY_STORE_ROOT}/metrics.jsonl`)).toBe(true);
+      expect([...files.keys()].some((k) => k.startsWith(`${MEMORY_STORE_ROOT}/projects/`))).toBe(false);
+
+      // Switching back to vault-local routing works and clears epochs.
+      snapshot = settings({});
+      const again = await coordinator.planInjection({
+        conversationId: 'c-ext',
+        messages: [{ id: 'm1', role: 'user', content: 'turn two' }],
+        latestUserText: 'turn two',
+      });
+      expect(again).not.toBeNull();
+      expect([...files.keys()].some((k) => k.startsWith(`${MEMORY_STORE_ROOT}/projects/`))).toBe(true);
+    } finally {
+      nodeFs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('switching the shared root resets epoch state so the same epoch re-injects', async () => {
+    const tmpA = tmpRoot();
+    const tmpB = tmpRoot();
+    try {
+      const { app } = createFakeApp();
+      let snapshot = settings({ memoryExternalRoot: tmpA });
+      const coordinator = new MemoryRuntimeCoordinator({
+        app: app as never,
+        openCodeService: fakeOpenCodeService('{}') as never,
+        getSettings: () => snapshot,
+        getConversationMessages: async () => null,
+        turnSettleDelayMs: 0,
+      });
+      const messages = [{ id: 'm1', role: 'user' as const, content: 'turn' }];
+      const first = await coordinator.planInjection({ conversationId: 'c', messages, latestUserText: 'turn' });
+      const deduped = await coordinator.planInjection({ conversationId: 'c', messages, latestUserText: 'turn' });
+      expect(first).not.toBeNull();
+      expect(deduped).toBeNull();
+
+      snapshot = settings({ memoryExternalRoot: tmpB });
+      const afterSwitch = await coordinator.planInjection({ conversationId: 'c', messages, latestUserText: 'turn' });
+      expect(afterSwitch).not.toBeNull();
+    } finally {
+      nodeFs.rmSync(tmpA, { recursive: true, force: true });
+      nodeFs.rmSync(tmpB, { recursive: true, force: true });
+    }
   });
 });
 

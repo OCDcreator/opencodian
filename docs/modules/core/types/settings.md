@@ -443,3 +443,4 @@ New normalize functions added:
 新增 PiBackendSettings 与 normalizePiBackendSettings，独立保存 executablePath/provider/model/thinkingLevel；既有 backendSettings 分支原样归一化。
 
 - 2026-09-13: 新增 MemoryBackendUserSettings（memory.memoryBackendEnabled 默认 false / memoryExtractionEnabled / memorySemanticRecallEnabled / memoryExtractionModel）与 normalizeMemoryBackendUserSettings。
+- 记忆设置组新增 `memoryExternalRoot`（默认空字符串，trim 后 ≤300 字符）：共享记忆根目录，空 = vault 本地 `.opencodian/memory`。另有 `memorySyncRemoteUrl`（≤500 字符）：git 整树同步远程地址，空 = 关闭。

@@ -9,6 +9,8 @@ const settings = (over: Partial<MemorySettingsSnapshot> = {}): MemorySettingsSna
   memoryExtractionEnabled: true,
   memorySemanticRecallEnabled: false,
   memoryExtractionModel: '',
+  memoryExternalRoot: '',
+  memorySyncRemoteUrl: '',
   ...over,
 });
 

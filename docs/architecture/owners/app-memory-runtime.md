@@ -7,9 +7,10 @@
 - **Include:** `src/app/memory/**`
 
 ## Responsibilities
-- compose the backend-neutral memory runtime: vault filesystem adapter, settings snapshot, OpenCode-backed extraction/reflection model invoker
+- compose the backend-neutral memory runtime: vault-local or shared external filesystem adapter (per `memoryExternalRoot`, with `~` expansion for cross-host synced settings), settings snapshot, OpenCode-backed extraction/reflection model invoker
 - observe turn-settled and compaction signals and schedule fail-soft per-turn extraction and compaction reflection
 - register memory maintenance commands (status/lint/list/forget) against the coordinator
+- when a shared external root plus a git remote URL are configured, sync the whole memory tree through `MemoryGitSyncService` (shared protocol with opencode-zmem: cross-plugin lock, main branch, identical ignore rules)
 
 ## Canonical state (truth home)
 - `MemoryRuntimeCoordinator` instance (owns extraction debounce state and transcript watermarks)
@@ -33,5 +34,8 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 ## Hard invariants
 - Every entry point is fail-soft: a memory failure must never surface in or block a user turn. Injection planning, extraction, reflection and metrics writes all swallow-and-log.
 - The coordinator is the only place allowed to bind `core.memory` ports to concrete infrastructure (Obsidian vault adapter filesystem, `OpenCodeService` temp-session model invoker).
+- The vault filesystem port consumes Obsidian's `DataAdapter.list()` as `ListedFiles` (plain full-path strings, not TFile objects); `listFiles` maps entries to basenames before returning.
+- Shared-store mode routes buckets to `<root>/projects/<slug>-<hash16>/memory` (the opencode-zmem / ZCode workspace-memory layout) through `ExternalMemoryFileSystem`; the metrics journal always stays in the vault, and a root switch resets per-conversation epoch state.
+- Git sync is fail-soft and lock-serialized with opencode-zmem on the same tree; per-machine diagnostics (`.last-injection.json`, `metrics.jsonl`) never enter the repository.
 - The model invoker uses throwaway sessions (`setCurrent: false`, deleted in `finally`) so memory distillation never pollutes the user's conversation list.
 - Metrics (`metrics.jsonl`) are append-only diagnostics under the store root; they are never cleaned automatically.
