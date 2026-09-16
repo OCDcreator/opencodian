@@ -264,7 +264,7 @@ describe('ClaudeCodeOptionsBuilder sandbox', () => {
       settings,
     });
 
-    expect(options.sandbox).toEqual({ enabled: true });
+    expect(options.sandbox).toEqual({ enabled: true, failIfUnavailable: false });
   });
 
   it('passes basic true sandbox fields when enabled', () => {
@@ -327,7 +327,7 @@ describe('ClaudeCodeOptionsBuilder sandbox', () => {
       },
     });
 
-    expect(options.sandbox).toEqual({ enabled: true, excludedCommands: ['docker *'] });
+    expect(options.sandbox).toEqual({ enabled: true, failIfUnavailable: false, excludedCommands: ['docker *'] });
   });
 
   it('passes allowUnsandboxedCommands only when explicitly false', () => {
@@ -343,7 +343,7 @@ describe('ClaudeCodeOptionsBuilder sandbox', () => {
       },
     });
 
-    expect(options.sandbox).toEqual({ enabled: true, allowUnsandboxedCommands: false });
+    expect(options.sandbox).toEqual({ enabled: true, failIfUnavailable: false, allowUnsandboxedCommands: false });
   });
 
   it('passes filesystem sub-policy only when a path list is non-empty', () => {
@@ -361,6 +361,7 @@ describe('ClaudeCodeOptionsBuilder sandbox', () => {
 
     expect(options.sandbox).toEqual({
       enabled: true,
+      failIfUnavailable: false,
       filesystem: { allowWrite: ['/tmp/build'], denyWrite: ['/etc'], denyRead: ['~/.aws/credentials'] },
     });
   });
@@ -380,6 +381,7 @@ describe('ClaudeCodeOptionsBuilder sandbox', () => {
 
     expect(options.sandbox).toEqual({
       enabled: true,
+      failIfUnavailable: false,
       network: { allowedDomains: ['github.com'], deniedDomains: ['internal.example.com'] },
     });
   });
@@ -400,6 +402,7 @@ describe('ClaudeCodeOptionsBuilder sandbox', () => {
 
     expect(options.sandbox).toEqual({
       enabled: true,
+      failIfUnavailable: false,
       enableWeakerNestedSandbox: true,
       enableWeakerNetworkIsolation: true,
     });
@@ -420,6 +423,7 @@ describe('ClaudeCodeOptionsBuilder sandbox', () => {
 
     expect(options.sandbox).toEqual({
       enabled: true,
+      failIfUnavailable: false,
       ripgrep: { command: '/usr/local/bin/rg', args: ['--max-count=100'] },
     });
   });

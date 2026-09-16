@@ -64,7 +64,8 @@
         "feature.chat-shell",
         "feature.settings-shell",
         "app.diagnostics-runtime",
-        "app.runtime"
+        "app.runtime",
+        "feature.inline-edit"
       ],
       "forbiddenDependencies": [],
       "adjacentOwners": [
@@ -1737,6 +1738,50 @@
       "risk": "low"
     },
     {
+      "id": "feature.inline-edit",
+      "layer": "feature",
+      "include": [
+        "src/features/inline-edit/**"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "inline edit CM6 controller, widget layer and word-level diff preview",
+        "backend-neutral auxiliary query orchestration, prompt contract and response parsing",
+        "inline edit host resolution for backend, model and working directory"
+      ],
+      "canonicalState": [
+        "inline edit controller singleton"
+      ],
+      "entrypoints": [
+        "src/features/inline-edit/InlineEditController.ts"
+      ],
+      "allowedOwnerDependencies": [
+        "shared.foundation",
+        "shared.i18n",
+        "shared.utils-misc",
+        "core.types",
+        "core.agents",
+        "core.backend"
+      ],
+      "forbiddenDependencies": [
+        "app"
+      ],
+      "adjacentOwners": [
+        "core.backend",
+        "feature.chat-shell",
+        "feature.settings-shell"
+      ],
+      "tests": [
+        "tests/unit/features/inline-edit/**"
+      ],
+      "overviewDoc": "docs/architecture/owners/feature-inline-edit.md",
+      "requiredGates": [
+        "typecheck",
+        "module-docs"
+      ],
+      "risk": "medium"
+    },
+    {
       "id": "feature.chat-send",
       "layer": "feature",
       "delegatesTo": [],
@@ -1852,7 +1897,8 @@
       "allowedOwnerDependencies": [
         "shared.foundation",
         "core.types",
-        "core.config"
+        "core.config",
+        "feature.inline-edit"
       ],
       "forbiddenDependencies": [
         "app"
@@ -1860,7 +1906,8 @@
       "adjacentOwners": [
         "app.composition",
         "feature.settings-debug",
-        "feature.settings-model-catalog"
+        "feature.settings-model-catalog",
+        "feature.inline-edit"
       ],
       "tests": [
         "tests/unit/features/settings/**"

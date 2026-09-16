@@ -66,3 +66,5 @@
 - 2026-09-08：SDK fallback 新线程通过 `ThreadOptions.threadSource = "opencodian"` 标记来源；`modelReasoningEffort` 接受 SDK 0.153.4 的 `max`、`ultra`、`persistent`。结构化插件设置继续拥有配置权，不暴露原始 `configOverrides`。
 
 - 2026-09-13: sendMessage 以 prependMemoryInjection 在输入文本前置记忆注入块（app-server turn options 无 instructions 字段）。
+
+- 2026-09-15: 实现 `AgentAuxQueryCapability.startAuxQuerySession()`：创建 ephemeral + read-only sandbox 的临时 thread，并用 app-server 的 `getThreadEffectiveSettings()` 回读校验 sandbox/approval/network（fail closed）。实现见 `auxiliary/CodexAuxQuerySession.ts`。

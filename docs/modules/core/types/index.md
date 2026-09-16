@@ -186,3 +186,5 @@ Settings exports now include `SandboxFilesystemConfig`, `SandboxNetworkConfig`, 
 1. `chat` 相关（`ChatMessage`, `StreamChunk`, `Conversation`）— 聊天核心
 2. `settings` 相关（`OpenCodianSettings`, `DEFAULT_SETTINGS`, `normalize*`）— 设置系统
 3. `permission` 相关（`PermissionRequest`, `PermissionMode`）— 权限交互
+
+- 2026-09-15: 导出 `normalizeInlineEditModelOverrides`，供设置分节在保存前归一化按 backend 键控的行内编辑模型覆盖。

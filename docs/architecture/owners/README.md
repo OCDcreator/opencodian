@@ -63,3 +63,5 @@ npm run inspect:owner -- <path|symbol> [--json] [--explain]
 ```
 
 The default reading chain is `AGENTS.md -> inspect:owner -> owner/module doc -> focused source`, not hundreds of phase-history documents.
+
+- 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。

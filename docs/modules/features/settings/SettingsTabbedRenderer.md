@@ -60,3 +60,5 @@ Tabbed plugin 内容创建 `SettingsPluginSection` 后，必须通过 `setPlugin
 ## Pi 后端路由
 
 2026-09-09：Pi使用已有activeBackend可见性规则，有独立主标签和八个二级页。renderDisplay对Pi实例化SettingsPiSection，其他路由/生命周期保持不变。
+
+2026-09-15：conversation 主标签的 renderConversationContent 在会话 section 之后挂载 SettingsInlineEditSection.attachTabbed（inline-edit 次级页，行内编辑设置）。

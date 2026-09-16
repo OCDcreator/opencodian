@@ -15,3 +15,5 @@ tests/unit/core/agents/backend/pi/，scripts/pi-sdk-acceptance.mjs，scripts/pi-
 2026-09-09：配置操作路由到configurationOnly进程，不构造Agent和扩展；坏模型默认值不能阻止打开配置。其他命令/历史仍由每会话服务处理。
 
 - 2026-09-13: sendMessage 以 prependMemoryInjection（core.memory 共享契约，Pi 边界测试已加白）在 prompt 前置记忆注入块。
+
+- 2026-09-15: 实现 `AgentAuxQueryCapability.startAuxQuerySession()`：用 Pi 原生的 `set_tools` / `get_tools` 把会话限制为只读工具并以 SDK 回读校验（fail closed）。实现见本目录的 `PiAuxQuerySession.ts`。

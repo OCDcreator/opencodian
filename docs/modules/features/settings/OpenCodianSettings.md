@@ -291,3 +291,5 @@ Classic General renders its layout, locale, and editor-area controls inside `.op
 The owner keeps `pluginUpdateExpanded` as ephemeral UI state. It passes that value and an `onExpandedChange` callback to `SettingsPluginUpdateSection`, so check/install/restore redraws preserve the disclosure state without writing to plugin settings. `hide()` resets the field to `false` for the next classic settings session.
 
 2026-09-09：经典布局在Pi激活时渲染独立SettingsPiSection及二级导航；tabbed模式继续共享SettingsTabbedRenderer。
+
+- 2026-09-15: 新增行内编辑设置分节（`SettingsInlineEditSection`，`inlineEditEnabled` + 按 backend 键控的 `inlineEditModelOverrides`）。

@@ -54,3 +54,5 @@ The new core.backend-pi owner isolates the external Pi process service. app.runt
 ## Auto-install target selection (2026-09-12)
 
 Auto-install calls `installNewestInstallable()`, not `installRelease(advertisedVersion)`: the newest entry in `versions.json` may have no Release assets, and installing it verbatim failed on every startup. The service picks the newest newer-and-downloadable version, so a broken index entry is skipped instead of fatal. A `null` result means "no newer installable release" and must stay silent (info log only, no notice); only a real installation failure may raise the failure notice, which still names the advertised version.
+
+- 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。

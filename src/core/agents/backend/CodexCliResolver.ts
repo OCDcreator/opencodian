@@ -112,16 +112,21 @@ function resolveWindowsNpmShim(
     return null;
   }
 
-  const nativeExecutable = pathApi.join(
-    npmBin,
-    'node_modules',
+  const nativeName = pathApi.join(
     ...platformPackage.packageName.split('/'),
     'vendor',
     platformPackage.targetTriple,
     'bin',
     'codex.exe',
   );
-  return existsSync(nativeExecutable) ? nativeExecutable : null;
+  // @openai/codex >= 0.154 declares the platform package as a regular
+  // dependency, so npm nests it under the codex package itself; older layouts
+  // (and pnpm) hoist it next to @openai/codex. Accept both.
+  const candidates = [
+    pathApi.join(packageRoot, 'node_modules', nativeName),
+    pathApi.join(npmBin, 'node_modules', nativeName),
+  ];
+  return candidates.find((candidate) => existsSync(candidate)) ?? null;
 }
 
 function resolveConfiguredPath(

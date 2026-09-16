@@ -47,3 +47,5 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 | D-O7 | semantic recall ships lexical + lite-model selection only; the embedding channel is intentionally not ported | the product constraints explicitly reject embedding/vector retrieval; storage must stay pure Markdown |
 | D-O1 | store root is `<vault>/.opencodian/memory/projects/<slug>-<hash16>/` | opencodian anchors every backend cwd to the vault; keeping the bucket inside the vault keeps model file-writes permission-free for all backends |
 | D-O2 | opt-in shared-store mode: `memoryExternalRoot` maps buckets to `<root>/projects/<slug>-<hash16>/memory` (zmem / ZCode layout), metrics stay in the vault | lets opencode-zmem, OpenCodian and ZCode workspace memory operate on one physical tree without format migration; `~` expansion keeps one synced settings value valid on every host |
+
+- 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。

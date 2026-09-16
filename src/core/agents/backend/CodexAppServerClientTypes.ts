@@ -83,6 +83,27 @@ export interface AppServerThreadStartOptions {
   sandbox?: 'read-only' | 'workspace-write' | 'danger-full-access';
   approvalPolicy?: 'untrusted' | 'on-request' | 'never';
   config?: Record<string, unknown>;
+  /**
+   * Create a thread the app-server does not persist: no rollout on disk and no
+   * `thread/list` entry. Used by the inline-edit auxiliary channel so auxiliary
+   * work cannot leak into chat history.
+   */
+  ephemeral?: boolean;
+  /**
+   * Developer-message instructions for the thread, layered on top of Codex's own
+   * base instructions (so the model keeps its tool knowledge).
+   *
+   * Verified against codex-cli 0.154.0 by observing model behaviour change; the
+   * field is present in `codex app-server generate-json-schema` for
+   * `ThreadStartParams`. The chat path still prepends memory injection to the
+   * message text and does not use this seam.
+   */
+  developerInstructions?: string;
+  /**
+   * Replaces Codex's base instructions for the thread rather than adding to
+   * them. Prefer `developerInstructions` unless the whole base prompt must go.
+   */
+  baseInstructions?: string;
 }
 
 export type AppServerThreadResumeOptions = AppServerThreadStartOptions;

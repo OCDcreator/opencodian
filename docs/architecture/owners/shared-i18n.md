@@ -59,3 +59,5 @@ English and Chinese Pi settings copy describe the external CLI, connection check
 
 中英文 locale 同步新增 `settings.model.iconCache.builtinPicker.library.modelsdev`（`models.dev`），对应内置图标选择器库过滤下拉新增的 models.dev 图标来源。
 - 2026-09-13: 新增 `settings.conversation.memory.externalRootName/externalRootDesc`（en/zh 同步）。
+
+- 2026-09-15: 新增 `inlineEdit.*`（命令名、placeholder、接受/拒绝、提示与全部错误原因）与 `settings.inlineEdit.*`（设置分节、覆盖项校验、计费说明）两组 zh/en 文案。

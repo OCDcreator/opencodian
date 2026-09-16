@@ -52,3 +52,5 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 ## Pi service delegation (2026-09-08)
 
 Pi runtime is delegated to [core.backend-pi](core-backend-pi.md). This owner retains the common registry/contracts and existing OpenCode/Claude/Codex implementations; Pi runtime responsibilities do not accumulate here.
+
+- 2026-09-15: 新增 `AgentAuxQueryCapability` 与三个 aux 会话实现（`auxiliary/OpenCodeAuxScope.ts`、`auxiliary/OpenCodeAuxQuerySession.ts`、`auxiliary/ClaudeCodeAuxQuerySession.ts`、`auxiliary/CodexAuxQuerySession.ts`）。OpenCode/Claude/Codex 三个 adapter 各自实现 `startAuxQuerySession()`，全部 fail closed；`AppServerThreadStartOptions` 增加 `ephemeral`。

@@ -11,6 +11,8 @@
  * See docs/requirements/multi-agent-foundation/03-opencode-adapter.md.
  */
 
+import { requestUrl } from 'obsidian';
+
 import { extractMemoryInjection } from '../../memory';
 import type { PromptSyntheticTextPartInput } from '../../opencode/OpenCodePromptRequestBuilder';
 import type { OpenCodeService } from '../../opencode/OpenCodeService';
@@ -19,6 +21,11 @@ import {
   type AgentCapability,
   OPENCODE_FULL_CAPABILITIES,
 } from '../AgentCapability';
+import type {
+  AgentAuxQueryCapability,
+  AuxQuerySession,
+  AuxQuerySessionConfig,
+} from './AgentAuxQueryCapability';
 import type {
   AgentAuthCapability,
   AgentBranchCapability,
@@ -37,6 +44,49 @@ import type {
   Disposable,
   StatusChangeHandler,
 } from './AgentService';
+import type { AuxTransport } from './auxiliary/AuxTransport';
+import { OpenCodeAuxQuerySession } from './auxiliary/OpenCodeAuxQuerySession';
+import { OPENCODE_AUX_AGENT, OpenCodeAuxScope } from './auxiliary/OpenCodeAuxScope';
+
+function auxAbortError(): Error {
+  const error = new Error('Aborted');
+  error.name = 'AbortError';
+  return error;
+}
+
+/**
+ * Obsidian renderer transport for auxiliary-scope HTTP. Raw `fetch` to
+ * localhost is blocked by the app CSP, so auxiliary traffic goes through
+ * `requestUrl` like every other plugin request (see src/core/opencode/sdkFetch.ts).
+ * `requestUrl` cannot abort in flight; aborting stops the wait while the
+ * session's server-side `/abort` call stops the actual generation.
+ */
+const auxRequestUrlTransport: AuxTransport = (url, request = {}) => {
+  const send = (async () => {
+    const response = await requestUrl({
+      url,
+      method: request.method ?? 'GET',
+      ...(request.headers ? { headers: request.headers } : {}),
+      ...(request.body !== undefined ? { body: request.body } : {}),
+      throw: false,
+    });
+    const text = response.text;
+    return {
+      ok: response.status >= 200 && response.status < 300,
+      status: response.status,
+      text: async () => text,
+      json: async () => JSON.parse(text) as unknown,
+    };
+  })();
+  const signal = request.signal;
+  if (!signal) return send;
+  if (signal.aborted) return Promise.reject(auxAbortError());
+  const aborted = new Promise<never>((_, reject) => {
+    signal.addEventListener('abort', () => reject(auxAbortError()), { once: true });
+  });
+  aborted.catch(() => { /* the race loser must not surface as unhandled */ });
+  return Promise.race([send, aborted]);
+};
 
 /**
  * Maps OpenCodeService server status strings to AgentConnectionStatus.
@@ -77,7 +127,8 @@ export class OpenCodeAdapter
     AgentMcpCapability,
     AgentConfigCapability,
     AgentToolCapability,
-    AgentAuthCapability
+    AgentAuthCapability,
+    AgentAuxQueryCapability
 {
   readonly kind: AgentBackendKind = 'opencode';
   readonly displayName = 'OpenCode';
@@ -85,6 +136,7 @@ export class OpenCodeAdapter
   readonly capabilities = OPENCODE_FULL_CAPABILITIES;
 
   private statusChangeHandlers = new Set<StatusChangeHandler>();
+  private auxScope: OpenCodeAuxScope | null = null;
 
   constructor(private readonly service: OpenCodeService) {}
 
@@ -122,6 +174,45 @@ export class OpenCodeAdapter
     // Only clear adapter-level state; the underlying OpenCodeService
     // is disposed separately by the plugin's onunload.
     this.statusChangeHandlers.clear();
+    const scope = this.auxScope;
+    this.auxScope = null;
+    if (scope) {
+      void scope.dispose().catch(() => { /* Scope teardown is best-effort. */ });
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // AgentAuxQueryCapability
+  // -------------------------------------------------------------------------
+
+  /**
+   * Start a read-only auxiliary session on an isolated OpenCode scope.
+   *
+   * Rejects when the isolated scope cannot be verified read-only; see
+   * docs/requirements/inline-edit.md §5.4.
+   */
+  async startAuxQuerySession(config: AuxQuerySessionConfig): Promise<AuxQuerySession> {
+    const configuredPath = this.service.getSettingsSnapshot().server.local.executablePath;
+    const scope = this.auxScope ?? new OpenCodeAuxScope({
+      workingDirectory: config.workingDirectory,
+      ...(configuredPath.trim() ? { executablePath: configuredPath.trim() } : {}),
+      transport: auxRequestUrlTransport,
+    });
+    this.auxScope = scope;
+    try {
+      return await OpenCodeAuxQuerySession.create({
+        systemPrompt: config.systemPrompt,
+        workingDirectory: config.workingDirectory,
+        scope,
+        agentName: OPENCODE_AUX_AGENT,
+        transport: auxRequestUrlTransport,
+        ...(config.model ? { model: config.model } : {}),
+      });
+    } catch (error) {
+      this.auxScope = null;
+      await scope.dispose().catch(() => { /* Scope teardown is best-effort. */ });
+      throw error instanceof Error ? error : new Error(String(error));
+    }
   }
 
   onStatusChange(handler: StatusChangeHandler): Disposable {

@@ -42,3 +42,5 @@ Pi图标由AgentSwitcherFloatingIcons单处注册用户SVG形状，三种后端�
 ## Agent switcher icon modifier cleanup (2026-09-11)
 
 `AgentSwitcherFloatingIcons` now removes the `opencodian-agent-switcher-icon--lobehub` modifier class before falling back to `fallbackIcon`. That class only applies to LobeHub glyphs, so a reused button container kept hiding the fallback icon after a backend lost its LobeHub icon. Pi icon registration stays single-sourced in this owner.
+
+- 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。

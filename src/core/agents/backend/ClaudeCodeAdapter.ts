@@ -17,6 +17,11 @@ import type { AgentBackendKind, ContextUsageSnapshot, StreamChunk } from '../../
 import type { ClaudeCodeBackendSettings, ClaudeCodeEffort } from '../../types/settings';
 import { AgentCapability, type BackendCapabilities } from '../AgentCapability';
 import type {
+  AgentAuxQueryCapability,
+  AuxQuerySession,
+  AuxQuerySessionConfig,
+} from './AgentAuxQueryCapability';
+import type {
   AgentChatCapability,
   AgentChatSendRequest,
   AgentConnectionStatus,
@@ -27,6 +32,10 @@ import type {
   Disposable,
   StatusChangeHandler,
 } from './AgentService';
+import {
+  type ClaudeAuxSdkFacade,
+  ClaudeCodeAuxQuerySession,
+} from './auxiliary/ClaudeCodeAuxQuerySession';
 import type { ClaudeCodeMcpServersMap } from './ClaudeCodeMcpConfigAdapter';
 import {
   buildClaudeCodeOptions,
@@ -1045,6 +1054,9 @@ const CLAUDE_CODE_PHASE1_CAPABILITIES: BackendCapabilities = Object.freeze(
     // + ContextRing pipeline. Round 11 Codex acceptance promoted runtimeProof
     // to 'pass' after BUILD_ID-anchored Obsidian proof of live ring/detail data.
     AgentCapability.Context,
+    // Inline edit: adapter exposes startAuxQuerySession() backed by
+    // ClaudeCodeAuxQuerySession (read-only allowedTools, fail-closed).
+    AgentCapability.AuxQuery,
   ]),
 );
 
@@ -1392,7 +1404,12 @@ export class ClaudeCodeRuntimeAbortController {
 }
 
 export class ClaudeCodeAdapter
-  implements AgentService, AgentChatCapability, AgentSessionCapability, AgentForkCapability
+  implements
+    AgentService,
+    AgentChatCapability,
+    AgentSessionCapability,
+    AgentForkCapability,
+    AgentAuxQueryCapability
 {
   readonly kind: AgentBackendKind = 'claude-code';
   readonly displayName = 'Claude Code';
@@ -1504,6 +1521,47 @@ export class ClaudeCodeAdapter
     clearPromptSuggestionSink();
     this.statusValue = 'disconnected';
     this.trace((port) => port.recordLifecycle('runtime.stopped', { reason: 'dispose' }));
+  }
+
+  // -------------------------------------------------------------------------
+  // AgentAuxQueryCapability
+  // -------------------------------------------------------------------------
+
+  /**
+   * Start a read-only auxiliary session.
+   *
+   * The session's tool surface is restricted to the read-only allowlist and
+   * verified against the CLI's own `system/init` report on its first turn; a
+   * deviation fails the turn rather than degrading. See
+   * docs/requirements/inline-edit.md §5.4.
+   */
+  async startAuxQuerySession(config: AuxQuerySessionConfig): Promise<AuxQuerySession> {
+    if (this.options.pathToClaudeCodeExecutable === undefined && !this.options.sdk) {
+      throw new Error('Claude Code auxiliary session requires a resolved CLI executable.');
+    }
+    const sdk = await this.getSdk();
+    let effort: ClaudeCodeEffort | undefined;
+    if (config.effort) {
+      if (!CLAUDE_CODE_EFFORT_VALUES.has(config.effort as ClaudeCodeEffort)) {
+        throw new Error(`Unsupported Claude Code aux effort: ${config.effort}`);
+      }
+      effort = config.effort as ClaudeCodeEffort;
+    }
+    return ClaudeCodeAuxQuerySession.create({
+      systemPrompt: config.systemPrompt,
+      workingDirectory: config.workingDirectory,
+      // The aux session declares the narrow SDK slice it uses; the real facade
+      // is structurally wider, so the bridge is made explicit here instead of
+      // typing the aux module against this file (which would form a cycle).
+      sdk: sdk as unknown as ClaudeAuxSdkFacade,
+      ...(config.model ? { model: config.model } : {}),
+      ...(effort ? { effort } : {}),
+      ...(this.options.pathToClaudeCodeExecutable
+        ? { pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable }
+        : {}),
+      ...(this.options.processEnv ? { env: { ...this.options.processEnv } } : {}),
+      spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
+    });
   }
 
   /**

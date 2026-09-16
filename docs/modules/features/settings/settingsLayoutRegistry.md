@@ -31,7 +31,7 @@ registry 里的 `backendRequired` 是设置 surface 的后端边界声明：Open
 | `codex` | `connection`, `permissions`, `resume-inspect`, `account`, `resources` |
 | `server` | `connection`, `auth`, `status` |
 | `model` | `common`, `project-config`, `availability`, `tools` |
-| `conversation` | `display`, `title`, plus OpenCode-only `compaction`, `sharing`, `questions` |
+| `conversation` | `display`, `title`, plus OpenCode-only `compaction`, `sharing`, `questions`; backend-neutral `memory` and `inline-edit` |
 | `agents` | `default`, `catalog`, `editor`, `workspace` |
 | `commands` | `mode`, `editor`, `catalog` |
 | `mcp` | `overview` |
@@ -74,3 +74,4 @@ Plugins 的二级标签 `overview` / `config-sources` / `project-plugins` / `omo
 Pi主标签使用用户SVG注册图标opencodian-pi，与后端状态和切换入口一致。
 
 - 2026-09-13: conversation 主标签新增后端无关的 memory 次级标签。
+- 2026-09-15: conversation 主标签新增后端无关的 inline-edit 次级标签（行内编辑设置）。

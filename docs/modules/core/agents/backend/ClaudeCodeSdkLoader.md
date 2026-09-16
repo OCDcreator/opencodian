@@ -28,5 +28,6 @@
 
 - 不在本模块中保存 session 状态或做 OpenCodian stream normalizing；session/history/subagent API 只做 facade 透传，身份映射责任属于 `ClaudeCodeAdapter`
 - JSONL history、subagent transcript 和 sessionStore import 入口只是 SDK foundation 暴露；稳定 browser/import UI 仍需要运行期证明后再打开。
+- 每个 facade `query` 调用都包在 `withSdkAbortControllerShim`（见 `ClaudeCodeSdkAbortShim`）里：Electron 39 渲染进程内 SDK 内部 AbortController 构造会触发 Node `events.setMaxListeners` 的 ERR_INVALID_ARG_TYPE，不垫片则聊天与 aux 全部无法启动
 - 官方 SDK API 变动时优先在本 loader 与 `ClaudeCodeOptionsBuilder` 收口兼容
 - 不要把 SDK import specifier 改成变量拼接；那会让 esbuild 失去静态解析能力，Obsidian/Test Vault 产物可能再次出现 SDK 找不到或 `import.meta.url` 运行时错误。

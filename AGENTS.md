@@ -76,6 +76,7 @@ The inspector returns the owner, its responsibilities, canonical state, entrypoi
 - `src/features/settings/OpenCodianSettings.ts` + `src/core/types/settings.ts`: the settings surface is large and heavily normalized; UI changes often require matching default, migration, style, and locale updates.
 - `src/features/settings/ProviderIconCacheModal.ts` + `src/features/settings/ProviderBuiltinIconPickerModal.ts`: provider icon management lives in the existing cache modal; prefer extending that flow instead of adding a separate settings page for builtin icon selection.
 - `src/features/chat/liquidDiamondDemo.ts`, `src/features/chat/liquidDiamondDemoWebgl.ts`, and `src/features/chat/glassOctahedronDemo.ts`: experimental visual demos. Keep them opt-in and do not expose them in stable UI paths by accident.
+- `src/features/inline-edit/**`: inline edit (select text or place the cursor → embedded input box → in-place word diff → accept/reject). The feature is UI plus orchestration only: every backend must implement `AgentAuxQueryCapability.startAuxQuerySession()` and prove read-only execution at runtime, and the only write path is a single `editor.replaceRange` in `InlineEditController` taken after a snapshot dirty check. Backend-specific aux sessions live in `src/core/agents/backend/auxiliary/` (opencode/claude/codex) and `src/core/agents/backend/pi/PiAuxQuerySession.ts`. Do not weaken the fail-closed rules to make a backend "work": the gate is `node scripts/audit/run-aux-query-audit.mjs` (real CLIs, real models).
 
 ## Non-Obvious Rules
 

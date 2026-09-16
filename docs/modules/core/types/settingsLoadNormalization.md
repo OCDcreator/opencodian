@@ -86,3 +86,5 @@ Ownership facts:
 It also migrates the old `Server > MCP` remembered location into the new top-level `MCP` tab. A saved snapshot like `{ settingsTabbedPrimaryTab: 'server', settingsTabbedSecondaryTabByPrimary: { server: 'mcp' } }` now becomes `settingsTabbedPrimaryTab: 'mcp'` with `settingsTabbedSecondaryTabByPrimary.mcp = 'overview'`.
 
 - 2026-09-13: 加载归一化接入 memory: normalizeMemoryBackendUserSettings。
+
+- 2026-09-15: 在最终合并边界补上 `inlineEditEnabled` 与 `inlineEditModelOverrides` 的归一化，使旧设置快照也能得到完整字段。

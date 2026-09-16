@@ -21,6 +21,7 @@ import { SettingsCommandsSection } from './SettingsCommandsSection';
 import { SettingsConversationSection } from './SettingsConversationSection';
 import { SettingsDebugSection } from './SettingsDebugSection';
 import { SettingsFormatterSection } from './SettingsFormatterSection';
+import { SettingsInlineEditSection } from './SettingsInlineEditSection';
 import {
   getActiveSecondaryTabId,
   resolvePrimaryTabId,
@@ -436,6 +437,10 @@ export class SettingsTabbedRenderer {
       setRefreshTitleModelsCallback: (callback) => { this.deps.setRefreshTitleModelsCallback(callback); },
     });
     conversationSection.attachTabbed(containerEl, secondaryTabId);
+    new SettingsInlineEditSection({
+      plugin: this.deps.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
+    }).attachTabbed(containerEl, secondaryTabId);
   }
 
   private renderAgentsContent(containerEl: HTMLElement, secondaryTabId: string): void {

@@ -58,3 +58,5 @@ The shell supplies the Pi slash-catalog discriminator only. All Pi runtime lifec
 ## Model selection host app seam (2026-09-11)
 
 `createChatSelectionControlsCoordinatorHost()` now supplies `getApp: () => this.app` so the selection controls can resolve local bundled provider icon resource paths. This is a host port only — the shell does not gain icon-resolution logic.
+
+- 2026-09-15: `OpenCodianView` 增加两个只读访问器 `getActiveConversationBackendKind()` / `getActiveTabModelRef()`，供 inline edit 宿主在 `editorCallback` 之外解析当前聊天 tab 的后端与模型；未新增运行时归属。

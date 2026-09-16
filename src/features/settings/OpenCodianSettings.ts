@@ -29,6 +29,7 @@ import {
   type SettingsDropdownsEnhancerHandle,
 } from './SettingsDropdownControl';
 import { SettingsFormatterSection } from './SettingsFormatterSection';
+import { SettingsInlineEditSection } from './SettingsInlineEditSection';
 import { SettingsMcpSection } from './SettingsMcpSection';
 import { SettingsModelSection } from './SettingsModelSection';
 import {
@@ -66,6 +67,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private agentsSection: SettingsAgentsSection | null = null;
   private commandsSection: SettingsCommandsSection | null = null;
   private conversationSection: SettingsConversationSection | null = null;
+  private inlineEditSection: SettingsInlineEditSection | null = null;
   private modelSection: SettingsModelSection | null = null;
   private pluginSection: SettingsPluginSection | null = null;
   private styleSection: SettingsStyleSection | null = null;
@@ -384,6 +386,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       this.addModelSettings(containerEl);
     }
     this.addConversationSettings(containerEl);
+    this.addInlineEditSettings(containerEl);
     if (this.isActiveBackend('opencode')) {
       this.addAgentsSettings(containerEl);
       this.addCommandsSettings(containerEl);
@@ -565,6 +568,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     return this.conversationSection.attach(containerEl);
+  }
+
+  private addInlineEditSettings(containerEl: HTMLElement): HTMLHeadingElement {
+    this.inlineEditSection ??= new SettingsInlineEditSection({
+      plugin: this.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
+    });
+    return this.inlineEditSection.attach(containerEl);
   }
 
   private addAgentsSettings(containerEl: HTMLElement): HTMLHeadingElement {

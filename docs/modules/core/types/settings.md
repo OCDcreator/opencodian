@@ -444,3 +444,5 @@ New normalize functions added:
 
 - 2026-09-13: 新增 MemoryBackendUserSettings（memory.memoryBackendEnabled 默认 false / memoryExtractionEnabled / memorySemanticRecallEnabled / memoryExtractionModel）与 normalizeMemoryBackendUserSettings。
 - 记忆设置组新增 `memoryExternalRoot`（默认空字符串，trim 后 ≤300 字符）：共享记忆根目录，空 = vault 本地 `.opencodian/memory`。另有 `memorySyncRemoteUrl`（≤500 字符）：git 整树同步远程地址，空 = 关闭。
+
+- 2026-09-15: 新增 `inlineEditEnabled`（总开关，默认 true）与 `inlineEditModelOverrides`（按 backend 键控的模型覆盖），并提供 `normalizeInlineEditModelOverrides()` 做加载期归一化。

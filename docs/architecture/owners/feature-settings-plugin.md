@@ -51,3 +51,5 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 
 `ProviderBuiltinIconPickerModal`'s library filter now offers `modelsdev` alongside `lobehub` and `opencode`, so the remote models.dev icon set can be browsed per library. Icon resolution itself stays in `shared.utils-icons`; the modal only renders and filters.
 - 2026-09-13: 会话设置的工作区记忆块新增「共享记忆根目录」文本项（`memoryExternalRoot`），保存后立即通知 memoryRuntime 重建服务。
+
+- 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。

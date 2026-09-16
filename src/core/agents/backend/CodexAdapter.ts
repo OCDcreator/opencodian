@@ -22,8 +22,13 @@ import type { Codex, Thread, ThreadEvent, ThreadOptions, UserInput } from '@open
 import { createLogger } from '../../../shared';
 import { prependMemoryInjection } from '../../memory';
 import type { AgentBackendKind, ContextUsageSnapshot, ImageAttachment, StreamChunk } from '../../types/chat';
-import type { CodexApprovalPolicy } from '../../types/settings';
+import type { CodexApprovalPolicy, CodexReasoningEffort } from '../../types/settings';
 import { AgentCapability, type BackendCapabilities } from '../AgentCapability';
+import type {
+  AgentAuxQueryCapability,
+  AuxQuerySession,
+  AuxQuerySessionConfig,
+} from './AgentAuxQueryCapability';
 import type {
   AgentChatCapability,
   AgentChatSendRequest,
@@ -35,6 +40,8 @@ import type {
   Disposable,
   StatusChangeHandler,
 } from './AgentService';
+import { CodexAuxQuerySession, type CodexAuxSessionOptions } from './auxiliary/CodexAuxQuerySession';
+import { CODEX_EFFORT_VARIANTS } from './BackendModelCatalog';
 import {
   type AppServerAccountRateLimitsResult,
   type AppServerAccountUsageResult,
@@ -341,6 +348,7 @@ const CODEX_CAPABILITIES: BackendCapabilities = Object.freeze(
     AgentCapability.Permissions, // sandbox mode selector (read-only/workspace-write/danger-full-access)
     AgentCapability.Images,    // local_image input via temp-file translation
     AgentCapability.Models,    // getModelList() (app-server model/list + codex debug models fallback)
+    AgentCapability.AuxQuery,  // startAuxQuerySession() via CodexAuxQuerySession (read-only sandbox, fail-closed)
   ]),
 );
 
@@ -359,7 +367,8 @@ export class CodexAdapter
     AgentService,
     AgentChatCapability,
     AgentSessionCapability,
-    AgentForkCapability
+    AgentForkCapability,
+    AgentAuxQueryCapability
 {
   readonly kind: AgentBackendKind = 'codex';
   readonly displayName = 'Codex';
@@ -1151,6 +1160,40 @@ export class CodexAdapter
     this.sessions.clear();
     this.threadAlias.clear();
     this.statusHandlers.clear();
+  }
+
+  // -------------------------------------------------------------------------
+  // AgentAuxQueryCapability
+  // -------------------------------------------------------------------------
+
+  /**
+   * Start a read-only auxiliary session on an ephemeral Codex thread.
+   *
+   * Rejects when the app-server is unavailable or does not confirm the
+   * read-only sandbox in its own effective-settings report. See
+   * docs/requirements/inline-edit.md §5.4.
+   */
+  async startAuxQuerySession(config: AuxQuerySessionConfig): Promise<AuxQuerySession> {
+    const client = this.appServerClient;
+    if (!client) {
+      throw new Error(
+        'Codex auxiliary session requires a running app-server (read-only sandbox cannot be verified otherwise).',
+      );
+    }
+    let effort: CodexAuxSessionOptions['effort'];
+    if (config.effort) {
+      if (!CODEX_EFFORT_VARIANTS.includes(config.effort as CodexReasoningEffort)) {
+        throw new Error(`Unsupported Codex aux effort: ${config.effort}`);
+      }
+      effort = config.effort as CodexAuxSessionOptions['effort'];
+    }
+    return CodexAuxQuerySession.create({
+      systemPrompt: config.systemPrompt,
+      workingDirectory: config.workingDirectory,
+      client,
+      ...(config.model ? { model: config.model } : {}),
+      ...(effort ? { effort } : {}),
+    });
   }
 
   /**

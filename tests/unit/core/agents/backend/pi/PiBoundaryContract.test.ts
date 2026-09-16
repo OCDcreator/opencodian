@@ -18,9 +18,12 @@ describe('Pi backend isolation contract', () => {
       }
     }
     expect(imports.length).toBeGreaterThan(0);
-    // '../../../memory' is the backend-neutral memory contract (core.memory),
-    // a shared contract like types/chat — not another backend implementation.
-    const allowed = ['../AgentService', '../../AgentCapability', '../../../types/chat', '../../../types/settings', '../../../memory'];
+    // '../../../memory' is the backend-neutral memory contract (core.memory) and
+    // '../AgentAuxQueryCapability' is the backend-neutral auxiliary-query
+    // contract — shared contracts like types/chat, not another backend
+    // implementation. The Pi aux session itself lives in this directory and is
+    // covered by the './' allowance above.
+    const allowed = ['../AgentService', '../AgentAuxQueryCapability', '../../AgentCapability', '../../../types/chat', '../../../types/settings', '../../../memory', '../../../../shared/logger'];
     expect(imports.filter((specifier) => !specifier.startsWith('node:') && !specifier.startsWith('./') && !allowed.includes(specifier))).toEqual([]);
   });
 

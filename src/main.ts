@@ -8,6 +8,19 @@ import { presentPiUiRequest } from './features/chat/services/PiExtensionUiHost';
 
 import { ModelConfigService, ModelPricingService, OpencodeConfigManager } from './core/config';
 import { setAgentServiceRegistry } from './core/agents/AgentCapability';
+import { InlineEditController } from './features/inline-edit/InlineEditController';
+import {
+  findMarkdownViewForView,
+  inlineEditSelectionAffordanceExtension,
+} from './features/inline-edit/InlineEditSelectionAffordance';
+import type { InlineEditChoice, InlineEditHost } from './features/inline-edit/InlineEditHost';
+import { createInlineEditPluginHost } from './features/inline-edit/InlineEditPluginHost';
+import { inlineEditOverlayTrackerExtension } from './features/inline-edit/InlineEditInputOverlay';
+import { CLAUDE_CODE_EFFORT_VARIANTS, CODEX_EFFORT_VARIANTS } from './core/agents/backend/BackendModelCatalog';
+import {
+  normalizeInlineEditEffortOverrides,
+  normalizeInlineEditModelOverrides,
+} from './core/types';
 import {
   getConversationSessionBackendService,
   hasSessionCreationCapability,
@@ -64,7 +77,7 @@ import { OpenCodianView } from './features/chat/OpenCodianView';
 import { createChatDiagnosticsCoordinatorFactory } from './features/chat/services/ChatDiagnosticsCoordinator';
 import { OpenCodianSettingTab } from './features/settings/OpenCodianSettings';
 import { broadcastModelsLoadedToSettingsViews, broadcastServerStatusToSettingsViews, registerSettingsView } from './features/settings/SettingsViewRegistrar';
-import { setLocale, t } from './i18n';
+import { getLocale, setLocale, t } from './i18n';
 import {
   createLogger,
   getRecentLogText,
@@ -143,6 +156,9 @@ export default class OpenCodianPlugin extends Plugin {
   modelPricingService: ModelPricingService | null = null;
   pluginUpdateService: PluginUpdateService;
   settingsTab?: InstanceType<typeof OpenCodianSettingTab>;
+  /** Singleton inline-edit controller; only one inline edit exists at a time. */
+  inlineEditController: InlineEditController | null = null;
+  private inlineEditHost: InlineEditHost | null = null;
 
   private conversations: Conversation[] = [];
   private conversationsLoaded = false;
@@ -426,6 +442,108 @@ export default class OpenCodianPlugin extends Plugin {
     });
 
     await this.startupCoordinator.measureStartupStep('loadConversations', () => this.loadConversations());
+
+    this.inlineEditHost = createInlineEditPluginHost({
+      getVaultPath: () => getVaultBasePath(this.app) ?? '',
+      getLocale: () => getLocale(),
+      getRegistry: () => this.agentServiceRegistry ?? null,
+      getActiveChatBackend: () => this.getActiveChatBackendKind(),
+      getActiveChatModel: () => this.getActiveChatModelRef(),
+      getSettings: () => ({
+        enabled: this.settings.inlineEditEnabled,
+        modelOverrides: this.settings.inlineEditModelOverrides,
+        effortOverrides: this.settings.inlineEditEffortOverrides,
+      }),
+      listModels: (kind) => this.listInlineEditModels(kind),
+      listEfforts: (kind) => {
+        if (kind === 'claude-code') {
+          return CLAUDE_CODE_EFFORT_VARIANTS.map((id) => ({ id, label: id }));
+        }
+        if (kind === 'codex') {
+          return CODEX_EFFORT_VARIANTS.map((id) => ({ id, label: id }));
+        }
+        return null;
+      },
+      setModelOverride: async (kind, ref) => {
+        const next = { ...this.settings.inlineEditModelOverrides };
+        if (ref === null) delete next[kind];
+        else next[kind] = ref;
+        this.settings.inlineEditModelOverrides = normalizeInlineEditModelOverrides(next);
+        await this.saveSettings();
+      },
+      setEffortOverride: async (kind, id) => {
+        const next = { ...this.settings.inlineEditEffortOverrides };
+        if (id === null) delete next[kind];
+        else next[kind] = id;
+        this.settings.inlineEditEffortOverrides = normalizeInlineEditEffortOverrides(next);
+        await this.saveSettings();
+      },
+    });
+    this.inlineEditController = new InlineEditController({ host: this.inlineEditHost });
+  }
+
+  /**
+   * Model choices for the inline-edit floating bar picker, per backend.
+   * `null` keeps the chip but leaves the menu without model rows (no catalog).
+   */
+  private async listInlineEditModels(
+    kind: AgentBackendKind,
+  ): Promise<readonly InlineEditChoice[] | null> {    try {
+      if (kind === 'claude-code') {
+        const adapter = this.agentServiceRegistry?.get('claude-code') as {
+          supportedModels?: () => Promise<Array<{ id: string; name: string }>>;
+        } | undefined;
+        const models = await adapter?.supportedModels?.();
+        return (models ?? []).map((entry) => ({ id: entry.id, label: entry.name || entry.id }));
+      }
+      if (kind === 'codex') {
+        const adapter = this.agentServiceRegistry?.get('codex') as {
+          getModelList?: () => Promise<Array<{ slug: string; display_name?: string }> | null>;
+        } | undefined;
+        const models = await adapter?.getModelList?.();
+        return (models ?? []).map((entry) => ({ id: entry.slug, label: entry.display_name || entry.slug }));
+      }
+      if (kind === 'opencode') {
+        if (!this.modelConfigService) return null;
+        const bundle = await this.modelConfigService.getCatalogs(
+          this.settings.modelSourceMode,
+          this.settings.disabledModelRefs,
+        );
+        const choices: InlineEditChoice[] = [];
+        for (const provider of bundle.effective.providers) {
+          for (const model of provider.models) {
+            choices.push({ id: `${provider.id}/${model.id}`, label: `${provider.id}/${model.name || model.id}` });
+          }
+        }
+        return choices;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Whether inline edit can run right now.
+   *
+   * Used to hide the command and the editor menu entry rather than letting the
+   * user trigger a command that immediately reports an error.
+   */
+  private canRunInlineEdit(): boolean {
+    if (!this.settings?.inlineEditEnabled) return false;
+    return this.inlineEditHost?.resolveAdapter()?.getAuxQuery() != null;
+  }
+
+  /** Backend of the active chat tab, falling back to the registry's active kind. */
+  private getActiveChatBackendKind(): AgentBackendKind | null {
+    const fromTab = this.getOpenCodianView()?.getActiveConversationBackendKind() ?? null;
+    if (fromTab) return fromTab;
+    return this.agentServiceRegistry?.getActiveKind() ?? this.settings?.activeBackend ?? null;
+  }
+
+  /** Effective `{ provider, model }` of the active chat tab, when known. */
+  private getActiveChatModelRef(): { provider: string; model: string } | null {
+    return this.getOpenCodianView()?.getActiveTabModelRef() ?? null;
   }
 
   private getBundledClaudeCodeExecutablePath(vaultPath: string): string {
@@ -575,6 +693,33 @@ export default class OpenCodianPlugin extends Plugin {
 
     this.registerPluginCommands();
 
+    // Editor context-menu entry, mirroring the command. Registered once and
+    // hidden per-invocation when inline edit cannot run.
+    this.registerEvent(this.app.workspace.on('editor-menu', (menu, editor, view) => {
+      if (!this.canRunInlineEdit()) return;
+      menu.addItem((item) => {
+        item.setTitle(t('inlineEdit.command.name'))
+          .setIcon('pencil')
+          .onClick(() => {
+            this.inlineEditController?.open(editor, view);
+          });
+      });
+    }));
+
+    // Floating "inline edit" button next to the active selection.
+    this.registerEditorExtension(inlineEditSelectionAffordanceExtension({
+      canShow: () => this.canRunInlineEdit() && (this.settings?.inlineEditSelectionAffordance ?? true),
+      isEditing: () => this.inlineEditController?.phase != null,
+      openForView: (editorView) => {
+        const view = findMarkdownViewForView(this.app, editorView);
+        if (!view?.editor) return;
+        this.inlineEditController?.open(view.editor, view);
+      },
+    }));
+
+    // Remaps the floating inline-edit bar's anchor through document changes.
+    this.registerEditorExtension(inlineEditOverlayTrackerExtension());
+
     this.settingsTab = new OpenCodianSettingTab(this.app, this);
     this.addSettingTab(this.settingsTab);
   }
@@ -622,18 +767,17 @@ export default class OpenCodianPlugin extends Plugin {
 
     this.addCommand({
       id: 'inline-edit',
-      name: '行内编辑',
-      editorCallback: async (editor: Editor, view: MarkdownView) => {
-        const selectedText = editor.getSelection();
-        const notePath = view.file?.path || '未知笔记';
-
-        // TODO: Implement inline edit modal
-        new Notice(
-          '行内编辑：'
-          + (selectedText ? '选区' : '光标')
-          + '，位置 '
-          + notePath,
-        );
+      name: t('inlineEdit.command.name'),
+      // `editorCheckCallback` hides the command entirely when inline edit is off
+      // or the active backend cannot run a verified read-only session.
+      editorCheckCallback: (checking: boolean, editor: Editor, view: MarkdownView) => {
+        if (!this.canRunInlineEdit()) {
+          return false;
+        }
+        if (!checking) {
+          this.inlineEditController?.open(editor, view);
+        }
+        return true;
       },
     });
 
@@ -663,6 +807,10 @@ export default class OpenCodianPlugin extends Plugin {
     void this.openCodeService?.stop().catch((error) => {
       logger.warn('Failed to asynchronously stop OpenCode service during unload:', error);
     });
+    // Drop any in-flight inline edit and its auxiliary session before the
+    // adapters go away.
+    void this.inlineEditController?.close();
+    this.inlineEditController = null;
     // Dispose registry (which disposes adapters, which disposes OpenCodeService)
     this.agentServiceRegistry?.dispose();
     // DiagnosticsRuntimeCoordinator owns the unified flush/dispose of all three

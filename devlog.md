@@ -11,6 +11,53 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-16 行内编辑交互重做：悬浮指令条 + 选区悬浮按钮 + 模型/思考强度选择器
+
+用户实机反馈驱动：输入框嵌在正文里"生硬地挤开文字"、焦点跑掉后 Esc 取消不掉、且没有模型/思考强度选项。同日早些时候补齐了选区悬浮铅笔按钮（`InlineEditSelectionAffordance`，含一个视口/面板坐标系混用的定位 bug 修复，E2E 14/14 断言通过）。
+
+**悬浮指令条（`InlineEditInputOverlay`）取代 CM6 block widget 输入**
+- 面板绝对定位于 `view.dom`，锚在选区/光标下方，不再挤开正文；滚动跟随、文档变更经全局 `updateListener` + WeakMap 把锚点 `mapPos` 重映射；所有测量只在 rAF 内（与悬浮按钮同一条纪律）
+- 三条取消路径：任意焦点 Escape（文档捕获；菜单开着先关菜单）、面板外 pointerdown、焦点移出面板（`focusout` 且 relatedTarget 在外；切窗口不取消）+ 显式 ✕ 按钮
+- 澄清回复/错误显示在面板内；busy 态禁用输入与 chip 并保留面板
+
+**模型 + 思考强度选择器（面板 chip 下拉）**
+- 模型列表按后端：opencode=合并目录（`getCatalogs().effective`）、claude=`supportedModels()`、codex=`getModelList()`、pi=无列表只显示当前值；选择即写回 `inlineEditModelOverrides`（既有优先级链复用）
+- 思考强度仅 claude（`low..max`）与 codex（`minimal..persistent`）：新设置 `inlineEditEffortOverrides`（带白名单归一化），经 `AuxQuerySessionConfig.effort` 下发——claude→SDK `options.effort`、codex→`turn/start` effort（app-server 原生字段）；两端 adapter 对非法值 fail loudly；opencode/pi 的 aux 作用域无 variant 通路，v1 不显示
+- 会话启动后 chip 禁用（改动只影响下一次唤起）
+
+**设计文档同步**：`docs/requirements/inline-edit.md` §7.2/§7.4 修订（悬浮面板、取消路径、选择器契约）；模块文档新增 `InlineEditInputOverlay.md` 并更新 Widgets/Controller/AuxCapability 页。
+
+## 2026-09-15 行内编辑（Inline Edit）落地：四后端只读辅助查询 + CM6 内嵌 diff
+
+按 `docs/requirements/inline-edit.md`（v2，已过一轮设计审查）完整实施行内编辑：选中文字或放置光标 → 编辑器内嵌输入框 → 原位词级 diff 预览 → 接受/拒绝后落盘。
+
+**M1 技术验证（四后端运行时只读证明，全部通过）**
+
+新增 backend 无关的 `AgentAuxQueryCapability.startAuxQuerySession()`（短生命周期 `query`/`followUp`/`cancel`/`dispose` 会话 + `AuxQuerySafetyProof` 运行时证据），四个 adapter 全部实现，且**全部 fail closed**：
+
+- **opencode**：隔离执行作用域——临时目录生成配置 + 独立 `opencode serve`（`OPENCODE_CONFIG` 指向生成配置、`OPENCODE_PURE` 隔离用户插件、清理继承的 `OPENCODE_CONFIG_*`）。只读 agent 用 tools 白名单 + 末尾 `* → deny` 权限规则；启动后回读 `/agent` 与 `/experimental/tool/ids` 校验。**关键发现**：只把 cwd 换掉并不够——会话 `directory` 必须指向 scope 私有目录，否则辅助会话会出现在聊天服务器的会话列表里（两者共用同一份会话库）；改成私有会话目录 + 对 vault 的只读 `external_directory` 授权后，模型仍能读取被编辑的笔记，而串话为零。
+- **claude-code**：`tools` 只读白名单 + `disallowedTools` + `strictMcpConfig` + `canUseTool` deny 闸门；首轮读取 CLI 自己的 `system/init` 报告并断言工具集/MCP/权限模式，通过后把 `safety.effectiveTools` 升级为 CLI 上报值。**两个实测结论**：① `allowedTools` 里写裸工具名会让 SDK 在 `canUseTool` 之前整体放行该工具（shadowed 警告），等于绕过闸门，因此不加；② 不能丢 `settingSources`——provider 凭据常在 `~/.claude/settings.json` 的 `env` 里，丢了直接 "Not logged in"。
+- **codex**：`ephemeral` thread + `sandbox: 'read-only'` + `approvalPolicy: 'never'`，并用 app-server 自己的 `getThreadEffectiveSettings()` 回读断言 sandbox/approval/network。实测 ephemeral thread 不落 rollout（`~/.codex/sessions` 文件数不变）也不出现在 `thread/list`；因此 `dispose()` 不调用 `archiveThread`（会返回 "no rollout found"）。系统提示词走 `thread/start` 的 `developerInstructions`——仓库里「Codex 没有 instructions 接缝」的旧说法已过时，该字段在 `codex app-server generate-json-schema` 的 `ThreadStartParams` 里，并用行为实验（对照组/实验组首词差异）确认生效。
+- **pi**：`set_tools` 下发只读工具白名单，再用 SDK 的 `get_tools` 回读 `active` 断言完全一致且无写类残留；会话落在临时作用域而非 `.pi/opencodian-sessions`。**不是提示词降级**——这是 Pi 协议原生的会话级工具 allowlist。
+
+审计脚本 `scripts/audit/run-aux-query-audit.mjs` 对四后端逐一跑设计 §11 的四项检查（生效工具目录回读 / 写工具诱导审计 / vault 文件系统快照比对 / dispose 残留清理），并附**正向对照**：同一条诱导指令能让无限制 agent 写出逃逸文件，证明"未观察到写"不等于"诱导无效"。四后端全部 PASS，vault 快照零变化。
+
+**M2/M3 核心闭环**
+
+`src/features/inline-edit/` 新增 controller / widgets / diff / service / prompt / host 等模块：
+
+- CM6 单 `StateField` + 三个 `StateEffect` 驱动输入框与 `Decoration.replace` 预览；装饰随事务 `map(tr.changes)`，接受时用**映射后**范围而非旧偏移。
+- 词级 LCS 自研（无依赖），空白/换行独立成 token 以免重排 markdown 结构；中文按字对齐；超限降级为整段 before/after 视图。
+- XML 契约严格解析：唯一顶层 `<replacement>`/`<insertion>`，多标签/未闭合/同名嵌套一律拒绝，内容原样保留，无标签进入澄清循环（走 `followUp()` 复用原生会话）。
+- 写回只走单次 `editor.replaceRange`（undo 一步可撤）；接受前做快照脏检查，选区文本变了就拒绝落盘并提示。
+- 全部键盘判定带 `!isComposing`；快照用 `state.doc.sliceString` 而非 `editor.getSelection()`（后者归一化行尾会让脏检查失真）；`editor.cm` 取不到即停用并提示。
+- 服务层在每轮后审计 `AuxQueryResult.toolCalls`，命中任何写类工具即丢弃结果并销毁会话（§5.5 rule 2）。
+
+**M4 收尾**：设置项 `inlineEditEnabled` 与按后端键控的 `inlineEditModelOverrides`（含加载期归一化与独立设置分节）、编辑器右键菜单、zh/en 文案、`feature.inline-edit` owner 注册与 overview 文档、15 份模块文档、AGENTS.md 条目。
+
+验证：`npm run typecheck`、`npm run lint`（0 error / 0 warning）、全量单测 7493/7493、`npm run check:module-docs`、`npm run check:owner-boundaries`、`npm run check:owner-manifest`、`npm run check:devlog-order` 全绿；四后端安全审计 PASS（证据见 `docs/status/inline-edit-m1-audit.md`）。
+
+---
 ## 2026-09-14 记忆同步加固：审查驱动的安全护栏（双仓同修）
 
 对昨日 git 整树同步做了一轮严格代码审查（两仓未提交更改），协议实现本身逐字节同构、6 条设计不变量全部成立；本轮落地审查发现的全部 P1/P2 修复，两端保持逐字节一致（归一化 diff 验证）：

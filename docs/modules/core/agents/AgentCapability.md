@@ -20,3 +20,5 @@
 - Phase 0 不在此处接入真实 backend registry；`getActiveBackendCapabilities()` 的 registry lookup 留给后续阶段
 - 新增能力时需要同步更新相关 UI 条件、adapter 声明、测试和 multi-agent foundation 规格里的 capability mapping
 - `chat` / `sessions` 是 Phase 0/1 backend 抽象的基础 runtime 能力；OpenCode 继续通过 `OPENCODE_FULL_CAPABILITIES` 声明支持，Claude 等新 backend 必须显式实现对应 capability interface 后才能接入发送和会话生命周期路径
+
+- 2026-09-15: 新增 `AgentCapability.AuxQuery`（`aux-query`），用于 backend 无关的一次性只读辅助查询（inline edit）。能力接口见 `AgentAuxQueryCapability`。

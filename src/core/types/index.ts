@@ -164,6 +164,8 @@ export {
   normalizeDisabledPluginSpecs,
   normalizeEffortLevel,
   normalizeGlassRefractionInputPanelThemeId,
+  normalizeInlineEditEffortOverrides,
+  normalizeInlineEditModelOverrides,
   normalizeInputPanelActionButtonStyleId,
   normalizeInputPanelGlassRefractionSettings,
   normalizeInputPanelGlassRefractionSvgFilterPresetId,

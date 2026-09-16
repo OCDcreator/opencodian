@@ -33,6 +33,7 @@ export const AgentCapability = {
   Sharing: 'sharing',
   Export: 'export',
   Images: 'images',
+  AuxQuery: 'aux-query',
 } as const;
 
 export type AgentCapability = (typeof AgentCapability)[keyof typeof AgentCapability];

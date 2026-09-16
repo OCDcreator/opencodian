@@ -44,3 +44,5 @@ PiBackendSettings is a separate settings branch normalized by normalizePiBackend
 
 `ChatAppearanceUserSettings.style: UserBubbleStyleId`（`'solid' | 'glass'`）控制用户气泡渲染模式。默认与未知值归一化为 `'solid'`（`normalizeUserBubbleStyleId`）；主题预设不再各自固定气泡样式，预设切换会把气泡样式重置为基线（solid），glass 变为用户显式选择。
 - 2026-09-13: 记忆设置组新增 `memoryExternalRoot`（共享记忆根，默认空；支持开头 `~` 由 app 展开以兼容多机同步设置）。
+
+- 2026-09-15: `OpenCodianSettings` 增加 `inlineEditEnabled` 与 `inlineEditModelOverrides`，并在加载期归一化；导出 `normalizeInlineEditModelOverrides`。

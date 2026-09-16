@@ -358,9 +358,11 @@ export function buildClaudeCodeOptions(
   }
   if (input.settings.sandbox.enabled) {
     const sandbox: NonNullable<ClaudeCodeSdkOptionsShape['sandbox']> = { enabled: true };
-    if (input.settings.sandbox.failIfUnavailable) {
-      sandbox.failIfUnavailable = true;
-    }
+    // Send failIfUnavailable explicitly in both directions: when omitted, the
+    // SDK defaults to failing closed, which silently discards the plugin
+    // setting "allow unsandboxed execution when the OS sandbox is unavailable"
+    // (CLI >= 2.1.2xx hard-errors on such machines otherwise).
+    sandbox.failIfUnavailable = input.settings.sandbox.failIfUnavailable;
     if (input.settings.sandbox.autoAllowBashIfSandboxed) {
       sandbox.autoAllowBashIfSandboxed = true;
     }

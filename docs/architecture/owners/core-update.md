@@ -46,3 +46,5 @@ The new core.backend-pi owner isolates the external Pi process service. core.upd
 ## Unavailable release assets (2026-09-12)
 
 `versions.json` can advertise a version whose Release assets were never uploaded, so "the index lists it" is not the same as "it can be installed". The service classifies a missing asset or a 404/410 download as `ReleaseAssetsUnavailableError`, retires that candidate as `installable: false` with an `unavailableReason`, and recomputes `latestRelease` to the newest still-installable release. `installNewestInstallable()` is the auto-update entry point and walks the catalogue newest-first; `app.runtime` must call it instead of installing a specific advertised version, and must treat a `null` result as "nothing to do" rather than an error. The retirement is in-memory only: a later `checkForUpdates()` re-reads the index, so a version with assets uploaded later recovers without any cache invalidation. Transient 5xx failures must stay retryable and must not retire a version.
+
+- 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。

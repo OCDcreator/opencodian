@@ -4,7 +4,9 @@ import { prependMemoryInjection } from '../../../memory';
 import type { ContextUsageSnapshot, StreamChunk } from '../../../types/chat';
 import type { PiBackendSettings } from '../../../types/settings';
 import { AgentCapability, type BackendCapabilities } from '../../AgentCapability';
+import type { AgentAuxQueryCapability, AuxQuerySession, AuxQuerySessionConfig } from '../AgentAuxQueryCapability';
 import type { AgentChatCapability, AgentChatSendRequest, AgentConnectionStatus, AgentForkCapability, AgentModelCapability, AgentSessionCapability, Disposable, StatusChangeHandler } from '../AgentService';
+import { PiAuxQuerySession } from './PiAuxQuerySession';
 import { PI_CONFIG_COMMANDS, PI_RPC_COMMANDS, PI_SDK_COMMANDS, type PiCommandName, type PiModelInfo, type PiServiceEvent, type PiUiHandler } from './PiProtocol';
 import { type PiLaunchOptions, type PiRecord, piRecord, type PiRpcPort } from './PiRpcClient';
 import { PiSessionRuntime } from './PiSessionRuntime';
@@ -22,7 +24,7 @@ export interface PiAdapterOptions {
 }
 
 /** AgentService facade. Per-session SDK services own execution and native state. */
-export class PiAdapter implements AgentChatCapability, AgentSessionCapability, AgentModelCapability, AgentForkCapability {
+export class PiAdapter implements AgentChatCapability, AgentSessionCapability, AgentModelCapability, AgentForkCapability, AgentAuxQueryCapability {
   readonly kind = 'pi' as const;
   readonly displayName = 'Pi';
   readonly description = 'Official Pi SDK · independent local service';
@@ -30,6 +32,7 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
     AgentCapability.Chat, AgentCapability.Sessions, AgentCapability.Tools, AgentCapability.Models,
     AgentCapability.FileOps, AgentCapability.Shell, AgentCapability.Images, AgentCapability.CostTracking,
     AgentCapability.Fork, AgentCapability.Context, AgentCapability.Compaction, AgentCapability.Thinking, AgentCapability.Export,
+    AgentCapability.AuxQuery, // startAuxQuerySession() via PiAuxQuerySession (fail-closed read-only)
   ]);
   private currentStatus: AgentConnectionStatus = 'disconnected';
   private readonly statusHandlers = new Set<StatusChangeHandler>();
@@ -73,6 +76,33 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
   }
   async stop(): Promise<void> { this.generation++; this.runtime.closeAll(); this.setStatus('disconnected'); }
   dispose(): void { this.generation++; this.runtime.dispose(); this.setStatus('disconnected'); this.statusHandlers.clear(); }
+
+  // ---------------------------------------------------------------------------
+  // AgentAuxQueryCapability
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Start a read-only auxiliary session.
+   *
+   * The session restricts the Pi SDK's active tool set through `set_tools` and
+   * requires the SDK's own `get_tools` readback to match; a mismatch rejects the
+   * session. See docs/requirements/inline-edit.md §5.4.
+   */
+  async startAuxQuerySession(config: AuxQuerySessionConfig): Promise<AuxQuerySession> {
+    const settings = this.options.getSettings?.();
+    const executablePath = settings?.executablePath ?? '';
+    if (!executablePath) {
+      throw new Error('Pi auxiliary session requires a configured Pi executable path.');
+    }
+    const servicePath = this.options.servicePath;
+    return PiAuxQuerySession.create({
+      systemPrompt: config.systemPrompt,
+      workingDirectory: config.workingDirectory,
+      executablePath,
+      ...(servicePath ? { servicePath } : {}),
+      ...(config.model ? { model: config.model } : {}),
+    });
+  }
 
   /** Allowlisted SDK operations used by the Pi workbench, never arbitrary method reflection. */
   async command(sessionId: string | undefined, type: PiCommandName, input: PiRecord = {}): Promise<PiRecord> {

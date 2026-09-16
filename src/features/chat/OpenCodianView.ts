@@ -1447,6 +1447,30 @@ export class OpenCodianView extends ItemView {
     return Boolean(activeElement && this.inputContainer?.contains(activeElement));
   }
 
+  /**
+   * Backend of the active chat tab, or `null` when no tab is bound to a
+   * conversation.
+   *
+   * Read-only accessor for the inline-edit host: inline edit is triggered from
+   * an editor callback, which has no route to the chat view on its own
+   * (docs/requirements/inline-edit.md §7.1).
+   */
+  getActiveConversationBackendKind(): AgentBackendKind | null {
+    const tabId = this.getActiveTabId();
+    const tab = tabId ? this.tabManager?.getTab(tabId) : null;
+    if (!tab?.conversationId) {
+      return this.currentConversation?.backend ?? null;
+    }
+    const conversation = this.plugin.getConversations().find((item) => item.id === tab.conversationId);
+    return conversation?.backend ?? this.currentConversation?.backend ?? null;
+  }
+
+  /** Effective `{ provider, model }` of the active chat tab, when resolved. */
+  getActiveTabModelRef(): { provider: string; model: string } | null {
+    const model = this.getCurrentSessionModel();
+    return model ? { provider: model.provider, model: model.model } : null;
+  }
+
   getSessionIdForTab(tabId: TabId | null = this.getActiveTabId()): string | null {
     if (!tabId) {
       return null;

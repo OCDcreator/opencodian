@@ -3,6 +3,7 @@
  */
 
 import type { ClaudeCodeSdkFacade } from './ClaudeCodeAdapter';
+import { withSdkAbortControllerShim } from './ClaudeCodeSdkAbortShim';
 
 export interface WarmQueryHandle {
   query(prompt: string | AsyncIterable<unknown>): AsyncIterable<unknown> & { close?: () => void };
@@ -41,10 +42,12 @@ export async function loadClaudeCodeSdk(
   const importer = options.importer ?? officialClaudeAgentSdkImporter;
   const sdk = await importer();
   return {
-    query: (input) => sdk.query({
+    // Every query runs under the renderer-safe AbortController shim: the SDK
+    // crashes in the Obsidian renderer otherwise (see ClaudeCodeSdkAbortShim).
+    query: (input) => withSdkAbortControllerShim(() => sdk.query({
       prompt: input.prompt,
       options: input.options,
-    }),
+    })),
     ...(sdk.listSessions ? { listSessions: sdk.listSessions } : {}),
     ...(sdk.getSessionInfo ? { getSessionInfo: sdk.getSessionInfo } : {}),
     ...(sdk.getSessionMessages ? { getSessionMessages: sdk.getSessionMessages } : {}),

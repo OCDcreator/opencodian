@@ -38,6 +38,64 @@ export type PermissionMode = 'yolo' | 'plan' | 'normal';
 /** Effort level for adaptive thinking models */
 export type EffortLevel = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
+/** Backends inline edit can run on. Mirrors the implemented adapter set. */
+const INLINE_EDIT_BACKENDS: readonly AgentBackendKind[] = ['opencode', 'claude-code', 'codex', 'pi'];
+
+/**
+ * Normalize the per-backend inline-edit model override map.
+ *
+ * Keeps only known backends with non-empty string values, so a hand-edited or
+ * partially migrated settings file cannot make the inline-edit path read a
+ * non-string override.
+ */
+export function normalizeInlineEditModelOverrides(
+  value: unknown,
+): Partial<Record<AgentBackendKind, string>> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  const result: Partial<Record<AgentBackendKind, string>> = {};
+  // Kept as a literal rather than imported from the backend barrel: settings is
+  // loaded by jsdom unit tests, and the barrel pulls node-only modules in.
+  for (const backend of INLINE_EDIT_BACKENDS) {
+    const raw = (value as Record<string, unknown>)[backend];
+    if (typeof raw === 'string' && raw.trim()) {
+      result[backend] = raw.trim();
+    }
+  }
+  return result;
+}
+
+/**
+ * Per-backend effort values inline edit accepts, kept as literals for the same
+ * jsdom-loading reason as `INLINE_EDIT_BACKENDS`. Claude Code and Codex expose
+ * native effort controls; opencode and pi have no aux-session effort seam, so
+ * entries for them never normalize.
+ */
+const INLINE_EDIT_EFFORT_VALUES: Partial<Record<AgentBackendKind, readonly string[]>> = {
+  'claude-code': ['low', 'medium', 'high', 'xhigh', 'max'],
+  codex: ['minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra', 'persistent'],
+};
+
+/**
+ * Normalize the per-backend inline-edit effort override map. Unknown backends
+ * and values outside the backend's native effort list are dropped, so a stale
+ * or hand-edited settings file cannot send an unsupported effort to a session.
+ */
+export function normalizeInlineEditEffortOverrides(
+  value: unknown,
+): Partial<Record<AgentBackendKind, string>> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  const result: Partial<Record<AgentBackendKind, string>> = {};
+  for (const backend of INLINE_EDIT_BACKENDS) {
+    const allowed = INLINE_EDIT_EFFORT_VALUES[backend];
+    if (!allowed) continue;
+    const raw = (value as Record<string, unknown>)[backend];
+    if (typeof raw === 'string' && allowed.includes(raw.trim())) {
+      result[backend] = raw.trim();
+    }
+  }
+  return result;
+}
+
 export function normalizeCapabilityLabSelectedBackend(value: unknown): string | undefined {
   if (typeof value !== 'string') {
     return undefined;
@@ -2858,6 +2916,32 @@ export interface OpenCodianSettings {
   /** List of enabled backends. It can be empty when all agents are disabled. */
   enabledBackends: AgentBackendKind[];
 
+  /**
+   * Master switch for inline edit: while false the editor command and the
+   * editor context-menu entry are unavailable.
+   */
+  inlineEditEnabled: boolean;
+
+  /**
+   * Show the floating "inline edit" button next to the active text selection.
+   */
+  inlineEditSelectionAffordance: boolean;
+
+  /**
+   * Per-backend model override for inline edit. The value format follows each
+   * backend: `provider/model` for opencode and pi, an SDK alias or full id for
+   * claude-code, a model id for codex. Absent means "use the active chat tab's
+   * model, otherwise the backend default".
+   */
+  inlineEditModelOverrides: Partial<Record<AgentBackendKind, string>>;
+
+  /**
+   * Per-backend effort override for inline edit, set from the floating bar's
+   * effort picker. Only claude-code and codex have native aux-session effort
+   * seams; absent means "the backend's own default effort".
+   */
+  inlineEditEffortOverrides: Partial<Record<AgentBackendKind, string>>;
+
   capabilityLabSelectedBackend: string | undefined;
 
   /** Backend-specific settings that should not be flattened into OpenCode fields. */
@@ -3088,6 +3172,10 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   userName: '',
   activeBackend: 'opencode',
   enabledBackends: ['opencode'],
+  inlineEditEnabled: true,
+  inlineEditSelectionAffordance: true,
+  inlineEditModelOverrides: {},
+  inlineEditEffortOverrides: {},
   capabilityLabSelectedBackend: undefined,
   backendSettings: getDefaultBackendSettings(),
 

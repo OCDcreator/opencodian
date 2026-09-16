@@ -551,3 +551,5 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 
 - 2026-09-13: 新增 settings.conversation.tab.memory、settings.conversation.memory.* 与 commands.memory.* 键。
 - 新增 `settings.conversation.memory.externalRootName/externalRootDesc` 与 `syncRemoteName/syncRemoteDesc`、`commands.memory.statusSync`。
+
+- 2026-09-15: 新增 `inlineEdit.*` 文案：命令名、输入框 placeholder、接受/拒绝按钮、提示语与全部错误原因。

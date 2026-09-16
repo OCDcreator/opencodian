@@ -259,10 +259,10 @@ describe('SettingsTabbedRenderer', () => {
 
     renderer.renderDisplay(containerEl);
 
-    // title, display and memory are backend-agnostic, so they remain visible
+    // title, display, memory and inline-edit are backend-agnostic, so they remain visible
     const secondaryTabs = containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-secondary');
-    expect(secondaryTabs).toHaveLength(3);
-    expect(Array.from(secondaryTabs).map((tab) => tab.dataset.tabId)).toEqual(['title', 'display', 'memory']);
+    expect(secondaryTabs).toHaveLength(4);
+    expect(Array.from(secondaryTabs).map((tab) => tab.dataset.tabId)).toEqual(['title', 'display', 'memory', 'inline-edit']);
     // compaction is OpenCode-only and filtered out; falls back to first visible secondary tab (title)
     expectSingleContentShell(containerEl, 'conversation', 'title');
   });

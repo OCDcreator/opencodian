@@ -18,7 +18,10 @@ plugin-private `node_modules` runtime.
 3. On Windows it prefers a native `codex.exe`; when npm supplies only
    `codex.cmd`, it verifies the sibling `@openai/codex/package.json` and
    resolves the matching `@openai/codex-win32-*` native `codex.exe` instead of
-   spawning the `.cmd` shim.
+   spawning the `.cmd` shim. The platform package is looked up both hoisted
+   next to `@openai/codex` (older layouts, pnpm) and nested under
+   `@openai/codex/node_modules/` (`@openai/codex` ≥ 0.154 declares it as a
+   regular dependency, so npm nests it).
 4. A missing CLI returns `cli-not-on-path` with an actionable install message.
 
 The resolver is pure apart from its injectable `existsSync` seam, so platform,

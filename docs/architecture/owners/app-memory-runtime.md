@@ -39,3 +39,5 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 - Git sync is fail-soft and lock-serialized with opencode-zmem on the same tree; per-machine diagnostics (`.last-injection.json`, `metrics.jsonl`) never enter the repository.
 - The model invoker uses throwaway sessions (`setCurrent: false`, deleted in `finally`) so memory distillation never pollutes the user's conversation list.
 - Metrics (`metrics.jsonl`) are append-only diagnostics under the store root; they are never cleaned automatically.
+
+- 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。

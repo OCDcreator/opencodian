@@ -38,3 +38,5 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 ## Pi owner boundary review (2026-09-08)
 
 The shared backend chooser exposes Pi and mounts SettingsPiSection when enabled. Pi settings controls are owned by feature.settings-shell, not the OpenCode settings implementation.
+
+- 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。

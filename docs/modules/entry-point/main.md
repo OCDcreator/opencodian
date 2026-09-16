@@ -318,3 +318,5 @@ After settings load, `OpenCodianPlugin` constructs `PluginUpdateService` with th
 bootstrap 仅向注册入口注入 getPiSettings 读取回调，不在入口拥有 Pi 进程、协议或会话逻辑。
 
 - 2026-09-13: 构造并暴露 memoryRuntime（app.memory-runtime 组合），注册记忆维护命令，onunload 时 dispose。
+
+- 2026-09-15: 替换 `inline-edit` 命令 stub：改用 `editorCheckCallback` 驱动 `InlineEditController`，新增编辑器右键菜单项，并在启动末尾装配 `InlineEditHost`（backend/模型解析）与 controller 单例；`onunload` 先关闭进行中的 inline edit。

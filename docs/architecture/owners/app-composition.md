@@ -42,3 +42,5 @@ Run before merge: `npm run typecheck`, `npm run module-docs`, `npm run build`.
 ## Pi owner boundary review (2026-09-08)
 
 Bootstrap supplies only the Pi settings callback to adapter registration. Pi processes, protocol compatibility and session state belong to core.backend-pi.
+
+- 2026-09-15: `inline-edit` 命令由 stub 改为 `editorCheckCallback` + `InlineEditController`，新增编辑器右键菜单项，启动末尾装配 `InlineEditHost`，`onunload` 先关闭进行中的行内编辑。

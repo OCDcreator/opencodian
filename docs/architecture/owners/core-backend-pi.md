@@ -31,3 +31,5 @@ Model/thinking overrides are process launch arguments, followed by exact get_sta
 2026-09-09：独立配置进程管理官方settings/models文件，带schema、revision冲突、备份、校验；会话内存设置与持久配置分开。SDK升级测试对照51项设置全集。
 
 v1.1.14安装边界：用户自行安装官方Pi，缺失时直接报错；插件没有Pi安装/升级脚本。服务模块在构建时合并到main.js，通过stdin传给独立Node进程并在内存加载，不再展开assets/pi文件。发行包始终只有main.js、manifest.json、styles.css；真实SDK验收验证无服务文件也可运行。
+
+- 2026-09-15: 新增 `PiAuxQuerySession.ts`：用 Pi 原生的 `set_tools`/`get_tools` 建立并校验只读会话，会话落在临时作用域而非 `.pi/opencodian-sessions`；`PiAdapter` 实现 `startAuxQuerySession()`。

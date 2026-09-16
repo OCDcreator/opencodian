@@ -21,6 +21,8 @@ import {
   normalizeChatAppearanceSettings,
   normalizeChatFontSizePx,
   normalizeEffortLevel,
+  normalizeInlineEditEffortOverrides,
+  normalizeInlineEditModelOverrides,
   normalizeInputPanelGlassRefractionSettings,
   normalizeInputPanelGlassRefractionSvgFilterSettings,
   normalizeInputPanelLiquidGlassSettings,
@@ -527,6 +529,18 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
       settingsTabbedSecondaryTabByPrimary: migratedTabbedSettings.secondaryTabByPrimary,
       pluginUpdateAutoInstall: normalizePluginUpdateAutoInstall(normalizedSettings?.pluginUpdateAutoInstall),
       memory: normalizeMemoryBackendUserSettings(normalizedSettings?.memory),
+      inlineEditEnabled: typeof normalizedSettings?.inlineEditEnabled === 'boolean'
+        ? normalizedSettings.inlineEditEnabled
+        : DEFAULT_SETTINGS.inlineEditEnabled,
+      inlineEditSelectionAffordance: typeof normalizedSettings?.inlineEditSelectionAffordance === 'boolean'
+        ? normalizedSettings.inlineEditSelectionAffordance
+        : DEFAULT_SETTINGS.inlineEditSelectionAffordance,
+      inlineEditModelOverrides: normalizeInlineEditModelOverrides(
+        normalizedSettings?.inlineEditModelOverrides,
+      ),
+      inlineEditEffortOverrides: normalizeInlineEditEffortOverrides(
+        normalizedSettings?.inlineEditEffortOverrides,
+      ),
     },
     shouldMigrateLegacyLocalDefaultPort,
     shouldResetGlassRefractionGlassDefaults,

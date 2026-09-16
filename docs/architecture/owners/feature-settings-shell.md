@@ -57,3 +57,5 @@ SettingsPiSection owns the Pi settings surface through a narrow host. Credential
 2026-09-09：Pi独立主标签与八个二级页沿用后端导航契约；两项Pi配置子模块分别管理原生设置和provider/model表单。
 
 2026-09-09：设置表单间距由共享opencodian-settings-form-stack容器控制，跨wrapper与空状态区域仍保持12px；Pi配置渲染只挂布局类，不改变配置读写。验收需测量可见卡片几何边界，不能只检查相邻DOM兄弟。
+
+- 2026-09-15: 新增 `SettingsInlineEditSection`（`inlineEditEnabled` 总开关 + 按 backend 键控的模型覆盖，输入即校验）并挂到设置页。该分节按结构类型接收插件（settings + saveSettings），以避免 feature → app 依赖边。

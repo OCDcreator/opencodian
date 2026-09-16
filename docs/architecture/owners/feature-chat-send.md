@@ -27,3 +27,5 @@ Run before merge: `npm run typecheck`.
 ## Pi owner boundary review (2026-09-08)
 
 The new core.backend-pi owner isolates the external Pi process service. feature.chat-send retains its existing responsibilities; Pi process lifecycle, RPC compatibility and native history must not be added to this owner.
+
+- 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
