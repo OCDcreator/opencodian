@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "b0ea447e5d51e2963a00874bf25be090d1d6904c5391280848e7e771f1ce584b",
+  "digest": "1f43d2c30f45a784ffe53ed80fb131523ca6a2ce530c2995f23b0321f5b0facd",
   "recordCount": 660,
   "records": [
     {
@@ -2171,7 +2171,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditInputOverlay.ts",
-      "sha256": "ad7c9ac2c997347fc6f22819e78a0321c2276e2eeb817822f3da9f5b21eae455"
+      "sha256": "3fa31fc7c2886a5cf485f6e0bb9108fda5721d25659d8be9d10398473ca011ce"
     },
     {
       "kind": "src",
@@ -2201,7 +2201,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditWidgets.ts",
-      "sha256": "f9b6fefb5fd9c6b942ddd79888c526f0bd013b91547bd6267fda392de08594f3"
+      "sha256": "170f80aacded7f38cb8c1c7c8322ea92e5b9c27091201e93d386fc85bb90a405"
     },
     {
       "kind": "src",
@@ -3041,7 +3041,7 @@
     {
       "kind": "src",
       "key": "src/style/features/inline-edit.css",
-      "sha256": "a9a6d0b43074cce9436b43b54267b5aff2ef358a11a45858f6517ec430d1fe95"
+      "sha256": "9438218455de8f3985aba4527c7e91adf24c1f4ea0546a2d9c89f81ee03965bc"
     },
     {
       "kind": "src",
@@ -3304,7 +3304,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-16T11:26:01.929Z",
-  "headShaAtGeneration": "27418c80830ca579e741ac65d5a4e935b3a85ec1",
+  "generatedAt": "2026-09-16T12:15:55.214Z",
+  "headShaAtGeneration": "d981d15d756d5e2c45c748402a11a75462fdb1dd",
   "graphifyVersion": "graphify 0.9.31"
 }

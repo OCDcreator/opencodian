@@ -19476,16 +19476,27 @@ img.opencodian-model-provider-header-icon {
 
 /* features/inline-edit.css */
 /* ============================================================
-   Inline edit — floating instruction bar and in-flow diff preview
+   Inline edit — floating instruction bar, dropdowns, diff preview
    ============================================================
-   The instruction bar floats above the editor content (see
-   src/features/inline-edit/InlineEditInputOverlay.ts); the diff preview
-   renders in the text stream (InlineEditWidgets.ts). Colours come from
-   Obsidian's own theme variables wherever possible; only the diff accents
-   are ours.
+   Design language ported from shadcn/ui (new-york, neutral theme):
+   popover = 10px radius + 1px hairline border + layered soft shadow
+   + fade/zoom-in; menu = p-1 card, 30px items with a 16px check slot;
+   kbd = muted chip; dialog-footer style actions (primary filled right).
+   Colors map onto Obsidian theme variables so light/dark and custom
+   themes all resolve; surfaces stay translucent + frosted so editor
+   text glows through without fighting it.
+   DOM contract: src/features/inline-edit/InlineEditInputOverlay.ts
+   and InlineEditWidgets.ts.
    ============================================================ */
 
 .opencodian-inline-edit {
+  --ocie-radius: 10px;
+  --ocie-radius-sm: 6px;
+  --ocie-hairline: color-mix(in srgb, var(--background-modifier-border) 72%, transparent);
+  --ocie-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.04),
+    0 8px 14px -3px rgb(0 0 0 / 0.12),
+    0 24px 44px -10px rgb(0 0 0 / 0.26);
   font-family: var(--font-interface);
   font-size: var(--font-ui-small);
   color: var(--text-normal);
@@ -19497,80 +19508,155 @@ img.opencodian-model-provider-header-icon {
   position: absolute;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  min-width: 280px;
+  min-width: 320px;
   max-width: min(560px, calc(100% - 16px));
-  padding: 6px 8px;
+  padding: 8px;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-m);
-  background: var(--background-primary);
-  box-shadow: var(--shadow-l);
+  border-radius: var(--ocie-radius);
+  /* slight white lift keeps the frosted card readable off same-tone dark pages */
+  background: color-mix(in srgb, color-mix(in srgb, var(--background-primary) 94%, #fff) 90%, transparent);
+  backdrop-filter: blur(16px) saturate(1.6);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  box-shadow: var(--ocie-shadow);
   z-index: 30;
   box-sizing: border-box;
+  animation: ocie-pop-in 130ms cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+/* dark themes: shadows vanish against dark pages — go heavier */
+.theme-dark .opencodian-inline-edit-overlay,
+.theme-dark .opencodian-inline-edit-menu {
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.4),
+    0 10px 24px -4px rgb(0 0 0 / 0.5),
+    0 28px 48px -12px rgb(0 0 0 / 0.6);
+}
+
+.theme-dark .opencodian-inline-edit-preview {
+  /* in-flow card: faint hairline alone vanishes on dark — lift bg + border */
+  background: color-mix(in srgb, var(--background-primary) 95%, #fff);
+  border-color: color-mix(in srgb, var(--background-modifier-border) 95%, transparent);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.35), 0 12px 28px -10px rgb(0 0 0 / 0.5);
+}
+
+@keyframes ocie-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Row 1: selector chips (left) + kbd hints (right) */
 
 .opencodian-inline-edit-chipbar {
   display: flex;
   align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 2px 7px;
+  margin-bottom: 7px;
+  border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 68%, transparent);
 }
 
 .opencodian-inline-edit-chip {
-  padding: 1px 8px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-s);
-  background: var(--background-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  max-width: 230px;
+  padding: 0 7px 0 9px;
+  border: 1px solid transparent;
+  border-radius: var(--ocie-radius-sm);
+  background: color-mix(in srgb, var(--background-modifier-hover) 55%, transparent);
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
   cursor: pointer;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
 }
 
-.opencodian-inline-edit-chip:hover:not(:disabled) {
-  color: var(--text-normal);
-  border-color: var(--interactive-accent);
+.opencodian-inline-edit-chip:hover:not(:disabled),
+.opencodian-inline-edit-chip:focus-visible {
   background: var(--background-modifier-hover);
+  border-color: var(--ocie-hairline);
+  color: var(--text-normal);
 }
 
 .opencodian-inline-edit-chip:disabled {
-  opacity: 0.55;
+  opacity: 0.5;
   cursor: default;
 }
 
-.opencodian-inline-edit-overlay-close,
-.opencodian-inline-edit-overlay-submit {
-  display: flex;
+.opencodian-inline-edit-chip-prefix {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.opencodian-inline-edit-chip-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-normal);
+  font-weight: var(--font-medium, 500);
+}
+
+.opencodian-inline-edit-chip-chevron {
+  display: inline-flex;
+  flex: none;
+  color: var(--text-muted);
+}
+
+.opencodian-inline-edit-chip-chevron .svg-icon {
+  width: 12px;
+  height: 12px;
+}
+
+/* shadcn Kbd: muted chip, language-neutral glyphs */
+
+.opencodian-inline-edit-kbd-hints {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+.opencodian-inline-edit-kbd-hints kbd {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-s);
-  background: var(--background-secondary);
-  color: var(--text-muted);
-  cursor: pointer;
-  box-sizing: border-box;
+  height: 18px;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text-muted) 16%, transparent);
+  color: color-mix(in srgb, var(--text-normal) 70%, var(--text-muted));
+  font-family: var(--font-interface);
+  font-size: 10px;
+  font-weight: var(--font-medium, 500);
+  line-height: 1;
+  user-select: none;
 }
 
-.opencodian-inline-edit-overlay-close:hover,
-.opencodian-inline-edit-overlay-submit:hover {
-  color: var(--text-normal);
-  border-color: var(--interactive-accent);
-  background: var(--background-modifier-hover);
-}
+/* Row 2: input (flex) + submit/close ghost buttons */
 
-.opencodian-inline-edit-overlay .svg-icon {
-  width: 13px;
-  height: 13px;
+.opencodian-inline-edit-inputrow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .opencodian-inline-edit-overlay .opencodian-inline-edit-field {
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 30px;
+  padding: 0 4px;
   border: none;
   background: transparent;
   color: var(--text-normal);
@@ -19582,50 +19668,133 @@ img.opencodian-model-provider-header-icon {
   color: var(--text-faint);
 }
 
+.opencodian-inline-edit-overlay-submit,
+.opencodian-inline-edit-overlay-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: var(--ocie-radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.opencodian-inline-edit-overlay-submit {
+  color: var(--interactive-accent);
+}
+
+.opencodian-inline-edit-overlay-submit:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
+}
+
+.opencodian-inline-edit-overlay-close:hover:not(:disabled) {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.opencodian-inline-edit-overlay-submit .svg-icon,
+.opencodian-inline-edit-overlay-close .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.opencodian-inline-edit-spinning .svg-icon {
+  animation: ocie-spin 0.9s linear infinite;
+}
+
+@keyframes ocie-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Busy state */
+
 .opencodian-inline-edit-overlay.opencodian-inline-edit-busy .opencodian-inline-edit-field {
   opacity: 0.6;
 }
 
+.opencodian-inline-edit-overlay.opencodian-inline-edit-busy .opencodian-inline-edit-kbd-hints {
+  opacity: 0.65;
+}
+
+/* Reply / error blocks: muted alert, stacked above the chip row */
+
 .opencodian-inline-edit-overlay .opencodian-inline-edit-reply {
-  padding: 4px 6px;
-  border-left: 2px solid var(--interactive-accent);
+  margin: 2px 2px 8px;
+  padding: 7px 10px;
+  border-left: 2px solid color-mix(in srgb, var(--interactive-accent) 70%, transparent);
+  border-radius: 0 var(--ocie-radius-sm) var(--ocie-radius-sm) 0;
+  background: color-mix(in srgb, var(--background-modifier-hover) 56%, transparent);
   color: var(--text-muted);
   white-space: pre-wrap;
 }
 
 .opencodian-inline-edit-overlay .opencodian-inline-edit-error {
-  padding: 4px 6px;
-  border-left: 2px solid var(--text-error);
+  margin: 2px 2px 8px;
+  padding: 7px 10px;
+  border-left: 2px solid color-mix(in srgb, var(--text-error) 70%, transparent);
+  border-radius: 0 var(--ocie-radius-sm) var(--ocie-radius-sm) 0;
+  background: color-mix(in srgb, var(--text-error) 10%, transparent);
   color: var(--text-error);
   white-space: pre-wrap;
 }
 
-/* -- Picker menu ---------------------------------------------- */
+/* Focus rings (buttons only; the input stays borderless by design) */
+
+.opencodian-inline-edit-overlay button:focus-visible,
+.opencodian-inline-edit-menu-item:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--interactive-accent) 70%, transparent);
+  outline-offset: 1px;
+}
+
+/* -- Dropdown menu (shadcn DropdownMenu) ---------------------- */
 
 .opencodian-inline-edit-menu {
   position: absolute;
-  top: calc(100% - 4px);
-  min-width: 180px;
-  max-width: 360px;
-  max-height: 240px;
+  top: calc(100% - 6px);
+  min-width: 210px;
+  max-width: 380px;
+  max-height: 264px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 4px;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-m);
-  background: var(--background-primary);
-  box-shadow: var(--shadow-l);
+  border-radius: var(--ocie-radius);
+  background: color-mix(in srgb, var(--background-primary) 94%, #fff);
+  box-shadow: var(--ocie-shadow);
   z-index: 40;
+  animation: ocie-menu-in 110ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes ocie-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .opencodian-inline-edit-menu-item {
-  padding: 4px 8px;
-  border-radius: var(--radius-s);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: var(--ocie-radius-sm);
   color: var(--text-normal);
   font-size: var(--font-ui-smaller);
   cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  user-select: none;
 }
 
 .opencodian-inline-edit-menu-item:hover {
@@ -19634,21 +19803,55 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-inline-edit-menu-item.is-active {
   color: var(--interactive-accent);
-  font-weight: var(--font-medium, 600);
+  font-weight: var(--font-medium, 500);
 }
 
-/* -- Diff preview -------------------------------------------- */
+.opencodian-inline-edit-menu-item-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 16px;
+  color: var(--interactive-accent);
+  opacity: 0;
+}
+
+.opencodian-inline-edit-menu-item.is-active .opencodian-inline-edit-menu-item-check {
+  opacity: 1;
+}
+
+.opencodian-inline-edit-menu-item-check .svg-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.opencodian-inline-edit-menu-item-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opencodian-inline-edit-menu-separator {
+  height: 1px;
+  margin: 4px 2px;
+  background: color-mix(in srgb, var(--background-modifier-border) 70%, transparent);
+}
+
+/* -- Diff preview card (shadcn Card + dialog footer) ---------- */
 
 .opencodian-inline-edit-preview {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin: 4px 0;
-  padding: 6px 8px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-s);
-  background: var(--background-secondary);
+  gap: 8px;
+  margin: 6px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--ocie-hairline);
+  border-radius: var(--ocie-radius);
+  background: color-mix(in srgb, var(--background-primary) 92%, transparent);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.05), 0 8px 20px -10px rgb(0 0 0 / 0.14);
   white-space: pre-wrap;
+  animation: ocie-pop-in 130ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .opencodian-inline-edit-fallback {
@@ -19658,37 +19861,68 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-inline-edit-insert {
-  background: rgb(64 160 96 / 22%);
+  margin: 0 1px;
+  padding: 0 2px;
+  border-radius: 3px;
+  background: rgb(52 199 123 / 18%);
+  box-shadow: inset 0 0 0 1px rgb(52 199 123 / 22%);
   color: var(--text-normal);
-  border-radius: 2px;
   text-decoration: none;
 }
 
 .opencodian-inline-edit-delete {
-  background: rgb(200 72 72 / 20%);
-  color: var(--text-muted);
-  border-radius: 2px;
+  margin: 0 1px;
+  padding: 0 2px;
+  border-radius: 3px;
+  background: rgb(235 90 90 / 15%);
+  color: color-mix(in srgb, var(--text-error) 45%, var(--text-normal));
   text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--text-error) 70%, transparent);
+}
+
+/* breathing gap exactly at delete↔insert boundaries (same-type runs stay tight) */
+.opencodian-inline-edit-delete + .opencodian-inline-edit-insert,
+.opencodian-inline-edit-insert + .opencodian-inline-edit-delete {
+  margin-left: 6px;
 }
 
 .opencodian-inline-edit-actions {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   justify-content: flex-end;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 55%, transparent);
 }
 
 .opencodian-inline-edit-action {
-  padding: 2px 10px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-s);
-  background: var(--interactive-normal);
-  color: var(--text-normal);
-  cursor: pointer;
+  height: 28px;
+  padding: 0 14px;
+  border-radius: var(--ocie-radius-sm);
   font-size: var(--font-ui-smaller);
+  font-weight: var(--font-medium, 500);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
 }
 
-.opencodian-inline-edit-action:hover {
-  background: var(--interactive-hover);
+.opencodian-inline-edit-action.is-accept {
+  border: none;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.opencodian-inline-edit-action.is-accept:hover:not(:disabled) {
+  background: var(--interactive-accent-hover);
+}
+
+.opencodian-inline-edit-action.is-reject {
+  border: 1px solid var(--background-modifier-border);
+  background: transparent;
+  color: var(--text-normal);
+}
+
+.opencodian-inline-edit-action.is-reject:hover:not(:disabled) {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
 }
 
 .opencodian-inline-edit-action:disabled {
@@ -19703,30 +19937,46 @@ img.opencodian-model-provider-header-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   padding: 0;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-s);
-  background: var(--background-secondary);
+  border: 1px solid var(--ocie-hairline);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--background-primary) 88%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   color: var(--text-muted);
-  box-shadow: var(--shadow-s);
+  box-shadow: 0 2px 8px -2px rgb(0 0 0 / 0.25);
   cursor: pointer;
   z-index: 20;
   margin: 0;
   box-sizing: border-box;
+  transition: color 120ms ease, border-color 120ms ease, transform 120ms ease;
 }
 
 .opencodian-inline-edit-affordance:hover,
 .opencodian-inline-edit-affordance:active {
-  color: var(--text-normal);
-  border-color: var(--interactive-accent);
-  background: var(--background-modifier-hover);
+  color: var(--interactive-accent);
+  border-color: color-mix(in srgb, var(--interactive-accent) 55%, transparent);
+  transform: scale(1.06);
 }
 
 .opencodian-inline-edit-affordance .svg-icon {
   width: 13px;
   height: 13px;
+}
+
+/* -- Motion preferences --------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .opencodian-inline-edit-overlay,
+  .opencodian-inline-edit-menu,
+  .opencodian-inline-edit-preview {
+    animation: none;
+  }
+  .opencodian-inline-edit-spinning .svg-icon {
+    animation-duration: 1.8s;
+  }
 }
 
 

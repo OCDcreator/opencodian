@@ -139,8 +139,8 @@ class InlineEditPreviewWidget extends WidgetType {
     }
 
     const actions = root.createDiv({ cls: `${CSS_INPUT}-actions` });
-    const accept = actions.createEl('button', { text: this.payload.acceptLabel, cls: CSS_ACTION });
-    const reject = actions.createEl('button', { text: this.payload.rejectLabel, cls: CSS_ACTION });
+    const reject = actions.createEl('button', { text: this.payload.rejectLabel, cls: `${CSS_ACTION} is-reject` });
+    const accept = actions.createEl('button', { text: this.payload.acceptLabel, cls: `${CSS_ACTION} is-accept` });
     accept.type = 'button';
     reject.type = 'button';
     accept.disabled = this.payload.busy;

@@ -12,7 +12,7 @@ inline edit 的 CodeMirror 6 装饰层，只负责**预览**：一个 `StateFiel
 - 定义 effect：`showInlineEditPreview`（词级 diff 或插入预览）、`clearInlineEdit`
 - `ensureInlineEditField()`：首次使用时用 `StateEffect.appendConfig` 注入 field；`applyInlineEditEffect()` 在未注入时静默跳过
 - `readInlineEditRange()`：读取装饰**当前**范围。装饰集随每笔事务 `map(tr.changes)`，因此这就是接受时需要写入的偏移
-- `InlineEditPreviewWidget`：`Decoration.replace` 覆盖选区（插入形态为零长度 block widget），DOM 内渲染 diff span 与接受/拒绝按钮
+- `InlineEditPreviewWidget`：`Decoration.replace` 覆盖选区（插入形态为零长度 block widget），DOM 内渲染 diff span 与接受/拒绝按钮。按钮顺序固定为**拒绝在前（`is-reject` 描边）、接受在后（`is-accept` 实心）**——主操作居右；测试与自动化按类名选择，不要按下标
 - `eq()` 以 `token` 比对，避免无关事务重建预览 DOM
 
 ## 依赖

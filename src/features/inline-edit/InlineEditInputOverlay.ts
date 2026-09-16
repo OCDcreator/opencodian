@@ -82,11 +82,13 @@ export function inlineEditOverlayTrackerExtension(): Extension {
 export class InlineEditInputOverlay {
   private panel: HTMLElement | null = null;
   private field: HTMLInputElement | null = null;
+  private submitEl: HTMLElement | null = null;
   private menu: HTMLElement | null = null;
   private menuKind: 'model' | 'effort' | null = null;
   private state: InlineEditOverlayState | null = null;
   private anchorPos = 0;
   private frame = 0;
+  private spinOn = false;
   private lastLeft: number | null = null;
   private lastTop: number | null = null;
   private readonly handleDocKeydown: (event: KeyboardEvent) => void;
@@ -167,6 +169,12 @@ export class InlineEditInputOverlay {
       this.field.disabled = state.busy;
     }
 
+    if (this.submitEl && this.spinOn !== state.busy) {
+      this.spinOn = state.busy;
+      setIcon(this.submitEl, state.busy ? 'loader-circle' : 'corner-down-left');
+      this.submitEl.classList.toggle('opencodian-inline-edit-spinning', state.busy);
+    }
+
     this.syncChip('model', state.model);
     this.syncChip('effort', state.effort);
     if (this.menu && this.menuKind) {
@@ -198,6 +206,8 @@ export class InlineEditInputOverlay {
     this.panel?.remove();
     this.panel = null;
     this.field = null;
+    this.submitEl = null;
+    this.spinOn = false;
     this.state = null;
   }
 
@@ -221,17 +231,12 @@ export class InlineEditInputOverlay {
     this.buildChip(bar, 'model');
     this.buildChip(bar, 'effort');
 
-    const close = bar.createEl('button', {
-      cls: 'opencodian-inline-edit-overlay-close',
-      attr: { type: 'button', 'aria-label': t('inlineEdit.action.cancel'), title: t('inlineEdit.action.cancel') },
-    });
-    setIcon(close, 'x');
-    close.addEventListener('click', (event) => {
-      event.preventDefault();
-      this.callbacks.onReject();
-    });
+    const hints = bar.createDiv({ cls: 'opencodian-inline-edit-kbd-hints' });
+    hints.createEl('kbd', { text: '⏎' });
+    hints.createEl('kbd', { text: 'Esc' });
 
-    const field = root.createEl('input', {
+    const row = root.createDiv({ cls: 'opencodian-inline-edit-inputrow' });
+    const field = row.createEl('input', {
       type: 'text',
       cls: 'opencodian-inline-edit-field',
       attr: { 'aria-label': t('inlineEdit.command.name') },
@@ -245,7 +250,7 @@ export class InlineEditInputOverlay {
       // Escape bubbles to the document capture handler, which owns dismissal.
     });
 
-    const submit = root.createEl('button', {
+    const submit = row.createEl('button', {
       cls: 'opencodian-inline-edit-overlay-submit',
       attr: { type: 'button', 'aria-label': t('inlineEdit.action.submit'), title: t('inlineEdit.action.submit') },
     });
@@ -255,9 +260,20 @@ export class InlineEditInputOverlay {
       this.callbacks.onSubmit(field.value);
     });
 
+    const close = row.createEl('button', {
+      cls: 'opencodian-inline-edit-overlay-close',
+      attr: { type: 'button', 'aria-label': t('inlineEdit.action.cancel'), title: t('inlineEdit.action.cancel') },
+    });
+    setIcon(close, 'x');
+    close.addEventListener('click', (event) => {
+      event.preventDefault();
+      this.callbacks.onReject();
+    });
+
     this.view.dom.appendChild(root);
     this.panel = root;
     this.field = field;
+    this.submitEl = submit;
   }
 
   private buildChip(bar: HTMLElement, kind: 'model' | 'effort'): void {
@@ -265,6 +281,10 @@ export class InlineEditInputOverlay {
       cls: `opencodian-inline-edit-chip opencodian-inline-edit-chip-${kind}`,
       attr: { type: 'button' },
     });
+    chip.createSpan({ cls: 'opencodian-inline-edit-chip-prefix' });
+    chip.createSpan({ cls: 'opencodian-inline-edit-chip-value' });
+    const chevron = chip.createSpan({ cls: 'opencodian-inline-edit-chip-chevron' });
+    setIcon(chevron, 'chevron-down');
     chip.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -282,11 +302,14 @@ export class InlineEditInputOverlay {
     }
     chip.style.display = '';
     chip.disabled = state.disabled === true;
-    const label = state.loading
+    const prefix = chip.querySelector<HTMLElement>(':scope > .opencodian-inline-edit-chip-prefix');
+    const value = chip.querySelector<HTMLElement>(':scope > .opencodian-inline-edit-chip-value');
+    const prefixText = t(kind === 'model' ? 'inlineEdit.bar.model' : 'inlineEdit.bar.effort');
+    if (prefix && prefix.textContent !== prefixText) prefix.textContent = prefixText;
+    const valueText = state.loading
       ? t('inlineEdit.bar.loading')
       : state.label || t('inlineEdit.bar.default');
-    const text = `${t(kind === 'model' ? 'inlineEdit.bar.model' : 'inlineEdit.bar.effort')}: ${label}`;
-    if (chip.textContent !== text) chip.textContent = text;
+    if (value && value.textContent !== valueText) value.textContent = valueText;
   }
 
   private syncTextBlock(
@@ -329,15 +352,14 @@ export class InlineEditInputOverlay {
     const anchorChip = this.panel?.querySelector<HTMLElement>(`:scope .opencodian-inline-edit-chip-${kind}`);
     menu.empty();
     const clearLabel = kind === 'model' ? t('inlineEdit.bar.followChat') : t('inlineEdit.bar.effortDefault');
-    const entries: InlineEditOverlayMenuItem[] = [
-      { id: null, label: clearLabel, active: chip.label === '' || chip.label === t('inlineEdit.bar.default') },
-      ...chip.items,
-    ];
-    for (const entry of entries) {
+    const clearActive = !chip.label || chip.label === t('inlineEdit.bar.default');
+    const renderEntry = (entry: InlineEditOverlayMenuItem): void => {
       const item = menu.createDiv({
         cls: `opencodian-inline-edit-menu-item${entry.active ? ' is-active' : ''}`,
-        text: entry.label,
       });
+      const check = item.createSpan({ cls: 'opencodian-inline-edit-menu-item-check' });
+      setIcon(check, 'check');
+      item.createSpan({ cls: 'opencodian-inline-edit-menu-item-label', text: entry.label });
       item.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -346,6 +368,13 @@ export class InlineEditInputOverlay {
         if (kind === 'model') this.callbacks.onPickModel(id);
         else this.callbacks.onPickEffort(id);
       });
+    };
+    renderEntry({ id: null, label: clearLabel, active: clearActive });
+    if (chip.items.length > 0) {
+      menu.createDiv({ cls: 'opencodian-inline-edit-menu-separator' });
+      for (const entry of chip.items) {
+        renderEntry(entry);
+      }
     }
     // Anchor the menu under its chip, clamped inside the panel.
     if (anchorChip && this.panel) {

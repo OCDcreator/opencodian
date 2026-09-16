@@ -25,7 +25,13 @@
 - 思考强度仅 claude（`low..max`）与 codex（`minimal..persistent`）：新设置 `inlineEditEffortOverrides`（带白名单归一化），经 `AuxQuerySessionConfig.effort` 下发——claude→SDK `options.effort`、codex→`turn/start` effort（app-server 原生字段）；两端 adapter 对非法值 fail loudly；opencode/pi 的 aux 作用域无 variant 通路，v1 不显示
 - 会话启动后 chip 禁用（改动只影响下一次唤起）
 
-**设计文档同步**：`docs/requirements/inline-edit.md` §7.2/§7.4 修订（悬浮面板、取消路径、选择器契约）；模块文档新增 `InlineEditInputOverlay.md` 并更新 Widgets/Controller/AuxCapability 页。
+**样式重做（shadcn/ui 设计语言，用户反馈"样式太丑"）**
+- 从 shadcn/ui 仓库源码提取 new-york-v4 配方：popover=10px 圆角+发丝边框+分层阴影+fade/zoom-in、菜单=4px 内边距卡片+check 槽位、kbd 键帽、dialog-footer 主次按钮；颜色映射 Obsidian 主题变量，结构与动效照搬 shadcn
+- DOM 按固定布局契约重排：chipbar（chip=前缀+值+chevron，kbd 提示右对齐）→ 发丝线 → inputrow（无边框输入+提交/关闭幽灵按钮）；预览按钮改为拒绝（描边）在前、接受（实心）居右
+- 深色主题专项覆盖（`.theme-dark`）：阴影加浓（浅色阴影在深色页不可见）、卡片背景混白提亮、diff 卡边框加深；diff token 红/绿交界用相邻选择器加呼吸间隙，删除文字改暗红
+- 视觉回归工具 `.obsidian-debug/style-repro/`：puppeteer+本地 Chrome 实拍明/暗 × 输入条/预览四面板，四轮 AI 视觉评审全部通过；实机（Test Vault 部署后）E2E 全绿 + 窗口实拍评审通过（期间确认：Obsidian 窗口被完全遮挡时 Chromium `visibilityState=hidden` 会挂起异步 eval，最小化→还原循环可恢复）
+
+**设计文档同步**：`docs/requirements/inline-edit.md` §7.2/§7.4 修订（悬浮面板、取消路径、选择器契约）；模块文档新增 `InlineEditInputOverlay.md` 并更新 Widgets/Controller/AuxCapability 页；样式契约重写 `docs/modules/style/features/inline-edit.md`。
 
 ## 2026-09-15 行内编辑（Inline Edit）落地：四后端只读辅助查询 + CM6 内嵌 diff
 
