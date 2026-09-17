@@ -1,5 +1,10 @@
 # 测试框架
 
+## 并发负载抖动修复（2026-09-17）
+
+- `scripts/run-jest.js` 现在默认追加 `--maxWorkers=50%`（用户已显式传 `--maxWorkers` 时不覆盖）：20 核开发机上 jest 默认开 19 个 worker，puppeteer Chrome 启动、真实 CLI spawn 与临时目录 I/O 在全量并发下互相挤压，超时套件每轮漂移；砍半峰值并发后小核数 CI runner 不受影响（2 核 → 1 个 worker，与原默认一致）。
+- 三个 puppeteer 渲染套件（model-popover-viewport-render / model-popover-provider-hierarchy / capability-lab-tab-rail-render）的 `jest.setTimeout` 从 30s 提到 60s，并给每个 `puppeteer.launch` 显式 `timeout: 60000`：负载下真正超时的是 puppeteer 自身等待 DevTools 端点的 30s 启动预算，单独提高 jest 超时救不了它。
+
 ## Windows 与异步价格回归（2026-09-10）
 
 - CI 增加 Windows/macOS、Node 24 全量测试矩阵；Ubuntu 原有验证链保留。远端执行结果须以实际 CI run 为准。

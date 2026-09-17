@@ -3,7 +3,7 @@ const { join } = require('node:path');
 
 const puppeteer = require('puppeteer');
 
-jest.setTimeout(30000);
+jest.setTimeout(60000);
 
 describe('Capability Lab backend tab rail rendered contract', () => {
   it('stacks the outer header and preserves readable CJK copy in a 320px container', async () => {
@@ -17,6 +17,9 @@ describe('Capability Lab backend tab rail rendered contract', () => {
     );
     const browser = await puppeteer.launch({
       headless: true,
+      // Real Chrome spawn + DevTools handshake stalls under full-suite load;
+      // puppeteer's own 30s launch timeout (not jest's) is what flakes here.
+      timeout: 60000,
       args: ['--disable-setuid-sandbox', '--no-sandbox'],
     });
 
@@ -110,6 +113,9 @@ describe('Capability Lab backend tab rail rendered contract', () => {
     );
     const browser = await puppeteer.launch({
       headless: true,
+      // Real Chrome spawn + DevTools handshake stalls under full-suite load;
+      // puppeteer's own 30s launch timeout (not jest's) is what flakes here.
+      timeout: 60000,
       args: ['--disable-setuid-sandbox', '--no-sandbox'],
     });
 

@@ -3,7 +3,7 @@ const { join } = require('node:path');
 
 const puppeteer = require('puppeteer');
 
-jest.setTimeout(30000);
+jest.setTimeout(60000);
 
 describe('Model popover rendered viewport contract', () => {
   it('preserves a 280px model scroll viewport below shared card chrome', async () => {
@@ -17,6 +17,9 @@ describe('Model popover rendered viewport contract', () => {
     );
     const browser = await puppeteer.launch({
       headless: true,
+      // Real Chrome spawn + DevTools handshake stalls under full-suite load;
+      // puppeteer's own 30s launch timeout (not jest's) is what flakes here.
+      timeout: 60000,
       args: ['--disable-setuid-sandbox', '--no-sandbox'],
     });
 
@@ -86,6 +89,9 @@ describe('Model popover rendered viewport contract', () => {
     );
     const browser = await puppeteer.launch({
       headless: true,
+      // Real Chrome spawn + DevTools handshake stalls under full-suite load;
+      // puppeteer's own 30s launch timeout (not jest's) is what flakes here.
+      timeout: 60000,
       args: ['--disable-setuid-sandbox', '--no-sandbox'],
     });
 

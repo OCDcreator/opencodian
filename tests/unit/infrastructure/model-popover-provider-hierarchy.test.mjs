@@ -3,7 +3,7 @@ const { join } = require('node:path');
 
 const puppeteer = require('puppeteer');
 
-jest.setTimeout(30000);
+jest.setTimeout(60000);
 const MODEL_CSS_PATH = join(process.cwd(), 'src/style/components/model-selector.css');
 
 
@@ -164,6 +164,9 @@ describe('Model popover provider header vs model option visual hierarchy', () =>
   beforeAll(async () => {
     browser = await puppeteer.launch({
       headless: true,
+      // Real Chrome spawn + DevTools handshake stalls under full-suite load;
+      // puppeteer's own 30s launch timeout (not jest's) is what flakes here.
+      timeout: 60000,
       args: ['--disable-setuid-sandbox', '--no-sandbox'],
     });
   });
