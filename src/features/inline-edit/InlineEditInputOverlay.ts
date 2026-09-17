@@ -26,14 +26,15 @@ import { setIcon } from 'obsidian';
 
 import { t } from '../../i18n';
 import { OPENCODIAN_APP_ICON_ID } from '../../shared/brandingWordmark';
-import type { InlineEditChoice } from './InlineEditTypes';
+import { openContextPicker, syncContextFooter } from './InlineEditContextUi';
+import type { InlineEditChoice, InlineEditContextFile } from './InlineEditTypes';
 
 /** Gap between the anchor line's bottom and the panel top; keep in sync with CSS. */
 const PANEL_GAP = 6;
 /** Horizontal inset used when clamping the panel inside the editor DOM. */
 const PANEL_INSET = 8;
 /** Grown height cap for the instruction field, in px; beyond it the field scrolls. */
-const FIELD_MAX_HEIGHT = 120;
+const FIELD_MAX_HEIGHT = 100;
 
 /** One dropdown entry; `id === null` is the "clear override" row. */
 export interface InlineEditOverlayMenuItem {
@@ -63,6 +64,16 @@ export interface InlineEditOverlayState {
   readonly placeholder: string;
   readonly model: InlineEditOverlayChipState | null;
   readonly effort: InlineEditOverlayChipState | null;
+  /** Attached context notes, in pick order; `[]` renders no chips. */
+  readonly context: readonly InlineEditOverlayContextChip[];
+  /** False hides the "add context" affordance (host has no vault to offer). */
+  readonly contextSupported: boolean;
+}
+
+/** One attached note as the bar renders it. */
+export interface InlineEditOverlayContextChip {
+  readonly path: string;
+  readonly label: string;
 }
 
 export interface InlineEditOverlayCallbacks {
@@ -72,6 +83,10 @@ export interface InlineEditOverlayCallbacks {
   onPickEffort(id: string | null): void;
   /** Provider icon factory (same pipeline as the composer model selector). */
   createProviderIcon?(providerId: string, size: number): HTMLElement | null;
+  /** The user opened the attached-notes picker; the host supplies candidates. */
+  onRequestContextFiles?(): void;
+  /** Attach or detach one note path. */
+  onToggleContext?(path: string): void;
 }
 
 const activeOverlays = new WeakMap<EditorView, InlineEditInputOverlay>();
@@ -93,7 +108,13 @@ export class InlineEditInputOverlay {
   private field: HTMLTextAreaElement | null = null;
   private submitEl: HTMLElement | null = null;
   private menu: HTMLElement | null = null;
-  private menuKind: 'model' | 'effort' | null = null;
+  private menuKind: 'model' | 'effort' | 'context' | null = null;
+  /** Re-renders the open picker's rows after the attached set changes. */
+  private refreshPickerRows: ((attachedPaths: ReadonlySet<string>) => void) | null = null;
+  /** Footer elements kept by reference: queries would have to track nesting. */
+  private attachEl: HTMLButtonElement | null = null;
+  private contextRowEl: HTMLElement | null = null;
+  private readonly handleContextToggle = (path: string): void => { this.callbacks.onToggleContext?.(path); };
   private state: InlineEditOverlayState | null = null;
   private anchorPos = 0;
   private frame = 0;
@@ -186,13 +207,21 @@ export class InlineEditInputOverlay {
 
     this.syncChip('model', state.model);
     this.syncChip('effort', state.effort);
-    if (this.menu && this.menuKind) {
+    syncContextFooter(this.attachEl, this.contextRowEl, {
+      chips: state.context,
+      supported: state.contextSupported,
+      busy: state.busy,
+      onToggle: this.handleContextToggle,
+    });
+    if (this.menu && (this.menuKind === 'model' || this.menuKind === 'effort')) {
       const chip = state[this.menuKind];
       if (!chip) {
         this.closeMenu();
       } else {
         this.renderMenu(this.menuKind, chip);
       }
+    } else if (this.menu && this.menuKind === 'context') {
+      this.refreshContextPicker();
     }
     this.scheduleSync();
   }
@@ -216,6 +245,8 @@ export class InlineEditInputOverlay {
     this.panel = null;
     this.field = null;
     this.submitEl = null;
+    this.attachEl = null;
+    this.contextRowEl = null;
     this.spinOn = false;
     this.state = null;
   }
@@ -288,8 +319,32 @@ export class InlineEditInputOverlay {
     });
 
     const bar = root.createDiv({ cls: 'opencodian-inline-edit-chipbar' });
-    this.buildChip(bar, 'model');
-    this.buildChip(bar, 'effort');
+    // Two footer rows: attached notes get their own line (hidden while empty),
+    // then the configuration row. Keeping attachments out of the config row is
+    // what stops "add context" + model + effort from crowding one line.
+    const contextRow = bar.createDiv({ cls: 'opencodian-inline-edit-context-row' });
+    contextRow.style.display = 'none';
+    const configRow = bar.createDiv({ cls: 'opencodian-inline-edit-config-row' });
+    const attach = configRow.createEl('button', {
+      cls: 'opencodian-inline-edit-chip opencodian-inline-edit-chip-attach',
+      attr: { type: 'button', 'aria-label': t('inlineEdit.context.add'), title: t('inlineEdit.context.add') },
+    });
+    const attachIcon = attach.createSpan({ cls: 'opencodian-inline-edit-chip-prefix' });
+    setIcon(attachIcon, 'paperclip');
+    attach.createSpan({ cls: 'opencodian-inline-edit-chip-value', text: t('inlineEdit.context.add') });
+    attach.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (this.menuKind === 'context') {
+        this.closeMenu();
+        return;
+      }
+      this.callbacks.onRequestContextFiles?.();
+    });
+    this.attachEl = attach;
+    this.contextRowEl = contextRow;
+    this.buildChip(configRow, 'model');
+    this.buildChip(configRow, 'effort');
 
     this.view.dom.appendChild(root);
     this.panel = root;
@@ -453,10 +508,35 @@ export class InlineEditInputOverlay {
     }
   }
 
+  /** Open the attached-notes picker with the host's candidate list. */
+  showContextPicker(files: readonly InlineEditContextFile[]): void {
+    const panel = this.panel;
+    const window = this.view.dom.ownerDocument.defaultView;
+    if (!panel || !window) return;
+    this.closeMenu();
+    this.menuKind = 'context';
+    const opened = openContextPicker(panel, {
+      files,
+      attachedPaths: new Set((this.state?.context ?? []).map((entry) => entry.path)),
+      onToggle: this.handleContextToggle,
+      view: window,
+    });
+    this.menu = opened.element;
+    this.refreshPickerRows = opened.refresh;
+  }
+
+  /** Re-render the open picker (the attached set changes without reopening). */
+  refreshContextPicker(): void {
+    if (this.menuKind !== 'context') return;
+    this.refreshPickerRows?.(new Set((this.state?.context ?? []).map((entry) => entry.path)));
+  }
+
+
   private closeMenu(): void {
     this.menu?.remove();
     this.menu = null;
     this.menuKind = null;
+    this.refreshPickerRows = null;
   }
 
   handleDocUpdate(update: ViewUpdate): void {

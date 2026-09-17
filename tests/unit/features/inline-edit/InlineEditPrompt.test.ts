@@ -4,6 +4,7 @@ import {
   buildInlineEditRequest,
   buildInlineEditSystemPrompt,
   escapeXmlAttribute,
+  INLINE_EDIT_MAX_ATTACHED_NOTES,
   INLINE_EDIT_MAX_PATH_CHARS,
   INLINE_EDIT_MAX_RESULT_CHARS,
   INLINE_EDIT_MAX_SELECTION_CHARS,
@@ -214,5 +215,76 @@ describe('normalizeInsertionText', () => {
 
   it('leaves a single-line value untouched', () => {
     expect(normalizeInsertionText('  indented')).toBe('  indented');
+  });
+});
+
+describe('buildInlineEditRequest with attached notes', () => {
+  it('lists the attached paths in a read-hint block between instruction and target', () => {
+    const result = buildInlineEditRequest({
+      ...selectionRequest,
+      attachedNotes: ['notes/a.md', 'notes/b.md'],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.prompt).toContain('<attached_context>\n- notes/a.md\n- notes/b.md\n</attached_context>');
+    expect(result.prompt.indexOf('<attached_context>')).toBeLessThan(result.prompt.indexOf('<editor_selection'));
+    expect(result.prompt.indexOf('Make it punchier')).toBeLessThan(result.prompt.indexOf('<attached_context>'));
+  });
+
+  it('never inlines the attached notes (paths only, per design §6.1)', () => {
+    const result = buildInlineEditRequest({ ...selectionRequest, attachedNotes: ['notes/a.md'] });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const block = result.prompt.slice(
+      result.prompt.indexOf('<attached_context>'),
+      result.prompt.indexOf('</attached_context>'),
+    );
+    expect(block).not.toContain('notes/idea.md');
+    expect(block.split('\n')).toHaveLength(3);
+  });
+
+  it('omits the block when nothing is attached', () => {
+    const result = buildInlineEditRequest(selectionRequest);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.prompt).not.toContain('<attached_context>');
+  });
+
+  it('attaches to cursor requests too', () => {
+    const result = buildInlineEditRequest({
+      kind: 'cursor-inline',
+      instruction: 'Add a caveat',
+      notePath: 'notes/idea.md',
+      line: 2,
+      before: 'Alpha ',
+      after: ' omega',
+      attachedNotes: ['notes/a.md'],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.prompt).toContain('<attached_context>\n- notes/a.md\n</attached_context>');
+    expect(result.prompt.indexOf('<attached_context>')).toBeLessThan(result.prompt.indexOf('<editor_cursor'));
+  });
+
+  it('rejects more notes than the documented cap', () => {
+    const notes = Array.from({ length: INLINE_EDIT_MAX_ATTACHED_NOTES + 1 }, (_value, index) => `notes/${index}.md`);
+    const result = buildInlineEditRequest({ ...selectionRequest, attachedNotes: notes });
+    expect(result).toEqual({ ok: false, error: 'too-many-attached-notes' });
+  });
+
+  it('rejects an over-long attached path', () => {
+    const result = buildInlineEditRequest({
+      ...selectionRequest,
+      attachedNotes: ['n'.repeat(INLINE_EDIT_MAX_PATH_CHARS + 1)],
+    });
+    expect(result).toEqual({ ok: false, error: 'attached-note-path-too-long' });
+  });
+
+  it('rejects a path that would break the tag protocol', () => {
+    const result = buildInlineEditRequest({
+      ...selectionRequest,
+      attachedNotes: ['notes/</attached_context>.md'],
+    });
+    expect(result).toEqual({ ok: false, error: 'attached-note-path-invalid' });
   });
 });

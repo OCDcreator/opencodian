@@ -20,7 +20,13 @@ import { AgentCapability, hasCapability } from '../../core/agents/AgentCapabilit
 import type { AgentAuxQueryCapability, BackendModelSelection } from '../../core/agents/backend/AgentAuxQueryCapability';
 import type { AgentServiceRegistry } from '../../core/agents/backend/AgentServiceRegistry';
 import type { AgentBackendKind } from '../../core/types/chat';
-import type { InlineEditChoice, InlineEditHost, InlineEditHostAdapter, InlineEditModelSelectionLabel } from './InlineEditHost';
+import type {
+  InlineEditChoice,
+  InlineEditContextFile,
+  InlineEditHost,
+  InlineEditHostAdapter,
+  InlineEditModelSelectionLabel,
+} from './InlineEditHost';
 
 /** Settings slice inline edit reads. */
 export interface InlineEditSettingsSlice {
@@ -58,6 +64,8 @@ export interface InlineEditPluginBridge {
    * generic lucide glyph.
    */
   createProviderIcon?(providerId: string, size: number): HTMLElement | null;
+  /** Vault notes offered by the "add context" picker; `null` hides the affordance. */
+  listContextFiles?(): readonly InlineEditContextFile[] | null;
 }
 
 /** Build the host the controller uses. */
@@ -69,6 +77,7 @@ export function createInlineEditPluginHost(bridge: InlineEditPluginBridge): Inli
     createProviderIcon: bridge.createProviderIcon
       ? (providerId, size) => bridge.createProviderIcon?.(providerId, size) ?? null
       : undefined,
+    listContextFiles: bridge.listContextFiles ? () => bridge.listContextFiles?.() ?? null : undefined,
   };
 }
 

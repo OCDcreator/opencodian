@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "21f44a35c9b506966b4566d77d8a52b4f63fe9efee4ee034c7f0d8b8e298acaa",
-  "recordCount": 660,
+  "digest": "1758c55fa235252d27995d1445363914d364f661bbc114d5da61e3a1a452e85c",
+  "recordCount": 661,
   "records": [
     {
       "kind": "ignore",
@@ -2155,8 +2155,13 @@
     },
     {
       "kind": "src",
+      "key": "src/features/inline-edit/InlineEditContextUi.ts",
+      "sha256": "5762867d57f300fe58d0c1f7b12003c7ce1c36e786702f6166360df2d1934d36"
+    },
+    {
+      "kind": "src",
       "key": "src/features/inline-edit/InlineEditController.ts",
-      "sha256": "3b4eb1410cb92e78284e26d51750d335c2729319ac4f3f4b77ef12c3ef32a7d7"
+      "sha256": "aca5bfb309dff4591d4b75aa640dd6e47d7f67fe78f1c0b02039d39435050909"
     },
     {
       "kind": "src",
@@ -2166,22 +2171,22 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditHost.ts",
-      "sha256": "7983c3c53d381beae111168c6a17124d7d9a4d554921d9a24247304a613a4292"
+      "sha256": "fb900822a020dbc333a52425bdadc7a0f11f7c861c7ba1070fd5d5f532728c68"
     },
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditInputOverlay.ts",
-      "sha256": "dc567c062249fba18adcb4e279443cb50a5beb8494308a9d56a59164504a996c"
+      "sha256": "85f4e0b888c21e484bef8d97a780d35485bb83541ec7e067ff38b52e8e87bd37"
     },
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditPluginHost.ts",
-      "sha256": "a2e024414a75a3e399f14700a586942ab4768f76f1e8db4bb150a4c167d75da4"
+      "sha256": "18b6e32217a68794f377c9ed9cfa6606de5d64049a56f3191fbf18fe83966d31"
     },
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditPrompt.ts",
-      "sha256": "4bdc9fcfc9868eb401760458dfdcb3f576bc806e27e5a99d26b26316d3701330"
+      "sha256": "7eb0c83d51567b187f4f462e7891e1f55bce4f81b81890d351495aee27573866"
     },
     {
       "kind": "src",
@@ -2196,7 +2201,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditTypes.ts",
-      "sha256": "e2eb1c542088d3f6a80dafd0df15a6365c435336c236ecc486dd077d98e0c77f"
+      "sha256": "12f5ccf476b3ac787ae5eec87c88d13795ba1812d676c16c59de9e542beb868d"
     },
     {
       "kind": "src",
@@ -2781,7 +2786,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "679ca9e73567c3bb2750870289c2f23920df1f612d974872958476fffbb93be2"
+      "sha256": "7a7c381b410ff8f68522104b3e8f464d3e27fa781cb8ed0c765d7eab54a9cc66"
     },
     {
       "kind": "src",
@@ -2791,12 +2796,12 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "61a085b7be006deafb97fa7be177171452dbe3ab9bc88d4c330215c771965603"
+      "sha256": "b94214f4509252e573cef2699511bc4b4ef22feebc7a7c46ff2c940acf755f3d"
     },
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "eaac63f9b7b131b0528c01810b075c3972c86d81d7ea24ed44ad36759541a4b9"
+      "sha256": "fcb32291b679acc1c3175cb0522d68647256cb8cebfc0cbb5f34f49506d426f1"
     },
     {
       "kind": "src",
@@ -3041,7 +3046,7 @@
     {
       "kind": "src",
       "key": "src/style/features/inline-edit.css",
-      "sha256": "f2b45cd2cf41c6fa339a03374d168085c044380aada867d71f0990768d23ff23"
+      "sha256": "ae0b051ff8c6f670722df665fa8fce42504839cb683842da4bc8ef7f90b6d8b9"
     },
     {
       "kind": "src",
@@ -3304,7 +3309,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-17T04:11:53.219Z",
-  "headShaAtGeneration": "f4f1de78236d68260909f1a082f4e4e3148dcec4",
+  "generatedAt": "2026-09-17T05:04:18.309Z",
+  "headShaAtGeneration": "922001cef4f1db13d025d5662bb0f5ee3c1b6dcd",
   "graphifyVersion": "graphify 0.9.31"
 }

@@ -28,6 +28,8 @@ inline edit 的 CM6 状态机与编辑器胶合层。由 `editorCallback` / `edi
 - `src/utils/editorSelectionHighlight.ts`、`src/i18n`
 - `@codemirror/view`、`obsidian`
 
+- 附加上下文：`ActiveEdit.contextFiles`（至多 `INLINE_EDIT_MAX_ATTACHED_NOTES`，超限 `notify` 拒绝）随编辑存活，因此澄清轮次保留；`openContextPicker` 按需向 host 取候选，`toggleContextFile` 增删后重渲染并刷新选择器 ✓ 标记；`buildRequest(anchor, instruction, contextFiles)` 把路径透传给提示词（只传路径，不读文件内容）。
+
 ## 维护约束
 
 - 写回只能有一次 `editor.replaceRange`；不要改成多次编辑或直接改 CM6 文档

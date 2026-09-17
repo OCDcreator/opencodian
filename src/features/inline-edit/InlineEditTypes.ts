@@ -50,6 +50,18 @@ export interface InlineEditChoice {
   readonly label: string;
 }
 
+/**
+ * A vault note the user attached as extra context.
+ *
+ * Only the path travels to the model: per docs/requirements/inline-edit.md §6.1
+ * the prompt never inlines extra vault text, the read-only tools do the reading.
+ */
+export interface InlineEditContextFile {
+  readonly path: string;
+  /** Display name (the file's basename). */
+  readonly name: string;
+}
+
 /** What the model chip should display and where it comes from. */
 export interface InlineEditModelSelectionLabel {
   readonly label: string;

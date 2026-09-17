@@ -26,6 +26,8 @@ inline edit 与模型之间的请求构造与响应解析，采用 Claudian 验�
 
 - `src/i18n`（仅类型：`Locale`、`TranslationKey`）
 
+- 附加上下文：请求可带 `attachedNotes`（路径数组），渲染为 `<attached_context>` 块置于指令与目标块之间，**只列路径**（§6.1：不注入 vault 正文，读取交给只读工具）；系统提示词（zh/en）新增一句说明该块是"去读"的清单。校验 fail-closed：数量 ≤ `INLINE_EDIT_MAX_ATTACHED_NOTES`(5)、单路径 ≤ 500 字符、路径不得含 `<`/`>`，违规分别报 `too-many-attached-notes` / `attached-note-path-too-long` / `attached-note-path-invalid`。
+
 ## 维护约束
 
 - 长度上限是协议的一部分，改动需同步 `docs/requirements/inline-edit.md` §6.1 与单测

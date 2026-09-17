@@ -5130,6 +5130,12 @@ export const enTranslations = {
   'inlineEdit.bar.effort': 'Effort',
   'inlineEdit.bar.default': 'Backend default',
   'inlineEdit.bar.followChat': 'Follow chat model',
+  'inlineEdit.context.add': 'Add context',
+  'inlineEdit.context.searchPlaceholder': 'Search notes…',
+  'inlineEdit.context.empty': 'No notes available to attach',
+  'inlineEdit.context.truncated': 'Showing the first {{count}} matches — keep typing to narrow it down',
+  'inlineEdit.context.remove': 'Remove {{name}}',
+  'inlineEdit.context.limit': 'At most {{count}} notes can be attached.',
   'inlineEdit.bar.effortDefault': 'Default',
   'inlineEdit.bar.loading': 'Loading…',
   'inlineEdit.notice.rejected': 'Inline edit discarded.',
@@ -5154,6 +5160,9 @@ export const enTranslations = {
   'inlineEdit.error.unclosedTag': 'The model response contained an unclosed tag.',
   'inlineEdit.error.multipleTags': 'The model response contained more than one protocol tag.',
   'inlineEdit.error.malformedTag': 'The model response contained a malformed tag.',
+  'inlineEdit.error.tooManyAttachedNotes': 'Too many notes attached.',
+  'inlineEdit.error.attachedNotePathTooLong': 'An attached note path is too long.',
+  'inlineEdit.error.attachedNotePathInvalid': 'An attached note path contains unsupported characters.',
   'inlineEdit.error.generic': 'Inline edit failed.',
 
   // Inline edit settings

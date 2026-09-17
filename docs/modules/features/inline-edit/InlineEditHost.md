@@ -19,6 +19,8 @@ inline edit 与插件运行时之间的接缝。`editorCallback` 只给到 `Edit
 
 - `./InlineEditTypes`（`InlineEditHostAdapter`）
 
+- 可选 `listContextFiles()`："添加上下文"选择器的候选笔记（vault 内 `md`/`txt`）；缺失或返回 `null` 时整个入口隐藏，宿主无 vault 时悬浮条保持原状
+
 ## 维护约束
 
 - 接口保持窄小：只放 controller 真正需要的三个方法，backend/模型解析细节属于实现方

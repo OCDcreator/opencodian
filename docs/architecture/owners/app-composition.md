@@ -45,3 +45,4 @@ Bootstrap supplies only the Pi settings callback to adapter registration. Pi pro
 
 - 2026-09-15: `inline-edit` 命令由 stub 改为 `editorCheckCallback` + `InlineEditController`，新增编辑器右键菜单项，启动末尾装配 `InlineEditHost`，`onunload` 先关闭进行中的行内编辑。
 - 2026-09-17: `main.ts` 的品牌标记图标 id 改为从 `shared.brandingWordmark` 导入单一常量（注册与 ribbon 都用它），行为不变。
+- 2026-09-17: bridge 新增 `listContextFiles` 注入（vault `md`/`txt`，过滤含 `<`/`>` 的路径），供行内编辑附加上下文选择器按需枚举。

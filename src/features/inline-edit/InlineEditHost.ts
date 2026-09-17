@@ -10,9 +10,19 @@
  * See docs/requirements/inline-edit.md §5.2 and §9.
  */
 
-import type { InlineEditChoice, InlineEditHostAdapter, InlineEditModelSelectionLabel } from './InlineEditTypes';
+import type {
+  InlineEditChoice,
+  InlineEditContextFile,
+  InlineEditHostAdapter,
+  InlineEditModelSelectionLabel,
+} from './InlineEditTypes';
 
-export type { InlineEditChoice, InlineEditHostAdapter, InlineEditModelSelectionLabel };
+export type {
+  InlineEditChoice,
+  InlineEditContextFile,
+  InlineEditHostAdapter,
+  InlineEditModelSelectionLabel,
+};
 
 /**
  * Host services required by inline edit.
@@ -39,4 +49,9 @@ export interface InlineEditHost {
    * back to a generic lucide glyph.
    */
   createProviderIcon?(providerId: string, size: number): HTMLElement | null;
+  /**
+   * Vault notes offered by the "add context" picker. Absent or `null` hides the
+   * affordance entirely, so a host without a vault keeps the bar unchanged.
+   */
+  listContextFiles?(): readonly InlineEditContextFile[] | null;
 }

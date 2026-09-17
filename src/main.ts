@@ -14,7 +14,7 @@ import {
   findMarkdownViewForView,
   inlineEditSelectionAffordanceExtension,
 } from './features/inline-edit/InlineEditSelectionAffordance';
-import type { InlineEditChoice, InlineEditHost } from './features/inline-edit/InlineEditHost';
+import type { InlineEditChoice, InlineEditContextFile, InlineEditHost } from './features/inline-edit/InlineEditHost';
 import { createInlineEditPluginHost } from './features/inline-edit/InlineEditPluginHost';
 import { inlineEditOverlayTrackerExtension } from './features/inline-edit/InlineEditInputOverlay';
 import { ProviderIconService } from './utils/icons/ProviderIconService';
@@ -480,6 +480,7 @@ export default class OpenCodianPlugin extends Plugin {
         await this.saveSettings();
       },
       createProviderIcon: (providerId, size) => ProviderIconService.createIconElement(this.app, providerId, size),
+      listContextFiles: () => this.listInlineEditContextFiles(),
     });
     this.inlineEditController = new InlineEditController({ host: this.inlineEditHost });
   }
@@ -523,6 +524,24 @@ export default class OpenCodianPlugin extends Plugin {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Vault notes the inline-edit "add context" picker can offer.
+   *
+   * Text files only: the prompt passes paths and the read-only aux tools do the
+   * reading (§6.1 forbids inlining extra vault text). Paths containing `<` or
+   * `>` are left out because they would collide with the prompt's tag
+   * protocol, and the picker is the only place a user could choose them.
+   */
+  private listInlineEditContextFiles(): readonly InlineEditContextFile[] | null {
+    if (!this.app.vault?.getFiles) return null;
+    return this.app.vault
+      .getFiles()
+      .filter((file) => file.extension === 'md' || file.extension === 'txt')
+      .filter((file) => !/[<>]/.test(file.path))
+      .map((file) => ({ path: file.path, name: file.basename }))
+      .sort((left, right) => left.path.localeCompare(right.path));
   }
 
   /**

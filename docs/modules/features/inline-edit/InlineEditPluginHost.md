@@ -22,6 +22,8 @@
 - `../../core/agents/AgentCapability`、`../../core/agents/backend/AgentAuxQueryCapability`、`../../core/agents/backend/AgentServiceRegistry`、`../../core/types/chat`
 - `./InlineEditHost`
 
+- 可选 `listContextFiles()`：透传插件的 vault 文本文件列表（`md`/`txt`，过滤掉路径含 `<`/`>` 的项，因为它们会与提示词的标签协议冲突），供附加上下文选择器使用
+
 ## 维护约束
 
 - 显式配置但解析/校验失败必须返回 `{ ok: false, error }`，由 controller 提示并中止；不要静默改用默认模型

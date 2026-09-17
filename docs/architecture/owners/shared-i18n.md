@@ -61,3 +61,4 @@ English and Chinese Pi settings copy describe the external CLI, connection check
 - 2026-09-13: 新增 `settings.conversation.memory.externalRootName/externalRootDesc`（en/zh 同步）。
 
 - 2026-09-15: 新增 `inlineEdit.*`（命令名、placeholder、接受/拒绝、提示与全部错误原因）与 `settings.inlineEdit.*`（设置分节、覆盖项校验、计费说明）两组 zh/en 文案。
+- 2026-09-17: 新增 `inlineEdit.context.*` 与三条 `inlineEdit.error.{tooManyAttachedNotes,attachedNotePathTooLong,attachedNotePathInvalid}` 文案（zh/en）。

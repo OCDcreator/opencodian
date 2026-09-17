@@ -20,6 +20,8 @@ inline edit 的共享类型，使 controller 与 service 不必直接依赖插�
 
 - `../../core/agents/backend/AgentAuxQueryCapability`、`../../core/types/chat`
 
+- `InlineEditContextFile`：附加上下文的候选项（`path` + 展示用 `name`）。
+
 ## 维护约束
 
 - 纯类型模块，不要引入运行时依赖或副作用

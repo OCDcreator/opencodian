@@ -19673,7 +19673,9 @@ img.opencodian-model-provider-header-icon {
   width: 100% !important;
   min-width: 0;
   min-height: 18px !important;
-  max-height: 120px;
+  /* Second line of defence behind FIELD_MAX_HEIGHT: a long instruction stops
+     growing here (~5 lines) and scrolls instead of pushing the bar tall. */
+  max-height: 100px;
   margin: 0 !important;
   padding: 0 !important;
   border: none !important;
@@ -19767,10 +19769,44 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-inline-edit-chipbar {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 2px;
   padding: 6px 10px 8px;
   border-top: 1px solid var(--ocie-divider);
+}
+
+/* Row 1: attached notes (hidden by the overlay while none are attached).
+   Row 2: request configuration — attach, model, effort. */
+
+.opencodian-inline-edit-context-row,
+.opencodian-inline-edit-config-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* Attached context: one removable chip per note, on the footer's first row. */
+
+.opencodian-inline-edit-context-chip .opencodian-inline-edit-chip-value {
+  max-width: 150px;
+}
+
+.opencodian-inline-edit-context-chip-remove {
+  display: inline-flex;
+  flex: none;
+  color: var(--text-faint);
+}
+
+.opencodian-inline-edit-context-chip-remove .svg-icon {
+  width: 10px;
+  height: 10px;
+}
+
+.opencodian-inline-edit-context-chip:hover .opencodian-inline-edit-context-chip-remove,
+.opencodian-inline-edit-context-chip:focus-visible .opencodian-inline-edit-context-chip-remove {
+  color: var(--text-normal);
 }
 
 .opencodian-inline-edit-chip {
@@ -19954,6 +19990,99 @@ img.opencodian-model-provider-header-icon {
   height: 1px;
   margin: 4px 6px;
   background: var(--ocie-divider);
+}
+
+/* Picker variant of the menu: a pinned search field over a scrolling list, so
+   the query stays visible while the list moves. */
+
+.opencodian-inline-edit-picker {
+  display: flex;
+  flex-direction: column;
+  min-width: 260px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.opencodian-inline-edit-picker-search {
+  flex: none;
+  width: 100%;
+  height: 30px;
+  margin: 0 !important;
+  padding: 0 10px !important;
+  border: none !important;
+  border-bottom: 1px solid var(--ocie-divider);
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  appearance: none;
+  -webkit-appearance: none;
+  color: var(--text-normal);
+  font-family: var(--font-interface);
+  font-size: var(--font-ui-smaller) !important;
+}
+
+.opencodian-inline-edit-picker-search::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+.opencodian-inline-edit-picker-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+}
+
+.opencodian-inline-edit-picker-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.opencodian-inline-edit-picker-list::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background-clip: padding-box;
+  background-color: color-mix(in srgb, var(--text-muted) 30%, transparent);
+}
+
+/* Rows: the check slot marks attached notes, the highlight tracks the keyboard. */
+
+.opencodian-inline-edit-menu-item.is-checked .opencodian-inline-edit-menu-item-check {
+  opacity: 1;
+}
+
+.opencodian-inline-edit-menu-item.is-highlighted {
+  background: var(--background-modifier-hover);
+}
+
+.opencodian-inline-edit-menu-item-label {
+  flex: 0 1 auto;
+}
+
+.opencodian-inline-edit-picker-folder {
+  margin-left: auto;
+  padding-left: 8px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-inline-edit-picker-empty,
+.opencodian-inline-edit-picker-hint {
+  padding: 6px 8px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.5;
+}
+
+.opencodian-inline-edit-picker-hint {
+  margin-top: 4px;
+  border-top: 1px solid var(--ocie-divider);
 }
 
 /* -- Diff preview card (in-flow) -------------------------------- */

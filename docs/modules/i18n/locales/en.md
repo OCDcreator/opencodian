@@ -1,5 +1,7 @@
 # English Locale
 
+2026-09-17: added the `inlineEdit.context.*` strings (add context, search, empty, truncation, remove, limit) and `inlineEdit.error.{tooManyAttachedNotes,attachedNotePathTooLong,attachedNotePathInvalid}`.
+
 2026-09-10: installation phases, completed-file counts, progress accessibility label, and three-at-a-time history controls have English copy.
 
 > 2026-08-03: Updated modified-files sidebar copy to describe a persistent clickable entry, ready-empty/unavailable states, click/Escape dismissal, and OpenCode-session-only semantics instead of hover/auto-hide behavior.

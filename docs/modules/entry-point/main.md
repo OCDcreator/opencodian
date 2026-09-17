@@ -324,3 +324,6 @@ bootstrap 仅向注册入口注入 getPiSettings 读取回调，不在入口拥�
 - 2026-09-16: inline edit UI 重设计装配：bridge 新增 `createProviderIcon` 注入（`ProviderIconService.createIconElement`，与主输入窗口模型选择器同一管线），悬浮条模型 chip 与菜单行据此渲染提供商品牌图标。
 
 - 2026-09-17: 品牌标记图标 id 收敛到 `src/shared/brandingWordmark.ts` 的 `OPENCODIAN_APP_ICON_ID`，本文件与 `OpenCodianView` 不再各存一份字面量；行内编辑的字段框体引导图标、选区悬浮按钮、预览页脚身份标签改用该品牌标记。
+
+- 2026-09-17（附加上下文）: bridge 新增 `listContextFiles` 注入（vault 内 `md`/`txt`，过滤含 `<`/`>` 的路径），供行内编辑"添加上下文"选择器使用；候选仅在用户打开选择器时枚举。
+

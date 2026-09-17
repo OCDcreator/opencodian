@@ -23,7 +23,12 @@ import { Notice } from 'obsidian';
 import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import { hideSelectionHighlight, showSelectionHighlight } from '../../utils/editorSelectionHighlight';
-import type { InlineEditChoice, InlineEditHost, InlineEditHostAdapter } from './InlineEditHost';
+import type {
+  InlineEditChoice,
+  InlineEditContextFile,
+  InlineEditHost,
+  InlineEditHostAdapter,
+} from './InlineEditHost';
 import {
   choicesToMenuItems,
   InlineEditInputOverlay,
@@ -31,6 +36,7 @@ import {
 } from './InlineEditInputOverlay';
 import {
   describeInlineEditFailure,
+  INLINE_EDIT_MAX_ATTACHED_NOTES,
   type InlineEditRequest,
   normalizeInsertionText,
 } from './InlineEditPrompt';
@@ -71,6 +77,11 @@ interface ActiveEdit {
   overlay: InlineEditInputOverlay | null;
   /** Model choices for the picker; `null` until the async catalog resolves. */
   modelChoices: readonly InlineEditChoice[] | null;
+  /**
+   * Notes the user attached as extra context, in pick order. Kept on the edit
+   * (not the overlay) so a clarification round keeps them.
+   */
+  contextFiles: readonly InlineEditContextFile[];
   onDocumentKeydown: (event: KeyboardEvent) => void;
 }
 
@@ -137,6 +148,7 @@ export class InlineEditController {
       preview: null,
       overlay: null,
       modelChoices: null,
+      contextFiles: [],
       onDocumentKeydown: () => { /* replaced below */ },
     };
     this.active = edit;
@@ -222,6 +234,8 @@ export class InlineEditController {
         onPickModel: (id) => { void this.pickModel(id); },
         onPickEffort: (id) => { void this.pickEffort(id); },
         createProviderIcon: (providerId, size) => this.options.host.createProviderIcon?.(providerId, size) ?? null,
+        onRequestContextFiles: () => { this.openContextPicker(); },
+        onToggleContext: (path) => { this.toggleContextFile(path); },
       });
       edit.overlay.show(edit.anchor.from);
       edit.overlay.focusInput();
@@ -236,6 +250,8 @@ export class InlineEditController {
         : t('inlineEdit.placeholder.insert'),
       model: this.modelChipState(edit),
       effort: this.effortChipState(edit),
+      context: edit.contextFiles.map((file) => ({ path: file.path, label: file.name })),
+      contextSupported: this.options.host.listContextFiles != null,
     });
   }
 
@@ -278,6 +294,38 @@ export class InlineEditController {
       disabled: edit.service.hasSession,
       items: choicesToMenuItems(efforts, current),
     };
+  }
+
+  /**
+   * Open the attached-notes picker. Candidates come from the host on demand, so
+   * a vault is enumerated only when the user actually asks for it.
+   */
+  private openContextPicker(): void {
+    const edit = this.active;
+    if (!edit || edit.service.hasSession) return;
+    const files = this.options.host.listContextFiles?.() ?? null;
+    if (!files) return;
+    edit.overlay?.showContextPicker(files);
+  }
+
+  /** Attach or detach one note; the cap mirrors INLINE_EDIT_MAX_ATTACHED_NOTES. */
+  private toggleContextFile(path: string): void {
+    const edit = this.active;
+    if (!edit || edit.service.hasSession) return;
+    const attached = edit.contextFiles.some((file) => file.path === path);
+    if (attached) {
+      edit.contextFiles = edit.contextFiles.filter((file) => file.path !== path);
+    } else {
+      const file = this.options.host.listContextFiles?.()?.find((entry) => entry.path === path);
+      if (!file) return;
+      if (edit.contextFiles.length >= INLINE_EDIT_MAX_ATTACHED_NOTES) {
+        this.notify(t('inlineEdit.context.limit', { count: INLINE_EDIT_MAX_ATTACHED_NOTES }));
+        return;
+      }
+      edit.contextFiles = [...edit.contextFiles, file];
+    }
+    this.renderInput();
+    edit.overlay?.refreshContextPicker();
   }
 
   private async pickModel(id: string | null): Promise<void> {
@@ -353,7 +401,7 @@ export class InlineEditController {
     this.renderInput();
 
     const outcome = isFirstTurn
-      ? await edit.service.submit(buildRequest(edit.anchor, trimmed))
+      ? await edit.service.submit(buildRequest(edit.anchor, trimmed, edit.contextFiles))
       : await edit.service.clarify(trimmed);
 
     if (this.active !== edit) return;
@@ -464,7 +512,14 @@ export class InlineEditController {
 }
 
 /** Build the request payload for an anchor. */
-function buildRequest(anchor: InlineEditAnchor, instruction: string): InlineEditRequest {
+function buildRequest(
+  anchor: InlineEditAnchor,
+  instruction: string,
+  contextFiles: readonly InlineEditContextFile[] = [],
+): InlineEditRequest {
+  // Paths only: §6.1 keeps vault text out of the prompt, the read-only tools
+  // do the reading. An empty list leaves the field out entirely.
+  const attachedNotes = contextFiles.length > 0 ? contextFiles.map((file) => file.path) : undefined;
   if (anchor.mode === 'selection') {
     return {
       kind: 'selection',
@@ -473,6 +528,7 @@ function buildRequest(anchor: InlineEditAnchor, instruction: string): InlineEdit
       startLine: anchor.startLine,
       endLine: anchor.endLine,
       selectionText: anchor.snapshot,
+      attachedNotes,
     };
   }
   return {
@@ -482,6 +538,7 @@ function buildRequest(anchor: InlineEditAnchor, instruction: string): InlineEdit
     line: anchor.startLine,
     before: anchor.before,
     after: anchor.after,
+    attachedNotes,
   };
 }
 

@@ -28,6 +28,14 @@ export const INLINE_EDIT_MAX_CONTEXT_CHARS = 40_000;
 export const INLINE_EDIT_MAX_PATH_CHARS = 500;
 /** Longest generated result accepted from the model. */
 export const INLINE_EDIT_MAX_RESULT_CHARS = 40_000;
+/**
+ * Most notes one request may carry as attached context.
+ *
+ * Attached notes ride along as paths only (§6.1: never inline extra vault text,
+ * the read-only tools do the reading), so the cap keeps the block a hint rather
+ * than a payload.
+ */
+export const INLINE_EDIT_MAX_ATTACHED_NOTES = 5;
 
 /** Request shapes (§7.2). */
 export type InlineEditRequestKind = 'selection' | 'cursor-inline' | 'cursor-inbetween';
@@ -35,6 +43,7 @@ export type InlineEditRequestKind = 'selection' | 'cursor-inline' | 'cursor-inbe
 /** Tag names that make up the protocol. */
 export const INLINE_EDIT_SELECTION_TAG = 'editor_selection';
 export const INLINE_EDIT_CURSOR_TAG = 'editor_cursor';
+export const INLINE_EDIT_CONTEXT_TAG = 'attached_context';
 export const INLINE_EDIT_REPLACEMENT_TAG = 'replacement';
 export const INLINE_EDIT_INSERTION_TAG = 'insertion';
 
@@ -47,6 +56,8 @@ export interface InlineEditSelectionRequest {
   /** 1-based inclusive last line of the selection. */
   readonly endLine: number;
   readonly selectionText: string;
+  /** Vault-relative paths the user attached; rendered as a read-hint block. */
+  readonly attachedNotes?: readonly string[];
 }
 
 export interface InlineEditCursorRequest {
@@ -59,6 +70,8 @@ export interface InlineEditCursorRequest {
   readonly before: string;
   /** Text after the cursor on that line (or after the cursor in the paragraph). */
   readonly after: string;
+  /** Vault-relative paths the user attached; rendered as a read-hint block. */
+  readonly attachedNotes?: readonly string[];
 }
 
 export type InlineEditRequest = InlineEditSelectionRequest | InlineEditCursorRequest;
@@ -105,6 +118,7 @@ const SYSTEM_PROMPT_EN = [
   '- Write code and identifiers exactly as the surrounding code does.',
   '',
   'You have read-only tools. Use them silently when you need more context from the note or vault before editing — read first, then edit. Never mention the tools, and never attempt to create, modify, or delete files: writing is not available to you and the caller applies your result.',
+  'An <attached_context> block means the user attached those notes on purpose: read them with your tools before deciding, and treat them as reference for the edit rather than as text to rewrite.',
   '',
   'If the instruction is ambiguous, ask one short, specific question instead of guessing.',
 ].join('\n');
@@ -127,6 +141,7 @@ const SYSTEM_PROMPT_ZH = [
   '- 代码与标识符要和上下文写法一致。',
   '',
   '你有只读工具。需要更多上下文时可以静默使用它们先读再改。不要提及工具，也不要尝试创建、修改或删除文件——你没有写入能力，结果由调用方应用。',
+  '出现 <attached_context> 块表示用户特意附上了这些笔记：先用工具读取它们再决定，把它们当作本次修改的参考资料，而不是要改写的正文。',
   '',
   '如果指令含糊，请只提出一个简短具体的问题，不要猜测。',
 ].join('\n');
@@ -158,6 +173,12 @@ export function buildInlineEditRequest(request: InlineEditRequest): InlineEditRe
   if (request.notePath.length > INLINE_EDIT_MAX_PATH_CHARS) {
     return { ok: false, error: 'path-too-long' };
   }
+  const attachedError = validateAttachedNotes(request.attachedNotes);
+  if (attachedError) {
+    return { ok: false, error: attachedError };
+  }
+  const attached = renderAttachedContextBlock(request.attachedNotes);
+  const lead = attached ? `${instruction}\n\n${attached}\n\n` : `${instruction}\n\n`;
 
   if (request.kind === 'selection') {
     const body = request.selectionText;
@@ -172,7 +193,7 @@ export function buildInlineEditRequest(request: InlineEditRequest): InlineEditRe
     const block = `<${INLINE_EDIT_SELECTION_TAG} path="${escapeXmlAttribute(request.notePath)}" lines="${lines}">\n`
       + `${body}\n`
       + `</${INLINE_EDIT_SELECTION_TAG}>`;
-    return { ok: true, prompt: `${instruction}\n\n${block}` };
+    return { ok: true, prompt: `${lead}${block}` };
   }
 
   const contextLength = request.before.length + request.after.length;
@@ -188,7 +209,38 @@ export function buildInlineEditRequest(request: InlineEditRequest): InlineEditRe
   const block = `<${INLINE_EDIT_CURSOR_TAG} path="${escapeXmlAttribute(request.notePath)}" line="${request.line}">\n`
     + `${request.before}|${request.after} ${marker}\n`
     + `</${INLINE_EDIT_CURSOR_TAG}>`;
-  return { ok: true, prompt: `${instruction}\n\n${block}` };
+  return { ok: true, prompt: `${lead}${block}` };
+}
+
+/**
+ * Validate the attached-note list before it reaches the prompt.
+ *
+ * Fail-closed, like the rest of this builder: an unusable attachment is an
+ * error rather than something silently dropped, so the user never believes
+ * context was sent that was not.
+ */
+function validateAttachedNotes(notes: readonly string[] | undefined): string | null {
+  if (!notes || notes.length === 0) return null;
+  if (notes.length > INLINE_EDIT_MAX_ATTACHED_NOTES) return 'too-many-attached-notes';
+  for (const note of notes) {
+    if (note.length > INLINE_EDIT_MAX_PATH_CHARS) return 'attached-note-path-too-long';
+    // Angle brackets would break the tag protocol. The picker never offers such
+    // paths; this is the backstop that keeps the block unbreakable.
+    if (/[<>]/.test(note)) return 'attached-note-path-invalid';
+  }
+  return null;
+}
+
+/**
+ * `<attached_context>` block, `''` when nothing is attached.
+ *
+ * Paths only: per §6.1 the prompt never inlines extra vault text, and the
+ * system prompt tells the model to read them with its read-only tools.
+ */
+function renderAttachedContextBlock(notes: readonly string[] | undefined): string {
+  if (!notes || notes.length === 0) return '';
+  const lines = notes.map((note) => `- ${note}`).join('\n');
+  return `<${INLINE_EDIT_CONTEXT_TAG}>\n${lines}\n</${INLINE_EDIT_CONTEXT_TAG}>`;
 }
 
 /** True when `body` contains a literal closing tag for the given protocol tag. */
@@ -278,6 +330,9 @@ export function describeInlineEditFailure(reason: string): TranslationKey {
     case 'path-too-long': return 'inlineEdit.error.pathTooLong';
     case 'selection-too-long': return 'inlineEdit.error.selectionTooLong';
     case 'context-too-long': return 'inlineEdit.error.contextTooLong';
+    case 'too-many-attached-notes': return 'inlineEdit.error.tooManyAttachedNotes';
+    case 'attached-note-path-too-long': return 'inlineEdit.error.attachedNotePathTooLong';
+    case 'attached-note-path-invalid': return 'inlineEdit.error.attachedNotePathInvalid';
     case 'selection-contains-protocol-tag': return 'inlineEdit.error.protocolTagInSelection';
     case 'empty-response': return 'inlineEdit.error.emptyResponse';
     case 'empty-result': return 'inlineEdit.error.emptyResult';

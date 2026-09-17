@@ -244,9 +244,25 @@ export interface InlineEditHost {
 </editor_cursor>
 ```
 
+附加上下文（用户显式附加的笔记，可选）：
+
+```
+用户指令
+
+<attached_context>
+- 笔记路径A
+- 笔记路径B
+</attached_context>
+
+<editor_selection path="笔记路径" lines="3-9">
+选区原文
+</editor_selection>
+```
+
 加固规则：
 
 - **属性转义**：`path` 属性值转义 `&` `"` `<` `>`。
+- **附加上下文只传路径**（最多 5 篇，每篇路径 ≤ 500 字符，路径不得含 `<`/`>`）：与"不注入 vault 全文"同一条规则——附件是"去读这些"的清单，读取由只读工具完成。附件的路径在选择器层面就已过滤掉含尖括号的项，请求构建器再 fail-closed 兜底。
 - **正文原样嵌入**，但选区/上下文文本若包含字面量 `</editor_selection>`（或对应闭合标签），该次唤起直接报错拒绝（不尝试转义发明新协议）。
 - **长度上限**：选区 ≤ 20,000 字符（超出拒绝并提示）；注入的周边上下文（如有）总计 ≤ 40,000 字符；路径 ≤ 500 字符。
 - 不注入 vault 全文——模型需要更多上下文时通过只读工具自行读取（系统提示词要求先读再改）。
@@ -290,6 +306,10 @@ export interface InlineEditHost {
 | selection | 有选区 | 选区起点下方 | `<replacement>` → diff 预览 |
 | cursor-inline | 无选区、行内有文本 | 当前行下方 | `<insertion>` → 插入预览 |
 | cursor-inbetween | 光标在空行/段落间 | 光标行下方 | `<insertion>` → 插入预览 |
+
+### 7.2.1 附加上下文（v1.1.29 起）
+
+悬浮条页脚提供"添加上下文"chip：点击在面板内展开选择器（搜索框 + 候选笔记列表，**不用 modal**——modal 会把焦点移出面板并触发"焦点离开即取消"的契约）。已附加的笔记显示为可移除 chip；选择器内已附加项带 ✓，再点即取消。附件属于 active edit 状态，澄清轮次保留。候选来自 `InlineEditHost.listContextFiles()`（缺失时整个入口隐藏），只列 `md`/`txt`。
 
 ### 7.3 状态机
 

@@ -5129,6 +5129,12 @@ export const zhTranslations = {
   'inlineEdit.bar.effort': '思考强度',
   'inlineEdit.bar.default': '后端默认',
   'inlineEdit.bar.followChat': '跟随聊天模型',
+  'inlineEdit.context.add': '添加上下文',
+  'inlineEdit.context.searchPlaceholder': '搜索笔记…',
+  'inlineEdit.context.empty': '没有可附加的笔记',
+  'inlineEdit.context.truncated': '仅显示前 {{count}} 项，继续输入以缩小范围',
+  'inlineEdit.context.remove': '移除 {{name}}',
+  'inlineEdit.context.limit': '一次最多附加 {{count}} 篇笔记。',
   'inlineEdit.bar.effortDefault': '默认',
   'inlineEdit.bar.loading': '加载中…',
   'inlineEdit.notice.rejected': '已丢弃本次行内编辑。',
@@ -5153,6 +5159,9 @@ export const zhTranslations = {
   'inlineEdit.error.unclosedTag': '模型响应中存在未闭合的标签。',
   'inlineEdit.error.multipleTags': '模型响应中存在多个协议标签。',
   'inlineEdit.error.malformedTag': '模型响应中的标签格式不正确。',
+  'inlineEdit.error.tooManyAttachedNotes': '附加的笔记过多。',
+  'inlineEdit.error.attachedNotePathTooLong': '附加笔记的路径过长。',
+  'inlineEdit.error.attachedNotePathInvalid': '附加笔记的路径包含不可用字符。',
   'inlineEdit.error.generic': '行内编辑失败。',
 
   // Inline edit settings
