@@ -118,30 +118,47 @@
   white-space: pre-wrap;
 }
 
-/* Row 1: the field box (app mark + borderless input) + send / close.
-   The input is the primary task, so it owns the top row. */
+/* Row 1: the bar's avatar + the field box + send / close. The instruction is
+   the primary task, so it owns the top row and grows with its content. */
 
 .opencodian-inline-edit-inputrow {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   padding: 10px;
 }
 
-/* The field box owns the frame, the fill and the inner padding. A bare
-   `input` is styled by the host theme (and by user snippets), which is how a
+/* The app mark sits outside the field, pinned to the first line: inside the
+   box it competes with a growing instruction for the same space. */
+
+.opencodian-inline-edit-inputlead {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 14px;
+  height: 18px;
+  margin-top: 7px;
+}
+
+.opencodian-inline-edit-inputlead .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* The field box owns the frame, the fill and the inner padding. A bare form
+   control is styled by the host theme (and by user snippets), which is how a
    border with zero padding crept in and jammed the placeholder against it, so
    every box property is declared here and marked important: this widget must
    look the same under any theme. */
 
 .opencodian-inline-edit-inputfield {
   display: flex;
-  align-items: center;
-  gap: 9px;
+  align-items: flex-start;
   flex: 1 1 auto;
   min-width: 0;
-  height: 32px;
-  padding: 0 10px;
+  min-height: 32px;
+  padding: 7px 10px;
   border-radius: var(--ocie-radius-sm);
   background: var(--ocie-field-surface);
   box-shadow: inset 0 0 0 1px var(--ocie-field-ring);
@@ -153,17 +170,6 @@
 .opencodian-inline-edit-inputfield:focus-within {
   background: var(--ocie-field-surface-focus);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 52%, transparent);
-}
-
-.opencodian-inline-edit-inputlead {
-  display: inline-flex;
-  align-items: center;
-  flex: none;
-}
-
-.opencodian-inline-edit-inputlead .svg-icon {
-  width: 14px;
-  height: 14px;
 }
 
 .opencodian-inline-edit-overlay.opencodian-inline-edit-busy .opencodian-inline-edit-inputlead {
@@ -179,14 +185,18 @@
   }
 }
 
-.opencodian-inline-edit-overlay input.opencodian-inline-edit-field,
-.opencodian-inline-edit-overlay input.opencodian-inline-edit-field:hover,
-.opencodian-inline-edit-overlay input.opencodian-inline-edit-field:focus,
-.opencodian-inline-edit-overlay input.opencodian-inline-edit-field:active {
+/* The instruction field: borderless inside the box, one line tall by default
+   and grown by the overlay up to its cap, past which it scrolls. */
+
+.opencodian-inline-edit-overlay textarea.opencodian-inline-edit-field,
+.opencodian-inline-edit-overlay textarea.opencodian-inline-edit-field:hover,
+.opencodian-inline-edit-overlay textarea.opencodian-inline-edit-field:focus,
+.opencodian-inline-edit-overlay textarea.opencodian-inline-edit-field:active {
   flex: 1 1 auto !important;
   width: 100% !important;
   min-width: 0;
-  height: 100% !important;
+  min-height: 18px !important;
+  max-height: 120px;
   margin: 0 !important;
   padding: 0 !important;
   border: none !important;
@@ -197,6 +207,8 @@
   outline: none !important;
   appearance: none;
   -webkit-appearance: none;
+  resize: none;
+  overflow-y: hidden;
   color: var(--text-normal);
   font-family: var(--font-interface);
   font-size: var(--font-ui-small) !important;
@@ -204,22 +216,24 @@
   caret-color: var(--interactive-accent);
 }
 
-.opencodian-inline-edit-overlay input.opencodian-inline-edit-field::placeholder {
+.opencodian-inline-edit-overlay textarea.opencodian-inline-edit-field::placeholder {
   color: var(--text-muted);
   opacity: 1;
 }
 
-.opencodian-inline-edit-overlay.opencodian-inline-edit-busy .opencodian-inline-edit-field {
+.opencodian-inline-edit-overlay.opencodian-inline-edit-busy textarea.opencodian-inline-edit-field {
   opacity: 0.55;
 }
 
-/* Send: the one solid accent action on the bar. Close stays ghost. */
+/* Send: the one solid accent action on the bar. Close stays ghost. Both sit on
+   the field's bottom edge, the way chat composers place their send button. */
 
 .opencodian-inline-edit-overlay-submit,
 .opencodian-inline-edit-overlay-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  align-self: flex-end;
   flex: none;
   width: 26px;
   height: 26px;

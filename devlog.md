@@ -11,6 +11,22 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-17 行内编辑第四轮：多行指令（自增高 textarea）+ 品牌标记移出输入框
+
+用户实机反馈两条：指令一长就只有一行、看得到的信息太少（参考 VSCode 内联编辑）；品牌标记放在输入框里不太合适，问放哪里更好。
+
+**多行指令**：`input` 换成**自增高 `textarea`**（VSCode 内联编辑 / Cursor cmd-K 的骨架）——默认一行，随内容增高到 120px 上限（约 6 行），再多则内部滚动。增高在 rAF 的 `sync()` 里做（写 `height: auto` 再读 `scrollHeight` 属于 reflow，沿用本文件"不在编辑器 update 循环里测量"的纪律），`input` 事件只触发 `scheduleSync()`。键位：**Enter 提交、Shift+Enter 换行**（`!shiftKey` 判断本来就在，单行输入时 Shift+Enter 形同虚设，现在才真正生效）、Escape 仍由文档捕获态负责关闭。
+
+**条子会变高 → 加翻转**：新增 `resolveTop()`——优先放在锚点下方；多行时下方放不下、上方放得下就翻到锚点上方；两边都放不下则保持下方并裁切，维持光标侧阅读顺序。
+
+**品牌标记的新位置**：从字段框内移到**框外左侧，作为条子的头像并钉在首行**（`height: 18px; margin-top: 7px`；Notion AI / Copilot 内联输入的做法）。框内只剩文字，长指令不再和图标抢空间；提交/关闭按钮改为 `align-self: flex-end` 贴在框体底边（聊天输入框的惯例）。
+
+**harness**：mock 新增 `light-longtext` 面板（多行指令 + 与真实实现同款的自增高脚本），`verify-dark.cjs` 增加断言：控件 `resize: none`、品牌标记不在框内、多行时框体确实长过单行下限且不越过滚动上限。本地 e2e 脚本的字段选择器去元素化（`input.opencodian-inline-edit-field` → `.opencodian-inline-edit-field`），并修掉 8 个脚本里更早遗留的失效类名 `.opencodian-inline-edit-input`（悬浮条改造后就不存在了，这些脚本此前必然超时）。
+
+**真机验证暴露的两个问题（都已修）**：①增高原本只在 rAF 里做，而实测 `document.hidden: true` 时 **3 秒内 rAF 触发 0 次**（Chromium 对隐藏窗口完全暂停 rAF）——增高改为在 `input` 处理器里同步执行（读写自己 textarea 的 `scrollHeight` 不属于"CM6 几何测量"纪律的范围），rAF 里保留一次调用兜底程序化赋值；实测单行 32px → 3 行 69px → 回到短文本 32px，全程同步生效。②翻转定位依赖 rAF、隐藏窗口下无法实机验证，于是抽成导出纯函数 `resolvePanelTop()` 并补 6 条单测（含上下都放不下的保持下方、越界钳制边界），顺带删掉一个数学上不可达的 `Math.max(PANEL_INSET, …)` 防御分支。键位实测：Shift+Enter 不拦截默认（换行且不提交），Enter 拦截后走提交路径，Escape 仍关闭。
+
+---
+
 ## 2026-09-17 行内编辑第三轮：字段框体归我们所有 + 品牌标记 + 间距重排
 
 用户实机截图三条反馈：间距要重排、别用那颗 sparkles 星星要用插件自己的图标、输入框里的提示文字要离边框远一点。

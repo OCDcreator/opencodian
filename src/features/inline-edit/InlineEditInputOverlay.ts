@@ -32,6 +32,8 @@ import type { InlineEditChoice } from './InlineEditTypes';
 const PANEL_GAP = 6;
 /** Horizontal inset used when clamping the panel inside the editor DOM. */
 const PANEL_INSET = 8;
+/** Grown height cap for the instruction field, in px; beyond it the field scrolls. */
+const FIELD_MAX_HEIGHT = 120;
 
 /** One dropdown entry; `id === null` is the "clear override" row. */
 export interface InlineEditOverlayMenuItem {
@@ -88,7 +90,7 @@ export function inlineEditOverlayTrackerExtension(): Extension {
 
 export class InlineEditInputOverlay {
   private panel: HTMLElement | null = null;
-  private field: HTMLInputElement | null = null;
+  private field: HTMLTextAreaElement | null = null;
   private submitEl: HTMLElement | null = null;
   private menu: HTMLElement | null = null;
   private menuKind: 'model' | 'effort' | null = null;
@@ -237,15 +239,23 @@ export class InlineEditInputOverlay {
     // Input first: the instruction is the primary task, so it owns the
     // top row; model/effort configuration lives in the meta footer below.
     const row = root.createDiv({ cls: 'opencodian-inline-edit-inputrow' });
-    // The field box carries the frame, fill and inner padding (the host theme
-    // styles bare inputs on its own terms), and the app mark sits inside it.
-    const fieldBox = row.createDiv({ cls: 'opencodian-inline-edit-inputfield' });
-    const lead = fieldBox.createSpan({ cls: 'opencodian-inline-edit-inputlead' });
+    // The app mark is the bar's avatar: outside the field box, pinned to the
+    // first line, so a growing instruction never competes with it for space.
+    const lead = row.createSpan({ cls: 'opencodian-inline-edit-inputlead' });
     setIcon(lead, OPENCODIAN_APP_ICON_ID);
-    const field = fieldBox.createEl('input', {
-      type: 'text',
+    // The field box carries the frame, fill and inner padding (the host theme
+    // styles bare form controls on its own terms, see the style module doc).
+    const fieldBox = row.createDiv({ cls: 'opencodian-inline-edit-inputfield' });
+    const field = fieldBox.createEl('textarea', {
       cls: 'opencodian-inline-edit-field',
-      attr: { 'aria-label': t('inlineEdit.command.name') },
+      attr: { rows: '1', 'aria-label': t('inlineEdit.command.name') },
+    });
+    field.addEventListener('input', () => {
+      // Grow immediately: the browser pauses rAF entirely while the window is
+      // hidden, and reading our own textarea's scrollHeight is safe in any
+      // handler (the rAF discipline covers CM6 geometry reads, not this).
+      this.syncFieldHeight();
+      this.scheduleSync();
     });
     field.addEventListener('keydown', (event) => {
       if (event.isComposing) return;
@@ -253,7 +263,8 @@ export class InlineEditInputOverlay {
         event.preventDefault();
         this.callbacks.onSubmit(field.value);
       }
-      // Escape bubbles to the document capture handler, which owns dismissal.
+      // Shift+Enter inserts a newline; Escape bubbles to the document capture
+      // handler, which owns dismissal.
     });
 
     const submit = row.createEl('button', {
@@ -461,9 +472,28 @@ export class InlineEditInputOverlay {
     });
   }
 
+  /**
+   * Grow the instruction field to its content, up to `FIELD_MAX_HEIGHT`.
+   *
+   * Called straight from the input handler (never depend on rAF for this: a
+   * hidden window pauses rAF completely) and again in the rAF pass so
+   * programmatic value changes (clarification retries) grow too. Writing
+   * `height: auto` and reading `scrollHeight` is a reflow on our own element,
+   * which the file's no-measurement-in-the-update-cycle rule does not cover.
+   */
+  private syncFieldHeight(): void {
+    const field = this.field;
+    if (!field) return;
+    field.style.height = 'auto';
+    const contentHeight = field.scrollHeight;
+    field.style.height = `${Math.min(contentHeight, FIELD_MAX_HEIGHT)}px`;
+    field.style.overflowY = contentHeight > FIELD_MAX_HEIGHT ? 'auto' : 'hidden';
+  }
+
   private sync(): void {
     const panel = this.panel;
     if (!panel || !panel.isConnected) return;
+    this.syncFieldHeight();
     const coords = this.view.coordsAtPos(this.anchorPos);
     if (!coords) {
       // Anchor scrolled out of the render window: keep the last position so
@@ -477,12 +507,42 @@ export class InlineEditInputOverlay {
     const maxLeft = Math.max(PANEL_INSET, this.view.dom.clientWidth - panelWidth - PANEL_INSET);
     const rawLeft = coords.left - domRect.left;
     const left = Math.min(Math.max(rawLeft, PANEL_INSET), maxLeft);
-    const top = Math.max(0, coords.bottom - domRect.top + PANEL_GAP);
+    const top = resolvePanelTop({
+      anchorTop: coords.top - domRect.top,
+      anchorBottom: coords.bottom - domRect.top,
+      viewportHeight: this.view.dom.clientHeight,
+      panelHeight: panel.offsetHeight,
+    });
     panel.style.left = `${left}px`;
     panel.style.top = `${top}px`;
     this.lastLeft = left;
     this.lastTop = top;
   }
+}
+
+/**
+ * Vertical placement of the bar relative to the anchor line, in editor DOM
+ * coordinates.
+ *
+ * The bar sits below the anchor by default and flips above it when it no longer
+ * fits underneath — a multi-line instruction makes the bar tall enough that
+ * this happens well before the document ends. When it fits neither way it stays
+ * below and clips, which keeps the caret-side reading order intact.
+ */
+export function resolvePanelTop(input: {
+  readonly anchorTop: number;
+  readonly anchorBottom: number;
+  readonly viewportHeight: number;
+  readonly panelHeight: number;
+}): number {
+  const spaceBelow = input.viewportHeight - input.anchorBottom - PANEL_GAP - PANEL_INSET;
+  const fitsBelow = input.panelHeight <= spaceBelow;
+  const fitsAbove = input.anchorTop - PANEL_GAP - PANEL_INSET >= input.panelHeight;
+  if (!fitsBelow && fitsAbove) {
+    // `fitsAbove` already bounds this to at least PANEL_INSET.
+    return input.anchorTop - input.panelHeight - PANEL_GAP;
+  }
+  return Math.max(0, input.anchorBottom + PANEL_GAP);
 }
 
 /** Convert host `InlineEditChoice[]` entries into menu items with ids. */

@@ -56,3 +56,4 @@ Run before merge: `npm run typecheck`, `npm run check:module-docs`.
 
 - 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
 - 2026-09-17: 行内编辑 UI 第三轮：输入行改为「字段框体 + 内嵌品牌标记 + 无边框输入框」，字段框体归本 owner 的样式所有（裸 input 的盒属性以 `!important` 钉死，抵抗宿主主题/片段注入边框与内边距）；sparkles 换为插件 app 标记（id 常量移到 `shared.brandingWordmark`）。职责与边界未变。
+- 2026-09-17（第四轮）: 指令输入从单行 `input` 改为自增高 `textarea`（上限 120px 后内部滚动，Enter 提交 / Shift+Enter 换行），条子新增"下方放不下时翻到锚点上方"的定位规则；品牌标记移出字段框、作为条子头像钉在首行。职责与边界未变。
