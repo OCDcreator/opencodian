@@ -11,6 +11,18 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-17 发版断链修复：补发 6 个版本 + 发布体检探针
+
+用户实机反馈"版本发不出去我不知道"追查出的链路问题：**发布 workflow 只在 bump push 全门禁通过时才建 Release**，一次红门禁就切掉一个仍写在 `versions.json` 里的版本，客户端下载 `releases/download/v<ver>/main.js` 得到 404，而失败信号只停在 GitHub 的运行标记里，没人看也没人转达。
+
+**断链根因**：`tests/unit/app/memory/MemoryGitSyncService.test.ts` 的冲突用例用裸 `git pull --no-rebase` 造 unmerged 状态，而 git 在可能需要写 merge commit 时**先校验提交者身份**——CI 没有全局 `user.name/email`，pull 以 exit 128 提前退出，index 从未进入 unmerged，断言 `git ls-files -u` 为空。本地因有全局配置一直绿。产品代码不受影响（`MemoryGitSyncService` 自己带 `-c user.email=` 且 pull 走 `--rebase --autostash`）。修复=给该 pull 补上与相邻 commit 相同的显式身份参数；用 `GIT_CONFIG_GLOBAL=/dev/null` 复现 CI 环境后 14/14 通过。
+
+**补发**：`v1.1.2 / v1.1.15 / v1.1.16 / v1.1.25 / v1.1.26 / v1.1.27` 六个版本从各自 commit 用 worktree + `npm ci` + `npm run build` 重建三件套（逐版本校验产物 manifest 版本一致）后 `gh release create --target <sha> --latest=false` 补发，Latest 仍是 v1.1.28。v1.1.27 是本次 UI 重设计的版本，v1.1.28 是含测试修复的当前版本。
+
+**发布体检探针（`scripts/check-release-health.mjs` + `.github/workflows/release-health.yml`）**：每个版本三项检查（Release 存在 / 三件套齐全 / 产物 manifest 版本自洽），外加"main 分支上最近一次 Plugin Package 是否失败"这条独立信号；失败即退出码 1，并把发现写到唯一一条追踪 issue（fingerprint 去重，同一问题不重复刷评论）。workflow 在每次 Plugin Package 结束后与每日 06:00 UTC 运行，所以"发版断了"会自己冒出来，不再依赖有人去看运行列表。首次运行 29/29 全绿。
+
+---
+
 ## 2026-09-16 行内编辑 UI 重设计：指令条骨架翻转 + 提供商图标 + 幽灵分层
 
 用户对首版 shadcn 移植风格明确不满意（"太丑、布局也不满意"），并连续给出三轮实机反馈：卡片是直角、模型旁的键帽不知道干什么、思考强度选择器认不出来、tooltip 不要叠加。本轮把布局推翻重排并逐条回应。

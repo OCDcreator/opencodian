@@ -20,10 +20,13 @@ npm run check:module-docs
 npm run check:graphify
 npm run check:devlog-order
 npm run check:owner-manifest
+npm run check:release-health
 npm run inspect:owner -- <path|symbol>
 ```
 
 Use `npm run doctor:esbuild` only after dependency changes or when build/dev reports an esbuild platform mismatch.
+
+After pushing a version bump, run `npm run check:release-health`: it verifies that every version listed in `versions.json` actually has a published release with complete assets, and that the main-branch publish run is green. A release that failed to publish is a silent 404 for every installed client, so this is the one check that must never be skipped.
 
 ## Owner Routing (start here)
 

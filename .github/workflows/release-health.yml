@@ -1,0 +1,48 @@
+name: Release Health
+
+# The tripwire for a silently broken release pipeline.
+#
+# The publish workflow creates a release only when the bump push passes every
+# gate, so a red gate cuts a version that `versions.json` keeps advertising and
+# nothing tells anyone — v1.1.2, v1.1.15, v1.1.16, v1.1.25, v1.1.26 and v1.1.27
+# were all published-but-missing for days. This workflow runs after every
+# Plugin Package run (so a failed publish is reported within minutes) and once
+# a day (so a pipeline that broke without a push still surfaces), and it records
+# findings on one tracking issue. A red job here is the signal that the update
+# index and the releases have drifted apart.
+
+on:
+  workflow_run:
+    workflows:
+      - Plugin Package
+    types:
+      - completed
+  schedule:
+    # 06:00 UTC daily — before the maintainer's working day in UTC+8.
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: release-health
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Check that every listed version has a published release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/check-release-health.mjs --notify-issue --publish-workflow plugin-package.yml

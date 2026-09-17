@@ -81,6 +81,14 @@ Actions 与本地共用的 fail-closed 打包器。它只接受仓库根目录�
 
 检查 `devlog.md` 中 `## YYYY-MM-DD ...` 标题是否按降序排列。新条目必须插入到第一个日期标题之前，不能追加到文件末尾。
 
+### check-release-health.mjs — 发布体检（发版断链的探针）
+
+回答一个问题："`versions.json` 里承诺的每个版本，真的能下载到吗？"发布 workflow 只在 bump push 全门禁通过时才建 Release，所以一次红门禁就会切掉一个仍被 `versions.json` 广为宣传的版本——客户端在 `releases/download/v<ver>/main.js` 撞 404，而没有任何人被告知（v1.1.2 / 1.1.15 / 1.1.16 / 1.1.25 / 1.1.26 / 1.1.27 都是这样躺了数天）。
+
+每个版本查三件事：① `v<ver>` Release 存在；② 三件套资产齐全且 size > 0；③ 发布出去的 `manifest.json` 声明的版本号与该版本一致（防止"用别的树打包、贴上这个 tag"）。另有第二条独立信号：`--publish-workflow <file>` 读取该 workflow 在 **main 分支**上最近一次已完成运行，失败即计入问题（`tags: v*` 触发的老树验证失败不算，那是预期行为）。
+
+问题存在时退出码 1；`--notify-issue` 把发现写到唯一一条追踪 issue（标题固定，fingerprint 去重，同一个问题不会每天刷评论）。`--versions-file` / `--repo` / `--json` / `--dry-run` / `--only-newest` 供本地诊断与演练。`.github/workflows/release-health.yml` 在每次 Plugin Package 运行结束后与每日 06:00 UTC 调用它。
+
 ### update-graphify-src.mjs — src-scoped graphify 刷新
 
 运行当前平台可用的 Python graphify 入口，对 `src/` 做增量 code graph 更新；Windows 使用 `py -m graphify update src`。脚本会先清理旧的临时 `src/graphify-out/`，刷新完成后把 `src/graphify-out/GRAPH_REPORT.md` 和 `src/graphify-out/graph.json` 同步回根目录 `graphify-out/`，再删除临时输出。如果 graphify 在必需的 report/json 写出后仅因 HTML viz 规模上限返回非 0，脚本会继续同步这两个提交用 artifact。
@@ -179,6 +187,7 @@ Node.js 脚本形式的 Jest 启动包装器。`run-jest-options.js` 只在当�
 | `update-graphify-src.mjs` | `npm run graphify:update:src` | 刷新 `src` 范围 graphify artifacts |
 | `check-graphify-freshness.mjs` | `npm run check:graphify` | 检查 graphify artifacts 是否跟上 `src` |
 | `check-devlog-order.mjs` | `npm run check:devlog-order` | Devlog 排序验证 |
+| `check-release-health.mjs` | `npm run check:release-health` | 校验 `versions.json` 每个版本都有完整可下载的 Release |
 | `check-module-doc-coverage.mjs` | `npm run check:module-docs:coverage` | 模块文档覆盖 / orphan 检查 |
 | `check-module-doc-diff.mjs` | `npm run check:module-docs:diff` | 源码 diff 必须同步触碰映射文档 |
 | `list-module-doc-targets-from-diff.mjs` | `npm run list:module-docs` | 输出本次 diff 的文档同步目标 |

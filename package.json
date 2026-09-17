@@ -28,6 +28,7 @@
     "inspect:owner": "node scripts/inspect-owner.mjs",
     "verify:scope": "node scripts/run-verify.mjs",
     "check:graphify": "node scripts/check-graphify-freshness.mjs",
+    "check:release-health": "node scripts/check-release-health.mjs",
     "check:devlog-order": "node scripts/check-devlog-order.mjs",
     "check:module-docs:coverage": "node scripts/check-module-doc-coverage.mjs",
     "check:module-docs:diff": "node scripts/check-module-doc-diff.mjs --range HEAD",
