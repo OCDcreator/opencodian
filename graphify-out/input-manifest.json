@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "1758c55fa235252d27995d1445363914d364f661bbc114d5da61e3a1a452e85c",
+  "digest": "b8f4bf19d722fe7c7d3b1b282e263d3f65ce223318702032a356bf570246828a",
   "recordCount": 661,
   "records": [
     {
@@ -2156,7 +2156,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditContextUi.ts",
-      "sha256": "5762867d57f300fe58d0c1f7b12003c7ce1c36e786702f6166360df2d1934d36"
+      "sha256": "58cf546b35feb614743ea43aeb4269796e68dab586b6c54466535c7f24bd0de6"
     },
     {
       "kind": "src",
@@ -3046,7 +3046,7 @@
     {
       "kind": "src",
       "key": "src/style/features/inline-edit.css",
-      "sha256": "ae0b051ff8c6f670722df665fa8fce42504839cb683842da4bc8ef7f90b6d8b9"
+      "sha256": "b658f9ea543b1570457b458f65ba7fa4a8b82c8e7116085ed3a304be50836a4a"
     },
     {
       "kind": "src",
@@ -3309,7 +3309,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-17T05:04:18.309Z",
-  "headShaAtGeneration": "922001cef4f1db13d025d5662bb0f5ee3c1b6dcd",
+  "generatedAt": "2026-09-17T06:52:47.670Z",
+  "headShaAtGeneration": "7386d34b90ede55e95dc56dc506eecf1e5071f71",
   "graphifyVersion": "graphify 0.9.31"
 }

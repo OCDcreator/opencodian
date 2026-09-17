@@ -222,15 +222,10 @@ export function openContextPicker(
   options: OpenContextPickerOptions,
 ): { readonly element: HTMLElement; readonly refresh: (attachedPaths: ReadonlySet<string>) => void } {
   const menu = panel.createDiv({ cls: 'opencodian-inline-edit-menu opencodian-inline-edit-picker' });
-  const bar = panel.querySelector<HTMLElement>(':scope > .opencodian-inline-edit-chipbar');
-  if (bar) {
-    // Line the picker up with the footer's content inset, not with any one
-    // chip: the attach chip is the first item of the config row today, and this
-    // stays correct if the footer is rearranged again.
-    const inset = Number.parseFloat(getComputedStyle(bar).paddingLeft) || 0;
-    const panelRect = panel.getBoundingClientRect();
-    menu.style.left = `${Math.max(0, bar.getBoundingClientRect().left + inset - panelRect.left)}px`;
-  }
+  // Flush with the card's own border and spanning its full width (CSS keeps
+  // `width: 100%`): an inset picker reads as misaligned against the bar, and a
+  // wider one hangs past the card's right edge.
+  menu.style.left = '0';
   const refresh = renderContextPickerInto(menu, options);
   refresh(options.attachedPaths);
   focusContextPickerSearch(menu, options.view);

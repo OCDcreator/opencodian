@@ -15,7 +15,7 @@ overlay 仍持有选择器的**容器、定位与 Escape 顺序**（它就是一
 - `renderContextChips(row, chips, onToggle)`：清空并重建 `context-row`（列表至多 5 项、不持焦点/光标状态，故整块重建而非 diff）；空列表把整行 `display: none`；chip 本身即移除按钮，`title` 说明移除对象
 - `PICKER_MAX_ROWS` / `filterContextFiles(files, query)`：路径大小写不敏感子串过滤 + 行数上限（纯函数，有单测）
 - `renderContextPickerInto(container, { files, onToggle })`：渲染搜索框 + 列表，返回 `(attachedPaths) => void` 刷新回调——选择器在附加/取消时保持打开，回调带**当前**附加集合刷新 ✓ 标记，不重建容器（否则会丢查询与焦点）
-- `openContextPicker(panel, { files, attachedPaths, onToggle, view })`：创建容器、定位到附加 chip 左缘、渲染主体、延后聚焦搜索框；返回菜单元素与刷新回调
+- `openContextPicker(panel, { files, attachedPaths, onToggle, view })`：创建容器（`left: 0` + CSS `width: 100%`，让选择器左右边框与卡片边框对齐）、渲染主体、延后聚焦搜索框；返回菜单元素与刷新回调
 - 行内键盘：ArrowUp/Down 循环移动高亮（`is-highlighted`），Enter 切换高亮项，输入即过滤；Escape 冒泡给 overlay 的文档捕获处理器（先关菜单再考虑取消编辑）
 
 ## 依赖

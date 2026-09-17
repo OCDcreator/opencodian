@@ -19704,15 +19704,17 @@ img.opencodian-model-provider-header-icon {
   opacity: 0.55;
 }
 
-/* Send: the one solid accent action on the bar. Close stays ghost. Both sit on
-   the field's bottom edge, the way chat composers place their send button. */
+/* Send: the one solid accent action on the bar. Close stays ghost. Both stay
+   centred on the field box (the row itself is flex-start so the app mark can
+   sit on the first line): bottom-aligning them reads as a 3px droop on a
+   single-line bar. */
 
 .opencodian-inline-edit-overlay-submit,
 .opencodian-inline-edit-overlay-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  align-self: flex-end;
+  align-self: center;
   flex: none;
   width: 26px;
   height: 26px;
@@ -19993,12 +19995,15 @@ img.opencodian-model-provider-header-icon {
 }
 
 /* Picker variant of the menu: a pinned search field over a scrolling list, so
-   the query stays visible while the list moves. */
+   the query stays visible while the list moves. It spans the bar exactly (the
+   overlay sets `left: 0`), which is what makes its frame line up with the
+   card's own border on both sides. */
 
 .opencodian-inline-edit-picker {
   display: flex;
   flex-direction: column;
-  min-width: 260px;
+  width: 100%;
+  min-width: 0;
   padding: 0;
   overflow: hidden;
 }
