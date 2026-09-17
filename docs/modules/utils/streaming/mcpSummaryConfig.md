@@ -44,6 +44,8 @@
 
 若 category fields 无摘要，则尝试 `MCP_GENERIC_SUMMARY_FIELDS`。仍无结果时，返回 input 中第一个可格式化标量值。
 
+`search_query` / `searchQuery` 同时出现在 search category 和通用字段列表的前部：带这些字段的调用（例如 `web_search_prime`）应显示查询词，而不是 payload 里排在前面的 `content_size` 之类的配置项。
+
 ## 数据流
 
 ```text

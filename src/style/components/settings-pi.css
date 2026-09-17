@@ -41,6 +41,39 @@
   overflow-wrap: anywhere;
 }
 
+/* Pi extensions report their status as text; show it verbatim, not as a card that
+   implies the plugin parsed it into structure it does not have. */
+.opencodian-pi-mcp-status {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--opencodian-settings-space-md, 8px) var(--opencodian-settings-space-lg, 12px);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-normal);
+}
+
+.opencodian-pi-mcp-status-line,
+.opencodian-pi-mcp-status-message {
+  overflow-wrap: anywhere;
+}
+
+.opencodian-pi-mcp-status-message {
+  color: var(--text-muted);
+}
+
+.opencodian-pi-mcp-status:empty {
+  display: none;
+}
+
+.opencodian-pi-mcp-sources {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+}
+
 .opencodian-pi-config-multiline {
   flex-wrap: wrap;
 }

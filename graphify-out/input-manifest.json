@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "7b1a06c45bcb8c42b86bf2617e4de3939bc37f139ac3831f9aa32522f701294f",
-  "recordCount": 661,
+  "digest": "82520e498120ab2141b3d65c2002ad74215a75991e84e65fb9a4fecb8676d6b6",
+  "recordCount": 662,
   "records": [
     {
       "kind": "ignore",
@@ -381,7 +381,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/pi/PiAdapter.ts",
-      "sha256": "add2f6c13c0fdbd3d0293d2538dc99ecc54e223625dcac60454b33a5944c94c8"
+      "sha256": "b58efaec3e8ebc0af8ad4dfc74a5793f338b3a9f03565e507324c4a6a40c664a"
     },
     {
       "kind": "src",
@@ -390,8 +390,13 @@
     },
     {
       "kind": "src",
+      "key": "src/core/agents/backend/pi/PiMcpConfigService.ts",
+      "sha256": "8355d3281c58d56cdd43b41180c017775516db9621d1a318bc5bdcbcde9404df"
+    },
+    {
+      "kind": "src",
       "key": "src/core/agents/backend/pi/PiProtocol.ts",
-      "sha256": "92e455cc2d9a97ad92712eb5ec031c2084f2791a2ba3f05b09a6e32bfdfa60ad"
+      "sha256": "b56dca3b4cb9bf5892b00af7e73aa377e8f1749a3ac01d02d72a895cc3e5d3df"
     },
     {
       "kind": "src",
@@ -411,7 +416,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/pi/PiStreamMapper.ts",
-      "sha256": "4580deea263f74565459a891a0caf95c2cb8b8fc5162a4da78a6700754055356"
+      "sha256": "02c9fdcbe20d4399b141b08a0edb61e79d414d9ee5fb0c5c1685b10dadc1edb5"
     },
     {
       "kind": "src",
@@ -1051,7 +1056,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/AssistantErrorRenderer.ts",
-      "sha256": "6f5fe11fb9740354ab06a88f6aeec41d27d86bff2c687d858c8480790dcbff70"
+      "sha256": "68f51c6e80df4fed6ca2aec6f39b571b0b6a48bf10b32daea7d2659cdb6ab0d2"
     },
     {
       "kind": "src",
@@ -1731,7 +1736,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/PiExtensionUiHost.ts",
-      "sha256": "f4cb9515e058630925d1dfe03da993e20ab6d64e599ac2920a983588a410dc0a"
+      "sha256": "553ab11f813003cd97019031fe1b5c77f20393fe860e0b226a6d0e85cf5ce96a"
     },
     {
       "kind": "src",
@@ -2581,7 +2586,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/settingsLayoutRegistry.ts",
-      "sha256": "5c42a27683d531c930b640404ec221ed305b12e722806b2d29063c94e42432f3"
+      "sha256": "cefa6603a82f41710270e29e7b2a9f9a0f2ad2bdec4d19e40977548f6b738097"
     },
     {
       "kind": "src",
@@ -2636,7 +2641,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsPiSection.ts",
-      "sha256": "a658f4e76b4c59bd89eb8ca2cfee458e83fd45c87b50f63d7a3db81dfe89f6cc"
+      "sha256": "be47c94d861102e87585773866439452e769035d9fe0d333f6ded01206270dba"
     },
     {
       "kind": "src",
@@ -2786,7 +2791,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "7a7c381b410ff8f68522104b3e8f464d3e27fa781cb8ed0c765d7eab54a9cc66"
+      "sha256": "19e9e132848922012187995f130b03b9e86a23c34e958c7cb6132f4c9b5b6302"
     },
     {
       "kind": "src",
@@ -2796,7 +2801,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "b94214f4509252e573cef2699511bc4b4ef22feebc7a7c46ff2c940acf755f3d"
+      "sha256": "d0efec52a4063f064eff88b565070da726f68ed4260b6215c2546091198b5337"
     },
     {
       "kind": "src",
@@ -3021,7 +3026,7 @@
     {
       "kind": "src",
       "key": "src/style/components/settings-pi.css",
-      "sha256": "65c2826c095334234e85be1f85164a9db339c74fe48a8d3dc3460cf6fb4be4ac"
+      "sha256": "ac6b171531475e2ed3d8ac80659cd15eb73f41ebef28eb1e9b29359e72e65ba8"
     },
     {
       "kind": "src",
@@ -3031,7 +3036,7 @@
     {
       "kind": "src",
       "key": "src/style/components/streaming-content.css",
-      "sha256": "e47bcbac1ac83cf5c5093da843dd7ff8549dd2993044e69f21c4ce8e03b9a8b4"
+      "sha256": "5e337406ae468df4bd434d4386d2c9fa6f11706519eb497b7028976e0088da75"
     },
     {
       "kind": "src",
@@ -3231,7 +3236,7 @@
     {
       "kind": "src",
       "key": "src/utils/streaming/mcpSummaryConfig.ts",
-      "sha256": "65da63c7cb74fa56d165dddd7a092aaf3982f04b96162230b064dfcc1abfa415"
+      "sha256": "f49d69f2f7855683b16bf6f5b0df3c7e62470d43559cde1b9a153972e34672e8"
     },
     {
       "kind": "src",
@@ -3309,7 +3314,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-17T07:14:22.459Z",
-  "headShaAtGeneration": "c8e0dcc3c2618a9edd9c8f836f9e330d5582d258",
+  "generatedAt": "2026-09-17T11:55:34.223Z",
+  "headShaAtGeneration": "58185fff9a8a9fe3fc767bd3c5af184a92369223",
   "graphifyVersion": "graphify 0.9.31"
 }

@@ -142,8 +142,58 @@ describe('Pi stream semantics', () => {
     expect(chunks).toContainEqual({ type: 'file_edited', file: 'note.md' });
     expect(chunks).toContainEqual(expect.objectContaining({ type: 'backend_event', metadata: expect.objectContaining({ details: { diff: '+abc' } }) }));
   });
+  it('keeps the last extension status Pi reported over the UI channel', async () => {
+    const sandbox = await fs.mkdtemp(path.join(tmpdir(), 'pi-ui-'));
+    const requests: PiRecord[] = [];
+    let turns = 0;
+    const withUi = new PiAdapter({
+      workingDirectory: sandbox, sessionDirectory: sandbox,
+      onUiRequest: async (request) => { requests.push(request); },
+      createClient: (options) => {
+        const client = new FakeClient(options);
+        client.onPrompt = async (emitting) => {
+          if (turns++ > 0) { emitting.emit({ type: 'extension_ui_request', method: 'setStatus', statusKey: 'mcp', statusText: '' }); return; }
+          emitting.emit({ type: 'extension_ui_request', method: 'setStatus', statusKey: 'mcp', statusText: 'MCP: 5 servers enabled (1 connected)' });
+          emitting.emit({ type: 'extension_ui_request', method: 'notify', message: '✗ zhipu-zai: needs auth' });
+        };
+        return client;
+      },
+    });
+    try {
+      const session = await withUi.createSession('Chat');
+      await collect(withUi.sendMessage({ sessionId: session, content: 'Hello' }));
+      expect(requests).toHaveLength(2);
+      expect(requests[0]).toMatchObject({ sessionId: session, method: 'setStatus' });
+      expect(withUi.getExtensionStatus().statuses).toEqual({ mcp: 'MCP: 5 servers enabled (1 connected)' });
+      expect(withUi.getExtensionStatus().message).toBe('✗ zhipu-zai: needs auth');
+
+      await collect(withUi.sendMessage({ sessionId: session, content: 'Continue' }));
+      expect(withUi.getExtensionStatus().statuses).toEqual({});
+      expect(withUi.getExtensionStatus().message).toBe('✗ zhipu-zai: needs auth');
+    } finally {
+      withUi.dispose();
+      await fs.rm(sandbox, { recursive: true, force: true });
+    }
+  });
   it('does not turn a retryable attempt into a terminal UI error', () => {
     expect(new PiStreamMapper('id').map({ type: 'message_end', message: { role: 'assistant', stopReason: 'error', errorMessage: '429' } })).toEqual([]);
+  });
+  it('unwraps the MCP meta tool into the real server tool identity', () => {
+    const call = new PiStreamMapper('id').map({ type: 'tool_execution_start', toolCallId: 't1', toolName: 'mcp', args: { tool: 'zhipu-web-search_web_search_prime', args: '{"search_query":"news"}' } });
+    expect(call).toContainEqual(expect.objectContaining({ type: 'tool_use', name: 'zhipu-web-search_web_search_prime', kind: 'mcp', input: { search_query: 'news' } }));
+    const search = new PiStreamMapper('id').map({ type: 'tool_execution_start', toolCallId: 't2', toolName: 'mcp', args: { search: 'web search' } });
+    expect(search).toContainEqual(expect.objectContaining({ type: 'tool_use', name: 'mcp', kind: 'mcp', input: { query: 'web search' } }));
+    const describe = new PiStreamMapper('id').map({ type: 'tool_execution_start', toolCallId: 't3', toolName: 'mcp', args: { describe: 'server_tool' } });
+    expect(describe).toContainEqual(expect.objectContaining({ kind: 'mcp', input: { name: 'server_tool' } }));
+    const script = new PiStreamMapper('id').map({ type: 'tool_execution_start', toolCallId: 't4', toolName: 'mcpScript', args: { code: 'return 1' } });
+    expect(script).toContainEqual(expect.objectContaining({ name: 'mcpScript', kind: 'mcp' }));
+  });
+  it('restores the same MCP identity from native history', () => {
+    const messages = toPiChatMessages([
+      { id: 'a', role: 'assistant', content: [{ type: 'toolCall', id: 't', name: 'mcp', arguments: { tool: 'zhipu-web-search_web_search_prime', args: '{not json' } }] },
+    ]);
+    expect(messages[0].toolCalls?.[0]).toMatchObject({ name: 'zhipu-web-search_web_search_prime', kind: 'mcp', input: { args: '{not json' } });
+    expect(messages[0].contentBlocks?.[0]).toMatchObject({ toolKind: 'mcp', toolName: 'zhipu-web-search_web_search_prime' });
   });
   it('keeps billing separate from current context occupancy', () => {
     const snapshot = buildPiUsageSnapshot('id', { cost: 3.4, contextUsage: { tokens: 90, contextWindow: 1000 }, tokens: { input: 10000, output: 200 } }, { model: { id: 'm', provider: 'p' } });

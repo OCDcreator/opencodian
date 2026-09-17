@@ -31,7 +31,7 @@ class PiDialog extends Modal {
   private resolve(result: Record<string, unknown>): void { if (this.completed) return; this.completed = true; this.finish(result); this.close(); }
 }
 
-/** Renders all nine official RPC UI methods without interpreting extension HTML. */
+/** Renders the official RPC UI methods that either need a user response or have an Obsidian surface. */
 export async function presentPiUiRequest(app: App, request: PiServiceEvent, signal: AbortSignal): Promise<Record<string, unknown> | void> {
   const method = String(request.method);
   if (['select', 'confirm', 'input', 'editor'].includes(method)) {
@@ -61,17 +61,7 @@ export async function presentPiUiRequest(app: App, request: PiServiceEvent, sign
     return;
   }
   if (method === 'setTitle') { container.setAttribute('aria-label', String(request.title ?? 'Pi')); return; }
-  if (!['setStatus', 'setWidget'].includes(method)) return;
-  renderPiWidget(container, request, method);
-}
-
-function renderPiWidget(container: HTMLElement, request: PiServiceEvent, method: string): void {
-  let surface = container.querySelector<HTMLElement>('.opencodian-pi-extension-ui');
-  if (!surface) surface = container.createDiv({ cls: 'opencodian-pi-extension-ui', attr: { 'aria-live': 'polite' } });
-  const key = String(request.widgetKey ?? request.statusKey ?? 'status');
-  let item = [...surface.children].find((child) => (child as HTMLElement).dataset.piKey === key) as HTMLElement | undefined;
-  const text = method === 'setWidget' ? (Array.isArray(request.widgetLines) ? request.widgetLines.join('\n') : '') : String(request.statusText ?? '');
-  if (!text) { item?.remove(); return; }
-  if (!item) { item = surface.createEl('pre'); item.dataset.piKey = key; }
-  item.textContent = text;
+  // `setStatus` / `setWidget` are deliberately not rendered: they are Pi's terminal status line
+  // (a third-party MCP adapter reports "MCP: N servers enabled" through them), which duplicates
+  // what the chat UI already shows and has no equivalent on any other backend.
 }

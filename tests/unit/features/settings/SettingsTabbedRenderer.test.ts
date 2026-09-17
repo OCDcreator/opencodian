@@ -138,7 +138,7 @@ describe('SettingsTabbedRenderer', () => {
     renderer.renderDisplay(container);
     expect(container.querySelector('.opencodian-settings-tabs-primary [data-tab-id="pi"]')).not.toBeNull();
     expect(container.querySelector('.opencodian-settings-tabs-primary [data-tab-id="codex"]')).toBeNull();
-    expect(container.querySelector('.opencodian-settings-tabs-secondary')?.children).toHaveLength(8);
+    expect(container.querySelector('.opencodian-settings-tabs-secondary')?.children).toHaveLength(9);
     expect(renderPi).toHaveBeenCalledWith(expect.any(HTMLElement), 'providers');
   });
   beforeEach(() => {

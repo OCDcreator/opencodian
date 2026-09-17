@@ -53,6 +53,31 @@ function nativeImages(content: unknown): ImageAttachment[] {
     .map(block => ({ data: String(block.data), mediaType: block.mimeType as ImageMediaType }));
 }
 
+function parsePiToolArguments(value: unknown): PiRecord {
+  if (typeof value !== 'string') return piRecord(value);
+  try {
+    return piRecord(JSON.parse(value));
+  } catch {
+    return { args: value };
+  }
+}
+
+/** pi proxies every MCP call through one meta tool, so the real server/tool identity only exists
+ *  inside the arguments. Unwrap it so MCP cards match the identity other backends report. */
+export function resolvePiToolCall(
+  toolName: string,
+  args: PiRecord,
+): { name: string; input: PiRecord; kind?: ToolCallInfo['kind'] } {
+  if (toolName !== 'mcp' && toolName !== 'mcpScript') {
+    return { name: toolName, input: args };
+  }
+  const qualifiedName = typeof args.tool === 'string' ? args.tool.trim() : '';
+  if (qualifiedName) return { name: qualifiedName, input: parsePiToolArguments(args.args), kind: 'mcp' };
+  if (typeof args.search === 'string') return { name: toolName, input: { query: args.search }, kind: 'mcp' };
+  if (typeof args.describe === 'string') return { name: toolName, input: { name: args.describe }, kind: 'mcp' };
+  return { name: toolName, input: args, kind: 'mcp' };
+}
+
 /** Restore native entry identities, reasoning and tool results into the existing chat schema. */
 export function toPiChatMessages(entries: unknown[]): ChatMessage[] {
   const messages: ChatMessage[] = [];
@@ -79,9 +104,10 @@ export function toPiChatMessages(entries: unknown[]): ChatMessage[] {
         if (block.type === 'text') message.contentBlocks.push({ type: 'text', text: String(block.text ?? '') });
         if (block.type === 'thinking') message.contentBlocks.push({ type: 'thinking', thinking: String(block.thinking ?? '') });
         if (block.type === 'toolCall') {
-          const tool: ToolCallInfo = { id: String(block.id), name: String(block.name), input: piRecord(block.arguments), status: 'completed' };
+          const resolved = resolvePiToolCall(String(block.name), piRecord(block.arguments));
+          const tool: ToolCallInfo = { id: String(block.id), name: resolved.name, input: resolved.input, status: 'completed', ...(resolved.kind ? { kind: resolved.kind } : {}) };
           (message.toolCalls ??= []).push(tool); tools.set(tool.id, { tool, message });
-          message.contentBlocks.push({ type: 'tool_use', toolId: tool.id, toolName: tool.name, toolInput: tool.input });
+          message.contentBlocks.push({ type: 'tool_use', toolId: tool.id, toolName: tool.name, toolInput: tool.input, ...(resolved.kind ? { toolKind: resolved.kind } : {}) });
         }
       }
     }
@@ -139,9 +165,10 @@ export class PiStreamMapper {
   private mapToolEvent(event: PiRecord): StreamChunk[] {
     switch (event.type) {
       case 'tool_execution_start': {
-        const input = piRecord(event.args);
+        const resolved = resolvePiToolCall(String(event.toolName), piRecord(event.args));
+        const input = resolved.input;
         if (['write', 'edit'].includes(String(event.toolName)) && typeof input.path === 'string') this.toolPaths.set(String(event.toolCallId), input.path);
-        return [{ type: 'tool_use', id: String(event.toolCallId), name: String(event.toolName), input }];
+        return [{ type: 'tool_use', id: String(event.toolCallId), name: resolved.name, input, ...(resolved.kind ? { kind: resolved.kind } : {}) }];
       }
       case 'tool_execution_update': return [{ type: 'backend_event', source: 'pi', event: 'tool_progress', id: String(event.toolCallId), content: textContent(piRecord(event.partialResult).content), metadata: piRecord(event.partialResult) }];
       case 'tool_execution_end': {

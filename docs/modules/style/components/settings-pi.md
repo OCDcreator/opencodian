@@ -7,3 +7,5 @@ Pi设置表单继承现有settings layout token、主机背景/文字/边框。�
 通过src/style/index.css进入现有CSS合并流程；Test Vault同时检查宽编辑区和窄窗口。
 
 Pi内部相邻配置卡片统一使用--opencodian-settings-space-lg（12px）垂直间距，包括嵌套表单容器；不能依赖外层section gap使卡片相贴。
+
+2026-09-17：`.opencodian-pi-mcp-status` 是 MCP 子标签里承载 Pi 扩展上报文本的等宽块（次要背景、正常文字色、`--font-ui-smaller`），`-line` 是状态行、`-message` 用 `--text-muted`、`.opencodian-pi-mcp-sources` 用 `--text-faint` 列合并过的配置文件。上报是原文，样式只负责可读，不暗示插件解析出了结构。

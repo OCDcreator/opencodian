@@ -1,6 +1,7 @@
-import { Setting } from 'obsidian';
+import { type App, Setting } from 'obsidian';
 
 import type { PiAdapter } from '../../../../src/core/agents/backend/pi/PiAdapter';
+import type { PiMcpConfigService } from '../../../../src/core/agents/backend/pi/PiMcpConfigService';
 import { getActiveSecondaryTabId,getPrimaryTabDefinition } from '../../../../src/features/settings/settingsLayoutRegistry';
 import { SettingsPiConfigurationSection } from '../../../../src/features/settings/SettingsPiConfigurationSection';
 import { SettingsPiSection } from '../../../../src/features/settings/SettingsPiSection';
@@ -12,7 +13,7 @@ describe('Pi native settings integration', () => {
   it('owns a backend tab with dedicated secondary pages and remembers the selected page', () => {
     const pi = getPrimaryTabDefinition('pi');
     expect(pi?.backendRequired).toBe('pi');
-    expect(pi?.secondaryTabs.map(tab => tab.id)).toEqual(['connection', 'providers', 'model', 'execution', 'resources', 'account', 'sessions', 'advanced']);
+    expect(pi?.secondaryTabs.map(tab => tab.id)).toEqual(['connection', 'providers', 'model', 'execution', 'mcp', 'resources', 'account', 'sessions', 'advanced']);
     expect(getActiveSecondaryTabId('pi', { pi: 'providers' })).toBe('providers');
     expect(getPrimaryTabDefinition('codex')?.defaultSecondaryTabId).toBe('connection');
     expect(getPrimaryTabDefinition('claude-code')?.defaultSecondaryTabId).toBe('runtime');
@@ -24,6 +25,52 @@ describe('Pi native settings integration', () => {
     expect(container.querySelector('[data-settings-surface="section-body"]')).not.toBeNull();
     expect(container.textContent).toContain('连接');
     expect(container.textContent).not.toContain('settings.pi.');
+  });
+  it('lists declared MCP servers with the last extension status, without write actions', () => {
+    const rows: Array<{ name: string; desc: string }> = [];
+    jest.spyOn(Setting.prototype, 'setName').mockImplementation(function (name: string) {
+      rows.push({ name, desc: '' });
+      return this;
+    });
+    jest.spyOn(Setting.prototype, 'setDesc').mockImplementation(function (desc: string) {
+      const last = rows[rows.length - 1];
+      if (last) last.desc = desc;
+      return this;
+    });
+    const container = document.body.createDiv();
+    const host = {
+      app: { vault: { adapter: { basePath: '/vault' } } } as unknown as App,
+      settings: { backendSettings: {} },
+      saveSettings: async () => {},
+      agentServiceRegistry: { get: () => ({
+        getExtensionStatus: () => ({ statuses: { mcp: '🔌 MCP: 5 servers enabled (1 connected)' }, message: '✗ zhipu-zai: needs auth', updatedAt: Date.now() }),
+      } as unknown as PiAdapter) },
+    };
+    const mcpConfig = { read: () => ({
+      servers: [
+        { name: 'zhipu-web-search', transport: 'stdio' as const, endpoint: 'npx -y zhipu-mcp', disabled: false, auth: 'none' as const, source: '/home/u/.pi/agent/mcp.json' },
+        { name: 'remote', transport: 'http' as const, endpoint: 'https://mcp.example.com/sse', disabled: true, auth: 'oauth' as const, source: '/vault/.mcp.json' },
+      ],
+      sources: ['/home/u/.pi/agent/mcp.json', '/vault/.mcp.json'],
+      exclusive: false,
+    }) } as unknown as PiMcpConfigService;
+
+    new SettingsPiSection(host as never, mcpConfig).attachTabbed(container, 'mcp');
+
+    expect(container.querySelector('[data-pi-section="mcp"][data-settings-surface="section"]')).not.toBeNull();
+    expect(rows.map(row => row.name)).toEqual(['zhipu-web-search', 'remote']);
+    expect(rows[0].desc).toBe('stdio · npx -y zhipu-mcp · 来源 /home/u/.pi/agent/mcp.json');
+    expect(rows[1].desc).toBe('http · https://mcp.example.com/sse · 已禁用 · 认证：OAuth · 来源 /vault/.mcp.json');
+    expect(container.textContent).toContain('已合并的配置文件：/home/u/.pi/agent/mcp.json · /vault/.mcp.json');
+    expect(container.querySelector('.opencodian-pi-mcp-status-line')?.textContent).toBe('🔌 MCP: 5 servers enabled (1 connected)');
+    expect(container.textContent).toContain('✗ zhipu-zai: needs auth');
+    expect(container.querySelectorAll('button')).toHaveLength(0);
+  });
+  it('says so when Pi has not reported any status yet', () => {
+    const container = document.body.createDiv();
+    new SettingsPiSection({ settings: { backendSettings: {} }, saveSettings: async () => {} }).attachTabbed(container, 'mcp');
+
+    expect(container.textContent).toContain('还没有收到任何上报');
   });
   it('saves an explicit project override with revision and preserves untouched settings', async () => {
     const buttonCallbacks: Array<() => Promise<void>> = [];

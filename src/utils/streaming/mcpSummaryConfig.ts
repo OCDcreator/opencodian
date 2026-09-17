@@ -23,7 +23,7 @@ export const MCP_SUMMARY_CATEGORY_DEFINITIONS: readonly McpSummaryCategoryDefini
     id: 'search',
     label: 'Search / query',
     verbs: ['search', 'find', 'query', 'lookup', 'match'],
-    fields: ['query', 'q', 'keywords', 'term', 'search', 'searchTerm', 'prompt', 'text'],
+    fields: ['query', 'q', 'keywords', 'term', 'search', 'searchTerm', 'search_query', 'searchQuery', 'prompt', 'text'],
   },
   {
     id: 'fetch',
@@ -89,6 +89,8 @@ export const MCP_SUMMARY_CATEGORY_DEFINITIONS: readonly McpSummaryCategoryDefini
 
 export const MCP_GENERIC_SUMMARY_FIELDS = [
   'query',
+  'search_query',
+  'searchQuery',
   'url',
   'path',
   'file_path',

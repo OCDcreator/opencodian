@@ -11,6 +11,50 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-17 Pi 设置页新增只读 MCP 子标签：声明清单来自配置文件，状态来自扩展上报
+
+接上一条：用户指出 opencode 有独立 MCP 标签项，问能不能把 pi 的也放进设置页，而不是塞在会话界面。**先摸清两边有什么再动手**（两个子代理并行调研）：opencode 那个 MCP 标签是 `backendRequired: 'opencode'`，组件直接绑 `openCodeService` 与 opencode 类型，Claude/Codex 各自另有自己的 MCP 面——所以按仓库既有形态给 Pi 加自己的子标签，而不是把顶层标签重构成后端中立。
+
+pi 这一侧的现实约束更重要：**pi 的 RPC 协议里完全没有 MCP 命令，也没有通用命令执行入口**（`get_state` 无 MCP 字段；`PI_RPC_COMMANDS`/`PI_SDK_COMMANDS` 全表核对过）。MCP 完全属于第三方扩展 `pi-mcp-adapter`，它唯一的结构化状态发在进程内 `pi.events` 总线上，RPC 不过桥。宿主机能拿到的只有两样：(1) 扩展按顺序合并的**配置文件**（`~/.config/mcp/mcp.json` → `~/.agents` → Pi 全局 `~/.pi/agent/mcp.json` → 库内 `.mcp.json` / `.pi/mcp.json`，同名后者覆盖前者），(2) 扩展经 UI 通道发的**文本**状态行。用户选了「清单 + 最近状态」与「只读子标签」两项，按此实现。
+
+**实现**：新增 `PiMcpConfigService`（core.pi，只读）：按上述顺序读声明、用 `jsonc-parser`（与 Pi 一致）解析、给出名称/传输方式/端点/禁用/认证方式/来源文件；**端点脱敏**——http URL 去掉 query 与 fragment（令牌常在 query 里），stdio 参数命中 `token|key|secret|password|credential|auth` 时替换为 `***`，但单独的 flag 保留可读。这里踩到一个坑：`jsonc-parser` 的 `parse` **不抛异常**，只看返回值会把畸形文件解析成半成品对象并混进清单，所以必须检查 `errors` 数组。
+
+运行时状态侧：`PiAdapter` 在转发 UI 请求前先落一份 `setStatus`/`notify` 文本（`getExtensionStatus()` → `PiExtensionStatusSnapshot`，新类型在 PiProtocol）。这不是新增通道，而是把上一轮从 DOM 里去掉的那份数据改成**存下来**——正是用户说的"把 pi 提供的这些放到设置选项里"。
+
+设置页：Pi 主标签新增 `mcp` 二级标签（排在"执行与上下文"之后），渲染声明清单 + 合并过的配置文件 + 「Pi 最近一次上报」（等宽块显示原文 + 接收时间）。**刻意只读**：Pi 拥有这份配置与运行时，它的 `/mcp` 子命令只能往会话里发提示词执行，副作用不适合设置页；也**刻意不解析**上报文本——正则解析人类可读文本会随扩展措辞变化而悄悄失效。mcp 分支放在 `if (!adapter)` 之前，因为没有适配器时清单仍可渲染（只依赖文件）。
+
+**验证**：新增 `PiMcpConfigService.test.ts`（合并优先级、JSONC、禁用、脱敏不泄露 token、exclusive、缺失/畸形文件）、`PiAdapter` 新增扩展状态捕获用例（含 `setStatus` 空文本清除该键）、`SettingsPiSection.test.ts` 新增两条（清单+状态渲染且**无任何按钮**、未收到上报时的空态）；模块文档 13 份、owner 文档与 devlog 同步。构建后部署 Test Vault 并在实时设置页确认标签与内容。
+
+## 2026-09-17 不再把 Pi 扩展的终端状态行搬进 Obsidian（去掉「🔌 MCP: 5 servers enabled」那一行）
+
+用户指着聊天面板底部那一行 `🔌 MCP: 5 servers enabled (1 connected)` 说不要显示，并指出别的后端都没有。**先定位再改**：用 `obsidian vault=testvault eval` 找到那个元素的祖先链是 `pre > div.opencodian-pi-extension-ui > workspace-leaf-content`，对应 `PiExtensionUiHost` 里唯一的 `.opencodian-pi-extension-ui` 生产者；再顺文本回溯到发射方——它是用户装在 pi 里的第三方扩展 `~/.pi/agent/npm/node_modules/pi-mcp-adapter`，通过官方 RPC UI 方法 `ui.setStatus("mcp", …)` 报告 `MCP: N servers enabled (M connected)`（该包 `init.ts:661/675`，清空用 `ui.setStatus("mcp", undefined)`）。
+
+**结论**：这不是插件自己编的信息，而是插件"忠实转发 pi 终端状态行"的副产品。`setStatus` / `setWidget` 是 pi TUI 的状态栏与 widget 面：既和聊天界面已有的信息重复，又没有其他后端提供对应界面（claude-code / codex / opencode 都没有这个通道），所以决定不落地。
+
+**改法**：`PiExtensionUiHost` 只保留需要用户回复的 `select` / `confirm` / `input` / `editor`，以及能落到既有界面的 `notify`（Obsidian Notice，含登录链接）、`set_editor_text`（预填输入框）、`setTitle`（容器 aria-label）；删除 `renderPiWidget()` 与对应分支。安全性已确认：`PiSessionRuntime` 只对这四个对话框方法回包（`needsResponse`），`setStatus` / `setWidget` 官方就是通知型，忽略它们不会让扩展等待或卡住 RPC。顺带说明：`.opencodian-pi-extension-ui` 本来也没有任何 CSS，所以那一行才会以裸 `<pre>` 的样子出现。
+
+**若以后想只恢复某类 widget**，把它加回 `presentPiUiHost` 的白名单即可，不需要改 RPC 层。
+
+**验证**：`npm run verify`（含 full tests / typecheck / build）+ 模块文档与 owner 文档同步；构建后部署 Test Vault，重载后该行不再出现。
+
+## 2026-09-17 Pi 后端的 MCP 卡片信息丢失与错误块红底红字：一次「先取证再改」的三件套修复
+
+用户报了三件事：pi 后端发消息报 `OpenAI API error (400): ... reasoning 'encrypted_content' was not issued to this caller`；pi 的工具卡片全部只显示 `mcp` / `mcpScript`，没有摘要、和 opencode 完全不像；错误卡片红底红字根本看不清。**前两件是插件缺陷，第三件是它们那条链路的网关行为**，所以分开处理。
+
+**取证方式**：不再靠猜，直接读了两份现场证据——pi 自己写的会话转录 `testvault/.pi/opencodian-sessions/*.jsonl`（29 行，含 8 次工具调用与两次同样的 400），以及用 `obsidian vault=testvault eval` 读实时 DOM 的计算样式。第二件尤其关键：`.streaming-error-block` 的实际取值是 `background: rgb(255,85,85)` + `color: rgb(251,70,76)`，对比度约 1:1，而同一屏的 `.opencodian-chat-notice-card.is-error`（bg 深色、字近白）是正常的——所以红底红字只出在流式错误块这条老路径上。
+
+**MCP 卡片为什么会退化成光秃秃的 `mcp`**：pi 把整个 MCP 暴露成**一个元工具** `mcp`（外加 `mcpScript`），真正的身份只存在于参数里（`{tool: "server_tool", args: "<json 字符串>"}`，发现类调用是 `{search}` / `{describe}`），服务名与原始工具名只在结果的 `details` 里。而插件沿用的是"工具名即身份"的假设：`getToolIdentity('mcp')` 认不出它（既不是内置名、也不带 `mcp__` 前缀、更不在 MCP 观测集里），于是 `kind` 落空 → 不倒 MCP 图标、不进 `getMcpToolSummary()`、name 原样显示 `mcp`、摘要为空。opencode 侧不受影响，因为它的工具名本来就是 `<server>_<tool>`。
+
+**修法**：在 `PiStreamMapper` 新增 `resolvePiToolCall()`，把元工具还原成真实身份——`{tool,args}` 调用取限定工具名做 name、把 `args` 字符串解析成 input；`{search}` / `{describe}` 映射到 `query` / `name` 以便摘要可读；统一 `kind: 'mcp'`。**live 流和本地历史恢复共用同一个 helper**（历史侧连 content block 的 `toolKind` 一起写回，否则从本地存储恢复又变回 `mcp`），两处不会分叉。顺带在 `mcpSummaryConfig` 给 search 类补上 `search_query` / `searchQuery` 别名并提到通用字段前列：否则 `web_search_prime` 的摘要在字段回退里会拿到排在前面的 `content_size: "medium"`，比现在还误导（这条对 opencode 同样生效）。
+
+**错误块**：改回仓库既有的状态令牌（`--opencodian-status-error-subtle` / `-border` + `--text-normal` / `--text-muted`），与 notice card 同一套配色语言；同时 `AssistantErrorRenderer` 把文案按首个换行拆成标题行（人话摘要）与细节行（provider 原始报文，降级为次要色）——原始报文不丢，排障还要用，但不再是唯一且不可读的那一行。
+
+**验证**：`PiAdapter.test.ts` 覆盖四种元调用形态与历史恢复（含 `args` 非法 JSON 的回退），新增 `mcpSummaryConfig.test.ts`（别名优先级、参数类字段、路径尾名、标量回退），`AssistantErrorRenderer` 既有断言保持不变；三个套件 20/20 通过。
+
+**第三件（400）不是插件问题**：转录显示失败发生在模型 `muse-spark-1.3-contributor`（`api: openai-responses`）打完 8 次工具调用后的下一回合，且重试同样失败。`~/.pi/agent/models.json` 里 4 个 `openai-responses` 模型都带 `compat.sessionAffinityFormat: "openai-nosession"`，pi 因此不发会话粘性头，用户自建的账号池可以把下一回合路由到**另一个上游账号**；而 Responses API 的 reasoning 是服务端状态，`encrypted_content` 是按调用方签发的，换账号回放必然被拒（上一轮同族报错是 `Referenced reasoning item ... was not found or has expired`）。修法是网关侧：给会话固定上游账号，或在转发前剥掉 `type:"reasoning"` 条目；插件只通过 RPC 驱动 pi，碰不到 reasoning 条目和粘性头，只能做到把这类上游 400 显示得可读（本轮已顺带改善）。
+
+**只改代码、样式与文档，未触碰用户网关配置；构建与 Test Vault 部署见本轮收尾。**
+
 ## 2026-09-17 FlowText 功能对齐需求文档：能力对照、18 条需求与 6 个待裁决项
 
 用户拿 B 站「模块化 OB」余先生的付费插件 FlowText 的 8 期功能全解（转录稿在 `技术学习/转录总结/FlowText 插件功能全解.md`）来问 OpenCodian 还缺什么。**先做能力审计再写需求**：把 FlowText 的 20 余条功能逐项对完源码后，结论是差距不在"能力总量"，而在三类——(1) 行内编辑已有完整引擎却缺入口与生成体验（`@` 唤起、`#` 预设提示词、流式 diff、行内贴图转 LaTeX、多片段并行、全文模式、文件夹上下文）；(2) Obsidian 领域能力整体空白（自动内链、主题关联、编辑回退、基于官方 CLI 的原生工具、批量整理）；(3) 检索与生成类大工程（整库语义检索、文生图、Alt 一键补全、PDF、Canvas、外部接口）。反过来，OpenCodian 的侧边栏 Agent（四后端、多标签并发、MCP/Skills、跨会话持久记忆）已经**超过** FlowText，所以文档把"不因对齐而收缩既有能力"写进了非目标。

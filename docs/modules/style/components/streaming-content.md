@@ -15,7 +15,8 @@
 - `.streaming-tool-auth-btn`：MCP 认证失败时渲染的内联认证按钮（仅 Codex 聊天）。
 - `.streaming-tool-auth-done`：15Z 新增。认证成功后替换认证按钮的绿色 "Authenticated" 徽章。
 - `.streaming-mcp-auth-hint`（含 `.is-done`/`.is-pending`/`.is-failed` 变体）：15Z 新增。认证后状态提示（成功重试/进行中/失败重试）。
-- `.streaming-error-block`：流式错误信息条。
+- `.streaming-error-block`：流式错误信息条。背景/边框使用 `--opencodian-status-error-subtle` / `--opencodian-status-error-border` 与 `--background-secondary` 混色，正文用 `--text-normal` / `--text-muted`——不要回退到 `--background-modifier-error` 底 + `--text-error` 字（同色系红底红字对比度约为 1:1，实际不可读）。
+- `.streaming-error-body` / `.streaming-error-title` / `.streaming-error-text`：错误块的正文容器、摘要标题与细节行（provider 原始报文）。
 - `.opencodian-server-action-card*`：服务启动/确认动作卡片。
 - `.opencodian-pending*`：等待中提示文案。
 - 动画：`@keyframes spin`、`fadeIn`。

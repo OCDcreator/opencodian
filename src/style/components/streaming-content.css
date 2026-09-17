@@ -416,24 +416,37 @@
 /* Error block */
 .streaming-error-block {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   margin: 0.5em 0;
   padding: 10px 12px;
-  background: var(--background-modifier-error);
-  border: 1px solid var(--background-modifier-error-hover);
-  border-radius: 6px;
-  color: var(--text-error);
+  background: color-mix(in srgb, var(--background-secondary) 90%, var(--opencodian-status-error-subtle));
+  border: 1px solid var(--opencodian-status-error-border);
+  border-radius: 10px;
+  color: var(--text-normal);
 }
 
 .streaming-error-icon {
   flex-shrink: 0;
 }
 
+.streaming-error-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.streaming-error-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
 .streaming-error-text {
   font-size: 13px;
   white-space: pre-wrap;
   line-height: 1.5;
+  color: var(--text-muted);
+  word-break: break-word;
 }
 
 .opencodian-server-action-card {

@@ -26,7 +26,7 @@
 
 | 类别 | 动作词 | 字段优先级 |
 |---|---|---|
-| Search / query | `search`, `find`, `query`, `lookup`, `match` | `query` → `q` → `keywords` → `term` → `search` → `searchTerm` → `prompt` → `text` |
+| Search / query | `search`, `find`, `query`, `lookup`, `match` | `query` → `q` → `keywords` → `term` → `search` → `searchTerm` → `search_query` → `searchQuery` → `prompt` → `text` |
 | Fetch / open / download | `fetch`, `get`, `open`, `request`, `download`, `crawl`, `scrape`, `visit` | `url` → `uri` → `link` → `href` → `resource` → `resourceUrl` → `endpoint` → `path` |
 | Read / view / load | `read`, `cat`, `show`, `view`, `load` | `path` → `file_path` → `filePath` → `filename` → `file` → `source` → `url` → `uri` |
 | List / enumerate | `list`, `ls`, `glob`, `enumerate`, `browse` | `path` → `dir` → `directory` → `folder` → `cwd` → `root` → `pattern` → `glob` |
@@ -42,7 +42,7 @@
 
 当工具名类别无法提取摘要时，按以下顺序回退：
 
-`query` → `url` → `path` → `file_path` → `filePath` → `command` → `prompt` → `title` → `name` → `id` → `target` → `resource` → `selector` → `arguments` → `args`
+`query` → `search_query` → `searchQuery` → `url` → `path` → `file_path` → `filePath` → `command` → `prompt` → `title` → `name` → `id` → `target` → `resource` → `selector` → `arguments` → `args`
 
 ## 字段展示类型
 

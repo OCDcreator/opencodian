@@ -22,8 +22,11 @@ describe('Pi backend isolation contract', () => {
     // '../AgentAuxQueryCapability' is the backend-neutral auxiliary-query
     // contract — shared contracts like types/chat, not another backend
     // implementation. The Pi aux session itself lives in this directory and is
-    // covered by the './' allowance above.
-    const allowed = ['../AgentService', '../AgentAuxQueryCapability', '../../AgentCapability', '../../../types/chat', '../../../types/settings', '../../../memory', '../../../../shared/logger'];
+    // covered by the './' allowance above. 'jsonc-parser' is the same tolerant
+    // parser Pi's own MCP extension uses for its config files, so reading those
+    // files means reading them the same way; it stays an external package here
+    // and never pulls in another backend implementation.
+    const allowed = ['../AgentService', '../AgentAuxQueryCapability', '../../AgentCapability', '../../../types/chat', '../../../types/settings', '../../../memory', '../../../../shared/logger', 'jsonc-parser'];
     expect(imports.filter((specifier) => !specifier.startsWith('node:') && !specifier.startsWith('./') && !allowed.includes(specifier))).toEqual([]);
   });
 

@@ -10,7 +10,7 @@
 ## 公开接口
 
 - `AssistantErrorRenderer`：统一承接本地 stream-error block 的 DOM 渲染
-- `renderStreamError()`：清空 streaming content 容器、插入错误 icon/text，并把 footer 收尾交回 `AssistantFooterRenderer`
+- `renderStreamError()`：清空 streaming content 容器、插入错误 icon，并把错误文案按首个换行拆成标题（`.streaming-error-title`）与细节（`.streaming-error-text`，provider 原始报文），再把 footer 收尾交回 `AssistantFooterRenderer`；单行错误只渲染细节行
 - `AssistantErrorRendererHost`：只暴露 `finalizeErrorFooter()`，避免把 shell host、持久化或滚动能力重新带进来
 
 ## 设计目的
@@ -22,5 +22,6 @@
 ## 注意事项
 
 - 这个 helper 只负责本地 stream-error 内容块；notice card 错误提示仍由 `AssistantNoticeRenderer` 负责
+- 拆行只影响可读性：首行是给用户看的摘要，其余是 provider 原始报文；不要丢弃原始报文，排障仍需要它
 - footer 收尾仍通过 `AssistantFooterRenderer.finalizeErrorFooter()` 执行，不要把 timestamp/copy payload 逻辑重新塞回来
 - 消息持久化、fingerprint 更新和滚动写回仍属于 `OpenCodianView`

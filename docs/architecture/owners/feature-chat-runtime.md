@@ -54,3 +54,4 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 The new core.backend-pi owner isolates the external Pi process service. feature.chat-runtime retains its existing responsibilities; Pi process lifecycle, RPC compatibility and native history must not be added to this owner.
 
 - 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
+- 2026-09-17: `AssistantErrorRenderer.renderStreamError()` 把错误文案按首个换行拆成摘要标题（`.streaming-error-title`）与细节行（`.streaming-error-text`，保留 provider 原始报文）；单行错误行为不变。渲染细节仍在本 owner，工具身份归一化归 `core.backend-pi`。

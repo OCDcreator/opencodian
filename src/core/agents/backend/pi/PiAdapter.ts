@@ -7,7 +7,7 @@ import { AgentCapability, type BackendCapabilities } from '../../AgentCapability
 import type { AgentAuxQueryCapability, AuxQuerySession, AuxQuerySessionConfig } from '../AgentAuxQueryCapability';
 import type { AgentChatCapability, AgentChatSendRequest, AgentConnectionStatus, AgentForkCapability, AgentModelCapability, AgentSessionCapability, Disposable, StatusChangeHandler } from '../AgentService';
 import { PiAuxQuerySession } from './PiAuxQuerySession';
-import { PI_CONFIG_COMMANDS, PI_RPC_COMMANDS, PI_SDK_COMMANDS, type PiCommandName, type PiModelInfo, type PiServiceEvent, type PiUiHandler } from './PiProtocol';
+import { PI_CONFIG_COMMANDS, PI_RPC_COMMANDS, PI_SDK_COMMANDS, type PiCommandName, type PiExtensionStatusSnapshot, type PiModelInfo, type PiServiceEvent, type PiUiHandler } from './PiProtocol';
 import { type PiLaunchOptions, type PiRecord, piRecord, type PiRpcPort } from './PiRpcClient';
 import { PiSessionRuntime } from './PiSessionRuntime';
 import { type PiSessionInfo, PiSessionStore } from './PiSessionStore';
@@ -43,10 +43,38 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
   private startPromise: Promise<void> | null = null;
   private generation = 0;
   private readonly runs = new Map<string, { cancelled: boolean; client?: PiRpcPort }>();
+  private readonly extensionStatus: PiExtensionStatusSnapshot = { statuses: {}, updatedAt: 0 };
 
   constructor(private readonly options: PiAdapterOptions) {
     this.store = new PiSessionStore(options.sessionDirectory ?? path.join(options.workingDirectory, '.pi', 'opencodian-sessions'));
-    this.runtime = new PiSessionRuntime({ ...options, sessionDirectory: this.store.directory, servicePath: options.servicePath ?? '' });
+    this.runtime = new PiSessionRuntime({
+      ...options,
+      sessionDirectory: this.store.directory,
+      servicePath: options.servicePath ?? '',
+      onUiRequest: (request, signal) => this.forwardUiRequest(request, signal),
+    });
+  }
+  /** Extensions report through the UI channel; keep the text instead of dropping it. */
+  getExtensionStatus(): PiExtensionStatusSnapshot {
+    return { statuses: { ...this.extensionStatus.statuses }, message: this.extensionStatus.message, updatedAt: this.extensionStatus.updatedAt };
+  }
+  private forwardUiRequest(request: PiServiceEvent, signal: AbortSignal): ReturnType<PiUiHandler> {
+    this.recordExtensionStatus(request);
+    return this.options.onUiRequest?.(request, signal) ?? Promise.resolve();
+  }
+  private recordExtensionStatus(request: PiServiceEvent): void {
+    const method = String(request.method ?? '');
+    if (method !== 'setStatus' && method !== 'notify') return;
+    this.extensionStatus.updatedAt = Date.now();
+    if (method === 'notify') {
+      const message = String(request.message ?? '').trim();
+      if (message) this.extensionStatus.message = message;
+      return;
+    }
+    const key = String(request.statusKey ?? 'status');
+    const text = String(request.statusText ?? '').trim();
+    if (text) this.extensionStatus.statuses[key] = text;
+    else delete this.extensionStatus.statuses[key];
   }
   get status(): AgentConnectionStatus { return this.currentStatus; }
   get processCount(): number { return this.runtime.size; }

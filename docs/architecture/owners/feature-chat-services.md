@@ -63,3 +63,4 @@ PiModelSelectionBinding owns Pi selector policy; send preparation and slash disp
 `ChatSelectionControlsCoordinatorHost` gained `getApp(): App`, and `ChatSelectionControlsCoordinator` forwards it as the new `app` field when rendering the model list, so provider group header icons resolve through the same route as the async icon cache. Resolution rules stay with `shared.utils-icons`; this owner only passes the host through.
 
 - 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
+- 2026-09-17: `PiExtensionUiHost` 收窄主机面：只渲染需要用户回复的四个对话框方法，以及能落到既有界面的 `notify` / `set_editor_text` / `setTitle`；`setStatus` / `setWidget`（Pi 终端状态行，第三方 MCP 扩展用它报告服务器数量）不再落地。这两个方法官方不需要响应，忽略不会阻塞 RPC 往返（`PiSessionRuntime` 只对 select/confirm/input/editor 回包）。

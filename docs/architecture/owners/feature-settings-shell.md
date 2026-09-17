@@ -59,3 +59,5 @@ SettingsPiSection owns the Pi settings surface through a narrow host. Credential
 2026-09-09：设置表单间距由共享opencodian-settings-form-stack容器控制，跨wrapper与空状态区域仍保持12px；Pi配置渲染只挂布局类，不改变配置读写。验收需测量可见卡片几何边界，不能只检查相邻DOM兄弟。
 
 - 2026-09-15: 新增 `SettingsInlineEditSection`（`inlineEditEnabled` 总开关 + 按 backend 键控的模型覆盖，输入即校验）并挂到设置页。该分节按结构类型接收插件（settings + saveSettings），以避免 feature → app 依赖边。
+
+- 2026-09-17: `SettingsPiSection` 新增只读 `mcp` 二级标签（排在 execution 与 resources 之间）：声明清单来自 `core.backend-pi` 的 `PiMcpConfigService`（读 Pi 的配置文件），运行时状态来自 `PiAdapter.getExtensionStatus()`（扩展上报文本）。该页无任何写操作、也不解析上报文本；没有适配器实例时清单仍能渲染，所以 `attachTabbed` 的 mcp 分支排在 `if (!adapter)` 之前。构造器第二参数可注入配置读取器供测试。

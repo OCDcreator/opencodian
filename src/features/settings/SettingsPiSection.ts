@@ -1,15 +1,27 @@
+import * as nodeOs from 'node:os';
+
 import { type App, Notice, Setting } from 'obsidian';
 
 import type { PiAdapter } from '../../core/agents/backend/pi/PiAdapter';
+import { PiMcpConfigService } from '../../core/agents/backend/pi/PiMcpConfigService';
 import { toPiChatMessages } from '../../core/agents/backend/pi/PiStreamMapper';
 import type { PiBackendSettings } from '../../core/types/settings';
 import { normalizePiBackendSettings } from '../../core/types/settings';
 import { t } from '../../i18n';
+import { getVaultBasePath } from '../../shared';
 import { PiWorkbenchModal } from './PiWorkbenchModal';
 import { SettingsPiConfigurationSection } from './SettingsPiConfigurationSection';
 import { SettingsPiProvidersSection } from './SettingsPiProvidersSection';
 
-const PI_TABS = ['connection', 'providers', 'model', 'execution', 'resources', 'account', 'sessions', 'advanced'] as const;
+const PI_TABS = ['connection', 'providers', 'model', 'execution', 'mcp', 'resources', 'account', 'sessions', 'advanced'] as const;
+
+/** Config paths are shown for orientation only; the home prefix is the noisy part. */
+function shortenConfigPath(filePath: string): string {
+  const home = nodeOs.homedir();
+  const normalized = filePath.replace(/\\/g, '/');
+  const normalizedHome = home.replace(/\\/g, '/');
+  return normalized.startsWith(`${normalizedHome}/`) ? `~/${normalized.slice(normalizedHome.length + 1)}` : filePath;
+}
 
 export interface SettingsPiHost {
   app?: App;
@@ -23,7 +35,10 @@ export interface SettingsPiHost {
 
 /** Owns Pi settings only; auth, providers and extensions remain managed by the external Pi installation. */
 export class SettingsPiSection {
-  constructor(private readonly host: SettingsPiHost) {}
+  constructor(
+    private readonly host: SettingsPiHost,
+    private readonly mcpConfig: PiMcpConfigService = new PiMcpConfigService(),
+  ) {}
 
   attach(container: HTMLElement): void {
     container.createEl('h2', { text: t('settings.pi.title') });
@@ -43,6 +58,7 @@ export class SettingsPiSection {
     body.createEl('h3', { text: t(`settings.pi.tab.${tab}`) });
     const adapter = this.adapter;
     if (tab === 'connection') { this.connection(body); return; }
+    if (tab === 'mcp') { this.mcp(body, adapter); return; }
     if (!adapter) { body.createEl('p', { text: t('settings.pi.unavailable') }); return; }
     if (tab === 'providers') { new SettingsPiProvidersSection(adapter, () => this.reconnect()).attach(body); return; }
     if (tab === 'account') { this.account(body, adapter); return; }
@@ -141,6 +157,52 @@ export class SettingsPiSection {
           try { await adapter.command(undefined, 'logout', { provider: keyProvider || provider }); status.setText(t('settings.pi.authMissing')); } catch (error) { status.setText(String(error)); }
         }));
     }).catch(error => status.setText(String(error)));
+  }
+
+  /** Read-only: Pi owns MCP configuration, and its extensions own the runtime status. */
+  private mcp(container: HTMLElement, adapter: PiAdapter | undefined): void {
+    container.createEl('p', { text: t('settings.pi.mcp.intro'), cls: 'setting-item-description' });
+    const workingDirectory = this.host.app ? getVaultBasePath(this.host.app) : null;
+    const snapshot = workingDirectory
+      ? this.mcpConfig.read({ workingDirectory })
+      : { servers: [], sources: [], exclusive: false };
+    const body = container.createDiv({ cls: 'opencodian-settings-form-stack' });
+    if (!snapshot.servers.length) body.createEl('p', { text: t('settings.pi.mcp.empty') });
+    for (const server of snapshot.servers) {
+      new Setting(body).setName(server.name).setDesc([
+        t(`settings.pi.mcp.transport.${server.transport}`),
+        server.endpoint || t('settings.pi.mcp.endpointUnknown'),
+        server.disabled ? t('settings.pi.mcp.disabled') : '',
+        server.auth === 'none' ? '' : t('settings.pi.mcp.authValue', { auth: t(`settings.pi.mcp.auth.${server.auth}`) }),
+        t('settings.pi.mcp.sourceValue', { file: shortenConfigPath(server.source) }),
+      ].filter(Boolean).join(' · '));
+    }
+    if (snapshot.exclusive) container.createEl('p', { cls: 'setting-item-description', text: t('settings.pi.mcp.exclusive') });
+    if (snapshot.sources.length) {
+      container.createEl('p', {
+        cls: 'setting-item-description opencodian-pi-mcp-sources',
+        text: t('settings.pi.mcp.sourcesValue', { files: snapshot.sources.map(shortenConfigPath).join(' · ') }),
+      });
+    }
+    container.createEl('h4', { text: t('settings.pi.mcp.status.title') });
+    container.createEl('p', { text: t('settings.pi.mcp.status.help'), cls: 'setting-item-description' });
+    this.mcpStatus(container, adapter);
+  }
+
+  private mcpStatus(container: HTMLElement, adapter: PiAdapter | undefined): void {
+    const snapshot = adapter?.getExtensionStatus?.();
+    const lines = snapshot ? Object.values(snapshot.statuses).filter(Boolean) : [];
+    if (!snapshot || (!lines.length && !snapshot.message)) {
+      container.createEl('p', { cls: 'setting-item-description', text: t('settings.pi.mcp.status.none') });
+      return;
+    }
+    const block = container.createDiv({ cls: 'opencodian-pi-mcp-status', attr: { role: 'status' } });
+    for (const line of lines) block.createDiv({ cls: 'opencodian-pi-mcp-status-line', text: line });
+    if (snapshot.message) block.createDiv({ cls: 'opencodian-pi-mcp-status-message', text: snapshot.message });
+    container.createEl('p', {
+      cls: 'setting-item-description opencodian-pi-mcp-status-meta',
+      text: t('settings.pi.mcp.status.updatedAt', { time: new Date(snapshot.updatedAt).toLocaleTimeString() }),
+    });
   }
 
   private sessions(container: HTMLElement, adapter: PiAdapter): void {

@@ -33,3 +33,5 @@ Model/thinking overrides are process launch arguments, followed by exact get_sta
 v1.1.14安装边界：用户自行安装官方Pi，缺失时直接报错；插件没有Pi安装/升级脚本。服务模块在构建时合并到main.js，通过stdin传给独立Node进程并在内存加载，不再展开assets/pi文件。发行包始终只有main.js、manifest.json、styles.css；真实SDK验收验证无服务文件也可运行。
 
 - 2026-09-15: 新增 `PiAuxQuerySession.ts`：用 Pi 原生的 `set_tools`/`get_tools` 建立并校验只读会话，会话落在临时作用域而非 `.pi/opencodian-sessions`；`PiAdapter` 实现 `startAuxQuerySession()`。
+- 2026-09-17: `PiStreamMapper` 新增 `resolvePiToolCall()`，把 Pi 的 MCP 元工具（`mcp` / `mcpScript`，真实 server/tool 只存在于参数的 `{tool, args}` 或 `{search}` / `{describe}` 里）还原成 `kind: 'mcp'` + 限定工具名 + 解析后的 input。live 流与 `toPiChatMessages` 历史恢复共用该 helper，历史侧同时写回 content block 的 `toolKind`。身份归一化仍属本 owner（翻译进 StreamChunk 契约），不是渲染职责。
+- 2026-09-17: 新增 `PiMcpConfigService`（只读）：Pi 的 MCP 来自扩展而非 RPC，所以声明清单只能按扩展的合并顺序读配置文件（`~/.config/mcp` → `~/.agents` → Pi 全局 `mcp.json` → 库内 `.mcp.json` / `.pi/mcp.json`），并做端点脱敏。这是本 owner 第一次读 Pi 安装侧的文件；不写任何文件，也不复刻祖先目录发现与 imports 展开。同一轮 `PiAdapter` 捕获扩展经 UI 通道上报的 `setStatus`/`notify` 文本（`getExtensionStatus()`）供设置页展示。

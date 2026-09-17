@@ -81,6 +81,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
       { id: 'providers', labelKey: 'settings.pi.tab.providers' },
       { id: 'model', labelKey: 'settings.pi.tab.model' },
       { id: 'execution', labelKey: 'settings.pi.tab.execution' },
+      { id: 'mcp', labelKey: 'settings.pi.tab.mcp' },
       { id: 'resources', labelKey: 'settings.pi.tab.resources' },
       { id: 'account', labelKey: 'settings.pi.tab.account' },
       { id: 'sessions', labelKey: 'settings.pi.tab.sessions' },

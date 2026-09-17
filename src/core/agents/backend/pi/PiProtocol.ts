@@ -24,6 +24,15 @@ export interface PiConfigurationSnapshot {
 }
 export interface PiServiceEvent { type: string; [key: string]: unknown }
 export type PiUiHandler = (request: PiServiceEvent, signal: AbortSignal) => Promise<Record<string, unknown> | void>;
+/** Last text a Pi extension pushed through the RPC UI channel. Pi's MCP support is an extension,
+ *  so this is the only runtime status a host can observe; it is text, never structured data. */
+export interface PiExtensionStatusSnapshot {
+  /** Latest `setStatus` text per key; Pi clears a key by sending an empty text. */
+  statuses: Record<string, string>;
+  /** Last `notify` message, verbatim. */
+  message?: string;
+  updatedAt: number;
+}
 export interface PiModelInfo {
   id: string; name: string; provider: string; reasoning: boolean;
   contextWindow?: number; maxTokens?: number; input?: string[];

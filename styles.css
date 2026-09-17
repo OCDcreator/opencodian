@@ -6696,24 +6696,37 @@ img.opencodian-model-provider-header-icon {
 /* Error block */
 .streaming-error-block {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   margin: 0.5em 0;
   padding: 10px 12px;
-  background: var(--background-modifier-error);
-  border: 1px solid var(--background-modifier-error-hover);
-  border-radius: 6px;
-  color: var(--text-error);
+  background: color-mix(in srgb, var(--background-secondary) 90%, var(--opencodian-status-error-subtle));
+  border: 1px solid var(--opencodian-status-error-border);
+  border-radius: 10px;
+  color: var(--text-normal);
 }
 
 .streaming-error-icon {
   flex-shrink: 0;
 }
 
+.streaming-error-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.streaming-error-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
 .streaming-error-text {
   font-size: 13px;
   white-space: pre-wrap;
   line-height: 1.5;
+  color: var(--text-muted);
+  word-break: break-word;
 }
 
 .opencodian-server-action-card {
@@ -13557,6 +13570,39 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-pi-settings .setting-item-description {
   overflow-wrap: anywhere;
+}
+
+/* Pi extensions report their status as text; show it verbatim, not as a card that
+   implies the plugin parsed it into structure it does not have. */
+.opencodian-pi-mcp-status {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--opencodian-settings-space-md, 8px) var(--opencodian-settings-space-lg, 12px);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-normal);
+}
+
+.opencodian-pi-mcp-status-line,
+.opencodian-pi-mcp-status-message {
+  overflow-wrap: anywhere;
+}
+
+.opencodian-pi-mcp-status-message {
+  color: var(--text-muted);
+}
+
+.opencodian-pi-mcp-status:empty {
+  display: none;
+}
+
+.opencodian-pi-mcp-sources {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
 }
 
 .opencodian-pi-config-multiline {
