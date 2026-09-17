@@ -142,6 +142,43 @@ const SHARP_APPEARANCE = normalizeChatAppearanceSettings({
   },
 });
 
+const SHADCN_APPEARANCE = normalizeChatAppearanceSettings({
+  layout: {
+    // shadcn rides wider than the other styles: the chat frame sits 8px off
+    // the panel edges instead of the 12px host default.
+    messagesAreaInsetX: 8,
+  },
+  user: {
+    radius: 12,
+    tailRadius: 12,
+    blur: 0,
+    shadowBlur: 0,
+  },
+  assistant: {
+    radius: 12,
+    backgroundOpacity: 0,
+    blur: 0,
+    shadowBlur: 0,
+  },
+  input: {
+    radius: 12,
+    backgroundOpacity: 100,
+    blur: 0,
+    shadowBlur: 0,
+    composerInsetX: 12,
+    enFontFamily: 'inter',
+  },
+  scrollbar: {
+    width: 8,
+    radius: 999,
+    trackOpacity: 0,
+    thumbOpacity: 34,
+    thumbHoverOpacity: 54,
+    edgePadding: 2,
+    shadowOpacity: 0,
+  },
+});
+
 const BUILTIN_THEME_PRESETS: ThemePresetDefinition[] = [
   {
     id: 'glass-classic',
@@ -305,6 +342,18 @@ const BUILTIN_THEME_PRESETS: ThemePresetDefinition[] = [
       '--opencodian-accent-text': '#f59e0b',
     },
     appearance: SHARP_APPEARANCE,
+  },
+  {
+    id: 'shadcn-neutral',
+    name: 'shadcn Neutral',
+    styleId: 'shadcn',
+    schemeName: 'Neutral',
+    containerClass: 'opencodian-theme-shadcn',
+    // Accent stays empty here on purpose: the shadcn accent flips between a
+    // zinc-900 primary (light) and zinc-50 (dark), so it is defined per theme
+    // in the .opencodian-theme-shadcn CSS rules instead of as static variables.
+    cssVariables: {},
+    appearance: SHADCN_APPEARANCE,
   },
 ];
 

@@ -201,6 +201,20 @@ export class SettingsStyleSection {
     });
     this.addNumericStyleControl(layoutGroupEl, {
       group: 'layout',
+      name: t('settings.style.layout.messagesAreaInsetX.name'),
+      desc: t('settings.style.layout.messagesAreaInsetX.desc'),
+      min: 8,
+      max: 48,
+      step: 1,
+      unit: 'px',
+      value: () => this.plugin.settings.chatAppearance.layout.messagesAreaInsetX,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().layout.messagesAreaInsetX,
+      setValue: (appearance, value) => {
+        appearance.layout.messagesAreaInsetX = value;
+      },
+    });
+    this.addNumericStyleControl(layoutGroupEl, {
+      group: 'layout',
       name: t('settings.style.layout.messagePaddingX.name'),
       desc: t('settings.style.layout.messagePaddingX.desc'),
       min: 0,

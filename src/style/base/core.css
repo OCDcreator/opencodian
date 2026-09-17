@@ -216,11 +216,18 @@ body[data-opencodian-provider-icon-mode="color"] {
    32px bottom padding with the composer's inset. Keep device safe areas. */
 .workspace-leaf-content[data-type="opencodian-view"] > .view-content {
   --opencodian-chat-edge-gap: var(--size-4-3, 12px);
+  /* Neutralize the host's horizontal view padding: the chat frame inset is owned
+     by --opencodian-chat-inset-x on .opencodian-container so it is user-tunable. */
+  padding-inline: 0;
   padding-top: max(var(--safe-area-inset-top, 0px), var(--opencodian-chat-edge-gap));
   padding-bottom: max(var(--safe-area-inset-bottom, 0px), var(--opencodian-chat-edge-gap));
 }
 
 .opencodian-container {
+  --opencodian-chat-inset-x: 12px;
+  --opencodian-composer-inset-x: 0px;
+  --opencodian-composer-inset-y: 12px;
+  --opencodian-composer-max-height: 240px;
   --interactive-accent: var(--opencodian-accent);
   --interactive-accent-hover: var(--opencodian-accent-hover);
   --text-on-accent: var(--opencodian-accent-contrast);
@@ -314,6 +321,7 @@ body[data-opencodian-provider-icon-mode="color"] {
   flex-direction: column;
   height: 100%;
   max-height: 100vh; /* Ensure container doesn't exceed viewport */
+  padding-inline: var(--opencodian-chat-inset-x);
   overflow: hidden;
   position: relative; /* Create positioning context */
 }
@@ -423,6 +431,114 @@ body[data-opencodian-provider-icon-mode="color"] {
   --opencodian-shadow-md: 0 10px 22px color-mix(in srgb, var(--text-normal) 20%, transparent);
   --opencodian-shadow-lg: 0 14px 28px color-mix(in srgb, var(--text-normal) 22%, transparent);
 }
+
+
+/* ── shadcn: neutral bordered surfaces, docked composer, message-pane-only scroll ── */
+
+.opencodian-container.opencodian-theme-shadcn {
+  /* shadcn surface tokens derived from the Obsidian theme so custom vault themes keep working. */
+  --opencodian-shadcn-border: color-mix(in srgb, var(--background-modifier-border) 92%, transparent);
+  --opencodian-shadcn-surface: var(--background-primary);
+  --opencodian-shadcn-muted: color-mix(in srgb, var(--background-primary) 94%, var(--text-normal));
+  --opencodian-shadcn-muted-hover: color-mix(in srgb, var(--background-primary) 90%, var(--text-normal));
+  --opencodian-shadcn-ring: color-mix(in srgb, var(--opencodian-accent) 18%, transparent);
+  --opencodian-shadcn-shadow-sm: 0 1px 2px 0 color-mix(in srgb, var(--text-normal) 6%, transparent);
+  /* Neutralize the glass pipeline: flat opaque surfaces, no specular, no glow. */
+  --opencodian-glass-base: var(--background-primary);
+  --opencodian-glass-base-strong: var(--background-primary);
+  --opencodian-glass-base-soft: var(--background-primary);
+  --opencodian-glass-specular: transparent;
+  --opencodian-glass-specular-soft: transparent;
+  --opencodian-glass-border: var(--opencodian-shadcn-border);
+  --opencodian-glass-border-strong: var(--opencodian-shadcn-border);
+  --opencodian-glass-shadow: transparent;
+  --opencodian-glass-shadow-strong: transparent;
+  --opencodian-glass-highlight: transparent;
+  --opencodian-glass-highlight-strong: transparent;
+  --opencodian-shadow-xs: none;
+  --opencodian-shadow-sm: none;
+  --opencodian-shadow: none;
+  --opencodian-shadow-md: none;
+  --opencodian-shadow-lg: none;
+  --opencodian-shadow-xl: none;
+  --opencodian-user-bubble-bg: var(--opencodian-shadcn-muted);
+  --opencodian-user-bubble-bg-hover: var(--opencodian-shadcn-muted-hover);
+  --opencodian-user-bubble-border: var(--opencodian-shadcn-border);
+  --opencodian-user-bubble-border-hover: var(--opencodian-shadcn-border);
+  --opencodian-composer-lens-bg-solid: var(--opencodian-shadcn-surface);
+  --opencodian-composer-lens-border: var(--opencodian-shadcn-border);
+  --opencodian-composer-lens-border-strong: var(--opencodian-shadcn-border);
+  --opencodian-composer-lens-shadow: transparent;
+  --opencodian-composer-lens-shadow-strong: transparent;
+}
+
+/* shadcn's primary flips between zinc-900 (light) and zinc-50 (dark), so the
+   accent is defined per theme here instead of as static preset CSS variables. */
+.theme-dark .opencodian-container.opencodian-theme-shadcn {
+  --opencodian-accent: #fafafa;
+  --opencodian-accent-hover: #e4e4e7;
+  --opencodian-accent-contrast: #18181b;
+  --opencodian-accent-text: #fafafa;
+}
+
+.theme-light .opencodian-container.opencodian-theme-shadcn {
+  --opencodian-accent: #18181b;
+  --opencodian-accent-hover: #27272a;
+  --opencodian-accent-contrast: #fafafa;
+  --opencodian-accent-text: #18181b;
+}
+
+/*
+ * shadcn layout: dock the composer in the container flow instead of floating
+ * it over the messages pane. The messages pane then ends at the composer's top
+ * edge, so its scroll area no longer extends to the panel bottom underneath
+ * the input and the --opencodian-composer-stack-height scroll padding is unused.
+ */
+.opencodian-container.opencodian-theme-shadcn .opencodian-input-area {
+  position: static;
+  padding: var(--opencodian-composer-inset-y, 12px) var(--opencodian-composer-inset-x, 12px) var(--opencodian-composer-inset-y, 12px);
+}
+
+.opencodian-container.opencodian-theme-shadcn .opencodian-messages {
+  padding-bottom: 16px;
+}
+
+.opencodian-container.opencodian-theme-shadcn .opencodian-header {
+  border-bottom: 1px solid var(--opencodian-shadcn-border);
+}
+
+.opencodian-container.opencodian-theme-shadcn .opencodian-composer-shell {
+  border-radius: var(--opencodian-input-radius);
+  border: 1px solid var(--opencodian-shadcn-border);
+  box-shadow: var(--opencodian-shadcn-shadow-sm);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Image attachment chips insert above the padded content layer; in the bordered
+   shadcn card they must carry the content inset instead of sitting flush at the edge. */
+.opencodian-container.opencodian-theme-shadcn .opencodian-composer-image-chips {
+  margin: 10px 12px 0;
+}
+
+.opencodian-container.opencodian-theme-shadcn .opencodian-composer-shell:focus-within {
+  border-color: color-mix(in srgb, var(--opencodian-accent) 42%, var(--opencodian-shadcn-border));
+  box-shadow: 0 0 0 3px var(--opencodian-shadcn-ring), var(--opencodian-shadcn-shadow-sm);
+}
+
+/* Flat shadcn surfaces: no lift/glide on hover. */
+.opencodian-container.opencodian-theme-shadcn .opencodian-message--user:hover .opencodian-message-content {
+  transform: none;
+  box-shadow: none;
+}
+
+.opencodian-container.opencodian-theme-shadcn .opencodian-message--assistant:hover .opencodian-message-content {
+  transform: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 
 /* Header - transparent, no border */
 .opencodian-header {
@@ -655,14 +771,14 @@ body[data-opencodian-provider-icon-mode="color"] {
 }
 
 /* Pi is an embedded filled mark, independent of the connection-state color.
-   Its original artwork includes whitespace; keep the glyph legible in the
-   compact badge and away from the separate lower-right status indicator. */
+   Its 800-unit artwork carries symmetric whitespace, so the 22px box centers
+   naturally in the 28px badge; do not nudge it off-center to dodge the
+   status dot (the dot is sized/positioned to stay clear of the glyph ink). */
 .opencodian-server-status-icon[data-backend-icon='pi'] > svg.opencodian-pi {
   flex: 0 0 22px;
   width: 22px;
   height: 22px;
   color: var(--text-normal);
-  transform: translate(-2px, -2px);
 }
 
 .opencodian-server-status-icon-brandmark {
@@ -682,10 +798,11 @@ body[data-opencodian-provider-icon-mode="color"] {
 
 .opencodian-server-status-state {
   position: absolute;
-  inset-inline-end: 4px;
-  inset-block-end: 4px;
-  width: 6px;
-  height: 6px;
+  /* Hug the badge rim so the dot stays outside centered backend-icon ink. */
+  inset-inline-end: 2px;
+  inset-block-end: 2px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: currentColor;
   opacity: 0.95;

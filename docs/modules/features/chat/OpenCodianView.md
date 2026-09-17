@@ -8,6 +8,8 @@
 > 2026-07-31: The constructor receives the consumer-owned `ChatPluginPort` type. It narrows the plugin surface without adding runtime/state/lifecycle ownership; existing view and tab-runtime behavior is unchanged.
 
 > **源码**: `src/features/chat/OpenCodianView.ts`
+- 2026-09-17：Composer host 新增 `getComposerTextareaMaxHeight()`，把 `chatAppearance.input.textareaMaxHeight` 传给输入框高度增长上限。
+
 > **状态**: [REVIEW]
 > **最近更新**: Backend session browser with preview transcript seeding + settings info entry + sandbox badge host wiring + Codex session webSearchMode override host wiring
 > **最近更新**: G10c foreground Codex compaction host wiring — the view exposes adapter availability/compact methods through the existing `ActiveTabContextUsageCoordinatorHost` seam and passes the coordinator into `ContextDetailModal`; no compaction state is owned in the view.

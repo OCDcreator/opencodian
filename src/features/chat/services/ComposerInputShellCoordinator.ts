@@ -31,6 +31,12 @@ import {
 import { SlashCommandMenuCoordinator } from './SlashCommandMenuCoordinator';
 
 const COMPOSER_TEXTAREA_MAX_HEIGHT = 240;
+
+function resolveTextareaMaxHeightFallback(value: number | undefined): number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 120 && value <= 480
+    ? value
+    : COMPOSER_TEXTAREA_MAX_HEIGHT;
+}
 const COMPOSER_AVAILABILITY_NOTICE_GAP_PX = 8;
 const INPUT_HIGHLIGHT_SLASH_REGEX = /(^|\s)(\/(?:skills|skill)(?:\s+\S+)?|\/\S+)/g;
 
@@ -76,6 +82,8 @@ export interface ComposerInputShellCoordinatorHost {
   setContextRowElement(element: HTMLElement | null): void;
   setTooltipLabel(element: HTMLElement, label: string, position?: 'bottom' | 'left' | 'right' | 'top'): void;
   getInputPlaceholder(): string;
+  /** Composer textarea growth cap; driven by the input appearance setting. */
+  getComposerTextareaMaxHeight?(): number;
   getSlashCommandSkillMode(): SlashCommandSkillMode;
   /**
    * Whether the Codex backend is the active conversation backend. Drives the
@@ -893,6 +901,10 @@ export class ComposerInputShellCoordinator {
     this.agentMentionController.clear(this.slashCommandMenuEl);
   }
 
+  private resolveTextareaMaxHeight(): number {
+    return resolveTextareaMaxHeightFallback(this.host.getComposerTextareaMaxHeight?.());
+  }
+
   private syncTextareaHeight(): void {
     if (!this.inputTextareaEl) {
       return;
@@ -901,13 +913,14 @@ export class ComposerInputShellCoordinator {
     // Toggle custom placeholder overlay visibility
     const isEmpty = !this.inputTextareaEl.value;
     if (this.placeholderOverlayEl) {
-      this.placeholderOverlayEl.classList.toggle('is-hidden', !isEmpty);
+      this.placeholderOverlayEl.classList.toggle('is-hidden', isEmpty);
     }
 
+    const maxHeight = this.resolveTextareaMaxHeight();
     this.inputTextareaEl.style.height = 'auto';
-    const nextHeight = Math.min(this.inputTextareaEl.scrollHeight, COMPOSER_TEXTAREA_MAX_HEIGHT);
+    const nextHeight = Math.min(this.inputTextareaEl.scrollHeight, maxHeight);
     this.inputTextareaEl.style.height = `${nextHeight}px`;
-    this.inputTextareaEl.style.overflowY = this.inputTextareaEl.scrollHeight > COMPOSER_TEXTAREA_MAX_HEIGHT
+    this.inputTextareaEl.style.overflowY = this.inputTextareaEl.scrollHeight > maxHeight
       ? 'auto'
       : 'hidden';
     if (this.highlightBackdropEl) {
@@ -1490,6 +1503,15 @@ export class ComposerInputShellCoordinator {
     }
 
     this.imageChipContainerEl.empty();
+
+    if (this.attachedImages.length === 0) {
+      // Removing the last chip must not leave the empty chip row mounted:
+      // its margins would render as a blank strip above the input inside
+      // bordered composer cards. Keep this consistent with clearAttachedImages().
+      this.imageChipContainerEl.remove();
+      this.imageChipContainerEl = null;
+      return;
+    }
 
     for (let i = 0; i < this.attachedImages.length; i++) {
       const image = this.attachedImages[i];

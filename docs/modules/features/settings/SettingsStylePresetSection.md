@@ -38,6 +38,6 @@
 
 ## 注意事项
 
-- 保持 `glass / flat / soft / sharp` 的 style family 顺序，不要把 preset family / scheme 语义散回主 owner
+- 保持 `glass / flat / soft / sharp / shadcn` 的 style family 顺序，不要把 preset family / scheme 语义散回主 owner
 - 异步 preset apply/reset 必须继续保留 session guard，避免旧 settings 面板回写到新实例
 - 这里负责的是 preset 专属状态 UI，不要把通用 numeric/color/reset 控件逻辑重新塞进本文件

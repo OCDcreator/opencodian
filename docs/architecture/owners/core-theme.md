@@ -1,6 +1,7 @@
 # Owner: core.theme
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
+- 2026-09-17 (shadcn style): BUILTIN_THEME_PRESETS 新增第 13 个 preset `shadcn-neutral`（style `shadcn`，容器类 `opencodian-theme-shadcn`，cssVariables 留空——accent 深浅色各不同，改由主题 CSS 类按 `.theme-dark` / `.theme-light` 定义）；appearance 为 `SHADCN_APPEARANCE`（聊天框架边距 8px、不透明卡片输入区、无辉光、Inter 输入字体、对称圆角用户气泡、输入面板左右 12px）。
 - 2026-09-13 (universal memory backend): owner manifest gained `core.memory` and `app.memory-runtime`; this owner's boundary itself is unchanged (no source touched, allowlist untouched).
 
 - **Layer:** `core` (may import layers: shared, core)

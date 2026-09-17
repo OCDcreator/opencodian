@@ -3,6 +3,8 @@
 2026-09-11：`applyFontSelection` 对 `InputFontLoader.ensureLoaded` 改为 `void` 调用——该方法对 CSP 受限 CDN 字体返回异步注入 Promise，这里只需 fire-and-forget。
 
 > **源码**: `src/features/settings/SettingsStyleInputPanelSection.ts`
+- 2026-09-17：输入面板组新增三个数值控件：左右留白 `composerInsetX`（0–40，默认 0）、上下留白 `composerInsetY`（0–40，默认 12）、输入区最大高度 `textareaMaxHeight`（120–480，步进 10，默认 240）。
+
 > **状态**: [REVIEW]
 
 ## 概述

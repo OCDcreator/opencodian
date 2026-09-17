@@ -47,6 +47,7 @@ export function getChatAppearanceCssVariables(
   return {
     '--opencodian-messages-pad-top': `${appearance.layout.messagesPaddingTop}px`,
     '--opencodian-messages-pad-x': `${appearance.layout.messagesPaddingX}px`,
+    '--opencodian-chat-inset-x': `${appearance.layout.messagesAreaInsetX}px`,
     '--opencodian-message-pad-x': `${appearance.layout.messagePaddingX}px`,
     '--opencodian-content-pad-x': `${appearance.layout.contentPaddingX}px`,
     '--opencodian-content-pad-y': `${appearance.layout.contentPaddingY}px`,
@@ -91,6 +92,9 @@ export function getChatAppearanceCssVariables(
     '--opencodian-input-bg-opacity': `${appearance.input.backgroundOpacity}%`,
     '--opencodian-input-blur': `${appearance.input.blur}px`,
     '--opencodian-input-shadow-blur': `${appearance.input.shadowBlur}px`,
+    '--opencodian-composer-inset-x': `${appearance.input.composerInsetX}px`,
+    '--opencodian-composer-inset-y': `${appearance.input.composerInsetY}px`,
+    '--opencodian-composer-max-height': `${appearance.input.textareaMaxHeight}px`,
     '--opencodian-composer-font-family': resolveComposerFontFamily(
       appearance.input.enFontFamily,
       appearance.input.cnFontFamily,

@@ -1,5 +1,7 @@
 # chatAppearance
 
+2026-09-17：新增变量 `--opencodian-chat-inset-x`（layout.messagesAreaInsetX，整个聊天框架与面板两侧的留白，默认 12，最小 8）与 `--opencodian-composer-inset-x` / `--opencodian-composer-inset-y` / `--opencodian-composer-max-height`（input 组：输入面板左右留白默认 0、上下留白默认 12、输入文字区最大高度默认 240，后者同时取代 Composer 协调器里硬编码的 240px 上限）。
+
 > **源码**: `src/features/chat/chatAppearance.ts`
 > **状态**: [REVIEW]
 

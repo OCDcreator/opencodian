@@ -2,6 +2,8 @@
 
 > 2026-09-11：`.opencodian-settings-quick-nav` 基础规则背景由 94% 透明改为不透明的 `var(--background-secondary)`，并删除随之成为死代码的 `backdrop-filter` / `-webkit-backdrop-filter` blur 声明，修复滚动时设置卡片顶边透过 sticky 导航显现的问题；配套的布局契约 token `--opencodian-settings-nav-bg` 同步改为 `54% secondary + 46% primary`，与原来在默认面板底色上的合成色完全一致，仅变为不透明。
 
+2026-09-17：样式预设卡网格改为 `repeat(auto-fit, minmax(150px, 1fr))`（shadcn 样式卡加入后，固定 5 列在常规设置页宽度下把每张卡挤到 ~112px，描述折行最高达 7 行）；卡片最窄 150px，窄窗自动降列。
+
 > **源码**: `src/style/components/model-selector.css`
 > **状态**: [FINAL]
 

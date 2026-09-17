@@ -234,3 +234,72 @@ describe('OpenCodianSettingsRuntimeCoordinator config sync gating', () => {
     expect(OpencodeConfigManager.syncPermissionMode).not.toHaveBeenCalled();
   });
 });
+
+describe('OpenCodianSettingsRuntimeCoordinator immediate chat appearance apply', () => {
+  function createAppearanceHost() {
+    const storageService = {
+      saveCoreSettings: jest.fn().mockResolvedValue(undefined),
+      saveUiSettings: jest.fn().mockResolvedValue(undefined),
+    };
+    let settings = {
+      ...DEFAULT_SETTINGS,
+      theme: {
+        ...DEFAULT_SETTINGS.theme,
+        activePresetId: 'glass-classic' as const,
+      },
+    };
+
+    return {
+      host: {
+        getSettings: jest.fn(() => settings),
+        setSettings: jest.fn((nextSettings: typeof settings) => {
+          settings = nextSettings;
+        }),
+        getOpenCodeService: jest.fn(() => ({
+          getSettingsSnapshot: jest.fn(() => ({ ...DEFAULT_SETTINGS })),
+          updateSettings: jest.fn().mockResolvedValue(undefined),
+          checkHealth: jest.fn().mockResolvedValue(true),
+        })),
+        getStorageService: jest.fn(() => storageService),
+        getVaultBasePath: jest.fn(() => null),
+        refreshOpenCodianViews: jest.fn(),
+        invalidateSlashCommandMenuCatalogs: jest.fn(),
+        applyProviderIconColorMode: jest.fn(),
+        getOpenCodianLeaves: jest.fn(() => []),
+        onSettingsPersistenceBlocked: jest.fn(),
+        scheduleDeferredRuntimeWarmup: jest.fn(),
+      },
+      storageService,
+      getActivePresetId: () => settings.theme.activePresetId,
+    };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('restyles open views right away after selecting a preset', async () => {
+    const { host, storageService, getActivePresetId } = createAppearanceHost();
+    const coordinator = new OpenCodianSettingsRuntimeCoordinator(host as never);
+
+    coordinator.initialize(true);
+    await coordinator.selectThemePresetAndSave('flat-slate');
+
+    expect(getActivePresetId()).toBe('flat-slate');
+    expect(storageService.saveCoreSettings).toHaveBeenCalled();
+    // The regression this guards: preset switches used to persist without
+    // pushing applyUi, so views only restyled after another settings save.
+    expect(host.refreshOpenCodianViews).toHaveBeenCalledWith({ reloadModels: false, applyUi: true });
+  });
+
+  it('still rolls back and refreshes views when immediate persistence fails', async () => {
+    const { host, storageService } = createAppearanceHost();
+    storageService.saveCoreSettings.mockRejectedValue(new Error('disk full'));
+    const coordinator = new OpenCodianSettingsRuntimeCoordinator(host as never);
+
+    coordinator.initialize(true);
+    await expect(coordinator.selectThemePresetAndSave('flat-slate')).rejects.toThrow('disk full');
+
+    expect(host.refreshOpenCodianViews).toHaveBeenCalledWith({ reloadModels: false, applyUi: true });
+  });
+});

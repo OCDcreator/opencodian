@@ -1,5 +1,7 @@
 # Chinese Locale
 
+2026-09-17：新增 shadcn 主题样式文案：`settings.style.presets.styles.shadcn.{title,desc}`（中性细边框卡片、输入框固定底部、消息区独立滚动）与配色方案标签 `settings.style.presets.scheme.shadcn-neutral`；描述后来为预设卡可读性进一步精简。同日新增布局键 `settings.style.layout.messagesAreaInsetX.{name,desc}` 与输入面板键 `settings.style.input.{composerInsetX,composerInsetY,textareaMaxHeight}.{name,desc}`，并改写 `messagesPaddingX` / `messagePaddingX` 描述以说明两层留白的叠加关系。
+
 2026-09-17：新增 Pi MCP 设置文案组（`settings.pi.tab.mcp` 与 `settings.pi.mcp.*`）：只读说明（列出 Pi 合并读取的配置文件与同名覆盖规则）、空态/未声明端点/已禁用/exclusive 提示、传输方式与认证方式标签、来源标签，以及「Pi 最近一次上报」区块（说明、空态、接收时间）。文案明确状态是 Pi 最近发来的文本而非实时查询。
 
 2026-09-17：新增 `inlineEdit.context.*`（添加上下文/搜索/空态/截断/移除/上限）与 `inlineEdit.error.{tooManyAttachedNotes,attachedNotePathTooLong,attachedNotePathInvalid}` 文案。

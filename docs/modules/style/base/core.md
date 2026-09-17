@@ -1,5 +1,9 @@
 # Core Styles
 
+2026-09-17：新增 shadcn 主题容器类
+2026-09-17：聊天框架横向留白收编为 `--opencodian-chat-inset-x`（layout.messagesAreaInsetX，默认 12、最小 8）：view-content 的横向内边距清零，改由 `.opencodian-container` 的 `padding-inline` 承担，头部与消息区随之整体内收；输入面板留白变量化为 `--opencodian-composer-inset-x/-y`（`.opencodian-input-area` 基础规则与 shadcn 停靠规则都改读变量，shadcn 预设左右 12）。
+ `.opencodian-theme-shadcn`：派生自 Obsidian 主题的中性 token（`--opencodian-shadcn-{border,surface,muted,muted-hover,ring,shadow-sm}`），中和玻璃管线（specular/glow/阴影全部关闭），accent 在 dark/light 下分别取 zinc-50/zinc-900（写在 CSS 里而非 preset 静态变量）。布局上该主题把 `.opencodian-input-area` 从悬浮改为容器流内 dock，消息区滚动范围止于输入框上缘，`.opencodian-messages` 底部 padding 不再叠加 `--opencodian-composer-stack-height`；另给 header 加底边框、composer 卡片化加 focus ring、hover 去浮动；正文字号不覆盖，沿用会话级 chatFontSizePx 内联设置。附件缩略图行（`.opencodian-composer-image-chips`）在该主题下补 10px/12px 内缩，不再贴边（其在玻璃壳里的贴边设计在有边框卡片上不可接受）。另修复头部后端状态徽标：移除 Pi 图标历史 `translate(-2px,-2px)` 避让位移（其 800 单位画布留白对称，22px 盒天然居中于 28px 徽标），状态绿点缩小为 5px 并外移贴边（inset 2px），不再侵入居中图标的墨迹。
+
 2026-09-11：新增 `--opencodian-composer-lens-bg-solid`（dark/light/:root 三处），作为输入框背景强度滑杆的不透明混合端点，替代半透明的 `--opencodian-composer-lens-bg-strong`（保留定义供用户自定义 CSS 引用，插件自身不再消费）；滑杆 100% 现在真正得到不透明输入框。同时修复 sticky-mask 模式下 `.opencodian-turn-header::before` 的 `top` 负外延（原 `-1 * --opencodian-messages-pad-top`）：该不透明遮罩带在 header 未吸附时也会盖住上一轮助手消息底部约 4px（截断「已中断」徽标下缘），吸附时外延部分本就被滚动口裁掉，故改为 `top: 0`。
 
 2026-09-10：聊天 view-content 单独使用对称上下间距，覆盖 Obsidian 通用视图默认的 32px 底部留白；头部与输入区共享 `--opencodian-chat-edge-gap`（默认 12px），同时保留设备 safe-area。仅作用于 `data-type="opencodian-view"`，不改变主题或其它视图。

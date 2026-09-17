@@ -1168,7 +1168,10 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-theme-style-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* Auto-fit keeps every style card wide enough for its description; five
+     fixed columns squeezed cards to ~112px and wrapped descriptions into
+     tall clipped blocks. */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
   margin-top: 8px;
 }

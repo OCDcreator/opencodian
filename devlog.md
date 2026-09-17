@@ -11,6 +11,18 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-17 shadcn 主题、可调边距与一批「先量测再修」的 UX 修复
+
+本条覆盖一轮以截图/几何量测驱动的迭代。**shadcn 主题**：新增第 5 种 style（`shadcn-neutral`），中性派生 token、玻璃管线全关、accent 深浅色按 `.theme-dark/.theme-light` 各取 zinc-50/900、输入字体 Inter；核心布局变化是 `.opencodian-input-area` 从悬浮改为容器流内停靠——消息区滚动范围止于输入卡上缘，不再延伸到面板底部。
+
+**用户路径测出来的三个真 bug**：附件缩略图点 ✕ 后空容器残留（带着边距渲染成空白条，根因是只 `empty()` 不移除容器，与 `clearAttachedImages()` 对齐后修复并加回归测试）；预设切换只落盘不推 UI（`saveChatAppearanceImmediately()` 成功路径漏调 `refreshOpenCodianViews`，用户要切标签才见效，补调并加两条单测）；`.opencodian-input` 里残留字面量 `max-height: 240px` 暗中钳制新设置（>240 无效，删除后 380 实测正常）。另有 Pi 徽标偏心（历史 `translate(-2px,-2px)` 避让位移，SVG 留白本就对称，去掉位移改绿点缩小贴边）。
+
+**新设置四项**：布局组「消息区两侧边缘留白」（8–48，shadcn 基线 8px，比其它样式宽 4px；view-content 横向内边距收编为 `--opencodian-chat-inset-x`）；输入面板组「左右留白 / 上下留白 / 输入区最大高度」（后者取代硬编码 240，JS 与 CSS 双侧接线）。预设卡网格改 `auto-fit minmax(150px)`（固定 5 列曾把卡片挤到 112px、描述折 7 行）。两层留白的语义（消息区内部 vs 气泡外）写进了滑杆描述。
+
+**测试并发稳定性**：全量并发下 puppeteer 套件漂移失败——根因有二：jest 默认 19 worker（20 核机）互相挤压，`run-jest.js` 现在默认 `--maxWorkers=50%`；puppeteer 自身 30s 的 launch 超时（等 DevTools 端点）才是套件 32s 失败的真凶，jest 超时救不了它，三套件 launch 显式 `timeout: 60000`。后台跑 4 轮构建的压力下全量 779 套件全绿。
+
+E2E 全程走真实设置 UI 路径（CDP 驱动设置窗 + 主窗几何断言），截图与断言数据存 `.obsidian-debug/`（不入库）。
+
 ## 2026-09-17 Pi 设置页新增只读 MCP 子标签：声明清单来自配置文件，状态来自扩展上报
 
 接上一条：用户指出 opencode 有独立 MCP 标签项，问能不能把 pi 的也放进设置页，而不是塞在会话界面。**先摸清两边有什么再动手**（两个子代理并行调研）：opencode 那个 MCP 标签是 `backendRequired: 'opencode'`，组件直接绑 `openCodeService` 与 opencode 类型，Claude/Codex 各自另有自己的 MCP 面——所以按仓库既有形态给 Pi 加自己的子标签，而不是把顶层标签重构成后端中立。

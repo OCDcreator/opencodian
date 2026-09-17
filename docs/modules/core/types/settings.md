@@ -114,20 +114,20 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `ChatAppearanceSettings` | 完整外观设置（8 个子对象） |
 | `PartialChatAppearanceSettings` | 外观设置的部分覆盖类型 |
 | `ThemeSettings` | `{ activePresetId, customAppearanceOverrides }` |
-| `ThemePresetId` | 12 个预设 ID 的联合类型 |
+| `ThemePresetId` | 13 个预设 ID 的联合类型 |
 | `ThemePresetDefinition` | 预设完整定义 |
-| `ThemeStyleId` | `'glass' \| 'flat' \| 'soft' \| 'sharp'` |
+| `ThemeStyleId` | `'glass' \| 'flat' \| 'soft' \| 'sharp' \| 'shadcn'` |
 
 ### 外观子设置
 
 | 类型 | 说明 |
 |------|------|
-| `ChatAppearanceLayoutSettings` | 布局（`messagesPaddingTop`, `messagesPaddingX`） |
+| `ChatAppearanceLayoutSettings` | 布局（`messagesPaddingTop`, `messagesPaddingX`, `messagesAreaInsetX`, `messagePaddingX`, `contentPaddingX`, `contentPaddingY`） |
 | `ChatAppearanceStickySettings` | 吸顶区（`headerGap`, `maskHeight`, `maskBlur`） |
 | `ChatAppearanceBackgroundSettings` | 背景图（`imagePath`, `fitMode`, `opacity`, `blur`, `depth`, `dim`, `edgeFade`, `saturation`, `brightness`, `focusX`, `focusY`） |
 | `ChatAppearanceUserSettings` | 用户消息气泡，含渲染样式 `style`（`'solid'` 默认 / `'glass'`）与时间样式（`timeFontSize`, `timeFontWeight`, `timeColor`） |
 | `ChatAppearanceAssistantSettings` | 助手消息气泡，现含 meta/time/modelId 样式（字号、字重、颜色） |
-| `ChatAppearanceInputSettings` | 输入面板（`radius`, `backgroundOpacity`, `blur`, `shadowBlur`, `actionButtonStyle`, `contextRingStyle`, `enFontFamily`, `cnFontFamily`） |
+| `ChatAppearanceInputSettings` | 输入面板（`radius`, `backgroundOpacity`, `blur`, `shadowBlur`, `composerInsetX`, `composerInsetY`, `textareaMaxHeight`, `actionButtonStyle`, `contextRingStyle`, `enFontFamily`, `cnFontFamily`） |
 | `ChatAppearanceScrollbarSettings` | 滚动条（`width`, `radius`, `trackOpacity`, `thumbOpacity`, `thumbHoverOpacity`, `edgePadding`, `shadowOpacity`） |
 | `ChatAppearanceAdvancedSettings` | 高级（`customCssDeclarations`） |
 

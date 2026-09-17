@@ -384,6 +384,11 @@ export class OpenCodianSettingsRuntimeCoordinator {
       throw error;
     }
 
+    // Persisting is not enough: preset switches and group resets must restyle
+    // the open chat views right away, not wait for the next full settings save
+    // (e.g. the user navigating to another settings tab) to push applyUi.
+    this.host.refreshOpenCodianViews({ reloadModels: false, applyUi: true });
+
     if (previousBackgroundPath && previousBackgroundPath !== nextBackgroundPath) {
       this.clearThemeBackgroundDataUrlCache(previousBackgroundPath);
       try {

@@ -1839,6 +1839,8 @@ export interface ModelProviderConfig {
 export interface ChatAppearanceLayoutSettings {
   messagesPaddingTop: number;
   messagesPaddingX: number;
+  /** Left/right inset of the whole chat frame (header + messages) from the panel edge. */
+  messagesAreaInsetX: number;
   /** Horizontal padding on the message element itself (user & assistant). Replaces the hardcoded 28px. */
   messagePaddingX: number;
   /** Horizontal padding on the inner content bubble (user & assistant). Replaces the hardcoded 14px. */
@@ -1907,6 +1909,12 @@ export interface ChatAppearanceInputSettings {
   backgroundOpacity: number;
   blur: number;
   shadowBlur: number;
+  /** Left/right inset between the composer card and the panel edge. */
+  composerInsetX: number;
+  /** Vertical breathing room around the composer card (dock gap below in floating themes; top+bottom in docked themes). */
+  composerInsetY: number;
+  /** Maximum height the composer textarea may grow to before it scrolls. */
+  textareaMaxHeight: number;
   actionButtonStyle: InputPanelActionButtonStyleId;
   contextRingStyle: ContextRingStyleId;
   enFontFamily: string;
@@ -1982,7 +1990,7 @@ export interface PartialChatAppearanceSettings {
   advanced?: Partial<ChatAppearanceAdvancedSettings>;
 }
 
-export type ThemeStyleId = 'glass' | 'flat' | 'soft' | 'sharp';
+export type ThemeStyleId = 'glass' | 'flat' | 'soft' | 'sharp' | 'shadcn';
 
 export type ThemePresetId =
   | 'glass-classic'
@@ -1996,7 +2004,8 @@ export type ThemePresetId =
   | 'soft-latte'
   | 'sharp-graphite'
   | 'sharp-neon'
-  | 'sharp-amber';
+  | 'sharp-amber'
+  | 'shadcn-neutral';
 
 export interface ThemePresetDefinition {
   id: ThemePresetId;
@@ -2018,6 +2027,7 @@ export function getDefaultChatAppearanceSettings(): ChatAppearanceSettings {
     layout: {
       messagesPaddingTop: 12,
       messagesPaddingX: 0,
+      messagesAreaInsetX: 12,
       messagePaddingX: 21,
       contentPaddingX: 10,
       contentPaddingY: 5,
@@ -2074,6 +2084,9 @@ export function getDefaultChatAppearanceSettings(): ChatAppearanceSettings {
       backgroundOpacity: 32,
       blur: 18,
       shadowBlur: 28,
+      composerInsetX: 0,
+      composerInsetY: 12,
+      textareaMaxHeight: 240,
       actionButtonStyle: 'default',
       contextRingStyle: 'classic',
       enFontFamily: 'newsreader',
@@ -2722,6 +2735,9 @@ function normalizeChatAppearanceInputSettings(
   return {
     ...defaults,
     ...(input ?? {}),
+    composerInsetX: normalizeFiniteNumberInRange(input?.composerInsetX, defaults.composerInsetX, 0, 40),
+    composerInsetY: normalizeFiniteNumberInRange(input?.composerInsetY, defaults.composerInsetY, 0, 40),
+    textareaMaxHeight: normalizeFiniteNumberInRange(input?.textareaMaxHeight, defaults.textareaMaxHeight, 120, 480),
     actionButtonStyle: normalizeInputPanelActionButtonStyleId(input?.actionButtonStyle),
     contextRingStyle: normalizeContextRingStyleId(input?.contextRingStyle),
     enFontFamily: normalizeFontFamilyValue(input?.enFontFamily) || defaults.enFontFamily,
@@ -2736,6 +2752,7 @@ function normalizeChatAppearanceLayoutSettings(
   return {
     messagesPaddingTop: normalizeFiniteNumberInRange(layout?.messagesPaddingTop, defaults.messagesPaddingTop, 0, 32),
     messagesPaddingX: normalizeFiniteNumberInRange(layout?.messagesPaddingX, defaults.messagesPaddingX, 0, 32),
+    messagesAreaInsetX: normalizeFiniteNumberInRange(layout?.messagesAreaInsetX, defaults.messagesAreaInsetX, 8, 48),
     messagePaddingX: normalizeFiniteNumberInRange(layout?.messagePaddingX, defaults.messagePaddingX, 0, 48),
     contentPaddingX: normalizeFiniteNumberInRange(layout?.contentPaddingX, defaults.contentPaddingX, 0, 32),
     contentPaddingY: normalizeFiniteNumberInRange(layout?.contentPaddingY, defaults.contentPaddingY, 0, 32),
@@ -2782,6 +2799,7 @@ export function isThemePresetId(value: unknown): value is ThemePresetId {
     case 'sharp-graphite':
     case 'sharp-neon':
     case 'sharp-amber':
+    case 'shadcn-neutral':
       return true;
     default:
       return false;

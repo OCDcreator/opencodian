@@ -1,6 +1,8 @@
 # OpenCodianSettingsRuntimeCoordinator
 
 > **源码**: `src/core/runtime/OpenCodianSettingsRuntimeCoordinator.ts`
+
+- 2026-09-17：`saveChatAppearanceImmediately()` 成功持久化后现在会调用 `refreshOpenCodianViews({reloadModels:false, applyUi:true})`。此前预设切换/分组重置只落盘不推 UI，打开的聊天视图要等下一次全量设置保存（如切换设置标签）才换样式；错误回滚分支原本就有刷新，保持不变。
 > **状态**: [DRAFT]
 
 ## 概述

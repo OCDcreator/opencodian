@@ -883,6 +883,7 @@ export class OpenCodianView extends ItemView {
         ConversationRenderService.setTooltipLabel(element, label, position);
       },
       getInputPlaceholder: () => this.getInputPlaceholder(),
+      getComposerTextareaMaxHeight: () => this.plugin.settings.chatAppearance.input.textareaMaxHeight,
       getSlashCommandSkillMode: () => this.plugin.settings.slashCommandSkillMode,
       isCodexBackendActive: () => this.isCodexConversationActive(),
       onCodexAgentMentionUnavailable: () => this.codexChatSurfaceBinding.notifyAgentMentionUnavailable(),

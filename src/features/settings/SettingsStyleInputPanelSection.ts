@@ -234,6 +234,48 @@ export class SettingsStyleInputPanelSection {
         appearance.input.radius = value;
       },
     });
+    this.addNumericStyleControl(inputControlsEl, {
+      group: 'input',
+      name: t('settings.style.input.composerInsetX.name'),
+      desc: t('settings.style.input.composerInsetX.desc'),
+      min: 0,
+      max: 40,
+      step: 1,
+      unit: 'px',
+      value: () => this.plugin.settings.chatAppearance.input.composerInsetX,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().input.composerInsetX,
+      setValue: (appearance, value) => {
+        appearance.input.composerInsetX = value;
+      },
+    });
+    this.addNumericStyleControl(inputControlsEl, {
+      group: 'input',
+      name: t('settings.style.input.composerInsetY.name'),
+      desc: t('settings.style.input.composerInsetY.desc'),
+      min: 0,
+      max: 40,
+      step: 1,
+      unit: 'px',
+      value: () => this.plugin.settings.chatAppearance.input.composerInsetY,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().input.composerInsetY,
+      setValue: (appearance, value) => {
+        appearance.input.composerInsetY = value;
+      },
+    });
+    this.addNumericStyleControl(inputControlsEl, {
+      group: 'input',
+      name: t('settings.style.input.textareaMaxHeight.name'),
+      desc: t('settings.style.input.textareaMaxHeight.desc'),
+      min: 120,
+      max: 480,
+      step: 10,
+      unit: 'px',
+      value: () => this.plugin.settings.chatAppearance.input.textareaMaxHeight,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().input.textareaMaxHeight,
+      setValue: (appearance, value) => {
+        appearance.input.textareaMaxHeight = value;
+      },
+    });
 
     // ── Font controls (shown for all input panel themes) ──
     this.addFontControls(inputControlsEl);

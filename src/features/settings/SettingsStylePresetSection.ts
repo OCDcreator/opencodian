@@ -7,7 +7,7 @@ import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
 
 const logger = createLogger('SettingsStylePresetSection');
-const STYLE_ORDER: ThemeStyleId[] = ['glass', 'flat', 'soft', 'sharp'];
+const STYLE_ORDER: ThemeStyleId[] = ['glass', 'flat', 'soft', 'sharp', 'shadcn'];
 
 interface SettingsStylePresetSectionOptions {
   plugin: OpenCodianPlugin;

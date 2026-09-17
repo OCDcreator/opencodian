@@ -1748,6 +1748,24 @@ describe('ComposerInputShellCoordinator — image paste and drag-drop', () => {
     expect(fixture.container.querySelector('.opencodian-composer-image-chip-thumb')?.getAttribute('alt')).toBe('test.png');
   });
 
+  it('removes the chip row entirely when the last attached image is removed', async () => {
+    const fixture = createFixture({ hasImageInputCapability: true });
+
+    fixture.textarea.dispatchEvent(createPasteEvent([createImageFile('test.png', 'image/png')]));
+    await flushAsync();
+    flushAnimationFrames();
+    expect(fixture.container.querySelectorAll('.opencodian-composer-image-chip').length).toBe(1);
+
+    fixture.container.querySelector<HTMLButtonElement>('.opencodian-composer-image-chip-remove')?.click();
+    await flushAsync();
+    flushAnimationFrames();
+
+    expect(fixture.container.querySelector('.opencodian-composer-image-chip')).toBeNull();
+    // The empty chip row must not linger: its margins render as a blank strip
+    // above the input inside bordered composer cards.
+    expect(fixture.container.querySelector('.opencodian-composer-image-chips')).toBeNull();
+  });
+
   it('ignores pasted non-image files and allows text paste', async () => {
     const fixture = createFixture({ hasImageInputCapability: true });
 

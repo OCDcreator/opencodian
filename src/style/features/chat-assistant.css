@@ -997,6 +997,7 @@
   flex: 0 0 auto;
   display: block;
   margin: 0;
+  max-height: var(--opencodian-composer-max-height, 240px);
   padding: 8px 0 4px;
   width: 100%;
   background: transparent !important;
@@ -1006,7 +1007,6 @@
   box-shadow: none !important;
   resize: none;
   min-height: 68px;
-  max-height: 240px;
   font-family: var(--opencodian-composer-font-family, "OpenCodian Newsreader", Georgia, serif);
   font-size: 14px;
   line-height: 1.5;
@@ -1257,7 +1257,7 @@
   bottom: 0;
   left: 0;
   z-index: 40;
-  padding: 0 0 var(--opencodian-chat-edge-gap, 12px);
+  padding: 0 var(--opencodian-composer-inset-x, 0px) var(--opencodian-composer-inset-y, 12px);
   display: flex;
   flex-direction: column;
   gap: 8px;

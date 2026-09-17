@@ -1,6 +1,8 @@
 # SettingsStyleSection
 
 > **源码**: `src/features/settings/SettingsStyleSection.ts`
+- 2026-09-17：布局组新增「消息区两侧边缘留白」`messagesAreaInsetX`（8–48，默认 12）：整个聊天框架（含头部）与面板两侧的间距，替代此前宿主 view-content 固定的 12px 横向内边距。
+
 > **状态**: [REVIEW]
 
 ## 概述

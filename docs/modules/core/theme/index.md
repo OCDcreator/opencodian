@@ -7,12 +7,13 @@
 
 `src/core/theme/index.ts` 定义了内置聊天主题 preset，并提供一组围绕 preset 的解析、比较和差异提取函数。它服务的不是完整设置系统，而是“preset 作为基础，局部样式覆盖作为增量”的那一层逻辑。
 
-源码当前内置 12 个 preset，分成 4 种 style：
+源码当前内置 13 个 preset，分成 5 种 style：
 
 - `glass`
 - `flat`
 - `soft`
 - `sharp`
+- `shadcn`
 
 ## 导入关系
 
@@ -49,7 +50,7 @@ export function hasThemeAppearanceOverrides(theme: ThemeSettings): boolean;
 
 ### 内置 preset 列表
 
-源码里的 12 个 preset 如下：
+源码里的 13 个 preset 如下：
 
 | Style | Preset |
 |------|------|
@@ -57,6 +58,7 @@ export function hasThemeAppearanceOverrides(theme: ThemeSettings): boolean;
 | `flat` | `flat-slate`, `flat-ocean`, `flat-rose` |
 | `soft` | `soft-neutral`, `soft-lavender`, `soft-latte` |
 | `sharp` | `sharp-graphite`, `sharp-neon`, `sharp-amber` |
+| `shadcn` | `shadcn-neutral` |
 
 每个 preset 都包含：
 
@@ -75,6 +77,7 @@ export function hasThemeAppearanceOverrides(theme: ThemeSettings): boolean;
 - `FLAT_APPEARANCE`
 - `SOFT_APPEARANCE`
 - `SHARP_APPEARANCE`
+- `SHADCN_APPEARANCE`（shadcn 专属基线：聊天框架边距 8px、输入面板左右 12px、输入字体 Inter、无辉光）
 
 ### 运行时查找表与样式清单
 
@@ -82,7 +85,7 @@ export function hasThemeAppearanceOverrides(theme: ThemeSettings): boolean;
 
 - `THEME_STYLE_CONTAINER_CLASSES`
   - 来自所有 preset 的 `containerClass` 去重结果
-  - 当前值对应 `opencodian-theme-glass/flat/soft/sharp`
+  - 当前值对应 `opencodian-theme-glass/flat/soft/sharp/shadcn`
 - `THEME_PRESET_CSS_VARIABLE_NAMES`
   - 来自所有 preset 的 `cssVariables` key 去重结果
 

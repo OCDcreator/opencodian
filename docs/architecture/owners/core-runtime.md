@@ -1,6 +1,7 @@
 # Owner: core.runtime
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
+- 2026-09-17 (shadcn style): `saveChatAppearanceImmediately()` 成功后补调 `refreshOpenCodianViews({reloadModels:false, applyUi:true})`，修复预设切换不立即生效（此前需等下一次全量设置保存才推 UI）。边界与依赖不变。
 - 2026-09-13 (universal memory backend): owner manifest gained `core.memory` and `app.memory-runtime`; this owner's boundary itself is unchanged (no source touched, allowlist untouched).
 
 - **Layer:** `core` (may import layers: shared, core)
