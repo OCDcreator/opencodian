@@ -16,6 +16,7 @@ import {
 import type { InlineEditChoice, InlineEditHost } from './features/inline-edit/InlineEditHost';
 import { createInlineEditPluginHost } from './features/inline-edit/InlineEditPluginHost';
 import { inlineEditOverlayTrackerExtension } from './features/inline-edit/InlineEditInputOverlay';
+import { ProviderIconService } from './utils/icons/ProviderIconService';
 import { CLAUDE_CODE_EFFORT_VARIANTS, CODEX_EFFORT_VARIANTS } from './core/agents/backend/BackendModelCatalog';
 import {
   normalizeInlineEditEffortOverrides,
@@ -478,6 +479,7 @@ export default class OpenCodianPlugin extends Plugin {
         this.settings.inlineEditEffortOverrides = normalizeInlineEditEffortOverrides(next);
         await this.saveSettings();
       },
+      createProviderIcon: (providerId, size) => ProviderIconService.createIconElement(this.app, providerId, size),
     });
     this.inlineEditController = new InlineEditController({ host: this.inlineEditHost });
   }

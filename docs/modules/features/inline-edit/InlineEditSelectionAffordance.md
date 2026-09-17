@@ -5,7 +5,7 @@
 
 ## 概述
 
-选区悬浮按钮：非空选区出现时，在选区末端附近渲染一个铅笔图标按钮，点击即以该选区唤起 inline edit。作为 CodeMirror 6 `ViewPlugin` 由 `main.ts` 通过 `registerEditorExtension` 全局注册一次。
+选区悬浮按钮：非空选区出现时，在选区末端附近渲染一个 sparkles 图标按钮（24px 毛玻璃圆角方块，AI 语义入口），点击即以该选区唤起 inline edit。作为 CodeMirror 6 `ViewPlugin` 由 `main.ts` 通过 `registerEditorExtension` 全局注册一次。按钮带 `.opencodian-inline-edit` 基类，作用域令牌（圆角/阴影/深色提亮）才生效。
 
 ## 职责
 

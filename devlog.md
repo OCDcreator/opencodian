@@ -11,6 +11,27 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-16 行内编辑 UI 重设计：指令条骨架翻转 + 提供商图标 + 幽灵分层
+
+用户对首版 shadcn 移植风格明确不满意（"太丑、布局也不满意"），并连续给出三轮实机反馈：卡片是直角、模型旁的键帽不知道干什么、思考强度选择器认不出来、tooltip 不要叠加。本轮把布局推翻重排并逐条回应。
+
+**布局翻转（Cursor cmd-K 骨架）**
+- 输入行从第二行提到第一行（sparkles 引导图标 + 无边框输入 + 实心提交/幽灵关闭），模型/思考强度 chip 沉入页脚——指令条的主任务是指令，配置是次要 meta
+- 澄清/错误块从"左侧色条 alert"改为圆角淡色 tint + 前导语义图标；预览卡片页脚加 sparkles 身份标签（左）+ 幽灵"拒绝"/实心"接受"（右），拒绝按钮去掉描边，每个表面只留一个实心强调动作
+- ⏎/Esc 键帽提示删除（提交按钮本身就是 ⏎ 形状，Esc 关浮层是标准行为）
+
+**直角根因修复（历史 bug）**
+- `--ocie-radius` 等作用域令牌定义在 `.opencodian-inline-edit` 基类上，但 overlay 与 affordance 根元素从未挂基类——圆角与浅色阴影自始未生效。TS 补挂基类后圆角/阴影/深色提亮全部到位，并在样式模块文档写明该契约
+
+**模型 chip 提供商图标（同主输入窗口管线）**
+- bridge→host→controller→overlay 四层透传 `createProviderIcon`（`ProviderIconService.createIconElement`）：模型 chip 与菜单行渲染品牌图标，解析失败回退 lucide 字形；provider 推断规则为 `provider/model` 前缀，claude-code→anthropic、codex→openai
+- 思考强度 chip 恢复可见文字标签（"思考强度 high"），effort 菜单配 signal-low/medium/high 信号格图标；菜单行统一 13px 图标槽保证 label 对齐
+- chip tooltip 收敛为单一 `title`（截断时悬浮看全名），不叠加 aria 双 tooltip
+
+**明暗两版分层**：浅色靠 94% 不透明表面 + 全量发丝边框 + 柔和长阴影；深色混白提亮 + 顶部 inset 高光 + 三倍浓阴影，diff 色块 alpha 同步提升。四面板 mock（明/暗 × 指令条/预览）截图回归通过，`verify-dark` 计算样式断言通过。
+
+---
+
 ## 2026-09-16 行内编辑交互重做：悬浮指令条 + 选区悬浮按钮 + 模型/思考强度选择器
 
 用户实机反馈驱动：输入框嵌在正文里"生硬地挤开文字"、焦点跑掉后 Esc 取消不掉、且没有模型/思考强度选项。同日早些时候补齐了选区悬浮铅笔按钮（`InlineEditSelectionAffordance`，含一个视口/面板坐标系混用的定位 bug 修复，E2E 14/14 断言通过）。

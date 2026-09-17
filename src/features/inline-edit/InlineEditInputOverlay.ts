@@ -37,11 +37,15 @@ export interface InlineEditOverlayMenuItem {
   readonly id: string | null;
   readonly label: string;
   readonly active?: boolean;
+  /** Provider id for the row icon; `null`/absent renders no icon. */
+  readonly iconProvider?: string | null;
 }
 
 /** Chip (dropdown button) state; `null` hides the chip. */
 export interface InlineEditOverlayChipState {
   readonly label: string;
+  /** Provider id for the chip icon (model chip only); falls back to a lucide glyph. */
+  readonly iconProvider?: string | null;
   readonly loading?: boolean;
   readonly disabled?: boolean;
   readonly items: readonly InlineEditOverlayMenuItem[];
@@ -63,6 +67,8 @@ export interface InlineEditOverlayCallbacks {
   onReject(): void;
   onPickModel(id: string | null): void;
   onPickEffort(id: string | null): void;
+  /** Provider icon factory (same pipeline as the composer model selector). */
+  createProviderIcon?(providerId: string, size: number): HTMLElement | null;
 }
 
 const activeOverlays = new WeakMap<EditorView, InlineEditInputOverlay>();
@@ -225,17 +231,13 @@ export class InlineEditInputOverlay {
   // ---------------------------------------------------------------------------
 
   private buildDom(): void {
-    const root = this.view.dom.createEl('div', { cls: 'opencodian-inline-edit-overlay' });
+    const root = this.view.dom.createEl('div', { cls: 'opencodian-inline-edit opencodian-inline-edit-overlay' });
 
-    const bar = root.createDiv({ cls: 'opencodian-inline-edit-chipbar' });
-    this.buildChip(bar, 'model');
-    this.buildChip(bar, 'effort');
-
-    const hints = bar.createDiv({ cls: 'opencodian-inline-edit-kbd-hints' });
-    hints.createEl('kbd', { text: '⏎' });
-    hints.createEl('kbd', { text: 'Esc' });
-
+    // Input first: the instruction is the primary task, so it owns the
+    // top row; model/effort configuration lives in the meta footer below.
     const row = root.createDiv({ cls: 'opencodian-inline-edit-inputrow' });
+    const lead = row.createSpan({ cls: 'opencodian-inline-edit-inputlead' });
+    setIcon(lead, 'sparkles');
     const field = row.createEl('input', {
       type: 'text',
       cls: 'opencodian-inline-edit-field',
@@ -270,6 +272,10 @@ export class InlineEditInputOverlay {
       this.callbacks.onReject();
     });
 
+    const bar = root.createDiv({ cls: 'opencodian-inline-edit-chipbar' });
+    this.buildChip(bar, 'model');
+    this.buildChip(bar, 'effort');
+
     this.view.dom.appendChild(root);
     this.panel = root;
     this.field = field;
@@ -281,6 +287,8 @@ export class InlineEditInputOverlay {
       cls: `opencodian-inline-edit-chip opencodian-inline-edit-chip-${kind}`,
       attr: { type: 'button' },
     });
+    // Icon slot is filled by syncChip: provider icon for the model chip,
+    // a lucide glyph for effort. The full name lives on the tooltip.
     chip.createSpan({ cls: 'opencodian-inline-edit-chip-prefix' });
     chip.createSpan({ cls: 'opencodian-inline-edit-chip-value' });
     const chevron = chip.createSpan({ cls: 'opencodian-inline-edit-chip-chevron' });
@@ -302,14 +310,36 @@ export class InlineEditInputOverlay {
     }
     chip.style.display = '';
     chip.disabled = state.disabled === true;
-    const prefix = chip.querySelector<HTMLElement>(':scope > .opencodian-inline-edit-chip-prefix');
-    const value = chip.querySelector<HTMLElement>(':scope > .opencodian-inline-edit-chip-value');
     const prefixText = t(kind === 'model' ? 'inlineEdit.bar.model' : 'inlineEdit.bar.effort');
-    if (prefix && prefix.textContent !== prefixText) prefix.textContent = prefixText;
     const valueText = state.loading
       ? t('inlineEdit.bar.loading')
       : state.label || t('inlineEdit.bar.default');
-    if (value && value.textContent !== valueText) value.textContent = valueText;
+
+    const prefix = chip.querySelector<HTMLElement>(':scope > .opencodian-inline-edit-chip-prefix');
+    if (prefix) {
+      const provider = kind === 'model' ? state.iconProvider ?? null : null;
+      const iconKey = provider ? `provider:${provider}` : `lucide:${kind}`;
+      if (prefix.dataset.iconKey !== iconKey) {
+        prefix.dataset.iconKey = iconKey;
+        prefix.empty();
+        const iconEl = provider ? this.callbacks.createProviderIcon?.(provider, 13) : null;
+        if (iconEl) {
+          iconEl.setAttribute('aria-hidden', 'true');
+          prefix.appendChild(iconEl);
+        } else {
+          setIcon(prefix, kind === 'model' ? 'cpu' : 'brain');
+        }
+      }
+    }
+
+    // The effort chip keeps its label word visible — a bare "high" does not
+    // read as a thinking-effort selector. The model chip stays icon + name.
+    const value = chip.querySelector<HTMLElement>(':scope > .opencodian-inline-edit-chip-value');
+    const displayText = kind === 'effort' ? `${prefixText} ${valueText}` : valueText;
+    if (value && value.textContent !== displayText) value.textContent = displayText;
+
+    const label = `${prefixText}: ${valueText}`;
+    if (chip.title !== label) chip.title = label;
   }
 
   private syncTextBlock(
@@ -325,10 +355,14 @@ export class InlineEditInputOverlay {
       return;
     }
     if (existing) {
-      if (existing.textContent !== text) existing.textContent = text;
+      const textEl = existing.querySelector<HTMLElement>(':scope > .opencodian-inline-edit-alert-text');
+      if (textEl && textEl.textContent !== text) textEl.textContent = text;
       return;
     }
-    const el = panel.createDiv({ cls, text });
+    const el = panel.createDiv({ cls });
+    const icon = el.createSpan({ cls: 'opencodian-inline-edit-alert-icon' });
+    setIcon(icon, cls === 'opencodian-inline-edit-error' ? 'alert-circle' : 'message-circle');
+    el.createDiv({ cls: 'opencodian-inline-edit-alert-text', text });
     if (prepend) panel.prepend(el);
   }
 
@@ -359,6 +393,25 @@ export class InlineEditInputOverlay {
       });
       const check = item.createSpan({ cls: 'opencodian-inline-edit-menu-item-check' });
       setIcon(check, 'check');
+      // Every row carries a 13px icon slot so labels stay aligned: provider
+      // brand icons for models, signal bars for effort levels, a glyph for
+      // the "clear override" row.
+      if (kind === 'model') {
+        const iconEl = entry.id !== null && entry.iconProvider
+          ? this.callbacks.createProviderIcon?.(entry.iconProvider, 13)
+          : null;
+        if (iconEl) {
+          iconEl.classList.add('opencodian-inline-edit-menu-item-icon');
+          iconEl.setAttribute('aria-hidden', 'true');
+          item.appendChild(iconEl);
+        } else {
+          const glyph = item.createSpan({ cls: 'opencodian-inline-edit-menu-item-glyph' });
+          setIcon(glyph, entry.id === null ? 'messages-square' : 'cpu');
+        }
+      } else {
+        const glyph = item.createSpan({ cls: 'opencodian-inline-edit-menu-item-glyph' });
+        setIcon(glyph, effortMenuIcon(entry.id));
+      }
       item.createSpan({ cls: 'opencodian-inline-edit-menu-item-label', text: entry.label });
       item.addEventListener('click', (event) => {
         event.preventDefault();
@@ -438,4 +491,12 @@ export function choicesToMenuItems(
     label: choice.label,
     active: activeId !== null && choice.id === activeId,
   }));
+}
+
+/** Menu row glyph for an effort level: signal bars echo "thinking intensity". */
+function effortMenuIcon(id: string | null): string {
+  if (id === 'low') return 'signal-low';
+  if (id === 'medium') return 'signal-medium';
+  if (id === 'high') return 'signal-high';
+  return 'rotate-ccw';
 }

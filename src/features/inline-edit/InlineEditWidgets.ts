@@ -14,7 +14,9 @@ import type { EditorState } from '@codemirror/state';
 import { StateEffect, StateField } from '@codemirror/state';
 import type { DecorationSet } from '@codemirror/view';
 import { Decoration, EditorView, WidgetType } from '@codemirror/view';
+import { setIcon } from 'obsidian';
 
+import { t } from '../../i18n';
 import { renderDiffInto } from './InlineEditDiff';
 import type { InlineEditWidgetCallbacks } from './InlineEditTypes';
 
@@ -139,6 +141,10 @@ class InlineEditPreviewWidget extends WidgetType {
     }
 
     const actions = root.createDiv({ cls: `${CSS_INPUT}-actions` });
+    const identity = actions.createSpan({ cls: `${CSS_INPUT}-actions-label` });
+    const identityIcon = identity.createSpan();
+    setIcon(identityIcon, 'sparkles');
+    identity.createSpan({ text: t('inlineEdit.command.name') });
     const reject = actions.createEl('button', { text: this.payload.rejectLabel, cls: `${CSS_ACTION} is-reject` });
     const accept = actions.createEl('button', { text: this.payload.acceptLabel, cls: `${CSS_ACTION} is-accept` });
     accept.type = 'button';

@@ -52,6 +52,12 @@ export interface InlineEditPluginBridge {
   setModelOverride?(kind: AgentBackendKind, ref: string | null): Promise<void>;
   /** Persist the effort override (`null` clears the entry). */
   setEffortOverride?(kind: AgentBackendKind, id: string | null): Promise<void>;
+  /**
+   * Resolve a provider icon element for the model chip / menu rows, rendered
+   * the same way as the main composer model selector. `null` falls back to a
+   * generic lucide glyph.
+   */
+  createProviderIcon?(providerId: string, size: number): HTMLElement | null;
 }
 
 /** Build the host the controller uses. */
@@ -60,6 +66,9 @@ export function createInlineEditPluginHost(bridge: InlineEditPluginBridge): Inli
     getWorkingDirectory: () => bridge.getVaultPath(),
     getLocale: () => bridge.getLocale(),
     resolveAdapter: () => resolveAdapter(bridge),
+    createProviderIcon: bridge.createProviderIcon
+      ? (providerId, size) => bridge.createProviderIcon?.(providerId, size) ?? null
+      : undefined,
   };
 }
 

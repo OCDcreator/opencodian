@@ -320,3 +320,5 @@ bootstrap 仅向注册入口注入 getPiSettings 读取回调，不在入口拥�
 - 2026-09-13: 构造并暴露 memoryRuntime（app.memory-runtime 组合），注册记忆维护命令，onunload 时 dispose。
 
 - 2026-09-15: 替换 `inline-edit` 命令 stub：改用 `editorCheckCallback` 驱动 `InlineEditController`，新增编辑器右键菜单项，并在启动末尾装配 `InlineEditHost`（backend/模型解析）与 controller 单例；`onunload` 先关闭进行中的 inline edit。
+
+- 2026-09-16: inline edit UI 重设计装配：bridge 新增 `createProviderIcon` 注入（`ProviderIconService.createIconElement`，与主输入窗口模型选择器同一管线），悬浮条模型 chip 与菜单行据此渲染提供商品牌图标。

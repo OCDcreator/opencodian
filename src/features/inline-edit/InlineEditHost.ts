@@ -33,4 +33,10 @@ export interface InlineEditHost {
    * registry's active adapter when no chat view is open.
    */
   resolveAdapter(): InlineEditHostAdapter | null;
+  /**
+   * Resolve a provider icon element for the model chip / menu rows, rendered
+   * the same way as the main composer model selector. Absent or `null` falls
+   * back to a generic lucide glyph.
+   */
+  createProviderIcon?(providerId: string, size: number): HTMLElement | null;
 }

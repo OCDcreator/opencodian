@@ -32,7 +32,7 @@ export interface InlineEditAffordanceDeps {
 }
 
 /** Button size + gap used for positioning math; keep in sync with the CSS. */
-const BUTTON_SIZE = 22;
+const BUTTON_SIZE = 24;
 const BUTTON_GAP = 4;
 
 class SelectionAffordancePlugin {
@@ -110,14 +110,14 @@ class SelectionAffordancePlugin {
     if (this.button?.isConnected) return this.button;
     this.hide();
     const button = this.view.dom.createEl('button', {
-      cls: 'opencodian-inline-edit-affordance',
+      cls: 'opencodian-inline-edit opencodian-inline-edit-affordance',
       attr: {
         type: 'button',
         'aria-label': t('inlineEdit.command.name'),
         title: t('inlineEdit.command.name'),
       },
     });
-    setIcon(button, 'pencil');
+    setIcon(button, 'sparkles');
     button.addEventListener('mousedown', (event) => {
       // Never let the click collapse the selection it acts on.
       event.preventDefault();

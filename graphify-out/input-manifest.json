@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "1f43d2c30f45a784ffe53ed80fb131523ca6a2ce530c2995f23b0321f5b0facd",
+  "digest": "45d9b43c1003622f8c0227fbbd363f77ecb277186f9655bbbaae9582c9881d42",
   "recordCount": 660,
   "records": [
     {
@@ -16,12 +16,12 @@
     {
       "kind": "package",
       "key": "package-lock.json",
-      "sha256": "4fb5b5fcc2dc46e5de87e82dfd07f98a8547330647a62444cf0e49df11903af0"
+      "sha256": "b0f9915bf68bfbddee325c14c8ee7ffa5fa59ce6a4d4f014c16fe497b9f5e699"
     },
     {
       "kind": "package",
       "key": "package.json",
-      "sha256": "de2d20941d65eac0b48b8f2ae6782eaeb1738ca88fe18d5d6c96345361678b07"
+      "sha256": "4377852d1eaafe3a4c523a0a847852fa5b80619ff0fdeaa66ff3652719d86c16"
     },
     {
       "kind": "src",
@@ -2156,7 +2156,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditController.ts",
-      "sha256": "82cf81f2eb4da644ae16e509cc0dacf61c1ed960127961986959641cbb2a7191"
+      "sha256": "3b4eb1410cb92e78284e26d51750d335c2729319ac4f3f4b77ef12c3ef32a7d7"
     },
     {
       "kind": "src",
@@ -2166,17 +2166,17 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditHost.ts",
-      "sha256": "e2e1f325ae78b97c653a8534c5d91ba22ce956816d291bbea3c816f95325022a"
+      "sha256": "7983c3c53d381beae111168c6a17124d7d9a4d554921d9a24247304a613a4292"
     },
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditInputOverlay.ts",
-      "sha256": "3fa31fc7c2886a5cf485f6e0bb9108fda5721d25659d8be9d10398473ca011ce"
+      "sha256": "f1a7638b738f494498268a4d7e9429c0e3a29042788179413fd34c387cbb953a"
     },
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditPluginHost.ts",
-      "sha256": "93c38f72332f91579f85132f6fad2b9b611fef004a1e7a80f957c9ae0181c985"
+      "sha256": "a2e024414a75a3e399f14700a586942ab4768f76f1e8db4bb150a4c167d75da4"
     },
     {
       "kind": "src",
@@ -2186,7 +2186,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditSelectionAffordance.ts",
-      "sha256": "7835793418dcdab536fbe90769e7e22ceb6ddeb13f6d0f24481fe16edb1d5759"
+      "sha256": "5b177c509796a761d9a0d33327ae86fa3f5bfc0f42cdf15cb74e704c4a2de088"
     },
     {
       "kind": "src",
@@ -2201,7 +2201,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditWidgets.ts",
-      "sha256": "170f80aacded7f38cb8c1c7c8322ea92e5b9c27091201e93d386fc85bb90a405"
+      "sha256": "5cf5f8dfe3cc9638a80514bf2728cb19dde16f5941a8f5a71493da0e45968dd8"
     },
     {
       "kind": "src",
@@ -2796,7 +2796,7 @@
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "fe40aca83dbf89b0d873b5d8329a59d669e1ec0c4adb175b53d4b002a470406a"
+      "sha256": "c27ee8b34e9113ab4f2b09e7cb80856d46ababe302ad650d9018d266511f98a8"
     },
     {
       "kind": "src",
@@ -3041,7 +3041,7 @@
     {
       "kind": "src",
       "key": "src/style/features/inline-edit.css",
-      "sha256": "9438218455de8f3985aba4527c7e91adf24c1f4ea0546a2d9c89f81ee03965bc"
+      "sha256": "c576df9d1534e1d5731b8d84398b6894692da66015a037561427e132809d6876"
     },
     {
       "kind": "src",
@@ -3304,7 +3304,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-16T12:15:55.214Z",
-  "headShaAtGeneration": "d981d15d756d5e2c45c748402a11a75462fdb1dd",
+  "generatedAt": "2026-09-17T02:06:32.413Z",
+  "headShaAtGeneration": "d698ca794035b2ae7a4a129cd1dc978c37fb2481",
   "graphifyVersion": "graphify 0.9.31"
 }

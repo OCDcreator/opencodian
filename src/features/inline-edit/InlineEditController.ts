@@ -20,6 +20,7 @@ import type { EditorView } from '@codemirror/view';
 import type { Editor } from 'obsidian';
 import { Notice } from 'obsidian';
 
+import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import { hideSelectionHighlight, showSelectionHighlight } from '../../utils/editorSelectionHighlight';
 import type { InlineEditChoice, InlineEditHost, InlineEditHostAdapter } from './InlineEditHost';
@@ -220,6 +221,7 @@ export class InlineEditController {
         onReject: () => { this.reject(); },
         onPickModel: (id) => { void this.pickModel(id); },
         onPickEffort: (id) => { void this.pickEffort(id); },
+        createProviderIcon: (providerId, size) => this.options.host.createProviderIcon?.(providerId, size) ?? null,
       });
       edit.overlay.show(edit.anchor.from);
       edit.overlay.focusInput();
@@ -254,11 +256,16 @@ export class InlineEditController {
   private modelChipState(edit: ActiveEdit): InlineEditOverlayChipState {
     const selection = edit.adapter.describeModelSelection();
     const activeId = selection.source === 'default' ? null : selection.label;
+    const kind = edit.adapter.kind;
     return {
       label: activeId ?? '',
+      iconProvider: activeId ? inferInlineEditModelProvider(activeId, kind) : null,
       loading: edit.adapter.listModels != null && edit.modelChoices === null,
       disabled: edit.service.hasSession,
-      items: choicesToMenuItems(edit.modelChoices ?? [], activeId),
+      items: choicesToMenuItems(edit.modelChoices ?? [], activeId).map((item) => ({
+        ...item,
+        iconProvider: item.id === null ? null : inferInlineEditModelProvider(item.id, kind),
+      })),
     };
   }
 
@@ -523,4 +530,17 @@ function isEditorView(value: unknown): value is EditorView {
     && typeof record.state === 'object'
     && record.state !== null
     && typeof record.dom === 'object';
+}
+
+/**
+ * Provider id used to resolve the model chip / menu row icon. OpenCode and pi
+ * refs carry `provider/model`; bare claude-code and codex ids map to the
+ * provider their models come from. Anything else renders a generic glyph.
+ */
+function inferInlineEditModelProvider(ref: string, kind: AgentBackendKind): string | null {
+  const slash = ref.indexOf('/');
+  if (slash > 0) return ref.slice(0, slash);
+  if (kind === 'claude-code') return 'anthropic';
+  if (kind === 'codex') return 'openai';
+  return null;
 }
