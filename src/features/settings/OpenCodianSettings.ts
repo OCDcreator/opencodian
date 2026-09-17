@@ -574,8 +574,28 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.inlineEditSection ??= new SettingsInlineEditSection({
       plugin: this.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
+      openHotkeySettings: () => { this.openObsidianHotkeySettings(); },
     });
     return this.inlineEditSection.attach(containerEl);
+  }
+
+  /**
+   * Obsidian's own hotkeys tab, where the user binds a key to the
+   * `inline-edit` command (R-A1). `app.setting` is undocumented; guard the
+   * tab switch the same way the chat surface deep-links into settings.
+   */
+  private openObsidianHotkeySettings(): void {
+    const appSetting = (this.app as typeof this.app & {
+      setting?: { open: () => void; openTabById: (id: string) => void };
+    }).setting;
+    if (!appSetting) return;
+    appSetting.open();
+    try {
+      appSetting.openTabById('hotkeys');
+    } catch {
+      // Obsidian may throw when the settings DOM is not ready yet; the tab
+      // still opened, just without the hotkeys section focused.
+    }
   }
 
   private addAgentsSettings(containerEl: HTMLElement): HTMLHeadingElement {

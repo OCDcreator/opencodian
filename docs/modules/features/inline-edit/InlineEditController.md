@@ -14,7 +14,7 @@ inline edit 的 CM6 状态机与编辑器胶合层。由 `editorCallback` / `edi
 - 解析编辑器锚点：`getEditorView(editor)` 取 Obsidian 内部 `editor.cm`，失败即停用并提示；用 `state.doc.sliceString(from, to)` 取快照（**不用** `editor.getSelection()`，其会归一化行尾导致脏检查失真）
 - 判定三种形态：selection / cursor-inline（行内有文本）/ cursor-inbetween（空行）
 - 通过 `InlineEditHost` 解析 backend 与模型；无 adapter 或无 AuxQuery 能力时提示并中止
-- 渲染：输入阶段走悬浮面板 `InlineEditInputOverlay`（`renderInput` 创建/增量更新，含模型与努力程度 chip）；预览阶段仍走 CM6 装饰（`ensureInlineEditField` 注入 field）。`showSelectionHighlight` 复用既有选区高亮
+- 渲染：输入阶段走悬浮面板 `InlineEditInputOverlay`（`renderInput` 创建/增量更新，含模型与努力程度 chip 与 `#` 预设列表 `presets: host.listPresetPrompts()`）；预览阶段仍走 CM6 装饰（`ensureInlineEditField` 注入 field）。`showSelectionHighlight` 复用既有选区高亮
 - 悬浮条选择器：`loadModelChoices` 异步拉模型列表；`pickModel`/`pickEffort` 写回 host 覆盖设置；会话已启动（`hasSession`）后 chip 禁用，改动只影响下一次会话
 - 提供商图标：`modelChipState` 经 `inferInlineEditModelProvider`（`provider/model` 前缀，claude-code→anthropic、codex→openai）给 chip 与菜单项注入 `iconProvider`；overlay 的 `createProviderIcon` 回调透传 `host.createProviderIcon`（与主输入窗口同一 `ProviderIconService` 管线），解析失败由 overlay 回退 lucide 字形
 - 接受路径：读取装饰**映射后**的当前范围 → 脏检查（当前文本与快照全等）→ 关闭会话 → 单次 `editor.replaceRange`（Obsidian 原生 undo 一步可撤）
@@ -24,7 +24,7 @@ inline edit 的 CM6 状态机与编辑器胶合层。由 `editorCallback` / `edi
 
 ## 依赖
 
-- `./InlineEditHost`、`./InlineEditService`、`./InlineEditPrompt`、`./InlineEditTypes`、`./InlineEditWidgets`
+- `./InlineEditHost`、`./InlineEditService`、`./InlineEditPrompt`、`./InlineEditTypes`、`./InlineEditWidgets`、`./InlineEditOverlayPrimitives`（`choicesToMenuItems`）
 - `src/utils/editorSelectionHighlight.ts`、`src/i18n`
 - `@codemirror/view`、`obsidian`
 

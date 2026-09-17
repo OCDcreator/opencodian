@@ -20,6 +20,7 @@ inline edit 与插件运行时之间的接缝。`editorCallback` 只给到 `Edit
 - `./InlineEditTypes`（`InlineEditHostAdapter`）
 
 - 可选 `listContextFiles()`："添加上下文"选择器的候选笔记（vault 内 `md`/`txt`）；缺失或返回 `null` 时整个入口隐藏，宿主无 vault 时悬浮条保持原状
+- 可选 `listPresetPrompts()`（R-A2）：「内置 + 用户自定义」合成后的 `#` 预设列表；缺省等价于空表（菜单侧兜底，实际宿主总是提供）
 
 ## 维护约束
 

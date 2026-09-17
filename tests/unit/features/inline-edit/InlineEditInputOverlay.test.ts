@@ -7,7 +7,7 @@
  * positioning needs).
  */
 
-import { resolvePanelTop } from '../../../../src/features/inline-edit/InlineEditInputOverlay';
+import { resolvePanelTop } from '../../../../src/features/inline-edit/InlineEditOverlayPrimitives';
 
 /** Editor viewport used by the cases below; gap 6 + inset 8 match the module. */
 const VIEWPORT = 600;

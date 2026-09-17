@@ -30,10 +30,10 @@ import type {
   InlineEditHostAdapter,
 } from './InlineEditHost';
 import {
-  choicesToMenuItems,
   InlineEditInputOverlay,
   type InlineEditOverlayChipState,
 } from './InlineEditInputOverlay';
+import { choicesToMenuItems } from './InlineEditOverlayPrimitives';
 import {
   describeInlineEditFailure,
   INLINE_EDIT_MAX_ATTACHED_NOTES,
@@ -252,6 +252,7 @@ export class InlineEditController {
       effort: this.effortChipState(edit),
       context: edit.contextFiles.map((file) => ({ path: file.path, label: file.name })),
       contextSupported: this.options.host.listContextFiles != null,
+      presets: this.options.host.listPresetPrompts?.() ?? [],
     });
   }
 

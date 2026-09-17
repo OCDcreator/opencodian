@@ -6,6 +6,7 @@ Pricing readiness (2026-09-10): the settings shell binds catalog notifications t
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
 - 2026-09-13 (universal memory backend): settingsLayoutRegistry gained the backend-agnostic conversation/memory secondary tab.
+- 2026-09-18 (FlowText parity R-A1/R-A2): `SettingsInlineEditSection` gained the `inlineEditTriggerAt` toggle, the unbound-hotkey discoverability row (optional `openHotkeySettings` callback, deep-links into Obsidian's own hotkeys tab via `app.setting.open()` + `openTabById('hotkeys')`), and the `#` preset prompt CRUD rows (add/remove/edit label + body, persisted raw; load normalization prunes half-edited entries on next start). `OpenCodianSettings` supplies the callback through `openObsidianHotkeySettings()`.
 
 - **Layer:** `feature` (may import layers: shared, core, feature)
 - **Risk:** high

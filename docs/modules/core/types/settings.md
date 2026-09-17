@@ -446,3 +446,8 @@ New normalize functions added:
 - 记忆设置组新增 `memoryExternalRoot`（默认空字符串，trim 后 ≤300 字符）：共享记忆根目录，空 = vault 本地 `.opencodian/memory`。另有 `memorySyncRemoteUrl`（≤500 字符）：git 整树同步远程地址，空 = 关闭。
 
 - 2026-09-15: 新增 `inlineEditEnabled`（总开关，默认 true）与 `inlineEditModelOverrides`（按 backend 键控的模型覆盖），并提供 `normalizeInlineEditModelOverrides()` 做加载期归一化。
+
+## 2026-09-18 FlowText 对齐批次 A1（R-A1 / R-A2）
+
+- 新增 `inlineEditTriggerAt`（`@` 键唤起行内编辑，默认 `false`，需求 §10 Q1 裁决不默认开启）；加载期 boolean 归一化，缺失回退 `false`。
+- 新增 `inlineEditPresetPrompts`（`InlineEditPresetPrompt[]`，用户自定义 `#` 预设，默认 `[]` = 仅内置）与 `normalizeInlineEditPresetPrompts()`：剔除类型错误/空 id/空 label/空 prompt/超长字段（id ≤100、label ≤100、prompt ≤2000 字符）/重复 id（保留首个）的条目，列表上限 `INLINE_EDIT_PRESET_PROMPT_MAX_COUNT = 50`。内置目录不落 settings（文案走 i18n），由 feature 侧 `listEffectiveInlineEditPresets()` 合成。

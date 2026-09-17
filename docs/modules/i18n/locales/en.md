@@ -4,6 +4,8 @@
 
 2026-09-17: added the Pi MCP settings group (`settings.pi.tab.mcp` plus `settings.pi.mcp.*`): the read-only intro naming the config files Pi merges, empty/endpoint-unknown/disabled/exclusive copy, transport and auth labels, source labels, and the "latest status from Pi" block (help, empty, received-at). Copy states that the status is the last text Pi sent, not a live query.
 
+2026-09-18: added the FlowText parity batch A1 strings — `settings.inlineEdit.triggerAt.*` (@ trigger toggle), `settings.inlineEdit.hotkey.*` (unbound-command discoverability row), `settings.inlineEdit.presets.*` and `presetRow.*` (# preset prompt management), the six builtin catalog entries `inlineEdit.presets.{expand,condense,translate,summarize-table,polish-tone,fix-typos}.{label,prompt}`, and the menu empty state `inlineEdit.presetMenu.empty`.
+
 2026-09-17: added the `inlineEdit.context.*` strings (add context, search, empty, truncation, remove, limit) and `inlineEdit.error.{tooManyAttachedNotes,attachedNotePathTooLong,attachedNotePathInvalid}`.
 
 2026-09-10: installation phases, completed-file counts, progress accessibility label, and three-at-a-time history controls have English copy.

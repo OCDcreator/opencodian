@@ -16,7 +16,7 @@ function makeBridge(overrides: Partial<InlineEditPluginBridge> = {}): InlineEdit
     getRegistry: () => null,
     getActiveChatBackend: () => null,
     getActiveChatModel: () => null,
-    getSettings: () => ({ enabled: true, modelOverrides: {}, effortOverrides: {} }),
+    getSettings: () => ({ enabled: true, modelOverrides: {}, effortOverrides: {}, presetPrompts: [] }),
     ...overrides,
   };
 }
@@ -28,6 +28,7 @@ describe('describeModelSelection', () => {
         enabled: true,
         modelOverrides: { 'claude-code': 'opusplan' },
         effortOverrides: {},
+        presetPrompts: [],
       }),
     });
     expect(describeModelSelection(bridge, 'claude-code')).toEqual({
@@ -74,6 +75,7 @@ describe('adapter picker surface', () => {
         enabled: true,
         modelOverrides: {},
         effortOverrides: { 'claude-code': 'high' },
+        presetPrompts: [],
       }),
       listModels: async (kind) => [{ id: `${kind}/m1`, label: 'M1' }],
       listEfforts: (kind) => (kind === 'claude-code' ? [{ id: 'low', label: 'low' }] : null),

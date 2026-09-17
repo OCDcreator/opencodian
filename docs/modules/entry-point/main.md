@@ -6,6 +6,8 @@
 > 2026-07-31 (Phase 3 Task 11): The three backend trace services are no longer constructed inline in `handleBootstrapOpenCodeRuntime`. `main.ts` now constructs a single `DiagnosticsRuntimeCoordinator` (src/app/diagnostics) which owns construction (OpenCode → Codex → Claude, pinned order) with the same option getters, exposes typed backend ports, and owns the unified flush/dispose. `main.ts` has zero direct `new *SessionTraceService`; the legacy per-backend getters still delegate to the coordinator for Settings and other compatibility consumers.
 > 2026-07-31 (Phase 3 Task 12 Claude slice): `registerWorkspaceIntegration()` injects `createChatDiagnosticsCoordinatorFactory()` into each `OpenCodianView`. Its explicit OpenCode/Codex/Claude getters are lazy: before diagnostics bootstrap they return no service and fail closed; after bootstrap they read the same `DiagnosticsRuntimeCoordinator` instance. The chat coordinator now owns the three backend-specific routes. This note records the wiring slice only and does not infer overall Phase 3/Task 12 closure or review status.
 
+> 2026-09-18 (FlowText parity R-A1/R-A2): `registerWorkspaceIntegration()` additionally registers the `@` in-note trigger (`inlineEditAtTriggerExtension`, gated by `settings.inlineEditTriggerAt` AND `canRunInlineEdit()`; declines — letting `@` type through — for editors without a file-associated note) and passes `presetPrompts` through the inline-edit host bridge; `SettingsInlineEditSection` receives an `openHotkeySettings` callback that deep-links into Obsidian's own hotkeys tab (`app.setting.open()` + `openTabById('hotkeys')`, try/catch guarded).
+
 > **源码**: `src/main.ts`
 > **状态**: [REVIEW]
 

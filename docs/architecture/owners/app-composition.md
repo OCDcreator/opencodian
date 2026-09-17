@@ -2,6 +2,7 @@
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
 - 2026-09-13 (universal memory backend): main.ts constructs MemoryRuntimeCoordinator and registers the memory maintenance commands.
+- 2026-09-18 (FlowText parity R-A1/R-A2): `registerWorkspaceIntegration()` additionally registers the `@` in-note trigger extension (`inlineEditAtTriggerExtension`, gated by `settings.inlineEditTriggerAt` AND `canRunInlineEdit()`; declines — letting `@` type through — for editors without a file-associated note) and the host bridge passes `presetPrompts` to the inline-edit host.
 
 - **Layer:** `app` (may import layers: shared, core, feature, app)
 - **Risk:** high

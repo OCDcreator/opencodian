@@ -10,6 +10,7 @@
  * See docs/requirements/inline-edit.md §5.2 and §9.
  */
 
+import type { InlineEditPresetPrompt } from '../../core/types';
 import type {
   InlineEditChoice,
   InlineEditContextFile,
@@ -54,4 +55,11 @@ export interface InlineEditHost {
    * affordance entirely, so a host without a vault keeps the bar unchanged.
    */
   listContextFiles?(): readonly InlineEditContextFile[] | null;
+  /**
+   * Effective `#` preset list for the input bar's preset menu (R-A2): the
+   * builtin catalog plus the user-defined entries, already merged and
+   * filtered. Absent yields an empty list (menu shows a no-match row only
+   * when the trigger itself can produce one).
+   */
+  listPresetPrompts?(): readonly InlineEditPresetPrompt[];
 }

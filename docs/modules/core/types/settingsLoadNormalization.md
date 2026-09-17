@@ -88,3 +88,5 @@ It also migrates the old `Server > MCP` remembered location into the new top-lev
 - 2026-09-13: 加载归一化接入 memory: normalizeMemoryBackendUserSettings。
 
 - 2026-09-15: 在最终合并边界补上 `inlineEditEnabled` 与 `inlineEditModelOverrides` 的归一化，使旧设置快照也能得到完整字段。
+
+- 2026-09-18（R-A1 / R-A2）: 最终合并边界补上 `inlineEditTriggerAt`（boolean，缺失回退 `false`）与 `inlineEditPresetPrompts`（`normalizeInlineEditPresetPrompts`）的归一化，使旧设置快照也能得到完整字段。

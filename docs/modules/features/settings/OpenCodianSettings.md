@@ -292,4 +292,5 @@ The owner keeps `pluginUpdateExpanded` as ephemeral UI state. It passes that val
 
 2026-09-09：经典布局在Pi激活时渲染独立SettingsPiSection及二级导航；tabbed模式继续共享SettingsTabbedRenderer。
 
+- 2026-09-18 (R-A1/R-A2): `SettingsInlineEditSection` 增加 `inlineEditTriggerAt` 开关、「命令快捷键」发现性行（注入 `openHotkeySettings`，经 `openObsidianHotkeySettings()` 深链到 Obsidian 自带热键设置页）与 `#` 预设提示词 CRUD；`addInlineEditSettings` 负责装配该回调。
 - 2026-09-15: 新增行内编辑设置分节（`SettingsInlineEditSection`，`inlineEditEnabled` + 按 backend 键控的 `inlineEditModelOverrides`）。

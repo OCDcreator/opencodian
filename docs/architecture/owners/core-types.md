@@ -3,6 +3,7 @@
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
 - 2026-09-17 (shadcn style): `ThemeStyleId` 增加 `shadcn`，`ThemePresetId` 增加 `shadcn-neutral`，`isThemePresetId()` 同步收录；均为纯联合类型扩容，归一化与默认值（`glass-classic`）不变。
 - 2026-09-13 (universal memory backend): settings.ts gained the MemoryBackendUserSettings group + normalizer (master/extraction/semantic toggles + extraction model).
+- 2026-09-18 (FlowText parity R-A1/R-A2): settings.ts gained `inlineEditTriggerAt` (boolean, default false) and the user-defined `InlineEditPresetPrompt[]` list (`inlineEditPresetPrompts`, default `[]`) with `normalizeInlineEditPresetPrompts()` load hardening (trim, dedupe-by-id, caps) and the `INLINE_EDIT_PRESET_PROMPT_MAX_*` constants; `settingsLoadNormalization.ts` wires both into the final merge boundary.
 
 - **Layer:** `core` (may import layers: shared, core)
 - **Risk:** low

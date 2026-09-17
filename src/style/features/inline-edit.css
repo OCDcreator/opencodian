@@ -608,6 +608,17 @@
   line-height: 1.5;
 }
 
+/* Preset (`#`) menu variant: spans the bar like the context picker, and its
+   rows keep the single-line shape — the prompt body rides on the row title. */
+
+.opencodian-inline-edit-preset-menu {
+  width: 100%;
+}
+
+.opencodian-inline-edit-menu-item-preset {
+  height: 30px;
+}
+
 .opencodian-inline-edit-picker-hint {
   margin-top: 4px;
   border-top: 1px solid var(--ocie-divider);

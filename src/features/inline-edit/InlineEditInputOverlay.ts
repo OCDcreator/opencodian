@@ -24,26 +24,21 @@ import type { ViewUpdate } from '@codemirror/view';
 import { EditorView } from '@codemirror/view';
 import { setIcon } from 'obsidian';
 
+import type { InlineEditPresetPrompt } from '../../core/types';
 import { t } from '../../i18n';
 import { OPENCODIAN_APP_ICON_ID } from '../../shared/brandingWordmark';
 import { openContextPicker, syncContextFooter } from './InlineEditContextUi';
-import type { InlineEditChoice, InlineEditContextFile } from './InlineEditTypes';
+import {
+  effortMenuIcon,
+  INLINE_EDIT_PANEL_INSET as PANEL_INSET,
+  type InlineEditOverlayMenuItem,
+  resolvePanelTop,
+} from './InlineEditOverlayPrimitives';
+import { InlineEditPresetMenuController } from './InlineEditPresetMenu';
+import type { InlineEditContextFile } from './InlineEditTypes';
 
-/** Gap between the anchor line's bottom and the panel top; keep in sync with CSS. */
-const PANEL_GAP = 6;
-/** Horizontal inset used when clamping the panel inside the editor DOM. */
-const PANEL_INSET = 8;
 /** Grown height cap for the instruction field, in px; beyond it the field scrolls. */
 const FIELD_MAX_HEIGHT = 100;
-
-/** One dropdown entry; `id === null` is the "clear override" row. */
-export interface InlineEditOverlayMenuItem {
-  readonly id: string | null;
-  readonly label: string;
-  readonly active?: boolean;
-  /** Provider id for the row icon; `null`/absent renders no icon. */
-  readonly iconProvider?: string | null;
-}
 
 /** Chip (dropdown button) state; `null` hides the chip. */
 export interface InlineEditOverlayChipState {
@@ -68,6 +63,11 @@ export interface InlineEditOverlayState {
   readonly context: readonly InlineEditOverlayContextChip[];
   /** False hides the "add context" affordance (host has no vault to offer). */
   readonly contextSupported: boolean;
+  /**
+   * Effective `#` preset list (builtins + user-defined) for the preset menu.
+   * Always non-empty in practice: builtins are always composed on top.
+   */
+  readonly presets: readonly InlineEditPresetPrompt[];
 }
 
 /** One attached note as the bar renders it. */
@@ -108,9 +108,26 @@ export class InlineEditInputOverlay {
   private field: HTMLTextAreaElement | null = null;
   private submitEl: HTMLElement | null = null;
   private menu: HTMLElement | null = null;
-  private menuKind: 'model' | 'effort' | 'context' | null = null;
+  private menuKind: 'model' | 'effort' | 'context' | 'preset' | null = null;
   /** Re-renders the open picker's rows after the attached set changes. */
   private refreshPickerRows: ((attachedPaths: ReadonlySet<string>) => void) | null = null;
+  /** Owns everything `#`: trigger, filtering, walk, fill-without-submit. */
+  private readonly presetMenu = new InlineEditPresetMenuController({
+    getField: () => this.field,
+    getPanel: () => this.panel,
+    getPresets: () => this.state?.presets ?? [],
+    isOpen: () => this.menuKind === 'preset',
+    isMenuSlotTaken: () => this.menu != null,
+    attachMenu: (element) => {
+      this.menu = element;
+      this.menuKind = 'preset';
+    },
+    detachMenu: () => { this.closeMenu(); },
+    afterFill: () => {
+      this.syncFieldHeight();
+      this.scheduleSync();
+    },
+  });
   /** Footer elements kept by reference: queries would have to track nesting. */
   private attachEl: HTMLButtonElement | null = null;
   private contextRowEl: HTMLElement | null = null;
@@ -222,6 +239,10 @@ export class InlineEditInputOverlay {
       }
     } else if (this.menu && this.menuKind === 'context') {
       this.refreshContextPicker();
+    } else if (this.menuKind === 'preset') {
+      // The preset list may have changed underneath an open menu (settings
+      // edited mid-edit): re-filter with the live query and keep the walk.
+      this.presetMenu.refresh();
     }
     this.scheduleSync();
   }
@@ -287,9 +308,13 @@ export class InlineEditInputOverlay {
       // handler (the rAF discipline covers CM6 geometry reads, not this).
       this.syncFieldHeight();
       this.scheduleSync();
+      this.presetMenu.sync();
     });
     field.addEventListener('keydown', (event) => {
       if (event.isComposing) return;
+      // While the preset menu is open it owns Enter (fill, never submit) and
+      // the arrow walk; both must be consumed before the submit path below.
+      if (this.presetMenu.handleKeydown(event)) return;
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
         this.callbacks.onSubmit(field.value);
@@ -297,6 +322,7 @@ export class InlineEditInputOverlay {
       // Shift+Enter inserts a newline; Escape bubbles to the document capture
       // handler, which owns dismissal.
     });
+    this.presetMenu.bindField(field);
 
     const submit = row.createEl('button', {
       cls: 'opencodian-inline-edit-overlay-submit',
@@ -537,6 +563,9 @@ export class InlineEditInputOverlay {
     this.menu = null;
     this.menuKind = null;
     this.refreshPickerRows = null;
+    // Single close path for every menu kind: the preset controller drops its
+    // state here too, so Escape, outside pointer-down and teardown all agree.
+    this.presetMenu.reset();
   }
 
   handleDocUpdate(update: ViewUpdate): void {
@@ -600,47 +629,3 @@ export class InlineEditInputOverlay {
   }
 }
 
-/**
- * Vertical placement of the bar relative to the anchor line, in editor DOM
- * coordinates.
- *
- * The bar sits below the anchor by default and flips above it when it no longer
- * fits underneath — a multi-line instruction makes the bar tall enough that
- * this happens well before the document ends. When it fits neither way it stays
- * below and clips, which keeps the caret-side reading order intact.
- */
-export function resolvePanelTop(input: {
-  readonly anchorTop: number;
-  readonly anchorBottom: number;
-  readonly viewportHeight: number;
-  readonly panelHeight: number;
-}): number {
-  const spaceBelow = input.viewportHeight - input.anchorBottom - PANEL_GAP - PANEL_INSET;
-  const fitsBelow = input.panelHeight <= spaceBelow;
-  const fitsAbove = input.anchorTop - PANEL_GAP - PANEL_INSET >= input.panelHeight;
-  if (!fitsBelow && fitsAbove) {
-    // `fitsAbove` already bounds this to at least PANEL_INSET.
-    return input.anchorTop - input.panelHeight - PANEL_GAP;
-  }
-  return Math.max(0, input.anchorBottom + PANEL_GAP);
-}
-
-/** Convert host `InlineEditChoice[]` entries into menu items with ids. */
-export function choicesToMenuItems(
-  choices: readonly InlineEditChoice[],
-  activeId: string | null,
-): InlineEditOverlayMenuItem[] {
-  return choices.map((choice) => ({
-    id: choice.id,
-    label: choice.label,
-    active: activeId !== null && choice.id === activeId,
-  }));
-}
-
-/** Menu row glyph for an effort level: signal bars echo "thinking intensity". */
-function effortMenuIcon(id: string | null): string {
-  if (id === 'low') return 'signal-low';
-  if (id === 'medium') return 'signal-medium';
-  if (id === 'high') return 'signal-high';
-  return 'rotate-ccw';
-}

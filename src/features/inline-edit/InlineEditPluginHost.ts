@@ -19,6 +19,7 @@
 import { AgentCapability, hasCapability } from '../../core/agents/AgentCapability';
 import type { AgentAuxQueryCapability, BackendModelSelection } from '../../core/agents/backend/AgentAuxQueryCapability';
 import type { AgentServiceRegistry } from '../../core/agents/backend/AgentServiceRegistry';
+import type { InlineEditPresetPrompt } from '../../core/types';
 import type { AgentBackendKind } from '../../core/types/chat';
 import type {
   InlineEditChoice,
@@ -27,12 +28,15 @@ import type {
   InlineEditHostAdapter,
   InlineEditModelSelectionLabel,
 } from './InlineEditHost';
+import { listEffectiveInlineEditPresets } from './InlineEditPresets';
 
 /** Settings slice inline edit reads. */
 export interface InlineEditSettingsSlice {
   readonly enabled: boolean;
   readonly modelOverrides: Partial<Record<AgentBackendKind, string>>;
   readonly effortOverrides: Partial<Record<AgentBackendKind, string>>;
+  /** User-defined `#` presets; builtins are composed on top by the host. */
+  readonly presetPrompts: readonly InlineEditPresetPrompt[];
 }
 
 /** Everything the host needs from the plugin, injected so it stays testable. */
@@ -78,6 +82,7 @@ export function createInlineEditPluginHost(bridge: InlineEditPluginBridge): Inli
       ? (providerId, size) => bridge.createProviderIcon?.(providerId, size) ?? null
       : undefined,
     listContextFiles: bridge.listContextFiles ? () => bridge.listContextFiles?.() ?? null : undefined,
+    listPresetPrompts: () => listEffectiveInlineEditPresets(bridge.getSettings().presetPrompts),
   };
 }
 

@@ -4,6 +4,7 @@
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
 - 2026-09-13 (universal memory backend): en/zh gained settings.conversation.memory.* and commands.memory.* keys.
+- 2026-09-18 (FlowText parity R-A1/R-A2): en/zh gained the inline-edit trigger/hotkey/preset-management settings strings, the six builtin preset catalog entries (`inlineEdit.presets.{expand,condense,translate,summarize-table,polish-tone,fix-typos}.{label,prompt}`) and `inlineEdit.presetMenu.empty`.
 
 - **Layer:** `shared` (may import layers: shared)
 - **Risk:** low

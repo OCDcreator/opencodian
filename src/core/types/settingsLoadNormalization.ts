@@ -23,6 +23,7 @@ import {
   normalizeEffortLevel,
   normalizeInlineEditEffortOverrides,
   normalizeInlineEditModelOverrides,
+  normalizeInlineEditPresetPrompts,
   normalizeInputPanelGlassRefractionSettings,
   normalizeInputPanelGlassRefractionSvgFilterSettings,
   normalizeInputPanelLiquidGlassSettings,
@@ -535,11 +536,17 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
       inlineEditSelectionAffordance: typeof normalizedSettings?.inlineEditSelectionAffordance === 'boolean'
         ? normalizedSettings.inlineEditSelectionAffordance
         : DEFAULT_SETTINGS.inlineEditSelectionAffordance,
+      inlineEditTriggerAt: typeof normalizedSettings?.inlineEditTriggerAt === 'boolean'
+        ? normalizedSettings.inlineEditTriggerAt
+        : DEFAULT_SETTINGS.inlineEditTriggerAt,
       inlineEditModelOverrides: normalizeInlineEditModelOverrides(
         normalizedSettings?.inlineEditModelOverrides,
       ),
       inlineEditEffortOverrides: normalizeInlineEditEffortOverrides(
         normalizedSettings?.inlineEditEffortOverrides,
+      ),
+      inlineEditPresetPrompts: normalizeInlineEditPresetPrompts(
+        normalizedSettings?.inlineEditPresetPrompts,
       ),
     },
     shouldMigrateLegacyLocalDefaultPort,

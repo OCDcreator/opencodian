@@ -10,6 +10,7 @@ import { OPENCODIAN_APP_ICON_ID } from './shared/brandingWordmark';
 import { ModelConfigService, ModelPricingService, OpencodeConfigManager } from './core/config';
 import { setAgentServiceRegistry } from './core/agents/AgentCapability';
 import { InlineEditController } from './features/inline-edit/InlineEditController';
+import { inlineEditAtTriggerExtension } from './features/inline-edit/InlineEditAtTrigger';
 import {
   findMarkdownViewForView,
   inlineEditSelectionAffordanceExtension,
@@ -454,6 +455,7 @@ export default class OpenCodianPlugin extends Plugin {
         enabled: this.settings.inlineEditEnabled,
         modelOverrides: this.settings.inlineEditModelOverrides,
         effortOverrides: this.settings.inlineEditEffortOverrides,
+        presetPrompts: this.settings.inlineEditPresetPrompts,
       }),
       listModels: (kind) => this.listInlineEditModels(kind),
       listEfforts: (kind) => {
@@ -735,6 +737,21 @@ export default class OpenCodianPlugin extends Plugin {
         const view = findMarkdownViewForView(this.app, editorView);
         if (!view?.editor) return;
         this.inlineEditController?.open(view.editor, view);
+      },
+    }));
+
+    // Typing `@` at the start of a line or right after whitespace opens the
+    // panel at the cursor (R-A1, opt-in via `inlineEditTriggerAt`). The `@`
+    // is consumed — it never reaches the document.
+    this.registerEditorExtension(inlineEditAtTriggerExtension({
+      canTrigger: () => (this.settings?.inlineEditTriggerAt ?? false) && this.canRunInlineEdit(),
+      openForView: (editorView) => {
+        const view = findMarkdownViewForView(this.app, editorView);
+        if (!view?.editor || !view.file) return false;
+        this.inlineEditController?.open(view.editor, view);
+        // Consume the `@` only when the panel actually opened; otherwise the
+        // character falls through to normal typing.
+        return this.inlineEditController?.phase != null;
       },
     }));
 

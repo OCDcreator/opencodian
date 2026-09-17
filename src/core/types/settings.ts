@@ -105,6 +105,60 @@ export function normalizeCapabilityLabSelectedBackend(value: unknown): string | 
   return normalized.length > 0 ? normalized : undefined;
 }
 
+/**
+ * One user-defined inline-edit preset prompt (R-A2): a menu label plus the
+ * instruction body filled into the input when the preset is picked. The shape
+ * is settings-layer only — the builtin preset catalog lives in the feature and
+ * is always composed on top of this list.
+ */
+export interface InlineEditPresetPrompt {
+  /** Stable unique id. Ids of the builtin catalog are reserved. */
+  id: string;
+  /** Menu row label. */
+  label: string;
+  /** Instruction body inserted into the inline-edit input. */
+  prompt: string;
+}
+
+/** Hard caps for the user-defined preset list, applied at load normalization. */
+export const INLINE_EDIT_PRESET_PROMPT_MAX_COUNT = 50;
+export const INLINE_EDIT_PRESET_PROMPT_MAX_ID_CHARS = 100;
+export const INLINE_EDIT_PRESET_PROMPT_MAX_LABEL_CHARS = 100;
+export const INLINE_EDIT_PRESET_PROMPT_MAX_PROMPT_CHARS = 2000;
+
+/**
+ * Normalize the user-defined inline-edit preset list. Drops malformed entries
+ * (non-strings, empty id/label/prompt, oversized fields) and duplicate ids,
+ * keeping the first occurrence, so a stale or hand-edited settings file cannot
+ * render blank menu rows or unbounded lists.
+ */
+export function normalizeInlineEditPresetPrompts(value: unknown): InlineEditPresetPrompt[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const result: InlineEditPresetPrompt[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const record = entry as Record<string, unknown>;
+    if (typeof record.id !== 'string'
+      || typeof record.label !== 'string'
+      || typeof record.prompt !== 'string') {
+      continue;
+    }
+    const id = record.id.trim();
+    const label = record.label.trim();
+    const prompt = record.prompt.trim();
+    if (!id || !label || !prompt) continue;
+    if (id.length > INLINE_EDIT_PRESET_PROMPT_MAX_ID_CHARS) continue;
+    if (label.length > INLINE_EDIT_PRESET_PROMPT_MAX_LABEL_CHARS) continue;
+    if (prompt.length > INLINE_EDIT_PRESET_PROMPT_MAX_PROMPT_CHARS) continue;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    result.push({ id, label, prompt });
+    if (result.length >= INLINE_EDIT_PRESET_PROMPT_MAX_COUNT) break;
+  }
+  return result;
+}
+
 /** Thinking budget for custom models */
 export type ThinkingBudget = 0 | 1024 | 4096 | 8192 | 16384;
 
@@ -2946,6 +3000,14 @@ export interface OpenCodianSettings {
   inlineEditSelectionAffordance: boolean;
 
   /**
+   * Typing `@` at the start of a line or right after whitespace opens the
+   * inline-edit panel there (the `@` itself is swallowed). Off by default:
+   * `@` is a common character (emails, mentions) and conflicts with other
+   * plugins' `@` habits (docs/requirements/flowtext-parity.md R-A1, §10 Q1).
+   */
+  inlineEditTriggerAt: boolean;
+
+  /**
    * Per-backend model override for inline edit. The value format follows each
    * backend: `provider/model` for opencode and pi, an SDK alias or full id for
    * claude-code, a model id for codex. Absent means "use the active chat tab's
@@ -2959,6 +3021,13 @@ export interface OpenCodianSettings {
    * seams; absent means "the backend's own default effort".
    */
   inlineEditEffortOverrides: Partial<Record<AgentBackendKind, string>>;
+
+  /**
+   * User-defined preset prompts for the inline-edit `#` menu (R-A2). The
+   * builtin catalog is always composed on top; an empty list means "builtins
+   * only". Managed from the settings page (add/remove/edit).
+   */
+  inlineEditPresetPrompts: InlineEditPresetPrompt[];
 
   capabilityLabSelectedBackend: string | undefined;
 
@@ -3192,8 +3261,10 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   enabledBackends: ['opencode'],
   inlineEditEnabled: true,
   inlineEditSelectionAffordance: true,
+  inlineEditTriggerAt: false,
   inlineEditModelOverrides: {},
   inlineEditEffortOverrides: {},
+  inlineEditPresetPrompts: [],
   capabilityLabSelectedBackend: undefined,
   backendSettings: getDefaultBackendSettings(),
 

@@ -2,6 +2,10 @@
 
 Inline edit (2026-09-15): the feature is backend-agnostic UI plus orchestration. It never writes through the model: the only write path is a single `editor.replaceRange` in `InlineEditController`, taken after a dirty check against the snapshot the request was built from.
 
+2026-09-18 (FlowText parity R-A1/R-A2, milestone A1): two new entry/interaction surfaces, both strictly opt-in or non-destructive:
+- `@` in-note trigger (`InlineEditAtTrigger.ts`): a CM6 `EditorView.inputHandler` consumes a `@` typed at line start or after whitespace and opens the panel at the cursor; gated by `settings.inlineEditTriggerAt` (default off) plus the usual availability gate; IME composition never intercepted; editors without a file-associated note decline (the `@` falls through to normal typing).
+- `#` preset prompt menu (`InlineEditPresetMenu.ts` + `InlineEditPresets.ts` + `InlineEditOverlayPrimitives.ts`): the input bar's instruction field grows a preset menu (six localized builtins composed with user-defined entries from settings); selecting a preset fills the input without submitting; Escape closes without rejecting. Pure helpers and placement math were extracted from `InlineEditInputOverlay` into `InlineEditOverlayPrimitives` to keep the overlay within its max-lines budget.
+
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
 
 - **Layer:** `feature` (may import layers: shared, core, feature)
@@ -26,7 +30,7 @@ The singleton is the ownership truth for "at most one inline edit exists". The p
 
 - `src/features/inline-edit/InlineEditController.ts`
 
-The controller is reached from two places only, both in `app.composition`: the `inline-edit` editor command and the `editor-menu` context-menu item.
+The controller is reached from `app.composition` only: the `inline-edit` editor command, the `editor-menu` context-menu item, the selection floating button, and (R-A1, opt-in via `inlineEditTriggerAt`) the `@` in-note trigger extension. All of them funnel into `InlineEditController.open()`.
 
 ## Non-obvious invariants
 

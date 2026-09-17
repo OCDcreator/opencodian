@@ -4,6 +4,8 @@
 
 2026-09-17：新增 Pi MCP 设置文案组（`settings.pi.tab.mcp` 与 `settings.pi.mcp.*`）：只读说明（列出 Pi 合并读取的配置文件与同名覆盖规则）、空态/未声明端点/已禁用/exclusive 提示、传输方式与认证方式标签、来源标签，以及「Pi 最近一次上报」区块（说明、空态、接收时间）。文案明确状态是 Pi 最近发来的文本而非实时查询。
 
+2026-09-18：新增 FlowText 对齐批次 A1 文案——`settings.inlineEdit.triggerAt.*`（@ 键唤起开关）、`settings.inlineEdit.hotkey.*`（命令快捷键发现性入口）、`settings.inlineEdit.presets.*` 与 `presetRow.*`（# 预设提示词管理）、内置预设目录 `inlineEdit.presets.{expand,condense,translate,summarize-table,polish-tone,fix-typos}.{label,prompt}`，以及菜单空态 `inlineEdit.presetMenu.empty`。
+
 2026-09-17：新增 `inlineEdit.context.*`（添加上下文/搜索/空态/截断/移除/上限）与 `inlineEdit.error.{tooManyAttachedNotes,attachedNotePathTooLong,attachedNotePathInvalid}` 文案。
 
 2026-09-10：增加安装阶段、真实已完成文件数、进度无障碍标签，以及历史版本“显示更多/收起”文案。

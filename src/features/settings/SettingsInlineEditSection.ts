@@ -1,11 +1,16 @@
 /**
  * SettingsInlineEditSection — settings surface for the inline edit feature.
  *
- * Two settings (docs/requirements/inline-edit.md §9):
+ * Settings (docs/requirements/inline-edit.md §9, docs/requirements/flowtext-parity.md R-A1/R-A2):
  * - `inlineEditEnabled`: master switch; hides the command and the editor menu entry.
+ * - `inlineEditSelectionAffordance`: floating button next to the selection.
+ * - `inlineEditTriggerAt` (R-A1): typing `@` at line start / after whitespace
+ *   opens the panel there; off by default.
  * - `inlineEditModelOverrides`: per-backend model override, keyed by backend kind
  *   because the value format differs per backend (`provider/model` for opencode
  *   and pi, a bare model id or SDK alias for claude-code and codex).
+ * - `inlineEditPresetPrompts` (R-A2): user-defined `#` presets (label + body),
+ *   add/remove/edit. The builtin catalog always shows on top in the menu.
  *
  * The section shows one input per enabled backend rather than one global field,
  * so a stale entry for a backend the user does not run cannot silently apply.
@@ -13,7 +18,11 @@
 
 import { Setting } from 'obsidian';
 
-import { normalizeInlineEditModelOverrides, type OpenCodianSettings } from '../../core/types';
+import {
+  type InlineEditPresetPrompt,
+  normalizeInlineEditModelOverrides,
+  type OpenCodianSettings,
+} from '../../core/types';
 import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import { parseModelOverride } from '../inline-edit/InlineEditPluginHost';
@@ -33,6 +42,8 @@ interface InlineEditSettingsHost {
 interface SettingsInlineEditSectionOptions {
   plugin: InlineEditSettingsHost;
   createSectionHeading: (containerEl: HTMLElement, title: string, tooltip?: string) => HTMLHeadingElement;
+  /** Opens Obsidian's own hotkeys settings tab (R-A1 discoverability). */
+  openHotkeySettings?: () => void;
 }
 
 /** Backends offered in the per-backend override list. */
@@ -41,10 +52,13 @@ const OVERRIDE_BACKENDS: readonly AgentBackendKind[] = ['opencode', 'claude-code
 export class SettingsInlineEditSection {
   private readonly plugin: InlineEditSettingsHost;
   private readonly createSectionHeading: SettingsInlineEditSectionOptions['createSectionHeading'];
+  private readonly openHotkeySettings?: () => void;
+  private presetListEl: HTMLElement | null = null;
 
   constructor(options: SettingsInlineEditSectionOptions) {
     this.plugin = options.plugin;
     this.createSectionHeading = options.createSectionHeading;
+    this.openHotkeySettings = options.openHotkeySettings;
   }
 
   dispose(): void { /* No subscriptions to release. */ }
@@ -88,16 +102,45 @@ export class SettingsInlineEditSection {
           await this.plugin.saveSettings();
         }));
 
+    new Setting(containerEl)
+      .setName(t('settings.inlineEdit.triggerAt.name'))
+      .setDesc(t('settings.inlineEdit.triggerAt.desc'))
+      .addToggle((toggle) => toggle
+        .setValue(this.plugin.settings.inlineEditTriggerAt)
+        .onChange(async (value) => {
+          this.plugin.settings.inlineEditTriggerAt = value;
+          await this.plugin.saveSettings();
+        }));
+
+    this.addHotkeyDiscoveryRow(containerEl);
+
     for (const backend of OVERRIDE_BACKENDS) {
       if (!this.plugin.settings.enabledBackends.includes(backend)) continue;
       this.addOverrideRow(containerEl, backend);
     }
+
+    this.addPresetPromptSettings(containerEl);
 
     new Setting(containerEl)
       .setName(t('settings.inlineEdit.billingNotice.name'))
       .setDesc(t('settings.inlineEdit.billingNotice.desc'));
 
     return headingEl;
+  }
+
+  /**
+   * R-A1 discoverability: the `inline-edit` command ships without a default
+   * hotkey, so the section says so and links straight into Obsidian's own
+   * hotkeys tab where the user can bind one.
+   */
+  private addHotkeyDiscoveryRow(containerEl: HTMLElement): void {
+    const setting = new Setting(containerEl)
+      .setName(t('settings.inlineEdit.hotkey.name'))
+      .setDesc(t('settings.inlineEdit.hotkey.desc'));
+    if (!this.openHotkeySettings) return;
+    setting.addButton((button) => button
+      .setButtonText(t('settings.inlineEdit.hotkey.action'))
+      .onClick(() => { this.openHotkeySettings?.(); }));
   }
 
   private addOverrideRow(containerEl: HTMLElement, backend: AgentBackendKind): void {
@@ -136,6 +179,92 @@ export class SettingsInlineEditSection {
           await this.plugin.saveSettings();
         });
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Preset prompts (R-A2)
+  // ---------------------------------------------------------------------------
+
+  private addPresetPromptSettings(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.inlineEdit.presets.name'))
+      .setDesc(t('settings.inlineEdit.presets.desc'))
+      .addButton((button) => button
+        .setButtonText(t('settings.inlineEdit.presets.add'))
+        .onClick(async () => {
+          this.plugin.settings.inlineEditPresetPrompts = [
+            ...this.plugin.settings.inlineEditPresetPrompts,
+            { id: this.createPresetId(), label: '', prompt: '' },
+          ];
+          await this.plugin.saveSettings();
+          this.renderPresetRows();
+        }));
+
+    this.presetListEl = containerEl.createDiv({ cls: 'opencodian-inline-edit-presets' });
+    this.renderPresetRows();
+  }
+
+  /** Rebuild the preset rows from settings (called after add/remove). */
+  private renderPresetRows(): void {
+    const listEl = this.presetListEl;
+    if (!listEl) return;
+    listEl.empty();
+    const presets = this.plugin.settings.inlineEditPresetPrompts;
+    if (presets.length === 0) {
+      listEl.createDiv({
+        cls: 'opencodian-inline-edit-presets-empty setting-item-description',
+        text: t('settings.inlineEdit.presets.empty'),
+      });
+      return;
+    }
+    presets.forEach((preset, index) => {
+      this.addPresetRow(listEl, preset, index);
+    });
+  }
+
+  private addPresetRow(listEl: HTMLElement, preset: InlineEditPresetPrompt, index: number): void {
+    const setting = new Setting(listEl)
+      .setName(t('settings.inlineEdit.presetRow.name', { index: index + 1 }))
+      .setDesc(t('settings.inlineEdit.presetRow.desc'));
+    setting.addText((text) => text
+      .setPlaceholder(t('settings.inlineEdit.presetRow.labelPlaceholder'))
+      .setValue(preset.label)
+      .onChange(async (value) => {
+        preset.label = value;
+        await this.persistPresetPrompts();
+      }));
+    setting.addTextArea((area) => area
+      .setPlaceholder(t('settings.inlineEdit.presetRow.promptPlaceholder'))
+      .setValue(preset.prompt)
+      .onChange(async (value) => {
+        preset.prompt = value;
+        await this.persistPresetPrompts();
+      }));
+    setting.addExtraButton((button) => button
+      .setIcon('trash-2')
+      .setTooltip(t('settings.inlineEdit.presetRow.delete'))
+      .onClick(async () => {
+        this.plugin.settings.inlineEditPresetPrompts =
+          this.plugin.settings.inlineEditPresetPrompts.filter((entry) => entry !== preset);
+        await this.plugin.saveSettings();
+        this.renderPresetRows();
+      }));
+  }
+
+  /**
+   * Persist the user presets as they are: load-time normalization prunes
+   * half-edited (empty) entries on the next restart, but mid-edit empties
+   * must survive the session or the row would vanish from under the cursor.
+   * The menu composition filters empty entries from showing.
+   */
+  private persistPresetPrompts(): Promise<unknown> {
+    return this.plugin.saveSettings();
+  }
+
+  private createPresetId(): string {
+    return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? `preset-${crypto.randomUUID()}`
+      : `preset-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }
 }
 

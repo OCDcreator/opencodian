@@ -17,6 +17,7 @@ inline edit 全部 UI 的样式。设计语言：Cursor cmd-K 指令条骨架（
   **为什么字段框体归我们所有**：宿主主题与用户 CSS 片段会按自己的规则给裸表单控件加边框和内边距，实测出现过"有边框、零内边距、placeholder 贴着框线"的线上表现。这个浮层必须在任意主题下长相一致，所以框体由 `.opencodian-inline-edit-inputfield` 承担，输入控件本身被压成透明无边框；`.obsidian-debug/style-repro` 的 mock 现在也模拟宿主表单样式，并由 `verify-dark.cjs` 断言"控件无边框/无内边距、框体有填充与内边距、多行时框体确实增高、品牌标记在框外"——不要为了"看起来更简单"把这些 `!important` 删掉
 - `.opencodian-inline-edit-overlay-submit` / `-overlay-close`：实心 accent 提交按钮（busy 换 spinner）+ 幽灵关闭按钮
 - `.opencodian-inline-edit-chipbar`（两行：`-context-row` 已附加笔记 chip，空时由 overlay 隐藏；`-config-row` 配置行）/ `-chip`（`-prefix` / `-value` / `-chevron`）/ `-context-chip`（含 `-remove`）×）：页脚 ghost token chip——模型 chip 前缀为提供商品牌图标（`img`，同主输入窗口 `ProviderIconService` 管线），努力 chip 为 lucide 图标 + 可见文字标签；完整标签在 `title` tooltip
+- `.opencodian-inline-edit-preset-menu` / `.opencodian-inline-edit-menu-item-preset`：`#` 预设菜单变体（R-A2）——复用下拉菜单容器与行骨架，`width: 100%` 与上下文选择器对齐（左边框贴卡片边框），行高 30px；prompt 正文在行 `title` tooltip 而非副标题行
 - `.opencodian-inline-edit-menu`（`-item` / `-item-check` / `-item-icon` / `-item-glyph` / `-item-label` / `-menu-separator`）：下拉菜单；每行统一 13px 图标槽（品牌图标 / signal 信号格 / 清除行字形）保证 label 对齐；含自定义滚动条
 - `.opencodian-inline-edit-picker`（`-search` / `-list` / `-folder` / `-empty` / `-hint`）：附加上下文选择器——菜单的变体，`width: 100%` + overlay 侧 `left: 0`，使它的左右边框与卡片边框对齐（内缩会显得错位，更宽则探出卡片右缘）；搜索框置顶不随列表滚动，且与字段框体同样用 `!important` 钉死盒属性
 - `.opencodian-inline-edit-preview` / `-body` / `-fallback`：diff 预览卡片；body 继承编辑器字体字号（展示正文内容）
