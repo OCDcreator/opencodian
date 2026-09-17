@@ -16,6 +16,7 @@
 - `parseModelOverride()` / `normalizeTabModel()`：按 backend 归一化。opencode/pi 需要 `provider/model`，claude-code 与 codex 用单个 model 字符串；格式不合法时返回错误而不是回退
 - 可选 `isModelAvailable()` 钩子：由插件提供后端目录校验；未提供时只做格式校验
 - 可选 `createProviderIcon(providerId, size)`：透传插件注入的提供商图标工厂（`ProviderIconService.createIconElement`，与主输入窗口模型选择器同一管线），供悬浮条模型 chip 与菜单行渲染品牌图标；未提供时 overlay 回退 lucide 字形
+- `supportsImages`（R-A4）：`hasCapability(adapter.capabilities, AgentCapability.Images)` 注入宿主句柄；四个 adapter 均声明图片能力，该字段防御性地支撑「后端不支持图片时显式提示、不静默降级」
 - `listPresetPrompts()`（R-A2）：从 bridge 的 `InlineEditSettingsSlice.presetPrompts`（用户层）调 `listEffectiveInlineEditPresets()` 合成「内置 + 用户自定义」有效列表；内置目录的 i18n 与合成规则属于 `InlineEditPresets`
 
 ## 依赖

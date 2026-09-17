@@ -15,6 +15,7 @@
  */
 
 import type { Locale, TranslationKey } from '../../i18n';
+import type { InlineEditAnchor } from './InlineEditTypes';
 
 // -----------------------------------------------------------------------------
 // Limits (§6.1)
@@ -110,6 +111,8 @@ const SYSTEM_PROMPT_EN = [
   'Never emit more than one tag. Never nest tags. Never wrap the tag in markdown fences.',
   'The tag body is used verbatim, so put nothing in it but the final text.',
   '',
+  'Images: when a request carries an image, answer from its content and put the final text in the tag as usual — never describe the image, never mention being unable to see it. Mathematical notation in the image defaults to LaTeX, delimited as the request states for its anchor form.',
+  '',
   'Editing rules:',
   "- Imitate the note's existing voice, terminology, heading style, and language. Keep the author's wording wherever it already works.",
   '- Preserve markdown structure: list markers, indentation, code fences, links, and frontmatter must survive.',
@@ -132,6 +135,8 @@ const SYSTEM_PROMPT_ZH = [
   '- 需要提问或澄清：直接用纯文本回复，不要使用任何标签。',
   '禁止输出多个标签，禁止标签嵌套，禁止用 markdown 代码块包裹标签。',
   '标签内的内容会被原样使用，因此只能放最终文字。',
+  '',
+  '图片：当请求附带图片时，根据图片内容直接作答，并像往常一样把最终文字放入协议标签——不要描述图片，也不要提及看不见图片。图片中的数学公式默认输出 LaTeX，定界符按请求中注明的本次锚点形态使用。',
   '',
   '编辑要求：',
   '- 模仿笔记原有的语气、术语、标题风格与语言；原文已经合适的地方就保留原话。',
@@ -210,6 +215,29 @@ export function buildInlineEditRequest(request: InlineEditRequest): InlineEditRe
     + `${request.before}|${request.after} ${marker}\n`
     + `</${INLINE_EDIT_CURSOR_TAG}>`;
   return { ok: true, prompt: `${lead}${block}` };
+}
+
+/**
+ * Per-request image note (R-A4), appended to the prompt only when the turn
+ * carries an image attachment.
+ *
+ * The system prompt states the image contract in general; this note pins the
+ * LaTeX delimiter form to the anchor shape for this specific request:
+ * - `cursor-inline` (anchor inside a line of text) → inline math `$…$`;
+ * - `cursor-inbetween` (anchor on its own empty line) → display math `$$…$$`;
+ * - `selection` → display math `$$…$$` (the common OCR case: the rewritten
+ *   block stands on its own).
+ */
+export function buildInlineEditImageNote(locale: Locale, request: InlineEditRequest): string {
+  const inline = request.kind === 'cursor-inline';
+  return locale === 'zh'
+    ? `（图片输入）本次请求附带 1 张图片：请依据图片内容直接作答，把最终文字放入协议标签内，`
+      + `不要描述图片本身，也不要输出标签以外的任何内容。图片中的数学公式默认输出 LaTeX；`
+      + `本次锚点为${inline ? '行内' : '行间'}形态，公式请用 ${inline ? '$…$' : '$$…$$'} 定界。`
+    : `(Image input) This request carries 1 image: answer directly from its content and put the `
+      + `final text inside the protocol tag — do not describe the image and emit nothing outside `
+      + `the tag. Mathematical notation in the image defaults to LaTeX; this anchor is an `
+      + `${inline ? 'inline' : 'display'} form, so delimit formulas as ${inline ? '$…$' : '$$…$$'}.`;
 }
 
 /**
@@ -304,6 +332,39 @@ export function parseInlineEditResponse(raw: string): InlineEditResponse {
   return open[2] === INLINE_EDIT_REPLACEMENT_TAG
     ? { kind: 'replacement', text: normalizeInsertionText(content) }
     : { kind: 'insertion', text: normalizeInsertionText(content) };
+}
+
+/**
+ * Build the request payload for one anchored edit (docs/requirements/inline-edit.md
+ * §6.1: attached notes travel as paths only — the read-only tools do the
+ * reading; an empty list leaves the field out entirely).
+ */
+export function buildInlineEditRequestForAnchor(
+  anchor: InlineEditAnchor,
+  instruction: string,
+  contextFiles: readonly { readonly path: string }[] = [],
+): InlineEditRequest {
+  const attachedNotes = contextFiles.length > 0 ? contextFiles.map((file) => file.path) : undefined;
+  if (anchor.mode === 'selection') {
+    return {
+      kind: 'selection',
+      instruction,
+      notePath: anchor.notePath,
+      startLine: anchor.startLine,
+      endLine: anchor.endLine,
+      selectionText: anchor.snapshot,
+      attachedNotes,
+    };
+  }
+  return {
+    kind: anchor.mode,
+    instruction,
+    notePath: anchor.notePath,
+    line: anchor.startLine,
+    before: anchor.before,
+    after: anchor.after,
+    attachedNotes,
+  };
 }
 
 /**

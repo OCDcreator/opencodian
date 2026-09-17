@@ -10,7 +10,7 @@
 ## 职责
 
 - `create()`：启动/复用 scope，取其验证结果构造 `AuxQuerySafetyProof`（`effectiveTools` = scope 回读到的只读工具），创建原生 session
-- `query()`：`POST /session/{id}/message`，body 含 `agent`（隔离 scope 中的只读 agent）、`system`（aux 系统提示词）、`model`（opencode 归一化引用）、`parts`
+- `query()`：`POST /session/{id}/message`，body 含 `agent`（隔离 scope 中的只读 agent）、`system`（aux 系统提示词）、`model`（opencode 归一化引用）、`parts`；图片附件（R-A4）按聊天侧 `OpenCodeContextPartSerializer` 的 `file` part 形态（`mime` + `data:` URL）追加在文本 part 之后，纯内存传输不落盘
 - 回合前后各读一次 `GET /session/{id}/message`，用差集提取本回合的助手文本与工具调用，写入 `AuxQueryResult`；工具调用是 §5.5 审计的输入
 - `followUp()`：同一原生 session 上继续一轮，复用后端的原生会话状态
 - `cancel()`：`AbortController` + `POST /session/{id}/abort`

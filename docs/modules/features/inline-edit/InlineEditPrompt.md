@@ -9,7 +9,9 @@ inline edit 与模型之间的请求构造与响应解析，采用 Claudian 验�
 
 ## 职责
 
-- `buildInlineEditSystemPrompt(locale)`：zh/en 两份系统提示词；只负责质量（风格模仿、保留 markdown 结构、只读工具静默使用、禁止元评论），**不是安全层**
+- `buildInlineEditSystemPrompt(locale)`：zh/en 两份系统提示词；只负责质量（风格模仿、保留 markdown 结构、只读工具静默使用、禁止元评论），**不是安全层**。含 R-A4 图片语义段（条件式措辞：仅当请求附带图片时适用——按图片内容直出最终文本、公式默认 LaTeX、定界符按请求注明的锚点形态）
+- `buildInlineEditImageNote(locale, request)`（纯，R-A4）：带图请求追加在 prompt 末尾的锚点形态注记——`cursor-inline` → 行内 `$…$`；`cursor-inbetween` 与 `selection` → 行间 `$$…$$`（OCR 常见场景：改写块独立成行）
+- `buildInlineEditRequestForAnchor(anchor, instruction, contextFiles)`（纯）：锚点 → `InlineEditRequest`（从 controller 搬来，控制其行数预算）；附件仍是路径制清单
 - `buildInlineEditRequest()`：按形态生成请求
   - 选区：`<editor_selection path lines>选区原文</editor_selection>`
   - 光标：`<editor_cursor path line>前文|后文 #inline|#inbetween</editor_cursor>`

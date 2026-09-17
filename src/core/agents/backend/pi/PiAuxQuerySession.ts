@@ -240,8 +240,20 @@ export class PiAuxQuerySession implements AuxQuerySession {
     this.turnAbort = abort;
     const observed: AuxObservedToolCall[] = [];
     const seen = new Set<string>();
+    let streamed = '';
     const unsubscribe = client.subscribe((event) => {
       const record = piRecord(event);
+      if (record.type === 'message_update') {
+        // Progressive text emission (R-A3): same `text_delta` shape the chat
+        // stream mapper consumes (PiStreamMapper.mapDelta). Render-only — the
+        // authoritative result text is still read back after the prompt.
+        const delta = piRecord(record.assistantMessageEvent);
+        if (delta.type === 'text_delta' && typeof delta.delta === 'string' && delta.delta) {
+          streamed += delta.delta;
+          request.onTextChunk?.(streamed);
+        }
+        return;
+      }
       if (record.type !== 'tool_execution_start') return;
       const name = typeof record.toolName === 'string' ? record.toolName : '';
       if (!name || seen.has(name)) return;
@@ -260,7 +272,17 @@ export class PiAuxQuerySession implements AuxQuerySession {
       const message = includeSystemPrompt
         ? `${this.options.systemPrompt}\n\n---\n\n${request.prompt}`
         : request.prompt;
-      await client.request({ type: 'prompt', message }, 0);
+      // Image attachments reuse the chat-side wire shape (PiStreamMapper
+      // buildPiPrompt): `{ type: 'image', data, mimeType }` entries riding on
+      // the prompt request. Nothing touches the vault filesystem.
+      const images = request.images ?? [];
+      await client.request({
+        type: 'prompt',
+        message,
+        ...(images.length > 0
+          ? { images: images.map((image) => ({ type: 'image', data: image.data, mimeType: image.mediaType })) }
+          : {}),
+      }, 0);
       if (abort.signal.aborted) {
         return { success: false, error: 'Pi auxiliary turn was cancelled.', cancelled: true };
       }

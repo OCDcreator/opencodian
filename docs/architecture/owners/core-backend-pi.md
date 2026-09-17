@@ -1,5 +1,6 @@
 # Owner: core.backend-pi
 - 2026-09-13 (universal memory backend): owner manifest gained `core.memory` and `app.memory-runtime`; this owner's boundary itself is unchanged (no source touched, allowlist untouched).
+- 2026-09-18 (inline-edit R-A3/R-A4): `PiAuxQuerySession` gained per-turn image attachments (chat-side `images: [{type:'image', data, mimeType}]` shape on the prompt request) and progressive text streaming (`message_update` `text_delta` events). Read-only `set_tools`/`get_tools` contract and temp-scope cleanup unchanged; images never enter the vault.
 
 The canonical owner is declared in `architecture-owners.config.json`.
 

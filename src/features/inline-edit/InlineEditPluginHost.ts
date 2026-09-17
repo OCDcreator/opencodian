@@ -106,6 +106,7 @@ function resolveAdapter(bridge: InlineEditPluginBridge): InlineEditHostAdapter |
     listEfforts: listEfforts ? () => listEfforts(kind) : undefined,
     describeModelSelection: () => describeModelSelection(bridge, kind),
     getEffort: () => bridge.getSettings().effortOverrides[kind] ?? null,
+    supportsImages: hasCapability(adapter.capabilities, AgentCapability.Images),
     setModelOverride: setModelOverride ? (ref) => setModelOverride(kind, ref) : undefined,
     setEffortOverride: setEffortOverride ? (id) => setEffortOverride(kind, id) : undefined,
   };

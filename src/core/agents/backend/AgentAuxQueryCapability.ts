@@ -39,6 +39,24 @@ export interface AuxQueryTurnRequest {
   readonly signal?: AbortSignal;
   /** Streaming text callback (accumulated text). MVP uses it for spinner state. */
   readonly onTextChunk?: (accumulatedText: string) => void;
+  /**
+   * Images attached to this turn (R-A4). Backends that cannot transport
+   * images must reject the turn rather than silently dropping them.
+   */
+  readonly images?: readonly AuxQueryImageAttachment[];
+}
+
+/**
+ * One image attached to an auxiliary turn.
+ *
+ * The shape mirrors the chat-side `ImageAttachment`
+ * (src/core/types/chat.ts) so backends reuse their existing chat
+ * serialization: `data` is the raw base64 payload without a `data:` prefix.
+ */
+export interface AuxQueryImageAttachment {
+  readonly mediaType: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif';
+  /** Base64 payload, no data-URL prefix. */
+  readonly data: string;
 }
 
 /** A tool invocation observed in the backend's native event stream. */
@@ -87,6 +105,13 @@ export interface AuxQuerySession {
   cancel(): void;
   /** Idempotent teardown: destroy native session/thread/process state. */
   dispose(): Promise<void>;
+  /**
+   * Whether this session transports per-turn image attachments (R-A4).
+   * All four backends implement image transfer; a `false` here lets the
+   * service layer surface an explicit capability gap instead of downgrading
+   * an image request to text-only.
+   */
+  readonly supportsImages?: boolean;
 }
 
 /** Configuration for a new aux session. */

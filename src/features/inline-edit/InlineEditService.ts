@@ -15,14 +15,18 @@
  */
 
 import type {
+  AuxQueryImageAttachment,
   AuxQueryResult,
   AuxQuerySession,
 } from '../../core/agents/backend/AgentAuxQueryCapability';
 import { findWriteToolCalls } from '../../core/agents/backend/AgentAuxQueryCapability';
 import type { Locale } from '../../i18n';
+import { t } from '../../i18n';
 import {
+  buildInlineEditImageNote,
   buildInlineEditRequest,
   buildInlineEditSystemPrompt,
+  describeInlineEditFailure,
   type InlineEditRequest,
   parseInlineEditResponse,
 } from './InlineEditPrompt';
@@ -34,6 +38,17 @@ export interface InlineEditServiceConfig {
   readonly workingDirectory: string;
   readonly locale: Locale;
   readonly signal?: AbortSignal;
+}
+
+/**
+ * Per-turn options (docs/requirements/flowtext-parity.md R-A3 / R-A4).
+ *
+ * `onTextChunk` feeds the streaming preview; `images` attach to this turn
+ * only (clarification follow-ups reuse the session that already saw them).
+ */
+export interface InlineEditTurnOptions {
+  readonly onTextChunk?: (accumulatedText: string) => void;
+  readonly images?: readonly AuxQueryImageAttachment[];
 }
 
 export class InlineEditService {
@@ -53,8 +68,12 @@ export class InlineEditService {
    *
    * Rejects with `status: 'error'` when the backend cannot start a read-only
    * session — the session is never downgraded to a prompting-only mode.
+   *
+   * When `options.images` is non-empty the prompt carries the R-A4 image
+   * semantics note (plain-text result; LaTeX delimiters matched to the anchor
+   * form), and the images ride the turn request to the backend.
    */
-  async submit(request: InlineEditRequest): Promise<InlineEditOutcome> {
+  async submit(request: InlineEditRequest, options: InlineEditTurnOptions = {}): Promise<InlineEditOutcome> {
     const built = buildInlineEditRequest(request);
     if (!built.ok) {
       return { status: 'error', reason: built.error };
@@ -62,14 +81,19 @@ export class InlineEditService {
     const session = await this.ensureSession();
     if ('status' in session) return session;
     const signal = this.config.signal;
+    const prompt = options.images?.length
+      ? `${built.prompt}\n\n${buildInlineEditImageNote(this.config.locale, request)}`
+      : built.prompt;
     return this.runTurn(session.query({
-      prompt: built.prompt,
+      prompt,
       ...(signal ? { signal } : {}),
+      ...(options.images?.length ? { images: options.images } : {}),
+      ...(options.onTextChunk ? { onTextChunk: options.onTextChunk } : {}),
     }));
   }
 
   /** Continue the clarification loop on the same native session. */
-  async clarify(instruction: string): Promise<InlineEditOutcome> {
+  async clarify(instruction: string, options: InlineEditTurnOptions = {}): Promise<InlineEditOutcome> {
     const session = this.session;
     if (!session) {
       return { status: 'error', reason: 'no-session' };
@@ -79,7 +103,10 @@ export class InlineEditService {
       return { status: 'error', reason: 'empty-instruction' };
     }
     const signal = this.config.signal;
-    return this.runTurn(session.followUp(prompt, signal ? { signal } : undefined));
+    return this.runTurn(session.followUp(prompt, {
+      ...(signal ? { signal } : {}),
+      ...(options.onTextChunk ? { onTextChunk: options.onTextChunk } : {}),
+    }));
   }
 
   /** Cancel the in-flight turn; the session stays alive for a retry. */
@@ -194,4 +221,36 @@ export class InlineEditService {
  */
 export function canApplyEdit(snapshot: string, currentText: string): boolean {
   return snapshot === currentText;
+}
+
+/**
+ * Build the user-facing reason for a failed outcome. Service-level failure
+ * reasons (session start, turn failure, write-tool audit) get dedicated
+ * wording; protocol and validation reasons delegate to
+ * `describeInlineEditFailure`.
+ */
+export function describeInlineEditOutcome(reason: string, detail?: string): string {
+  switch (reason) {
+    case 'turn-failed':
+    case 'session-unavailable':
+      return detail
+        ? `${t('inlineEdit.error.sessionUnavailable')} ${detail}`
+        : t('inlineEdit.error.sessionUnavailable');
+    case 'write-tool-observed':
+      return detail
+        ? `${t('inlineEdit.error.writeToolObserved')} (${detail})`
+        : t('inlineEdit.error.writeToolObserved');
+    case 'model-unavailable':
+      return detail
+        ? `${t('inlineEdit.error.modelUnavailable')} ${detail}`
+        : t('inlineEdit.error.modelUnavailable');
+    case 'capability-unavailable':
+      return t('inlineEdit.error.capabilityUnavailable', { backend: detail ?? '' });
+    case 'cancelled':
+      return t('inlineEdit.notice.cancelled');
+    case 'no-session':
+      return t('inlineEdit.error.sessionUnavailable');
+    default:
+      return t(describeInlineEditFailure(reason));
+  }
 }

@@ -170,6 +170,8 @@ export class ClaudeCodeAuxQuerySession implements AuxQuerySession {
   private turnSettle: ((result: AuxQueryResult) => void) | null = null;
   private turnMessages: unknown[] = [];
   private turnAbort: AbortController | null = null;
+  private turnTextChunk: ((accumulatedText: string) => void) | null = null;
+  private streamedText = '';
   private sdkAbort: RendererSafeAbortController | null = null;
   private initReport: ClaudeInitReport | null = null;
   private verificationFailure: string | null = null;
@@ -253,6 +255,8 @@ export class ClaudeCodeAuxQuerySession implements AuxQuerySession {
     const abort = new AbortController();
     this.turnAbort = abort;
     this.turnMessages = [];
+    this.streamedText = '';
+    this.turnTextChunk = request.onTextChunk ?? null;
     const timeout = setTimeout(
       () => abort.abort(),
       this.options.turnTimeoutMs ?? DEFAULT_TURN_TIMEOUT_MS,
@@ -264,12 +268,16 @@ export class ClaudeCodeAuxQuerySession implements AuxQuerySession {
       if (!this.pump) {
         this.startSession();
       }
-      const result = await this.awaitTurn(request.prompt, abort);
+      const result = await this.awaitTurn(request, abort);
       if (result.success) {
+        // Authoritative end-of-turn emission: the accumulated text built from
+        // partial stream events may lag a holdback behind the final message,
+        // so the complete assistant text is always emitted once here too.
         request.onTextChunk?.(result.text);
       }
       return result;
     } finally {
+      this.turnTextChunk = null;
       clearTimeout(timeout);
       if (this.turnAbort === abort) {
         this.turnAbort = null;
@@ -318,9 +326,33 @@ export class ClaudeCodeAuxQuerySession implements AuxQuerySession {
       this.captureInitReport(message);
       return;
     }
+    if (record?.type === 'stream_event') {
+      this.observeStreamEvent(message);
+      return;
+    }
     if (record?.type === 'result') {
       this.settleTurn(this.buildTurnResult(message));
     }
+  }
+
+  /**
+   * Progressive text emission (R-A3): with `includePartialMessages` the SDK
+   * wraps raw Messages API stream events; text deltas accumulate into the
+   * turn text so the caller can render the growing preview. Only text deltas
+   * count — thinking and tool-input JSON never enter the preview channel.
+   * Render-only: the authoritative result text still comes from the complete
+   * assistant messages at `type === 'result'`.
+   */
+  private observeStreamEvent(message: unknown): void {
+    const emit = this.turnTextChunk;
+    if (!emit) return;
+    const event = (message as { event?: unknown }).event;
+    const record = event as { type?: unknown; delta?: unknown };
+    if (record?.type !== 'content_block_delta') return;
+    const delta = record.delta as { type?: unknown; text?: unknown };
+    if (delta?.type !== 'text_delta' || typeof delta.text !== 'string' || !delta.text) return;
+    this.streamedText += delta.text;
+    emit(this.streamedText);
   }
 
   /**
@@ -384,7 +416,7 @@ export class ClaudeCodeAuxQuerySession implements AuxQuerySession {
     return { success: true, text, toolCalls };
   }
 
-  private awaitTurn(prompt: string, abort: AbortController): Promise<AuxQueryResult> {
+  private awaitTurn(request: AuxQueryTurnRequest, abort: AbortController): Promise<AuxQueryResult> {
     return new Promise<AuxQueryResult>((resolve) => {
       this.turnSettle = resolve;
       abort.signal.addEventListener('abort', () => {
@@ -394,7 +426,10 @@ export class ClaudeCodeAuxQuerySession implements AuxQuerySession {
           cancelled: true,
         });
       }, { once: true });
-      this.queue.push(createUserPrompt(prompt));
+      // Image attachments reuse the chat-side queue serialization
+      // (ClaudeCodeQueue.createUserPrompt): Anthropic base64 image blocks in
+      // the user message content.
+      this.queue.push(createUserPrompt(request.prompt, request.images ?? []));
     });
   }
 
@@ -438,7 +473,11 @@ export class ClaudeCodeAuxQuerySession implements AuxQuerySession {
       tools: [...CLAUDE_AUX_ALLOWED_TOOLS],
       disallowedTools: [...CLAUDE_AUX_DISALLOWED_TOOLS],
       strictMcpConfig: true,
-      includePartialMessages: false,
+      // Progressive text deltas for the inline-edit streaming preview (R-A3).
+      // Partial stream events are render-only; the turn result still comes
+      // from the complete assistant messages.
+      includePartialMessages: true,
+      includeHookEvents: false,
       persistSession: false,
       permissionMode: 'default',
       // Renderer-safe controller: the DOM AbortSignal from a plain

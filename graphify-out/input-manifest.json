@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "3dee35aee385f75831de9a515620a97385995b1159b691e493ca95df92b6373e",
-  "recordCount": 666,
+  "digest": "d3440979c52dd68d09262827e79fb166a9127d830cd28ef77687a61bec3f017d",
+  "recordCount": 669,
   "records": [
     {
       "kind": "ignore",
@@ -101,7 +101,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/AgentAuxQueryCapability.ts",
-      "sha256": "61544bd670e21bd2f25a27072e00f55e1c5ae86c803dbd963a5a6eb0adafbe30"
+      "sha256": "5721ae3997e66e8507e59f0c23266b50ec6f658a730992a0305edc5d91e372e8"
     },
     {
       "kind": "src",
@@ -126,17 +126,17 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/auxiliary/ClaudeCodeAuxQuerySession.ts",
-      "sha256": "bcf7cf9dd8becca64d8c404eec47735ae19e4200dd953f9319cdea6ed6dd33ec"
+      "sha256": "ec5f45e829ac663b7de41faa962680903e64d3f83424762dfd42defccbe9056d"
     },
     {
       "kind": "src",
       "key": "src/core/agents/backend/auxiliary/CodexAuxQuerySession.ts",
-      "sha256": "e153482c650e594c6682b85b04f5632c5ec04f364c6fcae83b8c174d7b49e39c"
+      "sha256": "6cb31fb0a430306170c3a670c55a3697eb7c2f11daadcfab7b644877d2c3c331"
     },
     {
       "kind": "src",
       "key": "src/core/agents/backend/auxiliary/OpenCodeAuxQuerySession.ts",
-      "sha256": "034e0a9aae6c35e3b276264d645f6012d121327e8ed027568d37405532271ac9"
+      "sha256": "99b525404c3db21b2329dc1fcb669131f1be08b7a8514311c75d56caae22dab6"
     },
     {
       "kind": "src",
@@ -386,7 +386,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/pi/PiAuxQuerySession.ts",
-      "sha256": "a4a2a689296869e2b80460bc646fabbb4d98369c33da544be3ce7d089af14a0f"
+      "sha256": "adc25e501479f80bab9f2d94ab1640b9bd3adeafecf2eb193f301c722854de49"
     },
     {
       "kind": "src",
@@ -2171,7 +2171,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditController.ts",
-      "sha256": "b252f3ce8609a322267834c58a2c8d0f60f65cae76c533d4bbc9938a97e96bb3"
+      "sha256": "5f7c92b215997d07a8a5919e1fdae28cfbda8bdd295aa7cef9e59e0b20f0ea28"
     },
     {
       "kind": "src",
@@ -2185,8 +2185,18 @@
     },
     {
       "kind": "src",
+      "key": "src/features/inline-edit/InlineEditImageChip.ts",
+      "sha256": "8409383dc9370761fd03bb167ee73d8f806a98c4c59334393b12b6333182dd77"
+    },
+    {
+      "kind": "src",
       "key": "src/features/inline-edit/InlineEditInputOverlay.ts",
-      "sha256": "3f4f6507f422d783b3a6897bf3b6820df43b15869e50e1169902ad2839a5857f"
+      "sha256": "564b590fa9902646a84d501ee51b5ee91c762dc1c2cae925727e53cf51f014ae"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/inline-edit/InlineEditOverlayChips.ts",
+      "sha256": "c503417d9bf57b49e4577ae544c9806d7a5693b81dba555602210d800b9accdb"
     },
     {
       "kind": "src",
@@ -2196,7 +2206,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditPluginHost.ts",
-      "sha256": "88eac4803b5b89e1a97cac883e1e0ff29a60e1989ad2dcb152b9292899fd1abc"
+      "sha256": "ed50b29e1add7b65b23473e819d318b9270f760f5c7ad9001d1209f2955b040e"
     },
     {
       "kind": "src",
@@ -2211,7 +2221,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditPrompt.ts",
-      "sha256": "7eb0c83d51567b187f4f462e7891e1f55bce4f81b81890d351495aee27573866"
+      "sha256": "1a8684ff3dee90c7a6a0f53e75c1b43fd7e03bb42e501cdae25d7f77c69e5495"
     },
     {
       "kind": "src",
@@ -2221,17 +2231,22 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditService.ts",
-      "sha256": "14e9b7940c6dbd6dca2b9469f884eb3461982389e4ab5508d5bd57d4a3b7a5f0"
+      "sha256": "8f198faba6eb32faba6c4240068e6059b688463f8eb133ab67185f2f44082628"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/inline-edit/InlineEditStreamPreview.ts",
+      "sha256": "64d548ce9aff8c5d088929892629fc3d6203db48d52bba9f8179e3769601166d"
     },
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditTypes.ts",
-      "sha256": "12f5ccf476b3ac787ae5eec87c88d13795ba1812d676c16c59de9e542beb868d"
+      "sha256": "81a352d6eed308411b372c498e54fdfb375ae8c78c865dfc10fcd8d600f52813"
     },
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditWidgets.ts",
-      "sha256": "1fe21a8725fb9a4242ea411cdb9a377f08334cf88986d5713a5dd6537a897e5f"
+      "sha256": "ea3a45ed1d831662085331472217921a1f0a2d4a032e9e759e214d9c8e5785c0"
     },
     {
       "kind": "src",
@@ -2811,7 +2826,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "95be4085e4c2de57a2a136bd075cbbd7937c04cf0b8cdb5371e4056c6c6d342c"
+      "sha256": "882dcf476208646365b55c632b5241c80af4aa75ddf6fe8084452da3d97870c3"
     },
     {
       "kind": "src",
@@ -2821,7 +2836,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "2e5d028e0a3cb3eb20a09a054d25aa8106b1643dedb88b7d678e3f2f35438480"
+      "sha256": "7d8a8e7b35ea118b849a7b2e7ad0ea072fc752e4c686be5a3fdce0bfcfd5fdfb"
     },
     {
       "kind": "src",
@@ -3071,7 +3086,7 @@
     {
       "kind": "src",
       "key": "src/style/features/inline-edit.css",
-      "sha256": "f6ece190c00c9aa846588354fce44db24f1d3a6825b5efe695e9c331f38c9ade"
+      "sha256": "9b0c6295390bc27d9ce2e5690dc2d1b1bf003051f7e5da952d5cab212303361f"
     },
     {
       "kind": "src",
@@ -3334,7 +3349,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-17T17:07:37.145Z",
-  "headShaAtGeneration": "a1d03a0e76bc13db2b9a21c225e06f011d731b9b",
+  "generatedAt": "2026-09-17T18:35:05.981Z",
+  "headShaAtGeneration": "1c5e1b89d35fdb8a2454f16ef0a6a69efccd66e4",
   "graphifyVersion": "graphify 0.9.36"
 }

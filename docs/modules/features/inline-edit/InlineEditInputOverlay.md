@@ -20,11 +20,13 @@
 - `inlineEditOverlayTrackerExtension()`：全局唯一 `EditorView.updateListener`，经 WeakMap 找到当前 view 的活动面板，把 `anchorPos` 经 `update.changes.mapPos` 重映射；`main.ts` 用 `registerEditorExtension` 注册一次
 - `#` 预设菜单（R-A2）：状态与机制全部委托 `InlineEditPresetMenuController`（见 `InlineEditPresetMenu.md`）；本文件只保留共享菜单槽（`menu`/`menuKind` 增加 `'preset'`）、宿主闭包注入（`attachMenu/detachMenu/afterFill`）、字段事件转发（`input` → `presetMenu.sync()`、`keydown` → `presetMenu.handleKeydown(event)`，返回 `true` 时跳过提交路径）与 `update(state)` 里 `menuKind === 'preset'` 的重过滤分支。`closeMenu()` 统一调 `presetMenu.reset()`，Escape / 面板外点击 / chip 菜单抢占 / 拆除共用一条清理路径
 - `InlineEditOverlayState.presets`：渲染态携带「内置 + 用户自定义」合成后的有效预设列表（host 侧 `listPresetPrompts()` 已合成，overlay 不再过滤）；置于 state 使设置页中途改动后 `update()` 可重过滤
+- 模型/努力 chip 与下拉菜单（抽出到 `InlineEditOverlayChips.ts`）：构建/同步/行渲染全在兄弟模块，本文件只留 `toggleMenu`（容器与开关）与 `renderMenu`（一行委托）
+- R-A4 图片行：`attachInlineEditImageSurface()` 一行装配 chip 行（插在配置行之前、空时隐藏）+ 字段粘贴 + 面板拖拽（`InlineEditImageChip.ts`）；`enabled()` = 非 busy 且 `state.imageSupported`；`update()` 经 `imageSurface.sync(state.imageSupported ? state.image : null)` 同步；`hide()` 一并 teardown
 - 纯辅助函数已抽至 `InlineEditOverlayPrimitives.ts`（`choicesToMenuItems` / `resolvePanelTop` / `effortMenuIcon` / 菜单项类型与 `PANEL_GAP`、`PANEL_INSET` 常量）：本文件因此保持在 max-lines 预算内
 
 ## 依赖
 
-- `@codemirror/state`、`@codemirror/view`、`obsidian`（`setIcon`）、`../../core/types`（`InlineEditPresetPrompt` 类型）、`../i18n`、`./InlineEditTypes`（`InlineEditContextFile`）、`./InlineEditOverlayPrimitives`、`./InlineEditPresetMenu`
+- `@codemirror/state`、`@codemirror/view`、`obsidian`（`setIcon`）、`../../core/types`（`InlineEditPresetPrompt` 类型）、`../i18n`、`./InlineEditTypes`（`InlineEditContextFile`）、`./InlineEditImageChip`、`./InlineEditOverlayChips`、`./InlineEditOverlayPrimitives`、`./InlineEditPresetMenu`
 
 ## 维护约束
 

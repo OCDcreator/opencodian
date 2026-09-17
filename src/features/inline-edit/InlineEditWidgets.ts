@@ -130,6 +130,7 @@ class InlineEditPreviewWidget extends WidgetType {
     root.className = `${CSS_INPUT}-preview`;
     root.addClass(CSS_INPUT);
     root.addClass(CSS_PREVIEW);
+    if (this.payload.busy) root.addClass('is-busy');
 
     const body = root.createDiv({ cls: `${CSS_INPUT}-body` });
     if (this.payload.insertion) {
@@ -146,6 +147,14 @@ class InlineEditPreviewWidget extends WidgetType {
     const identityIcon = identity.createSpan();
     setIcon(identityIcon, OPENCODIAN_APP_ICON_ID);
     identity.createSpan({ text: t('inlineEdit.command.name') });
+    if (this.payload.busy) {
+      // Generating marker (R-A3): an explicit "still streaming" affordance so
+      // a mid-stream frame is never mistaken for the final result.
+      const busy = actions.createSpan({ cls: `${CSS_INPUT}-busy-label` });
+      const busyIcon = busy.createSpan({ cls: `${CSS_INPUT}-busy-icon` });
+      setIcon(busyIcon, 'loader-circle');
+      busy.createSpan({ text: t('inlineEdit.preview.generating') });
+    }
     const reject = actions.createEl('button', { text: this.payload.rejectLabel, cls: `${CSS_ACTION} is-reject` });
     const accept = actions.createEl('button', { text: this.payload.acceptLabel, cls: `${CSS_ACTION} is-accept` });
     accept.type = 'button';

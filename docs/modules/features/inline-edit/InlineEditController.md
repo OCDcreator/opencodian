@@ -21,6 +21,9 @@ inline edit 的 CM6 状态机与编辑器胶合层。由 `editorCallback` / `edi
 - 拒绝：悬浮条三条取消路径（任意焦点 Esc / 面板外点击 / 焦点移出面板）与 ✕ 按钮都汇入 `reject()`；取消并 dispose 会话
 - 预览态键盘：Enter 接受、Esc 拒绝，监听挂在 `editorView.dom.ownerDocument`，所有判定带 `!event.isComposing` 保护中文输入法
 - 单例语义：同一时刻只允许一个 inline edit，唤起新的先拒绝旧的
+- R-A3 流式 diff 预览：`submit()` 为每轮创建 `InlineEditStreamSession`（`InlineEditStreamPreview.ts`），`onTextChunk` 重解析累计文本；开标签到达前澄清文本逐帧流入输入框上方回复区（`renderStreamingReply`），识别到标签即切预览通道（`renderStreamingPreview`，`busy: true` + 稳定 `previewToken`，经 rAF 合批每帧至多一次装饰 dispatch）；渐进解析报 violation 时冻结最后一帧好画面，回合收尾以 `parseInlineEditResponse()` 严格解析为准——不一致则 `clearStreamingPreview` 清预览 + 报错，绝不部分应用。Esc 取消走 `close()`：先 `stream.dispose()` 丢 pending 帧再 `clearInlineEdit`，无残留装饰
+- R-A4 图片附件：`attachImage`（粘贴/拖拽，经 `InlineEditImageChip` 校验——类型白名单 / ≤4MB / 至多 1 张，拒绝均带提示）挂在 edit 上仅首轮随 `submit({images})` 下发，澄清轮复用已见图会话；`supportsImages === false` 的后端提交时显式报 `inlineEdit.error.imagesUnsupported`，不静默降级
+- chip 状态与选择持久化已移至 `InlineEditOverlayChips.ts`（`inlineEditModelChipState` / `inlineEditEffortChipState` / `pickInlineEditModel` / `pickInlineEditEffort`），本文件只做委托
 
 ## 依赖
 

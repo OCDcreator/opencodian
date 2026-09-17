@@ -20,7 +20,7 @@ import type { EditorView } from '@codemirror/view';
 import type { Editor } from 'obsidian';
 import { Notice } from 'obsidian';
 
-import type { AgentBackendKind } from '../../core/types/chat';
+import type { AuxQueryImageAttachment } from '../../core/agents/backend/AgentAuxQueryCapability';
 import { t } from '../../i18n';
 import { hideSelectionHighlight, showSelectionHighlight } from '../../utils/editorSelectionHighlight';
 import type {
@@ -30,17 +30,30 @@ import type {
   InlineEditHostAdapter,
 } from './InlineEditHost';
 import {
-  InlineEditInputOverlay,
-  type InlineEditOverlayChipState,
-} from './InlineEditInputOverlay';
-import { choicesToMenuItems } from './InlineEditOverlayPrimitives';
+  type InlineEditImageChipModel,
+  readInlineEditImage,
+  validateInlineEditImage,
+} from './InlineEditImageChip';
 import {
-  describeInlineEditFailure,
+  InlineEditInputOverlay,
+} from './InlineEditInputOverlay';
+import {
+  inlineEditEffortChipState,
+  inlineEditModelChipState,
+  pickInlineEditEffort,
+  pickInlineEditModel,
+} from './InlineEditOverlayChips';
+import {
+  buildInlineEditRequestForAnchor,
   INLINE_EDIT_MAX_ATTACHED_NOTES,
-  type InlineEditRequest,
   normalizeInsertionText,
 } from './InlineEditPrompt';
-import { canApplyEdit, InlineEditService } from './InlineEditService';
+import { canApplyEdit, describeInlineEditOutcome, InlineEditService } from './InlineEditService';
+import {
+  createInlineEditStreamSession,
+  inlineEditFrameScheduler,
+  type InlineEditStreamSession,
+} from './InlineEditStreamPreview';
 import type { InlineEditAnchor, InlineEditMode, InlineEditOutcome } from './InlineEditTypes';
 
 /**
@@ -82,6 +95,21 @@ interface ActiveEdit {
    * (not the overlay) so a clarification round keeps them.
    */
   contextFiles: readonly InlineEditContextFile[];
+  /**
+   * Image attached to this edit (R-A4, at most one). Sent with the first
+   * turn; clarification follow-ups reuse the session that already saw it.
+   */
+  image: AuxQueryImageAttachment | null;
+  /** Per-turn streaming session; non-null only while generating. */
+  stream: InlineEditStreamSession | null;
+  /**
+   * Stable decoration token for the preview of this edit: streaming updates
+   * reuse it so the widget's `eq()` can compare accumulated text instead of
+   * rebuilding on every frame for other reasons.
+   */
+  previewToken: number | null;
+  /** True while a streaming preview decoration is live in the editor. */
+  previewShown: boolean;
   onDocumentKeydown: (event: KeyboardEvent) => void;
 }
 
@@ -149,6 +177,10 @@ export class InlineEditController {
       overlay: null,
       modelChoices: null,
       contextFiles: [],
+      image: null,
+      stream: null,
+      previewToken: null,
+      previewShown: false,
       onDocumentKeydown: () => { /* replaced below */ },
     };
     this.active = edit;
@@ -166,6 +198,11 @@ export class InlineEditController {
     this.active = null;
     if (!edit) return;
     this.unbindDocumentKeys(edit);
+    // Cancel any pending streaming frame first: the decoration clear below
+    // must be the last word on the editor state (Esc mid-stream leaves no
+    // residual preview).
+    edit.stream?.dispose();
+    edit.stream = null;
     edit.overlay?.hide();
     edit.overlay = null;
     applyInlineEditEffect(edit.editorView, clearInlineEdit.of(null));
@@ -236,6 +273,8 @@ export class InlineEditController {
         createProviderIcon: (providerId, size) => this.options.host.createProviderIcon?.(providerId, size) ?? null,
         onRequestContextFiles: () => { this.openContextPicker(); },
         onToggleContext: (path) => { this.toggleContextFile(path); },
+        onAttachImage: (files) => { void this.attachImage(edit, files); },
+        onRemoveImage: () => { this.removeImage(edit); },
       });
       edit.overlay.show(edit.anchor.from);
       edit.overlay.focusInput();
@@ -248,11 +287,13 @@ export class InlineEditController {
       placeholder: edit.anchor.mode === 'selection'
         ? t('inlineEdit.placeholder.edit')
         : t('inlineEdit.placeholder.insert'),
-      model: this.modelChipState(edit),
-      effort: this.effortChipState(edit),
+      model: inlineEditModelChipState(chipHost(edit)),
+      effort: inlineEditEffortChipState(chipHost(edit)),
       context: edit.contextFiles.map((file) => ({ path: file.path, label: file.name })),
       contextSupported: this.options.host.listContextFiles != null,
       presets: this.options.host.listPresetPrompts?.() ?? [],
+      image: edit.image ? inlineEditImageChipModel(edit.image) : null,
+      imageSupported: edit.adapter.supportsImages !== false,
     });
   }
 
@@ -268,33 +309,6 @@ export class InlineEditController {
       if (this.active === edit) edit.modelChoices = [];
     }
     if (this.active === edit) this.renderInput();
-  }
-
-  private modelChipState(edit: ActiveEdit): InlineEditOverlayChipState {
-    const selection = edit.adapter.describeModelSelection();
-    const activeId = selection.source === 'default' ? null : selection.label;
-    const kind = edit.adapter.kind;
-    return {
-      label: activeId ?? '',
-      iconProvider: activeId ? inferInlineEditModelProvider(activeId, kind) : null,
-      loading: edit.adapter.listModels != null && edit.modelChoices === null,
-      disabled: edit.service.hasSession,
-      items: choicesToMenuItems(edit.modelChoices ?? [], activeId).map((item) => ({
-        ...item,
-        iconProvider: item.id === null ? null : inferInlineEditModelProvider(item.id, kind),
-      })),
-    };
-  }
-
-  private effortChipState(edit: ActiveEdit): InlineEditOverlayChipState | null {
-    const efforts = edit.adapter.listEfforts?.() ?? null;
-    if (!efforts) return null;
-    const current = edit.adapter.getEffort();
-    return {
-      label: current ?? '',
-      disabled: edit.service.hasSession,
-      items: choicesToMenuItems(efforts, current),
-    };
   }
 
   /**
@@ -329,32 +343,68 @@ export class InlineEditController {
     edit.overlay?.refreshContextPicker();
   }
 
+  /**
+   * Attach one image from a paste or drop (R-A4). Fail-closed: an oversized,
+   * mistyped, or extra image is rejected with a notice — nothing is dropped
+   * silently. The file is read into memory only; it never lands in the vault.
+   */
+  private async attachImage(edit: ActiveEdit, files: readonly File[]): Promise<void> {
+    if (this.active !== edit) return;
+    const file = files[0];
+    if (!file) return;
+    const preCheck = validateInlineEditImage(file, edit.image !== null);
+    if (!preCheck.ok) {
+      this.notify(t(preCheck.reason));
+      return;
+    }
+    const result = await readInlineEditImage(file);
+    if (this.active !== edit) return;
+    if (!result.ok) {
+      this.notify(t(result.reason));
+      return;
+    }
+    edit.image = result.attachment;
+    edit.error = '';
+    this.renderInput();
+  }
+
+  private removeImage(edit: ActiveEdit): void {
+    if (this.active !== edit || edit.service.hasSession) return;
+    edit.image = null;
+    this.renderInput();
+  }
+
   private async pickModel(id: string | null): Promise<void> {
     const edit = this.active;
-    if (!edit || edit.service.hasSession) return;
-    try {
-      await edit.adapter.setModelOverride?.(id);
-    } catch (error) {
-      this.notify(error instanceof Error ? error.message : String(error));
-    }
-    if (this.active === edit) this.renderInput();
+    if (!edit) return;
+    await pickInlineEditModel(
+      { adapter: edit.adapter, modelChoices: edit.modelChoices, sessionStarted: edit.service.hasSession },
+      { notify: (m) => { this.notify(m); }, rerender: () => { if (this.active === edit) this.renderInput(); } },
+      id,
+    );
   }
 
   private async pickEffort(id: string | null): Promise<void> {
     const edit = this.active;
-    if (!edit || edit.service.hasSession) return;
-    try {
-      await edit.adapter.setEffortOverride?.(id);
-    } catch (error) {
-      this.notify(error instanceof Error ? error.message : String(error));
-    }
-    if (this.active === edit) this.renderInput();
+    if (!edit) return;
+    await pickInlineEditEffort(
+      { adapter: edit.adapter, modelChoices: edit.modelChoices, sessionStarted: edit.service.hasSession },
+      { notify: (m) => { this.notify(m); }, rerender: () => { if (this.active === edit) this.renderInput(); } },
+      id,
+    );
   }
 
-  private renderPreview(): void {
-    const edit = this.active;
-    const preview = edit?.preview;
-    if (!edit || !preview) return;
+  /**
+   * Dispatch the preview decoration for `edit`.
+   *
+   * Streaming updates reuse `edit.previewToken` so the widget's `eq()`
+   * compares the accumulated text and skips the rebuild when a frame carries
+   * no visible change; the final (strictly parsed) payload only differs in
+   * `busy` and text, so the decoration updates in place.
+   */
+  private renderPreview(edit: ActiveEdit, busy: boolean): void {
+    const preview = edit.preview;
+    if (!preview) return;
     // The preview replaces the anchored selection range. `readInlineEditRange`
     // would read the *input* decoration here — a collapsed widget position,
     // which is an invalid range for a replace decoration. The anchor range is
@@ -365,15 +415,19 @@ export class InlineEditController {
     const docLength = edit.editorView.state.doc.length;
     const from = Math.min(edit.anchor.from, docLength);
     const to = Math.min(Math.max(edit.anchor.to, from), docLength);
-    this.token += 1;
+    if (edit.previewToken === null) {
+      this.token += 1;
+      edit.previewToken = this.token;
+    }
+    edit.previewShown = true;
     applyInlineEditEffect(edit.editorView, showInlineEditPreview.of({
-      token: `${this.token}:preview`,
+      token: `${edit.previewToken}:preview`,
       from,
       to,
       before: edit.anchor.snapshot,
       after: preview.text,
       insertion: preview.mode === 'insertion',
-      busy: false,
+      busy,
       callbacks: {
         onSubmit: () => { /* no input in the preview phase */ },
         onAccept: () => { this.accept(); },
@@ -382,6 +436,39 @@ export class InlineEditController {
       acceptLabel: t('inlineEdit.action.accept'),
       rejectLabel: t('inlineEdit.action.reject'),
     }));
+  }
+
+  /** Clear a live streaming preview from the editor (error paths). */
+  private clearStreamingPreview(edit: ActiveEdit): void {
+    if (!edit.previewShown) return;
+    edit.previewShown = false;
+    edit.previewToken = null;
+    applyInlineEditEffect(edit.editorView, clearInlineEdit.of(null));
+  }
+
+  /**
+   * Per-frame preview update while a tag body streams in (R-A3). The payload
+   * carries `busy: true`, so the widget shows the generating marker and keeps
+   * accept/reject disabled until the strict parse settles the turn.
+   */
+  private renderStreamingPreview(edit: ActiveEdit, mode: 'replacement' | 'insertion', text: string): void {
+    if (this.active !== edit || edit.phase !== 'generating') return;
+    edit.preview = { mode, text };
+    edit.reply = '';
+    this.renderPreview(edit, true);
+  }
+
+  /**
+   * Per-frame reply update for pre-tag plain text: a clarification-shaped
+   * reply streams into the area above the input instead of the preview
+   * channel. The moment a tag opens, `renderStreamingPreview` takes over and
+   * clears this text.
+   */
+  private renderStreamingReply(edit: ActiveEdit, text: string): void {
+    if (this.active !== edit || edit.phase !== 'generating') return;
+    if (edit.reply === text) return;
+    edit.reply = text;
+    this.renderInput();
   }
 
   // ---------------------------------------------------------------------------
@@ -397,14 +484,42 @@ export class InlineEditController {
     edit.error = '';
     edit.reply = '';
 
+    if (edit.image && edit.adapter.supportsImages === false) {
+      // Explicit capability gap: never downgrade an image request to a
+      // text-only one behind the user's back (R-A4).
+      edit.error = t('inlineEdit.error.imagesUnsupported');
+      this.renderInput();
+      return;
+    }
+
     const isFirstTurn = !edit.service.hasSession;
     edit.phase = 'generating';
     this.renderInput();
 
-    const outcome = isFirstTurn
-      ? await edit.service.submit(buildRequest(edit.anchor, trimmed, edit.contextFiles))
-      : await edit.service.clarify(trimmed);
+    // R-A3: one streaming session per turn. Chunks re-parse the accumulated
+    // text; a per-frame batch dispatches at most one decoration update per
+    // animation frame, whatever chunk pacing the backend uses.
+    const stream = createInlineEditStreamSession({
+      onReply: (text) => { this.renderStreamingReply(edit, text); },
+      onPreview: (mode, text) => { this.renderStreamingPreview(edit, mode, text); },
+    }, inlineEditFrameScheduler(edit.editorView.dom.ownerDocument.defaultView ?? window));
+    edit.stream = stream;
 
+    const outcome = isFirstTurn
+      ? await edit.service.submit(
+        buildInlineEditRequestForAnchor(edit.anchor, trimmed, edit.contextFiles),
+        {
+          ...(edit.image ? { images: [edit.image] } : {}),
+          onTextChunk: (accumulated) => { stream.handleChunk(accumulated); },
+        },
+      )
+      : await edit.service.clarify(trimmed, {
+          onTextChunk: (accumulated) => { stream.handleChunk(accumulated); },
+        });
+
+    stream.flush();
+    stream.dispose();
+    if (edit.stream === stream) edit.stream = null;
     if (this.active !== edit) return;
     this.applyOutcome(edit, outcome);
   }
@@ -412,21 +527,31 @@ export class InlineEditController {
   private applyOutcome(edit: ActiveEdit, outcome: InlineEditOutcome): void {
     switch (outcome.status) {
       case 'preview':
+        // Strict parse is the only authority: the final payload always uses
+        // the strictly-parsed text, so a divergent streaming frame can never
+        // be applied (R-A3 需求 3/4).
         edit.preview = { mode: outcome.mode, text: outcome.text };
         edit.phase = 'preview';
         // The in-flow preview replaces the floating bar; the preview's own
         // accept/reject (Enter/Esc via the document handler) takes over.
         edit.overlay?.hide();
         edit.overlay = null;
-        this.renderPreview();
+        this.renderPreview(edit, false);
         return;
       case 'clarification':
+        edit.preview = null;
+        this.clearStreamingPreview(edit);
         edit.reply = outcome.text;
         edit.phase = 'input';
         this.renderInput();
         return;
       default:
-        edit.error = describeOutcome(outcome.reason, outcome.detail);
+        // A streaming preview may be live in the editor when the strict parse
+        // rejects the turn (multiple tags, unclosed tag): clear it and report
+        // — never leave a partial apply path behind.
+        edit.preview = null;
+        this.clearStreamingPreview(edit);
+        edit.error = describeInlineEditOutcome(outcome.reason, outcome.detail);
         edit.phase = 'input';
         this.renderInput();
     }
@@ -512,62 +637,9 @@ export class InlineEditController {
   }
 }
 
-/** Build the request payload for an anchor. */
-function buildRequest(
-  anchor: InlineEditAnchor,
-  instruction: string,
-  contextFiles: readonly InlineEditContextFile[] = [],
-): InlineEditRequest {
-  // Paths only: §6.1 keeps vault text out of the prompt, the read-only tools
-  // do the reading. An empty list leaves the field out entirely.
-  const attachedNotes = contextFiles.length > 0 ? contextFiles.map((file) => file.path) : undefined;
-  if (anchor.mode === 'selection') {
-    return {
-      kind: 'selection',
-      instruction,
-      notePath: anchor.notePath,
-      startLine: anchor.startLine,
-      endLine: anchor.endLine,
-      selectionText: anchor.snapshot,
-      attachedNotes,
-    };
-  }
-  return {
-    kind: anchor.mode,
-    instruction,
-    notePath: anchor.notePath,
-    line: anchor.startLine,
-    before: anchor.before,
-    after: anchor.after,
-    attachedNotes,
-  };
-}
-
-/** Build the user-facing reason for a failed outcome. */
-function describeOutcome(reason: string, detail?: string): string {
-  switch (reason) {
-    case 'turn-failed':
-    case 'session-unavailable':
-      return detail
-        ? `${t('inlineEdit.error.sessionUnavailable')} ${detail}`
-        : t('inlineEdit.error.sessionUnavailable');
-    case 'write-tool-observed':
-      return detail
-        ? `${t('inlineEdit.error.writeToolObserved')} (${detail})`
-        : t('inlineEdit.error.writeToolObserved');
-    case 'model-unavailable':
-      return detail
-        ? `${t('inlineEdit.error.modelUnavailable')} ${detail}`
-        : t('inlineEdit.error.modelUnavailable');
-    case 'capability-unavailable':
-      return t('inlineEdit.error.capabilityUnavailable', { backend: detail ?? '' });
-    case 'cancelled':
-      return t('inlineEdit.notice.cancelled');
-    case 'no-session':
-      return t('inlineEdit.error.sessionUnavailable');
-    default:
-      return t(describeInlineEditFailure(reason));
-  }
+/** Chip model for the overlay: label is the media type, thumb is the payload. */
+function inlineEditImageChipModel(image: AuxQueryImageAttachment): InlineEditImageChipModel {
+  return { mediaType: image.mediaType, data: image.data, label: image.mediaType.replace('image/', '') };
 }
 
 /**
@@ -590,15 +662,15 @@ function isEditorView(value: unknown): value is EditorView {
     && typeof record.dom === 'object';
 }
 
-/**
- * Provider id used to resolve the model chip / menu row icon. OpenCode and pi
- * refs carry `provider/model`; bare claude-code and codex ids map to the
- * provider their models come from. Anything else renders a generic glyph.
- */
-function inferInlineEditModelProvider(ref: string, kind: AgentBackendKind): string | null {
-  const slash = ref.indexOf('/');
-  if (slash > 0) return ref.slice(0, slash);
-  if (kind === 'claude-code') return 'anthropic';
-  if (kind === 'codex') return 'openai';
-  return null;
+/** Chip-state host view of one active edit. */
+function chipHost(edit: ActiveEdit): {
+  adapter: InlineEditHostAdapter;
+  modelChoices: readonly InlineEditChoice[] | null;
+  sessionStarted: boolean;
+} {
+  return {
+    adapter: edit.adapter,
+    modelChoices: edit.modelChoices,
+    sessionStarted: edit.service.hasSession,
+  };
 }

@@ -2,6 +2,7 @@
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
 - 2026-09-13 (universal memory backend): OpenCodeAdapter/ClaudeCodeAdapter/CodexAdapter/PiAdapter consumed the new memory-injection seam (opencode: synthetic text part; claude/codex/pi: prompt prefix).
+- 2026-09-18 (inline-edit R-A3/R-A4): the auxiliary sessions (ClaudeCode/Codex/OpenCode) gained per-turn image attachments reusing the chat-side wire shapes (Anthropic base64 block via `createUserPrompt`; Codex `localImage` with temp files in the system temp dir, cleaned per-turn and on dispose) and progressive text streaming (Claude `includePartialMessages` text_delta only; Codex native per-token deltas). Read-only contract, deny-list, and audit semantics unchanged; images never enter the vault.
 
 - **Layer:** `core` (may import layers: shared, core)
 - **Risk:** high

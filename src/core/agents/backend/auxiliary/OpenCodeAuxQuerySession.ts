@@ -27,6 +27,14 @@ import { OpenCodeAuxScope, scopeUrl } from './OpenCodeAuxScope';
 
 const logger = createLogger('OpenCodeAuxQuerySession');
 
+/** File extension per image media type; mirrors the chat-side mapping. */
+const AUX_IMAGE_EXTENSIONS: Readonly<Record<string, string>> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+};
+
 export interface OpenCodeAuxSessionOptions {
   readonly systemPrompt: string;
   readonly model?: BackendModelSelection;
@@ -181,7 +189,7 @@ export class OpenCodeAuxQuerySession implements AuxQuerySession {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         signal: controller.signal,
-        body: JSON.stringify(this.buildPromptBody(request.prompt)),
+        body: JSON.stringify(this.buildPromptBody(request)),
       });
       if (!response.ok) {
         return {
@@ -217,11 +225,23 @@ export class OpenCodeAuxQuerySession implements AuxQuerySession {
     }
   }
 
-  private buildPromptBody(prompt: string): Record<string, unknown> {
+  private buildPromptBody(request: AuxQueryTurnRequest): Record<string, unknown> {
+    const parts: Record<string, unknown>[] = [{ type: 'text', text: request.prompt }];
+    // Image attachments reuse the chat-side wire shape
+    // (OpenCodeContextPartSerializer): a `file` part carrying a data URL.
+    // Nothing is written to disk — the payload travels inside the message.
+    for (const image of request.images ?? []) {
+      parts.push({
+        type: 'file',
+        mime: image.mediaType,
+        filename: `inline-edit.${AUX_IMAGE_EXTENSIONS[image.mediaType] ?? 'bin'}`,
+        url: `data:${image.mediaType};base64,${image.data}`,
+      });
+    }
     const body: Record<string, unknown> = {
       agent: this.options.agentName,
       system: this.options.systemPrompt,
-      parts: [{ type: 'text', text: prompt }],
+      parts,
     };
     const model = this.options.model;
     if (model && model.kind === 'opencode') {

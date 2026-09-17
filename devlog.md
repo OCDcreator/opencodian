@@ -11,6 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-18 行内编辑 A2：流式 diff 预览（R-A3）与面板贴图（R-A4）
+
+FlowText 对齐批次 A 第二个里程碑（`docs/requirements/flowtext-parity.md`），只动 `src/features/inline-edit/**` 与 `AgentAuxQueryCapability` 面，不削弱只读契约。
+
+**R-A3 流式预览**：`AuxQueryTurnRequest.onTextChunk` 接缝接入 `InlineEditService.submit()/clarify()`。新增纯模块 `InlineEditStreamPreview.ts`——渐进解析把累计文本分类为 preamble / streaming / violation（尾部可能是标签 token 前缀的片段扣住不渲染），violation 冻结最后一帧好画面；rAF 合批把任意 chunk 频率压到每帧至多一次装饰 dispatch（1000 chunk ≈ 60 次）；controller 在开标签到达前把澄清文本流进输入框上方回复区，识别到标签即切编辑器预览通道（`busy: true` + 稳定 token，`eq()` 按累计文本比对避免整块重建）。**收尾权威仍是 `parseInlineEditResponse()` 严格解析**：流式与严格不一致（双标签、未闭合）一律清预览 + 报错，绝不部分应用；Esc 取消先丢 pending 帧再清装饰，无残留。Claude 侧开 `includePartialMessages` 只收 `text_delta`、Pi 侧订阅 `message_update` 的 `text_delta`（均与聊天事件形态同源），Codex 原生逐 token；OpenCode 维持回合末单次发射（HTTP 传输无 SSE）。
+
+**R-A4 贴图**：`AuxQueryImageAttachment`（png/jpeg/webp/gif 白名单 + 纯 base64）+ `AuxQueryTurnRequest.images`，四后端全部复用聊天侧序列化落地（OpenCode data-URL file part；Claude `createUserPrompt` 的 Anthropic base64 block；Codex `localImage` 临时文件写在系统临时目录、回合 finally + dispose 双重清理；Pi prompt 请求 `images` 数组）。面板经 `InlineEditImageChip.ts` 支持粘贴/拖拽/chip（缩略图 + 移除），上限 1 张、≤4MB，超限/超类型/超张数拒绝并提示，不静默丢弃；图片不落 vault。系统提示词加图片语义（按内容直出文本、公式默认 LaTeX），请求注记按锚点形态选定界符（行内 `$…$` / 行间 `$$…$$`）。后端无图片能力时显式提示，不静默降级。overlay 行数预算：chip 机制与模型/努力 chip 分别抽给 `InlineEditImageChip.ts` / `InlineEditOverlayChips.ts` 兄弟模块。
+
+测试：渐进/严格解析一致性、violation 冻结、rAF 合批（1000 chunk）、四后端 images 序列化契约（含 Codex 临时文件生命周期与 vault 快照零变化）、图片校验；`run-aux-query-audit.mjs` 新增 check 5 图片回合（真 CLI 真模型）。
+
 ## 2026-09-17 shadcn 主题、可调边距与一批「先量测再修」的 UX 修复
 
 本条覆盖一轮以截图/几何量测驱动的迭代。**shadcn 主题**：新增第 5 种 style（`shadcn-neutral`），中性派生 token、玻璃管线全关、accent 深浅色按 `.theme-dark/.theme-light` 各取 zinc-50/900、输入字体 Inter；核心布局变化是 `.opencodian-input-area` 从悬浮改为容器流内停靠——消息区滚动范围止于输入卡上缘，不再延伸到面板底部。

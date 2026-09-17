@@ -23,6 +23,8 @@ inline edit 全部 UI 的样式。设计语言：Cursor cmd-K 指令条骨架（
 - `.opencodian-inline-edit-preview` / `-body` / `-fallback`：diff 预览卡片；body 继承编辑器字体字号（展示正文内容）
 - `.opencodian-inline-edit-insert` / `-delete`：词级 diff 配色（绿插入 / 红删除+删除线，底 + inset 发丝环；相邻 delete↔insert 边界用相邻选择器加 6px 呼吸间隙；fallback 模式为块级展示）
 - `.opencodian-inline-edit-actions` / `-actions-label` / `-action.is-accept` / `.is-reject`：预览页脚——左侧品牌标记身份标签，右侧幽灵"拒绝" + 实心"接受"
+- `.opencodian-inline-edit-preview.is-busy`（R-A3）：流式中帧的虚线 accent 外框 + `-busy-label`（转圈图标 + `inlineEdit.preview.generating` 文案），配合按钮 disabled 表明"生成中、非最终结果"；reduced-motion 下转圈减速
+- `.opencodian-inline-edit-image-row` / `-image-chip`（`-thumb` 22px data-URL 缩略图 / `-remove`）与 `.opencodian-inline-edit-overlay.is-image-drag-over`（R-A4）：图片附件 chip 行（插在配置行之前、空时隐藏）与拖拽悬停高亮
 - `.opencodian-inline-edit-affordance`：选区悬浮小按钮（品牌标记图标，毛玻璃 + pop-in + hover 放大）
 - `.theme-dark .opencodian-inline-edit*`：深色主题覆盖——表面混白提亮 + 卡片顶部 inset 高光 + 阴影大幅加浓（浅色阴影在深色页面上不可见）、diff 色块 alpha 提升、reply 块改用前景色 tint
 

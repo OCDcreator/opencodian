@@ -1,7 +1,9 @@
 import { describe, expect, it } from '@jest/globals';
 
 import {
+  buildInlineEditImageNote,
   buildInlineEditRequest,
+  buildInlineEditRequestForAnchor,
   buildInlineEditSystemPrompt,
   escapeXmlAttribute,
   INLINE_EDIT_MAX_ATTACHED_NOTES,
@@ -132,6 +134,82 @@ describe('buildInlineEditSystemPrompt', () => {
     expect(buildInlineEditSystemPrompt('en')).not.toBe(buildInlineEditSystemPrompt('zh'));
     expect(buildInlineEditSystemPrompt('zh')).toContain('<replacement>');
     expect(buildInlineEditSystemPrompt('en')).toContain('<replacement>');
+  });
+
+  it('states the R-A4 image semantics in both locales', () => {
+    const en = buildInlineEditSystemPrompt('en');
+    expect(en).toContain('image');
+    expect(en.toLowerCase()).toContain('latex');
+    const zh = buildInlineEditSystemPrompt('zh');
+    expect(zh).toContain('图片');
+    expect(zh).toContain('LaTeX');
+  });
+});
+
+describe('buildInlineEditImageNote', () => {
+  const selection = { ...selectionRequest };
+  const cursorInline = {
+    kind: 'cursor-inline' as const,
+    instruction: 'OCR this',
+    notePath: 'notes/idea.md',
+    line: 3,
+    before: 'The formula ',
+    after: ' continues.',
+  };
+  const cursorInbetween = {
+    kind: 'cursor-inbetween' as const,
+    instruction: 'OCR this',
+    notePath: 'notes/idea.md',
+    line: 4,
+    before: '',
+    after: '',
+  };
+
+  it('selects inline $…$ delimiters for cursor-inline anchors', () => {
+    expect(buildInlineEditImageNote('en', cursorInline)).toContain('$…$');
+    expect(buildInlineEditImageNote('en', cursorInline)).not.toContain('$$…$$');
+    expect(buildInlineEditImageNote('zh', cursorInline)).toContain('$…$');
+  });
+
+  it('selects display $$…$$ delimiters for cursor-inbetween anchors', () => {
+    expect(buildInlineEditImageNote('en', cursorInbetween)).toContain('$$…$$');
+    expect(buildInlineEditImageNote('zh', cursorInbetween)).toContain('$$…$$');
+  });
+
+  it('defaults selections to display math', () => {
+    expect(buildInlineEditImageNote('en', selection)).toContain('$$…$$');
+  });
+});
+
+describe('buildInlineEditRequestForAnchor', () => {
+  const anchor = {
+    mode: 'selection' as const,
+    notePath: 'notes/idea.md',
+    from: 4,
+    to: 26,
+    snapshot: 'The cat sat on the mat.',
+    startLine: 3,
+    endLine: 5,
+    before: '',
+    after: '',
+  };
+
+  it('builds the same selection request as the inline shapes', () => {
+    const request = buildInlineEditRequestForAnchor(anchor, 'Tighten', [{ path: 'a.md' }, { path: 'b.md' }]);
+    expect(request.kind).toBe('selection');
+    if (request.kind !== 'selection') return;
+    expect(request.selectionText).toBe('The cat sat on the mat.');
+    expect(request.attachedNotes).toEqual(['a.md', 'b.md']);
+    const built = buildInlineEditRequest(request);
+    expect(built.ok).toBe(true);
+  });
+
+  it('builds a cursor request from cursor anchors', () => {
+    const request = buildInlineEditRequestForAnchor({ ...anchor, mode: 'cursor-inline', from: 10, to: 10, before: 'abc', after: 'def' }, 'Insert');
+    expect(request.kind).toBe('cursor-inline');
+    if (request.kind === 'selection') return;
+    expect(request.before).toBe('abc');
+    expect(request.after).toBe('def');
   });
 });
 

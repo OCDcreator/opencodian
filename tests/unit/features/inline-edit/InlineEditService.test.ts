@@ -233,3 +233,127 @@ describe('canApplyEdit', () => {
     expect(canApplyEdit('a\nb', 'a\r\nb')).toBe(false);
   });
 });
+
+
+describe('InlineEditService turn options (R-A3 streaming / R-A4 images)', () => {
+  it('forwards turn images to the backend session and adds the image note to the prompt', async () => {
+    const received: { prompt: string; images?: readonly { mediaType: string; data: string }[] }[] = [];
+    const session: AuxQuerySession = {
+      queryId: 'test',
+      safety: SAFETY,
+      query(request) {
+        received.push({ prompt: request.prompt, images: request.images });
+        return Promise.resolve({ success: true, text: '<insertion>$x$</insertion>', toolCalls: [] });
+      },
+      followUp: () => Promise.resolve({ success: true, text: '<replacement>fallback</replacement>', toolCalls: [] }),
+      cancel() { /* no-op */ },
+      dispose: () => Promise.resolve(),
+    };
+    const { adapter } = adapterWith(session);
+    const service = new InlineEditService({ adapter, workingDirectory: '/vault', locale: 'en' });
+    const image = { mediaType: 'image/png' as const, data: 'aGVsbG8=' };
+    const outcome = await service.submit(selectionRequest, { images: [image] });
+    expect(outcome).toEqual({ status: 'preview', mode: 'insertion', text: '$x$' });
+    expect(received).toHaveLength(1);
+    // The image rides the turn request verbatim (no data-URL prefix added).
+    expect(received[0]?.images).toEqual([image]);
+    // The prompt carries the R-A4 image semantics note.
+    expect(received[0]?.prompt).toContain('Image input');
+    expect(received[0]?.prompt).toContain('$$…$$');
+    await service.dispose();
+  });
+
+  it('selects the inline LaTeX delimiter form for cursor-inline anchors', async () => {
+    const received: string[] = [];
+    const session: AuxQuerySession = {
+      queryId: 'test',
+      safety: SAFETY,
+      query(request) { received.push(request.prompt); return Promise.resolve({ success: true, text: '<insertion>$x$</insertion>', toolCalls: [] }); },
+      followUp: () => Promise.resolve({ success: true, text: '<replacement>fallback</replacement>', toolCalls: [] }),
+      cancel() { /* no-op */ },
+      dispose: () => Promise.resolve(),
+    };
+    const { adapter } = adapterWith(session);
+    const service = new InlineEditService({ adapter, workingDirectory: '/vault', locale: 'en' });
+    await service.submit({
+      kind: 'cursor-inline',
+      instruction: 'OCR this',
+      notePath: 'a.md',
+      line: 3,
+      before: 'The formula ',
+      after: ' continues.',
+    }, { images: [{ mediaType: 'image/png', data: 'aGVsbG8=' }] });
+    expect(received[0]).toContain('$…$');
+    expect(received[0]).not.toContain('$$…$$');
+    await service.dispose();
+  });
+
+  it('omits images and the note for text-only turns', async () => {
+    const received: { prompt: string; images?: readonly unknown[] }[] = [];
+    const session: AuxQuerySession = {
+      queryId: 'test',
+      safety: SAFETY,
+      query(request) { received.push({ prompt: request.prompt, images: request.images }); return Promise.resolve({ success: true, text: '<replacement>ok</replacement>', toolCalls: [] }); },
+      followUp: () => Promise.resolve({ success: true, text: '<replacement>fallback</replacement>', toolCalls: [] }),
+      cancel() { /* no-op */ },
+      dispose: () => Promise.resolve(),
+    };
+    const { adapter } = adapterWith(session);
+    const service = new InlineEditService({ adapter, workingDirectory: '/vault', locale: 'en' });
+    await service.submit(selectionRequest);
+    expect(received[0]?.images).toBeUndefined();
+    expect(received[0]?.prompt).not.toContain('Image input');
+    await service.dispose();
+  });
+
+  it('forwards onTextChunk to the turn request for streaming previews', async () => {
+    const session: AuxQuerySession = {
+      queryId: 'test',
+      safety: SAFETY,
+      query(request) {
+        request.onTextChunk?.('<replacement>par');
+        request.onTextChunk?.('<replacement>partial');
+        return Promise.resolve({ success: true, text: '<replacement>partial</replacement>', toolCalls: [] });
+      },
+      followUp: () => Promise.resolve({ success: true, text: '<replacement>fallback</replacement>', toolCalls: [] }),
+      cancel() { /* no-op */ },
+      dispose: () => Promise.resolve(),
+    };
+    const { adapter } = adapterWith(session);
+    const service = new InlineEditService({ adapter, workingDirectory: '/vault', locale: 'en' });
+    const chunks: string[] = [];
+    const outcome = await service.submit(selectionRequest, {
+      onTextChunk: (accumulated) => { chunks.push(accumulated); },
+    });
+    expect(chunks).toEqual(['<replacement>par', '<replacement>partial']);
+    // The final outcome is still the strict parse of the full text.
+    expect(outcome).toEqual({ status: 'preview', mode: 'replacement', text: 'partial' });
+    await service.dispose();
+  });
+
+  it('clears nothing itself but reports the strict error when streaming and strict disagree', async () => {
+    // Streaming rendered a tag body, but the strict parse of the full text
+    // fails (two tags): the service must surface the strict error, not the
+    // streamed preview (R-A3 需求 4 — the controller clears the preview).
+    const session: AuxQuerySession = {
+      queryId: 'test',
+      safety: SAFETY,
+      query(request) {
+        request.onTextChunk?.('<replacement>one</replacement>');
+        return Promise.resolve({
+          success: true,
+          text: '<replacement>one</replacement><replacement>two</replacement>',
+          toolCalls: [],
+        });
+      },
+      followUp: () => Promise.resolve({ success: true, text: '<replacement>fallback</replacement>', toolCalls: [] }),
+      cancel() { /* no-op */ },
+      dispose: () => Promise.resolve(),
+    };
+    const { adapter } = adapterWith(session);
+    const service = new InlineEditService({ adapter, workingDirectory: '/vault', locale: 'en' });
+    const outcome = await service.submit(selectionRequest);
+    expect(outcome).toEqual({ status: 'error', reason: 'multiple-tags' });
+    await service.dispose();
+  });
+});

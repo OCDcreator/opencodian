@@ -1,5 +1,7 @@
 # English Locale
 
+2026-09-18: added the FlowText parity batch A2 strings — `inlineEdit.error.imageTypeUnsupported` / `inlineEdit.error.imageTooLarge` / `inlineEdit.error.imageLimit` (image validation rejections, R-A4), `inlineEdit.error.imagesUnsupported` (explicit capability gap, never a silent text-only downgrade), `inlineEdit.image.remove` / `inlineEdit.image.dropHint` (chip + drop surface labels), and `inlineEdit.preview.generating` (streaming busy marker in the diff preview).
+
 2026-09-17: added the shadcn theme style strings: `settings.style.presets.styles.shadcn.{title,desc}` (neutral borders, docked composer, message-only scroll) and the scheme label `settings.style.presets.scheme.shadcn-neutral`; the description was later shortened for style-card readability. Same day added `settings.style.layout.messagesAreaInsetX.{name,desc}` plus `settings.style.input.{composerInsetX,composerInsetY,textareaMaxHeight}.{name,desc}`, and rewrote the `messagesPaddingX` / `messagePaddingX` descriptions to explain the layered insets.
 
 2026-09-17: added the Pi MCP settings group (`settings.pi.tab.mcp` plus `settings.pi.mcp.*`): the read-only intro naming the config files Pi merges, empty/endpoint-unknown/disabled/exclusive copy, transport and auth labels, source labels, and the "latest status from Pi" block (help, empty, received-at). Copy states that the status is the last text Pi sent, not a live query.

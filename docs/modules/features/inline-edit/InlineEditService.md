@@ -10,7 +10,8 @@ backend 无关的 inline edit 编排：一个 inline edit 一个 `AuxQuerySessio
 ## 职责
 
 - `ensureSession()`：解析能力与模型后调用 `startAuxQuerySession()`。无 `AuxQuery` 能力、模型不可用、或后端拒绝建立只读会话时返回 `error`，**不降级**
-- `submit()`：先构建请求（构建失败直接返回原因，不启动会话），再执行首轮
+- `submit(request, options?)`：先构建请求（构建失败直接返回原因，不启动会话），再执行首轮。`InlineEditTurnOptions`（R-A3/R-A4）：`onTextChunk` 透传 backend 流式接缝给调用方做渐进渲染；`images`（`AuxQueryImageAttachment[]`）仅首轮携带，澄清轮复用已见图的会话。带图时于 prompt 末尾追加 `buildInlineEditImageNote(locale, request)`（图片语义 + 按锚点形态选择 LaTeX 定界符），`images` 原样透传——绝不静默降级为无图请求
+- `clarify(instruction, options?)`：走 `session.followUp()`，复用后端原生会话状态（设计 §7.6 要求）；`options.onTextChunk` 让澄清回复同样流式显示
 - `clarify()`：走 `session.followUp()`，复用后端原生会话状态（设计 §7.6 要求）
 - `runTurn()`：统一处理回合结果
   - 失败/取消 → 相应 error；回合失败视为会话不可复用并 dispose
@@ -18,6 +19,7 @@ backend 无关的 inline edit 编排：一个 inline edit 一个 `AuxQuerySessio
   - 解析响应 → `preview` / `clarification` / `error`
 - `cancel()` 取消当前回合但保留会话；`dispose()` 幂等释放原生会话
 - `canApplyEdit(snapshot, currentText)`：脏检查谓词（全等比对，含行尾敏感）
+- `describeInlineEditOutcome(reason, detail)`：把回合失败原因（含协议/校验原因，经 `describeInlineEditFailure`）翻成用户可见文案（controller 错误态用）
 
 ## 依赖
 

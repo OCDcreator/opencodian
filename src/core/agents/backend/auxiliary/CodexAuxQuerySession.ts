@@ -23,6 +23,10 @@
  * See docs/requirements/inline-edit.md §5.3, §5.4 and §11.
  */
 
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
 import { createLogger } from '../../../../shared/logger';
 import type {
   AuxObservedToolCall,
@@ -40,6 +44,21 @@ import { type AppServerStreamState,mapAppServerNotification } from '../CodexAppS
 const logger = createLogger('CodexAuxQuerySession');
 
 const DEFAULT_TURN_TIMEOUT_MS = 180_000;
+
+/**
+ * Temp-dir prefix for image attachments. Mirrors the chat-side prefix
+ * (`opencodian-codex-image-` in CodexAdapter); the aux variant is distinct so
+ * audit residue probes can tell aux traffic apart from chat traffic.
+ */
+const AUX_IMAGE_TEMP_PREFIX = 'opencodian-aux-image-';
+
+/** File extension per image media type; mirrors the chat-side mapping. */
+const AUX_IMAGE_EXTENSIONS: Readonly<Record<string, string>> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+};
 
 export interface CodexAuxSessionOptions {
   readonly systemPrompt: string;
@@ -71,6 +90,8 @@ export class CodexAuxQuerySession implements AuxQuerySession {
   private disposed = false;
   private observedTools: AuxObservedToolCall[] = [];
   private effectiveSettings: CodexEffectiveSettings | null = null;
+  /** Temp dirs currently holding image attachments; dispose() sweeps them. */
+  private readonly imageTempDirs = new Set<string>();
 
   private constructor(private readonly options: CodexAuxSessionOptions) {
     this.queryId = `codex-aux-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -128,6 +149,14 @@ export class CodexAuxQuerySession implements AuxQuerySession {
     this.subscription = null;
     const threadId = this.threadId;
     this.threadId = null;
+    // Backstop: a cancelled turn normally cleans its own image temp dir in
+    // the turn's finally, but a wedged turn must not leave one behind either.
+    // The dirs live in the system temp directory, never in the vault, so the
+    // vault-snapshot audit is unaffected; this sweep just keeps /tmp clean.
+    for (const dir of this.imageTempDirs) {
+      removeImageTempDir(dir);
+    }
+    this.imageTempDirs.clear();
     if (!threadId) return;
     // Ephemeral threads are not persisted, so there is no rollout to archive
     // (the app-server reports "no rollout found" for them). Only the adapter's
@@ -288,10 +317,26 @@ export class CodexAuxQuerySession implements AuxQuerySession {
       if (settledResult) resolve(settledResult);
     });
 
+    let imageTempDir: string | null = null;
+    let input: AppServerTurnStartOptions['input'];
+    try {
+      const built = this.buildTurnInput(request);
+      input = built.input;
+      imageTempDir = built.imageTempDir;
+    } catch (error) {
+      clearTimeout(timeout);
+      this.subscription.dispose();
+      this.subscription = null;
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+
     try {
       const turn = await this.options.client.startTurn({
         threadId,
-        input: [{ type: 'text', text: request.prompt, text_elements: [] }],
+        input,
         cwd: this.options.workingDirectory,
         approvalPolicy: 'never',
         sandboxPolicy: { type: 'readOnly', networkAccess: false },
@@ -303,6 +348,7 @@ export class CodexAuxQuerySession implements AuxQuerySession {
       clearTimeout(timeout);
       this.subscription.dispose();
       this.subscription = null;
+      this.cleanupImageTempDir(imageTempDir);
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error),
@@ -324,13 +370,59 @@ export class CodexAuxQuerySession implements AuxQuerySession {
       clearTimeout(timeout);
       this.subscription?.dispose();
       this.subscription = null;
+      this.cleanupImageTempDir(imageTempDir);
       if (this.turnAbort === abort) this.turnAbort = null;
       this.currentTurnId = null;
     }
   }
 
+  /**
+   * Turn input: one text entry plus, for image attachments, one `localImage`
+   * entry per image — the chat-side app-server shape (CodexAdapter
+   * `buildAppServerInput`). `local_image` requires a real file path, so each
+   * image is decoded into a temp dir in the SYSTEM temp directory (never the
+   * vault); the turn's finally removes the dir, and `dispose()` sweeps any
+   * leftover.
+   */
+  private buildTurnInput(request: AuxQueryTurnRequest): {
+    input: AppServerTurnStartOptions['input'];
+    imageTempDir: string | null;
+  } {
+    const text: AppServerTurnStartOptions['input'][number] = {
+      type: 'text',
+      text: request.prompt,
+      text_elements: [],
+    };
+    const images = request.images ?? [];
+    if (images.length === 0) return { input: [text], imageTempDir: null };
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), AUX_IMAGE_TEMP_PREFIX));
+    this.imageTempDirs.add(tempDir);
+    const input: AppServerTurnStartOptions['input'] = [text];
+    images.forEach((image, index) => {
+      const ext = AUX_IMAGE_EXTENSIONS[image.mediaType] ?? 'bin';
+      const filePath = path.join(tempDir, `image-${index}.${ext}`);
+      fs.writeFileSync(filePath, Buffer.from(image.data, 'base64'));
+      input.push({ type: 'localImage', path: filePath });
+    });
+    return { input, imageTempDir: tempDir };
+  }
+
+  private cleanupImageTempDir(dir: string | null): void {
+    if (!dir) return;
+    this.imageTempDirs.delete(dir);
+    removeImageTempDir(dir);
+  }
+
   private resolveModelId(): string | null {
     const model = this.options.model;
     return model && model.kind === 'codex' ? model.model : null;
+  }
+}
+
+function removeImageTempDir(dir: string): void {
+  try {
+    fs.rmSync(dir, { recursive: true, force: true });
+  } catch (error) {
+    logger.warn('Failed to remove Codex auxiliary image temp dir', error);
   }
 }

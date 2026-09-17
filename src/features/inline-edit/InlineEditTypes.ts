@@ -38,6 +38,12 @@ export interface InlineEditHostAdapter {
   describeModelSelection(): InlineEditModelSelectionLabel;
   /** Effort override id, or `null` when the backend default applies. */
   getEffort(): string | null;
+  /**
+   * Whether the backend transports per-turn image attachments (R-A4).
+   * `false` surfaces an explicit capability gap instead of a silent
+   * downgrade; absent means "not declared" (treated as supported).
+   */
+  readonly supportsImages?: boolean;
   /** Persist the model override (`null` clears → follow chat/default). */
   setModelOverride?(ref: string | null): Promise<void>;
   /** Persist the effort override (`null` clears → backend default). */

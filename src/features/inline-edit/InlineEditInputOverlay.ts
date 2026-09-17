@@ -29,7 +29,16 @@ import { t } from '../../i18n';
 import { OPENCODIAN_APP_ICON_ID } from '../../shared/brandingWordmark';
 import { openContextPicker, syncContextFooter } from './InlineEditContextUi';
 import {
-  effortMenuIcon,
+  attachInlineEditImageSurface,
+  type InlineEditImageChipModel,
+  type InlineEditImageSurface,
+} from './InlineEditImageChip';
+import {
+  buildInlineEditConfigChip,
+  renderInlineEditConfigMenu,
+  syncInlineEditConfigChip,
+} from './InlineEditOverlayChips';
+import {
   INLINE_EDIT_PANEL_INSET as PANEL_INSET,
   type InlineEditOverlayMenuItem,
   resolvePanelTop,
@@ -68,6 +77,10 @@ export interface InlineEditOverlayState {
    * Always non-empty in practice: builtins are always composed on top.
    */
   readonly presets: readonly InlineEditPresetPrompt[];
+  /** The image attached to this edit, if any (R-A4, at most one). */
+  readonly image: InlineEditImageChipModel | null;
+  /** False when the backend cannot transport images; hides the surface. */
+  readonly imageSupported: boolean;
 }
 
 /** One attached note as the bar renders it. */
@@ -87,6 +100,10 @@ export interface InlineEditOverlayCallbacks {
   onRequestContextFiles?(): void;
   /** Attach or detach one note path. */
   onToggleContext?(path: string): void;
+  /** Image files pasted or dropped onto the bar (R-A4). */
+  onAttachImage?(files: readonly File[]): void;
+  /** Remove the attached image. */
+  onRemoveImage?(): void;
 }
 
 const activeOverlays = new WeakMap<EditorView, InlineEditInputOverlay>();
@@ -131,6 +148,7 @@ export class InlineEditInputOverlay {
   /** Footer elements kept by reference: queries would have to track nesting. */
   private attachEl: HTMLButtonElement | null = null;
   private contextRowEl: HTMLElement | null = null;
+  private imageSurface: InlineEditImageSurface | null = null;
   private readonly handleContextToggle = (path: string): void => { this.callbacks.onToggleContext?.(path); };
   private state: InlineEditOverlayState | null = null;
   private anchorPos = 0;
@@ -222,8 +240,12 @@ export class InlineEditInputOverlay {
       this.submitEl.classList.toggle('opencodian-inline-edit-spinning', state.busy);
     }
 
-    this.syncChip('model', state.model);
-    this.syncChip('effort', state.effort);
+    if (this.panel) {
+      const chipCallbacks = { createProviderIcon: this.callbacks.createProviderIcon };
+      syncInlineEditConfigChip(this.panel, 'model', state.model, chipCallbacks);
+      syncInlineEditConfigChip(this.panel, 'effort', state.effort, chipCallbacks);
+    }
+    this.imageSurface?.sync(state.imageSupported ? state.image : null);
     syncContextFooter(this.attachEl, this.contextRowEl, {
       chips: state.context,
       supported: state.contextSupported,
@@ -262,6 +284,8 @@ export class InlineEditInputOverlay {
       activeOverlays.delete(this.view);
     }
     this.closeMenu();
+    this.imageSurface?.teardown();
+    this.imageSurface = null;
     this.panel?.remove();
     this.panel = null;
     this.field = null;
@@ -369,8 +393,16 @@ export class InlineEditInputOverlay {
     });
     this.attachEl = attach;
     this.contextRowEl = contextRow;
-    this.buildChip(configRow, 'model');
-    this.buildChip(configRow, 'effort');
+    buildInlineEditConfigChip(configRow, 'model', () => { this.toggleMenu('model'); });
+    buildInlineEditConfigChip(configRow, 'effort', () => { this.toggleMenu('effort'); });
+    this.imageSurface = attachInlineEditImageSurface({
+      field,
+      panel: root,
+      anchor: configRow,
+      enabled: () => this.state?.busy !== true && this.state?.imageSupported === true,
+      onFiles: (files) => { this.callbacks.onAttachImage?.(files); },
+      onRemove: () => { this.callbacks.onRemoveImage?.(); },
+    });
 
     this.view.dom.appendChild(root);
     this.panel = root;
@@ -379,63 +411,14 @@ export class InlineEditInputOverlay {
   }
 
   private buildChip(bar: HTMLElement, kind: 'model' | 'effort'): void {
-    const chip = bar.createEl('button', {
-      cls: `opencodian-inline-edit-chip opencodian-inline-edit-chip-${kind}`,
-      attr: { type: 'button' },
-    });
-    // Icon slot is filled by syncChip: provider icon for the model chip,
-    // a lucide glyph for effort. The full name lives on the tooltip.
-    chip.createSpan({ cls: 'opencodian-inline-edit-chip-prefix' });
-    chip.createSpan({ cls: 'opencodian-inline-edit-chip-value' });
-    const chevron = chip.createSpan({ cls: 'opencodian-inline-edit-chip-chevron' });
-    setIcon(chevron, 'chevron-down');
-    chip.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      this.toggleMenu(kind);
-    });
+    buildInlineEditConfigChip(bar, kind, () => { this.toggleMenu(kind); });
   }
 
   private syncChip(kind: 'model' | 'effort', state: InlineEditOverlayChipState | null): void {
-    const chip = this.panel?.querySelector<HTMLButtonElement>(`:scope .opencodian-inline-edit-chip-${kind}`);
-    if (!chip) return;
-    if (!state) {
-      chip.style.display = 'none';
-      chip.disabled = true;
-      return;
-    }
-    chip.style.display = '';
-    chip.disabled = state.disabled === true;
-    const prefixText = t(kind === 'model' ? 'inlineEdit.bar.model' : 'inlineEdit.bar.effort');
-    const valueText = state.loading
-      ? t('inlineEdit.bar.loading')
-      : state.label || t('inlineEdit.bar.default');
-
-    const prefix = chip.querySelector<HTMLElement>(':scope > .opencodian-inline-edit-chip-prefix');
-    if (prefix) {
-      const provider = kind === 'model' ? state.iconProvider ?? null : null;
-      const iconKey = provider ? `provider:${provider}` : `lucide:${kind}`;
-      if (prefix.dataset.iconKey !== iconKey) {
-        prefix.dataset.iconKey = iconKey;
-        prefix.empty();
-        const iconEl = provider ? this.callbacks.createProviderIcon?.(provider, 13) : null;
-        if (iconEl) {
-          iconEl.setAttribute('aria-hidden', 'true');
-          prefix.appendChild(iconEl);
-        } else {
-          setIcon(prefix, kind === 'model' ? 'cpu' : 'brain');
-        }
-      }
-    }
-
-    // The effort chip keeps its label word visible — a bare "high" does not
-    // read as a thinking-effort selector. The model chip stays icon + name.
-    const value = chip.querySelector<HTMLElement>(':scope > .opencodian-inline-edit-chip-value');
-    const displayText = kind === 'effort' ? `${prefixText} ${valueText}` : valueText;
-    if (value && value.textContent !== displayText) value.textContent = displayText;
-
-    const label = `${prefixText}: ${valueText}`;
-    if (chip.title !== label) chip.title = label;
+    if (!this.panel) return;
+    syncInlineEditConfigChip(this.panel, kind, state, {
+      createProviderIcon: this.callbacks.createProviderIcon,
+    });
   }
 
   private syncTextBlock(
@@ -480,58 +463,12 @@ export class InlineEditInputOverlay {
     const menu = this.menu;
     if (!menu) return;
     const anchorChip = this.panel?.querySelector<HTMLElement>(`:scope .opencodian-inline-edit-chip-${kind}`);
-    menu.empty();
-    const clearLabel = kind === 'model' ? t('inlineEdit.bar.followChat') : t('inlineEdit.bar.effortDefault');
-    const clearActive = !chip.label || chip.label === t('inlineEdit.bar.default');
-    const renderEntry = (entry: InlineEditOverlayMenuItem): void => {
-      const item = menu.createDiv({
-        cls: `opencodian-inline-edit-menu-item${entry.active ? ' is-active' : ''}`,
-      });
-      const check = item.createSpan({ cls: 'opencodian-inline-edit-menu-item-check' });
-      setIcon(check, 'check');
-      // Every row carries a 13px icon slot so labels stay aligned: provider
-      // brand icons for models, signal bars for effort levels, a glyph for
-      // the "clear override" row.
-      if (kind === 'model') {
-        const iconEl = entry.id !== null && entry.iconProvider
-          ? this.callbacks.createProviderIcon?.(entry.iconProvider, 13)
-          : null;
-        if (iconEl) {
-          iconEl.classList.add('opencodian-inline-edit-menu-item-icon');
-          iconEl.setAttribute('aria-hidden', 'true');
-          item.appendChild(iconEl);
-        } else {
-          const glyph = item.createSpan({ cls: 'opencodian-inline-edit-menu-item-glyph' });
-          setIcon(glyph, entry.id === null ? 'messages-square' : 'cpu');
-        }
-      } else {
-        const glyph = item.createSpan({ cls: 'opencodian-inline-edit-menu-item-glyph' });
-        setIcon(glyph, effortMenuIcon(entry.id));
-      }
-      item.createSpan({ cls: 'opencodian-inline-edit-menu-item-label', text: entry.label });
-      item.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        const id = entry.id;
-        this.closeMenu();
-        if (kind === 'model') this.callbacks.onPickModel(id);
-        else this.callbacks.onPickEffort(id);
-      });
-    };
-    renderEntry({ id: null, label: clearLabel, active: clearActive });
-    if (chip.items.length > 0) {
-      menu.createDiv({ cls: 'opencodian-inline-edit-menu-separator' });
-      for (const entry of chip.items) {
-        renderEntry(entry);
-      }
-    }
-    // Anchor the menu under its chip, clamped inside the panel.
-    if (anchorChip && this.panel) {
-      const chipRect = anchorChip.getBoundingClientRect();
-      const panelRect = this.panel.getBoundingClientRect();
-      const localLeft = chipRect.left - panelRect.left;
-      menu.style.left = `${Math.max(0, localLeft)}px`;
-    }
+    renderInlineEditConfigMenu({ menu, kind, chip, anchorChip: anchorChip ?? null, panel: this.panel }, {
+      createProviderIcon: this.callbacks.createProviderIcon,
+      onPickModel: (id) => { this.callbacks.onPickModel(id); },
+      onPickEffort: (id) => { this.callbacks.onPickEffort(id); },
+      onClose: () => { this.closeMenu(); },
+    });
   }
 
   /** Open the attached-notes picker with the host's candidate list. */
