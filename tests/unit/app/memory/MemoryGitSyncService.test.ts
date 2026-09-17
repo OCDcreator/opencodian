@@ -220,7 +220,11 @@ describe('sync safety rails', () => {
     nodeFs.writeFileSync(nodePath.join(memDir, 'conflict.md'), 'from A\n');
     sh(tree, 'add', '-A');
     sh(tree, '-c', 'user.name=a', '-c', 'user.email=a@a', 'commit', '-m', 'A');
-    shAllowFail(tree, 'pull', '--no-rebase', 'origin', 'main');
+    // The conflict must leave unmerged entries behind. Git validates the
+    // committer identity up front when a merge commit may be needed, so pass
+    // it here too — otherwise a host without a global git identity (CI) fails
+    // the pull with exit 128 before the index ever goes unmerged.
+    shAllowFail(tree, '-c', 'user.name=a', '-c', 'user.email=a@a', 'pull', '--no-rebase', 'origin', 'main');
     expect(sh(tree, 'ls-files', '-u').trim().length).toBeGreaterThan(0);
 
     const r = await syncMemoryTree(tree, remote, { host: 'host-a' });
