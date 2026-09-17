@@ -11,6 +11,18 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-17 行内编辑第三轮：字段框体归我们所有 + 品牌标记 + 间距重排
+
+用户实机截图三条反馈：间距要重排、别用那颗 sparkles 星星要用插件自己的图标、输入框里的提示文字要离边框远一点。
+
+**"框"的真相**：活体读计算样式（`obsidian eval` 查 testvault 里真实渲染的 overlay）发现输入框本身是透明无边框、`padding: 0` 的——那道框来自宿主对裸 `input[type=text]` 的样式（主题或用户 CSS 片段按主题级特异性注入边框）。于是不再和宿主抢规则，而是**把字段框体收归自己**：新增 `.opencodian-inline-edit-inputfield` 承担填充底（`--background-modifier-form-field`）、发丝内环、`0 10px` 内边距与聚焦态强调色内环；裸 input 的盒属性（border/background/box-shadow/padding/height/outline/font-size）全部 `!important` 钉死。间距节奏同步重排：行内边距 10px、字段框体 32px、按钮 26px、页脚 6/8px、澄清块与字段框体共用 10px 左基线。
+
+**截图管线补课（这才是根因）**：mock 之前不模拟宿主表单样式，所以"宿主给输入框加边框"这类问题在四张截图里永远看不见。现已在 mock 里加宿主模拟块（按主题级特异性，即最坏情况），并把断言加进 `verify-dark.cjs`——第一次跑就抓到 `padding: 4px 8px` 从宿主规则漏进来（我的 `padding: 0` 忘了 `!important`）。
+
+**品牌标记**：sparkles 换成插件自己的 app icon（`opencodian-app-icon`，主题双图层由 `core.css` 切换）。图标 id 收敛为 `src/shared/brandingWordmark.ts` 的单一常量，`main.ts` 与 `OpenCodianView` 不再各存一份字面量；字段框体引导图标 14px、选区悬浮按钮、预览页脚身份标签三处统一品牌。placeholder 用 `--text-muted`（`--text-faint` 只有 2.8:1，不足 4.5:1）。
+
+---
+
 ## 2026-09-17 发版断链修复：补发 6 个版本 + 发布体检探针
 
 用户实机反馈"版本发不出去我不知道"追查出的链路问题：**发布 workflow 只在 bump push 全门禁通过时才建 Release**，一次红门禁就切掉一个仍写在 `versions.json` 里的版本，客户端下载 `releases/download/v<ver>/main.js` 得到 404，而失败信号只停在 GitHub 的运行标记里，没人看也没人转达。

@@ -5,6 +5,7 @@ import type { Editor, MarkdownView } from 'obsidian';
 import { addIcon, Notice, Plugin } from 'obsidian';
 import * as path from 'path';
 import { presentPiUiRequest } from './features/chat/services/PiExtensionUiHost';
+import { OPENCODIAN_APP_ICON_ID } from './shared/brandingWordmark';
 
 import { ModelConfigService, ModelPricingService, OpencodeConfigManager } from './core/config';
 import { setAgentServiceRegistry } from './core/agents/AgentCapability';
@@ -94,7 +95,6 @@ import { registerBuiltinGlassAdapters } from './utils/glass';
 import type { AgentBackendKind } from './core/types/chat';
 
 const logger = createLogger('OpenCodian');
-const OPENCODIAN_APP_ICON = 'opencodian-app-icon';
 const OPENCODIAN_APP_ICON_SVG = `
   <g class="opencodian-app-icon-layer opencodian-app-icon-layer--light">
     <rect x="10" y="0" width="80" height="100" fill="#211E1E"/>
@@ -216,7 +216,7 @@ export default class OpenCodianPlugin extends Plugin {
     await this.startupCoordinator.execute({
       manifest: this.manifest,
       getVaultBasePath: () => getVaultBasePath(this.app),
-      registerAppIcon: () => addIcon(OPENCODIAN_APP_ICON, OPENCODIAN_APP_ICON_SVG),
+      registerAppIcon: () => addIcon(OPENCODIAN_APP_ICON_ID, OPENCODIAN_APP_ICON_SVG),
       onPrepareStartupState: (coordinator) => this.handlePrepareStartupState(coordinator),
       onBootstrapOpenCodeRuntime: (initialManagedServerState) => this.handleBootstrapOpenCodeRuntime(initialManagedServerState),
       onRegisterWorkspaceIntegration: () => this.registerWorkspaceIntegration(),
@@ -689,7 +689,7 @@ export default class OpenCodianPlugin extends Plugin {
 
     registerSettingsView(this);
 
-    this.addRibbonIcon(OPENCODIAN_APP_ICON, '打开 OpenCodian', () => {
+    this.addRibbonIcon(OPENCODIAN_APP_ICON_ID, '打开 OpenCodian', () => {
       this.activateView();
     });
 

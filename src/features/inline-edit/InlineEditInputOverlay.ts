@@ -25,6 +25,7 @@ import { EditorView } from '@codemirror/view';
 import { setIcon } from 'obsidian';
 
 import { t } from '../../i18n';
+import { OPENCODIAN_APP_ICON_ID } from '../../shared/brandingWordmark';
 import type { InlineEditChoice } from './InlineEditTypes';
 
 /** Gap between the anchor line's bottom and the panel top; keep in sync with CSS. */
@@ -236,9 +237,12 @@ export class InlineEditInputOverlay {
     // Input first: the instruction is the primary task, so it owns the
     // top row; model/effort configuration lives in the meta footer below.
     const row = root.createDiv({ cls: 'opencodian-inline-edit-inputrow' });
-    const lead = row.createSpan({ cls: 'opencodian-inline-edit-inputlead' });
-    setIcon(lead, 'sparkles');
-    const field = row.createEl('input', {
+    // The field box carries the frame, fill and inner padding (the host theme
+    // styles bare inputs on its own terms), and the app mark sits inside it.
+    const fieldBox = row.createDiv({ cls: 'opencodian-inline-edit-inputfield' });
+    const lead = fieldBox.createSpan({ cls: 'opencodian-inline-edit-inputlead' });
+    setIcon(lead, OPENCODIAN_APP_ICON_ID);
+    const field = fieldBox.createEl('input', {
       type: 'text',
       cls: 'opencodian-inline-edit-field',
       attr: { 'aria-label': t('inlineEdit.command.name') },

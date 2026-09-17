@@ -59,6 +59,7 @@ import {
   isInternalStructuredOutputTool,
   toVaultRelativePath,
 } from '../../shared';
+import { OPENCODIAN_APP_ICON_ID } from '../../shared/brandingWordmark';
 import { ProviderIconService } from '../../utils/icons/ProviderIconService';
 import { MarkdownRenderService } from '../../utils/markdown';
 import type { ToolCallInfo } from '../../utils/streaming';
@@ -324,8 +325,6 @@ import { OpenCodeExperimentalActionModal } from './ui/OpenCodeExperimentalAction
 
 
 const logger = createLogger('OpenCodianView');
-
-const OPENCODIAN_APP_ICON = 'opencodian-app-icon';
 
 /**
  * Pure capability-availability lookup. Accepts the bound `requireSdkCapability`
@@ -2630,7 +2629,7 @@ export class OpenCodianView extends ItemView {
   }
 
   getIcon(): string {
-    return OPENCODIAN_APP_ICON;
+    return OPENCODIAN_APP_ICON_ID;
   }
 
   async onOpen() {

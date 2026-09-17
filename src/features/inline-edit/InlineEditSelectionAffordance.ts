@@ -20,6 +20,7 @@ import type { MarkdownView } from 'obsidian';
 import { setIcon } from 'obsidian';
 
 import { t } from '../../i18n';
+import { OPENCODIAN_APP_ICON_ID } from '../../shared/brandingWordmark';
 import { getEditorView } from './InlineEditController';
 
 export interface InlineEditAffordanceDeps {
@@ -117,7 +118,7 @@ class SelectionAffordancePlugin {
         title: t('inlineEdit.command.name'),
       },
     });
-    setIcon(button, 'sparkles');
+    setIcon(button, OPENCODIAN_APP_ICON_ID);
     button.addEventListener('mousedown', (event) => {
       // Never let the click collapse the selection it acts on.
       event.preventDefault();

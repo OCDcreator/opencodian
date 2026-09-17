@@ -22,6 +22,9 @@
   --ocie-divider: color-mix(in srgb, var(--background-modifier-border) 72%, transparent);
   --ocie-surface: color-mix(in srgb, var(--background-primary) 94%, transparent);
   --ocie-menu-surface: color-mix(in srgb, var(--background-primary) 97%, transparent);
+  --ocie-field-surface: var(--background-modifier-form-field);
+  --ocie-field-surface-focus: color-mix(in srgb, var(--background-modifier-form-field) 94%, var(--text-normal));
+  --ocie-field-ring: color-mix(in srgb, var(--background-modifier-border) 80%, transparent);
   --ocie-shadow:
     0 1px 2px rgb(0 0 0 / 0.06),
     0 16px 40px -12px rgb(0 0 0 / 0.25);
@@ -74,7 +77,7 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  margin: 8px 8px 2px;
+  margin: 10px 10px 2px;
   padding: 8px 10px;
   border-radius: var(--ocie-radius-sm);
   font-size: var(--font-ui-smaller);
@@ -115,20 +118,47 @@
   white-space: pre-wrap;
 }
 
-/* Row 1: leading sparkles + borderless input + send / close.
+/* Row 1: the field box (app mark + borderless input) + send / close.
    The input is the primary task, so it owns the top row. */
 
 .opencodian-inline-edit-inputrow {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 8px 8px 8px 12px;
+  gap: 8px;
+  padding: 10px;
+}
+
+/* The field box owns the frame, the fill and the inner padding. A bare
+   `input` is styled by the host theme (and by user snippets), which is how a
+   border with zero padding crept in and jammed the placeholder against it, so
+   every box property is declared here and marked important: this widget must
+   look the same under any theme. */
+
+.opencodian-inline-edit-inputfield {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: var(--ocie-radius-sm);
+  background: var(--ocie-field-surface);
+  box-shadow: inset 0 0 0 1px var(--ocie-field-ring);
+  transition:
+    background 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.opencodian-inline-edit-inputfield:focus-within {
+  background: var(--ocie-field-surface-focus);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 52%, transparent);
 }
 
 .opencodian-inline-edit-inputlead {
   display: inline-flex;
+  align-items: center;
   flex: none;
-  color: var(--text-faint);
 }
 
 .opencodian-inline-edit-inputlead .svg-icon {
@@ -137,7 +167,6 @@
 }
 
 .opencodian-inline-edit-overlay.opencodian-inline-edit-busy .opencodian-inline-edit-inputlead {
-  color: var(--interactive-accent);
   animation: ocie-lead-pulse 1.2s ease-in-out infinite;
 }
 
@@ -150,21 +179,34 @@
   }
 }
 
-.opencodian-inline-edit-overlay .opencodian-inline-edit-field {
-  flex: 1 1 auto;
+.opencodian-inline-edit-overlay input.opencodian-inline-edit-field,
+.opencodian-inline-edit-overlay input.opencodian-inline-edit-field:hover,
+.opencodian-inline-edit-overlay input.opencodian-inline-edit-field:focus,
+.opencodian-inline-edit-overlay input.opencodian-inline-edit-field:active {
+  flex: 1 1 auto !important;
+  width: 100% !important;
   min-width: 0;
-  height: 26px;
-  padding: 0;
-  border: none;
-  background: transparent;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  appearance: none;
+  -webkit-appearance: none;
   color: var(--text-normal);
-  font-size: var(--font-ui-small);
-  outline: none;
+  font-family: var(--font-interface);
+  font-size: var(--font-ui-small) !important;
+  line-height: 1.4;
   caret-color: var(--interactive-accent);
 }
 
-.opencodian-inline-edit-overlay .opencodian-inline-edit-field::placeholder {
-  color: var(--text-faint);
+.opencodian-inline-edit-overlay input.opencodian-inline-edit-field::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
 }
 
 .opencodian-inline-edit-overlay.opencodian-inline-edit-busy .opencodian-inline-edit-field {
@@ -179,8 +221,8 @@
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   border: none;
   border-radius: 7px;
@@ -236,7 +278,7 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 5px 8px 5px 10px;
+  padding: 6px 10px 8px;
   border-top: 1px solid var(--ocie-divider);
 }
 
@@ -622,6 +664,7 @@
 .theme-dark .opencodian-inline-edit {
   --ocie-surface: color-mix(in srgb, color-mix(in srgb, var(--background-primary) 94%, #fff) 94%, transparent);
   --ocie-menu-surface: color-mix(in srgb, color-mix(in srgb, var(--background-primary) 94%, #fff) 97%, transparent);
+  --ocie-field-ring: color-mix(in srgb, var(--background-modifier-border) 92%, transparent);
   --ocie-shadow:
     0 0 0 1px rgb(0 0 0 / 0.4),
     0 16px 40px -12px rgb(0 0 0 / 0.55),

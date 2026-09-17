@@ -766,3 +766,5 @@ OpenCode 的 store 为 memory mode 或仍带 custom-directory fallback `lastErro
 斜杠菜单的 backend key 识别 Pi，会话后端优先；仅增加组装判断，Pi 不复用 OpenCode 命令目录。
 
 - 2026-09-15: 新增只读访问器 `getActiveConversationBackendKind()` 与 `getActiveTabModelRef()`，供 inline edit 宿主在 `editorCallback` 之外解析"当前聊天活动 tab 的后端与模型"（未新增运行时归属）。
+
+- 2026-09-17: `getIcon()` 返回的品牌标记图标 id 改为从 `shared/brandingWordmark` 的 `OPENCODIAN_APP_ICON_ID` 引入，去掉 view 内的重复字面量；无行为变化。

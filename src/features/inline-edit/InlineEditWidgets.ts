@@ -17,6 +17,7 @@ import { Decoration, EditorView, WidgetType } from '@codemirror/view';
 import { setIcon } from 'obsidian';
 
 import { t } from '../../i18n';
+import { OPENCODIAN_APP_ICON_ID } from '../../shared/brandingWordmark';
 import { renderDiffInto } from './InlineEditDiff';
 import type { InlineEditWidgetCallbacks } from './InlineEditTypes';
 
@@ -143,7 +144,7 @@ class InlineEditPreviewWidget extends WidgetType {
     const actions = root.createDiv({ cls: `${CSS_INPUT}-actions` });
     const identity = actions.createSpan({ cls: `${CSS_INPUT}-actions-label` });
     const identityIcon = identity.createSpan();
-    setIcon(identityIcon, 'sparkles');
+    setIcon(identityIcon, OPENCODIAN_APP_ICON_ID);
     identity.createSpan({ text: t('inlineEdit.command.name') });
     const reject = actions.createEl('button', { text: this.payload.rejectLabel, cls: `${CSS_ACTION} is-reject` });
     const accept = actions.createEl('button', { text: this.payload.acceptLabel, cls: `${CSS_ACTION} is-accept` });

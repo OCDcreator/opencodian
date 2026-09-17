@@ -44,3 +44,4 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 The new core.backend-pi owner isolates the external Pi process service. shared.foundation retains its existing responsibilities; Pi process lifecycle, RPC compatibility and native history must not be added to this owner.
 
 - 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
+- 2026-09-17: `shared/brandingWordmark.ts` 新增 `OPENCODIAN_APP_ICON_ID`（app 标记图标 id 的单一来源，供入口注册与各界面渲染引用），无新增运行时归属。

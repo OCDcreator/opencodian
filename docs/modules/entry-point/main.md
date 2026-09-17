@@ -147,7 +147,7 @@ OpenCode server status 回调也不再只刷新设置页状态：当本地/远�
 
 - `activateView()`: 按 `openInMainTab` 决定在主标签页或右侧边栏打开 `OpenCodianView`。
 - `startNewConversationForCurrentView()`: 供 `new-conversation` 命令使用；先激活聊天视图，再委托当前 `OpenCodianView` 的 current-tab 新建会话入口，避免只创建后台 conversation 而 UI 仍停在旧 session。
-- ribbon 图标：`bot`
+- ribbon 图标：品牌标记 `OPENCODIAN_APP_ICON_ID`（由本文件 `addIcon` 注册，id 常量来自 `src/shared/brandingWordmark.ts`）
 - 命令：
 - `open-view`
 - `new-conversation`
@@ -322,3 +322,5 @@ bootstrap 仅向注册入口注入 getPiSettings 读取回调，不在入口拥�
 - 2026-09-15: 替换 `inline-edit` 命令 stub：改用 `editorCheckCallback` 驱动 `InlineEditController`，新增编辑器右键菜单项，并在启动末尾装配 `InlineEditHost`（backend/模型解析）与 controller 单例；`onunload` 先关闭进行中的 inline edit。
 
 - 2026-09-16: inline edit UI 重设计装配：bridge 新增 `createProviderIcon` 注入（`ProviderIconService.createIconElement`，与主输入窗口模型选择器同一管线），悬浮条模型 chip 与菜单行据此渲染提供商品牌图标。
+
+- 2026-09-17: 品牌标记图标 id 收敛到 `src/shared/brandingWordmark.ts` 的 `OPENCODIAN_APP_ICON_ID`，本文件与 `OpenCodianView` 不再各存一份字面量；行内编辑的字段框体引导图标、选区悬浮按钮、预览页脚身份标签改用该品牌标记。
