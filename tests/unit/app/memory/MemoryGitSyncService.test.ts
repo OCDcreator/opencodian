@@ -37,7 +37,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  nodeFs.rmSync(work, { recursive: true, force: true });
+  nodeFs.rmSync(work, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 // Real-git cycles are spawn-heavy on Windows; give them room.

@@ -78,8 +78,8 @@ describe('computeGraphInputDigest — determinism', () => {
     const d1 = callExport('computeGraphInputDigest', r1);
     const d2 = callExport('computeGraphInputDigest', r2);
     expect(d1).not.toBe(d2);
-    fs.rmSync(dir1, { recursive: true, force: true });
-    fs.rmSync(dir2, { recursive: true, force: true });
+    fs.rmSync(dir1, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    fs.rmSync(dir2, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
   test('comment-only source change changes the digest (conservative by design)', () => {
@@ -88,8 +88,8 @@ describe('computeGraphInputDigest — determinism', () => {
     const d1 = callExport('computeGraphInputDigest', collectInRepo(dir1));
     const d2 = callExport('computeGraphInputDigest', collectInRepo(dir2));
     expect(d1).not.toBe(d2);
-    fs.rmSync(dir1, { recursive: true, force: true });
-    fs.rmSync(dir2, { recursive: true, force: true });
+    fs.rmSync(dir1, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    fs.rmSync(dir2, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 });
 
@@ -116,7 +116,7 @@ describe('collectGraphInputRecords — envelope coverage', () => {
     expect(keys).toContain('wrapper:scripts/update-graphify-src.mjs');
     expect(keys).toContain('wrapper:scripts/run-graphify-update.py');
     expect(keys).toContain('tool:graphify-version');
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
   test('excludes transient src/graphify-out', () => {
@@ -129,7 +129,7 @@ describe('collectGraphInputRecords — envelope coverage', () => {
     const keys = records.map((r) => r.key);
     expect(keys).toContain('src/a.ts');
     expect(keys.some((k) => k.startsWith('src/graphify-out/'))).toBe(false);
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 });
 
@@ -148,7 +148,7 @@ describe('checkFreshness', () => {
     `;
     const result = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '--eval', code], { encoding: 'utf8' }));
     expect(result.fresh).toBe(true);
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
   test('fresh=false with changedRecords when content changes', () => {
@@ -165,7 +165,7 @@ describe('checkFreshness', () => {
     const result = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '--eval', code], { encoding: 'utf8' }));
     expect(result.fresh).toBe(false);
     expect(result.changedRecords.some((c) => c.key === 'src/a.ts')).toBe(true);
-    fs.rmSync(dir1, { recursive: true, force: true });
+    fs.rmSync(dir1, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 });
 
@@ -178,7 +178,7 @@ describe('untracked files in graph-input envelope (Codex Phase 2 review fix)', (
     const keys = records.map((r) => r.key);
     expect(keys).toContain('src/a.ts');
     expect(keys).toContain('src/new-untracked.ts');
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 });
 
@@ -205,7 +205,7 @@ describe('tsconfig extends chain resolution (Codex Phase 2 round-2 review fix)',
     const d1 = callExport('computeGraphInputDigest', r1);
     const d2 = callExport('computeGraphInputDigest', r2);
     expect(d1).not.toBe(d2);
-    fs.rmSync(dir1, { recursive: true, force: true });
-    fs.rmSync(dir2, { recursive: true, force: true });
+    fs.rmSync(dir1, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    fs.rmSync(dir2, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 });

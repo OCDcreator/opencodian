@@ -167,7 +167,7 @@ describe('version lifecycle synchronization', () => {
         '1.2.0': '1.4.5',
       });
     } finally {
-      fs.rmSync(root, { recursive: true, force: true });
+      fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     }
   });
 });
@@ -239,7 +239,7 @@ describe('Gitea release publishing', () => {
       expect(uploaded).toEqual(['main.js', 'manifest.json', 'styles.css']);
     } finally {
       await new Promise((resolve) => server.close(resolve));
-      fs.rmSync(fixture.root, { recursive: true, force: true });
+      fs.rmSync(fixture.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     }
   });
 
@@ -277,7 +277,7 @@ describe('Gitea release publishing', () => {
       expect(output.skipped).toEqual(['main.js', 'manifest.json', 'styles.css']);
     } finally {
       await new Promise((resolve) => server.close(resolve));
-      fs.rmSync(fixture.root, { recursive: true, force: true });
+      fs.rmSync(fixture.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     }
   });
 
@@ -298,7 +298,7 @@ describe('Gitea release publishing', () => {
       expect(result.stderr).toMatch(/points to/);
     } finally {
       await new Promise((resolve) => server.close(resolve));
-      fs.rmSync(fixture.root, { recursive: true, force: true });
+      fs.rmSync(fixture.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     }
   });
 
@@ -332,7 +332,7 @@ describe('Gitea release publishing', () => {
       expect(result.stderr).toMatch(/does not match the packaged file/);
     } finally {
       await new Promise((resolve) => server.close(resolve));
-      fs.rmSync(fixture.root, { recursive: true, force: true });
+      fs.rmSync(fixture.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     }
   });
 });

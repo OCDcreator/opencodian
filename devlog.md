@@ -11,6 +11,30 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-17 FlowText 功能对齐需求文档：能力对照、18 条需求与 6 个待裁决项
+
+用户拿 B 站「模块化 OB」余先生的付费插件 FlowText 的 8 期功能全解（转录稿在 `技术学习/转录总结/FlowText 插件功能全解.md`）来问 OpenCodian 还缺什么。**先做能力审计再写需求**：把 FlowText 的 20 余条功能逐项对完源码后，结论是差距不在"能力总量"，而在三类——(1) 行内编辑已有完整引擎却缺入口与生成体验（`@` 唤起、`#` 预设提示词、流式 diff、行内贴图转 LaTeX、多片段并行、全文模式、文件夹上下文）；(2) Obsidian 领域能力整体空白（自动内链、主题关联、编辑回退、基于官方 CLI 的原生工具、批量整理）；(3) 检索与生成类大工程（整库语义检索、文生图、Alt 一键补全、PDF、Canvas、外部接口）。反过来，OpenCodian 的侧边栏 Agent（四后端、多标签并发、MCP/Skills、跨会话持久记忆）已经**超过** FlowText，所以文档把"不因对齐而收缩既有能力"写进了非目标。
+
+审计过程中纠正了两处容易被名字误导的现状：`memorySemanticRecallEnabled` 在生产路径上只跑词面匹配（`memoryRecall.ts` 明确写了 embedding 通道未移植），以及 `ContextFileCatalogIndex` 只是一个给选择器用的路径索引，不是内容级检索——两者都不能当作"整库感知"的现成底座。
+
+文档落在 `docs/requirements/flowtext-parity.md`：18 条需求按 A（行内编辑 v2）/ B（Obsidian 领域能力）/ C（检索与生成）三批，每条都带现状证据（file:line）、需求、技术约束、验收标准与风险；另附跨批次硬约束（只读辅助契约、唯一写路径、脏检查、fail-closed 不得放宽）、新增设置项清单、测试计划与里程碑出口标准。
+
+**刻意留了 6 个待裁决项**，因为它们是产品决策而非编码问题：`@` 是否默认开启（与邮箱、@提及及其他插件冲突）、原生工具走官方 CLI 还是自建 MCP server、整库检索走词面还是向量、回退用插件侧快照还是依赖后端 rewind、批次顺序、Codex 图片输入的临时文件是否可接受。每条都给了推荐与理由，等用户裁决后再进入各自的设计文档。
+
+**只动文档**（新增 1 个 md + 本条目），不涉及构建与部署。
+
+## 2026-09-17 修掉验证期测试抖动：项目级 testTimeout
+
+本轮编辑功能迭代里 `npm run verify` 反复在 `full tests` 上红（至少 5 次），失败的都是文件系统/进程重的套件，报错统一是 `Exceeded timeout of 5000 ms`，而同一份代码单独跑必然全绿。**先量后改**：把这批套件（`core/config/OpencodeConfigManager*`、`core/agents/backend/P1*ResourceScope.contract`、`ScopedConfigurationResourceService`）单独跑——整套 1.6s，**最慢的单个测试 111ms**。也就是说 5s 不是工作量预算而是调度预算：777 个套件并发时，Windows 上的真实 CLI spawn、临时目录 I/O 和杀毒扫描把这 100ms 拖到 5s 以上，而且**抖动的文件每次不同**（跨运行在 6 个文件之间跳），所以逐个加 `jest.setTimeout`（仓库原有做法：git 60s、三个渲染套件 30s）必然一直漏。
+
+**修法**：`jest.config.js` 给 unit / integration / scripts 三个项目设 `testTimeout: 20_000`（常量 `TEST_TIMEOUT_MS`，注释里写明测量依据与不设白名单的理由），对这些套件是 ~180 倍余量，而真正挂死的测试仍在有界时间内失败；已知自身就慢的套件保留各自的 30–60s 覆盖。
+
+**第二类抖动（同一轮里冒出来的，与超时无关）**：`ServerManager.binary.test.ts` 报 `EBUSY: resource busy or locked, unlink '...opencode-cli.exe'`——套件在自己的 teardown 里删临时目录，而 Windows 还占着那个刚写出的假可执行文件（杀毒扫描 / 子进程未完全回收），`force: true` 对 EBUSY 无效（它只忽略 ENOENT）。**修法**：只给"会创建可执行文件或真跑进程"的套件（正是 EBUSY 的成因，10 个文件）的递归删除加上 Node 为此提供的 `maxRetries: 10, retryDelay: 50`（52 处）；重试后仍失败依旧照常抛错，所以不是把问题藏起来。曾考虑在 jest setup 里全局包裹 `fs.rmSync`，实测行不通：ts-jest 的 `__importStar` 给 `fs` 命名空间生成只读副本，且测试混用 `'fs'` / `'node:fs'`（56 / 37 个文件），全局 mock 还会改变默认导入语义——代价大于收益，故取显式改法。
+
+**验证**：① 刻意制造争用——一边跑生产构建一边跑全量测试，777 套件 / 7526 用例全绿、零超时；② 两类修复落地后**连跑 4 次完整 `npm run verify` 全部 15/15**（修复前约 9 次 verify 里红过 5 次，且失败套件每次不同）。
+
+**注意**：给测试文件批量改行尾时踩到过 CRLF 陷阱（python 写文本模式在 Windows 上把 LF 全变成 CRLF，diff 从 52 行炸成 3867 行）；按 HEAD 的行尾恢复后确认 diff 只有 52 行。
+
 ## 2026-09-17 行内编辑第五轮：附加上下文（参考 VSCode Copilot 的 Add Context）
 
 用户要求补上"添加上下文"能力。设计按需求文档既有约束落地——§6.1 明确"不注入 vault 全文，模型需要更多上下文时通过只读工具自行读取"，所以**附件只传路径**，不内联文件内容（也因此没有标签冲突与长度上限问题）。四个后端的 aux 会话都是真正的运行时只读（opencode 有 vault 只读目录授权、claude 只读工具白名单、codex read-only sandbox、pi 工具 allowlist），所以附件是能被真正读到的。

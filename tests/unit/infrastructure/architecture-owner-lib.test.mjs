@@ -302,7 +302,7 @@ describe('findMissingOverviewDocs and auditPathReferences', () => {
   });
 
   afterEach(() => {
-    fs.rmSync(tmpRoot, { recursive: true, force: true });
+    fs.rmSync(tmpRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
   test('findMissingOverviewDocs reports missing docs', () => {

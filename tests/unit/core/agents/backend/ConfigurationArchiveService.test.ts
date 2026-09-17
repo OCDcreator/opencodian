@@ -83,7 +83,7 @@ describe('ConfigurationArchiveService — archive-root-anchored symlink confinem
     for (const d of [findHashDir(archiveRoot)]) {
       if (d) try { fs.chmodSync(d, 0o755); } catch { /* ignore */ }
     }
-    for (const d of [projectRoot, archiveRoot, outside]) fs.rmSync(d, { recursive: true, force: true });
+    for (const d of [projectRoot, archiveRoot, outside]) fs.rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
   it('refuses a backend-level symlink that escapes the archive root', async () => {
@@ -93,7 +93,7 @@ describe('ConfigurationArchiveService — archive-root-anchored symlink confinem
     await service.archiveOverwrite(ctx, revisionOf(target)); // builds real structure
     // Replace backend dir with a symlink to outside.
     const backendDir = path.join(archiveRoot, 'test');
-    fs.rmSync(backendDir, { recursive: true, force: true });
+    fs.rmSync(backendDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     fs.symlinkSync(outside, backendDir);
 
     await expect(service.archiveOverwrite(ctx, revisionOf(target))).rejects.toThrow();
@@ -108,7 +108,7 @@ describe('ConfigurationArchiveService — archive-root-anchored symlink confinem
     await service.archiveOverwrite(ctx, revisionOf(target));
     const hashDir = findHashDir(archiveRoot) as string;
     const versionsDir = path.join(hashDir, 'versions');
-    fs.rmSync(versionsDir, { recursive: true, force: true });
+    fs.rmSync(versionsDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     fs.symlinkSync(outside, versionsDir);
 
     await expect(service.archiveOverwrite(ctx, revisionOf(target))).rejects.toThrow();
@@ -123,7 +123,7 @@ describe('ConfigurationArchiveService — archive-root-anchored symlink confinem
     await service.archiveDeleted(ctx, revisionOf(target));
     const hashDir = findHashDir(archiveRoot) as string;
     const deletedDir = path.join(hashDir, 'deleted');
-    fs.rmSync(deletedDir, { recursive: true, force: true });
+    fs.rmSync(deletedDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     fs.symlinkSync(outside, deletedDir);
 
     const res = await service.readLatestDeletedContent(ctx);
@@ -163,7 +163,7 @@ describe('ConfigurationArchiveService — manifest present-but-invalid is fail-c
     ctx = { backend: 'test', kind: 'config', format: 'json', match };
   });
   afterEach(() => {
-    for (const d of [projectRoot, archiveRoot]) fs.rmSync(d, { recursive: true, force: true });
+    for (const d of [projectRoot, archiveRoot]) fs.rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
   it('a corrupt-JSON manifest is NOT treated as first archive and NOT overwritten', async () => {
@@ -209,7 +209,7 @@ describe('ConfigurationArchiveService — retention transaction order', () => {
     ctx = { backend: 'test', kind: 'config', format: 'json', match };
   });
   afterEach(() => {
-    for (const d of [projectRoot, archiveRoot]) fs.rmSync(d, { recursive: true, force: true });
+    for (const d of [projectRoot, archiveRoot]) fs.rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
   it('manifest-write failure preserves the old manifest + its files and cleans the new orphan', async () => {
@@ -261,7 +261,7 @@ describe('ConfigurationArchiveService — revision/content snapshot integrity', 
   });
 
   afterEach(() => {
-    for (const dir of [projectRoot, archiveRoot]) fs.rmSync(dir, { recursive: true, force: true });
+    for (const dir of [projectRoot, archiveRoot]) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
   it.each(['archiveOverwrite', 'archiveDeleted'] as const)(
@@ -291,7 +291,7 @@ describe('ConfigurationArchiveService — cross-format rejection', () => {
     match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync.native(target) };
   });
   afterEach(() => {
-    for (const d of [projectRoot, archiveRoot]) fs.rmSync(d, { recursive: true, force: true });
+    for (const d of [projectRoot, archiveRoot]) fs.rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
   it('does not read history across formats (json archive vs toml ctx → invalid, not found)', async () => {
@@ -336,7 +336,7 @@ describe('ConfigurationArchiveService — restore honesty (not-found vs archive-
     ctx = { backend: 'test', kind: 'config', format: 'json', match };
   });
   afterEach(() => {
-    for (const d of [projectRoot, archiveRoot]) fs.rmSync(d, { recursive: true, force: true });
+    for (const d of [projectRoot, archiveRoot]) fs.rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
   it('manifest ENOENT (no archive at all) => not-found', async () => {
@@ -423,7 +423,7 @@ describe('ConfigurationArchiveService — entry content integrity (item 3)', () 
     match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync.native(target) };
     ctx = { backend: 'test', kind: 'config', format: 'json', match };
   });
-  afterEach(() => { for (const d of [projectRoot, archiveRoot]) fs.rmSync(d, { recursive: true, force: true }); });
+  afterEach(() => { for (const d of [projectRoot, archiveRoot]) fs.rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); });
 
   it('a tampered deleted entry (still valid JSON) → archive-failed, target unchanged', async () => {
     const service = new ConfigurationArchiveService(archiveRoot);
@@ -456,7 +456,7 @@ describe('ConfigurationArchiveService — clearDeleted honesty (item 4)', () => 
     match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync.native(target) };
     ctx = { backend: 'test', kind: 'config', format: 'json', match };
   });
-  afterEach(() => { for (const d of [projectRoot, archiveRoot]) fs.rmSync(d, { recursive: true, force: true }); });
+  afterEach(() => { for (const d of [projectRoot, archiveRoot]) fs.rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); });
 
   it('a backend-association-tampered manifest → integrityFailure, history not cleared', async () => {
     const service = new ConfigurationArchiveService(archiveRoot);
@@ -519,7 +519,7 @@ describe('ConfigurationArchiveService — symlink confinement at every archive l
     match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync.native(target) };
     ctx = { backend: 'test', kind: 'config', format: 'json', match };
   });
-  afterEach(() => { for (const d of [projectRoot, archiveRoot, outside]) fs.rmSync(d, { recursive: true, force: true }); });
+  afterEach(() => { for (const d of [projectRoot, archiveRoot, outside]) fs.rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); });
 
   it('scope-level symlink escape is refused (sentinel untouched)', async () => {
     const sentinel = path.join(outside, 'scope-out.json');
@@ -528,7 +528,7 @@ describe('ConfigurationArchiveService — symlink confinement at every archive l
     await service.archiveOverwrite(ctx, revisionOf(target)); // build real tree
     const hashDir = findHashDir(archiveRoot) as string;
     const scopeDir = path.dirname(path.dirname(hashDir)); // .../test/project
-    fs.rmSync(scopeDir, { recursive: true, force: true });
+    fs.rmSync(scopeDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     fs.symlinkSync(outside, scopeDir);
     await expect(service.archiveOverwrite(ctx, revisionOf(target))).rejects.toThrow();
     expect(fs.existsSync(sentinel)).toBe(true);
@@ -541,7 +541,7 @@ describe('ConfigurationArchiveService — symlink confinement at every archive l
     await service.archiveOverwrite(ctx, revisionOf(target));
     const hashDir = findHashDir(archiveRoot) as string;
     const kindDir = path.dirname(hashDir); // .../config
-    fs.rmSync(kindDir, { recursive: true, force: true });
+    fs.rmSync(kindDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     fs.symlinkSync(outside, kindDir);
     await expect(service.archiveOverwrite(ctx, revisionOf(target))).rejects.toThrow();
     expect(fs.existsSync(sentinel)).toBe(true);
@@ -553,7 +553,7 @@ describe('ConfigurationArchiveService — symlink confinement at every archive l
     const service = new ConfigurationArchiveService(archiveRoot);
     await service.archiveOverwrite(ctx, revisionOf(target));
     const hashDir = findHashDir(archiveRoot) as string;
-    fs.rmSync(hashDir, { recursive: true, force: true });
+    fs.rmSync(hashDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     fs.symlinkSync(outside, hashDir);
     await expect(service.archiveOverwrite(ctx, revisionOf(target))).rejects.toThrow();
     expect(fs.existsSync(sentinel)).toBe(true);
@@ -590,7 +590,7 @@ describe('ConfigurationArchiveService — clearDeleted fail-closed at scan level
     match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync.native(target) };
     ctx = { backend: 'test', kind: 'config', format: 'json', match };
   });
-  afterEach(() => { for (const d of [projectRoot, archiveRoot, outside]) fs.rmSync(d, { recursive: true, force: true }); });
+  afterEach(() => { for (const d of [projectRoot, archiveRoot, outside]) fs.rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); });
 
   it('a scope-level symlink during clear → integrityFailure, sentinel untouched', async () => {
     const sentinel = path.join(outside, 'scope-clear.json');
@@ -599,7 +599,7 @@ describe('ConfigurationArchiveService — clearDeleted fail-closed at scan level
     await service.archiveDeleted(ctx, revisionOf(target));
     const hashDir = findHashDir(archiveRoot) as string;
     const scopeDir = path.dirname(path.dirname(hashDir));
-    fs.rmSync(scopeDir, { recursive: true, force: true });
+    fs.rmSync(scopeDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     fs.symlinkSync(outside, scopeDir);
     const result = await service.clearDeleted({ backend: 'test' });
     expect(result.ok).toBe(false);
@@ -613,7 +613,7 @@ describe('ConfigurationArchiveService — clearDeleted fail-closed at scan level
     const service = new ConfigurationArchiveService(archiveRoot);
     await service.archiveDeleted(ctx, revisionOf(target));
     const hashDir = findHashDir(archiveRoot) as string;
-    fs.rmSync(hashDir, { recursive: true, force: true });
+    fs.rmSync(hashDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     fs.symlinkSync(outside, hashDir);
     const result = await service.clearDeleted({ backend: 'test' });
     expect(result.ok).toBe(false);
@@ -644,7 +644,7 @@ describe('ConfigurationArchiveService — clearDeleted preflight (item A round 6
     match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync.native(target) };
     ctx = { backend: 'test', kind: 'config', format: 'json', match };
   });
-  afterEach(() => { for (const d of [projectRoot, archiveRoot]) fs.rmSync(d, { recursive: true, force: true }); });
+  afterEach(() => { for (const d of [projectRoot, archiveRoot]) fs.rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); });
 
   it('a deleted-entry symlink → integrityFailure, manifest byte-for-byte unchanged', async () => {
     const service = new ConfigurationArchiveService(archiveRoot);
@@ -699,7 +699,7 @@ describe('ConfigurationArchiveService — preflight directory symlink + EACCES (
     match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync.native(target) };
     ctx = { backend: 'test', kind: 'config', format: 'json', match };
   });
-  afterEach(() => { for (const d of [projectRoot, archiveRoot, outside]) fs.rmSync(d, { recursive: true, force: true }); });
+  afterEach(() => { for (const d of [projectRoot, archiveRoot, outside]) fs.rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); });
 
   it('planted versions/ symlink with EMPTY versions list → preflight catches it, manifest unchanged', async () => {
     const service = new ConfigurationArchiveService(archiveRoot);
@@ -763,7 +763,7 @@ describe('ConfigurationArchiveService — round 8: readdir seam + in-root symlin
     match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync.native(target) };
     ctx = { backend: 'test', kind: 'config', format: 'json', match };
   });
-  afterEach(() => { for (const d of [projectRoot, archiveRoot]) fs.rmSync(d, { recursive: true, force: true }); });
+  afterEach(() => { for (const d of [projectRoot, archiveRoot]) fs.rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); });
 
   it('EACCES via readDirEntries seam → ok:false, integrityFailures with code, manifest unchanged', async () => {
     const service = new ConfigurationArchiveService(archiveRoot);

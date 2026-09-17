@@ -548,7 +548,7 @@ describe('ServerManager runtime seams', () => {
   beforeEach(() => {
     process.env = { ...originalEnv };
     if (fs.existsSync(testVaultPath)) {
-      fs.rmSync(testVaultPath, { recursive: true, force: true });
+      fs.rmSync(testVaultPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     }
     manager = new ServerManager(defaultConfig);
     jest.clearAllMocks();
@@ -557,7 +557,7 @@ describe('ServerManager runtime seams', () => {
   afterEach(() => {
     process.env = { ...originalEnv };
     if (fs.existsSync(testVaultPath)) {
-      fs.rmSync(testVaultPath, { recursive: true, force: true });
+      fs.rmSync(testVaultPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     }
   });
 

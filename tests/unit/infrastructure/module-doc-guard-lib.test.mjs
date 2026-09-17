@@ -254,7 +254,7 @@ describe('loadConfig strict top-level schema (Phase 2 Task 8)', () => {
     writeConfig(dir, validConfig());
     const r = loadIn(dir);
     expect(r.ok).toBe(true);
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
   test('rejects a stray top-level mapping', () => {
@@ -265,6 +265,6 @@ describe('loadConfig strict top-level schema (Phase 2 Task 8)', () => {
     const r = loadIn(dir);
     expect(r.ok).toBe(false);
     expect(r.error).toContain('unknown top-level key');
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 });

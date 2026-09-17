@@ -406,7 +406,7 @@ describe('ServerManager lifecycle and environment', () => {
   beforeEach(() => {
     process.env = { ...originalEnv };
     if (fs.existsSync(testVaultPath)) {
-      fs.rmSync(testVaultPath, { recursive: true, force: true });
+      fs.rmSync(testVaultPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     }
     manager = new ServerManager(defaultConfig);
     jest.clearAllMocks();
@@ -415,7 +415,7 @@ describe('ServerManager lifecycle and environment', () => {
   afterEach(() => {
     process.env = { ...originalEnv };
     if (fs.existsSync(testVaultPath)) {
-      fs.rmSync(testVaultPath, { recursive: true, force: true });
+      fs.rmSync(testVaultPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     }
   });
 

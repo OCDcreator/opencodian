@@ -68,7 +68,7 @@ describe('plugin artifact packaging', () => {
       expect(result.hashes['main.js']).toMatch(/^[a-f0-9]{64}$/);
       expect(fs.readFileSync(path.join(outputDir, 'main.js'), 'utf8')).toContain('plugin');
     } finally {
-      fs.rmSync(rootDir, { recursive: true, force: true });
+      fs.rmSync(rootDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     }
   });
 
@@ -80,7 +80,7 @@ describe('plugin artifact packaging', () => {
       expect(() => callPackagePluginArtifact({ rootDir })).toThrow();
       expect(fs.existsSync(path.join(rootDir, 'artifacts', 'opencodian'))).toBe(false);
     } finally {
-      fs.rmSync(rootDir, { recursive: true, force: true });
+      fs.rmSync(rootDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     }
   });
 
@@ -102,8 +102,8 @@ describe('plugin artifact packaging', () => {
       fs.symlinkSync(outsideDir, path.join(rootDir, 'artifacts'), 'dir');
       expect(() => callPackagePluginArtifact({ rootDir })).toThrow(/outputDir must not traverse a symlink/);
     } finally {
-      fs.rmSync(rootDir, { recursive: true, force: true });
-      fs.rmSync(outsideDir, { recursive: true, force: true });
+      fs.rmSync(rootDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+      fs.rmSync(outsideDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     }
   });
 
@@ -115,7 +115,7 @@ describe('plugin artifact packaging', () => {
         .toThrow(/distDir and outputDir must be disjoint/);
       expect(fs.existsSync(path.join(rootDir, 'dist', 'main.js'))).toBe(true);
     } finally {
-      fs.rmSync(rootDir, { recursive: true, force: true });
+      fs.rmSync(rootDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     }
   });
 
