@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "a4ecd00bfda17cf1a8c051136a424b4c0d9b928695e2f55abc5bd59bdb590480",
-  "recordCount": 703,
+  "digest": "d9cc4d163eacdab6be849b9b3d4662094abfdd13c21071beb0213e11b468a56a",
+  "recordCount": 705,
   "records": [
     {
       "kind": "ignore",
@@ -31,7 +31,7 @@
     {
       "kind": "src",
       "key": "src/app/batchOrganize/BatchOrganizeModal.ts",
-      "sha256": "5916a1c95741a9cda3743f8955e29f401a1f7e7e8f5838d8db3b1cc943f7a307"
+      "sha256": "73aa7173f9b81b8209172eb003d6d9d1cc4aa5c8f30dea6e49a7385f32602596"
     },
     {
       "kind": "src",
@@ -86,7 +86,7 @@
     {
       "kind": "src",
       "key": "src/app/obsidianTooling/ObsidianToolingApprovalModal.ts",
-      "sha256": "cda0625375214d1909a19c30ae10ae58f024507bf4609077d0f81b4496afa02d"
+      "sha256": "61ee908505f60185ad4d0bd2c46e1073275e06e1dc7f2624b674f62357aeea4f"
     },
     {
       "kind": "src",
@@ -2981,7 +2981,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "b58a07cd2b6541c09785e06886745a57687ae3172eb3c094b663253f9cf94c2c"
+      "sha256": "cf9201d8e1799ddfc1a5d8ab7bfe5bc1b0d65e1bf9d5277cdb05f70b71f16fac"
     },
     {
       "kind": "src",
@@ -2991,7 +2991,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "4949631d1eb9c321f45586c649c915b0b4d9afc33dc77be020e3a290e0b9d673"
+      "sha256": "f78b968745a4714084ee22c33eb1e9e778d3770bbb3754f24f5ea3be20a7e5d1"
     },
     {
       "kind": "src",
@@ -3146,7 +3146,7 @@
     {
       "kind": "src",
       "key": "src/style/components/inline-permission.css",
-      "sha256": "c332202c04f75966c46f0f5904287daae6b1969a607628e27e46859a5acf086a"
+      "sha256": "85e01fa5b69394523241b83f088c3bab0479c03e38fb7308730e716315dcfbfb"
     },
     {
       "kind": "src",
@@ -3161,7 +3161,7 @@
     {
       "kind": "src",
       "key": "src/style/components/modified-files-sidebar.css",
-      "sha256": "d2d51647809f3a0778fe599971f5ad239f886fe1c9cb3c077867e9659ab301b8"
+      "sha256": "4c0916d2ce73d96d1afb69902854ad13ef7d09aaf8a16746535a5bae4d0bcded"
     },
     {
       "kind": "src",
@@ -3246,22 +3246,27 @@
     {
       "kind": "src",
       "key": "src/style/features/chat-assistant.css",
-      "sha256": "b673dfdeb62527332251473604aa701dc360e7c988484b6840013e3a915157dc"
+      "sha256": "2e5076a6617c0b01e37a033374b4b4ffc99ce695849e84725e0cb50ca5a05729"
     },
     {
       "kind": "src",
       "key": "src/style/features/chat-user.css",
-      "sha256": "e2abf3c9e84a42c69588696f99a9b1f3c42901f6b75830388328a01cf2a3a8f3"
+      "sha256": "6420cbeb1918d42bf40dbea82d8ec4b9ccfb9115b64c2e66205f664d6997da84"
     },
     {
       "kind": "src",
       "key": "src/style/features/inline-edit.css",
-      "sha256": "06e41ae87a2a083bda46978d807735bd2e45fe973b05fdec49985dad87428577"
+      "sha256": "6f683e3b54092add8d94eade6f6c9735d2f86411fc414cdc4aa6365c8d01bbfb"
     },
     {
       "kind": "src",
       "key": "src/style/index.css",
-      "sha256": "2c178fb2d5b4bf6460a12f1111c94445e8b696f91dab57407dbd10e37dc000a8"
+      "sha256": "f2136dc7914fedfbe12d4223bdfc4391fd61c12b4ee0da31dee058f6f06ea2b8"
+    },
+    {
+      "kind": "src",
+      "key": "src/style/modals/batch-organize-modal.css",
+      "sha256": "f29ea67421c578868fc20cd16b463066a0456cb14e8c30a61ccf152e62c5ca0c"
     },
     {
       "kind": "src",
@@ -3272,6 +3277,11 @@
       "kind": "src",
       "key": "src/style/modals/delete-confirm-dialog.css",
       "sha256": "233168dcd0abcdb344ed72ed1dc79af0687261fd0c7b046279c699a365bfd035"
+    },
+    {
+      "kind": "src",
+      "key": "src/style/modals/obsidian-tooling-confirm-modal.css",
+      "sha256": "f9e403cca5353689134a50ab486f5a5ce5544d03bfbe1515f51ede8658ef7969"
     },
     {
       "kind": "src",
@@ -3491,7 +3501,7 @@
     {
       "kind": "tool",
       "key": "graphify-version",
-      "sha256": "b51978f2277743327d67f2e691d74d1915bc4705f49837c36ab7ef8a2ab92ca8"
+      "sha256": "3743012c1f0a4169ff074ffacae1312a05745afae16e874a4a80c3061b2624b3"
     },
     {
       "kind": "tsconfig",
@@ -3519,7 +3529,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-18T12:11:30.194Z",
-  "headShaAtGeneration": "4b19e86955544d3fdb34bb242b00489120c34a82",
-  "graphifyVersion": "graphify 0.9.36"
+  "generatedAt": "2026-09-18T13:21:53.195Z",
+  "headShaAtGeneration": "6979f441d50514681d4ce2384ae1c6d22734aad1",
+  "graphifyVersion": "graphify 0.8.50"
 }
