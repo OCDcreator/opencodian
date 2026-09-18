@@ -30397,19 +30397,18 @@ img.opencodian-model-provider-header-icon {
   }
 }
 
-/* Primary CTA contrast fix. DESIGN.md §2 makes the Obsidian Accent
-   Proxy the primary action color, but light accents (the neutral
-   preset is slate #64748b) measure ~2.9:1 against the host's white
-   on-accent label — below the 4.5:1 floor for a 13px label. Mixing
-   22% of DESIGN.md ink-graphite (#0f172a) into the accent keeps the
-   hue and lifts the label past ~6:1 without inventing a new color. */
+/* Primary action colour is inherited from the host theme on purpose.
+   An earlier revision mixed 22% ink-graphite into the accent to "fix"
+   contrast, on the assumption that the on-accent label is light. Live
+   measurement disproved it: this theme pairs --interactive-accent
+   #aa1141 with --text-on-accent black, so darkening the accent made
+   the label worse (2.87:1 -> 2.2:1). The accent/on-accent pairing is
+   the host theme's to define (PRODUCT.md: Obsidian-native first), and
+   overriding it here also made our buttons diverge from every other
+   .mod-cta in the app. The host pairing's own contrast is a theme
+   issue, recorded in the acceptance notes rather than patched here. */
 .opencodian-batch-organize-modal .mod-cta {
-  background: color-mix(in srgb, var(--interactive-accent) 78%, #0f172a);
   transition: background-color 150ms ease;
-}
-
-.opencodian-batch-organize-modal .mod-cta:hover {
-  background: color-mix(in srgb, var(--interactive-accent-hover, var(--interactive-accent)) 74%, #0f172a);
 }
 
 /* Visible keyboard focus on every interactive control (shared
@@ -30527,17 +30526,13 @@ img.opencodian-model-provider-header-icon {
   color: var(--text-normal);
 }
 
-/* Deny uses the native destructive vocabulary (rose) so the risk
-   path reads consistently with the inline permission dialogs;
-   Allow keeps the accent primary (same ink-mixed contrast fix as
-   the batch-organize modal). */
+/* Allow keeps the host's accent/on-accent pairing (see the longer note
+   in batch-organize-modal.css: darkening the accent measured WORSE on
+   this theme, 2.87:1 -> 2.2:1, because the host label is near-black).
+   Deny is ours to define, so it carries its own rose plus a light
+   label. */
 .opencodian-tooling-confirm-modal .mod-cta {
-  background: color-mix(in srgb, var(--interactive-accent) 78%, #0f172a);
   transition: background-color 150ms ease;
-}
-
-.opencodian-tooling-confirm-modal .mod-cta:hover {
-  background: color-mix(in srgb, var(--interactive-accent-hover, var(--interactive-accent)) 74%, #0f172a);
 }
 
 /* Deny label contrast. Measured live at 4.22:1 — the host theme

@@ -77,17 +77,13 @@
   color: var(--text-normal);
 }
 
-/* Deny uses the native destructive vocabulary (rose) so the risk
-   path reads consistently with the inline permission dialogs;
-   Allow keeps the accent primary (same ink-mixed contrast fix as
-   the batch-organize modal). */
+/* Allow keeps the host's accent/on-accent pairing (see the longer note
+   in batch-organize-modal.css: darkening the accent measured WORSE on
+   this theme, 2.87:1 -> 2.2:1, because the host label is near-black).
+   Deny is ours to define, so it carries its own rose plus a light
+   label. */
 .opencodian-tooling-confirm-modal .mod-cta {
-  background: color-mix(in srgb, var(--interactive-accent) 78%, #0f172a);
   transition: background-color 150ms ease;
-}
-
-.opencodian-tooling-confirm-modal .mod-cta:hover {
-  background: color-mix(in srgb, var(--interactive-accent-hover, var(--interactive-accent)) 74%, #0f172a);
 }
 
 /* Deny label contrast. Measured live at 4.22:1 — the host theme

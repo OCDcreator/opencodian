@@ -182,19 +182,18 @@
   }
 }
 
-/* Primary CTA contrast fix. DESIGN.md §2 makes the Obsidian Accent
-   Proxy the primary action color, but light accents (the neutral
-   preset is slate #64748b) measure ~2.9:1 against the host's white
-   on-accent label — below the 4.5:1 floor for a 13px label. Mixing
-   22% of DESIGN.md ink-graphite (#0f172a) into the accent keeps the
-   hue and lifts the label past ~6:1 without inventing a new color. */
+/* Primary action colour is inherited from the host theme on purpose.
+   An earlier revision mixed 22% ink-graphite into the accent to "fix"
+   contrast, on the assumption that the on-accent label is light. Live
+   measurement disproved it: this theme pairs --interactive-accent
+   #aa1141 with --text-on-accent black, so darkening the accent made
+   the label worse (2.87:1 -> 2.2:1). The accent/on-accent pairing is
+   the host theme's to define (PRODUCT.md: Obsidian-native first), and
+   overriding it here also made our buttons diverge from every other
+   .mod-cta in the app. The host pairing's own contrast is a theme
+   issue, recorded in the acceptance notes rather than patched here. */
 .opencodian-batch-organize-modal .mod-cta {
-  background: color-mix(in srgb, var(--interactive-accent) 78%, #0f172a);
   transition: background-color 150ms ease;
-}
-
-.opencodian-batch-organize-modal .mod-cta:hover {
-  background: color-mix(in srgb, var(--interactive-accent-hover, var(--interactive-accent)) 74%, #0f172a);
 }
 
 /* Visible keyboard focus on every interactive control (shared

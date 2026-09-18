@@ -17,7 +17,7 @@
 - 内联校验错误：`.opencodian-batch-organize-error`（10% `--background-modifier-error` 色调块、`--text-error` 混 `--text-normal` 保证双主题可读；`:empty` 时完全隐藏）。**不使用侧边条纹**。
 - 预览清单：`.opencodian-batch-organize-list`（有界 260px 内部滚动、10px 圆角、`--background-secondary` 底）、`.opencodian-batch-organize-item`（mono 路径、`overflow-wrap: anywhere`，hover 用 `--background-modifier-hover`）；冲突/跳过项 `.opencodian-batch-organize-conflict` 与 `.opencodian-batch-organize-conflict-summary` 用低彩度着色，不铺满整行。
 - 执行中：`.opencodian-batch-organize-running`、`.opencodian-batch-organize-spinner`（状态指示用旋转，`opencodian-batch-organize-spin` 0.9s linear；reduced-motion 下放慢到 1.8s）。
-- 主按钮对比度：`.opencodian-batch-organize-modal .mod-cta` 把 `--interactive-accent` 与 `#0f172a`（DESIGN.md ink-graphite）按 78/22 混合，使 13px 标签从约 2.9:1 提升到约 6:1，保持色相且不新增调色板颜色。
+- 主按钮配色：`.mod-cta` **刻意继承宿主的 accent/on-accent 配对**，本模块只加 150ms 背景色过渡。曾有一版把 `--interactive-accent` 与 `#0f172a` 按 78/22 混色以"修"对比度，前提是假设 on-accent 标签为浅色；实机测量否证了它——当前主题的配对是 `--interactive-accent: #aa1141` + `--text-on-accent: black`，压暗底色只会让近黑标签更难读（2.87:1 → **2.2:1**），而且让我们的按钮偏离全应用其它 `.mod-cta`。accent 配对是宿主主题的职责（PRODUCT.md 的 Obsidian-native first），其自身对比度属于主题问题，记录在验收笔记里而不是在此覆盖。
 - 焦点与响应式：`:focus-visible` 统一 2px accent 描边 + 2px offset；≤720px 时表单行塌为单列、控件左对齐、`max-width: none`。
 
 ## 关联 TS 组件
@@ -32,5 +32,5 @@
 - 新增间距一律走 modal token；不要给单个元素补 margin，`DESIGN.md` §5 明确禁止 ad-hoc margins。
 - 不要给错误块或冲突行加侧边条纹（`border-left`/`border-right` 大于 1px）——那是共享绝对禁令；风险表达靠色调与文字。
 - 预览清单是「有界滚动 + 路径换行」的所有者；改 `max-height` 或去掉 `overflow-wrap` 会让长路径撑破弹窗。
-- 主按钮的 ink 混色是针对浅色 accent（neutral 预设 slate）的对比度修复，**不是**新配色；调整时要保持 13px 标签 ≥4.5:1。
+- 不要再给 `.mod-cta` 覆盖背景色。宿主主题的 accent/on-accent 配对由其自身负责，且标签可能是深色（当前主题就是近黑）；任何「压暗 accent 以提亮白字」的改法在这类主题下都会反向劣化。若某主题自身配对不达标，应作为主题问题记录，而不是在插件里改控制面色。
 - 契约测试 `tests/unit/uiCssDesignContract.test.ts` 断言本文件的 token 值与禁令；改动这些值需同步更新断言。
