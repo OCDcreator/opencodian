@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "bf2fe8bc55d983ee07fcf8220955dbbf72c921620455bc4f5b24bc0740c16412",
+  "digest": "0841d97b59d4caf1f4e9fbf745161353ed938bf7637e86e3fd23ad0e8a6b078a",
   "recordCount": 742,
   "records": [
     {
@@ -1026,7 +1026,7 @@
     {
       "kind": "src",
       "key": "src/core/pdf/pdfTextEngine.ts",
-      "sha256": "b0dfab5ebe941ac7f0442004f72546ae68f233e05516bcee9868470bcd9a2879"
+      "sha256": "bef5add3c11d61f5fc541b6c11f045909c861fe46a91b2d8300700904a6a82e5"
     },
     {
       "kind": "src",
@@ -1961,7 +1961,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/PdfChatIntegration.ts",
-      "sha256": "0df893f43dfc95ae0b39d305dbdb456926b4ed069111f164822ec1f76dcbd436"
+      "sha256": "3074435337d9c9446a9ea527ce253f188a3097b27d43b078c9480133edb4617a"
     },
     {
       "kind": "src",
@@ -3171,7 +3171,7 @@
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "dccef7caf3cf4323666f0165e576caef6fbc0a13c01469d7c3607bf8d7208f9c"
+      "sha256": "90233e7f3d4cbbe16d90fd10d0f3fc4327b1d66d62e94e1a13ddf814caaf1ad9"
     },
     {
       "kind": "src",
@@ -3714,7 +3714,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-18T22:06:14.668Z",
-  "headShaAtGeneration": "345bf1e5b305170641ae941fb0c1f60319e64832",
+  "generatedAt": "2026-09-18T22:34:04.172Z",
+  "headShaAtGeneration": "ac462c70c13eaf0972a6e7e5817372c3250cdd8c",
   "graphifyVersion": "graphify 0.9.36"
 }
