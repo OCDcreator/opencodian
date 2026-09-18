@@ -97,3 +97,5 @@ It also migrates the old `Server > MCP` remembered location into the new top-lev
 > 2026-09-18 (R-A5/R-A6)：加载归一化接入 `inlineEditMaxConcurrentEdits`（clamp）与 `inlineEditDocumentModeEnabled`（布尔，缺省 true）。
 
 ## 维护约束
+
+- 2026-09-18 (FlowText R-B4): Obsidian 原生工具注入接缝接入——载入归一化新增 normalizeObsidianToolingSettingsOnLoad：未知/陈旧模式值在最终合并边界回退 off（手改配置文件不能静默激活能力）。

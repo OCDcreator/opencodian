@@ -309,6 +309,10 @@ export interface ChatRuntimeCompositionHost {
     deleteConversation(conversationId: string): unknown;
     readonly agentServiceRegistry: unknown;
     readonly memoryRuntime: MemoryRuntimePort | null;
+    /** R-B4 Obsidian native tooling runtime (app.obsidian-tooling owner); null before bootstrap. */
+    readonly obsidianToolingRuntime: {
+      planInjection(input: { conversationId: string; messages: unknown[] }): { text: string } | null;
+    } | null;
     /** R-B3 edit-revert service (core.storage owner); null before bootstrap or when disabled. */
     readonly editRevertService: EditRevertServicePort | null;
   };
@@ -990,6 +994,14 @@ export class ChatRuntimeComposition {
               conversationId: conversation.id,
               messages: conversation.messages ?? [],
               latestUserText,
+            })
+            : null
+        ),
+        planObsidianToolingInjection: async (conversation: Conversation) => (
+          host.plugin.obsidianToolingRuntime
+            ? host.plugin.obsidianToolingRuntime.planInjection({
+              conversationId: conversation.id,
+              messages: conversation.messages ?? [],
             })
             : null
         ),

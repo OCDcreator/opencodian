@@ -19,3 +19,5 @@ tests/unit/core/agents/backend/pi/，scripts/pi-sdk-acceptance.mjs，scripts/pi-
 - 2026-09-15: 实现 `AgentAuxQueryCapability.startAuxQuerySession()`：用 Pi 原生的 `set_tools` / `get_tools` 把会话限制为只读工具并以 SDK 回读校验（fail closed）。实现见本目录的 `PiAuxQuerySession.ts`。
 
 - 2026-09-17: UI 请求转发前先落一份状态：`setStatus` / `notify` 的文本存进适配器（`getExtensionStatus()` → `PiExtensionStatusSnapshot`），其余方法原样交给 `onUiRequest`。Pi 的 MCP 能力来自扩展而非 RPC，这是宿主机唯一能观测到的运行时状态，设置页的 Pi MCP 面板读它；FakeClient 测试覆盖上报与 `setStatus` 空文本清除该键。
+
+- 2026-09-18 (FlowText R-B4): Obsidian 原生工具注入接缝接入——sendMessage 现在把 options.obsidianToolingInjection 以 prependObsidianToolingInjection 前缀到消息文本（记忆块之后），同一选项袋接缝。

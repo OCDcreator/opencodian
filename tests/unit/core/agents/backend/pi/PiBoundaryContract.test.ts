@@ -21,12 +21,14 @@ describe('Pi backend isolation contract', () => {
     // '../../../memory' is the backend-neutral memory contract (core.memory) and
     // '../AgentAuxQueryCapability' is the backend-neutral auxiliary-query
     // contract — shared contracts like types/chat, not another backend
-    // implementation. The Pi aux session itself lives in this directory and is
+    // implementation. '../../../obsidianTooling' is the R-B4 backend-neutral
+    // injection seam (core.obsidian-tooling): pure helpers + catalog, no
+    // backend imports. The Pi aux session itself lives in this directory and is
     // covered by the './' allowance above. 'jsonc-parser' is the same tolerant
     // parser Pi's own MCP extension uses for its config files, so reading those
     // files means reading them the same way; it stays an external package here
     // and never pulls in another backend implementation.
-    const allowed = ['../AgentService', '../AgentAuxQueryCapability', '../../AgentCapability', '../../../types/chat', '../../../types/settings', '../../../memory', '../../../../shared/logger', 'jsonc-parser'];
+    const allowed = ['../AgentService', '../AgentAuxQueryCapability', '../../AgentCapability', '../../../types/chat', '../../../types/settings', '../../../memory', '../../../obsidianTooling', '../../../../shared/logger', 'jsonc-parser'];
     expect(imports.filter((specifier) => !specifier.startsWith('node:') && !specifier.startsWith('./') && !allowed.includes(specifier))).toEqual([]);
   });
 

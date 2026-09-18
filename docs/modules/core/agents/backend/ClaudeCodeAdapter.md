@@ -136,3 +136,5 @@ Claude Code 现在声明 `AgentCapability.Images`，因此共享 composer 会显
 - 2026-09-13: sendMessage 以 prependMemoryInjection 在消息文本前置记忆注入块（Claude 无 per-turn system 接缝，settings.systemPrompt append 保持不动）。
 
 - 2026-09-15: 实现 `AgentAuxQueryCapability.startAuxQuerySession()`：以 `tools` 只读白名单 + `disallowedTools` + `strictMcpConfig` + `canUseTool` deny 闸门建立辅助会话，并在首轮用 CLI 的 `system/init` 报告回读校验（fail closed）。实现见 `auxiliary/ClaudeCodeAuxQuerySession.ts`。
+
+- 2026-09-18 (FlowText R-B4): Obsidian 原生工具注入接缝接入——sendMessage 现在把 options.obsidianToolingInjection 以 prependObsidianToolingInjection 前缀到消息文本（记忆块之后），同一选项袋接缝。

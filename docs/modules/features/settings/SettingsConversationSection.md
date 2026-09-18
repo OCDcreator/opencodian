@@ -162,3 +162,5 @@ The classic `attach()` method remains the full-list owner, but both classic and 
 
 - 2026-09-13: 新增 memory 次级标签块（总开关/每轮抽取/语义召回/抽取模型 4 行设置）。
 - 工作区记忆块新增「共享记忆根目录」文本设置（`memoryExternalRoot`，占位符 `~/.zcode/cli/memories`），变更即保存并通知 memoryRuntime；紧随其后是「记忆同步远程仓库（git）」文本设置（`memorySyncRemoteUrl`）。
+
+- 2026-09-18 (FlowText R-B4): Obsidian 原生工具注入接缝接入——会话设置新增 Obsidian 原生工具块（经典+分页两种布局注册 obsidian-tooling 目标）：模式下拉（off/cli/mcp 预留）、诚实状态行（桌面/Windows/未检测/超时/失败/可用+版本）与重新检测、安装引导行；切换即 saveSettings + 协调器 applySettings。

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-18T04:07:27.748Z",
-  "headShaAtGeneration": "c01a261f34d470d47162346a1abed8ed8b38a5dd",
+  "generatedAt": "2026-09-18T08:31:41.429Z",
+  "headShaAtGeneration": "c2e5b58ab5261a4d2a4eb8864018fc0854697b34",
   "edges": [
     {
       "id": "src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts|src/app/diagnostics/types.ts|type-only|./types",
@@ -3959,6 +3959,69 @@
       "specifier": "../../shared"
     },
     {
+      "id": "src/core/storage/EditRevertService.ts|src/core/storage/EditRevertStore.ts|runtime-static|./EditRevertStore",
+      "from": "src/core/storage/EditRevertService.ts",
+      "to": "src/core/storage/EditRevertStore.ts",
+      "kind": "runtime-static",
+      "specifier": "./EditRevertStore"
+    },
+    {
+      "id": "src/core/storage/EditRevertService.ts|src/core/storage/EditRevertVaultWriteback.ts|runtime-static|./EditRevertVaultWriteback",
+      "from": "src/core/storage/EditRevertService.ts",
+      "to": "src/core/storage/EditRevertVaultWriteback.ts",
+      "kind": "runtime-static",
+      "specifier": "./EditRevertVaultWriteback"
+    },
+    {
+      "id": "src/core/storage/EditRevertService.ts|src/core/types/index.ts|type-only|../types",
+      "from": "src/core/storage/EditRevertService.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../types"
+    },
+    {
+      "id": "src/core/storage/EditRevertService.ts|src/shared/index.ts|runtime-static|../../shared",
+      "from": "src/core/storage/EditRevertService.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../shared"
+    },
+    {
+      "id": "src/core/storage/EditRevertService.ts|src/shared/index.ts|runtime-static|../../shared",
+      "from": "src/core/storage/EditRevertService.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../shared"
+    },
+    {
+      "id": "src/core/storage/EditRevertStore.ts|src/core/types/index.ts|type-only|../types",
+      "from": "src/core/storage/EditRevertStore.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../types"
+    },
+    {
+      "id": "src/core/storage/EditRevertStore.ts|src/shared/index.ts|runtime-static|../../shared",
+      "from": "src/core/storage/EditRevertStore.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../shared"
+    },
+    {
+      "id": "src/core/storage/EditRevertVaultWriteback.ts|src/core/storage/EditRevertStore.ts|type-only|./EditRevertStore",
+      "from": "src/core/storage/EditRevertVaultWriteback.ts",
+      "to": "src/core/storage/EditRevertStore.ts",
+      "kind": "type-only",
+      "specifier": "./EditRevertStore"
+    },
+    {
+      "id": "src/core/storage/EditRevertVaultWriteback.ts|src/core/types/index.ts|type-only|../types",
+      "from": "src/core/storage/EditRevertVaultWriteback.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../types"
+    },
+    {
       "id": "src/core/storage/index.ts|src/core/storage/StorageService.ts|re-export|./StorageService",
       "from": "src/core/storage/index.ts",
       "to": "src/core/storage/StorageService.ts",
@@ -4057,11 +4120,32 @@
       "specifier": "./settings"
     },
     {
+      "id": "src/core/types/editRevert.ts|src/shared/index.ts|type-only|../../shared",
+      "from": "src/core/types/editRevert.ts",
+      "to": "src/shared/index.ts",
+      "kind": "type-only",
+      "specifier": "../../shared"
+    },
+    {
+      "id": "src/core/types/editRevert.ts|src/shared/index.ts|type-only|../../shared",
+      "from": "src/core/types/editRevert.ts",
+      "to": "src/shared/index.ts",
+      "kind": "type-only",
+      "specifier": "../../shared"
+    },
+    {
       "id": "src/core/types/index.ts|src/core/types/chat.ts|re-export|./chat",
       "from": "src/core/types/index.ts",
       "to": "src/core/types/chat.ts",
       "kind": "re-export",
       "specifier": "./chat"
+    },
+    {
+      "id": "src/core/types/index.ts|src/core/types/editRevert.ts|type-only|./editRevert",
+      "from": "src/core/types/index.ts",
+      "to": "src/core/types/editRevert.ts",
+      "kind": "type-only",
+      "specifier": "./editRevert"
     },
     {
       "id": "src/core/types/index.ts|src/core/types/models.ts|re-export|./models",
@@ -10364,6 +10448,13 @@
       "specifier": "../ui/ModifiedFilesSidebar"
     },
     {
+      "id": "src/features/chat/services/ModifiedFilesSidebarCoordinator.ts|src/shared/index.ts|type-only|../../../shared",
+      "from": "src/features/chat/services/ModifiedFilesSidebarCoordinator.ts",
+      "to": "src/shared/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../shared"
+    },
+    {
       "id": "src/features/chat/services/PermissionModeSelectorCoordinator.ts|src/core/types/settings.ts|type-only|../../../core/types/settings",
       "from": "src/features/chat/services/PermissionModeSelectorCoordinator.ts",
       "to": "src/core/types/settings.ts",
@@ -12352,11 +12443,11 @@
       "specifier": "../../../../utils/icons/ProviderIconService"
     },
     {
-      "id": "src/features/chat/ui/ModifiedFilesSidebar.ts|src/core/types/chat.ts|type-only|../../../core/types/chat",
+      "id": "src/features/chat/ui/ModifiedFilesSidebar.ts|src/core/types/index.ts|type-only|../../../core/types",
       "from": "src/features/chat/ui/ModifiedFilesSidebar.ts",
-      "to": "src/core/types/chat.ts",
+      "to": "src/core/types/index.ts",
       "kind": "type-only",
-      "specifier": "../../../core/types/chat"
+      "specifier": "../../../core/types"
     },
     {
       "id": "src/features/chat/ui/ModifiedFilesSidebar.ts|src/features/chat/services/ConversationRenderService.ts|runtime-static|../services/ConversationRenderService",
@@ -12377,6 +12468,13 @@
       "from": "src/features/chat/ui/ModifiedFilesSidebar.ts",
       "to": "src/shared/index.ts",
       "kind": "runtime-static",
+      "specifier": "../../../shared"
+    },
+    {
+      "id": "src/features/chat/ui/ModifiedFilesSidebar.ts|src/shared/index.ts|type-only|../../../shared",
+      "from": "src/features/chat/ui/ModifiedFilesSidebar.ts",
+      "to": "src/shared/index.ts",
+      "kind": "type-only",
       "specifier": "../../../shared"
     },
     {
@@ -12541,6 +12639,13 @@
       "specifier": "../../shared"
     },
     {
+      "id": "src/features/inline-edit/InlineEditAutoLink.ts|src/features/inline-edit/InlineEditHost.ts|type-only|./InlineEditHost",
+      "from": "src/features/inline-edit/InlineEditAutoLink.ts",
+      "to": "src/features/inline-edit/InlineEditHost.ts",
+      "kind": "type-only",
+      "specifier": "./InlineEditHost"
+    },
+    {
       "id": "src/features/inline-edit/InlineEditConfirmModal.ts|src/i18n/index.ts|runtime-static|../../i18n",
       "from": "src/features/inline-edit/InlineEditConfirmModal.ts",
       "to": "src/i18n/index.ts",
@@ -12595,6 +12700,13 @@
       "to": "src/features/inline-edit/InlineEditAttachments.ts",
       "kind": "runtime-static",
       "specifier": "./InlineEditAttachments"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditController.ts|src/features/inline-edit/InlineEditAutoLink.ts|runtime-static|./InlineEditAutoLink",
+      "from": "src/features/inline-edit/InlineEditController.ts",
+      "to": "src/features/inline-edit/InlineEditAutoLink.ts",
+      "kind": "runtime-static",
+      "specifier": "./InlineEditAutoLink"
     },
     {
       "id": "src/features/inline-edit/InlineEditController.ts|src/features/inline-edit/InlineEditContextUi.ts|runtime-static|./InlineEditContextUi",
@@ -14088,6 +14200,13 @@
       "specifier": "./SettingsCommandsSection"
     },
     {
+      "id": "src/features/settings/OpenCodianSettings.ts|src/features/settings/SettingsContextGroupsSection.ts|runtime-static|./SettingsContextGroupsSection",
+      "from": "src/features/settings/OpenCodianSettings.ts",
+      "to": "src/features/settings/SettingsContextGroupsSection.ts",
+      "kind": "runtime-static",
+      "specifier": "./SettingsContextGroupsSection"
+    },
+    {
       "id": "src/features/settings/OpenCodianSettings.ts|src/features/settings/SettingsConversationSection.ts|runtime-static|./SettingsConversationSection",
       "from": "src/features/settings/OpenCodianSettings.ts",
       "to": "src/features/settings/SettingsConversationSection.ts",
@@ -15521,6 +15640,20 @@
       "to": "src/shared/index.ts",
       "kind": "runtime-static",
       "specifier": "../../shared"
+    },
+    {
+      "id": "src/features/settings/SettingsContextGroupsSection.ts|src/core/types/index.ts|type-only|../../core/types",
+      "from": "src/features/settings/SettingsContextGroupsSection.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/types"
+    },
+    {
+      "id": "src/features/settings/SettingsContextGroupsSection.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/features/settings/SettingsContextGroupsSection.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
     },
     {
       "id": "src/features/settings/SettingsConversationSection.ts|src/core/agents/backend/AgentBackendRouting.ts|runtime-static|../../core/agents/backend/AgentBackendRouting",
@@ -17084,6 +17217,13 @@
       "specifier": "./SettingsCommandsSection"
     },
     {
+      "id": "src/features/settings/SettingsTabbedRenderer.ts|src/features/settings/SettingsContextGroupsSection.ts|runtime-static|./SettingsContextGroupsSection",
+      "from": "src/features/settings/SettingsTabbedRenderer.ts",
+      "to": "src/features/settings/SettingsContextGroupsSection.ts",
+      "kind": "runtime-static",
+      "specifier": "./SettingsContextGroupsSection"
+    },
+    {
       "id": "src/features/settings/SettingsTabbedRenderer.ts|src/features/settings/SettingsConversationSection.ts|runtime-static|./SettingsConversationSection",
       "from": "src/features/settings/SettingsTabbedRenderer.ts",
       "to": "src/features/settings/SettingsConversationSection.ts",
@@ -17616,6 +17756,13 @@
       "specifier": "./core/storage/ConversationFullMessageCache"
     },
     {
+      "id": "src/main.ts|src/core/storage/EditRevertService.ts|runtime-static|./core/storage/EditRevertService",
+      "from": "src/main.ts",
+      "to": "src/core/storage/EditRevertService.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/storage/EditRevertService"
+    },
+    {
       "id": "src/main.ts|src/core/storage/index.ts|runtime-static|./core/storage",
       "from": "src/main.ts",
       "to": "src/core/storage/index.ts",
@@ -17691,6 +17838,13 @@
       "to": "src/features/inline-edit/InlineEditAtTrigger.ts",
       "kind": "runtime-static",
       "specifier": "./features/inline-edit/InlineEditAtTrigger"
+    },
+    {
+      "id": "src/main.ts|src/features/inline-edit/InlineEditAutoLink.ts|runtime-static|./features/inline-edit/InlineEditAutoLink",
+      "from": "src/main.ts",
+      "to": "src/features/inline-edit/InlineEditAutoLink.ts",
+      "kind": "runtime-static",
+      "specifier": "./features/inline-edit/InlineEditAutoLink"
     },
     {
       "id": "src/main.ts|src/features/inline-edit/InlineEditConfirmModal.ts|runtime-static|./features/inline-edit/InlineEditConfirmModal",
@@ -17854,11 +18008,39 @@
       "specifier": "../diagnosticSecretSanitizer"
     },
     {
+      "id": "src/shared/index.ts|src/shared/contextGroupPlan.ts|re-export|./contextGroupPlan",
+      "from": "src/shared/index.ts",
+      "to": "src/shared/contextGroupPlan.ts",
+      "kind": "re-export",
+      "specifier": "./contextGroupPlan"
+    },
+    {
+      "id": "src/shared/index.ts|src/shared/contextGroupPlan.ts|type-only|./contextGroupPlan",
+      "from": "src/shared/index.ts",
+      "to": "src/shared/contextGroupPlan.ts",
+      "kind": "type-only",
+      "specifier": "./contextGroupPlan"
+    },
+    {
       "id": "src/shared/index.ts|src/shared/diagnosticSecretSanitizer.ts|re-export|./diagnosticSecretSanitizer",
       "from": "src/shared/index.ts",
       "to": "src/shared/diagnosticSecretSanitizer.ts",
       "kind": "re-export",
       "specifier": "./diagnosticSecretSanitizer"
+    },
+    {
+      "id": "src/shared/index.ts|src/shared/editRevertPlan.ts|re-export|./editRevertPlan",
+      "from": "src/shared/index.ts",
+      "to": "src/shared/editRevertPlan.ts",
+      "kind": "re-export",
+      "specifier": "./editRevertPlan"
+    },
+    {
+      "id": "src/shared/index.ts|src/shared/editRevertPlan.ts|type-only|./editRevertPlan",
+      "from": "src/shared/index.ts",
+      "to": "src/shared/editRevertPlan.ts",
+      "kind": "type-only",
+      "specifier": "./editRevertPlan"
     },
     {
       "id": "src/shared/index.ts|src/shared/logger.ts|re-export|./logger",

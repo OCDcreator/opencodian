@@ -196,3 +196,5 @@ Settings exports now include `SandboxFilesystemConfig`, `SandboxNetworkConfig`, 
 > 2026-09-18 (R-A5)：再导出 `normalizeInlineEditMaxConcurrentEdits` 与并发上限常量。
 
 ## 维护约束
+
+- 2026-09-18 (FlowText R-B4): Obsidian 原生工具注入接缝接入——导出面新增 obsidianToolingMode / ObsidianToolingMode / OBSIDIAN_TOOLING_MODES（R-B4 设置四件套）。

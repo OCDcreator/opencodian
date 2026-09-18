@@ -21,6 +21,7 @@ import type { Codex, Thread, ThreadEvent, ThreadOptions, UserInput } from '@open
 
 import { createLogger } from '../../../shared';
 import { prependMemoryInjection } from '../../memory';
+import { prependObsidianToolingInjection } from '../../obsidianTooling';
 import type { AgentBackendKind, ContextUsageSnapshot, ImageAttachment, StreamChunk } from '../../types/chat';
 import type { CodexApprovalPolicy, CodexReasoningEffort } from '../../types/settings';
 import { AgentCapability, type BackendCapabilities } from '../AgentCapability';
@@ -1497,10 +1498,14 @@ export class CodexAdapter
 
   async *sendMessage(rawRequest: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
     // Codex exposes no per-turn instructions seam; the backend-neutral
-    // memory injection rides at the front of the message text.
+    // memory injection rides at the front of the message text. The R-B4
+    // Obsidian-tooling injection uses the same seam, after memory.
     const request: AgentChatSendRequest = {
       ...rawRequest,
-      content: prependMemoryInjection(rawRequest.content, rawRequest.options),
+      content: prependObsidianToolingInjection(
+        prependMemoryInjection(rawRequest.content, rawRequest.options),
+        rawRequest.options,
+      ),
     };
     if (!this.codex) {
       yield { type: 'error', content: 'Codex adapter not started' };

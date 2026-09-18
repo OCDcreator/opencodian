@@ -12,6 +12,7 @@ import {
   parseModelReference,
   resolveModelSelection,
 } from '../../core/config/modelConfig';
+import type { ObsidianToolingStatusSnapshot } from '../../core/obsidianTooling';
 import { OPENCODE_CAPABILITY_SETTINGS_SCHEMA_VERSION } from '../../core/opencode/OpenCodeCapabilitySettingsMigration';
 import type {
   OpencodeCompactionConfig,
@@ -25,6 +26,8 @@ import {
   EDIT_REVERT_SNAPSHOT_LIMIT_MB_MIN,
   normalizeChatFontSizePx,
   normalizeEditRevertSnapshotLimitMb,
+  normalizeObsidianToolingMode,
+  OBSIDIAN_TOOLING_MODES,
 } from '../../core/types';
 import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
@@ -237,6 +240,11 @@ export class SettingsConversationSection {
       description: t('settings.conversation.display.desc'),
     });
     this.markSettingsTarget(displayBodyEl, 'display');
+    const obsidianToolingBodyEl = this.createSettingsBlock(containerEl, {
+      title: t('settings.obsidianTooling.title'),
+      description: t('settings.obsidianTooling.groupDesc'),
+    });
+    this.markSettingsTarget(obsidianToolingBodyEl, 'obsidian-tooling');
     const questionBodyEl = isOpenCodeActive
       ? this.createSettingsBlock(containerEl, {
           title: t('settings.conversation.questions.title'),
@@ -263,6 +271,7 @@ export class SettingsConversationSection {
       this.renderExperimentalBlock(experimentalBodyEl);
     }
     this.renderDisplayBlock(displayBodyEl);
+    this.renderObsidianToolingBlock(obsidianToolingBodyEl);
     if (questionBodyEl) {
       this.renderQuestionsBlock(questionBodyEl);
     }
@@ -287,6 +296,7 @@ export class SettingsConversationSection {
           ]
         : []),
       { id: 'display', render: (el) => this.renderDisplayTabBlock(el) },
+      { id: 'obsidian-tooling', render: (el) => this.renderObsidianToolingBlock(el) },
       { id: 'memory', render: (el) => this.renderMemoryBlock(el) },
       ...(this.isOpenCodeActive()
         ? [{ id: 'questions', render: (el: HTMLElement) => this.renderQuestionsBlock(el) }]
@@ -1422,6 +1432,91 @@ export class SettingsConversationSection {
             await this.plugin.saveSettings();
           });
       });
+  }
+
+  /**
+   * R-B4 Obsidian native tooling: mode selector + honest availability status
+   * + install guidance. The status never lies: off / unsupported platforms /
+   * probe failures each render their own explicit message.
+   */
+  private renderObsidianToolingBlock(containerEl: HTMLElement): void {
+    const modeLabels: Record<string, string> = {
+      off: t('settings.obsidianTooling.mode.off'),
+      cli: t('settings.obsidianTooling.mode.cli'),
+      mcp: t('settings.obsidianTooling.mode.mcp'),
+    };
+
+    new Setting(containerEl)
+      .setName(t('settings.obsidianTooling.mode.name'))
+      .setDesc(t('settings.obsidianTooling.mode.desc'))
+      .addDropdown((dropdown) => {
+        for (const mode of OBSIDIAN_TOOLING_MODES) {
+          dropdown.addOption(mode, modeLabels[mode] ?? mode);
+        }
+        dropdown
+          .setValue(this.plugin.settings.obsidianToolingMode)
+          .onChange(async (value) => {
+            const nextMode = normalizeObsidianToolingMode(value);
+            dropdown.setValue(nextMode);
+            this.plugin.settings.obsidianToolingMode = nextMode;
+            await this.plugin.saveSettings();
+            await this.plugin.obsidianToolingRuntime?.applySettings();
+            statusSetting.setDesc(this.resolveObsidianToolingStatusText());
+          });
+      });
+
+    const statusSetting = new Setting(containerEl)
+      .setName(t('settings.obsidianTooling.status.name'))
+      .setDesc(this.resolveObsidianToolingStatusText())
+      .addExtraButton((button) => {
+        button
+          .setIcon('refresh-cw')
+          .setTooltip(t('settings.obsidianTooling.recheck'))
+          .onClick(async () => {
+            await this.plugin.obsidianToolingRuntime?.refreshProbe();
+            statusSetting.setDesc(this.resolveObsidianToolingStatusText());
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.obsidianTooling.guidance.name'))
+      .setDesc(t('settings.obsidianTooling.guidance.desc'));
+  }
+
+  /** Compose the honest status line from the runtime snapshot (never silent). */
+  private resolveObsidianToolingStatusText(): string {
+    const mode = this.plugin.settings.obsidianToolingMode;
+    if (mode === 'off') {
+      return t('settings.obsidianTooling.status.off');
+    }
+    if (mode === 'mcp') {
+      return t('settings.obsidianTooling.status.mcpReserved');
+    }
+    const snapshot: ObsidianToolingStatusSnapshot | null =
+      this.plugin.obsidianToolingRuntime?.getStatus() ?? null;
+    if (!snapshot) {
+      return t('settings.obsidianTooling.status.unknown');
+    }
+    if (!snapshot.desktopSupported) {
+      return t('settings.obsidianTooling.status.mobile');
+    }
+    if (!snapshot.platformSupported) {
+      return t('settings.obsidianTooling.status.windows');
+    }
+    const cli = snapshot.cli;
+    if (!cli) {
+      return t('settings.obsidianTooling.status.unknown');
+    }
+    switch (cli.status) {
+      case 'available':
+        return t('settings.obsidianTooling.status.available', { version: cli.version });
+      case 'not-found':
+        return t('settings.obsidianTooling.status.notFound');
+      case 'timeout':
+        return t('settings.obsidianTooling.status.timeout');
+      case 'error':
+        return t('settings.obsidianTooling.status.error', { detail: cli.detail });
+    }
   }
 
   private addQuestionCardPositionSetting(containerEl: HTMLElement): void {

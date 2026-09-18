@@ -570,3 +570,5 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 > 2026-09-18 (R-A5/R-A6/R-A7)：新增 `inlineEdit.command.document`、`inlineEdit.mode.*`、`inlineEdit.placeholder.document`、`inlineEdit.preview.degraded/streamingLarge`、`inlineEdit.confirm.document.*`、`inlineEdit.error.tooManyEdits/documentTooLong/documentModeDisabled/noSelectionForMode`；`inlineEdit.context.limit/empty` 改写为「条目（文件或目录）」语义；`chat.context.kind.folder`、`chat.context.filePicker.addSelected/selectedCount`。
 
 ## 维护约束
+
+- 2026-09-18 (FlowText R-B4): Obsidian 原生工具注入接缝接入——新增 settings.obsidianTooling.* 键（块标题/组描述、模式、状态各态、重新检测、安装引导、确认对话框 allow/deny），中英双语同步。

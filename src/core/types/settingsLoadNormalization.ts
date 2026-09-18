@@ -34,6 +34,7 @@ import {
   normalizeInputPanelThemeId,
   normalizeMemoryBackendUserSettings,
   normalizeModelProviderPluginDebugSettings,
+  normalizeObsidianToolingMode,
   normalizePersistedTabState,
   normalizePluginUpdateAutoInstall,
   normalizeQuestionCardSettings,
@@ -453,6 +454,15 @@ function normalizeEditRevertSettingsOnLoad(
   };
 }
 
+/** R-B4 Obsidian native tooling, normalized at the final load-merge boundary. */
+function normalizeObsidianToolingSettingsOnLoad(
+  normalizedSettings: Partial<OpenCodianSettings> | null,
+): { obsidianToolingMode: ReturnType<typeof normalizeObsidianToolingMode> } {
+  return {
+    obsidianToolingMode: normalizeObsidianToolingMode(normalizedSettings?.obsidianToolingMode),
+  };
+}
+
 function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | null): LoadSettingsNormalizationResult {
   const normalizedModelProviderPluginDebugSettings = normalizeModelProviderPluginDebugSettings(savedSettings);
   const { normalizedServer, shouldMigrateLegacyLocalDefaultPort } = normalizeServerSettingsOnLoad(savedSettings);
@@ -580,6 +590,7 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
       ),
       contextGroups: normalizeContextGroups(normalizedSettings?.contextGroups),
       ...normalizeEditRevertSettingsOnLoad(normalizedSettings),
+      ...normalizeObsidianToolingSettingsOnLoad(normalizedSettings),
     },
     shouldMigrateLegacyLocalDefaultPort,
     shouldResetGlassRefractionGlassDefaults,

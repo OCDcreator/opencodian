@@ -458,3 +458,5 @@ New normalize functions added:
 > 2026-09-18 (R-A5/R-A6)：新增 `inlineEditMaxConcurrentEdits`（默认 3，clamp 1–8，`normalizeInlineEditMaxConcurrentEdits`——每个并行编辑同时消耗一个独立模型会话）与 `inlineEditDocumentModeEnabled`（默认 true，整篇形态总开关）。
 
 ## 维护约束
+
+- 2026-09-18 (FlowText R-B4): Obsidian 原生工具注入接缝接入——新增设置项 obsidianToolingMode（off/cli/mcp，默认 off）与 normalizeObsidianToolingMode；off 为零成本稳态（不探测/不注入/不监听），mcp 为预留值（本版本未实现、如实显示）。

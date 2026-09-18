@@ -175,6 +175,28 @@ export const EDIT_REVERT_SNAPSHOT_LIMIT_MB_MIN = 10;
 export const EDIT_REVERT_SNAPSHOT_LIMIT_MB_MAX = 500;
 
 /**
+ * Obsidian native tooling mode (R-B4, §10 Q2: CLI first, MCP as a later
+ * supplement). `off` is the zero-cost default: no CLI probing, no prompt
+ * injection, no request watcher. `cli` routes the agent through the generated
+ * gate wrapper for the official desktop CLI. `mcp` is a reserved value for
+ * the deferred self-hosted MCP route — accepted and persisted per the
+ * requirement's settings table, but NOT implemented this milestone; the
+ * settings UI and the chat capability surface say so explicitly.
+ */
+export type ObsidianToolingMode = 'off' | 'cli' | 'mcp';
+export const OBSIDIAN_TOOLING_MODES: readonly ObsidianToolingMode[] = ['off', 'cli', 'mcp'];
+
+/**
+ * Normalize the tooling mode: unknown / stale values fall back to `off` so a
+ * hand-edited settings file cannot silently activate the capability.
+ */
+export function normalizeObsidianToolingMode(value: unknown): ObsidianToolingMode {
+  return typeof value === 'string' && (OBSIDIAN_TOOLING_MODES as readonly string[]).includes(value)
+    ? (value as ObsidianToolingMode)
+    : 'off';
+}
+
+/**
  * Normalize the R-B3 checkpoint retention cap: finite integers within
  * [MIN, MAX] pass through; anything else falls back to the default so a
  * stale or hand-edited settings file cannot disable retention or inflate
@@ -3236,6 +3258,15 @@ export interface OpenCodianSettings {
    */
   editRevertSnapshotLimitMb: number;
 
+  /**
+   * Obsidian native tooling mode (R-B4, default `off`). When off there is no
+   * CLI probing, no prompt injection and no request watcher. `cli` enables
+   * the official desktop CLI through the plugin-generated confirmation gate
+   * wrapper; `mcp` is reserved for the deferred MCP route and is not
+   * implemented this milestone (surfaced as unavailable, never silent).
+   */
+  obsidianToolingMode: ObsidianToolingMode;
+
   capabilityLabSelectedBackend: string | undefined;
 
   /** Backend-specific settings that should not be flattened into OpenCode fields. */
@@ -3479,6 +3510,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   contextGroups: [],
   editRevertEnabled: true,
   editRevertSnapshotLimitMb: EDIT_REVERT_SNAPSHOT_LIMIT_MB_DEFAULT,
+  obsidianToolingMode: 'off',
   capabilityLabSelectedBackend: undefined,
   backendSettings: getDefaultBackendSettings(),
 

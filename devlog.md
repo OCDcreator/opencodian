@@ -11,6 +11,18 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-18 Obsidian 原生工具（R-B4）：官方 CLI 经确认门包装脚本 + 后端无关注入
+
+FlowText 对齐批次 B 的 R-B4（`docs/requirements/flowtext-parity.md`，§10 Q2 定案路线 A：官方 CLI 先行，MCP 留作后续补足）：让 agent 经 Obsidian 桌面官方 CLI 获得主题/插件/书签/日记/标签/属性/孤立笔记/搜索等仓库级原生能力，四后端共用同一能力；高影响操作（安装/启用插件与主题等）由**机制**而非提示词保证显式用户确认（§11.3）。
+
+**分层**：新 owner `core.obsidian-tooling`（`src/core/obsidianTooling/`）——`obsidianToolingCatalog.ts`（CLI 全子命令四类目录：read / navigation / vault-write / high-impact；未知子命令 fail-closed 归 high-impact；vault-write 经运行中的应用产生 vault 事件、由 R-B3 侧栏按轮记录）、`obsidianGateScript.ts`（生成的 POSIX sh 包装脚本——高影响确认的执行点：无决策不执行，deny=exit 3、超时/过期=exit 4、决策不可读=exit 5，允许后以完全相同 argv exec 真实 CLI）、`obsidianToolingRequests.ts`（request/decision 纯模式：严格校验含「argv 首位置参数必须等于声明子命令」）、`obsidianToolingInjection.ts`（镜像 D-O2 记忆注入契约的选项袋键 `obsidianToolingInjection` + 每 epoch 计划/标记扫描）、`obsidianToolingPrompt.ts`（能力块：available 全量 / unavailable 诚实短块）、`ObsidianCliProbe.ts`（`obsidian version` 结构化探测，可注入）、`obsidianToolingStatus.ts`（跨边界状态契约）。运行时 owner `app.obsidian-tooling`（`src/app/obsidianTooling/`）——`ObsidianToolingCoordinator.ts`（模式生命周期：off=零成本不探测/不注入/不监听；门供给（内容变更才重写+chmod）、fs.watch+15s 兜底扫描请求目录、fail-closed 请求处置（畸形→invalid、过期→expired、弹窗 Esc/关闭=deny）、探测缓存、注入 epoch 水位）、`ObsidianToolingApprovalModal.ts`（确认对话框：允许一次=仅该 argv 一次；拒绝/Esc/关闭=deny）。`main.ts` 仅 `initObsidianToolingRuntime()` 构造 + `onunload` dispose。
+
+**确认门机制与威胁模型**：agent 被注入块告知经 `<vault>/.opencodian/obsidian-tooling/obsidian-gate` 调用 CLI；high-impact 子命令先写 `requests/<id>.request.json`（tmp+mv 原子）并轮询 `<id>.decision.json`（默认 90s，上/下限钳制），插件 fs.watch 弹出确认对话框后写决策文件。诚实边界（已写进 owner 概览/注入块/设置 UI，不假装闭环）：同用户进程仍可调用裸 `obsidian` 二进制或伪造决策文件——门保证「默认必现对话框、无决策不执行、拒绝即无操作」，是对受认可路径的机制约束，不是对抗性沙箱；彻底闭环需路线 B（自建 MCP，后续批次）。Windows 本里程碑无包装脚本：设置页与注入块均如实显示不可用，不静默降级。
+
+**注入接缝（后端无关证明）**：扩展 `MessageSendPreparationService` 既有记忆注入缝——新增 `planObsidianToolingInjection` host 回调（ChatRuntimeComposition 接 `plugin.obsidianToolingRuntime.planInjection`），注入块挂 `modelOptions.obsidianToolingInjection`；四适配器各自接缝翻译：OpenCodeAdapter 合成 text part（kind `obsidian-tooling-injection`），Claude/Codex/Pi `prependObsidianToolingInjection(prependMemoryInjection(...))` 前缀。每 context epoch 注入一次（内存压缩水位 + 转录标记扫描双信号），模式关闭或能力不可用时不注入全量块（不可用时注入三行诚实声明）。设置四件套：`obsidianToolingMode`（off 默认 / cli / mcp 预留值但本版本未实现、UI 如实标注）+ `normalizeObsidianToolingMode` + 会话设置新「Obsidian 原生工具」块（模式/诚实状态行/重新检测/安装引导）+ zh/en 双语。owner manifest 新增 `core.obsidian-tooling`、`app.obsidian-tooling`，`core.backend`/`core.backend-pi` 增补对 core owner 的依赖；`architecture-baseline.generated.json` 重生成。
+
+**测试**：新增 8 套件 52 例——catalog（分类/未知 fail-closed/集合不相交）、gateScript（确定性/内嵌集合与目录一致/真实 /bin/sh 执行：passthrough 直执行、无插件时 high-impact 落请求文件后 exit 4 且 CLI 未运行、请求 JSON 记录精确 argv）、requests（严格校验矩阵/argv-subcommand 一致性/决策文档）、injection（epoch 一次/压缩后重注入/持久化标记跨重载/选项袋与记忆键互不串扰）、prompt（标记框定/确认语义/MVP 命令面/unavailable 变体）、probe（四态/不抛）、settings 归一化（默认 off/非法回退/载入合并边界）、coordinator（off 零成本、cli 供给+注入、探测失败→unavailable 块、Windows 不可用、模式切换拆除）+ 四后端注入契约（OpenCodeAdapter 行为级：合成部件落袋；claude/codex/pi 源级接缝断言 + 共享选项袋键断言）。
+
 ## 2026-09-18 编辑回退（R-B3）：插件侧快照、单文件/整轮回退与恢复回退
 
 FlowText 对齐批次 B 的 R-B3（`docs/requirements/flowtext-parity.md`）：**后端无关**的插件侧文件级回退——不依赖任何后端的 revert 能力（OpenCode 的会话级 `revertSession` 保持独立、可并存），四后端行为一致。

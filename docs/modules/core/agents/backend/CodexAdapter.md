@@ -68,3 +68,5 @@
 - 2026-09-13: sendMessage 以 prependMemoryInjection 在输入文本前置记忆注入块（app-server turn options 无 instructions 字段）。
 
 - 2026-09-15: 实现 `AgentAuxQueryCapability.startAuxQuerySession()`：创建 ephemeral + read-only sandbox 的临时 thread，并用 app-server 的 `getThreadEffectiveSettings()` 回读校验 sandbox/approval/network（fail closed）。实现见 `auxiliary/CodexAuxQuerySession.ts`。
+
+- 2026-09-18 (FlowText R-B4): Obsidian 原生工具注入接缝接入——sendMessage 现在把 options.obsidianToolingInjection 以 prependObsidianToolingInjection 前缀到消息文本（记忆块之后），同一选项袋接缝。

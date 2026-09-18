@@ -146,3 +146,5 @@ export function createMessageSendPreparationHost(
 Pi 发送启用自身模型目录校验并跳过 OpenCode skill 展开，原始 Pi /skill 和模板交给外部服务；其余后端条件不变。
 
 - 2026-09-13: prepareMessageSend 调用可选 planMemoryInjection 并把结果并入 modelOptions.memoryInjection（fail-soft）。
+
+- 2026-09-18 (FlowText R-B4): Obsidian 原生工具注入接缝接入——发送预检新增 planTurnToolingInjection：把 host.planObsidianToolingInjection 的每 epoch 注入块挂到 modelOptions.obsidianToolingInjection（与 memoryInjection 并列的后端无关选项袋键，fail-soft）。

@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 
 import { prependMemoryInjection } from '../../../memory';
+import { prependObsidianToolingInjection } from '../../../obsidianTooling';
 import type { ContextUsageSnapshot, StreamChunk } from '../../../types/chat';
 import type { PiBackendSettings } from '../../../types/settings';
 import { AgentCapability, type BackendCapabilities } from '../../AgentCapability';
@@ -209,9 +210,13 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
   async *sendMessage(rawRequest: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
     // Pi has no system-prompt seam; the backend-neutral memory injection
     // rides at the front of the message text (NOT-a-request framed).
+    // The R-B4 Obsidian-tooling injection uses the same seam, after memory.
     const request: AgentChatSendRequest = {
       ...rawRequest,
-      content: prependMemoryInjection(rawRequest.content, rawRequest.options),
+      content: prependObsidianToolingInjection(
+        prependMemoryInjection(rawRequest.content, rawRequest.options),
+        rawRequest.options,
+      ),
     };
     const id = request.sessionId;
     if (this.sessionLocks.has(id)) throw new Error('Pi session is busy.');

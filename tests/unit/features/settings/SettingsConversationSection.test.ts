@@ -1038,6 +1038,10 @@ describe('SettingsConversationSection', () => {
         description: t('settings.conversation.display.desc'),
       },
       {
+        title: t('settings.obsidianTooling.title'),
+        description: t('settings.obsidianTooling.groupDesc'),
+      },
+      {
         title: t('settings.conversation.questions.title'),
         description: t('settings.conversation.questions.desc'),
       },
@@ -1056,6 +1060,7 @@ describe('SettingsConversationSection', () => {
       'conversation-sharing',
       'conversation-experimental',
       'conversation-display',
+      'conversation-obsidian-tooling',
       'conversation-questions',
       'conversation-rendering',
     ]);

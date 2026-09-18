@@ -144,6 +144,12 @@ export interface MessageSendPreparationHost {
     conversation: Conversation,
     latestUserText: string,
   ): Promise<{ text: string } | null>;
+  /**
+   * Plan the backend-neutral Obsidian-tooling injection for this turn (R-B4,
+   * per context epoch). Optional and fail-soft: null when the tooling mode is
+   * off or the block was already injected this epoch.
+   */
+  planObsidianToolingInjection?(conversation: Conversation): Promise<{ text: string } | null>;
   getActiveTabId(): TabId | null;
   ensureTabRuntime(tabId: TabId | null): boolean;
   isTabForegroundBusy(tabId: TabId | null): boolean;
@@ -372,6 +378,12 @@ export class MessageSendPreparationService {
     if (memoryInjection) {
       (modelOptions as Record<string, unknown>).memoryInjection = memoryInjection;
     }
+    // Backend-neutral Obsidian-tooling injection rides the same options bag
+    // (R-B4): same adapter-seam contract, once per context epoch.
+    const toolingInjection = await this.planTurnToolingInjection(conversation);
+    if (toolingInjection) {
+      (modelOptions as Record<string, unknown>).obsidianToolingInjection = toolingInjection;
+    }
     const activeModelId = this.host.formatModelId(modelOptions);
     const persistentContextItems = await this.composerSendContext.resolvePersistentContextItems(conversation.externalContextPaths);
     const contextItems = this.mergeContextItems(persistentContextItems, draftContextItems);
@@ -517,6 +529,18 @@ export class MessageSendPreparationService {
       );
     } catch {
       return null; // fail-soft: memory must never block a user turn
+    }
+  }
+
+  private async planTurnToolingInjection(
+    conversation: Conversation,
+  ): Promise<{ text: string } | null> {
+    try {
+      return (
+        (await this.host.planObsidianToolingInjection?.(conversation)) ?? null
+      );
+    } catch {
+      return null; // fail-soft: tooling must never block a user turn
     }
   }
 

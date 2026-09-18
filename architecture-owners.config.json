@@ -808,7 +808,8 @@
         "shared.foundation",
         "shared.diagnostics",
         "core.types",
-        "core.memory"
+        "core.memory",
+        "core.obsidian-tooling"
       ],
       "forbiddenDependencies": [
         "feature",
@@ -851,7 +852,8 @@
       "allowedOwnerDependencies": [
         "core.types",
         "core.agents",
-        "core.backend"
+        "core.backend",
+        "core.obsidian-tooling"
       ],
       "forbiddenDependencies": [
         "feature",
@@ -1196,6 +1198,96 @@
         "module-docs"
       ],
       "risk": "low"
+    },
+    {
+      "id": "core.obsidian-tooling",
+      "layer": "core",
+      "include": [
+        "src/core/obsidianTooling/**"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "R-B4 Obsidian native tooling core (route A: official desktop CLI)",
+        "CLI subcommand catalog and fail-closed high-impact classification (single source for the gate script)",
+        "generated obsidian-gate wrapper script (the enforcement mechanism for high-impact confirmations)",
+        "request/decision handshake schema for the confirmation flow",
+        "backend-neutral tooling injection block, epoch planning and options-bag helpers",
+        "desktop CLI availability probe (structured, never throws)"
+      ],
+      "canonicalState": [
+        "command catalog and classification sets",
+        "gate script template",
+        "request/decision schema"
+      ],
+      "entrypoints": [
+        "src/core/obsidianTooling/index.ts"
+      ],
+      "allowedOwnerDependencies": [
+        "shared.foundation",
+        "core.types"
+      ],
+      "forbiddenDependencies": [
+        "feature",
+        "app"
+      ],
+      "adjacentOwners": [
+        "app.obsidian-tooling",
+        "core.types"
+      ],
+      "tests": [
+        "tests/unit/core/obsidianTooling/**"
+      ],
+      "overviewDoc": "docs/architecture/owners/core-obsidian-tooling.md",
+      "requiredGates": [
+        "typecheck",
+        "module-docs"
+      ],
+      "risk": "medium"
+    },
+    {
+      "id": "app.obsidian-tooling",
+      "layer": "app",
+      "include": [
+        "src/app/obsidianTooling/**"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "compose the R-B4 tooling runtime: gate provisioning into .opencodian/obsidian-tooling/, request watcher and CLI probe cache",
+        "lifecycle keyed off obsidianToolingMode: off means no probing, no injection, no watchers (zero cost)",
+        "fail-closed confirmation intake: modal dialog per request, dismissal = deny, stale requests expire, malformed requests answered invalid",
+        "backend-neutral injection plan consumed by the chat send pipeline through the plugin field"
+      ],
+      "canonicalState": [
+        "ObsidianToolingCoordinator instance (owns gate/watcher/probe state, pending request queue and per-conversation injection epochs)"
+      ],
+      "entrypoints": [
+        "ObsidianToolingCoordinator"
+      ],
+      "allowedOwnerDependencies": [
+        "shared.foundation",
+        "shared.i18n",
+        "core.obsidian-tooling",
+        "core.types"
+      ],
+      "forbiddenDependencies": [
+        "feature.chat-runtime",
+        "feature.chat-services",
+        "core.backend",
+        "core.backend-pi"
+      ],
+      "adjacentOwners": [
+        "app.composition",
+        "core.obsidian-tooling"
+      ],
+      "tests": [
+        "tests/unit/app/obsidianTooling/**"
+      ],
+      "overviewDoc": "docs/architecture/owners/app-obsidian-tooling.md",
+      "requiredGates": [
+        "typecheck",
+        "module-docs"
+      ],
+      "risk": "medium"
     },
     {
       "id": "core.types",

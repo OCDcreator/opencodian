@@ -52,6 +52,7 @@ import { OpenCodeSessionTraceService } from './core/opencode/diagnostics';
 import { ClaudeSessionTraceService, collectClaudeCodeKnownSecrets, CodexSessionTraceService } from './core/agents/backend/diagnostics';
 import { DiagnosticsRuntimeCoordinator } from './app/diagnostics';
 import { MemoryRuntimeCoordinator } from './app/memory';
+import { ObsidianToolingCoordinator } from './app/obsidianTooling';
 import { migrateOpenCodeCapabilitySettings } from './core/opencode/OpenCodeCapabilitySettingsMigration';
 import { OpenCodianSettingsRuntimeCoordinator } from './core/runtime/OpenCodianSettingsRuntimeCoordinator';
 import { OpenCodianStartupCoordinator } from './core/runtime/OpenCodianStartupCoordinator';
@@ -131,6 +132,8 @@ export default class OpenCodianPlugin extends Plugin {
   private diagnosticsCoordinator: DiagnosticsRuntimeCoordinator | null = null;
   /** Backend-neutral memory runtime (app.memory-runtime owner). Constructed during onload. */
   memoryRuntime: MemoryRuntimeCoordinator | null = null;
+  /** R-B4 Obsidian native tooling runtime (app.obsidian-tooling owner). Constructed during onload. */
+  obsidianToolingRuntime: ObsidianToolingCoordinator | null = null;
   /**
    * Backend-neutral edit-revert snapshot service (core.storage owner, R-B3).
    * Constructed during startup after settings load; the chat runtime and the
@@ -431,6 +434,7 @@ export default class OpenCodianPlugin extends Plugin {
         },
       });
       this.memoryRuntime.registerCommands(this);
+      this.initObsidianToolingRuntime();
 
       // Wire the Codex approval bridge host to the mutable context the chat
       // view populates on mount.  Mirrors the Claude permission host wiring.
@@ -949,6 +953,7 @@ export default class OpenCodianPlugin extends Plugin {
   onunload() {
     this.runtimeCoordinator.dispose();
     this.memoryRuntime?.dispose();
+    this.obsidianToolingRuntime?.dispose();
     this.editRevertService?.dispose();
     // Stop the OpenCode server (async, best-effort)
     void this.openCodeService?.stop().catch((error) => {
@@ -1058,6 +1063,22 @@ export default class OpenCodianPlugin extends Plugin {
   /** Save settings to storage */
   async saveSettings(options: { syncService?: boolean; reloadModels?: boolean; syncConfig?: boolean; applyUi?: boolean } = {}) {
     return this.getSettingsRuntimeCoordinator().saveSettings(options);
+  }
+
+  /**
+   * ObsidianToolingCoordinator owns the R-B4 native-tooling runtime
+   * (app.obsidian-tooling owner): gate provisioning, request watcher and the
+   * backend-neutral injection plan. main.ts composes only; the runtime
+   * itself stays a no-op unless `obsidianToolingMode` is `cli`.
+   */
+  private initObsidianToolingRuntime(): void {
+    this.obsidianToolingRuntime = new ObsidianToolingCoordinator({
+      app: this.app,
+      getMode: () => this.settings.obsidianToolingMode,
+    });
+    // Apply the persisted mode (no-op when off): provisions the gate and
+    // starts the request watcher only when the mode is `cli`.
+    void this.obsidianToolingRuntime.applySettings();
   }
 
   /**

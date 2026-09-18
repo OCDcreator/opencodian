@@ -288,3 +288,17 @@ export function debounce(fn: () => void, delay: number) {
 }
 
 export const requestUrl = jest.fn();
+
+/**
+ * Mock platform flags (R-B4 tooling coordinator tests mutate these to cover
+ * the unsupported-platform paths).
+ */
+export const Platform = {
+  isDesktopApp: true,
+  isMobile: false,
+  isMobileApp: false,
+  isMacOS: true,
+  isWin: false,
+  isIosApp: false,
+  isAndroidApp: false,
+};

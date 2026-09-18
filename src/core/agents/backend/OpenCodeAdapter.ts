@@ -14,6 +14,7 @@
 import { requestUrl } from 'obsidian';
 
 import { extractMemoryInjection } from '../../memory';
+import { extractObsidianToolingInjection } from '../../obsidianTooling';
 import type { PromptSyntheticTextPartInput } from '../../opencode/OpenCodePromptRequestBuilder';
 import type { OpenCodeService } from '../../opencode/OpenCodeService';
 import type { AgentBackendKind } from '../../types/chat';
@@ -255,6 +256,9 @@ export class OpenCodeAdapter
     // Backend-neutral memory seam: translate the injection into a synthetic
     // text part so it reaches the model as context, not user prose.
     const memoryInjection = extractMemoryInjection(options);
+    // Backend-neutral Obsidian-tooling seam (R-B4): same translation, once
+    // per context epoch, riding its own options-bag key.
+    const toolingInjection = extractObsidianToolingInjection(options);
     const syntheticParts = [
       ...(Array.isArray(options.syntheticTextParts)
         ? (options.syntheticTextParts as PromptSyntheticTextPartInput[])
@@ -264,6 +268,13 @@ export class OpenCodeAdapter
             text: memoryInjection,
             ignored: false,
             metadata: { kind: 'memory-injection' },
+          } satisfies PromptSyntheticTextPartInput]
+        : []),
+      ...(toolingInjection
+        ? [{
+            text: toolingInjection,
+            ignored: false,
+            metadata: { kind: 'obsidian-tooling-injection' },
           } satisfies PromptSyntheticTextPartInput]
         : []),
     ];

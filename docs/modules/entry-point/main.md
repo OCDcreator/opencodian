@@ -333,3 +333,5 @@ bootstrap 仅向注册入口注入 getPiSettings 读取回调，不在入口拥�
 
 - 2026-09-17（附加上下文）: bridge 新增 `listContextFiles` 注入（vault 内 `md`/`txt`，过滤含 `<`/`>` 的路径），供行内编辑"添加上下文"选择器使用；候选仅在用户打开选择器时枚举。
 
+
+- 2026-09-18 (FlowText R-B4): Obsidian 原生工具注入接缝接入——新增 initObsidianToolingRuntime()（构造 ObsidianToolingCoordinator 并应用持久化模式）与 onunload 中的 dispose；main.ts 仅组合，不承载门/监听逻辑。

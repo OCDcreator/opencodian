@@ -562,3 +562,5 @@ Added `chat.diffNotice.fileCount` (`{count}` accessible name for the header coun
 > 2026-09-18 (R-A5/R-A6/R-A7)：EN 同步新增上述键（见 zh.md 记录）。
 
 ## 维护约束
+
+- 2026-09-18 (FlowText R-B4): Obsidian 原生工具注入接缝接入——新增 settings.obsidianTooling.* 键（块标题/组描述、模式、状态各态、重新检测、安装引导、确认对话框 allow/deny），中英双语同步。
