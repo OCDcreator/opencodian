@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "eb513654397a4bc690a54f852f0de53724d3b86fc0cbb5e8c7bc7fbe3df4d038",
-  "recordCount": 719,
+  "digest": "96bbf769a02f7574e53341f659608da497ae399aa8e8f5f7eabc184842465d02",
+  "recordCount": 732,
   "records": [
     {
       "kind": "ignore",
@@ -16,12 +16,12 @@
     {
       "kind": "package",
       "key": "package-lock.json",
-      "sha256": "b887c5baea3f2a4dd8c1589c9dd6eb5df0fc2cdc53face0d3f671b5fdf41376e"
+      "sha256": "7c80684821b29e9d7f89c755d526ef3f92533e5a5bc55fc4e6f682b1fab08904"
     },
     {
       "kind": "package",
       "key": "package.json",
-      "sha256": "e2500d620fb3e8a9bbaaedd5e23bde477478daa4574477872a418e9120e308ff"
+      "sha256": "164578cd72ae44c9d760e11580fc91604e2353b6766bd8339bea519ed6598ea3"
     },
     {
       "kind": "src",
@@ -92,6 +92,11 @@
       "kind": "src",
       "key": "src/app/obsidianTooling/ObsidianToolingCoordinator.ts",
       "sha256": "1eda044bfda3e8c687af854b3a342a4b14fb3a2b95d943c439d79e2b964206f9"
+    },
+    {
+      "kind": "src",
+      "key": "src/app/pdf/PdfIndexFileSystem.ts",
+      "sha256": "ea4248b1172167b178d7a9f468cf1394fa1383aba63e8c4d165d7dcbdac9b2c9"
     },
     {
       "kind": "src",
@@ -681,7 +686,7 @@
     {
       "kind": "src",
       "key": "src/core/memory/VaultIndexService.ts",
-      "sha256": "8b9b94adc86334575d9046dddbbec01325fe750039509e72ae97dd3ca2e82491"
+      "sha256": "71dd4d25d22bfaa0a42015bb7dc65c7272a5e7d46e6159da83343b5cf8443bce"
     },
     {
       "kind": "src",
@@ -816,7 +821,7 @@
     {
       "kind": "src",
       "key": "src/core/opencode/OpenCodeContextPartSerializer.ts",
-      "sha256": "0de1eb22da195732e4a3b4a56f9db6d781601ed1d2e9a651803f9d9f0ae35d68"
+      "sha256": "e05585bedcceec0c3432bab9f76525240d41069f281cd72c712ccc70a7624aee"
     },
     {
       "kind": "src",
@@ -960,6 +965,51 @@
     },
     {
       "kind": "src",
+      "key": "src/core/pdf/index.ts",
+      "sha256": "99d565f362dda364d4035d78569341b89d8e5d1fe8fd1a6f13937ecc6fec86ff"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/pdf/pdfAnnotation.ts",
+      "sha256": "7e4ca55523fc9f2f6d9c6fa9dd454b9d404d1a5c93ff52729dbb46b7a9a9ed32"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/pdf/pdfEngineEntry.ts",
+      "sha256": "1c2d419bcb603d560b752027cf420995ac17cc2767fae8232996f210ca6849a5"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/pdf/pdfIndexFormat.ts",
+      "sha256": "25b68b3e35b23e0c4a9034880ce0d653c725225c069340f1f7ec0c84416aafc2"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/pdf/pdfIndexScoring.ts",
+      "sha256": "1a240d776b60b19ec955ab9126086d34838fcd08e778a7ff186b04862b5c415e"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/pdf/PdfIndexService.ts",
+      "sha256": "9961786dc42d651240340740345e412225fcc8dab9769e5c7999973a522a44d8"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/pdf/pdfTextEngine.ts",
+      "sha256": "b0dfab5ebe941ac7f0442004f72546ae68f233e05516bcee9868470bcd9a2879"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/pdf/pdfTextLayout.ts",
+      "sha256": "d25c7721da5c8be92b09f742a7a86b8ef3042da723c9b09875c135d49537aef1"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/pdf/pdfViewProbe.ts",
+      "sha256": "47c0ecd8ef8aeaf579cc52d1b5fc2f0727f23daffdb7e69a23943b8210a55244"
+    },
+    {
+      "kind": "src",
       "key": "src/core/prompts/titleGeneration.ts",
       "sha256": "9f0444f7c39dadaa522a541b33e472904e8b3f39f2279178c06077fadb63af01"
     },
@@ -1051,7 +1101,7 @@
     {
       "kind": "src",
       "key": "src/core/types/chat.ts",
-      "sha256": "eae02e52ff54e0966a478dfd6d2f55c76de445dfb24d57e238aba49189cde801"
+      "sha256": "8063621ad59ac1767bb70e423d3a2658e01d9d15a0c533cd8e1688f8316bf03b"
     },
     {
       "kind": "src",
@@ -1061,7 +1111,7 @@
     {
       "kind": "src",
       "key": "src/core/types/index.ts",
-      "sha256": "b42a0ceffe908cdefce6f22b71c36ded30887938f0f26a243517fee697870043"
+      "sha256": "36420407601d701810d3c3178191e61591471b3961d290eb0efcdffa72bb1926"
     },
     {
       "kind": "src",
@@ -1086,12 +1136,12 @@
     {
       "kind": "src",
       "key": "src/core/types/settings.ts",
-      "sha256": "0f8045a9e617db6c68cf274446ce562f1e82e8f30ab6d1072955e068f6096da5"
+      "sha256": "12cf3b782728ff96efdd2af7142f396b0b20a75c201394a1951e21044b10d9bd"
     },
     {
       "kind": "src",
       "key": "src/core/types/settingsLoadNormalization.ts",
-      "sha256": "c2766a71e02945f242eaef0edf874b52c28cf20f137346e1146b7cd7783b5110"
+      "sha256": "36e83330192c829d0a0bc2b52ecbda1551377a960445d9bbdfe73e6ee24b91c7"
     },
     {
       "kind": "src",
@@ -1161,7 +1211,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
-      "sha256": "45ee14c7f7d28ce9210f8fa757bba33220d93241d697d89bf34ebb8d547d7caf"
+      "sha256": "b679f0d16db6c2b93ec3c85c1dc33e818167a1de9abb8e8c36bc2d151437c076"
     },
     {
       "kind": "src",
@@ -1251,7 +1301,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/ChatRuntimeComposition.ts",
-      "sha256": "477d530896aee87f7687cf26a8d86bc7963a2c17249fb3029ff180b5009489de"
+      "sha256": "135409feeb6ce33cc59768f83627dc35099732715f2352b31966f6cb4d460ea9"
     },
     {
       "kind": "src",
@@ -1391,7 +1441,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/UserMessageContentRenderer.ts",
-      "sha256": "1bde820223b0a06f10b83181d73603e5ea62ec63a25181d2fe95829e5adddc7b"
+      "sha256": "1079e9e09af59cad914e5fe008bb99f2720a9c5cc0148af7455d067f8c1ac0dd"
     },
     {
       "kind": "src",
@@ -1531,7 +1581,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ComposerContextActionService.ts",
-      "sha256": "5f43fff4877c09b2a1ed5a5a75f6eb6c4bb4919cdd4ebe2439e3547f071f12e0"
+      "sha256": "bd8f01217b557b65ceb0d158f684aa78a5ed038c2fe4ef1a9ee46302745ea3ed"
     },
     {
       "kind": "src",
@@ -1566,7 +1616,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ComposerContextViewFacade.ts",
-      "sha256": "80cb3bca8700467c433d9206749cc6a8f2504195fd42bebde24054799e4705eb"
+      "sha256": "a2bbfd5269f988475984076b00d4eea539f713310e527a78b9f8c0dcf7581f39"
     },
     {
       "kind": "src",
@@ -1586,7 +1636,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ContextAttachmentBuilder.ts",
-      "sha256": "5bb3a6e24dd89d9a08cd90391df5cedb059ea7e6ac1f5d1a93e7678d374c78cc"
+      "sha256": "fdc294fb92ca1542c4de1eb939f698a92d0048ab7128b807b3a023727a0b5976"
     },
     {
       "kind": "src",
@@ -1852,6 +1902,16 @@
       "kind": "src",
       "key": "src/features/chat/services/ModifiedFilesSidebarCoordinator.ts",
       "sha256": "a17d5c488c08fabd56dd7cdb7ea09326c0abaafba57884e6fd58af94251184cd"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/chat/services/PdfAnnotationPreviewModal.ts",
+      "sha256": "f456f3eacd6d83aba84d577d081a05e24dd429468161cb5faa73f0e6d3e3ab6f"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/chat/services/PdfChatIntegration.ts",
+      "sha256": "0df893f43dfc95ae0b39d305dbdb456926b4ed069111f164822ec1f76dcbd436"
     },
     {
       "kind": "src",
@@ -2121,7 +2181,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/VaultRetrievalComposerCoordinator.ts",
-      "sha256": "c1931ceda89210e0234593a3dd876f0ebfee1206d1c9a4619b6aef4b2ffbd5c8"
+      "sha256": "0b66020a047566befd34daa713265d1e17d54e8ff14e48efc12dbcd4098f1b53"
     },
     {
       "kind": "src",
@@ -2811,7 +2871,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsConversationSection.ts",
-      "sha256": "bfa8a1514df36c0e53e684cdbb3fd703d4a20f3a3efe7b1268d4bc8b6959e8cc"
+      "sha256": "c433fd79995b5ae565d5625dbc6cad33ea404bcff74be91e24430e7b218a09e3"
     },
     {
       "kind": "src",
@@ -3046,7 +3106,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "10f908e009dd96c392d7a7e96d38bf4c20c339db29934866992ed57bd1a9091d"
+      "sha256": "3fb71afa9c4b42b6a04cfed205f1b1db454a3227ae0c297c2043b7f7291a0b91"
     },
     {
       "kind": "src",
@@ -3056,12 +3116,12 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "b41b4bcbaeb7c70b4ce2eacf5987246002e67a39613a1d6969225d28bd8e636f"
+      "sha256": "ffd3357cfd93fb26546e8ed223834e084d03d57afe1e0a51b6616ef153ee16c5"
     },
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "583e19cec77aa265eaa2522a4964081c3d9ba9a70143c454cb28bdd12c6afa75"
+      "sha256": "e183c01ad6e1650fa1bc64e4fe610aed6cbb2000546774bf0b72078b70967f4a"
     },
     {
       "kind": "src",
@@ -3126,7 +3186,7 @@
     {
       "kind": "src",
       "key": "src/shared/index.ts",
-      "sha256": "15a0b7fbbc00986788d262ac872dece734e126222e1c5599c45e5c08ebc22608"
+      "sha256": "ea03d36dde46a70264fccbebe599663564183f146fff2f9da5a3af9fe4bb37d8"
     },
     {
       "kind": "src",
@@ -3146,7 +3206,7 @@
     {
       "kind": "src",
       "key": "src/shared/obsidianContext.ts",
-      "sha256": "8630e5e17a2f4b3d1714d52105d9ac833715d1b33dca128ae5d0f4e2f47e78eb"
+      "sha256": "fa0f955ad62b611ba1103cf9faaf823d381ed41c40814811c60919c99f6fa1e2"
     },
     {
       "kind": "src",
@@ -3375,6 +3435,11 @@
     },
     {
       "kind": "src",
+      "key": "src/types/pdfjs-worker-shim.d.ts",
+      "sha256": "00ca096448839a33430324d5d5c2dd4bc8f033cef33585b7100a4493dd4fc357"
+    },
+    {
+      "kind": "src",
       "key": "src/types/ws-shim.d.ts",
       "sha256": "f05aac3628790b550c20afc94a0c60f3cf20ec3938779be8e63058ee3b8c97bf"
     },
@@ -3599,7 +3664,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-18T19:06:10.111Z",
-  "headShaAtGeneration": "abb637ecc6b1ac18215fa81d25d51b7c78bc0126",
+  "generatedAt": "2026-09-18T20:41:24.641Z",
+  "headShaAtGeneration": "b84547f4c3513b9918651b7a42b9cacde0ebd7a7",
   "graphifyVersion": "graphify 0.9.36"
 }
