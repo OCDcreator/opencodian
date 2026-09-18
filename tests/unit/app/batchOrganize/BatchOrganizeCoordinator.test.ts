@@ -11,13 +11,16 @@
  *   - property edits go through fileManager.processFrontMatter with typed
  *     values, and the revert restores the file byte-identically;
  *   - cancel/empty plans never open a snapshot and never write;
- *   - R-B5-D2: created folders come down on revert via `adapter.rmdir`
- *     (the file-only `adapter.remove` threw on directories in the real
- *     app), the emptiness guard keeps user content, and folders that
- *     remain are returned as `leftoverFolders` instead of being swallowed.
+ *   - R-B5-D2b: created folders come down on revert via the VAULT API
+ *     (`vault.delete(folder, true)` after a TFolder lookup). The adapter
+ *     cannot do it at runtime — `adapter.remove` is file-only and
+ *     `adapter.rmdir` throws EISDIR for directories on the real desktop app
+ *     (Obsidian 1.13.7 probe; the test double models exactly that) — the
+ *     emptiness guard keeps user content, and folders that remain are
+ *     returned as `leftoverFolders` instead of being swallowed.
  */
 
-import { TFile } from 'obsidian';
+import { TFile, TFolder } from 'obsidian';
 
 import { BatchOrganizeCoordinator } from '../../../../src/app/batchOrganize/BatchOrganizeCoordinator';
 import {
@@ -403,34 +406,41 @@ describe('BatchOrganizeCoordinator created-folder cleanup (R-B5-D2)', () => {
     return coordinator;
   }
 
-  it('revert deletes the folder the batch created: remove() on a directory throws, rmdir() takes it down', async () => {
-    // Regression for the live defect: adapter.remove() is file-only in the
-    // Obsidian Adapter API, so the cleanup threw, was swallowed by the warn,
-    // and the created folder survived the revert as an empty orphan.
+  it('revert deletes the created folder via the vault API: the adapter cannot (remove file-only, rmdir EISDIR)', async () => {
+    // Regression for the live defect pair: adapter.remove() is file-only in
+    // the Obsidian Adapter API, and the "fix" of routing through
+    // adapter.rmdir() ALSO throws on the real desktop app (EISDIR for a
+    // directory, Obsidian 1.13.7 probe) — 7deadbab shipped green because the
+    // test double modelled rmdir as working. The deletion must go through
+    // the vault API instead.
     const { harness, caches } = setupHarness();
     const coordinator = await executeMoveIntoNewFolder(harness, caches);
 
-    // The strict harness would fail this misuse loudly:
+    // The strict harness fails both adapter misuse paths loudly:
     await expect(harness.adapter.remove('归档验收P')).rejects.toThrow(/file-only/);
-    // (the folder is untouched by the failed remove — like the real API)
+    await expect(harness.adapter.rmdir('归档验收P', false)).rejects.toThrow(/EISDIR/);
+    // (the folder is untouched by the failed adapter calls — like the real API)
     expect(harness.hasVaultFolder('归档验收P')).toBe(true);
+    expect(harness.deleteLog).toEqual([]);
 
     const revert = await coordinator.revertLastBatch();
     expect(revert).toMatchObject({ result: { ok: true, changed: 2 }, leftoverFolders: [] });
     expect(harness.vaultFiles.get('notes/a.md')).toBe(NOTE_A);
     expect(harness.vaultFiles.get('notes/b.md')).toBe(NOTE_B);
-    // The created folder is gone: the vault is back to its pre-batch shape.
+    // The created folder is gone — through vault.delete(folder, true),
+    // proven by the delete log: the vault is back to its pre-batch shape.
+    expect(harness.deleteLog).toEqual([{ path: '归档验收P', force: true }]);
     expect(harness.hasVaultFolder('归档验收P')).toBe(false);
     expect(harness.folders.has('归档验收P')).toBe(false);
   });
 
-  it('when rmdir itself fails the leftover folder is surfaced in the revert result, not swallowed', async () => {
+  it('when the vault deletion itself fails the leftover folder is surfaced in the revert result, not swallowed', async () => {
     const { harness, caches } = setupHarness();
     const coordinator = await executeMoveIntoNewFolder(harness, caches);
 
-    // Genuinely exceptional removal failure (e.g. EACCES on the directory).
-    harness.adapter.rmdir = async (): Promise<never> => {
-      throw new Error('EACCES: simulated rmdir failure');
+    // Genuinely exceptional deletion failure (e.g. EACCES on the folder).
+    harness.vault.delete = async (): Promise<never> => {
+      throw new Error('EACCES: simulated vault.delete failure');
     };
 
     const revert = await coordinator.revertLastBatch();
@@ -440,18 +450,45 @@ describe('BatchOrganizeCoordinator created-folder cleanup (R-B5-D2)', () => {
     expect(harness.hasVaultFolder('归档验收P')).toBe(true);
   });
 
-  it('harness honesty: rmdir refuses a non-empty directory without recursive and a missing directory', async () => {
+  it('harness honesty: adapter rmdir throws EISDIR for existing directories, recursive or not', async () => {
     const { harness } = setupHarness();
     await expect(harness.adapter.rmdir('ghost', false)).rejects.toThrow(/directory not found/);
+    await expect(harness.adapter.rmdir('ghost', true)).rejects.toThrow(/directory not found/);
 
     await harness.vault.createFolder('hascontent');
     harness.vaultFiles.set('hascontent/note.md', 'content');
-    await expect(harness.adapter.rmdir('hascontent', false)).rejects.toThrow(/not empty/);
+    // Both arities throw like the probed runtime — non-recursive AND
+    // recursive; the folder and its content survive both failed calls.
+    await expect(harness.adapter.rmdir('hascontent', false)).rejects.toThrow(/EISDIR/);
+    await expect(harness.adapter.rmdir('hascontent', true)).rejects.toThrow(/EISDIR/);
     expect(harness.hasVaultFolder('hascontent')).toBe(true);
     expect(harness.vaultFiles.get('hascontent/note.md')).toBe('content');
+  });
 
-    await expect(harness.adapter.rmdir('hascontent', true)).resolves.toBeUndefined();
-    expect(harness.hasVaultFolder('hascontent')).toBe(false);
-    expect(harness.vaultFiles.has('hascontent/note.md')).toBe(false);
+  it('harness honesty: vault.delete removes an empty folder and files, refuses a non-empty folder', async () => {
+    const { harness } = setupHarness();
+
+    // An empty created folder comes down — the probed-working path.
+    await harness.vault.createFolder('emptydir');
+    const folder = harness.vault.getAbstractFileByPath('emptydir');
+    expect(folder).not.toBeNull();
+    await harness.vault.delete(folder as TFolder, true);
+    expect(harness.hasVaultFolder('emptydir')).toBe(false);
+    expect(harness.deleteLog).toEqual([{ path: 'emptydir', force: true }]);
+
+    // Files go down too.
+    const file = harness.vault.getAbstractFileByPath('notes/a.md');
+    expect(file).not.toBeNull();
+    await harness.vault.delete(file as TFile);
+    expect(harness.vaultFiles.has('notes/a.md')).toBe(false);
+
+    // A non-empty folder is refused even with force=true: deliberate
+    // divergence so the coordinator's emptiness guard stays load-bearing.
+    await harness.vault.createFolder('full');
+    harness.vaultFiles.set('full/note.md', 'content');
+    const full = harness.vault.getAbstractFileByPath('full');
+    await expect(harness.vault.delete(full as TFolder, true)).rejects.toThrow(/folder not empty/);
+    expect(harness.hasVaultFolder('full')).toBe(true);
+    expect(harness.vaultFiles.get('full/note.md')).toBe('content');
   });
 });

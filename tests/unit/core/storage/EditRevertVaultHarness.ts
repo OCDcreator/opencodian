@@ -48,6 +48,8 @@ export class EditRevertVaultHarness {
   /** Plugin-data artifacts (checkpoint blobs and round JSONs). */
   readonly diskFiles = new Map<string, string>();
   readonly trashLog: Array<{ path: string; system: boolean }> = [];
+  /** R-B5-D2b: every `vault.delete` call, so tests can prove vault-API deletes. */
+  readonly deleteLog: Array<{ path: string; force: boolean }> = [];
   readonly processLog: string[] = [];
   readonly createLog: string[] = [];
   /** Every adapter write; must stay under the plugin data prefix. */
@@ -84,45 +86,37 @@ export class EditRevertVaultHarness {
       return content;
     },
     // R-B5-D2: mirror the real Adapter split — `remove` is FILE-only (it
-    // throws on a directory; directories go through `rmdir`), so a caller
-    // using the wrong API fails loudly here instead of silently in tests.
+    // throws on a directory), so a caller using the wrong API fails loudly
+    // here instead of silently in tests. Directories cannot be removed
+    // through the adapter at all on the real desktop app: `rmdir` below
+    // throws EISDIR too (R-B5-D2b), so vault-content folders go through the
+    // vault API (`vault.delete`).
     remove: async (path: string): Promise<void> => {
       if (this.dirs.has(path) || this.folders.has(path)) {
-        throw new Error(`remove() is file-only; use rmdir for directory: ${path}`);
+        throw new Error(`remove() is file-only; use the vault API for directories: ${path}`);
       }
       this.diskFiles.delete(path);
     },
+    // R-B5-D2b — RUNTIME EVIDENCE, do not "fix" this back to a working
+    // rmdir without NEW live evidence: on the deployed build
+    // feature-flowtext-parity.202609182214 (contains 7deadbab) against
+    // Obsidian 1.13.7 / macOS, `vault.createFolder('归档验收R')` followed by
+    // `adapter.rmdir(path, false)` threw
+    //   "Path is a directory: rm returned EISDIR (is a directory) /…/归档验收R"
+    // for CJK and ASCII names alike, while `vault.delete(folderFile, true)`
+    // removed the same empty folder. The typings (obsidian.d.ts:1510 rmdir
+    // vs :1556 remove) suggest rmdir is a normal directory API and do NOT
+    // warn about this — exactly how the tidy-but-wrong "working rmdir"
+    // model let 7deadbab ship green and fail at runtime. This double now
+    // mirrors the observed runtime: rmdir ALWAYS throws for an existing
+    // directory, recursive or not (only the non-recursive case was probed
+    // live; the recursive case is modelled the same way).
     rmdir: async (path: string, recursive: boolean): Promise<void> => {
       if (!this.dirs.has(path) && !this.folders.has(path)) {
         throw new Error(`directory not found: ${path}`);
       }
-      if (!recursive) {
-        const listing = await this.adapter.list(path);
-        if (listing.files.length > 0 || listing.folders.length > 0) {
-          throw new Error(`directory not empty: ${path}`);
-        }
-      } else {
-        const prefix = `${path}/`;
-        for (const file of [...this.diskFiles.keys(), ...this.vaultFiles.keys()]) {
-          if (file.startsWith(prefix)) {
-            this.diskFiles.delete(file);
-            this.vaultFiles.delete(file);
-          }
-        }
-        for (const dir of [...this.dirs]) {
-          if (dir === path || dir.startsWith(prefix)) {
-            this.dirs.delete(dir);
-          }
-        }
-        for (const folder of [...this.folders]) {
-          if (folder === path || folder.startsWith(prefix)) {
-            this.folders.delete(folder);
-          }
-        }
-        return;
-      }
-      this.dirs.delete(path);
-      this.folders.delete(path);
+      void recursive;
+      throw new Error(`Path is a directory: rm returned EISDIR (is a directory) ${VAULT_BASE}/${path}`);
     },
     stat: async (path: string): Promise<{ size: number }> => {
       const content = this.vaultFiles.get(path) ?? this.diskFiles.get(path);
@@ -221,6 +215,32 @@ export class EditRevertVaultHarness {
     trash: async (file: TFile, system: boolean): Promise<void> => {
       this.vaultFiles.delete(file.path);
       this.trashLog.push({ path: file.path, system });
+      this.emit('delete', file.path);
+    },
+    // R-B5-D2b: the vault API's delete — the ONLY way the real desktop app
+    // removes a folder (adapter rmdir/remove both throw EISDIR/file-only,
+    // see the adapter.rmdir evidence comment above). Works for files and for
+    // EMPTY folders, like `vault.delete(file, force)` did in the live probe.
+    delete: async (file: TFile | TFolder, force?: boolean): Promise<void> => {
+      this.deleteLog.push({ path: file.path, force: force ?? false });
+      if (file instanceof TFolder) {
+        const prefix = `${file.path}/`;
+        const hasChildren =
+          [...this.vaultFiles.keys(), ...this.diskFiles.keys()].some((path) => path.startsWith(prefix)) ||
+          [...this.folders, ...this.dirs].some((path) => path.startsWith(prefix));
+        if (hasChildren) {
+          // Deliberate divergence from the real API (which would delete
+          // recursively when force=true): the double refuses so the
+          // coordinator's adapter.list emptiness guard stays load-bearing —
+          // dropping that guard must fail tests loudly instead of silently
+          // deleting user content through the force flag.
+          throw new Error(`folder not empty: ${file.path}`);
+        }
+        this.folders.delete(file.path);
+        this.dirs.delete(file.path);
+        return;
+      }
+      this.vaultFiles.delete(file.path);
       this.emit('delete', file.path);
     },
   };

@@ -19,6 +19,6 @@ R-B5 批量整理的模态 UI（configure → preview → running → result 四
 - 模板名、字段标签、状态与错误文案全部来自 `batchOrganize.*` i18n 键（zh/en 双语），模板是产品资产，代码不含措辞。
 - 确认时把预览签名传给 `BatchOrganizeCoordinator.execute`；stale-plan / snapshot-unavailable / empty / **folder-unavailable** 四种结果以 Notice 如实呈现并回到 configure 阶段。
 - 预览阶段如实列出"将新建目录"（`foldersToCreate`）；结果页披露本批次新建的目录，并说明回退会移除其中因此变空的目录（R-B5-D1）。
-- 回退后仍残留的本批次创建目录（非空保留或 `rmdir` 删除失败，R-B5-D2）经 `notifyLeftoverFolders` 以 `batchOrganize.notice.revertLeftoverFolders` Notice 显式提示；execute 的 `ok` / `folder-unavailable` 出口同理，不再静默留孤儿目录。
+- 回退后仍残留的本批次创建目录（非空保留或 vault API 删除失败，R-B5-D2b）经 `notifyLeftoverFolders` 以 `batchOrganize.notice.revertLeftoverFolders` Notice 显式提示；execute 的 `ok` / `folder-unavailable` 出口同理，不再静默留孤儿目录。
 - 回退按钮与"回退上一次批量"确认对话框共用 `revertLastBatchAndNotify`（同一套 Notice 反馈）。
 - 样式遵循 Obsidian 原生优先（h3/p/button/select/input 原生元素，无新增 CSS）。

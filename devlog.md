@@ -11,6 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-18 批量整理（R-B5-D2b 修复）：目录清理改走 vault API——`adapter.rmdir` 在真机上对目录抛 EISDIR
+
+实机复验 `7deadbab`（部署构建 `feature-flowtext-parity.202609182214`，Obsidian 1.13.7 / macOS）发现：R-B5-D2 把空目录删除改到 `adapter.rmdir(normalized, false)` 的修复**在真机上不成立**——对 `vault.createFolder` 刚创建的空目录（中文名 `归档验收R` 与 ASCII 名对照目录均试）调用 `adapter.rmdir` 一律抛 `Path is a directory: rm returned EISDIR (is a directory)`，目录原样保留；而 `app.vault.delete(folderFile, true)` 删除同一空目录成功。端到端复现一致：批量移动进新目录 → 回退后 `revertLastBatch()` 如实返回 `leftoverFolders: ['归档验收P']`（D2 的残留上报半边是好的，保留），但目录 6 秒 12 次轮询后仍在。单测全绿的原因：`EditRevertVaultHarness` 把 `rmdir` 建模成"空目录可删"，而 `obsidian.d.ts`（1510 行 `rmdir` / 1556 行 `remove`）的类型拆分完全看不出真机会抛 EISDIR——类型正确 ≠ 运行时可用。
+
+**修复**：`removeEmptyFolders` 的删除改走 **vault API**——`adapter.list` 空判定守卫不变（绝不删有内容的目录），随后 `vault.getAbstractFileByPath` 解析为 `TFolder`（解析不到即视为失败，进 leftover + warn），再 `vault.delete(folder, true)` 永久删除。**删除 vs 回收站的选择：永久删除**——目录是本批次刚刚创建且已验证为空，R-B5 承诺恢复批量前库形态，为插件自建的脚手架目录留一条回收站条目反而是新增状态（对照：R-B3 文件回退用 `vault.trash` 是因为那是要保护的用户文件）。`force: true` 与实测探针一致，避免隐藏未索引文件造成误拒；内容安全由紧邻其前的空判定承担，不由该标志承担。残留上报路径（Notice + `batchOrganize.notice.revertLeftoverFolders`）与失败路径（`vault.delete` 抛错 → warn + leftover）语义不变。
+
+**替身拨乱反正（本次的关键）**：`EditRevertVaultHarness` 改为镜像实测运行时——`adapter.rmdir(path, recursive)` 对已存在目录**一律抛 EISDIR**（递归与否都抛；双关注释写明实测证据，防止后人把替身"修"回整洁但错误的模型）、`adapter.remove` 维持仅文件、新增 `vault.delete(file, force?)`（文件与**空**目录可删；非空目录即使 `force=true` 也拒绝——刻意偏离真实 API，让协调器的空判定守卫保持承重：守卫一旦被拆，测试立即转红而非静默删除用户内容）并新增 `deleteLog` 供测试证明删除确实走了 vault API。
+
+**测试**：更新 3 例、新增 1 例——回退删除本批次创建目录改经 vault API（断言 `deleteLog == [{ path, force: true }]`，且两条 adapter 误用路径 `remove`/`rmdir` 均抛错）、`vault.delete` 失败时残留目录如实上浮、替身诚实性（`rmdir` 对存在目录递归/非递归均抛 EISDIR、缺失目录抛 not-found）、替身诚实性（`vault.delete` 可删空目录与文件、拒绝非空目录）。`npm run verify` 绿。
+
 ## 2026-09-18 批量整理（R-B5-D2 修复）：回退后目录清理改用 `adapter.rmdir` 并如实上报残留目录
 
 实机验收发现的必修缺陷（R-B5-D2）：批量移动到**尚不存在**的目标目录后一键回退，文件全部还原，但本批次创建的目录**残留为空目录**——违反 D1 承诺的"回退恢复批量前库形态"。单测未抓到的原因：`EditRevertVaultHarness` 的 `adapter.remove` 对目录同样静默删除，而真实 Obsidian Adapter API 中 `remove(normalizedPath)` **仅适用于文件**（`obsidian.d.ts` 1556 行），对目录调用抛错；协调器 `removeEmptyFolders` 的 `try/catch` 把该错误降级为 `logger.warn('batch organize folder cleanup skipped')`，批量照报成功。

@@ -29,7 +29,7 @@
  * (`src/shared/batchOrganizePlan.ts`).
  */
 
-import { type App, normalizePath, TFile } from 'obsidian';
+import { type App, normalizePath, TFile, TFolder } from 'obsidian';
 
 import type { EditRevertActionResult, EditRevertServicePort } from '../../core/types';
 import {
@@ -223,7 +223,7 @@ export class BatchOrganizeCoordinator {
   /**
    * One-click revert of the most recent batch (null when none recorded).
    * After the R-B3 revert of the file entries, folders this batch created
-   * are removed when they are now empty (via `adapter.rmdir`, R-B5-D2), so
+   * are removed when they are now empty (via the vault API, R-B5-D2b), so
    * the vault returns to its pre-batch shape; a folder that received other
    * content in the meantime is kept (never delete user content). Folders
    * that remain — kept or unremovable — are returned in `leftoverFolders`
@@ -344,13 +344,27 @@ export class BatchOrganizeCoordinator {
    * this is what makes a reverted batch leave the vault exactly as it was,
    * while a folder that gained user content in the meantime is kept.
    *
-   * R-B5-D2: empty directories go through `adapter.rmdir(path, false)` —
-   * `adapter.remove` is file-only in the Obsidian Adapter API and throws on
-   * a directory, which previously left every created folder orphaned behind
-   * a swallowed warn. Non-recursive by design: this code must never delete
-   * content, the emptiness check is the guard. Returns the folders that DID
-   * come down and those that remain (non-empty by user content, or the
-   * removal itself failed) so callers can surface the outcome honestly.
+   * R-B5-D2b: the actual delete goes through the VAULT API — resolve the
+   * folder to its `TFolder` (`vault.getAbstractFileByPath`) and call
+   * `vault.delete(folder, true)`. The Adapter API looks like the right tool
+   * on paper (`adapter.rmdir` exists in obsidian.d.ts next to the file-only
+   * `adapter.remove`), but on the real desktop app both throw for
+   * directories: Obsidian 1.13.7 probe on an empty `vault.createFolder`
+   * directory — `adapter.rmdir(path, false)` → "Path is a directory: rm
+   * returned EISDIR (is a directory)", CJK and ASCII names alike, while
+   * `vault.delete(folderFile, true)` removed the same folder (see the
+   * evidence comment in `EditRevertVaultHarness.adapter.rmdir`). The
+   * previous `rmdir` attempt shipped green behind a tidy-but-wrong test
+   * double and failed at runtime; writes go through the vault API, full
+   * stop. Permanent delete (not `vault.trash`) on purpose: the folder was
+   * created by this same batch and is verified empty right above, and R-B5
+   * promises the pre-batch shape — a trash entry for plugin-created
+   * scaffolding would be new state. `force: true` matches the probe and
+   * keeps hidden un-indexed files from producing a spurious refusal; the
+   * emptiness re-check is the real content safety, not the flag. Returns
+   * the folders that DID come down and those that remain (non-empty by user
+   * content, unresolvable in the vault index, or the deletion itself
+   * failed) so callers can surface the outcome honestly.
    */
   private async removeEmptyFolders(folders: readonly string[]): Promise<{ removed: string[]; leftover: string[] }> {
     const removed: string[] = [];
@@ -364,7 +378,11 @@ export class BatchOrganizeCoordinator {
           leftover.push(folder);
           continue;
         }
-        await this.app.vault.adapter.rmdir(normalized, false);
+        const abstract = this.app.vault.getAbstractFileByPath(normalized);
+        if (!(abstract instanceof TFolder)) {
+          throw new Error(`folder not resolvable in the vault index: ${normalized}`);
+        }
+        await this.app.vault.delete(abstract, true);
         removed.push(folder);
       } catch (error) {
         logger.warn('batch organize folder cleanup skipped', { error, folder });
