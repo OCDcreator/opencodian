@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "d9cc4d163eacdab6be849b9b3d4662094abfdd13c21071beb0213e11b468a56a",
+  "digest": "94911a5eb7d4d3733c84859693ab9d8743f7e57fbf4cac2b742d82d577a39bd2",
   "recordCount": 705,
   "records": [
     {
@@ -3501,7 +3501,7 @@
     {
       "kind": "tool",
       "key": "graphify-version",
-      "sha256": "3743012c1f0a4169ff074ffacae1312a05745afae16e874a4a80c3061b2624b3"
+      "sha256": "b51978f2277743327d67f2e691d74d1915bc4705f49837c36ab7ef8a2ab92ca8"
     },
     {
       "kind": "tsconfig",
@@ -3529,7 +3529,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-18T13:21:53.195Z",
-  "headShaAtGeneration": "6979f441d50514681d4ce2384ae1c6d22734aad1",
-  "graphifyVersion": "graphify 0.8.50"
+  "generatedAt": "2026-09-18T13:26:30.281Z",
+  "headShaAtGeneration": "42383b876a77f9c6ecc394206d63ef2d28d539d4",
+  "graphifyVersion": "graphify 0.9.36"
 }
