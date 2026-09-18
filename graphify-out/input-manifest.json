@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "eded338a3b396cfae7ec09030616c4f56b4b3f3f212ad7faf1b003c216748bd7",
-  "recordCount": 684,
+  "digest": "45ad33619c5f3cfa37cb00c748b2739693c140ac055741aff8defddc324e4035",
+  "recordCount": 695,
   "records": [
     {
       "kind": "ignore",
@@ -57,6 +57,21 @@
       "kind": "src",
       "key": "src/app/memory/MemoryRuntimeCoordinator.ts",
       "sha256": "78c53202c74a8fe0009b6624fda15891498905dfd1ee64acde2e0ad3101b4019"
+    },
+    {
+      "kind": "src",
+      "key": "src/app/obsidianTooling/index.ts",
+      "sha256": "17737d19ffccb1b8db4d5a30194bad59d5f4dab71aa649803e30d64f7228f68d"
+    },
+    {
+      "kind": "src",
+      "key": "src/app/obsidianTooling/ObsidianToolingApprovalModal.ts",
+      "sha256": "cda0625375214d1909a19c30ae10ae58f024507bf4609077d0f81b4496afa02d"
+    },
+    {
+      "kind": "src",
+      "key": "src/app/obsidianTooling/ObsidianToolingCoordinator.ts",
+      "sha256": "1eda044bfda3e8c687af854b3a342a4b14fb3a2b95d943c439d79e2b964206f9"
     },
     {
       "kind": "src",
@@ -151,7 +166,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/ClaudeCodeAdapter.ts",
-      "sha256": "90d0008af339efd8bb22765edb960db9965522a03e55dba4998c5fea6039edff"
+      "sha256": "ae5e5a3f1d2eedeed12eadc83df5dd92c5274a2264c8accc0d648ad0dddfd2f3"
     },
     {
       "kind": "src",
@@ -266,7 +281,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexAdapter.ts",
-      "sha256": "138516cecdb5422145b745acd22594b799c46fd0088b3e2392453a2c0d0dda6b"
+      "sha256": "b8c5225c4ed4f7e2cdce45c0deb0b3cf38d1d5a6f78135150a797dda4a20dada"
     },
     {
       "kind": "src",
@@ -371,7 +386,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/OpenCodeAdapter.ts",
-      "sha256": "652122121656c1f021750a27e17803dd7ebb6dfee8cf78a8bb3161db8136aeb6"
+      "sha256": "0e9698d2a32464018af5e83be81eddb9031110dc16148d34654caf7906a0656e"
     },
     {
       "kind": "src",
@@ -381,7 +396,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/pi/PiAdapter.ts",
-      "sha256": "b58efaec3e8ebc0af8ad4dfc74a5793f338b3a9f03565e507324c4a6a40c664a"
+      "sha256": "6cf29fbc7f266da90383fb21bd18ee21022c8df959af8695bbf32bd738b304d3"
     },
     {
       "kind": "src",
@@ -627,6 +642,46 @@
       "kind": "src",
       "key": "src/core/memory/memoryTypes.ts",
       "sha256": "c6a7900cd75273071443485bba7431b35d0b74bbfb7d3bc1f6705af1195e32b2"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/obsidianTooling/index.ts",
+      "sha256": "2144e97852367dc00b1d4fbd110884ff9fb121892998e7380aed02cb045df1c0"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/obsidianTooling/ObsidianCliProbe.ts",
+      "sha256": "a5f357ee795ae146a27852036700d22cb8f92b970f87770b0750f5b1662ba7c1"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/obsidianTooling/obsidianGateScript.ts",
+      "sha256": "96e625e1be1519ad14b285e3a165baaefd77d6cc8b2a1ef45e288134a06deae7"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/obsidianTooling/obsidianToolingCatalog.ts",
+      "sha256": "0eb60698ba2eee6cf00b0c1efaadaece357cddbbd8f2a9dd5f3c86d185a16b42"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/obsidianTooling/obsidianToolingInjection.ts",
+      "sha256": "2055b8039c5861c52f5a5489a2a027af43e805ac946642d7753a3e5d3376851a"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/obsidianTooling/obsidianToolingPrompt.ts",
+      "sha256": "68125e37c872f510b0eb609ead3525b4e34469aadbe17aea97b6c54e0a6ae5ff"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/obsidianTooling/obsidianToolingRequests.ts",
+      "sha256": "dc31954bf4d7375bc409e8f7699759b74e3d653ab1399ce4e4b7bbcf2d243a21"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/obsidianTooling/obsidianToolingStatus.ts",
+      "sha256": "f1b249458ec9efc53a8d182a76fa85c7c289163a0d7186745eb0ae9049225195"
     },
     {
       "kind": "src",
@@ -956,7 +1011,7 @@
     {
       "kind": "src",
       "key": "src/core/types/index.ts",
-      "sha256": "9c52d01239cae3a6d49fe22fd4b07274180f814c0322b9317a1011ed02984895"
+      "sha256": "00e7f4bad31e8f443a3af52dcbe0c897b27b99c294d2b3959fd4a49184c1b4fa"
     },
     {
       "kind": "src",
@@ -981,12 +1036,12 @@
     {
       "kind": "src",
       "key": "src/core/types/settings.ts",
-      "sha256": "9907359eabc84598aa8238d0894b0823df956109121666a900911b5b6e0c98b7"
+      "sha256": "72fd299b23696fec4cc297fcb9272edc34d7cf8c18b6fe480d192f061eb8c1a3"
     },
     {
       "kind": "src",
       "key": "src/core/types/settingsLoadNormalization.ts",
-      "sha256": "fc4a7d9a921adb7964f85ecd793d3398f53912636cd569166ab0e2e1657105f1"
+      "sha256": "2fe32f10c858a449ee2d7e418f40d2c946a27a3708473b72c6667e4f73168170"
     },
     {
       "kind": "src",
@@ -1146,7 +1201,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/ChatRuntimeComposition.ts",
-      "sha256": "858cf4fcbef8b24857420f5aa437144e87e30d867cd41caced3d1de50082d8f1"
+      "sha256": "8b16a2928b620139e3fec027854a7e37171a7e3a5aad1874a5585fb8fa0d1018"
     },
     {
       "kind": "src",
@@ -1731,7 +1786,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/MessageSendPreparationService.ts",
-      "sha256": "120a75d8c39de06ef7543cc765f3bb46118893374d1ce0ed0a7bf9b0f8e1b6a9"
+      "sha256": "315c2c1d0de75f2fa665fc8fefcdcb28faf2475cecfc44e86a1eb5da2ca984d2"
     },
     {
       "kind": "src",
@@ -2661,7 +2716,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsConversationSection.ts",
-      "sha256": "d150926b78c42e1106bd0595e4f78227762a429c3719d9f5be94cdc23c4465d5"
+      "sha256": "aa87d2a7ea8dcf016cbdd2621f52c8fdd8d8e99e9e3907381bdff347615070df"
     },
     {
       "kind": "src",
@@ -2891,7 +2946,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "1dcad1d7da49ed90f53477eb206a375254cb7ab1e74eda21afc7900c206a2a4d"
+      "sha256": "3a21899d64a098739f263d5a77f020a80941a5206b2992064b641f6cf1abe7ef"
     },
     {
       "kind": "src",
@@ -2901,12 +2956,12 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "952b156fc51bd0779c2b9d2f54eff61e978dc516487d98037340450e4405c756"
+      "sha256": "b81cfbe0442414f9224df6b4649ab4f73d4dcc08695cb034913525de8534a6a4"
     },
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "d9aeca08ba7b513ae3de2634a71800e48694f008927e0f256a54520f36fa86ec"
+      "sha256": "fdcd21c484deabf7e4d7a2a0b982f08bc065c233a75fe2f0a7f9ff6158884271"
     },
     {
       "kind": "src",
@@ -3424,7 +3479,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-18T07:18:13.293Z",
-  "headShaAtGeneration": "509017274f6f33f1714141c0a5ab4b1bca75f6d0",
+  "generatedAt": "2026-09-18T08:35:22.310Z",
+  "headShaAtGeneration": "c2e5b58ab5261a4d2a4eb8864018fc0854697b34",
   "graphifyVersion": "graphify 0.9.36"
 }
