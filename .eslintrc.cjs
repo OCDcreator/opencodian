@@ -1,4 +1,8 @@
 const justifiedMaxLinesFiles = [
+  // Cohesive multi-stage modal: configure -> preview -> running, plus the
+  // revert confirmation. Splitting it would scatter one DOM contract across
+  // files; its size comes from the three stages, not from unrelated duties.
+  'src/app/batchOrganize/BatchOrganizeModal.ts',
   'src/core/opencode/OpenCodeCatalogQueryCoordinator.ts',
   'src/core/opencode/OpenCodeService.ts',
   'src/core/opencode/OpenCodeStreamEventTransformer.ts',

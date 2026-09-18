@@ -95,6 +95,9 @@ describe('batch organize modal design contract (DESIGN.md §5 Modal Layout)', ()
   });
 
   it('contains no side-stripe accent borders', () => {
+    // jest/expect-expect cannot see through the local expectNoMatches helper,
+    // so pair it with a direct assertion that also pins the file identity.
+    expect(css).toContain('opencodian-batch-organize-modal');
     expectNoMatches(css, SIDE_STRIPE_PATTERN, 'batch-organize side stripe');
   });
 });
