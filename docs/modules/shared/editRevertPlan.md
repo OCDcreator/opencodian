@@ -25,6 +25,12 @@
 | `EDIT_REVERT_IDLE_CACHE_MAX_FILES/BYTES` | 64 / 8 MiB | 空闲内容缓存上限 |
 | `EDIT_REVERT_POST_TURN_GRACE_MS` | 10 min | 回合结束后写入仍归属该轮的宽限窗 |
 
+## R-B5 增量
+
+- `EditRevertFileStatus` 新增 `'moved'`（插件发起的移动/重命名条目：内容未变，回退 = 经 `fileManager.renameFile` 改回并还原引用，不需要内容 pre-image）；`EditRevertFileEntry` 新增 `movedTo?: string`；`EditRevertSidebarEntry` 新增 `movedTo: string | null`。
+- `isEntryRevertible`：`'moved'` 条目在 `movedTo` 存在即可回退（无需 pre-image）；`isEntryRestorable`：`'moved'` 条目 revert 后可对称恢复。
+- `EditRevertEntrySource` 新增 `'plugin'`（插件发起批量的显式登记来源）。
+
 ## 关键导出
 
 | 导出 | 说明 |

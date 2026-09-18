@@ -1,8 +1,71 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-18T08:31:41.429Z",
-  "headShaAtGeneration": "c2e5b58ab5261a4d2a4eb8864018fc0854697b34",
+  "generatedAt": "2026-09-18T09:44:01.349Z",
+  "headShaAtGeneration": "13ee707ba459a75981ce00fb2a391f81faf4d8ab",
   "edges": [
+    {
+      "id": "src/app/batchOrganize/BatchOrganizeCoordinator.ts|src/core/types/index.ts|type-only|../../core/types",
+      "from": "src/app/batchOrganize/BatchOrganizeCoordinator.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/types"
+    },
+    {
+      "id": "src/app/batchOrganize/BatchOrganizeCoordinator.ts|src/shared/index.ts|runtime-static|../../shared",
+      "from": "src/app/batchOrganize/BatchOrganizeCoordinator.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../shared"
+    },
+    {
+      "id": "src/app/batchOrganize/BatchOrganizeCoordinator.ts|src/shared/index.ts|runtime-static|../../shared",
+      "from": "src/app/batchOrganize/BatchOrganizeCoordinator.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../shared"
+    },
+    {
+      "id": "src/app/batchOrganize/BatchOrganizeModal.ts|src/app/batchOrganize/BatchOrganizeCoordinator.ts|type-only|./BatchOrganizeCoordinator",
+      "from": "src/app/batchOrganize/BatchOrganizeModal.ts",
+      "to": "src/app/batchOrganize/BatchOrganizeCoordinator.ts",
+      "kind": "type-only",
+      "specifier": "./BatchOrganizeCoordinator"
+    },
+    {
+      "id": "src/app/batchOrganize/BatchOrganizeModal.ts|src/core/types/index.ts|type-only|../../core/types",
+      "from": "src/app/batchOrganize/BatchOrganizeModal.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/types"
+    },
+    {
+      "id": "src/app/batchOrganize/BatchOrganizeModal.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/app/batchOrganize/BatchOrganizeModal.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
+    },
+    {
+      "id": "src/app/batchOrganize/BatchOrganizeModal.ts|src/shared/index.ts|runtime-static|../../shared",
+      "from": "src/app/batchOrganize/BatchOrganizeModal.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../shared"
+    },
+    {
+      "id": "src/app/batchOrganize/index.ts|src/app/batchOrganize/BatchOrganizeCoordinator.ts|re-export|./BatchOrganizeCoordinator",
+      "from": "src/app/batchOrganize/index.ts",
+      "to": "src/app/batchOrganize/BatchOrganizeCoordinator.ts",
+      "kind": "re-export",
+      "specifier": "./BatchOrganizeCoordinator"
+    },
+    {
+      "id": "src/app/batchOrganize/index.ts|src/app/batchOrganize/BatchOrganizeModal.ts|re-export|./BatchOrganizeModal",
+      "from": "src/app/batchOrganize/index.ts",
+      "to": "src/app/batchOrganize/BatchOrganizeModal.ts",
+      "kind": "re-export",
+      "specifier": "./BatchOrganizeModal"
+    },
     {
       "id": "src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts|src/app/diagnostics/types.ts|type-only|./types",
       "from": "src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts",
@@ -149,6 +212,62 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/app/obsidianTooling/index.ts|src/app/obsidianTooling/ObsidianToolingApprovalModal.ts|re-export|./ObsidianToolingApprovalModal",
+      "from": "src/app/obsidianTooling/index.ts",
+      "to": "src/app/obsidianTooling/ObsidianToolingApprovalModal.ts",
+      "kind": "re-export",
+      "specifier": "./ObsidianToolingApprovalModal"
+    },
+    {
+      "id": "src/app/obsidianTooling/index.ts|src/app/obsidianTooling/ObsidianToolingCoordinator.ts|re-export|./ObsidianToolingCoordinator",
+      "from": "src/app/obsidianTooling/index.ts",
+      "to": "src/app/obsidianTooling/ObsidianToolingCoordinator.ts",
+      "kind": "re-export",
+      "specifier": "./ObsidianToolingCoordinator"
+    },
+    {
+      "id": "src/app/obsidianTooling/ObsidianToolingApprovalModal.ts|src/core/obsidianTooling/index.ts|type-only|../../core/obsidianTooling",
+      "from": "src/app/obsidianTooling/ObsidianToolingApprovalModal.ts",
+      "to": "src/core/obsidianTooling/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/obsidianTooling"
+    },
+    {
+      "id": "src/app/obsidianTooling/ObsidianToolingApprovalModal.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/app/obsidianTooling/ObsidianToolingApprovalModal.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
+    },
+    {
+      "id": "src/app/obsidianTooling/ObsidianToolingCoordinator.ts|src/app/obsidianTooling/ObsidianToolingApprovalModal.ts|runtime-static|./ObsidianToolingApprovalModal",
+      "from": "src/app/obsidianTooling/ObsidianToolingCoordinator.ts",
+      "to": "src/app/obsidianTooling/ObsidianToolingApprovalModal.ts",
+      "kind": "runtime-static",
+      "specifier": "./ObsidianToolingApprovalModal"
+    },
+    {
+      "id": "src/app/obsidianTooling/ObsidianToolingCoordinator.ts|src/core/obsidianTooling/index.ts|runtime-static|../../core/obsidianTooling",
+      "from": "src/app/obsidianTooling/ObsidianToolingCoordinator.ts",
+      "to": "src/core/obsidianTooling/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/obsidianTooling"
+    },
+    {
+      "id": "src/app/obsidianTooling/ObsidianToolingCoordinator.ts|src/core/types/index.ts|type-only|../../core/types",
+      "from": "src/app/obsidianTooling/ObsidianToolingCoordinator.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/types"
+    },
+    {
+      "id": "src/app/obsidianTooling/ObsidianToolingCoordinator.ts|src/shared/index.ts|runtime-static|../../shared",
+      "from": "src/app/obsidianTooling/ObsidianToolingCoordinator.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../shared"
     },
     {
       "id": "src/app/runtime/PluginRuntimeCoordinator.ts|src/core/opencode/index.ts|runtime-static|../../core/opencode",
@@ -662,6 +781,13 @@
       "specifier": "../../memory"
     },
     {
+      "id": "src/core/agents/backend/ClaudeCodeAdapter.ts|src/core/obsidianTooling/index.ts|runtime-static|../../obsidianTooling",
+      "from": "src/core/agents/backend/ClaudeCodeAdapter.ts",
+      "to": "src/core/obsidianTooling/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../obsidianTooling"
+    },
+    {
       "id": "src/core/agents/backend/ClaudeCodeAdapter.ts|src/core/types/chat.ts|type-only|../../types/chat",
       "from": "src/core/agents/backend/ClaudeCodeAdapter.ts",
       "to": "src/core/types/chat.ts",
@@ -989,6 +1115,13 @@
       "to": "src/core/memory/index.ts",
       "kind": "runtime-static",
       "specifier": "../../memory"
+    },
+    {
+      "id": "src/core/agents/backend/CodexAdapter.ts|src/core/obsidianTooling/index.ts|runtime-static|../../obsidianTooling",
+      "from": "src/core/agents/backend/CodexAdapter.ts",
+      "to": "src/core/obsidianTooling/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../obsidianTooling"
     },
     {
       "id": "src/core/agents/backend/CodexAdapter.ts|src/core/types/chat.ts|type-only|../../types/chat",
@@ -1516,6 +1649,13 @@
       "specifier": "../../memory"
     },
     {
+      "id": "src/core/agents/backend/OpenCodeAdapter.ts|src/core/obsidianTooling/index.ts|runtime-static|../../obsidianTooling",
+      "from": "src/core/agents/backend/OpenCodeAdapter.ts",
+      "to": "src/core/obsidianTooling/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../obsidianTooling"
+    },
+    {
       "id": "src/core/agents/backend/OpenCodeAdapter.ts|src/core/opencode/OpenCodePromptRequestBuilder.ts|type-only|../../opencode/OpenCodePromptRequestBuilder",
       "from": "src/core/agents/backend/OpenCodeAdapter.ts",
       "to": "src/core/opencode/OpenCodePromptRequestBuilder.ts",
@@ -1612,6 +1752,13 @@
       "to": "src/core/memory/index.ts",
       "kind": "runtime-static",
       "specifier": "../../../memory"
+    },
+    {
+      "id": "src/core/agents/backend/pi/PiAdapter.ts|src/core/obsidianTooling/index.ts|runtime-static|../../../obsidianTooling",
+      "from": "src/core/agents/backend/pi/PiAdapter.ts",
+      "to": "src/core/obsidianTooling/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../obsidianTooling"
     },
     {
       "id": "src/core/agents/backend/pi/PiAdapter.ts|src/core/types/chat.ts|type-only|../../../types/chat",
@@ -2683,6 +2830,104 @@
       "to": "src/core/memory/memoryTypes.ts",
       "kind": "type-only",
       "specifier": "./memoryTypes"
+    },
+    {
+      "id": "src/core/obsidianTooling/index.ts|src/core/obsidianTooling/ObsidianCliProbe.ts|re-export|./ObsidianCliProbe",
+      "from": "src/core/obsidianTooling/index.ts",
+      "to": "src/core/obsidianTooling/ObsidianCliProbe.ts",
+      "kind": "re-export",
+      "specifier": "./ObsidianCliProbe"
+    },
+    {
+      "id": "src/core/obsidianTooling/index.ts|src/core/obsidianTooling/obsidianGateScript.ts|re-export|./obsidianGateScript",
+      "from": "src/core/obsidianTooling/index.ts",
+      "to": "src/core/obsidianTooling/obsidianGateScript.ts",
+      "kind": "re-export",
+      "specifier": "./obsidianGateScript"
+    },
+    {
+      "id": "src/core/obsidianTooling/index.ts|src/core/obsidianTooling/obsidianToolingCatalog.ts|re-export|./obsidianToolingCatalog",
+      "from": "src/core/obsidianTooling/index.ts",
+      "to": "src/core/obsidianTooling/obsidianToolingCatalog.ts",
+      "kind": "re-export",
+      "specifier": "./obsidianToolingCatalog"
+    },
+    {
+      "id": "src/core/obsidianTooling/index.ts|src/core/obsidianTooling/obsidianToolingInjection.ts|re-export|./obsidianToolingInjection",
+      "from": "src/core/obsidianTooling/index.ts",
+      "to": "src/core/obsidianTooling/obsidianToolingInjection.ts",
+      "kind": "re-export",
+      "specifier": "./obsidianToolingInjection"
+    },
+    {
+      "id": "src/core/obsidianTooling/index.ts|src/core/obsidianTooling/obsidianToolingPrompt.ts|re-export|./obsidianToolingPrompt",
+      "from": "src/core/obsidianTooling/index.ts",
+      "to": "src/core/obsidianTooling/obsidianToolingPrompt.ts",
+      "kind": "re-export",
+      "specifier": "./obsidianToolingPrompt"
+    },
+    {
+      "id": "src/core/obsidianTooling/index.ts|src/core/obsidianTooling/obsidianToolingRequests.ts|re-export|./obsidianToolingRequests",
+      "from": "src/core/obsidianTooling/index.ts",
+      "to": "src/core/obsidianTooling/obsidianToolingRequests.ts",
+      "kind": "re-export",
+      "specifier": "./obsidianToolingRequests"
+    },
+    {
+      "id": "src/core/obsidianTooling/index.ts|src/core/obsidianTooling/obsidianToolingStatus.ts|type-only|./obsidianToolingStatus",
+      "from": "src/core/obsidianTooling/index.ts",
+      "to": "src/core/obsidianTooling/obsidianToolingStatus.ts",
+      "kind": "type-only",
+      "specifier": "./obsidianToolingStatus"
+    },
+    {
+      "id": "src/core/obsidianTooling/obsidianGateScript.ts|src/core/obsidianTooling/obsidianToolingCatalog.ts|runtime-static|./obsidianToolingCatalog",
+      "from": "src/core/obsidianTooling/obsidianGateScript.ts",
+      "to": "src/core/obsidianTooling/obsidianToolingCatalog.ts",
+      "kind": "runtime-static",
+      "specifier": "./obsidianToolingCatalog"
+    },
+    {
+      "id": "src/core/obsidianTooling/obsidianToolingInjection.ts|src/core/obsidianTooling/obsidianToolingCatalog.ts|runtime-static|./obsidianToolingCatalog",
+      "from": "src/core/obsidianTooling/obsidianToolingInjection.ts",
+      "to": "src/core/obsidianTooling/obsidianToolingCatalog.ts",
+      "kind": "runtime-static",
+      "specifier": "./obsidianToolingCatalog"
+    },
+    {
+      "id": "src/core/obsidianTooling/obsidianToolingInjection.ts|src/core/types/index.ts|type-only|../types",
+      "from": "src/core/obsidianTooling/obsidianToolingInjection.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../types"
+    },
+    {
+      "id": "src/core/obsidianTooling/obsidianToolingPrompt.ts|src/core/obsidianTooling/obsidianToolingCatalog.ts|runtime-static|./obsidianToolingCatalog",
+      "from": "src/core/obsidianTooling/obsidianToolingPrompt.ts",
+      "to": "src/core/obsidianTooling/obsidianToolingCatalog.ts",
+      "kind": "runtime-static",
+      "specifier": "./obsidianToolingCatalog"
+    },
+    {
+      "id": "src/core/obsidianTooling/obsidianToolingRequests.ts|src/core/obsidianTooling/obsidianToolingCatalog.ts|runtime-static|./obsidianToolingCatalog",
+      "from": "src/core/obsidianTooling/obsidianToolingRequests.ts",
+      "to": "src/core/obsidianTooling/obsidianToolingCatalog.ts",
+      "kind": "runtime-static",
+      "specifier": "./obsidianToolingCatalog"
+    },
+    {
+      "id": "src/core/obsidianTooling/obsidianToolingStatus.ts|src/core/obsidianTooling/ObsidianCliProbe.ts|type-only|./ObsidianCliProbe",
+      "from": "src/core/obsidianTooling/obsidianToolingStatus.ts",
+      "to": "src/core/obsidianTooling/ObsidianCliProbe.ts",
+      "kind": "type-only",
+      "specifier": "./ObsidianCliProbe"
+    },
+    {
+      "id": "src/core/obsidianTooling/obsidianToolingStatus.ts|src/core/types/index.ts|type-only|../types",
+      "from": "src/core/obsidianTooling/obsidianToolingStatus.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../types"
     },
     {
       "id": "src/core/opencode/createSdkClient.ts|src/core/opencode/diagnostics/index.ts|type-only|./diagnostics",
@@ -15670,6 +15915,13 @@
       "specifier": "../../core/config/modelConfig"
     },
     {
+      "id": "src/features/settings/SettingsConversationSection.ts|src/core/obsidianTooling/index.ts|type-only|../../core/obsidianTooling",
+      "from": "src/features/settings/SettingsConversationSection.ts",
+      "to": "src/core/obsidianTooling/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/obsidianTooling"
+    },
+    {
       "id": "src/features/settings/SettingsConversationSection.ts|src/core/opencode/OpenCodeCapabilitySettingsMigration.ts|runtime-static|../../core/opencode/OpenCodeCapabilitySettingsMigration",
       "from": "src/features/settings/SettingsConversationSection.ts",
       "to": "src/core/opencode/OpenCodeCapabilitySettingsMigration.ts",
@@ -17574,6 +17826,13 @@
       "specifier": "./zh"
     },
     {
+      "id": "src/main.ts|src/app/batchOrganize/index.ts|runtime-static|./app/batchOrganize",
+      "from": "src/main.ts",
+      "to": "src/app/batchOrganize/index.ts",
+      "kind": "runtime-static",
+      "specifier": "./app/batchOrganize"
+    },
+    {
       "id": "src/main.ts|src/app/diagnostics/index.ts|runtime-static|./app/diagnostics",
       "from": "src/main.ts",
       "to": "src/app/diagnostics/index.ts",
@@ -17586,6 +17845,13 @@
       "to": "src/app/memory/index.ts",
       "kind": "runtime-static",
       "specifier": "./app/memory"
+    },
+    {
+      "id": "src/main.ts|src/app/obsidianTooling/index.ts|runtime-static|./app/obsidianTooling",
+      "from": "src/main.ts",
+      "to": "src/app/obsidianTooling/index.ts",
+      "kind": "runtime-static",
+      "specifier": "./app/obsidianTooling"
     },
     {
       "id": "src/main.ts|src/app/runtime/PluginRuntimeCoordinator.ts|runtime-static|./app/runtime/PluginRuntimeCoordinator",
@@ -18006,6 +18272,20 @@
       "to": "src/shared/diagnosticSecretSanitizer.ts",
       "kind": "runtime-static",
       "specifier": "../diagnosticSecretSanitizer"
+    },
+    {
+      "id": "src/shared/index.ts|src/shared/batchOrganizePlan.ts|re-export|./batchOrganizePlan",
+      "from": "src/shared/index.ts",
+      "to": "src/shared/batchOrganizePlan.ts",
+      "kind": "re-export",
+      "specifier": "./batchOrganizePlan"
+    },
+    {
+      "id": "src/shared/index.ts|src/shared/batchOrganizePlan.ts|type-only|./batchOrganizePlan",
+      "from": "src/shared/index.ts",
+      "to": "src/shared/batchOrganizePlan.ts",
+      "kind": "type-only",
+      "specifier": "./batchOrganizePlan"
     },
     {
       "id": "src/shared/index.ts|src/shared/contextGroupPlan.ts|re-export|./contextGroupPlan",

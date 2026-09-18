@@ -31,11 +31,20 @@ export const EDIT_REVERT_IDLE_CACHE_MAX_BYTES = 8 * 1024 * 1024;
 /** Post-turn grace window: writes after turn end still attribute to the round. */
 export const EDIT_REVERT_POST_TURN_GRACE_MS = 10 * 60 * 1000;
 
-export type EditRevertFileStatus = 'modified' | 'created' | 'deleted';
+/**
+ * File lifecycle covered by revert. `'moved'` (R-B5) is a plugin-recorded
+ * rename/move: content is unchanged, so revert renames the file back through
+ * `fileManager.renameFile` (which also restores updated references) instead
+ * of writing a pre-image blob.
+ */
+export type EditRevertFileStatus = 'modified' | 'created' | 'deleted' | 'moved';
 export type EditRevertEntryState = 'active' | 'reverted';
 export type EditRevertPreImageStatus = 'available' | 'oversize' | 'unavailable';
-/** How the turn learned about the write: a declared tool call, or the vault-event safety net. */
-export type EditRevertEntrySource = 'tool' | 'vault-event';
+/**
+ * How the turn learned about the write: a declared tool call, the vault-event
+ * safety net, or an explicit plugin-initiated batch operation (R-B5).
+ */
+export type EditRevertEntrySource = 'tool' | 'vault-event' | 'plugin';
 
 export interface EditRevertFileEntry {
   /** Vault-relative path with `/` separators. */
@@ -48,6 +57,8 @@ export interface EditRevertFileEntry {
   preImageBytes?: number;
   /** Content hash captured right after a create event (informational). */
   createdHash?: string;
+  /** For `'moved'` entries: the vault-relative path the file lives at now. */
+  movedTo?: string;
   /** Content hash captured at revert time; enables "恢复回退". */
   restoreHash?: string;
   restoreBytes?: number;
@@ -81,6 +92,8 @@ export type EditRevertExcludedReason = 'oversize' | 'no-preimage';
 export interface EditRevertSidebarEntry {
   readonly path: string;
   readonly status: EditRevertFileStatus;
+  /** Current location for `'moved'` entries; `null` otherwise. */
+  readonly movedTo: string | null;
   readonly state: EditRevertEntryState;
   readonly revertible: boolean;
   readonly restorable: boolean;
@@ -442,11 +455,21 @@ export function isEntryRevertible(entry: EditRevertFileEntry): boolean {
   if (entry.status === 'created') {
     return true;
   }
+  // A recorded move needs no content pre-image: revert renames the file back.
+  if (entry.status === 'moved') {
+    return !!entry.movedTo;
+  }
   return entry.preImageStatus === 'available' && !!entry.preImageHash;
 }
 
 export function isEntryRestorable(entry: EditRevertFileEntry): boolean {
-  return entry.state === 'reverted' && !!entry.restoreHash;
+  if (entry.state !== 'reverted') {
+    return false;
+  }
+  if (entry.status === 'moved') {
+    return !!entry.movedTo;
+  }
+  return !!entry.restoreHash;
 }
 
 /** Derive the sidebar view model from a round (null when no round exists). */
@@ -478,6 +501,7 @@ export function buildSidebarModel(
     return {
       path: entry.path,
       status: entry.status,
+      movedTo: entry.status === 'moved' ? entry.movedTo ?? null : null,
       state: entry.state,
       revertible,
       restorable,

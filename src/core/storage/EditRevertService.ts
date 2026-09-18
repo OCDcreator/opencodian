@@ -200,6 +200,49 @@ export class EditRevertService implements EditRevertServicePort {
     });
   }
 
+  // --- R-B5: plugin-initiated batch capture ---------------------------------
+
+  async beginBatchCapture(conversationId: string, paths: readonly string[]): Promise<boolean> {
+    if (this.disposed || !this.isEnabled() || !conversationId) {
+      return false;
+    }
+    try {
+      await this.enqueue(() => this.performBeginBatchCapture(conversationId, paths));
+      return true;
+    } catch (error) {
+      // A failed forced snapshot must never let the batch proceed.
+      logger.warn('beginBatchCapture failed; refusing batch execution', { error, conversationId });
+      return false;
+    }
+  }
+
+  async notePluginMove(conversationId: string, fromPath: string, toPath: string): Promise<void> {
+    if (this.disposed || !conversationId) {
+      return;
+    }
+    await this.enqueue(() => this.performNotePluginMove(conversationId, fromPath, toPath)).catch((error) => {
+      logger.warn('notePluginMove failed', { error, conversationId, fromPath, toPath });
+    });
+  }
+
+  async notePluginWrite(conversationId: string, path: string): Promise<void> {
+    if (this.disposed || !conversationId) {
+      return;
+    }
+    await this.enqueue(() => this.performNotePluginWrite(conversationId, path)).catch((error) => {
+      logger.warn('notePluginWrite failed', { error, conversationId, path });
+    });
+  }
+
+  async endBatchCapture(conversationId: string): Promise<void> {
+    if (this.disposed || !conversationId) {
+      return;
+    }
+    await this.enqueue(() => this.performEndBatchCapture(conversationId)).catch((error) => {
+      logger.warn('endBatchCapture failed', { error, conversationId });
+    });
+  }
+
   revertFile(conversationId: string, path: string): Promise<EditRevertActionResult> {
     return this.enqueue(() => this.performRevertFile(conversationId, path));
   }
@@ -491,11 +534,184 @@ export class EditRevertService implements EditRevertServicePort {
     }
   }
 
+  /**
+   * Open a plugin-initiated batch round (R-B5) and force-capture pre-images
+   * for every listed path. Unlike the turn-start path there is no wall-clock
+   * budget: the batch is user-initiated, the file list is known upfront from
+   * the confirmed preview, and anything over the per-file cap lands in
+   * `standbyOversize` so it stays honestly marked not revertible.
+   */
+  private async performBeginBatchCapture(conversationId: string, paths: readonly string[]): Promise<void> {
+    const now = this.now();
+    const previous = this.getLatestRound(conversationId);
+    if (previous && previous.meta.closedAt === null) {
+      previous.meta.closedAt = now;
+      previous.meta.acceptsWritesUntil = now;
+      previous.dirty = true;
+    }
+    const round: RoundState = {
+      meta: {
+        id: `round-${now}-${++this.roundSeq}`,
+        conversationId,
+        backend: 'plugin',
+        createdAt: now,
+        closedAt: null,
+        degraded: false,
+        acceptsWritesUntil: Number.MAX_SAFE_INTEGER,
+        lastActivityAtHint: now,
+        entries: [],
+      },
+      standby: new Map(),
+      standbyOversize: new Set(),
+      dirty: true,
+    };
+    this.rounds.set(round.meta.id, round);
+    this.frozenIdleByRound.set(round.meta.id, new Map(this.idleCache));
+
+    for (const rawPath of paths) {
+      const normalized = this.normalizeVaultPath(rawPath);
+      if (!normalized || !isMarkdownPath(normalized)) {
+        continue;
+      }
+      if (round.standby.has(normalized) || round.standbyOversize.has(normalized)) {
+        continue;
+      }
+      const captured = await this.captureContent(normalized);
+      if (captured === 'oversize') {
+        round.standbyOversize.add(normalized);
+      } else if (captured !== 'missing') {
+        round.standby.set(normalized, captured);
+      }
+    }
+
+    this.schedulePersist();
+    this.notifyChanged();
+  }
+
+  /**
+   * Record a plugin-performed move/rename (R-B5). Vault `rename` events are
+   * not observed by the event funnel, so moves must be recorded explicitly;
+   * the entry reverts by renaming `movedTo` back (references included).
+   */
+  private async performNotePluginMove(conversationId: string, fromPath: string, toPath: string): Promise<void> {
+    const round = this.getLatestRound(conversationId);
+    if (!round || round.meta.closedAt !== null) {
+      return;
+    }
+    const from = this.normalizeVaultPath(fromPath);
+    const to = this.normalizeVaultPath(toPath);
+    if (!from || !to || from === to || !isMarkdownPath(from) || !isMarkdownPath(to)) {
+      return;
+    }
+    const now = this.now();
+    round.meta.lastActivityAtHint = now;
+    let entry = round.meta.entries.find((item) => item.path === from);
+    if (!entry) {
+      entry = {
+        path: from,
+        status: 'moved',
+        state: 'active',
+        preImageStatus: 'unavailable',
+        sizeBytes: 0,
+        firstWriteAt: now,
+        lastWriteAt: now,
+        source: 'plugin',
+      };
+      round.meta.entries.push(entry);
+    } else {
+      entry.status = 'moved';
+      entry.lastWriteAt = now;
+      if (entry.state === 'reverted') {
+        entry.state = 'active';
+      }
+    }
+    entry.movedTo = to;
+    round.dirty = true;
+    this.schedulePersist();
+    this.notifyChanged();
+  }
+
+  /**
+   * Record a plugin-performed content write (R-B5) so the batch round stays
+   * the authoritative record even when a concurrent chat turn's round would
+   * otherwise win vault-event attribution. Pre-images resolve from the forced
+   * batch capture; a path with no captured pre-image stays listed but marked
+   * not revertible.
+   */
+  private async performNotePluginWrite(conversationId: string, path: string): Promise<void> {
+    const round = this.getLatestRound(conversationId);
+    if (!round || round.meta.closedAt !== null) {
+      return;
+    }
+    const normalized = this.normalizeVaultPath(path);
+    if (!normalized || !isMarkdownPath(normalized)) {
+      return;
+    }
+    const now = this.now();
+    round.meta.lastActivityAtHint = now;
+    let entry = round.meta.entries.find((item) => item.path === normalized);
+    if (!entry) {
+      entry = {
+        path: normalized,
+        status: 'modified',
+        state: 'active',
+        preImageStatus: 'unavailable',
+        sizeBytes: 0,
+        firstWriteAt: now,
+        lastWriteAt: now,
+        source: 'plugin',
+      };
+      round.meta.entries.push(entry);
+    } else {
+      entry.lastWriteAt = now;
+      if (entry.state === 'reverted') {
+        entry.state = 'active';
+      }
+    }
+    const size = await this.readVaultFileSize(normalized);
+    if (size !== null) {
+      entry.sizeBytes = size;
+    }
+    if (entry.state !== 'reverted') {
+      const preImage = this.resolvePreImage(round, normalized);
+      if (preImage.status === 'available') {
+        entry.preImageStatus = 'available';
+        entry.preImageHash = preImage.image.hash;
+        entry.preImageBytes = preImage.image.bytes;
+      } else if (preImage.status === 'oversize') {
+        entry.preImageStatus = 'oversize';
+      } else {
+        entry.preImageStatus = 'unavailable';
+      }
+    }
+    round.dirty = true;
+    this.schedulePersist();
+    this.notifyChanged();
+  }
+
+  /**
+   * Close a batch round. No post-close grace: every batch write is recorded
+   * explicitly before `endBatchCapture`, so one-click revert is available
+   * immediately after the task completes (R-B5 acceptance 1).
+   */
+  private async performEndBatchCapture(conversationId: string): Promise<void> {
+    const round = this.getLatestRound(conversationId);
+    if (!round || round.meta.closedAt !== null) {
+      return;
+    }
+    const now = this.now();
+    round.meta.closedAt = now;
+    round.meta.acceptsWritesUntil = now;
+    round.dirty = true;
+    this.schedulePersist();
+    this.enqueue(() => this.enforceRetention()).catch(() => undefined);
+    this.notifyChanged();
+  }
+
   private resolvePreImage(
     round: RoundState,
     path: string,
-  ): { status: 'available'; image: StandbyImage } | { status: 'oversize' } | { status: 'unavailable' } {
-    const standby = round.standby.get(path);
+  ): { status: 'available'; image: StandbyImage } | { status: 'oversize' } | { status: 'unavailable' } {    const standby = round.standby.get(path);
     if (standby) {
       return { status: 'available', image: standby };
     }

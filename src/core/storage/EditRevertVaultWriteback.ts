@@ -41,6 +41,22 @@ export class EditRevertVaultWriteback {
    * content is kept as `restoreHash` so the revert itself is undoable.
    */
   async applyRevert(entry: EditRevertFileEntry): Promise<EditRevertActionResult> {
+    if (entry.status === 'moved') {
+      // A recorded move reverts by renaming the file back; renameFile also
+      // restores the references Obsidian rewrote when the batch moved it.
+      if (!entry.movedTo) {
+        return { ok: false, changed: 0, skipped: [entry.path], error: 'no-move-target' };
+      }
+      const renamed = await this.renameVaultFile(entry.movedTo, entry.path);
+      if (!renamed.ok) {
+        entry.lastError = renamed.error;
+        return { ok: false, changed: 0, skipped: [entry.path], error: renamed.error };
+      }
+      entry.state = 'reverted';
+      entry.lastError = undefined;
+      return { ok: true, changed: 1, skipped: [] };
+    }
+
     if (entry.status === 'created') {
       const restore = await this.captureCurrentContent(entry.path);
       if (restore) {
@@ -82,6 +98,20 @@ export class EditRevertVaultWriteback {
 
   /** Undo a revert by writing the captured restore content back. */
   async applyRestore(entry: EditRevertFileEntry): Promise<EditRevertActionResult> {
+    if (entry.status === 'moved') {
+      // Re-do the move the revert undid (same reference-updating path).
+      if (!entry.movedTo) {
+        return { ok: false, changed: 0, skipped: [entry.path], error: 'no-move-target' };
+      }
+      const renamed = await this.renameVaultFile(entry.path, entry.movedTo);
+      if (!renamed.ok) {
+        entry.lastError = renamed.error;
+        return { ok: false, changed: 0, skipped: [entry.path], error: renamed.error };
+      }
+      entry.state = 'active';
+      entry.lastError = undefined;
+      return { ok: true, changed: 1, skipped: [] };
+    }
     if (!entry.restoreHash) {
       return { ok: false, changed: 0, skipped: [entry.path], error: 'not-restorable' };
     }
@@ -109,6 +139,30 @@ export class EditRevertVaultWriteback {
     }
     this.selfWrites.delete(path);
     return guardUntil >= now;
+  }
+
+  /**
+   * Rename/move through `app.fileManager.renameFile` — the only rename path
+   * that also updates existing links to the file. Refuses when the source is
+   * missing or the target path is already occupied (never overwrite).
+   */
+  private async renameVaultFile(
+    currentPath: string,
+    newPath: string,
+  ): Promise<{ ok: true } | { ok: false; error: string }> {
+    try {
+      const file = this.app.vault.getAbstractFileByPath(normalizePath(currentPath));
+      if (!(file instanceof TFile)) {
+        return { ok: false, error: 'file-missing' };
+      }
+      if (this.app.vault.getAbstractFileByPath(normalizePath(newPath))) {
+        return { ok: false, error: 'target-exists' };
+      }
+      await this.app.fileManager.renameFile(file, normalizePath(newPath));
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
   }
 
   private async readVaultFile(path: string): Promise<string | null> {

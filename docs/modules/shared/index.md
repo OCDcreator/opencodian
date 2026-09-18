@@ -120,3 +120,7 @@ export { getFilePathBasename, getVaultBasePath, toVaultRelativePath } from './va
 
 - barrel 容易越长越杂，新增导出时应确认它确实属于"全局共享工具"
 - 改动这里的导出面影响范围通常较广
+
+## 2026-09-18 (FlowText R-B5)
+
+导出 `src/shared/batchOrganizePlan.ts`（R-B5 纯规划核心）：模板 id 常量、范围匹配、计划编译与冲突排除、计划签名（stale-plan 握手）、带类型属性值解析与 processFrontMatter 变更、参数校验。

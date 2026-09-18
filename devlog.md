@@ -11,6 +11,18 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-18 批量整理（R-B5）：任务模板、强制快照与执行前预览确认
+
+FlowText 对齐批次 B 的 R-B5（`docs/requirements/flowtext-parity.md`，依赖 R-B3/R-B4 已就绪）：批量整理的**任务模板**（按标签/属性/关键词查找并移动、批量改 frontmatter 属性可带条件、按规则重命名并更新引用）+ 任何批量写前**强制 R-B3 快照** + 执行前**真实预览确认**（文件数与具体清单）。行为由机制保证而非提示词（§11.3）。
+
+**分层**：`src/shared/batchOrganizePlan.ts`（shared.foundation，纯规划核心，与 R-B3 的 `editRevertPlan` 同构）——三类范围匹配（标签 `#` 容忍/大小写不敏感/嵌套、属性存在或标量等值、关键词名称+内容）、模板→计划编译（确定性排序、目标占用/重名目标以 `conflicts` 显式排除、绝不覆盖）、`planSignature`（stale-plan 握手）、带类型属性值解析（text/number/boolean/list）与 `processFrontMatter` 回调内变更、参数校验错误码；模板文案全部走 `batchOrganize.*` i18n 键，代码零措辞。新 owner `app.batch-organize`（`src/app/batchOrganize/`）——`BatchOrganizeCoordinator.ts`（预览计算、fail-closed 执行握手、vault 写路径：`fileManager.renameFile` 引用自动更新 / `fileManager.processFrontMatter` YAML 格式与属性类型保持）、`BatchOrganizeModal.ts`（configure→preview→running→result 四阶段 + `BatchRevertConfirmModal` 确认对话框）。`main.ts` 仅构造 coordinator + 注册两条命令（打开模板模态、确认后回退上一次批量）。
+
+**R-B3 扩展（插件发起的批量捕获，选项 a：显式 API）**：port 新增可选成员 `beginBatchCapture(conversationId, paths)`（对全部受影响文件**强制预捕获**——不走 200ms 回合预算：批量是用户发起、清单在预览阶段已知；超限文件照旧如实标注不可回退；内部失败一律解析 `false`，调用方必须拒绝执行）、`notePluginMove`（vault `rename` 事件不在事件漏斗内——Obsidian 移动只发 `rename`，插件移动必须显式登记为 `moved` 条目 + `movedTo`）、`notePluginWrite`（显式记录写入条目，并发聊天回合也不夺走归属）、`endBatchCapture`（**无宽限窗**立即关闭：批量写入全部显式登记，一键回退即时可用，AC1）。`editRevertPlan.ts` 增量：`status:'moved'`（回退 = `renameFile` 改回并还原引用，无需内容 pre-image；恢复对称前移）、`source:'plugin'`。声明为可选成员以不破坏聊天侧既有测试替身；具体服务始终实现，协调器缺失时 fail-closed 拒绝。
+
+**安全护栏（机制化）**：预览必须真实（基于 metadataCache + cachedRead 的当前库状态）；执行前重算计划并与确认签名比对，**漂移即零写入拒绝**（AC3 的机制版本）；快照层不可用/`editRevertEnabled` 关闭时批量整体拒绝执行（零写入）；计划阶段与执行阶段双重目标占用检查，绝不覆盖；预览阶段取消（Esc/关闭）零写入。批量回合使用合成会话 id（`batch-organize-…`），不污染聊天侧栏；回退入口 = 结果模态一键回退按钮（立即可见）+ "回退上一次批量"命令（确认对话框，关闭即取消）。无新增设置项（需求 §7 未列，快照可用性直接继承 `editRevertEnabled`）。
+
+**测试**：新增 3 套件 31 例——`tests/unit/shared/batchOrganizePlan.test.ts`（范围匹配矩阵、移动/重命名/改属性计划编译、冲突排除、签名等价与漂移敏感、类型值解析、processFrontMatter 变更语义、参数校验）、`tests/unit/core/storage/EditRevertService.batch.test.ts`（强制捕获全路径+即时回退、checkpoint blob 落盘、超限诚实标注、禁用态 false、与并发聊天回合隔离、moved 条目回退=改回+可再撤销）、`tests/unit/app/batchOrganize/BatchOrganizeCoordinator.test.ts`（真实预览无写入、快照先于首写（顺序日志断言）、一键回退全部恢复、stale-plan 零写入、快照不可用零写入、空计划不开快照、逐操作失败如实上报不阻塞）。`EditRevertVaultHarness` 扩展 `fileManager`（renameFile 不发 modify/create/delete 事件——与 Obsidian 一致）与 JSON frontmatter 的 `processFrontMatter`，未新建第二个 vault 替身；既有 R-B3 测试仅侧栏条目精确断言补 `movedTo: null` 一处。owner manifest 新增 `app.batch-organize`，shared.foundation 增补职责，`architecture-baseline.generated.json` 重生成。
+
 ## 2026-09-18 Obsidian 原生工具（R-B4）：官方 CLI 经确认门包装脚本 + 后端无关注入
 
 FlowText 对齐批次 B 的 R-B4（`docs/requirements/flowtext-parity.md`，§10 Q2 定案路线 A：官方 CLI 先行，MCP 留作后续补足）：让 agent 经 Obsidian 桌面官方 CLI 获得主题/插件/书签/日记/标签/属性/孤立笔记/搜索等仓库级原生能力，四后端共用同一能力；高影响操作（安装/启用插件与主题等）由**机制**而非提示词保证显式用户确认（§11.3）。

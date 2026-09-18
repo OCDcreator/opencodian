@@ -18,6 +18,24 @@ export const POST_TURN_GRACE_MS = 10 * 60 * 1000;
 
 type VaultFileHandler = (file: TFile) => void;
 
+/**
+ * Split a test note into its frontmatter block and the remainder. Test notes
+ * store frontmatter as JSON (a valid YAML subset), so `processFrontMatter`
+ * can round-trip typed property values without a real YAML engine.
+ */
+function splitFrontmatter(content: string): { frontmatter: Record<string, unknown>; rest: string } | null {
+  if (!content.startsWith('---\n')) {
+    return null;
+  }
+  const end = content.indexOf('\n---\n', 4);
+  if (end === -1) {
+    return null;
+  }
+  const raw = content.slice(4, end);
+  const rest = content.slice(end + '\n---\n'.length);
+  return { frontmatter: JSON.parse(raw) as Record<string, unknown>, rest };
+}
+
 export class EditRevertVaultHarness {
   /** Vault content files keyed by vault-relative path. */
   readonly vaultFiles = new Map<string, string>();
@@ -28,6 +46,10 @@ export class EditRevertVaultHarness {
   readonly createLog: string[] = [];
   /** Every adapter write; must stay under the plugin data prefix. */
   readonly adapterWriteLog: string[] = [];
+  /** R-B5: every fileManager.renameFile, in call order. */
+  readonly renameLog: Array<{ from: string; to: string }> = [];
+  /** R-B5: call-order log proving snapshots happen before writes. */
+  readonly operationOrder: string[] = [];
   private readonly dirs = new Set<string>();
   private readonly handlers: Record<'modify' | 'create' | 'delete', VaultFileHandler[]> = {
     modify: [],
@@ -89,6 +111,16 @@ export class EditRevertVaultHarness {
     getAbstractFileByPath: (path: string): TFile | null => {
       return this.vaultFiles.has(path) ? makeTFile(path) : null;
     },
+    getMarkdownFiles: (): TFile[] => {
+      return [...this.vaultFiles.keys()].filter((path) => path.endsWith('.md')).map(makeTFile);
+    },
+    cachedRead: async (file: TFile): Promise<string> => {
+      const content = this.vaultFiles.get(file.path);
+      if (content === undefined) {
+        throw new Error(`file not found: ${file.path}`);
+      }
+      return content;
+    },
     process: async (file: TFile, fn: (content: string) => string): Promise<TFile> => {
       const next = fn(this.vaultFiles.get(file.path) ?? '');
       this.vaultFiles.set(file.path, next);
@@ -106,6 +138,38 @@ export class EditRevertVaultHarness {
       this.vaultFiles.delete(file.path);
       this.trashLog.push({ path: file.path, system });
       this.emit('delete', file.path);
+    },
+  };
+
+  /**
+   * R-B5: fileManager double. `renameFile` moves the vault key WITHOUT
+   * emitting modify/create/delete events — exactly like Obsidian, where a
+   * rename fires only a `rename` event the event funnel does not observe.
+   */
+  readonly fileManager = {
+    renameFile: async (file: TFile, newPath: string): Promise<void> => {
+      const content = this.vaultFiles.get(file.path);
+      if (content === undefined) {
+        throw new Error(`file not found: ${file.path}`);
+      }
+      if (this.vaultFiles.has(newPath)) {
+        throw new Error('target already exists');
+      }
+      this.operationOrder.push(`rename:${file.path}`);
+      this.vaultFiles.delete(file.path);
+      this.vaultFiles.set(newPath, content);
+      this.renameLog.push({ from: file.path, to: newPath });
+    },
+    processFrontMatter: async (file: TFile, fn: (frontmatter: Record<string, unknown>) => void): Promise<void> => {
+      const content = this.vaultFiles.get(file.path) ?? '';
+      const parsed = splitFrontmatter(content);
+      this.operationOrder.push(`frontmatter:${file.path}`);
+      if (!parsed) {
+        throw new Error(`no frontmatter block: ${file.path}`);
+      }
+      fn(parsed.frontmatter);
+      const next = `---\n${JSON.stringify(parsed.frontmatter)}\n---\n${parsed.rest}`;
+      await this.vault.process(file, () => next);
     },
   };
 
@@ -160,7 +224,7 @@ export function createHarnessService(
   const harness = overrides.harness ?? new EditRevertVaultHarness();
   const clock = { value: 1_000_000 };
   const service = new EditRevertService({
-    app: { vault: harness.vault } as unknown as { vault: unknown },
+    app: { vault: harness.vault, fileManager: harness.fileManager } as unknown as { vault: unknown },
     isEnabled: overrides.isEnabled ?? (() => true),
     getSnapshotLimitBytes: () => overrides.limitBytes ?? 50 * 1024 * 1024,
     now: overrides.now ?? (() => clock.value),

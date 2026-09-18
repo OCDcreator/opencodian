@@ -564,3 +564,7 @@ Added `chat.diffNotice.fileCount` (`{count}` accessible name for the header coun
 ## 维护约束
 
 - 2026-09-18 (FlowText R-B4): Obsidian 原生工具注入接缝接入——新增 settings.obsidianTooling.* 键（块标题/组描述、模式、状态各态、重新检测、安装引导、确认对话框 allow/deny），中英双语同步。
+
+## 2026-09-18 (FlowText R-B5)
+
+新增 `batchOrganize.*` 键组：模板名（move-notes / edit-properties / rename-by-rule）、范围与参数表单标签、预览/确认/结果文案、冲突与错误码文案、两条命令名。模板文案是产品资产，代码零措辞。

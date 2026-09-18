@@ -59,4 +59,26 @@ export interface EditRevertServicePort {
   restoreFile(conversationId: string, path: string): Promise<EditRevertActionResult>;
   /** Subscribe to entry/state changes; returns the unsubscribe callback. */
   onEntriesChanged(listener: () => void): () => void;
+
+  // --- R-B5: plugin-initiated batch capture (optional so chat-side doubles
+  // stay valid; the concrete service always implements them and the batch
+  // coordinator refuses to execute when they are missing — fail closed) ---
+
+  /**
+   * Open a plugin-initiated batch capture round and force-capture pre-images
+   * for every listed path (no turn-start budget; over-limit paths are
+   * honestly marked not revertible). Resolves `false` when snapshots are
+   * unavailable — callers must not write in that case.
+   */
+  beginBatchCapture?(conversationId: string, paths: readonly string[]): Promise<boolean>;
+  /** Record a plugin-performed move/rename (revert renames back, references included). */
+  notePluginMove?(conversationId: string, fromPath: string, toPath: string): Promise<void>;
+  /** Record a plugin-performed content write on an already-captured path. */
+  notePluginWrite?(conversationId: string, path: string): Promise<void>;
+  /**
+   * Close the batch capture window. Unlike the turn path there is no
+   * post-close grace: every batch write was recorded explicitly, so revert
+   * becomes available immediately.
+   */
+  endBatchCapture?(conversationId: string): Promise<void>;
 }

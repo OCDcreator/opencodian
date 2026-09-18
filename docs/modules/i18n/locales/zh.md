@@ -572,3 +572,7 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 ## 维护约束
 
 - 2026-09-18 (FlowText R-B4): Obsidian 原生工具注入接缝接入——新增 settings.obsidianTooling.* 键（块标题/组描述、模式、状态各态、重新检测、安装引导、确认对话框 allow/deny），中英双语同步。
+
+## 2026-09-18 (FlowText R-B5)
+
+新增 `batchOrganize.*` 键组（与 en.ts 一一对应）：模板名（移动/改属性/重命名）、范围与参数表单标签、预览/确认/结果文案、冲突与错误码文案、两条命令名。

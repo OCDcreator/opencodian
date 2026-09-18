@@ -230,6 +230,7 @@
         "src/shared/debugModules.ts",
         "src/shared/diagnosticSecretSanitizer.ts",
         "src/shared/editRevertPlan.ts",
+        "src/shared/batchOrganizePlan.ts",
         "src/shared/index.ts",
         "src/shared/logger.ts",
         "src/shared/obsidianContext.ts",
@@ -241,7 +242,8 @@
       "responsibilities": [
         "shared cross-cutting primitives: logging, context paths, vault access, tool identity",
         "diagnostic secret sanitizer primitive",
-        "pure edit-revert planning core (R-B3): write-tool classification, retention planning, sidebar model"
+        "pure edit-revert planning core (R-B3): write-tool classification, retention planning, sidebar model",
+        "pure batch-organize planning core (R-B5): template scope matching, plan compilation, stale-plan signature"
       ],
       "canonicalState": [
         "shared logger instance"
@@ -1283,6 +1285,50 @@
         "tests/unit/app/obsidianTooling/**"
       ],
       "overviewDoc": "docs/architecture/owners/app-obsidian-tooling.md",
+      "requiredGates": [
+        "typecheck",
+        "module-docs"
+      ],
+      "risk": "medium"
+    },
+    {
+      "id": "app.batch-organize",
+      "layer": "app",
+      "include": [
+        "src/app/batchOrganize/**"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "compose the R-B5 batch note organizing runtime: template parameter forms, real preview and confirm modal",
+        "fail-closed execution handshake: the confirmed preview signature is recomputed from live vault state before any write; drift aborts with zero writes",
+        "forced R-B3 snapshots for plugin-initiated batches: beginBatchCapture pre-images every affected file before the first write, refusal when the snapshot layer is unavailable",
+        "vault writes go only through app.fileManager.renameFile (references update) and app.fileManager.processFrontMatter (YAML/types survive)"
+      ],
+      "canonicalState": [
+        "BatchOrganizeCoordinator instance (owns the last batch id and the preview/execute handshake; stateless besides that)"
+      ],
+      "entrypoints": [
+        "BatchOrganizeCoordinator"
+      ],
+      "allowedOwnerDependencies": [
+        "shared.foundation",
+        "shared.i18n",
+        "core.types"
+      ],
+      "forbiddenDependencies": [
+        "feature.chat-runtime",
+        "feature.chat-services",
+        "core.backend",
+        "core.backend-pi"
+      ],
+      "adjacentOwners": [
+        "app.composition",
+        "core.storage"
+      ],
+      "tests": [
+        "tests/unit/app/batchOrganize/**"
+      ],
+      "overviewDoc": "docs/architecture/owners/app-batch-organize.md",
       "requiredGates": [
         "typecheck",
         "module-docs"

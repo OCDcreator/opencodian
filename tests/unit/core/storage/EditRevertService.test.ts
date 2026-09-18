@@ -210,6 +210,8 @@ describe('EditRevertService capability honesty (R-B3)', () => {
     expect(model.entries.find((entry) => entry.path === 'notes/big.md')).toEqual({
       path: 'notes/big.md',
       status: 'modified',
+      // R-B5 additive field: only 'moved' entries carry a target location.
+      movedTo: null,
       state: 'active',
       revertible: false,
       restorable: false,

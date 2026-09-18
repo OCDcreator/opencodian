@@ -3,6 +3,43 @@
  */
 
 export type {
+  BatchConflict,
+  BatchConflictReason,
+  BatchEditPropertiesParams,
+  BatchMoveParams,
+  BatchNoteSnapshot,
+  BatchOperation,
+  BatchOrganizeTemplateId,
+  BatchParamErrorCode,
+  BatchPlan,
+  BatchPlanResult,
+  BatchPropertyCondition,
+  BatchPropertyOperation,
+  BatchPropertyValue,
+  BatchRenameParams,
+  BatchScope,
+  BatchTemplateParams,
+} from './batchOrganizePlan';
+export {
+  applyBatchPropertyOperation,
+  applyRenameRule,
+  basenameOf,
+  BATCH_ORGANIZE_TEMPLATE_IDS,
+  buildBatchPlan,
+  coercePropertyToString,
+  directoryOf,
+  matchesBatchScope,
+  normalizeTag,
+  normalizeTagList,
+  parseBatchPropertyValue,
+  plansAreIdentical,
+  planSignature,
+  propertyOperationWouldChange,
+  validatePropertyName,
+  validateRenameRule,
+  validateTargetFolder,
+} from './batchOrganizePlan';
+export type {
   ContextGroupAttachCandidate,
   ContextGroupAttachPlan,
   ContextGroupAttachPlanOptions,

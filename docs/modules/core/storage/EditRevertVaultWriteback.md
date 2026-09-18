@@ -45,3 +45,9 @@ class EditRevertVaultWriteback {
 
 - 失败信息写入条目的 `lastError` 并随 `EditRevertActionResult.error` 返回，UI 以 notice 如实呈现；不静默降级、不部分应用。
 - 修改本类时必须保持"写前捕获 restore blob"的顺序，否则回退将不可撤销（R-B3 验收标准 5）。
+
+## R-B5 扩展：moved 条目与 renameFile 写回
+
+- `applyRevert` 对 `status:'moved'` 条目走新分支：经 `app.fileManager.renameFile(movedTo → path)` 改回原路径（renameFile 会同步还原 Obsidian 在移动时改写的引用，内容不变故无需 pre-image blob）；`applyRestore` 对称地再次前移（`path → movedTo`），实现"回退可再撤销"。
+- 新增 `renameVaultFile` 私有写路径：源不存在（`file-missing`）或目标已占用（`target-exists`）一律拒绝——**绝不覆盖**。
+- 该路径仅供 R-B3/R-B5 的回退/恢复使用；批量执行期间的首次移动不走这里（批量协调器直接调 `fileManager.renameFile` 并以 `notePluginMove` 登记）。

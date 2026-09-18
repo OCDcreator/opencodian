@@ -8,12 +8,13 @@
 
 - **Layer:** `shared` (may import layers: shared)
 - **Risk:** low
-- **Include:** `src/shared/index.ts`, `src/shared/brandingWordmark.ts`, `src/shared/contextGroupPlan.ts` (R-B2 one-click group-attach planner), `src/shared/editRevertPlan.ts` (R-B3 pure edit-revert planner), `src/shared/contextPath.ts`, `src/shared/debugModules.ts`, `src/shared/diagnosticSecretSanitizer.ts`, `src/shared/logger.ts`, `src/shared/obsidianContext.ts`, `src/shared/toolExecution.ts`, `src/shared/toolIdentity.ts`, `src/shared/TooltipLayerController.ts`, `src/shared/vault.ts`
+- **Include:** `src/shared/index.ts`, `src/shared/brandingWordmark.ts`, `src/shared/contextGroupPlan.ts` (R-B2 one-click group-attach planner), `src/shared/editRevertPlan.ts` (R-B3 pure edit-revert planner), `src/shared/batchOrganizePlan.ts` (R-B5 pure batch-organize planner), `src/shared/contextPath.ts`, `src/shared/debugModules.ts`, `src/shared/diagnosticSecretSanitizer.ts`, `src/shared/logger.ts`, `src/shared/obsidianContext.ts`, `src/shared/toolExecution.ts`, `src/shared/toolIdentity.ts`, `src/shared/TooltipLayerController.ts`, `src/shared/vault.ts`
 
 ## Responsibilities
 - shared cross-cutting primitives: logging, context paths, vault access, tool identity
 - diagnostic secret sanitizer primitive
 - pure edit-revert planning core (R-B3): write-tool classification, retention planning, sidebar model
+- pure batch-organize planning core (R-B5): template scope matching, plan compilation, stale-plan signature
 
 ## Canonical state (truth home)
 - shared logger instance

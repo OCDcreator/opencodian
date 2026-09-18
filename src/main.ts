@@ -52,6 +52,7 @@ import { OpenCodeSessionTraceService } from './core/opencode/diagnostics';
 import { ClaudeSessionTraceService, collectClaudeCodeKnownSecrets, CodexSessionTraceService } from './core/agents/backend/diagnostics';
 import { DiagnosticsRuntimeCoordinator } from './app/diagnostics';
 import { MemoryRuntimeCoordinator } from './app/memory';
+import { BatchOrganizeCoordinator, BatchOrganizeModal, BatchRevertConfirmModal } from './app/batchOrganize';
 import { ObsidianToolingCoordinator } from './app/obsidianTooling';
 import { migrateOpenCodeCapabilitySettings } from './core/opencode/OpenCodeCapabilitySettingsMigration';
 import { OpenCodianSettingsRuntimeCoordinator } from './core/runtime/OpenCodianSettingsRuntimeCoordinator';
@@ -140,6 +141,8 @@ export default class OpenCodianPlugin extends Plugin {
    * modified-files sidebar consume it through `EditRevertServicePort`.
    */
   editRevertService: EditRevertService | null = null;
+  /** R-B5 batch note organizing runtime (app.batch-organize owner). Constructed during onload. */
+  batchOrganizeCoordinator: BatchOrganizeCoordinator | null = null;
   /**
    * Delegating getters returning the coordinator's typed backend ports. The
    * declared types are non-nullable to match the prior stored fields (so
@@ -259,6 +262,12 @@ export default class OpenCodianPlugin extends Plugin {
     });
     await coordinator.measureStartupStep('editRevert.initialize', () =>
       this.editRevertService?.initialize() ?? Promise.resolve());
+    // R-B5 batch organizing composes on top of the R-B3 snapshot layer: the
+    // coordinator refuses to execute when the snapshot service is unavailable.
+    this.batchOrganizeCoordinator = new BatchOrganizeCoordinator({
+      app: this.app,
+      editRevert: this.editRevertService,
+    });
     this.pluginUpdateService = new PluginUpdateService({
       app: this.app,
       manifest: this.manifest,
@@ -946,6 +955,31 @@ export default class OpenCodianPlugin extends Plugin {
       editorCallback: async (editor: Editor, view: MarkdownView) => {
         await this.activateView();
         await this.getOpenCodianView()?.addSelectionContextFromActiveEditor(editor, view);
+      },
+    });
+
+    this.addCommand({
+      id: 'batch-organize-open',
+      name: t('batchOrganize.command.open'),
+      callback: () => {
+        if (this.batchOrganizeCoordinator) {
+          new BatchOrganizeModal(this.app, this.batchOrganizeCoordinator).open();
+        }
+      },
+    });
+
+    this.addCommand({
+      id: 'batch-organize-revert-last',
+      name: t('batchOrganize.command.revertLast'),
+      checkCallback: (checking: boolean) => {
+        const coordinator = this.batchOrganizeCoordinator;
+        if (!coordinator?.hasLastBatch()) {
+          return false;
+        }
+        if (!checking) {
+          new BatchRevertConfirmModal(this.app, coordinator).open();
+        }
+        return true;
       },
     });
   }

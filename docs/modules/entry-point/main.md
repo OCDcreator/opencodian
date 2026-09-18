@@ -335,3 +335,5 @@ bootstrap 仅向注册入口注入 getPiSettings 读取回调，不在入口拥�
 
 
 - 2026-09-18 (FlowText R-B4): Obsidian 原生工具注入接缝接入——新增 initObsidianToolingRuntime()（构造 ObsidianToolingCoordinator 并应用持久化模式）与 onunload 中的 dispose；main.ts 仅组合，不承载门/监听逻辑。
+
+- 2026-09-18 (FlowText R-B5): 批量整理组合接入——settings 加载后构造 `BatchOrganizeCoordinator`（app.batch-organize owner，注入 `EditRevertServicePort`），注册 `batch-organize-open`（打开模板/预览模态）与 `batch-organize-revert-last`（确认后回退最近一次批量，`checkCallback` 门控）两条命令；main.ts 仅组合，预览/执行/快照逻辑全部在 coordinator 与 shared 纯规划层。

@@ -15,6 +15,7 @@
 - **Fail-closed 诚实**：超限（>2MiB）或无 pre-image 的文件仍会列出，但明确标注"未纳入回退"，且 `revertible: false`；回退请求会被拒绝并返回原因。
 - **写回唯一出口**：所有破坏性写操作都委托给 `EditRevertVaultWriteback`（vault.process / vault.create / vault.trash），自身绝不直接写文件系统。
 - **Fail-soft**：快照 / 通知 / 持久化的失败只记 warn 日志，绝不阻塞发送主链路（send pipeline 以 fire-and-forget 方式调用）。
+- **插件发起批量捕获（R-B5）**：`beginBatchCapture` 不走 200ms 回合预算——批量是用户发起、清单在预览阶段已知，对全部受影响文件强制预捕获；超限文件照旧进入 `standbyOversize` 如实标注不可回退。`notePluginMove` 存在的原因：vault `rename` 事件不在事件漏斗监听范围内（Obsidian 移动只发 `rename`），插件移动必须显式登记；`endBatchCapture` 关闭后**无宽限窗**（批量写入全部显式登记），因此一键回退即时可用。`beginBatchCapture` 内部失败一律解析为 `false`，批量执行方必须拒绝执行（fail-closed）。
 
 ## 导入关系
 
@@ -39,6 +40,11 @@ class EditRevertService implements EditRevertServicePort {
   revertAll(conversationId): Promise<EditRevertActionResult>;
   restoreFile(conversationId, path): Promise<EditRevertActionResult>;
   onEntriesChanged(listener): () => void;            // 侧栏刷新订阅
+  // R-B5 插件发起批量捕获（详见 docs/architecture/owners/app-batch-organize.md）
+  beginBatchCapture(conversationId, paths): Promise<boolean>; // 强制预捕获全部路径，无预算；失败 → false
+  notePluginMove(conversationId, from, to): Promise<void>;    // 'moved' 条目（movedTo），回退 = renameFile 改回
+  notePluginWrite(conversationId, path): Promise<void>;       // 显式记录写入条目（pre-image 来自强制捕获）
+  endBatchCapture(conversationId): Promise<void>;             // 立即关闭（无 grace），回退即时可用
   // 测试缝：handleVaultModify/Create/Delete、flush()、getRoundMeta()、listBlobHashes()
 }
 ```
