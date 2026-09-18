@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "1d354d6913b183f19cacee25152a3553697c0656328f25a6579d43e6d09367de",
-  "recordCount": 699,
+  "digest": "c3be94f19c3530a15114f8bfc097047c19cbddef67d6603ab95775ef4ef4142e",
+  "recordCount": 703,
   "records": [
     {
       "kind": "ignore",
@@ -61,7 +61,7 @@
     {
       "kind": "src",
       "key": "src/app/memory/index.ts",
-      "sha256": "b8778f7199e503af583dd80a8a6691309a60911508b1562432a4fdd432e5c05e"
+      "sha256": "236d61daaaf7a2294ba470d94e3f19b1af87597d2b42eac576055364eaaf8255"
     },
     {
       "kind": "src",
@@ -72,6 +72,11 @@
       "kind": "src",
       "key": "src/app/memory/MemoryRuntimeCoordinator.ts",
       "sha256": "78c53202c74a8fe0009b6624fda15891498905dfd1ee64acde2e0ad3101b4019"
+    },
+    {
+      "kind": "src",
+      "key": "src/app/memory/VaultIndexFileSystem.ts",
+      "sha256": "4c62ec0829f009a37782c3cb524485edae1aab1d99ac4d6454e33ac1fe42b2f7"
     },
     {
       "kind": "src",
@@ -581,7 +586,7 @@
     {
       "kind": "src",
       "key": "src/core/memory/index.ts",
-      "sha256": "20816a6aef57ba9d839c3ab5d60a3014ed14c8b0866a0c4b0aba3a6d4303db94"
+      "sha256": "705f61252db3495efd498d68fd651a26de7ac6ac42e30f7d69aa8ef343aa17d9"
     },
     {
       "kind": "src",
@@ -657,6 +662,16 @@
       "kind": "src",
       "key": "src/core/memory/memoryTypes.ts",
       "sha256": "c6a7900cd75273071443485bba7431b35d0b74bbfb7d3bc1f6705af1195e32b2"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/memory/VaultIndexService.ts",
+      "sha256": "8b9b94adc86334575d9046dddbbec01325fe750039509e72ae97dd3ca2e82491"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/memory/vaultRetrievalIndex.ts",
+      "sha256": "df60b1310c9c3288ff501ad7ddd478d957c09393f6cd03de2b7c67e38434b2a9"
     },
     {
       "kind": "src",
@@ -1016,7 +1031,7 @@
     {
       "kind": "src",
       "key": "src/core/types/chat.ts",
-      "sha256": "4c3897c0cb5379a1ff83372c5154cc7407316e6c8de8a509d537819dd86a9f05"
+      "sha256": "eae02e52ff54e0966a478dfd6d2f55c76de445dfb24d57e238aba49189cde801"
     },
     {
       "kind": "src",
@@ -1026,7 +1041,7 @@
     {
       "kind": "src",
       "key": "src/core/types/index.ts",
-      "sha256": "00e7f4bad31e8f443a3af52dcbe0c897b27b99c294d2b3959fd4a49184c1b4fa"
+      "sha256": "cb605e165e23ec8ab402c882d595cdb618c220bb02d3e3e7f1e33ab658bdaed4"
     },
     {
       "kind": "src",
@@ -1051,12 +1066,12 @@
     {
       "kind": "src",
       "key": "src/core/types/settings.ts",
-      "sha256": "72fd299b23696fec4cc297fcb9272edc34d7cf8c18b6fe480d192f061eb8c1a3"
+      "sha256": "de8f2ad2c67ca8d95f1e1b3fa6414f97841d5712c916115d3149075fb078ffa1"
     },
     {
       "kind": "src",
       "key": "src/core/types/settingsLoadNormalization.ts",
-      "sha256": "2fe32f10c858a449ee2d7e418f40d2c946a27a3708473b72c6667e4f73168170"
+      "sha256": "ed6a0ecc3f6100bb991732f23caa3aeb3e4ba26bd05bb06295fbf5647ddee60e"
     },
     {
       "kind": "src",
@@ -1086,7 +1101,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/composerContext.ts",
-      "sha256": "96b0c479f8ff5ffa1e270b3e7b1e196c9c60b4a872e423d99ca93446d0de0a6f"
+      "sha256": "826de6dfef6bff51974ef482c4678b55f989b1c3ff216e0785fd8d59566a8039"
     },
     {
       "kind": "src",
@@ -1126,7 +1141,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
-      "sha256": "51c8cbcb023e876e6cccd6de6f53e12f798ff01afd884b886ec8126d6ea97cb5"
+      "sha256": "414523d85a376152389bcc95edc402b05869d5025ac9aa4b2f2be9d8aefe83ce"
     },
     {
       "kind": "src",
@@ -1216,7 +1231,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/ChatRuntimeComposition.ts",
-      "sha256": "8b16a2928b620139e3fec027854a7e37171a7e3a5aad1874a5585fb8fa0d1018"
+      "sha256": "3bcb389d30d0395dd34e482a279dacd4f18e43c0dec82da8c3a39319efb7fc80"
     },
     {
       "kind": "src",
@@ -1356,7 +1371,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/UserMessageContentRenderer.ts",
-      "sha256": "d04f584be95c5b5886184a591d7640208c88fc45256168874ad99ccce56fc707"
+      "sha256": "1bde820223b0a06f10b83181d73603e5ea62ec63a25181d2fe95829e5adddc7b"
     },
     {
       "kind": "src",
@@ -1506,7 +1521,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ComposerContextCoordinator.ts",
-      "sha256": "40a1af67bd5e63ecc8c093cf9842e7216ad839c3ff7a4a6ab216398a243236d1"
+      "sha256": "a13af438d6243f66837da845127a251dfdbd11b98a21c2a0f983dcedbf99ab0a"
     },
     {
       "kind": "src",
@@ -1526,12 +1541,12 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ComposerContextRuntimeStore.ts",
-      "sha256": "45c878507be639c0651eb0b588013568ab5ce7a0d8116a3e3681e6eb9c492572"
+      "sha256": "a66c5a195396b862ab4206a52076d6cad0e79cf10e5cb52c0b0823a8653345d5"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/ComposerContextViewFacade.ts",
-      "sha256": "bf75c30427e0bda8bbab105e7a2c98cbd1837349ba8f53038f51ff0bf2d07021"
+      "sha256": "80cb3bca8700467c433d9206749cc6a8f2504195fd42bebde24054799e4705eb"
     },
     {
       "kind": "src",
@@ -1546,7 +1561,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ComposerInputShellCoordinator.ts",
-      "sha256": "0f4a5809aa7299d5877735b072639288f33a5070702792e68e2ba1c26251f6c3"
+      "sha256": "7b10bec699bca0922be5ceefdbb12259a13cdee1f4002792f00720bfb250d31e"
     },
     {
       "kind": "src",
@@ -2077,6 +2092,11 @@
       "kind": "src",
       "key": "src/features/chat/services/trailingAssistantPatchTypes.ts",
       "sha256": "941cf92be73c1a86a5cc67108ef6cccaf8e6820591a52c7a13aa949791425783"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/chat/services/VaultRetrievalComposerCoordinator.ts",
+      "sha256": "c1931ceda89210e0234593a3dd876f0ebfee1206d1c9a4619b6aef4b2ffbd5c8"
     },
     {
       "kind": "src",
@@ -2731,7 +2751,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsConversationSection.ts",
-      "sha256": "aa87d2a7ea8dcf016cbdd2621f52c8fdd8d8e99e9e3907381bdff347615070df"
+      "sha256": "bfa8a1514df36c0e53e684cdbb3fd703d4a20f3a3efe7b1268d4bc8b6959e8cc"
     },
     {
       "kind": "src",
@@ -2756,7 +2776,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/settingsLayoutRegistry.ts",
-      "sha256": "04f83690ce65e3f1444efbe93ed74927157956ba1e22bd6291a7e32d9c0e93c2"
+      "sha256": "5018769714de125df4291e7c663c6bb43d42237a4fc95a7432585086e0a16a79"
     },
     {
       "kind": "src",
@@ -2961,7 +2981,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "61da9785e8ca5fb126799c89c8713c7f0e8420aece4fb4add294d631ee84902d"
+      "sha256": "9d90ceeeca436b5f3e06f2822727c95a79439a6a499ff49b0f63acb5846e7174"
     },
     {
       "kind": "src",
@@ -2971,12 +2991,12 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "ff7190baac4447185a73ade14a7d40df034e84e9de38ebb2c29d0377ffc2e0e2"
+      "sha256": "8e542cc54b03e261b84a354ed68e6869dff92d4235538fd51a27ef852ccc4c59"
     },
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "252df25aea3c3df059bbe15d171a0c6e2f5e6f5117051c59c4b0b8d484134355"
+      "sha256": "f9d927537734894c5c1c078074b10b0494e7641eb908d07dcf30e08f96acc4a2"
     },
     {
       "kind": "src",
@@ -3061,7 +3081,7 @@
     {
       "kind": "src",
       "key": "src/shared/obsidianContext.ts",
-      "sha256": "353dfc5d4f56a43515d908ee44adb08d7c23bcce37a365c3f490ca6ee5d20298"
+      "sha256": "8630e5e17a2f4b3d1714d52105d9ac833715d1b33dca128ae5d0f4e2f47e78eb"
     },
     {
       "kind": "src",
@@ -3226,7 +3246,7 @@
     {
       "kind": "src",
       "key": "src/style/features/chat-assistant.css",
-      "sha256": "71065d385095c3865923b323df94722d04735400820bfd5c24bc5c00eb48bc4c"
+      "sha256": "b673dfdeb62527332251473604aa701dc360e7c988484b6840013e3a915157dc"
     },
     {
       "kind": "src",
@@ -3499,7 +3519,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-18T09:44:14.761Z",
-  "headShaAtGeneration": "13ee707ba459a75981ce00fb2a391f81faf4d8ab",
+  "generatedAt": "2026-09-18T11:21:04.079Z",
+  "headShaAtGeneration": "fe3b21bbb1a1c2fbd5b80e01990dfccd7a294a2d",
   "graphifyVersion": "graphify 0.9.36"
 }
