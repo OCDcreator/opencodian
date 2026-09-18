@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "c94915e535e9e39ac88b6994ed79bf42d9672a678c46974bb34d64757decea79",
-  "recordCount": 732,
+  "digest": "bf2fe8bc55d983ee07fcf8220955dbbf72c921620455bc4f5b24bc0740c16412",
+  "recordCount": 742,
   "records": [
     {
       "kind": "ignore",
@@ -512,6 +512,36 @@
       "kind": "src",
       "key": "src/core/agents/types.ts",
       "sha256": "8dab4cbe2eb47183643781dffe711f20a4f519853d4796d6d8546e777be7665c"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/canvas/CanvasDocument.ts",
+      "sha256": "79e9ad5157e8385baf2e4b022d9eb29f418e187d9889c6f627fdb471a3173eaa"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/canvas/CanvasGenerationService.ts",
+      "sha256": "b7c5c335dde0cf4d336e4034d09a6297fbffc3af7c70b0d0691fb0e0297e7cbc"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/canvas/CanvasLayout.ts",
+      "sha256": "bd79e0330294c845fb5ed921f9bf47c766101a11f449f04f5bc45a5932788542"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/canvas/CanvasNodeWriteService.ts",
+      "sha256": "e9bf18211e4290521949c9014d06c32c2c281545fcc45524eec7d84fa91bd9bd"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/canvas/CanvasSplitProposal.ts",
+      "sha256": "f2bd740943205bdc963be57cc6d411d5686ff7d0f0f31d87edb3623fd8e7afb2"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/canvas/index.ts",
+      "sha256": "ef9d19d9afbfb30242dc0be8ed9133c0c39c0c156aeb6c81f71417cd09c91f03"
     },
     {
       "kind": "src",
@@ -1152,6 +1182,26 @@
       "kind": "src",
       "key": "src/core/update/PluginUpdateService.ts",
       "sha256": "bc90da9705bfdef418b01349189d3bb65022b938f44ab79a791c077de15de0ba"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/canvas-integration/CanvasGenerationFlow.ts",
+      "sha256": "e0247ef49a675e479903e1fbcf25f4ab4d33556a87837b7a04d182a9a49a2fd4"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/canvas-integration/CanvasIntegrationController.ts",
+      "sha256": "e6f2d3ef2346363a2030d3ca1adb0d927984449ed2d14ba5574f5a4bb15a9038"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/canvas-integration/CanvasNodeRewriteService.ts",
+      "sha256": "456e4ce10cfa5cd7e75020ab03c2e2103ad7f27ee040fc811112fb7674e374db"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/canvas-integration/CanvasRewriteModals.ts",
+      "sha256": "cb39eee24d87f129d86b61283cce57b4a111bedb0b6e3a06dd2fac1d00c399cb"
     },
     {
       "kind": "src",
@@ -2876,7 +2926,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsDebugSection.ts",
-      "sha256": "94cffbaed4275c7c6f3943814c46f3ec20cc02afafb667ab11fdcb0d5e52be04"
+      "sha256": "c82e9e1424f00da6fed6128ceabc54be65fd7f5531695594935e7fbc52a858d6"
     },
     {
       "kind": "src",
@@ -3106,7 +3156,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "7c4cce1da61e803f74b73456805db5f2bd2e25df0fb03663ab4ef053f774810a"
+      "sha256": "70ad2e38fe89c3189971a3221b10f922f0cca4ae7332d25f0ffbb2c5677cf92f"
     },
     {
       "kind": "src",
@@ -3116,12 +3166,12 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "a28f031b2d13bf83267948a1ad16a3f399a993a405473520886d22ca7062152a"
+      "sha256": "4aa54f6b8a455d54162271278cc2f80ef5f2f02e243d8dab7e5117d580ab64f2"
     },
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "e183c01ad6e1650fa1bc64e4fe610aed6cbb2000546774bf0b72078b70967f4a"
+      "sha256": "dccef7caf3cf4323666f0165e576caef6fbc0a13c01469d7c3607bf8d7208f9c"
     },
     {
       "kind": "src",
@@ -3664,7 +3714,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-18T20:52:42.882Z",
-  "headShaAtGeneration": "1b880aea9b57e3827f703dcbb950c410d8794360",
+  "generatedAt": "2026-09-18T22:06:14.668Z",
+  "headShaAtGeneration": "345bf1e5b305170641ae941fb0c1f60319e64832",
   "graphifyVersion": "graphify 0.9.36"
 }
