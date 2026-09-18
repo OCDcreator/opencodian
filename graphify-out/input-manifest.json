@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "0841d97b59d4caf1f4e9fbf745161353ed938bf7637e86e3fd23ad0e8a6b078a",
-  "recordCount": 742,
+  "digest": "28542d3f8fb3707e00c4d4849034d4cb6cefbe245e85b2727c98b2bd3b9f9516",
+  "recordCount": 747,
   "records": [
     {
       "kind": "ignore",
@@ -1045,6 +1045,26 @@
     },
     {
       "kind": "src",
+      "key": "src/core/remotecontrol/index.ts",
+      "sha256": "1424a5e98d5906757bc354edf5804060dc48a047a35f81a71c2bbadd43f7068f"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/remotecontrol/RemoteControlAudit.ts",
+      "sha256": "e8a33fe6813298055efbd5e351226598f3bdf9f699e9645300576a05904ffbd5"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/remotecontrol/RemoteControlAuth.ts",
+      "sha256": "fb511110baff1ba29f94e19f3ad00838b3498db8a52ecbff832212af49dd4837"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/remotecontrol/RemoteControlService.ts",
+      "sha256": "0ac542ad4e31c173fd5e8d09721a7dc74b94f09934f70eecf1493e9f77d94c96"
+    },
+    {
+      "kind": "src",
       "key": "src/core/runtime/OpenCodianSettingsRuntimeCoordinator.ts",
       "sha256": "8554b071d1c8c85e9f09c4ab04c786442a424eab53b6512bffa94621a9d04ed6"
     },
@@ -1141,7 +1161,7 @@
     {
       "kind": "src",
       "key": "src/core/types/index.ts",
-      "sha256": "36420407601d701810d3c3178191e61591471b3961d290eb0efcdffa72bb1926"
+      "sha256": "84ab71cbf91b5cda1010f52bcef3b083505b95dccac489d189a22ac780c38b74"
     },
     {
       "kind": "src",
@@ -1166,12 +1186,12 @@
     {
       "kind": "src",
       "key": "src/core/types/settings.ts",
-      "sha256": "12cf3b782728ff96efdd2af7142f396b0b20a75c201394a1951e21044b10d9bd"
+      "sha256": "72ab872eb08c7384db901f4c491a649adf1f2638f3547304ce07f36e57e75bd0"
     },
     {
       "kind": "src",
       "key": "src/core/types/settingsLoadNormalization.ts",
-      "sha256": "36e83330192c829d0a0bc2b52ecbda1551377a960445d9bbdfe73e6ee24b91c7"
+      "sha256": "fd338e679a221be18156032bfa6c49fe42b3db6fa82cbd2765a2e386937931d2"
     },
     {
       "kind": "src",
@@ -2776,7 +2796,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/OpenCodianSettings.ts",
-      "sha256": "fd53131fd041ea19b7558dba841cc4c9071aab3ce0f52b1c62049510a3c95d31"
+      "sha256": "d5c3850081c74f6f36899fde55312a2b0bbe7eba80d9730f04bb8238c00f3163"
     },
     {
       "kind": "src",
@@ -2951,7 +2971,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/settingsLayoutRegistry.ts",
-      "sha256": "ae1fdaff8b1ff2daca04796f0533ace2df89ca0d8f3adc195b707e35f69344a2"
+      "sha256": "972829783b1ee3a5579a57b4a6039581c8415496d324f4688b31f817c80a4210"
     },
     {
       "kind": "src",
@@ -3045,6 +3065,11 @@
     },
     {
       "kind": "src",
+      "key": "src/features/settings/SettingsRemoteControlSection.ts",
+      "sha256": "cb2592ddb4f9bf753cc765c22cfce3088c4ec52d9c289825dd51060b6b4903a7"
+    },
+    {
+      "kind": "src",
       "key": "src/features/settings/SettingsSectionCoordinator.ts",
       "sha256": "328ecf5494399a625d7cbdebaa1fbd028d734b672200c7689583d8dfddcc5618"
     },
@@ -3101,7 +3126,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsTabbedRenderer.ts",
-      "sha256": "e0866cdecb452f4ce6b350b12cc204e1b9902ab5286250c4de7ecae6869fd32b"
+      "sha256": "9f65fddcc35827605ebc3c34e7e291d251992ebe5c83b5c433199324b82b151f"
     },
     {
       "kind": "src",
@@ -3156,7 +3181,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "70ad2e38fe89c3189971a3221b10f922f0cca4ae7332d25f0ffbb2c5677cf92f"
+      "sha256": "45c06839ef28d40c04e131da9eadd45626a145cd9686c2497134a9e7ff33c783"
     },
     {
       "kind": "src",
@@ -3166,12 +3191,12 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "4aa54f6b8a455d54162271278cc2f80ef5f2f02e243d8dab7e5117d580ab64f2"
+      "sha256": "0935eab933470fd31fd73f74255aad3164104bf769da7ee5d488d0aae00ef955"
     },
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "90233e7f3d4cbbe16d90fd10d0f3fc4327b1d66d62e94e1a13ddf814caaf1ad9"
+      "sha256": "8dc22b3538e8b1d9e054a636e2fdb2a91eeefd6e6620df301a3fa74a252188fc"
     },
     {
       "kind": "src",
@@ -3714,7 +3739,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-18T22:34:04.172Z",
-  "headShaAtGeneration": "ac462c70c13eaf0972a6e7e5817372c3250cdd8c",
+  "generatedAt": "2026-09-18T23:39:05.723Z",
+  "headShaAtGeneration": "249e6701dddce896295b8a9aabfac393307dd593",
   "graphifyVersion": "graphify 0.9.36"
 }
