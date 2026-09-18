@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "025c4391c275478dd8eb6228213171ab21745fcd8efc19adac70990f2116f133",
+  "digest": "c06945ff79c67afb1cbbce6c94d6e46c5e3c5e8c8ab08bc6b772dcdb3f0108cf",
   "recordCount": 712,
   "records": [
     {
@@ -476,7 +476,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/imagegen/ImageGenerationService.ts",
-      "sha256": "044fde5cd2cefbd714e2b72ead1f2df80e4e64a672ddae944d7634fd6e4cbaeb"
+      "sha256": "51467fca42de9db05315218bd45e994ebbd3339fe9aa3547d88523dbdce9b986"
     },
     {
       "kind": "src",
@@ -986,7 +986,7 @@
     {
       "kind": "src",
       "key": "src/core/storage/EditRevertService.ts",
-      "sha256": "9c447740891b569afc9247731eb5d01e0e24eb80f03396d8eef0732603199ba7"
+      "sha256": "781c95de5be5d7389eb48e4f1fc309614a5f700a0fdfda05b5df4de44a7cef65"
     },
     {
       "kind": "src",
@@ -1046,7 +1046,7 @@
     {
       "kind": "src",
       "key": "src/core/types/editRevert.ts",
-      "sha256": "82562d638706ddca094e5dd6bbb6697e8c0ef9d65c6cea8f2eef1fe7db35f772"
+      "sha256": "2c61ab17f0a5a4abdbe60f0365cfdfe531e3dd7606fc65b6a22b3f5820759382"
     },
     {
       "kind": "src",
@@ -1796,7 +1796,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ImageGenerationChatController.ts",
-      "sha256": "28fa77a3b65f969758b7ce3e016e8dc6755251ab39416402bbe6c6e53c786e1f"
+      "sha256": "956fac48ef607f37a400786d3f0dd565c4ebdc651f000b8447b72d263f8aebcd"
     },
     {
       "kind": "src",
@@ -2291,7 +2291,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditAccept.ts",
-      "sha256": "b92938144269c7c669f1cbec866a0220eb8f8d1e644a1363394ee8262bff0347"
+      "sha256": "0e287558fbfe59a0065ea363c9cb6ba6aca5a4d25cb47d9faad2dcd9d9810b65"
     },
     {
       "kind": "src",
@@ -2326,7 +2326,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditController.ts",
-      "sha256": "54486f157fecfe68c23f5cac6b786b141ec581b7bd84c36bbad2e439f0e2914a"
+      "sha256": "0add48d39b2a1d67887a4466393f3ab36f04d14fc00eb7fb3c710efaf4349eec"
     },
     {
       "kind": "src",
@@ -2351,7 +2351,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditImageGen.ts",
-      "sha256": "9e0085db1a5e4000e14b6da86e706bb14d739fd25e3e461097a5d8143bdc3e59"
+      "sha256": "b3e4c7b8d6a733a4e2661c5e884b738b928147f423c2077393f2d5641a64d7cd"
     },
     {
       "kind": "src",
@@ -3026,7 +3026,7 @@
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "cce27187eec5f4014e2a22b7dfe7f8ce91c1693ec9592924916e2717dbaf04bb"
+      "sha256": "87b9f83749c3e8b0269124a20874a708adf72361b232a6a79e6fdadca1c67a00"
     },
     {
       "kind": "src",
@@ -3311,7 +3311,7 @@
     {
       "kind": "src",
       "key": "src/style/modals/image-generation-modal.css",
-      "sha256": "388255fc6e153fe9783f20e06e29ca9e824252049ba329cafaf51f28fcc5e465"
+      "sha256": "ecbd245384a5d857ca7f247132ea89705273f72baa1b06bbac5942330814cb49"
     },
     {
       "kind": "src",
@@ -3564,7 +3564,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-18T16:24:07.010Z",
-  "headShaAtGeneration": "2c1bc8f9549c69c717c30e4ccc676d35ae2c78a9",
+  "generatedAt": "2026-09-18T17:15:10.734Z",
+  "headShaAtGeneration": "528d3916c28104f4d209c8f6bce8bc2cdeacace3",
   "graphifyVersion": "graphify 0.9.36"
 }
