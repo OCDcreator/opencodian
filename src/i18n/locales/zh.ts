@@ -2843,6 +2843,7 @@ export const zhTranslations = {
   'batchOrganize.error.revertUnavailable': '没有可回退的批量任务。',
   'batchOrganize.error.folderUnavailable': '无法创建目标目录 {{folder}}——未写入任何内容，请检查路径后重试。',
   'batchOrganize.notice.nothingToDo': '没有匹配的笔记，无需执行。',
+  'batchOrganize.notice.revertLeftoverFolders': '已回退，但本批次创建的文件夹仍保留：{{folders}}。',
   'batchOrganize.revertConfirm.title': '回退上一次批量整理',
   'batchOrganize.revertConfirm.desc': '最近一次批量任务修改的所有文件都将恢复到批量前的状态（被移动的文件会改回原路径并还原引用）。关闭此对话框视为取消。',
   'batchOrganize.revertConfirm.cancel': '取消',

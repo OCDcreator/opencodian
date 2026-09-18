@@ -2,6 +2,8 @@
 > 2026-09-18 (R-B3): R-B3 文案：`settings.conversation.editRevertEnabled.*` / `editRevertSnapshotLimitMb.*`，以及侧栏键 `editRevert.sectionTitle`、`editRevert.revertibleShort`、`editRevert.revert`（回退）、`editRevert.revertAll`（全部回退）、`editRevert.restore`（恢复回退）、`editRevert.excludedOversize`（未纳入回退（超出大小上限））、`editRevert.excludedNoPreimage`、`editRevert.roundOpenHint`、`editRevert.degradedHint` 与 `editRevert.notice.*`。
 > 2026-09-18 (R-B1/R-B2)：新增 `inlineEdit.context.groupsHeading/groupEntryCount/groupAttach/groupAttached/groupAttachedNone/groupOmitted/groupMissing/groupMissingMore`、`settings.inlineEdit.autoLink*`（开关 + 排除词）、`settings.conversation.tab.contextGroups`、`settings.contextGroups.*`（CRUD 行），以及 `chat.context.filePicker.groupsHeading/groupAttach/groupEntryCount` 与 `chat.context.notice.groupAttached/groupMissing/groupMissingMore`。
 
+2026-09-18（R-B5-D2）：新增 `batchOrganize.notice.revertLeftoverFolders`——批量整理回退后仍有本批次创建的目录残留（因用户内容非空而保留，或删除失败）时显示的提示，让"恢复批量前库形态"的承诺可见而非静默。
+
 2026-09-18: added the FlowText parity batch A2 strings — `inlineEdit.error.imageTypeUnsupported` / `inlineEdit.error.imageTooLarge` / `inlineEdit.error.imageLimit`（图片校验拒绝提示，R-A4）、`inlineEdit.error.imagesUnsupported`（后端不支持图片时的显式能力缺失提示，绝不静默降级为无图请求）、`inlineEdit.image.remove` / `inlineEdit.image.dropHint`（chip 与拖拽面标签）、`inlineEdit.preview.generating`（流式预览生成中标识）。
 
 2026-09-17：新增 shadcn 主题样式文案：`settings.style.presets.styles.shadcn.{title,desc}`（中性细边框卡片、输入框固定底部、消息区独立滚动）与配色方案标签 `settings.style.presets.scheme.shadcn-neutral`；描述后来为预设卡可读性进一步精简。同日新增布局键 `settings.style.layout.messagesAreaInsetX.{name,desc}` 与输入面板键 `settings.style.input.{composerInsetX,composerInsetY,textareaMaxHeight}.{name,desc}`，并改写 `messagesPaddingX` / `messagePaddingX` 描述以说明两层留白的叠加关系。

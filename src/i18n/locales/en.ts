@@ -2843,6 +2843,7 @@ export const enTranslations = {
   'batchOrganize.error.revertUnavailable': 'No revertable batch found.',
   'batchOrganize.error.folderUnavailable': 'Could not create target folder {{folder}} — nothing was written. Check the path and try again.',
   'batchOrganize.notice.nothingToDo': 'No notes match — nothing to do.',
+  'batchOrganize.notice.revertLeftoverFolders': 'Reverted, but the folder(s) this batch created remain: {{folders}}.',
   'batchOrganize.revertConfirm.title': 'Revert last batch organize',
   'batchOrganize.revertConfirm.desc': 'Every file changed by the most recent batch will be restored to its pre-batch state (moved files are renamed back). Dismissing this dialog cancels.',
   'batchOrganize.revertConfirm.cancel': 'Cancel',

@@ -11,6 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-18 批量整理（R-B5-D2 修复）：回退后目录清理改用 `adapter.rmdir` 并如实上报残留目录
+
+实机验收发现的必修缺陷（R-B5-D2）：批量移动到**尚不存在**的目标目录后一键回退，文件全部还原，但本批次创建的目录**残留为空目录**——违反 D1 承诺的"回退恢复批量前库形态"。单测未抓到的原因：`EditRevertVaultHarness` 的 `adapter.remove` 对目录同样静默删除，而真实 Obsidian Adapter API 中 `remove(normalizedPath)` **仅适用于文件**（`obsidian.d.ts` 1556 行），对目录调用抛错；协调器 `removeEmptyFolders` 的 `try/catch` 把该错误降级为 `logger.warn('batch organize folder cleanup skipped')`，批量照报成功。
+
+**修复**：`removeEmptyFolders` 空目录改经 `adapter.rmdir(normalized, false)` 删除（**非递归是硬约束**——内容绝不删除，`adapter.list` 空判定即守卫）；清理结果如实返回 `{ removed, leftover }`：非空目录（用户内容）为设计性保留、删除失败为异常（warn 保留），二者一律进入 `leftover` 上浮——`revertLastBatch()` 返回值改为 `BatchRevertResult { result, leftoverFolders }`，execute 的 `ok` 与 `folder-unavailable` 出口各带 `leftoverFolders`；`BatchOrganizeModal` 经新 i18n 键 `batchOrganize.notice.revertLeftoverFolders`（en/zh）以 Notice 显式提示残留目录，不新增 UI 面。失败路径（changed=0 立即清理、folder-unavailable 回滚）使用同一修正后的 API。
+
+**替身补齐语义**：`EditRevertVaultHarness` 的 `adapter.remove` 改为**仅文件**（对目录抛 `remove() is file-only`，与真实 API 一致），新增 `adapter.rmdir(path, recursive)`（非递归遇非空目录抛错、目录不存在抛错、递归清空子树）——此类"API 文件/目录二分"缺陷今后会被单测挡住。改为严格替身后，既有 D1 回退形态测试在旧代码下立即转红（复现实机缺陷），修复后转绿。
+
+**测试**：新增 3 例（协调器 D2 组）——回退删除本批次创建目录（含 `remove()` 对目录抛错的替身诚实断言）、`rmdir` 失败时残留目录如实进入 `leftoverFolders` 而非吞掉、替身诚实性（`rmdir` 非空拒绝/缺失拒绝/递归清空）；另更新既有断言：非空目录保留用例同时断言 `leftoverFolders` 上报、changed=0 与 folder-unavailable 用例断言 `leftoverFolders` 为空。
+
 ## 2026-09-18 前端设计修复：批量整理与工具确认弹窗对齐设计系统
 
 - `BatchOrganizeModal` / `BatchRevertConfirmModal` 与 `ObsidianToolingApprovalModal` 落到 DESIGN.md §5 Modal Layout 词汇（新增 `src/style/modals/batch-organize-modal.css`、`src/style/modals/obsidian-tooling-confirm-modal.css`）：共享 `--opencodian-modal-*` 令牌、标签 + 控件双列表单行（`minmax(220px, max-content)` 控件列、16px 列距、12px 行距）、右对齐带顶部分隔线的操作行、Title 14/700 与 Body 13、预览路径与确认命令使用等宽证据字体、CTA 混入 ink-graphite 以满足 4.5:1 标签对比下限、破坏性/拒绝按钮使用玫瑰色 `mod-warning`、2px accent 焦点环与 reduced-motion 回退。新增两个 i18n 表单标签键（`batchOrganize.template.label`、`batchOrganize.value.label`），占位符与既有键一概未动。

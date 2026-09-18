@@ -78,12 +78,29 @@ export type BatchExecuteOutcome =
       failures: readonly string[];
       /** Folders created by this batch; revert removes the ones left empty. */
       createdFolders: readonly string[];
+      /**
+       * Created folders that remain because cleanup could not remove them
+       * (only possible when the post-abort cleanup of a zero-change run
+       * fails; surfaced so an orphan folder is never silent).
+       */
+      leftoverFolders: readonly string[];
     }
   | { status: 'stale-plan' }
   | { status: 'empty' }
   | { status: 'snapshot-unavailable' }
   /** Fail closed: target folder could not be created — nothing was written. */
-  | { status: 'folder-unavailable'; folder: string };
+  | { status: 'folder-unavailable'; folder: string; leftoverFolders: readonly string[] };
+
+/**
+ * Outcome of one-click revert: the R-B3 file result plus any folder the
+ * batch created that cleanup could not remove (kept because it is no longer
+ * empty, or the removal itself failed). Surfaced so the "vault back to its
+ * pre-batch shape" promise stays honest instead of being swallowed by a warn.
+ */
+export interface BatchRevertResult {
+  readonly result: EditRevertActionResult;
+  readonly leftoverFolders: readonly string[];
+}
 
 export class BatchOrganizeCoordinator {
   private readonly app: App;
@@ -163,11 +180,12 @@ export class BatchOrganizeCoordinator {
     // created and report; nothing has been written yet.
     const ensured = await this.ensureTargetFolders(operations);
     if (!ensured.ok) {
-      await this.removeEmptyFolders(ensured.created);
+      const rollback = await this.removeEmptyFolders(ensured.created);
       await this.editRevert?.endBatchCapture?.(batchId);
       logger.warn('batch organize refused to run: target folder could not be created', { folder: ensured.folder });
-      return { status: 'folder-unavailable', folder: ensured.folder };
-    }    this.createdFoldersByBatch.set(batchId, ensured.created);
+      return { status: 'folder-unavailable', folder: ensured.folder, leftoverFolders: rollback.leftover };
+    }
+    this.createdFoldersByBatch.set(batchId, ensured.created);
 
     const failures: string[] = [];
     let changed = 0;
@@ -184,10 +202,12 @@ export class BatchOrganizeCoordinator {
       await this.editRevert?.endBatchCapture?.(batchId);
     }
     let createdFolders = ensured.created;
+    let leftoverFolders: string[] = [];
     if (changed === 0 && createdFolders.length > 0) {
       // Nothing changed: drop the folders created for this batch right away
       // so the vault is left exactly as before (there is nothing to revert).
-      await this.removeEmptyFolders(createdFolders);
+      const cleanup = await this.removeEmptyFolders(createdFolders);
+      leftoverFolders = cleanup.leftover;
       createdFolders = [];
     }
     if (createdFolders.length > 0) {
@@ -197,26 +217,29 @@ export class BatchOrganizeCoordinator {
     if (failures.length > 0) {
       logger.warn('batch organize finished with skipped files', { batchId, failures });
     }
-    return { status: 'ok', batchId, changed, failures, createdFolders };
+    return { status: 'ok', batchId, changed, failures, createdFolders, leftoverFolders };
   }
 
   /**
    * One-click revert of the most recent batch (null when none recorded).
    * After the R-B3 revert of the file entries, folders this batch created
-   * are removed when they are now empty, so the vault returns to its
-   * pre-batch shape; a folder that received other content in the meantime is
-   * kept (never delete user content).
+   * are removed when they are now empty (via `adapter.rmdir`, R-B5-D2), so
+   * the vault returns to its pre-batch shape; a folder that received other
+   * content in the meantime is kept (never delete user content). Folders
+   * that remain — kept or unremovable — are returned in `leftoverFolders`
+   * so the caller can say so instead of leaving an orphan silently.
    */
-  async revertLastBatch(): Promise<EditRevertActionResult | null> {
+  async revertLastBatch(): Promise<BatchRevertResult | null> {
     if (!this.lastBatchId || !this.editRevert) {
       return null;
     }
     const result = await this.editRevert.revertAll(this.lastBatchId);
     const created = this.createdFoldersByBatch.get(this.lastBatchId);
+    let leftoverFolders: readonly string[] = [];
     if (created && created.length > 0) {
-      await this.removeEmptyFolders(created);
+      leftoverFolders = (await this.removeEmptyFolders(created)).leftover;
     }
-    return result;
+    return { result, leftoverFolders };
   }
 
   /** True when a completed batch of this session can still be reverted. */
@@ -320,23 +343,35 @@ export class BatchOrganizeCoordinator {
    * Remove the given folders deepest-first, but ONLY when they are empty —
    * this is what makes a reverted batch leave the vault exactly as it was,
    * while a folder that gained user content in the meantime is kept.
+   *
+   * R-B5-D2: empty directories go through `adapter.rmdir(path, false)` —
+   * `adapter.remove` is file-only in the Obsidian Adapter API and throws on
+   * a directory, which previously left every created folder orphaned behind
+   * a swallowed warn. Non-recursive by design: this code must never delete
+   * content, the emptiness check is the guard. Returns the folders that DID
+   * come down and those that remain (non-empty by user content, or the
+   * removal itself failed) so callers can surface the outcome honestly.
    */
-  private async removeEmptyFolders(folders: readonly string[]): Promise<string[]> {
+  private async removeEmptyFolders(folders: readonly string[]): Promise<{ removed: string[]; leftover: string[] }> {
     const removed: string[] = [];
+    const leftover: string[] = [];
     for (const folder of [...folders].sort().reverse()) {
+      const normalized = normalizePath(folder);
       try {
-        const normalized = normalizePath(folder);
         const listing = await this.app.vault.adapter.list(normalized);
         if (listing.files.length > 0 || listing.folders.length > 0) {
+          // Intentional keep: the folder is no longer empty (user content).
+          leftover.push(folder);
           continue;
         }
-        await this.app.vault.adapter.remove(normalized);
+        await this.app.vault.adapter.rmdir(normalized, false);
         removed.push(folder);
       } catch (error) {
         logger.warn('batch organize folder cleanup skipped', { error, folder });
+        leftover.push(folder);
       }
     }
-    return removed;
+    return { removed, leftover };
   }
 
   // --- snapshot collection -------------------------------------------------------

@@ -83,8 +83,44 @@ export class EditRevertVaultHarness {
       }
       return content;
     },
+    // R-B5-D2: mirror the real Adapter split — `remove` is FILE-only (it
+    // throws on a directory; directories go through `rmdir`), so a caller
+    // using the wrong API fails loudly here instead of silently in tests.
     remove: async (path: string): Promise<void> => {
+      if (this.dirs.has(path) || this.folders.has(path)) {
+        throw new Error(`remove() is file-only; use rmdir for directory: ${path}`);
+      }
       this.diskFiles.delete(path);
+    },
+    rmdir: async (path: string, recursive: boolean): Promise<void> => {
+      if (!this.dirs.has(path) && !this.folders.has(path)) {
+        throw new Error(`directory not found: ${path}`);
+      }
+      if (!recursive) {
+        const listing = await this.adapter.list(path);
+        if (listing.files.length > 0 || listing.folders.length > 0) {
+          throw new Error(`directory not empty: ${path}`);
+        }
+      } else {
+        const prefix = `${path}/`;
+        for (const file of [...this.diskFiles.keys(), ...this.vaultFiles.keys()]) {
+          if (file.startsWith(prefix)) {
+            this.diskFiles.delete(file);
+            this.vaultFiles.delete(file);
+          }
+        }
+        for (const dir of [...this.dirs]) {
+          if (dir === path || dir.startsWith(prefix)) {
+            this.dirs.delete(dir);
+          }
+        }
+        for (const folder of [...this.folders]) {
+          if (folder === path || folder.startsWith(prefix)) {
+            this.folders.delete(folder);
+          }
+        }
+        return;
+      }
       this.dirs.delete(path);
       this.folders.delete(path);
     },

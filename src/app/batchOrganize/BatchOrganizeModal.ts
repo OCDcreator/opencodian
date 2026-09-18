@@ -25,7 +25,6 @@
 import type { App } from 'obsidian';
 import { Modal, Notice } from 'obsidian';
 
-import type { EditRevertActionResult } from '../../core/types';
 import { t,type TranslationKey } from '../../i18n';
 import {
   BATCH_ORGANIZE_TEMPLATE_IDS,
@@ -38,7 +37,12 @@ import {
   parseBatchPropertyValue,
   validateTargetFolder,
 } from '../../shared';
-import type { BatchExecuteOutcome, BatchOrganizeCoordinator, BatchPreview } from './BatchOrganizeCoordinator';
+import type {
+  BatchExecuteOutcome,
+  BatchOrganizeCoordinator,
+  BatchPreview,
+  BatchRevertResult,
+} from './BatchOrganizeCoordinator';
 
 /** Maximum operations rendered in the preview list before a "+N more" line. */
 const PREVIEW_LIST_CAP = 200;
@@ -419,8 +423,10 @@ export class BatchOrganizeModal extends Modal {
       this.stage = 'configure';
     } else if (outcome.status === 'folder-unavailable') {
       new Notice(t('batchOrganize.error.folderUnavailable', { folder: outcome.folder }));
+      notifyLeftoverFolders(outcome.leftoverFolders);
       this.stage = 'configure';
     } else {
+      notifyLeftoverFolders(outcome.leftoverFolders);
       this.revertDone = false;
       this.stage = 'result';
     }
@@ -629,15 +635,27 @@ function createButton(parent: HTMLElement, label: string, cls?: string): HTMLBut
 
 /** Shared revert outcome reporting for the result stage and the confirm dialog. */
 async function revertLastBatchAndNotify(coordinator: BatchOrganizeCoordinator): Promise<boolean> {
-  const result: EditRevertActionResult | null = await coordinator.revertLastBatch();
-  if (!result) {
+  const outcome: BatchRevertResult | null = await coordinator.revertLastBatch();
+  if (!outcome) {
     new Notice(t('batchOrganize.error.revertUnavailable'));
     return false;
   }
-  if (result.ok) {
-    new Notice(t('editRevert.notice.revertAll', { count: result.changed, skippedDetail: '' }));
+  if (outcome.result.ok) {
+    new Notice(t('editRevert.notice.revertAll', { count: outcome.result.changed, skippedDetail: '' }));
   } else {
-    new Notice(t('editRevert.notice.failed', { error: result.error ?? 'unknown' }));
+    new Notice(t('editRevert.notice.failed', { error: outcome.result.error ?? 'unknown' }));
   }
-  return result.ok;
+  notifyLeftoverFolders(outcome.leftoverFolders);
+  return outcome.result.ok;
+}
+
+/**
+ * R-B5-D2: a folder the batch created that cleanup could not take down
+ * (kept because it is no longer empty, or the removal failed) is reported
+ * instead of being swallowed — the revert promise is "pre-batch shape".
+ */
+function notifyLeftoverFolders(folders: readonly string[]): void {
+  if (folders.length > 0) {
+    new Notice(t('batchOrganize.notice.revertLeftoverFolders', { folders: folders.join(', ') }));
+  }
 }

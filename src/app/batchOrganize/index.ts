@@ -9,5 +9,6 @@ export {
   BatchOrganizeCoordinator,
   type BatchPreview,
   type BatchPreviewOutcome,
+  type BatchRevertResult,
 } from './BatchOrganizeCoordinator';
 export { BatchOrganizeModal, BatchRevertConfirmModal } from './BatchOrganizeModal';
