@@ -10,9 +10,15 @@ import type {
   AuxQuerySession,
   BackendModelSelection,
 } from '../../core/agents/backend/AgentAuxQueryCapability';
+import type { AgentInlineCompletionCapability } from '../../core/agents/backend/AgentInlineCompletionCapability';
 import type { AgentBackendKind } from '../../core/types/chat';
 
-export type { AgentAuxQueryCapability, AuxQuerySession, BackendModelSelection };
+export type {
+  AgentAuxQueryCapability,
+  AgentInlineCompletionCapability,
+  AuxQuerySession,
+  BackendModelSelection,
+};
 
 /** The backend chosen for one inline edit, already resolved by the host. */
 export interface InlineEditHostAdapter {
@@ -20,6 +26,11 @@ export interface InlineEditHostAdapter {
   readonly displayName: string;
   /** Aux query capability, or `null` when the backend cannot prove read-only execution. */
   getAuxQuery(): AgentAuxQueryCapability | null;
+  /**
+   * Warm completion capability (R-C3), or `null` when the backend does not
+   * host one. Absent on older hosts — treated as "not available".
+   */
+  getInlineCompletion?(): AgentInlineCompletionCapability | null;
   /**
    * Documented precedence: `inlineEditModelOverrides[kind]` → active chat model →
    * `null`. Returns `{ error }` when an explicitly configured model cannot be

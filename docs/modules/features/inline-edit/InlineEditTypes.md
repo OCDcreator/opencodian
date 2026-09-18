@@ -27,3 +27,5 @@ inline edit 的共享类型，使 controller 与 service 不必直接依赖插�
 
 - 纯类型模块，不要引入运行时依赖或副作用
 - `InlineEditAnchor.snapshot` 的语义是"请求时刻的选区文本"，脏检查依赖它的全等性；不要改成行尾归一化后的文本
+
+> 2026-09-18 (R-C3)：`InlineEditHostAdapter` 新增可选 `getInlineCompletion(): AgentInlineCompletionCapability | null`（host 未实现按「不可用」处理）。

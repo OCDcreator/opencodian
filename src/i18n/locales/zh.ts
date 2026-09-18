@@ -5350,6 +5350,14 @@ export const zhTranslations = {
   'inlineEdit.error.modelUnavailable': '配置的行内编辑模型不可用。',
   'inlineEdit.error.sessionUnavailable': '无法启动行内编辑会话。',
   'inlineEdit.error.writeToolObserved': '模型尝试了写操作，结果已被丢弃。',
+
+  // R-C3 Alt 一键补全（ghost text）。
+  'inlineCompletion.command.trigger': '行内补全（光标处 ghost text）',
+  'inlineCompletion.error.unsupported': '{{backend}} 当前无法运行快速行内补全。',
+  'inlineCompletion.error.unsupportedAfterFailures': '{{backend}} 补全连续失败，已停用，直到重新开关该功能。',
+  'inlineCompletion.error.writeToolObserved': '{{backend}} 在补全期间尝试写操作（{{tools}}），建议已被丢弃，补全会话已关闭。',
+  'inlineCompletion.error.capabilityUnavailable': '当前没有后端支持经验证的只读行内补全。',
+  'inlineCompletion.error.sessionUnavailable': '无法启动 {{backend}} 补全会话。{{detail}}',
   'inlineEdit.error.staleSelection': '生成期间笔记已被修改，未做任何应用。',
   'inlineEdit.error.applyFailed': '应用编辑失败：{{message}}',
 
@@ -5439,6 +5447,12 @@ export const zhTranslations = {
   'settings.inlineEdit.triggerAt.desc': "在笔记中行首或空白后键入 @ 时，在光标处打开行内编辑面板（@ 本身不会写入文档）。注意：@ 常用于邮箱与提及，可能与输入习惯冲突。",
   'settings.inlineEdit.documentMode.name': "全文修改模式",
   'settings.inlineEdit.documentMode.desc': "允许行内面板切换到「整篇」形态，并提供「整篇行内编辑」命令。整篇修改会在接受前二次确认，且单次写入整篇笔记（可一步撤销）。",
+  'settings.inlineCompletion.enabled.name': "Alt 一键补全（ghost text）",
+  'settings.inlineCompletion.enabled.desc': "光标处按 Alt，补全当前句子或段落并显示为 ghost text：Tab 接受（一步撤销）、Esc 忽略、继续输入自动取消。默认关闭；开启后每个后端保留 1 个预热只读会话（空闲 5 分钟自动释放）。",
+  'settings.inlineCompletion.maxChars.name': "补全长度上限",
+  'settings.inlineCompletion.maxChars.desc': "单条建议的最大字符数（硬上限，超出先截断再显示）；重复光标前已有文本的建议会被拒绝。",
+  'settings.inlineCompletion.hotkey.name': "补全触发方式",
+  'settings.inlineCompletion.hotkey.desc': "默认手势：在光标处单独按下并松开 Alt。也可以在 Obsidian 热键设置中为「OpenCodian: 行内补全」命令绑定任意快捷键；输入法组合态不会触发。",
   'settings.inlineEdit.maxConcurrentEdits.name': "并行行内编辑上限",
   'settings.inlineEdit.maxConcurrentEdits.desc': "同一笔记中可同时存在的行内编辑数量。每个并行编辑都会同时消耗一个独立的模型会话，请按后端配额调整。",
   'settings.inlineEdit.hotkey.name': "命令快捷键",

@@ -17,6 +17,7 @@ Inline edit (2026-09-15): the feature is backend-agnostic UI plus orchestration.
 - inline edit CM6 controller, widget layer and word-level diff preview
 - backend-neutral auxiliary query orchestration, prompt contract and response parsing
 - inline edit host resolution for backend, model and working directory
+- R-C3 Alt ghost-text completion: warm session pool (`InlineCompletionService`), per-editor ghost state machine (`InlineCompletionController`), CM6 ghost layer (`InlineCompletionGhost`), output contract (`InlineCompletionPrompt`) and Alt-solo gesture (`InlineCompletionTrigger`) — same owner, the capability contract stays in `core.backend`
 
 ## Canonical state (truth home)
 

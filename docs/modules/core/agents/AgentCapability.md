@@ -22,3 +22,5 @@
 - `chat` / `sessions` 是 Phase 0/1 backend 抽象的基础 runtime 能力；OpenCode 继续通过 `OPENCODE_FULL_CAPABILITIES` 声明支持，Claude 等新 backend 必须显式实现对应 capability interface 后才能接入发送和会话生命周期路径
 
 - 2026-09-15: 新增 `AgentCapability.AuxQuery`（`aux-query`），用于 backend 无关的一次性只读辅助查询（inline edit）。能力接口见 `AgentAuxQueryCapability`。
+
+> 2026-09-18 (R-C3)：新增 `InlineCompletion: 'inline-completion'` 能力标识（Alt 一键补全的预热只读会话通道，`AgentInlineCompletionCapability`）。四后端均声明该能力；OpenCode 经穷举集 `OPENCODE_FULL_CAPABILITIES` 天然覆盖。

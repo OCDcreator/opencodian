@@ -27,6 +27,7 @@ import {
   normalizeImageGenerationAssetCleanup,
   normalizeImageGenerationMaxWidth,
   normalizeImageGenerationModels,
+  normalizeInlineCompletionMaxChars,
   normalizeInlineEditEffortOverrides,
   normalizeInlineEditMaxConcurrentEdits,
   normalizeInlineEditModelOverrides,
@@ -493,6 +494,22 @@ function normalizeVaultRetrievalSettingsOnLoad(
 }
 
 /** R-C2 text-to-image generation, normalized at the final load-merge boundary. */
+function normalizeInlineCompletionSettingsOnLoad(
+  normalizedSettings: Partial<OpenCodianSettings> | null,
+): {
+  inlineCompletionEnabled: boolean;
+  inlineCompletionMaxChars: number;
+} {
+  return {
+    inlineCompletionEnabled: typeof normalizedSettings?.inlineCompletionEnabled === 'boolean'
+      ? normalizedSettings.inlineCompletionEnabled
+      : DEFAULT_SETTINGS.inlineCompletionEnabled,
+    inlineCompletionMaxChars: normalizeInlineCompletionMaxChars(
+      normalizedSettings?.inlineCompletionMaxChars,
+    ),
+  };
+}
+
 function normalizeImageGenerationSettingsOnLoad(
   normalizedSettings: Partial<OpenCodianSettings> | null,
 ): {
@@ -639,6 +656,7 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
       ...normalizeObsidianToolingSettingsOnLoad(normalizedSettings),
       ...normalizeVaultRetrievalSettingsOnLoad(normalizedSettings),
       ...normalizeImageGenerationSettingsOnLoad(normalizedSettings),
+      ...normalizeInlineCompletionSettingsOnLoad(normalizedSettings),
     },
     shouldMigrateLegacyLocalDefaultPort,
     shouldResetGlassRefractionGlassDefaults,

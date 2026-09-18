@@ -5351,6 +5351,14 @@ export const enTranslations = {
   'inlineEdit.error.modelUnavailable': 'The configured inline edit model is not usable.',
   'inlineEdit.error.sessionUnavailable': 'The inline edit session could not be started.',
   'inlineEdit.error.writeToolObserved': 'The model attempted a write operation; the result was discarded.',
+
+  // R-C3 Alt ghost-text completion.
+  'inlineCompletion.command.trigger': 'Inline completion (ghost text at the cursor)',
+  'inlineCompletion.error.unsupported': '{{backend}} cannot run fast inline completions right now.',
+  'inlineCompletion.error.unsupportedAfterFailures': '{{backend}} completion kept failing; it is disabled until the feature is toggled again.',
+  'inlineCompletion.error.writeToolObserved': '{{backend}} attempted a write ({{tools}}) during a completion; the suggestion was discarded and the completion session closed.',
+  'inlineCompletion.error.capabilityUnavailable': 'No active backend supports verified read-only inline completion.',
+  'inlineCompletion.error.sessionUnavailable': 'Could not start the {{backend}} completion session. {{detail}}',
   'inlineEdit.error.staleSelection': 'The note changed while generating; nothing was applied.',
   'inlineEdit.error.applyFailed': 'Applying the edit failed: {{message}}',
 
@@ -5440,6 +5448,12 @@ export const enTranslations = {
   'settings.inlineEdit.triggerAt.desc': "Typing @ at the start of a line or right after whitespace opens the inline-edit panel at the cursor (the @ itself never enters the note). Note: @ is common in emails and mentions and may conflict with how you type.",
   'settings.inlineEdit.documentMode.name': "Whole-document edit mode",
   'settings.inlineEdit.documentMode.desc': "Lets the inline bar switch to the 整篇 (Document) form and provides the whole-document inline-edit command. Whole-document edits ask for a second confirmation before applying and write the note in a single step (one undo).",
+  'settings.inlineCompletion.enabled.name': "Alt ghost-text completion",
+  'settings.inlineCompletion.enabled.desc': "Press Alt at the cursor to complete the current sentence or paragraph as ghost text: Tab accepts (one undo step), Esc ignores, typing cancels. Off by default; while on, one warm read-only session per backend is kept alive (5-minute idle timeout).",
+  'settings.inlineCompletion.maxChars.name': "Completion length limit",
+  'settings.inlineCompletion.maxChars.desc': "Hard cap for one suggestion in characters. Suggestions longer than this are truncated before showing; suggestions that repeat the text before the cursor are rejected.",
+  'settings.inlineCompletion.hotkey.name': "Completion trigger",
+  'settings.inlineCompletion.hotkey.desc': "Default trigger: press and release Alt alone at the cursor. You can also bind the \"OpenCodian: inline completion\" command to any hotkey in Obsidian's hotkey settings; IME composition never triggers.",
   'settings.inlineEdit.maxConcurrentEdits.name': "Parallel inline edit cap",
   'settings.inlineEdit.maxConcurrentEdits.desc': "How many inline edits can be open in one note at the same time. Each parallel edit consumes its own model session concurrently, so tune this to your backend quota.",
   'settings.inlineEdit.hotkey.name': "Command hotkey",

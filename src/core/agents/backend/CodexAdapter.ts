@@ -31,6 +31,12 @@ import type {
   AuxQuerySessionConfig,
 } from './AgentAuxQueryCapability';
 import type {
+  AgentInlineCompletionCapability,
+  InlineCompletionSession,
+  InlineCompletionSessionConfig,
+} from './AgentInlineCompletionCapability';
+import { INLINE_COMPLETION_TURN_TIMEOUT_MS } from './AgentInlineCompletionCapability';
+import type {
   AgentChatCapability,
   AgentChatSendRequest,
   AgentConnectionStatus,
@@ -42,6 +48,10 @@ import type {
   StatusChangeHandler,
 } from './AgentService';
 import { CodexAuxQuerySession, type CodexAuxSessionOptions } from './auxiliary/CodexAuxQuerySession';
+import {
+  type WarmableAuxSession,
+  WarmInlineCompletionSession,
+} from './auxiliary/WarmInlineCompletionSession';
 import { CODEX_EFFORT_VARIANTS } from './BackendModelCatalog';
 import {
   type AppServerAccountRateLimitsResult,
@@ -350,6 +360,7 @@ const CODEX_CAPABILITIES: BackendCapabilities = Object.freeze(
     AgentCapability.Images,    // local_image input via temp-file translation
     AgentCapability.Models,    // getModelList() (app-server model/list + codex debug models fallback)
     AgentCapability.AuxQuery,  // startAuxQuerySession() via CodexAuxQuerySession (read-only sandbox, fail-closed)
+    AgentCapability.InlineCompletion, // startInlineCompletionSession() over the same read-only sandbox (R-C3)
   ]),
 );
 
@@ -369,7 +380,8 @@ export class CodexAdapter
     AgentChatCapability,
     AgentSessionCapability,
     AgentForkCapability,
-    AgentAuxQueryCapability
+    AgentAuxQueryCapability,
+    AgentInlineCompletionCapability
 {
   readonly kind: AgentBackendKind = 'codex';
   readonly displayName = 'Codex';
@@ -1194,6 +1206,31 @@ export class CodexAdapter
       client,
       ...(config.model ? { model: config.model } : {}),
       ...(effort ? { effort } : {}),
+      ...(config.turnTimeoutMs ? { turnTimeoutMs: config.turnTimeoutMs } : {}),
+    });
+  }
+
+  /**
+   * Start a warm completion session (R-C3) over the same read-only sandbox
+   * mechanics as inline edit: ephemeral thread, `sandbox=read-only`,
+   * `approvalPolicy=never`, verified against the app-server's effective
+   * settings. `reset()` rebuilds the ephemeral thread through this same
+   * construction; the app-server client (the warm part) is shared.
+   */
+  async startInlineCompletionSession(config: InlineCompletionSessionConfig): Promise<InlineCompletionSession> {
+    const startAux = async (): Promise<WarmableAuxSession> =>
+      await this.startAuxQuerySession({
+        systemPrompt: config.systemPrompt,
+        workingDirectory: config.workingDirectory,
+        turnTimeoutMs: INLINE_COMPLETION_TURN_TIMEOUT_MS,
+        ...(config.model ? { model: config.model } : {}),
+        ...(config.effort ? { effort: config.effort } : {}),
+      });
+    const initial = await startAux();
+    return WarmInlineCompletionSession.create({
+      backend: this.kind,
+      session: initial,
+      recreate: startAux,
     });
   }
 

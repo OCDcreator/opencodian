@@ -126,6 +126,12 @@ export interface AuxQuerySessionConfig {
   readonly effort?: string;
   /** Working directory scope for the aux session. */
   readonly workingDirectory: string;
+  /**
+   * Optional wall-clock budget for one turn. Absent lets each backend apply
+   * its own default (180 s). Callers with tight latency budgets (inline
+   * completion, R-C3) set a short one explicitly.
+   */
+  readonly turnTimeoutMs?: number;
 }
 
 /**

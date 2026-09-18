@@ -6,7 +6,10 @@ import type { ContextUsageSnapshot, StreamChunk } from '../../../types/chat';
 import type { PiBackendSettings } from '../../../types/settings';
 import { AgentCapability, type BackendCapabilities } from '../../AgentCapability';
 import type { AgentAuxQueryCapability, AuxQuerySession, AuxQuerySessionConfig } from '../AgentAuxQueryCapability';
+import type { AgentInlineCompletionCapability, InlineCompletionSession, InlineCompletionSessionConfig } from '../AgentInlineCompletionCapability';
+import { INLINE_COMPLETION_TURN_TIMEOUT_MS } from '../AgentInlineCompletionCapability';
 import type { AgentChatCapability, AgentChatSendRequest, AgentConnectionStatus, AgentForkCapability, AgentModelCapability, AgentSessionCapability, Disposable, StatusChangeHandler } from '../AgentService';
+import { type WarmableAuxSession,WarmInlineCompletionSession } from '../auxiliary/WarmInlineCompletionSession';
 import { PiAuxQuerySession } from './PiAuxQuerySession';
 import { PI_CONFIG_COMMANDS, PI_RPC_COMMANDS, PI_SDK_COMMANDS, type PiCommandName, type PiExtensionStatusSnapshot, type PiModelInfo, type PiServiceEvent, type PiUiHandler } from './PiProtocol';
 import { type PiLaunchOptions, type PiRecord, piRecord, type PiRpcPort } from './PiRpcClient';
@@ -25,7 +28,7 @@ export interface PiAdapterOptions {
 }
 
 /** AgentService facade. Per-session SDK services own execution and native state. */
-export class PiAdapter implements AgentChatCapability, AgentSessionCapability, AgentModelCapability, AgentForkCapability, AgentAuxQueryCapability {
+export class PiAdapter implements AgentChatCapability, AgentSessionCapability, AgentModelCapability, AgentForkCapability, AgentAuxQueryCapability, AgentInlineCompletionCapability {
   readonly kind = 'pi' as const;
   readonly displayName = 'Pi';
   readonly description = 'Official Pi SDK · independent local service';
@@ -34,6 +37,7 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
     AgentCapability.FileOps, AgentCapability.Shell, AgentCapability.Images, AgentCapability.CostTracking,
     AgentCapability.Fork, AgentCapability.Context, AgentCapability.Compaction, AgentCapability.Thinking, AgentCapability.Export,
     AgentCapability.AuxQuery, // startAuxQuerySession() via PiAuxQuerySession (fail-closed read-only)
+    AgentCapability.InlineCompletion, // startInlineCompletionSession() over the same fail-closed read-only session (R-C3)
   ]);
   private currentStatus: AgentConnectionStatus = 'disconnected';
   private readonly statusHandlers = new Set<StatusChangeHandler>();
@@ -130,6 +134,30 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
       executablePath,
       ...(servicePath ? { servicePath } : {}),
       ...(config.model ? { model: config.model } : {}),
+      ...(config.turnTimeoutMs ? { turnTimeoutMs: config.turnTimeoutMs } : {}),
+    });
+  }
+
+  /**
+   * Start a warm completion session (R-C3) over the same fail-closed
+   * `PiAuxQuerySession` mechanics: `set_tools` allowlist verified by the SDK's
+   * own `get_tools` readback. `reset()` rebuilds through this construction;
+   * the configured executable is re-read so a settings change applies on the
+   * next reset.
+   */
+  async startInlineCompletionSession(config: InlineCompletionSessionConfig): Promise<InlineCompletionSession> {
+    const startAux = async (): Promise<WarmableAuxSession> =>
+      await this.startAuxQuerySession({
+        systemPrompt: config.systemPrompt,
+        workingDirectory: config.workingDirectory,
+        turnTimeoutMs: INLINE_COMPLETION_TURN_TIMEOUT_MS,
+        ...(config.model ? { model: config.model } : {}),
+      });
+    const initial = await startAux();
+    return WarmInlineCompletionSession.create({
+      backend: this.kind,
+      session: initial,
+      recreate: startAux,
     });
   }
 

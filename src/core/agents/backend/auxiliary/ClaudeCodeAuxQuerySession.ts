@@ -199,6 +199,21 @@ export class ClaudeCodeAuxQuerySession implements AuxQuerySession {
   }
 
   /**
+   * Start the CLI process eagerly, without submitting a turn (R-C3 prewarm).
+   *
+   * The read-only session normally spawns the CLI inside the first `runTurn`,
+   * which would put the full 1–3 s process start inside the completion trigger
+   * path. `warmUp()` opens the SDK query and its prompt queue; the CLI idles
+   * until the first real prompt arrives. Enforcement is untouched: the same
+   * options are used, and the `system/init` readback still runs on the first
+   * turn and still fails the session on any deviation.
+   */
+  warmUp(): void {
+    if (this.pump || this.disposed) return;
+    this.startSession();
+  }
+
+  /**
    * The tool list the CLI itself reported for this session.
    *
    * `null` until the first turn has been observed. Read-only audit evidence:

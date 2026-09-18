@@ -20866,6 +20866,26 @@ img.opencodian-model-provider-header-icon {
   border-color: color-mix(in srgb, var(--text-accent) 45%, transparent);
 }
 
+/* -- Ghost-text completion (R-C3) ----------------------------------- */
+
+/*
+ * The suggestion renders as a widget AFTER the cursor (side 1), so it must
+ * read as clearly "not yet typed": same font metrics as the editor (it lines
+ * up with the text it continues), muted-but-legible color (>= 4.5:1 against
+ * the background via a text-muted/text-normal mix), and an italic voice that
+ * marks it as a proposal. No animation — a suggestion that appears while the
+ * user is reading must not move anything; this also keeps the reduced-motion
+ * contract satisfied by construction. The element is aria-hidden (CM6 widget)
+ * and non-interactive by design; the atomicRanges facet — not CSS — keeps
+ * the cursor out of the suggestion.
+ */
+.cm-inline-completion-ghost {
+  color: color-mix(in srgb, var(--text-muted) 72%, var(--text-normal));
+  font-style: italic;
+  pointer-events: none;
+  white-space: pre-wrap;
+}
+
 
 /* modals/delete-confirm-dialog.css */
 /* ============================================================

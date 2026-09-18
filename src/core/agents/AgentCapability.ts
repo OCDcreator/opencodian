@@ -34,6 +34,7 @@ export const AgentCapability = {
   Export: 'export',
   Images: 'images',
   AuxQuery: 'aux-query',
+  InlineCompletion: 'inline-completion',
 } as const;
 
 export type AgentCapability = (typeof AgentCapability)[keyof typeof AgentCapability];

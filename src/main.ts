@@ -10,6 +10,11 @@ import { OPENCODIAN_APP_ICON_ID } from './shared/brandingWordmark';
 import { ModelConfigService, ModelPricingService, OpencodeConfigManager } from './core/config';
 import { setAgentServiceRegistry } from './core/agents/AgentCapability';
 import { InlineEditController } from './features/inline-edit/InlineEditController';
+import { InlineCompletionController } from './features/inline-edit/InlineCompletionController';
+import { inlineCompletionGhostExtension } from './features/inline-edit/InlineCompletionGhost';
+import { buildInlineCompletionSystemPrompt } from './features/inline-edit/InlineCompletionPrompt';
+import type { InlineCompletionTarget } from './features/inline-edit/InlineCompletionService';
+import { InlineCompletionService } from './features/inline-edit/InlineCompletionService';
 import { createInlineEditAutoLinkProcessor } from './features/inline-edit/InlineEditAutoLink';
 import { confirmInlineEditDocumentReplace } from './features/inline-edit/InlineEditConfirmModal';
 import { inlineEditAtTriggerExtension } from './features/inline-edit/InlineEditAtTrigger';
@@ -199,6 +204,9 @@ export default class OpenCodianPlugin extends Plugin {
   /** Inline-edit controller; edits are bucketed per editor (R-A5 parallelism). */
   inlineEditController: InlineEditController | null = null;
   private inlineEditHost: InlineEditHost | null = null;
+  /** R-C3 warm completion session pool + per-editor ghost controller. */
+  private inlineCompletionPool: InlineCompletionService | null = null;
+  private inlineCompletionController: InlineCompletionController | null = null;
 
   private conversations: Conversation[] = [];
   private conversationsLoaded = false;
@@ -561,6 +569,85 @@ export default class OpenCodianPlugin extends Plugin {
       host: this.inlineEditHost,
       confirmDocumentReplace: (info) => confirmInlineEditDocumentReplace(this.app, info),
     });
+
+    this.configureInlineCompletion();
+  }
+
+  /**
+   * R-C3 Alt ghost-text completion: the pool owns the warm read-only
+   * sessions, the controller owns the per-editor ghost state machine, and
+   * main.ts only composes them (no completion logic lives here).
+   */
+  private configureInlineCompletion(): void {
+    this.inlineCompletionPool = new InlineCompletionService({
+      host: {
+        isEnabled: () => this.settings?.inlineCompletionEnabled ?? false,
+        getLocale: () => getLocale(),
+        getMaxChars: () => this.settings.inlineCompletionMaxChars,
+        getNotePath: () => this.app.workspace.getActiveViewOfType(MarkdownView)?.file?.path ?? '',
+        resolveCompletionTarget: () => this.resolveInlineCompletionTarget(),
+        buildSystemPrompt: () =>
+          buildInlineCompletionSystemPrompt(getLocale(), this.settings.inlineCompletionMaxChars),
+      },
+    });
+    this.inlineCompletionController = new InlineCompletionController({
+      pool: this.inlineCompletionPool,
+      isEnabled: () => this.settings?.inlineCompletionEnabled ?? false,
+      hasActiveInlineEdits: () => this.inlineEditController?.hasActiveEdits() ?? false,
+    });
+  }
+
+  /**
+   * R-C3: resolve the active backend's completion target for one pool call.
+   * Model resolution reuses the inline-edit host's documented precedence
+   * (C3-Q3): `inlineEditModelOverrides` → active chat tab model → backend
+   * default; the system prompt rides the backend's native seam.
+   */
+  private resolveInlineCompletionTarget(): InlineCompletionTarget {
+    const adapter = this.inlineEditHost?.resolveAdapter() ?? null;
+    const capability = adapter?.getInlineCompletion?.() ?? null;
+    if (!adapter || !capability) {
+      return { ok: false, reason: 'capability-unavailable', backend: adapter?.displayName ?? '' };
+    }
+    const resolvedModel = adapter.resolveModel();
+    if (!resolvedModel.ok) {
+      return { ok: false, reason: 'model-unavailable', detail: resolvedModel.error };
+    }
+    const workingDirectory = getVaultBasePath(this.app) ?? '';
+    const locale = getLocale();
+    const maxChars = this.settings.inlineCompletionMaxChars;
+    const effort = adapter.getEffort();
+    return {
+      ok: true,
+      backend: adapter.kind,
+      displayName: adapter.displayName,
+      workingDirectory,
+      model: resolvedModel.model,
+      effort: effort ?? null,
+      startSession: () => capability.startInlineCompletionSession({
+        systemPrompt: buildInlineCompletionSystemPrompt(locale, maxChars),
+        workingDirectory,
+        ...(resolvedModel.model ? { model: resolvedModel.model } : {}),
+        ...(effort ? { effort } : {}),
+      }),
+    };
+  }
+
+  /**
+   * R-C3 settings hook: the toggle is the pool's off switch. Turning the
+   * feature off disposes every warm session immediately (acceptance 7);
+   * turning it back on clears the per-cycle unsupported marks so a backend
+   * gets a fresh start.
+   */
+  onInlineCompletionSettingChanged(enabled: boolean): void {
+    if (!enabled) {
+      // Off = no sessions, no network (acceptance 7, C3-Q1 reading). The
+      // controller itself stays wired but gated: the extension falls through
+      // on the first `isEnabled()` check, and the pool never starts sessions.
+      void this.inlineCompletionPool?.disposeAll();
+      return;
+    }
+    this.inlineCompletionPool?.resetUnsupported();
   }
 
   /** Whole-document form gate (R-A6), also used by the command/menu checks. */
@@ -1031,13 +1118,52 @@ export default class OpenCodianPlugin extends Plugin {
     // aux sessions). Both events are cheap and prune only detached views.
     this.registerEvent(this.app.workspace.on('active-leaf-change', () => {
       void this.inlineEditController?.pruneDetachedEdits();
+      this.prewarmInlineCompletionOnEditorFocus();
     }));
+    this.registerInlineCompletionExtension();
     this.registerEvent(this.app.workspace.on('layout-change', () => {
       void this.inlineEditController?.pruneDetachedEdits();
     }));
 
     this.settingsTab = new OpenCodianSettingTab(this.app, this);
     this.addSettingTab(this.settingsTab);
+  }
+
+  /**
+   * R-C3 Alt ghost-text completion. Registered once at load (Obsidian only
+   * registers editor extensions there — the documented C3-Q1 deviation from
+   * acceptance 7's literal wording); every entry point is gated per event
+   * by `inlineCompletionEnabled`, so the off state is: no sessions, no
+   * network, no decorations, one gated key handler (R-A1 precedent).
+   */
+  private registerInlineCompletionExtension(): void {
+    this.registerEditorExtension(inlineCompletionGhostExtension({
+      // Cheap gate only: the mutual exclusion with an active inline edit
+      // needs editor state and is re-checked inside the controller's trigger
+      // chain, where it belongs.
+      canTrigger: () => this.settings?.inlineCompletionEnabled ?? false,
+      onAltTrigger: (editorView) => {
+        const view = findMarkdownViewForView(this.app, editorView);
+        if (!view?.editor || !view.file) return;
+        this.inlineCompletionController?.trigger(view.editor, view.file.path);
+      },
+      onTabAccept: (editorView) => this.inlineCompletionController?.accept(editorView) ?? false,
+      onEscDismiss: (editorView) => this.inlineCompletionController?.dismiss(editorView) ?? false,
+      onEditorActivity: (editorView) => {
+        this.inlineCompletionController?.onEditorActivity(editorView);
+      },
+    }));
+  }
+
+  /**
+   * R-C3 prewarm: the first editor focus starts the warm completion session
+   * for the active backend, taking the cold start out of the trigger path.
+   * Gated by `inlineCompletionEnabled` (also re-checked inside the pool).
+   */
+  private prewarmInlineCompletionOnEditorFocus(): void {
+    if (this.settings?.inlineCompletionEnabled) {
+      this.inlineCompletionPool?.prewarm();
+    }
   }
 
   private registerPluginCommands(): void {
@@ -1111,6 +1237,23 @@ export default class OpenCodianPlugin extends Plugin {
       },
     });
 
+    // R-C3: bindable completion trigger. The default Alt-solo gesture is the
+    // editor extension above; this command lets users rebind or fire the
+    // completion from any hotkey (design §3.4).
+    this.addCommand({
+      id: 'inline-completion-trigger',
+      name: t('inlineCompletion.command.trigger'),
+      editorCheckCallback: (checking: boolean, editor: Editor, view: MarkdownView) => {
+        if (!(this.settings?.inlineCompletionEnabled ?? false)) {
+          return false;
+        }
+        if (!checking) {
+          this.inlineCompletionController?.trigger(editor, view.file?.path ?? '');
+        }
+        return true;
+      },
+    });
+
     this.addCommand({
       id: 'add-current-note-to-context',
       name: '将当前笔记添加到 OpenCodian 上下文',
@@ -1173,6 +1316,10 @@ export default class OpenCodianPlugin extends Plugin {
     // adapters go away.
     void this.inlineEditController?.close();
     this.inlineEditController = null;
+    // R-C3: release every warm completion session (no native runtime leaks).
+    void this.inlineCompletionPool?.disposeAll();
+    this.inlineCompletionPool = null;
+    this.inlineCompletionController = null;
     // Dispose registry (which disposes adapters, which disposes OpenCodeService)
     this.agentServiceRegistry?.dispose();
     // DiagnosticsRuntimeCoordinator owns the unified flush/dispose of all three

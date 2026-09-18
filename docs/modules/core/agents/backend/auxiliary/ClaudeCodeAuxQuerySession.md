@@ -31,3 +31,5 @@
 - 首轮失败（含验证失败）视为会话不可复用，`settleTurn` 会同步释放原生状态，避免后续轮次复用未验证的会话
 - `dispose()` 不得 await 正在执行的 pump（否则自等死锁）；同步拆除放在 `releaseNativeState()`
 - 模型回答中若出现 `tool_use`，说明工具没有被真正限制，应优先检查 `tools` 是否被其他选项覆盖
+
+> 2026-09-18 (R-C3)：新增 additive `warmUp()`——不提交任何回合、提前 `startSession()` 拉起 CLI 进程，使补全预热把 1–3s 的进程冷启动移出触发路径；首轮 `system/init` 只读验证与全部 enforcement 选项保持不变。

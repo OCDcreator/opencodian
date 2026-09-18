@@ -39,3 +39,5 @@
 - 2026-09-15: 实现 `AgentAuxQueryCapability.startAuxQuerySession()`：在独立的隔离 opencode 实例上建立只读会话，scope 的配置与私有会话目录都不落在 vault 或用户配置目录。实现见 `auxiliary/OpenCodeAuxScope.ts` 与 `auxiliary/OpenCodeAuxQuerySession.ts`。
 
 - 2026-09-18 (FlowText R-B4): Obsidian 原生工具注入接缝接入——sendMessage 现在把 options.obsidianToolingInjection 也翻译为合成 text part（kind: obsidian-tooling-injection），与记忆注入并列，经同一选项袋接缝进入请求部件。
+
+> 2026-09-18 (R-C3)：实现 `AgentInlineCompletionCapability`——`startInlineCompletionSession()` 在同一个共享隔离 scope 内建会话（scope 进程级复用，native 会话由包装层按 reset 语义重建），经 `WarmInlineCompletionSession` 包装；implements 子句新增 `AgentInlineCompletionCapability`。

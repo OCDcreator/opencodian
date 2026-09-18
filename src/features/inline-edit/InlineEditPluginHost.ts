@@ -18,6 +18,7 @@
 
 import { AgentCapability, hasCapability } from '../../core/agents/AgentCapability';
 import type { AgentAuxQueryCapability, BackendModelSelection } from '../../core/agents/backend/AgentAuxQueryCapability';
+import type { AgentInlineCompletionCapability } from '../../core/agents/backend/AgentInlineCompletionCapability';
 import type { AgentServiceRegistry } from '../../core/agents/backend/AgentServiceRegistry';
 import type { ContextGroup, InlineEditPresetPrompt } from '../../core/types';
 import type { AgentBackendKind } from '../../core/types/chat';
@@ -139,6 +140,11 @@ function resolveAdapter(bridge: InlineEditPluginBridge): InlineEditHostAdapter |
     displayName: adapter.displayName,
     getAuxQuery: () => (hasCapability(adapter.capabilities, AgentCapability.AuxQuery)
       ? adapter as unknown as AgentAuxQueryCapability
+      : null),
+    // R-C3: the warm completion capability of the same adapter, or `null`
+    // when the backend does not host one (honest unavailability, §6.5).
+    getInlineCompletion: () => (hasCapability(adapter.capabilities, AgentCapability.InlineCompletion)
+      ? adapter as unknown as AgentInlineCompletionCapability
       : null),
     resolveModel: () => resolveModel(bridge, kind),
     listModels: listModels ? () => listModels(kind) : undefined,

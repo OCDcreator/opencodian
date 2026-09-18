@@ -44,3 +44,5 @@ inline edit 全部 UI 的样式。设计语言：Cursor cmd-K 指令条骨架（
 ## R-C2 扩展
 
 2026-09-18 新增生图 chip 样式：`.opencodian-inline-edit-chip-imagegen`（布局）与 `.opencodian-inline-edit-chip-imagegen-active`（accent 高亮）。
+
+> 2026-09-18 (R-C3)：新增 `.cm-inline-completion-ghost`——与编辑器同字号的弱化斜体色（`color-mix(text-muted 72%, text-normal)`，≥4.5:1），`white-space: pre-wrap`、`pointer-events: none`，刻意**无动画**（不移动读者视线，reduced-motion 由构造满足）；光标跳过由 CM6 `atomicRanges` 承担，不依赖 CSS。

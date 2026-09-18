@@ -28,6 +28,12 @@ import type {
   AuxQuerySessionConfig,
 } from './AgentAuxQueryCapability';
 import type {
+  AgentInlineCompletionCapability,
+  InlineCompletionSession,
+  InlineCompletionSessionConfig,
+} from './AgentInlineCompletionCapability';
+import { INLINE_COMPLETION_TURN_TIMEOUT_MS } from './AgentInlineCompletionCapability';
+import type {
   AgentAuthCapability,
   AgentBranchCapability,
   AgentChatCapability,
@@ -48,6 +54,10 @@ import type {
 import type { AuxTransport } from './auxiliary/AuxTransport';
 import { OpenCodeAuxQuerySession } from './auxiliary/OpenCodeAuxQuerySession';
 import { OPENCODE_AUX_AGENT, OpenCodeAuxScope } from './auxiliary/OpenCodeAuxScope';
+import {
+  type WarmableAuxSession,
+  WarmInlineCompletionSession,
+} from './auxiliary/WarmInlineCompletionSession';
 
 function auxAbortError(): Error {
   const error = new Error('Aborted');
@@ -129,7 +139,8 @@ export class OpenCodeAdapter
     AgentConfigCapability,
     AgentToolCapability,
     AgentAuthCapability,
-    AgentAuxQueryCapability
+    AgentAuxQueryCapability,
+    AgentInlineCompletionCapability
 {
   readonly kind: AgentBackendKind = 'opencode';
   readonly displayName = 'OpenCode';
@@ -208,12 +219,36 @@ export class OpenCodeAdapter
         agentName: OPENCODE_AUX_AGENT,
         transport: auxRequestUrlTransport,
         ...(config.model ? { model: config.model } : {}),
+        ...(config.turnTimeoutMs ? { turnTimeoutMs: config.turnTimeoutMs } : {}),
       });
     } catch (error) {
       this.auxScope = null;
       await scope.dispose().catch(() => { /* Scope teardown is best-effort. */ });
       throw error instanceof Error ? error : new Error(String(error));
     }
+  }
+
+  /**
+   * Start a warm, reusable completion session inside the same isolated scope
+   * the aux sessions use (R-C3). The scope is process-warm and shared; the
+   * wrapper owns turn serialization and reset-through-recreate so each turn
+   * keeps the cold, stateless request semantics. Rejects when the scope cannot
+   * be verified read-only — same fail-closed proof as inline edit.
+   */
+  async startInlineCompletionSession(config: InlineCompletionSessionConfig): Promise<InlineCompletionSession> {
+    const startAux = async (): Promise<WarmableAuxSession> =>
+      await this.startAuxQuerySession({
+        systemPrompt: config.systemPrompt,
+        workingDirectory: config.workingDirectory,
+        turnTimeoutMs: INLINE_COMPLETION_TURN_TIMEOUT_MS,
+        ...(config.model ? { model: config.model } : {}),
+      });
+    const initial = await startAux();
+    return WarmInlineCompletionSession.create({
+      backend: this.kind,
+      session: initial,
+      recreate: startAux,
+    });
   }
 
   onStatusChange(handler: StatusChangeHandler): Disposable {

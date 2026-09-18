@@ -70,3 +70,5 @@
 - 2026-09-15: 实现 `AgentAuxQueryCapability.startAuxQuerySession()`：创建 ephemeral + read-only sandbox 的临时 thread，并用 app-server 的 `getThreadEffectiveSettings()` 回读校验 sandbox/approval/network（fail closed）。实现见 `auxiliary/CodexAuxQuerySession.ts`。
 
 - 2026-09-18 (FlowText R-B4): Obsidian 原生工具注入接缝接入——sendMessage 现在把 options.obsidianToolingInjection 以 prependObsidianToolingInjection 前缀到消息文本（记忆块之后），同一选项袋接缝。
+
+> 2026-09-18 (R-C3)：实现 `AgentInlineCompletionCapability`——`startInlineCompletionSession()` 复用既有只读沙箱机制（ephemeral thread + `sandbox=read-only` + `approvalPolicy=never` + effective-settings 读回），经 `WarmInlineCompletionSession` 包装；`CODEX_CAPABILITIES` 增加 `AgentCapability.InlineCompletion`。

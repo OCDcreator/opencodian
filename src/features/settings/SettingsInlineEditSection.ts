@@ -19,10 +19,13 @@
 import { Setting } from 'obsidian';
 
 import {
+  INLINE_COMPLETION_MAX_CHARS_MAX,
+  INLINE_COMPLETION_MAX_CHARS_MIN,
   INLINE_EDIT_MAX_CONCURRENT_EDITS_MAX,
   INLINE_EDIT_MAX_CONCURRENT_EDITS_MIN,
   type InlineEditPresetPrompt,
   normalizeAutoInternalLinkExcludedTerms,
+  normalizeInlineCompletionMaxChars,
   normalizeInlineEditMaxConcurrentEdits,
   normalizeInlineEditModelOverrides,
   type OpenCodianSettings,
@@ -41,6 +44,12 @@ import { parseModelOverride } from '../inline-edit/InlineEditPluginHost';
 interface InlineEditSettingsHost {
   settings: OpenCodianSettings;
   saveSettings(): Promise<unknown>;
+  /**
+   * R-C3: called after the completion toggle changes so the plugin can
+   * dispose (or re-arm) the warm completion session pool immediately instead
+   * of waiting for the next trigger.
+   */
+  onInlineCompletionSettingChanged?(enabled: boolean): void;
 }
 
 interface SettingsInlineEditSectionOptions {
@@ -126,6 +135,8 @@ export class SettingsInlineEditSection {
           await this.plugin.saveSettings();
         }));
 
+    this.addInlineCompletionSettings(containerEl);
+
     new Setting(containerEl)
       .setName(t('settings.inlineEdit.maxConcurrentEdits.name'))
       .setDesc(t('settings.inlineEdit.maxConcurrentEdits.desc'))
@@ -159,6 +170,50 @@ export class SettingsInlineEditSection {
       .setDesc(t('settings.inlineEdit.billingNotice.desc'));
 
     return headingEl;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Inline completion (R-C3)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * R-C3 Alt ghost-text completion. Off by default: the feature keeps warm
+   * read-only sessions while enabled, so the toggle is the explicit opt-in.
+   * Turning it off notifies the plugin so the session pool is disposed
+   * immediately (no background sessions, acceptance 7).
+   */
+  private addInlineCompletionSettings(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.inlineCompletion.enabled.name'))
+      .setDesc(t('settings.inlineCompletion.enabled.desc'))
+      .addToggle((toggle) => toggle
+        .setValue(this.plugin.settings.inlineCompletionEnabled)
+        .onChange(async (value) => {
+          this.plugin.settings.inlineCompletionEnabled = value;
+          await this.plugin.saveSettings();
+          this.plugin.onInlineCompletionSettingChanged?.(value);
+        }));
+
+    new Setting(containerEl)
+      .setName(t('settings.inlineCompletion.maxChars.name'))
+      .setDesc(t('settings.inlineCompletion.maxChars.desc'))
+      .addSlider((slider) => slider
+        .setLimits(
+          INLINE_COMPLETION_MAX_CHARS_MIN,
+          INLINE_COMPLETION_MAX_CHARS_MAX,
+          50,
+        )
+        .setValue(this.plugin.settings.inlineCompletionMaxChars)
+        .setDynamicTooltip()
+        .onChange(async (value) => {
+          this.plugin.settings.inlineCompletionMaxChars =
+            normalizeInlineCompletionMaxChars(value);
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName(t('settings.inlineCompletion.hotkey.name'))
+      .setDesc(t('settings.inlineCompletion.hotkey.desc'));
   }
 
   /**

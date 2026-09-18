@@ -33,3 +33,5 @@
 - 校验逻辑必须复用 `parseModelOverride`，不要在设置层另写一套格式判断
 - 只展示 `enabledBackends` 中的 backend，保持设置面与运行时可用后端一致
 - 保存走 `plugin.saveSettings()` 并经过 `normalizeInlineEditModelOverrides`，保证落盘的永远是归一化后的映射
+
+> 2026-09-18 (R-C3)：新增补全设置组——`inlineCompletionEnabled` 开关（默认关，文案说明开启后每后端保留 1 个预热只读会话、空闲 5 分钟释放）、`inlineCompletionMaxChars` 滑条（50–2000，经 `normalizeInlineCompletionMaxChars`）、触发方式说明行；host 契约新增 `onInlineCompletionSettingChanged(enabled)`，关闭时由插件立即 dispose 全部会话（验收 7 口径）。

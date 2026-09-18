@@ -345,3 +345,5 @@ bootstrap 仅向注册入口注入 getPiSettings 读取回调，不在入口拥�
 2026-09-18 组合根新增：构造 `ImageGenerationService`（注入 requestUrl transport）与 `ImageAssetStorage`（`createImageAssetVaultAdapter` 包装 vault API，`getAvailablePathForAttachments` 为运行时已验证的未收型 API，用守卫 cast）；构造 `ImageGenerationChatController` 并提供 `openImageGenerationCard(prefill)`；inline-edit bridge `createInlineEditImageGenDeps()`（无配置模型时返回 null 隐藏 chip）；`resolveImageGenConversationId()` 解析资产登记会话（激活视图会话 → 最近会话 → null 跳过登记）。onunload 置空三个新字段。
 
 D2 record-then-close（同日）：聊天 ports 与 inline-edit deps 均新增 `noteReferenceWrite` / `endAssetCapture`，分别接到 `EditRevertService.notePluginWrite`（先显式登记成对引用写入，不依赖 autosave 事件时序）与 `endBatchCapture`（后立即关闭插件资产轮次；服务侧只关 `backend: 'plugin'` 轮次，进行中的 turn 轮次不受影响），使生成图像插入后一键回退即时可用，不再等待 10 分钟 post-turn grace。
+
+> 2026-09-18 (R-C3)：main.ts 仅做装配——构造 `InlineCompletionService`（池）与 `InlineCompletionController`，`registerEditorExtension(inlineCompletionGhostExtension(...))`（一次性注册、逐次门控，C3-Q1 裁决口径），新增 `inline-completion-trigger` 命令（`editorCheckCallback`），`active-leaf-change` 上按开关预热池，`onunload` 全量 `disposeAll()`；设置开关回调 `onInlineCompletionSettingChanged` 在关闭时立即释放全部会话。补全逻辑零行落在本文件。

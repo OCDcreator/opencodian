@@ -23,6 +23,12 @@ import type {
   AuxQuerySessionConfig,
 } from './AgentAuxQueryCapability';
 import type {
+  AgentInlineCompletionCapability,
+  InlineCompletionSession,
+  InlineCompletionSessionConfig,
+} from './AgentInlineCompletionCapability';
+import { INLINE_COMPLETION_TURN_TIMEOUT_MS } from './AgentInlineCompletionCapability';
+import type {
   AgentChatCapability,
   AgentChatSendRequest,
   AgentConnectionStatus,
@@ -37,6 +43,10 @@ import {
   type ClaudeAuxSdkFacade,
   ClaudeCodeAuxQuerySession,
 } from './auxiliary/ClaudeCodeAuxQuerySession';
+import {
+  type WarmableAuxSession,
+  WarmInlineCompletionSession,
+} from './auxiliary/WarmInlineCompletionSession';
 import type { ClaudeCodeMcpServersMap } from './ClaudeCodeMcpConfigAdapter';
 import {
   buildClaudeCodeOptions,
@@ -1058,6 +1068,9 @@ const CLAUDE_CODE_PHASE1_CAPABILITIES: BackendCapabilities = Object.freeze(
     // Inline edit: adapter exposes startAuxQuerySession() backed by
     // ClaudeCodeAuxQuerySession (read-only allowedTools, fail-closed).
     AgentCapability.AuxQuery,
+    // Inline completion (R-C3): adapter exposes startInlineCompletionSession()
+    // over the same audited read-only session, wrapped warm.
+    AgentCapability.InlineCompletion,
   ]),
 );
 
@@ -1410,7 +1423,8 @@ export class ClaudeCodeAdapter
     AgentChatCapability,
     AgentSessionCapability,
     AgentForkCapability,
-    AgentAuxQueryCapability
+    AgentAuxQueryCapability,
+    AgentInlineCompletionCapability
 {
   readonly kind: AgentBackendKind = 'claude-code';
   readonly displayName = 'Claude Code';
@@ -1561,7 +1575,32 @@ export class ClaudeCodeAdapter
         ? { pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable }
         : {}),
       ...(this.options.processEnv ? { env: { ...this.options.processEnv } } : {}),
+      ...(config.turnTimeoutMs ? { turnTimeoutMs: config.turnTimeoutMs } : {}),
       spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
+    });
+  }
+
+  /**
+   * Start a warm completion session (R-C3) over the same read-only
+   * `ClaudeCodeAuxQuerySession` mechanics: tools allowlist, strict MCP config,
+   * `canUseTool` deny gate, and the `system/init` readback on the first turn.
+   * `reset()` rebuilds through this same construction so no CLI-side context
+   * survives a note or model switch.
+   */
+  async startInlineCompletionSession(config: InlineCompletionSessionConfig): Promise<InlineCompletionSession> {
+    const startAux = async (): Promise<WarmableAuxSession> =>
+      await this.startAuxQuerySession({
+        systemPrompt: config.systemPrompt,
+        workingDirectory: config.workingDirectory,
+        turnTimeoutMs: INLINE_COMPLETION_TURN_TIMEOUT_MS,
+        ...(config.model ? { model: config.model } : {}),
+        ...(config.effort ? { effort: config.effort } : {}),
+      });
+    const initial = await startAux();
+    return WarmInlineCompletionSession.create({
+      backend: this.kind,
+      session: initial,
+      recreate: startAux,
     });
   }
 

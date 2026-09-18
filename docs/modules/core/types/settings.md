@@ -465,3 +465,5 @@ New normalize functions added:
 ## R-C2 扩展
 
 2026-09-18 新增三个设置项与类型：`imageGenerationModels: ImageGenerationModelConfig[]`（默认 `[]`；id/baseURL/model 必填，apiFormat 一期仅 `openai-images`，畸形条目修剪、id 去重、上限 20）、`imageGenerationMaxWidth`（默认 600，0–100000 整数钳制）、`imageGenerationAssetCleanup`（`'trash' | 'keep'`，默认 `'trash'`）。`apiKey` 沿用 `CodexBackendSettings.apiKey` 的密钥路径与脱敏契约。
+
+> 2026-09-18 (R-C3)：新增 `inlineCompletionEnabled`（默认 `false`）与 `inlineCompletionMaxChars`（默认 `300`，clamp 50–2000，`normalizeInlineCompletionMaxChars`）；`DEFAULT_SETTINGS` 同步。

@@ -11,6 +11,18 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-18 Alt 一键补全（R-C3）：热会话冷语义的暖池契约 + CM6 ghost text（widget + atomicRanges，禁 replace）
+
+FlowText 对齐 R-C3 落地（设计基准 `docs/requirements/flowtext-c3-design.md`）。核心是**新的会话生命周期契约**：aux 的「每次编辑新建、退出即 dispose」保持一字不改，补全走平行通道——
+
+**后端层（core.backend / core.backend-pi）**：新契约 `AgentInlineCompletionCapability`（`complete/reset/dispose` + 与 aux 同构的 `AuxQuerySafetyProof`）+ 共享包装 `WarmInlineCompletionSession`——四后端 adapter 各自用**既有已审计**的 `startAuxQuerySession` 构造（OpenCode 隔离 scope / Claude tools 白名单+`system/init` 读回 / Codex 只读沙箱 / Pi `set_tools` 读回）喂给包装层，只补 aux 没有的三件事：回合串行化、`reset()` 经只读工厂重建（笔记/模型切换零残留）、统一补全回合 prompt（四后端同构 wire 格式）。`AuxQuerySessionConfig` 增可选 `turnTimeoutMs`（补全 4s）；`ClaudeCodeAuxQuerySession` 增 additive `warmUp()`（不提交回合、提前拉起 CLI，把 1–3s 冷启动移出触发路径；首轮 system/init 验证不变）。只读机制零复制零放宽，每回合 observed tool calls 仍过共享 `findWriteToolCalls`（期望零写工具；命中 → dispose + 本周期 unsupported + 如实 Notice）。800ms 是首字节**预算**（预热 + 流式 chunk 压首字节），不是 abort 阈值——C3-Q5「如实标注、保持可用」。
+
+**feature 层（feature.inline-edit，5 个新模块）**：`InlineCompletionPrompt`（窗口构建：prefix ≤4000 整行对齐 / suffix ≤1000；`validateCompletion` 纯函数：maxChars 先截断 → 空白拒绝 → 行内编辑协议标签拒绝 → 前缀复读拒绝（重叠 > 短侧一半）；与行内编辑 XML 契约隔离）；`InlineCompletionTrigger`（Alt 空按纯判定 + tracker：1000ms 窗口、其他键打断、组合态判 none、OS key repeat 不刷新手势起点）；`InlineCompletionGhost`（`Decoration.widget` + `EditorView.atomicRanges`，**全模块无 `Decoration.replace`**——原子范围用不可见 mark 范围，点状 widget 装饰是零宽过不了 CM6 的跳跃判定，测试有静态源码断言钉死；docChanged/selection 在 state 层即清 ghost）；`InlineCompletionService`（暖池：backend×目录至多 1 会话、焦点预热 + Alt 懒启动、TTL 5 分钟、关闭/模型或笔记切换/卸载即释放；start 失败 → 本周期 unsupported + Notice；连续 2 回合失败 → dispose 冷重试，第 3 次 → unsupported）；`InlineCompletionController`（每视图**代数计数器** + abort 双保险——键入/Esc/重触发后迟到的回合与 chunk 一律丢弃（验收 2）；Tab 单事务 `changes + 清 ghost effect + userEvent 'input.complete'`（单步撤销，验收 3）且接受前重验位置与前缀尾（§4.2）；Esc 文档零变化（验收 4）；前置链含与活动行内编辑互斥、`view.composing` IME 守卫（验收 6））。
+
+**装配与设置**：main.ts 只装配（扩展注册一次、逐次门控——验收 7 与 `registerEditorExtension` 生命周期的冲突按 C3-Q1/R-A1 先例裁决：关闭 = 无会话、无网络、无装饰，仅剩被门控的空转键处理器）；`inline-completion-trigger` 命令可改绑；设置四件套 `inlineCompletionEnabled`（默认 false）/`inlineCompletionMaxChars`（默认 300，clamp 50–2000）+ 开关关闭立即 `disposeAll()`。ghost 样式走主题变量弱化色、无动画（reduced-motion 由构造满足）。测试 7 个新文件 106 例（含四后端能力矩阵契约、暖会话契约、池 TTL/失败链、代数计数器迟到覆盖、Tab 单事务/Esc 零变化）；`AgentCapability` 枚举 + Pi 边界白名单两处既有测试同步。待真机：分后端首字节实测、IME 手感、ghost 目测。
+
+---
+
 ## 2026-09-18 文生图（R-C2）验收修复三则：D1 畸形配置 fail-closed、D2 资产轮次即时关闭、D3 模态 chrome 对齐 DESIGN.md §5
 
 真机验收 R-C2（对本地 stub 端点驱动）暴露三处缺陷，本条全部修复：

@@ -131,6 +131,11 @@ export const INLINE_EDIT_MAX_CONCURRENT_EDITS_DEFAULT = 3;
 export const INLINE_EDIT_MAX_CONCURRENT_EDITS_MIN = 1;
 export const INLINE_EDIT_MAX_CONCURRENT_EDITS_MAX = 8;
 
+/** Default and hard bounds for the R-C3 suggestion length cap. */
+export const INLINE_COMPLETION_MAX_CHARS_DEFAULT = 300;
+export const INLINE_COMPLETION_MAX_CHARS_MIN = 50;
+export const INLINE_COMPLETION_MAX_CHARS_MAX = 2000;
+
 /**
  * One entry of a user-defined context group (R-B2): a vault-relative path
  * that is either a note or a directory. Groups are persisted in settings and
@@ -478,6 +483,21 @@ export function normalizeInlineEditMaxConcurrentEdits(value: unknown): number {
   const clamped = Math.floor(value);
   if (clamped < INLINE_EDIT_MAX_CONCURRENT_EDITS_MIN) return INLINE_EDIT_MAX_CONCURRENT_EDITS_DEFAULT;
   if (clamped > INLINE_EDIT_MAX_CONCURRENT_EDITS_MAX) return INLINE_EDIT_MAX_CONCURRENT_EDITS_MAX;
+  return clamped;
+}
+
+/**
+ * Normalize the completion output cap (R-C3). Non-numbers and NaN fall back
+ * to the default; out-of-range values clamp; floats floor. The cap is the
+ * hard bound `validateCompletion` enforces on every suggestion.
+ */
+export function normalizeInlineCompletionMaxChars(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return INLINE_COMPLETION_MAX_CHARS_DEFAULT;
+  }
+  const clamped = Math.floor(value);
+  if (clamped < INLINE_COMPLETION_MAX_CHARS_MIN) return INLINE_COMPLETION_MAX_CHARS_MIN;
+  if (clamped > INLINE_COMPLETION_MAX_CHARS_MAX) return INLINE_COMPLETION_MAX_CHARS_MAX;
   return clamped;
 }
 
@@ -3400,6 +3420,21 @@ export interface OpenCodianSettings {
   inlineEditDocumentModeEnabled: boolean;
 
   /**
+   * Alt-triggered ghost-text inline completion (R-C3, default off). When
+   * off there are no completion sessions, no network, and no decoration
+   * work — only the gated editor extension registered at plugin load (the
+   * documented C3-Q1 deviation, same shape as the `@` trigger).
+   */
+  inlineCompletionEnabled: boolean;
+
+  /**
+   * Hard cap for one completion suggestion in characters (R-C3, default
+   * 300). Enforced by truncation in `validateCompletion` before any other
+   * rule, so a suggestion can never exceed it.
+   */
+  inlineCompletionMaxChars: number;
+
+  /**
    * Auto-internal-link post-processing for inline-edit generation results
    * (R-B1, default off). When on, occurrences of verified reference-note
    * headings in the generated text become internal links before the diff is
@@ -3722,6 +3757,10 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   inlineEditPresetPrompts: [],
   inlineEditMaxConcurrentEdits: INLINE_EDIT_MAX_CONCURRENT_EDITS_DEFAULT,
   inlineEditDocumentModeEnabled: true,
+
+  // R-C3 Alt ghost-text completion (opt-in; off is zero cost).
+  inlineCompletionEnabled: false,
+  inlineCompletionMaxChars: INLINE_COMPLETION_MAX_CHARS_DEFAULT,
   autoInternalLinkEnabled: false,
   autoInternalLinkExcludedTerms: [],
   contextGroups: [],

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-18T11:18:08.470Z",
-  "headShaAtGeneration": "fe3b21bbb1a1c2fbd5b80e01990dfccd7a294a2d",
+  "generatedAt": "2026-09-18T18:35:36.023Z",
+  "headShaAtGeneration": "985dd76e7351a71dec5428fbc47dd303ce419702",
   "edges": [
     {
       "id": "src/app/batchOrganize/BatchOrganizeCoordinator.ts|src/core/types/index.ts|type-only|../../core/types",
@@ -30,13 +30,6 @@
       "to": "src/app/batchOrganize/BatchOrganizeCoordinator.ts",
       "kind": "type-only",
       "specifier": "./BatchOrganizeCoordinator"
-    },
-    {
-      "id": "src/app/batchOrganize/BatchOrganizeModal.ts|src/core/types/index.ts|type-only|../../core/types",
-      "from": "src/app/batchOrganize/BatchOrganizeModal.ts",
-      "to": "src/core/types/index.ts",
-      "kind": "type-only",
-      "specifier": "../../core/types"
     },
     {
       "id": "src/app/batchOrganize/BatchOrganizeModal.ts|src/i18n/index.ts|runtime-static|../../i18n",
@@ -494,6 +487,20 @@
       "specifier": "../../types/chat"
     },
     {
+      "id": "src/core/agents/backend/AgentInlineCompletionCapability.ts|src/core/agents/backend/AgentAuxQueryCapability.ts|type-only|./AgentAuxQueryCapability",
+      "from": "src/core/agents/backend/AgentInlineCompletionCapability.ts",
+      "to": "src/core/agents/backend/AgentAuxQueryCapability.ts",
+      "kind": "type-only",
+      "specifier": "./AgentAuxQueryCapability"
+    },
+    {
+      "id": "src/core/agents/backend/AgentInlineCompletionCapability.ts|src/core/agents/backend/AgentService.ts|type-only|./AgentService",
+      "from": "src/core/agents/backend/AgentInlineCompletionCapability.ts",
+      "to": "src/core/agents/backend/AgentService.ts",
+      "kind": "type-only",
+      "specifier": "./AgentService"
+    },
+    {
       "id": "src/core/agents/backend/AgentService.ts|src/core/agents/AgentCapability.ts|type-only|../AgentCapability",
       "from": "src/core/agents/backend/AgentService.ts",
       "to": "src/core/agents/AgentCapability.ts",
@@ -676,6 +683,34 @@
       "specifier": "../../../../shared/logger"
     },
     {
+      "id": "src/core/agents/backend/auxiliary/WarmInlineCompletionSession.ts|src/core/agents/backend/AgentAuxQueryCapability.ts|type-only|../AgentAuxQueryCapability",
+      "from": "src/core/agents/backend/auxiliary/WarmInlineCompletionSession.ts",
+      "to": "src/core/agents/backend/AgentAuxQueryCapability.ts",
+      "kind": "type-only",
+      "specifier": "../AgentAuxQueryCapability"
+    },
+    {
+      "id": "src/core/agents/backend/auxiliary/WarmInlineCompletionSession.ts|src/core/agents/backend/AgentInlineCompletionCapability.ts|runtime-static|../AgentInlineCompletionCapability",
+      "from": "src/core/agents/backend/auxiliary/WarmInlineCompletionSession.ts",
+      "to": "src/core/agents/backend/AgentInlineCompletionCapability.ts",
+      "kind": "runtime-static",
+      "specifier": "../AgentInlineCompletionCapability"
+    },
+    {
+      "id": "src/core/agents/backend/auxiliary/WarmInlineCompletionSession.ts|src/core/agents/backend/AgentInlineCompletionCapability.ts|type-only|../AgentInlineCompletionCapability",
+      "from": "src/core/agents/backend/auxiliary/WarmInlineCompletionSession.ts",
+      "to": "src/core/agents/backend/AgentInlineCompletionCapability.ts",
+      "kind": "type-only",
+      "specifier": "../AgentInlineCompletionCapability"
+    },
+    {
+      "id": "src/core/agents/backend/auxiliary/WarmInlineCompletionSession.ts|src/core/types/chat.ts|type-only|../../../types/chat",
+      "from": "src/core/agents/backend/auxiliary/WarmInlineCompletionSession.ts",
+      "to": "src/core/types/chat.ts",
+      "kind": "type-only",
+      "specifier": "../../../types/chat"
+    },
+    {
       "id": "src/core/agents/backend/BackendModelCatalog.ts|src/core/agents/backend/CodexAdapter.ts|type-only|./CodexAdapter",
       "from": "src/core/agents/backend/BackendModelCatalog.ts",
       "to": "src/core/agents/backend/CodexAdapter.ts",
@@ -704,6 +739,20 @@
       "specifier": "./AgentAuxQueryCapability"
     },
     {
+      "id": "src/core/agents/backend/ClaudeCodeAdapter.ts|src/core/agents/backend/AgentInlineCompletionCapability.ts|runtime-static|./AgentInlineCompletionCapability",
+      "from": "src/core/agents/backend/ClaudeCodeAdapter.ts",
+      "to": "src/core/agents/backend/AgentInlineCompletionCapability.ts",
+      "kind": "runtime-static",
+      "specifier": "./AgentInlineCompletionCapability"
+    },
+    {
+      "id": "src/core/agents/backend/ClaudeCodeAdapter.ts|src/core/agents/backend/AgentInlineCompletionCapability.ts|type-only|./AgentInlineCompletionCapability",
+      "from": "src/core/agents/backend/ClaudeCodeAdapter.ts",
+      "to": "src/core/agents/backend/AgentInlineCompletionCapability.ts",
+      "kind": "type-only",
+      "specifier": "./AgentInlineCompletionCapability"
+    },
+    {
       "id": "src/core/agents/backend/ClaudeCodeAdapter.ts|src/core/agents/backend/AgentService.ts|type-only|./AgentService",
       "from": "src/core/agents/backend/ClaudeCodeAdapter.ts",
       "to": "src/core/agents/backend/AgentService.ts",
@@ -716,6 +765,13 @@
       "to": "src/core/agents/backend/auxiliary/ClaudeCodeAuxQuerySession.ts",
       "kind": "runtime-static",
       "specifier": "./auxiliary/ClaudeCodeAuxQuerySession"
+    },
+    {
+      "id": "src/core/agents/backend/ClaudeCodeAdapter.ts|src/core/agents/backend/auxiliary/WarmInlineCompletionSession.ts|runtime-static|./auxiliary/WarmInlineCompletionSession",
+      "from": "src/core/agents/backend/ClaudeCodeAdapter.ts",
+      "to": "src/core/agents/backend/auxiliary/WarmInlineCompletionSession.ts",
+      "kind": "runtime-static",
+      "specifier": "./auxiliary/WarmInlineCompletionSession"
     },
     {
       "id": "src/core/agents/backend/ClaudeCodeAdapter.ts|src/core/agents/backend/ClaudeCodeMcpConfigAdapter.ts|type-only|./ClaudeCodeMcpConfigAdapter",
@@ -1068,6 +1124,20 @@
       "specifier": "./AgentAuxQueryCapability"
     },
     {
+      "id": "src/core/agents/backend/CodexAdapter.ts|src/core/agents/backend/AgentInlineCompletionCapability.ts|runtime-static|./AgentInlineCompletionCapability",
+      "from": "src/core/agents/backend/CodexAdapter.ts",
+      "to": "src/core/agents/backend/AgentInlineCompletionCapability.ts",
+      "kind": "runtime-static",
+      "specifier": "./AgentInlineCompletionCapability"
+    },
+    {
+      "id": "src/core/agents/backend/CodexAdapter.ts|src/core/agents/backend/AgentInlineCompletionCapability.ts|type-only|./AgentInlineCompletionCapability",
+      "from": "src/core/agents/backend/CodexAdapter.ts",
+      "to": "src/core/agents/backend/AgentInlineCompletionCapability.ts",
+      "kind": "type-only",
+      "specifier": "./AgentInlineCompletionCapability"
+    },
+    {
       "id": "src/core/agents/backend/CodexAdapter.ts|src/core/agents/backend/AgentService.ts|type-only|./AgentService",
       "from": "src/core/agents/backend/CodexAdapter.ts",
       "to": "src/core/agents/backend/AgentService.ts",
@@ -1080,6 +1150,13 @@
       "to": "src/core/agents/backend/auxiliary/CodexAuxQuerySession.ts",
       "kind": "runtime-static",
       "specifier": "./auxiliary/CodexAuxQuerySession"
+    },
+    {
+      "id": "src/core/agents/backend/CodexAdapter.ts|src/core/agents/backend/auxiliary/WarmInlineCompletionSession.ts|runtime-static|./auxiliary/WarmInlineCompletionSession",
+      "from": "src/core/agents/backend/CodexAdapter.ts",
+      "to": "src/core/agents/backend/auxiliary/WarmInlineCompletionSession.ts",
+      "kind": "runtime-static",
+      "specifier": "./auxiliary/WarmInlineCompletionSession"
     },
     {
       "id": "src/core/agents/backend/CodexAdapter.ts|src/core/agents/backend/BackendModelCatalog.ts|runtime-static|./BackendModelCatalog",
@@ -1628,6 +1705,20 @@
       "specifier": "./AgentAuxQueryCapability"
     },
     {
+      "id": "src/core/agents/backend/OpenCodeAdapter.ts|src/core/agents/backend/AgentInlineCompletionCapability.ts|runtime-static|./AgentInlineCompletionCapability",
+      "from": "src/core/agents/backend/OpenCodeAdapter.ts",
+      "to": "src/core/agents/backend/AgentInlineCompletionCapability.ts",
+      "kind": "runtime-static",
+      "specifier": "./AgentInlineCompletionCapability"
+    },
+    {
+      "id": "src/core/agents/backend/OpenCodeAdapter.ts|src/core/agents/backend/AgentInlineCompletionCapability.ts|type-only|./AgentInlineCompletionCapability",
+      "from": "src/core/agents/backend/OpenCodeAdapter.ts",
+      "to": "src/core/agents/backend/AgentInlineCompletionCapability.ts",
+      "kind": "type-only",
+      "specifier": "./AgentInlineCompletionCapability"
+    },
+    {
       "id": "src/core/agents/backend/OpenCodeAdapter.ts|src/core/agents/backend/AgentService.ts|type-only|./AgentService",
       "from": "src/core/agents/backend/OpenCodeAdapter.ts",
       "to": "src/core/agents/backend/AgentService.ts",
@@ -1654,6 +1745,13 @@
       "to": "src/core/agents/backend/auxiliary/OpenCodeAuxScope.ts",
       "kind": "runtime-static",
       "specifier": "./auxiliary/OpenCodeAuxScope"
+    },
+    {
+      "id": "src/core/agents/backend/OpenCodeAdapter.ts|src/core/agents/backend/auxiliary/WarmInlineCompletionSession.ts|runtime-static|./auxiliary/WarmInlineCompletionSession",
+      "from": "src/core/agents/backend/OpenCodeAdapter.ts",
+      "to": "src/core/agents/backend/auxiliary/WarmInlineCompletionSession.ts",
+      "kind": "runtime-static",
+      "specifier": "./auxiliary/WarmInlineCompletionSession"
     },
     {
       "id": "src/core/agents/backend/OpenCodeAdapter.ts|src/core/memory/index.ts|runtime-static|../../memory",
@@ -1705,11 +1803,32 @@
       "specifier": "../AgentAuxQueryCapability"
     },
     {
+      "id": "src/core/agents/backend/pi/PiAdapter.ts|src/core/agents/backend/AgentInlineCompletionCapability.ts|runtime-static|../AgentInlineCompletionCapability",
+      "from": "src/core/agents/backend/pi/PiAdapter.ts",
+      "to": "src/core/agents/backend/AgentInlineCompletionCapability.ts",
+      "kind": "runtime-static",
+      "specifier": "../AgentInlineCompletionCapability"
+    },
+    {
+      "id": "src/core/agents/backend/pi/PiAdapter.ts|src/core/agents/backend/AgentInlineCompletionCapability.ts|type-only|../AgentInlineCompletionCapability",
+      "from": "src/core/agents/backend/pi/PiAdapter.ts",
+      "to": "src/core/agents/backend/AgentInlineCompletionCapability.ts",
+      "kind": "type-only",
+      "specifier": "../AgentInlineCompletionCapability"
+    },
+    {
       "id": "src/core/agents/backend/pi/PiAdapter.ts|src/core/agents/backend/AgentService.ts|type-only|../AgentService",
       "from": "src/core/agents/backend/pi/PiAdapter.ts",
       "to": "src/core/agents/backend/AgentService.ts",
       "kind": "type-only",
       "specifier": "../AgentService"
+    },
+    {
+      "id": "src/core/agents/backend/pi/PiAdapter.ts|src/core/agents/backend/auxiliary/WarmInlineCompletionSession.ts|runtime-static|../auxiliary/WarmInlineCompletionSession",
+      "from": "src/core/agents/backend/pi/PiAdapter.ts",
+      "to": "src/core/agents/backend/auxiliary/WarmInlineCompletionSession.ts",
+      "kind": "runtime-static",
+      "specifier": "../auxiliary/WarmInlineCompletionSession"
     },
     {
       "id": "src/core/agents/backend/pi/PiAdapter.ts|src/core/agents/backend/pi/PiAuxQuerySession.ts|runtime-static|./PiAuxQuerySession",
@@ -1913,6 +2032,13 @@
       "to": "src/core/agents/types.ts",
       "kind": "type-only",
       "specifier": "./types"
+    },
+    {
+      "id": "src/core/agents/imagegen/ImageGenerationService.ts|src/core/types/settings.ts|type-only|../../types/settings",
+      "from": "src/core/agents/imagegen/ImageGenerationService.ts",
+      "to": "src/core/types/settings.ts",
+      "kind": "type-only",
+      "specifier": "../../types/settings"
     },
     {
       "id": "src/core/agents/index.ts|src/core/agents/AgentCapability.ts|re-export|./AgentCapability",
@@ -4321,6 +4447,13 @@
       "to": "src/core/types/index.ts",
       "kind": "type-only",
       "specifier": "../types"
+    },
+    {
+      "id": "src/core/storage/ImageAssetStorage.ts|src/core/agents/imagegen/ImageGenerationService.ts|type-only|../agents/imagegen/ImageGenerationService",
+      "from": "src/core/storage/ImageAssetStorage.ts",
+      "to": "src/core/agents/imagegen/ImageGenerationService.ts",
+      "kind": "type-only",
+      "specifier": "../agents/imagegen/ImageGenerationService"
     },
     {
       "id": "src/core/storage/index.ts|src/core/storage/StorageService.ts|re-export|./StorageService",
@@ -10434,6 +10567,27 @@
       "specifier": "./FocusContextRuntimeService"
     },
     {
+      "id": "src/features/chat/services/ImageGenerationChatController.ts|src/core/agents/imagegen/ImageGenerationService.ts|runtime-static|../../../core/agents/imagegen/ImageGenerationService",
+      "from": "src/features/chat/services/ImageGenerationChatController.ts",
+      "to": "src/core/agents/imagegen/ImageGenerationService.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../core/agents/imagegen/ImageGenerationService"
+    },
+    {
+      "id": "src/features/chat/services/ImageGenerationChatController.ts|src/core/types/index.ts|type-only|../../../core/types",
+      "from": "src/features/chat/services/ImageGenerationChatController.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/types"
+    },
+    {
+      "id": "src/features/chat/services/ImageGenerationChatController.ts|src/i18n/index.ts|runtime-static|../../../i18n",
+      "from": "src/features/chat/services/ImageGenerationChatController.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../i18n"
+    },
+    {
       "id": "src/features/chat/services/InputPanelAppearanceCoordinator.ts|src/core/types/index.ts|type-only|../../../core/types",
       "from": "src/features/chat/services/InputPanelAppearanceCoordinator.ts",
       "to": "src/core/types/index.ts",
@@ -12737,6 +12891,20 @@
       "specifier": "../../../shared/TooltipLayerController"
     },
     {
+      "id": "src/features/chat/ui/ImageGenerationModal.ts|src/features/chat/services/ImageGenerationChatController.ts|type-only|../services/ImageGenerationChatController",
+      "from": "src/features/chat/ui/ImageGenerationModal.ts",
+      "to": "src/features/chat/services/ImageGenerationChatController.ts",
+      "kind": "type-only",
+      "specifier": "../services/ImageGenerationChatController"
+    },
+    {
+      "id": "src/features/chat/ui/ImageGenerationModal.ts|src/i18n/index.ts|runtime-static|../../../i18n",
+      "from": "src/features/chat/ui/ImageGenerationModal.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../i18n"
+    },
+    {
       "id": "src/features/chat/ui/ImagePreviewOverlay.ts|src/i18n/index.ts|runtime-static|../../../i18n",
       "from": "src/features/chat/ui/ImagePreviewOverlay.ts",
       "to": "src/i18n/index.ts",
@@ -12903,6 +13071,104 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../../i18n"
+    },
+    {
+      "id": "src/features/inline-edit/InlineCompletionController.ts|src/core/agents/backend/AgentAuxQueryCapability.ts|runtime-static|../../core/agents/backend/AgentAuxQueryCapability",
+      "from": "src/features/inline-edit/InlineCompletionController.ts",
+      "to": "src/core/agents/backend/AgentAuxQueryCapability.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/agents/backend/AgentAuxQueryCapability"
+    },
+    {
+      "id": "src/features/inline-edit/InlineCompletionController.ts|src/features/inline-edit/InlineCompletionGhost.ts|runtime-static|./InlineCompletionGhost",
+      "from": "src/features/inline-edit/InlineCompletionController.ts",
+      "to": "src/features/inline-edit/InlineCompletionGhost.ts",
+      "kind": "runtime-static",
+      "specifier": "./InlineCompletionGhost"
+    },
+    {
+      "id": "src/features/inline-edit/InlineCompletionController.ts|src/features/inline-edit/InlineCompletionPrompt.ts|runtime-static|./InlineCompletionPrompt",
+      "from": "src/features/inline-edit/InlineCompletionController.ts",
+      "to": "src/features/inline-edit/InlineCompletionPrompt.ts",
+      "kind": "runtime-static",
+      "specifier": "./InlineCompletionPrompt"
+    },
+    {
+      "id": "src/features/inline-edit/InlineCompletionController.ts|src/features/inline-edit/InlineCompletionService.ts|type-only|./InlineCompletionService",
+      "from": "src/features/inline-edit/InlineCompletionController.ts",
+      "to": "src/features/inline-edit/InlineCompletionService.ts",
+      "kind": "type-only",
+      "specifier": "./InlineCompletionService"
+    },
+    {
+      "id": "src/features/inline-edit/InlineCompletionController.ts|src/features/inline-edit/InlineEditEditorView.ts|runtime-static|./InlineEditEditorView",
+      "from": "src/features/inline-edit/InlineCompletionController.ts",
+      "to": "src/features/inline-edit/InlineEditEditorView.ts",
+      "kind": "runtime-static",
+      "specifier": "./InlineEditEditorView"
+    },
+    {
+      "id": "src/features/inline-edit/InlineCompletionController.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/features/inline-edit/InlineCompletionController.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/inline-edit/InlineCompletionGhost.ts|src/features/inline-edit/InlineCompletionTrigger.ts|runtime-static|./InlineCompletionTrigger",
+      "from": "src/features/inline-edit/InlineCompletionGhost.ts",
+      "to": "src/features/inline-edit/InlineCompletionTrigger.ts",
+      "kind": "runtime-static",
+      "specifier": "./InlineCompletionTrigger"
+    },
+    {
+      "id": "src/features/inline-edit/InlineCompletionPrompt.ts|src/core/agents/backend/AgentInlineCompletionCapability.ts|runtime-static|../../core/agents/backend/AgentInlineCompletionCapability",
+      "from": "src/features/inline-edit/InlineCompletionPrompt.ts",
+      "to": "src/core/agents/backend/AgentInlineCompletionCapability.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/agents/backend/AgentInlineCompletionCapability"
+    },
+    {
+      "id": "src/features/inline-edit/InlineCompletionPrompt.ts|src/i18n/index.ts|type-only|../../i18n",
+      "from": "src/features/inline-edit/InlineCompletionPrompt.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "type-only",
+      "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/inline-edit/InlineCompletionService.ts|src/core/agents/backend/AgentAuxQueryCapability.ts|type-only|../../core/agents/backend/AgentAuxQueryCapability",
+      "from": "src/features/inline-edit/InlineCompletionService.ts",
+      "to": "src/core/agents/backend/AgentAuxQueryCapability.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/backend/AgentAuxQueryCapability"
+    },
+    {
+      "id": "src/features/inline-edit/InlineCompletionService.ts|src/core/agents/backend/AgentInlineCompletionCapability.ts|type-only|../../core/agents/backend/AgentInlineCompletionCapability",
+      "from": "src/features/inline-edit/InlineCompletionService.ts",
+      "to": "src/core/agents/backend/AgentInlineCompletionCapability.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/backend/AgentInlineCompletionCapability"
+    },
+    {
+      "id": "src/features/inline-edit/InlineCompletionService.ts|src/core/types/chat.ts|type-only|../../core/types/chat",
+      "from": "src/features/inline-edit/InlineCompletionService.ts",
+      "to": "src/core/types/chat.ts",
+      "kind": "type-only",
+      "specifier": "../../core/types/chat"
+    },
+    {
+      "id": "src/features/inline-edit/InlineCompletionService.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/features/inline-edit/InlineCompletionService.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/inline-edit/InlineCompletionService.ts|src/i18n/index.ts|type-only|../../i18n",
+      "from": "src/features/inline-edit/InlineCompletionService.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "type-only",
+      "specifier": "../../i18n"
     },
     {
       "id": "src/features/inline-edit/InlineEditAccept.ts|src/features/inline-edit/InlineEditPrompt.ts|runtime-static|./InlineEditPrompt",
@@ -13087,6 +13353,13 @@
       "specifier": "./InlineEditHost"
     },
     {
+      "id": "src/features/inline-edit/InlineEditController.ts|src/features/inline-edit/InlineEditImageGen.ts|runtime-static|./InlineEditImageGen",
+      "from": "src/features/inline-edit/InlineEditController.ts",
+      "to": "src/features/inline-edit/InlineEditImageGen.ts",
+      "kind": "runtime-static",
+      "specifier": "./InlineEditImageGen"
+    },
+    {
       "id": "src/features/inline-edit/InlineEditController.ts|src/features/inline-edit/InlineEditInputOverlay.ts|runtime-static|./InlineEditInputOverlay",
       "from": "src/features/inline-edit/InlineEditController.ts",
       "to": "src/features/inline-edit/InlineEditInputOverlay.ts",
@@ -13171,6 +13444,13 @@
       "specifier": "../../core/types"
     },
     {
+      "id": "src/features/inline-edit/InlineEditHost.ts|src/features/inline-edit/InlineEditImageGen.ts|type-only|./InlineEditImageGen",
+      "from": "src/features/inline-edit/InlineEditHost.ts",
+      "to": "src/features/inline-edit/InlineEditImageGen.ts",
+      "kind": "type-only",
+      "specifier": "./InlineEditImageGen"
+    },
+    {
       "id": "src/features/inline-edit/InlineEditHost.ts|src/features/inline-edit/InlineEditTypes.ts|type-only|./InlineEditTypes",
       "from": "src/features/inline-edit/InlineEditHost.ts",
       "to": "src/features/inline-edit/InlineEditTypes.ts",
@@ -13187,6 +13467,34 @@
     {
       "id": "src/features/inline-edit/InlineEditImageChip.ts|src/i18n/index.ts|runtime-static|../../i18n",
       "from": "src/features/inline-edit/InlineEditImageChip.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditImageGen.ts|src/core/agents/imagegen/ImageGenerationService.ts|runtime-static|../../core/agents/imagegen/ImageGenerationService",
+      "from": "src/features/inline-edit/InlineEditImageGen.ts",
+      "to": "src/core/agents/imagegen/ImageGenerationService.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/agents/imagegen/ImageGenerationService"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditImageGen.ts|src/core/agents/imagegen/ImageGenerationService.ts|type-only|../../core/agents/imagegen/ImageGenerationService",
+      "from": "src/features/inline-edit/InlineEditImageGen.ts",
+      "to": "src/core/agents/imagegen/ImageGenerationService.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/imagegen/ImageGenerationService"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditImageGen.ts|src/core/types/index.ts|type-only|../../core/types",
+      "from": "src/features/inline-edit/InlineEditImageGen.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/types"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditImageGen.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/features/inline-edit/InlineEditImageGen.ts",
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
@@ -13332,6 +13640,13 @@
       "specifier": "../../core/agents/backend/AgentAuxQueryCapability"
     },
     {
+      "id": "src/features/inline-edit/InlineEditPluginHost.ts|src/core/agents/backend/AgentInlineCompletionCapability.ts|type-only|../../core/agents/backend/AgentInlineCompletionCapability",
+      "from": "src/features/inline-edit/InlineEditPluginHost.ts",
+      "to": "src/core/agents/backend/AgentInlineCompletionCapability.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/backend/AgentInlineCompletionCapability"
+    },
+    {
       "id": "src/features/inline-edit/InlineEditPluginHost.ts|src/core/agents/backend/AgentServiceRegistry.ts|type-only|../../core/agents/backend/AgentServiceRegistry",
       "from": "src/features/inline-edit/InlineEditPluginHost.ts",
       "to": "src/core/agents/backend/AgentServiceRegistry.ts",
@@ -13358,6 +13673,13 @@
       "to": "src/features/inline-edit/InlineEditHost.ts",
       "kind": "type-only",
       "specifier": "./InlineEditHost"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditPluginHost.ts|src/features/inline-edit/InlineEditImageGen.ts|type-only|./InlineEditImageGen",
+      "from": "src/features/inline-edit/InlineEditPluginHost.ts",
+      "to": "src/features/inline-edit/InlineEditImageGen.ts",
+      "kind": "type-only",
+      "specifier": "./InlineEditImageGen"
     },
     {
       "id": "src/features/inline-edit/InlineEditPluginHost.ts|src/features/inline-edit/InlineEditPresets.ts|runtime-static|./InlineEditPresets",
@@ -13477,6 +13799,13 @@
       "to": "src/core/agents/backend/AgentAuxQueryCapability.ts",
       "kind": "type-only",
       "specifier": "../../core/agents/backend/AgentAuxQueryCapability"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditTypes.ts|src/core/agents/backend/AgentInlineCompletionCapability.ts|type-only|../../core/agents/backend/AgentInlineCompletionCapability",
+      "from": "src/features/inline-edit/InlineEditTypes.ts",
+      "to": "src/core/agents/backend/AgentInlineCompletionCapability.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/backend/AgentInlineCompletionCapability"
     },
     {
       "id": "src/features/inline-edit/InlineEditTypes.ts|src/core/types/chat.ts|type-only|../../core/types/chat",
@@ -14590,6 +14919,13 @@
       "to": "src/features/settings/SettingsFormatterSection.ts",
       "kind": "runtime-static",
       "specifier": "./SettingsFormatterSection"
+    },
+    {
+      "id": "src/features/settings/OpenCodianSettings.ts|src/features/settings/SettingsImageGenerationSection.ts|runtime-static|./SettingsImageGenerationSection",
+      "from": "src/features/settings/OpenCodianSettings.ts",
+      "to": "src/features/settings/SettingsImageGenerationSection.ts",
+      "kind": "runtime-static",
+      "specifier": "./SettingsImageGenerationSection"
     },
     {
       "id": "src/features/settings/OpenCodianSettings.ts|src/features/settings/SettingsInlineEditSection.ts|runtime-static|./SettingsInlineEditSection",
@@ -16258,6 +16594,27 @@
       "specifier": "../../main"
     },
     {
+      "id": "src/features/settings/SettingsImageGenerationSection.ts|src/core/types/index.ts|runtime-static|../../core/types",
+      "from": "src/features/settings/SettingsImageGenerationSection.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/types"
+    },
+    {
+      "id": "src/features/settings/SettingsImageGenerationSection.ts|src/core/types/index.ts|type-only|../../core/types",
+      "from": "src/features/settings/SettingsImageGenerationSection.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/types"
+    },
+    {
+      "id": "src/features/settings/SettingsImageGenerationSection.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/features/settings/SettingsImageGenerationSection.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
+    },
+    {
       "id": "src/features/settings/SettingsInlineEditSection.ts|src/core/types/chat.ts|type-only|../../core/types/chat",
       "from": "src/features/settings/SettingsInlineEditSection.ts",
       "to": "src/core/types/chat.ts",
@@ -17616,6 +17973,13 @@
       "specifier": "./SettingsFormatterSection"
     },
     {
+      "id": "src/features/settings/SettingsTabbedRenderer.ts|src/features/settings/SettingsImageGenerationSection.ts|runtime-static|./SettingsImageGenerationSection",
+      "from": "src/features/settings/SettingsTabbedRenderer.ts",
+      "to": "src/features/settings/SettingsImageGenerationSection.ts",
+      "kind": "runtime-static",
+      "specifier": "./SettingsImageGenerationSection"
+    },
+    {
       "id": "src/features/settings/SettingsTabbedRenderer.ts|src/features/settings/SettingsInlineEditSection.ts|runtime-static|./SettingsInlineEditSection",
       "from": "src/features/settings/SettingsTabbedRenderer.ts",
       "to": "src/features/settings/SettingsInlineEditSection.ts",
@@ -18085,6 +18449,13 @@
       "specifier": "./core/agents/backend/OpenCodeAdapter"
     },
     {
+      "id": "src/main.ts|src/core/agents/imagegen/ImageGenerationService.ts|runtime-static|./core/agents/imagegen/ImageGenerationService",
+      "from": "src/main.ts",
+      "to": "src/core/agents/imagegen/ImageGenerationService.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/agents/imagegen/ImageGenerationService"
+    },
+    {
       "id": "src/main.ts|src/core/config/index.ts|runtime-static|./core/config",
       "from": "src/main.ts",
       "to": "src/core/config/index.ts",
@@ -18155,6 +18526,13 @@
       "specifier": "./core/storage/EditRevertService"
     },
     {
+      "id": "src/main.ts|src/core/storage/ImageAssetStorage.ts|runtime-static|./core/storage/ImageAssetStorage",
+      "from": "src/main.ts",
+      "to": "src/core/storage/ImageAssetStorage.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/storage/ImageAssetStorage"
+    },
+    {
       "id": "src/main.ts|src/core/storage/index.ts|runtime-static|./core/storage",
       "from": "src/main.ts",
       "to": "src/core/storage/index.ts",
@@ -18218,11 +18596,60 @@
       "specifier": "./features/chat/services/ChatDiagnosticsCoordinator"
     },
     {
+      "id": "src/main.ts|src/features/chat/services/ImageGenerationChatController.ts|runtime-static|./features/chat/services/ImageGenerationChatController",
+      "from": "src/main.ts",
+      "to": "src/features/chat/services/ImageGenerationChatController.ts",
+      "kind": "runtime-static",
+      "specifier": "./features/chat/services/ImageGenerationChatController"
+    },
+    {
       "id": "src/main.ts|src/features/chat/services/PiExtensionUiHost.ts|runtime-static|./features/chat/services/PiExtensionUiHost",
       "from": "src/main.ts",
       "to": "src/features/chat/services/PiExtensionUiHost.ts",
       "kind": "runtime-static",
       "specifier": "./features/chat/services/PiExtensionUiHost"
+    },
+    {
+      "id": "src/main.ts|src/features/chat/ui/ImageGenerationModal.ts|runtime-static|./features/chat/ui/ImageGenerationModal",
+      "from": "src/main.ts",
+      "to": "src/features/chat/ui/ImageGenerationModal.ts",
+      "kind": "runtime-static",
+      "specifier": "./features/chat/ui/ImageGenerationModal"
+    },
+    {
+      "id": "src/main.ts|src/features/inline-edit/InlineCompletionController.ts|runtime-static|./features/inline-edit/InlineCompletionController",
+      "from": "src/main.ts",
+      "to": "src/features/inline-edit/InlineCompletionController.ts",
+      "kind": "runtime-static",
+      "specifier": "./features/inline-edit/InlineCompletionController"
+    },
+    {
+      "id": "src/main.ts|src/features/inline-edit/InlineCompletionGhost.ts|runtime-static|./features/inline-edit/InlineCompletionGhost",
+      "from": "src/main.ts",
+      "to": "src/features/inline-edit/InlineCompletionGhost.ts",
+      "kind": "runtime-static",
+      "specifier": "./features/inline-edit/InlineCompletionGhost"
+    },
+    {
+      "id": "src/main.ts|src/features/inline-edit/InlineCompletionPrompt.ts|runtime-static|./features/inline-edit/InlineCompletionPrompt",
+      "from": "src/main.ts",
+      "to": "src/features/inline-edit/InlineCompletionPrompt.ts",
+      "kind": "runtime-static",
+      "specifier": "./features/inline-edit/InlineCompletionPrompt"
+    },
+    {
+      "id": "src/main.ts|src/features/inline-edit/InlineCompletionService.ts|runtime-static|./features/inline-edit/InlineCompletionService",
+      "from": "src/main.ts",
+      "to": "src/features/inline-edit/InlineCompletionService.ts",
+      "kind": "runtime-static",
+      "specifier": "./features/inline-edit/InlineCompletionService"
+    },
+    {
+      "id": "src/main.ts|src/features/inline-edit/InlineCompletionService.ts|type-only|./features/inline-edit/InlineCompletionService",
+      "from": "src/main.ts",
+      "to": "src/features/inline-edit/InlineCompletionService.ts",
+      "kind": "type-only",
+      "specifier": "./features/inline-edit/InlineCompletionService"
     },
     {
       "id": "src/main.ts|src/features/inline-edit/InlineEditAtTrigger.ts|runtime-static|./features/inline-edit/InlineEditAtTrigger",
@@ -18258,6 +18685,13 @@
       "to": "src/features/inline-edit/InlineEditHost.ts",
       "kind": "type-only",
       "specifier": "./features/inline-edit/InlineEditHost"
+    },
+    {
+      "id": "src/main.ts|src/features/inline-edit/InlineEditImageGen.ts|type-only|./features/inline-edit/InlineEditImageGen",
+      "from": "src/main.ts",
+      "to": "src/features/inline-edit/InlineEditImageGen.ts",
+      "kind": "type-only",
+      "specifier": "./features/inline-edit/InlineEditImageGen"
     },
     {
       "id": "src/main.ts|src/features/inline-edit/InlineEditInputOverlay.ts|runtime-static|./features/inline-edit/InlineEditInputOverlay",
