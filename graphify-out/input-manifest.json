@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "c06945ff79c67afb1cbbce6c94d6e46c5e3c5e8c8ab08bc6b772dcdb3f0108cf",
-  "recordCount": 712,
+  "digest": "63231884701765e6def694b651b84f9bb16ff7e97e5e5e523c4fd865521936ae",
+  "recordCount": 719,
   "records": [
     {
       "kind": "ignore",
@@ -116,7 +116,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/AgentCapability.ts",
-      "sha256": "6a91421646aee9938a6f9523099e3df811c9ca0deededafad93312ab5a820ac6"
+      "sha256": "f1ae536b16d38a7d7c9e30cf5af35754de621926fb6ec913ec00ddbce79b058d"
     },
     {
       "kind": "src",
@@ -136,12 +136,17 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/AgentAuxQueryCapability.ts",
-      "sha256": "5721ae3997e66e8507e59f0c23266b50ec6f658a730992a0305edc5d91e372e8"
+      "sha256": "3444743e46a7ccda1cd223be3daa06a76d6bf780d2b2693c6ced77b516f82c89"
     },
     {
       "kind": "src",
       "key": "src/core/agents/backend/AgentBackendRouting.ts",
       "sha256": "4cc420a1d07eb710aa324776f1fae54cb0d80f8c2bbd96e878779e461c92f6c9"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/agents/backend/AgentInlineCompletionCapability.ts",
+      "sha256": "33f7da8ce15ce3a15b388710f66ba023945f5bb8612b6300578805318d38924d"
     },
     {
       "kind": "src",
@@ -161,7 +166,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/auxiliary/ClaudeCodeAuxQuerySession.ts",
-      "sha256": "ec5f45e829ac663b7de41faa962680903e64d3f83424762dfd42defccbe9056d"
+      "sha256": "f29ea5ddd078c987a853fe0423d6af6766873c47b823b273a9170a1357ca70b3"
     },
     {
       "kind": "src",
@@ -180,13 +185,18 @@
     },
     {
       "kind": "src",
+      "key": "src/core/agents/backend/auxiliary/WarmInlineCompletionSession.ts",
+      "sha256": "cd88346ab93c5fecb5713180bfcb5f76fee8d3a2e34094a829100711223c8593"
+    },
+    {
+      "kind": "src",
       "key": "src/core/agents/backend/BackendModelCatalog.ts",
       "sha256": "bd33eb182f8997af97b856c64d7f4a0f7396d622fbb70d91739f33707ecff907"
     },
     {
       "kind": "src",
       "key": "src/core/agents/backend/ClaudeCodeAdapter.ts",
-      "sha256": "ae5e5a3f1d2eedeed12eadc83df5dd92c5274a2264c8accc0d648ad0dddfd2f3"
+      "sha256": "a34ba7e4c2c4a2ee37e0049248936b005840505cf67f5cbaa6e4ecb6d7a9abe7"
     },
     {
       "kind": "src",
@@ -301,7 +311,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexAdapter.ts",
-      "sha256": "b8c5225c4ed4f7e2cdce45c0deb0b3cf38d1d5a6f78135150a797dda4a20dada"
+      "sha256": "192bcdd6864841c155cf8087c43dc609a745ce1ad300c79e1ef9eed59c854951"
     },
     {
       "kind": "src",
@@ -406,7 +416,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/OpenCodeAdapter.ts",
-      "sha256": "0e9698d2a32464018af5e83be81eddb9031110dc16148d34654caf7906a0656e"
+      "sha256": "6b5cbe04b2faebf64189be24638c714baf373bfbd375cce3d975492270ae3424"
     },
     {
       "kind": "src",
@@ -416,7 +426,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/pi/PiAdapter.ts",
-      "sha256": "6cf29fbc7f266da90383fb21bd18ee21022c8df959af8695bbf32bd738b304d3"
+      "sha256": "cee75af82bc18ad11f43a0a3351852b4b69d66e6d30b24b9e871748c926b61cc"
     },
     {
       "kind": "src",
@@ -1051,7 +1061,7 @@
     {
       "kind": "src",
       "key": "src/core/types/index.ts",
-      "sha256": "2abb94e466c13ea2514b3e736ffb5d576666f478aef1fbd1cc1bbe9c56530668"
+      "sha256": "b42a0ceffe908cdefce6f22b71c36ded30887938f0f26a243517fee697870043"
     },
     {
       "kind": "src",
@@ -1076,12 +1086,12 @@
     {
       "kind": "src",
       "key": "src/core/types/settings.ts",
-      "sha256": "742e4cff619e3092c3be8bfe561763ba85f2e74d2f22c9fa2c6345e206238026"
+      "sha256": "0f8045a9e617db6c68cf274446ce562f1e82e8f30ab6d1072955e068f6096da5"
     },
     {
       "kind": "src",
       "key": "src/core/types/settingsLoadNormalization.ts",
-      "sha256": "5f6d1e3b4ee5fa321396029f380f62718204f407e0c87fcb900f88204241fdaf"
+      "sha256": "c2766a71e02945f242eaef0edf874b52c28cf20f137346e1146b7cd7783b5110"
     },
     {
       "kind": "src",
@@ -2290,6 +2300,31 @@
     },
     {
       "kind": "src",
+      "key": "src/features/inline-edit/InlineCompletionController.ts",
+      "sha256": "3c3860d6dbf9459431e41e5f4c3e176781d1229349b86e035b0379bdbfc45614"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/inline-edit/InlineCompletionGhost.ts",
+      "sha256": "8d0c2ef3c23ef1971c57e077125eeeecd124687b5e4effd367aa7360f8359c81"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/inline-edit/InlineCompletionPrompt.ts",
+      "sha256": "0db5e927f9313741551012ee52c95651cd1e2f8187a1ae2ae96e4be1e00bf3d0"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/inline-edit/InlineCompletionService.ts",
+      "sha256": "280489d7d0767ee27c95b7d7a055a1e507dd4505aabe31244143103a49eda9a5"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/inline-edit/InlineCompletionTrigger.ts",
+      "sha256": "b292761497711b6d93ae1bc0973c9f05696b99648d84d9805b81feb60259563a"
+    },
+    {
+      "kind": "src",
       "key": "src/features/inline-edit/InlineEditAccept.ts",
       "sha256": "0e287558fbfe59a0065ea363c9cb6ba6aca5a4d25cb47d9faad2dcd9d9810b65"
     },
@@ -2381,7 +2416,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditPluginHost.ts",
-      "sha256": "26d6db787341ee3b715ec66837abca65e5e182562d14eb0eaa9e7eb75d8095bf"
+      "sha256": "3de9d2c1e312711a5435b1b162e5417da97d2e6d6c75bebf386b33b06fed58f0"
     },
     {
       "kind": "src",
@@ -2416,7 +2451,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditTypes.ts",
-      "sha256": "b50f2e190aa7a5fcb5ad3cbd6f5f4bfe9dfc3ab2aa77e66b5ab69fb54ba872d1"
+      "sha256": "5f12bc78a14aa86f03cba2d345c08fe114635426a9a160185b07e3cedf148ee3"
     },
     {
       "kind": "src",
@@ -2801,7 +2836,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsInlineEditSection.ts",
-      "sha256": "a65a2071d4b95c2ad12618b968b37af8769817b1747d726bb000f69baa99932b"
+      "sha256": "efa2bcf24c14e30f8541a06d6e00800b074a68060657ca6cc73b712552955606"
     },
     {
       "kind": "src",
@@ -3011,7 +3046,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "e06c5d46dfb7508faa56632b7775f559486c071cf76fe3e5eafcb7acd8b3ceb4"
+      "sha256": "10f908e009dd96c392d7a7e96d38bf4c20c339db29934866992ed57bd1a9091d"
     },
     {
       "kind": "src",
@@ -3021,12 +3056,12 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "10801e52637bffd4955e26339b25d51c9f9b12a4bfee1d8a1fbdcc82f4019563"
+      "sha256": "b41b4bcbaeb7c70b4ce2eacf5987246002e67a39613a1d6969225d28bd8e636f"
     },
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "87b9f83749c3e8b0269124a20874a708adf72361b232a6a79e6fdadca1c67a00"
+      "sha256": "23ee727fa75813aa8257815adc83f08997e9920e61f789e1d2c65b4d8af2a3f2"
     },
     {
       "kind": "src",
@@ -3286,7 +3321,7 @@
     {
       "kind": "src",
       "key": "src/style/features/inline-edit.css",
-      "sha256": "8b1067eaee7d8bb2f89f62677807cd54903093545fcca8c1994c7abb2ac05ad1"
+      "sha256": "a738ce6641855e8120cc5c0a8d4d240bd9b62a51fa7523a6877f4fb1d27f9144"
     },
     {
       "kind": "src",
@@ -3564,7 +3599,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-18T17:15:10.734Z",
-  "headShaAtGeneration": "528d3916c28104f4d209c8f6bce8bc2cdeacace3",
+  "generatedAt": "2026-09-18T18:45:36.483Z",
+  "headShaAtGeneration": "985dd76e7351a71dec5428fbc47dd303ce419702",
   "graphifyVersion": "graphify 0.9.36"
 }
