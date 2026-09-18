@@ -24,3 +24,4 @@ R-C3 的暖会话池（§3.2.4）：每 `backend × workingDirectory` 至多 1 �
 - 池是 vault 作用域（非每编辑器一份）；「编辑器卸载」的会话处置由 TTL 与笔记切换 reset 承担，ghost 状态清理在控制器
 - `unsupported` 是**周期**语义：仅重新开关功能（或重载插件）才解除，避免坏后端被反复重试
 - TTL 到期必须同时清 map 条目与释放原生会话（无进程/连接泄漏）
+- `notify` 是**必填**选项（生产由 main.ts 注入 Obsidian `Notice`）：§3.2.6 的如实上报消息（sessionUnavailable / unsupportedAfterFailures / writeToolObserved）全部经它送达；漏配必须编译期失败而非静默吞掉（R-C3-D1 缺陷即漏配所致），不得改回可选或加本地 Notice 兜底

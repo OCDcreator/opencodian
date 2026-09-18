@@ -25,3 +25,4 @@ R-C3 的每编辑器状态机。池是全局的，正确性状态在这：每视
 - 不直接接触后端/registry；一切经池与宿主注入，保持可单测
 - `complete()` 的 rejection 必须按失败回合处理（不崩、计入失败链）
 - 前置链的顺序即成本序，不要把需要编辑器状态的检查挪到门控之前
+- `reportPoolError` 的 `unsupported` / `capability-unavailable` / `model-unavailable` 必须经**必填** `notify`（生产为 main.ts 注入的 Obsidian `Notice`）如实上报；`disabled`（门控路径）与 `session-unavailable`（池已上报）有意静默。`notify` 漏配在编译期失败（R-C3-D1 回归护栏），组合级证明见 `tests/unit/main/inlineCompletionNotifyWiring.test.ts`

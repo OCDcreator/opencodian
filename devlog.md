@@ -11,6 +11,20 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-18 R-C3-D1 修复：组合根漏配 `notify`，R-C3 四条如实上报全数静默丢失
+
+真机验收发现（部署构建 `feature-flowtext-parity.202609190246`）：补全开关打开、解析后端不可用时，`pool.obtain()` 返回 `{ ok:false, error:{ reason:'unsupported', backend:'pi' } }`，真 Alt 手势与直接 `controller.trigger()` 连续 8 秒轮询**既无 ghost 也无任何 Notice**——§6.4（拒绝必须上报）与 §6.7（能力缺口须如实呈现）双违。
+
+**根因（交付层，非文案层）**：四条消息的发送点全部健在——池的 `sessionUnavailable`（start 失败）、`unsupportedAfterFailures`（连续 3 次失败）、`writeToolObserved`（写工具命中），控制器的 `unsupported` / `capability-unavailable` / `model-unavailable`（`reportPoolError`）——但全部经 `this.options.notify?.()` 送达，而 main.ts 组合根构造两组件时都**没传 `notify`**。单测/契约测试注入 spy 后断言文案，全绿；生产装配从未被测过。
+
+**修复三层**：① main.ts `configureInlineCompletion()` 为池与控制器各传入 `notify: (message) => { new Notice(message); }`（与既有两处 image-gen deps 模式一致）；② 两处 options 的 `notify` 由可选改**必填**——同类的再次漏配直接编译失败，而非静默吞掉；③ 新增组合级回归测试 `tests/unit/main/inlineCompletionNotifyWiring.test.ts`：构造真实 `OpenCodianPlugin` + 跑真实 `configureInlineCompletion()` 装配，五例分别证明 start 失败、控制器 unsupported 分支（即真机症状路径）、连续失败链、写工具命中、以及无桩真实 `resolveInlineCompletionTarget` 的 capability-unavailable，消息都落到真实（mock 模块捕获的）`Notice`——消息可达性从此端到端有据，不再只经注入 spy。
+
+**同类排查（全库 sweep）**：`notify?:` / `onError?:` / `showNotice` 等可选用户可见回调逐站点核验——`InlineEditController.notify?` 有意保留可选（其 `notify()` 内置 `new Notice` 兜底，生产不依赖注入，9 条 inlineEdit 提示不会丢）；`ChatDiagnosticsCoordinator` 的 `showNotice: () => undefined` 是 fail-closed 兜底宿主（真实工厂注入 `viewHost.showNotice`）；`LocalSidecarLauncher.onProcessError` / `ServerManager.onError` / `OpenCodeService.onError` 生产链路均已接线（ServerManager:427 → OpenCodeService:605 → main.ts:408）；`StreamEventCallbacks.onError` 无人注入但可见交付是无条件 DOM 错误块渲染，回调只是副通道；`BackendSessionBrowserModal.host.showNotice` 本就必填且三处站点全传。仅 R-C3 两处为真漏配，已修。
+
+行为、阈值、四条消息文案一字未动；只读契约与失败链语义不变。
+
+---
+
 ## 2026-09-18 Alt 一键补全（R-C3）：热会话冷语义的暖池契约 + CM6 ghost text（widget + atomicRanges，禁 replace）
 
 FlowText 对齐 R-C3 落地（设计基准 `docs/requirements/flowtext-c3-design.md`）。核心是**新的会话生命周期契约**：aux 的「每次编辑新建、退出即 dispose」保持一字不改，补全走平行通道——

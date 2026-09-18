@@ -51,8 +51,15 @@ export interface InlineCompletionControllerOptions {
   readonly isEnabled: () => boolean;
   /** True while any inline edit is active in any editor (mutual exclusion). */
   readonly hasActiveInlineEdits: () => boolean;
-  /** Surfaces user-visible messages; injectable so tests do not need Obsidian. */
-  readonly notify?: (message: string) => void;
+  /**
+   * Surfaces user-visible messages (Obsidian `Notice` in production).
+   * Required, not optional: the pool-error reports here are the user-facing
+   * half of the fail-closed contract (§6.4/§6.7 — a refusal must be shown
+   * truthfully), so a composition root that forgets it must fail to compile
+   * instead of silently dropping `unsupported` / `capabilityUnavailable` /
+   * `modelUnavailable` on the floor (defect R-C3-D1).
+   */
+  readonly notify: (message: string) => void;
 }
 
 /** Editor-side state for the in-flight (or last finished) request. */
@@ -324,6 +331,6 @@ export class InlineCompletionController {
   }
 
   private notify(message: string): void {
-    this.options.notify?.(message);
+    this.options.notify(message);
   }
 }

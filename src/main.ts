@@ -589,11 +589,18 @@ export default class OpenCodianPlugin extends Plugin {
         buildSystemPrompt: () =>
           buildInlineCompletionSystemPrompt(getLocale(), this.settings.inlineCompletionMaxChars),
       },
+      // R-C3-D1: the pool's honesty notices (start failure, failure-chain,
+      // write-tool audit) must reach the user — `notify` is required, and a
+      // missing wiring now fails to compile instead of dying silently.
+      notify: (message) => { new Notice(message); },
     });
     this.inlineCompletionController = new InlineCompletionController({
       pool: this.inlineCompletionPool,
       isEnabled: () => this.settings?.inlineCompletionEnabled ?? false,
       hasActiveInlineEdits: () => this.inlineEditController?.hasActiveEdits() ?? false,
+      // R-C3-D1: the controller's pool-error reports (unsupported backend,
+      // missing capability, unresolved model) must reach the user too.
+      notify: (message) => { new Notice(message); },
     });
   }
 

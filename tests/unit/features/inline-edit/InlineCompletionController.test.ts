@@ -174,6 +174,7 @@ function makeHarness(options: {
     pool,
     isEnabled: () => enabled,
     hasActiveInlineEdits: () => hasActiveInlineEdits,
+    notify: (message) => { notices.push(message); },
   });
 
   return {

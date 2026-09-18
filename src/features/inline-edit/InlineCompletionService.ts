@@ -75,8 +75,15 @@ export interface InlineCompletionPoolHost {
 
 export interface InlineCompletionPoolOptions {
   readonly host: InlineCompletionPoolHost;
-  /** Surfaces user-visible messages; injectable so tests do not need Obsidian. */
-  readonly notify?: (message: string) => void;
+  /**
+   * Surfaces user-visible messages (Obsidian `Notice` in production).
+   * Required, not optional: every message routed through here is an honesty
+   * contract (design §3.2.6 — refusals are reported, never swallowed), so a
+   * composition root that forgets it must fail to compile instead of
+   * silently dropping `sessionUnavailable` / `unsupportedAfterFailures` /
+   * `writeToolObserved` on the floor (defect R-C3-D1).
+   */
+  readonly notify: (message: string) => void;
   /** Idle lifetime override (tests); defaults to 5 minutes. */
   readonly ttlMs?: number;
 }
@@ -337,7 +344,7 @@ export class InlineCompletionService {
   }
 
   private notify(message: string): void {
-    this.options.notify?.(message);
+    this.options.notify(message);
   }
 }
 
