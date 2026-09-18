@@ -67,6 +67,13 @@ export interface EditRevertFileEntry {
   readonly firstWriteAt: number;
   lastWriteAt: number;
   readonly source: EditRevertEntrySource;
+  /**
+   * R-C2: the file is a plugin-generated BINARY asset (image generation).
+   * Binary entries never take text snapshots — revert is plain trash and
+   * "restore" is honestly unavailable (`restoreHash` stays unset by
+   * construction, not by adapter accident).
+   */
+  binaryAsset?: boolean;
   /** Last revert/restore failure message (kept on the entry for UI honesty). */
   lastError?: string;
 }

@@ -277,6 +277,120 @@ export function normalizeVaultRetrievalExcludedPaths(value: unknown): string[] {
   return result;
 }
 
+// --- R-C2 text-to-image generation -------------------------------------------
+
+/**
+ * Wire API format for one configured image-generation model (R-C2). Only the
+ * OpenAI images-compatible shape ships in phase 1; the enum is reserved so
+ * later formats extend without a settings migration.
+ */
+export type ImageGenerationApiFormat = 'openai-images';
+
+export const IMAGE_GENERATION_API_FORMATS: readonly ImageGenerationApiFormat[] = ['openai-images'];
+
+/** What happens to a generated asset whose reference was never written (R-C2 §4.6). */
+export type ImageGenerationAssetCleanup = 'trash' | 'keep';
+
+export const IMAGE_GENERATION_ASSET_CLEANUPS: readonly ImageGenerationAssetCleanup[] = ['trash', 'keep'];
+
+/** Default embed width for inserted images (R-C2 §7). 0 means natural width. */
+export const IMAGE_GENERATION_MAX_WIDTH_DEFAULT = 600;
+export const IMAGE_GENERATION_MAX_WIDTH_MIN = 0;
+export const IMAGE_GENERATION_MAX_WIDTH_MAX = 100_000;
+/** Bounds for one model entry's free-text fields (baseURL/model/size/displayName). */
+export const IMAGE_GENERATION_MODEL_FIELD_MAX_CHARS = 500;
+export const IMAGE_GENERATION_MAX_MODELS = 20;
+
+/**
+ * One configured text-to-image model (R-C2): provider endpoint + model + key.
+ * `apiKey` follows the existing settings credential path (same normalization
+ * and diagnostic redaction contract as `CodexBackendSettings.apiKey`) and must
+ * never be echoed into logs, diagnostics, or non-password UI.
+ */
+export interface ImageGenerationModelConfig {
+  /** Stable id (uuid) so entries can be edited/reordered without re-keying. */
+  readonly id: string;
+  /** Free-text label shown in pickers; defaults to the model name. */
+  readonly displayName: string;
+  /** Wire format; phase 1 only ships 'openai-images'. */
+  readonly apiFormat: ImageGenerationApiFormat;
+  /** API root, e.g. `https://api.openai.com/v1` (no trailing slash). */
+  readonly baseURL: string;
+  /** Bearer credential, stored and redacted like every other settings key. */
+  readonly apiKey: string;
+  /** Model name, e.g. `gpt-image-1` or a compatible custom name. */
+  readonly model: string;
+  /** Requested size, e.g. `1024x1024`; empty string uses the provider default. */
+  readonly size: string;
+}
+
+/**
+ * Normalize the R-C2 model list: keeps well-formed entries only (bounded
+ * strings, known apiFormat, non-empty baseURL+model), deduplicates ids,
+ * caps the list, and never carries half-edited rows across restarts.
+ */
+export function normalizeImageGenerationModels(value: unknown): ImageGenerationModelConfig[] {
+  if (!Array.isArray(value)) return [];
+  const seenIds = new Set<string>();
+  const result: ImageGenerationModelConfig[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+    const candidate = entry as Record<string, unknown>;
+    const baseURL = typeof candidate.baseURL === 'string' ? candidate.baseURL.trim() : '';
+    const model = typeof candidate.model === 'string' ? candidate.model.trim() : '';
+    if (!baseURL || !model) continue;
+    const rawFormat = typeof candidate.apiFormat === 'string' ? candidate.apiFormat : '';
+    const apiFormat: ImageGenerationApiFormat = IMAGE_GENERATION_API_FORMATS.includes(
+      rawFormat as ImageGenerationApiFormat,
+    )
+      ? (rawFormat as ImageGenerationApiFormat)
+      : 'openai-images';
+    const modelField = model.slice(0, IMAGE_GENERATION_MODEL_FIELD_MAX_CHARS);
+    let id = typeof candidate.id === 'string' ? candidate.id.trim() : '';
+    if (!id || seenIds.has(id)) {
+      id = `imagegen-${result.length}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    }
+    seenIds.add(id);
+    const displayName = (typeof candidate.displayName === 'string' ? candidate.displayName.trim() : '')
+      .slice(0, IMAGE_GENERATION_MODEL_FIELD_MAX_CHARS)
+      || modelField;
+    result.push({
+      id,
+      displayName,
+      apiFormat,
+      baseURL: baseURL.slice(0, IMAGE_GENERATION_MODEL_FIELD_MAX_CHARS).replace(/\/+$/, ''),
+      apiKey: typeof candidate.apiKey === 'string' ? candidate.apiKey : '',
+      model: modelField,
+      size: (typeof candidate.size === 'string' ? candidate.size.trim() : '')
+        .slice(0, IMAGE_GENERATION_MODEL_FIELD_MAX_CHARS),
+    });
+    if (result.length >= IMAGE_GENERATION_MAX_MODELS) break;
+  }
+  return result;
+}
+
+/**
+ * Normalize the R-C2 default embed width: integers within [MIN, MAX] pass
+ * through; anything else falls back to the default (edit-revert convention).
+ */
+export function normalizeImageGenerationMaxWidth(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return IMAGE_GENERATION_MAX_WIDTH_DEFAULT;
+  }
+  const rounded = Math.round(value);
+  if (rounded < IMAGE_GENERATION_MAX_WIDTH_MIN || rounded > IMAGE_GENERATION_MAX_WIDTH_MAX) {
+    return IMAGE_GENERATION_MAX_WIDTH_DEFAULT;
+  }
+  return rounded;
+}
+
+/** Normalize the R-C2 orphan-asset cleanup policy; unknown values → 'trash'. */
+export function normalizeImageGenerationAssetCleanup(value: unknown): ImageGenerationAssetCleanup {
+  return IMAGE_GENERATION_ASSET_CLEANUPS.includes(value as ImageGenerationAssetCleanup)
+    ? (value as ImageGenerationAssetCleanup)
+    : 'trash';
+}
+
 /**
  * Normalize the user-defined context-group list (R-B2). Drops malformed
  * entries (non-strings, empty id/name, oversized fields, paths over the cap
@@ -3353,6 +3467,23 @@ export interface OpenCodianSettings {
    */
   vaultRetrievalExcludedPaths: string[];
 
+  /**
+   * Configured text-to-image models (R-C2, default none): provider endpoint +
+   * model + credential per entry. Credentials follow the existing settings
+   * key path and are redacted from every diagnostic surface.
+   */
+  imageGenerationModels: ImageGenerationModelConfig[];
+
+  /** Default embed width for inserted generated images (R-C2, default 600). */
+  imageGenerationMaxWidth: number;
+
+  /**
+   * Orphan-asset policy (R-C2 §4.6, default 'trash'): what happens to a
+   * generated image whose reference the user never accepted. Documented in
+   * the settings description — never a silent behaviour.
+   */
+  imageGenerationAssetCleanup: ImageGenerationAssetCleanup;
+
   capabilityLabSelectedBackend: string | undefined;
 
   /** Backend-specific settings that should not be flattened into OpenCode fields. */
@@ -3603,6 +3734,11 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   vaultRetrievalTopK: VAULT_RETRIEVAL_TOP_K_DEFAULT,
   vaultRetrievalMaxCharsPerNote: VAULT_RETRIEVAL_MAX_CHARS_PER_NOTE_DEFAULT,
   vaultRetrievalExcludedPaths: [],
+
+  // R-C2 text-to-image generation (no models configured by default).
+  imageGenerationModels: [],
+  imageGenerationMaxWidth: IMAGE_GENERATION_MAX_WIDTH_DEFAULT,
+  imageGenerationAssetCleanup: 'trash',
   capabilityLabSelectedBackend: undefined,
   backendSettings: getDefaultBackendSettings(),
 

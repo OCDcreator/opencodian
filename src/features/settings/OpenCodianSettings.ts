@@ -30,6 +30,7 @@ import {
   type SettingsDropdownsEnhancerHandle,
 } from './SettingsDropdownControl';
 import { SettingsFormatterSection } from './SettingsFormatterSection';
+import { SettingsImageGenerationSection } from './SettingsImageGenerationSection';
 import { SettingsInlineEditSection } from './SettingsInlineEditSection';
 import { SettingsMcpSection } from './SettingsMcpSection';
 import { SettingsModelSection } from './SettingsModelSection';
@@ -388,6 +389,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     }
     this.addConversationSettings(containerEl);
     this.addInlineEditSettings(containerEl);
+    this.addImageGenerationSettings(containerEl);
     this.addContextGroupsSettings(containerEl);
     if (this.isActiveBackend('opencode')) {
       this.addAgentsSettings(containerEl);
@@ -579,6 +581,15 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       openHotkeySettings: () => { this.openObsidianHotkeySettings(); },
     });
     return this.inlineEditSection.attach(containerEl);
+  }
+
+  /** Configured text-to-image models and insert behaviour (R-C2). */
+  private addImageGenerationSettings(containerEl: HTMLElement): HTMLHeadingElement {
+    const section = new SettingsImageGenerationSection({
+      plugin: this.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
+    });
+    return section.attach(containerEl);
   }
 
   /** Persisted context groups / topics (R-B2), shared by panel and composer. */

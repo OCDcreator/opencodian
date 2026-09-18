@@ -576,3 +576,7 @@ Added `chat.diffNotice.fileCount` (`{count}` accessible name for the header coun
 ## 2026-09-18 (R-B5-D1 修复)
 
 新增 3 个 `batchOrganize.*` 键：`preview.newFolders`（预览如实列出将新建目录）、`result.createdFolders`（结果页披露本批次新建目录与回退清理语义）、`error.folderUnavailable`（目录创建失败 fail-closed 提示，含目录名）。
+
+## R-C2 扩展
+
+2026-09-18 新增 key 组：`inlineEdit.imageGen.*`（chip/错误/拒绝与插入失败提示）、`imageGen.errorKind.*`（timeout/quota/http/network/size-limit）、`chat.imageGen.*`（按钮/卡片/结果/插入/复制）、`slashCommand.image.description`、`settings.imageGeneration.*` 与 `settings.conversation.tab.imageGeneration`、`inlineEdit.error.applyFailed`。

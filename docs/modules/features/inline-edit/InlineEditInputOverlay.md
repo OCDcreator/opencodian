@@ -37,3 +37,7 @@
 - 取消语义集中在 overlay 回调（`onReject`），controller 是唯一状态机；不要在 overlay 里自行判断 phase
 - 每个 EditorView 同时最多一个面板（WeakMap 单槽）；`hide()` 必须清理监听，否则文档级捕获监听会泄漏
 - 生成中的 busy 态保留面板但禁用输入与 chip；面板外点击在 input/generating 阶段都是取消（preview 阶段由 controller 的文档键处理，面板已隐藏）
+
+## R-C2 扩展
+
+2026-09-18 配置行新增生图切换 chip（`opencodian-inline-edit-chip-imagegen`，sparkles）：state 新增 `imageGen: { available; form }`，callbacks 新增 `onToggleImageGen?`；available=false 或 null 时隐藏。点击由 controller 循环 off/line/inline，active 态有 accent 高亮。

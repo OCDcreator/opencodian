@@ -461,3 +461,7 @@ New normalize functions added:
 ## 维护约束
 
 - 2026-09-18 (FlowText R-B4): Obsidian 原生工具注入接缝接入——新增设置项 obsidianToolingMode（off/cli/mcp，默认 off）与 normalizeObsidianToolingMode；off 为零成本稳态（不探测/不注入/不监听），mcp 为预留值（本版本未实现、如实显示）。
+
+## R-C2 扩展
+
+2026-09-18 新增三个设置项与类型：`imageGenerationModels: ImageGenerationModelConfig[]`（默认 `[]`；id/baseURL/model 必填，apiFormat 一期仅 `openai-images`，畸形条目修剪、id 去重、上限 20）、`imageGenerationMaxWidth`（默认 600，0–100000 整数钳制）、`imageGenerationAssetCleanup`（`'trash' | 'keep'`，默认 `'trash'`）。`apiKey` 沿用 `CodexBackendSettings.apiKey` 的密钥路径与脱敏契约。

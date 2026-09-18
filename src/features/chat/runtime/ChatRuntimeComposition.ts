@@ -326,6 +326,8 @@ export interface ChatRuntimeCompositionHost {
     readonly vaultIndexService: {
       select(query: string): Promise<import('../../../core/memory').VaultRetrievalSnippet[]>;
     } | null;
+    /** R-C2: open the text-to-image generation card (composition root owns it). */
+    openImageGenerationCard?(prefill: string): void;
   };
 
   // --- lazily-read live state (resolves after the view destructures the result) ---
@@ -1119,6 +1121,10 @@ export class ChatRuntimeComposition {
         notifySlashCommandFailed: (commandId: string, error: unknown) => {
           const message = error instanceof Error ? error.message : String(error);
           new Notice(t('chat.slashCommand.executionFailed', { command: commandId, message }));
+        },
+        // R-C2: plugin-local /image — forwarded to the composition root's card.
+        runImageGenerationCommand: (promptArgument: string) => {
+          host.plugin.openImageGenerationCard?.(promptArgument.trim());
         },
       } as never),
     );

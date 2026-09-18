@@ -50,6 +50,13 @@ import type {
   InlineEditHostAdapter,
 } from './InlineEditHost';
 import {
+  cycleInlineEditImageGen,
+  type InlineEditImageGenDeps,
+  InlineEditImageGenTurnState,
+  releaseInlineEditImageAsset,
+  submitInlineEditImageGenerationTurn,
+} from './InlineEditImageGen';
+import {
   InlineEditInputOverlay,
 } from './InlineEditInputOverlay';
 import {
@@ -82,9 +89,11 @@ import type {
 } from './InlineEditTypes';
 import {
   applyInlineEditEffect,
+  clearInlineEditPreview,
+  dispatchInlineEditPreview,
+  dispatchInlineEditStreamingPreview,
   ensureInlineEditField,
   removeInlineEditPreview,
-  upsertInlineEditPreview,
 } from './InlineEditWidgets';
 
 /**
@@ -111,8 +120,14 @@ interface ActiveEdit {
   instruction: string;
   reply: string;
   error: string;
-  preview: { readonly mode: 'replacement' | 'insertion'; readonly text: string } | null;
+  preview: {
+    readonly mode: 'replacement' | 'insertion';
+    readonly text: string;
+    readonly preserveWhitespace?: boolean;
+  } | null;
   overlay: InlineEditInputOverlay | null;
+  /** R-C2 image-generation state + transitions (owned by InlineEditImageGen). */
+  readonly imageGen: InlineEditImageGenTurnState;
   /** Model choices for the picker; `null` until the async catalog resolves. */
   modelChoices: readonly InlineEditChoice[] | null;
   /**
@@ -162,6 +177,17 @@ export class InlineEditController {
   /** The edit keyboard dispatch treats as current; owned via focus events. */
   private focusedEditId: string | null = null;
   private token = 0;
+  /** Preview decoration dispatch, bridged to the widgets layer (R-A3/R-A5). */
+  private readonly previewDispatch = {
+    nextPreviewToken: () => {
+      this.token += 1;
+      return this.token;
+    },
+    focusEdit: (editId: string) => { this.focusedEditId = editId; },
+    isLive: (edit: ActiveEdit) => this.findEdit(edit.editId) === edit,
+    accept: (editId: string) => { void this.accept(editId); },
+    reject: (editId: string) => { this.reject(editId); },
+  };
   private readonly keyboard = new InlineEditKeyboardDispatcher({
     getFocusedEdit: () => {
       const edit = this.focusedEdit();
@@ -276,6 +302,7 @@ export class InlineEditController {
       error: '',
       preview: null,
       overlay: null,
+      imageGen: new InlineEditImageGenTurnState(),
       modelChoices: null,
       contextFiles: [],
       image: null,
@@ -291,7 +318,9 @@ export class InlineEditController {
     showSelectionHighlight(editorView, anchor.from, anchor.to, edit.editId);
     this.renderInput(edit);
     this.keyboard.bind(editorView.dom.ownerDocument);
-    void this.loadModelChoices(edit);
+    void loadInlineEditModelChoices(this.pickEdit(edit), {
+      rerender: () => { if (this.findEdit(edit.editId) === edit) this.renderInput(edit); },
+    });
     return true;
   }
 
@@ -348,8 +377,12 @@ export class InlineEditController {
         editId: edit.editId,
         onSubmit: (instruction) => { void this.submit(edit, instruction); },
         onReject: () => { this.reject(edit.editId); },
-        onPickModel: (id) => { void this.pickModel(edit, id); },
-        onPickEffort: (id) => { void this.pickEffort(edit, id); },
+        onPickModel: (id) => {
+          if (this.findEdit(edit.editId) === edit) void runInlineEditModelPick(this.pickEdit(edit), this.pickDeps(edit), id);
+        },
+        onPickEffort: (id) => {
+          if (this.findEdit(edit.editId) === edit) void runInlineEditEffortPick(this.pickEdit(edit), this.pickDeps(edit), id);
+        },
         createProviderIcon: (providerId, size) => this.options.host.createProviderIcon?.(providerId, size) ?? null,
         onRequestContextFiles: () => { this.attachments.openPicker(edit); },
         onToggleContext: (path) => { this.attachments.toggle(edit, path); },
@@ -357,6 +390,12 @@ export class InlineEditController {
         onAttachImage: (files) => { void this.attachments.attachImage(edit, files); },
         onRemoveImage: () => { this.attachments.removeImage(edit); },
         onModeChange: (mode) => { this.setEditMode(edit.editId, mode); },
+        onToggleImageGen: () => {
+          const allowed = this.findEdit(edit.editId) === edit
+            && edit.phase === 'input'
+            && !edit.service.hasSession;
+          cycleInlineEditImageGen(edit, allowed, () => { this.renderInput(edit); });
+        },
         onFocus: () => { this.focusEdit(edit.editId); },
       });
       edit.overlay.show(edit.anchor.from);
@@ -383,14 +422,12 @@ export class InlineEditController {
       mode: edit.anchor.mode,
       modeOptions: inlineEditModeOptions(edit.editorView.state, this.documentModeEnabled()),
       modeSwitchable: edit.phase === 'input' && !edit.service.hasSession,
+      imageGen: edit.imageGen.chipState(this.imageGenDeps()),
     });
   }
 
-  /** Fetch the backend's model list for the picker (best effort). */
-  private async loadModelChoices(edit: ActiveEdit): Promise<void> {
-    await loadInlineEditModelChoices(this.pickEdit(edit), {
-      rerender: () => { if (this.findEdit(edit.editId) === edit) this.renderInput(edit); },
-    });
+  private imageGenDeps(): InlineEditImageGenDeps | null {
+    return this.options.host.getImageGeneration?.() ?? null;
   }
 
   /**
@@ -403,16 +440,6 @@ export class InlineEditController {
     const edit = this.findEdit(editId);
     if (!edit) return;
     this.attachments.attachEntry(edit, entry);
-  }
-
-  private async pickModel(edit: ActiveEdit, id: string | null): Promise<void> {
-    if (this.findEdit(edit.editId) !== edit) return;
-    await runInlineEditModelPick(this.pickEdit(edit), this.pickDeps(edit), id);
-  }
-
-  private async pickEffort(edit: ActiveEdit, id: string | null): Promise<void> {
-    if (this.findEdit(edit.editId) !== edit) return;
-    await runInlineEditEffortPick(this.pickEdit(edit), this.pickDeps(edit), id);
   }
 
   private pickEdit(edit: ActiveEdit): InlineEditPickEditHost {
@@ -432,75 +459,9 @@ export class InlineEditController {
   }
 
   /**
-   * Dispatch the preview decoration for `edit`.
-   *
-   * Streaming updates reuse `edit.previewToken` so the widget's `eq()`
-   * compares the accumulated text and skips the rebuild when a frame carries
-   * no visible change; the final (strictly parsed) payload only differs in
-   * `busy` and text, so the decoration updates in place. The payload is keyed
-   * by `editId`, so parallel previews replace only their own decoration.
-   */
-  private renderPreview(edit: ActiveEdit, busy: boolean): void {
-    const preview = edit.preview;
-    if (!preview) return;
-    // The preview replaces the anchored selection range. The anchor range is
-    // the selection snapshot; if the note changed during generation these
-    // offsets are stale and the accept-time dirty check refuses the write
-    // (fail safe). Offsets are clamped to the current document so a shrunken
-    // note cannot produce an out-of-bounds decoration range.
-    const docLength = edit.editorView.state.doc.length;
-    const from = Math.min(edit.anchor.from, docLength);
-    const to = Math.min(Math.max(edit.anchor.to, from), docLength);
-    if (edit.previewToken === null) {
-      this.token += 1;
-      edit.previewToken = this.token;
-    }
-    edit.previewShown = true;
-    // A fresh preview makes this the edit the keyboard talks to.
-    this.focusedEditId = edit.editId;
-    applyInlineEditEffect(edit.editorView, upsertInlineEditPreview.of({
-      editId: edit.editId,
-      token: `${edit.previewToken}:preview`,
-      from,
-      to,
-      before: edit.anchor.snapshot,
-      after: preview.text,
-      insertion: preview.mode === 'insertion',
-      busy,
-      callbacks: {
-        onSubmit: () => { /* no input in the preview phase */ },
-        onAccept: () => { void this.accept(edit.editId); },
-        onReject: () => { this.reject(edit.editId); },
-      },
-      acceptLabel: t('inlineEdit.action.accept'),
-      rejectLabel: t('inlineEdit.action.reject'),
-    }));
-  }
-
-  /** Clear a live streaming preview from the editor (error paths). */
-  private clearStreamingPreview(edit: ActiveEdit): void {
-    if (!edit.previewShown) return;
-    edit.previewShown = false;
-    edit.previewToken = null;
-    applyInlineEditEffect(edit.editorView, removeInlineEditPreview.of(edit.editId));
-  }
-
-  /**
-   * Per-frame preview update while a tag body streams in (R-A3). The payload
-   * carries `busy: true`, so the widget shows the generating marker and keeps
-   * accept/reject disabled until the strict parse settles the turn.
-   */
-  private renderStreamingPreview(edit: ActiveEdit, mode: 'replacement' | 'insertion', text: string): void {
-    if (this.findEdit(edit.editId) !== edit || edit.phase !== 'generating') return;
-    edit.preview = { mode, text };
-    edit.reply = '';
-    this.renderPreview(edit, true);
-  }
-
-  /**
    * Per-frame reply update for pre-tag plain text: a clarification-shaped
    * reply streams into the area above the input instead of the preview
-   * channel. The moment a tag opens, `renderStreamingPreview` takes over and
+   * channel. The moment a tag opens, the streaming preview takes over and
    * clears this text.
    */
   private renderStreamingReply(edit: ActiveEdit, text: string): void {
@@ -522,6 +483,21 @@ export class InlineEditController {
     edit.error = '';
     edit.reply = '';
 
+    // R-C2: with the image chip active the instruction is an image prompt —
+    // the two-step write contract (generate → W-asset → register → preview)
+    // lives in InlineEditImageGen; the aux session stays untouched.
+    if (edit.imageGen.form !== 'off') {
+      await submitInlineEditImageGenerationTurn(this.imageGenDeps(), {
+        findEdit: (id) => this.findEdit(id),
+        renderInput: (target) => { if (this.findEdit(target.editId) === target) this.renderInput(target); },
+        renderPreview: (target, busy) => {
+          target.overlay = null;
+          dispatchInlineEditPreview(this.previewDispatch, target, busy);
+        },
+      }, edit, trimmed);
+      return;
+    }
+
     if (edit.image && edit.adapter.supportsImages === false) {
       // Explicit capability gap: never downgrade an image request to a
       // text-only one behind the user's back (R-A4).
@@ -539,7 +515,7 @@ export class InlineEditController {
     // animation frame, whatever chunk pacing the backend uses.
     const stream = createInlineEditStreamSession({
       onReply: (text) => { this.renderStreamingReply(edit, text); },
-      onPreview: (mode, text) => { this.renderStreamingPreview(edit, mode, text); },
+      onPreview: (mode, text) => { dispatchInlineEditStreamingPreview(this.previewDispatch, edit, mode, text); },
     }, inlineEditFrameScheduler(edit.editorView.dom.ownerDocument.defaultView ?? window));
     edit.stream = stream;
 
@@ -583,12 +559,12 @@ export class InlineEditController {
         // accept/reject (Enter/Esc via the document handler) takes over.
         edit.overlay?.hide();
         edit.overlay = null;
-        this.renderPreview(edit, false);
+        dispatchInlineEditPreview(this.previewDispatch, edit, false);
         return;
       }
       case 'clarification':
         edit.preview = null;
-        this.clearStreamingPreview(edit);
+        clearInlineEditPreview(edit);
         edit.reply = outcome.text;
         edit.phase = 'input';
         this.renderInput(edit);
@@ -598,7 +574,7 @@ export class InlineEditController {
         // rejects the turn (multiple tags, unclosed tag): clear it and report
         // — never leave a partial apply path behind.
         edit.preview = null;
-        this.clearStreamingPreview(edit);
+        clearInlineEditPreview(edit);
         edit.error = describeInlineEditOutcome(outcome.reason, outcome.detail);
         edit.phase = 'input';
         this.renderInput(edit);
@@ -622,6 +598,9 @@ export class InlineEditController {
   private reject(editId?: string): void {
     const edit = editId !== undefined ? this.findEdit(editId) : this.focusedEdit();
     if (!edit) return;
+    // R-C2: rejecting (any phase) cancels an in-flight generation and, when
+    // a saved asset is pending, follows `imageGenerationAssetCleanup` (§4.6).
+    releaseInlineEditImageAsset(edit, this.imageGenDeps());
     this.notify(t('inlineEdit.notice.rejected'));
     void this.close(edit.editId);
   }
@@ -640,6 +619,9 @@ export class InlineEditController {
     // residual preview).
     edit.stream?.dispose();
     edit.stream = null;
+    // R-C2: cancel an in-flight generation and honor any asset whose preview
+    // never reached an accept (editor closed / plugin teardown) — §4.6 policy.
+    releaseInlineEditImageAsset(edit, this.imageGenDeps());
     edit.overlay?.hide();
     edit.overlay = null;
     applyInlineEditEffect(edit.editorView, removeInlineEditPreview.of(edit.editId));

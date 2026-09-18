@@ -57,3 +57,7 @@
 - 本模块是纯函数层：不得引入 obsidian / node API 依赖（`EditRevertStore` 的 sha256 在 storage 层）。
 - 修改工具分类或路径解析时，先跑 `tests/unit/shared/editRevertPlan.test.ts`（四后端工具面已逐一固化）。
 - 侧栏模型字段被 `ModifiedFilesSidebar` 的 R-B3 区块直接消费，改动需同步样式与 locale 文案。
+
+## R-C2 扩展
+
+2026-09-18 `EditRevertFileEntry` 新增可选 `binaryAsset?: boolean`（插件生成的二进制资产标记：无文本快照、回退=trash、restore 构造性不可用）。`isEntryRevertible`/`buildSidebarModel` 无需特判（created 条目本就可回退）。

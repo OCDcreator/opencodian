@@ -39,3 +39,7 @@
 - 上游：`OpenCodianView` constructor consumer，以及 app-composition 注入的实现对象。
 - 下游：`ConversationTabRuntimeCoordinator` 只消费其继承的 `TabRuntimePluginSource` persistence contract。
 - Barrel：`src/features/chat/index.ts` 不重新导出 `ChatPluginPort`；它是 chat shell 的内部类型 seam。
+
+## R-C2 扩展
+
+2026-09-18 `ChatPluginPort` 新增 `openImageGenerationCard(prefill?: string): void`（组合根拥有实现；view 仅转发）。

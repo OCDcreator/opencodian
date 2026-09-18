@@ -11,6 +11,10 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-18 文生图（R-C2）：两段写（W-asset + W-ref）落地，插件首次向用户内容区写二进制资产
+
+按 `docs/requirements/flowtext-c2-design.md` 实施。核心：`ImageGenerationService`（`core/agents/imagegen/`，openai-images 兼容、transport 注入、120s/25MB 显式常量、fail-closed：非 2xx→quota/http、仅收 `b64_json`、签名嗅探、超限 `size-limit`、无自动重试）+ `ImageAssetStorage`（`core/storage/`，W-asset：附件目录经 `getAvailablePathForAttachments`、绝不覆盖、越界路径写前 fail-closed）+ `EditRevertService.registerPluginCreatedAsset`（沿用 R-B5 可选 port 成员模式：`created`/`source:'plugin'`/`binaryAsset: true` 条目零二进制快照，notePaths 免预算预像使资产与引用成对回退，无开轮次时新建 plugin 轮次并以 post-turn grace 关闭；writeback 对 `binaryAsset` 条目跳过 restore 捕获，restore 如实不可用）。两入口：行内编辑（chip off→整行→行内，复用既有 preview→单次 `replaceRange` 接受流，W-ref 失败保留资产并提示实际路径，预览拒绝按 `imageGenerationAssetCleanup` 清理）与聊天（生成先行、插入点击才写盘；composer 按钮 + `/image` 在 pi/claude-code 回退**之前**拦截保证四后端可用）。设置四件套齐（`imageGenerationModels`/`imageGenerationMaxWidth` 600/`imageGenerationAssetCleanup` trash，密钥走 password 框与既有脱敏契约）。聊天结果面与设计的"消息卡片"有偏差：以 Modal 卡片实现（会话流卡片需横切消息模型与渲染管线），行为要素全部保留，已向维护者声明。真机端到端生成未验证（无已配置图像端点），生成链路的供应商响应体/耗时分布（§7 未验证项 1）留待实机校准。
+
 ## 2026-09-18 批量整理（R-B5-D2b 修复）：目录清理改走 vault API——`adapter.rmdir` 在真机上对目录抛 EISDIR
 
 实机复验 `7deadbab`（部署构建 `feature-flowtext-parity.202609182214`，Obsidian 1.13.7 / macOS）发现：R-B5-D2 把空目录删除改到 `adapter.rmdir(normalized, false)` 的修复**在真机上不成立**——对 `vault.createFolder` 刚创建的空目录（中文名 `归档验收R` 与 ASCII 名对照目录均试）调用 `adapter.rmdir` 一律抛 `Path is a directory: rm returned EISDIR (is a directory)`，目录原样保留；而 `app.vault.delete(folderFile, true)` 删除同一空目录成功。端到端复现一致：批量移动进新目录 → 回退后 `revertLastBatch()` 如实返回 `leftoverFolders: ['归档验收P']`（D2 的残留上报半边是好的，保留），但目录 6 秒 12 次轮询后仍在。单测全绿的原因：`EditRevertVaultHarness` 把 `rmdir` 建模成"空目录可删"，而 `obsidian.d.ts`（1510 行 `rmdir` / 1556 行 `remove`）的类型拆分完全看不出真机会抛 EISDIR——类型正确 ≠ 运行时可用。

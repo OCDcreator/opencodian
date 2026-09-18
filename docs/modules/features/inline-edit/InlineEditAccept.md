@@ -34,3 +34,7 @@ executeInlineEditAccept(edit, deps): Promise<void>
 
 - 任何新增写路径都必须保持「单次 replaceRange 覆盖请求范围」的语义；分块/多次写入会破坏单步撤销与脏检查。
 - await 之后必须经 `deps.isCurrent` 复核编辑存活（确认弹窗是异步的，期间编辑可能被关闭）。
+
+## R-C2 扩展
+
+2026-09-18 W-ref 失败语义：`InlineEditAcceptEdit` 新增 `pendingImageAssetPath` 与 `preserveWhitespace`。脏检查失败或 `replaceRange` 抛错时：携带资产路径的编辑**保留资产**并以 Notice 报告实际路径（不静默丢弃、不自动清理）；成功路径在 closeEdit 前接管（清空）`pendingImageAssetPath`，使 teardown 不误删已引用资产。`preserveWhitespace` 为 true 时跳过 `normalizeInsertionText`（独占一行形态的空行填充是特性行为）。非图像编辑的 replaceRange 抛错也改为可见的 `inlineEdit.error.applyFailed`（原为未处理 rejection）。

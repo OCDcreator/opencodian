@@ -1,8 +1,8 @@
 /* eslint-disable simple-import-sort/imports -- Entry-point bootstrap imports stay manually clustered by startup seam so owner-guarded wiring changes do not create unrelated reorder churn. */
 import * as fs from 'fs';
 import type { ElicitationRequest, ElicitationResult } from '@anthropic-ai/claude-agent-sdk';
-import type { Editor, MarkdownView } from 'obsidian';
-import { addIcon, Notice, Plugin, TFile, TFolder } from 'obsidian';
+import type { Editor } from 'obsidian';
+import { addIcon, MarkdownView, Notice, normalizePath, Plugin, TFile, TFolder } from 'obsidian';
 import * as path from 'path';
 import { presentPiUiRequest } from './features/chat/services/PiExtensionUiHost';
 import { OPENCODIAN_APP_ICON_ID } from './shared/brandingWordmark';
@@ -62,6 +62,11 @@ import { PluginRuntimeCoordinator } from './app/runtime/PluginRuntimeCoordinator
 import { StorageService } from './core/storage';
 import { ConversationFullMessageCache } from './core/storage/ConversationFullMessageCache';
 import { EditRevertService } from './core/storage/EditRevertService';
+import { ImageAssetStorage, type ImageAssetVault } from './core/storage/ImageAssetStorage';
+import { createRequestUrlImageGenTransport, ImageGenerationService } from './core/agents/imagegen/ImageGenerationService';
+import { ImageGenerationChatController, type ImageGenerationChatPorts } from './features/chat/services/ImageGenerationChatController';
+import { ImageGenerationModal } from './features/chat/ui/ImageGenerationModal';
+import type { InlineEditImageGenDeps } from './features/inline-edit/InlineEditImageGen';
 import { PluginUpdateService } from './core/update/PluginUpdateService';
 import type {
   ChatAppearanceSettings,
@@ -142,6 +147,16 @@ export default class OpenCodianPlugin extends Plugin {
    * modified-files sidebar consume it through `EditRevertServicePort`.
    */
   editRevertService: EditRevertService | null = null;
+
+  /**
+   * R-C2 text-to-image runtime. Generation is a plugin-side HTTP invocation
+   * (never an agent session); asset writes are the plugin's first binary
+   * write into the user content area (core.storage owner). main.ts only
+   * composes these and bridges them into the two entry points.
+   */
+  imageGenerationService: ImageGenerationService | null = null;
+  imageAssetStorage: ImageAssetStorage | null = null;
+  imageGenerationChatController: ImageGenerationChatController | null = null;
 
   /**
    * R-C1 whole-vault retrieval index (core.memory service + app-side vault
@@ -270,6 +285,15 @@ export default class OpenCodianPlugin extends Plugin {
     });
     await coordinator.measureStartupStep('editRevert.initialize', () =>
       this.editRevertService?.initialize() ?? Promise.resolve());
+    // R-C2 text-to-image: generation is plugin-side HTTP (never an agent
+    // session); the asset write is the plugin's first binary write into the
+    // user content area (W-asset), and both entry points register generated
+    // assets with the edit-revert service above (R-B3 coverage).
+    this.imageGenerationService = new ImageGenerationService(createRequestUrlImageGenTransport());
+    this.imageAssetStorage = new ImageAssetStorage(this.createImageAssetVaultAdapter());
+    this.imageGenerationChatController = new ImageGenerationChatController(
+      this.createImageGenerationChatPorts(),
+    );
     // R-C1: the retrieval index attaches its fs adapter and settings getter;
     // onSettingsChanged() is a no-op while vaultRetrievalEnabled is false.
     this.vaultIndexService = new VaultIndexService();
@@ -531,6 +555,7 @@ export default class OpenCodianPlugin extends Plugin {
       resolveContextFile: (path) => this.resolveInlineEditContextFile(path),
       listContextGroups: () => this.settings.contextGroups,
       applyAutoInternalLinks: this.createInlineEditAutoLinkBridge(),
+      getImageGeneration: () => this.createInlineEditImageGenDeps(),
     });
     this.inlineEditController = new InlineEditController({
       host: this.inlineEditHost,
@@ -555,6 +580,115 @@ export default class OpenCodianPlugin extends Plugin {
       getExcludedTerms: () => this.settings.autoInternalLinkExcludedTerms,
     });
   }
+
+  // --- R-C2 text-to-image composition ---------------------------------------
+
+  /**
+   * The vault slice W-asset needs, over Obsidian's real APIs. Placement goes
+   * through `getAvailablePathForAttachments` (attachment folder setting +
+   * Obsidian conflict numbering); removal goes through `vault.trash` like the
+   * revert writeback. `getAvailablePathForAttachments` is runtime-verified
+   * but untyped in current obsidian.d.ts, hence the guarded cast.
+   */
+  private createImageAssetVaultAdapter(): ImageAssetVault {
+    const vault = this.app.vault;
+    return {
+      getAvailablePathForAttachments: async (fileName) => {
+        const resolver = (vault as unknown as {
+          getAvailablePathForAttachments?: (fileName: string) => Promise<string>;
+        }).getAvailablePathForAttachments;
+        if (!resolver) {
+          throw new Error('This Obsidian version does not expose getAvailablePathForAttachments.');
+        }
+        return resolver.call(vault, fileName);
+      },
+      writeBinary: (path, data) => vault.adapter.writeBinary(normalizePath(path), data),
+      exists: (path) => vault.adapter.exists(normalizePath(path)),
+      trash: async (path) => {
+        const file = vault.getAbstractFileByPath(normalizePath(path));
+        if (!file) return false;
+        try {
+          await vault.trash(file, false);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+    };
+  }
+
+  /** Chat-entry ports (design §3.5): generation first, writes only on insert click. */
+  private createImageGenerationChatPorts(): ImageGenerationChatPorts {
+    return {
+      getConfiguration: () => ({
+        models: this.settings.imageGenerationModels,
+        maxWidth: this.settings.imageGenerationMaxWidth,
+        cleanup: this.settings.imageGenerationAssetCleanup,
+      }),
+      generate: (model, prompt, signal) =>
+        this.imageGenerationService?.generate(model, prompt, signal)
+        ?? Promise.resolve({ ok: false as const, error: 'not ready', kind: 'http' as const }),
+      saveAsset: (bytes, mimeType, baseName) =>
+        this.imageAssetStorage!.save(bytes, mimeType, baseName),
+      trashAsset: (path) => this.imageAssetStorage?.trash(path) ?? Promise.resolve(false),
+      registerAsset: (assetPath, notePath) => {
+        const conversationId = this.resolveImageGenConversationId();
+        if (!conversationId) return;
+        void this.editRevertService?.registerPluginCreatedAsset?.(conversationId, assetPath, [notePath]);
+      },
+      resolveInsertTarget: () => {
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (!view) return null;
+        return { editor: view.editor, notePath: view.file?.path ?? '' };
+      },
+      notify: (message) => { new Notice(message); },
+    };
+  }
+
+  /**
+   * Inline-edit-entry bridge (design §3.4). `null` (runtime not ready or no
+   * configured model) hides the overlay chip instead of showing a dead one.
+   */
+  private createInlineEditImageGenDeps(): InlineEditImageGenDeps | null {
+    const service = this.imageGenerationService;
+    const storage = this.imageAssetStorage;
+    if (!service || !storage) return null;
+    const models = this.settings.imageGenerationModels;
+    if (models.length === 0) return null;
+    return {
+      models,
+      maxWidth: this.settings.imageGenerationMaxWidth,
+      cleanup: this.settings.imageGenerationAssetCleanup,
+      generate: (model, prompt, signal) => service.generate(model, prompt, signal),
+      saveAsset: (bytes, mimeType, baseName) => storage.save(bytes, mimeType, baseName),
+      trashAsset: (path) => storage.trash(path),
+      registerAsset: (assetPath, notePath) => {
+        const conversationId = this.resolveImageGenConversationId();
+        if (!conversationId) return;
+        void this.editRevertService?.registerPluginCreatedAsset?.(conversationId, assetPath, [notePath]);
+      },
+      notify: (message) => { new Notice(message); },
+    };
+  }
+
+  /**
+   * Conversation id a generated asset registers under: the active chat view's
+   * conversation when one is open, else the most recently known conversation.
+   * `null` honestly means the asset cannot be registered (no conversation
+   * exists at all) — the generation flow still works, revert coverage does not.
+   */
+  private resolveImageGenConversationId(): string | null {
+    const active = this.getOpenCodianView()?.getActiveConversationIdForAssets() ?? null;
+    if (active) return active;
+    return this.conversations[0]?.id ?? null;
+  }
+
+  /** Open the chat entry's generation card (composer button and /image). */
+  openImageGenerationCard(prefill = ''): void {
+    if (!this.imageGenerationChatController) return;
+    new ImageGenerationModal(this.app, this.imageGenerationChatController, prefill).open();
+  }
+
 
   /**
    * Model choices for the inline-edit floating bar picker, per backend.
@@ -1003,6 +1137,10 @@ export default class OpenCodianPlugin extends Plugin {
     this.memoryRuntime?.dispose();
     this.obsidianToolingRuntime?.dispose();
     this.editRevertService?.dispose();
+    // R-C2: stateless runtime handles — dropping the references is enough.
+    this.imageGenerationChatController = null;
+    this.imageAssetStorage = null;
+    this.imageGenerationService = null;
     this.vaultIndexService?.dispose();
     // Stop the OpenCode server (async, best-effort)
     void this.openCodeService?.stop().catch((error) => {

@@ -79,3 +79,7 @@ Pi主标签使用用户SVG注册图标opencodian-pi，与后端状态和切换�
 
 - 2026-09-13: conversation 主标签新增后端无关的 memory 次级标签。
 - 2026-09-15: conversation 主标签新增后端无关的 inline-edit 次级标签（行内编辑设置）。
+
+## R-C2 扩展
+
+2026-09-18 conversation 主 tab 二级 tab 新增 `image-generation`（后端无关，不设 backendRequired）。

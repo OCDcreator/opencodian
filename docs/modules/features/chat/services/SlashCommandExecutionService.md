@@ -112,3 +112,7 @@ export class SlashCommandExecutionService {
 ## 2026-09-08 Pi 独立服务接入
 
 Pi 的斜杠输入直接交给 Pi prompt，不读取或执行 OpenCode 命令。Claude 与 Codex/OpenCode 的既有分支不变。
+
+## R-C2 扩展
+
+2026-09-18 `tryRunSlashCommand` 在 pi / claude-code 回退**之前**拦截 `/image`（生成是插件侧 HTTP，必须四后端可用）：项目命令 `image` 仍保持优先；host 新增可选 `runImageGenerationCommand?(promptArgument)`。

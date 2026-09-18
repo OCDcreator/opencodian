@@ -243,6 +243,133 @@ export class EditRevertService implements EditRevertServicePort {
     });
   }
 
+  /**
+   * R-C2: register a plugin-generated binary asset (write step W-asset) so
+   * revert can remove it. Binary files cannot ride the markdown vault-event
+   * funnel (`isMarkdownPath` stays a text-note filter on purpose — binary
+   * content snapshots do not apply), so coverage is an explicit registration:
+   * a `created` / `source: 'plugin'` entry with NO pre-image and NO binary
+   * snapshot blob. Revert = Obsidian trash (the existing created-entry path);
+   * restore stays honestly unavailable for it.
+   *
+   * Markdown `notePaths` (the note about to receive the reference) get the
+   * same budget-free pre-image capture the batch path uses, so the asset and
+   * the reference revert as a pair. When no open round exists for the
+   * conversation, a fresh `plugin` round is created and closed with the
+   * post-turn grace window, so the immediately following reference write
+   * (W-ref) is captured by the vault-event funnel without holding an
+   * indefinitely open round. Fail-soft: registration problems never abort the
+   * generation flow, but are logged.
+   */
+  async registerPluginCreatedAsset(
+    conversationId: string,
+    assetPath: string,
+    notePaths: readonly string[] = [],
+  ): Promise<void> {
+    if (this.disposed || !conversationId || !assetPath) {
+      return;
+    }
+    await this.enqueue(() =>
+      this.performRegisterPluginCreatedAsset(conversationId, assetPath, notePaths),
+    ).catch((error) => {
+      logger.warn('registerPluginCreatedAsset failed', { error, conversationId, assetPath });
+    });
+  }
+
+  private async performRegisterPluginCreatedAsset(
+    conversationId: string,
+    assetPath: string,
+    notePaths: readonly string[],
+  ): Promise<void> {
+    if (!this.isEnabled()) {
+      return;
+    }
+    const asset = this.normalizeVaultPath(assetPath);
+    if (!asset) {
+      logger.warn('registerPluginCreatedAsset: path is not vault-relative; skipped', { assetPath });
+      return;
+    }
+    const now = this.now();
+    let round = this.getLatestRound(conversationId);
+    let ownsRound = false;
+    if (!round || round.meta.closedAt !== null) {
+      // No open round: open (and immediately grace-close) a plugin round so
+      // the paired reference write attributes here. An in-flight turn round
+      // is never disturbed — its own lifecycle owns it.
+      round = {
+        meta: {
+          id: `round-${now}-${++this.roundSeq}`,
+          conversationId,
+          backend: 'plugin',
+          createdAt: now,
+          closedAt: now,
+          degraded: false,
+          acceptsWritesUntil: now + EDIT_REVERT_POST_TURN_GRACE_MS,
+          lastActivityAtHint: now,
+          entries: [],
+        },
+        standby: new Map(),
+        standbyOversize: new Set(),
+        dirty: true,
+      };
+      this.rounds.set(round.meta.id, round);
+      this.frozenIdleByRound.set(round.meta.id, new Map(this.idleCache));
+      ownsRound = true;
+    }
+
+    round.meta.lastActivityAtHint = this.now();
+
+    // Paired markdown pre-images (budget-free, batch convention).
+    for (const rawPath of notePaths) {
+      const normalized = this.normalizeVaultPath(rawPath);
+      if (!normalized || !isMarkdownPath(normalized)) {
+        continue;
+      }
+      if (round.standby.has(normalized) || round.standbyOversize.has(normalized)) {
+        continue;
+      }
+      const captured = await this.captureContent(normalized);
+      if (captured === 'oversize') {
+        round.standbyOversize.add(normalized);
+      } else if (captured !== 'missing') {
+        round.standby.set(normalized, captured);
+      }
+    }
+
+    // The asset entry: created, no pre-image, no binary blob (zero snapshot
+    // storage for binaries — design §3.6). `isEntryRevertible` treats created
+    // entries as revertible (trash); the sidebar needs no special case.
+    const existing = round.meta.entries.find((item) => item.path === asset);
+    const stat = await this.readVaultFileSize(asset);
+    if (existing) {
+      existing.status = 'created';
+      existing.state = 'active';
+      existing.lastWriteAt = this.now();
+      if (stat !== null) {
+        existing.sizeBytes = stat;
+      }
+    } else {
+      round.meta.entries.push({
+        path: asset,
+        status: 'created',
+        state: 'active',
+        preImageStatus: 'unavailable',
+        sizeBytes: stat ?? 0,
+        firstWriteAt: this.now(),
+        lastWriteAt: this.now(),
+        source: 'plugin',
+        binaryAsset: true,
+      });
+    }
+
+    if (ownsRound) {
+      round.meta.closedAt = this.now();
+    }
+    round.dirty = true;
+    this.schedulePersist();
+    this.notifyChanged();
+  }
+
   revertFile(conversationId: string, path: string): Promise<EditRevertActionResult> {
     return this.enqueue(() => this.performRevertFile(conversationId, path));
   }

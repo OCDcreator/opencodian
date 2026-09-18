@@ -128,6 +128,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
       { id: 'vault-retrieval', labelKey: 'settings.conversation.tab.vaultRetrieval' },
       { id: 'inline-edit', labelKey: 'settings.conversation.tab.inlineEdit' },
       { id: 'context-groups', labelKey: 'settings.conversation.tab.contextGroups' },
+      { id: 'image-generation', labelKey: 'settings.conversation.tab.imageGeneration' },
     ],
   },
   {

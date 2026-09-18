@@ -149,3 +149,7 @@ export class ComposerInputShellCoordinator {
 - liquid-glass adapter mount、SVG filter 与 diagnostics 已进一步交给 `InputPanelAppearanceCoordinator`，本模块继续只负责 shell/layout lifecycle
 
 本模块推进 commands item 6 的 chat-side slash autocomplete slice：把 slash menu DOM、键盘选择和 menu-item 应用留在输入区 owner 内，而 slash execution 仍继续委托给相邻 runtime seam。
+
+## R-C2 扩展
+
+2026-09-18 composer 输入行新增文生图按钮（`opencodian-composer-imagegen-btn`，sparkles 图标），以 host 可选成员 `onRequestImageGeneration?` 门控——未实现即不渲染，不会出现半接线按钮。

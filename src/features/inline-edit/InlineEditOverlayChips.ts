@@ -312,3 +312,57 @@ export async function loadInlineEditModelChoices(
   }
   deps.rerender();
 }
+
+// -----------------------------------------------------------------------------
+// R-C2 image-generation chip
+// -----------------------------------------------------------------------------
+
+/** Structural state of the image-generation chip (`null`/unavailable hides it). */
+export interface InlineEditImageGenChipState {
+  readonly available: boolean;
+  readonly form: 'off' | 'line' | 'inline';
+}
+
+/**
+ * Build the image-generation toggle chip (off → exclusive line → inline).
+ * Starts hidden; `syncInlineEditImageGenChip` reveals it when the runtime
+ * bridge has configured models.
+ */
+export function buildInlineEditImageGenChip(
+  configRow: HTMLElement,
+  onToggle: () => void,
+): HTMLButtonElement {
+  const chip = configRow.createEl('button', {
+    cls: 'opencodian-inline-edit-chip opencodian-inline-edit-chip-imagegen',
+    attr: { type: 'button', 'aria-label': t('inlineEdit.imageGen.chip.title'), title: t('inlineEdit.imageGen.chip.title') },
+  });
+  const icon = chip.createSpan({ cls: 'opencodian-inline-edit-chip-prefix' });
+  setIcon(icon, 'sparkles');
+  chip.createSpan({ cls: 'opencodian-inline-edit-chip-value', text: t('inlineEdit.imageGen.chip.off') });
+  chip.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onToggle();
+  });
+  chip.style.display = 'none';
+  return chip;
+}
+
+/** Reveal/hide and relabel the image-generation chip for one render pass. */
+export function syncInlineEditImageGenChip(
+  chip: HTMLButtonElement | null,
+  state: InlineEditImageGenChipState | null,
+): void {
+  if (!chip) return;
+  const visible = state?.available === true;
+  chip.style.display = visible ? '' : 'none';
+  if (!visible) return;
+  const label = state.form === 'line'
+    ? t('inlineEdit.imageGen.chip.line')
+    : state.form === 'inline'
+      ? t('inlineEdit.imageGen.chip.inline')
+      : t('inlineEdit.imageGen.chip.off');
+  const valueEl = chip.querySelector<HTMLElement>(':scope .opencodian-inline-edit-chip-value');
+  if (valueEl && valueEl.textContent !== label) valueEl.textContent = label;
+  chip.classList.toggle('opencodian-inline-edit-chip-imagegen-active', state.form !== 'off');
+}

@@ -22,6 +22,7 @@ import { SettingsContextGroupsSection } from './SettingsContextGroupsSection';
 import { SettingsConversationSection } from './SettingsConversationSection';
 import { SettingsDebugSection } from './SettingsDebugSection';
 import { SettingsFormatterSection } from './SettingsFormatterSection';
+import { SettingsImageGenerationSection } from './SettingsImageGenerationSection';
 import { SettingsInlineEditSection } from './SettingsInlineEditSection';
 import {
   getActiveSecondaryTabId,
@@ -443,6 +444,10 @@ export class SettingsTabbedRenderer {
       createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
     }).attachTabbed(containerEl, secondaryTabId);
     new SettingsContextGroupsSection({
+      plugin: this.deps.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
+    }).attachTabbed(containerEl, secondaryTabId);
+    new SettingsImageGenerationSection({
       plugin: this.deps.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
     }).attachTabbed(containerEl, secondaryTabId);

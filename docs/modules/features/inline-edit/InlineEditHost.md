@@ -30,3 +30,7 @@ inline edit 与插件运行时之间的接缝。`editorCallback` 只给到 `Edit
 
 - 接口保持窄小：只放 controller 真正需要的三个方法，backend/模型解析细节属于实现方
 - 模型解析顺序固定为 `inlineEditModelOverrides[kind] → 活动 tab 模型 → null`；显式配置不可用时必须是错误，不得静默回退（`docs/requirements/inline-edit.md` §9）
+
+## R-C2 扩展
+
+2026-09-18 新增可选 host 成员 `getImageGeneration?(): InlineEditImageGenDeps | null`；absent/null 隐藏生图 chip。

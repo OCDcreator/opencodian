@@ -262,8 +262,8 @@ describe('SettingsTabbedRenderer', () => {
     // title, display, memory, vault-retrieval, inline-edit and context-groups
     // are backend-agnostic, so they remain visible
     const secondaryTabs = containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-secondary');
-    expect(secondaryTabs).toHaveLength(6);
-    expect(Array.from(secondaryTabs).map((tab) => tab.dataset.tabId)).toEqual(['title', 'display', 'memory', 'vault-retrieval', 'inline-edit', 'context-groups']);
+    expect(secondaryTabs).toHaveLength(7);
+    expect(Array.from(secondaryTabs).map((tab) => tab.dataset.tabId)).toEqual(['title', 'display', 'memory', 'vault-retrieval', 'inline-edit', 'context-groups', 'image-generation']);
     // compaction is OpenCode-only and filtered out; falls back to first visible secondary tab (title)
     expectSingleContentShell(containerEl, 'conversation', 'title');
   });

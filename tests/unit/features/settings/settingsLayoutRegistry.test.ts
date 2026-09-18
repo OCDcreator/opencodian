@@ -93,6 +93,7 @@ describe('SETTINGS_PRIMARY_TABS', () => {
       'vault-retrieval',
       'inline-edit',
       'context-groups',
+      'image-generation',
     ]);
   });
 

@@ -58,10 +58,15 @@ export class EditRevertVaultWriteback {
     }
 
     if (entry.status === 'created') {
-      const restore = await this.captureCurrentContent(entry.path);
-      if (restore) {
-        entry.restoreHash = restore.hash;
-        entry.restoreBytes = restore.bytes;
+      // R-C2: binary assets never take text snapshots — revert is plain
+      // trash and no restore blob is captured (restore stays honestly
+      // unavailable instead of writing a garbled text read back).
+      if (!entry.binaryAsset) {
+        const restore = await this.captureCurrentContent(entry.path);
+        if (restore) {
+          entry.restoreHash = restore.hash;
+          entry.restoreBytes = restore.bytes;
+        }
       }
       const trashed = await this.trashVaultFile(entry.path);
       if (!trashed.ok) {

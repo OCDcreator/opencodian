@@ -101,3 +101,7 @@ It also migrates the old `Server > MCP` remembered location into the new top-lev
 ## 维护约束
 
 - 2026-09-18 (FlowText R-B4): Obsidian 原生工具注入接缝接入——载入归一化新增 normalizeObsidianToolingSettingsOnLoad：未知/陈旧模式值在最终合并边界回退 off（手改配置文件不能静默激活能力）。
+
+## R-C2 扩展
+
+2026-09-18 新增 `normalizeImageGenerationSettingsOnLoad`（最终 load-merge 边界）：models 列表归一化、宽度钳制、cleanup 回退 'trash'。

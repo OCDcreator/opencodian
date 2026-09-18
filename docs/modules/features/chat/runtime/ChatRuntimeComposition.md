@@ -43,3 +43,7 @@ owner: `feature.chat-runtime`（layer features）。依赖 `feature.chat`（serv
 - 2026-09-13: 组合层接线 planMemoryInjection（host.plugin.memoryRuntime）与 onTurnSettled；plugin 形状新增 memoryRuntime 端口。
 
 - 2026-09-18 (FlowText R-B4): Obsidian 原生工具注入接缝接入——插件结构类型新增 obsidianToolingRuntime（planInjection 端口），MessageSendPreparationHost 新增 planObsidianToolingInjection 回调接线。
+
+## R-C2 扩展
+
+2026-09-18 slash host 字面量新增 `runImageGenerationCommand`（转发 `host.plugin.openImageGenerationCard?.(promptArgument.trim())`）；`ChatRuntimeCompositionHost.plugin` 结构类型新增可选 `openImageGenerationCard?`。

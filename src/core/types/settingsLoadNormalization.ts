@@ -24,6 +24,9 @@ import {
   normalizeContextGroups,
   normalizeEditRevertSnapshotLimitMb,
   normalizeEffortLevel,
+  normalizeImageGenerationAssetCleanup,
+  normalizeImageGenerationMaxWidth,
+  normalizeImageGenerationModels,
   normalizeInlineEditEffortOverrides,
   normalizeInlineEditMaxConcurrentEdits,
   normalizeInlineEditModelOverrides,
@@ -489,6 +492,23 @@ function normalizeVaultRetrievalSettingsOnLoad(
   };
 }
 
+/** R-C2 text-to-image generation, normalized at the final load-merge boundary. */
+function normalizeImageGenerationSettingsOnLoad(
+  normalizedSettings: Partial<OpenCodianSettings> | null,
+): {
+  imageGenerationModels: ReturnType<typeof normalizeImageGenerationModels>;
+  imageGenerationMaxWidth: number;
+  imageGenerationAssetCleanup: ReturnType<typeof normalizeImageGenerationAssetCleanup>;
+} {
+  return {
+    imageGenerationModels: normalizeImageGenerationModels(normalizedSettings?.imageGenerationModels),
+    imageGenerationMaxWidth: normalizeImageGenerationMaxWidth(normalizedSettings?.imageGenerationMaxWidth),
+    imageGenerationAssetCleanup: normalizeImageGenerationAssetCleanup(
+      normalizedSettings?.imageGenerationAssetCleanup,
+    ),
+  };
+}
+
 function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | null): LoadSettingsNormalizationResult {
   const normalizedModelProviderPluginDebugSettings = normalizeModelProviderPluginDebugSettings(savedSettings);
   const { normalizedServer, shouldMigrateLegacyLocalDefaultPort } = normalizeServerSettingsOnLoad(savedSettings);
@@ -618,6 +638,7 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
       ...normalizeEditRevertSettingsOnLoad(normalizedSettings),
       ...normalizeObsidianToolingSettingsOnLoad(normalizedSettings),
       ...normalizeVaultRetrievalSettingsOnLoad(normalizedSettings),
+      ...normalizeImageGenerationSettingsOnLoad(normalizedSettings),
     },
     shouldMigrateLegacyLocalDefaultPort,
     shouldResetGlassRefractionGlassDefaults,

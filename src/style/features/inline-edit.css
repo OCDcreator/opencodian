@@ -1004,3 +1004,16 @@
   color: var(--text-muted);
   padding: 6px 0;
 }
+
+/* -- Image generation chip (R-C2) ---------------------------------- */
+
+.opencodian-inline-edit-chip-imagegen {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.opencodian-inline-edit-chip-imagegen-active {
+  color: var(--text-accent);
+  border-color: color-mix(in srgb, var(--text-accent) 45%, transparent);
+}

@@ -1,0 +1,40 @@
+/**
+ * Image-generation modal (R-C2 text-to-image chat entry card).
+ *
+ * Obsidian-native first: the card is a plain `Modal` and inherits its frame;
+ * these rules only add the result layout, the error strip and a comfortable
+ * thumbnail cap. Contrast and focus states come from the host theme.
+ */
+
+.opencodian-imagegen-modal {
+  max-width: 560px;
+}
+
+.opencodian-imagegen-result {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.opencodian-imagegen-result-image {
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: var(--radius-m, 6px);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+
+.opencodian-imagegen-result-meta {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-imagegen-error {
+  color: var(--text-error);
+  font-size: var(--font-ui-smaller);
+  margin: 8px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

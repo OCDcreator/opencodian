@@ -1016,7 +1016,21 @@ export class OpenCodianView extends ItemView {
       },
       getComposerAvailabilityState: () => this.getComposerAvailabilityState(),
       hasImageInputCapability: () => hasCapability(this.caps, AgentCapability.Images),
+      // R-C2: the view only forwards — the card, the controller and the
+      // plugin-side generation service are owned by the composition root.
+      onRequestImageGeneration: () => { this.plugin.openImageGenerationCard(''); },
     };
+  }
+
+  /**
+   * R-C2: the conversation id a plugin-generated asset should register
+   * under. The chat entry is the common case (its conversation is active);
+   * the inline-edit entry has no conversation of its own, so the asset
+   * attributes to the conversation the user is currently looking at. `null`
+   * honestly means "no revert registration possible" (no conversation open).
+   */
+  getActiveConversationIdForAssets(): string | null {
+    return this.currentConversation?.id ?? null;
   }
 
   private handleComposerInputSubmission(

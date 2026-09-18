@@ -81,4 +81,21 @@ export interface EditRevertServicePort {
    * becomes available immediately.
    */
   endBatchCapture?(conversationId: string): Promise<void>;
+
+  // --- R-C2: plugin-generated binary asset (image generation) ----------------
+
+  /**
+   * Register a plugin-generated binary asset (write step W-asset) as a
+   * `created` / `source: 'plugin'` entry in the conversation's current round
+   * (or a fresh plugin round), with markdown pre-images captured for the
+   * listed `notePaths` so asset and reference revert as a pair. Optional so
+   * chat-side doubles stay valid; the concrete service always implements it
+   * and callers treat registration failure as fail-soft (the asset write
+   * itself already happened; revert coverage is honestly absent).
+   */
+  registerPluginCreatedAsset?(
+    conversationId: string,
+    assetPath: string,
+    notePaths?: readonly string[],
+  ): Promise<void>;
 }

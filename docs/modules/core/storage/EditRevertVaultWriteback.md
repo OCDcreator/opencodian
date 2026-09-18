@@ -51,3 +51,7 @@ class EditRevertVaultWriteback {
 - `applyRevert` 对 `status:'moved'` 条目走新分支：经 `app.fileManager.renameFile(movedTo → path)` 改回原路径（renameFile 会同步还原 Obsidian 在移动时改写的引用，内容不变故无需 pre-image blob）；`applyRestore` 对称地再次前移（`path → movedTo`），实现"回退可再撤销"。
 - 新增 `renameVaultFile` 私有写路径：源不存在（`file-missing`）或目标已占用（`target-exists`）一律拒绝——**绝不覆盖**。
 - 该路径仅供 R-B3/R-B5 的回退/恢复使用；批量执行期间的首次移动不走这里（批量协调器直接调 `fileManager.renameFile` 并以 `notePluginMove` 登记）。
+
+## R-C2 扩展：binaryAsset 条目
+
+2026-09-18 `applyRevert` 的 created 分支对 `entry.binaryAsset === true` 的条目（图片生成资产）**跳过** `captureCurrentContent`：不产生任何文本误读快照，`restoreHash` 保持未设置 → restore 如实不可用；回退仍为纯 `vault.trash`。

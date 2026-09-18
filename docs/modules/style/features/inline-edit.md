@@ -40,3 +40,7 @@ inline edit 全部 UI 的样式。设计语言：Cursor cmd-K 指令条骨架（
 - 深色专属调整必须走 `.theme-dark` 覆盖块，不要在基础规则里塞主题分支
 - 通过 `src/style/index.css` 的 `@import` 参与 `npm run build:css` 合并；新增文件必须同时登记到 index
 - 视觉回归用 `.obsidian-debug/style-repro/`（puppeteer + 本地 Chrome 实拍四个明暗面板）；改 DOM 结构必须同步 mock，否则截图骗人
+
+## R-C2 扩展
+
+2026-09-18 新增生图 chip 样式：`.opencodian-inline-edit-chip-imagegen`（布局）与 `.opencodian-inline-edit-chip-imagegen-active`（accent 高亮）。

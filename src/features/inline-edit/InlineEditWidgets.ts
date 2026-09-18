@@ -307,3 +307,103 @@ class InlineEditPreviewWidget extends WidgetType {
     return false;
   }
 }
+
+// -----------------------------------------------------------------------------
+// Preview dispatch (moved from InlineEditController so it stays in budget)
+// -----------------------------------------------------------------------------
+
+/** Structural slice of one active edit the preview dispatch needs. */
+export interface InlineEditPreviewDispatchEdit {
+  readonly editId: string;
+  readonly editorView: EditorView;
+  readonly anchor: { readonly from: number; readonly to: number; readonly snapshot: string };
+  phase: 'input' | 'generating' | 'preview';
+  reply: string;
+  previewToken: number | null;
+  previewShown: boolean;
+  preview: {
+    readonly mode: 'replacement' | 'insertion';
+    readonly text: string;
+    readonly preserveWhitespace?: boolean;
+  } | null;
+}
+
+/** Controller bridges the dispatch needs (token counter, focus, accept/reject). */
+export interface InlineEditPreviewDispatchHost<E> {
+  nextPreviewToken(): number;
+  focusEdit(editId: string): void;
+  isLive(edit: E): boolean;
+  accept(editId: string): void;
+  reject(editId: string): void;
+}
+
+/**
+ * Dispatch the preview decoration for one edit (streaming frames reuse the
+ * edit's `previewToken` so the widget's `eq()` compares accumulated text; a
+ * fresh preview makes the edit the keyboard's current one).
+ */
+export function dispatchInlineEditPreview<E extends InlineEditPreviewDispatchEdit>(
+  host: InlineEditPreviewDispatchHost<E>,
+  edit: E,
+  busy: boolean,
+): void {
+  const preview = edit.preview;
+  if (!preview) return;
+  // The preview replaces the anchored selection range. If the note changed
+  // during generation these offsets are stale and the accept-time dirty check
+  // refuses the write (fail safe). Offsets are clamped to the current document
+  // so a shrunken note cannot produce an out-of-bounds decoration range.
+  const docLength = edit.editorView.state.doc.length;
+  const from = Math.min(edit.anchor.from, docLength);
+  const to = Math.min(Math.max(edit.anchor.to, from), docLength);
+  if (edit.previewToken === null) {
+    edit.previewToken = host.nextPreviewToken();
+  }
+  edit.previewShown = true;
+  // A fresh preview makes this the edit the keyboard talks to.
+  host.focusEdit(edit.editId);
+  applyInlineEditEffect(edit.editorView, upsertInlineEditPreview.of({
+    editId: edit.editId,
+    token: `${edit.previewToken}:preview`,
+    from,
+    to,
+    before: edit.anchor.snapshot,
+    after: preview.text,
+    insertion: preview.mode === 'insertion',
+    busy,
+    callbacks: {
+      onSubmit: () => { /* no input in the preview phase */ },
+      onAccept: () => { host.accept(edit.editId); },
+      onReject: () => { host.reject(edit.editId); },
+    },
+    acceptLabel: t('inlineEdit.action.accept'),
+    rejectLabel: t('inlineEdit.action.reject'),
+  }));
+}
+
+/** Clear a live streaming preview from the editor (error paths). */
+export function clearInlineEditPreview(
+  edit: Pick<InlineEditPreviewDispatchEdit, 'editId' | 'editorView' | 'previewShown' | 'previewToken'>,
+): void {
+  if (!edit.previewShown) return;
+  edit.previewShown = false;
+  edit.previewToken = null;
+  applyInlineEditEffect(edit.editorView, removeInlineEditPreview.of(edit.editId));
+}
+
+/**
+ * Per-frame preview update while a tag body streams in (R-A3). The payload
+ * carries `busy: true`, so the widget shows the generating marker and keeps
+ * accept/reject disabled until the strict parse settles the turn.
+ */
+export function dispatchInlineEditStreamingPreview<E extends InlineEditPreviewDispatchEdit>(
+  host: InlineEditPreviewDispatchHost<E>,
+  edit: E,
+  mode: 'replacement' | 'insertion',
+  text: string,
+): void {
+  if (!host.isLive(edit) || edit.phase !== 'generating') return;
+  edit.preview = { mode, text };
+  edit.reply = '';
+  dispatchInlineEditPreview(host, edit, true);
+}

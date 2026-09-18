@@ -199,3 +199,7 @@ Settings exports now include `SandboxFilesystemConfig`, `SandboxNetworkConfig`, 
 ## 维护约束
 
 - 2026-09-18 (FlowText R-B4): Obsidian 原生工具注入接缝接入——导出面新增 obsidianToolingMode / ObsidianToolingMode / OBSIDIAN_TOOLING_MODES（R-B4 设置四件套）。
+
+## R-C2 扩展
+
+2026-09-18 settings 导出面新增 `ImageGenerationModelConfig` / `ImageGenerationApiFormat` / `ImageGenerationAssetCleanup` / `IMAGE_GENERATION_*` 常量与 `normalizeImageGeneration*` 函数。

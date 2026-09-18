@@ -11,6 +11,7 @@
  */
 
 import type { ContextGroup, InlineEditPresetPrompt } from '../../core/types';
+import type { InlineEditImageGenDeps } from './InlineEditImageGen';
 import type {
   InlineEditChoice,
   InlineEditContextFile,
@@ -98,4 +99,12 @@ export interface InlineEditHost {
     text: string,
     attachedNotes: readonly { readonly path: string; readonly kind?: 'file' | 'folder' }[],
   ): string;
+  /**
+   * Text-to-image runtime bridge (R-C2). Absent or `null` hides the
+   * image-generation chip entirely — the affordance never appears half-wired.
+   * The returned deps are the injected ports (generation service, asset
+   * storage, revert registrar) assembled by the composition root; see
+   * `InlineEditImageGenDeps` in InlineEditImageGen.
+   */
+  getImageGeneration?(): InlineEditImageGenDeps | null;
 }

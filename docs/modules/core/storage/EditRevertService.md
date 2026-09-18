@@ -82,3 +82,7 @@ class EditRevertService implements EditRevertServicePort {
 - 回合未关闭（turn 进行中或 grace 未过期）时回退请求会失败（`round-open`）；UI 在 `roundOpen` 时禁用回退按钮。
 - round id 为 `round-<ts>-<seq>`，`seq` 是实例内单调计数；持久化跨重启的唯一性由时间戳保证。
 - 修改本模块前先看 `src/shared/editRevertPlan.ts`（纯规划层）与 `EditRevertVaultWriteback`（唯一写缝）的职责边界，避免把 IO 或写回逻辑搬回本模块。
+
+## R-C2 扩展：registerPluginCreatedAsset
+
+2026-09-18 新增公开方法 `registerPluginCreatedAsset(conversationId, assetPath, notePaths?)`：把插件生成的二进制资产（W-asset 之后调用）登记为当前轮次（或新建 `backend: 'plugin'` 轮次）中 `status: 'created'`、`source: 'plugin'`、`binaryAsset: true` 的条目，并对 `notePaths`（即将写入引用的笔记）做免预算 markdown 预像捕获，使资产与引用可成对回退。无已开轮次时新建轮次并以 post-turn grace 关闭（引用写入落在 grace 窗口内，由 vault-event funnel 归因）。二进制条目零快照存储；回退=trash，restore 依 `binaryAsset` 标志在构造上不可用。启用关闭时为 no-op（fail-soft）。

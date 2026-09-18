@@ -65,3 +65,7 @@ Pi backend key 返回空目录，不展示 OpenCode 命令，也不触发 OpenCo
 ## Pi 原生命令目录
 
 2026-09-08：新增可选loadPiRuntimeCommands，只在Pi分支使用SDK命令/模板/skills目录，其余后端缓存及目录不变。
+
+## R-C2 扩展
+
+2026-09-18 `SYNTHETIC_BUILTIN_COMMAND_IDS` 新增 `'image'`（菜单显示 `/image`，描述 key `slashCommand.image.description`）。

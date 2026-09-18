@@ -161,6 +161,12 @@ export interface ComposerInputShellCoordinatorHost {
   getComposerCapabilityHint?(): ComposerCapabilityHint | null;
   /** Whether the active backend supports image input. */
   hasImageInputCapability?(): boolean;
+  /**
+   * R-C2: open the text-to-image generation card. Absent hides the composer
+   * button — the affordance never appears half-wired. Generation is
+   * plugin-side HTTP, independent of the active backend.
+   */
+  onRequestImageGeneration?(): void;
 }
 
 export interface ComposerCapabilityHint {
@@ -412,6 +418,23 @@ export class ComposerInputShellCoordinator {
       // composer card. It is intentionally mounted on the chat root so users
       // can drop while reading a turn and receive an explicit release affordance.
       this.installImageDropSurface();
+    }
+
+    // R-C2 text-to-image button (host-gated): opens the generation card.
+    // Generation is plugin-side HTTP and never touches the conversation.
+    if (this.host.onRequestImageGeneration) {
+      const imageGenBtnEl = this.composerContextActionsEl.createEl('button', {
+        cls: 'opencodian-composer-imagegen-btn opencodian-tooltip-trigger',
+        attr: {
+          type: 'button',
+          'aria-label': t('chat.imageGen.button'),
+        },
+      });
+      setIcon(imageGenBtnEl, 'sparkles');
+      this.host.setTooltipLabel(imageGenBtnEl, t('chat.imageGen.button'), 'top');
+      imageGenBtnEl.addEventListener('click', () => {
+        this.host.onRequestImageGeneration?.();
+      });
     }
 
     this.sendBtnEl = this.composerSubmitControlsEl.createEl('button', {

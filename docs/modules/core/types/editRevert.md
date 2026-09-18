@@ -27,3 +27,7 @@
 
 - 本文件只有类型，没有运行时逻辑；数据类型的规范定义与语义见 `docs/modules/shared/editRevertPlan.md`。
 - 修改 port 方法签名时必须同步 `EditRevertService`、`ChatPluginPort`（`editRevertService` 字段）与 `docs/modules/shared/editRevertPlan.md`。
+
+## R-C2 扩展
+
+2026-09-18 port 新增可选成员 `registerPluginCreatedAsset?(conversationId, assetPath, notePaths?)`（沿用 R-B5 可选成员模式，聊天侧 double 保持有效；具体服务始终实现）。

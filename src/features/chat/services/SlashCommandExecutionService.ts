@@ -65,6 +65,12 @@ export interface SlashCommandExecutionHost {
   startConversationSyncLoop(): void;
   syncVisibleConversationInBackground(): Promise<void>;
   notifySlashCommandFailed(commandId: string, error: unknown): void;
+  /**
+   * R-C2: run the plugin-local `/image` command (open the generation card,
+   * pre-filled with the given prompt). Absent makes `/image` fall through
+   * like any unknown command instead of appearing half-wired.
+   */
+  runImageGenerationCommand?(promptArgument: string): Promise<void> | void;
 }
 
 export interface SlashCommandExecutionHostDependencies {
@@ -256,6 +262,18 @@ export class SlashCommandExecutionService {
     // Mid-text commands always fall through to prompt path
     if (!content.trimStart().startsWith('/')) {
       return false;
+    }
+
+    // R-C2: plugin-local `/image` — generation is plugin-side HTTP and must
+    // stay reachable on every backend, so this branch runs BEFORE the pi /
+    // claude-code fall-throughs below would swallow the command. A project
+    // command named `image` keeps precedence, like every synthetic builtin.
+    if (parsedCommand.command === 'image') {
+      const projectCommands = await this.host.getProjectCommands();
+      if (!hasProjectCommand(projectCommands, 'image')) {
+        await this.host.runImageGenerationCommand?.(parsedCommand.arguments);
+        return true;
+      }
     }
 
     // Claude Code backend: all slash commands fall through to raw send.

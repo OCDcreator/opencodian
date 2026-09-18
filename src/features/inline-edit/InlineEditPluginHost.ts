@@ -28,6 +28,7 @@ import type {
   InlineEditHostAdapter,
   InlineEditModelSelectionLabel,
 } from './InlineEditHost';
+import type { InlineEditImageGenDeps } from './InlineEditImageGen';
 import { listEffectiveInlineEditPresets } from './InlineEditPresets';
 
 /** Settings slice inline edit reads. */
@@ -91,6 +92,11 @@ export interface InlineEditPluginBridge {
     text: string,
     attachedNotes: readonly { readonly path: string; readonly kind?: 'file' | 'folder' }[],
   ): string;
+  /**
+   * R-C2 text-to-image runtime bridge (generation service + asset storage +
+   * revert registrar). `null`/absent hides the image-generation chip.
+   */
+  getImageGeneration?(): InlineEditImageGenDeps | null;
 }
 
 /** Build the host the controller uses. */
@@ -112,6 +118,9 @@ export function createInlineEditPluginHost(bridge: InlineEditPluginBridge): Inli
     listContextGroups: bridge.listContextGroups ? () => bridge.listContextGroups?.() ?? [] : undefined,
     applyAutoInternalLinks: bridge.applyAutoInternalLinks
       ? (text, notes) => bridge.applyAutoInternalLinks?.(text, notes) ?? text
+      : undefined,
+    getImageGeneration: bridge.getImageGeneration
+      ? () => bridge.getImageGeneration?.() ?? null
       : undefined,
   };
 }

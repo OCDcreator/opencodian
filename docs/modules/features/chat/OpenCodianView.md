@@ -777,3 +777,7 @@ OpenCode 的 store 为 memory mode 或仍带 custom-directory fallback `lastErro
 > 2026-09-18 (R-A7)：composer input-shell host 增加 `addVaultPathContextFromDrop`，把 vault 拖放转交 `composerContextViewFacade`。
 
 ## 维护约束
+
+## R-C2 扩展
+
+2026-09-18 两处最小改动：composer host 字面量新增 `onRequestImageGeneration` 回调（转发 `plugin.openImageGenerationCard('')`）；新增公开 `getActiveConversationIdForAssets()` 供组合根解析资产登记会话。生成/插入逻辑全部在 services/组合根，view 不增长运行时职责。

@@ -38,8 +38,11 @@ import {
 import { buildInlineEditModeRow, type InlineEditModeRow } from './InlineEditModeSwitch';
 import {
   buildInlineEditConfigChip,
+  buildInlineEditImageGenChip,
+  type InlineEditImageGenChipState,
   renderInlineEditConfigMenu,
   syncInlineEditConfigChip,
+  syncInlineEditImageGenChip,
 } from './InlineEditOverlayChips';
 import {
   INLINE_EDIT_PANEL_INSET as PANEL_INSET,
@@ -96,6 +99,8 @@ export interface InlineEditOverlayState {
   readonly modeOptions: readonly InlineEditMode[];
   /** False disables the mode row (busy, or the session already started). */
   readonly modeSwitchable: boolean;
+  /** R-C2 image-generation chip; `null` or `available: false` hides it. */
+  readonly imageGen: InlineEditImageGenChipState | null;
 }
 
 /** One attached entry as the bar renders it. */
@@ -134,6 +139,8 @@ export interface InlineEditOverlayCallbacks {
   onRemoveImage?(): void;
   /** Switch the request form before the first turn (R-A6). */
   onModeChange?(mode: InlineEditMode): void;
+  /** Cycle the R-C2 image-generation chip (off → line → inline). */
+  onToggleImageGen?(): void;
   /** The panel gained focus; registers this edit as the current one (R-A5). */
   onFocus?(): void;
 }
@@ -181,6 +188,7 @@ export class InlineEditInputOverlay {
   });
   /** Footer elements kept by reference: queries would have to track nesting. */
   private attachEl: HTMLButtonElement | null = null;
+  private imageGenEl: HTMLButtonElement | null = null;
   private contextRowEl: HTMLElement | null = null;
   private modeRow: InlineEditModeRow | null = null;
   private imageSurface: InlineEditImageSurface | null = null;
@@ -294,6 +302,7 @@ export class InlineEditInputOverlay {
     }
 
     this.modeRow?.sync(state);
+    syncInlineEditImageGenChip(this.imageGenEl, state.imageGen);
 
     if (this.panel) {
       const chipCallbacks = { createProviderIcon: this.callbacks.createProviderIcon };
@@ -351,6 +360,7 @@ export class InlineEditInputOverlay {
     this.field = null;
     this.submitEl = null;
     this.attachEl = null;
+    this.imageGenEl = null;
     this.contextRowEl = null;
     this.modeRow = null;
     this.spinOn = false;
@@ -464,6 +474,10 @@ export class InlineEditInputOverlay {
     });
     this.attachEl = attach;
     this.contextRowEl = contextRow;
+    this.imageGenEl = buildInlineEditImageGenChip(
+      configRow,
+      () => { this.callbacks.onToggleImageGen?.(); },
+    );
     buildInlineEditConfigChip(configRow, 'model', () => { this.toggleMenu('model'); });
     buildInlineEditConfigChip(configRow, 'effort', () => { this.toggleMenu('effort'); });
     this.imageSurface = attachInlineEditImageSurface({

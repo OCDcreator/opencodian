@@ -44,3 +44,11 @@ inline edit 的 CM6 状态机与编辑器胶合层。由 `editorCallback` / `edi
 - 所有键盘判定都要保留 `isComposing` 检查
 - 不要在 CM6 `update()` 内 dispatch；状态通过 `InlineEditWidgets` 的 effect 驱动
 - `open()` 的参数是窄化的 `InlineEditEditorContext`，为了同时兼容 `MarkdownView` 与 `MarkdownFileInfo`
+
+## R-C2 扩展
+
+2026-09-18 新增图像生成分支：ActiveEdit 增加 `imageGenForm`（off→line→inline chip 循环，仅 input 相位可切）、`imageGenAbort`（生成中 Esc → abort）、`pendingImageAssetPath`。`submit()` 在 chip 非关时改走 `submitImageGeneration`（generate → W-asset → 登记 → 以 insertion preview 进入既有接受流）；生成/保存失败回 input 相位并显示原因；编辑中途销毁（disposeEdit）时 abort 在途生成并按 `imageGenerationAssetCleanup` 清理孤儿资产；`reject()` 对带资产预览执行同一清理策略。唯一 `editor.replaceRange` 写原语不变。
+
+## R-C2 后续调整：预览分发迁出
+
+2026-09-18（同一提交）`renderPreview` / `clearStreamingPreview` / `renderStreamingPreview` 的装饰分发体迁至 `InlineEditWidgets`（`dispatchInlineEditPreview` 等，经 `previewDispatch` host 桥调用），`renderStreamingReply` 留在 controller。行为不变（controller 单测全绿），仅为 max-lines 预算的结构性迁移。

@@ -20853,6 +20853,19 @@ img.opencodian-model-provider-header-icon {
   padding: 6px 0;
 }
 
+/* -- Image generation chip (R-C2) ---------------------------------- */
+
+.opencodian-inline-edit-chip-imagegen {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.opencodian-inline-edit-chip-imagegen-active {
+  color: var(--text-accent);
+  border-color: color-mix(in srgb, var(--text-accent) 45%, transparent);
+}
+
 
 /* modals/delete-confirm-dialog.css */
 /* ============================================================
@@ -31407,4 +31420,47 @@ img.opencodian-model-provider-header-icon {
   .opencodian-builtin-icon-picker-grid {
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   }
+}
+
+
+/* modals/image-generation-modal.css */
+/**
+ * Image-generation modal (R-C2 text-to-image chat entry card).
+ *
+ * Obsidian-native first: the card is a plain `Modal` and inherits its frame;
+ * these rules only add the result layout, the error strip and a comfortable
+ * thumbnail cap. Contrast and focus states come from the host theme.
+ */
+
+.opencodian-imagegen-modal {
+  max-width: 560px;
+}
+
+.opencodian-imagegen-result {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.opencodian-imagegen-result-image {
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: var(--radius-m, 6px);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+
+.opencodian-imagegen-result-meta {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-imagegen-error {
+  color: var(--text-error);
+  font-size: var(--font-ui-smaller);
+  margin: 8px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

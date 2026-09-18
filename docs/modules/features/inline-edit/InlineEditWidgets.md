@@ -30,3 +30,7 @@ inline edit 的 CodeMirror 6 装饰层，只负责**预览**。R-A5 起状态从
 - 预览 widget 的 `ignoreEvent()` 必须返回 `false`，让接受/拒绝按钮自己处理事件，编辑器不抢键
 - 预览用 `Decoration.replace` 覆盖选区是刻意的：接受前的原位预览；脏检查负责发现用户对同一范围的修改
 - 新增交互前先确认 `readInlineEditRange()` 仍返回可用于 `editor.replaceRange` 的范围
+
+## R-C2 扩展
+
+2026-09-18 预览装饰的分发入口从 `InlineEditController` 迁入本模块（`dispatchInlineEditPreview` / `clearInlineEditPreview` / `dispatchInlineEditStreamingPreview` + `InlineEditPreviewDispatchEdit` / `InlineEditPreviewDispatchHost`）：controller 通过注入的 host 桥（token 计数、焦点归属、accept/reject、isLive）调用，行为与原实现逐行等价（offset 钳制、token 复用、focus 归属均在）。迁移原因是 controller 的 max-lines 预算；随 R-C2 图像生成提交一并落地，非行为变更。

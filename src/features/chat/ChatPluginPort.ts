@@ -117,6 +117,8 @@ export interface ChatPluginPort extends TabRuntimePluginSource {
   agentServiceRegistry: AgentServiceRegistry;
   /** R-B3 backend-neutral edit-revert service (core.storage); null before bootstrap. */
   editRevertService: EditRevertServicePort | null;
+  /** R-C2: open the text-to-image generation card (composition root owns it). */
+  openImageGenerationCard(prefill?: string): void;
   claudeCodePermissionHostContext: Pick<
     ClaudeCodePermissionBridgeHostContext,
     | 'elicitationCardRenderer'

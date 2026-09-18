@@ -584,3 +584,7 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 ## 2026-09-18 (R-B5-D1 修复)
 
 新增 3 个 `batchOrganize.*` 键：`preview.newFolders`（预览如实列出将新建目录）、`result.createdFolders`（结果页披露本批次新建目录与回退清理语义）、`error.folderUnavailable`（目录创建失败 fail-closed 提示，含目录名）。
+
+## R-C2 扩展
+
+2026-09-18 与 en.ts 同步新增 R-C2 全部 key（行内入口、聊天入口、`/image`、设置分区、失败类别标签、`inlineEdit.error.applyFailed`）。

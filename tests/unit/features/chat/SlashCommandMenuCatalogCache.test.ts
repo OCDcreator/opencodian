@@ -76,6 +76,7 @@ const SYNTHETIC_BUILTIN_MENU_ITEMS = [
   { id: 'new', description: 'Start a new conversation', hasProjectOverride: false, runtimeAvailable: true, skillSource: undefined, source: 'command', subtask: false, isBuiltin: true },
   { id: 'share', description: 'Share the current conversation and copy link', hasProjectOverride: false, runtimeAvailable: true, skillSource: undefined, source: 'command', subtask: false, isBuiltin: true },
   { id: 'unshare', description: 'Stop sharing the current conversation', hasProjectOverride: false, runtimeAvailable: true, skillSource: undefined, source: 'command', subtask: false, isBuiltin: true },
+  { id: 'image', description: 'Generate an image from a prompt and insert it into the active note (/image <prompt>)', hasProjectOverride: false, runtimeAvailable: true, skillSource: undefined, source: 'command', subtask: false, isBuiltin: true },
 ];
 
 describe('SlashCommandMenuCatalogCache', () => {
@@ -151,11 +152,11 @@ describe('SlashCommandMenuCatalogCache', () => {
     });
     const cache = new SlashCommandMenuCatalogCache(host);
 
-    expect((await cache.load()).map((item) => item.id)).toEqual(['commit', 'review', 'compact', 'undo', 'redo', 'new', 'share', 'unshare']);
+    expect((await cache.load()).map((item) => item.id)).toEqual(['commit', 'review', 'compact', 'undo', 'redo', 'new', 'share', 'unshare', 'image']);
 
     hiddenCommandIds = ['review'];
 
-    expect((await cache.load()).map((item) => item.id)).toEqual(['commit', 'compact', 'undo', 'redo', 'new', 'share', 'unshare']);
+    expect((await cache.load()).map((item) => item.id)).toEqual(['commit', 'compact', 'undo', 'redo', 'new', 'share', 'unshare', 'image']);
     expect(host.loadRuntimeCommands).toHaveBeenCalledTimes(2);
   });
 
