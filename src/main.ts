@@ -10,6 +10,7 @@ import { OPENCODIAN_APP_ICON_ID } from './shared/brandingWordmark';
 import { ModelConfigService, ModelPricingService, OpencodeConfigManager } from './core/config';
 import { setAgentServiceRegistry } from './core/agents/AgentCapability';
 import { InlineEditController } from './features/inline-edit/InlineEditController';
+import { createInlineEditAutoLinkProcessor } from './features/inline-edit/InlineEditAutoLink';
 import { confirmInlineEditDocumentReplace } from './features/inline-edit/InlineEditConfirmModal';
 import { inlineEditAtTriggerExtension } from './features/inline-edit/InlineEditAtTrigger';
 import {
@@ -487,6 +488,8 @@ export default class OpenCodianPlugin extends Plugin {
       createProviderIcon: (providerId, size) => ProviderIconService.createIconElement(this.app, providerId, size),
       listContextFiles: () => this.listInlineEditContextFiles(),
       resolveContextFile: (path) => this.resolveInlineEditContextFile(path),
+      listContextGroups: () => this.settings.contextGroups,
+      applyAutoInternalLinks: this.createInlineEditAutoLinkBridge(),
     });
     this.inlineEditController = new InlineEditController({
       host: this.inlineEditHost,
@@ -497,6 +500,19 @@ export default class OpenCodianPlugin extends Plugin {
   /** Whole-document form gate (R-A6), also used by the command/menu checks. */
   private documentModeEnabled(): boolean {
     return this.settings?.inlineEditDocumentModeEnabled ?? true;
+  }
+
+  /**
+   * R-B1 bridge: deterministic auto-internal-link pass over the parsed inline
+   * edit result. The processor owns heading verification through the metadata
+   * cache and is a strict no-op while `autoInternalLinkEnabled` is off.
+   */
+  private createInlineEditAutoLinkBridge() {
+    return createInlineEditAutoLinkProcessor({
+      app: this.app,
+      isEnabled: () => this.settings.autoInternalLinkEnabled,
+      getExcludedTerms: () => this.settings.autoInternalLinkExcludedTerms,
+    });
   }
 
   /**

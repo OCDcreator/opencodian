@@ -46,3 +46,5 @@ The new core.backend-pi owner isolates the external Pi process service. shared.u
 
 - 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
 - 2026-09-17: MCP 摘要字段表补 `search_query` / `searchQuery`（同时在 search 类与通用回退列表前部），避免这类调用在字段回退里取到 `content_size` 之类的配置项；`.streaming-error-block` 改用 `--opencodian-status-error-subtle` / `-border` 令牌并把正文降为 `--text-normal` / `--text-muted`，因为原来的 `--background-modifier-error` 底 + `--text-error` 字在实测主题下对比度约 1:1。摘要分类规则仍只在本 owner 维护，不在 feature 层复刻。
+
+- 2026-09-18 (FlowText 批次 B)：owner manifest 随 R-B1/R-B2 更新——新增 `src/shared/contextGroupPlan.ts` 归属 `shared.foundation`；本 owner 的边界与职责未变。

@@ -2,6 +2,14 @@
  * Shared module
  */
 
+export type {
+  ContextGroupAttachCandidate,
+  ContextGroupAttachPlan,
+  ContextGroupAttachPlanOptions,
+  ContextGroupResolvedEntry,
+  ContextGroupSummary,
+} from './contextGroupPlan';
+export { planContextGroupAttach, summarizeContextGroup } from './contextGroupPlan';
 export { sanitizeDiagnosticReport } from './diagnosticSecretSanitizer';
 export type { LogChannel, LogEntry, Logger } from './logger';
 export { createLogger } from './logger';

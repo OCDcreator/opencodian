@@ -44,3 +44,5 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 The new core.backend-pi owner isolates the external Pi process service. core.agents retains its existing responsibilities; Pi process lifecycle, RPC compatibility and native history must not be added to this owner.
 
 - 2026-09-15: 新增 `AgentCapability.AuxQuery`（`aux-query`）：backend 无关的一次性只读辅助查询能力标识，供 inline edit 按可选能力收窄调用（`AgentAuxQueryCapability`）。
+
+- 2026-09-18 (FlowText 批次 B)：owner manifest 随 R-B1/R-B2 更新——新增 `src/shared/contextGroupPlan.ts` 归属 `shared.foundation`；本 owner 的边界与职责未变。

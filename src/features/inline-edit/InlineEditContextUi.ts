@@ -16,11 +16,21 @@
 
 import { setIcon } from 'obsidian';
 
+import type { ContextGroup } from '../../core/types';
 import { t } from '../../i18n';
-import type { InlineEditContextFile } from './InlineEditTypes';
+import type { InlineEditContextFile, InlineEditContextGroupRow } from './InlineEditTypes';
 
 /** Rows rendered at once; the search field narrows beyond that. */
 export const PICKER_MAX_ROWS = 50;
+
+/** Shape the picker's topic section renders one persisted group as (R-B2). */
+export function contextGroupRows(groups: readonly ContextGroup[]): readonly InlineEditContextGroupRow[] {
+  return groups.map((group) => ({
+    id: group.id,
+    name: group.name,
+    entryCount: group.entries.length,
+  }));
+}
 
 /** One context chip as the footer renders it. */
 export interface ContextChipModel {
@@ -110,6 +120,14 @@ export interface ContextPickerOptions {
   readonly files: readonly InlineEditContextFile[];
   /** Attach or detach one path (row click, or Enter on the highlighted row). */
   readonly onToggle: (path: string) => void;
+  /**
+   * Persisted context groups for the "attach topic" section (R-B2), rendered
+   * above the search field. One row click attaches the whole group through
+   * `onAttachGroup`; empty/absent renders no section.
+   */
+  readonly groups?: readonly InlineEditContextGroupRow[];
+  /** Attach every resolvable entry of one group. */
+  readonly onAttachGroup?: (groupId: string) => void;
 }
 
 /**
@@ -123,6 +141,7 @@ export function renderContextPickerInto(
   container: HTMLElement,
   options: ContextPickerOptions,
 ): (attachedPaths: ReadonlySet<string>) => void {
+  renderContextGroupSection(container, options);
   const search = container.createEl('input', {
     type: 'text',
     cls: 'opencodian-inline-edit-picker-search',
@@ -210,6 +229,43 @@ export function renderContextPickerInto(
     currentAttached = attachedPaths;
     renderRows(currentAttached);
   };
+}
+
+/**
+ * The "attach topic" section (R-B2): one row per persisted context group,
+ * sitting above the file search so the group affordance is visible the
+ * moment the picker opens. Clicking a row attaches the whole group through
+ * the host (cap + missing semantics live in InlineEditAttachments); the
+ * picker stays open so the user can keep attaching.
+ */
+function renderContextGroupSection(container: HTMLElement, options: ContextPickerOptions): void {
+  if (!options.groups || options.groups.length === 0 || !options.onAttachGroup) return;
+  const section = container.createDiv({ cls: 'opencodian-inline-edit-picker-groups' });
+  section.createDiv({
+    cls: 'opencodian-inline-edit-picker-groups-heading',
+    text: t('inlineEdit.context.groupsHeading'),
+  });
+  for (const group of options.groups) {
+    const row = section.createDiv({
+      cls: 'opencodian-inline-edit-menu-item opencodian-inline-edit-picker-group',
+    });
+    const glyph = row.createSpan({ cls: 'opencodian-inline-edit-menu-item-glyph' });
+    setIcon(glyph, 'layers');
+    row.createSpan({ cls: 'opencodian-inline-edit-menu-item-label', text: group.name });
+    row.createSpan({
+      cls: 'opencodian-inline-edit-picker-folder',
+      text: t('inlineEdit.context.groupEntryCount', { count: group.entryCount }),
+    });
+    row.setAttribute('title', t('inlineEdit.context.groupAttach', {
+      name: group.name,
+      count: group.entryCount,
+    }));
+    row.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      options.onAttachGroup?.(group.id);
+    });
+  }
 }
 
 /** Focus the picker's search field once it is in the document. */

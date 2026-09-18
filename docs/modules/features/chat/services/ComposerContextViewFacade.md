@@ -1,4 +1,5 @@
 # ComposerContextViewFacade
+> 2026-09-18 (R-B2): `contextGroups` port added to the create options and service dependencies, forwarded to `ComposerContextPickerActionService` next to `serverContext`.
 
 > **源码**: `src/features/chat/services/ComposerContextViewFacade.ts`
 > **状态**: [REVIEW]

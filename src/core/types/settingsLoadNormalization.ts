@@ -15,11 +15,13 @@ import {
   getDefaultInputPanelLiquidGlassSettings,
   getDefaultPersistedTabState,
   getDefaultThemeSettings,
+  normalizeAutoInternalLinkExcludedTerms,
   normalizeBackendSettings,
   normalizeBelowHeaderTabBarLayout,
   normalizeCapabilityLabSelectedBackend,
   normalizeChatAppearanceSettings,
   normalizeChatFontSizePx,
+  normalizeContextGroups,
   normalizeEffortLevel,
   normalizeInlineEditEffortOverrides,
   normalizeInlineEditMaxConcurrentEdits,
@@ -555,6 +557,13 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
       inlineEditDocumentModeEnabled: typeof normalizedSettings?.inlineEditDocumentModeEnabled === 'boolean'
         ? normalizedSettings.inlineEditDocumentModeEnabled
         : DEFAULT_SETTINGS.inlineEditDocumentModeEnabled,
+      autoInternalLinkEnabled: typeof normalizedSettings?.autoInternalLinkEnabled === 'boolean'
+        ? normalizedSettings.autoInternalLinkEnabled
+        : DEFAULT_SETTINGS.autoInternalLinkEnabled,
+      autoInternalLinkExcludedTerms: normalizeAutoInternalLinkExcludedTerms(
+        normalizedSettings?.autoInternalLinkExcludedTerms,
+      ),
+      contextGroups: normalizeContextGroups(normalizedSettings?.contextGroups),
     },
     shouldMigrateLegacyLocalDefaultPort,
     shouldResetGlassRefractionGlassDefaults,

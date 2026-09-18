@@ -1,4 +1,5 @@
 # ContextFilePickerModal
+> 2026-09-18 (R-B2): optional `groups` + `onAttachGroup` options render a one-click 「attach topic」 section above the file list; clicking a row attaches the whole group and closes the modal.
 
 > **源码**: `src/features/chat/ui/ContextFilePickerModal.ts`
 > **状态**: [REVIEW]

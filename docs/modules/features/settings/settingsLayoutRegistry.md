@@ -1,4 +1,5 @@
 # settingsLayoutRegistry
+> 2026-09-18 (R-B2): new conversation secondary tab `context-groups` (label `settings.conversation.tab.contextGroups`) after `inline-edit`.
 
 > **源码**: `src/features/settings/settingsLayoutRegistry.ts`
 > **状态**: [REVIEW]

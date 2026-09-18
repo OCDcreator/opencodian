@@ -1,4 +1,5 @@
 # InlineEditAttachments
+> 2026-09-18 (R-B2): adds `attachContextGroupToEdit` (planned via `planContextGroupAttach` with the remaining per-edit cap room; existing entries dedupe), `buildContextGroupAttachNotices` (attached/omitted/missing user-facing messages), `attachContextGroupById` (lookup + attach + notify), and `InlineEditAttachmentCoordinator` — the controller-side orchestration (picker open/toggle/drop/group/image plus the edit→adapter view), extracted so `InlineEditController` stays under the file-size gate.
 
 > **源码**: `src/features/inline-edit/InlineEditAttachments.ts`
 > **状态**: [REVIEW]

@@ -41,3 +41,5 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 - Metrics (`metrics.jsonl`) are append-only diagnostics under the store root; they are never cleaned automatically.
 
 - 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
+
+- 2026-09-18 (FlowText 批次 B)：owner manifest 随 R-B1/R-B2 更新——新增 `src/shared/contextGroupPlan.ts` 归属 `shared.foundation`；本 owner 的边界与职责未变。

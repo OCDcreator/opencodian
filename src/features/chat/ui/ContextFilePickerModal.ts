@@ -9,6 +9,13 @@ const ALL_EXTENSION_FILTER = '__all__';
 
 export type ContextPickedEntry = TFile | TFolder;
 
+/** One persisted context group as the picker's topic section renders it (R-B2). */
+export interface ContextGroupPickOption {
+  readonly id: string;
+  readonly name: string;
+  readonly entryCount: number;
+}
+
 export interface ContextFilePickerOptions {
   /**
    * When true, the picker shows a read-only hint that the connected OpenCode
@@ -17,6 +24,14 @@ export interface ContextFilePickerOptions {
    * behavior is unchanged.
    */
   serverContextAvailable?: boolean;
+  /**
+   * Persisted context groups for the "attach topic" section (R-B2), rendered
+   * above the file list. Clicking a row attaches the whole group through
+   * `onAttachGroup` and closes the picker; empty/absent renders no section.
+   */
+  groups?: readonly ContextGroupPickOption[];
+  /** Attach every resolvable entry of one group (R-B2). */
+  onAttachGroup?: (groupId: string) => void;
 }
 
 /**
@@ -78,6 +93,8 @@ class ContextFilePickerModal extends Modal {
         text: t('chat.context.filePicker.serverHint'),
       });
     }
+
+    this.renderGroupSection();
 
     const searchSectionEl = this.contentEl.createDiv({ cls: 'opencodian-context-file-search-section' });
     this.searchInput = this.contentEl.createEl('input', {
@@ -267,6 +284,46 @@ class ContextFilePickerModal extends Modal {
     }
 
     this.renderFooter();
+  }
+
+  /**
+   * The "attach topic" section (R-B2): one row per persisted context group,
+   * above the file list. Clicking a row attaches the whole group through the
+   * host callback (cap + missing semantics live there) and closes the picker,
+   * so the flow stays a single click like FlowText's topic association.
+   */
+  private renderGroupSection(): void {
+    const groups = this.options?.groups;
+    if (!groups || groups.length === 0 || !this.options?.onAttachGroup) return;
+    const sectionEl = this.contentEl.createDiv({ cls: 'opencodian-context-file-groups' });
+    sectionEl.createDiv({
+      cls: 'opencodian-context-file-groups-heading',
+      text: t('chat.context.filePicker.groupsHeading'),
+    });
+    for (const group of groups) {
+      const button = sectionEl.createEl('button', {
+        cls: 'opencodian-context-file-group',
+        attr: { type: 'button' },
+      });
+      const glyphEl = button.createSpan({ cls: 'opencodian-context-file-item-glyph' });
+      setIcon(glyphEl, 'layers');
+      const nameEl = button.createDiv({
+        cls: 'opencodian-context-file-name',
+        text: group.name,
+      });
+      nameEl.setAttribute('title', t('chat.context.filePicker.groupAttach', {
+        name: group.name,
+        count: group.entryCount,
+      }));
+      button.createDiv({
+        cls: 'opencodian-context-file-ext is-folder',
+        text: t('chat.context.filePicker.groupEntryCount', { count: group.entryCount }),
+      });
+      button.addEventListener('click', () => {
+        this.options?.onAttachGroup?.(group.id);
+        this.finish([]);
+      });
+    }
   }
 
   private renderFooter(): void {

@@ -1,4 +1,5 @@
 # InlineEditPluginHost
+> 2026-09-18 (R-B1/R-B2): bridge passthroughs for `listContextGroups` and `applyAutoInternalLinks`; both optional, keeping older hosts byte-identical.
 
 > **源码**: `src/features/inline-edit/InlineEditPluginHost.ts`
 > **状态**: [REVIEW]

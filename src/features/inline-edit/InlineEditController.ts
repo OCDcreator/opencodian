@@ -37,15 +37,11 @@ import { hideSelectionHighlight, showSelectionHighlight } from '../../utils/edit
 import { executeInlineEditAccept } from './InlineEditAccept';
 import { buildInlineEditAnchor, rebuildAnchorForMode } from './InlineEditAnchor';
 import {
-  attachContextEntryToEdit,
-  attachImageToEdit,
-  contextPickerCandidates,
-  type InlineEditAttachmentEdit,
-  type InlineEditAttachmentHost,
+  InlineEditAttachmentCoordinator,
   inlineEditImageChipModel,
-  removeImageFromEdit,
-  toggleContextEntry,
 } from './InlineEditAttachments';
+import { applyInlineEditAutoLinks } from './InlineEditAutoLink';
+import { contextGroupRows } from './InlineEditContextUi';
 import { getEditorView } from './InlineEditEditorView';
 import type {
   InlineEditChoice,
@@ -79,7 +75,11 @@ import {
   inlineEditFrameScheduler,
   type InlineEditStreamSession,
 } from './InlineEditStreamPreview';
-import type { InlineEditAnchor, InlineEditMode, InlineEditOutcome } from './InlineEditTypes';
+import type {
+  InlineEditAnchor,
+  InlineEditMode,
+  InlineEditOutcome,
+} from './InlineEditTypes';
 import {
   applyInlineEditEffect,
   ensureInlineEditField,
@@ -171,6 +171,14 @@ export class InlineEditController {
     },
     accept: (editId) => this.accept(editId),
     reject: (editId) => { this.reject(editId); },
+  });
+  /** Attachment orchestration (picker/toggle/drop/group/image; R-A4/R-A7/R-B2). */
+  private readonly attachments = new InlineEditAttachmentCoordinator({
+    host: () => this.options.host,
+    notify: (message) => { this.notify(message); },
+    isLive: (edit) => this.findEdit(edit.editId) === edit,
+    hasSession: (edit) => this.findEdit(edit.editId)?.service.hasSession ?? false,
+    rerender: (edit) => { this.renderInput(edit as ActiveEdit); },
   });
 
   constructor(private readonly options: InlineEditControllerOptions) {}
@@ -343,10 +351,11 @@ export class InlineEditController {
         onPickModel: (id) => { void this.pickModel(edit, id); },
         onPickEffort: (id) => { void this.pickEffort(edit, id); },
         createProviderIcon: (providerId, size) => this.options.host.createProviderIcon?.(providerId, size) ?? null,
-        onRequestContextFiles: () => { this.openContextPicker(edit); },
-        onToggleContext: (path) => { this.toggleContextFile(edit, path); },
-        onAttachImage: (files) => { void this.attachImage(edit, files); },
-        onRemoveImage: () => { this.removeImage(edit); },
+        onRequestContextFiles: () => { this.attachments.openPicker(edit); },
+        onToggleContext: (path) => { this.attachments.toggle(edit, path); },
+        onAttachGroup: (groupId) => { this.attachments.attachGroup(edit, groupId); },
+        onAttachImage: (files) => { void this.attachments.attachImage(edit, files); },
+        onRemoveImage: () => { this.attachments.removeImage(edit); },
         onModeChange: (mode) => { this.setEditMode(edit.editId, mode); },
         onFocus: () => { this.focusEdit(edit.editId); },
       });
@@ -366,6 +375,7 @@ export class InlineEditController {
         label: file.name,
         kind: file.kind ?? 'file',
       })),
+      groups: contextGroupRows(this.options.host.listContextGroups?.() ?? []),
       contextSupported: this.options.host.listContextFiles != null,
       presets: this.options.host.listPresetPrompts?.() ?? [],
       image: edit.image ? inlineEditImageChipModel(edit.image) : null,
@@ -384,60 +394,15 @@ export class InlineEditController {
   }
 
   /**
-   * Open the attached-entries picker. Candidates come from the host on demand,
-   * so a vault is enumerated only when the user actually asks for it.
-   */
-  private openContextPicker(edit: ActiveEdit): void {
-    if (this.findEdit(edit.editId) !== edit) return;
-    const files = contextPickerCandidates(this.attachmentEdit(edit), this.attachmentHost());
-    if (files) edit.overlay?.showContextPicker(files);
-  }
-
-  /** Attach or detach one entry (cap and notice semantics: InlineEditAttachments). */
-  private toggleContextFile(edit: ActiveEdit, path: string): void {
-    if (this.findEdit(edit.editId) !== edit) return;
-    toggleContextEntry(this.attachmentEdit(edit), this.attachmentHost(), path);
-  }
-
-  /**
    * Attach one entry resolved from a vault drop (R-A7). The host has already
    * validated the path via `app.vault.getAbstractFileByPath()`; an entry that
    * no longer resolves never reaches here, and a full list is a notice, not a
-   * truncation.
+   * truncation. Orchestration lives in InlineEditAttachments.
    */
   attachContextEntry(editId: string, entry: InlineEditContextFile): void {
     const edit = this.findEdit(editId);
     if (!edit) return;
-    attachContextEntryToEdit(this.attachmentEdit(edit), this.attachmentHost(), entry);
-  }
-
-  /** Attach one image from a paste or drop (R-A4, fail-closed). */
-  private async attachImage(edit: ActiveEdit, files: readonly File[]): Promise<void> {
-    if (this.findEdit(edit.editId) !== edit) return;
-    await attachImageToEdit(this.attachmentEdit(edit), this.attachmentHost(), files);
-    if (this.findEdit(edit.editId) === edit) edit.error = '';
-  }
-
-  private removeImage(edit: ActiveEdit): void {
-    if (this.findEdit(edit.editId) !== edit) return;
-    removeImageFromEdit(this.attachmentEdit(edit));
-  }
-
-  /** Adapter view of one edit for the attachment helpers. */
-  private attachmentEdit(edit: ActiveEdit): InlineEditAttachmentEdit {
-    return {
-      get contextFiles() { return edit.contextFiles; },
-      set contextFiles(value: readonly InlineEditContextFile[]) { edit.contextFiles = value; },
-      get image() { return edit.image; },
-      set image(value: AuxQueryImageAttachment | null) { edit.image = value; },
-      hasSession: edit.service.hasSession,
-      rerender: () => { this.renderInput(edit); },
-      refreshPicker: () => { edit.overlay?.refreshContextPicker(); },
-    };
-  }
-
-  private attachmentHost(): InlineEditAttachmentHost {
-    return { host: this.options.host, notify: (message) => { this.notify(message); } };
+    this.attachments.attachEntry(edit, entry);
   }
 
   private async pickModel(edit: ActiveEdit, id: string | null): Promise<void> {
@@ -599,11 +564,20 @@ export class InlineEditController {
 
   private applyOutcome(edit: ActiveEdit, outcome: InlineEditOutcome): void {
     switch (outcome.status) {
-      case 'preview':
+      case 'preview': {
         // Strict parse is the only authority: the final payload always uses
         // the strictly-parsed text, so a divergent streaming frame can never
         // be applied (R-A3 需求 3/4).
-        edit.preview = { mode: outcome.mode, text: outcome.text };
+        //
+        // R-B1 runs here — after the strict parse, before the preview payload
+        // is built — so every link is visible in the diff and rejectable,
+        // never a silent write; off means byte-identical (InlineEditAutoLink).
+        const text = applyInlineEditAutoLinks(
+          this.options.host.applyAutoInternalLinks,
+          edit.contextFiles,
+          outcome.text,
+        );
+        edit.preview = { mode: outcome.mode, text };
         edit.phase = 'preview';
         // The in-flow preview replaces the floating bar; the preview's own
         // accept/reject (Enter/Esc via the document handler) takes over.
@@ -611,6 +585,7 @@ export class InlineEditController {
         edit.overlay = null;
         this.renderPreview(edit, false);
         return;
+      }
       case 'clarification':
         edit.preview = null;
         this.clearStreamingPreview(edit);

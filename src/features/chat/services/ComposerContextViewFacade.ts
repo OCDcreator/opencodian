@@ -7,7 +7,7 @@ import { ComposerContextActionService } from './ComposerContextActionService';
 import { ComposerContextChipActionService } from './ComposerContextChipActionService';
 import { ComposerContextCoordinator } from './ComposerContextCoordinator';
 import { ComposerContextEventBridge } from './ComposerContextEventBridge';
-import { ComposerContextPickerActionService, type ComposerContextPickerServerContextPort } from './ComposerContextPickerActionService';
+import { type ComposerContextGroupsPort, ComposerContextPickerActionService, type ComposerContextPickerServerContextPort } from './ComposerContextPickerActionService';
 import {
   type ComposerContextRuntimeState,
   ComposerContextRuntimeStore,
@@ -96,6 +96,8 @@ export interface ComposerContextServiceDependencies {
   focusPreviewWritebackHost: FocusContextPreviewWritebackHost;
   /** Optional read-only server-side context capability port (v2 fs/reference). */
   serverContext?: ComposerContextPickerServerContextPort;
+  /** Persisted context groups for the picker's "attach topic" rows (R-B2). */
+  contextGroups?: ComposerContextGroupsPort;
 }
 
 export interface ComposerContextViewFacadeCreateOptions {
@@ -106,6 +108,8 @@ export interface ComposerContextViewFacadeCreateOptions {
   focusPreviewWritebackHost: FocusContextPreviewWritebackHost;
   /** Optional read-only server-side context capability port (v2 fs/reference). */
   serverContext?: ComposerContextPickerServerContextPort;
+  /** Persisted context groups for the picker's "attach topic" rows (R-B2). */
+  contextGroups?: ComposerContextGroupsPort;
 }
 
 export interface ComposerSendContextPort {
@@ -148,6 +152,7 @@ export class ComposerContextViewFacade {
       focusRuntimeViewHost: options.focusRuntimeViewHost,
       focusPreviewWritebackHost: options.focusPreviewWritebackHost,
       serverContext: options.serverContext,
+      contextGroups: options.contextGroups,
     }).viewFacade;
   }
 
@@ -247,7 +252,7 @@ export function createComposerContextServices(
     dependencies.contextAttachmentBuilder,
     dependencies.contextFileCatalogService,
     viewHostAdapter.createPickerActionServiceHost(contextPickerInteractionBridge),
-    { serverContext: dependencies.serverContext },
+    { serverContext: dependencies.serverContext, contextGroups: dependencies.contextGroups },
   );
   const chipActionService = new ComposerContextChipActionService(
     dependencies.contextAttachmentBuilder,

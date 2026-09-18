@@ -47,7 +47,11 @@ import {
   resolvePanelTop,
 } from './InlineEditOverlayPrimitives';
 import { InlineEditPresetMenuController } from './InlineEditPresetMenu';
-import type { InlineEditContextFile, InlineEditMode } from './InlineEditTypes';
+import type {
+  InlineEditContextFile,
+  InlineEditContextGroupRow,
+  InlineEditMode,
+} from './InlineEditTypes';
 
 /** Grown height cap for the instruction field, in px; beyond it the field scrolls. */
 const FIELD_MAX_HEIGHT = 100;
@@ -73,6 +77,8 @@ export interface InlineEditOverlayState {
   readonly effort: InlineEditOverlayChipState | null;
   /** Attached context entries, in pick order; `[]` renders no chips. */
   readonly context: readonly InlineEditOverlayContextChip[];
+  /** Persisted context groups for the picker's topic section (R-B2). */
+  readonly groups: readonly InlineEditContextGroupRow[];
   /** False hides the "add context" affordance (host has no vault to offer). */
   readonly contextSupported: boolean;
   /**
@@ -113,6 +119,8 @@ export interface InlineEditOverlayCallbacks {
   onRequestContextFiles?(): void;
   /** Attach or detach one entry path. */
   onToggleContext?(path: string): void;
+  /** Attach every resolvable entry of one persisted context group (R-B2). */
+  onAttachGroup?(groupId: string): void;
   /** Attach one entry resolved from a vault drop (R-A7). */
   onAttachContextEntry?(entry: InlineEditContextFile): void;
   /**
@@ -537,6 +545,8 @@ export class InlineEditInputOverlay {
     this.menuKind = 'context';
     const opened = openContextPicker(panel, {
       files,
+      groups: this.state?.groups ?? [],
+      onAttachGroup: (groupId) => { this.callbacks.onAttachGroup?.(groupId); },
       attachedPaths: new Set((this.state?.context ?? []).map((entry) => entry.path)),
       onToggle: this.handleContextToggle,
       view: window,

@@ -1,4 +1,5 @@
 # InlineEditContextUi
+> 2026-09-18 (R-B2): the picker body renders an optional 「attach topic」 section (`groups` + `onAttachGroup` options) above the search field; one row per persisted context group.
 
 > **源码**: `src/features/inline-edit/InlineEditContextUi.ts`
 > **状态**: [REVIEW]

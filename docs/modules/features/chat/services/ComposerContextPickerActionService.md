@@ -1,4 +1,5 @@
 # ComposerContextPickerActionService
+> 2026-09-18 (R-B2): adds `attachContextGroup(groupId)` — resolves every group entry against the vault in order (folders and text files; anything else counts as missing), attaches each built item to the draft, and surfaces attached/missing notices; the picker options now carry `groups` + `onAttachGroup`.
 
 > **源码**: `src/features/chat/services/ComposerContextPickerActionService.ts`
 > **状态**: [REVIEW]

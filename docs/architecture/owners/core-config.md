@@ -52,3 +52,5 @@ The new core.backend-pi owner isolates the external Pi process service. core.con
 Concurrent automatic and manual `refresh()` calls share one Promise through fetch and persistence; clear that Promise on either success or failure. `onCatalogUpdated` exposes a disposable event over the canonical in-memory catalog. Publish before persistence so consumers see usable prices even if saving fails; listener and diagnostic failures cannot break refresh or other consumers. Views own subscriptions and update current unavailable estimates without rewriting already priced history.
 
 - 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
+
+- 2026-09-18 (FlowText 批次 B)：owner manifest 随 R-B1/R-B2 更新——新增 `src/shared/contextGroupPlan.ts` 归属 `shared.foundation`；本 owner 的边界与职责未变。

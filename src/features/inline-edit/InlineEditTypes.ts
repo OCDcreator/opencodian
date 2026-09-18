@@ -78,6 +78,16 @@ export interface InlineEditModelSelectionLabel {
   readonly source: 'override' | 'chat' | 'default';
 }
 
+/**
+ * One persisted context group as the picker's topic section renders it
+ * (R-B2). The count is informational: the cap is enforced at attach time.
+ */
+export interface InlineEditContextGroupRow {
+  readonly id: string;
+  readonly name: string;
+  readonly entryCount: number;
+}
+
 /** How the request was anchored in the editor. */
 export type InlineEditMode = 'selection' | 'cursor-inline' | 'cursor-inbetween' | 'document';
 

@@ -1,4 +1,5 @@
 # InlineEditTypes
+> 2026-09-18 (R-B2): adds `InlineEditContextGroupRow` (id/name/entryCount) for the picker's topic section state.
 
 > **源码**: `src/features/inline-edit/InlineEditTypes.ts`
 > **状态**: [REVIEW]

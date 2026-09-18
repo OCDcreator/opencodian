@@ -10,7 +10,7 @@
  * See docs/requirements/inline-edit.md §5.2 and §9.
  */
 
-import type { InlineEditPresetPrompt } from '../../core/types';
+import type { ContextGroup, InlineEditPresetPrompt } from '../../core/types';
 import type {
   InlineEditChoice,
   InlineEditContextFile,
@@ -81,4 +81,21 @@ export interface InlineEditHost {
    * when the trigger itself can produce one).
    */
   listPresetPrompts?(): readonly InlineEditPresetPrompt[];
+  /**
+   * Persisted context groups for the picker's "attach topic" section (R-B2).
+   * Absent or empty renders no section; the host validates each entry's
+   * existence at attach time, so stale paths never become chips.
+   */
+  listContextGroups?(): readonly ContextGroup[];
+  /**
+   * Deterministic auto-internal-link pass over the strictly-parsed
+   * generation result, applied after parsing and before the diff payload is
+   * built (R-B1). Must return the input unchanged when the setting is off —
+   * the off path is a byte-identical regression of the previous behaviour.
+   * Absent disables the feature entirely.
+   */
+  applyAutoInternalLinks?(
+    text: string,
+    attachedNotes: readonly { readonly path: string; readonly kind?: 'file' | 'folder' }[],
+  ): string;
 }

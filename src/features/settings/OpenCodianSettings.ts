@@ -22,6 +22,7 @@ import { SettingsAgentsSection } from './SettingsAgentsSection';
 import { SettingsClaudeCodeSection } from './SettingsClaudeCodeSection';
 import { SettingsCodexSection } from './SettingsCodexSection';
 import { SettingsCommandsSection } from './SettingsCommandsSection';
+import { SettingsContextGroupsSection } from './SettingsContextGroupsSection';
 import { SettingsConversationSection } from './SettingsConversationSection';
 import { SettingsDebugSection } from './SettingsDebugSection';
 import {
@@ -387,6 +388,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     }
     this.addConversationSettings(containerEl);
     this.addInlineEditSettings(containerEl);
+    this.addContextGroupsSettings(containerEl);
     if (this.isActiveBackend('opencode')) {
       this.addAgentsSettings(containerEl);
       this.addCommandsSettings(containerEl);
@@ -577,6 +579,15 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       openHotkeySettings: () => { this.openObsidianHotkeySettings(); },
     });
     return this.inlineEditSection.attach(containerEl);
+  }
+
+  /** Persisted context groups / topics (R-B2), shared by panel and composer. */
+  private addContextGroupsSettings(containerEl: HTMLElement): HTMLHeadingElement {
+    const section = new SettingsContextGroupsSection({
+      plugin: this.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
+    });
+    return section.attach(containerEl);
   }
 
   /**

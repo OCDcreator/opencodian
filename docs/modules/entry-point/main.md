@@ -1,4 +1,5 @@
 # Plugin Entry Point (main.ts)
+> 2026-09-18 (R-B1/R-B2): the inline-edit host bridge exposes `listContextGroups` (from `settings.contextGroups`) and `applyAutoInternalLinks` via `createInlineEditAutoLinkProcessor` (heading verification through the metadata cache; strict no-op while `autoInternalLinkEnabled` is off).
 
 > 2026-07-29: Bootstrap constructs and injects `OpenCodeSessionTraceService`; unload flushes it independently.
 > 2026-07-30: Bootstrap additionally constructs `CodexSessionTraceService` (default-on, reads `backendSettings.codex.sessionTrace`), exposes it as `this.codexTraceService`, injects the service itself as `codexTracePort` into `wireHiddenAdapters()` so the Codex adapter/transport can emit session/turn/wire trace events, and flushes it independently in `onunload`. Codex trace flush failures only emit a generic warning so rejected errors cannot leak secrets or local paths; the OpenCode-side behavior is unchanged.

@@ -1,4 +1,5 @@
 # SettingsTabbedRenderer
+> 2026-09-18 (R-B2): `renderConversationContent` mounts `SettingsContextGroupsSection.attachTabbed` next to the inline-edit section.
 
 > **源码**: `src/features/settings/SettingsTabbedRenderer.ts`
 > **状态**: [REVIEW]

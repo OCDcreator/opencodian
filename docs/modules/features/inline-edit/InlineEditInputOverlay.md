@@ -1,4 +1,5 @@
 # InlineEditInputOverlay
+> 2026-09-18 (R-B2): overlay state carries `groups` (context-group rows) and the callback surface gains `onAttachGroup(groupId)`; `showContextPicker` forwards both into the picker.
 
 > **源码**: `src/features/inline-edit/InlineEditInputOverlay.ts`
 > **状态**: [REVIEW]

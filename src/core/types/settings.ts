@@ -132,6 +132,119 @@ export const INLINE_EDIT_MAX_CONCURRENT_EDITS_MIN = 1;
 export const INLINE_EDIT_MAX_CONCURRENT_EDITS_MAX = 8;
 
 /**
+ * One entry of a user-defined context group (R-B2): a vault-relative path
+ * that is either a note or a directory. Groups are persisted in settings and
+ * attachable in one click from the inline-edit panel and the chat composer.
+ */
+export interface ContextGroupEntry {
+  /** Vault-relative path (file or folder). */
+  path: string;
+  /** Entry kind; `'file'` covers any attachable vault text file. */
+  kind: 'file' | 'folder';
+}
+
+/**
+ * A named, ordered set of vault entries the user can attach in one click
+ * (R-B2, "主题关联"). Order matters: when a group exceeds the per-turn cap,
+ * the first N entries win. Existence is validated at attach time, not here —
+ * a stale path is skipped with a notice instead of failing the attach.
+ */
+export interface ContextGroup {
+  /** Stable unique id. */
+  id: string;
+  /** Display name shown in the attach-topic entries. */
+  name: string;
+  /** Ordered attachable entries (files or directories). */
+  entries: ContextGroupEntry[];
+}
+
+/** Hard caps for the context-group list, applied at load normalization. */
+export const CONTEXT_GROUP_MAX_COUNT = 50;
+export const CONTEXT_GROUP_MAX_ID_CHARS = 100;
+export const CONTEXT_GROUP_MAX_NAME_CHARS = 100;
+export const CONTEXT_GROUP_MAX_ENTRIES = 200;
+export const CONTEXT_GROUP_MAX_PATH_CHARS = 500;
+
+/** Hard caps for the auto-internal-link excluded-term list (R-B1). */
+export const AUTO_INTERNAL_LINK_MAX_EXCLUDED_TERMS = 100;
+export const AUTO_INTERNAL_LINK_MAX_TERM_CHARS = 100;
+
+/**
+ * Normalize the user-defined context-group list (R-B2). Drops malformed
+ * entries (non-strings, empty id/name, oversized fields, paths over the cap
+ * or containing `<>` — the same backstop the attached-context block uses) and
+ * duplicate ids / duplicate paths within one group, keeping the first
+ * occurrence, so a stale or hand-edited settings file cannot produce blank
+ * rows, dead chips, or unbounded lists.
+ */
+export function normalizeContextGroups(value: unknown): ContextGroup[] {
+  if (!Array.isArray(value)) return [];
+  const seenIds = new Set<string>();
+  const result: ContextGroup[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const record = entry as Record<string, unknown>;
+    if (typeof record.id !== 'string' || typeof record.name !== 'string') continue;
+    const id = record.id.trim();
+    const name = record.name.trim();
+    if (!id || !name) continue;
+    if (id.length > CONTEXT_GROUP_MAX_ID_CHARS) continue;
+    if (name.length > CONTEXT_GROUP_MAX_NAME_CHARS) continue;
+    if (seenIds.has(id)) continue;
+    const entries = normalizeContextGroupEntries(record.entries);
+    seenIds.add(id);
+    result.push({ id, name, entries });
+    if (result.length >= CONTEXT_GROUP_MAX_COUNT) break;
+  }
+  return result;
+}
+
+function normalizeContextGroupEntries(value: unknown): ContextGroupEntry[] {
+  if (!Array.isArray(value)) return [];
+  const seenPaths = new Set<string>();
+  const result: ContextGroupEntry[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const record = entry as Record<string, unknown>;
+    if (typeof record.path !== 'string') continue;
+    const path = record.path.trim();
+    if (!path) continue;
+    if (path.length > CONTEXT_GROUP_MAX_PATH_CHARS) continue;
+    // Angle brackets would break the attached-context tag protocol; the
+    // attach-time resolver rejects such paths anyway, so drop them here.
+    if (/[<>]/.test(path)) continue;
+    if (seenPaths.has(path)) continue;
+    seenPaths.add(path);
+    result.push({ path, kind: record.kind === 'folder' ? 'folder' : 'file' });
+    if (result.length >= CONTEXT_GROUP_MAX_ENTRIES) break;
+  }
+  return result;
+}
+
+/**
+ * Normalize the auto-internal-link excluded-term list (R-B1): trimmed,
+ * non-empty, de-duplicated (case/width-folded comparison happens at match
+ * time, so the list itself keeps the user's original wording), capped in
+ * count and per-term length.
+ */
+export function normalizeAutoInternalLinkExcludedTerms(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'string') continue;
+    const term = entry.trim();
+    if (!term || term.length > AUTO_INTERNAL_LINK_MAX_TERM_CHARS) continue;
+    if (seen.has(term)) continue;
+    seen.add(term);
+    result.push(term);
+    if (result.length >= AUTO_INTERNAL_LINK_MAX_EXCLUDED_TERMS) break;
+  }
+  return result;
+}
+
+
+/**
  * Normalize the parallel-edit cap (R-A5). Non-numbers, NaN and out-of-range
  * values fall back to the default; floats are floored. The cap bounds live
  * auxiliary query sessions, so the upper bound is deliberately small.
@@ -3064,6 +3177,28 @@ export interface OpenCodianSettings {
    */
   inlineEditDocumentModeEnabled: boolean;
 
+  /**
+   * Auto-internal-link post-processing for inline-edit generation results
+   * (R-B1, default off). When on, occurrences of verified reference-note
+   * headings in the generated text become internal links before the diff is
+   * rendered, so the user sees and can reject them. Off means the generated
+   * text is byte-identical to the model output.
+   */
+  autoInternalLinkEnabled: boolean;
+
+  /**
+   * Terms never auto-linked by R-B1 (e.g. generic words like "总结"). The
+   * match compares case-/width-folded forms; the list keeps original wording.
+   */
+  autoInternalLinkExcludedTerms: string[];
+
+  /**
+   * User-defined context groups / topics (R-B2): named, ordered sets of vault
+   * entries attachable in one click from the inline-edit panel and the chat
+   * composer. Persisted here so they survive restarts and work across notes.
+   */
+  contextGroups: ContextGroup[];
+
   capabilityLabSelectedBackend: string | undefined;
 
   /** Backend-specific settings that should not be flattened into OpenCode fields. */
@@ -3302,6 +3437,9 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   inlineEditPresetPrompts: [],
   inlineEditMaxConcurrentEdits: INLINE_EDIT_MAX_CONCURRENT_EDITS_DEFAULT,
   inlineEditDocumentModeEnabled: true,
+  autoInternalLinkEnabled: false,
+  autoInternalLinkExcludedTerms: [],
+  contextGroups: [],
   capabilityLabSelectedBackend: undefined,
   backendSettings: getDefaultBackendSettings(),
 

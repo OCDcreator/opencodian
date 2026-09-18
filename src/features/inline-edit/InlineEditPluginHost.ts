@@ -19,7 +19,7 @@
 import { AgentCapability, hasCapability } from '../../core/agents/AgentCapability';
 import type { AgentAuxQueryCapability, BackendModelSelection } from '../../core/agents/backend/AgentAuxQueryCapability';
 import type { AgentServiceRegistry } from '../../core/agents/backend/AgentServiceRegistry';
-import type { InlineEditPresetPrompt } from '../../core/types';
+import type { ContextGroup, InlineEditPresetPrompt } from '../../core/types';
 import type { AgentBackendKind } from '../../core/types/chat';
 import type {
   InlineEditChoice,
@@ -80,6 +80,17 @@ export interface InlineEditPluginBridge {
    * validation; `null` means "no chip".
    */
   resolveContextFile?(path: string): InlineEditContextFile | null;
+  /** Persisted context groups for the picker's "attach topic" section (R-B2). */
+  listContextGroups?(): readonly ContextGroup[];
+  /**
+   * R-B1 auto-internal-link pass over the parsed generation result. The
+   * implementation owns heading verification (metadata cache) and must be a
+   * strict no-op when the setting is off.
+   */
+  applyAutoInternalLinks?(
+    text: string,
+    attachedNotes: readonly { readonly path: string; readonly kind?: 'file' | 'folder' }[],
+  ): string;
 }
 
 /** Build the host the controller uses. */
@@ -98,6 +109,10 @@ export function createInlineEditPluginHost(bridge: InlineEditPluginBridge): Inli
     getMaxConcurrentEdits: () => bridge.getSettings().maxConcurrentEdits,
     isDocumentModeEnabled: () => bridge.getSettings().documentModeEnabled,
     listPresetPrompts: () => listEffectiveInlineEditPresets(bridge.getSettings().presetPrompts),
+    listContextGroups: bridge.listContextGroups ? () => bridge.listContextGroups?.() ?? [] : undefined,
+    applyAutoInternalLinks: bridge.applyAutoInternalLinks
+      ? (text, notes) => bridge.applyAutoInternalLinks?.(text, notes) ?? text
+      : undefined,
   };
 }
 

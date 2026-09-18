@@ -1,4 +1,5 @@
 # Core Types Barrel
+> 2026-09-18 (R-B1/R-B2): re-exports `ContextGroup` / `ContextGroupEntry`, the `CONTEXT_GROUP_MAX_*` caps, `AUTO_INTERNAL_LINK_MAX_*` caps, `normalizeContextGroups` and `normalizeAutoInternalLinkExcludedTerms`.
 
 > 2026-07-29: The type barrel exports the OpenCode trace settings default factory.
 

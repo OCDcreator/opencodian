@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-17T18:32:18.880Z",
-  "headShaAtGeneration": "1c5e1b89d35fdb8a2454f16ef0a6a69efccd66e4",
+  "generatedAt": "2026-09-18T04:07:27.748Z",
+  "headShaAtGeneration": "c01a261f34d470d47162346a1abed8ed8b38a5dd",
   "edges": [
     {
       "id": "src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts|src/app/diagnostics/types.ts|type-only|./types",
@@ -8236,6 +8236,20 @@
       "specifier": "../ui/ContextFilePickerModal"
     },
     {
+      "id": "src/features/chat/services/ComposerContextPickerActionService.ts|src/i18n/index.ts|runtime-static|../../../i18n",
+      "from": "src/features/chat/services/ComposerContextPickerActionService.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../i18n"
+    },
+    {
+      "id": "src/features/chat/services/ComposerContextPickerActionService.ts|src/shared/index.ts|runtime-static|../../../shared",
+      "from": "src/features/chat/services/ComposerContextPickerActionService.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../shared"
+    },
+    {
       "id": "src/features/chat/services/ComposerContextRuntimeStore.ts|src/core/types/index.ts|type-only|../../../core/types",
       "from": "src/features/chat/services/ComposerContextRuntimeStore.ts",
       "to": "src/core/types/index.ts",
@@ -12436,6 +12450,111 @@
       "specifier": "../../../i18n"
     },
     {
+      "id": "src/features/inline-edit/InlineEditAccept.ts|src/features/inline-edit/InlineEditPrompt.ts|runtime-static|./InlineEditPrompt",
+      "from": "src/features/inline-edit/InlineEditAccept.ts",
+      "to": "src/features/inline-edit/InlineEditPrompt.ts",
+      "kind": "runtime-static",
+      "specifier": "./InlineEditPrompt"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditAccept.ts|src/features/inline-edit/InlineEditService.ts|runtime-static|./InlineEditService",
+      "from": "src/features/inline-edit/InlineEditAccept.ts",
+      "to": "src/features/inline-edit/InlineEditService.ts",
+      "kind": "runtime-static",
+      "specifier": "./InlineEditService"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditAccept.ts|src/features/inline-edit/InlineEditTypes.ts|type-only|./InlineEditTypes",
+      "from": "src/features/inline-edit/InlineEditAccept.ts",
+      "to": "src/features/inline-edit/InlineEditTypes.ts",
+      "kind": "type-only",
+      "specifier": "./InlineEditTypes"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditAccept.ts|src/features/inline-edit/InlineEditWidgets.ts|runtime-static|./InlineEditWidgets",
+      "from": "src/features/inline-edit/InlineEditAccept.ts",
+      "to": "src/features/inline-edit/InlineEditWidgets.ts",
+      "kind": "runtime-static",
+      "specifier": "./InlineEditWidgets"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditAccept.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/features/inline-edit/InlineEditAccept.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditAnchor.ts|src/features/inline-edit/InlineEditTypes.ts|type-only|./InlineEditTypes",
+      "from": "src/features/inline-edit/InlineEditAnchor.ts",
+      "to": "src/features/inline-edit/InlineEditTypes.ts",
+      "kind": "type-only",
+      "specifier": "./InlineEditTypes"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditAttachments.ts|src/core/agents/backend/AgentAuxQueryCapability.ts|type-only|../../core/agents/backend/AgentAuxQueryCapability",
+      "from": "src/features/inline-edit/InlineEditAttachments.ts",
+      "to": "src/core/agents/backend/AgentAuxQueryCapability.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/backend/AgentAuxQueryCapability"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditAttachments.ts|src/core/types/index.ts|type-only|../../core/types",
+      "from": "src/features/inline-edit/InlineEditAttachments.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/types"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditAttachments.ts|src/features/inline-edit/InlineEditHost.ts|type-only|./InlineEditHost",
+      "from": "src/features/inline-edit/InlineEditAttachments.ts",
+      "to": "src/features/inline-edit/InlineEditHost.ts",
+      "kind": "type-only",
+      "specifier": "./InlineEditHost"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditAttachments.ts|src/features/inline-edit/InlineEditImageChip.ts|runtime-static|./InlineEditImageChip",
+      "from": "src/features/inline-edit/InlineEditAttachments.ts",
+      "to": "src/features/inline-edit/InlineEditImageChip.ts",
+      "kind": "runtime-static",
+      "specifier": "./InlineEditImageChip"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditAttachments.ts|src/features/inline-edit/InlineEditPrompt.ts|runtime-static|./InlineEditPrompt",
+      "from": "src/features/inline-edit/InlineEditAttachments.ts",
+      "to": "src/features/inline-edit/InlineEditPrompt.ts",
+      "kind": "runtime-static",
+      "specifier": "./InlineEditPrompt"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditAttachments.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/features/inline-edit/InlineEditAttachments.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditAttachments.ts|src/shared/index.ts|runtime-static|../../shared",
+      "from": "src/features/inline-edit/InlineEditAttachments.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../shared"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditConfirmModal.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/features/inline-edit/InlineEditConfirmModal.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditContextUi.ts|src/core/types/index.ts|type-only|../../core/types",
+      "from": "src/features/inline-edit/InlineEditContextUi.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/types"
+    },
+    {
       "id": "src/features/inline-edit/InlineEditContextUi.ts|src/features/inline-edit/InlineEditTypes.ts|type-only|./InlineEditTypes",
       "from": "src/features/inline-edit/InlineEditContextUi.ts",
       "to": "src/features/inline-edit/InlineEditTypes.ts",
@@ -12457,6 +12576,41 @@
       "specifier": "../../core/agents/backend/AgentAuxQueryCapability"
     },
     {
+      "id": "src/features/inline-edit/InlineEditController.ts|src/features/inline-edit/InlineEditAccept.ts|runtime-static|./InlineEditAccept",
+      "from": "src/features/inline-edit/InlineEditController.ts",
+      "to": "src/features/inline-edit/InlineEditAccept.ts",
+      "kind": "runtime-static",
+      "specifier": "./InlineEditAccept"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditController.ts|src/features/inline-edit/InlineEditAnchor.ts|runtime-static|./InlineEditAnchor",
+      "from": "src/features/inline-edit/InlineEditController.ts",
+      "to": "src/features/inline-edit/InlineEditAnchor.ts",
+      "kind": "runtime-static",
+      "specifier": "./InlineEditAnchor"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditController.ts|src/features/inline-edit/InlineEditAttachments.ts|runtime-static|./InlineEditAttachments",
+      "from": "src/features/inline-edit/InlineEditController.ts",
+      "to": "src/features/inline-edit/InlineEditAttachments.ts",
+      "kind": "runtime-static",
+      "specifier": "./InlineEditAttachments"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditController.ts|src/features/inline-edit/InlineEditContextUi.ts|runtime-static|./InlineEditContextUi",
+      "from": "src/features/inline-edit/InlineEditController.ts",
+      "to": "src/features/inline-edit/InlineEditContextUi.ts",
+      "kind": "runtime-static",
+      "specifier": "./InlineEditContextUi"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditController.ts|src/features/inline-edit/InlineEditEditorView.ts|runtime-static|./InlineEditEditorView",
+      "from": "src/features/inline-edit/InlineEditController.ts",
+      "to": "src/features/inline-edit/InlineEditEditorView.ts",
+      "kind": "runtime-static",
+      "specifier": "./InlineEditEditorView"
+    },
+    {
       "id": "src/features/inline-edit/InlineEditController.ts|src/features/inline-edit/InlineEditHost.ts|type-only|./InlineEditHost",
       "from": "src/features/inline-edit/InlineEditController.ts",
       "to": "src/features/inline-edit/InlineEditHost.ts",
@@ -12464,18 +12618,25 @@
       "specifier": "./InlineEditHost"
     },
     {
-      "id": "src/features/inline-edit/InlineEditController.ts|src/features/inline-edit/InlineEditImageChip.ts|runtime-static|./InlineEditImageChip",
-      "from": "src/features/inline-edit/InlineEditController.ts",
-      "to": "src/features/inline-edit/InlineEditImageChip.ts",
-      "kind": "runtime-static",
-      "specifier": "./InlineEditImageChip"
-    },
-    {
       "id": "src/features/inline-edit/InlineEditController.ts|src/features/inline-edit/InlineEditInputOverlay.ts|runtime-static|./InlineEditInputOverlay",
       "from": "src/features/inline-edit/InlineEditController.ts",
       "to": "src/features/inline-edit/InlineEditInputOverlay.ts",
       "kind": "runtime-static",
       "specifier": "./InlineEditInputOverlay"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditController.ts|src/features/inline-edit/InlineEditKeyboard.ts|runtime-static|./InlineEditKeyboard",
+      "from": "src/features/inline-edit/InlineEditController.ts",
+      "to": "src/features/inline-edit/InlineEditKeyboard.ts",
+      "kind": "runtime-static",
+      "specifier": "./InlineEditKeyboard"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditController.ts|src/features/inline-edit/InlineEditModeSwitch.ts|runtime-static|./InlineEditModeSwitch",
+      "from": "src/features/inline-edit/InlineEditController.ts",
+      "to": "src/features/inline-edit/InlineEditModeSwitch.ts",
+      "kind": "runtime-static",
+      "specifier": "./InlineEditModeSwitch"
     },
     {
       "id": "src/features/inline-edit/InlineEditController.ts|src/features/inline-edit/InlineEditOverlayChips.ts|runtime-static|./InlineEditOverlayChips",
@@ -12583,6 +12744,13 @@
       "specifier": "./InlineEditImageChip"
     },
     {
+      "id": "src/features/inline-edit/InlineEditInputOverlay.ts|src/features/inline-edit/InlineEditModeSwitch.ts|runtime-static|./InlineEditModeSwitch",
+      "from": "src/features/inline-edit/InlineEditInputOverlay.ts",
+      "to": "src/features/inline-edit/InlineEditModeSwitch.ts",
+      "kind": "runtime-static",
+      "specifier": "./InlineEditModeSwitch"
+    },
+    {
       "id": "src/features/inline-edit/InlineEditInputOverlay.ts|src/features/inline-edit/InlineEditOverlayChips.ts|runtime-static|./InlineEditOverlayChips",
       "from": "src/features/inline-edit/InlineEditInputOverlay.ts",
       "to": "src/features/inline-edit/InlineEditOverlayChips.ts",
@@ -12623,6 +12791,20 @@
       "to": "src/shared/brandingWordmark.ts",
       "kind": "runtime-static",
       "specifier": "../../shared/brandingWordmark"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditModeSwitch.ts|src/features/inline-edit/InlineEditTypes.ts|type-only|./InlineEditTypes",
+      "from": "src/features/inline-edit/InlineEditModeSwitch.ts",
+      "to": "src/features/inline-edit/InlineEditTypes.ts",
+      "kind": "type-only",
+      "specifier": "./InlineEditTypes"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditModeSwitch.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/features/inline-edit/InlineEditModeSwitch.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
     },
     {
       "id": "src/features/inline-edit/InlineEditOverlayChips.ts|src/core/types/chat.ts|type-only|../../core/types/chat",
@@ -12758,11 +12940,11 @@
       "specifier": "../../i18n"
     },
     {
-      "id": "src/features/inline-edit/InlineEditSelectionAffordance.ts|src/features/inline-edit/InlineEditController.ts|runtime-static|./InlineEditController",
+      "id": "src/features/inline-edit/InlineEditSelectionAffordance.ts|src/features/inline-edit/InlineEditEditorView.ts|runtime-static|./InlineEditEditorView",
       "from": "src/features/inline-edit/InlineEditSelectionAffordance.ts",
-      "to": "src/features/inline-edit/InlineEditController.ts",
+      "to": "src/features/inline-edit/InlineEditEditorView.ts",
       "kind": "runtime-static",
-      "specifier": "./InlineEditController"
+      "specifier": "./InlineEditEditorView"
     },
     {
       "id": "src/features/inline-edit/InlineEditSelectionAffordance.ts|src/i18n/index.ts|runtime-static|../../i18n",
@@ -17509,6 +17691,13 @@
       "to": "src/features/inline-edit/InlineEditAtTrigger.ts",
       "kind": "runtime-static",
       "specifier": "./features/inline-edit/InlineEditAtTrigger"
+    },
+    {
+      "id": "src/main.ts|src/features/inline-edit/InlineEditConfirmModal.ts|runtime-static|./features/inline-edit/InlineEditConfirmModal",
+      "from": "src/main.ts",
+      "to": "src/features/inline-edit/InlineEditConfirmModal.ts",
+      "kind": "runtime-static",
+      "specifier": "./features/inline-edit/InlineEditConfirmModal"
     },
     {
       "id": "src/main.ts|src/features/inline-edit/InlineEditController.ts|runtime-static|./features/inline-edit/InlineEditController",

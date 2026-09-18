@@ -1,4 +1,5 @@
 # InlineEditController
+> 2026-09-18 (R-B1/R-B2): `applyOutcome` runs the strictly-parsed result through `applyInlineEditAutoLinks` before the preview payload is built (links visible/rejectable in the diff; byte-identical when the seam is absent or off); all attachment orchestration (picker/toggle/drop/group/image) moved to `InlineEditAttachmentCoordinator` in InlineEditAttachments so this file stays under the file-size gate.
 
 > **源码**: `src/features/inline-edit/InlineEditController.ts`
 > **状态**: [REVIEW]

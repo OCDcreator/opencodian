@@ -1,4 +1,5 @@
 # SettingsInlineEditSection
+> 2026-09-18 (R-B1): adds the auto-internal-link toggle (`autoInternalLinkEnabled`) and the excluded-terms textarea (`autoInternalLinkExcludedTerms`, one term per line, normalized on save).
 
 > **源码**: `src/features/settings/SettingsInlineEditSection.ts`
 > **状态**: [REVIEW]

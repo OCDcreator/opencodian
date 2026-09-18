@@ -91,6 +91,7 @@ describe('SETTINGS_PRIMARY_TABS', () => {
       'questions',
       'memory',
       'inline-edit',
+      'context-groups',
     ]);
   });
 

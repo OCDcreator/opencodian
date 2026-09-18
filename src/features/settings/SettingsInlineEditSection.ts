@@ -22,6 +22,7 @@ import {
   INLINE_EDIT_MAX_CONCURRENT_EDITS_MAX,
   INLINE_EDIT_MAX_CONCURRENT_EDITS_MIN,
   type InlineEditPresetPrompt,
+  normalizeAutoInternalLinkExcludedTerms,
   normalizeInlineEditMaxConcurrentEdits,
   normalizeInlineEditModelOverrides,
   type OpenCodianSettings,
@@ -149,6 +150,8 @@ export class SettingsInlineEditSection {
       this.addOverrideRow(containerEl, backend);
     }
 
+    this.addAutoInternalLinkSettings(containerEl);
+
     this.addPresetPromptSettings(containerEl);
 
     new Setting(containerEl)
@@ -209,6 +212,42 @@ export class SettingsInlineEditSection {
           await this.plugin.saveSettings();
         });
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Auto internal links (R-B1)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * R-B1: deterministic post-processing that links verified reference-note
+   * headings in generation results before the diff is shown. Default off —
+   * it rewrites user-visible text, so the toggle states that explicitly.
+   * The excluded-terms field is one term per line (blank lines ignored).
+   */
+  private addAutoInternalLinkSettings(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.inlineEdit.autoLink.name'))
+      .setDesc(t('settings.inlineEdit.autoLink.desc'))
+      .addToggle((toggle) => toggle
+        .setValue(this.plugin.settings.autoInternalLinkEnabled)
+        .onChange(async (value) => {
+          this.plugin.settings.autoInternalLinkEnabled = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName(t('settings.inlineEdit.autoLinkExcluded.name'))
+      .setDesc(t('settings.inlineEdit.autoLinkExcluded.desc'))
+      .addTextArea((area) => {
+        area.setPlaceholder(t('settings.inlineEdit.autoLinkExcluded.placeholder'))
+          .setValue(this.plugin.settings.autoInternalLinkExcludedTerms.join('\n'))
+          .onChange(async (value) => {
+            this.plugin.settings.autoInternalLinkExcludedTerms =
+              normalizeAutoInternalLinkExcludedTerms(value.split('\n'));
+            await this.plugin.saveSettings();
+          });
+        area.inputEl.rows = 4;
+      });
   }
 
   // ---------------------------------------------------------------------------

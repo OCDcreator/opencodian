@@ -1,4 +1,5 @@
 # English Locale
+> 2026-09-18 (R-B1/R-B2): adds `inlineEdit.context.groupsHeading/groupEntryCount/groupAttach/groupAttached/groupAttachedNone/groupOmitted/groupMissing/groupMissingMore`, `settings.inlineEdit.autoLink*` (toggle + excluded terms), `settings.conversation.tab.contextGroups`, `settings.contextGroups.*` (CRUD rows), and `chat.context.filePicker.groupsHeading/groupAttach/groupEntryCount` + `chat.context.notice.groupAttached/groupMissing/groupMissingMore`.
 
 2026-09-18: added the FlowText parity batch A2 strings — `inlineEdit.error.imageTypeUnsupported` / `inlineEdit.error.imageTooLarge` / `inlineEdit.error.imageLimit` (image validation rejections, R-A4), `inlineEdit.error.imagesUnsupported` (explicit capability gap, never a silent text-only downgrade), `inlineEdit.image.remove` / `inlineEdit.image.dropHint` (chip + drop surface labels), and `inlineEdit.preview.generating` (streaming busy marker in the diff preview).
 

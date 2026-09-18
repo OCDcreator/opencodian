@@ -7,7 +7,7 @@
 
 - **Layer:** `shared` (may import layers: shared)
 - **Risk:** low
-- **Include:** `src/shared/index.ts`, `src/shared/brandingWordmark.ts`, `src/shared/contextPath.ts`, `src/shared/debugModules.ts`, `src/shared/diagnosticSecretSanitizer.ts`, `src/shared/logger.ts`, `src/shared/obsidianContext.ts`, `src/shared/toolExecution.ts`, `src/shared/toolIdentity.ts`, `src/shared/TooltipLayerController.ts`, `src/shared/vault.ts`
+- **Include:** `src/shared/index.ts`, `src/shared/brandingWordmark.ts`, `src/shared/contextGroupPlan.ts` (R-B2 one-click group-attach planner), `src/shared/contextPath.ts`, `src/shared/debugModules.ts`, `src/shared/diagnosticSecretSanitizer.ts`, `src/shared/logger.ts`, `src/shared/obsidianContext.ts`, `src/shared/toolExecution.ts`, `src/shared/toolIdentity.ts`, `src/shared/TooltipLayerController.ts`, `src/shared/vault.ts`
 
 ## Responsibilities
 - shared cross-cutting primitives: logging, context paths, vault access, tool identity

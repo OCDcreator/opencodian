@@ -1,4 +1,5 @@
 # InlineEditHost
+> 2026-09-18 (R-B1/R-B2): new optional seams — `listContextGroups()` (persisted R-B2 groups for the picker topic section) and `applyAutoInternalLinks(text, attachedNotes)` (deterministic R-B1 post-processing; must be a strict no-op when the setting is off).
 
 > **源码**: `src/features/inline-edit/InlineEditHost.ts`
 > **状态**: [REVIEW]

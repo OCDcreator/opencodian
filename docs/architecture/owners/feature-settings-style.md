@@ -41,3 +41,5 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 用户气泡样式组新增「气泡样式」下拉（solid 默认 / glass）。`SettingsStyleSection` 将用户组正文抽为 `renderUserStyleGroupBody()`，切换样式或重置分组时重渲染：毛玻璃专属的「气泡模糊」滑块仅在 glass 模式下渲染。`SettingsStyleControls.createStyleResetSetting()` 新增可选 `onAfterReset` 回调支撑该重渲染链路。
 
 - 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
+
+- 2026-09-18 (FlowText 批次 B)：owner manifest 随 R-B1/R-B2 更新——新增 `src/shared/contextGroupPlan.ts` 归属 `shared.foundation`；本 owner 的边界与职责未变。

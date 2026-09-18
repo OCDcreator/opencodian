@@ -144,8 +144,16 @@ export class Component {
   register() {}
 }
 
+export const capturedNotices: string[] = [];
+
 export class Notice {
-  constructor(_message: string) {}
+  constructor(message: string) {
+    capturedNotices.push(message);
+  }
+}
+
+export function clearCapturedNotices(): void {
+  capturedNotices.length = 0;
 }
 
 export class TFile {

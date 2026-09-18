@@ -29,7 +29,7 @@ import { AgentCapability, hasCapability } from '../../../core/agents';
 import { getConversationChatBackendService } from '../../../core/agents/backend/AgentBackendRouting';
 import type { MemoryRuntimePort } from '../../../core/memory';
 import { OpenCodeService } from '../../../core/opencode';
-import type { ChatMessage, Conversation } from '../../../core/types';
+import type { ChatMessage, ContextGroup, Conversation } from '../../../core/types';
 import { getTurnDiffNoticeMeta } from '../../../core/types';
 import { t } from '../../../i18n';
 import { getVaultBasePath } from '../../../shared';
@@ -290,6 +290,7 @@ export interface ChatRuntimeCompositionHost {
       readonly renderUserMarkupAsCodeBlocks: boolean;
       readonly showAnsweredQuestionCards: boolean;
       readonly locale: 'en' | 'zh';
+      readonly contextGroups: readonly ContextGroup[];
       readonly backendSettings: { readonly claudeCode: { readonly autoTitle: boolean } };
     };
     readonly settingsTab: unknown;
@@ -508,6 +509,7 @@ export class ChatRuntimeComposition {
       focusRuntimeViewHost: host.createFocusContextRuntimeViewHost(),
       focusPreviewWritebackHost: host.createFocusContextPreviewWritebackHost(),
       serverContext: serverReferenceContextService,
+      contextGroups: { listGroups: () => host.plugin.settings.contextGroups },
     });
     const titleGenerationService = new TitleGenerationService(host.plugin as never);
     const questionDockSlotCoordinator = new QuestionDockSlotCoordinator(

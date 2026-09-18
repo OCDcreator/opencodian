@@ -18,6 +18,7 @@ import { SettingsCapabilityLabSection } from './SettingsCapabilityLabSection';
 import { SettingsClaudeCodeSection } from './SettingsClaudeCodeSection';
 import { SettingsCodexSection } from './SettingsCodexSection';
 import { SettingsCommandsSection } from './SettingsCommandsSection';
+import { SettingsContextGroupsSection } from './SettingsContextGroupsSection';
 import { SettingsConversationSection } from './SettingsConversationSection';
 import { SettingsDebugSection } from './SettingsDebugSection';
 import { SettingsFormatterSection } from './SettingsFormatterSection';
@@ -438,6 +439,10 @@ export class SettingsTabbedRenderer {
     });
     conversationSection.attachTabbed(containerEl, secondaryTabId);
     new SettingsInlineEditSection({
+      plugin: this.deps.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
+    }).attachTabbed(containerEl, secondaryTabId);
+    new SettingsContextGroupsSection({
       plugin: this.deps.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
     }).attachTabbed(containerEl, secondaryTabId);

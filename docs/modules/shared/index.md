@@ -1,4 +1,5 @@
 # Shared Barrel
+> **Updated**: 2026-09-18 — exports the R-B2 `planContextGroupAttach` planner and `summarizeContextGroup` from `./contextGroupPlan` (see [contextGroupPlan.md](contextGroupPlan.md)).
 
 > **源码**: `src/shared/index.ts`
 > **状态**: [REVIEW]
