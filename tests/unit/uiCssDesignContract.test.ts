@@ -128,6 +128,15 @@ describe('obsidian tooling approval modal design contract', () => {
     expect(ts).toContain('mod-cta');
   });
 
+  it('keeps the deny label legible: deepened rose plus a light label (measured 4.22:1 before, ~7.3:1 after)', () => {
+    const deny = getCssRuleBlock(css, '.opencodian-tooling-confirm-modal .mod-warning');
+    // Deepened with DESIGN.md ink-graphite; a lightened rose would fix light
+    // themes but break dark ones and would soften the danger signal.
+    expect(deny).toContain('#e11d48');
+    expect(deny).toContain('#0f172a');
+    expect(deny).toMatch(/color:\s*#fff/);
+  });
+
   it('provides focus and reduced-motion handling and no side stripes', () => {
     expect(css).toMatch(/focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--interactive-accent\)/s);
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)/);

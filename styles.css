@@ -30540,13 +30540,31 @@ img.opencodian-model-provider-header-icon {
   background: color-mix(in srgb, var(--interactive-accent-hover, var(--interactive-accent)) 74%, #0f172a);
 }
 
+/* Deny label contrast. Measured live at 4.22:1 — the host theme
+   puts a near-black label on rgb(211,47,47) — which is below the
+   4.5:1 floor for a 13px label. Deepening the rose with DESIGN.md
+   ink-graphite and pairing it with a light label lifts it to
+   ~7.3:1; lightening the rose instead would fix light themes but
+   break dark ones, and would soften the danger signal against the
+   Status Honesty Rule. */
+.opencodian-tooling-confirm-modal .mod-warning {
+  background: color-mix(in srgb, #e11d48 72%, #0f172a);
+  color: #fff;
+  transition: background-color 150ms ease;
+}
+
+.opencodian-tooling-confirm-modal .mod-warning:hover {
+  background: color-mix(in srgb, #e11d48 82%, #0f172a);
+}
+
 .opencodian-tooling-confirm-modal button:focus-visible {
   outline: 2px solid var(--interactive-accent);
   outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .opencodian-tooling-confirm-modal .mod-cta {
+  .opencodian-tooling-confirm-modal .mod-cta,
+  .opencodian-tooling-confirm-modal .mod-warning {
     transition: none;
   }
 }

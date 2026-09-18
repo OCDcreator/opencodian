@@ -15,7 +15,8 @@
 - 风险说明：`.opencodian-tooling-confirm-desc`（13px / 1.5、`--text-muted`、纵向 12px 间距；内部 `p` 无 margin）。
 - 命令证据：`.opencodian-tooling-confirm-command` —— 确切命令以 `var(--font-monospace)` 呈现在扁平只读面上（`--background-secondary` 底 + 1px 边框 + 8px 圆角，12px / 1.5），长 argv 用 `overflow-wrap: anywhere` 换行而不是撑破弹窗（§3 Mono Evidence Rule）；`.opencodian-tooling-confirm-argv` 为参数行（与命令同色）。
 - 按钮语义：`.mod-cta`（允许）用与批量整理弹窗相同的 ink 混色对比度修复；拒绝/破坏性路径使用原生 `.mod-warning`（rose），与仓库既有的行内权限拒绝词汇一致。
-- 焦点与动效：`button:focus-visible` 为 2px accent 描边 + 2px offset；`.mod-cta` 仅 150ms 背景色过渡，reduced-motion 下取消过渡。
+- 焦点与动效：`button:focus-visible` 为 2px accent 描边 + 2px offset；`.mod-cta` 与 `.mod-warning` 仅 150ms 背景色过渡，reduced-motion 下取消过渡。
+- 拒绝按钮对比度契约：宿主主题把近黑标签压在 `rgb(211,47,47)` 上，**实机实测仅 4.22:1**，低于 13px 标签的 4.5:1 下限。因此本模块把 `.mod-warning` 背景改为 DESIGN.md rose 与 ink-graphite 的 72/28 混色、标签改浅色，实测提升到 **约 7.3:1**。选择「加深底色 + 浅标签」而非「提亮底色」有两个理由：提亮只在浅色主题成立、深色主题会反向劣化；且加深更符合 §2 的 Status Honesty Rule（不得把危险色软化到看不出风险）。改动这两个值时必须保证标签对比度在两个主题下都 ≥4.5:1。
 
 ## 关联 TS 组件
 
