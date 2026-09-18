@@ -891,6 +891,8 @@ export class OpenCodianView extends ItemView {
       addChosenFileContextToActiveTab: async () => {
         await this.composerContextViewFacade.addChosenFileContextToActiveTab();
       },
+      addVaultPathContextFromDrop: (rawPath) =>
+        this.composerContextViewFacade.addVaultPathContextFromDrop(rawPath),
       mountSelectionControls: (toolbar, options) => {
         this.chatSelectionControlsCoordinator.build(toolbar, {
           showModels: options.showModels && hasCapability(this.caps, AgentCapability.Models),

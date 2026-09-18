@@ -114,29 +114,42 @@ export function isDiffEmpty(ops: readonly InlineEditDiffOp[]): boolean {
  *
  * Falls back to a whole-text before/after view when a word diff is too large to
  * compute; both branches render the same accept/reject affordances in the
- * controller.
+ * controller. `fallbackLabel` (e.g. an i18n string) is rendered as a header
+ * above the before/after blocks so the degradation is explicit rather than
+ * looking like a regular diff (docs/requirements/flowtext-parity.md R-A6).
  */
 export function renderDiffInto(
   container: HTMLElement,
   before: string,
   after: string,
-  opClasses: { insert: string; delete: string },
+  options: {
+    insert: string;
+    delete: string;
+    /** Header rendered above the degraded before/after blocks (R-A6). */
+    fallbackLabel?: string;
+  },
 ): boolean {
   container.empty();
   const ops = computeWordDiff(before, after);
   if (!ops) {
     container.addClass('opencodian-inline-edit-fallback');
-    container.createDiv({ cls: opClasses.delete, text: before });
-    container.createDiv({ cls: opClasses.insert, text: after });
+    if (options.fallbackLabel) {
+      container.createDiv({
+        cls: 'opencodian-inline-edit-fallback-label',
+        text: options.fallbackLabel,
+      });
+    }
+    container.createDiv({ cls: options.delete, text: before });
+    container.createDiv({ cls: options.insert, text: after });
     return false;
   }
   for (const op of ops) {
     if (op.type === 'equal') {
-      container.appendChild(activeDocument.createTextNode(op.text));
+      container.appendChild((container.ownerDocument ?? document).createTextNode(op.text));
       continue;
     }
     container.createSpan({
-      cls: op.type === 'insert' ? opClasses.insert : opClasses.delete,
+      cls: op.type === 'insert' ? options.insert : options.delete,
       text: op.text,
     });
   }

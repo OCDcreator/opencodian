@@ -23,6 +23,8 @@
 - `./InlineEditTypes`（`InlineEditHostAdapter`、`InlineEditChoice`）、`../../core/types/chat`（`AgentBackendKind`）
 - 反向：`./InlineEditInputOverlay` 仅类型（`InlineEditOverlayChipState`），无运行时环
 
+> 2026-09-18 (A3)：新增按编辑的编排助手 `runInlineEditModelPick` / `runInlineEditEffortPick` / `loadInlineEditModelChoices`（控制器以 `pickEdit`/`pickDeps` 适配视图委托，保持控制器行数上限）。
+
 ## 维护约束
 
 - 菜单行点击必须走 `callbacks.onClose()` 而不是自行 `menu.remove()`：overlay 的 `closeMenu()` 统一维护 `menuKind` / preset 菜单 reset / picker 刷新引用，绕过会留下过期状态

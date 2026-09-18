@@ -1,3 +1,5 @@
+> 2026-09-18 (FlowText parity R-A7): `ContextFilePickerModal` (multi-select + folder rows + attach-N footer) — see the mapped module doc for the contract.
+
 # Owner: feature.chat-ui
 
 Pricing readiness (2026-09-10): ContextDetailModal accepts scoped readiness and pricing callbacks, prices its captured token snapshot instead of copying a newer snapshot's cost, and releases the subscription on close without resetting raw messages or compaction state.

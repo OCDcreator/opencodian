@@ -102,6 +102,14 @@ export interface ComposerInputShellCoordinatorHost {
   /** Invoked when the Codex skill selector is opened but has no skills. */
   onCodexSkillsEmpty?(): void;
   addChosenFileContextToActiveTab(): Promise<void>;
+  /**
+   * Vault drop entry point (R-A7): claim a raw `text/plain` drop payload.
+   * Returns true when it resolved to a vault text file or folder (attach
+   * started asynchronously); false leaves the drop to its default handling
+   * (e.g. editor text drops insert into the textarea). Absent disables the
+   * surface.
+   */
+  addVaultPathContextFromDrop?(rawPath: string): boolean;
   registerEscapeHandler(handler: () => boolean): void;
   mountSelectionControls(toolbar: HTMLElement, options: { showModels: boolean; showPermissions: boolean }): void;
   mountContextUsageIndicator(container: HTMLElement): void;
@@ -1616,6 +1624,20 @@ export class ComposerInputShellCoordinator {
     this.imageDropSurfaceEl?.removeClass('is-image-drag-over');
     if (this.isComposerInteractionDisabled()) {
       return;
+    }
+
+    // R-A7: vault paths ride `text/plain` (Obsidian file-explorer drags).
+    // Resolution goes through `app.vault.getAbstractFileByPath()` on the
+    // host side; only a claimed drop is preventDefault-ed, so editor text
+    // drags keep their default insert behaviour.
+    const rawPath = typeof event.dataTransfer?.getData === 'function'
+      ? event.dataTransfer.getData('text/plain') ?? ''
+      : '';
+    if (rawPath.trim() && this.host.addVaultPathContextFromDrop) {
+      if (this.host.addVaultPathContextFromDrop(rawPath)) {
+        event.preventDefault();
+        return;
+      }
     }
 
     const files = event.dataTransfer?.files;

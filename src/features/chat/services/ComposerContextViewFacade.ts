@@ -33,6 +33,7 @@ type ComposerContextAttachmentBuilderPort = Pick<
   | 'buildFileContextItemFromPath'
   | 'buildPersistentFileContextItems'
   | 'buildSelectionContextItemFromPreview'
+  | 'buildEntryContextItem'
   | 'hasFileAtPath'
 >;
 
@@ -53,7 +54,7 @@ type ComposerContextActionPort = Pick<
 
 type ComposerContextPickerActionPort = Pick<
   ComposerContextPickerActionService,
-  'addChosenFileContextToActiveTab'
+  'addChosenFileContextToActiveTab' | 'addVaultPathContextFromDrop'
 >;
 
 type ComposerContextCoordinatorPort = Pick<ComposerContextCoordinator, 'setContextRowElement'>;
@@ -176,6 +177,15 @@ export class ComposerContextViewFacade {
 
   async addChosenFileContextToActiveTab(): Promise<boolean> {
     return this.dependencies.pickerActionService.addChosenFileContextToActiveTab();
+  }
+
+  /**
+   * Vault drop entry point (R-A7). Synchronous claim: returns whether the
+   * payload resolved to a vault text file or folder and an attach was
+   * started; the actual item build is async.
+   */
+  addVaultPathContextFromDrop(rawPath: string): boolean {
+    return this.dependencies.pickerActionService.addVaultPathContextFromDrop(rawPath);
   }
 
   async addCurrentNoteContextFromActiveEditor(

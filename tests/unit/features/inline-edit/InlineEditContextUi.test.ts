@@ -6,7 +6,12 @@
  * and the keyboard walk all render without an editor.
  */
 
-import { filterContextFiles, PICKER_MAX_ROWS, renderContextPickerInto } from '../../../../src/features/inline-edit/InlineEditContextUi';
+import {
+  filterContextFiles,
+  PICKER_MAX_ROWS,
+  renderContextChips,
+  renderContextPickerInto,
+} from '../../../../src/features/inline-edit/InlineEditContextUi';
 
 const FILES = [
   { path: 'notes/alpha.md', name: 'alpha' },
@@ -111,6 +116,35 @@ describe('renderContextPickerInto', () => {
     const search = container.querySelector<HTMLInputElement>('.opencodian-inline-edit-picker-search');
     search?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
     expect(rows()[2].classList.contains('is-highlighted')).toBe(true);
+  });
+
+  it('renders folder entries with a folder glyph and the full path (R-A7)', () => {
+    const { container } = renderPicker([
+      { path: 'notes/a.md', name: 'a', kind: 'file' },
+      { path: 'projects/alpha', name: 'alpha', kind: 'folder' },
+    ]);
+    const rows = [...container.querySelectorAll('.opencodian-inline-edit-menu-item')];
+    expect(rows).toHaveLength(2);
+    const fileGlyph = rows[0].querySelector('.opencodian-inline-edit-menu-item-glyph svg');
+    const folderGlyph = rows[1].querySelector('.opencodian-inline-edit-menu-item-glyph svg');
+    expect(fileGlyph?.getAttribute('data-icon')).not.toBe('folder');
+    expect(folderGlyph?.getAttribute('data-icon')).toBe('folder');
+    // Files show the parent-folder suffix; folders show the full path.
+    expect(rows[0].querySelector('.opencodian-inline-edit-picker-folder')?.textContent).toBe('notes');
+    expect(rows[1].querySelector('.opencodian-inline-edit-picker-folder')?.textContent).toBe('projects/alpha');
+  });
+
+  it('renders folder context chips with a folder glyph (R-A7)', () => {
+    const row = document.createElement('div');
+    renderContextChips(row, [
+      { path: 'notes/a.md', label: 'a', kind: 'file' },
+      { path: 'projects/alpha', label: 'alpha', kind: 'folder' },
+    ], () => {});
+    const chips = [...row.querySelectorAll('.opencodian-inline-edit-context-chip')];
+    expect(chips).toHaveLength(2);
+    const glyphs = chips.map((chip) => chip.querySelector('.opencodian-inline-edit-chip-prefix svg')?.getAttribute('data-icon'));
+    expect(glyphs[0]).not.toBe('folder');
+    expect(glyphs[1]).toBe('folder');
   });
 
   it('refreshes check marks from a new attached set without rebuilding the rows', () => {

@@ -19,6 +19,8 @@
 
 - `@codemirror/view`（`ViewPlugin`、`EditorView`）、`obsidian`（`MarkdownView`、`setIcon`）、`../i18n`、`./InlineEditController`（`getEditorView`）
 
+> 2026-09-18 (A3)：`getEditorView` 移至 `InlineEditEditorView.ts`（控制器行数上限），此处仅消费。
+
 ## 维护约束
 
 - 测量（`coordsAtPos`、`getBoundingClientRect`）只允许在 rAF 回调里做，禁止在 `update()` 内直接调用

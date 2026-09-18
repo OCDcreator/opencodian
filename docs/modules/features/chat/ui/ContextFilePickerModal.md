@@ -5,7 +5,7 @@
 
 ## 概述
 
-Obsidian Modal，用于从 Vault 文件列表中选择文件作为消息的上下文附件。提供异步加载的文件目录（catalog）、搜索框、后缀名过滤器、分页渲染（最多 `MAX_RENDERED_FILES=200`）。对外暴露 `chooseContextFile()` 函数，返回 `Promise<TFile | null>`。Catalog 类型由 `ContextFileCatalogService` 导出，Modal 只消费数据，不负责构建或缓存目录。
+Obsidian Modal，用于从 Vault 中选择**文件与文件夹**作为消息的上下文附件（R-A7 多选）。提供异步加载的文件目录（catalog）、搜索框、后缀名过滤器、分页渲染（最多 `MAX_RENDERED_FILES=200`）。对外暴露 `chooseContextFiles()` 函数，返回 `Promise<readonly (TFile | TFolder)[]>`：行点击切换勾选（多选），底部「附加 N 项」一次解析全部勾选；取消/关闭返回空数组。目录条目只在「全部」过滤器下出现（无扩展名桶）。Catalog 类型由 `ContextFileCatalogService` 导出，Modal 只消费数据，不负责构建或缓存目录。
 
 ## 导入关系
 上游: `obsidian`（App、TFile、Modal）、`i18n`、`ContextFileCatalogService`（类型）
@@ -107,3 +107,8 @@ render() → 文件按钮列表
 ### Server-side read-only hint
 
 当 server 支持 `v2.fs` / `v2.reference` 时，显示只读 informational hint banner。vault 文件选择行为不变；不创建独立的 filesystem 浏览器。
+
+
+> 2026-09-18 (R-A7)：改为**多选**选择器 `chooseContextFiles()`，返回 `(TFile|TFolder)[]`；目录条目与文件一起列出（folder 图标 + 完整路径，仅在「全部」过滤器下出现），行点击切换勾选态，底部「附加 N 项」按钮一次性解析所有勾选条目；Esc/关闭解析空数组。vault 外路径永远不会从这里流出——返回值是 vault 对象实例，不是路径字符串。
+
+## 维护约束

@@ -11,7 +11,9 @@
 
 `renderUserMessageContent()` 在消息持久化的 `images` 存在时渲染 gallery。每张缩略图都是有可访问名称的按钮，点击复用 `ImagePreviewOverlay` 打开 data-URI 原图预览；这不会影响上下文附件 chip 或用户文本渲染。
 
-## 公开接口
+> 2026-09-18 (R-A7)：上下文附件 kind 标签支持 `folder`（`chat.context.kind.folder`）。
+
+## 维护约束
 
 - 正文和图片之后的 `.opencodian-user-message-controls` 将展开/收起按钮与上下文附件放在同一行；空间不足时每个附件可独立换行。短正文没有可见 toggle 且无附件时整行隐藏，OMO 原文折叠仍使用独立容器。
 

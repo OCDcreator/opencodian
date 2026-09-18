@@ -19,7 +19,10 @@ inline edit 与插件运行时之间的接缝。`editorCallback` 只给到 `Edit
 
 - `./InlineEditTypes`（`InlineEditHostAdapter`）
 
-- 可选 `listContextFiles()`："添加上下文"选择器的候选笔记（vault 内 `md`/`txt`）；缺失或返回 `null` 时整个入口隐藏，宿主无 vault 时悬浮条保持原状
+- 可选 `listContextFiles()`："添加上下文"选择器的候选条目（vault 内 `md`/`txt` 文件 + 文件夹，R-A7）；缺失或返回 `null` 时整个入口隐藏，宿主无 vault 时悬浮条保持原状
+- 可选 `resolveContextFile(path)`（R-A7）：把拖拽落下的原始路径解析为上下文条目；**必须**走 `app.vault.getAbstractFileByPath()` 并校验 `instanceof TFile | TFolder`，vault 外/非文本路径返回 `null`（不落 chip）；缺省时禁用面板拖拽入口
+- 可选 `getMaxConcurrentEdits()`（R-A5）：单编辑器并行编辑上限（`inlineEditMaxConcurrentEdits`）；缺省用控制器默认值 3
+- 可选 `isDocumentModeEnabled()`（R-A6）：整篇形态开关（`inlineEditDocumentModeEnabled`）；缺省视为开启
 - 可选 `listPresetPrompts()`（R-A2）：「内置 + 用户自定义」合成后的 `#` 预设列表；缺省等价于空表（菜单侧兜底，实际宿主总是提供）
 
 ## 维护约束

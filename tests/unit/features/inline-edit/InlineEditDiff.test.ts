@@ -6,6 +6,7 @@ import {
   INLINE_EDIT_DIFF_MAX_INPUT_CHARS,
   type InlineEditDiffOp,
   isDiffEmpty,
+  renderDiffInto,
   tokenizeForDiff,
 } from '../../../../src/features/inline-edit/InlineEditDiff';
 
@@ -98,6 +99,34 @@ describe('computeWordDiff', () => {
   it('inserts nothing when the text is unchanged apart from whitespace runs', () => {
     const ops = computeWordDiff('a b', 'a  b') as InlineEditDiffOp[];
     expect(rebuild(ops)).toEqual({ before: 'a b', after: 'a  b' });
+  });
+});
+
+describe('renderDiffInto degraded view (R-A6)', () => {
+  it('renders whole before/after blocks with an explicit degradation label', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const huge = 'word '.repeat(Math.ceil(INLINE_EDIT_DIFF_MAX_INPUT_CHARS / 5) + 20);
+    const rendered = renderDiffInto(container, huge, 'replacement', {
+      insert: 'ins',
+      delete: 'del',
+      fallbackLabel: '内容过大，仅显示前后对照',
+    });
+    expect(rendered).toBe(false);
+    expect(container.classList.contains('opencodian-inline-edit-fallback')).toBe(true);
+    const label = container.querySelector('.opencodian-inline-edit-fallback-label');
+    expect(label?.textContent).toBe('内容过大，仅显示前后对照');
+    const blocks = container.querySelectorAll(':scope > div:not(.opencodian-inline-edit-fallback-label)');
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].textContent).toBe(huge);
+    expect(blocks[1].textContent).toBe('replacement');
+  });
+
+  it('omits the label header when no fallback label is provided (legacy callers)', () => {
+    const container = document.createElement('div');
+    const huge = 'word '.repeat(Math.ceil(INLINE_EDIT_DIFF_MAX_INPUT_CHARS / 5) + 20);
+    renderDiffInto(container, huge, 'replacement', { insert: 'ins', delete: 'del' });
+    expect(container.querySelector('.opencodian-inline-edit-fallback-label')).toBeNull();
   });
 });
 

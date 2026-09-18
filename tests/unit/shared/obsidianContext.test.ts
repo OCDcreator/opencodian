@@ -1,7 +1,9 @@
 import {
+  buildObsidianContextTag,
   getContextPathExtension,
   isEligibleContextFilePath,
   isHiddenContextPath,
+  parseObsidianContextTag,
   resolveContextMimeFromPath,
 } from '../../../src/shared/obsidianContext';
 
@@ -32,5 +34,24 @@ describe('obsidianContext helpers', () => {
     expect(isEligibleContextFilePath('obsidian-sample-plugin/node_modules/pkg/index.js')).toBe(true);
     expect(isEligibleContextFilePath('obsidian-sample-plugin/dist/main.js')).toBe(true);
     expect(isEligibleContextFilePath('docs/LICENSE')).toBe(false);
+  });
+});
+
+describe('obsidianContext folder tags (R-A7)', () => {
+  it('round-trips a folder context item through the tag and the parser', () => {
+    const tag = buildObsidianContextTag({
+      id: 'ctx-1',
+      kind: 'folder',
+      path: 'projects/alpha',
+      label: 'projects/alpha',
+      mime: 'application/x-directory',
+    });
+    expect(tag).toBe('<obsidian_context kind="folder" path="projects/alpha"></obsidian_context>');
+
+    const parsed = parseObsidianContextTag(tag);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.kind).toBe('folder');
+    expect(parsed?.path).toBe('projects/alpha');
+    expect(parsed?.textSnapshot).toBeUndefined();
   });
 });

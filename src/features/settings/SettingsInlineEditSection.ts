@@ -19,7 +19,10 @@
 import { Setting } from 'obsidian';
 
 import {
+  INLINE_EDIT_MAX_CONCURRENT_EDITS_MAX,
+  INLINE_EDIT_MAX_CONCURRENT_EDITS_MIN,
   type InlineEditPresetPrompt,
+  normalizeInlineEditMaxConcurrentEdits,
   normalizeInlineEditModelOverrides,
   type OpenCodianSettings,
 } from '../../core/types';
@@ -109,6 +112,33 @@ export class SettingsInlineEditSection {
         .setValue(this.plugin.settings.inlineEditTriggerAt)
         .onChange(async (value) => {
           this.plugin.settings.inlineEditTriggerAt = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName(t('settings.inlineEdit.documentMode.name'))
+      .setDesc(t('settings.inlineEdit.documentMode.desc'))
+      .addToggle((toggle) => toggle
+        .setValue(this.plugin.settings.inlineEditDocumentModeEnabled)
+        .onChange(async (value) => {
+          this.plugin.settings.inlineEditDocumentModeEnabled = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName(t('settings.inlineEdit.maxConcurrentEdits.name'))
+      .setDesc(t('settings.inlineEdit.maxConcurrentEdits.desc'))
+      .addSlider((slider) => slider
+        .setLimits(
+          INLINE_EDIT_MAX_CONCURRENT_EDITS_MIN,
+          INLINE_EDIT_MAX_CONCURRENT_EDITS_MAX,
+          1,
+        )
+        .setValue(this.plugin.settings.inlineEditMaxConcurrentEdits)
+        .setDynamicTooltip()
+        .onChange(async (value) => {
+          this.plugin.settings.inlineEditMaxConcurrentEdits =
+            normalizeInlineEditMaxConcurrentEdits(value);
           await this.plugin.saveSettings();
         }));
 

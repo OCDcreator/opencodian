@@ -37,6 +37,10 @@ export interface InlineEditSettingsSlice {
   readonly effortOverrides: Partial<Record<AgentBackendKind, string>>;
   /** User-defined `#` presets; builtins are composed on top by the host. */
   readonly presetPrompts: readonly InlineEditPresetPrompt[];
+  /** Parallel edits per editor (R-A5); each extra edit is another aux session. */
+  readonly maxConcurrentEdits: number;
+  /** Whole-document form toggle (R-A6). */
+  readonly documentModeEnabled: boolean;
 }
 
 /** Everything the host needs from the plugin, injected so it stays testable. */
@@ -68,8 +72,14 @@ export interface InlineEditPluginBridge {
    * generic lucide glyph.
    */
   createProviderIcon?(providerId: string, size: number): HTMLElement | null;
-  /** Vault notes offered by the "add context" picker; `null` hides the affordance. */
+  /** Vault entries offered by the "add context" picker; `null` hides the affordance. */
   listContextFiles?(): readonly InlineEditContextFile[] | null;
+  /**
+   * Resolve one dropped path against the vault (R-A7). Must use
+   * `app.vault.getAbstractFileByPath()` plus `instanceof TFile | TFolder`
+   * validation; `null` means "no chip".
+   */
+  resolveContextFile?(path: string): InlineEditContextFile | null;
 }
 
 /** Build the host the controller uses. */
@@ -82,6 +92,11 @@ export function createInlineEditPluginHost(bridge: InlineEditPluginBridge): Inli
       ? (providerId, size) => bridge.createProviderIcon?.(providerId, size) ?? null
       : undefined,
     listContextFiles: bridge.listContextFiles ? () => bridge.listContextFiles?.() ?? null : undefined,
+    resolveContextFile: bridge.resolveContextFile
+      ? (path) => bridge.resolveContextFile?.(path) ?? null
+      : undefined,
+    getMaxConcurrentEdits: () => bridge.getSettings().maxConcurrentEdits,
+    isDocumentModeEnabled: () => bridge.getSettings().documentModeEnabled,
     listPresetPrompts: () => listEffectiveInlineEditPresets(bridge.getSettings().presetPrompts),
   };
 }

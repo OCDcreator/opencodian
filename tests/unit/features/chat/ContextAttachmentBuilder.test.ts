@@ -1,6 +1,6 @@
 import type { App, Editor } from 'obsidian';
 import * as obsidian from 'obsidian';
-import { MarkdownView, TFile } from 'obsidian';
+import { MarkdownView, TFile, TFolder } from 'obsidian';
 import { TextEncoder } from 'util';
 
 import type { ServerMode } from '../../../../src/core/types/settings';
@@ -223,5 +223,29 @@ describe('ContextAttachmentBuilder', () => {
     expect(noticeSpy).toHaveBeenCalledWith(
       t('chat.context.notice.tooLarge', { label: 'notes/alpha.md' }),
     );
+  });
+});
+
+describe('ContextAttachmentBuilder folder entries (R-A7)', () => {
+  it('builds a path-only folder context item without any text snapshot', async () => {
+    const { builder } = createBuilder();
+    const folder = new TFolder();
+    folder.path = 'projects/alpha';
+    folder.name = 'alpha';
+
+    const item = await builder.buildEntryContextItem(folder);
+    expect(item).not.toBeNull();
+    expect(item?.kind).toBe('folder');
+    expect(item?.path).toBe('projects/alpha');
+    expect(item?.mime).toBe('application/x-directory');
+    expect(item?.textSnapshot).toBeUndefined();
+  });
+
+  it('builds file entries through the existing file path', async () => {
+    const { builder } = createBuilder();
+    const file = createFile('notes/a.md');
+    const item = await builder.buildEntryContextItem(file);
+    expect(item?.kind).toBe('file');
+    expect(item?.path).toBe('notes/a.md');
   });
 });

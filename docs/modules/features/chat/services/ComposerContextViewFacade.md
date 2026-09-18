@@ -19,7 +19,9 @@
 上游: `OpenCodianView`
 下游: `ComposerContextActionService`、`ComposerContextPickerActionService`、`ComposerContextCoordinator`、`ComposerContextEventBridge`、`ComposerContextRuntimeStore`、`FocusContextPreviewCoordinator`、`FocusContextRuntimeService`
 
-## 公开接口
+> 2026-09-18 (R-A7)：暴露 `addVaultPathContextFromDrop`（委托 picker action service）；`contextAttachmentBuilder` 端口增加 `buildEntryContextItem`。
+
+## 维护约束
 
 ```typescript
 interface ComposerSendContextPort {

@@ -12,11 +12,13 @@
  * `getBoundingClientRect` only run inside a scheduled animation frame, never
  * in the CM6 update cycle. Document-change observation rides a single global
  * `updateListener` extension (`inlineEditOverlayTrackerExtension`) registered
- * once via `registerEditorExtension`; the active overlay for a view is found
- * through a WeakMap, so per-edit lifecycles never accumulate CM6 config.
+ * once via `registerEditorExtension`; active overlays for a view are tracked
+ * in a WeakMap of sets, so parallel edits in one editor (R-A5) each get their
+ * own bar without accumulating CM6 config.
  *
  * The preview phase keeps its in-flow replace decoration (InlineEditWidgets);
- * only the instruction bar floats.
+ * only the instruction bar floats. A mode row at the top switches between
+ * 选区 / 光标 / 整篇 forms before the first turn (R-A6).
  */
 
 import type { Extension } from '@codemirror/state';
@@ -27,12 +29,13 @@ import { setIcon } from 'obsidian';
 import type { InlineEditPresetPrompt } from '../../core/types';
 import { t } from '../../i18n';
 import { OPENCODIAN_APP_ICON_ID } from '../../shared/brandingWordmark';
-import { openContextPicker, syncContextFooter } from './InlineEditContextUi';
+import { installInlineEditContextDrop, openContextPicker, syncContextFooter } from './InlineEditContextUi';
 import {
   attachInlineEditImageSurface,
   type InlineEditImageChipModel,
   type InlineEditImageSurface,
 } from './InlineEditImageChip';
+import { buildInlineEditModeRow, type InlineEditModeRow } from './InlineEditModeSwitch';
 import {
   buildInlineEditConfigChip,
   renderInlineEditConfigMenu,
@@ -44,7 +47,7 @@ import {
   resolvePanelTop,
 } from './InlineEditOverlayPrimitives';
 import { InlineEditPresetMenuController } from './InlineEditPresetMenu';
-import type { InlineEditContextFile } from './InlineEditTypes';
+import type { InlineEditContextFile, InlineEditMode } from './InlineEditTypes';
 
 /** Grown height cap for the instruction field, in px; beyond it the field scrolls. */
 const FIELD_MAX_HEIGHT = 100;
@@ -68,7 +71,7 @@ export interface InlineEditOverlayState {
   readonly placeholder: string;
   readonly model: InlineEditOverlayChipState | null;
   readonly effort: InlineEditOverlayChipState | null;
-  /** Attached context notes, in pick order; `[]` renders no chips. */
+  /** Attached context entries, in pick order; `[]` renders no chips. */
   readonly context: readonly InlineEditOverlayContextChip[];
   /** False hides the "add context" affordance (host has no vault to offer). */
   readonly contextSupported: boolean;
@@ -81,32 +84,53 @@ export interface InlineEditOverlayState {
   readonly image: InlineEditImageChipModel | null;
   /** False when the backend cannot transport images; hides the surface. */
   readonly imageSupported: boolean;
+  /** Current request form (R-A6). */
+  readonly mode: InlineEditMode;
+  /** Modes the bar may offer for this edit (e.g. no 选区 on an empty selection). */
+  readonly modeOptions: readonly InlineEditMode[];
+  /** False disables the mode row (busy, or the session already started). */
+  readonly modeSwitchable: boolean;
 }
 
-/** One attached note as the bar renders it. */
+/** One attached entry as the bar renders it. */
 export interface InlineEditOverlayContextChip {
   readonly path: string;
   readonly label: string;
+  /** File or directory entry (R-A7); drives the chip glyph. */
+  readonly kind: 'file' | 'folder';
 }
 
 export interface InlineEditOverlayCallbacks {
+  /** Owning edit id (R-A5): focus registration and per-edit callbacks use it. */
+  readonly editId: string;
   onSubmit(instruction: string): void;
   onReject(): void;
   onPickModel(id: string | null): void;
   onPickEffort(id: string | null): void;
   /** Provider icon factory (same pipeline as the composer model selector). */
   createProviderIcon?(providerId: string, size: number): HTMLElement | null;
-  /** The user opened the attached-notes picker; the host supplies candidates. */
+  /** The user opened the attached-entries picker; the host supplies candidates. */
   onRequestContextFiles?(): void;
-  /** Attach or detach one note path. */
+  /** Attach or detach one entry path. */
   onToggleContext?(path: string): void;
+  /** Attach one entry resolved from a vault drop (R-A7). */
+  onAttachContextEntry?(entry: InlineEditContextFile): void;
+  /**
+   * Resolve a raw `text/plain` drop payload into a context entry, or `null`
+   * when it is not a vault text file / folder (R-A7). Absent disables drops.
+   */
+  resolveContextPath?(rawPath: string): InlineEditContextFile | null;
   /** Image files pasted or dropped onto the bar (R-A4). */
   onAttachImage?(files: readonly File[]): void;
   /** Remove the attached image. */
   onRemoveImage?(): void;
+  /** Switch the request form before the first turn (R-A6). */
+  onModeChange?(mode: InlineEditMode): void;
+  /** The panel gained focus; registers this edit as the current one (R-A5). */
+  onFocus?(): void;
 }
 
-const activeOverlays = new WeakMap<EditorView, InlineEditInputOverlay>();
+const activeOverlays = new WeakMap<EditorView, Set<InlineEditInputOverlay>>();
 
 /**
  * The single CM6 extension that remaps overlay anchors through document
@@ -116,7 +140,9 @@ const activeOverlays = new WeakMap<EditorView, InlineEditInputOverlay>();
 export function inlineEditOverlayTrackerExtension(): Extension {
   return EditorView.updateListener.of((update: ViewUpdate) => {
     if (!update.docChanged) return;
-    activeOverlays.get(update.view)?.handleDocUpdate(update);
+    const overlays = activeOverlays.get(update.view);
+    if (!overlays) return;
+    for (const overlay of overlays) overlay.handleDocUpdate(update);
   });
 }
 
@@ -148,8 +174,11 @@ export class InlineEditInputOverlay {
   /** Footer elements kept by reference: queries would have to track nesting. */
   private attachEl: HTMLButtonElement | null = null;
   private contextRowEl: HTMLElement | null = null;
+  private modeRow: InlineEditModeRow | null = null;
   private imageSurface: InlineEditImageSurface | null = null;
+  private teardownContextDrop: (() => void) | null = null;
   private readonly handleContextToggle = (path: string): void => { this.callbacks.onToggleContext?.(path); };
+  private readonly handleFocusIn = (): void => { this.callbacks.onFocus?.(); };
   private state: InlineEditOverlayState | null = null;
   private anchorPos = 0;
   private frame = 0;
@@ -168,6 +197,17 @@ export class InlineEditInputOverlay {
     const doc = view.dom.ownerDocument;
     this.handleDocKeydown = (event) => {
       if (event.key !== 'Escape' || event.isComposing) return;
+      // R-A5: with parallel bars on one document, Esc belongs to the bar that
+      // owns focus. When another inline-edit bar holds the active element,
+      // that bar answers; this one stays alive. (Focus in no bar at all can
+      // only happen while this bar is busy — focus-out already dismissed the
+      // siblings — so the busy Esc-cancel path keeps working.)
+      const active = doc.activeElement;
+      if (active instanceof HTMLElement
+        && !this.panel?.contains(active)
+        && active.closest('.opencodian-inline-edit-overlay')) {
+        return;
+      }
       if (this.menu) {
         event.preventDefault();
         this.closeMenu();
@@ -197,7 +237,12 @@ export class InlineEditInputOverlay {
     doc.addEventListener('pointerdown', this.handleDocPointerDown, true);
     view.scrollDOM.addEventListener('scroll', this.handleScroll, { passive: true });
     view.dom.addEventListener('focusout', this.handleFocusOut);
-    activeOverlays.set(view, this);
+    let overlays = activeOverlays.get(view);
+    if (!overlays) {
+      overlays = new Set();
+      activeOverlays.set(view, overlays);
+    }
+    overlays.add(this);
   }
 
   /** Show (or keep showing) the bar anchored at `pos`. */
@@ -240,6 +285,8 @@ export class InlineEditInputOverlay {
       this.submitEl.classList.toggle('opencodian-inline-edit-spinning', state.busy);
     }
 
+    this.modeRow?.sync(state);
+
     if (this.panel) {
       const chipCallbacks = { createProviderIcon: this.callbacks.createProviderIcon };
       syncInlineEditConfigChip(this.panel, 'model', state.model, chipCallbacks);
@@ -280,18 +327,24 @@ export class InlineEditInputOverlay {
     doc.removeEventListener('pointerdown', this.handleDocPointerDown, true);
     this.view.scrollDOM.removeEventListener('scroll', this.handleScroll);
     this.view.dom.removeEventListener('focusout', this.handleFocusOut);
-    if (activeOverlays.get(this.view) === this) {
-      activeOverlays.delete(this.view);
+    const overlays = activeOverlays.get(this.view);
+    if (overlays) {
+      overlays.delete(this);
+      if (overlays.size === 0) activeOverlays.delete(this.view);
     }
     this.closeMenu();
     this.imageSurface?.teardown();
     this.imageSurface = null;
+    this.teardownContextDrop?.();
+    this.teardownContextDrop = null;
+    this.panel?.removeEventListener('focusin', this.handleFocusIn);
     this.panel?.remove();
     this.panel = null;
     this.field = null;
     this.submitEl = null;
     this.attachEl = null;
     this.contextRowEl = null;
+    this.modeRow = null;
     this.spinOn = false;
     this.state = null;
   }
@@ -311,6 +364,15 @@ export class InlineEditInputOverlay {
 
   private buildDom(): void {
     const root = this.view.dom.createEl('div', { cls: 'opencodian-inline-edit opencodian-inline-edit-overlay' });
+    root.addEventListener('focusin', this.handleFocusIn);
+
+    this.modeRow = buildInlineEditModeRow(root, {
+      onModeChange: (mode) => {
+        if (this.state?.modeSwitchable !== true) return;
+        if (!this.state.modeOptions.includes(mode)) return;
+        this.callbacks.onModeChange?.(mode);
+      },
+    });
 
     // Input first: the instruction is the primary task, so it owns the
     // top row; model/effort configuration lives in the meta footer below.
@@ -369,9 +431,10 @@ export class InlineEditInputOverlay {
     });
 
     const bar = root.createDiv({ cls: 'opencodian-inline-edit-chipbar' });
-    // Two footer rows: attached notes get their own line (hidden while empty),
-    // then the configuration row. Keeping attachments out of the config row is
-    // what stops "add context" + model + effort from crowding one line.
+    // Two footer rows: attached entries get their own line (hidden while
+    // empty), then the configuration row. Keeping attachments out of the
+    // config row is what stops "add context" + model + effort from crowding
+    // one line.
     const contextRow = bar.createDiv({ cls: 'opencodian-inline-edit-context-row' });
     contextRow.style.display = 'none';
     const configRow = bar.createDiv({ cls: 'opencodian-inline-edit-config-row' });
@@ -403,22 +466,16 @@ export class InlineEditInputOverlay {
       onFiles: (files) => { this.callbacks.onAttachImage?.(files); },
       onRemove: () => { this.callbacks.onRemoveImage?.(); },
     });
+    this.teardownContextDrop = installInlineEditContextDrop(root, {
+      enabled: () => this.state?.busy !== true && this.state?.contextSupported === true,
+      resolve: (rawPath) => this.callbacks.resolveContextPath?.(rawPath) ?? null,
+      onAttach: (entry) => { this.callbacks.onAttachContextEntry?.(entry); },
+    });
 
     this.view.dom.appendChild(root);
     this.panel = root;
     this.field = field;
     this.submitEl = submit;
-  }
-
-  private buildChip(bar: HTMLElement, kind: 'model' | 'effort'): void {
-    buildInlineEditConfigChip(bar, kind, () => { this.toggleMenu(kind); });
-  }
-
-  private syncChip(kind: 'model' | 'effort', state: InlineEditOverlayChipState | null): void {
-    if (!this.panel) return;
-    syncInlineEditConfigChip(this.panel, kind, state, {
-      createProviderIcon: this.callbacks.createProviderIcon,
-    });
   }
 
   private syncTextBlock(
@@ -471,7 +528,7 @@ export class InlineEditInputOverlay {
     });
   }
 
-  /** Open the attached-notes picker with the host's candidate list. */
+  /** Open the attached-entries picker with the host's candidate list. */
   showContextPicker(files: readonly InlineEditContextFile[]): void {
     const panel = this.panel;
     const window = this.view.dom.ownerDocument.defaultView;
@@ -540,7 +597,14 @@ export class InlineEditInputOverlay {
     const panel = this.panel;
     if (!panel || !panel.isConnected) return;
     this.syncFieldHeight();
-    const coords = this.view.coordsAtPos(this.anchorPos);
+    let coords: { top: number; bottom: number; left: number } | null = null;
+    try {
+      coords = this.view.coordsAtPos(this.anchorPos);
+    } catch {
+      // No layout backend (tests) or detached view: behave like the anchor is
+      // out of view and keep the last known position.
+      coords = null;
+    }
     if (!coords) {
       // Anchor scrolled out of the render window: keep the last position so
       // the bar never disappears while the user is typing into it.
@@ -565,4 +629,3 @@ export class InlineEditInputOverlay {
     this.lastTop = top;
   }
 }
-

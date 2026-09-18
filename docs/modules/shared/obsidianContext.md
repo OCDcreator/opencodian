@@ -118,3 +118,8 @@ Obsidian 显式上下文（explicit context）工具函数。处理 `<obsidian_c
 - `dedupeContextAttachments()` 使用 `kind:path:startLine:endLine` 作为稳定 key；不会比较 `label`、`mime` 或 `textSnapshot`，以避免同一上下文来源因展示字段变化而重复
 - MIME 检测仅基于扩展名，不检查文件内容
 - `toFileContextUrl()` 的底层 file URL path 规范化由 `contextPath.ts` 负责；如果要调整 Windows/POSIX 路径兼容行为，应优先扩展该模块
+
+
+> 2026-09-18 (R-A7)：`parseObsidianContextTag` 接受 `kind="folder"`（目录条目的 `<obsidian_context>` 标签可无损往返）。
+
+## 维护约束

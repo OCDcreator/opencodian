@@ -44,7 +44,9 @@
 - 缩略图为 button，点击交由 `ImagePreviewOverlay`；删除按钮保持独立，避免预览和移除互相抢占。
 - 移除最后一张缩略图时，chip 容器（`.opencodian-composer-image-chips`）必须整体从 DOM 移除（与 `clearAttachedImages()` 一致）：空容器残留会带着外边距在有边框的 composer 卡片里渲染成输入区上方的空白条（2026-09-17 shadcn 主题实测踩坑，已加回归测试）。
 
-## 公开接口
+> 2026-09-18 (R-A7)：图片 drop handler 之前先尝试 vault 路径拖拽——`dataTransfer.getData('text/plain')` 交给宿主的 `addVaultPathContextFromDrop`，**只有被认领的 drop 才 preventDefault**，编辑器内文本拖拽的默认插入行为不受影响；`dataTransfer.getData` 缺失（测试/异常宿主）时安全跳过。
+
+## 维护约束
 
 ```typescript
 export interface ComposerInputShellCoordinatorHost {

@@ -48,6 +48,19 @@ export class OpenCodeContextPartSerializer {
   }
 
   createPromptContextPart(item: PromptContextItem): PromptRequestPart {
+    // Directory references (R-A7) are path-only tags in both server modes: a
+    // file URL is meaningless for a folder, and no text snapshot ever exists.
+    if (item.kind === 'folder') {
+      return {
+        type: 'text',
+        text: buildObsidianContextTag(item),
+        synthetic: true,
+        metadata: {
+          kind: item.kind,
+          path: item.path,
+        },
+      };
+    }
     return this.host.isLocalServerMode()
       ? this.createLocalContextPart(item)
       : this.createRemoteContextPart(item);

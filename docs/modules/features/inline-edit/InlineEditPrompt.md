@@ -30,6 +30,8 @@ inline edit 与模型之间的请求构造与响应解析，采用 Claudian 验�
 
 - 附加上下文：请求可带 `attachedNotes`（路径数组），渲染为 `<attached_context>` 块置于指令与目标块之间，**只列路径**（§6.1：不注入 vault 正文，读取交给只读工具）；系统提示词（zh/en）新增一句说明该块是"去读"的清单。校验 fail-closed：数量 ≤ `INLINE_EDIT_MAX_ATTACHED_NOTES`(5)、单路径 ≤ 500 字符、路径不得含 `<`/`>`，违规分别报 `too-many-attached-notes` / `attached-note-path-too-long` / `attached-note-path-invalid`。
 
+> 2026-09-18 (R-A6/R-A7)：请求侧新增 `document` 形态（`<editor_document path lines="1-N">` 整块嵌入，输出契约仍复用 `<replacement>`，解析器零改动）；`INLINE_EDIT_MAX_DOCUMENT_CHARS = 200_000`，超限拒绝**不分块**；正文含字面量 `</editor_document>` 或 `</replacement>` 沿用 fail-closed 拒绝。`attachedNotes` 改为 `InlineEditAttachedNote[]`（`{path, kind?: 'file'|'folder'}`），`<attached_context>` 中目录条目渲染 `[folder]` 前缀；计数语义为**每条目各计 1**（目录不展开），路径规则（≤500、不含 `<>`）对目录同适用。系统提示词新增整篇形态语义（允许调整结构、不得丢弃信息）与目录语义（按需读取、不要全量读取）。
+
 ## 维护约束
 
 - 长度上限是协议的一部分，改动需同步 `docs/requirements/inline-edit.md` §6.1 与单测

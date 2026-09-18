@@ -5,7 +5,10 @@
  */
 
 import {
+  INLINE_EDIT_MAX_CONCURRENT_EDITS_DEFAULT,
+  INLINE_EDIT_MAX_CONCURRENT_EDITS_MAX,
   INLINE_EDIT_PRESET_PROMPT_MAX_COUNT,
+  normalizeInlineEditMaxConcurrentEdits,
   normalizeInlineEditPresetPrompts,
 } from '../../../../src/core/types/settings';
 import { prepareLoadedSettingsBootstrapState } from '../../../../src/core/types/settingsLoadNormalization';
@@ -101,5 +104,33 @@ describe('prepareLoadedSettingsBootstrapState inline-edit settings', () => {
     expect(state.settings.inlineEditPresetPrompts).toEqual([
       { id: 'ok', label: 'Mine', prompt: 'Body.' },
     ]);
+  });
+});
+
+describe('normalizeInlineEditMaxConcurrentEdits (R-A5)', () => {
+  it('defaults non-numbers and out-of-range values to 3', () => {
+    expect(normalizeInlineEditMaxConcurrentEdits(undefined)).toBe(INLINE_EDIT_MAX_CONCURRENT_EDITS_DEFAULT);
+    expect(normalizeInlineEditMaxConcurrentEdits(null)).toBe(INLINE_EDIT_MAX_CONCURRENT_EDITS_DEFAULT);
+    expect(normalizeInlineEditMaxConcurrentEdits('3')).toBe(INLINE_EDIT_MAX_CONCURRENT_EDITS_DEFAULT);
+    expect(normalizeInlineEditMaxConcurrentEdits(Number.NaN)).toBe(INLINE_EDIT_MAX_CONCURRENT_EDITS_DEFAULT);
+    expect(normalizeInlineEditMaxConcurrentEdits(0)).toBe(INLINE_EDIT_MAX_CONCURRENT_EDITS_DEFAULT);
+  });
+
+  it('clamps to the 1-8 window and floors floats', () => {
+    expect(normalizeInlineEditMaxConcurrentEdits(1)).toBe(1);
+    expect(normalizeInlineEditMaxConcurrentEdits(2.9)).toBe(2);
+    expect(normalizeInlineEditMaxConcurrentEdits(99)).toBe(INLINE_EDIT_MAX_CONCURRENT_EDITS_MAX);
+  });
+
+  it('round-trips through the loaded-settings bootstrap with the document-mode default', () => {
+    const state = prepareLoadedSettingsBootstrapState({
+      core: { source: 'defaults', settings: {} },
+      ui: { source: 'defaults', settings: {} },
+      persist: { shouldPersist: false, writable: false },
+      shouldPersist: false,
+      writable: false,
+    } as never);
+    expect(state.settings.inlineEditMaxConcurrentEdits).toBe(INLINE_EDIT_MAX_CONCURRENT_EDITS_DEFAULT);
+    expect(state.settings.inlineEditDocumentModeEnabled).toBe(true);
   });
 });

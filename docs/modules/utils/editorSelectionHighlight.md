@@ -84,3 +84,8 @@ OpenCodianView (用户引用编辑器选区)
 
 回归：tests/unit/utils/editorSelectionHighlight.test.ts使用真实CodeMirror EditorState验证重复显示/清除无更新、文档位置映射与重配置恢复；实机复测需记录DOM层稳定性，不能只检查最终有高亮。
 
+
+
+> 2026-09-18 (R-A5)：选区高亮改为**按键控多区域**（`showSelectionHighlight(view, from, to, key)`，缺省 `'default'` 槽保持旧行为）——并行编辑各自持有高亮，关闭一个不影响兄弟编辑；field 状态同时维护区域 map 与派生 DecorationSet，文档变更时两者一起映射。
+
+## 维护约束

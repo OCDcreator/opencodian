@@ -2,15 +2,26 @@
  * InlineEditWidgets — the CodeMirror 6 decoration layer for inline edit
  * previews.
  *
- * One `StateField<DecorationSet>` plus two `StateEffect`s drive the preview
- * (docs/requirements/inline-edit.md §7.4). The instruction input moved to the
- * floating `InlineEditInputOverlay`; only the in-flow diff preview belongs in
- * the text stream here. Decorations are rebuilt from the effect payload, and
- * `map(tr.changes)` keeps them attached while the user edits; nothing here
- * dispatches a transaction from inside `update()`.
+ * One `StateField` plus three `StateEffect`s drive the previews, keyed by
+ * `editId` so parallel edits in one editor each own an independent preview
+ * (docs/requirements/flowtext-parity.md R-A5):
+ *
+ * - `upsertInlineEditPreview(payload)` inserts or replaces one edit's preview;
+ * - `removeInlineEditPreview(editId)` drops a single preview;
+ * - `clearAllInlineEditPreviews` empties the set (editor teardown).
+ *
+ * The instruction input lives in the floating `InlineEditInputOverlay`; only
+ * the in-flow diff preview belongs in the text stream here. Two decoration
+ * semantics are load-bearing and must survive every refactor (R-A5 技术约束):
+ * insertions render as `block: true` widgets, replacements render as *inline*
+ * (not block) replace decorations — a block replace is expanded to whole-line
+ * boundaries by CodeMirror, which would break the accept path's snapshot
+ * dirty-check and write range for partial-line selections. Decorations and
+ * the per-edit payload offsets are mapped through every transaction, and
+ * nothing here dispatches from inside `update()`.
  */
 
-import type { EditorState } from '@codemirror/state';
+import type { EditorState, Range } from '@codemirror/state';
 import { StateEffect, StateField } from '@codemirror/state';
 import type { DecorationSet } from '@codemirror/view';
 import { Decoration, EditorView, WidgetType } from '@codemirror/view';
@@ -18,7 +29,7 @@ import { setIcon } from 'obsidian';
 
 import { t } from '../../i18n';
 import { OPENCODIAN_APP_ICON_ID } from '../../shared/brandingWordmark';
-import { renderDiffInto } from './InlineEditDiff';
+import { canComputeWordDiff, renderDiffInto } from './InlineEditDiff';
 import type { InlineEditWidgetCallbacks } from './InlineEditTypes';
 
 const CSS_INPUT = 'opencodian-inline-edit';
@@ -29,6 +40,8 @@ const CSS_ACTION = 'opencodian-inline-edit-action';
 
 /** Payload for the accept/reject preview widget. */
 export interface InlineEditPreviewPayload {
+  /** Owning edit; the decoration set is keyed by this id. */
+  readonly editId: string;
   readonly token: string;
   readonly from: number;
   readonly to: number;
@@ -43,36 +56,126 @@ export interface InlineEditPreviewPayload {
   readonly rejectLabel: string;
 }
 
-export const showInlineEditPreview = StateEffect.define<InlineEditPreviewPayload>();
-export const clearInlineEdit = StateEffect.define<null>();
+export const upsertInlineEditPreview = StateEffect.define<InlineEditPreviewPayload>();
+export const removeInlineEditPreview = StateEffect.define<string>();
+export const clearAllInlineEditPreviews = StateEffect.define<null>();
 
-const inlineEditField = StateField.define<DecorationSet>({
-  create: () => Decoration.none,
-  update: (decorations, transaction) => {
-    for (const effect of transaction.effects) {
-      if (effect.is(clearInlineEdit)) {
-        return Decoration.none;
+interface InlineEditPreviewEntry {
+  readonly payload: InlineEditPreviewPayload;
+  /** Live offsets, mapped through every document change. */
+  from: number;
+  to: number;
+}
+
+interface InlineEditPreviewState {
+  /** Live decorations; authoritative for display (mapped by CodeMirror). */
+  readonly decorations: DecorationSet;
+  /** Latest payload per edit, with tracked offsets for reads and rebuilds. */
+  readonly entries: ReadonlyMap<string, InlineEditPreviewEntry>;
+}
+
+const EMPTY_PREVIEWS: InlineEditPreviewState = {
+  decorations: Decoration.none,
+  entries: new Map(),
+};
+
+/** One entry as a decoration range. Collapsed replace ranges render nothing. */
+function buildPreviewRange(entry: InlineEditPreviewEntry): Range<Decoration> | null {
+  const { payload } = entry;
+  const widget = new InlineEditPreviewWidget(payload);
+  if (payload.insertion) {
+    return Decoration.widget({ widget, block: true, side: 1 }).range(entry.from);
+  }
+  // Inline (not block) replace: a block replace decoration is expanded to
+  // whole-line boundaries by CodeMirror, which would break the accept
+  // path's snapshot dirty-check and write range for partial-line selections.
+  if (entry.from >= entry.to) return null;
+  return Decoration.replace({ widget }).range(entry.from, entry.to);
+}
+
+function buildPreviewSet(entries: ReadonlyMap<string, InlineEditPreviewEntry>): DecorationSet {
+  const ranges: Range<Decoration>[] = [];
+  for (const entry of entries.values()) {
+    const range = buildPreviewRange(entry);
+    if (range) ranges.push(range);
+  }
+  if (ranges.length === 0) return Decoration.none;
+  // Decoration.set requires sorted input; upsert order is arbitrary (Map
+  // insertion order), so sort by position then start side before building.
+  ranges.sort((left, right) => (left.from - right.from) || (left.value.startSide - right.value.startSide));
+  return Decoration.set(ranges);
+}
+
+/**
+ * Map one entry through a document change.
+ *
+ * Replace ranges mirror `EditorSelection.range` mapping (from assoc +1, to
+ * assoc -1); insertion widgets sit after their position (side 1). The safety
+ * net is the accept-time dirty check, which rejects any drift either way.
+ */
+function mapEntry(entry: InlineEditPreviewEntry, changes: {
+  mapPos(pos: number, assoc?: number): number;
+}): InlineEditPreviewEntry {
+  const from = changes.mapPos(entry.from, 1);
+  const to = entry.payload.insertion
+    ? from
+    : changes.mapPos(entry.to, -1);
+  if (from === entry.from && to === entry.to) return entry;
+  return { payload: entry.payload, from, to };
+}
+
+const inlineEditField = StateField.define<InlineEditPreviewState>({
+  create: () => EMPTY_PREVIEWS,
+  update: (state, transaction) => {
+    // Mutations always copy-on-write first (see below); the cast only widens.
+    let entries = state.entries as Map<string, InlineEditPreviewEntry>;
+
+    if (transaction.docChanged && entries.size > 0) {
+      const mapped = new Map<string, InlineEditPreviewEntry>();
+      for (const [editId, entry] of entries) {
+        mapped.set(editId, mapEntry(entry, transaction.changes));
       }
-      if (effect.is(showInlineEditPreview)) {
+      entries = mapped;
+    }
+
+    let touched = false;
+    for (const effect of transaction.effects) {
+      if (effect.is(clearAllInlineEditPreviews)) {
+        if (entries.size === 0) continue;
+        entries = new Map();
+        touched = true;
+        continue;
+      }
+      if (effect.is(removeInlineEditPreview)) {
+        if (!entries.has(effect.value)) continue;
+        entries = new Map(entries);
+        entries.delete(effect.value);
+        touched = true;
+        continue;
+      }
+      if (effect.is(upsertInlineEditPreview)) {
         const payload = effect.value;
-        const widget = new InlineEditPreviewWidget(payload);
-        if (payload.insertion) {
-          return Decoration.set([
-            Decoration.widget({ widget, block: true, side: 1 }).range(payload.from),
-          ]);
-        }
-        // Inline (not block) replace: a block replace decoration is expanded to
-        // whole-line boundaries by CodeMirror, which would break the accept
-        // path's snapshot dirty-check and write range for partial-line selections.
-        return Decoration.set([
-          Decoration.replace({ widget }).range(payload.from, payload.to),
-        ]);
+        entries = new Map(entries);
+        entries.set(payload.editId, {
+          payload,
+          from: payload.from,
+          to: payload.insertion ? payload.from : payload.to,
+        });
+        touched = true;
       }
     }
-    return decorations.map(transaction.changes);
+
+    if (!touched) {
+      if (entries === state.entries) return state;
+      return { entries, decorations: state.decorations.map(transaction.changes) };
+    }
+    return { entries, decorations: buildPreviewSet(entries) };
   },
-  provide: (field) => EditorView.decorations.from(field),
+  provide: (field) => EditorView.decorations.from(field, (value) => value.decorations),
 });
+
+/** The preview field, exported for contract tests (state-level assertions). */
+export const inlineEditPreviewField = inlineEditField;
 
 /** Inject the inline-edit field into an editor the first time it is used. */
 export function ensureInlineEditField(view: EditorView): void {
@@ -91,21 +194,32 @@ export function applyInlineEditEffect(
 
 /** The current inline-edit decorations, if the field is installed. */
 export function readInlineEditDecorations(state: EditorState): DecorationSet | null {
-  return state.field(inlineEditField, false) ?? null;
+  const fieldState = state.field(inlineEditField, false);
+  return fieldState?.decorations ?? null;
+}
+
+/** Ids of the edits that currently hold a preview decoration. */
+export function readInlineEditPreviewIds(state: EditorState): readonly string[] {
+  const fieldState = state.field(inlineEditField, false);
+  return fieldState ? [...fieldState.entries.keys()] : [];
 }
 
 /**
- * Current document range of the inline-edit decoration.
+ * Current document range of one edit's preview decoration.
  *
- * The decoration set is mapped through every transaction, so this is the
- * selection range *now* — which is what the accept path needs in order to write
- * at the right offsets after the user has edited elsewhere in the note.
+ * Entries are mapped through every transaction, so this is the selection range
+ * *now* — which is what the accept path needs in order to write at the right
+ * offsets after the user has edited elsewhere in the note.
  */
-export function readInlineEditRange(state: EditorState): { from: number; to: number } | null {
-  const decorations = readInlineEditDecorations(state);
-  if (!decorations || decorations.size === 0) return null;
-  const range = decorations.iter();
-  return { from: range.from, to: range.to };
+export function readInlineEditRange(
+  state: EditorState,
+  editId: string,
+): { from: number; to: number } | null {
+  const fieldState = state.field(inlineEditField, false);
+  if (!fieldState) return null;
+  const entry = fieldState.entries.get(editId);
+  if (!entry) return null;
+  return { from: entry.from, to: entry.to };
 }
 
 // -----------------------------------------------------------------------------
@@ -126,19 +240,35 @@ class InlineEditPreviewWidget extends WidgetType {
   }
 
   toDOM(): HTMLElement {
-    const root = activeDocument.createElement('div');
+    // `document` matches Obsidian's `activeDocument` in production; using the
+    // standard global keeps the widget renderable in tests too.
+    const root = document.createElement('div');
     root.className = `${CSS_INPUT}-preview`;
     root.addClass(CSS_INPUT);
     root.addClass(CSS_PREVIEW);
     if (this.payload.busy) root.addClass('is-busy');
 
     const body = root.createDiv({ cls: `${CSS_INPUT}-body` });
-    if (this.payload.insertion) {
+    const degraded = !canComputeWordDiff(this.payload.before, this.payload.after);
+    if (this.payload.busy && degraded) {
+      // Streaming a whole-document (or otherwise huge) edit: the final frame
+      // renders the full before/after fallback, but per-frame DOM churn of
+      // two giant blocks would freeze the editor — show a bounded progress
+      // body instead (R-A6 diff degradation + R-A3 busy marker).
+      body.addClass('opencodian-inline-edit-body-degraded-busy');
+      body.createDiv({
+        cls: `${CSS_INPUT}-busy-body`,
+        text: t('inlineEdit.preview.streamingLarge', {
+          chars: String(this.payload.after.length),
+        }),
+      });
+    } else if (this.payload.insertion) {
       body.createDiv({ cls: CSS_INSERT, text: this.payload.after });
     } else {
       renderDiffInto(body, this.payload.before, this.payload.after, {
         insert: CSS_INSERT,
         delete: CSS_DELETE,
+        fallbackLabel: t('inlineEdit.preview.degraded'),
       });
     }
 

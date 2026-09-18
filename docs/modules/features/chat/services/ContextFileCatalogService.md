@@ -74,3 +74,8 @@ class ContextFileCatalogService {
 - 只有缓存已存在时才增量更新；尚未打开过文件选择器时，vault 事件不会触发提前扫描
 - 非 `TFile` vault 事件必须 invalidate，避免文件夹变更导致缓存结构陈旧
 - service 自身不再持有 batch scan/yield 或 entry/bucket 维护细节；后续如果继续拆分 context catalog，应优先沿 `ContextFileCatalogBuildRunner` / `ContextFileCatalogIndex` 与 cache orchestration 的边界推进
+
+
+> 2026-09-18 (R-A7)：构建目录时把 `vault.getAllLoadedFiles()` 中的 `TFolder` 一并入索引（文件 + 文件夹一起批量构建）；既有 vault 事件路径对非 TFile 已整表失效，目录变更天然覆盖。
+
+## 维护约束

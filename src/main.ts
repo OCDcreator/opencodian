@@ -2,7 +2,7 @@
 import * as fs from 'fs';
 import type { ElicitationRequest, ElicitationResult } from '@anthropic-ai/claude-agent-sdk';
 import type { Editor, MarkdownView } from 'obsidian';
-import { addIcon, Notice, Plugin } from 'obsidian';
+import { addIcon, Notice, Plugin, TFile, TFolder } from 'obsidian';
 import * as path from 'path';
 import { presentPiUiRequest } from './features/chat/services/PiExtensionUiHost';
 import { OPENCODIAN_APP_ICON_ID } from './shared/brandingWordmark';
@@ -10,6 +10,7 @@ import { OPENCODIAN_APP_ICON_ID } from './shared/brandingWordmark';
 import { ModelConfigService, ModelPricingService, OpencodeConfigManager } from './core/config';
 import { setAgentServiceRegistry } from './core/agents/AgentCapability';
 import { InlineEditController } from './features/inline-edit/InlineEditController';
+import { confirmInlineEditDocumentReplace } from './features/inline-edit/InlineEditConfirmModal';
 import { inlineEditAtTriggerExtension } from './features/inline-edit/InlineEditAtTrigger';
 import {
   findMarkdownViewForView,
@@ -158,7 +159,7 @@ export default class OpenCodianPlugin extends Plugin {
   modelPricingService: ModelPricingService | null = null;
   pluginUpdateService: PluginUpdateService;
   settingsTab?: InstanceType<typeof OpenCodianSettingTab>;
-  /** Singleton inline-edit controller; only one inline edit exists at a time. */
+  /** Inline-edit controller; edits are bucketed per editor (R-A5 parallelism). */
   inlineEditController: InlineEditController | null = null;
   private inlineEditHost: InlineEditHost | null = null;
 
@@ -456,6 +457,8 @@ export default class OpenCodianPlugin extends Plugin {
         modelOverrides: this.settings.inlineEditModelOverrides,
         effortOverrides: this.settings.inlineEditEffortOverrides,
         presetPrompts: this.settings.inlineEditPresetPrompts,
+        maxConcurrentEdits: this.settings.inlineEditMaxConcurrentEdits,
+        documentModeEnabled: this.settings.inlineEditDocumentModeEnabled,
       }),
       listModels: (kind) => this.listInlineEditModels(kind),
       listEfforts: (kind) => {
@@ -483,8 +486,17 @@ export default class OpenCodianPlugin extends Plugin {
       },
       createProviderIcon: (providerId, size) => ProviderIconService.createIconElement(this.app, providerId, size),
       listContextFiles: () => this.listInlineEditContextFiles(),
+      resolveContextFile: (path) => this.resolveInlineEditContextFile(path),
     });
-    this.inlineEditController = new InlineEditController({ host: this.inlineEditHost });
+    this.inlineEditController = new InlineEditController({
+      host: this.inlineEditHost,
+      confirmDocumentReplace: (info) => confirmInlineEditDocumentReplace(this.app, info),
+    });
+  }
+
+  /** Whole-document form gate (R-A6), also used by the command/menu checks. */
+  private documentModeEnabled(): boolean {
+    return this.settings?.inlineEditDocumentModeEnabled ?? true;
   }
 
   /**
@@ -529,21 +541,50 @@ export default class OpenCodianPlugin extends Plugin {
   }
 
   /**
-   * Vault notes the inline-edit "add context" picker can offer.
+   * Vault entries the inline-edit "add context" picker can offer.
    *
-   * Text files only: the prompt passes paths and the read-only aux tools do the
-   * reading (§6.1 forbids inlining extra vault text). Paths containing `<` or
-   * `>` are left out because they would collide with the prompt's tag
-   * protocol, and the picker is the only place a user could choose them.
+   * Text files plus folders (R-A7): files pass paths and the read-only aux
+   * tools do the reading (§6.1 forbids inlining extra vault text); folder
+   * entries tell the model the notes under them are reference material. Paths
+   * containing `<` or `>` are left out because they would collide with the
+   * prompt's tag protocol, and the picker is the only place a user could
+   * choose them.
    */
   private listInlineEditContextFiles(): readonly InlineEditContextFile[] | null {
-    if (!this.app.vault?.getFiles) return null;
-    return this.app.vault
-      .getFiles()
-      .filter((file) => file.extension === 'md' || file.extension === 'txt')
-      .filter((file) => !/[<>]/.test(file.path))
-      .map((file) => ({ path: file.path, name: file.basename }))
-      .sort((left, right) => left.path.localeCompare(right.path));
+    if (!this.app.vault?.getFiles || !this.app.vault.getAllLoadedFiles) return null;
+    const entries: InlineEditContextFile[] = [];
+    for (const file of this.app.vault.getFiles()) {
+      if (file.extension !== 'md' && file.extension !== 'txt') continue;
+      if (/[<>]/.test(file.path)) continue;
+      entries.push({ path: file.path, name: file.basename, kind: 'file' });
+    }
+    for (const folder of this.app.vault.getAllLoadedFiles()) {
+      if (!(folder instanceof TFolder)) continue;
+      if (folder.path === '/') continue;
+      if (/[<>]/.test(folder.path)) continue;
+      entries.push({ path: folder.path, name: folder.name, kind: 'folder' });
+    }
+    return entries.sort((left, right) => left.path.localeCompare(right.path));
+  }
+
+  /**
+   * Resolve one dropped path against the vault for the inline-edit context
+   * drop surface (R-A7). The `instanceof TFile | TFolder` check is the hard
+   * gate: a path string that does not resolve to a vault entry — including
+   * anything outside the vault — never becomes a context chip.
+   */
+  private resolveInlineEditContextFile(path: string): InlineEditContextFile | null {
+    const abstract = this.app.vault.getAbstractFileByPath(path);
+    if (abstract instanceof TFolder) {
+      if (/[<>]/.test(abstract.path)) return null;
+      return { path: abstract.path, name: abstract.name, kind: 'folder' };
+    }
+    if (abstract instanceof TFile) {
+      if (abstract.extension !== 'md' && abstract.extension !== 'txt') return null;
+      if (/[<>]/.test(abstract.path)) return null;
+      return { path: abstract.path, name: abstract.basename, kind: 'file' };
+    }
+    return null;
   }
 
   /**
@@ -729,10 +770,23 @@ export default class OpenCodianPlugin extends Plugin {
       });
     }));
 
+    // Whole-document form (R-A6): same engine, document anchor, second
+    // confirmation on accept. Hidden while the mode is disabled.
+    this.registerEvent(this.app.workspace.on('editor-menu', (menu, editor, view) => {
+      if (!this.canRunInlineEdit() || !this.documentModeEnabled()) return;
+      menu.addItem((item) => {
+        item.setTitle(t('inlineEdit.mode.document'))
+          .setIcon('file-pen')
+          .onClick(() => {
+            this.inlineEditController?.open(editor, view, { mode: 'document' });
+          });
+      });
+    }));
+
     // Floating "inline edit" button next to the active selection.
     this.registerEditorExtension(inlineEditSelectionAffordanceExtension({
       canShow: () => this.canRunInlineEdit() && (this.settings?.inlineEditSelectionAffordance ?? true),
-      isEditing: () => this.inlineEditController?.phase != null,
+      isEditing: () => this.inlineEditController?.hasActiveEdits() ?? false,
       openForView: (editorView) => {
         const view = findMarkdownViewForView(this.app, editorView);
         if (!view?.editor) return;
@@ -748,15 +802,25 @@ export default class OpenCodianPlugin extends Plugin {
       openForView: (editorView) => {
         const view = findMarkdownViewForView(this.app, editorView);
         if (!view?.editor || !view.file) return false;
-        this.inlineEditController?.open(view.editor, view);
-        // Consume the `@` only when the panel actually opened; otherwise the
-        // character falls through to normal typing.
-        return this.inlineEditController?.phase != null;
+        // Consume the `@` only when a new panel actually opened; otherwise the
+        // character falls through to normal typing (at the cap, or when the
+        // backend is unavailable).
+        return this.inlineEditController?.open(view.editor, view) ?? false;
       },
     }));
 
     // Remaps the floating inline-edit bar's anchor through document changes.
     this.registerEditorExtension(inlineEditOverlayTrackerExtension());
+
+    // R-A5: closing a note tab or switching files detaches the editor view;
+    // dispose every inline edit that belonged to it (decorations + native
+    // aux sessions). Both events are cheap and prune only detached views.
+    this.registerEvent(this.app.workspace.on('active-leaf-change', () => {
+      void this.inlineEditController?.pruneDetachedEdits();
+    }));
+    this.registerEvent(this.app.workspace.on('layout-change', () => {
+      void this.inlineEditController?.pruneDetachedEdits();
+    }));
 
     this.settingsTab = new OpenCodianSettingTab(this.app, this);
     this.addSettingTab(this.settingsTab);
@@ -814,6 +878,20 @@ export default class OpenCodianPlugin extends Plugin {
         }
         if (!checking) {
           this.inlineEditController?.open(editor, view);
+        }
+        return true;
+      },
+    });
+
+    this.addCommand({
+      id: 'inline-edit-document',
+      name: t('inlineEdit.command.document'),
+      editorCheckCallback: (checking: boolean, editor: Editor, view: MarkdownView) => {
+        if (!this.canRunInlineEdit() || !this.documentModeEnabled()) {
+          return false;
+        }
+        if (!checking) {
+          this.inlineEditController?.open(editor, view, { mode: 'document' });
         }
         return true;
       },

@@ -951,3 +951,56 @@
     animation-duration: 1.8s;
   }
 }
+
+/* -- Mode switch (R-A6) ------------------------------------------- */
+
+.opencodian-inline-edit-moderow {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 2px;
+  margin: 8px 10px 0;
+  padding: 2px;
+  border-radius: var(--ocie-radius-sm);
+  background: color-mix(in srgb, var(--background-modifier-hover) 55%, transparent);
+}
+
+.opencodian-inline-edit-mode-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  padding: 3px 10px;
+  border-radius: calc(var(--ocie-radius-sm) - 2px);
+  cursor: pointer;
+}
+
+.opencodian-inline-edit-mode-btn:hover {
+  color: var(--text-normal);
+}
+
+.opencodian-inline-edit-mode-btn.is-active {
+  background: var(--background-primary);
+  color: var(--text-normal);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
+}
+
+.opencodian-inline-edit-mode-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* -- Degraded preview (R-A6) -------------------------------------- */
+
+.opencodian-inline-edit-fallback-label {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  padding: 2px 0 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px dashed color-mix(in srgb, var(--text-muted) 35%, transparent);
+}
+
+.opencodian-inline-edit-body-degraded-busy {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  padding: 6px 0;
+}

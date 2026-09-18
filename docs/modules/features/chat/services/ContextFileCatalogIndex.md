@@ -12,6 +12,8 @@
 上游: `obsidian`（`TFile`）、`shared/obsidianContext`
 下游: `ContextFileCatalogBuildRunner`、`ContextFileCatalogService`
 
+> 2026-09-18 (R-A7)：条目支持文件夹——`ContextFileEntry` 增加 `kind: 'file'|'folder'`（`file` 字段类型放宽为 `TFile | TFolder`）；目录只受隐藏路径规则约束（无扩展名概念）、不参与扩展名桶、排序在文件之前；`appendBuildFile/upsertFile/renameFile` 接受 `TFile | TFolder`。
+
 ## 公开接口
 
 ```typescript

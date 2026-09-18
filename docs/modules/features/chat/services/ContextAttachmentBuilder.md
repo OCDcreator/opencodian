@@ -12,7 +12,9 @@
 上游: `obsidian`（App、Editor、MarkdownView、TFile、Notice）、`core/types`、`core/types/settings`、`i18n`、`shared/obsidianContext`、`composerContext`
 下游: `ComposerContextActionService`、`ComposerContextCoordinator`、`OpenCodianView`
 
-## 公开接口
+> 2026-09-18 (R-A7)：新增 `buildEntryContextItem(entry: TFile | TFolder)`（picker/拖拽统一入口）与 `buildFolderContextItem`——目录条目为**纯路径引用**：永不携带 textSnapshot，远程模式的二进制/体积检查不适用。
+
+## 维护约束
 
 ```typescript
 const REMOTE_CONTEXT_TEXT_LIMIT_BYTES = 64 * 1024;

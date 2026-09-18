@@ -126,6 +126,26 @@ export const INLINE_EDIT_PRESET_PROMPT_MAX_ID_CHARS = 100;
 export const INLINE_EDIT_PRESET_PROMPT_MAX_LABEL_CHARS = 100;
 export const INLINE_EDIT_PRESET_PROMPT_MAX_PROMPT_CHARS = 2000;
 
+/** Default and hard bounds for parallel inline edits (R-A5). */
+export const INLINE_EDIT_MAX_CONCURRENT_EDITS_DEFAULT = 3;
+export const INLINE_EDIT_MAX_CONCURRENT_EDITS_MIN = 1;
+export const INLINE_EDIT_MAX_CONCURRENT_EDITS_MAX = 8;
+
+/**
+ * Normalize the parallel-edit cap (R-A5). Non-numbers, NaN and out-of-range
+ * values fall back to the default; floats are floored. The cap bounds live
+ * auxiliary query sessions, so the upper bound is deliberately small.
+ */
+export function normalizeInlineEditMaxConcurrentEdits(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return INLINE_EDIT_MAX_CONCURRENT_EDITS_DEFAULT;
+  }
+  const clamped = Math.floor(value);
+  if (clamped < INLINE_EDIT_MAX_CONCURRENT_EDITS_MIN) return INLINE_EDIT_MAX_CONCURRENT_EDITS_DEFAULT;
+  if (clamped > INLINE_EDIT_MAX_CONCURRENT_EDITS_MAX) return INLINE_EDIT_MAX_CONCURRENT_EDITS_MAX;
+  return clamped;
+}
+
 /**
  * Normalize the user-defined inline-edit preset list. Drops malformed entries
  * (non-strings, empty id/label/prompt, oversized fields) and duplicate ids,
@@ -3029,6 +3049,21 @@ export interface OpenCodianSettings {
    */
   inlineEditPresetPrompts: InlineEditPresetPrompt[];
 
+  /**
+   * How many inline edits may run in parallel inside one editor (R-A5,
+   * default 3). Every parallel edit is an independent auxiliary query
+   * session, so the cap also bounds concurrent model sessions; opening
+   * beyond the cap is refused with a notice rather than silently replacing
+   * an existing edit. Clamped to 1–8.
+   */
+  inlineEditMaxConcurrentEdits: number;
+
+  /**
+   * Whole-document inline-edit form (R-A6, default on). When off, the
+   * 整篇 mode toggle and the `inline-edit-document` command are hidden.
+   */
+  inlineEditDocumentModeEnabled: boolean;
+
   capabilityLabSelectedBackend: string | undefined;
 
   /** Backend-specific settings that should not be flattened into OpenCode fields. */
@@ -3265,6 +3300,8 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   inlineEditModelOverrides: {},
   inlineEditEffortOverrides: {},
   inlineEditPresetPrompts: [],
+  inlineEditMaxConcurrentEdits: INLINE_EDIT_MAX_CONCURRENT_EDITS_DEFAULT,
+  inlineEditDocumentModeEnabled: true,
   capabilityLabSelectedBackend: undefined,
   backendSettings: getDefaultBackendSettings(),
 

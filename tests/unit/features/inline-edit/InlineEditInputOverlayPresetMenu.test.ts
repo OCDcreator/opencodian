@@ -39,6 +39,11 @@ function baseState(overrides: Partial<InlineEditOverlayState> = {}): InlineEditO
     context: [],
     contextSupported: false,
     presets: BUILTIN_PRESETS,
+    image: null,
+    imageSupported: false,
+    mode: 'selection',
+    modeOptions: ['selection', 'cursor-inline', 'document'],
+    modeSwitchable: true,
     ...overrides,
   };
 }

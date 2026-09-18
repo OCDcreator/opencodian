@@ -1,3 +1,5 @@
+> 2026-09-18 (FlowText parity R-A7): `OpenCodeContextPartSerializer.createPromptContextPart` serializes `kind: 'folder'` context items as path-only `<obsidian_context kind="folder" path="...">` text parts in both local and remote modes (directories never carry a text snapshot or file URL).
+
 # Owner: core.opencode
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.

@@ -451,3 +451,8 @@ New normalize functions added:
 
 - 新增 `inlineEditTriggerAt`（`@` 键唤起行内编辑，默认 `false`，需求 §10 Q1 裁决不默认开启）；加载期 boolean 归一化，缺失回退 `false`。
 - 新增 `inlineEditPresetPrompts`（`InlineEditPresetPrompt[]`，用户自定义 `#` 预设，默认 `[]` = 仅内置）与 `normalizeInlineEditPresetPrompts()`：剔除类型错误/空 id/空 label/空 prompt/超长字段（id ≤100、label ≤100、prompt ≤2000 字符）/重复 id（保留首个）的条目，列表上限 `INLINE_EDIT_PRESET_PROMPT_MAX_COUNT = 50`。内置目录不落 settings（文案走 i18n），由 feature 侧 `listEffectiveInlineEditPresets()` 合成。
+
+
+> 2026-09-18 (R-A5/R-A6)：新增 `inlineEditMaxConcurrentEdits`（默认 3，clamp 1–8，`normalizeInlineEditMaxConcurrentEdits`——每个并行编辑同时消耗一个独立模型会话）与 `inlineEditDocumentModeEnabled`（默认 true，整篇形态总开关）。
+
+## 维护约束

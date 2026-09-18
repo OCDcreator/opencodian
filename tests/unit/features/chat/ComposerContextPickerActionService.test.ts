@@ -1,14 +1,15 @@
 import type { App, TFile } from 'obsidian';
+import { TFile as TFileClass, TFolder } from 'obsidian';
 
 import type { PromptContextItem } from '../../../../src/core/types';
 import {
   ComposerContextPickerActionService,
   type ComposerContextPickerActionServiceHost,
 } from '../../../../src/features/chat/services/ComposerContextPickerActionService';
-import { chooseContextFile } from '../../../../src/features/chat/ui/ContextFilePickerModal';
+import { chooseContextFiles } from '../../../../src/features/chat/ui/ContextFilePickerModal';
 
 jest.mock('../../../../src/features/chat/ui/ContextFilePickerModal', () => ({
-  chooseContextFile: jest.fn(),
+  chooseContextFiles: jest.fn(),
 }));
 
 function createContextItem(overrides: Partial<PromptContextItem> = {}): PromptContextItem {
@@ -24,7 +25,7 @@ function createContextItem(overrides: Partial<PromptContextItem> = {}): PromptCo
 }
 
 function createHarness(options: {
-  fileItem?: PromptContextItem | null;
+  builtItems?: ReadonlyMap<string, PromptContextItem | null>;
 } = {}) {
   const app = {} as App;
   const addDraftContextItem = jest.fn();
@@ -38,7 +39,8 @@ function createHarness(options: {
   };
 
   const contextAttachmentBuilder = {
-    buildFileContextItem: jest.fn(async () => options.fileItem ?? null),
+    buildEntryContextItem: jest.fn(async (entry: TFile) =>
+      options.builtItems?.get(entry.path) ?? null),
   };
 
   const contextFileCatalogService = {
@@ -71,10 +73,12 @@ describe('ComposerContextPickerActionService', () => {
     jest.resetAllMocks();
   });
 
-  it('opens the file picker with picker lifecycle hooks, loads the catalog, and attaches the chosen file context', async () => {
-    const file = { path: 'docs/spec.md' } as TFile;
-    const fileItem = createContextItem({ path: 'docs/spec.md' });
-    const chooseContextFileMock = chooseContextFile as jest.MockedFunction<typeof chooseContextFile>;
+  it('opens the picker with lifecycle hooks and attaches every picked entry (multi-select)', async () => {
+    const first = { path: 'docs/spec.md' } as TFile;
+    const second = { path: 'docs/extra.md' } as TFile;
+    const firstItem = createContextItem({ path: 'docs/spec.md' });
+    const secondItem = createContextItem({ path: 'docs/extra.md' });
+    const chooseContextFilesMock = chooseContextFiles as jest.MockedFunction<typeof chooseContextFiles>;
     const {
       service,
       app,
@@ -84,29 +88,33 @@ describe('ComposerContextPickerActionService', () => {
       contextAttachmentBuilder,
       contextFileCatalogService,
     } = createHarness({
-      fileItem,
+      builtItems: new Map([
+        [first.path, firstItem],
+        [second.path, secondItem],
+      ]),
     });
 
-    chooseContextFileMock.mockImplementation(async (actualApp, loadCatalog) => {
+    chooseContextFilesMock.mockImplementation(async (actualApp, loadCatalog) => {
       expect(beginContextPickerInteraction).toHaveBeenCalledTimes(1);
       expect(completeContextPickerInteraction).not.toHaveBeenCalled();
       expect(actualApp).toBe(app);
       await loadCatalog();
-      return file;
+      return [first, second];
     });
 
     const result = await service.addChosenFileContextToActiveTab();
 
     expect(result).toBe(true);
     expect(contextFileCatalogService.getCatalog).toHaveBeenCalledTimes(1);
-    expect(contextAttachmentBuilder.buildFileContextItem).toHaveBeenCalledWith(file, 'file');
-    expect(addDraftContextItem).toHaveBeenCalledWith(fileItem);
+    expect(contextAttachmentBuilder.buildEntryContextItem).toHaveBeenCalledTimes(2);
+    expect(addDraftContextItem).toHaveBeenCalledWith(firstItem);
+    expect(addDraftContextItem).toHaveBeenCalledWith(secondItem);
     expect(beginContextPickerInteraction).toHaveBeenCalledTimes(1);
     expect(completeContextPickerInteraction).toHaveBeenCalledTimes(1);
   });
 
   it('returns false without mutating draft context when the picker is cancelled', async () => {
-    const chooseContextFileMock = chooseContextFile as jest.MockedFunction<typeof chooseContextFile>;
+    const chooseContextFilesMock = chooseContextFiles as jest.MockedFunction<typeof chooseContextFiles>;
     const {
       service,
       addDraftContextItem,
@@ -114,19 +122,19 @@ describe('ComposerContextPickerActionService', () => {
       completeContextPickerInteraction,
       contextAttachmentBuilder,
     } = createHarness();
-    chooseContextFileMock.mockResolvedValue(null);
+    chooseContextFilesMock.mockResolvedValue([]);
 
     const result = await service.addChosenFileContextToActiveTab();
 
     expect(result).toBe(false);
-    expect(contextAttachmentBuilder.buildFileContextItem).not.toHaveBeenCalled();
+    expect(contextAttachmentBuilder.buildEntryContextItem).not.toHaveBeenCalled();
     expect(addDraftContextItem).not.toHaveBeenCalled();
     expect(beginContextPickerInteraction).toHaveBeenCalledTimes(1);
     expect(completeContextPickerInteraction).toHaveBeenCalledTimes(1);
   });
 
   it('still completes the picker lifecycle when the modal throws', async () => {
-    const chooseContextFileMock = chooseContextFile as jest.MockedFunction<typeof chooseContextFile>;
+    const chooseContextFilesMock = chooseContextFiles as jest.MockedFunction<typeof chooseContextFiles>;
     const {
       service,
       addDraftContextItem,
@@ -134,15 +142,52 @@ describe('ComposerContextPickerActionService', () => {
       completeContextPickerInteraction,
       contextAttachmentBuilder,
     } = createHarness({
-      fileItem: createContextItem({ path: 'docs/spec.md' }),
+      builtItems: new Map([['docs/spec.md', createContextItem({ path: 'docs/spec.md' })]]),
     });
-    chooseContextFileMock.mockRejectedValue(new Error('picker failed'));
+    chooseContextFilesMock.mockRejectedValue(new Error('picker failed'));
 
     await expect(service.addChosenFileContextToActiveTab()).rejects.toThrow('picker failed');
 
-    expect(contextAttachmentBuilder.buildFileContextItem).not.toHaveBeenCalled();
+    expect(contextAttachmentBuilder.buildEntryContextItem).not.toHaveBeenCalled();
     expect(addDraftContextItem).not.toHaveBeenCalled();
     expect(beginContextPickerInteraction).toHaveBeenCalledTimes(1);
     expect(completeContextPickerInteraction).toHaveBeenCalledTimes(1);
+  });
+
+  it('claims vault drops only after resolving through the vault (R-A7)', async () => {
+    const folder = Object.assign(new TFolder(), { path: 'projects', name: 'projects' });
+    const file = Object.assign(new TFileClass(), { path: 'notes/a.md', extension: 'md' });
+    const abstractFiles = new Map<string, unknown>([
+      ['projects', folder],
+      ['notes/a.md', file],
+      ['outside.txt', null],
+    ]);
+    const app = {
+      vault: {
+        getAbstractFileByPath: (path: string) => abstractFiles.get(path) ?? null,
+      },
+    } as unknown as App;
+    const addDraftContextItem = jest.fn();
+    const service = new ComposerContextPickerActionService(
+      app,
+      { buildEntryContextItem: jest.fn(async () => createContextItem()) },
+      { getCatalog: jest.fn() },
+      {
+        addDraftContextItem,
+        beginContextPickerInteraction: jest.fn(),
+        completeContextPickerInteraction: jest.fn(),
+      },
+    );
+
+    // Outside-vault / unknown paths are not claimed.
+    expect(service.addVaultPathContextFromDrop('/etc/passwd')).toBe(false);
+    expect(service.addVaultPathContextFromDrop('')).toBe(false);
+
+    // Vault file and folder drops are claimed and attach asynchronously.
+    expect(service.addVaultPathContextFromDrop('projects')).toBe(true);
+    expect(service.addVaultPathContextFromDrop('notes/a.md')).toBe(true);
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(addDraftContextItem).toHaveBeenCalledTimes(2);
   });
 });

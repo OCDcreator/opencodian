@@ -12,7 +12,9 @@
 上游: `obsidian`（`TFile`）、`ContextFileCatalogIndex`
 下游: `ContextFileCatalogService`
 
-## 公开接口
+> 2026-09-18 (R-A7)：`buildIndex` 接受 `readonly (TFile | TFolder)[]`（目录与文件同批构建）。
+
+## 维护约束
 
 ```typescript
 interface ContextFileCatalogBuildRunnerOptions {

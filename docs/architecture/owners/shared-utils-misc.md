@@ -1,3 +1,5 @@
+> 2026-09-18 (FlowText parity R-A5): `editorSelectionHighlight` becomes keyed multi-region (`showSelectionHighlight(view, from, to, key)`; default slot keeps legacy behavior) so parallel inline edits each keep their own highlight; region map and derived DecorationSet map together through every document change.
+
 # Owner: shared.utils-misc
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.

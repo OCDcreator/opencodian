@@ -26,6 +26,8 @@
 
 - 可选 `listContextFiles()`：透传插件的 vault 文本文件列表（`md`/`txt`，过滤掉路径含 `<`/`>` 的项，因为它们会与提示词的标签协议冲突），供附加上下文选择器使用
 
+> 2026-09-18 (R-A5/R-A6/R-A7)：`InlineEditSettingsSlice` 增加 `maxConcurrentEdits` 与 `documentModeEnabled`；host 暴露 `getMaxConcurrentEdits` / `isDocumentModeEnabled` / `resolveContextFile`（桥接实现，vault 解析 + instanceof 校验）。
+
 ## 维护约束
 
 - 显式配置但解析/校验失败必须返回 `{ ok: false, error }`，由 controller 提示并中止；不要静默改用默认模型

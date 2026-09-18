@@ -9,10 +9,10 @@ import {
   type FocusContextRuntimeViewHost,
 } from '../../../../src/features/chat/services/ComposerContextViewFacade';
 import type { TabId } from '../../../../src/features/chat/tabs';
-import { chooseContextFile } from '../../../../src/features/chat/ui/ContextFilePickerModal';
+import { chooseContextFiles } from '../../../../src/features/chat/ui/ContextFilePickerModal';
 
 jest.mock('../../../../src/features/chat/ui/ContextFilePickerModal', () => ({
-  chooseContextFile: jest.fn(),
+  chooseContextFiles: jest.fn(),
 }));
 
 type Mocked<T> = {
@@ -84,6 +84,7 @@ function createHarness(options: {
     buildFileContextItem: jest.fn(async () => options.fileItem ?? null),
     buildFileContextItemFromPath: jest.fn(async () => null),
     buildSelectionContextItemFromPreview: jest.fn(() => null),
+    buildEntryContextItem: jest.fn(async () => options.fileItem ?? null),
     hasFileAtPath: jest.fn().mockReturnValue(true),
   };
   const contextFileCatalogService = {
@@ -176,7 +177,7 @@ describe('ComposerContextViewFacade', () => {
       path: 'docs/spec.md',
       label: 'docs/spec.md',
     });
-    const chooseContextFileMock = chooseContextFile as jest.MockedFunction<typeof chooseContextFile>;
+    const chooseContextFilesMock = chooseContextFiles as jest.MockedFunction<typeof chooseContextFiles>;
     const { services, contextAttachmentBuilder } = createHarness({
       fileItem,
     });
@@ -188,14 +189,14 @@ describe('ComposerContextViewFacade', () => {
       services.focusContextPreviewCoordinator,
       'scheduleFocusContextPreviewRefresh',
     ).mockImplementation(() => {});
-    chooseContextFileMock.mockResolvedValue(file);
+    chooseContextFilesMock.mockResolvedValue([file]);
 
     const result = await services.viewFacade.addChosenFileContextToActiveTab();
 
     expect(result).toBe(true);
     expect(pointerDownSpy).toHaveBeenCalledTimes(1);
     expect(refreshSpy).toHaveBeenCalledTimes(1);
-    expect(contextAttachmentBuilder.buildFileContextItem).toHaveBeenCalledWith(file, 'file');
+    expect(contextAttachmentBuilder.buildEntryContextItem).toHaveBeenCalledWith(file);
     expect(services.viewFacade.sendContext.getDraftContextItems()).toEqual([fileItem]);
   });
 });

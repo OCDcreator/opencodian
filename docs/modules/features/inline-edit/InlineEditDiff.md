@@ -19,6 +19,8 @@ inline edit 预览用的词级 diff：自研 LCS（无依赖）+ 中日韩感知
 
 - 无（纯计算 + DOM 写入）
 
+> 2026-09-18 (R-A6)：`renderDiffInto(container, before, after, options)` 的 `options` 并入 `insert`/`delete` 类名与可选 `fallbackLabel`——整篇编辑必然超预算走整段 before/after 降级视图，标注头明确提示「内容过大，仅显示前后对照」。
+
 ## 维护约束
 
 - LCS 是 O(n×m)，**必须**保留上限判定；降级视图是有意的可接受结果，不要在超限时强行计算

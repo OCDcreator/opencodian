@@ -22,6 +22,13 @@ import type { InlineEditContextFile } from './InlineEditTypes';
 /** Rows rendered at once; the search field narrows beyond that. */
 export const PICKER_MAX_ROWS = 50;
 
+/** One context chip as the footer renders it. */
+export interface ContextChipModel {
+  readonly path: string;
+  readonly label: string;
+  readonly kind?: 'file' | 'folder';
+}
+
 /** The "add context" chip itself; hidden when the host offers no candidates. */
 export function syncAttachChip(attach: HTMLButtonElement, supported: boolean, busy: boolean): void {
   attach.style.display = supported ? '' : 'none';
@@ -29,7 +36,7 @@ export function syncAttachChip(attach: HTMLButtonElement, supported: boolean, bu
 }
 
 export interface ContextFooterState {
-  readonly chips: readonly { readonly path: string; readonly label: string }[];
+  readonly chips: readonly ContextChipModel[];
   readonly supported: boolean;
   readonly busy: boolean;
   readonly onToggle: (path: string) => void;
@@ -50,15 +57,17 @@ export function syncContextFooter(
 }
 
 /**
- * Rebuild the attached-note chips in their own footer row, and hide that row
+ * Rebuild the attached-entry chips in their own footer row, and hide that row
  * while nothing is attached so the footer does not reserve an empty line.
  *
  * Rebuilt rather than diffed: the list is at most
  * INLINE_EDIT_MAX_ATTACHED_NOTES long and holds no caret or focus state.
+ * Directory entries render a folder glyph so a folder chip is distinguishable
+ * from a note chip at a glance (R-A7).
  */
 export function renderContextChips(
   row: HTMLElement,
-  chips: readonly { readonly path: string; readonly label: string }[],
+  chips: readonly ContextChipModel[],
   onToggle: (path: string) => void,
 ): void {
   row.empty();
@@ -70,7 +79,7 @@ export function renderContextChips(
       attr: { type: 'button', title: removeLabel, 'aria-label': removeLabel },
     });
     const glyph = chip.createSpan({ cls: 'opencodian-inline-edit-chip-prefix' });
-    setIcon(glyph, 'file-text');
+    setIcon(glyph, entry.kind === 'folder' ? 'folder' : 'file-text');
     chip.createSpan({ cls: 'opencodian-inline-edit-chip-value', text: entry.label });
     const remove = chip.createSpan({ cls: 'opencodian-inline-edit-context-chip-remove' });
     setIcon(remove, 'x');
@@ -145,13 +154,19 @@ export function renderContextPickerInto(
       const check = row.createSpan({ cls: 'opencodian-inline-edit-menu-item-check' });
       setIcon(check, 'check');
       const glyph = row.createSpan({ cls: 'opencodian-inline-edit-menu-item-glyph' });
-      setIcon(glyph, 'file-text');
+      setIcon(glyph, file.kind === 'folder' ? 'folder' : 'file-text');
       row.createSpan({ cls: 'opencodian-inline-edit-menu-item-label', text: file.name });
       // Folder shown as a muted suffix; the label is the basename without the
-      // extension, so it cannot be used to slice the path.
-      const slash = file.path.lastIndexOf('/');
-      if (slash > 0) {
-        row.createSpan({ cls: 'opencodian-inline-edit-picker-folder', text: file.path.slice(0, slash) });
+      // extension, so it cannot be used to slice the path. For directory
+      // entries the full path is the only useful locator, so it is always
+      // shown; files keep the parent-folder suffix.
+      if (file.kind === 'folder') {
+        row.createSpan({ cls: 'opencodian-inline-edit-picker-folder', text: file.path });
+      } else {
+        const slash = file.path.lastIndexOf('/');
+        if (slash > 0) {
+          row.createSpan({ cls: 'opencodian-inline-edit-picker-folder', text: file.path.slice(0, slash) });
+        }
       }
       row.addEventListener('click', (event) => {
         event.preventDefault();
@@ -230,4 +245,54 @@ export function openContextPicker(
   refresh(options.attachedPaths);
   focusContextPickerSearch(menu, options.view);
   return { element: menu, refresh };
+}
+
+// -----------------------------------------------------------------------------
+// Vault drop surface (R-A7)
+// -----------------------------------------------------------------------------
+
+export interface InlineEditContextDropOptions {
+  /** False while the edit is busy or the host offers no context support. */
+  readonly enabled: () => boolean;
+  /**
+   * Resolve a raw `text/plain` drop payload. Must go through
+   * `app.vault.getAbstractFileByPath()` with `instanceof TFile | TFolder`
+   * checks on the host side; returns `null` for anything that is not a vault
+   * text file or folder.
+   */
+  readonly resolve: (rawPath: string) => InlineEditContextFile | null;
+  /** Attach one resolved entry. */
+  readonly onAttach: (entry: InlineEditContextFile) => void;
+}
+
+/**
+ * Wire vault-path drops onto the floating bar.
+ *
+ * Obsidian's file explorer drags carry the vault path as `text/plain` (OS
+ * files ride `dataTransfer.files` instead and are handled by the image
+ * surface). The payload is only trusted after the host resolves it against
+ * the vault, so a random path string can never become a context chip (R-A7
+ * 技术约束). `dragover` is deliberately not preventDefault-ed: selections
+ * dragged from the editor itself also use `text/plain`, and the bar must not
+ * swallow those — the drop handler only cancels the default once the payload
+ * actually resolved to a vault entry.
+ */
+export function installInlineEditContextDrop(
+  panel: HTMLElement,
+  options: InlineEditContextDropOptions,
+): () => void {
+  const handleDrop = (event: DragEvent): void => {
+    if (!options.enabled()) return;
+    const raw = event.dataTransfer?.getData('text/plain') ?? '';
+    if (!raw.trim()) return;
+    const entry = options.resolve(raw.trim());
+    if (!entry) return;
+    event.preventDefault();
+    event.stopPropagation();
+    options.onAttach(entry);
+  };
+  panel.addEventListener('drop', handleDrop);
+  return () => {
+    panel.removeEventListener('drop', handleDrop);
+  };
 }

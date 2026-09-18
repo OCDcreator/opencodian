@@ -15,7 +15,7 @@
  */
 
 import type { Locale, TranslationKey } from '../../i18n';
-import type { InlineEditAnchor } from './InlineEditTypes';
+import type { InlineEditAnchor, InlineEditContextFile } from './InlineEditTypes';
 
 // -----------------------------------------------------------------------------
 // Limits (§6.1)
@@ -30,23 +30,40 @@ export const INLINE_EDIT_MAX_PATH_CHARS = 500;
 /** Longest generated result accepted from the model. */
 export const INLINE_EDIT_MAX_RESULT_CHARS = 40_000;
 /**
+ * Longest whole note the document form will embed (R-A6). Beyond this the
+ * request is rejected rather than chunked: splitting a note destroys
+ * whole-document coherence and the model cannot guarantee cross-chunk
+ * continuity.
+ */
+export const INLINE_EDIT_MAX_DOCUMENT_CHARS = 200_000;
+/**
  * Most notes one request may carry as attached context.
  *
  * Attached notes ride along as paths only (§6.1: never inline extra vault text,
  * the read-only tools do the reading), so the cap keeps the block a hint rather
- * than a payload.
+ * than a payload. Every entry — file or directory — counts as one (R-A7).
  */
 export const INLINE_EDIT_MAX_ATTACHED_NOTES = 5;
 
-/** Request shapes (§7.2). */
-export type InlineEditRequestKind = 'selection' | 'cursor-inline' | 'cursor-inbetween';
+/** Request shapes (§7.2 + R-A6 document form). */
+export type InlineEditRequestKind = 'selection' | 'cursor-inline' | 'cursor-inbetween' | 'document';
 
 /** Tag names that make up the protocol. */
 export const INLINE_EDIT_SELECTION_TAG = 'editor_selection';
 export const INLINE_EDIT_CURSOR_TAG = 'editor_cursor';
+export const INLINE_EDIT_DOCUMENT_TAG = 'editor_document';
 export const INLINE_EDIT_CONTEXT_TAG = 'attached_context';
 export const INLINE_EDIT_REPLACEMENT_TAG = 'replacement';
 export const INLINE_EDIT_INSERTION_TAG = 'insertion';
+
+/**
+ * One attached-context entry (R-A7). `kind` distinguishes plain file paths
+ * from directory entries, which the rendered block marks `[folder]`.
+ */
+export interface InlineEditAttachedNote {
+  readonly path: string;
+  readonly kind?: 'file' | 'folder';
+}
 
 export interface InlineEditSelectionRequest {
   readonly kind: 'selection';
@@ -57,8 +74,8 @@ export interface InlineEditSelectionRequest {
   /** 1-based inclusive last line of the selection. */
   readonly endLine: number;
   readonly selectionText: string;
-  /** Vault-relative paths the user attached; rendered as a read-hint block. */
-  readonly attachedNotes?: readonly string[];
+  /** Vault-relative entries the user attached; rendered as a read-hint block. */
+  readonly attachedNotes?: readonly InlineEditAttachedNote[];
 }
 
 export interface InlineEditCursorRequest {
@@ -71,11 +88,30 @@ export interface InlineEditCursorRequest {
   readonly before: string;
   /** Text after the cursor on that line (or after the cursor in the paragraph). */
   readonly after: string;
-  /** Vault-relative paths the user attached; rendered as a read-hint block. */
-  readonly attachedNotes?: readonly string[];
+  /** Vault-relative entries the user attached; rendered as a read-hint block. */
+  readonly attachedNotes?: readonly InlineEditAttachedNote[];
 }
 
-export type InlineEditRequest = InlineEditSelectionRequest | InlineEditCursorRequest;
+/**
+ * Whole-document form (R-A6): the block embeds the entire note and the model
+ * replies with one `<replacement>` holding the rewritten note. The output
+ * contract is unchanged — only the request side gains the document block.
+ */
+export interface InlineEditDocumentRequest {
+  readonly kind: 'document';
+  readonly instruction: string;
+  readonly notePath: string;
+  /** 1-based inclusive last line of the note. */
+  readonly endLine: number;
+  readonly documentText: string;
+  /** Vault-relative entries the user attached; rendered as a read-hint block. */
+  readonly attachedNotes?: readonly InlineEditAttachedNote[];
+}
+
+export type InlineEditRequest =
+  | InlineEditSelectionRequest
+  | InlineEditCursorRequest
+  | InlineEditDocumentRequest;
 
 export type InlineEditRequestResult =
   | { readonly ok: true; readonly prompt: string }
@@ -111,6 +147,8 @@ const SYSTEM_PROMPT_EN = [
   'Never emit more than one tag. Never nest tags. Never wrap the tag in markdown fences.',
   'The tag body is used verbatim, so put nothing in it but the final text.',
   '',
+  'Whole document: when the request carries an <editor_document> block, the block holds the entire note and the <replacement> you reply with replaces it wholesale. You may restructure (heading levels, paragraph order) to serve the instruction, but you must not drop existing information unless the instruction explicitly asks for it.',
+  '',
   'Images: when a request carries an image, answer from its content and put the final text in the tag as usual — never describe the image, never mention being unable to see it. Mathematical notation in the image defaults to LaTeX, delimited as the request states for its anchor form.',
   '',
   'Editing rules:',
@@ -121,7 +159,7 @@ const SYSTEM_PROMPT_EN = [
   '- Write code and identifiers exactly as the surrounding code does.',
   '',
   'You have read-only tools. Use them silently when you need more context from the note or vault before editing — read first, then edit. Never mention the tools, and never attempt to create, modify, or delete files: writing is not available to you and the caller applies your result.',
-  'An <attached_context> block means the user attached those notes on purpose: read them with your tools before deciding, and treat them as reference for the edit rather than as text to rewrite.',
+  'An <attached_context> block means the user attached those notes on purpose: read them with your tools before deciding, and treat them as reference for the edit rather than as text to rewrite. Entries marked [folder] are directories: the notes under them are reference material — read only the relevant ones on demand, and never bulk-read the whole directory.',
   '',
   'If the instruction is ambiguous, ask one short, specific question instead of guessing.',
 ].join('\n');
@@ -136,6 +174,8 @@ const SYSTEM_PROMPT_ZH = [
   '禁止输出多个标签，禁止标签嵌套，禁止用 markdown 代码块包裹标签。',
   '标签内的内容会被原样使用，因此只能放最终文字。',
   '',
+  '整篇模式：当请求携带 <editor_document> 块时，块内是整篇笔记，你用 <replacement> 回复的完整内容将整体替换它。允许为了更好地执行指令而调整结构（标题层级、段落顺序），但不得丢弃既有信息，除非用户指令明确要求。',
+  '',
   '图片：当请求附带图片时，根据图片内容直接作答，并像往常一样把最终文字放入协议标签——不要描述图片，也不要提及看不见图片。图片中的数学公式默认输出 LaTeX，定界符按请求中注明的本次锚点形态使用。',
   '',
   '编辑要求：',
@@ -146,7 +186,7 @@ const SYSTEM_PROMPT_ZH = [
   '- 代码与标识符要和上下文写法一致。',
   '',
   '你有只读工具。需要更多上下文时可以静默使用它们先读再改。不要提及工具，也不要尝试创建、修改或删除文件——你没有写入能力，结果由调用方应用。',
-  '出现 <attached_context> 块表示用户特意附上了这些笔记：先用工具读取它们再决定，把它们当作本次修改的参考资料，而不是要改写的正文。',
+  '出现 <attached_context> 块表示用户特意附上了这些笔记：先用工具读取它们再决定，把它们当作本次修改的参考资料，而不是要改写的正文。其中标记为 [folder] 的条目是目录：该目录下的笔记是参考资料——按需读取其中相关的笔记，不要全量读取整个目录。',
   '',
   '如果指令含糊，请只提出一个简短具体的问题，不要猜测。',
 ].join('\n');
@@ -201,6 +241,26 @@ export function buildInlineEditRequest(request: InlineEditRequest): InlineEditRe
     return { ok: true, prompt: `${lead}${block}` };
   }
 
+  if (request.kind === 'document') {
+    const body = request.documentText;
+    if (body.length > INLINE_EDIT_MAX_DOCUMENT_CHARS) {
+      return { ok: false, error: 'document-too-long' };
+    }
+    // Fail-closed like the selection form: a literal protocol closing tag in
+    // the note would break the block, so the request is rejected instead of
+    // inventing an escaping scheme (R-A6).
+    const collision = findClosingTagCollision(body, INLINE_EDIT_DOCUMENT_TAG)
+      || findClosingTagCollision(body, INLINE_EDIT_REPLACEMENT_TAG);
+    if (collision) {
+      return { ok: false, error: 'selection-contains-protocol-tag' };
+    }
+    const lines = `1-${request.endLine}`;
+    const block = `<${INLINE_EDIT_DOCUMENT_TAG} path="${escapeXmlAttribute(request.notePath)}" lines="${lines}">\n`
+      + `${body}\n`
+      + `</${INLINE_EDIT_DOCUMENT_TAG}>`;
+    return { ok: true, prompt: `${lead}${block}` };
+  }
+
   const contextLength = request.before.length + request.after.length;
   if (contextLength > INLINE_EDIT_MAX_CONTEXT_CHARS) {
     return { ok: false, error: 'context-too-long' };
@@ -241,20 +301,21 @@ export function buildInlineEditImageNote(locale: Locale, request: InlineEditRequ
 }
 
 /**
- * Validate the attached-note list before it reaches the prompt.
+ * Validate the attached-entry list before it reaches the prompt.
  *
  * Fail-closed, like the rest of this builder: an unusable attachment is an
  * error rather than something silently dropped, so the user never believes
- * context was sent that was not.
+ * context was sent that was not. Every entry — file or directory (R-A7) —
+ * counts against the cap and obeys the same path rules.
  */
-function validateAttachedNotes(notes: readonly string[] | undefined): string | null {
+function validateAttachedNotes(notes: readonly InlineEditAttachedNote[] | undefined): string | null {
   if (!notes || notes.length === 0) return null;
   if (notes.length > INLINE_EDIT_MAX_ATTACHED_NOTES) return 'too-many-attached-notes';
   for (const note of notes) {
-    if (note.length > INLINE_EDIT_MAX_PATH_CHARS) return 'attached-note-path-too-long';
+    if (note.path.length > INLINE_EDIT_MAX_PATH_CHARS) return 'attached-note-path-too-long';
     // Angle brackets would break the tag protocol. The picker never offers such
     // paths; this is the backstop that keeps the block unbreakable.
-    if (/[<>]/.test(note)) return 'attached-note-path-invalid';
+    if (/[<>]/.test(note.path)) return 'attached-note-path-invalid';
   }
   return null;
 }
@@ -264,10 +325,14 @@ function validateAttachedNotes(notes: readonly string[] | undefined): string | n
  *
  * Paths only: per §6.1 the prompt never inlines extra vault text, and the
  * system prompt tells the model to read them with its read-only tools.
+ * Directory entries render with a `[folder]` marker so the model treats the
+ * directory as reference material instead of a single note (R-A7).
  */
-function renderAttachedContextBlock(notes: readonly string[] | undefined): string {
+function renderAttachedContextBlock(notes: readonly InlineEditAttachedNote[] | undefined): string {
   if (!notes || notes.length === 0) return '';
-  const lines = notes.map((note) => `- ${note}`).join('\n');
+  const lines = notes
+    .map((note) => `- ${note.kind === 'folder' ? '[folder] ' : ''}${note.path}`)
+    .join('\n');
   return `<${INLINE_EDIT_CONTEXT_TAG}>\n${lines}\n</${INLINE_EDIT_CONTEXT_TAG}>`;
 }
 
@@ -336,15 +401,17 @@ export function parseInlineEditResponse(raw: string): InlineEditResponse {
 
 /**
  * Build the request payload for one anchored edit (docs/requirements/inline-edit.md
- * §6.1: attached notes travel as paths only — the read-only tools do the
+ * §6.1: attached entries travel as paths only — the read-only tools do the
  * reading; an empty list leaves the field out entirely).
  */
 export function buildInlineEditRequestForAnchor(
   anchor: InlineEditAnchor,
   instruction: string,
-  contextFiles: readonly { readonly path: string }[] = [],
+  contextFiles: readonly InlineEditContextFile[] = [],
 ): InlineEditRequest {
-  const attachedNotes = contextFiles.length > 0 ? contextFiles.map((file) => file.path) : undefined;
+  const attachedNotes: readonly InlineEditAttachedNote[] | undefined = contextFiles.length > 0
+    ? contextFiles.map((file) => ({ path: file.path, ...(file.kind ? { kind: file.kind } : {}) }))
+    : undefined;
   if (anchor.mode === 'selection') {
     return {
       kind: 'selection',
@@ -353,6 +420,16 @@ export function buildInlineEditRequestForAnchor(
       startLine: anchor.startLine,
       endLine: anchor.endLine,
       selectionText: anchor.snapshot,
+      attachedNotes,
+    };
+  }
+  if (anchor.mode === 'document') {
+    return {
+      kind: 'document',
+      instruction,
+      notePath: anchor.notePath,
+      endLine: anchor.endLine,
+      documentText: anchor.snapshot,
       attachedNotes,
     };
   }
@@ -391,6 +468,7 @@ export function describeInlineEditFailure(reason: string): TranslationKey {
     case 'path-too-long': return 'inlineEdit.error.pathTooLong';
     case 'selection-too-long': return 'inlineEdit.error.selectionTooLong';
     case 'context-too-long': return 'inlineEdit.error.contextTooLong';
+    case 'document-too-long': return 'inlineEdit.error.documentTooLong';
     case 'too-many-attached-notes': return 'inlineEdit.error.tooManyAttachedNotes';
     case 'attached-note-path-too-long': return 'inlineEdit.error.attachedNotePathTooLong';
     case 'attached-note-path-invalid': return 'inlineEdit.error.attachedNotePathInvalid';

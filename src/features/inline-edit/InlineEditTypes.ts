@@ -57,15 +57,19 @@ export interface InlineEditChoice {
 }
 
 /**
- * A vault note the user attached as extra context.
+ * A vault entry the user attached as extra context.
  *
  * Only the path travels to the model: per docs/requirements/inline-edit.md §6.1
  * the prompt never inlines extra vault text, the read-only tools do the reading.
+ * `kind` distinguishes file entries from directory entries (R-A7): a directory
+ * entry means the notes under it are reference material, to be read on demand.
  */
 export interface InlineEditContextFile {
   readonly path: string;
-  /** Display name (the file's basename). */
+  /** Display name (the file's basename, or the folder name). */
   readonly name: string;
+  /** Entry kind; absent means `'file'` (older hosts). */
+  readonly kind?: 'file' | 'folder';
 }
 
 /** What the model chip should display and where it comes from. */
@@ -75,7 +79,7 @@ export interface InlineEditModelSelectionLabel {
 }
 
 /** How the request was anchored in the editor. */
-export type InlineEditMode = 'selection' | 'cursor-inline' | 'cursor-inbetween';
+export type InlineEditMode = 'selection' | 'cursor-inline' | 'cursor-inbetween' | 'document';
 
 /** The editor-side anchor captured when the request was issued. */
 export interface InlineEditAnchor {

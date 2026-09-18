@@ -53,8 +53,27 @@ export interface InlineEditHost {
   /**
    * Vault notes offered by the "add context" picker. Absent or `null` hides the
    * affordance entirely, so a host without a vault keeps the bar unchanged.
+   * Entries may include directories (`kind: 'folder'`, R-A7).
    */
   listContextFiles?(): readonly InlineEditContextFile[] | null;
+  /**
+   * Resolve one dropped vault path into a context entry (R-A7). The
+   * implementation must go through `app.vault.getAbstractFileByPath()` and
+   * validate `instanceof TFile | TFolder` — arbitrary path strings never
+   * resolve. `null` means "not a vault text file or folder" and produces no
+   * chip. Absent disables the drop surface entirely.
+   */
+  resolveContextFile?(path: string): InlineEditContextFile | null;
+  /**
+   * Parallel-edit concurrency cap for one editor (R-A5), from
+   * `inlineEditMaxConcurrentEdits`. Absent uses the controller default.
+   */
+  getMaxConcurrentEdits?(): number;
+  /**
+   * Whether the whole-document form is available (R-A6), from
+   * `inlineEditDocumentModeEnabled`. Absent means enabled.
+   */
+  isDocumentModeEnabled?(): boolean;
   /**
    * Effective `#` preset list for the input bar's preset menu (R-A2): the
    * builtin catalog plus the user-defined entries, already merged and

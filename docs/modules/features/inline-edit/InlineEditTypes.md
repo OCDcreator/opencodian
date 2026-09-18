@@ -10,7 +10,7 @@ inline edit 的共享类型，使 controller 与 service 不必直接依赖插�
 ## 职责
 
 - `InlineEditHostAdapter`：宿主解析后的 backend 句柄，含 `kind`、`displayName`、`getAuxQuery()` 与 `resolveModel()`（返回 `{ ok: false, error }` 表示显式配置的模型不可用），以及 `supportsImages`（R-A4：会话级图片传输能力，`false` 时 UI 显式提示能力缺失而不是静默降级为无图请求）
-- `InlineEditMode`：`selection` / `cursor-inline` / `cursor-inbetween`
+- `InlineEditMode`：`selection` / `cursor-inline` / `cursor-inbetween` / `document`（R-A6 整篇形态）
 - `InlineEditAnchor`：请求发起时的编辑器锚点，含 `from`/`to`、`snapshot`（脏检查基准）、行号与光标前后文
 - `InlineEditOutcome`：`preview` / `clarification` / `error` 三态
 - `InlineEditWidgetCallbacks`：widget 回调面
@@ -20,7 +20,7 @@ inline edit 的共享类型，使 controller 与 service 不必直接依赖插�
 
 - `../../core/agents/backend/AgentAuxQueryCapability`、`../../core/types/chat`
 
-- `InlineEditContextFile`：附加上下文的候选项（`path` + 展示用 `name`）。
+- `InlineEditContextFile`：附加上下文的候选项（`path` + 展示用 `name`）；`kind?: 'file' | 'folder'`（R-A7，缺省 `'file'`）区分文件与目录条目——目录在 `<attached_context>` 中渲染为 `[folder]` 前缀，表示"该目录下笔记是参考资料，按需读取"。每条目各计 1 个上限名额。
 
 ## 维护约束
 

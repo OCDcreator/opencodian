@@ -255,3 +255,60 @@ export function renderInlineEditConfigMenu(
     menu.style.left = `${Math.max(0, localLeft)}px`;
   }
 }
+
+// -----------------------------------------------------------------------------
+// Per-edit orchestration (extracted from InlineEditController)
+// -----------------------------------------------------------------------------
+
+/** The slice of one active edit the pick/load helpers need. */
+export interface InlineEditPickEditHost {
+  readonly adapter: InlineEditHostAdapter;
+  modelChoices: readonly InlineEditChoice[] | null;
+  readonly sessionStarted: boolean;
+}
+
+export interface InlineEditPickDeps {
+  notify(message: string): void;
+  rerender(): void;
+}
+
+/** Run one model pick for `edit` (persists the override, re-renders the bar). */
+export async function runInlineEditModelPick(
+  edit: InlineEditPickEditHost,
+  deps: InlineEditPickDeps,
+  id: string | null,
+): Promise<void> {
+  await pickInlineEditModel(
+    { adapter: edit.adapter, modelChoices: edit.modelChoices, sessionStarted: edit.sessionStarted },
+    { notify: deps.notify, rerender: deps.rerender },
+    id,
+  );
+}
+
+/** Run one effort pick for `edit`. */
+export async function runInlineEditEffortPick(
+  edit: InlineEditPickEditHost,
+  deps: InlineEditPickDeps,
+  id: string | null,
+): Promise<void> {
+  await pickInlineEditEffort(
+    { adapter: edit.adapter, modelChoices: edit.modelChoices, sessionStarted: edit.sessionStarted },
+    { notify: deps.notify, rerender: deps.rerender },
+    id,
+  );
+}
+
+/** Fetch the backend's model list for the picker (best effort). */
+export async function loadInlineEditModelChoices(
+  edit: InlineEditPickEditHost,
+  deps: { rerender(): void },
+): Promise<void> {
+  const lister = edit.adapter.listModels;
+  if (!lister) return;
+  try {
+    edit.modelChoices = await lister.call(edit.adapter) ?? [];
+  } catch {
+    edit.modelChoices = [];
+  }
+  deps.rerender();
+}

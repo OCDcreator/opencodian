@@ -99,3 +99,8 @@ graph TD
 - 不要把它再拆成 `ImagePartBuilder`、`RemoteContextHelper` 之类更薄文件；R23 的目标是把 context/image request-part ownership 收口到一个较厚 owner。
 - `buildObsidianContextTag()` 的文本格式、Windows path normalization，以及 remote text-size guard 都是兼容边界，不要在没有专门迁移计划时改动。
 - serializer 只负责 request-part assembly；stream runtime、event transform、message normalization 分别留给后续 R24-R26。
+
+
+> 2026-09-18 (R-A7)：`createPromptContextPart` 对 `kind === 'folder'` 在本地/远程两种模式下都序列化为纯路径 `<obsidian_context kind="folder" path="...">` 文本部件（目录没有 file URL 语义，也永不携带快照；远程模式因此不再对目录抛「missing text snapshot」）。
+
+## 维护约束

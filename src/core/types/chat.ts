@@ -51,7 +51,12 @@ export interface SessionTodo {
   priority?: 'low' | 'medium' | 'high';
 }
 
-export type PromptContextKind = 'current_note' | 'selection' | 'file';
+/**
+ * Context attachment kinds. `folder` (R-A7) marks a directory entry: the
+ * notes under it are reference material for the model, not an inlined
+ * payload — the item never carries a text snapshot.
+ */
+export type PromptContextKind = 'current_note' | 'selection' | 'file' | 'folder';
 
 export interface PromptContextLineRange {
   startLine: number;

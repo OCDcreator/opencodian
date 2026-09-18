@@ -189,3 +189,8 @@ Settings exports now include `SandboxFilesystemConfig`, `SandboxNetworkConfig`, 
 3. `permission` 相关（`PermissionRequest`, `PermissionMode`）— 权限交互
 
 - 2026-09-15: 导出 `normalizeInlineEditModelOverrides`，供设置分节在保存前归一化按 backend 键控的行内编辑模型覆盖。
+
+
+> 2026-09-18 (R-A5)：再导出 `normalizeInlineEditMaxConcurrentEdits` 与并发上限常量。
+
+## 维护约束

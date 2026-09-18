@@ -1,5 +1,5 @@
 import type { App, TAbstractFile } from 'obsidian';
-import { TFile } from 'obsidian';
+import { TFile, TFolder } from 'obsidian';
 
 import { ContextFileCatalogBuildRunner } from './ContextFileCatalogBuildRunner';
 import {
@@ -84,6 +84,12 @@ export class ContextFileCatalogService {
   }
 
   private async buildCatalogIndex(): Promise<ContextFileCatalogIndex> {
-    return this.catalogBuildRunner.buildIndex(this.app.vault.getFiles());
+    // Folders join the catalog so the picker can offer directory entries
+    // (R-A7); vault events below invalidate the cache on folder changes too.
+    const filesAndFolders = [
+      ...this.app.vault.getFiles(),
+      ...this.app.vault.getAllLoadedFiles().filter((entry): entry is TFolder => entry instanceof TFolder),
+    ];
+    return this.catalogBuildRunner.buildIndex(filesAndFolders);
   }
 }

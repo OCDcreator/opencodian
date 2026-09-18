@@ -22,6 +22,8 @@ overlay 仍持有选择器的**容器、定位与 Escape 顺序**（它就是一
 
 - `obsidian`（`setIcon`）、`../../i18n`、`./InlineEditTypes`（`InlineEditContextFile`）
 
+> 2026-09-18 (R-A7)：picker 行与上下文 chip 按 `kind` 渲染图标（文件夹 → folder glyph），目录条目显示完整路径（文件仅父目录后缀）；新增 `installInlineEditContextDrop`——vault 拖放 glue：只信任宿主经 `getAbstractFileByPath` + instanceof 解析成功的 `text/plain` 负载，解析失败不 preventDefault（编辑器文本拖拽保持默认行为）。
+
 ## 维护约束
 
 - 选择器**不能改用 modal**：modal 会把焦点移出面板，`focusout` 到面板外即取消整次行内编辑（见 overlay 的取消契约）。它必须留在面板 DOM 内

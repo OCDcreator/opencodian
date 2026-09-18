@@ -21,7 +21,7 @@ import { setIcon } from 'obsidian';
 
 import { t } from '../../i18n';
 import { OPENCODIAN_APP_ICON_ID } from '../../shared/brandingWordmark';
-import { getEditorView } from './InlineEditController';
+import { getEditorView } from './InlineEditEditorView';
 
 export interface InlineEditAffordanceDeps {
   /** Feature + backend gate; false hides the button everywhere. */

@@ -145,3 +145,32 @@ describe('OpenCodeContextPartSerializer', () => {
     );
   });
 });
+
+describe('OpenCodeContextPartSerializer folder entries (R-A7)', () => {
+  const folderItem: PromptContextItem = {
+    id: 'ctx-folder',
+    kind: 'folder',
+    path: 'projects/alpha',
+    label: 'projects/alpha',
+    mime: 'application/x-directory',
+  };
+
+  it('serializes folders as path-only obsidian_context tags in local mode', () => {
+    const serializer = createSerializer({ local: true, vaultPath: '/vault' });
+    const part = serializer.createPromptContextPart(folderItem);
+    expect(part).toEqual({
+      type: 'text',
+      text: '<obsidian_context kind="folder" path="projects/alpha"></obsidian_context>',
+      synthetic: true,
+      metadata: { kind: 'folder', path: 'projects/alpha' },
+    });
+  });
+
+  it('serializes folders the same way in remote mode (no snapshot required)', () => {
+    const serializer = createSerializer({ local: false });
+    const part = serializer.createPromptContextPart(folderItem);
+    expect(part.type).toBe('text');
+    if (part.type !== 'text') return;
+    expect(part.text).toContain('<obsidian_context kind="folder" path="projects/alpha">');
+  });
+});

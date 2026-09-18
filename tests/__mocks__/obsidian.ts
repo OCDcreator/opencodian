@@ -184,6 +184,7 @@ export class Vault {
   
   getAbstractFileByPath() { return null; }
   getFiles() { return []; }
+  getAllLoadedFiles() { return []; }
   getRoot() { return {}; }
   create() { return Promise.resolve({}); }
   createFolder() { return Promise.resolve({}); }

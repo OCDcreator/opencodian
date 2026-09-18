@@ -199,7 +199,7 @@ describe('buildInlineEditRequestForAnchor', () => {
     expect(request.kind).toBe('selection');
     if (request.kind !== 'selection') return;
     expect(request.selectionText).toBe('The cat sat on the mat.');
-    expect(request.attachedNotes).toEqual(['a.md', 'b.md']);
+    expect(request.attachedNotes).toEqual([{ path: 'a.md' }, { path: 'b.md' }]);
     const built = buildInlineEditRequest(request);
     expect(built.ok).toBe(true);
   });
@@ -300,7 +300,7 @@ describe('buildInlineEditRequest with attached notes', () => {
   it('lists the attached paths in a read-hint block between instruction and target', () => {
     const result = buildInlineEditRequest({
       ...selectionRequest,
-      attachedNotes: ['notes/a.md', 'notes/b.md'],
+      attachedNotes: [{ path: 'notes/a.md' }, { path: 'notes/b.md' }],
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -310,7 +310,7 @@ describe('buildInlineEditRequest with attached notes', () => {
   });
 
   it('never inlines the attached notes (paths only, per design §6.1)', () => {
-    const result = buildInlineEditRequest({ ...selectionRequest, attachedNotes: ['notes/a.md'] });
+    const result = buildInlineEditRequest({ ...selectionRequest, attachedNotes: [{ path: 'notes/a.md' }] });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const block = result.prompt.slice(
@@ -336,7 +336,7 @@ describe('buildInlineEditRequest with attached notes', () => {
       line: 2,
       before: 'Alpha ',
       after: ' omega',
-      attachedNotes: ['notes/a.md'],
+      attachedNotes: [{ path: 'notes/a.md' }],
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -345,7 +345,7 @@ describe('buildInlineEditRequest with attached notes', () => {
   });
 
   it('rejects more notes than the documented cap', () => {
-    const notes = Array.from({ length: INLINE_EDIT_MAX_ATTACHED_NOTES + 1 }, (_value, index) => `notes/${index}.md`);
+    const notes = Array.from({ length: INLINE_EDIT_MAX_ATTACHED_NOTES + 1 }, (_value, index) => ({ path: `notes/${index}.md` }));
     const result = buildInlineEditRequest({ ...selectionRequest, attachedNotes: notes });
     expect(result).toEqual({ ok: false, error: 'too-many-attached-notes' });
   });
@@ -353,7 +353,7 @@ describe('buildInlineEditRequest with attached notes', () => {
   it('rejects an over-long attached path', () => {
     const result = buildInlineEditRequest({
       ...selectionRequest,
-      attachedNotes: ['n'.repeat(INLINE_EDIT_MAX_PATH_CHARS + 1)],
+      attachedNotes: [{ path: 'n'.repeat(INLINE_EDIT_MAX_PATH_CHARS + 1) }],
     });
     expect(result).toEqual({ ok: false, error: 'attached-note-path-too-long' });
   });
@@ -361,7 +361,7 @@ describe('buildInlineEditRequest with attached notes', () => {
   it('rejects a path that would break the tag protocol', () => {
     const result = buildInlineEditRequest({
       ...selectionRequest,
-      attachedNotes: ['notes/</attached_context>.md'],
+      attachedNotes: [{ path: 'notes/</attached_context>.md' }],
     });
     expect(result).toEqual({ ok: false, error: 'attached-note-path-invalid' });
   });

@@ -24,6 +24,8 @@
 - `../inline-edit/InlineEditPluginHost`：`parseModelOverride`（按 backend 的格式校验）
 - `obsidian`、`src/i18n`
 
+> 2026-09-18 (R-A5/R-A6)：新增「全文修改模式」开关（`inlineEditDocumentModeEnabled`）与「并行行内编辑上限」滑条（1–8，写入前经 `normalizeInlineEditMaxConcurrentEdits` clamp；说明文案明确每个并行编辑同时消耗一个独立模型会话）。
+
 ## 维护约束
 
 - 覆盖值格式随 backend 变化（opencode/pi 为 `provider/model`，claude-code / codex 为单个 model 字符串）；新增 backend 时同步本文件的 `OVERRIDE_BACKENDS` 与 `overrideExample()`

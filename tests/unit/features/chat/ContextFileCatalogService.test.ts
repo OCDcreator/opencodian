@@ -19,9 +19,11 @@ function createService(files: TFile[]): {
   getFiles: jest.Mock<TFile[], []>;
 } {
   const getFiles = jest.fn(() => files);
+  const getAllLoadedFiles = jest.fn(() => files);
   const app = {
     vault: {
       getFiles,
+      getAllLoadedFiles,
     },
   } as unknown as App;
 

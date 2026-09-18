@@ -12,7 +12,9 @@
 上游: `obsidian`（App）、`core/types`、`ContextAttachmentBuilder`、`ContextFileCatalogService`、`ui/ContextFilePickerModal`
 下游: `OpenCodianView`、`ComposerContextHostAdapter`
 
-## 公开接口
+> 2026-09-18 (R-A7)：picker 结果按多选处理——每个勾选的文件/文件夹经 `buildEntryContextItem` 变成一个上下文条目（构建失败的跳过），picker 取消（空数组）不加任何条目；新增 `addVaultPathContextFromDrop(rawPath)`：同步认领拖拽落的 vault 路径（instanceof TFile|TFolder 硬校验 + 文本 MIME 限制），返回 true 表示已启动异步附加，false 交给调用方默认处理。
+
+## 维护约束
 
 ```typescript
 interface ComposerContextPickerActionServiceHost {

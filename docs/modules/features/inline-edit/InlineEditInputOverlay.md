@@ -28,6 +28,8 @@
 
 - `@codemirror/state`、`@codemirror/view`、`obsidian`（`setIcon`）、`../../core/types`（`InlineEditPresetPrompt` 类型）、`../i18n`、`./InlineEditTypes`（`InlineEditContextFile`）、`./InlineEditImageChip`、`./InlineEditOverlayChips`、`./InlineEditOverlayPrimitives`、`./InlineEditPresetMenu`
 
+> 2026-09-18 (R-A5/R-A6/R-A7)：overlay 改为**每编辑一个实例**，`activeOverlays` 为 `WeakMap<EditorView, Set<overlay>>`，`inlineEditOverlayTrackerExtension` 遍历重映射全部锚点；输入相位的 Esc 带「兄弟面板焦点」门禁——焦点在另一个行内面板时本面板不响应（R-A5 多编辑下 Esc 只属于拥有焦点的面板；忙碌期 Esc 取消路径不受影响）；面板顶部新增形态分段切换（`InlineEditModeSwitch.ts`，选区/光标/整篇互斥，会话启动后禁用）；`focusin` 触发 `onFocus` 回调（焦点归属登记）；新增 vault 拖放入口 `installInlineEditContextDrop`（`InlineEditContextUi.ts`）——仅当宿主解析成功才 preventDefault，编辑器内文本拖拽不受影响；state 增加 `mode/modeOptions/modeSwitchable` 与上下文 chip 的 `kind`。
+
 ## 维护约束
 
 - 面板内 `update()` 不得重建输入框——澄清循环回来时用户焦点/输入必须保留- 测量（`coordsAtPos`/`getBoundingClientRect`/`offsetWidth`）只允许在 rAF 回调；CM6 update 循环内只做位置重映射记账

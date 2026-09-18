@@ -630,3 +630,69 @@
 }
 
 
+
+/* -- Multi-select + folders (R-A7) --------------------------------- */
+
+.opencodian-context-file-item .opencodian-context-file-item-check {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.opencodian-context-file-item .opencodian-context-file-item-check .svg-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.opencodian-context-file-item.is-selected {
+  border-color: color-mix(in srgb, var(--interactive-accent) 55%, var(--opencodian-glass-border));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--interactive-accent) 12%, var(--background-primary)) 0%,
+      color-mix(in srgb, var(--interactive-accent) 6%, var(--background-secondary)) 100%
+    );
+}
+
+.opencodian-context-file-item.is-selected .opencodian-context-file-item-check {
+  display: inline-flex;
+}
+
+.opencodian-context-file-item-glyph {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+
+.opencodian-context-file-ext.is-folder {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.opencodian-context-file-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 4px;
+  border-top: 1px solid color-mix(in srgb, var(--opencodian-glass-border) 60%, transparent);
+}
+
+.opencodian-context-file-selected-count {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.opencodian-context-file-confirm:disabled {
+  opacity: 0.55;
+  cursor: default;
+}

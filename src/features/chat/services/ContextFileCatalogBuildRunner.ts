@@ -1,4 +1,4 @@
-import { TFile } from 'obsidian';
+import type { TFile, TFolder } from 'obsidian';
 
 import { ContextFileCatalogIndex } from './ContextFileCatalogIndex';
 
@@ -21,7 +21,7 @@ export class ContextFileCatalogBuildRunner {
     this.yieldControl = options.yieldControl ?? yieldContextFileCatalogBuild;
   }
 
-  async buildIndex(files: readonly TFile[]): Promise<ContextFileCatalogIndex> {
+  async buildIndex(files: readonly (TFile | TFolder)[]): Promise<ContextFileCatalogIndex> {
     const catalogIndex = new ContextFileCatalogIndex();
 
     for (let index = 0; index < files.length; index += this.batchSize) {

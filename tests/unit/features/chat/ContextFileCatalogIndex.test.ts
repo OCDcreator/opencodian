@@ -1,6 +1,13 @@
-import { TFile } from 'obsidian';
+import { TFile, TFolder } from 'obsidian';
 
 import { ContextFileCatalogIndex } from '../../../../src/features/chat/services/ContextFileCatalogIndex';
+
+function createFolder(path: string): TFolder {
+  const folder = new TFolder();
+  folder.path = path;
+  folder.name = path.split('/').pop() ?? path;
+  return folder;
+}
 
 function createFile(path: string): TFile {
   const file = new TFile();
@@ -69,5 +76,37 @@ describe('ContextFileCatalogIndex', () => {
       entries: [],
       extensions: [],
     });
+  });
+});
+
+describe('ContextFileCatalogIndex folder entries (R-A7)', () => {
+  it('includes folders in the catalog without extension buckets, sorted before files', () => {
+    const index = new ContextFileCatalogIndex();
+    index.appendBuildFile(createFile('notes/A.md'));
+    index.appendBuildFile(createFolder('projects/alpha'));
+    index.appendBuildFile(createFolder('.hidden'));
+    index.finalizeBuild();
+
+    const catalog = index.getCatalog();
+    expect(catalog.entries.map((entry) => `${entry.kind}:${entry.file.path}`)).toEqual([
+      'folder:projects/alpha',
+      'file:notes/A.md',
+    ]);
+    // Folders never appear in the extension filter buckets.
+    expect(catalog.extensions).toEqual([{ value: 'md', count: 1 }]);
+  });
+
+  it('supports folder upsert, rename and remove', () => {
+    const index = new ContextFileCatalogIndex();
+    index.appendBuildFile(createFolder('projects/old'));
+    index.finalizeBuild();
+
+    index.renameFile(createFolder('projects/new'), 'projects/old');
+    expect(index.getCatalog().entries.map((entry) => entry.file.path)).toEqual(['projects/new']);
+    expect(index.getCatalog().entries[0]?.kind).toBe('folder');
+
+    index.removePath('projects/new');
+    expect(index.getCatalog().entries).toEqual([]);
+    expect(index.getCatalog().extensions).toEqual([]);
   });
 });

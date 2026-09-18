@@ -197,7 +197,7 @@ export function parseObsidianContextTag(text: string): MessageContextAttachment 
   }
 
   const kind = decodeHtmlAttribute(match[1]) as PromptContextKind;
-  if (kind !== 'current_note' && kind !== 'selection' && kind !== 'file') {
+  if (kind !== 'current_note' && kind !== 'selection' && kind !== 'file' && kind !== 'folder') {
     return null;
   }
 

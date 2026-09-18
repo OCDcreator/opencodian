@@ -223,6 +223,8 @@ export class UserMessageContentRenderer {
         return t('chat.context.kind.currentNote');
       case 'selection':
         return t('chat.context.kind.selection');
+      case 'folder':
+        return t('chat.context.kind.folder');
       default:
         return t('chat.context.kind.file');
     }

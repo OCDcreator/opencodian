@@ -1,11 +1,13 @@
-import type { App, TFile } from 'obsidian';
-import { Modal } from 'obsidian';
+import type { App, TFile, TFolder } from 'obsidian';
+import { Modal, setIcon,TFile as TFileClass } from 'obsidian';
 
 import { t } from '../../../i18n';
 import type { ContextFileCatalog, ContextFileEntry } from '../services/ContextFileCatalogService';
 
 const MAX_RENDERED_FILES = 200;
 const ALL_EXTENSION_FILTER = '__all__';
+
+export type ContextPickedEntry = TFile | TFolder;
 
 export interface ContextFilePickerOptions {
   /**
@@ -17,11 +19,17 @@ export interface ContextFilePickerOptions {
   serverContextAvailable?: boolean;
 }
 
-export function chooseContextFile(
+/**
+ * Multi-select vault picker (R-A7): files and folders, check-mark toggling,
+ * and one "attach" footer that resolves every picked entry. Replaces the old
+ * single-select `chooseContextFile` — callers attach each picked entry as a
+ * context item, so picking three notes in a row yields three chips.
+ */
+export function chooseContextFiles(
   app: App,
   loadCatalog: () => ContextFileCatalog | Promise<ContextFileCatalog>,
   options?: ContextFilePickerOptions,
-): Promise<TFile | null> {
+): Promise<readonly ContextPickedEntry[]> {
   return new Promise((resolve) => {
     new ContextFilePickerModal(app, loadCatalog, resolve, options).open();
   });
@@ -29,23 +37,25 @@ export function chooseContextFile(
 
 class ContextFilePickerModal extends Modal {
   private readonly loadCatalog: () => ContextFileCatalog | Promise<ContextFileCatalog>;
-  private readonly onResolve: (file: TFile | null) => void;
+  private readonly onResolve: (entries: readonly ContextPickedEntry[]) => void;
   private catalog: ContextFileCatalog | null = null;
   private settled = false;
   private query = '';
   private selectedExtension = ALL_EXTENSION_FILTER;
   private isLoading = true;
   private isClosed = false;
+  private readonly selectedPaths = new Set<string>();
   private searchInput: HTMLInputElement | null = null;
   private filterBarEl: HTMLElement | null = null;
   private listEl: HTMLElement | null = null;
   private summaryEl: HTMLElement | null = null;
+  private footerEl: HTMLElement | null = null;
   private renderFrameId: number | null = null;
 
   constructor(
     app: App,
     loadCatalog: () => ContextFileCatalog | Promise<ContextFileCatalog>,
-    onResolve: (file: TFile | null) => void,
+    onResolve: (entries: readonly ContextPickedEntry[]) => void,
     private readonly options?: ContextFilePickerOptions,
   ) {
     super(app);
@@ -89,6 +99,7 @@ class ContextFilePickerModal extends Modal {
     filterSectionEl.appendChild(this.filterBarEl);
     this.listEl = this.contentEl.createDiv({ cls: 'opencodian-context-file-list' });
     this.summaryEl = this.contentEl.createDiv({ cls: 'opencodian-context-file-summary' });
+    this.footerEl = this.contentEl.createDiv({ cls: 'opencodian-context-file-footer' });
 
     this.searchInput.addEventListener('input', () => {
       this.query = this.searchInput?.value.trim().toLowerCase() ?? '';
@@ -98,7 +109,7 @@ class ContextFilePickerModal extends Modal {
     this.searchInput.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        this.finish(null);
+        this.finish([]);
       }
     });
 
@@ -119,7 +130,7 @@ class ContextFilePickerModal extends Modal {
     this.modalEl.removeClass('opencodian-context-file-modal');
 
     if (!this.settled) {
-      this.finish(null, false);
+      this.finish([], false);
     }
   }
 
@@ -154,13 +165,14 @@ class ContextFilePickerModal extends Modal {
   }
 
   private render(): void {
-    if (!this.filterBarEl || !this.listEl || !this.summaryEl) {
+    if (!this.filterBarEl || !this.listEl || !this.summaryEl || !this.footerEl) {
       return;
     }
 
     this.filterBarEl.empty();
     this.listEl.empty();
     this.summaryEl.empty();
+    this.footerEl.empty();
 
     if (this.isLoading) {
       this.listEl.createDiv({
@@ -203,17 +215,31 @@ class ContextFilePickerModal extends Modal {
         cls: 'opencodian-context-file-item',
         attr: { type: 'button' },
       });
+      const isSelected = this.selectedPaths.has(entry.file.path);
+      button.classList.toggle('is-selected', isSelected);
+      button.setAttribute('aria-pressed', String(isSelected));
 
       const headerEl = button.createDiv({ cls: 'opencodian-context-file-item-header' });
+      const checkEl = headerEl.createSpan({ cls: 'opencodian-context-file-item-check' });
+      setIcon(checkEl, 'check');
+      const glyphEl = headerEl.createSpan({ cls: 'opencodian-context-file-item-glyph' });
+      setIcon(glyphEl, entry.kind === 'folder' ? 'folder' : 'file-text');
       const titleEl = headerEl.createDiv({
         cls: 'opencodian-context-file-name',
-        text: entry.file.basename,
+        text: entryDisplayName(entry),
       });
-      titleEl.setAttribute('title', entry.file.basename);
-      headerEl.createDiv({
-        cls: 'opencodian-context-file-ext',
-        text: `.${entry.extension}`,
-      });
+      titleEl.setAttribute('title', entryDisplayName(entry));
+      if (entry.kind === 'file') {
+        headerEl.createDiv({
+          cls: 'opencodian-context-file-ext',
+          text: `.${entry.extension}`,
+        });
+      } else {
+        headerEl.createDiv({
+          cls: 'opencodian-context-file-ext is-folder',
+          text: t('chat.context.kind.folder'),
+        });
+      }
 
       const pathEl = button.createDiv({
         cls: 'opencodian-context-file-path',
@@ -221,7 +247,15 @@ class ContextFilePickerModal extends Modal {
       });
       pathEl.setAttribute('title', entry.file.path);
       button.addEventListener('click', () => {
-        this.finish(entry.file);
+        // Multi-select (R-A7): a row toggles, it does not resolve. Rows stay
+        // open until the footer confirms, so several notes can be picked in a
+        // row without reopening the picker.
+        if (this.selectedPaths.has(entry.file.path)) {
+          this.selectedPaths.delete(entry.file.path);
+        } else {
+          this.selectedPaths.add(entry.file.path);
+        }
+        this.scheduleRender();
       });
     }
 
@@ -231,6 +265,32 @@ class ContextFilePickerModal extends Modal {
         total: String(filteredEntries.length),
       }));
     }
+
+    this.renderFooter();
+  }
+
+  private renderFooter(): void {
+    const footer = this.footerEl;
+    if (!footer) return;
+    footer.empty();
+    const count = this.selectedPaths.size;
+    footer.createSpan({
+      cls: 'opencodian-context-file-selected-count',
+      text: t('chat.context.filePicker.selectedCount', { count }),
+    });
+    const confirm = footer.createEl('button', {
+      cls: 'mod-cta opencodian-context-file-confirm',
+      attr: { type: 'button' },
+    });
+    confirm.disabled = count === 0;
+    confirm.textContent = t('chat.context.filePicker.addSelected', { count });
+    confirm.addEventListener('click', () => {
+      const entries = this.catalog?.entries ?? [];
+      const picked = entries
+        .filter((entry) => this.selectedPaths.has(entry.file.path))
+        .map((entry) => entry.file);
+      this.finish(picked);
+    });
   }
 
   private renderExtensionFilters(): void {
@@ -289,8 +349,11 @@ class ContextFilePickerModal extends Modal {
     const normalizedExtensionQuery = query.startsWith('.') ? query.slice(1) : query;
 
     return entries.filter((entry) => {
-      if (this.selectedExtension !== ALL_EXTENSION_FILTER && entry.extension !== this.selectedExtension) {
-        return false;
+      // Folder entries have no extension and only appear under "all" (R-A7).
+      if (this.selectedExtension !== ALL_EXTENSION_FILTER) {
+        if (entry.kind !== 'file' || entry.extension !== this.selectedExtension) {
+          return false;
+        }
       }
 
       if (!query) {
@@ -299,19 +362,29 @@ class ContextFilePickerModal extends Modal {
 
       return entry.lowerPath.includes(query)
         || entry.lowerBasename.includes(query)
-        || entry.lowerExtension.includes(normalizedExtensionQuery);
+        || (entry.kind === 'file' && entry.lowerExtension.includes(normalizedExtensionQuery));
     });
   }
 
-  private finish(file: TFile | null, shouldClose = true): void {
+  private finish(entries: readonly ContextPickedEntry[], shouldClose = true): void {
     if (this.settled) {
       return;
     }
 
     this.settled = true;
-    this.onResolve(file);
+    // Only real vault entries resolve: the modal never hands out path strings.
+    this.onResolve(entries.filter((entry) => entry instanceof TFileClass || isFolder(entry)));
     if (shouldClose) {
       this.close();
     }
   }
+}
+
+/** Folders carry `name` instead of `basename`; files keep the basename. */
+function entryDisplayName(entry: ContextFileEntry): string {
+  return entry.file instanceof TFileClass ? entry.file.basename : entry.file.name;
+}
+
+function isFolder(entry: ContextPickedEntry): entry is TFolder {
+  return !(entry instanceof TFileClass);
 }

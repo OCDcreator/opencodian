@@ -1,5 +1,5 @@
 import type { App, Editor, MarkdownView } from 'obsidian';
-import { normalizePath, Notice, TFile } from 'obsidian';
+import { normalizePath, Notice, TFile, TFolder } from 'obsidian';
 
 import type {
   PromptContextItem,
@@ -81,6 +81,33 @@ export class ContextAttachmentBuilder {
     }
 
     return this.createSelectionContextItem(targetFile.path, preview.lineRange, preview.textSnapshot);
+  }
+
+  /**
+   * Build one context item from a picker/drop entry (R-A7): files keep the
+   * existing file path, folders become path-only directory references that
+   * never carry a text snapshot.
+   */
+  async buildEntryContextItem(entry: TFile | TFolder): Promise<PromptContextItem | null> {
+    if (entry instanceof TFolder) {
+      return this.buildFolderContextItem(entry);
+    }
+    return this.buildFileContextItem(entry, 'file');
+  }
+
+  /**
+   * Directory context item (R-A7): the path is the reference — the model
+   * reads the notes under it with its tools. No text snapshot is ever taken,
+   * so the remote-mode size/binary checks do not apply.
+   */
+  buildFolderContextItem(folder: TFolder): PromptContextItem | null {
+    return {
+      id: this.createPromptContextId(),
+      kind: 'folder',
+      path: folder.path,
+      label: formatContextLabel(folder.path),
+      mime: 'application/x-directory',
+    };
   }
 
   async buildFileContextItem(

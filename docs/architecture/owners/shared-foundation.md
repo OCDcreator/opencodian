@@ -1,3 +1,5 @@
+> 2026-09-18 (FlowText parity R-A7): `parseObsidianContextTag` accepts `kind="folder"` so directory context tags round-trip losslessly.
+
 # Owner: shared.foundation
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.

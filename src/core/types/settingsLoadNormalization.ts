@@ -22,6 +22,7 @@ import {
   normalizeChatFontSizePx,
   normalizeEffortLevel,
   normalizeInlineEditEffortOverrides,
+  normalizeInlineEditMaxConcurrentEdits,
   normalizeInlineEditModelOverrides,
   normalizeInlineEditPresetPrompts,
   normalizeInputPanelGlassRefractionSettings,
@@ -548,6 +549,12 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
       inlineEditPresetPrompts: normalizeInlineEditPresetPrompts(
         normalizedSettings?.inlineEditPresetPrompts,
       ),
+      inlineEditMaxConcurrentEdits: normalizeInlineEditMaxConcurrentEdits(
+        normalizedSettings?.inlineEditMaxConcurrentEdits,
+      ),
+      inlineEditDocumentModeEnabled: typeof normalizedSettings?.inlineEditDocumentModeEnabled === 'boolean'
+        ? normalizedSettings.inlineEditDocumentModeEnabled
+        : DEFAULT_SETTINGS.inlineEditDocumentModeEnabled,
     },
     shouldMigrateLegacyLocalDefaultPort,
     shouldResetGlassRefractionGlassDefaults,

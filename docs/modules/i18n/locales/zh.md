@@ -563,3 +563,8 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 - 新增 `settings.conversation.memory.externalRootName/externalRootDesc` 与 `syncRemoteName/syncRemoteDesc`、`commands.memory.statusSync`。
 
 - 2026-09-15: 新增 `inlineEdit.*` 文案：命令名、输入框 placeholder、接受/拒绝按钮、提示语与全部错误原因。
+
+
+> 2026-09-18 (R-A5/R-A6/R-A7)：新增 `inlineEdit.command.document`、`inlineEdit.mode.*`、`inlineEdit.placeholder.document`、`inlineEdit.preview.degraded/streamingLarge`、`inlineEdit.confirm.document.*`、`inlineEdit.error.tooManyEdits/documentTooLong/documentModeDisabled/noSelectionForMode`；`inlineEdit.context.limit/empty` 改写为「条目（文件或目录）」语义；`chat.context.kind.folder`、`chat.context.filePicker.addSelected/selectedCount`。
+
+## 维护约束
