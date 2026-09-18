@@ -54,6 +54,19 @@ export interface ImageGenerationChatPorts {
   trashAsset(path: string): Promise<boolean>;
   /** R-B3 registration (fail-soft inside the service). */
   registerAsset(assetPath: string, notePath: string): void;
+  /**
+   * R-B3 record-then-close for the paired reference write (D2): record the
+   * note modification explicitly — no vault-event autosave timing dependency
+   * — before `endAssetCapture` closes the round. Optional so chat-side
+   * doubles stay valid.
+   */
+  noteReferenceWrite?(notePath: string): void;
+  /**
+   * R-B3 (D2): close the plugin asset round once the paired write attempt is
+   * terminal (success or failure), so revert is available without waiting
+   * out the post-turn grace. Optional so chat-side doubles stay valid.
+   */
+  endAssetCapture?(): void;
   /** Active markdown editor for explicit inserts; `null` when none. */
   resolveInsertTarget(): { editor: Editor; notePath: string } | null;
   notify(message: string): void;
@@ -141,9 +154,16 @@ export class ImageGenerationChatController {
       const cursor = target.editor.getCursor();
       target.editor.replaceRange(embedText, cursor);
     } catch {
+      // Insert failed: no reference write will be recorded, so the round can
+      // close right away (asset kept — revert stays available for it).
+      this.ports.endAssetCapture?.();
       this.ports.notify(t('inlineEdit.imageGen.notice.insertFailedKeepAsset', { path: assetPath }));
       return false;
     }
+    // Paired write done: record it explicitly (order matters — record before
+    // close) and free the round so one-click revert is available immediately.
+    this.ports.noteReferenceWrite?.(target.notePath);
+    this.ports.endAssetCapture?.();
     this.ports.notify(t('chat.imageGen.insert.ok', { path: assetPath }));
     return true;
   }

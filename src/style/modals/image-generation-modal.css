@@ -1,13 +1,32 @@
-/**
- * Image-generation modal (R-C2 text-to-image chat entry card).
- *
- * Obsidian-native first: the card is a plain `Modal` and inherits its frame;
- * these rules only add the result layout, the error strip and a comfortable
- * thumbnail cap. Contrast and focus states come from the host theme.
- */
+/* ============================================================
+   Image-generation modal (R-C2 text-to-image chat entry card) —
+   designed to DESIGN.md §5 Modal Layout like our other modals:
+   spacing comes from the shared --opencodian-modal-* tokens
+   (see batch-organize-modal.css); no ad-hoc chrome margins.
+   Obsidian-native first: colour choices stay host-native
+   (--radius-m, --background-secondary, --text-error,
+   --font-ui-smaller); these rules only add the result layout,
+   the error strip and a comfortable thumbnail cap. Contrast and
+   focus states come from the host theme.
+   DOM contract: src/features/chat/ui/ImageGenerationModal.ts
+   ============================================================ */
 
 .opencodian-imagegen-modal {
+  --opencodian-modal-content-padding-x: 22px;
+  --opencodian-modal-content-padding-y: 22px;
+  --opencodian-modal-header-body-gap: 16px;
+  --opencodian-modal-section-gap: 20px;
+  --opencodian-modal-section-inner-gap: 12px;
+  --opencodian-modal-card-gap: 12px;
+  --opencodian-modal-form-row-gap: 12px;
+  --opencodian-modal-form-label-control-gap: 16px;
+  --opencodian-modal-action-gap: 8px;
   max-width: 560px;
+}
+
+.opencodian-imagegen-modal .modal-content {
+  box-sizing: border-box;
+  padding: var(--opencodian-modal-content-padding-y) var(--opencodian-modal-content-padding-x);
 }
 
 .opencodian-imagegen-result {

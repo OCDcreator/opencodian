@@ -42,6 +42,7 @@ imageEmbedWidthSuffix(width): string;
 - 字节按签名嗅探（PNG/JPEG/WEBP），未知格式 → `http` 失败；`response_format` 参数**不**发送（gpt-image-1 拒绝它）。
 - 字节数超 `IMAGE_GENERATION_MAX_ASSET_BYTES` → `size-limit`，不截断不压缩。
 - **无任何自动重试**；重试是用户再次点击。
+- **畸形配置容忍（§6.4）**：`normalizeImageGenerationModels` 会补齐全部字段，但 `saveSettings()` 不再归一化，手改/程序写入的 `data.json` 条目可能缺字段。`buildImageGenerationRequest` 与 `generate` 的全部配置读取都经容忍读取（非字符串按缺失处理），**绝不抛 TypeError**：缺 `baseURL`/`model` → 既有的 `http` + "not configured" 失败形态；缺 `apiKey` → 不带 Authorization；缺 `size` → 视同 provider 默认（等价 `size: ''`）。良构条目行为不变。
 
 ## 嵌入文本（两入口共用）
 

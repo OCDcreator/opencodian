@@ -21,7 +21,7 @@
   - `EditRevertTurnBeginInfo`：`conversationId` / `backend` / `sessionId?` / `userText`（预算化预快照的候选来源）/ `contextPaths`（本轮附加上下文路径）。
   - `EditRevertWriteToolInfo`：`conversationId` / `toolName` / `input`（流上 `tool_use` chunk 的原始声明，先于工具结果）。
   - `EditRevertServicePort`：`getSidebarModel` / `beginTurnCapture` / `endTurnCapture` / `noteWriteToolUse` / `revertFile` / `revertAll` / `restoreFile` / `onEntriesChanged`。所有捕获方法均为 fail-soft（同步返回、内部吞错）。
-  - **R-B5 插件发起批量捕获（可选成员）**：`beginBatchCapture?(conversationId, paths)`（强制预捕获全部路径、无回合预算；禁用/失败解析为 `false`，调用方必须拒绝执行）、`notePluginMove?(conversationId, from, to)`（记录 `moved` 条目，回退 = 改回并还原引用）、`notePluginWrite?(conversationId, path)`（从强制捕获解析 pre-image 记录写入条目）、`endBatchCapture?(conversationId)`（立即关闭、无 post-turn grace，回退即时可用）。声明为可选成员是为了不破坏聊天侧测试替身；具体服务始终实现，批量协调器在缺失时 fail-closed 拒绝。
+  - **R-B5 插件发起批量捕获（可选成员）**：`beginBatchCapture?(conversationId, paths)`（强制预捕获全部路径、无回合预算；禁用/失败解析为 `false`，调用方必须拒绝执行）、`notePluginMove?(conversationId, from, to)`（记录 `moved` 条目，回退 = 改回并还原引用）、`notePluginWrite?(conversationId, path)`（从强制捕获解析 pre-image 记录写入条目）、`endBatchCapture?(conversationId)`（立即关闭、无 post-turn grace，回退即时可用；**只关闭 `backend: 'plugin'` 轮次**——批量轮与 R-C2 资产轮；若最新开放轮次是真实 agent turn 轮则拒绝关闭，绝不提前暴露回合中的回退）。声明为可选成员是为了不破坏聊天侧测试替身；具体服务始终实现，批量协调器在缺失时 fail-closed 拒绝。
 
 ## 注意事项
 
@@ -30,4 +30,4 @@
 
 ## R-C2 扩展
 
-2026-09-18 port 新增可选成员 `registerPluginCreatedAsset?(conversationId, assetPath, notePaths?)`（沿用 R-B5 可选成员模式，聊天侧 double 保持有效；具体服务始终实现）。
+2026-09-18 port 新增可选成员 `registerPluginCreatedAsset?(conversationId, assetPath, notePaths?)`（沿用 R-B5 可选成员模式，聊天侧 double 保持有效；具体服务始终实现）。D2 修复（同日）：无已开轮次时新建的 `plugin` 轮次**保持开放**（post-turn grace 仅作废弃轮次的有界兜底），R-C2 流程在成对引用写（W-ref）终态后经 `notePluginWrite` 显式登记、再 `endBatchCapture` 立即关闭——一键回退不再等待 grace；`endBatchCapture` 同时收窄为只关 `backend: 'plugin'` 轮次，进行中的 turn 轮次不受影响。

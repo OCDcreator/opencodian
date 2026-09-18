@@ -63,6 +63,12 @@ function createHarness(): Harness {
     registerAsset(assetPath, notePath) {
       calls.push(`register:${assetPath}:${notePath}`);
     },
+    noteReferenceWrite(notePath) {
+      calls.push(`noteRef:${notePath}`);
+    },
+    endAssetCapture() {
+      calls.push('endAsset');
+    },
     resolveInsertTarget() {
       if (!state.editorPresent) return null;
       return {
@@ -133,7 +139,7 @@ describe('ImageGenerationChatController.generate', () => {
 });
 
 describe('ImageGenerationChatController.insertIntoActiveNote — explicit W-asset → W-ref', () => {
-  it('writes asset, registers, and inserts at the cursor, in order', async () => {
+  it('writes asset, registers, inserts at the cursor, records the reference and closes the round, in order', async () => {
     const harness = createHarness();
     const candidate = await generated(harness);
     const inserted = await harness.controller.insertIntoActiveNote(candidate, 'line');
@@ -144,6 +150,10 @@ describe('ImageGenerationChatController.insertIntoActiveNote — explicit W-asse
       'register:attachments/c.png:notes/n.md',
       'cursor',
       'replace:\\n\\n![[attachments/c.png|600]]\\n\\n',
+      // D2 record-then-close: the reference write is recorded before the
+      // round closes, so one-click revert is available immediately.
+      'noteRef:notes/n.md',
+      'endAsset',
     ]);
     expect(harness.notices[harness.notices.length - 1]).toContain('attachments/c.png');
   });
@@ -169,13 +179,15 @@ describe('ImageGenerationChatController.insertIntoActiveNote — explicit W-asse
     expect(harness.notices[0]).toContain('disk full');
   });
 
-  it('insert failure (W-ref) → asset kept, notice carries the actual path', async () => {
+  it('insert failure (W-ref) → asset kept, path reported, round closed without a reference record', async () => {
     const harness = createHarness();
     const candidate = await generated(harness);
     harness.replaceRangeThrows = true;
     const inserted = await harness.controller.insertIntoActiveNote(candidate, 'inline');
     expect(inserted).toBe(false);
     expect(harness.calls).toContain('saved:attachments/c.png');
+    expect(harness.calls).toContain('endAsset');
+    expect(harness.calls.some((entry) => entry.startsWith('noteRef:'))).toBe(false);
     expect(harness.calls.some((entry) => entry.startsWith('replace:'))).toBe(false);
     const keepNotice = harness.notices.find((message) => message.includes('attachments/c.png'));
     expect(keepNotice).toBeDefined();

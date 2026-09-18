@@ -76,9 +76,11 @@ export interface EditRevertServicePort {
   /** Record a plugin-performed content write on an already-captured path. */
   notePluginWrite?(conversationId: string, path: string): Promise<void>;
   /**
-   * Close the batch capture window. Unlike the turn path there is no
-   * post-close grace: every batch write was recorded explicitly, so revert
-   * becomes available immediately.
+   * Close a plugin-owned capture window (batch rounds and R-C2 asset rounds).
+   * Unlike the turn path there is no post-close grace: every write was
+   * recorded explicitly, so revert becomes available immediately. Rounds
+   * owned by a real agent turn (`backend` other than `'plugin'`) are never
+   * touched — their own turn lifecycle closes them.
    */
   endBatchCapture?(conversationId: string): Promise<void>;
 
@@ -88,10 +90,15 @@ export interface EditRevertServicePort {
    * Register a plugin-generated binary asset (write step W-asset) as a
    * `created` / `source: 'plugin'` entry in the conversation's current round
    * (or a fresh plugin round), with markdown pre-images captured for the
-   * listed `notePaths` so asset and reference revert as a pair. Optional so
-   * chat-side doubles stay valid; the concrete service always implements it
-   * and callers treat registration failure as fail-soft (the asset write
-   * itself already happened; revert coverage is honestly absent).
+   * listed `notePaths` so asset and reference revert as a pair. A fresh round
+   * stays OPEN so the paired reference write (W-ref) attributes to it; the
+   * R-C2 flow records that write via `notePluginWrite` and then calls
+   * `endBatchCapture` once the write attempt is terminal, making revert
+   * available immediately (the post-turn grace only bounds an abandoned
+   * round). Optional so chat-side doubles stay valid; the concrete service
+   * always implements it and callers treat registration failure as fail-soft
+   * (the asset write itself already happened; revert coverage is honestly
+   * absent).
    */
   registerPluginCreatedAsset?(
     conversationId: string,

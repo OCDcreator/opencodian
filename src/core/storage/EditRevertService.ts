@@ -255,11 +255,15 @@ export class EditRevertService implements EditRevertServicePort {
    * Markdown `notePaths` (the note about to receive the reference) get the
    * same budget-free pre-image capture the batch path uses, so the asset and
    * the reference revert as a pair. When no open round exists for the
-   * conversation, a fresh `plugin` round is created and closed with the
-   * post-turn grace window, so the immediately following reference write
-   * (W-ref) is captured by the vault-event funnel without holding an
-   * indefinitely open round. Fail-soft: registration problems never abort the
-   * generation flow, but are logged.
+   * conversation, a fresh OPEN `plugin` round is created; the R-C2 flow
+   * records the paired reference write through `notePluginWrite` and then
+   * closes the round via `endBatchCapture` (the R-B5 record-then-close
+   * convention), so one-click revert is available immediately after the
+   * paired write instead of waiting out the post-turn grace. The grace window
+   * stays as the bounded fallback so an abandoned round (flow interrupted
+   * before the closer ran) still expires on its own. An in-flight turn round
+   * is never disturbed — its own lifecycle owns it. Fail-soft: registration
+   * problems never abort the generation flow, but are logged.
    */
   async registerPluginCreatedAsset(
     conversationId: string,
@@ -291,18 +295,18 @@ export class EditRevertService implements EditRevertServicePort {
     }
     const now = this.now();
     let round = this.getLatestRound(conversationId);
-    let ownsRound = false;
     if (!round || round.meta.closedAt !== null) {
-      // No open round: open (and immediately grace-close) a plugin round so
-      // the paired reference write attributes here. An in-flight turn round
-      // is never disturbed — its own lifecycle owns it.
+      // No open round: open a plugin round for the paired reference write.
+      // It stays OPEN with the post-turn grace as the bounded fallback window;
+      // the R-C2 flow closes it explicitly (notePluginWrite + endBatchCapture)
+      // once the paired write attempt is terminal.
       round = {
         meta: {
           id: `round-${now}-${++this.roundSeq}`,
           conversationId,
           backend: 'plugin',
           createdAt: now,
-          closedAt: now,
+          closedAt: null,
           degraded: false,
           acceptsWritesUntil: now + EDIT_REVERT_POST_TURN_GRACE_MS,
           lastActivityAtHint: now,
@@ -314,7 +318,6 @@ export class EditRevertService implements EditRevertServicePort {
       };
       this.rounds.set(round.meta.id, round);
       this.frozenIdleByRound.set(round.meta.id, new Map(this.idleCache));
-      ownsRound = true;
     }
 
     round.meta.lastActivityAtHint = this.now();
@@ -362,9 +365,6 @@ export class EditRevertService implements EditRevertServicePort {
       });
     }
 
-    if (ownsRound) {
-      round.meta.closedAt = this.now();
-    }
     round.dirty = true;
     this.schedulePersist();
     this.notifyChanged();
@@ -817,13 +817,22 @@ export class EditRevertService implements EditRevertServicePort {
   }
 
   /**
-   * Close a batch round. No post-close grace: every batch write is recorded
-   * explicitly before `endBatchCapture`, so one-click revert is available
-   * immediately after the task completes (R-B5 acceptance 1).
+   * Close a plugin-owned capture round. No post-close grace: every write was
+   * recorded explicitly before the call (batch: `notePluginWrite` per path;
+   * R-C2: `notePluginWrite` for the paired reference), so one-click revert is
+   * available immediately after the task completes (R-B5 acceptance 1,
+   * R-C2 D2 fix). Only `backend: 'plugin'` rounds (batch and R-C2 asset
+   * rounds) are closed: if a real agent turn began after the round was
+   * opened, the latest round is the turn round and its own lifecycle owns it
+   * — closing it here would expose mid-turn revert and break the turn's
+   * tool-declared pre-image capture.
    */
   private async performEndBatchCapture(conversationId: string): Promise<void> {
     const round = this.getLatestRound(conversationId);
     if (!round || round.meta.closedAt !== null) {
+      return;
+    }
+    if (round.meta.backend !== 'plugin') {
       return;
     }
     const now = this.now();

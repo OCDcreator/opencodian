@@ -18,7 +18,7 @@
 | 保存后 signal 已 abort | 零改动 | 资产立即 `trashAsset`（不留孤儿） | 取消提示 |
 | 成功 | preview 出现，接受才落引用 | 资产已落盘 + 登记 | 预览 diff |
 | 预览被拒绝 | 零改动 | 按 `imageGenerationAssetCleanup`（默认 trash）| Notice 含实际路径 |
-| W-ref 失败（脏检查/replaceRange 抛错） | 零改动 | 资产**保留** | Notice 含实际路径（见 `InlineEditAccept`） |
+| W-ref 失败（脏检查/replaceRange 抛错） | 零改动 | 资产**保留**；R-B3 资产轮次立即关闭（D2） | Notice 含实际路径（见 `InlineEditAccept`） |
 
 ## 对外 API
 
@@ -26,7 +26,9 @@
 interface InlineEditImageGenDeps {
   models; maxWidth; cleanup;
   generate(model, prompt, signal?); saveAsset(bytes, mime, baseName);
-  trashAsset(path); registerAsset(assetPath, notePath); notify(message);
+  trashAsset(path); registerAsset(assetPath, notePath);
+  noteReferenceWrite?(notePath); endAssetCapture?();
+  notify(message);
 }
 
 runInlineEditImageGeneration(deps, { prompt, form, notePath, signal? }): Promise<ImageGenInsertPlan>;
@@ -39,3 +41,7 @@ cleanupRejectedImageAsset(deps, path): Promise<void>;
 - `InlineEditHost.ts` / `InlineEditPluginHost.ts`：`getImageGeneration?()` 可选 host 成员；无配置模型时返回 `null`（chip 隐藏）。
 - `src/core/agents/imagegen/ImageGenerationService.ts`：生成服务与嵌入文本构造。
 - `src/main.ts`：deps 的组合实现（服务、资产存储、回退登记、conversation id 解析）。
+
+## D2 record-then-close（2026-09-18）
+
+`cleanupRejectedImageAsset`（预览拒绝 / 编辑销毁 / 生成中途编辑失活的唯一终态处理）现在首先调用可选的 `endAssetCapture()`——引用写永远不会发生，R-B3 插件资产轮次随之立即关闭，一键回退不再等待 post-turn grace。接受路径的先登记后关闭由 `InlineEditAccept` 的新可选 deps 承担（`noteReferenceWrite` 在 `replaceRange` 成功后、`endAssetCapture` 关闭前调用，顺序由组合根接到 `notePluginWrite` → `endBatchCapture` 的服务队列保证）。

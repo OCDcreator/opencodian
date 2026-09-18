@@ -22,6 +22,8 @@ interface InlineEditAcceptDeps {
   isCurrent(edit): boolean;      // await 之后确认编辑仍存活
   closeEdit(editId): Promise<void>;
   rejectEdit(editId): void;
+  noteImageReferenceWrite?(notePath): void;  // R-C2/D2：引用写成功后先显式登记
+  endImageAssetCapture?(): void;             // R-C2/D2：引用写终态后关闭资产轮次
 }
 executeInlineEditAccept(edit, deps): Promise<void>
 ```
@@ -38,3 +40,5 @@ executeInlineEditAccept(edit, deps): Promise<void>
 ## R-C2 扩展
 
 2026-09-18 W-ref 失败语义：`InlineEditAcceptEdit` 新增 `pendingImageAssetPath` 与 `preserveWhitespace`。脏检查失败或 `replaceRange` 抛错时：携带资产路径的编辑**保留资产**并以 Notice 报告实际路径（不静默丢弃、不自动清理）；成功路径在 closeEdit 前接管（清空）`pendingImageAssetPath`，使 teardown 不误删已引用资产。`preserveWhitespace` 为 true 时跳过 `normalizeInsertionText`（独占一行形态的空行填充是特性行为）。非图像编辑的 replaceRange 抛错也改为可见的 `inlineEdit.error.applyFailed`（原为未处理 rejection）。
+
+D2 补充（同日）：`InlineEditAcceptDeps` 新增可选 `noteImageReferenceWrite?(notePath)` 与 `endImageAssetCapture?()`（由 `InlineEditController.accept()` 从 `getImageGeneration()` 的 deps 桥接）。三个终态分支都会关闭 R-B3 插件资产轮次：脏检查失败（不会有引用写）与 `replaceRange` 抛错只调 `endImageAssetCapture`；成功路径先 `noteImageReferenceWrite(edit.anchor.notePath)`、后 `endImageAssetCapture`（先登记后关闭的顺序由 `EditRevertService` 的 FIFO 队列保证），一键回退不再等待 post-turn grace。

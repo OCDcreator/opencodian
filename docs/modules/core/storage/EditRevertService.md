@@ -15,7 +15,7 @@
 - **Fail-closed 诚实**：超限（>2MiB）或无 pre-image 的文件仍会列出，但明确标注"未纳入回退"，且 `revertible: false`；回退请求会被拒绝并返回原因。
 - **写回唯一出口**：所有破坏性写操作都委托给 `EditRevertVaultWriteback`（vault.process / vault.create / vault.trash），自身绝不直接写文件系统。
 - **Fail-soft**：快照 / 通知 / 持久化的失败只记 warn 日志，绝不阻塞发送主链路（send pipeline 以 fire-and-forget 方式调用）。
-- **插件发起批量捕获（R-B5）**：`beginBatchCapture` 不走 200ms 回合预算——批量是用户发起、清单在预览阶段已知，对全部受影响文件强制预捕获；超限文件照旧进入 `standbyOversize` 如实标注不可回退。`notePluginMove` 存在的原因：vault `rename` 事件不在事件漏斗监听范围内（Obsidian 移动只发 `rename`），插件移动必须显式登记；`endBatchCapture` 关闭后**无宽限窗**（批量写入全部显式登记），因此一键回退即时可用。`beginBatchCapture` 内部失败一律解析为 `false`，批量执行方必须拒绝执行（fail-closed）。
+- **插件发起批量捕获（R-B5）**：`beginBatchCapture` 不走 200ms 回合预算——批量是用户发起、清单在预览阶段已知，对全部受影响文件强制预捕获；超限文件照旧进入 `standbyOversize` 如实标注不可回退。`notePluginMove` 存在的原因：vault `rename` 事件不在事件漏斗监听范围内（Obsidian 移动只发 `rename`），插件移动必须显式登记；`endBatchCapture` 关闭后**无宽限窗**（批量写入全部显式登记），因此一键回退即时可用。`endBatchCapture` **只关闭 `backend: 'plugin'` 轮次**：若轮次开启后有真实 agent turn 启动（最新轮次变为 turn 轮），拒绝关闭——绝不提前暴露回合中的回退、也不破坏 turn 的工具声明 pre-image 捕获。`beginBatchCapture` 内部失败一律解析为 `false`，批量执行方必须拒绝执行（fail-closed）。
 
 ## 导入关系
 
@@ -85,4 +85,6 @@ class EditRevertService implements EditRevertServicePort {
 
 ## R-C2 扩展：registerPluginCreatedAsset
 
-2026-09-18 新增公开方法 `registerPluginCreatedAsset(conversationId, assetPath, notePaths?)`：把插件生成的二进制资产（W-asset 之后调用）登记为当前轮次（或新建 `backend: 'plugin'` 轮次）中 `status: 'created'`、`source: 'plugin'`、`binaryAsset: true` 的条目，并对 `notePaths`（即将写入引用的笔记）做免预算 markdown 预像捕获，使资产与引用可成对回退。无已开轮次时新建轮次并以 post-turn grace 关闭（引用写入落在 grace 窗口内，由 vault-event funnel 归因）。二进制条目零快照存储；回退=trash，restore 依 `binaryAsset` 标志在构造上不可用。启用关闭时为 no-op（fail-soft）。
+2026-09-18 新增公开方法 `registerPluginCreatedAsset(conversationId, assetPath, notePaths?)`：把插件生成的二进制资产（W-asset 之后调用）登记为当前轮次（或新建 `backend: 'plugin'` 轮次）中 `status: 'created'`、`source: 'plugin'`、`binaryAsset: true` 的条目，并对 `notePaths`（即将写入引用的笔记）做免预算 markdown 预像捕获，使资产与引用可成对回退。二进制条目零快照存储；回退=trash，restore 依 `binaryAsset` 标志在构造上不可用。启用关闭时为 no-op（fail-soft）。
+
+D2 修复（同日）：无已开轮次时新建的 `plugin` 轮次**保持开放**（`closedAt: null`，grace 窗口仅作流程中断时的有界兜底），R-C2 流程在 W-ref 终态（成功或失败）后走 R-B5 的 record-then-close 约定——`notePluginWrite` 显式登记引用写入（不依赖 autosave 事件时序）、`endBatchCapture` 立即关闭，一键回退即时可用，不再等待 10 分钟 grace。进行中的 turn 轮次照旧只随自身生命周期关闭。

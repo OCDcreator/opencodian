@@ -79,6 +79,69 @@ describe('buildImageGenerationRequest (openai-images shape)', () => {
   });
 });
 
+describe('malformed config entries fail closed instead of throwing (§6.4)', () => {
+  // A hand-edited / programmatically written data.json entry can bypass
+  // normalizeImageGenerationModels; missing fields must read as absent.
+  const malformed = (fields: Record<string, unknown>): Pick<ImageGenerationModelConfig, 'baseURL' | 'apiKey' | 'model' | 'size'> =>
+    fields as unknown as Pick<ImageGenerationModelConfig, 'baseURL' | 'apiKey' | 'model' | 'size'>;
+
+  it('treats a missing size like the empty (provider-default) size', () => {
+    const request = buildImageGenerationRequest(malformed({
+      baseURL: MODEL.baseURL,
+      apiKey: MODEL.apiKey,
+      model: MODEL.model,
+    }), 'p');
+    expect(request.body).toEqual({ model: 'gpt-image-1', prompt: 'p', n: 1 });
+    expect(request.headers.Authorization).toBe('Bearer sk-test-secret');
+  });
+
+  it('treats missing apiKey as no auth header and tolerates non-string fields', () => {
+    const request = buildImageGenerationRequest(malformed({
+      baseURL: MODEL.baseURL,
+      apiKey: undefined,
+      model: MODEL.model,
+      size: 42,
+    }), 'p');
+    expect(request.headers.Authorization).toBeUndefined();
+    expect(request.body).toEqual({ model: 'gpt-image-1', prompt: 'p', n: 1 });
+  });
+
+  it('generate resolves the normal http failure for an entry without baseURL/model fields', async () => {
+    let called = 0;
+    const service = new ImageGenerationService({
+      async postJson() { called += 1; return { status: 200, body: new ArrayBuffer(0) }; },
+    });
+    const result = await service.generate(
+      malformed({ baseURL: MODEL.baseURL, apiKey: MODEL.apiKey }),
+      'p',
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      kind: 'http',
+      error: expect.stringContaining('not configured'),
+    });
+    expect(called).toBe(0);
+  });
+
+  it('generate proceeds (provider-default size) when only size is missing', async () => {
+    const { transport, calls } = okTransport(pngBytes());
+    const service = new ImageGenerationService(transport);
+    const result = await service.generate(
+      malformed({
+        baseURL: MODEL.baseURL,
+        apiKey: MODEL.apiKey,
+        model: MODEL.model,
+      }),
+      'p',
+      undefined,
+      5_000,
+    );
+    expect(result).toMatchObject({ ok: true, mimeType: 'image/png' });
+    expect(calls[0]).toMatchObject({ url: 'https://api.example.com/v1/images/generations' });
+    expect((calls[0] as { body: Record<string, unknown> }).body).not.toHaveProperty('size');
+  });
+});
+
 describe('decodeImageGenerationResponse', () => {
   it('decodes b64_json and sniffs the mime type', () => {
     const result = decodeImageGenerationResponse(200, jsonBuffer({ data: [{ b64_json: b64(pngBytes()) }] }));

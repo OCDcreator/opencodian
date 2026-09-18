@@ -585,6 +585,7 @@ export class InlineEditController {
   private async accept(editId: string): Promise<void> {
     const edit = this.findEdit(editId);
     if (!edit) return;
+    const imageGen = this.imageGenDeps();
     await executeInlineEditAccept(edit, {
       notify: (message) => { this.notify(message); },
       confirmDocumentReplace: this.options.confirmDocumentReplace,
@@ -592,6 +593,10 @@ export class InlineEditController {
         && this.findEdit(candidate.editId) === edit,
       closeEdit: (id) => this.close(id),
       rejectEdit: (id) => { this.reject(id); },
+      // R-C2/D2: record the accepted image reference write, then close the
+      // plugin asset round so revert is available without the grace window.
+      noteImageReferenceWrite: (notePath) => { imageGen?.noteReferenceWrite?.(notePath); },
+      endImageAssetCapture: () => { imageGen?.endAssetCapture?.(); },
     });
   }
 

@@ -49,6 +49,20 @@ export interface InlineEditImageGenDeps {
   trashAsset(path: string): Promise<boolean>;
   /** R-B3 registration (fail-soft inside the service); fire and forget. */
   registerAsset(assetPath: string, notePath: string): void;
+  /**
+   * R-B3 record-then-close for the accepted reference write (D2): record the
+   * note modification explicitly — no vault-event autosave timing dependency
+   * — before `endAssetCapture` closes the round. Optional so doubles stay
+   * valid.
+   */
+  noteReferenceWrite?(notePath: string): void;
+  /**
+   * R-B3 (D2): close the plugin asset round once the paired write attempt is
+   * terminal (accepted, failed, or the asset was released without an
+   * insert), so revert is available without waiting out the post-turn grace.
+   * Optional so doubles stay valid.
+   */
+  endAssetCapture?(): void;
   notify(message: string): void;
 }
 
@@ -118,11 +132,14 @@ export async function runInlineEditImageGeneration(
  * Preview-rejected (or orphaned) asset handling per `imageGenerationAssetCleanup`
  * (design §4.6): `trash` is the default and removes the asset; `keep` retains
  * it. Either way the user is told exactly what happened — never silent.
+ * The reference write will never happen, so the plugin asset round is closed
+ * here as well (D2 failure branch): revert must not wait out the grace.
  */
 export async function cleanupRejectedImageAsset(
   deps: InlineEditImageGenDeps,
   path: string,
 ): Promise<void> {
+  deps.endAssetCapture?.();
   if (deps.cleanup === 'trash') {
     const trashed = await deps.trashAsset(path);
     deps.notify(trashed

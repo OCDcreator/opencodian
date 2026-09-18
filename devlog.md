@@ -11,6 +11,18 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-18 文生图（R-C2）验收修复三则：D1 畸形配置 fail-closed、D2 资产轮次即时关闭、D3 模态 chrome 对齐 DESIGN.md §5
+
+真机验收 R-C2（对本地 stub 端点驱动）暴露三处缺陷，本条全部修复：
+
+**D1（低危，健壮性）**：`buildImageGenerationRequest` 直接 `.trim()` 读 `apiKey`/`model`/`size`/`baseURL`，`generate()` 的预检同样直接读——`normalizeImageGenerationModels` 会补齐字段，但 `saveSettings()` 不再归一化，手改 `data.json` 缺 `size` 的条目让生成抛 `TypeError`（未处理 rejection），违反 §6.4「拒绝必须上报而非抛出」。修复：全部配置读取改经容忍读取（非字符串按缺失处理）——缺 `baseURL`/`model` → 既有 `http` + "not configured" 失败形态；缺 `apiKey` → 无 Authorization 头；缺 `size` → 视同 provider 默认（等价 `size: ''`）；良构条目行为逐字节不变。单测 4 例锁定畸形条目路径（请求构造不抛、缺 size 照常生成、缺 model 走失败形态零请求）。
+
+**D2（中危，UX）**：`registerPluginCreatedAsset` 原来新建的 plugin 轮次「创建即关闭 + `acceptsWritesUntil = now + 10min`」，而 `performRevertAll/performRevertFile` 以 `acceptsWritesUntil > now` 判 `round-open`——生成图像插入后 10 分钟内一键回退恒被拒（实测 3s/8s/15s 三次均 `round-open`）。修复沿用 **R-B5 既有 record-then-close 公开面**（未新增 port 成员）：新建 plugin 轮次改为**保持开放**（grace 仅作流程中断时的有界兜底），成对引用写（W-ref）终态后由流程先 `notePluginWrite`（显式登记引用写入，消除对 Obsidian autosave 事件时序的依赖——这是必须显式登记而非依赖 vault 事件的原因：立即关闭后迟到的 modify 事件会找不到归属轮次）再 `endBatchCapture` 立即关闭。`endBatchCapture` 收窄为**只关 `backend: 'plugin'` 轮次**：若轮次开启后有真实 turn 启动（最新轮次变为 turn 轮），拒绝关闭——turn 轮次的 grace 与生命周期不受影响，回退在 turn 进行中依旧不可用（纯批量流不受影响：批量轮本就是 `backend: 'plugin'`）。接线覆盖聊天与行内两入口的全部终态：插入成功（先登记后关闭）、W-ref 抛错（仅关闭，资产保留可回退）、行内脏检查失败（仅关闭）、预览拒绝/编辑销毁（`cleanupRejectedImageAsset` 首步关闭）。服务测试 5 例新增/改写：**「配对写登记并关闭后回退无需等待 grace」即本条会抓到 D2 的测试**；另锁定 turn 进行中 `endBatchCapture` 后回退仍 `round-open`、关闭后迟到 vault 事件不重复登记条目、插入失败分支仅回退资产一条。
+
+**D3（低危，一致性）**：`image-generation-modal.css` 原继承宿主默认 modal-content 内边距（实测 16px），与本仓其它自有模态（`batch-organize-modal.css`、`obsidian-tooling-confirm-modal.css`）不一致。补齐 DESIGN.md §5 文档化 token 全集（content padding 22px、header-body 16px、section 20px、section-inner/card/form-row 12px、label-control 16px、action 8px）与 `.modal-content` token 内边距；结果区布局规则与宿主原生颜色选择（`--radius-m`/`--background-secondary`/`--text-error`/`--font-ui-smaller`）保持不变。`uiCssDesignContract.test.ts` 新增 imagegen 契约块（token 逐字断言、宿主原生选择锁定、无侧条纹）。
+
+测试合计：imagegen 服务 22、R-C2 回退 13（含 4 新）、批量回归全绿、聊天控制器 7、行内 imagegen 8、设计契约 27（含 5 新）。`docs/modules/**` 九页同步；R-B5 批量语义与 turn 轮次 grace 未动，失败矩阵分支未移仅补齐终态关闭。
+
 ## 2026-09-18 文生图（R-C2）：两段写（W-asset + W-ref）落地，插件首次向用户内容区写二进制资产
 
 按 `docs/requirements/flowtext-c2-design.md` 实施。核心：`ImageGenerationService`（`core/agents/imagegen/`，openai-images 兼容、transport 注入、120s/25MB 显式常量、fail-closed：非 2xx→quota/http、仅收 `b64_json`、签名嗅探、超限 `size-limit`、无自动重试）+ `ImageAssetStorage`（`core/storage/`，W-asset：附件目录经 `getAvailablePathForAttachments`、绝不覆盖、越界路径写前 fail-closed）+ `EditRevertService.registerPluginCreatedAsset`（沿用 R-B5 可选 port 成员模式：`created`/`source:'plugin'`/`binaryAsset: true` 条目零二进制快照，notePaths 免预算预像使资产与引用成对回退，无开轮次时新建 plugin 轮次并以 post-turn grace 关闭；writeback 对 `binaryAsset` 条目跳过 restore 捕获，restore 如实不可用）。两入口：行内编辑（chip off→整行→行内，复用既有 preview→单次 `replaceRange` 接受流，W-ref 失败保留资产并提示实际路径，预览拒绝按 `imageGenerationAssetCleanup` 清理）与聊天（生成先行、插入点击才写盘；composer 按钮 + `/image` 在 pi/claude-code 回退**之前**拦截保证四后端可用）。设置四件套齐（`imageGenerationModels`/`imageGenerationMaxWidth` 600/`imageGenerationAssetCleanup` trash，密钥走 password 框与既有脱敏契约）。聊天结果面与设计的"消息卡片"有偏差：以 Modal 卡片实现（会话流卡片需横切消息模型与渲染管线），行为要素全部保留，已向维护者声明。真机端到端生成未验证（无已配置图像端点），生成链路的供应商响应体/耗时分布（§7 未验证项 1）留待实机校准。

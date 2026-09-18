@@ -32,8 +32,10 @@ function getCssRuleBlock(css: string, selector: string): string {
 
 const BATCH_CSS = 'src/style/modals/batch-organize-modal.css';
 const TOOLING_CSS = 'src/style/modals/obsidian-tooling-confirm-modal.css';
+const IMAGEGEN_CSS = 'src/style/modals/image-generation-modal.css';
 const BATCH_TS = 'src/app/batchOrganize/BatchOrganizeModal.ts';
 const TOOLING_TS = 'src/app/obsidianTooling/ObsidianToolingApprovalModal.ts';
+const IMAGEGEN_TS = 'src/features/chat/ui/ImageGenerationModal.ts';
 
 /** `border-left`/`border-right` wider than 1px is an impeccable ban. */
 const SIDE_STRIPE_PATTERN = /border-(?:left|right):\s*(?!1px|0\b|0px\b|none\b|transparent\b)[1-9]\d*(?:\.\d+)?px/;
@@ -144,6 +146,50 @@ describe('obsidian tooling approval modal design contract', () => {
     expect(css).toMatch(/focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--interactive-accent\)/s);
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)/);
     expectNoMatches(css, SIDE_STRIPE_PATTERN, 'tooling side stripe');
+  });
+});
+
+describe('image generation modal design contract (DESIGN.md §5 Modal Layout)', () => {
+  const css = read(IMAGEGEN_CSS);
+  const ts = read(IMAGEGEN_TS);
+
+  it('scopes the modal under a root class applied in the TS', () => {
+    expect(css).toMatch(/\.opencodian-imagegen-modal\s*\{/);
+    expect(ts).toContain("this.modalEl.addClass('opencodian-imagegen-modal')");
+  });
+
+  it('declares the documented modal spacing tokens verbatim and pads .modal-content with them', () => {
+    expect(css).toMatch(/--opencodian-modal-content-padding-x:\s*22px/);
+    expect(css).toMatch(/--opencodian-modal-content-padding-y:\s*22px/);
+    expect(css).toMatch(/--opencodian-modal-header-body-gap:\s*16px/);
+    expect(css).toMatch(/--opencodian-modal-section-gap:\s*20px/);
+    expect(css).toMatch(/--opencodian-modal-section-inner-gap:\s*12px/);
+    expect(css).toMatch(/--opencodian-modal-card-gap:\s*12px/);
+    expect(css).toMatch(/--opencodian-modal-form-row-gap:\s*12px/);
+    expect(css).toMatch(/--opencodian-modal-form-label-control-gap:\s*16px/);
+    expect(css).toMatch(/--opencodian-modal-action-gap:\s*8px/);
+    const block = getCssRuleBlock(css, '.opencodian-imagegen-modal .modal-content');
+    expect(block).toMatch(/padding:\s*var\(--opencodian-modal-content-padding-y\)\s+var\(--opencodian-modal-content-padding-x\)/);
+  });
+
+  it('keeps the host-native colour and type choices (no retheming)', () => {
+    expect(css).toMatch(/border-radius:\s*var\(--radius-m/);
+    expect(css).toMatch(/background:\s*var\(--background-secondary\)/);
+    expect(css).toMatch(/color:\s*var\(--text-error\)/);
+    expect(css).toMatch(/font-size:\s*var\(--font-ui-smaller\)/);
+  });
+
+  it('keeps the result image bounded and its caption an honest smaller label', () => {
+    const image = getCssRuleBlock(css, '.opencodian-imagegen-result-image');
+    expect(image).toMatch(/max-height:\s*320px/);
+    expect(image).toMatch(/object-fit:\s*contain/);
+    const meta = getCssRuleBlock(css, '.opencodian-imagegen-result-meta');
+    expect(meta).toMatch(/color:\s*var\(--text-muted\)/);
+  });
+
+  it('contains no side-stripe accent borders', () => {
+    expect(css).toContain('opencodian-imagegen-modal');
+    expectNoMatches(css, SIDE_STRIPE_PATTERN, 'imagegen side stripe');
   });
 });
 

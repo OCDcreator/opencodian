@@ -66,6 +66,12 @@ function createHarness(overrides: Partial<Pick<InlineEditImageGenDeps, 'cleanup'
     registerAsset(assetPath, notePath) {
       calls.push(`register:${assetPath}:${notePath}`);
     },
+    noteReferenceWrite(notePath) {
+      calls.push(`noteRef:${notePath}`);
+    },
+    endAssetCapture() {
+      calls.push('endAsset');
+    },
     notify(message) {
       notices.push(message);
     },
@@ -169,17 +175,17 @@ describe('runInlineEditImageGeneration — two-step write contract', () => {
 });
 
 describe('cleanupRejectedImageAsset — §4.6 asset policy', () => {
-  it('trash policy: trashes and reports the path', async () => {
+  it('trash policy: closes the asset round, trashes and reports the path', async () => {
     const harness = createHarness();
     await cleanupRejectedImageAsset(harness.deps, 'attachments/x.png');
-    expect(harness.calls).toEqual(['trash:attachments/x.png']);
+    expect(harness.calls).toEqual(['endAsset', 'trash:attachments/x.png']);
     expect(harness.notices[0]).toContain('attachments/x.png');
   });
 
-  it('keep policy: keeps the file and still tells the user where it is', async () => {
+  it('keep policy: closes the asset round, keeps the file and still tells the user where it is', async () => {
     const harness = createHarness({ cleanup: 'keep' });
     await cleanupRejectedImageAsset(harness.deps, 'attachments/x.png');
-    expect(harness.calls).toEqual([]);
+    expect(harness.calls).toEqual(['endAsset']);
     expect(harness.notices[0]).toContain('attachments/x.png');
   });
 

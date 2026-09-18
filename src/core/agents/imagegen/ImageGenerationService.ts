@@ -63,6 +63,18 @@ function joinImagesEndpoint(baseURL: string): string {
 }
 
 /**
+ * Tolerant config-field read (§6.4 fail-closed): `normalizeImageGenerationModels`
+ * supplies every field, but `saveSettings()` does not re-normalize, so a
+ * hand-edited or programmatically written `data.json` entry can reach this
+ * module with missing/non-string fields. Those read as absent — the request
+ * builder must never throw; `generate` reports the normal `{ ok:false }`
+ * failure shape with a clear reason instead of an unhandled TypeError.
+ */
+function configText(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+/**
  * Build the OpenAI images-compatible request (pure). `response_format` is
  * intentionally NOT sent: `gpt-image-1` rejects the parameter, and the
  * decoder only accepts `b64_json` payloads anyway (fail closed over
@@ -73,15 +85,16 @@ export function buildImageGenerationRequest(
   prompt: string,
 ): BuiltImageGenerationRequest {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (config.apiKey.trim()) {
-    headers.Authorization = `Bearer ${config.apiKey.trim()}`;
+  const apiKey = configText(config.apiKey);
+  if (apiKey.trim()) {
+    headers.Authorization = `Bearer ${apiKey.trim()}`;
   }
-  const body: Record<string, unknown> = { model: config.model.trim(), prompt, n: 1 };
-  const size = config.size.trim();
+  const body: Record<string, unknown> = { model: configText(config.model).trim(), prompt, n: 1 };
+  const size = configText(config.size).trim();
   if (size) {
     body.size = size;
   }
-  return { url: joinImagesEndpoint(config.baseURL), headers, body };
+  return { url: joinImagesEndpoint(configText(config.baseURL)), headers, body };
 }
 
 /** Minimal base64 → bytes that works in the Electron renderer and under Node tests. */
@@ -225,7 +238,7 @@ export class ImageGenerationService {
     signal?: AbortSignal,
     timeoutMs: number = IMAGE_GENERATION_TIMEOUT_MS,
   ): Promise<ImageGenerationResult> {
-    if (!config.baseURL.trim() || !config.model.trim()) {
+    if (!configText(config.baseURL).trim() || !configText(config.model).trim()) {
       return { ok: false, error: 'Image generation model is not configured (baseURL/model missing)', kind: 'http' };
     }
     if (signal?.aborted) {

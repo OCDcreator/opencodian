@@ -61,6 +61,18 @@ export interface InlineEditAcceptDeps {
   closeEdit(editId: string): Promise<void>;
   /** Reject the edit after a failed dirty check (notify + teardown). */
   rejectEdit(editId: string): void;
+  /**
+   * R-C2/D2 record-then-close: record the accepted image reference write
+   * explicitly (before `endImageAssetCapture` closes the round). Only called
+   * after the reference write actually applied.
+   */
+  noteImageReferenceWrite?(notePath: string): void;
+  /**
+   * R-C2/D2: close the plugin asset round once the reference write attempt
+   * is terminal (applied, refused, or thrown) so revert does not wait out
+   * the post-turn grace.
+   */
+  endImageAssetCapture?(): void;
 }
 
 /** Apply the previewed text after the dirty check (§7.5). */
@@ -86,6 +98,8 @@ export async function executeInlineEditAccept(
     // dirty-check failure branch — the asset is KEPT and its actual path is
     // reported (fail-visible), never silently dropped.
     if (edit.imageGen?.pendingAssetPath) {
+      // No reference write will happen; close the asset round now (D2).
+      deps.endImageAssetCapture?.();
       deps.notify(t('inlineEdit.imageGen.notice.insertFailedKeepAsset', {
         path: edit.imageGen.pendingAssetPath,
       }));
@@ -128,14 +142,23 @@ export async function executeInlineEditAccept(
     } catch (error) {
       // W-ref write failure (R-C2): the asset stays on disk and its actual
       // path is reported; the document is unchanged because the transaction
-      // never applied.
+      // never applied. The round closes now — no write will be recorded (D2).
       if (assetPath) {
+        deps.endImageAssetCapture?.();
         deps.notify(t('inlineEdit.imageGen.notice.insertFailedKeepAsset', { path: assetPath }));
         return;
       }
       deps.notify(t('inlineEdit.error.applyFailed', {
         message: error instanceof Error ? error.message : String(error),
       }));
+      return;
+    }
+    // The paired reference write applied: record it explicitly (order
+    // matters — record before close) and free the round so one-click revert
+    // is available immediately (D2).
+    if (assetPath) {
+      deps.noteImageReferenceWrite?.(edit.anchor.notePath);
+      deps.endImageAssetCapture?.();
     }
   });
 }

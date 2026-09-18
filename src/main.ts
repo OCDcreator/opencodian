@@ -636,6 +636,18 @@ export default class OpenCodianPlugin extends Plugin {
         if (!conversationId) return;
         void this.editRevertService?.registerPluginCreatedAsset?.(conversationId, assetPath, [notePath]);
       },
+      // D2 record-then-close: record the paired reference write explicitly,
+      // then close the plugin asset round so revert skips the grace window.
+      noteReferenceWrite: (notePath) => {
+        const conversationId = this.resolveImageGenConversationId();
+        if (!conversationId) return;
+        void this.editRevertService?.notePluginWrite?.(conversationId, notePath);
+      },
+      endAssetCapture: () => {
+        const conversationId = this.resolveImageGenConversationId();
+        if (!conversationId) return;
+        void this.editRevertService?.endBatchCapture?.(conversationId);
+      },
       resolveInsertTarget: () => {
         const view = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (!view) return null;
@@ -666,6 +678,17 @@ export default class OpenCodianPlugin extends Plugin {
         const conversationId = this.resolveImageGenConversationId();
         if (!conversationId) return;
         void this.editRevertService?.registerPluginCreatedAsset?.(conversationId, assetPath, [notePath]);
+      },
+      // D2 record-then-close (same contract as the chat entry ports).
+      noteReferenceWrite: (notePath) => {
+        const conversationId = this.resolveImageGenConversationId();
+        if (!conversationId) return;
+        void this.editRevertService?.notePluginWrite?.(conversationId, notePath);
+      },
+      endAssetCapture: () => {
+        const conversationId = this.resolveImageGenConversationId();
+        if (!conversationId) return;
+        void this.editRevertService?.endBatchCapture?.(conversationId);
       },
       notify: (message) => { new Notice(message); },
     };
