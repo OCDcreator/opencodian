@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "f1f860bf211fe8de55b53d4462dd010281c592f7039e29261c739dcb236c5d53",
+  "digest": "f70a7968b776bf5d997ae4db800003ec98b2b5679a89f8acd9bbc3b6a68a8b91",
   "recordCount": 705,
   "records": [
     {
@@ -26,7 +26,7 @@
     {
       "kind": "src",
       "key": "src/app/batchOrganize/BatchOrganizeCoordinator.ts",
-      "sha256": "f4f331b90ce9aadebe5cd9db3a520b1d8befec97dccf4234289e7a2a9308f173"
+      "sha256": "52f3a767e57535d9b33d42d1b7304d8539c122c342d28d13f6edc37f66c27fb6"
     },
     {
       "kind": "src",
@@ -3529,7 +3529,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-18T14:23:57.075Z",
-  "headShaAtGeneration": "c47fba8141b619c867c9ccd9fa829239f8bc75c2",
+  "generatedAt": "2026-09-18T14:34:52.837Z",
+  "headShaAtGeneration": "47790e76ec63cd03da9892c34b0404907a748b34",
   "graphifyVersion": "graphify 0.9.36"
 }
