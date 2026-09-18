@@ -1111,6 +1111,53 @@
       "risk": "high"
     },
     {
+      "id": "core.remotecontrol",
+      "layer": "core",
+      "include": [
+        "src/core/remotecontrol/**"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "R-C6 remote-drive loopback control interface: listener lifecycle on 127.0.0.1:4105 (off = zero construction, no http.Server), Host-header allowlist, closed method/path whitelist, timing-safe token authentication with a single fixed 401 copy, closed error-code set, 64 KiB JSON body cap",
+        "dedicated remote OpenCode session ownership: create with setCurrent:false, drive sendMessage chunks to a terminal state through the injected narrow session-driver port, single-flight scheduling with 409 busy, hard-deadline abort through the existing cancel/abort path returning an explicitly partial timeout result",
+        "audited request lifecycle on a dedicated shared-diagnostics TraceStore (bundlePrefix remote-control): structural retention, dual redaction (hardened TraceRedactor with dynamically collected known secrets + report sanitizer on export), instruction recorded as charLength + sha256 prefix only, token recorded as fingerprint only"
+      ],
+      "canonicalState": [
+        "remote control listener state machine (off/starting/listening/error) plus blockedReason (missing token, non-loopback without acknowledgement)",
+        "dedicated remote session id, single-flight instruction state, last terminal state and duration",
+        "remote-control audit TraceStore instance and audit event schema v1"
+      ],
+      "entrypoints": [
+        "src/core/remotecontrol/index.ts",
+        "src/core/remotecontrol/RemoteControlService.ts"
+      ],
+      "allowedOwnerDependencies": [
+        "shared.foundation",
+        "shared.diagnostics",
+        "core.types",
+        "core.opencode"
+      ],
+      "forbiddenDependencies": [
+        "feature",
+        "app"
+      ],
+      "adjacentOwners": [
+        "app.composition",
+        "core.opencode",
+        "feature.settings-plugin"
+      ],
+      "tests": [
+        "tests/unit/core/remotecontrol/**"
+      ],
+      "overviewDoc": "docs/architecture/owners/core-remotecontrol.md",
+      "requiredGates": [
+        "typecheck",
+        "module-docs",
+        "build"
+      ],
+      "risk": "high"
+    },
+    {
       "id": "core.security",
       "layer": "core",
       "include": [

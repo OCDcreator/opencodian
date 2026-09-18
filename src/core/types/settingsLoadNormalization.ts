@@ -42,6 +42,10 @@ import {
   normalizePersistedTabState,
   normalizePluginUpdateAutoInstall,
   normalizeQuestionCardSettings,
+  normalizeRemoteControlBindAddress,
+  normalizeRemoteControlEnabled,
+  normalizeRemoteControlNonLoopbackAcknowledgedAt,
+  normalizeRemoteControlToken,
   normalizeSettingsLayoutMode,
   normalizeSettingsTabbedPrimaryTab,
   normalizeSettingsTabbedSecondaryTabByPrimary,
@@ -530,6 +534,31 @@ function normalizeImageGenerationSettingsOnLoad(
   };
 }
 
+/**
+ * R-C6 remote control, normalized at the final load-merge boundary. The
+ * token follows the settings credential path (string-only, never echoed);
+ * the disabled state stays the default and clears no token (close ≠ revoke).
+ */
+function normalizeRemoteControlSettingsOnLoad(
+  normalizedSettings: Partial<OpenCodianSettings> | null,
+): {
+  remoteControlEnabled: boolean;
+  remoteControlBindAddress: string;
+  remoteControlToken: string;
+  remoteControlNonLoopbackAcknowledgedAt: string;
+} {
+  return {
+    remoteControlEnabled: normalizeRemoteControlEnabled(normalizedSettings?.remoteControlEnabled),
+    remoteControlBindAddress: normalizeRemoteControlBindAddress(
+      normalizedSettings?.remoteControlBindAddress,
+    ),
+    remoteControlToken: normalizeRemoteControlToken(normalizedSettings?.remoteControlToken),
+    remoteControlNonLoopbackAcknowledgedAt: normalizeRemoteControlNonLoopbackAcknowledgedAt(
+      normalizedSettings?.remoteControlNonLoopbackAcknowledgedAt,
+    ),
+  };
+}
+
 function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | null): LoadSettingsNormalizationResult {
   const normalizedModelProviderPluginDebugSettings = normalizeModelProviderPluginDebugSettings(savedSettings);
   const { normalizedServer, shouldMigrateLegacyLocalDefaultPort } = normalizeServerSettingsOnLoad(savedSettings);
@@ -661,6 +690,7 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
       ...normalizeVaultRetrievalSettingsOnLoad(normalizedSettings),
       ...normalizeImageGenerationSettingsOnLoad(normalizedSettings),
       ...normalizeInlineCompletionSettingsOnLoad(normalizedSettings),
+      ...normalizeRemoteControlSettingsOnLoad(normalizedSettings),
     },
     shouldMigrateLegacyLocalDefaultPort,
     shouldResetGlassRefractionGlassDefaults,

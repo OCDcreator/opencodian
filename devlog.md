@@ -11,6 +11,18 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-18 远程驱动外部接口（R-C6）：令牌鉴权环回控制面与全量审计
+
+FlowText 对齐 R-C6 落地（设计基准 `docs/requirements/flowtext-c6-design.md`，实现与设计逐条对齐；实机验收项（IPv6 关闭态端口扫描、真机 curl 往返、审计 grep、二次确认弹窗实机目测）留待主智能体执行）。
+
+**core.remotecontrol（新 owner，risk: high）**：`RemoteControlService` 持有 `node:http` 监听器与固定 fail-closed 请求管线（①Host 白名单 403 → ②方法+路径白名单 405/403 → ③令牌常数时间比对 401 同文案 → ④体上限 64KiB+封闭形态 400/413 → ⑤单飞行 409 → ⑥执行）；错误码封闭集八枚。**关闭态零构造**：`remoteControlEnabled=false` 时根本不建 `http.Server`、零 `listen` 调用，契约测试用 `LocalProcessProbe.canBindLocalEndpoint('127.0.0.1'/'::1')` 双栈探活证明；审计实例也是惰性的，关闭态连诊断目录都不建。操作白名单为代码内封闭枚举（health / instruction.submit / session.status），请求体封闭为单 `instruction` 字符串字段（≤32k），任何多余字段（假想 `path`/`op`）结构性 400——"vault 外读取被拒"由构造保证而非过滤。专用远程会话经注入的窄驱动端口驱动（`main.ts` 绑定 `openCodeService.createSession/sendMessage/cancelStream` 既有公开 API，**零改动 OpenCodeService**）：`setCurrent:false` 不抢占用户会话、单飞行不排队、硬轮限 15 分钟到期走 `cancelStream`（内部即 `OpenCodeSessionLifecycleCoordinator.abortSession`）并以显式 `timeout` 返回部分结果。
+
+**安全面**：`RemoteControlAuth` 纯函数层——`randomBytes(32)`→base64url（256-bit）、sha256 摘要 `timingSafeEqual`（等长归一，长度不泄漏）、Bearer 提取（缺失/畸形与错令牌同一 401 文案）、环回分类。令牌走既有设置凭据路径（先例 `CodexBackendSettings.apiKey`：默认空串+逐字段归一化），关闭不清除（关闭≠吊销，吊销走重生成）；`RemoteControlAudit` 双层 redaction——append 时 hardened `TraceRedactor`（knownSecrets 动态收集 remoteControlToken+现存 apiKey/password/token）+ 导出时逐行 hardened 重跑再叠 `sanitizeDiagnosticReport()`；审计指令只存 `charLength`+sha256 前 12 hex、令牌只存指纹，v1 刻意不提供内容采集开关使验收 3 的豁免条款空转。非环回绑定双保险：设置模态双语固定风险文案（明文 HTTP/同网段嗅探/令牌=驱动能力/审计无身份）确认后落 `remoteControlNonLoopbackAcknowledgedAt`，服务端绑定时二次校验，改回环回即清除。
+
+**设置四件套与组合**：`settings.ts` 四字段+归一化、`settingsLoadNormalization.ts` 最终合并边界物化、`SettingsRemoteControlSection.ts`（Security 主 tab 新二级 tab `remote` + 经典布局挂安全分区后；状态行/重查/一次性令牌展示模态/重生成确认/审计目录打开）与 zh/en 双语文案。`main.ts` 只组合：`configureVaultScopedServices()` 末尾 `initRemoteControl(vaultPath)` 构造+注入+`applySettings()`，`onunload` 增 `dispose()`（关监听/中止在飞/flush 审计）。owner 登记 `core.remotecontrol`（含 owner 概览文档），模块文档新增 5 页 + 既有 9 页同步。测试 5 套 123 例（Auth 31、Routing 35、Audit 7、Service 16——含关闭态双栈探活、缺令牌/非环回拒启、端口占用 fail-closed、401 不可区分、白名单负例矩阵、真环回往返、409、超时中止路径断言、审计无令牌无指令正文；设置归一化 34 例），本地门禁全绿。
+
+---
+
 ## 2026-09-18 R-C4 实机验收修复：阶梯首探不终局、拆除不抛错、引擎相对路径可解析
 
 R-C4 实机验收（Obsidian 1.13.7 + 真文字层 PDF）暴露三缺陷，全部对源核实后修复。

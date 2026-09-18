@@ -859,6 +859,7 @@ describe('OpenCodianSettingTab layout shell', () => {
       addFormatterSettings: jest.fn(),
       addPluginSettings: jest.fn(),
       addSecuritySettings: jest.fn(),
+      addRemoteControlSettings: jest.fn(),
       addUISettings: jest.fn(),
       addStyleSettings: jest.fn(),
       addDebugSettings: jest.fn(),

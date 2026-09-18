@@ -1,4 +1,5 @@
 # OpenCodianSettings
+> 2026-09-18 (R-C6): 经典布局在 `addSecuritySettings()` 之后新增 `addRemoteControlSettings()`，渲染 `SettingsRemoteControlSection`（远程驱动设置面：主开关/状态/绑定地址/令牌/审计）。
 > 2026-09-18 (R-B2): classic layout renders the new `SettingsContextGroupsSection` right after the inline-edit section.
 
 2026-09-10：设置 shell 持有 `SettingsPluginUpdateSection` 实例，重新渲染和 `hide()` 均释放其进度订阅；安装途中返回设置可从服务快照恢复进度。稳定版历史分页状态仅在当前 section 内保留。

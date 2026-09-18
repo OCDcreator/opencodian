@@ -1,4 +1,5 @@
 # Settings Types and Defaults
+> 2026-09-18 (R-C6): 新增远程驱动四字段 `remoteControlEnabled`（默认 `false`，关闭即不构造任何 http.Server）、`remoteControlBindAddress`（默认 `127.0.0.1`，`localhost` 归一化，非环回需确认时间戳）、`remoteControlToken`（默认 `''`，凭据路径先例 `CodexBackendSettings.apiKey`：字符串归一化、永不回显、关闭不清除）、`remoteControlNonLoopbackAcknowledgedAt`（默认 `''`，改回环回即清除）；配套 `REMOTE_CONTROL_*` 边界常量与四个 `normalizeRemoteControl*` 归一化函数。
 > 2026-09-18 (R-B3): R-B3 adds `editRevertEnabled` (default true) and `editRevertSnapshotLimitMb` (default 50, clamped 10-500 by `normalizeEditRevertSnapshotLimitMb`) to `OpenCodianSettings` / `DEFAULT_SETTINGS`, with the `EDIT_REVERT_SNAPSHOT_LIMIT_MB_MIN/DEFAULT/MAX` constants exported alongside.
 > 2026-09-18 (R-B1/R-B2): adds `ContextGroup` / `ContextGroupEntry` shapes with `normalizeContextGroups` (+ caps), `normalizeAutoInternalLinkExcludedTerms`, and the `autoInternalLinkEnabled` (default false) / `autoInternalLinkExcludedTerms` / `contextGroups` settings fields with defaults.
 

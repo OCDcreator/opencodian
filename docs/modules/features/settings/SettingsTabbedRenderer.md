@@ -1,4 +1,5 @@
 # SettingsTabbedRenderer
+> 2026-09-18 (R-C6): `renderSecurityContent()` 对二级 tab `remote` 分派到 `SettingsRemoteControlSection`；其余二级 tab 仍渲染 `SettingsSecuritySection`。
 > 2026-09-18 (R-B2): `renderConversationContent` mounts `SettingsContextGroupsSection.attachTabbed` next to the inline-edit section.
 
 > **源码**: `src/features/settings/SettingsTabbedRenderer.ts`

@@ -396,6 +396,82 @@ export function normalizeImageGenerationAssetCleanup(value: unknown): ImageGener
     : 'trash';
 }
 
+// --- R-C6 remote control (external loopback interface) ------------------------
+
+/** Default bind address (R-C6 §7): loopback only unless explicitly re-confirmed. */
+export const REMOTE_CONTROL_BIND_ADDRESS_DEFAULT = '127.0.0.1';
+/** Hard bound for the free-text bind address field. */
+export const REMOTE_CONTROL_BIND_ADDRESS_MAX_CHARS = 45;
+/** Hard bound for the stored access token field (base64url of 32 bytes ≈ 43). */
+export const REMOTE_CONTROL_TOKEN_MAX_CHARS = 200;
+/** Hard bound for the persisted ISO acknowledgement timestamp. */
+export const REMOTE_CONTROL_ACKNOWLEDGED_AT_MAX_CHARS = 40;
+
+/**
+ * Normalize the R-C6 bind address: `localhost` collapses to `127.0.0.1`
+ * (same listener), known loopback literals pass through, and any other
+ * non-empty address-shaped string is kept verbatim — binding it requires the
+ * non-loopback acknowledgement timestamp, enforced by the service at start
+ * time, not by normalization (fail-closed at the security boundary).
+ */
+export function normalizeRemoteControlBindAddress(value: unknown): string {
+  if (typeof value !== 'string') {
+    return REMOTE_CONTROL_BIND_ADDRESS_DEFAULT;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return REMOTE_CONTROL_BIND_ADDRESS_DEFAULT;
+  }
+  if (trimmed.length > REMOTE_CONTROL_BIND_ADDRESS_MAX_CHARS) {
+    return REMOTE_CONTROL_BIND_ADDRESS_DEFAULT;
+  }
+  if (trimmed.toLowerCase() === 'localhost') {
+    return '127.0.0.1';
+  }
+  return trimmed;
+}
+
+/**
+ * Normalize the R-C6 access token. This field follows the existing settings
+ * credential path (same contract as `CodexBackendSettings.apiKey`): string
+ * only, never echoed into logs/diagnostics/UI, never cleared by disabling the
+ * feature — revocation happens exclusively through regeneration.
+ */
+export function normalizeRemoteControlToken(value: unknown): string {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > REMOTE_CONTROL_TOKEN_MAX_CHARS) {
+    return '';
+  }
+  return trimmed;
+}
+
+/**
+ * Normalize the R-C6 non-loopback acknowledgement timestamp: kept only when
+ * it looks like a persisted timestamp, so a corrupted value cannot silently
+ * stand in for the user's explicit confirmation.
+ */
+export function normalizeRemoteControlNonLoopbackAcknowledgedAt(value: unknown): string {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > REMOTE_CONTROL_ACKNOWLEDGED_AT_MAX_CHARS) {
+    return '';
+  }
+  return trimmed;
+}
+
+/**
+ * Normalize the R-C6 master switch. `false` (the default) means no
+ * `http.Server` is ever constructed — no socket, no listener, zero cost.
+ */
+export function normalizeRemoteControlEnabled(value: unknown): boolean {
+  return value === true;
+}
+
 /**
  * Normalize the user-defined context-group list (R-B2). Drops malformed
  * entries (non-strings, empty id/name, oversized fields, paths over the cap
@@ -3528,6 +3604,38 @@ export interface OpenCodianSettings {
    */
   imageGenerationAssetCleanup: ImageGenerationAssetCleanup;
 
+  /**
+   * R-C6 remote-drive master switch (default off). While off the plugin
+   * constructs no `http.Server` at all — no socket, no listener, no request
+   * surface (requirement: "关闭状态：不监听任何端口（含 IPv6）").
+   */
+  remoteControlEnabled: boolean;
+
+  /**
+   * R-C6 bind address (default `127.0.0.1`). `localhost`/`::1` are loopback;
+   * any other address requires an explicit second confirmation recorded in
+   * `remoteControlNonLoopbackAcknowledgedAt`, and the service re-checks that
+   * acknowledgement at start time (UI + service double gate).
+   */
+  remoteControlBindAddress: string;
+
+  /**
+   * R-C6 access token (`crypto.randomBytes(32)` → base64url). Follows the
+   * existing settings credential path (same contract as
+   * `CodexBackendSettings.apiKey`): string-only normalization, never echoed
+   * into logs, diagnostics, or non-password UI. Disabling the feature does
+   * NOT clear it (close ≠ revoke); revocation is regeneration.
+   */
+  remoteControlToken: string;
+
+  /**
+   * R-C6 non-loopback confirmation timestamp (ISO string, empty = not
+   * acknowledged). Set only through the settings confirmation modal; cleared
+   * when the bind address returns to a loopback value, so a stale one-time
+   * confirmation can never permanently authorize a network-facing listener.
+   */
+  remoteControlNonLoopbackAcknowledgedAt: string;
+
   capabilityLabSelectedBackend: string | undefined;
 
   /** Backend-specific settings that should not be flattened into OpenCode fields. */
@@ -3788,6 +3896,12 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   imageGenerationModels: [],
   imageGenerationMaxWidth: IMAGE_GENERATION_MAX_WIDTH_DEFAULT,
   imageGenerationAssetCleanup: 'trash',
+
+  // R-C6 remote control (opt-in; off constructs no server at all).
+  remoteControlEnabled: false,
+  remoteControlBindAddress: REMOTE_CONTROL_BIND_ADDRESS_DEFAULT,
+  remoteControlToken: '',
+  remoteControlNonLoopbackAcknowledgedAt: '',
   capabilityLabSelectedBackend: undefined,
   backendSettings: getDefaultBackendSettings(),
 

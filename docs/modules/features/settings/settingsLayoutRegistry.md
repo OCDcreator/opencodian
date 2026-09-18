@@ -1,4 +1,5 @@
 # settingsLayoutRegistry
+> 2026-09-18 (R-C6): Security 主 tab 新增二级 tab `remote`（`settings.security.tab.remote`），承载 R-C6 远程驱动设置；其余二级 tab 不变。
 > 2026-09-18 (R-B2): new conversation secondary tab `context-groups` (label `settings.conversation.tab.contextGroups`) after `inline-edit`.
 
 > **源码**: `src/features/settings/settingsLayoutRegistry.ts`

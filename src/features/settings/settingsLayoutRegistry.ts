@@ -200,6 +200,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     secondaryTabs: [
       { id: 'config', labelKey: 'settings.security.tab.config' },
       { id: 'safety', labelKey: 'settings.security.tab.safety' },
+      { id: 'remote', labelKey: 'settings.security.tab.remote' },
     ],
   },
   {

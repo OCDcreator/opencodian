@@ -34,6 +34,7 @@ import { SettingsMcpSection } from './SettingsMcpSection';
 import { SettingsModelSection } from './SettingsModelSection';
 import { SettingsPiSection } from './SettingsPiSection';
 import { SettingsPluginSection } from './SettingsPluginSection';
+import { SettingsRemoteControlSection } from './SettingsRemoteControlSection';
 import { SettingsSecuritySection } from './SettingsSecuritySection';
 import { SettingsServerSection } from './SettingsServerSection';
 import { SettingsSkillSection } from './SettingsSkillSection';
@@ -502,6 +503,17 @@ export class SettingsTabbedRenderer {
   }
 
   private renderSecurityContent(containerEl: HTMLElement, secondaryTabId: string): void {
+    if (secondaryTabId === 'remote') {
+      // R-C6 remote control gets its own security secondary tab; the
+      // permission/config blocks below stay untouched on the other tabs.
+      const remoteControlSection = new SettingsRemoteControlSection({
+        app: this.deps.app,
+        plugin: this.deps.plugin,
+        createSectionHeading: this.deps.createHeading.bind(this.deps),
+      });
+      remoteControlSection.attachTabbed(containerEl, secondaryTabId);
+      return;
+    }
     const securitySection = new SettingsSecuritySection({
       app: this.deps.app,
       plugin: this.deps.plugin,

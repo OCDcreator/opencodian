@@ -46,6 +46,7 @@ import {
 import { SettingsPiSection } from './SettingsPiSection';
 import { SettingsPluginSection } from './SettingsPluginSection';
 import { SettingsPluginUpdateSection } from './SettingsPluginUpdateSection';
+import { SettingsRemoteControlSection } from './SettingsRemoteControlSection';
 import { SettingsSectionCoordinator } from './SettingsSectionCoordinator';
 import { SettingsSecuritySection } from './SettingsSecuritySection';
 import { SettingsServerSection } from './SettingsServerSection';
@@ -398,6 +399,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       this.addFormatterSettings(containerEl);
       this.addPluginSettings(containerEl);
       this.addSecuritySettings(containerEl);
+      this.addRemoteControlSettings(containerEl);
     }
     this.addUISettings(containerEl);
     this.addStyleSettings(containerEl);
@@ -650,6 +652,15 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   private addSecuritySettings(containerEl: HTMLElement): HTMLHeadingElement {
     return new SettingsSecuritySection({
+      app: this.app,
+      plugin: this.plugin,
+      createSectionHeading: this.createSectionHeading.bind(this),
+    }).attach(containerEl);
+  }
+
+  /** R-C6 remote control (external loopback interface), next to security. */
+  private addRemoteControlSettings(containerEl: HTMLElement): HTMLHeadingElement {
+    return new SettingsRemoteControlSection({
       app: this.app,
       plugin: this.plugin,
       createSectionHeading: this.createSectionHeading.bind(this),

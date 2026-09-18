@@ -53,6 +53,7 @@ import { CodexAdapter } from './core/agents/backend/CodexAdapter';
 import { type CodexApprovalHostContext, createCodexApprovalBridgeHost } from './core/agents/backend/CodexDefaultApprovalHost';
 import { OpenCodeAdapter } from './core/agents/backend/OpenCodeAdapter';
 import { OpenCodeService, SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from './core/opencode';
+import { RemoteControlService } from './core/remotecontrol';
 import { OpenCodeSessionTraceService } from './core/opencode/diagnostics';
 import { ClaudeSessionTraceService, collectClaudeCodeKnownSecrets, CodexSessionTraceService } from './core/agents/backend/diagnostics';
 import { DiagnosticsRuntimeCoordinator } from './app/diagnostics';
@@ -155,12 +156,20 @@ export default class OpenCodianPlugin extends Plugin {
   memoryRuntime: MemoryRuntimeCoordinator | null = null;
   /** R-B4 Obsidian native tooling runtime (app.obsidian-tooling owner). Constructed during onload. */
   obsidianToolingRuntime: ObsidianToolingCoordinator | null = null;
-  /**
-   * Backend-neutral edit-revert snapshot service (core.storage owner, R-B3).
+  /** Backend-neutral edit-revert snapshot service (core.storage owner, R-B3).
    * Constructed during startup after settings load; the chat runtime and the
    * modified-files sidebar consume it through `EditRevertServicePort`.
    */
   editRevertService: EditRevertService | null = null;
+
+  /**
+   * R-C6 remote-drive loopback listener (core.remotecontrol owner). main.ts
+   * only composes: it injects the narrow session driver bound to the
+   * OpenCodeService public API plus the settings getter, applies settings at
+   * startup, and disposes on unload. While `remoteControlEnabled` is false
+   * the service constructs no `http.Server` at all — zero runtime cost.
+   */
+  remoteControlService: RemoteControlService | null = null;
 
   /**
    * R-C2 text-to-image runtime. Generation is a plugin-side HTTP invocation
@@ -1184,6 +1193,9 @@ export default class OpenCodianPlugin extends Plugin {
       this.modelConfigService = null;
       logger.warn('Could not get vault path, OpenCode will use global config');
     }
+    // R-C6 remote control composes alongside the other vault-scoped services:
+    // construct + applySettings + dispose only (no listener/auth logic here).
+    this.initRemoteControl(vaultPath);
   }
 
   private async startConfiguredLocalServerIfNeeded(): Promise<void> {
@@ -1525,6 +1537,10 @@ export default class OpenCodianPlugin extends Plugin {
     this.canvasIntegration = null;
     this.canvasGenerationFlow = null;
     this.editRevertService?.dispose();
+    // R-C6: close the loopback listener (none exists while the feature is
+    // off), abort any in-flight remote instruction and flush the audit.
+    void this.remoteControlService?.dispose();
+    this.remoteControlService = null;
     // R-C2: stateless runtime handles — dropping the references is enough.
     this.imageGenerationChatController = null;
     this.imageAssetStorage = null;
@@ -1665,6 +1681,35 @@ export default class OpenCodianPlugin extends Plugin {
     // Apply the persisted mode (no-op when off): provisions the gate and
     // starts the request watcher only when the mode is `cli`.
     void this.obsidianToolingRuntime.applySettings();
+  }
+
+  /**
+   * R-C6 remote control (core.remotecontrol owner): construct + applySettings
+   * + dispose only. No listener, auth, or whitelist logic lives here; the
+   * narrow session driver binds the existing OpenCodeService public API
+   * (createSession/sendMessage/cancelStream) without touching the service.
+   */
+  private initRemoteControl(vaultPath: string | null): void {
+    this.remoteControlService = new RemoteControlService({
+      getSettings: () => this.settings,
+      driver: {
+        createSession: (title, options) => this.openCodeService.createSession(title, options),
+        sendMessage: (message, options) => this.openCodeService.sendMessage(message, options),
+        cancelStream: (sessionId) => this.openCodeService.cancelStream(sessionId),
+      },
+      knownSecrets: () => [
+        this.settings.remoteControlToken,
+        this.settings.server.auth.password,
+        this.settings.server.auth.token,
+        this.settings.backendSettings.codex.apiKey,
+        ...this.settings.imageGenerationModels.map((model) => model.apiKey),
+      ].filter((secret) => typeof secret === 'string' && secret.length >= 4),
+      vaultPath: vaultPath ?? undefined,
+      notify: (message) => { new Notice(message); },
+    });
+    // Apply the persisted state (no-op while remoteControlEnabled is false:
+    // no http.Server is constructed, nothing listens).
+    void this.remoteControlService.applySettings();
   }
 
   /**
