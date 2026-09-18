@@ -21,6 +21,9 @@
 
 ## 概述
 
+R-C4：新增两个纯委托的公共方法——`attachContextItemToActiveTab(item)`（把已构建的上下文条目如 PDF 选区挂到活动 tab 草稿）与 `getActiveConversationSnapshot()`（PDF 注释保存命令读取最近问答）。捕获/写入逻辑不进本视图。
+
+
 `OpenCodianView` 是聊天功能的主集成点。它继承 `ItemView`，负责把下列能力装配到同一个 Obsidian 视图里：
 
 - 在构建 composer 前创建 View 的 Obsidian `Scope`；Agent、permission 与 model card 的 Escape handler 都通过 host seam 存入单一分发器。Scope 收到 Escape 时先逐个请求已打开卡片关闭，只有没有卡片消费按键时才取消流式输出，避免注册顺序使流式 handler 抢先吞掉 Escape 或局部 DOM listener 收不到按键

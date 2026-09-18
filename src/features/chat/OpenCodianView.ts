@@ -1033,6 +1033,14 @@ export class OpenCodianView extends ItemView {
     return this.currentConversation?.id ?? null;
   }
 
+  /**
+   * R-C4: read access to the active conversation for the pdf integration's
+   * "save the latest PDF Q&A as an annotation" command. Read-only.
+   */
+  getActiveConversationSnapshot(): Conversation | null {
+    return this.currentConversation;
+  }
+
   private handleComposerInputSubmission(
     submission: ComposerInputSubmission,
   ): Promise<void> | void {
@@ -3348,6 +3356,15 @@ export class OpenCodianView extends ItemView {
     view?: MarkdownView | null,
   ): Promise<boolean> {
     return this.composerContextViewFacade.addSelectionContextFromActiveEditor(editor, view);
+  }
+
+  /**
+   * R-C4: attach an already-built context item (the PDF selection captured
+   * inside the pdf viewer) to the active tab's draft context. Delegation
+   * only — the capture logic lives in the pdf integration service.
+   */
+  public attachContextItemToActiveTab(item: PromptContextItem): boolean {
+    return this.composerContextViewFacade.attachBuiltContextItem(item);
   }
 
   /** Wire event handlers */

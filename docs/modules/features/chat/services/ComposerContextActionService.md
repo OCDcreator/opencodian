@@ -5,6 +5,9 @@
 
 ## 概述
 
+R-C4：新增 `attachBuiltContextItem(item)`——把已构建条目（PDF 选区）直接挂上活动 tab 草稿；构建仍由注入的 builder 完成。
+
+
 `ComposerContextActionService` 把 `OpenCodianView` 里 current-note / selection 两个依赖活动编辑器的 composer context 入口动作收束到单一职责 service。它统一负责活动编辑器回退，以及附件构建成功后的 draft 写回，让文件选择器生命周期和 catalog 编排继续留在独立的 picker service 里。
 
 ## 导入关系

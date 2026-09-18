@@ -2,6 +2,7 @@ import * as path from 'path';
 
 import {
   buildObsidianContextTag,
+  buildPdfContextTag,
   createLogger,
   isTextLikeMime,
   toFileContextUrl,
@@ -13,6 +14,14 @@ import type { QueryOptions } from './types';
 
 const logger = createLogger('OpenCodeContextPartSerializer');
 const REMOTE_CONTEXT_TEXT_LIMIT_BYTES = 64 * 1024;
+
+/** UTF-8 byte length with the jsdom-safe fallback (memoryTypes convention). */
+function utf8ByteLength(text: string): number {
+  if (typeof TextEncoder !== 'undefined') {
+    return new TextEncoder().encode(text).length;
+  }
+  return Buffer.byteLength(text, 'utf8');
+}
 
 interface OpenCodeContextPartSerializerHost {
   isLocalServerMode(): boolean;
@@ -61,9 +70,54 @@ export class OpenCodeContextPartSerializer {
         },
       };
     }
+    // PDF entries (R-C4) are text-only in both server modes: the payload is
+    // the extracted text layer carried on `pdfPages`/`pdfSelection` — never
+    // a binary file URL, never `textSnapshot`.
+    if (item.kind === 'pdf_document' || item.kind === 'pdf_selection') {
+      return this.createPdfContextPart(item);
+    }
     return this.host.isLocalServerMode()
       ? this.createLocalContextPart(item)
       : this.createRemoteContextPart(item);
+  }
+
+  /**
+   * PDF context parts (R-C4): the same synthetic `<obsidian_context>` text
+   * part in local and remote mode, so the extracted pages reach every
+   * backend identically (design §4 row 5). The remote byte cap applies to
+   * the rendered payload; over-limit documents were already refused at
+   * attach time — this is the last-line guard, fail-closed like the rest.
+   */
+  private createPdfContextPart(item: PromptContextItem): PromptRequestPart {
+    const text = buildPdfContextTag(item);
+    const byteLength = utf8ByteLength(text);
+    if (!this.host.isLocalServerMode() && byteLength > REMOTE_CONTEXT_TEXT_LIMIT_BYTES) {
+      // Remote mode: same hard cap as every other text context; over-limit
+      // documents were already refused at attach time (fail-closed).
+      throw new Error(`PDF context exceeds remote size limit: ${item.label}`);
+    }
+
+    logger.debug('Preparing PDF context part', {
+      kind: item.kind,
+      path: item.path,
+      pageCount: item.pdf?.pageCount,
+      pages: item.pdfPages?.length,
+      hasSelection: Boolean(item.pdfSelection),
+      byteLength,
+    });
+
+    return {
+      type: 'text',
+      text,
+      synthetic: true,
+      metadata: {
+        kind: item.kind,
+        path: item.path,
+        ...(item.pdf?.fragment
+          ? { pages: `${item.pdf.fragment.pageFrom}-${item.pdf.fragment.pageTo}` }
+          : {}),
+      },
+    };
   }
 
   private createLocalContextPart(item: PromptContextItem): PromptRequestPart {

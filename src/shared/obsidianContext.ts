@@ -1,5 +1,7 @@
 import type {
   MessageContextAttachment,
+  PdfPageText,
+  PdfSelectionRange,
   PromptContextItem,
   PromptContextKind,
   PromptContextLineRange,
@@ -189,6 +191,80 @@ export function buildObsidianContextTag(item: PromptContextItem): string {
   return `<obsidian_context ${attrs.join(' ')}>${item.textSnapshot ?? ''}</obsidian_context>`;
 }
 
+/** Cap for one persisted selection excerpt carried on message attachments. */
+export const PDF_SELECTION_EXCERPT_MAX_CHARS = 200;
+
+/**
+ * Render the body injected for a PDF context item (R-C4). PDF items never
+ * write `textSnapshot`, so this builds the payload from the structured page
+ * text instead — deterministic across backends because every backend's
+ * request parts are built from this same item shape.
+ */
+export function buildPdfContextBody(item: PromptContextItem): string {
+  const meta = item.pdf;
+  const pages = item.pdfPages ?? [];
+  if (item.kind === 'pdf_selection') {
+    const selection = item.pdfSelection;
+    const locator = selection
+      ? selection.rangeStr
+        ? `p.${selection.page} selection=${selection.rangeStr}`
+        : `p.${selection.page}`
+      : '';
+    const header = locator ? `# PDF 选区：${item.path}（${locator}）` : `# PDF 选区：${item.path}`;
+    const excerpt = selection?.text ?? pages.map((page) => page.text).join('\n');
+    return `${header}\n\n${excerpt}`;
+  }
+  const fragment = meta?.fragment;
+  const scope = fragment
+    ? `第 ${fragment.pageFrom}–${fragment.pageTo} 页片段`
+    : `共 ${meta?.pageCount ?? pages.length} 页`;
+  const header = `# PDF 附件：${item.path}（${scope}，提取 ${pages.reduce((sum, page) => sum + page.text.length, 0)} 字符）`;
+  const body = pages.map((page) => `[第 ${page.page} 页]\n${page.text}`).join('\n\n');
+  return `${header}\n\n${body}`;
+}
+
+/** Build the `<obsidian_context>` tag for a PDF item (R-C4). */
+export function buildPdfContextTag(item: PromptContextItem): string {
+  const attrs = [
+    `kind="${escapeHtmlAttribute(item.kind)}"`,
+    `path="${escapeHtmlAttribute(item.path)}"`,
+  ];
+  const selection = item.pdfSelection;
+  if (selection) {
+    attrs.push(`page="${selection.page}"`);
+    if (selection.rangeStr) {
+      attrs.push(`selection="${escapeHtmlAttribute(selection.rangeStr)}"`);
+    }
+  } else if (item.pdf?.fragment) {
+    attrs.push(`pages="${item.pdf.fragment.pageFrom}-${item.pdf.fragment.pageTo}"`);
+  }
+
+  return `<obsidian_context ${attrs.join(' ')}>${buildPdfContextBody(item)}</obsidian_context>`;
+}
+
+/** Build a `pdf_selection` context item's attachment payload (R-C4). */
+export function buildPdfSelectionRange(
+  page: number,
+  text: string,
+  rangeStr?: string,
+): PdfSelectionRange {
+  const excerpt = text.length > PDF_SELECTION_EXCERPT_MAX_CHARS
+    ? `${text.slice(0, PDF_SELECTION_EXCERPT_MAX_CHARS)}…`
+    : text;
+  return rangeStr ? { page, rangeStr, text: excerpt } : { page, text: excerpt };
+}
+
+/** Page texts for one fragment merged from the page payload (R-C4). */
+export function pdfPagesFromFragment(
+  pages: readonly PdfPageText[],
+  pageFrom: number,
+  pageTo: number,
+): PdfPageText[] {
+  return pages
+    .filter((page) => page.page >= pageFrom && page.page <= pageTo)
+    .map((page) => ({ page: page.page, text: page.text }));
+}
+
 export function parseObsidianContextTag(text: string): MessageContextAttachment | null {
   const trimmed = text.trim();
   const match = trimmed.match(OBSIDIAN_CONTEXT_PATTERN);
@@ -197,7 +273,14 @@ export function parseObsidianContextTag(text: string): MessageContextAttachment 
   }
 
   const kind = decodeHtmlAttribute(match[1]) as PromptContextKind;
-  if (kind !== 'current_note' && kind !== 'selection' && kind !== 'file' && kind !== 'folder') {
+  if (
+    kind !== 'current_note'
+    && kind !== 'selection'
+    && kind !== 'file'
+    && kind !== 'folder'
+    && kind !== 'pdf_document'
+    && kind !== 'pdf_selection'
+  ) {
     return null;
   }
 
@@ -227,6 +310,12 @@ export function buildContextAttachment(item: PromptContextItem): MessageContextA
       ? item.textSnapshot
       : undefined,
     ...(item.origin ? { origin: item.origin } : {}),
+    // R-C4: persist PDF display metadata and the bounded selection locator,
+    // but never the full page payload (keeps stored conversations small).
+    ...(item.pdf ? { pdf: item.pdf } : {}),
+    ...(item.pdfSelection
+      ? { pdfSelection: buildPdfSelectionRange(item.pdfSelection.page, item.pdfSelection.text, item.pdfSelection.rangeStr) }
+      : {}),
   };
 }
 

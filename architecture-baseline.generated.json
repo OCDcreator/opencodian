@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-18T18:35:36.023Z",
-  "headShaAtGeneration": "985dd76e7351a71dec5428fbc47dd303ce419702",
+  "generatedAt": "2026-09-18T20:42:59.903Z",
+  "headShaAtGeneration": "b84547f4c3513b9918651b7a42b9cacde0ebd7a7",
   "edges": [
     {
       "id": "src/app/batchOrganize/BatchOrganizeCoordinator.ts|src/core/types/index.ts|type-only|../../core/types",
@@ -18594,6 +18594,13 @@
       "to": "src/features/chat/services/ChatDiagnosticsCoordinator.ts",
       "kind": "runtime-static",
       "specifier": "./features/chat/services/ChatDiagnosticsCoordinator"
+    },
+    {
+      "id": "src/main.ts|src/features/chat/services/ContextAttachmentBuilder.ts|runtime-static|./features/chat/services/ContextAttachmentBuilder",
+      "from": "src/main.ts",
+      "to": "src/features/chat/services/ContextAttachmentBuilder.ts",
+      "kind": "runtime-static",
+      "specifier": "./features/chat/services/ContextAttachmentBuilder"
     },
     {
       "id": "src/main.ts|src/features/chat/services/ImageGenerationChatController.ts|runtime-static|./features/chat/services/ImageGenerationChatController",

@@ -50,6 +50,25 @@ const context = await esbuild.context({
 });
 
 if (prod) {
+	// R-C4: build the lazily required PDF engine artifact next to main.js so
+	// dev parity matches production (never part of the startup bundle).
+	await esbuild.build({
+		entryPoints: ['src/core/pdf/pdfEngineEntry.ts'],
+		bundle: true,
+		external: ['obsidian', 'electron', 'node:*', ...builtins],
+		format: 'cjs',
+		target: 'es2022',
+		logLevel: 'info',
+		sourcemap: 'inline',
+		treeShaking: true,
+		outfile: 'pdf-engine.js',
+		define: {
+			'import.meta.url': '__OPENCODIAN_IMPORT_META_URL__',
+		},
+		banner: {
+			js: 'var __OPENCODIAN_IMPORT_META_URL__ = require("url").pathToFileURL(__filename).href;',
+		},
+	});
 	await context.rebuild();
 	process.exit(0);
 } else {

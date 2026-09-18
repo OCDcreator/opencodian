@@ -58,6 +58,12 @@ export interface VaultRetrievalSettingsSlice {
   readonly vaultRetrievalTopK: number;
   readonly vaultRetrievalMaxCharsPerNote: number;
   readonly vaultRetrievalExcludedPaths: readonly string[];
+  /**
+   * R-C4: the PDF index rides the same retrieval surfacing and reuses the
+   * caps/rules above; included here so the composer coordinator's settings
+   * slice covers both retrieval surfaces.
+   */
+  readonly pdfIndexEnabled: boolean;
 }
 
 /** One injected snippet: located lines plus the already-truncated text. */

@@ -232,6 +232,10 @@ export class UserMessageContentRenderer {
         return t('chat.context.kind.selection');
       case 'folder':
         return t('chat.context.kind.folder');
+      case 'pdf_document':
+        return t('chat.context.kind.pdfDocument');
+      case 'pdf_selection':
+        return t('chat.context.kind.pdfSelection');
       default:
         return t('chat.context.kind.file');
     }

@@ -20,6 +20,9 @@
 
 ## 概述
 
+R-C4 组合：`pdfEngineLoader`（懒加载引擎，启动零成本）、`pdfIndexService`（挂 `PdfIndexFileSystem` + 设置切片 + 引擎端口；`onSettingsChanged()` 在 `pdfIndexEnabled=false` 时为 no-op）、`pdfChatIntegration`（PDF 视图集成，attach/detach 生命周期）与命令 `pdf-ask-selection` / `pdf-save-annotation`。main.ts 仍然只组合：全部 PDF 行为逻辑在 `core.pdf` 与 `feature.chat-services`。
+
+
 `main.ts` 定义 `OpenCodianPlugin`，是 Obsidian 侧的总装配点。它负责：
 
 - 初始化 `StorageService`，并通过 `src/core/types/settingsLoadNormalization.ts` 加载/迁移持久化设置

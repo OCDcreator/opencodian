@@ -87,6 +87,9 @@
 
 ## 概述
 
+R-C4：新增 `settings.pdfIndex.*`（设置块）、`chat.context.notice.pdf*`（PDF 附加 fail-closed 提示与注释保存结果）、`chat.context.kind.pdfDocument`/`pdfSelection`、`chat.context.pdfIntegration.*`（降级阶梯上报）、`chat.pdf.command.*` 与 `chat.pdf.annotation.*`（三期命令与预览模态）双语文案。
+
+
 2026-09-18（R-C1）：新增 `settings.vaultRetrieval.*`（标题/开关/双上限/排除路径/索引状态/重建，双语）与 `chat.context.originBadge.vaultRetrieval`（检索注入 chips 徽标）、`settings.conversation.tab.vaultRetrieval`。
 
 OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。

@@ -299,6 +299,7 @@ export interface ChatRuntimeCompositionHost {
       readonly vaultRetrievalTopK: number;
       readonly vaultRetrievalMaxCharsPerNote: number;
       readonly vaultRetrievalExcludedPaths: readonly string[];
+      readonly pdfIndexEnabled: boolean;
     };
     readonly settingsTab: unknown;
     readonly openCodeService: (InstanceType<typeof OpenCodeService>) & {
@@ -325,6 +326,14 @@ export interface ChatRuntimeCompositionHost {
     /** R-C1 vault retrieval index (core.memory owner); null before bootstrap. */
     readonly vaultIndexService: {
       select(query: string): Promise<import('../../../core/memory').VaultRetrievalSnippet[]>;
+    } | null;
+    /** R-C4 lazily required PDF engine loader; null before bootstrap. */
+    readonly pdfEngineLoader: {
+      load(): Promise<import('../../../core/pdf').PdfTextEngine>;
+    } | null;
+    /** R-C4 local PDF index (core.pdf owner); null before bootstrap or while off. */
+    readonly pdfIndexService: {
+      select(query: string): Promise<import('../../../core/pdf').SelectedPdfSnippet[]>;
     } | null;
     /** R-C2: open the text-to-image generation card (composition root owns it). */
     openImageGenerationCard?(prefill: string): void;
@@ -529,13 +538,17 @@ export class ChatRuntimeComposition {
       focusPreviewWritebackHost: host.createFocusContextPreviewWritebackHost(),
       serverContext: serverReferenceContextService,
       contextGroups: { listGroups: () => host.plugin.settings.contextGroups },
+      // R-C4: lazily resolved PDF engine for one-shot PDF text attach.
+      loadPdfEngine: () => host.plugin.pdfEngineLoader!.load(),
     });
     // R-C1: composer-side retrieval candidates. The coordinator is dormant
     // unless `vaultRetrievalEnabled` turns on; with the index service absent
-    // (never attached) it stays a full no-op.
+    // (never attached) it stays a full no-op. R-C4: the opt-in PDF index
+    // rides the same managed-chip flow when pdfIndexEnabled is on.
     const vaultRetrievalComposerCoordinator = new VaultRetrievalComposerCoordinator({
       facade: composerContextViewFacade.sendContext,
       retrieval: host.plugin.vaultIndexService ?? null,
+      pdfRetrieval: host.plugin.pdfIndexService ?? null,
       getSettings: () => host.plugin.settings,
       getActiveTabId: () => host.getActiveTabId(),
     });

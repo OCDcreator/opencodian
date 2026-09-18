@@ -54,9 +54,55 @@ export interface SessionTodo {
 /**
  * Context attachment kinds. `folder` (R-A7) marks a directory entry: the
  * notes under it are reference material for the model, not an inlined
- * payload — the item never carries a text snapshot.
+ * payload — the item never carries a text snapshot. `pdf_document` /
+ * `pdf_selection` (R-C4) carry extracted PDF text layer payloads in the
+ * structured `pdfPages` / `pdfSelection` fields — the plain-text
+ * `textSnapshot` stays note-text-only by contract and is never written
+ * by PDF items.
  */
-export type PromptContextKind = 'current_note' | 'selection' | 'file' | 'folder';
+export type PromptContextKind =
+  | 'current_note'
+  | 'selection'
+  | 'file'
+  | 'folder'
+  | 'pdf_document'
+  | 'pdf_selection';
+
+/** One extracted PDF page's text layer (R-C4, 1-based page number). */
+export interface PdfPageText {
+  page: number;
+  text: string;
+}
+
+/**
+ * PDF-specific metadata on a `pdf_document` / `pdf_selection` context item
+ * (R-C4). `textLayerPresent` is the fail-closed verdict: a scanned PDF with
+ * no text layer never becomes a context item.
+ */
+export interface PdfContextMeta {
+  textLayerPresent: boolean;
+  pageCount: number;
+  extractedChars: number;
+  /** Phase 1 only extracts the embedded text layer; OCR is never in scope. */
+  extraction: 'embedded';
+  /**
+   * Present only on retrieval-injected fragments: the injected item carries
+   * pages `pageFrom..pageTo` of the document, not the whole text layer.
+   */
+  fragment?: { pageFrom: number; pageTo: number };
+}
+
+/**
+ * In-document selection locator for a `pdf_selection` item (R-C4).
+ * `rangeStr` is Obsidian's native pdf.js selection serialization
+ * ("startIdx,startOffset,endIdx,endOffset") when the viewer exposes it;
+ * absent it the back link degrades to `#page=N`.
+ */
+export interface PdfSelectionRange {
+  page: number;
+  rangeStr?: string;
+  text: string;
+}
 
 export interface PromptContextLineRange {
   startLine: number;
@@ -82,6 +128,12 @@ export interface PromptContextItem {
   textSnapshot?: string;
   /** Absent on legacy items (treated as `manual`). */
   origin?: PromptContextOrigin;
+  /** R-C4: PDF extraction metadata (pdf_document / pdf_selection only). */
+  pdf?: PdfContextMeta;
+  /** R-C4: structured page text payload — never copied into textSnapshot. */
+  pdfPages?: PdfPageText[];
+  /** R-C4: in-document selection locator (pdf_selection only). */
+  pdfSelection?: PdfSelectionRange;
 }
 
 export interface MessageContextAttachment {
@@ -93,6 +145,10 @@ export interface MessageContextAttachment {
   textSnapshot?: string;
   /** Absent on legacy records (treated as `manual`). */
   origin?: PromptContextOrigin;
+  /** R-C4: display metadata only — the full page payload is never persisted. */
+  pdf?: PdfContextMeta;
+  /** R-C4: bounded selection locator (text is capped at the excerpt limit). */
+  pdfSelection?: PdfSelectionRange;
 }
 
 export interface QuestionOption {

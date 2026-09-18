@@ -478,6 +478,7 @@ function normalizeVaultRetrievalSettingsOnLoad(
   vaultRetrievalTopK: number;
   vaultRetrievalMaxCharsPerNote: number;
   vaultRetrievalExcludedPaths: string[];
+  pdfIndexEnabled: boolean;
 } {
   return {
     vaultRetrievalEnabled: typeof normalizedSettings?.vaultRetrievalEnabled === 'boolean'
@@ -490,6 +491,9 @@ function normalizeVaultRetrievalSettingsOnLoad(
     vaultRetrievalExcludedPaths: normalizeVaultRetrievalExcludedPaths(
       normalizedSettings?.vaultRetrievalExcludedPaths,
     ),
+    pdfIndexEnabled: typeof normalizedSettings?.pdfIndexEnabled === 'boolean'
+      ? normalizedSettings.pdfIndexEnabled
+      : DEFAULT_SETTINGS.pdfIndexEnabled,
   };
 }
 

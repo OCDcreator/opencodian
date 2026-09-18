@@ -10,6 +10,9 @@
 
 ## 概述
 
+R-C4：`ComposerContextViewFacade.create` 传入 `loadPdfEngine`（懒加载引擎端口）；`VaultRetrievalComposerCoordinator` 增加 `pdfRetrieval: host.plugin.pdfIndexService`——`pdfIndexEnabled` 开启时 PDF 命中片段与笔记片段走同一托管 chips 流。插件结构类型相应声明 `pdfEngineLoader` / `pdfIndexService` 窄化端口。
+
+
 2026-09-18（R-C1）：`createSurfaceRuntimeWiring` 组装 `VaultRetrievalComposerCoordinator`（端口：composer facade `sendContext`、`plugin.vaultIndexService`、设置 getter、active tab），并以展开包装方式给 `ComposerInputShellCoordinator` host 注入可选的 `onComposerInputChanged` / `onComposerSubmitted` 观察钩子；feature 关闭时协调器为 no-op，发送通道零改动。宿主 `plugin` 形状新增 `vaultIndexService` 与四个 `vaultRetrieval*` 设置只读字段。
 
 `ChatRuntimeComposition` 是聊天 runtime 的 composition owner。它在 `OpenCodianView` 构造时被实例化一次，通过 `compose()` 按既定阶段顺序（surface → identity/render → background → conversation → interaction）装配全部 chat runtime coordinator，返回单个 `ChatRuntime` 结构体，由 view 解构到既有的私有字段。

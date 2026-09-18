@@ -22,3 +22,5 @@ R-C1 整库检索的“可见、可取消”半边（`feature.chat-services` own
 - **刷新串行**：序号守卫丢弃过期刷新；检索抛错时保留现有 chips（可见可删），不注入新内容。
 - 双重上限：服务端 topK 之外，协调器对结果再做一次 `vaultRetrievalTopK` 防御性裁剪。
 - `origin` 只是客户端元数据：不进入请求 wire 格式（`buildObsidianContextTag` 不含 origin）。
+- **R-C4 PDF 检索面**：新增可选 `pdfRetrieval` 端口（`PdfIndexService.select`）。`pdfIndexEnabled` 独立于 `vaultRetrievalEnabled` 生效；PDF 命中片段构造为 `kind:'pdf_document'` 条目（`pdf.fragment` 标注页区间、`pdfPages` 只含命中片段、无 textSnapshot、origin 同为 `'vault-retrieval'`），与笔记片段合并进同一托管 chips 流，同样可见、可逐条取消。关闭态不变：两个端口都关闭时不发任何 select、请求逐字节一致。
+

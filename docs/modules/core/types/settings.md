@@ -16,6 +16,9 @@
 
 ## 概述
 
+R-C4：新增 `pdfIndexEnabled`（默认 `false`）——PDF 本地索引总开关；排除规则与注入上限复用 `vaultRetrievalExcludedPaths` / `vaultRetrievalTopK` / `vaultRetrievalMaxCharsPerNote`，不新增平行旋钮。
+
+
 OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_SETTINGS`，以及一组负责清洗历史配置和运行时输入的 `normalize*()` 辅助函数。它是设置 UI 与启动 bootstrap 的数据底座；具体的启动期 snapshot merge / migration orchestration 已收束到 `src/core/types/settingsLoadNormalization.ts`。
 
 源码约 1396 行，是项目最大的类型定义文件。

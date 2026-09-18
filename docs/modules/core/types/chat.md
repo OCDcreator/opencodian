@@ -6,6 +6,9 @@
 
 ## 概述
 
+R-C4 扩展：`PromptContextKind` 增加 `pdf_document` / `pdf_selection`；新增 `PdfPageText`（结构化页文本）、`PdfContextMeta`（`textLayerPresent` fail-closed 判定、页数、提取字符数、`extraction: 'embedded'`、可选 `fragment` 页区间标记——检索注入的片段条目）与 `PdfSelectionRange`（页码 + 可选原生 rangeStr + 选区文本）。`PromptContextItem` / `MessageContextAttachment` 增加 `pdf` / `pdfPages` / `pdfSelection` 字段；`textSnapshot` 语义保持“笔记原文文本”，PDF 条目永不写入。
+
+
 聊天系统的核心数据模型，定义了消息、会话、流式事件、上下文附件、OMO 元数据、权限请求等类型。同时导出视图类型常量 `VIEW_TYPE_OPENCODIAN`。整个聊天 UI、存储层和流式渲染管道都依赖此模块的类型定义。
 
 ### 2026-07-22 精确上下文 DTO

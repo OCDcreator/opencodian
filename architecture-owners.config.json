@@ -72,7 +72,9 @@
         "core.runtime",
         "core.opencode",
         "app.diagnostics-runtime",
-        "app.runtime"
+        "app.runtime",
+        "core.pdf",
+        "app.pdf-runtime"
       ],
       "tests": [
         "tests/unit/entry-point/**"
@@ -224,13 +226,13 @@
       "layer": "shared",
       "include": [
         "src/shared/TooltipLayerController.ts",
+        "src/shared/batchOrganizePlan.ts",
         "src/shared/brandingWordmark.ts",
         "src/shared/contextGroupPlan.ts",
         "src/shared/contextPath.ts",
         "src/shared/debugModules.ts",
         "src/shared/diagnosticSecretSanitizer.ts",
         "src/shared/editRevertPlan.ts",
-        "src/shared/batchOrganizePlan.ts",
         "src/shared/index.ts",
         "src/shared/logger.ts",
         "src/shared/obsidianContext.ts",
@@ -357,7 +359,8 @@
       "id": "shared.types",
       "layer": "shared",
       "include": [
-        "src/types/jsx-shim.ts"
+        "src/types/jsx-shim.ts",
+        "src/types/pdfjs-worker-shim.d.ts"
       ],
       "delegatesTo": [],
       "responsibilities": [
@@ -1676,7 +1679,8 @@
       "adjacentOwners": [
         "feature.chat-shell",
         "feature.chat-runtime",
-        "feature.chat-diagnostics"
+        "feature.chat-diagnostics",
+        "core.pdf"
       ],
       "tests": [
         "tests/unit/features/chat/services/**"
@@ -2505,6 +2509,98 @@
         "module-docs"
       ],
       "risk": "medium"
+    },
+    {
+      "adjacentOwners": [
+        "app.pdf-runtime",
+        "app.composition",
+        "feature.chat-services"
+      ],
+      "allowedOwnerDependencies": [
+        "core.types",
+        "core.memory",
+        "shared.foundation",
+        "shared.diagnostics"
+      ],
+      "canonicalState": [
+        "PDF index chunk tables under .opencodian/pdf-index (fingerprint-named, ready-gated)",
+        "lazy pdf-engine.js loader residency (never resident at startup)",
+        "per-leaf viewer probe decisions (A/B/C ladder input)"
+      ],
+      "delegatesTo": [],
+      "entrypoints": [
+        "src/core/pdf/index.ts",
+        "src/core/pdf/PdfIndexService.ts",
+        "src/core/pdf/pdfTextEngine.ts"
+      ],
+      "forbiddenDependencies": [
+        "core.opencode",
+        "core.opencode-diagnostics",
+        "core.agents",
+        "core.backend",
+        "core.backend-pi",
+        "core.backend-diagnostics",
+        "feature",
+        "app"
+      ],
+      "id": "core.pdf",
+      "include": [
+        "src/core/pdf/**"
+      ],
+      "layer": "core",
+      "overviewDoc": "docs/architecture/owners/core-pdf.md",
+      "requiredGates": [
+        "typecheck",
+        "module-docs"
+      ],
+      "responsibilities": [
+        "R-C4 phase 1: pure PDF text-layer layout rules, textless fail-closed verdict and one-shot attach limits",
+        "lazy pdf.js engine artifact contract and loader (pdf-engine.js is a second esbuild entry, required on first use, never at startup)",
+        "R-C4 phase 2: page-anchored PDF index format, storage service and retrieval selection REUSING the core.memory R-C1 primitives (tokenize, scoreChunk, gate, truncation) — no second retrieval stack",
+        "R-C4 phase 3: pure degradation-ladder decision and markdown sidecar annotation formatting; the only write path is the sidecar via the vault API under R-B3 coverage"
+      ],
+      "risk": "medium",
+      "tests": [
+        "tests/unit/core/pdf/**"
+      ]
+    },
+    {
+      "adjacentOwners": [
+        "app.composition",
+        "core.pdf"
+      ],
+      "allowedOwnerDependencies": [
+        "core.pdf",
+        "shared.foundation"
+      ],
+      "canonicalState": [
+        "PdfIndexFileSystem instance bound to the plugin app"
+      ],
+      "delegatesTo": [],
+      "entrypoints": [
+        "src/app/pdf/PdfIndexFileSystem.ts"
+      ],
+      "forbiddenDependencies": [
+        "feature.chat-runtime",
+        "feature.chat-services"
+      ],
+      "id": "app.pdf-runtime",
+      "include": [
+        "src/app/pdf/**"
+      ],
+      "layer": "app",
+      "overviewDoc": "docs/architecture/owners/app-pdf-runtime.md",
+      "requiredGates": [
+        "typecheck",
+        "module-docs"
+      ],
+      "responsibilities": [
+        "bind the core.pdf PdfIndexFs port to the Obsidian vault adapter: read-only PDF listing/reads and index writes confined to .opencodian/pdf-index/** with atomic tmp-to-rename writes"
+      ],
+      "risk": "low",
+      "tests": [
+        "tests/unit/core/pdf/**"
+      ]
     }
   ],
   "legacy": {

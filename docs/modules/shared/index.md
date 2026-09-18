@@ -7,6 +7,9 @@
 
 ## 概述
 
+R-C4：re-export 新增 `buildPdfContextTag` / `buildPdfContextBody` / `buildPdfSelectionRange` / `pdfPagesFromFragment` / `PDF_SELECTION_EXCERPT_MAX_CHARS`（PDF 上下文条目的渲染与摘录上限）。
+
+
 共享工具层的主聚合入口。它把日志、Obsidian 上下文解析、工具身份归一化、工具执行状态解析和 vault 路径工具统一暴露给主功能层使用，是多个 feature 与 core 模块都依赖的横切工具入口。
 
 ## 导入关系

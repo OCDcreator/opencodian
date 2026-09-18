@@ -14,6 +14,9 @@
 
 ## 概述
 
+R-C4：barrel 新增导出 `PdfPageText` / `PdfContextMeta` / `PdfSelectionRange`（来自 `./chat`）。
+
+
 OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权限、OpenCode 配置等分散类型统一导出，供主视图、设置面板、服务层和工具层使用，是整个项目最重要的类型入口之一。
 
 ## 导入关系

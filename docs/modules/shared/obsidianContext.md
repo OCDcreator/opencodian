@@ -5,6 +5,9 @@
 
 ## 概述
 
+R-C4：`<obsidian_context>` 格式扩展到 PDF 条目——`buildPdfContextTag` 以 `kind="pdf_document|pdf_selection"` + 可选 `page`/`selection`/`pages` 属性渲染，正文由 `buildPdfContextBody` 从结构化 `pdfPages`（页标题 + 页文本）或 `pdfSelection` 生成，PDF 条目永不写 `textSnapshot`。`parseObsidianContextTag` 白名单加入两种 PDF kind；`buildContextAttachment` 持久化 `pdf` 元数据与 ≤200 字符截断的 `pdfSelection`（`PDF_SELECTION_EXCERPT_MAX_CHARS`），从不持久化 `pdfPages`。
+
+
 2026-09-18（R-C1）：`buildContextAttachment` 透传可选 `origin`（条目存在时）；`buildObsidianContextTag` 不受影响——origin 永不进入请求 wire 格式，旧条目的附件序列化逐字节不变。
 
 Obsidian 显式上下文（explicit context）工具函数。处理 `<obsidian_context>` 标签的构建和解析、上下文附件对象与标签格式之间的转换、附件去重、文件路径 MIME 类型解析和行范围格式化。用于在 AI 聊天消息中编码和还原编辑器上下文信息。

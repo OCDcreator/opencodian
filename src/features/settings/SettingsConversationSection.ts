@@ -254,6 +254,11 @@ export class SettingsConversationSection {
       description: t('settings.vaultRetrieval.groupDesc'),
     });
     this.markSettingsTarget(vaultRetrievalBodyEl, 'vault-retrieval');
+    const pdfIndexBodyEl = this.createSettingsBlock(containerEl, {
+      title: t('settings.pdfIndex.title'),
+      description: t('settings.pdfIndex.groupDesc'),
+    });
+    this.markSettingsTarget(pdfIndexBodyEl, 'pdf-index');
     const questionBodyEl = isOpenCodeActive
       ? this.createSettingsBlock(containerEl, {
           title: t('settings.conversation.questions.title'),
@@ -282,6 +287,7 @@ export class SettingsConversationSection {
     this.renderDisplayBlock(displayBodyEl);
     this.renderObsidianToolingBlock(obsidianToolingBodyEl);
     this.renderVaultRetrievalBlock(vaultRetrievalBodyEl);
+    this.renderPdfIndexBlock(pdfIndexBodyEl);
     if (questionBodyEl) {
       this.renderQuestionsBlock(questionBodyEl);
     }
@@ -308,6 +314,7 @@ export class SettingsConversationSection {
       { id: 'display', render: (el) => this.renderDisplayTabBlock(el) },
       { id: 'obsidian-tooling', render: (el) => this.renderObsidianToolingBlock(el) },
       { id: 'vault-retrieval', render: (el) => this.renderVaultRetrievalBlock(el) },
+      { id: 'pdf-index', render: (el) => this.renderPdfIndexBlock(el) },
       { id: 'memory', render: (el) => this.renderMemoryBlock(el) },
       ...(this.isOpenCodeActive()
         ? [{ id: 'questions', render: (el: HTMLElement) => this.renderQuestionsBlock(el) }]
@@ -1564,6 +1571,73 @@ export class SettingsConversationSection {
     }
     return t('settings.vaultRetrieval.status.indexed', {
       count: String(service.indexedNoteCount()),
+    });
+  }
+
+  /**
+   * R-C4 PDF index: a single opt-in toggle plus an honest status line.
+   * Exclusion rules and the injection caps are intentionally shared with the
+   * R-C1 retrieval settings — no parallel knobs (design §3.2).
+   */
+  private renderPdfIndexBlock(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.pdfIndex.enable.name'))
+      .setDesc(t('settings.pdfIndex.enable.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.pdfIndexEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.pdfIndexEnabled = value;
+            await this.plugin.saveSettings();
+            await this.plugin.pdfIndexService?.onSettingsChanged();
+            statusSetting.setDesc(this.resolvePdfIndexStatusText());
+          });
+      });
+
+    const statusSetting = new Setting(containerEl)
+      .setName(t('settings.pdfIndex.status.name'))
+      .setDesc(this.resolvePdfIndexStatusText())
+      .addExtraButton((button) => {
+        button
+          .setIcon('refresh-cw')
+          .setTooltip(t('settings.pdfIndex.rebuild'))
+          .onClick(async () => {
+            const service = this.plugin.pdfIndexService;
+            if (!service) {
+              new Notice(t('settings.pdfIndex.rebuildDisabled'));
+              return;
+            }
+            button.disabled = true;
+            try {
+              await service.invalidateAll();
+              await service.onSettingsChanged();
+              statusSetting.setDesc(this.resolvePdfIndexStatusText());
+              new Notice(t('settings.pdfIndex.rebuildDone'));
+            } finally {
+              button.disabled = false;
+            }
+          });
+      });
+  }
+
+  /** Honest R-C4 index status line: off / building / indexed count. */
+  private resolvePdfIndexStatusText(): string {
+    if (!this.plugin.settings.pdfIndexEnabled) {
+      return t('settings.pdfIndex.status.off');
+    }
+    const service = this.plugin.pdfIndexService;
+    if (!service) {
+      return t('settings.pdfIndex.status.unknown');
+    }
+    const progress = service.onProgress();
+    if (service.isBuilding()) {
+      return t('settings.pdfIndex.status.building', {
+        done: String(progress.done),
+        total: String(progress.total),
+      });
+    }
+    return t('settings.pdfIndex.status.indexed', {
+      count: String(service.indexedPdfCount()),
     });
   }
 

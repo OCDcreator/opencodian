@@ -46,4 +46,13 @@ export class ComposerContextActionService {
     this.host.addDraftContextItem(contextItem);
     return true;
   }
+
+  /**
+   * Attach an already-built context item (R-C4: the PDF selection the
+   * integration captured inside the pdf viewer) to the active tab draft.
+   */
+  attachBuiltContextItem(contextItem: PromptContextItem): boolean {
+    this.host.addDraftContextItem(contextItem);
+    return true;
+  }
 }

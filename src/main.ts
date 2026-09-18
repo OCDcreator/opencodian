@@ -58,6 +58,9 @@ import { ClaudeSessionTraceService, collectClaudeCodeKnownSecrets, CodexSessionT
 import { DiagnosticsRuntimeCoordinator } from './app/diagnostics';
 import { MemoryRuntimeCoordinator, VaultIndexFileSystem } from './app/memory';
 import { VaultIndexService } from './core/memory';
+import { PdfIndexFileSystem } from './app/pdf/PdfIndexFileSystem';
+import { PdfEngineLoader, PdfIndexService } from './core/pdf';
+import { PdfChatIntegration } from './features/chat/services/PdfChatIntegration';
 import { BatchOrganizeCoordinator, BatchOrganizeModal, BatchRevertConfirmModal } from './app/batchOrganize';
 import { ObsidianToolingCoordinator } from './app/obsidianTooling';
 import { migrateOpenCodeCapabilitySettings } from './core/opencode/OpenCodeCapabilitySettingsMigration';
@@ -94,6 +97,7 @@ import {
 import { prepareLoadedSettingsBootstrapState } from './core/types/settingsLoadNormalization';
 import { OpenCodianView } from './features/chat/OpenCodianView';
 import { createChatDiagnosticsCoordinatorFactory } from './features/chat/services/ChatDiagnosticsCoordinator';
+import { ContextAttachmentBuilder } from './features/chat/services/ContextAttachmentBuilder';
 import { OpenCodianSettingTab } from './features/settings/OpenCodianSettings';
 import { broadcastModelsLoadedToSettingsViews, broadcastServerStatusToSettingsViews, registerSettingsView } from './features/settings/SettingsViewRegistrar';
 import { getLocale, setLocale, t } from './i18n';
@@ -169,6 +173,15 @@ export default class OpenCodianPlugin extends Plugin {
    * no indexing and no injected context while off. main.ts only composes.
    */
   vaultIndexService: VaultIndexService | null = null;
+  /**
+   * R-C4 PDF runtime: the lazily required extraction engine loader (zero
+   * startup cost — pdf-engine.js is only required on first PDF attach or
+   * index build), the opt-in page-anchored index service, and the pdf-view
+   * chat integration. main.ts only composes.
+   */
+  pdfEngineLoader: PdfEngineLoader | null = null;
+  pdfIndexService: PdfIndexService | null = null;
+  pdfChatIntegration: PdfChatIntegration | null = null;
   /** R-B5 batch note organizing runtime (app.batch-organize owner). Constructed during onload. */
   batchOrganizeCoordinator: BatchOrganizeCoordinator | null = null;
   /**
@@ -308,6 +321,40 @@ export default class OpenCodianPlugin extends Plugin {
     this.vaultIndexService.attach(new VaultIndexFileSystem(this.app), () => this.settings);
     await coordinator.measureStartupStep('vaultIndex.applySettings', () =>
       this.vaultIndexService?.onSettingsChanged() ?? Promise.resolve());
+    // R-C4: the PDF engine loader performs NO work at startup (the pdf.js
+    // artifact is required on first use); the index service is dormant while
+    // pdfIndexEnabled is off, and the viewer integration only mounts on pdf
+    // leaves it can actually probe.
+    this.pdfEngineLoader = new PdfEngineLoader({
+      getPluginDir: () => this.manifest.dir,
+    });
+    this.pdfIndexService = new PdfIndexService();
+    this.pdfIndexService.attach(
+      new PdfIndexFileSystem(this.app),
+      () => this.settings,
+      () => this.pdfEngineLoader!.load(),
+    );
+    await coordinator.measureStartupStep('pdfIndex.applySettings', () =>
+      this.pdfIndexService?.onSettingsChanged() ?? Promise.resolve());
+    this.pdfChatIntegration = new PdfChatIntegration(this.app, {
+      attachContextItemToActiveChat: async (item) => {
+        await this.activateView();
+        this.getOpenCodianView()?.attachContextItemToActiveTab(item);
+      },
+      openChat: async () => {
+        await this.activateView();
+      },
+      getActiveConversation: () => this.getOpenCodianView()?.getActiveConversationSnapshot() ?? null,
+      getEditRevert: () => this.editRevertService,
+      buildPdfSelectionItem: (input) => {
+        const builder = new ContextAttachmentBuilder(this.app, {
+          getServerMode: () => this.settings.server.mode,
+          loadPdfEngine: () => this.pdfEngineLoader!.load(),
+        });
+        return builder.buildPdfSelectionContextItem(input);
+      },
+    });
+    this.pdfChatIntegration.attach();
     // R-B5 batch organizing composes on top of the R-B3 snapshot layer: the
     // coordinator refuses to execute when the snapshot service is unavailable.
     this.batchOrganizeCoordinator = new BatchOrganizeCoordinator({
@@ -1279,6 +1326,31 @@ export default class OpenCodianPlugin extends Plugin {
       },
     });
 
+    // R-C4 phase 3: in-document interaction entries. The command works on
+    // every backend (it only builds context and opens the chat) and degrades
+    // honestly: no capturable selection → open the chat for manual paste.
+    this.addCommand({
+      id: 'pdf-ask-selection',
+      name: t('chat.pdf.command.askSelection'),
+      callback: async () => {
+        await this.pdfChatIntegration?.askSelectionFromActivePdf();
+      },
+    });
+
+    this.addCommand({
+      id: 'pdf-save-annotation',
+      name: t('chat.pdf.command.saveAnnotation'),
+      checkCallback: (checking: boolean) => {
+        if (!this.pdfChatIntegration) {
+          return false;
+        }
+        if (!checking) {
+          void this.pdfChatIntegration.saveLastAnnotation();
+        }
+        return true;
+      },
+    });
+
     this.addCommand({
       id: 'batch-organize-open',
       name: t('batchOrganize.command.open'),
@@ -1315,6 +1387,13 @@ export default class OpenCodianPlugin extends Plugin {
     this.imageAssetStorage = null;
     this.imageGenerationService = null;
     this.vaultIndexService?.dispose();
+    // R-C4: unmount pdf-view toolbar buttons/listeners and cancel any
+    // in-flight index build (nothing partial is ever marked ready).
+    this.pdfChatIntegration?.detach();
+    this.pdfChatIntegration = null;
+    this.pdfIndexService?.dispose();
+    this.pdfIndexService = null;
+    this.pdfEngineLoader = null;
     // Stop the OpenCode server (async, best-effort)
     void this.openCodeService?.stop().catch((error) => {
       logger.warn('Failed to asynchronously stop OpenCode service during unload:', error);

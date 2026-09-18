@@ -35,10 +35,11 @@ const buildId = generateBuildId();
 console.log(`[build] BUILD_ID: ${buildId}`);
 
 let context;
+let esbuild;
 
 try {
   const esbuildModule = await import("esbuild");
-  const esbuild = esbuildModule.default ?? esbuildModule;
+  esbuild = esbuildModule.default ?? esbuildModule;
 
   context = await esbuild.context({
     banner: {
@@ -86,10 +87,40 @@ try {
 if (prod) {
   buildCss();
   await context.rebuild();
-  
+
+  // R-C4: the PDF text engine is a SECOND, lazily required artifact. It is
+  // never imported by main.js; PdfEngineLoader requires it on first PDF
+  // attach/index, so startup parsing cost stays at zero.
+  const pdfEngineOutfile = path.join(distDir, 'pdf-engine.js');
+  await esbuild.build({
+    entryPoints: ['src/core/pdf/pdfEngineEntry.ts'],
+    bundle: true,
+    external: [
+      'obsidian',
+      'electron',
+      'node:*',
+      ...builtins],
+    format: 'cjs',
+    // The engine only ever runs inside current Electron, so it can target a
+    // modern baseline even though main.js stays es2018. Minified: it is a
+    // standalone, rarely-loaded artifact and MB-level even compressed.
+    target: 'es2022',
+    logLevel: 'info',
+    sourcemap: false,
+    minify: true,
+    treeShaking: true,
+    outfile: pdfEngineOutfile,
+    define: {
+      'import.meta.url': '__OPENCODIAN_IMPORT_META_URL__',
+    },
+    banner: {
+      js: 'var __OPENCODIAN_IMPORT_META_URL__ = require("url").pathToFileURL(__filename).href;',
+    },
+  });
+
   // Copy manifest.json to dist
   fs.copyFileSync('manifest.json', 'dist/manifest.json');
-  
+
   // Copy styles.css if it exists
   if (fs.existsSync('styles.css')) {
     fs.copyFileSync('styles.css', 'dist/styles.css');
@@ -97,7 +128,15 @@ if (prod) {
 
   copyDirectoryIfExists('assets', 'dist/assets');
   pruneClaudeAgentSdkRuntimeArtifacts(process.cwd(), distDir);
-  
+
+  for (const artifact of ['main.js', 'pdf-engine.js']) {
+    const artifactPath = path.join(distDir, artifact);
+    if (fs.existsSync(artifactPath)) {
+      const sizeMb = (fs.statSync(artifactPath).size / (1024 * 1024)).toFixed(2);
+      console.log(`[build] ${artifact}: ${sizeMb} MB`);
+    }
+  }
+
   await context.dispose();
   console.log('Production build complete!');
   process.exit(0);

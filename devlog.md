@@ -11,6 +11,20 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-18 PDF 读取 / 索引 / 内文交互（R-C4）：懒加载 pdf-engine、页锚定本地索引与侧车注释
+
+FlowText 对齐 R-C4 落地（设计基准 `docs/requirements/flowtext-c4-design.md`，三期按既有可行性结论实施）。
+
+**一期（文本层）**：引入 `pdfjs-dist@6.3.289`（本 feature 唯一新依赖，设计 D3 已裁决），第二个 esbuild 入口产出独立产物 `pdf-engine.js`（生产 minify、es2022；`main.js` 只持十几行 `PdfEngineLoader`，`createRequire(pluginDir/main.js)` 首次使用才 require——启动零解析成本，加载失败 fail-closed 且不缓存）。Worker 策略：把 worker 模块挂到 pdf.js 文档化的 `globalThis.pdfjsWorker` 主线程钩子，不构造 `Worker`、不做运行时脚本抓取（Obsidian 内两者不可靠）。行重建 / 无文字层判定（总字符 <32 且有字页占比 <20%）/ 一次性附加页数与字符上限全部是 `core/pdf/pdfTextLayout.ts` 纯函数（pdf.js 不可达处单测钉住）。新上下文条目类型 `pdf_document` / `pdf_selection`（`PdfPageText` / `PdfContextMeta` / `PdfSelectionRange`），`textSnapshot` 保持笔记文本语义、PDF 条目永不写入；序列化走 `buildPdfContextTag`（shared），`requestParts` 对四后端只构建一次，天然后端无关。真机 Node 冒烟：自制文字 PDF 提取三行文本全部正确。
+
+**二期（本地索引）**：`PdfIndexService` 完全复用 R-C1 检索栈原语（设计 §11.4）——`memoryRecall.tokenize`、`vaultRetrievalIndex.scoreChunk`（字段式签名按 token 数组计分，与行无关：PDF 文件名 → title 字段、正文 → body 字段，**无需**在 core.memory 补 `scoreTokens`）、选段门槛与 `truncateNoteSnippet`。存储 `.opencodian/pdf-index/<sha1(path+mtime+size)>.json`（点前缀目录，Obsidian 不列出/不搜索），指纹不匹配即重建；切片**页界不跨 chunk**（页内空行分段，800–1200 字符窗口）；原子写 = tmp + rename 且 `ready:true` 与完整 chunk 表同一次落盘，半截索引不可查。开关 `pdfIndexEnabled` 默认 false：关闭态零读取/零写入/零引擎加载/查询恒 []（契约测试锁定）；排除规则与 topK/字符上限复用 R-C1 设置，无平行旋钮。构建分批让出主循环 + 代际计数取消（关开关即取消，取消不留 ready）；批末清理孤儿/旧指纹，64MiB 总量上限按最久未命中淘汰。
+
+**三期（内文交互）**：`PdfChatIntegration`（feature.chat-services）按设计主路径 + 三级降级实施。运行时确认门 = feature-detect + 实际调用一次 `child.getTextSelectionRangeStr({win})`：不抛错即证明内部上下文形态被接受（A 级），抛错/序列非法落 B 级（DOM `getSelection()` + `data-page-number` 页锚定），viewer 结构缺失落 C 级（命令开聊天手动粘贴，恒可用）——当前级别经 `getLadderReport()` 在设置调试区如实显示。双入口：A/B 级挂 `toolbar.toolbarRightEl/LeftEl` 的 `clickable-icon` 按钮 + 命令 `pdf-ask-selection`（后端无关：只构建上下文并打开聊天，四后端同一聊天管线）。注释保存 `pdf-save-annotation`：预览模态展示逐字节条目与目标路径（回退覆盖不可用时显式警告）→ `beginBatchCapture` → 单次 `vault.process`（新文件 `vault.create`，闭包先读后写即脏检查）→ `notePluginWrite` → `endBatchCapture`（R-B3 全覆盖）；`highlightText` 仅作 A 级临时视觉反馈，PDF 二进制零写入（契约测试以真实 `EditRevertService` + 共享 vault harness 证明预快照顺序、回退/恢复对称、失败零改动）。
+
+**架构与门禁**：登记新 owner `core.pdf`（`src/core/pdf/**`）与 `app.pdf-runtime`（fs 适配器，比照 app.memory-runtime 拆分）；`feature.chat-services` 与 `app.composition` 邻接更新，19 个模块文档页新增/更新，`check:owner-manifest` / `check:module-docs` / `lint 0/0` / 全量测试 / 生产构建全绿。
+
+---
+
 ## 2026-09-18 R-C3-D1 修复：组合根漏配 `notify`，R-C3 四条如实上报全数静默丢失
 
 真机验收发现（部署构建 `feature-flowtext-parity.202609190246`）：补全开关打开、解析后端不可用时，`pool.obtain()` 返回 `{ ok:false, error:{ reason:'unsupported', backend:'pi' } }`，真 Alt 手势与直接 `controller.trigger()` 连续 8 秒轮询**既无 ghost 也无任何 Notice**——§6.4（拒绝必须上报）与 §6.7（能力缺口须如实呈现）双违。

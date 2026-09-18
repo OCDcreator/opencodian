@@ -3503,6 +3503,15 @@ export interface OpenCodianSettings {
   vaultRetrievalExcludedPaths: string[];
 
   /**
+   * Opt-in local PDF index (R-C4, default off). When off no PDF is ever
+   * extracted for indexing, no index files are written, and PDF retrieval
+   * injects nothing — requests stay byte-identical to the pre-feature
+   * behavior. Exclusion rules reuse `vaultRetrievalExcludedPaths`; injection
+   * caps reuse `vaultRetrievalTopK` / `vaultRetrievalMaxCharsPerNote`.
+   */
+  pdfIndexEnabled: boolean;
+
+  /**
    * Configured text-to-image models (R-C2, default none): provider endpoint +
    * model + credential per entry. Credentials follow the existing settings
    * key path and are redacted from every diagnostic surface.
@@ -3773,6 +3782,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   vaultRetrievalTopK: VAULT_RETRIEVAL_TOP_K_DEFAULT,
   vaultRetrievalMaxCharsPerNote: VAULT_RETRIEVAL_MAX_CHARS_PER_NOTE_DEFAULT,
   vaultRetrievalExcludedPaths: [],
+  pdfIndexEnabled: false,
 
   // R-C2 text-to-image generation (no models configured by default).
   imageGenerationModels: [],

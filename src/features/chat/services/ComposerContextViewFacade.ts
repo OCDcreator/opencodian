@@ -49,7 +49,7 @@ type ComposerContextRuntimeStorePort = Pick<
 
 type ComposerContextActionPort = Pick<
   ComposerContextActionService,
-  'addCurrentNoteContextFromActiveEditor' | 'addSelectionContextFromActiveEditor'
+  'addCurrentNoteContextFromActiveEditor' | 'addSelectionContextFromActiveEditor' | 'attachBuiltContextItem'
 >;
 
 type ComposerContextPickerActionPort = Pick<
@@ -110,6 +110,8 @@ export interface ComposerContextViewFacadeCreateOptions {
   serverContext?: ComposerContextPickerServerContextPort;
   /** Persisted context groups for the picker's "attach topic" rows (R-B2). */
   contextGroups?: ComposerContextGroupsPort;
+  /** R-C4: lazily resolved PDF engine for one-shot PDF text attach. */
+  loadPdfEngine?: () => Promise<import('../../../core/pdf').PdfTextEngine>;
 }
 
 export interface ComposerSendContextPort {
@@ -146,6 +148,7 @@ export class ComposerContextViewFacade {
   static create(options: ComposerContextViewFacadeCreateOptions): ComposerContextViewFacade {
     const contextAttachmentBuilder = new ContextAttachmentBuilder(options.app, {
       getServerMode: () => options.getServerMode(),
+      ...(options.loadPdfEngine ? { loadPdfEngine: options.loadPdfEngine } : {}),
     });
     const contextFileCatalogService = new ContextFileCatalogService(options.app);
 
@@ -212,6 +215,14 @@ export class ComposerContextViewFacade {
     view?: MarkdownView | null,
   ): Promise<boolean> {
     return this.dependencies.actionService.addSelectionContextFromActiveEditor(editor, view);
+  }
+
+  /**
+   * R-C4: attach an already-built context item (e.g. the PDF selection the
+   * viewer integration captured) to the active tab's draft context.
+   */
+  attachBuiltContextItem(item: PromptContextItem): boolean {
+    return this.dependencies.actionService.attachBuiltContextItem(item);
   }
 
   start(): void {

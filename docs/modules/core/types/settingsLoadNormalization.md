@@ -7,6 +7,9 @@
 
 ## 概述
 
+R-C4：`normalizeVaultRetrievalSettingsOnLoad` 的返回类型与合并输出新增 `pdfIndexEnabled`（非布尔回落默认 `false`）。
+
+
 `settingsLoadNormalization.ts` 收束插件启动时的 persisted-settings bootstrap seam。它把 `main.ts` 里原本混杂的 core/ui snapshot merge、历史 server 结构迁移、theme/chat appearance 恢复、input panel legacy reset，以及“本次启动后是否要立刻回写归一化设置”的判定集中到单一 owner。
 
 这个模块不负责真正读写文件，也不负责 Obsidian 插件装配；它只把 `StorageService.loadPersistedSettings()` 的结果变成 `OpenCodianPlugin.loadSettings()` 可直接消费的 bootstrap state。

@@ -32,7 +32,11 @@ serializer 不负责 prompt option assembly，也不负责 SDK/legacy transport 
 - `PromptRequestPart`: 与 `OpenCodePromptRequestBuilder` 共享的 prompt part 结构。
 - `REMOTE_CONTEXT_TEXT_LIMIT_BYTES = 64 * 1024`: 远程 synthetic text part 的字节上限，保持既有 guard 语义。
 
-## 核心逻辑
+## 核心逻辑### PDF 条目分支（R-C4）
+
+`pdf_document` / `pdf_selection` 在本地与远程两种模式都产出同一条 synthetic `<obsidian_context>` 文本 part（正文由 `shared/obsidianContext.buildPdfContextTag` 从结构化 `pdfPages`/`pdfSelection` 渲染）——永不产出二进制 file URL、永不写 `textSnapshot`。远程模式沿用 64KiB 字节上限（附加时的页/字符上限已是第一道闸，此处为最后防线，fail-closed）。因为 `requestParts` 对四个后端只构建一次，该分支天然后端无关。
+
+
 
 ### Prompt part 顺序
 

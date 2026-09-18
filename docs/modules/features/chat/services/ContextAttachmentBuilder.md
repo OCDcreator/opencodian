@@ -5,6 +5,9 @@
 
 ## 概述
 
+R-C4：新增 `buildPdfDocumentContextItem(file)`（经注入的 `loadPdfEngine` 端口懒加载提取；加密/不可读/无文字层/超页数/超字符一律 Notice 明确拒绝，fail-closed；产物 `kind:'pdf_document'` 携带 `pdf` 元数据与 `pdfPages`，永不写 textSnapshot）与 `buildPdfSelectionContextItem(input)`（PDF 视图选区 → `kind:'pdf_selection'`，携带 `pdfSelection` 定位）。`buildEntryContextItem` 把 picker/拖拽命中的 PDF 路由到提取路径（`ContextAttachmentBuilderOptions.loadPdfEngine` 为新可选端口）。
+
+
 `ContextAttachmentBuilder` 负责把 composer 的 current-note / selection / file 三类输入统一收束成 `PromptContextItem`。它把 `ComposerContextActionService` / `ComposerContextCoordinator` 需要的上下文附件构建、remote 模式下的文本快照读取与 `64 KiB` 限制校验，集中到一个单一职责 service，让 view 只保留 host 装配、tab state 写回和 vault 事件转发。
 
 ## 导入关系

@@ -106,6 +106,9 @@ export {
 export {
   buildContextAttachment,
   buildObsidianContextTag,
+  buildPdfContextBody,
+  buildPdfContextTag,
+  buildPdfSelectionRange,
   dedupeContextAttachments,
   formatContextLabel,
   formatLineRange,
@@ -115,6 +118,8 @@ export {
   isTextLikeMime,
   parseLineRangeFromFileUrl,
   parseObsidianContextTag,
+  PDF_SELECTION_EXCERPT_MAX_CHARS,
+  pdfPagesFromFragment,
   resolveContextMimeFromPath,
   resolveTextMimeFromPath,
   toFileContextUrl,

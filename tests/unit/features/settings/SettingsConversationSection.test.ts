@@ -1046,6 +1046,10 @@ describe('SettingsConversationSection', () => {
         description: t('settings.vaultRetrieval.groupDesc'),
       },
       {
+        title: t('settings.pdfIndex.title'),
+        description: t('settings.pdfIndex.groupDesc'),
+      },
+      {
         title: t('settings.conversation.questions.title'),
         description: t('settings.conversation.questions.desc'),
       },
@@ -1066,6 +1070,7 @@ describe('SettingsConversationSection', () => {
       'conversation-display',
       'conversation-obsidian-tooling',
       'conversation-vault-retrieval',
+      'conversation-pdf-index',
       'conversation-questions',
       'conversation-rendering',
     ]);

@@ -5,6 +5,9 @@
 
 ## 概述
 
+R-C4：`getContextKindLabel` 增加 `pdf_document` / `pdf_selection` 标签（`chat.context.kind.pdfDocument` / `pdfSelection`）。
+
+
 `UserMessageContentRenderer` 是 user message body 的 DOM 组装模块。它把 visible text 渲染、context attachment chips、attached image gallery、OMO user injection 面板，以及 compaction divider 的渲染从 `OpenCodianView` 中抽出。
 
 ## 已发送图片（2026-07-22）

@@ -20,6 +20,7 @@ import type {
   VaultRetrievalSettingsSlice,
   VaultRetrievalSnippet,
 } from '../../../core/memory';
+import type { SelectedPdfSnippet } from '../../../core/pdf';
 import type { PromptContextItem } from '../../../core/types';
 import { createLogger, formatContextLabel } from '../../../shared';
 import { getPromptContextTargetKey } from '../composerContext';
@@ -39,10 +40,22 @@ export interface VaultRetrievalQueryPort {
   select(query: string): Promise<readonly VaultRetrievalSnippet[]>;
 }
 
+/**
+ * R-C4: optional PDF index port. Hits merge into the same managed-chip flow
+ * (visible, individually cancellable) but become `pdf_document` items that
+ * carry only the matched page fragment — the whole document is never
+ * injected (flowtext-c4-design §3.2).
+ */
+export interface PdfRetrievalQueryPort {
+  select(query: string): Promise<readonly SelectedPdfSnippet[]>;
+}
+
 export interface VaultRetrievalComposerCoordinatorDeps {
   facade: VaultRetrievalComposerPort;
   /** Null when the plugin has no index service (feature fully dormant). */
   retrieval: VaultRetrievalQueryPort | null;
+  /** Null when the PDF index service is absent or the engine is unavailable. */
+  pdfRetrieval?: PdfRetrievalQueryPort | null;
   getSettings: () => VaultRetrievalSettingsSlice;
   getActiveTabId(): TabId | null;
 }
@@ -66,7 +79,9 @@ export class VaultRetrievalComposerCoordinator {
       this.debounceTimer = null;
     }
     const settings = this.deps.getSettings();
-    if (!settings.vaultRetrievalEnabled || !this.deps.retrieval) {
+    const vaultActive = settings.vaultRetrievalEnabled && this.deps.retrieval;
+    const pdfActive = settings.pdfIndexEnabled && this.deps.pdfRetrieval;
+    if (!vaultActive && !pdfActive) {
       this.clearManagedChips();
       return;
     }
@@ -118,29 +133,53 @@ export class VaultRetrievalComposerCoordinator {
   private async refresh(query: string): Promise<void> {
     const settings = this.deps.getSettings();
     const retrieval = this.deps.retrieval;
-    if (!settings.vaultRetrievalEnabled || !retrieval) {
+    const vaultActive = settings.vaultRetrievalEnabled && retrieval !== null;
+    const pdfRetrieval = this.deps.pdfRetrieval ?? null;
+    const pdfActive = settings.pdfIndexEnabled && pdfRetrieval !== null;
+    // Either retrieval surface alone can drive managed chips: PDF indexing
+    // (pdfIndexEnabled) does not require the note-retrieval master switch.
+    if (!vaultActive && !pdfActive) {
       return;
     }
     const tabId = this.deps.getActiveTabId();
     const sequence = ++this.refreshSequence;
     let snippets: readonly VaultRetrievalSnippet[] = [];
-    try {
-      snippets = await retrieval.select(query);
-    } catch (error) {
-      // Fail-soft: never let retrieval break the composer. Existing managed
-      // chips stay visible so the user can remove them; nothing new injects.
-      logger.debug('vault retrieval refresh failed', { error });
+    let pdfSnippets: readonly SelectedPdfSnippet[] = [];
+    let vaultFailed = false;
+    if (vaultActive && retrieval) {
+      try {
+        snippets = await retrieval.select(query);
+      } catch (error) {
+        // Fail-soft: never let retrieval break the composer.
+        vaultFailed = true;
+        logger.debug('vault retrieval refresh failed', { error });
+      }
+    }
+    if (pdfActive && pdfRetrieval) {
+      try {
+        pdfSnippets = await pdfRetrieval.select(query);
+      } catch (error) {
+        logger.debug('pdf retrieval refresh failed', { error });
+      }
+    }
+    if (vaultFailed && pdfSnippets.length === 0) {
+      // Original R-C1 contract: when the retrieval surface throws and nothing
+      // new is available, keep the existing chips visible (nothing re-merges,
+      // so the user can still remove them) and inject nothing new.
       return;
     }
     if (sequence !== this.refreshSequence) {
       return;
     }
     const cancelled = this.collectCancelledKeys(tabId);
-    const items = snippets
-      // Defensive second cap: the service already enforces top-K.
-      .slice(0, Math.max(0, settings.vaultRetrievalTopK))
-      .map((snippet) => this.toContextItem(snippet))
-      .filter((item) => !cancelled.has(getPromptContextTargetKey(item)));
+    const items = [
+      ...snippets
+        // Defensive second cap: the service already enforces top-K.
+        .slice(0, Math.max(0, settings.vaultRetrievalTopK))
+        .map((snippet) => this.toContextItem(snippet)),
+      ...pdfSnippets.slice(0, Math.max(0, settings.vaultRetrievalTopK))
+        .map((snippet) => this.toPdfContextItem(snippet)),
+    ].filter((item) => !cancelled.has(getPromptContextTargetKey(item)));
     this.deps.facade.mergeVaultRetrievalDraftItems(items, tabId);
     this.injectedKeysByTab.set(tabId, new Set(items.map(getPromptContextTargetKey)));
   }
@@ -178,6 +217,32 @@ export class VaultRetrievalComposerCoordinator {
       mime: 'text/markdown',
       lineRange,
       textSnapshot: snippet.text,
+      origin: 'vault-retrieval',
+    };
+  }
+
+  /**
+   * R-C4: a retrieved PDF hit becomes a `pdf_document` item whose payload is
+   * ONLY the matched page fragment. No `textSnapshot` (PDF items never write
+   * it); `pdf.fragment` marks the injected page span so the serializer can
+   * label it honestly, and the retrieval chip can be removed like any other.
+   */
+  private toPdfContextItem(snippet: SelectedPdfSnippet): PromptContextItem {
+    this.itemIdSequence += 1;
+    return {
+      id: `pdf-retrieval-${this.itemIdSequence}`,
+      kind: 'pdf_document',
+      path: snippet.pdfPath,
+      label: `${snippet.pdfPath.replace(/\\/gu, '/').split('/').pop() ?? snippet.pdfPath} p.${snippet.pageFrom}${snippet.pageTo !== snippet.pageFrom ? `-${snippet.pageTo}` : ''}`,
+      mime: 'application/pdf',
+      pdf: {
+        textLayerPresent: true,
+        pageCount: 0,
+        extractedChars: snippet.text.length,
+        extraction: 'embedded',
+        fragment: { pageFrom: snippet.pageFrom, pageTo: snippet.pageTo },
+      },
+      pdfPages: [{ page: snippet.pageFrom, text: snippet.text }],
       origin: 'vault-retrieval',
     };
   }

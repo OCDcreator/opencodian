@@ -6,6 +6,9 @@
 
 ## 概述
 
+R-C4：vault 检索块之后新增 `pdf-index` 块（`renderPdfIndexBlock`）：`pdfIndexEnabled` 开关 + 诚实状态行（off / building {done}/{total} / indexed count）+ 手动重建按钮（`invalidateAll` + `onSettingsChanged`）。排除规则与注入上限刻意复用 R-C1 设置，无平行旋钮。
+
+
 2026-09-18（R-C1）：新增 `vault-retrieval` 设置块（classic `attach()` 与 tabbed `attachTabbed()` 双路径 + 布局注册表 tab）——总开关（变更即触发 `vaultIndexService.onSettingsChanged()`）、topK / 每篇截断上限（数字归一化回写）、排除路径 textarea（逐行 `normalizeVaultRetrievalExcludedPaths`）与诚实的索引状态行 + 手动重建按钮；关闭态描述为“零成本、请求逐字节不变”。
 
 `SettingsConversationSection` 是 settings/conversation 分区的厚 owner。它从 `OpenCodianSettings.ts` 接管 conversation section 的完整 lifecycle：标题生成模式与备用标题模型 picker、项目级 compaction 配置编辑、聊天字体大小、回合变更记录显示开关、问题卡片显示/位置、已回答卡片显示，以及 user markup 渲染开关。

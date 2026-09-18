@@ -23,3 +23,6 @@ R-C1 整库检索的运行时协调：后台、增量、时间预算制的 vault
 - **增量**：笔记 modify/create/delete/rename（rename = 旧删新建）防抖 2s 合并；mtime 相同跳过，mtime 变但 hash 相同仅推进 manifest mtime 不重写 shard；重启后从 shard 惰性水合（不重复全量哈希）。
 - **fail-closed**：select 内部吞错返回空数组；索引未就绪即无结果；绝不部分注入或降级为全库注入。
 - 体积保护：单 shard >512KB 裁剪为 `partial`；manifest 超 100MB 拒绝扩容。
+
+
+| `VaultRetrievalSettingsSlice.pdfIndexEnabled` | R-C4：PDF 索引与笔记检索共用同一设置切片（composer 协调器据此覆盖两个检索面） |
