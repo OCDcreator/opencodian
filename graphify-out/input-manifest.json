@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "61d7d8c5da94d273ae73697d36860ccbd597c7fffbada66844d077a62401700a",
+  "digest": "fa4be1f97fcc2d2fb7e598ae3c746ee02d4a7ec858686cae27d5023a1dcc5268",
   "recordCount": 705,
   "records": [
     {
@@ -26,17 +26,17 @@
     {
       "kind": "src",
       "key": "src/app/batchOrganize/BatchOrganizeCoordinator.ts",
-      "sha256": "4454db60c030ec1091ca1953b49850521476152e8e12582ef8fb98d810ffd0d6"
+      "sha256": "f4f331b90ce9aadebe5cd9db3a520b1d8befec97dccf4234289e7a2a9308f173"
     },
     {
       "kind": "src",
       "key": "src/app/batchOrganize/BatchOrganizeModal.ts",
-      "sha256": "73aa7173f9b81b8209172eb003d6d9d1cc4aa5c8f30dea6e49a7385f32602596"
+      "sha256": "475defc889874f268b8c44b1666e8de64d5c499df5d51102689f261c49b4450c"
     },
     {
       "kind": "src",
       "key": "src/app/batchOrganize/index.ts",
-      "sha256": "10b945a906f85bc20b3c4d262af63ecafdde15ac4739922f0cd3b163e414eddf"
+      "sha256": "72f53481390e3a4f7667edf93f82c1f54db1ffc5f8d886273f74be16e29b7334"
     },
     {
       "kind": "src",
@@ -2981,7 +2981,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "cf9201d8e1799ddfc1a5d8ab7bfe5bc1b0d65e1bf9d5277cdb05f70b71f16fac"
+      "sha256": "07ef1a6589989dbcc6499885991be068ed6158e8bfe29a78390a28f1f89c2b67"
     },
     {
       "kind": "src",
@@ -2991,7 +2991,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "f78b968745a4714084ee22c33eb1e9e778d3770bbb3754f24f5ea3be20a7e5d1"
+      "sha256": "0355cd62ba27f73f3ffef1fda9de3bf82c69985f654d543ebce949ecafd7c652"
     },
     {
       "kind": "src",
@@ -3529,7 +3529,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-18T13:43:32.497Z",
-  "headShaAtGeneration": "29fb68f24e5a038cf5ab4a83158aa6d2ab81b734",
+  "generatedAt": "2026-09-18T14:06:22.927Z",
+  "headShaAtGeneration": "e82adebac12c9d151da2c371bc0413587d75b09f",
   "graphifyVersion": "graphify 0.9.36"
 }
