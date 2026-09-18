@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "63231884701765e6def694b651b84f9bb16ff7e97e5e5e523c4fd865521936ae",
+  "digest": "eb513654397a4bc690a54f852f0de53724d3b86fc0cbb5e8c7bc7fbe3df4d038",
   "recordCount": 719,
   "records": [
     {
@@ -2301,7 +2301,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineCompletionController.ts",
-      "sha256": "3c3860d6dbf9459431e41e5f4c3e176781d1229349b86e035b0379bdbfc45614"
+      "sha256": "c34bdbff77628ec0d1fe55196cfedd0034a7229d7ec24ce52c31a953da519e59"
     },
     {
       "kind": "src",
@@ -2316,7 +2316,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineCompletionService.ts",
-      "sha256": "280489d7d0767ee27c95b7d7a055a1e507dd4505aabe31244143103a49eda9a5"
+      "sha256": "e9da0b52b56870a7863ae21e4daba504cf3bbf17a53ca7e5a1b75eda08705a95"
     },
     {
       "kind": "src",
@@ -3061,7 +3061,7 @@
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "23ee727fa75813aa8257815adc83f08997e9920e61f789e1d2c65b4d8af2a3f2"
+      "sha256": "583e19cec77aa265eaa2522a4964081c3d9ba9a70143c454cb28bdd12c6afa75"
     },
     {
       "kind": "src",
@@ -3599,7 +3599,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-18T18:45:36.483Z",
-  "headShaAtGeneration": "985dd76e7351a71dec5428fbc47dd303ce419702",
+  "generatedAt": "2026-09-18T19:06:10.111Z",
+  "headShaAtGeneration": "abb637ecc6b1ac18215fa81d25d51b7c78bc0126",
   "graphifyVersion": "graphify 0.9.36"
 }
