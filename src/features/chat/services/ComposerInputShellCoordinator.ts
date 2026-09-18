@@ -110,6 +110,14 @@ export interface ComposerInputShellCoordinatorHost {
    * surface.
    */
   addVaultPathContextFromDrop?(rawPath: string): boolean;
+  /**
+   * R-C1: optional observation of composer text changes for the opt-in
+   * whole-vault retrieval. Absent (or feature off) costs nothing: the
+   * coordinator-side guard runs first and the hook stays a no-op.
+   */
+  onComposerInputChanged?(value: string): void;
+  /** R-C1: turn boundary — the composer submitted; draft clearing happens in the pipeline. */
+  onComposerSubmitted?(): void;
   registerEscapeHandler(handler: () => boolean): void;
   mountSelectionControls(toolbar: HTMLElement, options: { showModels: boolean; showPermissions: boolean }): void;
   mountContextUsageIndicator(container: HTMLElement): void;
@@ -300,6 +308,7 @@ export class ComposerInputShellCoordinator {
         this.agentMentionController.syncContent(this.inputTextareaEl?.value ?? '');
       }
       this.syncHighlightBackdrop();
+      this.host.onComposerInputChanged?.(this.inputTextareaEl?.value ?? '');
       void this.refreshComposerSuggestionMenu();
     });
     this.inputTextareaEl.addEventListener('scroll', () => {
@@ -902,6 +911,7 @@ export class ComposerInputShellCoordinator {
     this.promptSuggestionService.clearActiveOnTurnStart();
     void this.host.submitMessage(submission);
     this.inputTextareaEl.value = '';
+    this.host.onComposerSubmitted?.();
     this.agentMentionController.clearTrackedMentions();
     this.clearAttachedImages();
     this.syncTextareaHeight();

@@ -312,6 +312,7 @@ import {
   logAssistantFinalizationDebug,
   previewLogText,
 } from './services/trailingAssistantPatchDebug';
+import { VaultRetrievalComposerCoordinator } from './services/VaultRetrievalComposerCoordinator';
 import type { TabBar, TabId, TabManager } from './tabs';
 import { type BackendSessionBrowserHost,BackendSessionBrowserModal } from './ui/BackendSessionBrowserModal';
 import { ContextDetailModal } from './ui/ContextDetailModal';
@@ -444,6 +445,7 @@ export class OpenCodianView extends ItemView {
   private conversationHistoryActionsCoordinator: ConversationHistoryActionsCoordinator;
   private chatSelectionControlsCoordinator: ChatSelectionControlsCoordinator;
   private composerInputShellCoordinator: ComposerInputShellCoordinator;
+  private vaultRetrievalComposerCoordinator: VaultRetrievalComposerCoordinator;
   private inputPanelAppearanceCoordinator: InputPanelAppearanceCoordinator;
   private slashCommandMenuCatalogCache: SlashCommandMenuCatalogCache;
   private slashCommandMenuPreloadTimerId: number | null = null;
@@ -1688,6 +1690,7 @@ export class OpenCodianView extends ItemView {
     this.chatSurfaceAppearanceCoordinator = runtime.chatSurfaceAppearanceCoordinator;
     this.conversationSessionSettingsCoordinator = runtime.conversationSessionSettingsCoordinator;
     this.composerContextViewFacade = runtime.composerContextViewFacade;
+    this.vaultRetrievalComposerCoordinator = runtime.vaultRetrievalComposerCoordinator;
     this.tabConversationSyncFingerprintRuntimePort = runtime.tabConversationSyncFingerprintRuntimePort;
     this.persistentAssistantNoticeService = runtime.persistentAssistantNoticeService;
     this.conversationNoticeCoordinator = runtime.conversationNoticeCoordinator;
@@ -2725,6 +2728,7 @@ export class OpenCodianView extends ItemView {
     this.chatSelectionControlsCoordinator.destroy();
     this.inputPanelAppearanceCoordinator.destroy();
     this.composerInputShellCoordinator.destroy();
+    this.vaultRetrievalComposerCoordinator.dispose();
     this.effortSelector?.destroy();
     this.effortSelector = null;
     this.effortContainerEl = null;

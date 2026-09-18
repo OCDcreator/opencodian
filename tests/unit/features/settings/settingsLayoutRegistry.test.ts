@@ -90,6 +90,7 @@ describe('SETTINGS_PRIMARY_TABS', () => {
       'display',
       'questions',
       'memory',
+      'vault-retrieval',
       'inline-edit',
       'context-groups',
     ]);

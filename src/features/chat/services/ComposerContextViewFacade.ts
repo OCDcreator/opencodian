@@ -44,7 +44,7 @@ type ComposerContextFileCatalogPort = Pick<
 
 type ComposerContextRuntimeStorePort = Pick<
   ComposerContextRuntimeStore,
-  'getDraftContextItems' | 'clearDraftContextItems'
+  'getDraftContextItems' | 'clearDraftContextItems' | 'mergeVaultRetrievalDraftItems'
 >;
 
 type ComposerContextActionPort = Pick<
@@ -116,6 +116,11 @@ export interface ComposerSendContextPort {
   getDraftContextItems(tabId?: TabId | null): PromptContextItem[];
   resolvePersistentContextItems(paths?: readonly string[]): Promise<PromptContextItem[]>;
   clearDraftContextItems(tabId?: TabId | null): void;
+  /**
+   * R-C1: atomically replace the vault-retrieval draft items with the given
+   * list (manual attachments untouched). Empty list clears the managed set.
+   */
+  mergeVaultRetrievalDraftItems(items: PromptContextItem[], tabId?: TabId | null): void;
 }
 
 export interface ComposerContextServices {
@@ -164,6 +169,9 @@ export class ComposerContextViewFacade {
         this.dependencies.contextAttachmentBuilder.buildPersistentFileContextItems(paths),
       clearDraftContextItems: (tabId?: TabId | null) => {
         this.dependencies.runtimeStore.clearDraftContextItems(tabId);
+      },
+      mergeVaultRetrievalDraftItems: (items: PromptContextItem[], tabId?: TabId | null) => {
+        this.dependencies.runtimeStore.mergeVaultRetrievalDraftItems(items, tabId);
       },
     };
   }

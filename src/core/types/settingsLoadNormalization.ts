@@ -47,6 +47,9 @@ import {
   normalizeThemeSettings,
   normalizeThinkingBudget,
   normalizeTitleMode,
+  normalizeVaultRetrievalExcludedPaths,
+  normalizeVaultRetrievalMaxCharsPerNote,
+  normalizeVaultRetrievalTopK,
   OPENCODE_LEGACY_LOCAL_DEFAULT_PORT,
   OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST,
   OPENCODIAN_LOCAL_SIDECAR_DEFAULT_PORT,
@@ -463,6 +466,29 @@ function normalizeObsidianToolingSettingsOnLoad(
   };
 }
 
+/** R-C1 whole-vault retrieval, normalized at the final load-merge boundary. */
+function normalizeVaultRetrievalSettingsOnLoad(
+  normalizedSettings: Partial<OpenCodianSettings> | null,
+): {
+  vaultRetrievalEnabled: boolean;
+  vaultRetrievalTopK: number;
+  vaultRetrievalMaxCharsPerNote: number;
+  vaultRetrievalExcludedPaths: string[];
+} {
+  return {
+    vaultRetrievalEnabled: typeof normalizedSettings?.vaultRetrievalEnabled === 'boolean'
+      ? normalizedSettings.vaultRetrievalEnabled
+      : DEFAULT_SETTINGS.vaultRetrievalEnabled,
+    vaultRetrievalTopK: normalizeVaultRetrievalTopK(normalizedSettings?.vaultRetrievalTopK),
+    vaultRetrievalMaxCharsPerNote: normalizeVaultRetrievalMaxCharsPerNote(
+      normalizedSettings?.vaultRetrievalMaxCharsPerNote,
+    ),
+    vaultRetrievalExcludedPaths: normalizeVaultRetrievalExcludedPaths(
+      normalizedSettings?.vaultRetrievalExcludedPaths,
+    ),
+  };
+}
+
 function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | null): LoadSettingsNormalizationResult {
   const normalizedModelProviderPluginDebugSettings = normalizeModelProviderPluginDebugSettings(savedSettings);
   const { normalizedServer, shouldMigrateLegacyLocalDefaultPort } = normalizeServerSettingsOnLoad(savedSettings);
@@ -591,6 +617,7 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
       contextGroups: normalizeContextGroups(normalizedSettings?.contextGroups),
       ...normalizeEditRevertSettingsOnLoad(normalizedSettings),
       ...normalizeObsidianToolingSettingsOnLoad(normalizedSettings),
+      ...normalizeVaultRetrievalSettingsOnLoad(normalizedSettings),
     },
     shouldMigrateLegacyLocalDefaultPort,
     shouldResetGlassRefractionGlassDefaults,

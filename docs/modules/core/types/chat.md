@@ -12,6 +12,10 @@
 
 `ContextUsageSnapshot` 新增权威 `totalTokens`（优先于可见分项的合成值），并把 `cacheWriteTokens` 与 `totalCost` 设为可空。`StreamChunk` 新增 `context_usage`，仅承载会话级快照；`Conversation.lastContextUsage` 持久化最后一次已验证快照。账号额度数据不复用此 DTO。OpenCode 专用的 `openCodeCurrentContext` 与 `openCodeHasCumulativeTokens` 额外保留桌面端的双口径：前者是最后一条有效 assistant message 的当前上下文，后者区分缺失 `session.tokens` 与真实的零累计值；其他 backend 与旧持久化数据保持这两个字段未定义。
 
+### 2026-09-18 R-C1 注入来源字段
+
+`PromptContextItem` 与 `MessageContextAttachment` 新增可选 `origin?: 'manual' | 'vault-retrieval'`。旧数据不含该字段（等价 `manual`）；`vault-retrieval` 标记整库检索注入的条目，仅用于客户端 chips 徽标，不进入请求 wire 格式。
+
 ## 导入关系
 
 上游: 无外部依赖

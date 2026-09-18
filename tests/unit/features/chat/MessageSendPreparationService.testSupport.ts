@@ -82,6 +82,7 @@ export function createComposerSendContext(
     clearDraftContextItems: jest.fn().mockImplementation(() => {
       callOrder.push('clearDraftContextItems');
     }),
+    mergeVaultRetrievalDraftItems: jest.fn(),
     ...overrides,
   };
 }

@@ -5,6 +5,8 @@
 
 ## 概述
 
+2026-09-18（R-C1）：`buildContextAttachment` 透传可选 `origin`（条目存在时）；`buildObsidianContextTag` 不受影响——origin 永不进入请求 wire 格式，旧条目的附件序列化逐字节不变。
+
 Obsidian 显式上下文（explicit context）工具函数。处理 `<obsidian_context>` 标签的构建和解析、上下文附件对象与标签格式之间的转换、附件去重、文件路径 MIME 类型解析和行范围格式化。用于在 AI 聊天消息中编码和还原编辑器上下文信息。
 
 ## 导入关系

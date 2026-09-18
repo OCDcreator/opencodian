@@ -4,6 +4,7 @@ import {
   type ComposerContextChipState,
   type FocusContextPreview,
   getContextTargetKey,
+  getPromptContextTargetKey,
   removeDraftContextItemsByTarget,
   upsertDraftContextItem,
 } from '../composerContext';
@@ -68,6 +69,21 @@ export class ComposerContextRuntimeStore {
       target,
     );
     this.setDraftContextItems(nextItems, tabId);
+  }
+
+  /**
+   * R-C1: atomically replace every `vault-retrieval` draft item with the
+   * given list, leaving manually attached items untouched, in a single
+   * render pass. Passing an empty list clears the managed set.
+   */
+  mergeVaultRetrievalDraftItems(
+    items: PromptContextItem[],
+    tabId: TabId | null = this.host.getActiveTabId(),
+  ): void {
+    const managedKey = new Set(items.map(getPromptContextTargetKey));
+    const others = this.getDraftContextItems(tabId).filter((item) =>
+      item.origin !== 'vault-retrieval' && !managedKey.has(getPromptContextTargetKey(item)));
+    this.setDraftContextItems([...others, ...items], tabId);
   }
 
   getFocusContextPreview(

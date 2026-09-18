@@ -12,6 +12,7 @@
 > **Updated**: 2026-07-28 — `CodexBackendSettings.executablePath` defaults to `''` and is trim-normalized; an empty string means automatic user-CLI discovery.
 > **Updated**: 2026-09-11 — `getDefaultChatAppearanceSettings().input.backgroundOpacity` retuned 72 → 32: the composer shell now mixes against the opaque `--opencodian-composer-lens-bg-solid` endpoint, so the previous glass character is preserved while 100% finally means fully opaque.
 > **Updated**: 2026-09-11 — added `UserBubbleStyleId` (`'solid'|'glass'`) and `ChatAppearanceUserSettings.style` (default `'solid'`, unknown values normalize to `'solid'` via `normalizeUserBubbleStyleId`); theme presets no longer pin a bubble style.
+> **Updated**: 2026-09-18 — R-C1 整库检索四设置项：`vaultRetrievalEnabled`（默认 `false`，关闭即零成本）、`vaultRetrievalTopK`（默认 6，1–20）、`vaultRetrievalMaxCharsPerNote`（默认 4000，500–20000）、`vaultRetrievalExcludedPaths`（默认 `[]`，目录前缀或段内 `*` 通配，大小写不敏感去重），配套 `normalizeVaultRetrieval*` 归一化。
 
 ## 概述
 

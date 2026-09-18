@@ -12,7 +12,8 @@
 ```text
 上游: ./memoryTypes, ./memoryPaths, ./memoryProtocol, ./memoryManifest, ./memoryIndexFormat,
       ./memoryStore, ./memorySecretScan, ./memoryRecall, ./memoryExtraction, ./memoryReflection,
-      ./memoryHygiene, ./memoryInjection, ./memoryFileSystem, ./MemoryBackendService
+      ./memoryHygiene, ./memoryInjection, ./memoryFileSystem, ./MemoryBackendService,
+      ./vaultRetrievalIndex, ./VaultIndexService
 下游: src/app/memory/MemoryRuntimeCoordinator.ts（唯一组合层消费者）
 ```
 

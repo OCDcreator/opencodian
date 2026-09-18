@@ -85,6 +85,8 @@
 
 ## 概述
 
+2026-09-18（R-C1）：新增 `settings.vaultRetrieval.*`（标题/开关/双上限/排除路径/索引状态/重建，双语）与 `chat.context.originBadge.vaultRetrieval`（检索注入 chips 徽标）、`settings.conversation.tab.vaultRetrieval`。
+
 OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。
 
 2026-07-20：新增 `settings.model.catalogComparison.*` 与 `chat.modelSelector.configuredOnly*`，用于 V2 影子目录三态摘要，以及聊天模型选择器的“仅配置”badge/tooltip。不可比较状态保持中性，不暗示 provider 故障。

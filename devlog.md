@@ -11,6 +11,20 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-18 整库检索（R-C1）：词面索引、可见可取消注入与关闭态逐字节回归
+
+FlowText 对齐批次 C 的 R-C1（`docs/requirements/flowtext-parity.md`，§10 Q3 定案：**仅词面**——零新依赖、离线、无网络；不推翻"不自动注入"原则，将其收窄为"显式开启时注入且始终可见"，默认行为不变）。设计基准 `docs/requirements/flowtext-c1-design.md`。
+
+**纯核心**：`src/core/memory/vaultRetrievalIndex.ts`（core.memory）——分块（ATX/Setext 标题切 section、超 1500 字符在围栏外空行处递归二分、YAML frontmatter 跳过、代码围栏不可穿越）、打分（复用 `memoryRecall.tokenize` 拉丁词 + CJK 二元组；title×3 / heading×2 / body×1，每查询 token 计一次）、选段门槛（≥2 个不同查询 token，或标题/小节命中，或 verbatim 标题命中——抑制单常用二元组误召回；同笔记至多 1 条；topK 硬上限；命中分块前后各扩 1 块）、`truncateNoteSnippet`（截断点回退最近完整段落/围栏闭合边界，绝不切进未闭合代码块）、排除规则（点前缀目录恒排除 + 用户目录前缀/段内 `*` 通配规则，大小写不敏感）、sha-1 内容哈希与按路径哈希的 shard 名。
+
+**运行时服务**：`src/core/memory/VaultIndexService.ts`（core.memory，fs 注入端口 `VaultIndexFs`，比照 MemoryBackendService）——存储在 vault 内 `.opencodian/vault-index/`（manifest.json + shards/，点前缀目录对 Obsidian 列表/搜索不可见，验收 6）；后台时间预算 tick（默认 8ms）永不阻塞 UI；笔记 modify/create/delete/rename 防抖 2s 增量（rename = 旧删新建）；mtime 跳过 + hash 跳过双层失效；重启后从 shard 惰性水合；shard >512KB 裁剪 `partial`、manifest >100MB 拒绝扩容；`select()` 回读正文 + 截断 + `memorySecretScan` 守卫（命中整体丢弃并计 debug 日志）；fail-closed——检索任何异常返回空数组。**关闭态零成本**：设置关闭即不订阅事件、不建索引、查询直空。
+
+**可见可取消注入**：`src/features/chat/services/VaultRetrievalComposerCoordinator.ts`（feature.chat-services）——composer 文本 600ms 防抖 → `select()` → 构造 `origin:'vault-retrieval'`、`kind:'selection'`（lineRange+textSnapshot，四后端经既有 contextItems 序列化尽量带内容）的草稿上下文条目，经 `ComposerSendContextPort.mergeVaultRetrievalDraftItems`（ComposerContextRuntimeStore 新增托管原子替换，手动条目不动）原子替换托管 chips。chips 带双语文"检索"徽标（ComposerContextCoordinator + UserMessageContentRenderer + `opencodian-context-chip-origin-badge` CSS），逐条 ✕ 走既有 chip 动作即从草稿删除——取消粘滞：被移除 key 在当前草稿周期不回加，提交边界（`onComposerSubmitted`）重置。**与设计的偏差（已记录）**：设计 §3.5 的发送管线钩子（prepareMessageSend 之后追加 `preparedSend.contextItems`）经核实不可行——OpenCode 请求以 prepare 内构建的 `requestParts` 优先，事后追加的 contextItems 不进请求；且发送内没有用户交互窗口，"发送前逐条取消"（设计 §3.5.3 / 验收 3）无从谈起。故注入点前移为 compose 期候选 + 既有草稿通道，发送管线（SendPipelineRuntime）零改动，关闭态逐字节一致成为结构性质。composer 观察经 `ComposerInputShellCoordinatorHost` 两个可选钩子（`onComposerInputChanged` / `onComposerSubmitted`）由 ChatRuntimeComposition 展开包装注入，OpenCodianView 仅解构 + dispose 两行。
+
+**设置四件套**：`vaultRetrievalEnabled`（默认 false）/ `vaultRetrievalTopK`（默认 6，1–20）/ `vaultRetrievalMaxCharsPerNote`（默认 4000，500–20000）/ `vaultRetrievalExcludedPaths`（默认 []）+ `normalizeVaultRetrieval*` 归一化（settings.ts + settingsLoadNormalization.ts 载入边界）；设置页会话区新「整库检索」块（classic + tabbed 双路径 + `settingsLayoutRegistry` 新 tab）：开关（变更即 `onSettingsChanged()`）、双上限、排除路径 textarea、诚实索引状态行 + 手动重建按钮；zh/en 双语全量。类型面：`PromptContextItem`/`MessageContextAttachment` 可选 `origin`（`'manual'|'vault-retrieval'`），`buildContextAttachment` 透传，`buildObsidianContextTag` 不含 origin（wire 不变）。`main.ts` 仅组合：构造 `VaultIndexFileSystem`（app.memory-runtime 新适配器，写入硬限制 `.opencodian/vault-index/**`）+ `VaultIndexService`，onunload dispose。owner manifest：core.memory 增补职责/入口，其余 owner 不变。
+
+**测试**：新增 4 套件 52 例——`tests/unit/core/memory/vaultRetrievalIndex.test.ts`（25：排除矩阵、标题/setext/围栏/二分/frontmatter 分块、权重与计次、门槛、单笔记一条与 topK、verbatim、邻块扩展、截断边界含围栏内回退、哈希/shard 命名、heading/body token 路由、partial 裁剪）、`tests/unit/core/memory/VaultIndexService.test.ts`（11：关闭态零订阅零写入、后台建库查询、select 反映最新内容（验收 5）、hash 不变跳过重写、删除清 shard/重命名重建、排除规则与事件过滤、密钥守卫、重启水合、invalidateAll、禁用即停）、`tests/unit/features/chat/services/VaultRetrievalComposerCoordinator.test.ts`（8：关闭态惰性、off 清理、chip 形状、防抖、取消粘滞、提交重置、fail-soft、双上限）、`tests/unit/features/chat/VaultRetrievalInjectionContract.test.ts`（8：**关闭态逐字节回归**——prepareMessageSend off vs 基线的 requestParts/optimisticParts/userMessage 深相等 + 序列化层空集恒等；开启态快照进请求部件（file part source.text + 精确 file URL）、乐观消息附件带 origin、topK 双上限、经既有 store 语义取消一条后重建请求不含该条；origin 向后兼容——旧条目无 origin key、wire tag 恒等、合并去重不吞手动条目）。
+
 ## 2026-09-18 批量整理（R-B5）：任务模板、强制快照与执行前预览确认
 
 FlowText 对齐批次 B 的 R-B5（`docs/requirements/flowtext-parity.md`，依赖 R-B3/R-B4 已就绪）：批量整理的**任务模板**（按标签/属性/关键词查找并移动、批量改 frontmatter 属性可带条件、按规则重命名并更新引用）+ 任何批量写前**强制 R-B3 快照** + 执行前**真实预览确认**（文件数与具体清单）。行为由机制保证而非提示词（§11.3）。

@@ -213,6 +213,70 @@ export function normalizeEditRevertSnapshotLimitMb(value: unknown): number {
   return rounded;
 }
 
+/** R-C1 whole-vault retrieval bounds, applied by load normalization. */
+export const VAULT_RETRIEVAL_TOP_K_DEFAULT = 6;
+export const VAULT_RETRIEVAL_TOP_K_MIN = 1;
+export const VAULT_RETRIEVAL_TOP_K_MAX = 20;
+export const VAULT_RETRIEVAL_MAX_CHARS_PER_NOTE_DEFAULT = 4000;
+export const VAULT_RETRIEVAL_MAX_CHARS_PER_NOTE_MIN = 500;
+export const VAULT_RETRIEVAL_MAX_CHARS_PER_NOTE_MAX = 20000;
+export const VAULT_RETRIEVAL_MAX_EXCLUDED_PATHS = 100;
+export const VAULT_RETRIEVAL_MAX_EXCLUDED_PATH_CHARS = 200;
+
+/**
+ * Normalize the R-C1 injection count cap: integers within [MIN, MAX] pass
+ * through; anything else falls back to the default (edit-revert convention).
+ */
+export function normalizeVaultRetrievalTopK(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return VAULT_RETRIEVAL_TOP_K_DEFAULT;
+  }
+  const rounded = Math.round(value);
+  if (rounded < VAULT_RETRIEVAL_TOP_K_MIN || rounded > VAULT_RETRIEVAL_TOP_K_MAX) {
+    return VAULT_RETRIEVAL_TOP_K_DEFAULT;
+  }
+  return rounded;
+}
+
+/** Normalize the R-C1 per-note truncation cap (same convention as top-K). */
+export function normalizeVaultRetrievalMaxCharsPerNote(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return VAULT_RETRIEVAL_MAX_CHARS_PER_NOTE_DEFAULT;
+  }
+  const rounded = Math.round(value);
+  if (
+    rounded < VAULT_RETRIEVAL_MAX_CHARS_PER_NOTE_MIN
+    || rounded > VAULT_RETRIEVAL_MAX_CHARS_PER_NOTE_MAX
+  ) {
+    return VAULT_RETRIEVAL_MAX_CHARS_PER_NOTE_DEFAULT;
+  }
+  return rounded;
+}
+
+/**
+ * Normalize the R-C1 exclusion rule list: non-empty strings only, trimmed,
+ * deduplicated case-insensitively, bounded count/length. Rules are
+ * vault-relative paths or `*` wildcards within a path segment.
+ */
+export function normalizeVaultRetrievalExcludedPaths(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'string') continue;
+    const rule = entry.trim().replace(/\\/gu, '/');
+    if (rule === '' || rule.length > VAULT_RETRIEVAL_MAX_EXCLUDED_PATH_CHARS) continue;
+    const folded = rule.toLowerCase();
+    if (seen.has(folded)) continue;
+    seen.add(folded);
+    result.push(rule);
+    if (result.length >= VAULT_RETRIEVAL_MAX_EXCLUDED_PATHS) break;
+  }
+  return result;
+}
+
 /**
  * Normalize the user-defined context-group list (R-B2). Drops malformed
  * entries (non-strings, empty id/name, oversized fields, paths over the cap
@@ -3267,6 +3331,28 @@ export interface OpenCodianSettings {
    */
   obsidianToolingMode: ObsidianToolingMode;
 
+  /**
+   * Opt-in whole-vault lexical retrieval (R-C1, §10 Q3, default off). When
+   * off there is no indexing, no listeners and no injected context — the
+   * outgoing request is byte-identical to the pre-feature behavior. When on,
+   * up to `vaultRetrievalTopK` snippets are offered as visible, individually
+   * cancellable composer chips each turn.
+   */
+  vaultRetrievalEnabled: boolean;
+
+  /** Injection count cap (R-C1, default 6, clamped 1–20 by load normalization). */
+  vaultRetrievalTopK: number;
+
+  /** Per-note truncation cap in chars (R-C1, default 4000, clamped 500–20000). */
+  vaultRetrievalMaxCharsPerNote: number;
+
+  /**
+   * Index exclusion rules (R-C1, default none): vault-relative paths,
+   * directory prefixes or `*` wildcards within a path segment. `.obsidian/`
+   * and `.opencodian/` are always excluded regardless of this list.
+   */
+  vaultRetrievalExcludedPaths: string[];
+
   capabilityLabSelectedBackend: string | undefined;
 
   /** Backend-specific settings that should not be flattened into OpenCode fields. */
@@ -3511,6 +3597,12 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   editRevertEnabled: true,
   editRevertSnapshotLimitMb: EDIT_REVERT_SNAPSHOT_LIMIT_MB_DEFAULT,
   obsidianToolingMode: 'off',
+
+  // R-C1 whole-vault retrieval (opt-in; off is zero cost).
+  vaultRetrievalEnabled: false,
+  vaultRetrievalTopK: VAULT_RETRIEVAL_TOP_K_DEFAULT,
+  vaultRetrievalMaxCharsPerNote: VAULT_RETRIEVAL_MAX_CHARS_PER_NOTE_DEFAULT,
+  vaultRetrievalExcludedPaths: [],
   capabilityLabSelectedBackend: undefined,
   backendSettings: getDefaultBackendSettings(),
 

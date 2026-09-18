@@ -125,6 +125,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
       { id: 'display', labelKey: 'settings.conversation.tab.display' },
       { id: 'questions', labelKey: 'settings.conversation.tab.questions', backendRequired: 'opencode' },
       { id: 'memory', labelKey: 'settings.conversation.tab.memory' },
+      { id: 'vault-retrieval', labelKey: 'settings.conversation.tab.vaultRetrieval' },
       { id: 'inline-edit', labelKey: 'settings.conversation.tab.inlineEdit' },
       { id: 'context-groups', labelKey: 'settings.conversation.tab.contextGroups' },
     ],

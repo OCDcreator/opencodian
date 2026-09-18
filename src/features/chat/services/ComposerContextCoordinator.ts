@@ -1,3 +1,4 @@
+import { t } from '../../../i18n';
 import {
   type ComposerContextChipState,
 } from '../composerContext';
@@ -37,13 +38,22 @@ export class ComposerContextCoordinator {
       const chipEl = document.createElement('button');
       chipEl.className = 'opencodian-composer-context-chip';
       chipEl.type = 'button';
-      chipEl.textContent = chipState.label;
       chipEl.title = chipState.path;
       chipEl.setAttribute('aria-pressed', String(chipState.attached));
 
       chipEl.classList.toggle('is-preview', chipState.preview);
       chipEl.classList.toggle('is-attached', !chipState.preview);
       chipEl.classList.toggle('is-selection', Boolean(chipState.lineRange));
+      if (chipState.origin === 'vault-retrieval') {
+        // R-C1: injected vault-retrieval snippets must stay visibly distinct
+        // from manually attached context.
+        chipEl.classList.add('is-vault-retrieval');
+        const badgeEl = document.createElement('span');
+        badgeEl.className = 'opencodian-context-chip-origin-badge';
+        badgeEl.textContent = t('chat.context.originBadge.vaultRetrieval');
+        chipEl.appendChild(badgeEl);
+      }
+      chipEl.appendChild(document.createTextNode(chipState.label));
       chipEl.addEventListener('click', () => {
         void this.chipActionService.handleChipClick(chipState);
       });

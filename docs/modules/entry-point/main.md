@@ -12,6 +12,8 @@
 
 > 2026-09-18 (FlowText parity R-A1/R-A2): `registerWorkspaceIntegration()` additionally registers the `@` in-note trigger (`inlineEditAtTriggerExtension`, gated by `settings.inlineEditTriggerAt` AND `canRunInlineEdit()`; declines — letting `@` type through — for editors without a file-associated note) and passes `presetPrompts` through the inline-edit host bridge; `SettingsInlineEditSection` receives an `openHotkeySettings` callback that deep-links into Obsidian's own hotkeys tab (`app.setting.open()` + `openTabById('hotkeys')`, try/catch guarded).
 
+> 2026-09-18 (FlowText parity R-C1): `main.ts` 仅做组合——构造 `VaultIndexFileSystem`（app.memory-runtime 的 Obsidian 适配器）与 `core.memory` 的 `VaultIndexService`，`attach()` 注入 fs 与设置 getter 后通过启动测量步骤调用 `onSettingsChanged()`（关闭态为即时 no-op，开启态后台 fire-and-forget 建索引）；`onunload` 增加 `vaultIndexService?.dispose()`。检索逻辑零行驻留本文件。
+
 > **源码**: `src/main.ts`
 > **状态**: [REVIEW]
 

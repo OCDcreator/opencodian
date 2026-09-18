@@ -10,6 +10,7 @@
 > **Updated**: 2026-07-29 — re-exports OpenCode desktop-style current-context usage type.
 > **Updated**: 2026-09-11 — re-exports `UserBubbleStyleId` and `normalizeUserBubbleStyleId` for the user bubble style setting.
 > **Updated**: 2026-09-18 — re-exports `InlineEditPresetPrompt`, `normalizeInlineEditPresetPrompts` and the `INLINE_EDIT_PRESET_PROMPT_MAX_*` caps for the R-A2 preset prompt setting.
+> **Updated**: 2026-09-18 — re-exports the R-C1 vault-retrieval normalizers (`normalizeVaultRetrievalTopK` / `normalizeVaultRetrievalMaxCharsPerNote` / `normalizeVaultRetrievalExcludedPaths`).
 
 ## 概述
 

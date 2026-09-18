@@ -1018,15 +1018,18 @@
       "responsibilities": [
         "backend-neutral workspace memory core: path identity, Markdown topic store, MEMORY.md index formatting and injection planning",
         "per-turn extraction and compaction reflection gates, prompts, parsers and provenance-stamped write plans",
-        "credential scan guard, hygiene notices and index-only recall assembly with lexical semantic fallback"
+        "credential scan guard, hygiene notices and index-only recall assembly with lexical semantic fallback",
+        "vault-wide lexical retrieval index (R-C1): pure chunking/scoring/truncation core plus the fs-injected background index service over .opencodian/vault-index"
       ],
       "canonicalState": [
         "workspace memory store layout rules and index budget caps",
-        "injection/extraction/reflection planning contracts"
+        "injection/extraction/reflection planning contracts",
+        "vault retrieval index layout rules (manifest + shards), selection thresholds and truncation caps"
       ],
       "entrypoints": [
         "src/core/memory/index.ts",
-        "src/core/memory/MemoryBackendService.ts"
+        "src/core/memory/MemoryBackendService.ts",
+        "src/core/memory/VaultIndexService.ts"
       ],
       "allowedOwnerDependencies": [],
       "forbiddenDependencies": [

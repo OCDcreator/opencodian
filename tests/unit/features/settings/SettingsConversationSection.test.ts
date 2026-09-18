@@ -1042,6 +1042,10 @@ describe('SettingsConversationSection', () => {
         description: t('settings.obsidianTooling.groupDesc'),
       },
       {
+        title: t('settings.vaultRetrieval.title'),
+        description: t('settings.vaultRetrieval.groupDesc'),
+      },
+      {
         title: t('settings.conversation.questions.title'),
         description: t('settings.conversation.questions.desc'),
       },
@@ -1061,6 +1065,7 @@ describe('SettingsConversationSection', () => {
       'conversation-experimental',
       'conversation-display',
       'conversation-obsidian-tooling',
+      'conversation-vault-retrieval',
       'conversation-questions',
       'conversation-rendering',
     ]);

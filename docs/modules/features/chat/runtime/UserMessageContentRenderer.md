@@ -12,6 +12,8 @@
 `renderUserMessageContent()` 在消息持久化的 `images` 存在时渲染 gallery。每张缩略图都是有可访问名称的按钮，点击复用 `ImagePreviewOverlay` 打开 data-URI 原图预览；这不会影响上下文附件 chip 或用户文本渲染。
 
 > 2026-09-18 (R-A7)：上下文附件 kind 标签支持 `folder`（`chat.context.kind.folder`）。
+>
+> 2026-09-18 (R-C1)：`contextAttachments` 中 `origin === 'vault-retrieval'` 的附件 chip 前缀渲染“检索”徽标（`opencodian-context-chip-origin-badge`，i18n `chat.context.originBadge.vaultRetrieval`）；无 origin 的旧附件渲染逐字节不变。
 
 ## 维护约束
 

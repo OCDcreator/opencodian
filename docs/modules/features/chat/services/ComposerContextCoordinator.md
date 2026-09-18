@@ -5,6 +5,8 @@
 
 ## 概述
 
+2026-09-18（R-C1）：`origin === 'vault-retrieval'` 的 chip 追加 `is-vault-retrieval` 类与“检索”徽标 span，其余 chip 的 DOM 形态不变。
+
 `ComposerContextCoordinator` 现在只负责 composer context chip 的 DOM 渲染与 click 委托。它消费 runtime store 已经整理好的 chip state，维护当前 row element，并把 attach/detach 交互转交给独立的 `ComposerContextChipActionService`，避免继续把 runtime 投影细节和 DOM 组装混在一个模块里。
 
 ## 导入关系

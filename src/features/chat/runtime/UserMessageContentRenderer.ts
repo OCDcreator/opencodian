@@ -147,13 +147,20 @@ export class UserMessageContentRenderer {
     for (const attachment of attachments) {
       const openBtn = listEl.createEl('button', {
         cls: 'opencodian-user-context-chip opencodian-composer-context-chip is-attached',
-        text: attachment.label,
         attr: {
           type: 'button',
           title: attachment.path,
           'aria-label': `${this.getContextKindLabel(attachment.kind)}: ${attachment.label}`,
         },
       });
+      if (attachment.origin === 'vault-retrieval') {
+        // R-C1: injected retrieval snippets stay visible on the sent message
+        // with their own badge, never blended into manual attachments.
+        openBtn.addClass('is-vault-retrieval');
+        const badgeEl = openBtn.createSpan({ cls: 'opencodian-context-chip-origin-badge' });
+        badgeEl.textContent = t('chat.context.originBadge.vaultRetrieval');
+      }
+      openBtn.createSpan({ text: attachment.label });
       openBtn.dataset.contextKind = attachment.kind;
       if (attachment.kind === 'selection') {
         openBtn.addClass('is-selection');

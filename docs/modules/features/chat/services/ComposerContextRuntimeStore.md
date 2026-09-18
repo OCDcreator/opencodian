@@ -5,6 +5,8 @@
 
 ## 概述
 
+2026-09-18（R-C1）：新增 `mergeVaultRetrievalDraftItems(items, tabId?)`——单次渲染内原子替换全部 `origin === 'vault-retrieval'` 托管草稿条目（手动附加条目保持不动；传入空数组即清空托管集）。
+
 `ComposerContextRuntimeStore` 把 active-tab `draftContextItems` / `focusContextPreview` 的读写、相等性判断、chip-state 派生，以及 active-tab rerender gate 从 `ComposerContextViewHostAdapter` 中拆出，形成独立的 composer/context runtime state store。这样 `OpenCodianView`、coordinator 与各个 composer service 可以共享同一份状态边界，而 host adapter 只保留 host 组装职责。
 
 ## 导入关系

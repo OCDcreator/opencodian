@@ -7,6 +7,8 @@
 
 ## 概述
 
+2026-09-18（R-C1）：host 接口新增两个可选钩子——输入监听中的 `onComposerInputChanged(value)` 与提交路径 `inputTextareaEl.value = ''` 后的 `onComposerSubmitted()`，把 composer 文本观察转交给 `VaultRetrievalComposerCoordinator`；未实现（或功能关闭）时零成本，输入/提交行为逐字节不变。
+
 `ComposerInputShellCoordinator` 承接聊天输入区 shell 的 DOM 与 layout lifecycle，避免 `OpenCodianView` 继续直接维护 textarea、自适应高度、send/stop 按钮、slash autocomplete / `@agent` menu 和 composer stack metrics。
 
 该 owner 当前仍是一个大文件，这是有意的：textarea、overlay、focus 恢复和 layout sync 共享同一批 DOM 引用与生命周期，拆散后比本地集中维护更容易引入回归。

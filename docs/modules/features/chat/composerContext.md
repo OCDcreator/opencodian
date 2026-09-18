@@ -7,6 +7,10 @@
 
 这个模块封装了 composer 上下文 chip 的纯状态计算，不负责读取文件、操作编辑器或更新 DOM。`OpenCodianView` 持有实际的 tab 级状态，然后调用这里的函数做去重、预览保留和渲染顺序计算。
 
+## R-C1（2026-09-18）
+
+`ComposerContextChipState` 新增可选 `origin`（来自条目的 `PromptContextItem.origin`），`vault-retrieval` 的 chips 由 `ComposerContextCoordinator` 渲染“检索”徽标；`buildComposerContextChipStates` 透传该字段，目标 key 语义不变。
+
 ## 核心类型
 
 ```typescript

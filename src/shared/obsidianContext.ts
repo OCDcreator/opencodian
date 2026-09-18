@@ -226,6 +226,7 @@ export function buildContextAttachment(item: PromptContextItem): MessageContextA
     textSnapshot: item.kind === 'selection'
       ? item.textSnapshot
       : undefined,
+    ...(item.origin ? { origin: item.origin } : {}),
   };
 }
 

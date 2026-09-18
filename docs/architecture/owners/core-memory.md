@@ -10,16 +10,19 @@
 - backend-neutral workspace memory core: path identity, Markdown topic store, `MEMORY.md` index formatting and injection planning
 - per-turn extraction and compaction reflection gates, prompts, parsers and provenance-stamped write plans
 - credential scan guard, hygiene notices and index-only recall assembly with lexical semantic fallback
+- vault-wide lexical retrieval index (R-C1): pure chunking/scoring/truncation core plus the fs-injected background index service over `.opencodian/vault-index` — lexical only by the §10 Q3 decision (no embedding, no vector store, no new dependency)
 
 ## Canonical state (truth home)
 - workspace memory store layout rules and index budget caps (200 lines / 25KB, archived tail marker)
 - injection/extraction/reflection planning contracts (option shapes, epoch markers, provenance tags)
+- vault retrieval index layout rules (`.opencodian/vault-index` manifest + shards, 512KB shard / 100MB manifest caps, SOFT_CHUNK_CHARS bisection, ≥2-distinct-token selection gate, per-note truncation cap)
 
 > Cross-owner access is read-only snapshot/command/event. Do not replicate this state as a second writable truth source.
 
 ## Entrypoints
 - `src/core/memory/index.ts`
 - `src/core/memory/MemoryBackendService.ts`
+- `src/core/memory/VaultIndexService.ts` (R-C1, fs port injected; the Obsidian adapter lives in `app.memory-runtime` as `VaultIndexFileSystem`)
 
 ## Dependency surface
 - **Allowed owner dependencies:** none — the owner is deliberately self-contained (structural transcript types only, injected filesystem port, injected model-invoker port)
@@ -37,6 +40,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 - All byte math uses the shared `byteLength()` helper (UTF-8 code-point safe, CJK correct) — never `String.length`.
 - The store is pure Markdown on the filesystem port; no vector store, no SQLite, no dedicated memory CRUD tool.
 - Injection-side secret guard only withholds content from injection; it never edits files on disk.
+- **R-C1 retrieval shares the lexical-only stance**: the index stores tokens + line numbers, never note bodies; snippet text is re-read at injection time and passes the same `scanForSecrets` guard. The service is dormant unless `vaultRetrievalEnabled` turns on — off means no listeners, no indexing and byte-identical outgoing requests (contract-tested).
 - Behavior is the frozen decision set of the reference implementation `opencode-zmem` (D1–D29); deviations are recorded as D-O decisions in the devlog and this page.
 
 ## Deliberate deviations from the reference implementation (D-O series)

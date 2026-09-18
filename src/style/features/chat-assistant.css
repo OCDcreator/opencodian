@@ -1637,6 +1637,26 @@
   font-style: normal;
 }
 
+/* R-C1: opt-in whole-vault retrieval chips stay visibly distinct from
+   manually attached context via the small "retrieved" badge. */
+.opencodian-composer-context-chip.is-vault-retrieval {
+  gap: 5px;
+}
+
+.opencodian-context-chip-origin-badge {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--interactive-accent) 18%, transparent);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
 /*
  * Layered composer layout (Obsidian-native input workbench).
  *

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-18T09:44:01.349Z",
-  "headShaAtGeneration": "13ee707ba459a75981ce00fb2a391f81faf4d8ab",
+  "generatedAt": "2026-09-18T11:18:08.470Z",
+  "headShaAtGeneration": "fe3b21bbb1a1c2fbd5b80e01990dfccd7a294a2d",
   "edges": [
     {
       "id": "src/app/batchOrganize/BatchOrganizeCoordinator.ts|src/core/types/index.ts|type-only|../../core/types",
@@ -172,6 +172,13 @@
       "specifier": "./MemoryRuntimeCoordinator"
     },
     {
+      "id": "src/app/memory/index.ts|src/app/memory/VaultIndexFileSystem.ts|re-export|./VaultIndexFileSystem",
+      "from": "src/app/memory/index.ts",
+      "to": "src/app/memory/VaultIndexFileSystem.ts",
+      "kind": "re-export",
+      "specifier": "./VaultIndexFileSystem"
+    },
+    {
       "id": "src/app/memory/MemoryGitSyncService.ts|src/core/memory/index.ts|runtime-static|../../core/memory",
       "from": "src/app/memory/MemoryGitSyncService.ts",
       "to": "src/core/memory/index.ts",
@@ -212,6 +219,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/app/memory/VaultIndexFileSystem.ts|src/core/memory/index.ts|type-only|../../core/memory",
+      "from": "src/app/memory/VaultIndexFileSystem.ts",
+      "to": "src/core/memory/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/memory"
     },
     {
       "id": "src/app/obsidianTooling/index.ts|src/app/obsidianTooling/ObsidianToolingApprovalModal.ts|re-export|./ObsidianToolingApprovalModal",
@@ -2552,6 +2566,20 @@
       "specifier": "./memoryTypes"
     },
     {
+      "id": "src/core/memory/index.ts|src/core/memory/VaultIndexService.ts|re-export|./VaultIndexService",
+      "from": "src/core/memory/index.ts",
+      "to": "src/core/memory/VaultIndexService.ts",
+      "kind": "re-export",
+      "specifier": "./VaultIndexService"
+    },
+    {
+      "id": "src/core/memory/index.ts|src/core/memory/vaultRetrievalIndex.ts|re-export|./vaultRetrievalIndex",
+      "from": "src/core/memory/index.ts",
+      "to": "src/core/memory/vaultRetrievalIndex.ts",
+      "kind": "re-export",
+      "specifier": "./vaultRetrievalIndex"
+    },
+    {
       "id": "src/core/memory/MemoryBackendService.ts|src/core/memory/memoryExtraction.ts|runtime-static|./memoryExtraction",
       "from": "src/core/memory/MemoryBackendService.ts",
       "to": "src/core/memory/memoryExtraction.ts",
@@ -2830,6 +2858,34 @@
       "to": "src/core/memory/memoryTypes.ts",
       "kind": "type-only",
       "specifier": "./memoryTypes"
+    },
+    {
+      "id": "src/core/memory/VaultIndexService.ts|src/core/memory/memorySecretScan.ts|runtime-static|./memorySecretScan",
+      "from": "src/core/memory/VaultIndexService.ts",
+      "to": "src/core/memory/memorySecretScan.ts",
+      "kind": "runtime-static",
+      "specifier": "./memorySecretScan"
+    },
+    {
+      "id": "src/core/memory/VaultIndexService.ts|src/core/memory/vaultRetrievalIndex.ts|runtime-static|./vaultRetrievalIndex",
+      "from": "src/core/memory/VaultIndexService.ts",
+      "to": "src/core/memory/vaultRetrievalIndex.ts",
+      "kind": "runtime-static",
+      "specifier": "./vaultRetrievalIndex"
+    },
+    {
+      "id": "src/core/memory/VaultIndexService.ts|src/shared/index.ts|runtime-static|../../shared",
+      "from": "src/core/memory/VaultIndexService.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../shared"
+    },
+    {
+      "id": "src/core/memory/vaultRetrievalIndex.ts|src/core/memory/memoryRecall.ts|runtime-static|./memoryRecall",
+      "from": "src/core/memory/vaultRetrievalIndex.ts",
+      "to": "src/core/memory/memoryRecall.ts",
+      "kind": "runtime-static",
+      "specifier": "./memoryRecall"
     },
     {
       "id": "src/core/obsidianTooling/index.ts|src/core/obsidianTooling/ObsidianCliProbe.ts|re-export|./ObsidianCliProbe",
@@ -5296,6 +5352,13 @@
       "specifier": "./services/trailingAssistantPatchDebug"
     },
     {
+      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/VaultRetrievalComposerCoordinator.ts|runtime-static|./services/VaultRetrievalComposerCoordinator",
+      "from": "src/features/chat/OpenCodianView.ts",
+      "to": "src/features/chat/services/VaultRetrievalComposerCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "./services/VaultRetrievalComposerCoordinator"
+    },
+    {
       "id": "src/features/chat/OpenCodianView.ts|src/features/chat/tabs/index.ts|type-only|./tabs",
       "from": "src/features/chat/OpenCodianView.ts",
       "to": "src/features/chat/tabs/index.ts",
@@ -6631,6 +6694,13 @@
       "to": "src/features/chat/services/trailingAssistantPatchDebug.ts",
       "kind": "runtime-static",
       "specifier": "../services/trailingAssistantPatchDebug"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/VaultRetrievalComposerCoordinator.ts|runtime-static|../services/VaultRetrievalComposerCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/VaultRetrievalComposerCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/VaultRetrievalComposerCoordinator"
     },
     {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/tabs/types.ts|type-only|../tabs/types",
@@ -8528,6 +8598,13 @@
       "to": "src/features/chat/services/ComposerContextChipActionService.ts",
       "kind": "type-only",
       "specifier": "./ComposerContextChipActionService"
+    },
+    {
+      "id": "src/features/chat/services/ComposerContextCoordinator.ts|src/i18n/index.ts|runtime-static|../../../i18n",
+      "from": "src/features/chat/services/ComposerContextCoordinator.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../i18n"
     },
     {
       "id": "src/features/chat/services/ComposerContextHostAdapter.ts|src/features/chat/services/ComposerContextViewFacade.ts|re-export|./ComposerContextViewFacade",
@@ -12240,6 +12317,41 @@
       "specifier": "../tabs"
     },
     {
+      "id": "src/features/chat/services/VaultRetrievalComposerCoordinator.ts|src/core/memory/index.ts|type-only|../../../core/memory",
+      "from": "src/features/chat/services/VaultRetrievalComposerCoordinator.ts",
+      "to": "src/core/memory/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/memory"
+    },
+    {
+      "id": "src/features/chat/services/VaultRetrievalComposerCoordinator.ts|src/core/types/index.ts|type-only|../../../core/types",
+      "from": "src/features/chat/services/VaultRetrievalComposerCoordinator.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/types"
+    },
+    {
+      "id": "src/features/chat/services/VaultRetrievalComposerCoordinator.ts|src/features/chat/composerContext.ts|runtime-static|../composerContext",
+      "from": "src/features/chat/services/VaultRetrievalComposerCoordinator.ts",
+      "to": "src/features/chat/composerContext.ts",
+      "kind": "runtime-static",
+      "specifier": "../composerContext"
+    },
+    {
+      "id": "src/features/chat/services/VaultRetrievalComposerCoordinator.ts|src/features/chat/tabs/index.ts|type-only|../tabs",
+      "from": "src/features/chat/services/VaultRetrievalComposerCoordinator.ts",
+      "to": "src/features/chat/tabs/index.ts",
+      "kind": "type-only",
+      "specifier": "../tabs"
+    },
+    {
+      "id": "src/features/chat/services/VaultRetrievalComposerCoordinator.ts|src/shared/index.ts|runtime-static|../../../shared",
+      "from": "src/features/chat/services/VaultRetrievalComposerCoordinator.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../shared"
+    },
+    {
       "id": "src/features/chat/services/VisibleConversationPostSyncCoordinator.ts|src/features/chat/services/PostSyncQuestionTodoRefreshFacade.ts|type-only|./PostSyncQuestionTodoRefreshFacade",
       "from": "src/features/chat/services/VisibleConversationPostSyncCoordinator.ts",
       "to": "src/features/chat/services/PostSyncQuestionTodoRefreshFacade.ts",
@@ -15915,6 +16027,13 @@
       "specifier": "../../core/config/modelConfig"
     },
     {
+      "id": "src/features/settings/SettingsConversationSection.ts|src/core/memory/index.ts|type-only|../../core/memory",
+      "from": "src/features/settings/SettingsConversationSection.ts",
+      "to": "src/core/memory/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/memory"
+    },
+    {
       "id": "src/features/settings/SettingsConversationSection.ts|src/core/obsidianTooling/index.ts|type-only|../../core/obsidianTooling",
       "from": "src/features/settings/SettingsConversationSection.ts",
       "to": "src/core/obsidianTooling/index.ts",
@@ -17978,6 +18097,13 @@
       "to": "src/core/config/McpConfigService.ts",
       "kind": "runtime-dynamic",
       "specifier": "./core/config/McpConfigService"
+    },
+    {
+      "id": "src/main.ts|src/core/memory/index.ts|runtime-static|./core/memory",
+      "from": "src/main.ts",
+      "to": "src/core/memory/index.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/memory"
     },
     {
       "id": "src/main.ts|src/core/opencode/diagnostics/index.ts|runtime-static|./core/opencode/diagnostics",

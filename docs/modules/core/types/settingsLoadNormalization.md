@@ -11,6 +11,8 @@
 
 这个模块不负责真正读写文件，也不负责 Obsidian 插件装配；它只把 `StorageService.loadPersistedSettings()` 的结果变成 `OpenCodianPlugin.loadSettings()` 可直接消费的 bootstrap state。
 
+2026-09-18（R-C1）：`normalizeVaultRetrievalSettingsOnLoad` 在最终 merge 边界归一化整库检索四设置项（enabled 布尔、topK/maxChars 越界回默认、excludedPaths 清洗去重），旧快照缺字段时落到 `DEFAULT_SETTINGS` 安全默认。
+
 ## 导入关系
 
 ```text

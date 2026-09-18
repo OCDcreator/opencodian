@@ -152,6 +152,7 @@ import type { TabMessagesPaneCoordinatorHost } from '../services/TabMessagesPane
 import { TabMessagesPaneCoordinator } from '../services/TabMessagesPaneCoordinator';
 import { TitleGenerationService } from '../services/TitleGenerationService';
 import { createDebugLogCallbacks } from '../services/trailingAssistantPatchDebug';
+import { VaultRetrievalComposerCoordinator } from '../services/VaultRetrievalComposerCoordinator';
 import type { TabId } from '../tabs/types';
 
 /** Local alias relocated from OpenCodianView (pre-Task-15 line 389). */
@@ -191,6 +192,8 @@ interface SurfaceRuntimeWiring {
   chatSurfaceAppearanceCoordinator: ChatSurfaceAppearanceCoordinator;
   conversationSessionSettingsCoordinator: ConversationSessionSettingsCoordinator;
   composerContextViewFacade: ComposerContextViewFacade;
+  /** R-C1: opt-in vault retrieval composer candidates (may be dormant). */
+  vaultRetrievalComposerCoordinator: VaultRetrievalComposerCoordinator;
   tabConversationSyncFingerprintRuntimePort: TabConversationSyncFingerprintRuntimePort;
   persistentAssistantNoticeService: PersistentAssistantNoticeService;
   conversationNoticeCoordinator: ConversationNoticeCoordinator;
@@ -292,6 +295,10 @@ export interface ChatRuntimeCompositionHost {
       readonly locale: 'en' | 'zh';
       readonly contextGroups: readonly ContextGroup[];
       readonly backendSettings: { readonly claudeCode: { readonly autoTitle: boolean } };
+      readonly vaultRetrievalEnabled: boolean;
+      readonly vaultRetrievalTopK: number;
+      readonly vaultRetrievalMaxCharsPerNote: number;
+      readonly vaultRetrievalExcludedPaths: readonly string[];
     };
     readonly settingsTab: unknown;
     readonly openCodeService: (InstanceType<typeof OpenCodeService>) & {
@@ -315,6 +322,10 @@ export interface ChatRuntimeCompositionHost {
     } | null;
     /** R-B3 edit-revert service (core.storage owner); null before bootstrap or when disabled. */
     readonly editRevertService: EditRevertServicePort | null;
+    /** R-C1 vault retrieval index (core.memory owner); null before bootstrap. */
+    readonly vaultIndexService: {
+      select(query: string): Promise<import('../../../core/memory').VaultRetrievalSnippet[]>;
+    } | null;
   };
 
   // --- lazily-read live state (resolves after the view destructures the result) ---
@@ -517,6 +528,15 @@ export class ChatRuntimeComposition {
       serverContext: serverReferenceContextService,
       contextGroups: { listGroups: () => host.plugin.settings.contextGroups },
     });
+    // R-C1: composer-side retrieval candidates. The coordinator is dormant
+    // unless `vaultRetrievalEnabled` turns on; with the index service absent
+    // (never attached) it stays a full no-op.
+    const vaultRetrievalComposerCoordinator = new VaultRetrievalComposerCoordinator({
+      facade: composerContextViewFacade.sendContext,
+      retrieval: host.plugin.vaultIndexService ?? null,
+      getSettings: () => host.plugin.settings,
+      getActiveTabId: () => host.getActiveTabId(),
+    });
     const titleGenerationService = new TitleGenerationService(host.plugin as never);
     const questionDockSlotCoordinator = new QuestionDockSlotCoordinator(
       {
@@ -549,9 +569,12 @@ export class ChatRuntimeComposition {
       chatSelectionControlsCoordinator: new ChatSelectionControlsCoordinator(
         host.createChatSelectionControlsCoordinatorHost(),
       ),
-      composerInputShellCoordinator: new ComposerInputShellCoordinator(
-        host.createComposerInputShellCoordinatorHost(),
-      ),
+      composerInputShellCoordinator: new ComposerInputShellCoordinator({
+        ...host.createComposerInputShellCoordinatorHost(),
+        onComposerInputChanged: (value: string) =>
+          vaultRetrievalComposerCoordinator.onComposerInputChanged(value),
+        onComposerSubmitted: () => vaultRetrievalComposerCoordinator.onComposerSubmitted(),
+      }),
       inputPanelAppearanceCoordinator: new InputPanelAppearanceCoordinator(
         host.createInputPanelAppearanceCoordinatorHost(),
       ),
@@ -560,6 +583,7 @@ export class ChatRuntimeComposition {
       ),
       conversationSessionSettingsCoordinator,
       composerContextViewFacade,
+      vaultRetrievalComposerCoordinator,
       tabConversationSyncFingerprintRuntimePort: host.createTabConversationSyncFingerprintRuntimePort(),
       persistentAssistantNoticeService: new PersistentAssistantNoticeService(
         host.createPersistentAssistantNoticeServiceHost(),

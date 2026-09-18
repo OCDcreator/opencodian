@@ -8,6 +8,7 @@
 > 2026-07-31: `ChatDiagnosticsCoordinator` owns OpenCode diagnostics logic and the Codex/Claude host adapters. The view creates one coordinator through the injected factory and supplies only settings, current conversation/tab, and UI callbacks; all three backend routes use coordinator operations. This module note records the current slice and does not infer overall Phase 3/Task 12 closure or review status.
 > 2026-07-31: The constructor receives the consumer-owned `ChatPluginPort` type. It narrows the plugin surface without adding runtime/state/lifecycle ownership; existing view and tab-runtime behavior is unchanged.
 
+> 2026-09-18（R-C1）：view 仅新增组合级接线——从 runtime 解构 `vaultRetrievalComposerCoordinator` 并在销毁序列中 `dispose()`；检索决策逻辑都在 `VaultRetrievalComposerCoordinator`（feature.chat-services），view 无新增运行时所有权。
 > **源码**: `src/features/chat/OpenCodianView.ts`
 - 2026-09-17：Composer host 新增 `getComposerTextareaMaxHeight()`，把 `chatAppearance.input.textareaMaxHeight` 传给输入框高度增长上限。
 

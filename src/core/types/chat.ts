@@ -63,6 +63,15 @@ export interface PromptContextLineRange {
   endLine: number;
 }
 
+/**
+ * Where a context item came from (R-C1). `manual` covers every pre-existing
+ * attach path (picker, current note, selection, groups); `vault-retrieval`
+ * marks the opt-in whole-vault retrieval injection so its chips can carry the
+ * "retrieved" badge. Client-side metadata only — never serialized into the
+ * outgoing request.
+ */
+export type PromptContextOrigin = 'manual' | 'vault-retrieval';
+
 export interface PromptContextItem {
   id: string;
   kind: PromptContextKind;
@@ -71,6 +80,8 @@ export interface PromptContextItem {
   mime: string;
   lineRange?: PromptContextLineRange;
   textSnapshot?: string;
+  /** Absent on legacy items (treated as `manual`). */
+  origin?: PromptContextOrigin;
 }
 
 export interface MessageContextAttachment {
@@ -80,6 +91,8 @@ export interface MessageContextAttachment {
   mime: string;
   lineRange?: PromptContextLineRange;
   textSnapshot?: string;
+  /** Absent on legacy records (treated as `manual`). */
+  origin?: PromptContextOrigin;
 }
 
 export interface QuestionOption {

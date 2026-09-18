@@ -17,6 +17,8 @@ export interface ComposerContextChipState {
   lineRange?: PromptContextLineRange;
   attached: boolean;
   preview: boolean;
+  /** R-C1: retrieval-injected chips render with the "retrieved" badge. */
+  origin?: PromptContextItem['origin'];
 }
 
 export function getContextTargetKey(
@@ -121,6 +123,7 @@ export function buildComposerContextChipStates(
         lineRange: matchedAttached.lineRange,
         attached: true,
         preview: false,
+        origin: matchedAttached.origin,
       });
       attachedByKey.delete(focusKey);
     } else {
@@ -150,6 +153,7 @@ export function buildComposerContextChipStates(
       lineRange: item.lineRange,
       attached: true,
       preview: false,
+      origin: item.origin,
     });
     attachedByKey.delete(key);
   }

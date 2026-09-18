@@ -6,6 +6,8 @@
 
 ## 概述
 
+2026-09-18（R-C1）：`ComposerSendContextPort` 新增 `mergeVaultRetrievalDraftItems`（转发 runtime store 的托管替换），供 `VaultRetrievalComposerCoordinator` 以窄端口写入检索候选 chips；既有 get/resolve/clear 端口语义不变。
+
 `ComposerContextViewFacade` 现在既负责在 `create()` 里组装 composer-context 子服务，也负责把这些子服务收敛成一条更窄的 view-facing seam。它让 `OpenCodianView` 不再分别持有 `ContextAttachmentBuilder`、`ContextFileCatalogService`、action、picker、coordinator、event bridge、runtime store 与 focus-preview/runtime service，而是通过一个 facade 处理：
 
 - composer context actions（current note / selection / file picker）

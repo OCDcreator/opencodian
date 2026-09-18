@@ -12,6 +12,7 @@ import {
   parseModelReference,
   resolveModelSelection,
 } from '../../core/config/modelConfig';
+import type { VaultIndexService } from '../../core/memory';
 import type { ObsidianToolingStatusSnapshot } from '../../core/obsidianTooling';
 import { OPENCODE_CAPABILITY_SETTINGS_SCHEMA_VERSION } from '../../core/opencode/OpenCodeCapabilitySettingsMigration';
 import type {
@@ -27,6 +28,9 @@ import {
   normalizeChatFontSizePx,
   normalizeEditRevertSnapshotLimitMb,
   normalizeObsidianToolingMode,
+  normalizeVaultRetrievalExcludedPaths,
+  normalizeVaultRetrievalMaxCharsPerNote,
+  normalizeVaultRetrievalTopK,
   OBSIDIAN_TOOLING_MODES,
 } from '../../core/types';
 import type { AgentBackendKind } from '../../core/types/chat';
@@ -245,6 +249,11 @@ export class SettingsConversationSection {
       description: t('settings.obsidianTooling.groupDesc'),
     });
     this.markSettingsTarget(obsidianToolingBodyEl, 'obsidian-tooling');
+    const vaultRetrievalBodyEl = this.createSettingsBlock(containerEl, {
+      title: t('settings.vaultRetrieval.title'),
+      description: t('settings.vaultRetrieval.groupDesc'),
+    });
+    this.markSettingsTarget(vaultRetrievalBodyEl, 'vault-retrieval');
     const questionBodyEl = isOpenCodeActive
       ? this.createSettingsBlock(containerEl, {
           title: t('settings.conversation.questions.title'),
@@ -272,6 +281,7 @@ export class SettingsConversationSection {
     }
     this.renderDisplayBlock(displayBodyEl);
     this.renderObsidianToolingBlock(obsidianToolingBodyEl);
+    this.renderVaultRetrievalBlock(vaultRetrievalBodyEl);
     if (questionBodyEl) {
       this.renderQuestionsBlock(questionBodyEl);
     }
@@ -297,6 +307,7 @@ export class SettingsConversationSection {
         : []),
       { id: 'display', render: (el) => this.renderDisplayTabBlock(el) },
       { id: 'obsidian-tooling', render: (el) => this.renderObsidianToolingBlock(el) },
+      { id: 'vault-retrieval', render: (el) => this.renderVaultRetrievalBlock(el) },
       { id: 'memory', render: (el) => this.renderMemoryBlock(el) },
       ...(this.isOpenCodeActive()
         ? [{ id: 'questions', render: (el: HTMLElement) => this.renderQuestionsBlock(el) }]
@@ -1432,6 +1443,132 @@ export class SettingsConversationSection {
             await this.plugin.saveSettings();
           });
       });
+  }
+
+  /**
+   * R-C1 whole-vault retrieval: opt-in toggle plus its dual caps, exclusion
+   * rules and an honest index status with a manual rebuild. Off is the
+   * zero-cost default, so the toggle leads the block.
+   */
+  private renderVaultRetrievalBlock(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.vaultRetrieval.enable.name'))
+      .setDesc(t('settings.vaultRetrieval.enable.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.vaultRetrievalEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.vaultRetrievalEnabled = value;
+            await this.plugin.saveSettings();
+            await this.plugin.vaultIndexService?.onSettingsChanged();
+            statusSetting.setDesc(this.resolveVaultRetrievalStatusText());
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.vaultRetrieval.topK.name'))
+      .setDesc(t('settings.vaultRetrieval.topK.desc'))
+      .addText((text) => {
+        text.inputEl.type = 'number';
+        text.inputEl.min = '1';
+        text.inputEl.max = '20';
+        text
+          .setPlaceholder(String(this.plugin.settings.vaultRetrievalTopK))
+          .setValue(String(this.plugin.settings.vaultRetrievalTopK))
+          .onChange(async (value) => {
+            const parsed = Number(value);
+            if (!Number.isFinite(parsed)) {
+              text.setValue(String(this.plugin.settings.vaultRetrievalTopK));
+              return;
+            }
+            const nextValue = normalizeVaultRetrievalTopK(parsed);
+            this.plugin.settings.vaultRetrievalTopK = nextValue;
+            text.setValue(String(nextValue));
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.vaultRetrieval.maxChars.name'))
+      .setDesc(t('settings.vaultRetrieval.maxChars.desc'))
+      .addText((text) => {
+        text.inputEl.type = 'number';
+        text.inputEl.min = '500';
+        text.inputEl.max = '20000';
+        text
+          .setPlaceholder(String(this.plugin.settings.vaultRetrievalMaxCharsPerNote))
+          .setValue(String(this.plugin.settings.vaultRetrievalMaxCharsPerNote))
+          .onChange(async (value) => {
+            const parsed = Number(value);
+            if (!Number.isFinite(parsed)) {
+              text.setValue(String(this.plugin.settings.vaultRetrievalMaxCharsPerNote));
+              return;
+            }
+            const nextValue = normalizeVaultRetrievalMaxCharsPerNote(parsed);
+            this.plugin.settings.vaultRetrievalMaxCharsPerNote = nextValue;
+            text.setValue(String(nextValue));
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.vaultRetrieval.excludedPaths.name'))
+      .setDesc(t('settings.vaultRetrieval.excludedPaths.desc'))
+      .addTextArea((textArea) => {
+        textArea
+          .setPlaceholder('templates/\narchive/*')
+          .setValue(this.plugin.settings.vaultRetrievalExcludedPaths.join('\n'))
+          .onChange(async (value) => {
+            this.plugin.settings.vaultRetrievalExcludedPaths = normalizeVaultRetrievalExcludedPaths(
+              value.split('\n'),
+            );
+            await this.plugin.saveSettings();
+            await this.plugin.vaultIndexService?.onSettingsChanged();
+          });
+      });
+
+    const statusSetting = new Setting(containerEl)
+      .setName(t('settings.vaultRetrieval.status.name'))
+      .setDesc(this.resolveVaultRetrievalStatusText())
+      .addExtraButton((button) => {
+        button
+          .setIcon('refresh-cw')
+          .setTooltip(t('settings.vaultRetrieval.rebuild'))
+          .onClick(async () => {
+            const service = this.resolveVaultIndexService();
+            if (!service) {
+              new Notice(t('settings.vaultRetrieval.rebuildDisabled'));
+              return;
+            }
+            button.disabled = true;
+            try {
+              await service.invalidateAll();
+              await service.onSettingsChanged();
+              statusSetting.setDesc(this.resolveVaultRetrievalStatusText());
+              new Notice(t('settings.vaultRetrieval.rebuildDone'));
+            } finally {
+              button.disabled = false;
+            }
+          });
+      });
+  }
+
+  /** Honest R-C1 index status line: off / indexed count / service absent. */
+  private resolveVaultRetrievalStatusText(): string {
+    if (!this.plugin.settings.vaultRetrievalEnabled) {
+      return t('settings.vaultRetrieval.status.off');
+    }
+    const service = this.resolveVaultIndexService();
+    if (!service || !service.isStarted()) {
+      return t('settings.vaultRetrieval.status.unknown');
+    }
+    return t('settings.vaultRetrieval.status.indexed', {
+      count: String(service.indexedNoteCount()),
+    });
+  }
+
+  private resolveVaultIndexService(): VaultIndexService | null {
+    return this.plugin.vaultIndexService ?? null;
   }
 
   /**

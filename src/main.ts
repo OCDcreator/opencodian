@@ -51,7 +51,8 @@ import { OpenCodeService, SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from './core/openc
 import { OpenCodeSessionTraceService } from './core/opencode/diagnostics';
 import { ClaudeSessionTraceService, collectClaudeCodeKnownSecrets, CodexSessionTraceService } from './core/agents/backend/diagnostics';
 import { DiagnosticsRuntimeCoordinator } from './app/diagnostics';
-import { MemoryRuntimeCoordinator } from './app/memory';
+import { MemoryRuntimeCoordinator, VaultIndexFileSystem } from './app/memory';
+import { VaultIndexService } from './core/memory';
 import { BatchOrganizeCoordinator, BatchOrganizeModal, BatchRevertConfirmModal } from './app/batchOrganize';
 import { ObsidianToolingCoordinator } from './app/obsidianTooling';
 import { migrateOpenCodeCapabilitySettings } from './core/opencode/OpenCodeCapabilitySettingsMigration';
@@ -141,6 +142,13 @@ export default class OpenCodianPlugin extends Plugin {
    * modified-files sidebar consume it through `EditRevertServicePort`.
    */
   editRevertService: EditRevertService | null = null;
+
+  /**
+   * R-C1 whole-vault retrieval index (core.memory service + app-side vault
+   * adapter). Dormant unless `vaultRetrievalEnabled` turns on: no listeners,
+   * no indexing and no injected context while off. main.ts only composes.
+   */
+  vaultIndexService: VaultIndexService | null = null;
   /** R-B5 batch note organizing runtime (app.batch-organize owner). Constructed during onload. */
   batchOrganizeCoordinator: BatchOrganizeCoordinator | null = null;
   /**
@@ -262,6 +270,12 @@ export default class OpenCodianPlugin extends Plugin {
     });
     await coordinator.measureStartupStep('editRevert.initialize', () =>
       this.editRevertService?.initialize() ?? Promise.resolve());
+    // R-C1: the retrieval index attaches its fs adapter and settings getter;
+    // onSettingsChanged() is a no-op while vaultRetrievalEnabled is false.
+    this.vaultIndexService = new VaultIndexService();
+    this.vaultIndexService.attach(new VaultIndexFileSystem(this.app), () => this.settings);
+    await coordinator.measureStartupStep('vaultIndex.applySettings', () =>
+      this.vaultIndexService?.onSettingsChanged() ?? Promise.resolve());
     // R-B5 batch organizing composes on top of the R-B3 snapshot layer: the
     // coordinator refuses to execute when the snapshot service is unavailable.
     this.batchOrganizeCoordinator = new BatchOrganizeCoordinator({
@@ -989,6 +1003,7 @@ export default class OpenCodianPlugin extends Plugin {
     this.memoryRuntime?.dispose();
     this.obsidianToolingRuntime?.dispose();
     this.editRevertService?.dispose();
+    this.vaultIndexService?.dispose();
     // Stop the OpenCode server (async, best-effort)
     void this.openCodeService?.stop().catch((error) => {
       logger.warn('Failed to asynchronously stop OpenCode service during unload:', error);
