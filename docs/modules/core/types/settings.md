@@ -1,4 +1,5 @@
 # Settings Types and Defaults
+> 2026-09-18 (R-B3): R-B3 adds `editRevertEnabled` (default true) and `editRevertSnapshotLimitMb` (default 50, clamped 10-500 by `normalizeEditRevertSnapshotLimitMb`) to `OpenCodianSettings` / `DEFAULT_SETTINGS`, with the `EDIT_REVERT_SNAPSHOT_LIMIT_MB_MIN/DEFAULT/MAX` constants exported alongside.
 > 2026-09-18 (R-B1/R-B2): adds `ContextGroup` / `ContextGroupEntry` shapes with `normalizeContextGroups` (+ caps), `normalizeAutoInternalLinkExcludedTerms`, and the `autoInternalLinkEnabled` (default false) / `autoInternalLinkExcludedTerms` / `contextGroups` settings fields with defaults.
 
 > 2026-07-29: `BackendSettings.opencode.sessionTrace` normalizes default-on tracing, console preset, six channels and storage directory.

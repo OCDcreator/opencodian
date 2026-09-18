@@ -1,4 +1,5 @@
 # ModifiedFilesSidebarCoordinator
+> 2026-09-18 (R-B3): R-B3: `refreshRevertState(model, actions)` passes the backend-neutral `EditRevertSidebarModel` and the revert/restore callbacks through to the sidebar.
 
 > **源码**: `src/features/chat/services/ModifiedFilesSidebarCoordinator.ts`
 > **状态**: [REVIEW]

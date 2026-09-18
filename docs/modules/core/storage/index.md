@@ -1,5 +1,7 @@
 # Core Storage Barrel
 
+> 2026-09-18 (R-B3)：目录下新增编辑回退 owner `EditRevertService.ts`、`EditRevertStore.ts` 与 `EditRevertVaultWriteback.ts`（各自有独立模块文档）。它们**不**通过本 barrel 导出——`src/main.ts` 按路径直接导入 `EditRevertService`，feature 层只通过 `src/core/types/editRevert.ts` 声明的 `EditRevertServicePort` 接缝消费。
+
 > **源码**: `src/core/storage/index.ts`
 > **状态**: [REVIEW]
 

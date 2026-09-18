@@ -22,6 +22,7 @@ import {
   normalizeChatAppearanceSettings,
   normalizeChatFontSizePx,
   normalizeContextGroups,
+  normalizeEditRevertSnapshotLimitMb,
   normalizeEffortLevel,
   normalizeInlineEditEffortOverrides,
   normalizeInlineEditMaxConcurrentEdits,
@@ -438,6 +439,20 @@ function resolveInitialLayoutMode(
   return explicitValue;
 }
 
+/** R-B3 edit-revert settings, normalized at the final load-merge boundary. */
+function normalizeEditRevertSettingsOnLoad(
+  normalizedSettings: Partial<OpenCodianSettings> | null,
+): { editRevertEnabled: boolean; editRevertSnapshotLimitMb: number } {
+  return {
+    editRevertEnabled: typeof normalizedSettings?.editRevertEnabled === 'boolean'
+      ? normalizedSettings.editRevertEnabled
+      : DEFAULT_SETTINGS.editRevertEnabled,
+    editRevertSnapshotLimitMb: normalizeEditRevertSnapshotLimitMb(
+      normalizedSettings?.editRevertSnapshotLimitMb,
+    ),
+  };
+}
+
 function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | null): LoadSettingsNormalizationResult {
   const normalizedModelProviderPluginDebugSettings = normalizeModelProviderPluginDebugSettings(savedSettings);
   const { normalizedServer, shouldMigrateLegacyLocalDefaultPort } = normalizeServerSettingsOnLoad(savedSettings);
@@ -564,6 +579,7 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
         normalizedSettings?.autoInternalLinkExcludedTerms,
       ),
       contextGroups: normalizeContextGroups(normalizedSettings?.contextGroups),
+      ...normalizeEditRevertSettingsOnLoad(normalizedSettings),
     },
     shouldMigrateLegacyLocalDefaultPort,
     shouldResetGlassRefractionGlassDefaults,

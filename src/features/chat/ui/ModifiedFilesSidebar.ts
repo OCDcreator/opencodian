@@ -7,12 +7,19 @@
 
 import { App, Component, setIcon } from 'obsidian';
 
-import type { SessionDiffEntry } from '../../../core/types/chat';
+import type { SessionDiffEntry } from '../../../core/types';
 import { t } from '../../../i18n';
+import type { EditRevertSidebarModel } from '../../../shared';
 import { getFilePathBasename, toVaultRelativePath } from '../../../shared';
 import { ConversationRenderService } from '../services/ConversationRenderService';
 
 export type ModifiedFilesSidebarAvailability = 'ready' | 'unavailable';
+
+export interface ModifiedFilesRevertActions {
+  revertFile(path: string): Promise<void>;
+  revertAll(): Promise<void>;
+  restoreFile(path: string): Promise<void>;
+}
 
 export class ModifiedFilesSidebar extends Component {
   private static nextInstanceId = 0;
@@ -24,9 +31,12 @@ export class ModifiedFilesSidebar extends Component {
   private headerEl!: HTMLElement;
   private summaryEl!: HTMLElement;
   private listEl!: HTMLElement;
+  private revertSectionEl: HTMLElement | null = null;
   private expanded = false;
   private entries: SessionDiffEntry[] = [];
   private availability: ModifiedFilesSidebarAvailability = 'unavailable';
+  private revertModel: EditRevertSidebarModel | null = null;
+  private revertActions: ModifiedFilesRevertActions | null = null;
   private readonly handleKeydown = (event: KeyboardEvent): void => {
     if (event.key === 'Escape' && this.expanded) {
       event.preventDefault();
@@ -123,6 +133,18 @@ export class ModifiedFilesSidebar extends Component {
     this.render();
   }
 
+  /** R-B3: backend-neutral revert state for the active conversation's latest round. */
+  updateRevertState(
+    model: EditRevertSidebarModel | null,
+    actions: ModifiedFilesRevertActions | null,
+  ): void {
+    this.revertModel = model;
+    this.revertActions = actions;
+    this.updateSummary();
+    this.render();
+    this.renderRevertSection();
+  }
+
   setVisible(enabled: boolean): void {
     this.wrapperEl.classList.toggle('is-disabled', !enabled);
     if (!enabled) {
@@ -139,25 +161,34 @@ export class ModifiedFilesSidebar extends Component {
   }
 
   private updateSummary(): void {
+    const showingRevert = this.hasRevertEntries();
+    const revertCount = this.revertModel?.entries.length ?? 0;
+    const revertibleCount = this.revertModel?.revertibleCount ?? 0;
     const additions = this.entries.reduce((total, entry) => total + entry.additions, 0);
     const deletions = this.entries.reduce((total, entry) => total + entry.deletions, 0);
     const summary = `+${additions} -${deletions}`;
-    const hasEntries = this.entries.length > 0;
-    this.badgeEl.textContent = hasEntries ? String(this.entries.length) : '';
+    const hasEntries = showingRevert ? revertCount > 0 : this.entries.length > 0;
+    this.badgeEl.textContent = hasEntries ? String(showingRevert ? revertCount : this.entries.length) : '';
     this.badgeEl.classList.toggle('is-hidden', !hasEntries);
     this.badgeEl.classList.toggle('is-empty', !hasEntries && this.availability === 'ready');
     this.hostEl.classList.toggle('is-empty', !hasEntries && this.availability === 'ready');
     this.hostEl.classList.toggle('is-unavailable', this.availability === 'unavailable');
     this.hostEl.dataset.state = hasEntries ? 'changed' : this.availability;
     if (this.summaryEl) {
-      this.summaryEl.textContent = hasEntries
-        ? `${this.entries.length} · ${summary}`
-        : this.availability === 'ready'
-          ? t('modifiedFiles.readyShort')
-          : t('modifiedFiles.unavailableShort');
+      if (showingRevert) {
+        this.summaryEl.textContent = `${revertCount} · ${t('editRevert.revertibleShort', { count: revertibleCount })}`;
+      } else {
+        this.summaryEl.textContent = hasEntries
+          ? `${this.entries.length} · ${summary}`
+          : this.availability === 'ready'
+            ? t('modifiedFiles.readyShort')
+            : t('modifiedFiles.unavailableShort');
+      }
     }
     const tooltip = hasEntries
-      ? `${t('modifiedFiles.title')}: ${this.entries.length}, ${summary}`
+      ? showingRevert
+        ? `${t('editRevert.sectionTitle')}: ${revertCount}`
+        : `${t('modifiedFiles.title')}: ${this.entries.length}, ${summary}`
       : this.availability === 'ready'
         ? t('modifiedFiles.empty')
         : t('modifiedFiles.unavailable');
@@ -169,6 +200,14 @@ export class ModifiedFilesSidebar extends Component {
 
   private render(): void {
     if (!this.listEl) {
+      return;
+    }
+
+    // R-B3: when the backend-neutral revert round has entries it replaces the
+    // read-only session-diff list (same files, plus revert actions).
+    const showingRevert = this.hasRevertEntries();
+    this.listEl.classList.toggle('is-hidden', showingRevert);
+    if (showingRevert) {
       return;
     }
 
@@ -227,6 +266,136 @@ export class ModifiedFilesSidebar extends Component {
         return t('modifiedFiles.statusDeleted');
       default:
         return t('modifiedFiles.statusModified');
+    }
+  }
+
+  private hasRevertEntries(): boolean {
+    return !!this.revertModel && this.revertModel.enabled && this.revertModel.entries.length > 0;
+  }
+
+  private renderRevertSection(): void {
+    if (!this.headerEl || !this.listEl) {
+      return;
+    }
+    const model = this.revertModel;
+    if (!this.hasRevertEntries() || !model) {
+      this.revertSectionEl?.remove();
+      this.revertSectionEl = null;
+      this.render();
+      this.updateSummary();
+      return;
+    }
+
+    if (!this.revertSectionEl) {
+      this.revertSectionEl = this.containerEl.createDiv({ cls: 'opencodian-edit-revert-section' });
+      this.headerEl.after(this.revertSectionEl);
+    }
+    this.revertSectionEl.empty();
+
+    const headerRow = this.revertSectionEl.createDiv({ cls: 'opencodian-edit-revert-header' });
+    headerRow.createSpan({
+      cls: 'opencodian-edit-revert-title',
+      text: t('editRevert.sectionTitle'),
+    });
+    if (model.roundOpen) {
+      headerRow.createSpan({
+        cls: 'opencodian-edit-revert-hint',
+        text: t('editRevert.roundOpenHint'),
+      });
+    } else if (model.revertibleCount > 0 && this.revertActions) {
+      const revertAllButton = headerRow.createEl('button', {
+        cls: 'opencodian-edit-revert-all opencodian-tooltip-trigger',
+        attr: { type: 'button' },
+      });
+      revertAllButton.textContent = t('editRevert.revertAll');
+      revertAllButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void this.runRevertAction(() => this.revertActions?.revertAll() ?? Promise.resolve());
+      });
+    }
+
+    if (model.degraded) {
+      this.revertSectionEl.createDiv({
+        cls: 'opencodian-edit-revert-hint',
+        text: t('editRevert.degradedHint'),
+      });
+    }
+
+    const listEl = this.revertSectionEl.createDiv({ cls: 'opencodian-edit-revert-list' });
+    for (const entry of model.entries) {
+      const rowEl = listEl.createDiv({
+        cls: `opencodian-edit-revert-item status-${entry.status} state-${entry.state}`,
+      });
+      const pathEl = rowEl.createSpan({
+        cls: 'opencodian-edit-revert-path',
+        text: entry.path,
+      });
+      pathEl.title = entry.path;
+      pathEl.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void this.app.workspace.openLinkText(entry.path, '', false);
+      });
+
+      if (entry.state === 'reverted') {
+        if (entry.restorable && this.revertActions) {
+          const restoreButton = rowEl.createEl('button', {
+            cls: 'opencodian-edit-revert-action',
+            attr: { type: 'button' },
+          });
+          restoreButton.textContent = t('editRevert.restore');
+          restoreButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            void this.runRevertAction(
+              () => this.revertActions?.restoreFile(entry.path) ?? Promise.resolve(),
+            );
+          });
+        }
+        continue;
+      }
+
+      if (entry.revertible) {
+        if (this.revertActions) {
+          const revertButton = rowEl.createEl('button', {
+            cls: 'opencodian-edit-revert-action',
+            attr: {
+              type: 'button',
+              ...(model.roundOpen ? { disabled: 'true' } : {}),
+            },
+          });
+          revertButton.textContent = t('editRevert.revert');
+          revertButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            void this.runRevertAction(
+              () => this.revertActions?.revertFile(entry.path) ?? Promise.resolve(),
+            );
+          });
+        }
+      } else {
+        rowEl.createSpan({
+          cls: 'opencodian-edit-revert-excluded',
+          text: t(entry.excludedReason === 'oversize'
+            ? 'editRevert.excludedOversize'
+            : 'editRevert.excludedNoPreimage'),
+        });
+      }
+    }
+  }
+
+  private revertBusy = false;
+
+  private async runRevertAction(action: () => Promise<void>): Promise<void> {
+    if (this.revertBusy) {
+      return;
+    }
+    this.revertBusy = true;
+    try {
+      await action();
+    } finally {
+      this.revertBusy = false;
     }
   }
 

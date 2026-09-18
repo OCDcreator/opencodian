@@ -1,4 +1,5 @@
 # SettingsConversationSection
+> 2026-09-18 (R-B3): R-B3: `addEditRevertSettings()` adds the `editRevertEnabled` toggle and the `editRevertSnapshotLimitMb` number input (clamped through `normalizeEditRevertSnapshotLimitMb`, bounds from the exported constants) to the conversation display block.
 
 > **源码**: `src/features/settings/SettingsConversationSection.ts`
 > **状态**: [REVIEW]

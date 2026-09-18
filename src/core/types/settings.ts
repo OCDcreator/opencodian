@@ -169,6 +169,28 @@ export const CONTEXT_GROUP_MAX_PATH_CHARS = 500;
 export const AUTO_INTERNAL_LINK_MAX_EXCLUDED_TERMS = 100;
 export const AUTO_INTERNAL_LINK_MAX_TERM_CHARS = 100;
 
+/** R-B3 edit-revert retention cap bounds (MiB), applied by load normalization. */
+export const EDIT_REVERT_SNAPSHOT_LIMIT_MB_DEFAULT = 50;
+export const EDIT_REVERT_SNAPSHOT_LIMIT_MB_MIN = 10;
+export const EDIT_REVERT_SNAPSHOT_LIMIT_MB_MAX = 500;
+
+/**
+ * Normalize the R-B3 checkpoint retention cap: finite integers within
+ * [MIN, MAX] pass through; anything else falls back to the default so a
+ * stale or hand-edited settings file cannot disable retention or inflate
+ * the cap without bound.
+ */
+export function normalizeEditRevertSnapshotLimitMb(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return EDIT_REVERT_SNAPSHOT_LIMIT_MB_DEFAULT;
+  }
+  const rounded = Math.round(value);
+  if (rounded < EDIT_REVERT_SNAPSHOT_LIMIT_MB_MIN || rounded > EDIT_REVERT_SNAPSHOT_LIMIT_MB_MAX) {
+    return EDIT_REVERT_SNAPSHOT_LIMIT_MB_DEFAULT;
+  }
+  return rounded;
+}
+
 /**
  * Normalize the user-defined context-group list (R-B2). Drops malformed
  * entries (non-strings, empty id/name, oversized fields, paths over the cap
@@ -3199,6 +3221,21 @@ export interface OpenCodianSettings {
    */
   contextGroups: ContextGroup[];
 
+  /**
+   * Backend-neutral edit revert master switch (R-B3, default on). When off,
+   * no snapshots are captured and the sidebar shows no revert actions; the
+   * capture listeners stay cheap no-ops. Independent of OpenCode's
+   * session-level `revertSession`, which keeps its own rewind UI.
+   */
+  editRevertEnabled: boolean;
+
+  /**
+   * Retention cap for `.opencodian/checkpoints/` in MiB (R-B3, default 50,
+   * clamped 10–500 by load normalization). Oldest checkpoint rounds evict
+   * first once the cap is exceeded.
+   */
+  editRevertSnapshotLimitMb: number;
+
   capabilityLabSelectedBackend: string | undefined;
 
   /** Backend-specific settings that should not be flattened into OpenCode fields. */
@@ -3440,6 +3477,8 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   autoInternalLinkEnabled: false,
   autoInternalLinkExcludedTerms: [],
   contextGroups: [],
+  editRevertEnabled: true,
+  editRevertSnapshotLimitMb: EDIT_REVERT_SNAPSHOT_LIMIT_MB_DEFAULT,
   capabilityLabSelectedBackend: undefined,
   backendSettings: getDefaultBackendSettings(),
 

@@ -1,4 +1,5 @@
 # Core Types Barrel
+> 2026-09-18 (R-B3): Core types barrel re-exports the R-B3 edit-revert seam: `EditRevertServicePort`, `EditRevertTurnBeginInfo`, `EditRevertWriteToolInfo` (from `./editRevert`), plus the `EDIT_REVERT_SNAPSHOT_LIMIT_MB_*` caps and `normalizeEditRevertSnapshotLimitMb`.
 > 2026-09-18 (R-B1/R-B2): re-exports `ContextGroup` / `ContextGroupEntry`, the `CONTEXT_GROUP_MAX_*` caps, `AUTO_INTERNAL_LINK_MAX_*` caps, `normalizeContextGroups` and `normalizeAutoInternalLinkExcludedTerms`.
 
 > 2026-07-29: The type barrel exports the OpenCode trace settings default factory.

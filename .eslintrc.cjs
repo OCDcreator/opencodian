@@ -5,6 +5,7 @@ const justifiedMaxLinesFiles = [
   'src/core/opencode/OpenCodeStreamingFinalizationCoordinator.ts',
   'src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts',
   'src/core/opencode/ServerManager.ts',
+  'src/core/storage/EditRevertService.ts',
   'src/core/types/settings.ts',
   'src/core/types/settingsLoadNormalization.ts',
   'src/features/chat/OpenCodianView.ts',

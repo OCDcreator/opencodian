@@ -1,4 +1,5 @@
 # PiStreamMapper
+> 2026-09-18 (R-B3): Mechanical refactor (no behavior change): the pi content-block mapping loop moved into a file-local `appendPiContentBlocks()` helper so `toPiChatMessages` stays within the complexity gate.
 
 > 源码: src/core/agents/backend/pi/PiStreamMapper.ts
 

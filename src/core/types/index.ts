@@ -44,6 +44,25 @@ export {
   VIEW_TYPE_OPENCODIAN_SETTINGS,
 } from './chat';
 
+// Edit revert (R-B3) consumer-owned service seam
+export type {
+  EditRevertActionResult,
+  EditRevertEntrySource,
+  EditRevertEntryState,
+  EditRevertExcludedReason,
+  EditRevertFileEntry,
+  EditRevertFileStatus,
+  EditRevertPreImageStatus,
+  EditRevertRoundMeta,
+  EditRevertRoundSummary,
+  EditRevertServicePort,
+  EditRevertSidebarEntry,
+  EditRevertSidebarModel,
+  EditRevertTurnBeginInfo,
+  EditRevertWriteToolInfo,
+  EditRevertWriteToolKind,
+} from './editRevert';
+
 // Local model pricing and cost-estimate provenance
 export {
   type ContextCostCompleteness,
@@ -105,6 +124,9 @@ export {
   type ContextGroupEntry,
   type ContextRingStyleId,
   DEFAULT_SETTINGS,
+  EDIT_REVERT_SNAPSHOT_LIMIT_MB_DEFAULT,
+  EDIT_REVERT_SNAPSHOT_LIMIT_MB_MAX,
+  EDIT_REVERT_SNAPSHOT_LIMIT_MB_MIN,
   getBashToolBlockedCommands,
   getCurrentPlatformBlockedCommands,
   getCurrentPlatformDebugLogPath,
@@ -181,6 +203,7 @@ export {
   normalizeContextRingStyleId,
   normalizeDisabledModelRefs,
   normalizeDisabledPluginSpecs,
+  normalizeEditRevertSnapshotLimitMb,
   normalizeEffortLevel,
   normalizeGlassRefractionInputPanelThemeId,
   normalizeInlineEditEffortOverrides,

@@ -21,7 +21,10 @@ import type {
   TitleMode,
 } from '../../core/types';
 import {
+  EDIT_REVERT_SNAPSHOT_LIMIT_MB_MAX,
+  EDIT_REVERT_SNAPSHOT_LIMIT_MB_MIN,
   normalizeChatFontSizePx,
+  normalizeEditRevertSnapshotLimitMb,
 } from '../../core/types';
 import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
@@ -472,6 +475,7 @@ export class SettingsConversationSection {
   private renderDisplayBlock(containerEl: HTMLElement): void {
     this.addChatFontSizeSetting(containerEl);
     this.addTurnChangeRecordsSetting(containerEl);
+    this.addEditRevertSettings(containerEl);
   }
 
   private renderDisplayTabBlock(containerEl: HTMLElement): void {
@@ -1379,6 +1383,43 @@ export class SettingsConversationSection {
             this.plugin.settings.showTurnChangeRecords = value;
             await this.plugin.saveSettings();
             this.plugin.refreshConversationRendering();
+          });
+      });
+  }
+
+  private addEditRevertSettings(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.conversation.editRevertEnabled.name'))
+      .setDesc(t('settings.conversation.editRevertEnabled.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.editRevertEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.editRevertEnabled = value;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.conversation.editRevertSnapshotLimitMb.name'))
+      .setDesc(t('settings.conversation.editRevertSnapshotLimitMb.desc'))
+      .addText((text) => {
+        text.inputEl.type = 'number';
+        text.inputEl.min = String(EDIT_REVERT_SNAPSHOT_LIMIT_MB_MIN);
+        text.inputEl.max = String(EDIT_REVERT_SNAPSHOT_LIMIT_MB_MAX);
+        text
+          .setPlaceholder(String(this.plugin.settings.editRevertSnapshotLimitMb))
+          .setValue(String(this.plugin.settings.editRevertSnapshotLimitMb))
+          .onChange(async (value) => {
+            const parsed = Number(value);
+            if (!Number.isFinite(parsed)) {
+              text.setValue(String(this.plugin.settings.editRevertSnapshotLimitMb));
+              return;
+            }
+            const nextValue = normalizeEditRevertSnapshotLimitMb(parsed);
+            this.plugin.settings.editRevertSnapshotLimitMb = nextValue;
+            text.setValue(String(nextValue));
+            await this.plugin.saveSettings();
           });
       });
   }

@@ -40,6 +40,7 @@ import {
   type ChatMessage,
   type ContextUsageSnapshot,
   type Conversation,
+  type EditRevertActionResult,
   getConversationBackendSessionId,
   type PromptContextItem,
   type QuestionRequest,
@@ -450,6 +451,8 @@ export class OpenCodianView extends ItemView {
   // Navigation sidebar
   private navigationSidebar: NavigationSidebar | null = null;
   private modifiedFilesSidebarCoordinator: ModifiedFilesSidebarCoordinator;
+  /** R-B3: unsubscribe hook for edit-revert entry-change notifications. */
+  private editRevertUnsubscribe: (() => void) | null = null;
 
   // Effort selector
   private effortSelector: EffortSelector | null = null;
@@ -1582,6 +1585,9 @@ export class OpenCodianView extends ItemView {
     this.chatDiagnosticsCoordinatorFactory = chatDiagnosticsCoordinatorFactory;
     this.messageComponent = new Component();
     this.modifiedFilesSidebarCoordinator = new ModifiedFilesSidebarCoordinator();
+    this.editRevertUnsubscribe = this.plugin.editRevertService?.onEntriesChanged(() => {
+      this.refreshModifiedFilesSidebar();
+    }) ?? null;
     this.currentVariant = undefined;
     this.slashCommandMenuCatalogCache = new SlashCommandMenuCatalogCache({
       loadPiRuntimeCommands: () => (this.plugin.agentServiceRegistry?.get('pi') as { getRuntimeCommands?(): Promise<Array<{ name: string; description?: string }>> } | undefined)?.getRuntimeCommands?.() ?? Promise.resolve([]),
@@ -2726,6 +2732,8 @@ export class OpenCodianView extends ItemView {
     this.contextRing = null;
     this.contextRingContainerEl = null;
     this.modifiedFilesSidebarCoordinator.destroy();
+    this.editRevertUnsubscribe?.();
+    this.editRevertUnsubscribe = null;
     this.chatVisualDemoCoordinator.destroyAll();
     this.permissionInlineCardRenderer.clearSessionApprovals();
     this.backendActiveChangeDisposable?.dispose();
@@ -2888,6 +2896,59 @@ export class OpenCodianView extends ItemView {
       (id) => this.plugin.openCodeService.getCachedSessionDiffEntries(id),
       sessionId && hasCapability(this.caps, AgentCapability.Context) ? 'ready' : 'unavailable',
       conversation?.messages ?? [],
+    );
+
+    // R-B3: backend-neutral revert state (works for every backend, including
+    // the ones without a session-diff surface). Actions surface their
+    // outcome through notices; the service notifies entry changes which
+    // re-enter this refresh through the subscription registered in the
+    // constructor.
+    const editRevertService = this.plugin.editRevertService;
+    if (!conversation || !editRevertService) {
+      this.modifiedFilesSidebarCoordinator.refreshRevertState(null, null);
+      return;
+    }
+    const conversationId = conversation.id;
+    const runRevertAction = async (
+      action: () => Promise<EditRevertActionResult>,
+      successMessage: (result: EditRevertActionResult) => string,
+    ): Promise<void> => {
+      try {
+        const result = await action();
+        if (result.ok) {
+          new Notice(successMessage(result));
+        } else {
+          new Notice(t('editRevert.notice.failed', { error: result.error ?? 'unknown' }));
+        }
+      } catch (error) {
+        new Notice(t('editRevert.notice.failed', {
+          error: error instanceof Error ? error.message : String(error),
+        }));
+      } finally {
+        this.refreshModifiedFilesSidebar();
+      }
+    };
+    this.modifiedFilesSidebarCoordinator.refreshRevertState(
+      editRevertService.getSidebarModel(conversationId),
+      {
+        revertFile: (path) => runRevertAction(
+          () => editRevertService.revertFile(conversationId, path),
+          () => t('editRevert.notice.reverted', { path }),
+        ).then(() => undefined),
+        revertAll: () => runRevertAction(
+          () => editRevertService.revertAll(conversationId),
+          (result) => t('editRevert.notice.revertAll', {
+            count: result.changed,
+            skippedDetail: result.skipped.length > 0
+              ? t('editRevert.notice.revertAllSkipped', { count: result.skipped.length })
+              : '',
+          }),
+        ).then(() => undefined),
+        restoreFile: (path) => runRevertAction(
+          () => editRevertService.restoreFile(conversationId, path),
+          () => t('editRevert.notice.restored', { path }),
+        ).then(() => undefined),
+      },
     );
   }
 

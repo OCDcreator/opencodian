@@ -1,4 +1,5 @@
 # ChatPluginPort
+> 2026-09-18 (R-B3): R-B3: the chat plugin port adds `editRevertService: EditRevertServicePort | null` plus the `editRevertEnabled` / `editRevertSnapshotLimitMb` settings picks; the view and runtime consume the port without importing core/storage.
 
 2026-09-10：定价端口增加 `onCatalogUpdated` 订阅；聊天消费者通过该窄端口接收本地目录就绪信号。
 

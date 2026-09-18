@@ -223,23 +223,25 @@
       "id": "shared.foundation",
       "layer": "shared",
       "include": [
-        "src/shared/index.ts",
+        "src/shared/TooltipLayerController.ts",
         "src/shared/brandingWordmark.ts",
         "src/shared/contextGroupPlan.ts",
         "src/shared/contextPath.ts",
         "src/shared/debugModules.ts",
         "src/shared/diagnosticSecretSanitizer.ts",
+        "src/shared/editRevertPlan.ts",
+        "src/shared/index.ts",
         "src/shared/logger.ts",
         "src/shared/obsidianContext.ts",
         "src/shared/toolExecution.ts",
         "src/shared/toolIdentity.ts",
-        "src/shared/TooltipLayerController.ts",
         "src/shared/vault.ts"
       ],
       "delegatesTo": [],
       "responsibilities": [
         "shared cross-cutting primitives: logging, context paths, vault access, tool identity",
-        "diagnostic secret sanitizer primitive"
+        "diagnostic secret sanitizer primitive",
+        "pure edit-revert planning core (R-B3): write-tool classification, retention planning, sidebar model"
       ],
       "canonicalState": [
         "shared logger instance"
@@ -968,15 +970,17 @@
       "delegatesTo": [],
       "responsibilities": [
         "local-first persistence for conversations, theme backgrounds and provider-icon assets",
-        "conversation metadata and full-message cache"
+        "conversation metadata and full-message cache",
+        "backend-neutral edit-revert snapshots: content-addressed checkpoint store, retention and vault write-back (R-B3)"
       ],
       "canonicalState": [
         "conversation store",
         "theme background storage"
       ],
       "entrypoints": [
-        "src/core/storage/index.ts",
-        "src/core/storage/StorageService.ts"
+        "src/core/storage/EditRevertService.ts",
+        "src/core/storage/StorageService.ts",
+        "src/core/storage/index.ts"
       ],
       "allowedOwnerDependencies": [
         "shared.foundation",

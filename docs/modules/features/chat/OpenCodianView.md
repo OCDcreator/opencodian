@@ -1,4 +1,5 @@
 # OpenCodianView
+> 2026-09-18 (R-B3): R-B3: `OpenCodianView` subscribes to `editRevertService.onEntriesChanged()` (unsubscribed on close) and `refreshModifiedFilesSidebar()` now feeds the coordinator the backend-neutral sidebar model plus revert/restore action callbacks that surface outcomes as notices. The view only assembles callbacks; revert execution stays in core.storage.
 
 2026-09-10：view 在 open/close 时连接、清理 context coordinator 的价格订阅；host 提供所有标签页 ID，并按目标 tab 的 conversation backend 解析价格身份。费用详情订阅固定打开时的 tab/session，切换标签页不会重定向已打开弹窗。运行逻辑仍由 coordinator 所有。
 

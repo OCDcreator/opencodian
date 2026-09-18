@@ -139,6 +139,18 @@ export class StreamChunkRouter {
   private async handleControlChunk(chunk: CoreStreamChunk): Promise<boolean> {
     const { host, preparedSend } = this.options;
 
+    // R-B3: a declared write tool means a vault write is about to happen;
+    // capture the pre-image before the tool result arrives. The chunk still
+    // renders normally (return false), preserving stream behavior.
+    if (chunk.type === 'tool_use') {
+      host.onWriteToolUse?.({
+        conversationId: preparedSend.conversation.id,
+        toolName: chunk.name,
+        input: chunk.input,
+      });
+      return false;
+    }
+
     if (chunk.type === 'message_start') {
       this.trace.logStage('message-start-received');
       void host.syncLatestUserMessageFromServer(

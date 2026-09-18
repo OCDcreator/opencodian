@@ -90,6 +90,25 @@ export interface SendPipelineViewPort {
     sessionId?: string;
     backend: string;
   }): void;
+  /**
+   * Optional R-B3 hook: opens the edit-revert capture round for this turn.
+   * Fire-and-forget; implementations must fail soft.
+   */
+  onTurnSnapshotBegin?(info: {
+    conversationId: string;
+    backend: string;
+    sessionId?: string;
+    userText: string;
+    contextPaths: string[];
+  }): void;
+  /** Optional R-B3 hook: closes the edit-revert capture round (post-turn grace starts). */
+  onTurnSnapshotEnd?(conversationId: string): void;
+  /** Optional R-B3 hook: a write-tool call was declared on the stream, before its result. */
+  onWriteToolUse?(info: {
+    conversationId: string;
+    toolName: string;
+    input: Record<string, unknown>;
+  }): void;
   getTabRuntimeState(tabId: TabId | null): SendPipelineTabRuntime | null;
   getActiveTabId(): TabId | null;
   shouldAutoScroll(tabId: TabId | null): boolean;
@@ -220,6 +239,8 @@ export type SendPipelineExecutionHost =
   Pick<
     SendPipelineViewPort,
     | 'onTurnSettled'
+    | 'onTurnSnapshotBegin'
+    | 'onTurnSnapshotEnd'
     | 'getTabRuntimeState'
     | 'getOrCreateTabStreamController'
     | 'claimOpenCodeDiagnosticRunToken'
@@ -240,7 +261,7 @@ export type SendPipelineTraceHost =
   Pick<SendPipelineDebugPort, 'summarizeContentBlocksForDebug' | 'logAssistantFinalizationDebug' | 'getLogPreview'>;
 
 export type StreamChunkRouterHost =
-  Pick<SendPipelineViewPort, 'getActiveTabId' | 'shouldAutoScroll' | 'scheduleSettledScrollToBottomIfNeeded' | 'syncTabStreamLikeState'>
+  Pick<SendPipelineViewPort, 'getActiveTabId' | 'shouldAutoScroll' | 'scheduleSettledScrollToBottomIfNeeded' | 'syncTabStreamLikeState' | 'onWriteToolUse'>
   & Pick<SendPipelineTransportPort,
     | 'detachStream'
     | 'syncLatestUserMessageFromServer'

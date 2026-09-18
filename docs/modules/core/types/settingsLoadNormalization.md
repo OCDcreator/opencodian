@@ -1,4 +1,5 @@
 # Settings Load Normalization
+> 2026-09-18 (R-B3): R-B3 load normalization: `normalizeEditRevertSettingsOnLoad()` (file-local helper) materializes `editRevertEnabled` and the clamped `editRevertSnapshotLimitMb` at the final merge boundary; a stale or hand-edited value falls back to the default.
 > 2026-09-18 (R-B1/R-B2): the final merge normalizes `autoInternalLinkEnabled`, `autoInternalLinkExcludedTerms` and `contextGroups` so stale or hand-edited snapshots materialize safe defaults.
 
 > **源码**: `src/core/types/settingsLoadNormalization.ts`

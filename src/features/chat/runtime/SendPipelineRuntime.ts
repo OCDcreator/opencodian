@@ -104,6 +104,22 @@ export interface SendPipelineHostDependencies {
     sessionId?: string;
     backend: string;
   }): void;
+  /** Optional R-B3 hook: opens the edit-revert capture round for this turn. */
+  onTurnSnapshotBegin?(info: {
+    conversationId: string;
+    backend: string;
+    sessionId?: string;
+    userText: string;
+    contextPaths: string[];
+  }): void;
+  /** Optional R-B3 hook: closes the edit-revert capture round. */
+  onTurnSnapshotEnd?(conversationId: string): void;
+  /** Optional R-B3 hook: a write-tool call was declared on the stream. */
+  onWriteToolUse?(info: {
+    conversationId: string;
+    toolName: string;
+    input: Record<string, unknown>;
+  }): void;
   getTabRuntimeState(tabId: import('../tabs').TabId | null): SendPipelineTabRuntime | null;
   getActiveTabId(): import('../tabs').TabId | null;
   shouldAutoScroll(tabId: import('../tabs').TabId | null): boolean;
@@ -145,6 +161,9 @@ export interface SendPipelineHostDependencies {
 export function createSendPipelineRuntimeHost(deps: SendPipelineHostDependencies): SendPipelineHost {
   const viewPort: SendPipelineViewPort = {
     onTurnSettled: (info) => deps.onTurnSettled?.(info),
+    onTurnSnapshotBegin: (info) => deps.onTurnSnapshotBegin?.(info),
+    onTurnSnapshotEnd: (conversationId) => deps.onTurnSnapshotEnd?.(conversationId),
+    onWriteToolUse: (info) => deps.onWriteToolUse?.(info),
     getTabRuntimeState: (tabId) => deps.getTabRuntimeState(tabId),
     getActiveTabId: () => deps.getActiveTabId(),
     shouldAutoScroll: (tabId) => deps.shouldAutoScroll(tabId),
@@ -256,6 +275,16 @@ export class SendPipelineRuntime {
         return;
       }
 
+      this.host.onTurnSnapshotBegin?.({
+        conversationId: preparedSend.conversation.id,
+        backend: preparedSend.conversation.backend ?? 'opencode',
+        sessionId: getConversationBackendSessionId(preparedSend.conversation) || undefined,
+        userText: content,
+        contextPaths: preparedSend.contextItems
+          .filter((item) => item.kind === 'file' || item.kind === 'current_note')
+          .map((item) => item.path),
+      });
+
       const routedStream = await new StreamChunkRouter({
         host: this.host,
         preparedSend,
@@ -298,6 +327,10 @@ export class SendPipelineRuntime {
           sessionId: getConversationBackendSessionId(preparedSend.conversation) || undefined,
           backend: preparedSend.conversation.backend ?? 'opencode',
         });
+      }, undefined);
+      // R-B3: close the edit-revert capture round (post-turn grace starts).
+      this.safeTrace(() => {
+        this.host.onTurnSnapshotEnd?.(preparedSend.conversation.id);
       }, undefined);
     }
     await this.sendQueuedFollowUp(preparedSend.tabId);

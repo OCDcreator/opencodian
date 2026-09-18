@@ -11,6 +11,20 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-18 编辑回退（R-B3）：插件侧快照、单文件/整轮回退与恢复回退
+
+FlowText 对齐批次 B 的 R-B3（`docs/requirements/flowtext-parity.md`）：**后端无关**的插件侧文件级回退——不依赖任何后端的 revert 能力（OpenCode 的会话级 `revertSession` 保持独立、可并存），四后端行为一致。
+
+**分层**：`src/shared/editRevertPlan.ts`（shared.foundation，纯规划：四后端写工具分类与目标路径提取、预算化候选提取、保留淘汰规划、侧栏视图模型；零 Obsidian 依赖）；`src/core/storage/` 三个 owner——`EditRevertService.ts`（编排：round 捕获、vault 事件漏斗、回退/恢复/保留）、`EditRevertStore.ts`（`.opencodian/checkpoints/` 内容寻址 blob + round JSON 磁盘 IO，sha256 去重）、`EditRevertVaultWriteback.ts`（唯一破坏性写缝：`vault.process`/`vault.create`/`vault.trash` + self-write guard，回退自身不会被误记为 agent 编辑）。port 声明在 `src/core/types/editRevert.ts`（`EditRevertServicePort`），消费方（`ChatPluginPort`、runtime composition、`main.ts`）不 import core/storage。`main.ts` 在设置加载后构造并 `initialize()`，`onunload` 时 dispose。
+
+**硬约束落地**：快照只覆盖 Markdown（vault 监听与工具目标都按 `.md` 过滤）；单文件上限 2MiB，超限条目标「未纳入回退」且无回退按钮（fail-closed）；回合开始预快照 200ms 预算，超时置 `degraded` 退化为仅工具声明捕获（侧栏如实展示）；存储上限 `editRevertSnapshotLimitMb`（默认 50，钳 10–500），按每会话条数（10）/全局条数（30）/字节三重淘汰最旧 round 并清扫无引用 blob；回合内新建文件回退走 `vault.trash` 进 Obsidian 回收站（绝不物理删除），回退前内容存 `restoreHash`，「恢复回退」逐字节还原（含回收站文件重建）；`created` 状态粘性——新建文件被再次写入不降级为 `modified`（否则丢失回退语义）。设置四件套同步（`editRevertEnabled` 默认开 / `editRevertSnapshotLimitMb`），侧栏在 `ModifiedFilesSidebar` 新增回退区块：逐条回退（回合未结束禁用）、全部回退、恢复回退、降级/进行中提示、未纳入标注，路径点击打开文件；仍不请求 Git、不渲染 patch。
+
+**发送管线接入**：`SendPipelineRuntime` 在 stream 启动前 `onTurnSnapshotBegin`（fire-and-forget），终态 `finally` 里 `onTurnSnapshotEnd`（覆盖完成/出错/取消）；`StreamChunkRouter` 把 `tool_use` chunk 转发给 `noteWriteToolUse` 以在工具结果到达前捕获 pre-image，chunk 渲染行为不变。观测侧 `OpenCodianView` 订阅 `onEntriesChanged` 刷新侧栏，动作结果以 notice 如实呈现。
+
+**测试**：新增 4 套件 58 例——`tests/unit/core/storage/EditRevertService.test.ts`（单文件回退字节一致且不影响他文件、整轮回退、新建文件进回收站+恢复、粘性 created、回退↔恢复对称、超限拒绝、无 pre-image 拒绝、round-open 守卫、预算降级、非 Markdown 忽略、绝对路径归一、写路径全部走 vault API、重启恢复、grace 归属、禁用态）、`EditRevertService.retention.test.ts`（内容寻址去重：三轮同内容只写一个 blob；每会话条数淘汰 + blob 清扫；字节上限淘汰；跨会话全局条数）、`EditRevertService.backendAgnostic.test.ts`（四后端同流程同结果 + 无 OpenCode SDK/service/revert 调用的静态契约）、`tests/unit/shared/editRevertPlan.test.ts`（纯函数：分类/提取/淘汰/字节核算/侧栏模型）。
+
+**顺手修复**：`editRevertPlan.ts` 裸 `*.md` 候选正则缺捕获组导致该来源从未生效（`[[Note]]` 无扩展名 wikilink 仍按设计忽略）；`settingsLoadNormalization.ts` 复杂度超限抽 `normalizeEditRevertSettingsOnLoad()`；已提交代码 `PiStreamMapper.ts` `toPiChatMessages` 复杂度 22 抽 `appendPiContentBlocks()`（机械重构，无行为变化）—— lint 恢复 0 警告基线。
+
 ## 2026-09-18 行内编辑 A2：流式 diff 预览（R-A3）与面板贴图（R-A4）
 
 FlowText 对齐批次 A 第二个里程碑（`docs/requirements/flowtext-parity.md`），只动 `src/features/inline-edit/**` 与 `AgentAuxQueryCapability` 面，不削弱只读契约。

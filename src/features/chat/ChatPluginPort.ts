@@ -10,7 +10,7 @@ import type {
 } from '../../core/config';
 import type { OpenCodeService } from '../../core/opencode';
 import type { OpenCodianSettingsRuntimeCoordinator } from '../../core/runtime/OpenCodianSettingsRuntimeCoordinator';
-import type { Conversation, OpenCodianSettings } from '../../core/types';
+import type { Conversation, EditRevertServicePort, OpenCodianSettings } from '../../core/types';
 import type { AgentBackendKind } from '../../core/types/chat';
 import type { OpenCodianSettingTab } from '../settings/OpenCodianSettings';
 import type { TabRuntimePluginSource } from './services/ConversationTabRuntimeCoordinator';
@@ -28,6 +28,8 @@ type ChatPluginSettings = Pick<
   | 'defaultModel'
   | 'defaultProvider'
   | 'disabledModelRefs'
+  | 'editRevertEnabled'
+  | 'editRevertSnapshotLimitMb'
   | 'enableAutoScroll'
   | 'enabledBackends'
   | 'enableDebugLogging'
@@ -113,6 +115,8 @@ export interface ChatPluginPort extends TabRuntimePluginSource {
   settings: ChatPluginSettings;
   openCodeService: ChatOpenCodeService;
   agentServiceRegistry: AgentServiceRegistry;
+  /** R-B3 backend-neutral edit-revert service (core.storage); null before bootstrap. */
+  editRevertService: EditRevertServicePort | null;
   claudeCodePermissionHostContext: Pick<
     ClaudeCodePermissionBridgeHostContext,
     | 'elicitationCardRenderer'

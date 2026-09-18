@@ -58,6 +58,7 @@ import { OpenCodianStartupCoordinator } from './core/runtime/OpenCodianStartupCo
 import { PluginRuntimeCoordinator } from './app/runtime/PluginRuntimeCoordinator';
 import { StorageService } from './core/storage';
 import { ConversationFullMessageCache } from './core/storage/ConversationFullMessageCache';
+import { EditRevertService } from './core/storage/EditRevertService';
 import { PluginUpdateService } from './core/update/PluginUpdateService';
 import type {
   ChatAppearanceSettings,
@@ -130,6 +131,12 @@ export default class OpenCodianPlugin extends Plugin {
   private diagnosticsCoordinator: DiagnosticsRuntimeCoordinator | null = null;
   /** Backend-neutral memory runtime (app.memory-runtime owner). Constructed during onload. */
   memoryRuntime: MemoryRuntimeCoordinator | null = null;
+  /**
+   * Backend-neutral edit-revert snapshot service (core.storage owner, R-B3).
+   * Constructed during startup after settings load; the chat runtime and the
+   * modified-files sidebar consume it through `EditRevertServicePort`.
+   */
+  editRevertService: EditRevertService | null = null;
   /**
    * Delegating getters returning the coordinator's typed backend ports. The
    * declared types are non-nullable to match the prior stored fields (so
@@ -242,6 +249,13 @@ export default class OpenCodianPlugin extends Plugin {
     this.storage = new StorageService(this);
     await coordinator.measureStartupStep('storage.initialize', () => this.storage.initialize());
     await coordinator.measureStartupStep('loadSettings', () => this.loadSettings());
+    this.editRevertService = new EditRevertService({
+      app: this.app,
+      isEnabled: () => this.settings?.editRevertEnabled ?? true,
+      getSnapshotLimitBytes: () => (this.settings?.editRevertSnapshotLimitMb ?? 50) * 1024 * 1024,
+    });
+    await coordinator.measureStartupStep('editRevert.initialize', () =>
+      this.editRevertService?.initialize() ?? Promise.resolve());
     this.pluginUpdateService = new PluginUpdateService({
       app: this.app,
       manifest: this.manifest,
@@ -935,6 +949,7 @@ export default class OpenCodianPlugin extends Plugin {
   onunload() {
     this.runtimeCoordinator.dispose();
     this.memoryRuntime?.dispose();
+    this.editRevertService?.dispose();
     // Stop the OpenCode server (async, best-effort)
     void this.openCodeService?.stop().catch((error) => {
       logger.warn('Failed to asynchronously stop OpenCode service during unload:', error);

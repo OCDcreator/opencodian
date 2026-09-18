@@ -78,6 +78,26 @@ export function resolvePiToolCall(
   return { name: toolName, input: args, kind: 'mcp' };
 }
 
+/** Map one pi content-block list into chat contentBlocks / toolCalls. */
+function appendPiContentBlocks(
+  message: ChatMessage,
+  entry: PiRecord,
+  tools: Map<string, { tool: ToolCallInfo; message: ChatMessage }>,
+): void {
+  if (!Array.isArray(entry.content)) return;
+  message.contentBlocks = [];
+  for (const block of entry.content.map(piRecord)) {
+    if (block.type === 'text') message.contentBlocks.push({ type: 'text', text: String(block.text ?? '') });
+    if (block.type === 'thinking') message.contentBlocks.push({ type: 'thinking', thinking: String(block.thinking ?? '') });
+    if (block.type === 'toolCall') {
+      const resolved = resolvePiToolCall(String(block.name), piRecord(block.arguments));
+      const tool: ToolCallInfo = { id: String(block.id), name: resolved.name, input: resolved.input, status: 'completed', ...(resolved.kind ? { kind: resolved.kind } : {}) };
+      (message.toolCalls ??= []).push(tool); tools.set(tool.id, { tool, message });
+      message.contentBlocks.push({ type: 'tool_use', toolId: tool.id, toolName: tool.name, toolInput: tool.input, ...(resolved.kind ? { toolKind: resolved.kind } : {}) });
+    }
+  }
+}
+
 /** Restore native entry identities, reasoning and tool results into the existing chat schema. */
 export function toPiChatMessages(entries: unknown[]): ChatMessage[] {
   const messages: ChatMessage[] = [];
@@ -98,19 +118,7 @@ export function toPiChatMessages(entries: unknown[]): ChatMessage[] {
     const message: ChatMessage = { id: String(entry.id), sourceMessageId: String(entry.id), role: entry.role === 'user' ? 'user' : 'assistant',
       content: textContent(entry.content), timestamp: Number(entry.timestamp) || Date.now(), images: nativeImages(entry.content) };
     if (entry.role === 'custom') { message.displayStyle = 'notice'; message.noticeTitle = String(entry.customType ?? 'Pi'); }
-    if (Array.isArray(entry.content)) {
-      message.contentBlocks = [];
-      for (const block of entry.content.map(piRecord)) {
-        if (block.type === 'text') message.contentBlocks.push({ type: 'text', text: String(block.text ?? '') });
-        if (block.type === 'thinking') message.contentBlocks.push({ type: 'thinking', thinking: String(block.thinking ?? '') });
-        if (block.type === 'toolCall') {
-          const resolved = resolvePiToolCall(String(block.name), piRecord(block.arguments));
-          const tool: ToolCallInfo = { id: String(block.id), name: resolved.name, input: resolved.input, status: 'completed', ...(resolved.kind ? { kind: resolved.kind } : {}) };
-          (message.toolCalls ??= []).push(tool); tools.set(tool.id, { tool, message });
-          message.contentBlocks.push({ type: 'tool_use', toolId: tool.id, toolName: tool.name, toolInput: tool.input, ...(resolved.kind ? { toolKind: resolved.kind } : {}) });
-        }
-      }
-    }
+    appendPiContentBlocks(message, entry, tools);
     messages.push(message);
   }
   return messages;

@@ -29,7 +29,7 @@ import { AgentCapability, hasCapability } from '../../../core/agents';
 import { getConversationChatBackendService } from '../../../core/agents/backend/AgentBackendRouting';
 import type { MemoryRuntimePort } from '../../../core/memory';
 import { OpenCodeService } from '../../../core/opencode';
-import type { ChatMessage, ContextGroup, Conversation } from '../../../core/types';
+import type { ChatMessage, ContextGroup, Conversation, EditRevertServicePort } from '../../../core/types';
 import { getTurnDiffNoticeMeta } from '../../../core/types';
 import { t } from '../../../i18n';
 import { getVaultBasePath } from '../../../shared';
@@ -309,6 +309,8 @@ export interface ChatRuntimeCompositionHost {
     deleteConversation(conversationId: string): unknown;
     readonly agentServiceRegistry: unknown;
     readonly memoryRuntime: MemoryRuntimePort | null;
+    /** R-B3 edit-revert service (core.storage owner); null before bootstrap or when disabled. */
+    readonly editRevertService: EditRevertServicePort | null;
   };
 
   // --- lazily-read live state (resolves after the view destructures the result) ---
@@ -1125,6 +1127,27 @@ export class ChatRuntimeComposition {
         backend: string;
       }) => {
         host.plugin.memoryRuntime?.onTurnSettled(info);
+      },
+      // R-B3 edit-revert hooks: fail-soft observers into the core.storage
+      // service; the pipeline never awaits snapshot work.
+      onTurnSnapshotBegin: (info: {
+        conversationId: string;
+        backend: string;
+        sessionId?: string;
+        userText: string;
+        contextPaths: string[];
+      }) => {
+        host.plugin.editRevertService?.beginTurnCapture(info);
+      },
+      onTurnSnapshotEnd: (conversationId: string) => {
+        host.plugin.editRevertService?.endTurnCapture(conversationId);
+      },
+      onWriteToolUse: (info: {
+        conversationId: string;
+        toolName: string;
+        input: Record<string, unknown>;
+      }) => {
+        host.plugin.editRevertService?.noteWriteToolUse(info);
       },
       getTabRuntimeState: (tabId: TabId) => host.getTabRuntimeState(tabId),
       getActiveTabId: () => host.getActiveTabId(),

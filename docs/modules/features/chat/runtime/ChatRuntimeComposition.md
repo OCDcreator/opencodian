@@ -1,4 +1,5 @@
 # ChatRuntimeComposition
+> 2026-09-18 (R-B3): R-B3: the pipeline view-port gains fail-soft observers `onTurnSnapshotBegin` / `onTurnSnapshotEnd` / `onWriteToolUse` that forward to `host.plugin.editRevertService`; the pipeline never awaits snapshot work.
 > 2026-09-18 (R-B2): `ComposerContextViewFacade.create` receives a `contextGroups` port reading `settings.contextGroups`; the structural `plugin.settings` type gains the `contextGroups` field.
 
 > 2026-08-01: 新增模块。Task 15 把 `OpenCodianView` 的四个 `create*RuntimeWiring()` 编排方法 + 构造器内联的 identity/render 装配 + `createSendPipelineHostDependencies` 全部迁出，集中到这个 composition owner。这是 Agent-Friendly Architecture Refactor Phase 4 的核心产物。

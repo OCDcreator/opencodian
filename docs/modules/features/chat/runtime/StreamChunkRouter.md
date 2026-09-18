@@ -1,4 +1,5 @@
 # StreamChunkRouter
+> 2026-09-18 (R-B3): R-B3: `handleControlChunk()` forwards declared write-tool chunks (`type: 'tool_use'`) to `host.onWriteToolUse` so the edit-revert service can capture the pre-image before the tool result arrives; the chunk still returns `false` and renders exactly as before.
 
 > **源码**: `src/features/chat/runtime/StreamChunkRouter.ts`
 > **状态**: [REVIEW]

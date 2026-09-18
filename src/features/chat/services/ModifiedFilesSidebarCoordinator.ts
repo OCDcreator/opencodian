@@ -5,7 +5,9 @@ import {
   getTurnDiffNoticeMeta,
   type SessionDiffEntry,
 } from '../../../core/types';
+import type { EditRevertSidebarModel } from '../../../shared';
 import {
+  type ModifiedFilesRevertActions,
   ModifiedFilesSidebar,
   type ModifiedFilesSidebarAvailability,
 } from '../ui/ModifiedFilesSidebar';
@@ -35,6 +37,14 @@ export class ModifiedFilesSidebarCoordinator {
         ? this.getPersistedTurnDiffEntries(persistedMessages)
         : [];
     this.sidebar?.updateEntries(entries, availability);
+  }
+
+  /** R-B3: backend-neutral revert state + actions for the active conversation. */
+  refreshRevertState(
+    model: EditRevertSidebarModel | null,
+    actions: ModifiedFilesRevertActions | null,
+  ): void {
+    this.sidebar?.updateRevertState(model, actions);
   }
 
   private getPersistedTurnDiffEntries(

@@ -1,4 +1,5 @@
 > 2026-09-18 (FlowText parity R-A7): `parseObsidianContextTag` accepts `kind="folder"` so directory context tags round-trip losslessly.
+> 2026-09-18 (R-B3 编辑回退): 新增 `src/shared/editRevertPlan.ts` 归属本 owner —— 编辑回退的纯规划核心（写工具分类、路径/候选提取、保留淘汰规划、侧栏视图模型）。零 Obsidian 依赖，禁止引入 core/feature/app import；单测在 `tests/unit/shared/editRevertPlan.test.ts`。
 
 # Owner: shared.foundation
 
@@ -7,11 +8,12 @@
 
 - **Layer:** `shared` (may import layers: shared)
 - **Risk:** low
-- **Include:** `src/shared/index.ts`, `src/shared/brandingWordmark.ts`, `src/shared/contextGroupPlan.ts` (R-B2 one-click group-attach planner), `src/shared/contextPath.ts`, `src/shared/debugModules.ts`, `src/shared/diagnosticSecretSanitizer.ts`, `src/shared/logger.ts`, `src/shared/obsidianContext.ts`, `src/shared/toolExecution.ts`, `src/shared/toolIdentity.ts`, `src/shared/TooltipLayerController.ts`, `src/shared/vault.ts`
+- **Include:** `src/shared/index.ts`, `src/shared/brandingWordmark.ts`, `src/shared/contextGroupPlan.ts` (R-B2 one-click group-attach planner), `src/shared/editRevertPlan.ts` (R-B3 pure edit-revert planner), `src/shared/contextPath.ts`, `src/shared/debugModules.ts`, `src/shared/diagnosticSecretSanitizer.ts`, `src/shared/logger.ts`, `src/shared/obsidianContext.ts`, `src/shared/toolExecution.ts`, `src/shared/toolIdentity.ts`, `src/shared/TooltipLayerController.ts`, `src/shared/vault.ts`
 
 ## Responsibilities
 - shared cross-cutting primitives: logging, context paths, vault access, tool identity
 - diagnostic secret sanitizer primitive
+- pure edit-revert planning core (R-B3): write-tool classification, retention planning, sidebar model
 
 ## Canonical state (truth home)
 - shared logger instance

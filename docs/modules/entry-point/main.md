@@ -1,4 +1,5 @@
 # Plugin Entry Point (main.ts)
+> 2026-09-18 (R-B3): R-B3: `main.ts` constructs `EditRevertService` (core.storage owner) right after settings load with `editRevertEnabled` / `editRevertSnapshotLimitMb` readers, awaits its `initialize()` as a measured startup step, exposes it as `editRevertService` for the chat runtime and sidebar, and disposes it in `onunload()`.
 > 2026-09-18 (R-B1/R-B2): the inline-edit host bridge exposes `listContextGroups` (from `settings.contextGroups`) and `applyAutoInternalLinks` via `createInlineEditAutoLinkProcessor` (heading verification through the metadata cache; strict no-op while `autoInternalLinkEnabled` is off).
 
 > 2026-07-29: Bootstrap constructs and injects `OpenCodeSessionTraceService`; unload flushes it independently.
