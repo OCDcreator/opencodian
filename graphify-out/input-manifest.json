@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "c3be94f19c3530a15114f8bfc097047c19cbddef67d6603ab95775ef4ef4142e",
+  "digest": "a4ecd00bfda17cf1a8c051136a424b4c0d9b928695e2f55abc5bd59bdb590480",
   "recordCount": 703,
   "records": [
     {
@@ -26,12 +26,12 @@
     {
       "kind": "src",
       "key": "src/app/batchOrganize/BatchOrganizeCoordinator.ts",
-      "sha256": "b2e5abcebfe74f40e3d9204c12b3077365e92bdd558c92ff73a31c09d3f9d3e7"
+      "sha256": "4454db60c030ec1091ca1953b49850521476152e8e12582ef8fb98d810ffd0d6"
     },
     {
       "kind": "src",
       "key": "src/app/batchOrganize/BatchOrganizeModal.ts",
-      "sha256": "773ffa98fd689cf25e2f73b25819a2cc465a0421d14345312e85ae24d6e612fe"
+      "sha256": "5916a1c95741a9cda3743f8955e29f401a1f7e7e8f5838d8db3b1cc943f7a307"
     },
     {
       "kind": "src",
@@ -2981,7 +2981,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "9d90ceeeca436b5f3e06f2822727c95a79439a6a499ff49b0f63acb5846e7174"
+      "sha256": "b58a07cd2b6541c09785e06886745a57687ae3172eb3c094b663253f9cf94c2c"
     },
     {
       "kind": "src",
@@ -2991,7 +2991,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "8e542cc54b03e261b84a354ed68e6869dff92d4235538fd51a27ef852ccc4c59"
+      "sha256": "4949631d1eb9c321f45586c649c915b0b4d9afc33dc77be020e3a290e0b9d673"
     },
     {
       "kind": "src",
@@ -3001,7 +3001,7 @@
     {
       "kind": "src",
       "key": "src/shared/batchOrganizePlan.ts",
-      "sha256": "48a9d6a008bff3ad606844e8eaf0f8ff0579eef8016a1e3eeb996725db05fdfa"
+      "sha256": "3da1392e128fbbb15619481c929085c9697efd2bf7237313f0ae7572a99ebe37"
     },
     {
       "kind": "src",
@@ -3061,7 +3061,7 @@
     {
       "kind": "src",
       "key": "src/shared/index.ts",
-      "sha256": "754326a96cf4b2baa8fa973ffeb5aa5e59069524d786509d3503644bbaa1ad5b"
+      "sha256": "15a0b7fbbc00986788d262ac872dece734e126222e1c5599c45e5c08ebc22608"
     },
     {
       "kind": "src",
@@ -3519,7 +3519,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-18T11:21:04.079Z",
-  "headShaAtGeneration": "fe3b21bbb1a1c2fbd5b80e01990dfccd7a294a2d",
+  "generatedAt": "2026-09-18T12:11:30.194Z",
+  "headShaAtGeneration": "4b19e86955544d3fdb34bb242b00489120c34a82",
   "graphifyVersion": "graphify 0.9.36"
 }
