@@ -11,6 +11,20 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-18 R-C4 实机验收修复：阶梯首探不终局、拆除不抛错、引擎相对路径可解析
+
+R-C4 实机验收（Obsidian 1.13.7 + 真文字层 PDF）暴露三缺陷，全部对源核实后修复。
+
+**D1（高，阶梯误报 C 级）**：Obsidian 在 pdf 叶子出现之后才构建 viewer 内部结构，`mountBridge` 首探必然落空 → `syncLeaves` 的 `if (!bridges.has(leaf))` 把首个错误"C 级"永久缓存，真机满载后实测可达 A 级却上报 `pdfViewer missing`（诚实性反向失败）。修复：首探不再终局——C 级叶子武装有界退避重探（默认 250/500/1000/2000/4000ms，累计 ~7.75s 覆盖实测 ~6s 加载，`viewerReadyRetryDelaysMs` 可注入），且每次 workspace sync 对已桥接叶子重探；`reevaluateBridge` 只升不降，升级前提是新探测真实证明更高一级（A 级判定本身要求原生序列化器真跑通一次），已证明的更高级不被后续低探测静默降级；viewer 永不就绪则保持 C 级真实原因，重试预算耗尽即停。新增 5 个 ladder 测试（退避升级、sync 升级、永不就绪保持 C、不降级、叶移除取消定时器），对修复前源码变异验证 6/7 失败（含 D2）。
+
+**D2（低，`unmountBridge` 抛错）**：真机报 `Cannot read properties of undefined (reading 'toolbarButton')`，并因此打断 `syncLeaves` 清扫循环（D1 无法自愈的帮凶）。修复：`unmountBridge` 接受 null/undefined 且逐段 try/catch（无按钮 C 级、失败挂载、畸形 bridge 一律干净拆除），清扫循环改为逐 bridge `releaseBridge`（清定时器 + 容错拆除），单个坏 bridge 不再中断整轮清扫；`detach` 同路。新增变异验证测试：undefined 条目 + 回调抛错的 bridge 都不阻断其余叶子的清扫。
+
+**D3（高，引擎生产不可加载）**：真机 `load()` 报 `engine-missing: The argument 'filename' must be a file URL object, file URL string, or absolute path string. Received '.obsidian/plugins/opencodian/main.js'`——Obsidian `manifest.dir` 是库相对路径，`createRequire` 拒绝之，一/二期（文本层、本地索引）在桌面端从未工作过。修复：`PdfEngineLoaderHost` 新增**必选** `getVaultBasePath()`（组合处漏配在 `tsc --noEmit` 直接失败；tests/ 不在 tsc 范围且 ts-jest diagnostics 关闭，故类型守卫放在 src 而非测试文件）；`resolvePluginDir` 绝对路径直通、相对路径与 vault 绝对基路径拼接（复用 `shared/vault.ts` 的 `getVaultBasePath`，即 `FileSystemAdapter` basePath，与全库既有绝对路径消费方一致）；两者皆缺 → 诚实 `engine-missing`（注明 vault-relative），保留真缺失场景的 fail-closed。`main.ts` 组合处传入 `getVaultBasePath: () => getVaultBasePath(this.app)`。新增"库相对目录（生产形态）+ 基路径可解析""相对目录无基路径诚实失败""相对目录解析后无产物仍 engine-missing"三个测试，对修复前源码变异验证前两个必失败——旧套件全注入绝对临时目录，恰恰漏掉生产形态。
+
+模块文档同步 `PdfChatIntegration.md` / `pdfTextEngine.md`。
+
+---
+
 ## 2026-09-18 Canvas 生成与节点级 AI（R-C5）：确定性布局、原子落盘与运行时确认门
 
 FlowText 对齐 R-C5 落地（设计基准 `docs/requirements/flowtext-c5-design.md`；Canvas API 面为静态核实、运行时行为留待实机验证，全链按设计的诚实降级实施）。

@@ -137,7 +137,7 @@ describe('R-C4 off-state contract (byte-identical requests when pdfIndexEnabled=
   });
 
   it('the engine loader requires nothing before load() is called', () => {
-    const loader = new PdfEngineLoader({ getPluginDir: () => '/unused' });
+    const loader = new PdfEngineLoader({ getPluginDir: () => '/unused', getVaultBasePath: () => null });
     expect(loader.isLoaded()).toBe(false);
   });
 

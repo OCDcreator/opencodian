@@ -339,7 +339,11 @@ export default class OpenCodianPlugin extends Plugin {
     // pdfIndexEnabled is off, and the viewer integration only mounts on pdf
     // leaves it can actually probe.
     this.pdfEngineLoader = new PdfEngineLoader({
+      // `manifest.dir` is VAULT-RELATIVE in Obsidian; the loader resolves it
+      // against the same adapter basePath every other absolute-path consumer
+      // uses (shared/vault.ts getVaultBasePath) before createRequire.
       getPluginDir: () => this.manifest.dir,
+      getVaultBasePath: () => getVaultBasePath(this.app),
     });
     this.pdfIndexService = new PdfIndexService();
     this.pdfIndexService.attach(

@@ -14,6 +14,15 @@
  *    `#page&selection` back links + `highlightText` feedback;
  *  - B: command entry + DOM selection text, `#page=N` only;
  *  - C: command opens the chat for manual paste — always available.
+ *
+ * First probe is never final (live-acceptance fix): Obsidian builds a pdf
+ * view's internals (`viewer.child.pdfViewer`, toolbar containers) AFTER the
+ * leaf appears, so the very first probe usually lands on an empty viewer.
+ * A C-verdict leaf is therefore re-probed on a short bounded backoff (and on
+ * every later workspace sync) and the bridge is UPGRADED only when a fresh
+ * probe genuinely proves a higher rung — the serializer is actually called,
+ * so A is claimed on evidence, never on a guess (§6.7). A viewer that never
+ * becomes ready stays at C with the honest reason.
  */
 
 import type { App, WorkspaceLeaf } from 'obsidian';
@@ -25,6 +34,7 @@ import {
   isValidRangeStr,
   pageNumberOfSelectionNode,
   type PdfIntegrationDecision,
+  type PdfIntegrationLevel,
   resolvePdfIntegrationLevel,
 } from '../../../core/pdf';
 import type {
@@ -70,15 +80,42 @@ interface LeafBridge {
   onSelectionReleased: () => void;
 }
 
+/** Ladder rank for the one-directional (upgrade-only) re-probe rule. */
+const LEVEL_ORDER: Record<PdfIntegrationLevel, number> = { C: 0, B: 1, A: 2 };
+
+/**
+ * Bounded re-probe schedule for a leaf whose first probe said C. Obsidian's
+ * pdf viewer finishes loading its internals within a few seconds of the leaf
+ * appearing (live-measured ~6s), so the cumulative ~7.75s budget covers the
+ * real open path while still being finite: a viewer that never becomes ready
+ * keeps the honest C verdict instead of retrying forever.
+ */
+const DEFAULT_VIEWER_READY_RETRY_DELAYS_MS: readonly number[] = [250, 500, 1000, 2000, 4000];
+
+export interface PdfChatIntegrationOptions {
+  /**
+   * Injectable re-probe schedule (tests pass tiny delays). The budget is
+   * consumed once per bridge mount; exhausting it stops the retries.
+   */
+  viewerReadyRetryDelaysMs?: readonly number[];
+}
+
 export class PdfChatIntegration {
   private readonly bridges = new Map<WorkspaceLeaf, LeafBridge>();
   private registeredRefs: Array<() => void> = [];
   private lastDecision: PdfIntegrationDecision | null = null;
+  private readonly readyRetryTimers = new Map<WorkspaceLeaf, ReturnType<typeof setTimeout>>();
+  private readonly readyRetryAttempts = new Map<WorkspaceLeaf, number>();
+  private readonly viewerReadyRetryDelaysMs: readonly number[];
 
   constructor(
     private readonly app: App,
     private readonly ports: PdfChatIntegrationPorts,
-  ) {}
+    options?: PdfChatIntegrationOptions,
+  ) {
+    this.viewerReadyRetryDelaysMs = options?.viewerReadyRetryDelaysMs
+      ?? DEFAULT_VIEWER_READY_RETRY_DELAYS_MS;
+  }
 
   /** Register workspace listeners; dormant-safe (no pdf leaf → no bridge). */
   attach(): void {
@@ -98,8 +135,8 @@ export class PdfChatIntegration {
       offref();
     }
     this.registeredRefs = [];
-    for (const bridge of [...this.bridges.values()]) {
-      this.unmountBridge(bridge);
+    for (const [leaf, bridge] of [...this.bridges.entries()]) {
+      this.releaseBridge(leaf, bridge);
     }
     this.bridges.clear();
   }
@@ -182,13 +219,21 @@ export class PdfChatIntegration {
   private syncLeaves(): void {
     const pdfLeaves = this.app.workspace.getLeavesOfType('pdf');
     for (const leaf of pdfLeaves) {
-      if (!this.bridges.has(leaf)) {
+      const existing = this.bridges.get(leaf);
+      if (existing) {
+        // A bridged leaf may still be waiting for Obsidian to finish building
+        // the viewer internals: re-probe so a later, genuinely-proven rung
+        // can upgrade the bridge (D1) instead of caching the first verdict.
+        this.reevaluateBridge(leaf, existing);
+      } else {
         this.mountBridge(leaf);
       }
     }
     for (const [leaf, bridge] of [...this.bridges.entries()]) {
       if (!pdfLeaves.includes(leaf)) {
-        this.unmountBridge(bridge);
+        // Per-bridge resilience (D2): one broken bridge must not abort the
+        // sweep for the remaining leaves.
+        this.releaseBridge(leaf, bridge);
         this.bridges.delete(leaf);
       }
     }
@@ -198,9 +243,31 @@ export class PdfChatIntegration {
    * Runtime confirmation gate (design §3.3): feature-detect the viewer
    * internals, then actually call the native serializer with the best-guess
    * context — running without throwing verifies the A path; a throw or a
-   * malformed result honestly degrades to B.
+   * malformed result honestly degrades to B. A C verdict on a fresh leaf is
+   * usually just "probed too early", so the bounded readiness re-probe is
+   * armed immediately (see `reevaluateBridge`).
    */
   private mountBridge(leaf: WorkspaceLeaf): void {
+    const decision = this.probeLeaf(leaf);
+    this.lastDecision = decision;
+
+    const toolbarButton = decision.level !== 'C'
+      ? this.mountToolbarButton(leaf)
+      : null;
+    this.bridges.set(leaf, {
+      leaf,
+      decision,
+      toolbarButton,
+      onSelectionReleased: () => undefined,
+    });
+    if (decision.level === 'C') {
+      this.readyRetryAttempts.set(leaf, 0);
+      this.scheduleViewerReadyRetry(leaf);
+    }
+  }
+
+  /** Structural probe of one pdf leaf → honest ladder decision. */
+  private probeLeaf(leaf: WorkspaceLeaf): PdfIntegrationDecision {
     const child = this.childOf(leaf);
     const probe = {
       hasPdfViewer: Boolean(child?.pdfViewer),
@@ -220,18 +287,57 @@ export class PdfChatIntegration {
         probe.nativeRangeStrWorks = false;
       }
     }
-    const decision = resolvePdfIntegrationLevel(probe);
-    this.lastDecision = decision;
+    return resolvePdfIntegrationLevel(probe);
+  }
 
-    const toolbarButton = decision.level !== 'C'
-      ? this.mountToolbarButton(leaf)
-      : null;
-    this.bridges.set(leaf, {
-      leaf,
-      decision,
-      toolbarButton,
-      onSelectionReleased: () => undefined,
-    });
+  /**
+   * Arm one step of the bounded readiness backoff for a C-verdict leaf.
+   * Guarded against double-scheduling; a finite budget keeps a viewer that
+   * never becomes usable at C with the honest reasons (fail-closed).
+   */
+  private scheduleViewerReadyRetry(leaf: WorkspaceLeaf): void {
+    if (this.readyRetryTimers.has(leaf)) {
+      return;
+    }
+    const attempt = this.readyRetryAttempts.get(leaf) ?? 0;
+    const delay = this.viewerReadyRetryDelaysMs[attempt];
+    if (delay === undefined) {
+      return; // budget exhausted: the C verdict stands, no infinite retrying
+    }
+    const timer = setTimeout(() => {
+      this.readyRetryTimers.delete(leaf);
+      this.readyRetryAttempts.set(leaf, attempt + 1);
+      const bridge = this.bridges.get(leaf);
+      if (bridge) {
+        this.reevaluateBridge(leaf, bridge);
+      }
+    }, delay);
+    this.readyRetryTimers.set(leaf, timer);
+  }
+
+  /**
+   * Re-probe a bridged leaf and move the ladder UP only. The fresh decision
+   * is adopted when it proves a higher rung (the probe actually CALLS the
+   * native serializer, so an upgrade is evidence, never a guess — §6.7) or
+   * restates the current rung; a lower re-probe never silently downgrades an
+   * already-proven bridge. A still-C leaf keeps the backoff walking.
+   */
+  private reevaluateBridge(leaf: WorkspaceLeaf, bridge: LeafBridge): void {
+    const next = this.probeLeaf(leaf);
+    const nextRank = LEVEL_ORDER[next.level];
+    const currentRank = LEVEL_ORDER[bridge.decision.level];
+    if (nextRank > currentRank) {
+      this.unmountBridge(bridge);
+      bridge.decision = next;
+      bridge.toolbarButton = next.level !== 'C' ? this.mountToolbarButton(leaf) : null;
+      this.lastDecision = next;
+    } else if (nextRank === currentRank) {
+      bridge.decision = next;
+      this.lastDecision = next;
+    }
+    if (bridge.decision.level === 'C') {
+      this.scheduleViewerReadyRetry(leaf);
+    }
   }
 
   private mountToolbarButton(leaf: WorkspaceLeaf): HTMLElement | null {
@@ -251,9 +357,37 @@ export class PdfChatIntegration {
     return button;
   }
 
-  private unmountBridge(bridge: LeafBridge): void {
-    bridge.toolbarButton?.remove();
-    bridge.onSelectionReleased();
+  /**
+   * Teardown must never throw (D2): a level-C bridge has no toolbar button,
+   * a failed mount may be missing either field, and a viewer being torn down
+   * concurrently can make even `remove()` throw. One bad bridge used to
+   * abort `syncLeaves`' cleanup loop, which blocked any self-healing.
+   */
+  private unmountBridge(bridge: LeafBridge | null | undefined): void {
+    if (!bridge) {
+      return;
+    }
+    try {
+      bridge.toolbarButton?.remove();
+    } catch {
+      // Best-effort: the sweep continues.
+    }
+    try {
+      bridge.onSelectionReleased();
+    } catch {
+      // Best-effort: the sweep continues.
+    }
+  }
+
+  /** Full release of one bridge: stop pending readiness retries, tear down. */
+  private releaseBridge(leaf: WorkspaceLeaf, bridge: LeafBridge | null | undefined): void {
+    const timer = this.readyRetryTimers.get(leaf);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      this.readyRetryTimers.delete(leaf);
+    }
+    this.readyRetryAttempts.delete(leaf);
+    this.unmountBridge(bridge);
   }
 
   private async askSelectionFromBridge(leaf: WorkspaceLeaf): Promise<void> {

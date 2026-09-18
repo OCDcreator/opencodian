@@ -12,6 +12,14 @@
  * `{ extractPages }` satisfying `PdfTextEngine`. The host resolves the
  * plugin directory at runtime (`manifest.dir`), so the loader itself stays
  * Obsidian-free and unit-testable.
+ *
+ * Path reality (live-acceptance fix): Obsidian's `manifest.dir` is a
+ * VAULT-RELATIVE path (`.obsidian/plugins/opencodian`), but Node's
+ * `createRequire` rejects relative paths. The host therefore also supplies
+ * the absolute vault base path and the loader joins the two; an
+ * already-absolute dir passes through unchanged, and a relative dir with no
+ * base path available fails closed as `engine-missing` instead of throwing
+ * a raw `createRequire` TypeError.
  */
 
 import { createRequire } from 'node:module';
@@ -59,8 +67,20 @@ export function isPasswordFailure(error: unknown): boolean {
 }
 
 export interface PdfEngineLoaderHost {
-  /** Plugin directory (`manifest.dir`); undefined before load — fail closed. */
+  /**
+   * Plugin directory (`manifest.dir`); undefined before load — fail closed.
+   * May be vault-relative (that is what Obsidian actually provides).
+   */
   getPluginDir(): string | undefined;
+  /**
+   * Absolute vault base path (the `FileSystemAdapter` basePath), used to
+   * resolve a vault-relative `getPluginDir()`. Required so no construction
+   * site can "forget" it — the D3 class of bug (production wiring passing a
+   * relative dir while tests inject absolute ones) must fail at typecheck.
+   * Return null when no absolute base exists (e.g. mobile) — the loader
+   * then fails closed for relative dirs with an honest `engine-missing`.
+   */
+  getVaultBasePath(): string | null | undefined;
 }
 
 interface PdfEngineModule {
@@ -97,15 +117,12 @@ export class PdfEngineLoader {
   }
 
   private async requireEngine(): Promise<PdfTextEngine> {
-    const pluginDir = this.host.getPluginDir();
-    if (!pluginDir) {
-      throw new PdfEngineError({ kind: 'engine-missing', detail: 'plugin directory unavailable' });
-    }
+    const pluginDir = this.resolvePluginDir();
     let mod: PdfEngineModule;
     try {
-      // The plugin loads from the plugin directory (`manifest.dir`), so a
-      // require anchored there resolves `pdf-engine.js` next to `main.js`.
-      // The specifier is computed at runtime — the bundler never tries to
+      // `resolvePluginDir` guarantees an absolute path, so `createRequire`
+      // accepts it and resolves `pdf-engine.js` next to `main.js`. The
+      // specifier is computed at runtime — the bundler never tries to
       // inline it, and nothing is loaded until the first PDF attach/index.
       const requireFromPlugin = createRequire(path.join(pluginDir, 'main.js'));
       mod = requireFromPlugin('./pdf-engine.js') as PdfEngineModule;
@@ -123,6 +140,31 @@ export class PdfEngineLoader {
     }
     this.engine = mod as unknown as PdfTextEngine;
     return this.engine;
+  }
+
+  /**
+   * Produce an absolute plugin directory for `createRequire`. An
+   * already-absolute dir passes through unchanged; a vault-relative dir
+   * (the production `manifest.dir` shape) is joined onto the host's vault
+   * base path. Without any way to obtain an absolute path the loader fails
+   * closed with the honest typed error — never a raw createRequire throw.
+   */
+  private resolvePluginDir(): string {
+    const pluginDir = this.host.getPluginDir();
+    if (!pluginDir) {
+      throw new PdfEngineError({ kind: 'engine-missing', detail: 'plugin directory unavailable' });
+    }
+    if (path.isAbsolute(pluginDir)) {
+      return pluginDir;
+    }
+    const vaultBasePath = this.host.getVaultBasePath() ?? null;
+    if (!vaultBasePath) {
+      throw new PdfEngineError({
+        kind: 'engine-missing',
+        detail: `plugin directory '${pluginDir}' is vault-relative and no absolute vault base path is available`,
+      });
+    }
+    return path.join(vaultBasePath, pluginDir);
   }
 }
 
