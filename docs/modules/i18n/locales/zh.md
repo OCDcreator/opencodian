@@ -578,3 +578,7 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 ## 2026-09-18 (FlowText R-B5)
 
 新增 `batchOrganize.*` 键组（与 en.ts 一一对应）：模板名（移动/改属性/重命名）、范围与参数表单标签、预览/确认/结果文案、冲突与错误码文案、两条命令名。
+
+## 2026-09-18 (R-B5-D1 修复)
+
+新增 3 个 `batchOrganize.*` 键：`preview.newFolders`（预览如实列出将新建目录）、`result.createdFolders`（结果页披露本批次新建目录与回退清理语义）、`error.folderUnavailable`（目录创建失败 fail-closed 提示，含目录名）。

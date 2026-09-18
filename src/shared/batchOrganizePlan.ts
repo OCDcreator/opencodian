@@ -487,6 +487,27 @@ export function plansAreIdentical(a: BatchPlanResult, b: BatchPlanResult): boole
 
 // --- path helpers --------------------------------------------------------------------
 
+/**
+ * Distinct target folders of move/rename operations, codepoint-sorted so a
+ * parent always precedes its nested children. The vault root (`''`) is
+ * excluded — it trivially exists. The executor ensures each of these exists
+ * (`vault.createFolder`) before the first write; the preview shows the ones
+ * currently missing as "folders to be created".
+ */
+export function collectTargetFolders(operations: readonly BatchOperation[]): string[] {
+  const folders = new Set<string>();
+  for (const operation of operations) {
+    if (operation.kind === 'edit-properties') {
+      continue;
+    }
+    const folder = directoryOf(operation.to);
+    if (folder) {
+      folders.add(folder);
+    }
+  }
+  return [...folders].sort(comparePaths);
+}
+
 export function basenameOf(path: string): string {
   const segments = path.split('/');
   return segments[segments.length - 1] ?? path;

@@ -142,11 +142,7 @@ export class BatchOrganizeModal extends Modal {
     }
 
     const errorEl = this.contentEl.createDiv({ cls: 'opencodian-batch-organize-error' });
-    const previewButton = this.contentEl.createEl('button', {
-      cls: 'mod-cta',
-      text: t('batchOrganize.preview'),
-      attr: { type: 'button' },
-    });
+    const previewButton = createButton(this.contentEl, t('batchOrganize.preview'), 'mod-cta');
     previewButton.addEventListener('click', () => {
       void this.handlePreview(errorEl);
     });
@@ -303,6 +299,15 @@ export class BatchOrganizeModal extends Modal {
         text: t('batchOrganize.preview.more', { count: operations.length - PREVIEW_LIST_CAP }),
       });
     }
+    // Honest disclosure: folders that do not exist yet will be created.
+    if (this.confirmedPreview.foldersToCreate.length > 0) {
+      listEl.createDiv({
+        cls: 'opencodian-batch-organize-hint',
+        text: t('batchOrganize.preview.newFolders', {
+          folders: this.confirmedPreview.foldersToCreate.join(', '),
+        }),
+      });
+    }
     for (const conflict of result.conflicts) {
       const row = listEl.createDiv({ cls: 'opencodian-batch-organize-conflict' });
       row.setText(
@@ -315,19 +320,16 @@ export class BatchOrganizeModal extends Modal {
     }
 
     const buttons = this.contentEl.createDiv({ cls: 'opencodian-batch-organize-buttons' });
-    const confirmButton = buttons.createEl('button', {
-      cls: 'mod-cta',
-      text: t('batchOrganize.confirm', { count: operations.length }),
-      attr: { type: 'button' },
-    });
+    const confirmButton = createButton(
+      buttons,
+      t('batchOrganize.confirm', { count: operations.length }),
+      'mod-cta',
+    );
     confirmButton.disabled = operations.length === 0;
     confirmButton.addEventListener('click', () => {
       void this.handleExecute();
     });
-    const backButton = buttons.createEl('button', {
-      text: t('batchOrganize.back'),
-      attr: { type: 'button' },
-    });
+    const backButton = createButton(buttons, t('batchOrganize.back'));
     backButton.addEventListener('click', () => {
       this.stage = 'configure';
       this.render();
@@ -358,6 +360,9 @@ export class BatchOrganizeModal extends Modal {
     } else if (outcome.status === 'empty') {
       new Notice(t('batchOrganize.notice.nothingToDo'));
       this.stage = 'configure';
+    } else if (outcome.status === 'folder-unavailable') {
+      new Notice(t('batchOrganize.error.folderUnavailable', { folder: outcome.folder }));
+      this.stage = 'configure';
     } else {
       this.revertDone = false;
       this.stage = 'result';
@@ -376,6 +381,12 @@ export class BatchOrganizeModal extends Modal {
     this.contentEl.createEl('p', {
       text: t('batchOrganize.result.changed', { count: outcome.changed }),
     });
+    if (outcome.createdFolders.length > 0) {
+      this.contentEl.createEl('p', {
+        cls: 'opencodian-batch-organize-hint',
+        text: t('batchOrganize.result.createdFolders', { folders: outcome.createdFolders.join(', ') }),
+      });
+    }
     if (outcome.failures.length > 0) {
       const failEl = this.contentEl.createDiv({ cls: 'opencodian-batch-organize-conflict' });
       failEl.setText(t('batchOrganize.result.skipped', { count: outcome.failures.length }));
@@ -386,34 +397,19 @@ export class BatchOrganizeModal extends Modal {
     }
 
     const buttons = this.contentEl.createDiv({ cls: 'opencodian-batch-organize-buttons' });
-    const revertButton = buttons.createEl('button', {
-      text: t('batchOrganize.result.revertAll'),
-      attr: { type: 'button' },
-    });
+    const revertButton = createButton(buttons, t('batchOrganize.result.revertAll'));
     revertButton.disabled = this.revertDone || outcome.changed === 0;
     revertButton.addEventListener('click', () => {
       void this.handleRevert(revertButton);
     });
-    const closeButton = buttons.createEl('button', {
-      text: t('batchOrganize.close'),
-      attr: { type: 'button' },
-    });
+    const closeButton = createButton(buttons, t('batchOrganize.close'));
     closeButton.addEventListener('click', () => super.close());
   }
 
   private async handleRevert(button: HTMLButtonElement): Promise<void> {
-    const result = await this.coordinator.revertLastBatch();
     this.revertDone = true;
     button.disabled = true;
-    if (!result) {
-      new Notice(t('batchOrganize.error.revertUnavailable'));
-      return;
-    }
-    if (result.ok) {
-      new Notice(t('editRevert.notice.revertAll', { count: result.changed, skippedDetail: '' }));
-    } else {
-      new Notice(t('editRevert.notice.failed', { error: result.error ?? 'unknown' }));
-    }
+    await revertLastBatchAndNotify(this.coordinator);
   }
 
   // --- form → template params ---------------------------------------------------------
@@ -538,18 +534,11 @@ export class BatchRevertConfirmModal extends Modal {
     this.contentEl.createEl('p', { text: t('batchOrganize.revertConfirm.desc') });
 
     const buttons = this.contentEl.createDiv({ cls: 'opencodian-batch-organize-buttons' });
-    const revertButton = buttons.createEl('button', {
-      cls: 'mod-cta',
-      text: t('batchOrganize.result.revertAll'),
-      attr: { type: 'button' },
-    });
+    const revertButton = createButton(buttons, t('batchOrganize.result.revertAll'), 'mod-cta');
     revertButton.addEventListener('click', () => {
       void this.handleRevert();
     });
-    const cancelButton = buttons.createEl('button', {
-      text: t('batchOrganize.revertConfirm.cancel'),
-      attr: { type: 'button' },
-    });
+    const cancelButton = createButton(buttons, t('batchOrganize.revertConfirm.cancel'));
     cancelButton.addEventListener('click', () => this.close());
   }
 
@@ -558,16 +547,26 @@ export class BatchRevertConfirmModal extends Modal {
   }
 
   private async handleRevert(): Promise<void> {
-    const result: EditRevertActionResult | null = await this.coordinator.revertLastBatch();
     this.close();
-    if (!result) {
-      new Notice(t('batchOrganize.error.revertUnavailable'));
-      return;
-    }
-    if (result.ok) {
-      new Notice(t('editRevert.notice.revertAll', { count: result.changed, skippedDetail: '' }));
-    } else {
-      new Notice(t('editRevert.notice.failed', { error: result.error ?? 'unknown' }));
-    }
+    await revertLastBatchAndNotify(this.coordinator);
   }
+}
+
+function createButton(parent: HTMLElement, label: string, cls?: string): HTMLButtonElement {
+  return parent.createEl('button', { text: label, attr: { type: 'button' }, ...(cls ? { cls } : {}) });
+}
+
+/** Shared revert outcome reporting for the result stage and the confirm dialog. */
+async function revertLastBatchAndNotify(coordinator: BatchOrganizeCoordinator): Promise<boolean> {
+  const result: EditRevertActionResult | null = await coordinator.revertLastBatch();
+  if (!result) {
+    new Notice(t('batchOrganize.error.revertUnavailable'));
+    return false;
+  }
+  if (result.ok) {
+    new Notice(t('editRevert.notice.revertAll', { count: result.changed, skippedDetail: '' }));
+  } else {
+    new Notice(t('editRevert.notice.failed', { error: result.error ?? 'unknown' }));
+  }
+  return result.ok;
 }

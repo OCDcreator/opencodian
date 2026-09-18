@@ -22,6 +22,7 @@
 | `matchesBatchScope` / `normalizeTag` / `normalizeTagList` | 标签（`#` 容忍、大小写不敏感、含嵌套）、属性（存在/标量字符串化等值）、关键词（名称+内容，大小写不敏感）三类范围匹配 |
 | `buildBatchPlan` | 模板 + 快照 → 确定性排序的操作计划；目标占用/重名目标以 `conflicts` 显式排除（**绝不覆盖**） |
 | `planSignature` / `plansAreIdentical` | 计划签名；执行前重算比对，漂移即 fail-closed 拒绝（零写入） |
+| `collectTargetFolders` | R-B5-D1：移动/重命名操作的目标目录清单（去重、码点序、父先于子、排除根目录）；执行侧据此确保目录存在，预览侧据此如实列出"将新建目录" |
 | `parseBatchPropertyValue` / `applyBatchPropertyOperation` | 表单原始输入 → 带类型的属性值（text/number/boolean/list）；在 `processFrontMatter` 回调内按声明 JS 类型变更 frontmatter（YAML 序列化完全留给 Obsidian） |
 | `validateTargetFolder` / `validateRenameRule` / `validatePropertyName` | 参数校验（错误码，UI 侧映射为 i18n 文案） |
 

@@ -8,7 +8,7 @@
  * vault-event funnel and its self-write guard are exercised for real.
  */
 
-import { TFile } from 'obsidian';
+import { TFile, TFolder } from 'obsidian';
 
 import { EditRevertService } from '../../../../src/core/storage/EditRevertService';
 
@@ -17,6 +17,12 @@ export const CONVERSATION_ID = 'conv-1';
 export const POST_TURN_GRACE_MS = 10 * 60 * 1000;
 
 type VaultFileHandler = (file: TFile) => void;
+
+/** The direct child folder segment of `path`; '' for vault-root entries. */
+function parentFolderOf(path: string): string {
+  const index = path.lastIndexOf('/');
+  return index === -1 ? '' : path.slice(0, index);
+}
 
 /**
  * Split a test note into its frontmatter block and the remainder. Test notes
@@ -50,6 +56,8 @@ export class EditRevertVaultHarness {
   readonly renameLog: Array<{ from: string; to: string }> = [];
   /** R-B5: call-order log proving snapshots happen before writes. */
   readonly operationOrder: string[] = [];
+  /** R-B5-D1: explicitly created vault folders (folders persist once created). */
+  readonly folders = new Set<string>();
   private readonly dirs = new Set<string>();
   private readonly handlers: Record<'modify' | 'create' | 'delete', VaultFileHandler[]> = {
     modify: [],
@@ -78,6 +86,7 @@ export class EditRevertVaultHarness {
     remove: async (path: string): Promise<void> => {
       this.diskFiles.delete(path);
       this.dirs.delete(path);
+      this.folders.delete(path);
     },
     stat: async (path: string): Promise<{ size: number }> => {
       const content = this.vaultFiles.get(path) ?? this.diskFiles.get(path);
@@ -93,13 +102,43 @@ export class EditRevertVaultHarness {
         }
         return path.slice(prefix.length + 1).split('/').length === 1;
       };
-      return {
-        files: [...this.diskFiles.keys()].filter((path) => direct(path) && !this.dirs.has(path)),
-        folders: [...this.dirs].filter(direct),
-      };
+      // Vault files AND plugin-data artifacts are both direct children.
+      const files = new Set<string>();
+      for (const path of this.diskFiles.keys()) {
+        if (direct(path) && !this.dirs.has(path)) {
+          files.add(path);
+        }
+      }
+      for (const path of this.vaultFiles.keys()) {
+        if (direct(path)) {
+          files.add(path);
+        }
+      }
+      // Folders: adapter mkdirs (plugin data) and created vault folders.
+      // Folders persist until removed — no derivation from file paths.
+      const folders = new Set<string>();
+      for (const path of this.dirs) {
+        if (direct(path)) {
+          folders.add(path);
+        }
+      }
+      for (const path of this.folders) {
+        if (direct(path)) {
+          folders.add(path);
+        }
+      }
+      return { files: [...files], folders: [...folders] };
     },
     getBasePath: (): string => VAULT_BASE,
   };
+
+  /** True when the vault folder `path` exists (folders persist until removed, like Obsidian). */
+  hasVaultFolder(path: string): boolean {
+    if (!path) {
+      return true; // vault root
+    }
+    return this.folders.has(path);
+  }
 
   readonly vault = {
     adapter: this.adapter,
@@ -108,8 +147,11 @@ export class EditRevertVaultHarness {
       return { off: (): void => undefined };
     },
     offref: (_ref: unknown): void => undefined,
-    getAbstractFileByPath: (path: string): TFile | null => {
-      return this.vaultFiles.has(path) ? makeTFile(path) : null;
+    getAbstractFileByPath: (path: string): TFile | TFolder | null => {
+      if (this.vaultFiles.has(path)) {
+        return makeTFile(path);
+      }
+      return this.hasVaultFolder(path) ? makeTFolder(path) : null;
     },
     getMarkdownFiles: (): TFile[] => {
       return [...this.vaultFiles.keys()].filter((path) => path.endsWith('.md')).map(makeTFile);
@@ -120,6 +162,12 @@ export class EditRevertVaultHarness {
         throw new Error(`file not found: ${file.path}`);
       }
       return content;
+    },
+    createFolder: async (path: string): Promise<TFolder> => {
+      // Real `vault.createFolder` creates missing ancestors; it never fails
+      // for a not-yet-existing path, so the double mirrors that.
+      this.folders.add(path);
+      return makeTFolder(path);
     },
     process: async (file: TFile, fn: (content: string) => string): Promise<TFile> => {
       const next = fn(this.vaultFiles.get(file.path) ?? '');
@@ -145,6 +193,8 @@ export class EditRevertVaultHarness {
    * R-B5: fileManager double. `renameFile` moves the vault key WITHOUT
    * emitting modify/create/delete events — exactly like Obsidian, where a
    * rename fires only a `rename` event the event funnel does not observe.
+   * R-B5-D1: like the real API it does NOT create parent folders — renaming
+   * into a folder that does not exist throws.
    */
   readonly fileManager = {
     renameFile: async (file: TFile, newPath: string): Promise<void> => {
@@ -154,6 +204,10 @@ export class EditRevertVaultHarness {
       }
       if (this.vaultFiles.has(newPath)) {
         throw new Error('target already exists');
+      }
+      const parent = parentFolderOf(newPath);
+      if (!this.hasVaultFolder(parent)) {
+        throw new Error(`target folder does not exist: ${parent || '(root)'}`);
       }
       this.operationOrder.push(`rename:${file.path}`);
       this.vaultFiles.delete(file.path);
@@ -203,6 +257,13 @@ export function makeTFile(path: string): TFile {
   file.basename = file.name.replace(/\.[^.]+$/, '');
   file.extension = file.name.includes('.') ? (file.name.split('.').pop() ?? '') : '';
   return file;
+}
+
+export function makeTFolder(path: string): TFolder {
+  const folder = new TFolder();
+  folder.path = path;
+  folder.name = path.split('/').pop() ?? path;
+  return folder;
 }
 
 export interface HarnessService {

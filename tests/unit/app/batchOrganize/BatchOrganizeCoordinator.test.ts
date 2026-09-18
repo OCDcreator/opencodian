@@ -35,6 +35,8 @@ function setupHarness(): { harness: EditRevertVaultHarness; caches: Map<string, 
   harness.vaultFiles.set('notes/a.md', NOTE_A);
   harness.vaultFiles.set('notes/b.md', NOTE_B);
   harness.vaultFiles.set('inbox/c.md', NOTE_C);
+  harness.folders.add('notes');
+  harness.folders.add('inbox');
   const caches = new Map<string, Record<string, unknown>>();
   caches.set('notes/a.md', { frontmatter: { tags: ['待整理'], status: 'todo' } });
   caches.set('notes/b.md', { frontmatter: { tags: ['#待整理'] }, tags: [{ tag: '#待整理' }] });
@@ -264,5 +266,110 @@ describe('BatchOrganizeCoordinator execute (R-B5)', () => {
     const revert = await coordinator.revertLastBatch();
     expect(revert).toMatchObject({ ok: true, changed: 1 });
     expect(harness.vaultFiles.get('notes/b.md')).toBe(NOTE_B);
+  });
+});
+
+describe('BatchOrganizeCoordinator target folder handling (R-B5-D1)', () => {
+  const MOVE_NEW_FOLDER_TEMPLATE = {
+    templateId: 'move-notes',
+    params: { scope: { kind: 'tag', tag: '待整理' }, targetFolder: '归档验收' },
+  } as const;
+
+  it('creates a missing target folder, executes the moves, and revert restores the pre-batch vault shape', async () => {
+    const { harness, caches } = setupHarness();
+    const { coordinator } = await buildCoordinator(harness, caches);
+    expect(harness.hasVaultFolder('归档验收')).toBe(false);
+
+    const preview = await coordinator.buildPreview(MOVE_NEW_FOLDER_TEMPLATE);
+    if (preview.status !== 'ok') {
+      throw new Error('preview failed');
+    }
+    // The preview honestly discloses the folder it will create.
+    expect(preview.preview.foldersToCreate).toEqual(['归档验收']);
+
+    const result = await coordinator.execute(MOVE_NEW_FOLDER_TEMPLATE, preview.preview.signature);
+    expect(result).toMatchObject({ status: 'ok', changed: 2, failures: [], createdFolders: ['归档验收'] });
+    expect(harness.hasVaultFolder('归档验收')).toBe(true);
+    expect(harness.vaultFiles.has('归档验收/a.md')).toBe(true);
+    expect(harness.vaultFiles.has('归档验收/b.md')).toBe(true);
+
+    const revert = await coordinator.revertLastBatch();
+    expect(revert).toMatchObject({ ok: true, changed: 2 });
+    expect(harness.vaultFiles.get('notes/a.md')).toBe(NOTE_A);
+    expect(harness.vaultFiles.get('notes/b.md')).toBe(NOTE_B);
+    // The folder the batch created is gone again: vault == pre-batch shape.
+    expect(harness.hasVaultFolder('归档验收')).toBe(false);
+  });
+
+  it('folder creation failure is fail closed: zero writes, explicit outcome, nothing revertible', async () => {
+    const { harness, caches } = setupHarness();
+    const { coordinator } = await buildCoordinator(harness, caches);
+    harness.vault.createFolder = async (): Promise<never> => {
+      throw new Error('EACCES: simulated mkdir failure');
+    };
+
+    const preview = await coordinator.buildPreview(MOVE_NEW_FOLDER_TEMPLATE);
+    if (preview.status !== 'ok') {
+      throw new Error('preview failed');
+    }
+    const result = await coordinator.execute(MOVE_NEW_FOLDER_TEMPLATE, preview.preview.signature);
+    expect(result).toEqual({ status: 'folder-unavailable', folder: '归档验收' });
+    expect(harness.renameLog).toEqual([]);
+    expect(harness.vaultFiles.has('notes/a.md')).toBe(true);
+    expect(harness.vaultFiles.has('notes/b.md')).toBe(true);
+    expect(harness.hasVaultFolder('归档验收')).toBe(false);
+    expect(coordinator.hasLastBatch()).toBe(false);
+    // The snapshot round opened first (it precedes every mutation) but no
+    // file operation followed it.
+    expect(harness.operationOrder).toEqual(['snapshot']);
+  });
+
+  it('a created folder that gained other content is kept on revert (never deletes user content)', async () => {
+    const { harness, caches } = setupHarness();
+    const { coordinator } = await buildCoordinator(harness, caches);
+
+    const preview = await coordinator.buildPreview(MOVE_NEW_FOLDER_TEMPLATE);
+    if (preview.status !== 'ok') {
+      throw new Error('preview failed');
+    }
+    const result = await coordinator.execute(MOVE_NEW_FOLDER_TEMPLATE, preview.preview.signature);
+    expect(result).toMatchObject({ status: 'ok', changed: 2 });
+
+    // The user drops an unrelated note into the new folder afterwards.
+    harness.vaultFiles.set('归档验收/user-note.md', 'user content added later');
+
+    const revert = await coordinator.revertLastBatch();
+    expect(revert).toMatchObject({ ok: true, changed: 2 });
+    expect(harness.vaultFiles.get('notes/a.md')).toBe(NOTE_A);
+    expect(harness.vaultFiles.get('notes/b.md')).toBe(NOTE_B);
+    // The folder itself stays because it is no longer empty.
+    expect(harness.hasVaultFolder('归档验收')).toBe(true);
+    expect(harness.vaultFiles.get('归档验收/user-note.md')).toBe('user content added later');
+  });
+
+  it('a batch whose operations all fail removes the folders it just created', async () => {
+    const { harness, caches } = setupHarness();
+    const { coordinator } = await buildCoordinator(harness, caches);
+    harness.fileManager.renameFile = async (file) => {
+      throw new Error(`simulated rename failure for ${file.path}`);
+    };
+
+    const preview = await coordinator.buildPreview(MOVE_NEW_FOLDER_TEMPLATE);
+    if (preview.status !== 'ok') {
+      throw new Error('preview failed');
+    }
+    const result = await coordinator.execute(MOVE_NEW_FOLDER_TEMPLATE, preview.preview.signature);
+    expect(result).toMatchObject({ status: 'ok', changed: 0, failures: ['notes/a.md', 'notes/b.md'], createdFolders: [] });
+    expect(harness.hasVaultFolder('归档验收')).toBe(false);
+    expect(harness.vaultFiles.has('notes/a.md')).toBe(true);
+  });
+
+  it('harness honesty: renaming into a missing folder throws like the real API', async () => {
+    const { harness } = setupHarness();
+    const file = harness.vault.getAbstractFileByPath('notes/a.md');
+    expect(file).not.toBeNull();
+    await expect(harness.fileManager.renameFile(file as TFile, 'missing/a.md')).rejects.toThrow(
+      /target folder does not exist/,
+    );
   });
 });

@@ -27,6 +27,7 @@ export {
   BATCH_ORGANIZE_TEMPLATE_IDS,
   buildBatchPlan,
   coercePropertyToString,
+  collectTargetFolders,
   directoryOf,
   matchesBatchScope,
   normalizeTag,

@@ -35,6 +35,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 - No write without a confirmed preview: the modal's confirm carries the preview signature, and `execute()` recomputes the plan first — a stale signature means the vault changed and the batch aborts with zero writes (fail closed, requirement acceptance 3).
 - No write without a forced snapshot: when `beginBatchCapture` is missing, disabled, or fails, the batch refuses to run (mechanism guarantee, requirement §11.3 — not prompt wording).
 - Never overwrite: planned moves/renames into occupied paths are excluded at plan time (`conflicts`) and re-checked at execution time.
+- Missing target folders are created BEFORE the first note write (`vault.createFolder`, disclosed in the preview); a folder-creation failure is fail closed (created folders rolled back, explicit prompt, zero writes), and revert removes the folders a batch created when they are left empty — never a non-empty folder (R-B5-D1).
 - Template labels are i18n product assets (`batchOrganize.*` in `zh.ts`/`en.ts`); no user-facing wording lives in code.
 - The batch modal is the immediate revert entry after completion; the "revert last batch" command (with confirm modal) is the durable entry. Batch rounds use synthetic conversation ids (`batch-organize-…`) so they never surface in a chat conversation's sidebar.
 

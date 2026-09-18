@@ -11,8 +11,10 @@
 import {
   applyBatchPropertyOperation,
   type BatchNoteSnapshot,
+  type BatchOperation,
   buildBatchPlan,
   coercePropertyToString,
+  collectTargetFolders,
   matchesBatchScope,
   normalizeTag,
   normalizeTagList,
@@ -308,5 +310,23 @@ describe('parameter validation helpers (R-B5)', () => {
     expect(coercePropertyToString({ a: 1 })).toBeNull();
     expect(coercePropertyToString(undefined)).toBeNull();
     expect(normalizeTag('#Hello/World')).toBe('hello/world');
+  });
+});
+
+describe('target folder collection (R-B5-D1)', () => {
+  it('collects distinct codepoint-sorted target folders; root and property edits are excluded', () => {
+    const operations: BatchOperation[] = [
+      { kind: 'move', from: 'a.md', to: '归档/b.md' },
+      { kind: 'move', from: 'c.md', to: '归档/sub/d.md' },
+      { kind: 'rename', from: 'e.md', to: 'f.md' },
+      { kind: 'edit-properties', path: '归档/g.md' },
+    ];
+    // Parents sort before children, so creating in list order is always safe.
+    expect(collectTargetFolders(operations)).toEqual(['归档', '归档/sub']);
+  });
+
+  it('returns an empty list for property-edit batches (no target folders involved)', () => {
+    const operations: BatchOperation[] = [{ kind: 'edit-properties', path: 'a.md' }];
+    expect(collectTargetFolders(operations)).toEqual([]);
   });
 });

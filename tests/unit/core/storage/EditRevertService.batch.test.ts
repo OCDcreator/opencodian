@@ -31,6 +31,7 @@ async function startedService(
   const context = createHarnessService({ ...overrides, harness });
   harness.vaultFiles.set('notes/a.md', 'PRE-A');
   harness.vaultFiles.set('notes/b.md', 'PRE-B');
+  harness.folders.add('notes');
   await context.service.initialize();
   await settle(context.service);
   return context;
@@ -127,6 +128,8 @@ describe('EditRevertService plugin move records (R-B5)', () => {
     const { service, harness } = context;
 
     await service.beginBatchCapture(BATCH_ID, ['notes/a.md']);
+    // The harness double now validates parent folders like the real API.
+    await harness.vault.createFolder('归档');
     await harness.fileManager.renameFile(harness.vault.getAbstractFileByPath('notes/a.md')!, '归档/a.md');
     await service.notePluginMove(BATCH_ID, 'notes/a.md', '归档/a.md');
     await service.endBatchCapture(BATCH_ID);
@@ -149,6 +152,7 @@ describe('EditRevertService plugin move records (R-B5)', () => {
     const { service, harness } = context;
 
     await service.beginBatchCapture(BATCH_ID, ['notes/a.md']);
+    await harness.vault.createFolder('归档');
     await harness.fileManager.renameFile(harness.vault.getAbstractFileByPath('notes/a.md')!, '归档/a.md');
     await service.notePluginMove(BATCH_ID, 'notes/a.md', '归档/a.md');
     await service.endBatchCapture(BATCH_ID);
