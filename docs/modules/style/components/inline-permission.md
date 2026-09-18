@@ -1,3 +1,5 @@
+> 2026-09-18 (R-A7)：上下文文件选择器新增多选与目录条目样式——勾选态（`is-selected` + 圆形对勾）、行首图标槽（文件/文件夹字形）、目录标签（`is-folder`）与底部确认条（已选计数 + `mod-cta` 附加按钮，禁用时弱化）。
+
 # Inline Permission Styles
 
 > **源码**: `src/style/components/inline-permission.css`
