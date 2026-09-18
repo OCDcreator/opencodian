@@ -259,6 +259,7 @@ export class SettingsDebugSection {
   ): void {
     this.addDebugLoggingSetting(containerEl);
     this.addPdfIntegrationStatusSetting(containerEl);
+    this.addCanvasIntegrationStatusSetting(containerEl);
     this.addDebugModuleSettings(
       containerEl,
       {
@@ -285,6 +286,28 @@ export class SettingsDebugSection {
       : levelText;
     new Setting(containerEl)
       .setName(t('chat.context.pdfIntegration.level'))
+      .setDesc(description);
+  }
+
+  /**
+   * R-C5: honestly surface the canvas runtime confirmation gate (design §3.4
+   * / §6.7). "Not mounted yet" until a canvas leaf has been probed; a failed
+   * probe shows the concrete missing pieces instead of a generic failure.
+   */
+  private addCanvasIntegrationStatusSetting(containerEl: HTMLElement): void {
+    const report = this.plugin.canvasIntegration?.getGateReport() ?? null;
+    const levelText = !report
+      ? t('canvas.integration.notMounted')
+      : report.supported
+        ? (report.canWriteBack
+          ? t('canvas.integration.levelReadWrite')
+          : t('canvas.integration.levelReadOnly'))
+        : t('canvas.integration.levelUnsupported');
+    const description = report && report.reasons.length > 0
+      ? `${levelText} — ${t('canvas.integration.reasons', { reasons: report.reasons.join('; ') })}`
+      : levelText;
+    new Setting(containerEl)
+      .setName(t('canvas.integration.gateLevel'))
       .setDesc(description);
   }
 

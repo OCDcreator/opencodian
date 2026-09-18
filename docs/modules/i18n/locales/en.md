@@ -87,6 +87,8 @@
 
 ## 概述
 
+R-C5：新增 `canvas.generate.*`（生成流程与失败/回退明示）、`canvas.command.generate`、`canvas.rewrite.*`（节点改写指令/预览确认/挑选/错误边界与撤销诚实提示）与 `canvas.integration.*`（调试区确认门状态）双语文案。
+
 R-C4：新增 `settings.pdfIndex.*`（设置块）、`chat.context.notice.pdf*`（PDF 附加 fail-closed 提示与注释保存结果）、`chat.context.kind.pdfDocument`/`pdfSelection`、`chat.context.pdfIntegration.*`（降级阶梯上报）、`chat.pdf.command.*` 与 `chat.pdf.annotation.*`（三期命令与预览模态）双语文案。
 
 

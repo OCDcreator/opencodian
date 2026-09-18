@@ -22,8 +22,8 @@
 - `src/main.ts`
 
 ## Dependency surface
-- **Allowed owner dependencies:** `core.runtime`, `core.opencode`, `core.agents`, `core.storage`, `core.config`, `feature.chat-shell`, `feature.settings-shell`, `app.diagnostics-runtime`, `app.runtime`
-- **Adjacent owners** (prefer editing these when out of scope): `core.runtime`, `core.opencode`, `app.diagnostics-runtime`, `app.runtime`
+- **Allowed owner dependencies:** `core.runtime`, `core.opencode`, `core.agents`, `core.storage`, `core.config`, `feature.chat-shell`, `feature.settings-shell`, `app.diagnostics-runtime`, `app.runtime`, `feature.inline-edit`, `core.canvas` (R-C5), `feature.canvas-integration` (R-C5)
+- **Adjacent owners** (prefer editing these when out of scope): `core.runtime`, `core.opencode`, `app.diagnostics-runtime`, `app.runtime`, `core.pdf`, `app.pdf-runtime`, `core.canvas`, `feature.canvas-integration`
 
 ## Focused tests
 - `tests/unit/entry-point/**`

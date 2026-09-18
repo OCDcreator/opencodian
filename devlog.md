@@ -11,6 +11,18 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-18 Canvas 生成与节点级 AI（R-C5）：确定性布局、原子落盘与运行时确认门
+
+FlowText 对齐 R-C5 落地（设计基准 `docs/requirements/flowtext-c5-design.md`；Canvas API 面为静态核实、运行时行为留待实机验证，全链按设计的诚实降级实施）。
+
+**core.canvas（新 owner）**：`CanvasDocument` 三段式契约——宽松解析（真实画布文件中的 `readingDesk`/`x-nimbalyst`/`toEnd` 等未知字段逐字保留，往返无损）+ 确定性序列化（固定键序 + 2 空格缩进，与 Obsidian 自身 writer 一致，黄金断言字节级可验）+ 严格写前校验 `assertWritableDocument`（id 唯一/边端点可解析/坐标有限/type 合法，fail-closed 抛稳定 reason）。`CanvasLayout` 确定性网格/分组布局（节点 360×160、间距 60、组内边距 40，实测常量；≤4 单行、≥5 每 3 换行；分组列式 + group 包边；无随机无时钟，n=1/3/4/5/7/20 黄金值 + 程序化几何不重叠断言）。`CanvasGenerationService` 原子落盘（验收 4）：内存构建 → 序列化字节往返 + 双重 `assertWritableDocument` → 重名追加 ` 2`/` 3` 不覆盖 → 恰一次 `vault.create` → create 抛错仍留文件即回收进回收站再抛原错；vault 只经 `CanvasVaultPort` 触达。`CanvasSplitProposal`：AI 主题拆分严格 JSON 契约（`sourcePath` 必须在给定路径内、摘录逐字、单篇 20k/50 篇/摘录 4k 上限，fail-closed 全拒）。`CanvasNodeWriteService`：运行时确认门纯判定（读侧 `view.canvas`/`getData`/形状不过 → 功能不注册并上报原因；写侧 `setData`/`requestSave` 缺失 → D 级仅复制；`selection` 非 Set 不拦门——C 级显式不依赖 selection，§7-U4）；文本节点写回 = 唯一 `.canvas` 变更路径（新鲜 `getData()` 脏检查 → 全文档替换 → 校验 → `setData`+`requestSave`，保存走 Canvas 自身管线）；文件节点 = 单次 `vault.process` 闭包先读比对后写。
+
+**feature.canvas-integration（新 owner）**：`CanvasIntegrationController` 桥接外来宿主视图——门不过该叶什么都不挂、原因进调试区（§6.7）；阶梯 A（`.canvas-menu-container` 浮动按钮，MutationObserver 懒挂载 + 右键菜单包装 feature-detect/可恢复）→ B（命令读 `canvas.selection`，多选只取第一个并明示）→ C（`getData()` 全节点挑选弹窗）→ D（改写结果仅复制并明示）。改写主流程：指令弹窗 → 只读 aux 会话（`CanvasNodeRewriteService` 复用行内编辑 `parseInlineEditResponse` 响应协议 + `findWriteToolCalls` 阻断审计，一改写一短命会话，`finally` 必 dispose）→ 预览确认弹窗（Mermaid 单块带实时渲染预览，渲染失败保留原始块）→ 按类型写回。`CanvasGenerationFlow`：R-A7 picker 多选 + R-B2 主题组一键行（文件夹展开为其中 markdown）→ 模式弹窗（文件引用默认；AI 拆分需只读后端，失败明示原因并回退文件引用模式——显式替代非静默降级）→ 生成 → `registerPluginCreatedAsset` 登记 R-B3（created 条目回退 = 回收站）并按 record-then-close 立即 `endBatchCapture` 使一键回退即时可用；无会话可归属时成功通知明示"未纳入回退覆盖"。文件节点写走 `beginBatchCapture` → 单次 `vault.process` → `notePluginWrite` → `endBatchCapture`（回退面缺失时拒绝写入而非不可回退地写）。撤销诚实条款（E2）：文本节点 `setData` 不在 R-B3 覆盖内（markdown-only funnel）且 Ctrl+Z 未验证，预览弹窗如实标注。
+
+**组合与调试**：main.ts 只组合（两命令 + Notice 注入 + picker/aux 端口装配；`resolveImageGenConversationId` 改名 `resolvePluginWriteConversationId` 语义归位、行为不变）；设置调试区新增 Canvas 集成级别行（读+写回/仅复制/不支持 + 原因列表，来自 `getGateReport()` 真实探测）。owner 登记 `core.canvas` 与 `feature.canvas-integration`，`app.composition` 邻接更新；新增 9 个模块文档页 + 4 个既有页同步；测试 7 套 99 例（往返无损含未知字段、assert 拒绝矩阵、布局黄金值、冲突后缀、失败零残留与回收、R-B3 登记可回退、拆分只读零写、写工具审计丢弃、门判定矩阵），全绿。
+
+---
+
 ## 2026-09-18 PDF 读取 / 索引 / 内文交互（R-C4）：懒加载 pdf-engine、页锚定本地索引与侧车注释
 
 FlowText 对齐 R-C4 落地（设计基准 `docs/requirements/flowtext-c4-design.md`，三期按既有可行性结论实施）。

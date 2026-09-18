@@ -133,4 +133,6 @@ Behavior remains unchanged:
 
 OpenCode tab adds an OpenCode-only session trace workbench: enabled/preset/six channels, storage directory/status/occupancy, historical-anomaly filter, recent trace copy/export/delete and separately confirmed clear-all. The catalog keeps read historical anomalies visible, while chat badges and smart-report selection use highest unread severity. Smart copy prompts for optional actual/expected/reproduction context; custom directory changes explicitly require reload. These controls do not change Claude Code, Codex or ACP logging.
 
+R-C5：插件调试面板新增 `addCanvasIntegrationStatusSetting`——如实显示 Canvas 运行时确认门结果（读+写回 / 仅复制 / 不支持 及缺失原因列表；未打开过画布时显示“尚未挂载”），来自 `plugin.canvasIntegration.getGateReport()`（§6.7，绝不伪造）。
+
 R-C4：插件调试面板新增 `addPdfIntegrationStatusSetting`——如实显示 PDF 视图集成当前生效的降级阶梯级别（A/B/C 及原因列表；尚未探测过 PDF 叶子时显示“尚未挂载”），来自 `plugin.pdfChatIntegration.getLadderReport()`，不伪装成功（§6.7）。

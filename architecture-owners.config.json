@@ -65,7 +65,9 @@
         "feature.settings-shell",
         "app.diagnostics-runtime",
         "app.runtime",
-        "feature.inline-edit"
+        "feature.inline-edit",
+        "core.canvas",
+        "feature.canvas-integration"
       ],
       "forbiddenDependencies": [],
       "adjacentOwners": [
@@ -74,7 +76,9 @@
         "app.diagnostics-runtime",
         "app.runtime",
         "core.pdf",
-        "app.pdf-runtime"
+        "app.pdf-runtime",
+        "core.canvas",
+        "feature.canvas-integration"
       ],
       "tests": [
         "tests/unit/entry-point/**"
@@ -2600,6 +2604,49 @@
       "risk": "low",
       "tests": [
         "tests/unit/core/pdf/**"
+      ]
+    },
+    {
+      "id": "core.canvas",
+      "include": [
+        "src/core/canvas/**"
+      ],
+      "layer": "core",
+      "overviewDoc": "docs/architecture/owners/core-canvas.md",
+      "requiredGates": [
+        "typecheck",
+        "module-docs"
+      ],
+      "responsibilities": [
+        "R-C5: .canvas JSON schema with lenient parse (unknown-field preservation for round-trip fidelity), deterministic serialization and the strict assertWritableDocument write gate",
+        "R-C5: deterministic grid/grouped layout (no force-directed layout, no randomness, golden-testable)",
+        "R-C5: canvas generation — in-memory document build, name-collision suffixing, single verified vault create through the CanvasVaultPort with failure reclaim so a half-written .canvas is never left behind",
+        "R-C5: canvas node write service — the runtime confirmation gate decision (pure), the text-node setData/requestSave write-back with snapshot dirty check, and the file-node vault.process dirty-checked write"
+      ],
+      "risk": "medium",
+      "tests": [
+        "tests/unit/core/canvas/**"
+      ]
+    },
+    {
+      "id": "feature.canvas-integration",
+      "include": [
+        "src/features/canvas-integration/**"
+      ],
+      "layer": "feature",
+      "overviewDoc": "docs/architecture/owners/feature-canvas-integration.md",
+      "requiredGates": [
+        "typecheck",
+        "module-docs"
+      ],
+      "responsibilities": [
+        "R-C5: integration into Obsidian's (unexported) canvas view — runtime confirmation gate probe per leaf, floating selection-menu button, and honest degradation when the gate fails",
+        "R-C5: canvas generation flow — note picking (R-A7 picker / R-B2 groups), optional read-only aux topic split, mode-choice, and EditRevertService registration of the created file",
+        "R-C5: node-level AI rewrite orchestration on the read-only aux contract (AgentAuxQueryCapability + findWriteToolCalls audit + inline-edit response parser reuse) with preview-confirm before any write-back"
+      ],
+      "risk": "medium",
+      "tests": [
+        "tests/unit/features/canvas-integration/**"
       ]
     }
   ],

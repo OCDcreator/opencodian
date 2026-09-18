@@ -22,6 +22,8 @@
 
 R-C4 组合：`pdfEngineLoader`（懒加载引擎，启动零成本）、`pdfIndexService`（挂 `PdfIndexFileSystem` + 设置切片 + 引擎端口；`onSettingsChanged()` 在 `pdfIndexEnabled=false` 时为 no-op）、`pdfChatIntegration`（PDF 视图集成，attach/detach 生命周期）与命令 `pdf-ask-selection` / `pdf-save-annotation`。main.ts 仍然只组合：全部 PDF 行为逻辑在 `core.pdf` 与 `feature.chat-services`。
 
+R-C5 组合：`canvasGenerationFlow`（生成流程，`pickNotes` 端口 = R-A7 picker + R-B2 主题组一键行，`resolveAuxTarget` 端口 = 行内编辑 host 适配器的只读会话切片）与 `canvasIntegration`（Canvas 视图桥，attach/detach + 运行时确认门）与命令 `canvas-generate-from-notes` / `canvas-ai-edit-node`；插件写归属会话改用 `resolvePluginWriteConversationId()`（R-C2 语义改名，行为不变）。Canvas 行为逻辑分别在 `core.canvas` 与 `feature.canvas-integration`，main.ts 只组合、注册命令与注入 Notice 沉降。
+
 
 `main.ts` 定义 `OpenCodianPlugin`，是 Obsidian 侧的总装配点。它负责：
 

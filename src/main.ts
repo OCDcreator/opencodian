@@ -62,6 +62,11 @@ import { PdfIndexFileSystem } from './app/pdf/PdfIndexFileSystem';
 import { PdfEngineLoader, PdfIndexService } from './core/pdf';
 import { PdfChatIntegration } from './features/chat/services/PdfChatIntegration';
 import { BatchOrganizeCoordinator, BatchOrganizeModal, BatchRevertConfirmModal } from './app/batchOrganize';
+import { CanvasIntegrationController } from './features/canvas-integration/CanvasIntegrationController';
+import { CanvasGenerationFlow, type CanvasPickedEntry } from './features/canvas-integration/CanvasGenerationFlow';
+import type { CanvasAuxTarget } from './features/canvas-integration/CanvasNodeRewriteService';
+import { chooseContextFiles } from './features/chat/ui/ContextFilePickerModal';
+import { ContextFileCatalogIndex, type ContextFileCatalog } from './features/chat/services/ContextFileCatalogIndex';
 import { ObsidianToolingCoordinator } from './app/obsidianTooling';
 import { migrateOpenCodeCapabilitySettings } from './core/opencode/OpenCodeCapabilitySettingsMigration';
 import { OpenCodianSettingsRuntimeCoordinator } from './core/runtime/OpenCodianSettingsRuntimeCoordinator';
@@ -182,6 +187,14 @@ export default class OpenCodianPlugin extends Plugin {
   pdfEngineLoader: PdfEngineLoader | null = null;
   pdfIndexService: PdfIndexService | null = null;
   pdfChatIntegration: PdfChatIntegration | null = null;
+  /**
+   * R-C5 canvas runtime (feature.canvas-integration + core.canvas). The
+   * controller owns the per-leaf runtime gate and the node-AI entries; the
+   * flow owns generation. main.ts only composes them, registers the two
+   * commands and injects the Notice sink — no canvas logic lives here.
+   */
+  canvasIntegration: CanvasIntegrationController | null = null;
+  canvasGenerationFlow: CanvasGenerationFlow | null = null;
   /** R-B5 batch note organizing runtime (app.batch-organize owner). Constructed during onload. */
   batchOrganizeCoordinator: BatchOrganizeCoordinator | null = null;
   /**
@@ -355,6 +368,27 @@ export default class OpenCodianPlugin extends Plugin {
       },
     });
     this.pdfChatIntegration.attach();
+    // R-C5: canvas generation + node-level AI. The runtime confirmation gate
+    // lives in the controller (per leaf); when the Canvas API surface cannot
+    // be proven, nothing mounts and the debug panel reports why — the plugin
+    // keeps working untouched. Creation/file writes register with the revert
+    // service above (R-B3 coverage).
+    this.canvasGenerationFlow = new CanvasGenerationFlow({
+      app: this.app,
+      getEditRevert: () => this.editRevertService,
+      getActiveConversationId: () => this.resolvePluginWriteConversationId(),
+      resolveAuxTarget: () => this.resolveCanvasAuxTarget(),
+      pickNotes: () => this.pickCanvasNotes(),
+      notify: (message) => { new Notice(message); },
+    });
+    this.canvasIntegration = new CanvasIntegrationController({
+      app: this.app,
+      getEditRevert: () => this.editRevertService,
+      getActiveConversationId: () => this.resolvePluginWriteConversationId(),
+      resolveAuxTarget: () => this.resolveCanvasAuxTarget(),
+      notify: (message) => { new Notice(message); },
+    });
+    this.canvasIntegration.attach();
     // R-B5 batch organizing composes on top of the R-B3 snapshot layer: the
     // coordinator refuses to execute when the snapshot service is unavailable.
     this.batchOrganizeCoordinator = new BatchOrganizeCoordinator({
@@ -842,9 +876,82 @@ export default class OpenCodianPlugin extends Plugin {
    * exists at all) — the generation flow still works, revert coverage does not.
    */
   private resolveImageGenConversationId(): string | null {
+    return this.resolvePluginWriteConversationId();
+  }
+
+  /**
+   * The conversation a PLUGIN-initiated write (R-C2 assets, R-C5 canvas) is
+   * attributed to for R-B3 round capture: the active chat conversation, or
+   * the first one. `null` means no revert coverage — callers must say so.
+   */
+  private resolvePluginWriteConversationId(): string | null {
     const active = this.getOpenCodianView()?.getActiveConversationIdForAssets() ?? null;
     if (active) return active;
     return this.conversations[0]?.id ?? null;
+  }
+
+  /**
+   * R-C5: resolve the active backend's read-only aux session inputs for the
+   * canvas flows. Same documented model precedence as inline edit / completion
+   * (overrides -> active chat model -> backend default); `null` makes the
+   * split option unavailable and the node rewrite say so honestly.
+   */
+  private resolveCanvasAuxTarget(): CanvasAuxTarget | null {
+    const adapter = this.inlineEditHost?.resolveAdapter() ?? null;
+    const capability = adapter?.getAuxQuery?.() ?? null;
+    if (!adapter || !capability) {
+      return null;
+    }
+    const resolved = adapter.resolveModel();
+    if (!resolved.ok) {
+      return null;
+    }
+    return {
+      adapter,
+      workingDirectory: getVaultBasePath(this.app) ?? '',
+    };
+  }
+
+  /**
+   * R-C5 generation source (design E3): the R-A7 multi-select picker is the
+   * primary entry; R-B2 topic groups render as one-click rows that resolve to
+   * their entries. Folder entries stay folders — the flow expands them.
+   */
+  private async pickCanvasNotes(): Promise<readonly CanvasPickedEntry[] | null> {
+    let groupPicked: readonly CanvasPickedEntry[] | null = null;
+    const picked = await chooseContextFiles(
+      this.app,
+      async () => this.buildCanvasPickerCatalog(),
+      {
+        groups: this.settings.contextGroups.map((group) => ({
+          id: group.id,
+          name: group.name,
+          entryCount: group.entries.length,
+        })),
+        onAttachGroup: (groupId) => {
+          const group = this.settings.contextGroups.find((candidate) => candidate.id === groupId);
+          if (!group) return;
+          groupPicked = group.entries.map((entry) => ({ path: entry.path, kind: entry.kind }));
+        },
+      },
+    );
+    const entries = picked.length > 0 ? picked : groupPicked;
+    if (!entries || entries.length === 0) {
+      return null;
+    }
+    return entries.map((entry) => ({
+      path: entry.path,
+      kind: entry instanceof TFolder ? 'folder' : 'file',
+    }));
+  }
+
+  /** Markdown-file catalog for the canvas note picker (composition wiring only). */
+  private buildCanvasPickerCatalog(): ContextFileCatalog {
+    const index = new ContextFileCatalogIndex();
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      index.appendBuildFile(file);
+    }
+    return index.getCatalog();
   }
 
   /** Open the chat entry's generation card (composer button and /image). */
@@ -1337,6 +1444,35 @@ export default class OpenCodianPlugin extends Plugin {
       },
     });
 
+    // R-C5: canvas generation from picked notes (file-reference nodes by
+    // default, optional read-only AI topic split). Every backend works for
+    // the default mode; the split needs a read-only aux backend and falls
+    // back with an explicit notice otherwise.
+    this.addCommand({
+      id: 'canvas-generate-from-notes',
+      name: t('canvas.command.generate'),
+      callback: () => {
+        void this.canvasGenerationFlow?.generateFromNotes();
+      },
+    });
+
+    // R-C5: node-level AI rewrite on the active canvas. The runtime gate has
+    // already decided what registers; an unusable surface gets an honest
+    // notice, never a silent no-op.
+    this.addCommand({
+      id: 'canvas-ai-edit-node',
+      name: t('canvas.rewrite.command.name'),
+      checkCallback: (checking: boolean) => {
+        if (!this.canvasIntegration) {
+          return false;
+        }
+        if (!checking) {
+          void this.canvasIntegration.aiEditNodeFromCommand();
+        }
+        return true;
+      },
+    });
+
     this.addCommand({
       id: 'pdf-save-annotation',
       name: t('chat.pdf.command.saveAnnotation'),
@@ -1381,6 +1517,9 @@ export default class OpenCodianPlugin extends Plugin {
     this.runtimeCoordinator.dispose();
     this.memoryRuntime?.dispose();
     this.obsidianToolingRuntime?.dispose();
+    this.canvasIntegration?.detach();
+    this.canvasIntegration = null;
+    this.canvasGenerationFlow = null;
     this.editRevertService?.dispose();
     // R-C2: stateless runtime handles — dropping the references is enough.
     this.imageGenerationChatController = null;
