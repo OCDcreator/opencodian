@@ -585,3 +585,5 @@ Added `chat.diffNotice.fileCount` (`{count}` accessible name for the header coun
 2026-09-18 新增 key 组：`inlineEdit.imageGen.*`（chip/错误/拒绝与插入失败提示）、`imageGen.errorKind.*`（timeout/quota/http/network/size-limit）、`chat.imageGen.*`（按钮/卡片/结果/插入/复制）、`slashCommand.image.description`、`settings.imageGeneration.*` 与 `settings.conversation.tab.imageGeneration`、`inlineEdit.error.applyFailed`。
 
 > 2026-09-18 (R-C3)：新增 `inlineCompletion.command.trigger`、`inlineCompletion.error.*`（unsupported / unsupportedAfterFailures / writeToolObserved / capabilityUnavailable / sessionUnavailable）与 `settings.inlineCompletion.*`（enabled / maxChars / hotkey 双行文案）。
+
+R-C4 补充：`chat.context.pdfIntegration.notMounted`（调试区在未探测过 PDF 叶子时的“尚未挂载”态）与 `SettingsDebugSection` 的 PDF 集成级别状态行文案。

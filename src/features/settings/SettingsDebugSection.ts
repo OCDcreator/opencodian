@@ -258,6 +258,7 @@ export class SettingsDebugSection {
     options: DebugRenderOptions = { includeIntro: true },
   ): void {
     this.addDebugLoggingSetting(containerEl);
+    this.addPdfIntegrationStatusSetting(containerEl);
     this.addDebugModuleSettings(
       containerEl,
       {
@@ -267,6 +268,24 @@ export class SettingsDebugSection {
         includeIntro: options.includeIntro,
       },
     );
+  }
+
+  /**
+   * R-C4: honestly surface which degradation ladder level the pdf view
+   * integration currently achieved (design §3.3/§6.7 — never fake A). Shows
+   * "not mounted yet" until a pdf leaf has been probed at least once.
+   */
+  private addPdfIntegrationStatusSetting(containerEl: HTMLElement): void {
+    const report = this.plugin.pdfChatIntegration?.getLadderReport() ?? null;
+    const levelText = report
+      ? t(`chat.context.pdfIntegration.level${report.level}`)
+      : t('chat.context.pdfIntegration.notMounted');
+    const description = report && report.reasons.length > 0
+      ? `${levelText} — ${t('chat.context.pdfIntegration.reasons', { reasons: report.reasons.join('; ') })}`
+      : levelText;
+    new Setting(containerEl)
+      .setName(t('chat.context.pdfIntegration.level'))
+      .setDesc(description);
   }
 
   private addActionButton(

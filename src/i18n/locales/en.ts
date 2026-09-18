@@ -2504,6 +2504,7 @@ export const enTranslations = {
   'chat.context.notice.pdfAnnotationFailed': 'Saving the annotation failed: {{message}}',
   'chat.context.notice.pdfAnnotationNoExchange': 'No answer with a PDF selection found in this conversation yet.',
   'chat.context.pdfIntegration.level': 'PDF integration level',
+  'chat.context.pdfIntegration.notMounted': 'Not mounted yet — open a PDF with the built-in viewer to probe.',
   'chat.context.pdfIntegration.levelA': 'A — toolbar entry, native selection links, highlight feedback',
   'chat.context.pdfIntegration.levelB': 'B — command entry, page-anchored selection (no native links)',
   'chat.context.pdfIntegration.levelC': 'C — command entry only (paste text manually)',

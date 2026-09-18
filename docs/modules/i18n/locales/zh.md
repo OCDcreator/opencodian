@@ -593,3 +593,5 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 2026-09-18 与 en.ts 同步新增 R-C2 全部 key（行内入口、聊天入口、`/image`、设置分区、失败类别标签、`inlineEdit.error.applyFailed`）。
 
 > 2026-09-18 (R-C3)：与 en 同步新增 `inlineCompletion.command.trigger`、`inlineCompletion.error.*`、`settings.inlineCompletion.*` 双语键。
+
+R-C4 补充：`chat.context.pdfIntegration.notMounted`（调试区在未探测过 PDF 叶子时的“尚未挂载”态）与 `SettingsDebugSection` 的 PDF 集成级别状态行文案。

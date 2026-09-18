@@ -2504,6 +2504,7 @@ export const zhTranslations = {
   'chat.context.notice.pdfAnnotationFailed': '保存注释失败：{{message}}',
   'chat.context.notice.pdfAnnotationNoExchange': '当前会话中还没有可保存的 PDF 问答。',
   'chat.context.pdfIntegration.level': 'PDF 集成级别',
+  'chat.context.pdfIntegration.notMounted': '尚未挂载——请先用内置阅读器打开一个 PDF 进行探测。',
   'chat.context.pdfIntegration.levelA': 'A——工具栏入口、原生选区回链、高亮反馈',
   'chat.context.pdfIntegration.levelB': 'B——命令入口、页锚定选区（无原生回链）',
   'chat.context.pdfIntegration.levelC': 'C——仅命令入口（手动粘贴文本）',
