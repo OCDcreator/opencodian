@@ -138,7 +138,7 @@
   flex: none;
   width: 14px;
   height: 18px;
-  margin-top: 7px;
+  margin-top: 6px;
 }
 
 .opencodian-inline-edit-inputlead .svg-icon {
@@ -158,7 +158,7 @@
   flex: 1 1 auto;
   min-width: 0;
   min-height: 32px;
-  padding: 7px 10px;
+  padding: 6px 10px;
   border-radius: var(--ocie-radius-sm);
   background: var(--ocie-field-surface);
   box-shadow: inset 0 0 0 1px var(--ocie-field-ring);
@@ -243,7 +243,7 @@
   height: 26px;
   padding: 0;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--ocie-radius-xs);
   cursor: pointer;
   transition:
     background 120ms ease,
@@ -699,7 +699,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 8px 7px 12px;
+  padding: 6px 8px 6px 12px;
   border-top: 1px solid var(--ocie-divider);
 }
 
@@ -722,7 +722,7 @@
   height: 26px;
   padding: 0 12px;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--ocie-radius-sm);
   font-size: var(--font-ui-smaller);
   font-weight: var(--font-medium, 500);
   cursor: pointer;
@@ -931,7 +931,7 @@
 .opencodian-inline-edit-image-chip-thumb {
   width: 22px;
   height: 22px;
-  border-radius: 5px;
+  border-radius: var(--ocie-radius-xs);
   object-fit: cover;
   display: block;
 }

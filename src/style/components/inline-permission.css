@@ -52,7 +52,7 @@
 }
 
 .opencodian-permission-inline-label {
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -206,7 +206,7 @@
 
 .opencodian-question-inline-collapse-hint {
   margin-left: auto;
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   color: var(--text-muted);
 }
 
@@ -216,7 +216,7 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
   color: var(--interactive-accent);
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   font-weight: 700;
   line-height: 1;
 }
@@ -266,12 +266,12 @@
 }
 
 .opencodian-question-inline-option-description {
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   color: var(--text-muted);
 }
 
 .opencodian-question-inline-option-preview {
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   color: var(--text-faint, var(--text-muted));
   background: color-mix(in srgb, var(--background-primary) 62%, transparent);
   border: 1px dashed color-mix(in srgb, var(--opencodian-glass-border) 56%, transparent);
@@ -327,7 +327,7 @@
   border-radius: 10px;
   padding: 8px 12px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   font-weight: 600;
 }
 
@@ -395,7 +395,7 @@
 }
 
 .opencodian-context-file-filter-heading {
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -448,7 +448,7 @@
 }
 
 .opencodian-context-file-filter-label {
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   font-weight: 500;
 }
 
@@ -461,7 +461,7 @@
   padding: 0 6px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--background-primary) 86%, transparent);
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   font-weight: 700;
   color: var(--text-muted);
 }
@@ -552,7 +552,7 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-secondary));
   color: var(--interactive-accent);
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   font-weight: 700;
   letter-spacing: 0.01em;
   line-height: 1;
@@ -560,7 +560,7 @@
 
 .opencodian-context-file-path,
 .opencodian-context-file-empty {
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   color: var(--text-muted);
   line-height: 1.55;
 }
@@ -586,7 +586,7 @@
 }
 
 .opencodian-context-file-summary {
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   color: var(--text-muted);
   padding: 0 4px 2px;
   line-height: 1.5;
@@ -610,26 +610,6 @@
   background: color-mix(in srgb, var(--background-modifier-error) 20%, transparent);
   color: var(--opencodian-status-error);
 }
-
-/* Completed permission status line */
-.opencodian-permission-completed {
-  font-size: 13px;
-  color: var(--text-muted);
-  padding: 4px 0;
-  margin: 8px 0;
-  border-left: 3px solid var(--background-modifier-border);
-  padding-left: 12px;
-}
-
-.opencodian-permission-completed:has-text("✓") {
-  border-left-color: var(--background-modifier-success);
-}
-
-.opencodian-permission-completed:has-text("✗") {
-  border-left-color: var(--background-modifier-error);
-}
-
-
 
 /* -- Multi-select + folders (R-A7) --------------------------------- */
 
@@ -688,7 +668,7 @@
 }
 
 .opencodian-context-file-selected-count {
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   color: var(--text-muted);
 }
 

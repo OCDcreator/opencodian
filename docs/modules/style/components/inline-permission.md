@@ -11,7 +11,7 @@
 
 ## 关键类名 / CSS 变量
 
-- 权限卡：`.opencodian-permission-inline*`、`.opencodian-permission-inline-btn`、`.opencodian-permission-completed`。
+- 权限卡：`.opencodian-permission-inline*`、`.opencodian-permission-inline-btn`。（已完成态的 `.opencodian-permission-completed` 侧边条样式已随设计系统清理移除：该类无 TS 渲染方，且 `:has-text` 非 CSS 合法选择器。）
 - 问题卡：`.opencodian-question-inline*`（含 `--resolved`、按钮、选项、进度和摘要列表）。新增 `.opencodian-question-inline-option-preview`，用于 AskUserQuestion 选项的 `preview` 纯文本安全渲染。该元素初始隐藏（`.is-hidden`），仅在选项获得焦点或悬停时显示当前对应 option 的 preview 文本；不再通过 `data-preview-format` 或 CSS `::before` 伪元素注入未本地化的格式前缀标签。
 - 文件选择弹窗：`.opencodian-context-file-modal`、`.opencodian-context-file-search`、`.opencodian-context-file-filter*`、`.opencodian-context-file-item*`。
 - 状态提示：`.opencodian-permission-inline-granted`、`.opencodian-permission-inline-rejected`。

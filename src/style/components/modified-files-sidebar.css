@@ -34,7 +34,7 @@
   background: var(--background-primary);
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   line-height: 1;
   opacity: 0;
   pointer-events: none;
@@ -159,7 +159,7 @@
   max-width: 46%;
   color: var(--text-muted);
   font-family: var(--font-monospace);
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -224,7 +224,7 @@
   color: var(--text-normal);
   cursor: pointer;
   font-family: var(--font-monospace);
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   line-height: 1.35;
   overflow: hidden;
   text-align: left;
@@ -250,7 +250,7 @@
 
 .opencodian-modified-files-sidebar-stats {
   font-family: var(--font-monospace);
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   font-weight: 700;
 }
 
@@ -267,7 +267,7 @@
   border-radius: 999px;
   background: var(--background-modifier-border);
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--font-ui-smaller);
   font-weight: 700;
   text-transform: uppercase;
 }
@@ -285,7 +285,7 @@
 .opencodian-modified-files-sidebar-empty {
   padding: 16px 12px;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   text-align: center;
 }
 
@@ -326,7 +326,7 @@
   min-width: 0;
   flex: 1;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -336,7 +336,7 @@
 .opencodian-edit-revert-hint {
   padding: 2px 8px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   line-height: 1.4;
 }
 
@@ -348,7 +348,7 @@
   background: var(--background-primary);
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   line-height: 1.6;
 }
 
@@ -384,7 +384,7 @@
   color: var(--text-normal);
   cursor: pointer;
   font-family: var(--font-monospace);
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   line-height: 1.35;
   overflow: hidden;
   text-align: left;
@@ -405,7 +405,7 @@
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   line-height: 1.6;
 }
 
@@ -425,7 +425,7 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--text-muted) 14%, transparent);
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--font-ui-smaller);
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;

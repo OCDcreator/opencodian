@@ -1,0 +1,232 @@
+/* ============================================================
+   Batch Organize Modal (R-B5) — designed to DESIGN.md §5 Modal
+   Layout. All spacing comes from the shared --opencodian-modal-*
+   tokens (see config-editor-modal.css); no ad-hoc margins. Form
+   rows use the documented label + control columns with a 16px
+   column gap and a 12px row gap; the action row is right-aligned
+   behind a top separator. Cards/panels stay on the documented
+   6-14px radius scale.
+   DOM contract: src/app/batchOrganize/BatchOrganizeModal.ts
+   ============================================================ */
+
+.opencodian-batch-organize-modal {
+  --opencodian-modal-content-padding-x: 22px;
+  --opencodian-modal-content-padding-y: 22px;
+  --opencodian-modal-header-body-gap: 16px;
+  --opencodian-modal-section-gap: 20px;
+  --opencodian-modal-section-inner-gap: 12px;
+  --opencodian-modal-card-gap: 12px;
+  --opencodian-modal-form-row-gap: 12px;
+  --opencodian-modal-form-label-control-gap: 16px;
+  --opencodian-modal-action-gap: 8px;
+  width: min(640px, calc(100vw - 40px));
+}
+
+.opencodian-batch-organize-modal .modal-content {
+  box-sizing: border-box;
+  padding: var(--opencodian-modal-content-padding-y) var(--opencodian-modal-content-padding-x);
+}
+
+/* Title: DESIGN.md §3 Title (700 / 14px / 1.35) — nothing in
+   product UI exceeds 16px. Captions and body lines: Body 13px. */
+.opencodian-batch-organize-modal h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text-normal);
+}
+
+.opencodian-batch-organize-hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.opencodian-batch-organize-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-normal);
+}
+
+/* Form row: label column + fixed control column (documented
+   minmax(220px, max-content) anatomy), 16px between the columns.
+   The 12px row gap is owned by .opencodian-modal-form-grid. */
+.opencodian-batch-organize-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, max-content);
+  column-gap: var(--opencodian-modal-form-label-control-gap);
+  align-items: center;
+}
+
+.opencodian-batch-organize-row[hidden] {
+  display: none;
+}
+
+.opencodian-batch-organize-row > label {
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text-normal);
+}
+
+.opencodian-batch-organize-control {
+  min-width: 0;
+  max-width: 420px;
+}
+
+.opencodian-batch-organize-control input[type='text'],
+.opencodian-batch-organize-control select {
+  width: 100%;
+}
+
+/* Two related controls in one control cell (property condition:
+   name + value) stack at the documented 8px (spacing.md) gap. */
+.opencodian-batch-organize-control-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Inline validation error: quiet tonal alert block, absent while
+   empty. No side stripe — the tint and text color carry it. */
+.opencodian-batch-organize-error {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--background-modifier-error) 10%, transparent);
+  color: color-mix(in srgb, var(--text-error) 72%, var(--text-normal));
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.opencodian-batch-organize-error:empty {
+  display: none;
+}
+
+/* Preview list: one bounded, scrollable track for concrete paths.
+   Paths are exact things → var(--font-monospace) (Mono Evidence
+   Rule). Rows wrap instead of overflowing the modal. */
+.opencodian-batch-organize-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 260px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-secondary);
+}
+
+.opencodian-batch-organize-item {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.opencodian-batch-organize-item:hover {
+  background: var(--background-modifier-hover);
+}
+
+/* Status lines inside the list (…and N more, folders to create). */
+.opencodian-batch-organize-list .opencodian-batch-organize-hint {
+  padding: 4px 8px;
+}
+
+/* Skipped/conflicted entries keep honest status color without
+   flooding the row: low-chroma tint plus an adaptive mix of
+   --text-error toward the normal text color for legibility in
+   both themes (same pattern as inline-edit diff deletions). */
+.opencodian-batch-organize-item.opencodian-batch-organize-conflict {
+  background: color-mix(in srgb, var(--background-modifier-error) 10%, transparent);
+  color: color-mix(in srgb, var(--text-error) 72%, var(--text-normal));
+}
+
+.opencodian-batch-organize-conflict-summary {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--text-error) 72%, var(--text-normal));
+}
+
+/* Running stage: state-conveying spinner (no decorative motion). */
+.opencodian-batch-organize-running {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.opencodian-batch-organize-spinner {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--background-modifier-border);
+  border-top-color: var(--interactive-accent);
+  animation: opencodian-batch-organize-spin 0.9s linear infinite;
+}
+
+@keyframes opencodian-batch-organize-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Primary CTA contrast fix. DESIGN.md §2 makes the Obsidian Accent
+   Proxy the primary action color, but light accents (the neutral
+   preset is slate #64748b) measure ~2.9:1 against the host's white
+   on-accent label — below the 4.5:1 floor for a 13px label. Mixing
+   22% of DESIGN.md ink-graphite (#0f172a) into the accent keeps the
+   hue and lifts the label past ~6:1 without inventing a new color. */
+.opencodian-batch-organize-modal .mod-cta {
+  background: color-mix(in srgb, var(--interactive-accent) 78%, #0f172a);
+  transition: background-color 150ms ease;
+}
+
+.opencodian-batch-organize-modal .mod-cta:hover {
+  background: color-mix(in srgb, var(--interactive-accent-hover, var(--interactive-accent)) 74%, #0f172a);
+}
+
+/* Visible keyboard focus on every interactive control (shared
+   2px accent outline with offset). */
+.opencodian-batch-organize-modal button:focus-visible,
+.opencodian-batch-organize-modal select:focus-visible,
+.opencodian-batch-organize-modal input:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+/* Below the documented 720px form breakpoint, rows collapse to a
+   single column with left-aligned controls. */
+@media (max-width: 720px) {
+  .opencodian-batch-organize-row {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 6px;
+  }
+
+  .opencodian-batch-organize-control {
+    max-width: none;
+  }
+}
+
+/* Reduced motion: the running spinner slows (it is the state
+   indicator) and color transitions are dropped. */
+@media (prefers-reduced-motion: reduce) {
+  .opencodian-batch-organize-spinner {
+    animation-duration: 1.8s;
+  }
+
+  .opencodian-batch-organize-modal .mod-cta {
+    transition: none;
+  }
+}

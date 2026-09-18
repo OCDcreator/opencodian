@@ -7010,7 +7010,7 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-permission-inline-label {
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -7164,7 +7164,7 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-question-inline-collapse-hint {
   margin-left: auto;
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   color: var(--text-muted);
 }
 
@@ -7174,7 +7174,7 @@ img.opencodian-model-provider-header-icon {
   border-radius: 999px;
   background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
   color: var(--interactive-accent);
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   font-weight: 700;
   line-height: 1;
 }
@@ -7224,12 +7224,12 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-question-inline-option-description {
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   color: var(--text-muted);
 }
 
 .opencodian-question-inline-option-preview {
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   color: var(--text-faint, var(--text-muted));
   background: color-mix(in srgb, var(--background-primary) 62%, transparent);
   border: 1px dashed color-mix(in srgb, var(--opencodian-glass-border) 56%, transparent);
@@ -7285,7 +7285,7 @@ img.opencodian-model-provider-header-icon {
   border-radius: 10px;
   padding: 8px 12px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   font-weight: 600;
 }
 
@@ -7353,7 +7353,7 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-context-file-filter-heading {
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -7406,7 +7406,7 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-context-file-filter-label {
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   font-weight: 500;
 }
 
@@ -7419,7 +7419,7 @@ img.opencodian-model-provider-header-icon {
   padding: 0 6px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--background-primary) 86%, transparent);
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   font-weight: 700;
   color: var(--text-muted);
 }
@@ -7510,7 +7510,7 @@ img.opencodian-model-provider-header-icon {
   border-radius: 999px;
   background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-secondary));
   color: var(--interactive-accent);
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   font-weight: 700;
   letter-spacing: 0.01em;
   line-height: 1;
@@ -7518,7 +7518,7 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-context-file-path,
 .opencodian-context-file-empty {
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   color: var(--text-muted);
   line-height: 1.55;
 }
@@ -7544,7 +7544,7 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-context-file-summary {
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   color: var(--text-muted);
   padding: 0 4px 2px;
   line-height: 1.5;
@@ -7568,26 +7568,6 @@ img.opencodian-model-provider-header-icon {
   background: color-mix(in srgb, var(--background-modifier-error) 20%, transparent);
   color: var(--opencodian-status-error);
 }
-
-/* Completed permission status line */
-.opencodian-permission-completed {
-  font-size: 13px;
-  color: var(--text-muted);
-  padding: 4px 0;
-  margin: 8px 0;
-  border-left: 3px solid var(--background-modifier-border);
-  padding-left: 12px;
-}
-
-.opencodian-permission-completed:has-text("✓") {
-  border-left-color: var(--background-modifier-success);
-}
-
-.opencodian-permission-completed:has-text("✗") {
-  border-left-color: var(--background-modifier-error);
-}
-
-
 
 /* -- Multi-select + folders (R-A7) --------------------------------- */
 
@@ -7646,7 +7626,7 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-context-file-selected-count {
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   color: var(--text-muted);
 }
 
@@ -7808,7 +7788,7 @@ img.opencodian-model-provider-header-icon {
   background: var(--background-primary);
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   line-height: 1;
   opacity: 0;
   pointer-events: none;
@@ -7933,7 +7913,7 @@ img.opencodian-model-provider-header-icon {
   max-width: 46%;
   color: var(--text-muted);
   font-family: var(--font-monospace);
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -7998,7 +7978,7 @@ img.opencodian-model-provider-header-icon {
   color: var(--text-normal);
   cursor: pointer;
   font-family: var(--font-monospace);
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   line-height: 1.35;
   overflow: hidden;
   text-align: left;
@@ -8024,7 +8004,7 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-modified-files-sidebar-stats {
   font-family: var(--font-monospace);
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   font-weight: 700;
 }
 
@@ -8041,7 +8021,7 @@ img.opencodian-model-provider-header-icon {
   border-radius: 999px;
   background: var(--background-modifier-border);
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--font-ui-smaller);
   font-weight: 700;
   text-transform: uppercase;
 }
@@ -8059,7 +8039,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-modified-files-sidebar-empty {
   padding: 16px 12px;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   text-align: center;
 }
 
@@ -8100,7 +8080,7 @@ img.opencodian-model-provider-header-icon {
   min-width: 0;
   flex: 1;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -8110,7 +8090,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-edit-revert-hint {
   padding: 2px 8px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   line-height: 1.4;
 }
 
@@ -8122,7 +8102,7 @@ img.opencodian-model-provider-header-icon {
   background: var(--background-primary);
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   line-height: 1.6;
 }
 
@@ -8158,7 +8138,7 @@ img.opencodian-model-provider-header-icon {
   color: var(--text-normal);
   cursor: pointer;
   font-family: var(--font-monospace);
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   line-height: 1.35;
   overflow: hidden;
   text-align: left;
@@ -8179,7 +8159,7 @@ img.opencodian-model-provider-header-icon {
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   line-height: 1.6;
 }
 
@@ -8199,7 +8179,7 @@ img.opencodian-model-provider-header-icon {
   border-radius: 999px;
   background: color-mix(in srgb, var(--text-muted) 14%, transparent);
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--font-ui-smaller);
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -16496,7 +16476,7 @@ img.opencodian-model-provider-header-icon {
   /* Base styles */
   padding: 4px var(--opencodian-message-pad-x) 4px;
   max-width: 95%;
-  animation: messageSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: messageSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 0;
 }
 
@@ -16771,7 +16751,7 @@ img.opencodian-model-provider-header-icon {
   border-end-start-radius: 4px;
   text-align: start;
   padding: var(--opencodian-assistant-pad-y) var(--opencodian-assistant-pad-x);
-  animation: messageSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: messageSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 1; /* Below sticky user messages (z-index: 100) */
 }
 
@@ -16927,7 +16907,7 @@ img.opencodian-model-provider-header-icon {
   border-color: color-mix(in srgb, var(--opencodian-composer-embedded-border-strong) 72%, transparent) !important;
   background: color-mix(in srgb, var(--opencodian-composer-embedded-fill) 18%, transparent);
   color: var(--text-normal);
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
 }
 
 .opencodian-user-context-chip.is-selection {
@@ -16973,20 +16953,20 @@ img.opencodian-model-provider-header-icon {
   border-radius: 999px;
   background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
   color: var(--interactive-accent);
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   font-weight: 700;
   letter-spacing: 0.02em;
 }
 
 .opencodian-omo-injection-title {
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   font-weight: 700;
   color: var(--text-normal);
 }
 
 .opencodian-omo-injection-summary {
   margin-top: 8px;
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   line-height: 1.6;
   color: var(--text-muted);
 }
@@ -17004,7 +16984,7 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-omo-raw-label {
   margin-bottom: 6px;
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   font-weight: 700;
   color: var(--text-faint, var(--text-muted));
   text-transform: uppercase;
@@ -17018,7 +16998,7 @@ img.opencodian-model-provider-header-icon {
   background: color-mix(in srgb, var(--background-primary) 78%, black 2%);
   border: 1px solid var(--background-modifier-border);
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
@@ -17139,7 +17119,7 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-chat-notice-meta {
   margin-top: 8px;
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   color: var(--text-faint);
 }
 
@@ -17183,7 +17163,7 @@ img.opencodian-model-provider-header-icon {
   border: 1px solid var(--background-modifier-border);
   background: var(--background-primary);
   color: var(--text-normal);
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
@@ -17218,7 +17198,7 @@ img.opencodian-model-provider-header-icon {
   border-radius: 999px;
   background: var(--background-modifier-hover);
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   text-align: center;
@@ -17309,7 +17289,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-turn-diff-status {
   padding: 1px 6px;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   font-weight: 600;
   line-height: 1.5;
 }
@@ -17334,7 +17314,7 @@ img.opencodian-model-provider-header-icon {
   padding: 1px 6px;
   border-radius: 6px;
   font-family: var(--font-monospace);
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   font-variant-numeric: tabular-nums;
   line-height: 1.5;
 }
@@ -17356,7 +17336,7 @@ img.opencodian-model-provider-header-icon {
   border-radius: 8px;
   background: transparent;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   font-weight: 600;
   cursor: pointer;
 }
@@ -17453,7 +17433,7 @@ img.opencodian-model-provider-header-icon {
 
 /* Copied state feedback */
 .opencodian-message-time {
-  font-size: 10px;
+  font-size: var(--font-ui-smaller);
   color: var(--text-muted);
   margin-top: 4px;
   text-align: right;
@@ -17515,7 +17495,7 @@ img.opencodian-model-provider-header-icon {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
-  font-family: 'Space Mono', monospace;
+  font-family: var(--font-monospace);
   letter-spacing: 0.02em;
 }
 
@@ -17607,7 +17587,7 @@ img.opencodian-model-provider-header-icon {
     0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 94%, transparent) inset,
     0 -1px 0 color-mix(in srgb, var(--background-modifier-border) 52%, transparent) inset;
   color: var(--opencodian-text-strong);
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -17674,7 +17654,7 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-copy-btn-inline.copied {
   color: var(--text-accent);
-  font-size: 10px;
+  font-size: var(--font-ui-smaller);
   font-family: var(--font-monospace);
   width: auto;
   min-width: 30px;
@@ -17709,7 +17689,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-fork-target-note {
   margin-top: 10px;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   line-height: 1.4;
 }
 
@@ -18348,7 +18328,7 @@ img.opencodian-model-provider-header-icon {
   color: var(--text-muted);
   box-shadow: none;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   font-family: inherit;
   line-height: 1;
   overflow: hidden;
@@ -18406,7 +18386,7 @@ img.opencodian-model-provider-header-icon {
   border-radius: 6px;
   background: color-mix(in srgb, var(--interactive-accent) 18%, transparent);
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--font-ui-smaller);
   font-weight: 600;
   letter-spacing: 0.02em;
   line-height: 1;
@@ -18520,7 +18500,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-slash-command-menu-hint {
   padding: 6px 10px 2px;
   color: var(--text-faint);
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   line-height: 1.35;
   overflow-wrap: anywhere;
   flex-shrink: 0;
@@ -18529,7 +18509,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-slash-command-menu-state {
   padding: 10px 12px;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
@@ -18622,7 +18602,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-slash-command-menu-badge {
   flex: 0 0 auto;
   max-width: 42%;
-  font-size: 10px;
+  font-size: var(--font-ui-smaller);
   font-weight: 600;
   padding: 1px 6px;
   border-radius: 999px;
@@ -18659,7 +18639,7 @@ img.opencodian-model-provider-header-icon {
   width: 100%;
   max-width: 100%;
   color: var(--text-faint);
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -18673,7 +18653,7 @@ img.opencodian-model-provider-header-icon {
   width: 100%;
   max-width: 100%;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -18860,7 +18840,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-question-dock-summary {
   padding: 4px 8px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   font-weight: 700;
   line-height: 1;
 }
@@ -18923,7 +18903,7 @@ img.opencodian-model-provider-header-icon {
   background: color-mix(in srgb, var(--background-primary) 78%, transparent);
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   font-weight: 600;
 }
 
@@ -18943,7 +18923,7 @@ img.opencodian-model-provider-header-icon {
   border-radius: 999px;
   background: color-mix(in srgb, var(--background-primary) 86%, transparent);
   color: inherit;
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   font-weight: 700;
 }
 
@@ -19030,7 +19010,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-session-todo-preview {
   min-width: 0;
   flex: 1 1 auto;
-  font-size: 12px;
+  font-size: var(--font-ui-smaller);
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -19238,7 +19218,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-input-capability-hint-glyph {
   flex: 0 0 auto;
   font-family: var(--font-monospace);
-  font-size: 10px;
+  font-size: var(--font-ui-smaller);
   font-weight: 800;
   letter-spacing: 0;
   color: currentColor;
@@ -19277,7 +19257,7 @@ img.opencodian-model-provider-header-icon {
   border-radius: 999px;
   background: var(--background-secondary);
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--font-ui-smaller);
   line-height: 1.35;
   cursor: pointer;
   transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
@@ -20006,7 +19986,7 @@ img.opencodian-model-provider-header-icon {
   flex: none;
   width: 14px;
   height: 18px;
-  margin-top: 7px;
+  margin-top: 6px;
 }
 
 .opencodian-inline-edit-inputlead .svg-icon {
@@ -20026,7 +20006,7 @@ img.opencodian-model-provider-header-icon {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 32px;
-  padding: 7px 10px;
+  padding: 6px 10px;
   border-radius: var(--ocie-radius-sm);
   background: var(--ocie-field-surface);
   box-shadow: inset 0 0 0 1px var(--ocie-field-ring);
@@ -20111,7 +20091,7 @@ img.opencodian-model-provider-header-icon {
   height: 26px;
   padding: 0;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--ocie-radius-xs);
   cursor: pointer;
   transition:
     background 120ms ease,
@@ -20567,7 +20547,7 @@ img.opencodian-model-provider-header-icon {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 8px 7px 12px;
+  padding: 6px 8px 6px 12px;
   border-top: 1px solid var(--ocie-divider);
 }
 
@@ -20590,7 +20570,7 @@ img.opencodian-model-provider-header-icon {
   height: 26px;
   padding: 0 12px;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--ocie-radius-sm);
   font-size: var(--font-ui-smaller);
   font-weight: var(--font-medium, 500);
   cursor: pointer;
@@ -20799,7 +20779,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-inline-edit-image-chip-thumb {
   width: 22px;
   height: 22px;
-  border-radius: 5px;
+  border-radius: var(--ocie-radius-xs);
   object-fit: cover;
   display: block;
 }
@@ -30228,6 +30208,346 @@ img.opencodian-model-provider-header-icon {
   .opencodian-plugin-source-badges {
     width: 100%;
     flex-wrap: wrap;
+  }
+}
+
+
+/* modals/batch-organize-modal.css */
+/* ============================================================
+   Batch Organize Modal (R-B5) — designed to DESIGN.md §5 Modal
+   Layout. All spacing comes from the shared --opencodian-modal-*
+   tokens (see config-editor-modal.css); no ad-hoc margins. Form
+   rows use the documented label + control columns with a 16px
+   column gap and a 12px row gap; the action row is right-aligned
+   behind a top separator. Cards/panels stay on the documented
+   6-14px radius scale.
+   DOM contract: src/app/batchOrganize/BatchOrganizeModal.ts
+   ============================================================ */
+
+.opencodian-batch-organize-modal {
+  --opencodian-modal-content-padding-x: 22px;
+  --opencodian-modal-content-padding-y: 22px;
+  --opencodian-modal-header-body-gap: 16px;
+  --opencodian-modal-section-gap: 20px;
+  --opencodian-modal-section-inner-gap: 12px;
+  --opencodian-modal-card-gap: 12px;
+  --opencodian-modal-form-row-gap: 12px;
+  --opencodian-modal-form-label-control-gap: 16px;
+  --opencodian-modal-action-gap: 8px;
+  width: min(640px, calc(100vw - 40px));
+}
+
+.opencodian-batch-organize-modal .modal-content {
+  box-sizing: border-box;
+  padding: var(--opencodian-modal-content-padding-y) var(--opencodian-modal-content-padding-x);
+}
+
+/* Title: DESIGN.md §3 Title (700 / 14px / 1.35) — nothing in
+   product UI exceeds 16px. Captions and body lines: Body 13px. */
+.opencodian-batch-organize-modal h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text-normal);
+}
+
+.opencodian-batch-organize-hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.opencodian-batch-organize-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-normal);
+}
+
+/* Form row: label column + fixed control column (documented
+   minmax(220px, max-content) anatomy), 16px between the columns.
+   The 12px row gap is owned by .opencodian-modal-form-grid. */
+.opencodian-batch-organize-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, max-content);
+  column-gap: var(--opencodian-modal-form-label-control-gap);
+  align-items: center;
+}
+
+.opencodian-batch-organize-row[hidden] {
+  display: none;
+}
+
+.opencodian-batch-organize-row > label {
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text-normal);
+}
+
+.opencodian-batch-organize-control {
+  min-width: 0;
+  max-width: 420px;
+}
+
+.opencodian-batch-organize-control input[type='text'],
+.opencodian-batch-organize-control select {
+  width: 100%;
+}
+
+/* Two related controls in one control cell (property condition:
+   name + value) stack at the documented 8px (spacing.md) gap. */
+.opencodian-batch-organize-control-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Inline validation error: quiet tonal alert block, absent while
+   empty. No side stripe — the tint and text color carry it. */
+.opencodian-batch-organize-error {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--background-modifier-error) 10%, transparent);
+  color: color-mix(in srgb, var(--text-error) 72%, var(--text-normal));
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.opencodian-batch-organize-error:empty {
+  display: none;
+}
+
+/* Preview list: one bounded, scrollable track for concrete paths.
+   Paths are exact things → var(--font-monospace) (Mono Evidence
+   Rule). Rows wrap instead of overflowing the modal. */
+.opencodian-batch-organize-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 260px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-secondary);
+}
+
+.opencodian-batch-organize-item {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.opencodian-batch-organize-item:hover {
+  background: var(--background-modifier-hover);
+}
+
+/* Status lines inside the list (…and N more, folders to create). */
+.opencodian-batch-organize-list .opencodian-batch-organize-hint {
+  padding: 4px 8px;
+}
+
+/* Skipped/conflicted entries keep honest status color without
+   flooding the row: low-chroma tint plus an adaptive mix of
+   --text-error toward the normal text color for legibility in
+   both themes (same pattern as inline-edit diff deletions). */
+.opencodian-batch-organize-item.opencodian-batch-organize-conflict {
+  background: color-mix(in srgb, var(--background-modifier-error) 10%, transparent);
+  color: color-mix(in srgb, var(--text-error) 72%, var(--text-normal));
+}
+
+.opencodian-batch-organize-conflict-summary {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--text-error) 72%, var(--text-normal));
+}
+
+/* Running stage: state-conveying spinner (no decorative motion). */
+.opencodian-batch-organize-running {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.opencodian-batch-organize-spinner {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--background-modifier-border);
+  border-top-color: var(--interactive-accent);
+  animation: opencodian-batch-organize-spin 0.9s linear infinite;
+}
+
+@keyframes opencodian-batch-organize-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Primary CTA contrast fix. DESIGN.md §2 makes the Obsidian Accent
+   Proxy the primary action color, but light accents (the neutral
+   preset is slate #64748b) measure ~2.9:1 against the host's white
+   on-accent label — below the 4.5:1 floor for a 13px label. Mixing
+   22% of DESIGN.md ink-graphite (#0f172a) into the accent keeps the
+   hue and lifts the label past ~6:1 without inventing a new color. */
+.opencodian-batch-organize-modal .mod-cta {
+  background: color-mix(in srgb, var(--interactive-accent) 78%, #0f172a);
+  transition: background-color 150ms ease;
+}
+
+.opencodian-batch-organize-modal .mod-cta:hover {
+  background: color-mix(in srgb, var(--interactive-accent-hover, var(--interactive-accent)) 74%, #0f172a);
+}
+
+/* Visible keyboard focus on every interactive control (shared
+   2px accent outline with offset). */
+.opencodian-batch-organize-modal button:focus-visible,
+.opencodian-batch-organize-modal select:focus-visible,
+.opencodian-batch-organize-modal input:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+/* Below the documented 720px form breakpoint, rows collapse to a
+   single column with left-aligned controls. */
+@media (max-width: 720px) {
+  .opencodian-batch-organize-row {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 6px;
+  }
+
+  .opencodian-batch-organize-control {
+    max-width: none;
+  }
+}
+
+/* Reduced motion: the running spinner slows (it is the state
+   indicator) and color transitions are dropped. */
+@media (prefers-reduced-motion: reduce) {
+  .opencodian-batch-organize-spinner {
+    animation-duration: 1.8s;
+  }
+
+  .opencodian-batch-organize-modal .mod-cta {
+    transition: none;
+  }
+}
+
+
+/* modals/obsidian-tooling-confirm-modal.css */
+/* ============================================================
+   Obsidian Tooling Approval Modal (R-B4) — the risk-critical
+   confirmation gate for high-impact CLI operations (installing /
+   enabling plugins and themes). Designed to DESIGN.md §5 Modal
+   Layout tokens; the exact command renders as monospace evidence
+   (Mono Evidence Rule) on a quiet readback surface, and the deny
+   path uses the repo's established rose reject vocabulary
+   (.opencodian-permission-inline-reject → native .mod-warning).
+   DOM contract: src/app/obsidianTooling/ObsidianToolingApprovalModal.ts
+   ============================================================ */
+
+.opencodian-tooling-confirm-modal {
+  --opencodian-modal-content-padding-x: 22px;
+  --opencodian-modal-content-padding-y: 22px;
+  --opencodian-modal-header-body-gap: 16px;
+  --opencodian-modal-section-gap: 20px;
+  --opencodian-modal-section-inner-gap: 12px;
+  --opencodian-modal-card-gap: 12px;
+  --opencodian-modal-form-row-gap: 12px;
+  --opencodian-modal-form-label-control-gap: 16px;
+  --opencodian-modal-action-gap: 8px;
+  width: min(480px, calc(100vw - 40px));
+}
+
+.opencodian-tooling-confirm-modal .modal-content {
+  box-sizing: border-box;
+  padding: var(--opencodian-modal-content-padding-y) var(--opencodian-modal-content-padding-x);
+}
+
+/* Title: DESIGN.md §3 Title (700 / 14px / 1.35). */
+.opencodian-tooling-confirm-modal h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text-normal);
+}
+
+/* Risk framing copy stays at Body 13px; the muted tone keeps it
+   quiet while the command block and button vocabulary carry the
+   risk signals. */
+.opencodian-tooling-confirm-desc {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-modal-section-inner-gap);
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.opencodian-tooling-confirm-desc p {
+  margin: 0;
+}
+
+/* The exact command: monospace evidence on a quiet, flat readback
+   surface. Long argv wraps instead of overflowing the modal. */
+.opencodian-tooling-confirm-command {
+  padding: 10px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.opencodian-tooling-confirm-command strong {
+  font-weight: 700;
+}
+
+.opencodian-tooling-confirm-argv {
+  margin-top: 6px;
+  color: var(--text-normal);
+}
+
+/* Deny uses the native destructive vocabulary (rose) so the risk
+   path reads consistently with the inline permission dialogs;
+   Allow keeps the accent primary (same ink-mixed contrast fix as
+   the batch-organize modal). */
+.opencodian-tooling-confirm-modal .mod-cta {
+  background: color-mix(in srgb, var(--interactive-accent) 78%, #0f172a);
+  transition: background-color 150ms ease;
+}
+
+.opencodian-tooling-confirm-modal .mod-cta:hover {
+  background: color-mix(in srgb, var(--interactive-accent-hover, var(--interactive-accent)) 74%, #0f172a);
+}
+
+.opencodian-tooling-confirm-modal button:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opencodian-tooling-confirm-modal .mod-cta {
+    transition: none;
   }
 }
 

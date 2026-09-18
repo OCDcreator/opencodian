@@ -33,4 +33,6 @@
 @import 'modals/delete-confirm-dialog.css';
 @import 'modals/permission-dialog.css';
 @import 'modals/config-editor-modal.css';
+@import 'modals/batch-organize-modal.css';
+@import 'modals/obsidian-tooling-confirm-modal.css';
 @import 'modals/provider-icon-cache.css';

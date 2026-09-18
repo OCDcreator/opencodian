@@ -11,6 +11,13 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-18 前端设计修复：批量整理与工具确认弹窗对齐设计系统
+
+- `BatchOrganizeModal` / `BatchRevertConfirmModal` 与 `ObsidianToolingApprovalModal` 落到 DESIGN.md §5 Modal Layout 词汇（新增 `src/style/modals/batch-organize-modal.css`、`src/style/modals/obsidian-tooling-confirm-modal.css`）：共享 `--opencodian-modal-*` 令牌、标签 + 控件双列表单行（`minmax(220px, max-content)` 控件列、16px 列距、12px 行距）、右对齐带顶部分隔线的操作行、Title 14/700 与 Body 13、预览路径与确认命令使用等宽证据字体、CTA 混入 ink-graphite 以满足 4.5:1 标签对比下限、破坏性/拒绝按钮使用玫瑰色 `mod-warning`、2px accent 焦点环与 reduced-motion 回退。新增两个 i18n 表单标签键（`batchOrganize.template.label`、`batchOrganize.value.label`），占位符与既有键一概未动。
+- 漂移修复：`inline-edit.css` 脱档圆角/内边距（7px/5px）归位到 `--ocie-radius-*` 与文档间距档位；`modified-files-sidebar.css`、`inline-permission.css`、`chat-assistant.css` 中硬编码的 10–12px 标签字号改为 `var(--font-ui-smaller)`，随用户界面字号设置缩放。
+- 禁项修复：删除死代码 `.opencodian-permission-completed` 侧边条块（无 TS 渲染方，且 `:has-text` 非 CSS 合法选择器）；chat-assistant/chat-user 的 `messageSlideIn` 弹跳缓动改为 200ms 指数缓出（两文件的 reduced-motion 分支已有）；`'Space Mono'`（无 @font-face 的未声明字体）替换为 `var(--font-monospace)`；`OpenCodian Newsreader` 与 `OpenCodian Oxanium Numerals` 在 DESIGN.md §3 Bundled Families 补齐角色声明。
+- 新增 `tests/unit/uiCssDesignContract.test.ts`：静态断言文档令牌、表单解剖、禁项缺失与字号规则。
+
 ## 2026-09-18 批量整理（R-B5-D1 修复）：目标目录自动创建、fail-closed 提示与回退后目录清理
 
 实机验收发现的必修缺陷（R-B5-D1）：批量移动到**尚不存在**的目标目录时静默无操作——`FileManager.renameFile` 不创建父目录，每个 op 都失败且仅进入无原因的 `failures` 列表，用户视角是"预览说 N 篇、确认后什么都没发生"，违反验收 1 与 §6.4（fail-closed 必须提示）。单测未抓到的原因：内存 vault 替身的 `renameFile` 不校验父目录，真实失败路径在替身里不存在。

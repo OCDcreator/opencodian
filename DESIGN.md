@@ -196,6 +196,13 @@ The palette is semantic and host-aware: Obsidian theme variables are the source 
 - **Label** (700, 10-11px, 1.4, slight positive letter spacing): badges, compact metadata, model/provider modes, and status chips.
 - **Mono** (400, 11-13px, 1.4-1.5): code blocks, tool names, file paths, raw messages, and JSON-like configuration previews.
 
+### Bundled Families
+
+Two families ship in `assets/fonts/` and are declared here so no undeclared font appears in UI labels:
+
+- **Composer Serif** (`"OpenCodian Newsreader"`, variable TTF): the optional longform voice for the chat input area. It is only ever consumed through `--opencodian-composer-font-family` (default `"OpenCodian Newsreader", Georgia, serif`); never for UI labels, titles, buttons, or data.
+- **Workbench Numerals** (`"OpenCodian Oxanium Numerals"`, variable TTF, digits-only `unicode-range`): tabular-feel numerals for the composer context usage counter. Digits and separators only; never applied to words.
+
 ### Named Rules
 
 **The 13px Workbench Rule.** Most product UI sits at 13px. Use 10-11px for metadata and 14-16px for titles only when hierarchy requires it.
