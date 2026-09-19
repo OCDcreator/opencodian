@@ -5541,6 +5541,8 @@ export const zhTranslations = {
   'inlineEdit.error.tooManyAttachedNotes': '附加的笔记过多。',
   'inlineEdit.error.attachedNotePathTooLong': '附加笔记的路径过长。',
   'inlineEdit.error.attachedNotePathInvalid': '附加笔记的路径包含不可用字符。',
+  'inlineEdit.reply.toolCallInspectedContext': '模型选择先用只读工具查看上下文，没有返回改写结果。请换一种表述重试，或移除附加的参考内容后再试。',
+  'inlineEdit.reply.unrenderableProtocolOutput': '模型返回的内容不符合输出协议，无法安全显示。请换一种表述后重试。',
   'inlineEdit.error.generic': '行内编辑失败。',
   'inlineEdit.error.imageTypeUnsupported': '不支持的图片类型（仅支持 PNG / JPEG / WebP / GIF）。',
   'inlineEdit.error.imageTooLarge': '图片超过 4MB 大小上限，已拒绝。',

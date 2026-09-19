@@ -74,6 +74,7 @@ import {
 } from './InlineEditOverlayChips';
 import {
   buildInlineEditRequestForAnchor,
+  classifyInlineEditClarification,
   INLINE_EDIT_MAX_DOCUMENT_CHARS,
 } from './InlineEditPrompt';
 import { describeInlineEditOutcome, InlineEditService } from './InlineEditService';
@@ -459,6 +460,23 @@ export class InlineEditController {
   }
 
   /**
+   * The text the clarification channel shows for one turn's raw output.
+   *
+   * Plain prose passes through untouched; anything tool-call-shaped or leaking
+   * protocol fragments is replaced with an honest, actionable message instead
+   * (§6.4 refusal reporting / §6.7 truthful gaps) — internal markup never
+   * renders. Applied on both writers of the channel (streaming preamble
+   * frames and the turn-end clarification), so the guard is backend-agnostic.
+   */
+  private clarificationReplyText(raw: string): string {
+    const presented = classifyInlineEditClarification(raw);
+    if (presented.kind === 'prose') return presented.text;
+    return presented.cause === 'tool-call'
+      ? t('inlineEdit.reply.toolCallInspectedContext')
+      : t('inlineEdit.reply.unrenderableProtocolOutput');
+  }
+
+  /**
    * Per-frame reply update for pre-tag plain text: a clarification-shaped
    * reply streams into the area above the input instead of the preview
    * channel. The moment a tag opens, the streaming preview takes over and
@@ -466,8 +484,9 @@ export class InlineEditController {
    */
   private renderStreamingReply(edit: ActiveEdit, text: string): void {
     if (this.findEdit(edit.editId) !== edit || edit.phase !== 'generating') return;
-    if (edit.reply === text) return;
-    edit.reply = text;
+    const shown = this.clarificationReplyText(text);
+    if (edit.reply === shown) return;
+    edit.reply = shown;
     this.renderInput(edit);
   }
 
@@ -565,7 +584,11 @@ export class InlineEditController {
       case 'clarification':
         edit.preview = null;
         clearInlineEditPreview(edit);
-        edit.reply = outcome.text;
+        // §6.7: the channel renders prose only — a tool-call stream or leaked
+        // protocol markup becomes the honest guard message, never raw output.
+        // Fail-closed: no preview, no application, and the session stays alive
+        // so the user can rephrase (the guard message says exactly that).
+        edit.reply = this.clarificationReplyText(outcome.text);
         edit.phase = 'input';
         this.renderInput(edit);
         return;

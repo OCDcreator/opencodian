@@ -11,6 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-18 行内编辑澄清通道防泄漏（不渲染原始工具调用标记）
+
+实机验收发现的呈现缺陷：行内编辑附带上下文后，模型可能选择先用只读工具读附件（R-A7 契约本身工作正常），其回传 `text` 是工具调用转录标记（`<|tool call>` / `<|tool invoke name="Read">` / `<|tool parameter …>`）。严格解析器找不到协议标签 → 判为 `clarification` → controller 把整段原始标记写进 `.opencodian-inline-edit-reply` 澄清通道：无预览、无写入、无提示，用户直面内部协议语法（违反 §6.4 拒绝须报告、§6.7 缺口须诚实可读呈现）。
+
+**接缝选择**：在 `InlineEditPrompt.ts`（响应契约纯函数属地）新增 `classifyInlineEditClarification()`——后端无关的单点分类：命中工具调用标记族（`<|` 特殊标记、antml `<function_calls>`/`<invoke …>`、通用 `<tool_call>`/`<tool_use>`/`<tool_result>` 系）→ `unrenderable/tool-call`；协议标签截断片段（`<replacement`、`</insert`，≥3 字母前缀，普通散文 `<div>`/`a < b` 不误伤）→ `unrenderable/protocol-fragment`；其余 `prose` 原样放行。controller 在回复区**仅有的两处写入点**统一过该分类器（流式前导帧 `renderStreamingReply` + 回合收尾 `applyOutcome` clarification 分支），兄弟路径一并覆盖：流式期间标记不再逐帧直播进回复区，混合"散文+标记"整体按 fail-closed 抑制（绝不渲染部分识别后的残余片段）。严格解析器权威与只读契约零改动。
+
+**诚实呈现**：新文案 `inlineEdit.reply.toolCallInspectedContext`（模型选择先查看上下文、未产出改写；建议改写指令或移除附件）/ `inlineEdit.reply.unrenderableProtocolOutput`（响应不符输出协议、无法安全显示），zh/en 双语。fail-closed 不变：无预览、无应用；回合以可读消息呈现且会话存活，用户可直接重试。测试：分类器 7 例（实机标记形状、其他后端语法、混合散文+标记、纯散文原样、空输出、截断片段、误伤护栏）+ controller 流 3 例（工具调用形状 → 诚实文案/无预览/无写入/可重试、纯散文澄清原样、协议片段 → 协议文案）。
+
+---
+
 ## 2026-09-18 上下文附件跨后端投递修复（attached-context parity）
 
 修复确认的后端一致性缺陷：用户附加的上下文（笔记/选区/文件夹/PDF/R-C1 检索片段 chips）只在 OpenCode 路径序列化进 prompt，Claude 与 Codex 适配器完全不消费——但 UI chips 照常显示"已附加"（违反 §6.5 backend-agnostic 验收项与 §6.7 诚实性；R-A7 "拖入文件夹→模型能读到其中笔记"、R-C1 验收 2 "请求包含 ≤ K 检索片段"、R-C4 阶段 1–2 "可随会话发送"在此二后端全部落空）。Pi 经 `PiStreamMapper` 消费 `requestParts` 本就正常。

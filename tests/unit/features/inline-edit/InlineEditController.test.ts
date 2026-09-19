@@ -30,7 +30,7 @@ import { InlineEditController } from '../../../../src/features/inline-edit/Inlin
 import type { InlineEditHost } from '../../../../src/features/inline-edit/InlineEditHost';
 import type { InlineEditRequest } from '../../../../src/features/inline-edit/InlineEditPrompt';
 import { canApplyEdit } from '../../../../src/features/inline-edit/InlineEditService';
-import type { InlineEditHostAdapter } from '../../../../src/features/inline-edit/InlineEditTypes';
+import type { InlineEditHostAdapter, InlineEditOutcome } from '../../../../src/features/inline-edit/InlineEditTypes';
 import {
   readInlineEditPreviewIds,
   readInlineEditRange,
@@ -47,6 +47,10 @@ interface HarnessOptions {
   readonly maxConcurrentEdits?: number;
   readonly documentModeEnabled?: boolean;
   readonly confirmResult?: boolean;
+  /** Overrides the first turn's outcome (defaults to a replacement preview). */
+  readonly firstTurnOutcome?: InlineEditOutcome;
+  /** Accumulated-text chunks the fake backend emits before settling. */
+  readonly firstTurnChunks?: readonly string[];
 }
 
 interface Harness {
@@ -125,8 +129,12 @@ function makeHarness(options: HarnessOptions = {}): Harness {
     },
     createService: () => ({
       get hasSession() { return false; },
-      submit(request: InlineEditRequest) {
+      submit(request: InlineEditRequest, turnOptions?: { onTextChunk?: (accumulated: string) => void }) {
         requests.push(request);
+        for (const chunk of options.firstTurnChunks ?? []) {
+          turnOptions?.onTextChunk?.(chunk);
+        }
+        if (options.firstTurnOutcome) return Promise.resolve(options.firstTurnOutcome);
         // Cursor forms answer with an insertion; selection/document with a
         // replacement, mirroring how the model answers each anchor shape.
         return request.kind === 'cursor-inline' || request.kind === 'cursor-inbetween'
@@ -418,5 +426,80 @@ describe('InlineEditController whole-document mode (R-A6)', () => {
     await flush();
     expect(h.requests).toHaveLength(1);
     expect(h.requests[0]!.kind).toBe('document');
+  });
+});
+
+describe('InlineEditController clarification channel guard (§6.4/§6.7)', () => {
+  const TOOL_CALL_TEXT = [
+    '<|tool call>',
+    '<|tool invoke name="Read">',
+    '<|tool parameter name="file_path">/tmp/opencodian-inline-aux-ABC123/work/link-ref-note.md</|tool parameter>',
+    '</|tool invoke>',
+  ].join('\n');
+
+  it('a tool-call-shaped response shows the honest message, no preview, and no write', async () => {
+    const h = makeHarness({
+      firstTurnChunks: ['我先看一下附上的笔记。\n<|tool call>'],
+      firstTurnOutcome: { status: 'clarification', text: TOOL_CALL_TEXT },
+    });
+    h.view.dispatch({ selection: { anchor: 0, head: 5 } });
+    expect(h.controller.open(h.editor, { file: { path: 'note.md' } })).toBe(true);
+    await flush(2);
+    await submitBar(h.view, bars(h.view)[0]!, 'rewrite with the reference');
+    await flush();
+
+    const replyText = bars(h.view)[0]!
+      .querySelector<HTMLElement>('.opencodian-inline-edit-reply .opencodian-inline-edit-alert-text')
+      ?.textContent ?? '';
+    expect(replyText).toBe(t('inlineEdit.reply.toolCallInspectedContext'));
+    // Raw protocol internals must not appear anywhere in the panel — neither
+    // from a mid-turn streaming frame nor from the settled outcome.
+    expect(bars(h.view)[0]!.textContent).not.toContain('<|tool');
+    expect(bars(h.view)[0]!.textContent).not.toContain('link-ref-note.md');
+    // Fail-closed: no preview decoration was ever created and nothing is written.
+    expect(previewEls(h.view)).toHaveLength(0);
+    expect(h.writes).toHaveLength(0);
+    // The turn is not swallowed: the edit stays open in the input phase so the
+    // user can rephrase or drop the attachment.
+    expect(h.controller.activeEditCountForView(h.view)).toBe(1);
+    expect(h.controller.phase).toBe('input');
+  });
+
+  it('a plain prose clarification still renders verbatim in the reply channel', async () => {
+    const h = makeHarness({
+      firstTurnOutcome: { status: 'clarification', text: 'Which tone do you want?' },
+    });
+    h.view.dispatch({ selection: { anchor: 0, head: 5 } });
+    expect(h.controller.open(h.editor, { file: { path: 'note.md' } })).toBe(true);
+    await flush(2);
+    await submitBar(h.view, bars(h.view)[0]!, 'rewrite');
+    await flush();
+
+    const replyText = bars(h.view)[0]!
+      .querySelector<HTMLElement>('.opencodian-inline-edit-reply .opencodian-inline-edit-alert-text')
+      ?.textContent ?? '';
+    expect(replyText).toBe('Which tone do you want?');
+    expect(previewEls(h.view)).toHaveLength(0);
+    expect(h.writes).toHaveLength(0);
+    expect(h.controller.activeEditCountForView(h.view)).toBe(1);
+  });
+
+  it('a protocol-fragment response shows the protocol message instead of markup', async () => {
+    const h = makeHarness({
+      firstTurnOutcome: { status: 'clarification', text: '<replacement' },
+    });
+    h.view.dispatch({ selection: { anchor: 0, head: 5 } });
+    expect(h.controller.open(h.editor, { file: { path: 'note.md' } })).toBe(true);
+    await flush(2);
+    await submitBar(h.view, bars(h.view)[0]!, 'rewrite');
+    await flush();
+
+    const replyText = bars(h.view)[0]!
+      .querySelector<HTMLElement>('.opencodian-inline-edit-reply .opencodian-inline-edit-alert-text')
+      ?.textContent ?? '';
+    expect(replyText).toBe(t('inlineEdit.reply.unrenderableProtocolOutput'));
+    expect(bars(h.view)[0]!.textContent).not.toContain('<replacement');
+    expect(previewEls(h.view)).toHaveLength(0);
+    expect(h.writes).toHaveLength(0);
   });
 });

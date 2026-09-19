@@ -399,6 +399,80 @@ export function parseInlineEditResponse(raw: string): InlineEditResponse {
     : { kind: 'insertion', text: normalizeInsertionText(content) };
 }
 
+// -----------------------------------------------------------------------------
+// Clarification-channel guard (§6.4 refusal reporting / §6.7 truthful gaps)
+// -----------------------------------------------------------------------------
+
+/**
+ * What the clarification channel may safely render from one turn's raw output.
+ *
+ * `prose` is a genuine clarification and renders as-is. `unrenderable` marks
+ * output that reached the "no protocol tag" branch but is not prose: the model
+ * spent the turn on tool calls (typically reading attached context) or leaked
+ * protocol fragments, and presenting that text would expose internal markup.
+ */
+export type InlineEditClarificationPresentation =
+  | { readonly kind: 'prose'; readonly text: string }
+  | { readonly kind: 'unrenderable'; readonly cause: 'tool-call' | 'protocol-fragment' };
+
+/**
+ * Tool-call markup shapes that must never reach the clarification channel.
+ *
+ * Deliberately backend-agnostic (the guard sits at the shared presentation
+ * boundary, not per backend): the `<|` family covers LLM special-token markup
+ * (`<|tool call>`, `<|tool invoke name="…">`, `<|im_start|>`), the rest covers
+ * the common function-calling conventions (Claude antml blocks, generic
+ * `<tool_call>`-style tags). Prose never legitimately contains these.
+ */
+const TOOL_CALL_MARKUP: readonly RegExp[] = [
+  /<\|/,
+  /<function_calls\b/i,
+  /<(?:antml:)?(?:invoke|function_call)\b/i,
+  /<(?:tool_call|tool_use|tool_result|tool_invoke|tool_parameter)\b/i,
+];
+
+/**
+ * True when `text` contains a `<`/`</` fragment whose letters start a protocol
+ * tag name (`<replacement` truncated mid-stream, `</insert`…). The strict
+ * parser already rejects *complete* tokens, so only these partial forms can
+ * reach the clarification branch — and they are just as much internal markup.
+ * A minimum of three letters keeps ordinary prose (`a < b`, `<div>`) untouched.
+ */
+function findProtocolTagFragment(text: string): boolean {
+  for (let at = text.indexOf('<'); at >= 0; at = text.indexOf('<', at + 1)) {
+    let cursor = at + 1;
+    if (text[cursor] === '/') cursor += 1;
+    let end = cursor;
+    while (end < text.length && /[a-z]/i.test(text[end]!)) end += 1;
+    const word = text.slice(cursor, end).toLowerCase();
+    if (word.length < 3) continue;
+    if (INLINE_EDIT_REPLACEMENT_TAG.startsWith(word) || INLINE_EDIT_INSERTION_TAG.startsWith(word)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Classify raw turn output for the clarification channel.
+ *
+ * Pure and backend-agnostic; the controller applies it on both paths that feed
+ * the channel (streaming preamble frames and the turn-end strict-parse
+ * clarification), so no raw markup can render regardless of which backend
+ * produced it. Tool-call shapes win over bare protocol fragments so the user
+ * gets the more explanatory message.
+ */
+export function classifyInlineEditClarification(raw: string): InlineEditClarificationPresentation {
+  const text = raw ?? '';
+  for (const pattern of TOOL_CALL_MARKUP) {
+    if (pattern.test(text)) return { kind: 'unrenderable', cause: 'tool-call' };
+  }
+  if (findProtocolTagFragment(text)) {
+    return { kind: 'unrenderable', cause: 'protocol-fragment' };
+  }
+  return { kind: 'prose', text };
+}
+
 /**
  * Build the request payload for one anchored edit (docs/requirements/inline-edit.md
  * §6.1: attached entries travel as paths only — the read-only tools do the

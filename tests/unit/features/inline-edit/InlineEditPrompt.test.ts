@@ -5,6 +5,7 @@ import {
   buildInlineEditRequest,
   buildInlineEditRequestForAnchor,
   buildInlineEditSystemPrompt,
+  classifyInlineEditClarification,
   escapeXmlAttribute,
   INLINE_EDIT_MAX_ATTACHED_NOTES,
   INLINE_EDIT_MAX_PATH_CHARS,
@@ -364,5 +365,78 @@ describe('buildInlineEditRequest with attached notes', () => {
       attachedNotes: [{ path: 'notes/</attached_context>.md' }],
     });
     expect(result).toEqual({ ok: false, error: 'attached-note-path-invalid' });
+  });
+});
+
+describe('classifyInlineEditClarification', () => {
+  it('flags the live tool-call transcript shape (opencode evidence) as a tool-call stream', () => {
+    const raw = [
+      '<|tool call>',
+      '<|tool invoke name="Read">',
+      '<|tool parameter name="file_path">/tmp/opencodian-inline-aux-ABC123/work/link-ref-note.md</|tool parameter>',
+      '</|tool invoke>',
+    ].join('\n');
+    expect(classifyInlineEditClarification(raw)).toEqual({
+      kind: 'unrenderable',
+      cause: 'tool-call',
+    });
+  });
+
+  it('flags other backends tool-call syntaxes as a tool-call stream', () => {
+    expect(classifyInlineEditClarification('<function_calls>\n<invoke name="read">')).toEqual({
+      kind: 'unrenderable',
+      cause: 'tool-call',
+    });
+    expect(classifyInlineEditClarification('{"x":1}\n<tool_call>\nread\n</tool_call>')).toEqual({
+      kind: 'unrenderable',
+      cause: 'tool-call',
+    });
+    expect(classifyInlineEditClarification('<tool_use name="grep">')).toEqual({
+      kind: 'unrenderable',
+      cause: 'tool-call',
+    });
+  });
+
+  it('fails closed on mixed prose + markup: never renders the mixture as prose', () => {
+    const mixed = '我先看一下附上的笔记。\n<|tool invoke name="Read">\n</|tool invoke>';
+    expect(classifyInlineEditClarification(mixed)).toEqual({
+      kind: 'unrenderable',
+      cause: 'tool-call',
+    });
+  });
+
+  it('renders a plain prose clarification verbatim', () => {
+    const prose = '你想要更正式的语气，还是保持现在的口语风格？';
+    expect(classifyInlineEditClarification(prose)).toEqual({ kind: 'prose', text: prose });
+  });
+
+  it('keeps ordinary angle-bracket prose renderable (no overreach)', () => {
+    expect(classifyInlineEditClarification('要改成 <div> 结构吗？')).toEqual({
+      kind: 'prose',
+      text: '要改成 <div> 结构吗？',
+    });
+    expect(classifyInlineEditClarification('a < b 就替换吗？')).toEqual({
+      kind: 'prose',
+      text: 'a < b 就替换吗？',
+    });
+  });
+
+  it('flags truncated protocol tags as protocol fragments', () => {
+    expect(classifyInlineEditClarification('<replacement')).toEqual({
+      kind: 'unrenderable',
+      cause: 'protocol-fragment',
+    });
+    expect(classifyInlineEditClarification('改写如下\n</insert')).toEqual({
+      kind: 'unrenderable',
+      cause: 'protocol-fragment',
+    });
+    expect(classifyInlineEditClarification('<repl')).toEqual({
+      kind: 'unrenderable',
+      cause: 'protocol-fragment',
+    });
+  });
+
+  it('returns empty prose for empty output (strict parser reports empty-response upstream)', () => {
+    expect(classifyInlineEditClarification('')).toEqual({ kind: 'prose', text: '' });
   });
 });

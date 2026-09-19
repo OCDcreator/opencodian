@@ -5542,6 +5542,8 @@ export const enTranslations = {
   'inlineEdit.error.tooManyAttachedNotes': 'Too many notes attached.',
   'inlineEdit.error.attachedNotePathTooLong': 'An attached note path is too long.',
   'inlineEdit.error.attachedNotePathInvalid': 'An attached note path contains unsupported characters.',
+  'inlineEdit.reply.toolCallInspectedContext': 'The model chose to inspect the context with its read-only tools instead of producing a rewrite. Try rephrasing the instruction, or remove the attached reference and retry.',
+  'inlineEdit.reply.unrenderableProtocolOutput': 'The model replied with content that does not follow the output protocol, so it cannot be shown safely. Try rephrasing the instruction.',
   'inlineEdit.error.generic': 'Inline edit failed.',
   'inlineEdit.error.imageTypeUnsupported': 'Unsupported image type (PNG / JPEG / WebP / GIF only).',
   'inlineEdit.error.imageTooLarge': 'Image exceeds the 4MB size limit and was rejected.',
