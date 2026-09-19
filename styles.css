@@ -19876,6 +19876,13 @@ img.opencodian-model-provider-header-icon {
   --ocie-shadow:
     0 1px 2px rgb(0 0 0 / 0.06),
     0 16px 40px -12px rgb(0 0 0 / 0.25);
+  /* Micro elevation for one control inside a row (the segmented-control
+     thumb). A token rather than an inline literal so the shadow ramp stays
+     countable instead of drifting per rule. */
+  --ocie-shadow-xs: 0 1px 2px rgb(0 0 0 / 0.12);
+  /* Tonal lift: the dark theme raises a surface by mixing toward white. Named
+     so the technique is a documented decision rather than a stray `#fff`. */
+  --ocie-lift: #fff;
   --ocie-diff-insert-bg: rgb(52 199 123 / 16%);
   --ocie-diff-insert-ring: rgb(52 199 123 / 26%);
   --ocie-diff-delete-bg: rgb(235 90 90 / 13%);
@@ -20638,7 +20645,7 @@ img.opencodian-model-provider-header-icon {
   -webkit-backdrop-filter: blur(10px);
   color: var(--text-muted);
   box-shadow:
-    0 1px 2px rgb(0 0 0 / 0.12),
+    var(--ocie-shadow-xs),
     0 4px 12px -4px rgb(0 0 0 / 0.22);
   cursor: pointer;
   z-index: 20;
@@ -20732,8 +20739,8 @@ img.opencodian-model-provider-header-icon {
    Light-theme shadows are nearly invisible on dark pages. -------- */
 
 .theme-dark .opencodian-inline-edit {
-  --ocie-surface: color-mix(in srgb, color-mix(in srgb, var(--background-primary) 94%, #fff) 94%, transparent);
-  --ocie-menu-surface: color-mix(in srgb, color-mix(in srgb, var(--background-primary) 94%, #fff) 97%, transparent);
+  --ocie-surface: color-mix(in srgb, color-mix(in srgb, var(--background-primary) 94%, var(--ocie-lift)) 94%, transparent);
+  --ocie-menu-surface: color-mix(in srgb, color-mix(in srgb, var(--background-primary) 94%, var(--ocie-lift)) 97%, transparent);
   --ocie-field-ring: color-mix(in srgb, var(--background-modifier-border) 92%, transparent);
   --ocie-shadow:
     0 0 0 1px rgb(0 0 0 / 0.4),
@@ -20759,7 +20766,7 @@ img.opencodian-model-provider-header-icon {
 }
 
 .theme-dark .opencodian-inline-edit-preview {
-  background: color-mix(in srgb, var(--background-primary) 95.5%, #fff);
+  background: color-mix(in srgb, var(--background-primary) 95.5%, var(--ocie-lift));
   border-color: color-mix(in srgb, var(--background-modifier-border) 95%, transparent);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.04),
@@ -20768,7 +20775,7 @@ img.opencodian-model-provider-header-icon {
 }
 
 .theme-dark .opencodian-inline-edit-affordance {
-  background: color-mix(in srgb, var(--background-primary) 80%, #fff);
+  background: color-mix(in srgb, var(--background-primary) 80%, var(--ocie-lift));
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.07),
     0 2px 4px rgb(0 0 0 / 0.4),
@@ -20881,7 +20888,7 @@ img.opencodian-model-provider-header-icon {
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
   padding: 3px 10px;
-  border-radius: calc(var(--ocie-radius-sm) - 2px);
+  border-radius: var(--ocie-radius-xs);
   cursor: pointer;
 }
 
@@ -20892,7 +20899,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-inline-edit-mode-btn.is-active {
   background: var(--background-primary);
   color: var(--text-normal);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
+  box-shadow: var(--ocie-shadow-xs);
 }
 
 .opencodian-inline-edit-mode-btn:disabled {
@@ -30719,7 +30726,17 @@ img.opencodian-model-provider-header-icon {
 
 /* Light label on the host's own solid accent/danger ground: the one
    declaration measured to win the cascade (and enough to clear
-   4.5:1 on both measured grounds). */
+   4.5:1 on both measured grounds). Named as a token so the label ink is
+   a documented decision instead of a repeated literal. */
+:is(.opencodian-inline-edit-confirm-modal,
+    .opencodian-batch-organize-modal,
+    .opencodian-imagegen-modal,
+    .opencodian-tooling-confirm-modal,
+    .opencodian-canvas-modal,
+    .opencodian-pdf-annotation-modal) {
+  --opencodian-modal-contrast-label: #fff;
+}
+
 :is(.opencodian-inline-edit-confirm-modal,
     .opencodian-batch-organize-modal,
     .opencodian-imagegen-modal,
@@ -30732,8 +30749,8 @@ img.opencodian-model-provider-header-icon {
     .opencodian-tooling-confirm-modal,
     .opencodian-canvas-modal,
     .opencodian-pdf-annotation-modal) .mod-warning {
-  color: #fff;
-  --text-color: #fff;
+  color: var(--opencodian-modal-contrast-label);
+  --text-color: var(--opencodian-modal-contrast-label);
   transition: background-color 150ms ease;
 }
 

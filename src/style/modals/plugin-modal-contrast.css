@@ -87,7 +87,17 @@
 
 /* Light label on the host's own solid accent/danger ground: the one
    declaration measured to win the cascade (and enough to clear
-   4.5:1 on both measured grounds). */
+   4.5:1 on both measured grounds). Named as a token so the label ink is
+   a documented decision instead of a repeated literal. */
+:is(.opencodian-inline-edit-confirm-modal,
+    .opencodian-batch-organize-modal,
+    .opencodian-imagegen-modal,
+    .opencodian-tooling-confirm-modal,
+    .opencodian-canvas-modal,
+    .opencodian-pdf-annotation-modal) {
+  --opencodian-modal-contrast-label: #fff;
+}
+
 :is(.opencodian-inline-edit-confirm-modal,
     .opencodian-batch-organize-modal,
     .opencodian-imagegen-modal,
@@ -100,8 +110,8 @@
     .opencodian-tooling-confirm-modal,
     .opencodian-canvas-modal,
     .opencodian-pdf-annotation-modal) .mod-warning {
-  color: #fff;
-  --text-color: #fff;
+  color: var(--opencodian-modal-contrast-label);
+  --text-color: var(--opencodian-modal-contrast-label);
   transition: background-color 150ms ease;
 }
 

@@ -198,8 +198,11 @@ describe('shared plugin modal contrast contract (R-A6 and siblings)', () => {
 
   it('lightens the label only: light ink on the host ground, no background override', () => {
     const label = css.match(/\.mod-cta,\n?[\s\S]*?\.mod-warning \{([^}]*)\}/)?.[1] ?? '';
-    expect(label).toMatch(/color:\s*#fff/);
-    expect(label).toMatch(/--text-color:\s*#fff/);
+    // The label ink is a documented token rather than a repeated literal, so
+    // the value lives in exactly one place and reads as a design decision.
+    expect(label).toMatch(/color:\s*var\(--opencodian-modal-contrast-label\)/);
+    expect(label).toMatch(/--text-color:\s*var\(--opencodian-modal-contrast-label\)/);
+    expect(css).toMatch(/--opencodian-modal-contrast-label:\s*#fff/);
     // Declaring a background can only lose the cascade against the theme
     // (measured live) — a silent non-win is exactly the drift this stops.
     expect(css).not.toMatch(/background:\s*color-mix/);

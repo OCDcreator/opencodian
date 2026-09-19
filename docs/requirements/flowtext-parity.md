@@ -40,12 +40,12 @@
 | A | R-A1 | 笔记内 `@` 唤起与默认热键 | `@` 呼出悬浮窗 | P0 | DONE |
 | A | R-A2 | `#` 预设提示词菜单 | `#` 快速调出预设提示词 | P0 | DONE |
 | A | R-A3 | 流式 diff 预览 | 流式续写 | P0 | PARTIAL |
-| A | R-A4 | 行内面板贴图（OCR / 手写 → LaTeX） | 截图转公式 | P0 | PARTIAL |
+| A | R-A4 | 行内面板贴图（OCR / 手写 → LaTeX） | 截图转公式 | P0 | DONE |
 | A | R-A5 | 多片段并行编辑 | 多片段并行续写/修改 | P1 | DONE |
 | A | R-A6 | 全文修改模式 | 点击机器人图标改全篇 | P1 | DONE |
 | A | R-A7 | 文件夹 / 多选上下文 + 拖拽 | 选择整个文件夹、内链嵌入 | P1 | DONE |
 | B | R-B1 | 生成内容自动内链 | 自动建立指向参考笔记标题的内链 | P1 | PARTIAL |
-| B | R-B2 | 主题关联（上下文组） | 勾选关联主题作参考资料 | P1 | PARTIAL |
+| B | R-B2 | 主题关联（上下文组） | 勾选关联主题作参考资料 | P1 | DONE |
 | B | R-B3 | 编辑回退（单文件 / 整轮） | 单文件回退、一键回退全部 | P1 | DONE |
 | B | R-B4 | Obsidian 原生工具 | 基于官方 CLI 的 Agent | P1 | DONE |
 | B | R-B5 | 批量整理（归拢笔记 / 批量改属性） | 批量操作与整理 | P2 | DONE |
@@ -878,12 +878,12 @@ export interface AuxQueryTurnRequest {
 | R-A1 | `d892256d` | `InlineEditAtTrigger.test.ts` 等 | 行首 `@` 开面板且 `@` 不入文档；`user@example.com` 中间不触发；设置页「@ 键唤起」+ 未绑定快捷键提示 | IME 组合态、Reading mode |
 | R-A2 | `d892256d` | `InlineEditPresetMenu/Presets/InputOverlayPresetMenu.test.ts` | `#` 弹出六个内置预设；Enter 填入且**不发请求**；Esc 关闭内容不变 | `#标签` 误触与空自定义集仅单测覆盖 |
 | R-A3 | `78eeef05` | `InlineEditStreamPreview.test.ts` | 面板 busy 即时、最终预览 + 拒绝/接受、拒绝后文档逐字节未变；**换 `claude-code`（CLI 确为流式）以 250ms 采样复测**：48 帧中仍只有 2 个状态（251ms busy → 12067ms 完整预览） | **量化承诺仍不可演示，但原因不是供应商**：输出契约要求完整的 `<replacement>` 标签才可解析，解析前的片段没有可渲染语义，故实现只提供 busy 状态而非逐段增长的内容帧。要演示流式 diff 需改输出契约（设计变更，非缺陷） |
-| R-A4 | `78eeef05` | 四后端审计脚本含图片轮次 | **四后端真 CLI 审计 PASS**（vision 模型下模型确实读到图；vault 快照零变化；Codex 临时目录 0） | 面板内粘贴/拖拽、chip 缩略图、LaTeX 定界符实机未验 |
+| R-A4 | `78eeef05` | 四后端审计脚本含图片轮次 | **六条验收全部实机**：①真实粘贴图片 → 模型读出公式并返回 LaTeX → diff 显示 → 接受插入；②四后端真 CLI 审计 PASS（vision 模型下模型确实读到图、vault 快照零变化、Codex 临时目录 0）；③面板内粘贴后出现 1 个图片 chip 且含**真实缩略图**（`<img src="data:image/png;base64,…">`），空行元素 `display:none` 高度 0，chip 可移除（截图 `ra4-image-chip.png`）；④**定界符按锚点形态**：行内锚点 → `$E = mc^2$`、段间锚点 → `$$E = mc^2$$`（截图 `ra4-latex-inline.png` / `ra4-latex-display.png`）；⑤**超限拒绝**：粘贴 5,881,918 字节 PNG（上限 4 MiB）→ chip 数不变（未静默接受）并提示「图片超过 4MB 大小上限，已拒绝。」；⑥不支持图片时模型如实说明看不到图（图片确以图像形式到达） | 拖拽入面板未验（picker 拖拽已验，见 R-A7） |
 | R-A5 | `47e90f95`、`9babaf49`、`49c6b55c` | `InlineEditWidgets.test.ts`、`InlineEditInputOverlay.test.ts`、`InlineEditOverlayDismissal.test.ts` | 并行上限设置项与文案已验；**同一笔记内两编辑共存**（选区 + 光标，`overlayCount: 2`，截图 `ra5-two-panels.png`）；**交叉接受无漂移**（接受 A 只改 line 2，第二段未波及，B 面板/模式/输入内容/锚点行全保留）；**面板互不遮挡**（重叠面积 0，各自工具栏经 `elementFromPoint` 可达）；**Esc 只作用于聚焦编辑**（焦点在 A 时真实 Escape 只关 A，B 内容不丢） | — |
 | R-A6 | `47e90f95`、`f33732bc` | `InlineEditDocumentMode.test.ts` | 「整篇」模式切换 active 正确转移；**独立命令入口**（面板模式「整篇」、占位符「描述要如何修改整篇笔记…」）；**二次确认弹窗**（「应用整篇修改？」+ 取消/替换整篇，确认前文档逐字节未变，截图 `ra6-document-confirm.png`）；**单步撤销**（一次 Cmd+Z 精确还原原文，`restoredExactly: true`）；**降级差异视图**（3961 字符触发「内容过大，仅显示前后对照。」且词级标记数为 0，截图 `ra6-degraded.png`）；确认按钮标签对比度 4.22:1 → **4.98:1** | 20k+ 字符笔记未单独构造（降级路径已由 3961 字符触发并验证） |
 | R-A7 | `47e90f95`、`c01a261f` | `InlineEditContextUi.test.ts` | 连续点击 3 行 → 3 个 chip 且选择器保持打开；目录条目可附加/取消；搜索 + 截断提示；截图 `ra7-picker-chips.png`。**「模型能读到附加内容」已实机成立**：辅助会话把附加笔记物化到临时工作目录，模型用只读 `Read` 工具读取它。**四后端口令回显测试**（§6.5）：`claude-code` 两次独立运行均把只存在于附加笔记中的口令写进改写结果 → **上下文投递成立**；`pi` 在路径配为对象形态后辅助会话可启动；`opencode` 走只读工具路径并给出诚实文案；`codex` 如实拒绝（需 app-server） | 拖拽（picker 已验，拖入未验） |
 | R-B1 | `f6543338` | `InlineEditAutoLink.test.ts` + 流程测试 | **内链在差异视图中可见**：参考笔记含 `## 注意力机制` 并经真实 UI 附加为上下文后，预览（diff）中出现指向该标题的 `[[ref-attention.md#注意力机制]]`，在接受前即可见（截图 `rb1-autolink.png`）；**需协议合规模型**（`deepseek/deepseek-v4-flash` 会先吐伪工具标记而拿不到改写结果，改用 `opencode-go/gpt-5.6-luna` 即稳定产出） | 范围仅行内编辑（聊天侧未接线，已在实施报告记录）；死链与代码块内不插链接由单测覆盖，未单独实机构造 |
-| R-B2 | `f6543338` | `contextGroupPlan.test.ts` + 组附加用例 | 设置分区渲染（截图 `rb2-context-groups.png`）；**一键附加整组已实机**：选择器出现「主题组」分区与「RB2 主题组 2 个条目」行，点击后两条目同时成为 chip（`rb2-alpha`、`rb2-beta`）且选择器保持打开 | — |
+| R-B2 | `f6543338` | `contextGroupPlan.test.ts` + 组附加用例 | 设置分区渲染（截图 `rb2-context-groups.png`）；**三条验收全部实机**：①聊天 composer 的 `+` 打开模态「选择一个 vault 文件」，其「主题组」入口一键附加 **8 个 chip**（聊天侧 `cap = Infinity`），行内面板同一动作按需求 3 以 **5 条上限 + 明确省略条数**工作；②主题含已删除笔记 → 跳过并**具名**提示「1 个条目不存在，已跳过：rb2-acc-deleted.md」，不报错；③插件重载后 `contextGroups` 仍为 `{name, n: 9}`，入口仍提供该主题且行为一致 | — |
 | R-B3 | `67ce67ae` | 58 例（含 retention / backendAgnostic） | 回退恢复文件、新建目录删除、有内容目录保留并如实上报、写入后**即时**可回退（3ms）；**侧栏入口已验**：条目渲染 + 「回退」/「全部回退」按钮，收起态提示「本轮修改（可回退）：N」（截图 `rb3-revert-sidebar.png`） | — |
 | R-B4 | `b17508d7` | 52 例（含 gate 脚本真实 `/bin/sh` 测试） | CLI 探测 available；闸门就绪；真实包装脚本 → 确认框 → 拒绝/超时 → **"Nothing was executed"** | Windows 平台（已在 UI 如实标注不支持） |
 | R-B5 | `572947af`、`40a29b85`、`7deadbab`、`47790e76` | 46 例（含替身父目录校验） | 预览列 2 篇 → 确认执行 → 移动 → 一键回退；目录不存在时创建并披露；空目录回退时删除、有用户内容时保留 | — |
