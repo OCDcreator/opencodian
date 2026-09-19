@@ -41,8 +41,8 @@
 | A | R-A2 | `#` 预设提示词菜单 | `#` 快速调出预设提示词 | P0 | DONE |
 | A | R-A3 | 流式 diff 预览 | 流式续写 | P0 | PARTIAL |
 | A | R-A4 | 行内面板贴图（OCR / 手写 → LaTeX） | 截图转公式 | P0 | PARTIAL |
-| A | R-A5 | 多片段并行编辑 | 多片段并行续写/修改 | P1 | PARTIAL |
-| A | R-A6 | 全文修改模式 | 点击机器人图标改全篇 | P1 | PARTIAL |
+| A | R-A5 | 多片段并行编辑 | 多片段并行续写/修改 | P1 | DONE |
+| A | R-A6 | 全文修改模式 | 点击机器人图标改全篇 | P1 | DONE |
 | A | R-A7 | 文件夹 / 多选上下文 + 拖拽 | 选择整个文件夹、内链嵌入 | P1 | DONE |
 | B | R-B1 | 生成内容自动内链 | 自动建立指向参考笔记标题的内链 | P1 | PARTIAL |
 | B | R-B2 | 主题关联（上下文组） | 勾选关联主题作参考资料 | P1 | PARTIAL |
@@ -879,19 +879,19 @@ export interface AuxQueryTurnRequest {
 | R-A2 | `d892256d` | `InlineEditPresetMenu/Presets/InputOverlayPresetMenu.test.ts` | `#` 弹出六个内置预设；Enter 填入且**不发请求**；Esc 关闭内容不变 | `#标签` 误触与空自定义集仅单测覆盖 |
 | R-A3 | `78eeef05` | `InlineEditStreamPreview.test.ts` | 面板 busy 即时、最终预览 + 拒绝/接受、拒绝后文档逐字节未变 | **量化承诺无法演示**：可用供应商不增量流式（实测仅 1 个 chunk @2660ms），无中间态可渲染 |
 | R-A4 | `78eeef05` | 四后端审计脚本含图片轮次 | **四后端真 CLI 审计 PASS**（vision 模型下模型确实读到图；vault 快照零变化；Codex 临时目录 0） | 面板内粘贴/拖拽、chip 缩略图、LaTeX 定界符实机未验 |
-| R-A5 | `47e90f95` | `InlineEditWidgets.test.ts` | 并行上限设置项与文案已验 | 交叉接受无漂移、键盘只作用聚焦项 |
-| R-A6 | `47e90f95` | `InlineEditDocumentMode.test.ts` | 「整篇」模式切换 active 正确转移 | >20k 笔记、diff 整段降级视图、Ctrl+Z 单步、二次确认 |
+| R-A5 | `47e90f95`、`9babaf49`、`49c6b55c` | `InlineEditWidgets.test.ts`、`InlineEditInputOverlay.test.ts`、`InlineEditOverlayDismissal.test.ts` | 并行上限设置项与文案已验；**同一笔记内两编辑共存**（选区 + 光标，`overlayCount: 2`，截图 `ra5-two-panels.png`）；**交叉接受无漂移**（接受 A 只改 line 2，第二段未波及，B 面板/模式/输入内容/锚点行全保留）；**面板互不遮挡**（重叠面积 0，各自工具栏经 `elementFromPoint` 可达）；**Esc 只作用于聚焦编辑**（焦点在 A 时真实 Escape 只关 A，B 内容不丢） | — |
+| R-A6 | `47e90f95`、`f33732bc` | `InlineEditDocumentMode.test.ts` | 「整篇」模式切换 active 正确转移；**独立命令入口**（面板模式「整篇」、占位符「描述要如何修改整篇笔记…」）；**二次确认弹窗**（「应用整篇修改？」+ 取消/替换整篇，确认前文档逐字节未变，截图 `ra6-document-confirm.png`）；**单步撤销**（一次 Cmd+Z 精确还原原文，`restoredExactly: true`）；**降级差异视图**（3961 字符触发「内容过大，仅显示前后对照。」且词级标记数为 0，截图 `ra6-degraded.png`）；确认按钮标签对比度 4.22:1 → **4.98:1** | 20k+ 字符笔记未单独构造（降级路径已由 3961 字符触发并验证） |
 | R-A7 | `47e90f95`、`c01a261f` | `InlineEditContextUi.test.ts` | 连续点击 3 行 → 3 个 chip 且选择器保持打开；目录条目可附加/取消；搜索 + 截断提示；截图 `ra7-picker-chips.png`。**「模型能读到附加内容」已实机成立**：辅助会话把附加笔记物化到临时工作目录，模型用只读 `Read` 工具读取它 | 拖拽（picker 已验，拖入未验） |
-| R-B1 | `f6543338` | `InlineEditAutoLink.test.ts` + 流程测试 | — | diff 中链接可见性实机未验；范围仅行内编辑（聊天侧未接线，已在实施报告记录） |
+| R-B1 | `f6543338` | `InlineEditAutoLink.test.ts` + 流程测试 | **内链在差异视图中可见**：参考笔记含 `## 注意力机制` 并经真实 UI 附加为上下文后，预览（diff）中出现指向该标题的 `[[ref-attention.md#注意力机制]]`，在接受前即可见（截图 `rb1-autolink.png`）；**需协议合规模型**（`deepseek/deepseek-v4-flash` 会先吐伪工具标记而拿不到改写结果，改用 `opencode-go/gpt-5.6-luna` 即稳定产出） | 范围仅行内编辑（聊天侧未接线，已在实施报告记录）；死链与代码块内不插链接由单测覆盖，未单独实机构造 |
 | R-B2 | `f6543338` | `contextGroupPlan.test.ts` + 组附加用例 | 设置分区渲染（截图 `rb2-context-groups.png`） | 一键附加整组 → chip 的实机流程 |
 | R-B3 | `67ce67ae` | 58 例（含 retention / backendAgnostic） | 回退恢复文件、新建目录删除、有内容目录保留并如实上报、写入后**即时**可回退（3ms）；**侧栏入口已验**：条目渲染 + 「回退」/「全部回退」按钮，收起态提示「本轮修改（可回退）：N」（截图 `rb3-revert-sidebar.png`） | — |
 | R-B4 | `b17508d7` | 52 例（含 gate 脚本真实 `/bin/sh` 测试） | CLI 探测 available；闸门就绪；真实包装脚本 → 确认框 → 拒绝/超时 → **"Nothing was executed"** | Windows 平台（已在 UI 如实标注不支持） |
 | R-B5 | `572947af`、`40a29b85`、`7deadbab`、`47790e76` | 46 例（含替身父目录校验） | 预览列 2 篇 → 确认执行 → 移动 → 一键回退；目录不存在时创建并披露；空目录回退时删除、有用户内容时保留 | — |
 | R-C1 | `07ba94d7` | 52 例（含关闭态逐字节回归） | 54/54 篇约 1s 索引；chip 显示路径 + 行号范围；取消有粘性；chip 对比度 7.39:1；索引在 `.opencodian/vault-index/` | 万篇级首次索引耗时（需万篇规模库） |
 | R-C2 | `fe595ffb`、`7b022968` | 58 例（失败语义矩阵逐支） | 对本地 stub：线格式正确、资产落盘 7832 字节 PNG、嵌入宽度 `|600` 生效、生成失败零文档改动、回退移除资产 | 真实供应商响应差异（本机无图像端点） |
-| R-C3 | `f00653a3`、`e7e1abda` | 106 例 + 组合层 notify 测试 | 幽灵文本真实续写；斜体弱化色对比度 10.74:1；Esc 清除；后端不可用时**如实提示**（修复前为静默） | 首字节 800ms 未达标（实测 1759–2550ms，瓶颈在供应商）；实体 Alt 手势（合成按键无法验证）；IME |
-| R-C4 | `2ed00f27`、`3e9766ad` | 90 例 | 引擎加载成功、一期提取出 4 行真实文本、正常路径阶梯达 **A 级**、sidecar 注释写入并被回退移除 | 内文选中提问流程、大 PDF 索引耗时；`pdfjsWorker` 全局污染为**未证实风险** |
-| R-C5 | `71bf642d` | 99 例 | 门禁 A 级（可写回）；生成 3 节点无重叠、Obsidian 正常渲染；失败不留文件 | 节点级 AI 改写端到端（入口**间歇缺席，未定因**） |
+| R-C3 | `f00653a3`、`e7e1abda` | 106 例 + 组合层 notify 测试 | 幽灵文本真实续写；斜体弱化色对比度 10.74:1；Esc 清除；后端不可用时**如实提示**；**实体 Alt 手势已验**（CDP 真实 keydown/keyup，页内同一时钟计时）；**继续输入即清除**；**Tab 接受后一次 Cmd+Z 精确还原**；建议形态为一句而非续写整篇 | **首字节 800ms 仅最佳情况达标**：分模型实测 `opencode-go/gpt-5.6-luna` 2610/2188/2754ms、`deepseek/deepseek-v4-flash` 1307/1252/923ms、`deepseek/deepseek-flash` 1315/1111/**692ms**。架构为渐进渲染（首块即 ghost），故差距在模型侧；补全与行内编辑**共用** `inlineEditModelOverrides`，若要稳定达标需独立的补全模型设置项。IME 组合态仍未验 |
+| R-C4 | `2ed00f27`、`3e9766ad` | 90 例 | 引擎加载成功、一期提取出 4 行真实文本、正常路径阶梯达 **A 级**、sidecar 注释写入并被回退移除；**真实 UI 流程已验**：带文字层 PDF（4 行）+ 真实鼠标拖选产生选区 + `opencodian:pdf-ask-selection` 把 PDF 作为上下文 chip 带入对话；无问答时 `pdf-save-annotation` 如实提示 | **新缺陷 R-C4-D4**（A 级序列化 ctx 缺 `contains`，真实选区必抛错 → A 静默降级为 B 而阶梯仍报 A）已派修；大 PDF 索引耗时；`pdfjsWorker` 全局污染为**未证实风险** |
+| R-C5 | `71bf642d` | 99 例 | 门禁 A 级（可写回）；生成 3 节点无重叠、Obsidian 正常渲染；失败不留文件；**入口已定因**：真实入口是选中浮动工具条 `.canvas-menu` 内的「AI 改写节点」按钮（与原生 移除/设置颜色/聚焦当前卡片/编辑 并列，两次独立运行均稳定出现），此前「间歇缺席」是探针找错目标（`onSelectionContextMenu` 在 1.13.7 的真实右键路径下 `calls: 0`）；**端到端已跑通**：指令弹窗 → Mermaid 结果预览（原始内容/新内容）→ 写回后 `.canvas` 节点文本确实变更 | **新缺陷 R-C5-D1**（写回后 Ctrl+Z 不能撤销）与 **R-C5-D2**（文本节点写回未纳入 R-B3 快照体系，§6.2）已派修 |
 | R-C6 | `6e488736` | 123 例（以负例为主） | 关闭态 IPv4+IPv6 零监听且关闭后端口释放；401 与错令牌**逐字节相同**；审计无令牌无指令正文；越权结构性拒绝 | — |
 
 ### 跨条目修正
@@ -901,8 +901,20 @@ export interface AuxQueryTurnRequest {
 
 ### 新登记待修项（实机发现）
 
-**行内编辑遇到「工具调用式回复」时显示原始协议标记**：附加了上下文时，模型可能选择用只读工具读取该笔记而不产出 `<replacement>` 标签。此时面板**既无改写结果、也无 Notice、也无面板内错误**，唯一可见产物是澄清通道里的原始 `<|tool invoke …>` 标记（用户看不懂的内部语法）。对照：不附加任何上下文时同一路径正常（`busy` 101ms、预览 1216ms）。按 §6.7，此情形应给出诚实可读的说明（例如"模型选择了读取上下文而未产出改写"），而不是把协议语法摊给用户。**注意**：上下文投递本身是正常的（已证明模型确实读到了附加笔记）。
+**行内编辑遇到「工具调用式回复」时显示原始协议标记** —— **已修复并实机复验**（`349c589a` → 补齐全角形态 `1919b7d7`）。附加了上下文时，模型可能选择用只读工具读取该笔记而不产出 `<replacement>` 标签；修复前面板既无改写结果也无面板内错误，唯一可见产物是澄清通道里的原始标记。现在这类输出统一映射为诚实文案（`inlineEdit.reply.toolCallInspectedContext` / `unrenderableProtocolOutput`），fail-closed 语义不变。
+
+**这里有一次值得记住的假通过**：首版守卫的单测全绿，实机却完全无效——夹具写的是 ASCII `<|tool call>`，模型实际吐的是**全角竖线** `｜`（U+FF5C）加空格分隔复数标签名（`<｜tool calls> <｜tool invoke …> <｜tool parameter …>`）。同一配方在旧构建上 3/3 复现泄漏、在新构建上 3/3 显示诚实文案。教训：**验证夹具必须逐字取自真实产物**。
+
+### 本轮实机新发现、已派修的缺陷
+
+- **R-C5-D1 / D2**（§6.2 与 R-C5 验收 3）：画布**文本节点**写回走 `vault.process`，绕过 Canvas 视图自身的数据/历史管线，故原生 Ctrl+Z 无法撤销（实测 `restored: false`）；同时 `EditRevertService` 全程以 `isMarkdownPath` 过滤，`.canvas` 永远进不了快照体系，而**文件节点**路径（markdown 笔记）是完整走 `beginBatchCapture → notePluginWrite → endBatchCapture` 且覆盖不可用时**中止写入**的。修复方向：写回改走宿主数据/历史管线使原生撤销成立，并把 `.canvas` 这类文本类 vault 文件纳入可捕获集合后同样 fail-closed。
+- **R-C4-D4**（高）：A 级原生选区序列化在**真实选区**上必抛 `e.contains is not a function`（插件传入的 ctx 只有 `{ win }`），被 `catch` 吞掉后降级到 B 级 DOM 路径——于是选区级 `#page&selection` 回链与高亮反馈静默失效，而阶梯仍报 A。已实测 `{ win, contains: (n) => document.contains(n) }` 返回合法 range string `"0,0,0,57"`。修复方向：传入可用的 `contains` 谓词，并让 A 级判定**基于真实选区的证据**而非「函数可调用」。
+- **系统化对比度**（设计契约）：宿主主题的 `.mod-cta` 配对实测 **2.87:1**（`rgb(170,17,65)` 底 + 黑标签）、`.mod-warning.mod-destructive` **4.22:1**、`--text-error` 正文 **4.2:1**，均低于 13px 文本的 4.5:1 下限；同一个 accent 底配白标签算得 **7.33:1**。此前各弹窗各自打补丁（tooling/batch-organize/imagegen/inline-edit-confirm），画布改写预览的「写回」按钮仍是 2.87:1。修复方向：收敛为**一套共享的插件弹窗规则**，保留色相、提亮标签（禁止提亮底色——浅色主题才成立且会软化危险信号）。
 
 ### 全局未覆盖清单（如实登记）
 
-面板贴图与 LaTeX 定界符实机；多片段交叉接受；大笔记全文模式与 diff 降级；内链在 diff 中可见；IME 组合态（`@`/`#`/Alt）；万篇级索引耗时；C4 内文选中提问与大 PDF 索引耗时；C5 节点 AI 改写端到端（入口间歇缺席，未定因）；R-C3 实体 Alt 手势与 800ms 首字节；四后端下上下文投递的实机端到端（修复后待复核）。此外 `pdfjsWorker` 全局污染为**未证实风险**（干净进程对照显示 PDF 不渲染与本插件无关）。
+本轮已补齐（详见上表）：面板贴图（chip 缩略图 + LaTeX 定界符）、多片段交叉接受与键盘作用域、大笔记全文模式与 diff 降级、二次确认与单步撤销、内链在 diff 中可见、C5 节点 AI 改写端到端、C4 内文选中提问、R-C3 实体 Alt 手势与 Tab/撤销。
+
+仍未覆盖（如实登记）：**IME 组合态**（`@`/`#`/Alt 与行内编辑/补全的 `isComposing` 交互，仅单测覆盖）；**万篇级索引首次耗时**（需万篇规模库）；**大 PDF（数百页）索引耗时与问答引用片段**；**R-C3 800ms 首字节的稳定性**（仅最佳情况 692ms 达标，且补全与行内编辑共用模型设置）；**四后端下上下文投递的实机端到端**（修复后仅 OpenCode 侧实测，Claude/Codex 因本机 CLI 不可用未复核：`claude` 启动即退出码 1、`codex` 可执行路径是 Windows 路径）；**R-C2 真实供应商文生图**（本机无图像端点，用本地 stub 验证线格式与落盘）。
+
+未证实风险：`pdfjsWorker` 全局污染（干净进程对照显示 PDF 不渲染与本插件无关，故不记为缺陷，但我们的引擎入口确实写入该全局）。
