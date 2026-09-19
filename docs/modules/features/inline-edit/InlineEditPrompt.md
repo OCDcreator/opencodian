@@ -10,6 +10,7 @@ inline edit 与模型之间的请求构造与响应解析，采用 Claudian 验�
 ## 职责
 
 - `buildInlineEditSystemPrompt(locale)`：zh/en 两份系统提示词；只负责质量（风格模仿、保留 markdown 结构、只读工具静默使用、禁止元评论），**不是安全层**。含 R-A4 图片语义段（条件式措辞：仅当请求附带图片时适用——按图片内容直出最终文本、公式默认 LaTeX、定界符按请求注明的锚点形态）
+  - **输出顺序要求（flowtext-parity R-A3 验收 1）**：带标签的回复必须**先输出开标签**——`<replacement>`（或 `<insertion>`）是回复的最开头字符，正文在标签内撰写，闭合标签是回复的最结尾字符。这是对"正文何时可得"的排序约束，不改变标签文法；渐进解析（`78eeef05`）只有在轮内真的存在部分标签体时才有东西可渲染——若模型先思考、最后一次性吐出整块带标签正文，预览会从 `busy` 直接跳到完整结果。
 - `buildInlineEditImageNote(locale, request)`（纯，R-A4）：带图请求追加在 prompt 末尾的锚点形态注记——`cursor-inline` → 行内 `$…$`；`cursor-inbetween` 与 `selection` → 行间 `$$…$$`（OCR 常见场景：改写块独立成行）
 - `buildInlineEditRequestForAnchor(anchor, instruction, contextFiles)`（纯）：锚点 → `InlineEditRequest`（从 controller 搬来，控制其行数预算）；附件仍是路径制清单
 - `buildInlineEditRequest()`：按形态生成请求
@@ -35,6 +36,8 @@ inline edit 与模型之间的请求构造与响应解析，采用 Claudian 验�
 > 2026-09-18 (R-A6/R-A7)：请求侧新增 `document` 形态（`<editor_document path lines="1-N">` 整块嵌入，输出契约仍复用 `<replacement>`，解析器零改动）；`INLINE_EDIT_MAX_DOCUMENT_CHARS = 200_000`，超限拒绝**不分块**；正文含字面量 `</editor_document>` 或 `</replacement>` 沿用 fail-closed 拒绝。`attachedNotes` 改为 `InlineEditAttachedNote[]`（`{path, kind?: 'file'|'folder'}`），`<attached_context>` 中目录条目渲染 `[folder]` 前缀；计数语义为**每条目各计 1**（目录不展开），路径规则（≤500、不含 `<>`）对目录同适用。系统提示词新增整篇形态语义（允许调整结构、不得丢弃信息）与目录语义（按需读取、不要全量读取）。
 
 > 2026-09-18 (澄清通道防泄漏)：新增 `classifyInlineEditClarification()`。实测（附加上下文流）中模型会用只读工具先读附件，其 `text` 回传工具调用转录标记，严格解析判为 `clarification` 后原始标记直出回复区。该分类器在 controller 的两处回复区写入点统一拦截（后端无关），不改动严格解析器的权威，也不削弱只读契约；诚实文案见 `inlineEdit.reply.*`（zh/en）。
+
+> 2026-09-18 (R-A3 输出顺序要求)：系统提示词新增一条排序约束——先开标签、标签内写正文、闭合标签收尾（zh/en 各一句，见上方职责节）。背景：`0fada4d1` 让 OpenCode aux 会话轮内轮询历史并喂 `onTextChunk`，渐进渲染已就位，但实机三种配置仍只有 `busy` → 完整预览两个状态（rAF 已排除采样假象）——模型先思考、最后一次性吐出整块 `<replacement>` 正文，轮内不存在可供渲染的部分标签体。本约束只影响**部分正文何时可得**（渲染预览），严格解析器（completed-token + 脏检查）仍是唯一写权威，未被削弱。**各后端事实**：四条 aux/补全会话缝（OpenCode 历史轮询、Claude `stream_event` text_delta、Codex app-server 通知 chunk、Pi `text_delta`）都能在轮内送达内容增量，因此排序约束对四后端都可能生效；约束本身是软约束（提示词是质量层），模型是否遵守只能实测，不能由此断言所有模型/提供方都逐步吐出正文。
 
 ## 维护约束
 

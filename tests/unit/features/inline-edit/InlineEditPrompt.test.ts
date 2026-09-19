@@ -145,6 +145,38 @@ describe('buildInlineEditSystemPrompt', () => {
     expect(zh).toContain('图片');
     expect(zh).toContain('LaTeX');
   });
+
+  // R-A3 acceptance 1: the model must open the protocol tag first so a partial
+  // body exists mid-turn for the render-only preview. Without the ordering
+  // requirement models think first and emit the whole tagged block in one
+  // burst at the end, and the preview stays `busy` until the turn completes.
+  it('requires the opening tag before the body in both locales (R-A3 ordering)', () => {
+    const en = buildInlineEditSystemPrompt('en');
+    expect(en).toContain('Begin a tagged reply with the opening tag itself');
+    expect(en).toContain('as your very first characters');
+    expect(en).toContain('the closing tag your very last characters');
+    const zh = buildInlineEditSystemPrompt('zh');
+    expect(zh).toContain('带标签的回复必须以开标签本身开头');
+    expect(zh).toContain('作为回复的最开头输出');
+    expect(zh).toContain('以闭合标签作为回复的最结尾');
+  });
+
+  it('keeps the existing output-contract clauses alongside the ordering rule', () => {
+    const en = buildInlineEditSystemPrompt('en');
+    expect(en).toContain('exactly one <replacement>');
+    expect(en).toContain('exactly one <insertion>');
+    expect(en).toContain('NO tags');
+    expect(en).toContain('Never emit more than one tag');
+    expect(en).toContain('Never wrap the tag in markdown fences');
+    expect(en).toContain('used verbatim');
+    const zh = buildInlineEditSystemPrompt('zh');
+    expect(zh).toContain('只回复一个 <replacement>');
+    expect(zh).toContain('只回复一个 <insertion>');
+    expect(zh).toContain('不要使用任何标签');
+    expect(zh).toContain('禁止输出多个标签');
+    expect(zh).toContain('禁止用 markdown 代码块包裹标签');
+    expect(zh).toContain('原样使用');
+  });
 });
 
 describe('buildInlineEditImageNote', () => {

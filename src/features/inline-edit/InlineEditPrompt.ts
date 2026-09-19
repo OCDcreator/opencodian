@@ -8,7 +8,12 @@
  *   `<editor_cursor>` block whose body is the note text;
  * - the response must contain exactly one top-level `<replacement>` or
  *   `<insertion>` tag, or no tag at all (question / clarification);
- * - malformed responses are rejected rather than guessed at.
+ * - malformed responses are rejected rather than guessed at;
+ * - a tagged reply must open the tag first (flowtext-parity R-A3): the body is
+ *   previewed render-only while it streams, so an early opening tag is what
+ *   makes a partial body observable mid-turn. This is an ordering requirement
+ *   on when the body becomes available — the grammar and the strict parser
+ *   are unchanged.
  *
  * Everything here is pure so the whole contract is unit-testable without
  * Obsidian or a model.
@@ -144,6 +149,7 @@ const SYSTEM_PROMPT_EN = [
   '- To rewrite the selected text, reply with exactly one <replacement>...</replacement> tag holding the new text.',
   '- To insert text at the cursor, reply with exactly one <insertion>...</insertion> tag holding the text to insert.',
   '- To ask a question or ask for clarification, reply with plain prose and NO tags.',
+  '- Begin a tagged reply with the opening tag itself: emit <replacement> (or <insertion>) as your very first characters, compose the body inside the tag, and make the closing tag your very last characters — the body is previewed while it streams, so the tag must open early.',
   'Never emit more than one tag. Never nest tags. Never wrap the tag in markdown fences.',
   'The tag body is used verbatim, so put nothing in it but the final text.',
   '',
@@ -171,6 +177,7 @@ const SYSTEM_PROMPT_ZH = [
   '- 改写选中的文字：只回复一个 <replacement>...</replacement> 标签，标签内是改写后的文字。',
   '- 在光标处插入文字：只回复一个 <insertion>...</insertion> 标签，标签内是要插入的文字。',
   '- 需要提问或澄清：直接用纯文本回复，不要使用任何标签。',
+  '- 带标签的回复必须以开标签本身开头：先把 <replacement>（或 <insertion>）作为回复的最开头输出，再在标签内撰写正文，并以闭合标签作为回复的最结尾——正文会在生成过程中被逐步预览，标签必须尽早打开。',
   '禁止输出多个标签，禁止标签嵌套，禁止用 markdown 代码块包裹标签。',
   '标签内的内容会被原样使用，因此只能放最终文字。',
   '',

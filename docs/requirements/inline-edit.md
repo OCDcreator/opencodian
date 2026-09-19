@@ -284,6 +284,8 @@ export interface InlineEditHost {
 
 系统提示词要点（完整文案实施时编写）：风格模仿；只读工具静默使用；**输出只能是标签内容或回答**（列举禁止的元评论句式）；散文 vs 代码差异化处理；澄清要简短具体；模型不得输出协议标签以外的任何标记。
 
+输出顺序要求（flowtext-parity R-A3 验收 1，2026-09-18 起）：带标签的回复必须**先输出开标签**——`<replacement>`（或 `<insertion>`）是回复的最开头字符，正文在标签内撰写，闭合标签是回复的最结尾字符。该要求让部分标签体在轮内逐步可得，供渲染侧的流式 diff 预览（flowtext-parity R-A3）消费；它只约束正文的**可得时机**，不改变上文文法，严格解析器仍是唯一写权威。前提（按后端）：会话缝须能在轮内送达内容增量（OpenCode 历史轮询、Claude `stream_event`、Codex 通知 chunk、Pi `text_delta` 目前均满足）；若某后端的缝只在轮末返回整条消息，此提示词要求无法单独让预览逐步增长。
+
 ### 6.3 为什么不用 unified diff 或 JSON
 
 - unified diff：模型生成行号/hunk 头不稳定，解析脆；inline edit 粒度小，词级 diff 由前端计算更准。

@@ -11,6 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-19 R-A3 验收 1 收口：提示词层要求「先开标签、标签内写正文」（partial body 可得性）
+
+**触发**：R-A3 验收 1（预览在首字节后 500ms 内出现、随生成逐步增长）实测仍只有两个状态——`busy` → 完整预览（7.8s / 46.7s），且 rAF 已验证健康（1.5s 92 帧）、渐进渲染链路（`78eeef05`）与 OpenCode 轮内历史轮询（`0fada4d1`）均已就位。剩余闸门在模型侧：模型先思考，最后把整块 `<replacement>…</replacement>` 一次性吐出——轮内**从不存在**可供渲染的部分正文，渲染层无从增长。
+
+**改动**：`buildInlineEditSystemPrompt`（zh/en）新增一条**输出顺序约束**：带标签的回复必须以开标签本身开头——`<replacement>`（或 `<insertion>`）是回复的最开头字符，正文在标签内撰写，闭合标签是回复的最结尾字符，并说明原因（正文在生成过程中被逐步预览，标签必须尽早打开）。这是对「部分正文何时可得」的排序约束：标签文法（单标签对、标签外无评论、禁 markdown 围栏）与严格解析器（completed-token 解析 + 脏检查，唯一写权威）逐字节未动，`onTextChunk` 仍是 render-only。**各后端事实**（已核实源码，非均匀假设）：四条会话缝都能在轮内送达内容增量——OpenCode 轮内历史轮询、Claude `stream_event` text_delta（`includePartialMessages`）、Codex app-server 通知 chunk、Pi `message_update` text_delta；因此该约束对四后端都可能生效。但它仍是软约束（提示词是质量层，模块文档明言非安全层）：模型是否遵守只能实测验证；若未来某后端的缝只在轮末返回整条消息，本提示词要求无法单独让预览增长（已在 `docs/requirements/inline-edit.md` §6.2 与模块文档如实记录）。
+
+**测试**：`InlineEditPrompt.test.ts` 新增两例——zh/en 均断言顺序约束句存在（开头/最结尾措辞）；既有输出契约条款（单标签对、NO tags、禁多标签、禁围栏、原样使用）仍逐条在场。
+
+---
+
 ## 2026-09-19 发送路径上下文条目缺失对齐 R-B2：跳过 + 诚实提示，绝不让整轮失败
 
 **触发**：部署版实测——composer 附加的笔记被外部删除（验收 harness 移入废纸篓，不触发 Obsidian vault 事件）后，下一次发送（vaultRetrievalEnabled 开启）整轮失败，assistant 回复变成 `发送消息失败 File not found: /Volumes/.../rb1-chat-ref.md`：原始文件系统错误 + 绝对机器路径直接漏进聊天，整轮消息丢失；且删除后 chip 仍留在 composer 里继续被提供，这正是过期路径进入请求的通道。
