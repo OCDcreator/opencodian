@@ -382,6 +382,34 @@ describe('classifyInlineEditClarification', () => {
     });
   });
 
+  // The fixtures above use the ASCII pipe. Real models emit the full-width
+  // `｜` (U+FF5C) with space-separated, plural tag names instead — verified
+  // live on the running app, where the ASCII-only guard let the raw markup
+  // through while every test stayed green. Keep these verbatim copies.
+  it('flags the full-width-pipe tool-call transcript that a real model emitted', () => {
+    const raw = '<｜tool calls> <｜tool invoke name="Read"> <｜tool parameter name="filePath" string="true">acceptance-crossaccept.md</｜tool parameter> </｜tool invoke> </｜tool calls>';
+    expect(classifyInlineEditClarification(raw)).toEqual({
+      kind: 'unrenderable',
+      cause: 'tool-call',
+    });
+    const lowercase = '<｜tool calls> <｜tool invoke name="read"> <｜tool parameter name="file_path" string="true">verify-ref-note.md</｜tool parameter> </｜tool invoke> </｜tool calls>';
+    expect(classifyInlineEditClarification(lowercase)).toEqual({
+      kind: 'unrenderable',
+      cause: 'tool-call',
+    });
+  });
+
+  it('flags a bare full-width closer and space-separated tag names', () => {
+    expect(classifyInlineEditClarification('改写结果如下</｜tool invoke>')).toEqual({
+      kind: 'unrenderable',
+      cause: 'tool-call',
+    });
+    expect(classifyInlineEditClarification('<tool calls>\nread\n</tool calls>')).toEqual({
+      kind: 'unrenderable',
+      cause: 'tool-call',
+    });
+  });
+
   it('flags other backends tool-call syntaxes as a tool-call stream', () => {
     expect(classifyInlineEditClarification('<function_calls>\n<invoke name="read">')).toEqual({
       kind: 'unrenderable',

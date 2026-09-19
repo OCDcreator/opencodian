@@ -423,12 +423,24 @@ export type InlineEditClarificationPresentation =
  * (`<|tool call>`, `<|tool invoke name="…">`, `<|im_start|>`), the rest covers
  * the common function-calling conventions (Claude antml blocks, generic
  * `<tool_call>`-style tags). Prose never legitimately contains these.
+ *
+ * Two shape details are load-bearing and were both missed by the first
+ * version of this guard (live acceptance caught it: the panel still showed raw
+ * markup while the unit fixtures — written with the ASCII form — stayed green):
+ *
+ * - The pipe can be the **full-width** `｜` (U+FF5C). Models that write tool
+ *   markup as plain text emit `<｜tool calls>`, not `<|tool calls>`. Both the
+ *   opener and the closer appear, so the pattern must accept `</` before the
+ *   pipe as well.
+ * - The tag name can be **space-separated and plural** (`tool calls`,
+ *   `tool invoke`, `tool parameter`), so the underscore-only alternation below
+ *   never matched the observed output. `[\s_]*` covers both spellings.
  */
 const TOOL_CALL_MARKUP: readonly RegExp[] = [
-  /<\|/,
+  /<\/?[|｜]/,
   /<function_calls\b/i,
   /<(?:antml:)?(?:invoke|function_call)\b/i,
-  /<(?:tool_call|tool_use|tool_result|tool_invoke|tool_parameter)\b/i,
+  /<(?:tool[\s_]*calls?|tool[\s_]*use|tool[\s_]*result|tool[\s_]*invoke|tool[\s_]*parameter)\b/i,
 ];
 
 /**

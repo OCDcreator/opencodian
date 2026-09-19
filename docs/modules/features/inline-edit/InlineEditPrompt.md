@@ -22,7 +22,8 @@ inline edit 与模型之间的请求构造与响应解析，采用 Claudian 验�
   - 完全无标签 → `clarification`（进入澄清循环，不盲目替换）
   - 标签内容**原样保留**（不做反转义）
 - `normalizeInsertionText()`：只去掉插入文本首尾的空行，保留缩进
-- `classifyInlineEditClarification()`（纯，§6.4/§6.7）：无标签回复进入澄清通道前的防泄漏分类——命中工具调用标记（`<|` 特殊标记族如 `<|tool call>` / `<|tool invoke …>`、antml `<function_calls>` / `<invoke …>`、通用 `<tool_call>`/`<tool_use>`/`<tool_result>` 系）→ `unrenderable/tool-call`；含协议标签截断片段（`<replacement`、`</insert` 等，≥3 字母前缀匹配，普通散文 `<div>`、`a < b` 不误伤）→ `unrenderable/protocol-fragment`；其余为 `prose` 原样放行。工具调用形态优先于片段，用户得到更有解释性的提示
+- `classifyInlineEditClarification()`（纯，§6.4/§6.7）：无标签回复进入澄清通道前的防泄漏分类——命中工具调用标记（`<|` 特殊标记族如 `<|tool call>` / `<|tool invoke …>`，**含全角竖线 `｜`（U+FF5C）的 `<｜…` 与 `</｜…` 形态**、antml `<function_calls>` / `<invoke …>`、通用 `<tool_call>`/`<tool_use>`/`<tool_result>` 系，**标签名允许空格分隔与复数形式**如 `tool calls` / `tool invoke` / `tool parameter`）→ `unrenderable/tool-call`；含协议标签截断片段（`<replacement`、`</insert` 等，≥3 字母前缀匹配，普通散文 `<div>`、`a < b` 不误伤）→ `unrenderable/protocol-fragment`；其余为 `prose` 原样放行。工具调用形态优先于片段，用户得到更有解释性的提示
+  - **全角/空格形态是实机回归的教训**：首版只匹配 ASCII `<|` 与下划线标签名，单测夹具也照此书写，于是测试全绿而实机面板依旧显示原始标记。实机模型（opencode + `deepseek/deepseek-v4-flash`）实际吐出的是 `<｜tool calls> <｜tool invoke name="read"> <｜tool parameter name="file_path" …>…</｜tool invoke> </｜tool calls>`。夹具现已改为**逐字复制实机字符串**。
 - `describeInlineEditFailure()`：把失败原因映射为翻译键
 
 ## 依赖
