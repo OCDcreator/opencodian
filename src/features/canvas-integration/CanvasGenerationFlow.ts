@@ -320,6 +320,8 @@ class CanvasGenerationModeModal extends Modal {
   }
 
   onOpen(): void {
+    // Shared plugin-modal contrast contract scope (plugin-modal-contrast.css).
+    this.modalEl.addClass('opencodian-canvas-modal');
     this.setTitle(t('canvas.generate.mode.title'));
     new Setting(this.contentEl)
       .setName(t('canvas.generate.mode.titleName'))

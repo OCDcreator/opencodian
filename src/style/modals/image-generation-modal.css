@@ -4,7 +4,8 @@
    spacing comes from the shared --opencodian-modal-* tokens
    (see batch-organize-modal.css); no ad-hoc chrome margins.
    Obsidian-native first: colour choices stay host-native
-   (--radius-m, --background-secondary, --text-error,
+   (--radius-m, --background-secondary,
+   --opencodian-modal-warning-ink (see plugin-modal-contrast.css),
    --font-ui-smaller); these rules only add the result layout,
    the error strip and a comfortable thumbnail cap. Contrast and
    focus states come from the host theme.
@@ -51,7 +52,7 @@
 }
 
 .opencodian-imagegen-error {
-  color: var(--text-error);
+  color: var(--opencodian-modal-warning-ink);
   font-size: var(--font-ui-smaller);
   margin: 8px 0;
   white-space: pre-wrap;

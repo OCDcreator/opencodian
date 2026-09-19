@@ -4,9 +4,11 @@
  * preview-and-confirm gate before ANY write-back, and the ladder-C node
  * picker used when the selection set cannot be read.
  *
- * All dialogs use Obsidian-native components and theme styling only — no
- * custom CSS surface (same rule as PdfAnnotationPreviewModal). Fail states
- * are shown, never silently swallowed (§6.7).
+ * All dialogs use Obsidian-native components and theme styling; the only
+ * plugin CSS surface is the shared modal contrast contract (the
+ * `opencodian-canvas-modal` root class scopes plugin-modal-contrast.css,
+ * which lifts the CTA label and the warning note above the measured
+ * contrast floor). Fail states are shown, never silently swallowed (§6.7).
  */
 
 import type { App } from 'obsidian';
@@ -31,6 +33,7 @@ export class CanvasRewriteInstructionModal extends Modal {
   }
 
   onOpen(): void {
+    this.modalEl.addClass('opencodian-canvas-modal');
     this.setTitle(t('canvas.rewrite.instruction.title'));
     let instruction = '';
     new Setting(this.contentEl)
@@ -135,6 +138,7 @@ export class CanvasRewritePreviewModal extends Modal {
   }
 
   onOpen(): void {
+    this.modalEl.addClass('opencodian-canvas-modal');
     this.setTitle(t('canvas.rewrite.preview.title'));
 
     const original = this.contentEl.createDiv();
@@ -162,7 +166,9 @@ export class CanvasRewritePreviewModal extends Modal {
     if (this.options.revertNote) {
       const warning = this.contentEl.createEl('p');
       warning.setText(this.options.revertNote);
-      warning.style.color = 'var(--text-error)';
+      // Shared plugin-modal warning ink (plugin-modal-contrast.css):
+      // raw --text-error measured 4.20:1 as modal body copy — below floor.
+      warning.addClass('opencodian-modal-warning-note');
     }
 
     new Setting(this.contentEl)
@@ -244,6 +250,7 @@ export class CanvasNodePickModal extends Modal {
   }
 
   onOpen(): void {
+    this.modalEl.addClass('opencodian-canvas-modal');
     this.setTitle(t('canvas.rewrite.pick.title'));
     if (this.rows.length === 0) {
       this.contentEl.createDiv({ text: t('canvas.rewrite.pick.empty') });

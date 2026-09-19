@@ -33,11 +33,24 @@ function getCssRuleBlock(css: string, selector: string): string {
 const BATCH_CSS = 'src/style/modals/batch-organize-modal.css';
 const TOOLING_CSS = 'src/style/modals/obsidian-tooling-confirm-modal.css';
 const IMAGEGEN_CSS = 'src/style/modals/image-generation-modal.css';
-const INLINE_EDIT_CONFIRM_CSS = 'src/style/modals/inline-edit-confirm-modal.css';
+const CONTRAST_CSS = 'src/style/modals/plugin-modal-contrast.css';
 const BATCH_TS = 'src/app/batchOrganize/BatchOrganizeModal.ts';
 const TOOLING_TS = 'src/app/obsidianTooling/ObsidianToolingApprovalModal.ts';
 const IMAGEGEN_TS = 'src/features/chat/ui/ImageGenerationModal.ts';
 const INLINE_EDIT_CONFIRM_TS = 'src/features/inline-edit/InlineEditConfirmModal.ts';
+const CANVAS_REWRITE_TS = 'src/features/canvas-integration/CanvasRewriteModals.ts';
+const CANVAS_GENERATE_TS = 'src/features/canvas-integration/CanvasGenerationFlow.ts';
+const PDF_ANNOTATION_TS = 'src/features/chat/services/PdfAnnotationPreviewModal.ts';
+
+/** Every plugin modal root class covered by the shared contrast contract. */
+const CONTRAST_MODAL_CLASSES = [
+  'opencodian-inline-edit-confirm-modal',
+  'opencodian-batch-organize-modal',
+  'opencodian-imagegen-modal',
+  'opencodian-tooling-confirm-modal',
+  'opencodian-canvas-modal',
+  'opencodian-pdf-annotation-modal',
+] as const;
 
 /** `border-left`/`border-right` wider than 1px is an impeccable ban. */
 const SIDE_STRIPE_PATTERN = /border-(?:left|right):\s*(?!1px|0\b|0px\b|none\b|transparent\b)[1-9]\d*(?:\.\d+)?px/;
@@ -98,11 +111,14 @@ describe('batch organize modal design contract (DESIGN.md §5 Modal Layout)', ()
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)/);
   });
 
-  it('contains no side-stripe accent borders', () => {
+  it('contains no side-stripe accent borders and no per-modal warning-ink duplicate', () => {
     // jest/expect-expect cannot see through the local expectNoMatches helper,
     // so pair it with a direct assertion that also pins the file identity.
     expect(css).toContain('opencodian-batch-organize-modal');
     expectNoMatches(css, SIDE_STRIPE_PATTERN, 'batch-organize side stripe');
+    // The warning tone has ONE source of truth (shared contrast module).
+    expect(css).toMatch(/color:\s*var\(--opencodian-modal-warning-ink\)/);
+    expect(css).not.toContain('color-mix(in srgb, var(--text-error)');
   });
 });
 
@@ -135,52 +151,87 @@ describe('obsidian tooling approval modal design contract', () => {
     expect(ts).toContain('mod-cta');
   });
 
-  it('keeps the deny label legible: deepened rose plus a light label (measured 4.22:1 before, ~7.3:1 after)', () => {
-    const deny = getCssRuleBlock(css, '.opencodian-tooling-confirm-modal .mod-warning');
-    // Deepened with DESIGN.md ink-graphite; a lightened rose would fix light
-    // themes but break dark ones and would soften the danger signal.
-    expect(deny).toContain('#e11d48');
-    expect(deny).toContain('#0f172a');
-    expect(deny).toMatch(/color:\s*#fff/);
+  it('no longer ships a per-modal button contrast rule (shared contract owns it)', () => {
+    // The ink-mix background was measured live as NEVER landing (the theme
+    // out-specifies a (0,2,0) plugin selector for background-color); the
+    // label-only fix lives in plugin-modal-contrast.css now.
+    expect(css).not.toContain('#e11d48');
+    expect(css).not.toContain('#0f172a');
+    expect(css).not.toMatch(/\.opencodian-tooling-confirm-modal \.(mod-warning|mod-cta)\s*\{/);
   });
 
-  it('provides focus and reduced-motion handling and no side stripes', () => {
+  it('provides focus handling, owns no motion rules, and has no side stripes', () => {
     expect(css).toMatch(/focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--interactive-accent\)/s);
-    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)/);
+    // Button transitions (and their reduced-motion alternative) are owned by
+    // the shared contrast module — this file carries no motion declarations.
+    expect(css).not.toMatch(/transition:/);
     expectNoMatches(css, SIDE_STRIPE_PATTERN, 'tooling side stripe');
   });
 });
 
 describe('inline edit document-replace confirm modal design contract', () => {
-  const css = read(INLINE_EDIT_CONFIRM_CSS);
   const ts = read(INLINE_EDIT_CONFIRM_TS);
 
-  it('scopes the destructive button under a modal root class applied in the TS', () => {
-    expect(css).toMatch(/\.opencodian-inline-edit-confirm-modal\s+\.mod-destructive/);
+  it('applies the modal root class covered by the shared contrast contract', () => {
     expect(ts).toContain("modal.modalEl.addClass('opencodian-inline-edit-confirm-modal')");
     // The destructive pairing comes from the native setWarning() vocabulary.
     expect(ts).toContain('.setWarning()');
   });
+});
 
-  it('keeps the destructive label legible: deepened rose plus a light label (measured 4.22:1 before, ~7.3:1 after)', () => {
-    // The rule targets both destructive class names under one selector list;
-    // grab the first rule block through its shared body.
-    const deny = css.match(
-      /\.opencodian-inline-edit-confirm-modal \.mod-destructive[^{]*\{([^}]*)\}/,
-    )?.[1] ?? '';
-    expect(deny).not.toBe('');
-    // Deepened with DESIGN.md ink-graphite; a lightened rose would fix light
-    // themes but break dark ones and would soften the danger signal.
-    expect(deny).toContain('#e11d48');
-    expect(deny).toContain('#0f172a');
-    expect(deny).toMatch(/color:\s*#fff/);
+describe('shared plugin modal contrast contract (R-A6 and siblings)', () => {
+  const css = read(CONTRAST_CSS);
+
+  it('is wired into the style index', () => {
+    expect(read('src/style/index.css')).toContain("@import 'modals/plugin-modal-contrast.css';");
+    expect(fs.existsSync(path.resolve(WT_ROOT, 'src/style/modals/inline-edit-confirm-modal.css'))).toBe(false);
   });
 
-  it('carries the same contract on the legacy mod-warning vocabulary and stays motion-safe', () => {
-    expect(css).toMatch(/\.opencodian-inline-edit-confirm-modal \.mod-warning/);
+  it('targets every plugin modal root class in all three rule sets', () => {
+    for (const modalClass of CONTRAST_MODAL_CLASSES) {
+      const scoped = css.split(modalClass).length - 1;
+      // The class must appear in the warning-ink scope, the warning-note
+      // rule, the button-label rules and the reduced-motion block.
+      expect(scoped).toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  it('lightens the label only: light ink on the host ground, no background override', () => {
+    const label = css.match(/\.mod-cta,\n?[\s\S]*?\.mod-warning \{([^}]*)\}/)?.[1] ?? '';
+    expect(label).toMatch(/color:\s*#fff/);
+    expect(label).toMatch(/--text-color:\s*#fff/);
+    // Declaring a background can only lose the cascade against the theme
+    // (measured live) — a silent non-win is exactly the drift this stops.
+    expect(css).not.toMatch(/background:\s*color-mix/);
+    // Bare .mod-destructive sits on a translucent ground — whitening its
+    // label would be unreadable; only solid-ground variants are covered.
+    expect(css).not.toMatch(/\}\s*\.mod-destructive\s*\{/);
+  });
+
+  it('owns the shared warning body-copy ink (raw --text-error measured 4.20:1)', () => {
+    expect(css).toMatch(/--opencodian-modal-warning-ink:\s*color-mix\(in srgb, var\(--text-error\) 72%, var\(--text-normal\)\)/);
+    expect(css).toMatch(/\.opencodian-modal-warning-note \{\s*color: var\(--opencodian-modal-warning-ink\);/);
+  });
+
+  it('stays motion-safe and free of impeccable bans', () => {
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)/);
-    expect(css).toContain('opencodian-inline-edit-confirm-modal');
-    expectNoMatches(css, SIDE_STRIPE_PATTERN, 'inline-edit confirm side stripe');
+    expectNoMatches(css, SIDE_STRIPE_PATTERN, 'plugin contrast side stripe');
+  });
+
+  it('every scoped modal TS applies its root class', () => {
+    expect(read(BATCH_TS)).toContain("this.modalEl.addClass('opencodian-batch-organize-modal')");
+    expect(read(TOOLING_TS)).toContain("this.modalEl.addClass('opencodian-tooling-confirm-modal')");
+    expect(read(IMAGEGEN_TS)).toContain("this.modalEl.addClass('opencodian-imagegen-modal')");
+    expect(read(CANVAS_REWRITE_TS)).toContain("this.modalEl.addClass('opencodian-canvas-modal')");
+    expect(read(CANVAS_GENERATE_TS)).toContain("this.modalEl.addClass('opencodian-canvas-modal')");
+    expect(read(PDF_ANNOTATION_TS)).toContain("this.modalEl.addClass('opencodian-pdf-annotation-modal')");
+  });
+
+  it('canvas and pdf preview modals use the shared warning-note class, not inline --text-error', () => {
+    for (const ts of [read(CANVAS_REWRITE_TS), read(PDF_ANNOTATION_TS)]) {
+      expect(ts).toContain("addClass('opencodian-modal-warning-note')");
+      expect(ts).not.toContain("style.color = 'var(--text-error)'");
+    }
   });
 });
 
@@ -210,7 +261,10 @@ describe('image generation modal design contract (DESIGN.md §5 Modal Layout)', 
   it('keeps the host-native colour and type choices (no retheming)', () => {
     expect(css).toMatch(/border-radius:\s*var\(--radius-m/);
     expect(css).toMatch(/background:\s*var\(--background-secondary\)/);
-    expect(css).toMatch(/color:\s*var\(--text-error\)/);
+    // Warning body copy rides the shared measured ink (raw --text-error
+    // measured 4.20:1 as modal body text — below the floor).
+    expect(css).toMatch(/color:\s*var\(--opencodian-modal-warning-ink\)/);
+    expect(css).not.toMatch(/color:\s*var\(--text-error\)/);
     expect(css).toMatch(/font-size:\s*var\(--font-ui-smaller\)/);
   });
 

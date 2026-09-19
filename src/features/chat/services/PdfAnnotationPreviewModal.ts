@@ -5,8 +5,11 @@
  * Shows the EXACT markdown entry that will be appended plus the target
  * sidecar path, so the write is never silent (§6.3). When R-B3 revert
  * coverage is unavailable the modal says so instead of writing quietly
- * unrevertable content (§6.7 honesty). Uses Obsidian-native modal styling
- * only — no custom CSS surface.
+ * unrevertable content (§6.7 honesty). Uses Obsidian-native modal styling;
+ * the only plugin CSS surface is the shared modal contrast contract (the
+ * `opencodian-pdf-annotation-modal` root class scopes
+ * plugin-modal-contrast.css, which lifts the CTA label and the warning
+ * note above the measured contrast floor).
  */
 
 import type { App } from 'obsidian';
@@ -36,6 +39,7 @@ export class PdfAnnotationPreviewModal extends Modal {
   }
 
   onOpen(): void {
+    this.modalEl.addClass('opencodian-pdf-annotation-modal');
     this.setTitle(t('chat.pdf.annotation.title'));
 
     new Setting(this.contentEl)
@@ -48,7 +52,9 @@ export class PdfAnnotationPreviewModal extends Modal {
     if (!this.options.revertAvailable) {
       const warning = this.contentEl.createEl('p');
       warning.setText(t('chat.pdf.annotation.noRevertCoverage'));
-      warning.style.color = 'var(--text-error)';
+      // Shared plugin-modal warning ink (plugin-modal-contrast.css):
+      // raw --text-error measured 4.20:1 as modal body copy — below floor.
+      warning.addClass('opencodian-modal-warning-note');
     }
 
     new Setting(this.contentEl)

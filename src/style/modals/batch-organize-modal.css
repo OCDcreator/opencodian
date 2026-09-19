@@ -92,12 +92,14 @@
 }
 
 /* Inline validation error: quiet tonal alert block, absent while
-   empty. No side stripe — the tint and text color carry it. */
+   empty. No side stripe — the tint and text color carry it. The
+   warning ink is the shared plugin-modal variable
+   (plugin-modal-contrast.css). */
 .opencodian-batch-organize-error {
   padding: 8px 12px;
   border-radius: 8px;
   background: color-mix(in srgb, var(--background-modifier-error) 10%, transparent);
-  color: color-mix(in srgb, var(--text-error) 72%, var(--text-normal));
+  color: var(--opencodian-modal-warning-ink);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -148,7 +150,7 @@
    both themes (same pattern as inline-edit diff deletions). */
 .opencodian-batch-organize-item.opencodian-batch-organize-conflict {
   background: color-mix(in srgb, var(--background-modifier-error) 10%, transparent);
-  color: color-mix(in srgb, var(--text-error) 72%, var(--text-normal));
+  color: var(--opencodian-modal-warning-ink);
 }
 
 .opencodian-batch-organize-conflict-summary {
@@ -156,7 +158,7 @@
   font-size: 13px;
   font-weight: 600;
   line-height: 1.5;
-  color: color-mix(in srgb, var(--text-error) 72%, var(--text-normal));
+  color: var(--opencodian-modal-warning-ink);
 }
 
 /* Running stage: state-conveying spinner (no decorative motion). */
@@ -182,19 +184,13 @@
   }
 }
 
-/* Primary action colour is inherited from the host theme on purpose.
-   An earlier revision mixed 22% ink-graphite into the accent to "fix"
-   contrast, on the assumption that the on-accent label is light. Live
-   measurement disproved it: this theme pairs --interactive-accent
-   #aa1141 with --text-on-accent black, so darkening the accent made
-   the label worse (2.87:1 -> 2.2:1). The accent/on-accent pairing is
-   the host theme's to define (PRODUCT.md: Obsidian-native first), and
-   overriding it here also made our buttons diverge from every other
-   .mod-cta in the app. The host pairing's own contrast is a theme
-   issue, recorded in the acceptance notes rather than patched here. */
-.opencodian-batch-organize-modal .mod-cta {
-  transition: background-color 150ms ease;
-}
+/* Primary + destructive button label contrast now comes from the
+   shared plugin-modal contrast contract (plugin-modal-contrast.css):
+   a light label on the host's own solid ground (accent 7.33:1,
+   danger 4.98:1 — measured), replacing this file's earlier
+   label-only experiments. History: a 22% ink-graphite accent mix
+   here once made the label WORSE (2.87:1 -> 2.2:1) because this
+   theme pairs the accent with a near-black on-accent label.
 
 /* Visible keyboard focus on every interactive control (shared
    2px accent outline with offset). */
@@ -223,9 +219,5 @@
 @media (prefers-reduced-motion: reduce) {
   .opencodian-batch-organize-spinner {
     animation-duration: 1.8s;
-  }
-
-  .opencodian-batch-organize-modal .mod-cta {
-    transition: none;
   }
 }

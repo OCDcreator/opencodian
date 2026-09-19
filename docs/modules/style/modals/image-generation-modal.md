@@ -10,9 +10,9 @@ R-C2 聊天入口生成卡片（`ImageGenerationModal`）的样式，与 `batch-
 - `.opencodian-imagegen-result`：结果区纵向布局。
 - `.opencodian-imagegen-result-image`：缩略图上限（max-height 320px、contain、圆角边框、次级背景）。
 - `.opencodian-imagegen-result-meta`：模型/耗时元信息（muted、小号）。
-- `.opencodian-imagegen-error`：错误条（error 色、小号、可换行）。
+- `.opencodian-imagegen-error`：错误条（共享警示墨色 `--opencodian-modal-warning-ink`，见 `plugin-modal-contrast.css`——裸 `--text-error` 作弹窗正文实测 4.20:1 低于下限；小号、可换行）。
 
-对比度、焦点态、reduced-motion 均继承宿主主题变量，不另设硬编码色值。颜色与字号刻意保持宿主原生（`--radius-m`、`--background-secondary`、`--text-error`、`--font-ui-smaller`），设计契约测试锁定这组选择不被替换。
+对比度、焦点态、reduced-motion 均继承宿主主题变量与共享弹窗对比度契约（`plugin-modal-contrast.css`），不另设硬编码色值。颜色与字号刻意保持宿主原生（`--radius-m`、`--background-secondary`、共享 `--opencodian-modal-warning-ink`、`--font-ui-smaller`），设计契约测试锁定这组选择不被替换。
 
 ## 关联模块
 

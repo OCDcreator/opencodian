@@ -11,6 +11,18 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-19 插件弹窗对比度契约收敛为单一共享规则集（R-A6 及同类）
+
+**触发**：部署版实测 canvas 改写预览弹窗的两处失败均在覆盖之外——「写回」`.mod-cta` 近黑标签压 accent 底 **2.87:1 FAIL**、`--text-error` 警示段落正文 **4.20:1 FAIL**；而当时 tooling-confirm、batch-organize、image-generation、inline-edit-confirm 各自为政（有的有覆盖、有的没有），漂移已经发生。
+
+**关键实机证据（决定契约形态）**：f33732bc 在 inline-edit 确认弹窗写入的「混色底 + 白标签」经实机复测——标签变白落地了（**4.98:1 PASS**），混色底**从未生效**（屏幕上仍是宿主 rgb(211,47,47)）。即主题在 `background-color` 上以更高特异性压过插件的 (0,2,0) 选择器，在 `color` 上压不过。模块文档里"~7.36:1 computed"描述的是一个到不了屏幕的底色，已弃用。
+
+**改动**：新增 `src/style/modals/plugin-modal-contrast.css` 单一规则集——插件弹窗根类作用域（六类：inline-edit-confirm、batch-organize、imagegen、tooling-confirm、`opencodian-canvas-modal`（canvas 三弹窗 + 生成模式弹窗，新增根类）、`opencodian-pdf-annotation-modal`（新增根类））内：`.mod-cta`/`.mod-warning` 标签浅色化（`color:#fff` + `--text-color:#fff` 双保险；**刻意不声明 background**，只可能输级联）；裸 `.mod-destructive`（半透明底）明确排除，防止白标签不可读；警示正文统一 `opencodian-modal-warning-note` + 共享变量 `--opencodian-modal-warning-ink`（72% 混 `--text-normal`，双主题自适应）。每弹窗副本全部迁移：inline-edit-confirm.css 删除、tooling 的混色块删除、batch/imagegen 的墨色与过渡收敛到共享变量；裸 `--text-error` 内联样式（canvas/pdf 预览）改共享类。
+
+**测试**：`uiCssDesignContract.test.ts` 新增「shared plugin modal contrast contract」块——共享规则存在、三处 `:is(...)` 命中全部六类根类、七个 TS 根类落地、无遗留每弹窗按钮规则/混色/内联 `--text-error`、reduced-motion 由共享块持有；文档记录全部实机数字并注明「真实对比度无法单测」。
+
+---
+
 ## 2026-09-19 Canvas 文本节点写回可撤销化并纳入 R-B3（R-C5，双撤销通道）
 
 **触发**：部署版实测两项失败——① 选中节点 → AI 改写 → 写回成功后，Canvas 视图聚焦按真实 Cmd+Z，文件不变（`restored: false`）；② 写回后 `acceptance-canvas-e2e.canvas` 从未出现在会话侧栏（R-B3 覆盖缺失）。

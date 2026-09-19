@@ -30403,12 +30403,14 @@ img.opencodian-model-provider-header-icon {
 }
 
 /* Inline validation error: quiet tonal alert block, absent while
-   empty. No side stripe — the tint and text color carry it. */
+   empty. No side stripe — the tint and text color carry it. The
+   warning ink is the shared plugin-modal variable
+   (plugin-modal-contrast.css). */
 .opencodian-batch-organize-error {
   padding: 8px 12px;
   border-radius: 8px;
   background: color-mix(in srgb, var(--background-modifier-error) 10%, transparent);
-  color: color-mix(in srgb, var(--text-error) 72%, var(--text-normal));
+  color: var(--opencodian-modal-warning-ink);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -30459,7 +30461,7 @@ img.opencodian-model-provider-header-icon {
    both themes (same pattern as inline-edit diff deletions). */
 .opencodian-batch-organize-item.opencodian-batch-organize-conflict {
   background: color-mix(in srgb, var(--background-modifier-error) 10%, transparent);
-  color: color-mix(in srgb, var(--text-error) 72%, var(--text-normal));
+  color: var(--opencodian-modal-warning-ink);
 }
 
 .opencodian-batch-organize-conflict-summary {
@@ -30467,7 +30469,7 @@ img.opencodian-model-provider-header-icon {
   font-size: 13px;
   font-weight: 600;
   line-height: 1.5;
-  color: color-mix(in srgb, var(--text-error) 72%, var(--text-normal));
+  color: var(--opencodian-modal-warning-ink);
 }
 
 /* Running stage: state-conveying spinner (no decorative motion). */
@@ -30493,19 +30495,13 @@ img.opencodian-model-provider-header-icon {
   }
 }
 
-/* Primary action colour is inherited from the host theme on purpose.
-   An earlier revision mixed 22% ink-graphite into the accent to "fix"
-   contrast, on the assumption that the on-accent label is light. Live
-   measurement disproved it: this theme pairs --interactive-accent
-   #aa1141 with --text-on-accent black, so darkening the accent made
-   the label worse (2.87:1 -> 2.2:1). The accent/on-accent pairing is
-   the host theme's to define (PRODUCT.md: Obsidian-native first), and
-   overriding it here also made our buttons diverge from every other
-   .mod-cta in the app. The host pairing's own contrast is a theme
-   issue, recorded in the acceptance notes rather than patched here. */
-.opencodian-batch-organize-modal .mod-cta {
-  transition: background-color 150ms ease;
-}
+/* Primary + destructive button label contrast now comes from the
+   shared plugin-modal contrast contract (plugin-modal-contrast.css):
+   a light label on the host's own solid ground (accent 7.33:1,
+   danger 4.98:1 — measured), replacing this file's earlier
+   label-only experiments. History: a 22% ink-graphite accent mix
+   here once made the label WORSE (2.87:1 -> 2.2:1) because this
+   theme pairs the accent with a near-black on-accent label.
 
 /* Visible keyboard focus on every interactive control (shared
    2px accent outline with offset). */
@@ -30535,10 +30531,6 @@ img.opencodian-model-provider-header-icon {
   .opencodian-batch-organize-spinner {
     animation-duration: 1.8s;
   }
-
-  .opencodian-batch-organize-modal .mod-cta {
-    transition: none;
-  }
 }
 
 
@@ -30551,6 +30543,8 @@ img.opencodian-model-provider-header-icon {
    (Mono Evidence Rule) on a quiet readback surface, and the deny
    path uses the repo's established rose reject vocabulary
    (.opencodian-permission-inline-reject → native .mod-warning).
+   Button label contrast lives in the shared
+   plugin-modal-contrast.css contract.
    DOM contract: src/app/obsidianTooling/ObsidianToolingApprovalModal.ts
    ============================================================ */
 
@@ -30622,79 +30616,140 @@ img.opencodian-model-provider-header-icon {
   color: var(--text-normal);
 }
 
-/* Allow keeps the host's accent/on-accent pairing (see the longer note
-   in batch-organize-modal.css: darkening the accent measured WORSE on
-   this theme, 2.87:1 -> 2.2:1, because the host label is near-black).
-   Deny is ours to define, so it carries its own rose plus a light
-   label. */
-.opencodian-tooling-confirm-modal .mod-cta {
-  transition: background-color 150ms ease;
-}
-
-/* Deny label contrast. Measured live at 4.22:1 — the host theme
-   puts a near-black label on rgb(211,47,47) — which is below the
-   4.5:1 floor for a 13px label. Deepening the rose with DESIGN.md
-   ink-graphite and pairing it with a light label lifts it to
-   ~7.3:1; lightening the rose instead would fix light themes but
-   break dark ones, and would soften the danger signal against the
-   Status Honesty Rule. */
-.opencodian-tooling-confirm-modal .mod-warning {
-  background: color-mix(in srgb, #e11d48 72%, #0f172a);
-  color: #fff;
-  transition: background-color 150ms ease;
-}
-
-.opencodian-tooling-confirm-modal .mod-warning:hover {
-  background: color-mix(in srgb, #e11d48 82%, #0f172a);
-}
-
+/* Button label contrast (deny .mod-warning, confirm .mod-cta) now
+   comes from the shared plugin-modal contrast contract
+   (plugin-modal-contrast.css): light label on the host's own solid
+   ground, measured 4.98:1 live (was 4.22:1 with the host's
+   near-black label). No per-modal button rules here anymore — one
+   source of truth. */
 .opencodian-tooling-confirm-modal button:focus-visible {
   outline: 2px solid var(--interactive-accent);
   outline-offset: 2px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .opencodian-tooling-confirm-modal .mod-cta,
-  .opencodian-tooling-confirm-modal .mod-warning {
-    transition: none;
-  }
-}
 
 
-/* modals/inline-edit-confirm-modal.css */
+/* modals/plugin-modal-contrast.css */
 /* ============================================================
-   Inline Edit document-replace confirm modal (R-A6) — the second
-   confirmation gating a destructive whole-note replacement.
-   Contrast contract: the host theme renders the setWarning()
-   button (mod-destructive / mod-warning) as a near-black label on
-   rgb(211,47,47) — measured live at 4.22:1, below the 4.5:1 floor
-   for a 13px label. Same treatment as the tooling approval modal
-   (obsidian-tooling-confirm-modal.css): deepen the rose with
-   DESIGN.md ink-graphite and pair it with a light label — ~7.3:1
-   live-measured on that sibling, ~7.36:1 computed for this mix.
-   Lightening the rose instead would fix light themes but break
-   dark ones, and would soften the danger signal against DESIGN.md
-   §2 Status Honesty. The button keeps reading as destructive:
-   deep danger ground, light label, native destructive vocabulary
-   untouched.
-   DOM contract: src/features/inline-edit/InlineEditConfirmModal.ts
+   Plugin Modal Contrast Contract (R-A6 and siblings) — ONE shared
+   rule set for plugin-owned modals, replacing the per-modal
+   overrides that had started to drift.
+
+   MEASURED CONTRACT (live measurement on the deployed build, real
+   computed styles rasterised through a canvas, WCAG relative
+   luminance, source-over compositing — NOT unit-testable; true
+   contrast cannot be asserted from CSS source):
+
+     .mod-cta            bg rgb(170,17,65)  label rgb(0,0,0) -> 2.87:1 FAIL
+     .mod-warning        bg rgb(211,47,47)  label rgb(0,0,0) -> 4.22:1 FAIL
+       (same surface with a white label, measured live on the
+       inline-edit confirm modal after f33732bc)           -> 4.98:1 PASS
+     white on the measured .mod-cta accent ground (computed from
+       the measured bg + white)                            -> 7.33:1 PASS
+     raw --text-error as modal body copy                   -> 4.20:1 FAIL
+
+   THE FIX DIRECTION IS LABEL-ONLY. White on the same measured
+   grounds passes on both the accent (7.33:1) and the danger
+   (4.98:1) surface, so the host's hue/background is KEPT — never
+   lightened (that only works in light themes and softens the
+   danger signal against DESIGN.md §2 Status Honesty Rule), and
+   not re-mixed either: the earlier per-modal ink-mix background
+   (color-mix #e11d48/#0f172a, f33732bc) was measured live as NOT
+   landing — the label turned white while the background stayed
+   the host's rgb(211,47,47), i.e. the theme out-specifies a
+   (0,2,0) plugin selector for background-color while losing it
+   for `color`. The honest contract is therefore "light label on
+   the host's own danger/accent ground", and the numbers above
+   are the ones actually observed, not arithmetic on a mix that
+   never reaches the screen.
+
+   CASCADE EFFECTIVENESS: `color` at (0,2,0) is measured to win on
+   the real modal (the f33732bc label did land). `--text-color` is
+   set alongside as belt-and-braces for themes that re-derive the
+   label from the host's `button { color: var(--text-color) }`
+   pattern. The background is deliberately NOT declared: it can
+   only lose the cascade, and a silent non-win is exactly the
+   drift this module exists to stop. Live re-verification of every
+   scoped modal remains the acceptance owner's job.
+
+   SCOPE — plugin modals only (host modals are never restyled):
+     .opencodian-inline-edit-confirm-modal
+     .opencodian-batch-organize-modal
+     .opencodian-imagegen-modal
+     .opencodian-tooling-confirm-modal
+     .opencodian-canvas-modal            (canvas rewrite/generate)
+     .opencodian-pdf-annotation-modal
+   Bare `.mod-destructive` (host: 10%-alpha ground, error-toned
+   label) is deliberately NOT targeted — whitening that label on a
+   translucent ground would be unreadable. Only buttons on solid
+   accent/danger ground (.mod-cta / .mod-warning) are covered.
+
+   DOM contracts: the modal classes are applied in
+   src/features/inline-edit/InlineEditConfirmModal.ts,
+   src/app/batchOrganize/BatchOrganizeModal.ts,
+   src/features/chat/ui/ImageGenerationModal.ts,
+   src/app/obsidianTooling/ObsidianToolingApprovalModal.ts,
+   src/features/canvas-integration/CanvasRewriteModals.ts,
+   src/features/canvas-integration/CanvasGenerationFlow.ts,
+   src/features/chat/services/PdfAnnotationPreviewModal.ts.
    ============================================================ */
 
-.opencodian-inline-edit-confirm-modal .mod-destructive,
-.opencodian-inline-edit-confirm-modal .mod-warning {
-  background: color-mix(in srgb, #e11d48 72%, #0f172a);
+/* Warning body-copy tone: raw --text-error measured 4.20:1 as modal
+   body text — below the floor. The repo's established remedy (first
+   shipped for batch-organize conflicts) mixes the error ink toward
+   --text-normal, which adapts to both themes; consumers read the
+   shared variable so the tone has exactly one source of truth. */
+:is(.opencodian-inline-edit-confirm-modal,
+    .opencodian-batch-organize-modal,
+    .opencodian-imagegen-modal,
+    .opencodian-tooling-confirm-modal,
+    .opencodian-canvas-modal,
+    .opencodian-pdf-annotation-modal) {
+  --opencodian-modal-warning-ink: color-mix(in srgb, var(--text-error) 72%, var(--text-normal));
+}
+
+:is(.opencodian-inline-edit-confirm-modal,
+    .opencodian-batch-organize-modal,
+    .opencodian-imagegen-modal,
+    .opencodian-tooling-confirm-modal,
+    .opencodian-canvas-modal,
+    .opencodian-pdf-annotation-modal) .opencodian-modal-warning-note {
+  color: var(--opencodian-modal-warning-ink);
+}
+
+/* Light label on the host's own solid accent/danger ground: the one
+   declaration measured to win the cascade (and enough to clear
+   4.5:1 on both measured grounds). */
+:is(.opencodian-inline-edit-confirm-modal,
+    .opencodian-batch-organize-modal,
+    .opencodian-imagegen-modal,
+    .opencodian-tooling-confirm-modal,
+    .opencodian-canvas-modal,
+    .opencodian-pdf-annotation-modal) .mod-cta,
+:is(.opencodian-inline-edit-confirm-modal,
+    .opencodian-batch-organize-modal,
+    .opencodian-imagegen-modal,
+    .opencodian-tooling-confirm-modal,
+    .opencodian-canvas-modal,
+    .opencodian-pdf-annotation-modal) .mod-warning {
   color: #fff;
+  --text-color: #fff;
   transition: background-color 150ms ease;
 }
 
-.opencodian-inline-edit-confirm-modal .mod-destructive:hover,
-.opencodian-inline-edit-confirm-modal .mod-warning:hover {
-  background: color-mix(in srgb, #e11d48 82%, #0f172a);
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .opencodian-inline-edit-confirm-modal .mod-destructive,
-  .opencodian-inline-edit-confirm-modal .mod-warning {
+  :is(.opencodian-inline-edit-confirm-modal,
+      .opencodian-batch-organize-modal,
+      .opencodian-imagegen-modal,
+      .opencodian-tooling-confirm-modal,
+      .opencodian-canvas-modal,
+      .opencodian-pdf-annotation-modal) .mod-cta,
+  :is(.opencodian-inline-edit-confirm-modal,
+      .opencodian-batch-organize-modal,
+      .opencodian-imagegen-modal,
+      .opencodian-tooling-confirm-modal,
+      .opencodian-canvas-modal,
+      .opencodian-pdf-annotation-modal) .mod-warning {
     transition: none;
   }
 }
@@ -31552,7 +31607,8 @@ img.opencodian-model-provider-header-icon {
    spacing comes from the shared --opencodian-modal-* tokens
    (see batch-organize-modal.css); no ad-hoc chrome margins.
    Obsidian-native first: colour choices stay host-native
-   (--radius-m, --background-secondary, --text-error,
+   (--radius-m, --background-secondary,
+   --opencodian-modal-warning-ink (see plugin-modal-contrast.css),
    --font-ui-smaller); these rules only add the result layout,
    the error strip and a comfortable thumbnail cap. Contrast and
    focus states come from the host theme.
@@ -31599,7 +31655,7 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-imagegen-error {
-  color: var(--text-error);
+  color: var(--opencodian-modal-warning-ink);
   font-size: var(--font-ui-smaller);
   margin: 8px 0;
   white-space: pre-wrap;

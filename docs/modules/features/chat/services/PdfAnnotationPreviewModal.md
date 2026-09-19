@@ -5,7 +5,7 @@
 
 ## 概述
 
-注释落盘前的显式预览确认（设计 §4 行 3/§6.3）：展示将逐字节追加的 markdown 条目与目标侧车路径；R-B3 回退覆盖不可用时展示警告行（§6.7 如实呈现）而非静默写入不可回退内容。仅用 Obsidian 原生 modal/Setting 样式，无自定义 CSS 面。
+注释落盘前的显式预览确认（设计 §4 行 3/§6.3）：展示将逐字节追加的 markdown 条目与目标侧车路径；R-B3 回退覆盖不可用时展示警告行（§6.7 如实呈现）而非静默写入不可回退内容。仅用 Obsidian 原生 modal/Setting 样式；唯一的插件 CSS 面是共享弹窗对比度契约（弹窗根类作用域 `plugin-modal-contrast.css`：CTA 标签浅色化 + 警示段落用共享警示墨色，实测对比度达标），根类 `opencodian-pdf-annotation-modal`，警示行走 `opencodian-modal-warning-note`。
 
 ## 关键导出
 

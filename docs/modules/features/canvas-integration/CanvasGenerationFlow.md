@@ -18,7 +18,7 @@ R-C5 生成流程编排（设计 §3.3/E1/E3）。入口链：`generateFromNotes
 | `CanvasGenerationFlow.generateFromNotes()` | 命令入口（pick → mode → create） |
 | `generateFromResolvedNotes(notes, choice)` | 模式执行（契约测试入口） |
 | `CanvasPickedEntry` / `CanvasGenerationFlowPorts` | 组合根端口（app、editRevert、会话 id、aux、picker、notify） |
-| `openCanvasGenerationModeModal()` | 模式 + 标题选择（原生 Modal，无自定义 CSS） |
+| `openCanvasGenerationModeModal()` | 模式 + 标题选择（原生 Modal；根类 `opencodian-canvas-modal` 挂共享弹窗对比度契约 `plugin-modal-contrast.css`） |
 
 ## 边界与约束
 

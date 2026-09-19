@@ -1,0 +1,123 @@
+/* ============================================================
+   Plugin Modal Contrast Contract (R-A6 and siblings) — ONE shared
+   rule set for plugin-owned modals, replacing the per-modal
+   overrides that had started to drift.
+
+   MEASURED CONTRACT (live measurement on the deployed build, real
+   computed styles rasterised through a canvas, WCAG relative
+   luminance, source-over compositing — NOT unit-testable; true
+   contrast cannot be asserted from CSS source):
+
+     .mod-cta            bg rgb(170,17,65)  label rgb(0,0,0) -> 2.87:1 FAIL
+     .mod-warning        bg rgb(211,47,47)  label rgb(0,0,0) -> 4.22:1 FAIL
+       (same surface with a white label, measured live on the
+       inline-edit confirm modal after f33732bc)           -> 4.98:1 PASS
+     white on the measured .mod-cta accent ground (computed from
+       the measured bg + white)                            -> 7.33:1 PASS
+     raw --text-error as modal body copy                   -> 4.20:1 FAIL
+
+   THE FIX DIRECTION IS LABEL-ONLY. White on the same measured
+   grounds passes on both the accent (7.33:1) and the danger
+   (4.98:1) surface, so the host's hue/background is KEPT — never
+   lightened (that only works in light themes and softens the
+   danger signal against DESIGN.md §2 Status Honesty Rule), and
+   not re-mixed either: the earlier per-modal ink-mix background
+   (color-mix #e11d48/#0f172a, f33732bc) was measured live as NOT
+   landing — the label turned white while the background stayed
+   the host's rgb(211,47,47), i.e. the theme out-specifies a
+   (0,2,0) plugin selector for background-color while losing it
+   for `color`. The honest contract is therefore "light label on
+   the host's own danger/accent ground", and the numbers above
+   are the ones actually observed, not arithmetic on a mix that
+   never reaches the screen.
+
+   CASCADE EFFECTIVENESS: `color` at (0,2,0) is measured to win on
+   the real modal (the f33732bc label did land). `--text-color` is
+   set alongside as belt-and-braces for themes that re-derive the
+   label from the host's `button { color: var(--text-color) }`
+   pattern. The background is deliberately NOT declared: it can
+   only lose the cascade, and a silent non-win is exactly the
+   drift this module exists to stop. Live re-verification of every
+   scoped modal remains the acceptance owner's job.
+
+   SCOPE — plugin modals only (host modals are never restyled):
+     .opencodian-inline-edit-confirm-modal
+     .opencodian-batch-organize-modal
+     .opencodian-imagegen-modal
+     .opencodian-tooling-confirm-modal
+     .opencodian-canvas-modal            (canvas rewrite/generate)
+     .opencodian-pdf-annotation-modal
+   Bare `.mod-destructive` (host: 10%-alpha ground, error-toned
+   label) is deliberately NOT targeted — whitening that label on a
+   translucent ground would be unreadable. Only buttons on solid
+   accent/danger ground (.mod-cta / .mod-warning) are covered.
+
+   DOM contracts: the modal classes are applied in
+   src/features/inline-edit/InlineEditConfirmModal.ts,
+   src/app/batchOrganize/BatchOrganizeModal.ts,
+   src/features/chat/ui/ImageGenerationModal.ts,
+   src/app/obsidianTooling/ObsidianToolingApprovalModal.ts,
+   src/features/canvas-integration/CanvasRewriteModals.ts,
+   src/features/canvas-integration/CanvasGenerationFlow.ts,
+   src/features/chat/services/PdfAnnotationPreviewModal.ts.
+   ============================================================ */
+
+/* Warning body-copy tone: raw --text-error measured 4.20:1 as modal
+   body text — below the floor. The repo's established remedy (first
+   shipped for batch-organize conflicts) mixes the error ink toward
+   --text-normal, which adapts to both themes; consumers read the
+   shared variable so the tone has exactly one source of truth. */
+:is(.opencodian-inline-edit-confirm-modal,
+    .opencodian-batch-organize-modal,
+    .opencodian-imagegen-modal,
+    .opencodian-tooling-confirm-modal,
+    .opencodian-canvas-modal,
+    .opencodian-pdf-annotation-modal) {
+  --opencodian-modal-warning-ink: color-mix(in srgb, var(--text-error) 72%, var(--text-normal));
+}
+
+:is(.opencodian-inline-edit-confirm-modal,
+    .opencodian-batch-organize-modal,
+    .opencodian-imagegen-modal,
+    .opencodian-tooling-confirm-modal,
+    .opencodian-canvas-modal,
+    .opencodian-pdf-annotation-modal) .opencodian-modal-warning-note {
+  color: var(--opencodian-modal-warning-ink);
+}
+
+/* Light label on the host's own solid accent/danger ground: the one
+   declaration measured to win the cascade (and enough to clear
+   4.5:1 on both measured grounds). */
+:is(.opencodian-inline-edit-confirm-modal,
+    .opencodian-batch-organize-modal,
+    .opencodian-imagegen-modal,
+    .opencodian-tooling-confirm-modal,
+    .opencodian-canvas-modal,
+    .opencodian-pdf-annotation-modal) .mod-cta,
+:is(.opencodian-inline-edit-confirm-modal,
+    .opencodian-batch-organize-modal,
+    .opencodian-imagegen-modal,
+    .opencodian-tooling-confirm-modal,
+    .opencodian-canvas-modal,
+    .opencodian-pdf-annotation-modal) .mod-warning {
+  color: #fff;
+  --text-color: #fff;
+  transition: background-color 150ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.opencodian-inline-edit-confirm-modal,
+      .opencodian-batch-organize-modal,
+      .opencodian-imagegen-modal,
+      .opencodian-tooling-confirm-modal,
+      .opencodian-canvas-modal,
+      .opencodian-pdf-annotation-modal) .mod-cta,
+  :is(.opencodian-inline-edit-confirm-modal,
+      .opencodian-batch-organize-modal,
+      .opencodian-imagegen-modal,
+      .opencodian-tooling-confirm-modal,
+      .opencodian-canvas-modal,
+      .opencodian-pdf-annotation-modal) .mod-warning {
+    transition: none;
+  }
+}

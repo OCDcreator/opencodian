@@ -6,6 +6,8 @@
    (Mono Evidence Rule) on a quiet readback surface, and the deny
    path uses the repo's established rose reject vocabulary
    (.opencodian-permission-inline-reject → native .mod-warning).
+   Button label contrast lives in the shared
+   plugin-modal-contrast.css contract.
    DOM contract: src/app/obsidianTooling/ObsidianToolingApprovalModal.ts
    ============================================================ */
 
@@ -77,40 +79,14 @@
   color: var(--text-normal);
 }
 
-/* Allow keeps the host's accent/on-accent pairing (see the longer note
-   in batch-organize-modal.css: darkening the accent measured WORSE on
-   this theme, 2.87:1 -> 2.2:1, because the host label is near-black).
-   Deny is ours to define, so it carries its own rose plus a light
-   label. */
-.opencodian-tooling-confirm-modal .mod-cta {
-  transition: background-color 150ms ease;
-}
-
-/* Deny label contrast. Measured live at 4.22:1 — the host theme
-   puts a near-black label on rgb(211,47,47) — which is below the
-   4.5:1 floor for a 13px label. Deepening the rose with DESIGN.md
-   ink-graphite and pairing it with a light label lifts it to
-   ~7.3:1; lightening the rose instead would fix light themes but
-   break dark ones, and would soften the danger signal against the
-   Status Honesty Rule. */
-.opencodian-tooling-confirm-modal .mod-warning {
-  background: color-mix(in srgb, #e11d48 72%, #0f172a);
-  color: #fff;
-  transition: background-color 150ms ease;
-}
-
-.opencodian-tooling-confirm-modal .mod-warning:hover {
-  background: color-mix(in srgb, #e11d48 82%, #0f172a);
-}
-
+/* Button label contrast (deny .mod-warning, confirm .mod-cta) now
+   comes from the shared plugin-modal contrast contract
+   (plugin-modal-contrast.css): light label on the host's own solid
+   ground, measured 4.98:1 live (was 4.22:1 with the host's
+   near-black label). No per-modal button rules here anymore — one
+   source of truth. */
 .opencodian-tooling-confirm-modal button:focus-visible {
   outline: 2px solid var(--interactive-accent);
   outline-offset: 2px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .opencodian-tooling-confirm-modal .mod-cta,
-  .opencodian-tooling-confirm-modal .mod-warning {
-    transition: none;
-  }
-}
