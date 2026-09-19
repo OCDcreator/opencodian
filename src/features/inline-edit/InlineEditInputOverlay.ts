@@ -16,6 +16,12 @@
  * in a WeakMap of sets, so parallel edits in one editor (R-A5) each get their
  * own bar without accumulating CM6 config.
  *
+ * Dismissal scoping (R-A5): the document-level Escape / outside-pointerdown /
+ * focusout handlers are built by `InlineEditOverlayDismissal` on top of the
+ * pure `resolveDismissOwner`, so exactly the anchored bar answers an event
+ * and passive paths only dismiss pristine bars (typed input is never lost to
+ * a stray click; focus moving between bars keeps both alive).
+ *
  * Parallel placement (R-A5): the geometry math lives in
  * `InlineEditOverlayPrimitives` — `placeInlineEditPanel` composes the
  * anchor-preferred top with sibling-collision resolution and writes the
@@ -53,6 +59,10 @@ import {
   syncInlineEditConfigChip,
   syncInlineEditImageGenChip,
 } from './InlineEditOverlayChips';
+import {
+  bindInlineEditOverlayDismissal,
+  type InlineEditDismissalHost,
+} from './InlineEditOverlayDismissal';
 import {
   claimPanelForeground,
   focusInstructionField,
@@ -223,44 +233,13 @@ export class InlineEditInputOverlay {
     private readonly callbacks: InlineEditOverlayCallbacks,
   ) {
     const doc = view.dom.ownerDocument;
-    this.handleDocKeydown = (event) => {
-      if (event.key !== 'Escape' || event.isComposing) return;
-      // R-A5: with parallel bars on one document, Esc belongs to the bar that
-      // owns focus. When another inline-edit bar holds the active element,
-      // that bar answers; this one stays alive. (Focus in no bar at all can
-      // only happen while this bar is busy — focus-out already dismissed the
-      // siblings — so the busy Esc-cancel path keeps working.)
-      const active = doc.activeElement;
-      if (active instanceof HTMLElement
-        && !this.panel?.contains(active)
-        && active.closest('.opencodian-inline-edit-overlay')) {
-        return;
-      }
-      if (this.menu) {
-        event.preventDefault();
-        this.closeMenu();
-        return;
-      }
-      event.preventDefault();
-      this.callbacks.onReject();
-    };
-    this.handleDocPointerDown = (event) => {
-      const target = event.target;
-      if (target instanceof Node && this.panel?.contains(target)) {
-        // Inside the panel but outside the open menu: close just the menu.
-        if (this.menu && !this.menu.contains(target)) this.closeMenu();
-        return;
-      }
-      this.callbacks.onReject();
-    };
-    this.handleFocusOut = (event) => {
-      // "Focus left the panel" dismissal. `relatedTarget == null` (window
-      // deactivation, alt-tab) intentionally keeps the edit alive.
-      const next = event.relatedTarget;
-      if (!next) return;
-      if (next instanceof Node && this.panel?.contains(next)) return;
-      this.callbacks.onReject();
-    };
+    // R-A5: Escape / outside-pointerdown / focusout are scoped by the shared
+    // dismissal wiring — exactly the anchored bar answers, and passive paths
+    // only dismiss pristine bars (see InlineEditOverlayDismissal).
+    const dismissal = bindInlineEditOverlayDismissal(doc, this.dismissalHost(), () => this.dismissalBars());
+    this.handleDocKeydown = dismissal.onDocKeydown;
+    this.handleDocPointerDown = dismissal.onDocPointerDown;
+    this.handleFocusOut = dismissal.onFocusOut;
     doc.addEventListener('keydown', this.handleDocKeydown, true);
     doc.addEventListener('pointerdown', this.handleDocPointerDown, true);
     view.scrollDOM.addEventListener('scroll', this.handleScroll, { passive: true });
@@ -386,6 +365,42 @@ export class InlineEditInputOverlay {
   // ---------------------------------------------------------------------------
   // Internals
   // ---------------------------------------------------------------------------
+
+  /**
+   * R-A5 dismissal facet: what the shared dismissal wiring needs to know
+   * about THIS bar. `dismissalBars()` feeds the same facet for every open
+   * bar of the editor, so all of them derive identical verdicts from one
+   * per-event snapshot.
+   */
+  private dismissalHost(): InlineEditDismissalHost {
+    return {
+      editId: this.callbacks.editId,
+      panel: () => this.panel,
+      menu: () => this.menu,
+      pristine: () => this.isPristine,
+      closeMenu: () => { this.closeMenu(); },
+      reject: () => { this.callbacks.onReject(); },
+    };
+  }
+
+  private dismissalBars(): InlineEditDismissalHost[] {
+    return [...(activeOverlays.get(this.view) ?? [])].map((overlay) => overlay.dismissalHost());
+  }
+
+  /**
+   * Pristine = nothing to lose: empty instruction, input phase (not busy),
+   * nothing generated (no clarification reply, no error). Only pristine
+   * bars self-dismiss on the passive paths (outside pointerdown, focus
+   * leaving the bars); a bar with content survives them so a stray click
+   * never discards typed input. Explicit exits always work regardless.
+   */
+  private get isPristine(): boolean {
+    const state = this.state;
+    return (this.field?.value.trim().length ?? 0) === 0
+      && state?.busy !== true
+      && !state?.reply
+      && !state?.error;
+  }
 
   /**
    * R-A5: focus/pointer ownership elevates this panel above its siblings,

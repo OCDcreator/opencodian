@@ -11,6 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-18 行内编辑取消路径归属裁决与数据保护（R-A5 Esc/pointerdown/focusout 误伤修复）
+
+实机实测缺陷（CDP，Obsidian 1.13.7）：同一笔记两条指令条（A 有选区、B 光标位，均已输入内容），焦点在 A，真实 Escape 后**两条全部被拒**——B 的已输入内容随之丢失。根因（A1）：每条面板各自在 document 捕获态挂 keydown，守卫在**handler 运行时**重读 live `activeElement`；A 先响应并拆除 DOM，焦点跌回 body，B 的守卫对同一事件随即失真而自毁——判定顺序依赖，天然错误。代码同构缺陷（A2）：面板外 pointerdown 只测「是否在本面板内」，点击 A 会拒绝 B；（A3）：`focusout` 无条件拒绝，且与 A2 叠加后鼠标用户**无法**并行多编辑——点正文唤起第二条必然毁掉第一条连同输入。
+
+**接缝选择**：裁决数学收进 `InlineEditOverlayPrimitives.resolveDismissOwner`（纯函数：kind + 候选快照（id/isAnchor/hasMenu/pristine）+ `anchorWithinSomeBar` → 逐条 `'none'|'reject'|'close-menu'`，全量单测）；DOM 接线抽到新模块 `InlineEditOverlayDismissal.bindInlineEditOverlayDismissal`（overlay 文件顶在 500 行预算，本文件只剩装配与 `isPristine` 事实暴露）。两个修复支柱：① **per-event 焦点快照**——同一 Escape 的第一个 handler 把「`activeElement` 所在面板」记进 `WeakMap<KeyboardEvent, panel>`，后续 handler 复用，事件中途的兄弟拆除再也污染不了裁决；② **被动路径数据保护**——面板外 pointerdown 与焦点移出只拒绝**原始条**（`isPristine`：指令为空 ∧ 非 busy ∧ 无 reply/error），非原始条存活（顺手关掉开菜单），条间焦点移动两条都保留。焦点不在任何条内时多条全不动作（按键原样放行、不 preventDefault）；单条保留旧语义——忙碌期 Esc 取消、外部点击清理误唤起、窗口切换不取消、✕ 恒可用、`isComposing` 惰性、preview 相位 `InlineEditKeyboard` 零改动。
+
+**不弱化项**：唯一写路径（单次 `editor.replaceRange`）、只读 aux 契约、脏检查零改动；取消语义仍集中在 overlay→controller 的 `onReject` 单通道。测试 23 例（新 `InlineEditOverlayDismissal.test.ts`）：纯裁决 8 例 + 真实监听器接线 15 例——双条 Escape 焦点在 A 仅 A 拒（onReject 真调 `hide()` 复现中途拆除的焦点回落，旧实现必挂）、无焦点 Escape 零拒绝不 preventDefault、条内 pointerdown 零拒绝、条外 pointerdown 仅原始条拒 + 存活条关菜单、focusout 条间/编辑器（空拒/非空存）/busy 存活、IME 惰性、单条旧语义回归组。诚实边界：实机 Obsidian 复测由主智能体执行，此处不声称。
+
+---
+
 ## 2026-09-18 行内编辑多面板放置修复（R-A5 并行面板互不遮挡）
 
 实机实测缺陷（CDP，Obsidian 1.13.7 / macOS）：同一笔记两个行内编辑面板（锚线相差 3 行）纵向重叠 30px——面板 B（DOM 较后）盖住面板 A 的底部操作行（添加上下文/生图/模型 chips），打开且可编辑的面板出现用户够不到的控件；若被盖住的面板正持有焦点，"正在用的面板被别人压住"。违反 R-A5 验收「两个面板同时存在、互不干扰」。根因：`resolvePanelTop` 只解面板-视口翻转、不知道兄弟面板；所有面板共享 `z-index: 30`，绘制顺序退化为 DOM 顺序。

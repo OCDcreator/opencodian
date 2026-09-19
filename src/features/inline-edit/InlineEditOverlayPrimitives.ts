@@ -310,3 +310,94 @@ export function claimPanelForeground(
     if (sibling !== panel) sibling?.classList.remove('is-focused');
   }
 }
+
+// ---------------------------------------------------------------------------
+// R-A5 dismissal ownership (parallel bars on one document)
+// ---------------------------------------------------------------------------
+
+/** Which interaction asks `resolveDismissOwner` for a verdict. */
+export type InlineEditDismissKind = 'escape' | 'pointerdown' | 'focusout';
+
+/** What a bar may do once its dismissal verdict resolves. */
+export type InlineEditDismissAction = 'none' | 'reject' | 'close-menu';
+
+/** One open bar as the dismissal decision sees it (per-event snapshot). */
+export interface InlineEditDismissCandidate {
+  /** Stable identity (the edit id); keys the returned verdicts. */
+  readonly id: string;
+  /**
+   * True when this bar anchors the event: it held the captured document
+   * focus (escape), contains the pointerdown target (pointerdown), or is
+   * the panel the focus left (focusout).
+   */
+  readonly isAnchor: boolean;
+  /** True when the bar has an open dropdown menu. */
+  readonly hasMenu: boolean;
+  /**
+   * True when the bar has nothing to lose: empty instruction, input phase
+   * (not busy), nothing generated. Only pristine bars self-dismiss on the
+   * passive paths (outside pointerdown, focus-out); a bar with content
+   * survives them so a stray interaction never discards typed input.
+   */
+  readonly pristine: boolean;
+}
+
+/**
+ * Decide once per event which of the parallel open bars may answer a
+ * dismissal path (R-A5). Every overlay of the editor resolves the same
+ * candidate snapshot and acts only on its own verdict, so listener order
+ * and mid-event teardown (which blur the removed panel's field to body)
+ * cannot flip a sibling's decision — the defect that let one Escape
+ * reject every open bar.
+ *
+ * Per kind:
+ * - `escape` — the keydown belongs to the anchor bar: it rejects (an
+ *   explicit exit works regardless of content), or just closes its open
+ *   menu. Anchor in a bar outside this candidate set → nobody acts. Focus
+ *   in no bar at all keeps today's semantics for the lone-bar case (the
+ *   single bar answers, so the busy-phase Esc cancel survives); with
+ *   several open bars nobody acts and the keydown passes through.
+ * - `pointerdown` — a pointerdown inside any bar never dismisses anything
+ *   (the anchored bar closes its own menu locally). Outside every bar the
+ *   passive path applies: pristine bars self-dismiss (the accidental
+ *   invocation still cleans itself up), survivors keep their content but
+ *   close open menus.
+ * - `focusout` — only the panel the focus left may act, and only when the
+ *   focus did not land in some (other) bar; a pristine source dismisses, a
+ *   bar with content survives.
+ *
+ * Pure: reads only the given snapshot, returns per-bar verdicts.
+ */
+export function resolveDismissOwner(input: {
+  readonly kind: InlineEditDismissKind;
+  readonly candidates: readonly InlineEditDismissCandidate[];
+  /**
+   * True when the event's anchor — the held focus (escape), the pointer
+   * target (pointerdown), the focus destination (focusout) — lies inside
+   * some open bar, possibly outside this candidate set (a second editor).
+   */
+  readonly anchorWithinSomeBar: boolean;
+}): ReadonlyMap<string, InlineEditDismissAction> {
+  const verdicts = new Map<string, InlineEditDismissAction>();
+  for (const candidate of input.candidates) {
+    let action: InlineEditDismissAction = 'none';
+    if (candidate.isAnchor) {
+      if (input.kind === 'escape') {
+        action = candidate.hasMenu ? 'close-menu' : 'reject';
+      } else if (input.kind === 'focusout') {
+        action = !input.anchorWithinSomeBar && candidate.pristine ? 'reject' : 'none';
+      }
+      // pointerdown: a bar is never dismissed by a pointer inside a bar.
+    } else if (input.kind === 'pointerdown' && !input.anchorWithinSomeBar) {
+      action = candidate.pristine ? 'reject' : candidate.hasMenu ? 'close-menu' : 'none';
+    } else if (
+      input.kind === 'escape'
+      && !input.anchorWithinSomeBar
+      && input.candidates.length === 1
+    ) {
+      action = candidate.hasMenu ? 'close-menu' : 'reject';
+    }
+    verdicts.set(candidate.id, action);
+  }
+  return verdicts;
+}

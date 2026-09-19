@@ -21,6 +21,7 @@
 - `syncInstructionFieldHeight(field)`：指令字段随内容增高，上限 `INLINE_EDIT_FIELD_MAX_HEIGHT`，超出改内部滚动（自 overlay 抽入；overlay 在 input 处理器与 rAF 里各调一次）
 - `focusInstructionField(field, doc)`：延迟到布局稳定后再聚焦（`doc.defaultView.setTimeout(0)`，带 `isConnected` 防拆）
 - `claimPanelForeground(panel, siblingPanels)`（R-A5）：焦点/交互归属提升——给 panel 加 `is-focused`（CSS z-index 31），并把兄弟面板上的同名类摘掉；DOM 插入顺序无关
+- `InlineEditDismissKind` / `InlineEditDismissAction` / `InlineEditDismissCandidate` / `resolveDismissOwner({kind, candidates, anchorWithinSomeBar})`（R-A5，有单测）：并行条**取消归属裁决**。同一事件快照下每个开放条得到 `'none' | 'reject' | 'close-menu'` 之一：escape → 锚条（事件进入时持有焦点的条）拒绝、有菜单则只关菜单；锚在候选集之外（另一编辑器）或无锚且多条开放时全不动作；无锚且仅剩单条时保留旧语义（忙碌期 Esc 取消）。pointerdown → 条内指针永不取消任何条；条外被动路径仅原始条（`pristine`）拒绝、存活条关菜单。focusout → 仅源条可动且仅原始条拒绝；落点在任何条内（含另一条）不取消。纯函数：只读快照、返回逐条裁决；接线（锚采集与 per-event 记忆）在 `InlineEditOverlayDismissal`
 
 ## 依赖
 

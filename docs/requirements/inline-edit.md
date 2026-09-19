@@ -328,7 +328,7 @@ idle → input（悬浮指令条 + 选区高亮）
 - **选区快照**：`editorView.state.doc.sliceString(from, to)`（不用 `editor.getSelection()`——copilot 证实后者有 CRLF 坑）。快照失败同样中止。
 - 预览：一个 `StateField<DecorationSet>` + 两个 `StateEffect`（showPreview / hide）驱动（`InlineEditWidgets`）；装饰 `map(tr.changes)` 跟随文档编辑；**不在 `update()` 内 dispatch**（copilot 注释证实的冲突模式）。
 - **输入为悬浮面板**（`InlineEditInputOverlay`，2026-09-16 修订）：不再用 block widget 挤开正文。面板绝对定位于 `view.dom`、锚在锚点下方（`coordsAtPos` 减 `view.dom` 视口偏移后钳制），滚动跟随、文档变更经全局 `updateListener` + WeakMap 重映射锚点；测量只在 rAF 内。
-- **取消路径**：任意焦点下 Escape（文档捕获态；菜单打开时先关菜单）、面板外 pointerdown、焦点移出面板（`focusout` 且 relatedTarget 在面板外；窗口切换不取消）、面板 ✕ 按钮。输入阶段与生成阶段均适用。
+- **取消路径**（2026-09-18 修订：R-A5 并行条归属裁决 + 被动路径数据保护）：归属在事件进入时**一次裁决**——Escape（文档捕获态）只作用于**拥有焦点的那个**条（先快照 `activeElement` 所在面板、后允许任何条拆除；兄弟条先行取消导致的焦点回落不得改变裁决）；焦点不在任何条内时多条全部不动作（按键原样放行、不 preventDefault），单条保留原语义（忙碌期 Esc 取消仍可用）；菜单打开时先关菜单。面板外 pointerdown 与焦点移出条（`focusout` 且落点不在任何条内；窗口切换不取消；焦点移入另一条不取消源条）是**被动路径**：只有"原始态"条（指令为空、输入阶段、无生成内容）自动清理，误唤起照旧自愈；**非原始态条（已输入指令 / 生成中 / 有澄清或错误输出）一律存活**——零散点击与焦点移动不得丢弃已输入内容或进行中的生成（R-A5 多编辑下，鼠标用户先点正文再唤起第二条不再毁掉第一条）。显式出口始终可用：Esc（焦点在条内时）、面板 ✕、提交。
 - **模型/努力程度选择器**：面板顶部两个 chip。模型列表按后端取（opencode=合并目录、claude=`supportedModels()`、codex=`getModelList()`、pi=无列表仅显示当前值）；选项格式同 `inlineEditModelOverrides`，选择即写回该设置（`null`=跟随聊天模型）。努力程度仅 claude（`low..max`）与 codex（`minimal..persistent`）显示，写回 `inlineEditEffortOverrides`，经 `AuxQuerySessionConfig.effort` 下发（claude→SDK options.effort，codex→turn/start effort）；会话启动后 chip 禁用（改动只影响下一次唤起）。
 - `installedEditors: WeakSet<EditorView>` 保证每个 EditorView 只注入一次 field。
 - 全局单例 controller：同时只允许一个 inline edit；唤起新的先拒绝旧的。
