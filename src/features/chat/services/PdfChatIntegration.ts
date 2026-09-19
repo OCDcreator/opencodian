@@ -11,18 +11,36 @@
  *
  * Ladder (probed at runtime per leaf, honestly reported in settings debug):
  *  - A: toolbar button + native `getTextSelectionRangeStr` serialization +
- *    `#page&selection` back links + `highlightText` feedback;
- *  - B: command entry + DOM selection text, `#page=N` only;
+ *    `#page&selection` back links + `highlightText` feedback — claimed ONLY
+ *    after the serializer has serialized a REAL selection end to end;
+ *  - B: toolbar button + DOM selection text, `#page=N` only. This is the
+ *    honest state of a callable-but-unproven serializer too (a bare probe
+ *    with no selection on screen proves nothing about real captures — the
+ *    deployed build reported A while every real capture threw inside the
+ *    host because the ctx lacked a `contains` predicate);
  *  - C: command opens the chat for manual paste — always available.
+ *
+ * The serializer ctx is `{ win, contains }` — Obsidian's implementation
+ * (1.13.7 bundle) runs `if (!e.contains(t)) return null` and then walks
+ * parent nodes from the selection looking for `.textLayerNode`, so the ctx
+ * must be a working containment ROOT. `document.contains` was measured
+ * working on a real selection; `pdfViewer.contains` was measured returning
+ * null (the stop-at-root rule eats the walk), and `{ win }` alone throws
+ * "e.contains is not a function" on every real selection.
+ *
+ * A real capture is the evidence channel in BOTH directions: the first
+ * successful serialization on a live selection UPGRADES the bridge to A
+ * (recorded verbatim in the reasons), and a serializer failure on a live
+ * selection DOWNGRADES a claimed A to B — the reported level and the real
+ * capability are never allowed to disagree (same defect class as R-C4-D1).
  *
  * First probe is never final (live-acceptance fix): Obsidian builds a pdf
  * view's internals (`viewer.child.pdfViewer`, toolbar containers) AFTER the
  * leaf appears, so the very first probe usually lands on an empty viewer.
  * A C-verdict leaf is therefore re-probed on a short bounded backoff (and on
  * every later workspace sync) and the bridge is UPGRADED only when a fresh
- * probe genuinely proves a higher rung — the serializer is actually called,
- * so A is claimed on evidence, never on a guess (§6.7). A viewer that never
- * becomes ready stays at C with the honest reason.
+ * probe genuinely proves a higher rung. A viewer that never becomes ready
+ * stays at C with the honest reason.
  */
 
 import type { App, WorkspaceLeaf } from 'obsidian';
@@ -274,13 +292,16 @@ export class PdfChatIntegration {
       hasToolbar: Boolean(child?.toolbar?.toolbarLeftEl ?? child?.toolbar?.toolbarRightEl),
       hasNativeRangeSerializer: typeof child?.getTextSelectionRangeStr === 'function',
       nativeRangeStrWorks: false,
+      // A probe never carries a real selection, so it can never PROVE A —
+      // that evidence only comes from a live capture (see captureSelection).
+      nativeRangeStrProvenOnSelection: false,
       hasDomSelection: this.hasReadableDomSelection(leaf),
     };
     if (probe.hasNativeRangeSerializer) {
       try {
-        const result = child?.getTextSelectionRangeStr?.({ win: this.docOf(leaf).defaultView });
+        const result = child?.getTextSelectionRangeStr?.(this.serializerCtx(leaf));
         // Any non-throwing run (empty string included — no selection yet)
-        // proves the method accepts our context shape.
+        // proves the method accepts our context shape; it does NOT prove A.
         probe.nativeRangeStrWorks = (result === undefined || result === null)
           || typeof result === 'string';
       } catch {
@@ -414,28 +435,65 @@ export class PdfChatIntegration {
   }
 
   // -------------------------------------------------------------------------
-  // Selection capture (A → B degradation)
+  // Selection capture (A ⇄ B, evidence-driven)
   // -------------------------------------------------------------------------
 
+  /**
+   * The ctx the native serializer needs (Obsidian 1.13.7 bundle:
+   * `getTextSelectionRangeStr(e)` reads `e.win.getSelection()` and runs
+   * `e.contains(...)` as the containment ROOT when locating the selection's
+   * `.textLayerNode` ancestor). `{ win }` alone throws
+   * "e.contains is not a function" on every real selection; `document.contains`
+   * was measured working on a real selection (the narrowest predicate that
+   * keeps the host's own behaviour correct — `pdfViewer.contains` was
+   * measured returning null).
+   */
+  private serializerCtx(leaf: WorkspaceLeaf): { win: Window | null; contains: (node: Node) => boolean } {
+    const doc = this.docOf(leaf);
+    return {
+      win: doc.defaultView,
+      contains: (node: Node) => {
+        try {
+          return doc.contains(node);
+        } catch {
+          return false;
+        }
+      },
+    };
+  }
+
   private captureSelection(
-    bridge: Pick<LeafBridge, 'leaf' | 'decision'>,
+    bridge: LeafBridge,
   ): { text: string; page: number; rangeStr?: string } | null {
     const child = this.childOf(bridge.leaf);
     const doc = this.docOf(bridge.leaf);
-    // Level A: Obsidian's native selection serialization.
-    if (bridge.decision.level === 'A' && typeof child?.getTextSelectionRangeStr === 'function') {
+    // Level A candidate: Obsidian's native selection serialization. Tried
+    // whenever the function exists — a B-level bridge with a working
+    // serializer earns its A exactly here, on a REAL selection.
+    if (typeof child?.getTextSelectionRangeStr === 'function') {
       try {
-        const rangeStr = child.getTextSelectionRangeStr({ win: doc.defaultView });
+        const rangeStr = child.getTextSelectionRangeStr(this.serializerCtx(bridge.leaf));
         if (isValidRangeStr(rangeStr)) {
           const selection = doc.getSelection();
           const text = selection?.toString() ?? '';
           const page = pageNumberOfSelectionNode(selection?.anchorNode ?? null);
           if (text.trim() !== '' && page !== null) {
+            this.recordCaptureEvidence(bridge, true);
             return { text, page, rangeStr };
           }
         }
+        // No-throw but unusable output on a REAL selection: only downgrade a
+        // claimed A when a selection was actually present (an empty-selection
+        // run — e.g. the probe — proves nothing either way).
+        const liveSelection = doc.getSelection();
+        if (liveSelection && !liveSelection.isCollapsed && liveSelection.toString().trim() !== '') {
+          this.recordCaptureEvidence(bridge, false);
+        }
       } catch {
-        // Fall through to the DOM path — level B behavior, honestly degraded.
+        // A serializer throw on a real selection is hard evidence the A
+        // capability does not work: downgrade a claimed A honestly and fall
+        // through to the DOM path (level B behaviour).
+        this.recordCaptureEvidence(bridge, false);
       }
     }
     // Level B: plain DOM selection, page anchored via data-page-number.
@@ -452,6 +510,34 @@ export class PdfChatIntegration {
       return null;
     }
     return { text, page };
+  }
+
+  /**
+   * Fold a REAL capture outcome into the bridge's reported level so the
+   * capability report can never disagree with the real capability:
+   * proven serialization upgrades B → A (kept in the reasons verbatim);
+   * a failure on a live selection downgrades a claimed A → B.
+   */
+  private recordCaptureEvidence(bridge: LeafBridge, proven: boolean): void {
+    if (proven) {
+      if (bridge.decision.level !== 'A') {
+        const next: PdfIntegrationDecision = {
+          level: 'A',
+          reasons: ['native serializer proven on a live selection'],
+        };
+        bridge.decision = next;
+        this.lastDecision = next;
+      }
+      return;
+    }
+    if (bridge.decision.level === 'A') {
+      const next: PdfIntegrationDecision = {
+        level: 'B',
+        reasons: ['native range serializer failed on a live selection — downgraded to #page links'],
+      };
+      bridge.decision = next;
+      this.lastDecision = next;
+    }
   }
 
   // -------------------------------------------------------------------------

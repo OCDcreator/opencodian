@@ -39,6 +39,9 @@ function makePdfLeaf(): { leaf: WorkspaceLeaf; view: FakeView; toolbarRightEl: H
     containerEl: document.createElement('div'),
     file: { path: 'docs/paper.pdf' },
   };
+  // A real pdf leaf's container is connected to the document; the capture
+  // evidence tests rely on document-level containment and document selections.
+  document.body.appendChild(view.containerEl);
   return {
     leaf: { view } as unknown as WorkspaceLeaf,
     view,
@@ -47,15 +50,34 @@ function makePdfLeaf(): { leaf: WorkspaceLeaf; view: FakeView; toolbarRightEl: H
 }
 
 /** Simulate the viewer becoming fully loaded (the ~6s-later reality). */
-function loadViewerInternals(view: FakeView, toolbarRightEl: HTMLElement): void {
+function loadViewerInternals(
+  view: FakeView,
+  toolbarRightEl: HTMLElement,
+  serialize?: (ctx: unknown) => unknown,
+): void {
   view.viewer = {
     child: {
       pdfViewer: {},
       toolbar: { toolbarRightEl },
-      getTextSelectionRangeStr: () => '0,1,2,3',
+      getTextSelectionRangeStr: serialize ?? (() => '0,1,2,3'),
       highlightText: () => undefined,
     },
   };
+}
+
+/**
+ * Place a REAL DOM selection inside the leaf container (jsdom): a page
+ * container with a text-layer-like span, fully selected, so the DOM fallback
+ * path and page anchoring run for real.
+ */
+function selectRealText(view: FakeView): void {
+  view.containerEl.innerHTML = '<div data-page-number="1"><span class="textLayerNode" data-idx="0">hello annotated world</span></div>';
+  const textNode = view.containerEl.querySelector('span')!.firstChild!;
+  const selection = document.getSelection()!;
+  const range = document.createRange();
+  range.selectNodeContents(textNode);
+  selection.removeAllRanges();
+  selection.addRange(range);
 }
 
 function makeApp(pdfLeaves: WorkspaceLeaf[]): { app: App; fireWorkspaceSync(): void } {
@@ -79,13 +101,14 @@ function makeApp(pdfLeaves: WorkspaceLeaf[]): { app: App; fireWorkspaceSync(): v
   };
 }
 
-function makePorts(): PdfChatIntegrationPorts {
+function makePorts(overrides: Partial<PdfChatIntegrationPorts> = {}): PdfChatIntegrationPorts {
   return {
     attachContextItemToActiveChat: async () => undefined,
     openChat: async () => undefined,
     getActiveConversation: () => null,
     getEditRevert: () => null,
     buildPdfSelectionItem: () => null,
+    ...overrides,
   };
 }
 
@@ -106,7 +129,7 @@ async function waitFor(condition: () => boolean, timeoutMs = 1000): Promise<void
 }
 
 describe('PdfChatIntegration ladder re-probe (D1: first probe is never final)', () => {
-  it('upgrades C → A through the bounded readiness backoff when the viewer finishes loading', async () => {
+  it('upgrades C → B through the bounded readiness backoff when the viewer finishes loading (never A: no live proof yet)', async () => {
     const { leaf, view, toolbarRightEl } = makePdfLeaf();
     const { app } = makeApp([leaf]);
     const integration = new PdfChatIntegration(app, makePorts(), {
@@ -121,17 +144,19 @@ describe('PdfChatIntegration ladder re-probe (D1: first probe is never final)', 
     expect(integration.getLadderReport()?.reasons).toContain('toolbar containers missing');
 
     // The viewer finishes loading with no workspace event in between —
-    // exactly the normal open path.
+    // exactly the normal open path. The serializer is callable, but the
+    // probe has no live selection: A would be a guess, so the honest rung
+    // is B ("unproven").
     loadViewerInternals(view, toolbarRightEl);
-    await waitFor(() => integration.getLadderReport()?.level === 'A');
+    await waitFor(() => integration.getLadderReport()?.level === 'B');
 
-    expect(integration.getLadderReport()?.reasons).toEqual([]);
+    expect(integration.getLadderReport()?.reasons.join(' ')).toContain('unproven on a live selection');
     // The upgrade mounted the real toolbar button (evidence, not a guess).
     expect(toolbarRightEl.querySelectorAll('.clickable-icon')).toHaveLength(1);
     integration.detach();
   });
 
-  it('upgrades C → A on the next workspace sync without waiting for the backoff', () => {
+  it('upgrades C → B on the next workspace sync without waiting for the backoff', () => {
     const { leaf, view, toolbarRightEl } = makePdfLeaf();
     const { app, fireWorkspaceSync } = makeApp([leaf]);
     const integration = new PdfChatIntegration(app, makePorts(), {
@@ -144,8 +169,8 @@ describe('PdfChatIntegration ladder re-probe (D1: first probe is never final)', 
     loadViewerInternals(view, toolbarRightEl);
     fireWorkspaceSync();
 
-    expect(integration.getLadderReport()?.level).toBe('A');
-    expect(integration.getLadderReport()?.reasons).toEqual([]);
+    expect(integration.getLadderReport()?.level).toBe('B');
+    expect(integration.getLadderReport()?.reasons.join(' ')).toContain('unproven on a live selection');
     expect(toolbarRightEl.querySelectorAll('.clickable-icon')).toHaveLength(1);
     integration.detach();
   });
@@ -167,7 +192,7 @@ describe('PdfChatIntegration ladder re-probe (D1: first probe is never final)', 
     integration.detach();
   });
 
-  it('never silently downgrades an already-proven higher rung', () => {
+  it('never silently downgrades an already-proven higher rung', async () => {
     const { leaf, view, toolbarRightEl } = makePdfLeaf();
     const { app, fireWorkspaceSync } = makeApp([leaf]);
     const integration = new PdfChatIntegration(app, makePorts(), {
@@ -177,6 +202,11 @@ describe('PdfChatIntegration ladder re-probe (D1: first probe is never final)', 
     integration.attach();
     loadViewerInternals(view, toolbarRightEl);
     fireWorkspaceSync();
+    expect(integration.getLadderReport()?.level).toBe('B');
+
+    // Prove A on a real capture (selection + working serializer).
+    selectRealText(view);
+    await integration.askSelectionFromActivePdf();
     expect(integration.getLadderReport()?.level).toBe('A');
 
     // The internals disappear (viewer torn down beneath the bridge): the
@@ -210,6 +240,96 @@ describe('PdfChatIntegration ladder re-probe (D1: first probe is never final)', 
     integration.detach();
   });
 });
+
+
+describe('PdfChatIntegration capture evidence (reported level must equal real capability)', () => {
+  it('passes a working serializer ctx: win plus a document-containment predicate', async () => {
+    const { leaf, view, toolbarRightEl } = makePdfLeaf();
+    const { app } = makeApp([leaf]);
+    const contexts: unknown[] = [];
+    const integration = new PdfChatIntegration(app, makePorts(), { viewerReadyRetryDelaysMs: [60_000] });
+
+    integration.attach();
+    loadViewerInternals(view, toolbarRightEl, (ctx) => {
+      contexts.push(ctx);
+      return '0,0,21,3';
+    });
+    selectRealText(view);
+    await integration.askSelectionFromActivePdf();
+
+    expect(contexts).toHaveLength(1);
+    const ctx = contexts[0] as { win: unknown; contains: (node: Node) => boolean };
+    expect(ctx.win).toBe(document.defaultView);
+    // The predicate is REAL containment, not a stub: connected nodes in, detached out.
+    expect(ctx.contains(view.containerEl.querySelector('span')!)).toBe(true);
+    expect(ctx.contains(document.createElement('div'))).toBe(false);
+    expect(ctx.contains(document.body)).toBe(true);
+    integration.detach();
+  });
+
+  it('a proven live capture upgrades B → A and the capture itself already carries the rangeStr', async () => {
+    const { leaf, view, toolbarRightEl } = makePdfLeaf();
+    const attached: Array<{ rangeStr?: string; text: string; page: number }> = [];
+    const { app, fireWorkspaceSync } = makeApp([leaf]);
+    const integration = new PdfChatIntegration(app, makePorts({
+      buildPdfSelectionItem: (input) => {
+        attached.push(input);
+        return { kind: 'pdf_selection', path: input.pdfPath, label: 'paper.pdf', mime: 'application/pdf' };
+      },
+    }), { viewerReadyRetryDelaysMs: [60_000] });
+
+    integration.attach();
+    loadViewerInternals(view, toolbarRightEl);
+    fireWorkspaceSync();
+    expect(integration.getLadderReport()?.level).toBe('B');
+
+    selectRealText(view);
+    await integration.askSelectionFromActivePdf();
+
+    // First capture already serialized (no UX loss from the honest B start)…
+    expect(attached).toHaveLength(1);
+    expect(attached[0]).toMatchObject({ rangeStr: '0,1,2,3', text: 'hello annotated world', page: 1 });
+    // …and the bridge earned A on that evidence, verbatim in the reasons.
+    expect(integration.getLadderReport()?.level).toBe('A');
+    expect(integration.getLadderReport()?.reasons).toEqual(['native serializer proven on a live selection']);
+    integration.detach();
+  });
+
+  it('a serializer throw on a real selection downgrades A → B and the DOM fallback still captures', async () => {
+    const { leaf, view, toolbarRightEl } = makePdfLeaf();
+    const attached: Array<{ rangeStr?: string }> = [];
+    const { app } = makeApp([leaf]);
+    const integration = new PdfChatIntegration(app, makePorts({
+      buildPdfSelectionItem: (input) => {
+        attached.push(input);
+        return { kind: 'pdf_selection', path: input.pdfPath, label: 'paper.pdf', mime: 'application/pdf' };
+      },
+    }), { viewerReadyRetryDelaysMs: [60_000] });
+
+    integration.attach();
+    loadViewerInternals(view, toolbarRightEl);
+    selectRealText(view);
+    await integration.askSelectionFromActivePdf();
+    expect(integration.getLadderReport()?.level).toBe('A');
+
+    // The host serializer starts throwing on real selections (the measured
+    // deployed-build behaviour for a broken ctx).
+    loadViewerInternals(view, toolbarRightEl, () => {
+      throw new Error('e.contains is not a function');
+    });
+    selectRealText(view);
+    await integration.askSelectionFromActivePdf();
+
+    // The report downgraded honestly (no silent A)…
+    expect(integration.getLadderReport()?.level).toBe('B');
+    expect(integration.getLadderReport()?.reasons.join(' ')).toContain('failed on a live selection');
+    // …and the user still got their selection, via the DOM path (no rangeStr).
+    expect(attached).toHaveLength(2);
+    expect(attached[1].rangeStr).toBeUndefined();
+    integration.detach();
+  });
+});
+
 
 describe('PdfChatIntegration teardown resilience (D2: a bad bridge must not abort the sweep)', () => {
   it('detaches a level-C bridge (no toolbar button) without throwing', () => {

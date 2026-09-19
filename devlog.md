@@ -11,6 +11,18 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-19 PDF A 级选区序列化证据化：ctx 修复 + 等级只随真实捕获升降（R-C4）
+
+**触发**：部署版实测——有真实文字层的 PDF 上阶梯报告 `level: "A", reasons: []`，真实鼠标拖选后以插件传入的 ctx 直呼宿主序列化器：`{win}` 单参**必抛** `e.contains is not a function`，被 `captureSelection` 的 catch 吞掉后静默走 B 级 DOM 路径——无 `#page&selection` 回链、无 `highlightText` 反馈，而报告仍显示 A。"A 的证据"只是"函数可调用（无选区时探测不抛错）"，与本模块自己的规矩（「A is claimed on evidence, never on a guess」）相悖。
+
+**根因（bundle + 实测双证据）**：宿主实现（1.13.7 `app.js`）为 `getTextSelectionRangeStr(e)` → `e.win.getSelection()` + `M1(e, node)` 内 `if (!e.contains(t)) return null`——ctx 必须是**包含根**。`{win}` 单参缺 `contains`，真实选区必抛（无选区时提前返回 null，所以探测"从不抛错"，假证据的来源）。
+
+**改动**：ctx 定为 `{ win: doc.defaultView, contains: (node) => doc.contains(node) }`（实测 `document.contains` 在真实选区上产出合法 rangeStr；`pdfViewer.contains` 因宿主的根截断规则实测返回 null，故取文档级包含根这一"能工作的最窄谓词"）。同时把 A 级判据证据化：纯判定新增 `nativeRangeStrProvenOnSelection`——探测（永无真实选区）最多给 B（原因 `unproven on a live selection`）；A 只能由**真实捕获**授予（原因 `native serializer proven on a live selection`，首次成功捕获即已带 rangeStr，无 UX 损失）；真实捕获失败把已声称的 A 降 B（原因 `failed on a live selection — downgraded to #page links`），DOM 兜底不变、用户永不空手。报告等级与真实能力从此不允许分歧。只读契约、写路径与侧车 R-B3 覆盖未动。
+
+**测试**：ctx 断言（win + 真实包含谓词：连接节点进、游离节点出）；D1 探测升级改为 C→B（探测给不了 A）；真实 jsdom 选区驱动 B→A 升级（首次捕获即带 rangeStr）与序列化器抛错时 A→B 诚实降级 + DOM 兜底捕获；纯判定矩阵补"可调用但未证明 = B"。
+
+---
+
 ## 2026-09-19 插件弹窗对比度契约收敛为单一共享规则集（R-A6 及同类）
 
 **触发**：部署版实测 canvas 改写预览弹窗的两处失败均在覆盖之外——「写回」`.mod-cta` 近黑标签压 accent 底 **2.87:1 FAIL**、`--text-error` 警示段落正文 **4.20:1 FAIL**；而当时 tooling-confirm、batch-organize、image-generation、inline-edit-confirm 各自为政（有的有覆盖、有的没有），漂移已经发生。

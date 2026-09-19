@@ -23,8 +23,18 @@ export interface PdfViewProbeResult {
   hasToolbar: boolean;
   /** `child.getTextSelectionRangeStr` is callable. */
   hasNativeRangeSerializer: boolean;
-  /** Calling the native serializer produced a "s,s,e,e" string. */
+  /** Calling the native serializer with a working ctx did not throw. */
   nativeRangeStrWorks: boolean;
+  /**
+   * The serializer has serialized a REAL selection end to end (valid
+   * "s,s,e,e" rangeStr + non-empty text + resolved page). This is the ONLY
+   * evidence that can claim level A: a bare "function is callable" probe
+   * (usually run with NO selection on screen) proved nothing — the deployed
+   * build reported A while every real capture threw inside the host and
+   * silently fell back to the DOM path (R-C4-D4 class: reported capability
+   * ≠ real capability).
+   */
+  nativeRangeStrProvenOnSelection: boolean;
   /** `document.getSelection()` inside the viewer is readable. */
   hasDomSelection: boolean;
 }
@@ -37,7 +47,13 @@ export interface PdfIntegrationDecision {
   reasons: string[];
 }
 
-/** Ladder selection (pure): A → B → C, honestly degraded. */
+/** Ladder selection (pure): A → B → C, honestly degraded.
+ *
+ * A is claimed ONLY on proof: the serializer must have serialized a real
+ * selection (`nativeRangeStrProvenOnSelection`). "Callable" or "did not
+ * throw without a selection" earns B with an explicit unproven reason —
+ * never A.
+ */
 export function resolvePdfIntegrationLevel(probe: PdfViewProbeResult): PdfIntegrationDecision {
   const reasons: string[] = [];
   if (!probe.hasPdfViewer) {
@@ -58,6 +74,10 @@ export function resolvePdfIntegrationLevel(probe: PdfViewProbeResult): PdfIntegr
   }
   if (!probe.nativeRangeStrWorks) {
     reasons.push('native range serializer failed — #page links only');
+    return { level: 'B', reasons };
+  }
+  if (!probe.nativeRangeStrProvenOnSelection) {
+    reasons.push('native range serializer unproven on a live selection — #page links only');
     return { level: 'B', reasons };
   }
   return { level: 'A', reasons };

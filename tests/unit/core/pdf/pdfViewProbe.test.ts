@@ -10,16 +10,26 @@ function probe(overrides: Partial<Parameters<typeof resolvePdfIntegrationLevel>[
     hasToolbar: true,
     hasNativeRangeSerializer: true,
     nativeRangeStrWorks: true,
+    nativeRangeStrProvenOnSelection: true,
     hasDomSelection: true,
     ...overrides,
   };
 }
 
 describe('resolvePdfIntegrationLevel (degradation ladder)', () => {
-  it('reaches level A when every internal interface feature-detects', () => {
+  it('reaches level A ONLY when a real capture proved the serializer end to end', () => {
     const decision = resolvePdfIntegrationLevel(probe());
     expect(decision.level).toBe('A');
     expect(decision.reasons).toEqual([]);
+  });
+
+  it('keeps an unproven serializer at B even when it is callable and did not throw', () => {
+    // The measured defect: a probe with NO selection cannot distinguish a
+    // working serializer from one that throws on every real capture —
+    // claiming A there made the report disagree with reality.
+    const decision = resolvePdfIntegrationLevel(probe({ nativeRangeStrProvenOnSelection: false }));
+    expect(decision.level).toBe('B');
+    expect(decision.reasons.join(' ')).toContain('unproven on a live selection');
   });
 
   it('drops to B when the native serializer is absent', () => {
@@ -29,7 +39,10 @@ describe('resolvePdfIntegrationLevel (degradation ladder)', () => {
   });
 
   it('drops to B when the native serializer fails the live call', () => {
-    const decision = resolvePdfIntegrationLevel(probe({ nativeRangeStrWorks: false }));
+    const decision = resolvePdfIntegrationLevel(probe({
+      nativeRangeStrWorks: false,
+      nativeRangeStrProvenOnSelection: false,
+    }));
     expect(decision.level).toBe('B');
     expect(decision.reasons.join(' ')).toContain('failed');
   });

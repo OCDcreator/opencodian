@@ -166,7 +166,7 @@ export interface PdfSelectionRange {
 
 **选区捕获（两级实现）**
 
-1. 首选：`viewer.child.getTextSelectionRangeStr(ctx)` —— Obsidian 自带的选区序列化（§7 探测 2 已核实其算法：`ctx.win.getSelection()` → range → `dataset.idx` 容器映射 → 字符偏移）。`ctx` 的具体形态未公开，实施首日以"包装该方法记录 Obsidian 原生调用入参"的 5 分钟诊断确定；确定后即为最稳路径。
+1. 首选：`viewer.child.getTextSelectionRangeStr(ctx)` —— Obsidian 自带的选区序列化（§7 探测 2 已核实其算法：`ctx.win.getSelection()` → range → `e.contains` 包含根定位 `.textLayerNode` → `dataset.idx` 容器映射 → 字符偏移）。**`ctx` 形态已闭环（2026-09-19，bundle + 实测）**：`{ win: doc.defaultView, contains: (node) => doc.contains(node) }`——宿主实现（1.13.7 `app.js`）运行 `if (!e.contains(t)) return null` 并从选区节点向上走找 `.textLayerNode`，ctx 必须是可用的包含根；实测 `document.contains` 在真实选区上工作（产出合法 rangeStr），`{win}` 单参在真实选区上必抛 `e.contains is not a function`，`pdfViewer.contains` 因走根截断规则返回 null。
 2. 兜底：直接读 `containerEl.ownerDocument.getSelection()`（纯 DOM API，实测可用），文本取 `range.toString()`；`page` 由 range 节点向上找 `.page[data-page-number]` 得出（DOM 结构已实测，§7 探测 1）。`rangeStr` 缺省，链接退化为 `[[file.pdf#page=N]]`。
 3. 两级都失败（内部结构缺失）→ 降级路径 C（下文）。
 
@@ -273,7 +273,7 @@ export interface PdfSelectionRange {
 
 - `child` 原型方法含 `getTextSelectionRangeStr(ctx)` / `highlightText(page, rangeStr)` / `clearTextHighlight` / `getAnnotatedText` / `getTextByRect` / `highlightAnnotation` / `onAnnotationPointerDown` / `onMobileCopy`。
 - 反编译源核实算法：`getTextSelectionRangeStr` 读 `ctx.win.getSelection()`，把起止容器经 `dataset.idx` 映射、字符偏移换算，产出 `"startIdx,startOffset,endIdx,endOffset"`——与 PDF 链接 `#page=N&selection=...` 子路径同构；`highlightText` 用该串经 `page.textLayer.textLayer.textDivs/textContentItems` 反向定位并滚动高亮。**这正是三期"选中 → 对话 → 注释回链"需要的原生原语，且无需自研序列化。**
-- ⏳ 未闭环项：`ctx` 入参形态未公开（`.win` 不在 child/viewer 自有属性上，疑为内部调用方构造的页面对象）；且库内样本均无文字层，无法当场完成"真实选中 → 序列化 → 高亮"全链路。**实施首日任务**：造一个有文字层的库内样本 PDF（实施期允许），包装 `getTextSelectionRangeStr` 记录原生调用入参，5 分钟内可定；若不可定则走 §3.3 兜底（DOM selection 直读，B 级）。
+- ~~⏳ 未闭环项：`ctx` 入参形态未公开~~ **已闭环（2026-09-19）**：`{ win, contains: document.contains }`（见 §3.3-1）；注意 A 级判据必须来自真实选区的端到端序列化（无选区的探测不构成证据——部署版曾因以"可调用"为 A 级证据而报告与真实能力不符的 A 级）。
 - 另核实：pdf.js 提取与渲染均可用，但 Obsidian 未把内嵌 pdf.js 导出为模块（`window.pdfjsLib` undefined、asar 内位于 `lib/pdfjs` 私有目录）——**一期仍需自备 pdfjs-dist**，不能白嫖宿主。
 
 **结论**
