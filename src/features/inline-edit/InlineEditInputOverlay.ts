@@ -16,6 +16,15 @@
  * in a WeakMap of sets, so parallel edits in one editor (R-A5) each get their
  * own bar without accumulating CM6 config.
  *
+ * Parallel placement (R-A5): the geometry math lives in
+ * `InlineEditOverlayPrimitives` — `placeInlineEditPanel` composes the
+ * anchor-preferred top with sibling-collision resolution and writes the
+ * styles; this file only measures and forwards numbers. A collision-displaced
+ * panel gets a hairline anchor link (`--ocie-anchor-link-length`) back to its
+ * anchor line, and focus/pointer ownership (`is-focused`) raises a panel
+ * above its siblings so the one being typed into never paints under a
+ * later-mounted neighbour.
+ *
  * The preview phase keeps its in-flow replace decoration (InlineEditWidgets);
  * only the instruction bar floats. A mode row at the top switches between
  * 选区 / 光标 / 整篇 forms before the first turn (R-A6).
@@ -45,9 +54,12 @@ import {
   syncInlineEditImageGenChip,
 } from './InlineEditOverlayChips';
 import {
-  INLINE_EDIT_PANEL_INSET as PANEL_INSET,
+  claimPanelForeground,
+  focusInstructionField,
   type InlineEditOverlayMenuItem,
-  resolvePanelTop,
+  type InlineEditPanelBand,
+  placeInlineEditPanel,
+  syncInstructionFieldHeight,
 } from './InlineEditOverlayPrimitives';
 import { InlineEditPresetMenuController } from './InlineEditPresetMenu';
 import type {
@@ -55,9 +67,6 @@ import type {
   InlineEditContextGroupRow,
   InlineEditMode,
 } from './InlineEditTypes';
-
-/** Grown height cap for the instruction field, in px; beyond it the field scrolls. */
-const FIELD_MAX_HEIGHT = 100;
 
 /** Chip (dropdown button) state; `null` hides the chip. */
 export interface InlineEditOverlayChipState {
@@ -163,6 +172,8 @@ export function inlineEditOverlayTrackerExtension(): Extension {
 
 export class InlineEditInputOverlay {
   private panel: HTMLElement | null = null;
+  /** Hairline + anchor marker shown only while collision resolution displaced the panel. */
+  private anchorLink: HTMLElement | null = null;
   private field: HTMLTextAreaElement | null = null;
   private submitEl: HTMLElement | null = null;
   private menu: HTMLElement | null = null;
@@ -182,7 +193,7 @@ export class InlineEditInputOverlay {
     },
     detachMenu: () => { this.closeMenu(); },
     afterFill: () => {
-      this.syncFieldHeight();
+      syncInstructionFieldHeight(this.field);
       this.scheduleSync();
     },
   });
@@ -194,7 +205,8 @@ export class InlineEditInputOverlay {
   private imageSurface: InlineEditImageSurface | null = null;
   private teardownContextDrop: (() => void) | null = null;
   private readonly handleContextToggle = (path: string): void => { this.callbacks.onToggleContext?.(path); };
-  private readonly handleFocusIn = (): void => { this.callbacks.onFocus?.(); };
+  private readonly handleFocusIn = (): void => { this.claimForeground(); this.callbacks.onFocus?.(); };
+  private readonly handlePanelPointerDown = (): void => { this.claimForeground(); };
   private state: InlineEditOverlayState | null = null;
   private anchorPos = 0;
   private frame = 0;
@@ -278,9 +290,9 @@ export class InlineEditInputOverlay {
     if (!panel) return;
 
     const replyEl = panel.querySelector<HTMLElement>(':scope > .opencodian-inline-edit-reply');
-    this.syncTextBlock(replyEl, 'opencodian-inline-edit-reply', state.reply, true);
+    this.syncTextBlock(replyEl, 'opencodian-inline-edit-reply', state.reply);
     const errorEl = panel.querySelector<HTMLElement>(':scope > .opencodian-inline-edit-error');
-    this.syncTextBlock(errorEl, 'opencodian-inline-edit-error', state.error, true);
+    this.syncTextBlock(errorEl, 'opencodian-inline-edit-error', state.error);
 
     panel.classList.toggle('opencodian-inline-edit-busy', state.busy);
 
@@ -304,11 +316,9 @@ export class InlineEditInputOverlay {
     this.modeRow?.sync(state);
     syncInlineEditImageGenChip(this.imageGenEl, state.imageGen);
 
-    if (this.panel) {
-      const chipCallbacks = { createProviderIcon: this.callbacks.createProviderIcon };
-      syncInlineEditConfigChip(this.panel, 'model', state.model, chipCallbacks);
-      syncInlineEditConfigChip(this.panel, 'effort', state.effort, chipCallbacks);
-    }
+    const chipCallbacks = { createProviderIcon: this.callbacks.createProviderIcon };
+    syncInlineEditConfigChip(panel, 'model', state.model, chipCallbacks);
+    syncInlineEditConfigChip(panel, 'effort', state.effort, chipCallbacks);
     this.imageSurface?.sync(state.imageSupported ? state.image : null);
     syncContextFooter(this.attachEl, this.contextRowEl, {
       chips: state.context,
@@ -357,6 +367,7 @@ export class InlineEditInputOverlay {
     this.panel?.removeEventListener('focusin', this.handleFocusIn);
     this.panel?.remove();
     this.panel = null;
+    this.anchorLink = null;
     this.field = null;
     this.submitEl = null;
     this.attachEl = null;
@@ -369,19 +380,26 @@ export class InlineEditInputOverlay {
 
   /** Focus the instruction input, deferred until layout settles. */
   focusInput(): void {
-    const field = this.field;
-    if (!field) return;
-    this.view.dom.ownerDocument.defaultView?.setTimeout(() => {
-      if (field.isConnected) field.focus();
-    }, 0);
+    focusInstructionField(this.field, this.view.dom.ownerDocument);
   }
 
   // ---------------------------------------------------------------------------
   // Internals
   // ---------------------------------------------------------------------------
 
+  /**
+   * R-A5: focus/pointer ownership elevates this panel above its siblings,
+   * so the panel the user is working in never paints under a later-mounted
+   * neighbour even while both stay fully editable.
+   */
+  private claimForeground(): void {
+    claimPanelForeground(this.panel, [...(activeOverlays.get(this.view) ?? [])].map((overlay) => overlay.panel));
+  }
+
   private buildDom(): void {
     const root = this.view.dom.createEl('div', { cls: 'opencodian-inline-edit opencodian-inline-edit-overlay' });
+    const anchorLink = root.createDiv({ cls: 'opencodian-inline-edit-anchor-link' });
+    root.addEventListener('pointerdown', this.handlePanelPointerDown);
     root.addEventListener('focusin', this.handleFocusIn);
 
     this.modeRow = buildInlineEditModeRow(root, {
@@ -410,7 +428,7 @@ export class InlineEditInputOverlay {
       // Grow immediately: the browser pauses rAF entirely while the window is
       // hidden, and reading our own textarea's scrollHeight is safe in any
       // handler (the rAF discipline covers CM6 geometry reads, not this).
-      this.syncFieldHeight();
+      syncInstructionFieldHeight(this.field);
       this.scheduleSync();
       this.presetMenu.sync();
     });
@@ -496,6 +514,7 @@ export class InlineEditInputOverlay {
 
     this.view.dom.appendChild(root);
     this.panel = root;
+    this.anchorLink = anchorLink;
     this.field = field;
     this.submitEl = submit;
   }
@@ -504,7 +523,6 @@ export class InlineEditInputOverlay {
     existing: HTMLElement | null,
     cls: string,
     text: string,
-    prepend: boolean,
   ): void {
     const panel = this.panel;
     if (!panel) return;
@@ -521,7 +539,7 @@ export class InlineEditInputOverlay {
     const icon = el.createSpan({ cls: 'opencodian-inline-edit-alert-icon' });
     setIcon(icon, cls === 'opencodian-inline-edit-error' ? 'alert-circle' : 'message-circle');
     el.createDiv({ cls: 'opencodian-inline-edit-alert-text', text });
-    if (prepend) panel.prepend(el);
+    panel.prepend(el);
   }
 
   private toggleMenu(kind: 'model' | 'effort'): void {
@@ -600,27 +618,25 @@ export class InlineEditInputOverlay {
   }
 
   /**
-   * Grow the instruction field to its content, up to `FIELD_MAX_HEIGHT`.
+   * Other mounted panels' occupied bands in this editor, editor-relative.
    *
-   * Called straight from the input handler (never depend on rAF for this: a
-   * hidden window pauses rAF completely) and again in the rAF pass so
-   * programmatic value changes (clarification retries) grow too. Writing
-   * `height: auto` and reading `scrollHeight` is a reflow on our own element,
-   * which the file's no-measurement-in-the-update-cycle rule does not cover.
+   * Runs inside the rAF pass like every other measurement; zero-height,
+   * hidden or detached siblings are dropped so they can never displace a
+   * live panel.
    */
-  private syncFieldHeight(): void {
-    const field = this.field;
-    if (!field) return;
-    field.style.height = 'auto';
-    const contentHeight = field.scrollHeight;
-    field.style.height = `${Math.min(contentHeight, FIELD_MAX_HEIGHT)}px`;
-    field.style.overflowY = contentHeight > FIELD_MAX_HEIGHT ? 'auto' : 'hidden';
+  private siblingBands(domRect: DOMRect): InlineEditPanelBand[] {
+    return [...(activeOverlays.get(this.view) ?? [])].flatMap((overlay) => {
+      const sibling = overlay.panel;
+      if (!sibling || sibling === this.panel || !sibling.isConnected || sibling.offsetHeight <= 0) return [];
+      const rect = sibling.getBoundingClientRect();
+      return [{ top: rect.top - domRect.top, bottom: rect.bottom - domRect.top }];
+    });
   }
 
   private sync(): void {
     const panel = this.panel;
     if (!panel || !panel.isConnected) return;
-    this.syncFieldHeight();
+    syncInstructionFieldHeight(this.field);
     let coords: { top: number; bottom: number; left: number } | null = null;
     try {
       coords = this.view.coordsAtPos(this.anchorPos);
@@ -637,18 +653,15 @@ export class InlineEditInputOverlay {
       return;
     }
     const domRect = this.view.dom.getBoundingClientRect();
-    const panelWidth = panel.offsetWidth;
-    const maxLeft = Math.max(PANEL_INSET, this.view.dom.clientWidth - panelWidth - PANEL_INSET);
-    const rawLeft = coords.left - domRect.left;
-    const left = Math.min(Math.max(rawLeft, PANEL_INSET), maxLeft);
-    const top = resolvePanelTop({
-      anchorTop: coords.top - domRect.top,
-      anchorBottom: coords.bottom - domRect.top,
+    const { left, top } = placeInlineEditPanel({
+      panel,
+      anchorLink: this.anchorLink,
+      anchor: { top: coords.top - domRect.top, bottom: coords.bottom - domRect.top, left: coords.left - domRect.left },
+      panelSize: { width: panel.offsetWidth, height: panel.offsetHeight },
       viewportHeight: this.view.dom.clientHeight,
-      panelHeight: panel.offsetHeight,
+      viewportWidth: this.view.dom.clientWidth,
+      siblings: this.siblingBands(domRect),
     });
-    panel.style.left = `${left}px`;
-    panel.style.top = `${top}px`;
     this.lastLeft = left;
     this.lastTop = top;
   }

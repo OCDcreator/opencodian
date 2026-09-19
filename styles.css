@@ -19916,6 +19916,15 @@ img.opencodian-model-provider-header-icon {
   }
 }
 
+/* R-A5: the focused (or last-interacted) panel paints above its siblings
+   regardless of DOM insertion order. The base 30 token stays the floor;
+   one step up is enough because ownership is exclusive — no panel is ever
+   "more focused" than another, so no spread of z-index values is needed. */
+
+.opencodian-inline-edit-overlay.is-focused {
+  z-index: 31;
+}
+
 /* Reply / error blocks: rounded tint blocks with a leading icon,
    stacked above the input row. No colored left border — the icon
    and tint carry the semantics. */
@@ -20663,6 +20672,60 @@ img.opencodian-model-provider-header-icon {
 .opencodian-inline-edit-affordance .svg-icon {
   width: 13px;
   height: 13px;
+}
+
+/* -- Anchor link (R-A5 parallel edits) --------------------------- */
+
+/* While sibling-collision resolution holds a panel away from its anchor
+   line, a hairline plus an anchor dot keep the panel↔line association
+   readable: the hairline spans the gap from the panel's leading corner,
+   the dot marks the anchor line. Pure adornment — pointer-events none so
+   editor text under the line stays clickable, and deliberately no
+   transition (placement follows scroll in rAF; a link that animated would
+   trail its panel). Hidden by default: a panel at its anchor-preferred
+   spot never renders it, so the single-panel case stays untouched, and
+   reduced-motion needs no extra rule by the same construction. */
+
+.opencodian-inline-edit-anchor-link {
+  --ocie-anchor-link-length: 0px;
+  position: absolute;
+  top: auto;
+  bottom: 100%;
+  width: 1px;
+  height: var(--ocie-anchor-link-length);
+  background: var(--ocie-hairline);
+  pointer-events: none;
+  z-index: 20;
+  display: none;
+}
+
+/* Panel pushed above its anchor instead: the link grows downward from the
+   panel's bottom edge and the dot flips to the far (anchor-side) end. */
+
+.opencodian-inline-edit-anchor-link.is-anchor-below {
+  top: 100%;
+  bottom: auto;
+}
+
+/* Anchor-side dot: a 5px frosted chip centred on the hairline's far end —
+   the selection affordance's treatment at a smaller radius. */
+
+.opencodian-inline-edit-anchor-link::before {
+  content: '';
+  position: absolute;
+  left: -2px;
+  top: -2px;
+  width: 5px;
+  height: 5px;
+  border: 1px solid var(--ocie-hairline);
+  border-radius: 999px;
+  background: var(--ocie-surface);
+  box-sizing: border-box;
+}
+
+.opencodian-inline-edit-anchor-link.is-anchor-below::before {
+  top: auto;
+  bottom: -2px;
 }
 
 /* -- Dark theme: lifted surfaces, inset top highlight, heavy shadows.

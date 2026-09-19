@@ -26,6 +26,8 @@ inline edit 全部 UI 的样式。设计语言：Cursor cmd-K 指令条骨架（
 - `.opencodian-inline-edit-preview.is-busy`（R-A3）：流式中帧的虚线 accent 外框 + `-busy-label`（转圈图标 + `inlineEdit.preview.generating` 文案），配合按钮 disabled 表明"生成中、非最终结果"；reduced-motion 下转圈减速
 - `.opencodian-inline-edit-image-row` / `-image-chip`（`-thumb` 22px data-URL 缩略图 / `-remove`）与 `.opencodian-inline-edit-overlay.is-image-drag-over`（R-A4）：图片附件 chip 行（插在配置行之前、空时隐藏）与拖拽悬停高亮
 - `.opencodian-inline-edit-affordance`：选区悬浮小按钮（品牌标记图标，毛玻璃 + pop-in + hover 放大）
+- `.opencodian-inline-edit-overlay.is-focused`（R-A5）：焦点/最近交互面板的绘制提升——基础 `z-index: 30` 保持地板，归属面板抬到 31，与 DOM 插入顺序无关；归属互斥所以只需一档，不铺 z-index 阶梯
+- `.opencodian-inline-edit-anchor-link`（R-A5）：碰撞消解把面板撞离锚位时的关联启示——1px `--ocie-hairline` 发丝线（`--ocie-anchor-link-length` 由 JS 按位移距离写入，默认 `bottom: 100%` 自面板顶向上长；`is-anchor-below` 翻转为自面板底向下）+ 锚端 5px 毛玻璃圆点（`::before`，affordance 的小号处理）。纯装饰：`pointer-events: none`（线下正文可点）、刻意**无 transition**（面板定位随滚动走 rAF，连接件动画会拖尾），故 reduced-motion 无需额外规则；默认 `display: none`，面板处于锚位首选位置时永不渲染（单面板零视觉噪音）。几何由 primitives `anchorLinkGeometry`/`applyAnchorLink` 提供
 - `.theme-dark .opencodian-inline-edit*`：深色主题覆盖——表面混白提亮 + 卡片顶部 inset 高光 + 阴影大幅加浓（浅色阴影在深色页面上不可见）、diff 色块 alpha 提升、reply 块改用前景色 tint
 
 ## 依赖
@@ -46,3 +48,5 @@ inline edit 全部 UI 的样式。设计语言：Cursor cmd-K 指令条骨架（
 2026-09-18 新增生图 chip 样式：`.opencodian-inline-edit-chip-imagegen`（布局）与 `.opencodian-inline-edit-chip-imagegen-active`（accent 高亮）。
 
 > 2026-09-18 (R-C3)：新增 `.cm-inline-completion-ghost`——与编辑器同字号的弱化斜体色（`color-mix(text-muted 72%, text-normal)`，≥4.5:1），`white-space: pre-wrap`、`pointer-events: none`，刻意**无动画**（不移动读者视线，reduced-motion 由构造满足）；光标跳过由 CM6 `atomicRanges` 承担，不依赖 CSS。
+
+> 2026-09-18 (R-A5)：并行行内编辑实测缺陷修复——多面板同编辑器互相覆盖面板 A 的操作行。新增 `.opencodian-inline-edit-overlay.is-focused`（z-index 30→31 焦点提升）与 `.opencodian-inline-edit-anchor-link`（发丝锚线 + 锚端圆点，仅位移时可见，`--ocie-anchor-link-length` 由 `applyAnchorLink` 写入）；全部复用既有 `--ocie-*` 令牌，无新增色值。

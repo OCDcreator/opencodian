@@ -11,6 +11,18 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-18 行内编辑多面板放置修复（R-A5 并行面板互不遮挡）
+
+实机实测缺陷（CDP，Obsidian 1.13.7 / macOS）：同一笔记两个行内编辑面板（锚线相差 3 行）纵向重叠 30px——面板 B（DOM 较后）盖住面板 A 的底部操作行（添加上下文/生图/模型 chips），打开且可编辑的面板出现用户够不到的控件；若被盖住的面板正持有焦点，"正在用的面板被别人压住"。违反 R-A5 验收「两个面板同时存在、互不干扰」。根因：`resolvePanelTop` 只解面板-视口翻转、不知道兄弟面板；所有面板共享 `z-index: 30`，绘制顺序退化为 DOM 顺序。
+
+**接缝选择**：放置几何全部收进 `InlineEditOverlayPrimitives.ts`（overlay 文件在 500 行预算顶格，抽取是该预算规则的既定产物，顺带把 `syncInstructionFieldHeight`/`focusInstructionField` 一并抽入腾位）。新增 `resolvePanelTopAmongSiblings`：兄弟占用带 → "禁止 top 区间"（开区间，两端恰好留出 6px 净空）→ 排序合并（O(n log n)）→ 从 anchor-preferred top 向外扫：先向下推过最低冲突栈（保持今日"锚下"默认）、再向上顶到最高栈，取第一个能装进视口（`0 … viewportHeight - inset`）的方向；两向都装不下则各自钳入视口、取兄弟覆盖面积更小者（平局偏向向下，永不返回负 top）。无兄弟或 preferred 处无冲突 → 逐字节返回 preferred：**单面板路径零扰动**（回归关键）。overlay `sync()` 只测量转发：`siblingBands()` 在 rAF 内收集同编辑器兄弟带（剔除自身与隐藏/分离/零高面板），`placeInlineEditPanel()` 统一完成水平钳制、翻转、消解与样式写入；keep-last-position 与 rAF 调度纪律原样保留。
+
+**焦点永不被遮挡**：`claimPanelForeground` 在面板 `focusin` 与面板内 `pointerdown` 时给归属面板加 `.is-focused`（z-index 31，30 保持地板、只此一档），并摘掉兄弟面板同类——焦点/最近交互面板恒绘制在最上，与 DOM 插入顺序无关。**锚位关联启示**：被撞离锚位的面板渲染发丝锚线（`--ocie-hairline`，长度=位移距离，经 `--ocie-anchor-link-length` 写入）+ 锚端 5px 毛玻璃圆点，`pointer-events: none`、刻意无 transition（reduced-motion 由构造满足）、面板处于锚位首选位置时永不渲染（单面板零视觉噪音）。全部复用既有 `--ocie-*` 令牌，无新增色值。
+
+**不弱化项**：唯一写路径仍是 `InlineEditController` 的单次 `editor.replaceRange`；单面板定位、面板-视口翻转、锚点滚出保持上次位置全部不变。测试 35 例（`InlineEditInputOverlay.test.ts`）：碰撞消解 8 例（含实测缺陷几何回归：A top 288 / 高 135 / B preferred 393 → 429，以及"相差一行的面板 sync 后必不相交"的 overlay 级用例与重同步稳定性）、锚线几何 4 例、连接件渲染 4 例、字段增高 2 例、焦点提升 4 例（含 CSS 地板/31 契约、DOM 顺序无关、pointerdown 归属）、放置流水线 2 例 + 原单面板翻转 6 例。诚实边界：实机 Obsidian 复测（CDP、reduced-motion 实测）由主智能体执行，此处不声称。
+
+---
+
 ## 2026-09-18 行内编辑澄清通道防泄漏（不渲染原始工具调用标记）
 
 实机验收发现的呈现缺陷：行内编辑附带上下文后，模型可能选择先用只读工具读附件（R-A7 契约本身工作正常），其回传 `text` 是工具调用转录标记（`<|tool call>` / `<|tool invoke name="Read">` / `<|tool parameter …>`）。严格解析器找不到协议标签 → 判为 `clarification` → controller 把整段原始标记写进 `.opencodian-inline-edit-reply` 澄清通道：无预览、无写入、无提示，用户直面内部协议语法（违反 §6.4 拒绝须报告、§6.7 缺口须诚实可读呈现）。
