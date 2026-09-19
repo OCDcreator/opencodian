@@ -6,6 +6,7 @@ import type {
 import { getConversationBackendSessionId } from '../../../core/types';
 import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
+import type { AutoInternalLinkTurnRewriter } from './AssistantAutoInternalLinkService';
 import { ConversationAuthoritativeMessageMergeCoordinator } from './ConversationAuthoritativeMessageMergeCoordinator';
 import { ConversationAuthoritativeReloadCoordinator } from './ConversationAuthoritativeReloadCoordinator';
 import type { ConversationWriteTicket } from './ConversationWriteSerializationService';
@@ -115,18 +116,46 @@ export class ConversationAuthoritativeSyncCoordinator {
   private readonly messageMergeCoordinator: ConversationAuthoritativeMessageMergeCoordinator;
   private readonly reloadCoordinator: ConversationAuthoritativeReloadCoordinator;
 
-  constructor(private readonly host: ConversationAuthoritativeSyncHost) {
+  constructor(
+    private readonly host: ConversationAuthoritativeSyncHost,
+    /**
+     * R-B1 (chat): optional auto-internal-link turn rewriter. When present,
+     * every authoritative merge re-applies the pass to the text it adopts, so
+     * a client-side auto-link rewrite survives the resync instead of being
+     * silently replaced by raw server text. Absent ⇒ byte-identical merge.
+     */
+    private readonly autoInternalLinks?: AutoInternalLinkTurnRewriter,
+  ) {
     this.messageMergeCoordinator = new ConversationAuthoritativeMessageMergeCoordinator(host);
     this.reloadCoordinator = new ConversationAuthoritativeReloadCoordinator({
       host,
       mergeSyncedConversationMessages: (existingMessages, syncedMessages, verbose, backend) =>
-        this.messageMergeCoordinator.mergeSyncedConversationMessages(
-          existingMessages,
-          syncedMessages,
-          verbose,
-          backend,
-        ),
+        this.mergeSyncedMessagesWithAutoInternalLinks(existingMessages, syncedMessages, verbose, backend),
     });
+  }
+
+  /**
+   * Authoritative merge + R-B1 rewrite survival. The merge adopts server text
+   * for every matched message, which would drop the auto-link rewrite the
+   * stored conversation carries; re-applying the shared pass to the merged
+   * array (before any fingerprint is computed from it) keeps a single source
+   * of truth: server text + the deterministic link rule. Idempotent, so
+   * re-applying over already-linked text changes nothing.
+   */
+  private mergeSyncedMessagesWithAutoInternalLinks(
+    existingMessages: ChatMessage[],
+    syncedMessages: ChatMessage[],
+    verbose: boolean,
+    backend?: string,
+  ): ChatMessage[] {
+    const merged = this.messageMergeCoordinator.mergeSyncedConversationMessages(
+      existingMessages,
+      syncedMessages,
+      verbose,
+      backend,
+    );
+    this.autoInternalLinks?.applyToTurnMessages(merged);
+    return merged;
   }
 
   mergeClientOnlyMessageFields(

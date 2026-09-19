@@ -11,6 +11,14 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-19 R-B1 聊天侧自动内链：修复 turn 边界渲染缺失与 resync 丢失
+
+实机验收（opencode 默认后端）发现存储与渲染在 turn 边界分叉：持久化 assistant 文本含 `[[rb1-chat-ref.md#注意力机制]]`，但 DOM 只渲染服务端原始文本（0 anchor）；插件重载后权威 resync 又用服务端文本覆盖了本地改写，链接从存储中也消失。根因有二：其一，`ConversationRenderService.applySyncedConversationUpdate` 对 opencode 会用 canonical 投影（由原始服务端 parts 重建）替换 render apply 的 `nextMessages`，本地内链从未进入渲染输入；其二，权威合并 `mergeSyncedConversationMessages` 以 `...syncedMessage` 采纳服务端文本，`content`/`contentBlocks` 的客户端改写不在保留集合内。
+
+修复保持单一事实来源（服务端定稿文本 + 确定性内链规则），`AssistantAutoInternalLinkService` 新增 `applyToTurnMessages()`（按轮从 user 消息持久化 `contextAttachments` 派生引用集、跳过 notice/interrupted、幂等），在两个消费点重放：`ConversationAuthoritativeSyncCoordinator`（可选第二构造参数）在权威合并产出后、指纹计算前重放，finalization 同步、重载 resync、sync-event 全部经过该入口，存储文本始终携带内链；`ConversationRenderService`（可选第三构造参数）在 canonical 投影建好后重放，finalization render apply、全量重渲、tab 切换的渲染输入与存储一致。`ChatRuntimeComposition.getAutoInternalLinkService()` 将同一实例注入 finalization、合并与投影三个消费点。若某路径丢失附件记录（服务端未回传 file parts），pass 找不到引用集即不改写——fail-closed，整轮退回无链接的服务端文本，不会出现"文本单独失去链接"的静默分叉。
+
+关闭态逐字节回归、流式/中断/notice 不改写、参考集合规则（手动 `file`/`current_note`）、共享 `AutoInternalLinkProcessor` 不分叉全部保留。新增 `MessageFinalizationService.autolink.render.test.ts`（真实 sync coordinator + 真实 render service 驱动 `finalizeAfterStream`：存储与 DOM 同轮一致、resync 后链接存活、无引用 fail-closed、关闭态一致）与 `AssistantAutoInternalLinkService` 的 turn-walk 单测（按轮派生、引用不跨轮、跳过中断/notice、幂等、无 seam no-op）。
+
 ## 2026-09-19 PDF A 级选区序列化证据化：ctx 修复 + 等级只随真实捕获升降（R-C4）
 
 **触发**：部署版实测——有真实文字层的 PDF 上阶梯报告 `level: "A", reasons: []`，真实鼠标拖选后以插件传入的 ctx 直呼宿主序列化器：`{win}` 单参**必抛** `e.contains is not a function`，被 `captureSelection` 的 catch 吞掉后静默走 B 级 DOM 路径——无 `#page&selection` 回链、无 `highlightText` 反馈，而报告仍显示 A。"A 的证据"只是"函数可调用（无选区时探测不抛错）"，与本模块自己的规矩（「A is claimed on evidence, never on a guess」）相悖。

@@ -271,3 +271,90 @@ describe('AssistantAutoInternalLinkService honesty', () => {
     expect(conversation.messages[1]).toBe(message);
   });
 });
+
+describe('AssistantAutoInternalLinkService turn-walk rewrite (merge/projection consumers)', () => {
+  // Mirrors the real processor's protected-zone behaviour: text that already
+  // carries a link is left untouched, so the walk is idempotent.
+  const linkUnlessLinked = (text: string): string =>
+    text.includes('[[') ? text : linkAttention(text);
+
+  function createUserMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
+    return createMessage({
+      id: 'user-1',
+      role: 'user',
+      content: '总结一下',
+      timestamp: 1,
+      ...overrides,
+    });
+  }
+
+  it('rewrites each completed turn from its user message contextAttachments', () => {
+    const service = new AssistantAutoInternalLinkService(jest.fn(linkUnlessLinked));
+    const firstAnswer = createMessage({ id: 'a-1', content: '第一轮提到注意力机制。', timestamp: 10 });
+    const secondAnswer = createMessage({ id: 'a-2', content: '第二轮提到注意力机制。', timestamp: 20 });
+    const messages = [
+      createUserMessage({ contextAttachments: [createContextItem()] }),
+      firstAnswer,
+      createUserMessage({ id: 'user-2', timestamp: 15, contextAttachments: [createContextItem()] }),
+      secondAnswer,
+    ];
+
+    const changed = service.applyToTurnMessages(messages);
+
+    expect(changed).toBe(true);
+    expect(firstAnswer.content).toBe('第一轮提到[[notes/ref-attention.md#注意力机制]]。');
+    expect(secondAnswer.content).toBe('第二轮提到[[notes/ref-attention.md#注意力机制]]。');
+  });
+
+  it('does not carry a previous turn\'s references into a turn without attachments', () => {
+    const processor = jest.fn(linkUnlessLinked);
+    const service = new AssistantAutoInternalLinkService(processor);
+    const ungroundedAnswer = createMessage({ id: 'a-2', content: '第二轮提到注意力机制。', timestamp: 20 });
+    const messages = [
+      createUserMessage({ contextAttachments: [createContextItem()] }),
+      createMessage({ id: 'a-1', content: '第一轮提到注意力机制。', timestamp: 10 }),
+      createUserMessage({ id: 'user-2', timestamp: 15 }),
+      ungroundedAnswer,
+    ];
+
+    service.applyToTurnMessages(messages);
+
+    expect(ungroundedAnswer.content).toBe('第二轮提到注意力机制。');
+  });
+
+  it('skips interrupted messages and notices and stays idempotent on linked text', () => {
+    const processor = jest.fn(linkUnlessLinked);
+    const service = new AssistantAutoInternalLinkService(processor);
+    const interrupted = createMessage({ id: 'a-1', streamState: 'interrupted', content: '注意力机制', timestamp: 10 });
+    const notice = createMessage({ id: 'a-2', displayStyle: 'notice', content: '注意力机制通知', timestamp: 11 });
+    const completed = createMessage({ id: 'a-3', content: '注意力机制', timestamp: 12 });
+    const messages = [
+      createUserMessage({ contextAttachments: [createContextItem()] }),
+      interrupted,
+      notice,
+      completed,
+    ];
+
+    expect(service.applyToTurnMessages(messages)).toBe(true);
+    expect(interrupted.content).toBe('注意力机制');
+    expect(notice.content).toBe('注意力机制通知');
+    expect(completed.content).toBe('[[notes/ref-attention.md#注意力机制]]');
+
+    // Second pass over the already-linked array: the processor sees the
+    // protected zones and changes nothing (no double-linking).
+    expect(service.applyToTurnMessages(messages)).toBe(false);
+    expect(completed.content).toBe('[[notes/ref-attention.md#注意力机制]]');
+  });
+
+  it('is a structural no-op without a processor seam', () => {
+    const service = new AssistantAutoInternalLinkService(null);
+    const answer = createMessage({ id: 'a-1', content: '注意力机制', timestamp: 10 });
+    const messages = [
+      createUserMessage({ contextAttachments: [createContextItem()] }),
+      answer,
+    ];
+
+    expect(service.applyToTurnMessages(messages)).toBe(false);
+    expect(answer.content).toBe('注意力机制');
+  });
+});

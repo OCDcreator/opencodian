@@ -32,6 +32,11 @@ export interface ConversationAuthoritativeSyncHost {
 }
 
 export class ConversationAuthoritativeSyncCoordinator {
+  constructor(
+    host: ConversationAuthoritativeSyncHost,
+    // R-B1 (chat): 可选。提供时每次权威合并都会对采纳文本重放 auto-internal-link pass。
+    autoInternalLinks?: AutoInternalLinkTurnRewriter,
+  );
   mergeClientOnlyMessageFields(...): ChatMessage;
   syncLatestUserMessageFromServer(...): Promise<void>;
   syncConversationMessagesFromServer(...): Promise<...>;
@@ -44,6 +49,7 @@ export class ConversationAuthoritativeSyncCoordinator {
 - `syncConversationMessagesFromServer()` 仍保留原有 public contract，但 conversation-level reload / auth-sync 细节已转交给 `ConversationAuthoritativeReloadCoordinator`。
 - `syncConversationMessagesFromCanonicalState()` 会在已有 canonical session graph 可用时，复用同一套 merge/apply owner 做本地 authoritative-like merge；当 graph 缺口存在时则由上层 bridge 继续回退到 server reload。
 - `mergeClientOnlyMessageFields()` 仍保留原有 public contract，但实际 field/model merge 规则已转交给 `ConversationAuthoritativeMessageMergeCoordinator`；新增可选 `backend` 参数用于 backend-aware 字段保留（当前只对 `claude-code` 保留 `structured`）。
+- **R-B1 改写存活（R-B1 rewrite survival）**: 注入可选 `autoInternalLinks`（`AutoInternalLinkTurnRewriter`）后，注入 reload coordinator 的 `mergeSyncedConversationMessages` 会在 merge 产出合并数组后、指纹计算前重放 `applyToTurnMessages`。权威合并以服务端文本为准，本重放保证 finalization 插入的内链在后续 resync / 重载中不被静默还原；pass 幂等且引用集取自持久化 `contextAttachments`（详见 `AssistantAutoInternalLinkService.md`）。不注入时合并行为逐字节不变。
 - `syncLatestUserMessageFromServer()` 继续保留 optimistic user bubble 的 visible-text mismatch guard；只有 source/message text 真正对齐时才会替换本地 message，并继续触发 hydrated anchor writeback 与单条 user rerender。
 - **Backend-aware session identity**: 使用 `getConversationBackendSessionId()` 解析会话标识，不再直接读取 `conversation.openCodeSessionId`。
 - **OpenCode-only sync gate**: `syncLatestUserMessageFromServer()` 与 `syncConversationMessagesFromServer()` 在 `conversation.backend !== 'opencode'` 时直接返回无变化结果。Authoritative server sync 目前仍是 OpenCode-specific 能力（message shape、hydration path、canonical state 都假设 OpenCode 语义）。Claude 等非 OpenCode backend 的 sync 暂不启用，避免把 Claude session ID 误传入 OpenCode-only 路径。

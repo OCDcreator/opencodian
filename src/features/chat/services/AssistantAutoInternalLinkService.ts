@@ -51,8 +51,53 @@ export interface ChatAutoInternalLinkOutcome {
 /** Stage logger shared with the finalization pipeline's trace. */
 export type ChatAutoInternalLinkLogStage = (stage: string, payload?: Record<string, unknown>) => void;
 
+/**
+ * Narrow port consumed by the authoritative sync merge (rewrite survival) and
+ * the canonical render projection (render parity): re-apply the deterministic
+ * per-turn pass over a message array. No processor ⇒ structural no-op.
+ */
+export type AutoInternalLinkTurnRewriter = {
+  applyToTurnMessages(messages: ChatMessage[]): boolean;
+};
+
 export class AssistantAutoInternalLinkService {
   constructor(private readonly processor: AutoInternalLinkProcessor | null | undefined) {}
+
+  /**
+   * Re-apply the pass over a whole message array, turn by turn: the reference
+   * set for each turn is derived from THAT turn's user message
+   * `contextAttachments` (the durable record — this is what survives the
+   * server round trip and a plugin reload), and each completed assistant
+   * message of the turn is rewritten in place. Interrupted streams and notice
+   * rows are never touched, exactly like the finalization tail pass. The
+   * processor is idempotent (existing links are protected zones), so running
+   * this over already-linked text is a no-op.
+   *
+   * Consumers: the authoritative sync merge (so the text the merge adopts
+   * keeps the links) and the canonical render projection (so the render input
+   * matches the stored text). Both feed the same rule, so storage and DOM
+   * cannot disagree.
+   */
+  applyToTurnMessages(messages: ChatMessage[]): boolean {
+    if (!this.processor) {
+      return false;
+    }
+    let changed = false;
+    let references: readonly { readonly path: string }[] = [];
+    for (const message of messages) {
+      if (message.role === 'user') {
+        references = collectStoredReferenceNotes(message.contextAttachments);
+        continue;
+      }
+      if (references.length === 0 || !isRewritableAssistantMessage(message)) {
+        continue;
+      }
+      if (applyProcessorToMessageText(this.processor, message, references)) {
+        changed = true;
+      }
+    }
+    return changed;
+  }
 
   /**
    * Apply the auto-internal-link pass to this turn's completed assistant
@@ -128,21 +173,69 @@ export class AssistantAutoInternalLinkService {
  */
 function collectTurnReferenceNotes(
   contextItems: readonly PromptContextItem[] | undefined,
-): { readonly path: string; readonly kind?: 'file' | 'folder' }[] {
+): { readonly path: string }[] {
   if (!contextItems || contextItems.length === 0) {
     return [];
   }
   const references: { path: string }[] = [];
   for (const item of contextItems) {
-    if (item.kind !== 'file' && item.kind !== 'current_note') {
-      continue;
-    }
-    if (item.origin === 'vault-retrieval') {
+    if (!isEligibleReferenceNote(item)) {
       continue;
     }
     references.push({ path: item.path });
   }
   return references;
+}
+
+/**
+ * The durable variant: derive the reference set from the turn's user message
+ * `contextAttachments` — the record that persists with the conversation and
+ * survives the authoritative server round trip. Same eligibility rules as the
+ * finalization-time collector, so a resync re-applies exactly the links whose
+ * references are still on record and never invents new ones.
+ */
+function collectStoredReferenceNotes(
+  attachments: readonly {
+    kind?: PromptContextItem['kind'];
+    path: string;
+    origin?: PromptContextItem['origin'];
+  }[]
+  | undefined,
+): { readonly path: string }[] {
+  if (!attachments || attachments.length === 0) {
+    return [];
+  }
+  const references: { path: string }[] = [];
+  for (const attachment of attachments) {
+    if (!isEligibleReferenceNote(attachment)) {
+      continue;
+    }
+    references.push({ path: attachment.path });
+  }
+  return references;
+}
+
+function isEligibleReferenceNote(
+  entry: { kind?: PromptContextItem['kind']; path: string; origin?: PromptContextItem['origin'] },
+): boolean {
+  if (entry.kind !== 'file' && entry.kind !== 'current_note') {
+    return false;
+  }
+  if (entry.origin === 'vault-retrieval') {
+    return false;
+  }
+  return Boolean(entry.path);
+}
+
+/**
+ * What the pass may rewrite: a regular assistant message with final text.
+ * Interrupted streams and notice rows are fail-closed exclusions — partial
+ * text stays as generated, notices are never prose.
+ */
+function isRewritableAssistantMessage(message: ChatMessage): boolean {
+  return message.role === 'assistant'
+    && message.displayStyle !== 'notice'
+    && message.streamState !== 'interrupted';
 }
 
 /**
@@ -167,13 +260,13 @@ function findCompletedTurnAssistantMessage(
   let candidateIndex = -1;
   for (let i = lastUserIndex + 1; i < messages.length; i += 1) {
     const message = messages[i];
-    if (!message || message.role !== 'assistant' || message.displayStyle === 'notice') {
+    if (!message || !isRewritableAssistantMessage(message)) {
       continue;
     }
     candidate = message;
     candidateIndex = i;
   }
-  if (!candidate || candidateIndex < 0 || candidate.streamState === 'interrupted') {
+  if (!candidate || candidateIndex < 0) {
     return null;
   }
   return { message: candidate, index: candidateIndex };

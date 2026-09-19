@@ -173,6 +173,7 @@ export class ConversationRenderService {
   - 跨 conversation 由 `conversationId` 字段 + owner guard 双重防误命中；sync fallback 全量重建走同一队列入口，commit 后同样覆写指纹。
 - 只在当前活动 conversation 仍匹配、且消息容器存在时执行
 - 如果当前 session 已有 canonical state，会直接调用 `ConversationTurnViewModelBuilder.buildCanonicalRenderInput()` 生成稳定的 canonical render `ChatMessage[]`
+- **R-B1 canonical 投影重放**：canonical 分支在建好投影后、合并本地 turn diff notice 前，会调用可选注入的 `autoInternalLinks.applyToTurnMessages()`（`ConversationRenderService` 第三个构造参数，来自 `ChatRuntimeComposition` 共享实例）重放 auto-internal-link pass——canonical 投影从原始服务端 parts 重建，若不重放会把存储文本中的内链从渲染输入中丢弃，导致"存储有链接、屏幕无链接"。投影消息是服务端已定稿帧，流式/部分文本永远不会进入该路径；pass 幂等。不注入时投影渲染原始服务端文本，行为逐字节不变。
 - canonical state 一旦可用，就作为 assistant/user truth；通过 `ConversationCanonicalRenderSource.getLocalTurnDiffNotices()` 只追加冻结、按 `noticeMeta.sourceMessageId` 去重的本地 turn diff cards，其他 generic client-only notice 不会被放宽保留
 - canonical read path 仍保持 lazy fallback；local turn diff callback 独立读取持久化 notice，避免把本地 card 当成 canonical message 或写入顶层 source identity
 - 进入 hydration 前先抓取 scroll snapshot，并复用 `ScrollManager` 恢复 bottom / distance / anchor 语义；恢复前经 `resolveEffectiveScrollRestoreSnapshot()` 以 live `autoScrollEnabled` 修正快照（重渲期间的用户滚动意图优先于捕获时的 stick-to-bottom），并带 `lateContentReapplyWindowMs`（1500ms）：anchor 模式下监听容器内 load 事件重放 anchor 位置，用户滚动接管即提前 dispose

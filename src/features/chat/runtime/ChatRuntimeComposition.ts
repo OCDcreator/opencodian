@@ -474,7 +474,24 @@ export interface ChatRuntimeCompositionHost {
  * are independent, so this reorder is behaviorally inert.)
  */
 export class ChatRuntimeComposition {
+  /**
+   * R-B1 (chat): the one shared auto-internal-link boundary service. The same
+   * instance feeds the finalization tail pass, the authoritative merge
+   * (rewrite survival), and the canonical render projection (render parity),
+   * so all three consumers run the identical processor seam.
+   */
+  private assistantAutoInternalLinkService: AssistantAutoInternalLinkService | null = null;
+
   constructor(private readonly host: ChatRuntimeCompositionHost) {}
+
+  private getAutoInternalLinkService(): AssistantAutoInternalLinkService {
+    if (!this.assistantAutoInternalLinkService) {
+      this.assistantAutoInternalLinkService = new AssistantAutoInternalLinkService(
+        this.host.plugin.createAutoInternalLinkBridge?.() ?? null,
+      );
+    }
+    return this.assistantAutoInternalLinkService;
+  }
 
   compose(): ChatRuntime {
     const surface = this.createSurfaceRuntimeWiring();
@@ -757,6 +774,10 @@ export class ChatRuntimeComposition {
           return conversation.messages.filter((message) => getTurnDiffNoticeMeta(message) !== null);
         },
       },
+      // R-B1 (chat): the canonical render projection re-applies the auto-link
+      // pass so the DOM always shows the same linked text the conversation
+      // stores (see AssistantAutoInternalLinkService.applyToTurnMessages).
+      this.getAutoInternalLinkService(),
     );
   }
 
@@ -814,6 +835,9 @@ export class ChatRuntimeComposition {
     const { conversationRenderService, conversationIdentityRuntime, composerContextViewFacade, tabMessagesPaneCoordinator } = inputs;
     const conversationAuthoritativeSyncCoordinator = new ConversationAuthoritativeSyncCoordinator(
       host.createConversationAuthoritativeSyncHost(conversationRenderService),
+      // R-B1 (chat): every authoritative merge re-applies the auto-link pass
+      // to the text it adopts, so the rewrite survives the resync.
+      this.getAutoInternalLinkService(),
     );
     const tabActivationAssembly = createTabActivationRuntimeAssembly({
       hostProviderHost: host.createTabActivationRuntimeHostProviderHost(),
@@ -1010,10 +1034,10 @@ export class ChatRuntimeComposition {
     // R-B1 (chat): the same processor seam the inline edit path uses; the
     // finalization service applies it once the turn's assistant text is final.
     // Optional port: hosts without the seam get the honest
-    // `processor-unavailable` trace instead of a crash.
-    const assistantAutoInternalLinkService = new AssistantAutoInternalLinkService(
-      host.plugin.createAutoInternalLinkBridge?.() ?? null,
-    );
+    // `processor-unavailable` trace instead of a crash. The memoized instance
+    // is shared with the merge wrapper and the render projection so all three
+    // consumers cannot drift.
+    const assistantAutoInternalLinkService = this.getAutoInternalLinkService();
     const messageFinalizationService = new MessageFinalizationService(
       createMessageFinalizationHost({
         getCurrentConversation: () => host.currentConversation,

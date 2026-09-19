@@ -18,10 +18,17 @@ R-B1「生成内容自动内链」的**聊天侧边界**（此前仅行内编辑
 
 | 路径 | 最终文本来源 | 处理时机 | 渲染一致性 |
 |---|---|---|---|
-| opencode 干净完成 | canonical/服务端 sync 合并后的消息 | sync 返回后、`applySyncedConversationUpdate` 前；插入链接时强制 `needsForegroundRenderSync` | render apply 直接渲染链接后的文本 |
+| opencode 干净完成 | canonical/服务端 sync 合并后的消息 | sync 返回后、`applySyncedConversationUpdate` 前；插入链接时强制 `needsForegroundRenderSync` | render apply 的 canonical 投影由渲染服务重放同一 pass（见下），DOM 与存储同为链接文本 |
 | 本地持久化路径（claude-code / codex / pi；opencode 中断） | `persistLocalStreamOutcome` 已写入 `conversation.messages` 的本地消息 | 最终保存前；前台会话用 `applySyncedConversationUpdate` 重渲尾部 | 服务返回的 `previousMessages` 含被改写消息的**改写前克隆**，render apply 能看到真实 before/after diff（尾部 patch 或 full rerender 兜底） |
 
-已知边界：opencode 后续 authoritative resync 以服务端文本为准合并 `content`，本地插入的内链可能在之后的重同步中被一致地还原（存储与渲染同时回到无链接文本，不会出现不一致展示）。
+## 改写的存活：合并重放 + 投影重放
+
+finalization 的改写是对 `conversation.messages` 的就地改写，而 opencode 的权威合并以服务端文本为准、canonical 渲染投影也从原始服务端 parts 重建——两处都会"看不见"本地内链。为此同一 pass 在两个消费点重放（`applyToTurnMessages`）：
+
+- **权威合并重放**（`ConversationAuthoritativeSyncCoordinator`，可选第二构造参数）：`mergeSyncedConversationMessages` 采纳服务端文本后、指纹计算前，对合并结果重放 pass。finalization 的同步、会话重载 resync、sync-event 同步全部经过这一入口，因此存储文本始终携带内链（重载不再还原）。
+- **canonical 投影重放**（`ConversationRenderService`，可选第三构造参数）：`resolveConversationRenderMessages` 的 canonical 分支在投影建好后重放 pass。finalization render apply、全量重渲、tab 切换共用该入口，因此渲染输入与存储文本一致。
+
+两处引用集合都从**当轮 user 消息的持久化 `contextAttachments`**（`file` / `current_note`，排除 `vault-retrieval`）派生——这是随会话持久化、能穿越服务端 round-trip 的记录。opencode 发送路径把附件作为 file parts 上送、hydration 会重建 `contextAttachments`，因此 resync 能复现同一改写；若某条路径真的丢掉了附件记录，pass 找不到引用集即不改写（fail-closed：整轮退回无链接的服务端文本，芯片与链接同态消失，不会出现"文本单独失去链接"的静默分叉）。pass 幂等（已链接文本是保护区），重放不会产生双重链接。
 
 ## 公开接口
 
@@ -34,7 +41,11 @@ class AssistantAutoInternalLinkService {
     contextItems: readonly PromptContextItem[] | undefined,
     logStage: (stage: string, payload?: Record<string, unknown>) => void,
   ): ChatAutoInternalLinkOutcome;   // { changed, reason, referenceCount, previousMessages }
+  // 合并/投影消费的窄端口：按轮派生引用集（user 消息 contextAttachments）、
+  // 就地重放 pass；跳过 notice 与 interrupted；幂等；无 processor 时结构化 no-op。
+  applyToTurnMessages(messages: ChatMessage[]): boolean;
 }
+type AutoInternalLinkTurnRewriter = Pick<AssistantAutoInternalLinkService, 'applyToTurnMessages'>;
 ```
 
 `reason`: `processor-unavailable` / `no-references` / `no-completed-assistant-message` / `unchanged` / `applied`。
@@ -48,11 +59,13 @@ class AssistantAutoInternalLinkService {
 
 ```text
 上游: src/features/inline-edit/InlineEditAutoLink.ts（仅 AutoInternalLinkProcessor 类型）
-下游: MessageFinalizationService（唯一调用方）、ChatRuntimeComposition（装配）
+下游: MessageFinalizationService（finalization 尾部 pass）、ConversationAuthoritativeSyncCoordinator（合并重放）、ConversationRenderService（canonical 投影重放）、ChatRuntimeComposition（共享装配）
 ```
 
 ## 维护约束
 
 - 不得在此复制/修改匹配、阈值、死链拒绝语义——那是 `InlineEditAutoLink` 的职责，本服务只做边界与一致性编排。
 - `changed` 必须真实反映改写：`false` 时调用方不得触发 render apply（保证关闭态逐字节回归）。
+- 三个消费点（finalization 尾部、合并重放、投影重放）必须共享同一 service 实例（`ChatRuntimeComposition.getAutoInternalLinkService()`）；新消费点必须复用 `applyToTurnMessages`，不得另写派生逻辑。
+- `applyToTurnMessages` 只处理"最终文本"：`streamState === 'interrupted'` 与 notice 行是硬排除，投影路径天然只含服务端已定稿帧。
 - 本服务不改写 vault 文件；聊天消息属于插件存储，不涉及唯一写路径与脏检查。

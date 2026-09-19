@@ -16,6 +16,7 @@ import { disposeCollapsiblesWithin } from '../rendering/collapsible';
 import { summarizeChatMessageForDebug } from '../runtime/SendPipelineDebugSummaries';
 import type { UserMessageContentRenderer } from '../runtime/UserMessageContentRenderer';
 import type { TabId } from '../tabs';
+import type { AutoInternalLinkTurnRewriter } from './AssistantAutoInternalLinkService';
 import { ConversationKeyedReconcileDelegate } from './ConversationKeyedReconcileDelegate';
 import {
   beginConversationRenderSurfacePass,
@@ -273,6 +274,13 @@ export class ConversationRenderService {
   constructor(
     private readonly host: ConversationRenderHost,
     private readonly canonicalRenderSource?: ConversationCanonicalRenderSource,
+    /**
+     * R-B1 (chat): optional auto-internal-link turn rewriter. When present,
+     * the canonical projection (opencode render input) re-applies the pass so
+     * the DOM always shows the same linked text the conversation stores.
+     * Absent ⇒ the projection renders raw server text exactly as before.
+     */
+    private readonly autoInternalLinks?: AutoInternalLinkTurnRewriter,
   ) {
     this.messageRenderer = new ConversationMessageRenderDelegate(host);
     this.trailingAssistantPatchPlanner = new TrailingAssistantPatchPlanningDelegate(host);
@@ -805,6 +813,15 @@ export class ConversationRenderService {
     if (canonicalMessages.length === 0) {
       return fallbackMessages ?? conversation.messages;
     }
+
+    // R-B1 (chat): the canonical projection is hydrated from raw server
+    // parts and would drop the client-side auto-internal-link rewrite the
+    // stored conversation carries. Re-apply the same deterministic pass so
+    // the render input matches the stored text. Canonical messages are
+    // server-final frames by construction — streaming/partial text is never
+    // seen here — and the pass is idempotent, so this is a no-op when the
+    // projection carries no eligible turn.
+    this.autoInternalLinks?.applyToTurnMessages(canonicalMessages);
 
     return this.mergeCanonicalWithLocalTurnDiffNotices(conversation.id, canonicalMessages);
   }

@@ -17,6 +17,8 @@ R-C4：`ComposerContextViewFacade.create` 传入 `loadPdfEngine`（懒加载引�
 
 2026-09-18（R-B1 聊天侧）：`createInteractionRuntimeWiring` 构造 `AssistantAutoInternalLinkService`（processor 取自 `host.plugin.createAutoInternalLinkBridge?.()`——与行内编辑共用的 `createInlineEditAutoLinkProcessor` seam），作为 `MessageFinalizationService` 的第二个构造参数注入；`ChatRuntimeCompositionHost.plugin` 结构类型相应声明可选的 `createAutoInternalLinkBridge?`（缺失时 service 经 trace 如实上报 `processor-unavailable`，行为与关闭态一致）。finalization 缺省该 service 时保持既有行为逐字节不变。
 
+2026-09-18（R-B1 修复）：`AssistantAutoInternalLinkService` 改为 `getAutoInternalLinkService()` 单例共享，同一实例注入三个消费点——`MessageFinalizationService`（finalization 尾部 pass）、`ConversationAuthoritativeSyncCoordinator`（可选第二构造参数，权威合并重放，内链穿越 resync/重载）、`createConversationRenderService`（可选第三构造参数，canonical 投影重放，DOM 与存储文本一致）。
+
 `ChatRuntimeComposition` 是聊天 runtime 的 composition owner。它在 `OpenCodianView` 构造时被实例化一次，通过 `compose()` 按既定阶段顺序（surface → identity/render → background → conversation → interaction）装配全部 chat runtime coordinator，返回单个 `ChatRuntime` 结构体，由 view 解构到既有的私有字段。
 
 关键不变量（characterization 测试 + inventory §2.2c 锁定）：

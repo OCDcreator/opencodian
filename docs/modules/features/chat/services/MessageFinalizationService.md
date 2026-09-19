@@ -122,7 +122,7 @@ export class MessageFinalizationService {
 
 ### R-B1 聊天侧自动内链（post-sync、最终保存前）
 
-- `finalizeAfterStream()` 在 **sync 返回之后、render apply 与最终保存之前**调用 `AssistantAutoInternalLinkService.applyToConversationTail()`：opencode 干净完成路径的最终文本来自 sync，在此处改写可让「渲染的文本 = 持久化的文本」；插入链接时强制 `needsForegroundRenderSync = true`（即使 sync 报告无漂移也执行 render apply）。
+- `finalizeAfterStream()` 在 **sync 返回之后、render apply 与最终保存之前**调用 `AssistantAutoInternalLinkService.applyToConversationTail()`：opencode 干净完成路径的最终文本来自 sync，在此处改写可让「渲染的文本 = 持久化的文本」；插入链接时强制 `needsForegroundRenderSync = true`（即使 sync 报告无漂移也执行 render apply）。渲染一致性由渲染服务的 canonical 投影重放同一 pass 保证（同步链路在合并时也会重放，见 `AssistantAutoInternalLinkService.md`），因此 render apply 的 canonical 输入与存储文本一致。
 - 非 sync 路径（claude-code / codex / pi 及 opencode 中断）：本地持久化消息已在 `conversation.messages`，在最终保存前改写，并在前台用 `applySyncedConversationUpdate(previousMessages, conversation.messages)` 重渲尾部（service 返回的 `previousMessages` 含改写前克隆，保证 render apply 看得到真实 diff；尾部 patch 失败会兜底 full rerender）。
 - 参考集合为空、无已完成 assistant 消息（中断/仅 notice）、或无匹配时全部为 no-op；`autoInternalLinks` 缺省时整个 pass 不存在，关闭态与既有行为逐字节一致（回归锁定在 `tests/unit/features/chat/MessageFinalizationService.test.ts` 的 R-B1 describe 块）。
 
