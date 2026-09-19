@@ -133,6 +133,20 @@ export function isMarkdownPath(path: string): boolean {
   return MARKDOWN_EXTENSION.test(path);
 }
 
+/**
+ * Obsidian canvas files are TEXT (JSON `nodes`/`edges`), so their pre-images
+ * snapshot and restore exactly like markdown (R-C5: the text-node write-back
+ * rides the R-B3 batch capture). This predicate is deliberately NARROW —
+ * markdown + canvas and nothing else: the vault-event funnel, reference
+ * rewriting and binary exclusion keep their `isMarkdownPath` semantics, and
+ * binary formats never become "revertible text" by accident.
+ */
+const CANVAS_EXTENSION = /\.canvas$/i;
+
+export function isRevertibleTextPath(path: string): boolean {
+  return isMarkdownPath(path) || CANVAS_EXTENSION.test(path);
+}
+
 const STRUCTURED_WRITE_TOOL_NAMES = new Set([
   'write',
   'edit',

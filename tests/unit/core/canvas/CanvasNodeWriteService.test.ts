@@ -117,17 +117,17 @@ describe('resolveSelectedNode (ladder B selection read, synchronous per §7-U4)'
 });
 
 describe('writeTextNode (the only .canvas mutating path)', () => {
-  it('writes via setData+requestSave and never touches a file', () => {
-    const calls: string[] = [];
+  it('writes via setData+requestSave(false) and never touches a file', () => {
+    const calls: Array<[string, unknown[]]> = [];
     const canvas = canvasWith({
       setData: (data) => {
-        calls.push('setData');
+        calls.push(['setData', [data]]);
         expect((data as { nodes: Array<{ id: string; text?: string }> }).nodes
           .find((node) => node.id === 'n1')?.text).toBe('rewritten');
         expect((data as { nodes: Array<{ id: string; text?: string }> }).nodes
           .find((node) => node.id === 'n2')?.file).toBe('notes/a.md');
       },
-      requestSave: () => calls.push('requestSave'),
+      requestSave: (pushHistory) => calls.push(['requestSave', [pushHistory]]),
     });
     const result = writeTextNode({
       canvas,
@@ -136,7 +136,29 @@ describe('writeTextNode (the only .canvas mutating path)', () => {
       snapshotAtRequest: 'original',
     });
     expect(result).toEqual({ ok: true });
-    expect(calls).toEqual(['setData', 'requestSave']);
+    expect(calls.map(([name]) => name)).toEqual(['setData', 'requestSave']);
+    // The host history discipline (Obsidian 1.13.7 bundle): setData pushes the
+    // post-write snapshot itself, so requestSave MUST carry pushHistory=false —
+    // a default/true second push would end the stack as [pre, post, post] and
+    // swallow the first Ctrl+Z (it re-applies the identical state).
+    expect(calls[1][1][0]).toBe(false);
+  });
+
+  it('does not call requestSave when the write is refused before setData', () => {
+    const calls: string[] = [];
+    const canvas = canvasWith({
+      setData: () => calls.push('setData'),
+      requestSave: () => calls.push('requestSave'),
+      getData: () => ({ nodes: [], edges: [] }),
+    });
+    const result = writeTextNode({
+      canvas,
+      nodeId: 'n1',
+      nextText: 'rewritten',
+      snapshotAtRequest: 'original',
+    });
+    expect(result).toEqual({ ok: false, reason: 'node-not-found' });
+    expect(calls).toEqual([]);
   });
 
   it('refuses when the node drifted since the rewrite session started (dirty check)', () => {

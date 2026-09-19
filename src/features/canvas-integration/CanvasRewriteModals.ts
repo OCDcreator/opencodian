@@ -103,10 +103,10 @@ export interface CanvasRewritePreviewModalOptions {
   /** Where the content will go ("text node …" / "note <path>"). */
   targetLabel: string;
   /**
-   * Honest undo/revert note shown before confirming: text-node `setData`
-   * writes are outside the R-B3 revert funnel and rely on Canvas's own
-   * (unverified) Ctrl+Z; file-node writes without a composed revert surface
-   * say that. Absent = revert coverage exists.
+   * Honest revert note shown before confirming: shown only when the R-B3
+   * coverage surface is not composed (both node kinds refuse the write in
+   * that case). Absent = coverage exists, and both undo channels work
+   * (host Ctrl+Z via the canvas history pipeline + the sidebar revert).
    */
   revertNote?: string;
   /**

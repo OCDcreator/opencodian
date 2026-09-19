@@ -83,6 +83,10 @@ class EditRevertService implements EditRevertServicePort {
 - round id 为 `round-<ts>-<seq>`，`seq` 是实例内单调计数；持久化跨重启的唯一性由时间戳保证。
 - 修改本模块前先看 `src/shared/editRevertPlan.ts`（纯规划层）与 `EditRevertVaultWriteback`（唯一写缝）的职责边界，避免把 IO 或写回逻辑搬回本模块。
 
+## R-C5 扩展：canvas 文本文件纳入批次覆盖
+
+2026-09-19 新增 `isRevertibleTextPath`（markdown + `.canvas`），并仅在两个插件写路径上替换 `isMarkdownPath`：`performBeginBatchCapture`（强制预像）与 `performNotePluginWrite`（插件写记录）。动机：Canvas 文本节点写回（R-C5）以 `.canvas` 为写入目标，`.canvas` 是文本 JSON，预像快照与恢复与 markdown 同语义；此前该路径被 markdown-only 过滤挡在 R-B3 覆盖之外（实测：写回后侧栏无条目）。范围刻意收窄：vault 事件漏斗（`isMarkdownVaultFile` + `performVaultWriteEvent`）、turn 候选预快照、工具声明目标、move 记录与引用改写仍保持 markdown-only——二进制排除语义不变。
+
 ## R-C2 扩展：registerPluginCreatedAsset
 
 2026-09-18 新增公开方法 `registerPluginCreatedAsset(conversationId, assetPath, notePaths?)`：把插件生成的二进制资产（W-asset 之后调用）登记为当前轮次（或新建 `backend: 'plugin'` 轮次）中 `status: 'created'`、`source: 'plugin'`、`binaryAsset: true` 的条目，并对 `notePaths`（即将写入引用的笔记）做免预算 markdown 预像捕获，使资产与引用可成对回退。二进制条目零快照存储；回退=trash，restore 依 `binaryAsset` 标志在构造上不可用。启用关闭时为 no-op（fail-soft）。

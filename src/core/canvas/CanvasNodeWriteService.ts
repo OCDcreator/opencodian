@@ -3,7 +3,7 @@
  * flowtext-c5-design §3.4). Two explicit, bounded write paths, nothing else:
  *
  * - TEXT node: `canvas.getData()` → replace the one node's `text` in memory →
- *   `assertWritableDocument` → `canvas.setData(doc)` → `canvas.requestSave()`.
+ *   `assertWritableDocument` → `canvas.setData(doc)` → `canvas.requestSave(false)`.
  *   The save itself stays in Canvas's own pipeline — the plugin never writes
  *   the `.canvas` file directly here.
  * - FILE node: the underlying markdown note is rewritten through a single
@@ -18,9 +18,24 @@
  * must NOT register itself, and the UI reports the gap honestly (§6.7) — no
  * silent no-op, no fake success.
  *
- * Ctrl+Z honesty (design §3.4 / E2): native undo coverage of the `setData`
- * path is UNVERIFIED; the guaranteed undo channel is the R-B3 revert system,
- * which is view-independent. Nothing here claims native undo works.
+ * Ctrl+Z honesty (design §3.4 / E2, R-C5 acceptance 3): the write-back rides
+ * the canvas view's OWN data + history pipeline, verified statically against
+ * the shipped Obsidian 1.13.7 renderer bundle (`app.js`, canvas class):
+ *
+ * - `canvas.setData(doc)` applies the document AND pushes it onto the host
+ *   history stack (`history.push(e)` inside `setData`);
+ * - `canvas.requestSave()` with no argument pushes the SAME post-write
+ *   snapshot a second time (its `pushHistory` flag defaults to true), so the
+ *   history stack ends up `[pre, post, post]` — the first Ctrl+Z re-applies
+ *   the identical post state and the undo looks dead (measured live:
+ *   "file unchanged after Cmd+Z");
+ * - `canvas.requestSave(false)` keeps the view save (dirty flag + debounced
+ *   `view.save` → `vault.modify`) while skipping the duplicate push, leaving
+ *   `[pre, post]` — one Ctrl+Z applies `pre` through `applyHistory`, which
+ *   itself calls `view.requestSave()` so the file reverts on disk too.
+ *
+ * The guaranteed second undo channel is the R-B3 revert system, which is
+ * view-independent (see CanvasIntegrationController's coverage round).
  *
  * Pure module: everything is expressed over structural interfaces, so the
  * whole contract is unit-testable without Obsidian.
@@ -43,12 +58,26 @@ export interface CanvasRuntimeLike {
   selection?: unknown;
   getData?: () => unknown;
   setData?: (data: unknown) => unknown;
-  requestSave?: () => unknown;
+  /**
+   * Host signature `requestSave(pushHistory?: boolean)` (Obsidian 1.13.7
+   * bundle): the flag defaults to true and pushes a history snapshot. The
+   * text write passes `false` — `setData` already pushed — so the stack does
+   * not end up with two identical post-write entries that eat the first
+   * Ctrl+Z. A host that ignores the argument only degrades to the old
+   * "undo twice" behaviour, never to data loss.
+   */
+  requestSave?: (pushHistory?: boolean) => unknown;
 }
 
 /** Structural shape of Obsidian's canvas view (`view.canvas` carries the rest). */
 export interface CanvasViewLike {
   canvas?: CanvasRuntimeLike;
+  /**
+   * Host view save (Obsidian's canvas FileView): persists immediately when
+   * the view is dirty instead of waiting out the ~2s debounced save.
+   * Optional — when absent the debounced save remains the fallback.
+   */
+  saveImmediately?: () => unknown;
 }
 
 /** Feature-detect results gathered from one canvas view (host-side, impure). */
@@ -206,8 +235,14 @@ export type CanvasTextWriteResult =
  * authoritative source the write-back itself uses — and refuses on divergence
  * from the snapshot taken when the rewrite session started. The rewritten node
  * is replaced inside the full document, validated, and handed back through
- * `setData` + `requestSave`; any validation failure returns BEFORE `setData`
- * is ever reached, so the canvas never sees a broken document.
+ * `setData` + `requestSave(false)`; any validation failure returns BEFORE
+ * `setData` is ever reached, so the canvas never sees a broken document.
+ *
+ * `setData` applies the document and records the host history entry;
+ * `requestSave(false)` persists through the view's own save pipeline WITHOUT
+ * a second identical history push (see the module header for the bundle
+ * evidence) — so the host's own Ctrl+Z restores the pre-write state and
+ * re-saves it.
  */
 export function writeTextNode(input: {
   canvas: CanvasRuntimeLike;
@@ -252,7 +287,11 @@ export function writeTextNode(input: {
   }
   try {
     canvas.setData(nextDoc);
-    canvas.requestSave();
+    // `false`: setData already pushed the post-write history entry; a default
+    // requestSave() would push the same snapshot again and swallow the first
+    // Ctrl+Z (it would re-apply the identical state). The view-level save
+    // (dirty + debounced vault.modify) still runs — that is what persists.
+    canvas.requestSave(false);
   } catch (error) {
     return { ok: false, reason: 'write-refused', detail: error instanceof Error ? error.message : String(error) };
   }

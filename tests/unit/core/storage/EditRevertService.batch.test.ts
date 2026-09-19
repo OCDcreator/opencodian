@@ -177,3 +177,52 @@ describe('EditRevertService plugin move records (R-B5)', () => {
     expect(result).toMatchObject({ ok: true, changed: 0, skipped: [] });
   });
 });
+
+describe('EditRevertService canvas coverage (R-C5 text-node write under R-B3)', () => {
+  it('force-captures a .canvas pre-image and reverts the plugin write back to it', async () => {
+    const context = await startedService();
+    const { service, harness } = context;
+    harness.vaultFiles.set('boards/e2e.canvas', '{"nodes":[],"edges":[]}');
+
+    // The canvas text-node write path: forced capture BEFORE the write.
+    const ok = await service.beginBatchCapture(BATCH_ID, ['boards/e2e.canvas']);
+    expect(ok).toBe(true);
+    harness.writeAgentFile('boards/e2e.canvas', '{"nodes":[{"id":"n1","text":"AI rewritten"}],"edges":[]}');
+    await service.notePluginWrite(BATCH_ID, 'boards/e2e.canvas');
+    await service.endBatchCapture(BATCH_ID);
+    await settle(service);
+
+    const meta = service.getRoundMeta(
+      service.getSidebarModel(BATCH_ID).roundId ?? '',
+    );
+    const entry = meta?.entries.find((item) => item.path === 'boards/e2e.canvas');
+    expect(entry).toMatchObject({ status: 'modified', source: 'plugin', preImageStatus: 'available' });
+
+    const result = await service.revertFile(BATCH_ID, 'boards/e2e.canvas');
+    expect(result).toMatchObject({ ok: true, changed: 1 });
+    expect(harness.vaultFiles.get('boards/e2e.canvas')).toBe('{"nodes":[],"edges":[]}');
+  });
+
+  it('refuses the canvas batch (fail closed) when the snapshot layer is disabled', async () => {
+    const context = await startedService({ isEnabled: () => false });
+    const { service } = context;
+    const ok = await service.beginBatchCapture(BATCH_ID, ['boards/e2e.canvas']);
+    expect(ok).toBe(false);
+  });
+
+  it('keeps the vault-event funnel markdown-only: a canvas modify never self-records', async () => {
+    const context = await startedService();
+    const { service, harness } = context;
+    harness.vaultFiles.set('boards/e2e.canvas', '{"nodes":[],"edges":[]}');
+
+    await service.beginBatchCapture(BATCH_ID, ['boards/e2e.canvas']);
+    await settle(service);
+    // An external canvas write while the round is open: the funnel ignores
+    // non-markdown files on purpose — only the explicit notePluginWrite may
+    // record the canvas entry.
+    harness.writeAgentFile('boards/e2e.canvas', '{"nodes":[{"id":"n1"}],"edges":[]}');
+    await settle(service);
+    const meta = service.getRoundMeta(service.getSidebarModel(BATCH_ID).roundId ?? '');
+    expect(meta?.entries.find((item) => item.path === 'boards/e2e.canvas')).toBeUndefined();
+  });
+});

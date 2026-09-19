@@ -2,8 +2,8 @@
  * CanvasIntegrationController — the plugin's bridge into Obsidian's
  * (unexported) canvas view (R-C5, flowtext-c5-design §3.4).
  *
- * Structural work only; every capability is feature-detected at runtime and
- * the degradation ladder is the designed one:
+ * Structural work only; every capability is feature-detected at runtime, with
+ * the designed degradation ladder:
  *
  * - A: floating selection-menu button + direct write-back (gate fully passes);
  * - B: command entry reading `canvas.selection` (same write-back);
@@ -14,11 +14,13 @@
  *   fake write.
  *
  * When even the READ side cannot be proven at runtime, the feature registers
- * NOTHING for that leaf and the debug surface says so honestly (§6.7). The
- * guaranteed undo channel is the R-B3 revert system (view-independent): file
- * node writes ride it; text-node `setData` writes cannot (markdown-only
- * funnel) and say so in the preview instead of claiming an undo that is
- * unverified (design §3.4 / E2).
+ * NOTHING for that leaf and the debug surface says so honestly (§6.7). Both
+ * write paths ride the R-B3 revert system (view-independent): file-node
+ * writes and text-node writes open a batch capture round and REFUSE the
+ * write when coverage is unavailable. Native Ctrl+Z rides the canvas view's
+ * own history pipeline (`setData` pushes; `requestSave(false)` avoids the
+ * duplicate push that used to swallow the first undo — see
+ * CanvasNodeWriteService for the bundle evidence).
  */
 
 import type { App, WorkspaceLeaf } from 'obsidian';
@@ -367,9 +369,12 @@ export class CanvasIntegrationController {
     nextText: string,
   ): Promise<void> {
     const copyOnly = !bridge.decision.canWriteBack;
-    const revertNote = target.kind === 'file'
-      ? (this.isRevertCoverageAvailable() ? undefined : t('canvas.rewrite.preview.noRevertCoverage'))
-      : t('canvas.rewrite.preview.textNodeUndoNote');
+    // Honest undo/revert disclosure, identical for both node kinds: when the
+    // R-B3 surface is not composed the preview says so BEFORE the confirm
+    // (and the write is refused afterwards). When it is composed, both undo
+    // channels exist (host Ctrl+Z via the canvas history pipeline + the
+    // sidebar revert round) and no warning is needed.
+    const revertNote = this.isRevertCoverageAvailable() ? undefined : t('canvas.rewrite.preview.noRevertCoverage');
     const confirmed = await new Promise<boolean>((resolve) => {
       new CanvasRewritePreviewModal(this.ports.app, {
         originalText: target.text,
@@ -391,20 +396,58 @@ export class CanvasIntegrationController {
       return;
     }
     if (target.kind === 'text') {
-      const result = writeTextNode({
-        canvas,
-        nodeId: target.nodeId,
-        nextText,
-        snapshotAtRequest: target.text,
-      });
-      if (!result.ok) {
-        this.ports.notify(this.describeWriteFailure(result.reason, result.detail));
-        return;
-      }
-      this.ports.notify(t('canvas.rewrite.textNodeWritten'));
+      await this.writeTextNodeUnderCoverage(bridge, canvas, target, nextText);
       return;
     }
     await this.writeFileNode(target, nextText);
+  }
+
+  /**
+   * Text-node write with fail-closed R-B3 coverage (R-C5 / §6.2): the
+   * `.canvas` pre-image is force-captured BEFORE the write, the write rides
+   * the canvas view's own data + history pipeline (`setData` +
+   * `requestSave(false)` — see CanvasNodeWriteService), and any unavailable
+   * coverage piece aborts with an honest notice — never an unrevertable write.
+   */
+  private async writeTextNodeUnderCoverage(
+    bridge: CanvasLeafBridge,
+    canvas: CanvasRuntimeLike,
+    target: RewriteTarget,
+    nextText: string,
+  ): Promise<void> {
+    const canvasPath = this.leafPathOf(bridge);
+    const conversationId = this.ports.getActiveConversationId();
+    const revert = this.ports.getEditRevert();
+    if (!canvasPath || !conversationId || !revert?.beginBatchCapture || !revert.notePluginWrite || !revert.endBatchCapture) {
+      this.ports.notify(t('canvas.rewrite.preview.noRevertCoverage'));
+      return;
+    }
+    // Forced pre-image (budget-free batch convention) — must run BEFORE the
+    // write; an unavailable surface aborts the write instead of writing
+    // unrevertable.
+    const captured = await revert.beginBatchCapture(conversationId, [canvasPath]);
+    if (!captured) {
+      this.ports.notify(t('canvas.rewrite.preview.noRevertCoverage'));
+      return;
+    }
+    const result = writeTextNode({ canvas, nodeId: target.nodeId, nextText, snapshotAtRequest: target.text });
+    if (!result.ok) {
+      // No write happened — close the round so nothing dangles.
+      await revert.endBatchCapture(conversationId);
+      this.ports.notify(this.describeWriteFailure(result.reason, result.detail));
+      return;
+    }
+    // Flush the host's debounced view save so the recorded entry matches the
+    // vault now (and a later view save cannot clobber a fast revert).
+    await this.persistCanvasViewNow(bridge);
+    await revert.notePluginWrite(conversationId, canvasPath);
+    await revert.endBatchCapture(conversationId);
+    this.ports.notify(t('canvas.rewrite.textNodeWritten'));
+  }
+
+  /** Best-effort immediate view save; the debounced save is the fallback. */
+  private persistCanvasViewNow(bridge: CanvasLeafBridge): Promise<unknown> {
+    return Promise.resolve((bridge.leaf.view as CanvasViewLike).saveImmediately?.()).catch(() => undefined);
   }
 
   /** File-node write: the markdown note via ONE vault.process under R-B3 coverage. */

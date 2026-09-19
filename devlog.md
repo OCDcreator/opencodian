@@ -11,6 +11,18 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-19 Canvas 文本节点写回可撤销化并纳入 R-B3（R-C5，双撤销通道）
+
+**触发**：部署版实测两项失败——① 选中节点 → AI 改写 → 写回成功后，Canvas 视图聚焦按真实 Cmd+Z，文件不变（`restored: false`）；② 写回后 `acceptance-canvas-e2e.canvas` 从未出现在会话侧栏（R-B3 覆盖缺失）。
+
+**根因（bundle 证据，Obsidian 1.13.7 `app.js` 只读解包核实）**：① 画布 `setData(e)` 内部已 `pushHistory(e)` 推入写后快照，而插件随后无参调用 `requestSave()` 时其 `pushHistory` 标志缺省 true，**再次推送相同快照**——历史栈成为 `[前, 后, 后]`，第一次 Ctrl+Z 经 `undo()` 应用 `data[current-1]` 恰为相同的写后状态，表现为"撤销失效"。② `EditRevertService` 的批次捕获与插件写记录都经 `isMarkdownPath`（`extension==='md'`）过滤，`.canvas` 永远不可能被快照。
+
+**改动**：`writeTextNode` 改为 `setData(doc)` + `requestSave(false)`（栈为 `[前, 后]`，一次 Ctrl+Z 经 `applyHistory` 恢复写前状态且宿主自动落盘；活体按键验收由验收方回填）；控制器为文本节点写回新增与文件节点同构的 fail-closed 覆盖批次——`beginBatchCapture([canvasPath])` 强制预快照在前，覆盖缺失即拒写并明示，写回后 `view.saveImmediately()` 尽力立即落盘再 `notePluginWrite` + `endBatchCapture`；shared 新增窄谓词 `isRevertibleTextPath`（markdown + `.canvas`），**仅**用于批次捕获与插件写记录，vault 事件漏斗 / 引用改写 / 二进制排除的 `isMarkdownPath` 语义不动。预览弹窗披露语更新为实况（覆盖缺失即拒写；已覆盖时双通道），双语言同步。
+
+**测试**：新增控制器级流程测试（真实 `EditRevertService` + 内存 vault：覆盖批次登记、预像=写前、一键回退还原、两种缺失场景拒写）；`isRevertibleTextPath` 纯谓词矩阵；`requestSave(false)` 契约与拒绝路径不触 `requestSave`；canvas 批次覆盖三例（含漏斗保持 markdown-only 的反例）。
+
+---
+
 ## 2026-09-18 澄清通道防泄漏守卫补齐全角竖线与空格标签名（实机回归）
 
 **触发**：部署后实机复验发现，首版守卫（`349c589a`）在真实模型输出上**完全不生效**——行内面板依旧直出原始标记，而单测全绿。

@@ -17,6 +17,7 @@ import {
   extractCandidatePathsFromPrompt,
   extractWriteToolTargets,
   isMarkdownPath,
+  isRevertibleTextPath,
   parseApplyPatchPaths,
   parseShellRedirectionTargets,
   planRoundEvictions,
@@ -210,6 +211,21 @@ describe('editRevertPlan: sidebar model derivation (capability-boundary honesty)
     expect(isMarkdownPath('notes/a.md')).toBe(true);
     expect(isMarkdownPath('notes/a.txt')).toBe(false);
     expect(isMarkdownPath('notes/a')).toBe(false);
+  });
+
+  it('isRevertibleTextPath accepts markdown AND canvas (text/JSON vault files), case-insensitive', () => {
+    expect(isRevertibleTextPath('notes/a.md')).toBe(true);
+    expect(isRevertibleTextPath('boards/ACCEPTANCE.CANVAS')).toBe(true);
+    expect(isRevertibleTextPath('boards/acceptance-canvas-e2e.canvas')).toBe(true);
+  });
+
+  it('isRevertibleTextPath rejects binaries and extensionless paths (binary exclusion stays intact)', () => {
+    expect(isRevertibleTextPath('assets/photo.png')).toBe(false);
+    expect(isRevertibleTextPath('docs/paper.pdf')).toBe(false);
+    expect(isRevertibleTextPath('notes/a.txt')).toBe(false);
+    expect(isRevertibleTextPath('notes/a.canvasx')).toBe(false);
+    expect(isRevertibleTextPath('notes/a')).toBe(false);
+    expect(isRevertibleTextPath('.opencodian/checkpoints/round.json')).toBe(false);
   });
 
   it('marks oversize and pre-image-less entries as not revertible with a reason (AC6)', () => {

@@ -47,6 +47,7 @@ import {
   isEntryRestorable,
   isEntryRevertible,
   isMarkdownPath,
+  isRevertibleTextPath,
   planRoundEvictions,
 } from '../../shared';
 import type {
@@ -667,6 +668,10 @@ export class EditRevertService implements EditRevertServicePort {
    * budget: the batch is user-initiated, the file list is known upfront from
    * the confirmed preview, and anything over the per-file cap lands in
    * `standbyOversize` so it stays honestly marked not revertible.
+   *
+   * The path filter is `isRevertibleTextPath`, not `isMarkdownPath` (R-C5):
+   * the canvas text-node write-back hands us a `.canvas` path, and a canvas
+   * file is text/JSON whose pre-image snapshots and restores like markdown.
    */
   private async performBeginBatchCapture(conversationId: string, paths: readonly string[]): Promise<void> {
     const now = this.now();
@@ -697,7 +702,7 @@ export class EditRevertService implements EditRevertServicePort {
 
     for (const rawPath of paths) {
       const normalized = this.normalizeVaultPath(rawPath);
-      if (!normalized || !isMarkdownPath(normalized)) {
+      if (!normalized || !isRevertibleTextPath(normalized)) {
         continue;
       }
       if (round.standby.has(normalized) || round.standbyOversize.has(normalized)) {
@@ -764,6 +769,10 @@ export class EditRevertService implements EditRevertServicePort {
    * otherwise win vault-event attribution. Pre-images resolve from the forced
    * batch capture; a path with no captured pre-image stays listed but marked
    * not revertible.
+   *
+   * The path filter is `isRevertibleTextPath`, not `isMarkdownPath` (R-C5):
+   * the canvas text-node write records its `.canvas` path here explicitly,
+   * because the canvas vault-event funnel stays markdown-only on purpose.
    */
   private async performNotePluginWrite(conversationId: string, path: string): Promise<void> {
     const round = this.getLatestRound(conversationId);
@@ -771,7 +780,7 @@ export class EditRevertService implements EditRevertServicePort {
       return;
     }
     const normalized = this.normalizeVaultPath(path);
-    if (!normalized || !isMarkdownPath(normalized)) {
+    if (!normalized || !isRevertibleTextPath(normalized)) {
       return;
     }
     const now = this.now();

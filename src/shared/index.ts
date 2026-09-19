@@ -80,6 +80,7 @@ export {
   isEntryRestorable,
   isEntryRevertible,
   isMarkdownPath,
+  isRevertibleTextPath,
   parseApplyPatchPaths,
   parseShellRedirectionTargets,
   planRoundEvictions,

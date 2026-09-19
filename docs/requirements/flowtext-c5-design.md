@@ -125,14 +125,16 @@ export function layoutGrid(input: LayoutInput): Array<{x:number;y:number;width:n
 
 **确认与写回（区分节点类型，两条都显式且有限）**
 
-- **文本节点**（`canvas.setData` 全文档回写）：
+- **文本节点**（`canvas.setData` 全文档回写，走 Canvas 自身数据 + 历史管线，并纳入 R-B3）：
   1. **脏检查**：重新 `node.getData().text`，与会话起始快照比对，不一致 → 拒绝并提示"节点已被修改"（§6.3）。
-  2. 预览对话框：原文 / 新文（Mermaid 目标时带渲染预览）→ 确认/取消。
-  3. `doc = canvas.getData()`（bundle 核实遍历 `this.nodes`）→ 内存中替换目标节点条目 → `assertWritableDocument` → `canvas.setData(doc)`（bundle 核实消费 `{nodes:[...]}`）→ `canvas.requestSave()`（bundle 核实 `dirty=true` + 去抖保存）。**不直接写文件**，保存仍由 Canvas 自身管线完成。
+  2. 预览对话框：原文 / 新文（Mermaid 目标时带渲染预览）→ 确认/取消；R-B3 覆盖面缺失时在预览中明示。
+  3. **R-B3 预快照（fail closed）**：确认后先 `beginBatchCapture(conversationId, [canvasPath])` 强制捕获 `.canvas` 预像；覆盖面缺失（无会话 / 无 `EditRevertService` / 捕获失败）→ **拒绝写回并明示**，绝不写不可回退的内容。`.canvas` 是文本 JSON，预像快照与恢复与 markdown 同语义（`isRevertibleTextPath`，仅批次捕获与插件写记录放宽；vault 事件漏斗、引用改写、二进制排除保持 `isMarkdownPath`）。
+  4. `doc = canvas.getData()`（bundle 核实遍历 `this.nodes`）→ 内存中替换目标节点条目 → `assertWritableDocument` → `canvas.setData(doc)`（bundle 核实消费 `{nodes:[...]}`，且 `setData` 内部 `pushHistory`）→ `canvas.requestSave(false)`。**不直接写文件**，保存仍由 Canvas 自身管线完成（`dirty=true` + 去抖 `vault.modify`）。`requestSave(false)` 是关键：无参调用会再推一次相同写后快照（bundle 核实 `pushHistory` 标志默认 true），历史栈变成 `[前, 后, 后]`，第一次 Ctrl+Z 重放相同状态——实测表现为"撤销失效"；`false` 跳过重复推送，栈为 `[前, 后]`，一次 Ctrl+Z 即恢复写前状态。
+  5. 写回成功后 `view.saveImmediately()`（尽力而为）立即落盘，使 `notePluginWrite` 记录与磁盘一致、并收窄"快速回退被视图延迟保存覆盖"的窗口；随后 `notePluginWrite` + `endBatchCapture` 关闭批次（R-B5 record-then-close 约定），侧栏立即可一键回退。
 - **文件节点**（底层笔记即一篇 markdown，走既有文本写语义）：
   1. 预览确认同上，明确标注"将修改笔记 `<path>`"。
   2. `EditRevertService` 预快照 → 单次 `vault.process` 闭包内**先读比对（脏检查）后写** → 成功提示；闭包抛错零改动。
-- **撤销语义（如实）**：`Ctrl+Z` 依赖 Canvas 原生 undo 对 `setData` 路径的覆盖，**未经验证**（§7-U3）。保证性撤销 = R-B3 回退入口（后端与视图无关）；验收 3 按实测如实记录：原生 undo 可用则双通道，不可用则 R-B3 单通道并明示。
+- **撤销语义（双通道，bundle 证据）**：`Ctrl+Z` 由 Canvas 视图自身的 `scope.register(["Mod"],"Z", … → canvas.undo())` 承接（Obsidian 1.13.7 bundle 核实）；`canvas.setData` 推入写后历史、`applyHistory` 恢复写前状态并再次 `view.requestSave()` 落盘——原生 undo 单步恢复写前状态**且文件随之还原**。保底撤销 = R-B3 回退入口（后端与视图无关）。双通道均已定义；live 验收（真实 Ctrl+Z 按键、真实侧栏回退）由验收方按 §6.7 实测回填。
 
 **降级阶梯（§6.7）**
 
@@ -150,7 +152,7 @@ export function layoutGrid(input: LayoutInput): Array<{x:number;y:number;width:n
 | §6 约束 | 本设计的落实 |
 |---|---|
 | 1 只读辅助契约不削弱 | AI 拆分与改写都走 `startAuxQuerySession` 只读会话；无新 aux 形态、无新工具授权；`findWriteToolCalls` 审计保持阻断；AI 永远只提案，写动作全部由插件显式执行 |
-| 2 写路径显式且有限 | 全条写路径恰三条，均显式定义：① 生成新 `.canvas`（单次 `vault.create`）；② 文本节点写回（`canvas.setData`+`requestSave`，走 Canvas 自身保存管线）；③ 文件节点写回（单次 `vault.process`）。索引之外的文件系统访问为零 |
+| 2 写路径显式且有限 | 全条写路径恰三条，均显式定义：① 生成新 `.canvas`（单次 `vault.create`）；② 文本节点写回（`canvas.setData`+`requestSave(false)`，走 Canvas 自身数据+历史+保存管线，且前置 R-B3 批次预快照、覆盖缺失即拒写）；③ 文件节点写回（单次 `vault.process`，同样前置 R-B3 预快照）。索引之外的文件系统访问为零 |
 | 3 落盘前脏检查 | 生成：触盘前双重校验（§3.3-2）；文本节点：写回前重读比对；文件节点：`vault.process` 闭包先读后写 + R-B3 预快照 |
 | 4 fail-closed 优先 | schema 校验失败 / aux 提案解析失败 / 会话失败 / 确认门失败 / 节点已变更 → 一律拒绝并提示；拆分失败回退文件引用模式是**明确提示下的替代**，不是静默降级 |
 | 5 后端无关是验收项 | aux 会话四后端同构（既有能力面）；某后端 aux 不可用 → 如实显示"该后端不支持"，改写入口禁用并说明 |
@@ -210,7 +212,7 @@ export function layoutGrid(input: LayoutInput): Array<{x:number;y:number;width:n
 
 - `view.canvas`：视图构造中 `.canvas=new <Canvas类>`，Canvas 实例自带 scope 挂在 app scope。
 - 状态容器：`this.nodes`（Map 语义，`getData` 中 `Array.from(this.nodes.values())`）、`this.edges=new Map`、`this.selection=new Set`、`this.dirty=new Set`、`isDragging`。
-- 数据接口：`canvas.getData()`（组装 `{nodes,edges}`）；各节点子类 `getData` 产出 `type:"file"/"text"/"link"/"group"`；`canvas.setData(e)` 消费 `{nodes:[...]}` 全量回灌；`canvas.requestSave()` 实现 `dirty=true` + 去抖保存。
+- 数据接口：`canvas.getData()`（组装 `{nodes,edges}`）；各节点子类 `getData` 产出 `type:"file"/"text"/"link"/"group"`；`canvas.setData(e)` 消费 `{nodes:[...]}` 全量回灌**并 `pushHistory(e)` 推入宿主历史栈**；`canvas.requestSave(pushHistory?: boolean)` 实现 `this.data=getData()` + `dirty=true` + 去抖保存，`pushHistory` 缺省为 true（无参调用会再推一次相同快照）；视图热键 `scope.register(["Mod"],"Z", … → canvas.undo())`，`undo()` 经 `applyHistory` 恢复上一快照并再次 `view.requestSave()` 落盘。
 - UI 挂点：浮动选择菜单 `canvas-menu-container` → `canvas-menu`；节点 DOM `canvas-node` / `canvas-node-content` / `canvas-node-interaction-layer` / `canvas-node-resizer[data-resize]`；`canvas.onSelectionContextMenu`；`canvasEl` 与边线 SVG 容器；`canvas.requestFrame`。
 - 文件节点携带 `filePath`（`this.filePath=e.path`）。
 
@@ -220,7 +222,7 @@ export function layoutGrid(input: LayoutInput): Array<{x:number;y:number;width:n
 
 - U1 `canvas.selection` 在真实多选/单选时的成员类型与稳定性。
 - U2 浮动菜单 DOM 追加按钮的实际渲染与命中（静态确认容器存在，未活体点击）。
-- U3 `Ctrl+Z` 对 `setData` 写回的原生 undo 覆盖（决定验收 3 的撤销通道是双是单）。
+- U3 `Ctrl+Z` 对 `setData` 写回的原生 undo 覆盖 —— **已由 bundle 证据闭环（2026-09-19）**：`setData` 自身推历史，而此前的 `requestSave()` 无参调用重复推送相同快照致首次 Ctrl+Z 重放相同状态（部署版实测 "撤销失效" 的根因）；`requestSave(false)` 修复后栈为 `[前, 后]`。剩余仅活体验收（真实按键 + 文件还原）待回填。
 - U4 选中变化的推送事件名（bundle 中未见 `"selection-changed"` 字面量）——设计已规避依赖：本方案在**用户动作时同步读** `selection`，不需要事件推送。
 
 **结论**
@@ -235,6 +237,6 @@ export function layoutGrid(input: LayoutInput): Array<{x:number;y:number;width:n
 | # | 问题 | 建议 | 理由 |
 |---|---|---|---|
 | E1 | 生成的默认节点模式 | **文件引用节点为默认**，AI 拆分为显式二级选项 | 零 token、零内容拷贝、改名自动跟随；拆分按需付费且失败可回退 |
-| E2 | 验收 3 的 `Ctrl+Z` 若原生 undo 不覆盖 `setData` | **保底撤销 = R-B3 回退**，并在验收记录中如实标注单通道 | 后端/视图无关的撤销语义是仓库既定方向（§10-Q4 同理）；不因验收措辞伪造 undo |
+| E2 | 验收 3 的 `Ctrl+Z` 若原生 undo 不覆盖 `setData` | **已解决（2026-09-19）**：原生 undo 覆盖成立（`setData` 推历史 + `requestSave(false)` 去重复推送，bundle 核实），双通道可用——`Ctrl+Z` 走宿主历史，R-B3 回退为保底；文本节点写回同时纳入 R-B3 批次覆盖，覆盖缺失仍 fail closed | 后端/视图无关的撤销语义是仓库既定方向（§10-Q4 同理）；不因验收措辞伪造 undo |
 | E3 | "选中 3 篇笔记"的入口形态 | **picker 多选为主**，文件浏览器多选内部 API 做 feature-detect 增强，R-B2 主题组作为来源之一 | 文件浏览器多选态属未公开内部 API（与 §7 同类风险），不可作为唯一入口 |
 | E4 | 文件节点的 AI 改写范围 | **整篇笔记为改写对象**（预览强确认），不做"仅节点摘录"的部分改写 | 部分改写需要锚点回写，引入对齐类失败模式；整篇写走既有"单次闭包 + 快照 + 脏检查"语义最稳 |

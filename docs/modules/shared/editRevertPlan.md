@@ -36,6 +36,7 @@
 | 导出 | 说明 |
 |------|------|
 | `isMarkdownPath(path)` | 快照范围只覆盖 Markdown 文本文件 |
+| `isRevertibleTextPath(path)` | markdown **+ `.canvas`**（文本 JSON，预像可快照/恢复）；仅用于批次捕获与插件写记录（R-C5）。vault 事件漏斗、引用改写、二进制排除仍用 `isMarkdownPath` |
 | `classifyWriteTool(toolName)` | 把四后端工具名分类为 `structured` / `shell` / `null`（大小写不敏感、`str_replace*` 前缀容错） |
 | `extractWriteToolTargets(toolName, input)` | 从写工具声明提取目标路径：结构化字段（`file_path`/`path`/…）、apply_patch / unified-diff 文本、shell 重定向（只认字面 `.md` 目标，忽略变量与 `/dev`） |
 | `parseApplyPatchPaths` / `parseShellRedirectionTargets` | 上述两条路径的独立解析器 |
