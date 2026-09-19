@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "82baaa4a7d3986c65724a89e125ae60695f446e56097d3b1ddfcee7e2f8d3dd9",
+  "digest": "39f66b1dff1934e2d2c144449c0033914d070fedd1f3f8fe7069e617e638d801",
   "recordCount": 750,
   "records": [
     {
@@ -181,7 +181,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/auxiliary/OpenCodeAuxQuerySession.ts",
-      "sha256": "99b525404c3db21b2329dc1fcb669131f1be08b7a8514311c75d56caae22dab6"
+      "sha256": "1efb1db09c549091a8b4e1fd38c4287ee2eb753eca28cc569009314386c24a64"
     },
     {
       "kind": "src",
@@ -3754,7 +3754,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-19T06:24:31.194Z",
-  "headShaAtGeneration": "8c479a7ee27c650e3392655041a0b95dc4c70c2c",
+  "generatedAt": "2026-09-19T07:07:19.841Z",
+  "headShaAtGeneration": "0fada4d1af706132a6c595f88b963939186e6843",
   "graphifyVersion": "graphify 0.9.36"
 }
