@@ -877,7 +877,7 @@ export interface AuxQueryTurnRequest {
 |---|---|---|---|---|
 | R-A1 | `d892256d` | `InlineEditAtTrigger.test.ts` 等 | 行首 `@` 开面板且 `@` 不入文档；`user@example.com` 中间不触发；设置页「@ 键唤起」+ 未绑定快捷键提示 | IME 组合态、Reading mode |
 | R-A2 | `d892256d` | `InlineEditPresetMenu/Presets/InputOverlayPresetMenu.test.ts` | `#` 弹出六个内置预设；Enter 填入且**不发请求**；Esc 关闭内容不变 | `#标签` 误触与空自定义集仅单测覆盖 |
-| R-A3 | `78eeef05` | `InlineEditStreamPreview.test.ts` | 面板 busy 即时、最终预览 + 拒绝/接受、拒绝后文档逐字节未变 | **量化承诺无法演示**：可用供应商不增量流式（实测仅 1 个 chunk @2660ms），无中间态可渲染 |
+| R-A3 | `78eeef05` | `InlineEditStreamPreview.test.ts` | 面板 busy 即时、最终预览 + 拒绝/接受、拒绝后文档逐字节未变；**换 `claude-code`（CLI 确为流式）以 250ms 采样复测**：48 帧中仍只有 2 个状态（251ms busy → 12067ms 完整预览） | **量化承诺仍不可演示，但原因不是供应商**：输出契约要求完整的 `<replacement>` 标签才可解析，解析前的片段没有可渲染语义，故实现只提供 busy 状态而非逐段增长的内容帧。要演示流式 diff 需改输出契约（设计变更，非缺陷） |
 | R-A4 | `78eeef05` | 四后端审计脚本含图片轮次 | **四后端真 CLI 审计 PASS**（vision 模型下模型确实读到图；vault 快照零变化；Codex 临时目录 0） | 面板内粘贴/拖拽、chip 缩略图、LaTeX 定界符实机未验 |
 | R-A5 | `47e90f95`、`9babaf49`、`49c6b55c` | `InlineEditWidgets.test.ts`、`InlineEditInputOverlay.test.ts`、`InlineEditOverlayDismissal.test.ts` | 并行上限设置项与文案已验；**同一笔记内两编辑共存**（选区 + 光标，`overlayCount: 2`，截图 `ra5-two-panels.png`）；**交叉接受无漂移**（接受 A 只改 line 2，第二段未波及，B 面板/模式/输入内容/锚点行全保留）；**面板互不遮挡**（重叠面积 0，各自工具栏经 `elementFromPoint` 可达）；**Esc 只作用于聚焦编辑**（焦点在 A 时真实 Escape 只关 A，B 内容不丢） | — |
 | R-A6 | `47e90f95`、`f33732bc` | `InlineEditDocumentMode.test.ts` | 「整篇」模式切换 active 正确转移；**独立命令入口**（面板模式「整篇」、占位符「描述要如何修改整篇笔记…」）；**二次确认弹窗**（「应用整篇修改？」+ 取消/替换整篇，确认前文档逐字节未变，截图 `ra6-document-confirm.png`）；**单步撤销**（一次 Cmd+Z 精确还原原文，`restoredExactly: true`）；**降级差异视图**（3961 字符触发「内容过大，仅显示前后对照。」且词级标记数为 0，截图 `ra6-degraded.png`）；确认按钮标签对比度 4.22:1 → **4.98:1** | 20k+ 字符笔记未单独构造（降级路径已由 3961 字符触发并验证） |
