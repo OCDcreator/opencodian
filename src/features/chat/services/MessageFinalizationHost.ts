@@ -2,6 +2,7 @@ import type { SessionActivityStatus } from '../../../core/opencode';
 import type {
   ChatMessage,
   Conversation,
+  PromptContextItem,
   SessionTodo,
 } from '../../../core/types';
 import { getConversationBackendSessionId } from '../../../core/types';
@@ -30,6 +31,12 @@ export interface FinalizeMessageOptions {
   tabId: TabId | null;
   shouldSyncFromServer: boolean;
   editedFiles: string[];
+  /**
+   * R-B1 (chat): the context items attached to THIS turn's request. Non-empty
+   * note attachments are the reference-note set the auto-internal-link pass
+   * may link to; absent/empty means the pass is a no-op.
+   */
+  contextItems?: readonly PromptContextItem[];
   logStage(stage: string, payload?: Record<string, unknown>): void;
 }
 

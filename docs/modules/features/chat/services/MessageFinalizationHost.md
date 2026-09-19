@@ -9,6 +9,7 @@
 
 - `shouldSyncAfterStream()`: shared gate for deciding whether a finished stream should converge through authoritative sync.
 - `FinalizeMessageOptions`, `MessageFinalizationSyncResult`, `AssistantErrorRenderOptions`: typed inputs/outputs shared with `MessageFinalizationService`.
+- `FinalizeMessageOptions.contextItems` (R-B1, optional): the sending turn's attached context items; they are the reference-note set the finalization-time auto-internal-link pass may link to (absent/empty keeps the pass a no-op).
 - `MessageFinalizationHost` / `MessageFinalizationHostDependencies`: the runtime contract between the service and `OpenCodianView`-owned coordinators.
 - `createMessageFinalizationHost()`: assembles the host object from view/runtime dependencies.
 

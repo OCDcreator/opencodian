@@ -68,10 +68,17 @@ export interface FinalizeMessageOptions {
   tabId: TabId | null;
   shouldSyncFromServer: boolean;
   editedFiles: string[];
+  /** R-B1 (chat)：本轮请求附带的上下文条目，作为自动内链的参考集合。 */
+  contextItems?: readonly PromptContextItem[];
   logStage(stage: string, payload?: Record<string, unknown>): void;
 }
 
 export class MessageFinalizationService {
+  // 第二个参数可选：缺省（或 service 无 processor）时保持既有行为逐字节不变
+  constructor(
+    host: MessageFinalizationHost,
+    autoInternalLinks?: AssistantAutoInternalLinkService,
+  );
   finalizeAfterStream(options: FinalizeMessageOptions): Promise<void>;
   finalizeAssistantMessageWithError(
     messageEl: HTMLElement,
@@ -112,6 +119,12 @@ export class MessageFinalizationService {
 - finalization 不再用 stale visual `Conversation.messages` fingerprint 自行判定漂移；本地 cache fingerprint 只保留为诊断日志，实际 render drift 以 canonical/server projection 的 sync result 为准
 - 不再把本地 `Conversation.messages` assistant body repair 当作 truth；本地流式消息只作为 live/cache 输出，最终收敛由 canonical projection 决定
 - 不重新实现 append / patch / full rerender 细节，而是复用已有 `ConversationRenderService` 边界
+
+### R-B1 聊天侧自动内链（post-sync、最终保存前）
+
+- `finalizeAfterStream()` 在 **sync 返回之后、render apply 与最终保存之前**调用 `AssistantAutoInternalLinkService.applyToConversationTail()`：opencode 干净完成路径的最终文本来自 sync，在此处改写可让「渲染的文本 = 持久化的文本」；插入链接时强制 `needsForegroundRenderSync = true`（即使 sync 报告无漂移也执行 render apply）。
+- 非 sync 路径（claude-code / codex / pi 及 opencode 中断）：本地持久化消息已在 `conversation.messages`，在最终保存前改写，并在前台用 `applySyncedConversationUpdate(previousMessages, conversation.messages)` 重渲尾部（service 返回的 `previousMessages` 含改写前克隆，保证 render apply 看得到真实 diff；尾部 patch 失败会兜底 full rerender）。
+- 参考集合为空、无已完成 assistant 消息（中断/仅 notice）、或无匹配时全部为 no-op；`autoInternalLinks` 缺省时整个 pass 不存在，关闭态与既有行为逐字节一致（回归锁定在 `tests/unit/features/chat/MessageFinalizationService.test.ts` 的 R-B1 describe 块）。
 
 ### 收尾时序
 

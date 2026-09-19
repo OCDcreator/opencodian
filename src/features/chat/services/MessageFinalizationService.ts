@@ -5,6 +5,7 @@ import type {
 import { getConversationBackendSessionId } from '../../../core/types';
 import { t } from '../../../i18n';
 import type { TabId } from '../tabs';
+import type { AssistantAutoInternalLinkService } from './AssistantAutoInternalLinkService';
 import type {
   FinalizeMessageOptions,
   MessageFinalizationHost,
@@ -25,6 +26,11 @@ interface MessageFinalizationSyncAfterStreamState {
   syncResult: MessageFinalizationSyncResult;
   syncSource: 'canonical' | 'server';
   isForegroundConversation: boolean;
+  /**
+   * Mutable: the R-B1 (chat) auto-internal-link pass runs after the sync and
+   * before the render apply; when it rewrote the tail text, the render apply
+   * must happen even if the sync itself reported no drift.
+   */
   needsForegroundRenderSync: boolean;
 }
 
@@ -66,7 +72,15 @@ export function getUnavailableServerMessage(availability: UnavailableServerAvail
 }
 
 export class MessageFinalizationService {
-  constructor(private readonly host: MessageFinalizationHost) {}
+  /**
+   * R-B1 (chat): optional auto-internal-link boundary service. Absent (or a
+   * processor-less service) keeps finalization byte-identical to the
+   * previous behaviour, so the default-off path is a strict regression.
+   */
+  constructor(
+    private readonly host: MessageFinalizationHost,
+    private readonly autoInternalLinks?: AssistantAutoInternalLinkService,
+  ) {}
 
   getUnavailableServerPromptMessage(availability: UnavailableServerAvailability): string {
     return getUnavailableServerMessage(availability);
@@ -88,6 +102,15 @@ export class MessageFinalizationService {
           tabId,
           logStage,
         );
+        // R-B1 (chat): the authoritative sync has produced the turn-final
+        // assistant text; insert verified internal links now — after the
+        // sync and before the render apply + final save — so the rendered
+        // text and the persisted text are the same linked text.
+        const autoLink = this.autoInternalLinks
+          ?.applyToConversationTail(conversation, options.contextItems, logStage);
+        if (autoLink?.changed && syncAfterStreamState.isForegroundConversation) {
+          syncAfterStreamState.needsForegroundRenderSync = true;
+        }
         await this.applySyncAfterStreamFollowUp({
           conversation,
           tabId,
@@ -95,6 +118,20 @@ export class MessageFinalizationService {
           syncAfterStreamState,
           logStage,
         });
+      } else {
+        // R-B1 (chat): local persistence already stored this turn's assistant
+        // message; post-process it before the final save and re-render the
+        // foreground tail (patch, or full rerender as fallback) so the DOM
+        // shows exactly the stored text. The service returns a pre-mutation
+        // snapshot whose rewritten message is cloned, so the render apply
+        // sees a genuine before/after diff even though the live message was
+        // rewritten in place.
+        const autoLink = this.autoInternalLinks
+          ?.applyToConversationTail(conversation, options.contextItems, logStage);
+        if (autoLink?.changed && this.isForegroundConversation(conversation, tabId)) {
+          await this.host.applySyncedConversationUpdate(autoLink.previousMessages, conversation.messages);
+          logStage('auto-internal-link-render-applied');
+        }
       }
 
       if (conversation.backend === undefined || conversation.backend === 'opencode') {

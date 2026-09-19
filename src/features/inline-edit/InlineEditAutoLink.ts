@@ -19,8 +19,10 @@
  *   or ≥ 4 western words, and not in the user's excluded-term list;
  * - the same heading text in two reference notes is ambiguous and never
  *   linked;
- * - insertion happens on the final, strictly-parsed result before the diff
- *   preview is rendered, so the user sees every link and can reject them.
+ * - insertion happens on the final text before the user sees it — for the
+ *   inline-edit path on the strictly-parsed result before the diff preview
+ *   is rendered, for the chat path once the turn's assistant text is final —
+ *   so the user sees every link and stored and rendered text agree.
  *
  * Everything except the small Obsidian-facing factory at the bottom is pure
  * and unit-testable without Obsidian or a model.
@@ -28,8 +30,6 @@
 
 import type { App, Vault } from 'obsidian';
 import { TFile } from 'obsidian';
-
-import type { InlineEditHost } from './InlineEditHost';
 
 /** Link syntax follows the vault config (R-B1). */
 export type AutoLinkStyle = 'wiki' | 'markdown';
@@ -307,7 +307,7 @@ function formatAutoLink(style: AutoLinkStyle, candidate: AutoLinkCandidate, disp
  * the text byte-identical.
  */
 export function applyInlineEditAutoLinks(
-  link: InlineEditHost['applyAutoInternalLinks'],
+  link: AutoInternalLinkProcessor | undefined,
   contextFiles: readonly { readonly path: string; readonly kind?: 'file' | 'folder' }[],
   text: string,
 ): string {
@@ -323,6 +323,17 @@ export function applyInlineEditAutoLinks(
 // Obsidian-facing glue (the only non-pure part of R-B1)
 // -----------------------------------------------------------------------------
 
+/**
+ * The R-B1 host seam shared by the inline-edit path and the chat path: given
+ * the final generated text and the turn's attached note entries, returns the
+ * text with verified internal links inserted (or byte-identically unchanged
+ * when the setting is off, nothing is attached, or nothing qualifies).
+ */
+export type AutoInternalLinkProcessor = (
+  text: string,
+  attachedNotes: readonly { readonly path: string; readonly kind?: 'file' | 'folder' }[],
+) => string;
+
 export interface InlineEditAutoLinkProcessorDeps {
   readonly app: App;
   readonly isEnabled: () => boolean;
@@ -330,15 +341,17 @@ export interface InlineEditAutoLinkProcessorDeps {
 }
 
 /**
- * Build the host seam the inline-edit controller calls after the strict
- * parse and before the preview payload is built. Returns the text unchanged
- * (byte-identical) whenever the feature is off, nothing is attached, or no
- * heading matches — so the off path is a strict regression of the previous
- * behaviour.
+ * Build the R-B1 auto-internal-link processor. Both consumers — the inline
+ * edit controller (before the diff preview) and the chat finalization
+ * service (once the turn's assistant text is final) — call this same seam,
+ * so matching/verification semantics cannot drift between the two paths.
+ * Returns the text unchanged (byte-identical) whenever the feature is off,
+ * nothing is attached, or no heading matches — so the off path is a strict
+ * regression of the previous behaviour.
  */
 export function createInlineEditAutoLinkProcessor(
   deps: InlineEditAutoLinkProcessorDeps,
-): (text: string, attachedNotes: readonly { path: string; kind?: 'file' | 'folder' }[]) => string {
+): AutoInternalLinkProcessor {
   return (text, attachedNotes) => {
     if (!deps.isEnabled()) return text;
     const references = collectReferenceNotes(deps.app, attachedNotes);

@@ -47,6 +47,18 @@
 
 ---
 
+## 2026-09-18 R-B1 聊天侧自动内链接线：finalization 边界 + 共享 processor seam
+
+**触发**：`docs/requirements/flowtext-parity.md` R-B1 长期 PARTIAL——「范围仅行内编辑（聊天侧未接线，已在实施报告记录）」。行内编辑路径已实现并实机验证，聊天路径对参考笔记的生成内容完全不产内链，属于同一条需求的 documented scope gap。
+
+**边界决策（流式与一致性）**：聊天侧的最终文本有两个来源——opencode 干净完成时来自 canonical/server sync 合并；其余（claude-code/codex/pi 及 opencode 中断）来自 `persistLocalStreamOutcome` 的本地持久化。因此改写点定在 `MessageFinalizationService.finalizeAfterStream()` 内：sync 路径在 sync 返回之后、`applySyncedConversationUpdate` 与最终保存之前（插入链接时强制 `needsForegroundRenderSync`，即使 sync 报无漂移也重渲）；本地路径在最终保存前改写，前台用 `applySyncedConversationUpdate(previousMessages, conversation.messages)` 重渲尾部（service 返回的 `previousMessages` 把被改写消息替换为改写前克隆，render apply 才看得到真实 diff——浅拷贝数组会与原地改写后的对象共享引用，签名比对为空、DOM 不会更新，这是实现中踩掉的一个坑）。流式期间逐帧文本从不改写；改写只发生一次，渲染与存储从此一致（尾部 patch 失败由 full rerender 兜底）。已知边界如实记录：opencode 后续 authoritative resync 以服务端文本合并 `content`，内链可能被一致地还原（存储与渲染同时回退，不会出现不一致展示）。
+
+**改动**：新增 `src/features/chat/services/AssistantAutoInternalLinkService.ts`（feature.chat-services owner）——参考集合取本轮 `contextItems` 中 `file`/`current_note` 手动附加（R-B2 上下文组经同一 chip 机制成为 manual 条目；目录/PDF/选区/R-C1 检索片段不参与）；只处理本轮（最后一条 user 之后）、非 notice、非 interrupted 的 assistant 消息；每个 text contentBlock 单独过 processor，`content` 在「等于块文本 join」不变式下派生回写、否则独立处理，两条渲染路径看到的都是同一已存文本；`processor-unavailable` 经 trace 如实上报（§6.7），无匹配是正常 no-op 不发通知。`InlineEditAutoLink.ts` 导出 `AutoInternalLinkProcessor` 类型并让工厂返回它——`main.ts` 的 bridge 更名 `createAutoInternalLinkBridge()` 并公开，行内编辑与聊天消费**同一个** processor 实例，匹配/验证语义不可能分叉；`SendPipelineRuntime` 向 finalization 透传 `preparedSend.contextItems`；`ChatRuntimeComposition` 完成装配（`OpenCodianView` 零新增运行时职责）。不涉及 vault 写入，唯一写路径与脏检查不动。
+
+**测试**：新增 `tests/unit/features/chat/services/AssistantAutoInternalLinkService.test.ts`（参考集合筛选、本轮 tail 选取、中断/仅 notice 不改写、content 与块的一致性、pre-mutation snapshot、processor 缺失上报）；`MessageFinalizationService.test.ts` 新增 R-B1 describe——真实 `createInlineEditAutoLinkProcessor` + 假 vault（TFile mock + metadataCache headings）的端到端断言：sync 路径插入 `[[notes/ref-attention.md#注意力机制]]` 且 render apply 拿到同一文本，不存在标题不插链，**开关关闭时存储文本逐字节不变且无 render apply（验收 4 回归）**，本地路径改写 + 前台重渲，空参考集 no-op。既有 `InlineEditAutoLink` 全部测试语义未动。
+
+---
+
 ## 2026-09-18 澄清通道防泄漏守卫补齐全角竖线与空格标签名（实机回归）
 
 **触发**：部署后实机复验发现，首版守卫（`349c589a`）在真实模型输出上**完全不生效**——行内面板依旧直出原始标记，而单测全绿。

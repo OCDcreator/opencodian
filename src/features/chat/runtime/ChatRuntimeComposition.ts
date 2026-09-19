@@ -65,6 +65,7 @@ import type { UserMessageFooterRendererHost } from '../runtime/UserMessageFooter
 import { UserMessageFooterRenderer } from '../runtime/UserMessageFooterRenderer';
 import type { ActiveTabContextUsageCoordinatorHost } from '../services/ActiveTabContextUsageCoordinator';
 import { ActiveTabContextUsageCoordinator } from '../services/ActiveTabContextUsageCoordinator';
+import { AssistantAutoInternalLinkService } from '../services/AssistantAutoInternalLinkService';
 import type { BackgroundTaskCompletionNoticeServiceHost } from '../services/BackgroundTaskCompletionNoticeService';
 import { BackgroundTaskCompletionNoticeService } from '../services/BackgroundTaskCompletionNoticeService';
 import type { BackgroundTaskLiveSignalCoordinatorHostBuilderHost } from '../services/BackgroundTaskLiveSignalCoordinator';
@@ -301,6 +302,12 @@ export interface ChatRuntimeCompositionHost {
       readonly vaultRetrievalExcludedPaths: readonly string[];
       readonly pdfIndexEnabled: boolean;
     };
+    /**
+     * R-B1 shared auto-internal-link processor seam (inline edit + chat).
+     * Optional port: absent in stub/legacy hosts, in which case the
+     * finalization pass reports `processor-unavailable` through its trace.
+     */
+    createAutoInternalLinkBridge?(): import('../../inline-edit/InlineEditAutoLink').AutoInternalLinkProcessor;
     readonly settingsTab: unknown;
     readonly openCodeService: (InstanceType<typeof OpenCodeService>) & {
       start(): unknown;
@@ -1000,6 +1007,13 @@ export class ChatRuntimeComposition {
   ): InteractionRuntimeWiring {
     const { conversation, surface, background, conversationIdentityRuntime, userMessageContentRenderer } = inputs;
     const host = this.host;
+    // R-B1 (chat): the same processor seam the inline edit path uses; the
+    // finalization service applies it once the turn's assistant text is final.
+    // Optional port: hosts without the seam get the honest
+    // `processor-unavailable` trace instead of a crash.
+    const assistantAutoInternalLinkService = new AssistantAutoInternalLinkService(
+      host.plugin.createAutoInternalLinkBridge?.() ?? null,
+    );
     const messageFinalizationService = new MessageFinalizationService(
       createMessageFinalizationHost({
         getCurrentConversation: () => host.currentConversation,
@@ -1024,6 +1038,7 @@ export class ChatRuntimeComposition {
         formatCurrentSessionModelId: () => host.formatModelId(host.getCurrentSessionModel()),
         scrollToBottom: (options?: unknown) => host.scrollToBottom(options),
       } as never),
+      assistantAutoInternalLinkService,
     );
     const messageSendPreparationService = new MessageSendPreparationService(
       createMessageSendPreparationHost({

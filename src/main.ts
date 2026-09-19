@@ -656,7 +656,7 @@ export default class OpenCodianPlugin extends Plugin {
       listContextFiles: () => this.listInlineEditContextFiles(),
       resolveContextFile: (path) => this.resolveInlineEditContextFile(path),
       listContextGroups: () => this.settings.contextGroups,
-      applyAutoInternalLinks: this.createInlineEditAutoLinkBridge(),
+      applyAutoInternalLinks: this.createAutoInternalLinkBridge(),
       getImageGeneration: () => this.createInlineEditImageGenDeps(),
     });
     this.inlineEditController = new InlineEditController({
@@ -757,11 +757,15 @@ export default class OpenCodianPlugin extends Plugin {
   }
 
   /**
-   * R-B1 bridge: deterministic auto-internal-link pass over the parsed inline
-   * edit result. The processor owns heading verification through the metadata
-   * cache and is a strict no-op while `autoInternalLinkEnabled` is off.
+   * R-B1 bridge: deterministic auto-internal-link pass over final generated
+   * text. One construction serves both consumers — the inline edit result
+   * (before the diff preview) and the chat finalization service (once the
+   * turn's assistant text is final) — so heading verification through the
+   * metadata cache and the matching rules cannot drift between the paths.
+   * Strict no-op while `autoInternalLinkEnabled` is off. Public because the
+   * chat runtime composition wires it into finalization.
    */
-  private createInlineEditAutoLinkBridge() {
+  createAutoInternalLinkBridge() {
     return createInlineEditAutoLinkProcessor({
       app: this.app,
       isEnabled: () => this.settings.autoInternalLinkEnabled,

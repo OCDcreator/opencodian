@@ -5,7 +5,7 @@
 
 ## 概述
 
-R-B1「生成内容自动内链」的后处理层。生成结果经过严格解析后、构建 diff 预览 payload 前，把生成文本中与**参考笔记已验证标题**精确匹配的词句转为 vault 内链——链接在 diff 中可见、可拒绝，绝不落盘时静默改写。
+R-B1「生成内容自动内链」的后处理层。生成结果经过严格解析后、构建 diff 预览 payload 前，把生成文本中与**参考笔记已验证标题**精确匹配的词句转为 vault 内链——链接在 diff 中可见、可拒绝，绝不落盘时静默改写。聊天侧（`AssistantAutoInternalLinkService`）复用同一个 `createInlineEditAutoLinkProcessor` seam，在本轮 assistant 最终文本上执行同一套匹配/校验语义，两条路径不会漂移。
 
 「宁可不链，不产生死链」：链接目标只可能来自调用方提供的 `CachedMetadata.headings` 验证列表，构造上不可能产生死链。提示词只作辅助，本模块是唯一机制。
 
@@ -19,11 +19,13 @@ interface AutoInternalLinkResult { readonly text: string; readonly insertedCount
 
 applyAutoInternalLinks(text, references, options): AutoInternalLinkResult
 normalizeAutoLinkKey(raw: string): string        // 去层级号 + trim + 全半角/大小写折叠
+type AutoInternalLinkProcessor = (text, attachedNotes) => string
+applyInlineEditAutoLinks(link, contextFiles, text): string   // 行内编辑侧纯编排（无 seam 时逐字节原样）
 createInlineEditAutoLinkProcessor(deps: {
   app: App;
   isEnabled: () => boolean;                       // autoInternalLinkEnabled
   getExcludedTerms: () => readonly string[];      // autoInternalLinkExcludedTerms
-}): (text, attachedNotes) => string               // 关闭/无参考时逐字节原样返回
+}): AutoInternalLinkProcessor                    // 关闭/无参考时逐字节原样返回；行内编辑与聊天共用
 ```
 
 ## 核心逻辑
@@ -38,7 +40,7 @@ createInlineEditAutoLinkProcessor(deps: {
 
 ```text
 上游: obsidian（仅工厂部分）、无其他运行时依赖（纯函数可单测）
-下游: src/main.ts（host 桥接）
+下游: src/main.ts（host 桥接，行内编辑与聊天共用）、src/features/chat/services/AssistantAutoInternalLinkService.ts（聊天侧消费者）
 ```
 
 ## 维护约束

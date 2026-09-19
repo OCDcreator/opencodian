@@ -306,6 +306,9 @@ export class SendPipelineRuntime {
         tabId: preparedSend.tabId,
         shouldSyncFromServer: localFinalization.shouldSyncFromServer,
         editedFiles: [...execution.runtime.pendingEditedFiles],
+        // R-B1 (chat): this turn's own reference-note set for the
+        // auto-internal-link post-processing pass.
+        contextItems: preparedSend.contextItems,
         logStage: localFinalization.logAssistantFinalizationStage,
       });
     } finally {
