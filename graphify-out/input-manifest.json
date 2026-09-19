@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "a780d070b5ff48397bb54bffe620e3ab366f1c166d257187e6f6b1f27e46f6ab",
-  "recordCount": 749,
+  "digest": "180170f42193ed29607608d40779003217041fea6b14e9a84fbfe40070195d34",
+  "recordCount": 750,
   "records": [
     {
       "kind": "ignore",
@@ -1371,7 +1371,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/ChatRuntimeComposition.ts",
-      "sha256": "135409feeb6ce33cc59768f83627dc35099732715f2352b31966f6cb4d460ea9"
+      "sha256": "f5bf1fcd540a274ef9ea89277cefa3397166bd174ee6b524b7e97308931f8af6"
     },
     {
       "kind": "src",
@@ -1446,7 +1446,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/SendPipelineRuntime.ts",
-      "sha256": "4025148d706196b0991a995f798a9640852b34ffe8d8f869189ebd8b61121a15"
+      "sha256": "975863334efecbb9fbaf29b7ca5886e1ee6ad2c2a66852d549b5c93ac734b5dc"
     },
     {
       "kind": "src",
@@ -1537,6 +1537,11 @@
       "kind": "src",
       "key": "src/features/chat/services/AgentMentionComposerController.ts",
       "sha256": "d6e550c6fce863353daea04f053ed94216076581a4b231bb7e706711a01fa386"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/chat/services/AssistantAutoInternalLinkService.ts",
+      "sha256": "166d4e136f32bf0909cae3bbd44ee184fe8cb45b4014cc190ab4d52f01bf8ccb"
     },
     {
       "kind": "src",
@@ -1951,12 +1956,12 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/MessageFinalizationHost.ts",
-      "sha256": "7d653648cf6658b19110be374aa6a612b98ba3a9e6f94278f6accd81bda2a850"
+      "sha256": "c0d5445170622d651294e2dcf183192156e4bd046b5cb2c438ec90dc2b7e8bd0"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/MessageFinalizationService.ts",
-      "sha256": "ee814c048ce2b774318961161d57e300252ea48470b81acd76c4196117198b96"
+      "sha256": "dcd29d5d99e57d51a7b1d195fd869d8e7bc905e9764094e5f946ae9f44db8b73"
     },
     {
       "kind": "src",
@@ -2476,7 +2481,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditAutoLink.ts",
-      "sha256": "77c258a5db9c44a224a03946ce0abae8cc0a2c6987401fd75586ffcefab45896"
+      "sha256": "df1b8f0509825b372f07ca5b42e1b3cc93acf111e908200d31f8dd64a4fc8697"
     },
     {
       "kind": "src",
@@ -3201,7 +3206,7 @@
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "8dc22b3538e8b1d9e054a636e2fdb2a91eeefd6e6620df301a3fa74a252188fc"
+      "sha256": "c4d03620068fdfcdaf7707f39d381c55f922bccf3d3971979f4a84c3529c5364"
     },
     {
       "kind": "src",
@@ -3461,7 +3466,7 @@
     {
       "kind": "src",
       "key": "src/style/features/inline-edit.css",
-      "sha256": "0daea15febaedb248c2037300527a10e432e3fdd4fc7e5b0806d4b15efa9f850"
+      "sha256": "5d12865c505933980f9bd8f22e66f663876faddaf95bb173ae038ceb5924d43a"
     },
     {
       "kind": "src",
@@ -3501,7 +3506,7 @@
     {
       "kind": "src",
       "key": "src/style/modals/plugin-modal-contrast.css",
-      "sha256": "6adfd0aa76e9ce93f807b018d34d2b8371a421ed61509ce293e55b4e2e5d030e"
+      "sha256": "a57680ba10b8a3d9c38f28bd5978f432824312593c4cc5a254cc0637a6931101"
     },
     {
       "kind": "src",
@@ -3749,7 +3754,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-19T03:40:12.617Z",
-  "headShaAtGeneration": "0e591a8ba1c5c95f7a61290d3e83b868fc3f70ba",
+  "generatedAt": "2026-09-19T04:35:31.076Z",
+  "headShaAtGeneration": "14be905bc0eafe463170f2d308ddcd796098c39f",
   "graphifyVersion": "graphify 0.9.36"
 }
