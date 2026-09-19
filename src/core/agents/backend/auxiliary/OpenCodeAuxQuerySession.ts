@@ -9,6 +9,11 @@
  * Tool calls are read back from the session message history after each turn and
  * returned in `AuxQueryResult.toolCalls` for the service-layer write audit.
  *
+ * During a turn the same history is polled on a short interval so the growing
+ * assistant text reaches `onTextChunk` while the generation is still running
+ * (R-A3 streaming preview). That emission is render-only: the turn result is
+ * still the post-turn history read, audited and strictly parsed as before.
+ *
  * See docs/requirements/inline-edit.md §5.2–§5.5.
  */
 
@@ -50,6 +55,15 @@ export interface OpenCodeAuxSessionOptions {
 }
 
 const DEFAULT_TURN_TIMEOUT_MS = 180_000;
+
+/**
+ * How often the in-flight turn's message history is polled for growing
+ * assistant text (R-A3). The server persists `message.part.updated` state as
+ * it streams, so polling turns that already-arrived content into preview
+ * frames; 250ms keeps the first partial well inside the 500ms appear target
+ * without turning the history endpoint into a hot loop.
+ */
+const PROGRESSIVE_POLL_INTERVAL_MS = 250;
 
 /** Raw part as returned by `/session/:id/message`. */
 interface OpenCodePart {
@@ -185,12 +199,25 @@ export class OpenCodeAuxQuerySession implements AuxQuerySession {
 
     try {
       const before = await this.readHistory(sessionId, controller.signal);
-      const response = await this.transport(this.url(`/session/${sessionId}/message`), {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify(this.buildPromptBody(request)),
-      });
+      // R-A3: surface the growing assistant text while the POST is in flight
+      // (render-only). The post-turn history read below stays authoritative.
+      const stopProgressive = this.emitProgressiveText(
+        sessionId,
+        before.length,
+        request,
+        controller.signal,
+      );
+      let response;
+      try {
+        response = await this.transport(this.url(`/session/${sessionId}/message`), {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify(this.buildPromptBody(request)),
+        });
+      } finally {
+        stopProgressive();
+      }
       if (!response.ok) {
         return {
           success: false,
@@ -248,6 +275,63 @@ export class OpenCodeAuxQuerySession implements AuxQuerySession {
       body.model = { providerID: model.provider, modelID: model.model };
     }
     return body;
+  }
+
+  /**
+   * Progressive text emission while the turn POST is in flight (R-A3).
+   *
+   * The turn POST only resolves once generation is complete, but the server
+   * stores each `message.part.updated` as it streams — the partial text has
+   * already arrived and is simply invisible to a session that reads history
+   * after the fact. Polling the same history endpoint through the same
+   * transport turns it into growing `onTextChunk` frames, so the inline-edit
+   * preview grows instead of jumping from busy to complete.
+   *
+   * Render-only: the authoritative text is still the post-turn history read in
+   * `runTurn`, the write-tool audit is still the post-turn `collectToolCalls`,
+   * and the strict `parseInlineEditResponse()` at turn end stays the only
+   * authority for what may be applied. A failed poll is non-fatal (the final
+   * read decides); emissions are strictly growing and stop with the poll.
+   *
+   * Returns a stop function; `runTurn` stops the poll before the POST settles
+   * so no emission can land after the turn resolved.
+   */
+  private emitProgressiveText(
+    sessionId: string,
+    baselineCount: number,
+    request: AuxQueryTurnRequest,
+    signal: AbortSignal,
+  ): () => void {
+    const emit = request.onTextChunk;
+    if (!emit) return () => { /* No render sink: nothing to poll for. */ };
+    let lastText = '';
+    let stopped = false;
+    let reading = false;
+    const read = (): void => {
+      if (stopped || reading || signal.aborted) return;
+      reading = true;
+      void (async () => {
+        try {
+          const history = await this.readHistory(sessionId, signal);
+          const text = accumulateAssistantText(history.slice(baselineCount));
+          if (!stopped && !signal.aborted && text && text !== lastText) {
+            lastText = text;
+            emit(text);
+          }
+        } catch (error) {
+          // A missed poll only delays the next frame; the post-turn history
+          // read is what the turn result is built from.
+          logger.debug('OpenCode auxiliary progressive read failed', error);
+        } finally {
+          reading = false;
+        }
+      })();
+    };
+    const timer = setInterval(read, PROGRESSIVE_POLL_INTERVAL_MS);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
   }
 
   private async readHistory(

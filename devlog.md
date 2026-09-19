@@ -67,6 +67,16 @@
 
 ---
 
+## 2026-09-18 R-A3 验收 1 补齐：OpenCode 辅助会话流式期间丢弃已到达部分文本（渐进轮询发射）
+
+**触发**：R-A3 验收 1（「预览在首字节后 500ms 内出现，且随生成推进逐步增长」）实测仅 2 个状态（busy → 完整预览）；换 `claude-code` 复测仍 2 状态，说明瓶颈至少有一个在自己这条链路上。逐段核对后发现任务描述中的「预览组件只在严格解析拿到完整标签后才渲染」与当前代码不符：`InlineEditStreamPreview.ts` 的渐进解析 + rAF 批处理 + `dispatchInlineEditStreamingPreview` 自 `78eeef05` 起就把开标签后的部分正文逐帧渲染成增长中的预览（jsdom 用真实 Controller 以异步分片驱动实测可得 ≥3 个可区分部分状态）。真正的丢弃点在 **OpenCode 辅助会话**：`runTurn()` 等待回合 POST 完成后才读一次历史并**只发一次** `onTextChunk`（完整文本）——生成期间已到达服务端的部分（`message.part.updated` 逐段持久化）被整段丢弃，于是 OpenCode 路由的后端（实测的两个供应商都是）结构性地只能呈现 busy → 完整两态。
+
+**改动**：`OpenCodeAuxQuerySession` 新增 `emitProgressiveText()`：回合 POST 在途期间以 250ms 轮询同一条消息历史（复用既有 `AuxTransport` 与 `accumulateAssistantText`），把增长中的助手文本增量发给 `onTextChunk`；轮询失败只推迟下一帧（debug 日志，不报错）；发射严格递增、带 `stopped` 哨兵，POST 落定的 `finally` 即停轮，任何发射不会晚于回合 resolve。**渲染专用不变**：回合结果、写入工具审计、严格解析仍只以回合结束后的那次权威历史读取为准，轮询帧永不参与落盘。UI 层（渐进解析/批处理/预览 widget/禁用按钮/错误清理）零改动。
+
+**测试**：新增 `OpenCodeAuxQuerySession.test.ts`（POST 在途期间渐进发射且严格递增、最终发射为完整文本且与回合结果一致；无 `onTextChunk` 时不轮询——在途仅 1 次基线读、落定后 1 次权威读；回合落定后历史再变化也无新发射）；新增 `InlineEditStreamParity.test.ts`（jsdom 真实 Controller 驱动：部分分片产出 ≥3 个可区分增长状态且每帧 accept/reject 均 disabled、无写入；流式中 Enter 无效；闭合标签到达后回到正常可用预览且接受写入严格解析文本；多标签/未闭合两条错误路径清除预览并如实报错、零写入；开标签前的分片只进回复通道、面板 busy、全程无 preview/无动作按钮）。既有 408 个 inline-edit 测试全绿。
+
+---
+
 ## 2026-09-18 R-B1 聊天侧自动内链接线：finalization 边界 + 共享 processor seam
 
 **触发**：`docs/requirements/flowtext-parity.md` R-B1 长期 PARTIAL——「范围仅行内编辑（聊天侧未接线，已在实施报告记录）」。行内编辑路径已实现并实机验证，聊天路径对参考笔记的生成内容完全不产内链，属于同一条需求的 documented scope gap。
