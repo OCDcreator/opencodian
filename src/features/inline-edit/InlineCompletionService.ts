@@ -57,7 +57,10 @@ export type InlineCompletionTarget =
 /**
  * Everything the pool needs from the plugin runtime. Implemented over the
  * existing inline-edit host bridge, so model resolution follows the documented
- * chain (`inlineEditModelOverrides` → active chat model → backend default).
+ * chain (R-C3: dedicated `inlineCompletionModelOverrides` first, then
+ * `inlineEditModelOverrides` → active chat model → backend default; with the
+ * dedicated map empty the chain is byte-identical to the pre-setting
+ * behaviour).
  */
 export interface InlineCompletionPoolHost {
   /** Whether `inlineCompletionEnabled` is on. Off = the pool never starts. */

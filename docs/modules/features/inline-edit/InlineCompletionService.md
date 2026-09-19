@@ -13,7 +13,7 @@ R-C3 的暖会话池（§3.2.4）：每 `backend × workingDirectory` 至多 1 �
 - 失败链（§3.2.6）：start 失败 → 本周期 unsupported + 如实 Notice；单回合失败静默；连续 2 次 → dispose 供下次冷启动重试；第 3 次 → 本周期 unsupported；`reportTurnSuccess` 清零计数
 - `reportWriteToolViolation`：写工具命中 → dispose + unsupported + 如实 Notice（ghost 从未入文档，无损害可撤）
 - `disposeAll()`：开关关闭与 `onunload` 调用；`resetUnsupported()`：新启用周期清状态
-- `InlineCompletionPoolHost`：插件注入的宿主面（isEnabled / locale / maxChars / notePath / resolveCompletionTarget / buildSystemPrompt），main.ts 以 inline-edit host 桥实现（模型解析沿用 C3-Q3 优先级链）
+- `InlineCompletionPoolHost`：插件注入的宿主面（isEnabled / locale / maxChars / notePath / resolveCompletionTarget / buildSystemPrompt），main.ts 以 inline-edit host 桥实现（模型解析顺序：R-C3 专用 `inlineCompletionModelOverrides` 优先，留空则沿用 C3-Q3 优先级链，默认下逐字节等同旧行为）
 
 ## 依赖
 

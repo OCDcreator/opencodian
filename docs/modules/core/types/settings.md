@@ -471,3 +471,5 @@ New normalize functions added:
 2026-09-18 新增三个设置项与类型：`imageGenerationModels: ImageGenerationModelConfig[]`（默认 `[]`；id/baseURL/model 必填，apiFormat 一期仅 `openai-images`，畸形条目修剪、id 去重、上限 20）、`imageGenerationMaxWidth`（默认 600，0–100000 整数钳制）、`imageGenerationAssetCleanup`（`'trash' | 'keep'`，默认 `'trash'`）。`apiKey` 沿用 `CodexBackendSettings.apiKey` 的密钥路径与脱敏契约。
 
 > 2026-09-18 (R-C3)：新增 `inlineCompletionEnabled`（默认 `false`）与 `inlineCompletionMaxChars`（默认 `300`，clamp 50–2000，`normalizeInlineCompletionMaxChars`）；`DEFAULT_SETTINGS` 同步。
+
+> 2026-09-19 (R-C3 补全专用模型覆盖)：新增 `inlineCompletionModelOverrides: Partial<Record<AgentBackendKind, string>>`（默认 `{}`），值格式与 `inlineEditModelOverrides` 完全一致；归一化经 `normalizeInlineCompletionModelOverrides()`（委托同一实现，独立命名保持两条设置各自可检索）。补全延迟敏感——模型首字节之前 ghost text 无法出现——该设置允许为补全单独钉一个低延迟模型而不动行内编辑；空映射 = 继承既有解析链（默认行为逐字节不变）。

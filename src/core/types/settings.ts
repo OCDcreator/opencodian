@@ -65,6 +65,22 @@ export function normalizeInlineEditModelOverrides(
 }
 
 /**
+ * Normalize the per-backend completion model override map (R-C3).
+ *
+ * Same map shape, same value format, and exactly the same discipline as
+ * `normalizeInlineEditModelOverrides` — the completion setting differs only in
+ * what consumes it (the warm completion pool's model resolution, which reads
+ * it *before* the inline-edit chain) and why it exists (completions are
+ * latency-sensitive, so a user may pin a fast model without touching inline
+ * edit). Named separately so both settings stay independently greppable.
+ */
+export function normalizeInlineCompletionModelOverrides(
+  value: unknown,
+): Partial<Record<AgentBackendKind, string>> {
+  return normalizeInlineEditModelOverrides(value);
+}
+
+/**
  * Per-backend effort values inline edit accepts, kept as literals for the same
  * jsdom-loading reason as `INLINE_EDIT_BACKENDS`. Claude Code and Codex expose
  * native effort controls; opencode and pi have no aux-session effort seam, so
@@ -3511,6 +3527,17 @@ export interface OpenCodianSettings {
   inlineCompletionMaxChars: number;
 
   /**
+   * Per-backend model override for Alt completions (R-C3). Completions are
+   * latency-sensitive — the ghost text cannot appear before the model's first
+   * byte — so a user may pin a fast model here without changing inline edit.
+   * Value format follows each backend exactly like `inlineEditModelOverrides`
+   * (`provider/model` for opencode and pi, a model id/alias for claude-code
+   * and codex). Empty map means "use the inline-edit model chain", which is
+   * byte-identical to the behaviour before this setting existed.
+   */
+  inlineCompletionModelOverrides: Partial<Record<AgentBackendKind, string>>;
+
+  /**
    * Auto-internal-link post-processing for inline-edit generation results
    * (R-B1, default off). When on, occurrences of verified reference-note
    * headings in the generated text become internal links before the diff is
@@ -3878,6 +3905,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   // R-C3 Alt ghost-text completion (opt-in; off is zero cost).
   inlineCompletionEnabled: false,
   inlineCompletionMaxChars: INLINE_COMPLETION_MAX_CHARS_DEFAULT,
+  inlineCompletionModelOverrides: {},
   autoInternalLinkEnabled: false,
   autoInternalLinkExcludedTerms: [],
   contextGroups: [],

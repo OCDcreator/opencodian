@@ -35,3 +35,5 @@
 - 保存走 `plugin.saveSettings()` 并经过 `normalizeInlineEditModelOverrides`，保证落盘的永远是归一化后的映射
 
 > 2026-09-18 (R-C3)：新增补全设置组——`inlineCompletionEnabled` 开关（默认关，文案说明开启后每后端保留 1 个预热只读会话、空闲 5 分钟释放）、`inlineCompletionMaxChars` 滑条（50–2000，经 `normalizeInlineCompletionMaxChars`）、触发方式说明行；host 契约新增 `onInlineCompletionSettingChanged(enabled)`，关闭时由插件立即 dispose 全部会话（验收 7 口径）。
+
+> 2026-09-19 (R-C3 补全专用模型覆盖)：补全设置组内新增 `inlineCompletionModelOverrides` 每已启用 backend 一行输入（`addCompletionModelOverrideRow`）——语义与校验完全复用行内编辑覆盖行（空 = 继承既有解析链；格式非法不落盘、描述行换错误提示；保存经 `normalizeInlineCompletionModelOverrides`），仅消费方不同：只被补全池的模型解析读取（`resolveCompletionOverride` 优先于行内编辑链），因此可以单独为补全钉一个低延迟模型而不改行内编辑。文案（双语）如实说明补全对延迟敏感、推荐使用响应快的模型，不承诺具体毫秒数。

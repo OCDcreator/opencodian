@@ -222,6 +222,7 @@ export {
   normalizeImageGenerationMaxWidth,
   normalizeImageGenerationModels,
   normalizeInlineCompletionMaxChars,
+  normalizeInlineCompletionModelOverrides,
   normalizeInlineEditEffortOverrides,
   normalizeInlineEditMaxConcurrentEdits,
   normalizeInlineEditModelOverrides,

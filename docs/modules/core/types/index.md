@@ -209,3 +209,5 @@ Settings exports now include `SandboxFilesystemConfig`, `SandboxNetworkConfig`, 
 2026-09-18 settings 导出面新增 `ImageGenerationModelConfig` / `ImageGenerationApiFormat` / `ImageGenerationAssetCleanup` / `IMAGE_GENERATION_*` 常量与 `normalizeImageGeneration*` 函数。
 
 > 2026-09-18 (R-C3)：barrel 新增导出 `INLINE_COMPLETION_MAX_CHARS_DEFAULT/MIN/MAX` 与 `normalizeInlineCompletionMaxChars`。
+
+> 2026-09-19 (R-C3 补全专用模型覆盖)：barrel 新增导出 `normalizeInlineCompletionModelOverrides`（R-C3 `inlineCompletionModelOverrides` 设置的保存期归一化）。

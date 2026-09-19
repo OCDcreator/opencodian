@@ -5,9 +5,11 @@
  */
 
 import {
+  DEFAULT_SETTINGS,
   INLINE_EDIT_MAX_CONCURRENT_EDITS_DEFAULT,
   INLINE_EDIT_MAX_CONCURRENT_EDITS_MAX,
   INLINE_EDIT_PRESET_PROMPT_MAX_COUNT,
+  normalizeInlineCompletionModelOverrides,
   normalizeInlineEditMaxConcurrentEdits,
   normalizeInlineEditPresetPrompts,
 } from '../../../../src/core/types/settings';
@@ -132,5 +134,80 @@ describe('normalizeInlineEditMaxConcurrentEdits (R-A5)', () => {
     } as never);
     expect(state.settings.inlineEditMaxConcurrentEdits).toBe(INLINE_EDIT_MAX_CONCURRENT_EDITS_DEFAULT);
     expect(state.settings.inlineEditDocumentModeEnabled).toBe(true);
+  });
+});
+
+// R-C3 dedicated completion model override: same map shape and normalization
+// discipline as the inline-edit model overrides.
+describe('normalizeInlineCompletionModelOverrides (R-C3)', () => {
+  it('keeps known backends with non-empty string values and trims them', () => {
+    expect(normalizeInlineCompletionModelOverrides({
+      opencode: '  deepseek/deepseek-flash  ',
+      'claude-code': 'claude-haiku-4-5',
+      codex: 'gpt-5-mini',
+      pi: 'provider/model',
+    })).toEqual({
+      opencode: 'deepseek/deepseek-flash',
+      'claude-code': 'claude-haiku-4-5',
+      codex: 'gpt-5-mini',
+      pi: 'provider/model',
+    });
+  });
+
+  it('drops malformed values: unknown backends, non-strings, whitespace-only', () => {
+    expect(normalizeInlineCompletionModelOverrides({
+      opencode: '   ',
+      'claude-code': 42,
+      'not-a-backend': 'p/m',
+      codex: { model: 'gpt-5' },
+      pi: ['p', 'm'],
+    })).toEqual({});
+  });
+
+  it('returns an empty map for non-object input', () => {
+    expect(normalizeInlineCompletionModelOverrides(undefined)).toEqual({});
+    expect(normalizeInlineCompletionModelOverrides(null)).toEqual({});
+    expect(normalizeInlineCompletionModelOverrides('opencode')).toEqual({});
+    expect(normalizeInlineCompletionModelOverrides(['opencode'])).toEqual({});
+  });
+
+  it('defaults to an empty map (byte-identical fallback premise)', () => {
+    expect(DEFAULT_SETTINGS.inlineCompletionModelOverrides).toEqual({});
+  });
+
+  it('materializes the empty default when a snapshot lacks the key, and round-trips a persisted map', () => {
+    const absent = prepareLoadedSettingsBootstrapState({
+      core: {
+        data: {},
+        filePath: '.opencodian/settings.core.json',
+        source: 'primary',
+        shouldPersist: false,
+      },
+      ui: { data: null, filePath: '.opencodian/settings.ui.json', source: 'missing', shouldPersist: false },
+      writable: true,
+      shouldPersist: false,
+    });
+    expect(absent.settings.inlineCompletionModelOverrides).toEqual({});
+
+    const persisted = prepareLoadedSettingsBootstrapState({
+      core: {
+        data: {
+          inlineCompletionModelOverrides: {
+            opencode: ' deepseek/deepseek-flash ',
+            stale: 'p/m',
+            'claude-code': '',
+          },
+        },
+        filePath: '.opencodian/settings.core.json',
+        source: 'primary',
+        shouldPersist: false,
+      },
+      ui: { data: null, filePath: '.opencodian/settings.ui.json', source: 'missing', shouldPersist: false },
+      writable: true,
+      shouldPersist: false,
+    });
+    expect(persisted.settings.inlineCompletionModelOverrides).toEqual({
+      opencode: 'deepseek/deepseek-flash',
+    });
   });
 });

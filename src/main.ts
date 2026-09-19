@@ -13,6 +13,7 @@ import { InlineEditController } from './features/inline-edit/InlineEditControlle
 import { InlineCompletionController } from './features/inline-edit/InlineCompletionController';
 import { inlineCompletionGhostExtension } from './features/inline-edit/InlineCompletionGhost';
 import { buildInlineCompletionSystemPrompt } from './features/inline-edit/InlineCompletionPrompt';
+import type { BackendModelSelection } from './core/agents/backend/AgentAuxQueryCapability';
 import type { InlineCompletionTarget } from './features/inline-edit/InlineCompletionService';
 import { InlineCompletionService } from './features/inline-edit/InlineCompletionService';
 import { createInlineEditAutoLinkProcessor } from './features/inline-edit/InlineEditAutoLink';
@@ -23,7 +24,7 @@ import {
   inlineEditSelectionAffordanceExtension,
 } from './features/inline-edit/InlineEditSelectionAffordance';
 import type { InlineEditChoice, InlineEditContextFile, InlineEditHost } from './features/inline-edit/InlineEditHost';
-import { createInlineEditPluginHost } from './features/inline-edit/InlineEditPluginHost';
+import { createInlineEditPluginHost, resolveCompletionOverride } from './features/inline-edit/InlineEditPluginHost';
 import { inlineEditOverlayTrackerExtension } from './features/inline-edit/InlineEditInputOverlay';
 import { ProviderIconService } from './utils/icons/ProviderIconService';
 import { CLAUDE_CODE_EFFORT_VARIANTS, CODEX_EFFORT_VARIANTS } from './core/agents/backend/BackendModelCatalog';
@@ -700,9 +701,14 @@ export default class OpenCodianPlugin extends Plugin {
 
   /**
    * R-C3: resolve the active backend's completion target for one pool call.
-   * Model resolution reuses the inline-edit host's documented precedence
-   * (C3-Q3): `inlineEditModelOverrides` → active chat tab model → backend
-   * default; the system prompt rides the backend's native seam.
+   * Model resolution reads the dedicated completion override first
+   * (`inlineCompletionModelOverrides[kind]` — completions are latency-
+   * sensitive, so a fast model can be pinned without touching inline edit)
+   * and falls back to the inline-edit host's documented precedence (C3-Q3):
+   * `inlineEditModelOverrides` → active chat tab model → backend default.
+   * With the override map at its default (`{}`) the resolution is
+   * byte-identical to the pre-setting behaviour. The system prompt rides the
+   * backend's native seam.
    */
   private resolveInlineCompletionTarget(): InlineCompletionTarget {
     const adapter = this.inlineEditHost?.resolveAdapter() ?? null;
@@ -710,7 +716,16 @@ export default class OpenCodianPlugin extends Plugin {
     if (!adapter || !capability) {
       return { ok: false, reason: 'capability-unavailable', backend: adapter?.displayName ?? '' };
     }
-    const resolvedModel = adapter.resolveModel();
+    const dedicated = resolveCompletionOverride(
+      adapter.kind,
+      this.settings.inlineCompletionModelOverrides?.[adapter.kind],
+    );
+    let resolvedModel: { ok: true; model: BackendModelSelection | null } | { ok: false; error: string };
+    if (dedicated) {
+      resolvedModel = dedicated;
+    } else {
+      resolvedModel = adapter.resolveModel();
+    }
     if (!resolvedModel.ok) {
       return { ok: false, reason: 'model-unavailable', detail: resolvedModel.error };
     }

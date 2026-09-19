@@ -589,4 +589,6 @@ Added `chat.diffNotice.fileCount` (`{count}` accessible name for the header coun
 
 > 2026-09-18 (R-C3)：新增 `inlineCompletion.command.trigger`、`inlineCompletion.error.*`（unsupported / unsupportedAfterFailures / writeToolObserved / capabilityUnavailable / sessionUnavailable）与 `settings.inlineCompletion.*`（enabled / maxChars / hotkey 双行文案）。
 
+> 2026-09-19 (R-C3 补全专用模型覆盖)：en/zh 同步新增 `settings.inlineCompletion.modelOverride.name` / `.desc` / `.invalid`——desc 如实说明补全对延迟敏感（模型首字节之前建议无法出现）、推荐使用响应快的模型，并写明留空时沿用的解析链；不承诺具体毫秒数。
+
 R-C4 补充：`chat.context.pdfIntegration.notMounted`（调试区在未探测过 PDF 叶子时的“尚未挂载”态）与 `SettingsDebugSection` 的 PDF 集成级别状态行文案。

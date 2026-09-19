@@ -111,3 +111,5 @@ It also migrates the old `Server > MCP` remembered location into the new top-lev
 2026-09-18 新增 `normalizeImageGenerationSettingsOnLoad`（最终 load-merge 边界）：models 列表归一化、宽度钳制、cleanup 回退 'trash'。
 
 > 2026-09-18 (R-C3)：加载归一化新增 `inlineCompletionEnabled`（布尔回退默认 false）与 `inlineCompletionMaxChars`（经 `normalizeInlineCompletionMaxChars` clamp）两条迁移路径。
+
+> 2026-09-19 (R-C3 补全专用模型覆盖)：`normalizeInlineCompletionSettingsOnLoad` 增加第三条路径 `inlineCompletionModelOverrides`（经 `normalizeInlineCompletionModelOverrides` 归一化）——快照缺键时物化为空默认，保证补全模型解析链与该设置存在之前逐字节一致；持久化映射按已知 backend + 非空字符串裁剪，畸形值（非字符串、纯空白、未知 backend）全部丢弃。

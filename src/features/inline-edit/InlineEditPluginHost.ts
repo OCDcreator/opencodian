@@ -12,6 +12,10 @@
  *   2. model    — `inlineEditModelOverrides[kind]`, else the active chat tab's
  *                 model, else `null` (let the backend pick its default)
  *
+ * R-C3 completions resolve their model through `resolveCompletionOverride`
+ * first (`inlineCompletionModelOverrides[kind]`, a dedicated latency pin) and
+ * fall back to the chain above when unset.
+ *
  * An explicitly configured override that does not parse is reported as an error
  * instead of silently falling back to a default model.
  */
@@ -174,6 +178,33 @@ export function describeModelSelection(
     return { label, source: 'chat' };
   }
   return { label: '', source: 'default' };
+}
+
+/**
+ * Resolve the dedicated completion model override (R-C3: make the latency
+ * target reachable by configuration — completions are latency-sensitive, so a
+ * user may pin a fast model without touching inline edit).
+ *
+ * Returns `null` when no dedicated override is configured for the backend, so
+ * the caller falls back to the existing inline-edit chain unchanged: with the
+ * setting at its default (`{}`) the resolved model is byte-identical to the
+ * behaviour before this setting existed. A configured but malformed override
+ * is an error, never a silent fallback (same discipline as §9).
+ */
+export function resolveCompletionOverride(
+  kind: AgentBackendKind,
+  override: unknown,
+  isModelAvailable?: (kind: AgentBackendKind, selection: BackendModelSelection) => boolean,
+): { ok: true; model: BackendModelSelection } | { ok: false; error: string } | null {
+  if (typeof override !== 'string' || !override.trim()) return null;
+  const parsed = parseModelOverride(kind, override.trim());
+  if (!parsed) {
+    return { ok: false, error: `"${override.trim()}" is not a valid ${kind} model reference.` };
+  }
+  if (isModelAvailable && !isModelAvailable(kind, parsed)) {
+    return { ok: false, error: `"${override.trim()}" is not available in the ${kind} model catalog.` };
+  }
+  return { ok: true, model: parsed };
 }
 
 function resolveModel(

@@ -16,7 +16,7 @@
 2. 补全会话池（预热、TTL、中止、处置）——本文档核心。
 3. CM6 ghost text 层（widget 装饰、atomicRanges、Tab/Esc/键入竞争、IME 守卫）。
 4. 独立的补全输出契约（提示词 + 校验），与行内编辑 XML 契约隔离。
-5. §7 设置项：`inlineCompletionEnabled`（默认 `false`）、`inlineCompletionMaxChars`（建议 300）。
+5. §7 设置项：`inlineCompletionEnabled`（默认 `false`）、`inlineCompletionMaxChars`（建议 300）；2026-09-19 起另加 `inlineCompletionModelOverrides`（补全专用每 backend 模型覆盖，默认 `{}` = 继承既有解析链）。
 
 **明确不做（§11 适用）**：
 
@@ -174,7 +174,7 @@ export function validateCompletion(input: {
 | 各后端 adapter（`OpenCodeAdapter.ts`、`ClaudeCodeAdapter.ts`、`CodexAdapter.ts`、`pi/PiAdapter.ts`） | 改 | 实现/不实现新 capability（如实暴露） |
 | `InlineCompletionService.ts` / `Controller.ts` / `Ghost.ts` / `Prompt.ts` / `Trigger.ts` | 新 | 3.2 池、3.3 CM6、3.5 契约、3.4 触发 |
 | `src/main.ts` | 改 | `registerEditorExtension`、命令注册、池装配与卸载钩子 |
-| `src/core/types/settings.ts` + 设置 UI + i18n | 改 | `inlineCompletionEnabled` / `inlineCompletionMaxChars` 四件套 |
+| `src/core/types/settings.ts` + 设置 UI + i18n | 改 | `inlineCompletionEnabled` / `inlineCompletionMaxChars` 四件套；2026-09-19 追加 `inlineCompletionModelOverrides`（补全延迟敏感，允许单独钉低延迟模型） |
 | `scripts/audit/run-inline-completion-audit.mjs`（新，比照 `run-aux-query-audit.mjs`） | 新 | 四后端真 CLI 审计：只读证明 + 首字节延迟实测 |
 | `docs/modules/**` + owner 概况 | 改 | module-docs 硬门禁 |
 
@@ -260,6 +260,6 @@ export function validateCompletion(input: {
 |---|---|---|
 | C3-Q1 | 验收 7"关闭时不注册 handler"与 Obsidian `registerEditorExtension` 仅能在 onload 注册的约束冲突。R-A1 先例是"注册一次 + 逐次门控"。 | 建议**沿用 R-A1 先例**并把验收 7 口径改为"无会话、无网络、无装饰更新；仅存在被门控的空转键处理器（与已交付的 `@` 触发同构）"。若坚持字面零注册，唯一诚实路径是"切换后提示重启插件生效"，体验更差。 |
 | C3-Q2 | 默认手势：Alt 空按 vs 默认绑定 Alt+A 这类组合键？ | 建议**Alt 空按为默认 + 命令可改绑**（本设计采用）：与 FlowText 对齐；真机步骤 12-15 若发现系统性冲突再降级默认值（设置项留有余地）。 |
-| C3-Q3 | 补全使用哪个模型？ | 建议沿用行内编辑的解析链：`inlineEditModelOverrides` > 当前聊天 tab 模型 > 后端默认（`InlineEditPluginHost.resolveModel` 既有逻辑可复用），并在设置文案说明低延迟模型更合适。 |
+| C3-Q3 | 补全使用哪个模型？ | 建议沿用行内编辑的解析链：`inlineEditModelOverrides` > 当前聊天 tab 模型 > 后端默认（`InlineEditPluginHost.resolveModel` 既有逻辑可复用），并在设置文案说明低延迟模型更合适。**2026-09-19 落地补充**：实测（同构建热会话，6 次真实 Alt 手势，`deepseek/deepseek-flash` → 1415/1835/902/798/1060/532 ms，2/6 达标）确认插件侧已就绪、残差是供应商延迟，且补全被迫与行内编辑共用 `inlineEditModelOverrides`——因此新增**补全专用** `inlineCompletionModelOverrides`，解析顺序改为：专用覆盖 > `inlineEditModelOverrides` > 当前聊天 tab 模型 > 后端默认；空映射默认下逐字节等同原链路，设置文案如实说明延迟敏感、推荐低延迟模型（不承诺具体毫秒数），800ms 指标本身不动。 |
 | C3-Q4 | 预热时机：首个编辑器焦点即预热（有成本：四后端各 1 个空闲进程/连接）vs 首次 Alt 才建（冷启动 1-3s）？ | 建议**首个编辑器焦点预热 + TTL 5 分钟**：预热是 800ms 目标的前提；TTL 限制常驻成本；设置页说明。 |
 | C3-Q5 | 若实测某后端热态仍 > 800ms，如何处理？ | 建议**如实标注 + 保持可用**（验收 1 要求的是"给出实测数据，分后端"）；全部后端显著超标时回到本表重新裁决（换触发形态或调整目标值），不在实现中静默放宽。 |

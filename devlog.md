@@ -11,6 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-19 R-C3 补全专用模型覆盖：`inlineCompletionModelOverrides` 让 <800ms 目标「可通过配置达成」
+
+**触发**：R-C3 的延迟硬指标实测未达标（同构建、热会话、6 次真实 Alt 手势）：`deepseek/deepseek-flash` → 1415/1835/902/798/1060/532 ms（2/6 低于 800ms），更慢的模型更差。插件侧已就绪（预热挂编辑器焦点、池保持热态），残差是供应商延迟；而补全被迫与行内编辑共用 `inlineEditModelOverrides`，用户无法只为补全钉一个快模型而不改行内编辑。
+
+**改动**：新增归一化设置 `inlineCompletionModelOverrides: Partial<Record<AgentBackendKind, string>>`（默认 `{}`，值格式与 `inlineEditModelOverrides` 完全一致；归一化 `normalizeInlineCompletionModelOverrides` 委托同一实现、独立命名保持可检索；加载归一化并入 `normalizeInlineCompletionSettingsOnLoad`，缺键物化为空默认、畸形值全弃）。设置 UI 在补全设置组内按已启用 backend 逐行输入（`addCompletionModelOverrideRow`），校验/持久化语义与行内编辑覆盖行一致（空 = 继承；非法不落盘、描述行换错误提示）；双语文案如实说明补全延迟敏感、推荐响应快的模型，不承诺具体毫秒数，代码与文档中的 800ms 数字一律未动。解析顺序改为：**专用覆盖 → `inlineEditModelOverrides` → 活动 tab 模型 → 后端默认**——新纯函数 `resolveCompletionOverride`（InlineEditPluginHost）返回 `null` 表示未配置，`main.ts resolveInlineCompletionTarget` 才落回既有链，因此默认 `{}` 下解析结果与该设置存在之前逐字节一致；已配置但格式非法按 `model-unavailable` 如实上报，不静默回退（§9 同一纪律）。池在 modelRef 变化时本就 dispose 重建（既有 reset 语义），专用覆盖变更自然触发重建。
+
+**测试**：`InlineEditPluginHost.test.ts` 新增 `resolveCompletionOverride` 五例（opencode/pi、claude-code/codex 各格式解析；未配置/空/空白/非字符串返回 `null`；畸形 ref 报错不回退；可选目录校验钩子）；`inlineEditSettings.test.ts` 新增归一化与加载边界六例（含 `DEFAULT_SETTINGS` 空映射与缺键物化两条**默认逐字节回归**）；新增组合级 `tests/unit/main/inlineCompletionModelOverride.test.ts`（真实 `configureInlineCompletion` + 仅桩 adapter 缝：专用覆盖优先于链、session config 透传专用模型、空映射下 target.model 与 `adapter.resolveModel()` 逐项相等、畸形覆盖 → `model-unavailable` 且不起会话、专用覆盖变更 → 池 dispose 旧会话并重建）。
+
+---
+
 ## 2026-09-19 R-A3 验收 1 收口：提示词层要求「先开标签、标签内写正文」（partial body 可得性）
 
 **触发**：R-A3 验收 1（预览在首字节后 500ms 内出现、随生成逐步增长）实测仍只有两个状态——`busy` → 完整预览（7.8s / 46.7s），且 rAF 已验证健康（1.5s 92 帧）、渐进渲染链路（`78eeef05`）与 OpenCode 轮内历史轮询（`0fada4d1`）均已就位。剩余闸门在模型侧：模型先思考，最后把整块 `<replacement>…</replacement>` 一次性吐出——轮内**从不存在**可供渲染的部分正文，渲染层无从增长。

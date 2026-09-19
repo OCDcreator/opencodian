@@ -11,6 +11,11 @@
  *   and pi, a bare model id or SDK alias for claude-code and codex).
  * - `inlineEditPresetPrompts` (R-A2): user-defined `#` presets (label + body),
  *   add/remove/edit. The builtin catalog always shows on top in the menu.
+ * - `inlineCompletionModelOverrides` (R-C3): per-backend model override for
+ *   Alt completions, same value format and override semantics as
+ *   `inlineEditModelOverrides` but consumed only by the completion pool, so a
+ *   fast (latency-friendly) model can be pinned for completions without
+ *   touching inline edit. Empty = inherit.
  *
  * The section shows one input per enabled backend rather than one global field,
  * so a stale entry for a backend the user does not run cannot silently apply.
@@ -26,6 +31,7 @@ import {
   type InlineEditPresetPrompt,
   normalizeAutoInternalLinkExcludedTerms,
   normalizeInlineCompletionMaxChars,
+  normalizeInlineCompletionModelOverrides,
   normalizeInlineEditMaxConcurrentEdits,
   normalizeInlineEditModelOverrides,
   type OpenCodianSettings,
@@ -211,9 +217,67 @@ export class SettingsInlineEditSection {
           await this.plugin.saveSettings();
         }));
 
+    // R-C3: dedicated per-backend completion model override. Same override
+    // semantics and validation as the inline-edit rows above, but scoped to
+    // the completion pool's model resolution so a fast model can be pinned
+    // for completions without changing inline edit.
+    for (const backend of OVERRIDE_BACKENDS) {
+      if (!this.plugin.settings.enabledBackends.includes(backend)) continue;
+      this.addCompletionModelOverrideRow(containerEl, backend);
+    }
+
     new Setting(containerEl)
       .setName(t('settings.inlineCompletion.hotkey.name'))
       .setDesc(t('settings.inlineCompletion.hotkey.desc'));
+  }
+
+  /**
+   * R-C3: one text row per enabled backend for `inlineCompletionModelOverrides`.
+   * Empty = inherit (the completion target falls back to the inline-edit model
+   * chain, byte-identical to the behaviour before this setting existed);
+   * otherwise a backend-shaped model ref, rejected inline when malformed.
+   */
+  private addCompletionModelOverrideRow(containerEl: HTMLElement, backend: AgentBackendKind): void {
+    const setting = new Setting(containerEl)
+      .setName(t('settings.inlineCompletion.modelOverride.name', { backend }))
+      .setDesc(
+        t('settings.inlineCompletion.modelOverride.desc', {
+          backend,
+          example: overrideExample(backend),
+        }),
+      );
+
+    setting.addText((text) => {
+      text.setPlaceholder(overrideExample(backend))
+        .setValue(this.plugin.settings.inlineCompletionModelOverrides[backend] ?? '')
+        .onChange(async (value) => {
+          const trimmed = value.trim();
+          const next: Partial<Record<AgentBackendKind, string>> = {
+            ...this.plugin.settings.inlineCompletionModelOverrides,
+          };
+          if (!trimmed) {
+            delete next[backend];
+            setting.setDesc(t('settings.inlineCompletion.modelOverride.desc', {
+              backend,
+              example: overrideExample(backend),
+            }));
+          } else if (parseModelOverride(backend, trimmed)) {
+            next[backend] = trimmed;
+            setting.setDesc(t('settings.inlineCompletion.modelOverride.desc', {
+              backend,
+              example: overrideExample(backend),
+            }));
+          } else {
+            // Keep the value visible but reject it, so the completion path never
+            // silently falls back to a default model either.
+            setting.setDesc(t('settings.inlineCompletion.modelOverride.invalid', { backend }));
+            return;
+          }
+          const settings: OpenCodianSettings = this.plugin.settings;
+          settings.inlineCompletionModelOverrides = normalizeInlineCompletionModelOverrides(next);
+          await this.plugin.saveSettings();
+        });
+    });
   }
 
   /**

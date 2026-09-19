@@ -7,6 +7,7 @@ import {
   createInlineEditPluginHost,
   describeModelSelection,
   type InlineEditPluginBridge,
+  resolveCompletionOverride,
 } from '../../../../src/features/inline-edit/InlineEditPluginHost';
 
 function makeBridge(overrides: Partial<InlineEditPluginBridge> = {}): InlineEditPluginBridge {
@@ -111,5 +112,62 @@ describe('normalizeInlineEditEffortOverrides', () => {
     expect(normalizeInlineEditEffortOverrides(null)).toEqual({});
     expect(normalizeInlineEditEffortOverrides('high')).toEqual({});
     expect(normalizeInlineEditEffortOverrides(['high'])).toEqual({});
+  });
+});
+
+// R-C3: the dedicated completion override resolves BEFORE the inline-edit
+// chain. `null` means "unset — fall back unchanged", which is what keeps the
+// default behaviour byte-identical.
+describe('resolveCompletionOverride (R-C3 dedicated completion model)', () => {
+  it('resolves a configured backend-shaped ref for opencode/pi', () => {
+    expect(resolveCompletionOverride('opencode', 'deepseek/deepseek-flash')).toEqual({
+      ok: true,
+      model: { kind: 'opencode', provider: 'deepseek', model: 'deepseek-flash' },
+    });
+    expect(resolveCompletionOverride('pi', ' provider/model-x ')).toEqual({
+      ok: true,
+      model: { kind: 'pi', provider: 'provider', model: 'model-x' },
+    });
+  });
+
+  it('resolves a bare model id for claude-code and codex', () => {
+    expect(resolveCompletionOverride('claude-code', 'claude-haiku-4-5')).toEqual({
+      ok: true,
+      model: { kind: 'claude-code', model: 'claude-haiku-4-5' },
+    });
+    expect(resolveCompletionOverride('codex', 'gpt-5-mini')).toEqual({
+      ok: true,
+      model: { kind: 'codex', model: 'gpt-5-mini' },
+    });
+  });
+
+  it('returns null when unset so the caller falls back to the existing chain', () => {
+    expect(resolveCompletionOverride('opencode', undefined)).toBeNull();
+    expect(resolveCompletionOverride('opencode', '')).toBeNull();
+    expect(resolveCompletionOverride('opencode', '   ')).toBeNull();
+    expect(resolveCompletionOverride('opencode', 42)).toBeNull();
+    expect(resolveCompletionOverride('opencode', null)).toBeNull();
+  });
+
+  it('rejects a malformed ref instead of silently falling back', () => {
+    const refused = resolveCompletionOverride('opencode', 'no-slash');
+    expect(refused).toEqual({
+      ok: false,
+      error: '"no-slash" is not a valid opencode model reference.',
+    });
+    expect(resolveCompletionOverride('claude-code', 'has space')).toEqual({
+      ok: false,
+      error: '"has space" is not a valid claude-code model reference.',
+    });
+  });
+
+  it('honours the optional availability check like the inline-edit chain', () => {
+    const unavailable = resolveCompletionOverride('opencode', 'ghost/nope', () => false);
+    expect(unavailable).toEqual({
+      ok: false,
+      error: '"ghost/nope" is not available in the opencode model catalog.',
+    });
+    const available = resolveCompletionOverride('opencode', 'p/m', () => true);
+    expect(available).toEqual({ ok: true, model: { kind: 'opencode', provider: 'p', model: 'm' } });
   });
 });

@@ -29,6 +29,8 @@
 
 > 2026-09-18 (R-A5/R-A6/R-A7)：`InlineEditSettingsSlice` 增加 `maxConcurrentEdits` 与 `documentModeEnabled`；host 暴露 `getMaxConcurrentEdits` / `isDocumentModeEnabled` / `resolveContextFile`（桥接实现，vault 解析 + instanceof 校验）。
 
+> 2026-09-19 (R-C3 补全专用模型覆盖)：新增纯函数 `resolveCompletionOverride(kind, override, isModelAvailable?)`——解析 `inlineCompletionModelOverrides[kind]`（补全延迟敏感，允许单独钉一个快模型而不动行内编辑）。**返回 `null` 表示未配置**，调用方（`main.ts resolveInlineCompletionTarget`）原样落回既有行内编辑解析链，因此默认 `{}` 下解析结果与该设置存在之前逐字节一致；已配置但格式非法/目录不可用 → `{ ok: false, error }`，不静默回退（§9 同一纪律）。`src/main.ts` 的补全目标解析顺序自此为：专用覆盖 → `inlineEditModelOverrides` → 活动 tab 模型 → 后端默认。
+
 ## 维护约束
 
 - 显式配置但解析/校验失败必须返回 `{ ok: false, error }`，由 controller 提示并中止；不要静默改用默认模型

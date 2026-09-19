@@ -28,6 +28,7 @@ import {
   normalizeImageGenerationMaxWidth,
   normalizeImageGenerationModels,
   normalizeInlineCompletionMaxChars,
+  normalizeInlineCompletionModelOverrides,
   normalizeInlineEditEffortOverrides,
   normalizeInlineEditMaxConcurrentEdits,
   normalizeInlineEditModelOverrides,
@@ -501,12 +502,13 @@ function normalizeVaultRetrievalSettingsOnLoad(
   };
 }
 
-/** R-C2 text-to-image generation, normalized at the final load-merge boundary. */
+/** R-C3 text-to-image generation, normalized at the final load-merge boundary. */
 function normalizeInlineCompletionSettingsOnLoad(
   normalizedSettings: Partial<OpenCodianSettings> | null,
 ): {
   inlineCompletionEnabled: boolean;
   inlineCompletionMaxChars: number;
+  inlineCompletionModelOverrides: OpenCodianSettings['inlineCompletionModelOverrides'];
 } {
   return {
     inlineCompletionEnabled: typeof normalizedSettings?.inlineCompletionEnabled === 'boolean'
@@ -514,6 +516,12 @@ function normalizeInlineCompletionSettingsOnLoad(
       : DEFAULT_SETTINGS.inlineCompletionEnabled,
     inlineCompletionMaxChars: normalizeInlineCompletionMaxChars(
       normalizedSettings?.inlineCompletionMaxChars,
+    ),
+    // Same discipline as the neighbouring completion settings: a snapshot
+    // without the key materializes the empty default, so the completion
+    // model chain stays byte-identical to the pre-setting behaviour.
+    inlineCompletionModelOverrides: normalizeInlineCompletionModelOverrides(
+      normalizedSettings?.inlineCompletionModelOverrides,
     ),
   };
 }
