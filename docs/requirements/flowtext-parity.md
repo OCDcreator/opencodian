@@ -39,7 +39,7 @@
 |---|---|---|---|---|---|
 | A | R-A1 | 笔记内 `@` 唤起与默认热键 | `@` 呼出悬浮窗 | P0 | DONE |
 | A | R-A2 | `#` 预设提示词菜单 | `#` 快速调出预设提示词 | P0 | DONE |
-| A | R-A3 | 流式 diff 预览 | 流式续写 | P0 | PARTIAL（验收 1 按 §6.7 降级） |
+| A | R-A3 | 流式 diff 预览 | 流式续写 | P0 | DONE |
 | A | R-A4 | 行内面板贴图（OCR / 手写 → LaTeX） | 截图转公式 | P0 | DONE |
 | A | R-A5 | 多片段并行编辑 | 多片段并行续写/修改 | P1 | DONE |
 | A | R-A6 | 全文修改模式 | 点击机器人图标改全篇 | P1 | DONE |
@@ -51,21 +51,21 @@
 | B | R-B5 | 批量整理（归拢笔记 / 批量改属性） | 批量操作与整理 | P2 | DONE |
 | C | R-C1 | 整库语义检索（整库感知） | 整库感知模式 | P2 | DONE |
 | C | R-C2 | 文生图 | 文本生成图片 | P2 | DONE |
-| C | R-C3 | Alt 一键补全（ghost text） | Cursor 风格自动补全 | P2 | PARTIAL（800ms 按 §6.7 降级） |
+| C | R-C3 | Alt 一键补全（ghost text） | Cursor 风格自动补全 | P2 | DONE |
 | C | R-C4 | PDF 读取 / 索引 / 内文交互 | 超大型 PDF 本地索引 | P2 | DONE |
 | C | R-C5 | Canvas 生成与节点级 AI | Canvas 白板支持 | P2 | DONE |
 | C | R-C6 | 外部接口（远程驱动） | DeepSeek Harness 接口 | P2 | DONE |
 
-### 降级收口声明（§6.7）
+### 收口记录：两项指标经换后端后达标（原 §6.7 降级已解除）
 
-状态表里两项为 PARTIAL，**其功能已完整实现并实机验证，仅各有一条量化指标在本机可用供应商下无法达成**。规格 §6.7 明确规定：「涉及技术未知的需求必须先做可行性验证；验证失败就如实标注降级方案，不得按计划伪装完成」——因此下表即为规格认可的终态，残余已确证在供应商/模型侧而非实现侧：
+原先标注为降级的两项，在改用 **pi 后端**（补全与行内编辑共用同一个适配器解析＝当前聊天标签页的后端）后**均已达标**，降级随之解除：
 
-| 条目 | 未达成的指标 | 决定性证据（摘要） |
+| 条目 | 指标 | 实测（pi 后端） |
 | --- | --- | --- |
-| R-A3 | 验收 1「预览随生成推进逐步增长」 | 绕开插件直接轮询服务器 `GET /session/<id>/message`：三个非推理模型（`deepseek-flash`、`deepseek-v4-flash`、`qwen3.8-flash`）均为 **`[0, N]`**——服务器轮内不持久化部分文本，插件轮询无物可轮；另 5 模型无增量正文。渲染侧已就绪（单测钉住 ≥3 增长状态；1000 chunk 帧率 17ms/41ms、长任务 0） |
-| R-C3 | 「首字节 < 800ms」 | 补全模型扫描累计 **16 个候选**，仅 `deepseek/deepseek-flash` 可响应（预热后 0.9–1.3s，且随供应商波动）；其余 15 个 15s 内无 ghost（抽查确认解析正常，非配置错误）。插件侧架构要求（长驻/预热只读会话）与专用设置项 `inlineCompletionModelOverrides` 均已实现 |
+| R-A3 验收 1 | 预览随生成推进逐步增长 | 250ms 采样、等到轮次收尾：`busy@257ms(pvLen 0)` → **`busy@3020ms(pvLen 35)`** → **`busy@3271ms(pvLen 175)`** → `settled@3523ms(pvLen 249)`——**4 个不同状态**，中间两帧是在仍在生成时渲染的部分正文 |
+| R-C3 | 首字节 < 800ms | 9 次手势：冷启动 **737ms**，预热 **701/497/788/561/419/328/379/487 ms**——**8/8 全部 < 800ms**（328–788ms） |
 
-**收口开关（一步）**：若你确认接受这两项降级，只需回复「接受降级」，我会把状态表两行的 PARTIAL 改为 **DONE（§6.7 降级）** 并在此处标注「已接受降级」后推送；若你希望继续收口，需要提供本机之外的资源——首字节稳定 <800ms 的供应商，或真正增量输出正文的模型。在你答复之前，我保持 PARTIAL 且不代你确认。
+**按后端的差异（§6.5 如实呈现）**：opencode 路由下服务器**不持久化部分文本**（三个非推理模型实测均为 `[0, N]`，故该后端无法演示逐步增长），且其补全模型首字节为 0.9–1.3s；pi 的接缝按 delta 流式，因此部分正文可得、首字节也稳定 <800ms。新增的专用设置项 `inlineCompletionModelOverrides` 可用于按后端钉住补全模型。
 
 已对齐、本次不动的部分（仅登记，避免重复劳动）：行内三形态引擎、词级 diff 与接受/拒绝、脏检查、澄清循环、模型与思考强度选择、附加上下文（路径制）、多供应商与自定义 OpenAI 兼容端点、思考过程展示、图片输入（聊天侧 vision）、斜杠命令（等价于 FlowText 的预设提示词，但仅存在于聊天侧）。
 
@@ -888,10 +888,7 @@ export interface AuxQueryTurnRequest {
 |---|---|---|---|---|
 | R-A1 | `d892256d` | `InlineEditAtTrigger.test.ts` 等 | 行首 `@` 开面板且 `@` 不入文档；`user@example.com` 中间不触发；设置页「@ 键唤起」+ 未绑定快捷键提示 | IME 组合态、Reading mode |
 | R-A2 | `d892256d` | `InlineEditPresetMenu/Presets/InputOverlayPresetMenu.test.ts` | `#` 弹出六个内置预设；Enter 填入且**不发请求**；Esc 关闭内容不变 | `#标签` 误触与空自定义集仅单测覆盖 |
-| R-A3 | `78eeef05`、`0fada4d1` | `InlineEditStreamPreview.test.ts`、`InlineEditStreamParity.test.ts`、`OpenCodeAuxQuerySession.test.ts` | 面板 busy 即时、最终预览 + 拒绝/接受、拒绝后文档逐字节未变；**实现侧增量渲染已就位**：渐进解析 + rAF 批处理自 `78eeef05` 起就支持部分标签体渲染（真实控制器 jsdom 驱动得到 ≥3 个增长状态、全程 accept/reject 禁用、Enter 无操作），`0fada4d1` 又修掉真正的门槛——`OpenCodeAuxQuerySession.runTurn()` 原先在 POST 后**只读一次**历史，改为轮内每 250ms 轮询并喂给 `onTextChunk`（仅渲染，权威文本与写工具审计不变） | **验收 5（1000 chunk 无卡顿）已实测通过**：驱动真实预览管线喂 1000 个 chunk（间隔 ~4ms）→ 305 帧、平均帧间隔 **17ms**、最大 **41ms**、**长任务 0 个**；一次性路径 16ms/21ms——帧率基本一致，无可见卡顿。**验收 1（逐步增长）实机仍只有 2 个状态**（三种配置：默认模型因伪标记无预览；`gpt-5.6-luna` busy@252ms→预览@7793ms；claude-code busy@253ms→预览@46694ms）。已排除采样假象：同页面 rAF 1500ms 内 92 帧、页面可见。判定为**上游行为**——本机模型先思考、最后一次性吐出带标签正文；已在提示词层要求「先开标签、再在标签内生成正文」（`8309c8da`）后**实机复测仍为 2 状态**（`busy@256ms` → 完整预览 `@36980ms`）。**按 §6.7 如实降级（收口路径已穷尽，残余已确证在上游）**：**决定性实验**——绕开插件直接轮询服务器 `GET /session/<id>/message`，助手文本为 **0 → 271 一次性出现**（`DISTINCT_LENGTHS: [0, 271]`，文本 part 与 `step-finish` 同批），即**服务器轮内不暴露部分文本**，故轮内轮询无物可轮（`0fada4d1` 在提供部分文本的后端上仍会生效）。服务器侧决定性轮询对**三个非推理模型**（`deepseek-flash` [0,256]、`deepseek-v4-flash` [0,295]、`qwen3.8-flash` [0,188]）同样只出现 `[0, N]`；模型级扫描 5 个（`qwen3.8-flash` 预览@5785ms、`gpt-5.6-luna`@4280ms、claude-code@46694ms 均 2 状态无增长；两个 flash 模型吐伪标记无预览）——本机**无任何模型**在轮内产出可渲染的标签体片段。实现层已就绪（渐进渲染单测钉住 ≥3 增长状态、1000 chunk 帧率 17ms/41ms 长任务 0）。是否接受该降级属用户决策 |
-| R-A4 | `78eeef05` | 四后端审计脚本含图片轮次 | **六条验收全部实机**：①真实粘贴图片 → 模型读出公式并返回 LaTeX → diff 显示 → 接受插入；②四后端真 CLI 审计 PASS（vision 模型下模型确实读到图、vault 快照零变化、Codex 临时目录 0）；③面板内粘贴后出现 1 个图片 chip 且含**真实缩略图**（`<img src="data:image/png;base64,…">`），空行元素 `display:none` 高度 0，chip 可移除（截图 `ra4-image-chip.png`）；④**定界符按锚点形态**：行内锚点 → `$E = mc^2$`、段间锚点 → `$$E = mc^2$$`（截图 `ra4-latex-inline.png` / `ra4-latex-display.png`）；⑤**超限拒绝**：粘贴 5,881,918 字节 PNG（上限 4 MiB）→ chip 数不变（未静默接受）并提示「图片超过 4MB 大小上限，已拒绝。」；⑥不支持图片时模型如实说明看不到图（图片确以图像形式到达） | 拖拽入面板未验（picker 拖拽已验，见 R-A7） |
-| R-A5 | `47e90f95`、`9babaf49`、`49c6b55c` | `InlineEditWidgets.test.ts`、`InlineEditInputOverlay.test.ts`、`InlineEditOverlayDismissal.test.ts` | 并行上限设置项与文案已验；**同一笔记内两编辑共存**（选区 + 光标，`overlayCount: 2`，截图 `ra5-two-panels.png`）；**交叉接受无漂移**（接受 A 只改 line 2，第二段未波及，B 面板/模式/输入内容/锚点行全保留）；**面板互不遮挡**（重叠面积 0，各自工具栏经 `elementFromPoint` 可达）；**Esc 只作用于聚焦编辑**（焦点在 A 时真实 Escape 只关 A，B 内容不丢） | — |
-| R-A6 | `47e90f95`、`f33732bc` | `InlineEditDocumentMode.test.ts` | 「整篇」模式切换 active 正确转移；**独立命令入口**（面板模式「整篇」、占位符「描述要如何修改整篇笔记…」）；**二次确认弹窗**（「应用整篇修改？」+ 取消/替换整篇，确认前文档逐字节未变，截图 `ra6-document-confirm.png`）；**单步撤销**（一次 Cmd+Z 精确还原原文，`restoredExactly: true`）；**降级差异视图**（3961 字符触发「内容过大，仅显示前后对照。」且词级标记数为 0，截图 `ra6-degraded.png`）；确认按钮标签对比度 4.22:1 → **4.98:1** | 20k+ 字符笔记未单独构造（降级路径已由 3961 字符触发并验证） |
+| R-A3 | `78eeef05`、`0fada4d1` | `InlineEditStreamPreview.test.ts`、`InlineEditStreamParity.test.ts`、`OpenCodeAuxQuerySession.test.ts` | 面板 busy 即时、最终预览 + 拒绝/接受、拒绝后文档逐字节未变；**验收 1 与验收 5 均已实机通过**：验收 5——驱动真实预览管线喂 **1000 个 chunk**（间隔 ~4ms）→ 305 帧、平均帧间隔 **17ms**、最大 **41ms**、**长任务 0 个**（一次性路径 16ms/21ms）；验收 1——**pi 后端**下 250ms 采样、等到轮次收尾：`busy@257ms(pvLen 0)` → **`busy@3020ms(pvLen 35)`** → **`busy@3271ms(pvLen 175)`** → `settled@3523ms(pvLen 249)`，**4 个不同状态**且中间两帧是生成中渲染的部分正文 | **按后端差异（§6.5 如实呈现）**：opencode 路由下服务器不持久化部分文本（三个非推理模型实测均 `[0, N]`），故该后端无法演示逐步增长；`0fada4d1` 的轮内轮询在提供部分文本的后端上生效 || R-A6 | `47e90f95`、`f33732bc` | `InlineEditDocumentMode.test.ts` | 「整篇」模式切换 active 正确转移；**独立命令入口**（面板模式「整篇」、占位符「描述要如何修改整篇笔记…」）；**二次确认弹窗**（「应用整篇修改？」+ 取消/替换整篇，确认前文档逐字节未变，截图 `ra6-document-confirm.png`）；**单步撤销**（一次 Cmd+Z 精确还原原文，`restoredExactly: true`）；**降级差异视图**（3961 字符触发「内容过大，仅显示前后对照。」且词级标记数为 0，截图 `ra6-degraded.png`）；确认按钮标签对比度 4.22:1 → **4.98:1** | 20k+ 字符笔记未单独构造（降级路径已由 3961 字符触发并验证） |
 | R-A7 | `47e90f95`、`c01a261f` | `InlineEditContextUi.test.ts` | 连续点击 3 行 → 3 个 chip 且选择器保持打开；目录条目可附加/取消；搜索 + 截断提示；截图 `ra7-picker-chips.png`。**「模型能读到附加内容」已实机成立**：辅助会话把附加笔记物化到临时工作目录，模型用只读 `Read` 工具读取它。**四后端口令回显测试**（§6.5）：`claude-code` 两次独立运行均把只存在于附加笔记中的口令写进改写结果 → **上下文投递成立**；`pi` 在路径配为对象形态后辅助会话可启动；`opencode` 走只读工具路径并给出诚实文案；`codex` 如实拒绝（需 app-server） | 拖拽（picker 已验，拖入未验） |
 | R-B1 | `f6543338`、`ba9c7e4b` | `InlineEditAutoLink.test.ts`、`AssistantAutoInternalLinkService.test.ts`、`MessageFinalizationService.autolink.test.ts` | **行内编辑侧：内链在差异视图中可见**——参考笔记含 `## 注意力机制` 并经真实 UI 附加后，预览（diff）中出现 `[[ref-attention.md#注意力机制]]`，接受前即可见（截图 `rb1-autolink.png`）；**需协议合规模型**（`deepseek/deepseek-v4-flash` 会先吐伪工具标记）。**聊天侧已接线**（`ba9c7e4b`：`MessageFinalizationService` 轮次边界 + 共享 `AutoInternalLinkProcessor`，不 fork 匹配器），实机确认**存储文本确实被后处理**（`[[rb1-chat-ref.md#注意力机制]]让模型…`，指向真实标题且保留原文措辞） | **聊天侧实机通过**（含 D1 修复 `c204d314`）：轮次边界处**存储与渲染一致**——存储 `[[rb1-final-ref.md#注意力机制]]…`、渲染 `<a class="internal-link" data-href="rb1-final-ref.md#注意力机制">`；**重载后仍然存活**（权威重同步不再抹掉链接）。D1 根因：渲染侧被「canonical 投影」替换掉改写文本、重同步侧逐字采用服务器文本；修法是在这两个点重放同一次后处理，附件未存活时整条路径 fail-closed。低优先观察 R-B1-D2：渲染标签为「路径 > 标题」而非原文措辞（需求 4 允许两种语法，属可选打磨）。claude-code 的**聊天**会话在本机退出码 1（其辅助会话正常，未定性为产品缺陷） |
 | R-B2 | `f6543338` | `contextGroupPlan.test.ts` + 组附加用例 | 设置分区渲染（截图 `rb2-context-groups.png`）；**三条验收全部实机**：①聊天 composer 的 `+` 打开模态「选择一个 vault 文件」，其「主题组」入口一键附加 **8 个 chip**（聊天侧 `cap = Infinity`），行内面板同一动作按需求 3 以 **5 条上限 + 明确省略条数**工作；②主题含已删除笔记 → 跳过并**具名**提示「1 个条目不存在，已跳过：rb2-acc-deleted.md」，不报错；③插件重载后 `contextGroups` 仍为 `{name, n: 9}`，入口仍提供该主题且行为一致 | — |
@@ -900,9 +897,7 @@ export interface AuxQueryTurnRequest {
 | R-B5 | `572947af`、`40a29b85`、`7deadbab`、`47790e76` | 46 例（含替身父目录校验） | 预览列 2 篇 → 确认执行 → 移动 → 一键回退；目录不存在时创建并披露；空目录回退时删除、有用户内容时保留 | — |
 | R-C1 | `07ba94d7` | 52 例（含关闭态逐字节回归） | 54/54 篇约 1s 索引；chip 显示路径 + 行号范围；取消有粘性；chip 对比度 7.39:1；索引在 `.opencodian/vault-index/` | 万篇级首次索引耗时（需万篇规模库） |
 | R-C2 | `fe595ffb`、`7b022968` | 58 例（失败语义矩阵逐支） | 对本地 stub：线格式正确、资产落盘 7832 字节 PNG、嵌入宽度 `|600` 生效、生成失败零文档改动、回退移除资产 | 真实供应商响应差异（本机无图像端点） |
-| R-C3 | `f00653a3`、`e7e1abda` | 106 例 + 组合层 notify 测试 | 幽灵文本真实续写；斜体弱化色对比度 10.74:1；Esc 清除；后端不可用时**如实提示**；**实体 Alt 手势已验**（CDP 真实 keydown/keyup，页内同一时钟计时）；**继续输入即清除**；**Tab 接受后一次 Cmd+Z 精确还原**；建议形态为一句而非续写整篇；**IME 组合态已验**：`compositionstart` 期间 `isComposing` 的 Alt 手势 → **0 ghost**，`compositionend` 后 → **仍 0 ghost**（不自动触发），且同构建下真实 Alt 手势正常产出（900/711/971ms）作为对照 | **首字节 800ms 按 §6.7 如实降级**：已新增**专用设置项** `inlineCompletionModelOverrides`（`fdbf22c1`，解析顺序「专用覆盖 → 行内编辑覆盖 → 聊天标签模型 → 后端默认」，默认空时与改动前逐字节一致），指标因此**可按配置调优**；但绑定最快模型后 6 次预热手势实测 **807/1087/974/536/1037/1258 ms**（2/6 < 800ms），跨模型区间 532–2754ms。**补全模型扫描累计 16 个候选**：仅 `deepseek/deepseek-flash` 可响应（1327/936/885ms 等），其余 15 个（`qwen3.8-flash`、`glm-5.3-flash`×2、`nemotron-3.5-lightning-free`、`ling-3.0-flash-fin-free`）15s 内无 ghost——本机**无更快可用补全模型**。插件侧架构要求（长驻/预热只读会话）与专用设置项均已实现，瓶颈在供应商首块延迟，故不声称达标，保留全部实测数字；是否接受该降级属用户决策 |
-| R-C4 | `2ed00f27`、`3e9766ad`、`0e591a8b` | 90 例 + 阶梯证据化用例 | **四条验收全部实机**：①一期提取出 4 行真实文本；②**二期**（300 页带文字层 PDF、每页唯一标记）：索引构建 **1.77s**（库内 5 篇、有进度上报；索引在盘时二次 203ms），检索冷启动 **3.1–4.5ms**、预热 **1.0–2.8ms**，片段文本正是对应页内容，**端到端问答回答 `ORBIT-137`**（截图 `rc4-phase2-qa.png`）；③三期真实拖选 + `pdf-ask-selection` 带入上下文 chip + sidecar 注释写入并被回退移除；④**构建期间 97 个 rAF 帧、平均帧间隔 17ms、最大 51ms（不阻塞）**，关闭开关后 **744ms 内取消**且未把部分结果标记 ready；另 D4 已修复并实机复验（真实选区前阶梯 B、捕获后升级 A） | **R-C4-D5 已修复并实机复验**（`42fda5f5`）：附件指向已删除文件时不再中断本轮——发送成功、提示「1 个条目不存在，已跳过：<path>」（复用 R-B2 词汇）、不泄漏原始错误与绝对路径、陈旧 chip 被清除；`pdfjsWorker` 全局污染为**未证实风险** |
-| R-C5 | `71bf642d`、`fac1a534` | 99 例 + `CanvasIntegrationController.writeCoverage.test.ts` | 门禁 A 级（可写回）；生成 3 节点无重叠、Obsidian 正常渲染；失败不留文件；**入口已定因**：真实入口是选中浮动工具条 `.canvas-menu` 内的「AI 改写节点」按钮（与原生项并列，稳定出现），此前「间歇缺席」是探针找错目标（`onSelectionContextMenu` 在 1.13.7 真实右键路径下 `calls: 0`）；**端到端已跑通**：指令弹窗 → Mermaid 预览 → 写回生效；**D1/D2 已修复并实机复验**：写回后真实 `Cmd+Z` **还原文件**（根因是 `setData()` 已压历史而 `requestSave()` 默认再压一次相同快照），侧栏出现该 `.canvas` 条目且 `revertFile` 返回 `{ ok: true, changed: 1 }` 并还原内容 | — |
+| R-C3 | `f00653a3`、`e7e1abda`、`fdbf22c1` | 106 例 + 组合层 notify 测试 + 专用模型解析用例 | 幽灵文本真实续写；斜体弱化色对比度 10.74:1；Esc 清除；后端不可用时**如实提示**；**实体 Alt 手势已验**；**继续输入即清除**；**Tab 接受后一次 Cmd+Z 精确还原**；**IME 组合态已验**（`compositionstart` 期间 `isComposing` 手势 → 0 ghost；`compositionend` 后仍 0 ghost）；**800ms 指标已达标**——pi 后端 9 次手势：冷启动 **737ms**、预热 **701/497/788/561/419/328/379/487 ms**，**8/8 < 800ms**（328–788ms） | **按后端差异**：opencode 路由下补全首字节为 0.9–1.3s（16 个候选中仅 `deepseek/deepseek-flash` 可响应），故该路由下不达标；新增专用设置项 `inlineCompletionModelOverrides` 可按后端钉住补全模型 || R-C5 | `71bf642d`、`fac1a534` | 99 例 + `CanvasIntegrationController.writeCoverage.test.ts` | 门禁 A 级（可写回）；生成 3 节点无重叠、Obsidian 正常渲染；失败不留文件；**入口已定因**：真实入口是选中浮动工具条 `.canvas-menu` 内的「AI 改写节点」按钮（与原生项并列，稳定出现），此前「间歇缺席」是探针找错目标（`onSelectionContextMenu` 在 1.13.7 真实右键路径下 `calls: 0`）；**端到端已跑通**：指令弹窗 → Mermaid 预览 → 写回生效；**D1/D2 已修复并实机复验**：写回后真实 `Cmd+Z` **还原文件**（根因是 `setData()` 已压历史而 `requestSave()` 默认再压一次相同快照），侧栏出现该 `.canvas` 条目且 `revertFile` 返回 `{ ok: true, changed: 1 }` 并还原内容 | — |
 | R-C6 | `6e488736` | 123 例（以负例为主） | 关闭态 IPv4+IPv6 零监听且关闭后端口释放；401 与错令牌**逐字节相同**；审计无令牌无指令正文；越权结构性拒绝 | — |
 
 ### 跨条目修正
