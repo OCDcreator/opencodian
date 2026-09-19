@@ -597,6 +597,8 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 
 > 2026-09-19 (R-C3 补全专用模型覆盖)：与 en 同步新增 `settings.inlineCompletion.modelOverride.name` / `.desc` / `.invalid` 双语键——文案如实说明补全延迟敏感、推荐低延迟模型，留空 = 沿用行内编辑解析链；无具体毫秒数承诺。
 
+> 2026-09-19 (按后端差异的用户可见声明)：与 en 同步新增两处纯声明键——`settings.inlineCompletion.latencyNotice.name` / `.desc`（补全首字节按后端差异：pi 预热 8/8 次 328–788ms；OpenCode 路由通常 0.9–1.3s 且部分模型不返回建议；并给出可操作建议）与 `settings.inlineEdit.streamPreviewNotice.name` / `.desc`（流式预览逐步增长同样取决于后端接缝：pi 按 delta 流式 → 4 个中间状态；OpenCode 路由下服务器不暴露部分文本 → 结束时一次出现，功能不受影响）。数字均为实测值。
+
 > 2026-09-18 (R-C5)：与 en 同步新增 `canvas.generate.*`（生成流程与失败/回退明示）、`canvas.command.generate`、`canvas.rewrite.*`（节点改写指令/预览确认/挑选/错误边界与撤销诚实提示）与 `canvas.integration.*`（调试区确认门状态）双语文案。
 
 R-C4 补充：`chat.context.pdfIntegration.notMounted`（调试区在未探测过 PDF 叶子时的“尚未挂载”态）与 `SettingsDebugSection` 的 PDF 集成级别状态行文案。

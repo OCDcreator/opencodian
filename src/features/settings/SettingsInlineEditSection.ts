@@ -141,6 +141,13 @@ export class SettingsInlineEditSection {
           await this.plugin.saveSettings();
         }));
 
+    // R-A3: the preview grows while the turn streams only on backends whose
+    // seam delivers partial text. Stated here (measured, per backend) so the
+    // difference reads as a backend characteristic, not as a broken feature.
+    new Setting(containerEl)
+      .setName(t('settings.inlineEdit.streamPreviewNotice.name'))
+      .setDesc(t('settings.inlineEdit.streamPreviewNotice.desc'));
+
     this.addInlineCompletionSettings(containerEl);
 
     new Setting(containerEl)
@@ -199,6 +206,13 @@ export class SettingsInlineEditSection {
           await this.plugin.saveSettings();
           this.plugin.onInlineCompletionSettingChanged?.(value);
         }));
+
+    // R-C3: the first byte is provider-bound, and the difference is large
+    // enough that a user must know it before blaming the feature. The measured
+    // per-backend numbers live here rather than only in the docs.
+    new Setting(containerEl)
+      .setName(t('settings.inlineCompletion.latencyNotice.name'))
+      .setDesc(t('settings.inlineCompletion.latencyNotice.desc'));
 
     new Setting(containerEl)
       .setName(t('settings.inlineCompletion.maxChars.name'))

@@ -591,4 +591,6 @@ Added `chat.diffNotice.fileCount` (`{count}` accessible name for the header coun
 
 > 2026-09-19 (R-C3 补全专用模型覆盖)：en/zh 同步新增 `settings.inlineCompletion.modelOverride.name` / `.desc` / `.invalid`——desc 如实说明补全对延迟敏感（模型首字节之前建议无法出现）、推荐使用响应快的模型，并写明留空时沿用的解析链；不承诺具体毫秒数。
 
+> 2026-09-19 (per-backend declarations)：新增 `settings.inlineCompletion.latencyNotice.name` / `.desc`（首字节按后端差异的实测值：pi 预热 8/8 次 328–788ms；OpenCode 路由通常 0.9–1.3s 且部分模型无建议；附可操作建议）与 `settings.inlineEdit.streamPreviewNotice.name` / `.desc`（流式预览逐步增长取决于后端接缝：pi 按 delta 流式 → 实测 4 个中间状态；OpenCode 路由不暴露部分文本 → 结束时一次出现；功能不受影响）。
+
 R-C4 补充：`chat.context.pdfIntegration.notMounted`（调试区在未探测过 PDF 叶子时的“尚未挂载”态）与 `SettingsDebugSection` 的 PDF 集成级别状态行文案。

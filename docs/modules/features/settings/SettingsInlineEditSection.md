@@ -37,3 +37,5 @@
 > 2026-09-18 (R-C3)：新增补全设置组——`inlineCompletionEnabled` 开关（默认关，文案说明开启后每后端保留 1 个预热只读会话、空闲 5 分钟释放）、`inlineCompletionMaxChars` 滑条（50–2000，经 `normalizeInlineCompletionMaxChars`）、触发方式说明行；host 契约新增 `onInlineCompletionSettingChanged(enabled)`，关闭时由插件立即 dispose 全部会话（验收 7 口径）。
 
 > 2026-09-19 (R-C3 补全专用模型覆盖)：补全设置组内新增 `inlineCompletionModelOverrides` 每已启用 backend 一行输入（`addCompletionModelOverrideRow`）——语义与校验完全复用行内编辑覆盖行（空 = 继承既有解析链；格式非法不落盘、描述行换错误提示；保存经 `normalizeInlineCompletionModelOverrides`），仅消费方不同：只被补全池的模型解析读取（`resolveCompletionOverride` 优先于行内编辑链），因此可以单独为补全钉一个低延迟模型而不改行内编辑。文案（双语）如实说明补全对延迟敏感、推荐使用响应快的模型，不承诺具体毫秒数。
+
+> 2026-09-19 (按后端差异的用户可见声明)：在补全设置组开关下方新增 `settings.inlineCompletion.latencyNotice`（双语）——**把实测数字写进设置界面**，让用户不必先怀疑功能：pi 后端预热后 8/8 次手势 328–788ms（稳定 <800ms），经 OpenCode 路由的供应商通常 0.9–1.3s 且部分模型不返回建议；并给出可操作建议（切 pi 后端，或用下方「补全模型覆盖」钉一个更快的模型）。同时在行内编辑设置组「整篇」开关后新增 `settings.inlineEdit.streamPreviewNotice`（双语），说明流式预览的**逐步增长**同样取决于后端接缝（pi 按 delta 流式 → 实测 4 个中间状态；OpenCode 路由下服务器不暴露部分文本 → 预览在结束时一次出现），并明确功能本身不受影响。两处均为纯声明行（无控件），不改变任何设置语义。
