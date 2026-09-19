@@ -53,7 +53,7 @@
 | C | R-C2 | 文生图 | 文本生成图片 | P2 | DONE |
 | C | R-C3 | Alt 一键补全（ghost text） | Cursor 风格自动补全 | P2 | PARTIAL |
 | C | R-C4 | PDF 读取 / 索引 / 内文交互 | 超大型 PDF 本地索引 | P2 | PARTIAL |
-| C | R-C5 | Canvas 生成与节点级 AI | Canvas 白板支持 | P2 | PARTIAL |
+| C | R-C5 | Canvas 生成与节点级 AI | Canvas 白板支持 | P2 | DONE |
 | C | R-C6 | 外部接口（远程驱动） | DeepSeek Harness 接口 | P2 | DONE |
 
 已对齐、本次不动的部分（仅登记，避免重复劳动）：行内三形态引擎、词级 diff 与接受/拒绝、脏检查、澄清循环、模型与思考强度选择、附加上下文（路径制）、多供应商与自定义 OpenAI 兼容端点、思考过程展示、图片输入（聊天侧 vision）、斜杠命令（等价于 FlowText 的预设提示词，但仅存在于聊天侧）。
@@ -890,8 +890,8 @@ export interface AuxQueryTurnRequest {
 | R-C1 | `07ba94d7` | 52 例（含关闭态逐字节回归） | 54/54 篇约 1s 索引；chip 显示路径 + 行号范围；取消有粘性；chip 对比度 7.39:1；索引在 `.opencodian/vault-index/` | 万篇级首次索引耗时（需万篇规模库） |
 | R-C2 | `fe595ffb`、`7b022968` | 58 例（失败语义矩阵逐支） | 对本地 stub：线格式正确、资产落盘 7832 字节 PNG、嵌入宽度 `|600` 生效、生成失败零文档改动、回退移除资产 | 真实供应商响应差异（本机无图像端点） |
 | R-C3 | `f00653a3`、`e7e1abda` | 106 例 + 组合层 notify 测试 | 幽灵文本真实续写；斜体弱化色对比度 10.74:1；Esc 清除；后端不可用时**如实提示**；**实体 Alt 手势已验**（CDP 真实 keydown/keyup，页内同一时钟计时）；**继续输入即清除**；**Tab 接受后一次 Cmd+Z 精确还原**；建议形态为一句而非续写整篇 | **首字节 800ms 仅最佳情况达标**：分模型实测 `opencode-go/gpt-5.6-luna` 2610/2188/2754ms、`deepseek/deepseek-v4-flash` 1307/1252/923ms、`deepseek/deepseek-flash` 1315/1111/**692ms**。架构为渐进渲染（首块即 ghost），故差距在模型侧；补全与行内编辑**共用** `inlineEditModelOverrides`，若要稳定达标需独立的补全模型设置项。IME 组合态仍未验 |
-| R-C4 | `2ed00f27`、`3e9766ad` | 90 例 | 引擎加载成功、一期提取出 4 行真实文本、正常路径阶梯达 **A 级**、sidecar 注释写入并被回退移除；**真实 UI 流程已验**：带文字层 PDF（4 行）+ 真实鼠标拖选产生选区 + `opencodian:pdf-ask-selection` 把 PDF 作为上下文 chip 带入对话；无问答时 `pdf-save-annotation` 如实提示 | **新缺陷 R-C4-D4**（A 级序列化 ctx 缺 `contains`，真实选区必抛错 → A 静默降级为 B 而阶梯仍报 A）已派修；大 PDF 索引耗时；`pdfjsWorker` 全局污染为**未证实风险** |
-| R-C5 | `71bf642d` | 99 例 | 门禁 A 级（可写回）；生成 3 节点无重叠、Obsidian 正常渲染；失败不留文件；**入口已定因**：真实入口是选中浮动工具条 `.canvas-menu` 内的「AI 改写节点」按钮（与原生 移除/设置颜色/聚焦当前卡片/编辑 并列，两次独立运行均稳定出现），此前「间歇缺席」是探针找错目标（`onSelectionContextMenu` 在 1.13.7 的真实右键路径下 `calls: 0`）；**端到端已跑通**：指令弹窗 → Mermaid 结果预览（原始内容/新内容）→ 写回后 `.canvas` 节点文本确实变更 | **新缺陷 R-C5-D1**（写回后 Ctrl+Z 不能撤销）与 **R-C5-D2**（文本节点写回未纳入 R-B3 快照体系，§6.2）已派修 |
+| R-C4 | `2ed00f27`、`3e9766ad`、`0e591a8b` | 90 例 + 阶梯证据化用例 | 引擎加载成功、一期提取出 4 行真实文本、sidecar 注释写入并被回退移除；**真实 UI 流程已验**：带文字层 PDF + 真实拖选 + `pdf-ask-selection` 带入上下文 chip；无问答时如实提示；**D4 已修复并实机复验**：真实选区前阶梯为 **B**（理由「unproven on a live selection」），修复后的 ctx 返回合法 range string，真实捕获后**升级为 A**（理由「proven on a live selection」）——A 级现在基于证据且真正可用 | 大 PDF（数百页）索引耗时与问答引用片段未验；`pdfjsWorker` 全局污染为**未证实风险** |
+| R-C5 | `71bf642d`、`fac1a534` | 99 例 + `CanvasIntegrationController.writeCoverage.test.ts` | 门禁 A 级（可写回）；生成 3 节点无重叠、Obsidian 正常渲染；失败不留文件；**入口已定因**：真实入口是选中浮动工具条 `.canvas-menu` 内的「AI 改写节点」按钮（与原生项并列，稳定出现），此前「间歇缺席」是探针找错目标（`onSelectionContextMenu` 在 1.13.7 真实右键路径下 `calls: 0`）；**端到端已跑通**：指令弹窗 → Mermaid 预览 → 写回生效；**D1/D2 已修复并实机复验**：写回后真实 `Cmd+Z` **还原文件**（根因是 `setData()` 已压历史而 `requestSave()` 默认再压一次相同快照），侧栏出现该 `.canvas` 条目且 `revertFile` 返回 `{ ok: true, changed: 1 }` 并还原内容 | — |
 | R-C6 | `6e488736` | 123 例（以负例为主） | 关闭态 IPv4+IPv6 零监听且关闭后端口释放；401 与错令牌**逐字节相同**；审计无令牌无指令正文；越权结构性拒绝 | — |
 
 ### 跨条目修正
@@ -907,14 +907,14 @@ export interface AuxQueryTurnRequest {
 
 ### 本轮实机新发现、已派修的缺陷
 
-- **R-C5-D1 / D2**（§6.2 与 R-C5 验收 3）：画布**文本节点**写回走 `vault.process`，绕过 Canvas 视图自身的数据/历史管线，故原生 Ctrl+Z 无法撤销（实测 `restored: false`）；同时 `EditRevertService` 全程以 `isMarkdownPath` 过滤，`.canvas` 永远进不了快照体系，而**文件节点**路径（markdown 笔记）是完整走 `beginBatchCapture → notePluginWrite → endBatchCapture` 且覆盖不可用时**中止写入**的。修复方向：写回改走宿主数据/历史管线使原生撤销成立，并把 `.canvas` 这类文本类 vault 文件纳入可捕获集合后同样 fail-closed。
+- **R-C5-D1 / D2**（§6.2 与 R-C5 验收 3）—— **已修复并实机复验**（`fac1a534`）：画布文本节点写回原本绕过 Canvas 视图的数据/历史管线（原生 Ctrl+Z 无效），且 `.canvas` 因 `isMarkdownPath` 过滤而进不了 R-B3 快照体系。修复后写回走 `setData() + requestSave(false)`（旧实现的 `requestSave()` 默认再压一次相同快照，导致第一次 Ctrl+Z 只是重放同一状态——这是「撤销无效」的真正根因），并新增窄谓词 `isRevertibleTextPath`（md + `.canvas`）只用于批量捕获与 `notePluginWrite`，写前捕获、不可用时拒绝写入。实测：`Cmd+Z` 还原文件、侧栏出现 `.canvas` 条目、`revertFile` 返回 `{ ok: true, changed: 1 }` 并还原内容。
 - **R-C4-D4**（高）：A 级原生选区序列化在**真实选区**上必抛 `e.contains is not a function`（插件传入的 ctx 只有 `{ win }`），被 `catch` 吞掉后降级到 B 级 DOM 路径——于是选区级 `#page&selection` 回链与高亮反馈静默失效，而阶梯仍报 A。已实测 `{ win, contains: (n) => document.contains(n) }` 返回合法 range string `"0,0,0,57"`。修复方向：传入可用的 `contains` 谓词，并让 A 级判定**基于真实选区的证据**而非「函数可调用」。
-- **系统化对比度**（设计契约）：宿主主题的 `.mod-cta` 配对实测 **2.87:1**（`rgb(170,17,65)` 底 + 黑标签）、`.mod-warning.mod-destructive` **4.22:1**、`--text-error` 正文 **4.2:1**，均低于 13px 文本的 4.5:1 下限；同一个 accent 底配白标签算得 **7.33:1**。此前各弹窗各自打补丁（tooling/batch-organize/imagegen/inline-edit-confirm），画布改写预览的「写回」按钮仍是 2.87:1。修复方向：收敛为**一套共享的插件弹窗规则**，保留色相、提亮标签（禁止提亮底色——浅色主题才成立且会软化危险信号）。
+- **系统化对比度**（设计契约）—— **已修复并实机复验**（`6d683ff9`）：宿主主题的 `.mod-cta` 配对实测 **2.87:1**（`rgb(170,17,65)` 底 + 黑标签）、`.mod-warning.mod-destructive` **4.22:1**、`--text-error` 正文 **4.2:1**，均低于 13px 文本下限。现收敛为**一套共享规则**（`src/style/modals/plugin-modal-contrast.css`，作用于 6 个插件弹窗根类），采纳实机证据改为**只提亮标签、不声明背景**（背景声明在 (0,2,0) 特异性下会静默输掉级联——实测印证），并删除各弹窗的重复规则与未生效的 ink 混色声明。实测：画布弹窗「改写」`.mod-cta` **7.33:1**（原 2.87:1）、整篇确认「替换整篇」**4.98:1**（原 4.22:1）。
 
 ### 全局未覆盖清单（如实登记）
 
 本轮已补齐（详见上表）：面板贴图（chip 缩略图 + LaTeX 定界符）、多片段交叉接受与键盘作用域、大笔记全文模式与 diff 降级、二次确认与单步撤销、内链在 diff 中可见、C5 节点 AI 改写端到端、C4 内文选中提问、R-C3 实体 Alt 手势与 Tab/撤销。
 
-仍未覆盖（如实登记）：**IME 组合态**（`@`/`#`/Alt 与行内编辑/补全的 `isComposing` 交互，仅单测覆盖）；**万篇级索引首次耗时**（需万篇规模库）；**大 PDF（数百页）索引耗时与问答引用片段**；**R-C3 800ms 首字节的稳定性**（仅最佳情况 692ms 达标，且补全与行内编辑共用模型设置）；（四后端上下文投递已由口令回显实机覆盖，见上）；**R-C2 真实供应商文生图**（本机无图像端点，用本地 stub 验证线格式与落盘）。
+仍未覆盖（如实登记）：**IME 组合态**（`@`/`#`/Alt 与行内编辑/补全的 `isComposing` 交互，仅单测覆盖）；**万篇级索引首次耗时**（需万篇规模库）；**大 PDF（数百页）索引耗时与问答引用片段**；**R-C3 800ms 首字节的稳定性**（仅最佳情况 692ms 达标，且补全与行内编辑共用模型设置）；（四后端上下文投递已由口令回显实机覆盖，见上）；**R-C5 的节点级 AI 写回撤销与 R-B3 覆盖、R-C4 的 A 级序列化、插件弹窗对比度均已修复并实机复验**；**R-C2 真实供应商文生图**（本机无图像端点，用本地 stub 验证线格式与落盘）。
 
 未证实风险：`pdfjsWorker` 全局污染（干净进程对照显示 PDF 不渲染与本插件无关，故不记为缺陷，但我们的引擎入口确实写入该全局）。
