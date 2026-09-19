@@ -881,10 +881,10 @@ export interface AuxQueryTurnRequest {
 | R-A4 | `78eeef05` | 四后端审计脚本含图片轮次 | **四后端真 CLI 审计 PASS**（vision 模型下模型确实读到图；vault 快照零变化；Codex 临时目录 0） | 面板内粘贴/拖拽、chip 缩略图、LaTeX 定界符实机未验 |
 | R-A5 | `47e90f95` | `InlineEditWidgets.test.ts` | 并行上限设置项与文案已验 | 交叉接受无漂移、键盘只作用聚焦项 |
 | R-A6 | `47e90f95` | `InlineEditDocumentMode.test.ts` | 「整篇」模式切换 active 正确转移 | >20k 笔记、diff 整段降级视图、Ctrl+Z 单步、二次确认 |
-| R-A7 | `47e90f95`、`c01a261f` | `InlineEditContextUi.test.ts` | 连续点击 3 行 → 3 个 chip 且选择器保持打开；目录条目可附加/取消；搜索 + 截断提示；截图 `ra7-picker-chips.png` | 拖拽（picker 已验，拖入未验） |
+| R-A7 | `47e90f95`、`c01a261f` | `InlineEditContextUi.test.ts` | 连续点击 3 行 → 3 个 chip 且选择器保持打开；目录条目可附加/取消；搜索 + 截断提示；截图 `ra7-picker-chips.png`。**「模型能读到附加内容」已实机成立**：辅助会话把附加笔记物化到临时工作目录，模型用只读 `Read` 工具读取它 | 拖拽（picker 已验，拖入未验） |
 | R-B1 | `f6543338` | `InlineEditAutoLink.test.ts` + 流程测试 | — | diff 中链接可见性实机未验；范围仅行内编辑（聊天侧未接线，已在实施报告记录） |
 | R-B2 | `f6543338` | `contextGroupPlan.test.ts` + 组附加用例 | 设置分区渲染（截图 `rb2-context-groups.png`） | 一键附加整组 → chip 的实机流程 |
-| R-B3 | `67ce67ae` | 58 例（含 retention / backendAgnostic） | 回退恢复文件、新建目录删除、有内容目录保留并如实上报、写入后**即时**可回退（3ms） | 侧栏 UI 截图 |
+| R-B3 | `67ce67ae` | 58 例（含 retention / backendAgnostic） | 回退恢复文件、新建目录删除、有内容目录保留并如实上报、写入后**即时**可回退（3ms）；**侧栏入口已验**：条目渲染 + 「回退」/「全部回退」按钮，收起态提示「本轮修改（可回退）：N」（截图 `rb3-revert-sidebar.png`） | — |
 | R-B4 | `b17508d7` | 52 例（含 gate 脚本真实 `/bin/sh` 测试） | CLI 探测 available；闸门就绪；真实包装脚本 → 确认框 → 拒绝/超时 → **"Nothing was executed"** | Windows 平台（已在 UI 如实标注不支持） |
 | R-B5 | `572947af`、`40a29b85`、`7deadbab`、`47790e76` | 46 例（含替身父目录校验） | 预览列 2 篇 → 确认执行 → 移动 → 一键回退；目录不存在时创建并披露；空目录回退时删除、有用户内容时保留 | — |
 | R-C1 | `07ba94d7` | 52 例（含关闭态逐字节回归） | 54/54 篇约 1s 索引；chip 显示路径 + 行号范围；取消有粘性；chip 对比度 7.39:1；索引在 `.opencodian/vault-index/` | 万篇级首次索引耗时（需万篇规模库） |
@@ -899,6 +899,10 @@ export interface AuxQueryTurnRequest {
 - **四后端上下文一致性**（`6cb0da04`）：修复前**上下文附件（文件/文件夹/PDF/检索片段）在 Claude/Codex 上完全到不了模型**（`buildObsidianContextTag` 仅被 OpenCode 序列化器调用；`grep contextAttachments|contextItems src/core/agents/backend/` 零命中）。修复扩展共享模块 `src/shared/obsidianContext.ts` 而非各写一套，顺序为 `[工具][记忆] → 用户文本 → 上下文块`（尊重提示缓存纪律），并以字节级对等测试钉住。**本地服务模式下 `file`/`current_note` 条目为路径引用（与 OpenCode 本地语义一致），由 CLI 用自身工具读取**——该端到端行为待实机复核。
 - **缺陷修复链**：R-B5-D1（移动到不存在目录静默无操作）→ R-B5-D2（用 `adapter.remove` 删目录被静默吞掉）→ R-B5-D2b（`adapter.rmdir` 同样抛 `EISDIR`，改用 `vault.delete`，并把测试替身改为与运行时一致）；R-C4-D1（阶梯门禁竞态致 A 级在正常路径永不激活）、D2（卸载抛错）、D3（相对路径喂给 `createRequire` 致引擎在生产环境永不加载）；R-C3-D1（`notify` 未接线致四条失败提示全静默）；R-C2-D1/D2/D3（畸形配置抛错、插件轮次 10 分钟不可回退、模态框内边距不一致）。
 
+### 新登记待修项（实机发现）
+
+**行内编辑遇到「工具调用式回复」时显示原始协议标记**：附加了上下文时，模型可能选择用只读工具读取该笔记而不产出 `<replacement>` 标签。此时面板**既无改写结果、也无 Notice、也无面板内错误**，唯一可见产物是澄清通道里的原始 `<|tool invoke …>` 标记（用户看不懂的内部语法）。对照：不附加任何上下文时同一路径正常（`busy` 101ms、预览 1216ms）。按 §6.7，此情形应给出诚实可读的说明（例如"模型选择了读取上下文而未产出改写"），而不是把协议语法摊给用户。**注意**：上下文投递本身是正常的（已证明模型确实读到了附加笔记）。
+
 ### 全局未覆盖清单（如实登记）
 
-面板贴图与 LaTeX 定界符实机；多片段交叉接受；大笔记全文模式与 diff 降级；内链在 diff 中可见；侧栏回退入口截图；IME 组合态（`@`/`#`/Alt）；万篇级索引耗时；C4 内文选中提问与大 PDF 索引耗时；C5 节点 AI 改写端到端（入口间歇缺席，未定因）；R-C3 实体 Alt 手势与 800ms 首字节；四后端下上下文投递的实机端到端（修复后待复核）。此外 `pdfjsWorker` 全局污染为**未证实风险**（干净进程对照显示 PDF 不渲染与本插件无关）。
+面板贴图与 LaTeX 定界符实机；多片段交叉接受；大笔记全文模式与 diff 降级；内链在 diff 中可见；IME 组合态（`@`/`#`/Alt）；万篇级索引耗时；C4 内文选中提问与大 PDF 索引耗时；C5 节点 AI 改写端到端（入口间歇缺席，未定因）；R-C3 实体 Alt 手势与 800ms 首字节；四后端下上下文投递的实机端到端（修复后待复核）。此外 `pdfjsWorker` 全局污染为**未证实风险**（干净进程对照显示 PDF 不渲染与本插件无关）。
