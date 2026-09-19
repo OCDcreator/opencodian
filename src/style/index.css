@@ -35,5 +35,6 @@
 @import 'modals/config-editor-modal.css';
 @import 'modals/batch-organize-modal.css';
 @import 'modals/obsidian-tooling-confirm-modal.css';
+@import 'modals/inline-edit-confirm-modal.css';
 @import 'modals/provider-icon-cache.css';
 @import 'modals/image-generation-modal.css';

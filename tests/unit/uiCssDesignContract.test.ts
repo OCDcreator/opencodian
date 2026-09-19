@@ -33,9 +33,11 @@ function getCssRuleBlock(css: string, selector: string): string {
 const BATCH_CSS = 'src/style/modals/batch-organize-modal.css';
 const TOOLING_CSS = 'src/style/modals/obsidian-tooling-confirm-modal.css';
 const IMAGEGEN_CSS = 'src/style/modals/image-generation-modal.css';
+const INLINE_EDIT_CONFIRM_CSS = 'src/style/modals/inline-edit-confirm-modal.css';
 const BATCH_TS = 'src/app/batchOrganize/BatchOrganizeModal.ts';
 const TOOLING_TS = 'src/app/obsidianTooling/ObsidianToolingApprovalModal.ts';
 const IMAGEGEN_TS = 'src/features/chat/ui/ImageGenerationModal.ts';
+const INLINE_EDIT_CONFIRM_TS = 'src/features/inline-edit/InlineEditConfirmModal.ts';
 
 /** `border-left`/`border-right` wider than 1px is an impeccable ban. */
 const SIDE_STRIPE_PATTERN = /border-(?:left|right):\s*(?!1px|0\b|0px\b|none\b|transparent\b)[1-9]\d*(?:\.\d+)?px/;
@@ -146,6 +148,39 @@ describe('obsidian tooling approval modal design contract', () => {
     expect(css).toMatch(/focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--interactive-accent\)/s);
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)/);
     expectNoMatches(css, SIDE_STRIPE_PATTERN, 'tooling side stripe');
+  });
+});
+
+describe('inline edit document-replace confirm modal design contract', () => {
+  const css = read(INLINE_EDIT_CONFIRM_CSS);
+  const ts = read(INLINE_EDIT_CONFIRM_TS);
+
+  it('scopes the destructive button under a modal root class applied in the TS', () => {
+    expect(css).toMatch(/\.opencodian-inline-edit-confirm-modal\s+\.mod-destructive/);
+    expect(ts).toContain("modal.modalEl.addClass('opencodian-inline-edit-confirm-modal')");
+    // The destructive pairing comes from the native setWarning() vocabulary.
+    expect(ts).toContain('.setWarning()');
+  });
+
+  it('keeps the destructive label legible: deepened rose plus a light label (measured 4.22:1 before, ~7.3:1 after)', () => {
+    // The rule targets both destructive class names under one selector list;
+    // grab the first rule block through its shared body.
+    const deny = css.match(
+      /\.opencodian-inline-edit-confirm-modal \.mod-destructive[^{]*\{([^}]*)\}/,
+    )?.[1] ?? '';
+    expect(deny).not.toBe('');
+    // Deepened with DESIGN.md ink-graphite; a lightened rose would fix light
+    // themes but break dark ones and would soften the danger signal.
+    expect(deny).toContain('#e11d48');
+    expect(deny).toContain('#0f172a');
+    expect(deny).toMatch(/color:\s*#fff/);
+  });
+
+  it('carries the same contract on the legacy mod-warning vocabulary and stays motion-safe', () => {
+    expect(css).toMatch(/\.opencodian-inline-edit-confirm-modal \.mod-warning/);
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)/);
+    expect(css).toContain('opencodian-inline-edit-confirm-modal');
+    expectNoMatches(css, SIDE_STRIPE_PATTERN, 'inline-edit confirm side stripe');
   });
 });
 

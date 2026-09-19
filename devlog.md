@@ -11,6 +11,14 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-18 整篇行内编辑确认按钮对比度契约（R-A6，4.22:1 → ~7.3:1）
+
+实机实测缺陷（CDP 取真实计算样式、canvas 光栅化按 WCAG 相对亮度合成）：整篇替换二次确认弹窗的「替换整篇」按钮（Obsidian 原生 `setWarning()` → `mod-destructive mod-cta`，13px 标签）为近黑标签压 `rgb(211,47,47)` 底，**实测 4.22:1，低于 13px 文本的 4.5:1 下限**（同弹窗取消按钮 7.77:1 达标）。该按钮把守整篇 `replaceRange` 破坏性写入，标签读不清是可达性缺口而非观感问题。
+
+**接缝选择**：完全复用仓库已建立的同一宿主配色契约——`obsidian-tooling-confirm-modal.css`「拒绝按钮对比度契约」的配方（DESIGN.md rose 与 ink-graphite 72/28 混色作底 + `#fff` 浅标签，兄弟模块实测 ~7.3:1，本混色按 WCAG 计算约 7.36:1），不发明新色板、不提亮底色（提亮只在浅色主题成立且软化危险信号，违反 DESIGN.md §2 Status Honesty）。按钮是 `Setting().addButton(...)` 产物、与消息 div 互为兄弟，故 TS 侧给 `modal.modalEl` 挂弹窗级类 `opencodian-inline-edit-confirm-modal`，CSS 新模块 `src/style/modals/inline-edit-confirm-modal.css`（接入 `src/style/index.css`）经该类命中破坏性按钮；同时命中 `.mod-destructive`（1.13.x `setWarning()` 实测产出）与 `.mod-warning`（旧词汇）防版本漂移。加深后的按钮仍明确读作危险操作：深危险底、浅标签、原生破坏性词汇未动。刻意不加布局 token——弹窗其余沿用宿主默认，本模块只承载对比度契约。测试：`uiCssDesignContract.test.ts` 新增 3 例（弹窗级类 + setWarning 词汇、混色/浅标签规则体、mod-warning 双词汇 + reduced-motion + 无侧条纹）。诚实边界：修复后数值来自同配方兄弟模块实测与 WCAG 计算（~7.3:1 / ~7.36:1），真实对比度无法单测，实机复测由主智能体执行。
+
+---
+
 ## 2026-09-18 行内编辑取消路径归属裁决与数据保护（R-A5 Esc/pointerdown/focusout 误伤修复）
 
 实机实测缺陷（CDP，Obsidian 1.13.7）：同一笔记两条指令条（A 有选区、B 光标位，均已输入内容），焦点在 A，真实 Escape 后**两条全部被拒**——B 的已输入内容随之丢失。根因（A1）：每条面板各自在 document 捕获态挂 keydown，守卫在**handler 运行时**重读 live `activeElement`；A 先响应并拆除 DOM，焦点跌回 body，B 的守卫对同一事件随即失真而自毁——判定顺序依赖，天然错误。代码同构缺陷（A2）：面板外 pointerdown 只测「是否在本面板内」，点击 A 会拒绝 B；（A3）：`focusout` 无条件拒绝，且与 A2 叠加后鼠标用户**无法**并行多编辑——点正文唤起第二条必然毁掉第一条连同输入。

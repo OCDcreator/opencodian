@@ -30661,6 +30661,45 @@ img.opencodian-model-provider-header-icon {
 }
 
 
+/* modals/inline-edit-confirm-modal.css */
+/* ============================================================
+   Inline Edit document-replace confirm modal (R-A6) — the second
+   confirmation gating a destructive whole-note replacement.
+   Contrast contract: the host theme renders the setWarning()
+   button (mod-destructive / mod-warning) as a near-black label on
+   rgb(211,47,47) — measured live at 4.22:1, below the 4.5:1 floor
+   for a 13px label. Same treatment as the tooling approval modal
+   (obsidian-tooling-confirm-modal.css): deepen the rose with
+   DESIGN.md ink-graphite and pair it with a light label — ~7.3:1
+   live-measured on that sibling, ~7.36:1 computed for this mix.
+   Lightening the rose instead would fix light themes but break
+   dark ones, and would soften the danger signal against DESIGN.md
+   §2 Status Honesty. The button keeps reading as destructive:
+   deep danger ground, light label, native destructive vocabulary
+   untouched.
+   DOM contract: src/features/inline-edit/InlineEditConfirmModal.ts
+   ============================================================ */
+
+.opencodian-inline-edit-confirm-modal .mod-destructive,
+.opencodian-inline-edit-confirm-modal .mod-warning {
+  background: color-mix(in srgb, #e11d48 72%, #0f172a);
+  color: #fff;
+  transition: background-color 150ms ease;
+}
+
+.opencodian-inline-edit-confirm-modal .mod-destructive:hover,
+.opencodian-inline-edit-confirm-modal .mod-warning:hover {
+  background: color-mix(in srgb, #e11d48 82%, #0f172a);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opencodian-inline-edit-confirm-modal .mod-destructive,
+  .opencodian-inline-edit-confirm-modal .mod-warning {
+    transition: none;
+  }
+}
+
+
 /* modals/provider-icon-cache.css */
 .opencodian-icon-cache-modal-summary {
   margin-bottom: 24px;

@@ -16,3 +16,7 @@ confirmInlineEditDocumentReplace(app, { notePath, charCount }): Promise<boolean>
 ## 依赖
 
 - `obsidian`（Modal / Setting）、`../../i18n`
+
+## 样式合同（R-A6，2026-09-18）
+
+`modal.modalEl` 挂 `opencodian-inline-edit-confirm-modal` 弹窗级类：确认按钮是 `Setting().addButton(...)` 的产物、与消息 div 互为兄弟，破坏性按钮对比度契约（`setWarning()` 实测 4.22:1 → 加深 rose + 浅标签 ~7.3:1）必须经弹窗级类命中，规则在 `src/style/modals/inline-edit-confirm-modal.css`（详见该样式模块文档的对比度契约段）。

@@ -31,6 +31,11 @@ export function confirmInlineEditDocumentReplace(
 ): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
     const modal = new Modal(app);
+    // Modal-level scope for the style module: the Setting buttons are
+    // siblings of the message div, so the destructive-contrast contract in
+    // src/style/modals/inline-edit-confirm-modal.css hangs off the modal
+    // root class (R-A6).
+    modal.modalEl.addClass('opencodian-inline-edit-confirm-modal');
     let settled = false;
     const settle = (value: boolean): void => {
       if (settled) return;
