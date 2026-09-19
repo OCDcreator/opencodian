@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "39f66b1dff1934e2d2c144449c0033914d070fedd1f3f8fe7069e617e638d801",
+  "digest": "b453e3ae34d0a5e83ff269e23f31281a23ebbdf6c005b5a06b0fe804166a90e1",
   "recordCount": 750,
   "records": [
     {
@@ -1161,7 +1161,7 @@
     {
       "kind": "src",
       "key": "src/core/types/index.ts",
-      "sha256": "84ab71cbf91b5cda1010f52bcef3b083505b95dccac489d189a22ac780c38b74"
+      "sha256": "c5e65939cbc4837816c3b2372c15f7017ef99aab92f69a4b40fa86cf5a7efab4"
     },
     {
       "kind": "src",
@@ -1186,12 +1186,12 @@
     {
       "kind": "src",
       "key": "src/core/types/settings.ts",
-      "sha256": "72ab872eb08c7384db901f4c491a649adf1f2638f3547304ce07f36e57e75bd0"
+      "sha256": "2606787a8556f8eac6ed5ee22dace9f1c4408828909836d11eb4bcef7ae9f5db"
     },
     {
       "kind": "src",
       "key": "src/core/types/settingsLoadNormalization.ts",
-      "sha256": "fd338e679a221be18156032bfa6c49fe42b3db6fa82cbd2765a2e386937931d2"
+      "sha256": "1c6260290100715e6c31558b9f1924e196666da001546a24802a8469de4eb059"
     },
     {
       "kind": "src",
@@ -2451,7 +2451,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineCompletionService.ts",
-      "sha256": "e9da0b52b56870a7863ae21e4daba504cf3bbf17a53ca7e5a1b75eda08705a95"
+      "sha256": "8afda2649f9f39f28f595a5df03d935f9199a6a923a66718f96d202c6a440d92"
     },
     {
       "kind": "src",
@@ -2556,7 +2556,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditPluginHost.ts",
-      "sha256": "3de9d2c1e312711a5435b1b162e5417da97d2e6d6c75bebf386b33b06fed58f0"
+      "sha256": "82586e7ffdfc67fda9468d0499b526106da9bda450458cfc45d7c5f5c15b69d5"
     },
     {
       "kind": "src",
@@ -2571,7 +2571,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditPrompt.ts",
-      "sha256": "7c1aaddc429fd8f46f92a5be1d77aae6c55b42e3d26c85bf8d2c36485f394e4a"
+      "sha256": "f5015dd8440742f18f94b8b9e14272004221f8b7f92c340d247910f83c9e613f"
     },
     {
       "kind": "src",
@@ -2976,7 +2976,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsInlineEditSection.ts",
-      "sha256": "efa2bcf24c14e30f8541a06d6e00800b074a68060657ca6cc73b712552955606"
+      "sha256": "2f7e25ece9a4339c612bc9141c9c8a9f1817afb520999b602450291b8e3ab8fb"
     },
     {
       "kind": "src",
@@ -3191,7 +3191,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "ee1b9166612148c4450a07d6f6ee4237053b0967cfe60c4423e44247508c518d"
+      "sha256": "fdecfe911f4cddd0db724cbc2a4ddd4dd6f836f8179fda8ecbada8ae87098a2a"
     },
     {
       "kind": "src",
@@ -3201,12 +3201,12 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "df53450805b5f79521a23e5ab37fcdb882530412eb511c633b9cdd72118bb465"
+      "sha256": "55f8d2b3cf8b4ee8a2502dbb51b849c5f219d03527001e578fc91d9cae5ee436"
     },
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "c4d03620068fdfcdaf7707f39d381c55f922bccf3d3971979f4a84c3529c5364"
+      "sha256": "4fdf9e3915c1211cf32d5d714bcf60be0e8f4e45009b9ff00b5c118aa84e1dd0"
     },
     {
       "kind": "src",
@@ -3754,7 +3754,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-19T07:07:19.841Z",
-  "headShaAtGeneration": "0fada4d1af706132a6c595f88b963939186e6843",
+  "generatedAt": "2026-09-19T07:53:44.011Z",
+  "headShaAtGeneration": "fdbf22c1f21109d47373a573fa858da71a1063de",
   "graphifyVersion": "graphify 0.9.36"
 }
