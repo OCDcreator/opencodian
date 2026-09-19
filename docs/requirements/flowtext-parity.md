@@ -881,7 +881,7 @@ export interface AuxQueryTurnRequest {
 | R-A4 | `78eeef05` | 四后端审计脚本含图片轮次 | **四后端真 CLI 审计 PASS**（vision 模型下模型确实读到图；vault 快照零变化；Codex 临时目录 0） | 面板内粘贴/拖拽、chip 缩略图、LaTeX 定界符实机未验 |
 | R-A5 | `47e90f95`、`9babaf49`、`49c6b55c` | `InlineEditWidgets.test.ts`、`InlineEditInputOverlay.test.ts`、`InlineEditOverlayDismissal.test.ts` | 并行上限设置项与文案已验；**同一笔记内两编辑共存**（选区 + 光标，`overlayCount: 2`，截图 `ra5-two-panels.png`）；**交叉接受无漂移**（接受 A 只改 line 2，第二段未波及，B 面板/模式/输入内容/锚点行全保留）；**面板互不遮挡**（重叠面积 0，各自工具栏经 `elementFromPoint` 可达）；**Esc 只作用于聚焦编辑**（焦点在 A 时真实 Escape 只关 A，B 内容不丢） | — |
 | R-A6 | `47e90f95`、`f33732bc` | `InlineEditDocumentMode.test.ts` | 「整篇」模式切换 active 正确转移；**独立命令入口**（面板模式「整篇」、占位符「描述要如何修改整篇笔记…」）；**二次确认弹窗**（「应用整篇修改？」+ 取消/替换整篇，确认前文档逐字节未变，截图 `ra6-document-confirm.png`）；**单步撤销**（一次 Cmd+Z 精确还原原文，`restoredExactly: true`）；**降级差异视图**（3961 字符触发「内容过大，仅显示前后对照。」且词级标记数为 0，截图 `ra6-degraded.png`）；确认按钮标签对比度 4.22:1 → **4.98:1** | 20k+ 字符笔记未单独构造（降级路径已由 3961 字符触发并验证） |
-| R-A7 | `47e90f95`、`c01a261f` | `InlineEditContextUi.test.ts` | 连续点击 3 行 → 3 个 chip 且选择器保持打开；目录条目可附加/取消；搜索 + 截断提示；截图 `ra7-picker-chips.png`。**「模型能读到附加内容」已实机成立**：辅助会话把附加笔记物化到临时工作目录，模型用只读 `Read` 工具读取它 | 拖拽（picker 已验，拖入未验） |
+| R-A7 | `47e90f95`、`c01a261f` | `InlineEditContextUi.test.ts` | 连续点击 3 行 → 3 个 chip 且选择器保持打开；目录条目可附加/取消；搜索 + 截断提示；截图 `ra7-picker-chips.png`。**「模型能读到附加内容」已实机成立**：辅助会话把附加笔记物化到临时工作目录，模型用只读 `Read` 工具读取它。**四后端口令回显测试**（§6.5）：`claude-code` 两次独立运行均把只存在于附加笔记中的口令写进改写结果 → **上下文投递成立**；`pi` 在路径配为对象形态后辅助会话可启动；`opencode` 走只读工具路径并给出诚实文案；`codex` 如实拒绝（需 app-server） | 拖拽（picker 已验，拖入未验） |
 | R-B1 | `f6543338` | `InlineEditAutoLink.test.ts` + 流程测试 | **内链在差异视图中可见**：参考笔记含 `## 注意力机制` 并经真实 UI 附加为上下文后，预览（diff）中出现指向该标题的 `[[ref-attention.md#注意力机制]]`，在接受前即可见（截图 `rb1-autolink.png`）；**需协议合规模型**（`deepseek/deepseek-v4-flash` 会先吐伪工具标记而拿不到改写结果，改用 `opencode-go/gpt-5.6-luna` 即稳定产出） | 范围仅行内编辑（聊天侧未接线，已在实施报告记录）；死链与代码块内不插链接由单测覆盖，未单独实机构造 |
 | R-B2 | `f6543338` | `contextGroupPlan.test.ts` + 组附加用例 | 设置分区渲染（截图 `rb2-context-groups.png`）；**一键附加整组已实机**：选择器出现「主题组」分区与「RB2 主题组 2 个条目」行，点击后两条目同时成为 chip（`rb2-alpha`、`rb2-beta`）且选择器保持打开 | — |
 | R-B3 | `67ce67ae` | 58 例（含 retention / backendAgnostic） | 回退恢复文件、新建目录删除、有内容目录保留并如实上报、写入后**即时**可回退（3ms）；**侧栏入口已验**：条目渲染 + 「回退」/「全部回退」按钮，收起态提示「本轮修改（可回退）：N」（截图 `rb3-revert-sidebar.png`） | — |
@@ -896,7 +896,7 @@ export interface AuxQueryTurnRequest {
 
 ### 跨条目修正
 
-- **四后端上下文一致性**（`6cb0da04`）：修复前**上下文附件（文件/文件夹/PDF/检索片段）在 Claude/Codex 上完全到不了模型**（`buildObsidianContextTag` 仅被 OpenCode 序列化器调用；`grep contextAttachments|contextItems src/core/agents/backend/` 零命中）。修复扩展共享模块 `src/shared/obsidianContext.ts` 而非各写一套，顺序为 `[工具][记忆] → 用户文本 → 上下文块`（尊重提示缓存纪律），并以字节级对等测试钉住。**本地服务模式下 `file`/`current_note` 条目为路径引用（与 OpenCode 本地语义一致），由 CLI 用自身工具读取**——该端到端行为待实机复核。
+- **四后端上下文一致性**（`6cb0da04`）：修复前**上下文附件（文件/文件夹/PDF/检索片段）在 Claude/Codex 上完全到不了模型**（`buildObsidianContextTag` 仅被 OpenCode 序列化器调用；`grep contextAttachments|contextItems src/core/agents/backend/` 零命中）。修复扩展共享模块 `src/shared/obsidianContext.ts` 而非各写一套，顺序为 `[工具][记忆] → 用户文本 → 上下文块`（尊重提示缓存纪律），并以字节级对等测试钉住。**端到端已实机复核**：以「口令回显」为判据（口令只存在于附加笔记中），`claude-code` 两次独立运行均回显成功；`opencode` 走只读工具路径并如实提示；`codex` 因辅助会话需 app-server 而**如实拒绝**（fail-closed，符合 §6.5/§6.7）；`pi` 在可执行路径配为对象形态后可启动。另登记一条健壮性缺口：`normalizeBackendSettings` 对字符串形态的后端配置**静默清空**（旧版本/手改/跨平台同步留下的形态会被无声丢弃，建议迁移而非丢弃）。
 - **缺陷修复链**：R-B5-D1（移动到不存在目录静默无操作）→ R-B5-D2（用 `adapter.remove` 删目录被静默吞掉）→ R-B5-D2b（`adapter.rmdir` 同样抛 `EISDIR`，改用 `vault.delete`，并把测试替身改为与运行时一致）；R-C4-D1（阶梯门禁竞态致 A 级在正常路径永不激活）、D2（卸载抛错）、D3（相对路径喂给 `createRequire` 致引擎在生产环境永不加载）；R-C3-D1（`notify` 未接线致四条失败提示全静默）；R-C2-D1/D2/D3（畸形配置抛错、插件轮次 10 分钟不可回退、模态框内边距不一致）。
 
 ### 新登记待修项（实机发现）
@@ -915,6 +915,6 @@ export interface AuxQueryTurnRequest {
 
 本轮已补齐（详见上表）：面板贴图（chip 缩略图 + LaTeX 定界符）、多片段交叉接受与键盘作用域、大笔记全文模式与 diff 降级、二次确认与单步撤销、内链在 diff 中可见、C5 节点 AI 改写端到端、C4 内文选中提问、R-C3 实体 Alt 手势与 Tab/撤销。
 
-仍未覆盖（如实登记）：**IME 组合态**（`@`/`#`/Alt 与行内编辑/补全的 `isComposing` 交互，仅单测覆盖）；**万篇级索引首次耗时**（需万篇规模库）；**大 PDF（数百页）索引耗时与问答引用片段**；**R-C3 800ms 首字节的稳定性**（仅最佳情况 692ms 达标，且补全与行内编辑共用模型设置）；**四后端下上下文投递的实机端到端**（修复后仅 OpenCode 侧实测，Claude/Codex 因本机 CLI 不可用未复核：`claude` 启动即退出码 1、`codex` 可执行路径是 Windows 路径）；**R-C2 真实供应商文生图**（本机无图像端点，用本地 stub 验证线格式与落盘）。
+仍未覆盖（如实登记）：**IME 组合态**（`@`/`#`/Alt 与行内编辑/补全的 `isComposing` 交互，仅单测覆盖）；**万篇级索引首次耗时**（需万篇规模库）；**大 PDF（数百页）索引耗时与问答引用片段**；**R-C3 800ms 首字节的稳定性**（仅最佳情况 692ms 达标，且补全与行内编辑共用模型设置）；（四后端上下文投递已由口令回显实机覆盖，见上）；**R-C2 真实供应商文生图**（本机无图像端点，用本地 stub 验证线格式与落盘）。
 
 未证实风险：`pdfjsWorker` 全局污染（干净进程对照显示 PDF 不渲染与本插件无关，故不记为缺陷，但我们的引擎入口确实写入该全局）。
