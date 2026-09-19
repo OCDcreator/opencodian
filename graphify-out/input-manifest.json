@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "c7d3d6f17585c04490de52f44fdbc248796a4e705255753ea87a6491c4bbccb2",
+  "digest": "a780d070b5ff48397bb54bffe620e3ab366f1c166d257187e6f6b1f27e46f6ab",
   "recordCount": 749,
   "records": [
     {
@@ -531,7 +531,7 @@
     {
       "kind": "src",
       "key": "src/core/canvas/CanvasNodeWriteService.ts",
-      "sha256": "e9bf18211e4290521949c9014d06c32c2c281545fcc45524eec7d84fa91bd9bd"
+      "sha256": "ffab356fb2c74ed328e6fea879db925d95850eab5f35526a51c24c9507aa617c"
     },
     {
       "kind": "src",
@@ -1036,7 +1036,7 @@
     {
       "kind": "src",
       "key": "src/core/pdf/pdfViewProbe.ts",
-      "sha256": "47c0ecd8ef8aeaf579cc52d1b5fc2f0727f23daffdb7e69a23943b8210a55244"
+      "sha256": "1643dd4fce0e5f0f06a0eabfff9a02227ee3f39246aab44f341ed1d9212cc00b"
     },
     {
       "kind": "src",
@@ -1096,7 +1096,7 @@
     {
       "kind": "src",
       "key": "src/core/storage/EditRevertService.ts",
-      "sha256": "781c95de5be5d7389eb48e4f1fc309614a5f700a0fdfda05b5df4de44a7cef65"
+      "sha256": "8d5780ff1d2238caef70148b1e446b164997fe121c9743d9fab3b29bbc01a919"
     },
     {
       "kind": "src",
@@ -1206,12 +1206,12 @@
     {
       "kind": "src",
       "key": "src/features/canvas-integration/CanvasGenerationFlow.ts",
-      "sha256": "e0247ef49a675e479903e1fbcf25f4ab4d33556a87837b7a04d182a9a49a2fd4"
+      "sha256": "a9fc58ce66a2e89f300ffaa76310e571357e15609de719ca7678c4326800fadd"
     },
     {
       "kind": "src",
       "key": "src/features/canvas-integration/CanvasIntegrationController.ts",
-      "sha256": "e6f2d3ef2346363a2030d3ca1adb0d927984449ed2d14ba5574f5a4bb15a9038"
+      "sha256": "c62319c91d04c6e53032cae0d544163bdc0cb78b5b828664d84c7b9204e5ab0c"
     },
     {
       "kind": "src",
@@ -1221,7 +1221,7 @@
     {
       "kind": "src",
       "key": "src/features/canvas-integration/CanvasRewriteModals.ts",
-      "sha256": "cb39eee24d87f129d86b61283cce57b4a111bedb0b6e3a06dd2fac1d00c399cb"
+      "sha256": "e9ad152c51ec9fec629472236df62b36dec8535145bd32d731dbee78b0522478"
     },
     {
       "kind": "src",
@@ -1976,12 +1976,12 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/PdfAnnotationPreviewModal.ts",
-      "sha256": "f456f3eacd6d83aba84d577d081a05e24dd429468161cb5faa73f0e6d3e3ab6f"
+      "sha256": "9b1db2192e371b93325fd47404f211f8e3657a101529e4743a630db8a1ab0ed7"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/PdfChatIntegration.ts",
-      "sha256": "3074435337d9c9446a9ea527ce253f188a3097b27d43b078c9480133edb4617a"
+      "sha256": "1cbd0a8ba463b63b962c6e08bfadcd388b1ca84dd7f65d9fc1116edd216762b1"
     },
     {
       "kind": "src",
@@ -3186,7 +3186,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "3484c9fd7a07b8506552cb11fb8e3a05526c0b53f7121f574c2db0ca611a82b6"
+      "sha256": "ee1b9166612148c4450a07d6f6ee4237053b0967cfe60c4423e44247508c518d"
     },
     {
       "kind": "src",
@@ -3196,7 +3196,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "00ac3e4426a7ba2042992125dd9c78e40ea800ecb662fd2a2ca18b071d3b85c8"
+      "sha256": "df53450805b5f79521a23e5ab37fcdb882530412eb511c633b9cdd72118bb465"
     },
     {
       "kind": "src",
@@ -3261,12 +3261,12 @@
     {
       "kind": "src",
       "key": "src/shared/editRevertPlan.ts",
-      "sha256": "086fd347394399c84e719ad71bec9f590a7a0ca7d128bf8fc7219fc09dc4ea25"
+      "sha256": "87ed4a23c965d243a9eafee24aaa898a7bd4cadeb21804364afe9253222cf896"
     },
     {
       "kind": "src",
       "key": "src/shared/index.ts",
-      "sha256": "a57941d6f31f9001846bacb6b4be393d3033904647e830c4fabbe589b259b7a6"
+      "sha256": "d52525f69490b86309fc8b17fe0e8e2491715dc0ca331254274b08d8f0841a80"
     },
     {
       "kind": "src",
@@ -3466,12 +3466,12 @@
     {
       "kind": "src",
       "key": "src/style/index.css",
-      "sha256": "ab781bd1da095a99ca870b3117267b58f945e8cd40bf7efc47be15ed529156bd"
+      "sha256": "99667013d0d6ecc461143adb16bd4085ce31f79ce85619acc160f6496dc76416"
     },
     {
       "kind": "src",
       "key": "src/style/modals/batch-organize-modal.css",
-      "sha256": "64085b1954d250f1c8d9967473e2745872066831632d71387f9cc05df3612e76"
+      "sha256": "d5de890a86644903961a1ad2e0b388bb982a90e3a0903fc5bc7ac3e9778fba1f"
     },
     {
       "kind": "src",
@@ -3486,22 +3486,22 @@
     {
       "kind": "src",
       "key": "src/style/modals/image-generation-modal.css",
-      "sha256": "ecbd245384a5d857ca7f247132ea89705273f72baa1b06bbac5942330814cb49"
-    },
-    {
-      "kind": "src",
-      "key": "src/style/modals/inline-edit-confirm-modal.css",
-      "sha256": "91583dc543018b982a75a8541772a9a31bc50358e5dcb1eb6dc3d0f9a8fd97e4"
+      "sha256": "49786c46ff6d03121d6c5881608e6a1fc875703a55a39a7c1f3a4830bee81cd6"
     },
     {
       "kind": "src",
       "key": "src/style/modals/obsidian-tooling-confirm-modal.css",
-      "sha256": "9e605b076ae1a250d7e4e95891d407dfa5037544906c42a4dc47d264daf35cb3"
+      "sha256": "5f035fd9bcf06da51ab738ea566278a4d733a6b2c04de027667258c3ea606113"
     },
     {
       "kind": "src",
       "key": "src/style/modals/permission-dialog.css",
       "sha256": "7e9b263ee409ed01e99aeb4df8fe3178da100c33477e60630d0619f310392b47"
+    },
+    {
+      "kind": "src",
+      "key": "src/style/modals/plugin-modal-contrast.css",
+      "sha256": "6adfd0aa76e9ce93f807b018d34d2b8371a421ed61509ce293e55b4e2e5d030e"
     },
     {
       "kind": "src",
@@ -3749,7 +3749,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-19T02:40:08.804Z",
-  "headShaAtGeneration": "66fe73f310922755bf9a036ad0ae77b036167a15",
+  "generatedAt": "2026-09-19T03:40:12.617Z",
+  "headShaAtGeneration": "0e591a8ba1c5c95f7a61290d3e83b868fc3f70ba",
   "graphifyVersion": "graphify 0.9.36"
 }
