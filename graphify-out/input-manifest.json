@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "180170f42193ed29607608d40779003217041fea6b14e9a84fbfe40070195d34",
+  "digest": "46cc25b345c9ca50d4e5227a13b0a4b1dd513f4d1850ab69824be50ea91c336c",
   "recordCount": 750,
   "records": [
     {
@@ -1371,7 +1371,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/ChatRuntimeComposition.ts",
-      "sha256": "f5bf1fcd540a274ef9ea89277cefa3397166bd174ee6b524b7e97308931f8af6"
+      "sha256": "2d41d0c99229f4f0d898bca9d59f43c69d73b2319d24e7660c3ab55038118561"
     },
     {
       "kind": "src",
@@ -1541,7 +1541,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/AssistantAutoInternalLinkService.ts",
-      "sha256": "166d4e136f32bf0909cae3bbd44ee184fe8cb45b4014cc190ab4d52f01bf8ccb"
+      "sha256": "c74cb39b0b0d915658f2e58f66fa099baf57ec4f8008fbb3910b222bdd0851be"
     },
     {
       "kind": "src",
@@ -1766,7 +1766,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ConversationAuthoritativeSyncCoordinator.ts",
-      "sha256": "7941736074d9463571e53b8ba3bc94b641f338a0a60f1aa600e150744622fbb7"
+      "sha256": "593b1b130d612abb9372f6cbb8ec20a3806a11075a520a7672b0cee5db5e1aa7"
     },
     {
       "kind": "src",
@@ -1811,7 +1811,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ConversationRenderService.ts",
-      "sha256": "4eae5498dde53f78df569329cbae573abc8205b8f6ae043617ddf8bafc8188a9"
+      "sha256": "b2002a7d357aa6ae673853b58072af76177a103f58e17b95a73257428dce6ec3"
     },
     {
       "kind": "src",
@@ -3754,7 +3754,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-19T04:35:31.076Z",
-  "headShaAtGeneration": "14be905bc0eafe463170f2d308ddcd796098c39f",
+  "generatedAt": "2026-09-19T05:36:34.658Z",
+  "headShaAtGeneration": "c204d314d3398fd76431312a55af5844b85f688e",
   "graphifyVersion": "graphify 0.9.36"
 }
