@@ -81,6 +81,17 @@ The inspector returns the owner, its responsibilities, canonical state, entrypoi
 - `src/features/chat/liquidDiamondDemo.ts`, `src/features/chat/liquidDiamondDemoWebgl.ts`, and `src/features/chat/glassOctahedronDemo.ts`: experimental visual demos. Keep them opt-in and do not expose them in stable UI paths by accident.
 - `src/features/inline-edit/**`: inline edit (select text or place the cursor → embedded input box → in-place word diff → accept/reject). The feature is UI plus orchestration only: every backend must implement `AgentAuxQueryCapability.startAuxQuerySession()` and prove read-only execution at runtime, and the only write path is a single `editor.replaceRange` in `InlineEditController` taken after a snapshot dirty check. Backend-specific aux sessions live in `src/core/agents/backend/auxiliary/` (opencode/claude/codex) and `src/core/agents/backend/pi/PiAuxQuerySession.ts`. Do not weaken the fail-closed rules to make a backend "work": the gate is `node scripts/audit/run-aux-query-audit.mjs` (real CLIs, real models).
 
+## Destructive Command Policy (hard rule)
+
+A dispatched agent once ran `rm -rf` against the project root while cleaning up what it believed was a stray directory, and suppressed the error with `2>/dev/null`. It destroyed the checkout and, because the repository lived inside a Syncthing-synced vault, put the user's vault data at risk. These rules exist because of that incident; they are not advisory.
+
+- **Never run a recursive delete** (`rm -rf`, `rm -r`, `find -delete`, `git clean -fdx`, PowerShell `Remove-Item -Recurse`) **outside the repository worktree you were given**. The worktree is the boundary of your write authority.
+- **Before any recursive delete inside the worktree**, verify the absolute target with `realpath` (or `cd <dir> && pwd -P`) and confirm it is inside that worktree. Delete explicit paths you created; never delete a computed/derived/variable path.
+- **Never suppress stderr on a destructive command.** `2>/dev/null` on a delete is forbidden: the error text is the last chance to notice you are deleting the wrong thing.
+- **Prefer reversible operations**: `git clean -n` before `git clean -f`, `git stash` before discarding, moving to a temp directory before deleting.
+- **Do not delete anything you did not create.** If a path looks stray but you did not create it in this session, stop and report instead of cleaning it up.
+- **Keep repositories, worktrees, and agent scratch dirs outside synced folders.** A sync client can propagate a local deletion to every peer within seconds; nothing in this repo may assume a backup exists.
+
 ## Non-Obvious Rules
 
 - Model availability is resolved in layers: provider toggles live in local `.opencode` config, per-model toggles live in plugin `disabledModelRefs`, and the chat/title-generation flows consume the filtered catalog.
