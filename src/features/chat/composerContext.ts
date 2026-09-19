@@ -53,6 +53,31 @@ export function removeDraftContextItemsByTarget(
   return items.filter((item) => getPromptContextTargetKey(item) !== targetKey);
 }
 
+/**
+ * Send-path existence gate (R-B2 parity): partition context items into
+ * entries whose vault path still resolves and entries that no longer exist.
+ * A path deleted after attach (moved, trashed, removed outside Obsidian) must
+ * never reach the request as an unreadable file part — the caller drops the
+ * missing entries from the outgoing context, prunes their draft chips and
+ * reports them once with the group-attach vocabulary, so the turn always
+ * sends. Pure so the semantics stay unit-testable without Obsidian.
+ */
+export function partitionExistingContextItems(
+  items: readonly PromptContextItem[],
+  hasEntryAtPath: (path: string) => boolean,
+): { existing: PromptContextItem[]; missingPaths: string[] } {
+  const existing: PromptContextItem[] = [];
+  const missingPaths: string[] = [];
+  for (const item of items) {
+    if (hasEntryAtPath(item.path)) {
+      existing.push(item);
+    } else if (!missingPaths.includes(item.path)) {
+      missingPaths.push(item.path);
+    }
+  }
+  return { existing, missingPaths };
+}
+
 export function createFocusContextPreview(
   path: string,
   lineRange?: PromptContextLineRange,

@@ -119,6 +119,9 @@ function createComposerSendContext(): MockedComposerSendContextPort {
     getDraftContextItems: jest.fn().mockReturnValue([]),
     resolvePersistentContextItems: jest.fn().mockResolvedValue([]),
     clearDraftContextItems: jest.fn(),
+    mergeVaultRetrievalDraftItems: jest.fn(),
+    hasVaultEntryAtPath: jest.fn().mockReturnValue(true),
+    removeDraftContextItemsByPaths: jest.fn(),
   };
 }
 

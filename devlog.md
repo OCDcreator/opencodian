@@ -11,6 +11,18 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-19 发送路径上下文条目缺失对齐 R-B2：跳过 + 诚实提示，绝不让整轮失败
+
+**触发**：部署版实测——composer 附加的笔记被外部删除（验收 harness 移入废纸篓，不触发 Obsidian vault 事件）后，下一次发送（vaultRetrievalEnabled 开启）整轮失败，assistant 回复变成 `发送消息失败 File not found: /Volumes/.../rb1-chat-ref.md`：原始文件系统错误 + 绝对机器路径直接漏进聊天，整轮消息丢失；且删除后 chip 仍留在 composer 里继续被提供，这正是过期路径进入请求的通道。
+
+**根因**：local 模式下 `OpenCodeContextPartSerializer.createLocalContextPart()` 把 `file`/`current_note`/selection 类条目序列化成 `file://<绝对路径>` part，文件由 OpenCode 服务端在请求时读取；附加时验证过的路径（R-A7/R-B2）在发送时可能已消失，服务端读不到即拒绝整个 prompt，`ConversationNoticeCoordinator.getFriendlyStreamErrorMessage()` 兜底把原始错误文本拼进 `chat.error.sendFailed`。draft chips 在附加后不再校验，持久路径的 `buildPersistentFileContextItems()` 反而一直会静默跳过。
+
+**改动**：发送准备阶段（`MessageSendPreparationService.prepareMessageSend`）在持久+draft 合并后用新纯函数 `composerContext.partitionExistingContextItems()` + `ContextAttachmentBuilder.hasVaultEntryAtPath()`（`TFile`/`TFolder` 均认可）做存在性分区：缺失条目从发送 payload、optimistic `contextAttachments`、R-B3 snapshot paths 与 R-B1 内链引用集中剔除，本轮照常发送（部分缺失保余下上下文，全部缺失则无上下文发送）；chips 经新端口 `ComposerSendContextPort.removeDraftContextItemsByPaths()`（`ComposerContextRuntimeStore` 按路径移除全部行范围引用、无命中不重绘）从 composer 撤下，并以与 context-group attach 完全相同的 `chat.context.notice.groupMissing` / `groupMissingMore` 词汇 toast 一次（复用既有键，未新增文案）。纵深防御：`getFriendlyStreamErrorMessage()` 新增 `file not found` 分支，把检查与发送之间竞态下漏出的原始错误改写为同一缺失条目词汇，只露出文件名、绝不露出绝对路径，原文留在日志/trace。facade 端口只做窄转发（`hasVaultEntryAtPath` / `removeDraftContextItemsByPaths`）。fail-closed 规则、aux 只读契约、dirty check、单一 `replaceRange` 写路径均未触碰。
+
+**测试**：新增 `MessageSendPreparationService.missingContext.test.ts`（单条缺失照常发送且余下上下文/请求/用户消息附件完好、提示含 vault 路径不含 `File not found` 与 `/Volumes/`、chips 被清理；全部缺失仍发送 + 提示 + 空上下文；全有效回归：无提示、无清理、请求上下文逐项不变；超 3 条走 groupMissingMore 压缩）；`ComposerContextRuntimeStore`（按路径全行范围移除、无命中不重绘）、`composerContext`（分区去重、全有效恒等）、`ContextAttachmentBuilder`（闸口认可文件与目录、空/失效路径不抛错）、`ConversationNoticeCoordinator`（原始绝对路径错误 → sendFailed + groupMissing 词汇、机器路径与异常文本不外漏；无可解析路径仍诚实）各补对应用例。
+
+---
+
 ## 2026-09-19 R-B1 聊天侧自动内链：修复 turn 边界渲染缺失与 resync 丢失
 
 实机验收（opencode 默认后端）发现存储与渲染在 turn 边界分叉：持久化 assistant 文本含 `[[rb1-chat-ref.md#注意力机制]]`，但 DOM 只渲染服务端原始文本（0 anchor）；插件重载后权威 resync 又用服务端文本覆盖了本地改写，链接从存储中也消失。根因有二：其一，`ConversationRenderService.applySyncedConversationUpdate` 对 opencode 会用 canonical 投影（由原始服务端 parts 重建）替换 render apply 的 `nextMessages`，本地内链从未进入渲染输入；其二，权威合并 `mergeSyncedConversationMessages` 以 `...syncedMessage` 采纳服务端文本，`content`/`contentBlocks` 的客户端改写不在保留集合内。

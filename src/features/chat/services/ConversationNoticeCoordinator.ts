@@ -59,6 +59,25 @@ const NETWORK_ERROR_PATTERNS = [
   'http 0',
 ] as const;
 
+/** Backend readers report missing files as "File not found: <path>". */
+const FILE_NOT_FOUND_PATTERN = /\bfile not found\b/i;
+
+/**
+ * Extract the vault-relative entry name from a raw "File not found: <path>"
+ * error and phrase it with the group-attach missing-entry vocabulary. The
+ * absolute machine path never reaches the chat surface; when no path can be
+ * extracted the notice still reports that an entry was skipped.
+ */
+function formatMissingContextEntryNotice(rawMessage: string): string {
+  const match = rawMessage.match(/file not found:?\s*(.+)/i);
+  const rawPath = match?.[1]?.trim().replace(/^["']|["']$/g, '') ?? '';
+  const entryName = rawPath.split(/[\\/]/).filter(Boolean).pop() ?? '';
+  return t('chat.context.notice.groupMissing', {
+    count: 1,
+    paths: entryName,
+  });
+}
+
 export interface ConversationNoticeCoordinatorHost {
   getCurrentSessionModel(): ModelSelectorSelection | null;
   formatModelId(model: ModelSelectorSelection | null | undefined): string | undefined;
@@ -249,6 +268,15 @@ export class ConversationNoticeCoordinator {
 
     if (lowerMessage.includes('claude code')) {
       return `${t('chat.error.sendFailed')}\n${message}`;
+    }
+
+    if (FILE_NOT_FOUND_PATTERN.test(message)) {
+      // R-B2 parity: a context file that vanished between the send-time
+      // existence gate and the backend read must surface as the honest
+      // skipped-entry notice — never as the raw filesystem error text, which
+      // carries an absolute machine path. The vault-relative name is all the
+      // user needs; the raw message stays in the log/trace.
+      return `${t('chat.error.sendFailed')}\n${formatMissingContextEntryNotice(message)}`;
     }
 
     if (NETWORK_ERROR_PATTERNS.some((pattern) => lowerMessage.includes(pattern))) {

@@ -72,6 +72,29 @@ export class ComposerContextRuntimeStore {
   }
 
   /**
+   * Send-path chip honesty (R-B2 parity): remove every draft item whose path
+   * is in the given set, regardless of line range — the vault entry itself is
+   * gone, so every chip referencing it (file, note, selection slice) is stale.
+   * No-op (no re-render) when nothing matches, and retrieval-managed chips are
+   * treated like any other: a missing backing path must not stay offered.
+   */
+  removeDraftContextItemsByPaths(
+    paths: readonly string[],
+    tabId: TabId | null = this.host.getActiveTabId(),
+  ): void {
+    if (paths.length === 0) {
+      return;
+    }
+    const missing = new Set(paths);
+    const currentItems = this.getDraftContextItems(tabId);
+    const nextItems = currentItems.filter((item) => !missing.has(item.path));
+    if (nextItems.length === currentItems.length) {
+      return;
+    }
+    this.setDraftContextItems(nextItems, tabId);
+  }
+
+  /**
    * R-C1: atomically replace every `vault-retrieval` draft item with the
    * given list, leaving manually attached items untouched, in a single
    * render pass. Passing an empty list clears the managed set.

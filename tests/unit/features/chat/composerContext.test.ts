@@ -2,6 +2,7 @@ import type { PromptContextItem } from '../../../../src/core/types';
 import {
   buildComposerContextChipStates,
   createFocusContextPreview,
+  partitionExistingContextItems,
   removeDraftContextItemsByTarget,
   resolveFocusContextPreview,
   upsertDraftContextItem,
@@ -181,5 +182,35 @@ describe('composerContext helpers', () => {
     expect(resolveFocusContextPreview(next, previous, {
       retainSelectionPreview: true,
     })).toEqual(next);
+  });
+
+  it('partitions context items into existing entries and deduplicated missing paths (R-B2 send-path parity)', () => {
+    const alive = createContextItem({ id: 'context-alive', path: 'notes/A.md' });
+    const dead = createContextItem({ id: 'context-dead', path: 'notes/GONE.md' });
+    const deadSelection = createContextItem({
+      id: 'context-dead-selection',
+      path: 'notes/GONE.md',
+      lineRange: { startLine: 1, endLine: 2 },
+    });
+
+    const { existing, missingPaths } = partitionExistingContextItems(
+      [alive, dead, deadSelection],
+      (path) => path !== 'notes/GONE.md',
+    );
+
+    expect(existing).toEqual([alive]);
+    expect(missingPaths).toEqual(['notes/GONE.md']);
+  });
+
+  it('reports every item as existing when all paths still resolve', () => {
+    const items = [
+      createContextItem({ id: 'context-1', path: 'notes/A.md' }),
+      createContextItem({ id: 'context-2', path: 'notes/B.md' }),
+    ];
+
+    const { existing, missingPaths } = partitionExistingContextItems(items, () => true);
+
+    expect(existing).toEqual(items);
+    expect(missingPaths).toEqual([]);
   });
 });

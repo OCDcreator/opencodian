@@ -37,6 +37,7 @@ class ComposerContextRuntimeStore {
     target: Pick<PromptContextItem, 'path' | 'lineRange'>,
     tabId?: TabId | null,
   ): void
+  removeDraftContextItemsByPaths(paths: readonly string[], tabId?: TabId | null): void
   getFocusContextPreview(tabId?: TabId | null): FocusContextPreview | null
   setFocusContextPreview(preview: FocusContextPreview | null, tabId?: TabId | null): void
 }
@@ -47,6 +48,7 @@ class ComposerContextRuntimeStore {
 - `getDraftContextItems()` 始终返回副本，避免调用方直接持有 runtime 数组引用
 - `getContextChipStates()` 统一复用 `composerContext.buildComposerContextChipStates()`，让 attached / preview chip 的投影由 runtime store 而不是 coordinator 拼装
 - draft add/remove/clear 共用同一条 `setDraftContextItems()` 写回路径，只在活动 tab 写回时触发 `renderComposerContext()`
+- `removeDraftContextItemsByPaths()`（2026-09-19，R-B2 发送路径对齐）：按路径集合移除引用该路径的全部草稿条目（不限行范围——vault 条目本身已不存在），用于发送时剔除已删除/移动条目后同步清理 composer chips；无命中时不触发重绘
 - `setFocusContextPreview()` 保留 preview equality guard，避免等值 preview 引发冗余重绘
 - `OpenCodianView` 的 send 前 context-draft 读取/清空与 composer runtime host 现在共享同一份 store，而不是各自走 adapter 内部 helper
 

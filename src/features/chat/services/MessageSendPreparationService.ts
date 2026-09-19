@@ -1,4 +1,6 @@
 /* eslint-disable max-lines -- Send preparation keeps preflight, optimistic bootstrap, and one-slot follow-up enqueue in one runtime owner. */
+import { Notice } from 'obsidian';
+
 import type {
   ResolvedAgentInvocation,
   SurfaceInvocationIntent,
@@ -23,7 +25,7 @@ import type {
 import { getConversationBackendSessionId } from '../../../core/types';
 import { t } from '../../../i18n';
 import { buildContextAttachment, createLogger } from '../../../shared';
-import { getPromptContextTargetKey } from '../composerContext';
+import { getPromptContextTargetKey, partitionExistingContextItems } from '../composerContext';
 import type { SendPipelineStreamElements } from '../runtime/SendPipelineTypes';
 import type { TabId } from '../tabs';
 import type { ComposerSendContextPort } from './ComposerContextViewFacade';
@@ -386,7 +388,24 @@ export class MessageSendPreparationService {
     }
     const activeModelId = this.host.formatModelId(modelOptions);
     const persistentContextItems = await this.composerSendContext.resolvePersistentContextItems(conversation.externalContextPaths);
-    const contextItems = this.mergeContextItems(persistentContextItems, draftContextItems);
+    const mergedContextItems = this.mergeContextItems(persistentContextItems, draftContextItems);
+    // R-B2 send-path parity: a context entry whose vault path no longer
+    // resolves (deleted/moved after attach — vault events do not fire for
+    // removals made outside Obsidian) must be skipped with the honest
+    // group-attach notice, never forwarded as a file part the backend cannot
+    // read. Forwarding it failed the whole turn with a raw "File not found"
+    // filesystem error as the assistant reply; skipping keeps the turn alive
+    // with the remaining context intact.
+    const { existing: contextItems, missingPaths } = partitionExistingContextItems(
+      mergedContextItems,
+      (path) => this.composerSendContext.hasVaultEntryAtPath(path),
+    );
+    if (missingPaths.length > 0) {
+      // Chip honesty: stop offering the stale entries in the composer, then
+      // report once with the same vocabulary as the context-group attach.
+      this.composerSendContext.removeDraftContextItemsByPaths(missingPaths, tabId);
+      this.reportMissingContextPaths(missingPaths);
+    }
     const resolvedAgentInvocation = this.agentInvocationService.resolveInvocationIntent(options.invocationIntent);
     // For Claude backend, preserve @agent mentions as raw text in the prompt.
     // Claude processes @agent natively; OpenCode strips mentions into invocationParts.
@@ -574,6 +593,26 @@ export class MessageSendPreparationService {
     }
 
     return [...itemsByTarget.values()];
+  }
+
+  /**
+   * One honest toast for every context entry skipped at send time, using the
+   * exact vocabulary of the context-group attach (R-B2): name the missing
+   * vault paths so the user can fix them — never the raw filesystem error or
+   * an absolute machine path. Same first-three + "N more" compaction.
+   */
+  private reportMissingContextPaths(missingPaths: readonly string[]): void {
+    const shown = missingPaths.slice(0, 3).join('、');
+    new Notice(missingPaths.length > 3
+      ? t('chat.context.notice.groupMissingMore', {
+        count: missingPaths.length,
+        paths: shown,
+        more: missingPaths.length - 3,
+      })
+      : t('chat.context.notice.groupMissing', {
+        count: missingPaths.length,
+        paths: shown,
+      }));
   }
 
   async ensureServerReadyForChat(

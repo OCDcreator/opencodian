@@ -249,3 +249,25 @@ describe('ContextAttachmentBuilder folder entries (R-A7)', () => {
     expect(item?.path).toBe('notes/a.md');
   });
 });
+
+describe('ContextAttachmentBuilder vault-entry existence gate (R-B2 send-path parity)', () => {
+  it('accepts files and folders that still resolve in the vault', () => {
+    const file = createFile('notes/a.md');
+    const folder = new TFolder();
+    folder.path = 'projects';
+    const { builder, getAbstractFileByPath } = createBuilder({ files: [file] });
+    getAbstractFileByPath.mockImplementation((path: string) =>
+      path === folder.path ? folder : path === file.path ? file : null);
+
+    expect(builder.hasVaultEntryAtPath('notes/a.md')).toBe(true);
+    expect(builder.hasVaultEntryAtPath('projects')).toBe(true);
+  });
+
+  it('rejects paths that no longer resolve or are empty, without throwing', () => {
+    const { builder } = createBuilder({ files: [] });
+
+    expect(builder.hasVaultEntryAtPath('rb1-chat-ref.md')).toBe(false);
+    expect(builder.hasVaultEntryAtPath('')).toBe(false);
+    expect(builder.hasVaultEntryAtPath('   ')).toBe(false);
+  });
+});

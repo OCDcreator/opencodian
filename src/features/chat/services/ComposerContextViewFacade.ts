@@ -35,6 +35,7 @@ type ComposerContextAttachmentBuilderPort = Pick<
   | 'buildSelectionContextItemFromPreview'
   | 'buildEntryContextItem'
   | 'hasFileAtPath'
+  | 'hasVaultEntryAtPath'
 >;
 
 type ComposerContextFileCatalogPort = Pick<
@@ -44,7 +45,10 @@ type ComposerContextFileCatalogPort = Pick<
 
 type ComposerContextRuntimeStorePort = Pick<
   ComposerContextRuntimeStore,
-  'getDraftContextItems' | 'clearDraftContextItems' | 'mergeVaultRetrievalDraftItems'
+  | 'getDraftContextItems'
+  | 'clearDraftContextItems'
+  | 'mergeVaultRetrievalDraftItems'
+  | 'removeDraftContextItemsByPaths'
 >;
 
 type ComposerContextActionPort = Pick<
@@ -123,6 +127,17 @@ export interface ComposerSendContextPort {
    * list (manual attachments untouched). Empty list clears the managed set.
    */
   mergeVaultRetrievalDraftItems(items: PromptContextItem[], tabId?: TabId | null): void;
+  /**
+   * R-B2 send-path parity: whether the vault still resolves this context path
+   * (file or folder). The send preparation uses it to skip entries deleted
+   * after attach instead of forwarding unreadable file parts.
+   */
+  hasVaultEntryAtPath(path: string): boolean;
+  /**
+   * R-B2 send-path parity: drop every draft chip referencing the given
+   * (missing) paths so the composer stops offering stale entries.
+   */
+  removeDraftContextItemsByPaths(paths: readonly string[], tabId?: TabId | null): void;
 }
 
 export interface ComposerContextServices {
@@ -132,7 +147,10 @@ export interface ComposerContextServices {
 }
 
 export interface ComposerContextViewFacadeDependencies {
-  contextAttachmentBuilder: Pick<ComposerContextAttachmentBuilderPort, 'buildPersistentFileContextItems'>;
+  contextAttachmentBuilder: Pick<
+    ComposerContextAttachmentBuilderPort,
+    'buildPersistentFileContextItems' | 'hasVaultEntryAtPath'
+  >;
   runtimeStore: ComposerContextRuntimeStorePort;
   actionService: ComposerContextActionPort;
   pickerActionService: ComposerContextPickerActionPort;
@@ -175,6 +193,11 @@ export class ComposerContextViewFacade {
       },
       mergeVaultRetrievalDraftItems: (items: PromptContextItem[], tabId?: TabId | null) => {
         this.dependencies.runtimeStore.mergeVaultRetrievalDraftItems(items, tabId);
+      },
+      hasVaultEntryAtPath: (path: string) =>
+        this.dependencies.contextAttachmentBuilder.hasVaultEntryAtPath(path),
+      removeDraftContextItemsByPaths: (paths: readonly string[], tabId?: TabId | null) => {
+        this.dependencies.runtimeStore.removeDraftContextItemsByPaths(paths, tabId);
       },
     };
   }

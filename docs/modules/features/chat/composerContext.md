@@ -45,6 +45,10 @@ interface ComposerContextChipState {
 `upsertDraftContextItem()` 会删除同目标键的旧项，再把新项追加到数组末尾。  
 `removeDraftContextItemsByTarget()` 则按目标键过滤移除。
 
+### 发送前存在性分区（R-B2 对齐，2026-09-19）
+
+`partitionExistingContextItems(items, hasEntryAtPath)` 是纯函数：把合并后的上下文条目按“vault 路径是否仍可解析”分成 `existing` 与去重后的 `missingPaths`。发送准备阶段用它跳过附加后被删除/移动的条目（外部删除不会触发 vault 事件，所以发送时闸口是唯一可靠的一道），调用方负责把缺失条目从请求中剔除、清理对应 chips，并按 group-attach 词汇一次性提示。
+
 ### 焦点预览创建与保留
 
 `createFocusContextPreview()` 根据路径、可选行范围和可选文本快照构造预览对象：

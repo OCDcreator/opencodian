@@ -392,6 +392,33 @@ describe('ConversationNoticeCoordinator error and action helpers', () => {
       const coordinator = new ConversationNoticeCoordinator(createHost());
       expect(coordinator.getFriendlyStreamErrorMessage('FAILED TO FETCH')).toBe(t('chat.error.serverConnection'));
     });
+
+    it('maps a raw file-not-found error to the missing-entry notice without the machine path', () => {
+      const coordinator = new ConversationNoticeCoordinator(createHost());
+      const rawError = 'File not found: /Volumes/SDD2T/obsidian-vault-write/testvault/rb1-chat-ref.md';
+
+      const result = coordinator.getFriendlyStreamErrorMessage(rawError);
+
+      expect(result).toBe(`${t('chat.error.sendFailed')}\n${t('chat.context.notice.groupMissing', {
+        count: 1,
+        paths: 'rb1-chat-ref.md',
+      })}`);
+      // The absolute machine path and the raw exception framing must never
+      // reach the chat surface.
+      expect(result).not.toContain('/Volumes/');
+      expect(result).not.toContain('File not found');
+    });
+
+    it('stays honest when a file-not-found error carries no parseable path', () => {
+      const coordinator = new ConversationNoticeCoordinator(createHost());
+
+      const result = coordinator.getFriendlyStreamErrorMessage('File not found');
+
+      expect(result).toBe(`${t('chat.error.sendFailed')}\n${t('chat.context.notice.groupMissing', {
+        count: 1,
+        paths: '',
+      })}`);
+    });
   });
 
   describe('routeNoticeAction', () => {

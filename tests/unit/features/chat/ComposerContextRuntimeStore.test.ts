@@ -160,4 +160,33 @@ describe('ComposerContextRuntimeStore', () => {
     runtimeStore.addDraftContextItem(createContextItem('item-2', 'notes/beta.md'));
     expect(runtimes.get('tab-1' as TabId)?.draftContextItems).toEqual([selectionItem]);
   });
+
+  it('removes every draft item referencing a missing path regardless of line range (R-B2 send-path parity)', () => {
+    const { runtimeStore, renderComposerContext } = createHarness();
+    const fileItem = createContextItem('item-1', 'notes/alpha.md');
+    const selectionSlice = createContextItem('item-2', 'notes/alpha.md', { startLine: 1, endLine: 4 });
+    const otherItem = createContextItem('item-3', 'notes/beta.md');
+
+    runtimeStore.addDraftContextItem(fileItem);
+    runtimeStore.addDraftContextItem(selectionSlice);
+    runtimeStore.addDraftContextItem(otherItem);
+    renderComposerContext.mockClear();
+
+    runtimeStore.removeDraftContextItemsByPaths(['notes/alpha.md']);
+
+    expect(runtimeStore.getDraftContextItems()).toEqual([otherItem]);
+    expect(renderComposerContext).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not re-render when no draft item matches the removed paths', () => {
+    const { runtimeStore, renderComposerContext } = createHarness();
+    runtimeStore.addDraftContextItem(createContextItem('item-1', 'notes/alpha.md'));
+    renderComposerContext.mockClear();
+
+    runtimeStore.removeDraftContextItemsByPaths(['notes/other.md']);
+    runtimeStore.removeDraftContextItemsByPaths([]);
+
+    expect(runtimeStore.getDraftContextItems()).toHaveLength(1);
+    expect(renderComposerContext).not.toHaveBeenCalled();
+  });
 });

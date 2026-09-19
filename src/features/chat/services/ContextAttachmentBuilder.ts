@@ -336,6 +336,19 @@ export class ContextAttachmentBuilder {
     return this.resolveFileByPath(path) !== null;
   }
 
+  /**
+   * Send-path existence gate (R-B2 parity): unlike `hasFileAtPath` this
+   * accepts folders too, because the merged outgoing context may contain
+   * directory references. A path that no longer resolves (deleted/moved after
+   * attach, including removals outside Obsidian that never fire vault events)
+   * lets the send path skip the entry with the honest group-attach notice
+   * instead of forwarding a file part the backend cannot read.
+   */
+  hasVaultEntryAtPath(path: string): boolean {
+    return path.trim().length > 0
+      && this.app.vault.getAbstractFileByPath(path) !== null;
+  }
+
   private createSelectionContextItem(
     path: string,
     lineRange: PromptContextLineRange,

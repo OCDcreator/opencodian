@@ -83,6 +83,10 @@ export function createComposerSendContext(
       callOrder.push('clearDraftContextItems');
     }),
     mergeVaultRetrievalDraftItems: jest.fn(),
+    // Default: every attached path still resolves, so existing tests keep
+    // their exact request context. Missing-path tests override this.
+    hasVaultEntryAtPath: jest.fn().mockReturnValue(true),
+    removeDraftContextItemsByPaths: jest.fn(),
     ...overrides,
   };
 }

@@ -42,6 +42,7 @@ class ContextAttachmentBuilder {
     paths: readonly string[] | undefined,
   ): Promise<PromptContextItem[]>
   hasFileAtPath(path: string): boolean
+  hasVaultEntryAtPath(path: string): boolean
 }
 ```
 
@@ -63,6 +64,7 @@ class ContextAttachmentBuilder {
 
 - `buildFileContextItemFromPath()` 与 `hasFileAtPath()` 统一处理 `vault.getAbstractFileByPath()` + `TFile` 判定
 - `OpenCodianView` 因此不再自己解析当前预览 path 或重复持有 `PromptContextItem` 组装细节
+- `hasVaultEntryAtPath()`（2026-09-19，R-B2 发送路径对齐）：与 `hasFileAtPath` 不同，它同时认可 `TFile` 与 `TFolder`，因为发送前合并上下文可能包含目录引用；`MessageSendPreparationService` 用它判定附加条目的路径是否仍可解析，从而跳过附加后被删除/移动的条目（含 Obsidian 之外删除、不触发 vault 事件的场景），而不是把读不到的 file part 发给后端
 
 ### 持久上下文路径解析
 

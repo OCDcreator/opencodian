@@ -61,6 +61,7 @@ export class ConversationNoticeCoordinator {
 
 - `createStreamErrorNotice()` 复用 `AssistantNoticeRenderer.buildStreamErrorNotice()`，统一补上当前模型 id
 - `getFriendlyStreamErrorMessage()` 把原始流错误字符串映射为用户友好文案：网络错误 → server connection，opencode not found → binary missing，空消息 → backend-aware no response，其余 → send failed + 原文
+- 2026-09-19（R-B2 发送路径对齐）：新增 `file not found` 分支——后端读取器抛出的“文件不存在”错误一律改写为「发送消息失败 + `chat.context.notice.groupMissing`」词汇，只露出从原始错误中提取的文件名（vault 相对名），绝不把原始异常文本或绝对机器路径送进聊天表面；无法解析路径时仍如实报告有条目被跳过。原始错误保留在日志/trace
 - 空消息在 OpenCode 保留既有 server-no-response 指引；Claude Code 改为“未返回可显示内容”，避免用户被错误引导到 OpenCode 服务设置
 - Claude Code backend 的 SDK/stream 错误保留 Claude Code 标签，不再被映射成 OpenCode server connection failure，避免用户在 Claude 后端失败时被引导去排查 OpenCode 本地服务。
 

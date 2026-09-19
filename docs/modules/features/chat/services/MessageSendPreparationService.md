@@ -75,6 +75,7 @@ export function createMessageSendPreparationHost(
 - 先完成 server readiness 与 model availability 检查
 - 再通过 `ComposerContextViewFacade.sendContext` 读取 draft context，并把 `Conversation.externalContextPaths` 解析成持久 `PromptContextItem[]`
 - 两类上下文按 target key 合并：持久路径先铺底，同 target 的一次性 draft context 覆盖旧条目
+- 2026-09-19（R-B2 发送路径对齐）：合并后会用 `composerContext.partitionExistingContextItems()` + `sendContext.hasVaultEntryAtPath()` 做存在性分区。路径已失效（附加后被删除/移动，含 Obsidian 之外删除）的条目直接从发送 payload、optimistic user message `contextAttachments`、R-B3 snapshot paths 与 R-B1 引用集合中剔除——绝不把读不到的 file part 发给后端（旧行为会让整轮失败，并把 `File not found: <绝对路径>` 当成 assistant 回复）。缺失条目的 chips 通过 `sendContext.removeDraftContextItemsByPaths()` 从 composer 移除，并以 `chat.context.notice.groupMissing` / `groupMissingMore`（与 context-group attach 同一词汇、同一“前 3 条 + N 等”压缩）toast 一次；全部条目缺失时同样照常发送（无上下文 + 提示）
 - 基于合并后的 context items 向 `OpenCodeService` 请求稳定 `messageID + parts[]` send payload；如果上游额外提供 `syntheticTextParts`，这些插件注入文本会继续以结构化 synthetic parts 进入 payload，而不是改写 `userMessage.content`
 - Skill 展开通过 `SkillContentExpander` 完成，返回的 `syntheticParts`（不再是 `syntheticBlocks`）会映射为带 metadata 的 synthetic text parts：`{ text, ignored: false, metadata: { kind: 'skill-expansion', skillName } }`，使下游渲染层能识别并隐藏 skill 合成内容
 - 如果上游提供 `invocationIntent`，`AgentInvocationService` 会先把它解析成 top-level main `agent` 与 `agent` / `subtask` native parts；这些 invocation parts 会和普通 parts 一起进入稳定 payload，而不是被拼回纯文本
