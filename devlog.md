@@ -11,6 +11,20 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-18 上下文附件跨后端投递修复（attached-context parity）
+
+修复确认的后端一致性缺陷：用户附加的上下文（笔记/选区/文件夹/PDF/R-C1 检索片段 chips）只在 OpenCode 路径序列化进 prompt，Claude 与 Codex 适配器完全不消费——但 UI chips 照常显示"已附加"（违反 §6.5 backend-agnostic 验收项与 §6.7 诚实性；R-A7 "拖入文件夹→模型能读到其中笔记"、R-C1 验收 2 "请求包含 ≤ K 检索片段"、R-C4 阶段 1–2 "可随会话发送"在此二后端全部落空）。Pi 经 `PiStreamMapper` 消费 `requestParts` 本就正常。
+
+**接缝选择**：`requestParts` 对 claude/codex 混有 skill-expansion/invocation/image part（图片与技能在二后端各有原生通道），直接消费会重复投递；而 `options.contextItems` 是类型化的纯上下文条目且携带 PDF 结构化负载。故在 `src/shared/obsidianContext.ts`（全部上下文标签构建器的唯一属地）新增三个纯函数：`buildContextItemPromptBlock`（kind 分发：PDF→`buildPdfContextTag`，其余→`buildObsidianContextTag`，与 `OpenCodeContextPartSerializer` 同一分发）、`extractPromptContextItems`（惰性读 options 袋、丢畸形条目）、`appendObsidianContextBlocks`（块以 `\n\n` 追加）。claude/codex 的 `sendMessage` 在既有 `prependObsidianToolingInjection(prependMemoryInjection(...))` 组合外侧各加一行调用——与两个 prepend helper 同一选项袋接缝模式，无第二序列化、无新模块。
+
+**顺序与缓存纪律**：最终消息文本为 [tooling][memory]（每 epoch 注入，外层 prepend 顺序保持现状不动）→ 用户文本 → 上下文块（每轮）。逐轮附件绝不置于每 epoch 稳定前缀之前，缓存前缀位置稳定。该顺序同时镜像 OpenCode wire 顺序（[message part][context parts]）与 Pi 顺序（[expanded, ...files]）。
+
+**诚实边界（未伪装交付）**：本地服务器模式的 file/current_note 条目按设计不带 `textSnapshot`（OpenCode 本地由服务端读盘内联）；claude/codex 侧此类条目渲染为路径引用标签（空正文），由 CLI 以自身文件工具读取——与 folder 条目既有 R-A7 契约完全一致（CLI cwd = vault，路径可读）。选区、R-C1 片段、远端模式文件、PDF（全模式）均完整内联正文。修复后四后端能力矩阵对齐，chips 无需 UI 变更即诚实。
+
+**防重复投递护栏**：OpenCode/Pi 路径零改动（`git diff` 不含其文件）；新契约测试断言 `OpenCodeAdapter`/`PiAdapter`/`PiStreamMapper` 源码不含新 helper。测试 7 例（`contextAttachmentPromptParity.test.ts`）：同组条目 helper 追加文本与远端序列化器产出逐字节相等（含 folder/PDF/R-C1 origin 条目）、本地无快照文件条目的路径引用标签、无条目时逐字节不变（无空标签）、顺序断言（用真实 prepend helper 组合）、claude/codex 接缝源码契约（append 包裹 prepend 组合的顺序钉死）。
+
+---
+
 ## 2026-09-18 远程驱动外部接口（R-C6）：令牌鉴权环回控制面与全量审计
 
 FlowText 对齐 R-C6 落地（设计基准 `docs/requirements/flowtext-c6-design.md`，实现与设计逐条对齐；实机验收项（IPv6 关闭态端口扫描、真机 curl 往返、审计 grep、二次确认弹窗实机目测）留待主智能体执行）。

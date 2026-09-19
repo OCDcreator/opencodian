@@ -131,3 +131,7 @@ export { getFilePathBasename, getVaultBasePath, toVaultRelativePath } from './va
 ## 2026-09-18 (R-B5-D1 修复)
 
 新增导出 `collectTargetFolders`（见 `docs/modules/shared/batchOrganizePlan.md`）。
+
+## 2026-09-18 (attached-context parity)
+
+新增导出 `appendObsidianContextBlocks`、`buildContextItemPromptBlock`、`extractPromptContextItems`（见 `docs/modules/shared/obsidianContext.md`）：claude/codex 适配器经共享标签构建器消费 `options.contextItems`，修复上下文附件在后端间的不一致投递。

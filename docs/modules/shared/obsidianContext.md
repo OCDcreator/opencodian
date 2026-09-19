@@ -64,6 +64,12 @@ Obsidian 显式上下文（explicit context）工具函数。处理 `<obsidian_c
 
 `toFileContextUrl(path, range?)` 会委托 `contextPath.pathToContextFileUrl()` 构建 `file:///` URL，再追加 `start` / `end` 行范围参数。这样在 macOS/Linux 测试环境处理 Windows vault path（例如 `C:\vault`）时，也会稳定输出 `file:///C:/vault/...`，不会被当前宿主平台误解析成仓库内的相对路径。
 
+### 跨后端上下文投递（claude/codex seam）
+
+`buildContextItemPromptBlock(item)` 是唯一的条目→文本序列化分发：PDF 条目走 `buildPdfContextTag`，其余走 `buildObsidianContextTag`。`OpenCodeContextPartSerializer`（请求 part）与 claude/codex 适配器（prompt 追加块）都经由它，保证同一条目在四个后端渲染一致。
+
+`extractPromptContextItems(options)` 从发送 options 袋读取 `contextItems`，丢弃畸形条目（惰性：无键/空数组返回空）。`appendObsidianContextBlocks(content, options)` 把条目块以 `\n\n` 追加到 prompt 文本——仅 claude/codex 使用；OpenCode/Pi 走请求 part 路径，不得调用（防重复投递）。排序约束：每轮的上下文块必须严格位于每 epoch 的 memory/tooling 注入前缀与用户文本之后，保证缓存稳定前缀不被逐轮内容移动。
+
 ### 文件路径判断
 
 - `isHiddenContextPath(path)` — 检查是否包含 `.` 开头的目录段
@@ -74,6 +80,10 @@ Obsidian 显式上下文（explicit context）工具函数。处理 `<obsidian_c
 | 方法 | 说明 |
 |------|------|
 | `buildObsidianContextTag(item)` | 构建 XML 标签字符串 |
+| `buildPdfContextTag(item)` | 构建 PDF 条目的 XML 标签（正文来自 pdfPages/pdfSelection） |
+| `buildContextItemPromptBlock(item)` | 单条目 → `<obsidian_context>` 文本（kind 分发，跨后端唯一序列化点） |
+| `extractPromptContextItems(options)` | 从 options 袋读取 `contextItems`（丢弃畸形条目） |
+| `appendObsidianContextBlocks(content, options)` | 上下文块追加到 prompt 文本（仅 claude/codex seam） |
 | `parseObsidianContextTag(text)` | 解析 XML 标签为附件对象 |
 | `buildContextAttachment(item)` | PromptContextItem → MessageContextAttachment |
 | `dedupeContextAttachments(attachments)` | 按 kind/path/line-range 去重上下文附件 |

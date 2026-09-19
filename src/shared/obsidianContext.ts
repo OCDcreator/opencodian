@@ -223,6 +223,65 @@ export function buildPdfContextBody(item: PromptContextItem): string {
   return `${header}\n\n${body}`;
 }
 
+/**
+ * Render one attached context item as the `<obsidian_context>` text every
+ * backend consumes. This is the single serialization dispatch: the OpenCode
+ * part serializer and the claude/codex prompt-block seam both route through
+ * here, so a given item always renders identically across backends.
+ * PDF items (R-C4) carry their payload on `pdfPages`/`pdfSelection` and use
+ * the PDF tag; every other kind uses the snapshot/path tag.
+ */
+export function buildContextItemPromptBlock(item: PromptContextItem): string {
+  if (item.kind === 'pdf_document' || item.kind === 'pdf_selection') {
+    return buildPdfContextTag(item);
+  }
+  return buildObsidianContextTag(item);
+}
+
+/**
+ * Read attached context items out of a backend send-options bag. Inert for
+ * bags that do not carry them; malformed entries are dropped so a legacy or
+ * foreign bag can never crash a send.
+ */
+export function extractPromptContextItems(
+  options: Record<string, unknown> | undefined | null,
+): PromptContextItem[] {
+  const raw = (options as { contextItems?: unknown } | undefined | null)?.contextItems;
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.filter((item): item is PromptContextItem =>
+    Boolean(item)
+    && typeof item === 'object'
+    && typeof (item as { kind?: unknown }).kind === 'string'
+    && typeof (item as { path?: unknown }).path === 'string'
+  );
+}
+
+/**
+ * Append attached-context blocks to a prompt content (claude/codex seam:
+ * these backends expose neither request parts nor a server-side file-part
+ * reader, so the per-turn context rides the message text after the user
+ * turn, mirroring the OpenCode wire order `[message][context parts]` and
+ * Pi's `[expanded, ...files]` order).
+ *
+ * Prompt-caching discipline: the per-epoch memory/tooling injections stay
+ * at the very front of the message; per-turn context blocks are appended
+ * strictly after them and after the user text, so the stable cached prefix
+ * is never shifted by per-turn attachments.
+ */
+export function appendObsidianContextBlocks(
+  content: string,
+  options: Record<string, unknown> | undefined | null,
+): string {
+  const items = extractPromptContextItems(options);
+  if (items.length === 0) {
+    return content;
+  }
+  const blocks = items.map(buildContextItemPromptBlock);
+  return `${content}\n\n${blocks.join('\n\n')}`;
+}
+
 /** Build the `<obsidian_context>` tag for a PDF item (R-C4). */
 export function buildPdfContextTag(item: PromptContextItem): string {
   const attrs = [

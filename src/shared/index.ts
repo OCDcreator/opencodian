@@ -104,12 +104,15 @@ export {
   shouldEmitLogFingerprint,
 } from './logger';
 export {
+  appendObsidianContextBlocks,
   buildContextAttachment,
+  buildContextItemPromptBlock,
   buildObsidianContextTag,
   buildPdfContextBody,
   buildPdfContextTag,
   buildPdfSelectionRange,
   dedupeContextAttachments,
+  extractPromptContextItems,
   formatContextLabel,
   formatLineRange,
   getContextPathExtension,

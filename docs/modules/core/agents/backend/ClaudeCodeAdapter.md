@@ -140,3 +140,5 @@ Claude Code 现在声明 `AgentCapability.Images`，因此共享 composer 会显
 - 2026-09-18 (FlowText R-B4): Obsidian 原生工具注入接缝接入——sendMessage 现在把 options.obsidianToolingInjection 以 prependObsidianToolingInjection 前缀到消息文本（记忆块之后），同一选项袋接缝。
 
 > 2026-09-18 (R-C3)：实现 `AgentInlineCompletionCapability`——`startInlineCompletionSession()` 复用 `startAuxQuerySession()` 的同一套只读机制（tools 白名单 + strictMcpConfig + canUseTool + system/init 读回），经 `WarmInlineCompletionSession` 包装为可复用会话，turn 超时 4s；`CLAUDE_CODE_PHASE1_CAPABILITIES` 增加 `AgentCapability.InlineCompletion`。
+
+- 2026-09-18 (attached-context parity)：`sendMessage` 现在以 `appendObsidianContextBlocks` 把 `options.contextItems` 渲染成 `<obsidian_context>` 块追加到消息文本末尾（与 OpenCode/Pi 相同的共享序列化器），修复上下文附件在此后端被静默丢弃的缺陷。顺序为 [tooling][memory]（每 epoch 前缀）→ 用户文本 → 上下文块（每轮），逐轮内容绝不进入每 epoch 稳定缓存前缀。快照缺失的本地文件条目渲染为路径引用标签，由 CLI 以自身文件工具读取（与 folder 条目同一 R-A7 契约，CLI cwd = vault）。

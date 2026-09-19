@@ -19,7 +19,7 @@ import { join } from 'node:path';
 
 import type { Codex, Thread, ThreadEvent, ThreadOptions, UserInput } from '@openai/codex-sdk';
 
-import { createLogger } from '../../../shared';
+import { appendObsidianContextBlocks, createLogger } from '../../../shared';
 import { prependMemoryInjection } from '../../memory';
 import { prependObsidianToolingInjection } from '../../obsidianTooling';
 import type { AgentBackendKind, ContextUsageSnapshot, ImageAttachment, StreamChunk } from '../../types/chat';
@@ -1537,10 +1537,17 @@ export class CodexAdapter
     // Codex exposes no per-turn instructions seam; the backend-neutral
     // memory injection rides at the front of the message text. The R-B4
     // Obsidian-tooling injection uses the same seam, after memory.
+    // Attached context (chips) is per-turn: it appends strictly after the
+    // per-epoch injection prefix and after the user text, rendered by the
+    // shared backend-neutral serializer so Codex receives the same
+    // <obsidian_context> text OpenCode/Pi deliver.
     const request: AgentChatSendRequest = {
       ...rawRequest,
-      content: prependObsidianToolingInjection(
-        prependMemoryInjection(rawRequest.content, rawRequest.options),
+      content: appendObsidianContextBlocks(
+        prependObsidianToolingInjection(
+          prependMemoryInjection(rawRequest.content, rawRequest.options),
+          rawRequest.options,
+        ),
         rawRequest.options,
       ),
     };

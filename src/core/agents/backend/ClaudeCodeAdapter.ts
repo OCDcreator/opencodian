@@ -11,7 +11,7 @@ import type {
 } from '@anthropic-ai/claude-agent-sdk';
 import { spawn } from 'child_process';
 
-import { createLogger, sanitizeDiagnosticReport } from '../../../shared';
+import { appendObsidianContextBlocks, createLogger, sanitizeDiagnosticReport } from '../../../shared';
 import { prependMemoryInjection } from '../../memory';
 import { prependObsidianToolingInjection } from '../../obsidianTooling';
 import type { AgentBackendKind, ContextUsageSnapshot, StreamChunk } from '../../types/chat';
@@ -4835,10 +4835,17 @@ export class ClaudeCodeAdapter
     // backend-neutral memory injection rides at the front of the message
     // text (its runtime systemPrompt append stays a settings-level seam).
     // The R-B4 Obsidian-tooling injection uses the same seam, after memory.
+    // Attached context (chips) is per-turn: it appends strictly after the
+    // per-epoch injection prefix and after the user text, rendered by the
+    // shared backend-neutral serializer so Claude receives the same
+    // <obsidian_context> text OpenCode/Pi deliver.
     const request: AgentChatSendRequest = {
       ...rawRequest,
-      content: prependObsidianToolingInjection(
-        prependMemoryInjection(rawRequest.content, rawRequest.options),
+      content: appendObsidianContextBlocks(
+        prependObsidianToolingInjection(
+          prependMemoryInjection(rawRequest.content, rawRequest.options),
+          rawRequest.options,
+        ),
         rawRequest.options,
       ),
     };
