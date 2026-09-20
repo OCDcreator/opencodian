@@ -50,7 +50,7 @@
 
 | 批次 | 编号 | 需求 | 来源 | 优先级 | 状态 |
 |---|---|---|---|---|---|
-| D | R-D1 | 对话导出 / 另存为 Markdown 笔记 | Copilot | P0 | TODO |
+| D | R-D1 | 对话导出 / 另存为 Markdown 笔记 | Copilot | P0 | DONE |
 | D | R-D2 | API 密钥入 Obsidian Keychain | Copilot | P1 | TODO |
 | D | R-D3 | 轮次完成通知音效 | 双方 | P3 | TODO |
 | E | R-E1 | URL / 网页内容上下文（本地抓取） | Copilot | P1 | TODO |
@@ -98,6 +98,14 @@
 - i18n 双语文案；命令注册挂 `main.ts` 命令区，不进 `OpenCodianView`。
 
 **验收**：导出后笔记可被 Obsidian 搜索/链接；重开对话导出幂等（同名追加序号）；四后端对话各导出一次结构合法。
+
+**落地证据（2026-09-20，提交 `d2441942`）**：
+
+- **实现**：`src/core/storage/ConversationMarkdownExporter.ts`（纯序列化：frontmatter 元数据 + 分轮标题 + 折叠工具调用 callout + 图片占位符）+ `ConversationMarkdownExportService.ts`（vault 编排：手动导出纯新增 `vault.create` + `-2/-3…` 冲突序号绝不覆盖；自动导出默认关、只刷新本功能创建的笔记、mtime 守卫检测用户编辑后诚实停用并提示；附件内容寻址去重；笔记写失败回收本次附件）。命令 `export-conversation-markdown` + 历史菜单每条会话导出按钮（可选 host 缝）；`saveConversation` 后自动导出钩子在设置关或无新回复时零成本。设置 `conversationExport`（目录/模板/自动导出）含 load 归一化 + 「会话 → 导出」二级 tab + zh/en 双语。
+- **测试**：`ConversationMarkdownExporter.test.ts` 14 例（序列化结构、冲突序号幂等、附件去重、失败回收、自动导出创建→原地刷新、用户编辑停用+回调、删除后重建、设置归一化含不安全目录拒绝）+ 设置三件套断言更新（settingsLayoutRegistry / SettingsTabbedRenderer / SettingsConversationSection）。`npm run verify` 15/15 PASS（lint 零警告）。
+- **实机（Test Vault，BUILD_ID `zcode-advantage-parity.202609202228`，四文件 cmp 逐字节一致，plugin reload 后运行时确认新服务/设置/命令在场）**：直连与 byId 双路径导出成功，同名重复导出实测追加 `-2`/`-3` 序号；导出笔记被 Obsidian 索引并渲染为属性面板（截图 `exported-note-reading.png`：frontmatter → 笔记属性、`## User/Assistant · 时间` 轮次标题、`> [!example]- Tool calls (1)` 折叠 callout）。**四后端各导出一次全部成功**（opencode/claude-code/codex/pi 各生成独立结构合法笔记，`2026-09-20_R-D1_四后端结构验证_<backend>.md`）。
+- **视觉验收门（有界两轮）**：设置「导出」tab 截图 `settings-export-tab.png`（+2x 裁剪 `strip-crop2.png`）——标题/名称对比度 **12.32:1**、描述 **9.75:1**（≥4.5:1）；名称 13px/18.2 w700、描述 12px/18.6 与全设置面一致；无文本溢出（`scrollWidth == clientWidth` 实测）；8 个二级 pill 全渲染、「导出」激活（描边高亮，DOM 命中测试 + 2x 裁剪双确认）。历史菜单截图 `history-dropdown-export.png`——导出按钮 **26×26** 与重命名按钮同尺寸同行对齐（视觉子代理 PASS）。修复轮：路径类输入接 `opencodian-wide-text-setting`（152px→**253px**，值 159px 完整显示）+ title 悬停；序列化缺陷修复：callout 续行补 `> ` 前缀（实机发现的回归，含单测断言）。截图存 worktree `.visual-evidence/rd1/`。
+- **偏差登记**：Q1 建议照办（自动导出默认关）；自动导出对**自己创建且未被用户修改**的笔记做原地 `vault.modify` 刷新（Copilot autosave 同型行为），手动导出仍纯新增——这是对「纯新增」约束在自动路径上的显式放宽，已在本节与技术注释双处声明。
 
 ### R-D2 API 密钥入 Obsidian Keychain（P1）
 

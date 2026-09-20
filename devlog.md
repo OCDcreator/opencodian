@@ -11,6 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-20 R-D1 对话导出 Markdown：命令 + 历史菜单 + 自动导出，四后端实机全通
+
+**触发**：advantage-parity 批次 D 首条（P0）。Copilot 把对话保存为库内 Markdown 笔记（可同步/搜索/内链），OpenCodian 此前只有插件本地存储与 OpenCode `/share` 链接，没有任何 Markdown 出口。
+
+**改动**：`core.storage` 下两个新模块——`ConversationMarkdownExporter.ts`（纯序列化：frontmatter 元数据、`## User/Assistant · 时间` 分轮、`> [!example]-` 折叠工具调用 callout、`{{opencodian:image:…}}` 图片占位符；locale 无关、固定英文文档标签）与 `ConversationMarkdownExportService.ts`（vault 编排：手动导出 `vault.create` + `-2/-3…` 冲突序号**绝不覆盖**；自动导出默认关，只刷新本功能创建的笔记，mtime 守卫（1.5s 宽限）检测到用户编辑即停用该会话自动导出 + 本地化提示，笔记被删则重建；附件按消息 id + 内容哈希内容寻址去重；笔记写失败 best-effort 回收本次附件，不留半个文件）。入口三件：命令 `export-conversation-markdown`、历史菜单每条会话导出按钮（`ConversationHistoryActionsHost` 可选方法，视图零逻辑）、`saveConversation` 末尾 `scheduleAutoExport`（设置关或 `lastResponseAt` 未前进时零成本，标题/设置类保存不触发任何 vault 写）。设置 `conversationExport`（目录默认 `opencodian-conversations`、模板 `{$date}_{$topic}` 支持五占位符、自动导出开关）含 load 归一化（绝对路径/`..` 拒绝）、「会话 → 导出」二级 tab、zh/en 双语。文件名/路径清洗下沉 `shared/vault.ts`（`sanitizeVaultFileBaseName`/`isSafeVaultRelativePath`，与 R-C2 附件名共用一套边界规则，`ImageAssetStorage` 保留历史名再导出）。自动导出状态记插件私有 `.opencodian/conversation-export-state.json`。**对「纯新增」约束的显式放宽**（需求文档偏差登记）：自动导出对自己创建且未被用户修改的笔记原地 `vault.modify` 刷新（Copilot autosave 同型行为），手动导出仍纯新增。
+
+**测试**：`ConversationMarkdownExporter.test.ts` 14 例（序列化结构/冲突幂等/附件去重/失败回收/自动导出创建→刷新/用户编辑停用/删除重建/归一化）+ 设置三件套断言更新；`npm run verify` 15/15 PASS（lint 零警告）。实机（Test Vault，BUILD_ID `zcode-advantage-parity.202609202228` 四文件 cmp 逐字节一致 + reload 后运行时确认新服务/设置/命令在场）：直连与 byId 双路径导出、同名重复导出实测追加 `-2`/`-3` 序号、**四后端（opencode/claude-code/codex/pi）各导出一次全部成功**、导出笔记被 Obsidian 索引为属性面板 + callout 折叠渲染正常（截图 `.visual-evidence/rd1/exported-note-reading.png`）。视觉验收门有界两轮：修复轮把路径类输入接 `opencodian-wide-text-setting`（152px→253px，值 159px 完整显示，实测 `scrollWidth == clientWidth`）+ title 悬停；实机另抓到并修复一处序列化缺陷——callout 续行缺 `> ` 前缀会击穿折叠块（已加单测断言）。设置块对比度实测名称 **12.32:1**、描述 **9.75:1**（≥4.5:1），历史菜单导出按钮 **26×26** 与重命名按钮同尺寸对齐。环境坑两条照旧登记：npm install 首跑挂在代理死连接（CLOSE_WAIT，`--prefer-offline` 重跑即好）；新 src 文件须先 `git add` 否则依赖方向门报 unresolved specifier。
+
+---
+
 ## 2026-09-20 flowtext-parity 快进合并入 main；开启 advantage-parity 优势继承轨道
 
 **触发**：`feature/flowtext-parity` 分支（99 个提交，R-A1…R-C6 全部 18 条 DONE 含实机证据）长期滞留远端未合并，main 用户侧缺整批能力。同日完成对 Copilot（logancyang/obsidian-copilot v4.0.9）与 Claudian（YishenTu/claudian v2.3.1）两个开源插件的实盘功能盘点。
