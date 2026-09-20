@@ -11,6 +11,15 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-20 flowtext-parity 快进合并入 main；开启 advantage-parity 优势继承轨道
+
+**触发**：`feature/flowtext-parity` 分支（99 个提交，R-A1…R-C6 全部 18 条 DONE 含实机证据）长期滞留远端未合并，main 用户侧缺整批能力。同日完成对 Copilot（logancyang/obsidian-copilot v4.0.9）与 Claudian（YishenTu/claudian v2.3.1）两个开源插件的实盘功能盘点。
+
+**改动**：main 快进合并至 `8cb0e8696`（零冲突，main 无分叉提交）；`npm install` 引入 `pdfjs-dist@6.3.289`（R-C4 引擎，构建新增独立产物 `dist/pdf-engine.js`，运行时按需加载，已纳入 Test Vault 部署清单）。合并后 `npm run verify` 15/15 PASS（首次跑遇到两处环境问题：`npm install` 后 `node_modules/.bin` 部分链接丢执行位→chmod 修复；`OpenCodeTraceStoreHardening` 满负载下 4097 次写盘超 5s 阈值偶发超时，单跑 45ms 通过，复跑全量绿）。Test Vault 部署 main.js/manifest.json/styles.css/pdf-engine.js 四文件与 dist 逐字节一致；main 已推 origin 与 gitea 双远端。随后建立 `zcode/advantage-parity` worktree（`~/zcode-worktrees/opencodian/advantage-parity`，基线为合并后 main），并落 `docs/requirements/advantage-parity.md`（Draft v0）：批次 D 对话资产（Markdown 导出 P0、Keychain 密钥）、批次 E 上下文与检索（URL 上下文、相关笔记面板、语义检索增强层、Dataview/Bases）、批次 F 会话交互（turn steering、会话-笔记绑定、暖进程池、Grok、i18n 扩语种等）、批次 G 裁决项（Collab、移动端、fan-out、web 搜索层）；判定基线登记了双方已有对等物的能力防止重复劳动。
+
+**测试**：合并本身零代码改动（快进），门禁证据为 verify 15/15 PASS 与部署四文件 cmp 逐字节一致；advantage-parity.md 为 docs-only 新增，不触碰 src。
+---
+
 ## 2026-09-19 R-C3 补全专用模型覆盖：`inlineCompletionModelOverrides` 让 <800ms 目标「可通过配置达成」
 
 **触发**：R-C3 的延迟硬指标实测未达标（同构建、热会话、6 次真实 Alt 手势）：`deepseek/deepseek-flash` → 1415/1835/902/798/1060/532 ms（2/6 低于 800ms），更慢的模型更差。插件侧已就绪（预热挂编辑器焦点、池保持热态），残差是供应商延迟；而补全被迫与行内编辑共用 `inlineEditModelOverrides`，用户无法只为补全钉一个快模型而不改行内编辑。

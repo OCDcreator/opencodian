@@ -1,0 +1,277 @@
+# Copilot / Claudian 优势继承需求文档
+
+- 状态：**待审查（Draft v0）**
+- 日期：2026-09-20
+- 基线：`main@8cb0e8696`（`feature/flowtext-parity` 已于本日快进合并，R-A1…R-C6 全部在库）
+- 对标来源：两个开源 Obsidian 插件的**实盘代码盘点**（2026-09-20）：
+  - **Copilot** `logancyang/obsidian-copilot` v4.0.9（克隆于 `/tmp/plugin-compare/copilot`，临时目录，盘点结论已固化进本文档）
+  - **Claudian** `YishenTu/claudian` v2.3.1（克隆于 `/tmp/plugin-compare/claudian`，同上）
+- 定位：**能力驱动的需求清单**。只继承「适合本插件架构」的优势：凡与既有硬约束（只读辅助契约、唯一写路径、fail-closed、不自动注入）冲突，或需要引入第三方云依赖的一律改造或放弃，**不复制对标插件的实现路径**。
+- 前置文档：`docs/requirements/flowtext-parity.md`（批次 A/B/C 编号已占用，本文档从 R-D 起）
+
+> **维护方式**：每条需求带唯一编号（`R-D1`…）。实现落地后回填「状态」列（`TODO` → `DONE` / `PARTIAL` / `WONTFIX`）并附证据来源。不重写结构。
+
+---
+
+## 1. 目标与判定基线
+
+### 1.1 目标
+
+在 flowtext-parity 合并后的能力面之上，吸收两个对标插件中**OpenCodian 仍缺**的高价值能力，保持既有架构优势（四后端 + ACP、多标签并发、后台任务、MCP 托管、记忆系统、诊断工作台）不回退。
+
+### 1.2 判定基线（已覆盖项，登记防重复劳动）
+
+以下能力经盘点确认**已有对等物或本插件占优**，本计划不再做：
+
+| 对标能力 | OpenCodian 对等物 |
+|---|---|
+| Copilot Quick Ask 行内问答 / Quick Command | inline-edit v2（三形态 + 文档模式 + `@`/`#` + 流式 + 贴图） |
+| Copilot 自定义命令库（16 默认命令） | 斜杠命令（builtin + project/user `.md` + skills）+ 行内 `#` 预设 |
+| Copilot diff 应用视图（ApplyView） | Modified Files 侧栏 + R-B3 文件级回退 |
+| Copilot 技能管理 / 项目指令 | Skills 设置分区（project/external）+ Agents workspace + AGENTS.md 消费 |
+| Copilot 记忆笔记 | 持久记忆系统（提取/反思/git 同步，占优） |
+| Copilot Plan 模式 | Claude `setPermissionMode` 含 plan；无专属提案卡（差距小，暂不做） |
+| Copilot 内置技能库（obsidian-markdown 等 4 个） | R-B4 官方 CLI 原生工具 + Skills 机制可承载，暂不内置 |
+| Copilot 移动端 Quick Chat | 裁决项 R-G2（架构性） |
+| Claudian fork / 子代理管理 / 上下文环 / inline edit | 均已有（fork、ChildSessionTree、ContextRing、inline-edit） |
+| Claudian 会话历史恢复 | 后端会话浏览器 + 权威重同步 |
+| Claudian 回退（claude/grok 专属） | R-B3 后端无关文件回退（覆盖面更广） |
+| 双方 Canvas / PDF / 文生图 / 检索注入 / 自动内链 | flowtext-parity 批次 B/C 已交付 |
+
+### 1.3 范围外
+
+见 §9 非目标。
+
+---
+
+## 2. 批次总表
+
+优先级判据：**先补「对话资产与高频小件」（低改动高体感），再补「上下文与检索」，再补「会话交互与运行时」；架构级大工程单独裁决。**
+
+| 批次 | 编号 | 需求 | 来源 | 优先级 | 状态 |
+|---|---|---|---|---|---|
+| D | R-D1 | 对话导出 / 另存为 Markdown 笔记 | Copilot | P0 | TODO |
+| D | R-D2 | API 密钥入 Obsidian Keychain | Copilot | P1 | TODO |
+| D | R-D3 | 轮次完成通知音效 | 双方 | P3 | TODO |
+| E | R-E1 | URL / 网页内容上下文（本地抓取） | Copilot | P1 | TODO |
+| E | R-E2 | Web Viewer 标签页上下文 | Copilot | P2 | TODO |
+| E | R-E3 | 相关笔记面板（图谱 + 检索双通道） | Copilot | P1 | TODO |
+| E | R-E4 | 语义检索增强层（embedding on R-C1） | Copilot/Miyo | P2 | TODO |
+| E | R-E5 | Dataview / Bases 上下文支持 | Copilot | P2 | TODO |
+| E | R-E6 | 选区 / 全库 token 计数命令 | Copilot | P2 | TODO |
+| F | R-F1 | Turn steering + 流式中消息排队 | Claudian | P1 | TODO |
+| F | R-F2 | 会话-笔记绑定草稿（linked content） | Claudian | P2 | TODO |
+| F | R-F3 | 回退预览 + 冲突检测 UI | Claudian | P2 | TODO |
+| F | R-F4 | 暖进程池（聊天侧预热） | Claudian | P2 | TODO |
+| F | R-F5 | 双栏会话管理器 | Claudian | P3 | TODO |
+| F | R-F6 | Vim 风格聊天导航键 | Claudian | P3 | TODO |
+| F | R-F7 | 每供应商环境变量分域 + 环境哈希失效 | Claudian | P2 | TODO |
+| F | R-F8 | 自定义模型自定义上下文窗口 | Claudian | P2 | TODO |
+| F | R-F9 | 文件管理器右键「附加到上下文」 | 双方 | P1 | TODO |
+| F | R-F10 | Grok 后端（ACP 一等接入） | Claudian | P2 | TODO |
+| F | R-F11 | i18n 扩语种 | Claudian | P2 | TODO |
+| F | R-F12 | `$` 技能触发符 / 可复用指令（评估） | Claudian | P3 | TODO |
+| G | R-G1 | Collab 团队协作模式 | Claudian | 裁决 | TODO |
+| G | R-G2 | 移动端轻量直连聊天 | Copilot | 裁决 | TODO |
+| G | R-G3 | 多 agent fan-out 只读研究 | Copilot | 裁决 | TODO |
+| G | R-G4 | 插件级 web 搜索供应商层 | Copilot | 裁决 | TODO |
+
+---
+
+## 3. 批次 D：对话资产
+
+### R-D1 对话导出 / 另存为 Markdown 笔记（P0）
+
+**目标**：Copilot 把对话保存为库内 Markdown 笔记（frontmatter + 正文，可同步、可搜索、可内链），OpenCodian 目前只有插件本地存储 + OpenCode `/share` 链接，**没有任何 Markdown 出口**。
+
+**需求**
+
+1. 命令 `export-conversation-markdown` + 会话历史菜单项：把当前（或指定）对话导出为 vault 内 Markdown 笔记。
+2. 导出格式：frontmatter（backend、model、标题、起止时间、消息数）+ 正文（用户/助手轮次，保留 markdown 原文；工具调用与图片以折叠块或引用形式保留；图片导出为附件引用）。
+3. 设置项：导出目录（默认 `opencodian-conversations/`）、文件名模板（`{$date}_{$topic}` 类）、自动导出开关（默认关）。
+4. 导出为**纯新增文件**，不得触碰对话存储本身；失败时明确报错，不留半个文件。
+
+**技术约束**
+
+- 写入走 `vault.create`，纳入既有命名冲突策略（追加序号，不覆盖）。
+- 消息序列化必须复用既有存储的消息结构（`StorageService` 全量消息），不得重新实现渲染管线；导出的是**原始 markdown**，不是渲染后的 HTML。
+- i18n 双语文案；命令注册挂 `main.ts` 命令区，不进 `OpenCodianView`。
+
+**验收**：导出后笔记可被 Obsidian 搜索/链接；重开对话导出幂等（同名追加序号）；四后端对话各导出一次结构合法。
+
+### R-D2 API 密钥入 Obsidian Keychain（P1）
+
+**目标**：Copilot 用 Obsidian 1.11.4+ 的 Keychain API 存 API key（不落 `data.json`）。OpenCodian 的 Pi 供应商密钥、自定义供应商密钥目前明文在设置数据里。
+
+**需求**
+
+1. 密钥写入 Keychain（`app.keychain` 可用时），`data.json` 只存占位引用。
+2. 迁移：首次加载发现明文密钥 → 写入 Keychain → 明文字段清除（一次性、可回滚）。
+3. Keychain 不可用（旧版宿主）→ 如实降级为现状存储并提示，不静默。
+
+**验收**：迁移后 `data.json` 中 grep 不到任何密钥值；宿主降级场景行为一致；四后端连接不受影响。
+
+### R-D3 轮次完成通知音效（P3）
+
+设置项（默认关）+ 完成时播放短音（内置一个资源 + 可选自定义文件路径）；仅后台任务与非聚焦窗口触发，避免前台打扰。小件，随手做。
+
+---
+
+## 4. 批次 E：上下文与检索
+
+### R-E1 URL / 网页内容上下文（P1）
+
+**目标**：Copilot 支持 URL/YouTube/Twitter 提及（云端解析）。OpenCodian 上下文目前完全限于 vault 内 + 图片。
+
+**需求**
+
+1. Composer 粘贴或输入 URL（http/https）→ 出现「网页」上下文 chip；发送前本地抓取（`requestUrl`）转 Markdown 存为该条目的快照。
+2. 抓取成功后内容进入 `<attached_context>` 同一等通道（四后端可用）；失败（超时/非 HTML/robots 拒绝）→ 条目如实标注「抓取失败」，不静默剔除。
+3. 每条 URL 内容截断上限（沿用上下文字符预算）；YouTube 链接仅当可取得字幕文本时作为文本上下文，取不到则如实标注。
+4. **默认开箱可用但仅限用户显式粘贴的 URL**——不自动抓取消息正文里出现的链接（与「不自动注入」原则一致）。
+
+**技术约束**：不走任何第三方云解析服务（与 Copilot 的 Brevilabs 路线刻意不同）；HTML→MD 的转换需选型（零依赖正则降级可接受，但不渲染脚本/样式）；SSRF 防护：拒绝解析结果指回 `127.0.0.1`/内网段的重定向（插件自身就有本地端口，必须防回环）。
+
+**验收**：粘贴文章 URL → chip → 模型能引用其中内容；内网重定向被拒；失败路径如实标注。
+
+### R-E2 Web Viewer 标签页上下文（P2）
+
+Obsidian 核心 Web Viewer 插件的活动标签页（URL + 选区）作为上下文来源；未启用 Web Viewer 时入口不出现。依赖 R-E1 的网页上下文条目类型。
+
+### R-E3 相关笔记面板（P1）
+
+**目标**：Copilot 的 Relevant Notes 是高频入口：按当前活动笔记给出「链接图谱相关 + 检索相关」双通道笔记列表，实时更新。
+
+**需求**
+
+1. 独立侧栏视图 `opencodian-relevant-notes`：当前活动笔记的相关笔记列表（出链/入链邻居 + R-C1 检索索引按相似度取 TopN），两通道分组展示、可折叠。
+2. 随活动笔记切换实时刷新（防抖）；点击条目打开笔记；每条提供「附加到聊天上下文」按钮（复用 `add-current-note-to-context` 的通道）。
+3. 检索通道复用 R-C1 的 `.opencodian/vault-index/`，**不建第二套索引**。
+
+**验收**：切笔记后列表更新；图谱通道与 Obsidian 反链面板结论一致；附加按钮产生与手选一致的上下文条目。
+
+### R-E4 语义检索增强层（P2）
+
+**目标**：R-C1 目前只有词面检索；Copilot 靠外部 Miyo 提供语义通道。OpenCodian 的补齐方式必须**插件内自洽**。
+
+**需求**
+
+1. 在 R-C1 索引之上加可选 embedding 通道：向量生成走「已配置的模型供应商 embedding 端点或 OpenCode 服务端 embedding」，本地向量存储（插件数据目录，内容寻址）。
+2. 默认关闭；开启后检索注入 = 词面 ∪ 语义 TopK 合并去重；UI 如实标注每条命中来自哪个通道。
+3. 无可用 embedding 端点时如实提示降级为纯词面，不伪造。
+
+**技术约束**：先出独立设计文档（存储规模、增量更新、包体积零新增——不引入向量库依赖，用平铺余弦即可，万篇级内存可控性需测算）；§8 Q3 的「先词面」裁决本条为后续增强层，不推翻。
+
+### R-E5 Dataview / Bases 上下文支持（P2）
+
+上下文构建时：dataview 代码块执行结果内联（宿主 Dataview 插件 API 可用时）；`.base` 文件以文本形态进上下文。不可用时如实标注，不静默跳过。
+
+### R-E6 选区 / 全库 token 计数命令（P2）
+
+命令：选区词数/token 估算；全库（R-C1 索引范围）token 估算。估算复用既有 tokenizer 常量；结果 Notice + 复制。小件。
+
+---
+
+## 5. 批次 F：会话交互与运行时
+
+### R-F1 Turn steering + 流式中消息排队（P1）
+
+**目标**：Claudian 在 agent 运行中允许注入新输入（codex/grok/pi 原生支持），并把流式期间的排队消息合并而非丢弃。OpenCodian 目前流式中只能取消。
+
+**需求**
+
+1. 流式期间输入框允许「排队发送」：消息进入本 tab 队列，轮次结束后自动作为下一轮发出；队列可见、可逐条撤回。
+2. 后端原生支持轮内注入时（先做 codex/pi 的能力探测），提供「立即注入」模式：排队消息即时进入当前轮（steering）；不支持的后端如实显示「将在本轮结束后发送」。
+3. 排队不改变多 tab 并发语义；每 tab 独立队列。
+
+**技术约束**：能力探测挂 `AgentCapability`（新增 `TurnSteering`）；注入走各后端既有会话缝（codex app-server / pi RPC），不新起会话；默认行为保持「排队」模式，steering 由用户显式选择。
+
+**验收**：codex/pi 上注入的补充指令改变当轮输出方向；claude 上排队消息轮后自动发出；取消轮次时队列保留且可撤回。
+
+### R-F2 会话-笔记绑定草稿（P2）
+
+Claudian 的 linked content：会话可绑定一篇笔记作为产出草稿（auto-draft/explicit-draft/submitting/locked 四态，重命名跟随）。OpenCodian 适配：会话设置里可选「绑定笔记」，绑定的笔记变更纳入 R-B3 快照与 Modified Files 侧栏联动；不做自动写回（写路径仍归 agent 工具 + 唯一写路径约束）。
+
+### R-F3 回退预览 + 冲突检测 UI（P2）
+
+R-B3 回退前显示预览：将恢复的文件清单 + 每文件 before/after 行数统计；生成后文件内容若已被用户后续修改（快照后又有新变更）→ 冲突标记并要求二选一。纯 UI 层，回退语义不动。
+
+### R-F4 暖进程池（P2）
+
+Claudian 预热最多 N 个 agent 运行时降低起会话延迟。OpenCodian 适配：仅对「最近使用的默认后端」维持 1 个预热空会话（可关，默认关）；必须复用 R-C3 已落地的暖会话基础设施，不另建池；预热会话不产生任何计费轮次。
+
+### R-F5 双栏会话管理器（P3）
+
+主区聊天 + 常驻侧栏会话浏览并排（设置项，默认关）。UI 布局件，价值中等。
+
+### R-F6 Vim 风格聊天导航键（P3）
+
+聊天区 `w`/`s`/`i`（可配置）滚动/聚焦输入。小件。
+
+### R-F7 每供应商环境变量分域 + 环境哈希失效（P2）
+
+Claudian 把环境变量按 `shared` / `provider:*` 分域，环境指纹变化即失效旧会话。OpenCodian 已有 Claude env 与 additional directories；本条统一为分域模型 + 会话失效信号，防止「改了 key 旧会话还在用旧环境」。
+
+### R-F8 自定义模型自定义上下文窗口（P2）
+
+自定义 OpenAI 兼容模型缺权威 context window 元数据时，允许用户为模型声明上限（ContextRing 与压缩阈值消费）。落点：模型目录条目加可选 `contextWindowOverride`。
+
+### R-F9 文件管理器右键「附加到上下文」（P1）
+
+资源管理器文件/文件夹右键菜单项：附加到当前 tab 聊天上下文（走 R-A7 的多选/文件夹条目通道）。小件、高频。
+
+### R-F10 Grok 后端（P2）
+
+经既有 ACP 机制一等接入 grok（Claudian 的 Grok 走 ACP native connection）：预置 ACP agent 配置 + 模型发现 + 能力矩阵行。先做可行性验证（grok CLI 的 ACP 兼容面），验证失败如实登记。
+
+### R-F11 i18n 扩语种（P2）
+
+zh-TW/ja/ko/de/fr/es/ru/pt 八语种（Claudian 同款清单）。i18n 框架已就绪（en/zh 键完备），需要翻译流水线与缺键回退策略；分批做，每批跑 `obsidian-plugin-i18n` 技能流程。
+
+### R-F12 `$` 技能触发符 / 可复用指令（P3，评估）
+
+Claudian 用 `$` 调技能、`/instruction` 保存可复用指令。OpenCodian 斜杠命令已含 skills-as-commands 与 project/user 命令，功能面基本等价——**建议 WONTFIX**，除非用户指出具体缺口。
+
+---
+
+## 6. 批次 G：裁决项（默认不动）
+
+| # | 需求 | 内容 | 建议 |
+|---|---|---|---|
+| R-G1 | Collab 团队协作 | Claudian 的工单/变更评审/冲突解决/LAN+云同步子系统（60+ 文件 + 独立云服务器仓库） | 独立产品决策，不作为「对齐项」自动启动；若立项需单独立项文档与安全设计（网络面大） |
+| R-G2 | 移动端轻量聊天 | Copilot 的 BYOK 直连 Quick Chat 可上移动端（agent 桌面限定） | 架构性：需独立轻量会话栈 + 移动端构建验证，先出可行性文档 |
+| R-G3 | 多 agent fan-out | 一次只读研究任务同时派多个后端 agent | 依赖多 tab 基建，可复用后台任务面板；价值待用户确认 |
+| R-G4 | 插件级 web 搜索供应商层 | Firecrawl/Perplexity/Exa 等可切换搜索 + 引用 UI | 四后端 agent 已自带 web search；除非「非 agent 直连模式」立项，否则倾向 WONTFIX |
+
+---
+
+## 7. 跨批次硬约束
+
+1. 沿用 `flowtext-parity.md` §6 全部约束（只读辅助契约、唯一写路径、脏检查、fail-closed、后端无关验收、自动注入显式可见、能力缺失如实呈现）。
+2. **不引入第三方云服务依赖**：对标插件中走云端的能力（Copilot 的 Brevilabs 解析、Plus 门控、OpenArtifacts）一律以本地实现或放弃的方式继承。
+3. **不新建平行系统**：检索复用 R-C1 索引、上下文复用 R-A7/obsidianContext 通道、回退复用 R-B3 快照、暖会话复用 R-C3 池。
+4. 每条新设置同步 `settings.ts` 默认值/迁移 + 设置 UI + `zh.ts`/`en.ts`。
+5. UI 能力四后端一致；某后端不支持的如实标注，不静默降级。
+
+---
+
+## 8. 开放问题
+
+| # | 问题 | 建议 |
+|---|---|---|
+| Q1 | R-D1 自动导出是否默认开 | 默认关；手动命令先行，自动导出观察需求 |
+| Q2 | R-E1 是否需要白名单域限制 | 首版不做域白名单，仅回环/内网防护；如需再加 |
+| Q3 | R-E4 embedding 供应商选型（OpenCode 服务端 vs 各供应商 API vs 本地模型） | 先出设计文档测算成本与规模，倾向复用 OpenCode 服务端能力 |
+| Q4 | R-F10 Grok 的 ACP 兼容性未验证 | 先可行性 spike，失败则登记 WONTFIX |
+| Q5 | R-F11 翻译的维护策略（机翻 vs 人工校对） | 机翻底稿 + 用户常用语种优先人工校对 |
+| Q6 | 批次顺序 D→E→F 是否固定 | D 批次最小可先行；E/F 可按用户反馈并行插队 |
+
+---
+
+## 9. 明确非目标
+
+1. 不做 Copilot 的 Plus/云门控商业模式类能力。
+2. 不做 Claudian 的 Collab 云服务器与 LAN 组网（除非 R-G1 立项裁决通过）。
+3. 不复制两个插件的 React 组件栈/实现路径。
+4. 不为对齐引入向量库、第二套检索栈、第二套上下文序列化。
+5. 不改动既有只读辅助契约、唯一写路径、脏检查。
