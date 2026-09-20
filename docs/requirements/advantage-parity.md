@@ -52,7 +52,7 @@
 |---|---|---|---|---|---|
 | D | R-D1 | 对话导出 / 另存为 Markdown 笔记 | Copilot | P0 | DONE |
 | D | R-D2 | API 密钥入 Obsidian Keychain | Copilot | P1 | DONE |
-| D | R-D3 | 轮次完成通知音效 | 双方 | P3 | TODO |
+| D | R-D3 | 轮次完成通知音效 | 双方 | P3 | DONE |
 | E | R-E1 | URL / 网页内容上下文（本地抓取） | Copilot | P1 | TODO |
 | E | R-E2 | Web Viewer 标签页上下文 | Copilot | P2 | TODO |
 | E | R-E3 | 相关笔记面板（图谱 + 检索双通道） | Copilot | P1 | TODO |
@@ -129,6 +129,8 @@
 ### R-D3 轮次完成通知音效（P3）
 
 设置项（默认关）+ 完成时播放短音（内置一个资源 + 可选自定义文件路径）；仅后台任务与非聚焦窗口触发，避免前台打扰。小件，随手做。
+
+**落地证据（2026-09-21，提交 `aed5e1c9`）**：`TurnCompletionSoundService`（feature.chat-services，全注入缝）——内置双音提示（C6→E6 正弦 0.28s，构建期合成的 base64 WAV，零外部资产）或库内自定义音频（`vault.getResourcePath` 解析；不可解析→本地化 Notice + 回退内置）；触发门 = 默认关 且（后台任务会话 或 窗口未聚焦）；`main.ts saveConversation` 以 `lastResponseAt` 前进为轮次完成信号；播放拒绝只记日志。测试 `TurnCompletionSoundService.test.ts` 7 例 + verify 15/15。实机（BUILD_ID `202609210011`）：服务在场、默认值 off/空、禁用门与播放门结果正确，且内置 WAV 在真实 Obsidian 中 `play()` resolve、duration 0.28s、readyState 4、currentTime 前进（真实解码播放）；视觉门两轮 PASS（截图 `.visual-evidence/rd3/rd3-sound-settings.png`：两行与同块字号/对齐/行距一致，宽输入 289px+、占位符完整、toggle 可用态）。
 
 ---
 

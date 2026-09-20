@@ -11,7 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
-## 2026-09-21 R-D2 密钥入 Obsidian SecretStorage：持久化边界占位符往返 + 一次性迁移 + 显式回滚
+## 2026-09-21 R-D3 轮次完成提示音：后台任务/非聚焦触发门 + 内置合成音 + 库内自定义音
+
+**触发**：advantage-parity 批次 D 第 3 条（P3 小件）。两个对标插件都有「agent 完成时叫我」的提示音能力，OpenCodian 无任何完成通知。
+
+**改动**：`TurnCompletionSoundService`（feature.chat-services，聚焦/资源路径/Notice/audio 构造全注入缝）——音源为**构建期合成的内置双音提示**（C6→E6 正弦 + 指数衰减，0.28s 16-bit 单声道 WAV 以 base64 常量内嵌，16.5KB，零外部资产）或用户配置的库内相对音频文件（`vault.getResourcePath` 解析；不可解析 → 本地化 Notice + 回退内置，诚实降级）；`Audio.play()` 拒绝只记日志绝不影响聊天路径。触发门（需求原文）：`enabled`（默认关）且（`isBackgroundTask` 或窗口未聚焦）——前台正看的轮次绝不发声。触发点在 `main.ts saveConversation`：`lastResponseAt` 前进即轮次完成。设置 `turnCompletionSoundEnabled/Path`（display 块两行，路径宽输入 + title 悬停）+ zh/en + load 归一化。
+
+**测试**：`TurnCompletionSoundService.test.ts` 7 例（禁用门/前台静默/后台聚焦播放/非聚焦播放/自定义路径解析与回退 Notice/播放拒绝吞掉/构造失败如实）+ verify 15/15。实机（BUILD_ID `202609210011`）：默认值 off/空、门结果正确；**内置 WAV 在真实 Obsidian 中实证播放**（`play()` resolve、duration 0.28s、readyState 4、currentTime 前进）。视觉门两轮 PASS（第一轮截图滚动位置没盖到目标行——测量已证行在场；第二轮完整证据：字号/对齐/行距与同块一致、宽输入右缘对齐、占位符完整、toggle 可用态）。
+
+---
+
 
 **触发**：advantage-parity 批次 D 第 2 条（P1）。Copilot 用 Obsidian 钥匙串 API 存密钥不落 `data.json`；OpenCodian 的 Pi/自定义供应商/codex 密钥、服务器认证、远程控制令牌此前全部明文在设置文件里。
 
