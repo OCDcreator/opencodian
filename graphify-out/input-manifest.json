@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "54d4d9525c1493a2c20eeb22665260b8215cd169f7d54c9e5a5f561752b816e4",
-  "recordCount": 754,
+  "digest": "258e586d8ab268ff73b9f6c7814de2097cd5d80c05294dfc6e107144f664e8b3",
+  "recordCount": 755,
   "records": [
     {
       "kind": "ignore",
@@ -851,7 +851,7 @@
     {
       "kind": "src",
       "key": "src/core/opencode/OpenCodeContextPartSerializer.ts",
-      "sha256": "e05585bedcceec0c3432bab9f76525240d41069f281cd72c712ccc70a7624aee"
+      "sha256": "b6c598edbb06ef9b02c4b7bc3054986547b8799ef732b24e879ef2be5df68e8f"
     },
     {
       "kind": "src",
@@ -1166,7 +1166,7 @@
     {
       "kind": "src",
       "key": "src/core/types/chat.ts",
-      "sha256": "8063621ad59ac1767bb70e423d3a2658e01d9d15a0c533cd8e1688f8316bf03b"
+      "sha256": "5b803ca4eed02785a04f66ecefe57f6b7e7a33052e36db805696333912ab72f5"
     },
     {
       "kind": "src",
@@ -1256,7 +1256,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/composerContext.ts",
-      "sha256": "d4e967b1844fe9e48e2a1b33c5797b33e6b855c9c7887030cb3d68a40d893f7a"
+      "sha256": "8d499a07f33dec37a29f04d6e2a7fbb6de8cd0847d5d6733292026c6e7acb0f6"
     },
     {
       "kind": "src",
@@ -1296,7 +1296,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
-      "sha256": "25ac58d5c7a0216b284d959ae5b6c4eb6d8244d38891d9c36ac6de16c52e20bf"
+      "sha256": "5aef370368624731f082f0f7e2572ac41708eff799ba53a62b1a50be69b5268c"
     },
     {
       "kind": "src",
@@ -1386,7 +1386,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/ChatRuntimeComposition.ts",
-      "sha256": "2d41d0c99229f4f0d898bca9d59f43c69d73b2319d24e7660c3ab55038118561"
+      "sha256": "e5a37eedff9544b5d92a693a1611570e2f4b21865d42d6deb343061186fadef8"
     },
     {
       "kind": "src",
@@ -1526,7 +1526,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/UserMessageContentRenderer.ts",
-      "sha256": "1079e9e09af59cad914e5fe008bb99f2720a9c5cc0148af7455d067f8c1ac0dd"
+      "sha256": "4b0e17cbc4273b7dea6b33f5484b4ac47f767423d5de2ab643f1c987b9a04819"
     },
     {
       "kind": "src",
@@ -1721,7 +1721,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ComposerInputShellCoordinator.ts",
-      "sha256": "94315cf45508cff79b2cffa5046b3c78f3b1e0e1629609306769b7f8401a93e6"
+      "sha256": "b68e32e613ec3c83fd14edc023a61a88d7c889837c270068101cec0f97b626e2"
     },
     {
       "kind": "src",
@@ -1981,7 +1981,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/MessageSendPreparationService.ts",
-      "sha256": "593f02b8ded8eb84962e3f76dfda886841392045140a6b7592365c07f492959b"
+      "sha256": "62d26c40138f32d703df10a458bde6640322497b17d661523351495c37680057"
     },
     {
       "kind": "src",
@@ -2272,6 +2272,11 @@
       "kind": "src",
       "key": "src/features/chat/services/TurnCompletionSoundService.ts",
       "sha256": "c9def841908add1bbc2c461f7a80c4ce9ac1f4ae9493ac0d92278f59fca03cf2"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/chat/services/UrlContextFetchService.ts",
+      "sha256": "5a3931bdef9c3270eb991d99faef7c38aa33cb5d034d49126c9632a33853510e"
     },
     {
       "kind": "src",
@@ -3211,7 +3216,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "50121b068d1b9fdecbff1613a302b1e7878b1576a6f28d1f26ceb392a551ae35"
+      "sha256": "28430c1967ee32290074c9dfed23fe53cd6e0a722c60ea73925020922d4c1ad5"
     },
     {
       "kind": "src",
@@ -3221,7 +3226,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "ce0eff62bb416fae8dc0923692c94f2e14fdde13cea3f86d4b3b88798152464d"
+      "sha256": "567a15b12387a38375ec1cdfd721ef4728dddcff148ebf1062778ab584c493bc"
     },
     {
       "kind": "src",
@@ -3291,7 +3296,7 @@
     {
       "kind": "src",
       "key": "src/shared/index.ts",
-      "sha256": "c3a3409bff769dad4d67bf318599fe9ec60fd5032bfa1d56be28ec11025c0c6c"
+      "sha256": "e39c1947393c63ff008c21a7afce9da4fc253ecb0de8671e06ed55538c795d06"
     },
     {
       "kind": "src",
@@ -3311,7 +3316,7 @@
     {
       "kind": "src",
       "key": "src/shared/obsidianContext.ts",
-      "sha256": "bb93943006484d9272455c97f4847a90467fdbbfc4286263042d364639ba97ba"
+      "sha256": "862d957c2a08e57e844bec1fa8ddd335ecaf47e48687cbe4b41ac4cdeecbff17"
     },
     {
       "kind": "src",
@@ -3774,7 +3779,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-20T16:08:56.994Z",
-  "headShaAtGeneration": "ca2eb4fc6edd8136d3ccb8d5915c559f819acdb0",
+  "generatedAt": "2026-09-20T16:38:55.746Z",
+  "headShaAtGeneration": "2a1e1067a57bb2cc3eafe82f436346bd59e8769e",
   "graphifyVersion": "graphify 0.9.36"
 }

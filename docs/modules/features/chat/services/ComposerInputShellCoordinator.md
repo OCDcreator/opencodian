@@ -1,4 +1,5 @@
 # ComposerInputShellCoordinator
+> 2026-09-21 (advantage-parity R-E1)：新增粘贴监听——整个粘贴为一条 http(s) URL 时拦截并经 host 缝 attachUrlContextToActiveTab 成网页 chip；嵌在长文本里的链接不拦截。
 
 > **源码**: `src/features/chat/services/ComposerInputShellCoordinator.ts`
 > **状态**: [REVIEW]

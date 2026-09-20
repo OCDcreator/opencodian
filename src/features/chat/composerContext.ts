@@ -69,6 +69,11 @@ export function partitionExistingContextItems(
   const existing: PromptContextItem[] = [];
   const missingPaths: string[] = [];
   for (const item of items) {
+    // URL items (R-E1) carry their own payload — no vault path to go stale.
+    if (item.kind === 'url') {
+      existing.push(item);
+      continue;
+    }
     if (hasEntryAtPath(item.path)) {
       existing.push(item);
     } else if (!missingPaths.includes(item.path)) {

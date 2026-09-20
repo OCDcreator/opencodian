@@ -66,7 +66,34 @@ export type PromptContextKind =
   | 'file'
   | 'folder'
   | 'pdf_document'
-  | 'pdf_selection';
+  | 'pdf_selection'
+  | 'url';
+
+/**
+ * URL/webpage context metadata (advantage-parity R-E1). `status` is the
+ * honest fetch verdict: `pending` until the send-time local fetch resolves,
+ * `ok` with the converted markdown in `textSnapshot`, or `failed` with a
+ * machine-readable `failureReason` (chip + injected tag both show it; a
+ * failed entry is never silently dropped).
+ */
+export interface UrlContextMeta {
+  href: string;
+  /** Final URL after redirects, when the transport reports it. */
+  finalUrl?: string;
+  /** Page <title>, when extraction succeeded. */
+  title?: string;
+  fetchedAt?: number;
+  status: 'pending' | 'ok' | 'failed';
+  failureReason?:
+    | 'blocked-private-target'
+    | 'non-http-response'
+    | 'timeout'
+    | 'fetch-error'
+    | 'empty-content'
+    | 'youtube-transcript-unavailable';
+  contentChars: number;
+  truncated: boolean;
+}
 
 /** One extracted PDF page's text layer (R-C4, 1-based page number). */
 export interface PdfPageText {
@@ -130,6 +157,8 @@ export interface PromptContextItem {
   origin?: PromptContextOrigin;
   /** R-C4: PDF extraction metadata (pdf_document / pdf_selection only). */
   pdf?: PdfContextMeta;
+  /** R-E1: URL fetch metadata (url items only). */
+  url?: UrlContextMeta;
   /** R-C4: structured page text payload — never copied into textSnapshot. */
   pdfPages?: PdfPageText[];
   /** R-C4: in-document selection locator (pdf_selection only). */
@@ -149,6 +178,8 @@ export interface MessageContextAttachment {
   pdf?: PdfContextMeta;
   /** R-C4: bounded selection locator (text is capped at the excerpt limit). */
   pdfSelection?: PdfSelectionRange;
+  /** R-E1: URL fetch verdict (url items only; body rides the request only). */
+  url?: UrlContextMeta;
 }
 
 export interface QuestionOption {

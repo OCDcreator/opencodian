@@ -3,6 +3,7 @@ import * as path from 'path';
 import {
   buildObsidianContextTag,
   buildPdfContextTag,
+  buildUrlContextTag,
   createLogger,
   isTextLikeMime,
   toFileContextUrl,
@@ -76,6 +77,12 @@ export class OpenCodeContextPartSerializer {
     if (item.kind === 'pdf_document' || item.kind === 'pdf_selection') {
       return this.createPdfContextPart(item);
     }
+    // URL entries (R-E1) are backend-neutral synthetic text parts like PDF
+    // entries: the payload is the send-time fetched markdown (or the honest
+    // failure header) carried in the item, never a file URL.
+    if (item.kind === 'url') {
+      return this.createUrlContextPart(item);
+    }
     return this.host.isLocalServerMode()
       ? this.createLocalContextPart(item)
       : this.createRemoteContextPart(item);
@@ -116,6 +123,40 @@ export class OpenCodeContextPartSerializer {
         ...(item.pdf?.fragment
           ? { pages: `${item.pdf.fragment.pageFrom}-${item.pdf.fragment.pageTo}` }
           : {}),
+      },
+    };
+  }
+
+  /**
+   * URL context parts (R-E1): the same synthetic `<obsidian_context>` text
+   * part in local and remote mode, so the fetched page content (or the
+   * honest fetch-failure header) reaches every backend identically. The
+   * remote byte cap applies; over-budget pages are truncated at fetch time
+   * with `truncated` marked on the item metadata.
+   */
+  private createUrlContextPart(item: PromptContextItem): PromptRequestPart {
+    const text = buildUrlContextTag(item);
+    const byteLength = utf8ByteLength(text);
+    if (!this.host.isLocalServerMode() && byteLength > REMOTE_CONTEXT_TEXT_LIMIT_BYTES) {
+      // Fail-closed like PDFs: the fetch-time truncation keeps every item
+      // inside the budget, so an over-limit tag means the budget shrank.
+      throw new Error(`URL context exceeds remote size limit: ${item.label}`);
+    }
+
+    logger.debug('Preparing URL context part', {
+      kind: item.kind,
+      href: item.url?.href,
+      status: item.url?.status,
+      byteLength,
+    });
+
+    return {
+      type: 'text',
+      text,
+      synthetic: true,
+      metadata: {
+        kind: item.kind,
+        path: item.path,
       },
     };
   }

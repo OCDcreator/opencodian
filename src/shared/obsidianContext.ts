@@ -301,6 +301,40 @@ export function buildPdfContextTag(item: PromptContextItem): string {
   return `<obsidian_context ${attrs.join(' ')}>${buildPdfContextBody(item)}</obsidian_context>`;
 }
 
+/**
+ * Render the body injected for a URL context item (R-E1). A failed or
+ * still-pending fetch injects an explicit failure header naming the reason —
+ * the entry is never silently dropped, and the model sees that the user
+ * referenced this URL even when no content could be retrieved.
+ */
+export function buildUrlContextBody(item: PromptContextItem): string {
+  const meta = item.url;
+  if (!meta || meta.status !== 'ok') {
+    const reason = meta?.failureReason ?? (meta?.status === 'pending' ? 'pending' : 'fetch-failed');
+    return `[fetch failed: ${reason}] ${meta?.href ?? item.path}`;
+  }
+  const header = [
+    `# ${meta.title || meta.href}`,
+    meta.finalUrl && meta.finalUrl !== meta.href ? `redirected: ${meta.finalUrl}` : '',
+    meta.truncated ? 'content truncated to the context budget' : '',
+    `fetched: ${new Date(meta.fetchedAt ?? Date.now()).toISOString()}`,
+  ].filter(Boolean).join('\n\n');
+  return `${header}\n\n${item.textSnapshot ?? ''}`;
+}
+
+/** Build a `url` context item's `<obsidian_context>` tag (R-E1). */
+export function buildUrlContextTag(item: PromptContextItem): string {
+  const meta = item.url;
+  const attrs = [
+    'kind="url"',
+    `href="${escapeHtmlAttribute(meta?.href ?? item.path)}"`,
+  ];
+  if (meta?.status && meta.status !== 'ok') {
+    attrs.push(`status="${escapeHtmlAttribute(meta.status)}"`);
+  }
+  return `<obsidian_context ${attrs.join(' ')}>${buildUrlContextBody(item)}</obsidian_context>`;
+}
+
 /** Build a `pdf_selection` context item's attachment payload (R-C4). */
 export function buildPdfSelectionRange(
   page: number,
@@ -375,6 +409,9 @@ export function buildContextAttachment(item: PromptContextItem): MessageContextA
     ...(item.pdfSelection
       ? { pdfSelection: buildPdfSelectionRange(item.pdfSelection.page, item.pdfSelection.text, item.pdfSelection.rangeStr) }
       : {}),
+    // R-E1: persist the URL fetch verdict (status/reason/size) so chips stay
+    // honest across reloads; the fetched page body rides the request only.
+    ...(item.url ? { url: { ...item.url } } : {}),
   };
 }
 

@@ -29,7 +29,13 @@ import { AgentCapability, hasCapability } from '../../../core/agents';
 import { getConversationChatBackendService } from '../../../core/agents/backend/AgentBackendRouting';
 import type { MemoryRuntimePort } from '../../../core/memory';
 import { OpenCodeService } from '../../../core/opencode';
-import type { ChatMessage, ContextGroup, Conversation, EditRevertServicePort } from '../../../core/types';
+import type {
+  ChatMessage,
+  ContextGroup,
+  Conversation,
+  EditRevertServicePort,
+  PromptContextItem,
+} from '../../../core/types';
 import { getTurnDiffNoticeMeta } from '../../../core/types';
 import { t } from '../../../i18n';
 import { getVaultBasePath } from '../../../shared';
@@ -153,6 +159,7 @@ import type { TabMessagesPaneCoordinatorHost } from '../services/TabMessagesPane
 import { TabMessagesPaneCoordinator } from '../services/TabMessagesPaneCoordinator';
 import { TitleGenerationService } from '../services/TitleGenerationService';
 import { createDebugLogCallbacks } from '../services/trailingAssistantPatchDebug';
+import { UrlContextFetchService } from '../services/UrlContextFetchService';
 import { VaultRetrievalComposerCoordinator } from '../services/VaultRetrievalComposerCoordinator';
 import type { TabId } from '../tabs/types';
 
@@ -1064,6 +1071,8 @@ export class ChatRuntimeComposition {
       } as never),
       assistantAutoInternalLinkService,
     );
+    // R-E1: shared URL context fetch service (composer chips + send path).
+    const urlContextFetchService = new UrlContextFetchService();
     const messageSendPreparationService = new MessageSendPreparationService(
       createMessageSendPreparationHost({
         planMemoryInjection: async (conversation: Conversation, latestUserText: string) => (
@@ -1083,6 +1092,10 @@ export class ChatRuntimeComposition {
             })
             : null
         ),
+        // R-E1: send-time local fetch for pending URL chips (single shared
+        // service instance; failures resolve to failed items, never throws).
+        resolveUrlContextItems: (items: PromptContextItem[]) =>
+          urlContextFetchService.resolvePendingItems(items),
         getCurrentConversation: () => host.currentConversation,
         createNewConversation: async () => {
           await host.createNewConversation();

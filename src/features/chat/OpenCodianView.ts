@@ -312,6 +312,7 @@ import {
   logAssistantFinalizationDebug,
   previewLogText,
 } from './services/trailingAssistantPatchDebug';
+import { buildPendingUrlContextItem } from './services/UrlContextFetchService';
 import { VaultRetrievalComposerCoordinator } from './services/VaultRetrievalComposerCoordinator';
 import type { TabBar, TabId, TabManager } from './tabs';
 import { type BackendSessionBrowserHost,BackendSessionBrowserModal } from './ui/BackendSessionBrowserModal';
@@ -903,6 +904,10 @@ export class OpenCodianView extends ItemView {
       },
       addVaultPathContextFromDrop: (rawPath) =>
         this.composerContextViewFacade.addVaultPathContextFromDrop(rawPath),
+      // R-E1: pasted bare URL → webpage context chip (same attach path as
+      // the PDF selection integration; the fetch itself happens at send).
+      attachUrlContextToActiveTab: (href) =>
+        this.composerContextViewFacade.attachBuiltContextItem(buildPendingUrlContextItem(href)),
       mountSelectionControls: (toolbar, options) => {
         this.chatSelectionControlsCoordinator.build(toolbar, {
           showModels: options.showModels && hasCapability(this.caps, AgentCapability.Models),

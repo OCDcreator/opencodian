@@ -112,6 +112,8 @@ export {
   buildPdfContextBody,
   buildPdfContextTag,
   buildPdfSelectionRange,
+  buildUrlContextBody,
+  buildUrlContextTag,
   dedupeContextAttachments,
   extractPromptContextItems,
   formatContextLabel,

@@ -1,4 +1,5 @@
 # Obsidian Context Helpers
+> 2026-09-21 (advantage-parity R-E1)：新增 buildUrlContextTag/Body（ok 载荷带标题/最终 URL/截断标记，或诚实失败头）；buildContextAttachment 透传 url 元数据（不落正文）。
 
 > **源码**: `src/shared/obsidianContext.ts`
 > **状态**: [REVIEW]

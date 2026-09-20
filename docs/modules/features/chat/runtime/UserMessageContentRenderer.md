@@ -1,4 +1,5 @@
 # UserMessageContentRenderer
+> 2026-09-21 (advantage-parity R-E1)：已发消息的 url 附件 chip 带「抓取失败」徽标并改为系统浏览器打开源链接。
 
 > **源码**: `src/features/chat/runtime/UserMessageContentRenderer.ts`
 > **状态**: [REVIEW]

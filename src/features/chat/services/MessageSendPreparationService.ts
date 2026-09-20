@@ -152,6 +152,12 @@ export interface MessageSendPreparationHost {
    * off or the block was already injected this epoch.
    */
   planObsidianToolingInjection?(conversation: Conversation): Promise<{ text: string } | null>;
+  /**
+   * R-E1: send-time local fetch for pending URL context chips. Optional;
+   * absent passes items through unchanged (the serialized tag then carries
+   * the honest pending/failed verdict).
+   */
+  resolveUrlContextItems?(items: PromptContextItem[]): Promise<PromptContextItem[]>;
   getActiveTabId(): TabId | null;
   ensureTabRuntime(tabId: TabId | null): boolean;
   isTabForegroundBusy(tabId: TabId | null): boolean;
@@ -388,7 +394,26 @@ export class MessageSendPreparationService {
     }
     const activeModelId = this.host.formatModelId(modelOptions);
     const persistentContextItems = await this.composerSendContext.resolvePersistentContextItems(conversation.externalContextPaths);
-    const mergedContextItems = this.mergeContextItems(persistentContextItems, draftContextItems);
+    let mergedContextItems = this.mergeContextItems(persistentContextItems, draftContextItems);
+    // R-E1: pending URL chips fetch now (send-time, local, SSRF-guarded).
+    // Failures stay in the context list with status failed — the injected
+    // tag reports them honestly; a fetch failure never blocks the turn.
+    if (mergedContextItems.some((item) => item.kind === 'url' && item.url?.status !== 'ok')) {
+      mergedContextItems = await (this.host.resolveUrlContextItems?.(mergedContextItems)
+        ?? Promise.resolve(mergedContextItems));
+      // Honest surfacing: every failed webpage fetch gets a notice with the
+      // localized reason; the entry itself still sends with a failed marker.
+      for (const failed of mergedContextItems.filter((item) => item.kind === 'url' && item.url?.status === 'failed')) {
+        const reasonKey = failed.url?.failureReason ?? 'fetch-error';
+        new Notice(
+          t('chat.context.url.fetchFailedNotice', {
+            url: failed.url?.href ?? failed.path,
+            reason: t(`chat.context.url.reason.${reasonKey}` as never),
+          }),
+          8000,
+        );
+      }
+    }
     // R-B2 send-path parity: a context entry whose vault path no longer
     // resolves (deleted/moved after attach — vault events do not fire for
     // removals made outside Obsidian) must be skipped with the honest

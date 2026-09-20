@@ -1,4 +1,5 @@
 > 2026-09-18 (FlowText parity R-A7): `OpenCodeContextPartSerializer.createPromptContextPart` serializes `kind: 'folder'` context items as path-only `<obsidian_context kind="folder" path="...">` text parts in both local and remote modes (directories never carry a text snapshot or file URL).
+> 2026-09-21 (advantage-parity R-E1)：OpenCodeContextPartSerializer 新增 url 条目分支（合成 text part，与 PDF 同型，双模式一致）。
 
 # Owner: core.opencode
 

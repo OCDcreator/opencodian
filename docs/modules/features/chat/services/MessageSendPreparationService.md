@@ -1,4 +1,5 @@
 # MessageSendPreparationService
+> 2026-09-21 (advantage-parity R-E1)：合并上下文后、分区前经 resolveUrlContextItems 缝抓取 pending URL 条目；失败条目保留并逐条本地化 Notice。
 
 > **源码**: `src/features/chat/services/MessageSendPreparationService.ts`
 > **状态**: [REVIEW]

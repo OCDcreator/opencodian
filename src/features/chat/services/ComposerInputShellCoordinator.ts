@@ -167,6 +167,11 @@ export interface ComposerInputShellCoordinatorHost {
    * plugin-side HTTP, independent of the active backend.
    */
   onRequestImageGeneration?(): void;
+  /**
+   * R-E1: attach a pasted URL as a webpage context chip (send-time local
+   * fetch). Absent disables the paste affordance entirely.
+   */
+  attachUrlContextToActiveTab?(href: string): boolean;
 }
 
 export interface ComposerCapabilityHint {
@@ -351,6 +356,30 @@ export class ComposerInputShellCoordinator {
         }
         event.preventDefault();
         void this.processImageFiles(imageFiles);
+      });
+    }
+
+    // R-E1: pasting a bare http(s) URL attaches it as a webpage context chip
+    // (send-time local fetch). URLs embedded in longer pastes stay text —
+    // the affordance only fires when the whole paste IS the URL, so nothing
+    // is silently swallowed. Only user-pasted URLs ever fetch.
+    if (this.host.attachUrlContextToActiveTab) {
+      this.inputTextareaEl.addEventListener('paste', (event) => {
+        if (event.defaultPrevented) {
+          return;
+        }
+        const files = event.clipboardData?.files;
+        if (files && files.length > 0) {
+          return;
+        }
+        const text = event.clipboardData?.getData('text') ?? '';
+        const trimmed = text.trim();
+        if (!/^https?:\/\/\S+$/i.test(trimmed)) {
+          return;
+        }
+        if (this.host.attachUrlContextToActiveTab?.(trimmed)) {
+          event.preventDefault();
+        }
       });
     }
 

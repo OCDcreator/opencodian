@@ -1,4 +1,5 @@
 > 2026-09-18 (FlowText parity R-A7): `UserMessageContentRenderer` renders the `folder` context-attachment kind label (`chat.context.kind.folder`).
+> 2026-09-21 (advantage-parity R-E1)：ChatRuntimeComposition 组合 UrlContextFetchService 并注入发送准备的 resolveUrlContextItems 缝。
 
 # Owner: feature.chat-runtime
 

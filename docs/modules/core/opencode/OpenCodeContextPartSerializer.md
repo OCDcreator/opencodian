@@ -1,4 +1,5 @@
 # OpenCodeContextPartSerializer
+> 2026-09-21 (advantage-parity R-E1)：新增 createUrlContextPart——url 条目在本地/远程两种模式一致序列化为合成 text part（与 PDF 同型），远程沿用 64KiB 上限。
 
 > **源码**: `src/core/opencode/OpenCodeContextPartSerializer.ts`
 > **状态**: [REVIEW]

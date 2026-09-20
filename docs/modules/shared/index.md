@@ -1,4 +1,5 @@
 # Shared Barrel
+> 2026-09-21 (advantage-parity R-E1)：barrel 导出 buildUrlContextTag / buildUrlContextBody。
 > 2026-09-20 (advantage-parity R-D1)：barrel 新增导出 `shared/vault.ts` 的 `sanitizeVaultFileBaseName` / `isSafeVaultRelativePath` 及其常量。
 > 2026-09-18 (R-B3): R-B3: exports the pure edit-revert planner from `./editRevertPlan` (constants, write-tool classification, retention planning, sidebar model) — see [editRevertPlan.md](editRevertPlan.md).
 > **Updated**: 2026-09-18 — exports the R-B2 `planContextGroupAttach` planner and `summarizeContextGroup` from `./contextGroupPlan` (see [contextGroupPlan.md](contextGroupPlan.md)).

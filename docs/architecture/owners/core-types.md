@@ -1,4 +1,5 @@
 # Owner: core.types
+> 2026-09-21 (advantage-parity R-E1)：chat 类型新增 url PromptContextKind 与 UrlContextMeta（抓取状态机元数据）。
 > 2026-09-20 (advantage-parity R-D1)：settings 新增 conversationExport 块（目录/模板/自动导出）与 normalizeConversationExportSettings 归一化器；load 边界合流点同步消费；index barrel 导出新类型与归一化函数。
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.

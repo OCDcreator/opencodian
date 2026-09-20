@@ -160,14 +160,28 @@ export class UserMessageContentRenderer {
         const badgeEl = openBtn.createSpan({ cls: 'opencodian-context-chip-origin-badge' });
         badgeEl.textContent = t('chat.context.originBadge.vaultRetrieval');
       }
+      if (attachment.url?.status === 'failed') {
+        // R-E1: a failed webpage fetch stays on the sent message with the
+        // honest verdict, never silently dropped.
+        openBtn.addClass('is-url-fetch-failed');
+        const badgeEl = openBtn.createSpan({ cls: 'opencodian-context-chip-origin-badge' });
+        badgeEl.textContent = t('chat.context.url.failedBadge');
+      }
       openBtn.createSpan({ text: attachment.label });
       openBtn.dataset.contextKind = attachment.kind;
       if (attachment.kind === 'selection') {
         openBtn.addClass('is-selection');
       }
-      openBtn.addEventListener('click', () => {
-        this.host.openContextAttachment(attachment.path);
-      });
+      if (attachment.kind === 'url') {
+        // Webpage chips open the source URL in the system browser.
+        openBtn.addEventListener('click', () => {
+          window.open(attachment.url?.href ?? attachment.path, '_blank', 'noopener');
+        });
+      } else {
+        openBtn.addEventListener('click', () => {
+          this.host.openContextAttachment(attachment.path);
+        });
+      }
     }
   }
 
@@ -236,6 +250,8 @@ export class UserMessageContentRenderer {
         return t('chat.context.kind.pdfDocument');
       case 'pdf_selection':
         return t('chat.context.kind.pdfSelection');
+      case 'url':
+        return t('chat.context.kind.url');
       default:
         return t('chat.context.kind.file');
     }

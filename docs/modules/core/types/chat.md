@@ -1,4 +1,5 @@
 # Chat Types
+> 2026-09-21 (advantage-parity R-E1)：PromptContextKind 增 url；UrlContextMeta（href/finalUrl/title/status/failureReason/contentChars/truncated）；MessageContextAttachment 透传 url 元数据。
 
 > **源码**: `src/core/types/chat.ts`
 > **状态**: [REVIEW]

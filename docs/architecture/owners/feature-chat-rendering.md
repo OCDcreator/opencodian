@@ -1,4 +1,5 @@
 # Owner: feature.chat-rendering
+> 2026-09-21 (advantage-parity R-E1)：UserMessageContentRenderer 的 url 附件 chip 带「抓取失败」徽标并外链打开。
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
 - 2026-09-17 (chat frame inset): chatAppearance 新增 `--opencodian-chat-inset-x` 与 `--opencodian-composer-{inset-x,inset-y,max-height}` 变量输出；view-content 横向内边距清零、由容器 padding-inline 承担。本 owner 边界不变，仅变量面扩大。

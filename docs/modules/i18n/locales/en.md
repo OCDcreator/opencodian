@@ -1,4 +1,5 @@
 # English Locale
+> 2026-09-21 (advantage-parity R-E1)：新增 chat.context.kind.url、chat.context.url.*（失败徽标/失败 Notice/各失败原因）键（与 zh 对齐）。
 > 2026-09-21 (advantage-parity R-D3)：新增 chat.sound.turnCompletion.* 与 chat.sound.customPathUnresolved 键（与 zh 对齐）。
 > 2026-09-20 (advantage-parity R-D1)：新增 `chat.history.export`、`chat.export.*`（命令/成功/失败/未找到/空会话/自动导出停用）与 `settings.conversation.export.*`（tab/标题/目录/模板/自动导出/非法目录）键。
 > 2026-09-18 (R-C6): added the `settings.security.tab.remote` key and the `settings.remoteControl.*` group (master switch / status / bind address / non-loopback confirmation modal / one-time token reveal + regeneration confirm / audit directory); copy states the risks honestly: plaintext HTTP, same-segment token sniffing, token == drive capability, no caller identity in audit.
