@@ -6019,6 +6019,126 @@ img.opencodian-model-provider-header-icon {
 }
 
 
+/* components/relevant-notes.css */
+/* ── Relevant notes side panel (advantage-parity R-E3) ─────────────────── */
+
+.opencodian-relevant-notes {
+  padding: 12px 10px;
+  font-size: var(--font-ui-small, 13px);
+  color: var(--text-normal);
+}
+
+.opencodian-relevant-notes-header {
+  margin-bottom: 12px;
+}
+
+.opencodian-relevant-notes-title {
+  font-size: var(--font-ui-medium, 14px);
+  font-weight: 700;
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opencodian-relevant-notes-subtitle {
+  margin-top: 2px;
+  font-size: var(--font-ui-smaller, 11px);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opencodian-relevant-notes-section {
+  margin-bottom: 14px;
+}
+
+.opencodian-relevant-notes-section-title {
+  font-size: var(--font-ui-small, 13px);
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.opencodian-relevant-notes-section-desc {
+  margin: 2px 0 8px;
+  font-size: var(--font-ui-smaller, 11px);
+  color: var(--text-muted);
+}
+
+.opencodian-relevant-notes-hint {
+  padding: 8px 10px;
+  border-radius: var(--radius-s, 4px);
+  background-color: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller, 11px);
+}
+
+.opencodian-relevant-notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.opencodian-relevant-notes-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: var(--radius-s, 4px);
+  cursor: pointer;
+}
+
+.opencodian-relevant-notes-item:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.opencodian-relevant-notes-item-content {
+  min-width: 0;
+  flex: 1;
+}
+
+.opencodian-relevant-notes-item-title {
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opencodian-relevant-notes-item-meta {
+  margin-top: 1px;
+  font-size: var(--font-ui-smaller, 11px);
+  color: var(--text-muted);
+}
+
+.opencodian-relevant-notes-item-attach {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-s, 4px);
+  background-color: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.opencodian-relevant-notes-item-attach:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.opencodian-relevant-notes-empty {
+  padding: 16px 12px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller, 11px);
+  text-align: center;
+}
+
+
 /* components/backend-session-browser.css */
 /* Backend Session Browser Modal */
 

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "258e586d8ab268ff73b9f6c7814de2097cd5d80c05294dfc6e107144f664e8b3",
-  "recordCount": 755,
+  "digest": "62ff7df90e9af5fe7a7d7fe72b3d78a79aad419bb8981b786e230b463f019f05",
+  "recordCount": 758,
   "records": [
     {
       "kind": "ignore",
@@ -1297,6 +1297,16 @@
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
       "sha256": "5aef370368624731f082f0f7e2572ac41708eff799ba53a62b1a50be69b5268c"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/chat/RelevantNotesModel.ts",
+      "sha256": "ce5e618fb2605e4a1c69214a085da2cb1f0b997719f42b7cf632b1a90b35209b"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/chat/RelevantNotesView.ts",
+      "sha256": "55eda8dbefc3517eae42e421df41bb600b6377b90f17c52f9ed19d909a06d1ad"
     },
     {
       "kind": "src",
@@ -3216,7 +3226,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "28430c1967ee32290074c9dfed23fe53cd6e0a722c60ea73925020922d4c1ad5"
+      "sha256": "526586f26fa2d97d3387aff6b6ddcab514fdc8ad5d40614a6f8aae2359fe5c32"
     },
     {
       "kind": "src",
@@ -3226,12 +3236,12 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "567a15b12387a38375ec1cdfd721ef4728dddcff148ebf1062778ab584c493bc"
+      "sha256": "acb0db71d30ee9cbd73bb9a7fe9c7b7d910503a4efc3ce37850932403c038a65"
     },
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "0186f7a3662d8312877aca8d220dfde49ea2264412f657a88c709ee35720bbfd"
+      "sha256": "cd3047dc11597b4e0b68e57de111ec9d45e6d910cb54baa64ab36d36601b13ee"
     },
     {
       "kind": "src",
@@ -3410,6 +3420,11 @@
     },
     {
       "kind": "src",
+      "key": "src/style/components/relevant-notes.css",
+      "sha256": "477893ddb8be4a4b95379e3bf4eff35a3b70f7e02721a3d6de65b2323e7950bd"
+    },
+    {
+      "kind": "src",
       "key": "src/style/components/settings-agents.css",
       "sha256": "f49d25730a9f9f2f405098d06f6054b12fe91d882a15e6ed884ed1be8795300a"
     },
@@ -3496,7 +3511,7 @@
     {
       "kind": "src",
       "key": "src/style/index.css",
-      "sha256": "99667013d0d6ecc461143adb16bd4085ce31f79ce85619acc160f6496dc76416"
+      "sha256": "6b24f4c9add6b58a318f6e5789d0b33ce3916fbbdf9fedcb9e1f9b981d779a37"
     },
     {
       "kind": "src",
@@ -3779,7 +3794,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-20T16:38:55.746Z",
-  "headShaAtGeneration": "2a1e1067a57bb2cc3eafe82f436346bd59e8769e",
+  "generatedAt": "2026-09-20T17:14:27.048Z",
+  "headShaAtGeneration": "58d8f64e4bac019ef02b30a9413584fc753d9aa0",
   "graphifyVersion": "graphify 0.9.36"
 }

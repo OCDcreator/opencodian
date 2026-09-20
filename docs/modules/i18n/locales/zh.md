@@ -1,4 +1,5 @@
 # Chinese Locale
+> 2026-09-21 (advantage-parity R-E3)：新增 relevantNotes.* 18 键（视图/命令/两通道/附加动作）。
 > 2026-09-21 (advantage-parity R-E1)：新增 chat.context.kind.url、chat.context.url.*（失败徽标/失败 Notice/各失败原因）键。
 > 2026-09-21 (advantage-parity R-D3)：新增 chat.sound.turnCompletion.* 与 chat.sound.customPathUnresolved 键。
 > 2026-09-20 (advantage-parity R-D1)：新增 `chat.history.export`、`chat.export.*`（命令/成功/失败/未找到/空会话/自动导出停用）与 `settings.conversation.export.*`（tab/标题/目录/模板/自动导出/非法目录）键（与 en 对齐）。

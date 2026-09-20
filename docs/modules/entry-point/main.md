@@ -1,4 +1,5 @@
 # Plugin Entry Point (main.ts)
+> 2026-09-21 (advantage-parity R-E3)：注册 opencodian-relevant-notes 视图与 open-relevant-notes 命令；新增 activateRelevantNotesView 与 attachVaultFileToActiveChatContext（共享 ContextAttachmentBuilder 通道，产出与 + picker 一致的条目）。
 > 2026-09-21 (advantage-parity R-D3)：组合根新增 turnCompletionSoundService（资源路径/聚焦/Notice 注入缝）；saveConversation 在 lastResponseAt 前进时触发提示音（服务自守门：默认关、仅后台任务或非聚焦窗口）。
 > 2026-09-20 (advantage-parity R-D1)：组合根新增 `conversationExportService`（vault/adapter 缝 + `onUserEditedAutoExport` 本地化 Notice）、命令 `export-conversation-markdown`、`exportConversationMarkdown{,ById}` 公开方法、`saveConversation` 末尾的 `scheduleAutoExport` 钩子（设置关闭时零成本）、onunload dispose。
 > 2026-09-18 (R-B1 chat): `createInlineEditAutoLinkBridge()` 更名为 `createAutoInternalLinkBridge()` 并改为 public——同一个 processor seam（`createInlineEditAutoLinkProcessor`：metadata cache 标题校验、`autoInternalLinkEnabled` 关闭时严格 no-op）现在同时供行内编辑与聊天 finalization（`ChatRuntimeComposition` 装配 `AssistantAutoInternalLinkService`）消费，两条路径的匹配/校验语义不会漂移。本文件仍零匹配逻辑驻留。

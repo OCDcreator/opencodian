@@ -82,6 +82,7 @@ import {
   type ConversationExportVault,
 } from './core/storage/ConversationMarkdownExportService';
 import { TurnCompletionSoundService } from './features/chat/services/TurnCompletionSoundService';
+import { RelevantNotesView, VIEW_TYPE_RELEVANT_NOTES } from './features/chat/RelevantNotesView';
 import { ImageAssetStorage, type ImageAssetVault } from './core/storage/ImageAssetStorage';
 import { createRequestUrlImageGenTransport, ImageGenerationService } from './core/agents/imagegen/ImageGenerationService';
 import { ImageGenerationChatController, type ImageGenerationChatPorts } from './features/chat/services/ImageGenerationChatController';
@@ -1341,6 +1342,13 @@ export default class OpenCodianPlugin extends Plugin {
       }))
     );
 
+    // advantage-parity R-E3: the relevant-notes side panel (graph + R-C1
+    // retrieval channels for the active note).
+    this.registerView(
+      VIEW_TYPE_RELEVANT_NOTES,
+      (leaf) => new RelevantNotesView(leaf, this),
+    );
+
     registerSettingsView(this);
 
     this.addRibbonIcon(OPENCODIAN_APP_ICON_ID, '打开 OpenCodian', () => {
@@ -1471,6 +1479,16 @@ export default class OpenCodianPlugin extends Plugin {
       name: '新建会话',
       callback: async () => {
         await this.startNewConversationForCurrentView();
+      },
+    });
+
+    // advantage-parity R-E3: open the relevant-notes side panel (graph +
+    // retrieval channels for the active note).
+    this.addCommand({
+      id: 'open-relevant-notes',
+      name: t('relevantNotes.command.open'),
+      callback: () => {
+        void this.activateRelevantNotesView();
       },
     });
 
@@ -1740,6 +1758,47 @@ export default class OpenCodianPlugin extends Plugin {
     return leaf?.view instanceof OpenCodianView
       ? leaf.view
       : null;
+  }
+
+  /**
+   * advantage-parity R-E3: open (or create) the relevant-notes side panel.
+   * The panel itself owns refresh timing; this only guarantees a leaf.
+   */
+  async activateRelevantNotesView(): Promise<void> {
+    const { workspace } = this.app;
+    let leaf = workspace.getLeavesOfType(VIEW_TYPE_RELEVANT_NOTES)[0];
+    if (!leaf) {
+      const newLeaf = workspace.getRightLeaf(false);
+      if (newLeaf) {
+        await newLeaf.setViewState({
+          type: VIEW_TYPE_RELEVANT_NOTES,
+          active: true,
+        });
+        leaf = newLeaf;
+      }
+    }
+    if (leaf) {
+      workspace.revealLeaf(leaf);
+    }
+  }
+
+  /**
+   * advantage-parity R-E3: attach a vault note to the active chat tab's
+   * context — same channel and same item shape as the `+` picker (shared
+   * ContextAttachmentBuilder), so the resulting chip is identical to a
+   * manually chosen file.
+   */
+  async attachVaultFileToActiveChatContext(path: string): Promise<boolean> {
+    await this.activateView();
+    const builder = new ContextAttachmentBuilder(this.app, {
+      getServerMode: () => this.settings.server.mode,
+      loadPdfEngine: () => this.pdfEngineLoader!.load(),
+    });
+    const item = await builder.buildFileContextItemFromPath(path, 'file');
+    if (!item) {
+      return false;
+    }
+    return this.getOpenCodianView()?.attachContextItemToActiveTab(item) ?? false;
   }
 
   async reapplyConversationSessionDefaults(): Promise<void> {
