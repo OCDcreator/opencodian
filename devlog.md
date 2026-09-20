@@ -11,7 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
-## 2026-09-21 R-E1 网页上下文：粘贴 URL 成 chip、发送时本地抓取、三层 SSRF 防护
+## 2026-09-21 R-E3 相关笔记面板：图谱 + R-C1 检索双通道侧栏，附加按钮与手选逐字段一致
+
+**触发**：advantage-parity 批次 E 第 2 条（P1）。Copilot 的 Relevant Notes 是高频入口（当前笔记的相关笔记双通道列表实时更新），OpenCodian 无此面板。
+
+**改动**：新 ItemView \`opencodian-relevant-notes\`（落在 feature.chat-shell 伞下、port 化引用插件——不 import main，符合依赖方向门）——**图谱通道**读 \`metadataCache.resolvedLinks\` 合并出/入链（与反链面板同源同结论）；**检索通道**复用 R-C1 \`VaultIndexService.select\`（查询=活动笔记去 frontmatter/代码块的清洗文本，零第二索引）；500ms 防抖跟随 active-leaf-change 与 resolved 变化、异步刷新带序号守卫丢弃过期渲染。诚实状态三件：检索未启用→明示提示文案（不装空列表）、非 markdown/无活动笔记→空态、检索失败→可见错误行。条目点击开笔记；附加按钮走 main.ts 新增的 \`attachVaultFileToActiveChatContext\`（共享 \`ContextAttachmentBuilder\`，与 \`+\` picker 产出逐字段一致）。纯计算在 \`RelevantNotesModel.ts\`（邻居/查询/折叠）；样式 \`relevant-notes.css\` 全主题变量。**路径选择教训**：最初为面板建独立 owner \`feature.relevant-notes\`，改 manifest 触发 55 页 owner 概览涟漪——撤回 manifest、文件挪入 \`src/features/chat/\` 由 chat-shell 伞覆盖即过；新 src 文件必须先 git add 才进依赖方向门的扫描面（再次踩中）。
+
+**测试**：\`RelevantNotesModel.test.ts\` 7 例 + verify 15/15。实机（BUILD_ID \`202609210116\`）：hub↔a↔b 链接簇 + 词汇相关 c.md——图谱列 a/b（2 条链接，同反链结论）；临时启用 R-C1 后检索 Top1 = c.md（相似度 11）、切 a.md 双通道即时更新；附加按钮实证 chip=\`re3-test/a.md\`（与手选一致）；测试笔记已清理。视觉门 PASS（行 45×430、按钮 24×24 居中、标题对比度 12.2:1、meta 9.7:1、无裸元素）。
+
+---
+
 
 **触发**：advantage-parity 批次 E 首条（P1）。Copilot 支持 URL/YouTube 提及（云端解析），OpenCodian 上下文完全限于 vault 内 + 图片；要求本地实现、拒绝第三方云解析。
 

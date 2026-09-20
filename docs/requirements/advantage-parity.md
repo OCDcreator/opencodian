@@ -55,7 +55,7 @@
 | D | R-D3 | 轮次完成通知音效 | 双方 | P3 | DONE |
 | E | R-E1 | URL / 网页内容上下文（本地抓取） | Copilot | P1 | DONE |
 | E | R-E2 | Web Viewer 标签页上下文 | Copilot | P2 | TODO |
-| E | R-E3 | 相关笔记面板（图谱 + 检索双通道） | Copilot | P1 | TODO |
+| E | R-E3 | 相关笔记面板（图谱 + 检索双通道） | Copilot | P1 | DONE |
 | E | R-E4 | 语义检索增强层（embedding on R-C1） | Copilot/Miyo | P2 | TODO |
 | E | R-E5 | Dataview / Bases 上下文支持 | Copilot | P2 | TODO |
 | E | R-E6 | 选区 / 全库 token 计数命令 | Copilot | P2 | TODO |
@@ -173,6 +173,12 @@ Obsidian 核心 Web Viewer 插件的活动标签页（URL + 选区）作为上�
 3. 检索通道复用 R-C1 的 `.opencodian/vault-index/`，**不建第二套索引**。
 
 **验收**：切笔记后列表更新；图谱通道与 Obsidian 反链面板结论一致；附加按钮产生与手选一致的上下文条目。
+
+**落地证据（2026-09-21，提交 `5651232f`）**：
+
+- **实现**：`opencodian-relevant-notes` ItemView（feature.chat-shell 归属、port 化不 import main）——图谱通道读 `metadataCache.resolvedLinks`（与反链面板同源同结论），检索通道**复用** R-C1 `VaultIndexService.select`（查询=活动笔记清洗文本，零第二索引）；500ms 防抖跟随 active-leaf-change 与 resolved 变化，异步刷新带序号守卫；诚实状态（检索未启用→明示提示、非 md/无笔记→空态、失败→可见错误行）；条目点击开笔记、附加按钮走 main.ts 共享 `ContextAttachmentBuilder` 通道。纯计算（邻居合并排序/查询构造/折叠去重）在 `RelevantNotesModel.ts`；样式 `relevant-notes.css` 全取主题变量。命令 `open-relevant-notes`。
+- **测试**：`RelevantNotesModel.test.ts` 7 例（图谱出入链合并/自环排除/排序平分、查询剥离 frontmatter/代码块/限长、折叠去重取最高分/排除活动笔记/确定性排序）+ verify 15/15。
+- **实机（Test Vault，BUILD_ID `202609210116`）**：构造 hub↔a↔b 链接簇 + 词汇相关 c.md——图谱通道列出 a/b（各 2 条链接，与反链结论一致）；临时启用 R-C1 后检索通道 Top 命中 c.md（相似度 11）并含 a/b，切到 a.md 后双通道即时更新（hub 图谱 2 条 + 检索 hub 12 分等）；附加按钮点击实证产出 chip `re3-test/a.md`（与手选逐字段一致）；测试笔记已 vault.trash 清理。视觉门 PASS（截图 `.visual-evidence/re3/re3-panel.png`：条目行 45×430、附加按钮 24×24 垂直居中、标题 13px/16.9 **对比度 12.2:1**、meta **9.7:1**，与宿主主题完全协调，无裸元素）。
 
 ### R-E4 语义检索增强层（P2）
 
