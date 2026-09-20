@@ -11,7 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
-## 2026-09-21 R-D3 轮次完成提示音：后台任务/非聚焦触发门 + 内置合成音 + 库内自定义音
+## 2026-09-21 R-E1 网页上下文：粘贴 URL 成 chip、发送时本地抓取、三层 SSRF 防护
+
+**触发**：advantage-parity 批次 E 首条（P1）。Copilot 支持 URL/YouTube 提及（云端解析），OpenCodian 上下文完全限于 vault 内 + 图片；要求本地实现、拒绝第三方云解析。
+
+**改动**：\`PromptContextKind\` 增 \`url\` + \`UrlContextMeta\`（href/finalUrl/title/status/failureReason/truncated）；\`UrlContextFetchService\`（feature.chat-services）用 \`node:http(s)\`（构建 external、渲染器运行时解析）**手控重定向**——Obsidian \`requestUrl\` 不透明自动跟随、无法逐跳校验，故弃用——≤5 跳、每跳重跑守卫、15s 超时、2MB 上限；零依赖正则 HTML→MD 降级（需求明示可接受）按 UTF-8 字节截断到 60KiB 共享预算。**SSRF 三层**：前置拒（方案/私有回环保留 IP 字面量含 IPv6 方括号形态/localhost·\`.local\`·\`.internal\`）→ DNS 预解析拒内网（防首跳 rebinding）→ 重定向逐跳重守卫（防指回 \`127.0.0.1:4196\` 本地服务）。composer 粘贴仅在「整个粘贴就是一条 URL」时拦截成 chip；发送时 \`resolveUrlContextItems\` 缝抓取，失败条目保留 + 六类 \`failureReason\`（含 YouTube watch 页无可提取字幕 → \`youtube-transcript-unavailable\`，不伪造内容）、注入标签带失败头、本地化 Notice、已发消息 chip「抓取失败」徽标 + 外链打开。序列化复用 \`<obsidian_context>\` 合成 text part（PDF 先例、双模式一致、四后端同通道）；\`partitionExistingContextItems\` 豁免 url（自带载荷无库路径可失效）。
+
+**测试**：12 例单测 + verify 15/15。实机三重验证：SSRF 守卫在真实 renderer 拒掉 \`127.0.0.1:4196\`/\`localhost:4096\`/\`10.0.0.1\`；手控重定向活体（github 301+Location 可读→跟随 200、example.com 200）；合成 paste 拦截 + chip 出现 + URL 不落输入框。视觉门像素级 PASS（chip 与相邻几何一致、状态差异为设计态、ellipsis 在位）。坑：jsdom 测试环境无 \`TextEncoder\` 全局（用 Buffer 回退，同序列化器惯例）；\`URL.hostname\` 对 IPv6 保留方括号需剥。
+
+---
+
 
 **触发**：advantage-parity 批次 D 第 3 条（P3 小件）。两个对标插件都有「agent 完成时叫我」的提示音能力，OpenCodian 无任何完成通知。
 

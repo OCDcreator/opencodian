@@ -53,7 +53,7 @@
 | D | R-D1 | 对话导出 / 另存为 Markdown 笔记 | Copilot | P0 | DONE |
 | D | R-D2 | API 密钥入 Obsidian Keychain | Copilot | P1 | DONE |
 | D | R-D3 | 轮次完成通知音效 | 双方 | P3 | DONE |
-| E | R-E1 | URL / 网页内容上下文（本地抓取） | Copilot | P1 | TODO |
+| E | R-E1 | URL / 网页内容上下文（本地抓取） | Copilot | P1 | DONE |
 | E | R-E2 | Web Viewer 标签页上下文 | Copilot | P2 | TODO |
 | E | R-E3 | 相关笔记面板（图谱 + 检索双通道） | Copilot | P1 | TODO |
 | E | R-E4 | 语义检索增强层（embedding on R-C1） | Copilot/Miyo | P2 | TODO |
@@ -150,6 +150,13 @@
 **技术约束**：不走任何第三方云解析服务（与 Copilot 的 Brevilabs 路线刻意不同）；HTML→MD 的转换需选型（零依赖正则降级可接受，但不渲染脚本/样式）；SSRF 防护：拒绝解析结果指回 `127.0.0.1`/内网段的重定向（插件自身就有本地端口，必须防回环）。
 
 **验收**：粘贴文章 URL → chip → 模型能引用其中内容；内网重定向被拒；失败路径如实标注。
+
+**落地证据（2026-09-21，提交 `a49809db`）**：
+
+- **实现**：`UrlContextFetchService`（feature.chat-services）——`node:http(s)` 传输**手控重定向**（Obsidian `requestUrl` 不透明自动跟随，弃用）逐跳跟随 + 每跳守卫 + 15s 超时 + 2MB 上限；零依赖正则 HTML→MD 降级（script/style/head 等剔除、结构保留、实体解码、按 UTF-8 字节截断到共享 60KiB 预算并标 truncated）。**SSRF 三层**：前置拒（非 http(s) 方案/私有回环保留 IP 字面量含 IPv6 方括号/localhost·`.local`·`.internal` 族）→ DNS 预解析拒内网 → 每个重定向跳重跑守卫。序列化走既有 `<obsidian_context>` 合成 text part（PDF 先例，本地/远程一致，四后端同通道）；`partitionExistingContextItems` 豁免 url 条目。composer 粘贴：整个粘贴为一条 URL 才拦截成 chip（嵌在长文本里的链接永不抓取，与「不自动注入」一致）。YouTube：watch 页转换后正文 < 300 字符 → `youtube-transcript-unavailable` 如实失败，不伪造。失败路径：条目保留 + `failureReason`、注入标签带显式失败头、发送时本地化 Notice、已发消息 chip 带「抓取失败」徽标并外链打开。
+- **测试**：`UrlContextFetchService.test.ts` 12 例（IPv4/IPv6 私有段、localhost 族与非 http 方案前置拒、转换器结构/剔除/实体、抓取 ok/首跳 DNS 拒/**重定向回环拒**/非 HTML/HTTP 错/超时、YouTube 无字幕、字节预算截断、按 id 回填不串 chip）；verify 15/15。
+- **实机（Test Vault，BUILD_ID `202609210040`）**：①SSRF 守卫活体验——真实 renderer 中 `127.0.0.1:4196`/`localhost:4096`/`10.0.0.1` 全部 `refused: blocked-private-target`；②手控重定向活体验——`http://github.com` 首跳 301 + Location 可读、跟随 `https://github.com` 200、`example.com` 200 返回 HTML（node 内建在构建中为 external、渲染器运行时解析）；③粘贴→chip 实证——合成 paste 事件被拦截（`defaultPrevented: true`）、URL chip 出现、URL 文本未落入输入框。
+- **视觉验收**：composer URL chip（截图 `.visual-evidence/re1/re1-url-chip.png`）视觉子代理像素级 PASS——与相邻笔记 chip 共享胶囊几何（高 28px/圆角 10px/12px 字号/同填充），状态差异（实线已附加 vs 虚线预览斜体）为既有设计态；截断机制（ellipsis）CSS 在位；与 +/图片按钮行左缘精确对齐、行间距 ~7.5px≈gap 6px。
 
 ### R-E2 Web Viewer 标签页上下文（P2）
 
