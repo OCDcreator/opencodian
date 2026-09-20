@@ -508,11 +508,43 @@ export class SettingsConversationSection {
     this.addChatFontSizeSetting(containerEl);
     this.addTurnChangeRecordsSetting(containerEl);
     this.addEditRevertSettings(containerEl);
+    this.addTurnCompletionSoundSettings(containerEl);
   }
 
   private renderDisplayTabBlock(containerEl: HTMLElement): void {
     this.renderDisplayBlock(containerEl);
     this.renderRenderingBlock(containerEl);
+  }
+
+  /** advantage-parity R-D3: turn-completion chime (off by default). */
+  private addTurnCompletionSoundSettings(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('chat.sound.turnCompletion.name'))
+      .setDesc(t('chat.sound.turnCompletion.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.turnCompletionSoundEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.turnCompletionSoundEnabled = value;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('chat.sound.turnCompletion.pathName'))
+      .setDesc(t('chat.sound.turnCompletion.pathDesc'))
+      .setClass('opencodian-wide-text-setting')
+      .addText((text) => {
+        text
+          .setPlaceholder(t('chat.sound.turnCompletion.pathPlaceholder'))
+          .setValue(this.plugin.settings.turnCompletionSoundPath)
+          .onChange(async (value) => {
+            this.plugin.settings.turnCompletionSoundPath = value.trim();
+            text.inputEl.title = this.plugin.settings.turnCompletionSoundPath;
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.title = this.plugin.settings.turnCompletionSoundPath;
+      });
   }
 
   private renderQuestionsBlock(containerEl: HTMLElement): void {

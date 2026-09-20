@@ -3044,6 +3044,14 @@ export const zhTranslations = {
   'chat.export.emptyConversation': '当前没有可导出的会话。',
   'chat.export.autoDisabledUserEdited': '检测到导出笔记 {{path}} 已被手动修改，已停止该会话的自动导出（手动导出不受影响）。',
 
+  // advantage-parity R-D3：轮次完成音效
+  'chat.sound.turnCompletion.name': '轮次完成提示音',
+  'chat.sound.turnCompletion.desc': '默认关闭。开启后，后台任务完成、或窗口未聚焦时轮次完成会播放一声短促提示音；前台正在看的轮次不会打扰。播放失败只记录日志，不影响聊天。',
+  'chat.sound.turnCompletion.pathName': '自定义提示音文件',
+  'chat.sound.turnCompletion.pathDesc': '库内相对路径的音频文件（如 audio/done.wav），留空使用内置提示音；路径无法解析时如实提示并回退内置音。',
+  'chat.sound.turnCompletion.pathPlaceholder': '留空使用内置提示音',
+  'chat.sound.customPathUnresolved': '提示音文件 {{path}} 无法解析（不存在或不是库内文件），已回退内置提示音。',
+
   'chat.backendSessions.modalTitle': '后端会话',
   'chat.backendSessions.loading': '正在加载会话...',
   'chat.backendSessions.empty': '未找到后端会话。',

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "0e4128dfaab54b6494b450a74ec426bda8ea631f7faffcc7ee0709a340f25fc2",
-  "recordCount": 753,
+  "digest": "54d4d9525c1493a2c20eeb22665260b8215cd169f7d54c9e5a5f561752b816e4",
+  "recordCount": 754,
   "records": [
     {
       "kind": "ignore",
@@ -1201,12 +1201,12 @@
     {
       "kind": "src",
       "key": "src/core/types/settings.ts",
-      "sha256": "e843cf0e6e7516dd5910a5a3d6639cd94fd3014cc81379d5562d9f51247cbffb"
+      "sha256": "4e5cc37d60f040833d7ce411377735502a2a139df174733283538baf965fdafe"
     },
     {
       "kind": "src",
       "key": "src/core/types/settingsLoadNormalization.ts",
-      "sha256": "0e665f6a2de3d3621525d6c5dd7f465fbf560e29c4a464d0bc9cdbe0dd6870fa"
+      "sha256": "029f41d93f336fdb403a6a3b8d87274433671558db845f5c51cc12f28a92257f"
     },
     {
       "kind": "src",
@@ -2270,6 +2270,11 @@
     },
     {
       "kind": "src",
+      "key": "src/features/chat/services/TurnCompletionSoundService.ts",
+      "sha256": "c9def841908add1bbc2c461f7a80c4ce9ac1f4ae9493ac0d92278f59fca03cf2"
+    },
+    {
+      "kind": "src",
       "key": "src/features/chat/services/VaultRetrievalComposerCoordinator.ts",
       "sha256": "0b66020a047566befd34daa713265d1e17d54e8ff14e48efc12dbcd4098f1b53"
     },
@@ -2966,7 +2971,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsConversationSection.ts",
-      "sha256": "d446d3dfa648039e3e16288f5e732995e7e73d820fc58f584322e3bfffceedd6"
+      "sha256": "e934e0cd517f37ddd53527955b1e811c6f4327f815b71658f0a5edc02593727b"
     },
     {
       "kind": "src",
@@ -3206,7 +3211,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "599bf6ad2e16d3b17363399b2326297671c0df3f6a6fb57c6b6d890e6eb7b67b"
+      "sha256": "50121b068d1b9fdecbff1613a302b1e7878b1576a6f28d1f26ceb392a551ae35"
     },
     {
       "kind": "src",
@@ -3216,12 +3221,12 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "acdf280fe0a48cceb8b6e8824b5ff9b6bc826d869a41dcef7b6038af15a2aa88"
+      "sha256": "ce0eff62bb416fae8dc0923692c94f2e14fdde13cea3f86d4b3b88798152464d"
     },
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "86e64a5adf67678e0a56c3629f9da67d01d4411c4148701a35a1abc1cb73f9d5"
+      "sha256": "0186f7a3662d8312877aca8d220dfde49ea2264412f657a88c709ee35720bbfd"
     },
     {
       "kind": "src",
@@ -3769,7 +3774,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-20T16:01:00.709Z",
-  "headShaAtGeneration": "3efd3a38ae1782033b5312b09f0cde12eb563421",
+  "generatedAt": "2026-09-20T16:08:56.994Z",
+  "headShaAtGeneration": "ca2eb4fc6edd8136d3ccb8d5915c559f819acdb0",
   "graphifyVersion": "graphify 0.9.36"
 }

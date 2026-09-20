@@ -3579,6 +3579,21 @@ export interface OpenCodianSettings {
   secretsKeychainEnabled: boolean;
 
   /**
+   * Play a short chime when a chat turn completes (advantage-parity R-D3,
+   * default off). Only fires for background-task conversations or while the
+   * Obsidian window is unfocused — never for a foreground turn the user is
+   * watching.
+   */
+  turnCompletionSoundEnabled: boolean;
+
+  /**
+   * Vault-relative audio file for the completion chime (R-D3). Empty string
+   * uses the embedded builtin chime; an unresolvable path degrades to the
+   * builtin with an explicit notice.
+   */
+  turnCompletionSoundPath: string;
+
+  /**
    * Backend-neutral edit revert master switch (R-B3, default on). When off,
    * no snapshots are captured and the sidebar shows no revert actions; the
    * capture listeners stay cheap no-ops. Independent of OpenCode's
@@ -3819,6 +3834,16 @@ export function normalizeSecretsKeychainEnabled(value: unknown): boolean {
   return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.secretsKeychainEnabled;
 }
 
+/** advantage-parity R-D3: chime toggle normalizes to the safe default (off). */
+export function normalizeTurnCompletionSoundEnabled(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.turnCompletionSoundEnabled;
+}
+
+/** advantage-parity R-D3: string-only chime path, trimmed. */
+export function normalizeTurnCompletionSoundPath(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : DEFAULT_SETTINGS.turnCompletionSoundPath;
+}
+
 /** User-facing memory backend settings (mirrors core MemorySettingsSnapshot). */
 export interface MemoryBackendUserSettings {
   /** Master switch. Default false — the memory backend ships dark. */
@@ -3990,6 +4015,9 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   // advantage-parity R-D2: secrets via Obsidian Keychain (placeholder form
   // in the persisted core profile; explicit rollback via this toggle).
   secretsKeychainEnabled: true,
+  // advantage-parity R-D3: turn-completion chime (opt-in; quiet by default).
+  turnCompletionSoundEnabled: false,
+  turnCompletionSoundPath: '',
   editRevertEnabled: true,
   editRevertSnapshotLimitMb: EDIT_REVERT_SNAPSHOT_LIMIT_MB_DEFAULT,
   obsidianToolingMode: 'off',

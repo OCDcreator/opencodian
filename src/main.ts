@@ -81,6 +81,7 @@ import {
   ConversationMarkdownExportService,
   type ConversationExportVault,
 } from './core/storage/ConversationMarkdownExportService';
+import { TurnCompletionSoundService } from './features/chat/services/TurnCompletionSoundService';
 import { ImageAssetStorage, type ImageAssetVault } from './core/storage/ImageAssetStorage';
 import { createRequestUrlImageGenTransport, ImageGenerationService } from './core/agents/imagegen/ImageGenerationService';
 import { ImageGenerationChatController, type ImageGenerationChatPorts } from './features/chat/services/ImageGenerationChatController';
@@ -174,6 +175,12 @@ export default class OpenCodianPlugin extends Plugin {
    * composes it (vault/adapter seams + settings getter + notice hooks).
    */
   conversationExportService: ConversationMarkdownExportService | null = null;
+
+  /**
+   * advantage-parity R-D3: turn-completion chime. Off by default; only
+   * background-task conversations or an unfocused window may make noise.
+   */
+  turnCompletionSoundService: TurnCompletionSoundService | null = null;
 
   /**
    * R-C6 remote-drive loopback listener (core.remotecontrol owner). main.ts
@@ -352,6 +359,18 @@ export default class OpenCodianPlugin extends Plugin {
       onUserEditedAutoExport: (_conversationId, path) => {
         new Notice(t('chat.export.autoDisabledUserEdited', { path }), 10000);
       },
+    });
+    // advantage-parity R-D3: notification audio, composed once. The custom
+    // path resolves through Obsidian's resource path (vault-internal files).
+    this.turnCompletionSoundService = new TurnCompletionSoundService({
+      isWindowFocused: () => document.hasFocus(),
+      getResourcePath: (vaultRelativePath) => {
+        const file = this.app.vault.getAbstractFileByPath(normalizePath(vaultRelativePath));
+        return file && file instanceof TFile
+          ? this.app.vault.getResourcePath(file)
+          : null;
+      },
+      showNotice: (message) => { new Notice(message, 8000); },
     });
     // R-C2 text-to-image: generation is plugin-side HTTP (never an agent
     // session); the asset write is the plugin's first binary write into the
@@ -2206,6 +2225,9 @@ export default class OpenCodianPlugin extends Plugin {
 
   async saveConversation(conversation: Conversation): Promise<void> {
     const index = this.conversations.findIndex((item) => item.id === conversation.id);
+    const previousLastResponseAt = index !== -1
+      ? this.conversations[index].lastResponseAt
+      : undefined;
     let nextConversation = conversation;
 
     if (
@@ -2239,6 +2261,23 @@ export default class OpenCodianPlugin extends Plugin {
     // any timer, so ordinary saves — title edits, settings writes — never
     // trigger a vault write).
     this.conversationExportService?.scheduleAutoExport(nextConversation);
+
+    // advantage-parity R-D3: a new assistant response = a completed turn.
+    // The chime gates itself (off by default; background task or unfocused
+    // window only) and swallows its own playback failures.
+    const turnJustCompleted = nextConversation.lastResponseAt !== undefined
+      && nextConversation.lastResponseAt > (previousLastResponseAt ?? 0);
+    if (turnJustCompleted && this.turnCompletionSoundService) {
+      this.turnCompletionSoundService.playForTurnCompletion(
+        {
+          enabled: this.settings?.turnCompletionSoundEnabled ?? false,
+          customPath: this.settings?.turnCompletionSoundPath ?? '',
+        },
+        {
+          isBackgroundTask: Boolean(nextConversation.backgroundTaskMetadata?.activeAnchor),
+        },
+      );
+    }
   }
 
   /**

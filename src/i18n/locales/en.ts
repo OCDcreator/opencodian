@@ -3044,6 +3044,14 @@ export const enTranslations = {
   'chat.export.emptyConversation': 'There is no conversation to export yet.',
   'chat.export.autoDisabledUserEdited': 'The exported note {{path}} was edited manually, so automatic export for this conversation has stopped (manual export is unaffected).',
 
+  // advantage-parity R-D3: turn-completion sound
+  'chat.sound.turnCompletion.name': 'Turn completion sound',
+  'chat.sound.turnCompletion.desc': 'Off by default. When on, a short chime plays when a turn completes while the window is unfocused or the conversation is a background task; foreground turns you are watching stay silent. Playback failures are logged only.',
+  'chat.sound.turnCompletion.pathName': 'Custom sound file',
+  'chat.sound.turnCompletion.pathDesc': 'Vault-relative audio file (e.g. audio/done.wav); empty uses the built-in chime. An unresolvable path is reported and falls back to the built-in chime.',
+  'chat.sound.turnCompletion.pathPlaceholder': 'Empty uses the built-in chime',
+  'chat.sound.customPathUnresolved': 'The sound file {{path}} could not be resolved (missing or not a vault file); fell back to the built-in chime.',
+
   'chat.backendSessions.modalTitle': 'Backend Sessions',
   'chat.backendSessions.loading': 'Loading sessions...',
   'chat.backendSessions.empty': 'No backend sessions found.',
