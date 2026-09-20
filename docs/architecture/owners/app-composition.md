@@ -1,4 +1,5 @@
 # Owner: app.composition
+> 2026-09-21 (advantage-parity R-E2)：attach-webviewer-tab-to-context 命令（checkCallback 门控）。
 > 2026-09-21 (advantage-parity R-E3)：main.ts 注册 opencodian-relevant-notes 视图与 open-relevant-notes 命令；新增 activateRelevantNotesView 与 attachVaultFileToActiveChatContext（共享 ContextAttachmentBuilder 通道）。
 > 2026-09-20 (advantage-parity R-D1)：main.ts 组合 conversationExportService（vault/adapter 缝 + 用户编辑回调 Notice）、命令 export-conversation-markdown、exportConversationMarkdown{,ById}、saveConversation 后自动导出钩子（设置关时零成本）、onunload dispose。
 

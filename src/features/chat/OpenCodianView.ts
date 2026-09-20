@@ -314,6 +314,10 @@ import {
 } from './services/trailingAssistantPatchDebug';
 import { buildPendingUrlContextItem } from './services/UrlContextFetchService';
 import { VaultRetrievalComposerCoordinator } from './services/VaultRetrievalComposerCoordinator';
+import {
+  buildWebViewerContextItem,
+  getActiveWebViewerTabContext,
+} from './services/WebViewerContextService';
 import type { TabBar, TabId, TabManager } from './tabs';
 import { type BackendSessionBrowserHost,BackendSessionBrowserModal } from './ui/BackendSessionBrowserModal';
 import { ContextDetailModal } from './ui/ContextDetailModal';
@@ -908,6 +912,11 @@ export class OpenCodianView extends ItemView {
       // the PDF selection integration; the fetch itself happens at send).
       attachUrlContextToActiveTab: (href) =>
         this.composerContextViewFacade.attachBuiltContextItem(buildPendingUrlContextItem(href)),
+      // R-E2: the active Web Viewer tab as a context source (same R-E1 item
+      // shape; the globe button exists only while a webviewer tab is active).
+      getActiveWebViewerTabContext: () => getActiveWebViewerTabContext(this.app),
+      attachWebViewerTabContextToActiveTab: (tab) =>
+        this.composerContextViewFacade.attachBuiltContextItem(buildWebViewerContextItem(tab)),
       mountSelectionControls: (toolbar, options) => {
         this.chatSelectionControlsCoordinator.build(toolbar, {
           showModels: options.showModels && hasCapability(this.caps, AgentCapability.Models),

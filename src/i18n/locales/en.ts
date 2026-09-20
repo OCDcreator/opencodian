@@ -2530,6 +2530,11 @@ export const enTranslations = {
   'chat.context.kind.url': 'Webpage',
   'chat.context.url.failedBadge': 'fetch failed',
 
+  // advantage-parity R-E2：Web Viewer 标签页上下文
+  'chat.webViewer.attachButton': 'Attach current Web Viewer tab',
+  'chat.webViewer.command.name': 'Attach the active Web Viewer tab to chat context',
+  'chat.webViewer.command.unavailable': 'The active tab is not a Web Viewer page.',
+
   // advantage-parity R-E3：相关笔记面板
   'relevantNotes.viewTitle': 'Relevant notes',
   'relevantNotes.command.open': 'Open the relevant notes panel',

@@ -2530,6 +2530,11 @@ export const zhTranslations = {
   'chat.context.kind.url': '网页',
   'chat.context.url.failedBadge': '抓取失败',
 
+  // advantage-parity R-E2：Web Viewer 标签页上下文
+  'chat.webViewer.attachButton': '附加当前网页标签页（Web Viewer）',
+  'chat.webViewer.command.name': '附加 Web Viewer 当前标签页到聊天上下文',
+  'chat.webViewer.command.unavailable': '当前活动标签页不是 Web Viewer 网页。',
+
   // advantage-parity R-E3：相关笔记面板
   'relevantNotes.viewTitle': '相关笔记',
   'relevantNotes.command.open': '打开相关笔记面板',

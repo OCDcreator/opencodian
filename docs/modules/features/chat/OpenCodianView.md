@@ -1,4 +1,5 @@
 # OpenCodianView
+> 2026-09-21 (advantage-parity R-E2)：composer host 新增 getActiveWebViewerTabContext / attachWebViewerTabContextToActiveTab 两缝（构造 R-E1 url 条目，视图零逻辑）。
 > 2026-09-21 (advantage-parity R-E1)：composer input host 新增 attachUrlContextToActiveTab（粘贴的整段 URL → pending 网页 chip，复用 attachBuiltContextItem 通道）。
 > 2026-09-20 (advantage-parity R-D1)：`createConversationHistoryActionsHost` 新增 `exportConversationMarkdown` host 方法（转发到 `plugin.exportConversationMarkdownById`），视图本身不持有导出逻辑。
 > 2026-09-18 (R-B3): R-B3: `OpenCodianView` subscribes to `editRevertService.onEntriesChanged()` (unsubscribed on close) and `refreshModifiedFilesSidebar()` now feeds the coordinator the backend-neutral sidebar model plus revert/restore action callbacks that surface outcomes as notices. The view only assembles callbacks; revert execution stays in core.storage.

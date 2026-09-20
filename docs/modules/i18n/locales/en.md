@@ -1,4 +1,5 @@
 # English Locale
+> 2026-09-21 (advantage-parity R-E2)：新增 chat.webViewer.* 3 键（与 zh 对齐）。
 > 2026-09-21 (advantage-parity R-E3)：新增 relevantNotes.* 18 键（与 zh 对齐）。
 > 2026-09-21 (advantage-parity R-E1)：新增 chat.context.kind.url、chat.context.url.*（失败徽标/失败 Notice/各失败原因）键（与 zh 对齐）。
 > 2026-09-21 (advantage-parity R-D3)：新增 chat.sound.turnCompletion.* 与 chat.sound.customPathUnresolved 键（与 zh 对齐）。

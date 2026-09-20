@@ -172,6 +172,17 @@ export interface ComposerInputShellCoordinatorHost {
    * fetch). Absent disables the paste affordance entirely.
    */
   attachUrlContextToActiveTab?(href: string): boolean;
+  /**
+   * R-E2: the active Web Viewer tab as a context source. Null (or absent)
+   * hides the composer affordance — the entry only exists while a webviewer
+   * tab is active with the core plugin enabled.
+   */
+  getActiveWebViewerTabContext?(): Promise<{ url: string; title?: string } | null>;
+  /**
+   * R-E2: attach the active Web Viewer tab (R-E1 URL item shape). Absent
+   * disables the button even when a tab context exists.
+   */
+  attachWebViewerTabContextToActiveTab?(tab: { url: string; title?: string }): boolean;
 }
 
 export interface ComposerCapabilityHint {
@@ -464,6 +475,13 @@ export class ComposerInputShellCoordinator {
       imageGenBtnEl.addEventListener('click', () => {
         this.host.onRequestImageGeneration?.();
       });
+    }
+
+    // R-E2: attach the active Web Viewer tab (globe button). Rendered only
+    // when both host seams exist AND the current tab resolves to a webviewer
+    // context — the affordance never appears half-wired.
+    if (this.host.getActiveWebViewerTabContext && this.host.attachWebViewerTabContextToActiveTab) {
+      void this.setupWebViewerContextButton();
     }
 
     this.sendBtnEl = this.composerSubmitControlsEl.createEl('button', {
@@ -1630,6 +1648,36 @@ export class ComposerInputShellCoordinator {
     this.attachedImages = [];
     this.imageChipContainerEl?.remove();
     this.imageChipContainerEl = null;
+  }
+
+  /**
+   * R-E2: the Web Viewer attach button. Availability is checked up front AND
+   * again on every click (the active tab can change between render and
+   * click); a null context removes the button so the entry tracks the
+   * active leaf honestly.
+   */
+  private async setupWebViewerContextButton(): Promise<void> {
+    const tab = await this.host.getActiveWebViewerTabContext?.() ?? null;
+    if (!tab || !this.composerContextActionsEl) {
+      return;
+    }
+    const btnEl = this.composerContextActionsEl.createEl('button', {
+      cls: 'opencodian-composer-webviewer-btn opencodian-tooltip-trigger',
+      attr: {
+        type: 'button',
+        'aria-label': t('chat.webViewer.attachButton'),
+      },
+    });
+    setIcon(btnEl, 'globe');
+    this.host.setTooltipLabel(btnEl, t('chat.webViewer.attachButton'), 'top');
+    btnEl.addEventListener('click', async () => {
+      const current = await this.host.getActiveWebViewerTabContext?.() ?? null;
+      if (!current) {
+        btnEl.remove();
+        return;
+      }
+      this.host.attachWebViewerTabContextToActiveTab?.(current);
+    });
   }
 
   private installImageDropSurface(): void {

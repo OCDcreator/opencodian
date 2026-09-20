@@ -82,6 +82,11 @@ import {
   type ConversationExportVault,
 } from './core/storage/ConversationMarkdownExportService';
 import { TurnCompletionSoundService } from './features/chat/services/TurnCompletionSoundService';
+import {
+  buildWebViewerContextItem,
+  getActiveWebViewerTabContext,
+  isWebViewerAvailable,
+} from './features/chat/services/WebViewerContextService';
 import { RelevantNotesView, VIEW_TYPE_RELEVANT_NOTES } from './features/chat/RelevantNotesView';
 import { ImageAssetStorage, type ImageAssetVault } from './core/storage/ImageAssetStorage';
 import { createRequestUrlImageGenTransport, ImageGenerationService } from './core/agents/imagegen/ImageGenerationService';
@@ -1492,6 +1497,23 @@ export default class OpenCodianPlugin extends Plugin {
       },
     });
 
+    // advantage-parity R-E2: attach the active Web Viewer tab. The command
+    // only exists while the core Web Viewer plugin is enabled; without an
+    // active webviewer tab it reports the honest unavailable notice.
+    this.addCommand({
+      id: 'attach-webviewer-tab-to-context',
+      name: t('chat.webViewer.command.name'),
+      checkCallback: (checking: boolean) => {
+        if (!isWebViewerAvailable(this.app)) {
+          return false;
+        }
+        if (!checking) {
+          void this.attachActiveWebViewerTabToChatContext();
+        }
+        return true;
+      },
+    });
+
     // advantage-parity R-D1: export the active tab's conversation to a vault
     // Markdown note. Works on every backend identically — it serializes the
     // plugin's own stored messages, no backend involvement at all.
@@ -1799,6 +1821,24 @@ export default class OpenCodianPlugin extends Plugin {
       return false;
     }
     return this.getOpenCodianView()?.attachContextItemToActiveTab(item) ?? false;
+  }
+
+  /**
+   * advantage-parity R-E2: attach the active Web Viewer tab (R-E1 URL item
+   * shape; honest notice when the active tab is not a webviewer page).
+   */
+  private async attachActiveWebViewerTabToChatContext(): Promise<void> {
+    const tab = await getActiveWebViewerTabContext(this.app);
+    if (!tab) {
+      new Notice(t('chat.webViewer.command.unavailable'));
+      return;
+    }
+    await this.activateView();
+    const attached = this.getOpenCodianView()
+      ?.attachContextItemToActiveTab(buildWebViewerContextItem(tab)) ?? false;
+    if (attached) {
+      new Notice(t('relevantNotes.attachSuccess', { path: tab.title ?? tab.url }));
+    }
   }
 
   async reapplyConversationSessionDefaults(): Promise<void> {

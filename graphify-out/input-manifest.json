@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "62ff7df90e9af5fe7a7d7fe72b3d78a79aad419bb8981b786e230b463f019f05",
-  "recordCount": 758,
+  "digest": "157f8143fab9d2cd52c44ad41bf27747ca3f75515edfdd30451c31e592ddd092",
+  "recordCount": 759,
   "records": [
     {
       "kind": "ignore",
@@ -1296,7 +1296,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
-      "sha256": "5aef370368624731f082f0f7e2572ac41708eff799ba53a62b1a50be69b5268c"
+      "sha256": "a97339d81479ea25bc4dc222e77f70ad1818af1571735cf7d46aa755d2cfd230"
     },
     {
       "kind": "src",
@@ -1731,7 +1731,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ComposerInputShellCoordinator.ts",
-      "sha256": "b68e32e613ec3c83fd14edc023a61a88d7c889837c270068101cec0f97b626e2"
+      "sha256": "c9b25b2d2f06f42132d760ed729dfcf713d6e86fc61864420bb47afe6cf283ed"
     },
     {
       "kind": "src",
@@ -2307,6 +2307,11 @@
       "kind": "src",
       "key": "src/features/chat/services/VisibleConversationPostSyncStateHostAdapter.ts",
       "sha256": "66505f7d1f391a55a8b91c3c3e8ecd4f5dc26a5cb355bcdc98cef54ebdcf3af5"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/chat/services/WebViewerContextService.ts",
+      "sha256": "a7471b14494b15494e087b95021951cc0af1a958c227b2db51a3b00e5f1841b7"
     },
     {
       "kind": "src",
@@ -3226,7 +3231,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "526586f26fa2d97d3387aff6b6ddcab514fdc8ad5d40614a6f8aae2359fe5c32"
+      "sha256": "55c577d7fe76e4cd5912cc08f8541b60268021dd3e5a87d6bf7e3ee93f64758c"
     },
     {
       "kind": "src",
@@ -3236,12 +3241,12 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "acb0db71d30ee9cbd73bb9a7fe9c7b7d910503a4efc3ce37850932403c038a65"
+      "sha256": "6981fd4d4faf65373636bb041d6f67b93b71f811004cdd4b5e9e62d7c16af234"
     },
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "cd3047dc11597b4e0b68e57de111ec9d45e6d910cb54baa64ab36d36601b13ee"
+      "sha256": "8ba06d3d002a2eabb2bba2fe9e528ecb4f39358966a334f933792dfe3f4cf6a1"
     },
     {
       "kind": "src",
@@ -3794,7 +3799,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-20T17:14:27.048Z",
-  "headShaAtGeneration": "58d8f64e4bac019ef02b30a9413584fc753d9aa0",
+  "generatedAt": "2026-09-20T17:34:16.978Z",
+  "headShaAtGeneration": "b1df946aed28b7e021163e9c1db1c3d847cfa49f",
   "graphifyVersion": "graphify 0.9.36"
 }
