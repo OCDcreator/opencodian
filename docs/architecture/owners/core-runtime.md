@@ -1,4 +1,5 @@
 # Owner: core.runtime
+> 2026-09-20 (advantage-parity R-D2)：SettingsRuntimeCoordinator 的 persistSettingsDomains 向 saveCoreSettings 传入 secretsKeychainEnabled 旗标（钥匙串回滚开关；关闭时持久化明文密钥）。
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
 - 2026-09-17 (shadcn style): `saveChatAppearanceImmediately()` 成功后补调 `refreshOpenCodianViews({reloadModels:false, applyUi:true})`，修复预设切换不立即生效（此前需等下一次全量设置保存才推 UI）。边界与依赖不变。

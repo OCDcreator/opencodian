@@ -1,4 +1,5 @@
 # OpenCodianSettingsRuntimeCoordinator
+> 2026-09-20 (advantage-parity R-D2)：persistSettingsDomains 向 saveCoreSettings 传入 `secretsKeychainEnabled`（关闭即回滚：持久化明文）。
 
 > **源码**: `src/core/runtime/OpenCodianSettingsRuntimeCoordinator.ts`
 

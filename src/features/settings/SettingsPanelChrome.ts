@@ -40,6 +40,54 @@ export function renderLanguageSetting(
     });
 }
 
+/**
+ * advantage-parity R-D2: the keychain secrets toggle. Shared by the modal
+ * settings tab and the editor-area settings view. The toggle is the explicit
+ * rollback — while off, the next persist writes real secret values back into
+ * `settings.core.json`. On hosts without the keychain API the row states the
+ * honest degradation instead of pretending protection exists.
+ */
+export function renderSecretsKeychainSetting(containerEl: HTMLElement, plugin: OpenCodianPlugin): void {
+  const keychainAvailable = plugin.storage?.isSettingsSecretsKeychainAvailable() ?? false;
+  const setting = new Setting(containerEl)
+    .setName(t('settings.secrets.name'))
+    .addToggle((toggle) => {
+      toggle
+        .setValue(plugin.settings.secretsKeychainEnabled && keychainAvailable)
+        .setDisabled(!keychainAvailable)
+        .onChange(async (value) => {
+          plugin.settings.secretsKeychainEnabled = value;
+          await plugin.saveSettings();
+          setting.setDesc(value ? t('settings.secrets.descOn') : t('settings.secrets.descOff'));
+        });
+    });
+  setting.setDesc(
+    keychainAvailable
+      ? (plugin.settings.secretsKeychainEnabled
+        ? t('settings.secrets.descOn')
+        : t('settings.secrets.descOff'))
+      : t('settings.secrets.descUnavailable'),
+  );
+}
+
+/** Shared "settings in editor area" row (modal tab + editor-area view). */
+export function renderSettingsInEditorAreaSettingRow(
+  containerEl: HTMLElement,
+  plugin: OpenCodianPlugin,
+): void {
+  new Setting(containerEl)
+    .setName(t('settings.ui.settingsInEditorArea.name'))
+    .setDesc(t('settings.ui.settingsInEditorArea.desc'))
+    .addToggle((toggle) =>
+      toggle
+        .setValue(plugin.settings.settingsInEditorArea)
+        .onChange(async (value) => {
+          plugin.settings.settingsInEditorArea = value;
+          await plugin.saveSettings();
+        })
+    );
+}
+
 export function createSettingsBlock(
   containerEl: HTMLElement,
   options: SettingsBlockOptions,

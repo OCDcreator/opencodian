@@ -1,4 +1,5 @@
 # OpenCodianSettingsView
+> 2026-09-20 (advantage-parity R-D2)：编辑区设置面同享钥匙串开关行与编辑区设置行（均委托 SettingsPanelChrome，消除与模态设置页的重复实现）。
 
 2026-09-10：编辑器设置页持有插件更新 section 实例，通过已有 `disposeSections()` 在重建/关闭时取消进度订阅，与主设置页使用同一进度和分批历史实现。
 

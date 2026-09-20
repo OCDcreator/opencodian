@@ -3521,6 +3521,15 @@ export const zhTranslations = {
   'settings.layoutMode.desc': '选择设置页面的展示方式',
   'settings.layoutMode.classic': '经典平铺',
   'settings.layoutMode.tabbed': '多级标签分类',
+
+  // advantage-parity R-D2：密钥入 Obsidian Keychain
+  'settings.secrets.name': '密钥存入 Obsidian 钥匙串',
+  'settings.secrets.descOn': '开启：设置里的 API 密钥等敏感值存入 Obsidian 钥匙串，数据文件只保留占位引用；运行时行为不变。关闭即回滚——下次保存会把真实值写回本地设置文件。',
+  'settings.secrets.descOff': '已关闭：敏感值以明文保存在本地设置文件中（回滚模式）。重新开启后，下次保存会把它们迁入钥匙串。',
+  'settings.secrets.descUnavailable': '当前 Obsidian 版本未提供钥匙串接口（需要 1.11.4+），敏感值继续保存在本地设置文件中，不做任何静默处理。',
+  'settings.secrets.migratedNotice': '已把 {{count}} 项设置密钥迁入 Obsidian 钥匙串（数据文件不再包含明文密钥）。',
+  'settings.secrets.unresolvedNotice': '有 {{count}} 项密钥无法从钥匙串读取（条目缺失或读取失败），对应字段已置空，请重新填写。',
+  'settings.secrets.noKeychainNotice': '当前 Obsidian 版本不支持钥匙串，{{count}} 项敏感值仍以明文保存在本地设置文件中。',
   'settings.general.tab.basic': '基础',
   'settings.general.tab.agents': '智能体管理',
   'settings.general.tab.language': '语言',

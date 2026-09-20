@@ -1,4 +1,5 @@
 # SettingsPanelChrome
+> 2026-09-20 (advantage-parity R-D2)：新增共享设置行 `renderSecretsKeychainSetting`（钥匙串开关 + 不可用时的诚实降级文案 + 回滚语义）与 `renderSettingsInEditorAreaSettingRow`。
 
 > **源码**: `src/features/settings/SettingsPanelChrome.ts`
 > **状态**: [REVIEW]

@@ -37,6 +37,7 @@ function createPluginWithSavedSettings(savedSettings: Record<string, unknown>): 
     }),
     saveCoreSettings: jest.fn().mockResolvedValue(undefined),
     saveUiSettings: jest.fn().mockResolvedValue(undefined),
+    takeSettingsSecretsLoadReport: jest.fn().mockReturnValue(null),
   } as Pick<StorageService, 'loadPersistedSettings' | 'saveCoreSettings' | 'saveUiSettings'>;
 
   return plugin;
@@ -493,6 +494,7 @@ function createPluginWithSavedSettings(savedSettings: Record<string, unknown>): 
       }),
       saveCoreSettings: jest.fn().mockResolvedValue(undefined),
       saveUiSettings: jest.fn().mockResolvedValue(undefined),
+      takeSettingsSecretsLoadReport: jest.fn().mockReturnValue(null),
     } as Pick<StorageService, 'loadPersistedSettings' | 'saveCoreSettings' | 'saveUiSettings'>;
 
     await plugin.loadSettings();

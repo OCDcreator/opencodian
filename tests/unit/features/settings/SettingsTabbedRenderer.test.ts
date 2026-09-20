@@ -53,6 +53,9 @@ function createRendererState(options?: {
   const renderSettingsInEditorAreaSetting = jest.fn((containerEl: HTMLElement) => {
     containerEl.createDiv({ cls: 'settings-editor-area-marker', text: 'settings-editor-area-setting' });
   });
+  const renderSecretsKeychainSetting = jest.fn((containerEl: HTMLElement) => {
+    containerEl.createDiv({ cls: 'secrets-keychain-marker', text: 'secrets-keychain-setting' });
+  });
   const renderPluginUpdateSection = jest.fn((containerEl: HTMLElement) => {
     containerEl.createDiv({ cls: 'plugin-update-marker', text: 'plugin-update-section' });
   });
@@ -101,6 +104,7 @@ function createRendererState(options?: {
     renderLayoutModeSetting,
     renderLanguageSetting,
     renderSettingsInEditorAreaSetting,
+    renderSecretsKeychainSetting,
     renderPluginUpdateSection,
   });
 
@@ -111,6 +115,7 @@ function createRendererState(options?: {
     renderLayoutModeSetting,
     renderLanguageSetting,
     renderSettingsInEditorAreaSetting,
+    renderSecretsKeychainSetting,
     renderPluginUpdateSection,
     renderUserContent,
     setActive,

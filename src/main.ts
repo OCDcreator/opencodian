@@ -1765,6 +1765,7 @@ export default class OpenCodianPlugin extends Plugin {
     this.getSettingsRuntimeCoordinator().initialize(this.settingsPersistenceWritable);
 
     this.reportSettingsLoadState(loadState.persistedSettings);
+    this.reportSettingsSecretsLoadState();
 
     await this.migrateOpenCodeCapabilitySettingsEnvelope(loadState.settings.opencodeCapabilities);
 
@@ -2452,6 +2453,32 @@ export default class OpenCodianPlugin extends Plugin {
         ?? result.ui.message
         ?? 'OpenCodian could not recover saved settings. Persistence is temporarily disabled to avoid overwriting data.',
       );
+    }
+  }
+
+  /**
+   * R-D2: surface the keychain load report honestly — migrated fields,
+   * unresolvable placeholders (missing keychain entries / older host), and
+   * the "keychain not available" degradation are all announced, never silent.
+   */
+  private reportSettingsSecretsLoadState(): void {
+    const report = this.storage?.takeSettingsSecretsLoadReport();
+    if (!report) {
+      return;
+    }
+    if (report.migrated.length > 0) {
+      new Notice(t('settings.secrets.migratedNotice', { count: report.migrated.length }), 8000);
+    }
+    if (report.unresolved.length > 0) {
+      logger.warn('Settings secrets could not be resolved from the keychain', {
+        keys: report.unresolved,
+      });
+      new Notice(t('settings.secrets.unresolvedNotice', { count: report.unresolved.length }), 12000);
+    }
+    if (report.plaintextWithoutSecretStorage.length > 0) {
+      new Notice(t('settings.secrets.noKeychainNotice', {
+        count: report.plaintextWithoutSecretStorage.length,
+      }), 12000);
     }
   }
 

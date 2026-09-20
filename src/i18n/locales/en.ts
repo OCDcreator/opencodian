@@ -3521,6 +3521,15 @@ export const enTranslations = {
   'settings.layoutMode.desc': 'Choose how settings are displayed',
   'settings.layoutMode.classic': 'Classic flat',
   'settings.layoutMode.tabbed': 'Tabbed categories',
+
+  // advantage-parity R-D2: secrets in the Obsidian Keychain
+  'settings.secrets.name': 'Store secrets in the Obsidian Keychain',
+  'settings.secrets.descOn': 'On: sensitive settings values (API keys and the like) live in the Obsidian keychain; the data files keep only placeholder references. Runtime behavior is unchanged. Turning this off is the rollback — the next save writes real values back into the local settings file.',
+  'settings.secrets.descOff': 'Off: sensitive values are stored in plaintext in the local settings file (rollback mode). Re-enabling migrates them into the keychain on the next save.',
+  'settings.secrets.descUnavailable': 'This Obsidian version does not expose the keychain API (1.11.4+ required); sensitive values keep living in the local settings file. No silent fallback is performed.',
+  'settings.secrets.migratedNotice': 'Migrated {{count}} settings secret(s) into the Obsidian keychain (the data files no longer contain plaintext secrets).',
+  'settings.secrets.unresolvedNotice': '{{count}} secret(s) could not be read from the keychain (missing entries or read failures); the affected fields were cleared — please re-enter them.',
+  'settings.secrets.noKeychainNotice': 'This Obsidian version has no keychain support; {{count}} sensitive value(s) remain in plaintext in the local settings file.',
   'settings.general.tab.basic': 'Basic',
   'settings.general.tab.agents': 'Agent Management',
   'settings.general.tab.language': 'Language',

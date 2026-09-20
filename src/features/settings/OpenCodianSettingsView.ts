@@ -33,6 +33,8 @@ import {
   applyInlineCodeText,
   createSettingsBlock,
   renderLanguageSetting,
+  renderSecretsKeychainSetting,
+  renderSettingsInEditorAreaSettingRow,
   renderSettingsPanelTitle,
   setSettingDescWithFormatting,
   setSettingNameWithFormatting,
@@ -261,6 +263,7 @@ export class OpenCodianSettingsView extends ItemView {
       renderLayoutModeSetting: (el) => { this.renderLayoutModeSetting(el); },
       renderLanguageSetting: (el) => { this.renderLanguageSetting(el); },
       renderSettingsInEditorAreaSetting: (el) => { this.renderSettingsInEditorAreaSetting(el); },
+      renderSecretsKeychainSetting: (el) => { this.renderSecretsKeychainSetting(el); },
       renderPluginUpdateSection: (el) => { this.renderPluginUpdateSection(el); },
     };
   }
@@ -289,18 +292,14 @@ export class OpenCodianSettingsView extends ItemView {
   }
 
   private renderSettingsInEditorAreaSetting(containerEl: HTMLElement): void {
-    new Setting(containerEl)
-      .setName(t('settings.ui.settingsInEditorArea.name'))
-      .setDesc(t('settings.ui.settingsInEditorArea.desc'))
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.settingsInEditorArea)
-          .onChange(async (value) => {
-            this.plugin.settings.settingsInEditorArea = value;
-            await this.plugin.saveSettings();
-          })
-      );
+    renderSettingsInEditorAreaSettingRow(containerEl, this.plugin);
   }
+
+  /** advantage-parity R-D2: keychain toggle (shared implementation). */
+  private renderSecretsKeychainSetting(containerEl: HTMLElement): void {
+    renderSecretsKeychainSetting(containerEl, this.plugin);
+  }
+
   private renderPluginUpdateSection(containerEl: HTMLElement): void {
     this.pluginUpdateSection?.dispose();
     this.pluginUpdateSection = new SettingsPluginUpdateSection({ plugin: this.plugin, requestDisplayRefresh: () => { this.renderSettings(); }, isExpanded: this.pluginUpdateExpanded, onExpandedChange: (isExpanded) => { this.pluginUpdateExpanded = isExpanded; } });
@@ -328,6 +327,7 @@ export class OpenCodianSettingsView extends ItemView {
     this.renderLayoutModeSetting(blockBodyEl);
     this.renderLanguageSetting(blockBodyEl);
     this.renderSettingsInEditorAreaSetting(blockBodyEl);
+    this.renderSecretsKeychainSetting(blockBodyEl);
     this.renderPluginUpdateSection(containerEl);
   }
 

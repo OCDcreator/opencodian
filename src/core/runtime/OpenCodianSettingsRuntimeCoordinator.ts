@@ -352,7 +352,11 @@ export class OpenCodianSettingsRuntimeCoordinator {
 
     const { core, ui } = splitPersistedSettings(this.host.getSettings());
     if (options.core) {
-      await this.host.getStorageService().saveCoreSettings(core);
+      await this.host.getStorageService().saveCoreSettings(core, {
+        // R-D2: while the keychain toggle is off the persisted profile keeps
+        // real secret values (explicit rollback to data.json storage).
+        secretsKeychainEnabled: this.host.getSettings().secretsKeychainEnabled !== false,
+      });
     }
     if (options.ui) {
       await this.host.getStorageService().saveUiSettings(ui);

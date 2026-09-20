@@ -3569,6 +3569,16 @@ export interface OpenCodianSettings {
   conversationExport: ConversationExportSettings;
 
   /**
+   * Store settings secrets in the Obsidian Keychain instead of `data.json`
+   * (advantage-parity R-D2, default on when the host exposes the keychain).
+   * The live settings object always holds real values; only the persisted
+   * core profile swaps secrets for placeholders. Turning this off is the
+   * explicit rollback: the next persist writes real values back into
+   * `settings.core.json`.
+   */
+  secretsKeychainEnabled: boolean;
+
+  /**
    * Backend-neutral edit revert master switch (R-B3, default on). When off,
    * no snapshots are captured and the sidebar shows no revert actions; the
    * capture listeners stay cheap no-ops. Independent of OpenCode's
@@ -3804,6 +3814,11 @@ export function normalizePluginUpdateAutoInstall(value: unknown): boolean {
   return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.pluginUpdateAutoInstall;
 }
 
+/** advantage-parity R-D2: keychain toggle normalizes to the safe default (on). */
+export function normalizeSecretsKeychainEnabled(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.secretsKeychainEnabled;
+}
+
 /** User-facing memory backend settings (mirrors core MemorySettingsSnapshot). */
 export interface MemoryBackendUserSettings {
   /** Master switch. Default false — the memory backend ships dark. */
@@ -3972,6 +3987,9 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
 
   // advantage-parity R-D1: conversation → vault Markdown export.
   conversationExport: { ...DEFAULT_CONVERSATION_EXPORT_SETTINGS },
+  // advantage-parity R-D2: secrets via Obsidian Keychain (placeholder form
+  // in the persisted core profile; explicit rollback via this toggle).
+  secretsKeychainEnabled: true,
   editRevertEnabled: true,
   editRevertSnapshotLimitMb: EDIT_REVERT_SNAPSHOT_LIMIT_MB_DEFAULT,
   obsidianToolingMode: 'off',

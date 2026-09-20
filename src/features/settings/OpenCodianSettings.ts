@@ -39,6 +39,7 @@ import {
   applyInlineCodeText,
   createSettingsBlock,
   renderLanguageSetting,
+  renderSecretsKeychainSetting,
   renderSettingsPanelTitle,
   setSettingDescWithFormatting,
   setSettingNameWithFormatting,
@@ -136,6 +137,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         renderLayoutModeSetting: (el) => { this.renderLayoutModeSetting(el); },
         renderLanguageSetting: (el) => { this.renderLanguageSetting(el); },
         renderSettingsInEditorAreaSetting: (el) => { this.renderSettingsInEditorAreaSetting(el); },
+        renderSecretsKeychainSetting: (el) => { this.renderSecretsKeychainSetting(el); },
         renderPluginUpdateSection: (el) => { this.renderPluginUpdateSection(el); },
       });
     }
@@ -465,6 +467,15 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       });
   }
 
+  /**
+   * R-D2: secrets storage mode (shared implementation in SettingsPanelChrome).
+   * The toggle is the explicit rollback — while off, the next persist writes
+   * real secret values back into `settings.core.json`.
+   */
+  renderSecretsKeychainSetting(containerEl: HTMLElement): void {
+    renderSecretsKeychainSetting(containerEl, this.plugin);
+  }
+
   // ─── Classic section rendering ─────────────────────────────────────
 
   private renderClassicGeneralSection(containerEl: HTMLElement): void {
@@ -486,6 +497,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.renderLayoutModeSetting(blockBodyEl);
     this.renderLanguageSetting(blockBodyEl);
     this.renderSettingsInEditorAreaSetting(blockBodyEl);
+    this.renderSecretsKeychainSetting(blockBodyEl);
     this.renderPluginUpdateSection(containerEl);
   }
 

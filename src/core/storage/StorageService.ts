@@ -25,6 +25,10 @@ import {
   ConversationMetadataCache,
   type MutableConversationListDiagnostics,
 } from './ConversationMetadataCache';
+import {
+  SettingsSecretsKeychain,
+  type SettingsSecretsLoadReport,
+} from './SettingsSecretsKeychain';
 import type { StoragePluginPort } from './StoragePluginPort';
 import { type StoredThemeBackgroundAsset, ThemeBackgroundStorage } from './ThemeBackgroundStorage';
 
@@ -171,6 +175,8 @@ export class StorageService {
   private settingsWriteQueue: Promise<void> = Promise.resolve();
   private conversationMetadataCache: ConversationMetadataCache;
   private themeBackgroundStorage: ThemeBackgroundStorage;
+  /** R-D2: keychain-backed secret store for the persisted core profile. */
+  private settingsSecretsKeychain: SettingsSecretsKeychain;
   private lastConversationListDiagnostics: ConversationListDiagnostics | null = null;
 
   constructor(plugin: StoragePluginPort) {
@@ -178,6 +184,7 @@ export class StorageService {
     this.vaultPath = (this.app.vault.adapter as unknown as { basePath: string }).basePath;
     this.conversationMetadataCache = new ConversationMetadataCache(this.app.vault.adapter);
     this.themeBackgroundStorage = new ThemeBackgroundStorage(this.app.vault.adapter);
+    this.settingsSecretsKeychain = SettingsSecretsKeychain.forApp(this.app, this.vaultPath);
   }
 
   /** Initialize storage directories */
@@ -356,8 +363,18 @@ export class StorageService {
     return cloneConversationListDiagnostics(this.lastConversationListDiagnostics);
   }
 
-  async saveCoreSettings(settings: PersistedCoreSettings): Promise<void> {
-    await this.saveSettingsProfile(CORE_SETTINGS_PROFILE, settings);
+  async saveCoreSettings(
+    settings: PersistedCoreSettings,
+    options: { secretsKeychainEnabled?: boolean } = {},
+  ): Promise<void> {
+    // R-D2: the persisted form swaps real secrets for keychain placeholders
+    // (best-effort; a keychain failure keeps plaintext so persistence never
+    // loses the credential). The live settings object is never mutated.
+    const scrubbed = await this.settingsSecretsKeychain.scrubForPersistence(
+      settings,
+      { enabled: options.secretsKeychainEnabled !== false },
+    );
+    await this.saveSettingsProfile(CORE_SETTINGS_PROFILE, scrubbed as PersistedCoreSettings);
   }
 
   async saveUiSettings(settings: PersistedUiSettings): Promise<void> {
@@ -403,9 +420,28 @@ export class StorageService {
   async loadPersistedSettings(): Promise<SettingsLoadResult> {
     const legacySettings = await this.readLegacySettings();
     const core = await this.loadSettingsProfile(CORE_SETTINGS_PROFILE, legacySettings);
+    // R-D2: resolve keychain placeholders back to real values AND perform the
+    // one-time plaintext migration (push to keychain, replace with
+    // placeholder). The migration is converged to disk by the startup
+    // normalization backfill that follows a shouldPersist load.
+    if (core.data) {
+      core.data = await this.settingsSecretsKeychain.resolveAfterLoad(
+        core.data as Partial<Record<string, unknown>>,
+      ) as Partial<PersistedCoreSettings>;
+    }
     const ui = await this.loadSettingsProfile(UI_SETTINGS_PROFILE, legacySettings);
 
     return this.buildSettingsLoadResult(core, ui);
+  }
+
+  /** R-D2: load-boundary keychain report for honest app-layer notices. */
+  takeSettingsSecretsLoadReport(): SettingsSecretsLoadReport | null {
+    return this.settingsSecretsKeychain.takePendingLoadReport();
+  }
+
+  /** R-D2: keychain availability for the settings UI status row. */
+  isSettingsSecretsKeychainAvailable(): boolean {
+    return this.settingsSecretsKeychain.isAvailable();
   }
 
   async saveManagedServerState(state: ManagedServerState | null): Promise<void> {

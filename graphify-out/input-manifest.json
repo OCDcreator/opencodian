@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "2b47d89aac1cd793694186f1ea13c46ca09f89588d2bff89c32c902e03444c16",
-  "recordCount": 752,
+  "digest": "0e4128dfaab54b6494b450a74ec426bda8ea631f7faffcc7ee0709a340f25fc2",
+  "recordCount": 753,
   "records": [
     {
       "kind": "ignore",
@@ -1066,7 +1066,7 @@
     {
       "kind": "src",
       "key": "src/core/runtime/OpenCodianSettingsRuntimeCoordinator.ts",
-      "sha256": "8554b071d1c8c85e9f09c4ab04c786442a424eab53b6512bffa94621a9d04ed6"
+      "sha256": "f59470bf5f6304307fff8b1100c72585406f432a553671c66e1d54f6ef4cb34e"
     },
     {
       "kind": "src",
@@ -1130,13 +1130,18 @@
     },
     {
       "kind": "src",
+      "key": "src/core/storage/SettingsSecretsKeychain.ts",
+      "sha256": "8fd77f3a6adfdf30b021a1f1001b12d6a5c1028860d585a68ebf3a9b0bf17895"
+    },
+    {
+      "kind": "src",
       "key": "src/core/storage/StoragePluginPort.ts",
       "sha256": "c584ae0b404eda6604ef47dd121fe029f090da5be3c2be26a661fedc3b7437dd"
     },
     {
       "kind": "src",
       "key": "src/core/storage/StorageService.ts",
-      "sha256": "5de67ab08f16369770cc7374569775ec7da9dd7dd84c11cafb669cf70bde5aed"
+      "sha256": "7cd01890a986d7844b46cca0f556cf3a19857ecb569d027fb15119b3b19ec7bf"
     },
     {
       "kind": "src",
@@ -1196,12 +1201,12 @@
     {
       "kind": "src",
       "key": "src/core/types/settings.ts",
-      "sha256": "dc418f3d58e776bf13d427433f143d5c279493bc3102852ca98ea057ef379df7"
+      "sha256": "e843cf0e6e7516dd5910a5a3d6639cd94fd3014cc81379d5562d9f51247cbffb"
     },
     {
       "kind": "src",
       "key": "src/core/types/settingsLoadNormalization.ts",
-      "sha256": "72366e466b9fd307a08e81c2993ff8ac82f2be99710fb8767bcefb58956fd150"
+      "sha256": "0e665f6a2de3d3621525d6c5dd7f465fbf560e29c4a464d0bc9cdbe0dd6870fa"
     },
     {
       "kind": "src",
@@ -2816,12 +2821,12 @@
     {
       "kind": "src",
       "key": "src/features/settings/OpenCodianSettings.ts",
-      "sha256": "d5c3850081c74f6f36899fde55312a2b0bbe7eba80d9730f04bb8238c00f3163"
+      "sha256": "652e5abee2aa33955d3adbc87efcdfa5edc19d473dda8d5bcae4d408e7d91ba1"
     },
     {
       "kind": "src",
       "key": "src/features/settings/OpenCodianSettingsView.ts",
-      "sha256": "c28d53b74970f904097fdc70ac1065651b83122fef4712053747b22a41aad128"
+      "sha256": "0c49ccad9630d31cbfe684ce32f9ef3e7eabf26c6c598c37e9d2f9563d9487b1"
     },
     {
       "kind": "src",
@@ -3031,7 +3036,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsPanelChrome.ts",
-      "sha256": "01c93fc4cae2c7f0a985c751253828dcdf9abd3c3542ade8c0dd29f48b4d9bb3"
+      "sha256": "9130b63603350a0647109aa57f002302cd90f6039c7a9b064e3c7ceb6ffdc152"
     },
     {
       "kind": "src",
@@ -3146,7 +3151,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsTabbedRenderer.ts",
-      "sha256": "9f65fddcc35827605ebc3c34e7e291d251992ebe5c83b5c433199324b82b151f"
+      "sha256": "9650e890840b05e493ff2a6516a07f3820e0b51834285c79c160698881939dca"
     },
     {
       "kind": "src",
@@ -3201,7 +3206,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "d1664f6a2ef722779ca6d1fef23082693578009d779bf3484ea63f14b52a51f5"
+      "sha256": "599bf6ad2e16d3b17363399b2326297671c0df3f6a6fb57c6b6d890e6eb7b67b"
     },
     {
       "kind": "src",
@@ -3211,12 +3216,12 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "c4ba0a6f3de38fd34334b2af5449283c1167e808694f2fb0f7235abe0c05afb7"
+      "sha256": "acdf280fe0a48cceb8b6e8824b5ff9b6bc826d869a41dcef7b6038af15a2aa88"
     },
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "53c14d7286e343538e7ab9c7112f9a3fa58f2a84f8d5df2952a78f54b0e7024a"
+      "sha256": "86e64a5adf67678e0a56c3629f9da67d01d4411c4148701a35a1abc1cb73f9d5"
     },
     {
       "kind": "src",
@@ -3764,7 +3769,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-20T15:25:10.480Z",
-  "headShaAtGeneration": "a7ec4c4196c4bdaf2d08e98c6f0a7ce1af9b2ee8",
+  "generatedAt": "2026-09-20T16:01:00.709Z",
+  "headShaAtGeneration": "3efd3a38ae1782033b5312b09f0cde12eb563421",
   "graphifyVersion": "graphify 0.9.36"
 }

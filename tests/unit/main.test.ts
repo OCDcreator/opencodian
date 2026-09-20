@@ -1209,6 +1209,7 @@ describe('OpenCodianPlugin.loadSettings', () => {
       }),
       saveCoreSettings: jest.fn().mockResolvedValue(undefined),
       saveUiSettings: jest.fn().mockResolvedValue(undefined),
+      takeSettingsSecretsLoadReport: jest.fn().mockReturnValue(null),
     } as Pick<StorageService, 'loadPersistedSettings' | 'saveCoreSettings' | 'saveUiSettings'>;
 
     await plugin.loadSettings();
@@ -1258,6 +1259,7 @@ describe('OpenCodianPlugin.loadSettings', () => {
       }),
       saveCoreSettings: jest.fn().mockResolvedValue(undefined),
       saveUiSettings: jest.fn().mockResolvedValue(undefined),
+      takeSettingsSecretsLoadReport: jest.fn().mockReturnValue(null),
     } as Pick<StorageService, 'loadPersistedSettings' | 'saveCoreSettings' | 'saveUiSettings'>;
 
     await plugin.loadSettings();
