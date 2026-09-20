@@ -77,6 +77,10 @@ import { PluginRuntimeCoordinator } from './app/runtime/PluginRuntimeCoordinator
 import { StorageService } from './core/storage';
 import { ConversationFullMessageCache } from './core/storage/ConversationFullMessageCache';
 import { EditRevertService } from './core/storage/EditRevertService';
+import {
+  ConversationMarkdownExportService,
+  type ConversationExportVault,
+} from './core/storage/ConversationMarkdownExportService';
 import { ImageAssetStorage, type ImageAssetVault } from './core/storage/ImageAssetStorage';
 import { createRequestUrlImageGenTransport, ImageGenerationService } from './core/agents/imagegen/ImageGenerationService';
 import { ImageGenerationChatController, type ImageGenerationChatPorts } from './features/chat/services/ImageGenerationChatController';
@@ -162,6 +166,14 @@ export default class OpenCodianPlugin extends Plugin {
    * modified-files sidebar consume it through `EditRevertServicePort`.
    */
   editRevertService: EditRevertService | null = null;
+
+  /**
+   * Conversation → vault Markdown export (core.storage owner, advantage-parity
+   * R-D1). Manual exports are purely additive vault notes; the opt-in
+   * auto-export refresh only notes this feature itself created. main.ts only
+   * composes it (vault/adapter seams + settings getter + notice hooks).
+   */
+  conversationExportService: ConversationMarkdownExportService | null = null;
 
   /**
    * R-C6 remote-drive loopback listener (core.remotecontrol owner). main.ts
@@ -329,6 +341,18 @@ export default class OpenCodianPlugin extends Plugin {
     });
     await coordinator.measureStartupStep('editRevert.initialize', () =>
       this.editRevertService?.initialize() ?? Promise.resolve());
+    // advantage-parity R-D1: conversation export reads the stored message
+    // structure and writes user-visible vault notes. Auto-export stays a
+    // no-op while `conversationExport.autoExport` is false (the scheduler
+    // returns before touching any timer or state file).
+    this.conversationExportService = new ConversationMarkdownExportService({
+      vault: this.createConversationExportVaultAdapter(),
+      adapter: this.app.vault.adapter,
+      getSettings: () => this.settings?.conversationExport,
+      onUserEditedAutoExport: (_conversationId, path) => {
+        new Notice(t('chat.export.autoDisabledUserEdited', { path }), 10000);
+      },
+    });
     // R-C2 text-to-image: generation is plugin-side HTTP (never an agent
     // session); the asset write is the plugin's first binary write into the
     // user content area (W-asset), and both entry points register generated
@@ -820,6 +844,58 @@ export default class OpenCodianPlugin extends Plugin {
         } catch {
           return false;
         }
+      },
+    };
+  }
+
+  /**
+   * advantage-parity R-D1: the export service's vault seam. Note writes go
+   * through the VAULT API (`vault.create`/`vault.modify`) — never the raw
+   * adapter — because Obsidian must index the new note for search/links;
+   * `vault.createFolder` creates missing parents (probe-proven in
+   * BatchOrganizeCoordinator).
+   */
+  private createConversationExportVaultAdapter(): ConversationExportVault {
+    const vault = this.app.vault;
+    return {
+      getAbstractFileByPath: (path) => vault.getAbstractFileByPath(normalizePath(path)),
+      createFolder: (path) => vault.createFolder(normalizePath(path)),
+      create: (path, data) => vault.create(normalizePath(path), data),
+      modify: async (path, data) => {
+        // vault.modify is TFile-typed; resolve the file from our path seam
+        // and fail loudly when it vanished between resolution and write.
+        const file = vault.getAbstractFileByPath(normalizePath(path));
+        if (!file) {
+          throw new Error(`Cannot modify "${path}": the note no longer exists.`);
+        }
+        await vault.modify(file as TFile, data);
+      },
+      getAvailablePathForAttachments: async (fileName) => {
+        const resolver = (vault as unknown as {
+          getAvailablePathForAttachments?: (fileName: string) => Promise<string>;
+        }).getAvailablePathForAttachments;
+        if (!resolver) {
+          throw new Error('This Obsidian version does not expose getAvailablePathForAttachments.');
+        }
+        return resolver.call(vault, fileName);
+      },
+      writeBinary: (path, data) => vault.adapter.writeBinary(normalizePath(path), data),
+      exists: (path) => vault.adapter.exists(normalizePath(path)),
+      trash: async (path) => {
+        const file = vault.getAbstractFileByPath(normalizePath(path));
+        if (!file) return false;
+        try {
+          await vault.trash(file, false);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      getFileMtime: async (path) => {
+        const file = vault.getAbstractFileByPath(normalizePath(path));
+        if (!file) return null;
+        const stat = (file as TFile).stat;
+        return typeof stat?.mtime === 'number' ? stat.mtime : null;
       },
     };
   }
@@ -1379,6 +1455,23 @@ export default class OpenCodianPlugin extends Plugin {
       },
     });
 
+    // advantage-parity R-D1: export the active tab's conversation to a vault
+    // Markdown note. Works on every backend identically — it serializes the
+    // plugin's own stored messages, no backend involvement at all.
+    this.addCommand({
+      id: 'export-conversation-markdown',
+      name: t('chat.export.command.name'),
+      callback: async () => {
+        await this.activateView();
+        const conversation = this.getOpenCodianView()?.getActiveConversationSnapshot() ?? null;
+        if (!conversation) {
+          new Notice(t('chat.export.emptyConversation'));
+          return;
+        }
+        await this.exportConversationMarkdown(conversation);
+      },
+    });
+
     this.addCommand({
       id: 'toggle-liquid-diamond-demo',
       name: '切换钻石演示',
@@ -1556,6 +1649,9 @@ export default class OpenCodianPlugin extends Plugin {
     this.canvasIntegration = null;
     this.canvasGenerationFlow = null;
     this.editRevertService?.dispose();
+    // advantage-parity R-D1: drop pending auto-export timers.
+    this.conversationExportService?.dispose();
+    this.conversationExportService = null;
     // R-C6: close the loopback listener (none exists while the feature is
     // off), abort any in-flight remote instruction and flush the audit.
     void this.remoteControlService?.dispose();
@@ -2136,6 +2232,55 @@ export default class OpenCodianPlugin extends Plugin {
     this.trimConversationFullMessageCache();
 
     await this.storage.saveConversation(nextConversation);
+
+    // advantage-parity R-D1: no-op unless auto-export is on AND a new
+    // assistant response landed (the scheduler checks both before arming
+    // any timer, so ordinary saves — title edits, settings writes — never
+    // trigger a vault write).
+    this.conversationExportService?.scheduleAutoExport(nextConversation);
+  }
+
+  /**
+   * advantage-parity R-D1: export a conversation to a vault Markdown note
+   * (manual path — always a NEW file, conflict-suffixed, never an overwrite).
+   * Notices are localized here; the core service stays locale-free.
+   */
+  async exportConversationMarkdown(conversation: Conversation): Promise<string | null> {
+    if (!this.conversationExportService) {
+      return null;
+    }
+    try {
+      const { path } = await this.conversationExportService.exportConversation(conversation);
+      new Notice(t('chat.export.success', { path }));
+      return path;
+    } catch (error) {
+      logger.error('Conversation export failed:', error);
+      new Notice(
+        t('chat.export.failed', {
+          error: error instanceof Error ? error.message : String(error),
+        }),
+        10000,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Export by conversation id (history menu path): prefers the live view
+   * conversation when it is the active one, otherwise loads the stored full
+   * conversation. Returns null when the conversation cannot be resolved.
+   */
+  async exportConversationMarkdownById(conversationId: string): Promise<string | null> {
+    const activeSnapshot = this.getOpenCodianView()?.getActiveConversationSnapshot() ?? null;
+    if (activeSnapshot?.id === conversationId) {
+      return this.exportConversationMarkdown(activeSnapshot);
+    }
+    const stored = await this.storage.loadFullConversation(conversationId);
+    if (!stored) {
+      new Notice(t('chat.export.notFound'));
+      return null;
+    }
+    return this.exportConversationMarkdown(stored);
   }
 
   /** Get all conversations */

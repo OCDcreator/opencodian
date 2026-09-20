@@ -1,4 +1,5 @@
 # ConversationHistoryActionsCoordinator
+> 2026-09-20 (advantage-parity R-D1)：每个历史条目的 rename 按钮旁新增导出按钮（`download` 图标，`chat.history.export` 文案），点击关闭下拉并调用 host 的 `exportConversationMarkdown`（可选方法，未提供时不渲染）。
 
 > **源码**: `src/features/chat/services/ConversationHistoryActionsCoordinator.ts`
 > **最近更新**: 2026-06-06 (preview transcript seeding + settings info)

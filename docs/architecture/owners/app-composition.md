@@ -1,4 +1,5 @@
 # Owner: app.composition
+> 2026-09-20 (advantage-parity R-D1)：main.ts 组合 conversationExportService（vault/adapter 缝 + 用户编辑回调 Notice）、命令 export-conversation-markdown、exportConversationMarkdown{,ById}、saveConversation 后自动导出钩子（设置关时零成本）、onunload dispose。
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
 - 2026-09-13 (universal memory backend): main.ts constructs MemoryRuntimeCoordinator and registers the memory maintenance commands.

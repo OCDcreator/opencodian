@@ -1057,6 +1057,10 @@ describe('SettingsConversationSection', () => {
         title: t('settings.conversation.rendering.title'),
         description: t('settings.conversation.rendering.desc'),
       },
+      {
+        title: t('settings.conversation.export.title'),
+        description: t('settings.conversation.export.groupDesc'),
+      },
     ]);
     expect(
       Array.from(containerEl.querySelectorAll<HTMLElement>('[data-settings-target]')).map(
@@ -1073,6 +1077,7 @@ describe('SettingsConversationSection', () => {
       'conversation-pdf-index',
       'conversation-questions',
       'conversation-rendering',
+      'conversation-export',
     ]);
   });
 });

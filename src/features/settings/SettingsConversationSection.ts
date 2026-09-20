@@ -26,6 +26,8 @@ import {
   EDIT_REVERT_SNAPSHOT_LIMIT_MB_MAX,
   EDIT_REVERT_SNAPSHOT_LIMIT_MB_MIN,
   normalizeChatFontSizePx,
+  normalizeConversationExportDirectory,
+  normalizeConversationExportFilenameTemplate,
   normalizeEditRevertSnapshotLimitMb,
   normalizeObsidianToolingMode,
   normalizeVaultRetrievalExcludedPaths,
@@ -292,6 +294,7 @@ export class SettingsConversationSection {
       this.renderQuestionsBlock(questionBodyEl);
     }
     this.renderRenderingBlock(renderingBodyEl);
+    this.renderExportBlock(containerEl);
 
     this.finishAttach();
 
@@ -316,6 +319,7 @@ export class SettingsConversationSection {
       { id: 'vault-retrieval', render: (el) => this.renderVaultRetrievalBlock(el) },
       { id: 'pdf-index', render: (el) => this.renderPdfIndexBlock(el) },
       { id: 'memory', render: (el) => this.renderMemoryBlock(el) },
+      { id: 'export', render: (el) => this.renderExportBlock(el) },
       ...(this.isOpenCodeActive()
         ? [{ id: 'questions', render: (el: HTMLElement) => this.renderQuestionsBlock(el) }]
         : []),
@@ -535,6 +539,71 @@ export class SettingsConversationSection {
     const targetEl = blockEl ?? bodyEl;
     targetEl.dataset.sectionBlock = blockId;
     targetEl.dataset.settingsTarget = `conversation-${blockId}`;
+  }
+
+  /**
+   * advantage-parity R-D1: conversation → vault Markdown export settings.
+   * The directory input validates through the same normalizer the exporter
+   * uses, so an unsafe path is refused here AND at write time.
+   */
+  private renderExportBlock(containerEl: HTMLElement): void {
+    const blockEl = this.createSettingsBlock(containerEl, {
+      title: t('settings.conversation.export.title'),
+      description: t('settings.conversation.export.groupDesc'),
+    });
+    this.markSettingsTarget(blockEl, 'export');
+
+    new Setting(blockEl)
+      .setName(t('settings.conversation.export.directory.name'))
+      .setDesc(t('settings.conversation.export.directory.desc'))
+      // Same wide-input class as the server executable/URL settings: path-like
+      // values must not clip in the 154px default control column.
+      .setClass('opencodian-wide-text-setting')
+      .addText((text) => {
+        text
+          .setPlaceholder('opencodian-conversations')
+          .setValue(this.plugin.settings.conversationExport.directory)
+          .onChange(async (value) => {
+            const normalized = normalizeConversationExportDirectory(value);
+            if (!normalized) {
+              new Notice(t('settings.conversation.export.directory.invalid'));
+              text.setValue(this.plugin.settings.conversationExport.directory);
+              return;
+            }
+            this.plugin.settings.conversationExport.directory = normalized;
+            text.setValue(normalized);
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.title = this.plugin.settings.conversationExport.directory;
+      });
+
+    new Setting(blockEl)
+      .setName(t('settings.conversation.export.template.name'))
+      .setDesc(t('settings.conversation.export.template.desc'))
+      .setClass('opencodian-wide-text-setting')
+      .addText((text) => {
+        text
+          .setPlaceholder('{$date}_{$topic}')
+          .setValue(this.plugin.settings.conversationExport.filenameTemplate)
+          .onChange(async (value) => {
+            this.plugin.settings.conversationExport.filenameTemplate
+              = normalizeConversationExportFilenameTemplate(value);
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.title = this.plugin.settings.conversationExport.filenameTemplate;
+      });
+
+    new Setting(blockEl)
+      .setName(t('settings.conversation.export.auto.name'))
+      .setDesc(t('settings.conversation.export.auto.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.conversationExport.autoExport)
+          .onChange(async (value) => {
+            this.plugin.settings.conversationExport.autoExport = value;
+            await this.plugin.saveSettings();
+          });
+      });
   }
 
   private registerProjectConfigListeners(): void {

@@ -171,6 +171,8 @@ export interface ChatPluginPort extends TabRuntimePluginSource {
     backend?: AgentBackendKind,
   ): Promise<string | null>;
   saveConversation(conversation: Conversation): Promise<void>;
+  /** advantage-parity R-D1: export by id (history menu path); localized notices inside. */
+  exportConversationMarkdownById(conversationId: string): Promise<string | null>;
   getConversations(): Conversation[];
   getConversationById(
     id: string,

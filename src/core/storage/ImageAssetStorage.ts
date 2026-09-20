@@ -21,7 +21,19 @@
  * adapter — as the authority for placement.
  */
 
+import {
+  isSafeVaultRelativePath,
+  sanitizeVaultFileBaseName,
+} from '../../shared/vault';
 import type { ImageGenerationMimeType } from '../agents/imagegen/ImageGenerationService';
+
+// Re-exported under their historical names: callers (and tests) import the
+// sanitizers from this module; the implementations moved to shared/vault.ts
+// so settings normalization (core.types) can reuse the same boundary rules.
+export { isSafeVaultRelativePath as isSafeVaultRelativeAssetPath };
+export function sanitizeImageAssetBaseName(raw: string): string {
+  return sanitizeVaultFileBaseName(raw, 'image');
+}
 
 /** The slice of the Obsidian vault this storage needs (injectable for tests). */
 export interface ImageAssetVault {
@@ -38,46 +50,8 @@ const MIME_TO_EXTENSION: Record<ImageGenerationMimeType, string> = {
   'image/webp': 'webp',
 };
 
-/** Fallback base name when the prompt sanitizes to nothing. */
-const DEFAULT_ASSET_BASE_NAME = 'image';
-/** Hard cap for the sanitized base name (kept readable in embeds). */
-const MAX_BASE_NAME_CHARS = 60;
 /** Upper bound for the manual suffix probe (never reached with real Obsidian). */
 const MAX_MANUAL_SUFFIX_PROBES = 100;
-
-/**
- * Sanitize a prompt into a safe asset base name (pure): strips characters
- * Obsidian forbids in file names plus wiki-bracket syntax, collapses
- * whitespace, caps length, and falls back when nothing survives.
- */
-export function sanitizeImageAssetBaseName(raw: string): string {
-  const cleaned = raw
-    .replace(/[[\]#^|\\/:*?"<>]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (!cleaned) {
-    return DEFAULT_ASSET_BASE_NAME;
-  }
-  return cleaned.length > MAX_BASE_NAME_CHARS
-    ? cleaned.slice(0, MAX_BASE_NAME_CHARS).trim() || DEFAULT_ASSET_BASE_NAME
-    : cleaned;
-}
-
-/**
- * True when `path` is a plain vault-relative file path. Rejects absolute
- * paths (POSIX and Windows drive forms — the out-of-vault attachment folder
- * case), `..` traversal, and empty segments.
- */
-export function isSafeVaultRelativeAssetPath(path: string): boolean {
-  if (!path || path.startsWith('/') || path.startsWith('\\')) {
-    return false;
-  }
-  if (/^[A-Za-z]:[\\/]/.test(path)) {
-    return false;
-  }
-  const segments = path.split(/[\\/]/);
-  return segments.every((segment) => segment !== '' && segment !== '.' && segment !== '..');
-}
 
 export class ImageAssetStorage {
   constructor(private readonly vault: ImageAssetVault) {}
@@ -109,7 +83,7 @@ export class ImageAssetStorage {
       );
     }
     const normalized = resolved.replace(/^\.\//, '');
-    if (!isSafeVaultRelativeAssetPath(normalized)) {
+    if (!isSafeVaultRelativePath(normalized)) {
       // Out-of-vault attachment folder (absolute path) or malformed result:
       // fail closed instead of writing outside the user's content area.
       throw new Error(

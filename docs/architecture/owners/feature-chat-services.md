@@ -1,4 +1,5 @@
 > 2026-09-18 (FlowText parity R-A7): context services extend to folders and multi-select — `ContextFileCatalogIndex/Service/BuildRunner` index `TFolder` entries (no extension buckets, folder-first ordering), `ContextFilePickerModal` becomes multi-select (`chooseContextFiles` returning `TFile | TFolder` entries with a confirm footer), `ComposerContextPickerActionService` attaches every picked entry via the new `ContextAttachmentBuilder.buildEntryContextItem` and claims vault drops via `addVaultPathContextFromDrop` (`getAbstractFileByPath` + instanceof hard gate), `ComposerContextViewFacade` exposes the drop port, and `PromptContextKind` gains `'folder'` (path-only items, never a text snapshot).
+> 2026-09-20 (advantage-parity R-D1)：ConversationHistoryActionsCoordinator 每条会话新增「导出为 Markdown 笔记」按钮（可选 host 方法，未提供不渲染）。
 
 # Owner: feature.chat-services
 

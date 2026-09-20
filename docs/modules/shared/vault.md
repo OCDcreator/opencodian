@@ -1,4 +1,5 @@
 # Vault 工具函数
+> 2026-09-20 (advantage-parity R-D1)：新增 `sanitizeVaultFileBaseName`（R-C2 附件名与 R-D1 导出文件名共用的清洗规则，历史名 `sanitizeImageAssetBaseName` 保留在 `ImageAssetStorage` 再导出）与 `isSafeVaultRelativePath`（vault 相对路径安全判定）。
 
 > **源码**: `src/shared/vault.ts`
 > **状态**: [REVIEW]

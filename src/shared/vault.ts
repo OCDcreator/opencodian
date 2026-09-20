@@ -53,3 +53,46 @@ export function toVaultRelativePath(
   const relativePath = normalizedFile.slice(normalizedBase.length + 1);
   return relativePath.length > 0 ? relativePath : null;
 }
+
+/** Fallback base name when a sanitized stem would be empty. */
+export const DEFAULT_VAULT_FILE_BASE_NAME = 'file';
+/** Hard cap for a sanitized file base name (kept readable in embeds/links). */
+export const MAX_VAULT_FILE_BASE_CHARS = 60;
+
+/**
+ * Sanitize free text into a safe vault file base name (pure): strips the
+ * characters Obsidian forbids in file names plus wiki-bracket syntax,
+ * collapses whitespace, caps length, and falls back when nothing survives.
+ * Shared by image-asset placement (R-C2) and conversation export (R-D1).
+ */
+export function sanitizeVaultFileBaseName(
+  raw: string,
+  fallback: string = DEFAULT_VAULT_FILE_BASE_NAME,
+): string {
+  const cleaned = raw
+    .replace(/[[\]#^|\\/:*?"<>]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) {
+    return fallback;
+  }
+  return cleaned.length > MAX_VAULT_FILE_BASE_CHARS
+    ? cleaned.slice(0, MAX_VAULT_FILE_BASE_CHARS).trim() || fallback
+    : cleaned;
+}
+
+/**
+ * True when `path` is a plain vault-relative file path. Rejects absolute
+ * paths (POSIX and Windows drive forms — the out-of-vault attachment folder
+ * case), `..` traversal, and empty segments.
+ */
+export function isSafeVaultRelativePath(path: string): boolean {
+  if (!path || path.startsWith('/') || path.startsWith('\\')) {
+    return false;
+  }
+  if (/^[A-Za-z]:[\\/]/.test(path)) {
+    return false;
+  }
+  const segments = path.split(/[\\/]/);
+  return segments.every((segment) => segment !== '' && segment !== '.' && segment !== '..');
+}

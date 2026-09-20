@@ -1,4 +1,5 @@
 > 2026-09-18 (FlowText parity R-A7): the composer input-shell host gains `addVaultPathContextFromDrop`, forwarding vault path drops to `composerContextViewFacade` (claimed drops preventDefault; editor text drops keep default insertion).
+> 2026-09-20 (advantage-parity R-D1)：OpenCodianView 的历史菜单 host 新增 exportConversationMarkdown 转发方法（导出逻辑不进视图）。
 
 # Owner: feature.chat-shell
 

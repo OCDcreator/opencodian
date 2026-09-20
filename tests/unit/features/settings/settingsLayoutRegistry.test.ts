@@ -91,6 +91,7 @@ describe('SETTINGS_PRIMARY_TABS', () => {
       'questions',
       'memory',
       'vault-retrieval',
+      'export',
       'inline-edit',
       'context-groups',
       'image-generation',

@@ -1,4 +1,5 @@
 # Owner: feature.settings-shell
+> 2026-09-20 (advantage-parity R-D1)：conversation 主 tab 二级 tabs 新增 export（backend 无关）。
 
 Update progress (2026-09-10): both settings hosts retain and dispose the update section on replacement or close/hide; async completion may not resurrect a disposed surface. The expanded state survives install-driven refreshes.
 

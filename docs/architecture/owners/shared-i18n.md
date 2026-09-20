@@ -1,4 +1,5 @@
 # Owner: shared.i18n
+> 2026-09-20 (advantage-parity R-D1)：zh/en 新增 chat.history.export、chat.export.*、settings.conversation.export.* 键（双语对齐）。
 
 2026-09-10: update-install phase labels, failure state, completed-file counts and release-history disclosure controls are translated in English and Chinese; no synthetic download percentages.
 

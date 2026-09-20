@@ -1,4 +1,5 @@
 # Core Types Barrel
+> 2026-09-20 (advantage-parity R-D1)：导出 `ConversationExportSettings`、`DEFAULT_CONVERSATION_EXPORT_SETTINGS` 与 `normalizeConversationExport{Directory,FilenameTemplate,Settings}`（R-D1 对话导出设置归一化）。
 > 2026-09-18 (R-C6): barrel re-exports the remote-control settings normalizers `normalizeRemoteControlEnabled` / `normalizeRemoteControlBindAddress` / `normalizeRemoteControlToken` / `normalizeRemoteControlNonLoopbackAcknowledgedAt`.
 > 2026-09-18 (R-B3): Core types barrel re-exports the R-B3 edit-revert seam: `EditRevertServicePort`, `EditRevertTurnBeginInfo`, `EditRevertWriteToolInfo` (from `./editRevert`), plus the `EDIT_REVERT_SNAPSHOT_LIMIT_MB_*` caps and `normalizeEditRevertSnapshotLimitMb`.
 > 2026-09-18 (R-B1/R-B2): re-exports `ContextGroup` / `ContextGroupEntry`, the `CONTEXT_GROUP_MAX_*` caps, `AUTO_INTERNAL_LINK_MAX_*` caps, `normalizeContextGroups` and `normalizeAutoInternalLinkExcludedTerms`.

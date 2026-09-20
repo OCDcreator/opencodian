@@ -1,4 +1,5 @@
 # SettingsConversationSection
+> 2026-09-20 (advantage-parity R-D1)：新增「导出」设置块（classic 与 tabbed 两路径同渲染）：导出目录（经 `normalizeConversationExportDirectory` 校验，非法恢复原值 + Notice）、文件名模板、自动导出开关；tabbed 下为 conversation 主 tab 的 `export` 二级 tab。
 > 2026-09-18 (R-B3): R-B3: `addEditRevertSettings()` adds the `editRevertEnabled` toggle and the `editRevertSnapshotLimitMb` number input (clamped through `normalizeEditRevertSnapshotLimitMb`, bounds from the exported constants) to the conversation display block.
 
 > **源码**: `src/features/settings/SettingsConversationSection.ts`

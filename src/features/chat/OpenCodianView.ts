@@ -844,6 +844,11 @@ export class OpenCodianView extends ItemView {
         this.deleteConversationsAndCleanupTabs(conversationIds),
       deleteAllConversationsAndReset: (conversationIds) =>
         this.conversationLoadRecoveryCoordinator.deleteAllConversationsAndReset(conversationIds),
+      // advantage-parity R-D1: per-item export entry; the plugin method
+      // resolves the live conversation when it is the active one.
+      exportConversationMarkdown: async (conversationId) => {
+        await this.plugin.exportConversationMarkdownById(conversationId);
+      },
       showNotice: (message) => {
         new Notice(message);
       },

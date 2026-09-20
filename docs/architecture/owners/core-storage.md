@@ -50,3 +50,5 @@ The new core.backend-pi owner isolates the external Pi process service. core.sto
 - 2026-09-18 (FlowText 批次 B)：owner manifest 随 R-B1/R-B2 更新——新增 `src/shared/contextGroupPlan.ts` 归属 `shared.foundation`；本 owner 的边界与职责未变。
 
 - 2026-09-18 (R-B3 编辑回退)：本 owner 新增编辑回退职责——`EditRevertService.ts`（编排：round 捕获、vault 事件漏斗、回退/恢复、保留淘汰）、`EditRevertStore.ts`（`.opencodian/checkpoints/` 内容寻址 blob 与 round JSON 的磁盘 IO）、`EditRevertVaultWriteback.ts`（唯一破坏性写缝：vault.process/create/trash + self-write guard）。feature 层只通过 `core.types` 的 `EditRevertServicePort` 消费；保留规划纯逻辑在 `shared.foundation` 的 `editRevertPlan.ts`。
+
+- 2026-09-20 (advantage-parity R-D1)：本 owner 新增对话导出职责——`ConversationMarkdownExporter.ts`（会话 → vault Markdown 笔记：纯新增手动导出 + 默认关闭的自动导出刷新，附件内容寻址去重；私有状态 `.opencodian/conversation-export-state.json`）。文件名/路径清洗函数下沉到 `shared.foundation` 的 `vault.ts`（`sanitizeVaultFileBaseName` / `isSafeVaultRelativePath`，`ImageAssetStorage` 保留历史名再导出）。

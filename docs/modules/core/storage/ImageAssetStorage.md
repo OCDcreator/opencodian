@@ -1,4 +1,5 @@
 # ImageAssetStorage
+> 2026-09-20 (advantage-parity R-D1)：文件名/路径清洗与安全校验下沉到 `shared/vault.ts`（`sanitizeVaultFileBaseName` / `isSafeVaultRelativePath`）；本模块保留历史名再导出，行为不变。
 
 > **源码**: `src/core/storage/ImageAssetStorage.ts`
 > **状态**: [REVIEW]

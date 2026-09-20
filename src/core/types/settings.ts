@@ -14,6 +14,7 @@ import {
   normalizeDebugModuleSettings,
   normalizeDebugRefreshIntervalMs,
 } from '../../shared/debugModules';
+import { isSafeVaultRelativePath } from '../../shared/vault';
 import {
   CLAUDE_TRACE_CHANNEL_IDS,
   type ClaudeSessionTraceSettings,
@@ -3560,6 +3561,14 @@ export interface OpenCodianSettings {
   contextGroups: ContextGroup[];
 
   /**
+   * Conversation → vault Markdown export (advantage-parity R-D1). Manual
+   * export is always purely additive; `autoExport` (default off) refreshes
+   * the note the feature itself created after each turn, giving up honestly
+   * when the user edited that note.
+   */
+  conversationExport: ConversationExportSettings;
+
+  /**
    * Backend-neutral edit revert master switch (R-B3, default on). When off,
    * no snapshots are captured and the sidebar shows no revert actions; the
    * capture listeners stay cheap no-ops. Independent of OpenCode's
@@ -3888,6 +3897,57 @@ export function normalizeSettingsTabbedSecondaryTabByPrimary(
   return normalized;
 }
 
+/** Conversation → vault Markdown export settings (advantage-parity R-D1). */
+export interface ConversationExportSettings {
+  /** Vault-relative directory for exported notes, no leading/trailing slash. */
+  directory: string;
+  /** File name template; supports {$date} {$time} {$topic} {$backend} {$id}. */
+  filenameTemplate: string;
+  /** Auto-refresh the conversation's export note after each turn (default off). */
+  autoExport: boolean;
+}
+
+export const DEFAULT_CONVERSATION_EXPORT_SETTINGS: ConversationExportSettings = {
+  directory: 'opencodian-conversations',
+  filenameTemplate: '{$date}_{$topic}',
+  autoExport: false,
+};
+
+/**
+ * Normalize a user-configured export directory: strips slashes and rejects
+ * absolute / traversal forms (same boundary rule as attachment paths).
+ * Returns null when the value cannot be made safe.
+ */
+export function normalizeConversationExportDirectory(raw: string): string | null {
+  const trimmed = raw.trim().replace(/^[\\/]+|[\\/]+$/g, '');
+  if (!trimmed || !isSafeVaultRelativePath(trimmed)) {
+    return null;
+  }
+  return trimmed;
+}
+
+/**
+ * Normalize a filename template: trims and falls back to the default when
+ * empty (an unusable rendered stem is handled again at export time).
+ */
+export function normalizeConversationExportFilenameTemplate(raw: string): string {
+  return raw.trim() || DEFAULT_CONVERSATION_EXPORT_SETTINGS.filenameTemplate;
+}
+
+export function normalizeConversationExportSettings(raw: unknown): ConversationExportSettings {
+  const source = (raw ?? {}) as Partial<ConversationExportSettings>;
+  const directory = typeof source.directory === 'string'
+    ? normalizeConversationExportDirectory(source.directory)
+    : null;
+  return {
+    directory: directory ?? DEFAULT_CONVERSATION_EXPORT_SETTINGS.directory,
+    filenameTemplate: typeof source.filenameTemplate === 'string'
+      ? normalizeConversationExportFilenameTemplate(source.filenameTemplate)
+      : DEFAULT_CONVERSATION_EXPORT_SETTINGS.filenameTemplate,
+    autoExport: source.autoExport === true,
+  };
+}
+
 /** Default settings */
 export const DEFAULT_SETTINGS: OpenCodianSettings = {
   userName: '',
@@ -3909,6 +3969,9 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   autoInternalLinkEnabled: false,
   autoInternalLinkExcludedTerms: [],
   contextGroups: [],
+
+  // advantage-parity R-D1: conversation → vault Markdown export.
+  conversationExport: { ...DEFAULT_CONVERSATION_EXPORT_SETTINGS },
   editRevertEnabled: true,
   editRevertSnapshotLimitMb: EDIT_REVERT_SNAPSHOT_LIMIT_MB_DEFAULT,
   obsidianToolingMode: 'off',

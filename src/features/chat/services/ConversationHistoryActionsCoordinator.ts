@@ -18,6 +18,8 @@ export interface ConversationHistoryActionsHost {
   updateConversationTitle(conversationId: string, title: string): Promise<void>;
   deleteConversationsAndCleanupTabs(conversationIds: string[]): Promise<void>;
   deleteAllConversationsAndReset(conversationIds: string[]): Promise<void>;
+  /** advantage-parity R-D1: export the conversation to a vault Markdown note. */
+  exportConversationMarkdown?(conversationId: string): Promise<void>;
   showNotice(message: string): void;
   openTitleSettings?(): void;
   /** Open the backend session browser modal. */
@@ -138,6 +140,25 @@ export class ConversationHistoryActionsCoordinator {
         innerEvent.stopPropagation();
         void this.renameConversation(conversation.id);
       });
+
+      // advantage-parity R-D1: export this conversation as a vault note.
+      // Backend-neutral by construction (serializes stored messages only).
+      if (this.host.exportConversationMarkdown) {
+        const exportBtn = controlsEl.createEl('button', {
+          cls: 'opencodian-history-item-edit',
+          attr: {
+            type: 'button',
+            title: t('chat.history.export'),
+            'aria-label': t('chat.history.export'),
+          },
+        });
+        setIcon(exportBtn, 'download');
+        exportBtn.addEventListener('click', (innerEvent) => {
+          innerEvent.stopPropagation();
+          this.closeHistoryDropdown();
+          void this.host.exportConversationMarkdown?.(conversation.id);
+        });
+      }
 
       itemEl.addEventListener('click', (innerEvent) => {
         innerEvent.stopPropagation();
