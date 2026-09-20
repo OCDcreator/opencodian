@@ -51,7 +51,7 @@
 | 批次 | 编号 | 需求 | 来源 | 优先级 | 状态 |
 |---|---|---|---|---|---|
 | D | R-D1 | 对话导出 / 另存为 Markdown 笔记 | Copilot | P0 | DONE |
-| D | R-D2 | API 密钥入 Obsidian Keychain | Copilot | P1 | TODO |
+| D | R-D2 | API 密钥入 Obsidian Keychain | Copilot | P1 | DONE |
 | D | R-D3 | 轮次完成通知音效 | 双方 | P3 | TODO |
 | E | R-E1 | URL / 网页内容上下文（本地抓取） | Copilot | P1 | TODO |
 | E | R-E2 | Web Viewer 标签页上下文 | Copilot | P2 | TODO |
@@ -118,6 +118,13 @@
 3. Keychain 不可用（旧版宿主）→ 如实降级为现状存储并提示，不静默。
 
 **验收**：迁移后 `data.json` 中 grep 不到任何密钥值；宿主降级场景行为一致；四后端连接不受影响。
+
+**落地证据（2026-09-20/21，提交 `0412405c`）**：
+
+- **实现**：`SettingsSecretsKeychain`（core.storage）挂在持久化边界——保存侧把真实密钥换成 `opencodian-keychain:v1:<key>` 占位符（先写入 `app.secretStorage`），加载侧还原 + 明文一次性迁移；**运行时设置对象始终持真实值**（auth 装配、远程控制脱敏、诊断等既有消费方零改动）。密钥面覆盖 7 处：server.auth.password/token、codex/pi 后端 apiKey、自定义供应商 `providers[].apiKey`（按稳定 id 定键）、图片生成模型 `imageGenerationModels[].apiKey`、remoteControlToken。**API 事实修正**：`app.keychain` 不存在，1.11.4+ 唯一面是 `app.secretStorage`（经参考插件源码核实；id 约束 `^[a-z0-9-]+$` ≤64，本实现按 `oc<vaultHash8>-<slug>` 分域，不同库互不可读）。回滚 = `secretsKeychainEnabled` 开关（通用设置区，两个设置面共用行）；降级路径全部经 load report → main.ts 本地化 Notice（不静默）；钥匙串写失败保留明文继续落盘（凭证永不因钥匙串故障丢失）。
+- **测试**：`SettingsSecretsKeychain.test.ts` 12 例（占位符/id 合规与 vault 分域、scrub 全字段 + 输入不可变、禁用/不可用/写失败保留明文、冗余写跳过、占位符还原、明文一次性迁移不重复、条目缺失/无存储诚实降级、StorageService 集成：盘上无密钥字节/回滚写回明文/保存-加载往返）+ main/themeSettingsMigration 测试桩同步。verify 15/15 PASS（lint 零警告）。
+- **实机（Test Vault，BUILD_ID `zcode-advantage-parity.202609210001`）**：设 codex 密钥 + 供应商密钥 → 保存 → `settings.core.json` 仅剩占位符（`plaintextOnDisk: false`）且 `app.secretStorage.getSecret` 按计算出的 vault 分域 id 读回真实值（两处 `Ok: true`）；插件重载后运行时设置还原为真实密钥；**回滚实测**：开关关 → 盘上回到明文，开关重开 → 盘上回到占位符；测试密钥已清理（secretStorage `listSecrets` 为空）。验收项「grep 不到密钥值」以 `plaintextOnDisk: false` + 磁盘逐字检查达成。
+- **视觉验收**：通用 → 基础区开关行（截图 `.visual-evidence/rd2/secrets-toggle.png`）视觉子代理一轮 PASS：名称/描述字号、左对齐、右侧控件右对齐、toggle 44×20 可用态与相邻行完全一致，描述 4 行无截断不重叠；主代理实测名称 13px/18.2 w700、描述 12px/18.6。
 
 ### R-D3 轮次完成通知音效（P3）
 

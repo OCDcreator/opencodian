@@ -11,7 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
-## 2026-09-20 R-D1 对话导出 Markdown：命令 + 历史菜单 + 自动导出，四后端实机全通
+## 2026-09-21 R-D2 密钥入 Obsidian SecretStorage：持久化边界占位符往返 + 一次性迁移 + 显式回滚
+
+**触发**：advantage-parity 批次 D 第 2 条（P1）。Copilot 用 Obsidian 钥匙串 API 存密钥不落 `data.json`；OpenCodian 的 Pi/自定义供应商/codex 密钥、服务器认证、远程控制令牌此前全部明文在设置文件里。
+
+**改动**：新模块 `SettingsSecretsKeychain`（core.storage，挂在持久化边界而非消费方）：保存侧 `scrubForPersistence` 把真实密钥换成 `opencodian-keychain:v1:<key>` 占位符（先写 `app.secretStorage`，失败保留明文——凭证永不因钥匙串故障丢失）；加载侧 `resolveAfterLoad` 还原占位符并做**明文一次性迁移**（写钥匙串 + 换占位符，靠启动归一化回填落盘）；**运行时设置对象始终持真实值**，所有既有消费方零改动。密钥面 7 处（server.auth.password/token、codex/pi apiKey、`providers[].apiKey` 按稳定 id、`imageGenerationModels[].apiKey`、remoteControlToken）。**API 事实修正**（浅克隆参考插件核实）：`app.keychain` 不存在，1.11.4+ 唯一面是 `app.secretStorage`，id 约束 `^[a-z0-9-]+$` ≤64——本实现 `oc<hash8(vaultPath)>-<slug>` 分域（不同库互不可读），超长 slug 截断加哈希尾。回滚 = `secretsKeychainEnabled`（默认开，通用设置区共享行）；降级（无 API/条目缺失/读失败）全走 load report → main.ts 本地化 Notice。`SettingsPanelChrome` 新增共享设置行（模态/编辑区两设置面共用，顺带把「在编辑区打开设置」行也去重下沉，压住 View 的 max-lines）。
+
+**测试**：`SettingsSecretsKeychain.test.ts` 12 例 + StorageService 集成三例（盘上无密钥字节/回滚写明文/保存-加载往返）+ main 测试桩同步；verify 15/15 PASS。实机（BUILD_ID `202609210001`）：设密钥→保存→盘上仅占位符（`plaintextOnDisk: false`）且 secretStorage 按计算 id 读回真实值；重载还原；开关关→盘上回明文、重开→回占位符；测试密钥已清理。视觉门一轮 PASS（开关行与相邻行字号/对齐/toggle 44×20 一致，描述无截断）。坑两条：需求文档写的「Keychain API」在真实宿主上叫 `secretStorage`（1.13.7 无 `app.keychain`）；shell 双引号里写反引号会被命令替换吃掉（doc 注记补写）。
+
+---
+
 
 **触发**：advantage-parity 批次 D 首条（P0）。Copilot 把对话保存为库内 Markdown 笔记（可同步/搜索/内链），OpenCodian 此前只有插件本地存储与 OpenCode `/share` 链接，没有任何 Markdown 出口。
 
