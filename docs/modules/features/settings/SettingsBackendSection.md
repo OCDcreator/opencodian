@@ -12,6 +12,7 @@
 ## 职责
 
 - 渲染 active backend 的下拉选择，选项来自当前 enabled backend 列表；切换后会刷新设置页，让 tabbed settings surface 立即进入对应 backend 的专属设置面
+- 在默认 backend 行旁渲染 R-F4 `chatWarmSessionEnabled` 普通 toggle：仅预热当前聊天 backend 的空只读 aux session，不发 prompt/turn、不产生模型计费；真实聊天另建自己的会话
 - 通过 `IMPLEMENTED_AGENT_BACKENDS` 过滤已知 backend，渲染所有已实现的 backend 开关（`opencode`、`claude-code`、`codex`）
 - 为 backend 管理 surface 输出稳定样式与 QA 选择器：`.opencodian-backend-agent-surface`、`.opencodian-backend-agent-list`、`.opencodian-backend-agent-row`、`data-backend-agent-id`、`data-backend-agent-active`、`data-backend-agent-enabled`
 - 在 backend 行标题旁追加低调 badge：active、enabled、disabled。行标题本身只保留 backend 名称，避免重复朗读和视觉噪音
@@ -43,6 +44,7 @@
 - badge 只表达状态，不改变 backend 启用、active fallback、adapter lifecycle 或保存逻辑
 - 任意 backend 的 start/stop 均为 best-effort：失败不应阻止设置保存或 UI 刷新
 - Active backend 切换时必须 stop 旧 adapter + start 新 adapter，避免 stale 状态
+- 默认 backend 下拉或禁用 active backend 的 fallback 改变 active backend 后，必须调用 plugin 的 `onChatWarmSessionBackendChanged()`；R-F4 开启时由组合根排他地替换旧预热 session
 
 ## 2026-09-08 Pi 独立服务接入
 

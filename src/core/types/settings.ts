@@ -3522,6 +3522,12 @@ export interface OpenCodianSettings {
   inlineCompletionEnabled: boolean;
 
   /**
+   * Prewarm exactly one read-only, empty auxiliary session for the active chat
+   * backend. This never submits a prompt or completion turn (R-F4, default off).
+   */
+  chatWarmSessionEnabled: boolean;
+
+  /**
    * Hard cap for one completion suggestion in characters (R-C3, default
    * 300). Enforced by truncation in `validateCompletion` before any other
    * rule, so a suggestion can never exceed it.
@@ -4064,6 +4070,8 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
 
   // R-C3 Alt ghost-text completion (opt-in; off is zero cost).
   inlineCompletionEnabled: false,
+  // R-F4 chat warm session (opt-in; start/warm only, zero turns and zero cost).
+  chatWarmSessionEnabled: false,
   inlineCompletionMaxChars: INLINE_COMPLETION_MAX_CHARS_DEFAULT,
   inlineCompletionModelOverrides: {},
   autoInternalLinkEnabled: false,

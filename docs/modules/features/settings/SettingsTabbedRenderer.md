@@ -19,6 +19,7 @@
 - 根据当前激活标签路由到对应的 section content panel
 - 处理一级/二级标签切换并持久化停留位置
 - 处理 agent switcher 的 `activeBackend`、`AgentServiceRegistry.setActive()` 同步与对应 backend 标签入口持久化
+- 在 title/rail agent switcher 改变 active backend 后调用 `onChatWarmSessionBackendChanged()`，令启用中的 R-F4 排他地预热新 backend 的空只读 aux session
 - 为每个 section 创建对应的 section owner 实例并调用 `attachTabbed()`
 
 ## 依赖注入

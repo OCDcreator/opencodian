@@ -38,6 +38,7 @@ function createRendererState(options?: {
       activeBackend: options?.activeBackend ?? DEFAULT_SETTINGS.activeBackend,
     },
     saveSettings: jest.fn().mockResolvedValue(undefined),
+    onChatWarmSessionBackendChanged: jest.fn(),
     agentServiceRegistry: {
       setActive,
     },
@@ -140,6 +141,17 @@ function expectSingleContentShell(
 }
 
 describe('SettingsTabbedRenderer', () => {
+  it('notifies the R-F4 warm pool when the tabbed agent switcher changes backend', () => {
+    const { plugin, renderer } = createRendererState({
+      enabledBackends: ['opencode', 'codex'],
+      activeBackend: 'opencode',
+    });
+
+    (renderer as unknown as { switchAgent: (agent: AgentBackendKind) => void }).switchAgent('codex');
+
+    expect(plugin.onChatWarmSessionBackendChanged).toHaveBeenCalledTimes(1);
+  });
+
   it('shows and routes the Pi backend tab with the same backend visibility rules', () => {
     const renderPi = jest.spyOn(SettingsPiSection.prototype, 'attachTabbed').mockImplementation(() => {});
     const { renderer } = createRendererState({ primaryTabId: 'pi', secondaryTabs: { pi: 'providers' }, enabledBackends: ['opencode', 'pi'], activeBackend: 'pi' });

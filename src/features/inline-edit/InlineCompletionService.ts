@@ -109,6 +109,8 @@ export type InlineCompletionPoolResult =
   }
   | { readonly ok: false; readonly error: InlineCompletionPoolError };
 
+type ResolvedInlineCompletionTarget = Extract<InlineCompletionTarget, { ok: true }>;
+
 interface PoolEntry {
   readonly backend: AgentBackendKind;
   readonly workingDirectory: string;
@@ -123,6 +125,8 @@ interface PoolEntry {
 
 export class InlineCompletionService {
   private readonly entries = new Map<string, PoolEntry>();
+  /** Latest R-F4 exclusive warm request; cancels older backend snapshots. */
+  private exclusiveWarmGeneration = 0;
   /** Consecutive turn failures per backend (across rebuilds). */
   private readonly turnFailures = new Map<AgentBackendKind, number>();
   /** Backends that may not run completions until the next enable cycle. */
@@ -145,6 +149,11 @@ export class InlineCompletionService {
     );
   }
 
+  /** Number of live pooled sessions (diagnostics/tests). */
+  sessionCount(): number {
+    return [...this.entries.values()].filter((entry) => entry.session !== null).length;
+  }
+
   /**
    * Prewarm on the first editor focus: start the session for the current
    * backend so the trigger path pays no cold start. Fire-and-forget; failures
@@ -152,6 +161,31 @@ export class InlineCompletionService {
    */
   prewarm(): void {
     void this.obtain();
+  }
+
+  /**
+   * R-F4 chat warm-up: retain only the active target's session. The target is
+   * captured once before cleanup, so switching backends while a native session
+   * starts cannot create a session for the newly active backend by accident.
+   * This only constructs/warm-ups the read-only auxiliary session; it never
+   * submits a completion turn.
+   */
+  async prewarmExclusive(): Promise<void> {
+    const generation = ++this.exclusiveWarmGeneration;
+    if (!this.options.host.isEnabled()) return;
+    const target = this.options.host.resolveCompletionTarget();
+    if (!target.ok) {
+      // No usable active backend means the exclusive invariant has no target
+      // key to retain. Evict any prior backend immediately; this also awaits
+      // pending native starts so late sessions are disposed rather than leaked.
+      const stale = [...this.entries.entries()].map(([entryKey, entry]) => {
+        this.entries.delete(entryKey);
+        return this.disposeEntry(entry);
+      });
+      await Promise.all(stale);
+      return;
+    }
+    await this.prewarmExclusiveTarget(target, generation);
   }
 
   /**
@@ -164,21 +198,52 @@ export class InlineCompletionService {
       return { ok: false, error: { reason: 'disabled' } };
     }
     const target = this.options.host.resolveCompletionTarget();
+    return this.obtainTarget(target);
+  }
+
+  private async prewarmExclusiveTarget(
+    target: InlineCompletionTarget,
+    generation: number,
+  ): Promise<void> {
+    if (!target.ok) return;
+    const key = this.keyFor(target);
+    // Delete each entry before awaiting native disposal. A resolving old start
+    // cannot remain in the map, and `obtainTarget` detects that stale identity
+    // before publishing it as a live session.
+    const stale = [...this.entries.entries()]
+      .filter(([entryKey]) => entryKey !== key)
+      .map(([entryKey, entry]) => {
+        this.entries.delete(entryKey);
+        return this.disposeEntry(entry);
+    });
+    await Promise.all(stale);
+    // A second backend switch could have occurred while teardown awaited. It
+    // owns the newer snapshot; do not recreate an old target after cleanup.
+    if (generation !== this.exclusiveWarmGeneration) return;
+    // Chat warming deliberately has no note context. Unlike R-C3's editor
+    // path, it only starts the backend's empty read-only auxiliary runtime.
+    await this.obtainTarget(target, '', generation);
+  }
+
+  /** Start/reuse one already-snapshotted target. */
+  private async obtainTarget(
+    target: InlineCompletionTarget,
+    notePath = this.options.host.getNotePath(),
+    exclusiveGeneration?: number,
+  ): Promise<InlineCompletionPoolResult> {
     if (!target.ok) {
-      return target.reason === 'model-unavailable'
-        ? { ok: false, error: { reason: 'model-unavailable', detail: target.detail } }
-        : { ok: false, error: { reason: 'capability-unavailable', backend: target.backend } };
+      return this.unavailableTargetResult(target);
     }
     if (this.unsupportedBackends.has(target.backend)) {
       return { ok: false, error: { reason: 'unsupported', backend: target.backend } };
     }
+    if (this.isExclusiveWarmInvalidated(exclusiveGeneration)) return this.supersededResult();
     const workingDirectory = target.workingDirectory;
-    const key = `${target.backend}::${workingDirectory}`;
-    const notePath = this.options.host.getNotePath();
+    const key = this.keyFor(target);
     const modelRef = describeModelRef(target.model);
 
     let entry = this.entries.get(key);
-    if (entry && (entry.modelRef !== modelRef || (entry.notePath !== notePath && notePath !== ''))) {
+    if (entry && this.entryNeedsRebuild(entry, modelRef, notePath, exclusiveGeneration)) {
       // Model or note switched: the native context must not survive. Rebuild
       // through the adapter's own read-only construction (reset semantics).
       await this.disposeEntry(entry);
@@ -197,30 +262,8 @@ export class InlineCompletionService {
       this.entries.set(key, entry);
     }
 
-    if (!entry.session && !entry.starting) {
-      // The system prompt is built per start (locale/cap aware) and travels
-      // through the backend's native system-prompt seam, exactly like aux.
-      entry.starting = target.startSession();
-    }
-    if (entry.starting) {
-      try {
-        entry.session = await entry.starting;
-      } catch (error) {
-        entry.starting = null;
-        this.entries.delete(key);
-        this.markUnsupported(target.backend);
-        this.notifyUnsupportedStart(target.displayName, error);
-        return {
-          ok: false,
-          error: {
-            reason: 'session-unavailable',
-            detail: error instanceof Error ? error.message : String(error),
-          },
-        };
-      } finally {
-        entry.starting = null;
-      }
-    }
+    const startError = await this.ensureEntrySession(entry, key, target);
+    if (startError) return { ok: false, error: startError };
 
     const session = entry.session;
     if (!session) {
@@ -234,6 +277,71 @@ export class InlineCompletionService {
       backend: target.backend,
       displayName: target.displayName,
     };
+  }
+
+  private unavailableTargetResult(
+    target: Exclude<InlineCompletionTarget, ResolvedInlineCompletionTarget>,
+  ): InlineCompletionPoolResult {
+    return target.reason === 'model-unavailable'
+      ? { ok: false, error: { reason: 'model-unavailable', detail: target.detail } }
+      : { ok: false, error: { reason: 'capability-unavailable', backend: target.backend } };
+  }
+
+  private isExclusiveWarmInvalidated(generation: number | undefined): boolean {
+    return generation !== undefined && generation !== this.exclusiveWarmGeneration;
+  }
+
+  private entryNeedsRebuild(
+    entry: PoolEntry,
+    modelRef: string,
+    notePath: string,
+    exclusiveGeneration: number | undefined,
+  ): boolean {
+    if (entry.modelRef !== modelRef) return true;
+    return exclusiveGeneration !== undefined
+      ? entry.notePath !== ''
+      : entry.notePath !== notePath && notePath !== '';
+  }
+
+  private async ensureEntrySession(
+    entry: PoolEntry,
+    key: string,
+    target: ResolvedInlineCompletionTarget,
+  ): Promise<InlineCompletionPoolError | null> {
+    if (entry.session) return null;
+    if (!entry.starting) entry.starting = target.startSession();
+    const starting = entry.starting;
+    if (!starting) return { reason: 'session-unavailable', detail: 'no session' };
+    try {
+      const session = await starting;
+      if (!this.isCurrentStart(key, entry, starting)) return this.supersededError();
+      entry.session = session;
+    } catch (error) {
+      if (!this.isCurrentStart(key, entry, starting)) return this.supersededError();
+      entry.starting = null;
+      this.entries.delete(key);
+      this.markUnsupported(target.backend);
+      this.notifyUnsupportedStart(target.displayName, error);
+      return {
+        reason: 'session-unavailable',
+        detail: error instanceof Error ? error.message : String(error),
+      };
+    } finally {
+      if (entry.starting === starting) entry.starting = null;
+    }
+    return null;
+  }
+
+  private isCurrentStart(key: string, entry: PoolEntry, starting: Promise<InlineCompletionSession>): boolean {
+    return this.entries.get(key) === entry && entry.starting === starting;
+  }
+
+  private supersededResult(): InlineCompletionPoolResult {
+    return { ok: false, error: this.supersededError() };
+  }
+
+  private supersededError(): InlineCompletionPoolError {
+    return { reason: 'session-unavailable', detail: 'session superseded by backend switch' };
   }
 
   /**
@@ -284,6 +392,10 @@ export class InlineCompletionService {
 
   /** Dispose every pooled session (toggle off, plugin unload). */
   async disposeAll(): Promise<void> {
+    // An exclusive warm-up may be paused after it disposed stale entries but
+    // before it starts its captured target. Invalidate that snapshot first so
+    // toggle-off remains a strict zero-session state.
+    this.exclusiveWarmGeneration += 1;
     await Promise.all([...this.entries.values()].map((entry) => this.disposeEntry(entry)));
     this.entries.clear();
   }
@@ -302,6 +414,10 @@ export class InlineCompletionService {
         if (this.entries.get(key) === entry) this.entries.delete(key);
       });
     }, this.ttlMs);
+  }
+
+  private keyFor(target: Extract<InlineCompletionTarget, { ok: true }>): string {
+    return `${target.backend}::${target.workingDirectory}`;
   }
 
   private async disposeBackendSessions(backend: AgentBackendKind): Promise<void> {

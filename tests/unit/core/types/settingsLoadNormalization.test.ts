@@ -1,6 +1,19 @@
 import { prepareLoadedSettingsBootstrapState } from '../../../../src/core/types/settingsLoadNormalization';
 
 describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
+  it('defaults R-F4 chat warming to off and preserves only strict booleans on load', () => {
+    const bootstrap = (chatWarmSessionEnabled: unknown) => prepareLoadedSettingsBootstrapState({
+      core: { data: { chatWarmSessionEnabled }, filePath: '.opencodian/settings.core.json' },
+      ui: { data: null, filePath: '.opencodian/settings.ui.json' },
+      writable: true,
+      shouldPersist: false,
+    } as unknown as Parameters<typeof prepareLoadedSettingsBootstrapState>[0]);
+
+    expect(bootstrap(undefined).settings.chatWarmSessionEnabled).toBe(false);
+    expect(bootstrap('true').settings.chatWarmSessionEnabled).toBe(false);
+    expect(bootstrap(true).settings.chatWarmSessionEnabled).toBe(true);
+  });
+
   it('normalizes the optional Codex executable path for migration-safe persistence', () => {
     const state = prepareLoadedSettingsBootstrapState({
       core: {

@@ -110,6 +110,46 @@ describe('SettingsBackendSection', () => {
     expect(names).toContain('Pi');
   });
 
+  it('renders R-F4 off by default and saves the toggle before notifying the warm pool', async () => {
+    const { plugin } = createPluginMock();
+    const events: string[] = [];
+    plugin.saveSettings = jest.fn(async () => {
+      events.push(`save:${plugin.settings.chatWarmSessionEnabled}`);
+    });
+    const onChatWarmSessionSettingChanged = jest.fn((enabled: boolean) => {
+      events.push(`notify:${plugin.settings.chatWarmSessionEnabled}:${enabled}`);
+    });
+    plugin.onChatWarmSessionSettingChanged = onChatWarmSessionSettingChanged;
+    let renderedValue: boolean | undefined;
+    let onChange: ((value: boolean) => Promise<void>) | undefined;
+    jest.spyOn(Setting.prototype, 'addToggle').mockImplementation(function addToggle(callback) {
+      const toggle = {
+        setValue: jest.fn((value: boolean) => {
+          renderedValue = value;
+          return toggle;
+        }),
+        onChange: jest.fn((handler: (value: boolean) => Promise<void>) => {
+          onChange = handler;
+          return toggle;
+        }),
+      };
+      callback(toggle as never);
+      return this;
+    });
+    const section = new SettingsBackendSection({ plugin, requestDisplayRefresh: jest.fn() });
+
+    (section as unknown as { addChatWarmSessionSetting: (element: HTMLElement) => void })
+      .addChatWarmSessionSetting(document.createElement('div'));
+
+    expect(renderedValue).toBe(false);
+    const change = onChange?.(true);
+    expect(plugin.settings.chatWarmSessionEnabled).toBe(true);
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+    expect(onChatWarmSessionSettingChanged).not.toHaveBeenCalled();
+    await change;
+    expect(events).toEqual(['save:true', 'notify:true:true']);
+  });
+
   // -------------------------------------------------------------------------
   // Lifecycle tests: start/stop on enable/disable
   // -------------------------------------------------------------------------
@@ -167,6 +207,46 @@ describe('SettingsBackendSection', () => {
   // -------------------------------------------------------------------------
 
   describe('active backend switch lifecycle', () => {
+    it('notifies the R-F4 warm pool after the default-backend dropdown switches', async () => {
+      const { plugin } = createPluginMock();
+      const onChatWarmSessionBackendChanged = jest.fn();
+      plugin.onChatWarmSessionBackendChanged = onChatWarmSessionBackendChanged;
+      let onChange: ((value: string) => Promise<void>) | undefined;
+      jest.spyOn(Setting.prototype, 'addDropdown').mockImplementation(function addDropdown(callback) {
+        const dropdown = {
+          addOption: jest.fn(),
+          setValue: jest.fn().mockReturnThis(),
+          onChange: jest.fn((handler) => {
+            onChange = handler;
+            return dropdown;
+          }),
+        };
+        callback(dropdown as never);
+        return this;
+      });
+      const section = new SettingsBackendSection({ plugin, requestDisplayRefresh: jest.fn() });
+
+      (section as unknown as { addDefaultBackendSetting: (element: HTMLElement) => void })
+        .addDefaultBackendSetting(document.createElement('div'));
+      await onChange?.('codex');
+
+      expect(onChatWarmSessionBackendChanged).toHaveBeenCalledTimes(1);
+    });
+
+    it('notifies the R-F4 warm pool when disabling the active backend chooses a fallback', async () => {
+      const { plugin } = createPluginMock({
+        settings: { ...DEFAULT_SETTINGS, enabledBackends: ['opencode', 'codex'], activeBackend: 'codex' },
+      });
+      const onChatWarmSessionBackendChanged = jest.fn();
+      plugin.onChatWarmSessionBackendChanged = onChatWarmSessionBackendChanged;
+      const section = new SettingsBackendSection({ plugin, requestDisplayRefresh: jest.fn() });
+
+      await (section as unknown as { setBackendEnabled: (b: AgentBackendKind, e: boolean) => Promise<void> })
+        .setBackendEnabled('codex', false);
+
+      expect(onChatWarmSessionBackendChanged).toHaveBeenCalledTimes(1);
+    });
+
     it('stops previous adapter and starts new adapter on switch', async () => {
       const { plugin, adapters, registry } = createPluginMock();
       const refresh = jest.fn();

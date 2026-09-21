@@ -166,6 +166,201 @@ describe('InlineCompletionService pool lifecycle', () => {
     expect(harness.started).toHaveLength(1);
   });
 
+  it('R-F4 prewarms an empty session without submitting a model turn', async () => {
+    const harness = makeHarness({ notePath: 'notes/visible-to-r-c3.md' });
+    await harness.pool.prewarmExclusive();
+    const warm = harness.started[0] as StubSession;
+    expect(harness.started).toHaveLength(1);
+    expect(warm.completed).toHaveLength(0);
+
+    // R-C3's normal editor path has note context and therefore rebuilds the
+    // empty R-F4 session rather than allowing note state into chat warming.
+    await harness.pool.obtain();
+    expect(warm.disposed).toBe(true);
+    expect(harness.started).toHaveLength(2);
+  });
+
+  it('R-F4 rebuilds a note-bound R-C3 session into an empty chat warm session', async () => {
+    const harness = makeHarness({ notePath: 'notes/r-c3.md' });
+    const noteBound = expectPoolOk(await harness.pool.obtain());
+    await harness.pool.prewarmExclusive();
+
+    expect(noteBound.session).not.toBe(harness.started[1]);
+    expect(noteBound.session.disposed).toBe(true);
+    expect(harness.started).toHaveLength(2);
+    expect(harness.pool.sessionCount()).toBe(1);
+    expect((harness.started[1] as StubSession).completed).toHaveLength(0);
+  });
+
+  it('R-F4 keeps the same active-backend warm session on repeated prewarms', async () => {
+    const harness = makeHarness();
+    await harness.pool.prewarmExclusive();
+    const first = harness.started[0];
+    await harness.pool.prewarmExclusive();
+    expect(harness.started).toHaveLength(1);
+    expect(harness.started[0]).toBe(first);
+    expect(harness.pool.sessionCount()).toBe(1);
+  });
+});
+
+describe('InlineCompletionService R-F4 exclusive warming', () => {
+  it('R-F4 coalesces concurrent same-target prewarms while the first start is pending', async () => {
+    const harness = makeHarness();
+    let resolveStart: ((session: InlineCompletionSession) => void) | null = null;
+    harness.setTargetOverride({
+      ok: true,
+      backend: 'opencode',
+      displayName: 'OpenCode',
+      workingDirectory: '/vault',
+      model: null,
+      effort: null,
+      startSession: () => new Promise<InlineCompletionSession>((resolve) => {
+        resolveStart = (session) => {
+          harness.started.push(session);
+          resolve(session);
+        };
+      }),
+    });
+
+    const firstStart = harness.pool.prewarmExclusive();
+    await Promise.resolve();
+    await Promise.resolve();
+    const secondStart = harness.pool.prewarmExclusive();
+    await Promise.resolve();
+    resolveStart?.(stubSession('opencode'));
+    await Promise.all([firstStart, secondStart]);
+
+    expect(harness.started).toHaveLength(1);
+    expect(harness.pool.sessionCount()).toBe(1);
+    expect((harness.started[0] as StubSession).disposed).toBe(false);
+  });
+
+  it('R-F4 switches backend by disposing the old session and retaining only one', async () => {
+    const harness = makeHarness();
+    await harness.pool.prewarmExclusive();
+    const old = harness.started[0] as StubSession;
+    harness.setTargetOverride({
+      ok: true,
+      backend: 'pi',
+      displayName: 'Pi',
+      workingDirectory: '/vault',
+      model: null,
+      effort: null,
+      startSession: () => {
+        const next = stubSession('pi');
+        harness.started.push(next);
+        return Promise.resolve(next);
+      },
+    });
+
+    await harness.pool.prewarmExclusive();
+    expect(old.disposed).toBe(true);
+    expect(harness.pool.hasSession('opencode')).toBe(false);
+    expect(harness.pool.hasSession('pi')).toBe(true);
+    expect(harness.pool.sessionCount()).toBe(1);
+  });
+
+  it('R-F4 ignores an old backend start that resolves after a newer switch', async () => {
+    const harness = makeHarness();
+    let resolveOld: ((session: InlineCompletionSession) => void) | null = null;
+    harness.setTargetOverride({
+      ok: true,
+      backend: 'opencode',
+      displayName: 'OpenCode',
+      workingDirectory: '/vault',
+      model: null,
+      effort: null,
+      startSession: () => new Promise<InlineCompletionSession>((resolve) => { resolveOld = resolve; }),
+    });
+    const oldStart = harness.pool.prewarmExclusive();
+    await Promise.resolve();
+
+    const fresh = stubSession('pi');
+    harness.setTargetOverride({
+      ok: true,
+      backend: 'pi',
+      displayName: 'Pi',
+      workingDirectory: '/vault',
+      model: null,
+      effort: null,
+      startSession: () => Promise.resolve(fresh),
+    });
+    const newStart = harness.pool.prewarmExclusive();
+    const lateOld = stubSession('opencode');
+    resolveOld?.(lateOld);
+    await Promise.all([oldStart, newStart]);
+
+    expect(lateOld.disposed).toBe(true);
+    expect(harness.pool.hasSession('opencode')).toBe(false);
+    expect(harness.pool.hasSession('pi')).toBe(true);
+    expect(harness.pool.sessionCount()).toBe(1);
+  });
+
+  it('R-F4 off invalidates a backend switch paused on stale-session disposal', async () => {
+    const harness = makeHarness();
+    const old = stubSession('opencode');
+    let releaseOldDispose: (() => void) | null = null;
+    old.dispose = () => new Promise<void>((resolve) => {
+      releaseOldDispose = () => {
+        old.disposed = true;
+        resolve();
+      };
+    });
+    harness.setTargetOverride({
+      ok: true,
+      backend: 'opencode',
+      displayName: 'OpenCode',
+      workingDirectory: '/vault',
+      model: null,
+      effort: null,
+      startSession: () => {
+        harness.started.push(old);
+        return Promise.resolve(old);
+      },
+    });
+    await harness.pool.prewarmExclusive();
+
+    let newBackendStarts = 0;
+    harness.setTargetOverride({
+      ok: true,
+      backend: 'pi',
+      displayName: 'Pi',
+      workingDirectory: '/vault',
+      model: null,
+      effort: null,
+      startSession: () => {
+        newBackendStarts += 1;
+        return Promise.resolve(stubSession('pi'));
+      },
+    });
+    const switchingWarm = harness.pool.prewarmExclusive();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    await harness.pool.disposeAll();
+    releaseOldDispose?.();
+    await switchingWarm;
+
+    expect(old.disposed).toBe(true);
+    expect(newBackendStarts).toBe(0);
+    expect(harness.pool.sessionCount()).toBe(0);
+  });
+
+  it('R-F4 clears the old session when the active target becomes unavailable', async () => {
+    const harness = makeHarness();
+    await harness.pool.prewarmExclusive();
+    const old = harness.started[0] as StubSession;
+    harness.setTargetOverride({ ok: false, reason: 'capability-unavailable', backend: 'pi' });
+
+    await harness.pool.prewarmExclusive();
+
+    expect(old.disposed).toBe(true);
+    expect(harness.pool.sessionCount()).toBe(0);
+    expect(harness.pool.hasSession('opencode')).toBe(false);
+  });
+});
+
+describe('InlineCompletionService pool transitions', () => {
   it('rebuilds the session when the model reference changes (reset semantics)', async () => {
     const harness = makeHarness();
     const first = expectPoolOk(await harness.pool.obtain());

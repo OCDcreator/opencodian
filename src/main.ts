@@ -778,7 +778,13 @@ export default class OpenCodianPlugin extends Plugin {
   private configureInlineCompletion(): void {
     this.inlineCompletionPool = new InlineCompletionService({
       host: {
-        isEnabled: () => this.settings?.inlineCompletionEnabled ?? false,
+        // R-F4 shares the R-C3 pool: either feature authorizes creating the
+        // verified read-only auxiliary session, while only R-C3 authorizes
+        // ghost-text turns through the controller below.
+        isEnabled: () => (
+          this.settings?.inlineCompletionEnabled === true
+          || this.settings?.chatWarmSessionEnabled === true
+        ),
         getLocale: () => getLocale(),
         getMaxChars: () => this.settings.inlineCompletionMaxChars,
         getNotePath: () => this.app.workspace.getActiveViewOfType(MarkdownView)?.file?.path ?? '',
@@ -791,6 +797,9 @@ export default class OpenCodianPlugin extends Plugin {
       // missing wiring now fails to compile instead of dying silently.
       notify: (message) => { new Notice(message); },
     });
+    if (this.settings?.chatWarmSessionEnabled) {
+      void this.inlineCompletionPool.prewarmExclusive();
+    }
     this.inlineCompletionController = new InlineCompletionController({
       pool: this.inlineCompletionPool,
       isEnabled: () => this.settings?.inlineCompletionEnabled ?? false,
@@ -859,13 +868,34 @@ export default class OpenCodianPlugin extends Plugin {
    */
   onInlineCompletionSettingChanged(enabled: boolean): void {
     if (!enabled) {
-      // Off = no sessions, no network (acceptance 7, C3-Q1 reading). The
-      // controller itself stays wired but gated: the extension falls through
-      // on the first `isEnabled()` check, and the pool never starts sessions.
-      void this.inlineCompletionPool?.disposeAll();
+      // Do not tear down R-F4's read-only warm session just because the ghost
+      // UI is off. With both toggles off the pool is still disposed immediately.
+      if (!this.settings?.chatWarmSessionEnabled) {
+        void this.inlineCompletionPool?.disposeAll();
+      }
       return;
     }
     this.inlineCompletionPool?.resetUnsupported();
+  }
+
+  /** R-F4 settings hook: warm only an empty, read-only active-backend session. */
+  onChatWarmSessionSettingChanged(enabled: boolean): void {
+    if (!enabled) {
+      // R-C3 owns any remaining ghost-completion pool session.
+      if (!this.settings?.inlineCompletionEnabled) {
+        void this.inlineCompletionPool?.disposeAll();
+      }
+      return;
+    }
+    this.inlineCompletionPool?.resetUnsupported();
+    void this.inlineCompletionPool?.prewarmExclusive();
+  }
+
+  /** R-F4 backend-switch hook used by both settings selection entry points. */
+  onChatWarmSessionBackendChanged(): void {
+    if (this.settings?.chatWarmSessionEnabled) {
+      void this.inlineCompletionPool?.prewarmExclusive();
+    }
   }
 
   /** Whole-document form gate (R-A6), also used by the command/menu checks. */

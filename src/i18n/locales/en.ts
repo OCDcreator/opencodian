@@ -3678,6 +3678,8 @@ export const enTranslations = {
   'settings.agent.default': 'Default Agent',
   'settings.agent.default.desc': 'Agent used for new conversations',
   'settings.agent.default.empty.desc': 'Enable at least one agent below before selecting the default agent',
+  'settings.agent.chatWarmSession.name': 'Keep a warm session for the chat agent',
+  'settings.agent.chatWarmSession.desc': 'Prewarms one empty, read-only auxiliary session for the active chat agent. It sends no prompt and no completion turn, so it does not incur model usage; real chats always create their own session.',
   'settings.agent.empty': 'No agent enabled yet',
   'settings.agent.empty.notice': 'No agent enabled yet. Enable at least one agent below.',
   'settings.agent.enabled': 'Enabled Agents',

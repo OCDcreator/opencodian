@@ -45,6 +45,7 @@ export class SettingsBackendSection {
     this.ensureValidBackendState();
     const shellEl = containerEl.createDiv({ cls: 'opencodian-agent-settings-shell opencodian-backend-agent-surface' });
     this.addDefaultBackendSetting(shellEl);
+    this.addChatWarmSessionSetting(shellEl);
     this.addEnabledBackendsSettings(shellEl);
   }
 
@@ -95,10 +96,26 @@ export class SettingsBackendSection {
                 if (newAdapter) { await newAdapter.start(); }
               } catch { /* best effort */ }
 
+              this.plugin.onChatWarmSessionBackendChanged?.();
               this.requestDisplayRefresh();
             }
           });
       });
+  }
+
+  /** R-F4 is backend-scoped, so its quiet opt-in belongs beside the selector. */
+  private addChatWarmSessionSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.agent.chatWarmSession.name'))
+      .setDesc(t('settings.agent.chatWarmSession.desc'))
+      .setClass('opencodian-agent-settings-control-row')
+      .addToggle((toggle) => toggle
+        .setValue(this.plugin.settings.chatWarmSessionEnabled)
+        .onChange(async (value) => {
+          this.plugin.settings.chatWarmSessionEnabled = value;
+          await this.plugin.saveSettings();
+          this.plugin.onChatWarmSessionSettingChanged?.(value);
+        }));
   }
 
   private addEnabledBackendsSettings(containerEl: HTMLElement): void {
@@ -168,6 +185,7 @@ export class SettingsBackendSection {
   }
 
   private async setBackendEnabled(backend: AgentBackendKind, enabled: boolean): Promise<void> {
+    const previousActive = this.plugin.settings.activeBackend;
     const enabledBackends = new Set(this.getEnabledBackends());
     const isActive = this.plugin.settings.activeBackend === backend;
 
@@ -215,6 +233,10 @@ export class SettingsBackendSection {
       }
     } catch {
       // Best effort: the setting change should still be saved even if start/stop fails.
+    }
+
+    if (this.plugin.settings.activeBackend !== previousActive) {
+      this.plugin.onChatWarmSessionBackendChanged?.();
     }
   }
 

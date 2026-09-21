@@ -1,4 +1,5 @@
 # Plugin Entry Point (main.ts)
+> 2026-09-21 (advantage-parity R-F4)：`chatWarmSessionEnabled`（默认关、strict boolean load）复用唯一 `InlineCompletionService`；pool host 由 R-C3 / R-F4 任一开关启用。R-F4 启动、开关开启与两个 active-backend settings 入口均调 `prewarmExclusive()`，只构造一个空的只读 aux session；任一开关关闭仅在另一个也关闭时 `disposeAll()`，不破坏仍启用的一侧。
 > 2026-09-21 (advantage-parity R-F2)：startup metadata preload 和 `createConversationFromSession` 均保真 `linkedNotePath`；在 `loadConversations` 完成后由 plugin 单例注册 vault rename listener，逐条保存所有匹配绑定并通知打开的 chat view 刷新，不依赖 view mount 且不会重复监听。
 > 2026-09-21 (advantage-parity R-F7)：构造缝注入各后端域 env（ClaudeCodeAdapter `getDomainEnvironment`、wireHiddenAdapters `getCodexExtraEnv`/`getPiExtraEnv`、OpenCodeService `getExtraServerSpawnEnv`，统一经 `getDomainEnvFor`）；`refreshEnvironmentFingerprints` 在 loadSettings 尾部与 saveSettings 后比较 runtime.json 上次指纹——变化即本地化 Notice 列出受影响后端并保存新指纹（首次运行静默、未变不重写、失败仅记日志）。
 > 2026-09-21 (advantage-parity R-F8)：ModelConfigService 构造传入 getContextWindowOverrides（settings.modelContextWindowOverrides）。

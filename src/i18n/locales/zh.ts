@@ -3678,6 +3678,8 @@ export const zhTranslations = {
   'settings.agent.default': '默认智能体',
   'settings.agent.default.desc': '新建会话使用的智能体',
   'settings.agent.default.empty.desc': '请先在下方启用至少一个智能体，然后选择默认智能体',
+  'settings.agent.chatWarmSession.name': '为聊天智能体保持预热会话',
+  'settings.agent.chatWarmSession.desc': '仅为当前聊天智能体预热一个空的只读辅助会话；不会发送提示词或补全回合，因此不产生模型计费。真实聊天始终会新建自己的会话。',
   'settings.agent.empty': '尚未启用任何智能体',
   'settings.agent.empty.notice': '尚未启用任何智能体。请在下方启用至少一个智能体。',
   'settings.agent.enabled': '已启用智能体',

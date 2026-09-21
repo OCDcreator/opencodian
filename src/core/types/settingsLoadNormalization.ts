@@ -531,6 +531,7 @@ function normalizeInlineCompletionSettingsOnLoad(
   normalizedSettings: Partial<OpenCodianSettings> | null,
 ): {
   inlineCompletionEnabled: boolean;
+  chatWarmSessionEnabled: boolean;
   inlineCompletionMaxChars: number;
   inlineCompletionModelOverrides: OpenCodianSettings['inlineCompletionModelOverrides'];
 } {
@@ -538,6 +539,9 @@ function normalizeInlineCompletionSettingsOnLoad(
     inlineCompletionEnabled: typeof normalizedSettings?.inlineCompletionEnabled === 'boolean'
       ? normalizedSettings.inlineCompletionEnabled
       : DEFAULT_SETTINGS.inlineCompletionEnabled,
+    chatWarmSessionEnabled: typeof normalizedSettings?.chatWarmSessionEnabled === 'boolean'
+      ? normalizedSettings.chatWarmSessionEnabled
+      : DEFAULT_SETTINGS.chatWarmSessionEnabled,
     inlineCompletionMaxChars: normalizeInlineCompletionMaxChars(
       normalizedSettings?.inlineCompletionMaxChars,
     ),

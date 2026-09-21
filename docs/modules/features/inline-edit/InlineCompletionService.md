@@ -5,7 +5,7 @@
 
 ## 概述
 
-R-C3 的暖会话池（§3.2.4）：每 `backend × workingDirectory` 至多 1 个已验证只读补全会话；首个编辑器焦点预热（首个 Alt 懒启动兜底）；空闲 TTL 5 分钟 dispose；开关关闭 / 模型或笔记切换 / 插件卸载立即重建或释放。失败语义 fail-closed，绝不退化为本地伪补全。
+R-C3 的暖会话池（§3.2.4）：每 `backend × workingDirectory` 至多 1 个已验证只读补全会话；首个编辑器焦点预热（首个 Alt 懒启动兜底）；空闲 TTL 5 分钟 dispose；开关关闭 / 模型或笔记切换 / 插件卸载立即重建或释放。R-F4 复用同一池的 `prewarmExclusive()`，只保留当前聊天 backend 的一个**空上下文**只读 aux session，并且只 start/warm、绝不提交 completion/query 回合。失败语义 fail-closed，绝不退化为本地伪补全。
 
 ## 职责
 
@@ -13,6 +13,7 @@ R-C3 的暖会话池（§3.2.4）：每 `backend × workingDirectory` 至多 1 �
 - 失败链（§3.2.6）：start 失败 → 本周期 unsupported + 如实 Notice；单回合失败静默；连续 2 次 → dispose 供下次冷启动重试；第 3 次 → 本周期 unsupported；`reportTurnSuccess` 清零计数
 - `reportWriteToolViolation`：写工具命中 → dispose + unsupported + 如实 Notice（ghost 从未入文档，无损害可撤）
 - `disposeAll()`：开关关闭与 `onunload` 调用；`resetUnsupported()`：新启用周期清状态
+- `prewarmExclusive()`：R-F4 捕获一次 active/default backend target，在创建前淘汰其它 `backend × workingDirectory` entry；同 backend 复用；并发切换用 generation + entry identity 拒绝旧 start 的迟到结果，故池最终至多保留一个聊天预热 session
 - `InlineCompletionPoolHost`：插件注入的宿主面（isEnabled / locale / maxChars / notePath / resolveCompletionTarget / buildSystemPrompt），main.ts 以 inline-edit host 桥实现（模型解析顺序：R-C3 专用 `inlineCompletionModelOverrides` 优先，留空则沿用 C3-Q3 优先级链，默认下逐字节等同旧行为）
 
 ## 依赖
@@ -25,3 +26,4 @@ R-C3 的暖会话池（§3.2.4）：每 `backend × workingDirectory` 至多 1 �
 - `unsupported` 是**周期**语义：仅重新开关功能（或重载插件）才解除，避免坏后端被反复重试
 - TTL 到期必须同时清 map 条目与释放原生会话（无进程/连接泄漏）
 - `notify` 是**必填**选项（生产由 main.ts 注入 Obsidian `Notice`）：§3.2.6 的如实上报消息（sessionUnavailable / unsupportedAfterFailures / writeToolObserved）全部经它送达；漏配必须编译期失败而非静默吞掉（R-C3-D1 缺陷即漏配所致），不得改回可选或加本地 Notice 兜底
+- R-F4 只能调用 `startSession` / 已有 `warmUp` seam，不得调用 `complete` 或其它 query API；真实聊天会话不复用此 aux session

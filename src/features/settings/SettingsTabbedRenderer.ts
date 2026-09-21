@@ -224,6 +224,7 @@ export class SettingsTabbedRenderer {
     this.deps.plugin.settings.activeBackend = agent;
     this.deps.plugin.agentServiceRegistry?.setActive(agent);
     void this.deps.plugin.saveSettings();
+    this.deps.plugin.onChatWarmSessionBackendChanged?.();
 
     // Stop previous adapter and start the new active adapter
     try {
