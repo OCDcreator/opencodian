@@ -11,6 +11,19 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-21 批次 F 质量修复的视觉验收跟进：绑定分区不再挤压变更列表
+
+**触发**：批次 F 质量修复批次的视觉验收确认轮发现两处**由本批次自己引入**的回归（不在原审查报告里），必须修掉再交付。
+
+**改动**（提交 `1cb97c9d`）：
+
+1. diff 模式下绑定分区是滚动列表的固定兄弟节点，抢走了列表高度：实测列表 `clientHeight` 87 / `scrollHeight` 120，第二个变更行的 `+1 -0` 被裁在可视区外，而表头仍统计两个文件——该行读起来像"这一行没有统计"。改为 diff 模式把分区渲染在滚动列表**内部**，列表恢复满高（实测 182），两行统计完整可见；revert 模式保持分区为 revert 列表的兄弟节点（既有已验收布局，不改）。
+2. 绑定行用 `<button>` 承载 `.opencodian-modified-files-sidebar-path`，宿主把按钮设为 flex 容器并给固定输入高度：`text-overflow: ellipsis` 对 flex 容器的匿名 item 无效，路径被硬裁在字形中间且**没有省略号**，chip 高度被撑到 30px。共享规则新增 `display: block; height: auto`，按钮与 span 两种承载都能正确省略（实测 `scrollWidth` 424 / `clientWidth` 176，chip 30→17px）。
+
+**验证**：`ModifiedFilesSidebar.test.ts` 新增 2 例（diff 模式分区在列表内且两行完整 / revert 模式分区不在列表内），既有 `linked-note section placement` 分组改为按变更行断言（不再用"列表里有没有这个路径"这种会被新布局影响的写法）。修复后重跑视觉确认轮：**PASS，无 issues**，并逐条复核了两处原缺陷（表头 `2 · +4 -1` 与两行 `+3 -1` / `+1 -0` 完全对账；chip 以 `…` 正常省略）。Test Vault 四产物重新顺序部署并 `cmp`，reload 后运行时 BUILD_ID `zcode-advantage-parity.202609220112`。截图 `.visual-evidence/rf2-rf6-quality-fixes/d-modified-files-binding-section.png`。
+
+---
+
 ## 2026-09-21 批次 F 后续代码质量修复：回退轮次关闭、绑定笔记三态保存、Vim 键一致性与 rail 可访问名
 
 **触发**：advantage-parity 批次 F（R-F2 / R-F3 / R-F5 / R-F6）实现验收后的一轮独立代码审查。本轮不是重新审查，而是逐条复现 → 实施最小修复 → 补回归测试 → 实机验收。审查报告被当作线索而非真相：能复现的修，不能复现的登记并停止。

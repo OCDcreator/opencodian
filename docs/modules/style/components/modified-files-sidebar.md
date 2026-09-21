@@ -1,4 +1,5 @@
 # Modified Files Sidebar Styles
+> 2026-09-21 (advantage-parity R-F2 视觉复核跟进)：`.opencodian-modified-files-sidebar-path` 新增 `display: block; height: auto`。该规则同时承载变更行的 `<span>` 与绑定行的 `<button>`；宿主把按钮设为 flex 容器并给固定输入高度，而 `text-overflow: ellipsis` 对 flex 容器的匿名 item 无效 → 路径被硬裁在字形中间且无省略号、chip 被撑到 30px。显式 block + auto 高度让两种承载都能正确省略（实测 scrollWidth 424 / clientWidth 176，chip 30→17px）。
 > 2026-09-21 (advantage-parity R-F3)：新增 `.opencodian-edit-revert-preview-*`：Obsidian-native 单层确认 modal、可滚动路径列表、before→after 行数、图标+文字+边框三重冲突信号和共享 modal token 的 action rail；无嵌套 card / ad-hoc margin。
 > 2026-09-21 (advantage-parity R-F2)：为绑定草稿/缺失 locked 行和紧凑 badge 添加 host-theme 样式；不为绑定状态增加伪 diff 表面。
 > 2026-09-18 (R-B3): R-B3: adds the `.opencodian-edit-revert-*` classes (section, header, revert-all button, hint, list, per-item status/state classes, action buttons, excluded label) rendered by the sidebar's revert section; the read-only list gains an `is-hidden` state while revert entries are shown.
