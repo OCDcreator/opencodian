@@ -56,7 +56,7 @@
 | E | R-E1 | URL / 网页内容上下文（本地抓取） | Copilot | P1 | DONE |
 | E | R-E2 | Web Viewer 标签页上下文 | Copilot | P2 | DONE |
 | E | R-E3 | 相关笔记面板（图谱 + 检索双通道） | Copilot | P1 | DONE |
-| E | R-E4 | 语义检索增强层（embedding on R-C1） | Copilot/Miyo | P2 | TODO |
+| E | R-E4 | 语义检索增强层（embedding on R-C1） | Copilot/Miyo | P2 | DONE |
 | E | R-E5 | Dataview / Bases 上下文支持 | Copilot | P2 | DONE |
 | E | R-E6 | 选区 / 全库 token 计数命令 | Copilot | P2 | DONE |
 | F | R-F1 | Turn steering + 流式中消息排队 | Claudian | P1 | TODO |
@@ -198,6 +198,13 @@ Obsidian 核心 Web Viewer 插件的活动标签页（URL + 选区）作为上�
 3. 无可用 embedding 端点时如实提示降级为纯词面，不伪造。
 
 **技术约束**：先出独立设计文档（存储规模、增量更新、包体积零新增——不引入向量库依赖，用平铺余弦即可，万篇级内存可控性需测算）；§8 Q3 的「先词面」裁决本条为后续增强层，不推翻。
+
+**落地证据（2026-09-21，提交 `41b7c70f`，设计文档 `advantage-parity-re4-design.md`）**：
+
+- **实现**：`VaultEmbeddingIndexService`（core.memory）——**笔记级向量**（规模测算入设计文档：10k×1536 维 float32 ≈ 61MB 上界，chunk 级被规模数学否决）、内容哈希增量（未变跳过/已删移除/150ms 串行节流）、分片 base64-float32 存储于 `.opencodian/vault-embeddings/`、平铺余弦 TopK。端点 = 用户所选自定义供应商的 OpenAI 兼容 `/embeddings`（**Q3 裁决落地**：OpenCode 服务端无公开 embedding 面——设计文档核实后放弃该候选；本地 Ollama 合法故不做回环拦截，与 R-E1 语义差异已在文档明示）。注入合并：词面优先 ∪ 语义补位去重，条目带 `retrievalChannel`，composer 与已发消息 chip 徽标「检索·词面/检索·语义」如实分标；语义失败诚实降级为纯词面不破坏刷新。设置：开关默认 **false**（关时行为与特性存在前逐字节一致，Q3「先词面」不推翻）+ 供应商下拉 + 模型宽输入，未配置/供应商缺失如实 Notice。
+- **测试**：`VaultEmbeddingIndexService.test.ts` 6 例（float32 编解码往返、余弦、嵌入文本清洗/哈希、索引+排序+增量跳过+删除、三类降级原因与零伪造命中）+ `vaultRetrievalComposerSemantic.test.ts` 3 例（合并去重+通道标注、语义异常回退纯词面、开关关时永不查询语义）+ verify 15/15。
+- **实机（BUILD_ID `202609210934`）**：默认值 false；开启但未配置 → `query` 实测返回 `{ hits: [], degradation: 'not-configured' }`（诚实降级路径活体）；设置三行实测（toggle 44×20 可用、供应商下拉正常形态、模型宽输入 289px + 占位符可见）。视觉门有界两轮 PASS（第一轮截图滚动未覆盖后两行——测量已证在场；第二轮完整证据：字号/对齐/间距与同块一致、描述完整、宽输入占位符可见）。截图 `.visual-evidence/re4/re4-settings.png`。
+- **偏差登记**：无。语义命中为笔记级条目（无行区间），与词面条目（带行区间片段）形态不同但通道标注诚实区分。
 
 ### R-E5 Dataview / Bases 上下文支持（P2）
 

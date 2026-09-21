@@ -11,7 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
-## 2026-09-21 R-E5 Dataview 块内联 + .base 文本上下文：物化快照执行、不可用如实标记
+## 2026-09-21 R-E4 语义检索增强层：笔记级 embedding 索引 + 词面∪语义合并 + 通道标注（批次 E 收官）
+
+**触发**：advantage-parity 批次 E 末条（P2，技术约束要求先出独立设计文档）。R-C1 只有词面检索；Copilot 靠云端 Miyo 提供语义通道，本条要求插件内自洽。
+
+**改动**：设计文档 \`advantage-parity-re4-design.md\` 先行——**端点裁决（Q3 落地）**：OpenCode 服务端无公开 embedding 面（核实后放弃该候选），采用用户配置供应商的 OpenAI 兼容 \`/embeddings\`；**规模测算**：笔记级向量 10k×1536 维 float32 ≈ 61MB 上界（万篇级可控据此成立），chunk 级 300MB 被否决；本地 Ollama 是合法目标故**不做回环拦截**（与 R-E1 任意 URL 抓取的语义差异明示）。实现：\`VaultEmbeddingIndexService\`（core.memory；内容哈希增量 + 150ms 节流、分片 base64-float32 存储、平铺余弦 TopK、三类降级原因绝不伪造命中）+ \`VaultEmbeddingFileSystem\`（app.memory-runtime；写仅限 embeddings 目录、2s 防抖变更）+ 合并注入（\`VaultRetrievalComposerCoordinator\`：词面优先 ∪ 语义补位去重、\`retrievalChannel\` 通道标注、语义失败回退纯词面）+ 设置三行（开关默认 **false**——关时行为与特性存在前逐字节一致，Q3「先词面」不推翻；供应商下拉取自定义 providers、模型宽输入）+ 双语与未配置/供应商缺失如实 Notice。
+
+**测试**：9 例单测（编解码/余弦/清洗/增量跳过删除/三类降级；合并去重+标注/异常回退/开关关永不查询）+ verify 15/15。实机（BUILD_ID \`202609210934\`）：默认 false；开启未配置 → \`query\` 实测 \`{ hits: [], degradation: 'not-configured' }\`（降级活体）；设置行实测（toggle 44×20、模型宽输入 289px）。视觉门有界两轮 PASS（首轮截图滚动未盖全，次轮完整证据）。**批次 E 至此收官**：R-E1…R-E6 全部 DONE。
+
+---
+
 
 **触发**：advantage-parity 批次 E 第 5 条（P2）。Copilot 在上下文构建时执行 dataview 块取渲染结果；OpenCodian 的物化文本里 dataview 块只是未执行的围栏代码。
 
