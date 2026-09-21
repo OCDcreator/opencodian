@@ -11,6 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-21 R-F9 文件管理器右键附加：file-menu → 共享 picker 条目通道
+
+**触发**：advantage-parity 批次 F 首条（P1 小件高频）。两个对标插件都有资源管理器右键「发给 AI」入口；OpenCodian 此前只能从 composer `+` picker 附加。
+
+**改动**：main.ts 注册 `workspace.on('file-menu')`——菜单项「附加到 OpenCodian 聊天上下文」（plus-circle，双语）；点击经 `attachVaultEntryToActiveChatContext` 走共享 `ContextAttachmentBuilder.buildEntryContextItem`（R-A7 同入口：文件 / 文件夹 path-only 目录条目 / PDF 提取路径），chip 与手选逐字段一致。
+
+**测试**：main.test.ts 委托契约 1 例（真实 builder 的 TFolder 分支）+ verify 15/15。实机（BUILD_ID `202609210953`）：探针 Menu 触发 `file-menu` 事件——文件/文件夹目标均出现菜单项，点击文件夹实证 `{kind:'folder'}` chip 入 tab。原生菜单铬无自绘面（视觉门不适用）。
+
+---
+
 ## 2026-09-21 R-E4 语义检索增强层：笔记级 embedding 索引 + 词面∪语义合并 + 通道标注（批次 E 收官）
 
 **触发**：advantage-parity 批次 E 末条（P2，技术约束要求先出独立设计文档）。R-C1 只有词面检索；Copilot 靠云端 Miyo 提供语义通道，本条要求插件内自洽。

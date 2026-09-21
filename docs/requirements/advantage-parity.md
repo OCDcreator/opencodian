@@ -67,7 +67,7 @@
 | F | R-F6 | Vim 风格聊天导航键 | Claudian | P3 | TODO |
 | F | R-F7 | 每供应商环境变量分域 + 环境哈希失效 | Claudian | P2 | TODO |
 | F | R-F8 | 自定义模型自定义上下文窗口 | Claudian | P2 | TODO |
-| F | R-F9 | 文件管理器右键「附加到上下文」 | 双方 | P1 | TODO |
+| F | R-F9 | 文件管理器右键「附加到上下文」 | 双方 | P1 | DONE |
 | F | R-F10 | Grok 后端（ACP 一等接入） | Claudian | P2 | TODO |
 | F | R-F11 | i18n 扩语种 | Claudian | P2 | TODO |
 | F | R-F12 | `$` 技能触发符 / 可复用指令（评估） | Claudian | P3 | TODO |
@@ -267,6 +267,8 @@ Claudian 把环境变量按 `shared` / `provider:*` 分域，环境指纹变化�
 ### R-F9 文件管理器右键「附加到上下文」（P1）
 
 资源管理器文件/文件夹右键菜单项：附加到当前 tab 聊天上下文（走 R-A7 的多选/文件夹条目通道）。小件、高频。
+
+**落地证据（2026-09-21，提交 `a26b1d10`）**：main.ts 注册 `file-menu` 事件——菜单项「附加到 OpenCodian 聊天上下文」（plus-circle 图标，zh/en 双语）；点击经 `attachVaultEntryToActiveChatContext` 委托到共享 `ContextAttachmentBuilder.buildEntryContextItem`（与 `+` picker **同一入口**：文件保持 file 路径、文件夹为 path-only 目录条目、PDF 走文本层提取路径——chip 与手选逐字段一致，四后端同通道）。测试：main.test.ts 新增委托契约 1 例（真实 builder：TFolder → kind `folder`、mime `application/x-directory`、无快照）+ 既有 entry builder 覆盖（folder/file/PDF）+ verify 15/15。实机（BUILD_ID `202609210953`）：以探针 Menu 直接触发 workspace `file-menu` 事件——文件与文件夹目标均出现本菜单项，点击文件夹变体实证捕获 `{kind: 'folder'}` chip 落入活动 tab。原生菜单铬 + 既有 chip 组件，无自绘面（视觉门不适用，同 R-E5 惯例登记）。
 
 ### R-F10 Grok 后端（P2）
 
