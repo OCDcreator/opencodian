@@ -11,7 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
-## 2026-09-21 R-E3 相关笔记面板：图谱 + R-C1 检索双通道侧栏，附加按钮与手选逐字段一致
+## 2026-09-21 R-E2 Web Viewer 标签页上下文：复用 R-E1 条目形态，未启用无入口
+
+**触发**：advantage-parity 批次 E 第 3 条（P2）。Copilot 把浏览器标签页作为上下文源；OpenCodian 侧的对应物是 Obsidian 核心 Web Viewer 插件的活动标签页。
+
+**改动**：\`WebViewerContextService\`（feature.chat-services）——API 面在 1.13.7 实测：核心插件在 \`internalPlugins.plugins.webviewer\`（\`.enabled\`）、webviewer 叶 viewType 为 \`'webviewer'\`、\`view.getState()\` 返回 \`{ url, title, mode }\`。可用性门 = 插件启用 ∧ 活动 webviewer 叶 ∧ http(s) URL；附加产出 **R-E1 pending url 条目**（标签页标题进 label 与 \`url.title\`），发送时本地抓取 + 三层 SSRF 守卫逐字复用。入口：composer globe 按钮（渲染时与点击时双重验证，失效自移除）+ 命令 \`attach-webviewer-tab-to-context\`（未启用 → checkCallback false 命令不存在；活动页非 webviewer → 如实 Notice）。**偏差登记**：原文「URL + 选区」收敛为 URL——R-E1 抓整页已覆盖选区文本；\`<webview>\` executeJavaScript 可达性已探明备查，选区专属条目待真实需求立项。
+
+**测试**：5 例单测 + verify 15/15（第三次过：前两次为满负载下 jest worker SIGSEGV 段错误抖动——随机不同套件、隔离复跑均过，与既有「超时抖动」同族，已按规程处理）。实机：webviewer 开 example.com → 命令附加出「Example Domain」chip（title=标签页标题）；globe 按钮 42×30 与星标同级、四按钮同轴。视觉门像素级 PASS。
+
+---
+
 
 **触发**：advantage-parity 批次 E 第 2 条（P1）。Copilot 的 Relevant Notes 是高频入口（当前笔记的相关笔记双通道列表实时更新），OpenCodian 无此面板。
 

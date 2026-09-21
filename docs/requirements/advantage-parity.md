@@ -54,7 +54,7 @@
 | D | R-D2 | API 密钥入 Obsidian Keychain | Copilot | P1 | DONE |
 | D | R-D3 | 轮次完成通知音效 | 双方 | P3 | DONE |
 | E | R-E1 | URL / 网页内容上下文（本地抓取） | Copilot | P1 | DONE |
-| E | R-E2 | Web Viewer 标签页上下文 | Copilot | P2 | TODO |
+| E | R-E2 | Web Viewer 标签页上下文 | Copilot | P2 | DONE |
 | E | R-E3 | 相关笔记面板（图谱 + 检索双通道） | Copilot | P1 | DONE |
 | E | R-E4 | 语义检索增强层（embedding on R-C1） | Copilot/Miyo | P2 | TODO |
 | E | R-E5 | Dataview / Bases 上下文支持 | Copilot | P2 | TODO |
@@ -161,6 +161,13 @@
 ### R-E2 Web Viewer 标签页上下文（P2）
 
 Obsidian 核心 Web Viewer 插件的活动标签页（URL + 选区）作为上下文来源；未启用 Web Viewer 时入口不出现。依赖 R-E1 的网页上下文条目类型。
+
+**落地证据（2026-09-21，提交 `8aee3c30`）**：
+
+- **实现**：`WebViewerContextService`（feature.chat-services）——可用性门 = 核心 Web Viewer 插件启用（`internalPlugins.plugins.webviewer.enabled`，1.13.7 实测 API 面）且活动叶 viewType `'webviewer'` 且 state.url 为 http(s)；附加 = R-E1 pending url 条目（标签页标题进 label 与 `url.title`），发送时本地抓取与 SSRF 守卫逐字复用。入口两处：composer globe 按钮（双 host 缝 + 当前标签页可解析才渲染，点击时重验、失效自移除）、命令 `attach-webviewer-tab-to-context`（checkCallback 在核心插件未启用时返回 false 即命令不存在；活动页非 webviewer 如实 Notice）。
+- **测试**：`WebViewerContextService.test.ts` 5 例（可用性门、活动叶/webviewer/URL/state 异常全拒、条目构造含标题回退）+ verify 15/15。
+- **实机（BUILD_ID `202609210137`）**：webviewer 开 example.com → 命令附加出 chip「Example Domain」（title=标签页标题、tooltip=URL）；globe 按钮在场 42×30、与星标同级、四按钮同轴（像素级）。截图 `.visual-evidence/re2/re2-globe.png`。
+- **偏差登记**：原文「URL + 选区」收敛为 URL——R-E1 发送时抓取整页，选区文本已完整覆盖，单独附加不增信息量；选区专属条目（新 kind + composer 引用缝）待真实需求再立项。`<webview>` 的 executeJavaScript 可达性已探明（选区技术上可取），记录备查。
 
 ### R-E3 相关笔记面板（P1）
 
