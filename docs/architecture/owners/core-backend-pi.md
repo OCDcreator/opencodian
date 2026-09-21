@@ -1,4 +1,5 @@
 # Owner: core.backend-pi
+> 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 - 2026-09-13 (universal memory backend): owner manifest gained `core.memory` and `app.memory-runtime`; this owner's boundary itself is unchanged (no source touched, allowlist untouched).
 - 2026-09-18 (inline-edit R-A3/R-A4): `PiAuxQuerySession` gained per-turn image attachments (chat-side `images: [{type:'image', data, mimeType}]` shape on the prompt request) and progressive text streaming (`message_update` `text_delta` events). Read-only `set_tools`/`get_tools` contract and temp-scope cleanup unchanged; images never enter the vault.
 

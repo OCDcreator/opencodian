@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "157f8143fab9d2cd52c44ad41bf27747ca3f75515edfdd30451c31e592ddd092",
-  "recordCount": 759,
+  "digest": "8380ebac5d5fb511c0624061a218f4aea7d204141659a116a5c49f4a86134fb4",
+  "recordCount": 760,
   "records": [
     {
       "kind": "ignore",
@@ -3231,7 +3231,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "55c577d7fe76e4cd5912cc08f8541b60268021dd3e5a87d6bf7e3ee93f64758c"
+      "sha256": "6d625daf1c5b63abdac65d26cccb52e0ff000f1600ee9dc2bf3ad251334c7fef"
     },
     {
       "kind": "src",
@@ -3241,12 +3241,12 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "6981fd4d4faf65373636bb041d6f67b93b71f811004cdd4b5e9e62d7c16af234"
+      "sha256": "4fec540327f35086c5720d9c54ad5f06c097d89f2d58e51439bffb6d810240c1"
     },
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "8ba06d3d002a2eabb2bba2fe9e528ecb4f39358966a334f933792dfe3f4cf6a1"
+      "sha256": "743c3c5c48758a34031014c0477ef56ec35a29f3ec80c7a111e0ef4c2c50f154"
     },
     {
       "kind": "src",
@@ -3332,6 +3332,11 @@
       "kind": "src",
       "key": "src/shared/obsidianContext.ts",
       "sha256": "862d957c2a08e57e844bec1fa8ddd335ecaf47e48687cbe4b41ac4cdeecbff17"
+    },
+    {
+      "kind": "src",
+      "key": "src/shared/tokenEstimate.ts",
+      "sha256": "af9c43f1fe4275785c35cba9f3442299209f6a64f061ea3d7e01b078f5e11b76"
     },
     {
       "kind": "src",
@@ -3799,7 +3804,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-20T17:34:16.978Z",
-  "headShaAtGeneration": "b1df946aed28b7e021163e9c1db1c3d847cfa49f",
+  "generatedAt": "2026-09-21T01:04:01.240Z",
+  "headShaAtGeneration": "375abfd73ae0944f7f45f7dfcdab64339c605d99",
   "graphifyVersion": "graphify 0.9.36"
 }

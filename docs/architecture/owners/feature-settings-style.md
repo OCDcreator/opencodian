@@ -1,4 +1,5 @@
 # Owner: feature.settings-style
+> 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
 - 2026-09-17 (shadcn style): 样式预设卡的 `STYLE_ORDER` 追加 `shadcn`（第 5 张卡），点击后落到该 family 的首个 preset `shadcn-neutral`；样式卡网格列数在 model-selector.css 中同步 4→5。

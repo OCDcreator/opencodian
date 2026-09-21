@@ -1,4 +1,5 @@
 > 2026-09-18 (FlowText parity R-A7): `ContextFilePickerModal` (multi-select + folder rows + attach-N footer) — see the mapped module doc for the contract.
+> 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 
 # Owner: feature.chat-ui
 

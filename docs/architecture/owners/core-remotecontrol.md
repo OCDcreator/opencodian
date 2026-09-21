@@ -1,4 +1,5 @@
 # Owner: core.remotecontrol
+> 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
 - 2026-09-18 (R-C6): owner registered for the FlowText R-C6 external interface (远程驱动) — a token-gated loopback HTTP control plane with audited sessions. Registered under the owner model's high-risk-isolation provision: a self-owning listening socket is a complete behavior unit and a security boundary, not a thin helper layer (same precedent class as `feature.inline-edit`).

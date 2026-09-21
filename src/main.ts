@@ -59,7 +59,7 @@ import { OpenCodeSessionTraceService } from './core/opencode/diagnostics';
 import { ClaudeSessionTraceService, collectClaudeCodeKnownSecrets, CodexSessionTraceService } from './core/agents/backend/diagnostics';
 import { DiagnosticsRuntimeCoordinator } from './app/diagnostics';
 import { MemoryRuntimeCoordinator, VaultIndexFileSystem } from './app/memory';
-import { VaultIndexService } from './core/memory';
+import { isIndexablePath, VaultIndexService } from './core/memory';
 import { PdfIndexFileSystem } from './app/pdf/PdfIndexFileSystem';
 import { PdfEngineLoader, PdfIndexService } from './core/pdf';
 import { PdfChatIntegration } from './features/chat/services/PdfChatIntegration';
@@ -130,6 +130,7 @@ import {
   setDebugRefreshIntervalMs,
   setInlineSerializedDebugLogArgsEnabled,
 } from './shared';
+import { describeTextForTokenCount } from './shared/tokenEstimate';
 import { registerBuiltinGlassAdapters } from './utils/glass';
 import type { AgentBackendKind } from './core/types/chat';
 
@@ -1531,6 +1532,9 @@ export default class OpenCodianPlugin extends Plugin {
       },
     });
 
+    // advantage-parity R-E6: token estimate commands (selection + vault).
+    this.registerTokenCountCommands();
+
     this.addCommand({
       id: 'toggle-liquid-diamond-demo',
       name: '切换钻石演示',
@@ -1821,6 +1825,85 @@ export default class OpenCodianPlugin extends Plugin {
       return false;
     }
     return this.getOpenCodianView()?.attachContextItemToActiveTab(item) ?? false;
+  }
+
+  /**
+   * advantage-parity R-E6: token estimate commands. Selection falls back
+   * honestly without a non-empty selection; the vault command covers the
+   * R-C1 index scope (markdown minus exclusion rules, dot paths always out).
+   */
+  private registerTokenCountCommands(): void {
+    this.addCommand({
+      id: 'count-selection-tokens',
+      name: t('tokenCount.selection.command'),
+      editorCallback: (editor: Editor) => {
+        const selection = editor.getSelection();
+        if (!selection.trim()) {
+          new Notice(t('tokenCount.noSelection'));
+          return;
+        }
+        this.reportTokenEstimate(t('tokenCount.selection.title'), selection);
+      },
+    });
+
+    this.addCommand({
+      id: 'count-vault-tokens',
+      name: t('tokenCount.vault.command'),
+      callback: () => {
+        void this.countVaultTokens();
+      },
+    });
+  }
+
+  /**
+   * advantage-parity R-E6: report a token estimate as a Notice and copy the
+   * plain facts to the clipboard. The heuristic lives in shared/tokenEstimate
+   * and is documented as an orientation number, never a billing figure.
+   */
+  private reportTokenEstimate(title: string, text: string): void {
+    const facts = describeTextForTokenCount(text);
+    const line = t('tokenCount.summary', {
+      title,
+      chars: facts.chars,
+      words: facts.words,
+      tokens: facts.tokens,
+    });
+    new Notice(line, 8000);
+    void navigator.clipboard?.writeText(line).catch(() => {
+      // Clipboard may be unavailable (permissions); the Notice already
+      // carries the result.
+    });
+  }
+
+  private async countVaultTokens(): Promise<void> {
+    const rules = this.settings?.vaultRetrievalExcludedPaths ?? [];
+    const files = this.app.vault.getMarkdownFiles()
+      .filter((file) => isIndexablePath(file.path, rules));
+    if (files.length === 0) {
+      new Notice(t('tokenCount.vault.empty'));
+      return;
+    }
+    let chars = 0;
+    let cjkChars = 0;
+    for (const file of files) {
+      try {
+        const content = await this.app.vault.cachedRead(file);
+        chars += content.length;
+        cjkChars += (content.match(/[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/g) ?? []).length;
+      } catch {
+        // Unreadable file: skip it; the estimate stays an estimate.
+      }
+    }
+    const tokens = Math.ceil(((chars - cjkChars) / 4) + (cjkChars * 1.2));
+    const line = t('tokenCount.vault.summary', {
+      files: files.length,
+      chars,
+      tokens,
+    });
+    new Notice(line, 10000);
+    void navigator.clipboard?.writeText(line).catch(() => {
+      // See reportTokenEstimate: the Notice already carries the result.
+    });
   }
 
   /**

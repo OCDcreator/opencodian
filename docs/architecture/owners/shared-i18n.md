@@ -1,4 +1,6 @@
 # Owner: shared.i18n
+> 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
+> 2026-09-21 (advantage-parity R-E6)：tokenCount.* 键。
 > 2026-09-21 (advantage-parity R-E2)：chat.webViewer.* 键。
 > 2026-09-21 (advantage-parity R-E1)：zh/en 新增 chat.context.kind.url 与 chat.context.url.* 键。
 > 2026-09-20 (advantage-parity R-D1)：zh/en 新增 chat.history.export、chat.export.*、settings.conversation.export.* 键（双语对齐）。

@@ -2528,6 +2528,15 @@ export const zhTranslations = {
   'chat.context.kind.pdfDocument': 'PDF 文档',
   'chat.context.kind.pdfSelection': 'PDF 选区',
   'chat.context.kind.url': '网页',
+
+  // advantage-parity R-E6：token 计数命令
+  'tokenCount.selection.command': '估算选区 token 数',
+  'tokenCount.selection.title': '选区',
+  'tokenCount.noSelection': '没有非空选区可估算。',
+  'tokenCount.summary': '{{title}}：{{chars}} 字符 / {{words}} 词 / 约 {{tokens}} token（启发式估算，已复制）',
+  'tokenCount.vault.command': '估算全库 token 数（R-C1 索引范围）',
+  'tokenCount.vault.empty': '索引范围内没有可统计的 Markdown 笔记。',
+  'tokenCount.vault.summary': '全库（{{files}} 篇，R-C1 范围）：{{chars}} 字符 / 约 {{tokens}} token（启发式估算，已复制）',
   'chat.context.url.failedBadge': '抓取失败',
 
   // advantage-parity R-E2：Web Viewer 标签页上下文

@@ -1,4 +1,6 @@
 > 2026-09-18 (FlowText parity R-A7): `parseObsidianContextTag` accepts `kind="folder"` so directory context tags round-trip losslessly.
+> 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
+> 2026-09-21 (advantage-parity R-E6)：新增 shared/tokenEstimate.ts（启发式估算，定位数字非计费数字）。
 > 2026-09-21 (advantage-parity R-E1)：obsidianContext 新增 buildUrlContextTag/Body 与 attachment 的 url 元数据透传。
 > 2026-09-20 (advantage-parity R-D1)：vault.ts 新增 sanitizeVaultFileBaseName / isSafeVaultRelativePath（R-C2 附件名与 R-D1 导出文件名共用边界规则）；index barrel 同步导出。
 > 2026-09-18 (R-B3 编辑回退): 新增 `src/shared/editRevertPlan.ts` 归属本 owner —— 编辑回退的纯规划核心（写工具分类、路径/候选提取、保留淘汰规划、侧栏视图模型）。零 Obsidian 依赖，禁止引入 core/feature/app import；单测在 `tests/unit/shared/editRevertPlan.test.ts`。

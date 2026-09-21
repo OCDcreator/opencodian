@@ -1,4 +1,5 @@
 > 2026-09-18 (FlowText parity R-A5): `editorSelectionHighlight` becomes keyed multi-region (`showSelectionHighlight(view, from, to, key)`; default slot keeps legacy behavior) so parallel inline edits each keep their own highlight; region map and derived DecorationSet map together through every document change.
+> 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 
 # Owner: shared.utils-misc
 

@@ -1,4 +1,5 @@
 # Owner: core.runtime
+> 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 > 2026-09-20 (advantage-parity R-D2)：SettingsRuntimeCoordinator 的 persistSettingsDomains 向 saveCoreSettings 传入 secretsKeychainEnabled 旗标（钥匙串回滚开关；关闭时持久化明文密钥）。
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.

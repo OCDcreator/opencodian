@@ -1,4 +1,5 @@
 > 2026-09-18 (FlowText parity R-A7): the composer input-shell host gains `addVaultPathContextFromDrop`, forwarding vault path drops to `composerContextViewFacade` (claimed drops preventDefault; editor text drops keep default insertion).
+> 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 > 2026-09-21 (advantage-parity R-E2)：composer host 新增 Web Viewer 两缝。
 > 2026-09-21 (advantage-parity R-E1)：OpenCodianView 的 composer host 新增 attachUrlContextToActiveTab（粘贴 URL → 网页 chip，零视图逻辑）。
 > 2026-09-20 (advantage-parity R-D1)：OpenCodianView 的历史菜单 host 新增 exportConversationMarkdown 转发方法（导出逻辑不进视图）。

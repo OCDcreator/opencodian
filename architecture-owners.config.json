@@ -240,6 +240,7 @@
         "src/shared/index.ts",
         "src/shared/logger.ts",
         "src/shared/obsidianContext.ts",
+        "src/shared/tokenEstimate.ts",
         "src/shared/toolExecution.ts",
         "src/shared/toolIdentity.ts",
         "src/shared/vault.ts"

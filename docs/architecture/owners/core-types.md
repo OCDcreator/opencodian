@@ -1,4 +1,5 @@
 # Owner: core.types
+> 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 > 2026-09-21 (advantage-parity R-E1)：chat 类型新增 url PromptContextKind 与 UrlContextMeta（抓取状态机元数据）。
 > 2026-09-20 (advantage-parity R-D1)：settings 新增 conversationExport 块（目录/模板/自动导出）与 normalizeConversationExportSettings 归一化器；load 边界合流点同步消费；index barrel 导出新类型与归一化函数。
 

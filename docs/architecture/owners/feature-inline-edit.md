@@ -1,4 +1,5 @@
 # Owner: feature.inline-edit
+> 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 
 Inline edit (2026-09-15): the feature is backend-agnostic UI plus orchestration. It never writes through the model: the only write path is a single `editor.replaceRange` in `InlineEditController`, taken after a dirty check against the snapshot the request was built from.
 

@@ -1,4 +1,5 @@
 # Owner: feature.settings-plugin
+> 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 > 2026-09-20 (advantage-parity R-D1)：SettingsConversationSection 新增「导出」设置块（目录/模板/自动导出；目录走与导出器同一归一化器，非法恢复原值；路径类输入用 opencodian-wide-text-setting 宽输入）。
 
 Update progress (2026-09-10): SettingsPluginUpdateSection renders service-owned phases and truthful completed-file counts in place, with an indeterminate progress bar while busy. It owns three-at-a-time history disclosure and focus behavior; shell lifecycle disposes subscriptions. It does not own install/download/rollback transactions.

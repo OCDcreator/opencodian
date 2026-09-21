@@ -2528,6 +2528,15 @@ export const enTranslations = {
   'chat.context.kind.pdfDocument': 'PDF document',
   'chat.context.kind.pdfSelection': 'PDF selection',
   'chat.context.kind.url': 'Webpage',
+
+  // advantage-parity R-E6：token 计数命令
+  'tokenCount.selection.command': 'Estimate selection tokens',
+  'tokenCount.selection.title': 'Selection',
+  'tokenCount.noSelection': 'No non-empty selection to estimate.',
+  'tokenCount.summary': '{{title}}: {{chars}} chars / {{words}} words / ~{{tokens}} tokens (heuristic estimate, copied)',
+  'tokenCount.vault.command': 'Estimate whole-vault tokens (R-C1 scope)',
+  'tokenCount.vault.empty': 'No Markdown notes in the index scope.',
+  'tokenCount.vault.summary': 'Vault ({{files}} notes, R-C1 scope): {{chars}} chars / ~{{tokens}} tokens (heuristic estimate, copied)',
   'chat.context.url.failedBadge': 'fetch failed',
 
   // advantage-parity R-E2：Web Viewer 标签页上下文
