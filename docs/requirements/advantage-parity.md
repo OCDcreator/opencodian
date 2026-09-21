@@ -62,7 +62,7 @@
 | F | R-F1 | Turn steering + 流式中消息排队 | Claudian | P1 | DONE |
 | F | R-F2 | 会话-笔记绑定草稿（linked content） | Claudian | P2 | DONE |
 | F | R-F3 | 回退预览 + 冲突检测 UI | Claudian | P2 | DONE |
-| F | R-F4 | 暖进程池（聊天侧预热） | Claudian | P2 | TODO |
+| F | R-F4 | 暖进程池（聊天侧预热） | Claudian | P2 | DONE |
 | F | R-F5 | 双栏会话管理器 | Claudian | P3 | TODO |
 | F | R-F6 | Vim 风格聊天导航键 | Claudian | P3 | TODO |
 | F | R-F7 | 每供应商环境变量分域 + 环境哈希失效 | Claudian | P2 | DONE |
@@ -269,6 +269,14 @@ R-B3 回退前显示预览：将恢复的文件清单 + 每文件 before/after �
 ### R-F4 暖进程池（P2）
 
 Claudian 预热最多 N 个 agent 运行时降低起会话延迟。OpenCodian 适配：仅对「最近使用的默认后端」维持 1 个预热空会话（可关，默认关）；必须复用 R-C3 已落地的暖会话基础设施，不另建池；预热会话不产生任何计费轮次。
+
+**落地证据（2026-09-21，提交 `159198d9`，子代理实现 + 编排者独立校验）**：
+
+- **实现**：新增 `chatWarmSessionEnabled`（strict boolean load，默认 `false`），复用唯一 `InlineCompletionService` 池；R-F4 只对当前 active/default backend 维持一个空上下文、已验证只读 aux session，调用 `startSession`/既有 warm seam，绝不调用 `complete`、`query` 或发送 prompt。R-C3 与 R-F4 共享池但保持独立开关：任一开启才保留池，两个关闭才 `disposeAll()`。默认 backend 下拉、禁用 active backend 后的 fallback、tabbed agent switch 均触发排他预热；失败目标会清空旧 session。
+- **并发/隔离**：generation + entry identity 防止 A→B 切换时旧 start 迟到污染新池；同目标并发预热合并为一个 starter；关闭期间挂起预热会被 `disposeAll()` 失效；R-C3 笔记绑定 session 切入 R-F4 时强制 dispose/rebuild 为空上下文。池最终至多一个 live session。
+- **测试**：聚焦 5 suites / **73 tests**（R-F4 空预热/零 completion、重复预热、同目标并发、A→B 迟到、关闭竞态、不可用目标清理、R-C3→R-F4 空上下文隔离、双开关处置、后端切换入口、strict load 默认值与 UI 保存→通知顺序）+ `npm run typecheck` + ESLint `0 errors / 0 warnings` + module-docs 756/756 + graphify freshness + owner manifest + `git diff --check`。
+- **实机（Test Vault，BUILD_ID `zcode-advantage-parity.202609211729`）**：四产物逐个部署并 `cmp`/SHA-256 校验；运行时 `getDebugBuildIdentityText()` 回读同一 BUILD_ID。Obsidian 1.13.7 detached Settings target 中，`智能体管理`页真实显示 R-F4 行，默认 checkbox `false`；切换 `false→true→false` 后设置回读 `chatWarmSessionEnabled=false`、R-F3/R-C3 `inlineCompletionEnabled=false`、`sessionCount=0`。行实测 531×106.98 px，标题 249×18.20 px，说明 249×59.78 px，设置内容 `scrollWidth=clientWidth=531`（水平 overflow=0），说明文字对背景对比度 **9.74:1**。截图 `.visual-evidence/rf4/rf4-chat-warm-off.png`；独立视觉代理 PASS。
+- **偏差登记**：无。`activeBackend`（最近使用默认后端）作为需求中的“最近使用的默认后端”映射；真实聊天仍走既有 session 创建路径，不复用 R-F4 aux session。
 
 ### R-F5 双栏会话管理器（P3）
 

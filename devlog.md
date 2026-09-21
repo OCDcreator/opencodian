@@ -11,6 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-21 R-F4 聊天侧暖进程池：共享 R-C3 单池、排他空 aux 会话与零计费预热
+
+**触发**：advantage-parity 批次 F P2 条目。需求要求只为最近使用的默认后端保留一个空预热会话、默认关闭、复用 R-C3 基础设施，并保证预热不产生计费轮次。
+
+**改动**：提交 `159198d9` 新增 `chatWarmSessionEnabled`（strict boolean load，默认 `false`），让 R-F4 与 R-C3 共用唯一 `InlineCompletionService` 池。R-F4 只调用只读 aux 的 start/warm seam，不发送 prompt、不调用 `complete/query`；两个开关任一开启才保留池，均关闭才释放。默认 backend 下拉、active fallback、tabbed agent switch 统一触发排他预热；generation/entry identity 处理 A→B 迟到、同目标并发、关闭期间挂起预热，以及 R-C3 笔记绑定→R-F4 空上下文重建。
+
+**测试与实机**：编排者独立复跑 5 suites / 73 tests、typecheck、ESLint 0/0、module-docs 756/756、graphify、owner manifest、diff-check。Test Vault BUILD_ID `zcode-advantage-parity.202609211729`；四产物逐个部署并 cmp/SHA-256 校验；detached Settings target 真实显示中文 R-F4 行，默认关闭，开关切换后恢复关闭，最终 pool `sessionCount=0`。行 531×106.98 px，水平 overflow=0，说明文案对比度 9.74:1；截图 `.visual-evidence/rf4/rf4-chat-warm-off.png`，独立视觉代理 PASS。
+
+---
+
 ## 2026-09-21 R-F3 回退预览 + 冲突检测：post baseline、行数清单与二选一握手
 
 **触发**：advantage-parity 批次 F P2 条目。R-B3 已有可回退快照，但点击立即写回；需求要求先看到文件清单/行数，并在 agent 生成后又被用户修改时明确二选一。
