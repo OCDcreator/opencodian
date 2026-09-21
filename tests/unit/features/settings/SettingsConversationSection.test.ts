@@ -3,7 +3,7 @@ import type { App } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 
-import { DEFAULT_SETTINGS } from '../../../../src/core/types';
+import { DEFAULT_SETTINGS, normalizeChatVimNavigationKeys } from '../../../../src/core/types';
 import { SettingsConversationSection } from '../../../../src/features/settings/SettingsConversationSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
@@ -436,13 +436,16 @@ describe('SettingsConversationSection', () => {
       chatVimNavigationComposerKey: 'i',
     });
 
+    // 'k' now collides with the scroll-up key: the edit is refused and the
+    // previous valid triple survives, including the custom 'k' binding.
     await downKey?.onChange?.('k');
     expect(plugin.settings).toMatchObject({
-      chatVimNavigationUpKey: 'w',
+      chatVimNavigationUpKey: 'k',
       chatVimNavigationDownKey: 's',
       chatVimNavigationComposerKey: 'i',
     });
-    expect(plugin.saveSettings).toHaveBeenCalledTimes(2);
+    // Only the accepted edit persisted; a refused edit writes nothing.
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
   });
 
   it('dispose clears any registered title-model refresh callback', () => {
@@ -1323,4 +1326,121 @@ describe('SettingsConversationSection compaction fields', () => {
     expect(noticeSpy).toHaveBeenCalledWith(t('settings.conversation.compaction.configUnavailable'));
   });
 
+});
+
+describe('SettingsConversationSection Vim key conflict handling', () => {
+  let noticeSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    resetHarnessState();
+    noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    installSettingMocks({ includeSetClass: true });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    document.body.innerHTML = '';
+  });
+
+  function vimKeyPlugin() {
+    return createPlugin({
+      chatVimNavigationEnabled: true,
+      chatVimNavigationUpKey: 'j',
+      chatVimNavigationDownKey: 'k',
+      chatVimNavigationComposerKey: 'p',
+    });
+  }
+
+  it('rejects a duplicate binding without wiping the other two custom keys', async () => {
+    const plugin = vimKeyPlugin();
+    createSection(plugin);
+    const upKey = findText(t('settings.conversation.vimNavigation.upKey'));
+    const downKey = findText(t('settings.conversation.vimNavigation.downKey'));
+    const composerKey = findText(t('settings.conversation.vimNavigation.composerKey'));
+
+    expect(upKey?.control.inputEl.value).toBe('j');
+    expect(downKey?.control.inputEl.value).toBe('k');
+    expect(composerKey?.control.inputEl.value).toBe('p');
+
+    // 'k' is already the scroll-down key: the edit must be refused.
+    await upKey?.onChange?.('k');
+
+    expect(plugin.settings).toMatchObject({
+      chatVimNavigationUpKey: 'j',
+      chatVimNavigationDownKey: 'k',
+      chatVimNavigationComposerKey: 'p',
+    });
+  });
+
+  it('keeps the three inputs in exact agreement with the saved settings', async () => {
+    const plugin = vimKeyPlugin();
+    createSection(plugin);
+    const upKey = findText(t('settings.conversation.vimNavigation.upKey'));
+    const downKey = findText(t('settings.conversation.vimNavigation.downKey'));
+    const composerKey = findText(t('settings.conversation.vimNavigation.composerKey'));
+
+    await upKey?.onChange?.('k');
+
+    const shown = [
+      upKey?.control.inputEl.value,
+      downKey?.control.inputEl.value,
+      composerKey?.control.inputEl.value,
+    ];
+    const saved = [
+      plugin.settings.chatVimNavigationUpKey,
+      plugin.settings.chatVimNavigationDownKey,
+      plugin.settings.chatVimNavigationComposerKey,
+    ];
+    expect(shown).toEqual(saved);
+    expect(shown).toEqual(['j', 'k', 'p']);
+  });
+
+  it('explains a refused binding instead of resetting silently', async () => {
+    const plugin = vimKeyPlugin();
+    createSection(plugin);
+    const upKey = findText(t('settings.conversation.vimNavigation.upKey'));
+
+    await upKey?.onChange?.('k');
+
+    expect(noticeSpy).toHaveBeenCalledWith(
+      t('settings.conversation.vimNavigation.duplicateKeyNotice'),
+    );
+  });
+
+  it('applies a non-conflicting key without touching the other two', async () => {
+    const plugin = vimKeyPlugin();
+    createSection(plugin);
+    const upKey = findText(t('settings.conversation.vimNavigation.upKey'));
+    const downKey = findText(t('settings.conversation.vimNavigation.downKey'));
+    const composerKey = findText(t('settings.conversation.vimNavigation.composerKey'));
+
+    await upKey?.onChange?.('n');
+
+    expect(plugin.settings).toMatchObject({
+      chatVimNavigationUpKey: 'n',
+      chatVimNavigationDownKey: 'k',
+      chatVimNavigationComposerKey: 'p',
+    });
+    expect(upKey?.control.inputEl.value).toBe('n');
+    expect(downKey?.control.inputEl.value).toBe('k');
+    expect(composerKey?.control.inputEl.value).toBe('p');
+  });
+
+  it('reloads the persisted triple to the same values the UI shows', async () => {
+    const plugin = vimKeyPlugin();
+    createSection(plugin);
+    const upKey = findText(t('settings.conversation.vimNavigation.upKey'));
+
+    await upKey?.onChange?.('k');
+    await upKey?.onChange?.('n');
+
+    // Simulate a reload of the persisted settings through the load boundary.
+    const reloaded = normalizeChatVimNavigationKeys({
+      up: plugin.settings.chatVimNavigationUpKey,
+      down: plugin.settings.chatVimNavigationDownKey,
+      composer: plugin.settings.chatVimNavigationComposerKey,
+    });
+    expect(reloaded).toEqual({ up: 'n', down: 'k', composer: 'p' });
+    expect(upKey?.control.inputEl.value).toBe(reloaded.up);
+  });
 });

@@ -1,4 +1,5 @@
 # Owner: feature.settings-plugin
+> 2026-09-21 (advantage-parity R-F6 质量修复)：三个 Vim 键输入共享重绘缝，显示值与设置真值恒等；冲突输入由 core.types 的单槽位契约拒绝并给出 notice，不再静默整体重置。
 > 2026-09-21 (advantage-parity R-F5/R-F6)：SettingsConversationSection 的 Display 块新增默认关闭的会话 rail 与 Vim 导航 toggles、w/s/i 单字符配置；保存后复用既有聊天视图刷新缝，键值经 core.types 归一化，不在设置层持有会话或键监听器。
 > 2026-09-21 (advantage-parity R-F8)：新增 ContextWindowOverrideModal（窄 port 不 import 应用层）+ 模型通用 tab 声明入口行。
 > 2026-09-21 (advantage-parity R-E4)：整库检索块新增语义检索三行设置。

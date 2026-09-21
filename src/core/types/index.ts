@@ -90,6 +90,7 @@ export {
 
 // Settings types
 export {
+  applyChatVimNavigationKey,
   type ApprovalDecision,
   AUTO_INTERNAL_LINK_MAX_EXCLUDED_TERMS,
   AUTO_INTERNAL_LINK_MAX_TERM_CHARS,
@@ -106,6 +107,9 @@ export {
   type ChatAppearanceStickySettings,
   type ChatAppearanceUserSettings,
   type ChatScrollMode,
+  type ChatVimNavigationKeys,
+  type ChatVimNavigationKeySlot,
+  type ChatVimNavigationKeyUpdate,
   CLAUDE_CODE_DEBUG_CHANNEL_IDS,
   CLAUDE_OFFICIAL_PROVIDER_PRESET,
   CLAUDE_PROVIDER_MANAGED_ENV_KEYS,
@@ -201,6 +205,7 @@ export {
   normalizeChatAppearanceBackgroundFitMode,
   normalizeChatAppearanceSettings,
   normalizeChatFontSizePx,
+  normalizeChatVimNavigationKey,
   normalizeChatVimNavigationKeys,
   normalizeClaudeCodeAdditionalDirectories,
   normalizeClaudeCodeBackendSettings,

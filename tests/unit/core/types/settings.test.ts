@@ -4,6 +4,7 @@
  */
 
 import {
+  applyChatVimNavigationKey,
   DEFAULT_SETTINGS,
   getCurrentPlatformBlockedCommands,
   getCurrentPlatformKey,
@@ -58,6 +59,62 @@ describe('chat Vim navigation settings', () => {
     expect(normalizeChatVimNavigationKeys({ up: 'w', down: 'w', composer: 'i' })).toEqual({
       up: 'w', down: 's', composer: 'i',
     });
+  });
+
+  it('applies a single-slot edit without touching the other two keys', () => {
+    const current = { up: 'j', down: 'k', composer: 'p' };
+
+    expect(applyChatVimNavigationKey(current, 'up', 'n')).toEqual({
+      keys: { up: 'n', down: 'k', composer: 'p' },
+      rejected: false,
+    });
+    // Case and surrounding whitespace still normalize like the whole-map path.
+    expect(applyChatVimNavigationKey(current, 'composer', ' N ')).toEqual({
+      keys: { up: 'j', down: 'k', composer: 'n' },
+      rejected: false,
+    });
+  });
+
+  it('refuses a colliding single-slot edit and keeps the previous valid triple', () => {
+    const current = { up: 'j', down: 'k', composer: 'p' };
+
+    // 'k' is already the scroll-down key.
+    expect(applyChatVimNavigationKey(current, 'up', 'k')).toEqual({
+      keys: { up: 'j', down: 'k', composer: 'p' },
+      rejected: true,
+    });
+    // ... and the other two custom keys are never silently reset.
+    expect(applyChatVimNavigationKey(current, 'composer', 'j')).toEqual({
+      keys: { up: 'j', down: 'k', composer: 'p' },
+      rejected: true,
+    });
+  });
+
+  it('falls back per slot for unusable input, refusing only on a real collision', () => {
+    // Clearing the scroll-down field falls back to that slot's default.
+    expect(applyChatVimNavigationKey({ up: 'j', down: 'k', composer: 'p' }, 'down', '')).toEqual({
+      keys: { up: 'j', down: 's', composer: 'p' },
+      rejected: false,
+    });
+    // A default that collides with another custom key is refused instead:
+    // clearing the scroll-down field would fall back to 's', which the user
+    // already bound to scroll-up.
+    expect(applyChatVimNavigationKey({ up: 's', down: 'k', composer: 'p' }, 'down', '')).toEqual({
+      keys: { up: 's', down: 'k', composer: 'p' },
+      rejected: true,
+    });
+  });
+
+  it('never yields a duplicate triple through the per-slot path', () => {
+    const slots = ['up', 'down', 'composer'] as const;
+    const keys = ['w', 's', 'i', 'j', 'k', 'p'];
+    for (const slot of slots) {
+      for (const candidate of keys) {
+        const result = applyChatVimNavigationKey({ up: 'j', down: 'k', composer: 'p' }, slot, candidate);
+        const values = Object.values(result.keys);
+        expect(new Set(values).size).toBe(values.length);
+      }
+    }
   });
 });
 

@@ -19,10 +19,14 @@ export interface ConversationSessionRailHost {
  * second action surface and a second source of conversation truth.
  */
 export class ConversationSessionRailCoordinator {
+  private static nextInstanceId = 0;
+  private readonly titleId: string;
   private railEl: HTMLElement | null = null;
   private messagesShellEl: HTMLElement | null = null;
 
-  constructor(private readonly host: ConversationSessionRailHost) {}
+  constructor(private readonly host: ConversationSessionRailHost) {
+    this.titleId = `opencodian-session-rail-title-${++ConversationSessionRailCoordinator.nextInstanceId}`;
+  }
 
   refresh(messagesShellEl: HTMLElement | null): void {
     this.messagesShellEl = messagesShellEl;
@@ -33,10 +37,18 @@ export class ConversationSessionRailCoordinator {
 
     if (!this.railEl || this.railEl.parentElement !== messagesShellEl) {
       this.destroyRail();
+      // `role="navigation"` because the rail's purpose is navigating between
+      // conversations (each item loads a different session) — the ARIA
+      // definition of a navigation landmark. `complementary` would describe it
+      // as tangential supporting content, which understates the primary session
+      // switcher in a wide pane. A bare `div` with only `aria-label` has no
+      // nameable role, so screen readers may ignore the label entirely; the
+      // landmark is named from its own visible title via `aria-labelledby`.
       this.railEl = messagesShellEl.createDiv({
         cls: 'opencodian-session-rail',
         attr: {
-          'aria-label': t('chat.sessionRail.title'),
+          role: 'navigation',
+          'aria-labelledby': this.titleId,
         },
       });
       messagesShellEl.addClass('opencodian-messages-shell--session-rail');
@@ -60,6 +72,13 @@ export class ConversationSessionRailCoordinator {
     railEl.createDiv({
       cls: 'opencodian-session-rail-title',
       text: t('chat.sessionRail.title'),
+      // Heading semantics so the visible title is announced as the landmark's
+      // heading, and doubles as the `aria-labelledby` name source.
+      attr: {
+        id: this.titleId,
+        role: 'heading',
+        'aria-level': '2',
+      },
     });
 
     const listEl = railEl.createDiv({

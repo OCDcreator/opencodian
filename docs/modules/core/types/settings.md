@@ -1,4 +1,5 @@
 # Settings Types and Defaults
+> 2026-09-21 (advantage-parity R-F6 质量修复)：新增 `applyChatVimNavigationKey(current, slot, raw)` 与 `normalizeChatVimNavigationKey(raw, fallback)`。整表 `normalizeChatVimNavigationKeys` 保持原有 fail-closed 语义（持久化配置含重复键即整体回退默认 `w`/`s`/`i`），这是 load 边界该有的行为；但交互式单槽位编辑不再复用整表回退——冲突的候选被拒绝并返回原三元组（`rejected: true`），因此不会静默抹掉其他两个合法自定义键。单槽位路径在构造上不可能产出重复三元组（属性测试覆盖）。
 > 2026-09-21 (advantage-parity R-F5/R-F6)：新增双栏会话 rail 与 Vim 导航五字段；两个开关默认关闭，三键归一化为互不重复的单字符（默认 `w`/`s`/`i`），坏值 fail-closed。
 > 2026-09-21 (advantage-parity R-F4)：新增 `chatWarmSessionEnabled`（默认 `false`）：只许可为 active chat backend 预热一个空、已验证的只读 aux session；不提交 prompt / completion turn，真实聊天不复用它。
 > 2026-09-21 (advantage-parity R-F7)：新增 `environmentVariables: EnvironmentVariablesDomains`（`shared` + `providers`，默认空域；类型自 core.agents `BackendEnvironment` 导入）。

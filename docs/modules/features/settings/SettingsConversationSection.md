@@ -1,4 +1,5 @@
 # SettingsConversationSection
+> 2026-09-21 (advantage-parity R-F6 质量修复)：三个 Vim 键输入改为共享 `keyFields` + `refreshKeyFields()`：每次编辑后三个输入框都按设置真值重绘，显示值与运行时读取值恒等。冲突输入经 `applyChatVimNavigationKey` 拒绝后保留先前有效三元组、重绘输入并弹出 `vimNavigation.duplicateKeyNotice` 说明，不再静默整体重置为 `w/s/i`（该重置会同时抹掉另外两个合法自定义键）。被拒绝的编辑不写盘，因此 `saveSettings` 只在实际接受时调用。
 > 2026-09-21 (advantage-parity R-F5/R-F6)：Display 块新增会话管理 rail 开关、Vim 导航开关和三个单字符输入；保存走既有 view refresh seam，无需 reload。
 > 2026-09-21 (advantage-parity R-E4)：整库检索块内新增语义检索三行（开关默认关 + 供应商下拉（取自定义 providers）+ 模型宽输入）。
 > 2026-09-21 (advantage-parity R-D3)：display 块新增「轮次完成提示音」两行（开关默认关 + 自定义音频文件路径，宽输入 + title 悬停）。

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The sidebar suite keeps the diff list, revert round, linked-note binding and preview-modal contracts on one shared DOM harness. */
 import { type App, Component } from 'obsidian';
 import { Modal } from 'obsidian';
 

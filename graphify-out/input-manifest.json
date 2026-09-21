@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "d7d30232d2e024ceaeaca6dd193fa0dd1db91d4a0cd518d4e3a2881ab81c9aed",
+  "digest": "70b5f752517424d7c8c4ef710af78427d9d6eeb164925b753a6aa44c3a325149",
   "recordCount": 773,
   "records": [
     {
@@ -1191,7 +1191,7 @@
     {
       "kind": "src",
       "key": "src/core/types/index.ts",
-      "sha256": "4ac1e3bea74ee62691f84bb3b2e95600b407f4eb4da122c36fac2907c29f9ebf"
+      "sha256": "867852f8d7337ce7ff3c201ec12ee8515591ab3cbcad73ab29617189e3259e98"
     },
     {
       "kind": "src",
@@ -1656,7 +1656,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ChatVimNavigationCoordinator.ts",
-      "sha256": "43c9f71777d92eb4afa48f8db6cc72fd75ca50c8ca247bdef94955e5c11a6433"
+      "sha256": "bca543181d9112bb9cdc329f98993855a3ed3641aef95527b7e3858e00012f77"
     },
     {
       "kind": "src",
@@ -1861,7 +1861,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ConversationSessionRailCoordinator.ts",
-      "sha256": "ba04cea61e9e95105b2bc44862c30d5766bc6fd9aadb41168d32e692e2c7964f"
+      "sha256": "a8e9a4db3de060d57f344eb916b26d6fff7d042214701bbc1ed477f55ac69a1a"
     },
     {
       "kind": "src",
@@ -3041,7 +3041,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsConversationSection.ts",
-      "sha256": "07f8f502e52d65bca5717cba5aa2c71621dc09906b82339e8fc5f959fe5a7b28"
+      "sha256": "7625666f597f22d2356abf6638431175531a9d96678ce0be8f5f5ed2a27d6996"
     },
     {
       "kind": "src",
@@ -3869,7 +3869,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-21T15:56:30.755Z",
-  "headShaAtGeneration": "c7880094c0ceb97364e93886a21692c13ef71439",
+  "generatedAt": "2026-09-21T16:21:57.326Z",
+  "headShaAtGeneration": "3c528fa4a11dc52b75c8d32136a46b2686bf1f1b",
   "graphifyVersion": "graphify 0.9.36"
 }

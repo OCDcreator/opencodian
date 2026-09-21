@@ -1,4 +1,4 @@
-import type { App, ButtonComponent, ExtraButtonComponent } from 'obsidian';
+import type { App, ButtonComponent, ExtraButtonComponent, TextComponent } from 'obsidian';
 import { Notice, requestUrl, Setting } from 'obsidian';
 
 import {
@@ -23,10 +23,12 @@ import type {
   TitleMode,
 } from '../../core/types';
 import {
+  applyChatVimNavigationKey,
+  type ChatVimNavigationKeys,
+  type ChatVimNavigationKeySlot,
   EDIT_REVERT_SNAPSHOT_LIMIT_MB_MAX,
   EDIT_REVERT_SNAPSHOT_LIMIT_MB_MIN,
   normalizeChatFontSizePx,
-  normalizeChatVimNavigationKeys,
   normalizeConversationExportDirectory,
   normalizeConversationExportFilenameTemplate,
   normalizeEditRevertSnapshotLimitMb,
@@ -103,6 +105,15 @@ interface DropdownValueControl {
 }
 
 type ShareDiagnosticState = 'ok' | 'warning' | 'error' | 'pending';
+
+/**
+ * The three Vim key inputs plus the shared redraw. They are written and
+ * re-displayed together so no input can disagree with the saved settings.
+ */
+interface ChatVimNavigationKeyFields {
+  inputs: Partial<Record<ChatVimNavigationKeySlot, TextComponent>>;
+  refresh(): void;
+}
 
 interface ShareHostDiagnosticResult {
   reachable: boolean;
@@ -1536,53 +1547,71 @@ export class SettingsConversationSection {
           });
       });
 
-    this.addChatVimNavigationKeySetting(
-      containerEl,
-      'up',
-      'settings.conversation.vimNavigation.upKey',
-      'settings.conversation.vimNavigation.upKeyDesc',
-    );
-    this.addChatVimNavigationKeySetting(
-      containerEl,
-      'down',
-      'settings.conversation.vimNavigation.downKey',
-      'settings.conversation.vimNavigation.downKeyDesc',
-    );
-    this.addChatVimNavigationKeySetting(
-      containerEl,
-      'composer',
-      'settings.conversation.vimNavigation.composerKey',
-      'settings.conversation.vimNavigation.composerKeyDesc',
-    );
+    // All three key fields are written and re-displayed together: a save result
+    // that disagrees with any of the visible inputs is the bug this shape
+    // prevents (a refused edit used to leave two stale inputs on screen).
+    const fields: ChatVimNavigationKeyFields = {
+      inputs: {},
+      refresh: () => {
+        const keys = this.readChatVimNavigationKeys();
+        fields.inputs.up?.setValue(keys.up);
+        fields.inputs.down?.setValue(keys.down);
+        fields.inputs.composer?.setValue(keys.composer);
+      },
+    };
+
+    this.addChatVimNavigationKeySetting(containerEl, fields, {
+      key: 'up',
+      nameKey: 'settings.conversation.vimNavigation.upKey',
+      descriptionKey: 'settings.conversation.vimNavigation.upKeyDesc',
+    });
+    this.addChatVimNavigationKeySetting(containerEl, fields, {
+      key: 'down',
+      nameKey: 'settings.conversation.vimNavigation.downKey',
+      descriptionKey: 'settings.conversation.vimNavigation.downKeyDesc',
+    });
+    this.addChatVimNavigationKeySetting(containerEl, fields, {
+      key: 'composer',
+      nameKey: 'settings.conversation.vimNavigation.composerKey',
+      descriptionKey: 'settings.conversation.vimNavigation.composerKeyDesc',
+    });
+  }
+
+  private readChatVimNavigationKeys(): ChatVimNavigationKeys {
+    return {
+      up: this.plugin.settings.chatVimNavigationUpKey,
+      down: this.plugin.settings.chatVimNavigationDownKey,
+      composer: this.plugin.settings.chatVimNavigationComposerKey,
+    };
   }
 
   private addChatVimNavigationKeySetting(
     containerEl: HTMLElement,
-    key: 'up' | 'down' | 'composer',
-    nameKey: TranslationKey,
-    descriptionKey: TranslationKey,
+    fields: ChatVimNavigationKeyFields,
+    copy: { key: ChatVimNavigationKeySlot; nameKey: TranslationKey; descriptionKey: TranslationKey },
   ): void {
-    const readKeys = () => ({
-      up: this.plugin.settings.chatVimNavigationUpKey,
-      down: this.plugin.settings.chatVimNavigationDownKey,
-      composer: this.plugin.settings.chatVimNavigationComposerKey,
-    });
+    const { key } = copy;
     new Setting(containerEl)
-      .setName(t(nameKey))
-      .setDesc(t(descriptionKey))
+      .setName(t(copy.nameKey))
+      .setDesc(t(copy.descriptionKey))
       .addText((text) => {
+        fields.inputs[key] = text;
         text.inputEl.maxLength = 1;
         text
-          .setValue(readKeys()[key])
+          .setValue(this.readChatVimNavigationKeys()[key])
           .onChange(async (value) => {
-            const normalized = normalizeChatVimNavigationKeys({
-              ...readKeys(),
-              [key]: value,
-            });
-            this.plugin.settings.chatVimNavigationUpKey = normalized.up;
-            this.plugin.settings.chatVimNavigationDownKey = normalized.down;
-            this.plugin.settings.chatVimNavigationComposerKey = normalized.composer;
-            text.setValue(normalized[key]);
+            const update = applyChatVimNavigationKey(this.readChatVimNavigationKeys(), key, value);
+            if (update.rejected) {
+              // Keep the previous valid configuration and say so; do not
+              // silently reset the other two custom keys to their defaults.
+              fields.refresh();
+              new Notice(t('settings.conversation.vimNavigation.duplicateKeyNotice'));
+              return;
+            }
+            this.plugin.settings.chatVimNavigationUpKey = update.keys.up;
+            this.plugin.settings.chatVimNavigationDownKey = update.keys.down;
+            this.plugin.settings.chatVimNavigationComposerKey = update.keys.composer;
+            fields.refresh();
             await this.plugin.saveSettings();
           });
       });

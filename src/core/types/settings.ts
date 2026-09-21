@@ -3889,6 +3889,8 @@ export interface ChatVimNavigationKeys {
   composer: string;
 }
 
+export type ChatVimNavigationKeySlot = keyof ChatVimNavigationKeys;
+
 /**
  * Read one printable, single-code-point key. Whitespace, modifier-looking
  * values, multi-character values and duplicate bindings all fail closed to
@@ -3898,21 +3900,60 @@ export interface ChatVimNavigationKeys {
 export function normalizeChatVimNavigationKeys(
   value: Partial<ChatVimNavigationKeys> | null | undefined,
 ): ChatVimNavigationKeys {
-  const normalizeKey = (raw: unknown, fallback: string): string => {
-    if (typeof raw !== 'string') return fallback;
-    const key = raw.trim().toLowerCase();
-    return Array.from(key).length === 1 ? key : fallback;
-  };
-
   const normalized = {
-    up: normalizeKey(value?.up, DEFAULT_CHAT_VIM_NAVIGATION_KEYS.up),
-    down: normalizeKey(value?.down, DEFAULT_CHAT_VIM_NAVIGATION_KEYS.down),
-    composer: normalizeKey(value?.composer, DEFAULT_CHAT_VIM_NAVIGATION_KEYS.composer),
+    up: normalizeChatVimNavigationKey(value?.up, DEFAULT_CHAT_VIM_NAVIGATION_KEYS.up),
+    down: normalizeChatVimNavigationKey(value?.down, DEFAULT_CHAT_VIM_NAVIGATION_KEYS.down),
+    composer: normalizeChatVimNavigationKey(value?.composer, DEFAULT_CHAT_VIM_NAVIGATION_KEYS.composer),
   };
   const values = Object.values(normalized);
   return new Set(values).size === values.length
     ? normalized
     : { ...DEFAULT_CHAT_VIM_NAVIGATION_KEYS };
+}
+
+/**
+ * Normalize a single slot's key. An unusable value (non-string, whitespace,
+ * multi-code-point, modifier-looking) falls back to that slot's default.
+ */
+export function normalizeChatVimNavigationKey(raw: unknown, fallback: string): string {
+  if (typeof raw !== 'string') return fallback;
+  const key = raw.trim().toLowerCase();
+  return Array.from(key).length === 1 ? key : fallback;
+}
+
+export interface ChatVimNavigationKeyUpdate {
+  /** The triple to persist: either the accepted candidate or the previous one. */
+  keys: ChatVimNavigationKeys;
+  /** True when the candidate collided with another slot and was refused. */
+  rejected: boolean;
+}
+
+/**
+ * Apply a single-slot edit to the binding triple, refusing collisions.
+ *
+ * The whole-triple reset in {@link normalizeChatVimNavigationKeys} is the right
+ * fail-closed answer for a *persisted* map (a hand-edited file with duplicate
+ * keys must not silently shadow chat input), but it is the wrong answer for an
+ * *interactive* edit: resetting all three would discard the other two valid
+ * custom keys the user never touched. So an edit that would collide with
+ * another slot is refused outright and the previous triple is returned
+ * unchanged; callers surface that refusal instead of silently rewriting the
+ * settings. A non-colliding edit only ever changes its own slot.
+ */
+export function applyChatVimNavigationKey(
+  current: Partial<ChatVimNavigationKeys> | null | undefined,
+  slot: ChatVimNavigationKeySlot,
+  raw: unknown,
+): ChatVimNavigationKeyUpdate {
+  const base = normalizeChatVimNavigationKeys(current);
+  const candidate: ChatVimNavigationKeys = {
+    ...base,
+    [slot]: normalizeChatVimNavigationKey(raw, DEFAULT_CHAT_VIM_NAVIGATION_KEYS[slot]),
+  };
+  const values = Object.values(candidate);
+  return new Set(values).size === values.length
+    ? { keys: candidate, rejected: false }
+    : { keys: base, rejected: true };
 }
 
 /** advantage-parity R-D2: keychain toggle normalizes to the safe default (on). */

@@ -23,7 +23,8 @@
 - 默认上游将提供 `w` / `s` / `i`，但 coordinator 仅按 host 当前返回的键匹配，且不区分大小写。
 - 滚动按当前 `clientHeight` 的 65% 调用 `messagesContainer.scrollBy({ top, behavior: 'smooth' })`；上滚为负数，下滚为正数。
 - 只有已经执行滚动或聚焦时才调用 `preventDefault()`。
-- 输入、文本域、选择框、可编辑内容、Ctrl/Meta/Alt 组合键、输入法 composing、长按 repeat、已被消费的事件和 host 阻塞 overlay 都保持原始行为。
+- 输入、文本域、选择框、可编辑内容、Ctrl/Meta/Alt/**Shift** 组合键、输入法 composing、长按 repeat、已被消费的事件和 host 阻塞 overlay 都保持原始行为。
+  - Shift 是修饰键：`Shift+W` 的 `event.key` 是 `'W'`，经大小写不敏感归一化后会命中配置的 `'w'`，从而在用户输入大写字母时滚动聊天并吞掉按键。`shouldHandle()` 因此显式避让 `shiftKey`。CapsLock 或合成事件产生的「大写 key 但 `shiftKey === false`」仍按设计命中绑定（R-F6 质量修复，回归测试覆盖 `Shift+W/S/I`）。
 
 ## 生命周期
 

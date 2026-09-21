@@ -168,3 +168,52 @@ describe('ChatVimNavigationCoordinator', () => {
     expect(event.defaultPrevented).toBe(false);
   });
 });
+
+describe('ChatVimNavigationCoordinator Shift modifier (R-F6)', () => {
+  afterEach(() => {
+    document.body.empty();
+  });
+
+  // Shift is a modifier like Ctrl/Meta/Alt: Shift+W produces key 'W', which
+  // normalizes to the configured 'w' and used to scroll the chat and swallow
+  // the event. Typing a capital letter must stay with its current owner.
+  it.each([
+    ['Shift+W', 'W'],
+    ['Shift+S', 'S'],
+    ['Shift+I', 'I'],
+  ])('leaves %s to its current owner', (_label, key) => {
+    const { host, root, scrollBy } = createFixture();
+
+    const event = dispatchKey(root, { key, shiftKey: true });
+
+    expect(scrollBy).not.toHaveBeenCalled();
+    expect(host.focusComposer).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('still handles the plain lowercase configured keys', () => {
+    const { host, root, scrollBy } = createFixture();
+
+    const up = dispatchKey(root, { key: 'w' });
+    const down = dispatchKey(root, { key: 's' });
+    const focus = dispatchKey(root, { key: 'i' });
+
+    expect(scrollBy).toHaveBeenNthCalledWith(1, { top: -130, behavior: 'smooth' });
+    expect(scrollBy).toHaveBeenNthCalledWith(2, { top: 130, behavior: 'smooth' });
+    expect(host.focusComposer).toHaveBeenCalledTimes(1);
+    expect(up.defaultPrevented).toBe(true);
+    expect(down.defaultPrevented).toBe(true);
+    expect(focus.defaultPrevented).toBe(true);
+  });
+
+  it('still handles uppercase keys that arrive without the Shift modifier', () => {
+    const { root, scrollBy } = createFixture();
+
+    // CapsLock / synthetic events carry an uppercase key without shiftKey; the
+    // binding is case-insensitive by design and must keep working.
+    const event = dispatchKey(root, { key: 'W' });
+
+    expect(scrollBy).toHaveBeenCalledWith({ top: -130, behavior: 'smooth' });
+    expect(event.defaultPrevented).toBe(true);
+  });
+});

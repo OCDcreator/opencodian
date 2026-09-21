@@ -133,3 +133,83 @@ describe('ConversationSessionRailCoordinator', () => {
     expect(shell.querySelector('.opencodian-session-rail')).toBeNull();
   });
 });
+
+describe('ConversationSessionRailCoordinator accessibility (R-F5)', () => {
+  beforeEach(() => setLocale('en'));
+
+  afterEach(() => {
+    document.body.empty();
+    jest.clearAllMocks();
+  });
+
+  it('exposes the rail as a named navigation landmark', () => {
+    const { coordinator, shell } = createFixture();
+    coordinator.refresh(shell);
+
+    const rail = shell.querySelector<HTMLElement>('.opencodian-session-rail');
+    // A bare div with aria-label has no nameable role, so screen readers may
+    // drop the label. The rail navigates between conversations, so it is a
+    // navigation landmark.
+    expect(rail?.getAttribute('role')).toBe('navigation');
+  });
+
+  it('names the landmark from its visible heading through aria-labelledby', () => {
+    const { coordinator, shell } = createFixture();
+    coordinator.refresh(shell);
+
+    const rail = shell.querySelector<HTMLElement>('.opencodian-session-rail');
+    const labelledBy = rail?.getAttribute('aria-labelledby');
+    expect(labelledBy).toBeTruthy();
+    const title = shell.querySelector<HTMLElement>(`[id="${labelledBy}"]`);
+    expect(title).not.toBeNull();
+    expect(title).toBe(rail?.querySelector('.opencodian-session-rail-title'));
+    expect(title?.textContent).toBe(t('chat.sessionRail.title'));
+  });
+
+  it('gives the rail title real heading semantics', () => {
+    const { coordinator, shell } = createFixture();
+    coordinator.refresh(shell);
+
+    const title = shell.querySelector<HTMLElement>('.opencodian-session-rail-title');
+    expect(title?.getAttribute('role')).toBe('heading');
+    expect(title?.getAttribute('aria-level')).toBe('2');
+  });
+
+  it('keeps aria-current and the per-item button names', () => {
+    const { coordinator, shell, conversations } = createFixture();
+    coordinator.refresh(shell);
+
+    const items = Array.from(shell.querySelectorAll<HTMLButtonElement>('.opencodian-session-rail-item'));
+    expect(items).toHaveLength(conversations.length);
+    expect(items[0].getAttribute('aria-current')).toBe('page');
+    expect(items[1].getAttribute('aria-current')).toBe('false');
+    expect(items[0].getAttribute('aria-label'))
+      .toBe(t('chat.sessionRail.currentItem', { title: 'First' }));
+    expect(items[1].getAttribute('aria-label'))
+      .toBe(t('chat.sessionRail.openItem', { title: 'Second' }));
+    expect(items.every((item) => item.tagName === 'BUTTON' && item.getAttribute('type') === 'button'))
+      .toBe(true);
+  });
+
+  it('keeps the list semantics of the rail items', () => {
+    const { coordinator, shell } = createFixture();
+    coordinator.refresh(shell);
+
+    expect(shell.querySelector('.opencodian-session-rail-list')?.getAttribute('role')).toBe('list');
+    expect(shell.querySelectorAll('.opencodian-session-rail-list > [role="listitem"]'))
+      .toHaveLength(2);
+  });
+
+  it('does not reuse a landmark id across rail instances', () => {
+    const first = createFixture();
+    first.coordinator.refresh(first.shell);
+    const second = createFixture();
+    second.coordinator.refresh(second.shell);
+
+    const firstId = first.shell.querySelector('.opencodian-session-rail')?.getAttribute('aria-labelledby');
+    const secondId = second.shell.querySelector('.opencodian-session-rail')?.getAttribute('aria-labelledby');
+    expect(firstId).toBeTruthy();
+    expect(secondId).toBeTruthy();
+    expect(firstId).not.toBe(secondId);
+  });
+});

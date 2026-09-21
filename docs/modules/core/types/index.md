@@ -1,4 +1,5 @@
 # Core Types Barrel
+> 2026-09-21 (advantage-parity R-F6 质量修复)：re-export `applyChatVimNavigationKey`、`normalizeChatVimNavigationKey` 及 `ChatVimNavigationKeys`/`ChatVimNavigationKeySlot`/`ChatVimNavigationKeyUpdate` 类型，供设置 UI 做单槽位编辑（拒绝冲突、保留其他两个合法键）；整表归一化仍由 `core/types/settings.ts` 拥有。
 > 2026-09-21 (advantage-parity R-F5/R-F6)：re-export `normalizeChatVimNavigationKeys` for settings UI consumers; normalization remains owned by `core/types/settings.ts`.
 > 2026-09-21 (advantage-parity R-F3)：re-export `EditRevertPreview`、`EditRevertPreviewRow` 与 `EditRevertPreviewConflictReason`，使 chat UI 只经 core.types consumer-owned seam 消费只读回退预览。
 > 2026-09-20 (advantage-parity R-D1)：导出 `ConversationExportSettings`、`DEFAULT_CONVERSATION_EXPORT_SETTINGS` 与 `normalizeConversationExport{Directory,FilenameTemplate,Settings}`（R-D1 对话导出设置归一化）。

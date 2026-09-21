@@ -73,6 +73,10 @@ export class ChatVimNavigationCoordinator {
       && !event.ctrlKey
       && !event.metaKey
       && !event.altKey
+      // Shift is a modifier too: Shift+W reports key 'W', which normalizes to
+      // the configured 'w' and would otherwise scroll the chat and swallow the
+      // keystroke instead of letting the capital letter through.
+      && !event.shiftKey
       && !event.isComposing
       && !event.repeat
       && !this.host.hasBlockingOverlay?.()
