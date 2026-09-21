@@ -57,7 +57,7 @@
 | E | R-E2 | Web Viewer 标签页上下文 | Copilot | P2 | DONE |
 | E | R-E3 | 相关笔记面板（图谱 + 检索双通道） | Copilot | P1 | DONE |
 | E | R-E4 | 语义检索增强层（embedding on R-C1） | Copilot/Miyo | P2 | TODO |
-| E | R-E5 | Dataview / Bases 上下文支持 | Copilot | P2 | TODO |
+| E | R-E5 | Dataview / Bases 上下文支持 | Copilot | P2 | DONE |
 | E | R-E6 | 选区 / 全库 token 计数命令 | Copilot | P2 | DONE |
 | F | R-F1 | Turn steering + 流式中消息排队 | Claudian | P1 | TODO |
 | F | R-F2 | 会话-笔记绑定草稿（linked content） | Claudian | P2 | TODO |
@@ -202,6 +202,8 @@ Obsidian 核心 Web Viewer 插件的活动标签页（URL + 选区）作为上�
 ### R-E5 Dataview / Bases 上下文支持（P2）
 
 上下文构建时：dataview 代码块执行结果内联（宿主 Dataview 插件 API 可用时）；`.base` 文件以文本形态进上下文。不可用时如实标注，不静默跳过。
+
+**落地证据（2026-09-21，提交 `8a71e700`）**：`DataviewContextInliner`（feature.chat-services）——插件物化文本快照时（远程模式读取路径，`ContextAttachmentBuilder` 接入）```dataview/```dataviewjs 块经宿主 `dataview.api.queryMarkdown` 执行内联渲染结果；插件缺失或单块失败 → 原文保留 + 显式 `[dataview blocks present but …]` 标记行（逐块降级、重复块去重）；**本地服务器模式给后端文件 URL（agent 读原文），该模式不做变换**（调用点文档化）。`.base` 进 mime 映射 `text/plain` 以纯文本附加。测试 `DataviewContextInliner.test.ts` 5 例（内联成功/缺失标记/逐块降级/去重/纯文直通）+ verify 15/15。实机：`.base` 附加实证（chip=`re5-test.base`，已清理）；测试库未装 Dataview（恰为文档化的如实降级态，`getDataviewApi` 返回 null 路径与单测一致）。无新 UI 面，视觉门不适用。
 
 ### R-E6 选区 / 全库 token 计数命令（P2）
 

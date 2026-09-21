@@ -11,7 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
-## 2026-09-21 R-E6 token 计数命令：选区 + 全库（R-C1 范围），启发式估算 + 剪贴板
+## 2026-09-21 R-E5 Dataview 块内联 + .base 文本上下文：物化快照执行、不可用如实标记
+
+**触发**：advantage-parity 批次 E 第 5 条（P2）。Copilot 在上下文构建时执行 dataview 块取渲染结果；OpenCodian 的物化文本里 dataview 块只是未执行的围栏代码。
+
+**改动**：\`DataviewContextInliner\`（feature.chat-services）——作用于**插件物化的文本快照**（远程服务器模式 \`buildFileContextItem\` 读取路径）：\`\`\`dataview / \`\`\`dataviewjs 块经宿主 \`app.plugins.plugins.dataview.api.queryMarkdown(query, sourcePath)\`（结构守卫探测，社区插件面不入 d.ts）执行并以渲染 markdown 内联；插件缺失或单块查询失败 → 该块原文保留，任何 leftVerbatim > 0 追加显式标记行——绝不静默跳过；相同块去重只查一次。**模式边界**：本地服务器模式给后端文件 URL（agent 读原文），不做变换，调用点文档化。\`.base\`（Bases）文件入 \`TEXT_MIME_BY_EXTENSION\`（text/plain）以纯文本附加。
+
+**测试**：5 例单测（内联/缺失标记/逐块降级仍标记/去重/纯文直通）+ verify 15/15。实机（BUILD_ID \`202609210912\`）：\`re5-test.base\` 附加实证（chip 在场后清理）；测试库未装 Dataview——恰为文档化降级态（\`getDataviewApi\`→null 与单测路径一致）。无新 UI 面。
+
+---
+
 
 **触发**：advantage-parity 批次 E 第 4 条（P2 小件）。Copilot 有选区/全库 token 估算入口，OpenCodian 无。
 
