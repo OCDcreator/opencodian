@@ -50,7 +50,9 @@ export class ComposerContextCoordinator {
         chipEl.classList.add('is-vault-retrieval');
         const badgeEl = document.createElement('span');
         badgeEl.className = 'opencodian-context-chip-origin-badge';
-        badgeEl.textContent = t('chat.context.originBadge.vaultRetrieval');
+        badgeEl.textContent = chipState.retrievalChannel === 'semantic'
+          ? t('chat.context.originBadge.semanticRetrieval')
+          : t('chat.context.originBadge.vaultRetrieval');
         chipEl.appendChild(badgeEl);
       }
       chipEl.appendChild(document.createTextNode(chipState.label));

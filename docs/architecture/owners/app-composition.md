@@ -1,4 +1,5 @@
 # Owner: app.composition
+> 2026-09-21 (advantage-parity R-E4)：main.ts 组合 embedding 服务与供应商解析。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 > 2026-09-21 (advantage-parity R-E6)：main.ts 注册两个 token 估算命令（选区/全库 R-C1 范围）。
 > 2026-09-21 (advantage-parity R-E2)：attach-webviewer-tab-to-context 命令（checkCallback 门控）。

@@ -1,4 +1,5 @@
 # ComposerContextCoordinator
+> 2026-09-21 (advantage-parity R-E4)：检索 chip 徽标按 retrievalChannel 显示「检索·词面/检索·语义」。
 
 > **源码**: `src/features/chat/services/ComposerContextCoordinator.ts`
 > **状态**: [REVIEW]

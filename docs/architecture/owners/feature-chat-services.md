@@ -1,4 +1,5 @@
 > 2026-09-18 (FlowText parity R-A7): context services extend to folders and multi-select — `ContextFileCatalogIndex/Service/BuildRunner` index `TFolder` entries (no extension buckets, folder-first ordering), `ContextFilePickerModal` becomes multi-select (`chooseContextFiles` returning `TFile | TFolder` entries with a confirm footer), `ComposerContextPickerActionService` attaches every picked entry via the new `ContextAttachmentBuilder.buildEntryContextItem` and claims vault drops via `addVaultPathContextFromDrop` (`getAbstractFileByPath` + instanceof hard gate), `ComposerContextViewFacade` exposes the drop port, and `PromptContextKind` gains `'folder'` (path-only items, never a text snapshot).
+> 2026-09-21 (advantage-parity R-E4)：VaultRetrievalComposerCoordinator 新增语义通道合并注入与通道标注。
 > 2026-09-21 (advantage-parity R-E5)：新增 DataviewContextInliner（dataview 块执行内联 / 不可用如实标记）。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 > 2026-09-21 (advantage-parity R-E2)：新增 WebViewerContextService（活动 Web Viewer 标签页 → R-E1 url 条目；未启用无入口）。

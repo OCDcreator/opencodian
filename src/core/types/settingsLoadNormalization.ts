@@ -49,6 +49,8 @@ import {
   normalizeRemoteControlNonLoopbackAcknowledgedAt,
   normalizeRemoteControlToken,
   normalizeSecretsKeychainEnabled,
+  normalizeSemanticEmbeddingText,
+  normalizeSemanticRetrievalEnabled,
   normalizeSettingsLayoutMode,
   normalizeSettingsTabbedPrimaryTab,
   normalizeSettingsTabbedSecondaryTabByPrimary,
@@ -488,6 +490,9 @@ function normalizeVaultRetrievalSettingsOnLoad(
   vaultRetrievalMaxCharsPerNote: number;
   vaultRetrievalExcludedPaths: string[];
   pdfIndexEnabled: boolean;
+  semanticRetrievalEnabled: boolean;
+  semanticEmbeddingProvider: string;
+  semanticEmbeddingModel: string;
 } {
   return {
     vaultRetrievalEnabled: typeof normalizedSettings?.vaultRetrievalEnabled === 'boolean'
@@ -499,6 +504,15 @@ function normalizeVaultRetrievalSettingsOnLoad(
     ),
     vaultRetrievalExcludedPaths: normalizeVaultRetrievalExcludedPaths(
       normalizedSettings?.vaultRetrievalExcludedPaths,
+    ),
+    semanticRetrievalEnabled: normalizeSemanticRetrievalEnabled(
+      normalizedSettings?.semanticRetrievalEnabled,
+    ),
+    semanticEmbeddingProvider: normalizeSemanticEmbeddingText(
+      normalizedSettings?.semanticEmbeddingProvider,
+    ),
+    semanticEmbeddingModel: normalizeSemanticEmbeddingText(
+      normalizedSettings?.semanticEmbeddingModel,
     ),
     pdfIndexEnabled: typeof normalizedSettings?.pdfIndexEnabled === 'boolean'
       ? normalizedSettings.pdfIndexEnabled

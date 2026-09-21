@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "8e1b3b10e447dcacf47b169ba58cf767e0cae3326a176c55770906a0c3c0f30e",
-  "recordCount": 761,
+  "digest": "0b54532ef81f5595777e277616b55988292512148be9074730a55f4672d25d46",
+  "recordCount": 763,
   "records": [
     {
       "kind": "ignore",
@@ -61,7 +61,7 @@
     {
       "kind": "src",
       "key": "src/app/memory/index.ts",
-      "sha256": "236d61daaaf7a2294ba470d94e3f19b1af87597d2b42eac576055364eaaf8255"
+      "sha256": "b9d7d6f0f7cd110fab4d479a8e7f4580c5c4a6c84da2e5dc976e34346c8b26d3"
     },
     {
       "kind": "src",
@@ -72,6 +72,11 @@
       "kind": "src",
       "key": "src/app/memory/MemoryRuntimeCoordinator.ts",
       "sha256": "78c53202c74a8fe0009b6624fda15891498905dfd1ee64acde2e0ad3101b4019"
+    },
+    {
+      "kind": "src",
+      "key": "src/app/memory/VaultEmbeddingFileSystem.ts",
+      "sha256": "16e3bdc761090fe09c874ba34ca9c1f848aebaa0ef7e06b1a2bcdca1e1520e0f"
     },
     {
       "kind": "src",
@@ -636,7 +641,7 @@
     {
       "kind": "src",
       "key": "src/core/memory/index.ts",
-      "sha256": "705f61252db3495efd498d68fd651a26de7ac6ac42e30f7d69aa8ef343aa17d9"
+      "sha256": "9fed4699af62fa48b1c4fed73b0037efe06bf3af06202ec04956e2472bfa0259"
     },
     {
       "kind": "src",
@@ -715,8 +720,13 @@
     },
     {
       "kind": "src",
+      "key": "src/core/memory/VaultEmbeddingIndexService.ts",
+      "sha256": "8927a1c5868b5ecf51336f643a83defbccc84b21dbb8c005e5f059d7c058f968"
+    },
+    {
+      "kind": "src",
       "key": "src/core/memory/VaultIndexService.ts",
-      "sha256": "71dd4d25d22bfaa0a42015bb7dc65c7272a5e7d46e6159da83343b5cf8443bce"
+      "sha256": "f04a628261c3ad4575416115795d510d4bfc37328d53d4e2b607c39a769fc980"
     },
     {
       "kind": "src",
@@ -1166,7 +1176,7 @@
     {
       "kind": "src",
       "key": "src/core/types/chat.ts",
-      "sha256": "5b803ca4eed02785a04f66ecefe57f6b7e7a33052e36db805696333912ab72f5"
+      "sha256": "c5739d0e2ac4ddb29ecb6fb162e99ec74d357b7d9c7efbcf6c74e4625bd4f6f5"
     },
     {
       "kind": "src",
@@ -1201,12 +1211,12 @@
     {
       "kind": "src",
       "key": "src/core/types/settings.ts",
-      "sha256": "4e5cc37d60f040833d7ce411377735502a2a139df174733283538baf965fdafe"
+      "sha256": "ffa79ddb55387ea7cef5b36b9f3c05aa0c72d04646aa4502823b2b7c72b08d52"
     },
     {
       "kind": "src",
       "key": "src/core/types/settingsLoadNormalization.ts",
-      "sha256": "029f41d93f336fdb403a6a3b8d87274433671558db845f5c51cc12f28a92257f"
+      "sha256": "a0d807b799cc0a154a95ea4a43c5bd3723083413642d60e3c537e3bffbcc35ba"
     },
     {
       "kind": "src",
@@ -1256,7 +1266,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/composerContext.ts",
-      "sha256": "8d499a07f33dec37a29f04d6e2a7fbb6de8cd0847d5d6733292026c6e7acb0f6"
+      "sha256": "b6e0e84c51a7bb701addada761cb8831cda6439d96cbcc13c338961ec0ec8336"
     },
     {
       "kind": "src",
@@ -1396,7 +1406,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/ChatRuntimeComposition.ts",
-      "sha256": "e5a37eedff9544b5d92a693a1611570e2f4b21865d42d6deb343061186fadef8"
+      "sha256": "dcdc50e6b4f053c9afd01666301929b5780ef12358683f6c13de5509153a9a02"
     },
     {
       "kind": "src",
@@ -1536,7 +1546,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/UserMessageContentRenderer.ts",
-      "sha256": "4b0e17cbc4273b7dea6b33f5484b4ac47f767423d5de2ab643f1c987b9a04819"
+      "sha256": "bc3a0a5525b4d3c4a2219207af2f68a592cd7b9f821b76f6eebcc3be9fd25ef3"
     },
     {
       "kind": "src",
@@ -1691,7 +1701,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ComposerContextCoordinator.ts",
-      "sha256": "a13af438d6243f66837da845127a251dfdbd11b98a21c2a0f983dcedbf99ab0a"
+      "sha256": "56d567993d66a5f402e837e5a56e574472f4c60bde09b40c83a6e1dc5744e07f"
     },
     {
       "kind": "src",
@@ -2296,7 +2306,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/VaultRetrievalComposerCoordinator.ts",
-      "sha256": "0b66020a047566befd34daa713265d1e17d54e8ff14e48efc12dbcd4098f1b53"
+      "sha256": "b53e140aa011059e7c0310b8af76940dd523a30c53e5c550ccc58f00e7c590bc"
     },
     {
       "kind": "src",
@@ -2996,7 +3006,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsConversationSection.ts",
-      "sha256": "e934e0cd517f37ddd53527955b1e811c6f4327f815b71658f0a5edc02593727b"
+      "sha256": "2e3399737fee861061a27362c2f4126ad51fc3dcdafb5e28fa3ebeadfc2ed503"
     },
     {
       "kind": "src",
@@ -3236,7 +3246,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "6d625daf1c5b63abdac65d26cccb52e0ff000f1600ee9dc2bf3ad251334c7fef"
+      "sha256": "8da2a1c0611e2322301896ff35ab441d2653261ebc5a8b9ba094011b942dd879"
     },
     {
       "kind": "src",
@@ -3246,12 +3256,12 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "4fec540327f35086c5720d9c54ad5f06c097d89f2d58e51439bffb6d810240c1"
+      "sha256": "c1f9d24531e441ccc500fab62e66d00eb0ca6db8a1086f67c306d0dbf1997c62"
     },
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "743c3c5c48758a34031014c0477ef56ec35a29f3ec80c7a111e0ef4c2c50f154"
+      "sha256": "8467cd799a4381c2003da99fcbf5b2888882838555a60c8355cbd9c0a6fa55dc"
     },
     {
       "kind": "src",
@@ -3336,7 +3346,7 @@
     {
       "kind": "src",
       "key": "src/shared/obsidianContext.ts",
-      "sha256": "bb0ca6df73bed6c7c8c668c48148e48dbd263d1ed155efd383ce1c47813462fd"
+      "sha256": "397ce65e629898e8376b72bc543051459d99bd308f9e645254bde09fed6d7dfc"
     },
     {
       "kind": "src",
@@ -3809,7 +3819,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-21T01:11:00.823Z",
-  "headShaAtGeneration": "c64ecedf543372f3f44f71cd475110bf269b9907",
+  "generatedAt": "2026-09-21T01:32:56.038Z",
+  "headShaAtGeneration": "0eb7bec464b967ffbf8f3ce8b7b6dfd14fc3dc37",
   "graphifyVersion": "graphify 0.9.36"
 }

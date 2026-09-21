@@ -156,9 +156,12 @@ export class UserMessageContentRenderer {
       if (attachment.origin === 'vault-retrieval') {
         // R-C1: injected retrieval snippets stay visible on the sent message
         // with their own badge, never blended into manual attachments.
+        // R-E4: the badge names the retrieval channel honestly.
         openBtn.addClass('is-vault-retrieval');
         const badgeEl = openBtn.createSpan({ cls: 'opencodian-context-chip-origin-badge' });
-        badgeEl.textContent = t('chat.context.originBadge.vaultRetrieval');
+        badgeEl.textContent = attachment.retrievalChannel === 'semantic'
+          ? t('chat.context.originBadge.semanticRetrieval')
+          : t('chat.context.originBadge.vaultRetrieval');
       }
       if (attachment.url?.status === 'failed') {
         // R-E1: a failed webpage fetch stays on the sent message with the

@@ -58,8 +58,14 @@ import { RemoteControlService } from './core/remotecontrol';
 import { OpenCodeSessionTraceService } from './core/opencode/diagnostics';
 import { ClaudeSessionTraceService, collectClaudeCodeKnownSecrets, CodexSessionTraceService } from './core/agents/backend/diagnostics';
 import { DiagnosticsRuntimeCoordinator } from './app/diagnostics';
-import { MemoryRuntimeCoordinator, VaultIndexFileSystem } from './app/memory';
-import { isIndexablePath, VaultIndexService } from './core/memory';
+import { MemoryRuntimeCoordinator, VaultEmbeddingFileSystem, VaultIndexFileSystem } from './app/memory';
+import {
+  createOpenAiCompatibleEmbeddingClient,
+  type EmbeddingClient,
+  isIndexablePath,
+  VaultEmbeddingIndexService,
+  VaultIndexService,
+} from './core/memory';
 import { PdfIndexFileSystem } from './app/pdf/PdfIndexFileSystem';
 import { PdfEngineLoader, PdfIndexService } from './core/pdf';
 import { PdfChatIntegration } from './features/chat/services/PdfChatIntegration';
@@ -214,6 +220,11 @@ export default class OpenCodianPlugin extends Plugin {
    * no indexing and no injected context while off. main.ts only composes.
    */
   vaultIndexService: VaultIndexService | null = null;
+  /**
+   * R-E4 (advantage-parity): optional embedding channel over the R-C1
+   * lexical index. Dormant while semanticRetrievalEnabled is off.
+   */
+  vaultEmbeddingIndexService: VaultEmbeddingIndexService | null = null;
   /**
    * R-C4 PDF runtime: the lazily required extraction engine loader (zero
    * startup cost — pdf-engine.js is only required on first PDF attach or
@@ -394,6 +405,22 @@ export default class OpenCodianPlugin extends Plugin {
     this.vaultIndexService.attach(new VaultIndexFileSystem(this.app), () => this.settings);
     await coordinator.measureStartupStep('vaultIndex.applySettings', () =>
       this.vaultIndexService?.onSettingsChanged() ?? Promise.resolve());
+    // R-E4: the optional embedding channel over the lexical index. The
+    // service is a full no-op while semanticRetrievalEnabled is off (no
+    // client, no index pass, no vault events); when on, it reuses the R-C1
+    // scope rules and embeds incrementally with pacing. The degradation
+    // notices surface honestly through the localized callback.
+    this.vaultEmbeddingIndexService = new VaultEmbeddingIndexService(
+      new VaultEmbeddingFileSystem(this.app),
+      () => this.resolveSemanticEmbeddingClient(),
+      VaultEmbeddingIndexService.scopeMatcher(
+        this.settings?.vaultRetrievalExcludedPaths ?? [],
+      ),
+    );
+    await coordinator.measureStartupStep('vaultEmbeddings.applySettings', () =>
+      this.vaultEmbeddingIndexService?.onSettingsChanged(
+        this.settings?.semanticRetrievalEnabled ?? false,
+      ) ?? Promise.resolve());
     // R-C4: the PDF engine loader performs NO work at startup (the pdf.js
     // artifact is required on first use); the index service is dormant while
     // pdfIndexEnabled is off, and the viewer integration only mounts on pdf
@@ -1724,6 +1751,8 @@ export default class OpenCodianPlugin extends Plugin {
     this.imageAssetStorage = null;
     this.imageGenerationService = null;
     this.vaultIndexService?.dispose();
+    // R-E4: release the embedding watcher (dormant while off).
+    this.vaultEmbeddingIndexService?.dispose();
     // R-C4: unmount pdf-view toolbar buttons/listeners and cancel any
     // in-flight index build (nothing partial is ever marked ready).
     this.pdfChatIntegration?.detach();
@@ -2682,6 +2711,34 @@ export default class OpenCodianPlugin extends Plugin {
    * unresolvable placeholders (missing keychain entries / older host), and
    * the "keychain not available" degradation are all announced, never silent.
    */
+  /**
+   * R-E4: resolve the embedding client from the user's provider settings.
+   * Null (feature dormant) when the toggle is off or the provider/model is
+   * not configured; a mismatched provider id reports honestly via Notice.
+   */
+  private resolveSemanticEmbeddingClient(): EmbeddingClient | null {
+    const settings = this.settings;
+    if (!settings?.semanticRetrievalEnabled) {
+      return null;
+    }
+    const providerId = settings.semanticEmbeddingProvider.trim();
+    const model = settings.semanticEmbeddingModel.trim();
+    if (!providerId || !model) {
+      new Notice(t('settings.semanticRetrieval.notConfiguredNotice'), 10000);
+      return null;
+    }
+    const provider = settings.providers.find((entry) => entry.id === providerId);
+    if (!provider?.baseUrl) {
+      new Notice(t('settings.semanticRetrieval.providerMissingNotice'), 10000);
+      return null;
+    }
+    return createOpenAiCompatibleEmbeddingClient({
+      baseUrl: provider.baseUrl,
+      apiKey: provider.apiKey ?? '',
+      model,
+    });
+  }
+
   private reportSettingsSecretsLoadState(): void {
     const report = this.storage?.takeSettingsSecretsLoadReport();
     if (!report) {

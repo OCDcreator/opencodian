@@ -405,6 +405,8 @@ export function buildContextAttachment(item: PromptContextItem): MessageContextA
       ? item.textSnapshot
       : undefined,
     ...(item.origin ? { origin: item.origin } : {}),
+    // R-E4: which retrieval channel injected this item (display metadata).
+    ...(item.retrievalChannel ? { retrievalChannel: item.retrievalChannel } : {}),
     // R-C4: persist PDF display metadata and the bounded selection locator,
     // but never the full page payload (keeps stored conversations small).
     ...(item.pdf ? { pdf: item.pdf } : {}),

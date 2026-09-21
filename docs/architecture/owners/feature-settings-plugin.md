@@ -1,4 +1,5 @@
 # Owner: feature.settings-plugin
+> 2026-09-21 (advantage-parity R-E4)：整库检索块新增语义检索三行设置。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 > 2026-09-20 (advantage-parity R-D1)：SettingsConversationSection 新增「导出」设置块（目录/模板/自动导出；目录走与导出器同一归一化器，非法恢复原值；路径类输入用 opencodian-wide-text-setting 宽输入）。
 

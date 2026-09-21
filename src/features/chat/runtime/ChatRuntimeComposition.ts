@@ -308,7 +308,14 @@ export interface ChatRuntimeCompositionHost {
       readonly vaultRetrievalMaxCharsPerNote: number;
       readonly vaultRetrievalExcludedPaths: readonly string[];
       readonly pdfIndexEnabled: boolean;
+      readonly semanticRetrievalEnabled: boolean;
+      readonly semanticEmbeddingProvider: string;
+      readonly semanticEmbeddingModel: string;
     };
+    /** R-E4: the optional embedding index service (null = dormant). */
+    readonly vaultEmbeddingIndexService: {
+      query(queryText: string, options?: { reportDegradation?: (reason: string, detail?: string) => void }): Promise<{ hits: Array<{ path: string; score: number }>; degradation: string | null }>;
+    } | null;
     /**
      * R-B1 shared auto-internal-link processor seam (inline edit + chat).
      * Optional port: absent in stub/legacy hosts, in which case the
@@ -576,10 +583,13 @@ export class ChatRuntimeComposition {
     // unless `vaultRetrievalEnabled` turns on; with the index service absent
     // (never attached) it stays a full no-op. R-C4: the opt-in PDF index
     // rides the same managed-chip flow when pdfIndexEnabled is on.
+    // R-E4: the embedding channel merges into the same managed-chip flow
+    // when semanticRetrievalEnabled is on and an embedding service exists.
     const vaultRetrievalComposerCoordinator = new VaultRetrievalComposerCoordinator({
       facade: composerContextViewFacade.sendContext,
       retrieval: host.plugin.vaultIndexService ?? null,
       pdfRetrieval: host.plugin.pdfIndexService ?? null,
+      semanticRetrieval: host.plugin.vaultEmbeddingIndexService ?? null,
       getSettings: () => host.plugin.settings,
       getActiveTabId: () => host.getActiveTabId(),
     });

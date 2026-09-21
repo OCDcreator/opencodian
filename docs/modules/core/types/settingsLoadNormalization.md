@@ -1,4 +1,5 @@
 # Settings Load Normalization
+> 2026-09-21 (advantage-parity R-E4)：词面检索归一化块并入语义三字段。
 > 2026-09-21 (advantage-parity R-D3)：load 合流点新增两个提示音字段的归一化消费。
 > 2026-09-20 (advantage-parity R-D1)：load 合流点新增 `conversationExport: normalizeConversationExportSettings(...)`，旧快照缺字段时落到默认值。
 > 2026-09-18 (R-C6): 新增 file-local `normalizeRemoteControlSettingsOnLoad()`（合并入最终 merge boundary）：`remoteControlEnabled`（非 `true` 一律回落 `false`）、`remoteControlBindAddress`（`localhost` 归一为 `127.0.0.1`，空/超长/错型回落默认）、`remoteControlToken`（仅字符串且 ≤200 字符，否则空——关闭不清令牌，吊销只走重新生成）、`remoteControlNonLoopbackAcknowledgedAt`（错型/超长清空，损坏的确认串不能顶替用户显式确认）。

@@ -1,4 +1,5 @@
 # Core Memory Barrel
+> 2026-09-21 (advantage-parity R-E4)：barrel 导出 VaultEmbeddingIndexService。
 
 > **源码**: `src/core/memory/index.ts`
 > **状态**: [REVIEW]

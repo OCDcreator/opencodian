@@ -1,4 +1,5 @@
 # Plugin Entry Point (main.ts)
+> 2026-09-21 (advantage-parity R-E4)：组合 vaultEmbeddingIndexService（R-C1 scopeMatcher 复用、resolveSemanticEmbeddingClient 从 providers 解析 OpenAI 兼容端点、未配置如实 Notice）。
 > 2026-09-21 (advantage-parity R-E6)：registerTokenCountCommands——count-selection-tokens（选区估算，空选区如实 Notice）与 count-vault-tokens（R-C1 范围 isIndexablePath 过滤后逐篇 cachedRead 汇总），Notice + 剪贴板复制。
 > 2026-09-21 (advantage-parity R-E2)：命令 attach-webviewer-tab-to-context（checkCallback：核心 Web Viewer 未启用即不注册；活动页非 webviewer 如实 Notice）。
 > 2026-09-21 (advantage-parity R-E3)：注册 opencodian-relevant-notes 视图与 open-relevant-notes 命令；新增 activateRelevantNotesView 与 attachVaultFileToActiveChatContext（共享 ContextAttachmentBuilder 通道，产出与 + picker 一致的条目）。

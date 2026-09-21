@@ -1,4 +1,5 @@
 # Vault Index Service
+> 2026-09-21 (advantage-parity R-E4)：VaultRetrievalSettingsSlice 新增 semanticRetrievalEnabled / semanticEmbeddingProvider / semanticEmbeddingModel 三字段（词面通道语义不变）。
 
 > **源码**: `src/core/memory/VaultIndexService.ts`
 > **状态**: [REVIEW]

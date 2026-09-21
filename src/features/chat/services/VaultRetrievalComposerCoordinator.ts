@@ -56,8 +56,25 @@ export interface VaultRetrievalComposerCoordinatorDeps {
   retrieval: VaultRetrievalQueryPort | null;
   /** Null when the PDF index service is absent or the engine is unavailable. */
   pdfRetrieval?: PdfRetrievalQueryPort | null;
+  /**
+   * R-E4: the optional embedding channel (null when the service is absent —
+   * lexical-only behavior, byte-identical to the pre-feature flow).
+   */
+  semanticRetrieval?: SemanticRetrievalQueryPort | null;
   getSettings: () => VaultRetrievalSettingsSlice;
   getActiveTabId(): TabId | null;
+}
+
+/**
+ * R-E4: the embedding channel's query port (subset of
+ * VaultEmbeddingIndexService). Hits carry the semantic score; the channel
+ * label rides the context item.
+ */
+export interface SemanticRetrievalQueryPort {
+  query(
+    queryText: string,
+    options?: { reportDegradation?: (reason: string, detail?: string) => void },
+  ): Promise<{ hits: Array<{ path: string; score: number }>; degradation: string | null }>;
 }
 
 export class VaultRetrievalComposerCoordinator {
@@ -136,6 +153,10 @@ export class VaultRetrievalComposerCoordinator {
     const vaultActive = settings.vaultRetrievalEnabled && retrieval !== null;
     const pdfRetrieval = this.deps.pdfRetrieval ?? null;
     const pdfActive = settings.pdfIndexEnabled && pdfRetrieval !== null;
+    const semanticRetrieval = this.deps.semanticRetrieval ?? null;
+    // R-E4: the embedding channel rides only on top of the lexical one
+    // (design §4) — no lexical channel, no semantic injection either.
+    const semanticActive = vaultActive && settings.semanticRetrievalEnabled && semanticRetrieval !== null;
     // Either retrieval surface alone can drive managed chips: PDF indexing
     // (pdfIndexEnabled) does not require the note-retrieval master switch.
     if (!vaultActive && !pdfActive) {
@@ -143,26 +164,16 @@ export class VaultRetrievalComposerCoordinator {
     }
     const tabId = this.deps.getActiveTabId();
     const sequence = ++this.refreshSequence;
-    let snippets: readonly VaultRetrievalSnippet[] = [];
-    let pdfSnippets: readonly SelectedPdfSnippet[] = [];
-    let vaultFailed = false;
-    if (vaultActive && retrieval) {
-      try {
-        snippets = await retrieval.select(query);
-      } catch (error) {
-        // Fail-soft: never let retrieval break the composer.
-        vaultFailed = true;
-        logger.debug('vault retrieval refresh failed', { error });
-      }
-    }
-    if (pdfActive && pdfRetrieval) {
-      try {
-        pdfSnippets = await pdfRetrieval.select(query);
-      } catch (error) {
-        logger.debug('pdf retrieval refresh failed', { error });
-      }
-    }
-    if (vaultFailed && pdfSnippets.length === 0) {
+    const collected = await this.collectRetrievalResults({
+      query,
+      vaultActive,
+      pdfActive,
+      semanticActive,
+      retrieval,
+      pdfRetrieval,
+      semanticRetrieval,
+    });
+    if (collected.vaultFailed && collected.pdfSnippets.length === 0) {
       // Original R-C1 contract: when the retrieval surface throws and nothing
       // new is available, keep the existing chips visible (nothing re-merges,
       // so the user can still remove them) and inject nothing new.
@@ -172,16 +183,77 @@ export class VaultRetrievalComposerCoordinator {
       return;
     }
     const cancelled = this.collectCancelledKeys(tabId);
+    const lexicalItems = collected.snippets
+      // Defensive second cap: the service already enforces top-K.
+      .slice(0, Math.max(0, settings.vaultRetrievalTopK))
+      .map((snippet) => this.toContextItem(snippet));
+    // R-E4 merge (design §4): lexical first, semantic fills in unseen paths.
+    const lexicalPaths = new Set(lexicalItems.map((item) => item.path));
+    const semanticItems = collected.semanticHits
+      .filter((hit) => !lexicalPaths.has(hit.path))
+      .slice(0, Math.max(0, settings.vaultRetrievalTopK))
+      .map((hit) => this.toSemanticContextItem(hit));
     const items = [
-      ...snippets
-        // Defensive second cap: the service already enforces top-K.
-        .slice(0, Math.max(0, settings.vaultRetrievalTopK))
-        .map((snippet) => this.toContextItem(snippet)),
-      ...pdfSnippets.slice(0, Math.max(0, settings.vaultRetrievalTopK))
+      ...lexicalItems,
+      ...semanticItems,
+      ...collected.pdfSnippets.slice(0, Math.max(0, settings.vaultRetrievalTopK))
         .map((snippet) => this.toPdfContextItem(snippet)),
     ].filter((item) => !cancelled.has(getPromptContextTargetKey(item)));
     this.deps.facade.mergeVaultRetrievalDraftItems(items, tabId);
     this.injectedKeysByTab.set(tabId, new Set(items.map(getPromptContextTargetKey)));
+  }
+
+  /**
+   * Fan out the three retrieval surfaces (lexical / semantic / PDF) with the
+   * per-surface fail-soft semantics; the semantic surface degrades honestly
+   * to [] on failure (the service has already noticed the degradation).
+   */
+  private async collectRetrievalResults(input: {
+    query: string;
+    vaultActive: boolean;
+    pdfActive: boolean;
+    semanticActive: boolean;
+    retrieval: VaultRetrievalQueryPort | null;
+    pdfRetrieval: PdfRetrievalQueryPort | null;
+    semanticRetrieval: SemanticRetrievalQueryPort | null;
+  }): Promise<{
+    snippets: readonly VaultRetrievalSnippet[];
+    pdfSnippets: readonly SelectedPdfSnippet[];
+    semanticHits: Array<{ path: string; score: number }>;
+    vaultFailed: boolean;
+  }> {
+    let snippets: readonly VaultRetrievalSnippet[] = [];
+    let pdfSnippets: readonly SelectedPdfSnippet[] = [];
+    let semanticHits: Array<{ path: string; score: number }> = [];
+    let vaultFailed = false;
+    if (input.vaultActive && input.retrieval) {
+      try {
+        snippets = await input.retrieval.select(input.query);
+      } catch (error) {
+        // Fail-soft: never let retrieval break the composer.
+        vaultFailed = true;
+        logger.debug('vault retrieval refresh failed', { error });
+      }
+    }
+    if (input.semanticActive && input.semanticRetrieval) {
+      try {
+        const result = await input.semanticRetrieval.query(input.query);
+        semanticHits = result.hits;
+      } catch (error) {
+        // R-E4 honest degradation: a semantic failure never breaks the turn
+        // nor fakes hits; lexical results keep flowing and the service has
+        // already surfaced its one-time degradation notice.
+        logger.debug('semantic retrieval refresh failed', { error });
+      }
+    }
+    if (input.pdfActive && input.pdfRetrieval) {
+      try {
+        pdfSnippets = await input.pdfRetrieval.select(input.query);
+      } catch (error) {
+        logger.debug('pdf retrieval refresh failed', { error });
+      }
+    }
+    return { snippets, pdfSnippets, semanticHits, vaultFailed };
   }
 
   /**
@@ -218,6 +290,26 @@ export class VaultRetrievalComposerCoordinator {
       lineRange,
       textSnapshot: snippet.text,
       origin: 'vault-retrieval',
+      retrievalChannel: 'lexical',
+    };
+  }
+
+  /**
+   * R-E4: a semantic hit is a note-level match (no line range); the chip and
+   * the sent attachment both carry the channel label honestly. The snapshot
+   * is not read here — the user opts the chip in like any retrieval chip, and
+   * the backend reads the note by path (same contract as folder items).
+   */
+  private toSemanticContextItem(hit: { path: string; score: number }): PromptContextItem {
+    this.itemIdSequence += 1;
+    return {
+      id: `semantic-retrieval-${this.itemIdSequence}`,
+      kind: 'file',
+      path: hit.path,
+      label: formatContextLabel(hit.path),
+      mime: 'text/markdown',
+      origin: 'vault-retrieval',
+      retrievalChannel: 'semantic',
     };
   }
 

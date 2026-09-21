@@ -1,4 +1,5 @@
 # composerContext
+> 2026-09-21 (advantage-parity R-E4)：ComposerContextChipState 新增 retrievalChannel（chip 状态投影透传）。
 > 2026-09-21 (advantage-parity R-E1)：partitionExistingContextItems 豁免 url 条目（自带载荷，无库路径可失效）。
 
 > **源码**: `src/features/chat/composerContext.ts`

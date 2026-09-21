@@ -1,4 +1,5 @@
 # App Memory Barrel
+> 2026-09-21 (advantage-parity R-E4)：barrel 导出 VaultEmbeddingFileSystem。
 
 > **源码**: `src/app/memory/index.ts`
 > **状态**: [REVIEW]

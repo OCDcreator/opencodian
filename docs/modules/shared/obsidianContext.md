@@ -1,4 +1,5 @@
 # Obsidian Context Helpers
+> 2026-09-21 (advantage-parity R-E4)：buildContextAttachment 透传 retrievalChannel。
 > 2026-09-21 (advantage-parity R-E5)：TEXT_MIME_BY_EXTENSION 新增 base → text/plain（Bases 文件按纯文本进上下文）。
 > 2026-09-21 (advantage-parity R-E1)：新增 buildUrlContextTag/Body（ok 载荷带标题/最终 URL/截断标记，或诚实失败头）；buildContextAttachment 透传 url 元数据（不落正文）。
 

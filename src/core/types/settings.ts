@@ -3633,6 +3633,18 @@ export interface OpenCodianSettings {
   vaultRetrievalMaxCharsPerNote: number;
 
   /**
+   * Optional embedding channel over the R-C1 index (advantage-parity R-E4,
+   * default off — the lexical channel alone is the pre-feature behavior).
+   * While on, retrieval injection merges lexical ∪ semantic TopK with each
+   * hit labelled by channel; every failure degrades honestly to lexical.
+   */
+  semanticRetrievalEnabled: boolean;
+  /** Provider id from `providers[]` whose OpenAI-compatible /embeddings is used. */
+  semanticEmbeddingProvider: string;
+  /** Embedding model name sent to the endpoint (free text). */
+  semanticEmbeddingModel: string;
+
+  /**
    * Index exclusion rules (R-C1, default none): vault-relative paths,
    * directory prefixes or `*` wildcards within a path segment. `.obsidian/`
    * and `.opencodian/` are always excluded regardless of this list.
@@ -3839,6 +3851,16 @@ export function normalizeTurnCompletionSoundEnabled(value: unknown): boolean {
   return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.turnCompletionSoundEnabled;
 }
 
+/** advantage-parity R-E4: semantic retrieval toggle (safe default off). */
+export function normalizeSemanticRetrievalEnabled(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.semanticRetrievalEnabled;
+}
+
+/** advantage-parity R-E4: string-only provider id / model name, trimmed. */
+export function normalizeSemanticEmbeddingText(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 /** advantage-parity R-D3: string-only chime path, trimmed. */
 export function normalizeTurnCompletionSoundPath(value: unknown): string {
   return typeof value === 'string' ? value.trim() : DEFAULT_SETTINGS.turnCompletionSoundPath;
@@ -4026,6 +4048,11 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   vaultRetrievalEnabled: false,
   vaultRetrievalTopK: VAULT_RETRIEVAL_TOP_K_DEFAULT,
   vaultRetrievalMaxCharsPerNote: VAULT_RETRIEVAL_MAX_CHARS_PER_NOTE_DEFAULT,
+  // advantage-parity R-E4: semantic retrieval enhancement (opt-in, off by
+  // default; needs an explicitly configured provider + model).
+  semanticRetrievalEnabled: false,
+  semanticEmbeddingProvider: '',
+  semanticEmbeddingModel: '',
   vaultRetrievalExcludedPaths: [],
   pdfIndexEnabled: false,
 

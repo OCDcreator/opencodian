@@ -1,4 +1,5 @@
 # Owner: feature.chat-rendering
+> 2026-09-21 (advantage-parity R-E4)：已发消息附件徽标按检索通道标注。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 > 2026-09-21 (advantage-parity R-E1)：UserMessageContentRenderer 的 url 附件 chip 带「抓取失败」徽标并外链打开。
 

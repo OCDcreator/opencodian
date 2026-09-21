@@ -2529,6 +2529,18 @@ export const zhTranslations = {
   'chat.context.kind.pdfSelection': 'PDF 选区',
   'chat.context.kind.url': '网页',
 
+  // advantage-parity R-E4：语义检索增强层
+  'chat.context.originBadge.semanticRetrieval': '检索·语义',
+  'settings.semanticRetrieval.enableName': '语义检索增强层（R-E4，实验性）',
+  'settings.semanticRetrieval.enableDesc': '默认关闭。开启后在整库检索之上叠加 embedding 通道：注入结果 = 词面 ∪ 语义 TopK 合并去重，每条命中标注来源通道。需要显式配置 embedding 供应商与模型；不可用时如实降级为纯词面检索。',
+  'settings.semanticRetrieval.providerName': 'Embedding 供应商',
+  'settings.semanticRetrieval.providerDesc': '从上方已配置的自定义供应商中选择（取其 baseUrl 与 API 密钥调用 OpenAI 兼容 /embeddings 端点）。',
+  'settings.semanticRetrieval.modelName': 'Embedding 模型',
+  'settings.semanticRetrieval.modelDesc': '发送到端点的模型名（如 text-embedding-3-small、bge-m3 等，自由填写）。',
+  'settings.semanticRetrieval.notConfiguredNotice': '语义检索已开启但未配置 embedding 供应商或模型，当前为纯词面检索（设置 → 会话 → 整库检索）。',
+  'settings.semanticRetrieval.providerMissingNotice': '语义检索所选供应商不存在或缺 baseUrl，当前为纯词面检索。',
+  'settings.semanticRetrieval.degradedNotice': '语义检索暂不可用（{{reason}}），本轮仅词面检索。',
+
   // advantage-parity R-E6：token 计数命令
   'tokenCount.selection.command': '估算选区 token 数',
   'tokenCount.selection.title': '选区',

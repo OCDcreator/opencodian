@@ -1,4 +1,5 @@
 # Chinese Locale
+> 2026-09-21 (advantage-parity R-E4)：新增 semanticRetrieval 语义徽标与 10 个设置/降级键。
 > 2026-09-21 (advantage-parity R-E6)：新增 tokenCount.* 7 键。
 > 2026-09-21 (advantage-parity R-E2)：新增 chat.webViewer.* 3 键。
 > 2026-09-21 (advantage-parity R-E3)：新增 relevantNotes.* 18 键（视图/命令/两通道/附加动作）。

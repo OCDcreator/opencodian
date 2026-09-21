@@ -1,4 +1,5 @@
 # English Locale
+> 2026-09-21 (advantage-parity R-E4)：同 zh 对齐。
 > 2026-09-21 (advantage-parity R-E6)：新增 tokenCount.* 7 键（与 zh 对齐）。
 > 2026-09-21 (advantage-parity R-E2)：新增 chat.webViewer.* 3 键（与 zh 对齐）。
 > 2026-09-21 (advantage-parity R-E3)：新增 relevantNotes.* 18 键（与 zh 对齐）。

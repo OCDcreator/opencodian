@@ -155,6 +155,8 @@ export interface PromptContextItem {
   textSnapshot?: string;
   /** Absent on legacy items (treated as `manual`). */
   origin?: PromptContextOrigin;
+  /** R-E4: which retrieval channel injected a vault-retrieval item. */
+  retrievalChannel?: 'lexical' | 'semantic';
   /** R-C4: PDF extraction metadata (pdf_document / pdf_selection only). */
   pdf?: PdfContextMeta;
   /** R-E1: URL fetch metadata (url items only). */
@@ -174,6 +176,8 @@ export interface MessageContextAttachment {
   textSnapshot?: string;
   /** Absent on legacy records (treated as `manual`). */
   origin?: PromptContextOrigin;
+  /** R-E4: which retrieval channel injected this attachment. */
+  retrievalChannel?: 'lexical' | 'semantic';
   /** R-C4: display metadata only — the full page payload is never persisted. */
   pdf?: PdfContextMeta;
   /** R-C4: bounded selection locator (text is capped at the excerpt limit). */

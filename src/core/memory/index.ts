@@ -22,5 +22,6 @@ export * from './memoryReflection';
 export * from './memorySecretScan';
 export * from './memoryStore';
 export * from './memoryTypes';
+export * from './VaultEmbeddingIndexService';
 export * from './VaultIndexService';
 export * from './vaultRetrievalIndex';

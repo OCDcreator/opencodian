@@ -1659,6 +1659,9 @@ export class SettingsConversationSection {
             }
           });
       });
+
+    // R-E4: the optional embedding layer rides inside this block.
+    this.renderSemanticRetrievalSettings(containerEl);
   }
 
   /** Honest R-C1 index status line: off / indexed count / service absent. */
@@ -1673,6 +1676,58 @@ export class SettingsConversationSection {
     return t('settings.vaultRetrieval.status.indexed', {
       count: String(service.indexedNoteCount()),
     });
+  }
+
+  /**
+   * R-E4: the semantic retrieval enhancement rows inside the vault-retrieval
+   * block (lexical stays the base; this is the optional embedding layer).
+   * The provider dropdown lists the user's custom providers; honest status
+   * text states not-configured / indexed count / absent service.
+   */
+  private renderSemanticRetrievalSettings(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.semanticRetrieval.enableName'))
+      .setDesc(t('settings.semanticRetrieval.enableDesc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.semanticRetrievalEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.semanticRetrievalEnabled = value;
+            await this.plugin.saveSettings();
+            await this.plugin.vaultEmbeddingIndexService?.onSettingsChanged(value);
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.semanticRetrieval.providerName'))
+      .setDesc(t('settings.semanticRetrieval.providerDesc'))
+      .addDropdown((dropdown) => {
+        dropdown.addOption('', t('settings.semanticRetrieval.providerDesc'));
+        for (const provider of this.plugin.settings.providers) {
+          dropdown.addOption(provider.id, provider.name || provider.id);
+        }
+        dropdown
+          .setValue(this.plugin.settings.semanticEmbeddingProvider)
+          .onChange(async (value) => {
+            this.plugin.settings.semanticEmbeddingProvider = value;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.semanticRetrieval.modelName'))
+      .setDesc(t('settings.semanticRetrieval.modelDesc'))
+      .setClass('opencodian-wide-text-setting')
+      .addText((text) => {
+        text
+          .setPlaceholder('text-embedding-3-small')
+          .setValue(this.plugin.settings.semanticEmbeddingModel)
+          .onChange(async (value) => {
+            this.plugin.settings.semanticEmbeddingModel = value.trim();
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.title = this.plugin.settings.semanticEmbeddingModel;
+      });
   }
 
   /**

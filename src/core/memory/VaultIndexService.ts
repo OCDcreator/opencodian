@@ -64,6 +64,13 @@ export interface VaultRetrievalSettingsSlice {
    * slice covers both retrieval surfaces.
    */
   readonly pdfIndexEnabled: boolean;
+  /**
+   * advantage-parity R-E4: the optional embedding channel over this lexical
+   * index (off by default; provider/model empty = not configured).
+   */
+  readonly semanticRetrievalEnabled: boolean;
+  readonly semanticEmbeddingProvider: string;
+  readonly semanticEmbeddingModel: string;
 }
 
 /** One injected snippet: located lines plus the already-truncated text. */

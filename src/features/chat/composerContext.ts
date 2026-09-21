@@ -19,6 +19,8 @@ export interface ComposerContextChipState {
   preview: boolean;
   /** R-C1: retrieval-injected chips render with the "retrieved" badge. */
   origin?: PromptContextItem['origin'];
+  /** R-E4: which retrieval channel injected this chip (badge text). */
+  retrievalChannel?: PromptContextItem['retrievalChannel'];
 }
 
 export function getContextTargetKey(
@@ -184,6 +186,7 @@ export function buildComposerContextChipStates(
       attached: true,
       preview: false,
       origin: item.origin,
+      retrievalChannel: item.retrievalChannel,
     });
     attachedByKey.delete(key);
   }

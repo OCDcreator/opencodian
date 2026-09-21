@@ -21,4 +21,5 @@ export {
   type MemoryRuntimeCoordinatorOptions,
   VaultMemoryFileSystem,
 } from './MemoryRuntimeCoordinator';
+export { VaultEmbeddingFileSystem } from './VaultEmbeddingFileSystem';
 export { VaultIndexFileSystem } from './VaultIndexFileSystem';

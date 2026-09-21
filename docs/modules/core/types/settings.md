@@ -1,4 +1,5 @@
 # Settings Types and Defaults
+> 2026-09-21 (advantage-parity R-E4)：新增 semanticRetrievalEnabled（默认 false）/ semanticEmbeddingProvider / semanticEmbeddingModel 三字段与归一化器。
 > 2026-09-21 (advantage-parity R-D3)：新增 turnCompletionSoundEnabled（默认 false）与 turnCompletionSoundPath（默认空 = 内置音）及两个归一化器。
 > 2026-09-20 (advantage-parity R-D1)：新增 `conversationExport` 设置块（directory / filenameTemplate / autoExport，默认 `opencodian-conversations` / `{$date}_{$topic}` / false）与 `normalizeConversationExportSettings` 归一化器（目录剥离首尾斜杠、拒绝绝对路径与 `..`）。
 > 2026-09-18 (R-C6): 新增远程驱动四字段 `remoteControlEnabled`（默认 `false`，关闭即不构造任何 http.Server）、`remoteControlBindAddress`（默认 `127.0.0.1`，`localhost` 归一化，非环回需确认时间戳）、`remoteControlToken`（默认 `''`，凭据路径先例 `CodexBackendSettings.apiKey`：字符串归一化、永不回显、关闭不清除）、`remoteControlNonLoopbackAcknowledgedAt`（默认 `''`，改回环回即清除）；配套 `REMOTE_CONTROL_*` 边界常量与四个 `normalizeRemoteControl*` 归一化函数。

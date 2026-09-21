@@ -1,4 +1,5 @@
 # Vault Retrieval Composer Coordinator
+> 2026-09-21 (advantage-parity R-E4)：新增 semanticRetrieval 查询缝——注入 = 词面优先 ∪ 语义补位去重，条目带 retrievalChannel 通道标注；语义失败诚实降级为纯词面。
 
 > **源码**: `src/features/chat/services/VaultRetrievalComposerCoordinator.ts`
 > **状态**: [REVIEW]

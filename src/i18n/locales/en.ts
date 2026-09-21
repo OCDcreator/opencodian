@@ -2529,6 +2529,18 @@ export const enTranslations = {
   'chat.context.kind.pdfSelection': 'PDF selection',
   'chat.context.kind.url': 'Webpage',
 
+  // advantage-parity R-E4：语义检索增强层
+  'chat.context.originBadge.semanticRetrieval': 'retrieved · semantic',
+  'settings.semanticRetrieval.enableName': 'Semantic retrieval layer (R-E4, experimental)',
+  'settings.semanticRetrieval.enableDesc': 'Off by default. When on, an embedding channel rides the vault retrieval: injection = lexical ∪ semantic TopK merged and deduped, each hit labelled by channel. Requires an explicitly configured embedding provider and model; degrades honestly to lexical-only when unavailable.',
+  'settings.semanticRetrieval.providerName': 'Embedding provider',
+  'settings.semanticRetrieval.providerDesc': 'Pick one of the custom providers configured above (its baseUrl and API key call the OpenAI-compatible /embeddings endpoint).',
+  'settings.semanticRetrieval.modelName': 'Embedding model',
+  'settings.semanticRetrieval.modelDesc': 'Model name sent to the endpoint (e.g. text-embedding-3-small, bge-m3; free text).',
+  'settings.semanticRetrieval.notConfiguredNotice': 'Semantic retrieval is on but no embedding provider/model is configured; running lexical-only (Settings → Conversation → Vault retrieval).',
+  'settings.semanticRetrieval.providerMissingNotice': 'The selected semantic provider is missing or lacks a baseUrl; running lexical-only.',
+  'settings.semanticRetrieval.degradedNotice': 'Semantic retrieval unavailable ({{reason}}); lexical-only this turn.',
+
   // advantage-parity R-E6：token 计数命令
   'tokenCount.selection.command': 'Estimate selection tokens',
   'tokenCount.selection.title': 'Selection',
