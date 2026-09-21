@@ -11,6 +11,24 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-21 批次 F 后续代码质量修复：回退轮次关闭、绑定笔记三态保存、Vim 键一致性与 rail 可访问名
+
+**触发**：advantage-parity 批次 F（R-F2 / R-F3 / R-F5 / R-F6）实现验收后的一轮独立代码审查。本轮不是重新审查，而是逐条复现 → 实施最小修复 → 补回归测试 → 实机验收。审查报告被当作线索而非真相：能复现的修，不能复现的登记并停止。
+
+**改动（三个实现提交）**：
+
+1. `fix(storage): harden edit-revert post baseline closure` —— `closeRound()` 成为 turn/batch 唯一关闭缝，先冻结再**无条件**写 `closedAt` / `acceptsWritesUntil`；post baseline 冻结改为 best-effort（永不抛出）并带 500ms 墙钟预算 `EDIT_REVERT_POST_BASELINE_BUDGET_MS`。修复前 `storeBlob` 的 `adapter.write` 异常会穿过 `freezePostImages` 冒泡到只记 warn 的结束入口，使轮次保持 `closedAt: null` / `acceptsWritesUntil: Number.MAX_SAFE_INTEGER`，把此后所有用户编辑持续误归属到已结束的轮次。冻结失败条目诚实落 `postImageUnavailable`（预览 `baseline-unavailable`），不伪造基线；pre-image 与 writeback 语义未改。
+2. `fix(chat): preserve linked-note state and clarify revert UI` —— 绑定字段改为三态保存契约（`undefined` 未触碰不回写 / `null` 显式解绑 / string 显式选择），修复"弹窗打开期间 vault rename 跟随被旧路径覆盖"；Modified Files 的绑定笔记在 revert 与 session-diff 两种模式都进独立分区并带排除提示，命中真实 diff 时保留「绑定草稿」徽标不重复展示；回退预览两侧加语义标签并为 created/deleted/moved 增加动作说明；linked-note 文案不再声称"只作为上下文"（实际只喂 R-B3 快照候选，不进模型上下文）。
+3. `fix(chat): harden Vim keys and session rail accessibility` —— 新增单槽位契约 `applyChatVimNavigationKey`（冲突拒绝 + 保留原三元组），三个键输入共享重绘缝，显示值与运行时读取值恒等，冲突时给 notice 而非静默重置为 `w/s/i`（旧行为会同时抹掉另外两个合法自定义键）；`ChatVimNavigationCoordinator.shouldHandle()` 避让 Shift（`Shift+W/S/I` 不再被大小写不敏感归一化吞掉）；session rail 由带 `aria-label` 的 generic div 改为 `role="navigation"` landmark（`aria-labelledby` 指向自身可见标题 + heading 语义 + per-instance id），条目 `aria-current`/按钮名/list 语义不变。
+
+**回归测试**：`EditRevertService.baselineClosure.test.ts` 5 例（修复前全红）、`ConversationSessionSettingsLinkedNoteBinding.test.ts` 5 例（真实 modal + 真实 coordinator 交错时序）、`ModifiedFilesSidebar` linked-note section placement 5 例、`EditRevertPreviewModal` row semantics 6 例、`SettingsConversationSection` Vim 冲突 5 例 + `settings.test.ts` 4 例（含"单槽位路径永不产出重复三元组"属性测试）、`ChatVimNavigationCoordinator` Shift 3 例（修复前红）、`ConversationSessionRailCoordinator` 可访问性 6 例。`OpenCodianView.sessionRailContract.test.ts` 从 `readFileSync` + `match` 计数 + `indexOf` 顺序的**源码字符串**断言改为驱动真实 `OpenCodianView` 读取渲染 rail DOM 的行为测试，并用三组定向变异（反转 backend 过滤 / 删除标题态 refresh / 把 refresh 移出 finally）逐例验证会红，避免"绿但无覆盖"。
+
+**已测量、本批次未修改**：大 vault 的 linked-note 下拉用新 harness `tests/bench/linkedNoteDropdown.bench.ts` 实测（jsdom，5000 / 20000 路径）：打开 775ms → **33.1s**、`<option>` 5001 → 20001、展开 197ms → 826ms、菜单按钮同量、堆 +128MB → +365MB，两档均无检索框；单独插入 20000 个 option 已占 8.7s。修复需换成可检索选择器（复用 `ContextFileCatalogService` / `ContextFilePickerModal`），属独立大功能，按批次边界不动，已登记待立项。`.opencodian-container` 的 `container-type: inline-size` 做了只读影响核对：插件自有全部 `position: fixed` 元素都挂在 `document.body` 或 settings 窗口，**没有一个是该容器后代**，当前无可复现回归；收窄锚点会改变 rail 显示断点并把包含块副作用下移到后代更多的子树，因此只把约束登记进维护规则与 rail 模块文档，未伪装成已修 bug。
+
+**纠正**：R-F5 落地证据此前把源码字符串断言描述为"覆盖列表 predicate、标题持久化和删除恢复刷新"，本轮已换成真实行为测试；审查报告称下拉在弹窗打开时"已创建两倍节点"时点不准确（增强按钮在首次展开时才创建）。
+
+---
+
 ## 2026-09-21 R-F5/R-F6 双栏会话 rail + Vim 聊天导航：宽屏只读管理与可配置局部键位
 
 **触发**：advantage-parity 批次 F 两项 P3 小件。要求默认关闭的宽屏双栏会话浏览，以及可配置 w/s/i 聊天导航；两者都不能改变现有历史管理、会话 ownership 或 Obsidian 全局快捷键。

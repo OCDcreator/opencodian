@@ -347,6 +347,39 @@ Claudian 用 `$` 调技能、`/instruction` 保存可复用指令。OpenCodian �
 
 ---
 
+## 5.1 批次 F 后续代码质量修复（2026-09-21）
+
+批次 F 的 R-F2 / R-F3 / R-F5 / R-F6 在实现验收后另做了一轮独立代码审查。本节记录**审查后代码质量修复提交**及其回归测试，并**纠正**上文中被证伪或被夸大的说法。所有条目都先复现、再修复；无法复现的条目如实登记为未修改。
+
+### 已修复
+
+| # | 缺陷 | 根因（已复现） | 修复 | 回归测试 |
+|---|---|---|---|---|
+| R-F3-1 | post baseline 冻结失败会阻止轮次关闭 | `performEndTurnCapture` / `performEndBatchCapture` 在写 `closedAt` / `acceptsWritesUntil` **之前** `await freezePostImages(round)`，而后者经 `EditRevertStore.storeBlob` → `vault.adapter.write` 会抛；结束入口只记 warn。异常使轮次保持 `closedAt: null` 与 `acceptsWritesUntil: Number.MAX_SAFE_INTEGER`，此后**所有**用户编辑持续误归属到已结束的轮次 | 新增唯一关闭缝 `closeRound()`：先尝试冻结，再**无条件**写关闭态。冻结改为 best-effort 契约（永不抛出），失败/读失败/超预算条目落 `postImageUnavailable`，预览如实 `baseline-unavailable`；新增 500ms 墙钟预算 `EDIT_REVERT_POST_BASELINE_BUDGET_MS`。冻结仍在串行队列内完成，不挪后台，无 current-content 竞态。pre-image 与 writeback 语义未改 | `EditRevertService.baselineClosure.test.ts` 5 例（turn 关闭 / batch 关闭 / `baseline-unavailable` 且仍可回退 / 超预算及时结束并标记剩余 / 失败后 vault modify 不再归入 batch），修复前 5 例全红 |
+| R-F2-1 | 弹窗用旧 linked-note 路径覆盖 rename 跟随 | `handleSave` 总是把下拉当前值传给 `onSave`，coordinator 对任何非 `undefined` 值写回；下拉在打开时填充一次，而 `followConversationLinkedNoteRename` 就地改同一 conversation 对象 → 只保存其他设置也会把重命名跟随回滚 | 绑定字段改为三态契约：`undefined` = 未触碰（不回写）、`null` = 显式解绑、`string` = 显式选择；modal 用下拉自身 `change` 事件标记 dirty。`onSave` 第二参数类型改为 `string \| null \| undefined`，未退回单参数 | `ConversationSessionSettingsLinkedNoteBinding.test.ts` 5 例（真实 modal + 真实 coordinator 交错时序：只存其他设置不回写 / 保留 rename 跟随 / 显式解绑 / 显式选择 / 显式选择胜过竞态跟随）+ coordinator 4 例三态契约 |
+| R-F2-2 | Modified Files 的绑定笔记只在 revert 模式独立分区 | `renderStandaloneLinkedNoteSection` 仅由 `renderRevertSection` 调用；无 revert entries 时 `render()` 走 `renderLinkedNoteState()` 把绑定笔记当**裸行**插进普通文件变更列表（无标题、无排除提示），且命中 diff 时会重复显示 | `render()` 在两种模式都调用 `renderStandaloneLinkedNoteSection(getComparedPaths(...))`，分区锚点 `revertSectionEl ?? listEl`；命中真实 diff/revert 路径时只在那一行保留「绑定草稿」徽标 | `ModifiedFilesSidebar.test.ts` `linked-note section placement` 5 例（`updateRevertState(null, null)` + 绑定 / 不计入计数与徽标 / 命中 diff 不重复 / locked / 两模式各一个分区） |
+| R-F2-3 | linked-note 文案夸大能力 | 原文 "It is context only" / 「它只作为上下文」暗示笔记内容进入模型上下文；实际 `linkedNotePath` 只并入 R-B3 `contextPaths`（`SendPipelineRuntime` 的 `onTurnSnapshotBegin`），不进入 `preparedSend.contextItems` | 中英文改为诚实表述：用于快照、回退跟踪与 Modified Files 关联；**不会**把内容发送给模型；**不会**自动写回 | 文案断言随 modal/coordinator 套件；能力边界由 `SendPipelineRuntime` 现有测试与本节代码证据固定 |
+| R-F3-2 | 回退预览行数与动作有歧义 | 预览只显示 `before 行 → after 行`，语义是「本轮开始时 → 捕获结束时」而非「点击前 → 点击后」；created/deleted 的实际后果完全没写 | 两侧各加语义标签（`linesBeforeLabel` / `linesAfterLabel` / `linesValue`），每行新增动作说明：created = 回退将删除该文件、deleted = 用快照恢复、moved = 重命名回原路径、modified = 恢复本轮前内容且上方数字是捕获前后统计。移除歧义的裸 `lines` 组合键；中英文同步；写回逻辑未改 | `EditRevertPreviewModal.test.ts` 新增 6 例（两侧标签 / modified 框架 / created 含 delete / deleted 含 restore / moved / 不可计算带标签），修复前 6 例全红 |
+| R-F6-1 | 重复按键输入使显示值与实际设置不一致 | `SettingsConversationSection` 用 `normalizeChatVimNavigationKeys` 对**整表**归一化，而该函数在出现重复键时按 fail-closed 返回默认 `w/s/i`；随后只 `text.setValue(normalized[key])` 刷新被编辑的输入 → 设置被整体重置、另两个输入仍显示旧值。`j/k/p` 状态下把 up 改为 `k` 会同时抹掉另外两个合法自定义键 | 新增单槽位契约 `applyChatVimNavigationKey`：冲突候选被**拒绝**并返回原三元组；三个输入共享重绘缝，每次编辑后都按设置真值重绘，显示值与运行时读取值恒等；冲突时弹 notice 说明而非静默重置。整表归一化的 fail-closed 语义**保留**给持久化配置的 load 边界 | `SettingsConversationSection.test.ts` 新增 5 例（拒绝且不抹掉其他键 / 三输入与设置全等 / notice 反馈 / 非冲突编辑只改自己 / 重载一致）+ `settings.test.ts` 新增 4 例含属性测试「单槽位路径永不产出重复三元组」 |
+| R-F6-2 | Shift 修饰键未避让 | `shouldHandle()` 检查 Ctrl/Meta/Alt 但漏了 Shift；`Shift+W` 的 `event.key` 为 `'W'`，经大小写不敏感归一化命中配置的 `'w'` → 滚动并 `preventDefault`，吞掉大写字母 | `shouldHandle()` 增加 `!event.shiftKey`。`shiftKey === false` 的大写 key（CapsLock/合成事件）仍按设计命中 | `ChatVimNavigationCoordinator.test.ts` 新增 3 例（`Shift+W/S/I` 均不滚动/不聚焦/不 preventDefault）+ 小写键仍生效 + 无 Shift 的大写键仍生效；修复前 3 例红 |
+| R-F5-1 | session rail 可访问名称可能被忽略 | rail 是带 `aria-label` 的 generic `div`；generic 角色不可命名，读屏可能直接丢弃该名称 | 改为 `role="navigation"` landmark（`aria-labelledby` 指向自身可见标题；标题加 `role="heading"` + `aria-level="2"`；per-instance id 防重复）。选 `navigation` 而非 `complementary`：rail 的用途是在会话间导航（每项加载另一个会话），正是 navigation landmark 的 ARIA 定义；`complementary` 会把宽面板里主要的会话切换器描述成旁支内容。条目的 `aria-current`、按钮名与 list/listitem 角色保持不变 | `ConversationSessionRailCoordinator.test.ts` 新增 6 例（navigation role / aria-labelledby 指向可见标题 / heading 语义 / aria-current 与按钮名不变 / list 语义不变 / 实例 id 不重复）；修复前 4 例红 |
+| R-F5-2 | 源码字符串契约测试证明不了行为 | `OpenCodianView.sessionRailContract.test.ts` 用 `readFileSync` + `String.match` 计数 + `indexOf` 顺序断言源码文本；方法内重命名或重排会让行为变化而测试仍绿 | 改为驱动**真实** `OpenCodianView` 并读取渲染后的 rail DOM，覆盖同一批行为：rail 与 history 共用 active-backend 过滤结果、标题保存后 rail 刷新、单删/全删的 `finally` 恢复路径刷新 rail。**每一例都用定向变异验证过会红**（反转 backend 过滤 / 删除标题态 refresh / 把 refresh 移出 finally） | 同文件 4 例；三组变异分别精确打红对应用例，还原后 4 例全绿 |
+
+### 已测量、本批次未修改
+
+| # | 项 | 测量与证据 | 结论 |
+|---|---|---|---|
+| J | 大 vault 的 linked-note 下拉规模 | harness `tests/bench/linkedNoteDropdown.bench.ts`（刻意置于 jest `testMatch` 之外，手动运行 `npx jest --selectProjects unit --testMatch "**/tests/bench/**/*.bench.ts"`）。jsdom 实测：5000 路径 → 打开 775ms / 5075 节点 / 5001 `<option>` / 展开 197ms / 5001 菜单按钮 / 堆 +128MB；20000 路径 → 打开 **33.1s** / 20075 节点 / 20001 `<option>` / 展开 826ms / 20001 菜单按钮 / 堆 +365MB；两档均无检索框。单独插入 20000 个 `<option>` 已占 8.7s，说明成本主体是「全量物化原生 option」 | **未修改**。修复需要把枚举式选择器换成可检索选择器（复用 `ContextFileCatalogService` / `ContextFilePickerModal`），涉及新 host 依赖、新 UI 面与新样式，属独立大功能，按批次边界不在本次范围。已登记为待立项项；`tests/bench/` harness 保留以便将来复测 |
+| K | `.opencodian-container { container-type: inline-size }` 的 fixed 包含块副作用 | 只读核对：`container-type: inline-size` 使该容器成为 `position: fixed` 后代的包含块。逐一定位插件自有的全部 fixed 元素——`.opencodian-tooltip-layer`（`shared/TooltipLayerController.ts`，`document.body.appendChild`）、`.opencodian-image-preview-backdrop`（`features/chat/ui/ImagePreviewOverlay.ts`，`document.body.createDiv`）、`.opencodian-tab-overflow-menu`（`features/chat/tabs/TabBar.ts`，`doc.body.appendChild`）、portaled `.opencodian-settings-dropdown-menu`（`SettingsDropdownControl.ts`，`ownerDocument.body`）、`.opencodian-agent-switcher-floating`（settings 窗口）——**没有任何一个**是该容器的后代 | **未修改**。当前无可复现回归，符合审查报告自己的承认。收窄锚点也不是"极小改动"：`@container (min-width: 640px)`（`src/style/base/core.css`）是唯一的匿名 container query，它决定 R-F5 rail 的显示断点，改锚到 messages shell 会改变 rail 出现时机，并把包含块副作用下移到后代更多的子树。约束已登记在 `docs/status/development-maintainability-rules.md` 与 rail 模块文档，明确标注为「latent constraint，不是已修 bug」 |
+
+### 纠正（上文措辞修正）
+
+- R-F5 落地证据称 `OpenCodianView.sessionRailContract.test.ts` "覆盖列表 predicate、标题持久化和删除恢复刷新"。该文件当时是**源码字符串**断言，不是行为覆盖；本次已替换为真实行为测试（见 R-F5-2），行为范围不变但证据强度不同。
+- 审查报告称绑定笔记下拉在弹窗打开时"已创建两倍节点"。**时点不准确**：增强菜单的 option 按钮在 `open()`（首次展开）时才创建，弹窗打开阶段只有原生 `<option>`。实测数据见 J 行。
+- R-F2 的 `auto-draft` / `submitting` 裁剪与 R-F3 的 post baseline 只服务预览这两条原有偏差登记**不变**；本次未改动其语义。
+
+---
+
 ## 6. 批次 G：裁决项（默认不动）
 
 | # | 需求 | 内容 | 建议 |

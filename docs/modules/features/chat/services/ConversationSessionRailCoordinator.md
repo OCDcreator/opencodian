@@ -33,3 +33,17 @@ and date, marks the current item, and delegates a non-current click to the
 existing load path. It refuses selection while the active tab streams using
 the existing streaming-blocked notice. `destroy()` removes the DOM and layout
 class so closed views retain no listener or layout residue.
+
+## Layout anchor (registered constraint, R-F5 quality follow-up)
+
+The rail's visibility breakpoint is the unnamed `@container (min-width: 640px)`
+query in `src/style/base/core.css`, resolved against `.opencodian-container`
+(which carries `container-type: inline-size`). That makes the container a
+containing block for `position: fixed` descendants. No such descendant exists
+today — the plugin mounts every fixed overlay at `document.body` — so this is a
+latent constraint, not a current bug, and it was deliberately NOT "fixed" in
+this batch. Re-anchoring the query to the messages shell would change the width
+at which the rail appears and would move the containment hazard into a subtree
+with more descendants. See
+`docs/status/development-maintainability-rules.md` for the rule that governs
+new fixed-position elements in this container.

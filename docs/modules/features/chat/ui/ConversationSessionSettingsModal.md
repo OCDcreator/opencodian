@@ -1,4 +1,5 @@
 # ConversationSessionSettingsModal
+> 2026-09-21 (advantage-parity R-F2 质量修复 · 已测量未修复)：绑定笔记下拉在大 vault 下的规模问题已实测，**本批次未改代码**。harness 见 `tests/bench/linkedNoteDropdown.bench.ts`（刻意放在 jest `testMatch` 之外，用 `npx jest --selectProjects unit --testMatch "**/tests/bench/**/*.bench.ts"` 手动运行）。jsdom 实测：5000 路径 → 打开 775ms、5075 节点、5001 `<option>`、展开 197ms、5001 菜单按钮、堆增量 128MB；20000 路径 → 打开 **33.1s**、20075 节点、20001 `<option>`、展开 826ms、20001 菜单按钮、堆增量 365MB，且两档都无检索框。单纯插入 20000 个 `<option>` 就占 8.7s，说明成本主要在「全量物化原生 option」而非增强菜单；增强按钮确实只在展开时创建（审查报告"两倍节点"的说法在时点上不准确）。修复需要把枚举式选择器换成可检索的选择器（复用 `ContextFileCatalogService` / `ContextFilePickerModal`），涉及新的 host 依赖、新 UI 面与样式，属于独立大功能，按批次边界不在本次修复范围内。
 > 2026-09-21 (advantage-parity R-F2 质量修复)：绑定字段改为三态保存契约——未触碰 = `undefined`（不回写，弹窗打开期间发生的 vault rename 跟随得以保留）、显式解绑 = `null`、显式选择 = 路径。`onSave` 第二参数类型为 `string | null | undefined`，不再单参数化。回归测试 `tests/unit/features/chat/ConversationSessionSettingsLinkedNoteBinding.test.ts`（真实 modal + 真实 coordinator 交错时序）。
 > 2026-09-21 (advantage-parity R-F2)：新增紧凑 Obsidian-native「绑定笔记」分组，可选 Markdown note 或显式解绑；丢失目标保留路径并显示 locked，保存 callback 同时携带 `linkedNotePath: string | null`，且不触发自动写回。
 
