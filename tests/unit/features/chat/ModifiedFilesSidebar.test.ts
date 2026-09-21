@@ -593,11 +593,60 @@ describe('ModifiedFilesSidebar linked-note section placement (R-F2)', () => {
     expect(section?.textContent).toContain('drafts/plan.md');
     expect(section?.textContent).toContain(t('modifiedFiles.linkedNoteExcludedHint'));
 
-    // The binding is not a change: it never joins the diff list as a bare row.
-    const listPaths = Array.from(
-      document.querySelectorAll('.opencodian-modified-files-sidebar-list .opencodian-modified-files-sidebar-path'),
-    ).map((el) => el.textContent);
-    expect(listPaths).not.toContain('drafts/plan.md');
+    // The binding is not a change: it never becomes a change row and never
+    // contributes to the row count or the statistics.
+    const changeRowPaths = Array.from(document.querySelectorAll('.opencodian-modified-files-sidebar-item'))
+      .map((row) => row.querySelector('.opencodian-modified-files-sidebar-path')?.textContent);
+    expect(changeRowPaths).toEqual(['notes/other.md']);
+    expect(section?.querySelector('.opencodian-modified-files-sidebar-item')).toBeNull();
+  });
+
+  it('scrolls the binding section with the change list so the rows keep the panel height', () => {
+    const sidebar = mountSidebar();
+    sidebar.updateEntries([diffEntry('notes/other.md'), diffEntry('notes/second.md', 1, 0)], 'ready', {
+      path: 'drafts/plan.md',
+      exists: true,
+    });
+    sidebar.updateRevertState(null, null);
+
+    // A fixed sibling section used to squeeze the scrolling list until a change
+    // row was clipped mid-statistic; in diff mode the section belongs to the
+    // list so the rows keep the whole available height.
+    const list = document.querySelector('.opencodian-modified-files-sidebar-list');
+    const section = document.querySelector('.opencodian-modified-files-linked-note-section');
+    expect(list?.contains(section)).toBe(true);
+    expect(document.querySelectorAll('.opencodian-modified-files-sidebar-item')).toHaveLength(2);
+  });
+
+  it('keeps the binding section a sibling of the revert list in revert mode', () => {
+    const sidebar = mountSidebar();
+    sidebar.updateEntries([diffEntry('notes/other.md')], 'ready', { path: 'drafts/plan.md', exists: true });
+    sidebar.updateRevertState({
+      enabled: true,
+      roundId: 'round-1',
+      roundOpen: false,
+      degraded: false,
+      entries: [{
+        path: 'notes/other.md',
+        status: 'modified',
+        movedTo: null,
+        state: 'active',
+        revertible: true,
+        restorable: false,
+        excludedReason: null,
+      }],
+      revertibleCount: 1,
+    }, {
+      getRevertPreview: jest.fn().mockResolvedValue({ roundId: 'round-1', roundOpen: false, rows: [] } as EditRevertPreview),
+      revertFile: jest.fn().mockResolvedValue(undefined),
+      revertAll: jest.fn().mockResolvedValue(undefined),
+      restoreFile: jest.fn().mockResolvedValue(undefined),
+    });
+
+    const section = document.querySelector('.opencodian-modified-files-linked-note-section');
+    expect(section).not.toBeNull();
+    expect(document.querySelector('.opencodian-modified-files-sidebar-list')?.contains(section)).toBe(false);
+    expect(document.querySelector('.opencodian-edit-revert-section')?.contains(section)).toBe(false);
   });
 
   it('keeps the binding out of the diff count, line statistics and badge', () => {
@@ -637,6 +686,21 @@ describe('ModifiedFilesSidebar linked-note section placement (R-F2)', () => {
     expect(section?.textContent).toContain(t('modifiedFiles.linkedNoteLocked'));
     expect(section?.textContent).toContain(t('modifiedFiles.linkedNoteExcludedHint'));
     expect(section?.querySelector('[data-linked-note-state="locked"]')).not.toBeNull();
+  });
+
+  it('keeps the full binding path reachable when the panel ellipsises it', () => {
+    const longPath = 'opencodian-conversations/2026-09-20_a-very-long-note-name.md';
+    const sidebar = mountSidebar();
+    sidebar.updateEntries([diffEntry('notes/other.md')], 'ready', { path: longPath, exists: true });
+    sidebar.updateRevertState(null, null);
+
+    const sectionPath = document.querySelector(
+      '.opencodian-modified-files-linked-note-section .opencodian-modified-files-sidebar-path',
+    );
+    expect(sectionPath?.textContent).toBe(longPath);
+    // The sibling change rows expose the full path through `title`; the
+    // ellipsised binding row must not be the one that loses it.
+    expect(sectionPath?.getAttribute('title')).toBe(longPath);
   });
 
   it('renders exactly one binding section in both modes', () => {

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "70b5f752517424d7c8c4ef710af78427d9d6eeb164925b753a6aa44c3a325149",
+  "digest": "5970022b9f06ed2ba0a1a6214c6c8312c6bee1c3568409e02dc05875accbca93",
   "recordCount": 773,
   "records": [
     {
@@ -2476,7 +2476,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/ui/ModifiedFilesSidebar.ts",
-      "sha256": "294150065546338c18de76d8d64d81a3b797fef0a77b8122d47b2cc6b70346c8"
+      "sha256": "881b88e5ce688e3db79fd6749ab8b6de28ef40fcc4ed29b590339dd51451670f"
     },
     {
       "kind": "src",
@@ -3476,7 +3476,7 @@
     {
       "kind": "src",
       "key": "src/style/components/modified-files-sidebar.css",
-      "sha256": "89321fa66694b760a8d7d62158111b27ba0727c8da7b1cdb120ae1650a049c7f"
+      "sha256": "c96903058b46f40a050c0443f2a779512e3a5114e39694435844ad23249b9d1f"
     },
     {
       "kind": "src",
@@ -3869,7 +3869,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-21T16:21:57.326Z",
-  "headShaAtGeneration": "3c528fa4a11dc52b75c8d32136a46b2686bf1f1b",
+  "generatedAt": "2026-09-21T17:15:20.678Z",
+  "headShaAtGeneration": "4ade3cb147deafa9e6f0b704a5e255ab7f082a8f",
   "graphifyVersion": "graphify 0.9.36"
 }

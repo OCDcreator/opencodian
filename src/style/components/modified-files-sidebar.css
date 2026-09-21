@@ -218,6 +218,14 @@
 .opencodian-modified-files-sidebar-path {
   min-width: 0;
   flex: 1;
+  /* The binding row renders this class on a <button>, which the host styles as
+     a flex container with a fixed input height; `text-overflow` does not apply
+     to a flex container's anonymous item, so the path clipped mid-glyph with no
+     ellipsis marker, and the fixed height inflated a one-line path to 30px. An
+     explicit block display and auto height make the text container eligible for
+     the ellipsis in both the button (binding row) and span (change row) cases. */
+  display: block;
+  height: auto;
   padding: 0;
   border: 0;
   background: transparent;

@@ -223,9 +223,8 @@ export class ModifiedFilesSidebar extends Component {
     // bare row inside the change list. When the binding itself did change it is
     // already a normal row (carrying the draft badge), so the section is
     // skipped to avoid showing it twice.
-    this.renderStandaloneLinkedNoteSection(this.getComparedPaths(showingRevert));
-
     if (showingRevert) {
+      this.renderStandaloneLinkedNoteSection(this.getComparedPaths(true));
       return;
     }
 
@@ -235,9 +234,19 @@ export class ModifiedFilesSidebar extends Component {
         cls: `opencodian-modified-files-sidebar-empty is-${this.availability}`,
         text: this.availability === 'ready' ? t('modifiedFiles.empty') : t('modifiedFiles.unavailable'),
       });
-      return;
+    } else {
+      this.renderChangeRows();
     }
 
+    // In session-diff mode the section lives inside the scrolling list, so the
+    // change rows keep the panel's full height instead of being squeezed by a
+    // fixed sibling. The panel is a bounded popover: stealing height from the
+    // primary content to show supplementary content clips change rows
+    // mid-statistic, which reads as a broken row rather than as a scroll.
+    this.renderStandaloneLinkedNoteSection(this.getComparedPaths(false), this.listEl);
+  }
+
+  private renderChangeRows(): void {
     for (const entry of this.entries) {
       const itemEl = this.listEl.createEl('details', {
         cls: `opencodian-modified-files-sidebar-item status-${entry.status ?? 'modified'}`,
@@ -306,11 +315,14 @@ export class ModifiedFilesSidebar extends Component {
       cls: 'opencodian-modified-files-linked-note',
       attr: { 'data-linked-note-state': state },
     });
+    // The path is ellipsised in a narrow panel; the sibling change rows carry
+    // the full path in `title`, and this row must too or a long binding is
+    // unidentifiable once the tail is cut off.
     if (this.linkedNote.exists) {
       const pathButton = rowEl.createEl('button', {
         cls: 'opencodian-modified-files-sidebar-path',
         text: this.linkedNote.path,
-        attr: { type: 'button' },
+        attr: { type: 'button', title: this.linkedNote.path },
       });
       pathButton.addEventListener('click', () => {
         void this.app.workspace.openLinkText(this.linkedNote.path!, '', false);
@@ -319,6 +331,7 @@ export class ModifiedFilesSidebar extends Component {
       rowEl.createSpan({
         cls: 'opencodian-modified-files-sidebar-path is-unresolved',
         text: this.linkedNote.path,
+        attr: { title: this.linkedNote.path },
       });
     }
     rowEl.createSpan({
@@ -476,18 +489,22 @@ export class ModifiedFilesSidebar extends Component {
     this.renderStandaloneLinkedNoteSection(model.entries.map((entry) => entry.path));
   }
 
-  private renderStandaloneLinkedNoteSection(comparedPaths: readonly string[]): void {
+  private renderStandaloneLinkedNoteSection(
+    comparedPaths: readonly string[],
+    parentEl: HTMLElement = this.containerEl,
+  ): void {
     this.containerEl.querySelector('.opencodian-modified-files-linked-note-section')?.remove();
     if (!this.shouldRenderStandaloneLinkedNote(comparedPaths)) {
       return;
     }
 
-    const bindingSectionEl = this.containerEl.createDiv({
+    const bindingSectionEl = parentEl.createDiv({
       cls: 'opencodian-modified-files-linked-note-section',
     });
-    // Directly under the change list it belongs to: the revert list when a
-    // revert round is on screen, otherwise the read-only session-diff list.
-    (this.revertSectionEl ?? this.listEl).after(bindingSectionEl);
+    if (parentEl === this.containerEl) {
+      // Revert mode: directly under the revert list it belongs to.
+      (this.revertSectionEl ?? this.listEl).after(bindingSectionEl);
+    }
     bindingSectionEl.createDiv({
       cls: 'opencodian-modified-files-linked-note-section-title',
       text: t('modifiedFiles.linkedNoteSection'),
