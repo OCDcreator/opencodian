@@ -237,6 +237,7 @@ body[data-opencodian-provider-icon-mode="color"] {
   --opencodian-composer-stack-height: 0px;
   --opencodian-messages-pad-top: 12px;
   --opencodian-messages-pad-x: 0px;
+  container-type: inline-size;
   --opencodian-message-pad-x: 21px;
   --opencodian-content-pad-x: 10px;
   --opencodian-content-pad-y: 5px;
@@ -1993,6 +1994,121 @@ body[data-opencodian-provider-icon-mode="color"] {
   scrollbar-gutter: stable;
   position: relative;
   z-index: 2;
+}
+
+/* R-F5: the optional rail consumes only wide-pane space; narrow chat stays unchanged. */
+.opencodian-session-rail {
+  display: none;
+}
+
+@container (min-width: 640px) {
+  .opencodian-messages-shell--session-rail {
+    display: grid;
+    grid-template-columns: minmax(152px, 28%) minmax(0, 1fr);
+    column-gap: 8px;
+  }
+
+  .opencodian-messages-shell--session-rail .opencodian-messages {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  .opencodian-session-rail {
+    display: flex;
+    grid-column: 1;
+    grid-row: 1;
+    z-index: 2;
+    min-width: 0;
+    min-height: 0;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--background-secondary) 76%, transparent);
+  }
+
+  .opencodian-session-rail-title {
+    padding: 1px 2px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  .opencodian-session-rail-list {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: 4px;
+    overflow: auto;
+    scrollbar-width: thin;
+  }
+
+  .opencodian-session-rail-list > [role="listitem"] {
+    display: block;
+    min-width: 0;
+  }
+
+  .opencodian-session-rail button.opencodian-session-rail-item {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    height: auto !important;
+    min-height: 52px;
+    grid-template-rows: auto auto;
+    align-content: center;
+    gap: 2px;
+    padding: 6px 8px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    text-align: left;
+  }
+
+  .opencodian-session-rail button.opencodian-session-rail-item:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+  }
+
+  .opencodian-session-rail button.opencodian-session-rail-item.is-current {
+    border-color: color-mix(in srgb, var(--interactive-accent) 42%, var(--background-modifier-border));
+    background: color-mix(in srgb, var(--interactive-accent) 13%, var(--background-secondary));
+    color: var(--text-normal);
+    font-weight: 600;
+  }
+
+  .opencodian-session-rail button.opencodian-session-rail-item:focus-visible {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: 1px;
+  }
+
+  .opencodian-session-rail-item-title,
+  .opencodian-session-rail-item-date {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.4;
+  }
+
+  .opencodian-session-rail-item-title {
+    font-size: 12px;
+  }
+
+  .opencodian-session-rail-item-date,
+  .opencodian-session-rail-empty {
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .opencodian-session-rail-empty {
+    padding: 8px;
+  }
 }
 
 .opencodian-messages-pane {

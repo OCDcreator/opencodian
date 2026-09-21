@@ -201,6 +201,7 @@ export {
   normalizeChatAppearanceBackgroundFitMode,
   normalizeChatAppearanceSettings,
   normalizeChatFontSizePx,
+  normalizeChatVimNavigationKeys,
   normalizeClaudeCodeAdditionalDirectories,
   normalizeClaudeCodeBackendSettings,
   normalizeClaudeCodeDebugChannelSettings,

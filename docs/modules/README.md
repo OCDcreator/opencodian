@@ -415,6 +415,11 @@ docs/modules/
 - [Pi 模型选择绑定](features/chat/services/PiModelSelectionBinding.md)
 - [Pi 设置界面](features/settings/SettingsPiSection.md)
 
+## 聊天导航增量（2026-09-21）
+
+- [双栏会话管理栏](features/chat/services/ConversationSessionRailCoordinator.md)：R-F5 宽面板只读会话列表，复用历史会话的后端筛选与加载路径。
+- [Vim 风格聊天导航](features/chat/services/ChatVimNavigationCoordinator.md)：R-F6 opt-in 的 root-scoped w/s/i 键处理与输入/overlay 避让。
+
 ### Pi SDK 完整接入补充
 
 - core/agents/backend/pi/PiProtocol.md、PiSessionRuntime.md：版本化独立服务边界。

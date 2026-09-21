@@ -4,6 +4,7 @@
 > 2026-09-21 (advantage-parity R-E1)：ChatRuntimeComposition 组合 UrlContextFetchService 并注入发送准备的 resolveUrlContextItems 缝。
 
 # Owner: feature.chat-runtime
+> 2026-09-21 (advantage-parity R-F2/R-F3)：SendPipelineRuntime 把绑定笔记去重合入 R-B3 发送前 snapshot candidates；turn/batch 结束冻结 post-image 供回退预览。发送与回退写路径仍复用既有边界，不自动写回绑定笔记。
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
 - 2026-09-13 (universal memory backend): ChatRuntimeComposition wires planMemoryInjection and onTurnSettled into the send pipeline host; SendPipelineRuntime fires the settle hook in the finally block.

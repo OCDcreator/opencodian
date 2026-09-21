@@ -8,6 +8,7 @@
 > 2026-09-20 (advantage-parity R-D1)：ConversationHistoryActionsCoordinator 每条会话新增「导出为 Markdown 笔记」按钮（可选 host 方法，未提供不渲染）。
 
 # Owner: feature.chat-services
+> 2026-09-21 (advantage-parity R-F2/R-F3/R-F5/R-F6)：ConversationSessionSettingsCoordinator 与 ModifiedFilesSidebarCoordinator 只转发绑定元数据，不伪造 diff/revert；新增 ConversationSessionRailCoordinator 从 host 读取权威列表、按现有加载路径切换且流式时阻止，ChatVimNavigationCoordinator 仅持有 root-scoped 键监听器。两者不持久化第二套会话真值，关闭 view 时释放 DOM/监听器。
 
 Pricing readiness (2026-09-10): the context usage coordinator fills unavailable live-tab costs on catalog updates and snapshot restoration. Existing numeric costs, token ledgers and activity timestamps remain unchanged. Closing the view unsubscribes and flushes pending snapshots before discarding timers.
 

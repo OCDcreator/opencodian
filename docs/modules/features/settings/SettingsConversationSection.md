@@ -1,4 +1,5 @@
 # SettingsConversationSection
+> 2026-09-21 (advantage-parity R-F5/R-F6)：Display 块新增会话管理 rail 开关、Vim 导航开关和三个单字符输入；保存走既有 view refresh seam，无需 reload。
 > 2026-09-21 (advantage-parity R-E4)：整库检索块内新增语义检索三行（开关默认关 + 供应商下拉（取自定义 providers）+ 模型宽输入）。
 > 2026-09-21 (advantage-parity R-D3)：display 块新增「轮次完成提示音」两行（开关默认关 + 自定义音频文件路径，宽输入 + title 悬停）。
 > 2026-09-20 (advantage-parity R-D1)：新增「导出」设置块（classic 与 tabbed 两路径同渲染）：导出目录（经 `normalizeConversationExportDirectory` 校验，非法恢复原值 + Notice）、文件名模板、自动导出开关；tabbed 下为 conversation 主 tab 的 `export` 二级 tab。

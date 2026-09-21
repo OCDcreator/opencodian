@@ -26,6 +26,7 @@ import {
   EDIT_REVERT_SNAPSHOT_LIMIT_MB_MAX,
   EDIT_REVERT_SNAPSHOT_LIMIT_MB_MIN,
   normalizeChatFontSizePx,
+  normalizeChatVimNavigationKeys,
   normalizeConversationExportDirectory,
   normalizeConversationExportFilenameTemplate,
   normalizeEditRevertSnapshotLimitMb,
@@ -36,6 +37,7 @@ import {
   OBSIDIAN_TOOLING_MODES,
 } from '../../core/types';
 import type { AgentBackendKind } from '../../core/types/chat';
+import type { TranslationKey } from '../../i18n';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
@@ -506,6 +508,8 @@ export class SettingsConversationSection {
 
   private renderDisplayBlock(containerEl: HTMLElement): void {
     this.addChatFontSizeSetting(containerEl);
+    this.addSessionRailSetting(containerEl);
+    this.addChatVimNavigationSettings(containerEl);
     this.addTurnChangeRecordsSetting(containerEl);
     this.addEditRevertSettings(containerEl);
     this.addTurnCompletionSoundSettings(containerEl);
@@ -1497,6 +1501,89 @@ export class SettingsConversationSection {
             this.plugin.settings.chatFontSizePx = nextValue;
             text.setValue(String(nextValue));
             await this.saveGlobalSessionDefaults();
+          });
+      });
+  }
+
+  /** R-F5: the rail is a wide-pane enhancer and keeps the history dropdown intact. */
+  private addSessionRailSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.conversation.sessionRail.name'))
+      .setDesc(t('settings.conversation.sessionRail.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.chatSessionRailEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.chatSessionRailEnabled = value;
+            await this.plugin.saveSettings();
+            this.plugin.refreshConversationRendering();
+          });
+      });
+  }
+
+  /** R-F6: letters are opt-in, explicit, and normalized before persistence. */
+  private addChatVimNavigationSettings(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.conversation.vimNavigation.name'))
+      .setDesc(t('settings.conversation.vimNavigation.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.chatVimNavigationEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.chatVimNavigationEnabled = value;
+            await this.plugin.saveSettings();
+            this.plugin.refreshConversationRendering();
+          });
+      });
+
+    this.addChatVimNavigationKeySetting(
+      containerEl,
+      'up',
+      'settings.conversation.vimNavigation.upKey',
+      'settings.conversation.vimNavigation.upKeyDesc',
+    );
+    this.addChatVimNavigationKeySetting(
+      containerEl,
+      'down',
+      'settings.conversation.vimNavigation.downKey',
+      'settings.conversation.vimNavigation.downKeyDesc',
+    );
+    this.addChatVimNavigationKeySetting(
+      containerEl,
+      'composer',
+      'settings.conversation.vimNavigation.composerKey',
+      'settings.conversation.vimNavigation.composerKeyDesc',
+    );
+  }
+
+  private addChatVimNavigationKeySetting(
+    containerEl: HTMLElement,
+    key: 'up' | 'down' | 'composer',
+    nameKey: TranslationKey,
+    descriptionKey: TranslationKey,
+  ): void {
+    const readKeys = () => ({
+      up: this.plugin.settings.chatVimNavigationUpKey,
+      down: this.plugin.settings.chatVimNavigationDownKey,
+      composer: this.plugin.settings.chatVimNavigationComposerKey,
+    });
+    new Setting(containerEl)
+      .setName(t(nameKey))
+      .setDesc(t(descriptionKey))
+      .addText((text) => {
+        text.inputEl.maxLength = 1;
+        text
+          .setValue(readKeys()[key])
+          .onChange(async (value) => {
+            const normalized = normalizeChatVimNavigationKeys({
+              ...readKeys(),
+              [key]: value,
+            });
+            this.plugin.settings.chatVimNavigationUpKey = normalized.up;
+            this.plugin.settings.chatVimNavigationDownKey = normalized.down;
+            this.plugin.settings.chatVimNavigationComposerKey = normalized.composer;
+            text.setValue(normalized[key]);
+            await this.plugin.saveSettings();
           });
       });
   }

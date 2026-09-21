@@ -1,4 +1,5 @@
 # Owner: feature.settings-plugin
+> 2026-09-21 (advantage-parity R-F5/R-F6)：SettingsConversationSection 的 Display 块新增默认关闭的会话 rail 与 Vim 导航 toggles、w/s/i 单字符配置；保存后复用既有聊天视图刷新缝，键值经 core.types 归一化，不在设置层持有会话或键监听器。
 > 2026-09-21 (advantage-parity R-F8)：新增 ContextWindowOverrideModal（窄 port 不 import 应用层）+ 模型通用 tab 声明入口行。
 > 2026-09-21 (advantage-parity R-E4)：整库检索块新增语义检索三行设置。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。

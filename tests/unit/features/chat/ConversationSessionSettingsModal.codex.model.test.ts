@@ -131,6 +131,7 @@ describe('ConversationSessionSettingsModal Codex model override', () => {
       expect.objectContaining({
         codexModelOverride: 'gpt-5.4',
       }),
+      null,
     );
   });
 
@@ -177,6 +178,7 @@ describe('ConversationSessionSettingsModal Codex model override', () => {
       expect.objectContaining({
         codexModelOverride: 'o4-mini',
       }),
+      null,
     );
   });
 
@@ -217,6 +219,6 @@ describe('ConversationSessionSettingsModal Codex model override', () => {
     saveButton?.click();
     await Promise.resolve();
 
-    expect(onSave).toHaveBeenCalledWith(undefined);
+    expect(onSave).toHaveBeenCalledWith(undefined, null);
   });
 });

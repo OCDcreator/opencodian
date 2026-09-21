@@ -1,4 +1,5 @@
 # Chinese Locale
+> 2026-09-21 (advantage-parity R-F5/R-F6)：新增会话管理栏、Vim 导航设置及 rail 状态中文文案。
 > 2026-09-21 (advantage-parity R-F4)：新增 `settings.agent.chatWarmSession.{name,desc}`；明确预热只创建空只读 aux session、不发送提示词/回合、不计模型用量，真实聊天另建会话。
 > 2026-09-21 (advantage-parity R-F3)：新增 `editRevert.preview.*` 的确认回退、before→after 行数、冲突/无基线、失败与 round-open fail-closed 文案；与 en 保持一一对应。
 > 2026-09-21 (advantage-parity R-F2)：新增会话绑定笔记（未绑定 / 显式草稿 / 已锁定）和 Modified Files「绑定草稿」文案。

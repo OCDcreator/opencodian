@@ -1,4 +1,5 @@
 # Settings Types and Defaults
+> 2026-09-21 (advantage-parity R-F5/R-F6)：新增双栏会话 rail 与 Vim 导航五字段；两个开关默认关闭，三键归一化为互不重复的单字符（默认 `w`/`s`/`i`），坏值 fail-closed。
 > 2026-09-21 (advantage-parity R-F4)：新增 `chatWarmSessionEnabled`（默认 `false`）：只许可为 active chat backend 预热一个空、已验证的只读 aux session；不提交 prompt / completion turn，真实聊天不复用它。
 > 2026-09-21 (advantage-parity R-F7)：新增 `environmentVariables: EnvironmentVariablesDomains`（`shared` + `providers`，默认空域；类型自 core.agents `BackendEnvironment` 导入）。
 > 2026-09-21 (advantage-parity R-F8)：新增 modelContextWindowOverrides（provider/model → token 正整数映射）与 normalizeModelContextWindowOverrides（ref 形态/正整数/上限校验，字符串数字可 coercion）。

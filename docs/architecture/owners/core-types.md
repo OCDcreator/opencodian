@@ -1,4 +1,5 @@
 # Owner: core.types
+> 2026-09-21 (advantage-parity R-F2–R-F6)：会话类型新增受约束的绑定笔记路径、回退预览只读契约；设置新增默认关闭的聊天暖会话、双栏会话 rail、Vim 导航及 w/s/i 键配置，load 合流点对布尔值严格归一化并修复非法/重复键。既有后端会话与消息真值不迁移。
 > 2026-09-21 (advantage-parity R-F7)：settings 新增 `environmentVariables`（EnvironmentVariablesDomains，默认空域），load 合流点经 BackendEnvironment 归一化。
 > 2026-09-21 (advantage-parity R-F8)：modelContextWindowOverrides 设置字段与归一化。
 > 2026-09-21 (advantage-parity R-E4)：retrievalChannel 字段 + 语义检索设置三字段归一化。

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "6e70a80c23a839222a0078c81909066752069817a41ba781151d27bed96d1606",
-  "recordCount": 771,
+  "digest": "d7c48cb748bc767a2b2ffc4d1dfab8ce36de7724f66f8aeb0c82b07e4cbb1a1f",
+  "recordCount": 773,
   "records": [
     {
       "kind": "ignore",
@@ -1191,7 +1191,7 @@
     {
       "kind": "src",
       "key": "src/core/types/index.ts",
-      "sha256": "c22124e775ef2e9709163b5910f2d1e30e912ebdfdd92f915e4c684b70d3343e"
+      "sha256": "b65b7040d0b9f441b3e7fd81baf48e2f17fc0893be355c26cc6141f326509da0"
     },
     {
       "kind": "src",
@@ -1216,12 +1216,12 @@
     {
       "kind": "src",
       "key": "src/core/types/settings.ts",
-      "sha256": "798653d7150c9aa01a0f6da97a19933a94890ff999669bba1442f396dc1bd6b2"
+      "sha256": "2550e42cbc9d1e1089fe92d198024151bbbe07bb6dd53992cbdaf5ab4d8ce4e3"
     },
     {
       "kind": "src",
       "key": "src/core/types/settingsLoadNormalization.ts",
-      "sha256": "e5fe26a17f1752e622dfbf8e83e521ac4371404797b278ee16d8120e4353481f"
+      "sha256": "da9ab590f9d451b0aa401845f41caa02f86194f28cd741a38ecc7c59ad5b7ad2"
     },
     {
       "kind": "src",
@@ -1266,7 +1266,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/ChatPluginPort.ts",
-      "sha256": "1604881030e6cb15752c4b561a8b5ae7e8f0dd9032a8ff076b5527e16f8ef5f6"
+      "sha256": "8b635d3a8c6c939d104d12285a853477fa6834310439bcd53c75a06a52dc6bb7"
     },
     {
       "kind": "src",
@@ -1311,7 +1311,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
-      "sha256": "178c77e16c2f767a9b6248b73b8f2f8cbddbc2809db946ed1a64cb2d6459bce4"
+      "sha256": "c60fd7efc1512b38d0d230dc4adac9f9e792a1a8aae5008a8a01fed495d2617a"
     },
     {
       "kind": "src",
@@ -1655,6 +1655,11 @@
     },
     {
       "kind": "src",
+      "key": "src/features/chat/services/ChatVimNavigationCoordinator.ts",
+      "sha256": "43c9f71777d92eb4afa48f8db6cc72fd75ca50c8ca247bdef94955e5c11a6433"
+    },
+    {
+      "kind": "src",
       "key": "src/features/chat/services/ChatVisualDemoCoordinator.ts",
       "sha256": "3ba1c8d618968e527b3468f969da4108c3bd4ad8869eca6216b3dca29e3d19a4"
     },
@@ -1852,6 +1857,11 @@
       "kind": "src",
       "key": "src/features/chat/services/ConversationRenderService.ts",
       "sha256": "b2002a7d357aa6ae673853b58072af76177a103f58e17b95a73257428dce6ec3"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/chat/services/ConversationSessionRailCoordinator.ts",
+      "sha256": "ba04cea61e9e95105b2bc44862c30d5766bc6fd9aadb41168d32e692e2c7964f"
     },
     {
       "kind": "src",
@@ -3031,7 +3041,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsConversationSection.ts",
-      "sha256": "2e3399737fee861061a27362c2f4126ad51fc3dcdafb5e28fa3ebeadfc2ed503"
+      "sha256": "5c0d0302cc4e67322a0688797d33f5bda69059415f0663fefb51760e72c16677"
     },
     {
       "kind": "src",
@@ -3271,7 +3281,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "ebfaa52f96552a41358405f7a262467bf015af4fb8d2f58fa293dbc9b581dfab"
+      "sha256": "63aa0dc24e40b1d66e011814652dc756c042bf1d4607319829df290f891b1844"
     },
     {
       "kind": "src",
@@ -3281,7 +3291,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "50e837a2592486f1896cd2a38ee5413ce8ecb83a909d6b7633ddc02963923ed2"
+      "sha256": "ade8f398901cbb3bd785a98b81adc8a86e1eaf3e6add20f060717ada8d96222b"
     },
     {
       "kind": "src",
@@ -3401,7 +3411,7 @@
     {
       "kind": "src",
       "key": "src/style/base/core.css",
-      "sha256": "18612345b2c33b4a538cd104e18e3d5f1dd17117726c47ee28e05bf5ee6589b2"
+      "sha256": "1de217bb1a816418abfd575e470fe615024000119ec284d882a42038506fcb02"
     },
     {
       "kind": "src",
@@ -3859,7 +3869,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-21T09:22:12.941Z",
-  "headShaAtGeneration": "d987e6aff2f6e0c8424f6c678b231a3f13c8cf6d",
+  "generatedAt": "2026-09-21T11:02:21.333Z",
+  "headShaAtGeneration": "d6dc7c175231151d885502690a64d394a79af0e5",
   "graphifyVersion": "graphify 0.8.50"
 }

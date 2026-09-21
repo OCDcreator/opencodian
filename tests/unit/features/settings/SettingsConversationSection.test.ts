@@ -391,6 +391,60 @@ describe('SettingsConversationSection', () => {
     expect(plugin.refreshConversationRendering).toHaveBeenCalledTimes(1);
   });
 
+  it('renders opt-in session rail and Vim navigation controls with disabled/default bindings', () => {
+    const plugin = createPlugin();
+    createSection(plugin);
+
+    const railToggle = findToggle(t('settings.conversation.sessionRail.name'));
+    const vimToggle = findToggle(t('settings.conversation.vimNavigation.name'));
+    const upKey = findText(t('settings.conversation.vimNavigation.upKey'));
+    const downKey = findText(t('settings.conversation.vimNavigation.downKey'));
+    const composerKey = findText(t('settings.conversation.vimNavigation.composerKey'));
+
+    expect(railToggle?.control.setValue).toHaveBeenCalledWith(false);
+    expect(vimToggle?.control.setValue).toHaveBeenCalledWith(false);
+    expect(upKey?.control.setValue).toHaveBeenCalledWith('w');
+    expect(downKey?.control.setValue).toHaveBeenCalledWith('s');
+    expect(composerKey?.control.setValue).toHaveBeenCalledWith('i');
+  });
+
+  it('persists rail/Vim toggles through the existing rendering refresh seam', async () => {
+    const plugin = createPlugin();
+    createSection(plugin);
+    const railToggle = findToggle(t('settings.conversation.sessionRail.name'));
+    const vimToggle = findToggle(t('settings.conversation.vimNavigation.name'));
+
+    await railToggle?.onChange?.(true);
+    await vimToggle?.onChange?.(true);
+
+    expect(plugin.settings.chatSessionRailEnabled).toBe(true);
+    expect(plugin.settings.chatVimNavigationEnabled).toBe(true);
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(2);
+    expect(plugin.refreshConversationRendering).toHaveBeenCalledTimes(2);
+  });
+
+  it('normalizes and persists configured Vim navigation keys at the settings boundary', async () => {
+    const plugin = createPlugin();
+    createSection(plugin);
+    const upKey = findText(t('settings.conversation.vimNavigation.upKey'));
+    const downKey = findText(t('settings.conversation.vimNavigation.downKey'));
+
+    await upKey?.onChange?.('K');
+    expect(plugin.settings).toMatchObject({
+      chatVimNavigationUpKey: 'k',
+      chatVimNavigationDownKey: 's',
+      chatVimNavigationComposerKey: 'i',
+    });
+
+    await downKey?.onChange?.('k');
+    expect(plugin.settings).toMatchObject({
+      chatVimNavigationUpKey: 'w',
+      chatVimNavigationDownKey: 's',
+      chatVimNavigationComposerKey: 'i',
+    });
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(2);
+  });
+
   it('dispose clears any registered title-model refresh callback', () => {
     let refreshTitleModelsCallback: (() => void) | undefined = () => {};
     const section = new SettingsConversationSection({

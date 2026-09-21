@@ -1,4 +1,5 @@
 # Owner: core.storage
+> 2026-09-21 (advantage-parity R-F2/R-F3)：会话 metadata sidecar 保真库内 Markdown `linkedNotePath`；EditRevertService/Store 在 round 结束冻结 post-image 基线供只读预览与冲突比较，并将新增 blob 纳入引用、字节预算和 GC。持久化/回退真值仍在本 owner，不由 UI 另建。
 > 2026-09-21 (advantage-parity R-F7)：StorageService runtime.json 增 `environmentFingerprints` 读写（load 失败 null、save 失败 warn 不抛；R-F7 失效信号的数据面）。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 

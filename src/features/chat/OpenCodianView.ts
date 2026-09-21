@@ -175,6 +175,7 @@ import {
   ChatSurfaceAppearanceCoordinator,
   type ChatSurfaceAppearanceCoordinatorHost,
 } from './services/ChatSurfaceAppearanceCoordinator';
+import { ChatVimNavigationCoordinator } from './services/ChatVimNavigationCoordinator';
 import {
   ChatVisualDemoCoordinator,
 } from './services/ChatVisualDemoCoordinator';
@@ -220,6 +221,7 @@ import {
   ConversationRenderService,
   type ConversationUserMessageRenderFrame,
 } from './services/ConversationRenderService';
+import { ConversationSessionRailCoordinator } from './services/ConversationSessionRailCoordinator';
 import {
   ConversationSessionSettingsCoordinator,
   type ConversationSessionSettingsCoordinatorHost,
@@ -449,6 +451,8 @@ export class OpenCodianView extends ItemView {
   private tabMessagesPaneCoordinator: TabMessagesPaneCoordinator<TabRuntimeState>;
   private chatHeaderPresenter: ChatHeaderPresenter;
   private conversationHistoryActionsCoordinator: ConversationHistoryActionsCoordinator;
+  private conversationSessionRailCoordinator: ConversationSessionRailCoordinator;
+  private chatVimNavigationCoordinator: ChatVimNavigationCoordinator;
   private chatSelectionControlsCoordinator: ChatSelectionControlsCoordinator;
   private composerInputShellCoordinator: ComposerInputShellCoordinator;
   private vaultRetrievalComposerCoordinator: VaultRetrievalComposerCoordinator;
@@ -829,9 +833,7 @@ export class OpenCodianView extends ItemView {
     titleGenerationService: TitleGenerationService,
   ): ConversationHistoryActionsHost {
     return {
-      getConversations: () => this.plugin.getConversations().filter(
-        (conversation) => (conversation.backend ?? 'opencode') === this.plugin.settings.activeBackend,
-      ),
+      getConversations: () => this.getActiveBackendConversations(),
       getCurrentConversation: () => this.currentConversation,
       getHistoryBackendDisplayName: () => {
         const activeBackend = this.plugin.settings.activeBackend ?? 'opencode';
@@ -854,7 +856,7 @@ export class OpenCodianView extends ItemView {
       deleteConversationsAndCleanupTabs: (conversationIds) =>
         this.deleteConversationsAndCleanupTabs(conversationIds),
       deleteAllConversationsAndReset: (conversationIds) =>
-        this.conversationLoadRecoveryCoordinator.deleteAllConversationsAndReset(conversationIds),
+        this.deleteAllConversationsAndReset(conversationIds),
       // advantage-parity R-D1: per-item export entry; the plugin method
       // resolves the live conversation when it is the active one.
       exportConversationMarkdown: async (conversationId) => {
@@ -1644,6 +1646,25 @@ export class OpenCodianView extends ItemView {
     this.chatDiagnosticsCoordinatorFactory = chatDiagnosticsCoordinatorFactory;
     this.messageComponent = new Component();
     this.modifiedFilesSidebarCoordinator = new ModifiedFilesSidebarCoordinator();
+    this.conversationSessionRailCoordinator = new ConversationSessionRailCoordinator({
+      isEnabled: () => this.plugin.settings.chatSessionRailEnabled,
+      getConversations: () => this.getActiveBackendConversations(),
+      getCurrentConversation: () => this.currentConversation,
+      isActiveTabStreaming: () => this.isActiveTabStreaming(),
+      loadConversation: (conversationId) => this.loadConversation(conversationId),
+      showNotice: (message) => { new Notice(message); },
+    });
+    this.chatVimNavigationCoordinator = new ChatVimNavigationCoordinator({
+      isEnabled: () => this.plugin.settings.chatVimNavigationEnabled,
+      getKeys: () => ({
+        scrollUp: this.plugin.settings.chatVimNavigationUpKey,
+        scrollDown: this.plugin.settings.chatVimNavigationDownKey,
+        focusInput: this.plugin.settings.chatVimNavigationComposerKey,
+      }),
+      getMessagesContainer: () => this.messagesContainer,
+      focusComposer: () => this.composerInputShellCoordinator.focusInput(),
+      hasBlockingOverlay: () => this.hasChatVimNavigationBlockingOverlay(),
+    });
     this.editRevertUnsubscribe = this.plugin.editRevertService?.onEntriesChanged(() => {
       this.refreshModifiedFilesSidebar();
     }) ?? null;
@@ -2722,6 +2743,9 @@ export class OpenCodianView extends ItemView {
     await measureStep('buildUI', () => {
       this.buildUI();
     });
+    if (this.chatContainerEl) {
+      this.chatVimNavigationCoordinator.attach(this.chatContainerEl);
+    }
     await measureStep('initializeTabSystem', () => {
       this.initializeTabSystem();
     });
@@ -2759,6 +2783,7 @@ export class OpenCodianView extends ItemView {
       }
     });
     await measureStep('initializeFirstTab', () => this.initializeFirstTab());
+    this.conversationSessionRailCoordinator.refresh(this.messagesShellEl);
     this.plugin.registerConversationCachePinProvider(this.conversationCachePinProvider);
 
     logger.info(
@@ -2774,6 +2799,8 @@ export class OpenCodianView extends ItemView {
     this.clearSlashCommandMenuPreload();
     this.chatHeaderPresenter.destroy();
     this.conversationHistoryActionsCoordinator.destroy();
+    this.conversationSessionRailCoordinator.destroy();
+    this.chatVimNavigationCoordinator.destroy();
     this.conversationSyncBridgePorts.getLoopControl().stopConversationSyncLoop();
     this.composerContextViewFacade.dispose();
     this.chatSurfaceAppearanceCoordinator.destroy();
@@ -3101,11 +3128,36 @@ export class OpenCodianView extends ItemView {
   }
 
   public refreshCurrentConversationRendering(): void {
+    this.conversationSessionRailCoordinator.refresh(this.messagesShellEl);
     if (!this.currentConversation) {
       return;
     }
 
     void this.conversationRenderService.rerenderConversationMessages(this.currentConversation);
+  }
+
+  /** Vim navigation must yield while any interactive chat or host overlay is open. */
+  private hasChatVimNavigationBlockingOverlay(): boolean {
+    const documentForView = this.chatContainerEl?.ownerDocument ?? document;
+    const rendererWindow = documentForView.defaultView;
+    if (!rendererWindow) {
+      // A detached popout renderer cannot safely establish modal visibility.
+      return true;
+    }
+    const overlays = documentForView.querySelectorAll<HTMLElement>(
+      '.modal-container .modal, .menu, .opencodian-history-dropdown, .opencodian-permission-dropdown, '
+      + '.opencodian-model-dropdown, .opencodian-agent-dropdown, '
+      + '.opencodian-slash-command-menu:not(.is-hidden), .opencodian-inline-edit-overlay, '
+      + '.opencodian-inline-edit-menu',
+    );
+    return Array.from(overlays).some((overlay) => {
+      const style = rendererWindow.getComputedStyle(overlay);
+      return overlay.isConnected
+        && !overlay.hidden
+        && !overlay.classList.contains('is-hidden')
+        && style.display !== 'none'
+        && style.visibility !== 'hidden';
+    });
   }
 
   public async reapplyCurrentConversationSessionSettings(): Promise<void> {
@@ -3521,6 +3573,7 @@ export class OpenCodianView extends ItemView {
       || currentSessionId !== previousSessionId
     ) {
       this.refreshModifiedFilesSidebar();
+      this.conversationSessionRailCoordinator.refresh(this.messagesShellEl);
     }
   }
 
@@ -3539,6 +3592,7 @@ export class OpenCodianView extends ItemView {
       || currentSessionId !== previousSessionId
     ) {
       this.refreshModifiedFilesSidebar();
+      this.conversationSessionRailCoordinator.refresh(this.messagesShellEl);
     }
   }
 
@@ -3574,6 +3628,7 @@ export class OpenCodianView extends ItemView {
 
     await this.conversationLoadRecoveryCoordinator.loadConversation(id, options);
     this.refreshModifiedFilesSidebar();
+    this.conversationSessionRailCoordinator.refresh(this.messagesShellEl);
     await this.childSessionGraphCoordinator.refreshGraph();
   }
 
@@ -3681,7 +3736,19 @@ export class OpenCodianView extends ItemView {
   }
 
   private async deleteConversationsAndCleanupTabs(conversationIds: string[]): Promise<void> {
-    await this.conversationLoadRecoveryCoordinator.deleteConversationsAndRecover(conversationIds);
+    try {
+      await this.conversationLoadRecoveryCoordinator.deleteConversationsAndRecover(conversationIds);
+    } finally {
+      this.conversationSessionRailCoordinator.refresh(this.messagesShellEl);
+    }
+  }
+
+  private async deleteAllConversationsAndReset(conversationIds: string[]): Promise<void> {
+    try {
+      await this.conversationLoadRecoveryCoordinator.deleteAllConversationsAndReset(conversationIds);
+    } finally {
+      this.conversationSessionRailCoordinator.refresh(this.messagesShellEl);
+    }
   }
 
   /** Cancel streaming */
@@ -3966,6 +4033,10 @@ export class OpenCodianView extends ItemView {
 
     if (typeof update.title === 'string') {
       this.tabManager?.syncConversationTitle(conversationId, conversation.title);
+    }
+    this.conversationSessionRailCoordinator.refresh(this.messagesShellEl);
+
+    if (typeof update.title === 'string') {
       const backendSessionId = getConversationBackendSessionId(conversation);
       const backend = this.plugin.agentServiceRegistry
         ? getConversationSessionBackendService(this.plugin.agentServiceRegistry, conversation)
@@ -3978,6 +4049,13 @@ export class OpenCodianView extends ItemView {
         }
       }
     }
+  }
+
+  /** Canonical display scope shared by history actions and the R-F5 rail. */
+  private getActiveBackendConversations(): Conversation[] {
+    return this.plugin.getConversations().filter(
+      (conversation) => (conversation.backend ?? 'opencode') === this.plugin.settings.activeBackend,
+    );
   }
 
   /** Scroll to bottom of messages */

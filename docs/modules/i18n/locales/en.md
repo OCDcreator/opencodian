@@ -1,4 +1,5 @@
 # English Locale
+> 2026-09-21 (advantage-parity R-F5/R-F6)：adds English copy for the optional session rail, Vim navigation settings/keys, and session rail states.
 > 2026-09-21 (advantage-parity R-F4)：新增 `settings.agent.chatWarmSession.{name,desc}`；明确预热只创建空只读 aux session、不发送 prompt/turn、不计模型用量，真实聊天另建会话。
 > 2026-09-21 (advantage-parity R-F3)：新增 `editRevert.preview.*` 的确认回退、before→after 行数、冲突/无基线、失败与 round-open fail-closed 文案；与 zh 保持一一对应。
 > 2026-09-21 (advantage-parity R-F2)：新增会话绑定笔记（unbound / explicit draft / locked）和 Modified Files「Linked draft」文案。

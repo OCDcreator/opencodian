@@ -118,6 +118,7 @@ describe('ConversationSessionSettingsModal Codex webSearchMode', () => {
       expect.objectContaining({
         codexWebSearchMode: 'live',
       }),
+      null,
     );
   });
 
@@ -159,6 +160,6 @@ describe('ConversationSessionSettingsModal Codex webSearchMode', () => {
     saveButton?.click();
     await Promise.resolve();
 
-    expect(onSave).toHaveBeenCalledWith(undefined);
+    expect(onSave).toHaveBeenCalledWith(undefined, null);
   });
 });

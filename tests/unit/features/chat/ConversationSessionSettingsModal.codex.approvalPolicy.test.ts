@@ -122,6 +122,7 @@ describe('ConversationSessionSettingsModal Codex approvalPolicy', () => {
     await Promise.resolve();
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({ codexApprovalPolicy: null }),
+      null,
     );
   });
 
@@ -145,6 +146,7 @@ describe('ConversationSessionSettingsModal Codex approvalPolicy', () => {
     await Promise.resolve();
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({ codexApprovalPolicy: 'inherit' }),
+      null,
     );
   });
 });

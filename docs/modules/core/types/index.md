@@ -1,4 +1,5 @@
 # Core Types Barrel
+> 2026-09-21 (advantage-parity R-F5/R-F6)：re-export `normalizeChatVimNavigationKeys` for settings UI consumers; normalization remains owned by `core/types/settings.ts`.
 > 2026-09-21 (advantage-parity R-F3)：re-export `EditRevertPreview`、`EditRevertPreviewRow` 与 `EditRevertPreviewConflictReason`，使 chat UI 只经 core.types consumer-owned seam 消费只读回退预览。
 > 2026-09-20 (advantage-parity R-D1)：导出 `ConversationExportSettings`、`DEFAULT_CONVERSATION_EXPORT_SETTINGS` 与 `normalizeConversationExport{Directory,FilenameTemplate,Settings}`（R-D1 对话导出设置归一化）。
 > 2026-09-18 (R-C6): barrel re-exports the remote-control settings normalizers `normalizeRemoteControlEnabled` / `normalizeRemoteControlBindAddress` / `normalizeRemoteControlToken` / `normalizeRemoteControlNonLoopbackAcknowledgedAt`.

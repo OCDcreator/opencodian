@@ -7,6 +7,7 @@
 > 2026-09-20 (advantage-parity R-D1)：OpenCodianView 的历史菜单 host 新增 exportConversationMarkdown 转发方法（导出逻辑不进视图）。
 
 # Owner: feature.chat-shell
+> 2026-09-21 (advantage-parity R-F2/R-F3/R-F5/R-F6)：OpenCodianView 只组装绑定笔记、preview-first 回退、会话 rail 与 Vim 键协调器的窄 host port；rail 与历史菜单共享 active-backend 会话筛选和既有 load/recovery，宽面板并排、窄面板隐藏；Vim 事件只挂聊天根且避开输入/overlay。ChatPluginPort 仅扩展所需设置读取面，不引入第二份会话状态。
 
 Pricing readiness (2026-09-10): the shell supplies catalog subscription and per-tab billing identity ports; ActiveTabContextUsageCoordinator owns recomputation and listener lifecycle. Details callbacks remain pinned to the originating tab/session.
 

@@ -29,7 +29,7 @@ describe('ConversationSessionSettingsModal Codex controls', () => {
     expect(sandboxSelect).not.toBeNull();
     expect(sandboxSelect?.getAttribute('aria-hidden')).toBe('true');
     const selects = Array.from(modal.contentEl.querySelectorAll<HTMLSelectElement>('select'));
-    expect(selects).toHaveLength(6);
+    expect(selects).toHaveLength(7);
     expect(selects.every((select) => select.getAttribute('aria-hidden') === 'true')).toBe(true);
     expect(modal.contentEl.querySelectorAll('.opencodian-settings-dropdown-trigger')).toHaveLength(selects.length);
     expect(modal.contentEl.querySelector('[data-setting="codex-reasoning-effort"]')).not.toBeNull();
@@ -160,6 +160,7 @@ describe('ConversationSessionSettingsModal Codex controls', () => {
         codexSandboxMode: 'read-only',
         codexModelReasoningEffort: 'persistent',
       }),
+      null,
     );
   });
 
@@ -211,7 +212,7 @@ describe('ConversationSessionSettingsModal Codex controls', () => {
     saveButton?.click();
     await Promise.resolve();
 
-    expect(onSave).toHaveBeenCalledWith(undefined);
+    expect(onSave).toHaveBeenCalledWith(undefined, null);
   });
 
   it('shows a boundary hint that Codex settings apply to the next thread', () => {

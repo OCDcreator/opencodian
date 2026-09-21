@@ -114,6 +114,7 @@ describe('ConversationSessionSettingsModal Codex networkAccessEnabled', () => {
       expect.objectContaining({
         codexNetworkAccessEnabled: true,
       }),
+      null,
     );
   });
 
@@ -154,6 +155,6 @@ describe('ConversationSessionSettingsModal Codex networkAccessEnabled', () => {
     saveButton?.click();
     await Promise.resolve();
 
-    expect(onSave).toHaveBeenCalledWith(undefined);
+    expect(onSave).toHaveBeenCalledWith(undefined, null);
   });
 });

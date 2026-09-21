@@ -1,4 +1,5 @@
 # Settings Load Normalization
+> 2026-09-21 (advantage-parity R-F5/R-F6)：最终 merge boundary strict-load 会 materialize rail/Vim 开关；键值 trim/lowercase/单字符校验，重复或坏值整体回落默认键。
 > 2026-09-21 (advantage-parity R-F4)：`normalizeInlineCompletionSettingsOnLoad()` 新增 `chatWarmSessionEnabled` strict-boolean 归一化；缺失或任意非布尔值回落 `DEFAULT_SETTINGS` 的 `false`。
 > 2026-09-21 (advantage-parity R-F7)：load 合流点经 `normalizeEnvironmentVariablesDomains` 归一化 `environmentVariables`（键/值裁剪、空键与非字符串值丢弃、providers 键规整）。
 > 2026-09-21 (advantage-parity R-F8)：load 合流点消费 normalizeModelContextWindowOverrides。

@@ -14,6 +14,49 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
     expect(bootstrap(true).settings.chatWarmSessionEnabled).toBe(true);
   });
 
+  it('strict-loads R-F5/R-F6 navigation settings and repairs malformed key maps', () => {
+    const bootstrap = (data: Record<string, unknown>) => prepareLoadedSettingsBootstrapState({
+      core: { data, filePath: '.opencodian/settings.core.json' },
+      ui: { data: null, filePath: '.opencodian/settings.ui.json' },
+      writable: true,
+      shouldPersist: false,
+    } as unknown as Parameters<typeof prepareLoadedSettingsBootstrapState>[0]);
+
+    expect(bootstrap({}).settings).toMatchObject({
+      chatSessionRailEnabled: false,
+      chatVimNavigationEnabled: false,
+      chatVimNavigationUpKey: 'w',
+      chatVimNavigationDownKey: 's',
+      chatVimNavigationComposerKey: 'i',
+    });
+    expect(bootstrap({
+      chatSessionRailEnabled: 'true',
+      chatVimNavigationEnabled: 1,
+      chatVimNavigationUpKey: 'ww',
+      chatVimNavigationDownKey: 'w',
+      chatVimNavigationComposerKey: 'i',
+    }).settings).toMatchObject({
+      chatSessionRailEnabled: false,
+      chatVimNavigationEnabled: false,
+      chatVimNavigationUpKey: 'w',
+      chatVimNavigationDownKey: 's',
+      chatVimNavigationComposerKey: 'i',
+    });
+    expect(bootstrap({
+      chatSessionRailEnabled: true,
+      chatVimNavigationEnabled: true,
+      chatVimNavigationUpKey: 'K',
+      chatVimNavigationDownKey: 'J',
+      chatVimNavigationComposerKey: 'F',
+    }).settings).toMatchObject({
+      chatSessionRailEnabled: true,
+      chatVimNavigationEnabled: true,
+      chatVimNavigationUpKey: 'k',
+      chatVimNavigationDownKey: 'j',
+      chatVimNavigationComposerKey: 'f',
+    });
+  });
+
   it('normalizes the optional Codex executable path for migration-safe persistence', () => {
     const state = prepareLoadedSettingsBootstrapState({
       core: {

@@ -1,4 +1,5 @@
 # ChatPluginPort
+> 2026-09-21 (advantage-parity R-F5/R-F6)：chat settings pick now includes the opt-in session rail/Vim navigation toggles and normalized key fields consumed by the view coordinators.
 > 2026-09-20 (advantage-parity R-D1)：port 新增 `exportConversationMarkdownById(conversationId)`，历史菜单导出按钮经该缝触达插件层。
 > 2026-09-18 (R-B3): R-B3: the chat plugin port adds `editRevertService: EditRevertServicePort | null` plus the `editRevertEnabled` / `editRevertSnapshotLimitMb` settings picks; the view and runtime consume the port without importing core/storage.
 

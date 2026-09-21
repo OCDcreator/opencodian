@@ -1,4 +1,5 @@
 # Owner: shared.i18n
+> 2026-09-21 (advantage-parity R-F2–R-F6)：zh/en 同步新增绑定笔记/locked、回退预览与冲突、聊天空预热、会话 rail 和可配置 Vim 导航文案；预热零 prompt/turn、绑定笔记非自动写回、冲突覆盖风险均在 UI 文案中如实说明。
 > 2026-09-21 (advantage-parity R-F7)：`envDomains.changedNotice` 与 `settings.envDomains.*` 键。
 > 2026-09-21 (advantage-parity R-F8)：settings.contextWindowOverride.* 键。
 > 2026-09-21 (advantage-parity R-F1)：chat.queue.* 键。

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- settings normalizers are exercised as one public contract. */
 /**
  * Settings type definitions tests
  */
@@ -18,6 +19,7 @@ import {
   normalizeBelowHeaderTabBarLayout,
   normalizeCapabilityLabSelectedBackend,
   normalizeChatFontSizePx,
+  normalizeChatVimNavigationKeys,
   normalizeCompactionReservedTokens,
   normalizeContextRingStyleId,
   normalizeDisabledModelRefs,
@@ -41,6 +43,23 @@ import {
   normalizeTabsEnabled,
 } from '../../../../src/core/types/settings';
 import { DEBUG_MODULE_REGISTRY, DEFAULT_DEBUG_REFRESH_INTERVAL_MS } from '../../../../src/shared/debugModules';
+
+describe('chat Vim navigation settings', () => {
+  it('defaults the opt-in controls and fail-closes malformed or duplicate key maps', () => {
+    expect(DEFAULT_SETTINGS.chatSessionRailEnabled).toBe(false);
+    expect(DEFAULT_SETTINGS.chatVimNavigationEnabled).toBe(false);
+    expect(normalizeChatVimNavigationKeys(undefined)).toEqual({ up: 'w', down: 's', composer: 'i' });
+    expect(normalizeChatVimNavigationKeys({ up: ' W ', down: 'S', composer: 'I' })).toEqual({
+      up: 'w', down: 's', composer: 'i',
+    });
+    expect(normalizeChatVimNavigationKeys({ up: 'ww', down: 's', composer: 'i' })).toEqual({
+      up: 'w', down: 's', composer: 'i',
+    });
+    expect(normalizeChatVimNavigationKeys({ up: 'w', down: 'w', composer: 'i' })).toEqual({
+      up: 'w', down: 's', composer: 'i',
+    });
+  });
+});
 
   describe('provider icon variants', () => {
     it('defaults provider icon variant to auto', () => {

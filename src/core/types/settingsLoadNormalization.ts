@@ -22,6 +22,7 @@ import {
   normalizeCapabilityLabSelectedBackend,
   normalizeChatAppearanceSettings,
   normalizeChatFontSizePx,
+  normalizeChatVimNavigationKeys,
   normalizeContextGroups,
   normalizeConversationExportSettings,
   normalizeEditRevertSnapshotLimitMb,
@@ -554,6 +555,35 @@ function normalizeInlineCompletionSettingsOnLoad(
   };
 }
 
+/** R-F5/R-F6 display controls are normalized at the last merge boundary. */
+function normalizeChatNavigationSettingsOnLoad(
+  normalizedSettings: Partial<OpenCodianSettings> | null,
+): Pick<
+  OpenCodianSettings,
+  | 'chatSessionRailEnabled'
+  | 'chatVimNavigationEnabled'
+  | 'chatVimNavigationUpKey'
+  | 'chatVimNavigationDownKey'
+  | 'chatVimNavigationComposerKey'
+> {
+  const keys = normalizeChatVimNavigationKeys({
+    up: normalizedSettings?.chatVimNavigationUpKey,
+    down: normalizedSettings?.chatVimNavigationDownKey,
+    composer: normalizedSettings?.chatVimNavigationComposerKey,
+  });
+  return {
+    chatSessionRailEnabled: typeof normalizedSettings?.chatSessionRailEnabled === 'boolean'
+      ? normalizedSettings.chatSessionRailEnabled
+      : DEFAULT_SETTINGS.chatSessionRailEnabled,
+    chatVimNavigationEnabled: typeof normalizedSettings?.chatVimNavigationEnabled === 'boolean'
+      ? normalizedSettings.chatVimNavigationEnabled
+      : DEFAULT_SETTINGS.chatVimNavigationEnabled,
+    chatVimNavigationUpKey: keys.up,
+    chatVimNavigationDownKey: keys.down,
+    chatVimNavigationComposerKey: keys.composer,
+  };
+}
+
 function normalizeImageGenerationSettingsOnLoad(
   normalizedSettings: Partial<OpenCodianSettings> | null,
 ): {
@@ -732,6 +762,7 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
       ...normalizeVaultRetrievalSettingsOnLoad(normalizedSettings),
       ...normalizeImageGenerationSettingsOnLoad(normalizedSettings),
       ...normalizeInlineCompletionSettingsOnLoad(normalizedSettings),
+      ...normalizeChatNavigationSettingsOnLoad(normalizedSettings),
       ...normalizeRemoteControlSettingsOnLoad(normalizedSettings),
     },
     shouldMigrateLegacyLocalDefaultPort,

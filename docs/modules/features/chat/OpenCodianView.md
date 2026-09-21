@@ -1,4 +1,6 @@
 # OpenCodianView
+> 2026-09-21 (advantage-parity R-F5/R-F6)：视图通过窄 host 组装可选 `ConversationSessionRailCoordinator` 与 root-scoped `ChatVimNavigationCoordinator`；设置保存经现有刷新缝实时更新，关闭时清理 rail/listener。
+> 2026-09-21 (advantage-parity R-F5 follow-up)：history 与 rail 共用 active-backend 会话过滤；标题保存、单项/全部删除恢复后均刷新 rail，后端标题同步失败不阻断本地刷新。
 > 2026-09-21 (advantage-parity R-F3)：`refreshModifiedFilesSidebar()` 仅新增 `getRevertPreview(conversationId, paths?)` 的窄 callback wiring；preview modal 与确认锁属于 chat-ui，R-B3 写回仍经既有 core.storage action callbacks。
 > 2026-09-21 (advantage-parity R-F2)：会话设置 host 提供 vault Markdown 列表/存在性和 conversation 保存缝；plugin 单例处理 vault rename 后经 `refreshLinkedNoteBindingState` 通知当前 view，Modified Files refresh 同时传递绑定状态。
 > 2026-09-21 (advantage-parity R-F1)：composer host 接 setQueuedFollowUpBarElement；新增 refreshQueuedFollowUpBar/retractQueuedFollowUp/steerQueuedFollowUp/sendQueuedFollowUpNow——steer 经 AgentTurnSteeringCapability（失败保留条目+如实 Notice），sendNow 走 sendPipelineRuntime。

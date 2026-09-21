@@ -1,4 +1,6 @@
 # Core Styles
+> 2026-09-21 (advantage-parity R-F5)：新增基于 container query 的宽面板会话 rail 布局；窄面板自动保持原消息布局，rail 使用既有 Obsidian 主题变量与可读焦点态。
+> 2026-09-21 (advantage-parity R-F5 visual follow-up)：rail item 明确覆盖宿主 button 固定高度（`height:auto !important`、`min-height:52px`），title/date 保持两个 12px、1.4 line-height 行，避免宽面板中基线重叠。
 
 2026-09-17：新增 shadcn 主题容器类
 2026-09-17：聊天框架横向留白收编为 `--opencodian-chat-inset-x`（layout.messagesAreaInsetX，默认 12、最小 8）：view-content 的横向内边距清零，改由 `.opencodian-container` 的 `padding-inline` 承担，头部与消息区随之整体内收；输入面板留白变量化为 `--opencodian-composer-inset-x/-y`（`.opencodian-input-area` 基础规则与 shadcn 停靠规则都改读变量，shadcn 预设左右 12）。

@@ -3777,6 +3777,16 @@ export interface OpenCodianSettings {
   enableAutoScroll: boolean;
   showModifiedFilesSidebar: boolean;
   showTurnChangeRecords: boolean;
+  /** R-F5: keep the read-only conversation manager rail visible in wide chat panes. */
+  chatSessionRailEnabled: boolean;
+  /** R-F6: enable vim-inspired non-editable chat navigation keys. */
+  chatVimNavigationEnabled: boolean;
+  /** Normalized one-character key for scrolling the active messages pane up. */
+  chatVimNavigationUpKey: string;
+  /** Normalized one-character key for scrolling the active messages pane down. */
+  chatVimNavigationDownKey: string;
+  /** Normalized one-character key for focusing the composer. */
+  chatVimNavigationComposerKey: string;
   chatFontSizePx: number;
   chatScrollMode: ChatScrollMode;
   inputPanelTheme: InputPanelThemeId;
@@ -3864,6 +3874,45 @@ export function normalizeSettingsLayoutMode(value: unknown): SettingsLayoutMode 
 /** Anything but a real boolean falls back to the safe default (auto-install off). */
 export function normalizePluginUpdateAutoInstall(value: unknown): boolean {
   return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.pluginUpdateAutoInstall;
+}
+
+/** R-F6 defaults are deliberately letters that are inert while the feature is off. */
+export const DEFAULT_CHAT_VIM_NAVIGATION_KEYS = {
+  up: 'w',
+  down: 's',
+  composer: 'i',
+} as const;
+
+export interface ChatVimNavigationKeys {
+  up: string;
+  down: string;
+  composer: string;
+}
+
+/**
+ * Read one printable, single-code-point key. Whitespace, modifier-looking
+ * values, multi-character values and duplicate bindings all fail closed to
+ * the stable defaults so a hand-edited settings file cannot shadow normal
+ * chat input unexpectedly.
+ */
+export function normalizeChatVimNavigationKeys(
+  value: Partial<ChatVimNavigationKeys> | null | undefined,
+): ChatVimNavigationKeys {
+  const normalizeKey = (raw: unknown, fallback: string): string => {
+    if (typeof raw !== 'string') return fallback;
+    const key = raw.trim().toLowerCase();
+    return Array.from(key).length === 1 ? key : fallback;
+  };
+
+  const normalized = {
+    up: normalizeKey(value?.up, DEFAULT_CHAT_VIM_NAVIGATION_KEYS.up),
+    down: normalizeKey(value?.down, DEFAULT_CHAT_VIM_NAVIGATION_KEYS.down),
+    composer: normalizeKey(value?.composer, DEFAULT_CHAT_VIM_NAVIGATION_KEYS.composer),
+  };
+  const values = Object.values(normalized);
+  return new Set(values).size === values.length
+    ? normalized
+    : { ...DEFAULT_CHAT_VIM_NAVIGATION_KEYS };
 }
 
 /** advantage-parity R-D2: keychain toggle normalizes to the safe default (on). */
@@ -4179,6 +4228,12 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   enableAutoScroll: true,
   showModifiedFilesSidebar: true,
   showTurnChangeRecords: true,
+  // advantage-parity R-F5/R-F6: both are opt-in so the default chat remains unchanged.
+  chatSessionRailEnabled: false,
+  chatVimNavigationEnabled: false,
+  chatVimNavigationUpKey: 'w',
+  chatVimNavigationDownKey: 's',
+  chatVimNavigationComposerKey: 'i',
   chatFontSizePx: DEFAULT_CHAT_FONT_SIZE_PX,
   chatScrollMode: 'sticky-mask',
   inputPanelTheme: 'preset',
