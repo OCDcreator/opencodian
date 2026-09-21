@@ -1,4 +1,5 @@
 # Shared Barrel
+> 2026-09-21 (advantage-parity R-F3 质量修复)：barrel 新增导出 `EDIT_REVERT_POST_BASELINE_BUDGET_MS`（post baseline 冻结墙钟预算）。
 > 2026-09-21 (advantage-parity R-F3)：barrel re-export edit-revert preview DTO/冲突类型和 `countTextLines`，保持 chat UI 对 shared 纯规划层的窄依赖。
 > 2026-09-21 (advantage-parity R-E6)：barrel 未动（tokenEstimate 从模块路径直接导入）。
 > 2026-09-21 (advantage-parity R-E1)：barrel 导出 buildUrlContextTag / buildUrlContextBody。

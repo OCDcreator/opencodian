@@ -30,6 +30,14 @@ export const EDIT_REVERT_IDLE_CACHE_MAX_FILES = 64;
 export const EDIT_REVERT_IDLE_CACHE_MAX_BYTES = 8 * 1024 * 1024;
 /** Post-turn grace window: writes after turn end still attribute to the round. */
 export const EDIT_REVERT_POST_TURN_GRACE_MS = 10 * 60 * 1000;
+/**
+ * Wall-clock budget for the post-round baseline freeze (ms). The freeze runs
+ * inside the serial vault-event queue, so an unbounded number of blob writes
+ * would stall every later vault event behind it. Entries left unfrozen when
+ * the budget expires are marked `postImageUnavailable` (an honest
+ * "baseline-unavailable" preview row), never a fabricated baseline.
+ */
+export const EDIT_REVERT_POST_BASELINE_BUDGET_MS = 500;
 
 /**
  * File lifecycle covered by revert. `'moved'` (R-B5) is a plugin-recorded

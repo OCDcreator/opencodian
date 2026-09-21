@@ -17,6 +17,7 @@
 - **Fail-soft**：快照 / 通知 / 持久化的失败只记 warn 日志，绝不阻塞发送主链路（send pipeline 以 fire-and-forget 方式调用）。
 - **插件发起批量捕获（R-B5）**：`beginBatchCapture` 不走 200ms 回合预算——批量是用户发起、清单在预览阶段已知，对全部受影响文件强制预捕获；超限文件照旧进入 `standbyOversize` 如实标注不可回退。`notePluginMove` 存在的原因：vault `rename` 事件不在事件漏斗监听范围内（Obsidian 移动只发 `rename`），插件移动必须显式登记；`endBatchCapture` 关闭后**无宽限窗**（批量写入全部显式登记），因此一键回退即时可用。`endBatchCapture` **只关闭 `backend: 'plugin'` 轮次**：若轮次开启后有真实 agent turn 启动（最新轮次变为 turn 轮），拒绝关闭——绝不提前暴露回合中的回退、也不破坏 turn 的工具声明 pre-image 捕获。`beginBatchCapture` 内部失败一律解析为 `false`，批量执行方必须拒绝执行（fail-closed）。
 - **R-F3 后基线与预览**：`endTurnCapture` 和真正关闭 plugin round 的 `endBatchCapture` 都会为 active text entry 冻结一次 post-image（hash/bytes 或 missing）；普通 vault modify 不会覆盖它。`getRevertPreview(conversationId, paths?)` 是只读队列任务：从相同的内容寻址 hash 比较当前文件与该 frozen baseline，路径默认所有 active/revertible 条目，单文件严格过滤。无基线、二进制、超限、读失败都返回冲突/不可计算，绝不误标安全；该元数据不进入 `EditRevertVaultWriteback`。
+- **R-F3 质量修复：冻结失败不得阻塞轮次关闭**：`closeRound()` 是 turn / batch 两条结束路径唯一的关闭缝——先尝试冻结，再**无条件**写 `closedAt` / `acceptsWritesUntil`。冻结本身是 best-effort 契约（永不抛出）：单条目 blob 写入失败、读失败或超时都落到 `postImageUnavailable`，预览如实显示 `baseline-unavailable`，不伪造基线。冻结带 500ms 墙钟预算（`EDIT_REVERT_POST_BASELINE_BUDGET_MS`），超预算的剩余 active 条目直接标记 unavailable；冻结仍在串行队列内完成、不挪到无序后台，因此不会出现 "current content" 竞态。修复前的缺陷：`storeBlob` 的 `adapter.write` 异常会穿过 `freezePostImages` 冒泡到只记 warn 的结束入口，使轮次保持 `closedAt: null` 与 `acceptsWritesUntil: Number.MAX_SAFE_INTEGER`，从而把此后所有用户编辑持续误归属到已经结束的轮次。
 
 ## 导入关系
 

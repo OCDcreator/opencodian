@@ -42,6 +42,7 @@ import {
   EDIT_REVERT_MAX_ROUNDS_PER_CONVERSATION,
   EDIT_REVERT_MAX_ROUNDS_TOTAL,
   EDIT_REVERT_MAX_SNAPSHOT_BYTES,
+  EDIT_REVERT_POST_BASELINE_BUDGET_MS,
   EDIT_REVERT_POST_TURN_GRACE_MS,
   EDIT_REVERT_SNAPSHOT_BUDGET_MS,
   extractCandidatePathsFromPrompt,
@@ -641,14 +642,7 @@ export class EditRevertService implements EditRevertServicePort {
     if (!round || round.meta.closedAt !== null) {
       return;
     }
-    const now = this.now();
-    await this.freezePostImages(round);
-    round.meta.closedAt = now;
-    round.meta.acceptsWritesUntil = now + EDIT_REVERT_POST_TURN_GRACE_MS;
-    round.dirty = true;
-    this.schedulePersist();
-    this.enqueue(() => this.enforceRetention()).catch(() => undefined);
-    this.notifyChanged();
+    await this.closeRound(round, this.now() + EDIT_REVERT_POST_TURN_GRACE_MS);
   }
 
   private async performNoteWriteToolUse(info: EditRevertWriteToolInfo): Promise<void> {
@@ -857,10 +851,30 @@ export class EditRevertService implements EditRevertServicePort {
     if (round.meta.backend !== 'plugin') {
       return;
     }
+    await this.closeRound(round, this.now());
+  }
+
+  /**
+   * Move a round to its closed state. The post-baseline freeze is a
+   * preview/conflict safety record only, so it must never gate the lifecycle:
+   * `closedAt` / `acceptsWritesUntil` are written whether or not the freeze
+   * succeeded. A freeze that escaped would leave `closedAt === null` and
+   * `acceptsWritesUntil === Number.MAX_SAFE_INTEGER`, and the round would then
+   * stay the vault-event attribution target indefinitely — every later user
+   * edit would be folded into a turn that had already ended.
+   */
+  private async closeRound(round: RoundState, acceptsWritesUntil: number): Promise<void> {
     const now = this.now();
-    await this.freezePostImages(round);
+    try {
+      await this.freezePostImages(round);
+    } catch (error) {
+      logger.warn('post baseline freeze failed; closing round anyway', {
+        error,
+        roundId: round.meta.id,
+      });
+    }
     round.meta.closedAt = now;
-    round.meta.acceptsWritesUntil = now;
+    round.meta.acceptsWritesUntil = acceptsWritesUntil;
     round.dirty = true;
     this.schedulePersist();
     this.enqueue(() => this.enforceRetention()).catch(() => undefined);
@@ -871,8 +885,20 @@ export class EditRevertService implements EditRevertServicePort {
    * Freeze one post-round baseline for each active text entry. This is a
    * preview/conflict safety record only: writeback keeps its existing
    * pre-image semantics and never consumes these fields.
+   *
+   * Best-effort by contract — it never throws. A failed blob write, a read
+   * failure, or an exhausted wall-clock budget marks the entry
+   * `postImageUnavailable`, which the preview reports as
+   * `baseline-unavailable`. That is the honest outcome: no baseline is
+   * fabricated, and the round still reaches its closed state.
+   *
+   * The freeze deliberately stays inside the serial queue (no detached
+   * background pass): reading "current content" after the queue moved on
+   * would race with later vault writes and freeze a post-baseline that never
+   * existed at turn end.
    */
   private async freezePostImages(round: RoundState): Promise<void> {
+    const deadline = this.now() + EDIT_REVERT_POST_BASELINE_BUDGET_MS;
     for (const entry of round.meta.entries) {
       if (
         entry.state !== 'active'
@@ -882,28 +908,41 @@ export class EditRevertService implements EditRevertServicePort {
       ) {
         continue;
       }
+      if (this.now() > deadline) {
+        entry.postImageUnavailable = true;
+        continue;
+      }
       const currentPath = entry.status === 'moved' ? entry.movedTo : entry.path;
       if (entry.binaryAsset || !currentPath || !isRevertibleTextPath(currentPath)) {
         entry.postImageUnavailable = true;
         continue;
       }
-      const size = await this.readVaultFileSize(currentPath);
-      if (size === null) {
-        entry.postImageMissing = true;
-        continue;
-      }
-      if (size > EDIT_REVERT_MAX_SNAPSHOT_BYTES) {
+      try {
+        const size = await this.readVaultFileSize(currentPath);
+        if (size === null) {
+          entry.postImageMissing = true;
+          continue;
+        }
+        if (size > EDIT_REVERT_MAX_SNAPSHOT_BYTES) {
+          entry.postImageUnavailable = true;
+          continue;
+        }
+        const content = await this.readVaultFile(currentPath);
+        if (content === null) {
+          entry.postImageUnavailable = true;
+          continue;
+        }
+        const image = await this.store.storeBlob(content);
+        entry.postImageHash = image.hash;
+        entry.postImageBytes = image.bytes;
+      } catch (error) {
         entry.postImageUnavailable = true;
-        continue;
+        logger.warn('post baseline freeze failed for entry; marked unavailable', {
+          error,
+          roundId: round.meta.id,
+          path: entry.path,
+        });
       }
-      const content = await this.readVaultFile(currentPath);
-      if (content === null) {
-        entry.postImageUnavailable = true;
-        continue;
-      }
-      const image = await this.store.storeBlob(content);
-      entry.postImageHash = image.hash;
-      entry.postImageBytes = image.bytes;
     }
   }
 

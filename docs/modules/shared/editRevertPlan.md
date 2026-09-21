@@ -24,6 +24,7 @@
 | `EDIT_REVERT_MAX_ROUNDS_PER_CONVERSATION` | 10 | 每会话 round 上限 |
 | `EDIT_REVERT_IDLE_CACHE_MAX_FILES/BYTES` | 64 / 8 MiB | 空闲内容缓存上限 |
 | `EDIT_REVERT_POST_TURN_GRACE_MS` | 10 min | 回合结束后写入仍归属该轮的宽限窗 |
+| `EDIT_REVERT_POST_BASELINE_BUDGET_MS` | 500 | 回合结束 post baseline 冻结的墙钟预算；超预算的剩余 active 条目标 `postImageUnavailable`（R-F3 质量修复） |
 
 ## R-B5 增量
 

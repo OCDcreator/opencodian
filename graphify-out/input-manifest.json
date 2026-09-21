@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "d7c48cb748bc767a2b2ffc4d1dfab8ce36de7724f66f8aeb0c82b07e4cbb1a1f",
+  "digest": "5403fe9579e681acc91ef475c9a955e4457baa58eecfdd66b4478674cc1b62e7",
   "recordCount": 773,
   "records": [
     {
@@ -1121,7 +1121,7 @@
     {
       "kind": "src",
       "key": "src/core/storage/EditRevertService.ts",
-      "sha256": "95be2cc48d717200a26089ae3ca9557dafe4c382763dc0e107a33950b89feb54"
+      "sha256": "720a23aa50f5f580ccc60867249cd7fbce2645899f8e496bcdbd277d3495bff2"
     },
     {
       "kind": "src",
@@ -3356,12 +3356,12 @@
     {
       "kind": "src",
       "key": "src/shared/editRevertPlan.ts",
-      "sha256": "0cb5663e50dc66a77d34dbebb79d8e946f37a840f7eafb6ae674952472a64710"
+      "sha256": "c88ad0dc9d306ad40adbfb7fcf32343fcdead86f25338cfb3777349a364ad111"
     },
     {
       "kind": "src",
       "key": "src/shared/index.ts",
-      "sha256": "56c5541e0358802da3cf26635f181dc45ff86a2adf25291e909db3581ce884f6"
+      "sha256": "ebe4e1d195d47245b9f0da83173cb8572d6dd00a86c0fd8ef1249639a51eb41a"
     },
     {
       "kind": "src",
@@ -3841,7 +3841,7 @@
     {
       "kind": "tool",
       "key": "graphify-version",
-      "sha256": "3743012c1f0a4169ff074ffacae1312a05745afae16e874a4a80c3061b2624b3"
+      "sha256": "b51978f2277743327d67f2e691d74d1915bc4705f49837c36ab7ef8a2ab92ca8"
     },
     {
       "kind": "tsconfig",
@@ -3869,7 +3869,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-21T11:02:21.333Z",
-  "headShaAtGeneration": "d6dc7c175231151d885502690a64d394a79af0e5",
-  "graphifyVersion": "graphify 0.8.50"
+  "generatedAt": "2026-09-21T15:28:18.257Z",
+  "headShaAtGeneration": "95a442ec3a8f1247a7bb0e9c11bf9106a5cbcf86",
+  "graphifyVersion": "graphify 0.9.36"
 }

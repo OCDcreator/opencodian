@@ -8,6 +8,7 @@
 > 2026-09-18 (R-B3 编辑回退): 新增 `src/shared/editRevertPlan.ts` 归属本 owner —— 编辑回退的纯规划核心（写工具分类、路径/候选提取、保留淘汰规划、侧栏视图模型）。零 Obsidian 依赖，禁止引入 core/feature/app import；单测在 `tests/unit/shared/editRevertPlan.test.ts`。
 
 # Owner: shared.foundation
+> 2026-09-21 (advantage-parity R-F3 质量修复)：editRevertPlan 新增 `EDIT_REVERT_POST_BASELINE_BUDGET_MS` 常量（post baseline 冻结墙钟预算）并经 index barrel 导出；仍是零 Obsidian 依赖的纯规划面。
 > 2026-09-21 (advantage-parity R-F3)：editRevertPlan 的纯规划面新增/导出回退预览行数与冲突相关计算契约；继续零 Obsidian 依赖，实际文件读取、blob 保留及写回仍归 core.storage。
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
