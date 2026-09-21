@@ -58,7 +58,7 @@
 | E | R-E3 | 相关笔记面板（图谱 + 检索双通道） | Copilot | P1 | DONE |
 | E | R-E4 | 语义检索增强层（embedding on R-C1） | Copilot/Miyo | P2 | TODO |
 | E | R-E5 | Dataview / Bases 上下文支持 | Copilot | P2 | TODO |
-| E | R-E6 | 选区 / 全库 token 计数命令 | Copilot | P2 | TODO |
+| E | R-E6 | 选区 / 全库 token 计数命令 | Copilot | P2 | DONE |
 | F | R-F1 | Turn steering + 流式中消息排队 | Claudian | P1 | TODO |
 | F | R-F2 | 会话-笔记绑定草稿（linked content） | Claudian | P2 | TODO |
 | F | R-F3 | 回退预览 + 冲突检测 UI | Claudian | P2 | TODO |
@@ -206,6 +206,8 @@ Obsidian 核心 Web Viewer 插件的活动标签页（URL + 选区）作为上�
 ### R-E6 选区 / 全库 token 计数命令（P2）
 
 命令：选区词数/token 估算；全库（R-C1 索引范围）token 估算。估算复用既有 tokenizer 常量；结果 Notice + 复制。小件。
+
+**落地证据（2026-09-21，提交 `c488853b`）**：`shared/tokenEstimate.ts`（启发式：拉丁 ~4 字符/token、CJK ~1.2 token/字符、ceil；**定位数字非计费数字**——权威用量仍是后端 ContextRing 快照；既有 `tokenize()` 是词面匹配器非估算器，故新写并文档化）+ 命令 `count-selection-tokens`（空选区如实 Notice）与 `count-vault-tokens`（R-C1 范围 = `isIndexablePath` 共享匹配器过滤 markdown 后逐篇 cachedRead 汇总），Notice + 剪贴板。测试 `tokenEstimate.test.ts` 5 例 + verify 15/15。实机（BUILD_ID `202609210906`）：全库命令对测试库 63 篇输出「404844 字符 / 约 168460 token」且剪贴板完整落盘。owner manifest 因新 shared 文件刷新 63 页概览注记（边界未变）。无 UI 面（命令 + Notice），视觉门不适用。
 
 ---
 

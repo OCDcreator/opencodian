@@ -11,7 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
-## 2026-09-21 R-E2 Web Viewer 标签页上下文：复用 R-E1 条目形态，未启用无入口
+## 2026-09-21 R-E6 token 计数命令：选区 + 全库（R-C1 范围），启发式估算 + 剪贴板
+
+**触发**：advantage-parity 批次 E 第 4 条（P2 小件）。Copilot 有选区/全库 token 估算入口，OpenCodian 无。
+
+**改动**：\`shared/tokenEstimate.ts\`（新 shared 模块）——启发式：拉丁 ~4 字符/token、CJK ~1.2 token/字符、ceil；文档化定位为**定向参考数字，非计费/预算执行数字**（权威用量仍是后端 ContextRing 快照）；既有 \`tokenize()\` 是词面匹配器（停用词/双字窗）不适合做估算，故未强行复用。命令两枚：\`count-selection-tokens\`（editorCallback，空选区如实 Notice）与 \`count-vault-tokens\`（\`isIndexablePath\` 共享匹配器取 R-C1 范围、逐篇 \`cachedRead\` 汇总），结果 Notice + 剪贴板复制（剪贴板失败只降级不报错）。owner manifest 因新 shared 文件把 \`src/shared/tokenEstimate.ts\` 加进 shared.foundation include——**manifest 任何编辑都会触发全量 owner 概览刷新**（63 页，已知成本），以一行式「边界未变」注记脚本化处理。
+
+**测试**：\`tokenEstimate.test.ts\` 5 例（空输入/拉丁 ceil/CJK×1.2/混排求和/词数口径）+ verify 15/15。实机（BUILD_ID \`202609210906\`）：全库命令对测试库 **63 篇 → 404844 字符 / 约 168460 token**，剪贴板完整落盘「全库（63 篇，R-C1 范围）…（启发式估算，已复制）」。无 UI 面（命令 + Notice），视觉门不适用。
+
+---
+
 
 **触发**：advantage-parity 批次 E 第 3 条（P2）。Copilot 把浏览器标签页作为上下文源；OpenCodian 侧的对应物是 Obsidian 核心 Web Viewer 插件的活动标签页。
 
