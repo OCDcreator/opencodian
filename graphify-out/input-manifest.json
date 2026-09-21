@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "8380ebac5d5fb511c0624061a218f4aea7d204141659a116a5c49f4a86134fb4",
-  "recordCount": 760,
+  "digest": "8e1b3b10e447dcacf47b169ba58cf767e0cae3326a176c55770906a0c3c0f30e",
+  "recordCount": 761,
   "records": [
     {
       "kind": "ignore",
@@ -1736,7 +1736,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ContextAttachmentBuilder.ts",
-      "sha256": "e6d79bfab270817622b62bfde0cda4b35c82454177980422db04f224e1f3ef5f"
+      "sha256": "8e083f4760ac6c96b4326412a85fdf0dc1456cc928dfaf24cc5bc779ecd3cf51"
     },
     {
       "kind": "src",
@@ -1922,6 +1922,11 @@
       "kind": "src",
       "key": "src/features/chat/services/ConversationWriteSerializationService.ts",
       "sha256": "cc530755ce7f4583cf6cd2c4a55782410a30af87a8926a18a2d6bb15345c111f"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/chat/services/DataviewContextInliner.ts",
+      "sha256": "e82e5de3a474ea91c25170ac4acee882b4f75dced73e6faf9fad0957b439c96e"
     },
     {
       "kind": "src",
@@ -3331,7 +3336,7 @@
     {
       "kind": "src",
       "key": "src/shared/obsidianContext.ts",
-      "sha256": "862d957c2a08e57e844bec1fa8ddd335ecaf47e48687cbe4b41ac4cdeecbff17"
+      "sha256": "bb0ca6df73bed6c7c8c668c48148e48dbd263d1ed155efd383ce1c47813462fd"
     },
     {
       "kind": "src",
@@ -3804,7 +3809,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-21T01:04:01.240Z",
-  "headShaAtGeneration": "375abfd73ae0944f7f45f7dfcdab64339c605d99",
+  "generatedAt": "2026-09-21T01:11:00.823Z",
+  "headShaAtGeneration": "c64ecedf543372f3f44f71cd475110bf269b9907",
   "graphifyVersion": "graphify 0.9.36"
 }

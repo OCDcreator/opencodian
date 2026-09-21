@@ -9,6 +9,8 @@ import type {
 import { pathToContextFileUrl } from './contextPath';
 
 const TEXT_MIME_BY_EXTENSION: Record<string, string> = {
+  // R-E5: Obsidian Bases files are plain-text YAML — they attach as text.
+  base: 'text/plain',
   css: 'text/css',
   html: 'text/html',
   java: 'text/x-java-source',

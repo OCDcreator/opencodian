@@ -26,6 +26,7 @@ import {
   resolveTextMimeFromPath,
 } from '../../../shared';
 import type { FocusContextPreview } from '../composerContext';
+import { getDataviewApi, inlineDataviewBlocks } from './DataviewContextInliner';
 
 const logger = createLogger('ContextAttachmentBuilder');
 
@@ -266,7 +267,12 @@ export class ContextAttachmentBuilder {
 
     let textSnapshot: string | undefined;
     if (this.isRemoteContextMode()) {
-      const fileText = await this.app.vault.read(file);
+      let fileText = await this.app.vault.read(file);
+      // R-E5: materialized text runs ```dataview blocks through the host
+      // Dataview plugin (inlined results, or verbatim + explicit marker when
+      // unavailable). Local-server mode hands the backend a file URL — the
+      // agent reads the raw file and this transform does not apply.
+      fileText = (await inlineDataviewBlocks(getDataviewApi(this.app), fileText, file.path)).content;
       const validatedText = this.validateRemoteContextText(fileText, file.path);
       if (validatedText === null) {
         return null;

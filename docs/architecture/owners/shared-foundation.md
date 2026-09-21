@@ -1,4 +1,5 @@
 > 2026-09-18 (FlowText parity R-A7): `parseObsidianContextTag` accepts `kind="folder"` so directory context tags round-trip losslessly.
+> 2026-09-21 (advantage-parity R-E5)：obsidianContext mime 映射新增 .base。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 > 2026-09-21 (advantage-parity R-E6)：新增 shared/tokenEstimate.ts（启发式估算，定位数字非计费数字）。
 > 2026-09-21 (advantage-parity R-E1)：obsidianContext 新增 buildUrlContextTag/Body 与 attachment 的 url 元数据透传。

@@ -1,4 +1,5 @@
 # ContextAttachmentBuilder
+> 2026-09-21 (advantage-parity R-E5)：远程模式文本快照读取后经 DataviewContextInliner 物化（dataview 块内联/如实标记）；本地模式文件 URL 路径不变换（调用点文档化）。
 
 > **源码**: `src/features/chat/services/ContextAttachmentBuilder.ts`
 > **状态**: [REVIEW]
