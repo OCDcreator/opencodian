@@ -70,7 +70,7 @@
 | F | R-F9 | 文件管理器右键「附加到上下文」 | 双方 | P1 | DONE |
 | F | R-F10 | Grok 后端（ACP 一等接入） | Claudian | P2 | 暂停（用户裁决 2026-09-21：暂不接入） |
 | F | R-F11 | i18n 扩语种 | Claudian | P2 | 暂停（用户裁决 2026-09-21：暂不接入） |
-| F | R-F12 | `$` 技能触发符 / 可复用指令（评估） | Claudian | P3 | TODO |
+| F | R-F12 | `$` 技能触发符 / 可复用指令（评估） | Claudian | P3 | WONTFIX |
 | G | R-G1 | Collab 团队协作模式 | Claudian | 裁决 | TODO |
 | G | R-G2 | 移动端轻量直连聊天 | Copilot | 裁决 | TODO |
 | G | R-G3 | 多 agent fan-out 只读研究 | Copilot | 裁决 | TODO |
@@ -323,6 +323,13 @@ zh-TW/ja/ko/de/fr/es/ru/pt 八语种（Claudian 同款清单）。i18n 框架已
 ### R-F12 `$` 技能触发符 / 可复用指令（P3，评估）
 
 Claudian 用 `$` 调技能、`/instruction` 保存可复用指令。OpenCodian 斜杠命令已含 skills-as-commands 与 project/user 命令，功能面基本等价——**建议 WONTFIX**，除非用户指出具体缺口。
+
+**评估结论（2026-09-21）：WONTFIX（不新增通用 `$` 别名）**：
+
+- **等价能力已存在**：OpenCode slash catalog 已把 runtime skills、runtime commands、项目命令/agent 与项目 `.opencode/commands/**/*.md` 合并到同一可见菜单；全局/用户命令由 runtime `command.list()` 输入。OpenCode 另有 `/skills <skill>` 过滤模式，可复用指令与技能调用不缺产品入口。
+- **Codex 已有正确的后端专属 `$`**：`CodexAdapter` 经 `skills/list` 只读发现 skills，composer 仅在 Codex backend 解析 `$`，选择后插入原始 `$skill-name ` 交给 app-server；非 Codex 不加载 `codex-skill`。因此不能把 Codex native 语法错误泛化成所有后端的通用别名。
+- **冲突成本**：现有 `$` 查询在 token boundary 后解析；Codex 下尚未闭合的行内数学文本（例如 `$x`、`$E=mc^2`）可能临时打开 skill 菜单。只有显式选择才改文本，但扩展到其它后端仍会无收益地扩大数学/普通文本冲突面。
+- **证据边界**：源码与单测证明 catalog 合并、过滤和文本替换契约；未把这些静态证据表述为 app-server 实机执行。当前无用户报告或失败复现显示 slash/command 面存在功能缺口，故按原建议登记 WONTFIX；若将来出现具体不可达能力，再以该缺口单独立项。
 
 ---
 

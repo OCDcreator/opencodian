@@ -11,6 +11,14 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-21 R-F12 `$` 技能触发符评估：等价能力已在库，登记 WONTFIX
+
+**评估**：OpenCode 的 slash catalog 已把 runtime skills/runtime commands、项目命令与 `.opencode/commands/**/*.md` 合并到同一菜单，并提供 `/skills <skill>` 过滤；Codex 则已有仅限该后端的 native `$skill` 路径（`skills/list` 发现 → 插入原始 `$skill-name ` → app-server 解释）。非 Codex 不加载 `codex-skill`，未发现需要用通用 `$` 才能补齐的能力缺口。
+
+**裁决**：WONTFIX，不新增跨后端 `$` 别名。`$` 在 token boundary 会与尚未闭合的行内数学文本（如 `$x` / `$E=mc^2`）共享触发面；虽然只有显式选择才替换文本，把它扩到其它后端仍会扩大冲突而不增加功能。结论仅基于源码与单测契约，不冒充 app-server 实机执行；未来若出现具体不可达能力，再按失败复现单独立项。R-F10/R-F11 保持用户暂停，未触碰。
+
+---
+
 ## 2026-09-21 R-F4 聊天侧暖进程池：共享 R-C3 单池、排他空 aux 会话与零计费预热
 
 **触发**：advantage-parity 批次 F P2 条目。需求要求只为最近使用的默认后端保留一个空预热会话、默认关闭、复用 R-C3 基础设施，并保证预热不产生计费轮次。
