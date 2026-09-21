@@ -60,7 +60,7 @@
 | E | R-E5 | Dataview / Bases 上下文支持 | Copilot | P2 | DONE |
 | E | R-E6 | 选区 / 全库 token 计数命令 | Copilot | P2 | DONE |
 | F | R-F1 | Turn steering + 流式中消息排队 | Claudian | P1 | DONE |
-| F | R-F2 | 会话-笔记绑定草稿（linked content） | Claudian | P2 | TODO |
+| F | R-F2 | 会话-笔记绑定草稿（linked content） | Claudian | P2 | DONE |
 | F | R-F3 | 回退预览 + 冲突检测 UI | Claudian | P2 | TODO |
 | F | R-F4 | 暖进程池（聊天侧预热） | Claudian | P2 | TODO |
 | F | R-F5 | 双栏会话管理器 | Claudian | P3 | TODO |
@@ -246,6 +246,14 @@ Obsidian 核心 Web Viewer 插件的活动标签页（URL + 选区）作为上�
 ### R-F2 会话-笔记绑定草稿（P2）
 
 Claudian 的 linked content：会话可绑定一篇笔记作为产出草稿（auto-draft/explicit-draft/submitting/locked 四态，重命名跟随）。OpenCodian 适配：会话设置里可选「绑定笔记」，绑定的笔记变更纳入 R-B3 快照与 Modified Files 侧栏联动；不做自动写回（写路径仍归 agent 工具 + 唯一写路径约束）。
+
+**落地证据（2026-09-21，提交 `5a5edf7b`，子代理实现 + 编排者独立校验）**：
+
+- **实现**：`Conversation` / `ConversationMeta` 持久化可选 `linkedNotePath`（只接受库内 Markdown 相对路径，空值/绝对路径/父级穿越/非 Markdown fail closed）；会话设置新增「绑定笔记」原生下拉，支持显式绑定/解绑，存在态派生 `explicit-draft`、缺失态保留原路径并派生 `locked`。因本条明确不自动写回，`auto-draft` / `submitting` 不进入运行时，也没有新增任何写笔记路径。vault rename listener 在 plugin 单例生命周期注册（不依赖 chat view、不会多 view 重复监听），逐会话保存新路径；delete 保留 locked。发送前把绑定路径去重合入 R-B3 `contextPaths`，复用既有 EditRevert pre-snapshot，不改回退语义。
+- **Modified Files 联动**：真实 session diff / revert path 命中时才加「绑定草稿」徽标；未命中时绑定元数据放在独立「会话绑定笔记」区，并明示「不计入本轮修改或回退」，绝不伪造 diff、统计或回退条目；存在路径可打开，missing 路径不可点击。
+- **测试**：聚焦 6 suites / **132 tests**（存储与 metadata sidecar 归一化、绝对/穿越/非 Markdown 拒绝、modal 绑定/解绑/locked、coordinator 保存、plugin-scope rename 跟随且 listener 单例、SendPipeline snapshot path 去重、Modified Files 零伪造与独立分区）+ typecheck + ESLint `0 errors / 0 warnings` + module-docs 755/755 + graphify freshness + build。
+- **实机（Test Vault，BUILD_ID `zcode-advantage-parity.202609211507`）**：真实创建→绑定→vault rename（持久化路径同步）→vault trash（locked 路径保留）→清理/恢复；四产物逐个部署并 `cmp`。会话设置最终截图 `.visual-evidence/rf2/rf2-session-settings-locked-final.png`：locked 状态徽标 160×22.8、12px/16.8、对比度 **6.60:1**、水平 overflow=0；Modified Files 最终截图 `.visual-evidence/rf2/rf2-modified-files-sidebar-final.png`：真实 revertItems=1、虚构 diffItems=0、绑定区不在 revert DOM 内、panel/binding 水平 overflow=0。独立视觉代理最终两面 PASS。
+- **偏差登记**：四态按「不自动写回」裁剪为未绑定 / `explicit-draft` / `locked`；`auto-draft` 与 `submitting` 没有合法状态来源，故不实现。无其他偏差。
 
 ### R-F3 回退预览 + 冲突检测 UI（P2）
 

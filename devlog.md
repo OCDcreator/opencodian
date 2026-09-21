@@ -11,6 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-21 R-F2 会话-笔记绑定草稿：显式绑定/locked、R-B3 快照与 Modified Files 联动
+
+**触发**：advantage-parity 批次 F 剩余 P2 条目。Claudian 的 linked content 有 auto-draft/explicit-draft/submitting/locked 四态；OpenCodian 要求会话可绑定一篇产出草稿、重命名跟随、进入 R-B3 与 Modified Files，但明确禁止自动写回。
+
+**改动**：`Conversation` / `ConversationMeta` 持久化 `linkedNotePath`（仅库内 Markdown 相对路径，危险/无效路径 fail closed）；会话设置加入绑定/解绑，下拉状态裁剪为未绑定 / explicit-draft / locked（auto-draft/submitting 因无自动写路径不实现）。plugin 单例监听 vault rename，view 未打开也逐会话保存新路径，delete 不清空而如实 locked。发送链把绑定路径去重合入 R-B3 snapshot candidates。Modified Files 只有真实 diff/revert 命中时才附「绑定草稿」；未命中元数据在独立「会话绑定笔记」区明示“不计入本轮修改或回退”，不污染计数。
+
+**测试与实机**：实现提交 `5a5edf7b`；编排者独立复跑 6 suites / 132 tests、typecheck、ESLint 0/0、module-docs 755/755、graphify freshness、build。Test Vault BUILD_ID `zcode-advantage-parity.202609211507`；真实绑定→rename 持久化→trash locked→清理恢复。视觉门有界两轮：首轮修裸状态文本与 2.88:1/4.10:1 对比度，最终徽标 **6.60:1**；再修绑定元数据落在回退分组造成的语义误导，最终独立分区 PASS。证据 `.visual-evidence/rf2/rf2-session-settings-locked-final.png`、`rf2-modified-files-sidebar-final.png`。
+
+---
+
 ## 2026-09-21 R-F7 环境变量分域 + 指纹失效：shared/provider:* 分域贯通五后端，runtime.json 指纹跨运行检测
 
 **触发**：advantage-parity 批次 F 第 4 条（P2）。Claudian 按 `shared`/`provider:*` 分域环境变量并以环境指纹失效旧会话；OpenCodian 此前只有 claude env 与 ACP 每 agent env 两处孤岛。
