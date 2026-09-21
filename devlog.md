@@ -11,6 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-21 R-F7 环境变量分域 + 指纹失效：shared/provider:* 分域贯通五后端，runtime.json 指纹跨运行检测
+
+**触发**：advantage-parity 批次 F 第 4 条（P2）。Claudian 按 `shared`/`provider:*` 分域环境变量并以环境指纹失效旧会话；OpenCodian 此前只有 claude env 与 ACP 每 agent env 两处孤岛。
+
+**改动**（首个「子代理实现 + 编排者校验」条目）：`BackendEnvironment` 纯模块（合并序 shared < provider < **legacy env 保持覆盖**；键序无关 djb2-64 双 lane 指纹——ES target 无 BigInt 如实登记）+ 设置 `environmentVariables` + 指纹持久化 runtime.json + main.ts 双挂点刷新（变化→一条 Notice 点名后端，既有会话保留旧环境直至重启）。分域实际到达：claude-code options / codex SDK 与 app-server spawn / pi RPC 链 / OpenCode 本地 server spawn 链 / ACP 合并缝（该模块仓库内无组装点，契约测试覆盖合并序并如实登记）。设置 UI：分域编辑 Modal（窄 port）+ General 块入口，三个设置面同接。
+
+**测试**：28 新例 + verify 15/15（**编排者独立复跑**：tsc、四套件 28/28、eslint、全量 verify——不采信实现代理自报）。实机（BUILD_ID `202609211251`）：默认空域；五后端指纹持久化；**经真实 modal UI 加共享变量 → 设置落地 + pi 指纹翻转实证**；篡改-刷新证明变化分支执行。**两条环境坑留档**：①宿主 Obsidian 1.13 的 Notice 不从页面 DOM 可观测（整树 MutationObserver 零事件）——Notice 验证以同分支数据路径活证 + 单测为据；②视觉门首轮「重影」系探针重复点击致双 modal 实例（modalCount=1 复验澄清）——探针要先查实例数再截。R-F10/R-F11 同日登记用户裁决暂停。
+
+---
+
 ## 2026-09-21 R-F8 模型上下文窗口声明：catalog 边界纯装饰（只填缺失），四 catalog 面统一
 
 **触发**：advantage-parity 批次 F 第 3 条（P2）。自定义 OpenAI 兼容模型缺权威 context window 元数据时 ContextRing/压缩无从计算；Claudian 允许用户声明上限。

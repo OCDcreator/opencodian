@@ -65,11 +65,11 @@
 | F | R-F4 | 暖进程池（聊天侧预热） | Claudian | P2 | TODO |
 | F | R-F5 | 双栏会话管理器 | Claudian | P3 | TODO |
 | F | R-F6 | Vim 风格聊天导航键 | Claudian | P3 | TODO |
-| F | R-F7 | 每供应商环境变量分域 + 环境哈希失效 | Claudian | P2 | TODO |
+| F | R-F7 | 每供应商环境变量分域 + 环境哈希失效 | Claudian | P2 | DONE |
 | F | R-F8 | 自定义模型自定义上下文窗口 | Claudian | P2 | DONE |
 | F | R-F9 | 文件管理器右键「附加到上下文」 | 双方 | P1 | DONE |
-| F | R-F10 | Grok 后端（ACP 一等接入） | Claudian | P2 | TODO |
-| F | R-F11 | i18n 扩语种 | Claudian | P2 | TODO |
+| F | R-F10 | Grok 后端（ACP 一等接入） | Claudian | P2 | 暂停（用户裁决 2026-09-21：暂不接入） |
+| F | R-F11 | i18n 扩语种 | Claudian | P2 | 暂停（用户裁决 2026-09-21：暂不接入） |
 | F | R-F12 | `$` 技能触发符 / 可复用指令（评估） | Claudian | P3 | TODO |
 | G | R-G1 | Collab 团队协作模式 | Claudian | 裁决 | TODO |
 | G | R-G2 | 移动端轻量直连聊天 | Copilot | 裁决 | TODO |
@@ -266,6 +266,12 @@ Claudian 预热最多 N 个 agent 运行时降低起会话延迟。OpenCodian �
 ### R-F7 每供应商环境变量分域 + 环境哈希失效（P2）
 
 Claudian 把环境变量按 `shared` / `provider:*` 分域，环境指纹变化即失效旧会话。OpenCodian 已有 Claude env 与 additional directories；本条统一为分域模型 + 会话失效信号，防止「改了 key 旧会话还在用旧环境」。
+
+**落地证据（2026-09-21，提交 `10e1e416`，子代理实现 + 编排者独立校验）**：
+
+- **实现**：`BackendEnvironment`（core.agents 纯模块：分域 `{shared, providers}`、`resolveBackendEnvironment` 合并序 shared < providers[backend] < **legacyEnv 保持覆盖**、键序无关 djb2-64 双 32 位 lane 指纹（ES target 无 BigInt，文档注明）、`detectChangedBackends`）+ 设置 `environmentVariables` 归一化 + 指纹持久化于 runtime.json `environmentFingerprints`（读失败 null/写失败 log-warn/managedServer 保留）+ main.ts `refreshEnvironmentFingerprints`（load 尾与 saveSettings 包装双挂点；首跑静默、未变不重写、变化→一条本地化 Notice 点名受影响后端——既有会话保留旧环境直至重启）。**分域实际到达运行时**：claude-code options（legacy env 仍最终权）、codex SDK 构造 + app-server spawn（env 复制 process.env 基座保持保守）、pi RPC 链 getExtraEnv、OpenCode 本地 server spawn 链、ACP 合并缝（契约测试；仓库内该模块暂无组装点——休眠模块如实登记）。
+- **测试**：28 新例（纯函数 16 / 存储往返 6 / ACP 合并序 3 + claude 合并序 3）+ verify 15/15（**编排者独立复跑**，未采信实现代理自报）。
+- **实机（BUILD_ID `202609211251`）**：默认 `{shared:{},providers:{}}`；五后端指纹持久化；**经真实 modal UI 添加共享变量 → 设置落地 + pi 指纹翻转（`000015050000cde7`→`ef9cc1bb10e01144`）**；篡改-刷新实证变化检测分支执行并重写正确指纹/清除消失键；探针值已清理。设置行 497×107（13px/18.2 + 12px/18.6 与同 tab 一致）；modal 两分区 560×293。视觉门两轮 PASS（首轮重影系探针重复点击致双实例——modalCount=1 复验澄清；截图 `.visual-evidence/rf7/rf7-modal.png`）。**环境限制留档**：宿主 Obsidian 1.13 的 Notice 渲染层不可从页面 DOM 观测（整树 MutationObserver 零事件），Notice 分支以「同分支数据路径活证 + 单测」为据。
 
 ### R-F8 自定义模型自定义上下文窗口（P2）
 
