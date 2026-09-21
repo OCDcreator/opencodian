@@ -1,4 +1,5 @@
 # ConversationSessionSettingsModal
+> 2026-09-21 (advantage-parity R-F2 质量修复)：绑定字段改为三态保存契约——未触碰 = `undefined`（不回写，弹窗打开期间发生的 vault rename 跟随得以保留）、显式解绑 = `null`、显式选择 = 路径。`onSave` 第二参数类型为 `string | null | undefined`，不再单参数化。回归测试 `tests/unit/features/chat/ConversationSessionSettingsLinkedNoteBinding.test.ts`（真实 modal + 真实 coordinator 交错时序）。
 > 2026-09-21 (advantage-parity R-F2)：新增紧凑 Obsidian-native「绑定笔记」分组，可选 Markdown note 或显式解绑；丢失目标保留路径并显示 locked，保存 callback 同时携带 `linkedNotePath: string | null`，且不触发自动写回。
 
 > **源码**: `src/features/chat/ui/ConversationSessionSettingsModal.ts`

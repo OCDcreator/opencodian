@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "5403fe9579e681acc91ef475c9a955e4457baa58eecfdd66b4478674cc1b62e7",
+  "digest": "d7d30232d2e024ceaeaca6dd193fa0dd1db91d4a0cd518d4e3a2881ab81c9aed",
   "recordCount": 773,
   "records": [
     {
@@ -1191,7 +1191,7 @@
     {
       "kind": "src",
       "key": "src/core/types/index.ts",
-      "sha256": "b65b7040d0b9f441b3e7fd81baf48e2f17fc0893be355c26cc6141f326509da0"
+      "sha256": "4ac1e3bea74ee62691f84bb3b2e95600b407f4eb4da122c36fac2907c29f9ebf"
     },
     {
       "kind": "src",
@@ -1216,7 +1216,7 @@
     {
       "kind": "src",
       "key": "src/core/types/settings.ts",
-      "sha256": "2550e42cbc9d1e1089fe92d198024151bbbe07bb6dd53992cbdaf5ab4d8ce4e3"
+      "sha256": "e2201e219c911863b8790305a17ea66c04158a29f38fdc23476aeb1179cf7ef8"
     },
     {
       "kind": "src",
@@ -2421,12 +2421,12 @@
     {
       "kind": "src",
       "key": "src/features/chat/ui/ConversationSessionSettingsModal.ts",
-      "sha256": "00e75a4e8b8a537d08040c9e7a283a345dcc9c24a096fe21e3519e51c0a4e2b0"
+      "sha256": "d84485e85ed99553b394c04c1a7e8a162498749f83e23efc10153bbd38eaf2fe"
     },
     {
       "kind": "src",
       "key": "src/features/chat/ui/EditRevertPreviewModal.ts",
-      "sha256": "941f34d28681ec3fb43d7ee0016fff5d0a8815b1abf0fe7d23fc2ba08e5756b9"
+      "sha256": "b60e783c5e133a70c18285211a8f0787687affbe87ab68e2e0e98a438bc58f58"
     },
     {
       "kind": "src",
@@ -2476,7 +2476,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/ui/ModifiedFilesSidebar.ts",
-      "sha256": "38a57aca83cac32fbf12a1705926f45b81fee39ad454a619b92d90c02c0083b8"
+      "sha256": "294150065546338c18de76d8d64d81a3b797fef0a77b8122d47b2cc6b70346c8"
     },
     {
       "kind": "src",
@@ -3041,7 +3041,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsConversationSection.ts",
-      "sha256": "5c0d0302cc4e67322a0688797d33f5bda69059415f0663fefb51760e72c16677"
+      "sha256": "07f8f502e52d65bca5717cba5aa2c71621dc09906b82339e8fc5f959fe5a7b28"
     },
     {
       "kind": "src",
@@ -3281,7 +3281,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "63aa0dc24e40b1d66e011814652dc756c042bf1d4607319829df290f891b1844"
+      "sha256": "a5e8dd8cfbe323c95505a25572a0a95d7ad2998b77d979cebcbe954d4eb4695e"
     },
     {
       "kind": "src",
@@ -3291,7 +3291,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "ade8f398901cbb3bd785a98b81adc8a86e1eaf3e6add20f060717ada8d96222b"
+      "sha256": "4b131493276df42a18ae3b3bb01139756f06bb1121566a3d8496698a3afb77e5"
     },
     {
       "kind": "src",
@@ -3869,7 +3869,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-21T15:28:18.257Z",
-  "headShaAtGeneration": "95a442ec3a8f1247a7bb0e9c11bf9106a5cbcf86",
+  "generatedAt": "2026-09-21T15:56:30.755Z",
+  "headShaAtGeneration": "c7880094c0ceb97364e93886a21692c13ef71439",
   "graphifyVersion": "graphify 0.9.36"
 }

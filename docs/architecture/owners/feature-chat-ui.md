@@ -1,3 +1,4 @@
+> 2026-09-21 (advantage-parity R-F2/R-F3/R-F5 质量修复)：会话设置弹窗的绑定字段改为三态保存契约（`undefined` 不回写 / `null` 解绑 / string 显式选择），修复"弹窗打开期间 vault rename 跟随被旧路径覆盖"；Modified Files 的绑定笔记在 revert 与 session-diff 两种模式下都进独立分区并显示排除提示，未命中不再作为裸行混入变更列表；回退预览行数两侧加语义标签并为 created/deleted/moved 增加动作说明；会话 rail 改为具名 landmark（region）且标题具备 heading 语义。
 > 2026-09-18 (FlowText parity R-A7): `ContextFilePickerModal` (multi-select + folder rows + attach-N footer) — see the mapped module doc for the contract.
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 

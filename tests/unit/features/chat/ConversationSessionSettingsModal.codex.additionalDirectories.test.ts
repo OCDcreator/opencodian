@@ -88,7 +88,7 @@ describe('ConversationSessionSettingsModal Codex additionalDirectories', () => {
       expect.objectContaining({
         codexAdditionalDirectories: ['/tmp/probe', '/another/path'],
       }),
-      null,
+      undefined,
     );
   });
 
@@ -128,6 +128,6 @@ describe('ConversationSessionSettingsModal Codex additionalDirectories', () => {
     saveButton?.click();
     await Promise.resolve();
 
-    expect(onSave).toHaveBeenCalledWith(undefined, null);
+    expect(onSave).toHaveBeenCalledWith(undefined, undefined);
   });
 });

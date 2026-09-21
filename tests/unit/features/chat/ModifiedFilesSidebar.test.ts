@@ -552,3 +552,122 @@ describe('ModifiedFilesSidebar', () => {
     );
   });
 });
+
+describe('ModifiedFilesSidebar linked-note section placement (R-F2)', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  function mountSidebar(): ModifiedFilesSidebar {
+    const parentEl = document.createElement('div') as ObsidianLikeElement;
+    document.body.appendChild(parentEl);
+    const sidebar = new ModifiedFilesSidebar(
+      { workspace: { openLinkText: jest.fn() } } as unknown as App,
+      parentEl,
+    );
+    sidebar.onload();
+    return sidebar;
+  }
+
+  const diffEntry = (file: string, additions = 1, deletions = 0): SessionDiffEntry => ({
+    file,
+    additions,
+    deletions,
+    status: 'modified',
+  });
+
+  it('renders an unmatched binding in its own section with the exclusion hint when no revert entries exist', () => {
+    const sidebar = mountSidebar();
+    sidebar.updateEntries([diffEntry('notes/other.md')], 'ready', { path: 'drafts/plan.md', exists: true });
+    // The review's exact case: no revert round at all, only a session diff.
+    sidebar.updateRevertState(null, null);
+
+    const section = document.querySelector('.opencodian-modified-files-linked-note-section');
+    expect(section).not.toBeNull();
+    expect(section?.textContent).toContain(t('modifiedFiles.linkedNoteSection'));
+    expect(section?.textContent).toContain('drafts/plan.md');
+    expect(section?.textContent).toContain(t('modifiedFiles.linkedNoteExcludedHint'));
+
+    // The binding is not a change: it never joins the diff list as a bare row.
+    const listPaths = Array.from(
+      document.querySelectorAll('.opencodian-modified-files-sidebar-list .opencodian-modified-files-sidebar-path'),
+    ).map((el) => el.textContent);
+    expect(listPaths).not.toContain('drafts/plan.md');
+  });
+
+  it('keeps the binding out of the diff count, line statistics and badge', () => {
+    const sidebar = mountSidebar();
+    sidebar.updateEntries([diffEntry('notes/other.md', 3, 1)], 'ready', { path: 'drafts/plan.md', exists: true });
+    sidebar.updateRevertState(null, null);
+
+    expect(document.querySelector('.opencodian-modified-files-sidebar-summary')?.textContent)
+      .toBe('1 · +3 -1');
+    expect(document.querySelector('.opencodian-modified-files-strip-badge')?.textContent).toBe('1');
+    expect(document.querySelectorAll('.opencodian-modified-files-sidebar-item')).toHaveLength(1);
+  });
+
+  it('uses the draft badge on the diff row instead of a second standalone row when the binding itself changed', () => {
+    const sidebar = mountSidebar();
+    sidebar.updateEntries([diffEntry('drafts/plan.md'), diffEntry('notes/other.md')], 'ready', {
+      path: 'drafts/plan.md',
+      exists: true,
+    });
+    sidebar.updateRevertState(null, null);
+
+    expect(document.querySelector('.opencodian-modified-files-linked-note-section')).toBeNull();
+    const rows = Array.from(document.querySelectorAll('.opencodian-modified-files-sidebar-item'));
+    expect(rows).toHaveLength(2);
+    const linkedRow = rows.find((row) => row.textContent?.includes('drafts/plan.md'));
+    expect(linkedRow?.querySelector('.opencodian-modified-files-linked-note-badge')?.textContent)
+      .toBe(t('modifiedFiles.linkedNoteDraft'));
+  });
+
+  it('still gives a locked (missing) binding its own section with the exclusion hint', () => {
+    const sidebar = mountSidebar();
+    sidebar.updateEntries([diffEntry('notes/other.md')], 'ready', { path: 'missing.md', exists: false });
+    sidebar.updateRevertState(null, null);
+
+    const section = document.querySelector('.opencodian-modified-files-linked-note-section');
+    expect(section?.textContent).toContain('missing.md');
+    expect(section?.textContent).toContain(t('modifiedFiles.linkedNoteLocked'));
+    expect(section?.textContent).toContain(t('modifiedFiles.linkedNoteExcludedHint'));
+    expect(section?.querySelector('[data-linked-note-state="locked"]')).not.toBeNull();
+  });
+
+  it('renders exactly one binding section in both modes', () => {
+    const sidebar = mountSidebar();
+    sidebar.updateEntries([diffEntry('notes/other.md')], 'ready', { path: 'drafts/plan.md', exists: true });
+    sidebar.updateRevertState(null, null);
+    expect(document.querySelectorAll('.opencodian-modified-files-linked-note-section')).toHaveLength(1);
+
+    // Entering revert mode keeps exactly one section, now under the revert list.
+    sidebar.updateRevertState({
+      enabled: true,
+      roundId: 'round-1',
+      roundOpen: false,
+      degraded: false,
+      entries: [{
+        path: 'notes/other.md',
+        status: 'modified',
+        movedTo: null,
+        state: 'active',
+        revertible: true,
+        restorable: false,
+        excludedReason: null,
+      }],
+      revertibleCount: 1,
+    }, {
+      getRevertPreview: jest.fn().mockResolvedValue({ roundId: 'round-1', roundOpen: false, rows: [] } as EditRevertPreview),
+      revertFile: jest.fn().mockResolvedValue(undefined),
+      revertAll: jest.fn().mockResolvedValue(undefined),
+      restoreFile: jest.fn().mockResolvedValue(undefined),
+    });
+    expect(document.querySelectorAll('.opencodian-modified-files-linked-note-section')).toHaveLength(1);
+    expect(document.querySelector('.opencodian-modified-files-linked-note-section')?.textContent)
+      .toContain(t('modifiedFiles.linkedNoteExcludedHint'));
+  });
+});

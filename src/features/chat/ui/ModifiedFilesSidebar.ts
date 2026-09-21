@@ -215,12 +215,21 @@ export class ModifiedFilesSidebar extends Component {
     // read-only session-diff list (same files, plus revert actions).
     const showingRevert = this.hasRevertEntries();
     this.listEl.classList.toggle('is-hidden', showingRevert);
+
+    // The conversation's linked note is a separate concern from the turn's file
+    // changes: it is never a change, never counted, and never revertible. It
+    // therefore always gets its own labelled section with the exclusion hint —
+    // in the revert round AND in the read-only session-diff mode — instead of a
+    // bare row inside the change list. When the binding itself did change it is
+    // already a normal row (carrying the draft badge), so the section is
+    // skipped to avoid showing it twice.
+    this.renderStandaloneLinkedNoteSection(this.getComparedPaths(showingRevert));
+
     if (showingRevert) {
       return;
     }
 
     this.listEl.empty();
-    this.renderLinkedNoteState();
     if (this.entries.length === 0) {
       this.listEl.createDiv({
         cls: `opencodian-modified-files-sidebar-empty is-${this.availability}`,
@@ -273,11 +282,19 @@ export class ModifiedFilesSidebar extends Component {
     }
   }
 
-  private renderLinkedNoteState(): void {
-    if (!this.linkedNote.path || !this.listEl) {
-      return;
+  /**
+   * Vault-relative paths of the rows currently on screen, so the binding
+   * section can tell whether the linked note already appears as a real change.
+   * Revert-round entries are already vault-relative; session-diff entries are
+   * resolved the same way the rows themselves resolve their labels.
+   */
+  private getComparedPaths(showingRevert: boolean): string[] {
+    if (showingRevert) {
+      return (this.revertModel?.entries ?? []).map((entry) => entry.path);
     }
-    this.renderLinkedNoteStateInto(this.listEl);
+    return this.entries
+      .map((entry) => this.formatPath(entry.file))
+      .filter((path): path is string => path !== null);
   }
 
   private renderLinkedNoteStateInto(parentEl: HTMLElement): void {
@@ -312,10 +329,10 @@ export class ModifiedFilesSidebar extends Component {
     });
   }
 
-  private shouldRenderStandaloneLinkedNote(entries: EditRevertSidebarModel['entries']): boolean {
+  private shouldRenderStandaloneLinkedNote(comparedPaths: readonly string[]): boolean {
     return Boolean(
       this.linkedNote.path
-      && !entries.some((entry) => entry.path === this.linkedNote.path),
+      && !comparedPaths.includes(this.linkedNote.path),
     );
   }
 
@@ -456,19 +473,21 @@ export class ModifiedFilesSidebar extends Component {
       }
     }
 
-    this.renderStandaloneLinkedNoteSection(model.entries);
+    this.renderStandaloneLinkedNoteSection(model.entries.map((entry) => entry.path));
   }
 
-  private renderStandaloneLinkedNoteSection(entries: EditRevertSidebarModel['entries']): void {
+  private renderStandaloneLinkedNoteSection(comparedPaths: readonly string[]): void {
     this.containerEl.querySelector('.opencodian-modified-files-linked-note-section')?.remove();
-    if (!this.shouldRenderStandaloneLinkedNote(entries)) {
+    if (!this.shouldRenderStandaloneLinkedNote(comparedPaths)) {
       return;
     }
 
     const bindingSectionEl = this.containerEl.createDiv({
       cls: 'opencodian-modified-files-linked-note-section',
     });
-    this.revertSectionEl?.after(bindingSectionEl);
+    // Directly under the change list it belongs to: the revert list when a
+    // revert round is on screen, otherwise the read-only session-diff list.
+    (this.revertSectionEl ?? this.listEl).after(bindingSectionEl);
     bindingSectionEl.createDiv({
       cls: 'opencodian-modified-files-linked-note-section-title',
       text: t('modifiedFiles.linkedNoteSection'),

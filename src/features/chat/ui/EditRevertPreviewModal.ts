@@ -8,7 +8,7 @@
 
 import { App, Modal, setIcon } from 'obsidian';
 
-import { t } from '../../../i18n';
+import { t, type TranslationKey } from '../../../i18n';
 import type { EditRevertPreview } from '../../../shared';
 
 export interface EditRevertPreviewModalOptions {
@@ -77,12 +77,17 @@ export class EditRevertPreviewModal extends Modal {
         cls: 'opencodian-edit-revert-preview-path',
         text: row.path,
       }).title = row.path;
+      // Two unnamed numbers are ambiguous — the pair means "when the turn
+      // started → when the capture settled", not "before you clicked → after
+      // you clicked". Each side carries its own label so the direction is
+      // readable without a legend.
+      const linesEl = rowEl.createDiv({ cls: 'opencodian-edit-revert-preview-lines' });
+      this.renderLabelledLines(linesEl, 'before', t('editRevert.preview.linesBeforeLabel'), row.beforeLines);
+      linesEl.createSpan({ cls: 'opencodian-edit-revert-preview-lines-separator', text: '→' });
+      this.renderLabelledLines(linesEl, 'after', t('editRevert.preview.linesAfterLabel'), row.afterLines);
       rowEl.createDiv({
-        cls: 'opencodian-edit-revert-preview-lines',
-        text: t('editRevert.preview.lines', {
-          before: this.formatLines(row.beforeLines),
-          after: this.formatLines(row.afterLines),
-        }),
+        cls: 'opencodian-edit-revert-preview-action',
+        text: t(this.getActionKey(row.status)),
       });
       if (row.conflict) {
         const conflictEl = rowEl.createDiv({ cls: 'opencodian-edit-revert-preview-conflict' });
@@ -117,6 +122,36 @@ export class EditRevertPreviewModal extends Modal {
       attr: { type: 'button' },
     });
     confirmButton.addEventListener('click', () => this.resolve(true));
+  }
+
+  private renderLabelledLines(
+    parentEl: HTMLElement,
+    side: 'before' | 'after',
+    label: string,
+    lines: number | null,
+  ): void {
+    const sideEl = parentEl.createSpan({ cls: `opencodian-edit-revert-preview-lines-${side}` });
+    sideEl.createSpan({ cls: 'opencodian-edit-revert-preview-lines-label', text: label });
+    sideEl.createSpan({
+      cls: 'opencodian-edit-revert-preview-lines-value',
+      text: lines === null
+        ? t('editRevert.preview.linesUnavailable')
+        : t('editRevert.preview.linesValue', { count: String(lines) }),
+    });
+  }
+
+  /** What the revert will actually do to this row, in plain words. */
+  private getActionKey(status: EditRevertPreview['rows'][number]['status']): TranslationKey {
+    switch (status) {
+      case 'created':
+        return 'editRevert.preview.actionCreated';
+      case 'deleted':
+        return 'editRevert.preview.actionDeleted';
+      case 'moved':
+        return 'editRevert.preview.actionMoved';
+      default:
+        return 'editRevert.preview.actionModified';
+    }
   }
 
   private formatLines(lines: number | null): string {

@@ -1,4 +1,5 @@
 # Owner: shared.i18n
+> 2026-09-21 (advantage-parity R-F2/R-F3/R-F6 质量修复)：绑定笔记说明改为诚实能力表述（用于快照/回退跟踪/Modified Files 关联，不发送给模型、不自动写回）；回退预览行数改为带标签两侧并新增按状态动作说明（created 删除 / deleted 恢复 / moved 重命名回原路径 / modified 恢复本轮前内容）；新增 Vim 重复键提示。zh/en 键集一一对应。
 > 2026-09-21 (advantage-parity R-F2–R-F6)：zh/en 同步新增绑定笔记/locked、回退预览与冲突、聊天空预热、会话 rail 和可配置 Vim 导航文案；预热零 prompt/turn、绑定笔记非自动写回、冲突覆盖风险均在 UI 文案中如实说明。
 > 2026-09-21 (advantage-parity R-F7)：`envDomains.changedNotice` 与 `settings.envDomains.*` 键。
 > 2026-09-21 (advantage-parity R-F8)：settings.contextWindowOverride.* 键。

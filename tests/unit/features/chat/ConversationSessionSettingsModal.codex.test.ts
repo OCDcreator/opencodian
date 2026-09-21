@@ -160,7 +160,7 @@ describe('ConversationSessionSettingsModal Codex controls', () => {
         codexSandboxMode: 'read-only',
         codexModelReasoningEffort: 'persistent',
       }),
-      null,
+      undefined,
     );
   });
 
@@ -212,7 +212,7 @@ describe('ConversationSessionSettingsModal Codex controls', () => {
     saveButton?.click();
     await Promise.resolve();
 
-    expect(onSave).toHaveBeenCalledWith(undefined, null);
+    expect(onSave).toHaveBeenCalledWith(undefined, undefined);
   });
 
   it('shows a boundary hint that Codex settings apply to the next thread', () => {

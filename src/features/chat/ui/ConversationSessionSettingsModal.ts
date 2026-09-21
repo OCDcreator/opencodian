@@ -53,7 +53,11 @@ interface ConversationSessionSettingsModalOptions {
   showCodexControls?: boolean;
   onSave(
     overrides: ConversationSessionSettings | undefined,
-    linkedNotePath: string | null,
+    /**
+     * Linked-note binding field state: `undefined` = untouched (do not write
+     * it back), `null` = explicitly unbound, string = explicitly chosen path.
+     */
+    linkedNotePath: string | null | undefined,
   ): Promise<void> | void;
   onPreview?(
     overrides: ConversationSessionSettings | undefined,
@@ -100,6 +104,15 @@ export class ConversationSessionSettingsModal extends Modal {
   private codexWebSearchModeSelectEl: HTMLSelectElement | null = null;
   private codexApprovalPolicySelectEl: HTMLSelectElement | null = null;
   private linkedNotePathSelectEl: HTMLSelectElement | null = null;
+  /**
+   * True once the user actually changes the linked-note binding in this modal
+   * session. The select is populated once from the conversation's binding at
+   * open time, so an untouched field must stay "not changed" (`undefined`) on
+   * save: a vault rename that lands while the modal is open updates the
+   * conversation behind it, and writing the stale captured path back would
+   * silently undo that follow.
+   */
+  private linkedNotePathDirty = false;
   private codexGoalReadbackEl: HTMLElement | null = null;
   private codexGoalEmptyEl: HTMLElement | null = null;
   private codexGoalClearBtnEl: HTMLButtonElement | null = null;
@@ -210,6 +223,7 @@ export class ConversationSessionSettingsModal extends Modal {
     this.codexWebSearchModeSelectEl = null;
     this.codexApprovalPolicySelectEl = null;
     this.linkedNotePathSelectEl = null;
+    this.linkedNotePathDirty = false;
     this.codexGoalReadbackEl = null;
     this.codexGoalEmptyEl = null;
     this.errorEl = null;
@@ -333,6 +347,9 @@ export class ConversationSessionSettingsModal extends Modal {
       }
     }
     selectEl.value = linkedNote.currentPath ?? '';
+    selectEl.addEventListener('change', () => {
+      this.linkedNotePathDirty = true;
+    });
     this.linkedNotePathSelectEl = this.enhanceDropdown(selectEl);
 
     fieldEl.createDiv({
@@ -1575,7 +1592,17 @@ export class ConversationSessionSettingsModal extends Modal {
       : overrides;
   }
 
-  private readLinkedNotePath(): string | null {
+  /**
+   * The binding field's value on save:
+   * - `undefined` when the user never touched it — the caller must not write
+   *   the field back, so a rename follow that raced the open modal survives;
+   * - `null` when the user explicitly unbound the conversation;
+   * - the chosen path when the user explicitly picked one.
+   */
+  private readLinkedNotePath(): string | null | undefined {
+    if (!this.linkedNotePathDirty) {
+      return undefined;
+    }
     const value = this.linkedNotePathSelectEl?.value.trim() ?? '';
     return value.length > 0 ? value : null;
   }

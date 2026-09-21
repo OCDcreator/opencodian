@@ -175,6 +175,46 @@ describe('ConversationSessionSettingsCoordinator', () => {
     expect(host.saveConversation).toHaveBeenCalledWith(conversation);
   });
 
+  it('leaves the binding untouched when the save omits it', async () => {
+    const conversation = { ...createConversation(), linkedNotePath: 'drafts/old.md' };
+    const { coordinator, host } = createCoordinator({ currentConversation: conversation });
+
+    await coordinator.saveConversationOverrides(conversation, { chatFontSizePx: 14 });
+
+    expect(conversation.linkedNotePath).toBe('drafts/old.md');
+    expect(host.saveConversation).toHaveBeenCalledWith(conversation);
+  });
+
+  it('does not resurrect a stale binding over a rename that raced the save', async () => {
+    const conversation = { ...createConversation(), linkedNotePath: 'drafts/old.md' };
+    const { coordinator } = createCoordinator({ currentConversation: conversation });
+
+    // The modal was opened with 'drafts/old.md'; the vault rename follow then
+    // updated the same conversation object before the user saved.
+    conversation.linkedNotePath = 'drafts/new.md';
+    await coordinator.saveConversationOverrides(conversation, { chatFontSizePx: 14 }, undefined);
+
+    expect(conversation.linkedNotePath).toBe('drafts/new.md');
+  });
+
+  it('clears the binding on an explicit unbind', async () => {
+    const conversation = { ...createConversation(), linkedNotePath: 'drafts/old.md' };
+    const { coordinator } = createCoordinator({ currentConversation: conversation });
+
+    await coordinator.saveConversationOverrides(conversation, { chatFontSizePx: 14 }, null);
+
+    expect(conversation.linkedNotePath).toBeUndefined();
+  });
+
+  it('treats a blank explicit selection as an unbind', async () => {
+    const conversation = { ...createConversation(), linkedNotePath: 'drafts/old.md' };
+    const { coordinator } = createCoordinator({ currentConversation: conversation });
+
+    await coordinator.saveConversationOverrides(conversation, { chatFontSizePx: 14 }, '   ');
+
+    expect(conversation.linkedNotePath).toBeUndefined();
+  });
+
   it('shows a notice when opening session settings without an active conversation', () => {
     const { coordinator, host } = createCoordinator({
       currentConversation: null,

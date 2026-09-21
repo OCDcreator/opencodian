@@ -57,7 +57,9 @@ describe('ConversationSessionSettingsModal', () => {
     saveButton.click();
     await Promise.resolve();
 
-    expect(onSave).toHaveBeenCalledWith(undefined, null);
+    // An untouched binding field must stay "not changed" (`undefined`) so a
+    // rename follow that landed while the modal was open is not overwritten.
+    expect(onSave).toHaveBeenCalledWith(undefined, undefined);
   });
 
   it('lets users choose or explicitly unbind a linked Markdown draft', async () => {
@@ -74,7 +76,10 @@ describe('ConversationSessionSettingsModal', () => {
     const save = modal.contentEl.querySelector<HTMLButtonElement>('.opencodian-session-settings-save');
     if (!select || !save) throw new Error('Expected linked note controls');
 
+    // A real selection: the enhanced dropdown sets `value` and fires a
+    // bubbling `change`; that event is what marks the field as user-changed.
     select.value = 'drafts/plan.md';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
     save.click();
     await Promise.resolve();
     expect(onSave).toHaveBeenCalledWith(undefined, 'drafts/plan.md');

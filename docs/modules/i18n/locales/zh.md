@@ -1,4 +1,5 @@
 # Chinese Locale
+> 2026-09-21 (advantage-parity R-F2/R-F3/R-F6 质量修复)：`chat.sessionSettings.modal.linkedNote.description` 改为诚实能力表述（用于快照/回退跟踪/Modified Files 关联；不发送内容给模型、不自动写回）；`editRevert.preview.*` 行数改为带标签两侧（`linesBeforeLabel`/`linesAfterLabel`/`linesValue`）并新增按状态的动作说明（`actionCreated`/`actionDeleted`/`actionModified`/`actionMoved`），移除歧义的裸 `lines` 组合键；新增 `settings.conversation.vimNavigation.duplicateKeyNotice`。与 en 一一对应。
 > 2026-09-21 (advantage-parity R-F5/R-F6)：新增会话管理栏、Vim 导航设置及 rail 状态中文文案。
 > 2026-09-21 (advantage-parity R-F4)：新增 `settings.agent.chatWarmSession.{name,desc}`；明确预热只创建空只读 aux session、不发送提示词/回合、不计模型用量，真实聊天另建会话。
 > 2026-09-21 (advantage-parity R-F3)：新增 `editRevert.preview.*` 的确认回退、before→after 行数、冲突/无基线、失败与 round-open fail-closed 文案；与 en 保持一一对应。
