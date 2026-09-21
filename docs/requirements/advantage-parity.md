@@ -66,7 +66,7 @@
 | F | R-F5 | 双栏会话管理器 | Claudian | P3 | TODO |
 | F | R-F6 | Vim 风格聊天导航键 | Claudian | P3 | TODO |
 | F | R-F7 | 每供应商环境变量分域 + 环境哈希失效 | Claudian | P2 | TODO |
-| F | R-F8 | 自定义模型自定义上下文窗口 | Claudian | P2 | TODO |
+| F | R-F8 | 自定义模型自定义上下文窗口 | Claudian | P2 | DONE |
 | F | R-F9 | 文件管理器右键「附加到上下文」 | 双方 | P1 | DONE |
 | F | R-F10 | Grok 后端（ACP 一等接入） | Claudian | P2 | TODO |
 | F | R-F11 | i18n 扩语种 | Claudian | P2 | TODO |
@@ -270,6 +270,12 @@ Claudian 把环境变量按 `shared` / `provider:*` 分域，环境指纹变化�
 ### R-F8 自定义模型自定义上下文窗口（P2）
 
 自定义 OpenAI 兼容模型缺权威 context window 元数据时，允许用户为模型声明上限（ContextRing 与压缩阈值消费）。落点：模型目录条目加可选 `contextWindowOverride`。
+
+**落地证据（2026-09-21，提交 `0a9455bf`）**：
+
+- **实现**：设置 `modelContextWindowOverrides`（`provider/model → 正整数 token` 映射，load 边界归一化：ref 形态/正整数校验、数字字符串可 coercion）+ `applyContextWindowOverrides`（**纯目录装饰：只填无 contextWindow 的条目，绝不覆盖真实元数据**），在 `ModelConfigService.getCatalogs` 对 local/server/baseEffective/effective **四个 catalog 面统一施加**——选择器、ContextRing 百分比、压缩阈值经既有 contextWindow 流消费，**零消费方改动**。`ContextWindowOverrideModal`（feature 层窄 port，不 import 应用层）：校验表单 + 逐条移除；模型区通用 tab「管理声明」入口。
+- **测试**：`contextWindowOverride.test.ts` 6 例（只填缺失/绝不覆盖、空映射原样返回、无匹配 ref 无操作、纯函数不 mutate、归一化弃垃圾、非 record 输入空对象）+ verify 15/15。
+- **实机（BUILD_ID `202609211137`）**：设置默认 `{}`；模型通用 tab 行实测（名称 13px/18.2、描述 12px/18.6、行 497×126、管理按钮与相邻行右缘同列）；modal 三输入表单 + 诚实空态渲染正常。视觉门两图 PASS（`.visual-evidence/rf8/rf8-row.png`、`rf8-modal.png`；对比度 1.65/2.09 与同 tab 全部行同色同处理——主题整体风格，非本行回归）。注：测试库无 opencode 模型目录（pi 活动后端），catalog 填充路径以单测覆盖为准，UI 走临时启用 opencode 后端验证并已恢复。
 
 ### R-F9 文件管理器右键「附加到上下文」（P1）
 

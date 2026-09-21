@@ -11,6 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-21 R-F8 模型上下文窗口声明：catalog 边界纯装饰（只填缺失），四 catalog 面统一
+
+**触发**：advantage-parity 批次 F 第 3 条（P2）。自定义 OpenAI 兼容模型缺权威 context window 元数据时 ContextRing/压缩无从计算；Claudian 允许用户声明上限。
+
+**改动**：设置 `modelContextWindowOverrides`（provider/model → 正整数 token，归一化校验 ref 形态）+ `applyContextWindowOverrides` 纯装饰（**只填无 contextWindow 的条目，绝不覆盖真实元数据**）在 `ModelConfigService.getCatalogs` 对 local/server/baseEffective/effective 四面统一施加——选择器/ContextRing/压缩阈值经既有 contextWindow 流消费零改动。`ContextWindowOverrideModal`（窄 port 不 import 应用层——依赖方向门拦截过一次直接 import main，改结构性 host 后通过）+ 模型通用 tab「管理声明」入口。
+
+**测试**：6 例单测 + verify 15/15。实机（BUILD_ID `202609211137`）：行 497×126（13px/18.2 + 12px/18.6 与同 tab 一致）、modal 三输入 + 空态正常；视觉门两图 PASS（对比度 1.65/2.09 与同 tab 全行同色——主题整体风格非回归）。测试库无 opencode 目录（pi 后端），catalog 填充以单测为准、UI 临时启用 opencode 验证后已恢复。坑：设置 DOM 在独立窗口 target（主窗口无 settings DOM），后端切换后需 close/reopen 设置窗口才重渲染 tab。
+
+---
+
 ## 2026-09-21 R-F1 流式中排队 + Turn steering：多条 FIFO 队列条、pi 原生 steering 缝、能力如实分流
 
 **触发**：advantage-parity 批次 F 第 2 条（P1）。Claudian 允许 agent 运行中注入新输入（codex/grok/pi 原生）并把流式期间排队合并；OpenCodian 此前流式中只能取消（一槽 follow-up 队列不可见）。
