@@ -1,4 +1,5 @@
 # Owner: shared.i18n
+> 2026-09-21 (advantage-parity R-F8)：settings.contextWindowOverride.* 键。
 > 2026-09-21 (advantage-parity R-F1)：chat.queue.* 键。
 > 2026-09-21 (advantage-parity R-F9)：chat.context.fileMenu.attach 键。
 > 2026-09-21 (advantage-parity R-E4)：semanticRetrieval 徽标与设置键。

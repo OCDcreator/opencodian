@@ -2529,6 +2529,19 @@ export const enTranslations = {
   'chat.context.kind.pdfSelection': 'PDF selection',
   'chat.context.kind.url': 'Webpage',
 
+  // advantage-parity R-F8：模型上下文窗口声明
+  'settings.contextWindowOverride.rowName': 'Model context-window declarations',
+  'settings.contextWindowOverride.rowDesc': 'Declare context-window caps for catalog models that lack authoritative metadata (typical for custom OpenAI-compatible models); ContextRing and compaction thresholds consume them. Declarations fill missing values only — they never mask real metadata.',
+  'settings.contextWindowOverride.manageButton': 'Manage',
+  'settings.contextWindowOverride.modalTitle': 'Model context-window declarations',
+  'settings.contextWindowOverride.addName': 'Add a declaration',
+  'settings.contextWindowOverride.addDesc': 'Provider id / model id / window (tokens).',
+  'settings.contextWindowOverride.addButton': 'Add',
+  'settings.contextWindowOverride.invalidRef': 'Provider and model are both required (provider/model).',
+  'settings.contextWindowOverride.invalidWindow': 'The window must be a positive integer (tokens).',
+  'settings.contextWindowOverride.removeButton': 'Remove',
+  'settings.contextWindowOverride.empty': 'No declarations. Models with authoritative contextWindow metadata never need one.',
+
   // advantage-parity R-F1：流式中排队与轮内注入
   'chat.queue.barTitle': 'Queued messages ({{count}})',
   'chat.queue.steerAction': 'Inject into the active turn now',

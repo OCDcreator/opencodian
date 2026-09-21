@@ -1,4 +1,5 @@
 # English Locale
+> 2026-09-21 (advantage-parity R-F8)：新增 settings.contextWindowOverride.* 11 键（与 zh 对齐）。
 > 2026-09-21 (advantage-parity R-F1)：新增 chat.queue.* 12 键（与 zh 对齐）。
 > 2026-09-21 (advantage-parity R-F9)：新增 chat.context.fileMenu.attach 键（与 zh 对齐）。
 > 2026-09-21 (advantage-parity R-E4)：同 zh 对齐。

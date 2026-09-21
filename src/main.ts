@@ -1332,7 +1332,11 @@ export default class OpenCodianPlugin extends Plugin {
     const vaultPath = getVaultBasePath(this.app);
     if (vaultPath) {
       this.opencodeConfigManager = new OpencodeConfigManager(vaultPath);
-      this.modelConfigService = new ModelConfigService(this.opencodeConfigManager, this.openCodeService);
+      this.modelConfigService = new ModelConfigService(this.opencodeConfigManager, this.openCodeService, {
+        // R-F8: user-declared caps ride the catalog boundary (fills missing
+        // metadata only — never masks authoritative contextWindow values).
+        getContextWindowOverrides: () => this.settings?.modelContextWindowOverrides ?? {},
+      });
       this.openCodeService.setVaultPath(vaultPath);
       logger.debug(`Vault path set to: ${vaultPath}`);
       logger.debug(`Platform: ${process.platform}`);

@@ -1,4 +1,5 @@
 # SettingsModelSection
+> 2026-09-21 (advantage-parity R-F8)：通用 tab 新增「模型上下文窗口声明」行（管理声明 → ContextWindowOverrideModal）。
 
 > **源码**: `src/features/settings/SettingsModelSection.ts`
 > **状态**: [REVIEW]

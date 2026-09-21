@@ -10,6 +10,7 @@ import {
   type ModelCatalogComparison,
 } from './modelCatalogComparison';
 import {
+  applyContextWindowOverrides,
   applyModelConfig,
   assembleModelCatalog,
   assembleServerModelCatalog,
@@ -80,10 +81,14 @@ export interface ProviderAvailabilityProbe {
   sendTestResponsePreview?: string;
 }
 
-interface ModelConfigServiceOptions {
+export interface ModelConfigServiceOptions {
   xdgConfigHome?: string;
   homeDir?: string;
   managedConfigDir?: string;
+
+  /** R-F8: user context-window overrides ("provider/model" -> tokens); fills
+   * catalog entries that lack authoritative metadata only. */
+  getContextWindowOverrides?: () => Record<string, number>;
 }
 
 export class ModelConfigService {
@@ -215,6 +220,19 @@ export class ModelConfigService {
       providerDirectory: serverState.providerDirectory,
       effective: assembledCatalog.effective,
     };
+    // R-F8: user-declared caps fill entries lacking authoritative metadata
+    // across every catalog surface, so the selector, ContextRing percentages
+    // and compaction thresholds all see one consistent number.
+    const overrides = this.options.getContextWindowOverrides?.() ?? {};
+    if (Object.keys(overrides).length > 0) {
+      return {
+        ...bundle,
+        local: applyContextWindowOverrides(local, overrides),
+        server: applyContextWindowOverrides(server, overrides),
+        baseEffective: applyContextWindowOverrides(bundle.baseEffective, overrides),
+        effective: applyContextWindowOverrides(bundle.effective, overrides),
+      };
+    }
     return bundle;
   }
 

@@ -1,4 +1,5 @@
 # Plugin Entry Point (main.ts)
+> 2026-09-21 (advantage-parity R-F8)：ModelConfigService 构造传入 getContextWindowOverrides（settings.modelContextWindowOverrides）。
 > 2026-09-21 (advantage-parity R-F9)：注册 file-menu 右键菜单项「附加到 OpenCodian 聊天上下文」（文件/文件夹经共享 buildEntryContextItem——文件夹为 path-only 条目、PDF 走提取路径，与 + picker 逐字段一致）；attachVaultEntryToActiveChatContext 委托方法。
 > 2026-09-21 (advantage-parity R-E4)：组合 vaultEmbeddingIndexService（R-C1 scopeMatcher 复用、resolveSemanticEmbeddingClient 从 providers 解析 OpenAI 兼容端点、未配置如实 Notice）。
 > 2026-09-21 (advantage-parity R-E6)：registerTokenCountCommands——count-selection-tokens（选区估算，空选区如实 Notice）与 count-vault-tokens（R-C1 范围 isIndexablePath 过滤后逐篇 cachedRead 汇总），Notice + 剪贴板复制。

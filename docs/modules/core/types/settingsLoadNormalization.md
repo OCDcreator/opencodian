@@ -1,4 +1,5 @@
 # Settings Load Normalization
+> 2026-09-21 (advantage-parity R-F8)：load 合流点消费 normalizeModelContextWindowOverrides。
 > 2026-09-21 (advantage-parity R-E4)：词面检索归一化块并入语义三字段。
 > 2026-09-21 (advantage-parity R-D3)：load 合流点新增两个提示音字段的归一化消费。
 > 2026-09-20 (advantage-parity R-D1)：load 合流点新增 `conversationExport: normalizeConversationExportSettings(...)`，旧快照缺字段时落到默认值。

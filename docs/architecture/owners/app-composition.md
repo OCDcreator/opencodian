@@ -1,4 +1,5 @@
 # Owner: app.composition
+> 2026-09-21 (advantage-parity R-F8)：main.ts 构造 ModelConfigService 时传入 getContextWindowOverrides。
 > 2026-09-21 (advantage-parity R-F9)：main.ts 注册 file-menu 事件（文件/文件夹右键附加到聊天上下文，共享 R-A7 条目通道）。
 > 2026-09-21 (advantage-parity R-E4)：main.ts 组合 embedding 服务与供应商解析。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。

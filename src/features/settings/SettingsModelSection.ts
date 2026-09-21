@@ -5,6 +5,7 @@ import type { ModelSourceMode } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { renderCapabilityDisclosureRows } from './capabilityDisclosureRow';
+import { ContextWindowOverrideModal } from './ContextWindowOverrideModal';
 import { renderCostEstimateSettingsRow } from './CostEstimateSettingsRow';
 import {
   type OpenCodeServerStatus,
@@ -362,6 +363,18 @@ export class SettingsModelSection {
     this.catalogCoordinator.updateSmallModelButton();
 
     renderCostEstimateSettingsRow(commonBodyEl, this.plugin, 'opencode');
+    // advantage-parity R-F8: user-declared context-window caps for catalog
+    // models without authoritative metadata (ContextRing/compaction consume).
+    new Setting(commonBodyEl)
+      .setName(t('settings.contextWindowOverride.rowName'))
+      .setDesc(t('settings.contextWindowOverride.rowDesc'))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.contextWindowOverride.manageButton'))
+          .onClick(() => {
+            new ContextWindowOverrideModal(this.plugin).open();
+          });
+      });
 
     new Setting(commonBodyEl)
       .setName(t('settings.model.refresh.name'))

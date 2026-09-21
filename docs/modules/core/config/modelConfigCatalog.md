@@ -1,4 +1,5 @@
 # Model Config Catalog Owner
+> 2026-09-21 (advantage-parity R-F8)：新增 applyContextWindowOverrides——纯装饰，只填无 contextWindow 的条目，绝不覆盖真实元数据。
 
 > **源码**: `src/core/config/modelConfigCatalog.ts`
 > **状态**: [REVIEW]

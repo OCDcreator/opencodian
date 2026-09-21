@@ -3743,6 +3743,16 @@ export interface OpenCodianSettings {
   providerIconDefaultVariant: LobehubIconVariant;
   /** Local per-provider/model USD-per-million overrides for cost estimates. */
   modelPricingOverrides: ModelPricingOverride[];
+
+  /**
+   * advantage-parity R-F8: user-declared context-window caps for catalog
+   * models that lack authoritative metadata (key = "provider/model").
+   * Applied at the catalog boundary and ONLY where the entry has no
+   * contextWindow of its own — an override never masks real metadata.
+   * ContextRing percentages and compaction thresholds consume it unchanged
+   * through the existing contextWindow flow.
+   */
+  modelContextWindowOverrides: Record<string, number>;
   effortLevel: EffortLevel;
   thinkingBudget: ThinkingBudget;
 
@@ -3849,6 +3859,25 @@ export function normalizeSecretsKeychainEnabled(value: unknown): boolean {
 /** advantage-parity R-D3: chime toggle normalizes to the safe default (off). */
 export function normalizeTurnCompletionSoundEnabled(value: unknown): boolean {
   return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.turnCompletionSoundEnabled;
+}
+
+/** advantage-parity R-F8: string-keyed positive-integer map; junk dropped. */
+export function normalizeModelContextWindowOverrides(value: unknown): Record<string, number> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  const out: Record<string, number> = {};
+  for (const [rawRef, rawWindow] of Object.entries(value as Record<string, unknown>)) {
+    const ref = rawRef.trim();
+    const window = typeof rawWindow === 'number' ? rawWindow : Number(rawWindow);
+    const [refProvider, ...rest] = ref.split('/');
+    if (!refProvider || rest.length === 0 || !rest.every((part) => part.length > 0)
+      || !Number.isInteger(window) || window <= 0 || window > 100_000_000) {
+      continue;
+    }
+    out[ref] = window;
+  }
+  return out;
 }
 
 /** advantage-parity R-E4: semantic retrieval toggle (safe default off). */
@@ -4117,6 +4146,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   providerIconColorMode: 'system',
   providerIconDefaultVariant: 'auto',
   modelPricingOverrides: [],
+  modelContextWindowOverrides: {},
   effortLevel: 'high',
   thinkingBudget: 4096,
 

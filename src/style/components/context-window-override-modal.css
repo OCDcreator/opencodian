@@ -1,0 +1,52 @@
+/* ── Context window override modal (advantage-parity R-F8) ─────────────── */
+
+.opencodian-context-window-override-form {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.opencodian-context-window-override-form input {
+  flex: 1;
+  min-width: 0;
+}
+
+.opencodian-context-window-override-form input[type='number'] {
+  max-width: 120px;
+  flex: none;
+}
+
+.opencodian-context-window-override-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.opencodian-context-window-override-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: var(--radius-s, 4px);
+  background-color: var(--background-secondary);
+}
+
+.opencodian-context-window-override-ref {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-monospace);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opencodian-context-window-override-window {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.opencodian-context-window-override-empty {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller, 11px);
+  padding: 8px 0;
+}

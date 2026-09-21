@@ -1,4 +1,5 @@
 # Owner: core.types
+> 2026-09-21 (advantage-parity R-F8)：modelContextWindowOverrides 设置字段与归一化。
 > 2026-09-21 (advantage-parity R-E4)：retrievalChannel 字段 + 语义检索设置三字段归一化。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 > 2026-09-21 (advantage-parity R-E1)：chat 类型新增 url PromptContextKind 与 UrlContextMeta（抓取状态机元数据）。

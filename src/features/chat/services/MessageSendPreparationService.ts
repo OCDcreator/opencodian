@@ -376,6 +376,7 @@ export class MessageSendPreparationService {
         return null;
       }
       this.host.notifyFollowUpQueued?.(tabId, this.getFollowUpQueueSnapshot(tabId));
+      return null;
     }
     this.host.transitionTabSessionLifecycle(tabId, 'preparing', 'send-preflight');
     const draftContextItems = this.composerSendContext.getDraftContextItems(tabId);

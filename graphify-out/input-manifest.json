@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "819b3dcd9f147e1c91084dbc4092a5573d9f51fd4f3d60590031e8c7a8a0d12e",
-  "recordCount": 765,
+  "digest": "44f9492a727c0002cffa1ad33064ca0c9b4f53549dd8a451cf1874ed7f3ab9b0",
+  "recordCount": 767,
   "records": [
     {
       "kind": "ignore",
@@ -596,7 +596,7 @@
     {
       "kind": "src",
       "key": "src/core/config/modelConfigCatalog.ts",
-      "sha256": "0796125152c71387cefb9e731e33a23ea1b8021f58e98ee23e6f29bdf286c722"
+      "sha256": "145416490603a8b73ced56a3554bee8a8f5877b5fe9485d3bab9876471679513"
     },
     {
       "kind": "src",
@@ -606,7 +606,7 @@
     {
       "kind": "src",
       "key": "src/core/config/ModelConfigService.ts",
-      "sha256": "4b0b28ef20605182b6037fcb5bf6636fdbd6877bed87efada43d836c411661a4"
+      "sha256": "c7ea3971a64974473bffecb188a84816f9525192d82f708820e995b7f4b954ef"
     },
     {
       "kind": "src",
@@ -1211,12 +1211,12 @@
     {
       "kind": "src",
       "key": "src/core/types/settings.ts",
-      "sha256": "ffa79ddb55387ea7cef5b36b9f3c05aa0c72d04646aa4502823b2b7c72b08d52"
+      "sha256": "f403b86a027ee8df16024acbf6b4595f13e7bb61c8941f1cd1f3511c9a29216f"
     },
     {
       "kind": "src",
       "key": "src/core/types/settingsLoadNormalization.ts",
-      "sha256": "a0d807b799cc0a154a95ea4a43c5bd3723083413642d60e3c537e3bffbcc35ba"
+      "sha256": "757511bd5953aa2688c992e2c0939f6eeb3e20c1b734ca3310e904a505c6c95c"
     },
     {
       "kind": "src",
@@ -2735,6 +2735,11 @@
     },
     {
       "kind": "src",
+      "key": "src/features/settings/ContextWindowOverrideModal.ts",
+      "sha256": "cca9c1388142a1f8a7c0ce5c382475bbc8f4a82fbe8a996a92f268552278653d"
+    },
+    {
+      "kind": "src",
       "key": "src/features/settings/ConversationCompactionHelpModal.ts",
       "sha256": "1f2eb62f5a3780e841bb6da8b7bd2cedb07babc90751a10eecac6ed996a31fc7"
     },
@@ -3076,7 +3081,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsModelSection.ts",
-      "sha256": "6af4e4dec7576da484b9983ff0ce0018cca27f8dd43a4cb25d421ffd9ba1aa38"
+      "sha256": "7057a97f5609a852150bfb7006b2c6244f241383b40ce29c542d94f3db64a331"
     },
     {
       "kind": "src",
@@ -3251,7 +3256,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "db8eb61e32f0bb843a2aa7960765e688b9389e5958984d7959645de8030adb7b"
+      "sha256": "71168403af212412b7528c393e85f7d94c59236333da59008339c57aaa13fd1e"
     },
     {
       "kind": "src",
@@ -3261,12 +3266,12 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "58b4d609c123b8a4972f974426d7796a97dac3edb9eb76c091bbc9369807f694"
+      "sha256": "85a0f8838e9ebf10b195ecf6a2847287c973f25390ebb4632439a098482af9a1"
     },
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "6689d5fb3c80f3c3fc9b6a608c53dd944d438cf1e4f157a25bcade590c412bfa"
+      "sha256": "ceced16670e65f1cb90ae5155f83aa1a9176617a5aeec8c80b8ed657d298f210"
     },
     {
       "kind": "src",
@@ -3410,6 +3415,11 @@
     },
     {
       "kind": "src",
+      "key": "src/style/components/context-window-override-modal.css",
+      "sha256": "e655df824f89d8de0273fcff38d984652c321951229c746613de6c3ccf9c3b80"
+    },
+    {
+      "kind": "src",
       "key": "src/style/components/effort-selector.css",
       "sha256": "8d700890d72f13b6e8b4cc329aa3ba85aec5b7d992697393cfa071b6f23797a6"
     },
@@ -3451,7 +3461,7 @@
     {
       "kind": "src",
       "key": "src/style/components/queued-followup-bar.css",
-      "sha256": "c406cee747dfd0cb1f3672220010fd1df25c6fdf05b2a5660e47912425c9fa1e"
+      "sha256": "414e15b7d639581aaadebd5592b5cdbd7b9691c327032549ab877346e76432cc"
     },
     {
       "kind": "src",
@@ -3546,7 +3556,7 @@
     {
       "kind": "src",
       "key": "src/style/index.css",
-      "sha256": "8bce51416f158272aebe87c9a7f3286b2565ce1fdbf2ffb87649522cd3f9adc8"
+      "sha256": "9d63d5adbeb4badc31eb7a8e1fcee95e4dfa3c25e3dd6ed088b3422035d0b460"
     },
     {
       "kind": "src",
@@ -3829,7 +3839,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-21T02:46:48.308Z",
-  "headShaAtGeneration": "d911afe6195e87bb865bc7b210bcebf65fff130d",
+  "generatedAt": "2026-09-21T04:01:45.092Z",
+  "headShaAtGeneration": "09460834ed635bf021ab6f731b26018e0c1eb187",
   "graphifyVersion": "graphify 0.9.36"
 }

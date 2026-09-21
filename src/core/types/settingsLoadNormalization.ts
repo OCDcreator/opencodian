@@ -39,6 +39,7 @@ import {
   normalizeInputPanelLiquidGlassSettings,
   normalizeInputPanelThemeId,
   normalizeMemoryBackendUserSettings,
+  normalizeModelContextWindowOverrides,
   normalizeModelProviderPluginDebugSettings,
   normalizeObsidianToolingMode,
   normalizePersistedTabState,
@@ -490,6 +491,7 @@ function normalizeVaultRetrievalSettingsOnLoad(
   vaultRetrievalMaxCharsPerNote: number;
   vaultRetrievalExcludedPaths: string[];
   pdfIndexEnabled: boolean;
+  modelContextWindowOverrides: Record<string, number>;
   semanticRetrievalEnabled: boolean;
   semanticEmbeddingProvider: string;
   semanticEmbeddingModel: string;
@@ -504,6 +506,9 @@ function normalizeVaultRetrievalSettingsOnLoad(
     ),
     vaultRetrievalExcludedPaths: normalizeVaultRetrievalExcludedPaths(
       normalizedSettings?.vaultRetrievalExcludedPaths,
+    ),
+    modelContextWindowOverrides: normalizeModelContextWindowOverrides(
+      normalizedSettings?.modelContextWindowOverrides,
     ),
     semanticRetrievalEnabled: normalizeSemanticRetrievalEnabled(
       normalizedSettings?.semanticRetrievalEnabled,

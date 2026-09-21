@@ -1,4 +1,5 @@
 # Owner: feature.settings-model-catalog
+> 2026-09-21 (advantage-parity R-F8)：模型通用 tab 新增「模型上下文窗口声明」行（管理声明 → ContextWindowOverrideModal）。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 
 Pricing readiness (2026-09-10): the pricing modal subscribes only while open, refreshes catalog metadata and match hints in place, and fences manual-refresh completion against close/reopen so drafts and focus survive background updates.

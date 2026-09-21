@@ -1,4 +1,5 @@
 # ModelConfigService
+> 2026-09-21 (advantage-parity R-F8)：getCatalogs 对 local/server/baseEffective/effective 四个 catalog 面统一施加用户声明；options 增 getContextWindowOverrides 访问器。
 
 > **源码**: `src/core/config/ModelConfigService.ts`
 > **状态**: [REVIEW]

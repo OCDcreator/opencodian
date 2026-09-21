@@ -154,6 +154,39 @@ export function buildServerCatalog(
   };
 }
 
+/**
+ * advantage-parity R-F8: apply user-declared context-window caps at the
+ * catalog boundary. Keys are `provider/model` refs. An override fills ONLY
+ * entries whose contextWindow is absent (missing authoritative metadata —
+ * e.g. custom OpenAI-compatible models); it never masks real metadata.
+ * Downstream consumers (resolveModelSelection → ContextRing percentages,
+ * compaction thresholds) read it through the existing contextWindow flow
+ * with no changes.
+ */
+export function applyContextWindowOverrides(
+  catalog: ModelCatalog,
+  overrides: Record<string, number> | null | undefined,
+): ModelCatalog {
+  if (!overrides || Object.keys(overrides).length === 0) {
+    return catalog;
+  }
+  return {
+    ...catalog,
+    providers: catalog.providers.map((provider) => ({
+      ...provider,
+      models: provider.models.map((model) => {
+        if (typeof model.contextWindow === 'number' && model.contextWindow > 0) {
+          return model;
+        }
+        const override = overrides[`${provider.id}/${model.id}`];
+        return typeof override === 'number' && override > 0
+          ? { ...model, contextWindow: override }
+          : model;
+      }),
+    })),
+  };
+}
+
 export function mergeCatalogs(server: ModelCatalog, local: ModelCatalog): ModelCatalog {
   const providers = new Map<string, ModelCatalogProvider>();
 

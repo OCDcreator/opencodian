@@ -2529,6 +2529,19 @@ export const zhTranslations = {
   'chat.context.kind.pdfSelection': 'PDF 选区',
   'chat.context.kind.url': '网页',
 
+  // advantage-parity R-F8：模型上下文窗口声明
+  'settings.contextWindowOverride.rowName': '模型上下文窗口声明',
+  'settings.contextWindowOverride.rowDesc': '为目录中缺少权威元数据的模型（常见于自定义 OpenAI 兼容模型）声明上下文窗口上限；ContextRing 与压缩阈值据此计算。声明只填补缺失值，从不覆盖真实元数据。',
+  'settings.contextWindowOverride.manageButton': '管理声明',
+  'settings.contextWindowOverride.modalTitle': '模型上下文窗口声明',
+  'settings.contextWindowOverride.addName': '新增声明',
+  'settings.contextWindowOverride.addDesc': '供应商 id / 模型 id / 窗口（token 数）。',
+  'settings.contextWindowOverride.addButton': '添加',
+  'settings.contextWindowOverride.invalidRef': '供应商与模型都不能为空（格式 provider/model）。',
+  'settings.contextWindowOverride.invalidWindow': '窗口必须是正整数（token 数）。',
+  'settings.contextWindowOverride.removeButton': '移除',
+  'settings.contextWindowOverride.empty': '暂无声明。目录中已有权威 contextWindow 的模型无需声明。',
+
   // advantage-parity R-F1：流式中排队与轮内注入
   'chat.queue.barTitle': '已排队消息（{{count}}）',
   'chat.queue.steerAction': '立即注入当前轮',
