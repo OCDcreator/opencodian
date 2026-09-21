@@ -1416,6 +1416,23 @@ export default class OpenCodianPlugin extends Plugin {
       });
     }));
 
+    // advantage-parity R-F9: file-explorer context menu attach — files,
+    // folders, and PDFs ride the same entry builder as the `+` picker, so
+    // the chips are identical to hand-picked entries on every backend.
+    this.registerEvent(this.app.workspace.on('file-menu', (menu, file) => {
+      if (!(file instanceof TFile) && !(file instanceof TFolder)) {
+        return;
+      }
+      menu.addItem((menuItem) => {
+        menuItem
+          .setTitle(t('chat.context.fileMenu.attach'))
+          .setIcon('plus-circle')
+          .onClick(() => {
+            void this.attachVaultEntryToActiveChatContext(file);
+          });
+      });
+    }));
+
     // Floating "inline edit" button next to the active selection.
     this.registerEditorExtension(inlineEditSelectionAffordanceExtension({
       canShow: () => this.canRunInlineEdit() && (this.settings?.inlineEditSelectionAffordance ?? true),
@@ -1854,6 +1871,28 @@ export default class OpenCodianPlugin extends Plugin {
       return false;
     }
     return this.getOpenCodianView()?.attachContextItemToActiveTab(item) ?? false;
+  }
+
+  /**
+   * advantage-parity R-F9: file-explorer context menu attach. Reuses the
+   * picker's entry builder verbatim (files keep the file path, folders become
+   * path-only directory references, PDFs route to the extraction path), so
+   * the resulting chips are identical to hand-picked entries.
+   */
+  private async attachVaultEntryToActiveChatContext(entry: TFile | TFolder): Promise<void> {
+    await this.activateView();
+    const builder = new ContextAttachmentBuilder(this.app, {
+      getServerMode: () => this.settings.server.mode,
+      loadPdfEngine: () => this.pdfEngineLoader!.load(),
+    });
+    const item = await builder.buildEntryContextItem(entry);
+    if (!item) {
+      return;
+    }
+    const attached = this.getOpenCodianView()?.attachContextItemToActiveTab(item) ?? false;
+    if (attached) {
+      new Notice(t('relevantNotes.attachSuccess', { path: entry.name || entry.path }));
+    }
   }
 
   /**

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "0b54532ef81f5595777e277616b55988292512148be9074730a55f4672d25d46",
+  "digest": "2b9e2b930fd57c1a87cc10ba76e5ad749c6c0fa2e7667092606911c447c40ece",
   "recordCount": 763,
   "records": [
     {
@@ -3246,7 +3246,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "8da2a1c0611e2322301896ff35ab441d2653261ebc5a8b9ba094011b942dd879"
+      "sha256": "73e9a60337a97cfa0d217ef39d0e5c48382d7e1ca482f598e313a4208b5bb91b"
     },
     {
       "kind": "src",
@@ -3256,12 +3256,12 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "c1f9d24531e441ccc500fab62e66d00eb0ca6db8a1086f67c306d0dbf1997c62"
+      "sha256": "384e5d2db6f67261e260170e607c790f8f2b47cced235c2dadb2ea7dcdfb1535"
     },
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "8467cd799a4381c2003da99fcbf5b2888882838555a60c8355cbd9c0a6fa55dc"
+      "sha256": "6689d5fb3c80f3c3fc9b6a608c53dd944d438cf1e4f157a25bcade590c412bfa"
     },
     {
       "kind": "src",
@@ -3819,7 +3819,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-21T01:32:56.038Z",
-  "headShaAtGeneration": "0eb7bec464b967ffbf8f3ce8b7b6dfd14fc3dc37",
+  "generatedAt": "2026-09-21T02:00:02.221Z",
+  "headShaAtGeneration": "494df588b8222bba4c3c27b0f90c2c6d68f5f41c",
   "graphifyVersion": "graphify 0.9.36"
 }

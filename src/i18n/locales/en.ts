@@ -2529,6 +2529,9 @@ export const enTranslations = {
   'chat.context.kind.pdfSelection': 'PDF selection',
   'chat.context.kind.url': 'Webpage',
 
+  // advantage-parity R-F9：文件管理器右键附加
+  'chat.context.fileMenu.attach': 'Attach to OpenCodian chat context',
+
   // advantage-parity R-E4：语义检索增强层
   'chat.context.originBadge.semanticRetrieval': 'retrieved · semantic',
   'settings.semanticRetrieval.enableName': 'Semantic retrieval layer (R-E4, experimental)',

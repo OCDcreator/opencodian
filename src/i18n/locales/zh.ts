@@ -2529,6 +2529,9 @@ export const zhTranslations = {
   'chat.context.kind.pdfSelection': 'PDF 选区',
   'chat.context.kind.url': '网页',
 
+  // advantage-parity R-F9：文件管理器右键附加
+  'chat.context.fileMenu.attach': '附加到 OpenCodian 聊天上下文',
+
   // advantage-parity R-E4：语义检索增强层
   'chat.context.originBadge.semanticRetrieval': '检索·语义',
   'settings.semanticRetrieval.enableName': '语义检索增强层（R-E4，实验性）',

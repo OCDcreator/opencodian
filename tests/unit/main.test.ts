@@ -1,5 +1,6 @@
 /* eslint-disable max-lines */
 import * as fs from 'fs';
+import { TFile, TFolder } from 'obsidian';
 import * as os from 'os';
 import * as path from 'path';
 
@@ -1388,5 +1389,41 @@ describe('OpenCodianPlugin slash command catalog invalidation', () => {
 
     expect(plugin.settingsTab.refreshServerStatusDisplay).toHaveBeenCalledTimes(1);
     expect(plugin.runtimeCoordinator.invalidateSlashCommandMenuCatalogs).toHaveBeenCalledWith({ preload: true });
+  });
+});
+
+describe('OpenCodianPlugin R-F9 file-menu attach delegation', () => {
+  it('attaches a folder entry to the active chat tab through the shared picker builder', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      app: unknown;
+      activateView: jest.Mock<Promise<void>, []>;
+      getOpenCodianView: jest.Mock<OpenCodianView | null, []>;
+    };
+    plugin.app = { settings: { server: { mode: 'local' } } };
+    plugin.activateView = jest.fn(async () => undefined);
+    const attachedItems: unknown[] = [];
+    plugin.getOpenCodianView = jest.fn(() => ({
+      attachContextItemToActiveTab: (item: unknown) => {
+        attachedItems.push(item);
+        return true;
+      },
+    } as unknown as OpenCodianView));
+
+    const folder = new TFolder();
+    folder.path = 'projects/alpha';
+    folder.name = 'alpha';
+
+    await (
+      plugin as unknown as {
+        attachVaultEntryToActiveChatContext: (entry: TFile | TFolder) => Promise<void>;
+      }
+    ).attachVaultEntryToActiveChatContext(folder);
+
+    expect(plugin.activateView).toHaveBeenCalledTimes(1);
+    expect(attachedItems).toHaveLength(1);
+    const item = attachedItems[0] as { kind: string; path: string; mime: string };
+    expect(item.kind).toBe('folder');
+    expect(item.path).toBe('projects/alpha');
+    expect(item.mime).toBe('application/x-directory');
   });
 });
