@@ -176,6 +176,59 @@ describe('ModifiedFilesSidebar', () => {
     expect(document.body.textContent).not.toContain('stale.md');
   });
 
+  it('shows an existing linked draft without inventing a diff entry or statistics', () => {
+    const parentEl = document.createElement('div') as ObsidianLikeElement;
+    document.body.appendChild(parentEl);
+    const coordinator = new ModifiedFilesSidebarCoordinator();
+    coordinator.mountSidebar(parentEl, { workspace: { openLinkText: jest.fn() } } as unknown as App);
+
+    coordinator.refresh(null, jest.fn(), 'ready', [], { path: 'drafts/plan.md', exists: true });
+
+    expect(document.body.textContent).toContain('drafts/plan.md');
+    expect(document.body.textContent).toContain(t('modifiedFiles.linkedNoteDraft'));
+    expect(document.querySelector('.opencodian-modified-files-sidebar-summary')?.textContent)
+      .toBe(t('modifiedFiles.readyShort'));
+  });
+
+  it('keeps an unchanged linked draft visible beside other-file revert entries', () => {
+    const parentEl = document.createElement('div') as ObsidianLikeElement;
+    document.body.appendChild(parentEl);
+    const sidebar = new ModifiedFilesSidebar(
+      { workspace: { openLinkText: jest.fn() } } as unknown as App,
+      parentEl,
+    );
+    sidebar.onload();
+    sidebar.updateEntries([], 'ready', { path: 'drafts/plan.md', exists: true });
+    sidebar.updateRevertState({
+      enabled: true,
+      roundId: 'round-1',
+      roundOpen: false,
+      degraded: false,
+      entries: [{
+        path: 'notes/other.md',
+        status: 'modified',
+        movedTo: null,
+        state: 'active',
+        revertible: true,
+        restorable: false,
+        excludedReason: null,
+      }],
+      revertibleCount: 1,
+    }, {
+      revertFile: jest.fn().mockResolvedValue(undefined),
+      revertAll: jest.fn().mockResolvedValue(undefined),
+      restoreFile: jest.fn().mockResolvedValue(undefined),
+    });
+
+    expect(document.querySelector('.opencodian-edit-revert-section')?.textContent)
+      .not.toContain('drafts/plan.md');
+    expect(document.querySelector('.opencodian-modified-files-linked-note-section')?.textContent)
+      .toContain('drafts/plan.md');
+    expect(document.querySelector('.opencodian-modified-files-linked-note-section')?.textContent)
+      .toContain(t('modifiedFiles.linkedNoteExcludedHint'));
+    expect(document.querySelectorAll('.opencodian-edit-revert-item')).toHaveLength(1);
+  });
+
   it('falls back to unique persisted Turn Change Records when the canonical session diff is empty', () => {
     const parentEl = document.createElement('div') as ObsidianLikeElement;
     document.body.appendChild(parentEl);

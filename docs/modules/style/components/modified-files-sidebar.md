@@ -1,4 +1,5 @@
 # Modified Files Sidebar Styles
+> 2026-09-21 (advantage-parity R-F2)：为绑定草稿/缺失 locked 行和紧凑 badge 添加 host-theme 样式；不为绑定状态增加伪 diff 表面。
 > 2026-09-18 (R-B3): R-B3: adds the `.opencodian-edit-revert-*` classes (section, header, revert-all button, hint, list, per-item status/state classes, action buttons, excluded label) rendered by the sidebar's revert section; the read-only list gains an `is-hidden` state while revert entries are shown.
 
 > **源码**: `src/style/components/modified-files-sidebar.css`

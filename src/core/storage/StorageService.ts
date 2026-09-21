@@ -24,6 +24,7 @@ import {
   type ConversationListDiagnostics,
   ConversationMetadataCache,
   type MutableConversationListDiagnostics,
+  normalizeConversationLinkedNotePath,
 } from './ConversationMetadataCache';
 import {
   SettingsSecretsKeychain,
@@ -220,6 +221,7 @@ export class StorageService {
       backend: persistedConversation.backend ?? 'opencode',
       currentNote: persistedConversation.currentNote,
       externalContextPaths: persistedConversation.externalContextPaths,
+      linkedNotePath: normalizeConversationLinkedNotePath(persistedConversation.linkedNotePath),
       sessionSettings: normalizeConversationSessionSettings(persistedConversation.sessionSettings),
       lastContextUsage: persistedConversation.lastContextUsage,
       backgroundTaskMetadata: persistedConversation.backgroundTaskMetadata,
@@ -270,6 +272,7 @@ export class StorageService {
         data.backendAgentId = data.acpAgentId;
       }
       data.sessionSettings = normalizeConversationSessionSettings(data.sessionSettings);
+      data.linkedNotePath = normalizeConversationLinkedNotePath(data.linkedNotePath);
       const elapsedMs = getPerformanceTimestampMs() - startedAt;
       if (elapsedMs >= 120) {
         logger.debug('Loaded full conversation from storage', {

@@ -29,6 +29,7 @@ function createConversation(
   };
 }
 
+// eslint-disable-next-line max-lines-per-function -- coordinator variants share one realistic host fixture.
 describe('ConversationSessionSettingsCoordinator', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -49,6 +50,8 @@ describe('ConversationSessionSettingsCoordinator', () => {
         chatFontSizePx: 13,
       }),
       getChatContainerEl: jest.fn().mockReturnValue(chatContainerEl),
+      listMarkdownNotePaths: jest.fn().mockReturnValue(['drafts/plan.md']),
+      noteExists: jest.fn().mockReturnValue(true),
       saveConversation,
       showNotice: jest.fn(),
       shareSession: jest.fn().mockResolvedValue({ share: { url: 'https://opencode.ai/s/session-1' } }),
@@ -160,6 +163,16 @@ describe('ConversationSessionSettingsCoordinator', () => {
 
     expect(conversation.sessionSettings).toBeUndefined();
     expect(saveConversation).toHaveBeenCalledWith(conversation);
+  });
+
+  it('saves an explicit linked note independently from session overrides', async () => {
+    const conversation = createConversation();
+    const { coordinator, host } = createCoordinator({ currentConversation: conversation });
+
+    await coordinator.saveConversationOverrides(conversation, { chatFontSizePx: 14 }, ' drafts/plan.md ');
+
+    expect(conversation.linkedNotePath).toBe('drafts/plan.md');
+    expect(host.saveConversation).toHaveBeenCalledWith(conversation);
   });
 
   it('shows a notice when opening session settings without an active conversation', () => {

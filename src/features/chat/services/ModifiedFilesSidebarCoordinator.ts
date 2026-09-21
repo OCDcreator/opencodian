@@ -12,6 +12,11 @@ import {
   type ModifiedFilesSidebarAvailability,
 } from '../ui/ModifiedFilesSidebar';
 
+export interface LinkedNoteSidebarState {
+  path?: string;
+  exists: boolean;
+}
+
 export class ModifiedFilesSidebarCoordinator {
   private sidebar: ModifiedFilesSidebar | null = null;
 
@@ -23,11 +28,13 @@ export class ModifiedFilesSidebarCoordinator {
     this.sidebar = new ModifiedFilesSidebar(app, boundaryEl);
   }
 
+  // eslint-disable-next-line max-params -- session-diff inputs remain positional; linked-note state is an adjacent display-only input.
   refresh(
     sessionId: string | null,
     getEntries: (id: string) => SessionDiffEntry[],
     availability: ModifiedFilesSidebarAvailability = 'ready',
     persistedMessages: readonly ChatMessage[] = [],
+    linkedNote: LinkedNoteSidebarState = { exists: false },
   ): void {
     const canReadSessionChanges = availability === 'ready' && sessionId !== null;
     const canonicalEntries = canReadSessionChanges ? getEntries(sessionId) : [];
@@ -36,7 +43,7 @@ export class ModifiedFilesSidebarCoordinator {
       : canReadSessionChanges
         ? this.getPersistedTurnDiffEntries(persistedMessages)
         : [];
-    this.sidebar?.updateEntries(entries, availability);
+    this.sidebar?.updateEntries(entries, availability, linkedNote);
   }
 
   /** R-B3: backend-neutral revert state + actions for the active conversation. */

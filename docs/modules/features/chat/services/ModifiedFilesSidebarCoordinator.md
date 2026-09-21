@@ -1,4 +1,5 @@
 # ModifiedFilesSidebarCoordinator
+> 2026-09-21 (advantage-parity R-F2)：`refresh` 额外转发只读 linked-note `{path, exists}` 显示状态；它不将绑定路径转换为 SessionDiffEntry，也不伪造文件数或行统计。
 > 2026-09-18 (R-B3): R-B3: `refreshRevertState(model, actions)` passes the backend-neutral `EditRevertSidebarModel` and the revert/restore callbacks through to the sidebar.
 
 > **源码**: `src/features/chat/services/ModifiedFilesSidebarCoordinator.ts`

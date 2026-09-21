@@ -1,4 +1,5 @@
 # Config Editor Modal Styles
+> 2026-09-21 (advantage-parity R-F2)：session settings 的绑定笔记 field 复用既有两列 field 布局；locked 仅用 warning 文字/细边界诚实传达缺失状态。
 
 > **源码**: `src/style/modals/config-editor-modal.css`
 > **状态**: [FINAL]

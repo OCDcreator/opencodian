@@ -280,9 +280,14 @@ export class SendPipelineRuntime {
         backend: preparedSend.conversation.backend ?? 'opencode',
         sessionId: getConversationBackendSessionId(preparedSend.conversation) || undefined,
         userText: content,
-        contextPaths: preparedSend.contextItems
-          .filter((item) => item.kind === 'file' || item.kind === 'current_note')
-          .map((item) => item.path),
+        contextPaths: [...new Set([
+          ...preparedSend.contextItems
+            .filter((item) => item.kind === 'file' || item.kind === 'current_note')
+            .map((item) => item.path),
+          ...(preparedSend.conversation.linkedNotePath
+            ? [preparedSend.conversation.linkedNotePath]
+            : []),
+        ])],
       });
 
       const routedStream = await new StreamChunkRouter({

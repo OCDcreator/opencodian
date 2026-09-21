@@ -1,4 +1,5 @@
 # ConversationSessionSettingsModal
+> 2026-09-21 (advantage-parity R-F2)：新增紧凑 Obsidian-native「绑定笔记」分组，可选 Markdown note 或显式解绑；丢失目标保留路径并显示 locked，保存 callback 同时携带 `linkedNotePath: string | null`，且不触发自动写回。
 
 > **源码**: `src/features/chat/ui/ConversationSessionSettingsModal.ts`
 > **状态**: [REVIEW]

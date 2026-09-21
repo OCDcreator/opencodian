@@ -9,6 +9,34 @@ const CONVERSATION_META_BACKFILL_LOG_THRESHOLD_MS = 120;
 const CONVERSATION_LIST_DIAGNOSTIC_LIMIT = 5;
 const logger = createLogger('ConversationMetadataCache');
 
+/**
+ * Normalize the persisted conversation-to-note binding without rejecting old
+ * records. Empty or malformed legacy values simply behave as unbound.
+ */
+export function normalizeConversationLinkedNotePath(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return undefined;
+  }
+
+  const normalized = normalizePath(trimmed).replace(/\/{2,}/g, '/');
+  const segments = normalized.split('/');
+  if (
+    normalized.startsWith('/')
+    || /^[a-z]:\//i.test(normalized)
+    || !normalized.toLowerCase().endsWith('.md')
+    || segments.some((segment) => segment === '.' || segment === '..' || segment.length === 0)
+  ) {
+    return undefined;
+  }
+
+  return normalized;
+}
+
 interface ConversationMetaEnvelope {
   schemaVersion: number;
   updatedAt: number;
@@ -106,6 +134,7 @@ export function buildConversationMetaFromStoredRecord(
         ? data.acpAgentId
         : undefined,
     backend: data.backend ?? 'opencode',
+    linkedNotePath: normalizeConversationLinkedNotePath(data.linkedNotePath),
   };
 }
 

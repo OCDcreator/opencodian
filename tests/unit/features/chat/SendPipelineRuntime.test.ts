@@ -140,4 +140,24 @@ describe('SendPipelineRuntime', () => {
       sessionId: 'claude-session-1',
     }));
   });
+
+  it('captures the bound note once with ordinary file context paths', async () => {
+    const preparedSend = createPreparedSend({
+      conversation: { ...createPreparedSend().conversation, linkedNotePath: 'drafts/plan.md' },
+      contextItems: [{ id: 'draft', kind: 'file', path: 'drafts/plan.md', label: 'plan', mime: 'text/markdown' }],
+    });
+    const runtimeState = createTabRuntime();
+    const streamController = createStreamController();
+    const host = createHost(runtimeState, streamController, [], {
+      onTurnSnapshotBegin: jest.fn(),
+      sendStreamMessage: jest.fn().mockReturnValue(createAsyncStream([{ type: 'message_start' }, { type: 'message_stop' }])),
+    });
+    const runtime = new SendPipelineRuntime(host, createPreparationPort(preparedSend), createFinalizationPort());
+
+    await runtime.sendMessage('Use the draft');
+
+    expect(host.onTurnSnapshotBegin).toHaveBeenCalledWith(expect.objectContaining({
+      contextPaths: ['drafts/plan.md'],
+    }));
+  });
 });

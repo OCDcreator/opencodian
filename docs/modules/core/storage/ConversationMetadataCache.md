@@ -1,4 +1,5 @@
 # ConversationMetadataCache
+> 2026-09-21 (advantage-parity R-F2)：导出 `normalizeConversationLinkedNotePath`；metadata builder 为 `linkedNotePath` trim + Obsidian normalizePath，只保留库内 Markdown 相对路径，空值、绝对路径、父级穿越、非 Markdown 与旧错误类型均视为未绑定。
 
 > **源码**: `src/core/storage/ConversationMetadataCache.ts`
 > **状态**: [REVIEW]

@@ -37,6 +37,7 @@ export class ModifiedFilesSidebar extends Component {
   private availability: ModifiedFilesSidebarAvailability = 'unavailable';
   private revertModel: EditRevertSidebarModel | null = null;
   private revertActions: ModifiedFilesRevertActions | null = null;
+  private linkedNote: { path?: string; exists: boolean } = { exists: false };
   private readonly handleKeydown = (event: KeyboardEvent): void => {
     if (event.key === 'Escape' && this.expanded) {
       event.preventDefault();
@@ -126,9 +127,14 @@ export class ModifiedFilesSidebar extends Component {
     super.unload();
   }
 
-  updateEntries(entries: SessionDiffEntry[], availability: ModifiedFilesSidebarAvailability = 'ready'): void {
+  updateEntries(
+    entries: SessionDiffEntry[],
+    availability: ModifiedFilesSidebarAvailability = 'ready',
+    linkedNote: { path?: string; exists: boolean } = { exists: false },
+  ): void {
     this.entries = entries.map((entry) => ({ ...entry }));
     this.availability = availability;
+    this.linkedNote = { ...linkedNote };
     this.updateSummary();
     this.render();
   }
@@ -212,6 +218,7 @@ export class ModifiedFilesSidebar extends Component {
     }
 
     this.listEl.empty();
+    this.renderLinkedNoteState();
     if (this.entries.length === 0) {
       this.listEl.createDiv({
         cls: `opencodian-modified-files-sidebar-empty is-${this.availability}`,
@@ -255,7 +262,59 @@ export class ModifiedFilesSidebar extends Component {
         cls: `opencodian-modified-files-sidebar-status status-${entry.status ?? 'modified'}`,
         text: this.getStatusLabel(entry.status),
       });
+      if (this.linkedNote.path === relativePath && this.linkedNote.exists) {
+        metaEl.createSpan({
+          cls: 'opencodian-modified-files-linked-note-badge',
+          text: t('modifiedFiles.linkedNoteDraft'),
+        });
+      }
     }
+  }
+
+  private renderLinkedNoteState(): void {
+    if (!this.linkedNote.path || !this.listEl) {
+      return;
+    }
+    this.renderLinkedNoteStateInto(this.listEl);
+  }
+
+  private renderLinkedNoteStateInto(parentEl: HTMLElement): void {
+    if (!this.linkedNote.path) {
+      return;
+    }
+    const state = this.linkedNote.exists ? 'explicit-draft' : 'locked';
+    const rowEl = parentEl.createDiv({
+      cls: 'opencodian-modified-files-linked-note',
+      attr: { 'data-linked-note-state': state },
+    });
+    if (this.linkedNote.exists) {
+      const pathButton = rowEl.createEl('button', {
+        cls: 'opencodian-modified-files-sidebar-path',
+        text: this.linkedNote.path,
+        attr: { type: 'button' },
+      });
+      pathButton.addEventListener('click', () => {
+        void this.app.workspace.openLinkText(this.linkedNote.path!, '', false);
+      });
+    } else {
+      rowEl.createSpan({
+        cls: 'opencodian-modified-files-sidebar-path is-unresolved',
+        text: this.linkedNote.path,
+      });
+    }
+    rowEl.createSpan({
+      cls: 'opencodian-modified-files-linked-note-badge',
+      text: this.linkedNote.exists
+        ? t('modifiedFiles.linkedNoteDraft')
+        : t('modifiedFiles.linkedNoteLocked'),
+    });
+  }
+
+  private shouldRenderStandaloneLinkedNote(entries: EditRevertSidebarModel['entries']): boolean {
+    return Boolean(
+      this.linkedNote.path
+      && !entries.some((entry) => entry.path === this.linkedNote.path),
+    );
   }
 
   private getStatusLabel(status: SessionDiffEntry['status']): string {
@@ -281,6 +340,7 @@ export class ModifiedFilesSidebar extends Component {
     if (!this.hasRevertEntries() || !model) {
       this.revertSectionEl?.remove();
       this.revertSectionEl = null;
+      this.containerEl.querySelector('.opencodian-modified-files-linked-note-section')?.remove();
       this.render();
       this.updateSummary();
       return;
@@ -332,6 +392,12 @@ export class ModifiedFilesSidebar extends Component {
         text: entry.path,
       });
       pathEl.title = entry.path;
+      if (this.linkedNote.path === entry.path && this.linkedNote.exists) {
+        rowEl.createSpan({
+          cls: 'opencodian-modified-files-linked-note-badge',
+          text: t('modifiedFiles.linkedNoteDraft'),
+        });
+      }
       pathEl.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -383,6 +449,29 @@ export class ModifiedFilesSidebar extends Component {
         });
       }
     }
+
+    this.renderStandaloneLinkedNoteSection(model.entries);
+  }
+
+  private renderStandaloneLinkedNoteSection(entries: EditRevertSidebarModel['entries']): void {
+    this.containerEl.querySelector('.opencodian-modified-files-linked-note-section')?.remove();
+    if (!this.shouldRenderStandaloneLinkedNote(entries)) {
+      return;
+    }
+
+    const bindingSectionEl = this.containerEl.createDiv({
+      cls: 'opencodian-modified-files-linked-note-section',
+    });
+    this.revertSectionEl?.after(bindingSectionEl);
+    bindingSectionEl.createDiv({
+      cls: 'opencodian-modified-files-linked-note-section-title',
+      text: t('modifiedFiles.linkedNoteSection'),
+    });
+    this.renderLinkedNoteStateInto(bindingSectionEl);
+    bindingSectionEl.createDiv({
+      cls: 'opencodian-modified-files-linked-note-section-hint',
+      text: t('modifiedFiles.linkedNoteExcludedHint'),
+    });
   }
 
   private revertBusy = false;

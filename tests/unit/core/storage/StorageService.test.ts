@@ -53,6 +53,7 @@ describe('StorageService initialization', () => {
   });
 });
 
+// eslint-disable-next-line max-lines-per-function -- persistence variants share one stateful adapter fixture.
 describe('StorageService conversation persistence - saveConversation', () => {
   it('should save conversation metadata', async () => {
       const conversation = {
@@ -119,6 +120,22 @@ describe('StorageService conversation persistence - saveConversation', () => {
         '.opencodian/session-metas/conv-meta.json',
         expect.stringContaining('"backendSessionId": "session-meta"'),
       );
+  });
+
+  it('normalizes and persists a linked note in both the session record and metadata sidecar', async () => {
+      await storage.saveConversation({
+        id: 'conv-linked-note',
+        title: 'Linked note',
+        createdAt: 1,
+        updatedAt: 2,
+        linkedNotePath: '  drafts//plan.md  ',
+        messages: [],
+      } as never);
+
+      const session = JSON.parse(mockAdapter.write.mock.calls[0][1]);
+      const sidecar = JSON.parse(mockAdapter.write.mock.calls[1][1]);
+      expect(session.linkedNotePath).toBe('drafts/plan.md');
+      expect(sidecar.data.linkedNotePath).toBe('drafts/plan.md');
   });
 
   it('persists backend session identity for non-OpenCode conversations', async () => {
@@ -462,6 +479,46 @@ describe('StorageService conversation persistence - loadFullConversation', () =>
       expect(result?.externalContextPaths).toEqual(['notes/alpha.md', 'notes/beta.md']);
   });
 
+  it('normalizes a persisted linked note and treats empty legacy values as unbound', async () => {
+      mockAdapter.read.mockResolvedValueOnce(JSON.stringify({
+        id: 'conv-linked-note',
+        title: 'Linked note',
+        createdAt: 1,
+        updatedAt: 2,
+        linkedNotePath: ' drafts//plan.md ',
+        messages: [],
+      }));
+
+      const normalized = await storage.loadFullConversation('conv-linked-note');
+      expect(normalized?.linkedNotePath).toBe('drafts/plan.md');
+
+      mockAdapter.read.mockResolvedValueOnce(JSON.stringify({
+        id: 'conv-empty-linked-note',
+        title: 'Empty linked note',
+        createdAt: 1,
+        updatedAt: 2,
+        linkedNotePath: '  ',
+        messages: [],
+      }));
+      const legacy = await storage.loadFullConversation('conv-empty-linked-note');
+      expect(legacy?.linkedNotePath).toBeUndefined();
+  });
+
+  it('rejects non-Markdown, absolute, and parent-traversing linked note paths', async () => {
+      for (const linkedNotePath of ['/tmp/note.md', 'C:\\tmp\\note.md', '../outside.md', 'drafts/plan.canvas']) {
+        mockAdapter.read.mockResolvedValueOnce(JSON.stringify({
+          id: `conv-invalid-${linkedNotePath}`,
+          title: 'Invalid linked note',
+          createdAt: 1,
+          updatedAt: 2,
+          linkedNotePath,
+          messages: [],
+        }));
+        const loaded = await storage.loadFullConversation(`conv-invalid-${linkedNotePath}`);
+        expect(loaded?.linkedNotePath).toBeUndefined();
+      }
+  });
+
   it('restores persisted background task lifecycle metadata after reload', async () => {
       mockAdapter.read.mockResolvedValue(JSON.stringify({
         id: 'conv-bg-meta',
@@ -659,6 +716,31 @@ describe('StorageService conversation indexes', () => {
         metadataHitCount: 1,
         fullSessionFallbackCount: 0,
       }));
+    });
+
+    it('normalizes a linked note from a metadata sidecar without loading full messages', async () => {
+      mockAdapter.list.mockImplementation(async (dirPath: string) => ({
+        files: dirPath === '.opencodian/sessions'
+          ? ['.opencodian/sessions/conv-linked-note.json']
+          : ['.opencodian/session-metas/conv-linked-note.json'],
+        folders: [],
+      }));
+      mockAdapter.read.mockResolvedValue(JSON.stringify({
+        schemaVersion: 1,
+        updatedAt: 1,
+        data: {
+          id: 'conv-linked-note',
+          title: 'Linked note',
+          createdAt: 1,
+          updatedAt: 2,
+          messageCount: 0,
+          linkedNotePath: ' drafts//plan.md ',
+        },
+      }));
+
+      await expect(storage.listConversations()).resolves.toEqual([
+        expect.objectContaining({ linkedNotePath: 'drafts/plan.md' }),
+      ]);
     });
   });
 

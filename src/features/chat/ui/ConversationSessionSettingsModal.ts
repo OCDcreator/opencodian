@@ -38,6 +38,11 @@ interface ConversationSessionSettingsModalOptions {
   conversationTitle: string;
   defaults: ConversationSessionSettingsModalDefaults;
   initialOverrides?: ConversationSessionSettings;
+  linkedNote?: {
+    markdownPaths: readonly string[];
+    currentPath?: string;
+    exists: boolean;
+  };
   /** Whether to show the title-generation global summary row. Defaults to true. */
   showTitleSummary?: boolean;
   /** Whether to show the compaction summary row. Defaults to false. */
@@ -48,6 +53,7 @@ interface ConversationSessionSettingsModalOptions {
   showCodexControls?: boolean;
   onSave(
     overrides: ConversationSessionSettings | undefined,
+    linkedNotePath: string | null,
   ): Promise<void> | void;
   onPreview?(
     overrides: ConversationSessionSettings | undefined,
@@ -93,6 +99,7 @@ export class ConversationSessionSettingsModal extends Modal {
   private codexNetworkAccessEnabledSelectEl: HTMLSelectElement | null = null;
   private codexWebSearchModeSelectEl: HTMLSelectElement | null = null;
   private codexApprovalPolicySelectEl: HTMLSelectElement | null = null;
+  private linkedNotePathSelectEl: HTMLSelectElement | null = null;
   private codexGoalReadbackEl: HTMLElement | null = null;
   private codexGoalEmptyEl: HTMLElement | null = null;
   private codexGoalClearBtnEl: HTMLButtonElement | null = null;
@@ -143,6 +150,8 @@ export class ConversationSessionSettingsModal extends Modal {
     });
 
     this.createCodexSection(bodyEl);
+
+    this.createLinkedNoteSection(bodyEl);
 
     this.createSharingSection(bodyEl);
     this.createExperimentalActionsSection(bodyEl);
@@ -200,6 +209,7 @@ export class ConversationSessionSettingsModal extends Modal {
     this.codexNetworkAccessEnabledSelectEl = null;
     this.codexWebSearchModeSelectEl = null;
     this.codexApprovalPolicySelectEl = null;
+    this.linkedNotePathSelectEl = null;
     this.codexGoalReadbackEl = null;
     this.codexGoalEmptyEl = null;
     this.errorEl = null;
@@ -264,6 +274,78 @@ export class ConversationSessionSettingsModal extends Modal {
       text: options.description,
     });
     return sectionEl;
+  }
+
+  private createLinkedNoteSection(bodyEl: HTMLElement): void {
+    const sectionEl = this.createSection(bodyEl, {
+      section: 'linked-note',
+      title: t('chat.sessionSettings.modal.linkedNote.title'),
+      description: t('chat.sessionSettings.modal.linkedNote.description'),
+    });
+    const linkedNote = this.options.linkedNote ?? {
+      markdownPaths: [] as readonly string[],
+      exists: false,
+    };
+    const state = !linkedNote.currentPath
+      ? 'unbound'
+      : linkedNote.exists
+        ? 'explicit-draft'
+        : 'locked';
+    const fieldEl = sectionEl.createDiv({
+      cls: 'opencodian-session-settings-field opencodian-session-settings-linked-note-field',
+      attr: { 'data-linked-note-state': state },
+    });
+    const infoEl = fieldEl.createDiv({ cls: 'opencodian-session-settings-field-info' });
+    infoEl.createEl('label', {
+      cls: 'opencodian-session-settings-field-label',
+      text: t('chat.sessionSettings.modal.linkedNote.label'),
+      attr: { for: 'linked-note-path' },
+    });
+    infoEl.createDiv({
+      cls: 'opencodian-session-settings-field-description',
+      text: state === 'locked'
+        ? t('chat.sessionSettings.modal.linkedNote.lockedDescription')
+        : t('chat.sessionSettings.modal.linkedNote.fieldDescription'),
+    });
+
+    const controlEl = fieldEl.createDiv({ cls: 'opencodian-session-settings-field-control' });
+    const selectEl = controlEl.createEl('select', {
+      cls: 'opencodian-session-settings-dropdown opencodian-session-settings-linked-note-select',
+      attr: {
+        id: 'linked-note-path',
+        'data-linked-note-path': 'true',
+        'aria-label': t('chat.sessionSettings.modal.linkedNote.label'),
+      },
+    });
+    selectEl.createEl('option', {
+      text: t('chat.sessionSettings.modal.linkedNote.unbound'),
+      attr: { value: '' },
+    });
+    if (linkedNote.currentPath && !linkedNote.exists) {
+      selectEl.createEl('option', {
+        text: `${t('chat.sessionSettings.modal.linkedNote.locked')} · ${linkedNote.currentPath}`,
+        attr: { value: linkedNote.currentPath },
+      });
+    }
+    for (const path of linkedNote.markdownPaths) {
+      if (path !== linkedNote.currentPath || linkedNote.exists) {
+        selectEl.createEl('option', { text: path, attr: { value: path } });
+      }
+    }
+    selectEl.value = linkedNote.currentPath ?? '';
+    this.linkedNotePathSelectEl = this.enhanceDropdown(selectEl);
+
+    fieldEl.createDiv({
+      cls: 'opencodian-session-settings-linked-note-status',
+      attr: { 'data-linked-note-status': state },
+      text: t('chat.sessionSettings.modal.linkedNote.status', {
+        state: state === 'explicit-draft'
+          ? t('chat.sessionSettings.modal.linkedNote.explicitDraft')
+          : state === 'locked'
+            ? t('chat.sessionSettings.modal.linkedNote.locked')
+            : t('chat.sessionSettings.modal.linkedNote.unbound'),
+      }),
+    });
   }
 
   private createNumberField(containerEl: HTMLElement, options: {
@@ -1442,7 +1524,7 @@ export class ConversationSessionSettingsModal extends Modal {
     this.setError('');
 
     try {
-      await this.options.onSave(this.buildOverrides());
+      await this.options.onSave(this.buildOverrides(), this.readLinkedNotePath());
       this.didSave = true;
       this.close();
     } catch (error) {
@@ -1491,6 +1573,11 @@ export class ConversationSessionSettingsModal extends Modal {
     return Object.values(overrides).every((value) => value === null)
       ? undefined
       : overrides;
+  }
+
+  private readLinkedNotePath(): string | null {
+    const value = this.linkedNotePathSelectEl?.value.trim() ?? '';
+    return value.length > 0 ? value : null;
   }
 
   private buildCodexOverrides(overrides: ConversationSessionSettings): void {

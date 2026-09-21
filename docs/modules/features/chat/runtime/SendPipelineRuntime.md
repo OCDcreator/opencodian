@@ -1,4 +1,5 @@
 # SendPipelineRuntime
+> 2026-09-21 (advantage-parity R-F2)：R-B3 `onTurnSnapshotBegin` 将 `Conversation.linkedNotePath` 合入既有 file/current-note context paths，并以 `Set` 去重；不改变 EditRevertService capture 或回退语义。
 > 2026-09-21 (advantage-parity R-F1)：sendQueuedFollowUp 消费后即时通知队列变化（后台 tab 也先出队再决策）。
 > 2026-09-18 (R-B3): R-B3: `sendMessage()` opens the edit-revert capture round right before the stream router starts (`onTurnSnapshotBegin` with conversation id, backend, session id, user text and file context paths) and closes it from the terminal `finally` path (`onTurnSnapshotEnd`), covering completed, errored and cancelled turns. Fire-and-forget; streaming behavior is unchanged.
 

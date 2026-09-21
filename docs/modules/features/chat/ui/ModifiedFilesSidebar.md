@@ -1,4 +1,5 @@
 # ModifiedFilesSidebar
+> 2026-09-21 (advantage-parity R-F2)：绑定笔记是独立、只读的 draft/locked 行；仅真实 session diff 或 EditRevert path 命中时才附「绑定草稿」标记。回退区存在其他文件时，未命中的绑定笔记移到独立区并明示“不计入本轮修改或回退”，不污染修改计数。存在的路径可打开，缺失路径不可点击。
 > 2026-09-18 (R-B3): R-B3: `updateRevertState()` adds the backend-neutral revert section. When the latest round has entries it replaces the read-only session-diff list: per-entry Revert buttons (disabled while the round is open), an honest "未纳入回退" label instead of a button for oversize / pre-image-less files, an Undo-revert button for reverted entries, a Revert-all header action once the turn settles, degraded/round-open hints, and a click-to-open path. The sidebar remains Git-free and patch-free.
 
 > **源码**: `src/features/chat/ui/ModifiedFilesSidebar.ts`

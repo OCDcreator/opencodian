@@ -48,7 +48,10 @@ export interface ConversationSessionSettingsCoordinatorHost {
   getCurrentConversation(): Conversation | null;
   getSessionSettingsDefaults(): ResolvedConversationSessionSettings;
   getChatContainerEl(): HTMLElement | null;
+  listMarkdownNotePaths?(): readonly string[];
+  noteExists?(path: string): boolean;
   saveConversation(conversation: Conversation): Promise<void>;
+  onLinkedNotePathChanged?(conversation: Conversation): void;
   showNotice(message: string): void;
   shareSession?(sessionId: string): Promise<ShareInspectionEntry>;
   unshareSession?(sessionId: string): Promise<ShareInspectionEntry>;
@@ -96,6 +99,7 @@ export class ConversationSessionSettingsCoordinator {
     const sessionId = getConversationBackendSessionId(conversation);
     const shareUrl = showSharing && sessionId ? await this.getCurrentShareUrl(conversation, sessionId) : undefined;
     const shareMode = showSharing ? await this.getProjectShareMode() : undefined;
+    const linkedNotePath = conversation.linkedNotePath;
 
     const modal = new ConversationSessionSettingsModal(this.host.app, {
       conversationTitle: conversation.title || t('chat.history.untitled'),
@@ -114,14 +118,19 @@ export class ConversationSessionSettingsCoordinator {
       } : {}),
       },
       initialOverrides: conversation.sessionSettings,
+      linkedNote: {
+        markdownPaths: this.host.listMarkdownNotePaths?.() ?? [],
+        currentPath: linkedNotePath,
+        exists: linkedNotePath ? this.host.noteExists?.(linkedNotePath) === true : false,
+      },
       showTitleSummary: this.shouldShowTitleSummary(conversation),
       showCompactionSummary: showCompaction,
       showQuestionsSummary: this.shouldShowQuestionsSummary(conversation),
       showCodexControls: isCodex,
       shareUrl,
       shareMode,
-      onSave: async (overrides) => {
-        await this.saveConversationOverrides(conversation, overrides);
+      onSave: async (overrides, nextLinkedNotePath) => {
+        await this.saveConversationOverrides(conversation, overrides, nextLinkedNotePath);
       },
       onPreview: (overrides) => {
         this.previewConversationOverrides(conversation, overrides);
@@ -364,14 +373,19 @@ export class ConversationSessionSettingsCoordinator {
   async saveConversationOverrides(
     conversation: Conversation,
     overrides?: Partial<ConversationSessionSettings> | null,
+    linkedNotePath?: string | null,
   ): Promise<void> {
     const normalizedOverrides = normalizeConversationSessionSettings(overrides);
     conversation.sessionSettings = normalizedOverrides
       && Object.values(normalizedOverrides).every((value) => value === null)
       ? undefined
       : normalizedOverrides;
+    if (linkedNotePath !== undefined) {
+      conversation.linkedNotePath = linkedNotePath?.trim() || undefined;
+    }
     conversation.updatedAt = Date.now();
     await this.host.saveConversation(conversation);
+    this.host.onLinkedNotePathChanged?.(conversation);
 
     const isCurrentConversation = this.host.getCurrentConversation()?.id === conversation.id;
 

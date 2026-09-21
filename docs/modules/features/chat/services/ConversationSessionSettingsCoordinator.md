@@ -1,4 +1,5 @@
 # ConversationSessionSettingsCoordinator
+> 2026-09-21 (advantage-parity R-F2)：modal host 提供 Markdown note catalog/存在性；save 同时原子提交 session overrides 和可显式解绑的 `linkedNotePath`。plugin composition 负责跨 view 的 rename follow；删除不清除而由 UI 如实显示 locked。
 
 > **源码**: `src/features/chat/services/ConversationSessionSettingsCoordinator.ts`
 > **状态**: [REVIEW]

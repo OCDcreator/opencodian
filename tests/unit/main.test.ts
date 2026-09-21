@@ -126,6 +126,32 @@ describe('OpenCodianPlugin.getConversationById', () => {
 
 });
 
+describe('OpenCodianPlugin linked note rename lifecycle', () => {
+  it('updates and persists every matching binding without an OpenCodianView onOpen listener', async () => {
+    const plugin = new OpenCodianPlugin() as unknown as OpenCodianPlugin & {
+      conversations: Conversation[];
+      storage: Pick<StorageService, 'saveConversation'>;
+      followConversationLinkedNoteRename(oldPath: string, newPath: string): Promise<void>;
+      getOpenCodianView: jest.Mock;
+    };
+    const matchingCurrent = createConversation('conv-1', { linkedNotePath: 'drafts/old.md' });
+    const matchingBackground = createConversation('conv-2', { linkedNotePath: 'drafts/old.md' });
+    const unrelated = createConversation('conv-3', { linkedNotePath: 'drafts/other.md' });
+    const refreshLinkedNoteBindingState = jest.fn();
+    plugin.conversations = [matchingCurrent, matchingBackground, unrelated];
+    plugin.storage = { saveConversation: jest.fn().mockResolvedValue(undefined) } as Pick<StorageService, 'saveConversation'>;
+    plugin.getOpenCodianView = jest.fn().mockReturnValue({ refreshLinkedNoteBindingState });
+
+    await plugin.followConversationLinkedNoteRename(' drafts//old.md ', ' drafts//renamed.md ');
+
+    expect(matchingCurrent.linkedNotePath).toBe('drafts/renamed.md');
+    expect(matchingBackground.linkedNotePath).toBe('drafts/renamed.md');
+    expect(unrelated.linkedNotePath).toBe('drafts/other.md');
+    expect(plugin.storage.saveConversation).toHaveBeenCalledTimes(2);
+    expect(refreshLinkedNoteBindingState).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('OpenCodianPlugin unload diagnostics', () => {
   it('main.ts onunload delegates trace disposal to DiagnosticsRuntimeCoordinator (no inline per-service disposal)', () => {
     // After Phase 3 Task 11, main.ts no longer disposes trace services inline;
@@ -606,7 +632,10 @@ describe('OpenCodianPlugin backend bootstrap', () => {
     fs.writeFileSync(claudePath, '#!/bin/sh\n');
     const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
       app: {
-        vault: { adapter: { basePath: string } };
+        vault: {
+          adapter: { basePath: string };
+          on: jest.Mock;
+        };
         workspace: { getLeavesOfType: jest.Mock<unknown[], [string]> };
       };
       settings: typeof DEFAULT_SETTINGS;
@@ -616,7 +645,10 @@ describe('OpenCodianPlugin backend bootstrap', () => {
     };
 
     plugin.app = {
-      vault: { adapter: { basePath: vaultPath } },
+      vault: {
+        adapter: { basePath: vaultPath },
+        on: jest.fn().mockReturnValue({}),
+      },
       workspace: { getLeavesOfType: jest.fn().mockReturnValue([]) },
     };
     plugin.settings = {
@@ -673,6 +705,8 @@ describe('OpenCodianPlugin backend bootstrap', () => {
     expect(plugin.claudeCodePermissionBridge).toBeDefined();
     expect(plugin.claudeCodePermissionHostContext).toBeDefined();
     expect(typeof plugin.claudeCodePermissionHostContext.getActiveTabId).toBe('function');
+    expect(plugin.app.vault.on).toHaveBeenCalledTimes(1);
+    expect(plugin.app.vault.on).toHaveBeenCalledWith('rename', expect.any(Function));
   });
 });
 

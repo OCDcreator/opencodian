@@ -732,7 +732,10 @@ export class OpenCodianView extends ItemView {
         webSearchMode: this.plugin.settings.backendSettings.codex.webSearchMode,
       }),
       getChatContainerEl: () => this.chatContainerEl,
+      listMarkdownNotePaths: () => this.app.vault.getMarkdownFiles().map((file) => file.path),
+      noteExists: (path) => this.app.vault.getAbstractFileByPath(path) !== null,
       saveConversation: (conversation) => this.plugin.saveConversation(conversation),
+      onLinkedNotePathChanged: () => this.refreshModifiedFilesSidebar(),
       showNotice: (message) => {
         new Notice(message);
       },
@@ -2954,6 +2957,12 @@ export class OpenCodianView extends ItemView {
       (id) => this.plugin.openCodeService.getCachedSessionDiffEntries(id),
       sessionId && hasCapability(this.caps, AgentCapability.Context) ? 'ready' : 'unavailable',
       conversation?.messages ?? [],
+      {
+        path: conversation?.linkedNotePath,
+        exists: conversation?.linkedNotePath
+          ? this.app.vault.getAbstractFileByPath(conversation.linkedNotePath) !== null
+          : false,
+      },
     );
 
     // R-B3: backend-neutral revert state (works for every backend, including
@@ -3008,6 +3017,11 @@ export class OpenCodianView extends ItemView {
         ).then(() => undefined),
       },
     );
+  }
+
+  /** Plugin-owned vault rename handling uses this narrow refresh seam. */
+  refreshLinkedNoteBindingState(): void {
+    this.refreshModifiedFilesSidebar();
   }
 
   private restoreTurnStateFromActivePane(): void {

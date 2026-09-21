@@ -8355,6 +8355,52 @@ button.opencodian-queued-followup-steer:hover {
   text-transform: uppercase;
 }
 
+.opencodian-modified-files-linked-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px 8px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-modified-files-linked-note[data-linked-note-state='locked'] {
+  color: color-mix(in srgb, var(--text-error) 62%, var(--text-normal));
+}
+
+.opencodian-modified-files-linked-note[data-linked-note-state='locked']
+  .opencodian-modified-files-linked-note-badge {
+  color: color-mix(in srgb, var(--text-error) 62%, var(--text-normal));
+}
+
+.opencodian-modified-files-linked-note-badge {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-modified-files-linked-note-section {
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.opencodian-modified-files-linked-note-section-title {
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+}
+
+.opencodian-modified-files-linked-note-section-hint {
+  padding: 0 8px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.4;
+}
+
 .opencodian-modified-files-sidebar-status.status-added {
   background: color-mix(in srgb, var(--text-success) 18%, transparent);
   color: var(--text-success);
@@ -22744,6 +22790,27 @@ button.opencodian-queued-followup-steer:hover {
 
 .opencodian-session-settings-field + .opencodian-session-settings-field {
   border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 70%, transparent);
+}
+
+.opencodian-session-settings-linked-note-field[data-linked-note-state='locked'] {
+  border-color: var(--text-warning);
+}
+
+.opencodian-session-settings-linked-note-status {
+  grid-column: 2;
+  justify-self: end;
+  padding: 2px 7px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.4;
+}
+
+.opencodian-session-settings-linked-note-field[data-linked-note-state='locked']
+  .opencodian-session-settings-linked-note-status {
+  color: color-mix(in srgb, var(--text-error) 62%, var(--text-normal));
 }
 
 .opencodian-session-settings-section[data-section="codex"] {

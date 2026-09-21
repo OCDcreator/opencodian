@@ -57,7 +57,44 @@ describe('ConversationSessionSettingsModal', () => {
     saveButton.click();
     await Promise.resolve();
 
-    expect(onSave).toHaveBeenCalledWith(undefined);
+    expect(onSave).toHaveBeenCalledWith(undefined, null);
+  });
+
+  it('lets users choose or explicitly unbind a linked Markdown draft', async () => {
+    const onSave = jest.fn().mockResolvedValue(undefined);
+    const modal = new ConversationSessionSettingsModal({} as never, {
+      conversationTitle: 'Current chat',
+      defaults: { chatFontSizePx: 13 },
+      linkedNote: { markdownPaths: ['drafts/plan.md'], exists: false },
+      onSave,
+    });
+
+    modal.onOpen();
+    const select = modal.contentEl.querySelector<HTMLSelectElement>('[data-linked-note-path="true"]');
+    const save = modal.contentEl.querySelector<HTMLButtonElement>('.opencodian-session-settings-save');
+    if (!select || !save) throw new Error('Expected linked note controls');
+
+    select.value = 'drafts/plan.md';
+    save.click();
+    await Promise.resolve();
+    expect(onSave).toHaveBeenCalledWith(undefined, 'drafts/plan.md');
+  });
+
+  it('retains a missing linked note as locked until the user unbinds it', () => {
+    const modal = new ConversationSessionSettingsModal({} as never, {
+      conversationTitle: 'Current chat',
+      defaults: { chatFontSizePx: 13 },
+      linkedNote: { markdownPaths: [], currentPath: 'missing.md', exists: false },
+      onSave: jest.fn(),
+    });
+
+    modal.onOpen();
+    expect(modal.contentEl.querySelector('[data-linked-note-state="locked"]')).not.toBeNull();
+    expect(modal.contentEl.textContent).toContain('missing.md');
+    expect(modal.contentEl.querySelector('[data-linked-note-status="locked"]')?.textContent)
+      .toBe(t('chat.sessionSettings.modal.linkedNote.status', {
+        state: t('chat.sessionSettings.modal.linkedNote.locked'),
+      }));
   });
 
   it('previews chat font size changes before save and restores them on close', () => {

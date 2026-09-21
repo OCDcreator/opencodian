@@ -711,6 +711,8 @@ export interface ConversationMeta {
   backendSessionId?: string;
   backendAgentId?: string;
   backend?: AgentBackendKind;
+  /** Vault-relative Markdown note explicitly bound to this conversation. */
+  linkedNotePath?: string;
 }
 
 export interface BackgroundTaskActiveAnchorMetadata {
@@ -739,6 +741,8 @@ export interface Conversation {
   messages: ChatMessage[];
   currentNote?: string;
   externalContextPaths?: string[];
+  /** Vault-relative Markdown note explicitly bound to this conversation. */
+  linkedNotePath?: string;
   sessionSettings?: ConversationSessionSettings;
   /** Last verified backend context snapshot, retained for a useful reload state. */
   lastContextUsage?: ContextUsageSnapshot;

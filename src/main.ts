@@ -87,6 +87,7 @@ import { OpenCodianStartupCoordinator } from './core/runtime/OpenCodianStartupCo
 import { PluginRuntimeCoordinator } from './app/runtime/PluginRuntimeCoordinator';
 import { StorageService } from './core/storage';
 import { ConversationFullMessageCache } from './core/storage/ConversationFullMessageCache';
+import { normalizeConversationLinkedNotePath } from './core/storage/ConversationMetadataCache';
 import { EditRevertService } from './core/storage/EditRevertService';
 import {
   ConversationMarkdownExportService,
@@ -707,6 +708,14 @@ export default class OpenCodianPlugin extends Plugin {
     });
 
     await this.startupCoordinator.measureStartupStep('loadConversations', () => this.loadConversations());
+    // R-F2: this belongs to the plugin lifecycle, not individual chat views.
+    // Conversations are preloaded above, so the handler can update every
+    // matching binding even when no OpenCodianView is currently open.
+    this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
+      if (file instanceof TFile) {
+        void this.followConversationLinkedNoteRename(oldPath, file.path);
+      }
+    }));
 
     this.inlineEditHost = createInlineEditPluginHost({
       getVaultPath: () => getVaultBasePath(this.app) ?? '',
@@ -2373,6 +2382,7 @@ export default class OpenCodianPlugin extends Plugin {
           openCodeSessionId: meta.openCodeSessionId ?? meta.id,
           backendSessionId: meta.backendSessionId ?? meta.openCodeSessionId ?? meta.id,
           backendAgentId: meta.backendAgentId,
+          linkedNotePath: meta.linkedNotePath,
           messages: [],
         })),
         { detail: () => `${metas.length} conversations` },
@@ -2384,6 +2394,28 @@ export default class OpenCodianPlugin extends Plugin {
       await this.conversationsLoadPromise;
     } finally {
       this.conversationsLoadPromise = null;
+    }
+  }
+
+  /** Keep every explicit conversation-to-note binding aligned with a vault rename. */
+  private async followConversationLinkedNoteRename(oldPath: string, newPath: string): Promise<void> {
+    const previousPath = normalizeConversationLinkedNotePath(oldPath);
+    const nextPath = normalizeConversationLinkedNotePath(newPath);
+    if (!previousPath || !nextPath || previousPath === nextPath) {
+      return;
+    }
+
+    const affectedConversations = this.conversations.filter(
+      (conversation) => conversation.linkedNotePath === previousPath,
+    );
+    for (const conversation of affectedConversations) {
+      conversation.linkedNotePath = nextPath;
+      conversation.updatedAt = Date.now();
+      await this.saveConversation(conversation);
+    }
+
+    if (affectedConversations.length > 0) {
+      this.getOpenCodianView()?.refreshLinkedNoteBindingState();
     }
   }
 
@@ -2453,6 +2485,7 @@ export default class OpenCodianPlugin extends Plugin {
       messages: initial?.messages ? JSON.parse(JSON.stringify(initial.messages)) as Conversation['messages'] : [],
       currentNote: initial?.currentNote,
       externalContextPaths: initial?.externalContextPaths ? [...initial.externalContextPaths] : undefined,
+      linkedNotePath: normalizeConversationLinkedNotePath(initial?.linkedNotePath),
       sessionSettings: initial?.sessionSettings ? JSON.parse(JSON.stringify(initial.sessionSettings)) as Conversation['sessionSettings'] : undefined,
       lastResponseAt: initial?.lastResponseAt,
       titleGenerationStatus: initial?.titleGenerationStatus,
