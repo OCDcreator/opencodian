@@ -61,7 +61,7 @@
 | E | R-E6 | 选区 / 全库 token 计数命令 | Copilot | P2 | DONE |
 | F | R-F1 | Turn steering + 流式中消息排队 | Claudian | P1 | DONE |
 | F | R-F2 | 会话-笔记绑定草稿（linked content） | Claudian | P2 | DONE |
-| F | R-F3 | 回退预览 + 冲突检测 UI | Claudian | P2 | TODO |
+| F | R-F3 | 回退预览 + 冲突检测 UI | Claudian | P2 | DONE |
 | F | R-F4 | 暖进程池（聊天侧预热） | Claudian | P2 | TODO |
 | F | R-F5 | 双栏会话管理器 | Claudian | P3 | TODO |
 | F | R-F6 | Vim 风格聊天导航键 | Claudian | P3 | TODO |
@@ -258,6 +258,13 @@ Claudian 的 linked content：会话可绑定一篇笔记作为产出草稿（au
 ### R-F3 回退预览 + 冲突检测 UI（P2）
 
 R-B3 回退前显示预览：将恢复的文件清单 + 每文件 before/after 行数统计；生成后文件内容若已被用户后续修改（快照后又有新变更）→ 冲突标记并要求二选一。纯 UI 层，回退语义不动。
+
+**落地证据（2026-09-21，提交 `d2f255e8`，子代理实现 + 编排者独立校验）**：
+
+- **实现**：R-B3 round 结束时（turn `endTurnCapture` 与 plugin batch `endBatchCapture`）冻结 content-addressed `postImage` 基线；只读 `getRevertPreview` 返回单文件/全部目标的 `beforeLines → afterLines` 与 current-vs-post conflict。空文本=0 行、末尾换行不多算空行；created=0→post、deleted=pre→0、moved 使用现路径；二进制/超限/基线丢失诚实 `不可计算 + baseline-unavailable`。post blob 纳入 refcount、round bytes、retention stat 与 GC 保护。`EditRevertPreviewModal` 在原 `revertFile/revertAll` 前强制预览：clean=取消/确认回退；conflict=取消/仍然回退，并同时以边框+图标+文本标记；preview/read failure、空目标、round-open 均 fail closed 无确认。确认后仍调用原 `EditRevertVaultWriteback`，写语义零改动。
+- **测试**：聚焦 7 suites / **110 tests**（行数、turn/batch post baseline、modified/created/deleted/超限/current-read-failure conflict、单/全部过滤、post blob retention/GC、新 modal clean/conflict/failure/round-open、双击单 modal、取消零写）+ typecheck + ESLint 0/0 + module-docs 756/756 + graphify freshness + owner manifest + build。
+- **实机（Test Vault，BUILD_ID `zcode-advantage-parity.202609211606`）**：真实 batch 捕获 `before\n`→`after one\nafter two\n`，clean 预览显示 `1 行 → 2 行` 且取消后文件未写；随后用户再改为 `user changed\nthird\n`，conflict 预览显示「捕获后已修改」+「仍然回退」，确认后文件经原 writeback 恢复为 `before\n`。截图 `.visual-evidence/rf3/rf3-preview-clean.png`、`.visual-evidence/rf3/rf3-preview-conflict.png`；modal 560×192.6/214.6，row 526×34.9/56.9，水平 overflow=0，conflict 文案 **5.74:1**、冲突确认按钮 **5.57:1**。独立视觉代理两态 PASS；测试文件已清理。
+- **偏差登记**：无。R-F3 增加的 post baseline 只服务预览/冲突；回退/恢复实际写入语义、唯一 vault write path 与已有 restore 能力未改。
 
 ### R-F4 暖进程池（P2）
 

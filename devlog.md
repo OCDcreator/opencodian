@@ -11,6 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-21 R-F3 回退预览 + 冲突检测：post baseline、行数清单与二选一握手
+
+**触发**：advantage-parity 批次 F P2 条目。R-B3 已有可回退快照，但点击立即写回；需求要求先看到文件清单/行数，并在 agent 生成后又被用户修改时明确二选一。
+
+**改动**：round 结束冻结 content-addressed post-image baseline；`getRevertPreview` 只读比较 current 与 post hash，返回 before→after 行数及冲突，created/deleted/moved/超限/二进制均诚实建模，post blob 完整进入 retention/GC。Modified Files 单文件/全部回退变成 preview-first；新 `EditRevertPreviewModal` clean 态「取消 / 确认回退」，conflict 态用边框+图标+文字并给「取消 / 仍然回退」，失败/空/round-open 无确认。确认才放行原 writeback，写语义零改动。
+
+**测试与实机**：实现提交 `d2f255e8`；编排者独立复跑 7 suites / 110 tests、typecheck、ESLint 0/0、module-docs 756/756、graphify、owner manifest、build。Test Vault BUILD_ID `zcode-advantage-parity.202609211606`；真实 clean 预览取消零写，再次手改触发 conflict，确认后按原 writeback 回退成功。视觉代理 clean/conflict 双态 PASS；冲突文案 5.74:1、确认按钮 5.57:1、无 overflow。证据 `.visual-evidence/rf3/rf3-preview-clean.png`、`rf3-preview-conflict.png`。
+
+---
+
 ## 2026-09-21 R-F2 会话-笔记绑定草稿：显式绑定/locked、R-B3 快照与 Modified Files 联动
 
 **触发**：advantage-parity 批次 F 剩余 P2 条目。Claudian 的 linked content 有 auto-draft/explicit-draft/submitting/locked 四态；OpenCodian 要求会话可绑定一篇产出草稿、重命名跟随、进入 R-B3 与 Modified Files，但明确禁止自动写回。
