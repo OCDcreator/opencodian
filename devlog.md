@@ -11,6 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-21 R-F1 流式中排队 + Turn steering：多条 FIFO 队列条、pi 原生 steering 缝、能力如实分流
+
+**触发**：advantage-parity 批次 F 第 2 条（P1）。Claudian 允许 agent 运行中注入新输入（codex/grok/pi 原生）并把流式期间排队合并；OpenCodian 此前流式中只能取消（一槽 follow-up 队列不可见）。
+
+**改动**：一槽升级每 tab 多条 FIFO `queuedFollowUpSends`（取消轮次天然保留+可撤回；turn 结束逐条经既有链发出）；`QueuedFollowUpBarCoordinator` 可见队列条（预览+撤回；⚡ 实底强调钮=可注入 / 明示「轮后发送」/ 空闲 ➤ 立即发送）。`AgentCapability.TurnSteering` + `steerTurn(sessionId, text)`：**pi 原生缝探针实证**——忙时 prompt 无 `streamingBehavior` 被拒且报错指名参数，'steer' 即轮内注入；`PiAdapter.steerTurn` 发 `{type:'prompt', streamingBehavior:'steer'}` 于活动 run 的 RPC 客户端；codex SDK Thread 无轮内 API（类型面核实）→ 不声明、队列文案。事件缝：`notifyFollowUpQueued`（快照免轮询）/`notifyFollowUpQueueChanged`（消费即出队，后台 tab 亦然）。
+
+**测试**：5 新例 + 既有 follow-up 三套件更新 FIFO + capability 清单 + verify 15/15。实机：2 条目队列条（388×121）、撤回正确、无活动 run steer→false、空队列隐藏；视觉门两轮 PASS。**两个视觉坑留档**：①`button:not(.clickable-icon)` 特异性 (0,1,1) 压过单类 (0,1,0)——按钮样式规则要 `button.` 前缀提权；②聊天容器把 `--interactive-accent` 重映射进单色 accent 族（core.css），色相区分不可行——改结构性实底区分（CSS 注释留档）。
+
+---
+
 ## 2026-09-21 R-F9 文件管理器右键附加：file-menu → 共享 picker 条目通道
 
 **触发**：advantage-parity 批次 F 首条（P1 小件高频）。两个对标插件都有资源管理器右键「发给 AI」入口；OpenCodian 此前只能从 composer `+` picker 附加。

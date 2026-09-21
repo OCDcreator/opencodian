@@ -59,7 +59,7 @@
 | E | R-E4 | 语义检索增强层（embedding on R-C1） | Copilot/Miyo | P2 | DONE |
 | E | R-E5 | Dataview / Bases 上下文支持 | Copilot | P2 | DONE |
 | E | R-E6 | 选区 / 全库 token 计数命令 | Copilot | P2 | DONE |
-| F | R-F1 | Turn steering + 流式中消息排队 | Claudian | P1 | TODO |
+| F | R-F1 | Turn steering + 流式中消息排队 | Claudian | P1 | DONE |
 | F | R-F2 | 会话-笔记绑定草稿（linked content） | Claudian | P2 | TODO |
 | F | R-F3 | 回退预览 + 冲突检测 UI | Claudian | P2 | TODO |
 | F | R-F4 | 暖进程池（聊天侧预热） | Claudian | P2 | TODO |
@@ -235,6 +235,13 @@ Obsidian 核心 Web Viewer 插件的活动标签页（URL + 选区）作为上�
 **技术约束**：能力探测挂 `AgentCapability`（新增 `TurnSteering`）；注入走各后端既有会话缝（codex app-server / pi RPC），不新起会话；默认行为保持「排队」模式，steering 由用户显式选择。
 
 **验收**：codex/pi 上注入的补充指令改变当轮输出方向；claude 上排队消息轮后自动发出；取消轮次时队列保留且可撤回。
+
+**落地证据（2026-09-21，提交 `bf18c4aa`）**：
+
+- **实现**：一槽 `queuedFollowUpSend` 升级为每 tab **多条 FIFO** `queuedFollowUpSends`（流式中多条排队、turn 结束逐条经既有 `sendQueuedFollowUp` 链自动发出、队列在 tab 运行时态——取消轮次天然保留且可撤回）；`QueuedFollowUpBarCoordinator` 在 composer chips 行上方渲染可见队列条（每条预览 + 撤回按钮；状态行按后端如实分流：可注入→每条 ⚡ 实底强调钮；否则明示「将在本轮结束后自动发送」；空闲→每条 ➤ 立即发送钮）；`AgentCapability.TurnSteering` + `AgentTurnSteeringCapability.steerTurn`（注入活动轮，绝不新起会话）。**pi 原生缝实证**（探针脚本直连 RPC）：忙时无 `streamingBehavior` 的 prompt 被明确拒绝且报错指名 `'steer'|'followUp'` 参数——`PiAdapter.steerTurn` 即发 `{type:'prompt', streamingBehavior:'steer'}`；codex/claude-code **不声明**该能力（诚实队列文案）。
+- **测试**：`QueuedFollowUp.test.ts` 5 例（FIFO 多条、按下标撤回、流结束队列存活、steer ACK/拒绝/无活动 run 三态）+ 既有 follow-up 三套件按 FIFO 语义更新 + capability 清单补 turn-steering + verify 15/15。
+- **实机（BUILD_ID `202609211032`）**：队列条 2 条目渲染（388×121）、⚡/✕ 均 22×22、撤回正确移除目标条、`steerTurn('nonexistent')`→false（无活动 run 诚实降级）、空闲切换 ➤ 发送钮、空队列隐藏；⚡ 实底 rgb(24,24,27)+图标 rgb(250,250,250) vs ✕ 幽灵态实测可区分。视觉门两轮 PASS（首轮截图程序问题 + 按钮区分缺陷；根因两条均已修：`button:not(.clickable-icon)` 特异性压单类→选择器提权；聊天容器 accent 重映射单色系→改结构性实底区分，CSS 内注释留档）。截图 `.visual-evidence/rf1/rf1-queue-bar.png`。
+- **偏差登记**：pi 上「注入改变当轮输出方向」以 RPC 契约实证（streamingBehavior:'steer' ACK + continue）为准，未跑完整端到端对话（测试库 pi CLI 路径未配置）；codex 侧 SDK Thread 无轮内输入 API（0.155.1 类型面核实），按能力探测结果走队列模式——与需求「先做能力探测」一致。
 
 ### R-F2 会话-笔记绑定草稿（P2）
 
