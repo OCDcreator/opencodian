@@ -191,6 +191,8 @@ interface OpenCodeServiceRuntimeOptions {
   onManagedServerStateChange?: (state: ManagedServerState | null) => void;
   sdkFeatureFlags?: Partial<SdkFeatureFlags>;
   tracePort?: OpenCodeTracePort;
+  /** advantage-parity R-F7: resolved shared+`opencode` domain env for the local server spawn. */
+  getExtraServerSpawnEnv?: () => Record<string, string>;
 }
 
 interface ToolStateData {
@@ -625,6 +627,7 @@ export class OpenCodeService {
       initialManagedServerState: runtimeOptions.initialManagedServerState,
       onManagedServerStateChange: runtimeOptions.onManagedServerStateChange,
       tracePort: runtimeOptions.tracePort,
+      getExtraServerSpawnEnv: runtimeOptions.getExtraServerSpawnEnv,
     });
     return assembly.serviceLifecycle;
   }

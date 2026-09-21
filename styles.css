@@ -6286,6 +6286,68 @@ button.opencodian-queued-followup-steer:hover {
 }
 
 
+/* components/environment-variables-modal.css */
+/* ── Environment variables domains modal (advantage-parity R-F7) ────────── */
+
+.opencodian-env-domains-section-title {
+  font-weight: 600;
+  margin: 10px 0 6px 0;
+}
+
+.opencodian-env-domains-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.opencodian-env-domains-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: var(--radius-s, 4px);
+  background-color: var(--background-secondary);
+}
+
+.opencodian-env-domains-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.opencodian-env-domains-row input:first-child {
+  flex: 0 0 40%;
+  font-family: var(--font-monospace);
+}
+
+.opencodian-env-domains-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.opencodian-env-domains-picker select {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.opencodian-env-domains-picker input {
+  flex: 1;
+  min-width: 0;
+}
+
+.opencodian-env-domains-add {
+  margin-bottom: 4px;
+}
+
+.opencodian-env-domains-empty {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller, 11px);
+  padding: 8px 0;
+}
+
+
 /* components/backend-session-browser.css */
 /* Backend Session Browser Modal */
 

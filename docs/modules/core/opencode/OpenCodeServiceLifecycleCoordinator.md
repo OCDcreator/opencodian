@@ -1,4 +1,5 @@
 # OpenCodeServiceLifecycleCoordinator
+> 2026-09-21 (advantage-parity R-F7)：assembly host 新增 `getExtraServerSpawnEnv` → ServerManager runtimeOptions `getExtraSpawnEnv`。
 
 > 2026-07-29: Lifecycle assembly records server status/error transitions and forwards the optional OpenCode trace port through `ServerManager` to `LocalSidecarLauncher`.
 

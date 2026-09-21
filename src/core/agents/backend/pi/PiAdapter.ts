@@ -24,6 +24,8 @@ export interface PiAdapterOptions {
   servicePath?: string;
   getSettings?: () => PiBackendSettings;
   createClient?: (options: PiLaunchOptions) => PiRpcPort;
+  /** R-F7: extra env for spawned Pi service processes (domain environment). */
+  getExtraEnv?: () => Record<string, string>;
   onUiRequest?: PiUiHandler;
 }
 

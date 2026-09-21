@@ -9,6 +9,8 @@ export interface PiSessionRuntimeOptions {
   servicePath: string;
   getSettings?: () => PiBackendSettings;
   createClient?: (options: PiLaunchOptions) => PiRpcPort;
+  /** R-F7: extra env for spawned Pi service processes (domain environment). */
+  getExtraEnv?: () => Record<string, string>;
   onUiRequest?: PiUiHandler;
 }
 
@@ -34,6 +36,7 @@ export class PiSessionRuntime {
         workingDirectory: this.options.workingDirectory, sessionDirectory: this.options.sessionDirectory,
         sessionPath, servicePath: this.options.servicePath, executablePath: settings?.executablePath ?? '',
         configurationOnly: sessionId === 'configuration',
+        ...(this.options.getExtraEnv ? { getExtraEnv: this.options.getExtraEnv } : {}),
       };
       const client = this.options.createClient?.(launch) ?? new PiRpcClient(launch);
       const abort = new AbortController();

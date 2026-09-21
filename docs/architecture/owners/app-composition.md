@@ -1,4 +1,5 @@
 # Owner: app.composition
+> 2026-09-21 (advantage-parity R-F7)：R-F7 失效信号：`refreshEnvironmentFingerprints` 挂 loadSettings 尾部与 saveSettings 后（指纹变化本地化 Notice 列出后端；首次运行静默、幂等、有界失败）；`getDomainEnvFor` 单一 accessor 供各构造缝。
 > 2026-09-21 (advantage-parity R-F8)：main.ts 构造 ModelConfigService 时传入 getContextWindowOverrides。
 > 2026-09-21 (advantage-parity R-F9)：main.ts 注册 file-menu 事件（文件/文件夹右键附加到聊天上下文，共享 R-A7 条目通道）。
 > 2026-09-21 (advantage-parity R-E4)：main.ts 组合 embedding 服务与供应商解析。

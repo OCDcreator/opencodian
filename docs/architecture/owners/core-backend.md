@@ -1,4 +1,5 @@
 # Owner: core.backend
+> 2026-09-21 (advantage-parity R-F7)：R-F7 域 env 注入缝：ClaudeCodeOptionsBuilder `domainEnv`（legacy settings.env 仍最终覆盖）+ ClaudeCodeAdapter live accessor；CodexAdapter `getExtraEnv`（SDK 构造 + app-server transport）；AgentAdapterWiring 透传 codex/pi 缝。
 > 2026-09-21 (advantage-parity R-F1)：AgentService 新增 AgentTurnSteeringCapability 接口（steerTurn——注入活动轮，不新起会话）。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 

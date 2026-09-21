@@ -56,6 +56,9 @@ function createRendererState(options?: {
   const renderSecretsKeychainSetting = jest.fn((containerEl: HTMLElement) => {
     containerEl.createDiv({ cls: 'secrets-keychain-marker', text: 'secrets-keychain-setting' });
   });
+  const renderEnvironmentVariablesSetting = jest.fn((containerEl: HTMLElement) => {
+    containerEl.createDiv({ cls: 'env-domains-marker', text: 'environment-variables-setting' });
+  });
   const renderPluginUpdateSection = jest.fn((containerEl: HTMLElement) => {
     containerEl.createDiv({ cls: 'plugin-update-marker', text: 'plugin-update-section' });
   });
@@ -105,6 +108,7 @@ function createRendererState(options?: {
     renderLanguageSetting,
     renderSettingsInEditorAreaSetting,
     renderSecretsKeychainSetting,
+    renderEnvironmentVariablesSetting,
     renderPluginUpdateSection,
   });
 

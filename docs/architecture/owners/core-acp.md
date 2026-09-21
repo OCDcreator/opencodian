@@ -1,4 +1,5 @@
 # Owner: core.acp
+> 2026-09-21 (advantage-parity R-F7)：AcpClientManager 构造新增 `getDomainsEnv`：spawn env 合并序 process.env < domains[agent.id] < agent.config.env（当前无 main.ts 组装点，缝已就位）。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.

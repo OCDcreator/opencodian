@@ -1,4 +1,5 @@
 # StorageService
+> 2026-09-21 (advantage-parity R-F7)：RuntimeState 增可选 `environmentFingerprints`；新增 `loadEnvironmentFingerprints`（读失败/缺失返回 null，非字符串值过滤）与 `saveEnvironmentFingerprints`（runtime.json 读改写；失败 log warn 不抛）。
 > 2026-09-20 (advantage-parity R-D2)：构造 `SettingsSecretsKeychain`（按 vault 路径哈希分域探测宿主钥匙串）；`saveCoreSettings` 接受 `secretsKeychainEnabled` 旗标并在落盘前把真实密钥换成占位符（钥匙串写失败保留明文）；`loadPersistedSettings` 在归一化前还原占位符并做明文一次性迁移；新增 `takeSettingsSecretsLoadReport`/`isSettingsSecretsKeychainAvailable` 透传。
 
 > **源码**: `src/core/storage/StorageService.ts`

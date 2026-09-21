@@ -35,6 +35,7 @@ describe('SendPipelineRuntime queued follow-up sends', () => {
       consumeQueuedFollowUpSend: jest.fn()
         .mockReturnValueOnce({ content: 'Queued follow-up' })
         .mockReturnValueOnce(null),
+      notifyFollowUpQueueChanged: jest.fn(),
     });
     const finalizationPort = createFinalizationPort();
     const host = createHost(runtimeState, streamController, [], {
@@ -62,7 +63,8 @@ describe('SendPipelineRuntime queued follow-up sends', () => {
     const runtimeState = createTabRuntime();
     const streamController = createStreamController();
     const preparationPort = createPreparationPort(firstSend, [], {
-      consumeQueuedFollowUpSend: jest.fn().mockReturnValue({ content: 'Queued follow-up' }),
+      consumeQueuedFollowUpSend: jest.fn(),
+      notifyFollowUpQueueChanged: jest.fn(),
     });
     const finalizationPort = createFinalizationPort();
     const host = createHost(runtimeState, streamController, [], {

@@ -1,4 +1,5 @@
 # Settings Types and Defaults
+> 2026-09-21 (advantage-parity R-F7)：新增 `environmentVariables: EnvironmentVariablesDomains`（`shared` + `providers`，默认空域；类型自 core.agents `BackendEnvironment` 导入）。
 > 2026-09-21 (advantage-parity R-F8)：新增 modelContextWindowOverrides（provider/model → token 正整数映射）与 normalizeModelContextWindowOverrides（ref 形态/正整数/上限校验，字符串数字可 coercion）。
 > 2026-09-21 (advantage-parity R-E4)：新增 semanticRetrievalEnabled（默认 false）/ semanticEmbeddingProvider / semanticEmbeddingModel 三字段与归一化器。
 > 2026-09-21 (advantage-parity R-D3)：新增 turnCompletionSoundEnabled（默认 false）与 turnCompletionSoundPath（默认空 = 内置音）及两个归一化器。

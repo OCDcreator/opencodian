@@ -1,4 +1,5 @@
 # English Locale
+> 2026-09-21 (advantage-parity R-F7)：`envDomains.changedNotice` 与 `settings.envDomains.*`（行名称/描述/管理按钮、modal 标题、共享与供应商域区、新域选项、重复域提示、行增删、占位符、空态）。
 > 2026-09-21 (advantage-parity R-F8)：新增 settings.contextWindowOverride.* 11 键（与 zh 对齐）。
 > 2026-09-21 (advantage-parity R-F1)：新增 chat.queue.* 12 键（与 zh 对齐）。
 > 2026-09-21 (advantage-parity R-F9)：新增 chat.context.fileMenu.attach 键（与 zh 对齐）。

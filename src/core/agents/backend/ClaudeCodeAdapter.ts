@@ -734,6 +734,13 @@ export interface ClaudeCodeAdapterOptions {
   settings: ClaudeCodeBackendSettings;
   pathToClaudeCodeExecutable?: string;
   processEnv?: Record<string, string | undefined>;
+  /**
+   * advantage-parity R-F7: live accessor for the resolved environment-variable
+   * domains (shared + `claude-code` provider key). Read at every options
+   * assembly so edited domains reach new sessions without adapter rebuild.
+   * `settings.env` still overrides (legacy priority is preserved).
+   */
+  getDomainEnvironment?: () => Record<string, string>;
   spawnShell?: boolean;
   processResolver?: (options: ClaudeCodeProcessResolverOptions) => ClaudeCodeProcessResolution;
   sdk?: ClaudeCodeSdkFacade;
@@ -1463,6 +1470,14 @@ export class ClaudeCodeAdapter
     this.tracePort = options.tracePort;
   }
 
+  /**
+   * R-F7: resolved domain environment for the current settings, read live so
+   * edits reach the next session without rebuilding the adapter.
+   */
+  private getDomainEnvironment(): Record<string, string> {
+    return this.options.getDomainEnvironment?.() ?? {};
+  }
+
   hasCapability(cap: AgentCapability): boolean {
     return this.capabilities.has(cap);
   }
@@ -1574,7 +1589,12 @@ export class ClaudeCodeAdapter
       ...(this.options.pathToClaudeCodeExecutable
         ? { pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable }
         : {}),
-      ...(this.options.processEnv ? { env: { ...this.options.processEnv } } : {}),
+      // R-F7: aux sessions inherit the resolved CLI process env plus the
+      // environment-variable domains (domains win over the base env; the aux
+      // path has no legacy `settings.env` layer of its own).
+      ...(this.options.processEnv || Object.keys(this.getDomainEnvironment()).length > 0
+        ? { env: { ...(this.options.processEnv ?? {}), ...this.getDomainEnvironment() } }
+        : {}),
       ...(config.turnTimeoutMs ? { turnTimeoutMs: config.turnTimeoutMs } : {}),
       spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
     });
@@ -2209,6 +2229,7 @@ export class ClaudeCodeAdapter
       settings: phase1Settings,
       pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable,
       processEnv: this.options.processEnv,
+      domainEnv: this.getDomainEnvironment(),
       abortController: phase1Abort,
       spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
       enableFileCheckpointing: true,
@@ -2258,6 +2279,7 @@ export class ClaudeCodeAdapter
       settings: phase1Settings,
       pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable,
       processEnv: this.options.processEnv,
+      domainEnv: this.getDomainEnvironment(),
       abortController: phase2Abort,
       spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
       enableFileCheckpointing: true,
@@ -2647,6 +2669,7 @@ export class ClaudeCodeAdapter
       settings: probeSettings,
       pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable,
       processEnv: this.options.processEnv,
+      domainEnv: this.getDomainEnvironment(),
       abortController,
       spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
       persistSession: true,
@@ -5068,6 +5091,7 @@ export class ClaudeCodeAdapter
       },
       pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable,
       processEnv: this.options.processEnv,
+      domainEnv: this.getDomainEnvironment(),
       abortController,
       spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
       canUseTool: this.options.permissionBridge
@@ -5246,6 +5270,7 @@ export class ClaudeCodeAdapter
       settings: diagnosticSettings,
       pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable,
       processEnv: this.options.processEnv,
+      domainEnv: this.getDomainEnvironment(),
       abortController,
       spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
       canUseTool: this.resolveDiagnosticCanUseTool(request, bypassPermissions),

@@ -1,4 +1,5 @@
 # PiRpcClient
+> 2026-09-21 (advantage-parity R-F7)：PiLaunchOptions 新增 `getExtraEnv`；spawn env 在 PATH 增补之后叠加额外环境（显式用户变量含 PATH 保持最终话语权）。
 
 > 源码: src/core/agents/backend/pi/PiRpcClient.ts
 

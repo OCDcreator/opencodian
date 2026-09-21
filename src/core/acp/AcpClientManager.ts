@@ -12,8 +12,23 @@ interface AcpManagedAgent {
   activeSessionId: string | null;
 }
 
+export interface AcpClientManagerOptions {
+  /**
+   * advantage-parity R-F7: injection seam for the resolved environment-variable
+   * domains keyed by agent id (shared + `providers[agent.id]`). Merged between
+   * `process.env` and the agent's own `config.env`, so per-agent config keeps
+   * the final override.
+   */
+  getDomainsEnv?: (agentKey: string) => Record<string, string>;
+}
+
 export class AcpClientManager {
   private readonly agents = new Map<string, AcpManagedAgent>();
+  private readonly getDomainsEnv?: (agentKey: string) => Record<string, string>;
+
+  constructor(options: AcpClientManagerOptions = {}) {
+    this.getDomainsEnv = options.getDomainsEnv;
+  }
 
   loadConfigs(configs: AcpAgentConfig[]): void {
     const configIds = new Set(configs.map((config) => config.id));
@@ -61,7 +76,8 @@ export class AcpClientManager {
     try {
       const childProcess = spawn(agent.config.command, agent.config.args, {
         cwd: agent.config.cwd,
-        env: { ...process.env, ...agent.config.env },
+        // R-F7 merge order: base process env < domain env (shared+providers[agent.id]) < agent config env.
+        env: { ...process.env, ...(this.getDomainsEnv?.(agent.config.id) ?? {}), ...agent.config.env },
         stdio: ['pipe', 'pipe', 'pipe'],
       });
 

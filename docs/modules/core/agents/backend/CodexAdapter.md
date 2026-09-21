@@ -1,4 +1,5 @@
 # CodexAdapter
+> 2026-09-21 (advantage-parity R-F7)：options 新增 `getExtraEnv`：SDK 构造（抽出私有 `constructSdkClient`）与 app-server transport 均注入域 env——SDK 设 `env` 后不再继承 process.env，故以 `toPlainStringEnv(process.env)` 为底复制（extra 非空才设，保持既有行为逐字节一致）。
 
 > **源码**: `src/core/agents/backend/CodexAdapter.ts`
 > **状态**: [RUNTIME_PROVEN]

@@ -1,4 +1,5 @@
 > 2026-09-18 (FlowText parity R-A7): `OpenCodeContextPartSerializer.createPromptContextPart` serializes `kind: 'folder'` context items as path-only `<obsidian_context kind="folder" path="...">` text parts in both local and remote modes (directories never carry a text snapshot or file URL).
+> 2026-09-21 (advantage-parity R-F7)：ServerManager/LocalSidecarLauncher 增 `getExtraSpawnEnv` 缝：本地 server spawn env 末尾叠加 shared+opencode 域；OpenCodeService runtimeOptions 经 lifecycle host 透传。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 > 2026-09-21 (advantage-parity R-E1)：OpenCodeContextPartSerializer 新增 url 条目分支（合成 text part，与 PDF 同型，双模式一致）。
 

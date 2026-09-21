@@ -1,4 +1,5 @@
 # OpenCodeService
+> 2026-09-21 (advantage-parity R-F7)：runtimeOptions 新增 `getExtraServerSpawnEnv`，经 lifecycle assembly host 传入 ServerManager。
 
 > 2026-07-29: The service injects the independent trace port, binds session bootstrap, brackets each stream run, and observes raw plus normalized stream evidence.
 >

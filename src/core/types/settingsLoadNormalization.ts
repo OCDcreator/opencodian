@@ -1,4 +1,5 @@
 import { IMPLEMENTED_AGENT_BACKENDS } from '../agents/backend';
+import { normalizeEnvironmentVariablesDomains } from '../agents/BackendEnvironment';
 import type { SettingsLoadResult } from '../storage';
 import {
   areChatAppearanceSettingsEqual,
@@ -717,6 +718,8 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
       ),
       contextGroups: normalizeContextGroups(normalizedSettings?.contextGroups),
       conversationExport: normalizeConversationExportSettings(normalizedSettings?.conversationExport),
+      // advantage-parity R-F7: domains normalized at the final load-merge boundary.
+      environmentVariables: normalizeEnvironmentVariablesDomains(normalizedSettings?.environmentVariables),
       secretsKeychainEnabled: normalizeSecretsKeychainEnabled(normalizedSettings?.secretsKeychainEnabled),
       turnCompletionSoundEnabled: normalizeTurnCompletionSoundEnabled(normalizedSettings?.turnCompletionSoundEnabled),
       turnCompletionSoundPath: normalizeTurnCompletionSoundPath(normalizedSettings?.turnCompletionSoundPath),

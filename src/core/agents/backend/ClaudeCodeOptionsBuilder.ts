@@ -41,6 +41,12 @@ export interface ClaudeCodeOptionsBuilderInput {
   settings: ClaudeCodeBackendSettings;
   pathToClaudeCodeExecutable?: string;
   processEnv?: Record<string, string | undefined>;
+  /**
+   * advantage-parity R-F7: resolved shared+provider domain environment.
+   * Merged after processEnv but before `settings.env`, so the legacy
+   * per-backend env map keeps its historical override priority.
+   */
+  domainEnv?: Record<string, string>;
   canUseTool?: unknown;
   /** SDK >= 0.3.263 permission-prompt ownership declaration. */
   permissionPrompts?: 'host' | 'none';
@@ -334,6 +340,7 @@ export function buildClaudeCodeOptions(
   }
   const env = {
     ...(input.processEnv ?? {}),
+    ...(input.domainEnv ?? {}),
     ...input.settings.env,
   };
   if (Object.keys(env).length > 0) {

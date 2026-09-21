@@ -1,4 +1,5 @@
 # PiSessionRuntime
+> 2026-09-21 (advantage-parity R-F7)：options 新增 `getExtraEnv`；构造 PiLaunchOptions 时透传给每次 spawn。
 
 > 源码: src/core/agents/backend/pi/PiSessionRuntime.ts
 

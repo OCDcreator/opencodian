@@ -103,6 +103,8 @@ export function createHost(
     isTabForegroundBusy: jest.fn().mockReturnValue(false),
     queueFollowUpSend: jest.fn().mockReturnValue(false),
     consumeQueuedFollowUpSend: jest.fn().mockReturnValue(null),
+    getQueuedFollowUpSends: jest.fn().mockReturnValue([]),
+    removeQueuedFollowUpSend: jest.fn().mockReturnValue(null),
     notifyForegroundBusy: jest.fn().mockImplementation(() => { callOrder.push('notifyForegroundBusy'); }),
     getServerAvailability: jest.fn().mockImplementation(async () => { callOrder.push('getServerAvailability'); return 'running'; }),
     refreshServerStatusBadge: jest.fn().mockResolvedValue(undefined),

@@ -1,4 +1,5 @@
 # LocalSidecarLauncher
+> 2026-09-21 (advantage-parity R-F7)：构造新增第 4 参 `getExtraSpawnEnv`；getSpawnEnv 在 sanitized 基座与内建旗标之后叠加额外 env（显式用户变量最终生效）。
 
 > 2026-07-29: Managed stdout/stderr is independently redacted before logger output, the bounded in-memory tail, and the optional OpenCode trace port; process errors and exits then expose only that safe tail.
 

@@ -1,4 +1,5 @@
 # ClaudeCodeOptionsBuilder
+> 2026-09-21 (advantage-parity R-F7)：input 新增 `domainEnv`；env 合并序 `{...processEnv, ...domainEnv, ...settings.env}`——legacy settings.env 保持最终覆盖。
 
 > **源码**: `src/core/agents/backend/ClaudeCodeOptionsBuilder.ts`
 > **状态**: [REVIEW]

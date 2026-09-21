@@ -1,4 +1,5 @@
 # Owner: core.backend-pi
+> 2026-09-21 (advantage-parity R-F7)：PiLaunchOptions/PiSessionRuntime/PiAdapter 增 `getExtraEnv` 缝：Pi 服务进程 spawn env 在 PATH 增补后叠加域 env。
 > 2026-09-21 (advantage-parity R-F1)：PiAdapter 声明 TurnSteering 能力并实现 steerTurn（原生 RPC prompt streamingBehavior:'steer'，活体实证 pi 0.86.0）。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 - 2026-09-13 (universal memory backend): owner manifest gained `core.memory` and `app.memory-runtime`; this owner's boundary itself is unchanged (no source touched, allowlist untouched).

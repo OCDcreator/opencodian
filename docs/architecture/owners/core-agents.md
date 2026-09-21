@@ -1,4 +1,5 @@
 # Owner: core.agents
+> 2026-09-21 (advantage-parity R-F7)：新增纯模块 `src/core/agents/BackendEnvironment.ts`（分域模型 normalize/resolve + 双 lane djb2-64 环境指纹 + detectChangedBackends + 批量指纹）。边界不变：无 I/O、无 feature/app 依赖。
 > 2026-09-21 (advantage-parity R-F1)：AgentCapability 增 TurnSteering；AgentService 增 AgentTurnSteeringCapability 接口；PiAdapter 声明能力并实现 steerTurn（原生 RPC steer）。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 

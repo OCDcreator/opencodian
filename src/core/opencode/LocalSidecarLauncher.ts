@@ -66,6 +66,13 @@ export class LocalSidecarLauncher {
     config: OpenCodeServerConfig,
     processProbe: LocalProcessProbe = new LocalProcessProbe(),
     private readonly tracePort?: OpenCodeTracePort,
+    /**
+     * advantage-parity R-F7: extra environment variables for the spawned
+     * server process (the resolved shared+`opencode` domain env). Read at
+     * spawn time and merged last, so an explicitly configured variable wins
+     * over the sanitized base environment.
+     */
+    private readonly getExtraSpawnEnv?: () => Record<string, string>,
   ) {
     this.config = config;
     this.processProbe = processProbe;
@@ -583,6 +590,14 @@ export class LocalSidecarLauncher {
     // Safe to set on older versions (flag is ignored). Remove when the flag
     // becomes the default or is removed upstream.
     env.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM = 'true';
+
+    // advantage-parity R-F7: resolved domain environment merged last so an
+    // explicitly configured user variable keeps final say over the sanitized
+    // base environment.
+    const extraEnv = this.getExtraSpawnEnv?.() ?? {};
+    if (Object.keys(extraEnv).length > 0) {
+      return { ...env, ...extraEnv };
+    }
 
     return env;
   }

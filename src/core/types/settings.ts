@@ -23,6 +23,7 @@ import {
   type CodexSessionTraceSettings,
   type CodexTraceChannelId,
 } from '../agents/backend/diagnostics/types';
+import { type EnvironmentVariablesDomains } from '../agents/BackendEnvironment';
 import {
   OPEN_CODE_TRACE_CHANNEL_IDS,
   type OpenCodeSessionTraceSettings,
@@ -3827,6 +3828,14 @@ export interface OpenCodianSettings {
   acpAgents: AcpAgentConfig[];
 
   /**
+   * Per-provider environment-variable domains (advantage-parity R-F7):
+   * `shared` applies to every backend, `providers[backend]` only to that
+   * backend kind / provider id. Legacy per-backend env settings keep their
+   * override priority; domains merge underneath them.
+   */
+  environmentVariables: EnvironmentVariablesDomains;
+
+  /**
    * Versioned envelope for OpenCode SDK capability preferences and experimental
    * gates. Optional because the normalizer handles defaults; persisted only
    * when the user has overrides or a migration report to keep.
@@ -4210,6 +4219,9 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   skillCatalogCacheTtl: 30000,
   toolCatalogCacheTtl: 30000,
   acpAgents: [],
+
+  // advantage-parity R-F7: empty domains are the byte-identical-to-before default.
+  environmentVariables: { shared: {}, providers: {} },
 
   // Capability settings envelope is intentionally undefined; the normalizer in
   // OpenCodeCapabilitySettingsMigration supplies defaults on first load.

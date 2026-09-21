@@ -1,4 +1,5 @@
 # AgentAdapterWiring
+> 2026-09-21 (advantage-parity R-F7)：options 新增 `getCodexExtraEnv`/`getPiExtraEnv`，分别传入 CodexAdapter `getExtraEnv` 与 PiAdapter `getExtraEnv`。
 
 > **源码**: `src/core/agents/backend/AgentAdapterWiring.ts`
 > **状态**: [STABLE]

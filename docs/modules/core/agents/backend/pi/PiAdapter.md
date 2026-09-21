@@ -1,4 +1,5 @@
 # PiAdapter
+> 2026-09-21 (advantage-parity R-F7)：PiAdapterOptions 新增 `getExtraEnv`，经既有 options 透传至 PiSessionRuntime → launch options。
 > 2026-09-21 (advantage-parity R-F1)：新增 steerTurn——活动 run 的 RPC 客户端上发 {type:'prompt', streamingBehavior:'steer'}（忙时无此字段的 prompt 被明确拒绝并指名该参数，实证于 pi 0.86.0）；能力集声明 TurnSteering。
 
 > 源码: src/core/agents/backend/pi/PiAdapter.ts

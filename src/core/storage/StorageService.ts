@@ -47,6 +47,8 @@ const logger = createLogger('StorageService');
 
 interface RuntimeState {
   managedServer: ManagedServerState | null;
+  /** advantage-parity R-F7: last-run per-backend environment fingerprints. */
+  environmentFingerprints?: Record<string, string>;
 }
 
 type StoredConversationRecord = Conversation & { messageCount?: number };
@@ -458,6 +460,41 @@ export class StorageService {
     return runtime.managedServer ?? null;
   }
 
+  /**
+   * R-F7: last-run per-backend environment fingerprints, or null when no
+   * previous run recorded them (first run / unreadable file) — the app layer
+   * treats null as "never disturb the user".
+   */
+  async loadEnvironmentFingerprints(): Promise<Record<string, string> | null> {
+    const runtime = await this.loadRuntimeState();
+    const stored = runtime.environmentFingerprints;
+    if (!stored || typeof stored !== 'object') {
+      return null;
+    }
+    const fingerprints: Record<string, string> = {};
+    for (const [backend, fingerprint] of Object.entries(stored)) {
+      if (backend && typeof fingerprint === 'string') {
+        fingerprints[backend] = fingerprint;
+      }
+    }
+    return fingerprints;
+  }
+
+  /** R-F7: persist current fingerprints into runtime.json (read-modify-write). */
+  async saveEnvironmentFingerprints(fingerprints: Record<string, string>): Promise<void> {
+    try {
+      const runtime = await this.loadRuntimeState();
+      runtime.environmentFingerprints = { ...fingerprints };
+      await this.app.vault.adapter.write(
+        normalizePath(RUNTIME_FILE),
+        JSON.stringify(runtime, null, 2),
+      );
+    } catch (error) {
+      // Fingerprints only gate the invalidation notice; never break the save path.
+      logger.warn('Failed to persist environment fingerprints:', error);
+    }
+  }
+
   async saveThemeBackgroundAsset(
     data: ArrayBuffer,
     sourceName: string,
@@ -825,6 +862,7 @@ export class StorageService {
       const parsed = JSON.parse(content) as Partial<RuntimeState>;
       return {
         managedServer: parsed.managedServer ?? null,
+        environmentFingerprints: parsed.environmentFingerprints,
       };
     } catch {
       return {

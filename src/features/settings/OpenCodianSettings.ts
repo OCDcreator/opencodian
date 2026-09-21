@@ -38,6 +38,7 @@ import {
   addSettingHelpButton,
   applyInlineCodeText,
   createSettingsBlock,
+  renderEnvironmentVariablesSetting,
   renderLanguageSetting,
   renderSecretsKeychainSetting,
   renderSettingsPanelTitle,
@@ -138,6 +139,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         renderLanguageSetting: (el) => { this.renderLanguageSetting(el); },
         renderSettingsInEditorAreaSetting: (el) => { this.renderSettingsInEditorAreaSetting(el); },
         renderSecretsKeychainSetting: (el) => { this.renderSecretsKeychainSetting(el); },
+        renderEnvironmentVariablesSetting: (el) => { this.renderEnvironmentVariablesSetting(el); },
         renderPluginUpdateSection: (el) => { this.renderPluginUpdateSection(el); },
       });
     }
@@ -476,6 +478,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     renderSecretsKeychainSetting(containerEl, this.plugin);
   }
 
+  /**
+   * R-F7: per-provider environment-variable domains (shared implementation in
+   * SettingsPanelChrome). The row only opens the editor modal.
+   */
+  renderEnvironmentVariablesSetting(containerEl: HTMLElement): void {
+    renderEnvironmentVariablesSetting(containerEl, this.plugin);
+  }
+
   // ─── Classic section rendering ─────────────────────────────────────
 
   private renderClassicGeneralSection(containerEl: HTMLElement): void {
@@ -498,6 +508,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.renderLanguageSetting(blockBodyEl);
     this.renderSettingsInEditorAreaSetting(blockBodyEl);
     this.renderSecretsKeychainSetting(blockBodyEl);
+    this.renderEnvironmentVariablesSetting(blockBodyEl);
     this.renderPluginUpdateSection(containerEl);
   }
 

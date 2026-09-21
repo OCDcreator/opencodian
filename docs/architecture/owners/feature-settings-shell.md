@@ -1,4 +1,5 @@
 # Owner: feature.settings-shell
+> 2026-09-21 (advantage-parity R-F7)：新增 EnvironmentVariablesModal（结构化 host）+ SettingsPanelChrome 共享行；三个设置面（tabbed/经典/编辑器区）General 合并块接入。
 > 2026-09-21 (advantage-parity R-F8)：SettingsModelSection 通用 tab 新增上下文窗口声明入口（feature-settings-plugin 的 modal 经窄 port 复用）。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 > 2026-09-20 (advantage-parity R-D1)：conversation 主 tab 二级 tabs 新增 export（backend 无关）。

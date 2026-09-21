@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "44f9492a727c0002cffa1ad33064ca0c9b4f53549dd8a451cf1874ed7f3ab9b0",
-  "recordCount": 767,
+  "digest": "323bcc2e90c9b399b65ab5a3c4d1b88516d5b3e33e8b2c05937a167000a5c2dc",
+  "recordCount": 770,
   "records": [
     {
       "kind": "ignore",
@@ -111,7 +111,7 @@
     {
       "kind": "src",
       "key": "src/core/acp/AcpClientManager.ts",
-      "sha256": "934aa962e544fbd25c8003ca59bf6f3bcb4ec416056d35ba042fc1603ee63077"
+      "sha256": "7416cfba8f36aaef7c2db00348884fec935a081a87cf13bebcd5cd3ab1551297"
     },
     {
       "kind": "src",
@@ -141,7 +141,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/AgentAdapterWiring.ts",
-      "sha256": "431ff9290815d976cfac3b75f303fac31ace1e300c94b5a39a9826cecf6f9d52"
+      "sha256": "06270fbf5882f3ebfab5e2d74003083aea97dac556018571ba53eaeed6b1c2bd"
     },
     {
       "kind": "src",
@@ -206,7 +206,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/ClaudeCodeAdapter.ts",
-      "sha256": "7fa975ec75d92d75a6b1a93770628c56536a54600e56c3f55a3ba99f714b362e"
+      "sha256": "33a828bb99fdedd02bf242f4eb52dcb1b308ebe3e6b4acc9e25bca3352a7b5b5"
     },
     {
       "kind": "src",
@@ -231,7 +231,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/ClaudeCodeOptionsBuilder.ts",
-      "sha256": "7026ae7ca11161b0d246709988fd56d3883f45225b58aa593f3c416837d4b132"
+      "sha256": "f33e03ab541a4f9bb7fff50377c28958b0732a5329b36863670206b71dc87fcb"
     },
     {
       "kind": "src",
@@ -321,7 +321,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexAdapter.ts",
-      "sha256": "e2e2193ed7e78c83c5ac694ff23ffe6eae8d4fdccca700a59348493b8c24892d"
+      "sha256": "b103f7bee81d73331277c54a74d45d77e88b591d0eed111ef4572fdd30a8a479"
     },
     {
       "kind": "src",
@@ -346,7 +346,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexAppServerTransport.ts",
-      "sha256": "f6e7e20aee85aee46e375f2e507a60f2968143ff42ac1d01cea5c38e87906d2f"
+      "sha256": "a5aeb16673ca3a6904db5864e8c233d52c4f695cdff1eec29d40c7129f9d1e68"
     },
     {
       "kind": "src",
@@ -436,7 +436,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/pi/PiAdapter.ts",
-      "sha256": "36e7340e58e9460adce7a498e5e639cf6c6388dd6336b1ad87cea3bd719dfdbf"
+      "sha256": "7c150e0d5c3e9b3c95553cd3d081bc7fb475a9f808648953524b2f46e4ba912e"
     },
     {
       "kind": "src",
@@ -456,12 +456,12 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/pi/PiRpcClient.ts",
-      "sha256": "9e992300b6849d6377c3de232c52d733df8631d27e14f1bc1396220d05760c9b"
+      "sha256": "b31a1a2eac5a022f77ac91efd7c26b6d4303caaa956f57a854f84b9786f80a4a"
     },
     {
       "kind": "src",
       "key": "src/core/agents/backend/pi/PiSessionRuntime.ts",
-      "sha256": "67e179964f41654af024c791c22fd401e8581952de1630184ed5a045941328a1"
+      "sha256": "38dca5db108a47be9a21aae6f4224e6f8f7ff90668da028ad76364223ce0824f"
     },
     {
       "kind": "src",
@@ -487,6 +487,11 @@
       "kind": "src",
       "key": "src/core/agents/backend/ScopedConfigurationResourceService.ts",
       "sha256": "d61a3c93f0813f9bb88d930ccc3505316fd2b3ffb75ebd94d28cc56d563e869a"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/agents/BackendEnvironment.ts",
+      "sha256": "9975e35f6c23b8fd265b2952583dd68a65c445c0fb5decc3c0d59ece94044123"
     },
     {
       "kind": "src",
@@ -826,7 +831,7 @@
     {
       "kind": "src",
       "key": "src/core/opencode/LocalSidecarLauncher.ts",
-      "sha256": "64bea62e381fc3927bb4819d1d2a86cb3c4ac090cad3b75f99fcb41427f70871"
+      "sha256": "8dbd81a0e32b9ffffa74f06db5de310dbbfcf896018f5eb2fdcb5caabff9ad5a"
     },
     {
       "kind": "src",
@@ -921,12 +926,12 @@
     {
       "kind": "src",
       "key": "src/core/opencode/OpenCodeService.ts",
-      "sha256": "1835e56698feb4c8d5e0a49091d07d73f4861d6da60b37234bce26223a273a37"
+      "sha256": "520f2a07aaa697088a2441e7ceb3e5bbed3a4dad5599179d155b3b73f86444eb"
     },
     {
       "kind": "src",
       "key": "src/core/opencode/OpenCodeServiceLifecycleCoordinator.ts",
-      "sha256": "893fe55bed5177dc17210f66570d5951a9425cc6fb7caae8a74d8247d0d04c0f"
+      "sha256": "9a6280aa0940b10fa011e5d0bb9b9b2e201d266e839196c75bd1f8142ef9e060"
     },
     {
       "kind": "src",
@@ -991,7 +996,7 @@
     {
       "kind": "src",
       "key": "src/core/opencode/ServerManager.ts",
-      "sha256": "b07343e5a14dd871d667474367c4ea601f406d2b55ab8a3e33de8a95fceeeae3"
+      "sha256": "eef5be870545fbf2ee6831eb73e52d7c6fb6870fba1d569bba873bf603edf10e"
     },
     {
       "kind": "src",
@@ -1151,7 +1156,7 @@
     {
       "kind": "src",
       "key": "src/core/storage/StorageService.ts",
-      "sha256": "7cd01890a986d7844b46cca0f556cf3a19857ecb569d027fb15119b3b19ec7bf"
+      "sha256": "0717a4566a0bc6ad5bf2ec99a75d741afa593920684da39ef339bb563624cc75"
     },
     {
       "kind": "src",
@@ -1211,12 +1216,12 @@
     {
       "kind": "src",
       "key": "src/core/types/settings.ts",
-      "sha256": "f403b86a027ee8df16024acbf6b4595f13e7bb61c8941f1cd1f3511c9a29216f"
+      "sha256": "cb89f93a839c196f2635ff66ef536457df4465fe7bf07ebcc742c285f8832fe9"
     },
     {
       "kind": "src",
       "key": "src/core/types/settingsLoadNormalization.ts",
-      "sha256": "757511bd5953aa2688c992e2c0939f6eeb3e20c1b734ca3310e904a505c6c95c"
+      "sha256": "358583942864ccda7e516dbae10bbe6a037324cc3c0e99fdef7b4fc13584f6d1"
     },
     {
       "kind": "src",
@@ -2770,6 +2775,11 @@
     },
     {
       "kind": "src",
+      "key": "src/features/settings/EnvironmentVariablesModal.ts",
+      "sha256": "fe621acda7e71ee39a714ffd8b0d424eac96c89897cdc369a006db061f4fbcf0"
+    },
+    {
+      "kind": "src",
       "key": "src/features/settings/index.ts",
       "sha256": "d5d9fd87c02b2df16946c030b6040aa6b3b651527e46711ce47e0dc82fc5cce2"
     },
@@ -2871,12 +2881,12 @@
     {
       "kind": "src",
       "key": "src/features/settings/OpenCodianSettings.ts",
-      "sha256": "652e5abee2aa33955d3adbc87efcdfa5edc19d473dda8d5bcae4d408e7d91ba1"
+      "sha256": "200956e2180c012d5a44089033a36610182a52641b23a9071a922897df15cdea"
     },
     {
       "kind": "src",
       "key": "src/features/settings/OpenCodianSettingsView.ts",
-      "sha256": "0c49ccad9630d31cbfe684ce32f9ef3e7eabf26c6c598c37e9d2f9563d9487b1"
+      "sha256": "e8bafc1061791163dc264e4cf5dbcebb0e33acc46404dd29db03f80ffb520d0a"
     },
     {
       "kind": "src",
@@ -3086,7 +3096,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsPanelChrome.ts",
-      "sha256": "9130b63603350a0647109aa57f002302cd90f6039c7a9b064e3c7ceb6ffdc152"
+      "sha256": "9943f92358043de17250d1c3df75b4ebe61417cd71e0ee7a6c0d712563440680"
     },
     {
       "kind": "src",
@@ -3201,7 +3211,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsTabbedRenderer.ts",
-      "sha256": "9650e890840b05e493ff2a6516a07f3820e0b51834285c79c160698881939dca"
+      "sha256": "d2f0b562089c2e3303741f1d2a2389cfe3a00e46d9105252a4e59f31a13ff3c5"
     },
     {
       "kind": "src",
@@ -3256,7 +3266,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "71168403af212412b7528c393e85f7d94c59236333da59008339c57aaa13fd1e"
+      "sha256": "261a6f7b1ee899a584e12c839ea77f442c3541271f6a8c06ceda1adcc1722693"
     },
     {
       "kind": "src",
@@ -3266,12 +3276,12 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "85a0f8838e9ebf10b195ecf6a2847287c973f25390ebb4632439a098482af9a1"
+      "sha256": "91b449a4277a9d79cb775e56ccf53238b00cc7302b6eb75a32803c6041c0d3b1"
     },
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "ceced16670e65f1cb90ae5155f83aa1a9176617a5aeec8c80b8ed657d298f210"
+      "sha256": "35e1edc4235d83cf8797a74f84e0f8a909222c772f253cf79e9f2727af95e787"
     },
     {
       "kind": "src",
@@ -3425,6 +3435,11 @@
     },
     {
       "kind": "src",
+      "key": "src/style/components/environment-variables-modal.css",
+      "sha256": "536ce642b5817dc32ec1bf3e9de2dea429c4e008554ab8c1d72b0159fb61111f"
+    },
+    {
+      "kind": "src",
       "key": "src/style/components/history-dropdown.css",
       "sha256": "32683bd964e1c0c9da728be6570ea743b89b1390c756155e0445fd0713baa3d8"
     },
@@ -3556,7 +3571,7 @@
     {
       "kind": "src",
       "key": "src/style/index.css",
-      "sha256": "9d63d5adbeb4badc31eb7a8e1fcee95e4dfa3c25e3dd6ed088b3422035d0b460"
+      "sha256": "930ad92400c90b0cce2b388b3b0359cd5cfe07511f22b291363bef33ba0d3caf"
     },
     {
       "kind": "src",
@@ -3839,7 +3854,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-21T04:01:45.092Z",
-  "headShaAtGeneration": "09460834ed635bf021ab6f731b26018e0c1eb187",
+  "generatedAt": "2026-09-21T04:44:49.464Z",
+  "headShaAtGeneration": "03d105dde1a3dfcc91d78f688c7ebeb9607b1ae1",
   "graphifyVersion": "graphify 0.9.36"
 }

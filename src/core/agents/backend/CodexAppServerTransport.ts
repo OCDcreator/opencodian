@@ -47,6 +47,21 @@ interface JsonRpcInbound {
   error?: { code: number; message: string };
 }
 
+/**
+ * Copy `process.env` into a plain string map (undefined values dropped), so a
+ * caller-provided extra env can be spread over the real base environment
+ * (advantage-parity R-F7). Exported for the sibling Codex adapter spawn paths.
+ */
+export function toPlainStringEnv(env: NodeJS.ProcessEnv): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (typeof value === 'string') {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
 export class CodexAppServerTransport {
   protected ws: WebSocket | null = null;
   protected process: ReturnType<typeof spawn> | null = null;
@@ -78,10 +93,19 @@ export class CodexAppServerTransport {
    */
   protected readonly wireObserver?: CodexAppServerWireObserver;
 
-  constructor(options?: { codexPathOverride?: string; workingDirectory?: string; wireObserver?: CodexAppServerWireObserver }) {
+  /**
+   * R-F7: extra environment variables for the owned app-server process (the
+   * resolved shared+`codex` domain env), read at spawn time and merged over
+   * the plugin process env. `undefined` (the default) keeps the previous
+   * pure-inherit spawn behavior byte-for-byte.
+   */
+  protected readonly getExtraEnv?: () => Record<string, string>;
+
+  constructor(options?: { codexPathOverride?: string; workingDirectory?: string; wireObserver?: CodexAppServerWireObserver; getExtraEnv?: () => Record<string, string> }) {
     this.codexPathOverride = options?.codexPathOverride;
     this.workingDirectory = options?.workingDirectory;
     this.wireObserver = options?.wireObserver;
+    this.getExtraEnv = options?.getExtraEnv;
   }
 
   /**
@@ -125,12 +149,16 @@ export class CodexAppServerTransport {
     logger.info('Starting Codex app-server', { codexPath, cwd: this.workingDirectory ?? '(inherited)' });
     this.notifyObserver(() => this.wireObserver?.onConnection?.({ state: 'starting' }));
 
+    const extraEnv = this.getExtraEnv?.() ?? {};
     this.process = spawn(codexPath, ['app-server', '--listen', 'ws://127.0.0.1:0'], {
       stdio: ['ignore', 'pipe', 'pipe'],
       // Spawn the owned app-server inside the active vault so project-scoped
       // resources (.agents/skills, .codex/agents) resolve correctly. Omit cwd
       // only when no working directory is known (inherit plugin process cwd).
       ...(this.workingDirectory ? { cwd: this.workingDirectory } : {}),
+      // R-F7: replicate the inherited base env under the domain overrides so
+      // an explicitly configured variable reaches the app-server.
+      ...(Object.keys(extraEnv).length > 0 ? { env: { ...toPlainStringEnv(process.env), ...extraEnv } } : {}),
     });
 
     // Parse the WebSocket URL from stdout

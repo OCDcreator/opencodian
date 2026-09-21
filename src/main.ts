@@ -9,6 +9,11 @@ import { OPENCODIAN_APP_ICON_ID } from './shared/brandingWordmark';
 
 import { ModelConfigService, ModelPricingService, OpencodeConfigManager } from './core/config';
 import { setAgentServiceRegistry } from './core/agents/AgentCapability';
+import {
+  computeBackendEnvironmentFingerprints,
+  detectChangedBackends,
+  resolveBackendEnvironment,
+} from './core/agents/BackendEnvironment';
 import { InlineEditController } from './features/inline-edit/InlineEditController';
 import { InlineCompletionController } from './features/inline-edit/InlineCompletionController';
 import { inlineCompletionGhostExtension } from './features/inline-edit/InlineCompletionGhost';
@@ -154,6 +159,19 @@ const OPENCODIAN_APP_ICON_SVG = `
 
 type LoadedManagedServerState = Awaited<ReturnType<StorageService['loadManagedServerState']>>;
 type ConversationCachePinProvider = () => Iterable<string>;
+
+/** R-F7: key-set + value equality for fingerprint maps (both are string→string). */
+function environmentFingerprintsEqual(
+  left: Record<string, string>,
+  right: Record<string, string>,
+): boolean {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+  return leftKeys.every((key) => left[key] === right[key]);
+}
 
 // BUILD_ID is injected at build time via esbuild define
 declare const BUILD_ID: string;
@@ -309,6 +327,12 @@ export default class OpenCodianPlugin extends Plugin {
   private settingsPersistenceWarningShown = false;
   private startupCoordinator = new OpenCodianStartupCoordinator();
   private settingsRuntimeCoordinator: OpenCodianSettingsRuntimeCoordinator | null = null;
+  /**
+   * advantage-parity R-F7: in-memory copy of the last persisted per-backend
+   * environment fingerprints, so repeated saves never re-notify or rewrite
+   * runtime.json when the environment did not change.
+   */
+  private environmentFingerprintsCache: Record<string, string> | null = null;
 
   private getSettingsRuntimeCoordinator(): OpenCodianSettingsRuntimeCoordinator {
     if (!this.settingsRuntimeCoordinator) {
@@ -591,6 +615,7 @@ export default class OpenCodianPlugin extends Plugin {
           onManagedServerStateChange: (state) => {
             void this.storage.saveManagedServerState(state);
           },
+          getExtraServerSpawnEnv: () => this.getDomainEnvFor('opencode'),
         },
       );
 
@@ -606,25 +631,14 @@ export default class OpenCodianPlugin extends Plugin {
           vaultPath,
           settings: this.settings.backendSettings.claudeCode,
           pathToClaudeCodeExecutable: this.getBundledClaudeCodeExecutablePath(vaultPath),
+          getDomainEnvironment: () => this.getDomainEnvFor('claude-code'),
           sdkLoader: loadClaudeCodeSdk,
           permissionBridge: this.claudeCodePermissionBridge,
           tracePort: this.claudeTraceService,
           onElicitation: (request, options) => this.handleClaudeCodeElicitation(request, options),
           onUserDialog: (request, options) => this.handleClaudeCodeUserDialog(request, options),
           supportedDialogKinds: ['refusal_fallback_prompt'],
-          mcpConfigLoader: async () => {
-            if (!this.opencodeConfigManager) {
-              return {};
-            }
-            try {
-              const { McpConfigService } = await import('./core/config/McpConfigService');
-              const mcpConfigService = new McpConfigService(this.opencodeConfigManager);
-              const servers = await mcpConfigService.readProjectServers();
-              return adaptMcpConfigForClaude(servers);
-            } catch {
-              return {};
-            }
-          },
+          mcpConfigLoader: () => this.readClaudeMcpServers(),
         }));
       }
       wireHiddenAdapters({
@@ -637,6 +651,8 @@ export default class OpenCodianPlugin extends Plugin {
         codexSettings: this.settings.backendSettings.codex,
         codexTracePort: this.codexTraceService,
         getPiSettings: () => this.settings.backendSettings.pi,
+        getCodexExtraEnv: () => this.getDomainEnvFor('codex'),
+        getPiExtraEnv: () => this.getDomainEnvFor('pi'),
         onPiUiRequest: (request, signal) => presentPiUiRequest(this.app, request, signal),
       });
       this.agentServiceRegistry.setEnabledBackends(this.settings.enabledBackends);
@@ -2039,6 +2055,7 @@ export default class OpenCodianPlugin extends Plugin {
 
     this.reportSettingsLoadState(loadState.persistedSettings);
     this.reportSettingsSecretsLoadState();
+    await this.refreshEnvironmentFingerprints();
 
     await this.migrateOpenCodeCapabilitySettingsEnvelope(loadState.settings.opencodeCapabilities);
 
@@ -2053,7 +2070,8 @@ export default class OpenCodianPlugin extends Plugin {
 
   /** Save settings to storage */
   async saveSettings(options: { syncService?: boolean; reloadModels?: boolean; syncConfig?: boolean; applyUi?: boolean } = {}) {
-    return this.getSettingsRuntimeCoordinator().saveSettings(options);
+    await this.getSettingsRuntimeCoordinator().saveSettings(options);
+    await this.refreshEnvironmentFingerprints();
   }
 
   /**
@@ -2780,6 +2798,90 @@ export default class OpenCodianPlugin extends Plugin {
       apiKey: provider.apiKey ?? '',
       model,
     });
+  }
+
+  /**
+   * advantage-parity R-F7: resolved domain environment (shared + the backend's
+   * provider domain) for one backend kind / provider id — the single accessor
+   * behind every adapter construction seam below. Legacy per-backend env
+   * settings still override at their own merge points.
+   */
+  private getDomainEnvFor(backend: string): Record<string, string> {
+    return resolveBackendEnvironment(this.settings.environmentVariables, backend);
+  }
+
+  /** Project MCP servers for the Claude adapter; missing manager/reader stays an empty config. */
+  private async readClaudeMcpServers(): Promise<Awaited<ReturnType<typeof adaptMcpConfigForClaude>>> {
+    if (!this.opencodeConfigManager) {
+      return {};
+    }
+    try {
+      const { McpConfigService } = await import('./core/config/McpConfigService');
+      const mcpConfigService = new McpConfigService(this.opencodeConfigManager);
+      return adaptMcpConfigForClaude(await mcpConfigService.readProjectServers());
+    } catch {
+      return {};
+    }
+  }
+
+  /**
+   * R-F7: backend keys whose environment participates in the
+   * fingerprint — the built-in backend kinds plus every configured provider
+   * domain key (custom providers / ACP agent ids).
+   */
+  private getEnvironmentFingerprintBackends(): string[] {
+    const backends = new Set<string>([
+      'opencode',
+      'claude-code',
+      'codex',
+      'copilot',
+      'pi',
+      ...Object.keys(this.settings.environmentVariables.providers),
+    ]);
+    return [...backends].sort((left, right) => left.localeCompare(right));
+  }
+
+  /** R-F7: fingerprint of each backend's fully resolved environment (legacy env included). */
+  private computeCurrentEnvironmentFingerprints(): Record<string, string> {
+    return computeBackendEnvironmentFingerprints(
+      this.settings.environmentVariables,
+      this.getEnvironmentFingerprintBackends(),
+      (backend) => (backend === 'claude-code'
+        ? this.settings.backendSettings.claudeCode.env
+        : undefined),
+    );
+  }
+
+  /**
+   * R-F7: compare the current per-backend environment fingerprints against the
+   * persisted previous run; surface one localized notice listing the changed
+   * backends (session-invalidation signal: existing sessions keep their old
+   * environment until restarted), then persist the current fingerprints.
+   * First run (no stored fingerprints) and unchanged environments stay silent.
+   * Bounded failures: the fingerprint bookkeeping must never break settings
+   * load/save, so any error is logged and swallowed.
+   */
+  private async refreshEnvironmentFingerprints(): Promise<void> {
+    try {
+      if (!this.storage || !this.settings) {
+        return;
+      }
+      const current = this.computeCurrentEnvironmentFingerprints();
+      const previous = this.environmentFingerprintsCache
+        ?? await this.storage.loadEnvironmentFingerprints();
+      if (previous) {
+        const changed = detectChangedBackends(previous, current);
+        if (changed.length > 0) {
+          new Notice(t('envDomains.changedNotice', { backends: changed.join('、') }), 12000);
+        }
+      }
+      if (!previous || !environmentFingerprintsEqual(previous, current)) {
+        await this.storage.saveEnvironmentFingerprints(current);
+      }
+      this.environmentFingerprintsCache = current;
+    } catch (error) {
+      logger.warn('Environment fingerprint refresh failed:', error);
+    }
   }
 
   private reportSettingsSecretsLoadState(): void {

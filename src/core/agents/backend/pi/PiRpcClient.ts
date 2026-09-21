@@ -48,6 +48,13 @@ export interface PiLaunchOptions {
   servicePath?: string;
   agentDirectory?: string;
   configurationOnly?: boolean;
+  /**
+   * advantage-parity R-F7: extra environment variables for the Pi service
+   * process (the resolved shared+`pi` domain env). Read at spawn time and
+   * merged over the process env after the PATH augmentation, so an explicit
+   * user-configured variable (including PATH) keeps final say.
+   */
+  getExtraEnv?: () => Record<string, string>;
 }
 
 /** Keep package migration and SDK layout knowledge inside the Pi boundary. */
@@ -144,7 +151,8 @@ export class PiRpcClient implements PiRpcPort {
       ? ['--input-type=module', '--eval', PI_SERVICE_BOOTSTRAP, String(Buffer.byteLength(source)), sdkEntry, JSON.stringify(options)]
       : [servicePath!, sdkEntry, JSON.stringify(options)];
     this.child = spawn(command, args, { cwd: options.workingDirectory, shell: false, windowsHide: true,
-      env: { ...process.env, PATH: `${path.dirname(command)}${path.delimiter}${process.env.PATH ?? process.env.Path ?? ''}` },
+      env: { ...process.env, PATH: `${path.dirname(command)}${path.delimiter}${process.env.PATH ?? process.env.Path ?? ''}`,
+        ...(options.getExtraEnv?.() ?? {}) },
       stdio: ['pipe', 'pipe', 'pipe'] });
     this.child.stdout.setEncoding('utf8');
     this.child.stdout.on('data', (data: string) => this.receive(data));

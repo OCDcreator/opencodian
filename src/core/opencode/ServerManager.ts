@@ -40,6 +40,12 @@ interface ServerManagerRuntimeOptions {
   initialManagedServerState?: ManagedServerState | null;
   onManagedServerStateChange?: (state: ManagedServerState | null) => void;
   tracePort?: OpenCodeTracePort;
+  /**
+   * advantage-parity R-F7: extra environment variables for the spawned local
+   * server process (the resolved shared+`opencode` domain env), read at each
+   * spawn so edited domains reach the next server start.
+   */
+  getExtraSpawnEnv?: () => Record<string, string>;
 }
 
 interface ManagedServerShutdownPlan {
@@ -78,6 +84,7 @@ export class ServerManager {
       this.config,
       undefined,
       runtimeOptions.tracePort,
+      runtimeOptions.getExtraSpawnEnv,
     );
   }
 

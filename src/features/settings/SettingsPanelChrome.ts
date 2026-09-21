@@ -3,6 +3,7 @@ import { App, setIcon,Setting } from 'obsidian';
 import { setLocale, t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { getOpenCodianWordmarkDataUrl } from '../../shared/brandingWordmark';
+import { EnvironmentVariablesModal } from './EnvironmentVariablesModal';
 
 export interface SettingHelpButtonConfig {
   tooltip: string;
@@ -68,6 +69,28 @@ export function renderSecretsKeychainSetting(containerEl: HTMLElement, plugin: O
         : t('settings.secrets.descOff'))
       : t('settings.secrets.descUnavailable'),
   );
+}
+
+/**
+ * advantage-parity R-F7: per-provider environment-variable domains row,
+ * shared by every settings face. The modal owns the editing; this row only
+ * opens it through a structured host (no app-layer import in the modal).
+ */
+export function renderEnvironmentVariablesSetting(containerEl: HTMLElement, plugin: OpenCodianPlugin): void {
+  new Setting(containerEl)
+    .setName(t('settings.envDomains.name'))
+    .setDesc(t('settings.envDomains.desc'))
+    .addButton((button) => {
+      button
+        .setButtonText(t('settings.envDomains.manageButton'))
+        .onClick(() => {
+          new EnvironmentVariablesModal({
+            app: plugin.app,
+            settings: plugin.settings,
+            saveSettings: () => plugin.saveSettings(),
+          }).open();
+        });
+    });
 }
 
 /** Shared "settings in editor area" row (modal tab + editor-area view). */

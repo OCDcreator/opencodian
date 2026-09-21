@@ -1,4 +1,5 @@
 # CodexAppServerTransport
+> 2026-09-21 (advantage-parity R-F7)：传输 options 新增 `getExtraEnv`；spawn env 非空时以 `toPlainStringEnv(process.env)` 为底叠加域 env；导出 `toPlainStringEnv` 供 CodexAdapter 复用。
 
 > **源码**: `src/core/agents/backend/CodexAppServerTransport.ts`
 > **状态**: [RUNTIME_ADJUNCT]

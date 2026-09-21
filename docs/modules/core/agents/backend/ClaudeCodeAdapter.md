@@ -1,4 +1,5 @@
 # ClaudeCodeAdapter
+> 2026-09-21 (advantage-parity R-F7)：options 新增 `getDomainEnvironment`（live accessor，免适配器重建）；五个 buildClaudeCodeOptions 调用点传 `domainEnv`；aux 会话 env 叠加域 env（base env < domains）。
 
 > **源码**: `src/core/agents/backend/ClaudeCodeAdapter.ts`
 > **状态**: [REVIEW]

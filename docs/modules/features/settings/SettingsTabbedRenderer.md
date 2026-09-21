@@ -1,4 +1,5 @@
 # SettingsTabbedRenderer
+> 2026-09-21 (advantage-parity R-F7)：deps 新增 `renderEnvironmentVariablesSetting`；General 合并块在 keychain 行之后渲染环境变量行。
 > 2026-09-20 (advantage-parity R-D2)：通用/基础二级 tab 渲染序列加入钥匙串开关行（deps 新增 renderSecretsKeychainSetting）。
 > 2026-09-18 (R-C6): `renderSecurityContent()` 对二级 tab `remote` 分派到 `SettingsRemoteControlSection`；其余二级 tab 仍渲染 `SettingsSecuritySection`。
 > 2026-09-18 (R-B2): `renderConversationContent` mounts `SettingsContextGroupsSection.attachTabbed` next to the inline-edit section.

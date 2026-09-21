@@ -1,4 +1,5 @@
 # ServerManager
+> 2026-09-21 (advantage-parity R-F7)：runtimeOptions 新增 `getExtraSpawnEnv`，透传给 LocalSidecarLauncher（每次 spawn 时读取，编辑后的分域对下一次 server 启动生效）。
 
 > 2026-07-29: The manager forwards the trace port to its sidecar owner; status diagnostics are emitted by lifecycle assembly without adding trace ownership to this guarded shell.
 

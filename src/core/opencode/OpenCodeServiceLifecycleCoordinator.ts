@@ -89,6 +89,8 @@ export interface OpenCodeServiceLifecycleAssemblyHost {
   initialManagedServerState?: ManagedServerState | null;
   onManagedServerStateChange?: (state: ManagedServerState | null) => void;
   tracePort?: OpenCodeTracePort;
+  /** advantage-parity R-F7: resolved shared+`opencode` domain env for the local server spawn. */
+  getExtraServerSpawnEnv?: () => Record<string, string>;
 }
 
 export interface OpenCodeServiceLifecycleCoordinatorHost {
@@ -223,6 +225,7 @@ export class OpenCodeServiceLifecycleCoordinator {
         initialManagedServerState: host.initialManagedServerState,
         onManagedServerStateChange: host.onManagedServerStateChange,
         tracePort: host.tracePort,
+        getExtraSpawnEnv: host.getExtraServerSpawnEnv,
       },
     );
     serverManagerRef.current = serverManager;

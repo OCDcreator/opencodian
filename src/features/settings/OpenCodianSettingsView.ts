@@ -32,6 +32,7 @@ import {
   addSettingHelpButton,
   applyInlineCodeText,
   createSettingsBlock,
+  renderEnvironmentVariablesSetting,
   renderLanguageSetting,
   renderSecretsKeychainSetting,
   renderSettingsInEditorAreaSettingRow,
@@ -264,6 +265,7 @@ export class OpenCodianSettingsView extends ItemView {
       renderLanguageSetting: (el) => { this.renderLanguageSetting(el); },
       renderSettingsInEditorAreaSetting: (el) => { this.renderSettingsInEditorAreaSetting(el); },
       renderSecretsKeychainSetting: (el) => { this.renderSecretsKeychainSetting(el); },
+      renderEnvironmentVariablesSetting: (el) => { renderEnvironmentVariablesSetting(el, this.plugin); },
       renderPluginUpdateSection: (el) => { this.renderPluginUpdateSection(el); },
     };
   }
@@ -328,6 +330,7 @@ export class OpenCodianSettingsView extends ItemView {
     this.renderLanguageSetting(blockBodyEl);
     this.renderSettingsInEditorAreaSetting(blockBodyEl);
     this.renderSecretsKeychainSetting(blockBodyEl);
+    renderEnvironmentVariablesSetting(blockBodyEl, this.plugin);
     this.renderPluginUpdateSection(containerEl);
   }
 

@@ -88,6 +88,7 @@ import {
   mapAppServerNotification,
   readAppServerTurnError,
 } from './CodexAppServerStreamMapper';
+import { toPlainStringEnv } from './CodexAppServerTransport';
 import { type CodexCliResolution,getCodexCliErrorMessage } from './CodexCliResolver';
 import { CodexStreamNormalizer } from './CodexStreamNormalizer';
 import type { CodexTraceContext, CodexTracePort } from './diagnostics/types';
@@ -162,6 +163,14 @@ export interface CodexAdapterOptions {
   codexPathOverride?: string;
   /** Verified user-installed CLI resolution supplied during plugin startup. */
   codexCliResolution?: CodexCliResolution;
+  /**
+   * advantage-parity R-F7: extra environment variables for the Codex CLI
+   * process (the resolved shared+`codex` domain env), read at SDK
+   * construction. When it yields a non-empty map the SDK gets
+   * `{...process.env, ...extra}` — the SDK otherwise inherits `process.env`
+   * wholesale, so the base is replicated to keep behavior identical.
+   */
+  getExtraEnv?: () => Record<string, string>;
   /** DI seam: override the Codex SDK instance factory. */
   createCodex?: CodexFactory;
   /** DI seam: provide or deliberately disable the local app-server client. */
@@ -493,6 +502,28 @@ export class CodexAdapter
     return this._status;
   }
 
+  /**
+   * SDK construction path. Auth is deferred to the SDK runtime: the Codex CLI
+   * supports multiple auth sources (explicit apiKey, OPENAI_API_KEY env var,
+   * ~/.codex/auth.json ChatGPT login, etc.). The adapter does NOT pre-check
+   * for an API key — auth failures surface naturally when thread.runStreamed()
+   * is called, which is the honest place to report them.
+   */
+  private async constructSdkClient(): Promise<void> {
+    const { Codex: CodexClass } = await import('@openai/codex-sdk');
+    const extraEnv = this.options.getExtraEnv?.() ?? {};
+    this.codex = new CodexClass({
+      ...(this.options.apiKey ? { apiKey: this.options.apiKey } : {}),
+      ...(this.options.workingDirectory ? { cwd: this.options.workingDirectory } : {}),
+      ...(this.options.codexPathOverride ? { codexPathOverride: this.options.codexPathOverride } : {}),
+      // R-F7: the SDK stops inheriting process.env when `env` is set, so
+      // the base is replicated under the domain overrides.
+      ...(Object.keys(extraEnv).length > 0
+        ? { env: { ...toPlainStringEnv(process.env), ...extraEnv } }
+        : {}),
+    });
+  }
+
   async start(): Promise<void> {
     if (this.codex) {
       return;
@@ -505,18 +536,7 @@ export class CodexAdapter
       if (this.options.createCodex) {
         this.codex = await this.options.createCodex();
       } else {
-        // Auth is deferred to the SDK runtime: the Codex CLI supports
-        // multiple auth sources (explicit apiKey, OPENAI_API_KEY env var,
-        // ~/.codex/auth.json ChatGPT login, etc.).  The adapter does NOT
-        // pre-check for an API key — auth failures surface naturally when
-        // thread.runStreamed() is called, which is the honest place to
-        // report them.
-        const { Codex: CodexClass } = await import('@openai/codex-sdk');
-        this.codex = new CodexClass({
-          ...(this.options.apiKey ? { apiKey: this.options.apiKey } : {}),
-          ...(this.options.workingDirectory ? { cwd: this.options.workingDirectory } : {}),
-          ...(this.options.codexPathOverride ? { codexPathOverride: this.options.codexPathOverride } : {}),
-        });
+        await this.constructSdkClient();
       }
 
       // The app-server is the primary Codex chat transport because it is the
@@ -535,6 +555,8 @@ export class CodexAdapter
             // Spawn the owned app-server inside the vault so project-scoped
             // skills/agents resolve. Injected factories manage their own cwd.
             ...(this.options.workingDirectory ? { workingDirectory: this.options.workingDirectory } : {}),
+            // R-F7: the resolved domain env reaches the primary transport too.
+            ...(this.options.getExtraEnv ? { getExtraEnv: this.options.getExtraEnv } : {}),
             // Feed raw wire traffic into the trace port (no-op when absent).
             ...(wireBridge ? { wireObserver: wireBridge } : {}),
           });

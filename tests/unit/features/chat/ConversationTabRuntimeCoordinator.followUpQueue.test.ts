@@ -77,13 +77,15 @@ function createFixture() {
 }
 
 describe('ConversationTabRuntimeCoordinator follow-up queue', () => {
-  it('queues at most one follow-up send per busy tab and rejects a second queued send', () => {
+  it('queues multiple follow-ups per busy tab FIFO and drains in order (R-F1)', () => {
     const fixture = createFixture();
     fixture.runtimeByTab.set('tab-1', createRuntimeState({ isStreaming: true }));
 
     expect(fixture.coordinator.queueFollowUpSend('tab-1', { content: 'next prompt' })).toBe(true);
-    expect(fixture.coordinator.queueFollowUpSend('tab-1', { content: 'replacement prompt' })).toBe(false);
+    // R-F1: the visible multi-message queue replaces the old one-slot cap.
+    expect(fixture.coordinator.queueFollowUpSend('tab-1', { content: 'replacement prompt' })).toBe(true);
     expect(fixture.coordinator.consumeQueuedFollowUpSend('tab-1')).toEqual({ content: 'next prompt' });
+    expect(fixture.coordinator.consumeQueuedFollowUpSend('tab-1')).toEqual({ content: 'replacement prompt' });
     expect(fixture.coordinator.consumeQueuedFollowUpSend('tab-1')).toBeNull();
   });
 

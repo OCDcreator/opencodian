@@ -40,6 +40,10 @@ export interface WireHiddenAdaptersOptions {
    */
   codexTracePort?: CodexTracePort;
   getPiSettings?: () => PiBackendSettings;
+  /** R-F7: resolved domain env injected into spawned Pi service processes. */
+  getPiExtraEnv?: () => Record<string, string>;
+  /** R-F7: resolved domain env injected into Codex CLI / app-server processes. */
+  getCodexExtraEnv?: () => Record<string, string>;
   onPiUiRequest?: PiUiHandler;
 }
 
@@ -83,9 +87,11 @@ export function wireHiddenAdapters(options: WireHiddenAdaptersOptions): void {
       ...(codexCliResolution.mode === 'available'
         ? { codexPathOverride: codexCliResolution.executablePath }
         : {}),
+      ...(options.getCodexExtraEnv ? { getExtraEnv: options.getCodexExtraEnv } : {}),
       tracePort: options.codexTracePort,
     }));
     registry.register(new PiAdapter({ workingDirectory: vaultPath, getSettings: options.getPiSettings,
+      ...(options.getPiExtraEnv ? { getExtraEnv: options.getPiExtraEnv } : {}),
       servicePath: options.pluginDir ? path.join(options.pluginDir, 'assets', 'pi', 'service.mjs') : '', onUiRequest: options.onPiUiRequest }));
   }
 }

@@ -1,4 +1,5 @@
 # AcpClientManager
+> 2026-09-21 (advantage-parity R-F7)：构造新增 `AcpClientManagerOptions.getDomainsEnv`（按 agent.id 注入分域）；spawn env 合并序 `process.env` < `domains[agent.id]` < `agent.config.env`。
 
 > **源码**: `src/core/acp/AcpClientManager.ts`
 > **状态**: [REVIEW]

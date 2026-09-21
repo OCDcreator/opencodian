@@ -1,4 +1,5 @@
 # SettingsPanelChrome
+> 2026-09-21 (advantage-parity R-F7)：新增共享行 `renderEnvironmentVariablesSetting`（名称/描述 + 「管理」按钮打开 EnvironmentVariablesModal；modal 用结构化 host，不 import 应用层）。
 > 2026-09-20 (advantage-parity R-D2)：新增共享设置行 `renderSecretsKeychainSetting`（钥匙串开关 + 不可用时的诚实降级文案 + 回滚语义）与 `renderSettingsInEditorAreaSettingRow`。
 
 > **源码**: `src/features/settings/SettingsPanelChrome.ts`

@@ -9,6 +9,7 @@
 @import 'components/relevant-notes.css';
 @import 'components/queued-followup-bar.css';
 @import 'components/context-window-override-modal.css';
+@import 'components/environment-variables-modal.css';
 @import 'components/backend-session-browser.css';
 @import 'components/streaming-content.css';
 @import 'components/inline-permission.css';
