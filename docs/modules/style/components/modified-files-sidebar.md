@@ -1,4 +1,5 @@
 # Modified Files Sidebar Styles
+> 2026-09-21 (advantage-parity R-F3)：新增 `.opencodian-edit-revert-preview-*`：Obsidian-native 单层确认 modal、可滚动路径列表、before→after 行数、图标+文字+边框三重冲突信号和共享 modal token 的 action rail；无嵌套 card / ad-hoc margin。
 > 2026-09-21 (advantage-parity R-F2)：为绑定草稿/缺失 locked 行和紧凑 badge 添加 host-theme 样式；不为绑定状态增加伪 diff 表面。
 > 2026-09-18 (R-B3): R-B3: adds the `.opencodian-edit-revert-*` classes (section, header, revert-all button, hint, list, per-item status/state classes, action buttons, excluded label) rendered by the sidebar's revert section; the read-only list gains an `is-hidden` state while revert entries are shown.
 
@@ -20,6 +21,9 @@
 - `.opencodian-modified-files-sidebar-item`、`.opencodian-modified-files-sidebar-item > summary`、`.opencodian-modified-files-sidebar-path`：默认展开的原生 `<details>` 文件项、键盘可达折叠摘要与 monospace 路径按钮。
 - `.opencodian-modified-files-sidebar-additions` / `.deletions`：增删行数颜色。
 - `.opencodian-modified-files-toggle` 与 `.opencodian-modified-files-toggle-badge`：输入 toolbar toggle 与文件数量角标。
+- `.opencodian-edit-revert-preview-modal`：回退确认 modal 根；content 使用共享 `--opencodian-modal-section-inner-gap`。
+- `.opencodian-edit-revert-preview-row` / `.is-conflict`：一条文件预览；冲突使用 1px `--text-warning` 边框，并由 `.opencodian-edit-revert-preview-conflict` 的 Lucide icon + 文本补足非色彩语义。
+- `.opencodian-edit-revert-preview-actions`：有顶部分隔线的右对齐 action rail，使用共享 `--opencodian-modal-action-gap`；failure/round-open 时只渲染取消，没有 CTA。
 
 ## 关联 TS 组件
 

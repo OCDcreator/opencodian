@@ -16,6 +16,7 @@
 - **写回唯一出口**：所有破坏性写操作都委托给 `EditRevertVaultWriteback`（vault.process / vault.create / vault.trash），自身绝不直接写文件系统。
 - **Fail-soft**：快照 / 通知 / 持久化的失败只记 warn 日志，绝不阻塞发送主链路（send pipeline 以 fire-and-forget 方式调用）。
 - **插件发起批量捕获（R-B5）**：`beginBatchCapture` 不走 200ms 回合预算——批量是用户发起、清单在预览阶段已知，对全部受影响文件强制预捕获；超限文件照旧进入 `standbyOversize` 如实标注不可回退。`notePluginMove` 存在的原因：vault `rename` 事件不在事件漏斗监听范围内（Obsidian 移动只发 `rename`），插件移动必须显式登记；`endBatchCapture` 关闭后**无宽限窗**（批量写入全部显式登记），因此一键回退即时可用。`endBatchCapture` **只关闭 `backend: 'plugin'` 轮次**：若轮次开启后有真实 agent turn 启动（最新轮次变为 turn 轮），拒绝关闭——绝不提前暴露回合中的回退、也不破坏 turn 的工具声明 pre-image 捕获。`beginBatchCapture` 内部失败一律解析为 `false`，批量执行方必须拒绝执行（fail-closed）。
+- **R-F3 后基线与预览**：`endTurnCapture` 和真正关闭 plugin round 的 `endBatchCapture` 都会为 active text entry 冻结一次 post-image（hash/bytes 或 missing）；普通 vault modify 不会覆盖它。`getRevertPreview(conversationId, paths?)` 是只读队列任务：从相同的内容寻址 hash 比较当前文件与该 frozen baseline，路径默认所有 active/revertible 条目，单文件严格过滤。无基线、二进制、超限、读失败都返回冲突/不可计算，绝不误标安全；该元数据不进入 `EditRevertVaultWriteback`。
 
 ## 导入关系
 
@@ -33,6 +34,7 @@ class EditRevertService implements EditRevertServicePort {
   initialize(): Promise<void>;                       // 建目录 + 恢复持久化 rounds + 注册 vault 监听
   dispose(): void;
   getSidebarModel(conversationId): EditRevertSidebarModel;
+  getRevertPreview(conversationId, paths?): Promise<EditRevertPreview>; // 只读行数/冲突预览
   beginTurnCapture(info: EditRevertTurnBeginInfo): void;
   endTurnCapture(conversationId): void;
   noteWriteToolUse(info: EditRevertWriteToolInfo): void;
@@ -64,6 +66,8 @@ class EditRevertService implements EditRevertServicePort {
 ### 保留与淘汰
 
 `endTurnCapture` 与持久化定时器会触发 `enforceRetention()`：按 `planRoundEvictions()`（shared 纯函数）淘汰最旧 round（轮数上限 30、每会话上限 10、字节上限 `editRevertSnapshotLimitMb` 与单文件快照上限取大者），随后清扫不再被任何 round 引用的 blob。
+
+R-F3 post-image blob 与 pre-image/created/restore blob 一样参与引用收集、字节核算和 retention stat fallback，持久化 round 可在重启后继续用于 preview；绝不因为 GC 漏引用而把基线静默变成安全。
 
 ## 与其他模块的交互
 

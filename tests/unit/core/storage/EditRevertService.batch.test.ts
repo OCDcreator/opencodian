@@ -51,6 +51,13 @@ describe('EditRevertService forced batch capture (R-B5)', () => {
     await service.endBatchCapture(BATCH_ID);
     await settle(service);
 
+    const preview = await service.getRevertPreview(BATCH_ID);
+    expect(preview.roundOpen).toBe(false);
+    expect(preview.rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: 'notes/a.md', beforeLines: 1, afterLines: 1, conflict: false }),
+      expect.objectContaining({ path: 'notes/b.md', beforeLines: 1, afterLines: 1, conflict: false }),
+    ]));
+
     // Immediate availability: no clock advance, no post-turn grace needed.
     const result = await service.revertAll(BATCH_ID);
     expect(result).toMatchObject({ ok: true, changed: 2, skipped: [] });

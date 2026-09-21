@@ -24,6 +24,7 @@ class EditRevertStore {
   removeRound(meta): Promise<void>;
   roundFilePath(meta): string;
   storeBlob(content: string): Promise<StoredImage>;               // sha256 内容寻址；已存在即跳过（去重）
+  hashContent(content): StoredImage;                              // 同一 sha256/byte 算法，无 adapter 写入（R-F3 比较）
   readBlob(hash): Promise<string | null>;
   getBlobBytes(hash): number;                                     // 内存缓存
   statBlob(hash, fallback): Promise<number>;
@@ -40,7 +41,7 @@ class EditRevertStore {
 
 ### 内容寻址去重
 
-`storeBlob()` 先算 sha256，再按 hash 命名写文件；同一份内容无论被多少个 round / 条目引用，磁盘上只有一份。`blobBytesByHash` 内存缓存避免重复 stat。
+`storeBlob()` 先算 sha256，再按 hash 命名写文件；同一份内容无论被多少个 round / 条目引用，磁盘上只有一份。`hashContent()` 复用完全相同的 sha256/UTF-8 byte 算法但不写 adapter，供 R-F3 只读 current-vs-post-baseline 比较，避免创建第二套 hash 语义。`blobBytesByHash` 内存缓存避免重复 stat。
 
 ### 会话目录命名
 

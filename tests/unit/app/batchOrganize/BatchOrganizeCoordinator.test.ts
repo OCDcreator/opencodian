@@ -65,6 +65,7 @@ async function buildCoordinator(harness: EditRevertVaultHarness, caches: Map<str
   const order = harness.operationOrder;
   const port: EditRevertServicePort = {
     getSidebarModel: (id) => context.service.getSidebarModel(id),
+    getRevertPreview: (id, paths) => context.service.getRevertPreview(id, paths),
     beginTurnCapture: (info) => context.service.beginTurnCapture(info),
     endTurnCapture: (id) => context.service.endTurnCapture(id),
     noteWriteToolUse: (info) => context.service.noteWriteToolUse(info),

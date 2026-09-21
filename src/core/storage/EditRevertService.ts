@@ -29,12 +29,14 @@ import {
   type EventRef,
   normalizePath,
   type TAbstractFile,
+  TFile,
 } from 'obsidian';
 
 import { createLogger, toVaultRelativePath } from '../../shared';
 import {
   buildSidebarModel,
   computeRoundBytes,
+  countTextLines,
   EDIT_REVERT_IDLE_CACHE_MAX_BYTES,
   EDIT_REVERT_IDLE_CACHE_MAX_FILES,
   EDIT_REVERT_MAX_ROUNDS_PER_CONVERSATION,
@@ -52,7 +54,10 @@ import {
 } from '../../shared';
 import type {
   EditRevertActionResult,
+  EditRevertFileEntry,
   EditRevertFileStatus,
+  EditRevertPreview,
+  EditRevertPreviewRow,
   EditRevertRoundMeta,
   EditRevertServicePort,
   EditRevertSidebarModel,
@@ -172,6 +177,13 @@ export class EditRevertService implements EditRevertServicePort {
     }
     const round = this.getLatestRound(conversationId);
     return buildSidebarModel(round?.meta ?? null, true, this.now());
+  }
+
+  async getRevertPreview(
+    conversationId: string,
+    paths?: readonly string[],
+  ): Promise<EditRevertPreview> {
+    return this.enqueue(() => this.performGetRevertPreview(conversationId, paths));
   }
 
   beginTurnCapture(info: EditRevertTurnBeginInfo): void {
@@ -630,6 +642,7 @@ export class EditRevertService implements EditRevertServicePort {
       return;
     }
     const now = this.now();
+    await this.freezePostImages(round);
     round.meta.closedAt = now;
     round.meta.acceptsWritesUntil = now + EDIT_REVERT_POST_TURN_GRACE_MS;
     round.dirty = true;
@@ -845,12 +858,147 @@ export class EditRevertService implements EditRevertServicePort {
       return;
     }
     const now = this.now();
+    await this.freezePostImages(round);
     round.meta.closedAt = now;
     round.meta.acceptsWritesUntil = now;
     round.dirty = true;
     this.schedulePersist();
     this.enqueue(() => this.enforceRetention()).catch(() => undefined);
     this.notifyChanged();
+  }
+
+  /**
+   * Freeze one post-round baseline for each active text entry. This is a
+   * preview/conflict safety record only: writeback keeps its existing
+   * pre-image semantics and never consumes these fields.
+   */
+  private async freezePostImages(round: RoundState): Promise<void> {
+    for (const entry of round.meta.entries) {
+      if (
+        entry.state !== 'active'
+        || entry.postImageHash
+        || entry.postImageMissing
+        || entry.postImageUnavailable
+      ) {
+        continue;
+      }
+      const currentPath = entry.status === 'moved' ? entry.movedTo : entry.path;
+      if (entry.binaryAsset || !currentPath || !isRevertibleTextPath(currentPath)) {
+        entry.postImageUnavailable = true;
+        continue;
+      }
+      const size = await this.readVaultFileSize(currentPath);
+      if (size === null) {
+        entry.postImageMissing = true;
+        continue;
+      }
+      if (size > EDIT_REVERT_MAX_SNAPSHOT_BYTES) {
+        entry.postImageUnavailable = true;
+        continue;
+      }
+      const content = await this.readVaultFile(currentPath);
+      if (content === null) {
+        entry.postImageUnavailable = true;
+        continue;
+      }
+      const image = await this.store.storeBlob(content);
+      entry.postImageHash = image.hash;
+      entry.postImageBytes = image.bytes;
+    }
+  }
+
+  private async performGetRevertPreview(
+    conversationId: string,
+    paths?: readonly string[],
+  ): Promise<EditRevertPreview> {
+    const round = this.getLatestRound(conversationId);
+    if (!this.isEnabled() || !round) {
+      return { roundId: round?.meta.id ?? null, roundOpen: false, rows: [] };
+    }
+    const requested = paths === undefined
+      ? null
+      : new Set(paths.map((path) => this.normalizeVaultPath(path)).filter((path): path is string => !!path));
+    const targets = round.meta.entries.filter((entry) =>
+      entry.state === 'active'
+      && isEntryRevertible(entry)
+      && (requested === null || requested.has(entry.path)),
+    );
+    const rows = await Promise.all(targets.map((entry) => this.buildRevertPreviewRow(entry)));
+    return {
+      roundId: round.meta.id,
+      roundOpen: round.meta.acceptsWritesUntil > this.now(),
+      rows,
+    };
+  }
+
+  private async buildRevertPreviewRow(entry: EditRevertFileEntry): Promise<EditRevertPreviewRow> {
+    const beforeLines = await this.getPreviewBeforeLines(entry);
+    const afterLines = await this.getPreviewAfterLines(entry);
+    const baselineUnavailable = !entry.postImageHash && !entry.postImageMissing;
+    if (baselineUnavailable) {
+      return {
+        path: entry.path,
+        status: entry.status,
+        beforeLines,
+        afterLines,
+        conflict: true,
+        conflictReason: 'baseline-unavailable',
+      };
+    }
+    const currentPath = entry.status === 'moved' ? entry.movedTo : entry.path;
+    const current = currentPath ? await this.readPreviewCurrentContent(currentPath) : null;
+    const conflict = entry.postImageMissing
+      ? current !== null
+      : current === null || this.store.hashContent(current).hash !== entry.postImageHash;
+    return {
+      path: entry.path,
+      status: entry.status,
+      beforeLines,
+      afterLines,
+      conflict,
+      conflictReason: conflict ? 'changed-after-capture' : null,
+    };
+  }
+
+  private async readPreviewCurrentContent(path: string): Promise<string | null> {
+    const normalized = normalizePath(path);
+    const file = this.app.vault.getAbstractFileByPath(normalized);
+    if (file === null) {
+      return null;
+    }
+    if (!(file instanceof TFile)) {
+      throw new Error(`revert-preview-current-not-file:${path}`);
+    }
+    try {
+      return await this.app.vault.adapter.read(normalized);
+    } catch {
+      throw new Error(`revert-preview-current-read-failed:${path}`);
+    }
+  }
+
+  private async getPreviewBeforeLines(entry: EditRevertFileEntry): Promise<number | null> {
+    if (entry.status === 'created') {
+      return 0;
+    }
+    if (entry.status === 'moved') {
+      return this.getPreviewAfterLines(entry);
+    }
+    if (!entry.preImageHash) {
+      return null;
+    }
+    const content = await this.store.readBlob(entry.preImageHash);
+    return content === null ? null : countTextLines(content);
+  }
+
+  private async getPreviewAfterLines(entry: EditRevertFileEntry): Promise<number | null> {
+    if (entry.postImageMissing) {
+      return 0;
+    }
+    if (!entry.postImageHash) {
+      return null;
+    }
+    const content = await this.store.readBlob(entry.postImageHash);
+    return content === null ? null : countTextLines(content);
   }
 
   private resolvePreImage(
@@ -1112,6 +1260,7 @@ export class EditRevertService implements EditRevertServicePort {
       for (const entry of round.meta.entries) {
         bump(entry.preImageHash);
         bump(entry.createdHash);
+        bump(entry.postImageHash);
         bump(entry.restoreHash);
       }
       for (const image of round.standby.values()) {
@@ -1135,9 +1284,12 @@ export class EditRevertService implements EditRevertServicePort {
       // Refresh blob byte cache for hashes referenced by rounds.
       for (const round of this.rounds.values()) {
         for (const entry of round.meta.entries) {
-          for (const hash of [entry.preImageHash, entry.createdHash, entry.restoreHash]) {
+          for (const hash of [entry.preImageHash, entry.createdHash, entry.postImageHash, entry.restoreHash]) {
             if (hash) {
-              await this.store.statBlob(hash, entry.preImageBytes ?? entry.restoreBytes ?? 0);
+              await this.store.statBlob(
+                hash,
+                entry.preImageBytes ?? entry.postImageBytes ?? entry.restoreBytes ?? 0,
+              );
             }
           }
         }

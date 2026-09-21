@@ -77,9 +77,9 @@ describe('EditRevertService retention and dedup (R-B3 §8.1)', () => {
     const blobWrites = context.harness.adapterWriteLog.filter(
       (path) => path.startsWith(`${CHECKPOINT_BLOBS_DIR}/`) && path !== CHECKPOINT_BLOBS_DIR,
     );
-    // Three rounds each captured the identical pre-turn content 'SAME', but
-    // content addressing stored exactly one blob for it.
-    expect(blobWrites).toHaveLength(1);
+    // Three rounds share one identical pre-turn blob and retain three distinct
+    // settled post-image baselines for R-F3 conflict detection.
+    expect(blobWrites).toHaveLength(4);
   });
 
   it('evicts the oldest round beyond the per-conversation cap and sweeps its blob', async () => {
@@ -95,9 +95,9 @@ describe('EditRevertService retention and dedup (R-B3 §8.1)', () => {
     expect(rounds).toHaveLength(10);
 
     const blobs = context.harness.diskFilesUnder(CHECKPOINT_BLOBS_DIR);
-    // Rounds 2..11 reference CONTENT-1-PRE..CONTENT-10-PRE (10 blobs);
-    // round 1's pre-image blob was swept with its round.
-    expect(blobs).toHaveLength(10);
+    // Rounds 2..11 retain one pre-image and one post-image each; round 1's
+    // two unreferenced blobs were swept with its round.
+    expect(blobs).toHaveLength(20);
   });
 
   it('evicts the oldest round when the snapshot byte cap is exceeded', async () => {
@@ -125,10 +125,10 @@ describe('EditRevertService retention and dedup (R-B3 §8.1)', () => {
     }
     await settle(context.service);
 
-    // The byte cap floor (per-file snapshot cap) is exceeded by round 3's
-    // accounting, so round 1 (oldest) is evicted and its blob swept.
+    // Pre + settled-post baselines make each round ~1.44MiB. The 2MiB floor
+    // therefore retains only the newest round and sweeps both older pairs.
     const rounds = context.harness.diskFilesUnder(CHECKPOINT_ROUNDS_DIR).filter((path) => path.endsWith('.json'));
-    expect(rounds).toHaveLength(2);
+    expect(rounds).toHaveLength(1);
   });
 
   it('keeps rounds of different conversations under the global count cap', async () => {

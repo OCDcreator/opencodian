@@ -77,13 +77,20 @@ export class EditRevertStore {
 
   /** Content-addressed blob write; existing blobs are skipped (dedup). */
   async storeBlob(content: string): Promise<StoredImage> {
-    const hash = sha256Hex(content);
-    const bytes = Buffer.byteLength(content, 'utf8');
+    const { hash, bytes } = this.hashContent(content);
     if (!this.blobBytesByHash.has(hash)) {
       await this.app.vault.adapter.write(normalizePath(this.blobPath(hash)), content);
       this.blobBytesByHash.set(hash, bytes);
     }
     return { hash, bytes };
+  }
+
+  /** Existing blob-key algorithm exposed without an adapter write for previews. */
+  hashContent(content: string): StoredImage {
+    return {
+      hash: sha256Hex(content),
+      bytes: Buffer.byteLength(content, 'utf8'),
+    };
   }
 
   async readBlob(hash: string): Promise<string | null> {

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "416c21ec7c0d0c626ce82baf57049ff206ebf32271f3345c8821e839edabfb8f",
-  "recordCount": 770,
+  "digest": "46bd65f495f6d8153f3f69c4b9e5a0151d1b1d565cd8f51c72f8a72e5ce305a6",
+  "recordCount": 771,
   "records": [
     {
       "kind": "ignore",
@@ -1121,12 +1121,12 @@
     {
       "kind": "src",
       "key": "src/core/storage/EditRevertService.ts",
-      "sha256": "8d5780ff1d2238caef70148b1e446b164997fe121c9743d9fab3b29bbc01a919"
+      "sha256": "95be2cc48d717200a26089ae3ca9557dafe4c382763dc0e107a33950b89feb54"
     },
     {
       "kind": "src",
       "key": "src/core/storage/EditRevertStore.ts",
-      "sha256": "a2d8b178215a143d69548e413cf378e4f0f9cf1f038431735229f9f9f5241432"
+      "sha256": "6ca41e02be74378b7fb683419c9420171d4d90f76c82334fbcaffeaf00b77b98"
     },
     {
       "kind": "src",
@@ -1186,12 +1186,12 @@
     {
       "kind": "src",
       "key": "src/core/types/editRevert.ts",
-      "sha256": "2c61ab17f0a5a4abdbe60f0365cfdfe531e3dd7606fc65b6a22b3f5820759382"
+      "sha256": "bd3e7bacdebbfc28f0695c67e42e664be5739b6efcf5055afff97b4f1015b982"
     },
     {
       "kind": "src",
       "key": "src/core/types/index.ts",
-      "sha256": "c8c141acebad0dd1eb2a4537485a8e51b5bcef320d4f547abbded96e4de76042"
+      "sha256": "c22124e775ef2e9709163b5910f2d1e30e912ebdfdd92f915e4c684b70d3343e"
     },
     {
       "kind": "src",
@@ -1311,7 +1311,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
-      "sha256": "18549d93721e728281b4a5d107330fc8c931f5c4cf92a2719d2c735c25f25335"
+      "sha256": "178c77e16c2f767a9b6248b73b8f2f8cbddbc2809db946ed1a64cb2d6459bce4"
     },
     {
       "kind": "src",
@@ -2415,6 +2415,11 @@
     },
     {
       "kind": "src",
+      "key": "src/features/chat/ui/EditRevertPreviewModal.ts",
+      "sha256": "941f34d28681ec3fb43d7ee0016fff5d0a8815b1abf0fe7d23fc2ba08e5756b9"
+    },
+    {
+      "kind": "src",
       "key": "src/features/chat/ui/EffortSelector.ts",
       "sha256": "cf3ffb3577dd8433ed96ef07a7a17c058ca3b99b07499aa33feb142197b18bfc"
     },
@@ -2461,7 +2466,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/ui/ModifiedFilesSidebar.ts",
-      "sha256": "272ad8e2695039362e8f6d6a58760fd2b14aff597ce3e3f86e25af0efa03e187"
+      "sha256": "38a57aca83cac32fbf12a1705926f45b81fee39ad454a619b92d90c02c0083b8"
     },
     {
       "kind": "src",
@@ -3266,7 +3271,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "18b6f18af93efe65e00203bf9a77e8b3829cd8672dff766eb762a7c4dec43da6"
+      "sha256": "bb3a14a2d685234993893063c60b354f4d76a6dd7e6d59b54e03b479b378f712"
     },
     {
       "kind": "src",
@@ -3276,7 +3281,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "51c9f7a8ea2147f513c745b370538f09f8fc8bf317f248dd8748734eabccfc5a"
+      "sha256": "254e2575d492d186e62655f53884134b96f4c51a17d227aa3a3090b8aa1970e4"
     },
     {
       "kind": "src",
@@ -3341,12 +3346,12 @@
     {
       "kind": "src",
       "key": "src/shared/editRevertPlan.ts",
-      "sha256": "87ed4a23c965d243a9eafee24aaa898a7bd4cadeb21804364afe9253222cf896"
+      "sha256": "0cb5663e50dc66a77d34dbebb79d8e946f37a840f7eafb6ae674952472a64710"
     },
     {
       "kind": "src",
       "key": "src/shared/index.ts",
-      "sha256": "e39c1947393c63ff008c21a7afce9da4fc253ecb0de8671e06ed55538c795d06"
+      "sha256": "56c5541e0358802da3cf26635f181dc45ff86a2adf25291e909db3581ce884f6"
     },
     {
       "kind": "src",
@@ -3461,7 +3466,7 @@
     {
       "kind": "src",
       "key": "src/style/components/modified-files-sidebar.css",
-      "sha256": "0009d1ef90585ccc43777d4ca763eccb1157305befa72386f0f48460fd5d9558"
+      "sha256": "89321fa66694b760a8d7d62158111b27ba0727c8da7b1cdb120ae1650a049c7f"
     },
     {
       "kind": "src",
@@ -3854,7 +3859,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-21T07:07:24.886Z",
-  "headShaAtGeneration": "4e5d909b36525f54891c9d8d847d7616c799edc9",
+  "generatedAt": "2026-09-21T08:06:31.397Z",
+  "headShaAtGeneration": "df6dce90dbd4338ae16ad22dde1a937258a254b2",
   "graphifyVersion": "graphify 0.8.50"
 }

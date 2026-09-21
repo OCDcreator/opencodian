@@ -12,6 +12,7 @@ import {
   classifyWriteTool,
   computeBlobRefCounts,
   computeRoundBytes,
+  countTextLines,
   type EditRevertFileEntry,
   type EditRevertRoundMeta,
   extractCandidatePathsFromPrompt,
@@ -22,6 +23,18 @@ import {
   parseShellRedirectionTargets,
   planRoundEvictions,
 } from '../../../src/shared';
+
+describe('editRevertPlan: preview line semantics', () => {
+  it.each([
+    ['', 0],
+    ['one', 1],
+    ['one\ntwo', 2],
+    ['one\ntwo\n', 2],
+    ['\n', 1],
+  ])('counts %j as %i line(s)', (content, expected) => {
+    expect(countTextLines(content)).toBe(expected);
+  });
+});
 
 function makeEntry(overrides: Partial<EditRevertFileEntry> & { path: string }): EditRevertFileEntry {
   return {
@@ -187,7 +200,7 @@ describe('editRevertPlan: round bytes and blob refcounts (dedup accounting)', ()
       {
         entries: [
           makeEntry({ path: 'a.md', preImageHash: 'h1' }),
-          makeEntry({ path: 'b.md', preImageHash: 'h1', restoreHash: 'h2' }),
+          makeEntry({ path: 'b.md', preImageHash: 'h1', postImageHash: 'h2', restoreHash: 'h2' }),
         ],
       },
       (hash) => (hash === 'h1' ? 100 : 50),
@@ -197,11 +210,12 @@ describe('editRevertPlan: round bytes and blob refcounts (dedup accounting)', ()
 
   it('counts references across rounds', () => {
     const counts = computeBlobRefCounts([
-      { entries: [makeEntry({ path: 'a.md', preImageHash: 'h1' })] },
-      { entries: [makeEntry({ path: 'a.md', preImageHash: 'h1', restoreHash: 'h2' })] },
+      { entries: [makeEntry({ path: 'a.md', preImageHash: 'h1', postImageHash: 'h3' })] },
+      { entries: [makeEntry({ path: 'a.md', preImageHash: 'h1', postImageHash: 'h3', restoreHash: 'h2' })] },
     ]);
     expect(counts.get('h1')).toBe(2);
     expect(counts.get('h2')).toBe(1);
+    expect(counts.get('h3')).toBe(2);
   });
 });
 

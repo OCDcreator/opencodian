@@ -9,13 +9,15 @@ import { App, Component, setIcon } from 'obsidian';
 
 import type { SessionDiffEntry } from '../../../core/types';
 import { t } from '../../../i18n';
-import type { EditRevertSidebarModel } from '../../../shared';
+import type { EditRevertPreview, EditRevertSidebarModel } from '../../../shared';
 import { getFilePathBasename, toVaultRelativePath } from '../../../shared';
 import { ConversationRenderService } from '../services/ConversationRenderService';
+import { EditRevertPreviewModal } from './EditRevertPreviewModal';
 
 export type ModifiedFilesSidebarAvailability = 'ready' | 'unavailable';
 
 export interface ModifiedFilesRevertActions {
+  getRevertPreview(paths?: readonly string[]): Promise<EditRevertPreview>;
   revertFile(path: string): Promise<void>;
   revertAll(): Promise<void>;
   restoreFile(path: string): Promise<void>;
@@ -371,7 +373,10 @@ export class ModifiedFilesSidebar extends Component {
       revertAllButton.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
-        void this.runRevertAction(() => this.revertActions?.revertAll() ?? Promise.resolve());
+        void this.openRevertPreview(
+          () => this.revertActions?.getRevertPreview() ?? Promise.reject(new Error('preview-unavailable')),
+          () => this.revertActions?.revertAll() ?? Promise.resolve(),
+        );
       });
     }
 
@@ -435,7 +440,8 @@ export class ModifiedFilesSidebar extends Component {
           revertButton.addEventListener('click', (event) => {
             event.preventDefault();
             event.stopPropagation();
-            void this.runRevertAction(
+            void this.openRevertPreview(
+              () => this.revertActions?.getRevertPreview([entry.path]) ?? Promise.reject(new Error('preview-unavailable')),
               () => this.revertActions?.revertFile(entry.path) ?? Promise.resolve(),
             );
           });
@@ -475,6 +481,37 @@ export class ModifiedFilesSidebar extends Component {
   }
 
   private revertBusy = false;
+  private revertPreviewOpen = false;
+
+  private async openRevertPreview(
+    getPreview: () => Promise<EditRevertPreview>,
+    action: () => Promise<void>,
+  ): Promise<void> {
+    if (this.revertBusy || this.revertPreviewOpen) {
+      return;
+    }
+    this.revertPreviewOpen = true;
+    try {
+      const preview = await getPreview();
+      new EditRevertPreviewModal(this.app, {
+        preview,
+        onConfirm: () => {
+          this.revertPreviewOpen = false;
+          void this.runRevertAction(action);
+        },
+        onCancel: () => {
+          this.revertPreviewOpen = false;
+        },
+      }).open();
+    } catch (error) {
+      new EditRevertPreviewModal(this.app, {
+        error: error instanceof Error ? error.message : String(error),
+        onCancel: () => {
+          this.revertPreviewOpen = false;
+        },
+      }).open();
+    }
+  }
 
   private async runRevertAction(action: () => Promise<void>): Promise<void> {
     if (this.revertBusy) {

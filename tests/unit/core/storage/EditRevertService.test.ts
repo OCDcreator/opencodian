@@ -37,7 +37,143 @@ async function startedService(
   return context;
 }
 
+// eslint-disable-next-line max-lines-per-function -- revert and preview variants share one stateful vault harness.
 describe('EditRevertService revert flows (R-B3)', () => {
+  it('freezes a post baseline and reports a clean line-count preview without writing', async () => {
+    const context = await startedService();
+    context.service.beginTurnCapture({
+      conversationId: CONVERSATION_ID,
+      backend: 'opencode',
+      userText: '',
+      contextPaths: ['notes/a.md'],
+    });
+    await settle(context.service);
+    context.harness.writeAgentFile('notes/a.md', 'POST-A\nline-2\n');
+    await settle(context.service);
+    context.service.endTurnCapture(CONVERSATION_ID);
+    await settle(context.service);
+    const before = context.harness.vaultFiles.get('notes/a.md');
+    const preview = await context.service.getRevertPreview(CONVERSATION_ID);
+    expect(preview.rows).toEqual([expect.objectContaining({
+      path: 'notes/a.md',
+      beforeLines: 1,
+      afterLines: 2,
+      conflict: false,
+    })]);
+    expect(context.harness.vaultFiles.get('notes/a.md')).toBe(before);
+  });
+
+  it('keeps the frozen baseline through post-turn grace, marks a later user edit conflicted, and still permits revert', async () => {
+    const context = await startedService();
+    context.service.beginTurnCapture({
+      conversationId: CONVERSATION_ID,
+      backend: 'opencode',
+      userText: '',
+      contextPaths: ['notes/a.md', 'notes/b.md'],
+    });
+    await settle(context.service);
+    context.harness.writeAgentFile('notes/a.md', 'POST-A');
+    context.harness.writeAgentFile('notes/b.md', 'POST-B');
+    await settle(context.service);
+    context.service.endTurnCapture(CONVERSATION_ID);
+    await settle(context.service);
+    context.advance(POST_TURN_GRACE_MS - 1);
+    context.harness.writeAgentFile('notes/a.md', 'USER-EDIT');
+    await settle(context.service);
+    context.advance(2);
+    const preview = await context.service.getRevertPreview(CONVERSATION_ID, ['notes/a.md']);
+    expect(preview.rows).toHaveLength(1);
+    expect(preview.rows[0]).toMatchObject({ path: 'notes/a.md', conflict: true, conflictReason: 'changed-after-capture' });
+    expect(preview.roundOpen).toBe(false);
+    const reverted = await context.service.revertFile(CONVERSATION_ID, 'notes/a.md');
+    expect(reverted).toMatchObject({ ok: true, changed: 1 });
+    expect(context.harness.vaultFiles.get('notes/a.md')).toBe('PRE-A');
+  });
+
+  it('previews created and deleted files against their frozen settled states', async () => {
+    const context = await startedService();
+    const conversationId = 'conv-created-deleted-preview';
+    context.service.beginTurnCapture({
+      conversationId,
+      backend: 'opencode',
+      userText: '',
+      contextPaths: ['notes/a.md'],
+    });
+    await settle(context.service);
+    context.harness.createAgentFile('notes/new.md', 'one\ntwo\n');
+    context.harness.vaultFiles.delete('notes/a.md');
+    context.service.handleVaultDelete('notes/a.md');
+    await settle(context.service);
+    context.service.endTurnCapture(conversationId);
+    await settle(context.service);
+
+    const clean = await context.service.getRevertPreview(conversationId);
+    expect(clean.rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        path: 'notes/new.md', beforeLines: 0, afterLines: 2, conflict: false,
+      }),
+      expect.objectContaining({
+        path: 'notes/a.md', beforeLines: 1, afterLines: 0, conflict: false,
+      }),
+    ]));
+
+    context.harness.vaultFiles.delete('notes/new.md');
+    context.harness.vaultFiles.set('notes/a.md', 'user-restored');
+    context.advance(POST_TURN_GRACE_MS + 1);
+    const conflicted = await context.service.getRevertPreview(conversationId);
+    expect(conflicted.rows.every((row) => row.conflict)).toBe(true);
+  });
+
+  it('fails closed with unavailable counts when the settled baseline exceeds the text cap', async () => {
+    const context = await startedService();
+    const conversationId = 'conv-post-oversize';
+    context.service.beginTurnCapture({
+      conversationId,
+      backend: 'opencode',
+      userText: '',
+      contextPaths: ['notes/a.md'],
+    });
+    await settle(context.service);
+    context.harness.writeAgentFile('notes/a.md', 'x'.repeat(2 * 1024 * 1024 + 1));
+    await settle(context.service);
+    context.service.endTurnCapture(conversationId);
+    await settle(context.service);
+
+    const preview = await context.service.getRevertPreview(conversationId, ['notes/a.md']);
+    expect(preview.rows).toEqual([expect.objectContaining({
+      path: 'notes/a.md',
+      beforeLines: 1,
+      afterLines: null,
+      conflict: true,
+      conflictReason: 'baseline-unavailable',
+    })]);
+  });
+
+  it('rejects the preview when a present current file cannot be read', async () => {
+    const context = await startedService();
+    context.service.beginTurnCapture({
+      conversationId: CONVERSATION_ID,
+      backend: 'opencode',
+      userText: '',
+      contextPaths: ['notes/a.md'],
+    });
+    await settle(context.service);
+    context.harness.writeAgentFile('notes/a.md', 'POST-A');
+    await settle(context.service);
+    context.service.endTurnCapture(CONVERSATION_ID);
+    await settle(context.service);
+    const read = context.harness.adapter.read.bind(context.harness.adapter);
+    jest.spyOn(context.harness.adapter, 'read').mockImplementation(async (path) => {
+      if (path === 'notes/a.md') {
+        throw new Error('simulated read failure');
+      }
+      return read(path);
+    });
+
+    await expect(context.service.getRevertPreview(CONVERSATION_ID, ['notes/a.md']))
+      .rejects.toThrow('revert-preview-current-read-failed:notes/a.md');
+  });
+
   it('reverts one modified file byte-identically without touching the other (AC1/AC2)', async () => {
     const context = await startedService();
     const conversationId = CONVERSATION_ID;

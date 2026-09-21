@@ -1,4 +1,5 @@
 # ModifiedFilesSidebar
+> 2026-09-21 (advantage-parity R-F3)：Revert/全部回退先经 `getRevertPreview` 打开 `EditRevertPreviewModal`，不再直接触发 action。sidebar 持有 preview modal 生命周期锁，双击只会发起一份 preview；取消/失败零写，确认才释放原有 action。modal 在 round 已重新开放时同样 fail-closed。
 > 2026-09-21 (advantage-parity R-F2)：绑定笔记是独立、只读的 draft/locked 行；仅真实 session diff 或 EditRevert path 命中时才附「绑定草稿」标记。回退区存在其他文件时，未命中的绑定笔记移到独立区并明示“不计入本轮修改或回退”，不污染修改计数。存在的路径可打开，缺失路径不可点击。
 > 2026-09-18 (R-B3): R-B3: `updateRevertState()` adds the backend-neutral revert section. When the latest round has entries it replaces the read-only session-diff list: per-entry Revert buttons (disabled while the round is open), an honest "未纳入回退" label instead of a button for oversize / pre-image-less files, an Undo-revert button for reverted entries, a Revert-all header action once the turn settles, degraded/round-open hints, and a click-to-open path. The sidebar remains Git-free and patch-free.
 
@@ -24,6 +25,7 @@
 - `render()` 在 ready 空状态显示 `modifiedFiles.empty`，在不可用状态显示 `modifiedFiles.unavailable`；头部摘要使用短的 `modifiedFiles.readyShort` / `modifiedFiles.unavailableShort`，并通过省略号适配窄 pane，完整说明只留在正文；有内容时渲染默认展开、原生 `<details>` 可折叠的逐文件条目，摘要显示可点击路径，内容显示 `+N`/`-N` 统计和状态 badge；列表项使用随 DOM 替换一起释放的元素级 click listener，避免重复 render 积累 Component 级事件注册。
 - 每个组件实例生成生命周期内稳定且唯一的 panel id，并由触发器的 `aria-controls` 关联，避免多 chat leaf 的 DOM id 冲突。
 - `formatPath()` 委托共享纯函数 `toVaultRelativePath()`（`src/shared/vault.ts`）剥离 vault base path；base path 仍由桌面 adapter 的 `getBasePath()` 获取。无法证明位于 vault 内的路径只显示 `getFilePathBasename()` 提取的 basename，并标记为 unresolved，不写入绝对 tooltip，也不调用 `workspace.openLinkText()`。
+- R-F3 的 `ModifiedFilesRevertActions` 新增只读 `getRevertPreview(paths?)`。单文件传入一个路径，全部回退不传过滤；preview 成功后只由 modal 的 confirm callback 调用原有 `revertFile/revertAll`，因此此模块不拥有或改变任何 vault 写回语义。
 
 ## 与其他模块的交互
 

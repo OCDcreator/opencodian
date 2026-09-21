@@ -1,9 +1,11 @@
 import { type App, Component } from 'obsidian';
+import { Modal } from 'obsidian';
 
 import type { ChatMessage, SessionDiffEntry } from '../../../../src/core/types/chat';
 import { ModifiedFilesSidebarCoordinator } from '../../../../src/features/chat/services/ModifiedFilesSidebarCoordinator';
 import { ModifiedFilesSidebar } from '../../../../src/features/chat/ui/ModifiedFilesSidebar';
 import { t } from '../../../../src/i18n';
+import type { EditRevertPreview } from '../../../../src/shared';
 
 type ObsidianLikeElement = HTMLElement & {
   createDiv: (options?: { cls?: string; text?: string; attr?: Record<string, string> }) => HTMLDivElement;
@@ -215,6 +217,7 @@ describe('ModifiedFilesSidebar', () => {
       }],
       revertibleCount: 1,
     }, {
+      getRevertPreview: jest.fn().mockResolvedValue({ roundId: 'round-1', roundOpen: false, rows: [] } as EditRevertPreview),
       revertFile: jest.fn().mockResolvedValue(undefined),
       revertAll: jest.fn().mockResolvedValue(undefined),
       restoreFile: jest.fn().mockResolvedValue(undefined),
@@ -227,6 +230,53 @@ describe('ModifiedFilesSidebar', () => {
     expect(document.querySelector('.opencodian-modified-files-linked-note-section')?.textContent)
       .toContain(t('modifiedFiles.linkedNoteExcludedHint'));
     expect(document.querySelectorAll('.opencodian-edit-revert-item')).toHaveLength(1);
+  });
+
+  it('requests a preview before one revert, opens one modal on double-click, and cancellation writes nothing', async () => {
+    const parentEl = document.createElement('div') as ObsidianLikeElement;
+    document.body.appendChild(parentEl);
+    const sidebar = new ModifiedFilesSidebar(
+      { workspace: { openLinkText: jest.fn() } } as unknown as App,
+      parentEl,
+    );
+    sidebar.onload();
+    const getRevertPreview = jest.fn().mockResolvedValue({
+      roundId: 'round-1',
+      roundOpen: false,
+      rows: [{
+        path: 'notes/one.md', status: 'modified', beforeLines: 1, afterLines: 2,
+        conflict: false, conflictReason: null,
+      }],
+    } as EditRevertPreview);
+    const revertFile = jest.fn().mockResolvedValue(undefined);
+    const opened: Modal[] = [];
+    const openSpy = jest.spyOn(Modal.prototype, 'open').mockImplementation(function open(this: Modal) {
+      opened.push(this);
+    });
+    const closeSpy = jest.spyOn(Modal.prototype, 'close').mockImplementation(() => undefined);
+    sidebar.updateRevertState({
+      enabled: true, roundId: 'round-1', roundOpen: false, degraded: false,
+      entries: [{
+        path: 'notes/one.md', status: 'modified', movedTo: null, state: 'active',
+        revertible: true, restorable: false, excludedReason: null,
+      }], revertibleCount: 1,
+    }, {
+      getRevertPreview,
+      revertFile,
+      revertAll: jest.fn().mockResolvedValue(undefined),
+      restoreFile: jest.fn().mockResolvedValue(undefined),
+    });
+
+    const button = document.querySelector<HTMLButtonElement>('.opencodian-edit-revert-action')!;
+    button.click();
+    button.click();
+    await Promise.resolve();
+    expect(getRevertPreview).toHaveBeenCalledTimes(1);
+    expect(opened).toHaveLength(1);
+    (opened[0] as unknown as { onClose(): void }).onClose();
+    expect(revertFile).not.toHaveBeenCalled();
+    openSpy.mockRestore();
+    closeSpy.mockRestore();
   });
 
   it('falls back to unique persisted Turn Change Records when the canonical session diff is empty', () => {

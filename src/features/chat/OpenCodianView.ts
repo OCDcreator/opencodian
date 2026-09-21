@@ -2998,6 +2998,7 @@ export class OpenCodianView extends ItemView {
     this.modifiedFilesSidebarCoordinator.refreshRevertState(
       editRevertService.getSidebarModel(conversationId),
       {
+        getRevertPreview: (paths) => editRevertService.getRevertPreview(conversationId, paths),
         revertFile: (path) => runRevertAction(
           () => editRevertService.revertFile(conversationId, path),
           () => t('editRevert.notice.reverted', { path }),

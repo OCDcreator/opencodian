@@ -45,6 +45,7 @@ export type EditRevertPreImageStatus = 'available' | 'oversize' | 'unavailable';
  * safety net, or an explicit plugin-initiated batch operation (R-B5).
  */
 export type EditRevertEntrySource = 'tool' | 'vault-event' | 'plugin';
+export type EditRevertPreviewConflictReason = 'changed-after-capture' | 'baseline-unavailable';
 
 export interface EditRevertFileEntry {
   /** Vault-relative path with `/` separators. */
@@ -57,6 +58,13 @@ export interface EditRevertFileEntry {
   preImageBytes?: number;
   /** Content hash captured right after a create event (informational). */
   createdHash?: string;
+  /** Frozen content hash when this capture round settled (R-F3 preview only). */
+  postImageHash?: string;
+  postImageBytes?: number;
+  /** The settled file was absent (a deleted entry); this is a valid baseline. */
+  postImageMissing?: boolean;
+  /** A text baseline could not be captured (oversize/read failure/binary asset). */
+  postImageUnavailable?: boolean;
   /** For `'moved'` entries: the vault-relative path the file lives at now. */
   movedTo?: string;
   /** Content hash captured at revert time; enables "恢复回退". */
@@ -125,6 +133,36 @@ export interface EditRevertActionResult {
   readonly skipped: readonly string[];
   /** Human-readable failure detail when ok === false. */
   error?: string;
+}
+
+/** One read-only, pre-write safety row presented before an R-B3 revert. */
+export interface EditRevertPreviewRow {
+  readonly path: string;
+  readonly status: EditRevertFileStatus;
+  /** `null` means the content is deliberately unavailable for a truthful count. */
+  readonly beforeLines: number | null;
+  /** `null` means the content is deliberately unavailable for a truthful count. */
+  readonly afterLines: number | null;
+  readonly conflict: boolean;
+  readonly conflictReason: EditRevertPreviewConflictReason | null;
+}
+
+export interface EditRevertPreview {
+  readonly roundId: string | null;
+  readonly roundOpen: boolean;
+  readonly rows: readonly EditRevertPreviewRow[];
+}
+
+/**
+ * Count text lines for preview rows. Empty content is zero lines; a terminal
+ * newline is the line terminator of the last text line, not a second empty line.
+ */
+export function countTextLines(content: string): number {
+  if (content.length === 0) {
+    return 0;
+  }
+  const withoutTerminalNewline = content.endsWith('\n') ? content.slice(0, -1) : content;
+  return withoutTerminalNewline.split(/\r?\n/).length;
 }
 
 const MARKDOWN_EXTENSION = /\.md$/i;
@@ -440,7 +478,7 @@ export function computeRoundBytes(
   const seen = new Set<string>();
   let total = 0;
   for (const entry of round.entries) {
-    for (const hash of [entry.preImageHash, entry.createdHash, entry.restoreHash]) {
+    for (const hash of [entry.preImageHash, entry.createdHash, entry.postImageHash, entry.restoreHash]) {
       if (hash && !seen.has(hash)) {
         seen.add(hash);
         total += getBlobBytes(hash);
@@ -463,6 +501,7 @@ export function computeBlobRefCounts(rounds: readonly Pick<EditRevertRoundMeta, 
     for (const entry of round.entries) {
       bump(entry.preImageHash);
       bump(entry.createdHash);
+      bump(entry.postImageHash);
       bump(entry.restoreHash);
     }
   }

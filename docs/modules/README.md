@@ -246,6 +246,7 @@ docs/modules/
 │   │       │   ├── ModelSelectorRenderer.md
 │   │       │   └── types.md
 │   │       ├── NavigationSidebar.md
+│   │       ├── EditRevertPreviewModal.md
 │   │       ├── QuestionDock.md
 │   │       ├── questionDockState.md
 │   │       └── SessionTodoDock.md

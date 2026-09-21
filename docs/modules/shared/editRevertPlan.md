@@ -43,6 +43,7 @@
 | `extractCandidatePathsFromPrompt(text)` | 预算化预快照的候选集：wikilink / markdown 链接 / 裸 `*.md` token（排除 URL、协议相对 leftover、非 markdown） |
 | `planRoundEvictions(rounds, limits)` | 保留规划：先每会话溢出，再全局条数，再全局字节；总是最旧先淘汰 |
 | `computeRoundBytes` / `computeBlobRefCounts` | 内容寻址字节核算（round 内去重）与 blob 引用计数 |
+| `countTextLines` | R-F3 预览纯行数语义：空内容为 0；末尾换行不额外算空行 |
 | `isEntryRevertible` / `isEntryRestorable` | 条目可回退 / 可恢复判定（fail-closed） |
 | `buildSidebarModel(round, enabled, now)` | 侧栏视图模型推导：`revertible`、`restorable`、`excludedReason`（`oversize` / `no-preimage`）、`roundOpen`、`degraded`、`revertibleCount` |
 | 数据类型 | `EditRevertFileEntry` / `EditRevertRoundMeta` / `EditRevertSidebarModel` / `EditRevertActionResult` 等 |
@@ -52,6 +53,7 @@
 - `EditRevertFileEntry.status`：`modified` / `created` / `deleted`；`created` 语义为"回合内新建"，回退 = 进回收站。
 - `EditRevertFileEntry.state`：`active` / `reverted`；`reverted` 条目靠 `restoreHash` 支持恢复回退。
 - `EditRevertSidebarEntry.excludedReason` 只对**未回退且不可回退**的条目给出（回退条目不标"未纳入"，这是 UI 诚实性契约）。
+- R-F3：`EditRevertFileEntry` 额外保存冻结后的 `postImageHash/postImageBytes`，或 `postImageMissing/postImageUnavailable`；这些是 preview/conflict 元数据，不改变 pre-image 回退写语义。`EditRevertPreviewRow` 的 before/after 行数允许为 `null`，以保留二进制/超限/读取失败的诚实边界；任何无 post baseline 条目必须由 service 标为 conflict。
 
 ## 注意事项
 

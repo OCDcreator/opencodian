@@ -1,4 +1,5 @@
 # English Locale
+> 2026-09-21 (advantage-parity R-F3)：新增 `editRevert.preview.*` 的确认回退、before→after 行数、冲突/无基线、失败与 round-open fail-closed 文案；与 zh 保持一一对应。
 > 2026-09-21 (advantage-parity R-F2)：新增会话绑定笔记（unbound / explicit draft / locked）和 Modified Files「Linked draft」文案。
 > 2026-09-21 (advantage-parity R-F7)：`envDomains.changedNotice` 与 `settings.envDomains.*`（行名称/描述/管理按钮、modal 标题、共享与供应商域区、新域选项、重复域提示、行增删、占位符、空态）。
 > 2026-09-21 (advantage-parity R-F8)：新增 settings.contextWindowOverride.* 11 键（与 zh 对齐）。

@@ -131,6 +131,7 @@ export class Modal {
   contentEl = createMockElement('div');
   modalEl = createMockElement('div');
   titleEl = createMockElement('div');
+  setTitle(title: string) { this.titleEl.textContent = title; return this; }
   
   open() {}
   close() {}

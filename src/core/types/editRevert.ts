@@ -10,6 +10,7 @@
 
 import type {
   EditRevertActionResult,
+  EditRevertPreview,
   EditRevertSidebarModel,
 } from '../../shared';
 export type {
@@ -20,6 +21,9 @@ export type {
   EditRevertFileEntry,
   EditRevertFileStatus,
   EditRevertPreImageStatus,
+  EditRevertPreview,
+  EditRevertPreviewConflictReason,
+  EditRevertPreviewRow,
   EditRevertRoundMeta,
   EditRevertRoundSummary,
   EditRevertSidebarEntry,
@@ -48,6 +52,8 @@ export interface EditRevertWriteToolInfo {
 export interface EditRevertServicePort {
   /** Sidebar view model for one conversation (empty when disabled/no round). */
   getSidebarModel(conversationId: string): EditRevertSidebarModel;
+  /** Read-only settled baseline comparison used by the revert-confirmation UI. */
+  getRevertPreview(conversationId: string, paths?: readonly string[]): Promise<EditRevertPreview>;
   /** Open a capture round and run the budgeted turn-start pre-snapshot. Fail-soft. */
   beginTurnCapture(info: EditRevertTurnBeginInfo): void;
   /** Close the capture window for the current round (post-turn grace starts). Fail-soft. */
