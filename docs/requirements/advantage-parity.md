@@ -63,8 +63,8 @@
 | F | R-F2 | 会话-笔记绑定草稿（linked content） | Claudian | P2 | DONE |
 | F | R-F3 | 回退预览 + 冲突检测 UI | Claudian | P2 | DONE |
 | F | R-F4 | 暖进程池（聊天侧预热） | Claudian | P2 | DONE |
-| F | R-F5 | 双栏会话管理器 | Claudian | P3 | TODO |
-| F | R-F6 | Vim 风格聊天导航键 | Claudian | P3 | TODO |
+| F | R-F5 | 双栏会话管理器 | Claudian | P3 | DONE |
+| F | R-F6 | Vim 风格聊天导航键 | Claudian | P3 | DONE |
 | F | R-F7 | 每供应商环境变量分域 + 环境哈希失效 | Claudian | P2 | DONE |
 | F | R-F8 | 自定义模型自定义上下文窗口 | Claudian | P2 | DONE |
 | F | R-F9 | 文件管理器右键「附加到上下文」 | 双方 | P1 | DONE |
@@ -282,9 +282,23 @@ Claudian 预热最多 N 个 agent 运行时降低起会话延迟。OpenCodian �
 
 主区聊天 + 常驻侧栏会话浏览并排（设置项，默认关）。UI 布局件，价值中等。
 
+**落地证据（2026-09-21，提交 `5cb8eee2`，子代理实现 + 编排者独立校验）**：
+
+- **实现**：新增默认关闭的 `chatSessionRailEnabled`，由 `ConversationSessionRailCoordinator` 只读消费既有 active-backend 会话列表、当前会话、streaming 状态和 canonical `loadConversation()`；不缓存、不改名、不导出、不删除，历史菜单保持原入口。rail 仅在聊天容器宽度 ≥640px 时与消息区并排，窄面板 `display:none`；切换会话时复用既有 streaming 阻断语义，destroy/关闭设置均清掉 DOM、监听与 layout class。
+- **测试**：`ConversationSessionRailCoordinator.test.ts` 覆盖默认关闭、当前态、列表刷新、空态、canonical load、streaming 阻断和销毁；`OpenCodianView.sessionRailContract.test.ts` 覆盖列表 predicate、标题持久化和删除恢复刷新；`sessionRailStyles.test.ts` 固化双行最小高度；设置/default/load normalization 同步覆盖。R-F5/R-F6 合批聚焦 **7 suites / 122 tests**，最终 `npm run verify` **15/15**（883 suites / 8825 tests、ESLint 0/0、typecheck、module-docs 758/758、owner impact 31 source / 13 owners / 28 mapped docs、graphify、production build）全绿。
+- **实机（Test Vault，BUILD_ID `zcode-advantage-parity.202609211916`）**：四产物按 `main.js`→`manifest.json`→`styles.css`→`pdf-engine.js` 顺序部署，`cmp` 与 SHA-256 逐项一致，plugin disable/enable 后运行时读回同一 BUILD_ID。宽面板 rail item 实测 **195.94×52 px**，标题底部 **211.88 px**、日期顶部 **213.88 px**（2 px 分离）；窄侧栏 rail computed `display:none`。截图 `.visual-evidence/rf5-rf6/rf5-wide-session-rail-fixed.png`；独立视觉代理 PASS。探针后 `chatSessionRailEnabled=false`，临时宽聊天 leaf 已关闭。
+- **偏差登记**：无。双栏是宽面板增强，窄侧栏与既有历史菜单不变；首轮截图暴露标题/日期重叠，已在有界修复轮将 item 固化为双行 52px 最小高度并复验通过。
+
 ### R-F6 Vim 风格聊天导航键（P3）
 
 聊天区 `w`/`s`/`i`（可配置）滚动/聚焦输入。小件。
+
+**落地证据（2026-09-21，提交 `5cb8eee2`，子代理实现 + 编排者独立校验）**：
+
+- **实现**：新增默认关闭的 `chatVimNavigationEnabled` 与单字符 `w`/`s`/`i` 可配置键。`ChatVimNavigationCoordinator` 只在 chat root 监听，w/s 按消息 viewport 的 65% 平滑滚动，i 经既有 composer host port 聚焦；仅在动作真正发生时消费事件。输入框/textarea/select/contenteditable、Ctrl/Meta/Alt、IME composing、repeat、已消费事件、blocking overlay 和无消息容器均避让；destroy 移除 root-scoped listener。
+- **测试**：`ChatVimNavigationCoordinator.test.ts` 覆盖关闭态、editable/overlay 避让、双向滚动、动态键、无容器与销毁；`SettingsConversationSection.test.ts` 覆盖默认值、保存/刷新和键规范化，settings/load normalization 对非法或重复 key map fail closed。合批验证计数与 R-F5 相同，最终 verify 15/15 全绿。
+- **实机（Test Vault，BUILD_ID `zcode-advantage-parity.202609211916`）**：真实键盘事件下 w/s 分别平滑滚动 **-364 px / +364 px**，i 聚焦 composer；textarea 与 overlay 内按键均未被消费。detached Settings 实际显示两个默认关开关及 w/s/i 输入，截图 `.visual-evidence/rf5-rf6/rf56-settings-controls.png`；独立视觉代理 PASS。探针后 `chatVimNavigationEnabled=false`，配置恢复 `w`/`s`/`i`。
+- **偏差登记**：无。行为限定在 opt-in 聊天根，不接管 Obsidian 全局快捷键。
 
 ### R-F7 每供应商环境变量分域 + 环境哈希失效（P2）
 

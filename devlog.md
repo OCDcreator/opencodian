@@ -11,6 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-21 R-F5/R-F6 双栏会话 rail + Vim 聊天导航：宽屏只读管理与可配置局部键位
+
+**触发**：advantage-parity 批次 F 两项 P3 小件。要求默认关闭的宽屏双栏会话浏览，以及可配置 w/s/i 聊天导航；两者都不能改变现有历史管理、会话 ownership 或 Obsidian 全局快捷键。
+
+**改动**：提交 `5cb8eee2` 新增 `ConversationSessionRailCoordinator`，只读复用 active-backend conversation list 与 canonical `loadConversation()`，≥640px 才以 28%/主区双栏显示，窄侧栏隐藏，streaming 时按既有语义阻断切换；标题持久化与删除恢复都会刷新 rail。新增 `ChatVimNavigationCoordinator`，默认 w/s 按 viewport 65% 平滑滚动、i 聚焦 composer，设置可改为三个互异单字符；监听限定 chat root，输入/IME/修饰键/repeat/overlay/已消费事件全部避让。两项设置均 strict-load、默认关，生命周期销毁不留 DOM 或 listener。
+
+**测试与实机**：合批聚焦 7 suites / 122 tests；R-F2 旧 Codex modal 测试同步承认新增 linked-note 第二实参与第 7 个 select。编排者从头独立复跑 `npm run verify` 15/15：883 suites / 8825 tests、ESLint 0/0、typecheck、module-docs 758/758、owner impact 31 source / 13 owners / 28 mapped docs、graphify、production build。Test Vault 四产物逐个部署并 `cmp`/SHA-256 一致，reload 后运行时 BUILD_ID `zcode-advantage-parity.202609211916`。rail 首轮标题/日期重叠已在有界一轮修正；最终 item 195.94×52 px、标题底 211.88 px、日期顶 213.88 px，窄侧栏 `display:none`。真实 w/s 各平滑滚动 364px、i 聚焦 composer，textarea/overlay 未消费。截图 `.visual-evidence/rf5-rf6/rf5-wide-session-rail-fixed.png`、`.visual-evidence/rf5-rf6/rf56-settings-controls.png`，独立视觉代理 PASS；探针后两开关恢复关闭、按键恢复 w/s/i、临时 leaf 关闭。
+
+---
+
 ## 2026-09-21 R-F12 `$` 技能触发符评估：等价能力已在库，登记 WONTFIX
 
 **评估**：OpenCode 的 slash catalog 已把 runtime skills/runtime commands、项目命令与 `.opencode/commands/**/*.md` 合并到同一菜单，并提供 `/skills <skill>` 过滤；Codex 则已有仅限该后端的 native `$skill` 路径（`skills/list` 发现 → 插入原始 `$skill-name ` → app-server 解释）。非 Codex 不加载 `codex-skill`，未发现需要用通用 `$` 才能补齐的能力缺口。
