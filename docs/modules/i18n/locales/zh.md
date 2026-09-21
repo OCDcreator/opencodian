@@ -1,4 +1,5 @@
 # Chinese Locale
+> 2026-09-21 (advantage-parity R-F1)：新增 chat.queue.* 12 键。
 > 2026-09-21 (advantage-parity R-F9)：新增 chat.context.fileMenu.attach 键。
 > 2026-09-21 (advantage-parity R-E4)：新增 semanticRetrieval 语义徽标与 10 个设置/降级键。
 > 2026-09-21 (advantage-parity R-E6)：新增 tokenCount.* 7 键。

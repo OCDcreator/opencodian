@@ -8,7 +8,7 @@ import { AgentCapability, type BackendCapabilities } from '../../AgentCapability
 import type { AgentAuxQueryCapability, AuxQuerySession, AuxQuerySessionConfig } from '../AgentAuxQueryCapability';
 import type { AgentInlineCompletionCapability, InlineCompletionSession, InlineCompletionSessionConfig } from '../AgentInlineCompletionCapability';
 import { INLINE_COMPLETION_TURN_TIMEOUT_MS } from '../AgentInlineCompletionCapability';
-import type { AgentChatCapability, AgentChatSendRequest, AgentConnectionStatus, AgentForkCapability, AgentModelCapability, AgentSessionCapability, Disposable, StatusChangeHandler } from '../AgentService';
+import type { AgentChatCapability, AgentChatSendRequest, AgentConnectionStatus, AgentForkCapability, AgentModelCapability, AgentSessionCapability, AgentTurnSteeringCapability, Disposable, StatusChangeHandler } from '../AgentService';
 import { type WarmableAuxSession,WarmInlineCompletionSession } from '../auxiliary/WarmInlineCompletionSession';
 import { PiAuxQuerySession } from './PiAuxQuerySession';
 import { PI_CONFIG_COMMANDS, PI_RPC_COMMANDS, PI_SDK_COMMANDS, type PiCommandName, type PiExtensionStatusSnapshot, type PiModelInfo, type PiServiceEvent, type PiUiHandler } from './PiProtocol';
@@ -28,7 +28,7 @@ export interface PiAdapterOptions {
 }
 
 /** AgentService facade. Per-session SDK services own execution and native state. */
-export class PiAdapter implements AgentChatCapability, AgentSessionCapability, AgentModelCapability, AgentForkCapability, AgentAuxQueryCapability, AgentInlineCompletionCapability {
+export class PiAdapter implements AgentChatCapability, AgentSessionCapability, AgentModelCapability, AgentForkCapability, AgentAuxQueryCapability, AgentInlineCompletionCapability, AgentTurnSteeringCapability {
   readonly kind = 'pi' as const;
   readonly displayName = 'Pi';
   readonly description = 'Official Pi SDK · independent local service';
@@ -38,6 +38,7 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
     AgentCapability.Fork, AgentCapability.Context, AgentCapability.Compaction, AgentCapability.Thinking, AgentCapability.Export,
     AgentCapability.AuxQuery, // startAuxQuerySession() via PiAuxQuerySession (fail-closed read-only)
     AgentCapability.InlineCompletion, // startInlineCompletionSession() over the same fail-closed read-only session (R-C3)
+    AgentCapability.TurnSteering, // native RPC prompt streamingBehavior:'steer' (advantage-parity R-F1, live-proven)
   ]);
   private currentStatus: AgentConnectionStatus = 'disconnected';
   private readonly statusHandlers = new Set<StatusChangeHandler>();
@@ -273,6 +274,32 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
     } catch (error) { if (generation === this.generation) throw error; }
     finally { this.runs.delete(id); this.sessionLocks.delete(id); }
   }
+
+  /**
+   * advantage-parity R-F1: native turn steering over the pi RPC. A `prompt`
+   * sent while a generation is in flight is refused with an explicit error
+   * naming `streamingBehavior: 'steer' | 'followUp'` (live-proven on
+   * pi 0.86.0) — 'steer' injects the text into the ACTIVE turn; the
+   * continued output flows through the run's existing event subscription, so
+   * the visible stream picks the steered text up without any new session.
+   * Resolves false when there is no in-flight run to steer.
+   */
+  async steerTurn(id: string, text: string): Promise<boolean> {
+    const client = this.runs.get(id)?.client;
+    if (!client) {
+      return false;
+    }
+    try {
+      const response = await client.request(
+        { type: 'prompt', message: text, streamingBehavior: 'steer' },
+        10000,
+      );
+      return response?.success !== false;
+    } catch {
+      return false;
+    }
+  }
+
   async cancelStream(id: string): Promise<void> {
     const run = this.runs.get(id);
     if (run) {

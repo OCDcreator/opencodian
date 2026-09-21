@@ -76,6 +76,8 @@ export interface SendPipelinePreparationPort {
   enterStreamingState(tabId: TabId | null): void;
   completePreparedStreamStart(tabId: TabId | null): void;
   consumeQueuedFollowUpSend(tabId: TabId | null): PrepareMessageSendOptions | null;
+  /** R-F1: surface queue changes to the visible queue bar. */
+  notifyFollowUpQueueChanged(tabId: TabId | null): void;
 }
 
 export interface SendPipelineFinalizationPort {

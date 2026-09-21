@@ -341,7 +341,13 @@ export class SendPipelineRuntime {
 
   private async sendQueuedFollowUp(tabId: PreparedMessageSend['tabId']): Promise<void> {
     const queuedSend = this.messageSendPreparationService.consumeQueuedFollowUpSend(tabId);
-    if (!queuedSend || this.host.getActiveTabId() !== tabId) {
+    if (!queuedSend) {
+      return;
+    }
+    // R-F1: the visible queue bar drops the consumed item immediately, even
+    // when the send decision below defers (backgrounded tab).
+    this.messageSendPreparationService.notifyFollowUpQueueChanged(tabId);
+    if (this.host.getActiveTabId() !== tabId) {
       return;
     }
 

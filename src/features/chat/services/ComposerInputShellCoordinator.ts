@@ -79,6 +79,8 @@ export { buildComposerInputSubmission } from './composerInputParsing';
 export interface ComposerInputShellCoordinatorHost {
   attachSessionTodo(container: HTMLElement): void;
   attachQuestionDock(container: HTMLElement): void;
+  /** R-F1: the queued follow-up bar host element (rendered above the chips). */
+  setQueuedFollowUpBarElement?(element: HTMLElement): void;
   setContextRowElement(element: HTMLElement | null): void;
   setTooltipLabel(element: HTMLElement, label: string, position?: 'bottom' | 'left' | 'right' | 'top'): void;
   getInputPlaceholder(): string;
@@ -195,6 +197,7 @@ export class ComposerInputShellCoordinator {
   private inputContainerEl: HTMLElement | null = null;
   private inputTabBarSlotEl: HTMLElement | null = null;
   private composerShellEl: HTMLElement | null = null;
+  private queuedFollowUpBarEl: HTMLElement | null = null;
   private inputWrapperEl: HTMLElement | null = null;
   private composerInputRowEl: HTMLElement | null = null;
   private composerContextActionsEl: HTMLElement | null = null;
@@ -305,6 +308,11 @@ export class ComposerInputShellCoordinator {
     this.composerShellEl = container.createDiv({ cls: 'opencodian-composer-shell' });
     this.inputWrapperEl = this.composerShellEl.createDiv({ cls: 'opencodian-input-wrapper' });
     const composerContentEl = this.inputWrapperEl.createDiv({ cls: 'opencodian-composer-content' });
+    // R-F1: queued follow-up messages render above the context chips row.
+    this.queuedFollowUpBarEl = composerContentEl.createDiv({
+      cls: 'opencodian-queued-followup-bar is-hidden',
+    });
+    this.host.setQueuedFollowUpBarElement?.(this.queuedFollowUpBarEl);
     this.host.setContextRowElement(
       composerContentEl.createDiv({ cls: 'opencodian-composer-context-row is-empty' }),
     );

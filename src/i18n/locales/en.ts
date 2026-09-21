@@ -2529,6 +2529,20 @@ export const enTranslations = {
   'chat.context.kind.pdfSelection': 'PDF selection',
   'chat.context.kind.url': 'Webpage',
 
+  // advantage-parity R-F1：流式中排队与轮内注入
+  'chat.queue.barTitle': 'Queued messages ({{count}})',
+  'chat.queue.steerAction': 'Inject into the active turn now',
+  'chat.queue.sendNowAction': 'Send now',
+  'chat.queue.retractAction': 'Retract this message',
+  'chat.queue.statusSteerAvailable': 'Steering available: click ⚡ to inject into the running turn.',
+  'chat.queue.statusQueueOnly': 'This backend does not support in-turn injection; queued messages send after the turn ends.',
+  'chat.queue.statusIdle': 'The turn ended (or was cancelled). The queue survives: retract, or press ➤ to send now.',
+  'chat.queue.queuedNotice': 'Queued (#{{count}}): sends automatically after this turn.',
+  'chat.queue.steerSuccess': 'Injected into the active turn: {{preview}}',
+  'chat.queue.steerFailed': 'Injection failed (message stays queued): {{reason}}',
+  'chat.queue.steerUnavailable': 'This backend does not support in-turn injection.',
+  'chat.queue.sentNow': 'Queued message sent.',
+
   // advantage-parity R-F9：文件管理器右键附加
   'chat.context.fileMenu.attach': 'Attach to OpenCodian chat context',
 

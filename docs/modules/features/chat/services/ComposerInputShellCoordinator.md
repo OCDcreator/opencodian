@@ -1,4 +1,5 @@
 # ComposerInputShellCoordinator
+> 2026-09-21 (advantage-parity R-F1)：composer content 顶部新增队列条宿主元素（setQueuedFollowUpBarElement host 缝，chips 行之上）。
 > 2026-09-21 (advantage-parity R-E2)：新增 globe 按钮——双 host 缝（getActiveWebViewerTabContext + attachWebViewerTabContextToActiveTab）存在且当前活动 webviewer 标签页可解析时才渲染，点击时重验、失效自移除。
 > 2026-09-21 (advantage-parity R-E1)：新增粘贴监听——整个粘贴为一条 http(s) URL 时拦截并经 host 缝 attachUrlContextToActiveTab 成网页 chip；嵌在长文本里的链接不拦截。
 

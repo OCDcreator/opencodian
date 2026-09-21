@@ -1,4 +1,5 @@
 # ConversationTabRuntimeCoordinator
+> 2026-09-21 (advantage-parity R-F1)：一槽 queuedFollowUpSend 升级为多条 FIFO queuedFollowUpSends（get/remove 访问器；队列在 tab 运行时态，取消轮次天然保留）。
 
 > **源码**: `src/features/chat/services/ConversationTabRuntimeCoordinator.ts`
 > **状态**: [REVIEW]

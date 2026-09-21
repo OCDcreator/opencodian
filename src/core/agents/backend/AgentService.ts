@@ -229,6 +229,17 @@ export interface AgentToolCapability extends AgentService {
   refreshToolIds(): Promise<string[]>;
 }
 
+/** Turn steering: inject input into the ACTIVE turn of a streaming session (R-F1). */
+export interface AgentTurnSteeringCapability extends AgentService {
+  /**
+   * Steers the in-flight turn: the text enters the CURRENT generation
+   * through the backend's native seam (pi RPC streamingBehavior:'steer'),
+   * never a new session. Resolves false when the session has no active run
+   * or the backend refuses — callers degrade honestly to queueing.
+   */
+  steerTurn(sessionId: string, text: string): Promise<boolean>;
+}
+
 /** Auth: provider OAuth flows. */
 export interface AgentAuthCapability extends AgentService {
   getProviderAuthMethods(): Promise<unknown>;

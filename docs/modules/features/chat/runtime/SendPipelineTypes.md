@@ -1,4 +1,5 @@
 # SendPipelineTypes
+> 2026-09-21 (advantage-parity R-F1)：SendPipelinePreparationPort 增 notifyFollowUpQueueChanged（消费后队列条即时出队）。
 > 2026-09-18 (R-B3): R-B3: `SendPipelineViewPort` gains optional `onTurnSnapshotBegin` / `onTurnSnapshotEnd` / `onWriteToolUse` hooks; `SendPipelineExecutionHost` picks the two snapshot hooks and `StreamChunkRouterHost` picks `onWriteToolUse`.
 
 > 2026-07-30: Runtime view ports include per-tab OpenCode diagnostic-token claim and header-refresh seams.

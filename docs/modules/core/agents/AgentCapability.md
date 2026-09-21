@@ -1,4 +1,5 @@
 # AgentCapability
+> 2026-09-21 (advantage-parity R-F1)：新增 TurnSteering 能力（pi 经原生 RPC streamingBehavior:'steer' 实证声明；codex/claude-code 未声明——队列模式如实文案）。
 
 > **源码**: `src/core/agents/AgentCapability.ts`
 > **状态**: [REVIEW]

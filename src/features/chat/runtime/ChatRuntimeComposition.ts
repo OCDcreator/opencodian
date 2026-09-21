@@ -286,6 +286,8 @@ export interface ChatRuntime
  */
 export interface ChatRuntimeCompositionHost {
   readonly app: unknown;
+  /** R-F1: re-render the visible follow-up queue bar (view-owned). */
+  refreshQueuedFollowUpBar?(): void;
   readonly caps: unknown;
   readonly scrollScheduler: SettledScrollScheduler;
   readonly plugin: {
@@ -1125,6 +1127,13 @@ export class ChatRuntimeComposition {
         openPluginSettingsAtServerSection: () => host.openPluginSettingsAtServerSection(),
         startServer: () => host.plugin.openCodeService.start(),
         notifyForegroundBusy: () => { new Notice(t('chat.tab.processingBlocked')); },
+        notifyFollowUpQueued: (tabId: TabId | null, queue: readonly { content: string }[]) => {
+          new Notice(t('chat.queue.queuedNotice', { count: queue.length }));
+          host.refreshQueuedFollowUpBar?.();
+        },
+        notifyFollowUpQueueChanged: () => {
+          host.refreshQueuedFollowUpBar?.();
+        },
         assistantShellViewHostAdapter: surface.assistantShellViewHostAdapter,
         messageFinalizationService,
         chatSelectionControlsCoordinator: surface.chatSelectionControlsCoordinator,
@@ -1175,6 +1184,13 @@ export class ChatRuntimeComposition {
         ensureTabRuntimeState: (tabId: TabId) => host.ensureTabRuntimeState(tabId),
         isTabForegroundBusy: (tabId: TabId | null) => host.isTabForegroundBusy(tabId),
         notifyForegroundBusy: () => { new Notice(t('chat.tab.processingBlocked')); },
+        notifyFollowUpQueued: (tabId: TabId | null, queue: readonly { content: string }[]) => {
+          new Notice(t('chat.queue.queuedNotice', { count: queue.length }));
+          host.refreshQueuedFollowUpBar?.();
+        },
+        notifyFollowUpQueueChanged: () => {
+          host.refreshQueuedFollowUpBar?.();
+        },
         getServerAvailability: () => host.getServerAvailability(),
         chatHeaderPresenter: surface.chatHeaderPresenter,
         ensureServerReadyForChat: (availability: unknown) =>

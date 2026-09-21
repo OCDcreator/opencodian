@@ -163,7 +163,16 @@ export interface MessageSendPreparationHost {
   isTabForegroundBusy(tabId: TabId | null): boolean;
   queueFollowUpSend(tabId: TabId | null, request: PrepareMessageSendOptions): boolean;
   consumeQueuedFollowUpSend(tabId: TabId | null): PrepareMessageSendOptions | null;
+  getQueuedFollowUpSends(tabId: TabId | null): PrepareMessageSendOptions[];
+  removeQueuedFollowUpSend(tabId: TabId | null, index: number): PrepareMessageSendOptions | null;
   notifyForegroundBusy(): void;
+  /**
+   * R-F1: fired after a message was queued behind the active turn; the
+   * queue snapshot lets the visible queue bar render without polling.
+   */
+  notifyFollowUpQueued?(tabId: TabId | null, queue: readonly { content: string }[]): void;
+  /** R-F1: fired after one queued message left the queue (consume or retract). */
+  notifyFollowUpQueueChanged?(tabId: TabId | null): void;
   getServerAvailability(): Promise<SendPreparationServerAvailability>;
   refreshServerStatusBadge(): Promise<void>;
   refreshSettingsTabStatus(): void;
@@ -251,6 +260,8 @@ export interface MessageSendPreparationHostDependencies {
     clearPendingEditedFiles(tabId: TabId | null): void;
     queueFollowUpSend(tabId: TabId | null, request: PrepareMessageSendOptions): boolean;
     consumeQueuedFollowUpSend(tabId: TabId | null): PrepareMessageSendOptions | null;
+    getQueuedFollowUpSends(tabId: TabId | null): PrepareMessageSendOptions[];
+    removeQueuedFollowUpSend(tabId: TabId | null, index: number): PrepareMessageSendOptions | null;
   };
   getServerAvailability: () => Promise<SendPreparationServerAvailability>;
   chatHeaderPresenter: { refreshServerStatusBadge(): Promise<void> };
@@ -259,6 +270,8 @@ export interface MessageSendPreparationHostDependencies {
   openPluginSettingsAtServerSection: () => void;
   startServer: () => Promise<void>;
   notifyForegroundBusy: () => void;
+  notifyFollowUpQueued?: (tabId: TabId | null, queue: readonly { content: string }[]) => void;
+  notifyFollowUpQueueChanged?: (tabId: TabId | null) => void;
   assistantShellViewHostAdapter: { createAssistantShellContainer(): SendPipelineStreamElements };
   messageFinalizationService: {
     getUnavailableServerPromptMessage(availability: 'checking' | 'disabled' | 'starting' | 'offline'): string;
@@ -358,8 +371,11 @@ export class MessageSendPreparationService {
     }
     if (!this.isTargetTabActive(options.targetTabId) || !this.host.ensureTabRuntime(tabId)) return null;
     if (this.host.isTabForegroundBusy(tabId)) {
-      if (!this.queueFollowUpSend(tabId, options)) this.host.notifyForegroundBusy();
-      return null;
+      if (!this.queueFollowUpSend(tabId, options)) {
+        this.host.notifyForegroundBusy();
+        return null;
+      }
+      this.host.notifyFollowUpQueued?.(tabId, this.getFollowUpQueueSnapshot(tabId));
     }
     this.host.transitionTabSessionLifecycle(tabId, 'preparing', 'send-preflight');
     const draftContextItems = this.composerSendContext.getDraftContextItems(tabId);
@@ -547,6 +563,16 @@ export class MessageSendPreparationService {
         conversation.titleGenerationStatus = 'pending';
       },
     );
+  }
+
+  /** R-F1: current queue snapshot for the bar (content-only view of the runtime queue). */
+  /** R-F1: surface a queue change to the bar (consume/retract both land here). */
+  notifyFollowUpQueueChanged(tabId: TabId | null): void {
+    this.host.notifyFollowUpQueueChanged?.(tabId);
+  }
+
+  getFollowUpQueueSnapshot(tabId: TabId | null): { content: string }[] {
+    return this.host.getQueuedFollowUpSends(tabId).map((queued) => ({ content: queued.content }));
   }
 
   private queueFollowUpSend(tabId: TabId, options: PrepareMessageSendOptions): boolean {
@@ -775,7 +801,11 @@ export function createMessageSendPreparationHost(
     isTabForegroundBusy: (tabId) => (tabId ? deps.isTabForegroundBusy(tabId) : false),
     queueFollowUpSend: (tabId, request) => tabRuntime.queueFollowUpSend(tabId, request),
     consumeQueuedFollowUpSend: (tabId) => tabRuntime.consumeQueuedFollowUpSend(tabId),
+    getQueuedFollowUpSends: (tabId) => tabRuntime.getQueuedFollowUpSends(tabId),
+    removeQueuedFollowUpSend: (tabId, index) => tabRuntime.removeQueuedFollowUpSend(tabId, index),
     notifyForegroundBusy: () => deps.notifyForegroundBusy(),
+    notifyFollowUpQueued: (tabId, queue) => deps.notifyFollowUpQueued?.(tabId, queue),
+    notifyFollowUpQueueChanged: (tabId) => deps.notifyFollowUpQueueChanged?.(tabId),
     getServerAvailability: () => deps.getServerAvailability(),
     refreshServerStatusBadge: () => chatHeaderPresenter.refreshServerStatusBadge(),
     refreshSettingsTabStatus: () => deps.settingsTab?.refreshServerStatusDisplay(),

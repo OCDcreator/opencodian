@@ -1,4 +1,5 @@
 # ChatRuntimeComposition
+> 2026-09-21 (advantage-parity R-F1)：notifyFollowUpQueued/QueueChanged 接 host.refreshQueuedFollowUpBar + 本地化排队 Notice。
 > 2026-09-21 (advantage-parity R-E1)：组合 UrlContextFetchService 并注入 MessageSendPreparationService 的 resolveUrlContextItems 缝（发送时抓取 pending 网页 chip）。
 > 2026-09-18 (R-B3): R-B3: the pipeline view-port gains fail-soft observers `onTurnSnapshotBegin` / `onTurnSnapshotEnd` / `onWriteToolUse` that forward to `host.plugin.editRevertService`; the pipeline never awaits snapshot work.
 > 2026-09-18 (R-B2): `ComposerContextViewFacade.create` receives a `contextGroups` port reading `settings.contextGroups`; the structural `plugin.settings` type gains the `contextGroups` field.

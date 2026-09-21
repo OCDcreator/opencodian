@@ -1,4 +1,5 @@
 > 2026-09-18 (FlowText parity R-A7): `UserMessageContentRenderer` renders the `folder` context-attachment kind label (`chat.context.kind.folder`).
+> 2026-09-21 (advantage-parity R-F1)：消费后队列变化通知 + composition 接线。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 > 2026-09-21 (advantage-parity R-E1)：ChatRuntimeComposition 组合 UrlContextFetchService 并注入发送准备的 resolveUrlContextItems 缝。
 

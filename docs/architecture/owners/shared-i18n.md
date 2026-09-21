@@ -1,4 +1,5 @@
 # Owner: shared.i18n
+> 2026-09-21 (advantage-parity R-F1)：chat.queue.* 键。
 > 2026-09-21 (advantage-parity R-F9)：chat.context.fileMenu.attach 键。
 > 2026-09-21 (advantage-parity R-E4)：semanticRetrieval 徽标与设置键。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。

@@ -6139,6 +6139,98 @@ img.opencodian-model-provider-header-icon {
 }
 
 
+/* components/queued-followup-bar.css */
+/* ── Queued follow-up message bar (advantage-parity R-F1) ──────────────── */
+
+.opencodian-queued-followup-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 6px;
+  padding: 8px 10px;
+  border-radius: var(--radius-m, 6px);
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.opencodian-queued-followup-bar.is-hidden {
+  display: none;
+}
+
+.opencodian-queued-followup-title {
+  font-size: var(--font-ui-smaller, 11px);
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.opencodian-queued-followup-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.opencodian-queued-followup-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: var(--radius-s, 4px);
+  background-color: var(--background-primary);
+}
+
+.opencodian-queued-followup-item-content {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-ui-smaller, 11px);
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button.opencodian-queued-followup-action {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-s, 4px);
+  background-color: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+button.opencodian-queued-followup-action:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/*
+ * The chat surface remaps --interactive-accent into the plugin's monochrome
+ * accent family (src/style/base/core.css), so a hue-only distinction from
+ * the retract button is not achievable there. The steer affordance is a
+ * filled accent chip instead — structurally distinct in mono and colored
+ * themes alike, mirroring the send button's accent treatment.
+ */
+button.opencodian-queued-followup-steer {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+button.opencodian-queued-followup-steer:hover {
+  background-color: var(--interactive-accent-hover);
+  color: var(--text-on-accent);
+}
+
+.opencodian-queued-followup-status {
+  font-size: var(--font-ui-smaller, 11px);
+  color: var(--text-faint);
+}
+
+
 /* components/backend-session-browser.css */
 /* Backend Session Browser Modal */
 

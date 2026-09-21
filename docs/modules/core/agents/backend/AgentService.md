@@ -1,4 +1,5 @@
 # AgentService
+> 2026-09-21 (advantage-parity R-F1)：新增 AgentTurnSteeringCapability 接口（steerTurn 注入活动轮；失败返回 false 由调用方诚实降级为排队）。
 
 > **源码**: `src/core/agents/backend/AgentService.ts`
 > **状态**: [REVIEW]

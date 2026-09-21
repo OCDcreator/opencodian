@@ -2529,6 +2529,20 @@ export const zhTranslations = {
   'chat.context.kind.pdfSelection': 'PDF 选区',
   'chat.context.kind.url': '网页',
 
+  // advantage-parity R-F1：流式中排队与轮内注入
+  'chat.queue.barTitle': '已排队消息（{{count}}）',
+  'chat.queue.steerAction': '立即注入当前轮',
+  'chat.queue.sendNowAction': '立即发送',
+  'chat.queue.retractAction': '撤回该条',
+  'chat.queue.statusSteerAvailable': '支持立即注入：点击 ⚡ 把该条送入正在进行的轮次。',
+  'chat.queue.statusQueueOnly': '当前后端不支持轮内注入，将在本轮结束后自动发送。',
+  'chat.queue.statusIdle': '轮次已结束（或被取消）。队列保留：可撤回，或点击 ➤ 立即发送。',
+  'chat.queue.queuedNotice': '已加入排队（第 {{count}} 条）：本轮结束后自动发送。',
+  'chat.queue.steerSuccess': '已注入当前轮：{{preview}}',
+  'chat.queue.steerFailed': '注入失败（消息仍在队列中）：{{reason}}',
+  'chat.queue.steerUnavailable': '当前后端不支持轮内注入。',
+  'chat.queue.sentNow': '已发送排队消息。',
+
   // advantage-parity R-F9：文件管理器右键附加
   'chat.context.fileMenu.attach': '附加到 OpenCodian 聊天上下文',
 

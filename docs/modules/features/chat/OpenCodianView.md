@@ -1,4 +1,5 @@
 # OpenCodianView
+> 2026-09-21 (advantage-parity R-F1)：composer host 接 setQueuedFollowUpBarElement；新增 refreshQueuedFollowUpBar/retractQueuedFollowUp/steerQueuedFollowUp/sendQueuedFollowUpNow——steer 经 AgentTurnSteeringCapability（失败保留条目+如实 Notice），sendNow 走 sendPipelineRuntime。
 > 2026-09-21 (advantage-parity R-E2)：composer host 新增 getActiveWebViewerTabContext / attachWebViewerTabContextToActiveTab 两缝（构造 R-E1 url 条目，视图零逻辑）。
 > 2026-09-21 (advantage-parity R-E1)：composer input host 新增 attachUrlContextToActiveTab（粘贴的整段 URL → pending 网页 chip，复用 attachBuiltContextItem 通道）。
 > 2026-09-20 (advantage-parity R-D1)：`createConversationHistoryActionsHost` 新增 `exportConversationMarkdown` host 方法（转发到 `plugin.exportConversationMarkdownById`），视图本身不持有导出逻辑。

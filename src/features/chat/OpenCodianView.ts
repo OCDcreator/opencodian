@@ -284,6 +284,7 @@ import {
 import {
   type TabConversationSyncFingerprintRuntimePort,
 } from './services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
+import { QueuedFollowUpBarCoordinator } from './services/QueuedFollowUpBarCoordinator';
 import {
   SettledScrollScheduler,
 } from './services/ScrollManager';
@@ -503,6 +504,8 @@ export class OpenCodianView extends ItemView {
   private conversationLoadRecoveryCoordinator: ConversationLoadRecoveryCoordinator;
   private conversationTabOpenCoordinator: ConversationTabOpenCoordinator;
   private conversationTabRuntimeCoordinator: ConversationTabRuntimeCoordinator<TabRuntimeState>;
+  /** R-F1: the visible follow-up queue bar above the composer chips. */
+  private readonly queuedFollowUpBarCoordinator = new QueuedFollowUpBarCoordinator();
   private conversationRenderService: ConversationRenderService;
   private messageSendPreparationService: MessageSendPreparationService;
   private messageFinalizationService: MessageFinalizationService;
@@ -893,6 +896,16 @@ export class OpenCodianView extends ItemView {
       },
       setContextRowElement: (element) => {
         this.composerContextViewFacade.setContextRowElement(element);
+      },
+      setQueuedFollowUpBarElement: (element) => {
+        this.queuedFollowUpBarCoordinator.attach(element, {
+          isTabStreaming: () => this.isActiveTabStreaming(),
+          hasTurnSteering: () => hasCapability(this.caps, AgentCapability.TurnSteering),
+          onRetract: (index) => { this.retractQueuedFollowUp(index); },
+          onSteer: (index) => { void this.steerQueuedFollowUp(index); },
+          onSendNow: (index) => { void this.sendQueuedFollowUpNow(index); },
+        });
+        this.refreshQueuedFollowUpBar();
       },
       setTooltipLabel: (element, label, position) => {
         ConversationRenderService.setTooltipLabel(element, label, position);
@@ -3405,6 +3418,80 @@ export class OpenCodianView extends ItemView {
   }
 
   /** Create a new conversation */
+  // ─── R-F1: queued follow-up messages (visible bar + steering) ───────
+
+  /** Re-render the queue bar from the active tab's runtime queue (composition host seam). */
+  refreshQueuedFollowUpBar(): void {
+    this.queuedFollowUpBarCoordinator.render(
+      this.conversationTabRuntimeCoordinator.getQueuedFollowUpSends(this.getActiveTabId()),
+    );
+  }
+
+  /** Retract one queued message (user removal; nothing is sent). */
+  private retractQueuedFollowUp(index: number): void {
+    this.conversationTabRuntimeCoordinator.removeQueuedFollowUpSend(this.getActiveTabId(), index);
+    this.refreshQueuedFollowUpBar();
+  }
+
+  /**
+   * Steer one queued message into the ACTIVE turn through the backend's
+   * native seam (pi RPC streamingBehavior:'steer'). The item only leaves
+   * the queue on a successful injection; failures keep it queued with the
+   * honest reason surfaced.
+   */
+  private async steerQueuedFollowUp(index: number): Promise<void> {
+    const tabId = this.getActiveTabId();
+    const queue = this.conversationTabRuntimeCoordinator.getQueuedFollowUpSends(tabId);
+    const item = queue[index];
+    if (!item) {
+      this.refreshQueuedFollowUpBar();
+      return;
+    }
+    const conversation = this.currentConversation;
+    const sessionId = conversation ? getConversationBackendSessionId(conversation) : undefined;
+    const backend = conversation?.backend ?? 'opencode';
+    const service = this.plugin.agentServiceRegistry?.get(backend);
+    const steerer = service as { steerTurn?: (sessionId: string, text: string) => Promise<boolean> } | undefined;
+    if (!steerer || typeof steerer.steerTurn !== 'function' || !hasCapability(this.caps, AgentCapability.TurnSteering)) {
+      new Notice(t('chat.queue.steerUnavailable'));
+      return;
+    }
+    if (!sessionId) {
+      new Notice(t('chat.queue.steerFailed', { reason: 'no active session' }));
+      return;
+    }
+    let steered = false;
+    let reason = '';
+    try {
+      steered = await steerer.steerTurn(sessionId, item.content);
+      if (!steered) reason = 'backend refused';
+    } catch (error) {
+      reason = error instanceof Error ? error.message : String(error);
+    }
+    if (steered) {
+      this.conversationTabRuntimeCoordinator.removeQueuedFollowUpSend(tabId, index);
+      this.refreshQueuedFollowUpBar();
+      new Notice(t('chat.queue.steerSuccess', { preview: item.content.replace(/\s+/g, ' ').slice(0, 60) }));
+    } else {
+      new Notice(t('chat.queue.steerFailed', { reason: reason || 'unknown' }), 8000);
+    }
+  }
+
+  /**
+   * Send one queued message as a normal new turn (idle tab — e.g. the turn
+   * was cancelled and the queue survived).
+   */
+  private async sendQueuedFollowUpNow(index: number): Promise<void> {
+    const tabId = this.getActiveTabId();
+    const item = this.conversationTabRuntimeCoordinator.removeQueuedFollowUpSend(tabId, index);
+    this.refreshQueuedFollowUpBar();
+    if (!item) {
+      return;
+    }
+    await this.sendPipelineRuntime.sendMessage({ ...item, targetTabId: tabId ?? undefined });
+    new Notice(t('chat.queue.sentNow'));
+  }
+
   private async createNewConversation() {
     const previousConversationId = this.currentConversation?.id;
     const previousSessionId = this.currentConversation

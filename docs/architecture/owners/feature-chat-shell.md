@@ -1,4 +1,5 @@
 > 2026-09-18 (FlowText parity R-A7): the composer input-shell host gains `addVaultPathContextFromDrop`, forwarding vault path drops to `composerContextViewFacade` (claimed drops preventDefault; editor text drops keep default insertion).
+> 2026-09-21 (advantage-parity R-F1)：composer 队列条宿主 + view 四个队列动作（steer/撤回/立即发送/bar 刷新缝）。
 > 2026-09-21 (advantage-parity R-E4)：composer chip 徽标按检索通道标注（透传字段）。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 > 2026-09-21 (advantage-parity R-E2)：composer host 新增 Web Viewer 两缝。

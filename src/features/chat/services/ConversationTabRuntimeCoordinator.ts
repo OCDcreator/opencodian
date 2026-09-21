@@ -42,7 +42,8 @@ export interface ConversationTabRuntimeState extends TabMessagesPaneRuntimeState
   backgroundTaskInlineEls: Map<string, HTMLElement>;
   turnBodyByAnchorKey: Map<string, HTMLElement>;
   pendingEditedFiles: Set<string>;
-  queuedFollowUpSend?: PrepareMessageSendOptions | null;
+  /** R-F1: visible multi-message follow-up queue (FIFO; per-tab). */
+  queuedFollowUpSends?: PrepareMessageSendOptions[];
 }
 export interface ConversationTabRuntimeCoordinatorHost {
   areTabsEnabled(): boolean;
@@ -423,20 +424,32 @@ export class ConversationTabRuntimeCoordinator<
   }
   queueFollowUpSend(tabId: TabId | null, request: PrepareMessageSendOptions): boolean {
     const runtime = this.getRuntimeState(tabId);
-    if (!runtime?.isStreaming || runtime.queuedFollowUpSend) {
+    if (!runtime?.isStreaming) {
       return false;
     }
-    runtime.queuedFollowUpSend = { ...request, ...(request.syntheticTextParts ? { syntheticTextParts: [...request.syntheticTextParts] } : {}) };
+    runtime.queuedFollowUpSends ??= [];
+    runtime.queuedFollowUpSends.push({ ...request, ...(request.syntheticTextParts ? { syntheticTextParts: [...request.syntheticTextParts] } : {}) });
     return true;
+  }
+  /** R-F1: queue snapshot for the visible bar (copy; ids are index-stable until consume). */
+  getQueuedFollowUpSends(tabId: TabId | null): PrepareMessageSendOptions[] {
+    return [...(this.getRuntimeState(tabId)?.queuedFollowUpSends ?? [])];
+  }
+  /** R-F1: retract one queued message by index (user removal; no send). */
+  removeQueuedFollowUpSend(tabId: TabId | null, index: number): PrepareMessageSendOptions | null {
+    const queue = this.getRuntimeState(tabId)?.queuedFollowUpSends;
+    if (!queue || index < 0 || index >= queue.length) {
+      return null;
+    }
+    return queue.splice(index, 1)[0] ?? null;
   }
   consumeQueuedFollowUpSend(tabId: TabId | null): PrepareMessageSendOptions | null {
     const runtime = this.getRuntimeState(tabId);
-    if (!runtime?.queuedFollowUpSend) {
+    const queue = runtime?.queuedFollowUpSends;
+    if (!queue || queue.length === 0) {
       return null;
     }
-    const queued = runtime.queuedFollowUpSend;
-    runtime.queuedFollowUpSend = null;
-    return queued;
+    return queue.shift() ?? null;
   }
   updateConversationSyncRuntime(
     tabId: TabId | null,
