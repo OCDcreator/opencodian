@@ -51,6 +51,9 @@ describe('obsidian-gate script generation (R-B4)', () => {
   });
 
   it('approves passthrough subcommands and refuses high-impact ones without a decision (real sh)', () => {
+    // The generated wrapper is POSIX sh and this milestone marks Windows as
+    // unsupported; cmd.exe cannot execute the real-shell handshake fixture.
+    if (process.platform === 'win32') return;
     const script = buildGateScript({ cliCommand: 'obsidian-gate-fake-cli', waitSeconds: 3 });
     const dir = join(tmpdir(), `opencodian-gate-test-${Date.now()}-${process.pid}`);
     const requests = join(dir, 'requests');

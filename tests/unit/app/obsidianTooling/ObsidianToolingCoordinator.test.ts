@@ -68,7 +68,7 @@ describe('ObsidianToolingCoordinator (R-B4)', () => {
     const messages = [{ role: 'user' as const, content: 'turn' }];
     const first = coordinator.planInjection({ conversationId: 'c1', messages });
     expect(first?.text).toContain('[OPENCODIAN OBSIDIAN TOOLING]');
-    expect(first?.text).toContain(OBSIDIAN_TOOLING_DIR);
+    expect(first?.text.replaceAll('\\', '/')).toContain(OBSIDIAN_TOOLING_DIR);
 
     const second = coordinator.planInjection({ conversationId: 'c1', messages });
     expect(second).toBeNull();
@@ -124,7 +124,7 @@ describe('ObsidianToolingCoordinator (R-B4)', () => {
   });
 
   it('request dir naming matches the gate script contract', () => {
-    expect(join(OBSIDIAN_TOOLING_DIR, OBSIDIAN_TOOLING_REQUESTS_DIRNAME)).toBe(
+    expect(join(OBSIDIAN_TOOLING_DIR, OBSIDIAN_TOOLING_REQUESTS_DIRNAME).replaceAll('\\', '/')).toBe(
       '.opencodian/obsidian-tooling/requests',
     );
   });
