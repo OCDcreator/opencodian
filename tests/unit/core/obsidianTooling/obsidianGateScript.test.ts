@@ -43,6 +43,13 @@ describe('obsidian-gate script generation (R-B4)', () => {
     expect(script).toContain('fail closed');
   });
 
+  it('builds request ids without non-POSIX shell variables', () => {
+    const script = buildGateScript({});
+
+    expect(script).toContain('REQ_ID="req-$(date +%s)-$$"');
+    expect(script).not.toContain('$RANDOM');
+  });
+
   it('approves passthrough subcommands and refuses high-impact ones without a decision (real sh)', () => {
     const script = buildGateScript({ cliCommand: 'obsidian-gate-fake-cli', waitSeconds: 3 });
     const dir = join(tmpdir(), `opencodian-gate-test-${Date.now()}-${process.pid}`);

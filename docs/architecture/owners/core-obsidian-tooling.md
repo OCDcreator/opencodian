@@ -38,6 +38,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 - Unknown CLI subcommands classify as high-impact (fail closed): a future CLI command can never silently bypass the confirmation gate.
 - The gate script is deterministic and embeds the classification sets from the catalog; unknown subcommands route through the gate at run time, stale wrappers are regenerated on every `applySettings()`.
 - No decision means no execution: deny → exit 3, timeout/expired → exit 4, unreadable decision → exit 5, always without running the CLI.
+- The generated POSIX sh wrapper must not rely on bash/ash-only variables: Debian/Ubuntu dash runs it with `set -u`, and an unset variable must never turn a pending high-impact request into an environment-error exit before the request file is written.
 - Honest enforcement boundary (requirement §6.7): the wrapper gates the SANCTIONED path. A same-user process — including a misbehaving model — can still call the raw `obsidian` binary or forge decision files in the vault-owned requests directory. This residual risk is disclosed in the injection block, the settings UI, and here; it is NOT closable in user space without a platform trust anchor. Closing it is the motivation for the deferred route B (self-hosted MCP), not a reason to fake a guarantee.
 - This milestone ships a POSIX sh wrapper (macOS/Linux); Windows is surfaced as unsupported, never silently degraded.
 - Injection is once per context epoch and produces nothing when the mode is off.

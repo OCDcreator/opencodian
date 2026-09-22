@@ -128,7 +128,10 @@ mkdir -p "$REQUESTS_DIR" || {
   exit 2
 }
 
-REQ_ID="req-$(date +%s)-$$-$RANDOM"
+# RANDOM is a bash/ash extension and is unset under Debian/Ubuntu dash.
+# Seconds + the live wrapper process id are portable and distinguish
+# concurrent gate invocations without weakening strict unset-variable checks.
+REQ_ID="req-$(date +%s)-$$"
 REQ_TMP="$REQUESTS_DIR/$REQ_ID.request.json.tmp"
 REQ_FILE="$REQUESTS_DIR/$REQ_ID.request.json"
 DECISION_FILE="$REQUESTS_DIR/$REQ_ID.decision.json"

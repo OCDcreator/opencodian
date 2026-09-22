@@ -16,4 +16,4 @@
 ## 边界与约束（威胁模型的诚实陈述）
 
 - 包装脚本只约束**受认可路径**：同用户进程（含失控模型）仍可直接调用裸 `obsidian` 二进制、或自行伪造决策文件。该门保证"默认必现确认对话框、无决策不执行"，不是对抗性沙箱；残余风险在 owner 概览与需求报告中如实披露。
-- 请求文件以 tmp+`mv` 原子落盘；argv 经 JSON 转义记录；`$RANDOM` 在 dash 下为空但 id 仍由 date+pid 保证唯一。
+- 请求文件以 tmp+`mv` 原子落盘；argv 经 JSON 转义记录；请求 id 只使用 POSIX sh 可用的 date+pid，不读取 bash/ash 专属的 `$RANDOM`，因此 Debian/Ubuntu 的 dash 在 `set -u` 下也能进入正常等待/超时分支。
