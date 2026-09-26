@@ -161,6 +161,34 @@ describe('QuestionInlineCardRenderer', () => {
     document.body.replaceChildren();
   });
 
+  it('removes a lost native inline question without answering it', async () => {
+    jest.useFakeTimers();
+    try {
+      const harness = createRendererHarness();
+      const request = createQuestionRequest();
+      const pending = jest.fn(async () => false);
+      const renderer = new QuestionInlineCardRenderer(new StreamingInlineCardRenderer({
+        getActiveTabId: () => 'tab-1',
+        getTabRuntimeState: () => harness.runtime,
+        revealStreamingAssistantMessageElement: () => harness.messageEl,
+      }), {
+        getActiveTabId: () => 'tab-1',
+        getTabRuntimeState: () => harness.runtime,
+        keepQuestionCardPinnedToBottom: jest.fn(),
+        isRequestPending: pending,
+      });
+      const result = renderer.collectAction(request, 'all', 'tab-1');
+      expect(harness.runtime.questionInlineCardEl?.isConnected).toBe(true);
+      jest.advanceTimersByTime(500);
+      await expect(result).resolves.toBeNull();
+      expect(harness.runtime.questionInlineCardEl).toBeNull();
+      expect(harness.messageEl.querySelector('[data-question-card]')).toBeNull();
+      expect(pending).toHaveBeenCalledWith(request, 'tab-1');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('renders grouped inline questions and resolves submitted answers', async () => {
     const {
       contentEl,

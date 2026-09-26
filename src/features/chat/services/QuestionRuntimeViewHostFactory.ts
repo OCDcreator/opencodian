@@ -1,4 +1,6 @@
+import type { QuestionRequest } from '../../../core/types';
 import type { StreamingInlineCardRenderer } from '../runtime/StreamingInlineCardRenderer';
+import type { TabId } from '../tabs';
 import type { QuestionDockSlotCoordinator } from './QuestionDockSlotCoordinator';
 import {
   createQuestionPostResolutionRuntimeHostAdapter,
@@ -24,7 +26,10 @@ type QuestionDockSlotCoordinatorPort = Pick<
 export interface QuestionRuntimeViewHostFactoryHost extends QuestionRuntimeViewHostAdapterHost {
   settings: QuestionRuntimeSettingsPort;
   getQuestionDockSlotCoordinator(): QuestionDockSlotCoordinatorPort;
-  getQuestionApi(): QuestionRuntimeQuestionApiPort;
+  getQuestionApi(
+    tabId?: TabId | null,
+    request?: QuestionRequest,
+  ): QuestionRuntimeQuestionApiPort;
   getTabAttention(): QuestionRuntimeTabAttentionPort;
 }
 
@@ -55,10 +60,13 @@ export function createQuestionRuntimeViewHost(
         host.getQuestionDockSlotCoordinator().shouldUseAboveInputQuestionDock(),
     },
     questionApi: {
-      getPendingQuestions: () => host.getQuestionApi().getPendingQuestions(),
-      replyToQuestion: (requestId, answers) =>
-        host.getQuestionApi().replyToQuestion(requestId, answers),
-      rejectQuestion: (requestId) => host.getQuestionApi().rejectQuestion(requestId),
+      isPendingQuestionReadAuthoritative: (tabId) =>
+        host.getQuestionApi(tabId).isPendingQuestionReadAuthoritative?.(tabId) ?? false,
+      getPendingQuestions: (tabId) => host.getQuestionApi(tabId).getPendingQuestions(),
+      replyToQuestion: (requestId, answers, context) =>
+        host.getQuestionApi(context?.tabId, context?.request).replyToQuestion(requestId, answers),
+      rejectQuestion: (requestId, context) =>
+        host.getQuestionApi(context?.tabId, context?.request).rejectQuestion(requestId),
     },
     tabAttention: {
       setNeedsAttention: (tabId, needsAttention) => {

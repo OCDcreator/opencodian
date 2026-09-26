@@ -134,6 +134,22 @@ describe('AssistantShellViewHostAdapter', () => {
     expect(messageEl.querySelector('.opencodian-message-time-row')?.textContent).toContain('gpt-5.4');
   });
 
+  it('keeps a persisted failed tool card in the error state after a reload', async () => {
+    const { adapter } = createAdapter();
+    const message: ChatMessage = {
+      id: 'assistant-tool-error',
+      role: 'assistant',
+      content: '',
+      timestamp: 32345,
+      contentBlocks: [{ type: 'tool_use', toolId: 'call_failed', toolName: 'Read',
+        toolInput: { file_path: 'missing.md' }, toolStatus: 'error', toolResult: 'ZCode tool failed.' }],
+    };
+
+    const messageEl = await adapter.renderPersistedAssistantMessage({ message });
+
+    expect(messageEl.querySelector('.streaming-tool-status')?.classList.contains('status-error')).toBe(true);
+  });
+
   it('renders persisted structured output as a collapsible JSON block', async () => {
     const { adapter, turnBody } = createAdapter();
     const message: ChatMessage = {

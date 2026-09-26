@@ -1,5 +1,7 @@
 # QuestionTodoStatusRefreshCoordinator
 
+> 2026-09-24：激活及 post-sync 的 pending question 刷新支持 ZCode 原生待答读回，仍按目标 tab/session 路由。其余非 OpenCode 后端继续跳过；空 session 不触发刷新。
+
 > **源码**: `src/features/chat/services/QuestionTodoStatusRefreshCoordinator.ts`
 > **状态**: [REVIEW]
 

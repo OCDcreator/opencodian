@@ -10,6 +10,7 @@ import {
   type NormalizedSessionRow,
   unarchiveBackendSession,
 } from '../../../core/agents/backend/AgentBackendRouting';
+import type { AgentSessionCapability } from '../../../core/agents/backend/AgentService';
 import type { AgentServiceRegistry } from '../../../core/agents/backend/AgentServiceRegistry';
 import type { AgentBackendKind } from '../../../core/types/chat';
 import { t } from '../../../i18n';
@@ -239,6 +240,9 @@ export class BackendSessionBrowserModal extends Modal {
 
     const registry = this.getScopedRegistry();
     const activeService = registry?.getActive() ?? null;
+    const sessionService = activeService?.hasCapability(AgentCapability.Sessions)
+      ? activeService as AgentSessionCapability
+      : null;
     const selectedSession = this.sessions.find((s) => s.id === this.selectedSessionId);
     const selectedArchived = selectedSession?.archived ?? false;
     const disabled = !hasSelection || streaming;
@@ -256,7 +260,7 @@ export class BackendSessionBrowserModal extends Modal {
       });
     }
 
-    if (activeService?.hasCapability(AgentCapability.Sessions) && hasSelection && !selectedArchived) {
+    if (sessionService?.archiveSession && hasSelection && !selectedArchived) {
       const archiveBtn = this.footerEl.createEl('button', {
         cls: 'opencodian-backend-session-browser-archive-btn',
         text: t('chat.backendSessions.archiveButton'),
@@ -269,7 +273,7 @@ export class BackendSessionBrowserModal extends Modal {
       });
     }
 
-    if (activeService?.hasCapability(AgentCapability.Sessions) && hasSelection && selectedArchived) {
+    if (sessionService?.unarchiveSession && hasSelection && selectedArchived) {
       const unarchiveBtn = this.footerEl.createEl('button', {
         cls: 'mod-cta opencodian-backend-session-browser-unarchive-btn',
         text: t('chat.backendSessions.unarchiveButton'),

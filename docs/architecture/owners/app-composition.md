@@ -1,4 +1,5 @@
 # Owner: app.composition
+> 2026-09-22 (ZCode 票 01)：main.ts 的 wireHiddenAdapters 装配传入 `getZCodeSettings` 与 `getZCodeExtraEnv`（`getDomainEnvFor('zcode')`）；ZCode 仅装配，运行时状态留在 zcode adapter 边界内。
 > 2026-09-21 (advantage-parity R-F2/R-F3/R-F4)：main.ts 在 preload 后注册一次 vault rename 以跟随会话绑定路径，批量 round 结束交 EditRevertService 冻结 post-image；R-F4 只组合既有 InlineCompletionService，设置/后端切换调排他预热，双开关均关闭才释放池。运行时所有权仍在原服务。
 > 2026-09-21 (advantage-parity R-F7)：R-F7 失效信号：`refreshEnvironmentFingerprints` 挂 loadSettings 尾部与 saveSettings 后（指纹变化本地化 Notice 列出后端；首次运行静默、幂等、有界失败）；`getDomainEnvFor` 单一 accessor 供各构造缝。
 > 2026-09-21 (advantage-parity R-F8)：main.ts 构造 ModelConfigService 时传入 getContextWindowOverrides。

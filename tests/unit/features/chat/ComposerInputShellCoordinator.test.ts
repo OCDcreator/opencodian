@@ -1722,6 +1722,7 @@ function createDragEvent(type: string, files: File[]): DragEvent {
   });
 }
 
+// eslint-disable-next-line max-lines-per-function -- image lifecycle cases share one DOM fixture and teardown boundary.
 describe('ComposerInputShellCoordinator — image paste and drag-drop', () => {
   const originalResizeObserver = globalThis.ResizeObserver;
 
@@ -1883,7 +1884,7 @@ describe('ComposerInputShellCoordinator — image paste and drag-drop', () => {
     fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     flushAnimationFrames();
 
-    expect(fixture.host.submitMessage).toHaveBeenCalledWith(
+    expect(fixture.host.submitMessage).toHaveBeenLastCalledWith(
       expect.objectContaining({
         kind: 'prompt',
         content: 'Describe these images',
@@ -1892,6 +1893,7 @@ describe('ComposerInputShellCoordinator — image paste and drag-drop', () => {
           expect.objectContaining({ filename: 'b.webp', mediaType: 'image/webp' }),
         ]),
       }),
+      expect.any(Function),
     );
   });
 
@@ -1913,7 +1915,7 @@ describe('ComposerInputShellCoordinator — image paste and drag-drop', () => {
     fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     flushAnimationFrames();
 
-    expect(fixture.host.submitMessage).toHaveBeenCalledWith(
+    expect(fixture.host.submitMessage).toHaveBeenLastCalledWith(
       expect.objectContaining({
         kind: 'prompt',
         content: 'Analyze these',
@@ -1922,11 +1924,13 @@ describe('ComposerInputShellCoordinator — image paste and drag-drop', () => {
           expect.objectContaining({ filename: 'b.gif', mediaType: 'image/gif' }),
         ]),
       }),
+      expect.any(Function),
     );
   });
 
   it('clears attached images on send after paste', async () => {
     const fixture = createFixture({ hasImageInputCapability: true });
+    fixture.host.submitMessage.mockImplementation((_submission, outcome) => (outcome?.('accepted'), Promise.resolve(undefined)));
 
     const imageFile = createImageFile('test.png', 'image/png');
     const pasteEvent = createPasteEvent([imageFile]);
@@ -1945,6 +1949,7 @@ describe('ComposerInputShellCoordinator — image paste and drag-drop', () => {
 
   it('sends an image-only prompt without requiring placeholder text', async () => {
     const fixture = createFixture({ hasImageInputCapability: true });
+    fixture.host.submitMessage.mockImplementation((_submission, outcome) => (outcome?.('accepted'), Promise.resolve(undefined)));
     const imageFile = createImageFile('image-only.png', 'image/png');
     fixture.textarea.dispatchEvent(createPasteEvent([imageFile]));
     await flushAsync();
@@ -1953,12 +1958,40 @@ describe('ComposerInputShellCoordinator — image paste and drag-drop', () => {
     fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     flushAnimationFrames();
 
-    expect(fixture.host.submitMessage).toHaveBeenCalledWith(expect.objectContaining({
+    expect(fixture.host.submitMessage).toHaveBeenLastCalledWith(expect.objectContaining({
       kind: 'prompt',
       content: '',
       images: [expect.objectContaining({ filename: 'image-only.png', mediaType: 'image/png' })],
-    }));
+    }), expect.any(Function));
     expect(fixture.container.querySelectorAll('.opencodian-composer-image-chip')).toHaveLength(0);
+  });
+
+  it('keeps the image and text draft when send preparation rejects the selected model', async () => {
+    const fixture = createFixture({ hasImageInputCapability: true });
+    fixture.host.submitMessage.mockImplementation((_submission, onPreparationOutcome) => {
+      onPreparationOutcome?.('rejected');
+      return Promise.resolve(undefined);
+    });
+    const imageFile = createImageFile('unsupported.png', 'image/png');
+    fixture.textarea.dispatchEvent(createPasteEvent([imageFile]));
+    await flushAsync();
+    flushAnimationFrames();
+    fixture.textarea.value = 'Keep this description';
+
+    fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await flushAsync();
+    flushAnimationFrames();
+
+    expect(fixture.host.submitMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        kind: 'prompt',
+        content: 'Keep this description',
+        images: [expect.objectContaining({ filename: 'unsupported.png' })],
+      }),
+      expect.any(Function),
+    );
+    expect(fixture.textarea.value).toBe('Keep this description');
+    expect(fixture.container.querySelectorAll('.opencodian-composer-image-chip')).toHaveLength(1);
   });
 
   it('removes individual image chips after paste', async () => {

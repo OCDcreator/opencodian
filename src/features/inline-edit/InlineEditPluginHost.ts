@@ -172,7 +172,7 @@ export function describeModelSelection(
   }
   const tabModel = bridge.getActiveChatModel();
   if (tabModel?.model) {
-    const label = kind === 'opencode' || kind === 'pi'
+    const label = kind === 'opencode' || kind === 'pi' || kind === 'zcode'
       ? `${tabModel.provider}/${tabModel.model}`
       : tabModel.model;
     return { label, source: 'chat' };
@@ -232,9 +232,9 @@ function resolveModel(
  * Parse a user-entered model override.
  *
  * Formats follow each backend's own model identity (design §9):
- * `provider/model` for opencode and pi, a bare model id or SDK alias for
- * claude-code, and a model id for codex. Returns `null` when the string cannot
- * be a valid reference for that backend.
+ * `provider/model` for opencode, pi, and ZCode; a bare model id or SDK alias
+ * for claude-code; and a model id for codex. Returns `null` when the string
+ * cannot be a valid reference for that backend.
  */
 export function parseModelOverride(
   kind: AgentBackendKind,
@@ -242,7 +242,8 @@ export function parseModelOverride(
 ): BackendModelSelection | null {
   switch (kind) {
     case 'opencode':
-    case 'pi': {
+    case 'pi':
+    case 'zcode': {
       const separator = raw.indexOf('/');
       if (separator <= 0 || separator === raw.length - 1) return null;
       const provider = raw.slice(0, separator).trim();
@@ -264,7 +265,7 @@ export function normalizeTabModel(
   kind: AgentBackendKind,
   tabModel: { provider: string; model: string },
 ): BackendModelSelection {
-  if (kind === 'opencode' || kind === 'pi') {
+  if (kind === 'opencode' || kind === 'pi' || kind === 'zcode') {
     return { kind, provider: tabModel.provider, model: tabModel.model };
   }
   return kind === 'claude-code'

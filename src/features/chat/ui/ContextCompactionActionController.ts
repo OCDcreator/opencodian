@@ -149,7 +149,7 @@ export class ContextCompactionActionController {
     if (!this.statusEl) return;
     this.statusEl.setText(t(FOREGROUND_COMPACTION_MESSAGE_KEYS[key]));
     this.statusEl.setAttribute('aria-busy', busy ? 'true' : 'false');
-    const isPendingVerification = key === 'timeout-accepted';
+    const isPendingVerification = key === 'accepted' || key === 'timeout-accepted';
     this.statusEl.classList.toggle(
       'is-error',
       !['available', 'requesting', 'accepted', 'verified', 'timeout-accepted'].includes(key),

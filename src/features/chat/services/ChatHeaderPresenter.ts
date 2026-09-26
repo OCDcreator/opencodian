@@ -62,6 +62,7 @@ function readActiveBackendFromPlugin(): AgentBackendKind {
     || value === 'codex'
     || value === 'copilot'
     || value === 'pi'
+    || value === 'zcode'
   ) {
     return value;
   }

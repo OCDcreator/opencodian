@@ -79,6 +79,14 @@ describe('SlashCommandExecutionService Claude passthrough', () => {
     expect(host.getRuntimeSkills).toHaveBeenCalled();
   });
 
+  it('passes ZCode slash input to its native adapter instead of OpenCode commands', async () => {
+    const host = createHost(createConversation({ backend: 'zcode' }));
+    const service = new SlashCommandExecutionService(host);
+
+    await expect(service.tryRunSlashCommand('/goal verify native dispatch')).resolves.toBe(false);
+    expect(host.getRuntimeCommands).not.toHaveBeenCalled();
+  });
+
   it('continues normal slash-command flow when there is no current conversation', async () => {
     const host = createHost(null);
     const service = new SlashCommandExecutionService(host);

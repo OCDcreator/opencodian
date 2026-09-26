@@ -96,4 +96,16 @@ describe('OpenCodianView.loadSlashCommandMenuItems — Codex-active guard', () =
     expect(loadSpy).not.toHaveBeenCalled();
     expect(items).toEqual([]);
   });
+
+  it('routes a ZCode conversation to native slash commands without calling OpenCode', async () => {
+    const view = createView('zcode', ['zcode']);
+    const cache = (view as unknown as {
+      slashCommandMenuCatalogCache: { load: () => Promise<SlashCommandMenuItem[]> };
+    }).slashCommandMenuCatalogCache;
+    const items = await (view as unknown as { loadSlashCommandMenuItems: () => Promise<SlashCommandMenuItem[]> })
+      .loadSlashCommandMenuItems();
+
+    expect(items).toEqual([]);
+    expect((cache as unknown as { host: { getBackendKey: () => string } }).host.getBackendKey()).toBe('zcode');
+  });
 });

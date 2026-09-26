@@ -33,3 +33,7 @@
 ## 2026-09-08 Pi 独立服务接入
 
 新增 PiAdapter 惰性注册和 getPiSettings 回调。构造时不启动进程，不启用 Pi；OpenCode、Claude、Codex 的构造参数和实现保持不变。
+
+## 2026-09-22 ZCode 后端接入（票 01）
+
+wireHiddenAdapters 惰性注册 ZCodeAdapter（getZCodeSettings / getZCodeExtraEnv 回调），与 Codex/Pi 同样仅在有 vaultPath 时注册；构造时不启动进程，其他后端构造参数和实现保持不变。

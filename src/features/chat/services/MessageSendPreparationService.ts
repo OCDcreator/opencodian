@@ -92,7 +92,16 @@ export interface PrepareMessageSendOptions {
   /** One-shot structured-output schema for Claude Code `/json` trigger. Not persisted. */
   outputFormat?: Record<string, unknown>;
   images?: ImageAttachment[];
+  /**
+   * Composer-only acknowledgement. It never crosses the transport boundary:
+   * accepted means the optimistic turn has been recorded, queued means the
+   * tab owns the deferred intent, and rejected leaves the composer draft
+   * available for correction and retry.
+   */
+  onPreparationOutcome?: (outcome: MessageSendPreparationOutcome) => void;
 }
+
+export type MessageSendPreparationOutcome = 'accepted' | 'queued' | 'rejected';
 
 export interface PreparedMessageSend {
   conversation: Conversation;
@@ -198,6 +207,15 @@ export interface MessageSendPreparationHost {
   shouldUseModelCatalog(conversation: Conversation): boolean;
   ensureSelectedModelAvailable(provider: string | undefined, model: string | undefined): Promise<boolean>;
   appendModelUnavailableNoticeMessage(): Promise<void>;
+  /**
+   * Native ZCode catalog proof for the selected model. `unavailable` is a
+   * safe refusal: image sends may not proceed on a stale or unobserved model
+   * catalog.
+   */
+  getZCodeImageInputSupport?(
+    sessionId: string,
+    model: SendMessageModelOptions,
+  ): Promise<'supported' | 'unsupported' | 'unavailable'>;
   buildStructuredPromptSendPayload(
     content: string,
     options: {
@@ -297,6 +315,10 @@ export interface MessageSendPreparationHostDependencies {
   reloadModelCatalog: () => Promise<void>;
   getSendMessageOptions: () => SendMessageModelOptions;
   appendModelUnavailableNoticeMessage: () => Promise<void>;
+  getZCodeImageInputSupport?: (
+    sessionId: string,
+    model: SendMessageModelOptions,
+  ) => Promise<'supported' | 'unsupported' | 'unavailable'>;
   openCodeService: {
     buildStructuredPromptSendPayload(
       content: string,
@@ -352,6 +374,7 @@ export class MessageSendPreparationService {
   ): Promise<PreparedMessageSend | null> {
     const tabId = options.targetTabId ?? this.host.getActiveTabId();
     if (!tabId || !this.isTargetTabActive(options.targetTabId)) {
+      this.notifyPreparationOutcome(options, 'rejected');
       return null;
     }
     // Check server availability BEFORE creating a conversation/session,
@@ -359,23 +382,33 @@ export class MessageSendPreparationService {
     const earlyAvailability = await this.host.getServerAvailability();
     if (earlyAvailability !== 'running' && earlyAvailability !== 'external') {
       if (!(await this.ensureServerReadyForChat(earlyAvailability))) {
+        this.notifyPreparationOutcome(options, 'rejected');
         return null;
       }
     }
     const conversation = await this.host.ensureConversationReady();
-    if (!conversation) return null;
+    if (!conversation) {
+      this.notifyPreparationOutcome(options, 'rejected');
+      return null;
+    }
     const backendSessionId = getConversationBackendSessionId(conversation);
     if (!backendSessionId) {
       this.resetPreparingLifecycle(tabId);
+      this.notifyPreparationOutcome(options, 'rejected');
       return null;
     }
-    if (!this.isTargetTabActive(options.targetTabId) || !this.host.ensureTabRuntime(tabId)) return null;
+    if (!this.isTargetTabActive(options.targetTabId) || !this.host.ensureTabRuntime(tabId)) {
+      this.notifyPreparationOutcome(options, 'rejected');
+      return null;
+    }
     if (this.host.isTabForegroundBusy(tabId)) {
       if (!this.queueFollowUpSend(tabId, options)) {
         this.host.notifyForegroundBusy();
+        this.notifyPreparationOutcome(options, 'rejected');
         return null;
       }
       this.host.notifyFollowUpQueued?.(tabId, this.getFollowUpQueueSnapshot(tabId));
+      this.notifyPreparationOutcome(options, 'queued');
       return null;
     }
     this.host.transitionTabSessionLifecycle(tabId, 'preparing', 'send-preflight');
@@ -385,12 +418,19 @@ export class MessageSendPreparationService {
     if (availability !== 'running' && availability !== 'external') {
       if (!(await this.ensureServerReadyForChat(availability))) {
         this.resetPreparingLifecycle(tabId);
+        this.notifyPreparationOutcome(options, 'rejected');
         return null;
       }
     }
     const usesModelCatalog = this.host.shouldUseModelCatalog(conversation);
     const modelOptions = usesModelCatalog ? await this.prepareModelOptions(tabId) : {};
     if (!modelOptions) {
+      this.notifyPreparationOutcome(options, 'rejected');
+      return null;
+    }
+    if (!(await this.verifyImageInputBeforeOptimisticAppend(conversation, backendSessionId, modelOptions, options.images))) {
+      this.resetPreparingLifecycle(tabId);
+      this.notifyPreparationOutcome(options, 'rejected');
       return null;
     }
     // Merge one-shot structured-output trigger into model options for this send only.
@@ -455,7 +495,7 @@ export class MessageSendPreparationService {
     const requestContent = isClaudeBackend
       ? options.content
       : this.agentInvocationService.removeMentionFallbackText(options.content, resolvedAgentInvocation);
-    const skillExpansion = conversation.backend === 'pi'
+    const skillExpansion = conversation.backend === 'pi' || conversation.backend === 'zcode'
       ? { syntheticParts: [] }
       : await this.skillContentExpander.expand(requestContent);
     const syntheticTextParts: PromptSyntheticTextPartInput[] = [
@@ -491,6 +531,7 @@ export class MessageSendPreparationService {
     );
     if (!writeApplied) {
       this.resetPreparingLifecycle(tabId);
+      this.notifyPreparationOutcome(options, 'rejected');
       return null;
     }
 
@@ -517,6 +558,7 @@ export class MessageSendPreparationService {
         this.host.startAiConversationTitleGeneration(conversation.id, options.content, modelOptions);
       }
     }
+    this.notifyPreparationOutcome(options, 'accepted');
     return {
       conversation, tabId, messageID: structuredSend.messageID,
       requestParts: structuredSend.requestParts, optimisticUserParts: structuredSend.optimisticUserParts,
@@ -582,8 +624,49 @@ export class MessageSendPreparationService {
       ...(options.syntheticTextParts ? { syntheticTextParts: [...options.syntheticTextParts] } : {}),
       ...(options.invocationIntent ? { invocationIntent: options.invocationIntent } : {}),
       ...(options.images ? { images: [...options.images] } : {}),
+      ...(options.onPreparationOutcome ? { onPreparationOutcome: options.onPreparationOutcome } : {}),
       targetTabId: tabId,
     });
+  }
+
+  /**
+   * Image attachments are special because the optimistic message contains a
+   * visual claim. For ZCode, prove the selected model's image capability from
+   * the native catalog before recording that claim or dispatching a turn.
+   */
+  private async verifyImageInputBeforeOptimisticAppend(
+    conversation: Conversation,
+    backendSessionId: string,
+    modelOptions: SendMessageModelOptions,
+    images: readonly ImageAttachment[] | undefined,
+  ): Promise<boolean> {
+    if (conversation.backend !== 'zcode' || !images?.length) {
+      return true;
+    }
+    const support = await this.host.getZCodeImageInputSupport?.(backendSessionId, modelOptions)
+      ?? 'unavailable';
+    if (support === 'supported') {
+      return true;
+    }
+    new Notice(t(
+      support === 'unsupported'
+        ? 'chat.image.zcode.modelUnsupported'
+        : 'chat.image.zcode.catalogUnavailable',
+    ));
+    return false;
+  }
+
+  private notifyPreparationOutcome(
+    options: PrepareMessageSendOptions,
+    outcome: MessageSendPreparationOutcome,
+  ): void {
+    try {
+      options.onPreparationOutcome?.(outcome);
+    } catch (error) {
+      // A UI acknowledgement must not compromise the sending path. It is
+      // intentionally diagnostic-only and never reaches a backend request.
+      logger.warn('Composer send-preparation acknowledgement failed', { outcome, error });
+    }
   }
 
   private isFirstUserMessage(conversation: Conversation): boolean {
@@ -823,10 +906,12 @@ export function createMessageSendPreparationHost(
     formatModelId: (model) => selectionCtrl.formatModelId(model),
     shouldUseModelCatalog: (conversation) => {
       const backend = conversation.backend ?? 'opencode';
-      return backend === 'opencode' || backend === 'claude-code' || backend === 'pi';
+      return backend === 'opencode' || backend === 'claude-code' || backend === 'pi' || backend === 'zcode';
     },
     ensureSelectedModelAvailable: (provider, model) => selectionCtrl.ensureSelectedModelAvailable(provider, model),
     appendModelUnavailableNoticeMessage: () => deps.appendModelUnavailableNoticeMessage(),
+    getZCodeImageInputSupport: (sessionId, model) =>
+      deps.getZCodeImageInputSupport?.(sessionId, model) ?? Promise.resolve('unavailable'),
     buildStructuredPromptSendPayload: (content, options) => openCodeService.buildStructuredPromptSendPayload(content, options),
     loadSkills: async () => {
       const response = await openCodeService.sdk.app.skills();

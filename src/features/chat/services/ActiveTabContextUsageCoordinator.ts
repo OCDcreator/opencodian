@@ -45,6 +45,7 @@ export interface ForegroundCompactionAvailability {
 
 export type ForegroundCompactionActionStatus =
   | 'verified'
+  | 'accepted'
   | 'unavailable'
   | 'invalid-thread'
   | 'busy'
@@ -179,7 +180,12 @@ export class ActiveTabContextUsageCoordinator {
     }
 
     const conversation = this.host.getCurrentConversation();
-    this.commitState(this.restorePersistedSnapshot(this.createIdentityState(conversation), conversation));
+    let nextState = this.restorePersistedSnapshot(this.createIdentityState(conversation), conversation);
+    const sessionId = conversation ? getConversationBackendSessionId(conversation) : null;
+    const persisted = conversation?.lastContextUsage;
+    if (conversation?.backend === 'zcode' && sessionId && !(persisted?.sessionId === sessionId && persisted.totalTokens > 0)
+      && !(this.getCurrentState().sessionId === sessionId && (this.getCurrentState().preciseTokens?.total ?? 0) > 0)) nextState = ContextUsageService.markUsageUnavailable(nextState);
+    this.commitState(nextState);
     this.refreshUnavailableCosts();
   }
 
@@ -244,7 +250,7 @@ export class ActiveTabContextUsageCoordinator {
     if (
       !expectedConversationId
       || !expectedSessionId
-      || !['opencode', 'claude-code', 'codex', 'pi'].includes(expectedBackend)
+      || !['opencode', 'claude-code', 'codex', 'pi', 'zcode'].includes(expectedBackend)
       || !this.host.hasActiveTab()
     ) {
       report('skipped');
@@ -285,9 +291,7 @@ export class ActiveTabContextUsageCoordinator {
   }
 
   beginTabContextUsageStream(tabId: TabId | null): void {
-    if (!this.host.hasTab(tabId ?? '')) {
-      return;
-    }
+    if (!this.host.hasTab(tabId ?? '')) return;
 
     const nextState = ContextUsageService.beginStream(
       this.host.getTabContextUsage(tabId) ?? createEmptyTabContextState(),
@@ -296,9 +300,7 @@ export class ActiveTabContextUsageCoordinator {
   }
 
   completeTabContextUsageStream(tabId: TabId | null): void {
-    if (!this.host.hasTab(tabId ?? '')) {
-      return;
-    }
+    if (!this.host.hasTab(tabId ?? '')) return;
 
     const nextState = ContextUsageService.completeStream(
       this.host.getTabContextUsage(tabId) ?? createEmptyTabContextState(),
@@ -310,9 +312,7 @@ export class ActiveTabContextUsageCoordinator {
     tabId: TabId | null,
     chunk: Extract<StreamChunk, { type: 'usage' }>,
   ): void {
-    if (!this.host.hasTab(tabId ?? '')) {
-      return;
-    }
+    if (!this.host.hasTab(tabId ?? '')) return;
 
     let nextState = ContextUsageService.applyUsageChunk(
       this.host.getTabContextUsage(tabId) ?? createEmptyTabContextState(),
@@ -334,9 +334,7 @@ export class ActiveTabContextUsageCoordinator {
     tabId: TabId | null,
     snapshot: ContextUsageSnapshot,
   ): void {
-    if (!this.host.hasTab(tabId ?? '')) {
-      return;
-    }
+    if (!this.host.hasTab(tabId ?? '')) return;
 
     const currentState = this.host.getTabContextUsage(tabId) ?? createEmptyTabContextState();
     const enrichedSnapshot = this.enrichSnapshot(snapshot, currentState, tabId);
@@ -356,7 +354,7 @@ export class ActiveTabContextUsageCoordinator {
 
   getForegroundCompactionControl(): ForegroundCompactionControl {
     const conversation = this.host.getCurrentConversation();
-    if (!this.host.hasActiveTab() || !conversation || (conversation.backend ?? 'opencode') !== 'codex') {
+    if (!this.host.hasActiveTab() || !conversation || !['codex', 'zcode'].includes(conversation.backend ?? 'opencode')) {
       return {
         visible: false,
         tabId: this.host.getActiveTabId(),

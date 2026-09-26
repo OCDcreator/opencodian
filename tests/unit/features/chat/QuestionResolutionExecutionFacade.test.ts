@@ -65,7 +65,10 @@ describe('QuestionResolutionExecutionFacade', () => {
       answers: [['TypeScript']],
     });
 
-    expect(host.replyToQuestion).toHaveBeenCalledWith(request.id, [['TypeScript']]);
+    expect(host.replyToQuestion).toHaveBeenCalledWith(request.id, [['TypeScript']], {
+      tabId: null,
+      request,
+    });
     expect(host.rejectQuestion).not.toHaveBeenCalled();
   });
 
@@ -79,7 +82,10 @@ describe('QuestionResolutionExecutionFacade', () => {
       status: 'rejected',
     });
 
-    expect(host.rejectQuestion).toHaveBeenCalledWith(request.id);
+    expect(host.rejectQuestion).toHaveBeenCalledWith(request.id, {
+      tabId: null,
+      request,
+    });
     expect(host.replyToQuestion).not.toHaveBeenCalled();
   });
 
@@ -116,7 +122,10 @@ describe('QuestionResolutionExecutionFacade', () => {
 
     await expect(facade.executeAndApply(action, context)).resolves.toBe(true);
 
-    expect(host.replyToQuestion).toHaveBeenCalledWith(request.id, [['TypeScript']]);
+    expect(host.replyToQuestion).toHaveBeenCalledWith(request.id, [['TypeScript']], {
+      tabId: 'tab-active',
+      request,
+    });
     expect(lifecycle.markResolvedQuestionRequest).toHaveBeenCalledWith(
       request.id,
       'tab-active',

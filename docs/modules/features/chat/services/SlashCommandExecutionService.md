@@ -1,5 +1,7 @@
 # SlashCommandExecutionService
 
+2026-09-26：当当前会话为 ZCode 时，原样放行斜杠文本至 ZCode adapter，不查询或调用 OpenCode 的命令服务。ZCode 的 `/goal`、`/compact`、`/plan` 在原生边界处理，`/init` 与自定义命令由 ZCode 自身解析；OpenCode 原有命令路径不变。
+
 > **源码**: `src/features/chat/services/SlashCommandExecutionService.ts`
 > **状态**: [REVIEW]
 

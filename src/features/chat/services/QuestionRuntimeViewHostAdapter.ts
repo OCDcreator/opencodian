@@ -4,6 +4,7 @@ import type {
 } from '../../../core/types';
 import type { TabId } from '../tabs';
 import type { QuestionDockSlotCoordinator } from './QuestionDockSlotCoordinator';
+import type { QuestionResolutionRequestRoute } from './QuestionResolutionExecutionFacade';
 import type {
   QuestionRuntimeState,
   QuestionRuntimeViewHost,
@@ -20,9 +21,15 @@ export interface QuestionRuntimeSettingsPort {
 }
 
 export interface QuestionRuntimeQuestionApiPort {
-  getPendingQuestions(): Promise<QuestionRequest[]>;
-  replyToQuestion(requestId: string, answers: string[][]): Promise<void>;
-  rejectQuestion(requestId: string): Promise<void>;
+  /** True only when an empty pending read is a native authoritative readback. */
+  isPendingQuestionReadAuthoritative?(tabId?: TabId | null): boolean;
+  getPendingQuestions(tabId?: TabId | null): Promise<QuestionRequest[]>;
+  replyToQuestion(
+    requestId: string,
+    answers: string[][],
+    context?: QuestionResolutionRequestRoute,
+  ): Promise<void>;
+  rejectQuestion(requestId: string, context?: QuestionResolutionRequestRoute): Promise<void>;
 }
 
 export interface QuestionRuntimeTabAttentionPort {
@@ -68,9 +75,16 @@ export function createQuestionRuntimeViewHostAdapter(
     setTabNeedsAttention: (tabId, needsAttention) => {
       dependencies.tabAttention.setNeedsAttention(tabId, needsAttention);
     },
-    getPendingQuestions: () => dependencies.questionApi.getPendingQuestions(),
-    replyToQuestion: (requestId, answers) =>
-      dependencies.questionApi.replyToQuestion(requestId, answers),
-    rejectQuestion: (requestId) => dependencies.questionApi.rejectQuestion(requestId),
+    isPendingQuestionReadAuthoritative: (tabId) =>
+      dependencies.questionApi.isPendingQuestionReadAuthoritative?.(tabId) ?? false,
+    getPendingQuestions: (tabId) => tabId === undefined
+      ? dependencies.questionApi.getPendingQuestions()
+      : dependencies.questionApi.getPendingQuestions(tabId),
+    replyToQuestion: (requestId, answers, context) => context
+      ? dependencies.questionApi.replyToQuestion(requestId, answers, context)
+      : dependencies.questionApi.replyToQuestion(requestId, answers),
+    rejectQuestion: (requestId, context) => context
+      ? dependencies.questionApi.rejectQuestion(requestId, context)
+      : dependencies.questionApi.rejectQuestion(requestId),
   };
 }

@@ -252,6 +252,18 @@ describe('TabConversationActivationBridge', () => {
     ]);
   });
 
+  it('passes the ZCode session to pending-question refresh when returning to a streaming tab', () => {
+    const conversation = createConversation('streaming-zcode-conversation');
+    conversation.backend = 'zcode';
+    conversation.backendSessionId = 'sess-zcode';
+    delete conversation.openCodeSessionId;
+    const { bridge, tabViewActivationBridge } = createBridgeFixture();
+
+    bridge.applyStreamingConversationActivation('tab-1', conversation);
+
+    expect(tabViewActivationBridge.applyStreamingActivationOutcome).toHaveBeenCalledWith('tab-1', 'sess-zcode');
+  });
+
   it('applies loaded-conversation activation state through the shared state bridge', () => {
     const conversation = createConversation('loaded-conversation');
     const {

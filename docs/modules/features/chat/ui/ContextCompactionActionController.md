@@ -1,5 +1,7 @@
 # ContextCompactionActionController
 
+ZCode `session/compact` 返回受理但无独立终态/用量核验时，状态文案使用已有的 `accepted`（等待权威验证），并显示 pending-verification 而非 success。只有 `verified` 且 ACK、完成、用量读回齐全时显示成功。
+
 > **源码**: `src/features/chat/ui/ContextCompactionActionController.ts`
 > **状态**: [REVIEW]
 

@@ -98,3 +98,7 @@
 ## 2026-09-08 Pi 独立服务接入
 
 IMPLEMENTED_AGENT_BACKENDS 新增 pi；默认启用后端不变。Pi 实现归属独立 core.backend-pi owner。
+
+## 2026-09-22 ZCode 后端接入（票 01）
+
+IMPLEMENTED_AGENT_BACKENDS 新增 zcode；导出 zcode 包符号（ZCodeAdapter、诊断/解析类型）。默认启用后端不变。

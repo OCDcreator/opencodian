@@ -1,4 +1,17 @@
 # Owner: core.backend
+> 2026-09-25 (FA880): ZCode native background jobs are read from `session/read` and canceled only by an exact sessionId/taskId pair with terminal readback.
+> 2026-09-25 (FA880 ZCode): Native `session/events` mode transitions expose `planEnabled` separately from the `session/read` base mode; ZCodeAdapter confirms Plan only with matching same-session event readback. ZCodeInteractionBridge denies pure permission asks after 60 seconds and rejects late approvals.
+> 2026-09-24 (票 09)：兼容加固落地——协议版本协商证据入诊断、诊断文本统一脱敏上限、重启覆盖（首个 transport 释放 + 新握手无孤儿）。
+> 2026-09-24 (票 08)：ZCode aux/inline 裁决为证据支撑的 fail-closed 不可用（无运行时只读机制——工具清单含 write/shell/subagent、setMode 无效、无白名单通道），拒绝于启动、不开会话、不降级。
+> 2026-09-22（核查修复）：ZCode 启动路径两处阻断修复——node-bundle 运行器弃用宿主 Electron（改 bundle 应用 Electron → node）；provider 配置改官方成对 env 注入（BUILTIN+PERSONAL 同时提供），设置覆盖优先于环境命令覆盖。
+> 2026-09-24 (票 07)：图片附件诚实裁决——本地校验 + 协议面不可用（实测证据），零 dispatch；路由恢复保留记录级 attachments。
+> 2026-09-24 (票 06)：ZCode 实时模型/思考/模式/斜杠目录落地（快照+广播双通道）；setModel/setThoughtLevel/setMode 发送前校验；会话覆盖与持久化默认分处回合/物化两边界。
+> 2026-09-24 (票 05)：ZCodeStreamMapper 接通工具调用（tool_use/result/progress，streaming input 与 duration 双证据）、后台任务跟踪（稳定 taskId，不覆盖前景）、context_usage 仅原生证据（成本恒 null）；子代理链路经 `getSessionSubagents` 直通。
+> 2026-09-22 (票 04)：ZCode 交互环落地——原生 permission/userInput ask ↔ 既有权限/问答面（严格应答 schema：JL / action-content；恰一次；未知形状与过期应答 fail-closed；teardown 落定）。
+> 2026-09-22 (票 03)：ZCodeAdapter 接通原生生命周期（list/read/messages/fork/compact + resume 激活语义），AgentBackendRouting 的消息归一增加 zcode 信封兼容；rename 与 delete 均为证据支撑的诚实不可用（方法表无 rename/delete；实证 `session/close` 仅句柄分离——历史可回读、行保留）。
+> 2026-09-22（二轮核查修复）：ZCode provider 发现的计数改正式 schema（未知→null 不伪造），builtin 读取/解析失败分型（unreadable/malformed）。
+> 2026-09-22 (ZCode 票 02)：ZCodeAdapter 接通聊天/会话能力——`session/event` → ZCodeStreamMapper → StreamChunk（seq 去重、delta 通道互斥、终结/用量/失败归一）；`session/send|stop|create|subscribe` 走自有 transport；会话物化时对宿主 ask（runtime preferences / MCP auth headers）做诚实应答防死锁。并发 per-session 流与取消语义保持后端中立契约。
+> 2026-09-22 (ZCode 票 01)：`src/core/agents/backend/zcode/**` 新增 ZCode 独立 adapter/transport 边界——官方 `app-server --stdio` NDJSON 协议（无 `jsonrpc` 字段）、边界校验与未知事件诚实降级、fail-closed 服务端请求应答；进程所有权收口于 ZCodeAppServerTransport（只杀自有进程，SIGTERM→SIGKILL，无孤儿）；provider 配置只读发现并经 env 注入，绝不改写用户配置。
 > 2026-09-21 (advantage-parity R-F7)：R-F7 域 env 注入缝：ClaudeCodeOptionsBuilder `domainEnv`（legacy settings.env 仍最终覆盖）+ ClaudeCodeAdapter live accessor；CodexAdapter `getExtraEnv`（SDK 构造 + app-server transport）；AgentAdapterWiring 透传 codex/pi 缝。
 > 2026-09-21 (advantage-parity R-F1)：AgentService 新增 AgentTurnSteeringCapability 接口（steerTurn——注入活动轮，不新起会话）。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。

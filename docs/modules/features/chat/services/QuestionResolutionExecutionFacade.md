@@ -5,7 +5,7 @@
 
 ## 概述
 
-`QuestionResolutionExecutionFacade` 把 question resolve 流程里共享的 **OpenCode reply/reject 执行、resolved-state apply 与错误 notice** 从 `QuestionDockCoordinator` 和 `QuestionResolutionFlowCoordinator` 中收束出来，专门负责：
+`QuestionResolutionExecutionFacade` 把 question resolve 流程里共享的 **后端定向 reply/reject 执行、resolved-state apply 与错误 notice** 从 `QuestionDockCoordinator` 和 `QuestionResolutionFlowCoordinator` 中收束出来，专门负责：
 
 - 接收共享的 `reply` / `reject` execution action，统一调用 `replyToQuestion()` / `rejectQuestion()`
 - 复用同一份 logger 与 `chat.question.notice.error` 提示，保持 dock 与 inline fallback 的报错行为一致
@@ -17,8 +17,8 @@
 
 ```typescript
 export interface QuestionResolutionExecutionFacadeHost {
-  replyToQuestion(requestId: string, answers: string[][]): Promise<void>;
-  rejectQuestion(requestId: string): Promise<void>;
+  replyToQuestion(requestId: string, answers: string[][], context?: QuestionResolutionRequestRoute): Promise<void>;
+  rejectQuestion(requestId: string, context?: QuestionResolutionRequestRoute): Promise<void>;
 }
 
 export type QuestionResolutionExecutionAction =
@@ -33,7 +33,7 @@ export class QuestionResolutionExecutionFacade {
 
 ## 关键行为
 
-- `execute()` 在 `reply` / `reject` 之间统一分支，避免两个 coordinator 重复持有真实 question API 调用逻辑
+- `execute()` 在 `reply` / `reject` 之间统一分支，并把 `tabId + request` 的稳定 origin route 传给 host；卡片显示期间即使切换 tab/backend 也不会改写目标 adapter
 - 执行成功时直接返回 action 自带的 `QuestionResolution`，不再让 coordinator 重新拼装 answered/rejected shape
 - 执行失败时统一记录错误并显示现有本地化 notice，然后返回 `null`，由调用方跳过后续 writeback
 - `executeAndApply()` 在共享执行成功后继续通过 lifecycle port 完成 resolved-id 标记、resolved card/runtime apply、可选 queue cleanup，以及 `QuestionPostResolutionRuntimeFacade` follow-up，让 dock 与 inline fallback 共用同一条 post-resolution lifecycle

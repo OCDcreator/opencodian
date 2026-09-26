@@ -1,5 +1,7 @@
 # ActiveTabContextUsageCoordinator
 
+ZCode `session/compact` 请求被接受但尚无独立终态时，`ForegroundCompactionActionResult.status` 为 `accepted`，`runtimeVerified/completed/tokenUsageObserved` 均为 false。适配器只有取得同会话 `cmp_` 完成事件和原生 token 增量才返回 verified；此时本协调器刷新上下文。ACK/snapshot 不能单独作为压缩成功。
+
 2026-09-10：`connectPricingUpdates()` 订阅目录更新并立即补算已经存在的无金额状态；`syncIdentity()` 同样补算之后恢复的无金额快照，覆盖目录早于 view/restore 的时序。只更新 live tab 的缺失费用，保留已有金额（含零）、token ledger 和活动时间；后台标签页使用自身 tab ID 解析计费身份。`onPricingUpdated()` 向固定 tab/session 的详情弹窗推送结果。`dispose()` 取消订阅和计时器，并提交尚未写入的最后快照。
 
 > **源码**: `src/features/chat/services/ActiveTabContextUsageCoordinator.ts`
@@ -8,6 +10,8 @@
 ## 概述
 
 `ActiveTabContextUsageCoordinator` 把 activation/open 路径里剩余的 **context usage identity writeback + snapshot refresh writeback** 收束成一个更窄的 coordinator。它专门负责：
+
+- ZCode 会话通过 adapter 的 `session/read` + `session/usage` 读回原生窗口和 token；缺少任一原生字段时保持不可用，不制造 0。
 
 - 在活动 tab 存在时，根据当前会话模型、模型目录解析结果和当前 conversation 元数据同步 context usage identity
 - 在 loaded/open-side refresh 里拉取 session context usage snapshot，并只在 conversation/session 仍匹配时回写精确 token/cost

@@ -123,3 +123,5 @@ The editor-area settings view passes the same `renderPluginUpdateSection` seam t
 `OpenCodianSettingsView` owns a non-persisted `pluginUpdateExpanded` field and passes it through the section seam. Operation redraws retain the value; `onClose()` resets it to `false` so a newly opened editor-area view starts collapsed.
 
 2026-09-09：编辑区经典布局在Pi激活时包含Pi独立设置与二级导航；tabbed模式复用共享Pi路由。
+
+2026-09-22：ZCode 激活时渲染 `SettingsZCodeSection`（与 Pi 同模式）；tabbed 模式复用共享 ZCode 路由。

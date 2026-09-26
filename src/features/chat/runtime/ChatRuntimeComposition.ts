@@ -36,7 +36,7 @@ import type {
   EditRevertServicePort,
   PromptContextItem,
 } from '../../../core/types';
-import { getTurnDiffNoticeMeta } from '../../../core/types';
+import { getConversationBackendSessionId, getTurnDiffNoticeMeta } from '../../../core/types';
 import { t } from '../../../i18n';
 import { getVaultBasePath } from '../../../shared';
 // Host-interface return types (tightened from `unknown` to remove as-never casts at call sites).
@@ -131,7 +131,11 @@ import type { ConversationViewStateHost } from '../services/ConversationViewStat
 import type { InputPanelAppearanceCoordinatorHost } from '../services/InputPanelAppearanceCoordinator';
 import { InputPanelAppearanceCoordinator } from '../services/InputPanelAppearanceCoordinator';
 import { createMessageFinalizationHost,MessageFinalizationService } from '../services/MessageFinalizationService';
-import { createMessageSendPreparationHost,MessageSendPreparationService } from '../services/MessageSendPreparationService';
+import {
+  createMessageSendPreparationHost,
+  MessageSendPreparationService,
+  type SendMessageModelOptions,
+} from '../services/MessageSendPreparationService';
 import type { PersistentAssistantNoticeServiceHost } from '../services/PersistentAssistantNoticeService';
 import { PersistentAssistantNoticeService } from '../services/PersistentAssistantNoticeService';
 import { QuestionDockSlotCoordinator } from '../services/QuestionDockSlotCoordinator';
@@ -144,6 +148,37 @@ import {
 } from '../services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
 import type { SettledScrollScheduler } from '../services/ScrollManager';
 import { ServerReferenceContextService } from '../services/ServerReferenceContextService';
+
+interface ZCodeImageCatalogAdapter {
+  start?(): Promise<void>;
+  getSession?(id: string): Promise<unknown>;
+  getAvailableModels?(): Promise<readonly {
+    providerId: string;
+    modelId: string;
+    supportsImageInput: boolean;
+  }[]>;
+}
+
+async function getZCodeImageInputSupport(
+  registry: unknown,
+  sessionId: string,
+  model: SendMessageModelOptions,
+): Promise<'supported' | 'unsupported' | 'unavailable'> {
+  if (!model.provider || !model.model) return 'unavailable';
+  const adapter = (registry as { get?(backend: string): ZCodeImageCatalogAdapter | undefined } | null | undefined)
+    ?.get?.('zcode');
+  if (!adapter?.start || !adapter.getSession || !adapter.getAvailableModels) return 'unavailable';
+  try {
+    await adapter.start();
+    await adapter.getSession(sessionId);
+    const selected = (await adapter.getAvailableModels()).find((entry) =>
+      entry.providerId === model.provider && entry.modelId === model.model);
+    if (!selected) return 'unavailable';
+    return selected.supportsImageInput ? 'supported' : 'unsupported';
+  } catch {
+    return 'unavailable';
+  }
+}
 import type { SessionTodoCoordinator } from '../services/SessionTodoHostAdapter';
 import type { SessionTodoViewHost } from '../services/SessionTodoHostAdapter';
 import { createSessionTodoCoordinator } from '../services/SessionTodoHostAdapter';
@@ -1140,6 +1175,8 @@ export class ChatRuntimeComposition {
         reloadModelCatalog: () => host.reloadModelCatalog(),
         getSendMessageOptions: () => host.getSendMessageOptions(),
         appendModelUnavailableNoticeMessage: () => host.appendModelUnavailableNoticeMessage(),
+        getZCodeImageInputSupport: (sessionId: string, model: SendMessageModelOptions) =>
+          getZCodeImageInputSupport(host.plugin.agentServiceRegistry, sessionId, model),
         openCodeService: host.plugin.openCodeService,
         backgroundTaskHost: conversation.backgroundTaskHost,
         conversationSyncBridgePorts,
@@ -1260,6 +1297,14 @@ export class ChatRuntimeComposition {
         backend: string;
       }) => {
         host.plugin.memoryRuntime?.onTurnSettled(info);
+        // Slash /plan reaches the native session through the chat send path.
+        // Refresh only this still-visible session's mode from ZCode's readback;
+        // the toolbar's per-session cache otherwise keeps showing BUILD.
+        if (info.backend === 'zcode' && host.getActiveTabId() === info.tabId
+          && host.currentConversation
+          && getConversationBackendSessionId(host.currentConversation) === info.sessionId) {
+          void surface.chatSelectionControlsCoordinator.refreshZCodeSessionState();
+        }
       },
       // R-B3 edit-revert hooks: fail-soft observers into the core.storage
       // service; the pipeline never awaits snapshot work.

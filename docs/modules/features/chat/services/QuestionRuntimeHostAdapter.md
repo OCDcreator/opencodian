@@ -1,4 +1,5 @@
 # QuestionRuntimeHostAdapter
+> 2026-09-25 (FA880): The inline question renderer host now reads authoritative pending requests through the tab-scoped question API. It requires matching sessionId and requestId; non-authoritative backends cannot dismiss a card from an empty callback list.
 
 > **源码**: `src/features/chat/services/QuestionRuntimeHostAdapter.ts`
 > **状态**: [REVIEW]
@@ -36,9 +37,9 @@ export interface QuestionRuntimeViewHost {
   shouldRenderQuestionResolutionCards(): boolean;
   keepQuestionCardPinnedToBottom(tabId: TabId | null): void;
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
-  getPendingQuestions(): Promise<QuestionRequest[]>;
-  replyToQuestion(requestId: string, answers: string[][]): Promise<void>;
-  rejectQuestion(requestId: string): Promise<void>;
+  getPendingQuestions(tabId?: TabId | null): Promise<QuestionRequest[]>;
+  replyToQuestion(requestId: string, answers: string[][], context?: QuestionResolutionRequestRoute): Promise<void>;
+  rejectQuestion(requestId: string, context?: QuestionResolutionRequestRoute): Promise<void>;
 }
 ```
 
@@ -49,6 +50,8 @@ export interface QuestionRuntimeViewHost {
 - `createQuestionRuntimeServices()` 现在让 `QuestionResolutionExecutionFacade` 持有 resolved-id suppression、resolved-card apply 与 post-resolution follow-up 的共享 lifecycle，而 `QuestionDockCoordinator` 继续专注 pending-question refresh、queue waiter、draft/active selection 与 attention/render writeback
 - dock render-state gating 与 dock submit/reject action assembly 仍分别由 `QuestionDockRenderStateFacade` 与 `QuestionDockResolutionActionFacade` 解析；adapter 只负责装配
 - send pipeline 触发 question request 时，`QuestionResolutionFlowCoordinator` 只选择 dock 或 inline action source；dock 与 inline 最终都复用同一个 `QuestionResolutionExecutionFacade` execution/apply seam
+- pending fetch 用待刷新 tab 路由；resolution 则携带生成卡片时的 tab/request identity，因此刷新、提交与拒绝都不会在切换后端后误走 OpenCode
+- `isPendingQuestionReadAuthoritative()` 仅由具备原生 pending readback 的后端置真；它随 host 传到 `QuestionDockCoordinator`，不会改变 OpenCode 等 eventual API 的 waiter 保活行为
 
 ## 与 `OpenCodianView` 的边界
 

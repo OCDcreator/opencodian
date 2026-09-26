@@ -1,4 +1,7 @@
 # ChatRuntimeComposition
+
+2026-09-26：ZCode 回合在仍属于当前可见标签/会话时结束后，装配层请求选择控件从该会话的原生读回刷新模式。此举使从斜杠 `/plan` 进入 Plan 的同会话控制显示跟上真实状态；切换标签后的旧回合不覆盖当前会话。
+> 2026-09-24 (ZCode image preflight)：interaction wiring 仅通过窄 adapter seam 提供原生模型目录读取给发送 preparation；发送前按所选 provider/model 证明 `supportsImageInput`，不把 ZCode 图片判断转发到 OpenCode service。
 > 2026-09-21 (advantage-parity R-F1)：notifyFollowUpQueued/QueueChanged 接 host.refreshQueuedFollowUpBar + 本地化排队 Notice。
 > 2026-09-21 (advantage-parity R-E1)：组合 UrlContextFetchService 并注入 MessageSendPreparationService 的 resolveUrlContextItems 缝（发送时抓取 pending 网页 chip）。
 > 2026-09-18 (R-B3): R-B3: the pipeline view-port gains fail-soft observers `onTurnSnapshotBegin` / `onTurnSnapshotEnd` / `onWriteToolUse` that forward to `host.plugin.editRevertService`; the pipeline never awaits snapshot work.

@@ -5,7 +5,7 @@
 
 ## 概述
 
-`PermissionModeSelectorCoordinator` 承接聊天工具栏 permission selector 的 DOM 与 dropdown lifecycle。它现在是 triple-backend selector owner：OpenCode backend 显示 `yolo` / `normal` / `plan` permission templates，Claude Code backend 显示 SDK permission modes `default` / `acceptEdits` / `bypassPermissions` / `plan`，Codex backend 显示 sandbox modes `read-only` / `workspace-write` / `danger-full-access`。
+`PermissionModeSelectorCoordinator` 承接聊天工具栏 permission selector 的 DOM 与 dropdown lifecycle。它现在是多后端 selector owner：OpenCode backend 显示 `yolo` / `normal` / `plan` permission templates，Claude Code backend 显示 SDK permission modes，Codex backend 显示 sandbox modes，ZCode backend 显示原生 `plan` / `build` / `edit` / `yolo` / `auto` 会话模式。
 
 - trigger icon/text/class 渲染
 - permission mode option list 构建与 selected state 刷新
@@ -34,7 +34,7 @@ export interface PermissionModeConfig {
   options: PermissionModeOption[];
   displayMap: Record<string, string>;
   modeCssClasses: readonly string[];
-  backendLabel: 'opencode' | 'claude-code' | 'codex';
+  backendLabel: 'opencode' | 'claude-code' | 'codex' | 'zcode';
   variantClass?: string;
   boundaryHint?: string;
 }

@@ -242,4 +242,25 @@ describe('createMessageSendPreparationHost', () => {
     expect(deps.getCurrentConversation).toHaveBeenCalled();
     expect(deps.chatSelectionControlsCoordinator.hasLoadedModelCatalog).toHaveBeenCalled();
   });
+
+  it('passes the active ZCode tab model into the prepared send', async () => {
+    const deps = createDeps();
+    deps.getCurrentConversation = jest.fn().mockReturnValue({
+      ...createConversation(),
+      backend: 'zcode',
+      backendSessionId: 'zcode-session-1',
+    });
+    deps.getSendMessageOptions = jest.fn().mockReturnValue({
+      provider: 'krill',
+      model: 'gpt-6-sol',
+      variant: 'none',
+    });
+    const host = createMessageSendPreparationHost(deps);
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    const result = await service.prepareMessageSend({ content: 'hello' });
+
+    expect(result?.modelOptions).toMatchObject({ provider: 'krill', model: 'gpt-6-sol', variant: 'none' });
+    expect(deps.chatSelectionControlsCoordinator.ensureSelectedModelAvailable).toHaveBeenCalledWith('krill', 'gpt-6-sol');
+  });
 });

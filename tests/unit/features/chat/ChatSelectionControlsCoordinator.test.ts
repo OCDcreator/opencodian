@@ -80,6 +80,7 @@ function createCatalogBundle(
 }
 
 interface FixtureOptions {
+  getOwnConversation?: () => { backend?: string; backendSessionId?: string } | null;
   activeTabModelOverride?: ModelSelectorSelection | null;
   defaultModelSelection?: ModelSelectorSelection | null;
   loadModelCatalogData?: {
@@ -122,6 +123,7 @@ async function createFixture(options: FixtureOptions = {}) {
   };
 
   const host: jest.Mocked<ChatSelectionControlsCoordinatorHost> = {
+    getOwnConversation: options.getOwnConversation,
     registerEscapeHandler: jest.fn((handler) => {
       escapeHandler = handler;
     }),
@@ -184,6 +186,47 @@ describe('ChatSelectionControlsCoordinator', () => {
   afterEach(() => {
     document.body.innerHTML = '';
     jest.clearAllMocks();
+  });
+
+  it('does not paint an unconfigured ZCode model before native create readback arrives', async () => {
+    const globalApp = globalThis as typeof globalThis & { app?: unknown };
+    const previousApp = globalApp.app;
+    let resolveStart = () => {};
+    const ready = new Promise<void>((resolve) => { resolveStart = resolve; });
+    const start = jest.fn(() => ready);
+    let observed: { provider: string; model: string } | null = null;
+    globalApp.app = {
+      workspace: { activeLeaf: { view: {
+        getViewType: () => 'opencodian-view',
+        currentConversation: { backend: 'zcode', backendSessionId: 'sess_first' },
+      } } },
+      plugins: { plugins: { opencodian: {
+        settings: { activeBackend: 'zcode' },
+        agentServiceRegistry: { get: () => ({
+          start,
+          getSession: async () => { throw new Error('deferred'); },
+          getObservedModel: () => observed,
+          getAvailableModels: async () => [{
+            providerId: 'opencode-go', modelId: 'gpt-5.6-luna', label: 'GPT 5.6 Luna',
+            providerLabel: 'OpenCode Go', contextWindow: 200000, reasoningLevels: [],
+          }],
+        }) },
+      } } },
+    };
+    try {
+      const fixture = await createFixture();
+      const trigger = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-trigger');
+      expect(trigger?.style.visibility).toBe('hidden');
+      expect(trigger?.hasAttribute('aria-hidden')).toBe(true);
+
+      observed = { provider: 'opencode-go', model: 'gpt-5.6-luna' };
+      resolveStart();
+      await fixture.coordinator.reloadModelCatalog();
+      expect(trigger?.style.visibility).toBe('');
+      expect(trigger?.textContent).toContain('GPT 5.6 Luna');
+    } finally {
+      globalApp.app = previousApp;
+    }
   });
 
   it('loads model selector state and routes model selection through the active-tab override seam', async () => {
@@ -445,6 +488,27 @@ describe('ChatSelectionControlsCoordinator', () => {
       title: t('chat.notice.modelUnavailable.selectedTitle'),
       message: t('chat.notice.modelUnavailable.selectedBody'),
     });
+  });
+
+  it('retries an empty startup model catalog before a restored session sends', async () => {
+    const fixture = await createFixture({
+      loadModelCatalogData: { catalogBundle: null, providers: [] },
+    });
+    expect(fixture.coordinator.hasLoadedModelCatalog()).toBe(true);
+    expect(fixture.coordinator.getAvailableProviders()).toHaveLength(0);
+
+    fixture.host.loadModelCatalogData.mockResolvedValueOnce({
+      catalogBundle: null,
+      providers: [{
+        id: 'deepseek',
+        name: 'DeepSeek',
+        models: [{ id: 'deepseek-flash', name: 'deepseek-flash' }],
+      }],
+    });
+
+    expect(await fixture.coordinator.ensureSelectedModelAvailable('deepseek', 'deepseek-flash')).toBe(true);
+    expect(fixture.host.loadModelCatalogData).toHaveBeenCalledTimes(2);
+    expect(fixture.coordinator.getAvailableProviders()).toHaveLength(1);
   });
 
   it('updates permission display and closes open dropdowns through the shared escape handler', async () => {
@@ -1322,6 +1386,75 @@ describe('ChatSelectionControlsCoordinator', () => {
 
       // Should call the OpenCode-specific switch, not the Claude switch
       expect(host.switchPermissionMode).toHaveBeenCalledWith('yolo');
+    });
+
+    it('keeps ZCode mode actions on the active native session and away from OpenCode', async () => {
+      const readSessionMode = jest.fn(async () => 'build');
+      const setSessionMode = jest.fn(async () => {});
+      (globalThis as any).app = {
+        workspace: { activeLeaf: { view: {
+          getViewType: () => 'opencodian-view',
+          currentConversation: { backend: 'zcode', backendSessionId: 'sess_target' },
+        } } },
+        plugins: { plugins: { opencodian: {
+          settings: { activeBackend: 'opencode' },
+          agentServiceRegistry: { get: () => ({
+            readSessionMode, setSessionMode,
+            start: jest.fn(async () => {}),
+            getAvailableModels: jest.fn(async () => []),
+            getDefaultModel: jest.fn(() => null),
+          }) },
+        } } },
+      };
+      const fixture = await createFixture();
+      fixture.coordinator.build(fixture.toolbarEl, { showModels: false });
+      await settleAsyncWork();
+      const trigger = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-permission-trigger');
+      expect(trigger?.getAttribute('data-permission-backend')).toBe('zcode');
+      trigger?.click();
+      fixture.toolbarEl.querySelector<HTMLElement>('[data-mode="plan"]')?.click();
+      await settleAsyncWork();
+      expect(setSessionMode).toHaveBeenCalledWith('sess_target', 'plan');
+      expect(fixture.host.switchPermissionMode).not.toHaveBeenCalled();
+      await new Promise((resolve) => window.setTimeout(resolve, 50));
+      await fixture.coordinator.refreshZCodeSessionState();
+      expect(readSessionMode).toHaveBeenCalledWith('sess_target');
+      expect(trigger?.textContent).toContain(t('chat.zcode.mode.plan.requestAcceptedReadbackUnavailable'));
+      expect(trigger?.getAttribute('title')).toBe(t('chat.zcode.mode.plan.requestAcceptedReadbackUnavailable.description'));
+      expect(trigger?.hasClass('mode-plan-requested-readback-unavailable')).toBe(true);
+    });
+
+    it('routes a visible sidebar ZCode mode control to its own session while Markdown has focus', async () => {
+      let effective = 'build';
+      const readSessionMode = jest.fn(async () => effective);
+      const setSessionMode = jest.fn(async (_sessionId: string, mode: string) => { effective = mode; });
+      (globalThis as any).app = {
+        workspace: { activeLeaf: { view: { getViewType: () => 'markdown' } } },
+        plugins: { plugins: { opencodian: {
+          settings: { activeBackend: 'zcode' },
+          agentServiceRegistry: { get: () => ({
+            readSessionMode, setSessionMode,
+            start: jest.fn(async () => {}),
+            getAvailableModels: jest.fn(async () => []),
+            getDefaultModel: jest.fn(() => null),
+          }) },
+        } } },
+      };
+      const fixture = await createFixture({
+        getOwnConversation: () => ({ backend: 'zcode', backendSessionId: 'sess_sidebar' }),
+      });
+      fixture.coordinator.build(fixture.toolbarEl, { showModels: false });
+      await settleAsyncWork();
+      const trigger = Array.from(fixture.toolbarEl.querySelectorAll<HTMLElement>('.opencodian-permission-trigger')).at(-1);
+      expect(trigger?.textContent).toContain('BUILD');
+      trigger?.click();
+      Array.from(fixture.toolbarEl.querySelectorAll<HTMLElement>('[data-mode="plan"]')).at(-1)?.click();
+      await settleAsyncWork();
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+      expect(setSessionMode).toHaveBeenCalledWith('sess_sidebar', 'plan');
+      expect(readSessionMode).toHaveBeenCalledWith('sess_sidebar');
+      expect(fixture.host.switchPermissionMode).not.toHaveBeenCalled();
+      expect(trigger?.textContent).toContain('PLAN');
     });
     /* eslint-enable @typescript-eslint/no-explicit-any */
   });

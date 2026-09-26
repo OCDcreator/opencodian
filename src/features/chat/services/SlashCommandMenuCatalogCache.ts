@@ -52,6 +52,8 @@ export interface SlashCommandMenuCatalogCacheHost {
   /** Optional: returns a short backend discriminator for cache key partitioning. Return different values for different backends (e.g. 'opencode', 'claude-code', 'codex'). */
   getBackendKey?(): string;
   loadPiRuntimeCommands?(): Promise<Array<{ name: string; description?: string }>>;
+  /** Optional: load ZCode runtime slash commands (from the live session snapshot catalog). */
+  loadZCodeRuntimeCommands?(): Promise<readonly { name: string; description: string }[]>;
   /**
    * Optional: returns a short discriminator encoding the current server-side
    * slash-command/skill capability availability (e.g. whether `v2.command.list`
@@ -350,6 +352,11 @@ export class SlashCommandMenuCatalogCache {
 
   load(): Promise<SlashCommandMenuItem[]> {
     if (this.host.getBackendKey?.() === 'pi') return (this.host.loadPiRuntimeCommands?.() ?? Promise.resolve([])).then((commands) => commands.map((command) => ({
+      id: command.name, displayId: `/${command.name}`, description: command.description ?? '',
+      insertText: `/${command.name} `, runtimeAvailable: true, source: 'command' as const,
+      hasProjectOverride: false, subtask: false, isBuiltin: false,
+    })));
+    if (this.host.getBackendKey?.() === 'zcode') return (this.host.loadZCodeRuntimeCommands?.() ?? Promise.resolve([])).then((commands) => commands.map((command) => ({
       id: command.name, displayId: `/${command.name}`, description: command.description ?? '',
       insertText: `/${command.name} `, runtimeAvailable: true, source: 'command' as const,
       hasProjectOverride: false, subtask: false, isBuiltin: false,

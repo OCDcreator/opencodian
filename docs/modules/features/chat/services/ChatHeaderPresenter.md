@@ -5,6 +5,8 @@
 > 2026-07-30: Claude Code is now a third backend-routed diagnostics surface. The host may provide `showClaudeDiagnostics(event, tabId)` and `getClaudeDiagnosticsState(tabId)`; when the active backend is `claude-code`, the presenter writes the Claude state to the shared badge and dispatches clicks to `ClaudeDiagnosticsHostAdapter`. Missing or throwing trace callbacks keep the button conservative and do not affect the rest of header chrome.
 > Diagnostic callback fallbacks log only a generic status, never raw exception text, while preserving header refresh and click handling.
 
+> 2026-09-24（续做）：状态徽章把 `zcode` 作为有效后端，使用 ZCode 图标和 `data-active-backend`/`data-backend-icon`，活动会话 host 优先于全局设置。
+
 > **源码**: `src/features/chat/services/ChatHeaderPresenter.ts`
 > **状态**: [REVIEW]
 

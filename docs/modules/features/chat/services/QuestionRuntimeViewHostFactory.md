@@ -20,7 +20,7 @@ export interface QuestionRuntimeViewHostFactoryHost
   extends QuestionRuntimeViewHostAdapterHost {
   settings: QuestionRuntimeSettingsPort;
   getQuestionDockSlotCoordinator(): QuestionDockSlotCoordinatorPort;
-  getQuestionApi(): QuestionRuntimeQuestionApiPort;
+  getQuestionApi(tabId?: TabId | null, request?: QuestionRequest): QuestionRuntimeQuestionApiPort;
   getTabAttention(): QuestionRuntimeTabAttentionPort;
 }
 
@@ -45,6 +45,7 @@ export function createQuestionRuntimeBundle(
 - `createQuestionRuntimeViewHost()` 从单一 host 同时读取 view-level runtime seam 与 question 相邻的 late-bound port
 - `createQuestionRuntimeBundle()` 拥有完整装配链：view host → post-resolution adapter → runtime services，`OpenCodianView` 只需调用这一个函数
 - dock slot、question API 与 tab attention 都通过 getter 延迟读取，避免 `OpenCodianView` 在构造函数里重新展开这组依赖拼装
+- question API resolver 接收目标 `tabId`；resolve 时额外携带原始 `QuestionRequest`，因此后台 tab 的 ZCode 卡片在用户切换 active backend 后仍会回到生成该请求的 adapter
 - settings 仍保持 call-time 可读，因此 question display mode、answered-card gate 等开关不会退回到 view 里额外包一层
 - factory 输出继续复用 `QuestionRuntimeViewHostAdapter`，因此 question runtime host shape 本身保持不变；post-resolution follow-up 则不再混入这层 factory
 

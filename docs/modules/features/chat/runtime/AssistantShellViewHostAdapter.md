@@ -1,5 +1,7 @@
 # AssistantShellViewHostAdapter
 
+> 2026-09-24：恢复消息时保留持久工具块的 `error` 终态；经安全分类后的结果文字不含 `Error:` 前缀时，也不得把失败卡片重新渲染为完成。
+
 > **源码**: `src/features/chat/runtime/AssistantShellViewHostAdapter.ts`
 > **状态**: [REVIEW]
 

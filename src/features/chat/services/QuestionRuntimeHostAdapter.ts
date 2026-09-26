@@ -40,6 +40,7 @@ import {
 import {
   QuestionResolutionExecutionFacade,
   type QuestionResolutionExecutionFacadeHost,
+  type QuestionResolutionRequestRoute,
 } from './QuestionResolutionExecutionFacade';
 import {
   QuestionResolutionFlowCoordinator,
@@ -66,9 +67,14 @@ export interface QuestionRuntimeViewHost {
   shouldRenderQuestionResolutionCards(): boolean;
   keepQuestionCardPinnedToBottom(tabId: TabId | null): void;
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
-  getPendingQuestions(): Promise<QuestionRequest[]>;
-  replyToQuestion(requestId: string, answers: string[][]): Promise<void>;
-  rejectQuestion(requestId: string): Promise<void>;
+  isPendingQuestionReadAuthoritative?(tabId?: TabId | null): boolean;
+  getPendingQuestions(tabId?: TabId | null): Promise<QuestionRequest[]>;
+  replyToQuestion(
+    requestId: string,
+    answers: string[][],
+    context?: QuestionResolutionRequestRoute,
+  ): Promise<void>;
+  rejectQuestion(requestId: string, context?: QuestionResolutionRequestRoute): Promise<void>;
 }
 
 export interface QuestionPostResolutionRuntimeViewHost {
@@ -142,6 +148,12 @@ export function createQuestionRuntimeHosts(
       keepQuestionCardPinnedToBottom: (tabId: TabId | null) => {
         viewHost.keepQuestionCardPinnedToBottom(tabId);
       },
+      isRequestPending: async (request, tabId) => {
+        if (!viewHost.isPendingQuestionReadAuthoritative?.(tabId)) return true;
+        if (viewHost.getSessionIdForTab(tabId) !== request.sessionId) return false;
+        const pending = await viewHost.getPendingQuestions(tabId);
+        return pending.some((entry) => entry.id === request.id && entry.sessionId === request.sessionId);
+      },
     },
     inlineResolutionActionHost: {
       getActiveTabId: () => viewHost.getActiveTabId(),
@@ -163,7 +175,9 @@ export function createQuestionRuntimeHosts(
       getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
       ensureTabRuntimeState: (tabId: TabId | null) => viewHost.ensureTabRuntimeState(tabId),
       getSessionIdForTab: (tabId: TabId | null) => viewHost.getSessionIdForTab(tabId),
-      getPendingQuestions: () => viewHost.getPendingQuestions(),
+      isPendingQuestionReadAuthoritative: (tabId) =>
+        viewHost.isPendingQuestionReadAuthoritative?.(tabId) ?? false,
+      getPendingQuestions: (tabId) => viewHost.getPendingQuestions(tabId),
       setTabNeedsAttention: (tabId, needsAttention) => {
         viewHost.setTabNeedsAttention(tabId, needsAttention);
       },
@@ -180,9 +194,9 @@ export function createQuestionRuntimeHosts(
       getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
     },
     resolutionExecutionHost: {
-      replyToQuestion: (requestId: string, answers: string[][]) =>
-        viewHost.replyToQuestion(requestId, answers),
-      rejectQuestion: (requestId: string) => viewHost.rejectQuestion(requestId),
+      replyToQuestion: (requestId, answers, context) =>
+        viewHost.replyToQuestion(requestId, answers, context),
+      rejectQuestion: (requestId, context) => viewHost.rejectQuestion(requestId, context),
     },
     postResolutionRuntimeHost,
   };

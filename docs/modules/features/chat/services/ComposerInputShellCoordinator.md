@@ -1,4 +1,5 @@
 # ComposerInputShellCoordinator
+> 2026-09-24 (ZCode image recovery)：图片提交等待发送预检结果后才清空 textarea/chips；ZCode 模型不支持图片或原生目录不可读时，`rejected` 回调保留原草稿并显示 backend-specific Notice，用户可换模型后重试。accepted/queued 才会消费草稿。
 > 2026-09-21 (advantage-parity R-F1)：composer content 顶部新增队列条宿主元素（setQueuedFollowUpBarElement host 缝，chips 行之上）。
 > 2026-09-21 (advantage-parity R-E2)：新增 globe 按钮——双 host 缝（getActiveWebViewerTabContext + attachWebViewerTabContextToActiveTab）存在且当前活动 webviewer 标签页可解析时才渲染，点击时重验、失效自移除。
 > 2026-09-21 (advantage-parity R-E1)：新增粘贴监听——整个粘贴为一条 http(s) URL 时拦截并经 host 缝 attachUrlContextToActiveTab 成网页 chip；嵌在长文本里的链接不拦截。
@@ -73,7 +74,7 @@ export interface ComposerInputShellCoordinatorHost {
   isTabForegroundBusy(): boolean;
   showProcessingBlockedNotice(): void;
   getComposerInputMode(): 'prompt' | 'shell';
-  submitMessage(submission: ComposerInputSubmission): void | Promise<void>;
+  submitMessage(submission: ComposerInputSubmission, onPreparationOutcome?: (outcome: 'accepted' | 'queued' | 'rejected') => void): void | Promise<void>;
   loadSlashCommandMenuItems(): Promise<SlashCommandMenuItem[]>;
   loadAgentMentionCandidates?(): Promise<AgentMentionCandidate[]>;
   setComposerStackHeight(stackHeight: number): void;

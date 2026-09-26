@@ -1,4 +1,5 @@
 # Owner: feature.inline-edit
+> 2026-09-24: ZCode 文本补全的模型引用进入共享解析和池身份，但该能力当前未对用户开放：原生 `workspace/generateText` 实测 5.703 秒，超过 4 秒预算。通用辅助查询仍需独立存储与真机无写入审计。
 > 2026-09-21 (advantage-parity R-F4)：InlineCompletionService 复用 R-C3 唯一只读 aux 池来排他预热一个空聊天会话；同目标 pending start 合并、后端切换晚到结果拒绝、关闭使挂起 generation 失效，R-C3 笔记上下文与 R-F4 空上下文互相重建。预热绝不调用 complete/query，真实聊天不复用 aux session。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 

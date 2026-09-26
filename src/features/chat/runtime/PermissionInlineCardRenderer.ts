@@ -1,3 +1,5 @@
+import { setIcon } from 'obsidian';
+
 import type { StreamChunk } from '../../../core/types';
 import { type PermissionReply,SessionPermissionTracker } from '../../../core/types/permission';
 import { t, type TranslationKey } from '../../../i18n';
@@ -25,6 +27,7 @@ export class PermissionInlineCardRenderer {
     request: PermissionRequestChunk,
     tabId: TabId | null,
     respond: PermissionResponder,
+    isStillPending?: () => Promise<boolean>,
   ): Promise<boolean> {
     const action = this.getSessionPermissionAction(request);
     if (this.sessionPermissionTracker.isSessionApproved(
@@ -37,9 +40,9 @@ export class PermissionInlineCardRenderer {
       return true;
     }
 
-    const result = await this.collectResponse(request, tabId);
+    const result = await this.collectResponse(request, tabId, isStillPending);
     if (!result) {
-      return false;
+      return Boolean(isStillPending);
     }
 
     if (result === 'session') {
@@ -69,6 +72,7 @@ export class PermissionInlineCardRenderer {
   async collectResponse(
     request: PermissionRequestChunk,
     tabId: TabId | null,
+    isStillPending?: () => Promise<boolean>,
   ): Promise<PermissionInlineCardResult | null> {
     const permissionCard = this.streamingInlineCardRenderer.createStreamingInlineCard(
       'opencodian-permission-inline',
@@ -82,8 +86,25 @@ export class PermissionInlineCardRenderer {
     }
 
     const buttons = this.renderPermissionCard(permissionCard, request);
-    const response = await this.waitForResponse(buttons);
-    permissionCard.remove();
+    let timer: number | null = null;
+    const response = await Promise.race([
+      this.waitForResponse(buttons),
+      ...(isStillPending ? [new Promise<null>((resolve) => {
+        timer = window.setInterval(() => {
+          void isStillPending().then((pending) => {
+            if (!pending) resolve(null);
+          }).catch(() => { /* An uncertain read cannot authorize or dismiss. */ });
+        }, 500);
+      })] : []),
+    ]);
+    if (timer !== null) window.clearInterval(timer);
+    if (response) {
+      permissionCard.remove();
+    } else {
+      permissionCard.empty();
+      permissionCard.dataset.state = 'terminal';
+      permissionCard.createSpan({ text: t('permissionDialog.noLongerPending') });
+    }
     return response;
   }
 
@@ -94,7 +115,8 @@ export class PermissionInlineCardRenderer {
     const { permission, patterns, metadata } = request;
 
     const headerEl = permissionCard.createDiv({ cls: 'opencodian-permission-inline-header' });
-    headerEl.createSpan({ cls: 'opencodian-permission-inline-icon', text: '🔐' });
+    const iconEl = headerEl.createSpan({ cls: 'opencodian-permission-inline-icon', attr: { 'aria-hidden': 'true' } });
+    setIcon(iconEl, 'shield-alert');
     headerEl.createSpan({
       cls: 'opencodian-permission-inline-title',
       text: t('permissionDialog.title'),

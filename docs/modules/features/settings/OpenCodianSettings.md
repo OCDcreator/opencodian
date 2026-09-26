@@ -302,3 +302,7 @@ The owner keeps `pluginUpdateExpanded` as ephemeral UI state. It passes that val
 ## R-C2 扩展
 
 2026-09-18 classic 布局在行内编辑分区后新增 `addImageGenerationSettings`（`SettingsImageGenerationSection`）。
+
+## ZCode 扩展
+
+2026-09-22 classic 布局在 ZCode 激活时渲染 `SettingsZCodeSection`（与 Pi 同模式，运行时诊断面）。

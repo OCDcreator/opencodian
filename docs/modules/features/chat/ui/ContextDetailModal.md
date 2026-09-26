@@ -7,7 +7,7 @@
 
 ## 概述
 
-Obsidian Modal，展示当前会话的上下文使用详情。包括会话元信息（标题、provider、model）、消息统计（总数/用户/助手）、Token 明细（input/output/reasoning/cache/cost）、上下文分段条形图（breakdown）、异步加载的原始消息区、时间戳，以及 Codex 专用的底部 foreground compaction action。统计数据来源于 `ContextUsageService` 的 `summarize()`、`getDisplayTokenBreakdown()`、`getContextBreakdown()` 三个方法；原始消息由调用方通过懒加载回调提供。
+Obsidian Modal，展示当前会话的上下文使用详情。包括会话元信息（标题、provider、model）、消息统计（总数/用户/助手）、Token 明细（input/output/reasoning/cache/cost）、上下文分段条形图（breakdown）、异步加载的原始消息区、时间戳，以及当前后端可用时的底部 foreground compaction action。统计数据来源于 `ContextUsageService` 的 `summarize()`、`getDisplayTokenBreakdown()`、`getContextBreakdown()` 三个方法；原始消息由调用方通过懒加载回调提供。ZCode 的模型身份优先采用原生 billingUsage 中实际完成回合的 provider/model，避免下一回合的标签选择覆盖历史用量身份。
 
 当后端没有报告 cache-write 或 cost 时，modal 将它们显示为 `-`。OpenCode 遵循 desktop 双口径：total/input/output/reasoning/cache/cost 来自 `session.tokens` / `session.cost`，而 Usage、context limit 与 breakdown 来自最后一条有效 assistant message；因此当前上下文缺失但累计数据仍存在时，modal 保持网格，Usage/Limit/Breakdown 显示不可用。Claude/Codex 的本地数值不是订阅账单。Codex 的 total/context window 均来自 app-server 的 thread token-usage 通知，不混入账号日/周用量。
 

@@ -67,6 +67,8 @@ interface SettingsInlineEditSectionOptions {
 
 /** Backends offered in the per-backend override list. */
 const OVERRIDE_BACKENDS: readonly AgentBackendKind[] = ['opencode', 'claude-code', 'codex', 'pi'];
+/** ZCode is text-completion-only; it must not appear on generic aux-edit rows. */
+const COMPLETION_OVERRIDE_BACKENDS: readonly AgentBackendKind[] = [...OVERRIDE_BACKENDS, 'zcode'];
 
 export class SettingsInlineEditSection {
   private readonly plugin: InlineEditSettingsHost;
@@ -235,7 +237,7 @@ export class SettingsInlineEditSection {
     // semantics and validation as the inline-edit rows above, but scoped to
     // the completion pool's model resolution so a fast model can be pinned
     // for completions without changing inline edit.
-    for (const backend of OVERRIDE_BACKENDS) {
+    for (const backend of COMPLETION_OVERRIDE_BACKENDS) {
       if (!this.plugin.settings.enabledBackends.includes(backend)) continue;
       this.addCompletionModelOverrideRow(containerEl, backend);
     }
@@ -475,6 +477,7 @@ function overrideExample(backend: AgentBackendKind): string {
   switch (backend) {
     case 'opencode':
     case 'pi':
+    case 'zcode':
       return 'provider/model';
     case 'claude-code':
       return 'claude-sonnet-4-5';

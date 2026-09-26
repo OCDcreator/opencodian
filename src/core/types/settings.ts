@@ -42,6 +42,8 @@ export type EffortLevel = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
 /** Backends inline edit can run on. Mirrors the implemented adapter set. */
 const INLINE_EDIT_BACKENDS: readonly AgentBackendKind[] = ['opencode', 'claude-code', 'codex', 'pi'];
+/** Completion can additionally use ZCode's sessionless text-only path. */
+const INLINE_COMPLETION_BACKENDS: readonly AgentBackendKind[] = [...INLINE_EDIT_BACKENDS, 'zcode'];
 
 /**
  * Normalize the per-backend inline-edit model override map.
@@ -69,17 +71,23 @@ export function normalizeInlineEditModelOverrides(
 /**
  * Normalize the per-backend completion model override map (R-C3).
  *
- * Same map shape, same value format, and exactly the same discipline as
- * `normalizeInlineEditModelOverrides` — the completion setting differs only in
- * what consumes it (the warm completion pool's model resolution, which reads
- * it *before* the inline-edit chain) and why it exists (completions are
- * latency-sensitive, so a user may pin a fast model without touching inline
- * edit). Named separately so both settings stay independently greppable.
+ * The completion setting reads before the inline-edit chain and is separately
+ * normalized because ZCode is available only for sessionless text completion,
+ * not generic inline-edit auxiliary queries. This keeps a ZCode entry from
+ * accidentally enabling an unsupported generic auxiliary path.
  */
 export function normalizeInlineCompletionModelOverrides(
   value: unknown,
 ): Partial<Record<AgentBackendKind, string>> {
-  return normalizeInlineEditModelOverrides(value);
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  const result: Partial<Record<AgentBackendKind, string>> = {};
+  for (const backend of INLINE_COMPLETION_BACKENDS) {
+    const raw = (value as Record<string, unknown>)[backend];
+    if (typeof raw === 'string' && raw.trim()) {
+      result[backend] = raw.trim();
+    }
+  }
+  return result;
 }
 
 /**
@@ -1035,6 +1043,37 @@ export function normalizePiBackendSettings(value: unknown): PiBackendSettings {
   };
 }
 
+export interface ZCodeBackendSettings {
+  /**
+   * Optional user-installed ZCode runtime override: the `zcode-agent` native
+   * binary, the `zcode.cjs` node bundle, or a directory containing either.
+   * Empty means auto-discovery of the official installation (the settings
+   * override is never machine-hard-coded).
+   */
+  executablePath: string;
+  /**
+   * Persisted default model as `providerId/modelId`. Applied once at session
+   * materialization; conversation overrides never overwrite this default.
+   */
+  model: string;
+  /** Persisted default thinking level (validated against the live catalog before use). */
+  thinkingLevel: string;
+  /** Persisted default mode (plan/build/edit/yolo/auto). Empty = runtime default. */
+  mode: '' | 'plan' | 'build' | 'edit' | 'yolo' | 'auto';
+}
+
+export function normalizeZCodeBackendSettings(value: unknown): ZCodeBackendSettings {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  const text = (key: string): string => typeof source[key] === 'string' ? (source[key] as string).trim() : '';
+  const mode = text('mode');
+  return {
+    executablePath: text('executablePath'),
+    model: text('model'),
+    thinkingLevel: text('thinkingLevel'),
+    mode: ['plan', 'build', 'edit', 'yolo', 'auto'].includes(mode) ? mode as ZCodeBackendSettings['mode'] : '',
+  };
+}
+
 export interface BackendSettings {
   opencode: {
     sessionTrace: OpenCodeSessionTraceSettings;
@@ -1042,6 +1081,7 @@ export interface BackendSettings {
   claudeCode: ClaudeCodeBackendSettings;
   codex: CodexBackendSettings;
   pi: PiBackendSettings;
+  zcode: ZCodeBackendSettings;
 }
 
 export function getDefaultOpenCodeSessionTraceSettings(): OpenCodeSessionTraceSettings {
@@ -1143,6 +1183,7 @@ export function getDefaultBackendSettings(): BackendSettings {
     claudeCode: getDefaultClaudeCodeBackendSettings(),
     codex: getDefaultCodexBackendSettings(),
     pi: normalizePiBackendSettings(undefined),
+    zcode: normalizeZCodeBackendSettings(undefined),
   };
 }
 
@@ -1517,13 +1558,14 @@ export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBa
 
 export function normalizeBackendSettings(value: unknown): BackendSettings {
   const candidate = value && typeof value === 'object' && !Array.isArray(value)
-    ? value as { opencode?: unknown; claudeCode?: unknown; codex?: unknown; pi?: unknown }
+    ? value as { opencode?: unknown; claudeCode?: unknown; codex?: unknown; pi?: unknown; zcode?: unknown }
     : {};
   return {
     opencode: normalizeOpenCodeBackendSettings(candidate.opencode),
     claudeCode: normalizeClaudeCodeBackendSettings(candidate.claudeCode),
     codex: normalizeCodexBackendSettings(candidate.codex),
     pi: normalizePiBackendSettings(candidate.pi),
+    zcode: normalizeZCodeBackendSettings(candidate.zcode),
   };
 }
 

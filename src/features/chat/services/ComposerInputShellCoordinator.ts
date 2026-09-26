@@ -22,7 +22,11 @@ import {
   getSlashCommandMenuQuery,
   isCommandComposerText,
 } from './composerInputParsing';
-import type { ComposerInputMode, ComposerInputSubmission } from './MessageSendPreparationService';
+import type {
+  ComposerInputMode,
+  ComposerInputSubmission,
+  MessageSendPreparationOutcome,
+} from './MessageSendPreparationService';
 import { PromptSuggestionService } from './PromptSuggestionService';
 import {
   loadAgentMentionCandidatesFromComposerCatalog,
@@ -142,7 +146,15 @@ export interface ComposerInputShellCoordinatorHost {
   isTabForegroundBusy(): boolean;
   showProcessingBlockedNotice(): void;
   getComposerInputMode(): ComposerInputMode;
-  submitMessage(submission: ComposerInputSubmission): void | Promise<void>;
+  /**
+   * Prompt submissions with image attachments retain their visible draft until
+   * send preparation explicitly accepts or queues them. This prevents a
+   * rejected model capability from silently discarding user-provided files.
+   */
+  submitMessage(
+    submission: ComposerInputSubmission,
+    onPreparationOutcome?: (outcome: MessageSendPreparationOutcome) => void,
+  ): void | Promise<void>;
   loadSlashCommandMenuItems(): Promise<SlashCommandMenuItem[]>;
   loadAgentMentionCandidates?(): Promise<AgentMentionCandidate[]>;
   setComposerStackHeight(stackHeight: number): void;
@@ -240,6 +252,7 @@ export class ComposerInputShellCoordinator {
   private addImageBtnEl: HTMLButtonElement | null = null;
   private imageChipContainerEl: HTMLElement | null = null;
   private attachedImages: ImageAttachment[] = [];
+  private imageSubmissionPending = false;
   private fileInputEl: HTMLInputElement | null = null;
   private imageDropSurfaceEl: HTMLElement | null = null;
 
@@ -670,7 +683,7 @@ export class ComposerInputShellCoordinator {
     }
 
     this.sendBtnEl.empty();
-    this.sendBtnEl.disabled = this.isComposerInteractionDisabled();
+    this.sendBtnEl.disabled = this.isComposerInteractionDisabled() || this.imageSubmissionPending;
     if (this.host.isActiveTabStreaming()) {
       setIcon(this.sendBtnEl, 'square');
       this.sendBtnEl.addClass('opencodian-stop-btn');
@@ -853,6 +866,7 @@ export class ComposerInputShellCoordinator {
     this.addImageBtnEl = null;
     this.imageChipContainerEl = null;
     this.attachedImages = [];
+    this.imageSubmissionPending = false;
     this.fileInputEl?.remove();
     this.fileInputEl = null;
     this.slashCommandMenuEl = null;
@@ -955,6 +969,10 @@ export class ComposerInputShellCoordinator {
       return;
     }
 
+    if (this.imageSubmissionPending) {
+      return;
+    }
+
     if (this.host.isTabForegroundBusy()) {
       this.host.showProcessingBlockedNotice();
       return;
@@ -987,7 +1005,54 @@ export class ComposerInputShellCoordinator {
     }
 
     this.promptSuggestionService.clearActiveOnTurnStart();
+    if (submission.kind === 'prompt' && submission.images?.length) {
+      this.submitImagePromptWithRecovery(submission, rawContent, [...submission.images]);
+      return;
+    }
     void this.host.submitMessage(submission);
+    this.clearSubmittedDraft();
+  }
+
+  /**
+   * Image sends wait for the preparation decision. The callback is reached
+   * before streaming begins, so a ZCode model that cannot receive images
+   * leaves both the text and chips exactly where the user can correct them.
+   */
+  private submitImagePromptWithRecovery(
+    submission: Extract<ComposerInputSubmission, { kind: 'prompt' }>,
+    submittedText: string,
+    submittedImages: readonly ImageAttachment[],
+  ): void {
+    this.imageSubmissionPending = true;
+    this.updateSendButtonState();
+    const onPreparationOutcome = (outcome: MessageSendPreparationOutcome): void => {
+      this.imageSubmissionPending = false;
+      this.updateSendButtonState();
+      if (outcome === 'rejected' || !this.isUnchangedImageDraft(submittedText, submittedImages)) {
+        return;
+      }
+      this.clearSubmittedDraft();
+    };
+    void Promise.resolve(this.host.submitMessage(submission, onPreparationOutcome)).catch((error) => {
+      this.imageSubmissionPending = false;
+      this.updateSendButtonState();
+      logger.warn('Image prompt submission failed before preparation completed', { error });
+    });
+  }
+
+  private isUnchangedImageDraft(
+    submittedText: string,
+    submittedImages: readonly ImageAttachment[],
+  ): boolean {
+    return this.inputTextareaEl?.value === submittedText
+      && this.attachedImages.length === submittedImages.length
+      && this.attachedImages.every((image, index) => image === submittedImages[index]);
+  }
+
+  private clearSubmittedDraft(): void {
+    if (!this.inputTextareaEl) {
+      return;
+    }
     this.inputTextareaEl.value = '';
     this.host.onComposerSubmitted?.();
     this.agentMentionController.clearTrackedMentions();

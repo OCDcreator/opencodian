@@ -7,6 +7,7 @@ import {
   createInlineEditPluginHost,
   describeModelSelection,
   type InlineEditPluginBridge,
+  normalizeTabModel,
   resolveCompletionOverride,
 } from '../../../../src/features/inline-edit/InlineEditPluginHost';
 
@@ -48,6 +49,7 @@ describe('describeModelSelection', () => {
       source: 'chat',
     });
     expect(describeModelSelection(bridge, 'codex').label).toBe('deepseek-flash');
+    expect(describeModelSelection(bridge, 'zcode').label).toBe('deepseek/deepseek-flash');
   });
 
   it('reports the default source when nothing is set', () => {
@@ -119,7 +121,7 @@ describe('normalizeInlineEditEffortOverrides', () => {
 // chain. `null` means "unset — fall back unchanged", which is what keeps the
 // default behaviour byte-identical.
 describe('resolveCompletionOverride (R-C3 dedicated completion model)', () => {
-  it('resolves a configured backend-shaped ref for opencode/pi', () => {
+  it('resolves a configured backend-shaped ref for opencode/pi/zcode', () => {
     expect(resolveCompletionOverride('opencode', 'deepseek/deepseek-flash')).toEqual({
       ok: true,
       model: { kind: 'opencode', provider: 'deepseek', model: 'deepseek-flash' },
@@ -127,6 +129,16 @@ describe('resolveCompletionOverride (R-C3 dedicated completion model)', () => {
     expect(resolveCompletionOverride('pi', ' provider/model-x ')).toEqual({
       ok: true,
       model: { kind: 'pi', provider: 'provider', model: 'model-x' },
+    });
+    expect(resolveCompletionOverride('zcode', ' krill/gpt-6-sol ')).toEqual({
+      ok: true,
+      model: { kind: 'zcode', provider: 'krill', model: 'gpt-6-sol' },
+    });
+  });
+
+  it('keeps the active ZCode chat model provider-qualified', () => {
+    expect(normalizeTabModel('zcode', { provider: 'krill', model: 'gpt-6-sol' })).toEqual({
+      kind: 'zcode', provider: 'krill', model: 'gpt-6-sol',
     });
   });
 

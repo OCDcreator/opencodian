@@ -35,3 +35,7 @@
 ## Pi 自定义图标
 
 2026-09-09：Pi使用用户提供的P/i SVG路径，按800→100坐标缩放注册为opencodian-pi。颜色继承主机currentColor以同时适配浅色/深色；设置标签、后端切换和聊天状态通过同一注册图标呈现，移除Perplexity替代图标。
+
+## ZCode 图标
+
+2026-09-22：ZCode 使用用户提供的官方 SVG 路径（30→100 坐标缩放）注册为 opencodian-zcode，品牌配色原样保留；AGENT_ICON_BY_BACKEND 增加 zcode 条目（穷举映射）。

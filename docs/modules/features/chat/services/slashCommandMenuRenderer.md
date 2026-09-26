@@ -1,5 +1,7 @@
 # slashCommandMenuRenderer
 
+2026-09-25 ZCode 原生目录在可见菜单出现 `//goal`：目录项 `displayId` 已带 `/`，渲染器再加前缀。现对已带 `/` 的 displayId 原样显示；未带前缀的普通命令仍补一个 `/`，Codex `$skill` 规则保持不变。
+
 > **源码**: `src/features/chat/services/slashCommandMenuRenderer.ts`
 > **状态**: [REVIEW]
 

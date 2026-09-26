@@ -8,7 +8,7 @@
 `QuestionDockCoordinator` 是上方 question dock 的 lifecycle owner。它把 pending request hydration、dock waiter 队列、draft answer / active group / active index runtime state，以及 active/background writeback 收束到同一个 service，专门负责：
 
 - 维护 pending question request、resolved-request suppression、waiter、draft answer、active group 与 active index 这些 dock lifecycle runtime map
-- 统一处理 `clearPendingQuestionsForTab()` 与 `refreshPendingQuestionsForTab()` 的 API fetch、session filter、waiter-owned request 保活、stale runtime state pruning 与 tab attention/render writeback
+- 统一处理 `clearPendingQuestionsForTab()` 与 `refreshPendingQuestionsForTab()` 的目标-tab API fetch、session filter、waiter-owned request 保活、stale runtime state pruning 与 tab attention/render writeback
 - 继续通过 `QuestionDockRenderStateFacade` 与 `QuestionDockRenderAdapter` 组装 dock render payload，保留 `QuestionDock.ts` 的 DOM markup ownership
 - 在 submit/reject 或 inline fallback resolution 成功后，把可选 pending-request cleanup 上下文交给共享 `QuestionResolutionExecutionFacade`
 
@@ -37,10 +37,12 @@ export class QuestionDockCoordinator {
 
 ## 关键行为
 
-- `refreshPendingQuestionsForTab()` 现在通过同一条 pending runtime seam 完成服务端 pending question 拉取、session 过滤、resolved-id suppression、waiter-owned request 保活、draft answer / active selection 同步，以及 stale dock state pruning，再统一分流到 active/background tab writeback
+- `refreshPendingQuestionsForTab()` 现在把目标 `tabId` 交给 question API resolver，再完成服务端 pending question 拉取、session 过滤、resolved-id suppression、waiter-owned request 保活、draft answer / active selection 同步，以及 stale dock state pruning；active/background tab 不再共用当前 OpenCode API
+- 只有 API 明确标记“本次 native pending readback 权威”时，空结果才移除 waiter-owned request 并 resolve waiter；这处理重载前 ZCode 残留卡片，同时保留其他后端为抗竞态而保活的旧语义
 - post-sync 传入的 `isCurrent` lease 会在 pending-question await 返回后校验，切换 tab/conversation 时不提交旧 pending state。
 - `clearPendingQuestionsForTab()` 在丢弃 pending request / draft answer / active selection runtime state 前，会先 resolve 当前 tab 的所有 dock waiters，确保正在 `waitForDockResolutionIfEnabled()` 中等待上方 dock 的调用方不会因为清理路径永久挂起；该清理路径只释放本地等待，不会主动调用 OpenCode `reply` / `reject` API。
 - `waitForDockResolutionIfEnabled()` 负责创建 waiter、入队 pending request，并复用同一个 pending presentation sync + writeback 路径初始化 draft answer 与 active selection runtime
+- 等待中的权威 pending 读回每 500ms 按原 tab/session 刷新一次；进程退出使 ZCode adapter 待决集合清空后，刷新会自动移除旧卡并释放 waiter。回调式非权威后端不进入该监测，其他 tab 的卡不受影响。
 - `applyResolutionAction()` 是 dock 与 inline fallback 共用的 resolve 入口；它只补充可选 pending-request removal 上下文，真正的 resolved-id 标记、resolved state apply 与 status/sync follow-up 已下沉到共享 execution facade
 - `render()` 仍只消费 `QuestionDockRenderStateFacade` 的 `active` / `empty` / `skip` 结果，并把 callback payload 委托给 `QuestionDockRenderAdapter`
 

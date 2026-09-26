@@ -52,10 +52,9 @@ export class QuestionTodoStatusRefreshCoordinator {
       return;
     }
     const backend = this.host.getCurrentConversationBackend();
-    // Pending-questions REST polling is OpenCode-only.
-    // For non-OpenCode backends, questions arrive through SDK callbacks,
-    // not REST polling. Skip the REST call to avoid leaking.
-    const pendingQuestionsPromise = backend === 'opencode'
+    // ZCode reads its own adapter's authoritative pending asks. Other
+    // callback-only backends have no pending-question read endpoint.
+    const pendingQuestionsPromise = (backend === 'opencode' || backend === 'zcode') && sessionId
       ? options.isCurrent
         ? this.host.refreshPendingQuestionsForTab(tabId, sessionId, options)
         : this.host.refreshPendingQuestionsForTab(tabId, sessionId)
@@ -78,8 +77,8 @@ export class QuestionTodoStatusRefreshCoordinator {
       return;
     }
     const backend = this.host.getCurrentConversationBackend();
-    // Pending-questions REST polling is OpenCode-only (see refreshAfterActivation).
-    if (backend === 'opencode') {
+    // ZCode uses the same tab-scoped refresh port backed by its native adapter.
+    if ((backend === 'opencode' || backend === 'zcode') && options.questionSessionId) {
       if (options.isCurrent) {
         await this.host.refreshPendingQuestionsForTab(
           options.tabId,

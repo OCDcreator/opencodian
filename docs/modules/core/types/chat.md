@@ -215,4 +215,6 @@ Ownership facts:
 
 > 2026-09-18 (R-A7)：`PromptContextKind` 增加 `'folder'`——目录上下文条目（无快照、纯路径引用），序列化/解析（`parseObsidianContextTag`）与 kind 标签联动。
 
+> 2026-09-22 (ZCode 票 01)：`AgentBackendKind` 增加 `'zcode'`——官方 ZCode 运行时后端身份（独立 adapter/transport 边界）。
+
 ## 维护约束

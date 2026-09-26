@@ -645,16 +645,28 @@ export async function loadBackendSessionMessages(
 
   const safeMessages = rawMessages.filter((msg): msg is Record<string, unknown> => msg !== null && typeof msg === 'object');
 
-  if (backend === 'opencode') {
+  if (backend === 'opencode' || backend === 'zcode') {
+    // OpenCode uses `{ info: { id }, parts }`; the ZCode protocol uses the
+    // same envelope with `info.messageId` instead of `info.id`.
     return (safeMessages as Array<{
-      info: { id: string; role: string; time: { created?: number } };
+      info: { id?: string; messageId?: string; role: string; time: { created?: number } };
       parts: unknown;
-    }>).map(({ info, parts }) => ({
-      id: info.id,
-      role: info.role,
-      createdAt: info.time.created ?? null,
-      payload: JSON.stringify({ message: info, parts }, null, 2),
-    }));
+      attachments?: unknown;
+    }>).map((record) => {
+      const { info, parts } = record;
+      return {
+        id: info.id ?? info.messageId ?? '',
+        role: info.role,
+        createdAt: info.time?.created ?? null,
+        // Record-level attachments (native image/media refs) pass through
+        // unchanged so restored messages retain attachment identity.
+        payload: JSON.stringify(
+          record.attachments !== undefined ? { message: info, parts, attachments: record.attachments } : { message: info, parts },
+          null,
+          2,
+        ),
+      };
+    });
   }
 
   // Generic normalization for Claude / other backends.

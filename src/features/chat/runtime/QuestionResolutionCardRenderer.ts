@@ -1,3 +1,5 @@
+import { setIcon } from 'obsidian';
+
 import type { ContentBlock, QuestionRequest, QuestionResolution } from '../../../core/types';
 import { t } from '../../../i18n';
 
@@ -29,10 +31,11 @@ export function populateQuestionResolutionCard(
   const headerEl = summaryEl.createDiv({ cls: 'opencodian-question-inline-header' });
   const copy = getQuestionResolutionCopy(resolution.status);
 
-  headerEl.createSpan({
+  const iconEl = headerEl.createSpan({
     cls: 'opencodian-question-inline-icon',
-    text: copy.icon,
+    attr: { 'aria-hidden': 'true' },
   });
+  setIcon(iconEl, copy.icon);
   headerEl.createSpan({
     cls: 'opencodian-question-inline-title',
     text: copy.title,
@@ -154,12 +157,12 @@ export function buildQuestionRejectedMarkdown(request: QuestionRequest): string 
 function getQuestionResolutionCopy(status: QuestionResolution['status']): QuestionResolutionCopy {
   return status === 'answered'
     ? {
-        icon: 'i',
+        icon: 'circle-check',
         title: t('chat.question.notice.answeredTitle'),
         body: t('chat.question.notice.answeredBody'),
       }
     : {
-        icon: '!',
+        icon: 'circle-x',
         title: t('chat.question.notice.rejectedTitle'),
         body: t('chat.question.notice.rejectedBody'),
       };

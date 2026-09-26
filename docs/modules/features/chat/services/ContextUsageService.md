@@ -1,5 +1,7 @@
 # ContextUsageService
 
+> 2026-09-24（续做）：新增 `markUsageUnavailable`，在 ZCode 原生 usage 读回前清除本地空 token/成本估算，避免把“尚未观测”显示为真实 0。
+
 > **源码**: `src/features/chat/services/ContextUsageService.ts`
 > **状态**: [REVIEW]
 

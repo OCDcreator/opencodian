@@ -58,6 +58,7 @@ import { SettingsTabbedRenderer } from './SettingsTabbedRenderer';
 import { SettingsToolSection } from './SettingsToolSection';
 import { SettingsUiSection } from './SettingsUiSection';
 import { SettingsUserSection } from './SettingsUserSection';
+import { SettingsZCodeSection } from './SettingsZCodeSection';
 
 export class OpenCodianSettingTab extends PluginSettingTab {
   plugin: OpenCodianPlugin;
@@ -388,6 +389,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       this.addClaudeCodeSettings(containerEl);
     }
     if (this.isActiveBackend('pi')) new SettingsPiSection(this.plugin).attach(containerEl);
+    if (this.isActiveBackend('zcode')) new SettingsZCodeSection(this.plugin).attach(containerEl);
     if (this.isActiveBackend('opencode')) {
       this.addServerSettings(containerEl);
       this.addModelSettings(containerEl);

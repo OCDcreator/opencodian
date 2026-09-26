@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The question-dock lifecycle scenarios share one tab/runtime harness. */
 import type { QuestionDisplayMode, QuestionRequest } from '../../../../src/core/types';
 import {
   QuestionDockCoordinator,
@@ -68,6 +69,7 @@ function createCoordinator(options?: {
   questionDisplayMode?: QuestionDisplayMode;
   shouldUseAboveInputQuestionDock?: boolean;
   pendingQuestions?: QuestionRequest[];
+  pendingQuestionReadAuthoritative?: boolean;
   sessionIdsByTab?: Record<string, string | null>;
 }) {
   const activeTabId = options?.activeTabId ?? 'tab-active';
@@ -124,6 +126,9 @@ function createCoordinator(options?: {
       return created;
     }),
     getSessionIdForTab: jest.fn((tabId) => (tabId ? sessionIdsByTab.get(tabId) ?? null : null)),
+    isPendingQuestionReadAuthoritative: jest
+      .fn()
+      .mockReturnValue(options?.pendingQuestionReadAuthoritative ?? false),
     getPendingQuestions: jest
       .fn()
       .mockResolvedValue(options?.pendingQuestions ?? ([] as QuestionRequest[])),
@@ -213,7 +218,10 @@ describe('QuestionDockCoordinator resolution flow', () => {
 
     await expect(resolutionPromise).resolves.toBe(true);
 
-    expect(host.replyToQuestion).toHaveBeenCalledWith(request.id, [['TypeScript']]);
+    expect(host.replyToQuestion).toHaveBeenCalledWith(request.id, [['TypeScript']], {
+      tabId: 'tab-active',
+      request,
+    });
     expect(applyResolvedQuestionState).toHaveBeenCalledWith(
       expect.objectContaining({
         request,
@@ -266,6 +274,30 @@ describe('QuestionDockCoordinator resolution flow', () => {
     expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-active', false);
   });
 
+  it('clears a lost native question automatically without touching another tab', async () => {
+    const request = createQuestionRequest();
+    const other = createQuestionRequest({ id: 'other-request', sessionId: 'other-session' });
+    const { coordinator, host, runtimeByTab } = createCoordinator({
+      pendingQuestions: [request],
+      pendingQuestionReadAuthoritative: true,
+      sessionIdsByTab: { 'tab-other': 'other-session' },
+    });
+    const otherRuntime = runtimeByTab.get('tab-other');
+    if (!otherRuntime) throw new Error('Other tab runtime missing');
+    otherRuntime.pendingQuestionRequests = [other];
+    const resolved = coordinator.waitForDockResolutionIfEnabled(request, 'tab-active');
+    host.getPendingQuestions.mockResolvedValue([]);
+
+    await expect(Promise.race([
+      resolved,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('stale waiter')), 1_500)),
+    ])).resolves.toBe(true);
+    expect(runtimeByTab.get('tab-active')?.pendingQuestionRequests).toEqual([]);
+    expect(runtimeByTab.get('tab-active')?.questionRequestWaiters.size).toBe(0);
+    expect(otherRuntime.pendingQuestionRequests).toEqual([other]);
+    expect(host.getPendingQuestions).toHaveBeenCalledWith('tab-active');
+  });
+
   it('applies background resolution cleanup through the shared pending writeback path', async () => {
     const request = createQuestionRequest({
       id: 'request-background',
@@ -308,7 +340,10 @@ describe('QuestionDockCoordinator resolution flow', () => {
       ),
     ).resolves.toBe(true);
 
-    expect(host.replyToQuestion).toHaveBeenCalledWith(request.id, answers);
+    expect(host.replyToQuestion).toHaveBeenCalledWith(request.id, answers, {
+      tabId: 'tab-background',
+      request,
+    });
     expect(applyResolvedQuestionState).toHaveBeenCalledWith(
       expect.objectContaining({
         request,
@@ -426,6 +461,34 @@ describe('QuestionDockCoordinator pending-question refresh', () => {
     expect(activeRuntime.questionDraftAnswers.get(request.id)).toEqual([[]]);
     expect(activeRuntime.questionDraftAnswers.has('request-stale')).toBe(false);
     expect(getLatestRenderState().request).toEqual(request);
+  });
+
+  it('clears a waiter-owned ZCode card when its native pending readback is authoritatively empty', async () => {
+    const staleRequest = createQuestionRequest({ id: 'zcode-request-stale', sessionId: 'zcode-session' });
+    const resolveWaiter = jest.fn();
+    const { coordinator, host, runtimeByTab } = createCoordinator({
+      pendingQuestionReadAuthoritative: true,
+      sessionIdsByTab: { 'tab-zcode': 'zcode-session' },
+    });
+    const runtime = runtimeByTab.get('tab-zcode');
+    if (!runtime) {
+      throw new Error('Expected ZCode tab runtime');
+    }
+    runtime.pendingQuestionRequests = [staleRequest];
+    runtime.questionRequestWaiters.set(staleRequest.id, {
+      promise: Promise.resolve(),
+      resolve: resolveWaiter,
+    });
+
+    await expect(
+      coordinator.refreshPendingQuestionsForTab('tab-zcode', 'zcode-session'),
+    ).resolves.toEqual([]);
+
+    expect(host.getPendingQuestions).toHaveBeenCalledWith('tab-zcode');
+    expect(host.isPendingQuestionReadAuthoritative).toHaveBeenCalledWith('tab-zcode');
+    expect(runtime.pendingQuestionRequests).toEqual([]);
+    expect(runtime.questionRequestWaiters.size).toBe(0);
+    expect(resolveWaiter).toHaveBeenCalledTimes(1);
   });
 
   it('clears stale background-tab question state when no session remains', async () => {

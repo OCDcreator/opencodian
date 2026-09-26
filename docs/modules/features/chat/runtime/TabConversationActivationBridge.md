@@ -1,5 +1,7 @@
 # TabConversationActivationBridge
 
+> 2026-09-24：ZCode 流式标签重新激活时也把该标签的原生 session ID 交给问答刷新入口，使待答 Dock 可从 ZCode 原生 pending 读回恢复；Claude/Codex/Pi 保持既有回调路径。
+
 > **源码**: `src/features/chat/runtime/TabConversationActivationBridge.ts`
 > **状态**: [REVIEW]
 

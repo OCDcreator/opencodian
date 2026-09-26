@@ -3,6 +3,7 @@
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 
 # Owner: feature.chat-ui
+> 2026-09-24（ZCode）：ContextDetailModal 的 ZCode 用量身份优先显示原生已完成回合的 billing provider/model；下一回合的标签模型选择不能改写历史用量标签。上下文压缩入口继续由当前会话的可用性控制，双语标题使用后端中立文案。
 > 2026-09-21 (advantage-parity R-F2/R-F3)：ConversationSessionSettingsModal 提供绑定/解绑与 locked 显示；ModifiedFilesSidebar 将未变更绑定笔记放在独立分区，只有真实 diff 才加关联徽标；EditRevertPreviewModal 显示 before/after 行数与冲突二选一，确认后仍交既有回退服务写回。
 
 Pricing readiness (2026-09-10): ContextDetailModal accepts scoped readiness and pricing callbacks, prices its captured token snapshot instead of copying a newer snapshot's cost, and releases the subscription on close without resetting raw messages or compaction state.

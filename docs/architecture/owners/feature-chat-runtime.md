@@ -4,6 +4,10 @@
 > 2026-09-21 (advantage-parity R-E1)：ChatRuntimeComposition 组合 UrlContextFetchService 并注入发送准备的 resolveUrlContextItems 缝。
 
 # Owner: feature.chat-runtime
+> 2026-09-25 (FA880): BackgroundTaskInlinePanelRenderer displays native ZCode jobs separately from the foreground tool card, refreshing active jobs and surfacing cancel/failure/interrupted terminal states.
+> The native watch is armed on activation before a task exists and only fetches for the active tab; the renderer owns its timer cleanup.
+> 2026-09-25 (FA880): QuestionInlineCardRenderer now settles and removes an inline question whose original native ask disappears; process loss cannot leave its promise and answer buttons alive.
+> 2026-09-25 (FA880): PermissionInlineCardRenderer uses an optional native pending-read callback for ZCode. It removes actions and renders an explicit terminal card when the original ask expires or disconnects; callback-free backends keep their existing behavior.
 > 2026-09-21 (advantage-parity R-F2/R-F3)：SendPipelineRuntime 把绑定笔记去重合入 R-B3 发送前 snapshot candidates；turn/batch 结束冻结 post-image 供回退预览。发送与回退写路径仍复用既有边界，不自动写回绑定笔记。
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
@@ -61,3 +65,7 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 
 - 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
 - 2026-09-17: `AssistantErrorRenderer.renderStreamError()` 把错误文案按首个换行拆成摘要标题（`.streaming-error-title`）与细节行（`.streaming-error-text`，保留 provider 原始报文）；单行错误行为不变。渲染细节仍在本 owner，工具身份归一化归 `core.backend-pi`。
+# 2026-09-24
+
+- `ChatRuntimeComposition` supplies a narrow ZCode image-capability preflight seam to `MessageSendPreparationService`; it reads the native selected-model catalog before optimistic append and never routes the decision through OpenCode.
+- The composer acknowledgement is an explicit `accepted | queued | rejected` outcome; runtime composition remains the adapter boundary and does not own composer DOM cleanup.

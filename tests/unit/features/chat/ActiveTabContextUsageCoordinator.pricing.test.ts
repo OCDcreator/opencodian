@@ -62,6 +62,16 @@ describe('catalog readiness and per-tab current costs', () => {
   beforeEach(() => { jest.useFakeTimers(); });
   afterEach(() => { jest.clearAllTimers(); jest.useRealTimers(); });
 
+  it('keeps a new ZCode session unknown until native usage arrives', () => {
+    const { states, host, coordinator } = fixture();
+    host.getCurrentConversation = () => ({ id: 'z-new', backend: 'zcode', backendSessionId: 's-new', title: 'new', createdAt: 1, updatedAt: 2, lastContextUsage: undefined });
+    states.set('one', { ...createEmptyTabContextState(), sessionId: 's-new', contextWindow: 200000,
+      provider: 'openai', model: 'gpt-test', preciseTokens: { total: 0, input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 } });
+    coordinator.syncIdentity();
+    expect(states.get('one')).toMatchObject({ contextWindow: 0, preciseTokens: null, totalCost: null });
+    expect(coordinator.priceSnapshotCost('one', states.get('one')!)).toBeNull();
+  });
+
   it('updates both tabs on completion with their own pricing identity and preserves token truth', async () => {
     const { service, states, host, coordinator, complete } = fixture();
     const before = states.get('two')!;

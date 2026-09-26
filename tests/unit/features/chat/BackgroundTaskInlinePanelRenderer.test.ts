@@ -64,6 +64,9 @@ function createHarness() {
     getActiveTabId: () => 'tab-1',
     getTabRuntimeState: () => runtime,
     renderMarkdownInto,
+    getMessagesContainer: () => document.body,
+    readZCodeTasks: async () => [],
+    cancelZCodeTask: async () => false,
   });
 
   return {
@@ -77,9 +80,209 @@ function createHarness() {
   };
 }
 
+// eslint-disable-next-line max-lines-per-function -- Renderer scenarios share the same DOM and timeline harness.
 describe('BackgroundTaskInlinePanelRenderer', () => {
   afterEach(() => {
     document.body.replaceChildren();
+  });
+
+  it('shows a native ZCode task and cancels the same taskId from its visible button', async () => {
+    const tasks = [{ taskId: 'exec_original', status: 'running', description: 'Background Bash', cancellable: true }];
+    const readZCodeTasks = jest.fn(async () => tasks);
+    const cancelZCodeTask = jest.fn(async () => {
+      tasks[0].status = 'cancelled';
+      tasks[0].cancellable = false;
+      return true;
+    });
+    const timeline = { collectInlineSegments: () => [], getInlineCopy: jest.fn() };
+    const renderer = new BackgroundTaskInlinePanelRenderer(timeline as never, {
+      getActiveTabId: () => 'tab-1',
+      getTabRuntimeState: () => ({
+        backgroundTaskIndicatorEl: null, backgroundTaskInlineEls: new Map(),
+        turnBodyByAnchorKey: new Map(), backgroundTaskActiveAnchorKey: null,
+      }),
+      renderMarkdownInto: async () => {},
+      getMessagesContainer: () => document.body,
+      readZCodeTasks,
+      cancelZCodeTask,
+    });
+    await renderer.render({ backend: 'zcode', backendSessionId: 'sess_original', messages: [] } as Conversation, 'tab-1');
+    const row = document.body.querySelector<HTMLElement>('[data-task-id="exec_original"]');
+    expect(row?.dataset.taskStatus).toBe('running');
+    row?.querySelector('button')?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(cancelZCodeTask).toHaveBeenCalledWith('sess_original', 'exec_original');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(document.body.querySelector<HTMLElement>('[data-task-id="exec_original"]')?.dataset.taskStatus).toBe('cancelled');
+    renderer.clear('tab-1');
+  });
+
+  it('separates a native task title, status and long identity into readable card regions', async () => {
+    const taskId = 'exec_c72450d0-2528-4cd3-93ce-cc0012d685a6';
+    const tasks = [{ taskId, status: 'cancelled', description: 'Run delayed background task', cancellable: false }];
+    const renderer = new BackgroundTaskInlinePanelRenderer({
+      collectInlineSegments: () => [], getInlineCopy: jest.fn(),
+    } as never, {
+      getActiveTabId: () => 'tab-1', getTabRuntimeState: () => null,
+      renderMarkdownInto: async () => {}, getMessagesContainer: () => document.body,
+      readZCodeTasks: async () => tasks, cancelZCodeTask: async () => false,
+    });
+    await renderer.watchNativeTasks({ backend: 'zcode', backendSessionId: 'sess_card', messages: [] } as Conversation, 'tab-1');
+    const card = document.body.querySelector<HTMLElement>(`[data-task-id="${taskId}"]`);
+    expect(card?.querySelector('.opencodian-zcode-task-title')?.textContent).toBe('Run delayed background task');
+    expect(card?.querySelector('.opencodian-zcode-task-status')?.textContent).toBe('Canceled');
+    expect(card?.querySelector('.opencodian-zcode-task-id')?.textContent).toBe(taskId);
+    expect(card?.querySelector('.opencodian-zcode-task-icon svg')).not.toBeNull();
+    expect(card?.querySelector('button')).toBeNull();
+    tasks[0].status = 'interrupted';
+    await renderer.watchNativeTasks({ backend: 'zcode', backendSessionId: 'sess_card', messages: [] } as Conversation, 'tab-1');
+    const interrupted = document.body.querySelector<HTMLElement>(`[data-task-id="${taskId}"]`);
+    expect(interrupted?.querySelector('.opencodian-zcode-task-status')?.textContent)
+      .toBe('Connection lost; status unconfirmed');
+    expect(interrupted?.querySelector('button')).toBeNull();
+    tasks[0].status = 'stopped';
+    await renderer.watchNativeTasks({ backend: 'zcode', backendSessionId: 'sess_card', messages: [] } as Conversation, 'tab-1');
+    expect(document.body.querySelector<HTMLElement>(`[data-task-id="${taskId}"] .opencodian-zcode-task-status`)?.textContent)
+      .toBe('Stopped');
+    renderer.disposeNativeTaskWatch();
+  });
+
+  it('discovers a task after an initially empty native read without manual rendering', async () => {
+    jest.useFakeTimers();
+    try {
+      const jobs: Array<{ taskId: string; status: string; description: string; cancellable: boolean }> = [];
+      const renderer = new BackgroundTaskInlinePanelRenderer({
+        collectInlineSegments: () => [], getInlineCopy: jest.fn(),
+      } as never, {
+        getActiveTabId: () => 'tab-1',
+        getTabRuntimeState: () => null,
+        renderMarkdownInto: async () => {},
+        getMessagesContainer: () => document.body,
+        readZCodeTasks: async () => jobs,
+        cancelZCodeTask: async () => false,
+      });
+      const conversation = { backend: 'zcode', backendSessionId: 'sess_watch', messages: [] } as Conversation;
+      await renderer.watchNativeTasks(conversation, 'tab-1');
+      expect(document.body.querySelector('[data-task-id]')).toBeNull();
+      jobs.push({ taskId: 'exec_later', status: 'running', description: 'Later Bash', cancellable: true });
+      await jest.advanceTimersByTimeAsync(3_000);
+      expect(document.body.querySelector<HTMLElement>('[data-task-id="exec_later"]')?.dataset.taskStatus).toBe('running');
+      renderer.clear('tab-1');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('retries after connection loss and replaces an interrupted card with native readback', async () => {
+    jest.useFakeTimers();
+    try {
+      const taskId = 'exec_reconnected';
+      let connected = true;
+      let status = 'running';
+      const conversation = { backend: 'zcode', backendSessionId: 'sess_reconnected', messages: [] } as Conversation;
+      const renderer = new BackgroundTaskInlinePanelRenderer({
+        collectInlineSegments: () => [], getInlineCopy: jest.fn(),
+      } as never, {
+        getActiveTabId: () => 'tab-1', getConversationForTab: () => conversation,
+        getTabRuntimeState: () => null,
+        renderMarkdownInto: async () => {}, getMessagesContainer: () => document.body,
+        readZCodeTasks: async () => {
+          if (!connected) throw new Error('connection lost');
+          return [{ taskId, status, description: 'Recovered Bash', cancellable: status === 'running' }];
+        },
+        cancelZCodeTask: async () => false,
+      });
+      await renderer.watchNativeTasks(conversation, 'tab-1');
+      connected = false;
+      await jest.advanceTimersByTimeAsync(3_000);
+      expect(document.body.querySelector<HTMLElement>(`[data-task-id="${taskId}"]`)?.dataset.taskStatus).toBe('interrupted');
+      connected = true;
+      status = 'completed';
+      await jest.advanceTimersByTimeAsync(3_000);
+      expect(document.body.querySelector<HTMLElement>(`[data-task-id="${taskId}"]`)?.dataset.taskStatus).toBe('completed');
+      renderer.clear('tab-1');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('keeps at most one native task read in flight for a tab', async () => {
+    let release!: (jobs: Array<{ taskId: string; status: string; description: string; cancellable: boolean }>) => void;
+    const pending = new Promise<Array<{ taskId: string; status: string; description: string; cancellable: boolean }>>((resolve) => {
+      release = resolve;
+    });
+    const readZCodeTasks = jest.fn(() => pending);
+    const renderer = new BackgroundTaskInlinePanelRenderer({
+      collectInlineSegments: () => [], getInlineCopy: jest.fn(),
+    } as never, {
+      getActiveTabId: () => 'tab-1', getTabRuntimeState: () => null,
+      renderMarkdownInto: async () => {}, getMessagesContainer: () => document.body,
+      readZCodeTasks, cancelZCodeTask: async () => false,
+    });
+    const conversation = { backend: 'zcode', backendSessionId: 'sess_watch', messages: [] } as Conversation;
+    const first = renderer.watchNativeTasks(conversation, 'tab-1');
+    await renderer.watchNativeTasks(conversation, 'tab-1');
+    expect(readZCodeTasks).toHaveBeenCalledTimes(1);
+    release([]);
+    await first;
+    renderer.disposeNativeTaskWatch();
+  });
+
+  it('uses the tab-owned session when a late activation supplies another conversation', async () => {
+    const tabA = document.body.createDiv();
+    const tabB = document.body.createDiv();
+    const conversationA = { backend: 'zcode', backendSessionId: 'sess_A', messages: [] } as Conversation;
+    const conversationB = { backend: 'zcode', backendSessionId: 'sess_B', messages: [] } as Conversation;
+    const readZCodeTasks = jest.fn(async (sessionId: string) => [{
+      taskId: sessionId === 'sess_A' ? 'exec_A' : 'exec_B',
+      status: 'running', description: sessionId, cancellable: true,
+    }]);
+    const renderer = new BackgroundTaskInlinePanelRenderer({
+      collectInlineSegments: () => [], getInlineCopy: jest.fn(),
+    } as never, {
+      getActiveTabId: () => 'tab-A', getTabRuntimeState: () => null,
+      renderMarkdownInto: async () => {},
+      getMessagesContainer: (tabId) => tabId === 'tab-A' ? tabA : tabB,
+      getConversationForTab: (tabId) => tabId === 'tab-A' ? conversationA : conversationB,
+      readZCodeTasks, cancelZCodeTask: async () => false,
+    });
+    await renderer.watchNativeTasks(conversationB, 'tab-A');
+    expect(readZCodeTasks).toHaveBeenCalledWith('sess_A');
+    expect(tabA.querySelector('[data-task-id="exec_A"]')).not.toBeNull();
+    expect(tabA.querySelector('[data-task-id="exec_B"]')).toBeNull();
+    renderer.disposeNativeTaskWatch();
+  });
+
+  it('does not paint a native task read after the tab changes sessions', async () => {
+    const container = document.body.createDiv();
+    const conversationA = { backend: 'zcode', backendSessionId: 'sess_A', messages: [] } as Conversation;
+    const conversationB = { backend: 'zcode', backendSessionId: 'sess_B', messages: [] } as Conversation;
+    let current = conversationA;
+    let release!: (tasks: Array<{ taskId: string; status: string; description: string; cancellable: boolean }>) => void;
+    const firstRead = new Promise<Array<{ taskId: string; status: string; description: string; cancellable: boolean }>>((resolve) => {
+      release = resolve;
+    });
+    const readZCodeTasks = jest.fn((sessionId: string) => sessionId === 'sess_A'
+      ? firstRead
+      : Promise.resolve([{ taskId: 'exec_B', status: 'running', description: 'B', cancellable: true }]));
+    const renderer = new BackgroundTaskInlinePanelRenderer({
+      collectInlineSegments: () => [], getInlineCopy: jest.fn(),
+    } as never, {
+      getActiveTabId: () => 'tab-1', getTabRuntimeState: () => null,
+      getConversationForTab: () => current,
+      renderMarkdownInto: async () => {}, getMessagesContainer: () => container,
+      readZCodeTasks, cancelZCodeTask: async () => false,
+    });
+    const oldWatch = renderer.watchNativeTasks(conversationA, 'tab-1');
+    current = conversationB;
+    release([{ taskId: 'exec_A', status: 'running', description: 'A', cancellable: true }]);
+    await oldWatch;
+    expect(container.querySelector('[data-task-id="exec_A"]')).toBeNull();
+    await renderer.watchNativeTasks(conversationA, 'tab-1');
+    expect(readZCodeTasks).toHaveBeenLastCalledWith('sess_B');
+    expect(container.querySelector('[data-task-id="exec_B"]')).not.toBeNull();
+    renderer.disposeNativeTaskWatch();
   });
 
   it('renders inline panels, removes stale mounts, and updates the active indicator element', async () => {

@@ -1,4 +1,5 @@
 # Owner: feature.settings-shell
+> 2026-09-22 (ZCode 票 01)：SettingsTabbedRenderer 新增 zcode 主页签路由（SettingsZCodeSection.attachTabbed，与 pi 同模式）；settingsLayoutRegistry 注册 `zcode` 主页签（connection 二级 tab，backendRequired: zcode）；AgentSwitcherFloatingIcons 注册 opencodian-zcode 官方图标并补齐穷举映射 zcode 条目。
 > 2026-09-21 (advantage-parity R-F4)：SettingsTabbedRenderer 的 agent switcher 更新 active backend 后通知组合根刷新 R-F4 单池预热；不在设置 shell 构造会话或提交模型轮次。
 > 2026-09-21 (advantage-parity R-F7)：新增 EnvironmentVariablesModal（结构化 host）+ SettingsPanelChrome 共享行；三个设置面（tabbed/经典/编辑器区）General 合并块接入。
 > 2026-09-21 (advantage-parity R-F8)：SettingsModelSection 通用 tab 新增上下文窗口声明入口（feature-settings-plugin 的 modal 经窄 port 复用）。

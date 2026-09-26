@@ -187,6 +187,57 @@ describe('QuestionRuntimeViewHostFactory', () => {
       expect(nextQuestionApi.getPendingQuestions).toHaveBeenCalledTimes(1);
       expect(nextTabAttention.setNeedsAttention).toHaveBeenCalledWith('tab-next', false);
     });
+
+    it('routes refresh and resolution to the question API for the target tab and request', async () => {
+      const fixture = createFactoryFixture();
+      const adapter = createQuestionRuntimeViewHost(fixture.host);
+      const request = createQuestionRequest({ id: 'zcode-request', sessionId: 'zcode-session' });
+      const openCodeApi: Mocked<QuestionRuntimeQuestionApiPort> = {
+        getPendingQuestions: jest.fn().mockResolvedValue([]),
+        replyToQuestion: jest.fn().mockResolvedValue(undefined),
+        rejectQuestion: jest.fn().mockResolvedValue(undefined),
+      };
+      const zcodeApi: Mocked<QuestionRuntimeQuestionApiPort> = {
+        isPendingQuestionReadAuthoritative: jest.fn().mockReturnValue(true),
+        getPendingQuestions: jest.fn().mockResolvedValue([request]),
+        replyToQuestion: jest.fn().mockResolvedValue(undefined),
+        rejectQuestion: jest.fn().mockResolvedValue(undefined),
+      };
+      fixture.setQuestionApi(openCodeApi);
+
+      const getQuestionApi = fixture.host.getQuestionApi as unknown as jest.Mock<
+        QuestionRuntimeQuestionApiPort,
+        [string | null | undefined, QuestionRequest | undefined]
+      >;
+      getQuestionApi.mockImplementation((tabId) => tabId === 'tab-zcode' ? zcodeApi : openCodeApi);
+
+      const routedAdapter = adapter as unknown as {
+        isPendingQuestionReadAuthoritative(tabId: string | null): boolean;
+        getPendingQuestions(tabId: string | null): Promise<QuestionRequest[]>;
+        replyToQuestion(
+          requestId: string,
+          answers: string[][],
+          context: { tabId: string | null; request: QuestionRequest },
+        ): Promise<void>;
+        rejectQuestion(
+          requestId: string,
+          context: { tabId: string | null; request: QuestionRequest },
+        ): Promise<void>;
+      };
+
+      expect(routedAdapter.isPendingQuestionReadAuthoritative('tab-zcode')).toBe(true);
+      await expect(routedAdapter.getPendingQuestions('tab-zcode')).resolves.toEqual([request]);
+      await routedAdapter.replyToQuestion(request.id, [['Yes']], { tabId: 'tab-zcode', request });
+      await routedAdapter.rejectQuestion(request.id, { tabId: 'tab-zcode', request });
+
+      expect(zcodeApi.getPendingQuestions).toHaveBeenCalledTimes(1);
+      expect(zcodeApi.replyToQuestion).toHaveBeenCalledWith(request.id, [['Yes']]);
+      expect(zcodeApi.rejectQuestion).toHaveBeenCalledWith(request.id);
+      expect(openCodeApi.getPendingQuestions).not.toHaveBeenCalled();
+      expect(openCodeApi.replyToQuestion).not.toHaveBeenCalled();
+      expect(openCodeApi.rejectQuestion).not.toHaveBeenCalled();
+      expect(getQuestionApi).toHaveBeenLastCalledWith('tab-zcode', request);
+    });
   });
 
   describe('createQuestionRuntimeBundle', () => {

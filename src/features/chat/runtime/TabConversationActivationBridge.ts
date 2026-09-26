@@ -31,8 +31,9 @@ type BackgroundTaskActivationIndicatorPort = Pick<
   | 'renderOpenConversationIndicator'
 >;
 
-function supportsOpenCodeActivationRefresh(conversation: Conversation): boolean {
-  return (conversation.backend ?? 'opencode') === 'opencode'
+function supportsQuestionActivationRefresh(conversation: Conversation): boolean {
+  const backend = conversation.backend ?? 'opencode';
+  return (backend === 'opencode' || backend === 'zcode')
     && Boolean(getConversationBackendSessionId(conversation));
 }
 
@@ -97,7 +98,7 @@ export class TabConversationActivationBridge {
     this.tabConversationStateBridge.commitConversationSyncBaseline(conversation.messages);
     this.tabViewActivationBridge.applyStreamingActivationOutcome(
       tabId,
-      supportsOpenCodeActivationRefresh(conversation)
+      supportsQuestionActivationRefresh(conversation)
         ? getConversationBackendSessionId(conversation) ?? null
         : null,
     );
@@ -127,7 +128,7 @@ export class TabConversationActivationBridge {
       conversation,
       activeTabId,
     );
-    if (supportsOpenCodeActivationRefresh(conversation)) {
+    if (supportsQuestionActivationRefresh(conversation)) {
       this.questionTodoActivationRefreshCoordinator.applyConversationActivation(
         activeTabId,
         getConversationBackendSessionId(conversation) ?? null,

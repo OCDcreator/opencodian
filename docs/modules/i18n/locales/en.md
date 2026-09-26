@@ -1,4 +1,7 @@
 # English Locale
+> 2026-09-25 (session deletion): Confirmation copy describes removal of local OpenCodian messages and possible backend history retention; ZCode desktop task-list soft deletion is not presented as permanent native history removal.
+> 2026-09-25 (ZCode): `chat.zcode.backgroundTask.stopped` labels native `killed` as neutral "Stopped"; the existing unknown/connection-lost labels remain for tasks with no proven terminal notification.
+> 2026-09-24 (ZCode): Context compaction copy now names the current session rather than Codex so the ZCode details surface is accurate.
 > 2026-09-21 (advantage-parity R-F2/R-F3/R-F6 质量修复)：`chat.sessionSettings.modal.linkedNote.description` 改为诚实能力表述（用于快照/回退跟踪/Modified Files 关联；不发送内容给模型、不自动写回）；`editRevert.preview.*` 行数改为带标签两侧（`linesBeforeLabel`/`linesAfterLabel`/`linesValue`）并新增按状态的动作说明（`actionCreated`/`actionDeleted`/`actionModified`/`actionMoved`），移除歧义的裸 `lines` 组合键；新增 `settings.conversation.vimNavigation.duplicateKeyNotice`。与 zh 一一对应。
 > 2026-09-21 (advantage-parity R-F5/R-F6)：adds English copy for the optional session rail, Vim navigation settings/keys, and session rail states.
 > 2026-09-21 (advantage-parity R-F4)：新增 `settings.agent.chatWarmSession.{name,desc}`；明确预热只创建空只读 aux session、不发送 prompt/turn、不计模型用量，真实聊天另建会话。
@@ -35,6 +38,10 @@
 
 > 2026-08-03: Updated modified-files sidebar copy to describe a persistent clickable entry, ready-empty/unavailable states, click/Escape dismissal, and OpenCode-session-only semantics instead of hover/auto-hide behavior.
 > 2026-08-03: Added short `modifiedFiles.readyShort` / `modifiedFiles.unavailableShort` labels so narrow sidebar headers stay single-line while full empty-state explanations remain in the panel body.
+> 2026-09-25: `modifiedFiles.unavailable` / `unavailableShort` now describe unavailable session changes without claiming that a ZCode chat is waiting for OpenCode.
+> 2026-09-25: `chat.zcode.mode.plan.description` explains the native same-session event check and the conservative fallback for runtimes without it.
+> 2026-09-25: Added `permissionDialog.noLongerPending` for a pure permission request that timed out, was canceled, or lost its native connection.
+> 2026-09-25: Added `chat.zcode.backgroundTask.*` for native task status, interrupted readback, and cancel action.
 
 > 2026-08-02: Added `settings.conversation.showTurnChangeRecords` name/description for the global turn-change record display gate; copy explains that disabling only hides retained records and re-enabling restores them.
 
@@ -610,3 +617,8 @@ Added `chat.diffNotice.fileCount` (`{count}` accessible name for the header coun
 > 2026-09-19 (per-backend declarations)：新增 `settings.inlineCompletion.latencyNotice.name` / `.desc`（首字节按后端差异的实测值：pi 预热 8/8 次 328–788ms；OpenCode 路由通常 0.9–1.3s 且部分模型无建议；附可操作建议）与 `settings.inlineEdit.streamPreviewNotice.name` / `.desc`（流式预览逐步增长取决于后端接缝：pi 按 delta 流式 → 实测 4 个中间状态；OpenCode 路由不暴露部分文本 → 结束时一次出现；功能不受影响）。
 
 R-C4 补充：`chat.context.pdfIntegration.notMounted`（调试区在未探测过 PDF 叶子时的“尚未挂载”态）与 `SettingsDebugSection` 的 PDF 集成级别状态行文案。
+
+> 2026-09-22 (ZCode 票 01)：新增 `settings.agent.name.zcode` / `settings.agent.zcode.desc` 与 `settings.zcode.*`（连接页、运行时覆盖、重连、Runtime/Provider config/Connection 三行诚实诊断——ready/unavailable/failed 文案与 provider 校验态）。
+> 2026-09-22（二轮核查修复）：新增 `settings.zcode.status.providerValidatedNoCount`（计数不可用的诚实表述）。
+> 2026-09-24 (票 06)：新增 settings.zcode.model/.desc/.placeholder、settings.zcode.thinking/.desc/.placeholder、settings.zcode.mode/.desc/.inherit。
+> 2026-09-24（续做）：新增 `chat.zcode.mode.*` 与 `chat.zcode.reasoning.*`，区分原生模式的未确认状态和模型推理档位的下一回合生效边界。

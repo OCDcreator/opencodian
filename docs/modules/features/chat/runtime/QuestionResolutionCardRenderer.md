@@ -30,4 +30,5 @@
 - inline question request 的 grouped/sequential 收集逻辑仍由 `QuestionInlineCardRenderer.ts` 负责
 - `pendingQuestionResolution` 写入、卡片 clear/render 分支与贴底滚动现由 `QuestionResolutionCoordinator.ts` 负责
 - `appendQuestionResolutionCard()` 只服务持久化 assistant message 的静态插入；复用 inline card 容器的运行态卡片仍由 `QuestionResolutionCoordinator.ts` 先取得容器后调用 `populateQuestionResolutionCard()`
+- 已回答与已拒绝摘要分别使用 Lucide circle-check/circle-x 图标，并沿用同一聊天卡片边框、间距与文字层级；状态文案和原有折叠行为保持不变。
 - `buildQuestionResolutionCardRenderPlan()` 保持当前既有行为：一旦存在 `contentBlocks`，所有非 text blocks 先渲染，再插 resolved card，最后统一渲染 text blocks；同时会把持久化卡片的显示门控折叠进 render plan 的 `resolvedCardResolution`

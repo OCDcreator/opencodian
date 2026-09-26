@@ -31,7 +31,9 @@ export function createQuestionRuntimeViewHostAdapter(...): QuestionRuntimeViewHo
 - 透传 view 自己拥有的 tab/runtime 能力，例如 active tab、runtime state 与 scroll pin
 - 从 `QuestionDockSlotCoordinator` 读取当前 dock instance 与 above-input gate，而不是让 view 重新展开这组桥接
 - 从设置读取 `questionDisplayMode` 与 `showAnsweredQuestionCards`，让 resolution-card gate 也不再回到 view
-- 从 OpenCode question API 读取 pending question fetch、reply/reject 能力
+- 从目标 tab 的 question API 读取 pending question fetch、reply/reject 能力；不会按当前 active backend 重定向后台卡片
+- reply/reject 会透传 `QuestionResolutionRequestRoute`（目标 tab + 原始 request），让下游在真正调用 adapter 前核验 native session 身份
+- ZCode API 可声明 pending read 为原生权威读回；空数组会被标记给 dock lifecycle，允许清除旧 UI 留下的 waiter-owned 卡片，其他后端不声明该标记便保持既有保活语义
 - 直接复用 `TabRuntimeStateBridge.setNeedsAttention()` 写回 tab attention，而不是让 view 再包一层
 
 ## 与其它模块的边界

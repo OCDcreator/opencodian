@@ -1,4 +1,5 @@
 # QuestionInlineCardRenderer
+> 2026-09-25 (FA880): While a native authoritative question ask is visible inline, its original tab/session/requestId is checked every 500ms. A lost process, cancel, or removed native ask resolves the inline wait with null and removes the stale card without sending an answer. Callback-only backends retain the existing behavior.
 
 > **源码**: `src/features/chat/runtime/QuestionInlineCardRenderer.ts`
 > **状态**: [REVIEW]
@@ -33,6 +34,7 @@ Inline question card 的键盘处理保持在 `QuestionInlineCardRenderer` 本�
 - 已回答/已拒绝的 resolved question 回顾卡片内容与协调分别由 `QuestionResolutionCardRenderer.ts` / `QuestionResolutionCoordinator.ts` 负责，本模块继续提供共享容器复用与待回答 inline card 交互
 - host wiring 现在通常由 `QuestionRuntimeHostAdapter.ts` 统一提供，不要再把 active tab / runtime / pin-to-bottom 三段回调重新散落回 view
 - Question card root 设置 `data-question-card="true"`，提交和拒绝按钮分别设置 `data-question-action="submit|reject"`，供自动化测试和诊断探针稳定定位卡片与操作
+- 标题使用 Lucide circle-help 图标，与权限及通知卡共用紧凑的聊天卡片视觉规则；问题选项仍由原有输入状态和键盘逻辑处理。
 - 不要在这里复制 streaming shell 查询或 reveal 逻辑，统一继续走 `StreamingInlineCardRenderer`
 - sequential 模式必须复用并清空同一个 question card，避免破坏当前 scroll/pin 行为
 - keyboard 行为必须复用现有 `QuestionInputState` 与 `collectAnswerFromInputState()`，不要引入第二套答案解析

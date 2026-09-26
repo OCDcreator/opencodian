@@ -172,7 +172,7 @@ function renderSlashCommandMenuItem(itemEl: HTMLElement, item: SlashCommandMenuI
   // renders truthfully as `/skills <name>`. Ordinary slash commands are
   // unaffected.
   const displayId = item.displayId ?? item.id;
-  const title = item.source === 'codex-skill' && displayId.startsWith('$')
+  const title = displayId.startsWith('/') || (item.source === 'codex-skill' && displayId.startsWith('$'))
     ? displayId
     : `/${displayId}`;
   titleRowEl.createDiv({

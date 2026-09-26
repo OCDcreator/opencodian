@@ -36,6 +36,11 @@ export type { ContextUsageSummary } from './ContextUsageDisplayService';
 type TimestampRefreshMode = 'preserve' | 'now' | 'if-missing';
 
 export class ContextUsageService {
+  /** A session with no native usage snapshot has an unknown window and cost. */
+  static markUsageUnavailable(state: TabContextState): TabContextState {
+    return { ...state, contextWindow: 0, preciseTokens: null, billingUsage: null,
+      estimatedInputTokens: 0, estimatedOutputTokens: 0, totalCost: null, costDetails: null };
+  }
   static createState(
     modelInfo?: ContextModelInfo,
     sessionInfo?: ContextSessionInfo,

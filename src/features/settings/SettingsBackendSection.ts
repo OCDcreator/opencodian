@@ -15,6 +15,7 @@ const ALL_BACKEND_OPTIONS: Array<{
   { id: 'codex', labelKey: 'settings.agent.name.codex', descriptionKey: 'settings.agent.codex.desc' },
   { id: 'copilot', labelKey: 'settings.agent.name.copilot', descriptionKey: 'settings.agent.copilot.desc' },
   { id: 'pi', labelKey: 'settings.agent.name.pi', descriptionKey: 'settings.agent.pi.desc' },
+  { id: 'zcode', labelKey: 'settings.agent.name.zcode', descriptionKey: 'settings.agent.zcode.desc' },
 ];
 
 export const BACKEND_OPTIONS = ALL_BACKEND_OPTIONS.filter(

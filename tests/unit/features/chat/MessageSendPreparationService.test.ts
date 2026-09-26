@@ -147,6 +147,41 @@ describe('MessageSendPreparationService', () => {
     expect(result?.userMessage.images).toEqual(images);
   });
 
+  it('rejects an unsupported ZCode image model before the optimistic user message is recorded', async () => {
+    const conversation = createConversation();
+    conversation.backend = 'zcode';
+    conversation.backendSessionId = 'zcode-session-1';
+    delete conversation.openCodeSessionId;
+    const onPreparationOutcome = jest.fn();
+    const host = createHost(conversation, [], {
+      shouldUseModelCatalog: jest.fn().mockReturnValue(true),
+      getSendMessageOptions: jest.fn().mockReturnValue({
+        provider: 'opencode-go',
+        model: 'glm-5.3',
+      }),
+      getZCodeImageInputSupport: jest.fn().mockResolvedValue('unsupported'),
+    });
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+    const images = [{ data: 'iVBORw0KGgo=', mediaType: 'image/png' as const, filename: 'red.png' }];
+
+    const result = await service.prepareMessageSend({
+      content: 'Describe the image',
+      images,
+      onPreparationOutcome,
+    });
+
+    expect(result).toBeNull();
+    expect(host.getZCodeImageInputSupport).toHaveBeenCalledWith('zcode-session-1', {
+      provider: 'opencode-go',
+      model: 'glm-5.3',
+    });
+    expect(onPreparationOutcome).toHaveBeenCalledWith('rejected');
+    expect(host.seedCanonicalUserMessage).not.toHaveBeenCalled();
+    expect(host.saveConversation).not.toHaveBeenCalled();
+    expect(host.renderMessage).not.toHaveBeenCalled();
+    expect(conversation.messages).toHaveLength(0);
+  });
+
   it('merges one-shot outputFormat into modelOptions when provided', async () => {
     const conversation = createConversation();
     const host = createHost(conversation);

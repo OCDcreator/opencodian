@@ -85,3 +85,5 @@ Pi主标签使用用户SVG注册图标opencodian-pi，与后端状态和切换�
 ## R-C2 扩展
 
 2026-09-18 conversation 主 tab 二级 tab 新增 `image-generation`（后端无关，不设 backendRequired）。
+
+2026-09-22 主 tab 新增 `zcode`（icon: opencodian-zcode，backendRequired: zcode，二级 tab `connection`）。

@@ -18,7 +18,7 @@ import {
   getConversationSessionBackendService,
   loadBackendSessionMessages,
 } from '../../core/agents/backend/AgentBackendRouting';
-import type { AgentConnectionStatus } from '../../core/agents/backend/AgentService';
+import type { AgentConnectionStatus, AgentQuestionCapability } from '../../core/agents/backend/AgentService';
 import {
   buildClaudeCodeModelSelectorProviders,
   CLAUDE_CODE_EFFORT_VARIANTS,
@@ -280,6 +280,7 @@ import {
 } from './services/PersistentAssistantNoticeService';
 import type { QuestionDockSlotCoordinator } from './services/QuestionDockSlotCoordinator';
 import type { QuestionRuntimeServices } from './services/QuestionRuntimeHostAdapter';
+import type { QuestionRuntimeQuestionApiPort } from './services/QuestionRuntimeViewHostAdapter';
 import {
   type QuestionRuntimeViewHostFactoryHost,
 } from './services/QuestionRuntimeViewHostFactory';
@@ -321,6 +322,7 @@ import {
   buildWebViewerContextItem,
   getActiveWebViewerTabContext,
 } from './services/WebViewerContextService';
+import { recoverEmptyZCodeConversationSession } from './services/ZCodeEmptySessionRecovery';
 import type { TabBar, TabId, TabManager } from './tabs';
 import { type BackendSessionBrowserHost,BackendSessionBrowserModal } from './ui/BackendSessionBrowserModal';
 import { ContextDetailModal } from './ui/ContextDetailModal';
@@ -538,8 +540,12 @@ export class OpenCodianView extends ItemView {
     return this.questionRuntimeServices.dockCoordinator;
   }
 
-  /** Get current backend capabilities. Phase 0: always OpenCode full set. */
+  /** Capabilities follow the active conversation, including restored cross-backend tabs. */
   private get caps() {
+    const backend = this.currentConversation?.backend;
+    if (backend) {
+      return this.plugin.agentServiceRegistry?.get(backend)?.capabilities ?? new Set<AgentCapability>();
+    }
     return getActiveBackendCapabilities();
   }
 
@@ -635,13 +641,19 @@ export class OpenCodianView extends ItemView {
       scheduleComposerLayoutSync: () => {
         this.scheduleComposerLayoutSync();
       },
-      resolveServerAvailability: () => this.getServerAvailability(),
+      resolveServerAvailability: () => {
+        const backend = this.currentConversation?.backend ?? this.plugin.settings.activeBackend ?? 'opencode';
+        if (backend === (this.plugin.settings.activeBackend ?? 'opencode')) return this.getServerAvailability();
+        const status = this.plugin.agentServiceRegistry?.get(backend)?.status;
+        return Promise.resolve(status ? this.mapAgentConnectionStatusToServerAvailability(status) : 'offline');
+      },
       isLocalServerMode: () => this.plugin.settings.server.mode === 'local',
-      isOpenCodeBackend: () => this.isOpenCodeBackendActive(),
+      isOpenCodeBackend: () => (this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'opencode',
       getActiveBackendDisplayName: () => {
-        const activeBackend = this.plugin.settings.activeBackend ?? 'opencode';
+        const activeBackend = this.currentConversation?.backend ?? this.plugin.settings.activeBackend ?? 'opencode';
         return this.plugin.agentServiceRegistry?.get(activeBackend)?.displayName ?? activeBackend;
       },
+      getActiveBackendKind: () => this.currentConversation?.backend ?? this.plugin.settings.activeBackend ?? 'opencode',
       refreshContextUsageIndicator: () => {
         this.activeTabContextUsageCoordinator.refreshContextUsageIndicator();
       },
@@ -852,7 +864,7 @@ export class OpenCodianView extends ItemView {
         this.updateConversationTitleState(conversationId, {
           title,
           titleGenerationStatus: undefined,
-        }),
+        }, true),
       deleteConversationsAndCleanupTabs: (conversationIds) =>
         this.deleteConversationsAndCleanupTabs(conversationIds),
       deleteAllConversationsAndReset: (conversationIds) =>
@@ -1015,7 +1027,7 @@ export class OpenCodianView extends ItemView {
             const current = this.getCurrentSessionModel();
             this.currentVariant = this.normalizeEffortVariantForCurrentBackend(variant);
             if (current) {
-              this.variantStore[`${current.provider}/${current.model}`] = this.currentVariant;
+              this.variantStore[this.getEffortStoreKey(`${current.provider}/${current.model}`)] = this.currentVariant;
             }
           },
           getCurrentModel: () => {
@@ -1028,9 +1040,11 @@ export class OpenCodianView extends ItemView {
             return current ? `${current.provider}/${current.model}` : '';
           },
           allowDefaultOption: () => !this.isClaudeCodeConversationActive() && !this.isCodexConversationActive(),
-          getDefaultOptionLabel: () => t('chat.effort.disabled'),
+          getDefaultOptionLabel: () => this.currentConversation?.backend === 'zcode'
+            ? t('chat.zcode.reasoning.modelDefault') : t('chat.effort.disabled'),
           getBoundaryHint: () =>
-            this.isCodexConversationActive() ? t('chat.effort.boundaryHint.codex') : undefined,
+            this.isCodexConversationActive() ? t('chat.effort.boundaryHint.codex')
+              : this.currentConversation?.backend === 'zcode' ? t('chat.zcode.reasoning.boundaryHint') : undefined,
         });
         this.effortSelector.updateDisplay();
       },
@@ -1043,7 +1057,8 @@ export class OpenCodianView extends ItemView {
         new Notice(t('chat.tab.processingBlocked'));
       },
       getComposerInputMode: () => 'prompt',
-      submitMessage: (submission) => this.handleComposerInputSubmission(submission),
+      submitMessage: (submission, onPreparationOutcome) =>
+        this.handleComposerInputSubmission(submission, onPreparationOutcome),
       loadSlashCommandMenuItems: () => this.loadSlashCommandMenuItems(),
       setComposerStackHeight: (stackHeight) => {
         this.chatContainerEl?.style.setProperty('--opencodian-composer-stack-height', `${stackHeight}px`);
@@ -1080,6 +1095,7 @@ export class OpenCodianView extends ItemView {
 
   private handleComposerInputSubmission(
     submission: ComposerInputSubmission,
+    onPreparationOutcome?: (outcome: import('./services/MessageSendPreparationService').MessageSendPreparationOutcome) => void,
   ): Promise<void> | void {
     if (submission.kind === 'shell') {
       logger.warn('Ignoring shell composer submission because the stable shell runtime is not enabled in this view', {
@@ -1094,6 +1110,7 @@ export class OpenCodianView extends ItemView {
         ...(submission.syntheticTextParts ? { syntheticTextParts: submission.syntheticTextParts } : {}),
         ...(submission.invocationIntent ? { invocationIntent: submission.invocationIntent } : {}),
         ...(submission.images ? { images: submission.images } : {}),
+        ...(onPreparationOutcome ? { onPreparationOutcome } : {}),
       });
     }
 
@@ -1101,13 +1118,14 @@ export class OpenCodianView extends ItemView {
   }
 
   private loadSlashCommandMenuItems(): Promise<SlashCommandMenuItem[]> {
-    if (!this.isOpenCodeBackendActive() && !this.isClaudeCodeConversationActive() && !this.isCodexConversationActive()) {
+    const isZCode = (this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'zcode';
+    if (!this.isOpenCodeBackendActive() && !this.isClaudeCodeConversationActive() && !this.isCodexConversationActive() && !isZCode) {
       return Promise.resolve([]);
     }
 
     // Codex skills come from the app-server via the cache host's
     // loadCodexRuntimeSkills seam, so Codex does not require opencodeConfigManager.
-    if (!this.plugin.opencodeConfigManager && !this.isClaudeCodeConversationActive() && !this.isCodexConversationActive()) {
+    if (!this.plugin.opencodeConfigManager && !this.isClaudeCodeConversationActive() && !this.isCodexConversationActive() && !isZCode) {
       return Promise.resolve([]);
     }
 
@@ -1115,7 +1133,8 @@ export class OpenCodianView extends ItemView {
   }
 
   private scheduleSlashCommandMenuPreload(): void {
-    if (!this.isOpenCodeBackendActive() && !this.isClaudeCodeConversationActive() && !this.isCodexConversationActive()) {
+    const isZCode = (this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'zcode';
+    if (!this.isOpenCodeBackendActive() && !this.isClaudeCodeConversationActive() && !this.isCodexConversationActive() && !isZCode) {
       return;
     }
 
@@ -1125,7 +1144,7 @@ export class OpenCodianView extends ItemView {
 
     this.slashCommandMenuPreloadTimerId = window.setTimeout(() => {
       this.slashCommandMenuPreloadTimerId = null;
-      if (!this.plugin.opencodeConfigManager) {
+      if (!this.plugin.opencodeConfigManager && !isZCode) {
         return;
       }
 
@@ -1202,6 +1221,7 @@ export class OpenCodianView extends ItemView {
 
   private createChatSelectionControlsCoordinatorHost(): ChatSelectionControlsCoordinatorHost {
     return {
+      getOwnConversation: () => this.currentConversation,
       getApp: () => this.app,
       registerEscapeHandler: (handler) => {
         this.escapeHandlers.push(handler);
@@ -1299,7 +1319,7 @@ export class OpenCodianView extends ItemView {
         const current = this.getCurrentSessionModel();
         if (current) {
           const modelRef = `${current.provider}/${current.model}`;
-          const saved = this.variantStore[modelRef];
+          const saved = this.variantStore[this.getEffortStoreKey(modelRef)];
           const available = this.findKnownModelInfo({ provider: current.provider, model: current.model })?.variants ?? [];
           this.currentVariant = saved && available.includes(saved) ? saved : undefined;
         } else {
@@ -1671,6 +1691,7 @@ export class OpenCodianView extends ItemView {
     this.currentVariant = undefined;
     this.slashCommandMenuCatalogCache = new SlashCommandMenuCatalogCache({
       loadPiRuntimeCommands: () => (this.plugin.agentServiceRegistry?.get('pi') as { getRuntimeCommands?(): Promise<Array<{ name: string; description?: string }>> } | undefined)?.getRuntimeCommands?.() ?? Promise.resolve([]),
+      loadZCodeRuntimeCommands: async () => (this.plugin.agentServiceRegistry?.get('zcode') as { getSlashCommands?(): readonly { name: string; description: string }[] } | undefined)?.getSlashCommands?.() ?? [],
       getHiddenCommandIds: () => this.plugin.settings.hiddenSlashCommands ?? [],
       loadProjectAgents: async () => (this.isClaudeCodeConversationActive() || this.isCodexConversationActive()) ? {} : (this.plugin.opencodeConfigManager?.getAgentConfig() ?? {}),
       loadProjectCommands: async () => (this.isClaudeCodeConversationActive() || this.isCodexConversationActive()) ? {} : (this.plugin.opencodeConfigManager?.getCommandConfig() ?? {}),
@@ -1702,7 +1723,9 @@ export class OpenCodianView extends ItemView {
       },
       getBackendKey: () => (this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'pi'
         ? 'pi'
-        : this.isClaudeCodeConversationActive() ? 'claude-code' : (this.isCodexConversationActive() ? 'codex' : 'opencode'),
+        : (this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'zcode'
+          ? 'zcode'
+          : this.isClaudeCodeConversationActive() ? 'claude-code' : (this.isCodexConversationActive() ? 'codex' : 'opencode'),
       getSlashCommandCapabilityKey: () => {
         // Fold the current v2.command.list / v2.skill.list capability
         // availability into the cache key. When server support flips, the key
@@ -2143,10 +2166,21 @@ export class OpenCodianView extends ItemView {
           }
           return Promise.resolve(null);
         }
+        if (backend === 'zcode') {
+          const adapter = this.plugin.agentServiceRegistry?.get('zcode') as {
+            getSessionContextUsageSnapshot?(id: string): Promise<ContextUsageSnapshot | null>;
+          } | undefined;
+          return adapter?.getSessionContextUsageSnapshot?.(sessionId) ?? Promise.resolve(null);
+        }
         return this.plugin.openCodeService.getSessionContextUsageSnapshot(sessionId);
       },
       getForegroundCompactionAvailability: (sessionId): ForegroundCompactionAvailability => {
         const conversation = this.currentConversation;
+        if (conversation?.backend === 'zcode') {
+          return getConversationBackendSessionId(conversation) === sessionId
+            ? { status: 'available', threadId: sessionId }
+            : { status: 'invalid-thread' };
+        }
         if ((conversation?.backend ?? 'opencode') !== 'codex') {
           return { status: 'unavailable' };
         }
@@ -2163,6 +2197,27 @@ export class OpenCodianView extends ItemView {
         options,
       ): Promise<ForegroundCompactionActionResult> => {
         const conversation = this.currentConversation;
+        if (conversation?.backend === 'zcode' && getConversationBackendSessionId(conversation) === sessionId) {
+          const adapter = this.plugin.agentServiceRegistry?.get('zcode') as {
+            compactSession?(id: string, instructions?: string, options?: { timeoutMs?: number; onAccepted?: () => void }): Promise<{
+              acknowledged: boolean; completed: boolean; tokenUsageObserved: boolean;
+              terminalStatus: 'completed' | 'failed' | 'cancelled' | 'skipped' | null;
+            }>;
+          } | undefined;
+          if (!adapter?.compactSession) return Promise.resolve({ status: 'unavailable', acknowledged: false, runtimeVerified: false, started: false, completed: false, tokenUsageObserved: false });
+          return adapter.compactSession(sessionId, undefined, options).then((readback): ForegroundCompactionActionResult => {
+            const verified = readback.completed && readback.tokenUsageObserved;
+            return {
+              status: verified ? 'verified'
+                : readback.terminalStatus && readback.terminalStatus !== 'completed' ? 'failed'
+                  : readback.acknowledged ? 'accepted' : 'failed',
+              acknowledged: readback.acknowledged,
+              runtimeVerified: verified, started: readback.acknowledged,
+              completed: readback.completed, tokenUsageObserved: readback.tokenUsageObserved,
+              threadId: sessionId,
+            };
+          }).catch(() => ({ status: 'failed', acknowledged: false, runtimeVerified: false, started: false, completed: false, tokenUsageObserved: false, threadId: sessionId }));
+        }
         if ((conversation?.backend ?? 'opencode') !== 'codex') {
           return Promise.resolve({
             status: 'unavailable',
@@ -2273,6 +2328,10 @@ export class OpenCodianView extends ItemView {
       getMessageAnchorKey: (message) => this.getMessageAnchorKey(message),
       clearInlinePanel: (tabId) => {
         this.backgroundTaskInlinePanelRenderer.clear(tabId);
+        const conversation = this.getConversationForTab(tabId);
+        if (conversation?.backend === 'zcode') {
+          void this.backgroundTaskInlinePanelRenderer.watchNativeTasks(conversation, tabId);
+        }
       },
       armAuthoritativeSyncGate: (tabId) => {
         this.backgroundTaskLiveSignalCoordinator.armAuthoritativeSyncGate(tabId);
@@ -2291,8 +2350,24 @@ export class OpenCodianView extends ItemView {
   private createBackgroundTaskInlinePanelRendererHost(): BackgroundTaskInlinePanelRendererHost {
     return {
       getActiveTabId: () => this.getActiveTabId(),
+      getConversationForTab: (tabId) => this.getConversationForTab(tabId),
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
       renderMarkdownInto: (container, markdown) => this.renderMarkdownInto(container, markdown),
+      getMessagesContainer: (tabId) => this.getTabPaneState(tabId)?.messagesEl ?? null,
+      readZCodeTasks: async (sessionId) => {
+        const adapter = this.plugin.agentServiceRegistry?.get('zcode') as {
+          status?: string;
+          getBackgroundTasks?(id: string): Promise<Array<{ taskId: string; status: string; description: string; cancellable: boolean }>>;
+        } | undefined;
+        if (adapter?.status !== 'connected') throw new Error('ZCode connection unavailable');
+        return await adapter?.getBackgroundTasks?.(sessionId) ?? [];
+      },
+      cancelZCodeTask: async (sessionId, taskId) => {
+        const adapter = this.plugin.agentServiceRegistry?.get('zcode') as {
+          cancelBackgroundTask?(id: string, task: string): Promise<boolean>;
+        } | undefined;
+        return await adapter?.cancelBackgroundTask?.(sessionId, taskId) ?? false;
+      },
     };
   }
 
@@ -2705,8 +2780,47 @@ export class OpenCodianView extends ItemView {
       },
       settings: this.plugin.settings,
       getQuestionDockSlotCoordinator: () => this.questionDockSlotCoordinator,
-      getQuestionApi: () => this.plugin.openCodeService,
+      getQuestionApi: (tabId, request) => this.getQuestionApiForTab(tabId, request),
       getTabAttention: () => this.tabRuntimeStateBridge,
+    };
+  }
+
+  /**
+   * Resolve question traffic by the tab that owns the request, rather than by
+   * the currently selected backend.  A card can remain actionable while the
+   * user switches tabs, so a request/session mismatch fails before any native
+   * responder is reached.
+   */
+  private getQuestionApiForTab(
+    tabId: TabId | null | undefined,
+    request?: QuestionRequest,
+  ): QuestionRuntimeQuestionApiPort {
+    const resolvedTabId = tabId ?? this.getActiveTabId();
+    const sessionId = this.getSessionIdForTab(resolvedTabId);
+    if (request && (!sessionId || request.sessionId !== sessionId)) {
+      throw new Error('Question request no longer belongs to the target tab session.');
+    }
+
+    const conversation = this.getConversationForTab(resolvedTabId);
+    if (conversation?.backend !== 'zcode') {
+      return this.plugin.openCodeService;
+    }
+
+    const adapter = this.plugin.agentServiceRegistry?.get('zcode');
+    const questionAdapter = adapter as AgentQuestionCapability | undefined;
+    if (!adapter?.hasCapability(AgentCapability.Questions)
+      || typeof questionAdapter?.getPendingQuestions !== 'function'
+      || typeof questionAdapter.replyToQuestion !== 'function'
+      || typeof questionAdapter.rejectQuestion !== 'function') {
+      throw new Error('ZCode question responder unavailable.');
+    }
+
+    return {
+      isPendingQuestionReadAuthoritative: () => true,
+      getPendingQuestions: async () =>
+        await questionAdapter.getPendingQuestions() as QuestionRequest[],
+      replyToQuestion: (requestId, answers) => questionAdapter.replyToQuestion(requestId, answers),
+      rejectQuestion: (requestId) => questionAdapter.rejectQuestion(requestId),
     };
   }
 
@@ -2794,6 +2908,7 @@ export class OpenCodianView extends ItemView {
 
   async onClose() {
     this.activeTabContextUsageCoordinator.dispose();
+    this.backgroundTaskInlinePanelRenderer.disposeNativeTaskWatch();
     this.plugin.unregisterConversationCachePinProvider(this.conversationCachePinProvider);
     this.persistTabState({ flush: true });
     this.clearSlashCommandMenuPreload();
@@ -3066,6 +3181,7 @@ export class OpenCodianView extends ItemView {
 
   private async initializeFirstTab(): Promise<void> {
     await this.conversationTabRuntimeCoordinator.initializeFirstTab();
+    await this.refreshZCodeCatalogForCurrentConversation();
     this.refreshModifiedFilesSidebar();
   }
 
@@ -3107,6 +3223,7 @@ export class OpenCodianView extends ItemView {
 
   private async handleTabSwitch(tabId: string): Promise<void> {
     await this.conversationTabRuntimeCoordinator.handleTabSwitch(tabId);
+    await this.refreshZCodeCatalogForCurrentConversation();
     this.refreshModifiedFilesSidebar();
   }
 
@@ -3565,6 +3682,7 @@ export class OpenCodianView extends ItemView {
       ? getConversationBackendSessionId(this.currentConversation)
       : undefined;
     await this.conversationLoadRecoveryCoordinator.createConversationInNewTab();
+    await this.refreshZCodeCatalogForCurrentConversation();
     const currentSessionId = this.currentConversation
       ? getConversationBackendSessionId(this.currentConversation)
       : undefined;
@@ -3584,6 +3702,7 @@ export class OpenCodianView extends ItemView {
       ? getConversationBackendSessionId(this.currentConversation)
       : undefined;
     await this.conversationLoadRecoveryCoordinator.createConversationInCurrentTab();
+    await this.refreshZCodeCatalogForCurrentConversation();
     const currentSessionId = this.currentConversation
       ? getConversationBackendSessionId(this.currentConversation)
       : undefined;
@@ -3627,9 +3746,38 @@ export class OpenCodianView extends ItemView {
     }
 
     await this.conversationLoadRecoveryCoordinator.loadConversation(id, options);
+    await this.refreshZCodeCatalogForCurrentConversation();
     this.refreshModifiedFilesSidebar();
     this.conversationSessionRailCoordinator.refresh(this.messagesShellEl);
     await this.childSessionGraphCoordinator.refreshGraph();
+  }
+
+  private async refreshZCodeCatalogForCurrentConversation(): Promise<void> {
+    if (this.currentConversation?.backend !== 'zcode' || !getConversationBackendSessionId(this.currentConversation)) return;
+    try {
+      await recoverEmptyZCodeConversationSession({
+        conversation: this.currentConversation,
+        getCurrentConversation: () => this.currentConversation,
+        getAdapter: () => {
+          const adapter = this.plugin.agentServiceRegistry?.get('zcode') as {
+            recreateDeferredSessionIfMissing?(sessionId: string): Promise<string | null>;
+          } | undefined;
+          return typeof adapter?.recreateDeferredSessionIfMissing === 'function'
+            ? adapter as { recreateDeferredSessionIfMissing(sessionId: string): Promise<string | null> }
+            : null;
+        },
+        saveConversation: (conversation) => this.plugin.saveConversation(conversation),
+      });
+    } catch {
+      // A non-session-missing native failure must not manufacture a new id.
+      // The regular catalog/readback path below will surface it honestly.
+    }
+    await this.chatSelectionControlsCoordinator.reloadModelCatalog();
+    await this.chatSelectionControlsCoordinator.refreshZCodeSessionState();
+    await this.backgroundTaskInlinePanelRenderer.watchNativeTasks(
+      this.currentConversation,
+      this.getActiveTabId(),
+    );
   }
 
   private wireBackendSurfaceSwitch(): void {
@@ -3699,10 +3847,10 @@ export class OpenCodianView extends ItemView {
   private async applyActiveBackendConversationSurface(activeBackend: AgentBackendKind): Promise<void> {
     this.chatHeaderPresenter.refreshBackendChrome();
     this.chatHeaderPresenter.applyLocaleTexts();
-    this.refreshComposerToolbarForActiveBackend();
     void this.chatHeaderPresenter.refreshServerStatusBadge();
 
     if ((this.currentConversation?.backend ?? 'opencode') === activeBackend) {
+      this.refreshComposerToolbarForActiveBackend();
       return;
     }
 
@@ -3718,10 +3866,12 @@ export class OpenCodianView extends ItemView {
 
     if (targetConversation) {
       await this.loadConversation(targetConversation.id);
+      this.refreshComposerToolbarForActiveBackend();
       return;
     }
 
     await this.createConversationInCurrentTab();
+    this.refreshComposerToolbarForActiveBackend();
   }
 
   private refreshComposerToolbarForActiveBackend(): void {
@@ -4012,12 +4162,26 @@ export class OpenCodianView extends ItemView {
       title?: string;
       titleGenerationStatus?: 'pending' | 'success' | 'failed';
     },
+    requireNativeReadback = false,
   ): Promise<void> {
     const conversation = await this.plugin.getConversationById(conversationId, {
       preferCache: true,
     });
     if (!conversation) {
       return;
+    }
+
+    const backendSessionId = typeof update.title === 'string'
+      ? getConversationBackendSessionId(conversation)
+      : null;
+    const backend = backendSessionId && this.plugin.agentServiceRegistry
+      ? getConversationSessionBackendService(this.plugin.agentServiceRegistry, conversation)
+      : null;
+    if (requireNativeReadback && conversation.backend === 'zcode') {
+      if (!backendSessionId || !backend) {
+        throw new Error('ZCode session rename requires an active native session.');
+      }
+      await backend.updateSessionTitle(backendSessionId, update.title ?? '');
     }
 
     if (typeof update.title === 'string') {
@@ -4037,11 +4201,7 @@ export class OpenCodianView extends ItemView {
     this.conversationSessionRailCoordinator.refresh(this.messagesShellEl);
 
     if (typeof update.title === 'string') {
-      const backendSessionId = getConversationBackendSessionId(conversation);
-      const backend = this.plugin.agentServiceRegistry
-        ? getConversationSessionBackendService(this.plugin.agentServiceRegistry, conversation)
-        : null;
-      if (backendSessionId && backend) {
+      if (backendSessionId && backend && !(requireNativeReadback && conversation.backend === 'zcode')) {
         try {
           await backend.updateSessionTitle(backendSessionId, conversation.title);
         } catch (error) {
@@ -4433,6 +4593,12 @@ export class OpenCodianView extends ItemView {
     return this.normalizeEffortVariantForCurrentBackend(this.currentVariant);
   }
 
+  private getEffortStoreKey(modelRef: string): string {
+    return this.currentConversation?.backend === 'zcode'
+      ? `zcode:${this.currentConversation.id}:${modelRef}`
+      : modelRef;
+  }
+
   /**
    * Push a new reasoning-effort value into the live Codex adapter so that
    * subsequent thread creation/resume uses the updated level.
@@ -4598,7 +4764,26 @@ export class OpenCodianView extends ItemView {
       const responded = await this.permissionInlineCardRenderer.collectAndRespond(
         request,
         tabId,
-        (requestId, reply) => this.plugin.openCodeService.respondToPermission(requestId, reply),
+        (requestId, reply) => {
+          const conversation = this.getConversationForTab(tabId);
+          if (conversation?.backend === 'zcode') {
+            const adapter = this.plugin.agentServiceRegistry?.get('zcode') as {
+              respondToPermission?(id: string, decision: typeof reply): Promise<void>;
+            } | undefined;
+            if (!adapter?.respondToPermission) throw new Error('ZCode permission responder unavailable.');
+            return adapter.respondToPermission(requestId, reply);
+          }
+          return this.plugin.openCodeService.respondToPermission(requestId, reply);
+        },
+        this.getConversationForTab(tabId)?.backend === 'zcode'
+          ? async () => {
+              const adapter = this.plugin.agentServiceRegistry?.get('zcode') as {
+                getPendingPermissions?(): Promise<Array<{ id: string; sessionID: string }>>;
+              } | undefined;
+              const pending = await adapter?.getPendingPermissions?.() ?? [];
+              return pending.some((entry) => entry.id === request.id && entry.sessionID === request.sessionID);
+            }
+          : undefined,
       );
       if (!responded) {
         logger.error('No streaming message element found for permission card');

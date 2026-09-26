@@ -19,8 +19,22 @@ export type QuestionResolutionExecutionAction =
     };
 
 export interface QuestionResolutionExecutionFacadeHost {
-  replyToQuestion(requestId: string, answers: string[][]): Promise<void>;
-  rejectQuestion(requestId: string): Promise<void>;
+  replyToQuestion(
+    requestId: string,
+    answers: string[][],
+    context?: QuestionResolutionRequestRoute,
+  ): Promise<void>;
+  rejectQuestion(requestId: string, context?: QuestionResolutionRequestRoute): Promise<void>;
+}
+
+/**
+ * Stable origin identity for a question action.  The reply must remain bound
+ * to the tab and native session that produced the request, even if the user
+ * switches tabs or backends while the card is on screen.
+ */
+export interface QuestionResolutionRequestRoute {
+  tabId: TabId | null;
+  request: QuestionRequest;
 }
 
 export interface QuestionResolutionExecutionLifecyclePort {
@@ -76,12 +90,14 @@ export class QuestionResolutionExecutionFacade {
 
   async execute(
     action: QuestionResolutionExecutionAction,
+    tabId: TabId | null = null,
   ): Promise<QuestionResolution | null> {
     try {
+      const context: QuestionResolutionRequestRoute = { tabId, request: action.request };
       if (action.type === 'reply') {
-        await this.host.replyToQuestion(action.request.id, action.answers);
+        await this.host.replyToQuestion(action.request.id, action.answers, context);
       } else {
-        await this.host.rejectQuestion(action.request.id);
+        await this.host.rejectQuestion(action.request.id, context);
       }
 
       return action.resolution;
@@ -96,7 +112,7 @@ export class QuestionResolutionExecutionFacade {
     action: QuestionResolutionExecutionAction,
     context: QuestionResolutionApplyContext,
   ): Promise<boolean> {
-    const resolution = await this.execute(action);
+    const resolution = await this.execute(action, context.tabId);
     if (!resolution) {
       return false;
     }

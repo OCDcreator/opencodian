@@ -29,6 +29,7 @@ describe('SETTINGS_PRIMARY_TABS', () => {
       'claude-code',
       'codex',
       'pi',
+      'zcode',
       'server',
       'model',
       'conversation',

@@ -8,6 +8,7 @@ import {
   resolveCodexModelCatalogFromAdapter,
 } from '../../../core/agents/backend/BackendModelCatalog';
 import type { PiAdapter } from '../../../core/agents/backend/pi/PiAdapter';
+import type { ZCodeAdapter } from '../../../core/agents/backend/zcode';
 import type { ResolvedModelSelection } from '../../../core/config/modelConfig';
 import { VIEW_TYPE_OPENCODIAN } from '../../../core/types/chat';
 import type { ClaudeCodePermissionMode } from '../../../core/types/settings';
@@ -44,12 +45,16 @@ import {
   createClaudeCodePermissionConfig,
   createCodexSandboxConfig,
   createOpenCodePermissionConfig,
+  createZCodeModeConfig,
   PermissionModeSelectorCoordinator,
 } from './PermissionModeSelectorCoordinator';
 import { bindPiModelSelection } from './PiModelSelectionBinding';
 import { SandboxConfigBadgeCoordinator } from './SandboxConfigBadgeCoordinator';
+import { bindZCodeModelSelection } from './ZCodeModelSelectionBinding';
 
 export interface ChatSelectionControlsCoordinatorHost extends ModelSelectionRuntimeHost {
+  /** Conversation owned by this toolbar, even when a Markdown leaf has focus. */
+  getOwnConversation?(): { backend?: string; backendSessionId?: string } | null;
   registerEscapeHandler(handler: () => boolean): void;
   /** Obsidian app, used to resolve local provider icon resource paths. */
   getApp(): App;
@@ -74,6 +79,7 @@ let modelSelectorInstanceSequence = 0;
 const CLAUDE_CODE_PERMISSION_MODES: readonly ClaudeCodePermissionMode[] = [
   'default', 'acceptEdits', 'bypassPermissions', 'plan',
 ];
+const ZCODE_PLAN_READBACK_UNAVAILABLE = 'plan-requested-readback-unavailable';
 
 interface LiveOpenCodianPlugin {
   settings?: {
@@ -114,6 +120,7 @@ interface ActiveCodexView {
   getViewType?(): string;
   currentConversation: {
     backend?: string;
+    backendSessionId?: string;
     sessionSettings?: Record<string, unknown>;
     updatedAt?: number;
   };
@@ -310,6 +317,12 @@ export class ChatSelectionControlsCoordinator {
   private readonly modelSelectionRuntime: ModelSelectionRuntime;
   private readonly modelSelectorInstanceId = 'opencodian-model-selector-' + modelSelectorInstanceSequence++;
   private permissionSelector: PermissionModeSelectorCoordinator | null = null;
+  /**
+   * Local per-session presentation state. ZCode exposes its base mode in
+   * snapshots but omits the independent plan flag, so a successfully accepted
+   * plan request must not be overwritten by a later `build` projection.
+   */
+  private readonly zcodeModeBySession = new Map<string, string>();
   private readonly additionalDirectoriesBadge: AdditionalDirectoriesConfigBadgeCoordinator;
   private additionalDirectoriesBadgeContainer: HTMLElement | null = null;
   private readonly sandboxBadge: SandboxConfigBadgeCoordinator;
@@ -341,10 +354,13 @@ export class ChatSelectionControlsCoordinator {
   constructor(
     private readonly host: ChatSelectionControlsCoordinatorHost,
   ) {
-    this.modelSelectionRuntime = new ModelSelectionRuntime(bindPiModelSelection(wrapHostForCodex(host), () =>
+    this.modelSelectionRuntime = new ModelSelectionRuntime(bindZCodeModelSelection(bindPiModelSelection(wrapHostForCodex(host), () =>
       readActiveBackendFromPlugin() === 'pi'
         ? readOpenCodianPlugin()?.agentServiceRegistry?.get?.('pi') as PiAdapter ?? null
-        : null));
+        : null), () =>
+      this.getSelectionBackend() === 'zcode'
+        ? readOpenCodianPlugin()?.agentServiceRegistry?.get?.('zcode') as ZCodeAdapter ?? null
+        : null, () => this.getZCodeSessionId()));
     // Permission selector is created per-build in buildBackendPermissionSelector()
     // because the mode system depends on the active backend.
     this.additionalDirectoriesBadge = new AdditionalDirectoriesConfigBadgeCoordinator();
@@ -383,6 +399,22 @@ export class ChatSelectionControlsCoordinator {
     this.updateModelSelectorDisplay();
   }
 
+  async refreshZCodeSessionState(): Promise<void> {
+    if (this.getSelectionBackend() !== 'zcode') return;
+    await this.refreshZCodeMode();
+  }
+
+  private getSelectionBackend(): string {
+    return this.host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin();
+  }
+
+  private getZCodeSessionId(): string | null {
+    const conversation = this.host.getOwnConversation
+      ? this.host.getOwnConversation()
+      : getActiveCodexView()?.currentConversation;
+    return conversation?.backend === 'zcode' ? conversation.backendSessionId ?? null : null;
+  }
+
   hasLoadedModelCatalog(): boolean {
     return this.modelSelectionRuntime.hasLoadedModelCatalog();
   }
@@ -413,7 +445,11 @@ export class ChatSelectionControlsCoordinator {
     provider: string | undefined,
     model: string | undefined,
   ): Promise<boolean> {
-    if (!this.modelSelectionRuntime.hasLoadedModelCatalog()) {
+    // A startup or restored-session probe can complete before the native
+    // backend exposes its catalog. Treat an empty snapshot as retryable at
+    // send time instead of making the first empty result permanent.
+    if (!this.modelSelectionRuntime.hasLoadedModelCatalog()
+      || this.modelSelectionRuntime.getAvailableProviders().length === 0) {
       await this.reloadModelCatalog();
     }
 
@@ -435,6 +471,14 @@ export class ChatSelectionControlsCoordinator {
 
     const current = this.getCurrentSessionModel();
     const resolution = this.getCurrentSessionModelResolution();
+    // The ZCode selector mounts before session/create can supply its native
+    // model. Keep that first paint out of view until a real selection is
+    // observed; otherwise the user briefly sees the false "unconfigured"
+    // state even though the new session has a valid native default.
+    const awaitingZCodeModel = this.getSelectionBackend() === 'zcode'
+      && !current;
+    this.modelSelectorTrigger.style.visibility = awaitingZCodeModel ? 'hidden' : '';
+    this.modelSelectorTrigger.toggleAttribute('aria-hidden', awaitingZCodeModel);
     const modelInfo = this.findKnownModelInfo(current);
     const displayState = buildModelSelectorDisplayState({
       currentSelection: current,
@@ -481,6 +525,10 @@ export class ChatSelectionControlsCoordinator {
 
   updatePermissionTriggerDisplay(): void {
     this.permissionSelector?.updateTriggerDisplay();
+    if (this.getSelectionBackend() === 'zcode') {
+      const sessionId = this.getZCodeSessionId();
+      if (sessionId && !this.zcodeModeBySession.has(sessionId)) void this.refreshZCodeMode();
+    }
     this.syncAdditionalDirectoriesBadge();
     this.syncSandboxBadge();
     this.syncCodexRuntimeDefaultsBadge();
@@ -1252,7 +1300,7 @@ export class ChatSelectionControlsCoordinator {
    * build() invocation with the correct backend active.
    */
   private buildBackendPermissionSelector(containerEl: HTMLElement): void {
-    const activeBackend = readActiveBackendFromPlugin();
+    const activeBackend = this.getSelectionBackend();
 
     if (activeBackend === 'claude-code') {
       const permissionConfig = createClaudeCodePermissionConfig();
@@ -1274,6 +1322,19 @@ export class ChatSelectionControlsCoordinator {
         },
         sandboxConfig,
       );
+    } else if (activeBackend === 'zcode') {
+      this.permissionSelector = new PermissionModeSelectorCoordinator(
+        {
+          getPermissionMode: () => {
+            const sessionId = this.getZCodeSessionId();
+            const mode = sessionId ? this.zcodeModeBySession.get(sessionId) : null;
+            return mode === ZCODE_PLAN_READBACK_UNAVAILABLE ? 'unknown' : mode ?? 'checking';
+          },
+          switchPermissionMode: (mode) => this.switchZCodeMode(mode),
+          restoreInputFocus: () => this.host.restoreComposerInputFocus(),
+        },
+        createZCodeModeConfig(),
+      );
     } else {
       const permissionConfig = createOpenCodePermissionConfig();
       this.permissionSelector = new PermissionModeSelectorCoordinator(
@@ -1287,5 +1348,81 @@ export class ChatSelectionControlsCoordinator {
     }
 
     this.permissionSelector.mount(containerEl);
+    if (activeBackend === 'zcode') void this.refreshZCodeMode();
+  }
+
+  private async refreshZCodeMode(): Promise<void> {
+    const sessionId = this.getZCodeSessionId();
+    if (!sessionId) return;
+    const adapter = readOpenCodianPlugin()?.agentServiceRegistry?.get?.('zcode') as ZCodeAdapter | undefined;
+    const previous = this.zcodeModeBySession.get(sessionId);
+    try {
+      const mode = await adapter?.readSessionMode(sessionId);
+      if (this.getZCodeSessionId() !== sessionId) return;
+      // The official runtime projects an active plan state as base `build`.
+      // Keep only the locally witnessed request marker; never infer plan for a
+      // session we did not observe switching.
+      if (previous === ZCODE_PLAN_READBACK_UNAVAILABLE && (mode === 'build' || mode === null || mode === undefined)) {
+        this.zcodeModeBySession.set(sessionId, ZCODE_PLAN_READBACK_UNAVAILABLE);
+      } else {
+        this.zcodeModeBySession.set(sessionId, mode ?? 'unknown');
+      }
+    } catch {
+      this.zcodeModeBySession.set(sessionId, previous === ZCODE_PLAN_READBACK_UNAVAILABLE
+        ? ZCODE_PLAN_READBACK_UNAVAILABLE
+        : 'unknown');
+    }
+    this.permissionSelector?.updateTriggerDisplay();
+    this.applyZCodePlanReadbackPresentation(sessionId);
+  }
+
+  private async switchZCodeMode(mode: string): Promise<boolean> {
+    const sessionId = this.getZCodeSessionId();
+    if (!sessionId) return false;
+    const adapter = readOpenCodianPlugin()?.agentServiceRegistry?.get?.('zcode') as ZCodeAdapter | undefined;
+    try {
+      if (!adapter) return false;
+      await adapter.setSessionMode(sessionId, mode);
+      const effective = await adapter.readSessionMode(sessionId);
+      if (this.getZCodeSessionId() !== sessionId) return false;
+      if (mode === 'plan' && effective === 'build') {
+        this.zcodeModeBySession.set(sessionId, ZCODE_PLAN_READBACK_UNAVAILABLE);
+        this.permissionSelector?.updateTriggerDisplay();
+        this.scheduleZCodePlanReadbackPresentation(sessionId);
+        return true;
+      }
+      if (effective !== mode) return false;
+      this.zcodeModeBySession.set(sessionId, effective);
+      this.permissionSelector?.updateTriggerDisplay();
+      return true;
+    } catch {
+      new Notice(t('chat.zcode.mode.notConfirmed'));
+      await this.refreshZCodeMode();
+      return false;
+    }
+  }
+
+  /**
+   * Render the only honest plan result ZCode 0.16.9 gives us: request accepted
+   * while the upstream snapshot lacks an independent effective-plan field.
+   */
+  private applyZCodePlanReadbackPresentation(sessionId: string): void {
+    if (this.zcodeModeBySession.get(sessionId) !== ZCODE_PLAN_READBACK_UNAVAILABLE) return;
+    if (this.getZCodeSessionId() !== sessionId) return;
+    const trigger = this.toolbarEl?.querySelector<HTMLElement>('.opencodian-permission-trigger');
+    const text = trigger?.querySelector<HTMLElement>('.opencodian-permission-trigger-text');
+    if (!trigger || !text) return;
+    text.textContent = t('chat.zcode.mode.plan.requestAcceptedReadbackUnavailable');
+    trigger.setAttribute('title', t('chat.zcode.mode.plan.requestAcceptedReadbackUnavailable.description'));
+    trigger.addClass('mode-plan-requested-readback-unavailable');
+  }
+
+  /**
+   * The generic selector refreshes itself after its host promise resolves.
+   * Apply the ZCode-only presentation one turn later without changing that
+   * shared selector's cross-backend contract.
+   */
+  private scheduleZCodePlanReadbackPresentation(sessionId: string): void {
+    window.setTimeout(() => this.applyZCodePlanReadbackPresentation(sessionId), 0);
   }
 }

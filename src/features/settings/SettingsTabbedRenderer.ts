@@ -42,6 +42,7 @@ import { SettingsStyleSection } from './SettingsStyleSection';
 import { refreshSettingsTabbedHeader } from './SettingsTabbedHeader';
 import { SettingsToolSection } from './SettingsToolSection';
 import { SettingsUiSection } from './SettingsUiSection';
+import { SettingsZCodeSection } from './SettingsZCodeSection';
 
 interface SettingHelpButtonConfig {
   tooltip: string;
@@ -181,6 +182,7 @@ export class SettingsTabbedRenderer {
       },
     });
     if (activePrimaryId === 'pi') new SettingsPiSection(this.deps.plugin).attachTabbed(contentEl, activeSecondaryId);
+    else if (activePrimaryId === 'zcode') new SettingsZCodeSection(this.deps.plugin).attachTabbed(contentEl, activeSecondaryId);
     else this.renderContent(contentEl, activePrimaryId, activeSecondaryId);
   }
 

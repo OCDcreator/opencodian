@@ -23,6 +23,7 @@ jest.mock('../../../../src/core/opencode', () => ({
   },
 }));
 
+import { AgentCapability } from '../../../../src/core/agents/AgentCapability';
 import type { Conversation } from '../../../../src/core/types';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
@@ -36,6 +37,7 @@ interface ViewInternals {
   };
   createConversationHistoryActionsHost(service: unknown): {
     getConversations(): Conversation[];
+    updateConversationTitle(conversationId: string, title: string): Promise<void>;
   };
   updateConversationTitleState(
     conversationId: string,
@@ -65,6 +67,7 @@ function conversation(id: string, title: string, backend: string): Conversation 
 function createHarness(options: {
   conversations: Conversation[];
   activeBackend?: string;
+  agentServiceRegistry?: unknown;
 }): { view: OpenCodianView; internals: ViewInternals; saveConversation: jest.Mock } {
   const saveConversation = jest.fn().mockResolvedValue(undefined);
   const view = new OpenCodianView(new WorkspaceLeaf(), {
@@ -77,6 +80,7 @@ function createHarness(options: {
     },
     openCodeService: {},
     storage: {},
+    agentServiceRegistry: options.agentServiceRegistry,
     getConversations: () => options.conversations,
     saveConversation,
     getConversationById: async (id: string) =>
@@ -145,6 +149,30 @@ describe('OpenCodianView session rail behaviour (R-F5)', () => {
 
     expect(saveConversation).toHaveBeenCalled();
     expect(railItemTitles()).toEqual(['New title']);
+  });
+
+  it('saves a manual ZCode title only after native rename succeeds', async () => {
+    const item = conversation('z', 'Old title', 'zcode');
+    item.backendSessionId = 'sess_z';
+    const updateSessionTitle = jest.fn().mockRejectedValueOnce(new Error('native mismatch'))
+      .mockResolvedValueOnce(undefined);
+    const { internals, saveConversation } = createHarness({
+      conversations: [item],
+      activeBackend: 'zcode',
+      agentServiceRegistry: { get: () => ({
+        hasCapability: (capability: AgentCapability) => capability === AgentCapability.Sessions,
+        updateSessionTitle,
+      }) },
+    });
+    const host = internals.createConversationHistoryActionsHost({});
+    await expect(host.updateConversationTitle('z', 'New title')).rejects.toThrow('native mismatch');
+    expect(item.title).toBe('Old title');
+    expect(saveConversation).not.toHaveBeenCalled();
+
+    await host.updateConversationTitle('z', 'New title');
+    expect(updateSessionTitle).toHaveBeenCalledWith('sess_z', 'New title');
+    expect(item.title).toBe('New title');
+    expect(saveConversation).toHaveBeenCalledTimes(1);
   });
 
   it('refreshes the rail from the finally block when a single-conversation delete throws', async () => {

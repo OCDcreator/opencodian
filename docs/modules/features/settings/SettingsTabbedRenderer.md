@@ -71,3 +71,5 @@ Tabbed plugin 内容创建 `SettingsPluginSection` 后，必须通过 `setPlugin
 ## R-C2 扩展
 
 2026-09-18 `renderConversationContent` 追加 `SettingsImageGenerationSection.attachTabbed`（随二级 tab `image-generation` 显隐）。
+
+2026-09-22 zcode 主页签路由 `SettingsZCodeSection.attachTabbed`（与 pi 同模式）。

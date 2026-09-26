@@ -51,3 +51,5 @@
 Pi 加入已实现后端选择。仅启用 Pi 时挂载独立 SettingsPiSection，既有启停逻辑不变。
 
 2026-09-09：通用智能体页只负责启停/默认后端，移除内联Pi配置；Pi配置在独立后端标签。
+
+2026-09-22：ZCode 加入已实现后端选择（`settings.agent.name.zcode` / `settings.agent.zcode.desc`）；启用/禁用不影响其他后端的启停语义。

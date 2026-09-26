@@ -93,6 +93,37 @@ describe('ContextDetailModal', () => {
     expect(modal.contentEl.classList.contains('opencodian-context-detail-modal-content')).toBe(false);
   });
 
+  it('shows the model that actually produced ZCode usage when the next-turn selection differs', () => {
+    const { contextState, conversation } = createValidContext();
+    const modal = new ContextDetailModal({} as App, {
+      conversation: { ...conversation, backend: 'zcode' },
+      contextState: {
+        ...contextState,
+        provider: 'krill',
+        model: 'gpt-6-sol',
+        billingUsage: {
+          requestIds: ['request-1'],
+          providerId: 'opencode-go',
+          modelId: 'gpt-5.6-luna',
+          inputTokens: 100,
+          outputTokens: 10,
+          reasoningTokens: 0,
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
+        },
+      },
+    });
+
+    modal.onOpen();
+
+    const values = [...modal.contentEl.querySelectorAll('.opencodian-context-modal-value')]
+      .map((element) => element.textContent);
+    expect(values).toContain('opencode-go');
+    expect(values).toContain('gpt-5.6-luna');
+    expect(values).not.toContain('krill');
+    modal.onClose();
+  });
+
   it('keeps cumulative OpenCode session details visible when current context is unavailable', () => {
     const contextState = ContextUsageService.applyUsageSnapshot(
       createEmptyTabContextState(),

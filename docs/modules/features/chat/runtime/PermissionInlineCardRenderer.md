@@ -26,4 +26,6 @@
 - `session` 是 UI 返回值；renderer 在本地按 tool + action + 完整 pattern set 记录 session-scoped approval，并把实际 wire reply 交给 responder 的 `always` 路径
 - `patterns === ['*']` 时仍保持不渲染 pattern 区块的旧行为
 - Permission card root 设置 `data-permission-card="true"`，四个操作按钮分别设置 `data-permission-action="once|always|session|reject"`，供自动化测试和诊断探针稳定定位卡片与操作
+- 卡片标题使用 Lucide shield-alert 图标；权限、问题、通知和后台任务卡共享聊天卡片的单层边框与紧凑按钮层级，警示语义仍由文字与状态色共同呈现。
+- ZCode 卡片可接入原 requestId/sessionId 的待决读回；超时、取消或进程断开使原生 ask 消失后，500ms 内结束等待，保留无按钮的 `data-state="terminal"` 卡片并明确说明未批准。其他后端不传此读回函数，保持原流程。
 - 不要在这里重复实现 streaming shell 查询或 reveal 逻辑，统一继续走 `StreamingInlineCardRenderer`

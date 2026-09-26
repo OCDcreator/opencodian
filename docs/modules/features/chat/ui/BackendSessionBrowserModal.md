@@ -18,8 +18,8 @@ Obsidian Modal，用于浏览、查看详情、恢复、分叉、归档和取消
 - 点击 "Resume in chat" 后通过 host 创建 conversation 并加载
 - Preview 模式下，根据 active backend 的能力集合和所选 session 的归档状态显示生命周期按钮：
   - `Fork`：当 backend 声明 `AgentCapability.Fork` 且选中的是非归档 session 时显示
-  - `Archive`：当 backend 声明 `AgentCapability.Sessions` 且选中的是非归档 session 时显示；点击调用 `archiveBackendSession()`，成功后刷新列表
-  - `Unarchive`：当 backend 声明 `AgentCapability.Sessions` 且选中的是归档 session 时显示；点击调用 `unarchiveBackendSession()`，成功后刷新列表
+  - `Archive`：当 backend 声明 `AgentCapability.Sessions`、实际提供 `archiveSession()` 且选中的是非归档 session 时显示；点击调用 `archiveBackendSession()`，成功后刷新列表
+  - `Unarchive`：当 backend 声明 `AgentCapability.Sessions`、实际提供 `unarchiveSession()` 且选中的是归档 session 时显示；点击调用 `unarchiveBackendSession()`，成功后刷新列表。ZCode 没有原生归档方法，不能只凭通用 Sessions 能力显示无效按钮
 - 归档的 session 在列表项上渲染 `Archived` badge（`.opencodian-backend-session-browser-item-archived`），并添加 `.is-archived` 类以视觉区分
 - 列表同时加载 active backend 的活跃与归档 sessions；对于 Codex，这通过 `CodexAdapter.listSessions()` 同时请求 `thread/list archived=false` 与 `thread/list archived=true` 并合并实现
 
@@ -68,5 +68,5 @@ Obsidian Modal，用于浏览、查看详情、恢复、分叉、归档和取消
 - Detail transcript 对所有 part 类型诚实渲染：text 直接展示，非 text 用 collapsed `<details>` + `[type]` summary
 - Preview 跳过纯非 text 消息以避免空白行；detail 不跳过非 text 内容，确保 "Full Transcript" 名副其实
 - 当 `forcedBackendKind` 指定但 registry 中该 backend 未注册或未启用时，modal 会显示空列表（符合预期）
-- 生命周期按钮的可见性由 active backend 的 capability 集合和所选 session 的 `archived` 状态共同决定；不再由 host 显式传入
+- 生命周期按钮的可见性由 active backend 的 capability、对应原生方法是否存在及所选 session 的 `archived` 状态共同决定；不再由 host 显式传入
 - 列表必须同时返回归档与非归档 sessions，否则 `Unarchive` 按钮无法通过真实 UI 路径触发；Codex 适配器通过两次 `thread/list` 调用来满足这一点

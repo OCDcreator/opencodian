@@ -1,5 +1,7 @@
 # AgentAuxQueryCapability
 
+> 2026-09-24: `BackendModelSelection` 增加 ZCode 的 provider/model/reasoningLevel 引用，供隔离文本补全协议模块保留原生身份；不代表通用 ZCode AuxQuery 已开放。其能力仍需私有 app-server 存储、有效工具读回、图片和无写入审计。
+
 > **源码**: `src/core/agents/backend/AgentAuxQueryCapability.ts`
 > **状态**: [REVIEW]
 

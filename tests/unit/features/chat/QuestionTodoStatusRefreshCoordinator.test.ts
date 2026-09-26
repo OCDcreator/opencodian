@@ -253,6 +253,19 @@ describe('QuestionTodoStatusRefreshCoordinator', () => {
   });
 
   describe('non-OpenCode backend guard', () => {
+    it('refreshes ZCode pending questions from the owning native session on activation and post-sync', async () => {
+      const host = createHost({ backend: 'zcode' });
+      const coordinator = new QuestionTodoStatusRefreshCoordinator(host);
+
+      await coordinator.refreshAfterActivation('tab-z', 'sess-z');
+      await coordinator.refreshAfterPostSync({
+        tabId: 'tab-z', questionSessionId: 'sess-z', todoStatusSessionId: null,
+      });
+
+      expect(host.refreshPendingQuestionsForTab).toHaveBeenCalledTimes(2);
+      expect(host.refreshPendingQuestionsForTab).toHaveBeenCalledWith('tab-z', 'sess-z');
+    });
+
     it('skips pending-questions REST poll for non-OpenCode activation', async () => {
       const host = createHost({ backend: 'claude-code' });
       const coordinator = new QuestionTodoStatusRefreshCoordinator(host);

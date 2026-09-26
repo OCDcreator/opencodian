@@ -1,5 +1,7 @@
 # Chat Assistant Styles
 
+2026-09-26：聊天内联卡片沿用同一套 Obsidian card 变量（背景、边框、圆角、阴影），后台任务、权限与问题卡的状态以图标、文字和操作层级表达。样式需与真实聊天 DOM 及对应渲染模块一同验收。
+
 2026-09-18（R-C1）：`.opencodian-composer-context-chip.is-vault-retrieval` 与 `.opencodian-context-chip-origin-badge`——整库检索注入 chips 的“检索”徽标样式（accent 18% 混色、6px 圆角、10px/600 字重小标签；composer chips 与已发送用户消息的附件 chips 共用）。
 
 2026-09-17：`.opencodian-input-area` 基础规则与 `.opencodian-input` 改读可调变量：输入面板左右留白 `--opencodian-composer-inset-x`（默认 0，原为硬编码 0）、下方留白 `--opencodian-composer-inset-y`（默认 12，原为 `--opencodian-chat-edge-gap`）、文字区 `max-height: var(--opencodian-composer-max-height, 240px)`（原仅 JS 硬编码 240）。

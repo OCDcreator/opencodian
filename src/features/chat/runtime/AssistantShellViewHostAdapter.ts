@@ -436,6 +436,11 @@ export class AssistantShellViewHostAdapter {
   }
 
   private getStoredToolStatus(block: ContentBlock): ToolCallInfo['status'] {
+    // Persisted stream blocks already carry the terminal result. Recomputing
+    // from a sanitized result string must not turn a native failure green.
+    if (block.toolStatus === 'error') {
+      return 'error';
+    }
     return resolveToolExecutionStatus({
       toolName: block.toolName,
       storedStatus: block.toolStatus,

@@ -481,3 +481,6 @@ New normalize functions added:
 > 2026-09-18 (R-C3)：新增 `inlineCompletionEnabled`（默认 `false`）与 `inlineCompletionMaxChars`（默认 `300`，clamp 50–2000，`normalizeInlineCompletionMaxChars`）；`DEFAULT_SETTINGS` 同步。
 
 > 2026-09-19 (R-C3 补全专用模型覆盖)：新增 `inlineCompletionModelOverrides: Partial<Record<AgentBackendKind, string>>`（默认 `{}`），值格式与 `inlineEditModelOverrides` 完全一致；归一化经 `normalizeInlineCompletionModelOverrides()`（委托同一实现，独立命名保持两条设置各自可检索）。补全延迟敏感——模型首字节之前 ghost text 无法出现——该设置允许为补全单独钉一个低延迟模型而不动行内编辑；空映射 = 继承既有解析链（默认行为逐字节不变）。
+
+> 2026-09-22 (ZCode 票 01)：`BackendSettings` 增加 `zcode: ZCodeBackendSettings`（最小运行时选择：仅 `executablePath` 覆盖，空=自动发现官方安装）；`normalizeZCodeBackendSettings` 归一化缺失/非法值，`getDefaultBackendSettings` 同步。
+> 2026-09-24 (票 06)：ZCodeBackendSettings 增加持久化默认 model（providerId/modelId）/thinkingLevel/mode（枚举归一 plan/build/edit/yolo/auto，非法归空）；normalizeZCodeBackendSettings 同步。

@@ -1,4 +1,4 @@
-import { Notice } from 'obsidian';
+import { Notice, setIcon } from 'obsidian';
 
 import type { QuestionDisplayMode, QuestionRequest } from '../../../core/types';
 import { t } from '../../../i18n';
@@ -13,6 +13,7 @@ export interface QuestionInlineCardRendererHost {
   getActiveTabId(): TabId | null;
   getTabRuntimeState(tabId: TabId | null): QuestionInlineCardRuntimeState | null;
   keepQuestionCardPinnedToBottom(tabId: TabId | null): void;
+  isRequestPending?(request: QuestionRequest, tabId: TabId | null): Promise<boolean>;
 }
 
 export type QuestionInlineCardAction =
@@ -47,9 +48,22 @@ export class QuestionInlineCardRenderer {
     displayMode: QuestionDisplayMode,
     tabId: TabId | null = this.host.getActiveTabId(),
   ): Promise<QuestionInlineCardAction | null> {
-    return displayMode === 'single'
+    const action = displayMode === 'single'
       ? this.collectSequentialQuestionAction(request, tabId)
       : this.collectGroupedQuestionAction(request, tabId);
+    if (!this.host.isRequestPending) return action;
+    let timer: number | null = null;
+    const lost = new Promise<null>((resolve) => {
+      timer = window.setInterval(() => {
+        void this.host.isRequestPending?.(request, tabId).then((pending) => {
+          if (!pending) resolve(null);
+        }).catch(() => { /* An uncertain read cannot dismiss the card. */ });
+      }, 500);
+    });
+    const result = await Promise.race([action, lost]);
+    if (timer !== null) window.clearInterval(timer);
+    if (!result) this.clear(tabId);
+    return result;
   }
 
   getOrCreateCard(
@@ -257,7 +271,8 @@ export class QuestionInlineCardRenderer {
 
   private renderQuestionHeader(questionCard: HTMLElement, progressText: string | null = null): void {
     const headerEl = questionCard.createDiv({ cls: 'opencodian-question-inline-header' });
-    headerEl.createSpan({ cls: 'opencodian-question-inline-icon', text: '?' });
+    const iconEl = headerEl.createSpan({ cls: 'opencodian-question-inline-icon', attr: { 'aria-hidden': 'true' } });
+    setIcon(iconEl, 'circle-help');
     headerEl.createSpan({
       cls: 'opencodian-question-inline-title',
       text: t('chat.question.title'),

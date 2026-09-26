@@ -1,5 +1,15 @@
 # ChatSelectionControlsCoordinator
 
+Send-time model validation retries a loaded but empty catalog. A restored ZCode
+session can briefly return an empty catalog during startup; that first snapshot
+does not permanently block sends once the native catalog becomes available.
+
+The ZCode model trigger stays hidden while the initial native catalog/current model is unobserved, avoiding a false first-paint "Unconfigured" label. It becomes visible when the session's native model selection arrives; the deferred `session/read` failure no longer discards the `session/create` snapshot.
+
+2026-09-25 侧栏焦点修复：ZCode 模型和模式控件从创建该 toolbar 的 OpenCodianView 宿主读取当前 conversation/session，而非从 `workspace.activeLeaf` 猜测。用户焦点停在 Markdown 叶子但侧栏聊天可见时，模式点击仍须向该侧栏的原生 session 发请求；等待读回期间若本视图切换会话，旧结果不得写到新会话。其他后端原有的活动叶子路由不变。
+
+> 2026-09-25（当前读回）：ZCode 模式控件按活动会话 `backendSessionId` 读取、设置、再读回；失败保留原有效模式，不调用 OpenCode 权限模板或重启服务。`session/read` 只投影基础 `build`，但同会话 `session/events` 的 `session.updated` 可提供独立 `planEnabled`；有匹配的原生事件才显示确认的 Plan，否则显示「计划已请求 · 状态不可读回」。模型/提供商走 ZCode 实时目录。模型 `reasoningLevel` 与 `thoughtLevel` 有不同原生入口和读回字段；当前 ZCode 3.14.3 Test Vault 实测写 `thoughtLevel` 时两者有效值同步，不能把分字段误写成值互不影响。
+
 > **源码**: `src/features/chat/services/ChatSelectionControlsCoordinator.ts`
 > **状态**: [REVIEW]
 > **Updated**: 2026-07-28 — model selector trigger gains streaming-disable gate; Codex composer selection now targets the active OpenCodian view and persists through the existing session-settings coordinator.
@@ -86,3 +96,4 @@ export class ChatSelectionControlsCoordinator {
 ## 2026-09-08 Pi 独立服务接入
 
 在原有 Codex host 外组合 bindPiModelSelection；Pi 模型目录与选择策略由独立绑定模块负责，非 Pi 委托原有 host。
+> 2026-09-24 (票 06)：协调器在 pi 绑定外再包一层 bindZCodeModelSelection——仅当活动后端为 zcode 时接管模型选择器（实时目录 + 每模型 reasoning 档位 variants），其余后端语义不变。

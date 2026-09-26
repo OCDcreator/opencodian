@@ -69,3 +69,4 @@ Pi backend key 返回空目录，不展示 OpenCode 命令，也不触发 OpenCo
 ## R-C2 扩展
 
 2026-09-18 `SYNTHETIC_BUILTIN_COMMAND_IDS` 新增 `'image'`（菜单显示 `/image`，描述 key `slashCommand.image.description`）。
+> 2026-09-24 (票 06)：新增 loadZCodeRuntimeCommands 宿主口与 zcode 后端分支——ZCode 斜杠命令（快照目录）归一为既有 / 自动补全条目形态；getBackendKey 分区自然失效，与 pi 分支同语义。

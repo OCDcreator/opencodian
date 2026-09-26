@@ -79,7 +79,8 @@ export interface QuestionDockCoordinatorHost {
   getTabRuntimeState(tabId: TabId | null): QuestionDockRuntimeState | null;
   ensureTabRuntimeState(tabId: TabId | null): QuestionDockRuntimeState | null;
   getSessionIdForTab(tabId: TabId | null): string | null | undefined;
-  getPendingQuestions(): Promise<QuestionRequest[]>;
+  isPendingQuestionReadAuthoritative(tabId?: TabId | null): boolean;
+  getPendingQuestions(tabId?: TabId | null): Promise<QuestionRequest[]>;
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
 }
 
@@ -152,17 +153,21 @@ export class QuestionDockCoordinator {
     }
 
     try {
-      const pendingRequests = await this.host.getPendingQuestions();
+      const pendingRequests = await this.host.getPendingQuestions(tabId);
       if (options.isCurrent && !options.isCurrent()) {
         return runtime.pendingQuestionRequests;
       }
       const sessionRequests = pendingRequests.filter(
         (request) => request.sessionId === sessionId,
       );
-      const mergedRequests = this.mergePendingQuestionRequests(runtime, sessionRequests);
+      const authoritativeRead = this.host.isPendingQuestionReadAuthoritative(tabId);
+      const mergedRequests = this.mergePendingQuestionRequests(runtime, sessionRequests, {
+        preserveWaiterOwnedRequests: !authoritativeRead,
+      });
       return this.commitPendingQuestionRequests(runtime, tabId, mergedRequests, {
         pruneInactiveState: true,
         pruneResolvedQuestionRequestIdsFrom: sessionRequests,
+        ...(authoritativeRead ? { resolveRemovedWaiters: true } : {}),
       });
     } catch (error) {
       logger.debug('Failed to refresh pending questions', error);
@@ -184,7 +189,23 @@ export class QuestionDockCoordinator {
     }
 
     this.enqueuePendingQuestionRequest(request, tabId);
-    await waiter.promise;
+    // ZCode's native ask can disappear when its owned app-server exits while
+    // the dock is waiting. A tab-scoped authoritative read then removes the
+    // stale card and resolves this waiter without requiring a manual refresh.
+    // Callback-only backends are deliberately left alone.
+    const monitor = setInterval(() => {
+      if (!this.host.isPendingQuestionReadAuthoritative(tabId)) return;
+      if (this.host.getSessionIdForTab(tabId) !== request.sessionId) {
+        this.removePendingQuestionRequest(request.id, tabId);
+        return;
+      }
+      void this.refreshPendingQuestionsForTab(tabId, request.sessionId);
+    }, 500);
+    try {
+      await waiter.promise;
+    } finally {
+      clearInterval(monitor);
+    }
     return true;
   }
 
@@ -282,12 +303,17 @@ export class QuestionDockCoordinator {
   private mergePendingQuestionRequests(
     runtime: QuestionDockRuntimeState,
     sessionRequests: readonly QuestionRequest[],
+    options: { preserveWaiterOwnedRequests?: boolean } = {},
   ): QuestionRequest[] {
     const waitingIds = new Set(runtime.questionRequestWaiters.keys());
     const mergedRequests = sessionRequests.filter(
       (request) => !runtime.resolvedQuestionRequestIds.has(request.id),
     );
     const mergedRequestIds = new Set(mergedRequests.map((request) => request.id));
+
+    if (!options.preserveWaiterOwnedRequests) {
+      return mergedRequests;
+    }
 
     for (const existing of runtime.pendingQuestionRequests) {
       if (!waitingIds.has(existing.id) || mergedRequestIds.has(existing.id)) {

@@ -652,8 +652,10 @@ export default class OpenCodianPlugin extends Plugin {
         codexSettings: this.settings.backendSettings.codex,
         codexTracePort: this.codexTraceService,
         getPiSettings: () => this.settings.backendSettings.pi,
+        getZCodeSettings: () => this.settings.backendSettings.zcode,
         getCodexExtraEnv: () => this.getDomainEnvFor('codex'),
         getPiExtraEnv: () => this.getDomainEnvFor('pi'),
+        getZCodeExtraEnv: () => this.getDomainEnvFor('zcode'),
         onPiUiRequest: (request, signal) => presentPiUiRequest(this.app, request, signal),
       });
       this.agentServiceRegistry.setEnabledBackends(this.settings.enabledBackends);
@@ -2698,21 +2700,29 @@ export default class OpenCodianPlugin extends Plugin {
     if (index === -1) return;
 
     const conversation = this.conversations[index];
-    this.conversations.splice(index, 1);
-    this.conversationFullMessageCache.forget(id);
-
     const backendSessionId = getConversationBackendSessionId(conversation);
     const sessionBackend = getConversationSessionBackendService(this.agentServiceRegistry, conversation);
+    if (conversation.backend === 'zcode' && (!backendSessionId || !sessionBackend)) {
+      throw new Error('ZCode session deletion requires the owning backend service.');
+    }
     if (backendSessionId && sessionBackend) {
-      try {
+      if (conversation.backend === 'zcode') {
+        // ZCode's desktop task-index tombstone must be confirmed before the
+        // local copy disappears. Other backends retain their existing cleanup.
         await sessionBackend.deleteSession(backendSessionId);
-      } catch {
-        // Ignore errors
+      } else {
+        try {
+          await sessionBackend.deleteSession(backendSessionId);
+        } catch {
+          // Ignore errors
+        }
       }
     }
 
     // Delete from storage
     await this.storage.deleteConversation(id);
+    this.conversations.splice(index, 1);
+    this.conversationFullMessageCache.forget(id);
   }
 
   private touchConversationFullMessageCache(id: string): void {

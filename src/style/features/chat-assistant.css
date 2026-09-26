@@ -3108,3 +3108,387 @@
     transition: none;
   }
 }
+
+/* Conversation cards share one quiet Obsidian-native Card grammar. Keep risk
+   in the icon, words and action hierarchy instead of tinting whole panels. */
+.opencodian-container {
+  --oc-chat-card-bg: var(--background-primary);
+  --oc-chat-card-border: var(--background-modifier-border);
+  --oc-chat-card-radius: 10px;
+  --oc-chat-card-shadow: 0 2px 8px color-mix(in srgb, var(--text-normal) 7%, transparent);
+}
+
+.opencodian-container :is(
+  .opencodian-permission-inline,
+  .opencodian-question-inline,
+  .opencodian-chat-notice-card,
+  .opencodian-server-action-card,
+  .opencodian-omo-injection,
+  .opencodian-question-dock,
+  .opencodian-session-todo-dock
+) {
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--oc-chat-card-border);
+  border-radius: var(--oc-chat-card-radius);
+  background: var(--oc-chat-card-bg);
+  color: var(--text-normal);
+  box-shadow: var(--oc-chat-card-shadow);
+}
+
+.opencodian-container :is(
+  .opencodian-chat-notice-card.is-warning,
+  .opencodian-chat-notice-card.is-error,
+  .opencodian-chat-notice-card.is-info,
+  .opencodian-chat-notice-card.is-background-task,
+  .opencodian-chat-notice-card.is-background-task.is-inline,
+  .opencodian-chat-notice-card.is-turn-diff,
+  .opencodian-question-inline--resolved,
+  .opencodian-server-action-card.is-starting
+) {
+  border-color: var(--oc-chat-card-border);
+  background: var(--oc-chat-card-bg);
+  box-shadow: var(--oc-chat-card-shadow);
+}
+
+.opencodian-container .opencodian-permission-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-block: 10px;
+}
+
+.opencodian-container :is(.opencodian-permission-inline-header, .opencodian-question-inline-header) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.opencodian-container :is(.opencodian-permission-inline-icon, .opencodian-question-inline-icon) {
+  display: inline-grid;
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+}
+
+.opencodian-container :is(.opencodian-permission-inline-icon, .opencodian-question-inline-icon) svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2;
+}
+
+.opencodian-container :is(.opencodian-permission-inline-title, .opencodian-question-inline-title, .opencodian-chat-notice-title, .opencodian-server-action-title) {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+.opencodian-container .opencodian-permission-inline-info {
+  margin: 0;
+}
+
+.opencodian-container .opencodian-permission-inline-tool {
+  margin: 0 0 3px;
+  color: var(--text-normal);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-container :is(.opencodian-permission-inline-desc, .opencodian-question-inline-body-text, .opencodian-chat-notice-text) {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.5;
+}
+
+.opencodian-container :is(.opencodian-permission-inline-patterns, .opencodian-permission-inline-command) {
+  margin: 0;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--oc-chat-card-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+.opencodian-container .opencodian-permission-inline-command code {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-normal);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-container :is(.opencodian-permission-inline-buttons, .opencodian-question-inline-buttons, .opencodian-server-action-buttons) {
+  display: flex;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--oc-chat-card-border);
+}
+
+.opencodian-container :is(.opencodian-permission-inline-btn, .opencodian-question-inline-btn, .opencodian-server-action-btn, .opencodian-chat-notice-action-btn) {
+  box-sizing: border-box;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid var(--oc-chat-card-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  box-shadow: none;
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+  line-height: 1.35;
+  opacity: 1;
+  transform: none;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.opencodian-container :is(.opencodian-permission-inline-btn, .opencodian-question-inline-btn, .opencodian-server-action-btn, .opencodian-chat-notice-action-btn):hover:not(:disabled) {
+  background: var(--background-modifier-hover);
+  border-color: color-mix(in srgb, var(--text-muted) 45%, var(--oc-chat-card-border));
+  color: var(--text-normal);
+  opacity: 1;
+  transform: none;
+}
+
+.opencodian-container :is(.opencodian-permission-inline-btn, .opencodian-question-inline-btn, .opencodian-server-action-btn, .opencodian-chat-notice-action-btn):focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+.opencodian-container :is(.opencodian-permission-inline-btn, .opencodian-question-inline-btn, .opencodian-server-action-btn, .opencodian-chat-notice-action-btn):disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.opencodian-container :is(.opencodian-permission-inline-once, .opencodian-question-inline-btn.is-submit) {
+  border-color: var(--interactive-accent);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.opencodian-container :is(.opencodian-permission-inline-once, .opencodian-question-inline-btn.is-submit):hover:not(:disabled) {
+  border-color: var(--interactive-accent-hover);
+  background: var(--interactive-accent-hover);
+  color: var(--text-on-accent);
+}
+
+.opencodian-container :is(.opencodian-permission-inline-reject, .opencodian-question-inline-btn.is-reject) {
+  color: var(--opencodian-status-error);
+}
+
+.opencodian-container :is(.opencodian-permission-inline-reject, .opencodian-question-inline-btn.is-reject):hover:not(:disabled) {
+  border-color: var(--opencodian-status-error-border);
+  background: var(--opencodian-status-error-subtle);
+  color: var(--opencodian-status-error);
+}
+
+.opencodian-container .opencodian-permission-inline[data-state='terminal'] {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.5;
+}
+
+.opencodian-container .opencodian-question-inline {
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.opencodian-container :is(.opencodian-question-dock, .opencodian-session-todo-dock) {
+  gap: 10px;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.opencodian-container .opencodian-question-dock.is-hidden {
+  display: none;
+}
+
+.opencodian-container .opencodian-question-inline-icon {
+  border-radius: 6px;
+  font-weight: inherit;
+}
+
+.opencodian-container .opencodian-question-inline-progress {
+  border-radius: 6px;
+  background: var(--background-secondary);
+  color: var(--text-muted);
+}
+
+.opencodian-container .opencodian-question-inline-option {
+  border-color: var(--oc-chat-card-border);
+  border-radius: 6px;
+  background: transparent;
+}
+
+.opencodian-container .opencodian-question-inline-option:hover,
+.opencodian-container .opencodian-question-inline-option:focus-within {
+  border-color: color-mix(in srgb, var(--interactive-accent) 45%, var(--oc-chat-card-border));
+  background: var(--background-modifier-hover);
+}
+
+.opencodian-container .opencodian-question-inline-option:has(input:checked) {
+  border-color: var(--interactive-accent);
+}
+
+.opencodian-container .opencodian-question-inline-custom:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+.opencodian-container .opencodian-chat-notice-card {
+  gap: 10px;
+}
+
+.opencodian-container .opencodian-chat-notice-card.is-warning .opencodian-chat-notice-icon {
+  color: var(--opencodian-status-warning);
+}
+
+.opencodian-container .opencodian-chat-notice-card.is-error .opencodian-chat-notice-icon {
+  color: var(--opencodian-status-error);
+}
+
+.opencodian-container .opencodian-chat-notice-card.is-info .opencodian-chat-notice-icon {
+  color: var(--text-muted);
+}
+
+.opencodian-container .opencodian-chat-notice-card.is-background-task.is-inline {
+  padding: 10px 12px;
+}
+
+/* Native ZCode jobs use the same notice-card anatomy as other conversation
+   states: one title, a distinct state, then the copyable protocol identity. */
+.opencodian-container .opencodian-zcode-native-tasks {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.opencodian-container .opencodian-zcode-native-tasks .opencodian-chat-notice-card {
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.opencodian-container .opencodian-zcode-task-icon {
+  display: grid;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--background-secondary);
+}
+
+.opencodian-container .opencodian-zcode-task-icon svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2;
+}
+
+.opencodian-container .opencodian-zcode-task-body {
+  display: grid;
+  gap: 5px;
+}
+
+.opencodian-container .opencodian-zcode-task-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 5px;
+  min-width: 0;
+}
+
+.opencodian-container .opencodian-zcode-task-title {
+  flex: 1 1 145px;
+  min-width: 0;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-container .opencodian-zcode-task-status {
+  display: inline-flex;
+  flex: 0 1 auto;
+  max-width: 100%;
+  padding: 3px 7px;
+  border: 1px solid var(--oc-chat-card-border);
+  border-radius: 6px;
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-container .opencodian-zcode-task-id {
+  display: block;
+  padding: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.opencodian-container .opencodian-zcode-task-actions {
+  display: flex;
+  padding-top: 8px;
+  border-top: 1px solid var(--oc-chat-card-border);
+}
+
+.opencodian-container .opencodian-zcode-native-tasks [data-task-status='running'] .opencodian-zcode-task-icon,
+.opencodian-container .opencodian-zcode-native-tasks [data-task-status='running'] .opencodian-zcode-task-status {
+  color: var(--interactive-accent);
+}
+
+.opencodian-container .opencodian-zcode-native-tasks [data-task-status='completed'] .opencodian-zcode-task-icon,
+.opencodian-container .opencodian-zcode-native-tasks [data-task-status='completed'] .opencodian-zcode-task-status {
+  color: var(--opencodian-status-success);
+}
+
+.opencodian-container .opencodian-zcode-native-tasks [data-task-status='failed'] .opencodian-zcode-task-icon,
+.opencodian-container .opencodian-zcode-native-tasks [data-task-status='failed'] .opencodian-zcode-task-status {
+  color: var(--opencodian-status-error);
+}
+
+.opencodian-container .opencodian-zcode-native-tasks [data-task-status='interrupted'] .opencodian-zcode-task-icon,
+.opencodian-container .opencodian-zcode-native-tasks [data-task-status='interrupted'] .opencodian-zcode-task-status {
+  color: var(--opencodian-status-warning);
+}
+
+.opencodian-container .opencodian-zcode-native-tasks [data-task-status='running'] .opencodian-zcode-task-icon svg {
+  animation: opencodian-spin 0.9s linear infinite;
+}
+
+.opencodian-container .opencodian-omo-injection {
+  margin-top: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opencodian-container :is(.opencodian-permission-inline-btn, .opencodian-question-inline-btn, .opencodian-server-action-btn, .opencodian-chat-notice-action-btn) {
+    transition: none;
+  }
+
+  .opencodian-container .opencodian-zcode-native-tasks [data-task-status='running'] .opencodian-zcode-task-icon svg {
+    animation: none;
+  }
+}

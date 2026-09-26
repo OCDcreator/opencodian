@@ -7,6 +7,10 @@
 > 2026-09-20 (advantage-parity R-D1)：OpenCodianView 的历史菜单 host 新增 exportConversationMarkdown 转发方法（导出逻辑不进视图）。
 
 # Owner: feature.chat-shell
+> 2026-09-25 (FA880): The background panel host forwards native ZCode read/cancel operations with explicit session and task IDs; OpenCodianView does not synthesize task status.
+> 2026-09-25 (FA880): `showPermissionDialog` forwards a ZCode-only requestId/sessionId pending read to the inline permission card so teardown and timeout can clear that exact UI decision surface.
+> 2026-09-24 (ZCode image recovery)：OpenCodianView forwards the composer preparation acknowledgement callback into the send pipeline; it does not clear or recreate image chips itself.
+> 2026-09-24（ZCode）：后端切换时，视图先切换目标 conversation，再读取该 conversation 的 capabilities 重建 composer toolbar；不能用上一个后端的能力位决定新工具栏是否挂载权限模式控件。
 > 2026-09-21 (advantage-parity R-F2/R-F3/R-F5/R-F6)：OpenCodianView 只组装绑定笔记、preview-first 回退、会话 rail 与 Vim 键协调器的窄 host port；rail 与历史菜单共享 active-backend 会话筛选和既有 load/recovery，宽面板并排、窄面板隐藏；Vim 事件只挂聊天根且避开输入/overlay。ChatPluginPort 仅扩展所需设置读取面，不引入第二份会话状态。
 
 Pricing readiness (2026-09-10): the shell supplies catalog subscription and per-tab billing identity ports; ActiveTabContextUsageCoordinator owns recomputation and listener lifecycle. Details callbacks remain pinned to the originating tab/session.
@@ -70,4 +74,4 @@ The shell supplies the Pi slash-catalog discriminator only. All Pi runtime lifec
 `createChatSelectionControlsCoordinatorHost()` now supplies `getApp: () => this.app` so the selection controls can resolve local bundled provider icon resource paths. This is a host port only — the shell does not gain icon-resolution logic.
 
 - 2026-09-15: `OpenCodianView` 增加两个只读访问器 `getActiveConversationBackendKind()` / `getActiveTabModelRef()`，供 inline edit 宿主在 `editorCallback` 之外解析当前聊天 tab 的后端与模型；未新增运行时归属。
-- 2026-09-17: `OpenCodianView` 的品牌标记图标 id 改为从 `shared.brandingWordmark` 导入（原先在 view 内自存一份字面量），行为不变。
+- 2026-09-17: `OpenCodianView` 的品牌标记图标 id 改为从 `shared.brandingWordmark` 导入（原先在 view 内自存一份字面量），行为不变。> 2026-09-24 (票 06)：OpenCodianView 的斜杠缓存宿主接入 loadZCodeRuntimeCommands（ZCode 实时目录直取归一为既有 / 条目），其余后端语义不变。

@@ -38,7 +38,7 @@ R-C4 组合：`pdfEngineLoader`（懒加载引擎，启动零成本；`getPlugin
 R-C5 组合：`canvasGenerationFlow`（生成流程，`pickNotes` 端口 = R-A7 picker + R-B2 主题组一键行，`resolveAuxTarget` 端口 = 行内编辑 host 适配器的只读会话切片）与 `canvasIntegration`（Canvas 视图桥，attach/detach + 运行时确认门）与命令 `canvas-generate-from-notes` / `canvas-ai-edit-node`；插件写归属会话改用 `resolvePluginWriteConversationId()`（R-C2 语义改名，行为不变）。Canvas 行为逻辑分别在 `core.canvas` 与 `feature.canvas-integration`，main.ts 只组合、注册命令与注入 Notice 沉降。
 
 
-`main.ts` 定义 `OpenCodianPlugin`，是 Obsidian 侧的总装配点。它负责：
+`main.ts` 定义 `OpenCodianPlugin`，是 Obsidian 侧的总装配点。ZCode 会话删除在本地移除前必须等待其 adapter 对官方桌面 task-index tombstone 的按 ID 读回；失败保留本地会话并向调用方抛错。其他后端保持原有 best-effort session cleanup。它负责：
 
 - 初始化 `StorageService`，并通过 `src/core/types/settingsLoadNormalization.ts` 加载/迁移持久化设置
 - 创建 `OpenCodeService`、`OpencodeConfigManager`、`ModelConfigService`、`ModelPricingService`
@@ -368,3 +368,6 @@ D2 record-then-close（同日）：聊天 ports 与 inline-edit deps 均新增 `
 > 2026-09-18 (R-C3)：main.ts 仅做装配——构造 `InlineCompletionService`（池）与 `InlineCompletionController`，`registerEditorExtension(inlineCompletionGhostExtension(...))`（一次性注册、逐次门控，C3-Q1 裁决口径），新增 `inline-completion-trigger` 命令（`editorCheckCallback`），`active-leaf-change` 上按开关预热池，`onunload` 全量 `disposeAll()`；设置开关回调 `onInlineCompletionSettingChanged` 在关闭时立即释放全部会话。补全逻辑零行落在本文件。
 
 > 2026-09-19 (R-C3 补全专用模型覆盖)：`resolveInlineCompletionTarget()` 经 `resolveCompletionOverride`（InlineEditPluginHost）先读 `inlineCompletionModelOverrides[kind]`，未配置（`null`）才落回 `adapter.resolveModel()` 既有链——默认 `{}` 下与旧行为逐字节一致；已配置但格式非法按 `model-unavailable` 如实上报，不静默回退。配套组合级测试 `tests/unit/main/inlineCompletionModelOverride.test.ts`（解析顺序、默认逐字节回归、畸形拒绝、专用覆盖变更触发池重建）。
+
+> 2026-09-22 (ZCode 票 01)：`wireHiddenAdapters` 传入 `getZCodeSettings` 与 `getZCodeExtraEnv`（`getDomainEnvFor('zcode')`）；ZCode 仅做装配，运行时状态不进入视图层。
+> 2026-09-24 (票 06)：OpenCodianView 的斜杠缓存宿主接入 loadZCodeRuntimeCommands（经 adapter.getSlashCommands 的实时目录直取）。

@@ -1,4 +1,5 @@
 # InlineEditPluginHost
+> 2026-09-24: ZCode 文本补全的模型覆盖解析保留 provider/model；通用行内编辑仍不因该解析而启用 ZCode。`reasoningLevel` 由适配器按实时目录和当前原生选择校验。
 > 2026-09-18 (R-B1/R-B2): bridge passthroughs for `listContextGroups` and `applyAutoInternalLinks`; both optional, keeping older hosts byte-identical.
 
 > **源码**: `src/features/inline-edit/InlineEditPluginHost.ts`

@@ -31,6 +31,8 @@ function createHost(overrides?: Partial<BackendSessionBrowserHost>): BackendSess
   const mockService = {
     hasCapability: (cap: AgentCapability) =>
       cap === AgentCapability.Fork || cap === AgentCapability.Sessions,
+    archiveSession: jest.fn().mockResolvedValue(true),
+    unarchiveSession: jest.fn().mockResolvedValue(true),
   };
   return {
     getAgentServiceRegistry: () => ({
@@ -100,6 +102,20 @@ describe('BackendSessionBrowserModal lifecycle actions', () => {
     expect(footer!.querySelector('.opencodian-backend-session-browser-fork-btn')).toBeNull();
     expect(footer!.querySelector('.opencodian-backend-session-browser-archive-btn')).toBeNull();
     expect(footer!.querySelector('.opencodian-backend-session-browser-unarchive-btn')).toBeNull();
+  });
+
+  it('does not offer archive actions for a sessions backend without native archive methods', async () => {
+    const host = createHost({
+      getAgentServiceRegistry: () => ({
+        getActive: () => ({ hasCapability: (cap: AgentCapability) => cap === AgentCapability.Sessions }),
+      }) as unknown as ReturnType<BackendSessionBrowserHost['getAgentServiceRegistry']>,
+    });
+    const modal = await openModal(host);
+    (modal.contentEl.querySelector('[data-session-id="session-1"]') as HTMLElement).click();
+    expect(modal.contentEl.querySelector('.opencodian-backend-session-browser-resume-btn')).not.toBeNull();
+    expect(modal.contentEl.querySelector('.opencodian-backend-session-browser-archive-btn')).toBeNull();
+    (modal.contentEl.querySelector('[data-session-id="session-2"]') as HTMLElement).click();
+    expect(modal.contentEl.querySelector('.opencodian-backend-session-browser-unarchive-btn')).toBeNull();
   });
 
   it('archived sessions display the archived label and is-archived class', async () => {

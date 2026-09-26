@@ -101,4 +101,30 @@ describe('OpenCodianView streaming assistant shell visibility', () => {
     await expect(responsePromise).resolves.toBe('always');
     expect(permissionCard?.isConnected).toBe(false);
   });
+
+  it('shows a terminal permission card when the original native ask expires', async () => {
+    jest.useFakeTimers();
+    try {
+      const messageEl = document.createElement('div');
+      const inlineCardRenderer = new StreamingInlineCardRenderer({
+        getActiveTabId: () => 'tab-1',
+        getTabRuntimeState: () => ({ streamingMessageEl: messageEl }),
+        revealStreamingAssistantMessageElement: () => messageEl,
+      });
+      const renderer = new PermissionInlineCardRenderer(inlineCardRenderer);
+      const respond = jest.fn(async () => {});
+      const result = renderer.collectAndRespond({
+        type: 'permission_request', id: 'perm-timeout', sessionID: 'sess-a', permission: 'Write',
+        patterns: [], metadata: {}, always: [],
+      }, 'tab-1', respond, async () => false);
+
+      jest.advanceTimersByTime(500);
+      await expect(result).resolves.toBe(true);
+      expect(messageEl.querySelector('[data-permission-card]')?.getAttribute('data-state')).toBe('terminal');
+      expect(messageEl.querySelector('[data-permission-action]')).toBeNull();
+      expect(respond).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

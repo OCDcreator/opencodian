@@ -285,6 +285,14 @@ describe('ActiveTabContextUsageCoordinator identity and refresh', () => {
     expect(host.renderContextUsageIndicator).not.toHaveBeenCalled();
   });
 
+  it('refreshes ZCode context from the active native session', async () => {
+    const snapshot = { sessionId: 'sess_z', sessionTitle: 'ZCode', createdAt: 100, updatedAt: 200, providerId: null, providerName: null, modelId: null, modelName: null, contextWindow: 200000, totalTokens: 120, inputTokens: 100, outputTokens: 20, reasoningTokens: 7, cacheReadTokens: 9, cacheWriteTokens: null, totalCost: null } satisfies ContextUsageSnapshot;
+    const host = createHost({ getCurrentConversation: jest.fn().mockReturnValue({ id: 'zcode-conversation', backend: 'zcode', backendSessionId: 'sess_z', title: 'ZCode', createdAt: 100, updatedAt: 200 }), getSessionContextUsageSnapshot: jest.fn().mockResolvedValue(snapshot) });
+    await new ActiveTabContextUsageCoordinator(host).refreshFromServer();
+    expect(host.getSessionContextUsageSnapshot).toHaveBeenCalledWith('sess_z');
+    expect(host.setActiveTabContextUsage).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'sess_z', contextWindow: 200000 }));
+  });
+
   it('restores the latest app-server-authoritative snapshot for Codex conversations', async () => {
     const host = createHost({
       getCurrentConversation: jest.fn().mockReturnValue({

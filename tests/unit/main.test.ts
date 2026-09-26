@@ -1173,6 +1173,31 @@ describe('OpenCodianPlugin deferred runtime warmup', () => {
     expect(conversation.openCodeSessionId).toBe('opencode-forked-session');
   });
 
+  it('keeps a ZCode conversation when native task-index deletion fails', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      agentServiceRegistry: AgentServiceRegistry;
+      conversations: Conversation[];
+      storage: { deleteConversation: jest.Mock<Promise<void>, [string]> };
+      conversationFullMessageCache: { forget: jest.Mock<void, [string]> };
+    };
+    const deleteSession = jest.fn().mockRejectedValue(new Error('native readback failed'));
+    const service = {
+      kind: 'zcode', hasCapability: (cap: AgentCapability) => cap === AgentCapability.Sessions,
+      deleteSession,
+    };
+    plugin.agentServiceRegistry = { get: () => service } as unknown as AgentServiceRegistry;
+    plugin.conversations = [createConversation('zcode', {
+      backend: 'zcode', backendSessionId: 'sess_z', openCodeSessionId: undefined,
+    })];
+    plugin.storage = { deleteConversation: jest.fn().mockResolvedValue(undefined) };
+    plugin.conversationFullMessageCache = { forget: jest.fn() };
+
+    await expect(plugin.deleteConversation('zcode')).rejects.toThrow('native readback failed');
+    expect(plugin.conversations).toHaveLength(1);
+    expect(plugin.storage.deleteConversation).not.toHaveBeenCalled();
+    expect(plugin.conversationFullMessageCache.forget).not.toHaveBeenCalled();
+  });
+
   it('deletes conversations through their owning session backend', async () => {
     const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
       agentServiceRegistry: AgentServiceRegistry;

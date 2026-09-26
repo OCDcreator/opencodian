@@ -297,6 +297,7 @@ describe('ChatHeaderPresenter header shell and actions', () => {
     expect(statusIconEl?.style.getPropertyValue('--opencodian-server-status-icon-url')).toBe('');
     const codexIconEl = statusIconEl?.querySelector<HTMLElement>('.opencodian-agent-switcher-lobehub-icon');
     expect(codexIconEl?.dataset.lobehubIcon).toBe('codex');
+
   });
 
   it('marks the new-tab action for tab-disabled container CSS', () => {
@@ -341,6 +342,17 @@ describe('ChatHeaderPresenter header shell and actions', () => {
     expect(statusTextEl?.textContent).toBe(t('chat.serverStatus.disabled'));
   });
 
+});
+
+describe('ChatHeaderPresenter ZCode badge', () => {
+  it('uses the ZCode brand in the connection badge', async () => {
+    const fixture = createFixture();
+    fixture.host.getActiveBackendKind.mockReturnValue('zcode');
+    await fixture.presenter.refreshServerStatusBadge();
+    const icon = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-icon');
+    expect(icon?.getAttribute('data-backend-icon')).toBe('zcode');
+    expect(icon?.querySelector<HTMLElement>('[data-icon="opencodian-zcode"]')).not.toBeNull();
+  });
 });
 
 describe('ChatHeaderPresenter status-chip width', () => {

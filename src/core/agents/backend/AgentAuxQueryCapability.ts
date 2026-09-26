@@ -31,7 +31,9 @@ import type { AgentService } from './AgentService';
 export type BackendModelSelection =
   | { kind: 'opencode' | 'pi'; provider: string; model: string }
   | { kind: 'claude-code'; model: string }
-  | { kind: 'codex'; model: string; reasoningEffort?: string };
+  | { kind: 'codex'; model: string; reasoningEffort?: string }
+  /** ZCode models require a provider-qualified identity and may expose a per-model reasoning level. */
+  | { kind: 'zcode'; provider: string; model: string; reasoningLevel?: string };
 
 /** A single turn in an aux session. */
 export interface AuxQueryTurnRequest {

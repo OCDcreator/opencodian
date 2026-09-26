@@ -7,7 +7,7 @@
 
 import type { AgentBackendKind } from '../../types/chat';
 
-export const IMPLEMENTED_AGENT_BACKENDS: readonly AgentBackendKind[] = ['opencode', 'claude-code', 'codex', 'pi'];
+export const IMPLEMENTED_AGENT_BACKENDS: readonly AgentBackendKind[] = ['opencode', 'claude-code', 'codex', 'pi', 'zcode'];
 
 export {
   wireHiddenAdapters,
@@ -239,3 +239,11 @@ export {
   type ProjectResourceWriteError,
   toWriteErrorCode,
 } from './ProjectResourceSecureWrite';
+export {
+  ZCodeAdapter,
+  type ZCodeAdapterOptions,
+  type ZCodeAdapterRuntimeDiagnostics,
+  type ZCodeHandshakeState,
+  type ZCodeProviderConfigSnapshot,
+  type ZCodeRuntimeResolution,
+} from './zcode';

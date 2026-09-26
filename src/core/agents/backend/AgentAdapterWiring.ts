@@ -10,7 +10,7 @@
 
 import * as path from 'node:path';
 
-import type { CodexBackendSettings, PiBackendSettings } from '../../types/settings';
+import type { CodexBackendSettings, PiBackendSettings, ZCodeBackendSettings } from '../../types/settings';
 import type { AgentService } from './AgentService';
 import type { AgentServiceRegistry } from './AgentServiceRegistry';
 import { CodexAdapter } from './CodexAdapter';
@@ -18,6 +18,7 @@ import { resolveCodexCli } from './CodexCliResolver';
 import type { CodexTracePort } from './diagnostics/types';
 import { PiAdapter } from './pi/PiAdapter';
 import type { PiUiHandler } from './pi/PiProtocol';
+import { ZCodeAdapter } from './zcode';
 
 export interface WireHiddenAdaptersOptions {
   registry: AgentServiceRegistry;
@@ -40,10 +41,14 @@ export interface WireHiddenAdaptersOptions {
    */
   codexTracePort?: CodexTracePort;
   getPiSettings?: () => PiBackendSettings;
+  /** ZCode-specific settings from plugin configuration. */
+  getZCodeSettings?: () => ZCodeBackendSettings;
   /** R-F7: resolved domain env injected into spawned Pi service processes. */
   getPiExtraEnv?: () => Record<string, string>;
   /** R-F7: resolved domain env injected into Codex CLI / app-server processes. */
   getCodexExtraEnv?: () => Record<string, string>;
+  /** R-F7: resolved domain env injected into the owned ZCode app-server process. */
+  getZCodeExtraEnv?: () => Record<string, string>;
   onPiUiRequest?: PiUiHandler;
 }
 
@@ -93,5 +98,10 @@ export function wireHiddenAdapters(options: WireHiddenAdaptersOptions): void {
     registry.register(new PiAdapter({ workingDirectory: vaultPath, getSettings: options.getPiSettings,
       ...(options.getPiExtraEnv ? { getExtraEnv: options.getPiExtraEnv } : {}),
       servicePath: options.pluginDir ? path.join(options.pluginDir, 'assets', 'pi', 'service.mjs') : '', onUiRequest: options.onPiUiRequest }));
+    registry.register(new ZCodeAdapter({
+      workingDirectory: vaultPath,
+      ...(options.getZCodeSettings ? { getSettings: options.getZCodeSettings } : {}),
+      ...(options.getZCodeExtraEnv ? { getExtraEnv: options.getZCodeExtraEnv } : {}),
+    }));
   }
 }

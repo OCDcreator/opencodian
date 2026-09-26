@@ -161,4 +161,19 @@ describe('slashCommandMenuRenderer', () => {
 
     expect(menuEl.querySelector('.opencodian-slash-command-menu-title')?.textContent).toBe('/review');
   });
+
+  it('does not double the prefix of a native command display ID', () => {
+    const menuEl = document.body.createDiv();
+
+    renderSlashCommandMenu({
+      menuEl,
+      items: [menuItem({ id: 'goal', displayId: '/goal', insertText: '/goal ' })],
+      selectedIndex: 0,
+      status: 'idle',
+      onHoverItem: jest.fn(),
+      onSelectItem: jest.fn(),
+    });
+
+    expect(menuEl.querySelector('.opencodian-slash-command-menu-title')?.textContent).toBe('/goal');
+  });
 });

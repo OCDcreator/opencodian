@@ -89,6 +89,16 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     ],
   },
   {
+    id: 'zcode',
+    labelKey: 'settings.zcode.title',
+    icon: 'opencodian-zcode',
+    defaultSecondaryTabId: 'connection',
+    backendRequired: 'zcode',
+    secondaryTabs: [
+      { id: 'connection', labelKey: 'settings.zcode.tab.connection' },
+    ],
+  },
+  {
     id: 'server',
     labelKey: 'settings.server.title',
     icon: 'server',

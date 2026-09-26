@@ -1,4 +1,22 @@
 # OpenCodianView
+> 2026-09-25（ZCode 手动标题闭环）：历史菜单的手动重命名在 ZCode 会话上先调用适配器的原生 V4 rename 与 `session/list`/`session/read` 读回；失败时不保存 OpenCodian 本地标题，也不显示成功。其他自动标题路径继续使用原有同步策略。原生会话删除仍被安全拒绝；OpenCodian 本地会话删除与官方桌面私有 task-index tombstone 不等价。
+
+2026-09-25 ZCode 侧栏控件：`createChatSelectionControlsCoordinatorHost()` 提供本视图当前 conversation 给 ZCode 模型/模式选择器。即使 Obsidian 的活动叶子是 Markdown，侧栏里的可见控件仍作用于所属聊天会话；异步原生读回按该视图当前 session ID 防串线。
+
+2026-09-25 ZCode 压缩状态：`session/compact` 返回 snapshot/受理状态只足以显示「已受理，等待权威验证」，不能把 ACK 包装成完成。适配器现按同会话原生 `cmp_` operationId 读 `session.updated` 终态，再从 `session/read` 与 `session/usage` 验证同会话与 token 增量；仅三项齐全返回 verified。`skipped/failed/cancelled` 返回失败，缺读回保持 accepted。
+
+2026-09-25 斜杠菜单：构造 `SlashCommandMenuCatalogCache` 时的 backend key 包含 `zcode`，使可见 `/` 菜单走原生 `loadZCodeRuntimeCommands` 而非 OpenCode SDK 目录。原生 `session/read.slashCommands` 与 adapter 目录一致，Test Vault 菜单据此呈现 ZCode 命令。
+> 2026-09-25 (FA880 background tasks): The view supplies the existing inline background renderer with tab messages container and ZCode adapter native read/cancel ports; it does not own task state.
+> The ZCode conversation activation path starts the native task watch after model/mode refresh, so a newly launched task is found from an initially empty native read.
+> The existing timeline clear host re-arms the ZCode watch after a send resets legacy background panels. `onClose` disposes the watch timers.
+> The native task read host rejects while the adapter is disconnected; the renderer converts a previously running task to interrupted and stops its poll.
+> The native task host also supplies each tab's current conversation to the inline renderer, so rapid cross-tab activation cannot paint another session's task rows into the newly active pane.
+> 2026-09-25 (FA880): The ZCode permission card receives an original requestId/sessionId pending-read callback. A native timeout or lost process changes the card to a visible terminal state; approvals from another tab or request cannot satisfy it.
+
+> 2026-09-24（ZCode question card 路由）：question runtime 的 API resolver 以 card 所属 tab 和 request 原生 session 为键。ZCode `interaction/requestUserInput` 的提交/拒绝不再无条件落到 `openCodeService`；若 tab 已重绑到另一会话则安全拒绝，避免跨标签或跨后端误答。ZCode 原生 pending 空读回是权威结果，会清除该 tab 旧的 waiter-owned Dock 卡片；其他后端维持既有的竞态保活。
+
+> 2026-09-24（ZCode 续做）：当前会话后端决定能力门控、状态徽章图标与文字、权限响应路由。ZCode 模型/上下文/思考控件挂载后，模型 `reasoningLevel` 在下一回合经原生读回确认；ContextRing 从 ZCode 会话读回精确用量，详情沿活动标签会话隔离。跨后端切换须等目标会话加载或创建后才按其能力重建 composer toolbar，否则从 Pi 返回 ZCode 时模式控件会消失。
+> 2026-09-24（ZCode 空会话恢复）：在加载、恢复和跨后端切回 ZCode 后，视图先让窄恢复服务核对空本地消息与 native `SESSION_NOT_FOUND`，才重绑 replacement `backendSessionId` 并保存；有历史会话、stale await 和任何非缺失错误不重建。composer 草稿不参与此路径，故会保留；新会话读取已配置默认或原生默认后才刷新模型/模式控件。
 > 2026-09-21 (advantage-parity R-F5/R-F6)：视图通过窄 host 组装可选 `ConversationSessionRailCoordinator` 与 root-scoped `ChatVimNavigationCoordinator`；设置保存经现有刷新缝实时更新，关闭时清理 rail/listener。
 > 2026-09-21 (advantage-parity R-F5 follow-up)：history 与 rail 共用 active-backend 会话过滤；标题保存、单项/全部删除恢复后均刷新 rail，后端标题同步失败不阻断本地刷新。
 > 2026-09-21 (advantage-parity R-F3)：`refreshModifiedFilesSidebar()` 仅新增 `getRevertPreview(conversationId, paths?)` 的窄 callback wiring；preview modal 与确认锁属于 chat-ui，R-B3 写回仍经既有 core.storage action callbacks。
@@ -791,4 +809,4 @@ OpenCode 的 store 为 memory mode 或仍带 custom-directory fallback `lastErro
 
 ## R-C2 扩展
 
-2026-09-18 两处最小改动：composer host 字面量新增 `onRequestImageGeneration` 回调（转发 `plugin.openImageGenerationCard('')`）；新增公开 `getActiveConversationIdForAssets()` 供组合根解析资产登记会话。生成/插入逻辑全部在 services/组合根，view 不增长运行时职责。
+2026-09-18 两处最小改动：composer host 字面量新增 `onRequestImageGeneration` 回调（转发 `plugin.openImageGenerationCard('')`）；新增公开 `getActiveConversationIdForAssets()` 供组合根解析资产登记会话。生成/插入逻辑全部在 services/组合根，view 不增长运行时职责。> 2026-09-24 (票 06)：斜杠缓存宿主接线 `loadZCodeRuntimeCommands`——ZCode 实时目录（快照 slashCommands：name/description/inputHint/source）直取并归一为既有 `/` 自动补全条目形态，按后端键分区自然失效。

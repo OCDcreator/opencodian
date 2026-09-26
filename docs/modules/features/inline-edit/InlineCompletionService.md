@@ -1,5 +1,7 @@
 # InlineCompletionService
 
+> 2026-09-24: 补全池身份可区分 ZCode provider/model/reasoningLevel，避免模型或推理档切换后复用旧目标。ZCode 直接生成实测 5.703 秒，超过共享 4 秒预算，当前没有对用户暴露该后端补全能力。
+
 > **源码**: `src/features/inline-edit/InlineCompletionService.ts`
 > **状态**: [REVIEW]
 

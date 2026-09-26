@@ -1,4 +1,7 @@
 # Chinese Locale
+> 2026-09-25（删除语义）：确认文案说明移除 OpenCodian 本地消息，后端可能保留原生历史；避免把 ZCode 官方任务列表的软删除说成历史永久清除。
+> 2026-09-25（ZCode）：`chat.zcode.backgroundTask.stopped` 将原生 `killed` 中性显示为“已停止”；没有可验证终态通知的任务仍使用原有“状态未知／连接中断”文案。
+> 2026-09-24（ZCode）：上下文压缩文案改为后端中立的当前会话表述，避免 ZCode 详情仍写“Codex 线程”。
 > 2026-09-21 (advantage-parity R-F2/R-F3/R-F6 质量修复)：`chat.sessionSettings.modal.linkedNote.description` 改为诚实能力表述（用于快照/回退跟踪/Modified Files 关联；不发送内容给模型、不自动写回）；`editRevert.preview.*` 行数改为带标签两侧（`linesBeforeLabel`/`linesAfterLabel`/`linesValue`）并新增按状态的动作说明（`actionCreated`/`actionDeleted`/`actionModified`/`actionMoved`），移除歧义的裸 `lines` 组合键；新增 `settings.conversation.vimNavigation.duplicateKeyNotice`。与 en 一一对应。
 > 2026-09-21 (advantage-parity R-F5/R-F6)：新增会话管理栏、Vim 导航设置及 rail 状态中文文案。
 > 2026-09-21 (advantage-parity R-F4)：新增 `settings.agent.chatWarmSession.{name,desc}`；明确预热只创建空只读 aux session、不发送提示词/回合、不计模型用量，真实聊天另建会话。
@@ -35,6 +38,10 @@
 
 > 2026-08-03：更新修改文件侧栏文案，改为持久可点击入口、已就绪空状态/未就绪状态、点击/Escape 收起与仅当前 OpenCode 会话语义，不再描述悬浮或自动隐藏。
 > 2026-08-03：新增 `modifiedFiles.readyShort` / `modifiedFiles.unavailableShort` 短状态标签，适配窄侧栏单行摘要，完整空状态说明保留在面板正文。
+> 2026-09-25：`modifiedFiles.unavailable` / `unavailableShort` 改为后端中立的不可用说明；ZCode 会话不再看到“等待 OpenCode 就绪”的误导文案。
+> 2026-09-25：`chat.zcode.mode.plan.description` 说明当前会话会以原生事件核对独立计划状态；旧运行时没有该读回时仍显示未确认。
+> 2026-09-25：新增 `permissionDialog.noLongerPending`，供纯权限请求超时、取消或断连后的无按钮终态卡使用。
+> 2026-09-25：新增 `chat.zcode.backgroundTask.*`，显示原生后台任务运行、完成、取消、失败、断连待确认状态和取消动作。
 
 > 2026-08-02：新增 `settings.conversation.showTurnChangeRecords` 名称与说明（“显示本轮文件变更卡片”），明确关闭只隐藏、记录仍持续收集并保留，重新开启后恢复。
 
@@ -618,3 +625,8 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 > 2026-09-18 (R-C5)：与 en 同步新增 `canvas.generate.*`（生成流程与失败/回退明示）、`canvas.command.generate`、`canvas.rewrite.*`（节点改写指令/预览确认/挑选/错误边界与撤销诚实提示）与 `canvas.integration.*`（调试区确认门状态）双语文案。
 
 R-C4 补充：`chat.context.pdfIntegration.notMounted`（调试区在未探测过 PDF 叶子时的“尚未挂载”态）与 `SettingsDebugSection` 的 PDF 集成级别状态行文案。
+
+> 2026-09-22 (ZCode 票 01)：与 en 同步新增 `settings.agent.name.zcode` / `settings.agent.zcode.desc` 与 `settings.zcode.*`（连接页、运行时覆盖、重连、运行时/provider 配置/连接三行诚实诊断文案）。
+> 2026-09-22（二轮核查修复）：与 en 同步新增 `settings.zcode.status.providerValidatedNoCount`。
+> 2026-09-24 (票 06)：与 en 同步新增 settings.zcode.model/thinking/mode 九键。
+> 2026-09-24（续做）：与 en 同步新增 `chat.zcode.mode.*` 与 `chat.zcode.reasoning.*`，说明未确认读回与模型推理档位的生效边界。

@@ -1,4 +1,7 @@
 # Owner: feature.settings-agents
+> 2026-09-24 (票 06)：SettingsZCodeSection 新增三项持久化默认字段与重连时的斜杠目录失效调用。
+> 2026-09-22（二轮核查修复）：SettingsZCodeSection 的 provider 计数未知时显示「数量不可用」，移除 ?? 0 伪造。
+> 2026-09-22 (ZCode 票 01)：SettingsBackendSection 的 ALL_BACKEND_OPTIONS 增加 zcode（可启用/禁用，不影响其他后端启停语义）；新增 SettingsZCodeSection（ZCode 运行时覆盖 + ready/unavailable/failed 诚实诊断面）。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.

@@ -82,7 +82,7 @@ describe('SettingsBackendSection', () => {
   });
 
   it('exposes implemented backends without exposing future placeholders', () => {
-    expect(BACKEND_OPTIONS.map((option) => option.id)).toEqual(['opencode', 'claude-code', 'codex', 'pi']);
+    expect(BACKEND_OPTIONS.map((option) => option.id)).toEqual(['opencode', 'claude-code', 'codex', 'pi', 'zcode']);
   });
 
   it('attaches implemented backend options without rendering future backend placeholders', () => {

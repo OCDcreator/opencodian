@@ -52,6 +52,7 @@ import { SettingsTabbedRenderer, type TabRendererDependencies } from './Settings
 import { SettingsToolSection } from './SettingsToolSection';
 import { SettingsUiSection } from './SettingsUiSection';
 import { SettingsUserSection } from './SettingsUserSection';
+import { SettingsZCodeSection } from './SettingsZCodeSection';
 
 export class OpenCodianSettingsView extends ItemView {
   private readonly plugin: OpenCodianPlugin;
@@ -178,7 +179,7 @@ export class OpenCodianSettingsView extends ItemView {
     containerEl.dataset.settingsLayoutMode = 'classic';
 
     this.renderClassicGeneralSection(containerEl);
-    if (this.plugin.settings.activeBackend === 'pi') new SettingsPiSection(this.plugin).attach(containerEl);
+    if (this.plugin.settings.activeBackend === 'pi') new SettingsPiSection(this.plugin).attach(containerEl); if (this.plugin.settings.activeBackend === 'zcode') new SettingsZCodeSection(this.plugin).attach(containerEl);
     this.addClaudeCodeSettings(containerEl);
     this.addServerSettings(containerEl);
     this.addModelSettings(containerEl);

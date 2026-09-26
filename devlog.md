@@ -11,6 +11,146 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-26 ZCode 本地源码构建与双 Test Vault 验收
+
+OpenCodian 已接通开源 ZCode 的本地源码构建，后台 Bash 在 app-server 强杀后通过独立监督进程写入持久终态，并由 `session/backgroundTaskRead` 按会话 ID 与任务 ID 读回。macOS 和 FA880 Windows Test Vault 均观察到运行中、进程重连时状态未知、真实退出后完成；失败、取消和错误 ID 隔离也有原生读回。用户自定义 `/mpe` 在 macOS Test Vault 经真实问答、一次权限超时后的成功批准、PDF/HTML 内容核验及重载恢复。其余控件的产品路径、原生请求和读回见 `.visual-evidence/zcode-continued/final-delivery-audit-2026-09-26.md`。该 ZCode 补丁尚未进入官方发行版。
+
+本次 OpenCodian `npm run verify` 通过 15 项门禁、910 套件和 9134 测试，独立构建 `main.202609260628` 的四产物按顺序部署到两座 Test Vault，逐项校验 SHA-256 和 BUILD_ID。较早日志中将图片、Aux、Plan、删除和强杀后台终态称为协议不可用的阶段性判断，已由最终产品证据取代。
+
+## 2026-09-24 ZCode 后端接入票 09：兼容加固与运行验收
+
+**触发**：`.scratch/zcode-backend` 票 09——显式协议/能力协商且附加未知事件不破流；子进程启动/重启/EOF/信号/超时/孤儿清理覆盖或有界说明；诊断按既有后端追踪规则脱敏（凭据/令牌/提示词/路径/附件内容）；文档/owner/本地化/图标/回归测试同步；图新鲜度、文档、lint、typecheck、测试、构建与真实 Test Vault 部署/reload/运行冒烟全过，环境受限如实报告；不打 tag、不推远端、不做无关清理。
+
+**改动**：
+
+1. `ZCodeAdapter` 诊断快照新增 `protocolVersion`：`session/create` 快照的 `protocol:{name:"ZCode Protocol",version}` 即协议协商证据（未观测为 null 不伪造）；未知事件容忍不破流已由传输层/映射层测试锁定（未知通知/未知 kind/未知字段三类，未知方法 -32601 按结构化错误码诚实降级）。
+2. 诊断脱敏：新增 `redactZCodeDiagnosticText`（400 字符上限 + 截断标记），`failStart` 与进程退出两处 lastError 写入统一走它——远端错误负载（ZodError data 可能夹带凭据/提示词/路径）永不漫入用户面；结构化 `ZCodeRemoteRequestError.data` 按构造不进诊断文本；stderr 只排空不落日志（既有）。
+3. 重启覆盖：`stop() → start()` 首个 transport 释放 + 新实例完成全新握手、无孤儿（首个 dispose 恰一次、第二个握手调用命中、最终 dispose 恰一次）；既有覆盖还含 EOF/信号/超时/损坏流/SIGTERM→SIGKILL 升级（票 01 transport 测试）。
+4. 子进程平台有界说明：macOS 实机覆盖；Windows/Linux 走跨平台解析单测 + 契约形状（实机覆盖留待平台核验，如实登记不冒报）。
+
+**验证**：聚焦 3 例全绿（ZCodeAdapter.hardening：协议版本捕获 null→1、重启无孤儿、脱敏上限）；既有 100+ ZCode 例全绿覆盖未知事件容忍/断连/超时/取消/失败归一/teardown。统一运行验收（部署态 Test Vault 产品路径冒烟）见票内 Evidence。---
+
+## 2026-09-24 ZCode 后端接入票 08：辅助查询与内联补全的 fail-closed 不可用裁决
+
+**触发**：`.scratch/zcode-backend` 票 08——内联编辑/补全只有在原生辅助会话可证明隔离且只读时才可用，否则能力不可用并给出清晰原因；提示词约束不能作为只读证据。
+
+**调查（证据链，决定裁决形态）**：票 08 的准入条件是「运行时工具清单 + 观测调用证明只读契约」。对本协议面逐项实测：① 原生会话工具清单（`message.info.tools`）默认启用 **Bash/Write/Edit/Agent(Task)/Cron*/SendMessage/Skill** 等写类/壳类/子代理工具；② `session/setMode('plan')` 两次实测均不生效（setMode 结果与随后 `session/read` 均显示 `mode: build`）；③ 完整方法表无工具白名单或权限配置通道（无 setTools 等价物），而 OpenCodian 绝不隐式改写用户 ZCode 权限配置。**结论：无任何运行时机制可证明只读 ⇒ 按契约第 3 条启动即拒绝，绝不降级为不安全模式**。审计跑器结构核对：第 1 项（effectiveTools 非空 + deniedCapabilities 非空的执行回读）与第 5 项（图片轮必须成功，本面无图片传输——票 07 已证）对 zcode 天然不可满足，加入审计即注定失败，故不加入（跑一场注定的失败证不出任何东西）。
+
+**改动**：
+
+1. `ZCodeAuxUnavailable`（新）：稳定文案 `ZCODE_AUX_UNAVAILABLE_REASON`（含完整证据链）+ `createZCodeAuxUnavailableError`。
+2. `ZCodeAdapter`：`startAuxQuerySession`/`startInlineCompletionSession` 实现为 fail-closed 拒绝（**绝不启动任何会话/进程**）；能力集**不声明** AuxQuery/InlineCompletion（UI 不为 zcode 提供内联编辑/补全——正确诚实表面，`INLINE_EDIT_BACKENDS` 本就不含 zcode，无需改动）；诊断快照新增 `auxQuery:{available:false, reason}`（设置面可如实呈现）。
+
+**验证**：聚焦 5 例全绿（ZCodeAdapter.aux）：两种启动均以稳定证据文案拒绝、拒绝前后零 wire 调用（断言除握手外无任何方法调用）、能力集两枚均 false、诊断携带 `auxQuery` 裁决与原因、拒绝后 dispose 幂等无害。验收对照：辅助会话独立生命周期 ✓（无从谈起——不创建）；只读契约运行时证明 ✗→**证据支撑的拒绝**（满足第 2/3 条的强制拒绝形态）；写/壳/MCP/未验证面启动拒绝 ✓；dispose 无副作用 ✓（无状态可泄漏）；内联补全复用暖会话契约 ✗→不可用（同一裁决）；真实审计 ✗→结构性不可满足（如实登记，未伪造通过）。
+
+---
+
+## 2026-09-24 ZCode 后端接入票 07：图片附件的本地校验与诚实不可用裁决
+
+**触发**：`.scratch/zcode-backend` 票 07——图片附件应经官方协议形状传输并在恢复消息中保留身份；不支持/不安全文件先于 dispatch 拒绝。
+
+**调查（证据链，决定裁决形态）**：对官方运行时做了穷尽形状探测——`session/send` 的 `attachments` 键存在（`images`/`files` 键被严格拒绝），但五种候选形状（`{data,mimeType}` 内联、`ref:"data:image/..."` 数据 URI、`{type:"image",dataUrl,mediaType}`、`{ref:"/abs/path"}` 路径引用、`{ref,fileName,mime,bytes}` 结构化引用）全部被接受却**静默丢弃**（模型逐次自言「无图像内容块」并转向文件系统工具）。bundle schema 钉死原因：`session/send` 参数为 `{sessionId, content, attachments: m.array($x)}`（`$x` 为穿透形 `record(string, unknown)`），模型可见图片管道在桌面内部 artifact store 与 file-part 面（`zcode-artifact://`、`type:"image"` parts、`writeToolResultBinaryArtifact`）——**本协议面不暴露这些内容通道**。结论：此协议面无诚实的图片附件实现路径。
+
+**改动**：
+
+1. `ZCodeImageAttachment`（新）：本地校验（类型四选、base64 合法可解码、解码字节 ≤ 200 KiB——镜像运行时内联图片上限先例；失败类 missing-data/malformed-type/malformed-base64/oversized 均带可操作理由）+ 证据背书的不可用文案。
+2. `ZCodeAdapter.sendMessage` 图片分支改 fail-closed：逐附件校验——junk 报具体原因（含附件序号），合法图片如实不可用；**两种情况零 dispatch（绝无部分回合）**。
+3. `AgentBackendRouting` 信封分支保留记录级 `attachments`：恢复消息的附件身份（如 `zcode-artifact://` 引用）直通不裁剪（恢复侧验收成立）。
+
+**验证**：聚焦 12 例全绿（ZCodeImageAttachment 9 + ZCodeSessionRouting 3 回归）：各失败类、合法通过、junk 点名、多附件点名 #2、合法图片不可用、**三类发送均断言 session/send 调用为空**、恢复附件 identity 字段完整保留。验收对照：类型/大小先于请求校验 ✓（本地）；官方形状传输 ✗→**证据支撑的不可用**（无合规工作路径，不伪造支持）；失败与多附件 ✓；恢复身份 ✓（路由直通）；先拒绝不发出部分回合 ✓。
+---
+
+## 2026-09-24 ZCode 后端接入票 06：模型、思考级别、模式与斜杠命令
+
+**触发**：`.scratch/zcode-backend` 票 06——模型/provider 来自 ZCode 实时目录（非硬编码镜像）并带诚实不可用/过期态；思考级别与 build/edit/plan/yolo 模式映射原生且发送前拒绝不支持值；会话覆盖与持久化默认分层并在安全原生边界生效；斜杠命令从 ZCode 发现并归一到 `/` 自动补全且设置/运行时变化后失效。
+
+**改动**：
+
+1. `ZCodeModelCatalog`（新）：从快照 `settings` 与 `state.updated` 广播解析规范化目录（模型条目含 reasoningLevels/defaultLevel/supportsImageInput、thoughtLevels、currentMode、slashCommands）；无目录 → null（不伪造）；校验器按目录在**发送前**拒绝未知模型/不支持 reasoningLevel（解析 defaultLevel 或报 reasoning-required）/不支持 thoughtLevel/非法 mode（plan/build/edit/yolo/auto）。
+2. `ZCodeAdapter`：快照与广播双通道保持目录热；`getAvailableModels`（未观测→诚实抛错）/`getDefaultModel`（持久化 model 解析）/`getSlashCommands`；`setSessionModel`/`setSessionThoughtLevel`/`setSessionMode` 校验后才发；会话覆盖经 `request.options.provider/model/variant` 在回合边界生效（镜像 Pi prepareModel 契约）；持久化默认（model/thinkingLevel/mode，扩展 `ZCodeBackendSettings` + 归一化）仅在会话物化边界应用一次——**会话覆盖与持久化默认分层、永不在回合中突变**。
+3. 选择器与斜杠命令：`ZCodeModelSelectionBinding`（与 Pi 绑定同模式，按 provider 分组、每模型 reasoning variants、未观测如实给空）装配进 ChatSelectionControlsCoordinator（仅 zcode 活动时接管）；`SlashCommandMenuCatalogCache` 新增 `loadZCodeRuntimeCommands` 宿主口与 zcode 分支（归一为既有 `/` 条目形态）；SettingsZCodeSection 新增三项默认字段（model/thinking/mode 下拉）且重连时调用 `invalidateSlashCommandCatalog`（即时失效不等 TTL）；zh/en 九键同步。
+
+**验证**：聚焦 21 例全绿（ZCodeModelCatalog 9 + ZCodeAdapter.models 8 + zcodeBackendSettings 4）：全量解析/无目录→null/patch 合并、模型与档位校验（解析默认/未知模型/不支持/必需未给）、持久化默认物化应用、发送前零请求拒绝（断言 calls 为空）、turn 边界覆盖、广播保热、默认模型解析、mode 枚举与归一化。
+
+---
+
+## 2026-09-24 ZCode 后端接入票 05：工具、后台任务、子代理与用量渲染
+
+**触发**：`.scratch/zcode-backend` 票 05——带工具/后台工作的回合以与其他后端一致的真实生命周期语义渲染：工具输入/结果/错误/时长、后台与子代理归属、上下文与 token 只发原生证据、失败/取消/丢进程呈终态。
+
+**改动**：
+
+1. 真机全流捕获（Read 与后台 Bash 两个回合）钉死形状：`model.streaming` 的 `tool_input_delta`（流式 JSON 输入）与 `tool_call`（终稿 input 按 toolCallId）；`tool.updated` 按 kind 判别——`scheduled`（`assistantMessageId`/`dependencies`/`parallelGroupIndex`/`canRunParallel`/`schedule`/`inputByteLength`/`inputOmitted`/`inputRef`）、`started`（`startedAt`/`readOnly`/`sideEffectScope`）、`result`（`result:{success,content,perf:{totalMs},truncated,budgetStrategy}` + `duration`）、`batch`（`toolCallIds`/`successCount`/`errorCount`）；后台任务以 `session.updated` 的 `{taskId, taskKind, cancellable, command, description, status, toolCallId, pid?}` 跟踪（**稳定 taskId**），完成以独立后续回合（turnNumber 递增）交付——与「`session.status` 只反映前景 runner」的不变量天然吻合；`session/usage`（回合级 token 证据）、`usage/stats`（聚合）、`session/subagents`（`{revision, childSessionIds, running, ended}`）形状钉死。
+2. `ZCodeStreamMapper` 扩展：scheduled→`tool_use`（getToolIdentity 中枢身份 + 追踪 input + 全原生 toolMetadata）、started→tool_progress、result→`tool_result`（失败即 `isError` 终态不悬挂）+ 完成/失败进度（duration 与 perf.totalMs 保留）、batch→informational；后台条目→`background_tasks_changed`（仅告知不覆盖前景）；终稿快照→`context_usage`（仅原生证据：contextWindow/tokens/providerId/modelId 来自模型请求载荷，`totalCost: null` 绝不制造，无快照则不发不发）；part.delta field:input/output 改走独立 tool_progress 通道（文本去重互斥不受影响）。
+3. `ZCodeAdapter.getSessionSubagents`：原生子代理链路原样直通（稳定 id 不合成）。
+
+**验证**：聚焦 18 例全绿（ZCodeStreamMapper.tools 8 + ZCodeAdapter.sessions 10 含 subagents 直通）：流式输入保留、scheduled 身份/输入/元数据、started 进度、成功 result 的 duration/perf 证据、失败 result 终态 isError+failed 进度、batch informational、未知 kind 容忍、tool IO part.delta 独立通道且文本去重不受损、后台任务稳定 taskId 挂原 turn 且无前景状态覆盖、context_usage 仅原生证据（totalCost null）/无快照不发、子代理链路直通。---
+
+## 2026-09-22 ZCode 后端接入票 04：权限与问答交互环
+
+**触发**：`.scratch/zcode-backend` 票 04——原生权限/结构化问答 ask 进入既有 OpenCodian 卡片与 dock，应答/批准/拒绝回到原请求；过期、未知、断连 fail-closed；清理覆盖停止/退出/切换。
+
+**改动**：
+
+1. 真机钉死两类应答**严格 schema**（此前空应答恒报「Permission request failed」即 zod 拒绝）：`interaction/requestPermission` → `{decision: allow|deny|escalate|modify, reason?, modifiedInput?, permissionUpdates?: addRules[]}`（选项随 ask 下发 `{optionId,kind,name,response}`，`allowOnce` 官方语义 `{decision:"allow",reason:"Approved once"}`）；`interaction/requestUserInput` → `{action: accept|decline|cancel, content?, reason?}`（`content.answers: Record<问题文本,string[]>`，单题 `answer`/`answer_<i>` 简写同义；accept 后 `permission.resolved decision:"modify"` 把答案并入工具输入——真机问答全环打通：问「favorite color」答 red → 模型复述正确）。AskUserQuestion 自身也走 permission 事件（riskLevel/reason/requestId/toolCallId/turnId 全捕获）。
+2. 新增 `ZCodeInteractionBridge`：ask 归一为既有 `PermissionRequest`/`QuestionRequest`（选项顺序保留、身份稳定）；恰一次应答（settle 闭包独占置位/移除/resolve——修复了预置位导致 Promise 永不落定的缺陷）；未知形状 deny/decline fail-closed；teardown 落定 deny/cancel。`'always'` 优先用运行时下发的 allow_always 选项响应（缺省才 addRules），`'session'` 仅插件侧记账**不写原生配置**，映射镜像官方 `VZa/GZa/XZa` 语义。
+3. `ZCodeAdapter` 接通问答/权限能力：ask 经 `permission_request`/`question_request` StreamChunk 注入回合流；`cancelStream`/`stop`/`dispose`/进程退出均落定待决项。
+
+**验证**：聚焦 9 例全绿（批准恰一次/拒绝带理由/always+session 映射无原生写/问答答案键与选项顺序/decline/未知形状 fail-closed 且零待决/过期与错配应答/stop 落定 deny/问答落定 cancel）。---
+
+## 2026-09-22 ZCode 后端接入票 03：原生会话恢复与管理
+
+**触发**：`.scratch/zcode-backend` 票 03——reload 后恢复 ZCode 会话与消息、继续会话、重命名/删除/压缩/分叉映射（或诚实不可用）、分叉身份、清理只动选中会话。
+
+**改动**：
+
+1. 真机协议探测定型（隔离+真实库混合）：`session/resume {sessionId}` 为激活原语（**实证幂等**，返回全快照）；`session/read`→全快照、`session/messages`→`{messages:[{info,parts}]}`（`info.messageId`/`role`/`time.created`，与 opencode 信封同族）、`session/close`→`{closed:true}`（**实证语义：仅句柄分离**——随后 resume 可全量回读历史、会话仍列于列表；此前依据单个空会话消失得出的「移除选中会话」结论不成立，已在证据中更正）、`session/compact`→`{response,snapshot}`、`session/fork` 系 workspace checkpoint 门控（文本会话诚实报「No workspace checkpoint is available yet.」）；方法表无 rename 且 `session/create` 严格拒绝 `title` 键——rename 诚实不可用的证据链闭合。
+2. `ZCodeAdapter` 生命周期面：`listSessions`/`getSession`/`getSessionMessages`（各操作先 `session/resume` 激活）、`deleteSession` 证据支撑的诚实不可用（close 非删除，映射即伪造）、`forkSession`→`session/fork`（无原生身份即抛错、原生失败透传）、`compactSession`→`session/compact`（可选 `instructions`）、`updateSessionTitle` 诚实不可用；能力集 + Fork + Compaction。
+3. `AgentBackendRouting.loadBackendSessionMessages` 的 `{info,parts}` 信封分支并容 zcode（`info.id ?? info.messageId`）；稳定 id 保证重复水合行一致（双重渲染防护边界）。
+
+**验证**：聚焦 12 例全绿（ZCodeAdapter.sessions 9 + ZCodeSessionRouting 3）：resume 先于 read（激活语义）、resume 重复触发容忍（幂等契约）、水合失败透传（不吞错）、delete 只按目标 id 调 close 且 `closed:false`/native error 不伪造成功、rename 诚实不可用、fork 身份映射与 message 锚点透传、无身份/无 checkpoint 诚实失败、compact 指令映射与结果判定、`{info,parts}`→稳定 id 归一、重复水合幂等（无重复史）、opencode id 字段回归。---
+---
+
+## 2026-09-22 ZCode 票 01/02 独立核查修复：启动阻断两处 + 解析顺序校正
+
+**触发**：独立核查认定票 01/02 的「真实运行验收」不成立——插件启动路径有两个阻断点：① adapter 把 Obsidian 的 Electron 传给解析器并无条件优先（实证该 Electron 忽略 `ELECTRON_RUN_AS_NODE`，bundle 根本不会执行）；② provider 配置只注 `ZCODE_STORAGE_DIR` 未注入内置配置（打包安装里运行时自查找的 `Resources/glm/provider/` 与上溯五层候选均不存在，真实文件在 `Resources/config/provider/`，触发即报「无法定位 CLI ZCode Built-in Provider Config」）。另证据中「设置覆盖优先」与实现（环境命令覆盖优先）相反。
+
+**改动**：
+
+1. `ZCodeRuntimeResolver`：node-bundle 运行器改为 bundle 自带应用 Electron（官方 electron-node）→ PATH `node` 两级，宿主注入 Electron 一律不再使用；解析顺序改为设置 `executablePath` → `ZCODE_AGENT_SERVER_COMMAND` → `GLM_BINARY_PATH` → `ZCODE_AGENT_WORKDIR` → 平台内置目录。
+2. `ZCodeProviderConfigDiscovery`：改官方成对注入——`ZCODE_BUILTIN_PROVIDER_CONFIG_FILE` + `ZCODE_PERSONAL_PROVIDER_CONFIG_FILE` 同时提供（运行时 `resolveNodeProviderRuntimePaths` 对半对直接抛「路径必须同时提供」）；builtin 按入口锚定（`<resources>/glm` → `<resources>/config/provider`）+ 平台根 + 显式 env 发现并只读校验；personal 指向运行时自管 `<dataBaseDir>/.zcode/v2/provider_config.json`（缺失=合法首跑）；builtin 缺失/文件坏时不注半对、给可操作诊断。`ZCodeAdapter` 不再注入 `process.execPath`，并向发现器传 `entryPath` 锚点。
+
+**验证**：聚焦 61 例全绿（新增：设置优先于环境覆盖、成对注入、builtin 入口锚定、personal 缺失合法、半对不注入、malformed/unreadable 区分）。真机契约验证：冷库 + 成对 env → 注册表带 reasoning 档位正常加载、0 builtin 错误；`ymr` 源码级确认半对抛错语义。Obsidian Electron 启动形态复现失败（`Error: Command ".../zcode.cjs" not found.`）确认修复①必要性；`Resources/glm/provider/` 与 `/config/provider` 均不存在、`Resources/config/provider/zcode-builtin.json` 存在，确认修复②的候选修正。部署后在 Test Vault 内做产品 UI 验收（诊断性模型预配置后完成，见票据 Evidence）。
+
+
+## 2026-09-22 ZCode 后端接入票 02：可取消的流式对话
+
+**触发**：`.scratch/zcode-backend` 票 02——一次完整的可取消流式 ZCode 对话（原生会话映射、增量输出、终结/用量边界、取消后可用、失败归一）。
+
+**改动**：
+
+1. 新增 `ZCodeStreamMapper`：`session/event` → `StreamChunk` 的唯一映射面。真机实证的事件蓝本：`turn.started`（含原生用户消息 id）→ `message_start`；`model.streaming`（`kind: reasoning_delta|text_delta`）与 `part.delta`（`field: text|reasoning`）→ `thinking`/`text`；`turn.completed`（`response/tokenCount/usage{inputTokens,outputTokens,reasoningTokens,cacheReadTokens,cacheWriteTokens}/duration/resultType`）→ 未流式回填 + `usage`（provider/model 身份缺失留空不臆造）；`turn.failed`（结构化 error）→ `error` 块。顺序契约：`seq` 单调去重（迟到/乱序丢并计数）、回合内 delta 通道互斥（防双通道重复文本）、终结后帧一律忽略。
+2. `ZCodeAdapter` 接通 `AgentChatCapability` + `AgentSessionCapability`：`sendMessage` 订阅（`session/subscribe` `deliveryKind:"desktop-continuous"`）→ `session/send`（异步受理 `{accepted,stateRevision}`）→ 事件泵映射 → 恒发 `message_stop` 终结边界（取消也关流）；`cancelStream` 只停本会话（`session/stop`）并保持会话可继续发（retry-after-cancel 实测）；并发会话按 sessionId 分拣。`createSession` 映射 `session/create`（`workspace:{workspaceKey,workspacePath}`=vault），并对会话物化时的宿主 ask 做诚实应答防死锁（`session/requestRuntimePreferences` → 无原生搜索增强；`interaction/requestOfficialMcpAuthHeaders` → 空 headers）；删除/重命名为诚实不可用（票 03）。镜像 prompt-prefix 适配器消费 memory / obsidianTooling 注入缝。
+3. 真机协议发现（隔离+真实存储混合探测）：帧无 `jsonrpc`；`session/send` 参数 `{sessionId, content}`；`session/stop` → `{}`；`session/setModel` 模型引用严格 `{providerId, modelId, options:{reasoningLevel}}`（级别枚举按模型而异，mimo 为 disabled/enabled）；`session/setThoughtLevel` 独立方法；事件经 `session/event`（`type` 判别 + `seq`）投递。当前 grok-4.5 上游 400 故障期间完成了失败路径真机观察（`turn.failed` + 归因负载）。
+
+**验证**：聚焦测试 32 例全绿（ZCodeStreamMapper 10 + ZCodeAdapter.chat 10 + ZCodeAdapter 生命周期 12）：映射/顺序/去重/双通道互斥、终结用量与失败归一、取消→关流→会话可用→重发成功、并发会话隔离、busy 锁、协议失败可复用、进程退出中途回合诚实收尾、图片本地拒绝、createSession 映射与诚实不可用。真机 3 回合流式冒烟（成功流 capture `model.streaming`→`turn.completed` 完整负载；取消 + 重发接受）。CodeGraph（改后补测）：`ZCodeAdapter` 名查询直接 function/method 调用者 0（余为 file 节点），depth 2 模糊半径 262（同名符号跨后端误匹配、CLI 无 `--file`）；限定符号 `ZCodeAdapter::sendMessage` 同样跨后端误匹配；MCP file 限定 callgraph 两次超时——工具限制如实登记，实际消费面为 AgentAdapterWiring 构造 + registry（票 01 已测）。
+
+---
+
+## 2026-09-22 ZCode 后端接入票 01：运行时发现、能力握手与进程生命周期
+
+**触发**：`.scratch/zcode-backend` 票 01——注册并探测本地 ZCode 后端，走官方开源 ZCode 的 `app-server --stdio` 结构化协议（不操控桌面 UI、不解析终端文本、不读 SQLite、不接第三方代理）。
+
+**改动**：
+
+1. 新增 `src/core/agents/backend/zcode/`（ZCodeAdapter / ZCodeAppServerTransport / ZCodeProtocolTypes / ZCodeProviderConfigDiscovery / ZCodeRuntimeResolver）。协议为 NDJSON，消息封装**无 `jsonrpc` 字段**（真机实证：官方运行时以 "Invalid ZCode Protocol message" 拒绝带该字段的出站消息）；边界校验入站四形态（response / error / notification / server-request），未知事件与未知字段诚实降级不破流，畸形帧计数超预算或单帧超 8MB 才判流损坏；服务端发起请求未注册处理器一律 fail-closed 回 method-not-found。进程所有权收口于 transport：只 spawn/reap 自有子进程，dispose 幂等（SIGTERM→2s→SIGKILL），超时/早退/断连均以结构化 reason 归一，按错误码分支不匹配文本。
+2. 运行时解析镜像官方宿主命令解析链：设置 `executablePath` 覆盖（二进制 / `zcode.cjs` / 目录）→ `ZCODE_AGENT_SERVER_COMMAND`+`ZCODE_AGENT_SERVER_ARGS_JSON` → `GLM_BINARY_PATH` → `ZCODE_AGENT_WORKDIR` → 各平台应用内置 `resources/glm`；node-bundle 以宿主 Electron 二进制 + `ELECTRON_RUN_AS_NODE=1` 运行（官方 electron-node 形态，实测可用；Obsidian 自身 Electron 不接受该开关），无 Electron 宿主回退 PATH `node`。provider 配置按官方语义只读发现（`ZCODE_STORAGE_DIR`，默认 `~/.zcode`，beta 渠道 `~/.zcode-beta`）并注入自有进程，缺失/不可读/畸形给可操作诊断，**绝不改写用户配置**。
+3. 接线与 UI：`AgentBackendKind`/`IMPLEMENTED_AGENT_BACKENDS` 增加 zcode；`AgentAdapterWiring` 注册（仅 vaultPath 存在时）；设置 `backendSettings.zcode`（executablePath 覆盖 + 归一化）；`SettingsZCodeSection` 以 ready / unavailable / failed 三行诚实诊断（运行时解析、provider 配置、连接握手）+ 重连；官方 ZCode SVG 注册为 `opencodian-zcode`；双语文案对齐。其他后端启停/并发 tab/后台任务语义不变。
+
+**验证**：聚焦测试 8 套 79 例全绿（协议边界 / 解析器 / 宿主二进制回归 / provider 发现 / transport / adapter / 接线 / 设置归一化），失败路径含：解析缺失与配置路径错误、`ZCODE_AGENT_SERVER_ARGS_JSON` 非法、握手超时、spawn 失败、进程早退、dispose 杀进程与 SIGKILL 升级、超时迟到响应不复活、超大帧与畸形帧预算、fail-closed 未处理请求。真机实证：本机 ZCode.app bundle spawn `app-server --stdio` 完成 `runtime/capabilities` 握手（ZCode Electron + `ELECTRON_RUN_AS_NODE=1` 与系统 node 两种 runner 均验证）。CodeGraph（改前）：`wireHiddenAdapters` 1 个直接方法调用者（handleBootstrapOpenCodeRuntime）、depth 2、blast radius 11；`normalizeBackendSettings` 2 个直接函数调用者、depth 2、blast radius 10；均在票内范围。module-docs coverage 765/765、diff 13 targets OK；owner-manifest PASS。
+
+---
+
 ## 2026-09-21 批次 F 质量修复的视觉验收跟进：绑定分区不再挤压变更列表
 
 **触发**：批次 F 质量修复批次的视觉验收确认轮发现两处**由本批次自己引入**的回归（不在原审查报告里），必须修掉再交付。

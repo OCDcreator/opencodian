@@ -137,8 +137,8 @@ describe('normalizeInlineEditMaxConcurrentEdits (R-A5)', () => {
   });
 });
 
-// R-C3 dedicated completion model override: same map shape and normalization
-// discipline as the inline-edit model overrides.
+// R-C3 dedicated completion model override: ZCode is intentionally included
+// here only, because its sessionless text path does not implement generic aux.
 describe('normalizeInlineCompletionModelOverrides (R-C3)', () => {
   it('keeps known backends with non-empty string values and trims them', () => {
     expect(normalizeInlineCompletionModelOverrides({
@@ -146,11 +146,13 @@ describe('normalizeInlineCompletionModelOverrides (R-C3)', () => {
       'claude-code': 'claude-haiku-4-5',
       codex: 'gpt-5-mini',
       pi: 'provider/model',
+      zcode: 'krill/gpt-6-sol',
     })).toEqual({
       opencode: 'deepseek/deepseek-flash',
       'claude-code': 'claude-haiku-4-5',
       codex: 'gpt-5-mini',
       pi: 'provider/model',
+      zcode: 'krill/gpt-6-sol',
     });
   });
 
@@ -161,6 +163,7 @@ describe('normalizeInlineCompletionModelOverrides (R-C3)', () => {
       'not-a-backend': 'p/m',
       codex: { model: 'gpt-5' },
       pi: ['p', 'm'],
+      zcode: ' ',
     })).toEqual({});
   });
 
@@ -196,6 +199,7 @@ describe('normalizeInlineCompletionModelOverrides (R-C3)', () => {
             opencode: ' deepseek/deepseek-flash ',
             stale: 'p/m',
             'claude-code': '',
+            zcode: ' krill/gpt-6-sol ',
           },
         },
         filePath: '.opencodian/settings.core.json',
@@ -208,6 +212,7 @@ describe('normalizeInlineCompletionModelOverrides (R-C3)', () => {
     });
     expect(persisted.settings.inlineCompletionModelOverrides).toEqual({
       opencode: 'deepseek/deepseek-flash',
+      zcode: 'krill/gpt-6-sol',
     });
   });
 });

@@ -464,13 +464,14 @@ describe('ContextDetailModal foreground compaction layout and result states', ()
     ['failed', 'Context compaction failed'],
     ['malformed', 'malformed compaction response'],
     ['stale', 'result is stale'],
+    ['accepted', 'Accepted'],
   ] as const)('keeps %s result honest', async (status, copy) => {
     const coordinator = {
       getForegroundCompactionControl: jest.fn().mockReturnValue(control()),
       compactForegroundThread: jest.fn().mockResolvedValue(result({
         status,
         runtimeVerified: false,
-        acknowledged: false,
+        acknowledged: status === 'accepted',
         completed: false,
         tokenUsageObserved: false,
       })),
@@ -483,6 +484,9 @@ describe('ContextDetailModal foreground compaction layout and result states', ()
 
     expect(modal.contentEl.querySelector('[role="status"]')?.textContent).toContain(copy);
     expect(modal.contentEl.querySelector('[role="status"]')?.textContent).not.toContain('verified');
+    expect(modal.contentEl.querySelector('[role="status"]')?.classList.contains('is-pending-verification'))
+      .toBe(status === 'accepted');
+    expect(modal.contentEl.querySelector('[role="status"]')?.classList.contains('is-success')).toBe(false);
   });
 
   it('reports timeout with acknowledgement and fences late stale results', async () => {

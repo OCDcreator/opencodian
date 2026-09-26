@@ -210,6 +210,16 @@ export class ContextDetailModal extends Modal {
       };
     }
 
+    // ZCode's per-turn billing identity comes from the native model request.
+    // The tab selector may already point at a different model for the next
+    // turn, so it must not relabel the usage from the last completed turn.
+    if (this.conversation?.backend === 'zcode' && this.contextState?.billingUsage?.modelId) {
+      return {
+        provider: this.contextState.billingUsage.providerId ?? '-',
+        model: this.contextState.billingUsage.modelId,
+      };
+    }
+
     return {
       provider: this.contextState?.providerName ?? this.contextState?.provider ?? '-',
       model: this.contextState?.modelName ?? this.contextState?.model ?? '-',

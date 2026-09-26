@@ -1,6 +1,7 @@
 import { setIcon } from 'obsidian';
 
 import type { Conversation } from '../../../core/types';
+import { t } from '../../../i18n';
 import type {
   BackgroundTaskSegment,
   BackgroundTaskTimelineService,
@@ -11,6 +12,27 @@ type BackgroundTaskInlineTimelinePort = Pick<
   BackgroundTaskTimelineService,
   'collectInlineSegments' | 'getInlineCopy'
 >;
+
+const NATIVE_TASK_STATUS_ICONS: Record<string, string> = {
+  running: 'loader',
+  completed: 'circle-check',
+  cancelled: 'circle-slash',
+  stopped: 'circle-slash',
+  failed: 'circle-x',
+  interrupted: 'circle-alert',
+};
+
+function nativeTaskStatusLabel(status: string): string {
+  switch (status) {
+    case 'running': return t('chat.zcode.backgroundTask.running');
+    case 'completed': return t('chat.zcode.backgroundTask.completed');
+    case 'cancelled': return t('chat.zcode.backgroundTask.cancelled');
+    case 'stopped': return t('chat.zcode.backgroundTask.stopped');
+    case 'failed': return t('chat.zcode.backgroundTask.failed');
+    case 'interrupted': return t('chat.zcode.backgroundTask.interrupted');
+    default: return t('chat.zcode.backgroundTask.unknown');
+  }
+}
 
 export interface BackgroundTaskInlinePanelRuntimeState {
   backgroundTaskIndicatorEl: HTMLElement | null;
@@ -26,13 +48,20 @@ export interface BackgroundTaskInlinePanelRenderOptions {
 
 export interface BackgroundTaskInlinePanelRendererHost {
   getActiveTabId(): TabId | null;
+  getConversationForTab?(tabId: TabId): Conversation | null;
   getTabRuntimeState(tabId: TabId | null): BackgroundTaskInlinePanelRuntimeState | null;
   renderMarkdownInto(container: HTMLElement, markdown: string): Promise<void>;
+  getMessagesContainer(tabId: TabId | null): HTMLElement | null;
+  readZCodeTasks(sessionId: string): Promise<Array<{ taskId: string; status: string; description: string; cancellable: boolean }>>;
+  cancelZCodeTask(sessionId: string, taskId: string): Promise<boolean>;
 }
 
 export class BackgroundTaskInlinePanelRenderer {
   private readonly renderGenerationByRuntime = new WeakMap<object, number>();
   private readonly panelGenerationByElement = new WeakMap<HTMLElement, number>();
+  private readonly nativeTaskTimers = new Map<TabId, number>();
+  private readonly nativeTaskReads = new Set<TabId>();
+  private disposed = false;
 
   constructor(
     private readonly timelineService: BackgroundTaskInlineTimelinePort,
@@ -40,6 +69,12 @@ export class BackgroundTaskInlinePanelRenderer {
   ) {}
 
   clear(tabId: TabId | null = this.host.getActiveTabId()): void {
+    if (tabId) {
+      const timer = this.nativeTaskTimers.get(tabId);
+      if (timer !== undefined) window.clearInterval(timer);
+      this.nativeTaskTimers.delete(tabId);
+      this.host.getMessagesContainer(tabId)?.querySelector('.opencodian-zcode-native-tasks')?.remove();
+    }
     const runtime = this.host.getTabRuntimeState(tabId);
     if (!runtime) {
       return;
@@ -117,6 +152,118 @@ export class BackgroundTaskInlinePanelRenderer {
         return;
       }
     }
+    await this.renderNativeTasks(conversation, tabId);
+  }
+
+  /** Start native task readback when a ZCode conversation becomes active. */
+  async watchNativeTasks(conversation: Conversation | null, tabId: TabId | null): Promise<void> {
+    await this.renderNativeTasks(conversation, tabId);
+  }
+
+  disposeNativeTaskWatch(): void {
+    this.disposed = true;
+    for (const timer of this.nativeTaskTimers.values()) window.clearInterval(timer);
+    this.nativeTaskTimers.clear();
+  }
+
+  private async renderNativeTasks(conversation: Conversation | null, tabId: TabId | null): Promise<void> {
+    if (!tabId || this.disposed || this.nativeTaskReads.has(tabId)) return;
+    this.nativeTaskReads.add(tabId);
+    try {
+      await this.readAndRenderNativeTasks(
+        this.host.getConversationForTab ? this.host.getConversationForTab(tabId) : conversation,
+        tabId,
+      );
+    } finally {
+      this.nativeTaskReads.delete(tabId);
+    }
+  }
+
+  private async readAndRenderNativeTasks(conversation: Conversation | null, tabId: TabId): Promise<void> {
+    const oldTimer = this.nativeTaskTimers.get(tabId);
+    if (oldTimer !== undefined) window.clearInterval(oldTimer);
+    this.nativeTaskTimers.delete(tabId);
+    const container = this.host.getMessagesContainer(tabId);
+    const oldPanel = container?.querySelector<HTMLElement>('.opencodian-zcode-native-tasks');
+    const sessionId = conversation?.backend === 'zcode' ? conversation.backendSessionId : null;
+    if (!container || !sessionId) {
+      oldPanel?.remove();
+      return;
+    }
+    let tasks: Awaited<ReturnType<BackgroundTaskInlinePanelRendererHost['readZCodeTasks']>>;
+    try {
+      tasks = await this.host.readZCodeTasks(sessionId);
+    } catch {
+      tasks = [...(oldPanel?.querySelectorAll<HTMLElement>('[data-task-id]') ?? [])].map((row) => ({
+        taskId: row.dataset.taskId ?? '',
+        status: row.dataset.taskStatus === 'running' ? 'interrupted' : row.dataset.taskStatus ?? 'unknown',
+        description: row.dataset.taskDescription ?? '',
+        cancellable: false,
+      }));
+    }
+    if (this.disposed) return;
+    const currentConversation = this.host.getConversationForTab?.(tabId);
+    if (this.host.getConversationForTab && currentConversation?.backendSessionId !== sessionId) {
+      this.scheduleNativeTaskRefresh(currentConversation ?? null, tabId);
+      return;
+    }
+    oldPanel?.remove();
+    if (tasks.length === 0) {
+      this.scheduleNativeTaskRefresh(conversation, tabId);
+      return;
+    }
+    const panel = container.createDiv({ cls: 'opencodian-zcode-native-tasks' });
+    panel.dataset.sessionId = sessionId;
+    for (const task of tasks) {
+      const row = panel.createDiv({ cls: 'opencodian-chat-notice-card is-info is-background-task is-inline' });
+      row.dataset.taskId = task.taskId;
+      row.dataset.taskStatus = task.status;
+      row.dataset.taskDescription = task.description;
+      const status = nativeTaskStatusLabel(task.status);
+      const iconEl = row.createDiv({ cls: 'opencodian-chat-notice-icon opencodian-zcode-task-icon' });
+      iconEl.setAttribute('aria-hidden', 'true');
+      setIcon(iconEl, NATIVE_TASK_STATUS_ICONS[task.status] ?? 'circle-help');
+      const bodyEl = row.createDiv({ cls: 'opencodian-chat-notice-body opencodian-zcode-task-body' });
+      const headerEl = bodyEl.createDiv({ cls: 'opencodian-zcode-task-header' });
+      headerEl.createSpan({
+        cls: 'opencodian-chat-notice-title opencodian-zcode-task-title',
+        text: task.description || t('chat.backgroundTask.noDescription'),
+      });
+      headerEl.createSpan({ cls: 'opencodian-zcode-task-status', text: status });
+      bodyEl.createEl('code', {
+        cls: 'opencodian-zcode-task-id',
+        text: task.taskId,
+        attr: { title: task.taskId },
+      });
+      if (task.status === 'running' && task.cancellable) {
+        const actionsEl = bodyEl.createDiv({ cls: 'opencodian-zcode-task-actions' });
+        const cancel = actionsEl.createEl('button', {
+          cls: 'opencodian-chat-notice-action-btn',
+          text: t('chat.zcode.backgroundTask.cancel'),
+          attr: { type: 'button' },
+        });
+        cancel.addEventListener('click', () => {
+          cancel.disabled = true;
+          void this.host.cancelZCodeTask(sessionId, task.taskId).catch(() => false).finally(() => {
+            void this.renderNativeTasks(conversation, tabId);
+          });
+        });
+      }
+    }
+    // A connection loss must keep a bounded retry alive: the same tab can
+    // reconnect later and gain a native terminal readback for this task.
+    this.scheduleNativeTaskRefresh(conversation, tabId);
+  }
+
+  private scheduleNativeTaskRefresh(conversation: Conversation | null, tabId: TabId): void {
+    this.nativeTaskTimers.set(tabId, window.setInterval(() => {
+      if (this.host.getActiveTabId() === tabId) {
+        void this.renderNativeTasks(
+          this.host.getConversationForTab ? this.host.getConversationForTab(tabId) : conversation,
+          tabId,
+        );
+      }
+    }, 3_000));
   }
 
   private async renderSegment(

@@ -1,4 +1,7 @@
 # MessageSendPreparationService
+> 2026-09-24 (ZCode image preflight)：带图片的 ZCode turn 在 optimistic user message 之前读取原生模型目录并核对所选 provider/model 的 `supportsImageInput`；不支持或目录不可用时以可操作 Notice 拒绝，文本与图片草稿不被消费。composer 可通过 `onPreparationOutcome` 区分 accepted/queued/rejected。
+
+> 2026-09-24（ZCode 续做）：ZCode 发送跳过 OpenCode 专属 `app.skills`/SkillContentExpander 请求；官方 ZCode 斜杠目录仍由 ZCode adapter 提供，避免跨后端请求污染。ZCode 现在也走发送前模型目录与所选模型校验，当前标签的 provider/model/reasoning variant 会进入发送选项，由 adapter 对原生会话设置并读回；此前菜单显示新模型而发送仍用旧模型。
 > 2026-09-21 (advantage-parity R-F1)：排队成功后经 notifyFollowUpQueued 上抛队列快照（bar 无需轮询）；消费/撤回经 notifyFollowUpQueueChanged。
 > 2026-09-21 (advantage-parity R-E1)：合并上下文后、分区前经 resolveUrlContextItems 缝抓取 pending URL 条目；失败条目保留并逐条本地化 Notice。
 
@@ -106,7 +109,7 @@ export function createMessageSendPreparationHost(
 
 ### backend model options
 
-- OpenCode 与 Claude Code conversation 都会走 model catalog preparation，确保 composer 选择的 model / effort 在 stream transport 前成为 `PreparedMessageSend.modelOptions`
+- OpenCode、Claude Code、Pi 与 ZCode conversation 都会走 model catalog preparation，确保 composer 选择的 model / effort 在 stream transport 前成为 `PreparedMessageSend.modelOptions`
 - Claude Code 的 `modelOptions.variant` 表示 Claude Code effort，不再依赖 OpenCode provider model variants
 - `PrepareMessageSendOptions.outputFormat` 允许 send pipeline 为单条消息注入结构化输出 schema；`prepareMessageSend()` 会在构造完 `modelOptions` 后将其合并进去，使该 schema 能随 `sendStreamMessage` options 到达 backend adapter
 - 其他未接入 model capability 的 backend 仍可通过 host `shouldUseModelCatalog()` 保持跳过

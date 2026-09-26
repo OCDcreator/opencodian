@@ -40,7 +40,7 @@ export interface PermissionModeConfig {
   /** CSS class names for each mode, used on the trigger element. */
   modeCssClasses: readonly string[];
   /** Stable data attribute value identifying the backend system. */
-  backendLabel: 'opencode' | 'claude-code' | 'codex';
+  backendLabel: 'opencode' | 'claude-code' | 'codex' | 'zcode';
   /** Optional visual variant class shared by the container, trigger, and dropdown. */
   variantClass?: string;
   /**
@@ -84,6 +84,24 @@ export function createOpenCodePermissionConfig(): PermissionModeConfig {
     ],
     displayMap: { yolo: 'YOLO', normal: 'ASK', plan: 'PLAN' } as Record<PermissionMode, string>,
     modeCssClasses: ['mode-yolo', 'mode-normal', 'mode-plan'] as const,
+  };
+}
+
+/** Native ZCode session mode; this is one axis, not OpenCode permission templates. */
+export function createZCodeModeConfig(): PermissionModeConfig {
+  return {
+    backendLabel: 'zcode',
+    options: (['plan', 'build', 'edit', 'yolo', 'auto'] as const).map((id) => ({
+      id,
+      label: t(`chat.zcode.mode.${id}`),
+      description: t(`chat.zcode.mode.${id}.description`),
+    })),
+    displayMap: {
+      plan: 'PLAN', build: 'BUILD', edit: 'EDIT', yolo: 'YOLO', auto: 'AUTO',
+      unknown: t('chat.zcode.mode.unknown'),
+      checking: t('chat.zcode.mode.checking'),
+    },
+    modeCssClasses: ['mode-plan', 'mode-build', 'mode-edit', 'mode-yolo', 'mode-auto', 'mode-unknown', 'mode-checking'],
   };
 }
 

@@ -474,6 +474,8 @@ function describeModelRef(model: BackendModelSelection | null): string {
     case 'opencode':
     case 'pi':
       return `${model.kind}:${model.provider}/${model.model}`;
+    case 'zcode':
+      return `${model.kind}:${model.provider}/${model.model}${model.reasoningLevel ? `@${model.reasoningLevel}` : ''}`;
     case 'claude-code':
       return `${model.kind}:${model.model}`;
     case 'codex':

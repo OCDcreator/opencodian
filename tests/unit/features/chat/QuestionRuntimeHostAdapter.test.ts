@@ -245,8 +245,8 @@ describe('QuestionRuntimeHostAdapter', () => {
     expect(viewHost.keepQuestionCardPinnedToBottom).toHaveBeenCalledWith('tab-active');
     expect(viewHost.getPendingQuestions).toHaveBeenCalledTimes(1);
     expect(viewHost.setTabNeedsAttention).toHaveBeenCalledWith('tab-active', true);
-    expect(viewHost.replyToQuestion).toHaveBeenCalledWith(request.id, [['TypeScript']]);
-    expect(viewHost.rejectQuestion).toHaveBeenCalledWith(request.id);
+    expect(viewHost.replyToQuestion).toHaveBeenCalledWith(request.id, [['TypeScript']], { tabId: null, request });
+    expect(viewHost.rejectQuestion).toHaveBeenCalledWith(request.id, { tabId: null, request });
     expect(postResolutionRuntimeHost.refreshTabSessionStatus).toHaveBeenCalledWith(
       'tab-active',
       'session-1',
@@ -289,7 +289,7 @@ describe('QuestionRuntimeHostAdapter', () => {
 
     await expect(resolutionPromise).resolves.toBe(true);
 
-    expect(viewHost.replyToQuestion).toHaveBeenCalledWith(request.id, [['TypeScript']]);
+    expect(viewHost.replyToQuestion).toHaveBeenCalledWith(request.id, [['TypeScript']], { tabId: 'tab-active', request });
     expect(postResolutionRuntimeHost.refreshTabSessionStatus).toHaveBeenCalledWith(
       'tab-active',
       'session-1',
@@ -328,7 +328,7 @@ describe('QuestionRuntimeHostAdapter', () => {
     await services.resolutionFlowCoordinator.showQuestionDialog(request, 'tab-active');
 
     expect(collectActionSpy).toHaveBeenCalledWith(request, 'all', 'tab-active');
-    expect(viewHost.replyToQuestion).toHaveBeenCalledWith(request.id, [['TypeScript']]);
+    expect(viewHost.replyToQuestion).toHaveBeenCalledWith(request.id, [['TypeScript']], { tabId: 'tab-active', request });
     expect(postResolutionRuntimeHost.refreshTabSessionStatus).toHaveBeenCalledWith(
       'tab-active',
       'session-1',
