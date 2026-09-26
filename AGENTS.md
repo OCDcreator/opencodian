@@ -8,6 +8,19 @@ OpenCodian is an Obsidian plugin that embeds OpenCode into the sidebar. Keep thi
 - Prefer `rg`, small edits, and the smallest meaningful validation first.
 - Avoid unrelated refactors and avoid editing `reference-projects/` unless the task explicitly asks for it.
 
+## Agent skills
+
+### Issue tracker
+
+Issues and specs for this repo use Local Markdown under `.scratch/`; the
+project path is a symlink to a non-synced local tracker directory. See
+`docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+This is a single-context repository. Read `CONTEXT.md` and relevant ADRs under
+`docs/adr/` before exploring a domain. See `docs/agents/domain.md`.
+
 ## Quick Commands
 
 ```bash

@@ -33,6 +33,7 @@ data.json
 
 # AI coding assistants
 .agents/
+.scratch
 .claude/
 .copilot/
 .gemini/
@@ -62,6 +63,8 @@ docs/*
 !docs/adr/**
 !docs/architecture/
 !docs/architecture/**
+!docs/agents/
+!docs/agents/**
 !docs/archive/
 !docs/archive/**
 !docs/modules/
@@ -83,6 +86,7 @@ automation/runtime/
 
 # Local debug artifacts
 .obsidian-debug/
+.visual-evidence/
 tmp/
 /{outputDir}/
 
