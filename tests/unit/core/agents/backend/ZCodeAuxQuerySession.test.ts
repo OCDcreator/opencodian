@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import { afterAll, afterEach, describe, expect, it, jest } from '@jest/globals';
 
 import type { ZCodeAuxTransport } from '../../../../../src/core/agents/backend/zcode/ZCodeAuxQuerySession';
 import { ZCodeAuxQuerySession } from '../../../../../src/core/agents/backend/zcode/ZCodeAuxQuerySession';
@@ -101,7 +101,9 @@ class FakeAuxTransport implements ZCodeAuxTransport {
 }
 
 describe('ZCodeAuxQuerySession', () => {
-  const tempParent = path.join(process.cwd(), '.visual-evidence');
+  const tempBase = path.join(process.cwd(), '.tmp');
+  fs.mkdirSync(tempBase, { recursive: true });
+  const tempParent = fs.mkdtempSync(path.join(tempBase, 'zcode-aux-unit-'));
   const createdRoots = new Set<string>();
   let lastTransport: FakeAuxTransport | null = null;
 
@@ -115,6 +117,11 @@ describe('ZCodeAuxQuerySession', () => {
       if (fs.existsSync(root)) fs.rmSync(root, { recursive: true, force: true });
     }
     createdRoots.clear();
+  });
+
+  afterAll(() => {
+    // The suite owns this empty parent; keep the ignored product-evidence tree out of unit tests.
+    fs.rmdirSync(tempParent);
   });
 
   function create(mode: FakeAuxTransport['mode'] = 'success', turnTimeoutMs?: number): Promise<ZCodeAuxQuerySession> {
