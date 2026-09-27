@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "de24f8cefd086d8f4be7c366d34e72b7b94fe98a8a34c9b126195a7d483620bc",
+  "digest": "f183d6974f85c62b30a051e1ed5411041f7f4d970d02e2fe97ec8a88a4b9dd52",
   "recordCount": 790,
   "records": [
     {
@@ -546,12 +546,12 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/zcode/ZCodeProviderConfigDiscovery.ts",
-      "sha256": "460d6957ad26efb3c1e34371aa2acb071554e53079703e1d4a8cab119e466486"
+      "sha256": "63fec89e7a542b2e10a0b7928ec12b69573c9201ed5bb27812dddcdac0825dd5"
     },
     {
       "kind": "src",
       "key": "src/core/agents/backend/zcode/ZCodeRuntimeResolver.ts",
-      "sha256": "baed4a67fea2ae0c7a203eb28a28f10e796cfd1ae82ff834ea6f44eb061a2763"
+      "sha256": "e6c19d4a66304395d52d80639f9965b4521d550f5f748f4664137d091005c638"
     },
     {
       "kind": "src",
@@ -3954,7 +3954,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-26T02:19:39.898Z",
-  "headShaAtGeneration": "6678b90132a862ee1f61a4fe991b28e237a8ea52",
+  "generatedAt": "2026-09-27T01:07:51.963Z",
+  "headShaAtGeneration": "9891d2b1491427356f0781658b3e8c0fa5e501bc",
   "graphifyVersion": "graphify 0.9.31"
 }

@@ -57,7 +57,9 @@ export interface ZCodeProviderConfigDiscoveryOptions {
  * `ZCODE_STORAGE_DIR` when set, otherwise `~/.zcode` (beta channel uses
  * `~/.zcode-beta`).
  */
-export function resolveZCodeDataRoot(options: Pick<ZCodeProviderConfigDiscoveryOptions, 'env' | 'homedir'> = {}): string {
+export function resolveZCodeDataRoot(
+  options: Pick<ZCodeProviderConfigDiscoveryOptions, 'env' | 'homedir' | 'platform'> = {},
+): string {
   const env = options.env ?? process.env;
   const home = options.homedir ?? os.homedir();
   const explicit = (env['ZCODE_STORAGE_DIR'] ?? '').trim();
@@ -65,7 +67,10 @@ export function resolveZCodeDataRoot(options: Pick<ZCodeProviderConfigDiscoveryO
     return explicit;
   }
   const isBeta = env['ZCODE_BETA'] === '1' || env['ZCODE_ENV'] === 'beta';
-  return path.join(home, isBeta ? '.zcode-beta' : '.zcode');
+  // Join in the target platform's syntax: POSIX paths must stay POSIX even
+  // when discovery runs on a Windows host (simulated platform layouts).
+  const pathApi = (options.platform ?? process.platform) === 'win32' ? path.win32 : path.posix;
+  return pathApi.join(home, isBeta ? '.zcode-beta' : '.zcode');
 }
 
 /**
@@ -197,11 +202,11 @@ export function discoverZCodeProviderConfig(options: ZCodeProviderConfigDiscover
   const env = options.env ?? process.env;
   const platform = options.platform ?? process.platform;
   const home = options.homedir ?? os.homedir();
-  const pathApi = platform === 'win32' ? path.win32 : path;
+  const pathApi = platform === 'win32' ? path.win32 : path.posix;
   const readFile = options.readFile ?? ((filePath: string) => fs.readFileSync(filePath, 'utf8'));
   const existsSync = options.existsSync ?? fs.existsSync;
 
-  const dataRoot = resolveZCodeDataRoot({ env, homedir: home });
+  const dataRoot = resolveZCodeDataRoot({ env, homedir: home, platform });
   const dataBaseDir = (env['ZCODE_DATA_BASE_DIR'] ?? '').trim() || home;
   const personalPath = (env['ZCODE_PERSONAL_PROVIDER_CONFIG_FILE'] ?? '').trim()
     || pathApi.join(dataBaseDir, '.zcode', 'v2', 'provider_config.json');

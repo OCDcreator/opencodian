@@ -1,5 +1,7 @@
 # ZCodeProviderConfigDiscovery
 
+> 2026-09-27（跨平台修复）：`resolveZCodeDataRoot` 新增可选 `platform` 并按目标平台语义拼接 `~/.zcode`（非 win32 用 `path.posix`；`discoverZCodeProviderConfig` 透传其 platform）。此前在 Windows 宿主上解析 POSIX home 会产出反斜杠路径，CI Windows job 因此全红；真实宿主行为零变化。
+
 > 2026-09-22（核查修复）：改为官方成对注入契约——`ZCODE_BUILTIN_PROVIDER_CONFIG_FILE` + `ZCODE_PERSONAL_PROVIDER_CONFIG_FILE` **必须同时提供**（运行时对只给一半直接抛错）。builtin 按「解析入口锚定（`<resources>/glm/` → `<resources>/config/provider/zcode-builtin.json`）→ 各平台安装根 → 显式 env」发现并只读校验（打包安装里运行时自查找的两个候选路径均不存在，这是「无法定位 CLI ZCode Built-in Provider Config」的根因）；personal 路径指向运行时自管的 `<dataBaseDir>/.zcode/v2/provider_config.json`（缺失=合法首跑态）。builtin 缺失或文件坏时**不注入半对**，给可操作诊断。`ZCODE_STORAGE_DIR` 注入不变。\n\n> 2026-09-22（二轮核查修复）：provider 计数改读正式 schema `config.providerConfigRules.providerRules`，不识别形状返回 null（UI 显示「数量不可用」，未知绝不伪造为 0）；builtin 校验拆开读取失败（unreadable）与解析失败（malformed），两者均可达。
 
 > 源码: src/core/agents/backend/zcode/ZCodeProviderConfigDiscovery.ts

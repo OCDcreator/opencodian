@@ -69,7 +69,9 @@ const NATIVE_BINARY_NAME = 'zcode-agent';
 const NODE_BUNDLE_NAME = 'zcode.cjs';
 
 function getPathApi(platform: NodeJS.Platform): typeof path {
-  return platform === 'win32' ? path.win32 : path;
+  // POSIX platforms must join with POSIX semantics even when the host is
+  // Windows: the resolver derives paths for the target platform's layout.
+  return platform === 'win32' ? path.win32 : path.posix;
 }
 
 function expandHomeDirectory(candidate: string, env: Record<string, string | undefined>, home: string, pathApi: typeof path): string {

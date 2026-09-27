@@ -1,5 +1,7 @@
 # ZCodeRuntimeResolver
 
+> 2026-09-27（跨平台修复）：路径拼接按**目标平台**语义选择——非 win32 一律 `path.posix`（此前回退原生 `path`，Windows 宿主上模拟 darwin/Linux 布局会被 win32 化成反斜杠路径，CI Windows job 的 16 个断言因此全红）。真实宿主行为零变化：win32 宿主仍走 `path.win32`，POSIX 宿主原生 `path` 本就是 posix 语义。
+
 > 2026-09-22（核查修复）：node-bundle 运行器只认两个实证可用的 runner——bundle 自带应用 Electron（官方 electron-node 形态）→ PATH `node`；**绝不使用宿主注入的 Electron**（Obsidian 的 Electron 忽略 `ELECTRON_RUN_AS_NODE`，进程根本到不了 bundle）。解析顺序改为设置 `executablePath` 优先于 `ZCODE_AGENT_SERVER_COMMAND` 环境覆盖（用户显式选择高于继承环境），其余链不变。\n\n> 源码: src/core/agents/backend/zcode/ZCodeRuntimeResolver.ts
 
 ## 职责

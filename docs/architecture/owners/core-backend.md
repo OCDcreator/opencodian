@@ -1,4 +1,5 @@
 # Owner: core.backend
+> 2026-09-27（跨平台修复）：ZCode 路径解析按目标平台语义拼接——`getPathApi`/`discoverZCodeProviderConfig` 非 win32 回退改 `path.posix`，`resolveZCodeDataRoot` 新增可选 `platform`；真实宿主行为零变化，修复 Windows 宿主上模拟 darwin/Linux 布局被 win32 化导致的 CI 16 用例失败。
 > 2026-09-25 (FA880): ZCode native background jobs are read from `session/read` and canceled only by an exact sessionId/taskId pair with terminal readback.
 > 2026-09-25 (FA880 ZCode): Native `session/events` mode transitions expose `planEnabled` separately from the `session/read` base mode; ZCodeAdapter confirms Plan only with matching same-session event readback. ZCodeInteractionBridge denies pure permission asks after 60 seconds and rejects late approvals.
 > 2026-09-24 (票 09)：兼容加固落地——协议版本协商证据入诊断、诊断文本统一脱敏上限、重启覆盖（首个 transport 释放 + 新握手无孤儿）。

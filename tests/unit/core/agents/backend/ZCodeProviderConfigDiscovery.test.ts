@@ -31,16 +31,16 @@ function fsFixture(files: Record<string, string>) {
 
 describe('resolveZCodeDataRoot', () => {
   it('prefers ZCODE_STORAGE_DIR when set', () => {
-    expect(resolveZCodeDataRoot({ env: { ZCODE_STORAGE_DIR: '/data/zcode' }, homedir })).toBe('/data/zcode');
+    expect(resolveZCodeDataRoot({ env: { ZCODE_STORAGE_DIR: '/data/zcode' }, homedir, platform: 'linux' })).toBe('/data/zcode');
   });
 
   it('defaults to ~/.zcode', () => {
-    expect(resolveZCodeDataRoot({ env: {}, homedir })).toBe('/home/tester/.zcode');
+    expect(resolveZCodeDataRoot({ env: {}, homedir, platform: 'linux' })).toBe('/home/tester/.zcode');
   });
 
   it('uses the beta channel root when the runtime reports beta', () => {
-    expect(resolveZCodeDataRoot({ env: { ZCODE_BETA: '1' }, homedir })).toBe('/home/tester/.zcode-beta');
-    expect(resolveZCodeDataRoot({ env: { ZCODE_ENV: 'beta' }, homedir })).toBe('/home/tester/.zcode-beta');
+    expect(resolveZCodeDataRoot({ env: { ZCODE_BETA: '1' }, homedir, platform: 'linux' })).toBe('/home/tester/.zcode-beta');
+    expect(resolveZCodeDataRoot({ env: { ZCODE_ENV: 'beta' }, homedir, platform: 'linux' })).toBe('/home/tester/.zcode-beta');
   });
 });
 

@@ -11,6 +11,12 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-27 修复 ZCode 路径解析的跨平台缺陷（v1.1.33 CI 转绿）
+
+v1.1.33 起连续四次 push 的 CI `desktop-tests (windows-latest)` 全红（3 套件 16 用例）：`ZCodeRuntimeResolver.getPathApi` 与 `ZCodeProviderConfigDiscovery` 对非 win32 平台回退**原生** `path`，Windows 宿主上模拟 darwin/Linux 布局时路径被 win32 化（`/Applications/ZCode.app/...` → `\Applications\...`），`resolveZCodeDataRoot` 更是完全没有 platform 参数。macOS job 天然绿、Plugin Package 照常发布，因此发布未受影响，红的只是质量门；本地 Windows 复现同样 16 失败后定位。
+
+修复：两处 pathApi 非 win32 回退改为 `path.posix`；`resolveZCodeDataRoot` 新增可选 `platform` 并由 `discoverZCodeProviderConfig` 透传；三个数据根用例补显式 `platform: 'linux'`（fixture 为 POSIX home）。真实宿主行为零变化（win32 宿主仍 `path.win32`，POSIX 宿主原生 `path` 本就是 posix 语义），CodeGraph impact 深度 2 共 5 个受影响符号均在 zcode 模块内。顺带发现 `ZCodeRuntimeResolver.hostBinaryRegression.test.ts` 三处传入的 `isElectronHost` 在 options 接口中不存在（tests 不在 typecheck 范围故未拦截），属无效参数，本次未动。
+
 ## 2026-09-26 ZCode 本地源码构建与双 Test Vault 验收
 
 OpenCodian 已接通开源 ZCode 的本地源码构建，后台 Bash 在 app-server 强杀后通过独立监督进程写入持久终态，并由 `session/backgroundTaskRead` 按会话 ID 与任务 ID 读回。macOS 和 FA880 Windows Test Vault 均观察到运行中、进程重连时状态未知、真实退出后完成；失败、取消和错误 ID 隔离也有原生读回。用户自定义 `/mpe` 在 macOS Test Vault 经真实问答、一次权限超时后的成功批准、PDF/HTML 内容核验及重载恢复。其余控件的产品路径、原生请求和读回见 `.visual-evidence/zcode-continued/final-delivery-audit-2026-09-26.md`。该 ZCode 补丁尚未进入官方发行版。
