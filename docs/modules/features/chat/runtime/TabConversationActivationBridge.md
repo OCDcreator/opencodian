@@ -49,3 +49,7 @@ export class TabConversationActivationBridge {
 - `TabConversationStateBridge` 继续负责 active-tab conversation/session 写回、empty-state clear 与 sync baseline；`TabViewActivationBridge` 继续负责 activation 预刷新和 empty-state outcome UI；`QuestionTodoActivationRefreshCoordinator` 继续负责 activation/open 侧的 question/todo dock 与 supplemental refresh 顺序；adapter-owned background-task activation port 继续负责 open-side background-task indicator reset / rebuild / render trigger；`ActiveTabContextUsageCoordinator` 继续负责 open/activation 相邻的 context usage identity / snapshot writeback
 - `TabConversationActivationBridge` 只组合这些稳定边界，承接当前活动 tab 的 empty-state activation、streaming fast-path activation、loaded-conversation activation state writeback，以及 current-tab new conversation open runtime/UI shell
 - 这条边界推进的是 master plan 的 P1 `tab / pane / conversation activation 与 sync orchestration` ownership 迁移
+
+## 2026-09-27 OpenCode 2 compatibility
+
+OpenCode 2 conversations with native session IDs refresh pending form questions on tab activation.

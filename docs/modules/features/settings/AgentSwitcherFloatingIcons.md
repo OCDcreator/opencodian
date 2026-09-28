@@ -39,3 +39,7 @@
 ## ZCode 图标
 
 2026-09-22：ZCode 使用用户提供的官方 SVG 路径（30→100 坐标缩放）注册为 opencodian-zcode，品牌配色原样保留；AGENT_ICON_BY_BACKEND 增加 zcode 条目（穷举映射）。
+
+## 2026-09-27 OpenCode 2 compatibility
+
+The OpenCode 2 choice shares the OpenCode icon but has its own backend identity and label.

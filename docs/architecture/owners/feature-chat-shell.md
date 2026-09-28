@@ -75,3 +75,7 @@ The shell supplies the Pi slash-catalog discriminator only. All Pi runtime lifec
 
 - 2026-09-15: `OpenCodianView` 增加两个只读访问器 `getActiveConversationBackendKind()` / `getActiveTabModelRef()`，供 inline edit 宿主在 `editorCallback` 之外解析当前聊天 tab 的后端与模型；未新增运行时归属。
 - 2026-09-17: `OpenCodianView` 的品牌标记图标 id 改为从 `shared.brandingWordmark` 导入（原先在 view 内自存一份字面量），行为不变。> 2026-09-24 (票 06)：OpenCodianView 的斜杠缓存宿主接入 loadZCodeRuntimeCommands（ZCode 实时目录直取归一为既有 / 条目），其余后端语义不变。
+
+## 2026-09-27 OpenCode 2 compatibility
+
+The chat view routes OpenCode 2 model, permission, form, slash catalog, context and authoritative history reads to its native adapter.

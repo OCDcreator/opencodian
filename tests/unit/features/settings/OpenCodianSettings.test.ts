@@ -1228,7 +1228,7 @@ describe('OpenCodianSettingTab title styling', () => {
     expect(headingEl?.querySelector('.opencodian-logo')).not.toBeNull();
     expect(actionsEl).not.toBeNull();
     expect(iconButtons.map((button) => button.getAttribute('aria-label'))).toEqual([
-      'OpenCode',
+      'OpenCode 1',
       'Claude Code',
     ]);
     expect(iconButtons[0]?.getAttribute('aria-pressed')).toBe('true');

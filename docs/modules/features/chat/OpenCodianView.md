@@ -1,4 +1,8 @@
 # OpenCodianView
+
+OpenCode 2 slash autocomplete now enters the backend catalog path even when no OpenCode 1 config manager is present. Its Session Change Sidebar requests native `session.diff` through `ModifiedFilesSidebarCoordinator`; the view only routes the active backend/session and does not store diff state.
+The background task renderer receives OpenCode 2 native child-task read and interrupt callbacks alongside the existing ZCode callbacks; the view does not own task status.
+The real tab activation writeback refreshes sidebar identity immediately after assigning `currentConversation`. TabBar clicks bypass the view's older wrapper, so refreshing only in that wrapper is insufficient.
 > 2026-09-25（ZCode 手动标题闭环）：历史菜单的手动重命名在 ZCode 会话上先调用适配器的原生 V4 rename 与 `session/list`/`session/read` 读回；失败时不保存 OpenCodian 本地标题，也不显示成功。其他自动标题路径继续使用原有同步策略。原生会话删除仍被安全拒绝；OpenCodian 本地会话删除与官方桌面私有 task-index tombstone 不等价。
 
 2026-09-25 ZCode 侧栏控件：`createChatSelectionControlsCoordinatorHost()` 提供本视图当前 conversation 给 ZCode 模型/模式选择器。即使 Obsidian 的活动叶子是 Markdown，侧栏里的可见控件仍作用于所属聊天会话；异步原生读回按该视图当前 session ID 防串线。
@@ -810,3 +814,11 @@ OpenCode 的 store 为 memory mode 或仍带 custom-directory fallback `lastErro
 ## R-C2 扩展
 
 2026-09-18 两处最小改动：composer host 字面量新增 `onRequestImageGeneration` 回调（转发 `plugin.openImageGenerationCard('')`）；新增公开 `getActiveConversationIdForAssets()` 供组合根解析资产登记会话。生成/插入逻辑全部在 services/组合根，view 不增长运行时职责。> 2026-09-24 (票 06)：斜杠缓存宿主接线 `loadZCodeRuntimeCommands`——ZCode 实时目录（快照 slashCommands：name/description/inputHint/source）直取并归一为既有 `/` 自动补全条目形态，按后端键分区自然失效。
+
+## 2026-09-27 OpenCode 2 compatibility
+
+OpenCode 2 uses its own model, permission, question, context and history routes. Native history is merged by source message ID while preserving local image/context/card state; the slash menu reads the selected backend catalog.
+
+### 2026-09-28 parity continuation
+
+OpenCode 2 synchronization reads native revert state and filters rewound messages. Child session listing and session diff queries route to the OpenCode 2 adapter. Session IDs never enter OpenCode 1 calls.

@@ -9,6 +9,7 @@
 > 2026-09-20 (advantage-parity R-D1)：ConversationHistoryActionsCoordinator 每条会话新增「导出为 Markdown 笔记」按钮（可选 host 方法，未提供不渲染）。
 
 # Owner: feature.chat-services
+> 2026-09-28: OpenCode 2 slash autocomplete uses its native command and skill catalog, independent of OpenCode 1 project config.
 > 2026-09-25 (FA880): QuestionRuntimeHostAdapter supplies the inline card an authoritative tab/session/requestId pending read, preserving other tabs and callback-only backends.
 > 2026-09-25 (ZCode acceptance): The model binding keeps the native create catalog on a deferred read failure; the chooser waits for a real model before its first visible paint. QuestionDockCoordinator watches only authoritative pending reads while a waiter exists, clearing a lost-process card in its original tab.
 > 2026-09-24 (ZCode image recovery)：ComposerInputShellCoordinator waits for the preparation outcome before clearing image/text drafts; MessageSendPreparationService performs the selected ZCode model capability preflight before optimistic append.
@@ -78,3 +79,7 @@ PiModelSelectionBinding owns Pi selector policy; send preparation and slash disp
 
 - 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
 - 2026-09-17: `PiExtensionUiHost` 收窄主机面：只渲染需要用户回复的四个对话框方法，以及能落到既有界面的 `notify` / `set_editor_text` / `setTitle`；`setStatus` / `setWidget`（Pi 终端状态行，第三方 MCP 扩展用它报告服务器数量）不再落地。这两个方法官方不需要响应，忽略不会阻塞 RPC 往返（`PiSessionRuntime` 只对 select/confirm/input/editor 回包）。> 2026-09-24 (票 06)：ChatSelectionControlsCoordinator 增包 bindZCodeModelSelection（zcode 活动时接管选择器、实时目录+档位 variants）；SlashCommandMenuCatalogCache 新增 loadZCodeRuntimeCommands 口与 zcode 分支；新增 ZCodeModelSelectionBinding。
+
+## 2026-09-27 OpenCode 2 compatibility
+
+Selection, history sync, recovery and slash command services recognize OpenCode 2 while retaining their tab and session identity guards.

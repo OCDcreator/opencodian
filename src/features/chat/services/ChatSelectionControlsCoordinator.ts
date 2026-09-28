@@ -7,6 +7,7 @@ import {
   type CodexCatalogAdapter,
   resolveCodexModelCatalogFromAdapter,
 } from '../../../core/agents/backend/BackendModelCatalog';
+import type { OpenCode2Adapter } from '../../../core/agents/backend/OpenCode2Adapter';
 import type { PiAdapter } from '../../../core/agents/backend/pi/PiAdapter';
 import type { ZCodeAdapter } from '../../../core/agents/backend/zcode';
 import type { ResolvedModelSelection } from '../../../core/config/modelConfig';
@@ -44,6 +45,7 @@ import {
 import {
   createClaudeCodePermissionConfig,
   createCodexSandboxConfig,
+  createOpenCode2PermissionConfig,
   createOpenCodePermissionConfig,
   createZCodeModeConfig,
   PermissionModeSelectorCoordinator,
@@ -87,6 +89,7 @@ interface LiveOpenCodianPlugin {
     defaultProvider?: string;
     defaultModel?: string;
     backendSettings?: {
+      opencode2?: { permissionMode?: 'inherit' | PermissionMode };
       claudeCode?: { permissionMode?: ClaudeCodePermissionMode; model?: string };
       codex?: { sandboxMode?: CodexSandboxMode; model?: string };
     };
@@ -196,6 +199,10 @@ function wrapHostForCodex(host: ModelSelectionRuntimeHost): ModelSelectionRuntim
   return {
     ...host,
     async loadModelCatalogData() {
+      if (readActiveBackendFromPlugin() === 'opencode2') {
+        const adapter = readOpenCodianPlugin()?.agentServiceRegistry?.get?.('opencode2') as OpenCode2Adapter | undefined;
+        return { catalogBundle: null, providers: await adapter?.getModelSelectorProviders() ?? [] };
+      }
       if (readActiveBackendFromPlugin() === 'codex') {
         const providers = await resolveCodexModelProviders();
         if (providers) return { catalogBundle: null, providers };
@@ -204,6 +211,10 @@ function wrapHostForCodex(host: ModelSelectionRuntimeHost): ModelSelectionRuntim
       return host.loadModelCatalogData();
     },
     getDefaultModelSelection() {
+      if (readActiveBackendFromPlugin() === 'opencode2') {
+        const adapter = readOpenCodianPlugin()?.agentServiceRegistry?.get?.('opencode2') as OpenCode2Adapter | undefined;
+        return adapter?.getDefaultModelSelection() ?? null;
+      }
       if (readActiveBackendFromPlugin() === 'codex') {
         const model = readOpenCodianPlugin()?.settings?.backendSettings?.codex?.model?.trim() ?? '';
         return { provider: CODEX_PROVIDER_ID, model };
@@ -211,6 +222,11 @@ function wrapHostForCodex(host: ModelSelectionRuntimeHost): ModelSelectionRuntim
       return host.getDefaultModelSelection();
     },
     async isModelAvailableOnServer(provider: string, model: string) {
+      if (readActiveBackendFromPlugin() === 'opencode2') {
+        const adapter = readOpenCodianPlugin()?.agentServiceRegistry?.get?.('opencode2') as OpenCode2Adapter | undefined;
+        const providers = await adapter?.getModelSelectorProviders() ?? [];
+        return providers.some((item) => item.id === provider && item.models.some((entry) => entry.id === model));
+      }
       if (readActiveBackendFromPlugin() === 'codex') {
         return Boolean(provider && model);
       }
@@ -1301,6 +1317,31 @@ export class ChatSelectionControlsCoordinator {
    */
   private buildBackendPermissionSelector(containerEl: HTMLElement): void {
     const activeBackend = this.getSelectionBackend();
+
+    if (activeBackend === 'opencode2') {
+      const config = createOpenCode2PermissionConfig();
+      this.permissionSelector = new PermissionModeSelectorCoordinator({
+        getPermissionMode: () => readOpenCodianPlugin()?.settings?.backendSettings?.opencode2?.permissionMode ?? 'inherit',
+        switchPermissionMode: async (value) => {
+          if (this.host.isActiveTabStreaming?.()) return false;
+          if (!['inherit', 'normal', 'yolo', 'plan'].includes(value)) return false;
+          const plugin = readOpenCodianPlugin();
+          const settings = plugin?.settings?.backendSettings?.opencode2;
+          const sessionId = this.host.getOwnConversation?.()?.backendSessionId;
+          if (!settings || !plugin?.saveSettings) return false;
+          const mode = value as 'inherit' | PermissionMode;
+          const adapter = plugin.agentServiceRegistry?.get?.('opencode2') as OpenCode2Adapter | undefined;
+          if (!adapter) return false;
+          if (sessionId) await adapter.applyPermissionMode(sessionId, mode);
+          settings.permissionMode = mode;
+          await plugin.saveSettings();
+          return true;
+        },
+        restoreInputFocus: () => this.host.restoreComposerInputFocus(),
+      }, config);
+      this.permissionSelector.mount(containerEl);
+      return;
+    }
 
     if (activeBackend === 'claude-code') {
       const permissionConfig = createClaudeCodePermissionConfig();

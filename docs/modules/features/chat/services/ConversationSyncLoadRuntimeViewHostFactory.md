@@ -37,3 +37,7 @@ export function createConversationSyncLoadRuntimeViewHosts(
 - load-side server-sync policy 现在通过 `shouldUseOpenCodeServerSync()` 做 backend guard：OpenCode 旧会话继续按消息空缺、force server sync 或 interrupted tail 规则同步；非 OpenCode 会话直接返回 false，保留本地持久化消息作为 Phase 1 的 Claude history surface
 - `ConversationSyncLoadRuntimeHostAdapter` 继续负责从共享 seam 派生 `ConversationSyncViewHost` 与 `ConversationLoadRuntimeBridgeHost`
 - `ConversationSyncHostAdapter` 与 `ConversationLoadRuntimeBridge` 的行为边界保持不变
+
+## 2026-09-27 OpenCode 2 compatibility
+
+OpenCode 2 conversations opt into authoritative server message load by their backend session ID.

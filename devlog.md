@@ -11,6 +11,14 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-28 OpenCode 2 可选后端落地并双 Test Vault 验收（v1.1.34 发布）
+
+OpenCode 1 与 OpenCode 2 成为两个独立可选后端：新增 `OpenCode2Adapter` 作为独立 v2 传输边界（pin `@opencode/client@2.0.18`，独立可执行/服务器、独立 HTTP API 与事件 schema），配置、集成控件与权限模式各有原生 v2 归属，v1 会话 ID 与配置 owner 不传入 v2 传输。会话变更侧栏改为读取 v2 自身 adapter：上游把裸 `session.diff` 解释为最新 turn，因此 adapter 显式请求 first-user → last-visible-user 范围；staged revert 排除被回退用户 turn 及其后内容；过期异步结果在更新刷新、切页、重挂载或销毁后丢弃；TabBar 真实激活回写现在会触发刷新。`build-css.mjs` 将 Newsreader/Oxanium 两款字体由 `app://obsidian.md` URL 引用改为内嵌 `styles.css`，消除两座 Test Vault 上 CDP 观测到的 `ERR_FILE_NOT_FOUND`。
+
+`npm run verify` 通过（912 套件 / 9173 测试，lint 0 警告，架构/模块文档/Graphify/生产构建/生成 CSS 全绿），Mac 与 FA880 Windows Test Vault 完成双机验收：聊天与并发会话、重命名/回退/恢复/fork、上下文/模型/token 读回、手动压缩、取消重试、owned 进程丢失重连、子代理执行、图片、Build/Plan 权限卡、问答表单、命令/技能/agent 目录、侧栏与轮次变更记录、后台子任务、MCP 连接、只读 aux 审计、内联补全与转向均按 UI 或原生证据矩阵通过；完整矩阵与遗留缺口见 `docs/status/opencode2-backend-acceptance.md`。
+
+用户裁决确认的上游例外（OpenCode 2.0.18）：Todo 工具/dock（上游 `REMOVED_TOOLS` 明确移除且无替代 API）、会话分享/取消分享、legacy LSP 执行；原生文件 diff 需 Git-backed location，非 Git Test Vault 中如实显示"未提供状态与行数"而非伪造 `+0/-0`。遗留验收：API key/OAuth 完整链路需真实账号、选区内联编辑预览/接受/拒绝未双机验收、per-backend 内联模型设置保存未证实。本批工作合并入 main 并发布 v1.1.34。
+
 ## 2026-09-27 修复 ZCode 路径解析的跨平台缺陷（v1.1.33 CI 转绿）
 
 v1.1.33 起连续四次 push 的 CI `desktop-tests (windows-latest)` 全红（3 套件 16 用例）：`ZCodeRuntimeResolver.getPathApi` 与 `ZCodeProviderConfigDiscovery` 对非 win32 平台回退**原生** `path`，Windows 宿主上模拟 darwin/Linux 布局时路径被 win32 化（`/Applications/ZCode.app/...` → `\Applications\...`），`resolveZCodeDataRoot` 更是完全没有 platform 参数。macOS job 天然绿、Plugin Package 照常发布，因此发布未受影响，红的只是质量门；本地 Windows 复现同样 16 失败后定位。

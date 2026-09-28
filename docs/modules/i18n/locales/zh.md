@@ -1,4 +1,6 @@
 # Chinese Locale
+`modifiedFiles.statsUnavailable` 与 `modifiedFiles.statusUnavailable` 用于只有工具文件提示、没有权威原生快照统计和变更状态的记录。
+> 2026-09-28（OpenCode 2）：分享命令说明上游限制；配置应用提示以原生配置值回读为准。
 > 2026-09-25（删除语义）：确认文案说明移除 OpenCodian 本地消息，后端可能保留原生历史；避免把 ZCode 官方任务列表的软删除说成历史永久清除。
 > 2026-09-25（ZCode）：`chat.zcode.backgroundTask.stopped` 将原生 `killed` 中性显示为“已停止”；没有可验证终态通知的任务仍使用原有“状态未知／连接中断”文案。
 > 2026-09-24（ZCode）：上下文压缩文案改为后端中立的当前会话表述，避免 ZCode 详情仍写“Codex 线程”。
@@ -630,3 +632,11 @@ R-C4 补充：`chat.context.pdfIntegration.notMounted`（调试区在未探测�
 > 2026-09-22（二轮核查修复）：与 en 同步新增 `settings.zcode.status.providerValidatedNoCount`。
 > 2026-09-24 (票 06)：与 en 同步新增 settings.zcode.model/thinking/mode 九键。
 > 2026-09-24（续做）：与 en 同步新增 `chat.zcode.mode.*` 与 `chat.zcode.reasoning.*`，说明未确认读回与模型推理档位的生效边界。
+
+## 2026-09-27 OpenCode 2 compatibility
+
+Chinese settings copy distinguishes OpenCode 1 and OpenCode 2 and labels the version 2 connection controls.
+
+### 2026-09-28 parity continuation
+
+OpenCode 2 inherited server permission mode has Chinese label and explanation.

@@ -35,6 +35,12 @@ export async function executeCompactSession(
 export function createSlashCommandExecutionHost(
   deps: SlashCommandExecutionHostDependencies,
 ): SlashCommandExecutionHost {
+  const isOpenCode2 = () => deps.getCurrentConversation()?.backend === 'opencode2';
+  const openCode2 = () => {
+    const adapter = deps.getOpenCode2Adapter?.();
+    if (!adapter) throw new Error('OpenCode 2 adapter unavailable');
+    return adapter;
+  };
   return {
     ensureConversationReady: async () => {
       if (!deps.getCurrentConversation()) await deps.createNewConversation();
@@ -45,15 +51,20 @@ export function createSlashCommandExecutionHost(
     ensureTabRuntime: (tabId) => Boolean(tabId && deps.ensureTabRuntimeState(tabId)),
     isTabForegroundBusy: (tabId) => (tabId ? deps.isTabForegroundBusy(tabId) : false),
     notifyForegroundBusy: () => deps.notifyForegroundBusy(),
-    getServerAvailability: () => deps.getServerAvailability(),
+    getServerAvailability: async () => {
+      if (isOpenCode2()) { await openCode2().start(); return 'running'; }
+      return deps.getServerAvailability();
+    },
     refreshServerStatusBadge: () => deps.chatHeaderPresenter.refreshServerStatusBadge(),
     ensureServerReadyForChat: (availability) => deps.ensureServerReadyForChat(availability),
     getProjectCommands: async () => deps.opencodeConfigManager?.getCommandConfig() ?? {},
     getRuntimeCommands: async () => {
+      if (isOpenCode2()) return openCode2().listCommands();
       const runtimeCommands = await deps.openCodeServiceSdk.command.list();
       return Array.isArray(runtimeCommands) ? runtimeCommands : [];
     },
     getRuntimeSkills: async () => {
+      if (isOpenCode2()) return openCode2().listSkills();
       const runtimeSkills = await deps.openCodeServiceSdk.app.skills();
       return Array.isArray(runtimeSkills) ? runtimeSkills : [];
     },
@@ -64,11 +75,18 @@ export function createSlashCommandExecutionHost(
       deps.composerContextViewFacade.refreshActiveFocusContextPreview(),
     getActiveFocusContextPreview: () =>
       deps.getTabRuntimeState(deps.getActiveTabId())?.focusContextPreview ?? null,
-    runSessionCommand: (sessionId, input) =>
-      deps.openCodeService.runSessionCommand(sessionId, input),
-    runCompactSession: (sessionId) => deps.runCompactSession(sessionId),
-    revertSession: (sessionId, messageID) => deps.openCodeService.revertSession(sessionId, messageID),
-    unrevertSession: (sessionId) => deps.openCodeService.unrevertSession(sessionId),
+    runSessionCommand: (sessionId, input) => isOpenCode2()
+      ? openCode2().runSessionCommand(sessionId, input.command, input.arguments)
+      : deps.openCodeService.runSessionCommand(sessionId, input),
+    runCompactSession: (sessionId) => isOpenCode2()
+      ? openCode2().compactSession(sessionId)
+      : deps.runCompactSession(sessionId),
+    revertSession: (sessionId, messageID) => isOpenCode2()
+      ? openCode2().revertSession(sessionId, messageID)
+      : deps.openCodeService.revertSession(sessionId, messageID),
+    unrevertSession: (sessionId) => isOpenCode2()
+      ? openCode2().unrevertSession(sessionId)
+      : deps.openCodeService.unrevertSession(sessionId),
     shareSession: async (sessionId) => {
       try {
         const s = await deps.openCodeService.shareSession(sessionId);
@@ -83,8 +101,10 @@ export function createSlashCommandExecutionHost(
     createNewConversation: () => deps.createNewConversation(),
     startConversationSyncLoop: () =>
       deps.conversationSyncBridgePorts.getLoopControl().startConversationSyncLoop(),
-    syncVisibleConversationInBackground: () =>
-      deps.conversationSyncBridgePorts.getVisibleSyncFollowUp().syncVisibleConversationInBackground(),
+    syncVisibleConversationInBackground: async () => {
+      await deps.conversationSyncBridgePorts.getVisibleSyncFollowUp().syncVisibleConversationInBackground();
+      deps.refreshSessionChangeSidebar?.();
+    },
     notifySlashCommandFailed: (commandId, error) =>
       deps.notifySlashCommandFailed(commandId, error),
   };

@@ -57,3 +57,7 @@ PiBackendSettings is a separate settings branch normalized by normalizePiBackend
 - 2026-09-13: 记忆设置组新增 `memoryExternalRoot`（共享记忆根，默认空；支持开头 `~` 由 app 展开以兼容多机同步设置）。
 
 - 2026-09-15: `OpenCodianSettings` 增加 `inlineEditEnabled` 与 `inlineEditModelOverrides`，并在加载期归一化；导出 `normalizeInlineEditModelOverrides`。
+
+## 2026-09-27 OpenCode 2 compatibility
+
+OpenCode 2 has a separate backend identity and normalized connection settings; persisted OpenCode 1 settings and session IDs remain distinct.

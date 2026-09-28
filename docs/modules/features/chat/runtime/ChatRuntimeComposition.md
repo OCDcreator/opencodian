@@ -1,5 +1,7 @@
 # ChatRuntimeComposition
 
+The slash execution host receives a narrow `refreshSessionChangeSidebar` callback. It is invoked after undo/redo's visible sync and delegated to the view, where the modified-files coordinator performs the native OpenCode 2 diff read.
+
 2026-09-26：ZCode 回合在仍属于当前可见标签/会话时结束后，装配层请求选择控件从该会话的原生读回刷新模式。此举使从斜杠 `/plan` 进入 Plan 的同会话控制显示跟上真实状态；切换标签后的旧回合不覆盖当前会话。
 > 2026-09-24 (ZCode image preflight)：interaction wiring 仅通过窄 adapter seam 提供原生模型目录读取给发送 preparation；发送前按所选 provider/model 证明 `supportsImageInput`，不把 ZCode 图片判断转发到 OpenCode service。
 > 2026-09-21 (advantage-parity R-F1)：notifyFollowUpQueued/QueueChanged 接 host.refreshQueuedFollowUpBar + 本地化排队 Notice。
@@ -59,3 +61,7 @@ owner: `feature.chat-runtime`（layer features）。依赖 `feature.chat`（serv
 ## R-C2 扩展
 
 2026-09-18 slash host 字面量新增 `runImageGenerationCommand`（转发 `host.plugin.openImageGenerationCard?.(promptArgument.trim())`）；`ChatRuntimeCompositionHost.plugin` 结构类型新增可选 `openImageGenerationCard?`。
+
+## 2026-09-27 OpenCode 2 compatibility
+
+The send and slash command composition starts the selected OpenCode 2 adapter and routes command, compact, rewind and history work to it without forwarding OpenCode 2 session IDs to OpenCodeService.

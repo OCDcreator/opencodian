@@ -40,7 +40,7 @@ export interface PermissionModeConfig {
   /** CSS class names for each mode, used on the trigger element. */
   modeCssClasses: readonly string[];
   /** Stable data attribute value identifying the backend system. */
-  backendLabel: 'opencode' | 'claude-code' | 'codex' | 'zcode';
+  backendLabel: 'opencode' | 'opencode2' | 'claude-code' | 'codex' | 'zcode';
   /** Optional visual variant class shared by the container, trigger, and dropdown. */
   variantClass?: string;
   /**
@@ -84,6 +84,19 @@ export function createOpenCodePermissionConfig(): PermissionModeConfig {
     ],
     displayMap: { yolo: 'YOLO', normal: 'ASK', plan: 'PLAN' } as Record<PermissionMode, string>,
     modeCssClasses: ['mode-yolo', 'mode-normal', 'mode-plan'] as const,
+  };
+}
+
+export function createOpenCode2PermissionConfig(): PermissionModeConfig {
+  return {
+    backendLabel: 'opencode2',
+    options: (['inherit', 'normal', 'yolo', 'plan'] as const).map((id) => ({
+      id,
+      label: t(`chat.opencode2.mode.${id}`),
+      description: t(`chat.opencode2.mode.${id}.description`),
+    })),
+    displayMap: { inherit: 'AUTO', normal: 'ASK', yolo: 'YOLO', plan: 'PLAN' },
+    modeCssClasses: ['mode-inherit', 'mode-normal', 'mode-yolo', 'mode-plan'],
   };
 }
 

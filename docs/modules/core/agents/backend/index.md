@@ -102,3 +102,7 @@ IMPLEMENTED_AGENT_BACKENDS 新增 pi；默认启用后端不变。Pi 实现归�
 ## 2026-09-22 ZCode 后端接入（票 01）
 
 IMPLEMENTED_AGENT_BACKENDS 新增 zcode；导出 zcode 包符号（ZCodeAdapter、诊断/解析类型）。默认启用后端不变。
+
+## 2026-09-27 OpenCode 2 compatibility
+
+The public backend set and barrel now include opencode2 and OpenCode2Adapter. OpenCode 1 and 2 retain separate session and transport identities.

@@ -6,6 +6,7 @@ import type {
   TurnDiffNoticeMeta,
 } from '../../../core/types';
 import {
+  getConversationBackendSessionId,
   getTurnDiffNoticeMeta,
 } from '../../../core/types';
 import type { AgentBackendKind } from '../../../core/types/chat';
@@ -36,6 +37,7 @@ function readActiveBackendKindFromPlugin(): AgentBackendKind {
       ?.settings?.activeBackend;
     if (
       activeBackend === 'opencode'
+      || activeBackend === 'opencode2'
       || activeBackend === 'claude-code'
       || activeBackend === 'codex'
       || activeBackend === 'copilot'
@@ -86,8 +88,10 @@ export interface ConversationNoticeCoordinatorHost {
   getSessionDiff(
     sessionId: string,
     sourceMessageId: string,
+    backend?: AgentBackendKind,
   ): Promise<SessionDiffEntry[]>;
   getCachedSessionDiffEntries(sessionId: string): SessionDiffEntry[];
+  getOpenCode2BackgroundTaskChanges?(sessionId: string, taskId: string): Promise<{ sourceMessageId: string; entries: SessionDiffEntry[] } | null>;
   appendPersistentNotice(
     options: PersistentAssistantNoticeMessageOptions,
   ): Promise<void>;
@@ -103,6 +107,7 @@ export interface ConversationNoticeCoordinatorHost {
 }
 
 export class ConversationNoticeCoordinator {
+  private readonly backgroundDiffReads = new Set<string>();
   constructor(
     private readonly host: ConversationNoticeCoordinatorHost,
   ) {}
@@ -170,11 +175,11 @@ export class ConversationNoticeCoordinator {
     editedFiles: string[],
     tabId: TabId | null = this.host.getActiveTabId(),
   ): Promise<void> {
-    // Diff notices are OpenCode-only.  The getSessionDiff and
-    // getCachedSessionDiffEntries APIs are OpenCode-specific and do not
-    // have a backend-neutral equivalent yet.
+    // Both OpenCode protocols expose session diff. The host routes by backend.
     const backend = conversation.backend ?? 'opencode';
-    if (!conversation.openCodeSessionId || editedFiles.length === 0 || backend !== 'opencode') {
+    const sessionId = getConversationBackendSessionId(conversation);
+    if (!sessionId || (backend !== 'opencode' && backend !== 'opencode2')
+      || (backend === 'opencode' && editedFiles.length === 0)) {
       return;
     }
 
@@ -190,15 +195,13 @@ export class ConversationNoticeCoordinator {
       return;
     }
 
-    const diffEntries = await this.host.getSessionDiff(
-      conversation.openCodeSessionId,
-      latestUserMessage.sourceMessageId,
-    );
-    const cachedEntries = this.host.getCachedSessionDiffEntries(
-      conversation.openCodeSessionId,
-    );
+    const diffEntries = backend === 'opencode2'
+      ? await this.host.getSessionDiff(sessionId, latestUserMessage.sourceMessageId, backend)
+      : await this.host.getSessionDiff(sessionId, latestUserMessage.sourceMessageId);
+    const cachedEntries = backend === 'opencode'
+      ? this.host.getCachedSessionDiffEntries(sessionId) : [];
     const fallbackEntries: SessionDiffEntry[] = [...new Set(editedFiles)].map(
-      (file) => ({ file, additions: 0, deletions: 0 }),
+      (file) => ({ file, additions: 0, deletions: 0, ...(backend === 'opencode2' ? { statsUnavailable: true } : {}) }),
     );
 
     const entries =
@@ -208,6 +211,7 @@ export class ConversationNoticeCoordinator {
           ? cachedEntries
           : fallbackEntries;
     if (entries.length === 0) {
+      if (backend === 'opencode2') this.host.refreshSessionChangeSidebar();
       return;
     }
 
@@ -215,6 +219,7 @@ export class ConversationNoticeCoordinator {
       file: entry.file,
       additions: entry.additions,
       deletions: entry.deletions,
+      ...(entry.statsUnavailable ? { statsUnavailable: true } : {}),
       ...(entry.status ? { status: entry.status } : {}),
     })));
     const noticeMeta: TurnDiffNoticeMeta = Object.freeze({
@@ -238,10 +243,34 @@ export class ConversationNoticeCoordinator {
     }
   }
 
+  async appendBackgroundTaskDiffNoticeIfNeeded(conversation: Conversation, taskId: string, tabId: TabId): Promise<void> {
+    const sessionId = getConversationBackendSessionId(conversation);
+    if (conversation.backend !== 'opencode2' || !sessionId || !this.host.getOpenCode2BackgroundTaskChanges) return;
+    const key = `${conversation.id}:${taskId}`;
+    if (this.backgroundDiffReads.has(key) || conversation.messages.some((message) =>
+      getTurnDiffNoticeMeta(message)?.taskIds?.includes(taskId))) return;
+    this.backgroundDiffReads.add(key);
+    try {
+      const changes = await this.host.getOpenCode2BackgroundTaskChanges(sessionId, taskId);
+      if (!changes?.entries.length) return;
+      const entries = Object.freeze(changes.entries.map((entry) => Object.freeze({ ...entry })));
+      await this.host.appendPersistentNotice({
+        title: t('chat.omo.system.backgroundCompleted'),
+        content: this.formatDiffNoticeMarkdown(changes.entries), tone: 'info', conversation, tabId,
+        noticeMeta: Object.freeze({ kind: 'turn-diff',
+          sourceMessageId: `${changes.sourceMessageId}:background:${taskId}`,
+          anchorKey: changes.sourceMessageId, taskIds: [taskId], entries }),
+      });
+      this.host.refreshSessionChangeSidebar();
+    } finally {
+      this.backgroundDiffReads.delete(key);
+    }
+  }
+
   formatDiffNoticeMarkdown(entries: SessionDiffEntry[]): string {
     const lines = entries.map((entry) => {
       const link = `[[${entry.file}]]`;
-      const stats =
+      const stats = entry.statsUnavailable ? ` (${t('modifiedFiles.statsUnavailable')})` :
         entry.additions > 0 || entry.deletions > 0
           ? ` (+${entry.additions} / -${entry.deletions})`
           : '';

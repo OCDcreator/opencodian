@@ -42,3 +42,7 @@ buildLocalStreamOutcome(options): LocalStreamOutcome
 ## 注意事项
 
 - 这个模块刻意保持纯函数，后续如果需要增加更多收尾判定，优先继续收敛到这里。
+
+## 2026-09-27 OpenCode 2 compatibility
+
+Completed OpenCode 2 turns schedule server history reconciliation through their own adapter after local stream finalization.

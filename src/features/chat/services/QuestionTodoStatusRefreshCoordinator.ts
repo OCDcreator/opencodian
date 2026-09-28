@@ -54,7 +54,7 @@ export class QuestionTodoStatusRefreshCoordinator {
     const backend = this.host.getCurrentConversationBackend();
     // ZCode reads its own adapter's authoritative pending asks. Other
     // callback-only backends have no pending-question read endpoint.
-    const pendingQuestionsPromise = (backend === 'opencode' || backend === 'zcode') && sessionId
+    const pendingQuestionsPromise = (backend === 'opencode' || backend === 'opencode2' || backend === 'zcode') && sessionId
       ? options.isCurrent
         ? this.host.refreshPendingQuestionsForTab(tabId, sessionId, options)
         : this.host.refreshPendingQuestionsForTab(tabId, sessionId)
@@ -78,7 +78,7 @@ export class QuestionTodoStatusRefreshCoordinator {
     }
     const backend = this.host.getCurrentConversationBackend();
     // ZCode uses the same tab-scoped refresh port backed by its native adapter.
-    if ((backend === 'opencode' || backend === 'zcode') && options.questionSessionId) {
+    if ((backend === 'opencode' || backend === 'opencode2' || backend === 'zcode') && options.questionSessionId) {
       if (options.isCurrent) {
         await this.host.refreshPendingQuestionsForTab(
           options.tabId,

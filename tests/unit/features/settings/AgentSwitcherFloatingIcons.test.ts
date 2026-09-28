@@ -221,7 +221,7 @@ describe('renderAgentSwitcherHeaderIcons', () => {
 
     expect(groupEl).not.toBeNull();
     expect(buttons).toHaveLength(2);
-    expect(buttons[0]?.getAttribute('aria-label')).toBe('OpenCode');
+    expect(buttons[0]?.getAttribute('aria-label')).toBe('OpenCode 1');
     expect(buttons[1]?.getAttribute('aria-label')).toBe('Claude Code');
     expect(buttons[1]?.getAttribute('aria-pressed')).toBe('true');
     expect(opencodeIconEl?.dataset.lobehubIcon).toBe('opencode');

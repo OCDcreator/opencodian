@@ -371,3 +371,11 @@ D2 record-then-close（同日）：聊天 ports 与 inline-edit deps 均新增 `
 
 > 2026-09-22 (ZCode 票 01)：`wireHiddenAdapters` 传入 `getZCodeSettings` 与 `getZCodeExtraEnv`（`getDomainEnvFor('zcode')`）；ZCode 仅做装配，运行时状态不进入视图层。
 > 2026-09-24 (票 06)：OpenCodianView 的斜杠缓存宿主接入 loadZCodeRuntimeCommands（经 adapter.getSlashCommands 的实时目录直取）。
+
+## 2026-09-27 OpenCode 2 compatibility
+
+The composition root passes the live OpenCode 2 settings callback to adapter wiring; its process and sessions remain separate from OpenCodeService.
+
+## 2026-09-28 OpenCode 2 auxiliary integration
+
+Inline edit model choices read the OpenCode 2 native catalog when that backend is selected.

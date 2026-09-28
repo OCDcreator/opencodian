@@ -45,3 +45,7 @@ The shared backend chooser exposes Pi and mounts SettingsPiSection when enabled.
 - 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
 
 - 2026-09-18 (FlowText 批次 B)：owner manifest 随 R-B1/R-B2 更新——新增 `src/shared/contextGroupPlan.ts` 归属 `shared.foundation`；本 owner 的边界与职责未变。
+
+## 2026-09-27 OpenCode 2 compatibility
+
+Settings expose OpenCode 1 and 2 separately and provide local executable or remote server controls for OpenCode 2.

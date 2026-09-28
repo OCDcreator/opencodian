@@ -52,4 +52,10 @@ describe('composer runtime rail styles', () => {
     expect(backdropRule).toContain('font-family: var(--opencodian-composer-font-family, "OpenCodian Newsreader"');
     expect(placeholderRule).toContain('font-family: var(--opencodian-composer-font-family, "OpenCodian Newsreader"');
   });
+
+  it('embeds bundled font bytes in the three-file stylesheet artifact', () => {
+    const css = readStyleFile('styles.css');
+    expect(css.match(/src: url\("data:font\/ttf;base64,/g)).toHaveLength(2);
+    expect(css).not.toContain('url("assets/fonts/');
+  });
 });

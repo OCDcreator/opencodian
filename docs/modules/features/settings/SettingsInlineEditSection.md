@@ -1,4 +1,6 @@
 # SettingsInlineEditSection
+
+OpenCode 2 appears in both enabled-backend override lists. Its inline edit and completion model overrides use `provider/model` references like OpenCode 1.
 > 2026-09-24: ZCode 仅进入补全专用模型覆盖候选，使用 `provider/model` 形式；通用行内编辑覆盖列表仍不包含 ZCode。当前 ZCode 补全能力因原生延迟超过 4 秒预算未对用户开放，设置项不代表功能验收。
 > 2026-09-18 (R-B1): adds the auto-internal-link toggle (`autoInternalLinkEnabled`) and the excluded-terms textarea (`autoInternalLinkExcludedTerms`, one term per line, normalized on save).
 

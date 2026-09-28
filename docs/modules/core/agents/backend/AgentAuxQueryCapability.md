@@ -37,3 +37,7 @@
 - 四个 adapter 都必须实现 `startAuxQuerySession`，这是 inline edit 的验收硬指标；缺实现时调用侧置灰而不是降级
 
 > 2026-09-18 (R-C3)：`AuxQuerySessionConfig` 新增**可选** `turnTimeoutMs`（默认不变，各后端仍为 180s），供补全等低延迟调用方显式缩短回合预算；aux 契约其余语义（fail-closed、每次编辑新建、退出即 dispose）一字未改。
+
+## 2026-09-28 OpenCode 2 auxiliary integration
+
+OpenCode 2 model selections use the same provider/model shape with kind opencode2; the read-only auxiliary contract remains fail-closed.

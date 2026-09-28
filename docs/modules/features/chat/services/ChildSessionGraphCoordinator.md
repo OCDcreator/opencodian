@@ -88,3 +88,7 @@ graph 为 `partial` 时额外显示提醒文案。
 **2026-05-01**：将 `renderSessionTree`、`hideSessionTree`、`ensureChildSessionTreeContainer` 和 `SESSION_TREE_BASE_CSS` 从 `OpenCodianView` 迁入本 coordinator。动机：减少 `OpenCodianView` 的 DOM 渲染职责，让 coordinator 成为 child-session tree 的完整 owner。
 
 **DOM cleanup 修正**：`clearContainer()` 在清除内部引用前先调用 `remove()` 移除 DOM 元素，防止 pane/container 切换时留下 stale `.opencodian-session-tree` 节点。已添加回归测试验证容器切换不会创建重复节点。
+
+### 2026-09-28 parity continuation
+
+OpenCode 2 parent sessions are eligible for the child-session graph; the host retrieves native child sessions from the OpenCode 2 adapter.

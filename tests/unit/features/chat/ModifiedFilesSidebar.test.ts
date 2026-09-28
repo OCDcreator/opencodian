@@ -364,6 +364,96 @@ describe('ModifiedFilesSidebar', () => {
     expect(document.body.textContent).not.toContain('fallback.md');
   });
 
+  it('uses an authoritative asynchronous session diff, including an empty diff after revert', async () => {
+    const parentEl = document.createElement('div') as ObsidianLikeElement;
+    document.body.appendChild(parentEl);
+    const coordinator = new ModifiedFilesSidebarCoordinator();
+    coordinator.mountSidebar(parentEl, { workspace: { openLinkText: jest.fn() } } as unknown as App);
+    const persisted: ChatMessage[] = [{
+      id: 'completed-turn', role: 'assistant', content: '', timestamp: 1,
+      displayStyle: 'notice',
+      noticeMeta: { kind: 'turn-diff', sourceMessageId: 'user-1', entries: [
+        { file: 'old.md', additions: 1, deletions: 0 },
+      ] },
+    }];
+
+    coordinator.refresh('session-1', async () => [
+      { file: 'native.md', additions: 4, deletions: 2, status: 'added' },
+    ], 'ready', persisted);
+    await Promise.resolve();
+    expect(document.querySelector('.opencodian-modified-files-sidebar-path')?.textContent).toBe('native.md');
+    expect(document.querySelector('.opencodian-modified-files-sidebar-summary')?.textContent).toBe('1 · +4 -2');
+
+    coordinator.refresh('session-1', async () => [], 'ready', persisted);
+    await Promise.resolve();
+    expect(document.querySelector('.opencodian-modified-files-trigger-strip')?.getAttribute('data-state')).toBe('ready');
+    expect(document.querySelector('.opencodian-modified-files-sidebar-path')).toBeNull();
+    expect(document.body.textContent).not.toContain('old.md');
+  });
+
+  it('discards an asynchronous diff from a previous session after switching tabs', async () => {
+    const parentEl = document.createElement('div') as ObsidianLikeElement;
+    document.body.appendChild(parentEl);
+    const coordinator = new ModifiedFilesSidebarCoordinator();
+    coordinator.mountSidebar(parentEl, { workspace: { openLinkText: jest.fn() } } as unknown as App);
+    let finishOld!: (entries: SessionDiffEntry[]) => void;
+    const oldDiff = new Promise<SessionDiffEntry[]>((resolve) => { finishOld = resolve; });
+
+    coordinator.refresh('session-old', () => oldDiff);
+    coordinator.refresh('session-new', async () => [{ file: 'new.md', additions: 1, deletions: 0 }]);
+    await Promise.resolve();
+    finishOld([{ file: 'old.md', additions: 9, deletions: 0 }]);
+    await Promise.resolve();
+
+    expect(document.querySelector('.opencodian-modified-files-sidebar-path')?.textContent).toBe('new.md');
+    expect(document.body.textContent).not.toContain('old.md');
+  });
+
+  it('uses persisted turn records only when native snapshots are unavailable', async () => {
+    const parentEl = document.createElement('div') as ObsidianLikeElement;
+    document.body.appendChild(parentEl);
+    const coordinator = new ModifiedFilesSidebarCoordinator();
+    coordinator.mountSidebar(parentEl, { workspace: { openLinkText: jest.fn() } } as unknown as App);
+    coordinator.refresh('non-git-session', async () => null, 'ready', [{
+      id: 'turn-1', role: 'assistant', content: '', timestamp: 1, displayStyle: 'notice',
+      noticeMeta: { kind: 'turn-diff', sourceMessageId: 'user-1', entries: [
+        { file: 'written.md', additions: 0, deletions: 0 },
+      ] },
+    }]);
+    await Promise.resolve();
+    expect(document.querySelector('.opencodian-modified-files-sidebar-path')?.textContent).toBe('written.md');
+  });
+
+  it('keeps a completed background child file beside a canonical parent diff', async () => {
+    const parentEl = document.createElement('div') as ObsidianLikeElement;
+    document.body.appendChild(parentEl);
+    const coordinator = new ModifiedFilesSidebarCoordinator();
+    coordinator.mountSidebar(parentEl, { workspace: { openLinkText: jest.fn() } } as unknown as App);
+    const messages: ChatMessage[] = [{
+      id: 'child-record', role: 'assistant', content: '', timestamp: 2, displayStyle: 'notice',
+      noticeMeta: { kind: 'turn-diff', sourceMessageId: 'user-1:background:child-1',
+        anchorKey: 'user-1', taskIds: ['child-1'],
+        entries: [{ file: 'child.md', additions: 1, deletions: 0, status: 'added' }] },
+    }];
+    coordinator.refresh('session-1', async () => [{ file: 'parent.md', additions: 2, deletions: 0 }], 'ready', messages);
+    await Promise.resolve();
+    expect(Array.from(document.querySelectorAll('.opencodian-modified-files-sidebar-path'), (element) => element.textContent))
+      .toEqual(['parent.md', 'child.md']);
+  });
+
+  it('does not present file-hint placeholders as measured status or line counts', () => {
+    const parentEl = document.createElement('div') as ObsidianLikeElement;
+    document.body.appendChild(parentEl);
+    const sidebar = new ModifiedFilesSidebar({ workspace: { openLinkText: jest.fn() } } as unknown as App, parentEl);
+    sidebar.updateEntries([{ file: 'hint.md', additions: 0, deletions: 0, statsUnavailable: true }]);
+    expect(document.querySelector('.opencodian-modified-files-sidebar-summary')?.textContent)
+      .toContain(t('modifiedFiles.statsUnavailable'));
+    expect(document.querySelector('.opencodian-modified-files-sidebar-stats')?.textContent)
+      .toBe(t('modifiedFiles.statsUnavailable'));
+    expect(document.querySelector('.opencodian-modified-files-sidebar-status')?.textContent)
+      .toBe(t('modifiedFiles.statusUnavailable'));
+  });
+
   it('shows a compact session summary and toggles explicitly from the trigger', () => {
     const parentEl = document.createElement('div') as ObsidianLikeElement;
     document.body.appendChild(parentEl);

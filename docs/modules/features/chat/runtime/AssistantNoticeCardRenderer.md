@@ -1,4 +1,5 @@
 # AssistantNoticeCardRenderer
+Turn Change Records with `statsUnavailable` show the file path and an unavailable statistics label instead of presenting placeholder zeroes as measured additions/deletions.
 
 > **源码**: `src/features/chat/runtime/AssistantNoticeCardRenderer.ts`
 > **状态**: [REVIEW]

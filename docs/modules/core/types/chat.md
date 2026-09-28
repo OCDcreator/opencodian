@@ -1,4 +1,5 @@
 # Chat Types
+`SessionDiffEntry` and persisted `TurnDiffNoticeEntry` carry optional `statsUnavailable` when a backend exposes only a write-tool file hint and no native snapshot statistics. Numeric zero values remain storage-compatible placeholders and must not be rendered as verified `+0/-0`.
 > 2026-09-21 (advantage-parity R-F2)：`Conversation` 与 `ConversationMeta` 增可选 `linkedNotePath`（vault-relative 显式草稿绑定，不属于 `ConversationSessionSettings`）。
 > 2026-09-21 (advantage-parity R-E4)：PromptContextItem / MessageContextAttachment 新增 retrievalChannel（lexical | semantic）。
 > 2026-09-21 (advantage-parity R-E1)：PromptContextKind 增 url；UrlContextMeta（href/finalUrl/title/status/failureReason/contentChars/truncated）；MessageContextAttachment 透传 url 元数据。
@@ -218,3 +219,7 @@ Ownership facts:
 > 2026-09-22 (ZCode 票 01)：`AgentBackendKind` 增加 `'zcode'`——官方 ZCode 运行时后端身份（独立 adapter/transport 边界）。
 
 ## 维护约束
+
+## 2026-09-27 OpenCode 2 compatibility
+
+AgentBackendKind includes opencode2. Persisted conversations use their backend ID to resolve the matching session adapter.

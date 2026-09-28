@@ -1,4 +1,7 @@
 # MessageSendPreparationService
+OpenCode 2 skips OpenCode 1 skill-content expansion. The v2 adapter resolves slash skill names against the native v2 catalog and supplies native skill IDs to prompt admission.
+
+OpenCode 2 conversations enter first-message title bootstrap and AI title generation through their own backend seam.
 > 2026-09-24 (ZCode image preflight)：带图片的 ZCode turn 在 optimistic user message 之前读取原生模型目录并核对所选 provider/model 的 `supportsImageInput`；不支持或目录不可用时以可操作 Notice 拒绝，文本与图片草稿不被消费。composer 可通过 `onPreparationOutcome` 区分 accepted/queued/rejected。
 
 > 2026-09-24（ZCode 续做）：ZCode 发送跳过 OpenCode 专属 `app.skills`/SkillContentExpander 请求；官方 ZCode 斜杠目录仍由 ZCode adapter 提供，避免跨后端请求污染。ZCode 现在也走发送前模型目录与所选模型校验，当前标签的 provider/model/reasoning variant 会进入发送选项，由 adapter 对原生会话设置并读回；此前菜单显示新模型而发送仍用旧模型。
@@ -154,3 +157,11 @@ Pi 发送启用自身模型目录校验并跳过 OpenCode skill 展开，原始 
 - 2026-09-13: prepareMessageSend 调用可选 planMemoryInjection 并把结果并入 modelOptions.memoryInjection（fail-soft）。
 
 - 2026-09-18 (FlowText R-B4): Obsidian 原生工具注入接缝接入——发送预检新增 planTurnToolingInjection：把 host.planObsidianToolingInjection 的每 epoch 注入块挂到 modelOptions.obsidianToolingInjection（与 memoryInjection 并列的后端无关选项袋键，fail-soft）。
+
+## 2026-09-27 OpenCode 2 compatibility
+
+OpenCode 2 selections require native model catalog availability before send; this prevents a stale OpenCode 1 model from being used.
+
+### 2026-09-28 parity continuation
+
+AI title generation can run for OpenCode 2 conversations when selected in settings.

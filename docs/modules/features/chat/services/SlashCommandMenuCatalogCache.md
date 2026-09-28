@@ -1,5 +1,8 @@
 # SlashCommandMenuCatalogCache
 
+OpenCode 2 loads native command and skill names with its own backend key, adds applicable builtins, and leaves upstream-unavailable sharing commands out of the menu. It does not read OpenCode 1 project command or agent config for this catalog.
+The same native agent catalog supplies `@agent` mention candidates and the primary agent selector, excluding hidden agents and excluding subagent-only entries from the primary selector.
+
 > **源码**: `src/features/chat/services/SlashCommandMenuCatalogCache.ts`
 > **状态**: [REVIEW]
 

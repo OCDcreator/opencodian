@@ -37,3 +37,7 @@
 ## 2026-09-22 ZCode 后端接入（票 01）
 
 wireHiddenAdapters 惰性注册 ZCodeAdapter（getZCodeSettings / getZCodeExtraEnv 回调），与 Codex/Pi 同样仅在有 vaultPath 时注册；构造时不启动进程，其他后端构造参数和实现保持不变。
+
+## 2026-09-27 OpenCode 2 compatibility
+
+Registers OpenCode2Adapter when a Vault path and settings callback exist. Construction is lazy; the adapter starts only when selected.

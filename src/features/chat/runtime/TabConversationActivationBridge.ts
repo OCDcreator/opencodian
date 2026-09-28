@@ -33,7 +33,7 @@ type BackgroundTaskActivationIndicatorPort = Pick<
 
 function supportsQuestionActivationRefresh(conversation: Conversation): boolean {
   const backend = conversation.backend ?? 'opencode';
-  return (backend === 'opencode' || backend === 'zcode')
+  return (backend === 'opencode' || backend === 'opencode2' || backend === 'zcode')
     && Boolean(getConversationBackendSessionId(conversation));
 }
 

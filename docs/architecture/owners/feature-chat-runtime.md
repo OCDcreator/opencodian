@@ -69,3 +69,7 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 
 - `ChatRuntimeComposition` supplies a narrow ZCode image-capability preflight seam to `MessageSendPreparationService`; it reads the native selected-model catalog before optimistic append and never routes the decision through OpenCode.
 - The composer acknowledgement is an explicit `accepted | queued | rejected` outcome; runtime composition remains the adapter boundary and does not own composer DOM cleanup.
+
+## 2026-09-27 OpenCode 2 compatibility
+
+The chat runtime starts the selected OpenCode 2 adapter and dispatches its commands, compact and rewind through the backend session owner.

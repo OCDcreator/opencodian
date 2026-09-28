@@ -472,6 +472,7 @@ function describeModelRef(model: BackendModelSelection | null): string {
   if (!model) return '';
   switch (model.kind) {
     case 'opencode':
+    case 'opencode2':
     case 'pi':
       return `${model.kind}:${model.provider}/${model.model}`;
     case 'zcode':

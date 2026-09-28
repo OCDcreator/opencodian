@@ -174,7 +174,8 @@ export class ModifiedFilesSidebar extends Component {
     const revertibleCount = this.revertModel?.revertibleCount ?? 0;
     const additions = this.entries.reduce((total, entry) => total + entry.additions, 0);
     const deletions = this.entries.reduce((total, entry) => total + entry.deletions, 0);
-    const summary = `+${additions} -${deletions}`;
+    const summary = this.entries.some((entry) => entry.statsUnavailable)
+      ? t('modifiedFiles.statsUnavailable') : `+${additions} -${deletions}`;
     const hasEntries = showingRevert ? revertCount > 0 : this.entries.length > 0;
     this.badgeEl.textContent = hasEntries ? String(showingRevert ? revertCount : this.entries.length) : '';
     this.badgeEl.classList.toggle('is-hidden', !hasEntries);
@@ -275,12 +276,16 @@ export class ModifiedFilesSidebar extends Component {
 
       const metaEl = itemEl.createDiv({ cls: 'opencodian-modified-files-sidebar-meta' });
       const statsEl = metaEl.createSpan({ cls: 'opencodian-modified-files-sidebar-stats' });
-      statsEl.createSpan({ cls: 'opencodian-modified-files-sidebar-additions', text: `+${entry.additions}` });
-      statsEl.createSpan({ cls: 'opencodian-modified-files-sidebar-deletions', text: `-${entry.deletions}` });
+      if (entry.statsUnavailable) {
+        statsEl.createSpan({ text: t('modifiedFiles.statsUnavailable') });
+      } else {
+        statsEl.createSpan({ cls: 'opencodian-modified-files-sidebar-additions', text: `+${entry.additions}` });
+        statsEl.createSpan({ cls: 'opencodian-modified-files-sidebar-deletions', text: `-${entry.deletions}` });
+      }
 
       metaEl.createSpan({
         cls: `opencodian-modified-files-sidebar-status status-${entry.status ?? 'modified'}`,
-        text: this.getStatusLabel(entry.status),
+        text: entry.statsUnavailable && !entry.status ? t('modifiedFiles.statusUnavailable') : this.getStatusLabel(entry.status),
       });
       if (this.linkedNote.path === relativePath && this.linkedNote.exists) {
         metaEl.createSpan({

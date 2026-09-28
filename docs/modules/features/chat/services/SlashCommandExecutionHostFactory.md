@@ -48,3 +48,8 @@ export function executeCompactSession(
 - 本文件不依赖 `OpenCodianView`，只依赖 `SlashCommandExecutionService` 中定义的类型接口
 - `SlashCommandExecutionService` 不再导出 `createSlashCommandExecutionHost` 和 `executeCompactSession`
 - `OpenCodianView` 从本文件导入这两个函数
+
+## 2026-09-27 OpenCode 2 compatibility
+
+The host chooses OpenCode 2 native command and skill lists, command execution, compact and rewind based on the current conversation backend.
+After the visible conversation sync used by slash undo/redo, the host refreshes the Session Change Sidebar so a fresh native diff reflects the reverted or restored state.

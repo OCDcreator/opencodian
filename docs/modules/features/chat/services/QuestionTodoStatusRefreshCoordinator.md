@@ -44,3 +44,7 @@ export interface QuestionTodoStatusRefreshCoordinatorHost {
 - visible/background post-sync 的 state commit、authoritative mark 与 attention 判定分别由 `VisibleConversationPostSyncCoordinator` 与 `BackgroundConversationPostSyncHandoffCoordinator` 承接；pending-question + todo/status refresh order 继续由本 coordinator 承接
 - current-tab conversation open fast path 通过 activation coordinator 复用同一条 supplemental refresh，而 post-sync gate 则继续保留在本 coordinator
 - 这条边界推进的是 master plan 的 P2 `question / todo / background task` lane：把 post-sync 的组合刷新 ownership 从 view/bridge host surface 中继续下沉
+
+## 2026-09-27 OpenCode 2 compatibility
+
+Pending question refresh includes OpenCode 2 form requests. Task/Todo status still needs its own native contract before parity can be claimed.

@@ -67,3 +67,7 @@ Run before merge: `npm run typecheck`, `npm run check:module-docs`.
 - 2026-09-17（第四轮）: 指令输入从单行 `input` 改为自增高 `textarea`（上限 120px 后内部滚动，Enter 提交 / Shift+Enter 换行），条子新增"下方放不下时翻到锚点上方"的定位规则；品牌标记移出字段框、作为条子头像钉在首行。职责与边界未变。
 - 2026-09-17（第五轮）: 新增附加上下文：页脚"添加上下文"入口 + 面板内选择器（搜索/键盘）+ 已附加 chip（独立上一行），提示词新增 `<attached_context>` 块（只列路径，§6.1 不注入 vault 正文），宿主新增可选 `listContextFiles()`。UI 拆出 `InlineEditContextUi`（页脚 chip + 选择器主体），overlay 保持骨架体量。职责与边界未变。
 - 2026-09-17（第五轮布局修正）: 提交/关闭按钮改为与字段框体垂直居中；附加上下文选择器改为 `left: 0` + `width: 100%`，左右边框与卡片边框对齐（原先内缩 10px 且比卡片宽，视觉上错位）。职责与边界未变。
+
+## 2026-09-28 OpenCode 2 auxiliary integration
+
+OpenCode 2 provider-qualified model references pass through the existing inline edit/completion model resolution owners; the backend still owns read-only verification.

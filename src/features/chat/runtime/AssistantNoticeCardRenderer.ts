@@ -176,6 +176,10 @@ export class AssistantNoticeCardRenderer {
     }
 
     const metaEl = rowEl.createSpan({ cls: 'opencodian-turn-diff-meta' });
+    if (entry.statsUnavailable) {
+      metaEl.createSpan({ text: t('modifiedFiles.statsUnavailable') });
+      return rowEl;
+    }
     if (entry.status === 'added' || entry.status === 'deleted') {
       metaEl.createSpan({
         cls: `opencodian-turn-diff-status status-${entry.status}`,

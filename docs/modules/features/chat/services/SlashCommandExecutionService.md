@@ -1,5 +1,9 @@
 # SlashCommandExecutionService
 
+OpenCode 2 slash undo/redo uses the native revert path. Its post-action visible sync also refreshes the current Session Change Sidebar through the host callback, so the sidebar reads the new native session diff.
+
+OpenCode 2.0.18 does not expose session sharing. `/share` and `/unshare` explain that upstream limit for OpenCode 2 conversations.
+
 2026-09-26：当当前会话为 ZCode 时，原样放行斜杠文本至 ZCode adapter，不查询或调用 OpenCode 的命令服务。ZCode 的 `/goal`、`/compact`、`/plan` 在原生边界处理，`/init` 与自定义命令由 ZCode 自身解析；OpenCode 原有命令路径不变。
 
 > **源码**: `src/features/chat/services/SlashCommandExecutionService.ts`
@@ -118,3 +122,7 @@ Pi 的斜杠输入直接交给 Pi prompt，不读取或执行 OpenCode 命令。
 ## R-C2 扩展
 
 2026-09-18 `tryRunSlashCommand` 在 pi / claude-code 回退**之前**拦截 `/image`（生成是插件侧 HTTP，必须四后端可用）：项目命令 `image` 仍保持优先；host 新增可选 `runImageGenerationCommand?(promptArgument)`。
+
+## 2026-09-27 OpenCode 2 compatibility
+
+OpenCode 2 executes native slash commands and synthetic compact/undo/redo. Share and unshare remain limited to OpenCode 1 because the 2.0.18 server has no sharing API.

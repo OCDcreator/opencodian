@@ -1,6 +1,6 @@
 import type { ChildSessionGraph, ChildSessionInfo } from '../../../core/agents';
 import { ChildSessionGraphService } from '../../../core/agents';
-import type { Conversation } from '../../../core/types';
+import { type Conversation,getConversationBackendSessionId } from '../../../core/types';
 import { t } from '../../../i18n';
 
 export interface ChildSessionGraphCoordinatorHost {
@@ -130,23 +130,24 @@ export class ChildSessionGraphCoordinator {
   async refreshGraph(): Promise<ChildSessionGraph | null> {
     const conversation = this.host.getCurrentConversation();
     const backend = conversation?.backend ?? 'opencode';
-    // Session children / subagent graph is OpenCode-only.
+    // Session children / subagent graph is available for both OpenCode protocols.
     // Claude's subagent graph surface is not stable-complete.
-    if (!conversation?.openCodeSessionId || backend !== 'opencode') {
+    const sessionId = conversation ? getConversationBackendSessionId(conversation) : null;
+    if (!sessionId || (backend !== 'opencode' && backend !== 'opencode2')) {
       this.currentGraph = null;
       return null;
     }
 
     let childSessions: ChildSessionInfo[] | undefined;
     try {
-      childSessions = await this.host.getSessionChildren(conversation.openCodeSessionId);
+      childSessions = await this.host.getSessionChildren(sessionId);
     } catch {
       childSessions = undefined;
     }
 
     const graph = this.service.reconstructGraph({
-      parentSessionId: conversation.openCodeSessionId,
-      messages: conversation.messages,
+      parentSessionId: sessionId,
+      messages: conversation?.messages ?? [],
       childSessions,
     });
 

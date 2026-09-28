@@ -75,3 +75,7 @@ export class PermissionModeSelectorCoordinator {
 
 - selection controls coordinator 仍负责 model selector、shared Escape handler、model unavailable copy 与 effort selector联动
 - permission selector coordinator 只负责 permission mode UI lifecycle，并通过小 host seam 写回当前 backend 的 mode
+
+### 2026-09-28 parity continuation
+
+The backend label union includes opencode2 so its selector has a distinct DOM identity.

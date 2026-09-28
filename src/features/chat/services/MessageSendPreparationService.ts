@@ -495,7 +495,7 @@ export class MessageSendPreparationService {
     const requestContent = isClaudeBackend
       ? options.content
       : this.agentInvocationService.removeMentionFallbackText(options.content, resolvedAgentInvocation);
-    const skillExpansion = conversation.backend === 'pi' || conversation.backend === 'zcode'
+    const skillExpansion = conversation.backend === 'pi' || conversation.backend === 'zcode' || conversation.backend === 'opencode2'
       ? { syntheticParts: [] }
       : await this.skillContentExpander.expand(requestContent);
     const syntheticTextParts: PromptSyntheticTextPartInput[] = [
@@ -547,7 +547,7 @@ export class MessageSendPreparationService {
     this.host.scrollToBottom({ tabId, enableAutoScroll: true });
     const conversationBackend = conversation.backend ?? 'opencode';
     const shouldBootstrapTitle = this.isFirstUserMessage(conversation)
-      && (conversationBackend === 'opencode' || conversationBackend === 'claude-code');
+      && (conversationBackend === 'opencode' || conversationBackend === 'opencode2' || conversationBackend === 'claude-code');
     if (shouldBootstrapTitle) {
       await this.host.applyFallbackConversationTitle(conversation.id, options.content);
       const shouldGenerateAiTitle = this.host.shouldGenerateAiTitle(conversation);
@@ -906,7 +906,7 @@ export function createMessageSendPreparationHost(
     formatModelId: (model) => selectionCtrl.formatModelId(model),
     shouldUseModelCatalog: (conversation) => {
       const backend = conversation.backend ?? 'opencode';
-      return backend === 'opencode' || backend === 'claude-code' || backend === 'pi' || backend === 'zcode';
+      return backend === 'opencode' || backend === 'opencode2' || backend === 'claude-code' || backend === 'pi' || backend === 'zcode';
     },
     ensureSelectedModelAvailable: (provider, model) => selectionCtrl.ensureSelectedModelAvailable(provider, model),
     appendModelUnavailableNoticeMessage: () => deps.appendModelUnavailableNoticeMessage(),
@@ -936,7 +936,7 @@ export function createMessageSendPreparationHost(
       if (backend === 'claude-code') {
         return deps.getClaudeAutoTitle();
       }
-      return backend === 'opencode' && deps.getTitleMode() === 'ai';
+      return (backend === 'opencode' || backend === 'opencode2') && deps.getTitleMode() === 'ai';
     },
     startAiConversationTitleGeneration: (conversationId, firstMessage, modelOptions) => deps.startAiConversationTitleGeneration(conversationId, firstMessage, modelOptions),
     setStreaming: (tabId, value) => tabRuntime.setStreaming(tabId, value),

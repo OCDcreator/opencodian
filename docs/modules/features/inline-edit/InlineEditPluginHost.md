@@ -43,3 +43,7 @@
 2026-09-18 bridge 新增可选 `getImageGeneration?()` 并透传到 host（null-safe）。
 
 > 2026-09-18 (R-C3)：`resolveAdapter()` 新增 `getInlineCompletion()`——按 `hasCapability(adapter.capabilities, AgentCapability.InlineCompletion)` 门控返回适配器（同 `getAuxQuery` 的类型桥接模式），后端未声明即如实缺位（§6.5）。
+
+## 2026-09-28 OpenCode 2 auxiliary integration
+
+OpenCode 2 model labels, model overrides and active tab models preserve provider-qualified IDs.

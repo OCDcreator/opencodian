@@ -38,7 +38,7 @@ export interface ConversationSyncLoadRuntimeViewHost extends
 }
 
 function shouldUseOpenCodeServerSync(conversation: Conversation): boolean {
-  return (conversation.backend ?? 'opencode') === 'opencode'
+  return ((conversation.backend ?? 'opencode') === 'opencode' || conversation.backend === 'opencode2')
     && Boolean(getConversationBackendSessionId(conversation));
 }
 
