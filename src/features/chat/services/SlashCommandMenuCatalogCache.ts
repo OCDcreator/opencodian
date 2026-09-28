@@ -54,6 +54,9 @@ export interface SlashCommandMenuCatalogCacheHost {
   loadPiRuntimeCommands?(): Promise<Array<{ name: string; description?: string }>>;
   /** Optional: load ZCode runtime slash commands (from the live session snapshot catalog). */
   loadZCodeRuntimeCommands?(): Promise<readonly { name: string; description: string }[]>;
+  loadOpenCode2Commands?(): Promise<Array<{ name: string; description?: string }>>;
+  loadOpenCode2Skills?(): Promise<Array<{ name: string; description?: string }>>;
+  loadOpenCode2Agents?(): Promise<Array<{ id: string; name: string; description?: string; mode: 'primary' | 'subagent' | 'all'; hidden: boolean }>>;
   /**
    * Optional: returns a short discriminator encoding the current server-side
    * slash-command/skill capability availability (e.g. whether `v2.command.list`
@@ -351,6 +354,27 @@ export class SlashCommandMenuCatalogCache {
   }
 
   load(): Promise<SlashCommandMenuItem[]> {
+    if (this.host.getBackendKey?.() === 'opencode2') return Promise.all([
+      this.host.loadOpenCode2Commands?.() ?? Promise.resolve([]),
+      this.host.loadOpenCode2Skills?.() ?? Promise.resolve([]),
+      this.host.loadOpenCode2Agents?.() ?? Promise.resolve([]),
+    ]).then(([commands, skills, agents]) => {
+      const hidden = new Set(this.host.getHiddenCommandIds());
+      const entries: SlashCommandCatalogEntry[] = [...commands, ...skills].map((entry) => ({
+        id: entry.name, template: `/${entry.name}`, description: entry.description ?? '',
+        agent: '', model: '', hasProjectOverride: false, hidden: hidden.has(entry.name),
+        runtimeAvailable: true, source: 'command', subtask: false, isBuiltin: false,
+      }));
+      const items = buildVisibleSlashCommandMenuItems(appendSyntheticBuiltinCommands(entries, hidden)
+        .filter((entry) => entry.id !== 'share' && entry.id !== 'unshare'));
+      attachAgentMentionCandidatesToSlashCommandMenuItems(items, agents.filter((agent) => !agent.hidden).map((agent) => ({
+        id: agent.id, displayName: agent.name, description: agent.description ?? '', mode: agent.mode,
+      })));
+      attachAgentSelectionCandidatesToSlashCommandMenuItems(items, agents.filter((agent) => !agent.hidden && agent.mode !== 'subagent').map((agent) => ({
+        id: agent.id, displayName: agent.name, description: agent.description ?? '', mode: agent.mode === 'all' ? 'all' as const : 'primary' as const,
+      })));
+      return items;
+    });
     if (this.host.getBackendKey?.() === 'pi') return (this.host.loadPiRuntimeCommands?.() ?? Promise.resolve([])).then((commands) => commands.map((command) => ({
       id: command.name, displayId: `/${command.name}`, description: command.description ?? '',
       insertText: `/${command.name} `, runtimeAvailable: true, source: 'command' as const,

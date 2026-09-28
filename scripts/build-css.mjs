@@ -37,6 +37,15 @@ export function buildCss(root = rootDir) {
     }
   }
 
+  // Obsidian injects styles.css into app://obsidian.md/index.html, so relative
+  // font URLs resolve against the app root. Releases contain only the plugin's
+  // three standard files; inline the two bundled fonts into the CSS artifact.
+  combinedCSS = combinedCSS.replace(/url\("(assets\/fonts\/[^"?#]+\.ttf)"\)/g, (_match, relativeUrl) => {
+    const fontPath = path.join(root, decodeURIComponent(relativeUrl));
+    const encoded = fs.readFileSync(fontPath).toString('base64');
+    return `url("data:font/ttf;base64,${encoded}")`;
+  });
+
   fs.writeFileSync(outputFile, combinedCSS.trim());
   console.log(`CSS built successfully: ${outputFile}`);
   return true;

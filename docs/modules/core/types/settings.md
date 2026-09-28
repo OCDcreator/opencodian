@@ -484,3 +484,11 @@ New normalize functions added:
 
 > 2026-09-22 (ZCode 票 01)：`BackendSettings` 增加 `zcode: ZCodeBackendSettings`（最小运行时选择：仅 `executablePath` 覆盖，空=自动发现官方安装）；`normalizeZCodeBackendSettings` 归一化缺失/非法值，`getDefaultBackendSettings` 同步。
 > 2026-09-24 (票 06)：ZCodeBackendSettings 增加持久化默认 model（providerId/modelId）/thinkingLevel/mode（枚举归一 plan/build/edit/yolo/auto，非法归空）；normalizeZCodeBackendSettings 同步。
+
+## 2026-09-27 OpenCode 2 compatibility
+
+BackendSettings stores a distinct opencode2 block with local/remote mode, executable, URL and password. Normalization defaults to local mode without changing legacy OpenCode 1 settings.
+
+### 2026-09-28 parity continuation
+
+OpenCode 2 permissionMode persists inherit/normal/yolo/plan separately from OpenCode 1 settings; normalization rejects unknown modes.

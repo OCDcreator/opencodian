@@ -7,6 +7,11 @@ jest.mock('../../../../src/core/opencode', () => ({
 import type { SlashCommandMenuItem } from '../../../../src/core/config/slashCommandCatalog';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
+import {
+  loadAgentMentionCandidatesFromSlashCommandMenuItems,
+  loadAgentSelectionCandidatesFromSlashCommandMenuItems,
+  SlashCommandMenuCatalogCache,
+} from '../../../../src/features/chat/services/SlashCommandMenuCatalogCache';
 
 const codexSkillItem: SlashCommandMenuItem = {
   id: 'opencodian-runtime-smoke-skill',
@@ -60,6 +65,25 @@ describe('OpenCodianView slash command preload availability', () => {
   });
 });
 
+it('uses native OpenCode 2 agents for mention and selector candidates', async () => {
+  const cache = new SlashCommandMenuCatalogCache({
+    getBackendKey: () => 'opencode2',
+    getHiddenCommandIds: () => [],
+    loadOpenCode2Commands: async () => [{ name: 'review' }],
+    loadOpenCode2Skills: async () => [],
+    loadOpenCode2Agents: async () => [
+      { id: 'build', name: 'Build', mode: 'primary', hidden: false },
+      { id: 'explore', name: 'Explore', mode: 'subagent', hidden: false },
+      { id: 'private', name: 'Private', mode: 'subagent', hidden: true },
+    ],
+  } as never);
+  const items = await cache.load();
+  expect(items.some((item) => item.id === 'review')).toBe(true);
+  expect(items.some((item) => item.id === 'share')).toBe(false);
+  expect((await loadAgentMentionCandidatesFromSlashCommandMenuItems(items)).map((agent) => agent.id)).toEqual(['build', 'explore']);
+  expect((await loadAgentSelectionCandidatesFromSlashCommandMenuItems(items)).map((agent) => agent.id)).toEqual(['build']);
+});
+
 describe('OpenCodianView.loadSlashCommandMenuItems — Codex-active guard', () => {
   afterEach(() => {
     jest.restoreAllMocks();
@@ -95,6 +119,18 @@ describe('OpenCodianView.loadSlashCommandMenuItems — Codex-active guard', () =
 
     expect(loadSpy).not.toHaveBeenCalled();
     expect(items).toEqual([]);
+  });
+
+  it('loads the OpenCode 2 catalog without an OpenCode 1 config manager', async () => {
+    const view = createView('opencode2', ['opencode2']);
+    const cache = (view as unknown as {
+      slashCommandMenuCatalogCache: { load: () => Promise<SlashCommandMenuItem[]> };
+    }).slashCommandMenuCatalogCache;
+    const loadSpy = jest.spyOn(cache, 'load').mockResolvedValue([codexSkillItem]);
+    const items = await (view as unknown as { loadSlashCommandMenuItems: () => Promise<SlashCommandMenuItem[]> })
+      .loadSlashCommandMenuItems();
+    expect(loadSpy).toHaveBeenCalled();
+    expect(items).toEqual([codexSkillItem]);
   });
 
   it('routes a ZCode conversation to native slash commands without calling OpenCode', async () => {

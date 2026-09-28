@@ -29,3 +29,7 @@ R-C3 的暖会话池（§3.2.4）：每 `backend × workingDirectory` 至多 1 �
 - TTL 到期必须同时清 map 条目与释放原生会话（无进程/连接泄漏）
 - `notify` 是**必填**选项（生产由 main.ts 注入 Obsidian `Notice`）：§3.2.6 的如实上报消息（sessionUnavailable / unsupportedAfterFailures / writeToolObserved）全部经它送达；漏配必须编译期失败而非静默吞掉（R-C3-D1 缺陷即漏配所致），不得改回可选或加本地 Notice 兜底
 - R-F4 只能调用 `startSession` / 已有 `warmUp` seam，不得调用 `complete` 或其它 query API；真实聊天会话不复用此 aux session
+
+## 2026-09-28 OpenCode 2 auxiliary integration
+
+Session model change detection includes opencode2 provider/model references.

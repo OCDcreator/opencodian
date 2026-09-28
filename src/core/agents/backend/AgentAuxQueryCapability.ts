@@ -29,7 +29,7 @@ import type { AgentService } from './AgentService';
  * information (Claude Code aliases, Codex reasoning effort).
  */
 export type BackendModelSelection =
-  | { kind: 'opencode' | 'pi'; provider: string; model: string }
+  | { kind: 'opencode' | 'opencode2' | 'pi'; provider: string; model: string }
   | { kind: 'claude-code'; model: string }
   | { kind: 'codex'; model: string; reasoningEffort?: string }
   /** ZCode models require a provider-qualified identity and may expose a per-model reasoning level. */

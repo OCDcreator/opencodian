@@ -168,3 +168,7 @@ export class ConversationLoadRecoveryCoordinator {
 - `ConversationTabOpenCoordinator` 的 port 在装配时注入 `activateTab`、`openConversationInCurrentTab`、`syncActiveTabConversation` 与 `loadConversation`，使其能够独立完成 `openTaskToolSession()` 的全链路（new-tab activate 或无 tabManager 时的 sync+load），无需回调到 `OpenCodianView`
 - `syncActiveTabConversation` 直接委托给 `TabConversationStateBridge.syncActiveTabConversation()`，仅同步 tab 状态而不触发完整的 conversation open/reset/hydration 行为；`openConversationInCurrentTab` 则委托给 `TabConversationActivationBridge.openConversation()` 以执行完整的激活流程
 - 因此后续若继续推进相邻 residual，只需要沿这个 coordinator surface 往下收，而不必重新回到 `OpenCodianView` 里寻找分散入口
+
+## 2026-09-27 OpenCode 2 compatibility
+
+OpenCode 2 native session IDs may enter the existing rewind and restore actions through the selected backend branch capability.

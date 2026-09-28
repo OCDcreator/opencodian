@@ -323,6 +323,7 @@ export interface ChatRuntimeCompositionHost {
   readonly app: unknown;
   /** R-F1: re-render the visible follow-up queue bar (view-owned). */
   refreshQueuedFollowUpBar?(): void;
+  refreshSessionChangeSidebar(): void;
   readonly caps: unknown;
   readonly scrollScheduler: SettledScrollScheduler;
   readonly plugin: {
@@ -339,7 +340,10 @@ export interface ChatRuntimeCompositionHost {
       readonly showAnsweredQuestionCards: boolean;
       readonly locale: 'en' | 'zh';
       readonly contextGroups: readonly ContextGroup[];
-      readonly backendSettings: { readonly claudeCode: { readonly autoTitle: boolean } };
+      readonly backendSettings: {
+        readonly claudeCode: { readonly autoTitle: boolean };
+        readonly opencode2: { readonly mode: 'local' | 'remote' };
+      };
       readonly vaultRetrievalEnabled: boolean;
       readonly vaultRetrievalTopK: number;
       readonly vaultRetrievalMaxCharsPerNote: number;
@@ -373,7 +377,7 @@ export interface ChatRuntimeCompositionHost {
     createConversation(): unknown;
     createConversationFromSession(sessionId: string, initial: unknown): unknown;
     deleteConversation(conversationId: string): unknown;
-    readonly agentServiceRegistry: unknown;
+    readonly agentServiceRegistry: { get(kind: string): { start(): Promise<void> } | undefined } | null;
     readonly memoryRuntime: MemoryRuntimePort | null;
     /** R-B4 Obsidian native tooling runtime (app.obsidian-tooling owner); null before bootstrap. */
     readonly obsidianToolingRuntime: {
@@ -1158,9 +1162,13 @@ export class ChatRuntimeComposition {
         getServerAvailability: () => host.getServerAvailability(),
         chatHeaderPresenter: surface.chatHeaderPresenter,
         settingsTab: host.plugin.settingsTab ?? null,
-        getServerMode: () => host.plugin.settings.server.mode as never,
+        getServerMode: () => host.plugin.settings.activeBackend === 'opencode2'
+          ? host.plugin.settings.backendSettings.opencode2.mode
+          : host.plugin.settings.server.mode as never,
         openPluginSettingsAtServerSection: () => host.openPluginSettingsAtServerSection(),
-        startServer: () => host.plugin.openCodeService.start(),
+        startServer: () => host.plugin.settings.activeBackend === 'opencode2'
+          ? host.plugin.agentServiceRegistry?.get('opencode2')?.start() ?? Promise.reject(new Error('OpenCode 2 adapter unavailable'))
+          : host.plugin.openCodeService.start(),
         notifyForegroundBusy: () => { new Notice(t('chat.tab.processingBlocked')); },
         notifyFollowUpQueued: (tabId: TabId | null, queue: readonly { content: string }[]) => {
           new Notice(t('chat.queue.queuedNotice', { count: queue.length }));
@@ -1235,6 +1243,7 @@ export class ChatRuntimeComposition {
         opencodeConfigManager: host.plugin.opencodeConfigManager,
         getSlashCommandSkillMode: () => host.plugin.settings.slashCommandSkillMode,
         openCodeServiceSdk: host.plugin.openCodeService.sdk,
+        getOpenCode2Adapter: () => host.plugin.agentServiceRegistry?.get('opencode2') as never ?? null,
         openCodeService: host.plugin.openCodeService,
         runCompactSession: (sessionId: string) => executeCompactSession(
           sessionId,
@@ -1246,6 +1255,7 @@ export class ChatRuntimeComposition {
         composerContextViewFacade: surface.composerContextViewFacade,
         getTabRuntimeState: (tabId: TabId) => host.getTabRuntimeState(tabId),
         conversationSyncBridgePorts,
+        refreshSessionChangeSidebar: () => host.refreshSessionChangeSidebar(),
         notifySlashCommandFailed: (commandId: string, error: unknown) => {
           const message = error instanceof Error ? error.message : String(error);
           new Notice(t('chat.slashCommand.executionFailed', { command: commandId, message }));
@@ -1398,7 +1408,7 @@ export class ChatRuntimeComposition {
         host.syncLatestUserMessageFromServer(conversation, optimisticMessageId, tabId),
       beginTabContextUsageStream: (tabId: TabId | null) => {
         const conversationForTab = host.getConversationForTab(tabId as TabId);
-        if (conversationForTab && (conversationForTab.backend ?? 'opencode') !== 'opencode') {
+        if (conversationForTab && !['opencode', 'opencode2'].includes(conversationForTab.backend ?? 'opencode')) {
           return;
         }
         background.activeTabContextUsageCoordinator.beginTabContextUsageStream(tabId as TabId);

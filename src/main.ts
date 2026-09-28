@@ -653,6 +653,7 @@ export default class OpenCodianPlugin extends Plugin {
         codexTracePort: this.codexTraceService,
         getPiSettings: () => this.settings.backendSettings.pi,
         getZCodeSettings: () => this.settings.backendSettings.zcode,
+        getOpenCode2Settings: () => this.settings.backendSettings.opencode2,
         getCodexExtraEnv: () => this.getDomainEnvFor('codex'),
         getPiExtraEnv: () => this.getDomainEnvFor('pi'),
         getZCodeExtraEnv: () => this.getDomainEnvFor('zcode'),
@@ -1199,6 +1200,15 @@ export default class OpenCodianPlugin extends Plugin {
         } | undefined;
         const models = await adapter?.getModelList?.();
         return (models ?? []).map((entry) => ({ id: entry.slug, label: entry.display_name || entry.slug }));
+      }
+      if (kind === 'opencode2') {
+        const adapter = this.agentServiceRegistry?.get('opencode2') as {
+          getModelSelectorProviders?(): Promise<Array<{ id: string; models: Array<{ id: string; name: string }> }>>;
+        } | undefined;
+        const providers = await adapter?.getModelSelectorProviders?.() ?? [];
+        return providers.flatMap((provider) => provider.models.map((model) => ({
+          id: `${provider.id}/${model.id}`, label: `${provider.id}/${model.name || model.id}`,
+        })));
       }
       if (kind === 'opencode') {
         if (!this.modelConfigService) return null;

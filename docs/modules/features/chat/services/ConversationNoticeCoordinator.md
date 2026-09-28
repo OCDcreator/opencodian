@@ -63,6 +63,12 @@ export class ConversationNoticeCoordinator {
 - `getFriendlyStreamErrorMessage()` 把原始流错误字符串映射为用户友好文案：网络错误 → server connection，opencode not found → binary missing，空消息 → backend-aware no response，其余 → send failed + 原文
 - 2026-09-19（R-B2 发送路径对齐）：新增 `file not found` 分支——后端读取器抛出的“文件不存在”错误一律改写为「发送消息失败 + `chat.context.notice.groupMissing`」词汇，只露出从原始错误中提取的文件名（vault 相对名），绝不把原始异常文本或绝对机器路径送进聊天表面；无法解析路径时仍如实报告有条目被跳过。原始错误保留在日志/trace
 - 空消息在 OpenCode 保留既有 server-no-response 指引；Claude Code 改为“未返回可显示内容”，避免用户被错误引导到 OpenCode 服务设置
+
+### OpenCode 2 turn changes
+
+- OpenCode 2 queries native `session.diff(from: sourceMessageId)` at turn completion even when no write-tool file hint was emitted. A non-empty native result becomes the immutable Turn Change Record; the current Session Change Sidebar is then refreshed from a separate full-session native read.
+- An empty native turn diff produces no card and still refreshes the sidebar. OpenCode 1 retains its existing file-hint gate and cached-diff fallback.
+- In a non-Git OpenCode 2 vault, a successful write-tool file hint may create a limited immutable record with `statsUnavailable`; it never asserts status or line counts. A completed background child gets a separate record anchored to the originating user turn and child session ID, leaving the foreground record unchanged.
 - Claude Code backend 的 SDK/stream 错误保留 Claude Code 标签，不再被映射成 OpenCode server connection failure，避免用户在 Claude 后端失败时被引导去排查 OpenCode 本地服务。
 
 ### turn diff notice
@@ -104,3 +110,7 @@ export class ConversationNoticeCoordinator {
 - `open_model_settings` 的滚动恢复逻辑仍由 view host 负责
 - model-unavailable notice 仍归 `ChatSelectionControlsCoordinator`，不要迁移进这个 coordinator
 - `renderBackgroundTaskIndicatorIfNeeded()` 的 host seam 允许透传 `isCurrent` lease；notice 侧若在会话切换窗口调用该入口，不得丢掉 lease。
+
+### 2026-09-28 parity continuation
+
+Turn diff notices support OpenCode 2 session IDs and native diff readback while keeping the OpenCode 1 cache isolated.

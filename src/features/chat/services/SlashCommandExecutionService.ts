@@ -86,6 +86,15 @@ export interface SlashCommandExecutionHostDependencies {
   opencodeConfigManager: { getCommandConfig(): Promise<OpencodeCommandConfigRecord>; getConfigDir(): string } | null;
   getSlashCommandSkillMode: () => SlashCommandSkillMode;
   openCodeServiceSdk: { command: { list(): Promise<unknown> }; app: { skills(): Promise<unknown> } };
+  getOpenCode2Adapter?: () => {
+    start(): Promise<void>;
+    listCommands(): Promise<SlashCommandRuntimeCatalogEntry[]>;
+    listSkills(): Promise<SlashCommandRuntimeSkillEntry[]>;
+    runSessionCommand(sessionId: string, command: string, args: string): Promise<void>;
+    compactSession(sessionId: string): Promise<boolean>;
+    revertSession(sessionId: string, messageID: string): Promise<boolean>;
+    unrevertSession(sessionId: string): Promise<boolean>;
+  } | null;
   openCodeService: {
     runSessionCommand(sessionId: string, input: SessionCommandInput): Promise<unknown>;
     revertSession(sessionId: string, messageID: string, partID?: string): Promise<boolean>;
@@ -101,6 +110,7 @@ export interface SlashCommandExecutionHostDependencies {
     getLoopControl(): { startConversationSyncLoop(): void };
     getVisibleSyncFollowUp(): { syncVisibleConversationInBackground(): Promise<void> };
   };
+  refreshSessionChangeSidebar?: () => void;
   notifySlashCommandFailed: (commandId: string, error: unknown) => void;
 }
 
@@ -394,7 +404,7 @@ export class SlashCommandExecutionService {
 
   private ensureOpenCodeConversationForCommand(conversation: Conversation, commandId: string): boolean {
     const backend = conversation.backend ?? 'opencode';
-    if (backend === 'opencode') return true;
+    if (backend === 'opencode' || backend === 'opencode2') return true;
     this.host.notifySlashCommandFailed(commandId, new Error('No OpenCode session available'));
     return false;
   }
@@ -417,7 +427,7 @@ export class SlashCommandExecutionService {
     const conversation = await this.prepareExecutionContext();
     const backend = conversation?.backend ?? 'opencode';
     const sessionId = conversation ? getConversationBackendSessionId(conversation) : undefined;
-    if (!sessionId || backend !== 'opencode') { new Notice(t('slashCommand.compact.noSession')); return true; }
+    if (!sessionId || (backend !== 'opencode' && backend !== 'opencode2')) { new Notice(t('slashCommand.compact.noSession')); return true; }
     await this.host.runCompactSession(sessionId);
     return true;
   }
@@ -427,7 +437,7 @@ export class SlashCommandExecutionService {
     if (!conversation) { return true; }
     const backend = conversation?.backend ?? 'opencode';
     const sessionId = getConversationBackendSessionId(conversation);
-    if (!sessionId || backend !== 'opencode') { new Notice(t('slashCommand.undo.noSession')); return true; }
+    if (!sessionId || (backend !== 'opencode' && backend !== 'opencode2')) { new Notice(t('slashCommand.undo.noSession')); return true; }
     const lastUserMsg = [...conversation.messages].reverse()
       .find((m) => m.role === 'user' && m.sourceMessageId);
     if (!lastUserMsg?.sourceMessageId) { new Notice(t('slashCommand.undo.noUserMessage')); return true; }
@@ -444,7 +454,7 @@ export class SlashCommandExecutionService {
     if (!conversation) { return true; }
     const backend = conversation.backend ?? 'opencode';
     const sessionId = getConversationBackendSessionId(conversation);
-    if (!sessionId || backend !== 'opencode') { new Notice(t('slashCommand.redo.noSession')); return true; }
+    if (!sessionId || (backend !== 'opencode' && backend !== 'opencode2')) { new Notice(t('slashCommand.redo.noSession')); return true; }
     try {
       const ok = await this.host.unrevertSession(sessionId);
       new Notice(t(ok ? 'slashCommand.redo.success' : 'slashCommand.redo.failed'));
@@ -461,6 +471,7 @@ export class SlashCommandExecutionService {
   private async handleShareCommand(): Promise<boolean> {
     const conversation = await this.prepareExecutionContext();
     const backend = conversation?.backend ?? 'opencode';
+    if (backend === 'opencode2') { new Notice(t('slashCommand.share.opencode2Unavailable')); return true; }
     const sessionId = conversation ? getConversationBackendSessionId(conversation) : undefined;
     if (!sessionId || backend !== 'opencode') { new Notice(t('slashCommand.share.noSession')); return true; }
     new Notice(t('slashCommand.share.starting'));
@@ -473,6 +484,7 @@ export class SlashCommandExecutionService {
   private async handleUnshareCommand(): Promise<boolean> {
     const conversation = await this.prepareExecutionContext();
     const backend = conversation?.backend ?? 'opencode';
+    if (backend === 'opencode2') { new Notice(t('slashCommand.share.opencode2Unavailable')); return true; }
     const sessionId = conversation ? getConversationBackendSessionId(conversation) : undefined;
     if (!sessionId || backend !== 'opencode') { new Notice(t('slashCommand.unshare.noSession')); return true; }
     const ok = await this.host.unshareSession(sessionId);

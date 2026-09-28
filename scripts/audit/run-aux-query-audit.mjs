@@ -7,6 +7,7 @@
  *
  * Usage: node scripts/audit/run-aux-query-audit.mjs [backend ...]
  *   backends: opencode | claude-code | codex | pi   (default: all)
+ *   OpenCode 2: run separately with `opencode2` and OPENCODE2_BIN.
  */
 
 import { spawn } from 'node:child_process';
@@ -18,7 +19,9 @@ import esbuild from 'esbuild';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '..', '..');
-const entry = path.join(here, 'aux-query-audit.entry.ts');
+const isOpenCode2 = process.argv.slice(2).includes('opencode2');
+if (isOpenCode2 && process.argv.slice(2).length !== 1) throw new Error('Run the OpenCode 2 audit separately.');
+const entry = path.join(here, isOpenCode2 ? 'opencode2-aux-query-audit.entry.ts' : 'aux-query-audit.entry.ts');
 
 // The bundle must sit inside the repository so that Node resolves the bare
 // `packages: 'external'` imports (the SDK, `ws`) from node_modules at runtime.
@@ -34,11 +37,28 @@ await esbuild.build({
   platform: 'node',
   format: 'esm',
   target: 'node20',
-  packages: 'external',
+  packages: isOpenCode2 ? 'bundle' : 'external',
   sourcemap: 'inline',
   logLevel: 'warning',
   absWorkingDir: repoRoot,
+  ...(isOpenCode2 ? { banner: { js: "import { createRequire as auditCreateRequire } from 'node:module'; const require = auditCreateRequire(import.meta.url);" } } : {}),
+  plugins: isOpenCode2 ? [{
+    name: 'node-obsidian-http',
+    setup(build) {
+      build.onResolve({ filter: /^obsidian$/ }, () => ({ path: 'obsidian', namespace: 'audit-http' }));
+      build.onLoad({ filter: /.*/, namespace: 'audit-http' }, () => ({ contents: `
+        export async function requestUrl(options) {
+          const response = await fetch(options.url, options);
+          const text = await response.text();
+          if (!response.ok) throw new Error('HTTP ' + response.status + ': ' + text);
+          return { status: response.status, headers: Object.fromEntries(response.headers), text };
+        }
+      ` }));
+    },
+  }] : [],
 });
+
+if (isOpenCode2 && process.env.AUDIT_SAVE_BUNDLE) fs.copyFileSync(outFile, process.env.AUDIT_SAVE_BUNDLE);
 
 const child = spawn(process.execPath, [outFile, ...process.argv.slice(2)], {
   stdio: 'inherit',
@@ -48,7 +68,8 @@ const child = spawn(process.execPath, [outFile, ...process.argv.slice(2)], {
 
 child.on('exit', (code) => {
   try {
-    fs.rmSync(outDir, { recursive: true, force: true });
+    fs.unlinkSync(outFile);
+    fs.rmdirSync(outDir);
   } catch {
     // Temp cleanup is best effort.
   }

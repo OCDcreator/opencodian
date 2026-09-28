@@ -26,6 +26,7 @@ addIcon(ZCODE_BACKEND_ICON, '<g transform="scale(3.3333)"><path fill="#2D2D2D" d
 
 const AGENT_ICON_BY_BACKEND: Record<AgentBackendKind, AgentSwitcherIconConfig> = {
   opencode: { fallbackIcon: 'bot', iconId: 'opencode', variant: 'color' },
+  opencode2: { fallbackIcon: 'bot', iconId: 'opencode', variant: 'color' },
   'claude-code': { fallbackIcon: 'sparkles', iconId: 'claudecode', variant: 'color' },
   codex: { fallbackIcon: 'code-2', iconId: 'codex', variant: 'color' },
   copilot: { fallbackIcon: 'github', iconId: 'githubcopilot', variant: 'color' },

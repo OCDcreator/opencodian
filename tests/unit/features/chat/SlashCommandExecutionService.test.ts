@@ -168,6 +168,18 @@ describe('SlashCommandExecutionService', () => {
     expect(host.runSessionCommand).not.toHaveBeenCalled();
   });
 
+  it('refreshes the session sidebar after a native slash undo sync', async () => {
+    const refreshSessionChangeSidebar = jest.fn();
+    const deps = createDependencies({ refreshSessionChangeSidebar });
+    const host = createSlashCommandExecutionHost(deps as never);
+
+    await host.syncVisibleConversationInBackground();
+
+    expect(deps.conversationSyncBridgePorts.getVisibleSyncFollowUp()
+      .syncVisibleConversationInBackground).toHaveBeenCalledTimes(1);
+    expect(refreshSessionChangeSidebar).toHaveBeenCalledTimes(1);
+  });
+
   it('returns false for unknown slash commands so regular chat can handle the text', async () => {
     const host = createHost({
       getRuntimeCommands: jest.fn().mockResolvedValue([

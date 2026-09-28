@@ -1078,10 +1078,37 @@ export interface BackendSettings {
   opencode: {
     sessionTrace: OpenCodeSessionTraceSettings;
   };
+  opencode2: OpenCode2BackendSettings;
   claudeCode: ClaudeCodeBackendSettings;
   codex: CodexBackendSettings;
   pi: PiBackendSettings;
   zcode: ZCodeBackendSettings;
+}
+
+/** OpenCode 2 has a distinct API and process from the 1.x OpenCode server. */
+export interface OpenCode2BackendSettings {
+  mode: 'local' | 'remote';
+  executablePath: string;
+  baseUrl: string;
+  password: string;
+  permissionMode?: 'inherit' | PermissionMode;
+  /** Optional native OpenCode 2 config overlay; separate from OpenCode 1 project config. */
+  configContent?: string;
+}
+
+export function normalizeOpenCode2BackendSettings(value: unknown): OpenCode2BackendSettings {
+  const source = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown> : {};
+  const text = (key: string): string => typeof source[key] === 'string' ? (source[key] as string).trim() : '';
+  return {
+    mode: source.mode === 'remote' ? 'remote' : 'local',
+    executablePath: text('executablePath'),
+    baseUrl: text('baseUrl'),
+    password: text('password'),
+    permissionMode: source.permissionMode === 'normal' || source.permissionMode === 'yolo' || source.permissionMode === 'plan'
+      ? source.permissionMode : 'inherit',
+    configContent: text('configContent'),
+  };
 }
 
 export function getDefaultOpenCodeSessionTraceSettings(): OpenCodeSessionTraceSettings {
@@ -1180,6 +1207,7 @@ export function getDefaultBackendSettings(): BackendSettings {
     opencode: {
       sessionTrace: getDefaultOpenCodeSessionTraceSettings(),
     },
+    opencode2: normalizeOpenCode2BackendSettings(undefined),
     claudeCode: getDefaultClaudeCodeBackendSettings(),
     codex: getDefaultCodexBackendSettings(),
     pi: normalizePiBackendSettings(undefined),
@@ -1558,10 +1586,11 @@ export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBa
 
 export function normalizeBackendSettings(value: unknown): BackendSettings {
   const candidate = value && typeof value === 'object' && !Array.isArray(value)
-    ? value as { opencode?: unknown; claudeCode?: unknown; codex?: unknown; pi?: unknown; zcode?: unknown }
+    ? value as { opencode?: unknown; opencode2?: unknown; claudeCode?: unknown; codex?: unknown; pi?: unknown; zcode?: unknown }
     : {};
   return {
     opencode: normalizeOpenCodeBackendSettings(candidate.opencode),
+    opencode2: normalizeOpenCode2BackendSettings(candidate.opencode2),
     claudeCode: normalizeClaudeCodeBackendSettings(candidate.claudeCode),
     codex: normalizeCodexBackendSettings(candidate.codex),
     pi: normalizePiBackendSettings(candidate.pi),

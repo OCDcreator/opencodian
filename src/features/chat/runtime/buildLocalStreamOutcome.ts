@@ -64,7 +64,7 @@ export function buildLocalStreamOutcome(options: {
     shouldPersistInterruptedState: effectiveShouldPersistInterruptedState,
     streamErrorNoticeMessage: streamErrorNoticeMessage ?? retryErrorNoticeMessage,
     interruptedNoticeMessage: null,
-    shouldSyncFromServer: backend === 'opencode'
+    shouldSyncFromServer: (backend === 'opencode' || backend === 'opencode2')
       && shouldSyncAfterStream({
         streamCompleted: options.routedStream.streamCompleted,
         streamTimedOut: options.routedStream.streamTimedOut,

@@ -111,6 +111,8 @@ esbuild 配置：
 2. `fs.copyFileSync('manifest.json', 'dist/manifest.json')`
 3. `fs.copyFileSync('styles.css', 'dist/styles.css')`
 4. `copyDirectoryIfExists('assets', 'dist/assets')`
+
+`build-css.mjs` embeds `assets/fonts/*.ttf` referenced by `@font-face` as data URLs in the generated `styles.css`. Obsidian injects the stylesheet under `app://obsidian.md/index.html`, where a relative `assets/fonts/...` URL otherwise resolves to the app root and fails. The standard three-file plugin package therefore contains its required fonts without a separate asset directory.
 5. `pruneClaudeAgentSdkRuntimeArtifacts()` 移除旧的 `dist/node_modules/@anthropic-ai/claude-agent-sdk*` runtime artifact，防止历史 platform binary package 被误当成必需产物
 6. 不复制 Codex CLI 或平台原生包；`ws` 是声明的直接依赖，esbuild 仅将它别名到 Node 入口并静态打进 `main.js`，不改变其余依赖的 renderer 解析
 

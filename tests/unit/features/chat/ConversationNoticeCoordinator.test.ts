@@ -171,6 +171,29 @@ describe('ConversationNoticeCoordinator empty conversation notices', () => {
 describe('ConversationNoticeCoordinator diff notices', () => {
   beforeEach(resetConversationNoticeMocks);
 
+  it('persists child changes separately and never rewrites the completed parent turn', async () => {
+    const original = { kind: 'turn-diff', sourceMessageId: 'parent-user', entries: [
+      { file: 'parent.md', additions: 2, deletions: 0 },
+    ] };
+    const conversation = { id: 'parent-conv', backend: 'opencode2', backendSessionId: 'parent-session',
+      messages: [{ role: 'assistant', displayStyle: 'notice', noticeMeta: original }] };
+    const getOpenCode2BackgroundTaskChanges = jest.fn().mockResolvedValue({
+      sourceMessageId: 'parent-user', entries: [{ file: 'child.md', additions: 3, deletions: 1 }],
+    });
+    const coordinator = new ConversationNoticeCoordinator({ ...createHost(), getOpenCode2BackgroundTaskChanges });
+    const before = JSON.stringify(original);
+
+    await coordinator.appendBackgroundTaskDiffNoticeIfNeeded(conversation as never, 'child-session', 'tab-parent');
+
+    expect(JSON.stringify(original)).toBe(before);
+    expect(mockAppendPersistentNotice).toHaveBeenCalledWith(expect.objectContaining({
+      conversation, tabId: 'tab-parent', noticeMeta: expect.objectContaining({
+        kind: 'turn-diff', sourceMessageId: 'parent-user:background:child-session',
+        anchorKey: 'parent-user', taskIds: ['child-session'], entries: [{ file: 'child.md', additions: 3, deletions: 1 }],
+      }),
+    }));
+  });
+
   describe('formatDiffNoticeMarkdown', () => {
     it('renders vault links, stats, and status', () => {
       const coordinator = new ConversationNoticeCoordinator(createHost());
@@ -219,6 +242,27 @@ describe('ConversationNoticeCoordinator diff notices', () => {
       } as never, []);
       expect(mockGetSessionDiff).not.toHaveBeenCalled();
       expect(mockRefreshSessionChangeSidebar).not.toHaveBeenCalled();
+    });
+
+    it('captures a native OpenCode 2 turn diff even when a write tool emitted no file hint', async () => {
+      mockGetSessionDiff.mockResolvedValue([
+        { file: 'native-change.md', additions: 5, deletions: 1, status: 'modified' },
+      ]);
+      const coordinator = new ConversationNoticeCoordinator(createHost());
+
+      await coordinator.appendTurnDiffNoticeIfNeeded({
+        backend: 'opencode2', backendSessionId: 'session-v2',
+        messages: [{ role: 'user', sourceMessageId: 'user-v2' }],
+      } as never, []);
+
+      expect(mockGetSessionDiff).toHaveBeenCalledWith('session-v2', 'user-v2', 'opencode2');
+      expect(mockAppendPersistentNotice).toHaveBeenCalledWith(expect.objectContaining({
+        noticeMeta: expect.objectContaining({
+          kind: 'turn-diff', sourceMessageId: 'user-v2',
+          entries: [{ file: 'native-change.md', additions: 5, deletions: 1, status: 'modified' }],
+        }),
+      }));
+      expect(mockRefreshSessionChangeSidebar).toHaveBeenCalledTimes(1);
     });
 
     it('skips when there is no user source message', async () => {

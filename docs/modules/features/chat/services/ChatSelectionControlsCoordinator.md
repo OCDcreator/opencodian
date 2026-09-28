@@ -97,3 +97,11 @@ export class ChatSelectionControlsCoordinator {
 
 在原有 Codex host 外组合 bindPiModelSelection；Pi 模型目录与选择策略由独立绑定模块负责，非 Pi 委托原有 host。
 > 2026-09-24 (票 06)：协调器在 pi 绑定外再包一层 bindZCodeModelSelection——仅当活动后端为 zcode 时接管模型选择器（实时目录 + 每模型 reasoning 档位 variants），其余后端语义不变。
+
+## 2026-09-27 OpenCode 2 compatibility
+
+The OpenCode 2 model picker reads the native model catalog and default model. The OpenCode 1 permission mode selector is hidden because version 2 uses ordered rules and request approvals.
+
+### 2026-09-28 parity continuation
+
+OpenCode 2 now has a permission/agent selector: inherited Build, ask, allow and Plan. Changes are applied to the selected native session, read back, then persisted for subsequent turns.

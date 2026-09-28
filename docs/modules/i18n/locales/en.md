@@ -1,4 +1,6 @@
 # English Locale
+`modifiedFiles.statsUnavailable` and `modifiedFiles.statusUnavailable` label file-hint records that have no authoritative native snapshot statistics or change status.
+> 2026-09-28 (OpenCode 2): Sharing commands explain the upstream limit; config application copy reflects native value readback.
 > 2026-09-25 (session deletion): Confirmation copy describes removal of local OpenCodian messages and possible backend history retention; ZCode desktop task-list soft deletion is not presented as permanent native history removal.
 > 2026-09-25 (ZCode): `chat.zcode.backgroundTask.stopped` labels native `killed` as neutral "Stopped"; the existing unknown/connection-lost labels remain for tasks with no proven terminal notification.
 > 2026-09-24 (ZCode): Context compaction copy now names the current session rather than Codex so the ZCode details surface is accurate.
@@ -622,3 +624,11 @@ R-C4 补充：`chat.context.pdfIntegration.notMounted`（调试区在未探测�
 > 2026-09-22（二轮核查修复）：新增 `settings.zcode.status.providerValidatedNoCount`（计数不可用的诚实表述）。
 > 2026-09-24 (票 06)：新增 settings.zcode.model/.desc/.placeholder、settings.zcode.thinking/.desc/.placeholder、settings.zcode.mode/.desc/.inherit。
 > 2026-09-24（续做）：新增 `chat.zcode.mode.*` 与 `chat.zcode.reasoning.*`，区分原生模式的未确认状态和模型推理档位的下一回合生效边界。
+
+## 2026-09-27 OpenCode 2 compatibility
+
+English settings copy distinguishes OpenCode 1 and OpenCode 2 and labels the version 2 connection controls.
+
+### 2026-09-28 parity continuation
+
+OpenCode 2 inherited server permission mode has English label and explanation.

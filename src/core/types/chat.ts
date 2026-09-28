@@ -220,6 +220,8 @@ export interface SessionDiffEntry {
   after?: string;
   additions: number;
   deletions: number;
+  /** File hint only: the backend did not provide native diff statistics. */
+  statsUnavailable?: boolean;
   status?: 'added' | 'deleted' | 'modified';
 }
 
@@ -349,6 +351,7 @@ export interface TurnDiffNoticeEntry {
   readonly file: string;
   readonly additions: number;
   readonly deletions: number;
+  readonly statsUnavailable?: boolean;
   readonly status?: SessionDiffEntry['status'];
 }
 
@@ -696,7 +699,7 @@ export type StreamChunk =
   | { type: 'user_message_identity'; uuid: string; sessionId?: string };
 
 /** Logical agent backend identity. Determines which adapter owns a session. */
-export type AgentBackendKind = 'opencode' | 'claude-code' | 'codex' | 'copilot' | 'pi' | 'zcode';
+export type AgentBackendKind = 'opencode' | 'opencode2' | 'claude-code' | 'codex' | 'copilot' | 'pi' | 'zcode';
 
 /** Conversation metadata */
 export interface ConversationMeta {

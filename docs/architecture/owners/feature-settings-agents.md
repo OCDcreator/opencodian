@@ -1,4 +1,5 @@
 # Owner: feature.settings-agents
+> 2026-09-28：OpenCode 2 设置包含原生 MCP 连接状态、API 密钥/OAuth 认证、凭据切换与运行目录。原生配置覆盖层和 OpenCode 1 配置互相独立。
 > 2026-09-24 (票 06)：SettingsZCodeSection 新增三项持久化默认字段与重连时的斜杠目录失效调用。
 > 2026-09-22（二轮核查修复）：SettingsZCodeSection 的 provider 计数未知时显示「数量不可用」，移除 ?? 0 伪造。
 > 2026-09-22 (ZCode 票 01)：SettingsBackendSection 的 ALL_BACKEND_OPTIONS 增加 zcode（可启用/禁用，不影响其他后端启停语义）；新增 SettingsZCodeSection（ZCode 运行时覆盖 + ready/unavailable/failed 诚实诊断面）。
@@ -50,3 +51,7 @@ Pi图标由AgentSwitcherFloatingIcons单处注册用户SVG形状，三种后端�
 - 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
 
 - 2026-09-18 (FlowText 批次 B)：owner manifest 随 R-B1/R-B2 更新——新增 `src/shared/contextGroupPlan.ts` 归属 `shared.foundation`；本 owner 的边界与职责未变。
+
+## 2026-09-27 OpenCode 2 compatibility
+
+The agent switcher identifies OpenCode 2 independently and reuses the OpenCode visual icon.

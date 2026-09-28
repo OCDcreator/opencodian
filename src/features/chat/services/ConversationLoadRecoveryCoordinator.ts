@@ -387,7 +387,7 @@ export class ConversationLoadRecoveryCoordinator {
 
     // Revert is OpenCode-only until Claude runtime proof justifies it.
     // See docs/status/claude-code-current-state-2026-05-22.md §"What Exists But Must Not Be Described As Stable Completion".
-    if (!sessionId || !message.sourceMessageId || backend !== 'opencode') {
+    if (!sessionId || !message.sourceMessageId || (backend !== 'opencode' && backend !== 'opencode2')) {
       logger.debug('Rewind unavailable due to missing identifiers or unsupported backend', {
         conversationId: currentConversation.id,
         sessionId,
@@ -465,7 +465,7 @@ export class ConversationLoadRecoveryCoordinator {
     const backend = currentConversation.backend ?? 'opencode';
 
     // Unrevert is OpenCode-only until Claude runtime proof justifies it.
-    if (!sessionId || backend !== 'opencode') {
+    if (!sessionId || (backend !== 'opencode' && backend !== 'opencode2')) {
       this.host.showNotice(t('chat.rewind.restoreFailed'));
       return;
     }

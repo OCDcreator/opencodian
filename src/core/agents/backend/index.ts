@@ -7,7 +7,7 @@
 
 import type { AgentBackendKind } from '../../types/chat';
 
-export const IMPLEMENTED_AGENT_BACKENDS: readonly AgentBackendKind[] = ['opencode', 'claude-code', 'codex', 'pi', 'zcode'];
+export const IMPLEMENTED_AGENT_BACKENDS: readonly AgentBackendKind[] = ['opencode', 'opencode2', 'claude-code', 'codex', 'pi', 'zcode'];
 
 export {
   wireHiddenAdapters,
@@ -231,6 +231,7 @@ export {
   type CodexStreamNormalizerOptions,
   createCodexStreamNormalizer,
 } from './CodexStreamNormalizer';
+export { OpenCode2Adapter } from './OpenCode2Adapter';
 export { OpenCodeAdapter } from './OpenCodeAdapter';
 export {
   assertWithinRoot,

@@ -1,5 +1,7 @@
 # SettingsBackendSection
 
+OpenCode 2 runtime catalog refresh renders native MCP connections and integration authentication. API keys stay in password inputs and go to the native server; OAuth has external authorization, code completion, status readback and cancellation. Agent/command/skill/plugin names are displayed from the native catalog; their local definitions stay in the version-specific configuration overlay.
+
 > **源码**: `src/features/settings/SettingsBackendSection.ts`
 > **状态**: [REVIEW]
 
@@ -53,3 +55,7 @@ Pi 加入已实现后端选择。仅启用 Pi 时挂载独立 SettingsPiSection�
 2026-09-09：通用智能体页只负责启停/默认后端，移除内联Pi配置；Pi配置在独立后端标签。
 
 2026-09-22：ZCode 加入已实现后端选择（`settings.agent.name.zcode` / `settings.agent.zcode.desc`）；启用/禁用不影响其他后端的启停语义。
+
+## 2026-09-27 OpenCode 2 compatibility
+
+The backend list exposes OpenCode 1 and 2 separately; OpenCode 2 settings select local executable or remote URL/password.

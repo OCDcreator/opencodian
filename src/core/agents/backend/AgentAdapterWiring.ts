@@ -10,12 +10,13 @@
 
 import * as path from 'node:path';
 
-import type { CodexBackendSettings, PiBackendSettings, ZCodeBackendSettings } from '../../types/settings';
+import type { CodexBackendSettings, OpenCode2BackendSettings, PiBackendSettings, ZCodeBackendSettings } from '../../types/settings';
 import type { AgentService } from './AgentService';
 import type { AgentServiceRegistry } from './AgentServiceRegistry';
 import { CodexAdapter } from './CodexAdapter';
 import { resolveCodexCli } from './CodexCliResolver';
 import type { CodexTracePort } from './diagnostics/types';
+import { OpenCode2Adapter } from './OpenCode2Adapter';
 import { PiAdapter } from './pi/PiAdapter';
 import type { PiUiHandler } from './pi/PiProtocol';
 import { ZCodeAdapter } from './zcode';
@@ -41,6 +42,7 @@ export interface WireHiddenAdaptersOptions {
    */
   codexTracePort?: CodexTracePort;
   getPiSettings?: () => PiBackendSettings;
+  getOpenCode2Settings?: () => OpenCode2BackendSettings;
   /** ZCode-specific settings from plugin configuration. */
   getZCodeSettings?: () => ZCodeBackendSettings;
   /** R-F7: resolved domain env injected into spawned Pi service processes. */
@@ -69,6 +71,12 @@ export function wireHiddenAdapters(options: WireHiddenAdaptersOptions): void {
   }
 
   if (vaultPath) {
+    if (options.getOpenCode2Settings) {
+      registry.register(new OpenCode2Adapter({
+        workingDirectory: vaultPath,
+        getSettings: options.getOpenCode2Settings,
+      }));
+    }
     const codexCliResolution = resolveCodexCli({ executablePath: codexSettings?.executablePath ?? '' });
     registry.register(new CodexAdapter({
       workingDirectory: vaultPath,

@@ -83,6 +83,23 @@ export class TitleGenerationService {
       }
 
       const backend = await this.resolveConversationBackend(conversationId);
+      if (backend === 'opencode2') {
+        const adapter = this.plugin.agentServiceRegistry.get('opencode2') as {
+          generateTitle?(request: string, provider: string, model: string): Promise<string>;
+        } | undefined;
+        if (!adapter?.generateTitle) throw new Error('OpenCode 2 title generation unavailable');
+        const text = await adapter.generateTitle(
+          `${buildTitleGenerationSystemPrompt(locale)}\n\n${prompt}`,
+          currentModel.provider,
+          currentModel.model,
+        );
+        if (controller.signal.aborted) return;
+        const title = this.parseTitle(text);
+        await this.safeCallback(callback, conversationId, title
+          ? { success: true, title }
+          : { success: false, error: 'Failed to parse OpenCode 2 title' });
+        return;
+      }
       if (backend !== 'opencode') {
         await this.safeCallback(callback, conversationId, {
           success: true,

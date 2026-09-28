@@ -14,7 +14,7 @@
 ```ts
 export class ModifiedFilesSidebarCoordinator {
   mountSidebar(parentEl: HTMLElement, app: App): void;
-  refresh(sessionId: string | null, getEntries: (id: string) => SessionDiffEntry[], availability?: 'ready' | 'unavailable', persistedMessages?: readonly ChatMessage[]): void;
+  refresh(sessionId: string | null, getEntries: (id: string) => SessionDiffEntry[] | Promise<SessionDiffEntry[]>, availability?: 'ready' | 'unavailable', persistedMessages?: readonly ChatMessage[]): void;
   destroy(): void;
 }
 ```
@@ -23,6 +23,9 @@ export class ModifiedFilesSidebarCoordinator {
 
 - `mountSidebar()` replaces any existing `ModifiedFilesSidebar` before mounting into the nearest Chat `.opencodian-container`, so its percentage sizing and right inset resolve against the sidebar boundary rather than the wider workspace leaf.
 - `refresh()` reads the canonical cached `session.diff` through the injected session lookup when a session is available. A non-empty canonical cache always wins.
+- OpenCode 2 supplies an asynchronous native `session.diff` read. While it is pending the panel shows unavailable; an array result is authoritative even when empty after revert. A `null` result means native snapshots are unavailable (for example, a non-Git vault) and permits the persisted turn-record fallback. A rejected read stays unavailable instead of showing an old turn snapshot as current state.
+- Every refresh, remount and destroy invalidates older asynchronous results. A late diff from another tab/session cannot repaint the current sidebar.
+- Persisted records marked with a background child task ID add their files to the current session projection after the parent canonical read. A repeated path uses the latest child record, while the immutable parent and child cards remain separate.
 - When the canonical cache is empty and availability is `ready`, `refresh()` rebuilds the current Session Change Sidebar from persisted `turn-diff` Turn Change Records. It keeps the latest entry for each file while preserving stable first-seen file order, so repeated turns do not inflate the file count.
 - Capability gating affects whether canonical or persisted entries can be read, not whether the configured entry is discoverable. `unavailable` never exposes persisted OpenCode fallback data.
 - `destroy()` clears the sidebar and all DOM references for view close or navigation sidebar rebuild.
@@ -30,5 +33,5 @@ export class ModifiedFilesSidebarCoordinator {
 ## 边界
 
 - The coordinator does not decide the active conversation; callers pass the active session id.
-- The coordinator does not own canonical diff storage; `OpenCodeService.getCachedSessionDiffEntries()` remains the primary source of truth, while persisted Turn Change Records are reload-safe fallback evidence only.
+- The coordinator does not own canonical diff storage; OpenCode 1 uses `OpenCodeService.getCachedSessionDiffEntries()` with persisted Turn Change Records as fallback evidence, while OpenCode 2 reads its native diff directly.
 - `ModifiedFilesSidebar` still owns item rendering and file-open behavior.

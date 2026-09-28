@@ -118,6 +118,24 @@ describe('BackgroundTaskInlinePanelRenderer', () => {
     renderer.clear('tab-1');
   });
 
+  it('renders an OpenCode 2 child task from the native task reader', async () => {
+    const readOpenCode2Tasks = jest.fn(async () => [{
+      taskId: 'ses_child', status: 'running', description: 'Review notes', cancellable: true,
+    }]);
+    const renderer = new BackgroundTaskInlinePanelRenderer({
+      collectInlineSegments: () => [], getInlineCopy: jest.fn(),
+    } as never, {
+      getActiveTabId: () => 'tab-1', getTabRuntimeState: () => null,
+      renderMarkdownInto: async () => {}, getMessagesContainer: () => document.body,
+      readZCodeTasks: async () => [], cancelZCodeTask: async () => false,
+      readOpenCode2Tasks, cancelOpenCode2Task: async () => false,
+    });
+    await renderer.watchNativeTasks({ backend: 'opencode2', backendSessionId: 'ses_parent', messages: [] } as Conversation, 'tab-1');
+    expect(readOpenCode2Tasks).toHaveBeenCalledWith('ses_parent');
+    expect(document.body.querySelector<HTMLElement>('[data-task-id="ses_child"]')?.dataset.taskStatus).toBe('running');
+    renderer.disposeNativeTaskWatch();
+  });
+
   it('separates a native task title, status and long identity into readable card regions', async () => {
     const taskId = 'exec_c72450d0-2528-4cd3-93ce-cc0012d685a6';
     const tasks = [{ taskId, status: 'cancelled', description: 'Run delayed background task', cancellable: false }];

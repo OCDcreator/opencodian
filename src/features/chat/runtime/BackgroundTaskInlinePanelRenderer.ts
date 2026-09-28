@@ -54,6 +54,9 @@ export interface BackgroundTaskInlinePanelRendererHost {
   getMessagesContainer(tabId: TabId | null): HTMLElement | null;
   readZCodeTasks(sessionId: string): Promise<Array<{ taskId: string; status: string; description: string; cancellable: boolean }>>;
   cancelZCodeTask(sessionId: string, taskId: string): Promise<boolean>;
+  readOpenCode2Tasks?(sessionId: string): Promise<Array<{ taskId: string; status: string; description: string; cancellable: boolean }>>;
+  cancelOpenCode2Task?(sessionId: string, taskId: string): Promise<boolean>;
+  recordOpenCode2TaskChanges?(conversation: Conversation, tabId: TabId, taskId: string): Promise<void>;
 }
 
 export class BackgroundTaskInlinePanelRenderer {
@@ -179,20 +182,25 @@ export class BackgroundTaskInlinePanelRenderer {
     }
   }
 
+  // eslint-disable-next-line complexity -- one native task lane handles ZCode and OpenCode 2 with shared tab/session leases.
   private async readAndRenderNativeTasks(conversation: Conversation | null, tabId: TabId): Promise<void> {
     const oldTimer = this.nativeTaskTimers.get(tabId);
     if (oldTimer !== undefined) window.clearInterval(oldTimer);
     this.nativeTaskTimers.delete(tabId);
     const container = this.host.getMessagesContainer(tabId);
     const oldPanel = container?.querySelector<HTMLElement>('.opencodian-zcode-native-tasks');
-    const sessionId = conversation?.backend === 'zcode' ? conversation.backendSessionId : null;
+    const backend = conversation?.backend;
+    const sessionId = backend === 'zcode' || backend === 'opencode2'
+      ? conversation?.backendSessionId : null;
     if (!container || !sessionId) {
       oldPanel?.remove();
       return;
     }
     let tasks: Awaited<ReturnType<BackgroundTaskInlinePanelRendererHost['readZCodeTasks']>>;
     try {
-      tasks = await this.host.readZCodeTasks(sessionId);
+      tasks = backend === 'opencode2'
+        ? await this.host.readOpenCode2Tasks?.(sessionId) ?? []
+        : await this.host.readZCodeTasks(sessionId);
     } catch {
       tasks = [...(oldPanel?.querySelectorAll<HTMLElement>('[data-task-id]') ?? [])].map((row) => ({
         taskId: row.dataset.taskId ?? '',
@@ -215,6 +223,13 @@ export class BackgroundTaskInlinePanelRenderer {
     const panel = container.createDiv({ cls: 'opencodian-zcode-native-tasks' });
     panel.dataset.sessionId = sessionId;
     for (const task of tasks) {
+      if (backend === 'opencode2' && task.status === 'completed' && conversation) {
+        // Keep the task watch alive if persistence is temporarily unavailable;
+        // the coordinator retries the same immutable record on the next read.
+        await this.host.recordOpenCode2TaskChanges?.(conversation, tabId, task.taskId).catch(() => {});
+        if (this.disposed || (this.host.getConversationForTab
+          && this.host.getConversationForTab(tabId)?.backendSessionId !== sessionId)) return;
+      }
       const row = panel.createDiv({ cls: 'opencodian-chat-notice-card is-info is-background-task is-inline' });
       row.dataset.taskId = task.taskId;
       row.dataset.taskStatus = task.status;
@@ -244,7 +259,10 @@ export class BackgroundTaskInlinePanelRenderer {
         });
         cancel.addEventListener('click', () => {
           cancel.disabled = true;
-          void this.host.cancelZCodeTask(sessionId, task.taskId).catch(() => false).finally(() => {
+          const cancelTask = backend === 'opencode2'
+            ? this.host.cancelOpenCode2Task?.(sessionId, task.taskId) ?? Promise.resolve(false)
+            : this.host.cancelZCodeTask(sessionId, task.taskId);
+          void cancelTask.catch(() => false).finally(() => {
             void this.renderNativeTasks(conversation, tabId);
           });
         });

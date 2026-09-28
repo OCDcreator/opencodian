@@ -177,7 +177,7 @@ Node.js 脚本形式的 Jest 启动包装器。`run-jest-options.js` 只在当�
 | 脚本 | npm 命令 | 说明 |
 |------|----------|------|
 | `build.mjs` | `npm run build` | 生产构建 |
-| `build-css.mjs` | `npm run build:css` | CSS 合并 |
+| `build-css.mjs` | `npm run build:css` | CSS 合并，并将 `assets/fonts/*.ttf` 的 `@font-face` URL 内嵌为 data URL，避免 Obsidian 的 `app://obsidian.md` 根路径解析错误 |
 | `build-utils.mjs` | — | 共享工具（被其他脚本 import） |
 | `package-plugin-artifact.mjs` | `npm run package:plugin` | 生成并校验 Actions 上传的插件三件套 |
 | `doctor-esbuild.mjs` | `npm run doctor:esbuild` / `doctor:esbuild:fix` | esbuild 平台检查/修复 |
