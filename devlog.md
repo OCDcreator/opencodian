@@ -11,6 +11,19 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-28 三后端 SDK 例行刷新：Claude 0.3.283 / Codex 0.158.0 / OpenCode 1.18.33
+
+- 依赖刷新至 npm 当日 latest：`@anthropic-ai/claude-agent-sdk ^0.3.283`、`@openai/codex-sdk 0.158.0`、`@opencode-ai/sdk 1.18.33`；沿用既有 pin 风格（Codex/OpenCode 精确 pin、Claude caret）。`@opencode/client` 维持 `2.0.18`——npm 最新版仍是 2.0.18，上游源码 pin 的 tag 未变，不动。
+- 删除面审计（对照 2026-09-08 惯例）：Codex 0.153.4→0.158.0 与 OpenCode 1.18.29→1.18.33 的 `.d.ts` 全量 diff 均为纯增量、零删除行；Claude 0.3.263→0.3.283 的删除项为 Monitor 工具输入重构移除的 `TaskOutputInput`/`REPLInput`/`REPLOutput`、`onSetMaxThinkingTokens` 加宽（`thinkingDisplay` 新增 `'highlights'`）、内部 import 与 doc 注释，插件中全部零引用（typecheck 零错误 + rg 复核）。
+- 唯一行为适配——`snapshot: false` 保真：SDK ≥ 0.3.267 把 systemPrompt 记录语义翻转为默认记录（首次请求渲染后原样复用到 resume，同一会话后续传入的不同 `append` 被忽略直到压缩/新会话）。插件主聊天的 append 来自用户设置、会话中途可改，`ClaudeCodeOptionsBuilder` 因此在带 append 时显式 `snapshot: false`，保持升级前"每轮重新渲染、设置改动下一轮生效"的语义（SDK 文档对"a host that must change its append within a session"的推荐做法）。无 append 的裸 preset 维持 SDK 默认；aux 单发查询（裸字符串 + `persistSession: false`）无跨请求复用，不受影响。`ClaudeCodeOptionsBuilder.systemPrompt.test.ts` 两处断言同步更新。
+- 其余值得记录的上游行为变化（均已评估、无需代码变更）：新版运行时告警 `CLAUDE_SDK_CAN_USE_TOOL_SHADOWED`（裸 `allowedTools` 条目自动批准并遮蔽 `canUseTool`）只是让 adapter 已有诊断覆盖的既有语义可见化；任务类工具（TodoWrite/Task*）默认挂载面收窄为旧模型专属，插件未依赖默认挂载；`Settings.attribution` 类型放宽为 `boolean | {...}`，插件未消费该字段。
+- 验证：typecheck 零错误；`codex-sdk-smoke.mjs` 47 passed / 0 failed（0.158.0 API 面含流式事件形状）；`claude-code-smoke.mjs` 真机 10/10 全过（0.3.283：导入/平台二进制、流式文本、模型目录、thinking block、MCP stdio 工具往返、canUseTool 批准与拒绝、elicitation、session resume，含真实模型调用）；`npm run verify` 全绿（graphify 摘要随依赖刷新重刷）；Test Vault 部署后 CDP reload 实读 `OpenCodian 1.1.34 BUILD_ID=zcode-backend-sdk-refresh.202609282102`，无新增报错。
+- 合入前审查补强（真模型实证，非结构检查）：
+  - **Claude 同会话 systemPrompt 切换矩阵**（SDK 0.3.283，秘密词设计消除"模型模仿上一轮回复格式"的混淆——首轮用 marker 后缀设计测得的"append 替换失效"正是该混淆的假阳性）：S1 空 preset→append+`snapshot:false`＝append 生效；S2 appendA→appendB（双 `snapshot:false`）＝新 append 生效；S4 首轮默认记录→次轮 `snapshot:false`＝新 append 生效（能翻新既有记录）；S5 append→清空（次轮裸 preset 默认）＝旧规则消失；S3 对照组双默认＝首轮提示词冻结、后续 append 被忽略。结论：现有代码（append 路径带 `snapshot:false`、空值走默认）覆盖插件全部可产生路径，无需再加代码。
+  - **Codex 真实链路**（0.158.0 + 本机 `~/.codex` 认证 + 默认模型）：`runStreamed` 流式回合 `thread.started`/`item.completed`/`turn.completed` 全至，`agent_message` 精确命中暗号，usage 上报（input 18923 tokens）；同线程第二轮成功回忆暗号（input 涨至 37887，上下文连续）。
+  - **OpenCode 真实链路**：本机 CLI 由 1.18.32 升至 **1.18.33**（npm `opencode-ai@1.18.33`，fnm 全局），spawn 的 `opencode serve` 自报 session version `1.18.33`，与 SDK client 1.18.33 对齐；SDK v2 client（与插件同配置 `responseStyle:'data', throwOnError:true`）建会话、SSE `/event` 实收 `message.part.delta`/`message.updated`/`message.part.updated` 增量流、两轮同会话暗号均精确命中。Test Vault 4096 托管 server 当前未运行，下次使用将由 ServerManager 从 1.18.33 CLI 拉起。
+  - **环境发现（非本次回归）**：Codex 0.158.0 对用户 `~/.codex/config.toml` 的 `disable_response_storage`、`features.remote_connections`、`stream_idle_timeout_ms` 三个设置报"ignored"告警 item（插件外同样存在，属用户配置与新版 CLI 的漂移，未影响对话）。
+
 ## 2026-09-28 OpenCode 2 可选后端落地并双 Test Vault 验收（v1.1.34 发布）
 
 OpenCode 1 与 OpenCode 2 成为两个独立可选后端：新增 `OpenCode2Adapter` 作为独立 v2 传输边界（pin `@opencode/client@2.0.18`，独立可执行/服务器、独立 HTTP API 与事件 schema），配置、集成控件与权限模式各有原生 v2 归属，v1 会话 ID 与配置 owner 不传入 v2 传输。会话变更侧栏改为读取 v2 自身 adapter：上游把裸 `session.diff` 解释为最新 turn，因此 adapter 显式请求 first-user → last-visible-user 范围；staged revert 排除被回退用户 turn 及其后内容；过期异步结果在更新刷新、切页、重挂载或销毁后丢弃；TabBar 真实激活回写现在会触发刷新。`build-css.mjs` 将 Newsreader/Oxanium 两款字体由 `app://obsidian.md` URL 引用改为内嵌 `styles.css`，消除两座 Test Vault 上 CDP 观测到的 `ERR_FILE_NOT_FOUND`。
