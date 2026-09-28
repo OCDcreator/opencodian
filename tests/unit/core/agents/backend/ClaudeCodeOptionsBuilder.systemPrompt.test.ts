@@ -11,7 +11,7 @@ describe('ClaudeCodeOptionsBuilder systemPrompt option', () => {
     expect(options.systemPrompt).toEqual({ type: 'preset', preset: 'claude_code' });
   });
 
-  it('uses preset-with-append shape when settings.systemPrompt is non-empty', () => {
+  it('uses preset-with-append shape and snapshot:false when settings.systemPrompt is non-empty', () => {
     const options = buildClaudeCodeOptions({
       vaultPath: '/vault/project',
       settings: {
@@ -24,6 +24,7 @@ describe('ClaudeCodeOptionsBuilder systemPrompt option', () => {
       type: 'preset',
       preset: 'claude_code',
       append: 'Always use TypeScript.',
+      snapshot: false,
     });
   });
 
@@ -40,6 +41,7 @@ describe('ClaudeCodeOptionsBuilder systemPrompt option', () => {
       type: 'preset',
       preset: 'claude_code',
       append: 'Always use TypeScript.',
+      snapshot: false,
     });
   });
 });

@@ -95,7 +95,7 @@ export interface ClaudeCodeOptionsBuilderInput {
 export interface ClaudeCodeSdkOptionsShape {
   cwd: string;
   includePartialMessages: true;
-  systemPrompt: { type: 'preset'; preset: 'claude_code'; append?: string };
+  systemPrompt: { type: 'preset'; preset: 'claude_code'; append?: string; snapshot?: boolean };
   tools: string[] | { type: 'preset'; preset: 'claude_code' };
   settingSources: ClaudeCodeSettingSource[];
   permissionMode?: ClaudeCodePermissionMode;
@@ -229,8 +229,11 @@ export function buildClaudeCodeOptions(
   const options: ClaudeCodeSdkOptionsShape = {
     cwd: input.vaultPath,
     includePartialMessages: true,
+    // SDK >= 0.3.267 records the rendered prompt on first request and ignores a
+    // changed append until compaction; the append here mirrors live user settings,
+    // so it must keep rendering fresh every turn (pre-0.3.267 behavior).
     systemPrompt: systemPrompt
-      ? { type: 'preset', preset: 'claude_code', append: systemPrompt }
+      ? { type: 'preset', preset: 'claude_code', append: systemPrompt, snapshot: false }
       : { type: 'preset', preset: 'claude_code' },
     tools: { type: 'preset', preset: 'claude_code' },
     settingSources: cloneSettingSources(input.settings.settingSources),

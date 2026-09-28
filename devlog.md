@@ -11,6 +11,14 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-28 三后端 SDK 例行刷新：Claude 0.3.283 / Codex 0.158.0 / OpenCode 1.18.33
+
+- 依赖刷新至 npm 当日 latest：`@anthropic-ai/claude-agent-sdk ^0.3.283`、`@openai/codex-sdk 0.158.0`、`@opencode-ai/sdk 1.18.33`；沿用既有 pin 风格（Codex/OpenCode 精确 pin、Claude caret）。`@opencode/client` 维持 `2.0.18`——npm 最新版仍是 2.0.18，上游源码 pin 的 tag 未变，不动。
+- 删除面审计（对照 2026-09-08 惯例）：Codex 0.153.4→0.158.0 与 OpenCode 1.18.29→1.18.33 的 `.d.ts` 全量 diff 均为纯增量、零删除行；Claude 0.3.263→0.3.283 的删除项为 Monitor 工具输入重构移除的 `TaskOutputInput`/`REPLInput`/`REPLOutput`、`onSetMaxThinkingTokens` 加宽（`thinkingDisplay` 新增 `'highlights'`）、内部 import 与 doc 注释，插件中全部零引用（typecheck 零错误 + rg 复核）。
+- 唯一行为适配——`snapshot: false` 保真：SDK ≥ 0.3.267 把 systemPrompt 记录语义翻转为默认记录（首次请求渲染后原样复用到 resume，同一会话后续传入的不同 `append` 被忽略直到压缩/新会话）。插件主聊天的 append 来自用户设置、会话中途可改，`ClaudeCodeOptionsBuilder` 因此在带 append 时显式 `snapshot: false`，保持升级前"每轮重新渲染、设置改动下一轮生效"的语义（SDK 文档对"a host that must change its append within a session"的推荐做法）。无 append 的裸 preset 维持 SDK 默认；aux 单发查询（裸字符串 + `persistSession: false`）无跨请求复用，不受影响。`ClaudeCodeOptionsBuilder.systemPrompt.test.ts` 两处断言同步更新。
+- 其余值得记录的上游行为变化（均已评估、无需代码变更）：新版运行时告警 `CLAUDE_SDK_CAN_USE_TOOL_SHADOWED`（裸 `allowedTools` 条目自动批准并遮蔽 `canUseTool`）只是让 adapter 已有诊断覆盖的既有语义可见化；任务类工具（TodoWrite/Task*）默认挂载面收窄为旧模型专属，插件未依赖默认挂载；`Settings.attribution` 类型放宽为 `boolean | {...}`，插件未消费该字段。
+- 验证：typecheck 零错误；`codex-sdk-smoke.mjs` 47 passed / 0 failed（0.158.0 API 面含流式事件形状）；`claude-code-smoke.mjs` 真机 10/10 全过（0.3.283：导入/平台二进制、流式文本、模型目录、thinking block、MCP stdio 工具往返、canUseTool 批准与拒绝、elicitation、session resume，含真实模型调用）；`npm run verify` 全绿（graphify 摘要随依赖刷新重刷）。
+
 ## 2026-09-28 OpenCode 2 可选后端落地并双 Test Vault 验收（v1.1.34 发布）
 
 OpenCode 1 与 OpenCode 2 成为两个独立可选后端：新增 `OpenCode2Adapter` 作为独立 v2 传输边界（pin `@opencode/client@2.0.18`，独立可执行/服务器、独立 HTTP API 与事件 schema），配置、集成控件与权限模式各有原生 v2 归属，v1 会话 ID 与配置 owner 不传入 v2 传输。会话变更侧栏改为读取 v2 自身 adapter：上游把裸 `session.diff` 解释为最新 turn，因此 adapter 显式请求 first-user → last-visible-user 范围；staged revert 排除被回退用户 turn 及其后内容；过期异步结果在更新刷新、切页、重挂载或销毁后丢弃；TabBar 真实激活回写现在会触发刷新。`build-css.mjs` 将 Newsreader/Oxanium 两款字体由 `app://obsidian.md` URL 引用改为内嵌 `styles.css`，消除两座 Test Vault 上 CDP 观测到的 `ERR_FILE_NOT_FOUND`。
