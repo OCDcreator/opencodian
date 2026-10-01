@@ -4,6 +4,11 @@
  * These types were split out of `CodexAppServerClient` so the client module
  * stays under the project line budget. They are re-exported from
  * `CodexAppServerClient` for backwards-compatible imports.
+ *
+ * Shapes match the Codex 0.159.0 generated bindings
+ * (`codex app-server generate-json-schema`), verified 2026-09-30. A few legacy
+ * sections still note the older version they were first verified against; the
+ * 0.159.0 schema is backwards-compatible for the routes this plugin uses.
  */
 
 /** Raw thread shape from app-server thread/list and thread/read. */
@@ -27,6 +32,10 @@ export interface AppServerTurn {
   items: AppServerItem[];
   status?: string;
   error?: unknown;
+  /** Codex 0.159.0 `thread/turns/list` extras (unix seconds / milliseconds). */
+  startedAt?: number | null; completedAt?: number | null; durationMs?: number | null;
+  /** How much of `items` this turn payload carries (0.159.0 itemsView). */
+  itemsView?: AppServerTurnItemsView;
 }
 
 /** Exact token figures supplied by `thread/tokenUsage/updated`. */
@@ -227,10 +236,37 @@ export interface AppServerAccountRateLimitsResult {
   errorReason?: string;
 }
 
-/** Account usage shape from app-server account/usage/read. */
+/** Account usage summary from app-server account/usage/read (Codex 0.159.0). Index signature keeps forward-compatible server fields. */
+export interface AppServerAccountUsageSummary { lifetimeTokens?: number; currentStreakDays?: number; longestStreakDays?: number; peakDailyTokens?: number; longestRunningTurnSec?: number; readonly [key: string]: unknown }
+
+/** One daily token bucket from account/usage/read (startDate = bucket day). */
+export interface AppServerAccountUsageDailyBucket {
+  startDate: string; tokens: number; readonly [key: string]: unknown;
+}
+
+/** Per-speed/model token breakdown group inside a thread usage estimate. */
+export interface AppServerThreadUsageBreakdownGroup {
+  speed?: string | null; model?: string | null; reasoningEffort?: string | null;
+  netNewInputTokens?: number | null; cachedInputTokens?: number | null; inputTokens?: number | null;
+  outputTokens?: number | null; totalTokens?: number | null; estimatedUsageCreditsMicros?: number;
+  readonly [key: string]: unknown;
+}
+
+/** Estimated per-thread usage returned by account/usage/read when `threadId` was requested. */
+export interface AppServerThreadUsage {
+  threadId: string; estimatedUsageCreditsMicros: number; estimatedUsageUsdMicros?: number | null;
+  groups: AppServerThreadUsageBreakdownGroup[];
+}
+
+/**
+ * Account usage shape from app-server `account/usage/read`. Params are
+ * nullable `{ threadId? }` (Codex 0.159.0): omit for account-wide activity,
+ * pass a thread id for the per-thread estimate (`threadUsage`).
+ */
 export interface AppServerAccountUsage {
-  summary: Record<string, unknown>;
-  dailyUsageBuckets?: Array<Record<string, unknown>>;
+  summary: AppServerAccountUsageSummary;
+  dailyUsageBuckets?: AppServerAccountUsageDailyBucket[];
+  threadUsage?: AppServerThreadUsage | null;
 }
 
 /**
@@ -254,16 +290,29 @@ export interface AppServerMcpTool {
   annotations?: Record<string, unknown>;
 }
 
-/** Thread goal shape from app-server thread/goal/get. */
+/** Thread goal status from the Codex 0.159.0 ThreadGoal binding. */
+export type AppServerThreadGoalStatus = 'active' | 'paused' | 'blocked' | 'usageLimited' | 'budgetLimited' | 'complete';
+
+/** Thread goal shape from app-server thread/goal/get (Codex 0.159.0). */
 export interface AppServerThreadGoal {
   threadId: string;
   objective: string;
-  status: 'active' | 'paused' | 'blocked' | 'usageLimited' | 'budgetLimited' | 'complete';
+  status: AppServerThreadGoalStatus;
   tokenBudget: number | null;
   tokensUsed: number;
   timeUsedSeconds: number;
   createdAt: number;
   updatedAt: number;
+}
+
+/**
+ * Options for `thread/goal/set` beyond the thread id. All fields are optional
+ * on the wire (Codex 0.159.0): `status` alone pauses/resumes an existing goal
+ * without restating its objective; `objective` + `tokenBudget` create/update.
+ */
+export interface AppServerSetThreadGoalOptions {
+  status?: AppServerThreadGoalStatus;
+  tokenBudget?: number;
 }
 
 /** Fork result shape from app-server thread/fork. */
@@ -556,7 +605,15 @@ export interface CodexAppServerWireObserver {
   onServerReply?(input: { id: number | string; ok: boolean }): void;
   /** Fired at connection-lifecycle transitions. `detail` is best-effort. */
   onConnection?(input: {
-    state: 'starting' | 'ws-url' | 'connected' | 'initialized' | 'closed' | 'error' | 'stopped';
+    state:
+      | 'starting'
+      | 'ws-url'
+      | 'connected'
+      | 'initialized'
+      | 'reconnecting'
+      | 'closed'
+      | 'error'
+      | 'stopped';
     detail?: unknown;
   }): void;
   /**
@@ -568,3 +625,301 @@ export interface CodexAppServerWireObserver {
    */
   onServiceOutput?(input: { stream: 'stdout' | 'stderr'; text: string }): boolean;
 }
+
+
+// ---------------------------------------------------------------------------
+// Codex 0.159.0 additions (verified 2026-09-30 against
+// `codex app-server generate-json-schema` output). Covers turn/steer,
+// thread/items/list, thread/turns/list, thread/name/set, thread/delete,
+// thread/attachment/*, plugin/* routes, the five new server→client request
+// routes, and their notifications. Declarations are kept compact; the module
+// is under a max-lines budget that excludes comments but not code.
+// ---------------------------------------------------------------------------
+
+/** UI-defined span within a text user input (Codex 0.159.0 TextElement). */
+export interface AppServerUserInputTextElement { byteRange: { start: number; end: number }; placeholder?: string | null }
+
+export type AppServerUserInputImageDetail = 'auto' | 'low' | 'high' | 'original';
+
+/**
+ * UserInput union accepted by `turn/steer` (and `turn/start`). Matches the
+ * Codex 0.159.0 UserInput binding: text (with optional UI text elements),
+ * image (by url or fileId), and localImage (by absolute path).
+ */
+export type AppServerUserInput = { type: 'text'; text: string; text_elements?: AppServerUserInputTextElement[] }
+  | { type: 'image'; url?: string; fileId?: string; detail?: AppServerUserInputImageDetail | null }
+  | { type: 'localImage'; path: string; detail?: AppServerUserInputImageDetail | null };
+
+/** Turn kinds that can never be steered (Codex 0.159.0 NonSteerableTurnKind). */
+export type AppServerNonSteerableTurnKind = 'review' | 'compact';
+
+/** Misalignment payload attached to a rejected steer (MisalignmentSteer). */
+export interface AppServerMisalignmentSteer { message: string }
+
+/**
+ * Steer failure codes observed in the codex 0.159.0 binary. The server sends
+ * them inside the JSON-RPC error (message and/or `data`); `unknown` covers
+ * forward-compatible additions. `turnKind` is set for the `non_steerable_*`
+ * codes (and for `active_turn_not_steerable` when the server names the kind).
+ */
+export type AppServerSteerTurnErrorCode = 'no_active_turn' | 'expected_turn_mismatch' | 'non_steerable_review' | 'non_steerable_compact' | 'active_turn_not_steerable' | 'empty_input' | 'input_too_large' | 'unknown';
+
+/** Structured reason a `turn/steer` call was rejected by the server. */
+export interface AppServerSteerTurnError {
+  code: AppServerSteerTurnErrorCode; message: string;
+  /** Present when the active turn cannot be steered (review/compact). */
+  turnKind?: AppServerNonSteerableTurnKind;
+  /** Present when the server rejected the steer as a misalignment. */
+  misalignment?: AppServerMisalignmentSteer;
+}
+
+/**
+ * Result of `CodexAppServerClient.steerTurn()`. Distinguishes a successful
+ * injection (`turnId` of the steered turn), a server rejection with the
+ * structured steer error, and route/transport unavailability (-32601 or the
+ * WebSocket being down) so callers can dynamically drop the capability.
+ */
+export type AppServerSteerTurnResult = { ok: true; turnId: string }
+  | { ok: false; reason: 'rejected'; error: AppServerSteerTurnError }
+  | { ok: false; reason: 'unavailable'; errorReason: string };
+
+/** Item pagination cursor for `thread/items/list`: opaque string or item anchor. */
+export type AppServerThreadItemsListCursor = string | { type: 'item'; itemId: string };
+
+/** Shared pagination direction. Items default to asc, turns default to desc. */
+export type AppServerListSortDirection = 'asc' | 'desc';
+
+/** How much item detail a `thread/turns/list` turn payload carries. */
+export type AppServerTurnItemsView = 'notLoaded' | 'summary' | 'full';
+
+/** Options for `thread/items/list` (Codex 0.159.0 ThreadItemsListParams). */
+export interface AppServerThreadItemsListOptions {
+  /** Restrict to one turn; required when using an item-anchor cursor. */
+  turnId?: string | null;
+  cursor?: AppServerThreadItemsListCursor | null;
+  limit?: number;
+  sortDirection?: AppServerListSortDirection;
+}
+
+/** One entry of a `thread/items/list` page: the item plus its owning turn. */
+export interface AppServerThreadItemEntry {
+  item: AppServerItem; turnId: string; startedAtMs?: number | null; completedAtMs?: number | null;
+}
+
+/** A `thread/items/list` page. */
+export interface AppServerThreadItemsPage { data: AppServerThreadItemEntry[]; nextCursor: string | null; backwardsCursor: string | null }
+
+/** Options for `thread/turns/list` (Codex 0.159.0 ThreadTurnsListParams). */
+export interface AppServerThreadTurnsListOptions {
+  cursor?: string | null;
+  limit?: number;
+  sortDirection?: AppServerListSortDirection;
+  itemsView?: AppServerTurnItemsView;
+}
+
+/** A `thread/turns/list` page of turns (status/items plus timing metadata). */
+export interface AppServerThreadTurnsPage { data: AppServerTurn[]; nextCursor: string | null; backwardsCursor: string | null }
+
+/** An independently persisted thread attachment (Codex 0.159.0 ThreadAttachment). */
+export interface AppServerThreadAttachment {
+  id: string; attachmentType: string; identityKey: string; payload: unknown; createdAt: number;
+}
+
+/** Result of `thread/attachment/add`. */
+export interface AppServerThreadAttachmentAddResult { attachment: AppServerThreadAttachment; outcome: 'created' | 'existing' }
+
+/** A `thread/attachment/list` page. */
+export interface AppServerThreadAttachmentsPage { data: AppServerThreadAttachment[]; nextCursor: string | null }
+
+/** Operation carried by the `thread/attachment/updated` notification. */
+export type AppServerThreadAttachmentOperation = 'created' | 'deleted';
+
+// ── Plugins (Codex 0.159.0 plugin/* routes) ────────────────────────────────
+
+/** Marketplace kind filter for `plugin/list` (PluginListMarketplaceKind). */
+export type AppServerPluginMarketplaceKind = 'local' | 'vertical' | 'workspace-directory' | 'shared-with-me' | 'created-by-me-remote';
+
+/** Options for `plugin/list`. */
+export interface AppServerPluginListOptions {
+  /** Working directories used to discover repo marketplaces. */
+  cwds?: string[];
+  /** Request a fresh remote plugin catalog fetch. */
+  forceRefetch?: boolean;
+  /**
+   * Marketplace kind filter. When omitted, only local marketplaces are
+   * queried plus the default remote catalog when enabled server-side.
+   */
+  marketplaceKinds?: AppServerPluginMarketplaceKind[];
+}
+
+/** Plugin source discriminator (PluginSource union). */
+export type AppServerPluginSource = { type: 'local'; path: string }
+  | { type: 'git'; url: string; path?: string | null; refName?: string | null; sha?: string | null }
+  | { type: 'npm'; package: string; version?: string | null; registry?: string | null }
+  | { type: 'remote' };
+
+/** Availability signal for remote plugins (includes the upstream ENABLED alias). */
+export type AppServerPluginAvailability = 'DISABLED_BY_ADMIN' | 'AVAILABLE' | (string & {});
+
+export type AppServerPluginInstallPolicy = 'NOT_AVAILABLE' | 'AVAILABLE' | 'INSTALLED_BY_DEFAULT';
+
+export type AppServerPluginAuthPolicy = 'ON_INSTALL' | 'ON_USE' | (string & {});
+
+export type AppServerPluginDisabledReason = 'disabled_by_admin' | 'plan_not_eligible' | 'required_app_unavailable' | 'unknown';
+
+/** Plugin summary inside a marketplace entry (PluginSummary binding). */
+export interface AppServerPluginSummary {
+  id: string; name: string; installed: boolean; enabled: boolean;
+  installPolicy: AppServerPluginInstallPolicy; authPolicy: AppServerPluginAuthPolicy; source: AppServerPluginSource;
+  version?: string | null; localVersion?: string | null; remotePluginId?: string | null;
+  availability?: AppServerPluginAvailability | null; disabledReason?: AppServerPluginDisabledReason | null;
+  installPolicySource?: string; installedAt?: number | null; keywords?: string[]; eligiblePlanTypes?: string[];
+  mustShowInstallationInterstitial?: boolean;
+  /** Forward-compatible display/share metadata from the generated binding. */
+  interface?: unknown;
+  shareContext?: unknown;
+}
+
+/** One marketplace entry from `plugin/list` / `plugin/installed`. */
+export interface AppServerPluginMarketplaceEntry {
+  name: string; plugins: AppServerPluginSummary[]; path?: string | null;
+  interface?: { displayName?: string | null } | null;
+}
+
+/** A server-reported marketplace load failure. */
+export interface AppServerMarketplaceLoadErrorInfo { marketplacePath: string; message: string }
+
+/** Response of `plugin/list` (and shape of `plugin/installed`). */
+export interface AppServerPluginListResult {
+  marketplaces: AppServerPluginMarketplaceEntry[];
+  featuredPluginIds: string[];
+  marketplaceLoadErrors: AppServerMarketplaceLoadErrorInfo[];
+}
+
+/** Minimal app metadata returned by `plugin/install` (AppSummary). */
+export interface AppServerAppSummary {
+  id: string; name: string; category?: string | null; description?: string | null; installUrl?: string | null;
+}
+
+/** Response of `plugin/install`: apps that still need authorization. */
+export interface AppServerPluginInstallResult { appsNeedingAuth: AppServerAppSummary[]; authPolicy: AppServerPluginAuthPolicy }
+
+/** One entry of the `plugin/reconcile` changedPlugins list. */
+export interface AppServerPluginReconcileChangedPlugin { readonly [key: string]: unknown }
+
+/** Response of `plugin/reconcile`. */
+export interface AppServerPluginReconcileResult {
+  changedPlugins: AppServerPluginReconcileChangedPlugin[];
+  failedRemotePluginIds: string[];
+  failedMaterializationRemotePluginIds: string[];
+}
+
+/** Response of `plugin/skill/read`: null contents when the skill is absent. */
+export interface AppServerPluginSkillReadResult { contents: string | null }
+
+// ── Server→client request routes (Codex 0.159.0 ServerRequest union) ──────
+// Typed registration lives on CodexAppServerClient; the transport registry
+// still answers unhandled routes with -32601.
+
+/** Params of `item/commandExecution/requestApproval` (v2 command approval). */
+export interface AppServerCommandExecutionApprovalParams {
+  threadId: string; turnId: string; itemId: string; startedAtMs: number;
+  command?: string[]; cwd?: string; reason?: string;
+  /** Distinguishes a command approval from input to an existing terminal. */
+  kind?: 'command' | 'writeStdin';
+  approvalId?: string; environmentId?: string | null; commandActions?: unknown[];
+  networkApprovalContext?: { host: string; protocol: string } | null;
+  proposedExecpolicyAmendment?: string[] | null;
+  proposedNetworkPolicyAmendments?: unknown[] | null;
+}
+
+/** Decision variants accepted by `item/commandExecution/requestApproval`. */
+export type AppServerCommandExecutionApprovalDecision = 'accept' | 'acceptForSession' | 'decline' | 'cancel'
+  | { acceptWithExecpolicyAmendment: { execpolicy_amendment: string[] } }
+  | { applyNetworkPolicyAmendment: { network_policy_amendment: { action: 'allow' | 'deny'; host: string } } };
+
+/** Reply body for `item/commandExecution/requestApproval`. */
+export interface AppServerCommandExecutionApprovalResponse { decision: AppServerCommandExecutionApprovalDecision }
+
+/** Params of `item/fileChange/requestApproval` (v2 patch approval). */
+export interface AppServerFileChangeApprovalParams {
+  threadId: string; turnId: string; itemId: string; startedAtMs: number;
+  reason?: string;
+  /** When set, the agent asks to allow writes under this root for the session. */
+  grantRoot?: string | null;
+}
+
+/** Decision variants accepted by `item/fileChange/requestApproval`. */
+export type AppServerFileChangeApprovalDecision = 'accept' | 'acceptForSession' | 'decline' | 'cancel';
+
+/** Reply body for `item/fileChange/requestApproval`. */
+export interface AppServerFileChangeApprovalResponse { decision: AppServerFileChangeApprovalDecision }
+
+/** Requested permission profile on `item/permissions/requestApproval`. */
+export interface AppServerPermissionRequestProfile { fileSystem?: unknown; network?: unknown }
+
+/** Params of `item/permissions/requestApproval`. */
+export interface AppServerPermissionsApprovalParams {
+  threadId: string; turnId: string; itemId: string; startedAtMs: number;
+  cwd: string; permissions: AppServerPermissionRequestProfile; reason?: string; environmentId?: string | null;
+}
+
+/** Granted profile: approve → echo the requested profile; deny → empty grant. */
+export interface AppServerGrantedPermissionProfile { fileSystem?: unknown; network?: unknown }
+
+/** Reply body for `item/permissions/requestApproval`. */
+export interface AppServerPermissionsApprovalResponse {
+  permissions: AppServerGrantedPermissionProfile;
+  scope?: 'turn' | 'session';
+  strictAutoReview?: unknown;
+}
+
+/** One question on `item/tool/requestUserInput`. */
+export interface AppServerToolUserInputQuestion {
+  id: string; header: string; question: string; isOther?: boolean; isSecret?: boolean;
+  options?: Array<{ label: string; description: string }> | null;
+}
+
+/** Params of `item/tool/requestUserInput`. */
+export interface AppServerToolUserInputParams {
+  threadId: string; turnId: string; itemId: string;
+  questions: AppServerToolUserInputQuestion[];
+  isBlocking: boolean;
+  autoResolutionMs?: number | null;
+}
+
+/** Reply body for `item/tool/requestUserInput` (answers keyed by question id). */
+export interface AppServerToolUserInputResponse { answers: Record<string, { answers: string[] }> }
+
+/** Params of `mcpServer/elicitation/request`. */
+export interface AppServerMcpElicitationParams { serverName: string; threadId: string; turnId?: string | null }
+
+/** Reply body for `mcpServer/elicitation/request`. */
+export interface AppServerMcpElicitationResponse { action: 'accept' | 'decline' | 'cancel'; content?: unknown; _meta?: unknown }
+
+// ── New notifications (Codex 0.159.0 ServerNotification union) ─────────────
+
+/** Payload of `thread/name/updated`. */
+export interface AppServerThreadNameUpdatedNotification { threadId: string; threadName?: string | null }
+
+/** Payload of `thread/goal/updated`. */
+export interface AppServerThreadGoalUpdatedNotification { threadId: string; goal: AppServerThreadGoal; turnId?: string | null }
+
+/** Payload of `thread/goal/cleared`. */
+export interface AppServerThreadGoalClearedNotification { threadId: string }
+
+/** Payload of `thread/deleted`. */
+export interface AppServerThreadDeletedNotification { threadId: string }
+
+/** Payload of `thread/attachment/updated`. */
+export interface AppServerThreadAttachmentUpdatedNotification {
+  threadId: string; attachmentId: string; attachmentType: string; identityKey: string;
+  operation: AppServerThreadAttachmentOperation;
+}
+
+/**
+ * Payload of the top-level `deprecationNotice` notification. Not thread-scoped;
+ * surfaced through the dedicated deprecation callback so the adapter can log a
+ * trace and (eventually) nudge settings UI.
+ */
+export interface AppServerDeprecationNotice { summary: string; details?: string | null }

@@ -6,7 +6,7 @@
 
 > **源码**: `src/core/types/chat.ts`
 > **状态**: [REVIEW]
-> **Updated**: 2026-07-24 — `ConversationSessionSettings` gained a nullable `codexApprovalPolicy` per-session override (null/undefined inherits global); `normalizeConversationSessionSettings` validates it against `VALID_CODEX_APPROVAL_POLICIES`.
+> **Updated**: 2026-09-30 — `tool_use.kind` 联合新增 `'image'`（Codex `imageGeneration` 卡片渲染）；`backend_event.event` 联合新增 `thread_renamed` / `goal_updated` / `goal_cleared` / `thread_deleted` / `deprecation_notice`（Codex 0.159.0 通知 seam，聊天视图不渲染、adapter owner 消费）；`VALID_CODEX_APPROVAL_POLICIES` 移除上游废弃的 `'untrusted'`，持久化会话级 `'untrusted'` 在 `normalizeConversationSessionSettings` 迁移为 `'on-request'`（与 `normalizeCodexBackendSettings` 一致）。
 
 ## 概述
 

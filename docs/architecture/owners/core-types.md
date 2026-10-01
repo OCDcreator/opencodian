@@ -1,4 +1,8 @@
 # Owner: core.types
+> 2026-09-30 (Codex 0.159 types)：
+> - settings.ts：持久化 codex `approvalPolicy 'untrusted'` 迁移为 `'on-request'`（上游 0.15x 已退役该值并拒绝启动）；`VALID_APPROVAL_POLICY` 收窄；`SettingsCodexSection` 下拉同步更新。
+> - chat.ts：`tool_use` kind union 扩展 `'image'`；`backend_event` union 扩展（`thread_renamed`、`goal_updated`、`goal_cleared`、`thread_deleted`、`deprecation_notice`）；会话级 approval override 经 `normalizeCodexApprovalPolicyOverride` 做 untrusted→on-request 迁移。
+> - tools.ts kind union 对齐。
 > 2026-09-22 (ZCode 票 01)：`AgentBackendKind` 增加 `'zcode'`；`BackendSettings` 增加 `zcode: ZCodeBackendSettings`（最小运行时选择：`executablePath` 覆盖，空=自动发现）与 `normalizeZCodeBackendSettings` 严格归一化，`getDefaultBackendSettings` 同步。既有后端设置真值不迁移。
 > 2026-09-21 (advantage-parity R-F6 质量修复)：新增单槽位 Vim 键编辑契约 `applyChatVimNavigationKey` / `normalizeChatVimNavigationKey`（冲突拒绝 + 保留原三元组）；整表归一化的 fail-closed 语义不变，仍服务于持久化配置的 load 边界。
 > 2026-09-21 (advantage-parity R-F2–R-F6)：会话类型新增受约束的绑定笔记路径、回退预览只读契约；设置新增默认关闭的聊天暖会话、双栏会话 rail、Vim 导航及 w/s/i 键配置，load 合流点对布尔值严格归一化并修复非法/重复键。既有后端会话与消息真值不迁移。

@@ -1,4 +1,7 @@
 # Owner: feature.settings-codex
+> 2026-09-30 (Codex 0.159 integration)：
+> - 新增 `SettingsCodexPluginsSection`（插件市场/已安装浏览器，install/uninstall/reconcile，backend 不可用时诚实状态），注册为第 7 个 tab。
+> - `SettingsCodexAccountSurface` 增加 usage 分析卡片（全 null 空态）；approval 下拉不再含 `untrusted`。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.

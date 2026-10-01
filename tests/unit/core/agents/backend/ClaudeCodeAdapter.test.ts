@@ -194,6 +194,31 @@ describe('ClaudeCodeAdapter', () => {
     // ContextUsageSnapshot for the existing chat ContextRing pipeline.
     expect(adapter.hasCapability(AgentCapability.Context)).toBe(true);
     expect(adapter.hasCapability(AgentCapability.Images)).toBe(true);
+
+    // Exact capability-set lock (2026-09-30, other-backends-audit B5): future
+    // additions must update this expected list deliberately. TurnSteering stays
+    // undeclared — Claude serializes mid-turn input via runtime.input.push and
+    // has no native steer seam — and the adapter exposes no steerTurn method.
+    const expected = [
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+      AgentCapability.Fork,
+      AgentCapability.Models,
+      AgentCapability.Thinking,
+      AgentCapability.FileOps,
+      AgentCapability.Shell,
+      AgentCapability.Images,
+      AgentCapability.Todos,
+      AgentCapability.Permissions,
+      AgentCapability.Context,
+      AgentCapability.AuxQuery,
+      AgentCapability.InlineCompletion,
+    ].sort();
+    expect([...adapter.capabilities].sort()).toEqual(expected);
+    expect(adapter.hasCapability(AgentCapability.TurnSteering)).toBe(false);
+    expect(
+      (adapter as unknown as { steerTurn?: unknown }).steerTurn,
+    ).toBeUndefined();
   });
 
   it('returns normalized supported models from the SDK', async () => {

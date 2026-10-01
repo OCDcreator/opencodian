@@ -585,3 +585,4 @@ describe('ToolCallRenderer interactions', () => {
     );
   });
 });
+

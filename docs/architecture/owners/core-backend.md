@@ -1,4 +1,9 @@
 # Owner: core.backend
+> 2026-09-30 (Codex 0.159 app-server integration)：
+> - 新 client 路由：turn/steer、thread/items|turns 列表分页、thread/name/set、thread/delete、thread/attachment/*、account/usage/read、plugin/*；transport WS 重连带 backoff + `onReconnect`/`onReconnectFailed`。
+> - CodexAdapter：`steerTurn`（TurnSteering 仅在 app-server 路径声明）、会话 title/delete、goal pause/resume、approval v2（`item/*/requestApproval`）+ `item/tool/requestUserInput` 桥接、重连集成、plugin/usage 透传方法（`readAccountUsage`、`listCodexPlugins`、`listInstalledCodexPlugins`、`installCodexPlugin`、`uninstallCodexPlugin`、`reconcileCodexPlugins`）、`getSessionTurnsPage`/`getSessionTurnItemsPage`。
+> - 新增 `CodexElicitationBridge.ts`（`mcpServer/elicitation/request`，form/url 模式，http(s) allowlist）；`AppServerToolUserInputResponse` 类型化为按 question id 键控的 `Record`。
+> - `OpenCodeAdapter` legacy 能力集如实排除 TurnSteering（`OPENCODE_LEGACY_CAPABILITIES`）；`BackendCapabilitySets.test.ts` 锁定五个后端的能力集；`ClaudeCodeAdapter` 仅注释更新。
 > 2026-09-27（跨平台修复）：ZCode 路径解析按目标平台语义拼接——`getPathApi`/`discoverZCodeProviderConfig` 非 win32 回退改 `path.posix`，`resolveZCodeDataRoot` 新增可选 `platform`；真实宿主行为零变化，修复 Windows 宿主上模拟 darwin/Linux 布局被 win32 化导致的 CI 16 用例失败。
 > 2026-09-25 (FA880): ZCode native background jobs are read from `session/read` and canceled only by an exact sessionId/taskId pair with terminal readback.
 > 2026-09-25 (FA880 ZCode): Native `session/events` mode transitions expose `planEnabled` separately from the `session/read` base mode; ZCodeAdapter confirms Plan only with matching same-session event readback. ZCodeInteractionBridge denies pure permission asks after 60 seconds and rejects late approvals.

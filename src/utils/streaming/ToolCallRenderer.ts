@@ -1,5 +1,7 @@
+/* eslint-disable max-lines -- The renderer keeps per-kind expanded-content branches (builtin/mcp/task/image) and their summary resolvers together so card behavior stays comparable across tool kinds. */
 import { addIcon, setIcon } from 'obsidian';
 
+import { t } from '../../i18n';
 import { getToolIdentity, MCP_TOOL_ICON_ID } from '../../shared';
 import {
   getMcpToolSummary,
@@ -53,6 +55,7 @@ export class ToolCallRenderer {
     codesearch: (input) => this.truncateText((input.query as string) || '', 60),
     web_fetch: (input) => this.truncateText((input.url as string) || '', 60),
     task: (input) => this.getTaskSummary(input),
+    image_generation: (input) => this.getImageGenerationSummary(input),
     question: (input) => this.getQuestionSummary(input),
     skill: (input) => this.truncateText(
       (input.name as string)
@@ -154,6 +157,31 @@ export class ToolCallRenderer {
     renderMcpExpandedContent(container, toolCall, this.options.onOpenMcpServerDetail);
   }
 
+  private renderImageExpandedContent(
+    container: HTMLElement,
+    toolCall: ToolCallInfo,
+  ): void {
+    const result = typeof toolCall.result === 'string' ? toolCall.result : '';
+    if (toolCall.status === 'error' || !result) {
+      this.options.renderExpandedContent!(container, toolCall.name, result || undefined);
+    } else if (result.startsWith('data:image/')) {
+      const imageEl = container.createEl('img', { cls: 'streaming-tool-image' });
+      imageEl.setAttribute('src', result);
+      imageEl.setAttribute('alt', t('chat.toolCard.image.statusCompleted'));
+    } else {
+      container.createDiv({ cls: 'streaming-tool-image-path', text: result });
+    }
+
+    const revisedPrompt = typeof toolCall.input.revisedPrompt === 'string'
+      ? toolCall.input.revisedPrompt.trim()
+      : '';
+    if (revisedPrompt) {
+      const promptEl = container.createDiv({ cls: 'streaming-tool-image-revised-prompt' });
+      promptEl.createSpan({ cls: 'streaming-tool-image-revised-prompt-label', text: t('chat.toolCard.image.revisedPrompt') });
+      promptEl.createSpan({ cls: 'streaming-tool-image-revised-prompt-text', text: revisedPrompt });
+    }
+  }
+
   /** Populate the expanded-content container for a tool card. Shared by the
    *  initial render, the lazy first-expansion, and updateResult. */
   private populateExpandedContent(container: HTMLElement, toolCall: ToolCallInfo): void {
@@ -164,6 +192,12 @@ export class ToolCallRenderer {
       this.renderMcpExpandedContent(container, toolCall);
       if (toolCall.status !== 'pending' && toolCall.status !== 'running') {
         this.options.renderExpandedContent!(container, toolCall.name, toolCall.result);
+      } else {
+        container.createDiv({ cls: 'streaming-tool-pending', text: 'Waiting for result...' });
+      }
+    } else if (toolCall.kind === 'image') {
+      if (toolCall.status !== 'pending' && toolCall.status !== 'running') {
+        this.renderImageExpandedContent(container, toolCall);
       } else {
         container.createDiv({ cls: 'streaming-tool-pending', text: 'Waiting for result...' });
       }
@@ -379,6 +413,34 @@ export class ToolCallRenderer {
     return `${questions.length} questions`;
   }
 
+  private getImageGenerationSummary(input: Record<string, unknown>): string {
+    const revisedPrompt = typeof input.revisedPrompt === 'string' ? input.revisedPrompt.trim() : '';
+    if (revisedPrompt) {
+      return this.truncateText(revisedPrompt, 60);
+    }
+    return this.imageStatusLabel(input.status);
+  }
+
+  private imageStatusLabel(status: unknown): string {
+    if (typeof status !== 'string' || !status.trim()) {
+      return '';
+    }
+    switch (status.trim()) {
+      case 'in_progress':
+      case 'running':
+      case 'started':
+        return t('chat.toolCard.image.statusGenerating');
+      case 'completed':
+      case 'complete':
+        return t('chat.toolCard.image.statusCompleted');
+      case 'failed':
+      case 'error':
+        return t('chat.toolCard.image.statusFailed');
+      default:
+        return status.trim();
+    }
+  }
+
   private getPositiveInteger(value: unknown): number | null {
     if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
       return Math.floor(value);
@@ -493,6 +555,11 @@ export class ToolCallRenderer {
 
     if (toolCall.kind === 'custom') {
       setIcon(el, 'layers');
+      return;
+    }
+
+    if (toolCall.kind === 'image') {
+      setIcon(el, 'image');
       return;
     }
 

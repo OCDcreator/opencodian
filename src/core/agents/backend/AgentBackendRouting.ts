@@ -8,6 +8,8 @@ import type {
 } from './AgentService';
 import type { AgentServiceRegistry } from './AgentServiceRegistry';
 
+/* eslint-disable max-lines -- Backend-aware routing keeps the full seam matrix (sessions, previews, pagination, lifecycle) in one registry-lookup boundary so capability narrowing stays reviewable together. */
+
 export function resolveConversationBackendKind(
   conversation: Pick<Conversation, 'backend'> | null | undefined,
 ): AgentBackendKind {
@@ -537,6 +539,24 @@ function normalizeContentBlocks(blocks: unknown[]): NormalizedSessionPreviewPart
 }
 
 /**
+ * Read options passed through to the adapter's `getSessionMessages`
+ * implementation. Semantics are backend-defined: the Claude Code adapter
+ * understands `{ dir, limit, offset }`, backends with cursor pagination
+ * understand `{ cursor, limit }`. Callers that omit options get the
+ * adapter's default (historical) behavior.
+ */
+export interface BackendSessionMessagesReadOptions {
+  /** Maximum number of messages to return (backend-defined semantics). */
+  limit?: number;
+  /** Opaque pagination cursor for cursor-based backends. */
+  cursor?: string | null;
+  /** Offset-based pagination alternative (Claude Code adapter). */
+  offset?: number;
+  /** Direction for offset-based paging (Claude Code adapter). */
+  dir?: 'asc' | 'desc';
+}
+
+/**
  * Read session preview messages from the active backend as normalized entries.
  *
  * Routes through the registry and calls `getSessionMessages(sessionId)` on
@@ -545,6 +565,9 @@ function normalizeContentBlocks(blocks: unknown[]): NormalizedSessionPreviewPart
  * - OpenCode: extracts `.info.role` + `.parts[]` with `{type, text}`
  * - Claude / generic: extracts `.role`/`.type` + recognized content fields
  *
+ * `options` is passed through verbatim to adapters that accept pagination
+ * options; omitting it keeps the historical no-options call byte-identical.
+ *
  * Returns `null` when no history-capable adapter is available.
  * Returns `[]` when the backend supports preview reads but the session has no
  * previewable messages.
@@ -552,6 +575,7 @@ function normalizeContentBlocks(blocks: unknown[]): NormalizedSessionPreviewPart
 export async function getBackendSessionPreview(
   registry: AgentServiceRegistry | null | undefined,
   sessionId: string,
+  options?: BackendSessionMessagesReadOptions,
 ): Promise<NormalizedSessionPreviewMessage[] | null> {
   const historyService = getActiveSessionHistoryService(registry);
   if (!historyService) {
@@ -560,7 +584,9 @@ export async function getBackendSessionPreview(
 
   let rawMessages: unknown;
   try {
-    rawMessages = await historyService.getSessionMessages(sessionId);
+    rawMessages = options
+      ? await historyService.getSessionMessages(sessionId, { ...options } as Record<string, unknown>)
+      : await historyService.getSessionMessages(sessionId);
   } catch {
     return null;
   }
@@ -614,6 +640,153 @@ export async function getBackendSessionPreview(
       parts: [{ type: 'json', text: JSON.stringify(record, null, 2) }],
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// Backend-aware paginated session transcript seams
+// ---------------------------------------------------------------------------
+
+/**
+ * A page of normalized preview messages plus opaque cursor pagination
+ * metadata. Adapters that implement the paginated turns/items seams return
+ * this shape; `nextCursor` pages forward in the requested sort direction and
+ * `null` means the page sequence is exhausted.
+ */
+export interface NormalizedSessionMessagesPage {
+  messages: NormalizedSessionPreviewMessage[];
+  nextCursor: string | null;
+  backwardsCursor: string | null;
+}
+
+/** Options for the paginated session-turns seam. */
+export interface BackendSessionTurnsPageOptions {
+  /** Opaque cursor from a previous page's `nextCursor` / `backwardsCursor`. */
+  cursor?: string | null;
+  /** Turns per page (backend default applies when omitted). */
+  limit?: number;
+  /** Turn order; backends default to their native direction (codex: desc). */
+  sortDirection?: 'asc' | 'desc';
+}
+
+/** Options for the paginated per-turn session-items seam. */
+export interface BackendSessionItemsPageOptions {
+  /** Restrict items to one turn; required for item-anchor cursors. */
+  turnId?: string | null;
+  /** Opaque cursor from a previous page's `nextCursor` / `backwardsCursor`. */
+  cursor?: string | null;
+  /** Items per page (backend default applies when omitted). */
+  limit?: number;
+  /** Item order; backends default to their native direction (codex: asc). */
+  sortDirection?: 'asc' | 'desc';
+}
+
+/**
+ * Structural capability for adapters with paginated session transcript reads
+ * (e.g. codex `thread/turns/list` / `thread/items/list`). Adapters implement
+ * these optional methods on their session capability; routing detects them
+ * with typeof checks so backends without pagination keep compiling and
+ * behaving unchanged. Implementations must return `null` when a page cannot
+ * be produced (route unavailable, thread missing/deleted, transport error) —
+ * never throw.
+ */
+export interface BackendPaginatedSessionHistoryCapability {
+  /** List one page of session turns as normalized preview messages. */
+  getSessionTurnsPage?(
+    sessionId: string,
+    options?: BackendSessionTurnsPageOptions,
+  ): Promise<NormalizedSessionMessagesPage | null>;
+  /** List one page of one turn's items as normalized preview messages. */
+  getSessionTurnItemsPage?(
+    sessionId: string,
+    options?: BackendSessionItemsPageOptions,
+  ): Promise<NormalizedSessionMessagesPage | null>;
+}
+
+/**
+ * True when the active history service implements the paginated turns seam.
+ * Consumers (e.g. the session-browser detail pane) use this to choose between
+ * the paginated transcript path and the legacy flat-preview path.
+ */
+export function hasBackendSessionTurnsPage(
+  registry: AgentServiceRegistry | null | undefined,
+): boolean {
+  const historyService = getActiveSessionHistoryService(registry);
+  if (!historyService) {
+    return false;
+  }
+  return typeof (historyService as Partial<BackendPaginatedSessionHistoryCapability>).getSessionTurnsPage === 'function';
+}
+
+/**
+ * Read one page of session turns from the active backend as normalized
+ * preview messages. Returns `null` when the active adapter does not implement
+ * the paginated seam, the page request fails, or the returned page is
+ * malformed. Cursor pagination is opaque: pass a previous page's
+ * `nextCursor` back as `options.cursor` to continue in the same direction.
+ */
+export async function getBackendSessionTurnsPage(
+  registry: AgentServiceRegistry | null | undefined,
+  sessionId: string,
+  options?: BackendSessionTurnsPageOptions,
+): Promise<NormalizedSessionMessagesPage | null> {
+  const historyService = getActiveSessionHistoryService(registry);
+  if (!historyService) {
+    return null;
+  }
+  const capability = historyService as Partial<BackendPaginatedSessionHistoryCapability>;
+  if (typeof capability.getSessionTurnsPage !== 'function') {
+    return null;
+  }
+
+  let page: unknown;
+  try {
+    page = await capability.getSessionTurnsPage(sessionId, options);
+  } catch {
+    return null;
+  }
+  return sanitizeMessagesPage(page);
+}
+
+/**
+ * Read one page of a single turn's items from the active backend as
+ * normalized preview messages. Same contract as `getBackendSessionTurnsPage`;
+ * `options.turnId` selects the turn. Intended for per-turn transcript
+ * expansion on backends with paginated thread history.
+ */
+export async function getBackendSessionTurnItemsPage(
+  registry: AgentServiceRegistry | null | undefined,
+  sessionId: string,
+  options?: BackendSessionItemsPageOptions,
+): Promise<NormalizedSessionMessagesPage | null> {
+  const historyService = getActiveSessionHistoryService(registry);
+  if (!historyService) {
+    return null;
+  }
+  const capability = historyService as Partial<BackendPaginatedSessionHistoryCapability>;
+  if (typeof capability.getSessionTurnItemsPage !== 'function') {
+    return null;
+  }
+
+  let page: unknown;
+  try {
+    page = await capability.getSessionTurnItemsPage(sessionId, options);
+  } catch {
+    return null;
+  }
+  return sanitizeMessagesPage(page);
+}
+
+/** Validate an adapter-returned page and normalize missing cursors to null. */
+function sanitizeMessagesPage(page: unknown): NormalizedSessionMessagesPage | null {
+  if (!page || typeof page !== 'object' || !Array.isArray((page as NormalizedSessionMessagesPage).messages)) {
+    return null;
+  }
+  const record = page as NormalizedSessionMessagesPage;
+  return {
+    messages: record.messages,
+    nextCursor: record.nextCursor ?? null,
+    backwardsCursor: record.backwardsCursor ?? null,
+  };
 }
 
 /**

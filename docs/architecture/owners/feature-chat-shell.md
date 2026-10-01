@@ -7,6 +7,9 @@
 > 2026-09-20 (advantage-parity R-D1)：OpenCodianView 的历史菜单 host 新增 exportConversationMarkdown 转发方法（导出逻辑不进视图）。
 
 # Owner: feature.chat-shell
+> 2026-09-30 (Codex 0.159 integration)：
+> - OpenCodianView capability-change 缝加固：`CAPABILITY_CHANGE_REFRESH_CAPABILITIES` churn guard + capability 变化时排队刷新 follow-up bar。
+> - `installCodexApprovalHostContext` 扩展 `questionCardRenderer`/`elicitationCardRenderer`；`ChatPluginPort` 的 context `Pick` 放宽。
 > 2026-09-25 (FA880): The background panel host forwards native ZCode read/cancel operations with explicit session and task IDs; OpenCodianView does not synthesize task status.
 > 2026-09-25 (FA880): `showPermissionDialog` forwards a ZCode-only requestId/sessionId pending read to the inline permission card so teardown and timeout can clear that exact UI decision surface.
 > 2026-09-24 (ZCode image recovery)：OpenCodianView forwards the composer preparation acknowledgement callback into the send pipeline; it does not clear or recreate image chips itself.

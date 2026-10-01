@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- This mapper is one pure protocol boundary: every app-server notification and ThreadItem kind stays co-located so the wire-to-chunk contract is auditable in one file. */
 /**
  * Codex app-server notification -> OpenCodian stream chunk mapping.
  *
@@ -51,6 +52,16 @@ export function mapAppServerNotification({
     case 'item/started':
     case 'item/completed':
       return { chunks: mapItemNotification(params, event.method === 'item/completed', streamState) };
+    case 'thread/name/updated':
+      return mapThreadNameUpdated(params, threadId, sessionId);
+    case 'thread/goal/updated':
+      return mapThreadGoalUpdated(params, threadId, sessionId);
+    case 'thread/goal/cleared':
+      return mapThreadGoalCleared(params, threadId, sessionId);
+    case 'thread/deleted':
+      return mapThreadDeleted(params, threadId, sessionId);
+    case 'deprecationNotice':
+      return mapDeprecationNotice(params, sessionId);
     case 'error':
       return mapErrorNotification(params);
     case 'warning':
@@ -173,6 +184,108 @@ function mapWarningNotification(params: Record<string, unknown>, sessionId: stri
   };
 }
 
+// The thread-scoped notifications below are emitted by the app-server for the
+// subscribed thread only, but the params still carry a threadId: guard it so a
+// replayed or misrouted notification can never rename/close another session.
+// These chunks render nothing in chat today; they exist as the machine-readable
+// seam for the adapter owner (conversation title refresh, goal state, deletion).
+
+function mapThreadNameUpdated(
+  params: Record<string, unknown>,
+  threadId: string,
+  sessionId: string,
+): AppServerStreamMapResult {
+  if (params.threadId !== threadId) {
+    return { chunks: [] };
+  }
+  return {
+    chunks: [{
+      type: 'backend_event',
+      source: 'codex',
+      event: 'thread_renamed',
+      content: typeof params.threadName === 'string' ? params.threadName : '',
+      metadata: { threadName: typeof params.threadName === 'string' ? params.threadName : null },
+      sessionId,
+    }],
+  };
+}
+
+function mapThreadGoalUpdated(
+  params: Record<string, unknown>,
+  threadId: string,
+  sessionId: string,
+): AppServerStreamMapResult {
+  if (params.threadId !== threadId) {
+    return { chunks: [] };
+  }
+  const goal = asRecord(params.goal);
+  return {
+    chunks: [{
+      type: 'backend_event',
+      source: 'codex',
+      event: 'goal_updated',
+      metadata: { goal: Object.keys(goal).length > 0 ? goal : null },
+      sessionId,
+    }],
+  };
+}
+
+function mapThreadGoalCleared(
+  params: Record<string, unknown>,
+  threadId: string,
+  sessionId: string,
+): AppServerStreamMapResult {
+  if (params.threadId !== threadId) {
+    return { chunks: [] };
+  }
+  return {
+    chunks: [{
+      type: 'backend_event',
+      source: 'codex',
+      event: 'goal_cleared',
+      sessionId,
+    }],
+  };
+}
+
+function mapThreadDeleted(
+  params: Record<string, unknown>,
+  threadId: string,
+  sessionId: string,
+): AppServerStreamMapResult {
+  if (params.threadId !== threadId) {
+    return { chunks: [] };
+  }
+  return {
+    chunks: [
+      {
+        type: 'backend_event',
+        source: 'codex',
+        event: 'thread_deleted',
+        sessionId,
+      },
+      { type: 'error', content: 'Codex thread was deleted on the server.' },
+    ],
+  };
+}
+
+function mapDeprecationNotice(params: Record<string, unknown>, sessionId: string): AppServerStreamMapResult {
+  if (typeof params.summary !== 'string' || !params.summary.trim()) {
+    return { chunks: [] };
+  }
+  const details = typeof params.details === 'string' ? params.details : null;
+  return {
+    chunks: [{
+      type: 'backend_event',
+      source: 'codex',
+      event: 'deprecation_notice',
+      content: params.summary,
+      metadata: { details },
+      sessionId,
+    }],
+  };
+}
+
 function mapItemNotification(
   params: Record<string, unknown>,
   completed: boolean,
@@ -196,8 +309,13 @@ const itemMappers: Readonly<Record<string, ItemMapper>> = {
   commandExecution: mapCommandExecutionItem,
   error: mapErrorItem,
   fileChange: mapFileChangeItem,
+  // ThreadItem (app-server item notifications) spells it imageGeneration;
+  // ResponseItem (raw responses-api replay) spells it image_generation_call.
+  imageGeneration: mapImageGenerationItem,
+  image_generation_call: mapImageGenerationItem,
   mcpToolCall: mapMcpToolCallItem,
   reasoning: mapReasoningItem,
+  subAgentActivity: mapSubAgentActivityItem,
   todoList: mapTodoListItem,
   webSearch: mapWebSearchItem,
 };
@@ -330,6 +448,146 @@ function mapTodoListItem(
 
 function mapErrorItem(item: Record<string, unknown>): StreamChunk[] {
   return typeof item.message === 'string' ? [{ type: 'error', content: item.message }] : [];
+}
+
+const IMAGE_GENERATION_TOOL_NAME = 'image_generation';
+const IMAGE_RESULT_TEXT_LIMIT = 4096;
+
+function mapImageGenerationItem(item: Record<string, unknown>, completed: boolean): StreamChunk[] {
+  if (typeof item.id !== 'string' || !item.id) {
+    return [];
+  }
+  const id = item.id;
+  const status = typeof item.status === 'string' ? item.status : '';
+  // ThreadItem uses revisedPrompt; ResponseItem uses revised_prompt.
+  const revisedPrompt = typeof item.revisedPrompt === 'string'
+    ? item.revisedPrompt
+    : typeof item.revised_prompt === 'string'
+      ? item.revised_prompt
+      : '';
+  const input: Record<string, unknown> = { ...(status ? { status } : {}) };
+  if (revisedPrompt) {
+    input.revisedPrompt = revisedPrompt;
+  }
+
+  if (!completed) {
+    return [{
+      type: 'tool_use',
+      id,
+      name: IMAGE_GENERATION_TOOL_NAME,
+      kind: 'image',
+      input,
+    }];
+  }
+
+  const chunks: StreamChunk[] = [{
+    type: 'tool_use',
+    id,
+    name: IMAGE_GENERATION_TOOL_NAME,
+    kind: 'image',
+    input,
+  }];
+
+  const failure = asRecord(item.failure);
+  if (Object.keys(failure).length > 0) {
+    const failureText = describeImageGenerationFailure(failure);
+    // The tool_result flips the card to its error state; the error chunk makes
+    // the user-actionable notice (usage limit + reset time) prominent. Like any
+    // mid-turn error chunk it suppresses the post-turn server sync.
+    chunks.push({ type: 'tool_result', toolUseId: id, content: failureText, isError: true });
+    chunks.push({ type: 'error', content: failureText });
+    return chunks;
+  }
+
+  const savedPath = typeof item.savedPath === 'string' ? item.savedPath : '';
+  chunks.push({
+    type: 'tool_result',
+    toolUseId: id,
+    content: resolveImageGenerationResult(item.result, savedPath),
+  });
+  return chunks;
+}
+
+function resolveImageGenerationResult(result: unknown, savedPath: string): string {
+  if (typeof result !== 'string' || !result.trim()) {
+    return savedPath;
+  }
+  const trimmed = result.trim();
+  if (trimmed.startsWith('data:image/')) {
+    return trimmed;
+  }
+  if (looksLikeBase64Image(trimmed)) {
+    return `data:${detectImageMediaType(trimmed)};base64,${trimmed.replace(/\s+/g, '')}`;
+  }
+  if (looksLikeFilePath(trimmed)) {
+    return trimmed;
+  }
+  return trimmed.length > IMAGE_RESULT_TEXT_LIMIT
+    ? `${trimmed.slice(0, IMAGE_RESULT_TEXT_LIMIT)}…`
+    : trimmed;
+}
+
+function looksLikeBase64Image(value: string): boolean {
+  return value.length >= 256 && /^[A-Za-z0-9+/]+={0,2}$/.test(value);
+}
+
+function detectImageMediaType(base64: string): string {
+  if (base64.startsWith('iVBORw0KGgo')) return 'image/png';
+  if (base64.startsWith('/9j/')) return 'image/jpeg';
+  if (base64.startsWith('R0lGOD')) return 'image/gif';
+  if (base64.startsWith('UklGR')) return 'image/webp';
+  return 'image/png';
+}
+
+function looksLikeFilePath(value: string): boolean {
+  return value.startsWith('/')
+    || value.startsWith('./')
+    || value.startsWith('../')
+    || /^[A-Za-z]:[\\/]/.test(value);
+}
+
+function describeImageGenerationFailure(failure: Record<string, unknown>): string {
+  if (failure.type === 'usageLimitExceeded') {
+    const limitId = typeof failure.limitId === 'string' && failure.limitId ? ` (${failure.limitId})` : '';
+    const resetsAt = typeof failure.resetsAt === 'number' && failure.resetsAt > 0
+      ? ` Resets at ${new Date(failure.resetsAt).toLocaleString()}.`
+      : '';
+    return `Image generation failed: usage limit exceeded${limitId}.${resetsAt}`;
+  }
+  return `Image generation failed: ${stringifyValue(failure)}`;
+}
+
+function mapSubAgentActivityItem(item: Record<string, unknown>): StreamChunk[] {
+  const kind = typeof item.kind === 'string' ? item.kind : '';
+  if (kind !== 'started' && kind !== 'interacted' && kind !== 'interrupted' && kind !== 'completed') {
+    return [];
+  }
+  const agentPath = typeof item.agentPath === 'string' ? item.agentPath : '';
+  const agentThreadId = typeof item.agentThreadId === 'string' && item.agentThreadId
+    ? item.agentThreadId
+    : String(item.id ?? '');
+  if (!agentThreadId) {
+    return [];
+  }
+  // One card per subagent: key the tool call by agentThreadId so each activity
+  // kind merges into the running card instead of spawning a new one.
+  const chunks: StreamChunk[] = [{
+    type: 'tool_use',
+    id: agentThreadId,
+    name: 'task',
+    kind: 'task',
+    input: { subagent_type: agentPath, description: kind },
+    toolMetadata: { agentThreadId, agentPath },
+  }];
+  if (kind === 'completed' || kind === 'interrupted') {
+    chunks.push({
+      type: 'tool_result',
+      toolUseId: agentThreadId,
+      content: `Subagent ${agentPath || agentThreadId} ${kind}`,
+      isError: kind === 'interrupted',
+    });
+  }
+  return chunks;
 }
 
 function mapFileChangePaths(changes: unknown): StreamChunk[] {

@@ -57,6 +57,7 @@ import { ClaudeCodePermissionBridge, createClaudeCodePermissionBridge } from './
 import { loadClaudeCodeSdk } from './core/agents/backend/ClaudeCodeSdkLoader';
 import { CodexAdapter } from './core/agents/backend/CodexAdapter';
 import { type CodexApprovalHostContext, createCodexApprovalBridgeHost } from './core/agents/backend/CodexDefaultApprovalHost';
+import { createCodexElicitationBridgeHost } from './core/agents/backend/CodexElicitationBridge';
 import { OpenCodeAdapter } from './core/agents/backend/OpenCodeAdapter';
 import { OpenCodeService, SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from './core/opencode';
 import { RemoteControlService } from './core/remotecontrol';
@@ -683,14 +684,9 @@ export default class OpenCodianPlugin extends Plugin {
       this.memoryRuntime.registerCommands(this);
       this.initObsidianToolingRuntime();
 
-      // Wire the Codex approval bridge host to the mutable context the chat
-      // view populates on mount.  Mirrors the Claude permission host wiring.
-      const codexAdapter = this.agentServiceRegistry.get('codex');
-      if (codexAdapter instanceof CodexAdapter) {
-        codexAdapter.setApprovalHost(
-          createCodexApprovalBridgeHost(() => this.codexApprovalHostContext),
-        );
-      }
+      // Wire the Codex approval + elicitation bridge hosts to the mutable
+      // context the chat view populates on mount.
+      this.wireCodexBridgeHosts();
 
       // Auto-start the active adapter so it reaches connected state.
       // OpenCodeAdapter.start() is idempotent (ServerManager returns if already running).
@@ -2139,6 +2135,25 @@ export default class OpenCodianPlugin extends Plugin {
     // Apply the persisted mode (no-op when off): provisions the gate and
     // starts the request watcher only when the mode is `cli`.
     void this.obsidianToolingRuntime.applySettings();
+  }
+
+  /**
+   * Wire the Codex approval + elicitation bridge hosts to the mutable context
+   * the chat view populates on mount.  Mirrors the Claude permission host
+   * wiring; the same context object carries the approval, question, and
+   * elicitation card renderers.
+   */
+  private wireCodexBridgeHosts(): void {
+    const codexAdapter = this.agentServiceRegistry.get('codex');
+    if (!(codexAdapter instanceof CodexAdapter)) {
+      return;
+    }
+    codexAdapter.setApprovalHost(
+      createCodexApprovalBridgeHost(() => this.codexApprovalHostContext),
+    );
+    codexAdapter.setElicitationHost(
+      createCodexElicitationBridgeHost(() => this.codexApprovalHostContext),
+    );
   }
 
   /**

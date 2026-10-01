@@ -29,9 +29,13 @@
 ```typescript
 type ToolCallStatus = 'pending' | 'running' | 'completed' | 'error' | 'blocked';
 
+// kind 与 core/types/chat.ts 的 tool_use kind 联合保持一致；2026-09-30 新增 'image'（Codex imageGeneration 卡片）。
+type ToolCallKind = 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'image' | 'unknown';
+
 interface ToolCallInfo {
   id: string;
   name: string;
+  kind?: ToolCallKind;
   input: Record<string, unknown>;
   toolMetadata?: Record<string, unknown>;
   status: ToolCallStatus;

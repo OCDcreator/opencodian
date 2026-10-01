@@ -3,6 +3,8 @@
 > **源码**: `src/core/agents/backend/CodexAppServerClientTypes.ts`
 > **状态**: [RUNTIME_ADJUNCT]
 
+> **Codex 0.159.0 协议升级（2026-09-30）**: 文件头声明 shapes 对齐 0.159.0 生成的 bindings（`codex app-server generate-json-schema` 实测导出）。新增：`AppServerUserInput`（text 含 text_elements / image url|fileId / localImage）、`AppServerSteerTurnResult`（ok | rejected 携带 `AppServerSteerTurnError`（code/no_active_turn/expected_turn_mismatch/non_steerable_review|compact/active_turn_not_steerable/empty_input/input_too_large + turnKind + misalignment）| unavailable）、`AppServerThreadItemsListCursor`（string | item 锚点）、`AppServerThreadItemsPage` / `AppServerThreadTurnsPage`（data + nextCursor + backwardsCursor）、`AppServerTurnItemsView`（notLoaded|summary|full）、`AppServerThreadAttachment(AddResult|sPage)`、插件家族（`AppServerPluginMarketplaceKind`、`AppServerPluginSource` local|git|npm|remote、`AppServerPluginSummary`、`AppServerPluginListResult`、`AppServerPluginInstallResult{appsNeedingAuth,authPolicy}`、`AppServerPluginReconcileResult`、`AppServerPluginSkillReadResult`）、五个 server→client 请求路由的 params/response 类型（`AppServerCommandExecutionApprovalParams/Response`、`AppServerFileChangeApproval*`、`AppServerPermissionsApproval*`、`AppServerToolUserInput*`、`AppServerMcpElicitation*`）、新通知 payload（`AppServerThreadNameUpdatedNotification`、`AppServerThreadGoalUpdated|ClearedNotification`、`AppServerThreadDeletedNotification`、`AppServerThreadAttachmentUpdatedNotification`、`AppServerDeprecationNotice{summary,details?}`）。`AppServerAccountUsage` 收紧为类型化 summary/dailyUsageBuckets/threadUsage；`AppServerTurn` 增加 0.159.0 可选字段；`AppServerThreadGoalStatus` 抽出为独立联合类型。
+
 > **P1 grouped skills readback（2026-07-24）**: `AppServerSkill` 除既有 name/description/path/enabled/scope 外，防御式保留 `source`、`shortDescription`、`interface`、`dependencies`；`AppServerSkillGroup` 以 `{ cwd: string | null, skills, errors }` 保留每个 cwd 分组，`AppServerSkillError` 保留服务端的 path/message。`AppServerListSkillsOptions` 仍为 cwd?/forceReload?。
 
 > **新增类型（2026-07-24）**: `AppServerThreadEffectiveSettings` —— `thread/start`/`thread/resume` 响应中**服务端确认**的有效设置，形状对齐 Codex 0.144.1 生成的 bindings：`sandbox` 为判别对象 `AppServerSandboxPolicy`（`dangerFullAccess` / `readOnly` / `workspaceWrite` / 未知 type），`activePermissionProfile` 为 `AppServerEffectivePermissionProfile`（`{ id, extends? }`），`approvalPolicy` 为 `AppServerApprovalPolicyEffective`（已知标量或粒度对象），外加 model/modelProvider/cwd/runtimeWorkspaceRoots/instructionSources/approvalsReviewer/reasoningEffort。这是 runtime 证据轴的载体：缺失字段意为 `unavailable`（旧版 app-server 不回显），**非**请求侧值的伪回读。插件 UI 策略仍限 `inherit|untrusted|on-request|never`，与运行时证据的更宽形状分离。
@@ -21,6 +23,7 @@
 - 定义 `skills/list` 的扁平 skill metadata 以及供设置页使用的 cwd/error 分组 readback 类型
 - 定义 `hooks/list` 的 cwd 分组、HookMetadata（`key`/`eventName`/`handlerType` 为必需身份字段，其余字段可选）、错误和 `available|empty|unavailable|failed|malformed` 只读 readback outcome 类型
 - 定义 `AppServerServerRequestHandler`（服务端发起 JSON-RPC 请求的 handler 签名，供 `CodexAppServerTransport` 使用）
+- 定义 Codex 0.159.0 新增 wire shapes：`turn/steer`（UserInput/steer error）、`thread/items/list` 与 `thread/turns/list` 分页、thread attachment、plugin/* 路由、五个 server→client 请求路由、以及 `deprecationNotice` 等新通知 payload（详见顶部 2026-09-30 条目）
 
 ## 维护约束
 

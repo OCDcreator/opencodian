@@ -1,16 +1,27 @@
 import {
   getBackendSessionDetail,
   getBackendSessionPreview,
+  getBackendSessionTurnsPage,
+  hasBackendSessionTurnsPage,
   type NormalizedSessionDetail,
+  type NormalizedSessionMessagesPage,
   type NormalizedSessionPreviewMessage,
   type NormalizedSessionPreviewPart,
 } from '../../../core/agents/backend/AgentBackendRouting';
 import type { AgentServiceRegistry } from '../../../core/agents/backend/AgentServiceRegistry';
 import { t } from '../../../i18n';
 
+/** Turns requested per page when the backend exposes the paginated turns seam. */
+const TURN_PAGE_LIMIT = 20;
+
 /**
  * Render the detail view (metadata + full transcript) for a backend session
  * into the provided preview element.
+ *
+ * When the active backend implements the paginated turns seam
+ * (`getSessionTurnsPage`, e.g. codex `thread/turns/list`), the transcript is
+ * loaded page by page (oldest first) with a "load more" append affordance.
+ * Backends without the seam keep the historical flat-preview behavior.
  */
 export async function renderBackendSessionDetail(
   previewEl: HTMLElement,
@@ -23,6 +34,40 @@ export async function renderBackendSessionDetail(
     text: t('chat.backendSessions.detailLoading'),
   });
 
+  if (!hasBackendSessionTurnsPage(registry)) {
+    await renderLegacyDetail(previewEl, sessionId, registry);
+    return;
+  }
+
+  // Fetch metadata and the first transcript page in parallel. A null page
+  // means the thread is missing/deleted or the route failed — the metadata
+  // card still renders so the user sees which session was unavailable.
+  const [detailResult, firstPage] = await Promise.all([
+    getBackendSessionDetail(registry, sessionId).catch(() => null),
+    getBackendSessionTurnsPage(registry, sessionId, {
+      limit: TURN_PAGE_LIMIT,
+      sortDirection: 'asc',
+    }).catch(() => null),
+  ]);
+
+  previewEl.empty();
+
+  renderDetailMetadata(previewEl, detailResult);
+
+  if (!firstPage) {
+    renderTranscriptUnavailable(previewEl);
+    return;
+  }
+
+  renderPaginatedTranscript(previewEl, sessionId, registry, firstPage);
+}
+
+/** Historical detail path: metadata + full flat preview transcript. */
+async function renderLegacyDetail(
+  previewEl: HTMLElement,
+  sessionId: string,
+  registry: AgentServiceRegistry | null,
+): Promise<void> {
   // Fetch metadata and transcript in parallel
   const [detailResult, transcriptResult] = await Promise.all([
     getBackendSessionDetail(registry, sessionId).catch(() => null),
@@ -84,16 +129,7 @@ function renderDetailMetadata(containerEl: HTMLElement, detail: NormalizedSessio
 }
 
 function renderDetailTranscript(containerEl: HTMLElement, transcript: NormalizedSessionPreviewMessage[] | null): void {
-  const transcriptEl = containerEl.createDiv({
-    cls: 'opencodian-backend-session-browser-detail-transcript',
-  });
-
-  transcriptEl.createEl('h4', { text: t('chat.backendSessions.detailTranscriptTitle') });
-
-  const noticeEl = transcriptEl.createDiv({
-    cls: 'opencodian-backend-session-browser-detail-transcript-notice',
-  });
-  noticeEl.createEl('p', { text: t('chat.backendSessions.detailTranscriptNotice') });
+  const transcriptEl = createTranscriptShell(containerEl);
 
   if (!transcript || transcript.length === 0) {
     transcriptEl.createEl('p', {
@@ -113,29 +149,141 @@ function renderDetailTranscript(containerEl: HTMLElement, transcript: Normalized
   });
 
   for (const msg of transcript) {
-    if (msg.role === 'activity') {
-      for (const part of msg.parts) {
-        renderDetailActivityLine(messagesEl, part);
+    renderTranscriptMessage(messagesEl, msg);
+  }
+}
+
+/**
+ * Render the transcript section for backends with the paginated turns seam.
+ * The first page renders immediately; when the server reports more turns via
+ * `nextCursor`, a "load more" button appends the next page incrementally.
+ */
+function renderPaginatedTranscript(
+  containerEl: HTMLElement,
+  sessionId: string,
+  registry: AgentServiceRegistry | null,
+  firstPage: NormalizedSessionMessagesPage,
+): void {
+  const transcriptEl = createTranscriptShell(containerEl);
+
+  if (firstPage.messages.length === 0 && !firstPage.nextCursor) {
+    transcriptEl.createEl('p', {
+      cls: 'opencodian-backend-session-browser-detail-transcript-empty',
+      text: t('chat.backendSessions.detailTranscriptEmpty'),
+    });
+    return;
+  }
+
+  const state = {
+    nextCursor: firstPage.nextCursor,
+    count: firstPage.messages.length,
+    loading: false,
+  };
+
+  const countEl = transcriptEl.createEl('p', {
+    cls: 'opencodian-backend-session-browser-detail-transcript-count',
+    text: t('chat.backendSessions.detailTranscriptCount', { count: state.count }),
+  });
+
+  const messagesEl = transcriptEl.createDiv({
+    cls: 'opencodian-backend-session-browser-detail-messages',
+  });
+
+  for (const msg of firstPage.messages) {
+    renderTranscriptMessage(messagesEl, msg);
+  }
+
+  if (!state.nextCursor) {
+    return;
+  }
+
+  const loadMoreBtn = transcriptEl.createEl('button', {
+    cls: 'opencodian-backend-session-browser-detail-load-more',
+    text: t('chat.backendSessions.detailLoadMore'),
+  });
+  loadMoreBtn.addEventListener('click', () => {
+    if (state.loading || !state.nextCursor) {
+      return;
+    }
+    state.loading = true;
+    loadMoreBtn.disabled = true;
+    void getBackendSessionTurnsPage(registry, sessionId, {
+      cursor: state.nextCursor,
+      limit: TURN_PAGE_LIMIT,
+      sortDirection: 'asc',
+    }).then((page) => {
+      if (!page) {
+        // Page fetch failed (e.g. thread deleted mid-browse) — allow retry.
+        state.loading = false;
+        loadMoreBtn.disabled = false;
+        loadMoreBtn.setText(t('chat.backendSessions.detailLoadMoreRetry'));
+        return;
       }
-      continue;
-    }
-
-    // Skip messages that would produce a blank role-only row
-    const hasRenderableContent = msg.parts.some((p) => partHasContent(p));
-    if (!hasRenderableContent) continue;
-
-    const msgEl = messagesEl.createDiv({
-      cls: `opencodian-backend-session-browser-detail-msg opencodian-backend-session-browser-detail-msg-${msg.role}`,
+      for (const msg of page.messages) {
+        renderTranscriptMessage(messagesEl, msg);
+      }
+      state.count += page.messages.length;
+      countEl.setText(t('chat.backendSessions.detailTranscriptCount', { count: state.count }));
+      state.nextCursor = page.nextCursor;
+      state.loading = false;
+      if (state.nextCursor) {
+        loadMoreBtn.disabled = false;
+      } else {
+        loadMoreBtn.remove();
+      }
     });
+  });
+}
 
-    msgEl.createDiv({
-      cls: 'opencodian-backend-session-browser-detail-msg-role',
-      text: msg.role,
-    });
+/** Render the transcript section shell shared by both transcript paths. */
+function createTranscriptShell(containerEl: HTMLElement): HTMLElement {
+  const transcriptEl = containerEl.createDiv({
+    cls: 'opencodian-backend-session-browser-detail-transcript',
+  });
 
+  transcriptEl.createEl('h4', { text: t('chat.backendSessions.detailTranscriptTitle') });
+
+  const noticeEl = transcriptEl.createDiv({
+    cls: 'opencodian-backend-session-browser-detail-transcript-notice',
+  });
+  noticeEl.createEl('p', { text: t('chat.backendSessions.detailTranscriptNotice') });
+
+  return transcriptEl;
+}
+
+/** Render the transcript placeholder for a missing/deleted/unreachable session. */
+function renderTranscriptUnavailable(containerEl: HTMLElement): void {
+  const transcriptEl = createTranscriptShell(containerEl);
+  transcriptEl.createEl('p', {
+    cls: 'opencodian-backend-session-browser-detail-transcript-unavailable',
+    text: t('chat.backendSessions.detailTranscriptUnavailable'),
+  });
+}
+
+/** Render one normalized transcript message (activity lines or role + parts). */
+function renderTranscriptMessage(messagesEl: HTMLElement, msg: NormalizedSessionPreviewMessage): void {
+  if (msg.role === 'activity') {
     for (const part of msg.parts) {
-      renderDetailPart(msgEl, part);
+      renderDetailActivityLine(messagesEl, part);
     }
+    return;
+  }
+
+  // Skip messages that would produce a blank role-only row
+  const hasRenderableContent = msg.parts.some((p) => partHasContent(p));
+  if (!hasRenderableContent) return;
+
+  const msgEl = messagesEl.createDiv({
+    cls: `opencodian-backend-session-browser-detail-msg opencodian-backend-session-browser-detail-msg-${msg.role}`,
+  });
+
+  msgEl.createDiv({
+    cls: 'opencodian-backend-session-browser-detail-msg-role',
+    text: msg.role,
+  });
+
+  for (const part of msg.parts) {
+    renderDetailPart(msgEl, part);
   }
 }
 

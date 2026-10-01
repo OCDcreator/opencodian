@@ -26,7 +26,11 @@ import type {
   AppServerAccountUsage,
   AppServerAccountUsageResult,
   AppServerApprovalPolicyEffective,
+  AppServerCommandExecutionApprovalParams,
+  AppServerCommandExecutionApprovalResponse,
   AppServerEffectivePermissionProfile,
+  AppServerFileChangeApprovalParams,
+  AppServerFileChangeApprovalResponse,
   AppServerForkResult,
   AppServerHookError,
   AppServerHookGroup,
@@ -34,6 +38,8 @@ import type {
   AppServerHooksReadbackResult,
   AppServerListHooksOptions,
   AppServerListSkillsOptions,
+  AppServerMcpElicitationParams,
+  AppServerMcpElicitationResponse,
   AppServerMcpResourceContent,
   AppServerMcpResourceReadResult,
   AppServerMcpServerStatus,
@@ -43,23 +49,43 @@ import type {
   AppServerModelProviderCapabilities,
   AppServerNotificationSubscription,
   AppServerPermissionProfile,
+  AppServerPermissionsApprovalParams,
+  AppServerPermissionsApprovalResponse,
+  AppServerPluginInstallResult,
+  AppServerPluginListOptions,
+  AppServerPluginListResult,
+  AppServerPluginReconcileResult,
+  AppServerPluginSkillReadResult,
   AppServerRateLimits,
   AppServerReviewResult,
   AppServerReviewTarget,
   AppServerSandboxPolicy,
+  AppServerSetThreadGoalOptions,
   AppServerSkill,
   AppServerSkillError,
   AppServerSkillGroup,
+  AppServerSteerTurnError,
+  AppServerSteerTurnErrorCode,
+  AppServerSteerTurnResult,
   AppServerThread,
+  AppServerThreadAttachmentAddResult,
+  AppServerThreadAttachmentsPage,
   AppServerThreadCompactionAckResult,
   AppServerThreadCompactionStartOptions,
   AppServerThreadEffectiveSettings,
   AppServerThreadGoal,
+  AppServerThreadItemsListOptions,
+  AppServerThreadItemsPage,
   AppServerThreadNotification,
   AppServerThreadResumeOptions,
   AppServerThreadStartOptions,
+  AppServerThreadTurnsListOptions,
+  AppServerThreadTurnsPage,
+  AppServerToolUserInputParams,
+  AppServerToolUserInputResponse,
   AppServerTurn,
   AppServerTurnStartOptions,
+  AppServerUserInput,
   McpOauthLoginResult,
 } from './CodexAppServerClientTypes';
 import { CodexAppServerTransport } from './CodexAppServerTransport';
@@ -463,13 +489,26 @@ function errorToReason(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-/** Route absence/transport loss means the adjunct capability is unavailable. */
-function isHooksRouteUnavailable(error: unknown): boolean {
+/**
+ * True when a rejected request failed because the route does not exist on the
+ * current app-server (-32601 `Method not found` or an equivalent server
+ * message). Exported so capability owners can dynamically drop a route-backed
+ * capability after optimistic probing instead of string-matching ad hoc.
+ */
+export function isAppServerMethodNotFoundError(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  if (code === -32601) return true;
   const reason = errorToReason(error).toLowerCase();
   return reason.includes('method not found')
     || reason.includes('unknown method')
-    || reason.includes('not supported')
-    || reason.includes('websocket not open')
+    || reason.includes('not supported');
+}
+
+/** Route absence/transport loss means the adjunct capability is unavailable. */
+function isHooksRouteUnavailable(error: unknown): boolean {
+  if (isAppServerMethodNotFoundError(error)) return true;
+  const reason = errorToReason(error).toLowerCase();
+  return reason.includes('websocket not open')
     || reason.includes('app-server start')
     || reason.includes('app-server exited')
     || reason.includes('websocket connection')
@@ -560,6 +599,78 @@ function normalizeHooksListResult(result: unknown): AppServerHookGroup[] | null 
 function hooksReadbackFromGroups(groups: AppServerHookGroup[]): AppServerHooksReadbackResult {
   const empty = groups.every((group) => group.hooks.length === 0 && group.warnings.length === 0 && group.errors.length === 0);
   return { status: empty ? 'empty' : 'available', groups };
+}
+
+const STEER_ERROR_CODE_PATTERN =
+  /no_active_turn|expected_turn_mismatch|non_steerable_review|non_steerable_compact|active_turn_not_steerable|empty_input|input_too_large/;
+
+/**
+ * Classify a rejected `turn/steer` request. The server delivers steer errors
+ * inside the JSON-RPC error message and/or its free-form `data` payload; scan
+ * both defensively and map the `non_steerable_*` codes to their turn kind.
+ */
+function classifySteerError(error: unknown): AppServerSteerTurnError {
+  const message = errorToReason(error);
+  const data = (error as { data?: unknown } | null)?.data;
+  const haystack = `${message} ${typeof data === 'string' ? data : JSON.stringify(data ?? {})}`.toLowerCase();
+  const match = STEER_ERROR_CODE_PATTERN.exec(haystack);
+  const code: AppServerSteerTurnErrorCode = (match?.[0] as AppServerSteerTurnErrorCode | undefined) ?? 'unknown';
+  let turnKind: AppServerSteerTurnError['turnKind'];
+  if (haystack.includes('non_steerable_review') || (code === 'active_turn_not_steerable' && haystack.includes('review'))) {
+    turnKind = 'review';
+  } else if (haystack.includes('non_steerable_compact') || (code === 'active_turn_not_steerable' && haystack.includes('compact'))) {
+    turnKind = 'compact';
+  }
+  let misalignment: AppServerSteerTurnError['misalignment'];
+  if (haystack.includes('misalignment')) {
+    const misalignmentMessage = isPlainObject(data) && typeof data.message === 'string'
+      ? data.message
+      : message;
+    misalignment = { message: misalignmentMessage };
+  }
+  return {
+    code,
+    message,
+    ...(turnKind ? { turnKind } : {}),
+    ...(misalignment ? { misalignment } : {}),
+  };
+}
+
+/** Normalize a raw `thread/items/list` response; null when it is not a page. */
+function normalizeThreadItemsPage(result: unknown): AppServerThreadItemsPage | null {
+  if (!isPlainObject(result) || !Array.isArray(result.data)) return null;
+  return {
+    data: result.data as AppServerThreadItemsPage['data'],
+    nextCursor: typeof result.nextCursor === 'string' ? result.nextCursor : null,
+    backwardsCursor: typeof result.backwardsCursor === 'string' ? result.backwardsCursor : null,
+  };
+}
+
+/** Normalize a raw `thread/turns/list` response; null when it is not a page. */
+function normalizeThreadTurnsPage(result: unknown): AppServerThreadTurnsPage | null {
+  if (!isPlainObject(result) || !Array.isArray(result.data)) return null;
+  return {
+    data: result.data as AppServerThreadTurnsPage['data'],
+    nextCursor: typeof result.nextCursor === 'string' ? result.nextCursor : null,
+    backwardsCursor: typeof result.backwardsCursor === 'string' ? result.backwardsCursor : null,
+  };
+}
+
+/** Normalize a raw `plugin/list` (or `plugin/installed`) response defensively. */
+function normalizePluginListResult(result: unknown): AppServerPluginListResult | null {
+  if (!isPlainObject(result) || !Array.isArray(result.marketplaces)) return null;
+  return {
+    marketplaces: result.marketplaces as AppServerPluginListResult['marketplaces'],
+    featuredPluginIds: Array.isArray(result.featuredPluginIds)
+      ? result.featuredPluginIds.filter((id): id is string => typeof id === 'string')
+      : [],
+    marketplaceLoadErrors: Array.isArray(result.marketplaceLoadErrors)
+      ? result.marketplaceLoadErrors.filter(
+        (entry): entry is { marketplacePath: string; message: string } =>
+          isPlainObject(entry) && typeof entry.marketplacePath === 'string' && typeof entry.message === 'string',
+      )
+      : [],
+  };
 }
 
 export class CodexAppServerClient extends CodexAppServerTransport {
@@ -731,11 +842,7 @@ export class CodexAppServerClient extends CodexAppServerTransport {
       if (normalized.includes('thread not found') || normalized.includes('missing field')) {
         return { status: 'invalid-thread', acknowledged: false, errorReason: reason };
       }
-      if (normalized.includes('method not found')
-        || normalized.includes('unknown method')
-        || normalized.includes('not supported')
-        || normalized.includes('websocket not open')
-        || normalized.includes('app-server client stopped')) {
+      if (isHooksRouteUnavailable(err)) {
         return { status: 'unavailable', acknowledged: false, errorReason: reason };
       }
       return { status: 'failed', acknowledged: false, errorReason: reason };
@@ -776,6 +883,11 @@ export class CodexAppServerClient extends CodexAppServerTransport {
       'item/commandExecution/outputDelta',
       'item/fileChange/patchUpdated',
       'item/mcpToolCall/progress',
+      'thread/name/updated',
+      'thread/goal/updated',
+      'thread/goal/cleared',
+      'thread/deleted',
+      'thread/attachment/updated',
       'warning',
       'error',
     ];
@@ -850,10 +962,20 @@ export class CodexAppServerClient extends CodexAppServerTransport {
     }
   }
 
-  async getAccountUsage(): Promise<AppServerAccountUsageResult> {
+  /**
+   * Read token usage via `account/usage/read`. Params are nullable
+   * `{ threadId? }` on the wire (Codex 0.159.0): pass a thread id to get the
+   * per-thread estimate (`usage.threadUsage`) instead of account-wide buckets.
+   * With no options the request stays parameterless, matching the verified
+   * wire assumption documented in the module doc.
+   */
+  async getAccountUsage(options?: { threadId?: string }): Promise<AppServerAccountUsageResult> {
     await this.start();
     try {
-      const result = (await this.request('account/usage/read')) as AppServerAccountUsage | undefined;
+      const result = (await this.request(
+        'account/usage/read',
+        options?.threadId ? { threadId: options.threadId } : undefined,
+      )) as AppServerAccountUsage | undefined;
       if (result && typeof result === 'object' && 'summary' in result) {
         return { usage: result as AppServerAccountUsage };
       }
@@ -1162,10 +1284,26 @@ export class CodexAppServerClient extends CodexAppServerTransport {
     }
   }
 
-  async setThreadGoal(threadId: string, objective: string, options?: { tokenBudget?: number }): Promise<AppServerThreadGoal | null> {
+  /**
+   * Set, or update, a thread goal via `thread/goal/set` (Codex 0.159.0 accepts
+   * `{ threadId, objective?, status?, tokenBudget? }`). Passing only
+   * `options.status` pauses/resumes the existing goal without restating its
+   * objective.
+   */
+  async setThreadGoal(
+    threadId: string,
+    objective?: string,
+    options?: AppServerSetThreadGoalOptions,
+  ): Promise<AppServerThreadGoal | null> {
     await this.start();
     try {
-      const params: Record<string, unknown> = { threadId, objective };
+      const params: Record<string, unknown> = { threadId };
+      if (objective !== undefined) {
+        params.objective = objective;
+      }
+      if (options?.status !== undefined) {
+        params.status = options.status;
+      }
       if (options?.tokenBudget !== undefined) {
         params.tokenBudget = options.tokenBudget;
       }
@@ -1351,6 +1489,470 @@ export class CodexAppServerClient extends CodexAppServerTransport {
         this.removeNotificationHandler('item/completed', itemHandler);
       }
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Codex 0.159.0 additions (verified 2026-09-30 against the generated schema):
+  // turn/steer, thread/items/list, thread/turns/list, thread/name/set,
+  // thread/delete, thread/attachment/*, plugin/* routes, plus typed
+  // registration for the five new server→client request routes.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Steer the active turn of a thread via `turn/steer`. `expectedTurnId` is a
+   * required precondition: the request fails when it does not match the
+   * currently active turn. Review and compact turns are not steerable.
+   *
+   * The result discriminates a successful injection from a server rejection
+   * (`active_turn_not_steerable` / misalignment / stale turn, with the
+   * structured steer error) and from route/transport unavailability (-32601),
+   * so the adapter can dynamically drop the turn-steering capability.
+   */
+  async steerTurn(
+    threadId: string,
+    expectedTurnId: string,
+    input: AppServerUserInput[],
+    options?: { clientUserMessageId?: string | null },
+  ): Promise<AppServerSteerTurnResult> {
+    try {
+      await this.start();
+    } catch (err) {
+      return { ok: false, reason: 'unavailable', errorReason: errorToReason(err) };
+    }
+    try {
+      const params: Record<string, unknown> = { threadId, expectedTurnId, input };
+      if (options?.clientUserMessageId !== undefined) {
+        params.clientUserMessageId = options.clientUserMessageId;
+      }
+      const result = (await this.request('turn/steer', params, 30000)) as { turnId?: string } | undefined;
+      if (typeof result?.turnId === 'string' && result.turnId.length > 0) {
+        return { ok: true, turnId: result.turnId };
+      }
+      return {
+        ok: false,
+        reason: 'rejected',
+        error: { code: 'unknown', message: 'turn/steer response did not include a turnId' },
+      };
+    } catch (err) {
+      const reason = errorToReason(err);
+      if (isAppServerMethodNotFoundError(err)) {
+        return { ok: false, reason: 'unavailable', errorReason: reason };
+      }
+      logger.warn('Failed to steer turn via app-server', { threadId, error: reason });
+      return { ok: false, reason: 'rejected', error: classifySteerError(err) };
+    }
+  }
+
+  /**
+   * List items of a thread via `thread/items/list` (Codex 0.159.0). Supports
+   * turn filtering, opaque or item-anchor cursors, and asc/desc pagination.
+   * Returns null when the route is unavailable or the request fails.
+   */
+  async listThreadItems(
+    threadId: string,
+    options?: AppServerThreadItemsListOptions,
+  ): Promise<AppServerThreadItemsPage | null> {
+    await this.start();
+    try {
+      const params: Record<string, unknown> = { threadId };
+      if (options?.turnId != null) params.turnId = options.turnId;
+      if (options?.cursor != null) params.cursor = options.cursor;
+      if (options?.limit !== undefined) params.limit = options.limit;
+      if (options?.sortDirection !== undefined) params.sortDirection = options.sortDirection;
+      const result = (await this.request('thread/items/list', params, 30000)) as
+        | AppServerThreadItemsPage
+        | undefined;
+      return normalizeThreadItemsPage(result);
+    } catch (err) {
+      logger.warn('Failed to list thread items via app-server', {
+        threadId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * List turns of a thread via `thread/turns/list` (Codex 0.159.0), newest
+   * first by default. `itemsView` controls how much item detail each returned
+   * turn carries (`summary` is the cheap option for session browsing).
+   * Returns null when the route is unavailable or the request fails.
+   */
+  async listThreadTurns(
+    threadId: string,
+    options?: AppServerThreadTurnsListOptions,
+  ): Promise<AppServerThreadTurnsPage | null> {
+    await this.start();
+    try {
+      const params: Record<string, unknown> = { threadId };
+      if (options?.cursor != null) params.cursor = options.cursor;
+      if (options?.limit !== undefined) params.limit = options.limit;
+      if (options?.sortDirection !== undefined) params.sortDirection = options.sortDirection;
+      if (options?.itemsView !== undefined) params.itemsView = options.itemsView;
+      const result = (await this.request('thread/turns/list', params, 30000)) as
+        | AppServerThreadTurnsPage
+        | undefined;
+      return normalizeThreadTurnsPage(result);
+    } catch (err) {
+      logger.warn('Failed to list thread turns via app-server', {
+        threadId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /** Rename a thread via `thread/name/set`; the server emits `thread/name/updated`. */
+  async setThreadName(threadId: string, name: string): Promise<boolean> {
+    await this.start();
+    try {
+      await this.request('thread/name/set', { threadId, name }, 30000);
+      return true;
+    } catch (err) {
+      logger.warn('Failed to set thread name via app-server', {
+        threadId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return false;
+    }
+  }
+
+  /** Delete a thread via `thread/delete`; the server emits `thread/deleted`. */
+  async deleteThread(threadId: string): Promise<boolean> {
+    await this.start();
+    try {
+      await this.request('thread/delete', { threadId }, 30000);
+      this.clearThreadEffectiveSettings(threadId);
+      return true;
+    } catch (err) {
+      logger.warn('Failed to delete thread via app-server', {
+        threadId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Attach (or fetch an existing) attachment via `thread/attachment/add`.
+   * `identityKey` deduplicates: a matching existing attachment yields
+   * `outcome: 'existing'`. Returns null when the route is unavailable or fails.
+   */
+  async addThreadAttachment(
+    threadId: string,
+    attachmentType: string,
+    identityKey: string,
+    payload: unknown,
+  ): Promise<AppServerThreadAttachmentAddResult | null> {
+    await this.start();
+    try {
+      const result = (await this.request(
+        'thread/attachment/add',
+        { threadId, attachmentType, identityKey, payload },
+        30000,
+      )) as AppServerThreadAttachmentAddResult | undefined;
+      if (result && typeof result === 'object' && result.attachment && (result.outcome === 'created' || result.outcome === 'existing')) {
+        return result;
+      }
+      return null;
+    } catch (err) {
+      logger.warn('Failed to add thread attachment via app-server', {
+        threadId,
+        attachmentType,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /** List thread attachments via `thread/attachment/list` (paginated). */
+  async listThreadAttachments(
+    threadId: string,
+    options?: { cursor?: string | null; limit?: number },
+  ): Promise<AppServerThreadAttachmentsPage | null> {
+    await this.start();
+    try {
+      const params: Record<string, unknown> = { threadId };
+      if (options?.cursor != null) params.cursor = options.cursor;
+      if (options?.limit !== undefined) params.limit = options.limit;
+      const result = (await this.request('thread/attachment/list', params, 30000)) as
+        | AppServerThreadAttachmentsPage
+        | undefined;
+      if (result && Array.isArray(result.data)) {
+        return { data: result.data, nextCursor: result.nextCursor ?? null };
+      }
+      return null;
+    } catch (err) {
+      logger.warn('Failed to list thread attachments via app-server', {
+        threadId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /** Remove a thread attachment via `thread/attachment/remove` (by identity). */
+  async removeThreadAttachment(
+    threadId: string,
+    attachmentType: string,
+    identityKey: string,
+  ): Promise<boolean> {
+    await this.start();
+    try {
+      await this.request('thread/attachment/remove', { threadId, attachmentType, identityKey }, 30000);
+      return true;
+    } catch (err) {
+      logger.warn('Failed to remove thread attachment via app-server', {
+        threadId,
+        attachmentType,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return false;
+    }
+  }
+
+  /**
+   * List plugin marketplaces via `plugin/list` (Codex 0.159.0). Returns null
+   * when the route is unavailable (-32601 on older servers) or fails; load
+   * errors are reported per-marketplace inside the result.
+   */
+  async listPlugins(options?: AppServerPluginListOptions): Promise<AppServerPluginListResult | null> {
+    try {
+      await this.start();
+    } catch (err) {
+      logger.warn('Failed to start app-server for plugin/list', { error: errorToReason(err) });
+      return null;
+    }
+    try {
+      const params: Record<string, unknown> = {};
+      if (options?.cwds) params.cwds = options.cwds;
+      if (options?.forceRefetch) params.forceRefetch = true;
+      if (options?.marketplaceKinds) params.marketplaceKinds = options.marketplaceKinds;
+      const result = (await this.request('plugin/list', params, 30000)) as
+        | AppServerPluginListResult
+        | undefined;
+      return normalizePluginListResult(result);
+    } catch (err) {
+      logger.warn('Failed to list plugins via app-server', { error: errorToReason(err) });
+      return null;
+    }
+  }
+
+  /** Read one plugin's full metadata via `plugin/read` (by plugin name). */
+  async readPlugin(
+    pluginName: string,
+    options?: { marketplacePath?: string; remoteMarketplaceName?: string },
+  ): Promise<unknown | null> {
+    await this.start();
+    try {
+      const params: Record<string, unknown> = { pluginName };
+      if (options?.marketplacePath) params.marketplacePath = options.marketplacePath;
+      if (options?.remoteMarketplaceName) params.remoteMarketplaceName = options.remoteMarketplaceName;
+      const result = (await this.request('plugin/read', params, 30000)) as { plugin?: unknown } | undefined;
+      return result?.plugin ?? null;
+    } catch (err) {
+      logger.warn('Failed to read plugin via app-server', {
+        pluginName,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /** List installed plugins via `plugin/installed` (same shape as `plugin/list`). */
+  async listInstalledPlugins(options?: {
+    cwds?: string[];
+    installSuggestionPluginNames?: string[];
+  }): Promise<AppServerPluginListResult | null> {
+    await this.start();
+    try {
+      const params: Record<string, unknown> = {};
+      if (options?.cwds) params.cwds = options.cwds;
+      if (options?.installSuggestionPluginNames) {
+        params.installSuggestionPluginNames = options.installSuggestionPluginNames;
+      }
+      const result = (await this.request('plugin/installed', params, 30000)) as
+        | AppServerPluginListResult
+        | undefined;
+      return normalizePluginListResult(result);
+    } catch (err) {
+      logger.warn('Failed to list installed plugins via app-server', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Install a plugin via `plugin/install` (Codex 0.159.0). The response names
+   * the apps that still need authorization plus the plugin's auth policy.
+   * Returns null when the route is unavailable or the request fails.
+   */
+  async installPlugin(
+    pluginName: string,
+    options?: { marketplacePath?: string; remoteMarketplaceName?: string; installAttemptId?: string },
+  ): Promise<AppServerPluginInstallResult | null> {
+    await this.start();
+    try {
+      const params: Record<string, unknown> = { pluginName };
+      if (options?.marketplacePath) params.marketplacePath = options.marketplacePath;
+      if (options?.remoteMarketplaceName) params.remoteMarketplaceName = options.remoteMarketplaceName;
+      if (options?.installAttemptId) params.installAttemptId = options.installAttemptId;
+      const result = (await this.request('plugin/install', params, 60000)) as
+        | AppServerPluginInstallResult
+        | undefined;
+      if (result && Array.isArray(result.appsNeedingAuth)) {
+        return { appsNeedingAuth: result.appsNeedingAuth, authPolicy: result.authPolicy };
+      }
+      return null;
+    } catch (err) {
+      logger.warn('Failed to install plugin via app-server', {
+        pluginName,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /** Uninstall a plugin via `plugin/uninstall` (by plugin id). */
+  async uninstallPlugin(pluginId: string): Promise<boolean> {
+    await this.start();
+    try {
+      await this.request('plugin/uninstall', { pluginId }, 30000);
+      return true;
+    } catch (err) {
+      logger.warn('Failed to uninstall plugin via app-server', {
+        pluginId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return false;
+    }
+  }
+
+  /** Reconcile installed plugins against their sources via `plugin/reconcile`. */
+  async reconcilePlugins(reason?: string): Promise<AppServerPluginReconcileResult | null> {
+    await this.start();
+    try {
+      const result = (await this.request('plugin/reconcile', reason ? { reason } : {}, 60000)) as
+        | AppServerPluginReconcileResult
+        | undefined;
+      if (result && Array.isArray(result.changedPlugins)) {
+        return {
+          changedPlugins: result.changedPlugins,
+          failedRemotePluginIds: Array.isArray(result.failedRemotePluginIds) ? result.failedRemotePluginIds : [],
+          failedMaterializationRemotePluginIds: Array.isArray(result.failedMaterializationRemotePluginIds)
+            ? result.failedMaterializationRemotePluginIds
+            : [],
+        };
+      }
+      return null;
+    } catch (err) {
+      logger.warn('Failed to reconcile plugins via app-server', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /** Read a plugin skill's contents via `plugin/skill/read`; null when absent or unavailable. */
+  async readPluginSkill(
+    remoteMarketplaceName: string,
+    remotePluginId: string,
+    skillName: string,
+  ): Promise<string | null> {
+    await this.start();
+    try {
+      const result = (await this.request(
+        'plugin/skill/read',
+        { remoteMarketplaceName, remotePluginId, skillName },
+        30000,
+      )) as AppServerPluginSkillReadResult | undefined;
+      return typeof result?.contents === 'string' ? result.contents : null;
+    } catch (err) {
+      logger.warn('Failed to read plugin skill via app-server', {
+        remotePluginId,
+        skillName,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  // ── Typed registration for the Codex 0.159.0 server→client request routes ──
+  // Each wraps the generic transport registry (one handler per method). The
+  // business logic that answers the requests (question cards, permission
+  // profiles, elicitation bridging) lives in the adapter layer; when no
+  // handler is registered the transport still replies -32601 Method not found.
+
+  /** Register the handler for `item/commandExecution/requestApproval`. */
+  registerCommandExecutionApprovalHandler(
+    handler: (
+      params: AppServerCommandExecutionApprovalParams,
+    ) => AppServerCommandExecutionApprovalResponse | Promise<AppServerCommandExecutionApprovalResponse>,
+  ): void {
+    this.registerServerRequestHandler('item/commandExecution/requestApproval', (params) =>
+      handler(params as AppServerCommandExecutionApprovalParams));
+  }
+
+  /** Register the handler for `item/fileChange/requestApproval`. */
+  registerFileChangeApprovalHandler(
+    handler: (
+      params: AppServerFileChangeApprovalParams,
+    ) => AppServerFileChangeApprovalResponse | Promise<AppServerFileChangeApprovalResponse>,
+  ): void {
+    this.registerServerRequestHandler('item/fileChange/requestApproval', (params) =>
+      handler(params as AppServerFileChangeApprovalParams));
+  }
+
+  /** Register the handler for `item/permissions/requestApproval`. */
+  registerPermissionsApprovalHandler(
+    handler: (
+      params: AppServerPermissionsApprovalParams,
+    ) => AppServerPermissionsApprovalResponse | Promise<AppServerPermissionsApprovalResponse>,
+  ): void {
+    this.registerServerRequestHandler('item/permissions/requestApproval', (params) =>
+      handler(params as AppServerPermissionsApprovalParams));
+  }
+
+  /** Register the handler for `item/tool/requestUserInput`. */
+  registerToolUserInputHandler(
+    handler: (
+      params: AppServerToolUserInputParams,
+    ) => AppServerToolUserInputResponse | Promise<AppServerToolUserInputResponse>,
+  ): void {
+    this.registerServerRequestHandler('item/tool/requestUserInput', (params) =>
+      handler(params as AppServerToolUserInputParams));
+  }
+
+  /** Register the handler for `mcpServer/elicitation/request`. */
+  registerMcpElicitationHandler(
+    handler: (
+      params: AppServerMcpElicitationParams,
+    ) => AppServerMcpElicitationResponse | Promise<AppServerMcpElicitationResponse>,
+  ): void {
+    this.registerServerRequestHandler('mcpServer/elicitation/request', (params) =>
+      handler(params as AppServerMcpElicitationParams));
+  }
+
+  /**
+   * Subscribe to the top-level `deprecationNotice` notification (not
+   * thread-scoped). Returns an unsubscribe function. The adapter uses this to
+   * surface deprecation warnings in traces and settings UI.
+   */
+  subscribeToDeprecationNotice(handler: (notice: { summary: string; details?: string | null }) => void): () => void {
+    const wrapped = (params: unknown): void => {
+      const notice = params as { summary?: unknown; details?: unknown } | null;
+      if (typeof notice?.summary === 'string') {
+        handler({
+          summary: notice.summary,
+          ...(typeof notice.details === 'string' ? { details: notice.details } : {}),
+        });
+      }
+    };
+    this.addNotificationHandler('deprecationNotice', wrapped);
+    return () => {
+      this.removeNotificationHandler('deprecationNotice', wrapped);
+    };
   }
 
   // ---------------------------------------------------------------------------

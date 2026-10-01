@@ -739,7 +739,6 @@ export class ConversationSessionSettingsModal extends Modal {
       inheritLabel: t('chat.sessionSettings.modal.codexApprovalPolicyUseGlobal'),
       choices: [
         { value: 'inherit', label: t('settings.codex.approvalPolicy.inherit') },
-        { value: 'untrusted', label: t('settings.codex.approvalPolicy.untrusted') },
         { value: 'on-request', label: t('settings.codex.approvalPolicy.onRequest') },
         { value: 'never', label: t('settings.codex.approvalPolicy.never') },
       ],
@@ -1058,9 +1057,11 @@ export class ConversationSessionSettingsModal extends Modal {
   private approvalPolicyLabel(policy: CodexApprovalPolicy): string {
     switch (policy) {
       case 'inherit': return t('settings.codex.approvalPolicy.inherit');
-      case 'untrusted': return t('settings.codex.approvalPolicy.untrusted');
-      case 'on-request': return t('settings.codex.approvalPolicy.onRequest');
       case 'never': return t('settings.codex.approvalPolicy.never');
+      case 'on-request': return t('settings.codex.approvalPolicy.onRequest');
+      // Persisted 'untrusted' session overrides migrate to 'on-request' during
+      // normalization; any straggler displays as 'on-request' too.
+      default: return t('settings.codex.approvalPolicy.onRequest');
     }
   }
 

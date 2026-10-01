@@ -86,15 +86,16 @@ describe('OpenCodeAdapter', () => {
     expect(adapter.description).toBeTruthy();
   });
 
-  it('has full OpenCode capabilities', () => {
+  it('has full OpenCode capabilities except TurnSteering', () => {
     const adapter = new OpenCodeAdapter(createMockOpenCodeService());
-    expect(adapter.capabilities).toEqual(OPENCODE_FULL_CAPABILITIES);
+    expect(adapter.capabilities.size).toBe(OPENCODE_FULL_CAPABILITIES.size - 1);
+    expect(adapter.hasCapability(AgentCapability.TurnSteering)).toBe(false);
   });
 
-  it('hasCapability returns true for all known capabilities', () => {
+  it('hasCapability returns true for all known capabilities except TurnSteering', () => {
     const adapter = new OpenCodeAdapter(createMockOpenCodeService());
     for (const cap of Object.values(AgentCapability)) {
-      expect(adapter.hasCapability(cap)).toBe(true);
+      expect(adapter.hasCapability(cap)).toBe(cap !== AgentCapability.TurnSteering);
     }
   });
 
@@ -247,7 +248,8 @@ describe('OpenCodeAdapter', () => {
     const info = adapter.getInfo();
     expect(info.kind).toBe('opencode');
     expect(info.displayName).toBe('OpenCode');
-    expect(info.capabilities).toEqual(OPENCODE_FULL_CAPABILITIES);
+    expect(info.capabilities.size).toBe(OPENCODE_FULL_CAPABILITIES.size - 1);
+    expect(info.capabilities.has(AgentCapability.TurnSteering)).toBe(false);
     expect(info.status).toBe('connected');
   });
 

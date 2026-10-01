@@ -249,6 +249,20 @@
   font-size: 12px;
   padding: 12px 0;
 }
+.opencodian-backend-session-browser-detail-transcript-unavailable {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: italic;
+  padding: 12px 0;
+}
+.opencodian-backend-session-browser-detail-load-more {
+  margin: 8px 0 4px 0;
+  font-size: 12px;
+}
+.opencodian-backend-session-browser-detail-load-more:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .opencodian-backend-session-browser-detail-transcript-count {
   font-size: 11px;
   color: var(--text-muted);

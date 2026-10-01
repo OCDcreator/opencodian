@@ -205,6 +205,24 @@ export {
   mapCodexApprovalResolution,
 } from './CodexDefaultApprovalHost';
 export {
+  buildCodexElicitationContent,
+  buildCodexElicitationQuestionRequest,
+  buildCodexElicitationUrlQuestionRequest,
+  type CodexElicitationBridgeHost,
+  type CodexElicitationCardRenderer,
+  type CodexElicitationCardRequest,
+  type CodexElicitationContent,
+  type CodexElicitationFormParams,
+  type CodexElicitationFormSchema,
+  type CodexElicitationHostContext,
+  type CodexElicitationHostResponse,
+  type CodexElicitationUrlParams,
+  type CodexMcpElicitationWireParams,
+  createCodexElicitationBridgeHost,
+  isCodexElicitationDecline,
+  isCodexElicitationWireParams,
+} from './CodexElicitationBridge';
+export {
   type CodexAgentInfo,
   type CodexResourceWriteError,
   type CodexResourceWriteResult,

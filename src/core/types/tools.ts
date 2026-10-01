@@ -9,7 +9,7 @@ export interface ToolCallInfo {
   id: string;
   name: string;
   toolSourceKey?: string;
-  kind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'unknown';
+  kind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'image' | 'unknown';
   input: Record<string, unknown>;
   toolMetadata?: Record<string, unknown>;
   status: ToolCallStatus;

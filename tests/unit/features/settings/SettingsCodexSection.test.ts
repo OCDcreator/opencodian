@@ -736,9 +736,57 @@ describe('SettingsCodexSection permissions tab', () => {
     section.attachTabbed(containerEl, 'permissions');
 
     const handler = findCodexDropdownHandler('inherit');
-    await handler('untrusted');
+    await handler('on-request');
 
-    expect(updateApprovalPolicy).toHaveBeenCalledWith('untrusted');
+    expect(updateApprovalPolicy).toHaveBeenCalledWith('on-request');
+  });
+
+  it('no longer offers the retired untrusted option in the approval-policy dropdown', () => {
+    const plugin = createPlugin();
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attachTabbed(containerEl, 'permissions');
+
+    const calls = (Setting.prototype.addDropdown as jest.Mock).mock.calls as Array<
+      [(control: { addOption: jest.Mock; setValue: jest.Mock; onChange: jest.Mock }) => unknown]
+    >;
+    const approvalCall = calls.find(([cb]) => {
+      const probe = createDropdownControlCapture();
+      cb(probe);
+      return probe.addOption.mock.calls.some(([value]) => value === 'inherit');
+    });
+    expect(approvalCall).toBeTruthy();
+    const captured = createDropdownControlCapture();
+    (approvalCall as [jest.Mock])[0](captured);
+    const optionValues = captured.addOption.mock.calls.map(([value]) => value);
+    expect(optionValues).toEqual(['inherit', 'on-request', 'never']);
+  });
+
+  it('displays migrated on-request when a raw persisted untrusted value reaches the dropdown', () => {
+    const plugin = createPlugin();
+    (plugin.settings.backendSettings.codex as { approvalPolicy: string }).approvalPolicy = 'untrusted';
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attachTabbed(containerEl, 'permissions');
+
+    const calls = (Setting.prototype.addDropdown as jest.Mock).mock.calls as Array<
+      [(control: { addOption: jest.Mock; setValue: jest.Mock; onChange: jest.Mock }) => unknown]
+    >;
+    const approvalCall = calls.find(([cb]) => {
+      const probe = createDropdownControlCapture();
+      cb(probe);
+      return probe.addOption.mock.calls.some(([value]) => value === 'inherit');
+    });
+    expect(approvalCall).toBeTruthy();
+    const captured = createDropdownControlCapture();
+    (approvalCall as [jest.Mock])[0](captured);
+    expect(captured.setValue).toHaveBeenCalledWith('on-request');
   });
 });
 

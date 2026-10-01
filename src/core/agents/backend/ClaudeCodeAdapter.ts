@@ -1078,6 +1078,11 @@ const CLAUDE_CODE_PHASE1_CAPABILITIES: BackendCapabilities = Object.freeze(
     // Inline completion (R-C3): adapter exposes startInlineCompletionSession()
     // over the same audited read-only session, wrapped warm.
     AgentCapability.InlineCompletion,
+    // TurnSteering is intentionally NOT declared: the Claude Agent SDK has no
+    // mid-turn steer seam here. Mid-turn input is serialized through the
+    // persistent-query input queue (runtime.input.push in sendMessage), so a
+    // follow-up only takes effect after the active turn ends. The chat layer
+    // therefore renders queue-only status for this backend — by design.
   ]),
 );
 

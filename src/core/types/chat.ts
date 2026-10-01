@@ -25,7 +25,9 @@ const VALID_CODEX_REASONING_EFFORTS: readonly CodexReasoningEffort[] = [
   'persistent',
 ];
 const VALID_CODEX_WEB_SEARCH_MODES: readonly CodexWebSearchMode[] = ['disabled', 'cached', 'live'];
-const VALID_CODEX_APPROVAL_POLICIES: readonly CodexApprovalPolicy[] = ['inherit', 'untrusted', 'on-request', 'never'];
+// 'untrusted' was retired upstream (Codex CLI 0.15x refuses to start with it);
+// normalizeCodexApprovalPolicyOverride migrates persisted session values.
+const VALID_CODEX_APPROVAL_POLICIES: readonly CodexApprovalPolicy[] = ['inherit', 'on-request', 'never'];
 
 /** View type constant */
 export const VIEW_TYPE_OPENCODIAN = 'opencodian-view';
@@ -246,6 +248,16 @@ function normalizeNullableEnum<T extends string>(
   return undefined;
 }
 
+function normalizeCodexApprovalPolicyOverride(
+  raw: CodexApprovalPolicy | null | undefined,
+): CodexApprovalPolicy | null | undefined {
+  if (raw === null) return null;
+  // Mirror normalizeCodexBackendSettings: persisted 'untrusted' migrates to
+  // 'on-request' (closest supported semantics) instead of failing load.
+  if (raw === 'untrusted') return 'on-request';
+  return typeof raw === 'string' && VALID_CODEX_APPROVAL_POLICIES.includes(raw) ? raw : undefined;
+}
+
 function normalizeNullableString(raw: string | null | undefined): string | null | undefined {
   if (raw === null) return null;
   if (typeof raw === 'string') {
@@ -302,7 +314,7 @@ export function normalizeConversationSessionSettings(
   assignIfDefined(normalized, 'codexAdditionalDirectories', normalizeNullableStringArray(value.codexAdditionalDirectories));
   assignIfDefined(normalized, 'codexNetworkAccessEnabled', normalizeNullableBoolean(value.codexNetworkAccessEnabled));
   assignIfDefined(normalized, 'codexWebSearchMode', normalizeNullableEnum(value.codexWebSearchMode, VALID_CODEX_WEB_SEARCH_MODES));
-  assignIfDefined(normalized, 'codexApprovalPolicy', normalizeNullableEnum(value.codexApprovalPolicy, VALID_CODEX_APPROVAL_POLICIES));
+  assignIfDefined(normalized, 'codexApprovalPolicy', normalizeCodexApprovalPolicyOverride(value.codexApprovalPolicy));
 
   return Object.keys(normalized).length > 0 ? normalized as ConversationSessionSettings : undefined;
 }
@@ -318,7 +330,7 @@ export interface ContentBlock {
   toolId?: string;
   toolName?: string;
   toolSourceKey?: string;
-  toolKind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'unknown';
+  toolKind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'image' | 'unknown';
   toolInput?: Record<string, unknown>;
   toolMetadata?: Record<string, unknown>;
   toolStatus?: 'pending' | 'running' | 'completed' | 'error' | 'blocked';
@@ -456,7 +468,7 @@ export interface ToolCallInfo {
   id: string;
   name: string;
   toolSourceKey?: string;
-  kind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'unknown';
+  kind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'image' | 'unknown';
   input: Record<string, unknown>;
   toolMetadata?: Record<string, unknown>;
   status?: 'pending' | 'running' | 'completed' | 'error' | 'blocked';
@@ -629,7 +641,7 @@ export type StreamChunk =
       type: 'tool_use';
       id: string;
       name: string;
-      kind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'unknown';
+      kind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'image' | 'unknown';
       input: Record<string, unknown>;
       toolMetadata?: Record<string, unknown>;
       toolResultVisibility?: 'visible' | 'hidden';
@@ -668,7 +680,12 @@ export type StreamChunk =
         | 'background_tasks_changed'
         | 'thinking_tokens'
         | 'model_refusal'
-        | 'worker_shutting_down';
+        | 'worker_shutting_down'
+        | 'thread_renamed'
+        | 'goal_updated'
+        | 'goal_cleared'
+        | 'thread_deleted'
+        | 'deprecation_notice';
       status?: string;
       id?: string;
       name?: string;

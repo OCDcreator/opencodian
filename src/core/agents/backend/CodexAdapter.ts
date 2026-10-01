@@ -18,10 +18,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import type { Codex, Thread, ThreadEvent, ThreadOptions, UserInput } from '@openai/codex-sdk';
+import { Notice } from 'obsidian';
 
 import { appendObsidianContextBlocks, createLogger } from '../../../shared';
 import { prependMemoryInjection } from '../../memory';
 import { prependObsidianToolingInjection } from '../../obsidianTooling';
+import type { QuestionRequest } from '../../types';
 import type { AgentBackendKind, ContextUsageSnapshot, ImageAttachment, StreamChunk } from '../../types/chat';
 import type { CodexApprovalPolicy, CodexReasoningEffort } from '../../types/settings';
 import { AgentCapability, type BackendCapabilities } from '../AgentCapability';
@@ -30,6 +32,11 @@ import type {
   AuxQuerySession,
   AuxQuerySessionConfig,
 } from './AgentAuxQueryCapability';
+import type {
+  BackendSessionItemsPageOptions,
+  BackendSessionTurnsPageOptions,
+  NormalizedSessionMessagesPage,
+} from './AgentBackendRouting';
 import type {
   AgentInlineCompletionCapability,
   InlineCompletionSession,
@@ -43,6 +50,7 @@ import type {
   AgentForkCapability,
   AgentService,
   AgentSessionCapability,
+  AgentTurnSteeringCapability,
   CapabilityChangeHandler,
   Disposable,
   StatusChangeHandler,
@@ -55,17 +63,32 @@ import {
 import { CODEX_EFFORT_VARIANTS } from './BackendModelCatalog';
 import {
   type AppServerAccountRateLimitsResult,
+  type AppServerAccountUsage,
   type AppServerAccountUsageResult,
+  type AppServerCommandExecutionApprovalDecision,
+  type AppServerCommandExecutionApprovalParams,
+  type AppServerCommandExecutionApprovalResponse,
+  type AppServerFileChangeApprovalDecision,
+  type AppServerFileChangeApprovalParams,
+  type AppServerFileChangeApprovalResponse,
+  type AppServerGrantedPermissionProfile,
   type AppServerHooksReadbackResult,
   type AppServerListHooksOptions,
+  type AppServerMcpElicitationResponse,
   type AppServerMcpResourceReadResult,
   type AppServerMcpServerStatus,
   type AppServerMcpToolCallResult,
   type AppServerModel,
   type AppServerModelProviderCapabilities,
   type AppServerPermissionProfile,
+  type AppServerPermissionsApprovalParams,
+  type AppServerPermissionsApprovalResponse,
+  type AppServerPluginInstallResult,
+  type AppServerPluginListResult,
+  type AppServerPluginReconcileResult,
   type AppServerReviewResult,
   type AppServerReviewTarget,
+  type AppServerSetThreadGoalOptions,
   type AppServerSkill,
   type AppServerSkillGroup,
   type AppServerThread,
@@ -73,7 +96,10 @@ import {
   type AppServerThreadEffectiveEvidence,
   type AppServerThreadEffectiveSettings,
   type AppServerThreadGoal,
+  type AppServerThreadGoalStatus,
   type AppServerThreadStartOptions,
+  type AppServerToolUserInputParams,
+  type AppServerToolUserInputResponse,
   type AppServerTurnStartOptions,
   buildEffectiveEvidenceWithApplication,
   buildUniformEffectiveEvidence,
@@ -84,12 +110,26 @@ import {
   turnSuccessApplication,
 } from './CodexAppServerClient';
 import {
+  normalizeThreadItemsPageToPreviewMessages,
+  normalizeTurnsPageToPreviewMessages,
+} from './CodexAppServerClientNormalization';
+import {
   type AppServerStreamState,
   mapAppServerNotification,
   readAppServerTurnError,
 } from './CodexAppServerStreamMapper';
 import { toPlainStringEnv } from './CodexAppServerTransport';
 import { type CodexCliResolution,getCodexCliErrorMessage } from './CodexCliResolver';
+import {
+  buildCodexElicitationContent,
+  buildCodexElicitationQuestionRequest,
+  buildCodexElicitationUrlQuestionRequest,
+  type CodexElicitationBridgeHost,
+  type CodexElicitationFormParams,
+  type CodexElicitationUrlParams,
+  isCodexElicitationDecline,
+  isCodexElicitationWireParams,
+} from './CodexElicitationBridge';
 import { CodexStreamNormalizer } from './CodexStreamNormalizer';
 import type { CodexTraceContext, CodexTracePort } from './diagnostics/types';
 
@@ -199,12 +239,18 @@ export interface CodexModelSummary {
 // ---------------------------------------------------------------------------
 
 /**
- * The narrow server-request approval kinds wired in this slice. The Codex
- * app-server `ServerRequest` union defines additional approval variants
- * (`item/commandExecution/requestApproval`, `item/fileChange/requestApproval`,
- * `item/permissions/requestApproval`, etc.) which remain out of scope.
+ * The server-request approval kinds wired in this slice. Covers the legacy
+ * `execCommandApproval` / `applyPatchApproval` routes plus the Codex 0.159.0
+ * v2 routes (`item/commandExecution/requestApproval`,
+ * `item/fileChange/requestApproval`, `item/permissions/requestApproval`).
  */
-export type CodexApprovalKind = 'execCommand' | 'applyPatch';
+export type CodexApprovalKind = 'execCommand' | 'applyPatch' | 'commandExecution' | 'fileChange' | 'permissions';
+
+/** Server-proposed persistent network rule (allow/deny one host). */
+export interface CodexNetworkPolicyAmendment {
+  action: 'allow' | 'deny';
+  host: string;
+}
 
 /**
  * Backend-neutral approval request surfaced to the UI host. Mirrors the
@@ -218,33 +264,55 @@ export interface CodexApprovalRequest {
   readonly kind: CodexApprovalKind;
   /** Human-readable label for any approval kind. */
   readonly summary: string;
-  /** Command line for `execCommand` approvals; omitted for `applyPatch`. */
+  /** Command line for command approvals; omitted otherwise. */
   readonly command?: string;
-  /** Working directory for `execCommand` approvals; omitted otherwise. */
+  /** Working directory for command/permissions approvals; omitted otherwise. */
   readonly cwd?: string;
-  /** Number of file changes for `applyPatch` approvals; omitted otherwise. */
+  /** Number of file changes for legacy `applyPatch` approvals; omitted otherwise. */
   readonly changeCount?: number;
+  /** v2 commandExecution: server-proposed execpolicy rules for approval. */
+  readonly proposedExecpolicyAmendment?: string[];
+  /** v2 commandExecution: server-proposed persistent network rules. */
+  readonly proposedNetworkPolicyAmendments?: CodexNetworkPolicyAmendment[];
+  /** v2 commandExecution: managed-network context. */
+  readonly networkApprovalContext?: { host: string; protocol: string } | null;
+  /** v2 fileChange: session-scoped write root being requested. */
+  readonly grantRoot?: string | null;
+  /** v2 permissions: the profile the agent asked for (echoed back on approve). */
+  readonly permissionRequest?: { fileSystem?: unknown; network?: unknown };
+  /** Optional server explanation (network access, extra write access, ...). */
+  readonly reason?: string | null;
   /** Original server params, preserved for advanced rendering. */
   readonly raw: unknown;
 }
 
 /**
- * Scalar ReviewDecision the UI can produce. The full Codex `ReviewDecision`
- * union also includes object variants (`approved_execpolicy_amendment`,
- * `network_policy_amendment`) which are out of scope for this minimal wiring
- * slice.
+ * Decision variants the UI can produce. Scalar values map onto both legacy
+ * and v2 wire decisions; the two amendment variants answer the v2
+ * `commandExecution` object decisions
+ * (`acceptWithExecpolicyAmendment` / `applyNetworkPolicyAmendment`).
  */
-export type CodexApprovalDecision = {
-  decision: 'approved' | 'approved_for_session' | 'denied' | 'abort';
-};
+export type CodexApprovalDecision =
+  | { decision: 'approved' | 'approved_for_session' | 'denied' | 'abort' }
+  | { decision: 'accept_with_execpolicy_amendment'; execpolicyAmendment: string[] }
+  | { decision: 'apply_network_policy_amendment'; networkPolicyAmendment: CodexNetworkPolicyAmendment };
 
 /**
  * Host callback seam for surfacing server-request approvals to the UI. Set via
  * `CodexAdapter.setApprovalHost`. When the host returns `null` (cancelled) or
  * no callback is available, the bridge defaults to a safe `denied` decision.
+ * `collectQuestionAnswers` serves the dynamic `item/tool/requestUserInput`
+ * route through the same inline-card UI.
  */
 export interface CodexApprovalBridgeHost {
   collectApproval?(request: CodexApprovalRequest): Promise<CodexApprovalDecision | null>;
+  collectQuestionAnswers?(request: QuestionRequest): Promise<CodexApprovalResolutionResult | null>;
+}
+
+/** Structural supertype of the question-card resolution result the tool-user-input seam consumes. */
+export interface CodexApprovalResolutionResult {
+  status: 'answered' | 'rejected' | 'cancelled';
+  answers?: string[][];
 }
 
 /** Internal session tracking entry. */
@@ -390,7 +458,8 @@ export class CodexAdapter
     AgentSessionCapability,
     AgentForkCapability,
     AgentAuxQueryCapability,
-    AgentInlineCompletionCapability
+    AgentInlineCompletionCapability,
+    AgentTurnSteeringCapability
 {
   readonly kind: AgentBackendKind = 'codex';
   readonly displayName = 'Codex';
@@ -457,6 +526,53 @@ export class CodexAdapter
   private approvalHost: CodexApprovalBridgeHost = {};
   /** Whether approval handlers are currently registered on the client. */
   private approvalHandlersRegistered = false;
+
+  /**
+   * MCP elicitation bridge host. Set via `setElicitationHost`. When set (and
+   * the app-server client is available), the `mcpServer/elicitation/request`
+   * handler is registered so server-initiated elicitations reach the question
+   * card UI and the reply is sent back as a JSON-RPC result.
+   */
+  private elicitationHost: CodexElicitationBridgeHost = {};
+  /** Whether the elicitation handler is currently registered on the client. */
+  private elicitationHandlersRegistered = false;
+
+  /**
+   * Latest active turn id per app-server thread, tracked from the persistent
+   * `turn/started` notification subscription. Powers `steerTurn` (which needs
+   * the exact `expectedTurnId`) and the reconnect interruption sweep.
+   */
+  private activeTurnIdByThread = new Map<string, string>();
+  /** Removes the persistent turn/started + turn/completed listeners, or null. */
+  private turnTrackingUnsubscribe: (() => void) | null = null;
+
+  /**
+   * Latest app-server goal state per thread, tracked from the
+   * `thread/goal/updated` / `thread/goal/cleared` notification stream and the
+   * adapter's own goal mutations. Gives consumers instant local goal reads
+   * without an RPC; `getThreadGoal()` remains the live-authoritative read.
+   */
+  private threadGoalByThread = new Map<string, AppServerThreadGoal>();
+
+  /**
+   * Every thread id the adapter started or resumed on the app-server. On a
+   * transport reconnect the adapter re-resumes these threads so the server
+   * re-attaches this client to their notification streams.
+   */
+  private loadedThreadIds = new Set<string>();
+
+  /**
+   * Error-chunk sinks for in-flight app-server streams, keyed by logical
+   * session id. A reconnect (or reconnect failure) delivers an interruption
+   * error through each sink so waiting generators terminate instead of
+   * hanging on a dead notification stream.
+   */
+  private streamInterruptSinks = new Map<string, (message: string) => void>();
+
+  /** Unsubscribe function for the `deprecationNotice` notification, or null. */
+  private deprecationNoticeUnsubscribe: (() => void) | null = null;
+  /** One-time UI nudge guard for the deprecation notice Notice. */
+  private deprecationNoticeShown = false;
 
   /**
    * Handlers notified when the Codex app-server emits `skills/changed`. The
@@ -559,31 +675,42 @@ export class CodexAdapter
             ...(this.options.getExtraEnv ? { getExtraEnv: this.options.getExtraEnv } : {}),
             // Feed raw wire traffic into the trace port (no-op when absent).
             ...(wireBridge ? { wireObserver: wireBridge } : {}),
+            // Reconnect integration: re-resume loaded threads and interrupt
+            // in-flight streams; surface a terminal failure when the backoff
+            // budget is exhausted.
+            onReconnect: () => this.handleAppServerReconnect(),
+            onReconnectFailed: (error) => this.handleAppServerReconnectFailed(error),
           });
         if (appServerClient) {
           this.appServerClient = appServerClient;
           await this.appServerClient.start();
-          this.setContextCapabilityAvailable(true);
+          this.setAppServerCapabilitiesAvailable(true);
           // Wire approval handlers if a host was set before start.
           this.registerApprovalHandlers();
+          // Wire the MCP elicitation handler if a host was set before start.
+          this.registerElicitationHandlers();
+          // Track active turn ids per thread for turn steering.
+          this.subscribeToTurnTracking();
+          // Surface app-server deprecation notices (trace + one-time Notice).
+          this.subscribeToDeprecationNotice();
           // Subscribe to skills/changed so the chat menu cache can invalidate
           // immediately instead of relying solely on the 120s TTL.
           this.subscribeToAppServerSkillsChanged();
         } else {
-          this.setContextCapabilityAvailable(false);
+          this.setAppServerCapabilitiesAvailable(false);
         }
       } catch (err) {
         if (isExecutableMissingError(err)) {
           this.appServerClient?.stop();
           this.appServerClient = null;
-          this.setContextCapabilityAvailable(false);
+          this.setAppServerCapabilitiesAvailable(false);
           throw new Error(`Codex executable could not be started: ${err instanceof Error ? err.message : String(err)}. Verify the executable path in Codex settings, then reload OpenCodian.`);
         }
         logger.warn('Codex app-server negotiation failed; preserving SDK chat without context usage', {
           error: err instanceof Error ? err.message : String(err),
         });
         this.appServerClient = null;
-        this.setContextCapabilityAvailable(false);
+        this.setAppServerCapabilitiesAvailable(false);
       }
 
       this.setStatus('connected');
@@ -592,6 +719,7 @@ export class CodexAdapter
       if (this.appServerClient) {
         try {
           this.unregisterApprovalHandlers();
+          this.unregisterElicitationHandlers();
           this.unsubscribeFromAppServerSkillsChanged();
           this.appServerClient.stop();
         } catch {
@@ -599,7 +727,7 @@ export class CodexAdapter
         }
         this.appServerClient = null;
       }
-      this.setContextCapabilityAvailable(false);
+      this.setAppServerCapabilitiesAvailable(false);
       this.setStatus('error');
       throw err;
     }
@@ -619,9 +747,16 @@ export class CodexAdapter
     this.sessionEpochs.clear();
     this.lastEvidenceSessionId = null;
     this.codex = null;
+    this.activeTurnIdByThread.clear();
+    this.loadedThreadIds.clear();
+    this.threadGoalByThread.clear();
+    this.streamInterruptSinks.clear();
+    this.unsubscribeFromTurnTracking();
+    this.unsubscribeFromDeprecationNotice();
     if (this.appServerClient) {
       try {
         this.unregisterApprovalHandlers();
+        this.unregisterElicitationHandlers();
         this.unsubscribeFromAppServerSkillsChanged();
         this.appServerClient.stop();
       } catch {
@@ -629,7 +764,7 @@ export class CodexAdapter
       }
       this.appServerClient = null;
     }
-    this.setContextCapabilityAvailable(false);
+    this.setAppServerCapabilitiesAvailable(false);
     this.setStatus('disconnected');
   }
 
@@ -917,6 +1052,100 @@ export class CodexAdapter
   }
 
   /**
+   * Settings-facing account usage readback (B4 seam): unwraps the diagnostic
+   * `getAccountUsage()` result into the bare usage payload. Returns null when
+   * the app-server is unavailable or the account has no usage payload.
+   */
+  async readAccountUsage(): Promise<AppServerAccountUsage | null> {
+    const result = await this.getAccountUsage();
+    return result.usage;
+  }
+
+  /**
+   * Settings-facing plugin catalog readback (B4 seam): delegates to
+   * `plugin/list`. Returns null when the app-server client is unavailable or
+   * the route fails.
+   */
+  async listCodexPlugins(): Promise<AppServerPluginListResult | null> {
+    if (!this.appServerClient) {
+      return null;
+    }
+    try {
+      return await this.appServerClient.listPlugins();
+    } catch (err) {
+      logger.warn('Failed to list Codex plugins from app-server', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /** Settings-facing installed-plugin readback (B4 seam): delegates to `plugin/installed`. */
+  async listInstalledCodexPlugins(): Promise<AppServerPluginListResult | null> {
+    if (!this.appServerClient) {
+      return null;
+    }
+    try {
+      return await this.appServerClient.listInstalledPlugins();
+    } catch (err) {
+      logger.warn('Failed to list installed Codex plugins from app-server', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /** Settings-facing plugin install (B4 seam): delegates to `plugin/install`. */
+  async installCodexPlugin(
+    pluginName: string,
+    options?: { marketplacePath?: string; remoteMarketplaceName?: string },
+  ): Promise<AppServerPluginInstallResult | null> {
+    if (!this.appServerClient) {
+      return null;
+    }
+    try {
+      return await this.appServerClient.installPlugin(pluginName, options);
+    } catch (err) {
+      logger.warn('Failed to install Codex plugin via app-server', {
+        pluginName,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /** Settings-facing plugin uninstall (B4 seam): delegates to `plugin/uninstall`. */
+  async uninstallCodexPlugin(pluginId: string): Promise<boolean> {
+    if (!this.appServerClient) {
+      return false;
+    }
+    try {
+      return await this.appServerClient.uninstallPlugin(pluginId);
+    } catch (err) {
+      logger.warn('Failed to uninstall Codex plugin via app-server', {
+        pluginId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return false;
+    }
+  }
+
+  /** Settings-facing plugin reconcile (B4 seam): delegates to `plugin/reconcile`. */
+  async reconcileCodexPlugins(): Promise<AppServerPluginReconcileResult | null> {
+    if (!this.appServerClient) {
+      return null;
+    }
+    try {
+      return await this.appServerClient.reconcilePlugins();
+    } catch (err) {
+      logger.warn('Failed to reconcile Codex plugins via app-server', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /**
    * Read-only model provider capabilities readback via the app-server adjunct client.
    *
    * Returns capability flags (`namespaceTools`, `imageGeneration`, `webSearch`)
@@ -1077,7 +1306,15 @@ export class CodexAdapter
     }
   }
 
-  async setThreadGoal(backendSessionId: string, objective: string, options?: { tokenBudget?: number }): Promise<AppServerThreadGoal | null> {
+  /**
+   * Set or update a thread goal via `thread/goal/set`. Passing
+   * `options.status` alone pauses/resumes the existing goal without
+   * restating its objective; `objective` + `tokenBudget` create/update.
+   * `backendSessionId` must be the real thread id (the app-server routes are
+   * thread-scoped); use `pauseThreadGoal` / `resumeThreadGoal` for
+   * adapter-session aliasing.
+   */
+  async setThreadGoal(backendSessionId: string, objective: string, options?: AppServerSetThreadGoalOptions): Promise<AppServerThreadGoal | null> {
     if (!this.appServerClient) {
       return null;
     }
@@ -1086,6 +1323,41 @@ export class CodexAdapter
     } catch (err) {
       logger.warn('Failed to set thread goal', {
         backendSessionId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /** Pause an existing thread goal (status `paused`) without restating it. */
+  async pauseThreadGoal(sessionId: string): Promise<AppServerThreadGoal | null> {
+    return this.setThreadGoalStatus(sessionId, 'paused');
+  }
+
+  /** Resume a paused thread goal (status `active`). */
+  async resumeThreadGoal(sessionId: string): Promise<AppServerThreadGoal | null> {
+    return this.setThreadGoalStatus(sessionId, 'active');
+  }
+
+  private async setThreadGoalStatus(sessionId: string, status: AppServerThreadGoalStatus): Promise<AppServerThreadGoal | null> {
+    const client = this.appServerClient;
+    if (!client) {
+      return null;
+    }
+    const threadId = this.resolveThreadId(sessionId);
+    if (!threadId) {
+      return null;
+    }
+    try {
+      const goal = await client.setThreadGoal(threadId, undefined, { status });
+      if (goal) {
+        this.threadGoalByThread.set(threadId, goal);
+      }
+      return goal;
+    } catch (err) {
+      logger.warn('Failed to update thread goal status', {
+        threadId,
+        status,
         error: err instanceof Error ? err.message : String(err),
       });
       return null;
@@ -1379,11 +1651,14 @@ export class CodexAdapter
 
   /**
    * Set the host callback that surfaces server-request approvals to the UI.
-   * If the app-server client is already running, the `execCommandApproval` /
-   * `applyPatchApproval` handlers are registered immediately; otherwise they
-   * are registered on the next successful `start()`. Calling this replaces the
-   * previous host; already-registered handlers read the host dynamically, so a
-   * host that loses its `collectApproval` callback safely degrades to `denied`.
+   * If the app-server client is already running, the legacy
+   * (`execCommandApproval` / `applyPatchApproval`) and v2
+   * (`item/{commandExecution,fileChange,permissions}/requestApproval`,
+   * `item/tool/requestUserInput`) handlers are registered immediately;
+   * otherwise they are registered on the next successful `start()`. Calling
+   * this replaces the previous host; already-registered handlers read the
+   * host dynamically, so a host that loses its `collectApproval` callback
+   * safely degrades to `denied`.
    */
   setApprovalHost(host: CodexApprovalBridgeHost): void {
     this.approvalHost = host;
@@ -1391,9 +1666,21 @@ export class CodexAdapter
   }
 
   /**
-   * Register `execCommandApproval` / `applyPatchApproval` server-request
-   * handlers on the app-server client. Idempotent: a no-op when there is no
-   * client, no host callback, or handlers are already registered.
+   * Set the host callback that surfaces MCP elicitations to the UI. Same
+   * lifecycle as `setApprovalHost`: registers `mcpServer/elicitation/request`
+   * immediately when the client is running, else on the next `start()`.
+   */
+  setElicitationHost(host: CodexElicitationBridgeHost): void {
+    this.elicitationHost = host;
+    this.registerElicitationHandlers();
+  }
+
+  /**
+   * Register the legacy + v2 approval server-request handlers on the
+   * app-server client. Idempotent: a no-op when there is no client, no host
+   * callback, or handlers are already registered. The typed v2 registrations
+   * are guarded so injected client doubles without the 0.159.0 surface keep
+   * working (legacy routes stay registered).
    */
   private registerApprovalHandlers(): void {
     if (!this.appServerClient || this.approvalHandlersRegistered) {
@@ -1410,6 +1697,22 @@ export class CodexAdapter
       'applyPatchApproval',
       (params) => this.handleApproval('applyPatch', params),
     );
+    if (typeof this.appServerClient.registerCommandExecutionApprovalHandler === 'function') {
+      this.appServerClient.registerCommandExecutionApprovalHandler((params) =>
+        this.handleCommandExecutionApproval(params));
+    }
+    if (typeof this.appServerClient.registerFileChangeApprovalHandler === 'function') {
+      this.appServerClient.registerFileChangeApprovalHandler((params) =>
+        this.handleFileChangeApproval(params));
+    }
+    if (typeof this.appServerClient.registerPermissionsApprovalHandler === 'function') {
+      this.appServerClient.registerPermissionsApprovalHandler((params) =>
+        this.handlePermissionsApproval(params));
+    }
+    if (typeof this.appServerClient.registerToolUserInputHandler === 'function') {
+      this.appServerClient.registerToolUserInputHandler((params) =>
+        this.handleToolUserInput(params));
+    }
     this.approvalHandlersRegistered = true;
   }
 
@@ -1424,44 +1727,268 @@ export class CodexAdapter
     }
     this.appServerClient.unregisterServerRequestHandler('execCommandApproval');
     this.appServerClient.unregisterServerRequestHandler('applyPatchApproval');
+    this.appServerClient.unregisterServerRequestHandler('item/commandExecution/requestApproval');
+    this.appServerClient.unregisterServerRequestHandler('item/fileChange/requestApproval');
+    this.appServerClient.unregisterServerRequestHandler('item/permissions/requestApproval');
+    this.appServerClient.unregisterServerRequestHandler('item/tool/requestUserInput');
     this.approvalHandlersRegistered = false;
   }
 
+  /** Register the `mcpServer/elicitation/request` handler; idempotent. */
+  private registerElicitationHandlers(): void {
+    const client = this.appServerClient;
+    if (!client || this.elicitationHandlersRegistered) {
+      return;
+    }
+    if (!this.elicitationHost.collectElicitation) {
+      return;
+    }
+    if (typeof client.registerMcpElicitationHandler !== 'function') {
+      return;
+    }
+    client.registerMcpElicitationHandler((params) => this.handleMcpElicitation(params));
+    this.elicitationHandlersRegistered = true;
+  }
+
+  /** Remove the elicitation handler; afterwards the route answers -32601. */
+  private unregisterElicitationHandlers(): void {
+    if (!this.appServerClient || !this.elicitationHandlersRegistered) {
+      return;
+    }
+    this.appServerClient.unregisterServerRequestHandler('mcpServer/elicitation/request');
+    this.elicitationHandlersRegistered = false;
+  }
+
   /**
-   * Handle a single server-request approval: normalize params into a UI
-   * request, collect a decision from the host, and translate it into the
-   * `{ decision: ReviewDecision }` payload the bridge replies with. Defaults
-   * to a safe `denied` decision when the host is absent, throws, or cancels.
+   * Shared approval-collection core: collects the host decision for a
+   * pre-built request and traces every outcome. Fails closed: a missing host,
+   * a throwing host, or a cancelled card all produce `{ decision: 'denied' }`.
    */
-  private async handleApproval(kind: CodexApprovalKind, params: unknown): Promise<{ decision: string }> {
+  private async collectApprovalDecision(request: CodexApprovalRequest): Promise<CodexApprovalDecision> {
     const collect = this.approvalHost.collectApproval;
-    const threadId = readThreadIdFromParams(params);
+    const threadId = readThreadIdFromParams(request.raw);
     if (!collect) {
-      this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind, decision: 'denied', reason: 'no_host', threadId }));
+      this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: 'denied', reason: 'no_host', threadId }));
       return { decision: 'denied' };
     }
-    const request = this.normalizeApprovalRequest(kind, params);
-    this.trace((port) => port.recordToolInteraction(undefined, 'approval.request', { kind, threadId, summary: request.summary }));
+    this.trace((port) => port.recordToolInteraction(undefined, 'approval.request', { kind: request.kind, threadId, summary: request.summary }));
     let decision: CodexApprovalDecision | null;
     try {
       decision = await collect(request);
     } catch (err) {
       logger.warn('Approval host threw; defaulting to denied', {
-        kind,
+        kind: request.kind,
         error: err instanceof Error ? err.message : String(err),
       });
-      this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind, decision: 'denied', reason: 'host_threw', threadId }));
+      this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: 'denied', reason: 'host_threw', threadId }));
       return { decision: 'denied' };
     }
     if (!decision) {
-      this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind, decision: 'denied', reason: 'host_cancelled', threadId }));
+      this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: 'denied', reason: 'host_cancelled', threadId }));
       return { decision: 'denied' };
     }
-    this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind, decision: decision.decision, threadId }));
+    this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: decision.decision, threadId }));
+    return decision;
+  }
+
+  /**
+   * Handle a single legacy server-request approval: normalize params into a
+   * UI request, collect a decision from the host, and translate it into the
+   * `{ decision: ReviewDecision }` payload the legacy bridge replies with.
+   * Defaults to a safe `denied` decision when the host is absent, throws, or
+   * cancels.
+   */
+  private async handleApproval(kind: 'execCommand' | 'applyPatch', params: unknown): Promise<{ decision: string }> {
+    const request = this.normalizeApprovalRequest(kind, params);
+    const decision = await this.collectApprovalDecision(request);
     return { decision: decision.decision };
   }
 
-  private normalizeApprovalRequest(kind: CodexApprovalKind, params: unknown): CodexApprovalRequest {
+  /** v2 `item/commandExecution/requestApproval` → question card → wire decision. */
+  private async handleCommandExecutionApproval(
+    params: AppServerCommandExecutionApprovalParams,
+  ): Promise<AppServerCommandExecutionApprovalResponse> {
+    const decision = await this.collectApprovalDecision(this.normalizeCommandExecutionApproval(params));
+    return { decision: this.mapCommandExecutionWireDecision(decision) };
+  }
+
+  /** v2 `item/fileChange/requestApproval` → question card → wire decision. */
+  private async handleFileChangeApproval(
+    params: AppServerFileChangeApprovalParams,
+  ): Promise<AppServerFileChangeApprovalResponse> {
+    const decision = await this.collectApprovalDecision(this.normalizeFileChangeApproval(params));
+    return { decision: this.mapFileChangeWireDecision(decision) };
+  }
+
+  /**
+   * v2 `item/permissions/requestApproval` → question card → granted profile.
+   * Approve echoes the requested profile back (scope per the user's choice:
+   * Approve → `turn`, Approve for session → `session`); deny returns an empty
+   * grant, which the schema permits (all `GrantedPermissionProfile` fields
+   * are optional).
+   */
+  private async handlePermissionsApproval(
+    params: AppServerPermissionsApprovalParams,
+  ): Promise<AppServerPermissionsApprovalResponse> {
+    const decision = await this.collectApprovalDecision(this.normalizePermissionsApproval(params));
+    if (decision.decision === 'approved') {
+      return { permissions: this.echoGrantedProfile(params.permissions), scope: 'turn' };
+    }
+    if (decision.decision === 'approved_for_session') {
+      return { permissions: this.echoGrantedProfile(params.permissions), scope: 'session' };
+    }
+    return { permissions: {} };
+  }
+
+  /** Dynamic `item/tool/requestUserInput` → question card → per-question answers. */
+  private async handleToolUserInput(
+    params: AppServerToolUserInputParams,
+  ): Promise<AppServerToolUserInputResponse> {
+    const collect = this.approvalHost.collectQuestionAnswers;
+    const threadId = typeof params.threadId === 'string' ? params.threadId : undefined;
+    if (!collect) {
+      this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.declined', { reason: 'no_host', threadId }));
+      return this.emptyToolUserInputResponse();
+    }
+    const questionRequest: QuestionRequest = {
+      id: `codex-tool-input-${params.itemId}`,
+      sessionId: 'codex',
+      questions: (params.questions ?? []).map((question) => {
+        const options = (question.options ?? []).map((option) => ({
+          label: option.label,
+          description: option.description,
+        }));
+        return {
+          question: question.question,
+          header: question.header,
+          options,
+          multiple: options.length > 0,
+          custom: options.length === 0 || question.isOther === true,
+        };
+      }),
+    };
+    this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.request', {
+      threadId,
+      itemId: params.itemId,
+      questionCount: questionRequest.questions.length,
+    }));
+    let result: CodexApprovalResolutionResult | null;
+    try {
+      result = await collect(questionRequest);
+    } catch (err) {
+      logger.warn('Tool user-input host threw; returning empty answers', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return this.emptyToolUserInputResponse();
+    }
+    if (!result || result.status !== 'answered') {
+      this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.unanswered', { threadId, itemId: params.itemId }));
+      return this.emptyToolUserInputResponse();
+    }
+    // Wire shape (Codex 0.159.0 schema dump): answers maps each question id
+    // to its selected/typed answers.
+    const answersByQuestionId: Record<string, { answers: string[] }> = {};
+    (params.questions ?? []).forEach((question, index) => {
+      answersByQuestionId[question.id] = { answers: [...(result.answers?.[index] ?? [])] };
+    });
+    this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.answered', { threadId, itemId: params.itemId }));
+    return { answers: answersByQuestionId };
+  }
+
+  /** Fail-closed empty reply for the tool-user-input route. */
+  private emptyToolUserInputResponse(): AppServerToolUserInputResponse {
+    return { answers: {} };
+  }
+
+  /** `mcpServer/elicitation/request` → elicitation card → accept/decline/cancel. */
+  private async handleMcpElicitation(params: unknown): Promise<AppServerMcpElicitationResponse> {
+    const collect = this.elicitationHost.collectElicitation;
+    if (!collect) {
+      this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.cancelled', { reason: 'no_host' }));
+      return { action: 'cancel' };
+    }
+    if (!isCodexElicitationWireParams(params)) {
+      logger.warn('Ignoring malformed mcpServer/elicitation/request params');
+      return { action: 'cancel' };
+    }
+    if (params.mode === 'url') {
+      return this.handleUrlElicitation(params, collect);
+    }
+    if (params.mode !== 'form') {
+      // The openai/form dialect uses a schema shape this bridge cannot
+      // render; declining lets the MCP server apply its default behavior.
+      logger.warn('Declining unsupported Codex elicitation mode', { mode: params.mode, serverName: params.serverName });
+      this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.declined', { reason: 'unsupported_mode', mode: params.mode, serverName: params.serverName }));
+      return { action: 'decline' };
+    }
+    return this.handleFormElicitation(params, collect);
+  }
+
+  private async handleUrlElicitation(
+    params: CodexElicitationUrlParams,
+    collect: NonNullable<CodexElicitationBridgeHost['collectElicitation']>,
+  ): Promise<AppServerMcpElicitationResponse> {
+    if (!/^https?:\/\//i.test(params.url)) {
+      logger.warn('Declining Codex elicitation with non-http(s) URL', { serverName: params.serverName });
+      this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.declined', { reason: 'url_scheme_rejected', serverName: params.serverName }));
+      return { action: 'decline' };
+    }
+    try {
+      window.open(params.url, '_blank');
+    } catch (err) {
+      logger.warn('Failed to open Codex elicitation URL', {
+        url: params.url,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    const questionRequest = buildCodexElicitationUrlQuestionRequest(params);
+    this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.request', { mode: 'url', serverName: params.serverName, threadId: params.threadId }));
+    let response;
+    try {
+      response = await collect({ questionRequest, params });
+    } catch (err) {
+      logger.warn('Elicitation host threw; cancelling', { error: err instanceof Error ? err.message : String(err) });
+      return { action: 'cancel' };
+    }
+    if (!response) {
+      return { action: 'cancel' };
+    }
+    this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.decision', { mode: 'url', action: response.action }));
+    return { action: response.action };
+  }
+
+  private async handleFormElicitation(
+    params: CodexElicitationFormParams,
+    collect: NonNullable<CodexElicitationBridgeHost['collectElicitation']>,
+  ): Promise<AppServerMcpElicitationResponse> {
+    const questionRequest = buildCodexElicitationQuestionRequest(params);
+    this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.request', { mode: 'form', serverName: params.serverName, threadId: params.threadId }));
+    let response;
+    try {
+      response = await collect({ questionRequest, params });
+    } catch (err) {
+      logger.warn('Elicitation host threw; cancelling', { error: err instanceof Error ? err.message : String(err) });
+      return { action: 'cancel' };
+    }
+    if (!response) {
+      return { action: 'cancel' };
+    }
+    if (response.action !== 'accept') {
+      this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.decision', { mode: 'form', action: response.action }));
+      return { action: response.action };
+    }
+    if (isCodexElicitationDecline(questionRequest, response.answers)) {
+      this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.decision', { mode: 'form', action: 'decline' }));
+      return { action: 'decline' };
+    }
+    const content = buildCodexElicitationContent(questionRequest, response.answers ?? [], params);
+    this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.decision', { mode: 'form', action: 'accept' }));
+    return { action: 'accept', content };
+  }
+
+  // ── Approval normalization + wire mapping ─────────────────────────────────
+
+  private normalizeApprovalRequest(kind: 'execCommand' | 'applyPatch', params: unknown): CodexApprovalRequest {
     return kind === 'execCommand'
       ? this.normalizeExecCommandApproval(params)
       : this.normalizeApplyPatchApproval(params);
@@ -1489,6 +2016,101 @@ export class CodexAdapter
       changeCount: changes.length,
       raw: params,
     };
+  }
+
+  /** v2 commandExecution: surface the command plus any proposed amendments. */
+  private normalizeCommandExecutionApproval(params: AppServerCommandExecutionApprovalParams): CodexApprovalRequest {
+    const command = readCommandString(params.command);
+    const networkAmendments: CodexNetworkPolicyAmendment[] = [];
+    for (const raw of params.proposedNetworkPolicyAmendments ?? []) {
+      if (
+        isRecordLike(raw)
+        && typeof raw.host === 'string'
+        && (raw.action === 'allow' || raw.action === 'deny')
+      ) {
+        networkAmendments.push({ action: raw.action, host: raw.host });
+      }
+    }
+    return {
+      kind: 'commandExecution',
+      summary: params.reason ?? command ?? '(unknown command)',
+      ...(command ? { command } : {}),
+      ...(params.cwd ? { cwd: params.cwd } : {}),
+      ...(params.proposedExecpolicyAmendment && params.proposedExecpolicyAmendment.length > 0
+        ? { proposedExecpolicyAmendment: params.proposedExecpolicyAmendment }
+        : {}),
+      ...(networkAmendments.length > 0 ? { proposedNetworkPolicyAmendments: networkAmendments } : {}),
+      ...(params.networkApprovalContext ? { networkApprovalContext: params.networkApprovalContext } : {}),
+      ...(params.reason ? { reason: params.reason } : {}),
+      raw: params,
+    };
+  }
+
+  /** v2 fileChange: a grant-root / reason request without a change list. */
+  private normalizeFileChangeApproval(params: AppServerFileChangeApprovalParams): CodexApprovalRequest {
+    return {
+      kind: 'fileChange',
+      summary: params.reason
+        ?? (params.grantRoot ? `write access under ${params.grantRoot}` : 'file changes'),
+      ...(params.grantRoot ? { grantRoot: params.grantRoot } : {}),
+      ...(params.reason ? { reason: params.reason } : {}),
+      raw: params,
+    };
+  }
+
+  /** v2 permissions: the requested profile; approve echoes it back. */
+  private normalizePermissionsApproval(params: AppServerPermissionsApprovalParams): CodexApprovalRequest {
+    return {
+      kind: 'permissions',
+      summary: params.reason ?? 'additional permissions',
+      cwd: params.cwd,
+      permissionRequest: params.permissions,
+      ...(params.reason ? { reason: params.reason } : {}),
+      raw: params,
+    };
+  }
+
+  private echoGrantedProfile(requested: { fileSystem?: unknown; network?: unknown }): AppServerGrantedPermissionProfile {
+    const granted: AppServerGrantedPermissionProfile = {};
+    if (requested.fileSystem !== undefined) {
+      granted.fileSystem = requested.fileSystem;
+    }
+    if (requested.network !== undefined) {
+      granted.network = requested.network;
+    }
+    return granted;
+  }
+
+  private mapCommandExecutionWireDecision(decision: CodexApprovalDecision): AppServerCommandExecutionApprovalDecision {
+    switch (decision.decision) {
+      case 'approved':
+        return 'accept';
+      case 'approved_for_session':
+        return 'acceptForSession';
+      case 'abort':
+        return 'cancel';
+      case 'accept_with_execpolicy_amendment':
+        return { acceptWithExecpolicyAmendment: { execpolicy_amendment: decision.execpolicyAmendment } };
+      case 'apply_network_policy_amendment':
+        return { applyNetworkPolicyAmendment: { network_policy_amendment: decision.networkPolicyAmendment } };
+      case 'denied':
+      default:
+        return 'decline';
+    }
+  }
+
+  private mapFileChangeWireDecision(decision: CodexApprovalDecision): AppServerFileChangeApprovalDecision {
+    switch (decision.decision) {
+      case 'approved':
+        return 'accept';
+      case 'approved_for_session':
+        return 'acceptForSession';
+      case 'abort':
+        return 'cancel';
+      case 'denied':
+      default:
+        return 'decline';
+    }
   }
 
   onStatusChange(handler: StatusChangeHandler): Disposable {
@@ -1549,6 +2171,290 @@ export class CodexAdapter
       }
       this.skillsChangedUnsubscribe = null;
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Turn tracking / deprecation notice / reconnect integration
+  // -------------------------------------------------------------------------
+
+  /**
+   * Persistent `turn/started` / `turn/completed` tracking, independent from
+   * the per-turn stream subscriptions. The tracked per-thread active turn id
+   * is the `expectedTurnId` precondition for `turn/steer` and the sweep target
+   * for reconnect interruption. Registration is guarded so injected test
+   * doubles without notification support keep working.
+   */
+  private subscribeToTurnTracking(): void {
+    const client = this.appServerClient;
+    if (!client || this.turnTrackingUnsubscribe) {
+      return;
+    }
+    if (typeof client.addNotificationHandler !== 'function' || typeof client.removeNotificationHandler !== 'function') {
+      return;
+    }
+    const readThreadAndTurnId = (params: unknown): { threadId: string; turnId: string } | null => {
+      if (!isRecordLike(params)) return null;
+      const threadId = typeof params.threadId === 'string' ? params.threadId : null;
+      const turn = isRecordLike(params.turn) ? params.turn : null;
+      const turnId = turn && typeof turn.id === 'string' ? turn.id : null;
+      return threadId && turnId ? { threadId, turnId } : null;
+    };
+    const startedListener = (params: unknown): void => {
+      const ids = readThreadAndTurnId(params);
+      if (ids) {
+        this.activeTurnIdByThread.set(ids.threadId, ids.turnId);
+      }
+    };
+    const completedListener = (params: unknown): void => {
+      const ids = readThreadAndTurnId(params);
+      // Only clear when the completion matches the currently tracked turn;
+      // a straggler completion for an older turn must not drop the new one.
+      if (ids && this.activeTurnIdByThread.get(ids.threadId) === ids.turnId) {
+        this.activeTurnIdByThread.delete(ids.threadId);
+      }
+    };
+    client.addNotificationHandler('turn/started', startedListener);
+    client.addNotificationHandler('turn/completed', completedListener);
+    this.turnTrackingUnsubscribe = () => {
+      client.removeNotificationHandler('turn/started', startedListener);
+      client.removeNotificationHandler('turn/completed', completedListener);
+    };
+  }
+
+  private unsubscribeFromTurnTracking(): void {
+    if (this.turnTrackingUnsubscribe) {
+      try {
+        this.turnTrackingUnsubscribe();
+      } catch (err) {
+        logger.warn('Failed to unsubscribe from turn tracking', { error: err instanceof Error ? err.message : String(err) });
+      }
+      this.turnTrackingUnsubscribe = null;
+    }
+  }
+
+  private subscribeToDeprecationNotice(): void {
+    const client = this.appServerClient;
+    if (!client || this.deprecationNoticeUnsubscribe) {
+      return;
+    }
+    if (typeof client.subscribeToDeprecationNotice !== 'function') {
+      return;
+    }
+    this.deprecationNoticeUnsubscribe = client.subscribeToDeprecationNotice((notice) => {
+      this.handleDeprecationNotice(notice);
+    });
+  }
+
+  private unsubscribeFromDeprecationNotice(): void {
+    if (this.deprecationNoticeUnsubscribe) {
+      try {
+        this.deprecationNoticeUnsubscribe();
+      } catch (err) {
+        logger.warn('Failed to unsubscribe from deprecationNotice', { error: err instanceof Error ? err.message : String(err) });
+      }
+      this.deprecationNoticeUnsubscribe = null;
+    }
+  }
+
+  /** Trace + console warn + one-time Notice for an app-server deprecation notice. */
+  private handleDeprecationNotice(notice: { summary: string; details?: string | null }): void {
+    this.trace((port) => port.recordLifecycle('app_server.deprecation_notice', {
+      summary: notice.summary,
+      ...(notice.details ? { details: notice.details } : {}),
+    }));
+    logger.warn('Codex app-server deprecation notice', {
+      summary: notice.summary,
+      details: notice.details ?? null,
+    });
+    if (this.deprecationNoticeShown) {
+      return;
+    }
+    this.deprecationNoticeShown = true;
+    try {
+      new Notice(`Codex deprecation notice: ${notice.summary}`, 8000);
+    } catch (err) {
+      logger.warn('Failed to surface deprecation Notice', { error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  /**
+   * Transport reconnected (fresh handshake, handler registrations survive).
+   * Interrupt the in-flight streams first (their turns are dead), then
+   * re-resume every previously loaded thread so the server re-attaches this
+   * client to their notification streams.
+   */
+  private async handleAppServerReconnect(): Promise<void> {
+    this.trace((port) => port.recordLifecycle('app_server.reconnected', {
+      loadedThreads: this.loadedThreadIds.size,
+      inFlightTurns: this.activeAppServerTurns.size,
+    }));
+    logger.info('Codex app-server reconnected; interrupting in-flight turns and re-resuming threads', {
+      loadedThreads: this.loadedThreadIds.size,
+    });
+    this.interruptActiveStreams('Codex connection was re-established; the in-flight turn was interrupted. Please resend your message.');
+    const client = this.appServerClient;
+    if (!client) {
+      return;
+    }
+    const options = this.buildAppServerThreadOptions(this.captureAttemptOptions());
+    for (const threadId of [...this.loadedThreadIds]) {
+      try {
+        const thread = await client.resumeThread(threadId, options);
+        if (!thread?.id) {
+          this.loadedThreadIds.delete(threadId);
+        }
+      } catch (err) {
+        logger.warn('Failed to re-resume Codex thread after reconnect', {
+          threadId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+  }
+
+  /** Reconnect backoff budget exhausted: interrupt streams, trace, error status. */
+  private handleAppServerReconnectFailed(error: Error): void {
+    this.trace((port) => port.recordLifecycle('app_server.reconnect_failed', { error: error.message }));
+    this.trace((port) => port.markAnomaly(undefined, 'app_server.reconnect_failed', 'critical', { error: error.message }));
+    logger.error('Codex app-server reconnect failed', { error: error.message });
+    this.interruptActiveStreams(`Codex connection was lost and could not be re-established: ${error.message}`);
+    this.setStatus('error');
+  }
+
+  /**
+   * Deliver an interruption error to every in-flight app-server stream and
+   * clear their turn bookkeeping. Streams registered by stale attempts ignore
+   * the message via their own epoch guard.
+   */
+  private interruptActiveStreams(message: string): void {
+    for (const [sessionId, sink] of this.streamInterruptSinks) {
+      try {
+        sink(message);
+      } catch (err) {
+        logger.warn('Stream interrupt sink threw', {
+          sessionId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    for (const sessionId of this.activeAppServerTurns.keys()) {
+      const context = this.lastTurnContextBySession.get(sessionId);
+      if (context) {
+        this.lastTurnContextBySession.delete(sessionId);
+        this.trace((port) => port.finishTurn(context, 'incomplete', { reason: 'app_server_reconnect' }));
+      }
+    }
+    this.activeAppServerTurns.clear();
+    this.activeTurnIdByThread.clear();
+  }
+
+  /**
+   * Adapter-owned handling of the mapper's thread-scoped backend events. The
+   * chunks still pass through to the stream; this hook maintains local state
+   * that the stream cannot: goal tracking, title-rename trace evidence, and
+   * local invalidation (plus stream completion) on server-side deletion.
+   * `completeStream` only matters for `thread_deleted`: it releases the
+   * waiting generator so the mapper's error chunk drains instead of hanging.
+   */
+  private handleThreadBackendEvent(
+    chunk: Extract<StreamChunk, { type: 'backend_event' }>,
+    threadId: string,
+    sessionId: string,
+    completeStream: () => void,
+  ): void {
+    switch (chunk.event) {
+      case 'thread_renamed': {
+        const threadName = typeof chunk.metadata?.threadName === 'string' ? chunk.metadata.threadName : (chunk.content ?? '');
+        this.trace((port) => port.recordLifecycle('thread.renamed', { threadId, threadName }));
+        // No adapter-local title store exists: listSessions()/getSession()
+        // re-read titles from the app-server, and the chunk itself carries
+        // the new name to any stream consumer.
+        break;
+      }
+      case 'goal_updated': {
+        const goal = this.readTrackedGoal(chunk.metadata?.goal);
+        if (goal) {
+          this.threadGoalByThread.set(threadId, goal);
+          this.trace((port) => port.recordLifecycle('thread.goal_updated', { threadId, status: goal.status }));
+        }
+        break;
+      }
+      case 'goal_cleared': {
+        this.threadGoalByThread.delete(threadId);
+        this.trace((port) => port.recordLifecycle('thread.goal_cleared', { threadId }));
+        break;
+      }
+      case 'thread_deleted': {
+        this.invalidateLocalSessionForDeletedThread(threadId);
+        const activeTurn = this.activeAppServerTurns.get(sessionId);
+        if (activeTurn?.turnId && activeTurn.threadId === threadId) {
+          const context = this.lastTurnContextBySession.get(sessionId);
+          if (context) {
+            this.lastTurnContextBySession.delete(sessionId);
+            this.trace((port) => port.finishTurn(context, 'incomplete', { reason: 'thread_deleted' }));
+          }
+          this.activeAppServerTurns.delete(sessionId);
+          this.sessionEffectiveEvidence.set(sessionId, buildUniformEffectiveEvidence('failed', this.attemptWiringForSession(sessionId), 'Codex thread was deleted on the server'));
+          this.sessionEffectiveSettings.set(sessionId, null);
+          completeStream();
+        }
+        break;
+      }
+      default:
+        // deprecation_notice and all other backend events need no adapter-side
+        // action here (the persistent top-level deprecation subscription owns
+        // the trace + one-time Notice path).
+        break;
+    }
+  }
+
+  /** Defensive goal extraction from a goal_updated chunk's metadata. */
+  private readTrackedGoal(raw: unknown): AppServerThreadGoal | null {
+    if (!isRecordLike(raw) || typeof raw.threadId !== 'string' || typeof raw.objective !== 'string') {
+      return null;
+    }
+    return raw as unknown as AppServerThreadGoal;
+  }
+
+  /**
+   * Local-only invalidation for a thread the app-server reports as deleted
+   * (distinct from `deleteSession`, which also interrupts turns and calls
+   * `thread/delete`). Cleans the alias/session entry and every derived map so
+   * later lookups honestly report the session gone. Returns the logical
+   * session key that was removed, or null when the thread was unknown.
+   */
+  private invalidateLocalSessionForDeletedThread(threadId: string): string | null {
+    const provisionalId = this.threadAlias.get(threadId);
+    this.threadAlias.delete(threadId);
+    this.loadedThreadIds.delete(threadId);
+    this.activeTurnIdByThread.delete(threadId);
+    this.threadGoalByThread.delete(threadId);
+    this.appServerContextSnapshots.delete(threadId);
+    this.appServerClient?.clearThreadEffectiveSettings?.(threadId);
+    if (!provisionalId) {
+      return null;
+    }
+    this.sessions.delete(provisionalId);
+    this.sessionEffectiveEvidence.delete(provisionalId);
+    this.sessionEffectiveSettings.delete(provisionalId);
+    this.sessionAttemptOptions.delete(provisionalId);
+    this.lastTurnContextBySession.delete(provisionalId);
+    if (this.lastEvidenceSessionId === provisionalId) {
+      this.lastEvidenceSessionId = null;
+    }
+    this.trace((port) => port.recordLifecycle('session.invalidated_server_delete', { threadId, provisionalId }));
+    return provisionalId;
+  }
+
+  /**
+   * Instant local read of a thread's most recently tracked goal state (from
+   * `thread/goal/updated` / `thread/goal/cleared` notifications or the
+   * adapter's own mutations). Returns null when nothing is tracked; use
+   * `getThreadGoal()` for the live-authoritative RPC read.
+   */
+  getTrackedThreadGoal(sessionId: string): AppServerThreadGoal | null {
+    const threadId = this.resolveThreadId(sessionId);
+    return threadId ? this.threadGoalByThread.get(threadId) ?? null : null;
   }
 
   // -------------------------------------------------------------------------
@@ -1743,6 +2649,25 @@ export class CodexAdapter
       wake = null;
       resolve?.();
     };
+    // Reconnect integration: the transport delivers interruptions through
+    // this sink (guarded by the attempt epoch) so the waiting loop below
+    // terminates with an error chunk instead of hanging on a dead stream.
+    this.streamInterruptSinks.set(sessionId, (message: string) => {
+      if (!this.isCurrentAppServerAttempt(attempt)) {
+        return;
+      }
+      this.sessionEffectiveEvidence.set(sessionId, buildUniformEffectiveEvidence('failed', this.attemptWiringForSession(sessionId), message));
+      this.sessionEffectiveSettings.set(sessionId, null);
+      const ctx = turnContext;
+      if (ctx) {
+        this.trace((port) => port.finishTurn(ctx, 'incomplete', { reason: 'app_server_reconnect' }));
+      }
+      enqueue({ type: 'error', content: message });
+      completed = true;
+      const resolve = wake;
+      wake = null;
+      resolve?.();
+    });
     controller.signal.addEventListener('abort', () => {
       const resolve = wake;
       wake = null;
@@ -1797,6 +2722,18 @@ export class CodexAdapter
           this.appServerContextSnapshots.set(thread.id, mapping.contextUsageSnapshot);
         }
         for (const chunk of mapping.chunks) {
+          // Adapter-owned backend events (mapper-comment contract): maintain
+          // local goal state, react to server-side renames/deletes, and keep
+          // the stream from hanging when the thread is deleted mid-turn. The
+          // chunks still pass through to the stream unchanged.
+          if (chunk.type === 'backend_event') {
+            this.handleThreadBackendEvent(chunk, thread.id, sessionId, () => {
+              completed = true;
+              const resolve = wake;
+              wake = null;
+              resolve?.();
+            });
+          }
           enqueue(chunk);
         }
         if (mapping.chunks.length === 0 && !mapping.contextUsageSnapshot) {
@@ -1884,6 +2821,7 @@ export class CodexAdapter
       }
     } finally {
       subscription?.dispose();
+      this.streamInterruptSinks.delete(sessionId);
       if (this.activeControllers.get(sessionId) === controller) {
         this.activeControllers.delete(sessionId);
       }
@@ -1960,6 +2898,9 @@ export class CodexAdapter
     } else {
       this.sessions.set(provisionalId, { provisionalId, threadId: thread.id, thread: null });
     }
+    // Remember every started/resumed thread so a transport reconnect can
+    // re-resume them and re-attach this client to their notification streams.
+    this.loadedThreadIds.add(thread.id);
     return { thread, resumed };
   }
 
@@ -2095,6 +3036,58 @@ export class CodexAdapter
       controller.abort();
       this.activeControllers.delete(logicalKey);
     }
+  }
+
+  /**
+   * Implements `AgentTurnSteeringCapability` over the app-server `turn/steer`
+   * route: the text enters the CURRENT turn (tracked from `turn/started` per
+   * thread) instead of queueing a new message. Resolves `false` when there is
+   * no active turn, the SDK fallback path is in use, or the server rejects
+   * the injection — callers degrade honestly to queueing. A -32601
+   * (route unavailable) dynamically drops the `TurnSteering` capability.
+   */
+  async steerTurn(sessionId: string, text: string): Promise<boolean> {
+    const client = this.appServerClient;
+    if (!client || !this.capabilitySet.has(AgentCapability.TurnSteering)) {
+      return false;
+    }
+    const threadId = this.resolveThreadId(sessionId);
+    if (!threadId) {
+      return false;
+    }
+    const turnId = this.activeTurnIdByThread.get(threadId);
+    if (!turnId) {
+      logger.debug('steerTurn skipped: no active turn for thread', { threadId });
+      return false;
+    }
+    const result = await client.steerTurn(threadId, turnId, [{ type: 'text', text }]);
+    if (result.ok) {
+      this.trace((port) => port.recordLifecycle('turn.steered', { threadId, turnId }));
+      return true;
+    }
+    if (result.reason === 'unavailable') {
+      logger.debug('turn/steer unavailable on this server; dropping TurnSteering capability', { threadId });
+      this.setTurnSteeringCapabilityAvailable(false);
+      return false;
+    }
+    logger.debug('steerTurn rejected by app-server', {
+      threadId,
+      turnId,
+      code: result.error.code,
+      message: result.error.message,
+    });
+    this.trace((port) => port.recordLifecycle('turn.steer_rejected', {
+      threadId,
+      turnId,
+      code: result.error.code,
+    }));
+    return false;
+  }
+
+  /** Resolve a session id (provisional or thread alias) to a real thread id. */
+  private resolveThreadId(sessionId: string): string | null {
+    const entry = this.resolveSession(sessionId);
+    return entry?.threadId ?? (!this.isProvisionalId(sessionId) ? sessionId : null);
   }
 
   /** Return the most recent app-server-authoritative context snapshot. */
@@ -2509,6 +3502,15 @@ export class CodexAdapter
         // Best-effort cancellation; the attempt fence still blocks late state.
       }
     }
+    // Delete the persisted backend thread as well (the SDK fallback has no
+    // delete route; local cleanup below still runs when this fails).
+    if (threadId && this.appServerClient) {
+      try {
+        await this.appServerClient.deleteThread(threadId);
+      } catch {
+        // Best-effort server-side delete; the session is already unusable.
+      }
+    }
     this.activeAppServerTurns.delete(logicalKey);
     this.lastTurnContextBySession.delete(logicalKey);
     if (entry?.threadId) {
@@ -2529,6 +3531,8 @@ export class CodexAdapter
     if (threadId) {
       this.appServerClient?.clearThreadEffectiveSettings?.(threadId);
       this.appServerContextSnapshots.delete(threadId);
+      this.loadedThreadIds.delete(threadId);
+      this.threadGoalByThread.delete(threadId);
     }
     if (this.lastEvidenceSessionId === logicalKey || this.lastEvidenceSessionId === sessionId) {
       this.lastEvidenceSessionId = null;
@@ -2536,11 +3540,25 @@ export class CodexAdapter
   }
 
   async updateSessionTitle(
-    _sessionId: string,
-    _title: string,
+    sessionId: string,
+    title: string,
   ): Promise<void> {
-    // Codex SDK does not expose session title management.
-    // No-op to satisfy the interface contract.
+    const threadId = this.resolveThreadId(sessionId);
+    if (!threadId || !this.appServerClient) {
+      return;
+    }
+    const renamed = await this.appServerClient.setThreadName(threadId, title);
+    if (renamed) {
+      this.trace((port) => port.recordLifecycle('session.renamed', {
+        threadId,
+        titleLength: title.length,
+      }));
+    } else {
+      logger.debug('Codex thread rename was not confirmed by the app-server', { threadId });
+    }
+    // There is no adapter-local title field: listSessions/getSession re-read
+    // titles from the app-server, which emits `thread/name/updated` after a
+    // successful rename.
   }
 
   async listSessions(): Promise<unknown[]> {
@@ -2661,6 +3679,69 @@ export class CodexAdapter
         error: err instanceof Error ? err.message : String(err),
       });
       return [];
+    }
+  }
+
+  /**
+   * Paginated session-history seam (B3 consumption): one page of thread turns
+   * as normalized preview messages via `thread/turns/list` (itemsView
+   * `summary`). Returns null when the app-server client is unavailable, the
+   * thread cannot be resolved, or the page request fails — never throws.
+   */
+  async getSessionTurnsPage(
+    sessionId: string,
+    options?: BackendSessionTurnsPageOptions,
+  ): Promise<NormalizedSessionMessagesPage | null> {
+    const client = this.appServerClient;
+    const threadId = this.resolveThreadId(sessionId);
+    if (!client || !threadId) {
+      return null;
+    }
+    try {
+      const page = await client.listThreadTurns(threadId, {
+        cursor: options?.cursor ?? null,
+        ...(options?.limit !== undefined ? { limit: options.limit } : {}),
+        ...(options?.sortDirection !== undefined ? { sortDirection: options.sortDirection } : {}),
+        itemsView: 'summary',
+      });
+      return page ? normalizeTurnsPageToPreviewMessages(page) : null;
+    } catch (err) {
+      logger.warn('Failed to list thread turns page from app-server', {
+        threadId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Paginated per-turn item seam (B3 consumption): one page of one turn's
+   * items as normalized preview messages via `thread/items/list`. Returns
+   * null under the same contract as `getSessionTurnsPage` — never throws.
+   */
+  async getSessionTurnItemsPage(
+    sessionId: string,
+    options?: BackendSessionItemsPageOptions,
+  ): Promise<NormalizedSessionMessagesPage | null> {
+    const client = this.appServerClient;
+    const threadId = this.resolveThreadId(sessionId);
+    if (!client || !threadId) {
+      return null;
+    }
+    try {
+      const page = await client.listThreadItems(threadId, {
+        turnId: options?.turnId ?? null,
+        cursor: options?.cursor ?? null,
+        ...(options?.limit !== undefined ? { limit: options.limit } : {}),
+        ...(options?.sortDirection !== undefined ? { sortDirection: options.sortDirection } : {}),
+      });
+      return page ? normalizeThreadItemsPageToPreviewMessages(page) : null;
+    } catch (err) {
+      logger.warn('Failed to list thread items page from app-server', {
+        threadId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
     }
   }
 
@@ -2815,12 +3896,48 @@ export class CodexAdapter
     }
   }
 
-  private setContextCapabilityAvailable(available: boolean): void {
-    const changed = available
-      ? !this.capabilitySet.has(AgentCapability.Context)
-      : this.capabilitySet.delete(AgentCapability.Context);
+  /**
+   * Add/remove the capabilities that exist only while the app-server path is
+   * active: `Context` (authoritative usage snapshots) and `TurnSteering`
+   * (`turn/steer` has no SDK-fallback equivalent, so the SDK path must never
+   * advertise it). Emits `onCapabilitiesChange` only when the set actually
+   * changed.
+   */
+  private setAppServerCapabilitiesAvailable(available: boolean): void {
+    let changed: boolean;
     if (available) {
+      changed = !this.capabilitySet.has(AgentCapability.Context)
+        || !this.capabilitySet.has(AgentCapability.TurnSteering);
       this.capabilitySet.add(AgentCapability.Context);
+      this.capabilitySet.add(AgentCapability.TurnSteering);
+    } else {
+      const removedContext = this.capabilitySet.delete(AgentCapability.Context);
+      const removedSteering = this.capabilitySet.delete(AgentCapability.TurnSteering);
+      changed = removedContext || removedSteering;
+    }
+    if (!changed) {
+      return;
+    }
+    for (const handler of this.capabilityHandlers) {
+      try {
+        handler(new Set(this.capabilitySet));
+      } catch {
+        // Capability changes must not be blocked by a UI subscriber.
+      }
+    }
+  }
+
+  /**
+   * Narrow dynamic drop for the turn-steering capability: used when the
+   * server answers `turn/steer` with -32601 (route probing), without touching
+   * the `Context` capability that gates the whole app-server chat path.
+   */
+  private setTurnSteeringCapabilityAvailable(available: boolean): void {
+    const changed = available
+      ? !this.capabilitySet.has(AgentCapability.TurnSteering)
+      : this.capabilitySet.delete(AgentCapability.TurnSteering);
+    if (available) {
+      this.capabilitySet.add(AgentCapability.TurnSteering);
     }
     if (!changed) {
       return;

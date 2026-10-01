@@ -1,4 +1,5 @@
 # Owner: shared.i18n
+> 2026-09-30 (Codex 0.159 integration)：locale parity 保持（两侧各 5868 键）；新增 `chat.toolCard.image.*`（4 键）、`chat.backendSessions.detailLoadMore`/`detailLoadMoreRetry`/`detailTranscriptUnavailable`、`settings.codex.tab.plugins` + plugins 分节 + usage 文案；两侧同步移除 `settings.codex.approvalPolicy.untrusted`。
 > 2026-09-25 (FA880): Native ZCode background task statuses and cancel action have matching English and Chinese labels.
 > 2026-09-25 (FA880): Both locales identify a terminal ZCode permission ask without implying that approval was sent.
 > 2026-09-25 (ZCode acceptance): The unavailable modified-files panel copy is backend neutral in both locales; it no longer says a ZCode conversation is waiting for OpenCode.

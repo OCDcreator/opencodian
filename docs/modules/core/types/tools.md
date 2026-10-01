@@ -2,6 +2,7 @@
 
 > **源码**: `src/core/types/tools.ts`
 > **状态**: [REVIEW]
+> **Updated**: 2026-09-30 — `ToolCallInfo.kind` 联合新增 `'image'`（Codex `imageGeneration` 工具卡片），与 `core/types/chat.ts`、`utils/streaming/types.ts`、`shared/toolIdentity.ts` 的 kind 联合对齐。
 
 ## 概述
 

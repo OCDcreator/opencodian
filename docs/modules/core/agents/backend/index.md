@@ -4,6 +4,7 @@
 > **最近更新**: 2026-07-26 — `ClaudeProjectSettingsDiscovery` 保持只读 discover/open；创建与完整 settings mutation 已移交 `ClaudeSettingsSourceService`，barrel 不再导出旧的 `createClaudeProjectSettingsFile`。
 
 > **新增导出**: `CodexProjectResourceDiscovery`（Codex 项目/全局 skills+agents discovery 与安全 CRUD）、`ClaudeCodeProcessMissingReason`、`AppServerSkill`/`AppServerListSkillsOptions`（经 CodexAppServerClient re-export）。
+> **Updated**: 2026-09-30 — 新增 `CodexElicitationBridge` 导出族（builders + wire 类型 + host seam）；`CodexDefaultApprovalHost` 导出族新增 `CodexQuestionCardRenderer`。
 > **Updated**: 2026-07-28 — renamed ClaudeCodeModelSelectorProvider export to BackendModelSelectorProvider (backend-neutral).
 
 ## 概述
@@ -56,7 +57,9 @@
 - `AgentChatCapability` / `AgentSessionCapability` / `AgentAuthCapability` / `AgentBranchCapability` / `AgentConfigCapability` / `AgentMcpCapability` / `AgentModelCapability` / `AgentPermissionCapability` / `AgentQuestionCapability` / `AgentTodoCapability` / `AgentToolCapability`: 可选 capability interface。
 - `CodexAdapter` / `CodexFactory` / `CodexAdapterOptions`: Codex SDK adapter 骨架，实现 AgentChatCapability + AgentSessionCapability；DI seam 支持测试注入。
 - `CodexApprovalKind` / `CodexApprovalRequest` / `CodexApprovalDecision` / `CodexApprovalBridgeHost`: Codex server-request 审批 bridge 类型（Round 5）。`CodexAdapter.setApprovalHost(host)` 通过这些类型把 `execCommandApproval` / `applyPatchApproval` server-request 接到 UI-facing host 回调；仅 wire 两种最窄审批形状 + 四个标量 ReviewDecision，运行时触发证明仍待后续。
-- `CodexApprovalHostContext` / `CodexApprovalCardRenderer` / `CodexApprovalResolutionResult` / `createCodexApprovalBridgeHost` / `buildCodexApprovalQuestionRequest` / `mapCodexApprovalResolution`: Codex 审批 UI host seam（Round 6）。`createCodexApprovalBridgeHost(getContext)` 返回一个动态读取 context 的 `CodexApprovalBridgeHost`；`buildCodexApprovalQuestionRequest` 把 `CodexApprovalRequest` 翻译为 `QuestionRequest`，`mapCodexApprovalResolution` 把 `showQuestionDialog` 结果映射回 `CodexApprovalDecision`；chat view 通过 `installCodexApprovalHostContext()` 把 `approvalCardRenderer` 挂到 plugin 的 context 上。
+- `CodexApprovalHostContext` / `CodexApprovalCardRenderer` / `CodexQuestionCardRenderer` / `CodexApprovalResolutionResult` / `createCodexApprovalBridgeHost` / `buildCodexApprovalQuestionRequest` / `mapCodexApprovalResolution`: Codex 审批 UI host seam（Round 6，2026-09-30 扩展至 v2）。`createCodexApprovalBridgeHost(getContext)` 返回一个动态读取 context 的 `CodexApprovalBridgeHost`（`collectApproval` + `collectQuestionAnswers`）；`buildCodexApprovalQuestionRequest` 把 `CodexApprovalRequest` 翻译为 `QuestionRequest`（基础三选项 + execpolicy/network amendment 选项），`mapCodexApprovalResolution` 把 `showQuestionDialog` 结果映射回 `CodexApprovalDecision`（amendment 选项与 originating request 结构匹配）；chat view 通过 `installCodexApprovalHostContext()` 把 `approvalCardRenderer` / `questionCardRenderer` / `elicitationCardRenderer` 挂到 plugin 的 context 上
+- `buildCodexElicitationQuestionRequest` / `buildCodexElicitationUrlQuestionRequest` / `buildCodexElicitationContent` / `isCodexElicitationWireParams` / `isCodexElicitationDecline`: Codex 0.159.0 `mcpServer/elicitation/request` 的 wire 类型（`CodexMcpElicitationWireParams` 等）与 question-card 映射 builder（镜像 `ClaudeCodeElicitationBridge`）
+- `CodexElicitationBridgeHost` / `CodexElicitationHostContext` / `CodexElicitationCardRenderer` / `CodexElicitationCardRequest` / `CodexElicitationHostResponse` / `createCodexElicitationBridgeHost`: MCP elicitation host seam；plugin context 结构性兼容，`CodexAdapter.setElicitationHost` 消费
 - `CodexStreamNormalizer` / `CodexStreamNormalizerOptions` / `createCodexStreamNormalizer`: Codex SDK ThreadEvent → StreamChunk 转换器。
 
 ## 依赖
@@ -80,6 +83,7 @@
 - `src/core/agents/backend/CodexAdapter.ts`：Codex SDK adapter 骨架（Chat + Session）
 - `src/core/agents/backend/CodexCliResolver.ts`：用户安装 Codex CLI 的显式路径 / GUI PATH / Windows npm shim 解析；不读取插件私有 runtime
 - `src/core/agents/backend/CodexDefaultApprovalHost.ts`：Codex 审批 bridge 的默认 host 实现；连接 adapter 的 `setApprovalHost` 到 view 的 question/inline-card UI
+- `src/core/agents/backend/CodexElicitationBridge.ts`：Codex `mcpServer/elicitation/request` 桥（form/url builder + wire 类型 + host seam）；独立文件，与 Claude bridge 镜像但不共享 helper（2 consumers < 3+ 阈值）
 - `src/core/agents/backend/CodexStreamNormalizer.ts`：Codex SDK ThreadEvent → StreamChunk 转换器
 - `src/core/agents/backend/CodexAppServerClientTypes.ts`：从 `CodexAppServerClient` 拆出的纯 wire 类型模块（thread/model/account/MCP/review 等），由 `CodexAppServerClient` 通过 `export *` 重新导出
 - `src/core/agents/backend/CodexAppServerTransport.ts`：从 `CodexAppServerClient` 拆出的基类，负责 app-server 进程生命周期与 JSON-RPC 2.0 plumbing；`CodexAppServerClient extends CodexAppServerTransport`

@@ -2,6 +2,7 @@
 
 > **源码**: `src/style/components/streaming-content.css`
 > **状态**: [FINAL]
+> **Updated**: 2026-09-30 — image-generation tool card styles (`.streaming-tool-image`, `.streaming-tool-image-path`, `.streaming-tool-image-revised-prompt*`)
 
 ## 职责
 

@@ -1,4 +1,7 @@
 # Owner: shared.utils-streaming
+> 2026-09-30 (Codex 0.159 integration)：
+> - `ToolCallRenderer` 新增 image kind 渲染分支（data-URL img、path 回退、revisedPrompt 行、本地化状态）。
+> - streaming 类型 kind union 扩展；新增 `ToolCallRenderer.image.test`。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.

@@ -63,4 +63,4 @@ ZCode 后端的 AgentService 门面（票 01 范围：注册、探测、能力�
 
 ## 验证
 
-tests/unit/core/agents/backend/ZCodeAdapter.test.ts、ZCodeAdapterWiring.test.ts、ZCodeAdapter.models.test.ts、ZCodeAdapter.sessions.test.ts。能力集按运行时可证功能声明 Chat/Sessions/Fork/Compaction/Questions/Permissions/Models/Context/Thinking；模型、模式、上下文操作均以原生读回作为闭环门槛。
+tests/unit/core/agents/backend/ZCodeAdapter.test.ts、ZCodeAdapterWiring.test.ts、ZCodeAdapter.models.test.ts、ZCodeAdapter.sessions.test.ts。能力集按运行时可证功能声明 Chat/Sessions/Fork/Compaction/Questions/Permissions/Models/Context/Thinking/Images/InlineCompletion/AuxQuery；模型、模式、上下文操作均以原生读回作为闭环门槛。`TurnSteering` 有意缺席（无原生 mid-turn steer 接缝，mid-turn 输入按队列串行化，2026-09-30 B5 other-backends-audit 复核），能力集合精确锁定见 `tests/unit/core/agents/backend/BackendCapabilitySets.test.ts`。

@@ -1,4 +1,5 @@
 # settingsLayoutRegistry
+> 2026-09-30 (B4): Codex primary tab 新增 `plugins` 二级 tab（`settings.codex.tab.plugins`），排在 `resources` 之后，承载 `SettingsCodexPluginsSection` 插件浏览器。
 > 2026-09-20 (advantage-parity R-D1): conversation 主 tab 的 secondary tabs 在 `vault-retrieval` 后新增 `export`（backend 无关）。
 > 2026-09-18 (R-C6): Security 主 tab 新增二级 tab `remote`（`settings.security.tab.remote`），承载 R-C6 远程驱动设置；其余二级 tab 不变。
 > 2026-09-18 (R-B2): new conversation secondary tab `context-groups` (label `settings.conversation.tab.contextGroups`) after `inline-edit`.
@@ -34,7 +35,7 @@ registry 里的 `backendRequired` 是设置 surface 的后端边界声明：Open
 |---------|---------|
 | `general` | `basic`, `backend` |
 | `claude-code` | `runtime`, `model-thinking`, `permissions`, `context-sources`, `tools` |
-| `codex` | `connection`, `permissions`, `resume-inspect`, `account`, `resources` |
+| `codex` | `connection`, `permissions`, `resume-inspect`, `account`, `resources`, `plugins` |
 | `server` | `connection`, `auth`, `status` |
 | `model` | `common`, `project-config`, `availability`, `tools` |
 | `conversation` | `display`, `title`, plus OpenCode-only `compaction`, `sharing`, `questions`; backend-neutral `memory` and `inline-edit` |

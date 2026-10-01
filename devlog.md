@@ -11,6 +11,18 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-30 Codex 后端全面接入 0.159 app-server 能力面 + 跨后端统一能力缝
+
+对照本机 codex 0.159.0 的 `app-server generate-json-schema` 精确协议面（/tmp/codex-schema-0159），把插件从 0.144.1 时代的 wire 绑定补齐到当前上游能力，全部由「统一 capability 接口 + 各后端按需声明」的既有架构承载，聊天层零新 UX 体系。编排方式：1 个计划文件（.tmp/codex-full-integration-plan.md）+ 两波共 8 个并行子代理 + 独立审查代理（GO，2 个 should-fix 已修）。
+
+- **Steer（统一接口复用）**：`AgentTurnSteeringCapability.steerTurn` 早在 OpenCode2/Pi 上存在，Codex 本次补齐——追踪 `turn/started` 的 active turnId，经新路由 `turn/steer {threadId, expectedTurnId, input}` 注入；`TurnSteering` 仅 app-server 路径动态声明（沿用 Context 的 `setAppServerCapabilitiesAvailable` 先例，-32601 探测失败即摘除），SDK 回退永不声明；排队条「立即注入」UX 自动生效。顺带修正 OpenCode 1 legacy adapter 虚标 TurnSteering 的问题（全量 capability 集合无 steerTurn 实现，改为诚实排除 + `BackendCapabilitySets.test.ts` 锁死五后端精确能力集）。
+- **审批 v2 + elicitation 全面桥接**：注册三个 `item/*/requestApproval` 新路由（commandExecution/fileChange/permissions）+ `item/tool/requestUserInput` + `mcpServer/elicitation/request`，保留 legacy 路由；全部复用 question-card host 三层模式。新决策变体（acceptForSession、acceptWithExecpolicyAmendment、applyNetworkPolicyAmendment、decline、cancel）结构化校验防伪造标签；permissions 审批回复 GrantedPermissionProfile，deny 回空授予（schema 合法且不可误授）；elicitation form 模式镜像 Claude bridge（新 `CodexElicitationBridge.ts`，2 消费者不抽公共 helper），url 模式仅放行 http(s)（审查修复项）。
+- **会话管理补全**：`updateSessionTitle` → `thread/name/set`（不再是 no-op）、`deleteSession` → `thread/delete`；goal 暂停/恢复（`thread/goal/set` status）；会话浏览器走 `thread/turns/list`(summary) + 游标分页「加载更多」（`AgentBackendRouting` 新增结构化 `BackendPaginatedSessionHistoryCapability` seam，其他后端行为不变）。
+- **新渲染面**：`image_generation_call` item → `tool_use` 新 kind `'image'`（b64→data URL、magic-byte MIME、usageLimitExceeded 失败态）；`subAgentActivity` → task 卡片（按 agentThreadId 合并 started/interacted/completed）；新通知（thread/name/updated、goal/*、thread/deleted、deprecationNotice）→ backend_event 缝，adapter 侧拦截维护标题/goal 状态/会话失效。
+- **健壮性**：传输层 WS 断线指数退避重连（1-16s×5）+ 重握手 + handler 注册存续 + adapter 侧 re-resume 已加载 thread、进行中 turn 注入中断 error chunk（epoch 防串台）；`untrusted` 审批值迁移（上游 0.15x 配置层拒绝启动，normalize 层映射 → on-request，UI 下拉与会话级 override 同步清理）；聊天层 capability-change 缝补齐（A3 发现既有 `wireBackendSurfaceSwitch` 订阅已存在，仅加防churn守卫 + 排队条刷新）。
+- **设置 UI**：新「插件」页签（marketplace/已安装列表、install/uninstall/reconcile，backend 不可用显式降级）、账号 usage 分析卡片（lifetime/streak/peakDaily，全空时显式空态）。
+- 验证：全量 `npm run verify` 绿（934 套件 / 9390 测试、lint 0 警告、tsc 0 错误、生产构建）；独立审查代理对照 schema dump 逐路径审计 fail-closed 审批（无 blocker）；审查修复 3 项（`AppServerToolUserInputResponse` 类型矫正为 Record 并删除隐藏 cast、elicitation URL 协议白名单、app-server 构造参数断言放宽为 objectContaining）；architecture-baseline 与 graphify 随新文件刷新。
+
 ## 2026-09-28 三后端 SDK 例行刷新：Claude 0.3.283 / Codex 0.158.0 / OpenCode 1.18.33
 
 - 依赖刷新至 npm 当日 latest：`@anthropic-ai/claude-agent-sdk ^0.3.283`、`@openai/codex-sdk 0.158.0`、`@opencode-ai/sdk 1.18.33`；沿用既有 pin 风格（Codex/OpenCode 精确 pin、Claude caret）。`@opencode/client` 维持 `2.0.18`——npm 最新版仍是 2.0.18，上游源码 pin 的 tag 未变，不动。

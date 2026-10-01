@@ -1,5 +1,9 @@
 # Chinese Locale
 `modifiedFiles.statsUnavailable` 与 `modifiedFiles.statusUnavailable` 用于只有工具文件提示、没有权威原生快照统计和变更状态的记录。
+> 2026-09-30（B2 codex-stream-rendering）：新增 `chat.toolCard.image.*`（`statusGenerating` / `statusCompleted` / `statusFailed` / `revisedPrompt`），供 ToolCallRenderer 渲染的流式图像生成工具卡片使用；与 en 一一对应。
+> 2026-09-30（B4 codex plugins/usage）：新增 `settings.codex.tab.plugins` 与 `settings.codex.plugins.*` 组（浏览器标题/操作、市场+已安装分组、安装/卸载/对账通知、安装策略徽标、市场加载失败文案）以及 `settings.codex.accountSurface.usage.empty`（全 null 使用量的诚实空态）；与 en 一一对应。
+> 2026-09-30（A2 untrusted-migration）：删除 `settings.codex.approvalPolicy.untrusted`；审批策略描述仅保留“继承／按需／从不”（与 en 一一对应）。
+> 2026-09-30（B3 session-pagination）：新增 `chat.backendSessions.detailLoadMore` / `detailLoadMoreRetry`（detail 转录分页“加载更多”按钮及其重试态）和 `chat.backendSessions.detailTranscriptUnavailable`（会话缺失/已删除占位文案）；与 en 一一对应。
 > 2026-09-28（OpenCode 2）：分享命令说明上游限制；配置应用提示以原生配置值回读为准。
 > 2026-09-25（删除语义）：确认文案说明移除 OpenCodian 本地消息，后端可能保留原生历史；避免把 ZCode 官方任务列表的软删除说成历史永久清除。
 > 2026-09-25（ZCode）：`chat.zcode.backgroundTask.stopped` 将原生 `killed` 中性显示为“已停止”；没有可验证终态通知的任务仍使用原有“状态未知／连接中断”文案。

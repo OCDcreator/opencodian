@@ -413,6 +413,32 @@
   font-style: italic;
 }
 
+.streaming-tool-image {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.streaming-tool-image-path {
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  word-break: break-all;
+  color: var(--text-muted);
+}
+
+.streaming-tool-image-revised-prompt {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.streaming-tool-image-revised-prompt-label {
+  margin-inline-end: 6px;
+  font-weight: 600;
+}
+
 /* Error block */
 .streaming-error-block {
   display: flex;

@@ -129,4 +129,34 @@ describe('conversation session settings normalization', () => {
       codexModelReasoningEffort: effort,
     });
   });
+
+  it.each(['inherit', 'on-request', 'never'] as const)('preserves supported Codex approval policy %s', (policy) => {
+    expect(normalizeConversationSessionSettings({
+      codexApprovalPolicy: policy,
+    })).toEqual({
+      codexApprovalPolicy: policy,
+    });
+  });
+
+  it('migrates a persisted untrusted approval policy to on-request', () => {
+    expect(normalizeConversationSessionSettings({
+      codexApprovalPolicy: 'untrusted',
+    })).toEqual({
+      codexApprovalPolicy: 'on-request',
+    });
+  });
+
+  it('preserves explicit null codexApprovalPolicy', () => {
+    expect(normalizeConversationSessionSettings({
+      codexApprovalPolicy: null,
+    })).toEqual({
+      codexApprovalPolicy: null,
+    });
+  });
+
+  it('drops unknown Codex approval policy values', () => {
+    expect(normalizeConversationSessionSettings({
+      codexApprovalPolicy: 'whatever' as unknown as import('../../../../src/core/types/chat').ConversationSessionSettings['codexApprovalPolicy'],
+    })).toBeUndefined();
+  });
 });

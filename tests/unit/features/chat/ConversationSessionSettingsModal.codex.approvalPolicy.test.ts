@@ -64,7 +64,7 @@ describe('ConversationSessionSettingsModal Codex approvalPolicy', () => {
     // Blank value (use global) AND explicit inherit both present and distinct.
     expect(options).toContain('');
     expect(options).toContain('inherit');
-    expect(options).toEqual(['', 'inherit', 'untrusted', 'on-request', 'never']);
+    expect(options).toEqual(['', 'inherit', 'on-request', 'never']);
     // The blank option carries the "Use global setting" label.
     expect(select.options[0].textContent).toMatch(/global/i);
     // The explicit inherit option carries a distinct "backend default" label.
@@ -76,8 +76,14 @@ describe('ConversationSessionSettingsModal Codex approvalPolicy', () => {
   });
 
   it('initializes to an explicit override when one exists', () => {
-    expect(getSelect(openModal({ codexApprovalPolicy: 'untrusted' })).value).toBe('untrusted');
+    expect(getSelect(openModal({ codexApprovalPolicy: 'on-request' })).value).toBe('on-request');
     expect(getSelect(openModal({ codexApprovalPolicy: 'inherit' })).value).toBe('inherit');
+  });
+
+  it('falls back to "use global" for a legacy untrusted override (migrated upstream)', () => {
+    // Persisted 'untrusted' is normalized to 'on-request' before it reaches the
+    // modal; a raw straggler has no matching option and falls back to blank.
+    expect(getSelect(openModal({ codexApprovalPolicy: 'untrusted' })).value).toBe('');
   });
 
   it('gives the real Approval Policy, Sandbox Mode, and related session selects an accessible name', () => {
@@ -110,7 +116,7 @@ describe('ConversationSessionSettingsModal Codex approvalPolicy', () => {
       },
       // A non-null sibling override keeps the overrides object alive so the
       // null approval policy is observable instead of collapsed to undefined.
-      initialOverrides: { codexApprovalPolicy: 'untrusted', codexSandboxMode: 'read-only' },
+      initialOverrides: { codexApprovalPolicy: 'on-request', codexSandboxMode: 'read-only' },
       showCodexControls: true,
       onSave,
     });

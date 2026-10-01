@@ -48,7 +48,7 @@ describe('CodexAdapter — app-server start/stop lifecycle', () => {
       createCodex: async () => ({}) as any,
     });
     await adapter.start();
-    expect(MockedCodexAppServerClient).toHaveBeenCalledWith({ codexPathOverride: '/mock/codex' });
+    expect(MockedCodexAppServerClient).toHaveBeenCalledWith(expect.objectContaining({ codexPathOverride: '/mock/codex' }));
   });
 
   it('enters error without constructing the SDK when wiring reports no user CLI', async () => {
@@ -68,9 +68,9 @@ describe('CodexAdapter — app-server start/stop lifecycle', () => {
       createCodex: async () => ({}) as any,
     });
     await adapter.start();
-    expect(MockedCodexAppServerClient).toHaveBeenCalledWith({
+    expect(MockedCodexAppServerClient).toHaveBeenCalledWith(expect.objectContaining({
       codexPathOverride: undefined,
-    });
+    }));
   });
 
   it('continues with the SDK fallback when app-server protocol negotiation fails', async () => {

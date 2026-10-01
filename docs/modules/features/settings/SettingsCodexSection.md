@@ -1,3 +1,5 @@
+> **Updated**: 2026-09-30 — adds a seventh `plugins` secondary tab delegated to `SettingsCodexPluginsSection` (Codex plugin browser: marketplace/installed lists, install/uninstall with confirm → reconcile → reload, honest unavailable states); resource/plugin mutations now share `invalidateCodexRuntimeCatalogs()`.
+> **Updated**: 2026-09-30 — the approval-policy dropdown no longer offers `untrusted` (retired by Codex CLI 0.15x in 2026-08); the load-time normalizer migrates persisted `untrusted` to `on-request`, and the dropdown mirrors that fallback for raw values.
 > **Updated**: 2026-07-28 — adds Project configuration secondary tab (project-config) delegated to SettingsCodexProjectConfigSection.
 
 > **Updated**: 2026-07-29 — backend fallback initialization preserves sibling OpenCode trace settings.
@@ -14,14 +16,15 @@
 
 ## Purpose
 
-Codex backend settings panel. Uses six secondary tabs under the Codex primary tab to avoid piling unrelated settings into a single flat card stack, grouped by *what* a setting controls (Source Grouping, see `CONTEXT.md`):
+Codex backend settings panel. Uses seven secondary tabs under the Codex primary tab to avoid piling unrelated settings into a single flat card stack, grouped by *what* a setting controls (Source Grouping, see `CONTEXT.md`):
 
 1. **Connection** — user-installed CLI executable path (empty = automatic discovery), explicit `Reload OpenCodian` action, genuinely wired SDK options (`model`, `modelReasoningEffort`, `webSearchMode`), a lightweight connection-source summary, and masked legacy-credential status. No Codex secret input is rendered.
-2. **Permissions** — approval/sandbox boundary: `approvalPolicy` (`CodexApprovalPolicy`), `sandboxMode`, `networkAccessEnabled`, `additionalDirectories`. `approvalPolicy` default `inherit` omits the override; `untrusted`/`on-request` fail closed in `CodexAdapter` without the app-server + bridge; `never` may use the SDK fallback.
+2. **Permissions** — approval/sandbox boundary: `approvalPolicy` (`CodexApprovalPolicy`), `sandboxMode`, `networkAccessEnabled`, `additionalDirectories`. `approvalPolicy` default `inherit` omits the override; `on-request` fails closed in `CodexAdapter` without the app-server + bridge; `never` may use the SDK fallback. Retired `untrusted` was removed from the dropdown in 2026-09-30 (upstream Codex CLI 0.15x rejection); persisted values migrate to `on-request` at load time.
 3. **Resume & inspect** — the backend session browser and live runtime readbacks (model catalog, permission profiles, MCP servers, loaded threads, and read-only hooks metadata).
 4. **Account** — live read-only account/capability cards rendered by `SettingsCodexAccountSurface`.
 5. **Project Config** — delegated save/read flow for `<vault>/.codex/config.toml`, including the constrained advanced TOML editor owned by `SettingsCodexProjectConfigSection`.
 6. **Resources** — delegated to `SettingsCodexResourcesSection` (project skills/agents; global resources are read-only in P0, with CRUD deferred to P1's allowlisted-root contract).
+7. **Plugins** — delegated to `SettingsCodexPluginsSection` (Codex plugin browser: `plugin/list` marketplace catalog, `plugin/installed` list, confirm-gated install/uninstall followed by reconcile, and an explicit unavailable state when the backend is inactive or routes return null).
 
 The old disabled "Authentication" setting is replaced by the connection-source summary and an auth-source row inside the Account surface, so the UI never presents a disabled input as a status indicator.
 
@@ -46,6 +49,7 @@ The Account tab also exposes the shared cost-estimate entry as its own sub-group
 |--------|--------------|
 | `SettingsCodexReadbackControls` | Delegates the remaining diagnostic readbacks (model catalog, permission profiles, MCP servers, loaded threads) and the session-browser launcher |
 | `SettingsCodexAccountSurface` | Delegates the four account/capability product cards (identity, usage, rate limits, provider capabilities) |
+| `SettingsCodexPluginsSection` | Delegates the `plugins` tab plugin browser (marketplace/installed lists, install/uninstall/reconcile against the active Codex adapter) |
 | `SettingsCodexLegacyCredentialControl` | Owns masked legacy-credential status, confirmation-gated persistence transaction/rollback, localized failure state, and the post-success auth/runtime callback |
 
 ## Settings Surface
@@ -58,7 +62,7 @@ The Account tab also exposes the shared cost-estimate entry as its own sub-group
 | `modelReasoningEffort` | `string` (dropdown) | Yes | Connection tab | Dropdown in ordinary settings; persisted to `CodexBackendSettings`; live adapter writeback via `updateModelReasoningEffort()` for next-thread boundary |
 | `additionalDirectories` | `string` (newline-separated) | Yes | Permissions tab | Textarea in ordinary settings; persisted to `CodexBackendSettings`; live adapter update via `updateAdditionalDirectories()` for next-thread boundary |
 | `networkAccessEnabled` | `boolean` | Yes | Permissions tab | Toggle in ordinary settings; persisted to `CodexBackendSettings`; live adapter update via `updateNetworkAccessEnabled()` for next-thread boundary |
-| `approvalPolicy` | `string` (dropdown) | Yes | Permissions tab | `CodexApprovalPolicy` dropdown (inherit/untrusted/on-request/never); persisted to `CodexBackendSettings` (default `inherit`); live adapter update via `updateApprovalPolicy()`. `inherit` omits the override; `untrusted`/`on-request` require the app-server + approval bridge and fail closed in the adapter; `never` may use the SDK fallback. |
+| `approvalPolicy` | `string` (dropdown) | Yes | Permissions tab | `CodexApprovalPolicy` dropdown (inherit/on-request/never; retired `untrusted` removed 2026-09-30); persisted to `CodexBackendSettings` (default `inherit`); live adapter update via `updateApprovalPolicy()`. `inherit` omits the override; `on-request` requires the app-server + approval bridge and fails closed in the adapter; `never` may use the SDK fallback. A raw persisted `untrusted` displays as `on-request` (load-time normalizer migrates it). |
 | `webSearchMode` | `string` (dropdown) | Yes | Connection tab | Dropdown in ordinary settings; persisted to `CodexBackendSettings`; live adapter update via `updateWebSearchMode()` for next-thread boundary. Settings description honestly states distinct runtime behavior between modes is not yet proven. |
 | Legacy credential status | — | Save + clear | Connection tab | Shows only "configured (value hidden)" or login/environment guidance. Clear requires explicit confirmation; no create/edit/value input is exposed. |
 | Connection source summary | — | — | Connection tab | Lightweight read-only strip showing dynamic auth source description: legacy plugin credential (masked) when configured, Codex login/environment when not. |
@@ -76,13 +80,14 @@ The Account tab also exposes the shared cost-estimate entry as its own sub-group
 
 - Instantiated by `SettingsTabbedRenderer.renderCodexContent()`
 - Reads/writes `plugin.settings.backendSettings.codex`
-- Registered as primary tab `codex` with `backendRequired: 'codex'` in `settingsLayoutRegistry`; secondary tabs are `connection` (default), `permissions`, `resume-inspect`, `account`, `project-config`, and `resources` (6 tabs)
+- Registered as primary tab `codex` with `backendRequired: 'codex'` in `settingsLayoutRegistry`; secondary tabs are `connection` (default), `permissions`, `resume-inspect`, `account`, `project-config`, `resources`, and `plugins` (7 tabs)
 - Follows the same `attach()` / `attachTabbed()` pattern as `SettingsClaudeCodeSection`
 - Owns the wired settings controls grouped by Source Grouping (see `CONTEXT.md`): **Connection** tab owns `model`, `modelReasoningEffort`, `webSearchMode`, plus a masked/backward-compatible `apiKey` status; **Permissions** tab owns `approvalPolicy`, `sandboxMode`, `additionalDirectories`, `networkAccessEnabled`. Both tabs apply live adapter updates via `applyCodexRuntimeUpdates()`. `SettingsCodexLegacyCredentialControl` handles the legacy credential transaction: confirmation, temporary in-memory clear, awaited `saveSettings()`, rollback on rejection, localized failure, and the success-only callback that updates auth summary/account/runtime state.
 - Dropdown controls for approval policy and sandbox mode expose their setting names as explicit `aria-label` values in addition to the visible descriptions, preserving an accessible name when the Obsidian `Setting` wrapper is rendered or tested independently.
 - Renders a lightweight connection-source summary instead of a disabled "Authentication" setting
 - Delegates the remaining live runtime readbacks to `SettingsCodexReadbackControls` inside the **Resume & inspect** tab, including the read-only hooks/list inspection
 - Mounts the provider-configuration status strip and four account/capability product cards via `SettingsCodexAccountSurface` inside the **Account** tab, passing the inferred `authSource` derived from the plugin `apiKey` field; native Provider configuration is explicitly external-managed/read-only. The section disposes the account surface during settings re-render so its Codex connection subscription cannot outlive the visible tab.
+- Mounts the plugin browser via `SettingsCodexPluginsSection` inside the **Plugins** tab on the same borderless host contract as Resources (`data-codex-section="plugins"`); both resource and plugin mutations funnel through `invalidateCodexRuntimeCatalogs()`, which invalidates the slash-command catalog cache and forces a one-shot bypass of the server-side `skills/list` cache
 - The Account group header is a flex row (`.opencodian-settings-codex-group-header`): title + one-line description on the left, a ghost "Refresh all" button (`.opencodian-codex-account-refresh-all` → `SettingsCodexAccountSurface.refreshAllNow()`) on the right
 
 ## Boundaries

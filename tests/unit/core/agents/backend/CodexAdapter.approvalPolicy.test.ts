@@ -92,9 +92,9 @@ describe('CodexApprovalPolicy — type layer', () => {
     expect(missing.approvalPolicy).toBe('inherit');
   });
 
-  it('preserves a valid explicit approvalPolicy', () => {
+  it('preserves a valid explicit approvalPolicy and migrates retired untrusted to on-request', () => {
     expect(normalizeBackendSettings({ codex: { approvalPolicy: 'never' } }).codex.approvalPolicy).toBe('never');
-    expect(normalizeBackendSettings({ codex: { approvalPolicy: 'untrusted' } }).codex.approvalPolicy).toBe('untrusted');
+    expect(normalizeBackendSettings({ codex: { approvalPolicy: 'untrusted' } }).codex.approvalPolicy).toBe('on-request');
   });
 
   it('session override normalizes codexApprovalPolicy and rejects unknown values', () => {

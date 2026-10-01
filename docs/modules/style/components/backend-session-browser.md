@@ -34,8 +34,11 @@
 - `.opencodian-backend-session-browser-archive-btn`: 归档按钮
 - `.opencodian-backend-session-browser-unarchive-btn`: 取消归档按钮
 - `.opencodian-backend-session-browser-item.is-archived`: 归档会话行的视觉区分（透明度降低）
+- `.opencodian-backend-session-browser-detail-load-more`: detail 分页转录的“加载更多”按钮（含 `:disabled` 态）
+- `.opencodian-backend-session-browser-detail-transcript-unavailable`: 会话缺失/已删除时的转录占位文案
 
 ## 维护记录
 
 - 2026-06-06: 增加 preview notice、detail metadata card、detail transcript message/text、detail role header 和 detail button disabled state 样式，支持 `BackendSessionBrowserModal` 的 preview/detail 双模式展示。
 - 2026-06-13: 增加 `.opencodian-backend-session-browser-item-archived` badge、`.is-archived` 行样式和 Fork / Archive / Unarchive 按钮样式。
+- 2026-09-30: 增加 `.opencodian-backend-session-browser-detail-load-more`（含禁用态）和 `.opencodian-backend-session-browser-detail-transcript-unavailable`，支持 B3 分页转录的加载更多与缺失会话占位。

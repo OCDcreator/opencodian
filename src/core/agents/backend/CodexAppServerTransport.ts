@@ -8,9 +8,11 @@
  *   - spawning/connecting the app-server WebSocket,
  *   - the JSON-RPC 2.0 request/response/notification dispatch loop,
  *   - server-initiated request (approval callback) reply routing,
- *   - notification + server-request handler registration.
+ *   - notification + server-request handler registration,
+ *   - WebSocket reconnect after an unexpected close (exponential backoff,
+ *     handshake re-run, onReconnect/onReconnectFailed callbacks).
  *
- * Protocol: JSON-RPC 2.0 over WebSocket.
+ * Protocol: JSON-RPC 2.0 over WebSocket (shapes verified against Codex 0.159.0).
  * Lifecycle: spawns `codex app-server --listen ws://127.0.0.1:0`, parses the
  *   emitted ws:// URL from stdout, connects, initializes, then makes requests.
  */
@@ -23,6 +25,15 @@ import { createLogger } from '../../../shared';
 import type { AppServerServerRequestHandler, CodexAppServerWireObserver } from './CodexAppServerClientTypes';
 
 const logger = createLogger('CodexAppServerClient');
+
+/**
+ * WebSocket reconnect policy (Codex 0.159.0 hardening): at most 5 attempts
+ * with exponential backoff 1s → 2s → 4s → 8s → 16s (~31 s budget). Deliberate
+ * stop()/dispose never triggers a reconnect.
+ */
+const RECONNECT_MAX_ATTEMPTS = 5;
+const RECONNECT_BASE_DELAY_MS = 1000;
+const RECONNECT_MAX_DELAY_MS = 16000;
 
 /** JSON-RPC request envelope (client → server). */
 interface JsonRpcRequest {
@@ -44,7 +55,7 @@ interface JsonRpcInbound {
   method?: string;
   params?: unknown;
   result?: unknown;
-  error?: { code: number; message: string };
+  error?: { code: number; message: string; data?: unknown };
 }
 
 /**
@@ -101,11 +112,43 @@ export class CodexAppServerTransport {
    */
   protected readonly getExtraEnv?: () => Record<string, string>;
 
-  constructor(options?: { codexPathOverride?: string; workingDirectory?: string; wireObserver?: CodexAppServerWireObserver; getExtraEnv?: () => Record<string, string> }) {
+  /**
+   * Invoked after an unexpected WebSocket close was recovered: the socket was
+   * reopened and the initialize handshake re-run (server-request handler
+   * registrations survive automatically — the registry is never cleared on
+   * close). The adapter uses this to re-resume loaded threads. Observer
+   * exceptions are caught and logged, never propagated into the reconnect
+   * path.
+   */
+  protected readonly onReconnect?: () => void | Promise<void>;
+
+  /**
+   * Invoked when the reconnect budget is exhausted without re-establishing
+   * the session (fail-closed: pending requests already rejected, new requests
+   * fail fast until the next successful start()).
+   */
+  protected readonly onReconnectFailed?: (error: Error) => void;
+
+  /** True once stop() runs; suppresses reconnect and distinguishes deliberate closes. */
+  protected stopRequested = false;
+  /** Ongoing reconnect loop; start() awaits it instead of spawning a second process. */
+  protected reconnectPromise: Promise<void> | null = null;
+  private reconnectSleepTimer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor(options?: {
+    codexPathOverride?: string;
+    workingDirectory?: string;
+    wireObserver?: CodexAppServerWireObserver;
+    getExtraEnv?: () => Record<string, string>;
+    onReconnect?: () => void | Promise<void>;
+    onReconnectFailed?: (error: Error) => void;
+  }) {
     this.codexPathOverride = options?.codexPathOverride;
     this.workingDirectory = options?.workingDirectory;
     this.wireObserver = options?.wireObserver;
     this.getExtraEnv = options?.getExtraEnv;
+    this.onReconnect = options?.onReconnect;
+    this.onReconnectFailed = options?.onReconnectFailed;
   }
 
   /**
@@ -140,11 +183,21 @@ export class CodexAppServerTransport {
     if (this.initPromise) {
       return this.initPromise;
     }
+    if (this.reconnectPromise) {
+      // An unexpected close is already being recovered; wait for that loop
+      // instead of spawning a second app-server process.
+      await this.reconnectPromise;
+      if (this.initialized) {
+        return;
+      }
+      // Reconnect budget exhausted: fall through to a full restart.
+    }
     this.initPromise = this.doStart();
     return this.initPromise;
   }
 
   private async doStart(): Promise<void> {
+    this.stopRequested = false;
     const codexPath = this.codexPathOverride ?? 'codex';
     logger.info('Starting Codex app-server', { codexPath, cwd: this.workingDirectory ?? '(inherited)' });
     this.notifyObserver(() => this.wireObserver?.onConnection?.({ state: 'starting' }));
@@ -169,6 +222,16 @@ export class CodexAppServerTransport {
 
     // Node `ws` is statically bundled into main.js. Obsidian's renderer
     // WebSocket cannot connect to localhost app-server sockets.
+    await this.connectAndInitialize(wsUrl);
+  }
+
+  /**
+   * Open a WebSocket to `wsUrl`, attach the JSON-RPC handlers, and re-run the
+   * initialize handshake (the `initialized` notification). Shared by the
+   * initial start and the reconnect loop. `initializeTimeoutMs` bounds only
+   * the handshake request; the initial start keeps the legacy unbounded wait.
+   */
+  private async connectAndInitialize(wsUrl: string, initializeTimeoutMs?: number): Promise<void> {
     const ws = new WebSocket(wsUrl);
     this.ws = ws;
 
@@ -194,6 +257,16 @@ export class CodexAppServerTransport {
       logger.warn('App-server WebSocket closed');
       this.initialized = false;
       this.notifyObserver(() => this.wireObserver?.onConnection?.({ state: 'closed' }));
+      if (this.stopRequested || this.ws !== ws) {
+        // Deliberate stop()/dispose or a stale socket replaced by a newer
+        // connection: never reconnect.
+        return;
+      }
+      this.failPendingRequests(new Error('App-server WebSocket closed unexpectedly; pending request aborted'));
+      // Let subsequent start() calls join the reconnect instead of returning
+      // a stale resolved handshake promise.
+      this.initPromise = null;
+      this.beginReconnect();
     };
 
     ws.onerror = (err) => {
@@ -208,13 +281,91 @@ export class CodexAppServerTransport {
         experimentalApi: true,
         requestAttestation: false,
       },
-    });
+    }, initializeTimeoutMs);
 
     // Send initialized notification
     ws.send(JSON.stringify({ jsonrpc: '2.0', method: 'initialized' }));
     this.initialized = true;
     logger.info('App-server initialized');
     this.notifyObserver(() => this.wireObserver?.onConnection?.({ state: 'initialized' }));
+  }
+
+  // ---------------------------------------------------------------------------
+  // WebSocket reconnect (unexpected close only; stop()/dispose never reconnects)
+  // ---------------------------------------------------------------------------
+
+  private failPendingRequests(error: Error): void {
+    for (const pending of this.pending.values()) {
+      pending.reject(error);
+    }
+    this.pending.clear();
+  }
+
+  private beginReconnect(): void {
+    if (this.stopRequested || this.reconnectPromise) {
+      return;
+    }
+    const run = this.doReconnect();
+    this.reconnectPromise = run;
+    run.finally(() => {
+      if (this.reconnectPromise === run) {
+        this.reconnectPromise = null;
+      }
+    }).catch(() => {
+      // doReconnect never throws; belt-and-suspenders against an unhandled rejection.
+    });
+  }
+
+  private sleepBeforeReconnectAttempt(attempt: number): Promise<void> {
+    const delayMs = Math.min(RECONNECT_BASE_DELAY_MS * 2 ** (attempt - 1), RECONNECT_MAX_DELAY_MS);
+    this.notifyObserver(() =>
+      this.wireObserver?.onConnection?.({ state: 'reconnecting', detail: { attempt, delayMs } }));
+    return new Promise((resolve) => {
+      this.reconnectSleepTimer = setTimeout(() => {
+        this.reconnectSleepTimer = null;
+        resolve();
+      }, delayMs);
+    });
+  }
+
+  private async doReconnect(): Promise<void> {
+    let lastError: Error | null = null;
+    for (let attempt = 1; attempt <= RECONNECT_MAX_ATTEMPTS; attempt++) {
+      if (this.stopRequested) return;
+      await this.sleepBeforeReconnectAttempt(attempt);
+      if (this.stopRequested) return;
+      if (!this.wsUrl) {
+        lastError = new Error('App-server WebSocket URL unavailable for reconnect');
+        break;
+      }
+      try {
+        await this.connectAndInitialize(this.wsUrl, 30000);
+        logger.info('App-server WebSocket reconnected', { attempt });
+        if (this.onReconnect) {
+          try {
+            await this.onReconnect();
+          } catch (err) {
+            logger.warn('onReconnect callback threw', { error: err instanceof Error ? err.message : String(err) });
+          }
+        }
+        return;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        logger.warn('App-server reconnect attempt failed', { attempt, error: lastError.message });
+      }
+    }
+    const error = lastError ?? new Error('App-server reconnect budget exhausted');
+    logger.error('App-server reconnect failed; session stays down until the next start()', {
+      error: error.message,
+    });
+    this.notifyObserver(() => this.wireObserver?.onConnection?.({ state: 'error', detail: error.message }));
+    if (this.onReconnectFailed) {
+      try {
+        this.onReconnectFailed(error);
+      } catch (err) {
+        logger.warn('onReconnectFailed callback threw', { error: err instanceof Error ? err.message : String(err) });
+      }
+    }
   }
 
   private waitForWsUrl(proc: ReturnType<typeof spawn>): Promise<string> {
@@ -280,6 +431,11 @@ export class CodexAppServerTransport {
 
   stop(): void {
     logger.info('Stopping Codex app-server client');
+    this.stopRequested = true;
+    if (this.reconnectSleepTimer) {
+      clearTimeout(this.reconnectSleepTimer);
+      this.reconnectSleepTimer = null;
+    }
     if (this.ws) {
       try {
         this.ws.close();
@@ -295,10 +451,7 @@ export class CodexAppServerTransport {
     this.initialized = false;
     this.initPromise = null;
     // Reject any pending requests
-    for (const pending of this.pending.values()) {
-      pending.reject(new Error('App-server client stopped'));
-    }
-    this.pending.clear();
+    this.failPendingRequests(new Error('App-server client stopped'));
     this.notifyObserver(() => this.wireObserver?.onConnection?.({ state: 'stopped' }));
   }
 
@@ -345,7 +498,15 @@ export class CodexAppServerTransport {
         ...(msg.error ? { error: `JSON-RPC error ${msg.error.code}: ${msg.error.message}` } : {}),
       }));
       if (msg.error) {
-        entry.reject(new Error(`JSON-RPC error ${msg.error.code}: ${msg.error.message}`));
+        const error = new Error(`JSON-RPC error ${msg.error.code}: ${msg.error.message}`) as Error & {
+          code?: number;
+          data?: unknown;
+        };
+        error.code = msg.error.code;
+        if (msg.error.data !== undefined) {
+          error.data = msg.error.data;
+        }
+        entry.reject(error);
       } else {
         entry.resolve(msg.result);
       }

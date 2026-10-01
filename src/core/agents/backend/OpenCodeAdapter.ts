@@ -5,8 +5,11 @@
  * This is the first adapter and serves as the reference implementation.
  * It does NOT change any OpenCodeService internals — it only delegates.
  *
- * OpenCode supports all capabilities, so this adapter implements every
- * capability interface in addition to the core AgentService.
+ * OpenCode supports all capabilities except native mid-turn steering, so
+ * this adapter implements every capability interface in addition to the
+ * core AgentService; TurnSteering stays undeclared (see
+ * OPENCODE_LEGACY_CAPABILITIES below — the real steer seam lives in
+ * OpenCode2Adapter).
  *
  * See docs/requirements/multi-agent-foundation/03-opencode-adapter.md.
  */
@@ -19,7 +22,8 @@ import type { PromptSyntheticTextPartInput } from '../../opencode/OpenCodePrompt
 import type { OpenCodeService } from '../../opencode/OpenCodeService';
 import type { AgentBackendKind } from '../../types/chat';
 import {
-  type AgentCapability,
+  AgentCapability,
+  type BackendCapabilities,
   OPENCODE_FULL_CAPABILITIES,
 } from '../AgentCapability';
 import type {
@@ -122,6 +126,21 @@ function mapServerStatus(status: string): AgentConnectionStatus {
 }
 
 /**
+ * The legacy HTTP/SSE adapter declares every capability EXCEPT TurnSteering:
+ * it has no native mid-turn steer seam — mid-turn input is serialized through
+ * the normal send queue — so claiming 'turn-steering' would advertise a steer
+ * affordance that can only fail at click time. OpenCode2Adapter owns the real
+ * steerTurn() (delivery 'steer'). Keep this exclusion deliberate: a future
+ * native steer seam on this adapter must add steerTurn() AND remove this
+ * filter in the same change.
+ */
+const OPENCODE_LEGACY_CAPABILITIES: BackendCapabilities = Object.freeze(
+  new Set<AgentCapability>(
+    [...OPENCODE_FULL_CAPABILITIES].filter((cap) => cap !== AgentCapability.TurnSteering),
+  ),
+);
+
+/**
  * OpenCodeAdapter wraps an existing OpenCodeService instance and
  * exposes it through the AgentService interface.
  */
@@ -145,7 +164,7 @@ export class OpenCodeAdapter
   readonly kind: AgentBackendKind = 'opencode';
   readonly displayName = 'OpenCode';
   readonly description = 'OpenCode AI coding agent';
-  readonly capabilities = OPENCODE_FULL_CAPABILITIES;
+  readonly capabilities = OPENCODE_LEGACY_CAPABILITIES;
 
   private statusChangeHandlers = new Set<StatusChangeHandler>();
   private auxScope: OpenCodeAuxScope | null = null;

@@ -133,7 +133,10 @@ export interface ChatPluginPort extends TabRuntimePluginSource {
   >;
   codexApprovalHostContext: Pick<
     CodexApprovalHostContext,
-    'approvalCardRenderer' | 'getActiveTabId'
+    | 'approvalCardRenderer'
+    | 'elicitationCardRenderer'
+    | 'getActiveTabId'
+    | 'questionCardRenderer'
   >;
   opencodeConfigManager: Pick<
     OpencodeConfigManager,

@@ -30,6 +30,7 @@ import { parseProjectConfigFormValues } from './CodexProjectConfigFormModel';
 import { renderCostEstimateSettingsRow } from './CostEstimateSettingsRow';
 import { SettingsCodexAccountSurface } from './SettingsCodexAccountSurface';
 import { SettingsCodexLegacyCredentialControl } from './SettingsCodexLegacyCredentialControl';
+import { SettingsCodexPluginsSection } from './SettingsCodexPluginsSection';
 import { SettingsCodexProjectConfigSection } from './SettingsCodexProjectConfigSection';
 import { SettingsCodexReadbackControls } from './SettingsCodexReadbackControls';
 import { SettingsCodexResourcesSection } from './SettingsCodexResourcesSection';
@@ -46,6 +47,7 @@ export class SettingsCodexSection {
   private readonly accountSurface: SettingsCodexAccountSurface;
   private readonly legacyCredentialControl: SettingsCodexLegacyCredentialControl;
   private readonly resourcesSurface: SettingsCodexResourcesSection;
+  private readonly pluginsSurface: SettingsCodexPluginsSection;
   private readonly projectConfigSection: SettingsCodexProjectConfigSection;
   private connectionSummaryValueEl: HTMLElement | null = null;
 
@@ -67,22 +69,30 @@ export class SettingsCodexSection {
     this.resourcesSurface = new SettingsCodexResourcesSection({
       plugin: this.plugin,
       createSectionHeading: options.createSectionHeading,
-      onAfterMutation: () => {
-        // Invalidate the Codex runtime / slash-command menu catalog so the
-        // next `/` or `$` open reflects project changes immediately (not via
-        // skills/changed or the 120s TTL). Runtime skills/list remains the
-        // final menu truth.
-        this.plugin.invalidateSlashCommandCatalog();
-        // The app-server does not always emit `skills/changed` for files the
-        // plugin wrote itself, so force the next runtime `skills/list` to
-        // bypass the server cache. One-shot; normal menu opens keep caching.
-        const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
-          forceNextRuntimeSkillsReload?(): void;
-        } | undefined;
-        adapter?.forceNextRuntimeSkillsReload?.();
-      },
+      onAfterMutation: () => this.invalidateCodexRuntimeCatalogs(),
+    });
+    this.pluginsSurface = new SettingsCodexPluginsSection({
+      plugin: this.plugin,
+      createSectionHeading: options.createSectionHeading,
+      onAfterMutation: () => this.invalidateCodexRuntimeCatalogs(),
     });
     this.projectConfigSection = new SettingsCodexProjectConfigSection({ plugin: this.plugin });
+  }
+
+  /**
+   * After a Codex resource/plugin mutation, invalidate the chat slash-command
+   * menu catalog so the next `/` or `$` open reflects changes immediately
+   * (not via skills/changed or the 120s TTL). Runtime skills/list remains the
+   * final menu truth. The app-server does not always emit `skills/changed`
+   * for files the plugin wrote itself, so force the next runtime skills/list
+   * to bypass the server cache. One-shot; normal menu opens keep caching.
+   */
+  private invalidateCodexRuntimeCatalogs(): void {
+    this.plugin.invalidateSlashCommandCatalog();
+    const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
+      forceNextRuntimeSkillsReload?(): void;
+    } | undefined;
+    adapter?.forceNextRuntimeSkillsReload?.();
   }
 
   dispose(): void {
@@ -126,6 +136,21 @@ export class SettingsCodexSection {
         },
       });
       this.resourcesSurface.render(resourcesHost);
+      return;
+    }
+
+    // Plugins renders as independent per-group cards (marketplace / installed)
+    // with the same borderless host contract as resources; the section owns
+    // its unavailable/empty semantics per group.
+    if (resolvedTabId === 'plugins') {
+      const pluginsHost = containerEl.createDiv({
+        attr: {
+          'data-settings-surface': 'section',
+          'data-settings-target': `codex-${resolvedTabId}`,
+          'data-codex-section': resolvedTabId,
+        },
+      });
+      this.pluginsSurface.render(pluginsHost);
       return;
     }
 
@@ -691,6 +716,10 @@ export class SettingsCodexSection {
   }
 
   private renderApprovalPolicySetting(bodyEl: HTMLElement): void {
+    const rawPolicy = this.plugin.settings.backendSettings.codex.approvalPolicy;
+    // The load-time normalizer migrates retired 'untrusted' to 'on-request';
+    // mirror that here so a raw persisted value still displays sanely.
+    const effectivePolicy: CodexApprovalPolicy = rawPolicy === 'untrusted' ? 'on-request' : rawPolicy;
     new Setting(bodyEl)
       .setName(t('settings.codex.approvalPolicy.name'))
       .setDesc(t('settings.codex.approvalPolicy.desc'))
@@ -698,10 +727,9 @@ export class SettingsCodexSection {
         dropdown.selectEl?.setAttribute('aria-label', t('settings.codex.approvalPolicy.name'));
         return dropdown
           .addOption('inherit', t('settings.codex.approvalPolicy.inherit'))
-          .addOption('untrusted', t('settings.codex.approvalPolicy.untrusted'))
           .addOption('on-request', t('settings.codex.approvalPolicy.onRequest'))
           .addOption('never', t('settings.codex.approvalPolicy.never'))
-          .setValue(this.plugin.settings.backendSettings.codex.approvalPolicy)
+          .setValue(effectivePolicy)
           .onChange(async (value) => {
             this.plugin.settings.backendSettings.codex.approvalPolicy = value as CodexApprovalPolicy;
             await this.plugin.saveSettings();

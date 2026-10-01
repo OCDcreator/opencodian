@@ -6,6 +6,7 @@ export type ToolIdentityKind =
   | 'question'
   | 'skill'
   | 'plan'
+  | 'image'
   | 'unknown';
 
 export interface ToolIdentityOptions {
@@ -66,6 +67,7 @@ const BUILTIN_TOOL_DEFINITIONS: Record<string, BuiltinToolDefinition> = {
   taskoutput: { normalizedName: 'task_output', displayName: 'Task Output', icon: 'wrench', kind: 'builtin' },
   taskstop: { normalizedName: 'task_stop', displayName: 'Task Stop', icon: 'wrench', kind: 'builtin' },
   structuredoutput: { normalizedName: 'structuredoutput', displayName: 'StructuredOutput', icon: 'wrench', kind: 'unknown' },
+  imagegeneration: { normalizedName: 'image_generation', displayName: 'Image Generation', icon: 'image', kind: 'image' },
   invalid: { normalizedName: 'invalid', displayName: 'Invalid', icon: 'wrench', kind: 'unknown' },
 };
 

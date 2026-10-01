@@ -1,6 +1,7 @@
 # ChatPluginPort
 > 2026-09-21 (advantage-parity R-F5/R-F6)：chat settings pick now includes the opt-in session rail/Vim navigation toggles and normalized key fields consumed by the view coordinators.
 > 2026-09-20 (advantage-parity R-D1)：port 新增 `exportConversationMarkdownById(conversationId)`，历史菜单导出按钮经该缝触达插件层。
+> 2026-09-30：`codexApprovalHostContext` 的 Pick 扩至 `approvalCardRenderer` / `questionCardRenderer` / `elicitationCardRenderer` / `getActiveTabId`（v2 审批 + tool user input + MCP elicitation 共用同一 plugin context 对象）。
 > 2026-09-18 (R-B3): R-B3: the chat plugin port adds `editRevertService: EditRevertServicePort | null` plus the `editRevertEnabled` / `editRevertSnapshotLimitMb` settings picks; the view and runtime consume the port without importing core/storage.
 
 2026-09-10：定价端口增加 `onCatalogUpdated` 订阅；聊天消费者通过该窄端口接收本地目录就绪信号。

@@ -8,12 +8,29 @@
  * (`listBackendSessions` / `getBackendSessionPreview`).
  */
 
-import type { AppServerItem, AppServerThread, AppServerTurn } from './CodexAppServerClientTypes';
+import type {
+  AppServerItem,
+  AppServerThread,
+  AppServerThreadItemsPage,
+  AppServerThreadTurnsPage,
+  AppServerTurn,
+} from './CodexAppServerClientTypes';
 
 /** Normalized preview message shape consumed by AgentBackendRouting. */
 export interface AppServerPreviewMessage {
   role: string;
   parts: Array<{ type: string; text: string }>;
+}
+
+/**
+ * A page of normalized preview messages plus the cursor pagination metadata
+ * reported by `thread/turns/list` / `thread/items/list`. Cursors are opaque
+ * server tokens; `nextCursor` pages forward in the requested sort direction.
+ */
+export interface AppServerPreviewMessagePage {
+  messages: AppServerPreviewMessage[];
+  nextCursor: string | null;
+  backwardsCursor: string | null;
 }
 
 /** Normalize app-server threads into the shape expected by listBackendSessions. */
@@ -45,6 +62,42 @@ export function normalizeTurnsToPreviewMessages(
     }
   }
   return messages;
+}
+
+/**
+ * Normalize a `thread/turns/list` page (typically requested with
+ * `itemsView: 'summary'` for session browsing) into a preview-message page.
+ * Turn payloads in summary view carry the same AppServerItem shapes as full
+ * turns, so the per-item extraction matches `normalizeTurnsToPreviewMessages`.
+ */
+export function normalizeTurnsPageToPreviewMessages(
+  page: AppServerThreadTurnsPage,
+): AppServerPreviewMessagePage {
+  return {
+    messages: normalizeTurnsToPreviewMessages(page.data),
+    nextCursor: page.nextCursor ?? null,
+    backwardsCursor: page.backwardsCursor ?? null,
+  };
+}
+
+/**
+ * Normalize a `thread/items/list` page into a preview-message page. Used for
+ * per-turn item expansion on paginated thread transcripts; each entry's item
+ * goes through the same extraction as turn-embedded items.
+ */
+export function normalizeThreadItemsPageToPreviewMessages(
+  page: AppServerThreadItemsPage,
+): AppServerPreviewMessagePage {
+  const messages: AppServerPreviewMessage[] = [];
+  for (const entry of page.data) {
+    const extracted = extractItemMessages(entry.item);
+    if (extracted) messages.push(...extracted);
+  }
+  return {
+    messages,
+    nextCursor: page.nextCursor ?? null,
+    backwardsCursor: page.backwardsCursor ?? null,
+  };
 }
 
 /**

@@ -778,14 +778,20 @@ export type CodexWebSearchMode = 'disabled' | 'cached' | 'live';
  *
  *   - inherit:    plugin-only; omits approvalPolicy from app-server/SDK
  *                 overrides so the backend uses its own default policy.
- *   - untrusted:  requires an available app-server AND an approval bridge;
+ *   - on-request: requires an available app-server AND an approval bridge;
  *                 fails closed if either is unavailable.
- *   - on-request: same availability requirement as untrusted.
  *   - never:      may use the existing SDK fallback path.
  *
  * The on-failure/granular SDK variants are intentionally NOT in P0; they
  * remain a future advanced-TOML concern. The app-server wire union stays
  * 'untrusted' | 'on-request' | 'never'.
+ *
+ * Upstream retired `approval_policy = "untrusted"` in 2026-08 (Codex CLI
+ * 0.15x: config load now hard-fails with 'approval_policy = "untrusted" is
+ * no longer supported; remove this setting'). The 'untrusted' literal stays
+ * in this union only because foreign runtime code still references it; the
+ * settings normalizer migrates persisted 'untrusted' to 'on-request' on load
+ * and never emits it, so treat 'on-request' as the only escalation policy.
  */
 export type CodexApprovalPolicy = 'inherit' | 'untrusted' | 'on-request' | 'never';
 
@@ -815,8 +821,8 @@ export interface CodexBackendSettings {
   webSearchMode: CodexWebSearchMode;
   /**
    * Approval policy. Defaults to 'inherit' (omit the override). Missing or
-   * unknown values normalize to 'inherit'; old users are NOT migrated to
-   * on-request.
+   * unknown values normalize to 'inherit'. Retired 'untrusted' (removed by
+   * Codex CLI 0.15x in 2026-08) migrates to 'on-request' on load.
    */
   approvalPolicy: CodexApprovalPolicy;
   /** Codex session trace (diagnostics) settings. */
@@ -1683,7 +1689,7 @@ function normalizeCodexBackendSettings(value: unknown): CodexBackendSettings {
     'persistent',
   ];
   const VALID_WEB_SEARCH: readonly CodexWebSearchMode[] = ['disabled', 'cached', 'live'];
-  const VALID_APPROVAL_POLICY: readonly CodexApprovalPolicy[] = ['inherit', 'untrusted', 'on-request', 'never'];
+  const VALID_APPROVAL_POLICY: readonly CodexApprovalPolicy[] = ['inherit', 'on-request', 'never'];
   const candidate = value && typeof value === 'object' && !Array.isArray(value)
     ? value as { executablePath?: unknown; apiKey?: unknown; model?: unknown; pricingProviderId?: unknown; pricingEndpoint?: unknown; sandboxMode?: unknown; modelReasoningEffort?: unknown; additionalDirectories?: unknown; networkAccessEnabled?: unknown; webSearchMode?: unknown; approvalPolicy?: unknown; sessionTrace?: unknown }
     : {};
@@ -1712,10 +1718,15 @@ function normalizeCodexBackendSettings(value: unknown): CodexBackendSettings {
     webSearchMode: VALID_WEB_SEARCH.includes(rawWebSearch as CodexWebSearchMode)
       ? (rawWebSearch as CodexWebSearchMode)
       : 'cached',
-    // Missing/unknown normalizes directly to 'inherit' (no migration to on-request).
-    approvalPolicy: VALID_APPROVAL_POLICY.includes(rawApprovalPolicy as CodexApprovalPolicy)
-      ? (rawApprovalPolicy as CodexApprovalPolicy)
-      : 'inherit',
+    // Missing/unknown normalizes directly to 'inherit'. Upstream retired
+    // 'untrusted' (Codex CLI 0.15x, 2026-08) and now refuses to start with it,
+    // so persisted 'untrusted' migrates to 'on-request' (closest supported
+    // semantics: ask when the model wants escalation) instead of failing load.
+    approvalPolicy: rawApprovalPolicy === 'untrusted'
+      ? 'on-request'
+      : VALID_APPROVAL_POLICY.includes(rawApprovalPolicy as CodexApprovalPolicy)
+        ? (rawApprovalPolicy as CodexApprovalPolicy)
+        : 'inherit',
     sessionTrace: normalizeCodexSessionTraceSettings(candidate.sessionTrace),
   };
 }

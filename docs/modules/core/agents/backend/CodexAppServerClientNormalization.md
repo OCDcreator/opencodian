@@ -11,9 +11,12 @@
 
 - `normalizeThreadList(threads)`: 把 app-server threads 归一化为 `listBackendSessions` 期望的形状（保留 `archived` 布尔字段）
 - `normalizeTurnsToPreviewMessages(turns)`: 把 app-server turns 归一化为 `getBackendSessionPreview` 期望的 preview messages
+- `normalizeTurnsPageToPreviewMessages(page)`: 把 `thread/turns/list` 分页结果（通常 `itemsView: 'summary'`）归一化为 `AppServerPreviewMessagePage`（messages + `nextCursor`/`backwardsCursor`），供 paginated transcript seam 使用
+- `normalizeThreadItemsPageToPreviewMessages(page)`: 把 `thread/items/list` 分页结果归一化为 `AppServerPreviewMessagePage`，每个 entry 的 item 走与 turn 内嵌 item 相同的提取逻辑；用于 per-turn full-items 扩展
 - 内部 helper `extractItemMessages` / `normalizeUserMessageItem` / `normalizeActivityItem`: 从单个 turn item 提取可预览内容；非文本 item（`reasoning`、`contextCompaction`）返回 `null`，activity item（`mcpToolCall`、`fileChange`、`webSearch`）产生 activity 消息
 
 ## 维护约束
 
 - 纯函数模块，无类状态、无副作用
 - `CodexAppServerClient` 的静态 delegate 仅转发到此模块，新增归一化逻辑应在此文件实现
+- 分页 normalizer 只包装现有 flat 提取逻辑并透传 cursor；不要引入与 flat 输出不一致的消息形状

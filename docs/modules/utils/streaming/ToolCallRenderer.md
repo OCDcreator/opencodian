@@ -5,10 +5,10 @@
 
 ## 概述
 
-渲染 AI 工具调用卡片。显示工具名称、摘要信息、状态图标、MCP 服务器名 chip（当 `kind: 'mcp'` 且 `toolMetadata.server` 存在时）和可展开的执行结果。`ToolCallRenderer` 现在把 MCP 摘要分类/字段回退委托给 `mcpSummaryConfig.getMcpToolSummary()`，MCP 服务器 chip 和展开 `Server:` 行委托给 `McpToolCallRenderer`，task/subagent 展开卡片委托给 `TaskToolCallRenderer`；自身只保留 DOM 渲染与 builtin/custom 工具摘要装配；工具名称/图标识别继续统一委托给 `shared/toolIdentity`，兼容 OpenCode 与 Claudian 的不同命名体系。对 OpenCode 原生 `task`，它会切换到专用 subagent 卡片：显示 agent / description / status / child session，并避免默认展开原始 `<task_result>`。
+渲染 AI 工具调用卡片。显示工具名称、摘要信息、状态图标、MCP 服务器名 chip（当 `kind: 'mcp'` 且 `toolMetadata.server` 存在时）和可展开的执行结果。`ToolCallRenderer` 现在把 MCP 摘要分类/字段回退委托给 `mcpSummaryConfig.getMcpToolSummary()`，MCP 服务器 chip 和展开 `Server:` 行委托给 `McpToolCallRenderer`，task/subagent 展开卡片委托给 `TaskToolCallRenderer`；自身只保留 DOM 渲染与 builtin/custom 工具摘要装配；工具名称/图标识别继续统一委托给 `shared/toolIdentity`，兼容 OpenCode 与 Claudian 的不同命名体系。对 OpenCode 原生 `task`，它会切换到专用 subagent 卡片：显示 agent / description / status / child session，并避免默认展开原始 `<task_result>`。对 `kind: 'image'`（Codex `imageGeneration`），渲染分支改为：data-URL 结果直接以 `<img>` 展示、文件路径结果以等宽文本展示、错误/空结果走默认文本渲染，并在结果下方附 `revisedPrompt` 次级文本；卡片摘要优先显示 revised prompt，其次按 wire status 显示本地化状态标签（`chat.toolCard.image.*` 键）。
 
 ## 导入关系
-上游: `obsidian` (setIcon), `../../shared` (tool identity), `./mcpSummaryConfig` (MCP summary resolver), `./McpToolCallRenderer` (MCP server chip/detail), `./TaskToolCallRenderer` (task/subagent expanded card), `./streamingCollapsible` (collapsible disposer), `./types` (ToolCallInfo, ToolCallStatus, ToolRendererOptions)
+上游: `obsidian` (setIcon), `../../i18n` (`t()`，image 卡片状态标签与 revised prompt 标签), `../../shared` (tool identity), `./mcpSummaryConfig` (MCP summary resolver), `./McpToolCallRenderer` (MCP server chip/detail), `./TaskToolCallRenderer` (task/subagent expanded card), `./streamingCollapsible` (collapsible disposer), `./types` (ToolCallInfo, ToolCallStatus, ToolRendererOptions)
 下游: `StreamController` (持有并调用)
 
 ## 核心类型 / 接口

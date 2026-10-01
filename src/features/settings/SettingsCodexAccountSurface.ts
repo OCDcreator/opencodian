@@ -670,24 +670,49 @@ export class SettingsCodexAccountSurface {
   private renderUsage(el: HTMLElement, usage: NonNullable<AppServerAccountUsageResult['usage']>): void {
     el.empty();
     el.setAttribute('data-proof-state', 'readback');
-    el.setAttribute('data-usage-state', 'data');
 
     const summary = usage.summary as Record<string, unknown> | undefined;
-    const tilesEl = el.createDiv({ cls: 'opencodian-codex-account-tiles' });
 
+    // All summary fields are nullable. Hide tiles whose value is absent
+    // (never render "undefined"/placeholder text); when nothing is known at
+    // all, say so honestly instead of showing an empty tile grid.
+    const tiles: Array<{ label: string; value: string }> = [];
     const lifetimeTokens = this.readNumber(summary?.lifetimeTokens);
     const peakDaily = this.readNumber(summary?.peakDailyTokens);
     const longestTurnSec = this.readNumber(summary?.longestRunningTurnSec);
     const currentStreak = this.readNumber(summary?.currentStreakDays);
     const longestStreak = this.readNumber(summary?.longestStreakDays);
-
-    this.appendStatTile(tilesEl, t('settings.codex.accountSurface.usage.lifetimeTokens'), this.formatTokens(lifetimeTokens));
-    this.appendStatTile(tilesEl, t('settings.codex.accountSurface.usage.peakDaily'), this.formatTokens(peakDaily));
-    this.appendStatTile(tilesEl, t('settings.codex.accountSurface.usage.longestTurn'), this.formatDuration(longestTurnSec));
-    this.appendStatTile(tilesEl, t('settings.codex.accountSurface.usage.currentStreak'), this.formatStreak(currentStreak));
-    this.appendStatTile(tilesEl, t('settings.codex.accountSurface.usage.longestStreak'), this.formatStreak(longestStreak));
+    if (lifetimeTokens !== null) {
+      tiles.push({ label: t('settings.codex.accountSurface.usage.lifetimeTokens'), value: this.formatTokens(lifetimeTokens) });
+    }
+    if (peakDaily !== null) {
+      tiles.push({ label: t('settings.codex.accountSurface.usage.peakDaily'), value: this.formatTokens(peakDaily) });
+    }
+    if (longestTurnSec !== null) {
+      tiles.push({ label: t('settings.codex.accountSurface.usage.longestTurn'), value: this.formatDuration(longestTurnSec) });
+    }
+    if (currentStreak !== null) {
+      tiles.push({ label: t('settings.codex.accountSurface.usage.currentStreak'), value: this.formatStreak(currentStreak) });
+    }
+    if (longestStreak !== null) {
+      tiles.push({ label: t('settings.codex.accountSurface.usage.longestStreak'), value: this.formatStreak(longestStreak) });
+    }
 
     const buckets = Array.isArray(usage.dailyUsageBuckets) ? usage.dailyUsageBuckets : [];
+    if (tiles.length === 0 && buckets.length === 0) {
+      el.setAttribute('data-usage-state', 'empty');
+      el.createEl('p', {
+        cls: 'opencodian-codex-account-card-muted',
+        text: t('settings.codex.accountSurface.usage.empty'),
+      });
+      return;
+    }
+
+    el.setAttribute('data-usage-state', 'data');
+    const tilesEl = el.createDiv({ cls: 'opencodian-codex-account-tiles' });
+    for (const tile of tiles) {
+      this.appendStatTile(tilesEl, tile.label, tile.value);
+    }
     if (buckets.length > 0) {
       this.renderUsageBuckets(el, buckets);
     }

@@ -5,7 +5,7 @@
 
 > **源码**: `src/features/chat/ui/ConversationSessionSettingsModal.ts`
 > **状态**: [REVIEW]
-> **Updated**: 2026-07-28 — all session dropdowns use the shared `enhanceSettingsSelect` custom trigger/listbox primitive; the backing selects remain synchronized and hidden for form semantics, while trigger focus, keyboard navigation, portal cleanup, and modal teardown stay owned by the shared control.
+> **Updated**: 2026-09-30 — Codex approval-policy dropdown dropped the retired `untrusted` option (upstream 0.15x); raw legacy values fall back to the blank "use global" option and the label falls back to `on-request`.
 
 ## 概述
 
@@ -74,7 +74,7 @@ class ConversationSessionSettingsModal extends Modal {
 
 - 顶部 hero 区显示当前会话标题、继承说明与“会话覆盖”语义 badge，避免用户把它误认为全局设置
 - modal 主体包含聊天字体大小的单一显示设置
-- `showCodexControls` 开启时，在 Display 分组下方渲染 Codex 分组，包含模型覆盖（下拉，含“Inherit”、可用模型和“Custom...”自定义输入）、沙盒模式（read-only / workspace-write / danger-full-access）、推理强度（minimal / low / medium / high / xhigh）、审批策略（Use global setting / inherit / untrusted / on-request / never）等下拉；分组内含 boundary hint 说明"这些设置在下一个线程生效，不影响当前对话"
+- `showCodexControls` 开启时，在 Display 分组下方渲染 Codex 分组，包含模型覆盖（下拉，含“Inherit”、可用模型和“Custom...”自定义输入）、沙盒模式（read-only / workspace-write / danger-full-access）、推理强度（minimal / low / medium / high / xhigh）、审批策略（Use global setting / inherit / on-request / never）等下拉；分组内含 boundary hint 说明"这些设置在下一个线程生效，不影响当前对话"。审批策略下拉的 `untrusted` 选项已于 2026-09-30 移除（上游 Codex CLI 0.15x 废弃该值）；持久化会话级 `untrusted` 由 `normalizeConversationSessionSettings` 迁移为 `on-request`，原始残留值在下拉中无匹配项、显示回落为「Use global setting」，标签渲染同样回落为 `on-request` 文案
 - 会话级模型、沙盒、推理、网络、网页搜索和目录控件会生成稳定的 `id`，并通过对应 `<label for>`、`aria-labelledby` 与 `aria-label` 关联；Codex code-review target 下拉也提供明确的可访问名称，避免仅依赖视觉标题。
 - 会话级下拉（包括 Codex 沙盒模式、推理强度、模型覆盖、网络 / 网页搜索、审批策略和 code-review target）复用 `SettingsDropdownControl.enhanceSettingsSelect`，不会暴露浏览器原生 option 菜单；modal 关闭时销毁所有增强句柄并恢复 DOM 生命周期。
 - Codex 审批策略下拉：空值表示「Use global setting」（null 覆盖，继承真实全局值）；显式「inherit」强制后端默认（不覆盖）。二者语义不同，UI 与 `buildOverrides` 明确区分

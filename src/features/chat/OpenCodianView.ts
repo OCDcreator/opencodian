@@ -29,6 +29,7 @@ import {
   buildCodexApprovalQuestionRequest,
   mapCodexApprovalResolution,
 } from '../../core/agents/backend/CodexDefaultApprovalHost';
+import type { CodexElicitationCardRequest, CodexElicitationHostResponse } from '../../core/agents/backend/CodexElicitationBridge';
 import {
   type ResolvedModelSelection,
 } from '../../core/config/modelConfig';
@@ -417,6 +418,23 @@ const CURRENT_TAB_NEW_CONVERSATION_ICON = `<g fill="none" stroke="currentColor" 
 addIcon('opencodian-circle-plus', NEW_TAB_ICON);
 addIcon('opencodian-message-square-plus', CURRENT_TAB_NEW_CONVERSATION_ICON);
 
+/**
+ * Capabilities whose appearance/disappearance actually changes what the
+ * capability-change refresh path rebuilds (context ring, effort selector,
+ * model/permission/agent selection controls, modified-files availability,
+ * queued-follow-up steer affordance). Runtime capability changes outside this
+ * set leave every refreshed affordance unchanged, so the view skips the
+ * toolbar rebuild instead of churning the composer.
+ */
+const CAPABILITY_CHANGE_REFRESH_CAPABILITIES: readonly AgentCapability[] = [
+  AgentCapability.Context,
+  AgentCapability.TurnSteering,
+  AgentCapability.Thinking,
+  AgentCapability.Models,
+  AgentCapability.Permissions,
+  AgentCapability.Subagents,
+];
+
 export class OpenCodianView extends ItemView {
   private plugin: ChatPluginPort;
   private chatContainerEl: HTMLElement | null = null;
@@ -435,6 +453,13 @@ export class OpenCodianView extends ItemView {
   private eventRefs: EventRef[] = [];
   private backendActiveChangeDisposable: { dispose(): void } | null = null;
   private backendCapabilityChangeDisposable: { dispose(): void } | null = null;
+  /**
+   * Last composer-relevant capability signature applied from a registry
+   * `onCapabilitiesChange` event (keyed by the backend `this.caps` resolves
+   * against). Repeated events with an unchanged relevant set no-op instead of
+   * rebuilding the composer toolbar.
+   */
+  private lastCapabilityRefreshKey: { backend: string; signature: string } | null = null;
   private claudeCommandsChangedDisposable: { dispose(): void } | null = null;
   private readonly codexChatSurfaceBinding: CodexChatSurfaceBinding;
   private readonly chatDiagnosticsCoordinator: ChatDiagnosticsCoordinator;
@@ -1929,7 +1954,44 @@ export class OpenCodianView extends ItemView {
             tabId,
             { applyResolution: false, forceInline: true },
           );
-          return mapCodexApprovalResolution(result);
+          return mapCodexApprovalResolution(result, request);
+        } finally {
+          this.questionRuntimeServices.inlineCardRenderer.clear(tabId);
+        }
+      },
+    };
+    // Dynamic `item/tool/requestUserInput` seam: the adapter hands over a
+    // ready QuestionRequest and the raw resolution result flows back.
+    this.plugin.codexApprovalHostContext.questionCardRenderer = {
+      collectResponse: async (request, tabId) => {
+        try {
+          return await this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(
+            request,
+            tabId,
+            { applyResolution: false, forceInline: true },
+          );
+        } finally {
+          this.questionRuntimeServices.inlineCardRenderer.clear(tabId);
+        }
+      },
+    };
+    // MCP elicitation seam: same question card, but the accept/decline/cancel
+    // action and raw answers ride back to the adapter for schema coercion.
+    this.plugin.codexApprovalHostContext.elicitationCardRenderer = {
+      collectResponse: async (request: CodexElicitationCardRequest, tabId): Promise<CodexElicitationHostResponse | null> => {
+        try {
+          const result = await this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(
+            request.questionRequest,
+            tabId,
+            { applyResolution: false, forceInline: true },
+          );
+          if (result.status === 'rejected') {
+            return { action: 'decline' };
+          }
+          if (result.status !== 'answered') {
+            return { action: 'cancel' };
+          }
+          return { action: 'accept', answers: result.answers };
         } finally {
           this.questionRuntimeServices.inlineCardRenderer.clear(tabId);
         }
@@ -3868,11 +3930,29 @@ export class OpenCodianView extends ItemView {
       if (backend !== this.plugin.agentServiceRegistry?.getActiveKind()) {
         return;
       }
+      // A3 churn guard: `caps` follows the active conversation's backend, so
+      // key the signature by whichever backend the composer gates actually
+      // read. An unchanged relevant capability set (or an event for a backend
+      // the composer is not showing) leaves every refreshed affordance
+      // identical — skip the toolbar rebuild.
+      const signature = CAPABILITY_CHANGE_REFRESH_CAPABILITIES
+        .filter((capability) => hasCapability(this.caps, capability))
+        .join('|');
+      const backendKey = this.currentConversation?.backend ?? backend;
+      const lastKey = this.lastCapabilityRefreshKey;
+      if (lastKey && lastKey.backend === backendKey && lastKey.signature === signature) {
+        return;
+      }
+      this.lastCapabilityRefreshKey = { backend: backendKey, signature };
       this.refreshComposerToolbarForActiveBackend();
       this.activeTabContextUsageCoordinator.syncIdentity();
       this.codexChatSurfaceBinding.syncSkillsChangedSubscription();
       this.syncClaudeCommandsChangedSubscription();
       this.refreshModifiedFilesSidebar();
+      // The queued-follow-up bar reads `hasTurnSteering` lazily per render;
+      // re-render it so a steer affordance appearing/disappearing mid-mount
+      // does not leave a stale bar. No-op when the bar is not attached.
+      this.refreshQueuedFollowUpBar();
     }) ?? null;
   }
 

@@ -68,6 +68,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
       { id: 'resume-inspect', labelKey: 'settings.codex.tab.resumeInspect' },
       { id: 'account', labelKey: 'settings.codex.tab.account' },
       { id: 'resources', labelKey: 'settings.codex.tab.resources' },
+      { id: 'plugins', labelKey: 'settings.codex.tab.plugins' },
     ],
   },
   {

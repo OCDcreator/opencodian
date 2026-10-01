@@ -1,4 +1,5 @@
 # Settings Types and Defaults
+> 2026-09-30 (A2 untrusted-migration): Codex CLI 0.15x（2026-08）移除了 `approval_policy = "untrusted"`（config load 直接报错 `approval_policy = "untrusted" is no longer supported; remove this setting` 并拒绝启动）。`normalizeCodexBackendSettings` 在加载期把持久化的 `'untrusted'` 迁移为 `'on-request'`（最接近的受支持语义：模型请求升级时询问），缺失/未知值仍回退 `'inherit'`；normalizer 永不输出 `'untrusted'`。类型 `CodexApprovalPolicy` 暂保留 `'untrusted'` 字面量（CodexAdapter 等 runtime 代码仍引用，由并行包清理），设置 UI 审批策略下拉不再提供该选项，i18n `settings.codex.approvalPolicy.untrusted` 键已删除。
 > 2026-09-21 (advantage-parity R-F6 质量修复)：新增 `applyChatVimNavigationKey(current, slot, raw)` 与 `normalizeChatVimNavigationKey(raw, fallback)`。整表 `normalizeChatVimNavigationKeys` 保持原有 fail-closed 语义（持久化配置含重复键即整体回退默认 `w`/`s`/`i`），这是 load 边界该有的行为；但交互式单槽位编辑不再复用整表回退——冲突的候选被拒绝并返回原三元组（`rejected: true`），因此不会静默抹掉其他两个合法自定义键。单槽位路径在构造上不可能产出重复三元组（属性测试覆盖）。
 > 2026-09-21 (advantage-parity R-F5/R-F6)：新增双栏会话 rail 与 Vim 导航五字段；两个开关默认关闭，三键归一化为互不重复的单字符（默认 `w`/`s`/`i`），坏值 fail-closed。
 > 2026-09-21 (advantage-parity R-F4)：新增 `chatWarmSessionEnabled`（默认 `false`）：只许可为 active chat backend 预热一个空、已验证的只读 aux session；不提交 prompt / completion turn，真实聊天不复用它。
@@ -17,7 +18,7 @@
 
 > **源码**: `src/core/types/settings.ts`
 > **状态**: [REVIEW]
-> **Updated**: 2026-07-24 — added `CodexApprovalPolicy` type (`'inherit'|'untrusted'|'on-request'|'never'`), `CodexBackendSettings.approvalPolicy` (default `'inherit'`), and normalization (missing/unknown → `'inherit'`, no migration to `on-request`).
+> **Updated**: 2026-07-24 — added `CodexApprovalPolicy` type (`'inherit'|'untrusted'|'on-request'|'never'`), `CodexBackendSettings.approvalPolicy` (default `'inherit'`), and normalization (missing/unknown → `'inherit'`, no migration to `on-request`). — superseded 2026-09-30: `'untrusted'` now migrates to `'on-request'` (see top entry).
 > **Updated**: 2026-07-28 — `CodexBackendSettings.executablePath` defaults to `''` and is trim-normalized; an empty string means automatic user-CLI discovery.
 > **Updated**: 2026-09-11 — `getDefaultChatAppearanceSettings().input.backgroundOpacity` retuned 72 → 32: the composer shell now mixes against the opaque `--opencodian-composer-lens-bg-solid` endpoint, so the previous glass character is preserved while 100% finally means fully opaque.
 > **Updated**: 2026-09-11 — added `UserBubbleStyleId` (`'solid'|'glass'`) and `ChatAppearanceUserSettings.style` (default `'solid'`, unknown values normalize to `'solid'` via `normalizeUserBubbleStyleId`); theme presets no longer pin a bubble style.

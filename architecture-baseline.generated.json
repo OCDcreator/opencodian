@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-18T20:42:59.903Z",
-  "headShaAtGeneration": "b84547f4c3513b9918651b7a42b9cacde0ebd7a7",
+  "generatedAt": "2026-09-30T15:50:38.819Z",
+  "headShaAtGeneration": "abaa62764685a3fc0f6f7d9eff03ff4fd605c9a5",
   "edges": [
     {
       "id": "src/app/batchOrganize/BatchOrganizeCoordinator.ts|src/core/types/index.ts|type-only|../../core/types",
@@ -165,6 +165,13 @@
       "specifier": "./MemoryRuntimeCoordinator"
     },
     {
+      "id": "src/app/memory/index.ts|src/app/memory/VaultEmbeddingFileSystem.ts|re-export|./VaultEmbeddingFileSystem",
+      "from": "src/app/memory/index.ts",
+      "to": "src/app/memory/VaultEmbeddingFileSystem.ts",
+      "kind": "re-export",
+      "specifier": "./VaultEmbeddingFileSystem"
+    },
+    {
       "id": "src/app/memory/index.ts|src/app/memory/VaultIndexFileSystem.ts|re-export|./VaultIndexFileSystem",
       "from": "src/app/memory/index.ts",
       "to": "src/app/memory/VaultIndexFileSystem.ts",
@@ -212,6 +219,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/app/memory/VaultEmbeddingFileSystem.ts|src/core/memory/index.ts|type-only|../../core/memory",
+      "from": "src/app/memory/VaultEmbeddingFileSystem.ts",
+      "to": "src/core/memory/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/memory"
     },
     {
       "id": "src/app/memory/VaultIndexFileSystem.ts|src/core/memory/index.ts|type-only|../../core/memory",
@@ -275,6 +289,13 @@
       "to": "src/shared/index.ts",
       "kind": "runtime-static",
       "specifier": "../../shared"
+    },
+    {
+      "id": "src/app/pdf/PdfIndexFileSystem.ts|src/core/pdf/index.ts|runtime-static|../../core/pdf",
+      "from": "src/app/pdf/PdfIndexFileSystem.ts",
+      "to": "src/core/pdf/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/pdf"
     },
     {
       "id": "src/app/runtime/PluginRuntimeCoordinator.ts|src/core/opencode/index.ts|runtime-static|../../core/opencode",
@@ -424,6 +445,13 @@
       "specifier": "./diagnostics/types"
     },
     {
+      "id": "src/core/agents/backend/AgentAdapterWiring.ts|src/core/agents/backend/OpenCode2Adapter.ts|runtime-static|./OpenCode2Adapter",
+      "from": "src/core/agents/backend/AgentAdapterWiring.ts",
+      "to": "src/core/agents/backend/OpenCode2Adapter.ts",
+      "kind": "runtime-static",
+      "specifier": "./OpenCode2Adapter"
+    },
+    {
       "id": "src/core/agents/backend/AgentAdapterWiring.ts|src/core/agents/backend/pi/PiAdapter.ts|runtime-static|./pi/PiAdapter",
       "from": "src/core/agents/backend/AgentAdapterWiring.ts",
       "to": "src/core/agents/backend/pi/PiAdapter.ts",
@@ -436,6 +464,13 @@
       "to": "src/core/agents/backend/pi/PiProtocol.ts",
       "kind": "type-only",
       "specifier": "./pi/PiProtocol"
+    },
+    {
+      "id": "src/core/agents/backend/AgentAdapterWiring.ts|src/core/agents/backend/zcode/index.ts|runtime-static|./zcode",
+      "from": "src/core/agents/backend/AgentAdapterWiring.ts",
+      "to": "src/core/agents/backend/zcode/index.ts",
+      "kind": "runtime-static",
+      "specifier": "./zcode"
     },
     {
       "id": "src/core/agents/backend/AgentAdapterWiring.ts|src/core/types/settings.ts|type-only|../../types/settings",
@@ -1124,6 +1159,13 @@
       "specifier": "./AgentAuxQueryCapability"
     },
     {
+      "id": "src/core/agents/backend/CodexAdapter.ts|src/core/agents/backend/AgentBackendRouting.ts|type-only|./AgentBackendRouting",
+      "from": "src/core/agents/backend/CodexAdapter.ts",
+      "to": "src/core/agents/backend/AgentBackendRouting.ts",
+      "kind": "type-only",
+      "specifier": "./AgentBackendRouting"
+    },
+    {
       "id": "src/core/agents/backend/CodexAdapter.ts|src/core/agents/backend/AgentInlineCompletionCapability.ts|runtime-static|./AgentInlineCompletionCapability",
       "from": "src/core/agents/backend/CodexAdapter.ts",
       "to": "src/core/agents/backend/AgentInlineCompletionCapability.ts",
@@ -1173,6 +1215,13 @@
       "specifier": "./CodexAppServerClient"
     },
     {
+      "id": "src/core/agents/backend/CodexAdapter.ts|src/core/agents/backend/CodexAppServerClientNormalization.ts|runtime-static|./CodexAppServerClientNormalization",
+      "from": "src/core/agents/backend/CodexAdapter.ts",
+      "to": "src/core/agents/backend/CodexAppServerClientNormalization.ts",
+      "kind": "runtime-static",
+      "specifier": "./CodexAppServerClientNormalization"
+    },
+    {
       "id": "src/core/agents/backend/CodexAdapter.ts|src/core/agents/backend/CodexAppServerStreamMapper.ts|runtime-static|./CodexAppServerStreamMapper",
       "from": "src/core/agents/backend/CodexAdapter.ts",
       "to": "src/core/agents/backend/CodexAppServerStreamMapper.ts",
@@ -1180,11 +1229,25 @@
       "specifier": "./CodexAppServerStreamMapper"
     },
     {
+      "id": "src/core/agents/backend/CodexAdapter.ts|src/core/agents/backend/CodexAppServerTransport.ts|runtime-static|./CodexAppServerTransport",
+      "from": "src/core/agents/backend/CodexAdapter.ts",
+      "to": "src/core/agents/backend/CodexAppServerTransport.ts",
+      "kind": "runtime-static",
+      "specifier": "./CodexAppServerTransport"
+    },
+    {
       "id": "src/core/agents/backend/CodexAdapter.ts|src/core/agents/backend/CodexCliResolver.ts|runtime-static|./CodexCliResolver",
       "from": "src/core/agents/backend/CodexAdapter.ts",
       "to": "src/core/agents/backend/CodexCliResolver.ts",
       "kind": "runtime-static",
       "specifier": "./CodexCliResolver"
+    },
+    {
+      "id": "src/core/agents/backend/CodexAdapter.ts|src/core/agents/backend/CodexElicitationBridge.ts|runtime-static|./CodexElicitationBridge",
+      "from": "src/core/agents/backend/CodexAdapter.ts",
+      "to": "src/core/agents/backend/CodexElicitationBridge.ts",
+      "kind": "runtime-static",
+      "specifier": "./CodexElicitationBridge"
     },
     {
       "id": "src/core/agents/backend/CodexAdapter.ts|src/core/agents/backend/CodexStreamNormalizer.ts|runtime-static|./CodexStreamNormalizer",
@@ -1220,6 +1283,13 @@
       "to": "src/core/types/chat.ts",
       "kind": "type-only",
       "specifier": "../../types/chat"
+    },
+    {
+      "id": "src/core/agents/backend/CodexAdapter.ts|src/core/types/index.ts|type-only|../../types",
+      "from": "src/core/agents/backend/CodexAdapter.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../types"
     },
     {
       "id": "src/core/agents/backend/CodexAdapter.ts|src/core/types/settings.ts|type-only|../../types/settings",
@@ -1320,8 +1390,29 @@
       "specifier": "./CodexAdapter"
     },
     {
+      "id": "src/core/agents/backend/CodexDefaultApprovalHost.ts|src/core/agents/backend/CodexAdapter.ts|type-only|./CodexAdapter",
+      "from": "src/core/agents/backend/CodexDefaultApprovalHost.ts",
+      "to": "src/core/agents/backend/CodexAdapter.ts",
+      "kind": "type-only",
+      "specifier": "./CodexAdapter"
+    },
+    {
+      "id": "src/core/agents/backend/CodexDefaultApprovalHost.ts|src/core/agents/backend/CodexElicitationBridge.ts|type-only|./CodexElicitationBridge",
+      "from": "src/core/agents/backend/CodexDefaultApprovalHost.ts",
+      "to": "src/core/agents/backend/CodexElicitationBridge.ts",
+      "kind": "type-only",
+      "specifier": "./CodexElicitationBridge"
+    },
+    {
       "id": "src/core/agents/backend/CodexDefaultApprovalHost.ts|src/core/types/index.ts|type-only|../../types",
       "from": "src/core/agents/backend/CodexDefaultApprovalHost.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../types"
+    },
+    {
+      "id": "src/core/agents/backend/CodexElicitationBridge.ts|src/core/types/index.ts|type-only|../../types",
+      "from": "src/core/agents/backend/CodexElicitationBridge.ts",
       "to": "src/core/types/index.ts",
       "kind": "type-only",
       "specifier": "../../types"
@@ -1656,6 +1747,13 @@
       "specifier": "./CodexDefaultApprovalHost"
     },
     {
+      "id": "src/core/agents/backend/index.ts|src/core/agents/backend/CodexElicitationBridge.ts|re-export|./CodexElicitationBridge",
+      "from": "src/core/agents/backend/index.ts",
+      "to": "src/core/agents/backend/CodexElicitationBridge.ts",
+      "kind": "re-export",
+      "specifier": "./CodexElicitationBridge"
+    },
+    {
       "id": "src/core/agents/backend/index.ts|src/core/agents/backend/CodexProjectResourceDiscovery.ts|re-export|./CodexProjectResourceDiscovery",
       "from": "src/core/agents/backend/index.ts",
       "to": "src/core/agents/backend/CodexProjectResourceDiscovery.ts",
@@ -1668,6 +1766,13 @@
       "to": "src/core/agents/backend/CodexStreamNormalizer.ts",
       "kind": "re-export",
       "specifier": "./CodexStreamNormalizer"
+    },
+    {
+      "id": "src/core/agents/backend/index.ts|src/core/agents/backend/OpenCode2Adapter.ts|re-export|./OpenCode2Adapter",
+      "from": "src/core/agents/backend/index.ts",
+      "to": "src/core/agents/backend/OpenCode2Adapter.ts",
+      "kind": "re-export",
+      "specifier": "./OpenCode2Adapter"
     },
     {
       "id": "src/core/agents/backend/index.ts|src/core/agents/backend/OpenCodeAdapter.ts|re-export|./OpenCodeAdapter",
@@ -1684,11 +1789,95 @@
       "specifier": "./ProjectResourceSecureWrite"
     },
     {
+      "id": "src/core/agents/backend/index.ts|src/core/agents/backend/zcode/index.ts|re-export|./zcode",
+      "from": "src/core/agents/backend/index.ts",
+      "to": "src/core/agents/backend/zcode/index.ts",
+      "kind": "re-export",
+      "specifier": "./zcode"
+    },
+    {
       "id": "src/core/agents/backend/index.ts|src/core/types/chat.ts|type-only|../../types/chat",
       "from": "src/core/agents/backend/index.ts",
       "to": "src/core/types/chat.ts",
       "kind": "type-only",
       "specifier": "../../types/chat"
+    },
+    {
+      "id": "src/core/agents/backend/OpenCode2Adapter.ts|src/core/agents/AgentCapability.ts|runtime-static|../AgentCapability",
+      "from": "src/core/agents/backend/OpenCode2Adapter.ts",
+      "to": "src/core/agents/AgentCapability.ts",
+      "kind": "runtime-static",
+      "specifier": "../AgentCapability"
+    },
+    {
+      "id": "src/core/agents/backend/OpenCode2Adapter.ts|src/core/agents/backend/AgentAuxQueryCapability.ts|runtime-static|./AgentAuxQueryCapability",
+      "from": "src/core/agents/backend/OpenCode2Adapter.ts",
+      "to": "src/core/agents/backend/AgentAuxQueryCapability.ts",
+      "kind": "runtime-static",
+      "specifier": "./AgentAuxQueryCapability"
+    },
+    {
+      "id": "src/core/agents/backend/OpenCode2Adapter.ts|src/core/agents/backend/AgentInlineCompletionCapability.ts|type-only|./AgentInlineCompletionCapability",
+      "from": "src/core/agents/backend/OpenCode2Adapter.ts",
+      "to": "src/core/agents/backend/AgentInlineCompletionCapability.ts",
+      "kind": "type-only",
+      "specifier": "./AgentInlineCompletionCapability"
+    },
+    {
+      "id": "src/core/agents/backend/OpenCode2Adapter.ts|src/core/agents/backend/AgentService.ts|type-only|./AgentService",
+      "from": "src/core/agents/backend/OpenCode2Adapter.ts",
+      "to": "src/core/agents/backend/AgentService.ts",
+      "kind": "type-only",
+      "specifier": "./AgentService"
+    },
+    {
+      "id": "src/core/agents/backend/OpenCode2Adapter.ts|src/core/agents/backend/auxiliary/WarmInlineCompletionSession.ts|runtime-static|./auxiliary/WarmInlineCompletionSession",
+      "from": "src/core/agents/backend/OpenCode2Adapter.ts",
+      "to": "src/core/agents/backend/auxiliary/WarmInlineCompletionSession.ts",
+      "kind": "runtime-static",
+      "specifier": "./auxiliary/WarmInlineCompletionSession"
+    },
+    {
+      "id": "src/core/agents/backend/OpenCode2Adapter.ts|src/core/memory/index.ts|runtime-static|../../memory",
+      "from": "src/core/agents/backend/OpenCode2Adapter.ts",
+      "to": "src/core/memory/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../memory"
+    },
+    {
+      "id": "src/core/agents/backend/OpenCode2Adapter.ts|src/core/obsidianTooling/index.ts|runtime-static|../../obsidianTooling",
+      "from": "src/core/agents/backend/OpenCode2Adapter.ts",
+      "to": "src/core/obsidianTooling/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../obsidianTooling"
+    },
+    {
+      "id": "src/core/agents/backend/OpenCode2Adapter.ts|src/core/opencode/sdkFetch.ts|runtime-static|../../opencode/sdkFetch",
+      "from": "src/core/agents/backend/OpenCode2Adapter.ts",
+      "to": "src/core/opencode/sdkFetch.ts",
+      "kind": "runtime-static",
+      "specifier": "../../opencode/sdkFetch"
+    },
+    {
+      "id": "src/core/agents/backend/OpenCode2Adapter.ts|src/core/types/chat.ts|type-only|../../types/chat",
+      "from": "src/core/agents/backend/OpenCode2Adapter.ts",
+      "to": "src/core/types/chat.ts",
+      "kind": "type-only",
+      "specifier": "../../types/chat"
+    },
+    {
+      "id": "src/core/agents/backend/OpenCode2Adapter.ts|src/core/types/settings.ts|type-only|../../types/settings",
+      "from": "src/core/agents/backend/OpenCode2Adapter.ts",
+      "to": "src/core/types/settings.ts",
+      "kind": "type-only",
+      "specifier": "../../types/settings"
+    },
+    {
+      "id": "src/core/agents/backend/OpenCode2Adapter.ts|src/shared/obsidianContext.ts|runtime-static|../../../shared/obsidianContext",
+      "from": "src/core/agents/backend/OpenCode2Adapter.ts",
+      "to": "src/shared/obsidianContext.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../shared/obsidianContext"
     },
     {
       "id": "src/core/agents/backend/OpenCodeAdapter.ts|src/core/agents/AgentCapability.ts|runtime-static|../AgentCapability",
@@ -2027,6 +2216,321 @@
       "specifier": "./ProjectResourceSecureWrite"
     },
     {
+      "id": "src/core/agents/backend/zcode/index.ts|src/core/agents/backend/zcode/ZCodeAdapter.ts|re-export|./ZCodeAdapter",
+      "from": "src/core/agents/backend/zcode/index.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
+      "kind": "re-export",
+      "specifier": "./ZCodeAdapter"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/index.ts|src/core/agents/backend/zcode/ZCodeAppServerTransport.ts|re-export|./ZCodeAppServerTransport",
+      "from": "src/core/agents/backend/zcode/index.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeAppServerTransport.ts",
+      "kind": "re-export",
+      "specifier": "./ZCodeAppServerTransport"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/index.ts|src/core/agents/backend/zcode/ZCodeProtocolTypes.ts|re-export|./ZCodeProtocolTypes",
+      "from": "src/core/agents/backend/zcode/index.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeProtocolTypes.ts",
+      "kind": "re-export",
+      "specifier": "./ZCodeProtocolTypes"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/index.ts|src/core/agents/backend/zcode/ZCodeProviderConfigDiscovery.ts|re-export|./ZCodeProviderConfigDiscovery",
+      "from": "src/core/agents/backend/zcode/index.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeProviderConfigDiscovery.ts",
+      "kind": "re-export",
+      "specifier": "./ZCodeProviderConfigDiscovery"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/index.ts|src/core/agents/backend/zcode/ZCodeRuntimeResolver.ts|re-export|./ZCodeRuntimeResolver",
+      "from": "src/core/agents/backend/zcode/index.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeRuntimeResolver.ts",
+      "kind": "re-export",
+      "specifier": "./ZCodeRuntimeResolver"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAdapter.ts|src/core/agents/AgentCapability.ts|runtime-static|../../AgentCapability",
+      "from": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
+      "to": "src/core/agents/AgentCapability.ts",
+      "kind": "runtime-static",
+      "specifier": "../../AgentCapability"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAdapter.ts|src/core/agents/backend/AgentAuxQueryCapability.ts|type-only|../AgentAuxQueryCapability",
+      "from": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
+      "to": "src/core/agents/backend/AgentAuxQueryCapability.ts",
+      "kind": "type-only",
+      "specifier": "../AgentAuxQueryCapability"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAdapter.ts|src/core/agents/backend/AgentInlineCompletionCapability.ts|type-only|../AgentInlineCompletionCapability",
+      "from": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
+      "to": "src/core/agents/backend/AgentInlineCompletionCapability.ts",
+      "kind": "type-only",
+      "specifier": "../AgentInlineCompletionCapability"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAdapter.ts|src/core/agents/backend/AgentService.ts|type-only|../AgentService",
+      "from": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
+      "to": "src/core/agents/backend/AgentService.ts",
+      "kind": "type-only",
+      "specifier": "../AgentService"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAdapter.ts|src/core/agents/backend/zcode/ZCodeAppServerTransport.ts|runtime-static|./ZCodeAppServerTransport",
+      "from": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeAppServerTransport.ts",
+      "kind": "runtime-static",
+      "specifier": "./ZCodeAppServerTransport"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAdapter.ts|src/core/agents/backend/zcode/ZCodeAuxQuerySession.ts|runtime-static|./ZCodeAuxQuerySession",
+      "from": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeAuxQuerySession.ts",
+      "kind": "runtime-static",
+      "specifier": "./ZCodeAuxQuerySession"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAdapter.ts|src/core/agents/backend/zcode/ZCodeDesktopTaskIndex.ts|runtime-static|./ZCodeDesktopTaskIndex",
+      "from": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeDesktopTaskIndex.ts",
+      "kind": "runtime-static",
+      "specifier": "./ZCodeDesktopTaskIndex"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAdapter.ts|src/core/agents/backend/zcode/ZCodeImageAttachment.ts|runtime-static|./ZCodeImageAttachment",
+      "from": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeImageAttachment.ts",
+      "kind": "runtime-static",
+      "specifier": "./ZCodeImageAttachment"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAdapter.ts|src/core/agents/backend/zcode/ZCodeInlineCompletionSession.ts|runtime-static|./ZCodeInlineCompletionSession",
+      "from": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeInlineCompletionSession.ts",
+      "kind": "runtime-static",
+      "specifier": "./ZCodeInlineCompletionSession"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAdapter.ts|src/core/agents/backend/zcode/ZCodeInteractionBridge.ts|runtime-static|./ZCodeInteractionBridge",
+      "from": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeInteractionBridge.ts",
+      "kind": "runtime-static",
+      "specifier": "./ZCodeInteractionBridge"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAdapter.ts|src/core/agents/backend/zcode/ZCodeModelCatalog.ts|runtime-static|./ZCodeModelCatalog",
+      "from": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeModelCatalog.ts",
+      "kind": "runtime-static",
+      "specifier": "./ZCodeModelCatalog"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAdapter.ts|src/core/agents/backend/zcode/ZCodeProtocolTypes.ts|runtime-static|./ZCodeProtocolTypes",
+      "from": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeProtocolTypes.ts",
+      "kind": "runtime-static",
+      "specifier": "./ZCodeProtocolTypes"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAdapter.ts|src/core/agents/backend/zcode/ZCodeProtocolTypes.ts|runtime-static|./ZCodeProtocolTypes",
+      "from": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeProtocolTypes.ts",
+      "kind": "runtime-static",
+      "specifier": "./ZCodeProtocolTypes"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAdapter.ts|src/core/agents/backend/zcode/ZCodeProviderConfigDiscovery.ts|runtime-static|./ZCodeProviderConfigDiscovery",
+      "from": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeProviderConfigDiscovery.ts",
+      "kind": "runtime-static",
+      "specifier": "./ZCodeProviderConfigDiscovery"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAdapter.ts|src/core/agents/backend/zcode/ZCodeProviderConfigDiscovery.ts|type-only|./ZCodeProviderConfigDiscovery",
+      "from": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeProviderConfigDiscovery.ts",
+      "kind": "type-only",
+      "specifier": "./ZCodeProviderConfigDiscovery"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAdapter.ts|src/core/agents/backend/zcode/ZCodeRuntimeResolver.ts|runtime-static|./ZCodeRuntimeResolver",
+      "from": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeRuntimeResolver.ts",
+      "kind": "runtime-static",
+      "specifier": "./ZCodeRuntimeResolver"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAdapter.ts|src/core/agents/backend/zcode/ZCodeStreamMapper.ts|runtime-static|./ZCodeStreamMapper",
+      "from": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeStreamMapper.ts",
+      "kind": "runtime-static",
+      "specifier": "./ZCodeStreamMapper"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAdapter.ts|src/core/memory/index.ts|runtime-static|../../../memory",
+      "from": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
+      "to": "src/core/memory/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../memory"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAdapter.ts|src/core/obsidianTooling/index.ts|runtime-static|../../../obsidianTooling",
+      "from": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
+      "to": "src/core/obsidianTooling/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../obsidianTooling"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAdapter.ts|src/core/types/chat.ts|type-only|../../../types/chat",
+      "from": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
+      "to": "src/core/types/chat.ts",
+      "kind": "type-only",
+      "specifier": "../../../types/chat"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAdapter.ts|src/core/types/index.ts|type-only|../../../types",
+      "from": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../types"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAppServerTransport.ts|src/core/agents/backend/zcode/ZCodeProtocolTypes.ts|runtime-static|./ZCodeProtocolTypes",
+      "from": "src/core/agents/backend/zcode/ZCodeAppServerTransport.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeProtocolTypes.ts",
+      "kind": "runtime-static",
+      "specifier": "./ZCodeProtocolTypes"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAppServerTransport.ts|src/core/agents/backend/zcode/ZCodeRuntimeResolver.ts|type-only|./ZCodeRuntimeResolver",
+      "from": "src/core/agents/backend/zcode/ZCodeAppServerTransport.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeRuntimeResolver.ts",
+      "kind": "type-only",
+      "specifier": "./ZCodeRuntimeResolver"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAppServerTransport.ts|src/shared/index.ts|runtime-static|../../../../shared",
+      "from": "src/core/agents/backend/zcode/ZCodeAppServerTransport.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../../shared"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAuxQuerySession.ts|src/core/agents/backend/AgentAuxQueryCapability.ts|runtime-static|../AgentAuxQueryCapability",
+      "from": "src/core/agents/backend/zcode/ZCodeAuxQuerySession.ts",
+      "to": "src/core/agents/backend/AgentAuxQueryCapability.ts",
+      "kind": "runtime-static",
+      "specifier": "../AgentAuxQueryCapability"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAuxQuerySession.ts|src/core/agents/backend/AgentAuxQueryCapability.ts|type-only|../AgentAuxQueryCapability",
+      "from": "src/core/agents/backend/zcode/ZCodeAuxQuerySession.ts",
+      "to": "src/core/agents/backend/AgentAuxQueryCapability.ts",
+      "kind": "type-only",
+      "specifier": "../AgentAuxQueryCapability"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAuxQuerySession.ts|src/core/agents/backend/zcode/ZCodeAppServerTransport.ts|runtime-static|./ZCodeAppServerTransport",
+      "from": "src/core/agents/backend/zcode/ZCodeAuxQuerySession.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeAppServerTransport.ts",
+      "kind": "runtime-static",
+      "specifier": "./ZCodeAppServerTransport"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAuxQuerySession.ts|src/core/agents/backend/zcode/ZCodeImageAttachment.ts|runtime-static|./ZCodeImageAttachment",
+      "from": "src/core/agents/backend/zcode/ZCodeAuxQuerySession.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeImageAttachment.ts",
+      "kind": "runtime-static",
+      "specifier": "./ZCodeImageAttachment"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAuxQuerySession.ts|src/core/agents/backend/zcode/ZCodeModelCatalog.ts|runtime-static|./ZCodeModelCatalog",
+      "from": "src/core/agents/backend/zcode/ZCodeAuxQuerySession.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeModelCatalog.ts",
+      "kind": "runtime-static",
+      "specifier": "./ZCodeModelCatalog"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeAuxQuerySession.ts|src/core/agents/backend/zcode/ZCodeRuntimeResolver.ts|type-only|./ZCodeRuntimeResolver",
+      "from": "src/core/agents/backend/zcode/ZCodeAuxQuerySession.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeRuntimeResolver.ts",
+      "kind": "type-only",
+      "specifier": "./ZCodeRuntimeResolver"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeImageAttachment.ts|src/core/types/chat.ts|type-only|../../../types/chat",
+      "from": "src/core/agents/backend/zcode/ZCodeImageAttachment.ts",
+      "to": "src/core/types/chat.ts",
+      "kind": "type-only",
+      "specifier": "../../../types/chat"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeInlineCompletionSession.ts|src/core/agents/backend/AgentAuxQueryCapability.ts|runtime-static|../AgentAuxQueryCapability",
+      "from": "src/core/agents/backend/zcode/ZCodeInlineCompletionSession.ts",
+      "to": "src/core/agents/backend/AgentAuxQueryCapability.ts",
+      "kind": "runtime-static",
+      "specifier": "../AgentAuxQueryCapability"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeInlineCompletionSession.ts|src/core/agents/backend/AgentAuxQueryCapability.ts|type-only|../AgentAuxQueryCapability",
+      "from": "src/core/agents/backend/zcode/ZCodeInlineCompletionSession.ts",
+      "to": "src/core/agents/backend/AgentAuxQueryCapability.ts",
+      "kind": "type-only",
+      "specifier": "../AgentAuxQueryCapability"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeInlineCompletionSession.ts|src/core/agents/backend/AgentInlineCompletionCapability.ts|runtime-static|../AgentInlineCompletionCapability",
+      "from": "src/core/agents/backend/zcode/ZCodeInlineCompletionSession.ts",
+      "to": "src/core/agents/backend/AgentInlineCompletionCapability.ts",
+      "kind": "runtime-static",
+      "specifier": "../AgentInlineCompletionCapability"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeInlineCompletionSession.ts|src/core/agents/backend/zcode/ZCodeModelCatalog.ts|runtime-static|./ZCodeModelCatalog",
+      "from": "src/core/agents/backend/zcode/ZCodeInlineCompletionSession.ts",
+      "to": "src/core/agents/backend/zcode/ZCodeModelCatalog.ts",
+      "kind": "runtime-static",
+      "specifier": "./ZCodeModelCatalog"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeInteractionBridge.ts|src/core/types/chat.ts|type-only|../../../types/chat",
+      "from": "src/core/agents/backend/zcode/ZCodeInteractionBridge.ts",
+      "to": "src/core/types/chat.ts",
+      "kind": "type-only",
+      "specifier": "../../../types/chat"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeInteractionBridge.ts|src/core/types/index.ts|type-only|../../../types",
+      "from": "src/core/agents/backend/zcode/ZCodeInteractionBridge.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../types"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeInteractionBridge.ts|src/core/types/permission.ts|runtime-static|../../../types/permission",
+      "from": "src/core/agents/backend/zcode/ZCodeInteractionBridge.ts",
+      "to": "src/core/types/permission.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../types/permission"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeStreamMapper.ts|src/core/types/chat.ts|type-only|../../../types/chat",
+      "from": "src/core/agents/backend/zcode/ZCodeStreamMapper.ts",
+      "to": "src/core/types/chat.ts",
+      "kind": "type-only",
+      "specifier": "../../../types/chat"
+    },
+    {
+      "id": "src/core/agents/backend/zcode/ZCodeStreamMapper.ts|src/shared/toolIdentity.ts|runtime-static|../../../../shared/toolIdentity",
+      "from": "src/core/agents/backend/zcode/ZCodeStreamMapper.ts",
+      "to": "src/shared/toolIdentity.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../../shared/toolIdentity"
+    },
+    {
       "id": "src/core/agents/ChildSessionGraphService.ts|src/core/agents/types.ts|type-only|./types",
       "from": "src/core/agents/ChildSessionGraphService.ts",
       "to": "src/core/agents/types.ts",
@@ -2123,6 +2627,104 @@
       "to": "src/core/types/opencodeConfig.ts",
       "kind": "type-only",
       "specifier": "../types/opencodeConfig"
+    },
+    {
+      "id": "src/core/canvas/CanvasGenerationService.ts|src/core/canvas/CanvasDocument.ts|runtime-static|./CanvasDocument",
+      "from": "src/core/canvas/CanvasGenerationService.ts",
+      "to": "src/core/canvas/CanvasDocument.ts",
+      "kind": "runtime-static",
+      "specifier": "./CanvasDocument"
+    },
+    {
+      "id": "src/core/canvas/CanvasGenerationService.ts|src/core/canvas/CanvasLayout.ts|runtime-static|./CanvasLayout",
+      "from": "src/core/canvas/CanvasGenerationService.ts",
+      "to": "src/core/canvas/CanvasLayout.ts",
+      "kind": "runtime-static",
+      "specifier": "./CanvasLayout"
+    },
+    {
+      "id": "src/core/canvas/CanvasGenerationService.ts|src/core/canvas/CanvasSplitProposal.ts|type-only|./CanvasSplitProposal",
+      "from": "src/core/canvas/CanvasGenerationService.ts",
+      "to": "src/core/canvas/CanvasSplitProposal.ts",
+      "kind": "type-only",
+      "specifier": "./CanvasSplitProposal"
+    },
+    {
+      "id": "src/core/canvas/CanvasNodeWriteService.ts|src/core/canvas/CanvasDocument.ts|runtime-static|./CanvasDocument",
+      "from": "src/core/canvas/CanvasNodeWriteService.ts",
+      "to": "src/core/canvas/CanvasDocument.ts",
+      "kind": "runtime-static",
+      "specifier": "./CanvasDocument"
+    },
+    {
+      "id": "src/core/canvas/index.ts|src/core/canvas/CanvasDocument.ts|re-export|./CanvasDocument",
+      "from": "src/core/canvas/index.ts",
+      "to": "src/core/canvas/CanvasDocument.ts",
+      "kind": "re-export",
+      "specifier": "./CanvasDocument"
+    },
+    {
+      "id": "src/core/canvas/index.ts|src/core/canvas/CanvasDocument.ts|type-only|./CanvasDocument",
+      "from": "src/core/canvas/index.ts",
+      "to": "src/core/canvas/CanvasDocument.ts",
+      "kind": "type-only",
+      "specifier": "./CanvasDocument"
+    },
+    {
+      "id": "src/core/canvas/index.ts|src/core/canvas/CanvasGenerationService.ts|re-export|./CanvasGenerationService",
+      "from": "src/core/canvas/index.ts",
+      "to": "src/core/canvas/CanvasGenerationService.ts",
+      "kind": "re-export",
+      "specifier": "./CanvasGenerationService"
+    },
+    {
+      "id": "src/core/canvas/index.ts|src/core/canvas/CanvasGenerationService.ts|type-only|./CanvasGenerationService",
+      "from": "src/core/canvas/index.ts",
+      "to": "src/core/canvas/CanvasGenerationService.ts",
+      "kind": "type-only",
+      "specifier": "./CanvasGenerationService"
+    },
+    {
+      "id": "src/core/canvas/index.ts|src/core/canvas/CanvasLayout.ts|re-export|./CanvasLayout",
+      "from": "src/core/canvas/index.ts",
+      "to": "src/core/canvas/CanvasLayout.ts",
+      "kind": "re-export",
+      "specifier": "./CanvasLayout"
+    },
+    {
+      "id": "src/core/canvas/index.ts|src/core/canvas/CanvasLayout.ts|type-only|./CanvasLayout",
+      "from": "src/core/canvas/index.ts",
+      "to": "src/core/canvas/CanvasLayout.ts",
+      "kind": "type-only",
+      "specifier": "./CanvasLayout"
+    },
+    {
+      "id": "src/core/canvas/index.ts|src/core/canvas/CanvasNodeWriteService.ts|re-export|./CanvasNodeWriteService",
+      "from": "src/core/canvas/index.ts",
+      "to": "src/core/canvas/CanvasNodeWriteService.ts",
+      "kind": "re-export",
+      "specifier": "./CanvasNodeWriteService"
+    },
+    {
+      "id": "src/core/canvas/index.ts|src/core/canvas/CanvasNodeWriteService.ts|type-only|./CanvasNodeWriteService",
+      "from": "src/core/canvas/index.ts",
+      "to": "src/core/canvas/CanvasNodeWriteService.ts",
+      "kind": "type-only",
+      "specifier": "./CanvasNodeWriteService"
+    },
+    {
+      "id": "src/core/canvas/index.ts|src/core/canvas/CanvasSplitProposal.ts|re-export|./CanvasSplitProposal",
+      "from": "src/core/canvas/index.ts",
+      "to": "src/core/canvas/CanvasSplitProposal.ts",
+      "kind": "re-export",
+      "specifier": "./CanvasSplitProposal"
+    },
+    {
+      "id": "src/core/canvas/index.ts|src/core/canvas/CanvasSplitProposal.ts|type-only|./CanvasSplitProposal",
+      "from": "src/core/canvas/index.ts",
+      "to": "src/core/canvas/CanvasSplitProposal.ts",
+      "kind": "type-only",
+      "specifier": "./CanvasSplitProposal"
     },
     {
       "id": "src/core/config/commandScopedAgent.ts|src/core/config/modelConfig.ts|runtime-static|./modelConfig",
@@ -2692,6 +3294,13 @@
       "specifier": "./memoryTypes"
     },
     {
+      "id": "src/core/memory/index.ts|src/core/memory/VaultEmbeddingIndexService.ts|re-export|./VaultEmbeddingIndexService",
+      "from": "src/core/memory/index.ts",
+      "to": "src/core/memory/VaultEmbeddingIndexService.ts",
+      "kind": "re-export",
+      "specifier": "./VaultEmbeddingIndexService"
+    },
+    {
       "id": "src/core/memory/index.ts|src/core/memory/VaultIndexService.ts|re-export|./VaultIndexService",
       "from": "src/core/memory/index.ts",
       "to": "src/core/memory/VaultIndexService.ts",
@@ -2984,6 +3593,20 @@
       "to": "src/core/memory/memoryTypes.ts",
       "kind": "type-only",
       "specifier": "./memoryTypes"
+    },
+    {
+      "id": "src/core/memory/VaultEmbeddingIndexService.ts|src/core/memory/vaultRetrievalIndex.ts|runtime-static|./vaultRetrievalIndex",
+      "from": "src/core/memory/VaultEmbeddingIndexService.ts",
+      "to": "src/core/memory/vaultRetrievalIndex.ts",
+      "kind": "runtime-static",
+      "specifier": "./vaultRetrievalIndex"
+    },
+    {
+      "id": "src/core/memory/VaultEmbeddingIndexService.ts|src/shared/index.ts|runtime-static|../../shared",
+      "from": "src/core/memory/VaultEmbeddingIndexService.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../shared"
     },
     {
       "id": "src/core/memory/VaultIndexService.ts|src/core/memory/memorySecretScan.ts|runtime-static|./memorySecretScan",
@@ -4295,6 +4918,209 @@
       "specifier": "../types/settings"
     },
     {
+      "id": "src/core/pdf/index.ts|src/core/pdf/pdfAnnotation.ts|re-export|./pdfAnnotation",
+      "from": "src/core/pdf/index.ts",
+      "to": "src/core/pdf/pdfAnnotation.ts",
+      "kind": "re-export",
+      "specifier": "./pdfAnnotation"
+    },
+    {
+      "id": "src/core/pdf/index.ts|src/core/pdf/pdfIndexFormat.ts|re-export|./pdfIndexFormat",
+      "from": "src/core/pdf/index.ts",
+      "to": "src/core/pdf/pdfIndexFormat.ts",
+      "kind": "re-export",
+      "specifier": "./pdfIndexFormat"
+    },
+    {
+      "id": "src/core/pdf/index.ts|src/core/pdf/pdfIndexScoring.ts|re-export|./pdfIndexScoring",
+      "from": "src/core/pdf/index.ts",
+      "to": "src/core/pdf/pdfIndexScoring.ts",
+      "kind": "re-export",
+      "specifier": "./pdfIndexScoring"
+    },
+    {
+      "id": "src/core/pdf/index.ts|src/core/pdf/PdfIndexService.ts|re-export|./PdfIndexService",
+      "from": "src/core/pdf/index.ts",
+      "to": "src/core/pdf/PdfIndexService.ts",
+      "kind": "re-export",
+      "specifier": "./PdfIndexService"
+    },
+    {
+      "id": "src/core/pdf/index.ts|src/core/pdf/pdfTextEngine.ts|re-export|./pdfTextEngine",
+      "from": "src/core/pdf/index.ts",
+      "to": "src/core/pdf/pdfTextEngine.ts",
+      "kind": "re-export",
+      "specifier": "./pdfTextEngine"
+    },
+    {
+      "id": "src/core/pdf/index.ts|src/core/pdf/pdfTextLayout.ts|re-export|./pdfTextLayout",
+      "from": "src/core/pdf/index.ts",
+      "to": "src/core/pdf/pdfTextLayout.ts",
+      "kind": "re-export",
+      "specifier": "./pdfTextLayout"
+    },
+    {
+      "id": "src/core/pdf/index.ts|src/core/pdf/pdfViewProbe.ts|re-export|./pdfViewProbe",
+      "from": "src/core/pdf/index.ts",
+      "to": "src/core/pdf/pdfViewProbe.ts",
+      "kind": "re-export",
+      "specifier": "./pdfViewProbe"
+    },
+    {
+      "id": "src/core/pdf/pdfAnnotation.ts|src/shared/index.ts|runtime-static|../../shared",
+      "from": "src/core/pdf/pdfAnnotation.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../shared"
+    },
+    {
+      "id": "src/core/pdf/pdfEngineEntry.ts|src/core/pdf/pdfTextLayout.ts|runtime-static|./pdfTextLayout",
+      "from": "src/core/pdf/pdfEngineEntry.ts",
+      "to": "src/core/pdf/pdfTextLayout.ts",
+      "kind": "runtime-static",
+      "specifier": "./pdfTextLayout"
+    },
+    {
+      "id": "src/core/pdf/pdfEngineEntry.ts|src/core/types/index.ts|type-only|../types",
+      "from": "src/core/pdf/pdfEngineEntry.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../types"
+    },
+    {
+      "id": "src/core/pdf/pdfIndexScoring.ts|src/core/memory/memoryRecall.ts|runtime-static|../memory/memoryRecall",
+      "from": "src/core/pdf/pdfIndexScoring.ts",
+      "to": "src/core/memory/memoryRecall.ts",
+      "kind": "runtime-static",
+      "specifier": "../memory/memoryRecall"
+    },
+    {
+      "id": "src/core/pdf/pdfIndexScoring.ts|src/core/memory/vaultRetrievalIndex.ts|runtime-static|../memory/vaultRetrievalIndex",
+      "from": "src/core/pdf/pdfIndexScoring.ts",
+      "to": "src/core/memory/vaultRetrievalIndex.ts",
+      "kind": "runtime-static",
+      "specifier": "../memory/vaultRetrievalIndex"
+    },
+    {
+      "id": "src/core/pdf/pdfIndexScoring.ts|src/core/pdf/pdfIndexFormat.ts|type-only|./pdfIndexFormat",
+      "from": "src/core/pdf/pdfIndexScoring.ts",
+      "to": "src/core/pdf/pdfIndexFormat.ts",
+      "kind": "type-only",
+      "specifier": "./pdfIndexFormat"
+    },
+    {
+      "id": "src/core/pdf/PdfIndexService.ts|src/core/memory/vaultRetrievalIndex.ts|runtime-static|../memory/vaultRetrievalIndex",
+      "from": "src/core/pdf/PdfIndexService.ts",
+      "to": "src/core/memory/vaultRetrievalIndex.ts",
+      "kind": "runtime-static",
+      "specifier": "../memory/vaultRetrievalIndex"
+    },
+    {
+      "id": "src/core/pdf/PdfIndexService.ts|src/core/pdf/pdfIndexFormat.ts|runtime-static|./pdfIndexFormat",
+      "from": "src/core/pdf/PdfIndexService.ts",
+      "to": "src/core/pdf/pdfIndexFormat.ts",
+      "kind": "runtime-static",
+      "specifier": "./pdfIndexFormat"
+    },
+    {
+      "id": "src/core/pdf/PdfIndexService.ts|src/core/pdf/pdfIndexScoring.ts|runtime-static|./pdfIndexScoring",
+      "from": "src/core/pdf/PdfIndexService.ts",
+      "to": "src/core/pdf/pdfIndexScoring.ts",
+      "kind": "runtime-static",
+      "specifier": "./pdfIndexScoring"
+    },
+    {
+      "id": "src/core/pdf/PdfIndexService.ts|src/core/pdf/pdfTextEngine.ts|type-only|./pdfTextEngine",
+      "from": "src/core/pdf/PdfIndexService.ts",
+      "to": "src/core/pdf/pdfTextEngine.ts",
+      "kind": "type-only",
+      "specifier": "./pdfTextEngine"
+    },
+    {
+      "id": "src/core/pdf/PdfIndexService.ts|src/core/types/index.ts|type-only|../types",
+      "from": "src/core/pdf/PdfIndexService.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../types"
+    },
+    {
+      "id": "src/core/pdf/PdfIndexService.ts|src/shared/index.ts|runtime-static|../../shared",
+      "from": "src/core/pdf/PdfIndexService.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../shared"
+    },
+    {
+      "id": "src/core/pdf/pdfTextEngine.ts|src/core/types/index.ts|type-only|../types",
+      "from": "src/core/pdf/pdfTextEngine.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../types"
+    },
+    {
+      "id": "src/core/remotecontrol/index.ts|src/core/remotecontrol/RemoteControlAudit.ts|re-export|./RemoteControlAudit",
+      "from": "src/core/remotecontrol/index.ts",
+      "to": "src/core/remotecontrol/RemoteControlAudit.ts",
+      "kind": "re-export",
+      "specifier": "./RemoteControlAudit"
+    },
+    {
+      "id": "src/core/remotecontrol/index.ts|src/core/remotecontrol/RemoteControlAuth.ts|re-export|./RemoteControlAuth",
+      "from": "src/core/remotecontrol/index.ts",
+      "to": "src/core/remotecontrol/RemoteControlAuth.ts",
+      "kind": "re-export",
+      "specifier": "./RemoteControlAuth"
+    },
+    {
+      "id": "src/core/remotecontrol/index.ts|src/core/remotecontrol/RemoteControlService.ts|re-export|./RemoteControlService",
+      "from": "src/core/remotecontrol/index.ts",
+      "to": "src/core/remotecontrol/RemoteControlService.ts",
+      "kind": "re-export",
+      "specifier": "./RemoteControlService"
+    },
+    {
+      "id": "src/core/remotecontrol/RemoteControlAudit.ts|src/core/remotecontrol/RemoteControlAuth.ts|runtime-static|./RemoteControlAuth",
+      "from": "src/core/remotecontrol/RemoteControlAudit.ts",
+      "to": "src/core/remotecontrol/RemoteControlAuth.ts",
+      "kind": "runtime-static",
+      "specifier": "./RemoteControlAuth"
+    },
+    {
+      "id": "src/core/remotecontrol/RemoteControlAudit.ts|src/shared/diagnostics/index.ts|runtime-static|../../shared/diagnostics",
+      "from": "src/core/remotecontrol/RemoteControlAudit.ts",
+      "to": "src/shared/diagnostics/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../shared/diagnostics"
+    },
+    {
+      "id": "src/core/remotecontrol/RemoteControlService.ts|src/core/remotecontrol/RemoteControlAudit.ts|runtime-static|./RemoteControlAudit",
+      "from": "src/core/remotecontrol/RemoteControlService.ts",
+      "to": "src/core/remotecontrol/RemoteControlAudit.ts",
+      "kind": "runtime-static",
+      "specifier": "./RemoteControlAudit"
+    },
+    {
+      "id": "src/core/remotecontrol/RemoteControlService.ts|src/core/remotecontrol/RemoteControlAuth.ts|runtime-static|./RemoteControlAuth",
+      "from": "src/core/remotecontrol/RemoteControlService.ts",
+      "to": "src/core/remotecontrol/RemoteControlAuth.ts",
+      "kind": "runtime-static",
+      "specifier": "./RemoteControlAuth"
+    },
+    {
+      "id": "src/core/remotecontrol/RemoteControlService.ts|src/core/types/chat.ts|type-only|../../core/types/chat",
+      "from": "src/core/remotecontrol/RemoteControlService.ts",
+      "to": "src/core/types/chat.ts",
+      "kind": "type-only",
+      "specifier": "../../core/types/chat"
+    },
+    {
+      "id": "src/core/remotecontrol/RemoteControlService.ts|src/core/types/settings.ts|type-only|../../core/types/settings",
+      "from": "src/core/remotecontrol/RemoteControlService.ts",
+      "to": "src/core/types/settings.ts",
+      "kind": "type-only",
+      "specifier": "../../core/types/settings"
+    },
+    {
       "id": "src/core/runtime/OpenCodianSettingsRuntimeCoordinator.ts|src/core/config/index.ts|runtime-static|../config",
       "from": "src/core/runtime/OpenCodianSettingsRuntimeCoordinator.ts",
       "to": "src/core/config/index.ts",
@@ -4370,6 +5196,69 @@
       "to": "src/core/types/index.ts",
       "kind": "type-only",
       "specifier": "../types"
+    },
+    {
+      "id": "src/core/storage/ConversationMarkdownExporter.ts|src/core/types/chat.ts|type-only|../types/chat",
+      "from": "src/core/storage/ConversationMarkdownExporter.ts",
+      "to": "src/core/types/chat.ts",
+      "kind": "type-only",
+      "specifier": "../types/chat"
+    },
+    {
+      "id": "src/core/storage/ConversationMarkdownExporter.ts|src/core/types/index.ts|type-only|../types",
+      "from": "src/core/storage/ConversationMarkdownExporter.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../types"
+    },
+    {
+      "id": "src/core/storage/ConversationMarkdownExporter.ts|src/shared/vault.ts|runtime-static|../../shared/vault",
+      "from": "src/core/storage/ConversationMarkdownExporter.ts",
+      "to": "src/shared/vault.ts",
+      "kind": "runtime-static",
+      "specifier": "../../shared/vault"
+    },
+    {
+      "id": "src/core/storage/ConversationMarkdownExportService.ts|src/core/storage/ConversationMarkdownExporter.ts|runtime-static|./ConversationMarkdownExporter",
+      "from": "src/core/storage/ConversationMarkdownExportService.ts",
+      "to": "src/core/storage/ConversationMarkdownExporter.ts",
+      "kind": "runtime-static",
+      "specifier": "./ConversationMarkdownExporter"
+    },
+    {
+      "id": "src/core/storage/ConversationMarkdownExportService.ts|src/core/types/chat.ts|type-only|../types/chat",
+      "from": "src/core/storage/ConversationMarkdownExportService.ts",
+      "to": "src/core/types/chat.ts",
+      "kind": "type-only",
+      "specifier": "../types/chat"
+    },
+    {
+      "id": "src/core/storage/ConversationMarkdownExportService.ts|src/core/types/index.ts|type-only|../types",
+      "from": "src/core/storage/ConversationMarkdownExportService.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../types"
+    },
+    {
+      "id": "src/core/storage/ConversationMarkdownExportService.ts|src/core/types/settings.ts|runtime-static|../types/settings",
+      "from": "src/core/storage/ConversationMarkdownExportService.ts",
+      "to": "src/core/types/settings.ts",
+      "kind": "runtime-static",
+      "specifier": "../types/settings"
+    },
+    {
+      "id": "src/core/storage/ConversationMarkdownExportService.ts|src/core/types/settings.ts|type-only|../types/settings",
+      "from": "src/core/storage/ConversationMarkdownExportService.ts",
+      "to": "src/core/types/settings.ts",
+      "kind": "type-only",
+      "specifier": "../types/settings"
+    },
+    {
+      "id": "src/core/storage/ConversationMarkdownExportService.ts|src/shared/vault.ts|runtime-static|../../shared/vault",
+      "from": "src/core/storage/ConversationMarkdownExportService.ts",
+      "to": "src/shared/vault.ts",
+      "kind": "runtime-static",
+      "specifier": "../../shared/vault"
     },
     {
       "id": "src/core/storage/ConversationMetadataCache.ts|src/core/types/index.ts|type-only|../types",
@@ -4456,6 +5345,13 @@
       "specifier": "../agents/imagegen/ImageGenerationService"
     },
     {
+      "id": "src/core/storage/ImageAssetStorage.ts|src/shared/vault.ts|runtime-static|../../shared/vault",
+      "from": "src/core/storage/ImageAssetStorage.ts",
+      "to": "src/shared/vault.ts",
+      "kind": "runtime-static",
+      "specifier": "../../shared/vault"
+    },
+    {
       "id": "src/core/storage/index.ts|src/core/storage/StorageService.ts|re-export|./StorageService",
       "from": "src/core/storage/index.ts",
       "to": "src/core/storage/StorageService.ts",
@@ -4482,6 +5378,13 @@
       "to": "src/core/storage/ConversationMetadataCache.ts",
       "kind": "runtime-static",
       "specifier": "./ConversationMetadataCache"
+    },
+    {
+      "id": "src/core/storage/StorageService.ts|src/core/storage/SettingsSecretsKeychain.ts|runtime-static|./SettingsSecretsKeychain",
+      "from": "src/core/storage/StorageService.ts",
+      "to": "src/core/storage/SettingsSecretsKeychain.ts",
+      "kind": "runtime-static",
+      "specifier": "./SettingsSecretsKeychain"
     },
     {
       "id": "src/core/storage/StorageService.ts|src/core/storage/StoragePluginPort.ts|type-only|./StoragePluginPort",
@@ -4638,6 +5541,13 @@
       "specifier": "../agents/backend/diagnostics/types"
     },
     {
+      "id": "src/core/types/settings.ts|src/core/agents/BackendEnvironment.ts|runtime-static|../agents/BackendEnvironment",
+      "from": "src/core/types/settings.ts",
+      "to": "src/core/agents/BackendEnvironment.ts",
+      "kind": "runtime-static",
+      "specifier": "../agents/BackendEnvironment"
+    },
+    {
       "id": "src/core/types/settings.ts|src/core/opencode/diagnostics/index.ts|runtime-static|../opencode/diagnostics",
       "from": "src/core/types/settings.ts",
       "to": "src/core/opencode/diagnostics/index.ts",
@@ -4680,11 +5590,25 @@
       "specifier": "../../shared/debugModules"
     },
     {
+      "id": "src/core/types/settings.ts|src/shared/vault.ts|runtime-static|../../shared/vault",
+      "from": "src/core/types/settings.ts",
+      "to": "src/shared/vault.ts",
+      "kind": "runtime-static",
+      "specifier": "../../shared/vault"
+    },
+    {
       "id": "src/core/types/settingsLoadNormalization.ts|src/core/agents/backend/index.ts|runtime-static|../agents/backend",
       "from": "src/core/types/settingsLoadNormalization.ts",
       "to": "src/core/agents/backend/index.ts",
       "kind": "runtime-static",
       "specifier": "../agents/backend"
+    },
+    {
+      "id": "src/core/types/settingsLoadNormalization.ts|src/core/agents/BackendEnvironment.ts|runtime-static|../agents/BackendEnvironment",
+      "from": "src/core/types/settingsLoadNormalization.ts",
+      "to": "src/core/agents/BackendEnvironment.ts",
+      "kind": "runtime-static",
+      "specifier": "../agents/BackendEnvironment"
     },
     {
       "id": "src/core/types/settingsLoadNormalization.ts|src/core/storage/index.ts|type-only|../storage",
@@ -4713,6 +5637,118 @@
       "to": "src/core/types/settings.ts",
       "kind": "runtime-static",
       "specifier": "./settings"
+    },
+    {
+      "id": "src/features/canvas-integration/CanvasGenerationFlow.ts|src/core/agents/backend/AgentAuxQueryCapability.ts|runtime-static|../../core/agents/backend/AgentAuxQueryCapability",
+      "from": "src/features/canvas-integration/CanvasGenerationFlow.ts",
+      "to": "src/core/agents/backend/AgentAuxQueryCapability.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/agents/backend/AgentAuxQueryCapability"
+    },
+    {
+      "id": "src/features/canvas-integration/CanvasGenerationFlow.ts|src/core/canvas/index.ts|runtime-static|../../core/canvas",
+      "from": "src/features/canvas-integration/CanvasGenerationFlow.ts",
+      "to": "src/core/canvas/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/canvas"
+    },
+    {
+      "id": "src/features/canvas-integration/CanvasGenerationFlow.ts|src/core/types/index.ts|type-only|../../core/types",
+      "from": "src/features/canvas-integration/CanvasGenerationFlow.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/types"
+    },
+    {
+      "id": "src/features/canvas-integration/CanvasGenerationFlow.ts|src/features/canvas-integration/CanvasNodeRewriteService.ts|type-only|./CanvasNodeRewriteService",
+      "from": "src/features/canvas-integration/CanvasGenerationFlow.ts",
+      "to": "src/features/canvas-integration/CanvasNodeRewriteService.ts",
+      "kind": "type-only",
+      "specifier": "./CanvasNodeRewriteService"
+    },
+    {
+      "id": "src/features/canvas-integration/CanvasGenerationFlow.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/features/canvas-integration/CanvasGenerationFlow.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/canvas-integration/CanvasIntegrationController.ts|src/core/canvas/index.ts|runtime-static|../../core/canvas",
+      "from": "src/features/canvas-integration/CanvasIntegrationController.ts",
+      "to": "src/core/canvas/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/canvas"
+    },
+    {
+      "id": "src/features/canvas-integration/CanvasIntegrationController.ts|src/core/types/index.ts|type-only|../../core/types",
+      "from": "src/features/canvas-integration/CanvasIntegrationController.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/types"
+    },
+    {
+      "id": "src/features/canvas-integration/CanvasIntegrationController.ts|src/features/canvas-integration/CanvasNodeRewriteService.ts|runtime-static|./CanvasNodeRewriteService",
+      "from": "src/features/canvas-integration/CanvasIntegrationController.ts",
+      "to": "src/features/canvas-integration/CanvasNodeRewriteService.ts",
+      "kind": "runtime-static",
+      "specifier": "./CanvasNodeRewriteService"
+    },
+    {
+      "id": "src/features/canvas-integration/CanvasIntegrationController.ts|src/features/canvas-integration/CanvasNodeRewriteService.ts|type-only|./CanvasNodeRewriteService",
+      "from": "src/features/canvas-integration/CanvasIntegrationController.ts",
+      "to": "src/features/canvas-integration/CanvasNodeRewriteService.ts",
+      "kind": "type-only",
+      "specifier": "./CanvasNodeRewriteService"
+    },
+    {
+      "id": "src/features/canvas-integration/CanvasIntegrationController.ts|src/features/canvas-integration/CanvasRewriteModals.ts|runtime-static|./CanvasRewriteModals",
+      "from": "src/features/canvas-integration/CanvasIntegrationController.ts",
+      "to": "src/features/canvas-integration/CanvasRewriteModals.ts",
+      "kind": "runtime-static",
+      "specifier": "./CanvasRewriteModals"
+    },
+    {
+      "id": "src/features/canvas-integration/CanvasIntegrationController.ts|src/features/inline-edit/InlineEditPrompt.ts|runtime-static|../inline-edit/InlineEditPrompt",
+      "from": "src/features/canvas-integration/CanvasIntegrationController.ts",
+      "to": "src/features/inline-edit/InlineEditPrompt.ts",
+      "kind": "runtime-static",
+      "specifier": "../inline-edit/InlineEditPrompt"
+    },
+    {
+      "id": "src/features/canvas-integration/CanvasIntegrationController.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/features/canvas-integration/CanvasIntegrationController.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/canvas-integration/CanvasNodeRewriteService.ts|src/core/agents/backend/AgentAuxQueryCapability.ts|runtime-static|../../core/agents/backend/AgentAuxQueryCapability",
+      "from": "src/features/canvas-integration/CanvasNodeRewriteService.ts",
+      "to": "src/core/agents/backend/AgentAuxQueryCapability.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/agents/backend/AgentAuxQueryCapability"
+    },
+    {
+      "id": "src/features/canvas-integration/CanvasNodeRewriteService.ts|src/core/types/chat.ts|type-only|../../core/types/chat",
+      "from": "src/features/canvas-integration/CanvasNodeRewriteService.ts",
+      "to": "src/core/types/chat.ts",
+      "kind": "type-only",
+      "specifier": "../../core/types/chat"
+    },
+    {
+      "id": "src/features/canvas-integration/CanvasNodeRewriteService.ts|src/features/inline-edit/InlineEditPrompt.ts|runtime-static|../inline-edit/InlineEditPrompt",
+      "from": "src/features/canvas-integration/CanvasNodeRewriteService.ts",
+      "to": "src/features/inline-edit/InlineEditPrompt.ts",
+      "kind": "runtime-static",
+      "specifier": "../inline-edit/InlineEditPrompt"
+    },
+    {
+      "id": "src/features/canvas-integration/CanvasRewriteModals.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/features/canvas-integration/CanvasRewriteModals.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
     },
     {
       "id": "src/features/chat/chatAppearance.ts|src/core/types/index.ts|runtime-static|../../core/types",
@@ -4944,6 +5980,13 @@
       "to": "src/core/agents/backend/CodexDefaultApprovalHost.ts",
       "kind": "runtime-static",
       "specifier": "../../core/agents/backend/CodexDefaultApprovalHost"
+    },
+    {
+      "id": "src/features/chat/OpenCodianView.ts|src/core/agents/backend/CodexElicitationBridge.ts|type-only|../../core/agents/backend/CodexElicitationBridge",
+      "from": "src/features/chat/OpenCodianView.ts",
+      "to": "src/core/agents/backend/CodexElicitationBridge.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/backend/CodexElicitationBridge"
     },
     {
       "id": "src/features/chat/OpenCodianView.ts|src/core/config/modelConfig.ts|runtime-static|../../core/config/modelConfig",
@@ -5191,6 +6234,13 @@
       "specifier": "./services/ChatSurfaceAppearanceCoordinator"
     },
     {
+      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/ChatVimNavigationCoordinator.ts|runtime-static|./services/ChatVimNavigationCoordinator",
+      "from": "src/features/chat/OpenCodianView.ts",
+      "to": "src/features/chat/services/ChatVimNavigationCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "./services/ChatVimNavigationCoordinator"
+    },
+    {
       "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/ChatVisualDemoCoordinator.ts|runtime-static|./services/ChatVisualDemoCoordinator",
       "from": "src/features/chat/OpenCodianView.ts",
       "to": "src/features/chat/services/ChatVisualDemoCoordinator.ts",
@@ -5280,6 +6330,13 @@
       "to": "src/features/chat/services/ConversationRenderService.ts",
       "kind": "runtime-static",
       "specifier": "./services/ConversationRenderService"
+    },
+    {
+      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/ConversationSessionRailCoordinator.ts|runtime-static|./services/ConversationSessionRailCoordinator",
+      "from": "src/features/chat/OpenCodianView.ts",
+      "to": "src/features/chat/services/ConversationSessionRailCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "./services/ConversationSessionRailCoordinator"
     },
     {
       "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/ConversationSessionSettingsCoordinator.ts|runtime-static|./services/ConversationSessionSettingsCoordinator",
@@ -5408,6 +6465,13 @@
       "specifier": "./services/QuestionRuntimeHostAdapter"
     },
     {
+      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/QuestionRuntimeViewHostAdapter.ts|type-only|./services/QuestionRuntimeViewHostAdapter",
+      "from": "src/features/chat/OpenCodianView.ts",
+      "to": "src/features/chat/services/QuestionRuntimeViewHostAdapter.ts",
+      "kind": "type-only",
+      "specifier": "./services/QuestionRuntimeViewHostAdapter"
+    },
+    {
       "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/QuestionRuntimeViewHostFactory.ts|runtime-static|./services/QuestionRuntimeViewHostFactory",
       "from": "src/features/chat/OpenCodianView.ts",
       "to": "src/features/chat/services/QuestionRuntimeViewHostFactory.ts",
@@ -5420,6 +6484,13 @@
       "to": "src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle.ts",
       "kind": "runtime-static",
       "specifier": "./services/QuestionTodoBackgroundTaskRuntimeServiceBundle"
+    },
+    {
+      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/QueuedFollowUpBarCoordinator.ts|runtime-static|./services/QueuedFollowUpBarCoordinator",
+      "from": "src/features/chat/OpenCodianView.ts",
+      "to": "src/features/chat/services/QueuedFollowUpBarCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "./services/QueuedFollowUpBarCoordinator"
     },
     {
       "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/ScrollManager.ts|runtime-static|./services/ScrollManager",
@@ -5485,11 +6556,32 @@
       "specifier": "./services/trailingAssistantPatchDebug"
     },
     {
+      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/UrlContextFetchService.ts|runtime-static|./services/UrlContextFetchService",
+      "from": "src/features/chat/OpenCodianView.ts",
+      "to": "src/features/chat/services/UrlContextFetchService.ts",
+      "kind": "runtime-static",
+      "specifier": "./services/UrlContextFetchService"
+    },
+    {
       "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/VaultRetrievalComposerCoordinator.ts|runtime-static|./services/VaultRetrievalComposerCoordinator",
       "from": "src/features/chat/OpenCodianView.ts",
       "to": "src/features/chat/services/VaultRetrievalComposerCoordinator.ts",
       "kind": "runtime-static",
       "specifier": "./services/VaultRetrievalComposerCoordinator"
+    },
+    {
+      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/WebViewerContextService.ts|runtime-static|./services/WebViewerContextService",
+      "from": "src/features/chat/OpenCodianView.ts",
+      "to": "src/features/chat/services/WebViewerContextService.ts",
+      "kind": "runtime-static",
+      "specifier": "./services/WebViewerContextService"
+    },
+    {
+      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/ZCodeEmptySessionRecovery.ts|runtime-static|./services/ZCodeEmptySessionRecovery",
+      "from": "src/features/chat/OpenCodianView.ts",
+      "to": "src/features/chat/services/ZCodeEmptySessionRecovery.ts",
+      "kind": "runtime-static",
+      "specifier": "./services/ZCodeEmptySessionRecovery"
     },
     {
       "id": "src/features/chat/OpenCodianView.ts|src/features/chat/tabs/index.ts|type-only|./tabs",
@@ -5609,6 +6701,34 @@
       "to": "src/utils/streaming/McpToolCallRenderer.ts",
       "kind": "runtime-static",
       "specifier": "../../utils/streaming/McpToolCallRenderer"
+    },
+    {
+      "id": "src/features/chat/RelevantNotesView.ts|src/core/memory/index.ts|type-only|../../core/memory",
+      "from": "src/features/chat/RelevantNotesView.ts",
+      "to": "src/core/memory/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/memory"
+    },
+    {
+      "id": "src/features/chat/RelevantNotesView.ts|src/features/chat/RelevantNotesModel.ts|runtime-static|./RelevantNotesModel",
+      "from": "src/features/chat/RelevantNotesView.ts",
+      "to": "src/features/chat/RelevantNotesModel.ts",
+      "kind": "runtime-static",
+      "specifier": "./RelevantNotesModel"
+    },
+    {
+      "id": "src/features/chat/RelevantNotesView.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/features/chat/RelevantNotesView.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/chat/RelevantNotesView.ts|src/shared/index.ts|runtime-static|../../shared",
+      "from": "src/features/chat/RelevantNotesView.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../shared"
     },
     {
       "id": "src/features/chat/renderGroups.ts|src/core/types/index.ts|type-only|../../core/types",
@@ -6003,6 +7123,13 @@
       "specifier": "../tabs"
     },
     {
+      "id": "src/features/chat/runtime/BackgroundTaskInlinePanelRenderer.ts|src/i18n/index.ts|runtime-static|../../../i18n",
+      "from": "src/features/chat/runtime/BackgroundTaskInlinePanelRenderer.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../i18n"
+    },
+    {
       "id": "src/features/chat/runtime/BackgroundTaskStreamTriggerCoordinator.ts|src/core/types/index.ts|type-only|../../../core/types",
       "from": "src/features/chat/runtime/BackgroundTaskStreamTriggerCoordinator.ts",
       "to": "src/core/types/index.ts",
@@ -6309,6 +7436,13 @@
       "to": "src/features/chat/services/ActiveTabContextUsageCoordinator.ts",
       "kind": "type-only",
       "specifier": "../services/ActiveTabContextUsageCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/AssistantAutoInternalLinkService.ts|runtime-static|../services/AssistantAutoInternalLinkService",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/AssistantAutoInternalLinkService.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/AssistantAutoInternalLinkService"
     },
     {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/BackgroundTaskCompletionNoticeService.ts|runtime-static|../services/BackgroundTaskCompletionNoticeService",
@@ -6827,6 +7961,13 @@
       "to": "src/features/chat/services/trailingAssistantPatchDebug.ts",
       "kind": "runtime-static",
       "specifier": "../services/trailingAssistantPatchDebug"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/UrlContextFetchService.ts|runtime-static|../services/UrlContextFetchService",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/UrlContextFetchService.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/UrlContextFetchService"
     },
     {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/VaultRetrievalComposerCoordinator.ts|runtime-static|../services/VaultRetrievalComposerCoordinator",
@@ -7809,6 +8950,20 @@
       "specifier": "./slashCommandMenuRenderer"
     },
     {
+      "id": "src/features/chat/services/AssistantAutoInternalLinkService.ts|src/core/types/index.ts|type-only|../../../core/types",
+      "from": "src/features/chat/services/AssistantAutoInternalLinkService.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/types"
+    },
+    {
+      "id": "src/features/chat/services/AssistantAutoInternalLinkService.ts|src/features/inline-edit/InlineEditAutoLink.ts|type-only|../../inline-edit/InlineEditAutoLink",
+      "from": "src/features/chat/services/AssistantAutoInternalLinkService.ts",
+      "to": "src/features/inline-edit/InlineEditAutoLink.ts",
+      "kind": "type-only",
+      "specifier": "../../inline-edit/InlineEditAutoLink"
+    },
+    {
       "id": "src/features/chat/services/BackgroundConversationPostSyncHandoffCoordinator.ts|src/core/types/index.ts|type-only|../../../core/types",
       "from": "src/features/chat/services/BackgroundConversationPostSyncHandoffCoordinator.ts",
       "to": "src/core/types/index.ts",
@@ -8271,11 +9426,25 @@
       "specifier": "../../../core/agents/backend/BackendModelCatalog"
     },
     {
+      "id": "src/features/chat/services/ChatSelectionControlsCoordinator.ts|src/core/agents/backend/OpenCode2Adapter.ts|type-only|../../../core/agents/backend/OpenCode2Adapter",
+      "from": "src/features/chat/services/ChatSelectionControlsCoordinator.ts",
+      "to": "src/core/agents/backend/OpenCode2Adapter.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/agents/backend/OpenCode2Adapter"
+    },
+    {
       "id": "src/features/chat/services/ChatSelectionControlsCoordinator.ts|src/core/agents/backend/pi/PiAdapter.ts|type-only|../../../core/agents/backend/pi/PiAdapter",
       "from": "src/features/chat/services/ChatSelectionControlsCoordinator.ts",
       "to": "src/core/agents/backend/pi/PiAdapter.ts",
       "kind": "type-only",
       "specifier": "../../../core/agents/backend/pi/PiAdapter"
+    },
+    {
+      "id": "src/features/chat/services/ChatSelectionControlsCoordinator.ts|src/core/agents/backend/zcode/index.ts|type-only|../../../core/agents/backend/zcode",
+      "from": "src/features/chat/services/ChatSelectionControlsCoordinator.ts",
+      "to": "src/core/agents/backend/zcode/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/agents/backend/zcode"
     },
     {
       "id": "src/features/chat/services/ChatSelectionControlsCoordinator.ts|src/core/config/modelConfig.ts|type-only|../../../core/config/modelConfig",
@@ -8353,6 +9522,13 @@
       "to": "src/features/chat/services/SandboxConfigBadgeCoordinator.ts",
       "kind": "runtime-static",
       "specifier": "./SandboxConfigBadgeCoordinator"
+    },
+    {
+      "id": "src/features/chat/services/ChatSelectionControlsCoordinator.ts|src/features/chat/services/ZCodeModelSelectionBinding.ts|runtime-static|./ZCodeModelSelectionBinding",
+      "from": "src/features/chat/services/ChatSelectionControlsCoordinator.ts",
+      "to": "src/features/chat/services/ZCodeModelSelectionBinding.ts",
+      "kind": "runtime-static",
+      "specifier": "./ZCodeModelSelectionBinding"
     },
     {
       "id": "src/features/chat/services/ChatSelectionControlsCoordinator.ts|src/features/chat/ui/AnchoredOverlayLayoutController.ts|runtime-static|../ui/AnchoredOverlayLayoutController",
@@ -8467,10 +9643,10 @@
       "specifier": "../../../core/agents"
     },
     {
-      "id": "src/features/chat/services/ChildSessionGraphCoordinator.ts|src/core/types/index.ts|type-only|../../../core/types",
+      "id": "src/features/chat/services/ChildSessionGraphCoordinator.ts|src/core/types/index.ts|runtime-static|../../../core/types",
       "from": "src/features/chat/services/ChildSessionGraphCoordinator.ts",
       "to": "src/core/types/index.ts",
-      "kind": "type-only",
+      "kind": "runtime-static",
       "specifier": "../../../core/types"
     },
     {
@@ -9090,6 +10266,20 @@
       "specifier": "../../../shared"
     },
     {
+      "id": "src/features/chat/services/ContextAttachmentBuilder.ts|src/core/pdf/index.ts|runtime-static|../../../core/pdf",
+      "from": "src/features/chat/services/ContextAttachmentBuilder.ts",
+      "to": "src/core/pdf/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../core/pdf"
+    },
+    {
+      "id": "src/features/chat/services/ContextAttachmentBuilder.ts|src/core/pdf/index.ts|type-only|../../../core/pdf",
+      "from": "src/features/chat/services/ContextAttachmentBuilder.ts",
+      "to": "src/core/pdf/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/pdf"
+    },
+    {
       "id": "src/features/chat/services/ContextAttachmentBuilder.ts|src/core/types/index.ts|type-only|../../../core/types",
       "from": "src/features/chat/services/ContextAttachmentBuilder.ts",
       "to": "src/core/types/index.ts",
@@ -9109,6 +10299,13 @@
       "to": "src/features/chat/composerContext.ts",
       "kind": "type-only",
       "specifier": "../composerContext"
+    },
+    {
+      "id": "src/features/chat/services/ContextAttachmentBuilder.ts|src/features/chat/services/DataviewContextInliner.ts|runtime-static|./DataviewContextInliner",
+      "from": "src/features/chat/services/ContextAttachmentBuilder.ts",
+      "to": "src/features/chat/services/DataviewContextInliner.ts",
+      "kind": "runtime-static",
+      "specifier": "./DataviewContextInliner"
     },
     {
       "id": "src/features/chat/services/ContextAttachmentBuilder.ts|src/i18n/index.ts|runtime-static|../../../i18n",
@@ -9326,6 +10523,13 @@
       "to": "src/core/types/index.ts",
       "kind": "type-only",
       "specifier": "../../../core/types"
+    },
+    {
+      "id": "src/features/chat/services/ConversationAuthoritativeSyncCoordinator.ts|src/features/chat/services/AssistantAutoInternalLinkService.ts|type-only|./AssistantAutoInternalLinkService",
+      "from": "src/features/chat/services/ConversationAuthoritativeSyncCoordinator.ts",
+      "to": "src/features/chat/services/AssistantAutoInternalLinkService.ts",
+      "kind": "type-only",
+      "specifier": "./AssistantAutoInternalLinkService"
     },
     {
       "id": "src/features/chat/services/ConversationAuthoritativeSyncCoordinator.ts|src/features/chat/services/ConversationAuthoritativeMessageMergeCoordinator.ts|runtime-static|./ConversationAuthoritativeMessageMergeCoordinator",
@@ -9783,6 +10987,13 @@
       "specifier": "../runtime/UserMessageContentRenderer"
     },
     {
+      "id": "src/features/chat/services/ConversationRenderService.ts|src/features/chat/services/AssistantAutoInternalLinkService.ts|type-only|./AssistantAutoInternalLinkService",
+      "from": "src/features/chat/services/ConversationRenderService.ts",
+      "to": "src/features/chat/services/AssistantAutoInternalLinkService.ts",
+      "kind": "type-only",
+      "specifier": "./AssistantAutoInternalLinkService"
+    },
+    {
       "id": "src/features/chat/services/ConversationRenderService.ts|src/features/chat/services/ConversationKeyedReconcileDelegate.ts|runtime-static|./ConversationKeyedReconcileDelegate",
       "from": "src/features/chat/services/ConversationRenderService.ts",
       "to": "src/features/chat/services/ConversationKeyedReconcileDelegate.ts",
@@ -9858,6 +11069,20 @@
       "to": "src/shared/TooltipLayerController.ts",
       "kind": "runtime-static",
       "specifier": "../../../shared/TooltipLayerController"
+    },
+    {
+      "id": "src/features/chat/services/ConversationSessionRailCoordinator.ts|src/core/types/index.ts|type-only|../../../core/types",
+      "from": "src/features/chat/services/ConversationSessionRailCoordinator.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/types"
+    },
+    {
+      "id": "src/features/chat/services/ConversationSessionRailCoordinator.ts|src/i18n/index.ts|runtime-static|../../../i18n",
+      "from": "src/features/chat/services/ConversationSessionRailCoordinator.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../i18n"
     },
     {
       "id": "src/features/chat/services/ConversationSessionSettingsCoordinator.ts|src/core/agents/backend/AgentBackendRouting.ts|runtime-static|../../../core/agents/backend/AgentBackendRouting",
@@ -10728,6 +11953,13 @@
       "specifier": "../../../core/types"
     },
     {
+      "id": "src/features/chat/services/MessageFinalizationService.ts|src/features/chat/services/AssistantAutoInternalLinkService.ts|type-only|./AssistantAutoInternalLinkService",
+      "from": "src/features/chat/services/MessageFinalizationService.ts",
+      "to": "src/features/chat/services/AssistantAutoInternalLinkService.ts",
+      "kind": "type-only",
+      "specifier": "./AssistantAutoInternalLinkService"
+    },
+    {
       "id": "src/features/chat/services/MessageFinalizationService.ts|src/features/chat/services/MessageFinalizationHost.ts|re-export|./MessageFinalizationHost",
       "from": "src/features/chat/services/MessageFinalizationService.ts",
       "to": "src/features/chat/services/MessageFinalizationHost.ts",
@@ -10929,6 +12161,41 @@
       "to": "src/shared/index.ts",
       "kind": "type-only",
       "specifier": "../../../shared"
+    },
+    {
+      "id": "src/features/chat/services/PdfAnnotationPreviewModal.ts|src/i18n/index.ts|runtime-static|../../../i18n",
+      "from": "src/features/chat/services/PdfAnnotationPreviewModal.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../i18n"
+    },
+    {
+      "id": "src/features/chat/services/PdfChatIntegration.ts|src/core/pdf/index.ts|runtime-static|../../../core/pdf",
+      "from": "src/features/chat/services/PdfChatIntegration.ts",
+      "to": "src/core/pdf/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../core/pdf"
+    },
+    {
+      "id": "src/features/chat/services/PdfChatIntegration.ts|src/core/types/index.ts|type-only|../../../core/types",
+      "from": "src/features/chat/services/PdfChatIntegration.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/types"
+    },
+    {
+      "id": "src/features/chat/services/PdfChatIntegration.ts|src/features/chat/services/PdfAnnotationPreviewModal.ts|runtime-static|./PdfAnnotationPreviewModal",
+      "from": "src/features/chat/services/PdfChatIntegration.ts",
+      "to": "src/features/chat/services/PdfAnnotationPreviewModal.ts",
+      "kind": "runtime-static",
+      "specifier": "./PdfAnnotationPreviewModal"
+    },
+    {
+      "id": "src/features/chat/services/PdfChatIntegration.ts|src/i18n/index.ts|runtime-static|../../../i18n",
+      "from": "src/features/chat/services/PdfChatIntegration.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../i18n"
     },
     {
       "id": "src/features/chat/services/PermissionModeSelectorCoordinator.ts|src/core/types/settings.ts|type-only|../../../core/types/settings",
@@ -11533,6 +12800,13 @@
       "specifier": "./QuestionDockSlotCoordinator"
     },
     {
+      "id": "src/features/chat/services/QuestionRuntimeViewHostAdapter.ts|src/features/chat/services/QuestionResolutionExecutionFacade.ts|type-only|./QuestionResolutionExecutionFacade",
+      "from": "src/features/chat/services/QuestionRuntimeViewHostAdapter.ts",
+      "to": "src/features/chat/services/QuestionResolutionExecutionFacade.ts",
+      "kind": "type-only",
+      "specifier": "./QuestionResolutionExecutionFacade"
+    },
+    {
       "id": "src/features/chat/services/QuestionRuntimeViewHostAdapter.ts|src/features/chat/services/QuestionRuntimeHostAdapter.ts|type-only|./QuestionRuntimeHostAdapter",
       "from": "src/features/chat/services/QuestionRuntimeViewHostAdapter.ts",
       "to": "src/features/chat/services/QuestionRuntimeHostAdapter.ts",
@@ -11545,6 +12819,13 @@
       "to": "src/features/chat/tabs/index.ts",
       "kind": "type-only",
       "specifier": "../tabs"
+    },
+    {
+      "id": "src/features/chat/services/QuestionRuntimeViewHostFactory.ts|src/core/types/index.ts|type-only|../../../core/types",
+      "from": "src/features/chat/services/QuestionRuntimeViewHostFactory.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/types"
     },
     {
       "id": "src/features/chat/services/QuestionRuntimeViewHostFactory.ts|src/features/chat/runtime/StreamingInlineCardRenderer.ts|type-only|../runtime/StreamingInlineCardRenderer",
@@ -11573,6 +12854,13 @@
       "to": "src/features/chat/services/QuestionRuntimeViewHostAdapter.ts",
       "kind": "runtime-static",
       "specifier": "./QuestionRuntimeViewHostAdapter"
+    },
+    {
+      "id": "src/features/chat/services/QuestionRuntimeViewHostFactory.ts|src/features/chat/tabs/index.ts|type-only|../tabs",
+      "from": "src/features/chat/services/QuestionRuntimeViewHostFactory.ts",
+      "to": "src/features/chat/tabs/index.ts",
+      "kind": "type-only",
+      "specifier": "../tabs"
     },
     {
       "id": "src/features/chat/services/QuestionTodoActivationRefreshCoordinator.ts|src/features/chat/services/QuestionTodoStatusRefreshCoordinator.ts|type-only|./QuestionTodoStatusRefreshCoordinator",
@@ -11790,6 +13078,13 @@
       "to": "src/features/chat/tabs/index.ts",
       "kind": "type-only",
       "specifier": "../tabs"
+    },
+    {
+      "id": "src/features/chat/services/QueuedFollowUpBarCoordinator.ts|src/i18n/index.ts|runtime-static|../../../i18n",
+      "from": "src/features/chat/services/QueuedFollowUpBarCoordinator.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../i18n"
     },
     {
       "id": "src/features/chat/services/RetainedSelectionHighlightService.ts|src/features/chat/composerContext.ts|type-only|../composerContext",
@@ -12471,11 +13766,53 @@
       "specifier": "../tabs"
     },
     {
+      "id": "src/features/chat/services/TurnCompletionSoundService.ts|src/i18n/index.ts|runtime-static|../../../i18n",
+      "from": "src/features/chat/services/TurnCompletionSoundService.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../i18n"
+    },
+    {
+      "id": "src/features/chat/services/TurnCompletionSoundService.ts|src/shared/index.ts|runtime-static|../../../shared",
+      "from": "src/features/chat/services/TurnCompletionSoundService.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../shared"
+    },
+    {
+      "id": "src/features/chat/services/UrlContextFetchService.ts|src/core/types/chat.ts|type-only|../../../core/types/chat",
+      "from": "src/features/chat/services/UrlContextFetchService.ts",
+      "to": "src/core/types/chat.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/types/chat"
+    },
+    {
+      "id": "src/features/chat/services/UrlContextFetchService.ts|src/core/types/index.ts|type-only|../../../core/types",
+      "from": "src/features/chat/services/UrlContextFetchService.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/types"
+    },
+    {
+      "id": "src/features/chat/services/UrlContextFetchService.ts|src/shared/index.ts|runtime-static|../../../shared",
+      "from": "src/features/chat/services/UrlContextFetchService.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../shared"
+    },
+    {
       "id": "src/features/chat/services/VaultRetrievalComposerCoordinator.ts|src/core/memory/index.ts|type-only|../../../core/memory",
       "from": "src/features/chat/services/VaultRetrievalComposerCoordinator.ts",
       "to": "src/core/memory/index.ts",
       "kind": "type-only",
       "specifier": "../../../core/memory"
+    },
+    {
+      "id": "src/features/chat/services/VaultRetrievalComposerCoordinator.ts|src/core/pdf/index.ts|type-only|../../../core/pdf",
+      "from": "src/features/chat/services/VaultRetrievalComposerCoordinator.ts",
+      "to": "src/core/pdf/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/pdf"
     },
     {
       "id": "src/features/chat/services/VaultRetrievalComposerCoordinator.ts|src/core/types/index.ts|type-only|../../../core/types",
@@ -12560,6 +13897,48 @@
       "to": "src/features/chat/tabs/index.ts",
       "kind": "type-only",
       "specifier": "../tabs"
+    },
+    {
+      "id": "src/features/chat/services/WebViewerContextService.ts|src/core/types/index.ts|type-only|../../../core/types",
+      "from": "src/features/chat/services/WebViewerContextService.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/types"
+    },
+    {
+      "id": "src/features/chat/services/WebViewerContextService.ts|src/features/chat/services/UrlContextFetchService.ts|runtime-static|./UrlContextFetchService",
+      "from": "src/features/chat/services/WebViewerContextService.ts",
+      "to": "src/features/chat/services/UrlContextFetchService.ts",
+      "kind": "runtime-static",
+      "specifier": "./UrlContextFetchService"
+    },
+    {
+      "id": "src/features/chat/services/ZCodeEmptySessionRecovery.ts|src/core/types/index.ts|runtime-static|../../../core/types",
+      "from": "src/features/chat/services/ZCodeEmptySessionRecovery.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../core/types"
+    },
+    {
+      "id": "src/features/chat/services/ZCodeModelSelectionBinding.ts|src/core/agents/backend/zcode/index.ts|type-only|../../../core/agents/backend/zcode",
+      "from": "src/features/chat/services/ZCodeModelSelectionBinding.ts",
+      "to": "src/core/agents/backend/zcode/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/agents/backend/zcode"
+    },
+    {
+      "id": "src/features/chat/services/ZCodeModelSelectionBinding.ts|src/features/chat/services/ModelSelectionRuntime.ts|type-only|./ModelSelectionRuntime",
+      "from": "src/features/chat/services/ZCodeModelSelectionBinding.ts",
+      "to": "src/features/chat/services/ModelSelectionRuntime.ts",
+      "kind": "type-only",
+      "specifier": "./ModelSelectionRuntime"
+    },
+    {
+      "id": "src/features/chat/services/ZCodeModelSelectionBinding.ts|src/features/chat/ui/modelSelector/types.ts|type-only|../ui/modelSelector/types",
+      "from": "src/features/chat/services/ZCodeModelSelectionBinding.ts",
+      "to": "src/features/chat/ui/modelSelector/types.ts",
+      "kind": "type-only",
+      "specifier": "../ui/modelSelector/types"
     },
     {
       "id": "src/features/chat/tabs/index.ts|src/features/chat/tabs/Tab.ts|re-export|./Tab",
@@ -12693,6 +14072,13 @@
       "to": "src/core/agents/backend/AgentBackendRouting.ts",
       "kind": "runtime-static",
       "specifier": "../../../core/agents/backend/AgentBackendRouting"
+    },
+    {
+      "id": "src/features/chat/ui/BackendSessionBrowserModal.ts|src/core/agents/backend/AgentService.ts|type-only|../../../core/agents/backend/AgentService",
+      "from": "src/features/chat/ui/BackendSessionBrowserModal.ts",
+      "to": "src/core/agents/backend/AgentService.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/agents/backend/AgentService"
     },
     {
       "id": "src/features/chat/ui/BackendSessionBrowserModal.ts|src/core/agents/backend/AgentServiceRegistry.ts|type-only|../../../core/agents/backend/AgentServiceRegistry",
@@ -12870,6 +14256,20 @@
       "specifier": "../../../i18n"
     },
     {
+      "id": "src/features/chat/ui/EditRevertPreviewModal.ts|src/i18n/index.ts|runtime-static|../../../i18n",
+      "from": "src/features/chat/ui/EditRevertPreviewModal.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../i18n"
+    },
+    {
+      "id": "src/features/chat/ui/EditRevertPreviewModal.ts|src/shared/index.ts|type-only|../../../shared",
+      "from": "src/features/chat/ui/EditRevertPreviewModal.ts",
+      "to": "src/shared/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../shared"
+    },
+    {
       "id": "src/features/chat/ui/EffortSelector.ts|src/features/chat/ui/AnchoredOverlayLayoutController.ts|runtime-static|./AnchoredOverlayLayoutController",
       "from": "src/features/chat/ui/EffortSelector.ts",
       "to": "src/features/chat/ui/AnchoredOverlayLayoutController.ts",
@@ -12980,6 +14380,13 @@
       "to": "src/features/chat/services/ConversationRenderService.ts",
       "kind": "runtime-static",
       "specifier": "../services/ConversationRenderService"
+    },
+    {
+      "id": "src/features/chat/ui/ModifiedFilesSidebar.ts|src/features/chat/ui/EditRevertPreviewModal.ts|runtime-static|./EditRevertPreviewModal",
+      "from": "src/features/chat/ui/ModifiedFilesSidebar.ts",
+      "to": "src/features/chat/ui/EditRevertPreviewModal.ts",
+      "kind": "runtime-static",
+      "specifier": "./EditRevertPreviewModal"
     },
     {
       "id": "src/features/chat/ui/ModifiedFilesSidebar.ts|src/i18n/index.ts|runtime-static|../../../i18n",
@@ -13262,13 +14669,6 @@
       "specifier": "../../shared"
     },
     {
-      "id": "src/features/inline-edit/InlineEditAutoLink.ts|src/features/inline-edit/InlineEditHost.ts|type-only|./InlineEditHost",
-      "from": "src/features/inline-edit/InlineEditAutoLink.ts",
-      "to": "src/features/inline-edit/InlineEditHost.ts",
-      "kind": "type-only",
-      "specifier": "./InlineEditHost"
-    },
-    {
       "id": "src/features/inline-edit/InlineEditConfirmModal.ts|src/i18n/index.ts|runtime-static|../../i18n",
       "from": "src/features/inline-edit/InlineEditConfirmModal.ts",
       "to": "src/i18n/index.ts",
@@ -13535,6 +14935,13 @@
       "specifier": "./InlineEditOverlayChips"
     },
     {
+      "id": "src/features/inline-edit/InlineEditInputOverlay.ts|src/features/inline-edit/InlineEditOverlayDismissal.ts|runtime-static|./InlineEditOverlayDismissal",
+      "from": "src/features/inline-edit/InlineEditInputOverlay.ts",
+      "to": "src/features/inline-edit/InlineEditOverlayDismissal.ts",
+      "kind": "runtime-static",
+      "specifier": "./InlineEditOverlayDismissal"
+    },
+    {
       "id": "src/features/inline-edit/InlineEditInputOverlay.ts|src/features/inline-edit/InlineEditOverlayPrimitives.ts|runtime-static|./InlineEditOverlayPrimitives",
       "from": "src/features/inline-edit/InlineEditInputOverlay.ts",
       "to": "src/features/inline-edit/InlineEditOverlayPrimitives.ts",
@@ -13617,6 +15024,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/inline-edit/InlineEditOverlayDismissal.ts|src/features/inline-edit/InlineEditOverlayPrimitives.ts|runtime-static|./InlineEditOverlayPrimitives",
+      "from": "src/features/inline-edit/InlineEditOverlayDismissal.ts",
+      "to": "src/features/inline-edit/InlineEditOverlayPrimitives.ts",
+      "kind": "runtime-static",
+      "specifier": "./InlineEditOverlayPrimitives"
     },
     {
       "id": "src/features/inline-edit/InlineEditOverlayPrimitives.ts|src/features/inline-edit/InlineEditTypes.ts|type-only|./InlineEditTypes",
@@ -14116,6 +15530,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/ContextWindowOverrideModal.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/features/settings/ContextWindowOverrideModal.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
+    },
+    {
       "id": "src/features/settings/ConversationCompactionHelpModal.ts|src/i18n/index.ts|runtime-static|../../i18n",
       "from": "src/features/settings/ConversationCompactionHelpModal.ts",
       "to": "src/i18n/index.ts",
@@ -14289,6 +15710,20 @@
       "to": "src/shared/diagnostics/index.ts",
       "kind": "type-only",
       "specifier": "../../../shared/diagnostics"
+    },
+    {
+      "id": "src/features/settings/EnvironmentVariablesModal.ts|src/core/agents/BackendEnvironment.ts|runtime-static|../../core/agents/BackendEnvironment",
+      "from": "src/features/settings/EnvironmentVariablesModal.ts",
+      "to": "src/core/agents/BackendEnvironment.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/agents/BackendEnvironment"
+    },
+    {
+      "id": "src/features/settings/EnvironmentVariablesModal.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/features/settings/EnvironmentVariablesModal.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
     },
     {
       "id": "src/features/settings/index.ts|src/features/settings/OpenCodianSettings.ts|re-export|./OpenCodianSettings",
@@ -14977,6 +16412,13 @@
       "specifier": "./SettingsPluginUpdateSection"
     },
     {
+      "id": "src/features/settings/OpenCodianSettings.ts|src/features/settings/SettingsRemoteControlSection.ts|runtime-static|./SettingsRemoteControlSection",
+      "from": "src/features/settings/OpenCodianSettings.ts",
+      "to": "src/features/settings/SettingsRemoteControlSection.ts",
+      "kind": "runtime-static",
+      "specifier": "./SettingsRemoteControlSection"
+    },
+    {
       "id": "src/features/settings/OpenCodianSettings.ts|src/features/settings/SettingsSectionCoordinator.ts|runtime-static|./SettingsSectionCoordinator",
       "from": "src/features/settings/OpenCodianSettings.ts",
       "to": "src/features/settings/SettingsSectionCoordinator.ts",
@@ -15038,6 +16480,13 @@
       "to": "src/features/settings/SettingsUserSection.ts",
       "kind": "runtime-static",
       "specifier": "./SettingsUserSection"
+    },
+    {
+      "id": "src/features/settings/OpenCodianSettings.ts|src/features/settings/SettingsZCodeSection.ts|runtime-static|./SettingsZCodeSection",
+      "from": "src/features/settings/OpenCodianSettings.ts",
+      "to": "src/features/settings/SettingsZCodeSection.ts",
+      "kind": "runtime-static",
+      "specifier": "./SettingsZCodeSection"
     },
     {
       "id": "src/features/settings/OpenCodianSettings.ts|src/i18n/index.ts|runtime-static|../../i18n",
@@ -15234,6 +16683,13 @@
       "to": "src/features/settings/SettingsUserSection.ts",
       "kind": "runtime-static",
       "specifier": "./SettingsUserSection"
+    },
+    {
+      "id": "src/features/settings/OpenCodianSettingsView.ts|src/features/settings/SettingsZCodeSection.ts|runtime-static|./SettingsZCodeSection",
+      "from": "src/features/settings/OpenCodianSettingsView.ts",
+      "to": "src/features/settings/SettingsZCodeSection.ts",
+      "kind": "runtime-static",
+      "specifier": "./SettingsZCodeSection"
     },
     {
       "id": "src/features/settings/OpenCodianSettingsView.ts|src/i18n/index.ts|runtime-static|../../i18n",
@@ -15528,6 +16984,13 @@
       "to": "src/core/agents/backend/index.ts",
       "kind": "runtime-static",
       "specifier": "../../core/agents/backend"
+    },
+    {
+      "id": "src/features/settings/SettingsBackendSection.ts|src/core/agents/backend/OpenCode2Adapter.ts|type-only|../../core/agents/backend/OpenCode2Adapter",
+      "from": "src/features/settings/SettingsBackendSection.ts",
+      "to": "src/core/agents/backend/OpenCode2Adapter.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/backend/OpenCode2Adapter"
     },
     {
       "id": "src/features/settings/SettingsBackendSection.ts|src/core/types/chat.ts|type-only|../../core/types/chat",
@@ -16055,6 +17518,27 @@
       "specifier": "../../main"
     },
     {
+      "id": "src/features/settings/SettingsCodexPluginsSection.ts|src/core/agents/backend/CodexAppServerClientTypes.ts|type-only|../../core/agents/backend/CodexAppServerClientTypes",
+      "from": "src/features/settings/SettingsCodexPluginsSection.ts",
+      "to": "src/core/agents/backend/CodexAppServerClientTypes.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/backend/CodexAppServerClientTypes"
+    },
+    {
+      "id": "src/features/settings/SettingsCodexPluginsSection.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/features/settings/SettingsCodexPluginsSection.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/SettingsCodexPluginsSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsCodexPluginsSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsCodexProjectConfigSection.ts|src/core/agents/backend/ProjectResourceSecureWrite.ts|runtime-static|../../core/agents/backend/ProjectResourceSecureWrite",
       "from": "src/features/settings/SettingsCodexProjectConfigSection.ts",
       "to": "src/core/agents/backend/ProjectResourceSecureWrite.ts",
@@ -16235,6 +17719,13 @@
       "to": "src/features/settings/SettingsCodexLegacyCredentialControl.ts",
       "kind": "runtime-static",
       "specifier": "./SettingsCodexLegacyCredentialControl"
+    },
+    {
+      "id": "src/features/settings/SettingsCodexSection.ts|src/features/settings/SettingsCodexPluginsSection.ts|runtime-static|./SettingsCodexPluginsSection",
+      "from": "src/features/settings/SettingsCodexSection.ts",
+      "to": "src/features/settings/SettingsCodexPluginsSection.ts",
+      "kind": "runtime-static",
+      "specifier": "./SettingsCodexPluginsSection"
     },
     {
       "id": "src/features/settings/SettingsCodexSection.ts|src/features/settings/SettingsCodexProjectConfigSection.ts|runtime-static|./SettingsCodexProjectConfigSection",
@@ -16458,6 +17949,13 @@
       "from": "src/features/settings/SettingsConversationSection.ts",
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
+      "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/SettingsConversationSection.ts|src/i18n/index.ts|type-only|../../i18n",
+      "from": "src/features/settings/SettingsConversationSection.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "type-only",
       "specifier": "../../i18n"
     },
     {
@@ -16965,6 +18463,13 @@
       "specifier": "./capabilityDisclosureRow"
     },
     {
+      "id": "src/features/settings/SettingsModelSection.ts|src/features/settings/ContextWindowOverrideModal.ts|runtime-static|./ContextWindowOverrideModal",
+      "from": "src/features/settings/SettingsModelSection.ts",
+      "to": "src/features/settings/ContextWindowOverrideModal.ts",
+      "kind": "runtime-static",
+      "specifier": "./ContextWindowOverrideModal"
+    },
+    {
       "id": "src/features/settings/SettingsModelSection.ts|src/features/settings/CostEstimateSettingsRow.ts|runtime-static|./CostEstimateSettingsRow",
       "from": "src/features/settings/SettingsModelSection.ts",
       "to": "src/features/settings/CostEstimateSettingsRow.ts",
@@ -17005,6 +18510,13 @@
       "to": "src/main.ts",
       "kind": "type-only",
       "specifier": "../../main"
+    },
+    {
+      "id": "src/features/settings/SettingsPanelChrome.ts|src/features/settings/EnvironmentVariablesModal.ts|runtime-static|./EnvironmentVariablesModal",
+      "from": "src/features/settings/SettingsPanelChrome.ts",
+      "to": "src/features/settings/EnvironmentVariablesModal.ts",
+      "kind": "runtime-static",
+      "specifier": "./EnvironmentVariablesModal"
     },
     {
       "id": "src/features/settings/SettingsPanelChrome.ts|src/i18n/index.ts|runtime-static|../../i18n",
@@ -17404,6 +18916,41 @@
       "to": "src/shared/index.ts",
       "kind": "runtime-static",
       "specifier": "../../shared"
+    },
+    {
+      "id": "src/features/settings/SettingsRemoteControlSection.ts|src/core/remotecontrol/index.ts|runtime-static|../../core/remotecontrol",
+      "from": "src/features/settings/SettingsRemoteControlSection.ts",
+      "to": "src/core/remotecontrol/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/remotecontrol"
+    },
+    {
+      "id": "src/features/settings/SettingsRemoteControlSection.ts|src/core/remotecontrol/index.ts|type-only|../../core/remotecontrol",
+      "from": "src/features/settings/SettingsRemoteControlSection.ts",
+      "to": "src/core/remotecontrol/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/remotecontrol"
+    },
+    {
+      "id": "src/features/settings/SettingsRemoteControlSection.ts|src/core/types/index.ts|runtime-static|../../core/types",
+      "from": "src/features/settings/SettingsRemoteControlSection.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/types"
+    },
+    {
+      "id": "src/features/settings/SettingsRemoteControlSection.ts|src/core/types/index.ts|type-only|../../core/types",
+      "from": "src/features/settings/SettingsRemoteControlSection.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/types"
+    },
+    {
+      "id": "src/features/settings/SettingsRemoteControlSection.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/features/settings/SettingsRemoteControlSection.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
     },
     {
       "id": "src/features/settings/SettingsSectionCoordinator.ts|src/i18n/index.ts|runtime-static|../../i18n",
@@ -18022,6 +19569,13 @@
       "specifier": "./SettingsPluginSection"
     },
     {
+      "id": "src/features/settings/SettingsTabbedRenderer.ts|src/features/settings/SettingsRemoteControlSection.ts|runtime-static|./SettingsRemoteControlSection",
+      "from": "src/features/settings/SettingsTabbedRenderer.ts",
+      "to": "src/features/settings/SettingsRemoteControlSection.ts",
+      "kind": "runtime-static",
+      "specifier": "./SettingsRemoteControlSection"
+    },
+    {
       "id": "src/features/settings/SettingsTabbedRenderer.ts|src/features/settings/SettingsSecuritySection.ts|runtime-static|./SettingsSecuritySection",
       "from": "src/features/settings/SettingsTabbedRenderer.ts",
       "to": "src/features/settings/SettingsSecuritySection.ts",
@@ -18069,6 +19623,13 @@
       "to": "src/features/settings/SettingsUiSection.ts",
       "kind": "runtime-static",
       "specifier": "./SettingsUiSection"
+    },
+    {
+      "id": "src/features/settings/SettingsTabbedRenderer.ts|src/features/settings/SettingsZCodeSection.ts|runtime-static|./SettingsZCodeSection",
+      "from": "src/features/settings/SettingsTabbedRenderer.ts",
+      "to": "src/features/settings/SettingsZCodeSection.ts",
+      "kind": "runtime-static",
+      "specifier": "./SettingsZCodeSection"
     },
     {
       "id": "src/features/settings/SettingsTabbedRenderer.ts|src/i18n/index.ts|runtime-static|../../i18n",
@@ -18246,6 +19807,27 @@
       "specifier": "../../main"
     },
     {
+      "id": "src/features/settings/SettingsZCodeSection.ts|src/core/agents/backend/zcode/index.ts|type-only|../../core/agents/backend/zcode",
+      "from": "src/features/settings/SettingsZCodeSection.ts",
+      "to": "src/core/agents/backend/zcode/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/backend/zcode"
+    },
+    {
+      "id": "src/features/settings/SettingsZCodeSection.ts|src/core/types/settings.ts|runtime-static|../../core/types/settings",
+      "from": "src/features/settings/SettingsZCodeSection.ts",
+      "to": "src/core/types/settings.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/types/settings"
+    },
+    {
+      "id": "src/features/settings/SettingsZCodeSection.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/features/settings/SettingsZCodeSection.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
+    },
+    {
       "id": "src/features/settings/SlashCommandCatalogRenderer.ts|src/core/config/slashCommandCatalog.ts|type-only|../../core/config/slashCommandCatalog",
       "from": "src/features/settings/SlashCommandCatalogRenderer.ts",
       "to": "src/core/config/slashCommandCatalog.ts",
@@ -18337,6 +19919,13 @@
       "specifier": "./app/obsidianTooling"
     },
     {
+      "id": "src/main.ts|src/app/pdf/PdfIndexFileSystem.ts|runtime-static|./app/pdf/PdfIndexFileSystem",
+      "from": "src/main.ts",
+      "to": "src/app/pdf/PdfIndexFileSystem.ts",
+      "kind": "runtime-static",
+      "specifier": "./app/pdf/PdfIndexFileSystem"
+    },
+    {
       "id": "src/main.ts|src/app/runtime/PluginRuntimeCoordinator.ts|runtime-static|./app/runtime/PluginRuntimeCoordinator",
       "from": "src/main.ts",
       "to": "src/app/runtime/PluginRuntimeCoordinator.ts",
@@ -18356,6 +19945,13 @@
       "to": "src/core/agents/backend/AgentAdapterWiring.ts",
       "kind": "runtime-static",
       "specifier": "./core/agents/backend/AgentAdapterWiring"
+    },
+    {
+      "id": "src/main.ts|src/core/agents/backend/AgentAuxQueryCapability.ts|type-only|./core/agents/backend/AgentAuxQueryCapability",
+      "from": "src/main.ts",
+      "to": "src/core/agents/backend/AgentAuxQueryCapability.ts",
+      "kind": "type-only",
+      "specifier": "./core/agents/backend/AgentAuxQueryCapability"
     },
     {
       "id": "src/main.ts|src/core/agents/backend/AgentBackendRouting.ts|runtime-static|./core/agents/backend/AgentBackendRouting",
@@ -18435,6 +20031,13 @@
       "specifier": "./core/agents/backend/CodexDefaultApprovalHost"
     },
     {
+      "id": "src/main.ts|src/core/agents/backend/CodexElicitationBridge.ts|runtime-static|./core/agents/backend/CodexElicitationBridge",
+      "from": "src/main.ts",
+      "to": "src/core/agents/backend/CodexElicitationBridge.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/agents/backend/CodexElicitationBridge"
+    },
+    {
       "id": "src/main.ts|src/core/agents/backend/diagnostics/index.ts|runtime-static|./core/agents/backend/diagnostics",
       "from": "src/main.ts",
       "to": "src/core/agents/backend/diagnostics/index.ts",
@@ -18447,6 +20050,13 @@
       "to": "src/core/agents/backend/OpenCodeAdapter.ts",
       "kind": "runtime-static",
       "specifier": "./core/agents/backend/OpenCodeAdapter"
+    },
+    {
+      "id": "src/main.ts|src/core/agents/BackendEnvironment.ts|runtime-static|./core/agents/BackendEnvironment",
+      "from": "src/main.ts",
+      "to": "src/core/agents/BackendEnvironment.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/agents/BackendEnvironment"
     },
     {
       "id": "src/main.ts|src/core/agents/imagegen/ImageGenerationService.ts|runtime-static|./core/agents/imagegen/ImageGenerationService",
@@ -18498,6 +20108,20 @@
       "specifier": "./core/opencode/OpenCodeCapabilitySettingsMigration"
     },
     {
+      "id": "src/main.ts|src/core/pdf/index.ts|runtime-static|./core/pdf",
+      "from": "src/main.ts",
+      "to": "src/core/pdf/index.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/pdf"
+    },
+    {
+      "id": "src/main.ts|src/core/remotecontrol/index.ts|runtime-static|./core/remotecontrol",
+      "from": "src/main.ts",
+      "to": "src/core/remotecontrol/index.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/remotecontrol"
+    },
+    {
       "id": "src/main.ts|src/core/runtime/OpenCodianSettingsRuntimeCoordinator.ts|runtime-static|./core/runtime/OpenCodianSettingsRuntimeCoordinator",
       "from": "src/main.ts",
       "to": "src/core/runtime/OpenCodianSettingsRuntimeCoordinator.ts",
@@ -18517,6 +20141,20 @@
       "to": "src/core/storage/ConversationFullMessageCache.ts",
       "kind": "runtime-static",
       "specifier": "./core/storage/ConversationFullMessageCache"
+    },
+    {
+      "id": "src/main.ts|src/core/storage/ConversationMarkdownExportService.ts|runtime-static|./core/storage/ConversationMarkdownExportService",
+      "from": "src/main.ts",
+      "to": "src/core/storage/ConversationMarkdownExportService.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/storage/ConversationMarkdownExportService"
+    },
+    {
+      "id": "src/main.ts|src/core/storage/ConversationMetadataCache.ts|runtime-static|./core/storage/ConversationMetadataCache",
+      "from": "src/main.ts",
+      "to": "src/core/storage/ConversationMetadataCache.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/storage/ConversationMetadataCache"
     },
     {
       "id": "src/main.ts|src/core/storage/EditRevertService.ts|runtime-static|./core/storage/EditRevertService",
@@ -18582,11 +20220,39 @@
       "specifier": "./core/update/PluginUpdateService"
     },
     {
+      "id": "src/main.ts|src/features/canvas-integration/CanvasGenerationFlow.ts|runtime-static|./features/canvas-integration/CanvasGenerationFlow",
+      "from": "src/main.ts",
+      "to": "src/features/canvas-integration/CanvasGenerationFlow.ts",
+      "kind": "runtime-static",
+      "specifier": "./features/canvas-integration/CanvasGenerationFlow"
+    },
+    {
+      "id": "src/main.ts|src/features/canvas-integration/CanvasIntegrationController.ts|runtime-static|./features/canvas-integration/CanvasIntegrationController",
+      "from": "src/main.ts",
+      "to": "src/features/canvas-integration/CanvasIntegrationController.ts",
+      "kind": "runtime-static",
+      "specifier": "./features/canvas-integration/CanvasIntegrationController"
+    },
+    {
+      "id": "src/main.ts|src/features/canvas-integration/CanvasNodeRewriteService.ts|type-only|./features/canvas-integration/CanvasNodeRewriteService",
+      "from": "src/main.ts",
+      "to": "src/features/canvas-integration/CanvasNodeRewriteService.ts",
+      "kind": "type-only",
+      "specifier": "./features/canvas-integration/CanvasNodeRewriteService"
+    },
+    {
       "id": "src/main.ts|src/features/chat/OpenCodianView.ts|runtime-static|./features/chat/OpenCodianView",
       "from": "src/main.ts",
       "to": "src/features/chat/OpenCodianView.ts",
       "kind": "runtime-static",
       "specifier": "./features/chat/OpenCodianView"
+    },
+    {
+      "id": "src/main.ts|src/features/chat/RelevantNotesView.ts|runtime-static|./features/chat/RelevantNotesView",
+      "from": "src/main.ts",
+      "to": "src/features/chat/RelevantNotesView.ts",
+      "kind": "runtime-static",
+      "specifier": "./features/chat/RelevantNotesView"
     },
     {
       "id": "src/main.ts|src/features/chat/services/ChatDiagnosticsCoordinator.ts|runtime-static|./features/chat/services/ChatDiagnosticsCoordinator",
@@ -18603,6 +20269,13 @@
       "specifier": "./features/chat/services/ContextAttachmentBuilder"
     },
     {
+      "id": "src/main.ts|src/features/chat/services/ContextFileCatalogIndex.ts|runtime-static|./features/chat/services/ContextFileCatalogIndex",
+      "from": "src/main.ts",
+      "to": "src/features/chat/services/ContextFileCatalogIndex.ts",
+      "kind": "runtime-static",
+      "specifier": "./features/chat/services/ContextFileCatalogIndex"
+    },
+    {
       "id": "src/main.ts|src/features/chat/services/ImageGenerationChatController.ts|runtime-static|./features/chat/services/ImageGenerationChatController",
       "from": "src/main.ts",
       "to": "src/features/chat/services/ImageGenerationChatController.ts",
@@ -18610,11 +20283,39 @@
       "specifier": "./features/chat/services/ImageGenerationChatController"
     },
     {
+      "id": "src/main.ts|src/features/chat/services/PdfChatIntegration.ts|runtime-static|./features/chat/services/PdfChatIntegration",
+      "from": "src/main.ts",
+      "to": "src/features/chat/services/PdfChatIntegration.ts",
+      "kind": "runtime-static",
+      "specifier": "./features/chat/services/PdfChatIntegration"
+    },
+    {
       "id": "src/main.ts|src/features/chat/services/PiExtensionUiHost.ts|runtime-static|./features/chat/services/PiExtensionUiHost",
       "from": "src/main.ts",
       "to": "src/features/chat/services/PiExtensionUiHost.ts",
       "kind": "runtime-static",
       "specifier": "./features/chat/services/PiExtensionUiHost"
+    },
+    {
+      "id": "src/main.ts|src/features/chat/services/TurnCompletionSoundService.ts|runtime-static|./features/chat/services/TurnCompletionSoundService",
+      "from": "src/main.ts",
+      "to": "src/features/chat/services/TurnCompletionSoundService.ts",
+      "kind": "runtime-static",
+      "specifier": "./features/chat/services/TurnCompletionSoundService"
+    },
+    {
+      "id": "src/main.ts|src/features/chat/services/WebViewerContextService.ts|runtime-static|./features/chat/services/WebViewerContextService",
+      "from": "src/main.ts",
+      "to": "src/features/chat/services/WebViewerContextService.ts",
+      "kind": "runtime-static",
+      "specifier": "./features/chat/services/WebViewerContextService"
+    },
+    {
+      "id": "src/main.ts|src/features/chat/ui/ContextFilePickerModal.ts|runtime-static|./features/chat/ui/ContextFilePickerModal",
+      "from": "src/main.ts",
+      "to": "src/features/chat/ui/ContextFilePickerModal.ts",
+      "kind": "runtime-static",
+      "specifier": "./features/chat/ui/ContextFilePickerModal"
     },
     {
       "id": "src/main.ts|src/features/chat/ui/ImageGenerationModal.ts|runtime-static|./features/chat/ui/ImageGenerationModal",
@@ -18755,6 +20456,13 @@
       "to": "src/shared/index.ts",
       "kind": "runtime-static",
       "specifier": "./shared"
+    },
+    {
+      "id": "src/main.ts|src/shared/tokenEstimate.ts|runtime-static|./shared/tokenEstimate",
+      "from": "src/main.ts",
+      "to": "src/shared/tokenEstimate.ts",
+      "kind": "runtime-static",
+      "specifier": "./shared/tokenEstimate"
     },
     {
       "id": "src/main.ts|src/utils/glass/index.ts|runtime-static|./utils/glass",
@@ -19534,6 +21242,13 @@
       "specifier": "./types"
     },
     {
+      "id": "src/utils/streaming/ToolCallRenderer.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/utils/streaming/ToolCallRenderer.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
+    },
+    {
       "id": "src/utils/streaming/ToolCallRenderer.ts|src/shared/index.ts|runtime-static|../../shared",
       "from": "src/utils/streaming/ToolCallRenderer.ts",
       "to": "src/shared/index.ts",
@@ -19626,7 +21341,7 @@
   ],
   "mixedSccs": [
     {
-      "id": "src/app/runtime/PluginRuntimeCoordinator.ts;;src/features/chat/ChatPluginPort.ts;;src/features/chat/OpenCodianView.ts;;src/features/chat/runtime/ChatRuntimeComposition.ts;;src/features/chat/services/ChatHeaderPresenter.ts;;src/features/settings/AgentSwitcherFloatingIcons.ts;;src/features/settings/CostEstimateSettingsRow.ts;;src/features/settings/ModelConfigJsonModal.ts;;src/features/settings/ModelConfigModal.ts;;src/features/settings/ModelConfigProviderEditor.ts;;src/features/settings/ModelPricingModal.ts;;src/features/settings/OpenCodianSettings.ts;;src/features/settings/OpenCodianSettingsView.ts;;src/features/settings/ProviderBuiltinIconPickerModal.ts;;src/features/settings/ProviderIconCacheModal.ts;;src/features/settings/SettingsAcpSection.ts;;src/features/settings/SettingsAgentsSection.ts;;src/features/settings/SettingsBackendSection.ts;;src/features/settings/SettingsCapabilityLabSection.ts;;src/features/settings/SettingsClaudeCodeSection.ts;;src/features/settings/SettingsClaudeConfigurationSection.ts;;src/features/settings/SettingsClaudeProviderMetadataPersistenceCoordinator.ts;;src/features/settings/SettingsClaudeProvidersSection.ts;;src/features/settings/SettingsClaudeResourcesSection.ts;;src/features/settings/SettingsCodexAccountSurface.ts;;src/features/settings/SettingsCodexLegacyCredentialControl.ts;;src/features/settings/SettingsCodexProjectConfigSection.ts;;src/features/settings/SettingsCodexReadbackControls.ts;;src/features/settings/SettingsCodexResourcesSection.ts;;src/features/settings/SettingsCodexSection.ts;;src/features/settings/SettingsCommandsSection.ts;;src/features/settings/SettingsConversationSection.ts;;src/features/settings/SettingsDebugSection.ts;;src/features/settings/SettingsFormatterSection.ts;;src/features/settings/SettingsMcpSection.ts;;src/features/settings/SettingsModelCatalogCoordinator.ts;;src/features/settings/SettingsModelIconCacheManager.ts;;src/features/settings/SettingsModelSection.ts;;src/features/settings/SettingsPanelChrome.ts;;src/features/settings/SettingsPluginSection.ts;;src/features/settings/SettingsPluginUpdateSection.ts;;src/features/settings/SettingsProjectAgentEditor.ts;;src/features/settings/SettingsProjectCommandEditor.ts;;src/features/settings/SettingsSecuritySection.ts;;src/features/settings/SettingsServerSection.ts;;src/features/settings/SettingsSkillSection.ts;;src/features/settings/SettingsStyleBackgroundSection.ts;;src/features/settings/SettingsStyleInputPanelSection.ts;;src/features/settings/SettingsStyleLiquidGlassInputControls.ts;;src/features/settings/SettingsStylePresetSection.ts;;src/features/settings/SettingsStyleSection.ts;;src/features/settings/SettingsTabbedHeader.ts;;src/features/settings/SettingsTabbedRenderer.ts;;src/features/settings/SettingsToolDetailModal.ts;;src/features/settings/SettingsToolFileService.ts;;src/features/settings/SettingsToolSection.ts;;src/features/settings/SettingsUiSection.ts;;src/features/settings/SettingsUserSection.ts;;src/features/settings/SettingsViewRegistrar.ts;;src/features/settings/capabilityDisclosureRow.ts;;src/features/settings/settingsStyleControls.ts;;src/main.ts",
+      "id": "src/app/runtime/PluginRuntimeCoordinator.ts;;src/features/chat/ChatPluginPort.ts;;src/features/chat/OpenCodianView.ts;;src/features/chat/runtime/ChatRuntimeComposition.ts;;src/features/chat/services/ChatHeaderPresenter.ts;;src/features/settings/AgentSwitcherFloatingIcons.ts;;src/features/settings/CostEstimateSettingsRow.ts;;src/features/settings/ModelConfigJsonModal.ts;;src/features/settings/ModelConfigModal.ts;;src/features/settings/ModelConfigProviderEditor.ts;;src/features/settings/ModelPricingModal.ts;;src/features/settings/OpenCodianSettings.ts;;src/features/settings/OpenCodianSettingsView.ts;;src/features/settings/ProviderBuiltinIconPickerModal.ts;;src/features/settings/ProviderIconCacheModal.ts;;src/features/settings/SettingsAcpSection.ts;;src/features/settings/SettingsAgentsSection.ts;;src/features/settings/SettingsBackendSection.ts;;src/features/settings/SettingsCapabilityLabSection.ts;;src/features/settings/SettingsClaudeCodeSection.ts;;src/features/settings/SettingsClaudeConfigurationSection.ts;;src/features/settings/SettingsClaudeProviderMetadataPersistenceCoordinator.ts;;src/features/settings/SettingsClaudeProvidersSection.ts;;src/features/settings/SettingsClaudeResourcesSection.ts;;src/features/settings/SettingsCodexAccountSurface.ts;;src/features/settings/SettingsCodexLegacyCredentialControl.ts;;src/features/settings/SettingsCodexPluginsSection.ts;;src/features/settings/SettingsCodexProjectConfigSection.ts;;src/features/settings/SettingsCodexReadbackControls.ts;;src/features/settings/SettingsCodexResourcesSection.ts;;src/features/settings/SettingsCodexSection.ts;;src/features/settings/SettingsCommandsSection.ts;;src/features/settings/SettingsConversationSection.ts;;src/features/settings/SettingsDebugSection.ts;;src/features/settings/SettingsFormatterSection.ts;;src/features/settings/SettingsMcpSection.ts;;src/features/settings/SettingsModelCatalogCoordinator.ts;;src/features/settings/SettingsModelIconCacheManager.ts;;src/features/settings/SettingsModelSection.ts;;src/features/settings/SettingsPanelChrome.ts;;src/features/settings/SettingsPluginSection.ts;;src/features/settings/SettingsPluginUpdateSection.ts;;src/features/settings/SettingsProjectAgentEditor.ts;;src/features/settings/SettingsProjectCommandEditor.ts;;src/features/settings/SettingsSecuritySection.ts;;src/features/settings/SettingsServerSection.ts;;src/features/settings/SettingsSkillSection.ts;;src/features/settings/SettingsStyleBackgroundSection.ts;;src/features/settings/SettingsStyleInputPanelSection.ts;;src/features/settings/SettingsStyleLiquidGlassInputControls.ts;;src/features/settings/SettingsStylePresetSection.ts;;src/features/settings/SettingsStyleSection.ts;;src/features/settings/SettingsTabbedHeader.ts;;src/features/settings/SettingsTabbedRenderer.ts;;src/features/settings/SettingsToolDetailModal.ts;;src/features/settings/SettingsToolFileService.ts;;src/features/settings/SettingsToolSection.ts;;src/features/settings/SettingsUiSection.ts;;src/features/settings/SettingsUserSection.ts;;src/features/settings/SettingsViewRegistrar.ts;;src/features/settings/capabilityDisclosureRow.ts;;src/features/settings/settingsStyleControls.ts;;src/main.ts",
       "members": [
         "src/app/runtime/PluginRuntimeCoordinator.ts",
         "src/features/chat/ChatPluginPort.ts",
@@ -19654,6 +21369,7 @@
         "src/features/settings/SettingsClaudeResourcesSection.ts",
         "src/features/settings/SettingsCodexAccountSurface.ts",
         "src/features/settings/SettingsCodexLegacyCredentialControl.ts",
+        "src/features/settings/SettingsCodexPluginsSection.ts",
         "src/features/settings/SettingsCodexProjectConfigSection.ts",
         "src/features/settings/SettingsCodexReadbackControls.ts",
         "src/features/settings/SettingsCodexResourcesSection.ts",

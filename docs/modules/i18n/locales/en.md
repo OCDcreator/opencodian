@@ -1,5 +1,9 @@
 # English Locale
 `modifiedFiles.statsUnavailable` and `modifiedFiles.statusUnavailable` label file-hint records that have no authoritative native snapshot statistics or change status.
+> 2026-09-30 (B2 codex-stream-rendering): adds `chat.toolCard.image.*` (`statusGenerating` / `statusCompleted` / `statusFailed` / `revisedPrompt`) for the streaming image-generation tool card rendered by ToolCallRenderer; mirrors zh.
+> 2026-09-30 (B4 codex plugins/usage): adds `settings.codex.tab.plugins` plus the `settings.codex.plugins.*` group (browser heading/actions, marketplace+installed groups, install/uninstall/reconcile notices, install-policy badges, marketplace-load-error copy) and `settings.codex.accountSurface.usage.empty` (honest all-null usage state); mirrors zh.
+> 2026-09-30 (A2 untrusted-migration): removed `settings.codex.approvalPolicy.untrusted`; the approval-policy description now mentions only Inherit / On request / Never (mirrors zh).
+> 2026-09-30 (B3 session-pagination): adds `chat.backendSessions.detailLoadMore` / `detailLoadMoreRetry` (paginated detail-transcript load-more button and its retry state) and `chat.backendSessions.detailTranscriptUnavailable` (missing/deleted thread placeholder); mirrors zh.
 > 2026-09-28 (OpenCode 2): Sharing commands explain the upstream limit; config application copy reflects native value readback.
 > 2026-09-25 (session deletion): Confirmation copy describes removal of local OpenCodian messages and possible backend history retention; ZCode desktop task-list soft deletion is not presented as permanent native history removal.
 > 2026-09-25 (ZCode): `chat.zcode.backgroundTask.stopped` labels native `killed` as neutral "Stopped"; the existing unknown/connection-lost labels remain for tasks with no proven terminal notification.

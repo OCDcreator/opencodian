@@ -3,14 +3,21 @@ import { describe, expect, it } from '@jest/globals';
 
 import { AgentCapability, OPENCODE_FULL_CAPABILITIES } from '../../../../../src/core/agents/AgentCapability';
 import {
+  type BackendPaginatedSessionHistoryCapability,
+  type BackendSessionItemsPageOptions,
+  type BackendSessionTurnsPageOptions,
   getActiveSessionHistoryService,
   getBackendSessionDetail,
   getBackendSessionPreview,
+  getBackendSessionTurnItemsPage,
+  getBackendSessionTurnsPage,
   getConversationSessionBackendService,
   getConversationSessionHistoryService,
+  hasBackendSessionTurnsPage,
   hasSessionCreationCapability,
   listBackendSessions,
   loadBackendSessionMessages,
+  type NormalizedSessionMessagesPage,
   readBackendSessionShareUrl,
   readBackendSessionTitle,
 } from '../../../../../src/core/agents/backend/AgentBackendRouting';
@@ -1123,5 +1130,255 @@ describe('getBackendSessionDetail', () => {
     expect(result!.customTitle).toBeNull();
     expect(result!.gitBranch).toBeNull();
     expect(result!.title).toBe('');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getBackendSessionPreview — options passthrough
+// ---------------------------------------------------------------------------
+
+describe('getBackendSessionPreview options passthrough', () => {
+  it('passes pagination options through to getSessionMessages', async () => {
+    const calls: Array<{ args: unknown[] }> = [];
+    const adapter = createMockSessionAdapter('claude-code', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]), {
+      getSessionMessages: async (sessionId: string, options?: Record<string, unknown>) => {
+        calls.push({ args: [sessionId, options] });
+        return [];
+      },
+    });
+    const registry = createMockRegistry(new Map([['claude-code', adapter]]));
+
+    const result = await getBackendSessionPreview(registry, 'ses-1', { limit: 10, cursor: 'cur-1' });
+
+    expect(result).toEqual([]);
+    expect(calls).toEqual([{ args: ['ses-1', { limit: 10, cursor: 'cur-1' }] }]);
+  });
+
+  it('calls getSessionMessages without an options argument when options are omitted', async () => {
+    const calls: Array<{ args: unknown[] }> = [];
+    const adapter = createMockSessionAdapter('claude-code', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]), {
+      getSessionMessages: async (sessionId: string, options?: Record<string, unknown>) => {
+        calls.push({ args: options === undefined ? [sessionId] : [sessionId, options] });
+        return [{ id: 'm1', role: 'user', content: 'hi' }];
+      },
+    });
+    const registry = createMockRegistry(new Map([['claude-code', adapter]]));
+
+    const result = await getBackendSessionPreview(registry, 'ses-1');
+
+    expect(result).toHaveLength(1);
+    expect(calls).toEqual([{ args: ['ses-1'] }]);
+  });
+
+  it('returns null when the passthrough call throws', async () => {
+    const adapter = createMockSessionAdapter('claude-code', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]), {
+      getSessionMessages: async () => { throw new Error('paged read failed'); },
+    });
+    const registry = createMockRegistry(new Map([['claude-code', adapter]]));
+
+    const result = await getBackendSessionPreview(registry, 'ses-1', { limit: 5 });
+
+    expect(result).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Paginated session transcript seams
+// ---------------------------------------------------------------------------
+
+describe('hasBackendSessionTurnsPage', () => {
+  it('returns false when registry is null', () => {
+    expect(hasBackendSessionTurnsPage(null)).toBe(false);
+  });
+
+  it('returns false when the active adapter lacks getSessionMessages', () => {
+    const adapter = createMockSessionAdapter('codex', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]));
+    const registry = createMockRegistry(new Map([['codex', adapter]]));
+    expect(hasBackendSessionTurnsPage(registry)).toBe(false);
+  });
+
+  it('returns false when the adapter reads messages but has no turns seam', () => {
+    const adapter = createMockSessionAdapter('codex', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]), {
+      getSessionMessages: async () => [],
+    });
+    const registry = createMockRegistry(new Map([['codex', adapter]]));
+    expect(hasBackendSessionTurnsPage(registry)).toBe(false);
+  });
+
+  it('returns true when the adapter implements getSessionTurnsPage', () => {
+    const extra = {
+      getSessionMessages: async () => [],
+      getSessionTurnsPage: async () => null,
+    } as Partial<AgentSessionCapability> & Partial<BackendPaginatedSessionHistoryCapability>;
+    const adapter = createMockSessionAdapter('codex', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]), extra);
+    const registry = createMockRegistry(new Map([['codex', adapter]]));
+    expect(hasBackendSessionTurnsPage(registry)).toBe(true);
+  });
+});
+
+describe('getBackendSessionTurnsPage', () => {
+  it('returns null when registry is null', async () => {
+    expect(await getBackendSessionTurnsPage(null, 'ses-1')).toBeNull();
+  });
+
+  it('returns null when no active backend exists', async () => {
+    expect(await getBackendSessionTurnsPage(createMockRegistry(new Map()), 'ses-1')).toBeNull();
+  });
+
+  it('returns null when the active adapter does not implement the seam', async () => {
+    const adapter = createMockSessionAdapter('codex', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]), {
+      getSessionMessages: async () => [],
+    });
+    const registry = createMockRegistry(new Map([['codex', adapter]]));
+    expect(await getBackendSessionTurnsPage(registry, 'ses-1')).toBeNull();
+  });
+
+  it('returns the adapter page and passes cursor options through', async () => {
+    const calls: Array<unknown> = [];
+    const page = {
+      messages: [{ role: 'user', parts: [{ type: 'text', text: 'hi' }] }],
+      nextCursor: 'n2',
+      backwardsCursor: null,
+    };
+    const extra = {
+      getSessionMessages: async () => [],
+      getSessionTurnsPage: async (_sessionId: string, options?: BackendSessionTurnsPageOptions) => {
+        calls.push(options);
+        return page;
+      },
+    } as Partial<AgentSessionCapability> & Partial<BackendPaginatedSessionHistoryCapability>;
+    const adapter = createMockSessionAdapter('codex', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]), extra);
+    const registry = createMockRegistry(new Map([['codex', adapter]]));
+
+    const result = await getBackendSessionTurnsPage(registry, 'ses-1', {
+      cursor: 'c1',
+      limit: 20,
+      sortDirection: 'asc',
+    });
+
+    expect(result).toEqual(page);
+    expect(calls).toEqual([{ cursor: 'c1', limit: 20, sortDirection: 'asc' }]);
+  });
+
+  it('returns null when the seam throws (e.g. thread deleted mid-browse)', async () => {
+    const extra = {
+      getSessionMessages: async () => [],
+      getSessionTurnsPage: async () => { throw new Error('thread missing'); },
+    } as Partial<AgentSessionCapability> & Partial<BackendPaginatedSessionHistoryCapability>;
+    const adapter = createMockSessionAdapter('codex', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]), extra);
+    const registry = createMockRegistry(new Map([['codex', adapter]]));
+
+    expect(await getBackendSessionTurnsPage(registry, 'ses-1')).toBeNull();
+  });
+
+  it('returns null for a malformed adapter page', async () => {
+    const extra = {
+      getSessionMessages: async () => [],
+      getSessionTurnsPage: async () => ({ data: [] }) as unknown as NormalizedSessionMessagesPage,
+    } as Partial<AgentSessionCapability> & Partial<BackendPaginatedSessionHistoryCapability>;
+    const adapter = createMockSessionAdapter('codex', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]), extra);
+    const registry = createMockRegistry(new Map([['codex', adapter]]));
+
+    expect(await getBackendSessionTurnsPage(registry, 'ses-1')).toBeNull();
+  });
+
+  it('normalizes missing cursors to null', async () => {
+    const extra = {
+      getSessionMessages: async () => [],
+      getSessionTurnsPage: async () => ({ messages: [] }) as unknown as NormalizedSessionMessagesPage,
+    } as Partial<AgentSessionCapability> & Partial<BackendPaginatedSessionHistoryCapability>;
+    const adapter = createMockSessionAdapter('codex', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]), extra);
+    const registry = createMockRegistry(new Map([['codex', adapter]]));
+
+    const result = await getBackendSessionTurnsPage(registry, 'ses-1');
+
+    expect(result).toEqual({ messages: [], nextCursor: null, backwardsCursor: null });
+  });
+});
+
+describe('getBackendSessionTurnItemsPage', () => {
+  it('returns null when the adapter does not implement the items seam', async () => {
+    const adapter = createMockSessionAdapter('codex', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]), {
+      getSessionMessages: async () => [],
+    });
+    const registry = createMockRegistry(new Map([['codex', adapter]]));
+
+    expect(await getBackendSessionTurnItemsPage(registry, 'ses-1', { turnId: 'turn-1' })).toBeNull();
+  });
+
+  it('passes turnId through and returns the sanitized page', async () => {
+    const calls: Array<unknown> = [];
+    const extra = {
+      getSessionMessages: async () => [],
+      getSessionTurnItemsPage: async (_sessionId: string, options?: BackendSessionItemsPageOptions) => {
+        calls.push(options);
+        return {
+          messages: [{ role: 'assistant', parts: [{ type: 'text', text: 'full' }] }],
+          nextCursor: null,
+          backwardsCursor: null,
+        };
+      },
+    } as Partial<AgentSessionCapability> & Partial<BackendPaginatedSessionHistoryCapability>;
+    const adapter = createMockSessionAdapter('codex', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]), extra);
+    const registry = createMockRegistry(new Map([['codex', adapter]]));
+
+    const result = await getBackendSessionTurnItemsPage(registry, 'ses-1', { turnId: 'turn-9', limit: 50 });
+
+    expect(calls).toEqual([{ turnId: 'turn-9', limit: 50 }]);
+    expect(result?.messages).toHaveLength(1);
+    expect(result?.nextCursor).toBeNull();
+  });
+
+  it('returns null when the seam throws', async () => {
+    const extra = {
+      getSessionMessages: async () => [],
+      getSessionTurnItemsPage: async () => { throw new Error('route unavailable'); },
+    } as Partial<AgentSessionCapability> & Partial<BackendPaginatedSessionHistoryCapability>;
+    const adapter = createMockSessionAdapter('codex', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]), extra);
+    const registry = createMockRegistry(new Map([['codex', adapter]]));
+
+    expect(await getBackendSessionTurnItemsPage(registry, 'ses-1', { turnId: 'turn-9' })).toBeNull();
   });
 });
