@@ -343,14 +343,20 @@ export class StorageService {
     return sortedConversations;
   }
 
-  /** Delete a conversation */
-  async deleteConversation(id: string): Promise<void> {
-    const conversationPath = this.getConversationPath(id);
-    
+  /** Legacy best-effort cleanup; opt in to verified session-file absence before UI commit. */
+  async deleteConversation(id: string, options: { verifyAbsent?: boolean } = {}): Promise<void> {
+    const conversationPath = normalizePath(this.getConversationPath(id));
+    let removalError: unknown;
     try {
-      await this.app.vault.adapter.remove(normalizePath(conversationPath));
-    } catch {
-      // Ignore if file doesn't exist
+      await this.app.vault.adapter.remove(conversationPath);
+    } catch (error) {
+      removalError = error;
+    }
+
+    if (options.verifyAbsent && await this.app.vault.adapter.exists(conversationPath) !== false) {
+      throw removalError instanceof Error
+        ? removalError
+        : new Error('Local conversation deletion could not be confirmed; retained conversation can be retried.');
     }
 
     try {

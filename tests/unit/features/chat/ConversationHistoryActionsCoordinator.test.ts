@@ -3,6 +3,7 @@ import {
   ConversationHistoryActionsCoordinator,
   type ConversationHistoryActionsHost,
 } from '../../../../src/features/chat/services/ConversationHistoryActionsCoordinator';
+import { ConversationHistoryDialogService } from '../../../../src/features/chat/services/ConversationHistoryDialogService';
 import { t } from '../../../../src/i18n';
 
 function createConversation(
@@ -169,6 +170,53 @@ describe('ConversationHistoryActionsCoordinator', () => {
     ]);
 
     fixture.coordinator.destroy();
+  });
+
+  it.each(['current', 'selected', 'all'])('shows pending instead of success for %s deletion and permits a later retry', async (mode) => {
+    const pending = new Error('Codex deletion pending (admitted): local conversation retained. Retry deletion.');
+    const fixture = createFixture({
+      deleteConversationsAndCleanupTabs: jest.fn().mockRejectedValue(pending),
+      deleteAllConversationsAndReset: jest.fn().mockRejectedValue(pending),
+    });
+    const currentConfirm = jest.spyOn(ConversationHistoryDialogService.prototype, 'showDeleteCurrentConfirmDialog').mockResolvedValue(true);
+    const selectedConfirm = jest.spyOn(ConversationHistoryDialogService.prototype, 'showDeleteSelectedConfirmDialog').mockResolvedValue(true);
+    const allConfirm = jest.spyOn(ConversationHistoryDialogService.prototype, 'showDeleteAllConfirmDialog').mockResolvedValue(true);
+    const actions = fixture.coordinator as unknown as {
+      deleteCurrentConversation(): Promise<void>;
+      deleteSelectedConversations(ids: string[]): Promise<void>;
+      deleteAllConversations(): Promise<void>;
+    };
+    const run = () => mode === 'current' ? actions.deleteCurrentConversation()
+      : mode === 'selected' ? actions.deleteSelectedConversations(['conv-1', 'conv-1', 'conv-2'])
+        : actions.deleteAllConversations();
+    await run();
+    expect(fixture.host.showNotice).toHaveBeenCalledTimes(1);
+    expect(fixture.host.showNotice).toHaveBeenLastCalledWith(pending.message);
+    expect(fixture.conversations).toHaveLength(2);
+    fixture.host.deleteConversationsAndCleanupTabs.mockResolvedValue(undefined);
+    fixture.host.deleteAllConversationsAndReset.mockResolvedValue(undefined);
+    await run();
+    const successKey = mode === 'current' ? 'chat.deleteCurrentConfirm.success'
+      : mode === 'selected' ? 'chat.deleteSelectedConfirm.success' : 'chat.deleteAllConfirm.success';
+    expect(fixture.host.showNotice).toHaveBeenLastCalledWith(t(successKey));
+    const deletion = mode === 'all' ? fixture.host.deleteAllConversationsAndReset : fixture.host.deleteConversationsAndCleanupTabs;
+    expect(deletion).toHaveBeenCalledWith(mode === 'current' ? ['conv-1'] : ['conv-1', 'conv-2']);
+    currentConfirm.mockRestore();
+    selectedConfirm.mockRestore();
+    allConfirm.mockRestore();
+    fixture.coordinator.destroy();
+  });
+
+  it('shows a native failure through the actual history click/confirmation path without an unhandled rejection', async () => {
+    const fixture = createFixture({ deleteConversationsAndCleanupTabs: jest.fn().mockRejectedValue(new Error('Codex native deletion unavailable; retained')) });
+    jest.spyOn(ConversationHistoryDialogService.prototype, 'showDeleteCurrentConfirmDialog').mockResolvedValue(true);
+    fixture.coordinator.show(createHistoryEvent(fixture.anchorEl));
+    document.body.querySelectorAll<HTMLElement>('.opencodian-history-action')[0]?.click();
+    await flushPromises();
+    await flushPromises();
+    expect(fixture.host.showNotice).toHaveBeenCalledWith('Codex native deletion unavailable; retained');
+    fixture.coordinator.destroy();
+    jest.restoreAllMocks();
   });
 
   it('renders the active backend scope above the filtered history list', () => {

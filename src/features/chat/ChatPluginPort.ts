@@ -187,6 +187,7 @@ export interface ChatPluginPort extends TabRuntimePluginSource {
     options?: { preferCache?: boolean },
   ): Promise<Conversation | undefined>;
   deleteConversation(id: string): Promise<void>;
+  forgetConversation(id: string): Promise<void>;
   generateDefaultTitle(firstMessage: string): string;
   registerConversationCachePinProvider(provider: ConversationCachePinProvider): void;
   unregisterConversationCachePinProvider(provider: ConversationCachePinProvider): void;

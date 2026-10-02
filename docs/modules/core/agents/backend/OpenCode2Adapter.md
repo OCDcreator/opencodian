@@ -51,3 +51,7 @@ The native agent catalog may initially return an empty array while the 2.0.18 co
 Permission-mode changes and explicit primary-agent routing also use the ready catalog. A real turn started immediately after a fresh 2.0.18 process previously failed with `Build agent unavailable` when the first catalog read was empty; the normal, YOLO, and Plan paths must not interpret that transient response as a missing native agent.
 
 OpenCode 2.0.18 removes `todowrite` during v1 history migration and has no replacement todo tool or session todo API. The Todo dock is therefore an upstream exception for this version; its capability remains absent rather than claiming a fabricated snapshot.
+
+## 2026-10-02 T10 native history pagination
+
+OpenCode 2.0.18 `SessionMessagesQuery` permits `order` only on the first page. Its opaque cursor carries the requested ordering; combining `cursor` and `order` is rejected by the native handler. `listAllMessages()` therefore sends ascending order on page one and only the cursor on later pages. A later-page failure rejects the history read rather than returning a partial conversation as complete. Native OpenCode 2 IDs remain local to this adapter and are never delegated to OpenCode 1 SDK v2 facade. Focused regression: `OpenCode2Adapter.t10.test.ts`. Upstream baseline: tag `v2.0.18`, commit `cd9a14a6b688d4021bee381dfd39d2cef9c0f862`, `packages/protocol/src/groups/message.ts` and `packages/server/src/handlers/message.ts`. This regression is protocol-fixture evidence; real native and UI acceptance require their own evidence.

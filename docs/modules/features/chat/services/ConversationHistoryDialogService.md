@@ -35,3 +35,7 @@ export class ConversationHistoryDialogService {
 
 - coordinator 仍负责 history dropdown、selection state、active streaming guard、host delete/reset/rename 调用与 notice
 - dialog service 只返回用户确认结果或新标题字符串，不接触持久化和 tab state
+
+## 2026-10-02 Codex local forget / complete catalog UI
+
+新增 showForgetLocalConfirmDialog(count)，复用既有 confirm/countdown/Escape/cancel cleanup，通过 typed `chat.forgetLocalConfirm.*` keys 显示本地遗忘与原生历史保留说明。移除临时 copy override，标题、警告、emphasis、带 count 的说明与每次 countdown 更新统一调用 `t(...)`；cancel 复用既有 key。倒计时为既有 100ms 启动延迟 + 3s，确认前不执行 host action。英中正式测试断言 3s、2s 与结束后的确认文案；既有默认删除文案/countdown 行为保留。

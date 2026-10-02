@@ -24,7 +24,7 @@
 
 ## 核心类型 / 接口
 
-- `Session` / `Message` / `Part` / `SessionMessage`: session lifecycle 公开接口复用的基础形状；`Session` 新增可选字段 `cost?`、`tokens?`（含 input/output/reasoning/cache 细分）、`agent?`、`model?`（含 id/providerID/variant）和 `path?`，用于透传 server 端会话级 usage/元数据。
+- `Session` 与从 `./types` type re-export 的 `Message` / `Part` / `SessionMessage`: session lifecycle 公开接口复用的基础形状；`Session` 新增可选字段 `cost?`、`tokens?`（含 input/output/reasoning/cache 细分）、`agent?`、`model?`（含 id/providerID/variant）和 `path?`，用于透传 server 端会话级 usage/元数据。
 - `OpenCodeSessionLifecycleSdk`: coordinator 依赖的最小 session SDK 面，只覆盖 abort/create/get/list/messages/todo/status/delete/update；当前 host 可直接注入 `OpenCodeSdkFacade.session`，不再需要 `OpenCodeService` 先包一层 CRUD adapter。
 - `OpenCodeSessionLifecycleSyncRuntime`: 对 `OpenCodeSyncEventRuntimeCoordinator` 的最小订阅面抽象。
 - `OpenCodeSessionLifecycleCoordinatorHost`: host seam，提供 SDK CRUD/abort 开关、legacy HTTP helper、normalizer、revert 过滤、canonical snapshot 写入、tool 观测与日志。
@@ -91,3 +91,11 @@ graph TD
 - `suppressedInitialDefaultTitleUpdates` 只用于跳过每个 session 的第一次 provisional 写入；不要把它扩展成长期拦截，否则会影响本地兜底标题和用户手动重命名。
 - 不要在这里混入 session control/message operations、question/permission negotiation 或 broad query gateway；这些属于后续 roadmap queue。
 - SDK mutation (`create` / `delete` / `update`) 当前保持原有语义，不额外引入“SDK mutation 失败再回退 legacy”的行为变化；`abortSession()` 保留既有 SDK abort 失败后 legacy abort 的流式取消语义。
+
+### 2026-10-02 T10 review fix: snapshot request token
+
+`getSessionMessages()` captures a canonical snapshot token before every SDK or legacy HTTP request. It spans transport and asynchronous revert-state filtering, then commits with that token and returns the merged messages for both reload callers and tool-name observation. SDK read failure recaptures a fresh token before HTTP fallback. The existing state owner reconciles concurrent updates and deletions; this coordinator continues to own transport choice only. Focused regression: `OpenCodeService.snapshotRace.t10.test.ts`.
+
+### 2026-10-02 T10 cycle fix
+
+Snapshot token and message/part contracts are imported from `./types` with type-only imports. `Message`, `Part`, `SessionMessage` remain available through this module via type re-export; their definitions are unchanged. Lifecycle no longer depends on the state-store implementation for its host token contract. No lifecycle method body changed.

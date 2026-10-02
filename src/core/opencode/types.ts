@@ -11,7 +11,6 @@ import type {
   ServerMode,
 } from '../types/settings';
 import type { OpenCodeDiagnosticRunToken } from './diagnostics';
-import type { Message, Part, SessionMessage } from './OpenCodeSessionLifecycleCoordinator';
 import type { SdkFeatureFlags } from './sdkFeatureFlags';
 
 /** Response handler callbacks */
@@ -150,11 +149,67 @@ export interface OpenCodeCapabilitySnapshot {
   mcp: McpServerSnapshot;
 }
 
+export interface Message {
+  id: string;
+  sessionID: string;
+  role: 'user' | 'assistant';
+  providerID?: string;
+  modelID?: string;
+  summary?: boolean;
+  structured?: unknown;
+  error?: unknown;
+  cost?: number;
+  tokens?: {
+    total?: number;
+    input: number;
+    output: number;
+    reasoning: number;
+    cache: {
+      read: number;
+      write: number;
+    };
+  };
+  time: {
+    created: number;
+    updated?: number;
+  };
+}
+
+export interface Part {
+  id: string;
+  sessionID: string;
+  messageID: string;
+  type: string;
+  text?: string;
+  auto?: boolean;
+  overflow?: boolean;
+  tail_start_id?: string;
+  synthetic?: boolean;
+  metadata?: Record<string, unknown>;
+  duration?: number;
+  time?: {
+    start?: number;
+    end?: number;
+  };
+  [key: string]: unknown;
+}
+
+export interface SessionMessage {
+  info: Message;
+  parts: Part[];
+}
+
 export type OpenCodeCanonicalMessageInfo = Message;
 
 export type OpenCodeCanonicalPart = Part;
 
 export type OpenCodeSessionMessageWithParts = SessionMessage;
+
+export interface OpenCodeSessionSnapshotToken {
+  readonly revision: number;
+  readonly request: number;
+  readonly owner: object;
+}
 
 export interface OpenCodeCanonicalSessionState {
   sessionID: string;

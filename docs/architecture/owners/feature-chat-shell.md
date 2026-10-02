@@ -82,3 +82,5 @@ The shell supplies the Pi slash-catalog discriminator only. All Pi runtime lifec
 ## 2026-09-27 OpenCode 2 compatibility
 
 The chat view routes OpenCode 2 model, permission, form, slash catalog, context and authoritative history reads to its native adapter.
+
+2026-10-02：聊天 shell 为 Codex 显式本地遗忘提供既有 host forwarding，原生删除仍需要 verified；失败项标签与 identity 保留。运行时处理继续由 history/lifecycle owners 承担。

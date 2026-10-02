@@ -70,3 +70,7 @@ Obsidian Modal，用于浏览、查看详情、恢复、分叉、归档和取消
 - 当 `forcedBackendKind` 指定但 registry 中该 backend 未注册或未启用时，modal 会显示空列表（符合预期）
 - 生命周期按钮的可见性由 active backend 的 capability、对应原生方法是否存在及所选 session 的 `archived` 状态共同决定；不再由 host 显式传入
 - 列表必须同时返回归档与非归档 sessions，否则 `Unarchive` 按钮无法通过真实 UI 路径触发；Codex 适配器通过两次 `thread/list` 调用来满足这一点
+
+## 2026-10-02 Codex local forget / complete catalog UI
+
+Codex 列表经 readBackendSessionCatalog 消费 getSessionCatalog 完整目录结果，显示 `[data-session-catalog-state]` 的 loading/complete/partial/failed/unavailable 与 aria-busy。partial 保留已读 session rows；failed/unavailable 不伪装成 empty。Refresh 完整重读，选中 ID 仍存在则稳定保留，消失则清 selection/preview。row 的 data-session-id 和 resume 入参保持 native ID。其他 backend 继续旧 listBackendSessions 路径。

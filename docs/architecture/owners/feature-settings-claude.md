@@ -40,3 +40,5 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 - 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
 
 - 2026-09-18 (FlowText 批次 B)：owner manifest 随 R-B1/R-B2 更新——新增 `src/shared/contextGroupPlan.ts` 归属 `shared.foundation`；本 owner 的边界与职责未变。
+
+2026-10-02：现有设置恢复面提供一个活跃原生会话的输出样式目录重载和 MCP 收紧控制；无会话或不支持不派发，ACK 不推定有效配置，样式目录与新 query prompt 应用保持分离。

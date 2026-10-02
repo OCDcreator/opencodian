@@ -46,3 +46,7 @@
 ## R-C2 扩展
 
 2026-09-18 `ChatPluginPort` 新增 `openImageGenerationCard(prefill?: string): void`（组合根拥有实现；view 仅转发）。
+
+## 2026-10-02 Codex local forget / complete catalog UI
+
+新增 `forgetConversation(id)` 窄接口；chat host forwarding 经 main 明确使用 forget-local mode。既有 deleteConversation 仍默认 native delete；View 不新增 runtime ownership。

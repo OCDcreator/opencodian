@@ -1,5 +1,13 @@
 # 测试框架
 
+## Chat diagnostics 完整方法契约提取（2026-10-02）
+
+`ChatDiagnosticsContract.test.ts` 的删除路径源码契约改用现有 TypeScript compiler AST，按 class + method 唯一定位完整方法，替代固定 600/400 字符切片与缩进结束标记。StorageService、ConversationMetadataCache、OpenCodianPlugin 的无 trace/diagnostic 不变量和存储/metadata 委托断言保留；生产源码未变。回归覆盖长方法末尾清理、类型/default 参数与嵌套花括号、相邻/其他类同名方法隔离、600 字符后禁止的 trace 调用可见，以及缺失/歧义时 fail closed。verify attempt03 原始 13 失败日志与 test-only 962-path production 哈希证明保存在专属 evidence。
+
+## 隐藏目录工作树发现回归（2026-10-02）
+
+三个项目的 `testMatch` 改为 checkout-relative suffix pattern（`**/tests/...`），避免 `<rootDir>` 展开为含 `.codex` 的绝对 glob 时漏掉全部测试。`roots`、unit/integration/scripts 边界与 reference-projects 排除规则保持原约束。`jest-worktree-discovery.test.mjs` 使用 Jest 自身 matcher 验证 Windows/macOS 隐藏祖先、普通目录以及错误项目/源码路径；基线证据契约也通过 infrastructure wrapper 纳入默认 verify。
+
 ## 并发负载抖动修复（2026-09-17）
 
 - `scripts/run-jest.js` 现在默认追加 `--maxWorkers=50%`（用户已显式传 `--maxWorkers` 时不覆盖）：20 核开发机上 jest 默认开 19 个 worker，puppeteer Chrome 启动、真实 CLI spawn 与临时目录 I/O 在全量并发下互相挤压，超时套件每轮漂移；砍半峰值并发后小核数 CI runner 不受影响（2 核 → 1 个 worker，与原默认一致）。
@@ -132,3 +140,9 @@ npm run test
 - [ ] Obsidian API mock 的覆盖范围和限制
 - [ ] 测试覆盖率目标和各模块当前状态
 - [ ] E2E 测试方案
+
+2026-10-02 T07/T08 产品消费回归：PiClaudeSessionControlsUI.test.ts 覆盖现有 Pi 工作台动态档位/原生entries/回退及 Claude 单会话 controls 的成功、无会话、unsupported/failure、迟到响应和不持久标有效；PiAdapter.uiReads.test.ts 覆盖 typed只读facade/ID/结构/max normalization；PiThinkingAndConfiguration.test.ts 外包 Node test 直接加载真实 Pi asset handlers并使用隔离文件fixture，验证 max validator/schema与未知字段roundtrip，不访问用户global配置、不运行付费模型。既有 PiModelSelectionBinding/WorkbenchActions/SettingsClaudeCodeSection 回归随消费更新。冻结聚焦 12 suites/336 tests，命令和日志位于 final-expansion/pi-claude-ui；全量门禁由父代理统一执行。
+
+2026-10-02 PC1：新增正式 PiConfigurationEnumRoundtrip.test.ts 包装 Node .mjs 回归，真实 createConfigurationService + 内存 FileSettingsStorage，backup 仅写隔离 owned fixture 路径。9 条 Node tests 包含 reviewer exact repro、全部 6 enums × project/global × patch/document 的 unchanged preserve、新/改未知值拒绝、允许 supported replacement、类型/unsafe-key/revision及跨scope防豁免。修前 7 pass/2 fail，修后 9/9；聚焦含既有配置/UI为4 suites/38 tests。证据 final-expansion/pi-claude-ui/review-fixes/。
+
+PC1 最终 freeze 补跑受影响 PiBoundaryContract 后：5 suites/41 tests 通过，独立 Node enum 策略回归9/9通过；聚焦测试lint0errors/0warnings。精确命令、生产最小diff和基线记录见 pi-claude-ui/review-fixes/。

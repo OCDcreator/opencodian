@@ -9,3 +9,5 @@
 ## 验证
 
 PiWorkbenchActions.test.ts对照协议全集，防止遗漏/重复。业务实现位于独立SDK服务。
+
+2026-10-02：允许操作目录新增 get_available_thinking_levels 与 get_entries/since；set_thinking_level 字段不再提供静态档位，选项由工作台读取所选 session 决定。PiWorkbenchActions.test.ts 对照必需和 optional 协议全集；操作保持 allowlist。

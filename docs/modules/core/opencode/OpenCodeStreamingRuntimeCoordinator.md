@@ -129,3 +129,7 @@ graph LR
 - `streamSdkResponse()` 的 fallback 只允许发生在首个 SDK event 之前；不要把“已经开始消费 SDK events 后的错误”也改成回退 legacy。
 - 当前根因边界不是“单纯 SDK 不可用”，而是 SDK/legacy 两条 transport 都可能先结束本地流，再晚一点才让 canonical assistant tail 完整可见；因此收尾逻辑必须以最终 session state 为准，而不是只相信流内 chunk。
 - 可选诊断 observer 接收显式 `traceContext` 与 `sourceEventId`；SDK/legacy 的 raw ingress 和 normalized outcome 必须复用同一 id，不能从全局 current session 推断。
+
+### 2026-10-02 T10 fallback boundary regression
+
+SDK subscription or first-read failures may use legacy SSE for missing routes, server errors and unclassified transport failures. HTTP 400/401/403/429 rejections remain errors and do not submit a prompt through fallback. Cancellation during subscription setup or at a yielded message-start boundary suppresses prompt admission and fallback. In-flight SDK reads that finish after cancellation are discarded before ingress or finalization. A failure after the first SDK event never replays generation. Both pre-admission and post-admission SSE fallback retain `promptMessageId`, so finalization cannot borrow text or metadata from an earlier prompt. The prompt callback runs at most once. Focused regression: `OpenCodeStreamingRuntimeCoordinator.t10.test.ts`. These fixture assertions do not establish native generation or Obsidian UI acceptance.

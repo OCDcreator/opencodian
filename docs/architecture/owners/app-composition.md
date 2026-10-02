@@ -1,4 +1,5 @@
 # Owner: app.composition
+> 2026-10-02（reviewed continuation，用户已授权）：Codex conversation 删除消费 native mutation 结果；failed/unavailable 或仅 admitted 时保留 storage、conversation 与 cache，原生 verified 后才提交本地删除。显式 local forget 与无 native thread 的本地草稿另行区分。main 在 native/storage await 后按 conversation ID 重查本地提交位置，避免并发删除或同 ID 重复完成误删邻项；只拥有删除流程的组合与本地提交，native ID/alias、原生回读和重试状态仍属于 Codex backend。
 > 2026-09-30 (Codex 0.159 integration)：main.ts 抽出 `wireCodexBridgeHosts()`，负责构造 codex approval + elicitation bridge hosts；bridge 运行时所有权仍留在 adapter 边界内。
 > 2026-09-22 (ZCode 票 01)：main.ts 的 wireHiddenAdapters 装配传入 `getZCodeSettings` 与 `getZCodeExtraEnv`（`getDomainEnvFor('zcode')`）；ZCode 仅装配，运行时状态留在 zcode adapter 边界内。
 > 2026-09-21 (advantage-parity R-F2/R-F3/R-F4)：main.ts 在 preload 后注册一次 vault rename 以跟随会话绑定路径，批量 round 结束交 EditRevertService 冻结 post-image；R-F4 只组合既有 InlineCompletionService，设置/后端切换调排他预热，双开关均关闭才释放池。运行时所有权仍在原服务。

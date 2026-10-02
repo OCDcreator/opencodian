@@ -229,6 +229,44 @@ describe('ChatSelectionControlsCoordinator', () => {
     }
   });
 
+  it('reads Pi thinking levels from its own session while a different backend owns the focused leaf', async () => {
+    const globalApp = globalThis as typeof globalThis & { app?: unknown };
+    const previousApp = globalApp.app;
+    let conversation: { backend: string; backendSessionId: string } = { backend: 'pi', backendSessionId: 'pi-sidebar-a' };
+    const getAvailableThinkingLevels = jest.fn(async () => ({ levels: ['off', 'high', 'max'] }));
+    const command = jest.fn(async () => ({ model: { provider: 'local-provider', id: 'local-model' } }));
+    const adapter = {
+      start: jest.fn(async () => {}),
+      getAvailableModels: jest.fn(async () => [{ provider: 'local-provider', id: 'local-model', name: 'Local model' }]),
+      getDefaultModel: jest.fn(() => ({ provider: 'local-provider', model: 'local-model' })),
+      getAvailableThinkingLevels,
+      command,
+    };
+    globalApp.app = {
+      workspace: { activeLeaf: { view: {
+        getViewType: () => 'opencodian-view',
+        currentConversation: { backend: 'codex', backendSessionId: 'other-backend-session' },
+      } } },
+      plugins: { plugins: { opencodian: {
+        settings: { activeBackend: 'codex' },
+        agentServiceRegistry: { get: (backend: string) => backend === 'pi' ? adapter : null },
+      } } },
+    };
+    try {
+      const fixture = await createFixture({ getOwnConversation: () => conversation });
+      await fixture.coordinator.reloadModelCatalog();
+      expect(getAvailableThinkingLevels).toHaveBeenCalledWith('pi-sidebar-a');
+      expect(command).toHaveBeenCalledWith('pi-sidebar-a', 'get_state');
+      expect(getAvailableThinkingLevels).not.toHaveBeenCalledWith('other-backend-session');
+      conversation = { backend: 'pi', backendSessionId: 'pi-sidebar-b' };
+      await fixture.coordinator.reloadModelCatalog();
+      expect(getAvailableThinkingLevels).toHaveBeenLastCalledWith('pi-sidebar-b');
+      expect(command).toHaveBeenLastCalledWith('pi-sidebar-b', 'get_state');
+    } finally {
+      globalApp.app = previousApp;
+    }
+  });
+
   it('loads model selector state and routes model selection through the active-tab override seam', async () => {
     const fixture = await createFixture();
     const modelTrigger = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-trigger');

@@ -178,14 +178,9 @@ export class OpenCodeCatalogQueryCoordinator {
     try {
       const data = await this.host.getLegacy<{
         providers: Array<{ id: string; name: string; models: unknown }>;
-        default: { provider?: string; model?: string };
+        default: Record<string, string>;
       }>('/config/providers', { includeDirectory });
-      const normalized = this.normalizeAvailableModels({
-        providers: data.providers,
-        default: data.default?.provider && data.default?.model
-          ? { [data.default.provider]: data.default.model }
-          : {},
-      });
+      const normalized = this.normalizeAvailableModels(data);
       if (shouldLogDebug) {
         this.logProviderCatalogResponse({
           operation: 'getAvailableModels',

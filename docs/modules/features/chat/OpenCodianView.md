@@ -823,3 +823,7 @@ OpenCode 2 uses its own model, permission, question, context and history routes.
 ### 2026-09-28 parity continuation
 
 OpenCode 2 synchronization reads native revert state and filters rewound messages. Child session listing and session diff queries route to the OpenCode 2 adapter. Session IDs never enter OpenCode 1 calls.
+
+## 2026-10-02 Codex local forget / complete catalog UI
+
+history host 新增 forgetConversationsAndCleanupTabs 转发至 ConversationLoadRecoveryCoordinator，并在 finally 刷新 session rail；lifecycle host 转发 plugin.forgetConversation。View 只装配/转发，不持有分页、本地遗忘 pending 或删除验证 state。

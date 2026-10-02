@@ -11,6 +11,7 @@ const source = { key: 'source', label: '扩展包来源 / Package source' };
 export const PI_WORKBENCH_GROUPS: Record<string, PiWorkbenchAction[]> = {
   '会话与历史 / Sessions': [
     { id: 'get_state', label: '运行状态 / State' }, { id: 'get_messages', label: '读取历史 / Transcript' },
+    { id: 'get_entries', label: '原生历史节点 / Native entries', fields: [{ key: 'since', label: '原生节点 ID 之后（留空读取全部） / After native entry ID (blank for all)' }] },
     { id: 'get_last_assistant_text', label: '最近回复 / Last reply' },
     { id: 'new_session', label: '新建会话 / New session', mutation: true },
     { id: 'set_session_name', label: '重命名 / Rename', fields: [{ key: 'name', label: '标题 / Title' }] },
@@ -34,10 +35,11 @@ export const PI_WORKBENCH_GROUPS: Record<string, PiWorkbenchAction[]> = {
   ],
   '模型与上下文 / Model': [
     { id: 'get_available_models', label: '模型目录 / Models' },
+    { id: 'get_available_thinking_levels', label: '可用思考等级 / Available thinking levels' },
     { id: 'set_model', label: '选择模型 / Select model', fields: [provider, { key: 'modelId', label: '精确模型 ID / Exact model ID' }] },
     { id: 'cycle_model', label: '下一个限定模型 / Cycle model' },
     { id: 'set_scoped_models', label: '限定模型循环 / Scoped models', fields: [{ key: 'models', label: '模型引用数组 [{provider,model}] / Model references', kind: 'json' }] },
-    { id: 'set_thinking_level', label: '思考等级 / Thinking', fields: [{ key: 'level', label: '等级 / Level', options: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'] }] },
+    { id: 'set_thinking_level', label: '思考等级 / Thinking', fields: [{ key: 'level', label: '等级 / Level', options: [] }] },
     { id: 'cycle_thinking_level', label: '下一个思考等级 / Cycle thinking' },
     { id: 'get_session_stats', label: '实际费用和上下文 / Usage and cost' },
     { id: 'compact', label: '压缩上下文 / Compact', fields: [{ key: 'customInstructions', label: '保留内容要求 / Instructions' }] },

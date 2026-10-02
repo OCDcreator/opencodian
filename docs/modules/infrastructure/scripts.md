@@ -53,6 +53,16 @@ Actions 与本地共用的 fail-closed 打包器。它只接受仓库根目录�
 
 该脚本不把 `dist/assets/` 或平台相关 `dist/node_modules/` 混入 Obsidian 社区插件三件套；完整 Test Vault runtime 部署仍遵循仓库已有的宿主相关部署规则。
 
+### audit/backend-integration-baseline.mjs — 六后端验收基线
+
+只读取当前锁文件、四个已安装 SDK 的 package metadata、源码摘要和六后端实施方案的 canonical case 表。通过显式 `--output <evidence-directory>` 生成 `manifest.json`、`feature-ledger.json`、`cases.json`、`profiles.json` 和 `coverage.json`；已有证据使用 exclusive write 拒绝覆盖。
+
+目录覆盖 OpenCode 1/2、Codex、Claude Code、Pi、ZCode 的 17 个运行 profile，逐 feature 保存 backend/profile/platform、contractVersion、待验收三轴与 case IDs。依赖不匹配时 nativeReadiness 为 blocked；SDK 一致时仍为 unverified。脚本不启动 CLI/模型、不读取或写入用户配置，不把依赖成功映射成 native/UI/release pass。SDK version 与 runtimeVersion 分开，后者等待真实握手。
+
+执行：`node scripts/audit/backend-integration-baseline.mjs --output <非同步证据目录>`。独立回归：`node --test scripts/audit/backend-integration-baseline.test.mjs`；`tests/unit/infrastructure/backend-integration-baseline.test.mjs` 把同一契约回归纳入默认 Jest/verify。重复 case、缺少引用 case、缺依赖、空依赖与错误参数均按失败处理。
+
+该入口是 T00/T01 的证据基线，不表示 Capability Lab 已完成逐子功能目录接入，也不替代 L1–L5 执行报告。
+
 ### doctor-esbuild.mjs — 平台检查
 
 检测当前平台（`process.platform-process.arch`）对应的 `@esbuild/*` 包是否已安装：

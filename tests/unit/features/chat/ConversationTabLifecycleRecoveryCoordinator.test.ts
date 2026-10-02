@@ -161,6 +161,66 @@ describe('ConversationTabLifecycleRecoveryCoordinator', () => {
     expect(port.createConversationInNewTab).not.toHaveBeenCalled();
   });
 
+});
+
+describe('ConversationTabLifecycleRecoveryCoordinator deletion results', () => {
+  it('retains a pending conversation tab/pane and recovers only after retry completes', async () => {
+    const tabManager = new TabManager('New chat', { getMaxTabs: () => 4 });
+    const retainedTab = tabManager.createTab(createConversation('pending'))!;
+    const pending = new Error('Codex deletion pending (admitted); retained');
+    const host = createHost({
+      getTabManager: jest.fn(() => tabManager),
+      deleteConversation: jest.fn().mockRejectedValue(pending),
+    });
+    const port = createPort();
+    const coordinator = new ConversationTabLifecycleRecoveryCoordinator(host, port);
+    await expect(coordinator.deleteConversationsAndRecover(['pending'])).rejects.toBe(pending);
+    expect(tabManager.getTab(retainedTab.id)?.conversationId).toBe('pending');
+    expect(tabManager.getActiveTab()?.id).toBe(retainedTab.id);
+    expect(host.removeTabMessagesPane).not.toHaveBeenCalled();
+    expect(host.cancelOpenCodeDiagnosticCapture).not.toHaveBeenCalled();
+    expect(port.createConversationInNewTab).not.toHaveBeenCalled();
+    host.deleteConversation.mockResolvedValue(undefined);
+    await coordinator.deleteConversationsAndRecover(['pending']);
+    expect(host.removeTabMessagesPane).toHaveBeenCalledWith(retainedTab.id);
+    expect(port.createConversationInNewTab).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['selected', 'all'])('closes only completed tabs for partial %s deletion, keeping failed and pending tabs retryable', async (mode) => {
+    const tabManager = new TabManager('New chat', { getMaxTabs: () => 4 });
+    const first = tabManager.createTab(createConversation('verified-first'))!;
+    const failed = tabManager.createTab(createConversation('failed'))!;
+    const last = tabManager.createTab(createConversation('verified-last'))!;
+    const pending = tabManager.createTab(createConversation('pending'))!;
+    const host = createHost({
+      getTabManager: jest.fn(() => tabManager),
+      deleteConversation: jest.fn(async (id: string) => {
+        if (id === 'failed') throw new Error('native refused');
+        if (id === 'pending') throw new Error('Codex deletion pending (admitted); retained');
+      }),
+    });
+    const port = createPort();
+    const coordinator = new ConversationTabLifecycleRecoveryCoordinator(host, port);
+    const ids = ['verified-first', 'failed', 'verified-last', 'pending', 'failed'];
+    const run = () => mode === 'all' ? coordinator.deleteAllConversationsAndReset(ids) : coordinator.deleteConversationsAndRecover(ids);
+    await expect(run()).rejects.toMatchObject({
+      errors: [expect.objectContaining({ message: 'native refused' }), expect.objectContaining({ message: expect.stringContaining('pending (admitted)') })],
+    });
+    expect(host.deleteConversation).toHaveBeenCalledTimes(4);
+    expect(tabManager.getAllTabs().map((tab) => tab.id)).toEqual([failed.id, pending.id]);
+    expect(tabManager.getActiveTab()?.id).toBe(pending.id);
+    expect(host.removeTabMessagesPane.mock.calls.map(([id]) => id)).toEqual([first.id, last.id]);
+    expect(host.cancelOpenCodeDiagnosticCapture).not.toHaveBeenCalledWith(failed.id);
+    expect(host.cancelOpenCodeDiagnosticCapture).not.toHaveBeenCalledWith(pending.id);
+    expect(host.clearTabMessagesPanes).not.toHaveBeenCalled();
+    expect(host.resetTabManager).not.toHaveBeenCalled();
+    expect(port.createConversationInNewTab).not.toHaveBeenCalled();
+    host.deleteConversation.mockResolvedValue(undefined);
+    await coordinator.deleteConversationsAndRecover(['failed', 'pending']);
+    expect(tabManager.getTabCount()).toBe(0);
+    expect(port.createConversationInNewTab).toHaveBeenCalledTimes(1);
+  });
+
   it('uses the noticed new-tab path when deletion closes every tab', async () => {
     const tabManager = new TabManager('New chat', {
       getMaxTabs: () => 4,

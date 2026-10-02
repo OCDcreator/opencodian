@@ -10,10 +10,12 @@
   - 按 `src/**/*.ts` 映射的模块文档入口。代码行为变更时，优先更新这里。
 - `status/`
   - 当前 rollout、迁移状态和手工验收清单。
+  - 六后端接入审查见 [backend-integration-review-2026-10-02.md](status/backend-integration-review-2026-10-02.md)，后续实施与验证见 [backend-integration-implementation-2026-10-02.md](status/backend-integration-implementation-2026-10-02.md)。
   - 后续开发可维护性准入规则见 `status/development-maintainability-rules.md`。
   - 历史可维护性 phase/autopilot/checkpoint 文档已归档到 `docs/archive/maintainability/`（见 `archive/maintainability/index.md`），不在默认阅读链中；当前架构路线以 `superpowers/plans/2026-07-30-agent-friendly-architecture-and-governance-refactor.md` 为准。
 - `requirements/`
   - 仍有维护价值的功能需求、实现状态和产品约束说明。
+  - 六后端完善接入与测试方案见 [backend-integration-completion-plan-2026-10-02.md](requirements/backend-integration-completion-plan-2026-10-02.md)。
   - 当前维护期的项目级开发基线见 `requirements/maintenance-development-baseline.md`，应与 `status/development-maintainability-rules.md` 一起阅读。
 - `reference/`
   - 外部资料或文档快照，作为项目内参考，不直接代表当前实现。
@@ -51,3 +53,5 @@
 这些归档文档**不在默认 agent 阅读链中**；当前唯一的架构路线图是 `docs/superpowers/plans/2026-07-30-agent-friendly-architecture-and-governance-refactor.md`，配合 `docs/architecture/README.md`。
 
 注：`docs/superpowers/` 目录仍然存在，存放当前活跃 plan 与 specs（早期文档曾误称其已删除，现更正）。
+
+- [六后端接入 Mac 续做交接](status/backend-integration-mac-continuation-2026-10-02.md)：最终门禁、真实加载、尚待实机验收与可复制提示词。

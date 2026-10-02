@@ -1,5 +1,7 @@
 # ZCodeAdapter
 
+> 2026-10-02 T09：增加 `getManagementCatalog` / `setManagedPluginEnabled`，将当前 owned transport 与 workspace 绑定到 ZCodeManagementService。管理读取不隐式 start/session/create/send；断开和无 workspace 时 unavailable；停止/更换 transport 后旧异步响应拒绝。只增加 ZCode 管理接口，不更改 main/chat 消费者。项目插件保存通过 shared revision/archive secure-write，独立 hooks/MCP mutation 不可用；详见 [ZCodeManagementService](ZCodeManagementService.md)。
+
 > 2026-09-26（原生斜杠发送边界）：`sendMessage` 将 `/goal`、`/compact`、`/plan` 的控制请求与普通模型发送分开。目标写入经同会话 `session/read.projection.target` 确认；有 `targetId` 的目标执行只消费对应真实回合，跳过无正文控制回合。压缩仅在原生终态及会话读回确认后返回成功；Plan 通过独立原生计划状态读回确认，空任务不发送空模型提示。控制分支和事件流拆成 adapter 内部方法，以保持发送入口的复杂度门禁，不增加跨模块转发层。
 > 2026-09-26（原生斜杠执行）：普通 ZCode 斜杠输入不再被 OpenCode 命令执行器消费。适配器把 `/goal` 映射到官方 `session/goal` 并按同会话 target ID/目标文本读回；目标的空 `controlOnly` 回合不作为响应结束，等待同 targetId 的真实执行轮。`/compact` 使用已有原生操作终态验证；`/plan` 使用独立计划状态读回。`/init` 及自定义命令继续交由 ZCode 自己的原生 prompt resolver。详情见 `.visual-evidence/zcode-continued/final-aggregate-2026-09-26.md`。
 > 2026-09-26（源码 CLI 与桌面索引组合）：本地源码 `zcode.cjs` 覆盖仅用于 app-server 的新增原生接口；会话列表软删除筛选及删除仍通过单独定位的已安装官方桌面包 `TaskIndexRepo` 执行。此前把 CLI 覆盖路径交给桌面索引桥，导致 `listSessions()` 报“requires the official bundled runtime”，可见后端会话浏览器为空。现分别解析两个入口，维持索引包身份与双 ID 读回门禁；缺官方桌面索引时不伪造删除。

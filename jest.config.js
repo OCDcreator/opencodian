@@ -26,7 +26,9 @@ module.exports = {
       displayName: 'unit',
       roots: ['<rootDir>/src', '<rootDir>/tests'],
       testEnvironment: 'jsdom',
-      testMatch: ['<rootDir>/tests/unit/**/*.test.ts'],
+      // Keep discovery independent of dot-prefixed worktree ancestors (.codex).
+      // roots still confines discovery to this checkout's source/tests directories.
+      testMatch: ['**/tests/unit/**/*.test.ts'],
       testTimeout: TEST_TIMEOUT_MS,
       modulePathIgnorePatterns: ['<rootDir>/reference-projects/'],
       testPathIgnorePatterns: ['<rootDir>/reference-projects/'],
@@ -47,7 +49,7 @@ module.exports = {
       displayName: 'integration',
       roots: ['<rootDir>/src', '<rootDir>/tests'],
       testEnvironment: 'node',
-      testMatch: ['<rootDir>/tests/integration/**/*.test.ts'],
+      testMatch: ['**/tests/integration/**/*.test.ts'],
       testTimeout: TEST_TIMEOUT_MS,
       modulePathIgnorePatterns: ['<rootDir>/reference-projects/'],
       testPathIgnorePatterns: ['<rootDir>/reference-projects/'],
@@ -65,7 +67,7 @@ module.exports = {
       displayName: 'scripts',
       roots: ['<rootDir>/tests'],
       testEnvironment: 'node',
-      testMatch: ['<rootDir>/tests/unit/infrastructure/**/*.test.mjs'],
+      testMatch: ['**/tests/unit/infrastructure/**/*.test.mjs'],
       testTimeout: TEST_TIMEOUT_MS,
       transform: {},
       moduleFileExtensions: ['js', 'mjs', 'json'],

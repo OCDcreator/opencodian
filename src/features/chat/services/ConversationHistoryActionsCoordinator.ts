@@ -18,6 +18,8 @@ export interface ConversationHistoryActionsHost {
   updateConversationTitle(conversationId: string, title: string): Promise<void>;
   deleteConversationsAndCleanupTabs(conversationIds: string[]): Promise<void>;
   deleteAllConversationsAndReset(conversationIds: string[]): Promise<void>;
+  /** Explicit Codex local cleanup; preserves native history. */
+  forgetConversationsAndCleanupTabs?(conversationIds: string[]): Promise<void>;
   /** advantage-parity R-D1: export the conversation to a vault Markdown note. */
   exportConversationMarkdown?(conversationId: string): Promise<void>;
   showNotice(message: string): void;
@@ -67,6 +69,7 @@ export class ConversationHistoryActionsCoordinator {
     }
 
     let updateDeleteActionText: (() => void) | null = null;
+    let updateForgetActionState: (() => void) | null = null;
 
     for (const conversation of conversations) {
       const isActive = currentConversationId === conversation.id;
@@ -101,6 +104,7 @@ export class ConversationHistoryActionsCoordinator {
           selectedConversationIds.delete(conversation.id);
         }
         updateDeleteActionText?.();
+        updateForgetActionState?.();
       });
 
       const iconEl = itemEl.createSpan({ cls: 'opencodian-history-item-icon' });
@@ -260,6 +264,37 @@ export class ConversationHistoryActionsCoordinator {
       });
     }
 
+    if (this.host.forgetConversationsAndCleanupTabs && conversations.some((item) => item.backend === 'codex')) {
+      const forgetEl = actionsEl.createEl('button', {
+        cls: 'opencodian-history-action',
+        text: this.forgetPending ? t('chat.history.forgetLocalPending') : t('chat.history.forgetLocal'),
+        attr: {
+          type: 'button',
+          'data-codex-forget-local': 'true',
+          'aria-busy': String(this.forgetPending),
+          title: t('chat.forgetLocalConfirm.emphasis'),
+        },
+      });
+      const targetIds = () => selectedConversationIds.size > 0
+        ? Array.from(selectedConversationIds)
+        : currentConversationId ? [currentConversationId] : [];
+      updateForgetActionState = () => {
+        const ids = targetIds();
+        const eligible = ids.length > 0
+          && ids.every((id) => conversations.find((item) => item.id === id)?.backend === 'codex');
+        forgetEl.disabled = this.forgetPending || !eligible;
+        forgetEl.setAttribute('aria-disabled', String(forgetEl.disabled));
+      };
+      updateForgetActionState();
+      forgetEl.addEventListener('click', (innerEvent) => {
+        innerEvent.stopPropagation();
+        if (forgetEl.disabled) return;
+        const ids = targetIds();
+        this.closeHistoryDropdown();
+        void this.forgetConversations(ids);
+      });
+    }
+
     document.body.appendChild(this.historyDropdownEl);
     this.historyDropdownEl.style.position = 'fixed';
     this.historyDropdownEl.style.top = '0';
@@ -333,8 +368,12 @@ export class ConversationHistoryActionsCoordinator {
       return;
     }
 
-    await this.host.deleteConversationsAndCleanupTabs([currentConversation.id]);
-    this.host.showNotice(t('chat.deleteCurrentConfirm.success') || 'Conversation deleted');
+    try {
+      await this.host.deleteConversationsAndCleanupTabs([currentConversation.id]);
+      this.host.showNotice(t('chat.deleteCurrentConfirm.success') || 'Conversation deleted');
+    } catch (error) {
+      this.showDeletionIncomplete(error);
+    }
   }
 
   private async deleteSelectedConversations(conversationIds: string[]): Promise<void> {
@@ -350,10 +389,14 @@ export class ConversationHistoryActionsCoordinator {
       return;
     }
 
-    await this.host.deleteConversationsAndCleanupTabs(uniqueConversationIds);
-    this.host.showNotice(
-      t('chat.deleteSelectedConfirm.success') || 'Selected conversations deleted',
-    );
+    try {
+      await this.host.deleteConversationsAndCleanupTabs(uniqueConversationIds);
+      this.host.showNotice(
+        t('chat.deleteSelectedConfirm.success') || 'Selected conversations deleted',
+      );
+    } catch (error) {
+      this.showDeletionIncomplete(error);
+    }
   }
 
   private async deleteAllConversations(): Promise<void> {
@@ -367,10 +410,41 @@ export class ConversationHistoryActionsCoordinator {
       return;
     }
 
-    await this.host.deleteAllConversationsAndReset(
-      conversations.map((conversation) => conversation.id),
-    );
-    this.host.showNotice(t('chat.deleteAllConfirm.success') || 'All conversations deleted');
+    try {
+      await this.host.deleteAllConversationsAndReset(
+        conversations.map((conversation) => conversation.id),
+      );
+      this.host.showNotice(t('chat.deleteAllConfirm.success') || 'All conversations deleted');
+    } catch (error) {
+      this.showDeletionIncomplete(error);
+    }
+  }
+
+  private showDeletionIncomplete(error: unknown): void {
+    this.host.showNotice(error instanceof Error ? error.message : 'Conversation deletion incomplete; retained conversations can be retried.');
+  }
+
+  private forgetPending = false;
+
+  private async forgetConversations(conversationIds: string[]): Promise<void> {
+    if (this.forgetPending || !this.host.forgetConversationsAndCleanupTabs) return;
+    const ids = Array.from(new Set(conversationIds));
+    const conversations = this.host.getConversations();
+    if (ids.length === 0 || ids.some((id) => conversations.find((item) => item.id === id)?.backend !== 'codex')) return;
+    if (this.host.isActiveTabStreaming()) {
+      this.host.showNotice(t('chat.tab.streamingBlocked'));
+      return;
+    }
+    this.forgetPending = true;
+    try {
+      if (!await this.dialogService.showForgetLocalConfirmDialog(ids.length)) return;
+      await this.host.forgetConversationsAndCleanupTabs(ids);
+      this.host.showNotice(t('chat.forgetLocalConfirm.success'));
+    } catch (error) {
+      this.host.showNotice(error instanceof Error ? error.message : t('chat.forgetLocalConfirm.failed'));
+    } finally {
+      this.forgetPending = false;
+    }
   }
 
   private async renameConversation(conversationId: string): Promise<void> {

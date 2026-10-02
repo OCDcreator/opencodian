@@ -130,7 +130,7 @@ interface ManagedServerState {
 
 这组类型把 canonical `session/message/part` truth layer 的结构统一收在 `types.ts`：
 
-- `OpenCodeCanonicalMessageInfo` / `OpenCodeCanonicalPart` 目前直接对齐 `OpenCodeSessionLifecycleCoordinator` 的 `Message` / `Part`
+- `Message` / `Part` / `SessionMessage` 的原始定义由本类型 owner 持有；`OpenCodeCanonicalMessageInfo` / `OpenCodeCanonicalPart` 直接对齐它们。Lifecycle 保留 type re-export 兼容原导入路径。
 - `OpenCodeSessionMessageWithParts` 对齐 authoritative snapshot 的 `{ info, parts[] }`
 - `OpenCodeCanonicalSessionState` 则定义单个 session 的 message 列表与 `partsByMessageID`
 
@@ -177,3 +177,7 @@ settings/chat types -> core/opencode/types.ts -> OpenCodeService / ServerManager
 - `QueryOptions.externalContextPaths` 仍在类型里，但 `OpenCodeContextPartSerializer.buildPromptRequestParts()` 当前会忽略它。
 - `reasoningEffort` / `thinkingBudget` 的实际下发方式由 `OpenCodeService` 决定，不由此文件约束。
 - `ServerStatus` 在 `ServerManager.ts` 里也定义了一份同形联合类型；修改状态集合时需要同步。
+
+### 2026-10-02 T10 cycle fix
+
+`OpenCodeSessionSnapshotToken` and the unchanged `Message`, `Part`, `SessionMessage` definitions live in this existing contract owner. Snapshot consumers use type-only imports. Removing the former types-to-lifecycle import prevents the request-token seam from creating a lifecycle/state-store/transformer SCC. This module contains no new runtime code; token semantics and message fields are unchanged.

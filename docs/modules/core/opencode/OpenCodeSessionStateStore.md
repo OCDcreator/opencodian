@@ -44,13 +44,15 @@
 1. 用当前 session 的 authoritative 消息数组重建 state
 2. 补齐缺失的 `sessionID` / `messageID`
 3. 保留 authoritative message 顺序，并继续按 `id` 稳定排序 part
-4. 丢弃旧 snapshot 中已经不存在的 message/part
+4. 有读取 token 时，按请求开始 revision 合并等待期间的 message/part 更新、delta 和删除，再按合并结果判断 authoritative omission
+5. 丢弃请求开始之前已存在、且读取期间没有新事件的缺失 message/part；为其保留 stream retraction barrier
+6. 较旧请求晚于已提交的新请求完成时返回当前 clone；session eviction 后的旧 token 不得重建 session
 
 ### Incremental mutation
 
 - `upsertMessage()`：按 `message.id` 写入或更新 message
 - `upsertPart()`：按 `messageID + part.id` 写入或更新 part
-- `removeMessage()`：删除 message 并一并清掉其 parts
+- `removeMessage()`：删除 message 并清掉其 parts，同时为已有 part ID 分别记录 barrier；后续 message-only restore 不解除 part barrier
 - `removePart()`：删除指定 part；最后一个 part 删除后清掉对应 message bucket
 - `appendPartDelta()`：把 `delta` 追加到现有字符串字段，供后续 sync-event / streaming reducer 复用
 - `applyStreamMutations()`：按 `OpenCodeStreamEventTransformer` 产出的 mutation 顺序应用 stream message/part upsert、nested part merge、part delta 与 delta-first fallback part 补建
@@ -63,7 +65,8 @@
 
 | 方法 / 导出 | 说明 |
 |-------------|------|
-| `replaceSessionSnapshot()` | 用 authoritative `{info, parts[]}` 快照重建 canonical session graph |
+| `beginSessionSnapshot()` | 在每次异步请求前捕获 session owner、revision 和请求序号 |
+| `replaceSessionSnapshot()` | 重建快照并合并读取期间 mutation；返回合并后的 clone |
 | `upsertMessage()` | 写入或覆盖单条 message info |
 | `removeMessage()` | 删除 message 并清理关联 parts |
 | `upsertPart()` | 写入或覆盖单条 message part |
@@ -104,3 +107,15 @@ graph TD
 - message 顺序必须保留 authoritative snapshot / 增量 mutation 的原始会话顺序，不能再把 `id` 当成时间代理；本地 user message 已经可能使用随机 UUID 风格 `msg_*`，而 assistant message 仍可能来自单调 id 空间，按 `id` 排序会把旧 assistant 错挂到后续 user turn 后面。
 - part 目前仍按 `id` 稳定排序；若未来 part 也引入独立显式顺序字段，应该在这里统一调整。
 - `deleteSession()` 只清理本地 canonical graph；服务端删除仍由 OpenCodeSessionLifecycleCoordinator / OpenCodeService.deleteSession() 发起。
+
+### 2026-10-02 T10 authoritative retraction regression
+
+Authoritative message/part removal and omission from a replacement snapshot record session-local stream retraction barriers. `applyStreamMutations()` rejects delayed foreground upserts and delta-first fallback for those IDs. Authoritative upserts or snapshots can explicitly restore an ID; newly generated IDs remain accepted. Barriers survive snapshot replacement and belong weakly to the internal session state, so eviction releases them without changing the public canonical schema. This store owns backend messages only; immutable plugin-owned Turn Change Records remain in the chat owner under ADR 0002. Focused regression: `OpenCodeSessionStateStore.t10.test.ts`.
+
+### 2026-10-02 T10 review fix: delayed snapshots
+
+Lifecycle captures `beginSessionSnapshot()` before each SDK or HTTP request, including fallback, and retains the token through revert filtering. Message and part writes/removals/deltas record revisions. Snapshot commit preserves changes newer than the token; concurrent real removals still defeat stale restoration. Request order prevents an older response from replacing a newer committed snapshot. State-owned token identity prevents evicted-session resurrection. Synchronous replacement without a token remains authoritative. Dedicated regressions: `OpenCodeService.snapshotRace.t10.test.ts` and `OpenCodeSessionStateStore.snapshotRace.t10.test.ts`.
+
+### 2026-10-02 T10 cycle fix
+
+The snapshot token definition moved to `./types`; the store consumes it through its existing type-only import. Revision tracking, merge behavior, retraction barriers and runtime ownership are unchanged. This avoids making lifecycle consumers depend on this reducer implementation for a shared contract.

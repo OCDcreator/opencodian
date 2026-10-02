@@ -16,7 +16,7 @@ const mockResumeThread = jest.fn();
 const mockStartTurn = jest.fn();
 let mockClient: {
   start: jest.Mock; stop: jest.Mock; startThread: jest.Mock; resumeThread: jest.Mock;
-  startTurn: jest.Mock; interruptTurn: jest.Mock; subscribeToThreadNotifications: jest.Mock;
+  startTurn: jest.Mock; interruptTurn: jest.Mock; deleteThread: jest.Mock; deleteThreadResult: jest.Mock; subscribeToThreadNotifications: jest.Mock;
   registerServerRequestHandler: jest.Mock; unregisterServerRequestHandler: jest.Mock;
   getThreadEffectiveSettings: jest.Mock; clearThreadEffectiveSettings: jest.Mock;
 };
@@ -34,6 +34,8 @@ jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => {
         resumeThread: mockResumeThread,
         startTurn: mockStartTurn,
         interruptTurn: jest.fn(),
+        deleteThread: jest.fn().mockResolvedValue(true),
+        deleteThreadResult: jest.fn(async (threadId: string) => ({ operation: 'delete', threadId, status: 'verified', readback: { status: 'verified' } })),
         subscribeToThreadNotifications: jest.fn((_threadId: string, handler: typeof notificationHandler) => {
           notificationHandler = handler;
           return { dispose: jest.fn() };

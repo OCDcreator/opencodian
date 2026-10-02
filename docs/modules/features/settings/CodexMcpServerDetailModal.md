@@ -189,3 +189,7 @@ MCP 服务器详情弹窗改为默认折叠每个 server section，只露出固�
 - 刷新按钮归入 `.opencodian-codex-mcp-detail-toolbar.opencodian-inspection-summary-actions`。
 - 工具条目改用 `.opencodian-inspection-row` 结构，schema 切换按钮使用 `.opencodian-inspection-detail-toggle`。
 - schema 可见性通过 `.opencodian-codex-mcp-tool-schema.is-hidden` 类切换，不再使用内联 `display:none`。
+
+## 2026-10-02 Codex local forget / complete catalog UI
+
+共享 host factory 转发 getMcpServerStatusCatalog，settings/chat 同时可达；loadAndRender 优先结构化结果，旧 getMcpServerStatus 数组兼容。partial 保留 server sections 与原生 data-mcp-server-name，并通过 typed `settings.codex.readback.statusPartial`（count）/`messagePartialReload` 展示部分目录提示；英中正式 UI 测试覆盖 settings/chat 入口和第二页失败后的 server identity 保留；加载徽章具 aria-live/aria-busy。打开 inspection 本身只调用 mcpServerStatus/list；既有 Reload/OAuth/resource 操作仍是用户显式动作。

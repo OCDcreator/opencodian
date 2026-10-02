@@ -172,3 +172,7 @@ export class ConversationLoadRecoveryCoordinator {
 ## 2026-09-27 OpenCode 2 compatibility
 
 OpenCode 2 native session IDs may enter the existing rewind and restore actions through the selected backend branch capability.
+
+## 2026-10-02 Codex local forget / complete catalog UI
+
+新增 forgetConversationsAndRecover 转发及 assembly port 接线至既有 ConversationTabLifecycleRecoveryCoordinator。缺失 port fail-closed；不借 native delete fallback。

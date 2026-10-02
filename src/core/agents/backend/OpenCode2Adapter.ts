@@ -726,7 +726,7 @@ export class OpenCode2Adapter implements AgentService, AgentChatCapability, Agen
     const seenCursors = new Set<string>();
     let cursor: string | undefined;
     do {
-      const page = await client.message.list({ sessionID: sessionId, limit: 100, order: 'asc', ...(cursor ? { cursor } : {}) });
+      const page = await client.message.list({ sessionID: sessionId, limit: 100, ...(cursor ? { cursor } : { order: 'asc' as const }) });
       messages.push(...page.data);
       const next = page.cursor.next ?? undefined;
       if (page.data.length < 100 || !next || seenCursors.has(next)) break;

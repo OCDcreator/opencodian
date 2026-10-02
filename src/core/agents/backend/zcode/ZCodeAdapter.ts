@@ -5,8 +5,9 @@
  * runtime (`app-server --stdio` structured protocol).
  *
  * This adapter owns exactly one child process per start; it never touches the
- * already-open ZCode desktop UI, never parses terminal prose, and never
- * mutates the user's ZCode configuration. Capability negotiation happens
+ * already-open ZCode desktop UI or parses terminal prose. Global provider
+ * configuration stays read-only; project plugin overrides use the separate
+ * revision/archive guarded management owner. Capability negotiation happens
  * over the official `runtime/capabilities` request; anything the runtime does
  * not report stays `null` (unavailable) instead of being fabricated. Chat
  * sends map `session/event` deltas through `ZCodeStreamMapper`; cancellation
@@ -44,6 +45,7 @@ import type {
   Disposable,
   StatusChangeHandler,
 } from '../AgentService';
+import type { FileRevision } from '../ProjectResourceSecureWrite';
 import {
   normalizeZCodeHandshakeFailure,
   ZCodeAppServerTransport,
@@ -58,6 +60,7 @@ import {
   ZCodeInteractionBridge,
   type ZCodeInteractionReply,
 } from './ZCodeInteractionBridge';
+import { type ZCodeManagementCatalog, type ZCodeManagementMutationResult, ZCodeManagementService } from './ZCodeManagementService';
 import {
   parseZCodeDefaultModel,
   type ZCodeModelCatalog,
@@ -282,6 +285,32 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
 
   /** Honest state snapshot for settings/diagnostics surfaces. */
   getRuntimeDiagnostics(): ZCodeAdapterRuntimeDiagnostics { return { resolution: this.resolution, providerConfig: this.providerConfig, handshake: this.handshake, capabilities: this.capabilitiesReadback, lastError: this.lastError, protocolVersion: this.protocolVersion }; }
+
+  /** Catalog queries use the current transport without starting a session or model. */
+  async getManagementCatalog(): Promise<ZCodeManagementCatalog | null> {
+    return this.createManagementService()?.readCatalog() ?? null;
+  }
+
+  async setManagedPluginEnabled(pluginId: string, enabled: boolean, expectedRevision: FileRevision | null): Promise<ZCodeManagementMutationResult> {
+    const service = this.createManagementService();
+    return service ? service.setPluginEnabled(pluginId, enabled, expectedRevision) : {
+      status: 'unavailable', evidence: { persistence: 'unavailable', application: 'unavailable', runtime: 'unavailable' },
+    };
+  }
+
+  private createManagementService(): ZCodeManagementService | null {
+    if (!this.options.workingDirectory) return null;
+    const transport = this.handshake === 'ready' ? this.transport : null;
+    return new ZCodeManagementService({
+      workingDirectory: this.options.workingDirectory,
+      request: transport ? async (method, params) => {
+        if (this.transport !== transport) throw new ZCodeTransportError('transport-closed', 'ZCode management transport changed.');
+        const result = await transport.request(method, params);
+        if (this.transport !== transport) throw new ZCodeTransportError('transport-closed', 'ZCode management transport changed.');
+        return result;
+      } : null,
+    });
+  }
 
   /**
    * Discover the runtime, inject the provider configuration the official

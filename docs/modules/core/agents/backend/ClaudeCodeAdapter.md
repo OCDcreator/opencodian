@@ -145,3 +145,68 @@ Claude Code 现在声明 `AgentCapability.Images`，因此共享 composer 会显
 > 2026-09-18 (R-C3)：实现 `AgentInlineCompletionCapability`——`startInlineCompletionSession()` 复用 `startAuxQuerySession()` 的同一套只读机制（tools 白名单 + strictMcpConfig + canUseTool + system/init 读回），经 `WarmInlineCompletionSession` 包装为可复用会话，turn 超时 4s；`CLAUDE_CODE_PHASE1_CAPABILITIES` 增加 `AgentCapability.InlineCompletion`。
 
 - 2026-09-18 (attached-context parity)：`sendMessage` 现在以 `appendObsidianContextBlocks` 把 `options.contextItems` 渲染成 `<obsidian_context>` 块追加到消息文本末尾（与 OpenCode/Pi 相同的共享序列化器），修复上下文附件在此后端被静默丢弃的缺陷。顺序为 [tooling][memory]（每 epoch 前缀）→ 用户文本 → 上下文块（每轮），逐轮内容绝不进入每 epoch 稳定缓存前缀。快照缺失的本地文件条目渲染为路径引用标签，由 CLI 以自身文件工具读取（与 folder 条目同一 R-A7 契约，CLI cwd = vault）。
+
+## 2026-10-02 T08 reviewed continuation：单 native session control 已实施
+
+用户明确授权「确认允许按上述三项范围继续 reviewed continuation，并继续由子代理实施。」后，本 slice 在既有 `ClaudeCodeAdapter` 增加 `setMcpPermissionModeOverride`、`reloadOutputStyles` 和私有 `getActiveSessionControlTarget`，以及四个 Claude 专属 type imports。此前未应用的设计 diff 由本节实施说明替换。未修改 UI、其它后端、共享 routing、owner overview 或总方案。
+
+### 固定官方 source 与权限边界
+
+- `@anthropic-ai/claude-agent-sdk@0.3.283/sdk.d.ts:2865–2883`：`setMcpPermissionModeOverride(serverName: string, mode: 'default' | 'auto' | null): Promise<{ warning?: string }>`；streaming input only、tighten-only。override 仅在 session mode 本已 auto-allow（bypassPermissions/auto）时生效；default 强制逐动作问询，auto 经 classifier，null 清除 override。adapter 同时在类型与运行时拒绝其它 mode，不改变 session permission mode。名称必须原样匹配 MCP 注册名：只检查是否空白，发送时不 trim/改名。
+- 同一声明 `sdk.d.ts:3096–3105,4842–4847`：`reloadOutputStyles(): Promise<SDKControlReloadOutputStylesResponse>`，结果 `{ available_output_styles: string[] }`。重新读取目录、刷新 markdown scan cache；名称顺序沿用 SDK 回执。官方参考 `https://code.claude.com/docs/en/agent-sdk/typescript.md` 列出该签名、返回值及 SDK 0.3.261 起可用；页面未列出 MCP override，其精确依据仍是固定官方包声明。
+- MCP warning 是信息：未知 server 的 set 仍可储存，将来同名连接时生效。保留 warning 原字符串，但 ACK 不证明该 server 已连接或权限已有效回读。reload 只刷新可用样式名称，不选择样式，不证明当前 system prompt 或模型输出应用了它。
+
+### 实施 API、结果与生命周期边界
+
+| API / 状态 | 实际行为 |
+| --- | --- |
+| `setMcpPermissionModeOverride(nativeSessionId, serverName, mode)` | 在输入合法时，仅调用指定 native session 既有 query 的对应方法一次；三个合法 mode 原样透传 |
+| `reloadOutputStyles(nativeSessionId)` | 仅调用同一 native target 的 reload 方法一次，复制回执名称数组；保留顺序、重复项和空列表 |
+| `getActiveSessionControlTarget` | 私有、无状态，读取现有 sessions map；必须 `session.sdkSessionId === nativeSessionId`，runtime/query 存在且未 closed/aborted |
+| `unavailable` | invalid-native-session-id / no-active-session / missing-method；无 native target 或无 callable control 不能 void 成功 |
+| `failed` | invalid-input / request-failed / invalid-response / session-changed；不回显捕获的原生异常文本 |
+| `acknowledged` | 必须收到符合官方 shape 的 native response，并仍绑定原 session/runtime/query；只代表 control 回执，不写 verified |
+
+拒绝 plugin-local alias、未捕获的 provisional ID、未知/过期 ID，以及带多余空白的不同 ID；不能选择任一其它活跃 query 代替。原有 map 中 local/native 两个 key 常指向同一 session state，本 slice 精确取一个 native key，因此不沿用 `applyToActiveQueries` fan-out，也不重复 dispatch。
+
+control await 完成后检查 map 仍指向原 session、sdkSessionId 仍相等、runtime/query 未被替换、runtime 未 close/abort。任一变化返回 session-changed，不将旧 ACK 绑定到 reset 后的新会话，不重试到其它 session。MCP 空对象可 ACK；undefined/null/数组/错误 warning 类型均拒绝。styles 缺数组、非字符串项和 sparse slots 均拒绝。结果只复制官方已知字段，不透传 response 附加字段；样式 names 数组与 SDK 原数组分离。
+
+不调用 query 工厂、startup、resume validation、getOrCreateRuntime、restart/close/interrupt；不写 input queue 或 settings；不新增 override map、runtime coordinator 或跨会话 ownership。control 方法的 getter、同步 throw 和 Promise reject 都由 request-failed 边界收口。
+
+### 改前 CodeGraph 与 reviewed continuation 边界
+
+- 最新改前 `codegraph status .` 显示 **up to date**：1,795 files / 32,436 nodes / 155,703 edges。
+- `query ClaudeCodeAdapter --path . --json` 唯一 class root 为 `src/core/agents/backend/ClaudeCodeAdapter.ts:1432`。
+- `callers ClaudeCodeAdapter --path . --limit 200 --json` 返回 77 rows，排除 9 个 file nodes 后 distinct function/method direct callers 为 **68**。
+- 有限 `impact ClaudeCodeAdapter --path . --depth 1 --json`：**278 nodes / 491 edges**（nodeCount 含 root）；工具未给 risk，不补造风险等级。跨至 main/chat/settings/其它后端相关模块，因此此前停止。上述明确授权覆盖本次两个 public controls、一个 private selector 和 type imports；列出的 callers 是审查范围，未授权修改其源码。
+- 三个新增方法的改前 query 均无匹配。qualified selector 的 callers/impact 曾将不存在的名字错误解析到 constructor（line 1460），该 root 不可用，未将其 empty callers / 1 node 冒充 selector 证据；此次以唯一 class 的真实图证据和限定 reviewed continuation 授权实施。
+- 证据根：`C:/Users/lt/.codex/artifacts/opencodian/backend-integration-2026-10-02/reviewed-continuation/claude/`。保留改前 raw callers、有限-depth impact、授权 scope、聚焦语义检查与测试记录。最终 CodeGraph affected 已按 diff 管道检查；统一 sync/graph freshness/verify 由主代理在 freeze 后完成，本代理不 init 或 refresh 全图。
+
+| Direct-caller 文件 | Distinct function/method 数 | 符号与改前 snapshot 行号 |
+| --- | ---: | --- |
+| `tests/unit/core/agents/backend/ClaudeCodeAdapter.trace.test.ts` | 1 | `createAdapter:126` |
+| `src/main.ts` | 1 | `handleBootstrapOpenCodeRuntime:549` |
+| `tests/unit/core/agents/backend/ClaudeCodeSmokeHarness.test.ts` | 1 | `createStartedAdapter:202` |
+| `src/features/settings/SettingsCapabilityLabSection.ts` | 62 | `getClaudeCodeAdapter:177`、`buildMatrixRows:993`、`buildCoreMatrixRows:1002`、`loadSessionMessages:2451`、`importHistorySession:2496`、`runHistoryStoreMirrorProbe:2524`、`loadStoreMirrorReadback:2572`、`loadSubagents:2703`、`loadSubagentMessages:2747`、`runRewindDryRun:2870`、`runForkDiagnostic:3051`、`resolveForkSourceSessionId:3093`、`runResumeDiagnostic:3199`、`runSessionDetailDiagnostic:3332`、`runBackendRoutingProbe:3479`、`runStructuredOutputProbe:3661`、`renderDiscoveryRows:3784`、`renderDiscoveryPluginRows:3794`、`renderDiscoveryToolRows:3843`、`renderDiscoveryStandardRows:3961`、`renderDiscoveryControls:4002`、`renderAgentDefinitionsDiscoveryRow:4217`、`runHookProof:4404`、`runSubagentStreamProof:4457`、`runFallbackModelProof:4536`、`runSetModelLiveProof:4785`、`runPermissionApprovalProof:4875`、`runAskUserQuestionProof:4964`、`runMcpElicitationLiveProbe:5459`、`runMcpElicitationProductPathProof:5535`、`runStableSettingsReadbackProof:5843`、`renderRuntimeSettingsReadback:5881`、`runEnvironmentVariablesProof:6097`、`runAgentDefinitionProof:6229`、`runAllowedToolsProof:6390`、`runRestrictedBuiltinToolsProof:6490`、`runDisallowedToolsProof:6630`、`runPluginsProof:6747`、`runCommandExecutionProof:6923`、`runWarmStartupProof:7030`、`runStderrDiagnosticProof:7090`、`runPromptSuggestionsReadbackProof:7149`、`runSystemPromptReadbackProof:7245`、`runSystemPromptLiveProof:7309`、`runTaskBudgetReadbackProof:7384`、`runSandboxReadbackProof:7473`、`runPlanModeInstructionsReadbackProof:7616`、`runPlanModeInstructionsLiveProof:7712`、`runOutputStyleLiveProof:7758`、`runToolAliasesReadbackProof:7815`、`runDebugReadbackProof:7912`、`runJsRuntimeReadbackProof:7999`、`runLoadTimeoutReadbackProof:8080`、`runDebugFileReadbackProof:8161`、`runDebugFileLiveProof:8246`、`runStrictMcpConfigReadbackProof:8332`、`runContext1mBetaReadbackProof:8391`、`runContinueProof:8450`、`runResumeSessionAtProof:8527`、`runForkSessionProof:8596`、`runSessionTitleProof:8673`、`runCustomSessionIdProof:8750` |
+| `tests/unit/core/agents/backend/ClaudeCodeAdapter.probes.test.ts` | 1 | `createMockRunDiagnosticPrompt:2401` |
+| `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` | 2 | `startRuntime:3398`、`startRuntime:3580` |
+
+### 聚焦回归与证据局限
+
+`ClaudeCodeAdapter.sessionControls.test.ts` 使用注入 SDK 与人工 active session/query，local/native alias 指向同一 state，另有独立 native-B。逐场景验证其它 session 零 dispatch，以及 query/startup/resume read、input push、close/interrupt、setPermissionMode、MCP/skills refresh 均零旁路调用。没有真实 CLI/model/用户配置。
+
+| 回归组 | 覆盖 |
+| --- | --- |
+| Native target | 空/空白/未知/padded ID、local alias、未捕获/不同 native identity、无 sessions/runtime/query、closed/aborted target |
+| Capability | 两项方法缺失及 null/true/字符串成员；可调用 receiver 保持 SDK query 的 this |
+| Input | MCP 三个合法 mode；unchecked bypassPermissions/acceptEdits/plan/undefined/boolean/number；空白及非字符串 server name |
+| Response | 两项 void/null/数组/畸形结构、warning 非字符串、names 非数组/非字符串/sparse；ACK 深度足够的 copy、字段裁剪、warning/名称顺序保留 |
+| Failure | getter throw、同步 throw、Promise reject；返回 reason，不返回 raw exception |
+| Await race | native reset、close、abort、runtime 删除/替换、query 替换、native map 删除/替换；旧 ACK 均 failed/session-changed |
+| Isolation | local/native aliases 无重复 dispatch；并发 native-A/B controls 分离；reset 后新 native ID 正常、旧 ID unavailable |
+
+`ClaudeCodeQueue.controlContracts.test.ts` 保留 9 项 source/type 契约回归与 11 条真实负向断言，显式 TypeScript noEmit 使用 strictNullChecks/noImplicitAny。另对 adapter、Queue 和两份新 control tests 执行聚焦 noEmit 语义检查；不是完整项目 typecheck。既有 `ClaudeCodeAdapter.test.ts` 一并运行，检查此次新增未破坏其生命周期/流控制行为。
+
+这些 mock 与语义测试证明插件 adapter 契约、错误处理和隔离；尚未证明外部实际 CLI 对 control 的实现、MCP 权限实际生效、样式被 prompt 使用或产品 UI 可达。ACK 不能晋升 Configuration Evidence 为 verified；没有把此 bounded slice 标成完整 T08/配置闭环或真实 runtime/UI 验收通过。
+
+本轮验证结果：上述三份聚焦 tests **3 suites / 284 tests pass**；adapter/Queue/两份 controls tests 的聚焦 ESLint **0 errors / 0 warnings**；四份文件的显式 noEmit 语义检查 **0 diagnostics**。首轮 styles fixture 将数组误作 it.each 参数行（2 tests failed）与 MCP method 复杂度 21 的 lint warning 均已修正：数据改对象包装，mode 改三值集合成员检查，未删除边界断言或放宽契约。最终 affected 是共享树传递依赖列表，不等于所有路径已测试。

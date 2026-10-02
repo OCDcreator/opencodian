@@ -1,5 +1,6 @@
 import { type App, Modal } from 'obsidian';
 
+import type { AppServerCatalogReadResult } from '../../core/agents/backend/CodexAppServerClient';
 import { t } from '../../i18n';
 
 export interface CodexReadbackModalOptions<T> {
@@ -12,11 +13,12 @@ export interface CodexReadbackModalOptions<T> {
   unavailableText: string;
   failedText: string;
   emptyText: string;
-  fetchItems: () => Promise<T[] | null>;
+  fetchItems?: () => Promise<T[] | null>;
+  fetchCatalog?: () => Promise<AppServerCatalogReadResult<T>>;
   renderItems: (container: HTMLElement, items: T[]) => void;
 }
 
-export type CodexReadbackModalState = 'loading' | 'unavailable' | 'failed' | 'empty' | 'success';
+export type CodexReadbackModalState = 'loading' | 'unavailable' | 'failed' | 'empty' | 'success' | 'partial';
 
 export class CodexReadbackModal<T> extends Modal {
   private readonly options: CodexReadbackModalOptions<T>;
@@ -68,7 +70,16 @@ export class CodexReadbackModal<T> extends Modal {
   private async load(): Promise<void> {
     this.setState('loading');
     try {
-      const items = await this.options.fetchItems();
+      if (this.options.fetchCatalog) {
+        const result = await this.options.fetchCatalog();
+        if (result.status !== 'complete') {
+          this.setState(result.status, result.data);
+          return;
+        }
+        this.setState(result.data.length === 0 ? 'empty' : 'success', result.data);
+        return;
+      }
+      const items = await this.options.fetchItems?.() ?? null;
       if (items === null) {
         this.setState('unavailable');
       } else if (items.length === 0) {
@@ -88,6 +99,9 @@ export class CodexReadbackModal<T> extends Modal {
 
     this.contentAreaEl.empty();
     this.statusValueEl.setAttribute('data-readback-state', state);
+    this.statusValueEl.setAttribute('role', 'status');
+    this.statusValueEl.setAttribute('aria-live', 'polite');
+    this.statusValueEl.setAttribute('aria-busy', String(state === 'loading'));
 
     switch (state) {
       case 'loading':
@@ -106,8 +120,12 @@ export class CodexReadbackModal<T> extends Modal {
         this.statusValueEl.setText(t('settings.codex.readback.statusEmpty'));
         this.renderStateMessage(this.options.emptyText);
         return;
+      case 'partial':
       case 'success':
-        this.statusValueEl.setText(t('settings.codex.readback.statusCount', { count: items?.length ?? 0 }));
+        this.statusValueEl.setText(state === 'partial'
+          ? t('settings.codex.readback.statusPartial', { count: items?.length ?? 0 })
+          : t('settings.codex.readback.statusCount', { count: items?.length ?? 0 }));
+        if (state === 'partial') this.renderStateMessage(t('settings.codex.readback.messagePartial'));
         if (items && items.length > 0) {
           const listEl = this.contentAreaEl.createDiv({ cls: 'opencodian-inspection-list' });
           this.options.renderItems(listEl, items);

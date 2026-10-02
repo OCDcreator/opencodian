@@ -10,6 +10,7 @@
 /* eslint-disable max-lines-per-function -- Adapter test suite keeps lifecycle, session, DI, and sendMessage tests in one cohesive describe block. */
 
 jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => ({
+  ...jest.requireActual('../../../../../src/core/agents/backend/CodexAppServerClient'),
   CodexAppServerClient: jest.fn().mockImplementation(() => ({
     start: jest.fn().mockRejectedValue(new Error('app-server disabled in SDK adapter unit tests')),
     stop: jest.fn(),
@@ -269,11 +270,10 @@ describe('CodexAdapter', () => {
       expect(ids).toContain(id2);
     });
 
-    it('updateSessionTitle is a no-op', async () => {
+    it('updateSessionTitle reports unavailable without a native app-server', async () => {
       const options = createAdapterOptions();
       const adapter = new CodexAdapter(options);
-      // Should not throw
-      await expect(adapter.updateSessionTitle('any-id', 'Title')).resolves.toBeUndefined();
+      await expect(adapter.updateSessionTitle('any-id', 'Title')).rejects.toMatchObject({ result: { operation: 'rename', status: 'unavailable' } });
     });
   });
 

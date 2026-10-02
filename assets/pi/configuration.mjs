@@ -11,7 +11,7 @@ const terminal = { scope: 'terminal' };
 export const SETTINGS_FIELDS = [
   field('defaultProvider', 'model', 'string', '默认提供商', 'Default provider'),
   field('defaultModel', 'model', 'string', '默认模型 ID', 'Default model ID'),
-  choice('defaultThinkingLevel', 'model', '默认思考等级', 'Default thinking level', ['off', 'minimal', 'low', 'medium', 'high', 'xhigh']),
+  choice('defaultThinkingLevel', 'model', '默认思考等级', 'Default thinking level', ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']),
   field('enabledModels', 'model', 'list', '模型循环范围', 'Model cycling patterns'),
   ...['minimal', 'low', 'medium', 'high'].map(level => number(`thinkingBudgets.${level}`, 'model', `${level} 思考预算`, `${level} thinking budget`)),
   flag('hideThinkingBlock', 'advanced', '隐藏思考块', 'Hide thinking blocks', terminal),
@@ -70,7 +70,7 @@ function safeKeys(value) {
     safeKeys(child);
   }
 }
-function validateSettings(value) {
+function validateSettings(value, previousValue) {
   if (!object(value)) throw new Error('Settings must be an object.');
   safeKeys(value);
   for (const spec of SETTINGS_FIELDS) {
@@ -79,7 +79,11 @@ function validateSettings(value) {
     if (spec.kind === 'boolean' && typeof current !== 'boolean') throw new Error(`${spec.path}: expected boolean.`);
     if (spec.kind === 'number' && (!Number.isInteger(current) || current < spec.min || (spec.max !== undefined && current > spec.max))) throw new Error(`${spec.path}: invalid number.`);
     if (['string', 'choice'].includes(spec.kind) && typeof current !== 'string') throw new Error(`${spec.path}: expected text.`);
-    if (spec.options && !spec.options.includes(current)) throw new Error(`${spec.path}: unsupported value.`);
+    if (spec.options && !spec.options.includes(current)) {
+      const previous = spec.path.split('.').reduce((parent, key) => parent?.[key], previousValue);
+      // Preserve only an unchanged stored enum; unsupported edits remain invalid.
+      if (current !== previous) throw new Error(`${spec.path}: unsupported value.`);
+    }
     if (spec.kind === 'list' && (!Array.isArray(current) || current.some(item => typeof item !== 'string'))) throw new Error(`${spec.path}: expected text array.`);
   }
   for (const key of ['compaction', 'branchSummary', 'retry', 'terminal', 'images', 'thinkingBudgets', 'markdown', 'warnings']) {
@@ -116,7 +120,7 @@ export function createConfigurationService(sdk, cwd, agentDir) {
       storage.withLock(scope, raw => {
         if (command.revision !== hash(raw)) throw new Error('Configuration changed on disk. Reload before saving.');
         const value = command.value === undefined ? applyChanges(parse(raw), command.changes ?? {}) : command.value;
-        validateSettings(value);
+        validateSettings(value, parse(raw));
         if (raw !== undefined) writeFileSync(`${settingsPath(scope)}.opencodian.bak`, raw, { mode: 0o600 });
         return JSON.stringify(value, null, 2) + '\n';
       });

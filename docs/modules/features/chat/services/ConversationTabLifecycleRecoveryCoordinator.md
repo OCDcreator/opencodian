@@ -53,9 +53,10 @@ export class ConversationTabLifecycleRecoveryCoordinator {
 - 普通 close 成功后，会清理对应 messages pane；若 `TabManager` 返回 `nextActiveTabId`，继续复用 `ConversationViewStateService.activateTab()`
 - 关闭最后一个 tab 时，保留原来的静默 fallback：直接创建 conversation、创建 tab、激活新 tab，不额外显示“创建成功” notice
 - 即使 `TabManager.areTabsEnabled()` 为 false，close-last-tab 也仍保留内部 fallback tab，以维持 active conversation / pane runtime 的恢复能力；禁用标签只影响外部入口与 tab bar 显示
-- `deleteConversationsAndRecover()` 会先去重并按原顺序删除 conversation，再关闭所有指向被删 conversation 的 tab
+- `deleteConversationsAndRecover()` 去重并按原顺序逐项调用 host；仅 host 成功完成的 ID 才参与 tab/pane/capture 清理。pending/failed 项保留 tab、pane 和 current conversation，其他成功项继续恢复；清理后向上抛原错误，多个失败保留 `Error.errors` 及聚合 message，不伪装整个批量成功。
 - 删除导致 tab 清空时，如果标签 UI 仍启用，继续走 `ConversationTabOpenCoordinator.createConversationInNewTab()`，保留原来的 fallback 创建 notice 与错误处理语义；如果 `TabManager.areTabsEnabled()` 为 false，则直接静默创建内部 fallback tab 并激活，避免 current conversation 存在但 per-tab runtime 缺失
-- `deleteAllConversationsAndReset()` 会先删除全部 conversation，再清空所有 tab messages pane、重建空 `TabManager`。启用标签时继续走 noticed bootstrap；禁用标签时改为静默创建内部 fallback tab，让 streaming、scroll、context usage 等 tab-scoped runtime 仍有 owner
+- `deleteAllConversationsAndReset()` 只有全部 host 删除完成才清空所有 pane、重建空 `TabManager`。部分失败时复用成功 ID 的 tab recovery，不 reset/clear 留下的失败项，然后抛错误。完整成功时启用标签仍走 noticed bootstrap，禁用标签仍静默创建内部 fallback tab。
+- 2026-10-02 reviewed continuation：host `Promise<void>` 完成对于 Codex 表示 verified native absence 或本地草稿/显式忘记；admitted 是拒绝并保留的 pending，不是完成。coordinator 不自行推断远端终态，不增加删除队列或状态 owner。专属测试及 main+Codex 联合 fixture 覆盖 single、partial selected/all、去重、失败重试、tab/cache/pane 保留。
 
 ## 与 `OpenCodianView` 的边界
 
@@ -63,3 +64,7 @@ export class ConversationTabLifecycleRecoveryCoordinator {
 - `ConversationTabLifecycleRecoveryCoordinator` 统一承接 close/delete/delete-all 后“该激活现有 tab、静默补建 fallback，还是重置 tabs 后走 noticed bootstrap”的 recovery 决策
 - 这次切口推进 master plan 的 P1 `tab / pane / conversation activation 与 sync orchestration` lane：把 tab lifecycle recovery ownership 从主 view 迁到 dedicated coordinator
 - close 或批量删除 tab 时通过可选 host callback 取消该 `tabId` 的一次性 OpenCode、Codex 或 Claude Code deep capture 武装状态；三个 callback 都经过安全边界，且该清理不影响其他标签，也不改变非相关 backend lifecycle。Claude callback 只负责取消待命 token，不触碰 trace store 或会话消息。
+
+## 2026-10-02 Codex local forget / complete catalog UI
+
+新增 forgetConversationsAndRecover 复用 successful-only tab recovery：去重 ID，阻塞拥有 foreground busy tab 的项，逐项失败保留并聚合错误；同 ID pending promise 去重，只有启动方执行 tab recovery/fallback。只有本地 commit 成功项关闭 tabs/panes，失败/pending tabs 留待重试，批量全失败不 reset。默认 native delete 行为保留。

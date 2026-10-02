@@ -20,3 +20,9 @@
 ## 完整 SDK 接入
 
 只在Pi启用preserveRequestedModel；不可用选择保留并阻止发送。模型快照保留contextWindow和reasoning variants，目录/默认值来自Pi服务。
+
+## 2026-10-02 T07 产品消费
+
+`bindPiModelSelection(host, getAdapter, getSessionId?: () => string | null | undefined)` 第三回调读取当前 Pi conversation 的 plugin-local store handle（不是 SDK UUID）。目录读取复用 typed readonly facade；levels 不再由 reasoning 布尔值推导固定枚举，max 和未来字符串按 SDK 返回保留。相同 local session 的前后 get_state 模型身份一致时，仅匹配的 provider/model 获得动态 variants；其他目录模型不宣称支持。旧 SDK unavailable/读取失败保留模型目录、显示 Notice、不猜测档位；非 Pi 分支仍保留原 Promise identity。
+
+聚焦回归：PiModelSelectionBinding.test.ts 包含当前会话绑定、max/future level、其他模型不扩散、unsupported/failure、读期间模型变化。此 owner 不拥有模型切换后的目录刷新；宿主必须在选择/会话变化后触发既有 catalog reload。

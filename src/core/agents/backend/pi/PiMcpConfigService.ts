@@ -34,6 +34,7 @@ export interface PiMcpConfigReadOptions {
 }
 
 const SECRET_ARGUMENT_PATTERN = /(token|key|secret|password|credential|auth)/i;
+const BARE_FLAG_ARGUMENT_PATTERN = /^-{1,2}[A-Za-z][\w-]*$/;
 
 /**
  * Read-only view of the MCP servers Pi's own configuration declares.
@@ -138,23 +139,46 @@ export class PiMcpConfigService {
     const args = Array.isArray(record.args)
       ? record.args.filter((value): value is string => typeof value === 'string')
       : [];
-    return [command, ...args.map((value) => this.redactArgument(value))].filter(Boolean).join(' ');
+    let redactNextValue = false;
+    const redactedArgs = args.map((value) => {
+      if (redactNextValue) {
+        redactNextValue = false;
+        return '***';
+      }
+      redactNextValue = BARE_FLAG_ARGUMENT_PATTERN.test(value) && SECRET_ARGUMENT_PATTERN.test(value);
+      return this.redactArgument(value);
+    });
+    return [command, ...redactedArgs].filter(Boolean).join(' ');
   }
 
-  /** Keep a bare flag (`--token`) readable, but never the value it carries. */
+  /** Keep flag names readable, but redact their credentials and sanitize HTTP URL arguments. */
   private redactArgument(value: string): string {
-    if (!SECRET_ARGUMENT_PATTERN.test(value)) return value;
-    return /^-{1,2}[A-Za-z][\w-]*$/.test(value) ? value : '***';
+    const separator = value.indexOf('=');
+    const flag = separator < 0 ? value : value.slice(0, separator);
+    if (BARE_FLAG_ARGUMENT_PATTERN.test(flag)) {
+      if (separator < 0) return value;
+      if (SECRET_ARGUMENT_PATTERN.test(flag)) return `${flag}=***`;
+      const argument = value.slice(separator + 1);
+      const redacted = /^https?:/i.test(argument)
+        ? this.redactUrl(argument)
+        : SECRET_ARGUMENT_PATTERN.test(argument) ? '***' : argument;
+      return `${flag}=${redacted}`;
+    }
+    if (/^https?:/i.test(value)) return this.redactUrl(value);
+    return SECRET_ARGUMENT_PATTERN.test(value) ? '***' : value;
   }
 
   private redactUrl(rawUrl: string): string {
     try {
       const parsed = new URL(rawUrl);
+      parsed.username = '';
+      parsed.password = '';
       parsed.search = '';
       parsed.hash = '';
       return parsed.toString();
     } catch {
-      return rawUrl.split(/[?#]/)[0] ?? rawUrl;
+      // Parse errors may embed the original credentials; never echo an unvalidated URL.
+      return '[invalid URL]';
     }
   }
 

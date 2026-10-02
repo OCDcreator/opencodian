@@ -115,3 +115,7 @@ graph TD
 - `getAvailableModels()` 与 `getProviderDirectory()` 语义不同：前者接近 `opencode models`，后者是 connect-provider 目录总览。
 - 目录作用域 cache key 必须继续绑定 `baseUrl` 与 normalized vault directory，避免 stale managed server / stale vault cache 混淆。
 - 不要移除 SDK-first / legacy fallback，也不要改变 scoped-directory config semantics、MCP status writeback 或 public API shape。
+
+### 2026-10-02 T10 legacy provider defaults
+
+The legacy `/config/providers` response uses a provider-to-model `default` record, as declared by installed OpenCode SDK 1.18.33 and observed on the existing 1.18.34 service. `getAvailableModels()` passes the full legacy response through the same normalizer as the SDK path; it no longer drops native defaults before normalization. The older `{provider, model}` shape remains supported by that normalizer. Scope injection, provider/model context limits and the independent v2 shadow catalog are unchanged. Focused regression: `OpenCodeCatalogQueryCoordinator.t10.test.ts`.

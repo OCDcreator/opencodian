@@ -1849,7 +1849,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         ...textRecords,
         ...textAreaRecords,
         ...dropdownRecords,
-      ].some((record) => record.name.toLowerCase().includes('mcp'))).toBe(false);
+      ].filter(record => record.name !== t('settings.claudeCode.sessionControls.server')).some((record) => record.name.toLowerCase().includes('mcp'))).toBe(false);
       expect(containerEl.textContent).toContain(
         t('settings.claudeCode.mcpRuntime.loadedWithNames', {
           count: 2,
@@ -1924,7 +1924,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         ...textRecords,
         ...textAreaRecords,
         ...dropdownRecords,
-      ].some((record) => record.name.toLowerCase().includes('mcp'))).toBe(false);
+      ].filter(record => record.name !== t('settings.claudeCode.sessionControls.server')).some((record) => record.name.toLowerCase().includes('mcp'))).toBe(false);
     });
 
     it('renders the MCP runtime empty state as read-only discovery in the MCP tab', () => {

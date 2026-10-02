@@ -2,6 +2,7 @@ import { type App, Modal, Notice, Setting } from 'obsidian';
 
 import type { PiAdapter } from '../../core/agents/backend/pi/PiAdapter';
 import type { PiRecord } from '../../core/agents/backend/pi/PiRpcClient';
+import { t } from '../../i18n';
 import { PI_WORKBENCH_GROUPS, type PiActionField, type PiWorkbenchAction } from './PiWorkbenchActions';
 
 /** Dedicated Pi management surface; all operational state remains in the service. */
@@ -13,6 +14,7 @@ export class PiWorkbenchModal extends Modal {
   private form?: HTMLElement;
   private unsubscribe?: { dispose(): void };
   private eventLines: string[] = [];
+  private actionGeneration = 0;
 
   constructor(app: App, private readonly adapter: PiAdapter, private readonly openChat?: (id: string) => Promise<void>) { super(app); }
   onOpen(): void {
@@ -40,7 +42,7 @@ export class PiWorkbenchModal extends Modal {
     new Setting(controls).setName('当前会话 / Session').addDropdown((d) => {
       d.addOption('', '仅目录与账户 / Catalog and account');
       for (const session of sessions) d.addOption(session.id, session.title);
-      d.setValue(this.sessionId).onChange((id) => { this.sessionId = id; });
+      d.setValue(this.sessionId).onChange((id) => { this.sessionId = id; this.renderAction(); });
     }).addButton((b) => b.setButtonText('新建 / New').onClick(async () => {
       this.sessionId = await this.adapter.createSession(); controls.remove(); this.form?.remove(); this.output?.remove(); await this.load();
     })).addButton((b) => b.setButtonText('打开聊天 / Open chat').onClick(async () => {
@@ -56,6 +58,7 @@ export class PiWorkbenchModal extends Modal {
   }
   private renderAction(): void {
     if (!this.form) return;
+    this.actionGeneration++;
     this.form.empty();
     new Setting(this.form).setName('操作 / Action').addDropdown((d) => {
       for (const action of PI_WORKBENCH_GROUPS[this.group]) d.addOption(action.id, action.label);
@@ -67,13 +70,14 @@ export class PiWorkbenchModal extends Modal {
     if (this.action.mutation) new Setting(this.form).setName('确认执行所选操作 / Confirm selected change').addToggle((t) => t.setValue(false).onChange((v) => { confirmed = v; }));
     new Setting(this.form).addButton((b) => b.setButtonText('执行 / Run').setCta().onClick(async () => {
       if (!confirmed) { new Notice('请确认所选操作 / Confirm the selected change'); return; }
-      const action = this.action; b.setDisabled(true);
+      const action = this.action; const generation = this.actionGeneration; b.setDisabled(true);
       try {
         const previous = this.sessionId;
         const result = await this.execute(action, input);
+        if (generation !== this.actionGeneration) return;
         if (previous !== this.sessionId || action.id === 'set_session_name') await this.load();
         this.output?.empty(); this.output?.createEl('pre', { text: JSON.stringify(result, null, 2) });
-      } catch (error) { this.output?.setText(error instanceof Error ? error.message : String(error)); }
+      } catch (error) { if (generation === this.actionGeneration) this.output?.setText(error instanceof Error ? error.message : String(error)); }
       finally { b.setDisabled(false); }
     }));
     new Setting(this.form).addButton((b) => b.setButtonText('停止当前操作 / Stop').onClick(() => {
@@ -82,7 +86,28 @@ export class PiWorkbenchModal extends Modal {
   }
   private renderField(field: PiActionField, input: PiRecord): void {
     const setting = new Setting(this.form as HTMLElement).setName(field.label);
-    if (field.kind === 'boolean') {
+    if (this.action.id === 'set_thinking_level' && field.key === 'level') {
+      const generation = this.actionGeneration;
+      setting.addDropdown(dropdown => {
+        dropdown.addOption('', '…').setDisabled(true);
+        const sessionId = this.sessionId;
+        if (!sessionId) { setting.setDesc('请先选择会话 / Select a session first.'); return; }
+        const read = this.adapter.getAvailableThinkingLevels(sessionId);
+        void read.then(result => {
+          if (generation !== this.actionGeneration) return;
+          if (!('levels' in result)) {
+            setting.setDesc(t('settings.pi.thinking.unavailable'));
+            return;
+          }
+          if (!result.levels.length) { dropdown.addOption('', '—'); setting.setDesc(`${t('settings.pi.thinking.name')}: []`); return; }
+          for (const level of result.levels) dropdown.addOption(level, level);
+          dropdown.setValue(result.levels[0]).setDisabled(false).onChange(value => { input[field.key] = value; });
+          input[field.key] = result.levels[0];
+        }).catch(() => {
+          if (generation === this.actionGeneration) setting.setDesc(t('settings.pi.thinking.failed'));
+        });
+      });
+    } else if (field.kind === 'boolean') {
       input[field.key] = false; setting.addToggle((t) => t.onChange((v) => { input[field.key] = v; }));
     } else if (field.options) {
       input[field.key] = field.options[0]; setting.addDropdown((d) => {
@@ -94,6 +119,17 @@ export class PiWorkbenchModal extends Modal {
       t.onChange((v) => { input[field.key] = v; });
     });
   }
+  private async readSessionEntries(value: unknown): Promise<unknown> {
+    const sessionId = this.sessionId;
+    const since = typeof value === 'string' && value.trim() ? value.trim() : undefined;
+    const result = await this.adapter.getSessionEntries(sessionId, since);
+    if ('status' in result && result.status === 'unavailable') return {
+      ...result,
+      notice: t('settings.pi.entries.fallback'),
+      fallback: 'full-history', sinceApplied: false, messages: await this.adapter.getSessionMessages(sessionId),
+    };
+    return result;
+  }
   private async execute(action: PiWorkbenchAction, values: PiRecord): Promise<unknown> {
     const input = { ...values };
     for (const field of action.fields ?? []) {
@@ -101,12 +137,19 @@ export class PiWorkbenchModal extends Modal {
       if (field.kind === 'json') input[field.key] = JSON.parse(String(input[field.key] || '[]'));
     }
     if (action.id === 'new_session') { this.sessionId = await this.adapter.createSession(); return { sessionId: this.sessionId }; }
-    if (action.id === 'import_session' || action.id === 'switch_session') { this.sessionId = await this.adapter.importSession(String(input.sessionPath)); return { sessionId: this.sessionId }; }
+    if (['import_session', 'switch_session'].includes(action.id)) { this.sessionId = await this.adapter.importSession(String(input.sessionPath)); return { sessionId: this.sessionId }; }
     if (!this.sessionId && !['get_state', 'get_available_models', 'get_commands', 'get_resources', 'get_auth', 'get_packages', 'list_sessions', 'login', 'logout', 'set_api_key', 'install_package', 'remove_package', 'update_package'].includes(action.id)) throw new Error('请先选择会话 / Select a session first.');
     if (action.id === 'clone' || action.id === 'fork') {
       const fork = await this.adapter.forkSession(this.sessionId, action.id === 'fork' ? String(input.entryId) : undefined);
       this.sessionId = fork.id; return fork;
     }
+    if (action.id === 'set_thinking_level' && !input.level) throw new Error('思考等级不可用 / Thinking levels unavailable.');
+    const reads: Partial<Record<PiWorkbenchAction['id'], () => Promise<unknown>>> = {
+      get_available_thinking_levels: () => this.adapter.getAvailableThinkingLevels(this.sessionId || undefined),
+      get_entries: () => this.readSessionEntries(input.since),
+    };
+    const read = reads[action.id];
+    if (read) return read();
     return this.adapter.command(this.sessionId || undefined, action.id, input);
   }
 }

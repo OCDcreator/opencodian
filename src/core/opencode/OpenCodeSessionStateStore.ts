@@ -5,6 +5,7 @@ import type {
   OpenCodeCanonicalPart,
   OpenCodeCanonicalSessionState,
   OpenCodeSessionMessageWithParts,
+  OpenCodeSessionSnapshotToken,
 } from './types';
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
@@ -51,11 +52,33 @@ function cloneState(state: OpenCodeCanonicalSessionState): OpenCodeCanonicalSess
 export class OpenCodeSessionStateStore {
   private readonly sessions = new Map<string, OpenCodeCanonicalSessionState>();
   private readonly diffEntriesBySessionId = new Map<string, SessionDiffEntry[]>();
+  // Independent foreground ingress must not recreate authoritatively removed
+  // IDs. Weak ownership releases these barriers when a session is evicted.
+  private readonly streamRetractions = new WeakMap<OpenCodeCanonicalSessionState, {
+    messages: Set<string>;
+    parts: Map<string, Set<string>>;
+    revision: number;
+    nextRequest: number;
+    appliedRequest: number;
+    messageRevisions: Map<string, number>;
+    partRevisions: Map<string, Map<string, number>>;
+  }>();
+
+  beginSessionSnapshot(sessionID: string): OpenCodeSessionSnapshotToken {
+    const owner = this.getStreamRetractions(this.getOrCreateSessionState(sessionID));
+    return { revision: owner.revision, request: ++owner.nextRequest, owner };
+  }
 
   replaceSessionSnapshot(
     sessionID: string,
     messages: OpenCodeSessionMessageWithParts[],
+    token?: OpenCodeSessionSnapshotToken,
   ): OpenCodeCanonicalSessionState {
+    const previous = this.sessions.get(sessionID);
+    const owner = previous && this.getStreamRetractions(previous);
+    if (token && (!owner || token.owner !== owner || token.request < owner.appliedRequest)) {
+      return previous ? cloneState(previous) : { sessionID, messages: [], partsByMessageID: {} };
+    }
     const state: OpenCodeCanonicalSessionState = {
       sessionID,
       messages: [],
@@ -79,12 +102,18 @@ export class OpenCodeSessionStateStore {
       }
     }
 
+    if (token && previous) this.mergeConcurrentSnapshotChanges(state, previous, token.revision);
+    this.updateSnapshotRetractions(state);
+    const tracking = this.getStreamRetractions(state);
+    tracking.appliedRequest = token?.request ?? ++tracking.nextRequest;
     this.sessions.set(sessionID, state);
     return cloneState(state);
   }
 
   upsertMessage(info: OpenCodeCanonicalMessageInfo): OpenCodeCanonicalSessionState {
     const state = this.getOrCreateSessionState(info.sessionID);
+    this.streamRetractions.get(state)?.messages.delete(info.id);
+    this.recordSnapshotMutation(state, info.id);
     const next = cloneMessage(info);
     const index = state.messages.findIndex((message) => message.id === info.id);
     if (index >= 0) {
@@ -97,6 +126,15 @@ export class OpenCodeSessionStateStore {
 
   removeMessage(sessionID: string, messageID: string): OpenCodeCanonicalSessionState {
     const state = this.getOrCreateSessionState(sessionID);
+    const retractions = this.getStreamRetractions(state);
+    retractions.messages.add(messageID);
+    const removedParts = retractions.parts.get(messageID) ?? new Set<string>();
+    for (const part of state.partsByMessageID[messageID] ?? []) {
+      removedParts.add(part.id);
+      this.recordSnapshotMutation(state, messageID, part.id);
+    }
+    if (removedParts.size) retractions.parts.set(messageID, removedParts);
+    this.recordSnapshotMutation(state, messageID);
     state.messages = state.messages.filter((message) => message.id !== messageID);
     delete state.partsByMessageID[messageID];
     return cloneState(state);
@@ -104,6 +142,8 @@ export class OpenCodeSessionStateStore {
 
   upsertPart(part: OpenCodeCanonicalPart): OpenCodeCanonicalSessionState {
     const state = this.getOrCreateSessionState(part.sessionID);
+    this.streamRetractions.get(state)?.parts.get(part.messageID)?.delete(part.id);
+    this.recordSnapshotMutation(state, part.messageID, part.id);
     const next = clonePart(part);
     const parts = state.partsByMessageID[part.messageID] ?? [];
     const index = parts.findIndex((candidate) => candidate.id === part.id);
@@ -119,11 +159,16 @@ export class OpenCodeSessionStateStore {
   removePart(messageID: string, partID: string): OpenCodeCanonicalSessionState | null {
     for (const state of this.sessions.values()) {
       const parts = state.partsByMessageID[messageID];
-      if (!parts) {
+      if (!parts && !state.messages.some((message) => message.id === messageID)) {
         continue;
       }
 
-      state.partsByMessageID[messageID] = parts.filter((part) => part.id !== partID);
+      const retractions = this.getStreamRetractions(state);
+      const removedParts = retractions.parts.get(messageID) ?? new Set<string>();
+      removedParts.add(partID);
+      this.recordSnapshotMutation(state, messageID, partID);
+      retractions.parts.set(messageID, removedParts);
+      state.partsByMessageID[messageID] = (parts ?? []).filter((part) => part.id !== partID);
       if (state.partsByMessageID[messageID].length === 0) {
         delete state.partsByMessageID[messageID];
       }
@@ -150,6 +195,7 @@ export class OpenCodeSessionStateStore {
       const currentValue = typeof next[input.field] === 'string' ? next[input.field] as string : '';
       next[input.field] = `${currentValue}${input.delta}`;
       parts[index] = next;
+      this.recordSnapshotMutation(state, input.messageID, input.partID);
       return cloneState(state);
     }
 
@@ -158,6 +204,11 @@ export class OpenCodeSessionStateStore {
 
   applyStreamMutations(mutations: OpenCodeStreamMutation[]): void {
     for (const mutation of mutations) {
+      const state = this.sessions.get(mutation.sessionID);
+      const retractions = state && this.streamRetractions.get(state);
+      const partID = mutation.partID ?? mutation.part?.id;
+      if (retractions?.messages.has(mutation.messageID)
+        || (partID && retractions?.parts.get(mutation.messageID)?.has(partID))) continue;
       this.applyStreamMutation(mutation);
     }
   }
@@ -314,6 +365,97 @@ export class OpenCodeSessionStateStore {
   getSessionState(sessionID: string): OpenCodeCanonicalSessionState | null {
     const state = this.sessions.get(sessionID);
     return state ? cloneState(state) : null;
+  }
+
+  private recordSnapshotMutation(state: OpenCodeCanonicalSessionState, messageID: string, partID?: string): void {
+    const tracking = this.getStreamRetractions(state);
+    const revision = ++tracking.revision;
+    if (!partID) {
+      tracking.messageRevisions.set(messageID, revision);
+      return;
+    }
+    const parts = tracking.partRevisions.get(messageID) ?? new Map<string, number>();
+    parts.set(partID, revision);
+    tracking.partRevisions.set(messageID, parts);
+  }
+
+  private mergeConcurrentSnapshotChanges(
+    snapshot: OpenCodeCanonicalSessionState,
+    current: OpenCodeCanonicalSessionState,
+    revision: number,
+  ): void {
+    const tracking = this.getStreamRetractions(current);
+    for (const [messageID, changedAt] of tracking.messageRevisions) {
+      if (changedAt <= revision) continue;
+      const live = current.messages.find((message) => message.id === messageID);
+      const index = snapshot.messages.findIndex((message) => message.id === messageID);
+      if (live && index >= 0) snapshot.messages[index] = cloneMessage(live);
+      else if (live) snapshot.messages.push(cloneMessage(live));
+      else {
+        snapshot.messages = snapshot.messages.filter((message) => message.id !== messageID);
+        delete snapshot.partsByMessageID[messageID];
+      }
+    }
+    for (const [messageID, parts] of tracking.partRevisions) {
+      if (tracking.messages.has(messageID)) continue;
+      for (const [partID, changedAt] of parts) {
+        if (changedAt <= revision) continue;
+        this.mergeConcurrentSnapshotPart(snapshot, current, messageID, partID);
+      }
+    }
+  }
+
+  private mergeConcurrentSnapshotPart(
+    snapshot: OpenCodeCanonicalSessionState,
+    current: OpenCodeCanonicalSessionState,
+    messageID: string,
+    partID: string,
+  ): void {
+    const live = current.partsByMessageID[messageID]?.find((part) => part.id === partID);
+    const parts = (snapshot.partsByMessageID[messageID] ?? []).filter((part) => part.id !== partID);
+    if (live) {
+      parts.push(clonePart(live));
+      if (!snapshot.messages.some((message) => message.id === messageID)) {
+        const info = current.messages.find((message) => message.id === messageID);
+        if (info) snapshot.messages.push(cloneMessage(info));
+      }
+    }
+    if (parts.length) snapshot.partsByMessageID[messageID] = parts.sort(compareById);
+    else delete snapshot.partsByMessageID[messageID];
+  }
+
+  private getStreamRetractions(state: OpenCodeCanonicalSessionState) {
+    let retractions = this.streamRetractions.get(state);
+    if (!retractions) {
+      retractions = {
+        messages: new Set<string>(), parts: new Map<string, Set<string>>(),
+        revision: 0, nextRequest: 0, appliedRequest: 0,
+        messageRevisions: new Map<string, number>(), partRevisions: new Map<string, Map<string, number>>(),
+      };
+      this.streamRetractions.set(state, retractions);
+    }
+    return retractions;
+  }
+
+  private updateSnapshotRetractions(state: OpenCodeCanonicalSessionState): void {
+    const previous = this.sessions.get(state.sessionID);
+    const retractions = previous ? this.getStreamRetractions(previous) : this.getStreamRetractions(state);
+    const messageIDs = new Set(state.messages.map((message) => message.id));
+    for (const message of previous?.messages ?? []) {
+      if (!messageIDs.has(message.id)) retractions.messages.add(message.id);
+    }
+    for (const [messageID, parts] of Object.entries(previous?.partsByMessageID ?? {})) {
+      const partIDs = new Set(state.partsByMessageID[messageID]?.map((part) => part.id));
+      const removedParts = retractions.parts.get(messageID) ?? new Set<string>();
+      for (const part of parts) if (!partIDs.has(part.id)) removedParts.add(part.id);
+      if (removedParts.size) retractions.parts.set(messageID, removedParts);
+    }
+    // A subsequent authoritative snapshot can explicitly restore an ID.
+    for (const messageID of messageIDs) retractions.messages.delete(messageID);
+    for (const [messageID, parts] of Object.entries(state.partsByMessageID)) {
+      for (const part of parts) retractions.parts.get(messageID)?.delete(part.id);
+    }
+    this.streamRetractions.set(state, retractions);
   }
 
   private getOrCreateSessionState(sessionID: string): OpenCodeCanonicalSessionState {

@@ -12,6 +12,7 @@
 
 import { Modal, Notice, Setting } from 'obsidian';
 
+import type { AppServerCatalogReadResult } from '../../core/agents/backend/CodexAppServerClient';
 import type {
   AppServerHookGroup,
   AppServerHookMetadata,
@@ -244,6 +245,7 @@ export class SettingsCodexReadbackControls {
   private openModelListReadbackModal(): void {
     const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
       getModelList?: () => Promise<unknown[] | null>;
+      getModelsCatalog?: () => Promise<AppServerCatalogReadResult<unknown>>;
     } | null;
 
     new CodexReadbackModal<unknown>({
@@ -255,6 +257,7 @@ export class SettingsCodexReadbackControls {
       loadingText: t('settings.codex.modelList.loading'),
       unavailableText: t('settings.codex.modelList.unavailable'),
       failedText: t('settings.codex.modelList.failed'),
+      fetchCatalog: adapter?.getModelsCatalog?.bind(adapter),
       emptyText: t('settings.codex.modelList.empty'),
       fetchItems: async (): Promise<unknown[] | null> => {
         if (typeof adapter?.getModelList !== 'function') {
@@ -269,14 +272,16 @@ export class SettingsCodexReadbackControls {
       renderItems: (listEl: HTMLElement, models: unknown[]): void => {
         for (const model of models) {
           const entry = model as Record<string, unknown>;
-          const slug = String(entry.slug ?? 'unknown');
-          const displayName = String(entry.display_name ?? slug);
+          const slug = String(entry.slug ?? entry.model ?? entry.id ?? 'unknown');
+          const nativeId = String(entry.id ?? slug);
+          const displayName = String(entry.displayName ?? entry.display_name ?? slug);
           const description = entry.description as string | null | undefined;
 
           const rowEl = listEl.createDiv({
             cls: 'opencodian-codex-readback-row opencodian-inspection-row opencodian-codex-model-list-entry',
             attr: {
               'data-model-slug': slug,
+              'data-model-id': nativeId,
               'data-model-visibility': String(entry.visibility ?? ''),
               'data-proof-state': 'readback',
             },
@@ -330,6 +335,7 @@ export class SettingsCodexReadbackControls {
   private openPermissionProfilesReadbackModal(): void {
     const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
       getPermissionProfiles?: () => Promise<unknown[] | null>;
+      getPermissionProfilesCatalog?: () => Promise<AppServerCatalogReadResult<unknown>>;
     } | null;
 
     new CodexReadbackModal<unknown>({
@@ -341,6 +347,7 @@ export class SettingsCodexReadbackControls {
       loadingText: t('settings.codex.permissionProfiles.loading'),
       unavailableText: t('settings.codex.permissionProfiles.unavailable'),
       failedText: t('settings.codex.permissionProfiles.failed'),
+      fetchCatalog: adapter?.getPermissionProfilesCatalog?.bind(adapter),
       emptyText: t('settings.codex.permissionProfiles.empty'),
       fetchItems: async (): Promise<unknown[] | null> => {
         if (typeof adapter?.getPermissionProfiles !== 'function') {
@@ -486,6 +493,7 @@ export class SettingsCodexReadbackControls {
   private openLoadedThreadsReadbackModal(): void {
     const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
       listLoadedThreads?: () => Promise<Array<{ id: string }>>;
+      getLoadedThreadsCatalog?: () => Promise<AppServerCatalogReadResult<{ id: string }>>;
     } | null;
 
     new CodexReadbackModal<{ id: string }>({
@@ -497,6 +505,7 @@ export class SettingsCodexReadbackControls {
       loadingText: t('settings.codex.loadedThreads.loading'),
       unavailableText: t('settings.codex.loadedThreads.unavailable'),
       failedText: t('settings.codex.loadedThreads.failed'),
+      fetchCatalog: adapter?.getLoadedThreadsCatalog?.bind(adapter),
       emptyText: t('settings.codex.loadedThreads.empty'),
       fetchItems: async (): Promise<Array<{ id: string }> | null> => {
         if (typeof adapter?.listLoadedThreads !== 'function') {

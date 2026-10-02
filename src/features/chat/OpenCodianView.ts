@@ -903,6 +903,13 @@ export class OpenCodianView extends ItemView {
         this.deleteConversationsAndCleanupTabs(conversationIds),
       deleteAllConversationsAndReset: (conversationIds) =>
         this.deleteAllConversationsAndReset(conversationIds),
+      forgetConversationsAndCleanupTabs: async (conversationIds) => {
+        try {
+          await this.conversationLoadRecoveryCoordinator.forgetConversationsAndRecover(conversationIds);
+        } finally {
+          this.conversationSessionRailCoordinator.refresh(this.messagesShellEl);
+        }
+      },
       // advantage-parity R-D1: per-item export entry; the plugin method
       // resolves the live conversation when it is the active one.
       exportConversationMarkdown: async (conversationId) => {
@@ -2787,6 +2794,7 @@ export class OpenCodianView extends ItemView {
       getCurrentConversationId: () => this.currentConversation?.id ?? null,
       createConversation: () => this.plugin.createConversation(),
       deleteConversation: (conversationId) => this.plugin.deleteConversation(conversationId),
+      forgetConversation: (conversationId) => this.plugin.forgetConversation(conversationId),
       clearTabMessagesPanes: () => {
         this.clearTabMessagesPanes();
       },

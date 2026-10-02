@@ -265,19 +265,11 @@ export class OpenCodeStreamingRuntimeCoordinator {
       try {
         stream = await request.subscribe(streamContext.signal);
       } catch (error) {
-        this.recordReconnectFailure(request.sessionId, request.traceContext, error);
-        this.host.logServiceWarning(
-          'session.event-stream',
-          'SDK event stream failed before prompt start, falling back to legacy SSE',
-          error,
-        );
-        yield { type: 'message_start' };
-        yieldedMessageStart = true;
-        await request.startPrompt();
-        yield* this.consumeLegacyEventStream(request.sessionId, streamContext, request.promptMessageId);
+        yield* this.startLegacyFallback(request, streamContext, error);
         return;
       }
 
+      if (streamContext.signal.aborted) return;
       try {
         await request.startPrompt();
       } catch (error) {
@@ -288,11 +280,13 @@ export class OpenCodeStreamingRuntimeCoordinator {
       const iterator = stream[Symbol.asyncIterator]();
 
       while (true) {
+        if (streamContext.signal.aborted) return;
         let result: IteratorResult<SdkEvent>;
         try {
           result = await iterator.next() as IteratorResult<SdkEvent>;
         } catch (error) {
-          if (!yieldedMessageStart) {
+          if (streamContext.signal.aborted) return;
+          if (!yieldedMessageStart && this.canFallbackEventStream(error)) {
             this.recordReconnectFailure(request.sessionId, request.traceContext, error);
             this.host.logServiceWarning(
               'session.event-stream',
@@ -301,13 +295,15 @@ export class OpenCodeStreamingRuntimeCoordinator {
             );
             yield { type: 'message_start' };
             yieldedMessageStart = true;
-            yield* this.consumeLegacyEventStream(request.sessionId, streamContext);
+            if (streamContext.signal.aborted) return;
+            yield* this.consumeLegacyEventStream(request.sessionId, streamContext, request.promptMessageId);
             return;
           }
 
           throw error;
         }
 
+        if (streamContext.signal.aborted) return;
         if (result.done) {
           break;
         }
@@ -317,6 +313,7 @@ export class OpenCodeStreamingRuntimeCoordinator {
           yield { type: 'message_start' };
           yieldedMessageStart = true;
         }
+        if (streamContext.signal.aborted) return;
 
         const sourceEventId = randomUUID();
         this.host.observeIngress?.(
@@ -534,6 +531,31 @@ export class OpenCodeStreamingRuntimeCoordinator {
       state,
       promptMessageId,
     );
+  }
+
+  private async *startLegacyFallback(
+    request: OpenCodeStreamingSdkStreamRequest,
+    streamContext: OpenCodeStreamingRuntimeContext,
+    error: unknown,
+  ): AsyncGenerator<StreamChunk> {
+    if (streamContext.signal.aborted) return;
+    if (!this.canFallbackEventStream(error)) throw error;
+    this.recordReconnectFailure(request.sessionId, request.traceContext, error);
+    this.host.logServiceWarning(
+      'session.event-stream',
+      'SDK event stream failed before prompt start, falling back to legacy SSE',
+      error,
+    );
+    yield { type: 'message_start' };
+    if (streamContext.signal.aborted) return;
+    await request.startPrompt();
+    yield* this.consumeLegacyEventStream(request.sessionId, streamContext, request.promptMessageId);
+  }
+
+  private canFallbackEventStream(error: unknown): boolean {
+    // Missing routes and transport/server failures can use the existing SSE
+    // path. Auth, permission, request and rate-limit rejections stay terminal.
+    return ['not_found', 'server_error', 'unknown'].includes(classifySdkError(error));
   }
 
   private buildErrorChunk(error: unknown): StreamChunk {

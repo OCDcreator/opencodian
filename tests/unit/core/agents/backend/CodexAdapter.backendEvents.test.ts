@@ -13,6 +13,7 @@ const mockAppServerClientStop = jest.fn();
 const mockStartThread = jest.fn();
 const mockStartTurn = jest.fn();
 const mockSetThreadGoal = jest.fn();
+const mockDeleteThreadResult = jest.fn();
 let threadNotificationHandler: ((event: { method: string; params: unknown }) => void) | null = null;
 
 jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => {
@@ -27,6 +28,7 @@ jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => {
       startThread: mockStartThread,
       startTurn: mockStartTurn,
       setThreadGoal: mockSetThreadGoal,
+      deleteThreadResult: mockDeleteThreadResult,
       subscribeToThreadNotifications: jest.fn((_threadId: string, handler: (event: { method: string; params: unknown }) => void) => {
         threadNotificationHandler = handler;
         return { dispose: jest.fn() };
@@ -167,6 +169,31 @@ describe('CodexAdapter thread backend events', () => {
     expect((renameEvent as { metadata?: { threadName?: string } }).metadata?.threadName).toBe('Renamed conversation');
     // The session itself stays intact after a rename.
     await expect(adapter.getSession(sessionId)).resolves.not.toBeNull();
+    await adapter.stop();
+  });
+
+  it('drains the real thread/deleted stream notification without losing identity during pending product deletion', async () => {
+    const adapter = new CodexAdapter({ createCodex: jest.fn().mockResolvedValue(createMockCodex()) });
+    await adapter.start();
+    const sessionId = await adapter.createSession();
+    const stream = startStream(adapter, sessionId);
+    await settle();
+    let resolveDelete!: (value: unknown) => void;
+    mockDeleteThreadResult.mockReturnValueOnce(new Promise((resolve) => { resolveDelete = resolve; }));
+    const deletion = adapter.deleteSession(sessionId).catch((error: unknown) => error);
+    await settle();
+    emit('thread/deleted', { threadId: 'thread-1' });
+    const chunks = await stream.done;
+    expect(chunks.some((chunk) => chunk.type === 'error' && /deleted on the server/.test(chunk.content))).toBe(true);
+    await expect(adapter.getSession(sessionId)).resolves.not.toBeNull();
+    resolveDelete({ operation: 'delete', threadId: 'thread-1', status: 'admitted', readback: { status: 'unavailable', errorReason: 'offline' } });
+    await expect(deletion).resolves.toMatchObject({ result: { status: 'admitted' } });
+    emit('thread/deleted', { threadId: 'thread-1' });
+    await expect(adapter.getSession(sessionId)).resolves.not.toBeNull();
+    mockDeleteThreadResult.mockResolvedValueOnce({ operation: 'delete', threadId: 'thread-1', status: 'verified', readback: { status: 'verified' } });
+    await adapter.deleteSession(sessionId);
+    expect(mockDeleteThreadResult).toHaveBeenLastCalledWith('thread-1');
+    await expect(adapter.getSession(sessionId)).resolves.toBeNull();
     await adapter.stop();
   });
 

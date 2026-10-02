@@ -2719,18 +2719,44 @@ export default class OpenCodianPlugin extends Plugin {
     return cached;
   }
 
-  /** Delete a conversation */
-  async deleteConversation(id: string): Promise<void> {
+  /** Explicit local-only Codex UI action, using the same storage/cache commit path. */
+  async forgetConversation(id: string): Promise<void> {
+    await this.deleteConversation(id, { mode: 'forget-local' });
+  }
+
+  /** Codex native deletion completes only after verified absence; forgetting is explicit. */
+  async deleteConversation(id: string, options: { mode?: 'delete-native' | 'forget-local' } = {}): Promise<void> {
     const index = this.conversations.findIndex((c) => c.id === id);
     if (index === -1) return;
 
     const conversation = this.conversations[index];
     const backendSessionId = getConversationBackendSessionId(conversation);
     const sessionBackend = getConversationSessionBackendService(this.agentServiceRegistry, conversation);
+    let forgetLocalSession: (() => Promise<void>) | null = null;
+    if (options.mode === 'forget-local' && conversation.backend !== 'codex') {
+      throw new Error('Explicit local forgetting is supported only for Codex conversations.');
+    }
+    if (conversation.backend === 'codex' && backendSessionId) {
+      if (!sessionBackend) {
+        throw new Error('Codex session deletion requires the owning backend service; local conversation retained.');
+      }
+      if (options.mode === 'forget-local') {
+        const backend = sessionBackend as Partial<Pick<CodexAdapter, 'forgetSession'>>;
+        if (!backend.forgetSession) {
+          throw new Error('Codex local forgetting is unavailable; local conversation retained.');
+        }
+        // Keep adapter identity/evidence until local storage has committed.
+        forgetLocalSession = () => backend.forgetSession!(backendSessionId);
+      } else {
+        // Codex rejects with a mutation result for admitted/failed/unavailable.
+        // Its void completion means verified absence or a native-less draft.
+        await sessionBackend.deleteSession(backendSessionId);
+      }
+    }
     if (conversation.backend === 'zcode' && (!backendSessionId || !sessionBackend)) {
       throw new Error('ZCode session deletion requires the owning backend service.');
     }
-    if (backendSessionId && sessionBackend) {
+    if (backendSessionId && sessionBackend && conversation.backend !== 'codex') {
       if (conversation.backend === 'zcode') {
         // ZCode's desktop task-index tombstone must be confirmed before the
         // local copy disappears. Other backends retain their existing cleanup.
@@ -2744,9 +2770,16 @@ export default class OpenCodianPlugin extends Plugin {
       }
     }
 
-    // Delete from storage
-    await this.storage.deleteConversation(id);
-    this.conversations.splice(index, 1);
+    // Local forgetting commits only after the session file is confirmed absent.
+    if (options.mode === 'forget-local') {
+      await this.storage.deleteConversation(id, { verifyAbsent: true });
+    } else {
+      await this.storage.deleteConversation(id);
+    }
+    await forgetLocalSession?.();
+    // Other deletes may commit while native/storage awaits are in flight.
+    const commitIndex = this.conversations.findIndex((item) => item.id === id);
+    if (commitIndex !== -1) this.conversations.splice(commitIndex, 1);
     this.conversationFullMessageCache.forget(id);
   }
 

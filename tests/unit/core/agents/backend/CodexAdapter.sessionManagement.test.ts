@@ -11,6 +11,7 @@ const mockAppServerClientStart = jest.fn().mockResolvedValue(undefined);
 const mockAppServerClientStop = jest.fn();
 const mockSetThreadName = jest.fn();
 const mockDeleteThread = jest.fn();
+const mockDeleteThreadResult = jest.fn();
 const mockInterruptTurn = jest.fn();
 const mockSetThreadGoal = jest.fn();
 const mockClearThreadEffectiveSettings = jest.fn();
@@ -26,6 +27,7 @@ jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => {
       unregisterServerRequestHandler: mockUnregisterServerRequestHandler,
       setThreadName: mockSetThreadName,
       deleteThread: mockDeleteThread,
+      deleteThreadResult: mockDeleteThreadResult,
       interruptTurn: mockInterruptTurn,
       setThreadGoal: mockSetThreadGoal,
       clearThreadEffectiveSettings: mockClearThreadEffectiveSettings,
@@ -57,6 +59,7 @@ describe('CodexAdapter app-server session management', () => {
     mockAppServerClientStart.mockResolvedValue(undefined);
     mockSetThreadName.mockResolvedValue(true);
     mockDeleteThread.mockResolvedValue(true);
+    mockDeleteThreadResult.mockImplementation(async (threadId: string) => ({ operation: 'delete', threadId, status: 'verified', readback: { status: 'verified' } }));
     mockInterruptTurn.mockResolvedValue(true);
   });
 
@@ -82,14 +85,14 @@ describe('CodexAdapter app-server session management', () => {
       await adapter.stop();
     });
 
-    it('is a no-op when the app-server client is unavailable', async () => {
+    it('rejects with unavailable when the app-server client is unavailable', async () => {
       const adapter = new CodexAdapter({
         createAppServerClient: () => null,
         createCodex: jest.fn().mockResolvedValue(createMockCodex()),
       });
       await adapter.start();
 
-      await expect(adapter.updateSessionTitle('thread-9', 'title')).resolves.toBeUndefined();
+      await expect(adapter.updateSessionTitle('thread-9', 'title')).rejects.toMatchObject({ result: { status: 'unavailable', operation: 'rename' } });
       expect(mockSetThreadName).not.toHaveBeenCalled();
       await adapter.stop();
     });
@@ -106,9 +109,19 @@ describe('CodexAdapter app-server session management', () => {
       await adapter.deleteSession('thread-7');
 
       expect(mockInterruptTurn).toHaveBeenCalledWith('thread-7', 'turn-2');
-      expect(mockDeleteThread).toHaveBeenCalledWith('thread-7');
+      expect(mockDeleteThreadResult).toHaveBeenCalledWith('thread-7');
       expect(mockClearThreadEffectiveSettings).toHaveBeenCalledWith('thread-7');
       await expect(adapter.getSession('thread-7')).resolves.toBeNull();
+      await adapter.stop();
+    });
+
+    it('retains an ACK-only legacy client as admitted rather than resolving the void completion', async () => {
+      mockDeleteThreadResult.mockResolvedValue(undefined);
+      const adapter = createStartedAdapter();
+      await adapter.start();
+      await expect(adapter.deleteSession('thread-legacy')).rejects.toMatchObject({ result: { status: 'admitted', threadId: 'thread-legacy' } });
+      expect(mockDeleteThread).toHaveBeenCalledWith('thread-legacy');
+      expect(mockClearThreadEffectiveSettings).not.toHaveBeenCalled();
       await adapter.stop();
     });
 

@@ -47,7 +47,7 @@ describe('Pi MCP config reader', () => {
     await fs.writeFile(piGlobal(), JSON.stringify({
       mcpServers: {
         http: { url: 'https://mcp.example.com/mcp?key=super-secret#frag', auth: 'bearer', bearerTokenEnv: 'MCP_TOKEN' },
-        stdio: { command: 'npx', args: ['-y', 'pkg', '--token', 'plain-secret'] },
+        stdio: { command: 'npx', args: ['-y', 'pkg', '--token', 'audit731v8c'] },
         oauth: { url: 'https://oauth.example.com/sse', auth: 'oauth' },
       },
     }));
@@ -59,7 +59,7 @@ describe('Pi MCP config reader', () => {
     expect(JSON.stringify(snapshot)).not.toContain('super-secret');
     const stdio = snapshot.servers.find((server) => server.name === 'stdio');
     expect(stdio?.endpoint).toBe('npx -y pkg --token ***');
-    expect(JSON.stringify(snapshot)).not.toContain('plain-secret');
+    expect(JSON.stringify(snapshot)).not.toContain('audit731v8c');
     expect(snapshot.servers.find((server) => server.name === 'oauth')?.auth).toBe('oauth');
   });
 

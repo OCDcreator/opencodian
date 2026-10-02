@@ -22,6 +22,7 @@ export interface ConversationTabLifecycleRecoveryHost {
   getCurrentConversationId(): string | null;
   createConversation(): Promise<Conversation>;
   deleteConversation(conversationId: string): Promise<void>;
+  forgetConversation?(conversationId: string): Promise<void>;
   clearTabMessagesPanes(): void;
   resetTabManager(): void;
   removeTabMessagesPane(tabId: TabId): void;
@@ -90,16 +91,68 @@ export class ConversationTabLifecycleRecoveryCoordinator {
   }
 
   async deleteConversationsAndRecover(conversationIds: readonly string[]): Promise<void> {
-    const uniqueConversationIds = Array.from(new Set(conversationIds));
-    if (uniqueConversationIds.length === 0) {
-      return;
-    }
+    const { deletedIds, error } = await this.deleteConversations(conversationIds);
+    await this.recoverDeletedConversations(deletedIds);
+    if (error) throw error;
+  }
 
-    const conversationIdSet = new Set(uniqueConversationIds);
-    for (const conversationId of uniqueConversationIds) {
-      await this.host.deleteConversation(conversationId);
-    }
+  /** Local forgetting shares successful-only tab recovery, never native deletion. */
+  async forgetConversationsAndRecover(conversationIds: readonly string[]): Promise<void> {
+    if (!this.host.forgetConversation) throw new Error('Local forgetting is unavailable; conversations retained.');
+    const { deletedIds, error } = await this.deleteConversations(conversationIds, true);
+    await this.recoverDeletedConversations(deletedIds);
+    if (error) throw error;
+  }
 
+  private readonly pendingLocalForgets = new Map<string, Promise<void>>();
+
+  private async deleteConversations(conversationIds: readonly string[], forgetLocal = false): Promise<{ deletedIds: string[]; error?: Error }> {
+    const deletedIds: string[] = [];
+    const errors: Error[] = [];
+    for (const conversationId of new Set(conversationIds)) {
+      try {
+        if (forgetLocal) {
+          if (await this.forgetLocalConversation(conversationId)) deletedIds.push(conversationId);
+        } else {
+          await this.host.deleteConversation(conversationId);
+          deletedIds.push(conversationId);
+        }
+      } catch (error) {
+        errors.push(error instanceof Error ? error : new Error(String(error)));
+      }
+    }
+    return {
+      deletedIds,
+      error: errors.length > 1
+        ? Object.assign(new Error(`Conversation deletion incomplete: ${errors.map((error) => error.message).join('; ')}`), { errors })
+        : errors[0],
+    };
+  }
+
+  /** Only the initiating request recovers tabs; duplicate callers await its commit. */
+  private async forgetLocalConversation(conversationId: string): Promise<boolean> {
+    const existing = this.pendingLocalForgets.get(conversationId);
+    if (existing) {
+      await existing;
+      return false;
+    }
+    const tabs = this.host.getTabManager()?.getAllTabs() ?? [];
+    if (tabs.some((tab) => tab.conversationId === conversationId && this.host.isTabForegroundBusy(tab.id))) {
+      throw new Error(t('chat.tab.streamingBlocked'));
+    }
+    const pending = this.host.forgetConversation!(conversationId);
+    this.pendingLocalForgets.set(conversationId, pending);
+    try {
+      await pending;
+      return true;
+    } finally {
+      if (this.pendingLocalForgets.get(conversationId) === pending) this.pendingLocalForgets.delete(conversationId);
+    }
+  }
+
+  private async recoverDeletedConversations(conversationIds: readonly string[]): Promise<void> {
+    if (conversationIds.length === 0) return;
+    const conversationIdSet = new Set(conversationIds);
     const tabManager = this.host.getTabManager();
     if (!tabManager) {
       if (this.shouldRecoverCurrentConversation(conversationIdSet)) {
@@ -143,8 +196,11 @@ export class ConversationTabLifecycleRecoveryCoordinator {
       return;
     }
 
-    for (const conversationId of uniqueConversationIds) {
-      await this.host.deleteConversation(conversationId);
+    const { deletedIds, error } = await this.deleteConversations(uniqueConversationIds);
+    if (error) {
+      // Only completed deletions lose tabs/panes; pending and failed tabs survive.
+      await this.recoverDeletedConversations(deletedIds);
+      throw error;
     }
 
     // Reset drops every tab in one step, so it has no close-result loop in

@@ -26,6 +26,9 @@ import type {
   AppServerAccountUsage,
   AppServerAccountUsageResult,
   AppServerApprovalPolicyEffective,
+  AppServerCatalogListOptions,
+  AppServerCatalogPage,
+  AppServerCatalogReadFailure,
   AppServerCommandExecutionApprovalParams,
   AppServerCommandExecutionApprovalResponse,
   AppServerEffectivePermissionProfile,
@@ -49,6 +52,7 @@ import type {
   AppServerModelProviderCapabilities,
   AppServerNotificationSubscription,
   AppServerPermissionProfile,
+  AppServerPermissionProfilesListOptions,
   AppServerPermissionsApprovalParams,
   AppServerPermissionsApprovalResponse,
   AppServerPluginInstallResult,
@@ -76,6 +80,8 @@ import type {
   AppServerThreadGoal,
   AppServerThreadItemsListOptions,
   AppServerThreadItemsPage,
+  AppServerThreadListOptions,
+  AppServerThreadMutationResult,
   AppServerThreadNotification,
   AppServerThreadResumeOptions,
   AppServerThreadStartOptions,
@@ -673,6 +679,25 @@ function normalizePluginListResult(result: unknown): AppServerPluginListResult |
   };
 }
 
+/** Full catalog reads reject rather than returning a silently truncated array. */
+/** Complete catalog evidence keeps empty success distinct from transport failures. */
+export type AppServerCatalogReadResult<T> = { status: 'complete'; data: T[]; nextCursor: null } | AppServerCatalogReadFailure<T>;
+
+export class AppServerCatalogReadError<T = unknown> extends Error {
+  constructor(readonly result: AppServerCatalogReadFailure<T>) {
+    super(result.errorReason);
+    this.name = 'AppServerCatalogReadError';
+  }
+}
+
+/** Preserves operation/native identity when a legacy void adapter method rejects. */
+export class AppServerThreadMutationError extends Error {
+  constructor(readonly result: AppServerThreadMutationResult) {
+    super(result.errorReason ?? `Codex thread ${result.operation} is ${result.status}`);
+    this.name = 'AppServerThreadMutationError';
+  }
+}
+
 export class CodexAppServerClient extends CodexAppServerTransport {
   // ---------------------------------------------------------------------------
   // App-server API wrappers
@@ -684,6 +709,150 @@ export class CodexAppServerClient extends CodexAppServerTransport {
    * entries mean no verified runtime readback is available for that thread.
    */
   private readonly threadEffectiveSettings = new Map<string, AppServerThreadEffectiveSettings | null>();
+
+  private async requestCatalogPage<T>(
+    method: string,
+    params: Record<string, unknown>,
+    timeoutMs = 30000,
+  ): Promise<AppServerCatalogPage<T>> {
+    await this.start();
+    const result = await this.request(method, params, timeoutMs) as AppServerCatalogPage<T> | undefined;
+    if (!result || !Array.isArray(result.data)
+      || (result.nextCursor != null && typeof result.nextCursor !== 'string')) {
+      throw new Error(`${method} returned a malformed catalog page`);
+    }
+    // Older app-servers omit nextCursor on terminal pages.
+    return { data: result.data, nextCursor: result.nextCursor ?? null };
+  }
+
+  private async readCatalogPage<T>(method: string, params: Record<string, unknown>): Promise<AppServerCatalogPage<T> | null> {
+    try {
+      return await this.requestCatalogPage<T>(method, params);
+    } catch (err) {
+      logger.warn('Failed to read app-server catalog page', { method, error: errorToReason(err) });
+      return null;
+    }
+  }
+
+  private async collectCatalog<T>(
+    method: string,
+    params: Record<string, unknown>,
+    identity: (row: T) => string,
+  ): Promise<T[]> {
+    const data: T[] = [];
+    const ids = new Set<string>();
+    const cursors = new Set<string>();
+    let cursor = typeof params.cursor === 'string' ? params.cursor : null;
+    let pagesRead = 0;
+    try {
+      do {
+        if (cursor !== null) {
+          if (cursors.has(cursor)) throw new Error(`${method} returned a repeated pagination cursor`);
+          cursors.add(cursor);
+        }
+        const page = await this.requestCatalogPage<T>(method, {
+          ...params,
+          ...(cursor !== null ? { cursor } : {}),
+        });
+        page.data.forEach((row) => {
+          const id = identity(row);
+          if (typeof id !== 'string' || !id) throw new Error(`${method} returned a row without native identity`);
+          if (ids.has(id)) return;
+          ids.add(id);
+          data.push(row);
+        });
+        pagesRead += 1;
+        cursor = page.nextCursor;
+      } while (cursor !== null);
+      return data;
+    } catch (err) {
+      throw new AppServerCatalogReadError<T>({
+        status: pagesRead > 0 ? 'partial' : isAppServerMethodNotFoundError(err) ? 'unavailable' : 'failed',
+        data,
+        nextCursor: cursor,
+        errorReason: errorToReason(err),
+      });
+    }
+  }
+
+  /** Structured complete reads for UI consumers; legacy array contracts stay intact. */
+  private async readCatalogResult<T>(method: string, params: Record<string, unknown>, identity: (row: T) => string): Promise<AppServerCatalogReadResult<T>> {
+    try {
+      return { status: 'complete', data: await this.collectCatalog(method, params, identity), nextCursor: null };
+    } catch (error) {
+      if (error instanceof AppServerCatalogReadError) return error.result as AppServerCatalogReadFailure<T>;
+      return { status: 'failed', data: [], nextCursor: null, errorReason: errorToReason(error) };
+    }
+  }
+
+  getThreadsCatalog(options: AppServerThreadListOptions = {}): Promise<AppServerCatalogReadResult<AppServerThread>> {
+    return this.readCatalogResult('thread/list', { limit: options.limit ?? 50, ...(options.archived !== undefined ? { archived: options.archived } : {}) }, (row: AppServerThread) => row.id);
+  }
+
+  getModelsCatalog(): Promise<AppServerCatalogReadResult<AppServerModel>> {
+    return this.readCatalogResult('model/list', { limit: 50 }, (row: AppServerModel) => row.id);
+  }
+
+  getPermissionProfilesCatalog(options: { cwd?: string } = {}): Promise<AppServerCatalogReadResult<AppServerPermissionProfile>> {
+    return this.readCatalogResult('permissionProfile/list', { limit: 50, ...options }, (row: AppServerPermissionProfile) => row.id);
+  }
+
+  getMcpServerStatusCatalog(): Promise<AppServerCatalogReadResult<AppServerMcpServerStatus>> {
+    return this.readCatalogResult('mcpServerStatus/list', {}, (row: AppServerMcpServerStatus) => row.name);
+  }
+
+  async getLoadedThreadsCatalog(): Promise<AppServerCatalogReadResult<{ id: string }>> {
+    const result = await this.readCatalogResult('thread/loaded/list', {}, (row: string | { id: string }) => typeof row === 'string' ? row : row.id);
+    return { ...result, data: result.data.map((row) => typeof row === 'string' ? { id: row } : row) };
+  }
+
+  /** Additive page API; the legacy listThreads method remains a single-page array. */
+  async listThreadsPage(options: AppServerThreadListOptions = {}): Promise<AppServerCatalogPage<AppServerThread> | null> {
+    return this.readCatalogPage('thread/list', {
+      limit: options.limit ?? 50,
+      ...(options.archived !== undefined ? { archived: options.archived } : {}),
+      ...(options.cursor != null ? { cursor: options.cursor } : {}),
+    });
+  }
+
+  /** Read every page in one archive partition, retaining failure data in the error. */
+  async listAllThreads(options: AppServerThreadListOptions = {}): Promise<AppServerThread[]> {
+    return this.collectCatalog<AppServerThread>('thread/list', {
+      limit: options.limit ?? 50,
+      ...(options.archived !== undefined ? { archived: options.archived } : {}),
+      ...(options.cursor != null ? { cursor: options.cursor } : {}),
+    }, (thread) => thread.id);
+  }
+
+  async listModelsPage(options: AppServerCatalogListOptions = {}): Promise<AppServerCatalogPage<AppServerModel> | null> {
+    return this.readCatalogPage('model/list', {
+      limit: options.limit ?? 50,
+      ...(options.cursor != null ? { cursor: options.cursor } : {}),
+    });
+  }
+
+  async listPermissionProfilesPage(options: AppServerPermissionProfilesListOptions = {}): Promise<AppServerCatalogPage<AppServerPermissionProfile> | null> {
+    return this.readCatalogPage('permissionProfile/list', {
+      limit: options.limit ?? 50,
+      ...(options.cwd !== undefined ? { cwd: options.cwd } : {}),
+      ...(options.cursor != null ? { cursor: options.cursor } : {}),
+    });
+  }
+
+  async listMcpServerStatusPage(options: AppServerCatalogListOptions = {}): Promise<AppServerCatalogPage<AppServerMcpServerStatus> | null> {
+    return this.readCatalogPage('mcpServerStatus/list', {
+      ...(options.limit !== undefined ? { limit: options.limit } : {}),
+      ...(options.cursor != null ? { cursor: options.cursor } : {}),
+    });
+  }
+
+  async listLoadedThreadsPage(options: AppServerCatalogListOptions = {}): Promise<AppServerCatalogPage<{ id: string }> | null> {
+    const page = await this.readCatalogPage<string | { id: string }>('thread/loaded/list', {
+      ...(options.limit !== undefined ? { limit: options.limit } : {}),
+      ...(options.cursor != null ? { cursor: options.cursor } : {}),
+    });
+    return page ? { ...page, data: page.data.map((row) => typeof row === 'string' ? { id: row } : row) } : null;
+  }
 
   async listThreads(options: { limit?: number; archived?: boolean | null } = {}): Promise<AppServerThread[]> {
     await this.start();
@@ -915,9 +1084,9 @@ export class CodexAppServerClient extends CodexAppServerTransport {
   async listPermissionProfiles(options?: { cwd?: string; limit?: number; cursor?: string }): Promise<AppServerPermissionProfile[]> {
     await this.start();
     try {
-      const result = (await this.request('permissionProfile/list', { limit: options?.limit ?? 50, ...(options?.cwd ? { cwd: options.cwd } : {}), ...(options?.cursor ? { cursor: options.cursor } : {}) })) as { data: AppServerPermissionProfile[] } | undefined;
-      return result?.data ?? [];
+      return await this.collectCatalog<AppServerPermissionProfile>('permissionProfile/list', { limit: options?.limit ?? 50, ...(options?.cwd ? { cwd: options.cwd } : {}), ...(options?.cursor ? { cursor: options.cursor } : {}) }, (profile) => profile.id);
     } catch (err) {
+      if (err instanceof AppServerCatalogReadError && err.result.status === 'partial') throw err;
       logger.warn('Failed to list permission profiles', { error: err instanceof Error ? err.message : String(err) });
       return [];
     }
@@ -926,9 +1095,9 @@ export class CodexAppServerClient extends CodexAppServerTransport {
   async listModels(options?: { limit?: number; cursor?: string }): Promise<AppServerModel[]> {
     await this.start();
     try {
-      const result = (await this.request('model/list', { limit: options?.limit ?? 50, ...(options?.cursor ? { cursor: options.cursor } : {}) })) as { data: AppServerModel[] } | undefined;
-      return result?.data ?? [];
+      return await this.collectCatalog<AppServerModel>('model/list', { limit: options?.limit ?? 50, ...(options?.cursor ? { cursor: options.cursor } : {}) }, (model) => model.id);
     } catch (err) {
+      if (err instanceof AppServerCatalogReadError && err.result.status === 'partial') throw err;
       logger.warn('Failed to list models from app-server', { error: err instanceof Error ? err.message : String(err) });
       return [];
     }
@@ -1123,9 +1292,9 @@ export class CodexAppServerClient extends CodexAppServerTransport {
   async listMcpServerStatus(): Promise<AppServerMcpServerStatus[]> {
     await this.start();
     try {
-      const result = (await this.request('mcpServerStatus/list', {}, 30000)) as { data: AppServerMcpServerStatus[] } | undefined;
-      return result?.data ?? [];
+      return await this.collectCatalog<AppServerMcpServerStatus>('mcpServerStatus/list', {}, (server) => server.name);
     } catch (err) {
+      if (err instanceof AppServerCatalogReadError && err.result.status === 'partial') throw err;
       logger.warn('Failed to list MCP server status from app-server', {
         error: err instanceof Error ? err.message : String(err),
       });
@@ -1335,9 +1504,10 @@ export class CodexAppServerClient extends CodexAppServerTransport {
   async listLoadedThreads(): Promise<Array<{ id: string }>> {
     await this.start();
     try {
-      const result = (await this.request('thread/loaded/list', {})) as { data: Array<{ id: string }>; nextCursor: string | null } | undefined;
-      return result?.data ?? [];
+      const rows = await this.collectCatalog<string | { id: string }>('thread/loaded/list', {}, (row) => typeof row === 'string' ? row : row.id);
+      return rows.map((row) => typeof row === 'string' ? { id: row } : row);
     } catch (err) {
+      if (err instanceof AppServerCatalogReadError && err.result.status === 'partial') throw err;
       logger.warn('Failed to list loaded threads from app-server', {
         error: err instanceof Error ? err.message : String(err),
       });
@@ -1360,17 +1530,12 @@ export class CodexAppServerClient extends CodexAppServerTransport {
   }
 
   async archiveThread(threadId: string): Promise<boolean> {
-    await this.start();
-    try {
-      await this.request('thread/archive', { threadId });
-      return true;
-    } catch (err) {
-      logger.warn('Failed to archive thread via app-server', {
-        threadId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      return false;
-    }
+    return (await this.archiveThreadResult(threadId, { readback: false })).status === 'admitted';
+  }
+
+  async archiveThreadResult(threadId: string, options: { readback?: boolean } = {}): Promise<AppServerThreadMutationResult> {
+    const result = await this.mutateThread('archive', 'thread/archive', threadId);
+    return options.readback === false ? result : this.readThreadMutationBack(result);
   }
 
   async unarchiveThread(threadId: string): Promise<boolean> {
@@ -1602,35 +1767,102 @@ export class CodexAppServerClient extends CodexAppServerTransport {
     }
   }
 
-  /** Rename a thread via `thread/name/set`; the server emits `thread/name/updated`. */
-  async setThreadName(threadId: string, name: string): Promise<boolean> {
-    await this.start();
+  private async mutateThread(
+    operation: AppServerThreadMutationResult['operation'],
+    method: string,
+    threadId: string,
+    extraParams: Record<string, unknown> = {},
+  ): Promise<AppServerThreadMutationResult> {
     try {
-      await this.request('thread/name/set', { threadId, name }, 30000);
-      return true;
+      await this.start();
+      const ack = await this.request(method, { threadId, ...extraParams }, 30000);
+      // Native mutation responses are empty ACK objects. Accept legacy true,
+      // but never turn a false/missing/malformed response into success.
+      const admitted = ack === true || (ack !== null && typeof ack === 'object'
+        && !Array.isArray(ack) && Object.keys(ack).length === 0);
+      return admitted
+        ? { operation, threadId, status: 'admitted' }
+        : { operation, threadId, status: 'failed', errorReason: `${method} did not acknowledge the mutation` };
     } catch (err) {
-      logger.warn('Failed to set thread name via app-server', {
+      return {
+        operation,
         threadId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      return false;
+        status: isAppServerMethodNotFoundError(err) ? 'unavailable' : 'failed',
+        errorReason: errorToReason(err),
+      };
     }
   }
 
-  /** Delete a thread via `thread/delete`; the server emits `thread/deleted`. */
-  async deleteThread(threadId: string): Promise<boolean> {
-    await this.start();
-    try {
-      await this.request('thread/delete', { threadId }, 30000);
-      this.clearThreadEffectiveSettings(threadId);
-      return true;
-    } catch (err) {
-      logger.warn('Failed to delete thread via app-server', {
-        threadId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      return false;
+  /** Confirm only the same native ID and exact requested name; never echo input. */
+  async setThreadNameResult(threadId: string, name: string, options: { readback?: boolean } = {}): Promise<AppServerThreadMutationResult> {
+    const result = await this.mutateThread('rename', 'thread/name/set', threadId, { name });
+    return options.readback === false ? result : this.readThreadMutationBack(result, name);
+  }
+
+  /** Keep the legacy boolean contract for existing client callers. */
+  async setThreadName(threadId: string, name: string): Promise<boolean> {
+    return (await this.setThreadNameResult(threadId, name, { readback: false })).status === 'admitted';
+  }
+
+  async deleteThreadResult(threadId: string, options: { readback?: boolean } = {}): Promise<AppServerThreadMutationResult> {
+    let result = await this.mutateThread('delete', 'thread/delete', threadId);
+    if (options.readback !== false) {
+      // A prior ACK may already have deleted the thread before readback went
+      // offline. Only an exact same-ID absence error permits a retry probe;
+      // arbitrary mutation errors/false/unsupported still fail without a probe.
+      const retryAbsence = result.status === 'failed' && [
+        `no rollout found for thread id ${threadId}`,
+        `thread not found: ${threadId}`,
+        `thread ${threadId} does not exist`,
+      ].includes(result.errorReason?.trim() ?? '');
+      const readback = await this.readThreadMutationBack(retryAbsence ? { ...result, status: 'admitted' } : result);
+      result = retryAbsence && readback.status !== 'verified'
+        ? { ...result, readback: readback.readback }
+        : readback;
     }
+    if (result.status === 'verified') this.clearThreadEffectiveSettings(threadId);
+    return result;
+  }
+
+  private async readThreadMutationBack(result: AppServerThreadMutationResult, expectedName?: string): Promise<AppServerThreadMutationResult> {
+    if (result.status !== 'admitted') return result;
+    try {
+      if (result.operation === 'archive') {
+        const archived = await this.listAllThreads({ archived: true });
+        return this.withMutationReadback(result, archived.some((thread) => thread.id === result.threadId));
+      }
+      // readThread intentionally collapses read errors to null. Use the raw route
+      // here: null/offline is never proof of absence after a delete ACK.
+      const response = await this.request('thread/read', { threadId: result.threadId, includeTurns: false }, 30000) as { thread?: AppServerThread } | undefined;
+      if (response?.thread?.id !== result.threadId) {
+        return { ...result, readback: { status: 'unavailable', errorReason: 'Native readback did not return the same thread ID' } };
+      }
+      const matched = result.operation === 'rename' && response.thread.name === expectedName;
+      return this.withMutationReadback(result, matched);
+    } catch (err) {
+      const reason = errorToReason(err);
+      // Only an explicit absence of THIS ID proves deletion. Auth, transport,
+      // unsupported routes and an unrelated missing thread remain unavailable.
+      const missing = result.operation === 'delete' && !isAppServerMethodNotFoundError(err) && [
+        `no rollout found for thread id ${result.threadId}`,
+        `thread not found: ${result.threadId}`,
+        `thread ${result.threadId} does not exist`,
+      ].includes(reason.trim());
+      return missing
+        ? { ...result, status: 'verified', readback: { status: 'verified' } }
+        : { ...result, readback: { status: 'unavailable', errorReason: reason } };
+    }
+  }
+
+  private withMutationReadback(result: AppServerThreadMutationResult, matched: boolean): AppServerThreadMutationResult {
+    return matched
+      ? { ...result, status: 'verified', readback: { status: 'verified' } }
+      : { ...result, readback: { status: 'failed', errorReason: 'Native readback did not confirm the requested mutation' } };
+  }
+
+  /** Delete ACK only; errors retain the effective-settings cache for recovery. */
+  async deleteThread(threadId: string): Promise<boolean> {
+    return (await this.deleteThreadResult(threadId, { readback: false })).status === 'admitted';
   }
 
   /**

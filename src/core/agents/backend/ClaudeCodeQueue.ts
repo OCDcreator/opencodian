@@ -4,7 +4,7 @@
  * @module claude-code-queue
  */
 
-import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+import type { Query, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 
 import type { ImageAttachment } from '../../types';
 
@@ -35,6 +35,31 @@ export interface ClaudeCodeQueuedPrompt extends SDKUserMessage {
   parent_tool_use_id: null;
 }
 
+/** SDK 0.3.283 accepts only tighten-only MCP overrides, or null to inherit. */
+export type ClaudeCodeMcpPermissionModeOverride = Parameters<Query['setMcpPermissionModeOverride']>[1];
+
+/** A control acknowledgement is not effective-setting or prompt-application proof. */
+export type ClaudeCodeSessionControlResult<TResponse> =
+  | { status: 'acknowledged'; nativeSessionId: string; response: TResponse }
+  | {
+    status: 'unavailable';
+    nativeSessionId: string;
+    reason: 'invalid-native-session-id' | 'no-active-session' | 'missing-method';
+  }
+  | {
+    status: 'failed';
+    nativeSessionId: string;
+    reason: 'invalid-input' | 'request-failed' | 'invalid-response' | 'session-changed';
+  };
+
+export type ClaudeCodeMcpPermissionModeOverrideResult = ClaudeCodeSessionControlResult<
+  Awaited<ReturnType<Query['setMcpPermissionModeOverride']>>
+>;
+
+export type ClaudeCodeOutputStylesReloadResult = ClaudeCodeSessionControlResult<
+  Awaited<ReturnType<Query['reloadOutputStyles']>>
+>;
+
 export interface ClaudeCodeSessionRuntime {
   input: ClaudeCodeAsyncQueue<ClaudeCodeQueuedPrompt>;
   output: ClaudeCodeAsyncQueue<ClaudeCodeRuntimeOutput>;
@@ -48,6 +73,8 @@ export interface ClaudeCodeSessionRuntime {
     interrupt?: () => Promise<unknown>;
     setModel?: (model?: string) => Promise<void>;
     setPermissionMode?: (mode: string) => Promise<void>;
+    setMcpPermissionModeOverride?: Query['setMcpPermissionModeOverride'];
+    reloadOutputStyles?: Query['reloadOutputStyles'];
     setMcpServers?: (servers: Record<string, unknown>) => Promise<unknown>;
     reloadSkills?: () => Promise<unknown>;
     rewindFiles?: (userMessageId: string, options?: { dryRun?: boolean }) => Promise<unknown>;

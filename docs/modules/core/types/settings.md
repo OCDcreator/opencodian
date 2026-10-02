@@ -481,7 +481,7 @@ New normalize functions added:
 
 > 2026-09-18 (R-C3)：新增 `inlineCompletionEnabled`（默认 `false`）与 `inlineCompletionMaxChars`（默认 `300`，clamp 50–2000，`normalizeInlineCompletionMaxChars`）；`DEFAULT_SETTINGS` 同步。
 
-> 2026-09-19 (R-C3 补全专用模型覆盖)：新增 `inlineCompletionModelOverrides: Partial<Record<AgentBackendKind, string>>`（默认 `{}`），值格式与 `inlineEditModelOverrides` 完全一致；归一化经 `normalizeInlineCompletionModelOverrides()`（委托同一实现，独立命名保持两条设置各自可检索）。补全延迟敏感——模型首字节之前 ghost text 无法出现——该设置允许为补全单独钉一个低延迟模型而不动行内编辑；空映射 = 继承既有解析链（默认行为逐字节不变）。
+> 2026-09-19 (R-C3 补全专用模型覆盖)：新增 `inlineCompletionModelOverrides: Partial<Record<AgentBackendKind, string>>`（默认 `{}`），值格式与 `inlineEditModelOverrides` 完全一致；归一化经 `normalizeInlineCompletionModelOverrides()`（独立 allowlist，在行内编辑允许的后端基础上额外接受 ZCode 的无会话文本补全路径）。补全延迟敏感——模型首字节之前 ghost text 无法出现——该设置允许为补全单独钉一个低延迟模型而不动行内编辑；空映射 = 继承既有解析链（默认行为逐字节不变）。
 
 > 2026-09-22 (ZCode 票 01)：`BackendSettings` 增加 `zcode: ZCodeBackendSettings`（最小运行时选择：仅 `executablePath` 覆盖，空=自动发现官方安装）；`normalizeZCodeBackendSettings` 归一化缺失/非法值，`getDefaultBackendSettings` 同步。
 > 2026-09-24 (票 06)：ZCodeBackendSettings 增加持久化默认 model（providerId/modelId）/thinkingLevel/mode（枚举归一 plan/build/edit/yolo/auto，非法归空）；normalizeZCodeBackendSettings 同步。
@@ -493,3 +493,13 @@ BackendSettings stores a distinct opencode2 block with local/remote mode, execut
 ### 2026-09-28 parity continuation
 
 OpenCode 2 permissionMode persists inherit/normal/yolo/plan separately from OpenCode 1 settings; normalization rejects unknown modes.
+
+### 2026-10-02 T02 inline model override normalization
+
+`INLINE_EDIT_BACKENDS` now includes `opencode2`, matching the existing settings controls and model resolver. Both `normalizeInlineEditModelOverrides()` and `normalizeInlineCompletionModelOverrides()` retain trimmed, non-empty OpenCode 2 model references during save and reload, with independent `opencode` and `opencode2` keys. Invalid value types, empty values and unknown backend keys are still dropped. Backend-specific model syntax remains the feature resolver's responsibility.
+
+ZCode remains completion-only: `INLINE_COMPLETION_BACKENDS` adds `zcode` to the edit allowlist, while generic inline-edit overrides continue to exclude it. Including OpenCode 2 in the edit allowlist does not enable effort overrides; only the existing Claude Code and Codex native effort lists normalize.
+
+Focused regression tests cover the settings callbacks' saved JSON snapshots, the `prepareLoadedSettingsBootstrapState()` reload boundary, remounted controls, the real inline-edit model chain and the production completion target's session configuration. Dedicated completion overrides take precedence over edit overrides; absent overrides retain the edit/chat fallback chain. These unit tests prove persistence normalization and request application at the mocked backend seam; real OpenCode 2 runtime readback and Obsidian host interaction remain unverified.
+
+2026-10-02 T07：仅 PiBackendSettings.thinkingLevel 与 normalizePiBackendSettings 新增 max 持久化允许值，保留既有 xhigh 等历史值。PiAdapter.uiReads.test.ts 验证 max 不被 normalization 清空；此 allowlist 仅保障设置 roundtrip，模型支持列表必须来自当前 Pi session SDK readback。

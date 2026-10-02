@@ -1,13 +1,15 @@
 import { type App, Modal, Notice } from 'obsidian';
 
 import type { AppServerMcpResourceReadResult, AppServerMcpServerStatus, McpOauthLoginResult } from '../../core/agents/backend/CodexAppServerClient';
+import type { AppServerCatalogReadResult } from '../../core/agents/backend/CodexAppServerClient';
 import { t } from '../../i18n';
 import { type ExpandedState, renderResourceEntry, renderResourceTemplateEntry, renderToolEntry } from './CodexMcpServerDetailRenderers';
 
-type McpModalState = 'loading' | 'unavailable' | 'failed' | 'empty' | 'success';
+type McpModalState = 'loading' | 'unavailable' | 'failed' | 'empty' | 'success' | 'partial';
 
 export interface CodexMcpServerDetailModalHost {
   getMcpServerStatus(): Promise<AppServerMcpServerStatus[] | null>;
+  getMcpServerStatusCatalog?(): Promise<AppServerCatalogReadResult<AppServerMcpServerStatus>>;
   reloadMcpServers(): Promise<boolean>;
   triggerMcpServerOAuth(
     name: string,
@@ -75,8 +77,15 @@ export class CodexMcpServerDetailModal extends Modal {
 
   private async loadAndRender(): Promise<void> {
     this.busy = true;
+    this.setState('loading');
     let nextState: McpModalState = 'failed';
     try {
+      if (this.host.getMcpServerStatusCatalog) {
+        const result = await this.host.getMcpServerStatusCatalog();
+        this.servers = result.data;
+        nextState = result.status === 'complete' ? result.data.length > 0 ? 'success' : 'empty' : result.status;
+        return;
+      }
       const result = await this.host.getMcpServerStatus();
       if (result === null) {
         nextState = 'unavailable';
@@ -105,6 +114,9 @@ export class CodexMcpServerDetailModal extends Modal {
     this.state = state;
     this.contentAreaEl.empty();
     this.statusValueEl.setAttribute('data-mcp-state', state);
+    this.statusValueEl.setAttribute('role', 'status');
+    this.statusValueEl.setAttribute('aria-live', 'polite');
+    this.statusValueEl.setAttribute('aria-busy', String(state === 'loading'));
 
     switch (state) {
       case 'loading':
@@ -123,8 +135,12 @@ export class CodexMcpServerDetailModal extends Modal {
         this.statusValueEl.setText(t('settings.codex.readback.statusEmpty'));
         this.renderStateMessage(t('settings.codex.mcpDetail.empty'));
         return;
+      case 'partial':
       case 'success':
-        this.statusValueEl.setText(t('settings.codex.readback.statusCount', { count: this.servers.length }));
+        this.statusValueEl.setText(state === 'partial'
+          ? t('settings.codex.readback.statusPartial', { count: this.servers.length })
+          : t('settings.codex.readback.statusCount', { count: this.servers.length }));
+        if (state === 'partial') this.renderStateMessage(t('settings.codex.readback.messagePartialReload'));
         this.renderSuccessContent(this.contentAreaEl);
         this.applyFocusServer();
         return;
@@ -393,6 +409,7 @@ export class CodexMcpServerDetailModal extends Modal {
 
 export interface CodexMcpServerDetailAdapterLike {
   getMcpServerStatus?(): Promise<unknown[] | null>;
+  getMcpServerStatusCatalog?(): Promise<AppServerCatalogReadResult<AppServerMcpServerStatus>>;
   reloadMcpServers?(): Promise<boolean>;
   triggerMcpServerOAuth?(
     name: string,
@@ -405,6 +422,7 @@ export function createCodexMcpServerDetailHost(
   adapter: CodexMcpServerDetailAdapterLike,
 ): CodexMcpServerDetailModalHost {
   return {
+    ...(adapter.getMcpServerStatusCatalog ? { getMcpServerStatusCatalog: adapter.getMcpServerStatusCatalog.bind(adapter) } : {}),
     getMcpServerStatus: async (): Promise<AppServerMcpServerStatus[] | null> => {
       if (typeof adapter.getMcpServerStatus !== 'function') return null;
       const result = await adapter.getMcpServerStatus();

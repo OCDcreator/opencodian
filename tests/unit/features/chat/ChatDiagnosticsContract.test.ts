@@ -18,6 +18,7 @@
  * and the delete-conversation path through StorageService.
  */
 import type { Menu } from 'obsidian';
+import { createSourceFile, isClassDeclaration, isMethodDeclaration, ScriptTarget } from 'typescript';
 
 import type { ClaudeDiagnosticsHostAdapterHost } from '../../../../src/features/chat/services/ClaudeDiagnosticsHostAdapter';
 import { ClaudeDiagnosticsHostAdapter } from '../../../../src/features/chat/services/ClaudeDiagnosticsHostAdapter';
@@ -126,6 +127,17 @@ function expectSourceOrder(source: string, snippets: readonly string[]): void {
     expect(next).toBeGreaterThanOrEqual(0);
     cursor = next + snippet.length;
   }
+}
+
+function extractClassMethodSource(source: string, className: string, methodName: string): string {
+  const sourceFile = createSourceFile('diagnostics-contract.ts', source, ScriptTarget.Latest, true);
+  const classes = sourceFile.statements.filter(isClassDeclaration)
+    .filter((node) => node.name?.text === className);
+  if (classes.length !== 1) throw new Error(`Expected one class ${className}, found ${classes.length}`);
+  const methods = classes[0].members.filter(isMethodDeclaration)
+    .filter((node) => node.name.getText(sourceFile) === methodName && node.body);
+  if (methods.length !== 1) throw new Error(`Expected one method ${className}.${methodName}, found ${methods.length}`);
+  return methods[0].getText(sourceFile);
 }
 
 describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () => {
@@ -428,11 +440,55 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
   // seam here.
   //
   // We prove this by source-level contract: deleteConversation touches only
-  // vault.adapter.remove + conversationMetadataCache.removeConversationMeta.
+  // vault.adapter.remove/exists + conversationMetadataCache.removeConversationMeta.
+  // Parse the exact class method so added storage guards cannot truncate the check.
   // A behavioral test would require the full Obsidian vault mock; instead we
   // pin the structural invariant that no trace symbol is referenced from the
   // delete path.
   // ---------------------------------------------------------------------------
+
+  describe('exact method extraction protects the no-trace invariant', () => {
+    it('includes the full long method while excluding adjacent methods and same-named methods in other classes', () => {
+      const method = `async deleteConversation(id: string, options: { verifyAbsent?: boolean } = {}): Promise<void> {
+        const braces = 'body-like } { text';
+        ${'// nested-looking { } padding\n'.repeat(60)}
+        if (options.verifyAbsent) {
+          try { await this.vault.adapter.remove(id); } catch { if (braces) { await this.vault.adapter.exists(id); } }
+        }
+        await this.conversationMetadataCache.removeConversationMeta(id);
+      }`;
+      const source = `class Other { async deleteConversation() { this.traceService.cancelDeepCapture(); } }
+        class StorageService {
+          ${method}
+          adjacent() { this.traceService.cancelDeepCapture(); }
+        }`;
+      const extracted = extractClassMethodSource(source, 'StorageService', 'deleteConversation');
+      expect(extracted).toBe(method);
+      expect(extracted.length).toBeGreaterThan(600);
+      expect(extracted).toContain('removeConversationMeta(id)');
+      expect(extracted).not.toMatch(/traceService|cancelDeepCapture|adjacent/);
+    });
+
+    it('keeps forbidden trace calls after a long body visible to the invariant', () => {
+      const source = `class StorageService {
+        async deleteConversation(id: string) {
+          ${'// padding beyond the previous slice limit\n'.repeat(60)}
+          await this.conversationMetadataCache.removeConversationMeta(id);
+          this.traceService.cancelDeepCapture();
+        }
+      }`;
+      const extracted = extractClassMethodSource(source, 'StorageService', 'deleteConversation');
+      expect(extracted.indexOf('cancelDeepCapture')).toBeGreaterThan(600);
+      expect(extracted).toMatch(/traceService|cancelDeepCapture/);
+    });
+
+    it.each([
+      'class Other { deleteConversation() {} }',
+      'class StorageService { deleteConversation() {} deleteConversation() {} }',
+    ])('fails closed for a missing or ambiguous method', (source) => {
+      expect(() => extractClassMethodSource(source, 'StorageService', 'deleteConversation')).toThrow(/Expected one/);
+    });
+  });
 
   describe('delete-conversation performs NO trace interaction (plan invariant)', () => {
     it('StorageService.deleteConversation source references no trace/diagnostic symbol', () => {
@@ -444,17 +500,12 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
         path.resolve(__dirname, '../../../../src/core/storage/StorageService.ts'),
         'utf8',
       );
-      // Extract the deleteConversation method body.
-      const start = source.indexOf('async deleteConversation(');
-      expect(start).toBeGreaterThan(-1);
-      // Body ends at the next method's JSDoc or the closing brace before a
-      // method at column 2. Take a bounded slice.
-      const body = source.slice(start, start + 600);
+      const body = extractClassMethodSource(source, 'StorageService', 'deleteConversation');
       // The delete path must not reference any trace/diagnostic service or the
       // plugin-level diagnostic export surfaces (buildDiagnosticReport/
       // writeDiagnosticLogFile/logServerStatusSnapshot/getServerDiagnostics).
       expect(body).not.toMatch(/traceService|TraceService|tracePort|cancelDeepCapture|claimDeepCapture|armDeepCapture|flushRingBuffer|buildSmartReport|clearAll|buildDiagnosticReport|writeDiagnosticLogFile|logServerStatusSnapshot|getServerDiagnostics/);
-      // It must reference only vault removal + metadata cache removal.
+      // Both the session-file removal and the final metadata cleanup must be inspected.
       expect(body).toMatch(/vault\.adapter\.remove/);
       expect(body).toMatch(/removeConversationMeta/);
     });
@@ -468,9 +519,7 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
         path.resolve(__dirname, '../../../../src/core/storage/ConversationMetadataCache.ts'),
         'utf8',
       );
-      const start = source.indexOf('async removeConversationMeta(');
-      expect(start).toBeGreaterThan(-1);
-      const body = source.slice(start, start + 400);
+      const body = extractClassMethodSource(source, 'ConversationMetadataCache', 'removeConversationMeta');
       expect(body).not.toMatch(/traceService|TraceService|tracePort|cancelDeepCapture|claimDeepCapture|armDeepCapture|buildDiagnosticReport|writeDiagnosticLogFile/);
     });
 
@@ -485,12 +534,7 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
         path.resolve(__dirname, '../../../../src/main.ts'),
         'utf8',
       );
-      const start = source.indexOf('  async deleteConversation(id: string): Promise<void> {');
-      expect(start).toBeGreaterThan(-1);
-      // Bound to the next method at column 2.
-      const nextMethodRel = source.slice(start + 1).search(/\n[/ ]{2}(private|public|protected|async)\b/);
-      const end = nextMethodRel > 0 ? start + 1 + nextMethodRel : start + 800;
-      const body = source.slice(start, end);
+      const body = extractClassMethodSource(source, 'OpenCodianPlugin', 'deleteConversation');
       expect(body).not.toMatch(/traceService|TraceService|tracePort|cancelDeepCapture|claimDeepCapture|armDeepCapture|flushRingBuffer|buildSmartReport|clearAll|buildDiagnosticReport|writeDiagnosticLogFile|logServerStatusSnapshot|getServerDiagnostics/);
       // It delegates to storage.deleteConversation (no trace interaction).
       expect(body).toMatch(/this\.storage\.deleteConversation\(id\)/);

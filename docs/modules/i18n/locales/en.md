@@ -636,3 +636,7 @@ English settings copy distinguishes OpenCode 1 and OpenCode 2 and labels the ver
 ### 2026-09-28 parity continuation
 
 OpenCode 2 inherited server permission mode has English label and explanation.
+
+2026-10-02：补充 Pi 原生思考等级与历史节点的 unavailable/fallback 文案、Claude 活跃会话控制结果边界，以及 ZCode 插件/MCP/hooks 管理面的回读状态。两种语言保持相同 key 集合。
+
+2026-10-02：新增 Codex 仅遗忘本地的确认与成功/失败文案，以及会话、模型、权限、MCP、loaded 目录 partial/failed/unavailable 状态文案。原生历史保留边界在确认框显式说明。

@@ -3,13 +3,39 @@ import {
   getBackendSessionPreview,
   getBackendSessionTurnsPage,
   hasBackendSessionTurnsPage,
+  listBackendSessions,
   type NormalizedSessionDetail,
   type NormalizedSessionMessagesPage,
   type NormalizedSessionPreviewMessage,
   type NormalizedSessionPreviewPart,
+  type NormalizedSessionRow,
 } from '../../../core/agents/backend/AgentBackendRouting';
 import type { AgentServiceRegistry } from '../../../core/agents/backend/AgentServiceRegistry';
+import type { AppServerCatalogReadResult } from '../../../core/agents/backend/CodexAppServerClient';
 import { t } from '../../../i18n';
+
+/** Browser inspection consumes Codex evidence without changing legacy backends. */
+export async function readBackendSessionCatalog(registry: AgentServiceRegistry | null): Promise<AppServerCatalogReadResult<NormalizedSessionRow>> {
+  const active = registry?.getActive();
+  const codex = active?.kind === 'codex' ? active as unknown as {
+    getSessionCatalog?: () => Promise<AppServerCatalogReadResult<NormalizedSessionRow>>;
+  } : null;
+  if (codex?.getSessionCatalog) return codex.getSessionCatalog();
+  return { status: 'complete', data: await listBackendSessions(registry), nextCursor: null };
+}
+
+export function renderBackendSessionCatalogStatus(listEl: HTMLElement, state: AppServerCatalogReadResult<unknown>['status'] | 'loading'): void {
+  listEl.setAttribute('data-session-catalog-state', state);
+  listEl.setAttribute('aria-busy', String(state === 'loading'));
+  if (state === 'complete') return;
+  const messages = {
+    loading: t('chat.backendSessions.loading'),
+    partial: t('chat.backendSessions.catalogPartial'),
+    failed: t('chat.backendSessions.catalogFailed'),
+    unavailable: t('chat.backendSessions.catalogUnavailable'),
+  };
+  listEl.createEl('p', { text: messages[state], attr: { role: 'status', 'aria-live': 'polite' } });
+}
 
 /** Turns requested per page when the backend exposes the paginated turns seam. */
 const TURN_PAGE_LIMIT = 20;

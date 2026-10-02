@@ -87,3 +87,5 @@ English and Chinese Pi settings copy describe the external CLI, connection check
 ## 2026-09-27 OpenCode 2 compatibility
 
 English and Chinese strings distinguish OpenCode 1 and 2 and label the OpenCode 2 connection controls.
+
+2026-10-02：共享中英文目录新增 Codex 本地遗忘/分页状态、Pi 动态思考与原生节点降级、Claude 会话控制以及 ZCode 管理结果三轴文案；已知 native token 只在显示层翻译。

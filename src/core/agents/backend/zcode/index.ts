@@ -18,6 +18,7 @@ export {
   ZCodeRemoteRequestError,
   ZCodeTransportError,
 } from './ZCodeAppServerTransport';
+export type { ZCodeManagementCatalog, ZCodeManagementMutationResult } from './ZCodeManagementService';
 export {
   parseZCodeInboundMessage,
   parseZCodeRuntimeCapabilities,

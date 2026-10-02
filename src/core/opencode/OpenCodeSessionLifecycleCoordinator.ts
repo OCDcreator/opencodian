@@ -1,5 +1,8 @@
 import { createLogger } from '../../shared';
 import type { SessionTodo } from '../types';
+import type { OpenCodeSessionSnapshotToken, SessionMessage } from './types';
+
+export type { Message, Part, SessionMessage } from './types';
 import {
   OpenCodeSyncEventRuntimeCoordinator,
   type SessionActivityStatus,
@@ -44,56 +47,6 @@ export interface Session {
   share?: unknown;
 }
 
-export interface Message {
-  id: string;
-  sessionID: string;
-  role: 'user' | 'assistant';
-  providerID?: string;
-  modelID?: string;
-  summary?: boolean;
-  structured?: unknown;
-  error?: unknown;
-  cost?: number;
-  tokens?: {
-    total?: number;
-    input: number;
-    output: number;
-    reasoning: number;
-    cache: {
-      read: number;
-      write: number;
-    };
-  };
-  time: {
-    created: number;
-    updated?: number;
-  };
-}
-
-export interface Part {
-  id: string;
-  sessionID: string;
-  messageID: string;
-  type: string;
-  text?: string;
-  auto?: boolean;
-  overflow?: boolean;
-  tail_start_id?: string;
-  synthetic?: boolean;
-  metadata?: Record<string, unknown>;
-  duration?: number;
-  time?: {
-    start?: number;
-    end?: number;
-  };
-  [key: string]: unknown;
-}
-
-export interface SessionMessage {
-  info: Message;
-  parts: Part[];
-}
-
 export interface OpenCodeSessionLifecycleSdk {
   abort(request: { sessionID: string }): Promise<unknown>;
   create(request?: { title?: string }): Promise<unknown>;
@@ -134,7 +87,10 @@ export interface OpenCodeSessionLifecycleCoordinatorHost {
   normalizeSessionTodos(response: unknown): SessionTodo[];
   normalizeSessionStatuses(response: unknown): Record<string, SessionActivityStatus>;
   applySessionRevertState(sessionId: string, messages: SessionMessage[]): Promise<SessionMessage[]>;
-  applyCanonicalSnapshot(sessionId: string, messages: SessionMessage[]): void;
+  beginCanonicalSnapshot(sessionId: string): OpenCodeSessionSnapshotToken;
+  applyCanonicalSnapshot(
+    sessionId: string, messages: SessionMessage[], token: OpenCodeSessionSnapshotToken,
+  ): SessionMessage[];
   observeToolNamesInMessages(messages: SessionMessage[]): void;
   logServiceWarning(key: string, message: string, error: unknown): void;
   logServiceError(key: string, message: string, error: unknown): void;
@@ -230,28 +186,30 @@ export class OpenCodeSessionLifecycleCoordinator {
 
     if (this.host.shouldUseSdkCrud()) {
       try {
+        const token = this.host.beginCanonicalSnapshot(sessionId);
         const response = await this.host.getSdkSession().messages({ sessionID: sessionId });
         const messages = await this.host.applySessionRevertState(
           sessionId,
           this.host.normalizeSessionMessages(response),
         );
-        this.host.observeToolNamesInMessages(messages);
-        this.host.applyCanonicalSnapshot(sessionId, messages);
-        return messages;
+        const merged = this.host.applyCanonicalSnapshot(sessionId, messages, token);
+        this.host.observeToolNamesInMessages(merged);
+        return merged;
       } catch (error) {
         this.host.logServiceWarning('session.messages', `SDK session.messages failed for ${sessionId}, falling back to legacy HTTP`, error);
       }
     }
 
     try {
+      const token = this.host.beginCanonicalSnapshot(sessionId);
       const response = await this.host.getLegacy<unknown>(`/session/${sessionId}/message`);
       const messages = await this.host.applySessionRevertState(
         sessionId,
         Array.isArray(response) ? response as SessionMessage[] : [],
       );
-      this.host.observeToolNamesInMessages(messages);
-      this.host.applyCanonicalSnapshot(sessionId, messages);
-      return messages;
+      const merged = this.host.applyCanonicalSnapshot(sessionId, messages, token);
+      this.host.observeToolNamesInMessages(merged);
+      return merged;
     } catch (error) {
       this.host.logServiceError('session.messages', `Failed to get messages for session ${sessionId}:`, error);
       return [];

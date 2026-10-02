@@ -2,7 +2,8 @@ import * as nodeOs from 'node:os';
 
 import { Setting } from 'obsidian';
 
-import type { ZCodeAdapter, ZCodeAdapterRuntimeDiagnostics } from '../../core/agents/backend/zcode';
+import type { FileRevision } from '../../core/agents/backend/ProjectResourceSecureWrite';
+import type { ZCodeAdapter, ZCodeAdapterRuntimeDiagnostics, ZCodeManagementCatalog, ZCodeManagementMutationResult } from '../../core/agents/backend/zcode';
 import { normalizeZCodeBackendSettings, type ZCodeBackendSettings } from '../../core/types/settings';
 import { t } from '../../i18n';
 
@@ -11,7 +12,13 @@ export interface SettingsZCodeHost {
   settings: { backendSettings: { zcode?: ZCodeBackendSettings } };
   saveSettings(): Promise<void>;
   agentServiceRegistry?: {
-    get(kind: 'zcode'): { start(): Promise<void>; stop(): Promise<void>; getRuntimeDiagnostics?(): ZCodeAdapterRuntimeDiagnostics } | undefined;
+    get(kind: 'zcode'): {
+      start(): Promise<void>;
+      stop(): Promise<void>;
+      getRuntimeDiagnostics?(): ZCodeAdapterRuntimeDiagnostics;
+      getManagementCatalog?(): Promise<ZCodeManagementCatalog | null>;
+      setManagedPluginEnabled?(pluginId: string, enabled: boolean, expectedRevision: FileRevision | null): Promise<ZCodeManagementMutationResult>;
+    } | undefined;
   };
   invalidateSlashCommandCatalog?(): void;
 }
@@ -22,6 +29,12 @@ function shortenPath(filePath: string): string {
   const normalized = filePath.replace(/\\/g, '/');
   const normalizedHome = home.replace(/\\/g, '/');
   return normalized.startsWith(`${normalizedHome}/`) ? `~/${normalized.slice(normalizedHome.length + 1)}` : filePath;
+}
+
+/** Parent supplies locale entries; keep the surface usable until that handoff lands. */
+function managementText(key: string, fallback: string): string {
+  const translated = t(key as Parameters<typeof t>[0]);
+  return translated === key ? fallback : translated;
 }
 
 /**
@@ -53,6 +66,7 @@ export class SettingsZCodeSection {
     body.createEl('h3', { text: t('settings.zcode.tab.connection') });
     body.createEl('p', { text: t('settings.zcode.description'), cls: 'setting-item-description' });
 
+    // Initial values are a render snapshot; change handlers merge the latest host state.
     const settings = normalizeZCodeBackendSettings(this.host.settings.backendSettings.zcode);
     new Setting(body)
       .setName(t('settings.zcode.executable'))
@@ -63,7 +77,7 @@ export class SettingsZCodeSection {
           .setValue(settings.executablePath)
           .onChange(async (value) => {
             this.host.settings.backendSettings.zcode = normalizeZCodeBackendSettings({
-              ...settings,
+              ...normalizeZCodeBackendSettings(this.host.settings.backendSettings.zcode),
               executablePath: value,
             });
             await this.host.saveSettings();
@@ -78,7 +92,10 @@ export class SettingsZCodeSection {
           .setPlaceholder(t('settings.zcode.model.placeholder'))
           .setValue(settings.model)
           .onChange(async (value) => {
-            this.host.settings.backendSettings.zcode = normalizeZCodeBackendSettings({ ...settings, model: value });
+            this.host.settings.backendSettings.zcode = normalizeZCodeBackendSettings({
+              ...normalizeZCodeBackendSettings(this.host.settings.backendSettings.zcode),
+              model: value,
+            });
             await this.host.saveSettings();
           });
       });
@@ -90,7 +107,10 @@ export class SettingsZCodeSection {
           .setPlaceholder(t('settings.zcode.thinking.placeholder'))
           .setValue(settings.thinkingLevel)
           .onChange(async (value) => {
-            this.host.settings.backendSettings.zcode = normalizeZCodeBackendSettings({ ...settings, thinkingLevel: value });
+            this.host.settings.backendSettings.zcode = normalizeZCodeBackendSettings({
+              ...normalizeZCodeBackendSettings(this.host.settings.backendSettings.zcode),
+              thinkingLevel: value,
+            });
             await this.host.saveSettings();
           });
       });
@@ -102,7 +122,10 @@ export class SettingsZCodeSection {
           dropdown.addOption(value, value === '' ? t('settings.zcode.mode.inherit') : value);
         }
         dropdown.setValue(settings.mode).onChange(async (value) => {
-          this.host.settings.backendSettings.zcode = normalizeZCodeBackendSettings({ ...settings, mode: value });
+          this.host.settings.backendSettings.zcode = normalizeZCodeBackendSettings({
+            ...normalizeZCodeBackendSettings(this.host.settings.backendSettings.zcode),
+            mode: value,
+          });
           await this.host.saveSettings();
         });
       });
@@ -131,6 +154,95 @@ export class SettingsZCodeSection {
           }
         });
       });
+    this.attachManagement(body);
+  }
+
+  private attachManagement(body: HTMLElement): void {
+    const container = body.createDiv({ attr: { 'data-settings-target': 'zcode-management' } });
+    container.createEl('h3', { text: managementText('settings.zcode.management.title', 'Plugins, MCP and hooks') });
+    container.createEl('p', {
+      cls: 'setting-item-description',
+      text: managementText('settings.zcode.management.help', 'Plugin switches save workspace overrides. Effective configuration is read again after saving; existing sessions keep their startup snapshot. MCP status and hook declarations are read-only.'),
+    });
+    const outcome = container.createDiv({ attr: { role: 'status', 'data-zcode-management': 'outcome' } });
+    const catalog = container.createDiv({ attr: { 'data-zcode-management': 'catalog' } });
+    let refreshEpoch = 0;
+    const refresh = async (): Promise<void> => {
+      const epoch = ++refreshEpoch;
+      try {
+        const snapshot = await this.adapter?.getManagementCatalog?.() ?? null;
+        if (epoch === refreshEpoch) this.renderManagement(catalog, snapshot, outcome, refresh);
+      } catch {
+        if (epoch === refreshEpoch) {
+          catalog.empty();
+          this.addStateRow(catalog, managementText('settings.zcode.management.title', 'Plugins, MCP and hooks'), managementText('settings.zcode.management.failed', 'Readback failed; effective values are unknown.'));
+        }
+      }
+    };
+    new Setting(container)
+      .setName(managementText('settings.zcode.management.refresh', 'Refresh effective catalog'))
+      .addButton((button) => button.setButtonText(managementText('settings.zcode.management.refresh', 'Refresh effective catalog')).onClick(async () => {
+        button.setDisabled(true);
+        try { await refresh(); } finally { button.setDisabled(false); }
+      }));
+    void refresh();
+  }
+
+  private renderManagement(container: HTMLElement, catalog: ZCodeManagementCatalog | null, outcome: HTMLElement, refresh: () => Promise<void>): void {
+    container.empty();
+    if (!catalog) {
+      this.addStateRow(container, managementText('settings.zcode.management.title', 'Plugins, MCP and hooks'), managementText('settings.zcode.management.unavailable', 'Unavailable for this runtime or workspace.'));
+      return;
+    }
+    this.addStateRow(container, managementText('settings.zcode.management.declarations', 'Workspace declarations'),
+      catalog.configuration.state === 'available'
+        ? t('settings.zcode.management.declarationCounts', {
+            path: shortenPath(catalog.configuration.targetPath), plugins: catalog.configuration.pluginOverrideCount ?? '?',
+            mcp: catalog.configuration.mcpDeclarationCount ?? '?', hooks: catalog.configuration.hookDeclarationCount ?? '?',
+          })
+        : managementText('settings.zcode.management.failed', 'Readback failed; effective values are unknown.'));
+    this.addStateRow(container, managementText('settings.zcode.management.plugins', 'Effective plugin configuration'),
+      managementText(`settings.zcode.management.${catalog.plugins.state}`, catalog.plugins.state));
+    for (const plugin of catalog.plugins.entries ?? []) {
+      new Setting(container)
+        .setName(plugin.id)
+        .setDesc(t('settings.zcode.management.pluginDetails', {
+          source: managementText(`settings.zcode.management.sourceValue.${plugin.enabledSource ?? 'unknown'}`, plugin.enabledSource ?? 'unknown'),
+          mcp: plugin.mcpCount ?? '?', hooks: plugin.hookCount ?? '?',
+          missing: plugin.packageMissing ? t('settings.zcode.management.packageMissing') : '',
+        }))
+        .addToggle((toggle) => {
+          toggle.setValue(plugin.enabled).setDisabled(catalog.mutation.plugins !== 'available' || catalog.configuration.state !== 'available' || plugin.packageMissing || !this.adapter?.setManagedPluginEnabled);
+          toggle.onChange(async (enabled) => {
+            toggle.setDisabled(true);
+            try {
+              const result = await this.adapter?.setManagedPluginEnabled?.(plugin.id, enabled, catalog.configuration.revision);
+              if (result?.evidence.persistence === 'verified') this.host.invalidateSlashCommandCatalog?.();
+              await refresh();
+              outcome.setText(result ? t('settings.zcode.management.outcome', {
+                  status: managementText(`settings.zcode.management.result.${result.status}`, result.status),
+                  persistence: managementText(`settings.zcode.management.evidence.${result.evidence.persistence}`, result.evidence.persistence),
+                  application: managementText(`settings.zcode.management.evidence.${result.evidence.application}`, result.evidence.application),
+                  runtime: managementText(`settings.zcode.management.evidence.${result.evidence.runtime}`, result.evidence.runtime),
+                })
+                : managementText('settings.zcode.management.unavailable', 'Unavailable for this runtime or workspace.'));
+            } catch {
+              toggle.setValue(plugin.enabled).setDisabled(false);
+              outcome.setText(managementText('settings.zcode.management.failed', 'Readback failed; effective values are unknown.'));
+            }
+          });
+        });
+    }
+    this.addStateRow(container, managementText('settings.zcode.management.mcp', 'MCP runtime status'), managementText(`settings.zcode.management.${catalog.mcp.state}`, catalog.mcp.state));
+    for (const server of catalog.mcp.entries ?? []) {
+      this.addStateRow(container, server.id, t('settings.zcode.management.mcpDetails', {
+        status: managementText(`settings.zcode.management.mcpStatus.${server.status}`, server.status),
+        tools: server.toolCount ?? '?',
+        authentication: managementText(`settings.zcode.management.authValue.${server.authentication}`, server.authentication),
+      }));
+    }
+    this.addStateRow(container, managementText('settings.zcode.management.hooks', 'Effective hooks'), managementText('settings.zcode.management.hooksUnavailable', 'Unavailable: this protocol has no independent hook configuration readback. Declaration counts do not prove execution.'));
+    this.addStateRow(container, managementText('settings.zcode.management.mutations', 'MCP and hook changes'), managementText('settings.zcode.management.mutationsUnavailable', 'Unavailable: this runtime has no supported management mutation contract.'));
   }
 
   private get adapter(): ReturnType<NonNullable<SettingsZCodeHost['agentServiceRegistry']>['get']> {

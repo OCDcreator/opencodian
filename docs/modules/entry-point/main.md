@@ -38,7 +38,7 @@ R-C4 组合：`pdfEngineLoader`（懒加载引擎，启动零成本；`getPlugin
 R-C5 组合：`canvasGenerationFlow`（生成流程，`pickNotes` 端口 = R-A7 picker + R-B2 主题组一键行，`resolveAuxTarget` 端口 = 行内编辑 host 适配器的只读会话切片）与 `canvasIntegration`（Canvas 视图桥，attach/detach + 运行时确认门）与命令 `canvas-generate-from-notes` / `canvas-ai-edit-node`；插件写归属会话改用 `resolvePluginWriteConversationId()`（R-C2 语义改名，行为不变）。Canvas 行为逻辑分别在 `core.canvas` 与 `feature.canvas-integration`，main.ts 只组合、注册命令与注入 Notice 沉降。
 
 
-`main.ts` 定义 `OpenCodianPlugin`，是 Obsidian 侧的总装配点。ZCode 会话删除在本地移除前必须等待其 adapter 对官方桌面 task-index tombstone 的按 ID 读回；失败保留本地会话并向调用方抛错。其他后端保持原有 best-effort session cleanup。它负责：
+`main.ts` 定义 `OpenCodianPlugin`，是 Obsidian 侧的总装配点。ZCode 会话删除在本地移除前必须等待其 adapter 对官方桌面 task-index tombstone 的按 ID 读回；失败保留本地会话并向调用方抛错。Codex 默认删除同样 fail closed：native `verified`（或没有 native thread 的本地草稿）才清 storage、conversation 和 full-message cache；ACK-only `admitted` 以可重试 pending 错误传播，SDK native 删除 unavailable 或失败不做本地清理。其他后端保留原有 best-effort session cleanup。它负责：
 
 - 初始化 `StorageService`，并通过 `src/core/types/settingsLoadNormalization.ts` 加载/迁移持久化设置
 - 创建 `OpenCodeService`、`OpencodeConfigManager`、`ModelConfigService`、`ModelPricingService`
@@ -57,6 +57,13 @@ R-C5 组合：`canvasGenerationFlow`（生成流程，`pickNotes` 端口 = R-A7 
 Claude Code MCP elicitation 的入口处理保留在 `main.ts`：`onElicitation` 会检查 abort signal、查找当前 chat view 注册的 `elicitationCardRenderer`，并把用户 accept/decline/cancel 映射回 SDK `ElicitationResult`。请求和内容形状转换已下沉到 `ClaudeCodeElicitationBridge.ts`，入口层不再内联 schema parsing 或 answer-to-content 逻辑。当前产品状态仍为 wiring：真实 pass 需要 MCP server 发起 elicitation 并消费返回结果的端到端运行时证据。
 
 Codex 审批/elicitation host context 的入口级 wiring 保留在 `main.ts`：插件持有 mutable `codexApprovalHostContext`（默认 `getActiveTabId: () => null`）；`wireCodexBridgeHosts()`（2026-09-30 从 bootstrap 函数抽出以保持函数长度合规）在 adapter 注册后调用 `codexAdapter.setApprovalHost(createCodexApprovalBridgeHost(() => this.codexApprovalHostContext))` 与 `codexAdapter.setElicitationHost(createCodexElicitationBridgeHost(() => this.codexApprovalHostContext))`。host factory 动态读取 context，chat view 在 mount 时填充 `approvalCardRenderer` / `questionCardRenderer` / `elicitationCardRenderer`。镜像 Claude 的 `claudeCodePermissionHostContext` 模式。
+
+## Codex 删除提交边界（2026-10-02 reviewed continuation）
+
+- `deleteConversation(id)` 保持 `Promise<void>`；Codex adapter 的 void 成功只代表同 native ID absence 已 verified 或无 native thread 草稿，不能用 ACK 作为远端终态。失败/pending 保留本地 storage/cache，并交由 history/lifecycle 的现有错误路径处理。
+- `deleteConversation(id, { mode: 'forget-local' })` 是显式 Codex 本地遗忘命令，调用 `forgetSession`，不 dispatch native delete/archive、不宣称远端已删除。缺少 owning service 或 forget 方法会拒绝；该模式不能绕过 ZCode 删除确认。本轮仅提供显式 API，没有新增 View/i18n 控件。
+- RC-CX-03：native/storage 的 await 之后按 conversation `id` 重新查本地提交位置；并发 A/B 删除和同 ID 重复提交都不能 splice 已移动的邻项。已不在集合中的 ID 跳过 splice，cache forgetting 仍按 ID 幂等清理。
+- 专属 `tests/unit/main/codexDeletion.test.ts` 覆盖 native failure/unsupported、admitted→retry verified、SDK native unavailable vs explicit forget、草稿、部分 selected/all 的 tab/cache 保留、ZCode/其他后端回归，以及 deferred native/storage A-first/B-first/same-ID 并发提交。离线 fixture 不替代真实 CLI/UI 验收。
 
 ## 导入关系
 
@@ -379,3 +386,7 @@ The composition root passes the live OpenCode 2 settings callback to adapter wir
 ## 2026-09-28 OpenCode 2 auxiliary integration
 
 Inline edit model choices read the OpenCode 2 native catalog when that backend is selected.
+
+## 2026-10-02 Codex local forget / complete catalog UI
+
+新增 `forgetConversation(id)`，显式委托 deleteConversation 的 forget-local mode，只允许 Codex。2026-10-02 reviewed P2 补修中，forget-local 显式请求 `storage.deleteConversation(id, { verifyAbsent: true })`；真实 storage 仅在 adapter.exists 回读 session file 不存在后完成。adapter forget 推迟到该确认后，使 remove EACCES / still-present / readback failure 保留 conversation、tabs、cache、alias/effective evidence 并支持重试；随后提交 conversation array/full-message cache，失败交给既有 lifecycle 通道恢复。默认 delete-native 的 verified-only/失败保留/重试路径保留。

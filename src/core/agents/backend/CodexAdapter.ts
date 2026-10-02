@@ -36,6 +36,7 @@ import type {
   BackendSessionItemsPageOptions,
   BackendSessionTurnsPageOptions,
   NormalizedSessionMessagesPage,
+  NormalizedSessionRow,
 } from './AgentBackendRouting';
 import type {
   AgentInlineCompletionCapability,
@@ -97,6 +98,8 @@ import {
   type AppServerThreadEffectiveSettings,
   type AppServerThreadGoal,
   type AppServerThreadGoalStatus,
+  AppServerThreadMutationError,
+  type AppServerThreadMutationResult,
   type AppServerThreadStartOptions,
   type AppServerToolUserInputParams,
   type AppServerToolUserInputResponse,
@@ -560,6 +563,8 @@ export class CodexAdapter
    * re-attaches this client to their notification streams.
    */
   private loadedThreadIds = new Set<string>();
+  /** Keep retry identities through delete ACK/readback and late notifications. */
+  private pendingNativeDeletions = new Set<string>();
 
   /**
    * Error-chunk sinks for in-flight app-server streams, keyed by logical
@@ -1377,6 +1382,24 @@ export class CodexAdapter
       });
       return false;
     }
+  }
+
+  /** Structured catalogs are read-only UI evidence, without CLI/empty fallbacks. */
+  getModelsCatalog() {
+    return this.appServerClient?.getModelsCatalog() ?? Promise.resolve({ status: 'unavailable' as const, data: [], nextCursor: null, errorReason: 'Codex app-server unavailable' });
+  }
+
+  getPermissionProfilesCatalog() {
+    return this.appServerClient?.getPermissionProfilesCatalog({ ...(this.options.workingDirectory ? { cwd: this.options.workingDirectory } : {}) })
+      ?? Promise.resolve({ status: 'unavailable' as const, data: [], nextCursor: null, errorReason: 'Codex app-server unavailable' });
+  }
+
+  getMcpServerStatusCatalog() {
+    return this.appServerClient?.getMcpServerStatusCatalog() ?? Promise.resolve({ status: 'unavailable' as const, data: [], nextCursor: null, errorReason: 'Codex app-server unavailable' });
+  }
+
+  getLoadedThreadsCatalog() {
+    return this.appServerClient?.getLoadedThreadsCatalog() ?? Promise.resolve({ status: 'unavailable' as const, data: [], nextCursor: null, errorReason: 'Codex app-server unavailable' });
   }
 
   async listLoadedThreads(): Promise<Array<{ id: string }>> {
@@ -2385,6 +2408,12 @@ export class CodexAdapter
         break;
       }
       case 'thread_deleted': {
+        if (this.pendingNativeDeletions.has(threadId)) {
+          // A notification drains the stream but cannot commit product deletion.
+          // The delete result owns cleanup after verified same-ID absence.
+          completeStream();
+          break;
+        }
         this.invalidateLocalSessionForDeletedThread(threadId);
         const activeTurn = this.activeAppServerTurns.get(sessionId);
         if (activeTurn?.turnId && activeTurn.threadId === threadId) {
@@ -2424,6 +2453,7 @@ export class CodexAdapter
    * session key that was removed, or null when the thread was unknown.
    */
   private invalidateLocalSessionForDeletedThread(threadId: string): string | null {
+    if (this.pendingNativeDeletions.has(threadId)) return null;
     const provisionalId = this.threadAlias.get(threadId);
     this.threadAlias.delete(threadId);
     this.loadedThreadIds.delete(threadId);
@@ -3474,12 +3504,21 @@ export class CodexAdapter
     return provisionalId;
   }
 
-  async deleteSession(sessionId: string): Promise<void> {
+  /** Explicit local forgetting never dispatches native archive/delete. */
+  async forgetSession(sessionId: string): Promise<void> {
+    return this.deleteSession(sessionId, { mode: 'forget-local' });
+  }
+
+  async deleteSession(sessionId: string, options: { mode?: 'delete-native' | 'forget-local' } = {}): Promise<void> {
     const entry = this.resolveSession(sessionId);
     // The logical session key is the provisionalId; resolveSession finds the
     // entry whether sessionId is a provisional id or a real thread id/alias.
     const logicalKey = entry?.provisionalId ?? sessionId;
     const threadId = entry?.threadId ?? (!this.isProvisionalId(sessionId) ? sessionId : null);
+    // Native failure must leave identity, aliases and readback state recoverable.
+    if (threadId && options.mode !== 'forget-local') {
+      await this.verifyNativeSessionDeletion(threadId, logicalKey);
+    }
     this.invalidateAppServerAttempt(logicalKey);
     this.clearPendingForegroundCompactions('invalid-thread', 'Codex session was deleted', logicalKey);
     const controller = this.activeControllers.get(logicalKey);
@@ -3493,22 +3532,6 @@ export class CodexAdapter
         // cannot finish the same trace turn twice.
         this.lastTurnContextBySession.delete(logicalKey);
         this.trace((port) => port.finishTurn(activeContext, 'incomplete', { reason: 'session_deleted' }));
-      }
-    }
-    if (activeTurn?.turnId && this.appServerClient) {
-      try {
-        await this.appServerClient.interruptTurn(activeTurn.threadId, activeTurn.turnId);
-      } catch {
-        // Best-effort cancellation; the attempt fence still blocks late state.
-      }
-    }
-    // Delete the persisted backend thread as well (the SDK fallback has no
-    // delete route; local cleanup below still runs when this fails).
-    if (threadId && this.appServerClient) {
-      try {
-        await this.appServerClient.deleteThread(threadId);
-      } catch {
-        // Best-effort server-side delete; the session is already unusable.
       }
     }
     this.activeAppServerTurns.delete(logicalKey);
@@ -3527,8 +3550,9 @@ export class CodexAdapter
       this.sessionEffectiveSettings.delete(sessionId);
       this.lastTurnContextBySession.delete(sessionId);
     }
-    // Evict client readback cache + context snapshot by thread id (full chain).
+    // Evict only after verified deletion or explicitly requested forgetting.
     if (threadId) {
+      this.pendingNativeDeletions.delete(threadId);
       this.appServerClient?.clearThreadEffectiveSettings?.(threadId);
       this.appServerContextSnapshots.delete(threadId);
       this.loadedThreadIds.delete(threadId);
@@ -3539,26 +3563,90 @@ export class CodexAdapter
     }
   }
 
+  /** Fail closed until a native delete has same-ID absence evidence. */
+  private async verifyNativeSessionDeletion(threadId: string, logicalKey: string): Promise<void> {
+    this.pendingNativeDeletions.add(threadId);
+    const client = this.appServerClient;
+    if (!client) {
+      throw new AppServerThreadMutationError({ operation: 'delete', threadId, status: 'unavailable', errorReason: 'Codex native deletion requires the app-server; use forgetSession for local cleanup' });
+    }
+    const turn = this.activeAppServerTurns.get(logicalKey);
+    if (turn?.turnId) {
+      try {
+        await client.interruptTurn(turn.threadId, turn.turnId);
+      } catch {
+        // Native delete still gets a chance to stop/remove the thread.
+      }
+    }
+    const outcome: AppServerThreadMutationResult = await client.deleteThreadResult?.(threadId) ?? {
+      operation: 'delete' as const, threadId,
+      status: await client.deleteThread(threadId) ? 'admitted' as const : 'failed' as const,
+    };
+    // A void completion promises local cleanup is safe. ACK alone cannot make
+    // that promise; retain aliases/evidence and expose a retryable result.
+    if (outcome.status !== 'verified' || outcome.operation !== 'delete' || outcome.threadId !== threadId) {
+      throw new AppServerThreadMutationError({
+        ...outcome,
+        status: outcome.status === 'verified' ? 'failed' : outcome.status,
+        errorReason: outcome.status === 'admitted'
+          ? `Codex deletion pending (admitted): native absence is not verified; local conversation retained. Retry deletion. ${outcome.readback?.errorReason ?? ''}`.trim()
+          : outcome.errorReason ?? 'Codex native deletion was not verified for the same thread ID',
+      });
+    }
+  }
+
   async updateSessionTitle(
     sessionId: string,
     title: string,
   ): Promise<void> {
     const threadId = this.resolveThreadId(sessionId);
-    if (!threadId || !this.appServerClient) {
-      return;
+    if (!threadId) return;
+    const client = this.appServerClient;
+    if (!client) {
+      throw new AppServerThreadMutationError({ operation: 'rename', threadId, status: 'unavailable', errorReason: 'Codex native rename requires the app-server' });
     }
-    const renamed = await this.appServerClient.setThreadName(threadId, title);
-    if (renamed) {
-      this.trace((port) => port.recordLifecycle('session.renamed', {
-        threadId,
-        titleLength: title.length,
-      }));
-    } else {
-      logger.debug('Codex thread rename was not confirmed by the app-server', { threadId });
+    const outcome = await client.setThreadNameResult?.(threadId, title);
+    const renamed = outcome ? outcome.status === 'admitted' || outcome.status === 'verified' : await client.setThreadName(threadId, title);
+    if (!renamed) {
+      throw new AppServerThreadMutationError(outcome ?? { operation: 'rename', threadId, status: 'failed', errorReason: 'Codex native rename was not acknowledged' });
     }
+    this.trace((port) => port.recordLifecycle('session.rename_admitted', {
+      threadId,
+      titleLength: title.length,
+    }));
     // There is no adapter-local title field: listSessions/getSession re-read
     // titles from the app-server, which emits `thread/name/updated` after a
     // successful rename.
+  }
+
+  /** Browser evidence merges complete native partitions, retaining usable rows on failure. */
+  async getSessionCatalog(): Promise<import('./CodexAppServerClient').AppServerCatalogReadResult<NormalizedSessionRow>> {
+    const rows = new Map<string, NormalizedSessionRow>();
+    for (const session of this.sessions.values()) {
+      const id = session.threadId ?? session.provisionalId;
+      rows.set(id, { id, title: '', shareUrl: null, updatedAt: null });
+    }
+    const client = this.appServerClient;
+    if (!client) return { status: 'unavailable', data: Array.from(rows.values()), nextCursor: null, errorReason: 'Codex app-server unavailable' };
+    const results = await Promise.all([
+      client.getThreadsCatalog({ archived: false }),
+      client.getThreadsCatalog({ archived: true }),
+    ]);
+    const activeIds = new Set(results[0].data.map((thread) => thread.id));
+    results.forEach((result, index) => {
+      for (const thread of CodexAppServerClient.normalizeThreadList(result.data)) {
+        // Active partition wins over archived duplicates; native metadata replaces drafts.
+        if (index === 1 && activeIds.has(thread.id)) continue;
+        rows.set(thread.id, { id: thread.id, title: thread.title, shareUrl: null, updatedAt: thread.updatedAt, archived: index === 1 });
+      }
+    });
+    const data = Array.from(rows.values());
+    const failure = results.find((result) => result.status !== 'complete');
+    if (failure) {
+      const hasNativeRows = results.some((result) => result.data.length > 0);
+      return { ...failure, status: hasNativeRows ? 'partial' : failure.status, data };
+    }
+    return { status: 'complete', data, nextCursor: null };
   }
 
   async listSessions(): Promise<unknown[]> {
@@ -3573,9 +3661,11 @@ export class CodexAdapter
     // Query app-server for persisted threads and merge
     if (this.appServerClient) {
       try {
+        const client = this.appServerClient;
+        const listThreads = client.listAllThreads?.bind(client) ?? client.listThreads.bind(client);
         const [activeThreads, archivedThreads] = await Promise.all([
-          this.appServerClient.listThreads({ limit: 50, archived: false }),
-          this.appServerClient.listThreads({ limit: 50, archived: true }),
+          listThreads({ limit: 50, archived: false }),
+          listThreads({ limit: 50, archived: true }),
         ]);
         const normalizedActive = CodexAppServerClient.normalizeThreadList(activeThreads);
         // The app-server `thread/list` response does not echo an `archived` field
@@ -3608,6 +3698,9 @@ export class CodexAdapter
         logger.warn('Failed to list persisted threads from app-server', {
           error: err instanceof Error ? err.message : String(err),
         });
+        // Older injected clients retain their historical local-only fallback.
+        // The full-read API must propagate its failed/partial result.
+        if (typeof this.appServerClient.listAllThreads === 'function') throw err;
       }
     }
 

@@ -213,3 +213,7 @@ SDK非root帮助函数（FileSettingsStorage、resolveModelScope、resizeImage�
 ## Pi三文件发行兼容
 
 scripts/build-utils.mjs的bundlePiServiceSource供production/dev构建统一合并assets/pi模块，PiRpcClient通过stdin传入外部Node并在内存中加载，不写出服务文件。npm run package:plugin及GitHub/Gitea仅发布标准main.js/manifest.json/styles.css三文件，无需安装脚本、现有更新器改动或新增SDK依赖。scripts/pi-sdk-acceptance.mjs验证未安装Pi时报错，以及没有任何服务资产也能完成全部SDK能力验收。
+
+2026-10-02 T07：Pi assets/commands.mjs level 输入验证与 assets/configuration.mjs defaultThinkingLevel schema 允许 max。PiThinkingAndConfiguration.test.ts/.mjs 在隔离的 project/agent-fixture 路径直接验证真实 handler、配置差量/完整JSON的未知字段roundtrip及冲突失败。此静态兼容不声明每个模型支持；产品档位来自 SDK session 动态读取。未运行完整build/deploy（本轮明确限定聚焦回归）。
+
+2026-10-02 PC1（独立 review P2）：Pi configuration.mjs 的 choice/enum 校验现在与 revision 锁内当前作用域原始文档比较，仅允许完全未变的既有未知枚举随无关 patch/完整 JSON 保存往返；新引入或改为其他未知值仍拒绝，类型、安全键、revision 保护保留。校验基准从原始 raw 独立 parse，不能使用已被 applyChanges 修改的文档或另一作用域配置。PiConfigurationEnumRoundtrip.test.ts/.mjs 复现 future-sdk-level + defaultModel 无关编辑的 red→green，并覆盖全部 6 个 schema enums 的 project/global × patch/document 策略。

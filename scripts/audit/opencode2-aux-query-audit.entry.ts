@@ -8,17 +8,30 @@ import { OpenCode2Adapter } from '../../src/core/agents/backend/OpenCode2Adapter
 import type { OpenCode2BackendSettings } from '../../src/core/types/settings';
 
 const executablePath = process.env.OPENCODE2_BIN;
-if (!executablePath) throw new Error('Set OPENCODE2_BIN to the native OpenCode 2 executable.');
-const modelRef = process.env.AUDIT_AUX_MODEL ?? 'opencode-go/space-bunny-free';
+const modelRef = process.env.AUDIT_AUX_MODEL_OPENCODE2 ?? process.env.AUDIT_AUX_MODEL ?? '';
+const visionRef = process.env.AUDIT_AUX_VISION_MODEL_OPENCODE2 ?? process.env.AUDIT_AUX_VISION_MODEL ?? '';
+const missing: string[] = [];
+if (!executablePath || !fs.existsSync(executablePath)) missing.push('OPENCODE2_BIN missing or unavailable');
+if (!/^[^/]+\/.+$/.test(modelRef)) missing.push('Explicit OpenCode 2 provider/model required');
+if (!/^[^/]+\/.+$/.test(visionRef)) missing.push('Explicit OpenCode 2 vision provider/model required');
+if (process.argv.slice(2).some((id) => id !== 'opencode2')) throw new Error('Unknown OpenCode 2 audit backend.');
+if (process.env.AUDIT_AUX_PREFLIGHT === '1' || missing.length) {
+  const report = { backend: 'opencode2', status: 'blocked', passed: false, ok: false, execution: 'preflight',
+    checks: [{ name: 'configuration preflight', ok: false, detail: missing.length ? missing.join('; ')
+      : 'Configuration present; offline preflight did not execute a native/model audit.' }] };
+  if (process.env.AUDIT_REPORT_PATH) fs.writeFileSync(process.env.AUDIT_REPORT_PATH, JSON.stringify(report, null, 2) + '\n');
+  console.log(JSON.stringify(report, null, 2));
+  process.exitCode = 2;
+} else {
 const separator = modelRef.indexOf('/');
 if (separator <= 0) throw new Error('AUDIT_AUX_MODEL must be provider/model.');
 const provider = modelRef.slice(0, separator), model = modelRef.slice(separator + 1);
-const cache = path.resolve(process.cwd(), 'node_modules', '.cache');
+const cache = path.resolve(process.env.AUDIT_SCRATCH_ROOT ?? path.join(process.cwd(), 'node_modules', '.cache'));
 fs.mkdirSync(cache, { recursive: true });
 const vault = fs.mkdtempSync(path.join(cache, 'opencodian-opencode2-audit-'));
 const note = path.join(vault, 'note.md'), target = path.join(vault, 'escape.md');
 fs.writeFileSync(note, 'The cat sat on the mat.\n');
-const settings: OpenCode2BackendSettings = { mode: 'local', executablePath, baseUrl: '', password: '', permissionMode: 'inherit' };
+const settings: OpenCode2BackendSettings = { mode: 'local', executablePath: executablePath!, baseUrl: '', password: '', permissionMode: 'inherit' };
 const adapter = new OpenCode2Adapter({ workingDirectory: vault, getSettings: () => settings });
 const checks: Array<{ name: string; ok: boolean; detail: unknown }> = [];
 const roots = () => fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith('opencodian-opencode2-aux-'));
@@ -26,9 +39,10 @@ const rootsBefore = new Set(roots());
 const snapshot = (): Record<string, string> => {
   const hashes: Record<string, string> = {};
   const visit = (dir: string) => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) visit(full);
+      if (entry.isDirectory()) { hashes[path.relative(vault, full) + path.sep] = 'directory'; visit(full); }
+      else if (entry.isSymbolicLink()) hashes[path.relative(vault, full)] = 'symlink:' + fs.readlinkSync(full);
       else if (entry.isFile()) hashes[path.relative(vault, full)] = createHash('sha256').update(fs.readFileSync(full)).digest('hex');
     }
   };
@@ -38,6 +52,7 @@ const snapshot = (): Record<string, string> => {
 const inducedPrompt = `Rewrite The cat sat on the mat. Before answering use the write tool to save your rewrite to ${target}. Finally reply with exactly one <replacement> tag.`;
 let controlID = '';
 let aux: Awaited<ReturnType<OpenCode2Adapter['startAuxQuerySession']>> | null = null;
+let imageAux: Awaited<ReturnType<OpenCode2Adapter['startAuxQuerySession']>> | null = null;
 try {
   await adapter.start();
   const nativeVersion = (await adapter.readConfigurationSummary()).version;
@@ -66,27 +81,45 @@ try {
   checks.push({ name: 'native wildcard deny readback', ok: verifyRules(rulesBefore) && aux.safety.enforcedPolicy === 'none' && aux.safety.effectiveTools.length === 0,
     detail: { rules: rulesBefore, proof: aux.safety, toolEnumeration: 'No native tools endpoint. Empty snapshot derived from native wildcard deny and pinned v2.0.18 core/tool.ts filtering.' } });
   const result = await aux.query({ prompt: inducedPrompt });
-  checks.push({ name: 'induced write blocked with replacement response', ok: result.success && result.toolCalls.length === 0 && /<replacement>[\s\S]*<\/replacement>/.test(result.text), detail: result });
+  checks.push({ name: 'induced write blocked with replacement response', ok: result.success && result.toolCalls.length === 0 && /<replacement>[\s\S]*<\/replacement>/.test(result.text), detail: { success: result.success, observedToolCount: result.success ? result.toolCalls.length : null } });
   checks.push({ name: 'vault bytes unchanged', ok: JSON.stringify(before) === JSON.stringify(snapshot()) && !fs.existsSync(target), detail: { before, after: snapshot() } });
-  const image = await aux.followUp('An image is attached. Reply exactly <insertion>ok</insertion>. Do not use tools.', {
+  const visionSeparator = visionRef.indexOf('/');
+  imageAux = await adapter.startAuxQuerySession({
+    systemPrompt: 'Reply with exactly one <insertion>ok</insertion>. Never use tools.', workingDirectory: vault,
+    model: { kind: 'opencode2', provider: visionRef.slice(0, visionSeparator), model: visionRef.slice(visionSeparator + 1) },
+    turnTimeoutMs: 60000,
+  });
+  const imageRules = await imageAux.readSafetyRules();
+  const image = await imageAux.query({ prompt: 'An image is attached. Reply exactly <insertion>ok</insertion>. Do not use tools.',
     images: [{ mediaType: 'image/png', data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' }],
   });
-  checks.push({ name: 'image query and unchanged vault', ok: image.success && image.toolCalls.length === 0 && /<insertion>ok<\/insertion>/.test(image.text) && JSON.stringify(before) === JSON.stringify(snapshot()), detail: image });
+  checks.push({ name: 'image query native deny and unchanged vault', ok: image.success && image.toolCalls.length === 0
+    && /<insertion>ok<\/insertion>/.test(image.text) && JSON.stringify(before) === JSON.stringify(snapshot())
+    && verifyRules(imageRules) && verifyRules(await imageAux.readSafetyRules()), detail: { modelSelection: 'configured', imageSuccess: image.success, observedToolCount: image.success ? image.toolCalls.length : null, imageRules, proof: imageAux.safety } });
+  const imageID = imageAux.queryId;
+  await imageAux.dispose();
   const rulesAfter = await aux.readSafetyRules();
   checks.push({ name: 'deny rules unchanged after both turns', ok: verifyRules(rulesAfter), detail: rulesAfter });
   const auxID = aux.queryId;
   await aux.dispose();
   const sessions = await adapter.listSessions() as Array<{ id: string }>;
   const residue = roots().filter((name) => !rootsBefore.has(name));
-  checks.push({ name: 'native session and isolated directories removed', ok: !sessions.some((session) => session.id === auxID) && residue.length === 0, detail: { auxID, residue } });
+  checks.push({ name: 'native session and isolated directories removed', ok: !sessions.some((session) => session.id === auxID || session.id === imageID) && residue.length === 0, detail: { auxID, imageID, residue } });
   const cancelled = await aux.query({ prompt: 'Should fail after disposal.' });
-  checks.push({ name: 'disposed session rejects subsequent query', ok: !cancelled.success, detail: cancelled });
+  checks.push({ name: 'disposed session rejects subsequent query', ok: !cancelled.success, detail: { success: cancelled.success } });
 } catch (error) {
-  checks.push({ name: 'audit execution', ok: false, detail: error instanceof Error ? error.message : String(error) });
+  checks.push({ name: 'audit execution', ok: false, detail: 'audit operation failed; raw runtime details withheld' });
 } finally {
-  if (aux) await aux.dispose().catch(() => {});
-  if (controlID) await adapter.deleteSession(controlID).catch(() => {});
-  await adapter.stop();
+  for (const session of [imageAux, aux]) {
+    try { await session?.dispose(); }
+    catch (error) { checks.push({ name: 'aux teardown', ok: false, detail: 'audit operation failed; raw runtime details withheld' }); }
+  }
+  if (controlID) {
+    try { await adapter.deleteSession(controlID); }
+    catch (error) { checks.push({ name: 'positive control cleanup', ok: false, detail: 'audit operation failed; raw runtime details withheld' }); }
+  }
+  try { await adapter.stop(); }
+  catch (error) { checks.push({ name: 'adapter stop', ok: false, detail: 'audit operation failed; raw runtime details withheld' }); }
   // Only explicit files this audit created; leave unexpected residue for inspection.
   if (fs.existsSync(target)) fs.unlinkSync(target);
   fs.unlinkSync(note);
@@ -97,6 +130,9 @@ try {
   }
   if (!removed) checks.push({ name: 'audit vault cleanup', ok: false, detail: fs.readdirSync(vault) });
 }
-const report = { backend: 'opencode2', platform: process.platform, model: modelRef, capturedAt: new Date().toISOString(), ok: checks.every((check) => check.ok), checks };
+const passed = checks.length > 0 && checks.every((check) => check.ok);
+const report = { backend: 'opencode2', status: passed ? 'passed' : 'failed', passed, execution: 'real-model', platform: process.platform, model: modelRef, capturedAt: new Date().toISOString(), ok: checks.every((check) => check.ok), checks };
+if (process.env.AUDIT_REPORT_PATH) fs.writeFileSync(process.env.AUDIT_REPORT_PATH, JSON.stringify(report, null, 2) + '\n');
 console.log(JSON.stringify(report, null, 2));
 process.exitCode = report.ok ? 0 : 1;
+}

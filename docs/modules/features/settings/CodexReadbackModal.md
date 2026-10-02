@@ -74,3 +74,7 @@ Extracted from the inline readback rendering in `SettingsCodexReadbackControls` 
 ## 2026-06-16 Inspection panel refactor
 
 Replaced the separate status bar + loose paragraphs with a compact inspection-panel summary band and shared `.opencodian-inspection-*` layout classes. Loaded threads now render as rows with a collapsible raw-JSON detail instead of a full JSON dump.
+
+## 2026-10-02 Codex local forget / complete catalog UI
+
+新增可选 fetchCatalog，优先消费 AppServerCatalogReadResult；fetchItems 保留兼容。状态新增 partial：以 typed `settings.codex.readback.statusPartial`（count）/`messagePartial` 展示本地化的部分计数和关闭重开重试提示，并渲染已读条目；failed/unavailable/empty 各自区分。英中正式 UI 测试都覆盖分页第二页失败后的提示与 native ID 保留。status badge 具 role=status、aria-live、aria-busy。完整 refresh 通过关闭重开完成。

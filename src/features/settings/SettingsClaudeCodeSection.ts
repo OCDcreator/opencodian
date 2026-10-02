@@ -25,6 +25,7 @@ import {
   type ClaudeCodeProcessResolverOptions,
   resolveClaudeCodeProcess,
 } from '../../core/agents/backend/ClaudeCodeProcessResolver';
+import type { ClaudeCodeMcpPermissionModeOverride, ClaudeCodeMcpPermissionModeOverrideResult, ClaudeCodeOutputStylesReloadResult } from '../../core/agents/backend/ClaudeCodeQueue';
 import type { ClaudeProjectAgentInfo } from '../../core/agents/backend/ClaudeProjectAgentDiscovery';
 import type { ClaudeProjectCommandInfo } from '../../core/agents/backend/ClaudeProjectCommandDiscovery';
 import type { ClaudeProjectSkillInfo } from '../../core/agents/backend/ClaudeProjectSkillDiscovery';
@@ -1344,6 +1345,84 @@ export class SettingsClaudeCodeSection {
     await this.renderClaudeProjectAgentsReadback(outputEl);
   }
 
+  /** Session controls only acknowledge a request; no plugin setting or effective flag is persisted. */
+  private renderNativeSessionControls(containerEl: HTMLElement, kind: 'styles' | 'mcp'): void {
+    const area = containerEl.createDiv({ attr: { 'data-claude-session-controls': kind } });
+    const copy = (name: string): string => t(`settings.claudeCode.sessionControls.${name}` as TranslationKey);
+    let nativeSessionId = '';
+    let serverName = '';
+    let mode: ClaudeCodeMcpPermissionModeOverride = null;
+    let generation = 0;
+    const output = area.createDiv({ attr: { role: 'status', 'aria-live': 'polite', 'data-runtime-evidence': 'unavailable' } });
+    const reset = (): void => {
+      generation++;
+      output.empty();
+      output.dataset.controlStatus = 'unavailable';
+      output.dataset.runtimeEvidence = 'unavailable';
+    };
+    const session = new Setting(area).setName(copy('session')).setDesc(copy('help')).addText(text => {
+      text.onChange(value => { nativeSessionId = value.trim(); reset(); });
+    });
+    session.settingEl.dataset.claudeSessionField = 'session';
+    if (kind === 'mcp') {
+      const server = new Setting(area).setName(copy('server')).addText(text => {
+        text.onChange(value => { serverName = value.trim(); reset(); });
+      });
+      server.settingEl.dataset.claudeSessionField = 'server';
+      new Setting(area).setName(copy('mode')).addDropdown(dropdown => {
+        dropdown.addOption('inherit', copy('inherit')).addOption('default', 'default').addOption('auto', 'auto').setValue('inherit')
+          .onChange(value => { mode = value === 'inherit' ? null : value === 'auto' ? 'auto' : 'default'; reset(); });
+      });
+    }
+    new Setting(area).setName(copy(kind)).addButton(button => {
+      button.setButtonText(copy(kind === 'styles' ? 'styles' : 'apply')).onClick(async () => {
+        reset();
+        if (!nativeSessionId) { output.setText(copy('noSession')); return; }
+        if (kind === 'mcp' && !serverName) { output.setText(copy('serverRequired')); return; }
+        const adapter = this.getClaudeAdapter() as {
+          reloadOutputStyles?: (id: string) => Promise<ClaudeCodeOutputStylesReloadResult>;
+          setMcpPermissionModeOverride?: (id: string, server: string, mode: ClaudeCodeMcpPermissionModeOverride) => Promise<ClaudeCodeMcpPermissionModeOverrideResult>;
+        } | null;
+        if (kind === 'styles' ? !adapter?.reloadOutputStyles : !adapter?.setMcpPermissionModeOverride) {
+          output.setText(copy('unsupported')); return;
+        }
+        const requestGeneration = generation;
+        const requestedId = nativeSessionId;
+        button.setDisabled(true);
+        output.dataset.controlStatus = 'pending';
+        output.setText(copy('pending'));
+        try {
+          const result = kind === 'styles'
+            ? await adapter?.reloadOutputStyles?.(requestedId)
+            : await adapter?.setMcpPermissionModeOverride?.(requestedId, serverName, mode);
+          if (requestGeneration !== generation) return;
+          if (!result || result.nativeSessionId !== requestedId) throw new Error('Invalid session control response.');
+          output.empty();
+          output.dataset.controlStatus = result.status;
+          if (result.status === 'unavailable') {
+            output.setText(copy(result.reason === 'missing-method' ? 'unsupported' : 'noSession'));
+          } else if (result.status === 'failed') {
+            output.dataset.runtimeEvidence = 'failed';
+            output.setText(copy('failed'));
+          } else {
+            output.createEl('p', { text: copy(kind === 'styles' ? 'stylesAcknowledged' : 'acknowledged') });
+            if ('available_output_styles' in result.response) {
+              const list = output.createEl('ul');
+              for (const name of result.response.available_output_styles) list.createEl('li', { text: name });
+            } else if ('warning' in result.response && result.response.warning) {
+              output.createEl('p', { text: result.response.warning });
+            }
+          }
+        } catch {
+          if (requestGeneration !== generation) return;
+          output.dataset.controlStatus = 'failed';
+          output.dataset.runtimeEvidence = 'failed';
+          output.setText(copy('failed'));
+        } finally { button.setDisabled(false); }
+      });
+    });
+  }
+
   // ─── Shared helpers ────────────────────────────────────────────────
 
   private getVaultBasePath(): string | null {
@@ -2487,6 +2566,7 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderMcpRuntimeControls(containerEl: HTMLElement): void {
+    this.renderNativeSessionControls(containerEl, 'mcp');
     const statusEl = this.createClaudeCodeNotice(containerEl, {
       kind: 'readback',
       proofState: 'readback',
@@ -2869,6 +2949,7 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderOutputStyleSetting(containerEl: HTMLElement): void {
+    this.renderNativeSessionControls(containerEl, 'styles');
     const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.outputStyle.name'))
       .setDesc(t('settings.claudeCode.outputStyle.desc'))

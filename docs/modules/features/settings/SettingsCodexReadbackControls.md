@@ -69,3 +69,7 @@ The model catalog, permission profile, and loaded threads readbacks moved from i
 ## 2026-06-16 Inspection panel rows
 
 Model, permission-profile, and loaded-thread readbacks now render as `.opencodian-inspection-row` rows inside `CodexReadbackModal` instead of stacked paragraphs. Proof markers (`data-model-slug`, `data-profile-id`, `data-proof-state`) and the raw JSON code block for threads are preserved.
+
+## 2026-10-02 Codex local forget / complete catalog UI
+
+Model/permission/loaded readback 按钮优先消费结构化完整 catalog，旧 array callback 仅供 injected legacy adapter 兼容。模型原生 id 通过 data-model-id 稳定保留，model/slug 只作为显示字段；permission 为 data-profile-id，loaded 为 data-thread-id。MCP settings 与 chat 共享 host factory 完整 readback。线程 browser 走完整 native partitions，旧 in-memory-only 说明已不适用于该路径。正式测试从 Setting 按钮回调启动 modal，覆盖两页/边界重复/第二页失败/failed/unavailable/空目录，RPC 只读。

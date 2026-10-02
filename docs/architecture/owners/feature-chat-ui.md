@@ -58,3 +58,5 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 `RenderModelListOptions` gained a required `app: App`, and provider group headers now call `ProviderIconService.createIconElement(app, provider.id, 14)`. This removed the divergence where `hasIcon()` was true but `getIconUrl()` returned null, and lets local bundled icons render in the dropdown headers. Keep provider icon resolution in `shared.utils-icons`.
 
 - 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
+
+2026-10-02：后端会话浏览器消费 Codex 汇聚目录结果，complete/partial/failed/unavailable 状态显式呈现；本地遗忘确认框说明原生历史保留，未知或混合后端目标不得静默完成。

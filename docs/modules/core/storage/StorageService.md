@@ -43,7 +43,7 @@ class StorageService {
   loadConversation(id: string): Promise<ConversationMeta | null>;
   listConversations(): Promise<ConversationMeta[]>;
   getConversationListDiagnosticsSnapshot(): ConversationListDiagnostics | null;
-  deleteConversation(id: string): Promise<void>;
+  deleteConversation(id: string, options?: { verifyAbsent?: boolean }): Promise<void>;
   saveCoreSettings(settings: PersistedCoreSettings): Promise<void>;
   saveUiSettings(settings: PersistedUiSettings): Promise<void>;
   loadPersistedSettings(): Promise<SettingsLoadResult>;
@@ -168,7 +168,7 @@ class StorageService {
 - `slowestFallbacks`
 - `largestFallbackSessions`
 
-`deleteConversation()` 会尝试删除单个文件；文件不存在时静默忽略。
+`deleteConversation()` 默认保持既有 best-effort 契约，兼容原消费者。2026-10-02 reviewed P2 continuation 新增可选 `{ verifyAbsent: true }`：执行 session file remove 后必须由 adapter.exists(path) 明确回读 `false` 才允许完成；EACCES 且文件仍存在会抛出原 Error，resolved remove 但文件仍在或回读失败同样拒绝。ENOENT 也需要缺失回读确认。严格失败时不移除 metadata sidecar；确认不存在后才走既有 sidecar best-effort 清理。Codex forget-local 通过该契约确认持久化提交，其他调用默认行为保持兼容。真实 StorageService + mock disk adapter 的正式 UI integration 覆盖 EACCES 保留/重试、ENOENT 确认、resolved-but-present、readback denied 与默认兼容。
 
 删除 conversation 时，插件层还会同步调用 `ConversationFullMessageCache.forget(id)` 与 `OpenCodeService.deleteSession()`；后者会在服务端删除尝试结束后清理本地 canonical session graph。
 

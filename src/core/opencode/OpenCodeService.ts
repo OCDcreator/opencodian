@@ -114,6 +114,7 @@ import type {
   OpenCodeCanonicalSessionState,
   OpenCodeCapabilitySnapshot,
   OpenCodeSessionMessageWithParts,
+  OpenCodeSessionSnapshotToken,
   QueryOptions,
   ResponseHandler,
   ServerDiagnostics,
@@ -388,7 +389,8 @@ export class OpenCodeService {
       normalizeSessionTodos: (response) => OpenCodeService.messageNormalizationMapper.normalizeSessionTodos(response),
       normalizeSessionStatuses: (response) => OpenCodeService.messageNormalizationMapper.normalizeSessionStatuses(response),
       applySessionRevertState: (sessionId, messages) => this.applySessionRevertState(sessionId, messages),
-      applyCanonicalSnapshot: (sessionId, messages) => this.applyCanonicalSnapshot(sessionId, messages),
+      beginCanonicalSnapshot: (sessionId) => this.sessionStateStore.beginSessionSnapshot(sessionId),
+      applyCanonicalSnapshot: (sessionId, messages, token) => this.applyCanonicalSnapshot(sessionId, messages, token),
       observeToolNamesInMessages: (messages) => this.observeToolNamesInMessages(messages),
       logServiceWarning,
       logServiceError,
@@ -1315,9 +1317,12 @@ export class OpenCodeService {
   private applyCanonicalSnapshot(
     sessionId: string,
     messages: OpenCodeSessionMessageWithParts[],
-  ): void {
-    this.sessionStateStore.replaceSessionSnapshot(sessionId, messages);
-    this.logAssistantCanonicalStateForSnapshot(sessionId, messages, 'reload');
+    token: OpenCodeSessionSnapshotToken,
+  ): OpenCodeSessionMessageWithParts[] {
+    const state = this.sessionStateStore.replaceSessionSnapshot(sessionId, messages, token);
+    const merged = state.messages.map((info) => ({ info, parts: state.partsByMessageID[info.id] ?? [] }));
+    this.logAssistantCanonicalStateForSnapshot(sessionId, merged, 'reload');
+    return merged;
   }
 
   private applyCanonicalSyncEvent(update: SessionSyncEventUpdate): void {

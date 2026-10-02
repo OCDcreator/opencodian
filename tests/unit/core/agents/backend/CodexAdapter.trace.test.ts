@@ -9,6 +9,8 @@ const mockClient = {
   resumeThread: jest.fn().mockResolvedValue({ id: 'thread-1', turns: [] }),
   startTurn: jest.fn().mockResolvedValue({ id: 'turn-1', items: [] }),
   interruptTurn: jest.fn().mockResolvedValue(true),
+  deleteThread: jest.fn().mockResolvedValue(true),
+  deleteThreadResult: jest.fn(async (threadId: string) => ({ operation: 'delete', threadId, status: 'verified', readback: { status: 'verified' } })),
   subscribeToThreadNotifications: jest.fn((_id: string, handler: typeof notificationHandler) => {
     notificationHandler = handler;
     return { dispose: jest.fn() };

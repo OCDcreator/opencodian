@@ -683,6 +683,18 @@ export type AppServerSteerTurnResult = { ok: true; turnId: string }
   | { ok: false; reason: 'rejected'; error: AppServerSteerTurnError }
   | { ok: false; reason: 'unavailable'; errorReason: string };
 
+/** Catalog pagination follows the existing items/turns data + nextCursor contract. */
+export interface AppServerCatalogPage<T> { data: T[]; nextCursor: string | null }
+export interface AppServerCatalogListOptions { limit?: number; cursor?: string | null }
+export interface AppServerThreadListOptions extends AppServerCatalogListOptions { archived?: boolean | null }
+export interface AppServerPermissionProfilesListOptions extends AppServerCatalogListOptions { cwd?: string }
+
+/** A failed full read retains complete pages and the cursor that could not be read. */
+export interface AppServerCatalogReadFailure<T> extends AppServerCatalogPage<T> { status: 'partial' | 'failed' | 'unavailable'; errorReason: string }
+
+/** Admission is an ACK; verified requires a matching native readback. */
+export interface AppServerThreadMutationResult { operation: 'rename' | 'archive' | 'delete'; threadId: string; status: 'admitted' | 'verified' | 'failed' | 'unavailable'; errorReason?: string; readback?: { status: 'verified' | 'failed' | 'unavailable'; errorReason?: string } }
+
 /** Item pagination cursor for `thread/items/list`: opaque string or item anchor. */
 export type AppServerThreadItemsListCursor = string | { type: 'item'; itemId: string };
 
@@ -702,9 +714,7 @@ export interface AppServerThreadItemsListOptions {
 }
 
 /** One entry of a `thread/items/list` page: the item plus its owning turn. */
-export interface AppServerThreadItemEntry {
-  item: AppServerItem; turnId: string; startedAtMs?: number | null; completedAtMs?: number | null;
-}
+export interface AppServerThreadItemEntry { item: AppServerItem; turnId: string; startedAtMs?: number | null; completedAtMs?: number | null }
 
 /** A `thread/items/list` page. */
 export interface AppServerThreadItemsPage { data: AppServerThreadItemEntry[]; nextCursor: string | null; backwardsCursor: string | null }
@@ -721,9 +731,7 @@ export interface AppServerThreadTurnsListOptions {
 export interface AppServerThreadTurnsPage { data: AppServerTurn[]; nextCursor: string | null; backwardsCursor: string | null }
 
 /** An independently persisted thread attachment (Codex 0.159.0 ThreadAttachment). */
-export interface AppServerThreadAttachment {
-  id: string; attachmentType: string; identityKey: string; payload: unknown; createdAt: number;
-}
+export interface AppServerThreadAttachment { id: string; attachmentType: string; identityKey: string; payload: unknown; createdAt: number }
 
 /** Result of `thread/attachment/add`. */
 export interface AppServerThreadAttachmentAddResult { attachment: AppServerThreadAttachment; outcome: 'created' | 'existing' }

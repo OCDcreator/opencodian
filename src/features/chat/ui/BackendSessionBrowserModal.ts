@@ -5,7 +5,6 @@ import {
   archiveBackendSession,
   forkBackendSession,
   getBackendSessionPreview,
-  listBackendSessions,
   type NormalizedSessionPreviewMessage,
   type NormalizedSessionRow,
   unarchiveBackendSession,
@@ -15,7 +14,7 @@ import type { AgentServiceRegistry } from '../../../core/agents/backend/AgentSer
 import type { AgentBackendKind } from '../../../core/types/chat';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
-import { renderBackendSessionDetail } from './BackendSessionBrowserDetail';
+import { readBackendSessionCatalog, renderBackendSessionCatalogStatus, renderBackendSessionDetail } from './BackendSessionBrowserDetail';
 
 const logger = createLogger('BackendSessionBrowserModal');
 
@@ -86,6 +85,7 @@ export class BackendSessionBrowserModal extends Modal {
   private listEl: HTMLElement | null = null;
   private footerEl: HTMLElement | null = null;
   private loading = false;
+  private catalogState: 'loading' | 'complete' | 'partial' | 'failed' | 'unavailable' = 'complete';
   private viewMode: ViewMode = 'preview';
   private searchQuery = '';
 
@@ -290,24 +290,25 @@ export class BackendSessionBrowserModal extends Modal {
   // ─── Session list ────────────────────────────────────────────────
 
   private async loadSessions(): Promise<void> {
-    if (this.loading) return;
+    if (this.loading || !this.listEl) return;
     this.loading = true;
-
-    if (!this.listEl) return;
-    this.listEl.empty();
-    this.listEl.createEl('p', {
-      cls: 'opencodian-backend-session-browser-loading',
-      text: t('chat.backendSessions.loading'),
-    });
+    this.catalogState = 'loading';
+    this.renderSessionList();
 
     const registry = this.getScopedRegistry();
     try {
-      this.sessions = await listBackendSessions(registry);
+      const result = await readBackendSessionCatalog(registry);
+      this.sessions = result.data;
+      this.catalogState = result.status;
     } catch (err) {
       logger.warn('Failed to list backend sessions', { error: err instanceof Error ? err.message : String(err) });
-      this.sessions = [];
+      this.catalogState = 'failed';
     }
 
+    if (this.selectedSessionId && !this.sessions.some((session) => session.id === this.selectedSessionId)) {
+      this.selectedSessionId = null;
+      this.previewEl?.empty();
+    }
     this.loading = false;
     this.renderSessionList();
     this.renderFooter();
@@ -323,6 +324,8 @@ export class BackendSessionBrowserModal extends Modal {
   private renderSessionList(): void {
     if (!this.listEl) return;
     this.listEl.empty();
+    renderBackendSessionCatalogStatus(this.listEl, this.catalogState);
+    if (this.catalogState !== 'complete' && (this.catalogState === 'loading' || this.sessions.length === 0)) return;
 
     if (this.sessions.length === 0) {
       this.listEl.createEl('p', {

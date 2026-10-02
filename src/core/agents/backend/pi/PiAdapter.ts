@@ -11,7 +11,7 @@ import { INLINE_COMPLETION_TURN_TIMEOUT_MS } from '../AgentInlineCompletionCapab
 import type { AgentChatCapability, AgentChatSendRequest, AgentConnectionStatus, AgentForkCapability, AgentModelCapability, AgentSessionCapability, AgentTurnSteeringCapability, Disposable, StatusChangeHandler } from '../AgentService';
 import { type WarmableAuxSession,WarmInlineCompletionSession } from '../auxiliary/WarmInlineCompletionSession';
 import { PiAuxQuerySession } from './PiAuxQuerySession';
-import { PI_CONFIG_COMMANDS, PI_RPC_COMMANDS, PI_SDK_COMMANDS, type PiCommandName, type PiExtensionStatusSnapshot, type PiModelInfo, type PiServiceEvent, type PiUiHandler } from './PiProtocol';
+import { PI_CONFIG_COMMANDS, PI_OPTIONAL_RPC_COMMANDS, PI_RPC_COMMANDS, PI_SDK_COMMANDS, type PiAvailableThinkingLevelsResult, type PiCommandName, type PiEntriesResult, type PiExtensionStatusSnapshot, type PiModelInfo, type PiServiceEvent, type PiUiHandler,type PiUnavailableCommandResult } from './PiProtocol';
 import { type PiLaunchOptions, type PiRecord, piRecord, type PiRpcPort } from './PiRpcClient';
 import { PiSessionRuntime } from './PiSessionRuntime';
 import { type PiSessionInfo, PiSessionStore } from './PiSessionStore';
@@ -166,7 +166,7 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
 
   /** Allowlisted SDK operations used by the Pi workbench, never arbitrary method reflection. */
   async command(sessionId: string | undefined, type: PiCommandName, input: PiRecord = {}): Promise<PiRecord> {
-    if (![...PI_RPC_COMMANDS, ...PI_SDK_COMMANDS, ...PI_CONFIG_COMMANDS].includes(type)) throw new Error('Unknown Pi operation.');
+    if (![...PI_RPC_COMMANDS, ...PI_OPTIONAL_RPC_COMMANDS, ...PI_SDK_COMMANDS, ...PI_CONFIG_COMMANDS].includes(type)) throw new Error('Unknown Pi operation.');
     const info = sessionId ? await this.requireSession(sessionId) : undefined;
     const isConfiguration = (PI_CONFIG_COMMANDS as readonly string[]).includes(type);
     const client = await this.runtime.get(isConfiguration ? 'configuration' : sessionId ?? 'catalog', info ? this.nativePath(info) : undefined);
@@ -186,6 +186,30 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
   }
   listSessions(): Promise<PiSessionInfo[]> { return this.store.list(); }
   getSession(id: string): Promise<PiSessionInfo | null> { return this.store.get(id); }
+  /** SDK-reported levels for this session's current model; no guessed catalog variants. */
+  async getAvailableThinkingLevels(sessionId?: string): Promise<PiAvailableThinkingLevelsResult | PiUnavailableCommandResult> {
+    const result = await this.command(sessionId, 'get_available_thinking_levels');
+    if (result.status === 'unavailable') {
+      if (typeof result.reason !== 'string') throw new Error('Invalid Pi unavailable response.');
+      return { command: 'get_available_thinking_levels', status: 'unavailable', reason: result.reason };
+    }
+    if (!Array.isArray(result.levels) || !result.levels.every(level => typeof level === 'string')) throw new Error('Invalid Pi thinking levels response.');
+    return { levels: result.levels as string[] };
+  }
+  /** Preserve native entry identities and the leaf; unavailable is never an empty history. */
+  async getSessionEntries(sessionId: string, since?: string): Promise<PiEntriesResult | PiUnavailableCommandResult> {
+    if (!sessionId.trim()) throw new Error('Pi session is required for native entries.');
+    const result = await this.command(sessionId, 'get_entries', since === undefined ? {} : { since });
+    if (result.status === 'unavailable') {
+      if (typeof result.reason !== 'string') throw new Error('Invalid Pi unavailable response.');
+      return { command: 'get_entries', status: 'unavailable', reason: result.reason };
+    }
+    if (!Array.isArray(result.entries) || result.entries.some(entry => {
+      const record = piRecord(entry);
+      return typeof record.id !== 'string' || typeof record.type !== 'string' || (record.parentId !== null && typeof record.parentId !== 'string');
+    }) || (result.leafId !== null && typeof result.leafId !== 'string')) throw new Error('Invalid Pi entries response.');
+    return result as unknown as PiEntriesResult;
+  }
   async getSessionMessages(id: string): Promise<unknown[]> {
     const result = await this.command(id, 'get_messages');
     return Array.isArray(result.entries) ? result.entries : Array.isArray(result.messages) ? result.messages : [];

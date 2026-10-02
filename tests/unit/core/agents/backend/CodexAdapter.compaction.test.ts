@@ -1,7 +1,9 @@
 import { CodexAdapter } from '../../../../../src/core/agents/backend/CodexAdapter';
+import type { AppServerThreadMutationResult } from '../../../../../src/core/agents/backend/CodexAppServerClientTypes';
 
 const mockStart = jest.fn<Promise<void>, []>();
 const mockCompact = jest.fn();
+const mockDeleteThreadResult = jest.fn<Promise<AppServerThreadMutationResult>, [string]>();
 let handlers = new Map<string, (event: { method: string; params: Record<string, unknown> }) => void>();
 let synchronousSubscriptionEvent: { method: string; params: Record<string, unknown> } | null = null;
 
@@ -18,6 +20,7 @@ jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => {
         return { dispose: jest.fn(() => handlers.delete(threadId)) };
       }),
       startThreadCompaction: mockCompact,
+      deleteThreadResult: mockDeleteThreadResult,
     })),
   };
 });
@@ -42,6 +45,9 @@ describe('CodexAdapter foreground compaction', () => {
     synchronousSubscriptionEvent = null;
     mockStart.mockResolvedValue(undefined);
     mockCompact.mockResolvedValue({ status: 'accepted', acknowledged: true });
+    mockDeleteThreadResult.mockImplementation(async (threadId) => ({
+      operation: 'delete', threadId, status: 'verified', readback: { status: 'verified' },
+    }));
   });
 
   it('keeps empty ACK pending until matching compaction completion and fresh authoritative usage, in either notification order', async () => {
@@ -157,9 +163,33 @@ describe('CodexAdapter foreground compaction', () => {
     const deletingPending = deleting.compactForegroundThread('codex-local-a', { timeoutMs: 1000 });
     await new Promise((resolve) => setTimeout(resolve, 0));
     await deleting.deleteSession('codex-local-a');
+    expect(mockDeleteThreadResult).toHaveBeenCalledWith('thread-a');
     await expect(deletingPending).resolves.toMatchObject({ status: 'invalid-thread', acknowledged: true, runtimeVerified: false });
     emit('thread-a', 'thread/tokenUsage/updated', { turnId: 'late-delete', tokenUsage: { total: { totalTokens: 52 }, last: {}, modelContextWindow: 100 } });
     await expect(deleting.getContextUsageSnapshot('codex-local-a')).resolves.toBeNull();
+  });
+
+  it('keeps pending compaction alive when deletion is admitted without verified absence', async () => {
+    const subject = adapter();
+    await subject.start();
+    ownThread(subject);
+    const pending = subject.compactForegroundThread('codex-local-a', { timeoutMs: 1000 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    mockDeleteThreadResult.mockResolvedValueOnce({
+      operation: 'delete', threadId: 'thread-a', status: 'admitted',
+      readback: { status: 'unavailable', errorReason: 'readback offline' },
+    });
+
+    await expect(subject.deleteSession('codex-local-a')).rejects.toMatchObject({
+      result: { operation: 'delete', threadId: 'thread-a', status: 'admitted' },
+    });
+    expect(subject.getForegroundCompactionAvailability('codex-local-a')).toEqual({ status: 'busy', threadId: 'thread-a' });
+    emit('thread-a', 'item/started', { item: { id: 'compact-retained', type: 'contextCompaction' } });
+    emit('thread-a', 'item/completed', { item: { id: 'compact-retained', type: 'contextCompaction' } });
+    emit('thread-a', 'thread/tokenUsage/updated', { turnId: 'turn-retained', tokenUsage: { total: { totalTokens: 53 }, last: {}, modelContextWindow: 100 } });
+    await expect(pending).resolves.toMatchObject({ status: 'verified', threadId: 'thread-a', runtimeVerified: true });
+    await expect(subject.getContextUsageSnapshot('codex-local-a')).resolves.toMatchObject({ totalTokens: 53 });
+    await subject.stop();
   });
 
   it('requires a matching started/completed item pair before token usage can verify compaction', async () => {

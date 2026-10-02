@@ -66,8 +66,12 @@ import {
 } from './ClaudeCodeProcessResolver';
 import {
   ClaudeCodeAsyncQueue,
+  type ClaudeCodeMcpPermissionModeOverride,
+  type ClaudeCodeMcpPermissionModeOverrideResult,
+  type ClaudeCodeOutputStylesReloadResult,
   type ClaudeCodeQueuedPrompt,
   type ClaudeCodeRuntimeOutput,
+  type ClaudeCodeSessionControlResult,
   type ClaudeCodeSessionRuntime,
   createSessionId,
   createUserPrompt,
@@ -5060,6 +5064,94 @@ export class ClaudeCodeAdapter
   async reloadSkills(): Promise<void> {
     await this.applyToActiveQueries((runtime) => runtime.query?.reloadSkills?.());
     this.notifyCommandsChanged();
+  }
+
+  /** Tighten one MCP server on an existing native session; acknowledgement is not readback. */
+  async setMcpPermissionModeOverride(
+    nativeSessionId: string,
+    serverName: string,
+    mode: ClaudeCodeMcpPermissionModeOverride,
+  ): Promise<ClaudeCodeMcpPermissionModeOverrideResult> {
+    if (typeof serverName !== 'string' || !serverName.trim()
+      || !(['default', 'auto', null] as const).includes(mode)) {
+      return { status: 'failed', nativeSessionId, reason: 'invalid-input' };
+    }
+    const target = this.getActiveSessionControlTarget(nativeSessionId);
+    if (target.status === 'unavailable') return target;
+    const { session, runtime, query } = target;
+    try {
+      if (typeof query.setMcpPermissionModeOverride !== 'function') {
+        return { status: 'unavailable', nativeSessionId, reason: 'missing-method' };
+      }
+      const response = await query.setMcpPermissionModeOverride(serverName, mode);
+      if (!response || typeof response !== 'object' || Array.isArray(response)
+        || (response.warning !== undefined && typeof response.warning !== 'string')) {
+        return { status: 'failed', nativeSessionId, reason: 'invalid-response' };
+      }
+      if (this.sessions.get(nativeSessionId) !== session || session.sdkSessionId !== nativeSessionId
+        || session.runtime !== runtime || runtime.query !== query
+        || runtime.closed || runtime.abortController.signal.aborted) {
+        return { status: 'failed', nativeSessionId, reason: 'session-changed' };
+      }
+      return {
+        status: 'acknowledged', nativeSessionId,
+        response: response.warning === undefined ? {} : { warning: response.warning },
+      };
+    } catch {
+      return { status: 'failed', nativeSessionId, reason: 'request-failed' };
+    }
+  }
+
+  /** Re-scan style names on one native session; this does not apply a style to its prompt. */
+  async reloadOutputStyles(nativeSessionId: string): Promise<ClaudeCodeOutputStylesReloadResult> {
+    const target = this.getActiveSessionControlTarget(nativeSessionId);
+    if (target.status === 'unavailable') return target;
+    const { session, runtime, query } = target;
+    try {
+      if (typeof query.reloadOutputStyles !== 'function') {
+        return { status: 'unavailable', nativeSessionId, reason: 'missing-method' };
+      }
+      const response = await query.reloadOutputStyles();
+      if (!response || typeof response !== 'object' || Array.isArray(response)
+        || !Array.isArray(response.available_output_styles)) {
+        return { status: 'failed', nativeSessionId, reason: 'invalid-response' };
+      }
+      const names: unknown[] = [...response.available_output_styles];
+      if (!names.every((name): name is string => typeof name === 'string')) {
+        return { status: 'failed', nativeSessionId, reason: 'invalid-response' };
+      }
+      if (this.sessions.get(nativeSessionId) !== session || session.sdkSessionId !== nativeSessionId
+        || session.runtime !== runtime || runtime.query !== query
+        || runtime.closed || runtime.abortController.signal.aborted) {
+        return { status: 'failed', nativeSessionId, reason: 'session-changed' };
+      }
+      return {
+        status: 'acknowledged', nativeSessionId,
+        response: { available_output_styles: names },
+      };
+    } catch {
+      return { status: 'failed', nativeSessionId, reason: 'request-failed' };
+    }
+  }
+
+  private getActiveSessionControlTarget(nativeSessionId: string):
+    | Extract<ClaudeCodeSessionControlResult<never>, { status: 'unavailable' }>
+    | {
+      status: 'available';
+      session: ClaudeCodeSessionState;
+      runtime: ClaudeCodeSessionRuntime;
+      query: NonNullable<ClaudeCodeSessionRuntime['query']>;
+    } {
+    if (typeof nativeSessionId !== 'string' || !nativeSessionId.trim()) {
+      return { status: 'unavailable', nativeSessionId, reason: 'invalid-native-session-id' };
+    }
+    const session = this.sessions.get(nativeSessionId);
+    const runtime = session?.runtime;
+    if (!session || session.sdkSessionId !== nativeSessionId || !runtime?.query
+      || runtime.closed || runtime.abortController.signal.aborted) {
+      return { status: 'unavailable', nativeSessionId, reason: 'no-active-session' };
+    }
+    return { status: 'available', session, runtime, query: runtime.query };
   }
 
   async restartPersistentQueries(reason = 'manual'): Promise<void> {

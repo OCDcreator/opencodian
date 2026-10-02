@@ -1,8 +1,8 @@
 /** Public SDK business operations. No eval and no arbitrary method invocation. */
-export const RPC_COMMANDS = ['prompt', 'steer', 'follow_up', 'abort', 'new_session', 'get_state', 'set_model', 'cycle_model', 'get_available_models', 'set_thinking_level', 'cycle_thinking_level', 'set_steering_mode', 'set_follow_up_mode', 'compact', 'set_auto_compaction', 'set_auto_retry', 'abort_retry', 'bash', 'abort_bash', 'get_session_stats', 'export_html', 'switch_session', 'fork', 'clone', 'get_fork_messages', 'get_last_assistant_text', 'set_session_name', 'get_messages', 'get_commands'];
+export const RPC_COMMANDS = ['prompt', 'steer', 'follow_up', 'abort', 'new_session', 'get_state', 'set_model', 'cycle_model', 'get_available_models', 'set_thinking_level', 'cycle_thinking_level', 'get_available_thinking_levels', 'set_steering_mode', 'set_follow_up_mode', 'compact', 'set_auto_compaction', 'set_auto_retry', 'abort_retry', 'bash', 'abort_bash', 'get_session_stats', 'export_html', 'switch_session', 'fork', 'clone', 'get_fork_messages', 'get_entries', 'get_last_assistant_text', 'set_session_name', 'get_messages', 'get_commands'];
 export const SDK_COMMANDS = ['get_tree', 'navigate_tree', 'label_entry', 'list_sessions', 'import_session', 'export_jsonl', 'get_tools', 'set_tools', 'get_resources', 'reload', 'clear_queue', 'get_queue', 'abort_compaction', 'abort_branch_summary', 'get_auth', 'set_api_key', 'login', 'logout', 'get_packages', 'install_package', 'remove_package', 'update_package', 'set_scoped_models'];
 export const CONFIG_COMMANDS = ['get_configuration', 'save_configuration', 'get_model_configuration', 'save_model_configuration'];
-export const BUSY_ALLOWED = new Set(['get_state', 'get_messages', 'get_session_stats', 'get_commands', 'get_tree', 'get_fork_messages', 'get_last_assistant_text', 'get_tools', 'get_resources', 'get_queue', 'get_auth', 'get_packages', 'get_available_models', 'steer', 'follow_up', 'abort', 'abort_retry', 'abort_bash', 'abort_compaction', 'abort_branch_summary', 'clear_queue']);
+export const BUSY_ALLOWED = new Set(['get_state', 'get_messages', 'get_session_stats', 'get_commands', 'get_tree', 'get_fork_messages', 'get_last_assistant_text', 'get_tools', 'get_resources', 'get_queue', 'get_auth', 'get_packages', 'get_available_models', 'get_available_thinking_levels', 'get_entries', 'steer', 'follow_up', 'abort', 'abort_retry', 'abort_bash', 'abort_compaction', 'abort_branch_summary', 'clear_queue']);
 
 const required = (value, name) => {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${name} is required.`);
@@ -10,7 +10,7 @@ const required = (value, name) => {
 };
 const boolean = (value) => { if (typeof value !== 'boolean') throw new Error('Expected a boolean.'); return value; };
 const mode = (value) => { if (!['all', 'one-at-a-time'].includes(value)) throw new Error('Invalid queue mode.'); return value; };
-const level = (value) => { if (!['off', 'minimal', 'low', 'medium', 'high', 'xhigh'].includes(value)) throw new Error('Invalid thinking level.'); return value; };
+const level = (value) => { if (!['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].includes(value)) throw new Error('Invalid thinking level.'); return value; };
 
 export function sessionState(session) {
   return { model: session.model, thinkingLevel: session.thinkingLevel, isStreaming: session.isStreaming,
@@ -46,10 +46,20 @@ function nativeMessages(manager) {
 export async function executeCommand(host, c) {
   const s = host.runtime.session;
   const manager = s.sessionManager;
+  // Detect public SDK methods on the actual session, never infer support from a version range.
+  const capabilities = {
+    get_available_thinking_levels: typeof s.getAvailableThinkingLevels === 'function'
+      ? { status: 'available', source: 'sdk' }
+      : { status: 'unavailable', reason: 'Installed Pi SDK does not expose getAvailableThinkingLevels.' },
+    get_entries: typeof manager?.getEntries === 'function' && typeof manager?.getLeafId === 'function'
+      ? { status: 'available', source: 'sdk' }
+      : { status: 'unavailable', reason: 'Installed Pi SDK does not expose native entries and leaf ID.' },
+  };
   const registry = s.modelRegistry ?? (host.modelRuntime ? new host.sdk.ModelRegistry(host.modelRuntime) : undefined);
   host.auth.reload?.();
   switch (c.type) {
-    case 'get_state': return { ...sessionState(s), serviceProtocol: 1, sdkVersion: host.sdk.VERSION, commands: [...RPC_COMMANDS, ...SDK_COMMANDS, ...CONFIG_COMMANDS] };
+    case 'get_state': return { ...sessionState(s), serviceProtocol: 1, sdkVersion: host.sdk.VERSION,
+      commands: [...RPC_COMMANDS, ...SDK_COMMANDS, ...CONFIG_COMMANDS].filter((name) => capabilities[name]?.status !== 'unavailable'), capabilities };
     case 'get_configuration': return host.configuration.getSettings();
     case 'save_configuration': return host.configuration.saveSettings(c);
     case 'get_model_configuration': return host.configuration.getModels();
@@ -68,6 +78,10 @@ export async function executeCommand(host, c) {
     case 'cycle_model': return await s.cycleModel() ?? {};
     case 'set_thinking_level': s.setThinkingLevel(level(c.level)); return { level: s.thinkingLevel };
     case 'cycle_thinking_level': return { level: s.cycleThinkingLevel() };
+    case 'get_available_thinking_levels': {
+      if (capabilities[c.type].status === 'unavailable') return { command: c.type, ...capabilities[c.type] };
+      return { levels: s.getAvailableThinkingLevels() };
+    }
     case 'set_steering_mode': s.setSteeringMode(mode(c.mode)); return {};
     case 'set_follow_up_mode': s.setFollowUpMode(mode(c.mode)); return {};
     case 'compact': return await s.compact(c.customInstructions);
@@ -87,6 +101,17 @@ export async function executeCommand(host, c) {
       return host.runtime.fork(leaf, { position: 'at' });
     }
     case 'get_fork_messages': return { messages: s.getUserMessagesForForking() };
+    case 'get_entries': {
+      if (c.since !== undefined && typeof c.since !== 'string') throw new Error('since must be a native entry ID.');
+      if (capabilities[c.type].status === 'unavailable') return { command: c.type, ...capabilities[c.type] };
+      let entries = manager.getEntries();
+      if (c.since !== undefined) {
+        const sinceIndex = entries.findIndex((entry) => entry.id === c.since);
+        if (sinceIndex === -1) throw new Error(`Entry not found: ${c.since}`);
+        entries = entries.slice(sinceIndex + 1);
+      }
+      return { entries, leafId: manager.getLeafId() };
+    }
     case 'get_last_assistant_text': return { text: s.getLastAssistantText() ?? null };
     case 'set_session_name': s.setSessionName(required(c.name, 'Name')); return {};
     case 'get_messages': return { messages: s.messages, entries: nativeMessages(manager) };

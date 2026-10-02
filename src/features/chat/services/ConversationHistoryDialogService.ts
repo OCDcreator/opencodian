@@ -51,6 +51,19 @@ export class ConversationHistoryDialogService {
     });
   }
 
+  showForgetLocalConfirmDialog(count: number): Promise<boolean> {
+    return this.showDeleteConfirmDialog({
+      titleKey: 'chat.forgetLocalConfirm.title',
+      warningKey: 'chat.forgetLocalConfirm.warning',
+      description: t('chat.forgetLocalConfirm.description', { count }),
+      emphasisKey: 'chat.forgetLocalConfirm.emphasis',
+      cancelKey: 'chat.deleteSelectedConfirm.cancel',
+      confirmKey: 'chat.forgetLocalConfirm.confirm',
+      confirmTextKey: 'chat.forgetLocalConfirm.confirmText',
+      countdown: 3,
+    });
+  }
+
   showRenameConversationDialog(initialValue: string): Promise<string | null> {
     return new Promise((resolve) => {
       const overlay = document.createElement('div');

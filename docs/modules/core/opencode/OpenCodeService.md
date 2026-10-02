@@ -497,3 +497,11 @@ Compaction config is now project-scoped (`.opencode/opencode.json`). Ownership f
 
 每次 `sendMessage()` 从内部 `diagnosticRunToken` 解析显式 trace context，并用 trace-scoped SDK façade 同时覆盖 prompt、SDK event subscribe、SDK fetch 与 legacy fallback。legacy `/event` GET、raw ingress、normalized outcome 分别记录 transport 与同一 `sourceEventId` 的两侧结果；诊断令牌和 context 不序列化到 OpenCode 请求正文。active trace 以 `runId` 管理，避免同 session 并发标签覆盖。
 - 2026-09-08：移除 deprecated `respondToSessionPermission()` 公共包装；权限应答统一委托 `respondToPermission()` / SDK `permission.reply`。
+
+### 2026-10-02 T10 review fix: snapshot read seam
+
+The lifecycle host injects `beginCanonicalSnapshot` from the existing state store, then passes its token to `applyCanonicalSnapshot`. The service maps the canonical clone back to `{info, parts[]}` and returns that merged array for reload callers and diagnostics. Revision tracking, concurrent deletion precedence, late-read ordering and eviction protection remain in `OpenCodeSessionStateStore`. The facade adds no new runtime ownership. SDK/HTTP/fallback delayed-response regressions use the production lifecycle and canonical sync ingress in `OpenCodeService.snapshotRace.t10.test.ts`.
+
+### 2026-10-02 T10 cycle fix
+
+The service imports `OpenCodeSessionSnapshotToken` type-only from the existing `./types` contract owner, separately from the runtime state-store import. Snapshot host wiring and all method bodies remain unchanged.

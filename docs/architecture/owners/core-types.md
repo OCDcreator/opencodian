@@ -1,4 +1,5 @@
 # Owner: core.types
+> 2026-10-02（T02）：inline-edit/completion 模型覆盖 allowlist 补入 `opencode2`，保存归一化与重载保留独立 provider/model；ZCode 的编辑边界和 effort allowlist 保持原限制。归一化函数体不扩展运行时责任；native 模型回读另行验收。
 > 2026-09-30 (Codex 0.159 types)：
 > - settings.ts：持久化 codex `approvalPolicy 'untrusted'` 迁移为 `'on-request'`（上游 0.15x 已退役该值并拒绝启动）；`VALID_APPROVAL_POLICY` 收窄；`SettingsCodexSection` 下拉同步更新。
 > - chat.ts：`tool_use` kind union 扩展 `'image'`；`backend_event` union 扩展（`thread_renamed`、`goal_updated`、`goal_cleared`、`thread_deleted`、`deprecation_notice`）；会话级 approval override 经 `normalizeCodexApprovalPolicyOverride` 做 untrusted→on-request 迁移。

@@ -187,6 +187,7 @@ export interface ConversationLoadRecoveryPort {
   createConversationInCurrentTab(): Promise<void>;
   loadConversation(id: string, options?: LoadConversationOptions): Promise<void>;
   deleteConversationsAndRecover(conversationIds: readonly string[]): Promise<void>;
+  forgetConversationsAndRecover?(conversationIds: readonly string[]): Promise<void>;
   deleteAllConversationsAndReset(conversationIds: readonly string[]): Promise<void>;
 }
 
@@ -268,6 +269,11 @@ export class ConversationLoadRecoveryCoordinator {
 
   async deleteConversationsAndRecover(conversationIds: readonly string[]): Promise<void> {
     await this.port.deleteConversationsAndRecover(conversationIds);
+  }
+
+  async forgetConversationsAndRecover(conversationIds: readonly string[]): Promise<void> {
+    if (!this.port.forgetConversationsAndRecover) throw new Error('Local forgetting is unavailable; conversations retained.');
+    await this.port.forgetConversationsAndRecover(conversationIds);
   }
 
   async deleteAllConversationsAndReset(conversationIds: readonly string[]): Promise<void> {
@@ -671,6 +677,8 @@ export function assembleConversationLoadRecovery(
         conversationTabLifecycleRecoveryCoordinator.deleteConversationsAndRecover(
           conversationIds,
         ),
+      forgetConversationsAndRecover: (conversationIds) =>
+        conversationTabLifecycleRecoveryCoordinator.forgetConversationsAndRecover(conversationIds),
       deleteAllConversationsAndReset: (conversationIds) =>
         conversationTabLifecycleRecoveryCoordinator.deleteAllConversationsAndReset(
           conversationIds,

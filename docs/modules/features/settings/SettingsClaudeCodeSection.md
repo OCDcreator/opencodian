@@ -78,3 +78,13 @@
 - Runtime / permissions / context / tools textareas that expose manual resize use `TextareaSizeMemory` with stable keys, and `dispose()` cleans the attached observers when the section is rebuilt.
 - 2026-06-06 session browser launcher：`renderBackendSessionBrowserInfo()` 从 read-only notice 升级为 browse-only modal launcher；settings 侧 host 必须保持 `supportsResume: false`，避免在无聊天视图上下文时创建或恢复 conversation。
 - 2026-09-08：Skill 创建、编辑、删除和历史恢复成功后优先调用活动 Claude query 的 `reloadSkills()`；外部旧 CLI 不支持该控制请求时退回 `restartPersistentQueries('skill-resource-change')`，并始终失效 slash catalog。
+
+## 2026-10-02 T08 单会话 controls
+
+既有 Runtime prompt/output-style 行接入 reloadOutputStyles(nativeSessionId)，MCP runtime 区接入 setMcpPermissionModeOverride(nativeSessionId, serverName, 'default'|'auto'|null)。输入原生 Claude session ID；服务器名精确匹配；null 继承；显式按钮执行。没有 session/server 时不发送请求；控制方法缺失、no-active-session、failed 分别显示真实状态。控件不保存 plugin defaults 或全局配置。
+
+acknowledged 只表示请求确认：output styles 展示 SDK 实际返回目录，不声称当前 prompt 已应用；MCP warning 原样以文本显示，有效设置回读仍 unavailable。状态以 data-control-status 与 data-runtime-evidence 表示，未收到有效证据不添加 pass/verified。目标改变会清除旧状态并拒绝迟到响应。
+
+PiClaudeSessionControlsUI.test.ts 正式覆盖成功/无active session/unsupported/failure、MCP三个值、server缺失、wrong session 与迟到响应，断言 saveSettings 未调用、outputStyle 未改变、runtime 不误标有效。现有 SettingsClaudeCodeSection.test.ts 的无 config authoring 断言排除新增单会话 server 输入。native-t12 的 Claude SDK 0.3.283/CLI 2.1.272 样式目录作为消费证据；deny-all session 无 server，MCP mutation 仍 unavailable，不能据方法存在推测行为通过。
+
+Mac native-t12 兼容性补充：SDK 0.3.283 方法存在但 CLI 2.1.204 拒绝 reload_output_styles，UI 按 adapter failed 显示失败且 runtime evidence failed，不凭方法存在标有效。PiClaudeSessionControlsUI.test.ts 包含该具体拒绝回归；Windows CLI 2.1.272 返回目录的证据不能泛化到旧 CLI。

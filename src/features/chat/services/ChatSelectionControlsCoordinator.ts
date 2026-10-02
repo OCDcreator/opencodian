@@ -371,9 +371,12 @@ export class ChatSelectionControlsCoordinator {
     private readonly host: ChatSelectionControlsCoordinatorHost,
   ) {
     this.modelSelectionRuntime = new ModelSelectionRuntime(bindZCodeModelSelection(bindPiModelSelection(wrapHostForCodex(host), () =>
-      readActiveBackendFromPlugin() === 'pi'
+      this.getSelectionBackend() === 'pi'
         ? readOpenCodianPlugin()?.agentServiceRegistry?.get?.('pi') as PiAdapter ?? null
-        : null), () =>
+        : null, () => {
+          const conversation = this.host.getOwnConversation?.();
+          return conversation?.backend === 'pi' ? conversation.backendSessionId : undefined;
+        }), () =>
       this.getSelectionBackend() === 'zcode'
         ? readOpenCodianPlugin()?.agentServiceRegistry?.get?.('zcode') as ZCodeAdapter ?? null
         : null, () => this.getZCodeSessionId()));

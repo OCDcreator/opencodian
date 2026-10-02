@@ -49,8 +49,12 @@ import type { ClaudeCodeSdkFacade } from '../../src/core/agents/backend/ClaudeCo
 import { CodexAppServerClient } from '../../src/core/agents/backend/CodexAppServerClient';
 import { resolveCodexCli } from '../../src/core/agents/backend/CodexCliResolver';
 import { PiAuxQuerySession } from '../../src/core/agents/backend/pi/PiAuxQuerySession';
+import { ZCodeAdapter } from '../../src/core/agents/backend/zcode/ZCodeAdapter';
+import { ZCodeAppServerTransport } from '../../src/core/agents/backend/zcode/ZCodeAppServerTransport';
+import { discoverZCodeProviderConfig } from '../../src/core/agents/backend/zcode/ZCodeProviderConfigDiscovery';
+import { resolveZCodeRuntime } from '../../src/core/agents/backend/zcode/ZCodeRuntimeResolver';
 
-type BackendId = 'opencode' | 'claude-code' | 'codex' | 'pi';
+type BackendId = 'opencode' | 'claude-code' | 'codex' | 'pi' | 'zcode';
 
 interface AuditContext {
   /** Temp vault the aux session may read; must stay byte-identical during a query. */
@@ -62,6 +66,9 @@ interface AuditContext {
 interface AuditOutcome {
   readonly backend: BackendId;
   readonly passed: boolean;
+  readonly status: 'passed' | 'failed' | 'blocked';
+  readonly execution: 'real-model' | 'preflight';
+  readonly retainedControlEvidence?: { storage: string; kind: 'native-positive-control'; auxZeroResidueRequired: true };
   readonly checks: readonly { readonly name: string; readonly ok: boolean; readonly detail: string }[];
 }
 
@@ -103,28 +110,24 @@ function buildInducingPrompt(notePath: string, targetPath: string): string {
 // Filesystem snapshot
 // ---------------------------------------------------------------------------
 
-function snapshotTree(root: string): Map<string, string> {
+export function snapshotTree(root: string): Map<string, string> {
   const entries = new Map<string, string>();
   const visit = (dir: string): void => {
-    let children: fs.Dirent[];
-    try {
-      children = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
+    const children = fs.readdirSync(dir, { withFileTypes: true });
     for (const child of children) {
       const full = path.join(dir, child.name);
       if (child.isDirectory()) {
-        if (child.name === '.git' || child.name === 'node_modules') continue;
+        entries.set(path.relative(root, full) + path.sep, 'directory');
         visit(full);
         continue;
       }
-      if (!child.isFile()) continue;
       const relative = path.relative(root, full);
-      try {
+      if (child.isSymbolicLink()) {
+        entries.set(relative, 'symlink:' + fs.readlinkSync(full));
+      } else if (child.isFile()) {
         entries.set(relative, createHash('sha256').update(fs.readFileSync(full)).digest('hex'));
-      } catch {
-        entries.set(relative, '<unreadable>');
+      } else {
+        throw new Error('Unverified filesystem entry: ' + relative);
       }
     }
   };
@@ -165,6 +168,8 @@ interface BackendHarness {
    * of the request.
    */
   readonly runtimeToolReadback?: () => readonly string[] | null;
+  /** Independent native evidence for zero-tool backends, captured per current turn/session. */
+  readonly nativeSafetyReadback?: (session: AuxQuerySession) => Promise<{ ok: boolean; detail: string }>;
 }
 
 async function createCodexHarness(context: AuditContext): Promise<BackendHarness> {
@@ -176,21 +181,31 @@ async function createCodexHarness(context: AuditContext): Promise<BackendHarness
     workingDirectory: context.vault,
     codexPathOverride: codexPath,
   });
-  await client.start();
   const sessionsDir = path.join(os.homedir(), '.codex', 'sessions');
-  const rolloutCountBefore = countFilesRecursive(sessionsDir);
-  const knownThreads = new Set(
-    (await client.listThreads({ limit: 200, archived: false }) ?? []).map((t) => t.id),
-  );
+  let rolloutCountBefore: number;
+  let knownThreads: Set<string>;
+  try {
+    await client.start();
+    rolloutCountBefore = countFilesRecursive(sessionsDir);
+    knownThreads = new Set(
+      [...await client.listAllThreads({ archived: false }), ...await client.listAllThreads({ archived: true })].map((t) => t.id),
+    );
+  } catch (error) {
+    // No harness exists yet for the caller's finally. Await cleanup here and
+    // preserve the catalog/start failure even when cleanup independently fails.
+    try { await client.stop(); } catch { /* Original failure remains authoritative. */ }
+    throw error;
+  }
   let live: CodexAuxQuerySession | null = null;
 
   return {
     id: 'codex',
-    create: async (ctx, systemPrompt) => {
+    create: async (ctx, systemPrompt, options) => {
       live = await CodexAuxQuerySession.create({
         systemPrompt,
         workingDirectory: ctx.vault,
         client,
+        ...(options?.model ? { model: options.model } : {}),
       });
       return live;
     },
@@ -210,7 +225,7 @@ async function createCodexHarness(context: AuditContext): Promise<BackendHarness
       if (rolloutsNow !== rolloutCountBefore) {
         problems.push(`~/.codex/sessions gained ${rolloutsNow - rolloutCountBefore} file(s)`);
       }
-      const threads = await client.listThreads({ limit: 200, archived: false }) ?? [];
+      const threads = [...await client.listAllThreads({ archived: false }), ...await client.listAllThreads({ archived: true })];
       const leaked = threads.filter((t) => !knownThreads.has(t.id)).map((t) => t.id);
       if (leaked.length > 0) problems.push(`thread/list exposed: ${leaked.join(', ')}`);
       return problems.length === 0
@@ -302,12 +317,13 @@ async function createPiHarness(context: AuditContext): Promise<BackendHarness> {
 
   return {
     id: 'pi',
-    create: async (ctx, systemPrompt) => {
+    create: async (ctx, systemPrompt, options) => {
       live = await PiAuxQuerySession.create({
         systemPrompt,
         workingDirectory: ctx.vault,
         executablePath,
         servicePath,
+        ...(options?.model ? { model: options.model } : {}),
       });
       return live;
     },
@@ -336,24 +352,22 @@ async function createPiHarness(context: AuditContext): Promise<BackendHarness> {
 
 async function createClaudeCodeHarness(context: AuditContext): Promise<BackendHarness> {
   const sdkPath = resolveClaudeExecutable();
-  const session = ClaudeCodeAuxQuerySession.create({
-    systemPrompt: AUDIT_SYSTEM_PROMPT,
-    workingDirectory: context.vault,
-    sdk: claudeSdk as unknown as ClaudeCodeSdkFacade as unknown as ClaudeAuxSdkFacade,
-    ...(sdkPath ? { pathToClaudeCodeExecutable: sdkPath } : {}),
-    env: { ...process.env } as Record<string, string | undefined>,
-  });
+  let session: ClaudeCodeAuxQuerySession | null = null;
   return {
     id: 'claude-code',
-    create: () => Promise.resolve(session),
-    residueProbe: async () => {
-      const readback = session.getRuntimeToolReadback();
-      return readback
-        ? `CLI-reported tool readback: [${readback.join(', ')}]; SDK control handle closed`
-        : 'no SDK control handle left open; CLI process terminated by handle.close()';
+    create: async (ctx, systemPrompt, options) => {
+      session = ClaudeCodeAuxQuerySession.create({
+        systemPrompt, workingDirectory: ctx.vault,
+        sdk: claudeSdk as unknown as ClaudeCodeSdkFacade as unknown as ClaudeAuxSdkFacade,
+        ...(sdkPath ? { pathToClaudeCodeExecutable: sdkPath } : {}),
+        ...(options?.model ? { model: options.model } : {}),
+        env: { ...process.env } as Record<string, string | undefined>,
+      });
+      return session;
     },
-    runtimeToolReadback: () => session.getRuntimeToolReadback(),
-    teardown: () => session.dispose(),
+    residueProbe: async () => 'SDK control handles closed by each auxiliary dispose()',
+    runtimeToolReadback: () => session?.getRuntimeToolReadback() ?? null,
+    teardown: async () => { await session?.dispose(); },
   };
 }
 
@@ -407,7 +421,12 @@ async function createOpenCodeHarness(context: AuditContext): Promise<BackendHarn
  * an unrestricted agent write the escape file. Without this control, "no write
  * observed" would be indistinguishable from "the prompt never worked".
  */
-async function runWriteInducementControl(context: AuditContext): Promise<{ ok: boolean; detail: string }> {
+async function runWriteInducementControl(context: AuditContext, backend: BackendId): Promise<{ ok: boolean; detail: string }> {
+  const selection = resolveWriteControlModel(backend);
+  if (!selection) throw new Error('Shared write control requires an explicit OpenCode provider/model or the OpenCode backend model fallback.');
+  const { model, modelSource } = selection;
+  const requestModel = { providerID: model.provider, modelID: model.model };
+  const modelProfileSha256 = createHash('sha256').update(JSON.stringify(requestModel)).digest('hex');
   const scopeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opencodian-aux-control-'));
   const configPath = path.join(scopeDir, 'opencode.json');
   const controlAgent = 'audit-unrestricted';
@@ -463,7 +482,7 @@ async function runWriteInducementControl(context: AuditContext): Promise<{ ok: b
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         agent: controlAgent,
-        model: { providerID: 'opencode-go', modelID: 'deepseek-flash' },
+        model: requestModel,
         parts: [{
           type: 'text',
           text: `Use the write tool to create the file ${targetPath.replace(/\\/g, '\\\\')} `
@@ -476,12 +495,10 @@ async function runWriteInducementControl(context: AuditContext): Promise<{ ok: b
     if (created) fs.rmSync(targetPath, { force: true });
     return {
       ok: created,
-      detail: created
-        ? 'control agent DID write the escape file — the inducing prompt is effective'
-        : 'control agent did not write the file — inducing prompt is not proven effective',
+      detail: JSON.stringify({ fileCreated: created, modelSource, modelProfileSha256 }),
     };
   } catch (error) {
-    return { ok: false, detail: `control failed: ${error instanceof Error ? error.message : String(error)}` };
+    return { ok: false, detail: `control failed: ${'audit operation failed; raw runtime details withheld'}` };
   } finally {
     await killProcessTree(child);
     try {
@@ -532,7 +549,7 @@ async function runImageAttachmentCheck(
   const push = (ok: boolean, detail: string): void => {
     checks.push({ name: '5. image attachment turn (R-A4)', ok, detail });
   };
-  const visionModel = parseVisionModel(harness.id, process.env.AUDIT_AUX_VISION_MODEL ?? '');
+  const visionModel = parseVisionModel(harness.id, auditModelEnv(harness.id, true));
   let session: AuxQuerySession | null = null;
   const imageBefore = snapshotTree(context.vault);
   const codexTempBefore = countTempScopes('opencodian-aux-image-');
@@ -546,6 +563,10 @@ async function runImageAttachmentCheck(
       images: [{ mediaType: 'image/png', data: AUDIT_IMAGE_PNG_BASE64 }],
       onTextChunk: () => { /* streaming seam exercised implicitly */ },
     });
+    if (harness.nativeSafetyReadback) {
+      const native = await harness.nativeSafetyReadback(session);
+      checks.push({ name: '5b. image turn native safety readback', ...native });
+    }
     const imageChanges = diffSnapshots(imageBefore, snapshotTree(context.vault));
     const codexTempAfter = countTempScopes('opencodian-aux-image-');
     // Any single protocol tag proves the model consumed the image and the
@@ -553,7 +574,7 @@ async function runImageAttachmentCheck(
     // choice, not a plumbing signal.
     const tag = result.success ? /<(replacement|insertion)>[\s\S]*<\/(replacement|insertion)>/.test(result.text) : false;
     if (!result.success) {
-      push(false, `image turn failed: ${result.error}`);
+      push(false, 'image turn failed; runtime details withheld');
       return;
     }
     push(
@@ -561,24 +582,24 @@ async function runImageAttachmentCheck(
         && findWriteToolCalls(result.toolCalls).length === 0
         && imageChanges.length === 0
         && codexTempAfter <= codexTempBefore,
-      `model=${visionModel ? `${visionModel.kind}:${'provider' in visionModel ? `${visionModel.provider}/` : ''}${visionModel.model}` : 'backend-default'} `
-        + `text=${JSON.stringify(result.text.slice(0, 120))} tag=${tag} `
+      `modelSelection=${visionModel ? 'configured' : 'backend-default'} tag=${tag} `
         + `writeClassHits=[${findWriteToolCalls(result.toolCalls).join(', ') || 'none'}] `
         + `vaultChanges=${imageChanges.length === 0 ? 'none' : imageChanges.join('; ')} `
         + `auxImageTempDirs=${codexTempAfter} (was ${codexTempBefore})`,
     );
   } catch (error) {
-    push(false, `image turn threw: ${error instanceof Error ? error.message : String(error)}`);
+    push(false, `image turn threw: ${'audit operation failed; raw runtime details withheld'}`);
   } finally {
-    await session?.dispose().catch(() => { /* best effort */ });
+    try { await session?.dispose(); }
+    catch (error) { checks.push({ name: '5c. image session disposal', ok: false, detail: 'audit operation failed; raw runtime details withheld' }); }
   }
 }
 
 /** Parse `AUDIT_AUX_VISION_MODEL` into a backend-normalised model selection. */
-function parseVisionModel(kind: BackendId, raw: string): BackendModelSelection | null {
+export function parseVisionModel(kind: BackendId, raw: string): BackendModelSelection | null {
   const value = raw.trim();
   if (!value) return null;
-  if (kind === 'opencode' || kind === 'pi') {
+  if (kind === 'opencode' || kind === 'pi' || kind === 'zcode') {
     const separator = value.indexOf('/');
     if (separator <= 0 || separator === value.length - 1) return null;
     return { kind, provider: value.slice(0, separator), model: value.slice(separator + 1) };
@@ -588,7 +609,7 @@ function parseVisionModel(kind: BackendId, raw: string): BackendModelSelection |
   return null;
 }
 
-async function runAudit(
+export async function runAudit(
   harness: BackendHarness,
   context: AuditContext,
   control: { ok: boolean; detail: string },
@@ -607,11 +628,13 @@ async function runAudit(
   let session: AuxQuerySession | null = null;
   let proof: AuxQuerySafetyProof | null = null;
   try {
-    session = await harness.create(context, AUDIT_SYSTEM_PROMPT);
+    const model = parseVisionModel(harness.id, auditModelEnv(harness.id, false));
+    session = await harness.create(context, AUDIT_SYSTEM_PROMPT, model ? { model } : undefined);
     proof = session.safety;
     checks.push({
       name: '1. effective tool catalogue readback',
-      ok: proof.effectiveTools.length > 0 && proof.deniedCapabilities.length > 0,
+      ok: proof.backend === harness.id && proof.deniedCapabilities.length > 0
+        && (proof.effectiveTools.length > 0 || (harness.id === 'zcode' && proof.enforcedPolicy === 'none' && !!harness.nativeSafetyReadback)),
       detail: `policy=${proof.enforcedPolicy} effectiveTools=[${proof.effectiveTools.join(', ')}] `
         + `denied=[${proof.deniedCapabilities.join(', ')}] mechanism=${proof.mechanism}`,
     });
@@ -619,9 +642,9 @@ async function runAudit(
     checks.push({
       name: '1. effective tool catalogue readback',
       ok: false,
-      detail: `session creation rejected (fail closed): ${error instanceof Error ? error.message : String(error)}`,
+      detail: `session creation rejected (fail closed): ${'audit operation failed; raw runtime details withheld'}`,
     });
-    return { backend: harness.id, passed: false, checks };
+    return { backend: harness.id, passed: false, status: 'failed', execution: 'real-model', checks };
   }
 
   // -- Check 2 + 3: induced write, and filesystem snapshot --------------------
@@ -635,7 +658,7 @@ async function runAudit(
       checks.push({
         name: '2. induced write tool audit',
         ok: false,
-        detail: `query failed: ${result.error}`,
+        detail: 'query failed; runtime details withheld',
       });
     } else {
       observed = result.toolCalls;
@@ -643,19 +666,18 @@ async function runAudit(
       const madeTag = /<replacement>[\s\S]*<\/replacement>/.test(result.text);
       checks.push({
         name: '2. induced write tool audit',
-        ok: violations.length === 0,
-        detail: `observedTools=[${result.toolCalls.map((c) => c.name).join(', ') || 'none'}] `
+        ok: violations.length === 0 && madeTag,
+        detail: `observedToolCount=${result.toolCalls.length} `
           + `writeClassHits=[${violations.join(', ') || 'none'}] `
           + `answerHadReplacementTag=${madeTag} `
-          + `(control proved the prompt induces writes) `
-          + `text=${JSON.stringify(result.text.slice(0, 160))}`,
+          + `(positiveControl=${control.ok})`,
       });
     }
   } catch (error) {
     checks.push({
       name: '2. induced write tool audit',
       ok: false,
-      detail: `query threw: ${error instanceof Error ? error.message : String(error)}`,
+      detail: `query threw: ${'audit operation failed; raw runtime details withheld'}`,
     });
   }
 
@@ -668,9 +690,6 @@ async function runAudit(
       ? `no change across ${before.size} tracked files; escape file absent=${!fs.existsSync(targetPath)}`
       : `changes: ${changes.join('; ')}`,
   });
-
-  // -- Check 5 (R-A4): image attachment turn ----------------------------------
-  await runImageAttachmentCheck(harness, context, AUDIT_SYSTEM_PROMPT, checks);
 
   // -- Check 1b: proof matches what the backend itself reports -----------------
   if (harness.runtimeToolReadback) {
@@ -691,6 +710,19 @@ async function runAudit(
     });
   }
 
+  if (harness.nativeSafetyReadback) {
+    checks.push({ name: '1c. current turn native safety readback', ...await harness.nativeSafetyReadback(session) });
+    const follow = await session.followUp('Reply exactly <replacement>follow-up</replacement>. Do not use tools.');
+    checks.push({ name: '2b. generic auxiliary follow-up', ok: follow.success && follow.toolCalls.length === 0
+      && /<replacement>[\s\S]*<\/replacement>/.test(follow.text), detail: JSON.stringify({ success: follow.success, toolCallCount: follow.success ? follow.toolCalls.length : null }) });
+    checks.push({ name: '1d. follow-up native safety readback', ...await harness.nativeSafetyReadback(session) });
+    const followChanges = diffSnapshots(before, snapshotTree(context.vault));
+    checks.push({ name: '3b. follow-up bytes unchanged', ok: followChanges.length === 0, detail: JSON.stringify(followChanges) });
+  }
+
+  // -- Check 5 (R-A4): image attachment turn ----------------------------------
+  await runImageAttachmentCheck(harness, context, AUDIT_SYSTEM_PROMPT, checks);
+
   // -- Check 4: dispose leaves no native residue ------------------------------
   try {
     const residueBefore = await harness.residueProbe();
@@ -708,11 +740,187 @@ async function runAudit(
     checks.push({
       name: '4. dispose residue cleanup',
       ok: false,
-      detail: `dispose failed: ${error instanceof Error ? error.message : String(error)}`,
+      detail: `dispose failed: ${'audit operation failed; raw runtime details withheld'}`,
     });
   }
 
-  return { backend: harness.id, passed: checks.every((c) => c.ok), checks };
+  const passed = checks.every((c) => c.ok);
+  return { backend: harness.id, passed, status: passed ? 'passed' : 'failed', execution: 'real-model', checks };
+}
+
+
+/** Native observation only: the wrapped request always returns the real transport response. */
+interface ZCodeAuditReadback {
+  sessionId: string;
+  storage: string;
+  exited: boolean;
+  priorUserIds: Set<string>;
+  lastUsers: Array<Record<string, unknown>>;
+  currentUsers: Array<Record<string, unknown>>;
+  toolEvents: string[];
+  toolCallCount: unknown;
+}
+
+export function verifyZCodeNativeReadback(record: ZCodeAuditReadback, proof: AuxQuerySafetyProof): { ok: boolean; detail: string } {
+  const user = record.currentUsers.length === 1 ? record.currentUsers[0] : null;
+  const tools = user?.['tools'];
+  const emptyNative = tools !== null && typeof tools === 'object' && !Array.isArray(tools)
+    && Object.keys(tools as object).length === 0;
+  const ok = !!user && typeof user['id'] === 'string' && !record.priorUserIds.has(user['id'])
+    && emptyNative && record.toolCallCount === 0 && record.toolEvents.length === 0
+    && proof.backend === 'zcode' && proof.enforcedPolicy === 'none'
+    && proof.effectiveTools.length === 0 && proof.deniedCapabilities.length > 0;
+  return { ok, detail: JSON.stringify({ source: 'native session/messages info.tools and session/event',
+    sessionId: record.sessionId, currentMessageIds: record.currentUsers.map((entry) => entry['id']),
+    nativeToolsObjectPresent: tools !== undefined, nativeToolCount: tools && typeof tools === 'object' ? Object.keys(tools).length : null, toolCallCount: record.toolCallCount, toolEvents: record.toolEvents,
+    proof, storage: record.storage }) };
+}
+
+async function createZCodeHarness(context: AuditContext): Promise<BackendHarness & {
+  positiveControl(): Promise<{ ok: boolean; detail: string }>;
+  readonly retainedControlEvidence: { storage: string; kind: 'native-positive-control'; auxZeroResidueRequired: true };
+}> {
+  const hostStorage = path.join(path.dirname(context.vault), 'zcode-control-storage');
+  fs.mkdirSync(hostStorage, { recursive: true });
+  const records: ZCodeAuditReadback[] = [];
+  const bySession = new Map<AuxQuerySession, ZCodeAuditReadback>();
+  const scopesBefore = new Set(fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith('opencodian-zcode-aux-')));
+  const adapter = new ZCodeAdapter({
+    workingDirectory: context.vault,
+    getSettings: () => ({ executablePath: process.env.ZCODE_BIN ?? '' }),
+    discoverProviderConfig: (options) => discoverZCodeProviderConfig({ ...options,
+      env: { ...process.env, ZCODE_STORAGE_DIR: hostStorage } }),
+    getExtraEnv: () => ({ ZCODE_STORAGE_DIR: hostStorage }),
+    createTransport: (options) => {
+      const storage = options.extraEnv?.['ZCODE_STORAGE_DIR'] ?? '';
+      const record: ZCodeAuditReadback = { sessionId: '', storage, exited: false,
+        priorUserIds: new Set(), lastUsers: [], currentUsers: [], toolEvents: [], toolCallCount: null };
+      const transport = new ZCodeAppServerTransport({ ...options, onExit: (event) => {
+        record.exited = true;
+        options.onExit?.(event);
+      } });
+      if (!path.basename(path.dirname(storage)).startsWith('opencodian-zcode-aux-')) return transport;
+      records.push(record);
+      transport.onNotification('session/event', (params) => {
+        // The same native event envelope accepted by the production session.
+        const event = (params['event'] ?? params) as Record<string, unknown>;
+        if (event['sessionId'] !== record.sessionId) return;
+        const payload = (event['payload'] ?? {}) as Record<string, unknown>;
+        if (typeof event['type'] === 'string' && event['type'].startsWith('tool.')) record.toolEvents.push(event['type']);
+        if (event['type'] === 'turn.completed') record.toolCallCount = payload['toolCallCount'];
+      });
+      const nativeRequest = transport.request.bind(transport);
+      transport.request = async <T = unknown>(method: string, params?: Record<string, unknown>): Promise<T> => {
+        if (method === 'session/send') {
+          record.priorUserIds = new Set(record.lastUsers.map((user) => String(user['id'])));
+          record.currentUsers = []; record.toolEvents = []; record.toolCallCount = null;
+        }
+        const response = await nativeRequest(method, params) as T;
+        const value = response as Record<string, unknown>;
+        if (method === 'session/create') record.sessionId = String((value['session'] as Record<string, unknown>)['sessionId'] ?? '');
+        if (method === 'session/messages') {
+          record.lastUsers = (Array.isArray(value['messages']) ? value['messages'] : [])
+            .map((message) => (message as Record<string, unknown>)['info'] as Record<string, unknown>)
+            .filter((info) => info?.['role'] === 'user')
+            .map((info) => ({ ...info, id: info['id'] ?? info['messageId'] }));
+          record.currentUsers = record.lastUsers.filter((user) => typeof user['id'] === 'string'
+            && !record.priorUserIds.has(user['id']));
+        }
+        return response;
+      };
+      return transport;
+    },
+  });
+  try { await adapter.start(); } catch (error) { await adapter.stop(); throw error; }
+  return {
+    id: 'zcode',
+    retainedControlEvidence: { storage: hostStorage, kind: 'native-positive-control', auxZeroResidueRequired: true },
+    create: async (ctx, systemPrompt, options) => {
+      const beforeCount = records.length;
+      const session = await adapter.startAuxQuerySession({ systemPrompt, workingDirectory: ctx.vault,
+        ...(options?.model ? { model: options.model } : {}) });
+      const record = records[beforeCount];
+      if (!record || !record.sessionId) { await session.dispose(); throw new Error('No independent ZCode native transport evidence.'); }
+      bySession.set(session, record);
+      return session;
+    },
+    nativeSafetyReadback: async (session) => {
+      const record = bySession.get(session);
+      return record ? verifyZCodeNativeReadback(record, session.safety) : { ok: false, detail: 'Missing current-session native readback.' };
+    },
+    positiveControl: async () => {
+      const target = path.join(context.vault, 'zcode-control-escape.md');
+      const model = parseVisionModel('zcode', auditModelEnv('zcode', false));
+      if (!model || model.kind !== 'zcode') throw new Error('ZCode positive control requires an explicit provider/model.');
+      const sessionId = await adapter.createSession('aux audit native write control');
+      const tools: string[] = [];
+      for await (const chunk of adapter.sendMessage({ sessionId,
+        content: buildInducingPrompt(context.notePath, target), options: { provider: model.provider, model: model.model } })) {
+        if (chunk.type === 'tool_use') tools.push(chunk.name);
+        if (chunk.type === 'error') throw new Error(chunk.content);
+      }
+      const created = fs.existsSync(target);
+      const ok = created && tools.some((name) => /write|edit|patch/i.test(name));
+      if (created) fs.unlinkSync(target);
+      return { ok, detail: JSON.stringify({ backend: 'zcode', nativeSessionId: sessionId,
+        observedTools: tools, fileCreated: created, storage: hostStorage,
+        retainedControlEvidence: true }) };
+    },
+    residueProbe: async () => {
+      const listed = await adapter.listSessions() as Array<{ sessionId?: string }>;
+      const leakedIds = listed.filter((row) => records.some((record) => record.sessionId === row.sessionId)).map((row) => row.sessionId);
+      const remaining = records.filter((record) => fs.existsSync(path.dirname(record.storage)) || !record.exited)
+        .map((record) => ({ root: path.dirname(record.storage), exited: record.exited }));
+      const extra = fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith('opencodian-zcode-aux-') && !scopesBefore.has(name));
+      return remaining.length || leakedIds.length || extra.length
+        ? 'RESIDUE: ' + JSON.stringify({ remaining, leakedIds, extra })
+        : 'all native aux processes exited; private stores removed; aux ids absent from native session/list';
+    },
+    teardown: async () => { for (const session of bySession.keys()) await session.dispose(); await adapter.stop(); },
+  };
+}
+
+export function auditModelEnv(id: string, vision: boolean): string {
+  const stem = vision ? 'AUDIT_AUX_VISION_MODEL' : 'AUDIT_AUX_MODEL';
+  const suffix = id.replace(/-/g, '_').toUpperCase();
+  return process.env[stem + '_' + suffix] ?? process.env[stem] ?? '';
+}
+
+/** One selection rule for preflight and the actual shared positive-control request. */
+function resolveWriteControlModel(backend: BackendId): {
+  model: { provider: string; model: string };
+  modelSource: 'explicit-control' | 'opencode-model-fallback';
+} | null {
+  const explicit = process.env.AUDIT_AUX_CONTROL_MODEL;
+  const raw = explicit ?? (backend === 'opencode' ? auditModelEnv(backend, false) : '');
+  const model = parseVisionModel('opencode', raw);
+  if (!model || model.kind !== 'opencode') return null;
+  return { model, modelSource: explicit !== undefined ? 'explicit-control' : 'opencode-model-fallback' };
+}
+
+/** Reads configuration only. It never handshakes a server or calls a model. */
+export function auditPreflight(id: BackendId): string[] {
+  const missing: string[] = [];
+  for (const vision of [false, true]) {
+    const raw = auditModelEnv(id, vision);
+    if (!raw || !parseVisionModel(id, raw)) missing.push((vision ? 'vision model' : 'model') + ' requires explicit ' + id + ' selection');
+  }
+  if (id === 'pi' && (!process.env.PI_BIN || !fs.existsSync(process.env.PI_BIN))) missing.push('PI_BIN missing or unavailable');
+  if (id === 'codex' && !resolveCodexExecutable()) missing.push('Codex CLI unavailable');
+  if (id === 'claude-code' && !resolveClaudeExecutable()) missing.push('Claude CLI unavailable');
+  if (id === 'opencode' && !resolveOpenCodeExecutable()) missing.push('OpenCode CLI unavailable');
+  if (id === 'zcode') {
+    const runtime = resolveZCodeRuntime({ executablePath: process.env.ZCODE_BIN ?? '' });
+    if (runtime.mode !== 'ready') missing.push('ZCode runtime ' + runtime.mode);
+    else {
+      const config = discoverZCodeProviderConfig({ entryPath: runtime.launch.entryPath });
+      if (config.state !== 'validated') missing.push('ZCode provider configuration ' + config.state);
+    }
+  } else {
+    if (!resolveWriteControlModel(id)) missing.push('AUDIT_AUX_CONTROL_MODEL requires OpenCode provider/model for shared write positive control');
+    if (!resolveOpenCodeExecutable()) missing.push('OpenCode CLI unavailable for shared positive control');
+  }
+  return missing;
 }
 
 // ---------------------------------------------------------------------------
@@ -720,78 +928,68 @@ async function runAudit(
 // ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
-  const requested = process.argv.slice(2).filter(Boolean) as BackendId[];
-  const vault = fs.mkdtempSync(path.join(os.tmpdir(), 'opencodian-aux-vault-'));
-  const noteBody = '# Audit note\n\nThe cat sat on the mat.\n';
-  const notePath = path.join(vault, 'note.md');
-  fs.writeFileSync(notePath, noteBody);
-  const context: AuditContext = { vault, notePath, noteBody };
-
-  const available: BackendId[] = ['opencode', 'claude-code', 'codex', 'pi'];
-  const selected = requested.length > 0 ? requested : available;
-  const unknown = selected.filter((id) => !available.includes(id));
-  if (unknown.length > 0) {
-    console.error(`Unknown backend(s): ${unknown.join(', ')}`);
-    process.exit(2);
-  }
-
+  const requested = process.argv.slice(2);
+  const available: BackendId[] = ['opencode', 'claude-code', 'codex', 'pi', 'zcode'];
+  if (requested.some((id) => !available.includes(id as BackendId))) throw new Error('Unknown backend(s): ' + requested.join(', '));
+  const selected = requested.length ? requested as BackendId[] : available;
   const outcomes: AuditOutcome[] = [];
-  console.log('\nRunning induced-write positive control (unrestricted agent)...');
-  const control = await runWriteInducementControl(context);
   for (const id of selected) {
-    console.log(`\n${'='.repeat(72)}\nBACKEND: ${id}\n${'='.repeat(72)}`);
+    const missing = auditPreflight(id);
+    if (process.env.AUDIT_AUX_PREFLIGHT === '1' || missing.length) {
+      outcomes.push({ backend: id, passed: false, status: 'blocked', execution: 'preflight',
+        checks: [{ name: 'configuration preflight', ok: false,
+          detail: missing.length ? missing.join('; ') : 'Configuration present; offline preflight did not execute a native/model audit.' }] });
+      continue;
+    }
+    const scratchRoot = path.resolve(process.env.AUDIT_SCRATCH_ROOT ?? path.join(process.cwd(), 'node_modules', '.cache'));
+    fs.mkdirSync(scratchRoot, { recursive: true });
+    const runRoot = fs.mkdtempSync(path.join(scratchRoot, 'opencodian-aux-' + id + '-'));
+    const vault = path.join(runRoot, 'vault');
+    fs.mkdirSync(vault);
+    const noteBody = '# Audit note\n\nThe cat sat on the mat.\n';
+    const notePath = path.join(vault, 'note.md');
+    fs.writeFileSync(notePath, noteBody);
+    const context: AuditContext = { vault, notePath, noteBody };
     let harness: BackendHarness | null = null;
+    let outcome: AuditOutcome | null = null;
     try {
       if (id === 'opencode') harness = await createOpenCodeHarness(context);
       else if (id === 'claude-code') harness = await createClaudeCodeHarness(context);
       else if (id === 'codex') harness = await createCodexHarness(context);
       else if (id === 'pi') harness = await createPiHarness(context);
-      else {
-        console.log(`  [not implemented yet — M1 in progress]`);
-        outcomes.push({
-          backend: id,
-          passed: false,
-          checks: [{ name: 'harness', ok: false, detail: 'aux session not implemented yet' }],
-        });
-        continue;
-      }
-      const outcome = await runAudit(harness, context, control);
-      outcomes.push(outcome);
-      for (const check of outcome.checks) {
-        console.log(`  ${check.ok ? 'PASS' : 'FAIL'}  ${check.name}`);
-        console.log(`        ${check.detail}`);
-      }
-      console.log(`  → ${outcome.passed ? 'BACKEND PASS' : 'BACKEND FAIL'}`);
+      else harness = await createZCodeHarness(context);
+      const control = id === 'zcode'
+        ? await (harness as Awaited<ReturnType<typeof createZCodeHarness>>).positiveControl()
+        : await runWriteInducementControl(context, id);
+      outcome = await runAudit(harness, context, control);
     } catch (error) {
-      console.log(`  harness error: ${error instanceof Error ? error.stack : String(error)}`);
-      outcomes.push({
-        backend: id,
-        passed: false,
-        checks: [{ name: 'harness', ok: false, detail: String(error) }],
-      });
+      outcome = { backend: id, passed: false, status: 'failed', execution: 'real-model',
+        checks: [{ name: 'audit execution', ok: false, detail: 'audit operation failed; raw runtime details withheld' }] };
     } finally {
-      if (harness?.teardown) await harness.teardown().catch(() => { /* best effort */ });
+      const checks = [...(outcome?.checks ?? [])];
+      try { await harness?.teardown?.(); }
+      catch (error) { checks.push({ name: 'harness teardown', ok: false, detail: 'audit operation failed; raw runtime details withheld' }); }
+      try {
+        const original = new Map([['note.md', createHash('sha256').update(noteBody).digest('hex')]]);
+        const residue = diffSnapshots(original, snapshotTree(vault));
+        checks.push({ name: 'final audit vault bytes/residue', ok: residue.length === 0, detail: JSON.stringify(residue) });
+        // Remove only the audit note we created; leave all unexpected files as evidence.
+        fs.unlinkSync(notePath);
+        if (fs.readdirSync(vault).length === 0) fs.rmdirSync(vault);
+      } catch (error) { checks.push({ name: 'audit vault cleanup', ok: false, detail: 'audit operation failed; raw runtime details withheld' }); }
+      const passed = !!outcome && checks.length > 0 && checks.every((check) => check.ok);
+      outcomes.push({ backend: id, passed, status: passed ? 'passed' : 'failed', execution: 'real-model', checks,
+        ...(id === 'zcode' && harness ? { retainedControlEvidence: (harness as Awaited<ReturnType<typeof createZCodeHarness>>).retainedControlEvidence } : {}) });
+      fs.writeFileSync(path.join(runRoot, 'report.json'), JSON.stringify(outcomes.at(-1), null, 2) + '\n');
     }
   }
-
-  console.log(`\n${'='.repeat(72)}\nSUMMARY\n${'='.repeat(72)}`);
-  for (const outcome of outcomes) {
-    console.log(`  ${outcome.passed ? 'PASS' : 'FAIL'}  ${outcome.backend}`);
+  for (const outcome of outcomes) console.log(JSON.stringify(outcome, null, 2));
+  if (process.env.AUDIT_REPORT_PATH) {
+    if (outcomes.length !== 1) throw new Error('Child report requires exactly one selected backend.');
+    fs.writeFileSync(process.env.AUDIT_REPORT_PATH, JSON.stringify(outcomes[0], null, 2) + '\n');
   }
-
-  const residue = diffSnapshots(
-    new Map([[path.relative(vault, notePath), createHash('sha256').update(noteBody).digest('hex')]]),
-    snapshotTree(vault),
-  );
-  console.log(`  audit vault residue: ${residue.length === 0 ? 'none' : residue.join('; ')}`);
-
-  try {
-    fs.rmSync(vault, { recursive: true, force: true });
-  } catch {
-    // Temp cleanup is best effort.
-  }
-
-  process.exit(outcomes.every((o) => o.passed) ? 0 : 1);
+  process.exitCode = outcomes.some((outcome) => outcome.status === 'failed') ? 1
+    : outcomes.some((outcome) => outcome.status === 'blocked') ? 2 : 0;
 }
 
-await main();
+if (process.env.AUDIT_AUX_IMPORT_ONLY !== '1') await main();

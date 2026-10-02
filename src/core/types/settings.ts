@@ -41,7 +41,13 @@ export type PermissionMode = 'yolo' | 'plan' | 'normal';
 export type EffortLevel = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
 /** Backends inline edit can run on. Mirrors the implemented adapter set. */
-const INLINE_EDIT_BACKENDS: readonly AgentBackendKind[] = ['opencode', 'claude-code', 'codex', 'pi'];
+const INLINE_EDIT_BACKENDS: readonly AgentBackendKind[] = [
+  'opencode',
+  'opencode2',
+  'claude-code',
+  'codex',
+  'pi',
+];
 /** Completion can additionally use ZCode's sessionless text-only path. */
 const INLINE_COMPLETION_BACKENDS: readonly AgentBackendKind[] = [...INLINE_EDIT_BACKENDS, 'zcode'];
 
@@ -1036,7 +1042,7 @@ export interface PiBackendSettings {
   executablePath: string;
   provider: string;
   model: string;
-  thinkingLevel: '' | 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+  thinkingLevel: '' | 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 }
 
 export function normalizePiBackendSettings(value: unknown): PiBackendSettings {
@@ -1045,7 +1051,7 @@ export function normalizePiBackendSettings(value: unknown): PiBackendSettings {
   const thinkingLevel = text('thinkingLevel');
   return {
     executablePath: text('executablePath'), provider: text('provider'), model: text('model'),
-    thinkingLevel: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'].includes(thinkingLevel) ? thinkingLevel as PiBackendSettings['thinkingLevel'] : '',
+    thinkingLevel: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].includes(thinkingLevel) ? thinkingLevel as PiBackendSettings['thinkingLevel'] : '',
   };
 }
 

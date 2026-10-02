@@ -76,6 +76,7 @@ export class SettingsPiConfigurationSection {
     if (field.kind === 'boolean' || field.options) {
       setting.addDropdown(dropdown => {
         dropdown.addOption('', t('settings.pi.inherit'));
+        if (text && field.options && !field.options.includes(text)) dropdown.addOption(text, `${text} · ${t('settings.pi.config.unknownChoice')}`);
         for (const option of field.options ?? ['true', 'false']) dropdown.addOption(option, option === 'true' ? t('settings.pi.enabled') : option === 'false' ? t('settings.pi.disabled') : option);
         dropdown.setValue(text).setDisabled(field.readOnly === true).onChange(update);
       });
