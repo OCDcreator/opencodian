@@ -1,6 +1,32 @@
 import { normalizeConversationSessionSettings } from '../../../../src/core/types/chat';
 
 describe('conversation session settings normalization', () => {
+  it('round-trips Pi model and per-model effort overrides, including explicit inheritance', () => {
+    const value = {
+      piModelOverride: { provider: '  pi-provider ', model: ' model-a ' },
+      piEffortOverrides: { 'pi-provider/model-a': 'low', 'pi-provider/model-b': null },
+      chatFontSizePx: 15,
+    } as unknown as Parameters<typeof normalizeConversationSessionSettings>[0];
+    const normalized = normalizeConversationSessionSettings(value);
+    expect(normalized).toEqual({
+      piModelOverride: { provider: 'pi-provider', model: 'model-a' },
+      piEffortOverrides: { 'pi-provider/model-a': 'low', 'pi-provider/model-b': null },
+      chatFontSizePx: 15,
+    });
+    expect(normalizeConversationSessionSettings(JSON.parse(JSON.stringify(normalized)))).toEqual(normalized);
+  });
+
+  it('drops malformed Pi overrides without changing valid fields for other backends', () => {
+    expect(normalizeConversationSessionSettings({
+      piModelOverride: { provider: '', model: 'missing-provider' },
+      piEffortOverrides: { 'pi/one': 12, 'pi/two': '', 'pi/three': ' future-sdk-level ' },
+      codexModelOverride: 'codex-model',
+    } as unknown as Parameters<typeof normalizeConversationSessionSettings>[0])).toEqual({
+      piEffortOverrides: { 'pi/three': 'future-sdk-level' },
+      codexModelOverride: 'codex-model',
+    });
+  });
+
   it('drops legacy compaction override fields from conversation session settings', () => {
     const legacyValue = {
       autoCompactionEnabled: false,

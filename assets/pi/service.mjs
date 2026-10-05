@@ -1,5 +1,6 @@
 // Versioned process boundary: the SDK remains in the user's official Pi installation.
 import { readFileSync, realpathSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -7,11 +8,30 @@ import { BUSY_ALLOWED, executeCommand } from './commands.mjs';
 import { createConfigurationService, startConfigurationTransport } from './configuration.mjs';
 import { createExtensionUi } from './extension-ui.mjs';
 
+/** Resolve the installed package's public ESM export, including import-only exports. */
+export async function loadModelThinkingLevels(sdkPath) {
+  for (const root of createRequire(sdkPath).resolve.paths('@earendil-works/pi-ai') ?? []) {
+    try {
+      const directory = join(root, '@earendil-works/pi-ai');
+      const metadata = JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8'));
+      const target = metadata.exports?.['./models'];
+      const entry = typeof target === 'string' ? target : target?.import ?? target?.default;
+      if (typeof entry !== 'string' || !entry.startsWith('./')) return undefined;
+      const { getSupportedThinkingLevels } = await import(pathToFileURL(join(directory, entry)).href);
+      return typeof getSupportedThinkingLevels === 'function' ? getSupportedThinkingLevels : undefined;
+    } catch (error) {
+      if (error.code !== 'ENOENT') return undefined;
+    }
+  }
+  return undefined;
+}
+
 export async function startPiService(sdkPath, options, streams = process) {
   const write = (message) => streams.stdout.write(`${JSON.stringify(message)}\n`);
   // Extension console output belongs to stderr, never to JSONL framing.
   console.log = (...args) => streams.stderr.write(`${args.map(String).join(' ')}\n`);
   const sdk = await import(pathToFileURL(sdkPath).href);
+  const getSupportedThinkingLevels = sdk.ModelRuntime ? await loadModelThinkingLevels(sdkPath) : undefined;
   const { FileSettingsStorage } = await import(pathToFileURL(join(dirname(sdkPath), 'core/settings-manager.js')).href);
   const configuration = createConfigurationService({ ...sdk, FileSettingsStorage }, resolve(options.workingDirectory), options.agentDirectory || sdk.getAgentDir());
   if (options.configurationOnly) return startConfigurationTransport(configuration, sdk.VERSION, streams);
@@ -44,7 +64,7 @@ export async function startPiService(sdkPath, options, streams = process) {
     }
     await settings.reload();
   };
-  const host = { sdk, cwd, auth, credentials, modelRuntime, settings, refreshResources, sessionDirectory: options.sessionDirectory, send: write, runtime: null, ui: null, packages: null };
+  const host = { sdk, cwd, auth, credentials, modelRuntime, settings, refreshResources, getSupportedThinkingLevels, sessionDirectory: options.sessionDirectory, send: write, runtime: null, ui: null, packages: null };
   host.configuration = configuration;
   host.prepareImages = async images => {
     if (!images?.length || !settings.getImageAutoResize()) return images;

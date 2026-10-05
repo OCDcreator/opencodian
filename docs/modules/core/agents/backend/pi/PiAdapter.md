@@ -8,6 +8,8 @@
 
 AgentService 的聊天、模型、会话/分叉、上下文和费用入口；白名单管理命令由独立 SDK 服务执行。PiSessionRuntime 维持每会话服务；句柄同步真实 sessionFile 和标题，分叉后恢复原服务分支。
 
+辅助查询与普通聊天共用可执行路径语义：空路径（含未提供 settings 回调）以 `''` 交给 `PiAuxQuerySession` → `PiRpcClient` 的既有官方 Pi 安装自动解析，显式路径原样透传。`PiAuxQuerySession` 的只读 `set_tools` / `get_tools` 回读校验与 fail-closed 规则保持不变。
+
 2026-10-02（T07最小协议slice，reviewed continuation）：人类明确授权原跨scope图结果后，`command()` 仅扩展导入和内联allowlist为包含 `PI_OPTIONAL_RPC_COMMANDS`，接通 `get_available_thinking_levels`、`get_entries(since?)` 的公共 typed command 入口。方法支持仍来自服务 `get_state.commands/capabilities` 对实际SDK方法的检测，缺失时明确unavailable；adapter不从静态命令类型或版本号推断可用性。optional命令不加入mandatory handshake，因此旧SDK缺少方法仍能启动。`since`/原生entry/leaf数据及服务错误原样透传，未知since不回退全量历史。
 
 `PiSdkReadCommands.test.ts` 将公共dispatch连到实际 `assets/pi/commands.mjs` handler，通过离线SDK fixture验证实时档位/空集合、增量及分支leaf、空历史、新旧方法组合的unavailable和错误拒绝。optional读取只启动普通session/catalog客户端；输入中的伪造 `type` 不能转发成配置操作，未声明命令在任何客户端启动前拒绝。安装SDK只验证内存公开读方法，不启动真实CLI/模型/凭据。本slice不扩产品UI，不代表整T07完成；完整服务握手与产品实机流程待后续验收。

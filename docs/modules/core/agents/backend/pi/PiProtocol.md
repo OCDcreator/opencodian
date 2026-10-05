@@ -17,3 +17,6 @@
 2026-09-09：新增4个配置操作get/save_configuration、get/save_model_configuration，独立PiSettingField/PiConfigurationDocument类型。配置操作有专用页面，不算会话工作台动作。
 
 2026-09-17：新增 `PiExtensionStatusSnapshot`（`setStatus` 各键文本 + 最后一条 `notify` + 时间戳）。注意协议本身没有任何 MCP 命令、也没有通用命令执行入口：扩展的 MCP 状态只能以 UI 通道的文本形式被宿主机观测，这份快照就是那个观测点。
+## 2026-10-05 current SDK model levels
+
+`PiModelInfo.thinkingLevels?` 是安装 SDK 的 `getSupportedThinkingLevels(model)` 返回的模型专属档位。Pi service 沿该安装的 Node module 搜索路径读取 pi-ai 的公开 exports/import 入口，支持只有 ESM import 条件的 models 导出；不通过 CommonJS resolve 猜测这个入口。读取模型目录不调用 set_model、不改 native session 或 global settings。helper 不可用时不猜测档位，既有当前会话 typed read 保持其原边界。

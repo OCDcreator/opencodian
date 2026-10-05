@@ -223,3 +223,6 @@ Ownership facts:
 ## 2026-09-27 OpenCode 2 compatibility
 
 AgentBackendKind includes opencode2. Persisted conversations use their backend ID to resolve the matching session adapter.
+## 2026-10-05 Pi composer overrides
+
+`ConversationSessionSettings.piModelOverride` 保存 `{provider, model}`，`piEffortOverrides` 按 provider/model 保存下一次发送的 effort；null 明确表示继承。归一化保留字符串形式的 SDK 档位（包括未来值），丢弃非法字段，并由现有 StorageService 保存/加载链往返。它们只由 Pi 聊天分支消费，不改变其他后端默认值。

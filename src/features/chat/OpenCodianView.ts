@@ -280,6 +280,7 @@ import {
   PersistentAssistantNoticeService,
   type PersistentAssistantNoticeServiceHost,
 } from './services/PersistentAssistantNoticeService';
+import { savePiConversationSelection } from './services/PiModelSelectionBinding';
 import type { QuestionDockSlotCoordinator } from './services/QuestionDockSlotCoordinator';
 import type { QuestionRuntimeServices } from './services/QuestionRuntimeHostAdapter';
 import type { QuestionRuntimeQuestionApiPort } from './services/QuestionRuntimeViewHostAdapter';
@@ -1066,6 +1067,16 @@ export class OpenCodianView extends ItemView {
               return;
             }
             const current = this.getCurrentSessionModel();
+            const conversation = this.currentConversation;
+            if (conversation?.backend === 'pi' && current) {
+              await savePiConversationSelection(conversation, {
+                piEffortOverrides: {
+                  ...conversation.sessionSettings?.piEffortOverrides,
+                  [`${current.provider}/${current.model}`]: variant ?? null,
+                },
+              }, (target) => this.plugin.saveConversation(target));
+              return;
+            }
             this.currentVariant = this.normalizeEffortVariantForCurrentBackend(variant);
             if (current) {
               this.variantStore[this.getEffortStoreKey(`${current.provider}/${current.model}`)] = this.currentVariant;
@@ -1082,10 +1093,12 @@ export class OpenCodianView extends ItemView {
           },
           allowDefaultOption: () => !this.isClaudeCodeConversationActive() && !this.isCodexConversationActive(),
           getDefaultOptionLabel: () => this.currentConversation?.backend === 'zcode'
-            ? t('chat.zcode.reasoning.modelDefault') : t('chat.effort.disabled'),
+            ? t('chat.zcode.reasoning.modelDefault')
+            : this.currentConversation?.backend === 'pi' ? t('chat.effort.inherit.pi') : t('chat.effort.disabled'),
           getBoundaryHint: () =>
             this.isCodexConversationActive() ? t('chat.effort.boundaryHint.codex')
-              : this.currentConversation?.backend === 'zcode' ? t('chat.zcode.reasoning.boundaryHint') : undefined,
+              : this.currentConversation?.backend === 'zcode' ? t('chat.zcode.reasoning.boundaryHint')
+                : this.currentConversation?.backend === 'pi' ? t('chat.effort.boundaryHint.pi') : undefined,
         });
         this.effortSelector.updateDisplay();
       },
@@ -1302,6 +1315,14 @@ export class OpenCodianView extends ItemView {
           return false;
         }
 
+        const conversation = this.currentConversation;
+        if (conversation?.backend === 'pi') {
+          void savePiConversationSelection(conversation, { piModelOverride: selection },
+            (target) => this.plugin.saveConversation(target)).catch(() => {
+            if (this.currentConversation?.id === conversation.id) this.updateModelSelectorDisplay();
+          });
+          return true;
+        }
         this.tabManager.setActiveTabModelOverride(selection);
         return true;
       },
@@ -1341,6 +1362,10 @@ export class OpenCodianView extends ItemView {
           this.plugin.settings.providerIconLibrary,
         ),
       updateEffortSelectorDisplay: () => {
+        if (this.currentConversation?.backend === 'pi') {
+          this.effortSelector?.updateDisplay();
+          return;
+        }
         if (this.isClaudeCodeConversationActive()) {
           const current = this.getCurrentSessionModel();
           if (current) {
@@ -4780,6 +4805,10 @@ export class OpenCodianView extends ItemView {
   }
 
   private getBackendScopedActiveTabModelOverride(): ModelSelectorSelection | null {
+    if (this.currentConversation?.backend === 'pi'
+      && this.currentConversation.sessionSettings?.piModelOverride !== undefined) {
+      return this.currentConversation.sessionSettings.piModelOverride;
+    }
     const override = this.tabManager?.getActiveTabModelOverride() ?? null;
     if (!override || !this.isClaudeCodeConversationActive()) {
       return override;
@@ -4810,6 +4839,12 @@ export class OpenCodianView extends ItemView {
   }
 
   private getCurrentEffortVariant(): string | undefined {
+    if (this.currentConversation?.backend === 'pi') {
+      const current = this.getCurrentSessionModel();
+      return current
+        ? this.currentConversation.sessionSettings?.piEffortOverrides?.[`${current.provider}/${current.model}`] ?? undefined
+        : undefined;
+    }
     return this.normalizeEffortVariantForCurrentBackend(this.currentVariant);
   }
 

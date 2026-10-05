@@ -50,6 +50,8 @@ export interface PiExtensionStatusSnapshot {
 }
 export interface PiModelInfo {
   id: string; name: string; provider: string; reasoning: boolean;
+  /** Per-model supported levels from the installed SDK, independent of the live session model. */
+  thinkingLevels?: string[];
   contextWindow?: number; maxTokens?: number; input?: string[];
   cost?: { input: number; output: number; cacheRead: number; cacheWrite: number };
 }

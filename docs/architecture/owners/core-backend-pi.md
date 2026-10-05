@@ -41,3 +41,6 @@ v1.1.14安装边界：用户自行安装官方Pi，缺失时直接报错；插�
 - 2026-09-15: 新增 `PiAuxQuerySession.ts`：用 Pi 原生的 `set_tools`/`get_tools` 建立并校验只读会话，会话落在临时作用域而非 `.pi/opencodian-sessions`；`PiAdapter` 实现 `startAuxQuerySession()`。
 - 2026-09-17: `PiStreamMapper` 新增 `resolvePiToolCall()`，把 Pi 的 MCP 元工具（`mcp` / `mcpScript`，真实 server/tool 只存在于参数的 `{tool, args}` 或 `{search}` / `{describe}` 里）还原成 `kind: 'mcp'` + 限定工具名 + 解析后的 input。live 流与 `toPiChatMessages` 历史恢复共用该 helper，历史侧同时写回 content block 的 `toolKind`。身份归一化仍属本 owner（翻译进 StreamChunk 契约），不是渲染职责。
 - 2026-09-17: 新增 `PiMcpConfigService`（只读）：Pi 的 MCP 来自扩展而非 RPC，所以声明清单只能按扩展的合并顺序读配置文件（`~/.config/mcp` → `~/.agents` → Pi 全局 `mcp.json` → 库内 `.mcp.json` / `.pi/mcp.json`），并做端点脱敏。这是本 owner 第一次读 Pi 安装侧的文件；不写任何文件，也不复刻祖先目录发现与 imports 展开。同一轮 `PiAdapter` 捕获扩展经 UI 通道上报的 `setStatus`/`notify` 文本（`getExtensionStatus()`）供设置页展示。
+
+Pi auxiliary 查询与普通聊天使用同一官方 runtime 解析路径：`PiAdapter.startAuxQuerySession()` 把空 executable（含未提供 settings 回调）交给 `PiRpcClient` 自动发现，显式配置原样透传。默认路径不绕过 `PiAuxQuerySession` 的原生 `set_tools` / `get_tools` allowlist 回读；缺失或无效 runtime、工具集不匹配仍由既有 owner 拒绝。
+2026-10-05 current-sdk Pi continuation：PiModelInfo 可带官方安装 SDK 返回的 per-model thinkingLevels；service 从公开 pi-ai/models helper 读取，不切换活动 native 模型、不写默认值。聊天请求/原生回读的所有权仍在既有 adapter/session service；UI 会话 override 在 chat owner 保存，发送优先级不变。helper 不可用时不猜档位；minimum/legacy/Windows 未纳入本轮验收。

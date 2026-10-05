@@ -1,5 +1,5 @@
 import { ModelSelectionRuntime, type ModelSelectionRuntimeHost } from '../../../../../src/features/chat/services/ModelSelectionRuntime';
-import { bindPiModelSelection } from '../../../../../src/features/chat/services/PiModelSelectionBinding';
+import { bindPiModelSelection, savePiConversationSelection } from '../../../../../src/features/chat/services/PiModelSelectionBinding';
 
 function originalHost(): ModelSelectionRuntimeHost {
   return {
@@ -14,6 +14,20 @@ function originalHost(): ModelSelectionRuntimeHost {
 }
 
 describe('Pi model selection isolation', () => {
+  it('rolls back only the originating Pi selection when persistence fails after switching conversations', async () => {
+    const previous = { piModelOverride: { provider: 'pi', model: 'old' } };
+    const a = { id: 'a', backend: 'pi' as const, title: 'a', createdAt: 1, updatedAt: 1, messages: [], sessionSettings: previous };
+    const b = { ...a, id: 'b', sessionSettings: { piModelOverride: { provider: 'pi', model: 'other' } } };
+    let rejectSave: (error: Error) => void = () => {};
+    const save = jest.fn(() => new Promise<void>((_resolve, reject) => { rejectSave = reject; }));
+    const result = savePiConversationSelection(a, { piModelOverride: { provider: 'pi', model: 'new' } }, save);
+    rejectSave(new Error('save rejected'));
+    await expect(result).rejects.toThrow('save rejected');
+    expect(a.sessionSettings).toBe(previous);
+    expect(b.sessionSettings.piModelOverride).toEqual({ provider: 'pi', model: 'other' });
+    expect(save).toHaveBeenCalledWith(a);
+  });
+
   it('blocks an unavailable Pi selection through the shared runtime without selecting the first model', async () => {
     const runtime = new ModelSelectionRuntime(bindPiModelSelection(originalHost(), () => ({
       start: async () => {}, getDefaultModel: () => ({ provider: 'pi', model: 'available' }),
@@ -57,6 +71,24 @@ describe('Pi model selection isolation', () => {
 
 
 describe('Pi dynamic current-session variants', () => {
+  it('keeps SDK model-specific levels for a pending selection across catalog reloads without changing native defaults', async () => {
+    const command = jest.fn(async (_sessionId?: string, _command?: string) => ({ model: { provider: 'pi', id: 'default' } }));
+    const binding = bindPiModelSelection(originalHost(), () => ({
+      start: async () => {}, getDefaultModel: () => ({ provider: 'pi', model: 'default' }), command,
+      getAvailableThinkingLevels: async () => ({ levels: ['off', 'low'] }),
+      getAvailableModels: async () => [
+        { provider: 'pi', id: 'default', name: 'Default', reasoning: true, thinkingLevels: ['off', 'low'] },
+        { provider: 'pi', id: 'pending', name: 'Pending', reasoning: true, thinkingLevels: ['low', 'high', 'max'] },
+      ],
+    }), () => 'pi-local');
+    for (let reload = 0; reload < 2; reload++) {
+      const models = (await binding.loadModelCatalogData()).providers[0].models;
+      expect(models[1].variants).toEqual(['low', 'high', 'max']);
+      expect(binding.getDefaultModelSelection()).toEqual({ provider: 'pi', model: 'default' });
+    }
+    expect(command.mock.calls.every(call => call[1] === 'get_state')).toBe(true);
+  });
+
   it('uses the active local handle and does not apply its levels to other models', async () => {
     const read = jest.fn(async () => ({ levels: ['off', 'max', 'future-sdk-level'] }));
     const command = jest.fn(async () => ({ model: { provider: 'pi', id: 'current' } }));

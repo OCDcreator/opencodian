@@ -66,3 +66,4 @@ PiBackendSettings is a separate settings branch normalized by normalizePiBackend
 ## 2026-09-27 OpenCode 2 compatibility
 
 OpenCode 2 has a separate backend identity and normalized connection settings; persisted OpenCode 1 settings and session IDs remain distinct.
+2026-10-05 Pi-only continuation：ConversationSessionSettings 新增 Pi model override 和按模型的 nullable effort overrides，由既有 normalize/StorageService 处理保存恢复；其他后端字段归一化与默认值不变。字段是下一次发送的会话覆盖，不是 native effective 证据。

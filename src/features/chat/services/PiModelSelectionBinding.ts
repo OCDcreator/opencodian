@@ -3,6 +3,7 @@ import { Notice } from 'obsidian';
 import type { PiModelInfo } from '../../../core/agents/backend/pi/PiAdapter';
 import type { PiAvailableThinkingLevelsResult, PiCommandName, PiUnavailableCommandResult } from '../../../core/agents/backend/pi/PiProtocol';
 import type { PiRecord } from '../../../core/agents/backend/pi/PiRpcClient';
+import type { Conversation, ConversationSessionSettings } from '../../../core/types';
 import { t } from '../../../i18n';
 import type { ModelSelectorProvider, ModelSelectorSelection } from '../ui/modelSelector/types';
 import type { ModelSelectionRuntimeHost } from './ModelSelectionRuntime';
@@ -34,21 +35,24 @@ export function bindPiModelSelection(
         let levels: string[] = [];
         let currentModel: { id?: unknown; provider?: unknown } = {};
         try {
-          const sessionId = getSessionId() ?? undefined;
-          const before = await adapter.command?.(sessionId, 'get_state');
-          const result = adapter.getAvailableThinkingLevels
-            ? await adapter.getAvailableThinkingLevels(sessionId)
-            : await adapter.command?.(sessionId, 'get_available_thinking_levels');
-          const reported = result && 'levels' in result ? result.levels : undefined;
-          if (Array.isArray(reported) && reported.every(level => typeof level === 'string')) {
-            levels = [...new Set(reported as string[])];
-            const state = await adapter.command?.(sessionId, 'get_state');
-            const beforeModel = before?.model as typeof currentModel | undefined;
-            const afterModel = state?.model as typeof currentModel | undefined;
-            if (beforeModel?.id === afterModel?.id && beforeModel?.provider === afterModel?.provider
-              && (getSessionId() ?? undefined) === sessionId && afterModel) currentModel = afterModel;
-          } else {
-            new Notice(t('settings.pi.thinking.unavailable'));
+          if (models.some(model => !Array.isArray(model.thinkingLevels)
+            || model.thinkingLevels.some(level => typeof level !== 'string'))) {
+            const sessionId = getSessionId() ?? undefined;
+            const before = await adapter.command?.(sessionId, 'get_state');
+            const result = adapter.getAvailableThinkingLevels
+              ? await adapter.getAvailableThinkingLevels(sessionId)
+              : await adapter.command?.(sessionId, 'get_available_thinking_levels');
+            const reported = result && 'levels' in result ? result.levels : undefined;
+            if (Array.isArray(reported) && reported.every(level => typeof level === 'string')) {
+              levels = [...new Set(reported as string[])];
+              const state = await adapter.command?.(sessionId, 'get_state');
+              const beforeModel = before?.model as typeof currentModel | undefined;
+              const afterModel = state?.model as typeof currentModel | undefined;
+              if (beforeModel?.id === afterModel?.id && beforeModel?.provider === afterModel?.provider
+                && (getSessionId() ?? undefined) === sessionId && afterModel) currentModel = afterModel;
+            } else {
+              new Notice(t('settings.pi.thinking.unavailable'));
+            }
           }
         } catch {
           new Notice(t('settings.pi.thinking.failed'));
@@ -56,7 +60,9 @@ export function bindPiModelSelection(
         const groups = new Map<string, ModelSelectorProvider>();
         for (const model of models) {
           const group = groups.get(model.provider) ?? { id: model.provider, name: model.provider, models: [] };
-          group.models.push({ id: model.id, name: model.name, contextWindow: model.contextWindow, variants: currentModel.provider === model.provider && currentModel.id === model.id ? levels : [] });
+          const modelLevels = Array.isArray(model.thinkingLevels) && model.thinkingLevels.every(level => typeof level === 'string')
+            ? [...new Set(model.thinkingLevels)] : currentModel.provider === model.provider && currentModel.id === model.id ? levels : [];
+          group.models.push({ id: model.id, name: model.name, contextWindow: model.contextWindow, variants: modelLevels });
           groups.set(model.provider, group);
         }
         providers = [...groups.values()];
@@ -77,4 +83,23 @@ export function bindPiModelSelection(
       return override;
     },
   };
+}
+
+/** Persist only the originating Pi conversation; a failed save restores its prior selection. */
+export async function savePiConversationSelection(
+  conversation: Conversation,
+  patch: Pick<ConversationSessionSettings, 'piModelOverride' | 'piEffortOverrides'>,
+  save: (conversation: Conversation) => Promise<void>,
+): Promise<void> {
+  if (conversation.backend !== 'pi') throw new Error('Pi selection requires a Pi conversation.');
+  const previous = conversation.sessionSettings;
+  const next = { ...previous, ...patch };
+  conversation.sessionSettings = next;
+  try {
+    await save(conversation);
+  } catch (error) {
+    if (conversation.sessionSettings === next) conversation.sessionSettings = previous;
+    new Notice(t('chat.pi.selection.saveFailed'));
+    throw error;
+  }
 }

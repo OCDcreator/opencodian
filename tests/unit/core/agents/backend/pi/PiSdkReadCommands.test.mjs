@@ -1,10 +1,35 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { mkdtempSync, mkdirSync, readFileSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
 import { BUSY_ALLOWED, executeCommand } from '../../../../../../assets/pi/commands.mjs';
+import { loadModelThinkingLevels } from '../../../../../../assets/pi/service.mjs';
+
+test('loads an import-only public models export from the SDK installation rather than CommonJS resolution', async () => {
+  const tempRoot = path.resolve('.tmp');
+  mkdirSync(tempRoot, { recursive: true });
+  const root = mkdtempSync(path.join(tempRoot, 'pi-model-levels-'));
+  const sdkPath = path.join(root, 'index.mjs');
+  const directory = path.join(root, 'node_modules/@earendil-works/pi-ai');
+  mkdirSync(directory, { recursive: true });
+  const metadata = path.join(directory, 'package.json');
+  const modelFile = path.join(directory, 'levels.mjs');
+  writeFileSync(sdkPath, 'export {};');
+  writeFileSync(metadata, JSON.stringify({ type: 'module', exports: { './models': { import: './levels.mjs' } } }));
+  writeFileSync(modelFile, "export const getSupportedThinkingLevels = model => model.id === 'a' ? ['low'] : ['high', 'max'];");
+  try {
+    const read = await loadModelThinkingLevels(sdkPath);
+    assert.deepEqual(read({ id: 'a' }), ['low']);
+    assert.deepEqual(read({ id: 'b' }), ['high', 'max']);
+    assert.equal(JSON.parse(readFileSync(metadata, 'utf8')).exports['./models'].import, './levels.mjs');
+  } finally {
+    for (const file of [modelFile, metadata, sdkPath]) unlinkSync(file);
+    for (const folder of [directory, path.dirname(directory), path.dirname(path.dirname(directory)), root]) rmdirSync(folder);
+  }
+});
 
 function hostFor(session = {}, sdkVersion = 'fixture-sdk') {
   return { sdk: { VERSION: sdkVersion }, auth: {}, runtime: { session: {
@@ -21,6 +46,19 @@ const nativeEntries = [
 function nativeManager(entries = nativeEntries, leafId = 'native-current-branch') {
   return { getEntries: () => entries, getLeafId: () => leafId };
 }
+
+test('model catalog includes SDK-supported levels per model without mutating the current session', async () => {
+  const models = [{ provider: 'pi', id: 'a', reasoning: true }, { provider: 'pi', id: 'b', reasoning: true }];
+  const current = { provider: 'pi', id: 'native-default' };
+  const host = hostFor({ model: current, thinkingLevel: 'medium', modelRegistry: { getAvailable: () => models } });
+  host.getSupportedThinkingLevels = model => model.id === 'a' ? ['off', 'low'] : ['high', 'max'];
+  assert.deepEqual(await executeCommand(host, { type: 'get_available_models' }), {
+    models: [{ ...models[0], thinkingLevels: ['off', 'low'] }, { ...models[1], thinkingLevels: ['high', 'max'] }],
+  });
+  assert.equal(host.runtime.session.model, current);
+  assert.equal(host.runtime.session.thinkingLevel, 'medium');
+  assert.equal(models[0].thinkingLevels, undefined);
+});
 
 test('handshake advertises the installed SDK methods independently and keeps both reads usable while busy', async () => {
   const host = hostFor({ getAvailableThinkingLevels: () => ['off', 'high'], sessionManager: nativeManager() }, 'fixture-modern');

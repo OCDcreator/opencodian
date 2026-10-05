@@ -84,3 +84,4 @@ PiModelSelectionBinding owns Pi selector policy; send preparation and slash disp
 ## 2026-09-27 OpenCode 2 compatibility
 
 Selection, history sync, recovery and slash command services recognize OpenCode 2 while retaining their tab and session identity guards.
+2026-10-05 Pi-only continuation：PiModelSelectionBinding 以 SDK per-model thinkingLevels 为尚未发送的模型提供 variants，避免 catalog reload 依赖当前 native 模型。Pi selection 保存复用该文件的 conversation-only seam，失败恢复捕获的 snapshot，不建立第二套 process/native 真值；非 Pi host 保持原委托路径。

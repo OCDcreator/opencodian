@@ -127,9 +127,6 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
   async startAuxQuerySession(config: AuxQuerySessionConfig): Promise<AuxQuerySession> {
     const settings = this.options.getSettings?.();
     const executablePath = settings?.executablePath ?? '';
-    if (!executablePath) {
-      throw new Error('Pi auxiliary session requires a configured Pi executable path.');
-    }
     const servicePath = this.options.servicePath;
     return PiAuxQuerySession.create({
       systemPrompt: config.systemPrompt,

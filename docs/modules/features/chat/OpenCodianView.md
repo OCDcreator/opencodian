@@ -827,3 +827,8 @@ OpenCode 2 synchronization reads native revert state and filters rewound message
 ## 2026-10-02 Codex local forget / complete catalog UI
 
 history host 新增 forgetConversationsAndCleanupTabs 转发至 ConversationLoadRecoveryCoordinator，并在 finally 刷新 session rail；lifecycle host 转发 plugin.forgetConversation。View 只装配/转发，不持有分页、本地遗忘 pending 或删除验证 state。
+## 2026-10-05 Pi model / effort selection
+
+Pi 的 composer 模型和按模型的 effort 覆盖保存到当前 conversation 的 sessionSettings；切换/恢复时读取该 conversation，effort 不再依赖共享 provider/model view 缓存。Pi model 选择只更新会话请求值，调用既有 Pi binding 保存；发送仍由 PiAdapter 依 request variant → plugin Pi default → 不发送 setter 的顺序执行。Pi 默认选项显示「继承 Pi 默认 / 会话」，tooltip 明示下一次发送与 native state 的区别；明确 off 仍是独立 SDK 选项。
+
+PiModelSelectionBinding 的 SDK 每模型档位使设置返回/reload 保留尚未发送模型的 effort 控件。其他 backend 控件分支不变。回归见 `OpenCodianView.piSelection.test.ts`。

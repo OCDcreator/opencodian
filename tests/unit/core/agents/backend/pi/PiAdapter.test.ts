@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 
 import { PiAdapter } from '../../../../../../src/core/agents/backend/pi/PiAdapter';
+import { PiAuxQuerySession } from '../../../../../../src/core/agents/backend/pi/PiAuxQuerySession';
 import { PI_CONFIG_COMMANDS, PI_RPC_COMMANDS, PI_SDK_COMMANDS } from '../../../../../../src/core/agents/backend/pi/PiProtocol';
 import type { PiLaunchOptions, PiRecord, PiRpcPort } from '../../../../../../src/core/agents/backend/pi/PiRpcClient';
 import { buildPiPrompt, buildPiUsageSnapshot, PiStreamMapper, toPiChatMessages } from '../../../../../../src/core/agents/backend/pi/PiStreamMapper';
@@ -118,6 +119,41 @@ describe('Pi SDK service lifecycle', () => {
   it('rejects traversal and unknown handles before launching a process', async () => {
     await expect(adapter.getSession('../../secret')).rejects.toThrow('Invalid Pi session id');
     await expect(adapter.command('pi-00000000-0000-0000-0000-000000000000', 'get_messages')).rejects.toThrow('not found'); expect(clients).toHaveLength(0);
+  });
+});
+describe('Pi auxiliary executable path', () => {
+  it.each([
+    { name: 'empty configured path', executablePath: '' },
+    { name: 'missing settings callback', executablePath: undefined },
+    { name: 'explicit configured path', executablePath: ' "/installed Pi/bin/pi" ' },
+  ])('delegates $name to the auxiliary factory and preserves its rejection', async ({ executablePath }) => {
+    const factoryError = new Error('Auxiliary factory rejected');
+    const create = jest.spyOn(PiAuxQuerySession, 'create').mockRejectedValue(factoryError);
+    const adapter = new PiAdapter({
+      workingDirectory: '/offline-fixture',
+      servicePath: '/offline-fixture/pi-service.mjs',
+      getSettings: executablePath === undefined ? undefined : () => ({
+        executablePath, provider: '', model: '', thinkingLevel: '',
+      }),
+    });
+    const config = {
+      systemPrompt: 'Read-only auxiliary query',
+      workingDirectory: '/offline-fixture/query',
+      model: { kind: 'pi' as const, provider: 'test', model: 'one' },
+      turnTimeoutMs: 1234,
+    };
+    try {
+      await expect(adapter.startAuxQuerySession(config)).rejects.toBe(factoryError);
+      expect(create).toHaveBeenCalledTimes(1);
+      expect(create).toHaveBeenCalledWith({
+        ...config,
+        executablePath: executablePath ?? '',
+        servicePath: '/offline-fixture/pi-service.mjs',
+      });
+    } finally {
+      adapter.dispose();
+      create.mockRestore();
+    }
   });
 });
 describe('Pi stream semantics', () => {

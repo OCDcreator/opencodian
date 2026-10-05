@@ -69,7 +69,11 @@ export async function executeCommand(host, c) {
     case 'follow_up': await s.followUp(required(c.message, 'Message'), await host.prepareImages(c.images)); return {};
     case 'abort': host.ui.cancelAll(); s.abortCompaction(); s.abortBranchSummary(); s.abortBash(); host.loginAbort?.abort(); await s.abort(); return {};
     case 'new_session': return host.runtime.newSession({ parentSession: c.parentSession });
-    case 'get_available_models': return { models: registry.getAvailable() };
+    case 'get_available_models': return { models: registry.getAvailable().map(model => ({
+      ...model,
+      ...(typeof host.getSupportedThinkingLevels === 'function'
+        ? { thinkingLevels: host.getSupportedThinkingLevels(model) } : {}),
+    })) };
     case 'set_model': {
       const model = registry.find(required(c.provider, 'Provider'), required(c.modelId, 'Model'));
       if (!model) throw new Error('Requested Pi model does not exist; no fallback is allowed.');
