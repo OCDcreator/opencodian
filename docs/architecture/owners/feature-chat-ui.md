@@ -60,3 +60,8 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 - 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
 
 2026-10-02：后端会话浏览器消费 Codex 汇聚目录结果，complete/partial/failed/unavailable 状态显式呈现；本地遗忘确认框说明原生历史保留，未知或混合后端目标不得静默完成。
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+BackendSessionBrowserModal 保留 native user identity 的 resume seed；目录分页与 partial 状态继续由 backend catalog owner 提供。
+浏览器/detail seam 仅透传可选的本地 Codex native 引用，缺失 child 的权威读取仍属 backend owner。

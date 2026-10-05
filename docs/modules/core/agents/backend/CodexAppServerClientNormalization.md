@@ -20,3 +20,9 @@
 - 纯函数模块，无类状态、无副作用
 - `CodexAppServerClient` 的静态 delegate 仅转发到此模块，新增归一化逻辑应在此文件实现
 - 分页 normalizer 只包装现有 flat 提取逻辑并透传 cursor；不要引入与 flat 输出不一致的消息形状
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+assistant 的原生 item ID 和 owning turn 同样保留在恢复 seed 中，不使用本地 assistant alias 替代原生身份。
+
+userMessage 正文保留，真实 item.id→sourceMessageId、所属 turn.id→sourceTurnId；thread/items/list 使用 entry.turnId。缺失 ID 仍可展示正文，但没有可分支 identity；不以正文、数组下标或 rollout UUID 补造。

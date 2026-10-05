@@ -90,3 +90,7 @@ English and Chinese strings distinguish OpenCode 1 and 2 and label the OpenCode 
 
 2026-10-02：共享中英文目录新增 Codex 本地遗忘/分页状态、Pi 动态思考与原生节点降级、Claude 会话控制以及 ZCode 管理结果三轴文案；已知 native token 只在显示层翻译。
 2026-10-05：新增 Pi composer 继承、下一次发送/native 状态边界和会话选择保存失败的中英文本；不把 requested effort 描述为已确认 native effective。
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+中英文同步显示旧 Codex 历史 native identity 无法唯一映射时的不可用状态。

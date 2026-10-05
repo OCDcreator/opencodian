@@ -2875,6 +2875,7 @@ export const enTranslations = {
   'chat.fork.successNewTab': 'Forked conversation in new tab',
   'chat.fork.failed': 'Failed to fork conversation',
   'chat.fork.unavailable': 'This message cannot be forked yet',
+  'chat.fork.codexIdentityUnavailable': 'Message-level fork is unavailable for this older Codex history: native message identity cannot be mapped uniquely.',
   'chat.fork.streamingBlocked': 'Finish the current response before forking',
   'chat.fork.maxTabsReached': 'Cannot fork to a new tab: maximum tabs reached ({count})',
   'chat.rewind.button': 'Rewind',

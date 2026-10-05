@@ -200,8 +200,72 @@ describe('CodexAdapter app-server chat transport', () => {
 });
 
 
+describe('CodexAdapter app-server identity ambiguity', () => {
+  beforeEach(resetAppServerMocks);
+
+  it.each([true, false])('leaves same-turn original/steering identity ambiguity unavailable (early=%s)', async (early) => {
+    const original = { threadId: 'thread-new', turnId: 'turn-current', item: { type: 'userMessage', id: 'original-user', content: [] } };
+    mockStartTurn.mockImplementation(async () => {
+      if (early) emitNotification('item/completed', original);
+      setTimeout(() => {
+        if (!early) emitNotification('item/completed', original);
+        emitNotification('item/completed', { ...original, item: { ...original.item, id: 'steering-user' } });
+        emitNotification('item/completed', original);
+        emitNotification('turn/completed', { threadId: 'thread-new', turn: { id: 'turn-current', status: 'completed', error: null } });
+      }, 0);
+      return { id: 'turn-current' };
+    });
+    const adapter = new CodexAdapter({ createCodex: jest.fn().mockResolvedValue(createMockCodex()) });
+    await adapter.start();
+    const chunks = await collectStream(adapter, 'codex-local-steering-identity');
+    expect(chunks.filter(chunk => chunk.type === 'user_message_identity')).toEqual([]);
+    expect(chunks.at(-1)).toEqual({ type: 'message_stop' });
+    await adapter.stop();
+  });
+});
+
 describe('CodexAdapter app-server chat lifecycle', () => {
   beforeEach(resetAppServerMocks);
+
+  it('confirms the final native text and assistant identity after a retry replaces partial text', async () => {
+    mockStartTurn.mockImplementation(async () => {
+      setTimeout(() => {
+        emitNotification('item/completed', { threadId: 'thread-new', turnId: 'turn-current', item: { type: 'userMessage', id: 'native-user', content: [] } });
+        emitNotification('item/agentMessage/delta', { threadId: 'thread-new', turnId: 'turn-current', itemId: 'discarded-partial', delta: 'OC_CX_CHILD_' });
+        emitNotification('error', { threadId: 'thread-new', turnId: 'turn-current', error: { message: 'Reconnecting... 1/5' }, willRetry: true });
+        emitNotification('item/agentMessage/delta', { threadId: 'thread-new', turnId: 'turn-current', itemId: 'native-assistant', delta: 'OC_CX_CHILD_DONE' });
+        emitNotification('item/completed', { threadId: 'thread-new', turnId: 'turn-current', item: { type: 'agentMessage', id: 'native-assistant', text: 'OC_CX_CHILD_DONE' } });
+        emitNotification('turn/completed', { threadId: 'thread-new', turn: { id: 'turn-current', status: 'completed', error: null } });
+      }, 0);
+      return { id: 'turn-current' };
+    });
+    const adapter = new CodexAdapter({ createCodex: jest.fn().mockResolvedValue(createMockCodex()), model: 'gpt-6-sol' });
+    await adapter.start();
+    const chunks = await collectStream(adapter, 'codex-local-retry');
+    expect(chunks.some(chunk => chunk.type === 'error')).toBe(false);
+    expect(chunks).toContainEqual(expect.objectContaining({ type: 'message_metadata', messageId: 'native-assistant', sourceTurnId: 'turn-current', nativeText: 'OC_CX_CHILD_DONE' }));
+    expect(chunks.at(-1)).toEqual({ type: 'message_stop' });
+  });
+
+  it('fences early user identities by thread, turn and attempt and deduplicates replay', async () => {
+    mockStartTurn.mockImplementation(async () => {
+      const item = { type: 'userMessage', id: 'native-user-current', content: [{ type: 'text', text: 'Inspect this' }] };
+      emitNotification('item/completed', { threadId: 'thread-new', turnId: 'turn-old', item: { ...item, id: 'old-user' } });
+      emitNotification('item/completed', { threadId: 'foreign-thread', turnId: 'turn-current', item: { ...item, id: 'foreign-user' } });
+      emitNotification('item/completed', { threadId: 'thread-new', turnId: 'turn-current', item });
+      setTimeout(() => {
+        emitNotification('item/completed', { threadId: 'thread-new', turnId: 'turn-current', item });
+        emitNotification('turn/completed', { threadId: 'thread-new', turn: { id: 'turn-current', error: null } });
+      }, 0);
+      return { id: 'turn-current' };
+    });
+    const adapter = new CodexAdapter({ createCodex: jest.fn().mockResolvedValue(createMockCodex()), model: 'gpt-6.1-sol' });
+    await adapter.start();
+    const chunks = await collectStream(adapter, 'codex-local-identity', { model: 'gpt-6-sol', variant: 'high' });
+    expect(chunks.filter(c => c.type === 'user_message_identity')).toEqual([{ type: 'user_message_identity', uuid: 'native-user-current', sessionId: 'thread-new', sourceTurnId: 'turn-current' }]);
+    expect(mockStartThread).toHaveBeenCalledWith(expect.objectContaining({ model: 'gpt-6-sol' }));
+    expect(mockStartTurn).toHaveBeenCalledWith(expect.objectContaining({ model: 'gpt-6-sol', effort: 'high' }));
+  });
 
   it('ignores an older turn completion that arrives before the new turn is registered', async () => {
     mockStartTurn.mockImplementation(async () => {

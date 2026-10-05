@@ -46,3 +46,9 @@ persistLocalStreamOutcome(options): Promise<void>
 - interrupted assistant / notice persistence 日志中的 `sessionId` 同样通过 `getConversationBackendSessionId()` 解析，不再直接读取 `conversation.openCodeSessionId`。
 - interrupted notice 与 interrupted assistant message 是两条不同保底路径：前者用于“没有可见内容”，后者用于“已有部分内容但流被中断”。
 - question resolution 是明确的 client-only decoration，允许随本地 recovery 写回，但不会把 assistant body 重新定义成本地 truth。
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+Codex 权威单条 assistant text 与 native item/turn ID 先保存，再调用可选的当前会话重绘 callback 修正重试的显示残留；没有权威快照不会改写流内容。
+
+Codex user sourceMessageId/sourceTurnId 在同一 conversation write 中持久化；无 assistant body 的身份收敛也使用既有 backend-session finalization 路径。

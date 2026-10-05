@@ -390,3 +390,7 @@ Inline edit model choices read the OpenCode 2 native catalog when that backend i
 ## 2026-10-02 Codex local forget / complete catalog UI
 
 新增 `forgetConversation(id)`，显式委托 deleteConversation 的 forget-local mode，只允许 Codex。2026-10-02 reviewed P2 补修中，forget-local 显式请求 `storage.deleteConversation(id, { verifyAbsent: true })`；真实 storage 仅在 adapter.exists 回读 session file 不存在后完成。adapter forget 推迟到该确认后，使 remove EACCES / still-present / readback failure 保留 conversation、tabs、cache、alias/effective evidence 并支持重试；随后提交 conversation array/full-message cache，失败交给既有 lifecycle 通道恢复。默认 delete-native 的 verified-only/失败保留/重试路径保留。
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+createConversationFromBackendSession 对同一个已存在的 Codex native thread 复用本地 conversation，保留完整历史、native identity 和会话模型覆盖；其他后端仍走原创建路径。local forget 仍仅清本地引用，不删除 native thread。

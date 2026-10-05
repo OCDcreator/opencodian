@@ -20,6 +20,8 @@ import type {
 export interface AppServerPreviewMessage {
   role: string;
   parts: Array<{ type: string; text: string }>;
+  sourceMessageId?: string;
+  sourceTurnId?: string;
 }
 
 /**
@@ -58,7 +60,9 @@ export function normalizeTurnsToPreviewMessages(
   for (const turn of turns) {
     for (const item of turn.items) {
       const extracted = extractItemMessages(item);
-      if (extracted) messages.push(...extracted);
+      if (extracted) messages.push(...extracted.map((message) => message.sourceMessageId
+        ? { ...message, sourceTurnId: turn.id }
+        : message));
     }
   }
   return messages;
@@ -91,7 +95,9 @@ export function normalizeThreadItemsPageToPreviewMessages(
   const messages: AppServerPreviewMessage[] = [];
   for (const entry of page.data) {
     const extracted = extractItemMessages(entry.item);
-    if (extracted) messages.push(...extracted);
+    if (extracted) messages.push(...extracted.map((message) => message.sourceMessageId
+      ? { ...message, sourceTurnId: entry.turnId }
+      : message));
   }
   return {
     messages,
@@ -108,10 +114,10 @@ export function normalizeThreadItemsPageToPreviewMessages(
  */
 function extractItemMessages(item: AppServerItem): AppServerPreviewMessage[] | null {
   if (item.type === 'userMessage' && Array.isArray(item.content)) {
-    return normalizeUserMessageItem(item.content);
+    return normalizeUserMessageItem(item.content, typeof item.id === 'string' && item.id.trim() ? item.id : undefined);
   }
   if (item.type === 'agentMessage' && typeof item.text === 'string' && item.text.length > 0) {
-    return [{ role: 'assistant', parts: [{ type: 'text', text: item.text }] }];
+    return [{ role: 'assistant', ...(typeof item.id === 'string' && item.id.trim() ? { sourceMessageId: item.id } : {}), parts: [{ type: 'text', text: item.text }] }];
   }
   return normalizeActivityItem(item);
 }
@@ -119,6 +125,7 @@ function extractItemMessages(item: AppServerItem): AppServerPreviewMessage[] | n
 /** Normalize a userMessage content array into a single user message. */
 function normalizeUserMessageItem(
   content: Array<{ type: string; text?: string }>,
+  sourceMessageId: string | undefined,
 ): AppServerPreviewMessage[] | null {
   const textParts = content
     .filter((c): c is { type: string; text: string } =>
@@ -126,7 +133,7 @@ function normalizeUserMessageItem(
     )
     .map((c) => c.text);
   if (textParts.length === 0) return null;
-  return [{ role: 'user', parts: textParts.map((text) => ({ type: 'text', text })) }];
+  return [{ role: 'user', ...(sourceMessageId ? { sourceMessageId } : {}), parts: textParts.map((text) => ({ type: 'text', text })) }];
 }
 
 /** Normalize activity items (tool calls, file changes, web searches). */

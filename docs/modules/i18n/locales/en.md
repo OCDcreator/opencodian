@@ -641,3 +641,7 @@ OpenCode 2 inherited server permission mode has English label and explanation.
 
 2026-10-02：新增 Codex 仅遗忘本地的确认与成功/失败文案，以及会话、模型、权限、MCP、loaded 目录 partial/failed/unavailable 状态文案。原生历史保留边界在确认框显式说明。
 2026-10-05: Add Pi composer inheritance label, next-send/native-state boundary hint and session-selection save-failure notice. Explicit SDK off remains distinct from inheritance.
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+补充旧 Codex 历史无法唯一映射 native identity 时的 message-fork unavailable 文案，与中文 key 对齐。

@@ -9,6 +9,8 @@
  * (`codex app-server generate-json-schema`), verified 2026-09-30. A few legacy
  * sections still note the older version they were first verified against; the
  * 0.159.0 schema is backwards-compatible for the routes this plugin uses.
+ * Point-fork and configured thread-model fields below were
+ * checked against the installed 0.160.0 generated protocol on 2026-10-05.
  */
 
 /** Raw thread shape from app-server thread/list and thread/read. */
@@ -21,8 +23,9 @@ export interface AppServerThread {
   cwd: string;
   name: string | null;
   source: string;
-  status?: { type: string };
-  archived?: boolean;
+  status?: { type: string }; archived?: boolean;
+  /** Codex 0.160.0 configured thread model; not per-turn execution telemetry. */
+  model?: string | null; reasoningEffort?: string | null; forkedFromId?: string | null;
   turns: AppServerTurn[];
 }
 

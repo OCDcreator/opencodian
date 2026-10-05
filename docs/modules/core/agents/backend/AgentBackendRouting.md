@@ -54,3 +54,7 @@
 > 2026-09-22 (票 03)：`loadBackendSessionMessages` 的 `{info, parts}` 信封分支兼容 zcode（`info.messageId` 与 opencode 的 `info.id` 并容，`info.time.created` 容错）；水合映射输出稳定 id，重复水合产出相同行（双重渲染防护的边界证据）。
 > 2026-09-24 (票 07)：`loadBackendSessionMessages` 信封分支在记录含 `attachments` 时保留之（zcode 持久消息的附件身份直通不裁剪；opencode 形状不变，仅在其亦出现记录级附件时同向直通）。
 > 2026-09-30 (B3 session-pagination)：新增分页 transcript seams。`BackendPaginatedSessionHistoryCapability` 是 adapter 可选实现的结构化能力（typeof 检测，未实现的后端行为不变）：`getSessionTurnsPage(sessionId, {cursor, limit, sortDirection})` 对应 codex `thread/turns/list`，`getSessionTurnItemsPage(sessionId, {turnId, cursor, limit, sortDirection})` 对应 `thread/items/list`，两者都返回 `NormalizedSessionMessagesPage`（`NormalizedSessionPreviewMessage[]` + `nextCursor`/`backwardsCursor`）；实现方对 route 不可用、thread 缺失/删除、传输错误一律返回 `null` 而不抛异常。路由 wrapper `getBackendSessionTurnsPage()` / `getBackendSessionTurnItemsPage()` 做 try/catch 与 page shape 清洗（`sanitizeMessagesPage`），`hasBackendSessionTurnsPage()` 供消费方（session browser detail pane）在分页路径与 legacy flat-preview 路径之间选择。codex adapter 侧的对接在 integration wave 完成（委托 `CodexAppServerClient.listThreadTurns/listThreadItems` + `CodexAppServerClientNormalization` 分页 normalizer，turns 查询固定 `itemsView: 'summary'`）。
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+Codex preview 透传可选 sourceMessageId/sourceTurnId；展示用 ID 与权威 native identity 分开，其他后端无这些字段时保留原输出。

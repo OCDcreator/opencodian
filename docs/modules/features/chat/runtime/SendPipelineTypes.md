@@ -52,3 +52,9 @@
 - `SendPipelineTabRuntime` 只收录发送链路真正关心的字段；不要把整个 view runtime 状态无差别搬进来。
 
 - 2026-09-13: SendPipelineViewPort 增加 onTurnSettled?；ExecutionHost Pick 纳入该键。
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+LocalStreamOutcome 的可选 assistant owning turn / native text render 标志及 persistence callback 只用于已确认的 Codex 单条文本收敛。
+
+resolvedUserMessageTurnId 可选贯穿 router trace/outcome；不改变其他后端已使用的 resolvedUserMessageIdentity 类型与输出。

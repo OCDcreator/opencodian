@@ -832,3 +832,7 @@ history host 新增 forgetConversationsAndCleanupTabs 转发至 ConversationLoad
 Pi 的 composer 模型和按模型的 effort 覆盖保存到当前 conversation 的 sessionSettings；切换/恢复时读取该 conversation，effort 不再依赖共享 provider/model view 缓存。Pi model 选择只更新会话请求值，调用既有 Pi binding 保存；发送仍由 PiAdapter 依 request variant → plugin Pi default → 不发送 setter 的顺序执行。Pi 默认选项显示「继承 Pi 默认 / 会话」，tooltip 明示下一次发送与 native state 的区别；明确 off 仍是独立 SDK 选项。
 
 PiModelSelectionBinding 的 SDK 每模型档位使设置返回/reload 保留尚未发送模型的 effort 控件。其他 backend 控件分支不变。回归见 `OpenCodianView.piSelection.test.ts`。
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+History 的 Codex 目录向浏览器转发持久化的 Codex native 引用 ID；Resume 转发到插件既有恢复桥，以复用同 native ID 的本地引用。身份恢复、native point-fork 和目录精确读取均由邻接 owner 承担，view 不新增 runtime ownership。

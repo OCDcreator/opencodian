@@ -1,3 +1,4 @@
+import type { ContentBlock as StreamingContentBlock } from '../../../utils/streaming';
 import { shouldSyncAfterStream } from '../services/MessageFinalizationService';
 import type { PreparedMessageSend } from '../services/MessageSendPreparationService';
 import { buildStreamErrorNotice } from './AssistantNoticeRenderer';
@@ -8,6 +9,24 @@ import type {
   SendPipelineTabRuntime,
   StreamChunkRouterResult,
 } from './SendPipelineTypes';
+
+function applyCodexNativeTextSnapshot(
+  preparedSend: PreparedMessageSend,
+  routedStream: StreamChunkRouterResult,
+  blocks: StreamingContentBlock[] | undefined,
+): Pick<LocalStreamOutcome, 'streamContentBlocks' | 'finalizedAssistantTurnId' | 'requiresNativeTextRender'> {
+  const native = routedStream.finalizedAssistantMetadata;
+  if (preparedSend.conversation.backend !== 'codex' || !routedStream.streamCompleted || routedStream.latestErrorMessage
+    || typeof native?.nativeText !== 'string' || !native.sourceTurnId
+    || native.sourceTurnId !== routedStream.resolvedUserMessageTurnId
+    || !(blocks ?? []).every((block) => block.type === 'text' || block.type === 'thinking')) return { streamContentBlocks: blocks };
+  const corrected = getStreamedTextContent(blocks) !== native.nativeText;
+  return {
+    streamContentBlocks: corrected ? [...(blocks ?? []).filter((block) => block.type === 'thinking'), { type: 'text', content: native.nativeText }] : blocks,
+    finalizedAssistantTurnId: native.sourceTurnId,
+    ...(corrected ? { requiresNativeTextRender: true } : {}),
+  };
+}
 
 export function buildLocalStreamOutcome(options: {
   preparedSend: PreparedMessageSend;
@@ -22,10 +41,12 @@ export function buildLocalStreamOutcome(options: {
   const finalizedAssistantMessageId = options.routedStream.finalizedAssistantMetadata?.messageId;
   const finalizedBackendSessionId = options.routedStream.finalizedBackendSessionId ?? undefined;
   const rawContentBlocks = options.streamController?.getContentBlocks();
-  const streamContentBlocks = filterDuplicateStructuredOutputTextBlocks(
+  const filteredBlocks = filterDuplicateStructuredOutputTextBlocks(
     rawContentBlocks,
     options.routedStream.structuredOutput,
   );
+  const nativeOutcome = applyCodexNativeTextSnapshot(options.preparedSend, options.routedStream, filteredBlocks);
+  const streamContentBlocks = nativeOutcome.streamContentBlocks;
   const streamedTextContent = getStreamedTextContent(streamContentBlocks);
   const hasStreamContentBlocks = Boolean(streamContentBlocks && streamContentBlocks.length > 0);
   const shouldPersistInterruptedState = options.routedStream.streamInterrupted
@@ -56,6 +77,7 @@ export function buildLocalStreamOutcome(options: {
     finalizedTimestamp,
     finalizedModelId,
     finalizedAssistantMessageId,
+    ...nativeOutcome,
     finalizedBackendSessionId,
     finalizedStreamingMessageEl: options.runtime.streamingMessageEl,
     streamContentBlocks,
@@ -73,5 +95,6 @@ export function buildLocalStreamOutcome(options: {
       }),
     structuredOutput: options.routedStream.structuredOutput,
     resolvedUserMessageIdentity: options.routedStream.resolvedUserMessageIdentity,
+    ...(options.routedStream.resolvedUserMessageTurnId ? { resolvedUserMessageTurnId: options.routedStream.resolvedUserMessageTurnId } : {}),
   };
 }

@@ -923,8 +923,14 @@ export class OpenCodianView extends ItemView {
       openBackendSessionBrowserModal: () => {
         const modalHost: BackendSessionBrowserHost = {
           getAgentServiceRegistry: () => this.plugin.agentServiceRegistry ?? null,
+          getKnownCodexSessionIds: () => this.plugin.getConversations()
+            .filter((conversation) => conversation.backend === 'codex')
+            .map((conversation) => getConversationBackendSessionId(conversation)).filter((id): id is string => !!id),
           createConversationFromBackendSession: async (sessionId, title, initialMessages, backend?: AgentBackendKind) => {
             const resolvedBackend = backend ?? this.plugin.settings.activeBackend ?? 'opencode';
+            if (resolvedBackend === 'codex') {
+              return this.plugin.createConversationFromBackendSession(sessionId, title, initialMessages, 'codex');
+            }
             const conversation = await this.plugin.createConversationFromSession(sessionId, { title, backend: resolvedBackend, messages: initialMessages as ChatMessage[] });
             return conversation.id;
           },

@@ -46,3 +46,9 @@ buildLocalStreamOutcome(options): LocalStreamOutcome
 ## 2026-09-27 OpenCode 2 compatibility
 
 Completed OpenCode 2 turns schedule server history reconciliation through their own adapter after local stream finalization.
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+纯文本 Codex 回合只有在 completed、无终止错误、native snapshot 与本轮 user owning turn 相同且无工具 block 时，才用权威最终文本收敛重试留下的 partial；其他后端和复杂回合保持原流数据。
+
+可选 owning turn 从 routed stream 透传至本地持久化 outcome；缺失时保持既有输出结构。

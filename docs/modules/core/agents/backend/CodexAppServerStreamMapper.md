@@ -26,3 +26,9 @@
 - 新增协议 item 先补 app-server adapter fixture，再扩展该映射
 - b64 图像结果会作为 tool result 进入持久化 content block（与 ImageAttachment 先例一致）；新增大结果类型前先评估 vault 存储成本
 - Context snapshot 必须由调用方以真实 app-server thread ID 持久化，不能绑定 provisional 本地 ID
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+`error.willRetry=true` 是 native 重试进度，映射为非终止 informational 事件；仅 definitive error 沿原 error chunk 路径呈现失败。
+
+completed userMessage 仅在非空 item.id/threadId/turnId 下输出 user_message_identity 与 sourceTurnId；started 不赋身份。Mapper 只作 wire 规范化，attempt/thread/turn fencing 与重放去重由 CodexAdapter 负责。

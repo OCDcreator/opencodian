@@ -85,3 +85,7 @@ PiModelSelectionBinding owns Pi selector policy; send preparation and slash disp
 
 Selection, history sync, recovery and slash command services recognize OpenCode 2 while retaining their tab and session identity guards.
 2026-10-05 Pi-only continuation：PiModelSelectionBinding 以 SDK per-model thinkingLevels 为尚未发送的模型提供 variants，避免 catalog reload 依赖当前 native 模型。Pi selection 保存复用该文件的 conversation-only seam，失败恢复捕获的 snapshot，不建立第二套 process/native 真值；非 Pi host 保持原委托路径。
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+Codex 模型目录发送准备和旧历史身份恢复在既有服务 owner 内闭合；旧历史只接受 native ID/唯一 owning-turn 证据，文本/下标猜测拒绝。Codex fork 继承其 session settings。

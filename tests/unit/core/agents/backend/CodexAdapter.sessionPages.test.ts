@@ -88,7 +88,7 @@ describe('CodexAdapter paginated session history', () => {
       itemsView: 'summary',
     });
     expect(page).toEqual({
-      messages: [{ role: 'assistant', parts: [{ type: 'text', text: 'Hello from codex' }] }],
+      messages: [{ role: 'assistant', sourceMessageId: 'msg-1', sourceTurnId: 'turn-1', parts: [{ type: 'text', text: 'Hello from codex' }] }],
       nextCursor: 'cursor-2',
       backwardsCursor: null,
     });

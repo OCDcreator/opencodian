@@ -971,6 +971,12 @@ export class ChatRuntimeComposition {
         getActiveBackend: () => host.plugin.settings.activeBackend,
         createConversation: () => host.plugin.createConversation(),
         app: host.app as never,
+        readCodexSessionMessages: async (sessionId: string) => {
+          const adapter = (host.plugin.agentServiceRegistry as { get(kind: string): { getSessionMessages?(id: string): Promise<unknown[]> } | undefined } | undefined)?.get('codex');
+          return await adapter?.getSessionMessages?.(sessionId) ?? [];
+        },
+        commitCodexIdentityRecovery: (conversation: Conversation, write: () => void) =>
+          host.commitConversationWrite(conversation, host.createConversationWriteTicket(conversation.id), 'codex-user-identity-recovery', write),
         revertSession: (sessionId: string, messageId: unknown) => host.routeConversationRevertSession(sessionId, messageId),
         unrevertSession: (sessionId: string) => host.routeConversationUnrevertSession(sessionId),
         forkSession: (sessionId: string, messageId: unknown) => host.routeConversationForkSession(sessionId, messageId),
@@ -1267,7 +1273,7 @@ export class ChatRuntimeComposition {
       } as never),
     );
     const sendPipelineRuntime = new SendPipelineRuntime(
-      createSendPipelineRuntimeHost(this.buildSendPipelineHostDependencies(surface, conversation, background, questionRuntimeServices)),
+      createSendPipelineRuntimeHost(this.buildSendPipelineHostDependencies(surface, { ...conversation, renderService: conversationRenderService }, background, questionRuntimeServices)),
       messageSendPreparationService,
       messageFinalizationService,
       slashCommandExecutionService,
@@ -1294,7 +1300,7 @@ export class ChatRuntimeComposition {
    */
   private buildSendPipelineHostDependencies(
     surface: SurfaceRuntimeWiring,
-    conversation: ConversationRuntimeResult,
+    conversation: ConversationRuntimeResult & { renderService?: ConversationRenderService },
     background: BackgroundTaskRuntimeWiring,
     questionRuntimeServices: QuestionRuntimeServices,
   ): SendPipelineHostDependencies {
@@ -1307,6 +1313,22 @@ export class ChatRuntimeComposition {
         backend: string;
       }) => {
         host.plugin.memoryRuntime?.onTurnSettled(info);
+        // User identity arrives after the optimistic footer was drawn. Refresh
+        // only this settled, visible Codex conversation's footer, preserving its body.
+        if (info.backend === 'codex' && host.getActiveTabId() === info.tabId
+          && host.currentConversation?.id === info.conversationId
+          && getConversationBackendSessionId(host.currentConversation) === info.sessionId) {
+          const users = new Map(host.currentConversation.messages
+            .filter((message) => message.role === 'user' && message.sourceMessageId)
+            .map((message) => [message.id, message]));
+          for (const element of host.messagesContainer?.querySelectorAll<HTMLElement>('.opencodian-message[data-message-id]') ?? []) {
+            const message = users.get(element.dataset.messageId ?? '');
+            if (!message) continue;
+            element.dataset.sourceMessageId = message.sourceMessageId;
+            element.querySelector('.opencodian-user-message-footer')?.remove();
+            host.addUserMessageFooter(element, message, message.content);
+          }
+        }
         // Slash /plan reaches the native session through the chat send path.
         // Refresh only this still-visible session's mode from ZCode's readback;
         // the toolbar's per-session cache otherwise keeps showing BUILD.
@@ -1438,6 +1460,10 @@ export class ChatRuntimeComposition {
       createConversationWriteTicket: (conversationId: string) => host.createConversationWriteTicket(conversationId),
       commitConversationWrite: (conversation: Conversation, ticket: unknown, reason: string, write: () => void | Promise<void>) =>
         host.commitConversationWrite(conversation, ticket, reason, write),
+      reconcileCodexFinalText: async (value: Conversation, tabId: TabId | null) => {
+        if (value.backend !== 'codex' || host.getActiveTabId() !== tabId || host.currentConversation?.id !== value.id) return;
+        await conversation.renderService?.rerenderConversationMessages(value);
+      },
       summarizeContentBlocksForDebug: (blocks: unknown) =>
         summarizeContentBlocksForDebug(blocks as SendPipelineDebugContentBlock[] | undefined),
       summarizeCoreStreamChunkForDebug: (chunk: unknown) => summarizeCoreStreamChunkForDebug(chunk as never),

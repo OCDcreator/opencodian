@@ -165,6 +165,10 @@ function mapToolProgress(params: Record<string, unknown>, sessionId: string): Ap
 
 function mapErrorNotification(params: Record<string, unknown>): AppServerStreamMapResult {
   const error = readAppServerTurnError(params.error ?? params);
+  if (params.willRetry === true) {
+    return { chunks: [{ type: 'backend_event', source: 'codex', event: 'informational', status: 'retrying',
+      ...(error ? { content: error } : {}), metadata: { willRetry: true } }] };
+  }
   return { chunks: error ? [{ type: 'error', content: error }] : [] };
 }
 
@@ -294,6 +298,21 @@ function mapItemNotification(
   const item = asRecord(params.item);
   if (typeof item.id !== 'string' || typeof item.type !== 'string') {
     return [];
+  }
+  if (
+    completed
+    && item.type === 'userMessage'
+    && item.id.trim().length > 0
+    && typeof params.threadId === 'string'
+    && typeof params.turnId === 'string'
+    && params.turnId.trim().length > 0
+  ) {
+    return [{
+      type: 'user_message_identity',
+      uuid: item.id,
+      sessionId: params.threadId,
+      sourceTurnId: params.turnId,
+    }];
   }
   return (itemMappers[item.type] ?? noItemChunks)(item, completed, streamState);
 }

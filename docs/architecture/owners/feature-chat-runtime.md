@@ -73,3 +73,10 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 ## 2026-09-27 OpenCode 2 compatibility
 
 The chat runtime starts the selected OpenCode 2 adapter and dispatches its commands, compact and rewind through the backend session owner.
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+Codex 原生单条文本的纠正先通过 serialized write 保存，再经既有 renderer 按当前归属收敛显示；不改共享 StreamController 或其他后端。
+
+既有 router/outcome/persistence 链同时保存 user item ID 与 owning turn；composition 只注入 Codex 权威读取与 serialized write seam。
+settled Codex footer 的最小刷新留在已有 composition callback，并守住 active tab、conversation ID 和 native thread 三个归属条件，不增加 view-local runtime owner。

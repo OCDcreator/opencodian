@@ -66,6 +66,7 @@ import {
   type AppServerAccountRateLimitsResult,
   type AppServerAccountUsage,
   type AppServerAccountUsageResult,
+  type AppServerCatalogReadResult,
   type AppServerCommandExecutionApprovalDecision,
   type AppServerCommandExecutionApprovalParams,
   type AppServerCommandExecutionApprovalResponse,
@@ -473,6 +474,7 @@ export class CodexAdapter
   private _status: AgentConnectionStatus = 'disconnected';
   private codex: Codex | null = null;
   private sessions = new Map<string, CodexSessionEntry>();
+  private readonly forkedThreadIds = new Set<string>();
   private threadAlias = new Map<string, string>(); // threadId → provisionalId
   private activeControllers = new Map<string, AbortController>();
   private activeAppServerTurns = new Map<string, { threadId: string; turnId: string | null }>();
@@ -1422,14 +1424,43 @@ export class CodexAdapter
    * Implements AgentForkCapability. The new thread is created on the app-server
    * and persisted to disk; the returned id can be used to resume it.
    */
-  async forkSession(sessionId: string): Promise<{ id: string; title: string }> {
+  async forkSession(sessionId: string, messageID?: string): Promise<{ id: string; title: string }> {
     if (!this.appServerClient) {
       throw new Error('Codex app-server client is not available');
     }
-    const result = await this.appServerClient.forkThread(sessionId);
+    let beforeTurnId: string | undefined;
+    if (messageID !== undefined) {
+      await this.appServerClient.start();
+      if (!messageID.trim() || !this.appServerClient.supportsBeforeTurnFork()) {
+        throw new Error('Codex before-turn fork is unavailable; native identity cannot be safely applied');
+      }
+      if (this.activeControllers.has(this.logicalSessionKey(sessionId))) {
+        throw new Error('Cannot fork an active Codex session');
+      }
+      const source = await this.appServerClient.readThread(sessionId, true);
+      if (!source || source.id !== sessionId || !Array.isArray(source.turns)) {
+        throw new Error(`Cannot fork Codex session: foreign or unavailable identity ${messageID}`);
+      }
+      const matches = source.turns.flatMap((turn) => turn.items
+        .filter((item) => item.type === 'userMessage' && item.id === messageID)
+        .map(() => turn));
+      if (matches.length !== 1) {
+        throw new Error(`Cannot fork Codex session: identity ${messageID} is unknown or ambiguous`);
+      }
+      const owningTurn = matches[0];
+      if (!owningTurn.id || !['completed', 'interrupted', 'failed'].includes(owningTurn.status ?? '')
+        || source.status?.type === 'active' || this.activeControllers.has(this.logicalSessionKey(sessionId))) {
+        throw new Error(`Cannot fork Codex session: identity ${messageID} belongs to an active turn`);
+      }
+      beforeTurnId = owningTurn.id;
+    }
+    const result = beforeTurnId
+      ? await this.appServerClient.forkThread(sessionId, { beforeTurnId })
+      : await this.appServerClient.forkThread(sessionId);
     if (!result?.thread?.id) {
       throw new Error(`Failed to fork Codex session ${sessionId}`);
     }
+    this.forkedThreadIds.add(result.thread.id);
     const title = result.thread.name
       || (typeof result.thread.preview === 'string' ? result.thread.preview.slice(0, 80) : '')
       || '(untitled)';
@@ -2454,6 +2485,7 @@ export class CodexAdapter
    */
   private invalidateLocalSessionForDeletedThread(threadId: string): string | null {
     if (this.pendingNativeDeletions.has(threadId)) return null;
+    this.forkedThreadIds.delete(threadId);
     const provisionalId = this.threadAlias.get(threadId);
     this.threadAlias.delete(threadId);
     this.loadedThreadIds.delete(threadId);
@@ -2636,7 +2668,7 @@ export class CodexAdapter
     let ownedTurnId: string | null = null;
     /** Trace turn context captured at `beginTurn`; shared with the subscription callback and completion/catch paths. */
     let turnContext: CodexTraceContext | undefined;
-    const attempt = this.beginAppServerAttempt(request.sessionId);
+    const attempt = this.beginAppServerAttempt(request.sessionId, request.options);
     const sessionId = attempt.sessionId;
     const controller = new AbortController();
     this.activeControllers.get(sessionId)?.abort();
@@ -2653,19 +2685,38 @@ export class CodexAdapter
     };
     let wake: (() => void) | null = null;
     let completed = false;
-    const pendingTurnCompletions: Array<{ id?: string; error?: unknown }> = [];
+    let turnSucceeded = false;
+    const pendingTurnCompletions: Array<{ id?: string; status?: string; error?: unknown }> = [];
+    const pendingUserMessageIdentities: Array<Extract<StreamChunk, { type: 'user_message_identity' }>> = [];
+    const nativeAssistantCompletions: Array<{ threadId: string; turnId: string; id: string; text: string }> = [];
+    const nativeActivityTurns = new Set<string>();
     const enqueue = (chunk: StreamChunk): void => {
       pending.push(chunk);
       const resolve = wake;
       wake = null;
       resolve?.();
     };
-    const completeCurrentTurn = (completedTurn: { id?: string; error?: unknown }): void => {
-      const active = this.activeAppServerTurns.get(sessionId);
-      if (!active?.turnId || completedTurn.id !== active.turnId) {
+    const acceptUserIdentity = (identity: Extract<StreamChunk, { type: 'user_message_identity' }>): StreamChunk[] => {
+      // Steering can add another user item to this turn. Wait for terminal
+      // ownership evidence rather than attaching the last candidate to the send.
+      if (identity.sessionId === ownedThreadId) pendingUserMessageIdentities.push(identity);
+      return [];
+    };
+    const collectNativeItem = (params: unknown, method: string): void => {
+      const itemParams = params as { threadId?: string; turnId?: string; item?: { id?: string; type?: string; text?: string } } | null;
+      if (itemParams?.threadId !== ownedThreadId || !itemParams?.turnId || !itemParams.item) return;
+      const item = itemParams.item;
+      if (method === 'item/completed' && item.type === 'agentMessage' && item.id && typeof item.text === 'string') {
+        nativeAssistantCompletions.push({ threadId: itemParams.threadId!, turnId: itemParams.turnId, id: item.id, text: item.text });
+      }
+      if (item.type && !['userMessage', 'agentMessage', 'reasoning'].includes(item.type)) nativeActivityTurns.add(itemParams.turnId);
+    };
+    const completeCurrentTurn = (completedTurn: { id?: string; status?: string; error?: unknown }): void => {
+      if (!ownedTurnId || completedTurn.id !== ownedTurnId) {
         return;
       }
       const error = readAppServerTurnError(completedTurn.error);
+      turnSucceeded = completedTurn.status === 'completed' && !error;
       this.applyTurnCompletionEvidence(sessionId, error, (msg: string) => enqueue({ type: 'error', content: msg }));
       const ctx = turnContext;
       if (ctx) {
@@ -2718,11 +2769,11 @@ export class CodexAdapter
 
       subscription = client.subscribeToThreadNotifications(thread.id, (event) => {
         if (!this.isCurrentAppServerAttempt(attempt)) return;
-        const params = event.params as { turn?: { id?: string; error?: unknown } } | null;
+        collectNativeItem(event.params, event.method);
+        const params = event.params as { turn?: { id?: string; status?: string; error?: unknown } } | null;
         const completedTurn = params?.turn;
         if (event.method === 'turn/completed') {
-          const active = this.activeAppServerTurns.get(sessionId);
-          if (!active?.turnId) {
+          if (!ownedTurnId) {
             // The app-server can deliver notifications before turn/start
             // returns. Retain completions until the current turn ID is known,
             // then accept only that exact turn; a prior turn on this thread
@@ -2730,7 +2781,7 @@ export class CodexAdapter
             pendingTurnCompletions.push(completedTurn ?? {});
             return;
           }
-          if (completedTurn?.id !== active.turnId) {
+          if (completedTurn?.id !== ownedTurnId) {
             return;
           }
         }
@@ -2748,6 +2799,8 @@ export class CodexAdapter
           streamState,
           threadId: thread.id,
         });
+        mapping.chunks = mapping.chunks.flatMap((chunk) => chunk.type === 'user_message_identity'
+          ? acceptUserIdentity(chunk) : [chunk]);
         if (mapping.contextUsageSnapshot) {
           this.appServerContextSnapshots.set(thread.id, mapping.contextUsageSnapshot);
         }
@@ -2835,6 +2888,19 @@ export class CodexAdapter
         yield pending.shift()!;
       }
       if (this.isCurrentAppServerAttempt(attempt) && !controller.signal.aborted) {
+        const nativeUsers = [...new Map(pendingUserMessageIdentities
+          .filter((identity) => identity.sessionId === ownedThreadId && identity.sourceTurnId === ownedTurnId)
+          .map((identity) => [identity.uuid, identity])).values()];
+        if (nativeUsers.length === 1) yield nativeUsers[0];
+        const nativeMessages = [...new Map(nativeAssistantCompletions
+          .filter((message) => message.threadId === ownedThreadId && message.turnId === ownedTurnId)
+          .map((message) => [message.id, message])).values()];
+        if (turnSucceeded && nativeMessages.length === 1 && !nativeActivityTurns.has(ownedTurnId!)) {
+          const native = nativeMessages[0];
+          yield { type: 'message_metadata', messageId: native.id, timestamp: Date.now(), sessionId: thread.id,
+            sourceTurnId: native.turnId, nativeText: native.text,
+            ...(attempt.options.model ? { modelId: attempt.options.model } : {}) };
+        }
         yield { type: 'message_stop' };
       }
     } catch (err) {
@@ -3428,9 +3494,15 @@ export class CodexAdapter
   }
 
   /** Begin one immutable app-server attempt before its first await. */
-  private beginAppServerAttempt(sessionId: string): AppServerAttempt {
+  private beginAppServerAttempt(sessionId: string, sendOptions?: Record<string, unknown>): AppServerAttempt {
     const logicalSessionId = this.logicalSessionKey(sessionId);
-    const options = this.captureAttemptOptions();
+    const options: AttemptOptions = {
+      ...this.captureAttemptOptions(),
+      ...(typeof sendOptions?.model === 'string' && sendOptions.model.trim()
+        ? { model: sendOptions.model.trim() } : {}),
+      ...(typeof sendOptions?.variant === 'string' && CODEX_EFFORT_VARIANTS.some((variant) => variant === sendOptions.variant)
+        ? { modelReasoningEffort: sendOptions.variant as AttemptOptions['modelReasoningEffort'] } : {}),
+    };
     const epoch = ++this.nextAttemptEpoch;
     this.sessionEpochs.set(logicalSessionId, epoch);
     this.sessionAttemptOptions.set(logicalSessionId, options);
@@ -3552,6 +3624,7 @@ export class CodexAdapter
     }
     // Evict only after verified deletion or explicitly requested forgetting.
     if (threadId) {
+      this.forkedThreadIds.delete(threadId);
       this.pendingNativeDeletions.delete(threadId);
       this.appServerClient?.clearThreadEffectiveSettings?.(threadId);
       this.appServerContextSnapshots.delete(threadId);
@@ -3620,7 +3693,7 @@ export class CodexAdapter
   }
 
   /** Browser evidence merges complete native partitions, retaining usable rows on failure. */
-  async getSessionCatalog(): Promise<import('./CodexAppServerClient').AppServerCatalogReadResult<NormalizedSessionRow>> {
+  async getSessionCatalog(options?: { includeSessionIds?: readonly string[] }): Promise<AppServerCatalogReadResult<NormalizedSessionRow>> {
     const rows = new Map<string, NormalizedSessionRow>();
     for (const session of this.sessions.values()) {
       const id = session.threadId ?? session.provisionalId;
@@ -3640,12 +3713,28 @@ export class CodexAdapter
         rows.set(thread.id, { id: thread.id, title: thread.title, shareUrl: null, updatedAt: thread.updatedAt, archived: index === 1 });
       }
     });
+    const nativeIds = new Set(results.flatMap((result) => result.data.map((thread) => thread.id)));
+    const exactIds = [...new Set([...this.forkedThreadIds, ...(options?.includeSessionIds ?? [])])]
+      .filter((id) => id.trim() && !this.isProvisionalId(id) && !nativeIds.has(id));
+    let exactReadFailed = false;
+    let exactRowsRead = 0;
+    for (const id of exactIds) {
+      const thread = await client.readThread(id, true);
+      if (!thread || thread.id !== id) { exactReadFailed = true; continue; }
+      const preview = CodexAppServerClient.normalizeTurnsToPreviewMessages(thread.turns ?? [])
+        .find((message) => message.role === 'user')?.parts.map((part) => part.text).join('\n');
+      rows.set(id, { id, title: thread.name || thread.preview || preview?.slice(0, 80) || '(untitled)',
+        shareUrl: null, updatedAt: thread.updatedAt ? thread.updatedAt * 1000 : null,
+        ...(thread.archived !== undefined ? { archived: thread.archived } : {}) });
+      exactRowsRead++;
+    }
     const data = Array.from(rows.values());
     const failure = results.find((result) => result.status !== 'complete');
     if (failure) {
-      const hasNativeRows = results.some((result) => result.data.length > 0);
+      const hasNativeRows = exactRowsRead > 0 || results.some((result) => result.data.length > 0);
       return { ...failure, status: hasNativeRows ? 'partial' : failure.status, data };
     }
+    if (exactReadFailed) return { status: 'partial', data, nextCursor: null, errorReason: 'A referenced Codex thread could not be read authoritatively' };
     return { status: 'complete', data, nextCursor: null };
   }
 
@@ -3754,8 +3843,10 @@ export class CodexAdapter
     }
 
     try {
-      const thread = await this.appServerClient.readThread(sessionId, true);
-      if (!thread || !thread.turns) {
+      const threadId = this.resolveThreadId(sessionId);
+      if (!threadId) return [];
+      const thread = await this.appServerClient.readThread(threadId, true);
+      if (!thread || thread.id !== threadId || !thread.turns) {
         return [];
       }
 
@@ -3765,6 +3856,9 @@ export class CodexAdapter
       return previewMessages.map((msg) => ({
         role: msg.role,
         content: msg.parts,
+        ...(msg.sourceMessageId ? { id: msg.sourceMessageId } : {}),
+        ...(msg.sourceMessageId ? { sourceMessageId: msg.sourceMessageId } : {}),
+        ...(msg.sourceTurnId ? { sourceTurnId: msg.sourceTurnId } : {}),
       }));
     } catch (err) {
       logger.warn('Failed to read thread messages from app-server', {

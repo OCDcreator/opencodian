@@ -59,6 +59,7 @@ export async function persistLocalStreamOutcome(options: {
       timestamp: outcome.finalizedTimestamp,
       modelId: outcome.finalizedModelId,
       sourceMessageId: outcome.finalizedAssistantMessageId,
+      ...(outcome.finalizedAssistantTurnId ? { sourceTurnId: outcome.finalizedAssistantTurnId } : {}),
       streamState: outcome.shouldPersistInterruptedState ? 'interrupted' : undefined,
       contentBlocks: outcome.streamContentBlocks
         ? mapStreamingContentBlocksToMessageContentBlocks(outcome.streamContentBlocks)
@@ -132,6 +133,7 @@ export async function persistLocalStreamOutcome(options: {
       }
       if (outcome.resolvedUserMessageIdentity && !preparedSend.userMessage.sourceMessageId) {
         preparedSend.userMessage.sourceMessageId = outcome.resolvedUserMessageIdentity;
+        if (outcome.resolvedUserMessageTurnId) preparedSend.userMessage.sourceTurnId = outcome.resolvedUserMessageTurnId;
       }
       persistLocalMessage?.();
       preparedSend.conversation.updatedAt = outcome.finalizedTimestamp;
@@ -144,6 +146,9 @@ export async function persistLocalStreamOutcome(options: {
       messageCount: preparedSend.conversation.messages.length,
     });
     return;
+  }
+  if (outcome.requiresNativeTextRender && host.reconcileCodexFinalText) {
+    await host.reconcileCodexFinalText(preparedSend.conversation, preparedSend.tabId);
   }
 
   logAssistantFinalizationStage('conversation-saved-after-local-finalization', {
@@ -184,6 +189,7 @@ async function persistBackendSessionIdentityIfNeeded(options: {
       }
       if (needsUserIdentity) {
         options.preparedSend.userMessage.sourceMessageId = userMessageIdentity;
+        if (options.outcome.resolvedUserMessageTurnId) options.preparedSend.userMessage.sourceTurnId = options.outcome.resolvedUserMessageTurnId;
       }
     },
   );

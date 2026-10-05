@@ -26,6 +26,21 @@ function map(
   });
 }
 
+describe('Codex native user item identity', () => {
+  it('keeps a willRetry notification nonterminal and preserves a definitive error', () => {
+    const params = { error: { message: 'Reconnecting... 1/5' }, willRetry: true, threadId: 'thread-1', turnId: 'turn-1' };
+    expect(map('error', params).chunks).toEqual([{ type: 'backend_event', source: 'codex', event: 'informational', status: 'retrying', content: 'Reconnecting... 1/5', metadata: { willRetry: true } }]);
+    expect(map('error', { ...params, willRetry: false }).chunks).toEqual([{ type: 'error', content: 'Reconnecting... 1/5' }]);
+  });
+  it('emits the completed native item ID with its owning turn, never a text-derived identity', () => {
+    const params = { threadId: 'thread-1', turnId: 'turn-2', item: { type: 'userMessage', id: 'native-user-2', content: [{ type: 'text', text: 'same text' }] } };
+    expect(map('item/started', params).chunks).toEqual([]);
+    expect(map('item/completed', params).chunks).toEqual([{ type: 'user_message_identity', uuid: 'native-user-2', sessionId: 'thread-1', sourceTurnId: 'turn-2' }]);
+    expect(map('item/completed', { ...params, turnId: undefined }).chunks).toEqual([]);
+    expect(map('item/completed', { ...params, item: { ...params.item, id: '' } }).chunks).toEqual([]);
+  });
+});
+
 describe('CodexAppServerStreamMapper imageGeneration items', () => {
   it('emits an image-kind tool_use while the item is running', () => {
     const { chunks } = map('item/started', {

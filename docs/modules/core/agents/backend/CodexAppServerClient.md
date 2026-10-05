@@ -74,3 +74,7 @@
 ## 2026-10-02 Codex local forget / complete catalog UI
 
 新增结构化完整目录 `AppServerCatalogReadResult<T>` 与五个 `get*Catalog` 方法，复用现有 `collectCatalog` 分页/原生 identity 去重/游标循环保护。完整读取返回 complete（包括空数组）；首屏连接失败为 failed、-32601 为 unavailable，后页失败为 partial 并保留 rows/nextCursor。旧 Page 和 array 方法保留兼容契约。仅 catalog list RPC，UI inspection 不写配置。
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+forkThread 可传 beforeTurnId，仅在 native initialize 版本满足已核验的 0.160.0+ 契约时放行；未知/旧版本不会发送目标 fork。getThreadsCatalog 保留原有 native 默认来源和分页语义，缺失 child 的精确 ID 读取由 adapter 补充；不猜 sourceKinds 全集。static transcript delegate 保留可选原生身份字段。

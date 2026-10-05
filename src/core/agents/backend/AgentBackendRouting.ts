@@ -459,6 +459,8 @@ export interface NormalizedSessionPreviewPart {
 export interface NormalizedSessionPreviewMessage {
   role: string;
   parts: NormalizedSessionPreviewPart[];
+  sourceMessageId?: string;
+  sourceTurnId?: string;
 }
 
 /**
@@ -594,7 +596,15 @@ export async function getBackendSessionPreview(
     return null;
   }
 
+  const readCodexIdentity = (record: Record<string, unknown>) => {
+    if (historyService.kind !== 'codex') return {};
+    return {
+      ...(typeof record.sourceMessageId === 'string' ? { sourceMessageId: record.sourceMessageId } : {}),
+      ...(typeof record.sourceTurnId === 'string' ? { sourceTurnId: record.sourceTurnId } : {}),
+    };
+  };
   return rawMessages.filter((msg): msg is Record<string, unknown> => msg !== null && typeof msg === 'object').map((record): NormalizedSessionPreviewMessage => {
+    const identity = readCodexIdentity(record);
     // Detect OpenCode {info, parts} shape
     if (record.info && typeof record.info === 'object' && Array.isArray(record.parts)) {
       const info = record.info as Record<string, unknown>;
@@ -603,6 +613,7 @@ export async function getBackendSessionPreview(
       );
       return {
         role: String(info.role ?? 'unknown'),
+        ...identity,
         parts: parts.map((part) => ({
           type: String(part.type ?? 'unknown'),
           text: typeof part.text === 'string' ? part.text : JSON.stringify(part, null, 2),
@@ -623,20 +634,29 @@ export async function getBackendSessionPreview(
 
     // Try recognized content fields
     if (typeof content === 'string') {
-      return { role, parts: [{ type: 'text', text: content }] };
+      return {
+        role,
+        ...identity,
+        parts: [{ type: 'text', text: content }],
+      };
     }
 
     if (Array.isArray(content)) {
       // Claude SDK content blocks: [{ type: 'text', text: '...' }, ...]
       const parts = normalizeContentBlocks(content);
       if (parts.length > 0) {
-        return { role, parts };
+        return {
+          role,
+          ...identity,
+          parts,
+        };
       }
     }
 
     // Fallback: serialize the whole record as a single json part
     return {
       role,
+      ...identity,
       parts: [{ type: 'json', text: JSON.stringify(record, null, 2) }],
     };
   });

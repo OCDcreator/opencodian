@@ -100,6 +100,32 @@ function createOutcome(overrides: Partial<LocalStreamOutcome> = {}): LocalStream
 }
 
 describe('persistLocalStreamOutcome canonical cache boundary', () => {
+  it('renders a corrected Codex native snapshot only after its canonical text and item/turn IDs are saved', async () => {
+    const conversation = createConversation();
+    conversation.backend = 'codex';
+    const host = { ...createHost(), reconcileCodexFinalText: jest.fn(async () => {
+      expect(conversation.messages.at(-1)).toMatchObject({ id: 'native-assistant', content: 'native final text', sourceMessageId: 'native-assistant', sourceTurnId: 'native-turn' });
+    }) };
+    await persistLocalStreamOutcome({ host, preparedSend: createPreparedSend(conversation), runtime: createRuntime(), logAssistantFinalizationStage: jest.fn(), outcome: createOutcome({
+      shouldSyncFromServer: false, finalizedAssistantMessageId: 'native-assistant', finalizedAssistantTurnId: 'native-turn',
+      streamContentBlocks: [{ type: 'text', content: 'native final text' }], streamedTextContent: 'native final text', requiresNativeTextRender: true,
+    }) });
+    expect(host.reconcileCodexFinalText).toHaveBeenCalledWith(conversation, 'tab-1');
+  });
+  it('persists Codex user item and owning turn even when the response has no assistant body', async () => {
+    const conversation = createConversation();
+    conversation.backend = 'codex';
+    const preparedSend = createPreparedSend(conversation);
+    conversation.messages.push(preparedSend.userMessage);
+    const host = createHost();
+    await persistLocalStreamOutcome({ host, preparedSend, runtime: createRuntime(), logAssistantFinalizationStage: jest.fn(), outcome: createOutcome({
+      hasStreamContentBlocks: false, shouldSyncFromServer: false, finalizedBackendSessionId: 'native-thread',
+      resolvedUserMessageIdentity: 'native-user-item', resolvedUserMessageTurnId: 'native-turn',
+    }) });
+    expect(conversation.backendSessionId).toBe('native-thread');
+    expect(preparedSend.userMessage).toMatchObject({ sourceMessageId: 'native-user-item', sourceTurnId: 'native-turn' });
+    expect(host.saveConversation).toHaveBeenCalledWith(conversation);
+  });
   beforeEach(() => {
     jest.clearAllMocks();
   });

@@ -150,6 +150,7 @@ export interface SendPipelineHostDependencies {
   createSendPipelineShellPort(): import('./SendPipelineTypes').SendPipelineShellPort;
   createConversationWriteTicket: SendPipelineHost['createConversationWriteTicket'];
   commitConversationWrite: SendPipelineHost['commitConversationWrite'];
+  reconcileCodexFinalText?: SendPipelineRuntimeHost['reconcileCodexFinalText'];
   summarizeContentBlocksForDebug(blocks: SendPipelineDebugContentBlock[] | undefined): Record<string, unknown> | null;
   summarizeCoreStreamChunkForDebug: SendPipelineHost['summarizeCoreStreamChunkForDebug'];
   summarizeChatMessageForDebug: SendPipelineHost['summarizeChatMessageForDebug'];
@@ -230,6 +231,7 @@ export function createSendPipelineRuntimeHost(deps: SendPipelineHostDependencies
     ...shellPort,
     ...persistencePort,
     ...debugPort,
+    ...(deps.reconcileCodexFinalText ? { reconcileCodexFinalText: deps.reconcileCodexFinalText } : {}),
   };
 }
 

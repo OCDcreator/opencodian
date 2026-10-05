@@ -85,3 +85,7 @@ The chat view routes OpenCode 2 model, permission, form, slash catalog, context 
 
 2026-10-02：聊天 shell 为 Codex 显式本地遗忘提供既有 host forwarding，原生删除仍需要 verified；失败项标签与 identity 保留。运行时处理继续由 history/lifecycle owners 承担。
 2026-10-05 Pi-only continuation：composer host 的 Pi model/effort 选择绑定到当前 conversation.sessionSettings，切换/重开/reload 读取同会话的下一发送值；显式继承与 off 文案分开。View 只装配既有 Pi 保存 seam 和动态 catalog，不拥有 native setter/runtime；其他 backend 控件策略不变。
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+OpenCodianView 只转发 Codex 目录恢复到插件既有桥，保持 view/runtime ownership 分离。

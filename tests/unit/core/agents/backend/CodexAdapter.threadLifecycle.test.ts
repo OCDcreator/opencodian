@@ -8,6 +8,7 @@ import { CodexAdapter } from '../../../../../src/core/agents/backend/CodexAdapte
 const mockForkThread = jest.fn();
 const mockArchiveThread = jest.fn();
 const mockUnarchiveThread = jest.fn();
+const mockReadThread = jest.fn();
 
 jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => ({
   CodexAppServerClient: jest.fn().mockImplementation(() => ({
@@ -16,6 +17,8 @@ jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => (
     forkThread: mockForkThread,
     archiveThread: mockArchiveThread,
     unarchiveThread: mockUnarchiveThread,
+    readThread: mockReadThread,
+    supportsBeforeTurnFork: jest.fn().mockReturnValue(true),
   })),
 }));
 
@@ -43,6 +46,32 @@ describe('CodexAdapter session lifecycle', () => {
   });
 
   describe('forkSession', () => {
+    it('forks before the owning turn of the exact user item even with duplicate text', async () => {
+      mockReadThread.mockResolvedValue({ id: 'parent', status: { type: 'idle' }, turns: [
+        { id: 'turn-1', status: 'completed', items: [{ type: 'userMessage', id: 'u1', content: [{ type: 'text', text: 'same' }] }] },
+        { id: 'turn-2', status: 'completed', items: [{ type: 'userMessage', id: 'u2', content: [{ type: 'text', text: 'same' }] }] },
+      ] });
+      mockForkThread.mockResolvedValue({ thread: { id: 'child', preview: '' } });
+      const adapter = await createStartedAdapter();
+      await adapter.forkSession('parent', 'u2');
+      expect(mockReadThread).toHaveBeenCalledWith('parent', true);
+      expect(mockForkThread).toHaveBeenCalledWith('parent', { beforeTurnId: 'turn-2' });
+    });
+
+    it.each(['unknown', 'foreign'])('rejects %s identity without any native fork mutation', async target => {
+      mockReadThread.mockResolvedValue({ id: 'parent', turns: [{ id: 'turn-1', status: 'completed', items: [{ type: 'userMessage', id: 'u1' }] }] });
+      const adapter = await createStartedAdapter();
+      await expect(adapter.forkSession('parent', target)).rejects.toThrow(/identity/);
+      expect(mockForkThread).not.toHaveBeenCalled();
+    });
+
+    it.each(['ambiguous', 'active', 'wrong-thread'])('fails closed for %s native mapping', async condition => {
+      const turn = { id: 't1', status: condition === 'active' ? 'inProgress' : 'completed', items: [{ type: 'userMessage', id: 'u1' }] };
+      mockReadThread.mockResolvedValue({ id: condition === 'wrong-thread' ? 'other' : 'parent', turns: condition === 'ambiguous' ? [turn, { ...turn, id: 't2' }] : [turn] });
+      const adapter = await createStartedAdapter();
+      await expect(adapter.forkSession('parent', 'u1')).rejects.toThrow();
+      expect(mockForkThread).not.toHaveBeenCalled();
+    });
     it('returns id and title from forked thread', async () => {
       mockForkThread.mockResolvedValue({
         thread: {

@@ -15,12 +15,13 @@ import type { AppServerCatalogReadResult } from '../../../core/agents/backend/Co
 import { t } from '../../../i18n';
 
 /** Browser inspection consumes Codex evidence without changing legacy backends. */
-export async function readBackendSessionCatalog(registry: AgentServiceRegistry | null): Promise<AppServerCatalogReadResult<NormalizedSessionRow>> {
+export async function readBackendSessionCatalog(registry: AgentServiceRegistry | null, includeSessionIds?: readonly string[]): Promise<AppServerCatalogReadResult<NormalizedSessionRow>> {
   const active = registry?.getActive();
   const codex = active?.kind === 'codex' ? active as unknown as {
-    getSessionCatalog?: () => Promise<AppServerCatalogReadResult<NormalizedSessionRow>>;
+    getSessionCatalog?: (options?: { includeSessionIds?: readonly string[] }) => Promise<AppServerCatalogReadResult<NormalizedSessionRow>>;
   } : null;
-  if (codex?.getSessionCatalog) return codex.getSessionCatalog();
+  if (codex?.getSessionCatalog) return includeSessionIds
+    ? codex.getSessionCatalog({ includeSessionIds }) : codex.getSessionCatalog();
   return { status: 'complete', data: await listBackendSessions(registry), nextCursor: null };
 }
 

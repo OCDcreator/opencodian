@@ -649,3 +649,7 @@ OpenCode 2 inherited server permission mode has Chinese label and explanation.
 
 2026-10-02：新增 Codex 仅遗忘本地的确认与成功/失败文案，以及会话、模型、权限、MCP、loaded 目录 partial/failed/unavailable 状态文案。原生历史保留边界在确认框显式说明。
 2026-10-05：增加 Pi 聊天 effort 继承标签、下次发送/native 状态边界提示及会话选择保存失败提示；显式 off 与继承分开。
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+补充旧 Codex 历史无法唯一映射原生消息身份时的分叉不可用提示，与英文 key 对齐。

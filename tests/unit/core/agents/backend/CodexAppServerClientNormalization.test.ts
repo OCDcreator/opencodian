@@ -46,10 +46,10 @@ describe('normalizeTurnsPageToPreviewMessages', () => {
     const result = normalizeTurnsPageToPreviewMessages(page);
 
     expect(result.messages).toEqual([
-      { role: 'user', parts: [{ type: 'text', text: 'hello codex' }] },
-      { role: 'assistant', parts: [{ type: 'text', text: 'hi there' }] },
+      { role: 'user', sourceMessageId: 'u1', sourceTurnId: 'turn-1', parts: [{ type: 'text', text: 'hello codex' }] },
+      { role: 'assistant', sourceMessageId: 'a1', sourceTurnId: 'turn-1', parts: [{ type: 'text', text: 'hi there' }] },
       { role: 'activity', parts: [{ type: 'tool_call', text: 'fs/read' }] },
-      { role: 'assistant', parts: [{ type: 'text', text: 'done' }] },
+      { role: 'assistant', sourceMessageId: 'a2', sourceTurnId: 'turn-2', parts: [{ type: 'text', text: 'done' }] },
     ]);
     expect(result.nextCursor).toBe('cursor-2');
     expect(result.backwardsCursor).toBeNull();
@@ -105,8 +105,8 @@ describe('normalizeThreadItemsPageToPreviewMessages', () => {
     const result = normalizeThreadItemsPageToPreviewMessages(page);
 
     expect(result.messages).toEqual([
-      { role: 'user', parts: [{ type: 'text', text: 'expand me' }] },
-      { role: 'assistant', parts: [{ type: 'text', text: 'full reply text' }] },
+      { role: 'user', sourceMessageId: 'u1', sourceTurnId: 'turn-1', parts: [{ type: 'text', text: 'expand me' }] },
+      { role: 'assistant', sourceMessageId: 'a1', sourceTurnId: 'turn-1', parts: [{ type: 'text', text: 'full reply text' }] },
       { role: 'activity', parts: [{ type: 'tool_call', text: 'srv/grep' }] },
     ]);
     expect(result.nextCursor).toBe('items-cursor-2');

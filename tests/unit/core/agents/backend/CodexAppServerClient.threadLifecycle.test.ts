@@ -180,6 +180,28 @@ describe('CodexAppServerClient persisted thread actions', () => {
   beforeEach(resetAppServerMocks);
 
   describe('forkThread', () => {
+    it.each(['Codex Desktop/0.160.0 (macos)', 'Codex Desktop/0.159.0 (macos)', 'unknown'])('gates before-turn fork by native initialize contract: %s', async userAgent => {
+      const proc = createMockProcess();
+      mockSpawn.mockReturnValue(proc);
+      emitWsUrl(proc.stdout!);
+      setTimeout(() => mockWsInstance.onopen?.(), 10);
+      const client = new CodexAppServerClient({ codexPathOverride: '/path/to/codex' });
+      const requests: Array<{ method: string; params?: unknown }> = [];
+      mockWsInstance.send.mockImplementation((data: string) => {
+        const msg = JSON.parse(data);
+        requests.push(msg);
+        if (msg.method === 'initialize') setTimeout(() => simulateResponse(msg.id, { userAgent }), 5);
+        if (msg.method === 'thread/fork') setTimeout(() => simulateResponse(msg.id, { thread: SAMPLE_THREAD }), 5);
+      });
+      const supported = userAgent.includes('0.160.0');
+      const result = await client.forkThread('parent', { beforeTurnId: 'turn-2' })
+        .then(value => ({ value, error: null }), error => ({ value: null, error: String(error) }));
+      expect(result.value).toEqual(supported ? { thread: SAMPLE_THREAD } : null);
+      expect(result.error).toEqual(supported ? null : 'Error: Codex before-turn fork is unavailable for this native app-server');
+      expect(requests.filter(request => request.method === 'thread/fork').map(request => request.params))
+        .toEqual(supported ? [{ threadId: 'parent', beforeTurnId: 'turn-2' }] : []);
+      client.stop();
+    });
     it('returns the forked thread from app-server response', async () => {
       const proc = createMockProcess();
       mockSpawn.mockReturnValue(proc);

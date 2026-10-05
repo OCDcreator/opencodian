@@ -82,6 +82,8 @@ export class CodexAppServerTransport {
   /** Server-initiated request handlers (method+id messages). One per method. */
   protected serverRequestHandlers = new Map<string, AppServerServerRequestHandler>();
   protected initialized = false;
+  /** Native initialize response, never inferred from the configured CLI path. */
+  protected serverUserAgent: string | null = null;
   protected initPromise: Promise<void> | null = null;
   protected wsUrl: string | null = null;
 
@@ -275,13 +277,18 @@ export class CodexAppServerTransport {
     };
 
     // Initialize the JSON-RPC session
-    await this.request('initialize', {
+    this.serverUserAgent = null;
+    const initialization = await this.request('initialize', {
       clientInfo: { name: 'opencodian', version: '1.0.0' },
       capabilities: {
         experimentalApi: true,
         requestAttestation: false,
       },
     }, initializeTimeoutMs);
+    if (initialization && typeof initialization === 'object') {
+      const userAgent = (initialization as { userAgent?: unknown }).userAgent;
+      this.serverUserAgent = typeof userAgent === 'string' ? userAgent : null;
+    }
 
     // Send initialized notification
     ws.send(JSON.stringify({ jsonrpc: '2.0', method: 'initialized' }));

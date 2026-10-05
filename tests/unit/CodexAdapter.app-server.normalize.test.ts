@@ -20,8 +20,8 @@ describe('CodexAppServerClient.normalizeTurnsToPreviewMessages()', () => {
     const result = CodexAppServerClient.normalizeTurnsToPreviewMessages(turns as unknown as import('../../src/core/agents/backend/CodexAppServerClient').AppServerTurn[]);
 
     expect(result).toHaveLength(2);
-    expect(result[0]).toEqual({ role: 'user', parts: [{ type: 'text', text: 'Hello' }] });
-    expect(result[1]).toEqual({ role: 'assistant', parts: [{ type: 'text', text: 'Hi there!' }] });
+    expect(result[0]).toEqual({ role: 'user', sourceMessageId: 'item-1', sourceTurnId: 'turn-1', parts: [{ type: 'text', text: 'Hello' }] });
+    expect(result[1]).toEqual({ role: 'assistant', sourceMessageId: 'item-2', sourceTurnId: 'turn-1', parts: [{ type: 'text', text: 'Hi there!' }] });
   });
 
   it('skips reasoning and contextCompaction but includes mcpToolCall, webSearch, fileChange as activity', () => {
@@ -43,11 +43,11 @@ describe('CodexAppServerClient.normalizeTurnsToPreviewMessages()', () => {
     const result = CodexAppServerClient.normalizeTurnsToPreviewMessages(turns as unknown as import('../../src/core/agents/backend/CodexAppServerClient').AppServerTurn[]);
 
     expect(result).toHaveLength(5);
-    expect(result[0]).toEqual({ role: 'user', parts: [{ type: 'text', text: 'User prompt' }] });
+    expect(result[0]).toEqual({ role: 'user', sourceMessageId: 'item-1', sourceTurnId: 'turn-1', parts: [{ type: 'text', text: 'User prompt' }] });
     expect(result[1]).toEqual({ role: 'activity', parts: [{ type: 'tool_call', text: 'opencode/opencode_setup' }] });
     expect(result[2]).toEqual({ role: 'activity', parts: [{ type: 'web_search', text: 'test query' }] });
     expect(result[3]).toEqual({ role: 'activity', parts: [{ type: 'file_change', text: 'src/main.ts (modified)' }] });
-    expect(result[4]).toEqual({ role: 'assistant', parts: [{ type: 'text', text: 'Agent reply' }] });
+    expect(result[4]).toEqual({ role: 'assistant', sourceMessageId: 'item-7', sourceTurnId: 'turn-1', parts: [{ type: 'text', text: 'Agent reply' }] });
   });
 
   it('normalizes mcpToolCall without server name', () => {
@@ -148,7 +148,7 @@ describe('CodexAppServerClient.normalizeTurnsToPreviewMessages()', () => {
     const result = CodexAppServerClient.normalizeTurnsToPreviewMessages(turns as unknown as import('../../src/core/agents/backend/CodexAppServerClient').AppServerTurn[]);
 
     expect(result).toHaveLength(1);
-    expect(result[0]).toEqual({ role: 'assistant', parts: [{ type: 'text', text: 'I cannot see images.' }] });
+    expect(result[0]).toEqual({ role: 'assistant', sourceMessageId: 'item-2', sourceTurnId: 'turn-1', parts: [{ type: 'text', text: 'I cannot see images.' }] });
   });
 
   it('returns empty array for empty turns', () => {
@@ -156,4 +156,3 @@ describe('CodexAppServerClient.normalizeTurnsToPreviewMessages()', () => {
     expect(result).toEqual([]);
   });
 });
-

@@ -54,6 +54,40 @@ function createMessage(
   };
 }
 
+describe('Codex authoritative user identity recovery', () => {
+  it('recovers exact native item/turn anchors without text or positional matching', async () => {
+    const conversation = createBackendConversation('cx', 'codex');
+    conversation.messages = [
+      createMessage('native-u1', { content: 'same', sourceMessageId: undefined }),
+      createMessage('random-local-id', { content: 'same', sourceMessageId: undefined }),
+    ];
+    const host = createHost(conversation, {
+      readCodexSessionMessages: jest.fn().mockResolvedValue([
+        { role: 'user', sourceMessageId: 'native-u1', sourceTurnId: 'turn-1' },
+        { role: 'user', sourceMessageId: 'native-u2', sourceTurnId: 'turn-2' },
+      ]),
+      commitCodexIdentityRecovery: jest.fn().mockImplementation(async (_conversation, write) => { write(); return true; }),
+    });
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, createPort());
+    await coordinator.loadConversation(conversation.id);
+    expect(conversation.messages[0]).toMatchObject({ sourceMessageId: 'native-u1', sourceTurnId: 'turn-1', content: 'same' });
+    expect(conversation.messages[1].sourceMessageId).toBeUndefined();
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.fork.codexIdentityUnavailable'));
+  });
+
+  it('does not infer identity from a unique body or map ambiguous turn anchors', async () => {
+    const conversation = createBackendConversation('cx', 'codex');
+    conversation.messages = [createMessage('local', { content: 'unique body', sourceMessageId: undefined, sourceTurnId: 't1' })];
+    const host = createHost(conversation, { readCodexSessionMessages: jest.fn().mockResolvedValue([
+      { role: 'user', sourceMessageId: 'u1', sourceTurnId: 't1', content: 'unique body' },
+      { role: 'user', sourceMessageId: 'u2', sourceTurnId: 't1', content: 'other body' },
+    ]) });
+    await new ConversationLoadRecoveryCoordinator(host, createPort()).loadConversation(conversation.id);
+    expect(conversation.messages[0].sourceMessageId).toBeUndefined();
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.fork.codexIdentityUnavailable'));
+  });
+});
+
 type MockedConversationLoadRecoveryHost = {
   [Key in keyof ConversationLoadRecoveryHost]:
     ConversationLoadRecoveryHost[Key] extends (...args: infer Args) => infer Result

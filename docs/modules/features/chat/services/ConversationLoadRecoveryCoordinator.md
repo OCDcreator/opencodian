@@ -176,3 +176,7 @@ OpenCode 2 native session IDs may enter the existing rewind and restore actions 
 ## 2026-10-02 Codex local forget / complete catalog UI
 
 新增 forgetConversationsAndRecover 转发及 assembly port 接线至既有 ConversationTabLifecycleRecoveryCoordinator。缺失 port fail-closed；不借 native delete fallback。
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+旧 Codex 消息只通过已知 native item ID 或权威 owning turn 的唯一 user item 恢复身份；重复正文、顺序、随机本地 ID 不作为匹配依据。无法唯一映射时明确提示不可用。Codex fork 继承本地会话设置，local 前缀裁剪与 native beforeTurnId 切点配合；其他后端的恢复与 fork 行为不变。

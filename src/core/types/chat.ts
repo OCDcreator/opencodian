@@ -462,6 +462,8 @@ export interface ChatMessage {
   summaryKind?: 'compaction';
   sourceMessageId?: string;
   streamState?: 'interrupted';
+  /** Codex native owning turn, distinct from the user item ID. */
+  sourceTurnId?: string;
   displayStyle?: 'default' | 'notice';
   noticeTitle?: string;
   noticeTone?: 'info' | 'warning' | 'error';
@@ -670,6 +672,9 @@ export type StreamChunk =
       timestamp: number;
       modelId?: string;
       sessionId?: string;
+      /** Codex completed single-message turn snapshot, independently confirmed by native item/completed. */
+      nativeText?: string;
+      sourceTurnId?: string;
     }
   | {
       type: 'usage';
@@ -729,7 +734,7 @@ export type StreamChunk =
     }
   | { type: 'question_request'; request: QuestionRequest }
   | { type: 'prompt_suggestion'; suggestion: string; uuid: string; sessionId?: string }
-  | { type: 'user_message_identity'; uuid: string; sessionId?: string };
+  | { type: 'user_message_identity'; uuid: string; sessionId?: string; sourceTurnId?: string };
 
 /** Logical agent backend identity. Determines which adapter owns a session. */
 export type AgentBackendKind = 'opencode' | 'opencode2' | 'claude-code' | 'codex' | 'copilot' | 'pi' | 'zcode';

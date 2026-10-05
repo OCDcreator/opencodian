@@ -1,5 +1,7 @@
 # BackendSessionBrowserDetail
 
+> 2026-10-05：`readBackendSessionCatalog` 对 Codex 接受可选 includeSessionIds，交给 adapter 做缺失行的同 ID 原生读取；不改其他后端目录与详情/分页契约。
+
 > **源码**: `src/features/chat/ui/BackendSessionBrowserDetail.ts`
 > **最近更新**: 2026-09-30
 

@@ -88,3 +88,7 @@ export class StreamChunkRouter {
 - 不负责最终服务端 sync
 - 不直接保存 conversation
 - 只把消费结果和 trace logger 交给 `StreamLocalFinalizer`
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+user_message_identity 的 sourceTurnId 与 user item ID 一起交给本地 finalization；不自行从正文或 assistant alias 推断身份。

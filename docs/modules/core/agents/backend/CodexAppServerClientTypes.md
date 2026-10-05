@@ -39,3 +39,7 @@
 - 2026-09-15: `AppServerThreadStartOptions` 新增 `ephemeral?: boolean`：ephemeral thread 不落盘 rollout 且不出现在 `thread/list`，供 inline edit 辅助会话隔离使用。
 
 - 2026-09-15: `AppServerThreadStartOptions` 补充 `ephemeral`、`developerInstructions`、`baseInstructions`（后两者来自 `codex app-server generate-json-schema` 的 `ThreadStartParams`，行为已实测）。行内编辑辅助会话用 `developerInstructions` 注入系统提示词。
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+记录 0.160.0 的 thread configured model/reasoningEffort/forkedFromId。Thread.model 是当前配置/最新持久化值，不是逐 turn 的执行 telemetry；其他旧契约仍沿用其原验证版本。

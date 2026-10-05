@@ -1,6 +1,6 @@
 import { WorkspaceLeaf } from 'obsidian';
 
-import { DEFAULT_SETTINGS } from '../../../../src/core/types';
+import { type Conversation, DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
 
 jest.mock('../../../../src/core/opencode', () => ({
@@ -49,6 +49,54 @@ describe('ChatRuntimeComposition owner', () => {
     // full surface→identity→render→background→conversation→interaction chain completed.
     expect(v.sendPipelineRuntime).toBeDefined();
     expect(typeof (v.sendPipelineRuntime as { sendMessage: unknown }).sendMessage).toBe('function');
+  });
+
+  it('refreshes the visible settled Codex footer after native identity without replacing the message body', () => {
+    const view = constructView();
+    const v = view as unknown as {
+      currentConversation: Conversation;
+      messagesContainer: HTMLElement;
+      getActiveTabId(): string;
+      addUserMessageFooter(element: HTMLElement, message: unknown, copy: string): void;
+      sendPipelineRuntime: { host: { onTurnSettled(info: { backend: string; conversationId: string; sessionId: string; tabId: string }): void } };
+    };
+    v.currentConversation = { id: 'cx-owned', title: 'owned', backend: 'codex', backendSessionId: 'native-thread', createdAt: 1, updatedAt: 1,
+      messages: [{ id: 'local-user', role: 'user', content: 'owned', timestamp: 1, sourceMessageId: 'native-user', sourceTurnId: 'native-turn' }] };
+    v.messagesContainer = document.createElement('div');
+    v.messagesContainer.innerHTML = '<div class="opencodian-message" data-message-id="local-user"><span class="body">owned body</span><div class="opencodian-user-message-footer">Copy only</div></div>';
+    const body = v.messagesContainer.querySelector('.body');
+    jest.spyOn(v, 'getActiveTabId').mockReturnValue('active-tab');
+    const footer = jest.spyOn(v, 'addUserMessageFooter').mockImplementation(element => {
+      element.insertAdjacentHTML('beforeend', '<div class="opencodian-user-message-footer"><button>Fork</button></div>');
+    });
+    const info = { backend: 'codex', conversationId: 'cx-owned', sessionId: 'native-thread', tabId: 'active-tab' };
+    v.sendPipelineRuntime.host.onTurnSettled({ ...info, tabId: 'background-tab' });
+    expect(footer).not.toHaveBeenCalled();
+    v.sendPipelineRuntime.host.onTurnSettled(info);
+    expect(footer).toHaveBeenCalledTimes(1);
+    expect(v.messagesContainer.querySelector('.body')).toBe(body);
+    expect(v.messagesContainer.querySelectorAll('.opencodian-user-message-footer')).toHaveLength(1);
+    expect(v.messagesContainer.querySelector<HTMLElement>('.opencodian-message')?.dataset.sourceMessageId).toBe('native-user');
+  });
+
+  it('reconciles completed Codex text through the composed renderer only in its visible conversation', async () => {
+    const v = constructView() as unknown as {
+      currentConversation: Conversation;
+      getActiveTabId(): string;
+      conversationRenderService: { rerenderConversationMessages(value: Conversation): Promise<void> };
+      sendPipelineRuntime: { host: { reconcileCodexFinalText(value: Conversation, tabId: string): Promise<void> } };
+    };
+    const owned: Conversation = { id: 'cx-owned', title: 'owned', backend: 'codex', backendSessionId: 'native-thread', createdAt: 1, updatedAt: 1, messages: [] };
+    v.currentConversation = owned;
+    jest.spyOn(v, 'getActiveTabId').mockReturnValue('active-tab');
+    const render = jest.spyOn(v.conversationRenderService, 'rerenderConversationMessages').mockResolvedValue();
+    await v.sendPipelineRuntime.host.reconcileCodexFinalText(owned, 'background-tab');
+    await v.sendPipelineRuntime.host.reconcileCodexFinalText({ ...owned, id: 'foreign' }, 'active-tab');
+    await v.sendPipelineRuntime.host.reconcileCodexFinalText({ ...owned, backend: 'pi' }, 'active-tab');
+    expect(render).not.toHaveBeenCalled();
+    await v.sendPipelineRuntime.host.reconcileCodexFinalText(owned, 'active-tab');
+    expect(render).toHaveBeenCalledTimes(1);
+    expect(render).toHaveBeenCalledWith(owned);
   });
 
   it('reads the real questionCardPosition setting into the question dock slot coordinator (mutation guard)', () => {

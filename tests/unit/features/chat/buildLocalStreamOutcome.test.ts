@@ -72,6 +72,33 @@ function createRoutedStream(
 }
 
 describe('buildLocalStreamOutcome', () => {
+  it.each(['codex', 'pi'] as const)('replaces retried text only for a matching confirmed Codex turn (%s)', backend => {
+    const conversation = createConversation();
+    conversation.backend = backend;
+    const preparedSend = createPreparedSend({ conversation });
+    const routedStream = createRoutedStream({ streamCompleted: true, resolvedUserMessageTurnId: 'native-turn', finalizedAssistantMetadata: {
+      type: 'message_metadata', messageId: 'native-assistant', timestamp: 42, sessionId: 'native-thread', sourceTurnId: 'native-turn', nativeText: 'OC_CX_CHILD_DONE',
+    } });
+    const streamController = { getContentBlocks: () => [{ type: 'text', content: 'OC_CX_CHILD_OC_CX_CHILD_DONE' }] } as SendPipelineStreamController;
+    const outcome = buildLocalStreamOutcome({ preparedSend, routedStream, streamController, runtime: createRuntime() });
+    expect(outcome.streamedTextContent).toBe(backend === 'codex' ? 'OC_CX_CHILD_DONE' : 'OC_CX_CHILD_OC_CX_CHILD_DONE');
+    expect(outcome.requiresNativeTextRender).toBe(backend === 'codex' ? true : undefined);
+    expect(outcome.finalizedAssistantTurnId).toBe(backend === 'codex' ? 'native-turn' : undefined);
+  });
+
+  it.each(['foreign', 'tool'])('does not apply a %s snapshot to an incompatible transcript', condition => {
+    const conversation = createConversation();
+    conversation.backend = 'codex';
+    const preparedSend = createPreparedSend({ conversation });
+    const routedStream = createRoutedStream({ streamCompleted: true, resolvedUserMessageTurnId: 'owned-turn', finalizedAssistantMetadata: {
+      type: 'message_metadata', messageId: 'native-assistant', timestamp: 42, sourceTurnId: condition === 'foreign' ? 'foreign-turn' : 'owned-turn', nativeText: 'foreign text',
+    } });
+    const streamController = { getContentBlocks: () => [{ type: 'text', content: 'owned text' },
+      ...(condition === 'tool' ? [{ type: 'tool_use', toolCall: { id: 't1', name: 'read', input: {}, status: 'completed' } }] : [])] } as SendPipelineStreamController;
+    const outcome = buildLocalStreamOutcome({ preparedSend, routedStream, streamController, runtime: createRuntime() });
+    expect(outcome.streamedTextContent).toBe('owned text');
+    expect(outcome.requiresNativeTextRender).toBeUndefined();
+  });
   it('prefers metadata and rendered blocks when building the local outcome', () => {
     const preparedSend = createPreparedSend();
     const runtime = createRuntime();

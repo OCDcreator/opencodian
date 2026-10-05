@@ -163,7 +163,84 @@ describe('native mutation runtime readback', () => {
   });
 });
 
+describe('Codex fork child locator lifecycle', () => {
+  it.each(['native-delete', 'forget-local', 'server-delete'] as const)(
+    'evicts a fork child locator after %s so healthy native directories remain complete', async (mode) => {
+      const { adapter, client, request } = createFixture();
+      await adapter.start();
+      request.mockImplementation(async (method) => method === 'thread/fork'
+        ? { thread: { id: 'fork-child', preview: 'child' } }
+        : { data: [], nextCursor: null });
+      const read = jest.spyOn(client, 'readThread').mockResolvedValue(null);
+      jest.spyOn(client, 'deleteThreadResult').mockResolvedValue({
+        operation: 'delete', threadId: 'fork-child', status: 'verified',
+      });
+      await adapter.forkSession('parent');
+      if (mode === 'native-delete') await adapter.deleteSession('fork-child');
+      else if (mode === 'forget-local') await adapter.forgetSession('fork-child');
+      else (adapter as unknown as {
+        invalidateLocalSessionForDeletedThread(threadId: string): string | null;
+      }).invalidateLocalSessionForDeletedThread('fork-child');
+      await expect(adapter.getSessionCatalog()).resolves.toMatchObject({ status: 'complete', data: [] });
+      expect(read).not.toHaveBeenCalled();
+      expect(request.mock.calls.some(([method]) => method === 'thread/delete')).toBe(false);
+      await adapter.stop();
+    },
+  );
+
+  it('retains the fork child locator while native deletion is unverified', async () => {
+    const { adapter, client, request } = createFixture();
+    await adapter.start();
+    request.mockImplementation(async (method) => method === 'thread/fork'
+      ? { thread: { id: 'fork-child', preview: 'child' } }
+      : { data: [], nextCursor: null });
+    jest.spyOn(client, 'deleteThreadResult').mockResolvedValue({
+      operation: 'delete', threadId: 'fork-child', status: 'admitted',
+    });
+    const read = jest.spyOn(client, 'readThread').mockResolvedValue({ id: 'fork-child', preview: 'preserved child', turns: [] });
+    await adapter.forkSession('parent');
+    await expect(adapter.deleteSession('fork-child')).rejects.toBeInstanceOf(AppServerThreadMutationError);
+    const catalog = await adapter.getSessionCatalog();
+    expect(catalog.status).toBe('complete');
+    expect(catalog.data.map(row => row.id)).toEqual(['fork-child']);
+    expect(read).toHaveBeenCalledWith('fork-child', true);
+    await adapter.stop();
+  });
+});
+
 describe('Codex adapter complete catalog and mutation propagation', () => {
+  it('reads an omitted child by exact known ID without losing paging or active/archive precedence', async () => {
+    const { adapter, request } = createFixture();
+    await adapter.start();
+    request.mockImplementation(async (method, params) => {
+      if (method === 'thread/read') return { thread: { id: params.threadId, preview: '', source: 'vscode', turns: [{ id: 't1', items: [{ type: 'userMessage', id: 'u1', content: [{ type: 'text', text: 'owned child prefix' }] }] }] } };
+      if (params.archived) return { data: [{ id: 'parent', preview: 'stale archive row' }, { id: 'archived-only', preview: 'archived' }], nextCursor: null };
+      if (!params.cursor) return { data: [{ id: 'default-exec', preview: 'native default' }], nextCursor: 'default-page-2' };
+      return { data: [{ id: 'parent', preview: 'parent' }], nextCursor: null };
+    });
+    const catalog = await adapter.getSessionCatalog({ includeSessionIds: ['child', 'child', 'parent'] });
+    expect(catalog.status).toBe('complete');
+    expect(catalog.data.map(row => row.id).sort()).toEqual(['archived-only', 'child', 'default-exec', 'parent']);
+    expect(catalog.data.find(row => row.id === 'parent')?.archived).toBe(false);
+    expect(catalog.data.find(row => row.id === 'child')?.title).toBe('owned child prefix');
+    expect(request.mock.calls.filter(([method]) => method === 'thread/read').map(([, params]) => params.threadId)).toEqual(['child']);
+    expect(request).toHaveBeenCalledWith('thread/list', expect.objectContaining({ cursor: 'default-page-2' }), expect.any(Number));
+    await adapter.stop();
+  });
+
+  it('keeps exact child rows while native page two fails and rejects foreign readback', async () => {
+    const { adapter, request } = createFixture();
+    await adapter.start();
+    request.mockImplementation(async (method, params) => {
+      if (method === 'thread/read') return { thread: { id: params.threadId === 'foreign' ? 'other' : 'child', preview: 'child', turns: [] } };
+      if (params.cursor) throw new Error('native page two failed');
+      return { data: params.archived ? [] : [{ id: 'parent', preview: 'parent' }], nextCursor: params.archived ? null : 'page-2' };
+    });
+    const catalog = await adapter.getSessionCatalog({ includeSessionIds: ['child', 'foreign'] });
+    expect(catalog).toMatchObject({ status: 'partial', nextCursor: 'page-2' });
+    expect(catalog.data.map(row => row.id).sort()).toEqual(['child', 'parent']);
+    await adapter.stop();
+  });
   it('lists 121 active plus 121 archived threads with repeated boundaries and preserves native partition flags', async () => {
     const { adapter, request } = createFixture();
     await adapter.start();

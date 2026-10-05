@@ -35,3 +35,7 @@
 - 仅拥有传输层职责（进程 + JSON-RPC），不包含任何 app-server route 的类型化 wrapper（那些在 `CodexAppServerClient`）
 - `request()` 为 `protected` 以便子类调用；其余 transport 字段同样为 `protected`
 - 内部 `JsonRpcRequest` / `JsonRpcInbound` 接口不导出，仅在本文件内使用
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+保存本次 native initialize.userAgent，重连初始化前清空旧值；point-fork 的保守协议版本守卫只使用该 native 回应，不使用客户端版本字符串或路径推断。

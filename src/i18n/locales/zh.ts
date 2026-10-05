@@ -2875,6 +2875,7 @@ export const zhTranslations = {
   'chat.fork.successNewTab': '已在新标签创建分叉对话',
   'chat.fork.failed': '分叉对话失败',
   'chat.fork.unavailable': '当前消息暂时无法分叉',
+  'chat.fork.codexIdentityUnavailable': '这份旧 Codex 历史无法按消息分叉：无法唯一映射原生消息身份。',
   'chat.fork.streamingBlocked': '请先等待当前回复完成，再执行分叉',
   'chat.fork.maxTabsReached': '无法分叉到新标签：已达到最大标签数（{count}）',
   'chat.rewind.button': '回退到此处',

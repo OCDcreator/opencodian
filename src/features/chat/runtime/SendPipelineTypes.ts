@@ -287,6 +287,7 @@ export type StreamShellFinalizerHost = Pick<
 
 export type LocalStreamPersistenceHost =
   SendPipelinePersistencePort
+  & { reconcileCodexFinalText?(conversation: Conversation, tabId: TabId | null): Promise<void> }
   & Pick<SendPipelineDebugPort, 'summarizeChatMessageForDebug' | 'stringifyLogPayload' | 'getLogPreview'>;
 
 export type StreamLocalFinalizerHost =
@@ -317,6 +318,7 @@ export interface SendPipelineTraceState {
   finalizedAssistantMetadata: Extract<CoreStreamChunk, { type: 'message_metadata' }> | null;
   finalizedBackendSessionId: string | null;
   resolvedUserMessageIdentity: string | null;
+  resolvedUserMessageTurnId?: string;
 }
 
 export interface StreamChunkRouterOptions {
@@ -339,6 +341,8 @@ export interface LocalStreamOutcome {
   finalizedTimestamp: number;
   finalizedModelId: string | undefined;
   finalizedAssistantMessageId: string | undefined;
+  finalizedAssistantTurnId?: string;
+  requiresNativeTextRender?: boolean;
   finalizedBackendSessionId: string | undefined;
   finalizedStreamingMessageEl: HTMLElement | null;
   streamContentBlocks: StreamingContentBlock[] | undefined;
@@ -350,6 +354,7 @@ export interface LocalStreamOutcome {
   shouldSyncFromServer: boolean;
   structuredOutput?: unknown;
   resolvedUserMessageIdentity: string | null;
+  resolvedUserMessageTurnId?: string;
 }
 
 export interface StreamLocalFinalizerOptions {

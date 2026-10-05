@@ -28,6 +28,7 @@ export class StreamChunkRouter {
   private latestErrorMessage: string | null = null;
   private finalizedAssistantMetadata: Extract<CoreStreamChunk, { type: 'message_metadata' }> | null = null;
   private resolvedUserMessageIdentity: string | null = null;
+  private resolvedUserMessageTurnId: string | undefined;
   private receivedMeaningfulChunk = false;
   private receivedFirstVisibleContent = false;
   private structuredOutput: unknown | undefined;
@@ -185,6 +186,7 @@ export class StreamChunkRouter {
 
     if (chunk.type === 'user_message_identity') {
       this.resolvedUserMessageIdentity = chunk.uuid;
+      this.resolvedUserMessageTurnId = chunk.sourceTurnId;
       this.trace.logStage('user-message-identity-received', {
         uuid: chunk.uuid,
         sessionId: chunk.sessionId ?? null,
@@ -417,6 +419,7 @@ export class StreamChunkRouter {
       finalizedAssistantMetadata: this.finalizedAssistantMetadata,
       finalizedBackendSessionId: this.finalizedAssistantMetadata?.sessionId ?? null,
       resolvedUserMessageIdentity: this.resolvedUserMessageIdentity,
+      ...(this.resolvedUserMessageTurnId ? { resolvedUserMessageTurnId: this.resolvedUserMessageTurnId } : {}),
     };
   }
 }

@@ -11,7 +11,7 @@ import {
 } from '../../../core/agents/backend/AgentBackendRouting';
 import type { AgentSessionCapability } from '../../../core/agents/backend/AgentService';
 import type { AgentServiceRegistry } from '../../../core/agents/backend/AgentServiceRegistry';
-import type { AgentBackendKind } from '../../../core/types/chat';
+import type { AgentBackendKind, ChatMessage } from '../../../core/types/chat';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
 import { readBackendSessionCatalog, renderBackendSessionCatalogStatus, renderBackendSessionDetail } from './BackendSessionBrowserDetail';
@@ -51,18 +51,14 @@ function renderPreviewActivityLine(containerEl: HTMLElement, part: { type: strin
 }
 
 /** Lightweight chat message used to seed a resumed conversation with preview content. */
-export interface BackendSessionPreviewChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: number;
-}
+export type BackendSessionPreviewChatMessage = Pick<ChatMessage, 'id' | 'role' | 'content' | 'timestamp' | 'sourceMessageId' | 'sourceTurnId'>;
 
 export interface BackendSessionBrowserHost {
   getAgentServiceRegistry(): AgentServiceRegistry | null;
   createConversationFromBackendSession(sessionId: string, title: string, initialMessages?: Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: number }>, backend?: string): Promise<string | null>;
   loadConversation(conversationId: string): Promise<void>;
   getActiveBackendKind(): string | null;
+  getKnownCodexSessionIds?(): readonly string[];
   showNotice(message: string): void;
   isStreaming(): boolean;
   /** When false, the Resume button is hidden. Default: true. */
@@ -297,7 +293,7 @@ export class BackendSessionBrowserModal extends Modal {
 
     const registry = this.getScopedRegistry();
     try {
-      const result = await readBackendSessionCatalog(registry);
+      const result = await readBackendSessionCatalog(registry, this.host.getKnownCodexSessionIds?.());
       this.sessions = result.data;
       this.catalogState = result.status;
     } catch (err) {
@@ -503,7 +499,9 @@ export class BackendSessionBrowserModal extends Modal {
         const preview = await getBackendSessionPreview(registry, sessionId);
         if (preview && preview.length > 0) {
           previewChatMessages = preview.map((msg, idx) => ({
-            id: `preview-${idx}-${Date.now()}`,
+            id: msg.sourceMessageId ?? `preview-${idx}-${Date.now()}`,
+            ...(msg.sourceMessageId ? { sourceMessageId: msg.sourceMessageId } : {}),
+            ...(msg.sourceTurnId ? { sourceTurnId: msg.sourceTurnId } : {}),
             role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
             content: msg.parts
               .filter((p) => p.type === 'text' && p.text)

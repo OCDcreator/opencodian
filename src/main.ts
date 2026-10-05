@@ -2568,6 +2568,11 @@ export default class OpenCodianPlugin extends Plugin {
     backend?: AgentBackendKind,
   ): Promise<string | null> {
     const resolvedBackend = backend ?? this.settings.activeBackend ?? 'opencode';
+    if (resolvedBackend === 'codex') {
+      const existing = this.conversations.find((conversation) => conversation.backend === 'codex'
+        && getConversationBackendSessionId(conversation) === sessionId);
+      if (existing) return existing.id;
+    }
     const conversation = await this.createConversationFromSession(sessionId, {
       title,
       backend: resolvedBackend,

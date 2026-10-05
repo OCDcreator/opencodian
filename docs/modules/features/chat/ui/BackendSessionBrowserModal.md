@@ -74,3 +74,8 @@ Obsidian Modal，用于浏览、查看详情、恢复、分叉、归档和取消
 ## 2026-10-02 Codex local forget / complete catalog UI
 
 Codex 列表经 readBackendSessionCatalog 消费 getSessionCatalog 完整目录结果，显示 `[data-session-catalog-state]` 的 loading/complete/partial/failed/unavailable 与 aria-busy。partial 保留已读 session rows；failed/unavailable 不伪装成 empty。Refresh 完整重读，选中 ID 仍存在则稳定保留，消失则清 selection/preview。row 的 data-session-id 和 resume 入参保持 native ID。其他 backend 继续旧 listBackendSessions 路径。
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+Resume seed 保留 Codex userMessage 的 sourceMessageId/sourceTurnId，展示用 id 优先采用该原生 item ID；无 native identity 的 legacy preview 仍是不可用于 native cut point 的展示快照。
+目录刷新把可选的持久化 Codex native 引用交给已有读取 seam，确保插件重载后仍可找到未进入 native 默认列表的同一个 child。

@@ -64,3 +64,7 @@ Bootstrap supplies only the Pi settings callback to adapter registration. Pi pro
 ## 2026-09-27 OpenCode 2 compatibility
 
 The composition root injects the OpenCode 2 settings callback into adapter wiring without moving process ownership into main.ts.
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+Codex native child 的目录恢复复用同 native ID 的本地 conversation，保留历史与 session model override；local forget/native delete 边界和其他后端路径不变。

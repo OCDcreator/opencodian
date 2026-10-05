@@ -58,6 +58,15 @@ async function openModal(host: BackendSessionBrowserHost): Promise<BackendSessio
 }
 
 describe('BackendSessionBrowserModal lifecycle actions', () => {
+  it('passes persisted Codex reference IDs to the native catalog seam after an adapter restart', async () => {
+    const getSessionCatalog = jest.fn().mockResolvedValue({ status: 'complete', data: [{ id: 'exact-child', title: 'Child', shareUrl: null, updatedAt: null }], nextCursor: null });
+    const service = { kind: 'codex', getSessionCatalog, hasCapability: () => true };
+    const host = createHost({ getKnownCodexSessionIds: () => ['exact-child'], getAgentServiceRegistry: () => ({ getActive: () => service, get: () => service }) as never });
+    const modal = await openModal(host);
+    expect(getSessionCatalog).toHaveBeenCalledWith({ includeSessionIds: ['exact-child'] });
+    expect(modal.contentEl.querySelector('[data-session-id="exact-child"]')).not.toBeNull();
+    modal.close();
+  });
   it('renders fork and archive buttons for an active session', async () => {
     const host = createHost();
     const modal = await openModal(host);

@@ -96,3 +96,11 @@
 ## 2026-10-02 Codex local forget / complete catalog UI
 
 新增只读 `getSessionCatalog` / `getModelsCatalog` / `getPermissionProfilesCatalog` / `getMcpServerStatusCatalog` / `getLoadedThreadsCatalog` seam，供 Codex UI 消费完整分页证据。所有结果保留 complete/partial/failed/unavailable；不以 CLI fallback 或 null/[] 抹平 readback。线程浏览合并 active/archived partition 与 in-memory session，以原生 ID 去重，active partition 优先，native metadata 替换本地空标题；跨页失败保留已读 rows。既有 array API 和其他 backend 契约保留。`forgetSession` 只清本地 runtime，不发送 native delete/archive。正式消费测试：`CodexCatalogConsumptionUI.test.ts`、`CodexLocalForgetUI.test.ts`；真实 CLI/UI 尚由 parent 验收。
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+合并复核补充：live 用户身份等 turn 结束后仅在本次 thread/turn 有唯一 native user item 时发布；同 turn 多个 user item（例如 steering）保持不可用，避免覆盖原始发送身份。fork child 精确目录引用随 verified 删除、explicit local forget 或外部删除失效而清理，未确认删除仍保留引用；这两处为聚焦回归验证，原 2137 实机证据保留原构建身份。
+
+单条、无工具的 completed assistant 以匹配当前 thread/turn 的 `item/completed` 最终文本和真实 item ID 发出收敛 metadata；成功状态未知、多个 assistant item 或工具活动不会冒充一条权威文本。
+
+app-server live user item 以本次 attempt、native thread 与最终 turn/start ID 归属；早到 identity 暂存，旧 turn、外 thread、重放及失效 attempt 不持久化。getSessionMessages 保留 native user item ID 和 owning turn。目标 fork 先 thread/read 唯一映射 user item→turn，再传 beforeTurnId；unknown/foreign/ambiguous/active/unsupported 均拒绝，无 whole-thread fallback。无目标 fork 原行为保持。目录保留 native 默认分页与 active/archived 去重；对 fork 返回 ID 和插件持久化 Codex 引用的缺失行做同 ID 权威读取，native preview 为空时仅以权威 user 正文作展示标题，绝不据正文猜 identity。精确读取失败保留 partial。发送模型和 effort 来自本次会话选项快照，不改全局默认；请求、thread configured 回读与 turn effective 证据不可混称。

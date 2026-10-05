@@ -31,6 +31,18 @@ function pluginFixture(conversations: Conversation[], backend?: unknown) {
   return { plugin, state };
 }
 
+it('resumes the existing Codex local reference with its message identities and model override', async () => {
+  const existing = conversation('owned-child', 'native-child');
+  existing.sessionSettings = { codexModelOverride: 'gpt-6-sol' };
+  existing.messages = [{ id: 'local-u', role: 'user', content: 'owned', timestamp: 1, sourceMessageId: 'native-u', sourceTurnId: 'native-t' }];
+  const { plugin } = pluginFixture([existing]);
+  const create = jest.spyOn(plugin, 'createConversationFromSession').mockResolvedValue(conversation('duplicate', 'native-child'));
+  await expect(plugin.createConversationFromBackendSession('native-child', 'native title', [], 'codex')).resolves.toBe('owned-child');
+  expect(create).not.toHaveBeenCalled();
+  expect(existing.sessionSettings.codexModelOverride).toBe('gpt-6-sol');
+  expect(existing.messages[0].sourceMessageId).toBe('native-u');
+});
+
 async function codexFixture(withServer = true) {
   const client = new CodexAppServerClient({ codexPathOverride: '/fixture/codex' });
   jest.spyOn(client, 'start').mockResolvedValue(undefined);

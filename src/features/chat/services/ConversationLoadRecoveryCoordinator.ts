@@ -64,6 +64,7 @@ interface ForkConversationInitialState {
   currentNote?: string;
   externalContextPaths?: string[];
   backend?: AgentBackendKind;
+  sessionSettings?: Conversation['sessionSettings'];
 }
 
 export interface ConversationLoadRecoveryHost {
@@ -92,6 +93,8 @@ export interface ConversationLoadRecoveryHost {
   updateModelSelectorDisplay(): void;
   showNotice(message: string): void;
   backfillClaudeUserMessageIdentities?(conversation: Conversation): Promise<boolean>;
+  readCodexSessionMessages?(sessionId: string): Promise<unknown[]>;
+  commitCodexIdentityRecovery?(conversation: Conversation, write: () => void): Promise<boolean>;
   hasMatchingPersistentNotice?(
     title: string,
     content: string,
@@ -128,6 +131,8 @@ export interface ConversationLoadRecoveryHostDependencies {
   syncActiveTabConversation(conversation: Conversation): void;
   updateModelSelectorDisplay(): void;
   backfillClaudeUserMessageIdentities?(conversation: Conversation): Promise<boolean>;
+  readCodexSessionMessages?(sessionId: string): Promise<unknown[]>;
+  commitCodexIdentityRecovery?(conversation: Conversation, write: () => void): Promise<boolean>;
   hasMatchingPersistentNotice?(
     title: string,
     content: string,
@@ -172,6 +177,8 @@ export function createConversationLoadRecoveryHost(
     ...(deps.backfillClaudeUserMessageIdentities
       ? { backfillClaudeUserMessageIdentities: deps.backfillClaudeUserMessageIdentities }
       : {}),
+    ...(deps.readCodexSessionMessages ? { readCodexSessionMessages: deps.readCodexSessionMessages } : {}),
+    ...(deps.commitCodexIdentityRecovery ? { commitCodexIdentityRecovery: deps.commitCodexIdentityRecovery } : {}),
     ...(deps.hasMatchingPersistentNotice
       ? { hasMatchingPersistentNotice: deps.hasMatchingPersistentNotice }
       : {}),
@@ -192,6 +199,7 @@ export interface ConversationLoadRecoveryPort {
 }
 
 export class ConversationLoadRecoveryCoordinator {
+  private readonly unavailableCodexIdentityNotices = new Set<string>();
   constructor(
     private readonly host: ConversationLoadRecoveryHost,
     private readonly port: ConversationLoadRecoveryPort,
@@ -224,6 +232,12 @@ export class ConversationLoadRecoveryCoordinator {
         await this.host.backfillClaudeUserMessageIdentities(conversation);
       } catch { /* best-effort */ }
     }
+    if (conversation?.backend === 'codex') {
+      const changed = await this.restoreCodexUserMessageIdentities(conversation);
+      if (changed && this.host.getCurrentConversation()?.id === conversation.id) {
+        await this.port.loadConversation(conversation.id, { preserveScrollPosition: true });
+      }
+    }
 
     if (conversation && this.shouldShowCodexProvisionalWarning(conversation)) {
       await this.appendCodexProvisionalWarningIfNeeded(conversation);
@@ -236,6 +250,46 @@ export class ConversationLoadRecoveryCoordinator {
     }
     const sessionId = getConversationBackendSessionId(conversation);
     return !!sessionId && sessionId.startsWith('codex-local-');
+  }
+
+  /** Recover only native IDs/turn anchors; text and array positions never establish identity. */
+  private async restoreCodexUserMessageIdentities(conversation: Conversation): Promise<boolean> {
+    const users = conversation.messages.filter((message) => message.role === 'user' && !message.compactionDivider);
+    if (users.every((message) => message.sourceMessageId && message.sourceTurnId)) return false;
+    const sessionId = getConversationBackendSessionId(conversation);
+    if (!sessionId || !this.host.readCodexSessionMessages) return false;
+    const records = await this.host.readCodexSessionMessages(sessionId);
+    if (this.host.getCurrentConversation()?.id !== conversation.id) return false;
+    const native = records.filter((record): record is { role: 'user'; sourceMessageId: string; sourceTurnId: string } => {
+      if (!record || typeof record !== 'object') return false;
+      const message = record as Record<string, unknown>;
+      return message.role === 'user' && typeof message.sourceMessageId === 'string'
+        && !!message.sourceMessageId && typeof message.sourceTurnId === 'string' && !!message.sourceTurnId;
+    });
+    const mappings = users.flatMap((message) => {
+      if (message.sourceMessageId && message.sourceTurnId) return [];
+      const candidates = native.filter((item) => message.sourceMessageId
+        ? item.sourceMessageId === message.sourceMessageId
+        : message.sourceTurnId ? item.sourceTurnId === message.sourceTurnId
+          : item.sourceMessageId === message.id);
+      if (candidates.length !== 1) return [];
+      const identity = candidates[0];
+      if (message.sourceTurnId && identity.sourceTurnId !== message.sourceTurnId) return [];
+      return [{ message, identity }];
+    });
+    const incomplete = users.filter((message) => !message.sourceMessageId || !message.sourceTurnId).length;
+    if (incomplete > mappings.length && !this.unavailableCodexIdentityNotices.has(conversation.id)) {
+      this.unavailableCodexIdentityNotices.add(conversation.id);
+      this.host.showNotice(t('chat.fork.codexIdentityUnavailable'));
+    }
+    if (!mappings.length || !this.host.commitCodexIdentityRecovery) return false;
+    return this.host.commitCodexIdentityRecovery(conversation, () => {
+      for (const { message, identity } of mappings) {
+        if (!conversation.messages.includes(message)) continue;
+        message.sourceMessageId = identity.sourceMessageId;
+        message.sourceTurnId = identity.sourceTurnId;
+      }
+    });
   }
 
   private async appendCodexProvisionalWarningIfNeeded(conversation: Conversation): Promise<void> {
@@ -553,6 +607,8 @@ export class ConversationLoadRecoveryCoordinator {
       currentNote: currentConversation.currentNote,
       externalContextPaths: currentConversation.externalContextPaths,
       backend: currentConversation.backend,
+      ...(currentConversation.backend === 'codex' && currentConversation.sessionSettings
+        ? { sessionSettings: structuredClone(currentConversation.sessionSettings) } : {}),
     });
   }
 

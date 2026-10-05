@@ -18,6 +18,7 @@
 
 import { createLogger } from '../../../shared';
 import {
+  type AppServerPreviewMessage,
   normalizeThreadList as normalizeThreadListImpl,
   normalizeTurnsToPreviewMessages as normalizeTurnsToPreviewMessagesImpl,
 } from './CodexAppServerClientNormalization';
@@ -1515,10 +1516,22 @@ export class CodexAppServerClient extends CodexAppServerTransport {
     }
   }
 
-  async forkThread(threadId: string): Promise<AppServerForkResult | null> {
+  /** Point-fork requires the verified 0.160.0+ native contract; older/unknown versions fail closed. */
+  supportsBeforeTurnFork(): boolean {
+    const version = this.serverUserAgent?.match(/\/(\d+)\.(\d+)\.(\d+)(?:\s|$)/);
+    return !!version && (Number(version[1]) > 0 || Number(version[2]) >= 160);
+  }
+
+  async forkThread(threadId: string, options?: { beforeTurnId?: string }): Promise<AppServerForkResult | null> {
     await this.start();
+    if (options !== undefined && (!options.beforeTurnId?.trim() || !this.supportsBeforeTurnFork())) {
+      throw new Error('Codex before-turn fork is unavailable for this native app-server');
+    }
     try {
-      const result = (await this.request('thread/fork', { threadId })) as AppServerForkResult | undefined;
+      const result = (await this.request('thread/fork', {
+        threadId,
+        ...(options?.beforeTurnId ? { beforeTurnId: options.beforeTurnId } : {}),
+      })) as AppServerForkResult | undefined;
       return result ?? null;
     } catch (err) {
       logger.warn('Failed to fork thread via app-server', {
@@ -2207,7 +2220,7 @@ export class CodexAppServerClient extends CodexAppServerTransport {
   /** Normalize app-server turns into the shape expected by getBackendSessionPreview. */
   static normalizeTurnsToPreviewMessages(
     turns: AppServerTurn[],
-  ): Array<{ role: string; parts: Array<{ type: string; text: string }> }> {
+  ): AppServerPreviewMessage[] {
     return normalizeTurnsToPreviewMessagesImpl(turns);
   }
 }
