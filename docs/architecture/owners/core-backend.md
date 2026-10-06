@@ -97,3 +97,5 @@ Codex user item/owning-turn identity、attempt fencing、权威 beforeTurnId 映
 ## 2026-10-05 Claude external executable lifecycle
 
 ClaudeCodeAdapter owns current CLI resolution for new/resumed queries and dedicated probes. It revalidates after asynchronous SDK/MCP loading, preserves injected SDK/path/env/shell ownership, and snapshots each spawn callback. Executable edits do not close persistent queries. Explicit restart validates first and closes only after a valid selection; next send keeps native identity/history while adopting the current executable. No other backend behavior changes.
+
+2026-10-06：ZCodeManagementService 保存证据的 runtime 值继续限定为原生 effective catalog；application 在保存时保持 pending。会话新建/重连恢复及插件执行的独立观察不由 secure writer 推断，不新增状态所有者或绕过 revision/archive/fail-closed。

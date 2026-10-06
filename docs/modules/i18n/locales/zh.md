@@ -657,3 +657,5 @@ OpenCode 2 inherited server permission mode has Chinese label and explanation.
 ## 2026-10-05 Claude 可执行文件文案
 
 说明保存保留已有 query，新 query/显式重启采用当前有效选择，无效路径拒绝且不复用旧 CLI。通用重启失败提示不承诺保留 query，因为关闭过程可能已开始。
+
+2026-10-06：ZCode 管理帮助区分新会话、当前已加载快照及重连后恢复会话；保存结果分别标注“会话应用”和“有效目录”，明确目录回读不等于插件执行。与 en 对齐。

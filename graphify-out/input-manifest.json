@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "e8bfdd271fcf99bc409cf5eb2081d4da4dc8b7cfee0c72b77ac6f6db223a5d37",
+  "digest": "9aaa63aa3c3cc926e655ad38173af6c9a09be4286ce34795379f4f219a6e870e",
   "recordCount": 794,
   "records": [
     {
@@ -546,7 +546,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/zcode/ZCodeManagementService.ts",
-      "sha256": "57008db3b013416be1154422a8f16a214109564e2d99f693cf39a1bf0c0443ca"
+      "sha256": "d6b084f083cb52de0740325a5efec5c9e9c14dfff32f52cf4fa0c6bbfd2f0937"
     },
     {
       "kind": "src",
@@ -3386,7 +3386,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "45379bcf395f57ac3835392167fd6f7a0eea9c96c9e532b0af0314933c0d3a6d"
+      "sha256": "f203335fa796b00e1969951f0355619cf3623efdf3069db5c991986d800fcff3"
     },
     {
       "kind": "src",
@@ -3396,7 +3396,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "46bda476525e08b8d35c8798d33b222c3cd4de5a3d0360a4a5a5496df66d14aa"
+      "sha256": "de0e893c16756270c83d0a63141a32aeeeee17034e243676e383543d47ed62ee"
     },
     {
       "kind": "src",
@@ -3974,7 +3974,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-06T00:32:56.109Z",
-  "headShaAtGeneration": "3be3d84f1e15e25257dae80740197d4d1bf79f39",
+  "generatedAt": "2026-10-06T02:19:00.734Z",
+  "headShaAtGeneration": "44ebbc2ed01d60f70b8dbc7232cae5645f646b6b",
   "graphifyVersion": "graphify 0.8.50"
 }

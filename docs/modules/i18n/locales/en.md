@@ -649,3 +649,5 @@ OpenCode 2 inherited server permission mode has English label and explanation.
 ## 2026-10-05 Claude executable lifecycle copy
 
 Describe active-query preservation, new-query/current-selection boundaries and invalid-path rejection. The generic explicit-restart failure notice does not claim queries were preserved because closing may already have started.
+
+2026-10-06: ZCode management help distinguishes new sessions, already loaded snapshots and sessions restored after reconnect. Save outcomes label session application and effective catalog separately and state that catalog verification does not prove plugin execution. Mirrors zh.

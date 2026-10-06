@@ -98,3 +98,5 @@ English and Chinese strings distinguish OpenCode 1 and 2 and label the OpenCode 
 ## 2026-10-05 Claude CLI lifecycle
 
 English and Chinese copy describe executable snapshot/restart boundaries and explicit restart failures without claiming runtime verification or guaranteeing query preservation after a generic close failure.
+
+2026-10-06：ZCode 项目插件双语文案明确新会话、已加载快照和重连恢复的配置边界；保存结果区分会话应用、有效目录与尚未验证的插件执行。现有 translation keys 和参数保持不变。

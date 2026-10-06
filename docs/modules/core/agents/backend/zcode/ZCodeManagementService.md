@@ -35,3 +35,9 @@
 正式聚焦测试：`tests/unit/core/agents/backend/ZCodeManagementService.test.ts`，覆盖磁盘保存/重开/归档、其他字段保留、revision 冲突、create 冲突、读回不匹配、missing-method、意外 ACK、目录形状错误、敏感字段剥离、认证 unknown、archive failure 和目录 junction 逃逸。
 
 接线测试：`ZCodeAdapter.management.test.ts` 验证当前 transport、断开时不可用、无 workspace 不隐式启动，以及 transport 停止后的旧响应拒绝。SettingsZCodeSection.management.test.ts 验证经典/页签真实挂接路径、save/reopen/effective 更新、三轴 pending 显示和 unavailable 控件。证据根为 `C:/Users/lt/.codex/artifacts/opencodian/backend-integration-2026-10-02/final-expansion/zcode-t09/`，模型与 Obsidian 实机 UI 由 parent 验收。
+
+## 2026-10-06 会话生效边界
+
+保存结果的 runtime 轴仅表示 fresh native effective catalog 回读，不是插件执行证明。application 继续保持 pending；不会因为保存成功、目录匹配或已有独立验收记录而自动提升本次保存。说明明确区分新会话、当前进程内已加载会话以及重连后恢复的会话：新建/重新物化时按 workspace 路径加载当前项目配置，当前进程中已加载的会话保留启动快照。
+
+当前 macOS app-bundled 0.16.9 的受控 presentations:pptx 观察：off 的新会话实际 Skill 调用返回 Skill not found；on 的另一新会话实际 Skill 调用 completed，结果包含已安装技能正文。插件重载更换 owned app-server 进程后，UI 恢复原 off 会话，native ID 与原 4 条历史记录内容保持；该会话再调用技能 completed，返回结果与 on 新会话一致，并正确回忆旧回复标记。项目配置原缺席状态和临时插件设置均已恢复。此证据只覆盖该插件的技能加载功能，不代表 PPTX 生成、hooks/MCP 或其他 profile 完成；目录回读不能代替会话应用/执行检查。

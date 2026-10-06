@@ -233,7 +233,7 @@ export class ZCodeManagementService {
       evidence: {
         persistence: persisted ? 'verified' : 'failed', application: 'pending',
         runtime: confirmed ? 'verified' : readback.state === 'unavailable' ? 'unavailable' : 'failed',
-        detail: 'Effective workspace configuration only; existing sessions retain their startup snapshot. New-session application has not been observed.',
+        detail: 'Effective workspace catalog only; this save does not verify plugin execution. New sessions and sessions restored after reconnect load the current project configuration; already loaded sessions retain their startup snapshot. Session application remains pending until independently observed.',
       },
     };
   }

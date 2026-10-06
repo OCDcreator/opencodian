@@ -35,3 +35,7 @@ ZCode 后端的设置面（经典布局与页签布局共用）：可选运行�
 这些四字段测试证明组件状态合并与保存调用语义，未证明该四字段的真实磁盘持久化、原生 application/runtime readback 或 Obsidian 实机 UI 验收。T09 的 `SettingsZCodeSection.management.test.ts` 另外覆盖经典/页签的管理面挂接、插件 mutation revision 参数、native 目录刷新/reopen、application pending 展示、unavailable 禁用；管理 owner 有独立磁盘回归和 installed 0.16.9 隔离 native effective 回读（详见 ZCodeManagementService 模块页）。适配器数据契约仍由 ZCodeAdapter 测试覆盖。渲染挂接于 SettingsTabbedRenderer（zcode 主页签）与 OpenCodianSettings / OpenCodianSettingsView（经典布局）。
 
 2026-10-02：管理目录的声明数量、插件来源/包缺失、MCP 状态/工具数量/认证状态以及保存三轴结果均使用共享 locale 模板；原生状态 token 继续保留在 backend evidence 中，显示层只翻译已知值。
+
+## 2026-10-06 项目插件会话边界
+
+双语帮助说明项目覆盖在新会话以及重连后重新恢复的会话中加载；当前进程内已加载会话保留启动快照。保存反馈将 runtime 轴显示为“有效目录”，application 显示为“会话应用”，并明确本次保存没有验证插件执行。经典与页签布局继续共享已有挂接、revision/archive 写入及失效/冲突处理，没有新增第二份状态或运行时证明来源。
