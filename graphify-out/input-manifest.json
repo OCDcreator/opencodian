@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "b7ceccad963df6ffab65d1780864829a76cbd2d01bb02480cde9062fed83d62c",
+  "digest": "e6ec2c00cc2e7476a5cd9ef7da9400d34c42c41977b3e2c05ab24c36a30dec66",
   "recordCount": 794,
   "records": [
     {
@@ -466,7 +466,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/pi/PiRpcClient.ts",
-      "sha256": "b31a1a2eac5a022f77ac91efd7c26b6d4303caaa956f57a854f84b9786f80a4a"
+      "sha256": "dfb2134f2b0eb48cd71cfe149ed47c9c07dbd7e53fa193a11fc1cea1c74b446c"
     },
     {
       "kind": "src",
@@ -3974,7 +3974,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-06T18:20:20.679Z",
-  "headShaAtGeneration": "95ffab9c9e9079a92137c8d4ce47ab38e9b5e871",
+  "generatedAt": "2026-10-06T20:54:03.460Z",
+  "headShaAtGeneration": "cb4f7ba5e713f34021cb50ffb06cc70d0249d05b",
   "graphifyVersion": "graphify 0.8.50"
 }

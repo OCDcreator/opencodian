@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { mkdtempSync, mkdirSync, readFileSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
@@ -166,4 +166,62 @@ test('installed SDK public read methods work in memory without a model request o
   const levels = await executeCommand(host, { type: 'get_available_thinking_levels' });
   if (session.getAvailableThinkingLevels) assert.deepEqual(levels, { levels: session.getAvailableThinkingLevels() });
   else assert.equal(levels.status, 'unavailable');
+});
+
+function ownedForkFixture({ cancelled = false, persistent = false, missingDirectory = false } = {}) {
+  const tempRoot = path.resolve('.tmp');
+  mkdirSync(tempRoot, { recursive: true });
+  const root = mkdtempSync(path.join(tempRoot, 'pi-fork-persistence-'));
+  const parentFile = path.join(root, 'parent.jsonl');
+  const childFile = path.join(root, ...(missingDirectory ? ['missing'] : []), 'child.jsonl');
+  const parentBytes = JSON.stringify({ type: 'session', id: 'native-parent', version: 3 }) + '\n';
+  writeFileSync(parentFile, parentBytes);
+  const header = { type: 'session', version: 3, id: 'native-child', parentSession: parentFile, cwd: root, timestamp: '2026-10-07T00:00:00Z' };
+  const prefix = [{ id: 'native-model', parentId: null, type: 'model_change', provider: 'fixture', modelId: 'one' },
+    { id: 'native-effort', parentId: 'native-model', type: 'thinking_level_change', thinkingLevel: 'high' }];
+  const existingBytes = [header, ...prefix].map(value => JSON.stringify(value)).join('\n') + '\n';
+  if (persistent) writeFileSync(childFile, existingBytes);
+  const child = { sessionFile: childFile, sessionId: 'native-child', sessionManager: {
+    getHeader: () => header, getEntries: () => prefix, getLeafId: () => 'native-effort', getSessionId: () => 'native-child',
+  }, modelRegistry: {} };
+  const parent = { sessionFile: parentFile, sessionId: 'native-parent', sessionManager: { getLeafId: () => 'native-leaf' }, modelRegistry: {} };
+  const calls = [];
+  const host = hostFor(parent);
+  host.runtime.fork = async (entryId, options) => { calls.push({ entryId, options }); if (!cancelled) host.runtime.session = child; return { cancelled }; };
+  return { host, root, parentFile, childFile, header, prefix, calls, parentBytes, existingBytes, cleanup() {
+    for (const file of [parentFile, childFile]) if (existsSync(file)) unlinkSync(file);
+    rmdirSync(root);
+  } };
+}
+
+test('persists a native fork before the first message before its in-memory actor can be restored', async () => {
+  const f = ownedForkFixture();
+  try {
+    const result = await executeCommand(f.host, { type: 'fork', entryId: 'native-first-user' });
+    assert.equal(result.cancelled, false);
+    assert.deepEqual(f.calls, [{ entryId: 'native-first-user', options: { position: 'before' } }]);
+    assert.equal(existsSync(f.childFile), true, 'returned native branch file must exist before parent restoration');
+    const bytes = readFileSync(f.childFile, 'utf8');
+    assert.equal(bytes, f.existingBytes);
+    assert.deepEqual(JSON.parse(bytes.split('\n')[0]), f.header);
+    assert.equal(readFileSync(f.parentFile, 'utf8'), f.parentBytes);
+  } finally { f.cleanup(); }
+});
+
+test('does not rewrite an already persisted SDK clone or a cancelled fork', async () => {
+  const clone = ownedForkFixture({ persistent: true });
+  try { await executeCommand(clone.host, { type: 'clone' }); assert.equal(readFileSync(clone.childFile, 'utf8'), clone.existingBytes);
+    assert.deepEqual(clone.calls, [{ entryId: 'native-leaf', options: { position: 'at' } }]);
+  } finally { clone.cleanup(); }
+  const cancelled = ownedForkFixture({ cancelled: true });
+  try { assert.deepEqual(await executeCommand(cancelled.host, { type: 'fork', entryId: 'native-first-user' }), { cancelled: true });
+    assert.equal(existsSync(cancelled.childFile), false); assert.equal(readFileSync(cancelled.parentFile, 'utf8'), cancelled.parentBytes);
+  } finally { cancelled.cleanup(); }
+});
+
+test('rejects a fork whose native file cannot be persisted rather than acknowledging a dangling file', async () => {
+  const f = ownedForkFixture({ missingDirectory: true });
+  try { await assert.rejects(executeCommand(f.host, { type: 'fork', entryId: 'native-first-user' }), /ENOENT/);
+    assert.equal(existsSync(f.childFile), false); assert.equal(readFileSync(f.parentFile, 'utf8'), f.parentBytes);
+  } finally { f.cleanup(); }
 });
