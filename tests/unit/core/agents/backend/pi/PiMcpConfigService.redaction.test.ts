@@ -190,7 +190,7 @@ describe('Pi MCP endpoint redaction', () => {
     expect(display).toContain('[invalid URL]');
     expect(display).toContain('node server.js --token *** --api-key=*** --port 4096');
     expect(display).toContain('OAuth');
-    expect(display).toContain('/pi-mcp-t04/home/.pi/agent/mcp.json');
+    expect(display.replace(/\\/g, '/')).toContain('/pi-mcp-t04/home/.pi/agent/mcp.json');
     for (const output of [display, container.textContent, copiedEndpoints, JSON.stringify(snapshot)]) {
       expect(output).not.toContain(secret);
     }

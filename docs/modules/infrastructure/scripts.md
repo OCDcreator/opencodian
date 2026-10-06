@@ -74,6 +74,8 @@ Actions 与本地共用的 fail-closed 打包器。它只接受仓库根目录�
 
 2026-10-06：GitHub CI 和两处 Plugin Package 工作流显式设置 `NODE_OPTIONS=--test-reporter=tap`。Node 24 的子进程 `node --test` 默认 spec 输出与现有 wrapper 的 TAP summary 断言不一致；固定 reporter 保持原断言和跨平台测试语义，不改变测试用例或运行时源码。
 
+同次发布的 CI 回读确认 Graphify 工具版本也参与 freshness digest：本地图谱须用工作流固定的 `graphifyy==0.9.31` 生成。Pi MCP 设置脱敏测试在比较来源路径后缀时统一路径分隔符，兼容 Windows 路径和 home 缩写，保留全部凭据泄漏断言。
+
 根据 bump 类型更新版本号：
 - `patch`: 0.1.0 → 0.1.1
 - `minor`: 0.1.0 → 0.2.0
