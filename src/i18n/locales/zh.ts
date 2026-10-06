@@ -466,6 +466,8 @@ export const zhTranslations = {
   'settings.codex.readback.statusLoading': '加载中',
   'settings.codex.readback.statusUnavailable': '不可用',
   'settings.codex.readback.statusFailed': '失败',
+  'settings.codex.readback.statusPermissionDenied': '权限拒绝',
+  'settings.codex.readback.messagePermissionDenied': 'Codex 拒绝访问此目录。请检查当前账号和工作区权限，再重新打开此视图。',
   'settings.codex.readback.statusEmpty': '无内容',
   'settings.codex.readback.statusCount': '{count} 项',
   'settings.quickNav.title': '快捷跳转',

@@ -2581,9 +2581,16 @@ export class CodexAdapter
   }
 
   private async *sendMessageViaSdk(request: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
+    const threadOptions = this.buildThreadOptions({
+      ...this.captureAttemptOptions(),
+      ...(typeof request.options?.model === 'string' && request.options.model.trim()
+        ? { model: request.options.model.trim() } : {}),
+      ...(typeof request.options?.variant === 'string' && CODEX_EFFORT_VARIANTS.includes(request.options.variant as CodexReasoningEffort)
+        ? { modelReasoningEffort: request.options.variant as AttemptOptions['modelReasoningEffort'] } : {}),
+    });
     let thread: Thread | null;
     try {
-      thread = this.resolveOrCreateThread(request.sessionId);
+      thread = this.resolveOrCreateThread(request.sessionId, threadOptions);
     } catch (err) {
       yield {
         type: 'error',
@@ -2623,6 +2630,15 @@ export class CodexAdapter
       });
 
       for await (const event of streamed.events as AsyncIterable<ThreadEvent>) {
+        // exec JSON reports retry progress as an error event even when the
+        // same turn later succeeds. Keep terminal failures on the error path.
+        if (event.type === 'error' && event.message.startsWith('Reconnecting...')) {
+          yield {
+            type: 'backend_event', source: 'codex', event: 'informational',
+            status: 'retrying', name: 'reconnecting', metadata: { message: event.message },
+          };
+          continue;
+        }
         if (event.type === 'thread.started') {
           this.aliasSession(request.sessionId, event.thread_id, { resumed: false, via: 'sdk' });
         }
@@ -3941,61 +3957,60 @@ export class CodexAdapter
     return id.startsWith('codex-local-');
   }
 
-  private buildThreadOptions(): ThreadOptions {
+  private buildThreadOptions(options: AttemptOptions = this.options): ThreadOptions {
     return {
       // Codex SDK >= 0.152 records a caller-defined source on newly created
       // threads. Keep this stable and product-owned instead of exposing a raw
       // user override that could fragment attribution.
       threadSource: 'opencodian',
-      ...(this.options.workingDirectory
-        ? { workingDirectory: this.options.workingDirectory }
+      ...(options.workingDirectory
+        ? { workingDirectory: options.workingDirectory }
         : {}),
-      ...(this.options.model
-        ? { model: this.options.model }
+      ...(options.model
+        ? { model: options.model }
         : {}),
-      ...(this.options.sandboxMode
-        ? { sandboxMode: this.options.sandboxMode }
+      ...(options.sandboxMode
+        ? { sandboxMode: options.sandboxMode }
         : {}),
-      ...(this.options.modelReasoningEffort
-        ? { modelReasoningEffort: this.options.modelReasoningEffort }
+      ...(options.modelReasoningEffort
+        ? { modelReasoningEffort: options.modelReasoningEffort }
         : {}),
-      ...(this.options.additionalDirectories?.length
-        ? { additionalDirectories: [...this.options.additionalDirectories] }
+      ...(options.additionalDirectories?.length
+        ? { additionalDirectories: [...options.additionalDirectories] }
         : {}),
-      ...(this.options.networkAccessEnabled !== undefined
-        ? { networkAccessEnabled: this.options.networkAccessEnabled }
+      ...(options.networkAccessEnabled !== undefined
+        ? { networkAccessEnabled: options.networkAccessEnabled }
         : {}),
-      ...(this.options.webSearchMode
-        ? { webSearchMode: this.options.webSearchMode }
+      ...(options.webSearchMode
+        ? { webSearchMode: options.webSearchMode }
         : {}),
+      ...(options.approvalPolicy && options.approvalPolicy !== 'inherit'
+        ? { approvalPolicy: options.approvalPolicy } : {}),
       // Obsidian vaults are not typically Git repositories; skip the
       // Codex CLI's git-trust check to avoid immediate rejection.
       skipGitRepoCheck: true,
     };
   }
 
-  private resolveOrCreateThread(sessionId: string): Thread | null {
+  private resolveOrCreateThread(sessionId: string, threadOptions = this.buildThreadOptions()): Thread | null {
     if (!this.codex) {
       return null;
     }
 
     const entry = this.resolveSession(sessionId);
 
-    // Existing thread object
-    if (entry?.thread) {
-      return entry.thread;
-    }
-
-    // Session has a thread ID but no Thread object (adapter may have been restarted)
-    if (entry?.threadId) {
-      const thread = this.codex.resumeThread(entry.threadId, this.buildThreadOptions());
+    // SDK ThreadOptions are immutable. Refresh the wrapper for every turn
+    // while retaining the native thread ID and its persisted history.
+    const nativeThreadId = entry?.threadId ?? entry?.thread?.id;
+    if (entry && nativeThreadId) {
+      const thread = this.codex.resumeThread(nativeThreadId, threadOptions);
       entry.thread = thread;
       return thread;
     }
 
     // Known provisional session without thread → start new
     if (entry) {
-      const thread = this.codex.startThread(this.buildThreadOptions());
+      const thread = this.codex.startThread(threadOptions);
       entry.thread = thread;
       return thread;
     }
@@ -4004,7 +4019,7 @@ export class CodexAdapter
     //  - provisional-looking → start new thread (caller explicitly created a local session)
     //  - anything else → treat as a real thread ID and attempt resume
     if (this.isProvisionalId(sessionId)) {
-      const thread = this.codex.startThread(this.buildThreadOptions());
+      const thread = this.codex.startThread(threadOptions);
       this.sessions.set(sessionId, {
         provisionalId: sessionId,
         threadId: null,
@@ -4015,7 +4030,7 @@ export class CodexAdapter
 
     // Treat as a real Codex thread ID → resume.
     // If the ID is invalid, the SDK will throw; sendMessage() will yield it as an error chunk.
-    const thread = this.codex.resumeThread(sessionId, this.buildThreadOptions());
+    const thread = this.codex.resumeThread(sessionId, threadOptions);
     this.sessions.set(sessionId, {
       provisionalId: sessionId,
       threadId: sessionId,

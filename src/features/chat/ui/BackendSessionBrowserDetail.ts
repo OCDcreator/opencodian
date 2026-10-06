@@ -25,17 +25,21 @@ export async function readBackendSessionCatalog(registry: AgentServiceRegistry |
   return { status: 'complete', data: await listBackendSessions(registry), nextCursor: null };
 }
 
-export function renderBackendSessionCatalogStatus(listEl: HTMLElement, state: AppServerCatalogReadResult<unknown>['status'] | 'loading'): void {
+export function renderBackendSessionCatalogStatus(listEl: HTMLElement, state: AppServerCatalogReadResult<unknown>['status'] | 'loading', permissionDenied = false): void {
   listEl.setAttribute('data-session-catalog-state', state);
+  listEl.setAttribute('data-session-catalog-failure', permissionDenied ? 'permission-denied' : '');
   listEl.setAttribute('aria-busy', String(state === 'loading'));
   if (state === 'complete') return;
   const messages = {
     loading: t('chat.backendSessions.loading'),
     partial: t('chat.backendSessions.catalogPartial'),
-    failed: t('chat.backendSessions.catalogFailed'),
+    failed: t(permissionDenied ? 'settings.codex.readback.messagePermissionDenied' : 'chat.backendSessions.catalogFailed'),
     unavailable: t('chat.backendSessions.catalogUnavailable'),
   };
   listEl.createEl('p', { text: messages[state], attr: { role: 'status', 'aria-live': 'polite' } });
+  if (state === 'partial' && permissionDenied) {
+    listEl.createEl('p', { text: t('settings.codex.readback.messagePermissionDenied'), attr: { role: 'status', 'aria-live': 'polite' } });
+  }
 }
 
 /** Turns requested per page when the backend exposes the paginated turns seam. */

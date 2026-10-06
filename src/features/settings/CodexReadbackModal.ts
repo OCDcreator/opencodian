@@ -73,7 +73,7 @@ export class CodexReadbackModal<T> extends Modal {
       if (this.options.fetchCatalog) {
         const result = await this.options.fetchCatalog();
         if (result.status !== 'complete') {
-          this.setState(result.status, result.data);
+          this.setState(result.status, result.data, /(?:permission|access) denied|\b(?:EACCES|EPERM)\b/i.test(result.errorReason));
           return;
         }
         this.setState(result.data.length === 0 ? 'empty' : 'success', result.data);
@@ -92,13 +92,14 @@ export class CodexReadbackModal<T> extends Modal {
     }
   }
 
-  private setState(state: CodexReadbackModalState, items?: T[]): void {
+  private setState(state: CodexReadbackModalState, items?: T[], permissionDenied = false): void {
     if (!this.contentAreaEl || !this.statusValueEl) {
       return;
     }
 
     this.contentAreaEl.empty();
     this.statusValueEl.setAttribute('data-readback-state', state);
+    this.statusValueEl.setAttribute('data-readback-failure', permissionDenied ? 'permission-denied' : '');
     this.statusValueEl.setAttribute('role', 'status');
     this.statusValueEl.setAttribute('aria-live', 'polite');
     this.statusValueEl.setAttribute('aria-busy', String(state === 'loading'));
@@ -113,8 +114,8 @@ export class CodexReadbackModal<T> extends Modal {
         this.renderStateMessage(this.options.unavailableText);
         return;
       case 'failed':
-        this.statusValueEl.setText(t('settings.codex.readback.statusFailed'));
-        this.renderStateMessage(this.options.failedText);
+        this.statusValueEl.setText(t(permissionDenied ? 'settings.codex.readback.statusPermissionDenied' : 'settings.codex.readback.statusFailed'));
+        this.renderStateMessage(permissionDenied ? t('settings.codex.readback.messagePermissionDenied') : this.options.failedText);
         return;
       case 'empty':
         this.statusValueEl.setText(t('settings.codex.readback.statusEmpty'));
@@ -126,6 +127,7 @@ export class CodexReadbackModal<T> extends Modal {
           ? t('settings.codex.readback.statusPartial', { count: items?.length ?? 0 })
           : t('settings.codex.readback.statusCount', { count: items?.length ?? 0 }));
         if (state === 'partial') this.renderStateMessage(t('settings.codex.readback.messagePartial'));
+        if (state === 'partial' && permissionDenied) this.renderStateMessage(t('settings.codex.readback.messagePermissionDenied'));
         if (items && items.length > 0) {
           const listEl = this.contentAreaEl.createDiv({ cls: 'opencodian-inspection-list' });
           this.options.renderItems(listEl, items);

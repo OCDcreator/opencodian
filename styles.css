@@ -1983,6 +1983,7 @@ body[data-opencodian-provider-icon-mode="color"] {
 
 /* Messages */
 .opencodian-messages {
+  scroll-padding-bottom: calc(var(--opencodian-composer-stack-height) + 16px);
   height: 100%;
   overflow-y: auto;
   padding: var(--opencodian-messages-pad-top) var(--opencodian-messages-pad-x);
@@ -2157,6 +2158,12 @@ body[data-opencodian-provider-icon-mode="color"] {
   z-index: 22;
   isolation: isolate;
   margin-bottom: var(--opencodian-sticky-push-gap);
+}
+
+/* Keep pending questions reachable beneath long sticky user messages. */
+.opencodian-messages .opencodian-turn:has(.opencodian-question-inline:not(.opencodian-question-inline--resolved)) .opencodian-turn-header {
+  position: relative;
+  z-index: auto;
 }
 
 .opencodian-messages--sticky-mask .opencodian-turn-header::before {

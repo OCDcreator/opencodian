@@ -4,7 +4,7 @@ const path = require('node:path');
 
 test('T11 native candidate contracts preserve evidence levels and disabled-plugin selection semantics', () => {
   const output = execFileSync(process.execPath, [
-    '--test', path.join(process.cwd(), 'scripts/audit/codex-native-candidates.test.mjs'),
+    '--test', '--test-reporter=tap', path.join(process.cwd(), 'scripts/audit/codex-native-candidates.test.mjs'),
   ], { cwd: process.cwd(), encoding: 'utf8', timeout: 30000 });
   expect(output).toContain('# fail 0');
   expect(output).toContain('schema advertisements keep all feature defaults off');

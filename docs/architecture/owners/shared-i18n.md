@@ -100,3 +100,7 @@ English and Chinese strings distinguish OpenCode 1 and 2 and label the OpenCode 
 English and Chinese copy describe executable snapshot/restart boundaries and explicit restart failures without claiming runtime verification or guaranteeing query preservation after a generic close failure.
 
 2026-10-06：ZCode 项目插件双语文案明确新会话、已加载快照和重连恢复的配置边界；保存结果区分会话应用、有效目录与尚未验证的插件执行。现有 translation keys 和参数保持不变。
+
+## 2026-10-06 Codex catalog permission denial
+
+中英文目录新增 Codex catalog 权限拒绝状态与固定说明，原始 errorReason 不作为翻译参数或可见文本。

@@ -165,7 +165,7 @@ describe('CodexAdapter.invalidateLiveThread', () => {
     adapter.updateSandboxMode('workspace-write');
     adapter.updateModel('gpt-new');
 
-    // Without invalidation, the next turn reuses the cached thread (old opts).
+    // Every SDK turn now refreshes its wrapper with current options.
     const generator2 = adapter.sendMessage({
       sessionId: realThreadId,
       content: 'without invalidate',
@@ -175,7 +175,11 @@ describe('CodexAdapter.invalidateLiveThread', () => {
     for await (const _chunk of generator2) {
       // drain
     }
-    expect(options._mockCodex.resumeThread).toHaveBeenCalledTimes(1);
+    expect(options._mockCodex.resumeThread).toHaveBeenCalledTimes(2);
+    expect(options._mockCodex.resumeThread).toHaveBeenLastCalledWith(
+      realThreadId,
+      expect.objectContaining({ sandboxMode: 'workspace-write', model: 'gpt-new' }),
+    );
 
     // Invalidate → next turn re-resumes with the NEW options.
     expect(adapter.invalidateLiveThread(realThreadId)).toBe(true);
@@ -188,7 +192,7 @@ describe('CodexAdapter.invalidateLiveThread', () => {
     for await (const _chunk of generator3) {
       // drain
     }
-    expect(options._mockCodex.resumeThread).toHaveBeenCalledTimes(2);
+    expect(options._mockCodex.resumeThread).toHaveBeenCalledTimes(3);
     expect(options._mockCodex.resumeThread).toHaveBeenLastCalledWith(
       realThreadId,
       expect.objectContaining({ sandboxMode: 'workspace-write', model: 'gpt-new' }),

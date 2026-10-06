@@ -45,3 +45,7 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 - 2026-09-18 (FlowText 批次 B)：owner manifest 随 R-B1/R-B2 更新——新增 `src/shared/contextGroupPlan.ts` 归属 `shared.foundation`；本 owner 的边界与职责未变。
 
 2026-10-02：模型、权限、MCP 与 loaded threads 读回面消费 Codex catalog 结果，保留 partial 及错误边界；候选 gatewayOAuth/MCP App/disabledPluginIds 的 T11 探测与生产默认关闭分别记录。
+
+## 2026-10-06 Codex catalog permission denial
+
+CodexReadbackModal 和 CodexMcpServerDetailModal 从结构化目录失败中识别权限拒绝，只展示固定本地化说明。状态、已读取 partial 条目和重试流程仍由原 modal 持有，不新增目录真值或跨 owner 配置权。

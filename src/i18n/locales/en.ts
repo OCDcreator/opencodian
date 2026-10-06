@@ -466,6 +466,8 @@ export const enTranslations = {
   'settings.codex.readback.statusLoading': 'Loading',
   'settings.codex.readback.statusUnavailable': 'Unavailable',
   'settings.codex.readback.statusFailed': 'Failed',
+  'settings.codex.readback.statusPermissionDenied': 'Permission denied',
+  'settings.codex.readback.messagePermissionDenied': 'Codex refused access to this catalog. Check the current account and workspace permissions, then reopen this view.',
   'settings.codex.readback.statusEmpty': 'Empty',
   'settings.codex.readback.statusCount': '{count} item(s)',
   'settings.quickNav.title': 'Quick Jump',

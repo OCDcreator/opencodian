@@ -11,6 +11,13 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-10-07 Codex 剩余修复：SDK 模型与目录拒绝分类
+
+- SDK fallback 每 turn 捕获模型/effort 并刷新同 native ID 的 wrapper；nonfatal warning/reconnect 不再提前显示发送失败，terminal error 保持失败。
+- Codex readback/MCP/session 目录透传权限拒绝；partial 保留已有目录，双语固定说明避免暴露原始错误。
+- 权限卡取消 unresolved turn sticky header，并增加 composer scroll padding；Windows native 长 command 卡鼠标拒绝实测成功，Mac hidden 布局条件单独记录。
+- 版本保持 1.1.37；构建身份、Mac/Windows 实机证据、待审兼容 fork/清理和未测条件见 `docs/status/backend-remaining-codex-acceptance-2026-10-07.md`。
+
 ## 2026-10-06 v1.1.37：定向后端修复与 macOS 主路径验收
 
 - Pi 修复模型/effort 控件刷新、继承文案与会话独立保存恢复；Codex 接通原生消息/turn 身份、消息前 fork、子会话目录和逐发送模型，保留 fail-closed 及缓存清理；Claude 修复当前外部 CLI/env/shell 快照、await 后复验和 invalid restart 前置拒绝。

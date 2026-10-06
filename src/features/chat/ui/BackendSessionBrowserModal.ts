@@ -82,6 +82,7 @@ export class BackendSessionBrowserModal extends Modal {
   private footerEl: HTMLElement | null = null;
   private loading = false;
   private catalogState: 'loading' | 'complete' | 'partial' | 'failed' | 'unavailable' = 'complete';
+  private catalogPermissionDenied = false;
   private viewMode: ViewMode = 'preview';
   private searchQuery = '';
 
@@ -289,6 +290,7 @@ export class BackendSessionBrowserModal extends Modal {
     if (this.loading || !this.listEl) return;
     this.loading = true;
     this.catalogState = 'loading';
+    this.catalogPermissionDenied = false;
     this.renderSessionList();
 
     const registry = this.getScopedRegistry();
@@ -296,6 +298,7 @@ export class BackendSessionBrowserModal extends Modal {
       const result = await readBackendSessionCatalog(registry, this.host.getKnownCodexSessionIds?.());
       this.sessions = result.data;
       this.catalogState = result.status;
+      this.catalogPermissionDenied = result.status !== 'complete' && /(?:permission|access) denied|\b(?:EACCES|EPERM)\b/i.test(result.errorReason);
     } catch (err) {
       logger.warn('Failed to list backend sessions', { error: err instanceof Error ? err.message : String(err) });
       this.catalogState = 'failed';
@@ -320,7 +323,7 @@ export class BackendSessionBrowserModal extends Modal {
   private renderSessionList(): void {
     if (!this.listEl) return;
     this.listEl.empty();
-    renderBackendSessionCatalogStatus(this.listEl, this.catalogState);
+    renderBackendSessionCatalogStatus(this.listEl, this.catalogState, this.catalogPermissionDenied);
     if (this.catalogState !== 'complete' && (this.catalogState === 'loading' || this.sessions.length === 0)) return;
 
     if (this.sessions.length === 0) {
@@ -598,8 +601,7 @@ export class BackendSessionBrowserModal extends Modal {
 
   private setFooterLoading(loading: boolean): void {
     if (!this.footerEl) return;
-    const buttons = this.footerEl.querySelectorAll('button');
-    for (const btn of buttons) {
+    for (const btn of this.footerEl.querySelectorAll('button')) {
       (btn as HTMLButtonElement).disabled = loading;
     }
   }

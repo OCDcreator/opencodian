@@ -467,7 +467,17 @@ export class CodexStreamNormalizer {
   // -- error item -----------------------------------------------------------
 
   private onErrorItem(item: ErrorItem): StreamChunk[] {
-    return [{ type: 'error', content: item.message }];
+    // SDK ErrorItem is explicitly non-fatal. Fatal thread/turn events keep
+    // their error chunks; warnings must not produce "Failed to send" UI.
+    return [{
+      type: 'backend_event',
+      source: 'codex',
+      event: 'informational',
+      status: 'warning',
+      name: 'non-fatal-error',
+      id: item.id,
+      metadata: { message: item.message },
+    }];
   }
 }
 

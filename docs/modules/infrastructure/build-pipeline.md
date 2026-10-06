@@ -1,4 +1,5 @@
 # 构建管线
+> 2026-10-07：聊天消息滚动增加 composer 高度对应的 scroll-padding；待回答 question 所在回合暂时取消 sticky user header，防止长权限命令遮住选项和 Submit。卡片移除后恢复原 sticky 规则。源 CSS 位于 src/style/base/core.css，构建仍生成 styles.css；CSS 无 CodeGraph symbol/owner 映射，实机鼠标与键盘验收独立记录。
 
 > **源码**: `esbuild.config.mjs`, `scripts/build.mjs`, `scripts/build-css.mjs`, `scripts/build-utils.mjs`, `scripts/package-plugin-artifact.mjs`
 > **状态**: [REVIEW]

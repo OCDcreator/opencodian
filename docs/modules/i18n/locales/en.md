@@ -651,3 +651,7 @@ OpenCode 2 inherited server permission mode has English label and explanation.
 Describe active-query preservation, new-query/current-selection boundaries and invalid-path rejection. The generic explicit-restart failure notice does not claim queries were preserved because closing may already have started.
 
 2026-10-06: ZCode management help distinguishes new sessions, already loaded snapshots and sessions restored after reconnect. Save outcomes label session application and effective catalog separately and state that catalog verification does not prove plugin execution. Mirrors zh.
+
+## 2026-10-06 Codex catalog permission denial
+
+新增 settings.codex.readback.statusPermissionDenied / messagePermissionDenied，用于 Codex 目录读取被拒绝的固定状态和重试说明。原始服务错误不插入翻译参数。
