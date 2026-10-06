@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "109650aaf3dd58387b7ad77f8b62b07c81b9970a2cd7eb22e6c6606b419cd5b8",
+  "digest": "e8bfdd271fcf99bc409cf5eb2081d4da4dc8b7cfee0c72b77ac6f6db223a5d37",
   "recordCount": 794,
   "records": [
     {
@@ -206,7 +206,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/ClaudeCodeAdapter.ts",
-      "sha256": "efaa77be732416d1fbb8bb0132ac569df87e3d464196856600c3026ed006797d"
+      "sha256": "610fc2d9590113fd778aa9c11d763ba357533a9492f029fe4ab6fe4889b2aad8"
     },
     {
       "kind": "src",
@@ -3071,7 +3071,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsClaudeCodeSection.ts",
-      "sha256": "3040bd643514def28a2bff26cf630b7150faffcd0d1618062c410b0a22b7990a"
+      "sha256": "0488155e0d61757eb25493be673aca4ab7586cc96697963ef1b1fa96ea51e582"
     },
     {
       "kind": "src",
@@ -3386,7 +3386,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "172ce7ba062728779697f97c3312db8aafc95ff246d0d8fc9d3a2d7203d49e94"
+      "sha256": "45379bcf395f57ac3835392167fd6f7a0eea9c96c9e532b0af0314933c0d3a6d"
     },
     {
       "kind": "src",
@@ -3396,7 +3396,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "0b24f80d999aa4d0c064850ea7598f8f22e991a8d1cdb063b97cc2449314ea25"
+      "sha256": "46bda476525e08b8d35c8798d33b222c3cd4de5a3d0360a4a5a5496df66d14aa"
     },
     {
       "kind": "src",
@@ -3974,7 +3974,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-05T14:30:40.448Z",
-  "headShaAtGeneration": "ebbfe24189f23e9cf2033786c7c1bb1c003a34b9",
+  "generatedAt": "2026-10-06T00:32:56.109Z",
+  "headShaAtGeneration": "3be3d84f1e15e25257dae80740197d4d1bf79f39",
   "graphifyVersion": "graphify 0.8.50"
 }

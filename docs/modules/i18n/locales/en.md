@@ -645,3 +645,7 @@ OpenCode 2 inherited server permission mode has English label and explanation.
 ## 2026-10-05 Codex 消息前分支与恢复
 
 补充旧 Codex 历史无法唯一映射 native identity 时的 message-fork unavailable 文案，与中文 key 对齐。
+
+## 2026-10-05 Claude executable lifecycle copy
+
+Describe active-query preservation, new-query/current-selection boundaries and invalid-path rejection. The generic explicit-restart failure notice does not claim queries were preserved because closing may already have started.

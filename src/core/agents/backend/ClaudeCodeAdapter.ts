@@ -52,6 +52,7 @@ import {
   buildClaudeCodeOptions,
   type ClaudeCodeOptionsBuilderInput,
   type ClaudeCodeSdkOptionsShape,
+  type ClaudeCodeSpawnClaudeCodeProcess,
   type ClaudeCodeSpawnRequest,
 } from './ClaudeCodeOptionsBuilder';
 import {
@@ -1457,15 +1458,18 @@ export class ClaudeCodeAdapter
   private readonly postResultCallbacks = new Set<(chunk: StreamChunk) => void>();
   private readonly commandsChangedHandlers = new Set<() => void>();
   private readonly options: ClaudeCodeAdapterOptions;
+  private readonly resolveExternalProcess: boolean;
+  private readonly processOverrides: Pick<ClaudeCodeAdapterOptions, 'processEnv' | 'spawnShell'>;
   private readonly tracePort?: ClaudeTracePort;
   /** Current turn context keyed by both plugin-local and SDK session identities. */
   private readonly traceContextsBySession = new Map<string, ClaudeTraceContext>();
 
   constructor(options: ClaudeCodeAdapterOptions) {
     const bundledPathHint = isClaudeAgentSdkBundledExecutablePath(options.pathToClaudeCodeExecutable);
-    const shouldResolveExternalProcess = !options.sdk
+    this.resolveExternalProcess = !options.sdk
       && (!options.pathToClaudeCodeExecutable || bundledPathHint);
-    const processResolution = shouldResolveExternalProcess
+    this.processOverrides = { processEnv: options.processEnv, spawnShell: options.spawnShell };
+    const processResolution = this.resolveExternalProcess
       ? (options.processResolver ?? resolveClaudeCodeProcess)({ settings: options.settings })
       : null;
 
@@ -1473,8 +1477,8 @@ export class ClaudeCodeAdapter
       ...options,
       pathToClaudeCodeExecutable: processResolution?.pathToClaudeCodeExecutable
         ?? (bundledPathHint ? undefined : options.pathToClaudeCodeExecutable),
-      processEnv: processResolution?.env ?? options.processEnv,
-      spawnShell: processResolution?.shell ?? options.spawnShell,
+      processEnv: options.processEnv ?? processResolution?.env,
+      spawnShell: options.spawnShell ?? processResolution?.shell,
     };
     this.tracePort = options.tracePort;
   }
@@ -1525,6 +1529,16 @@ export class ClaudeCodeAdapter
   }
 
   private assertExternalClaudeCliAvailable(): void {
+    // Only resolver-owned selections follow live settings. Explicit constructor
+    // paths and SDK facades retain their injection contract.
+    if (this.resolveExternalProcess) {
+      const resolution = (this.options.processResolver ?? resolveClaudeCodeProcess)({ settings: this.options.settings });
+      this.options.pathToClaudeCodeExecutable = resolution.mode === 'external'
+        ? resolution.pathToClaudeCodeExecutable
+        : undefined;
+      this.options.processEnv = this.processOverrides.processEnv ?? resolution.env;
+      this.options.spawnShell = this.processOverrides.spawnShell ?? resolution.shell;
+    }
     if (this.options.sdk || this.options.pathToClaudeCodeExecutable) {
       return;
     }
@@ -2228,6 +2242,7 @@ export class ClaudeCodeAdapter
     sdk: ClaudeCodeSdkFacade,
     probeFilePath: string,
   ): Promise<CheckpointRewindProbeResult> {
+    this.assertExternalClaudeCliAvailable();
     const phase1Abort = new ClaudeCodeRuntimeAbortController() as AbortController;
     const phase1Settings: ClaudeCodeBackendSettings = {
       ...this.options.settings,
@@ -2283,6 +2298,7 @@ export class ClaudeCodeAdapter
     });
 
     const phase2Abort = new ClaudeCodeRuntimeAbortController() as AbortController;
+    this.assertExternalClaudeCliAvailable();
     const phase2Options = buildClaudeCodeOptions({
       vaultPath: this.options.vaultPath,
       settings: phase1Settings,
@@ -2664,6 +2680,9 @@ export class ClaudeCodeAdapter
   }> {
     await this.ensureReadyForQuery();
     const sdk = await this.getSdk();
+    // SDK/MCP loading may yield while the executable selection changes.
+    // Revalidate at options assembly before the dedicated query can spawn.
+    this.assertExternalClaudeCliAvailable();
 
     // Single persistent query with AsyncIterable input — same pattern as getOrStartRuntime().
     // This ensures Phase 1 + setModel + Phase 2 all run on the SAME query handle,
@@ -5155,6 +5174,9 @@ export class ClaudeCodeAdapter
   }
 
   async restartPersistentQueries(reason = 'manual'): Promise<void> {
+    // Reject invalid selections before closing a usable persistent query.
+    // The next send resumes its native identity with a current snapshot.
+    this.assertExternalClaudeCliAvailable();
     runtimeLogger.debug('runtime restart requested', {
       reason,
       sessionCount: this.sessions.size,
@@ -5178,6 +5200,7 @@ export class ClaudeCodeAdapter
     session?: ClaudeCodeSessionState,
     sendOptions?: Record<string, unknown>,
   ): ClaudeCodeSdkOptionsShape {
+    this.assertExternalClaudeCliAvailable();
     const overrides = resolveSendOptionOverrides(sendOptions);
     const options = buildClaudeCodeOptions({
       vaultPath: this.options.vaultPath,
@@ -5360,6 +5383,7 @@ export class ClaudeCodeAdapter
     abortController: AbortController | undefined,
     request: ClaudeCodeDiagnosticPromptRequest,
   ): ClaudeCodeSdkOptionsShape {
+    this.assertExternalClaudeCliAvailable();
     const bypassPermissions = request._diagnosticBypassPermissions === true;
     const diagnosticSettings = this.resolveDiagnosticSettings(request);
     const options = buildClaudeCodeOptions({
@@ -6272,60 +6296,65 @@ export class ClaudeCodeAdapter
     delete session.runtime;
   }
 
-  private readonly spawnClaudeCodeProcess = (request: ClaudeCodeSpawnRequest) => {
-    const envKeys = Object.keys(request.env ?? {});
-    runtimeLogger.debug('spawn command', {
-      command: request.command,
-      cwd: request.cwd,
-      argCount: request.args.length,
-      envKeyCount: envKeys.length,
-      envKeys,
-    });
-    const child = spawn(request.command, request.args, {
-      cwd: request.cwd,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: request.env as NodeJS.ProcessEnv,
-      shell: this.options.spawnShell === true,
-      windowsHide: true,
-    });
-
-    request.signal?.addEventListener('abort', () => {
-      if (!child.killed) {
-        child.kill('SIGTERM');
-      }
-    }, { once: true });
-
-    child.on('exit', (code, signal) => {
-      runtimeLogger.debug('spawn exit', {
+  private get spawnClaudeCodeProcess(): ClaudeCodeSpawnClaudeCodeProcess {
+    // Capture at options assembly: later settings edits cannot change a query
+    // whose SDK defers spawning (including an auxiliary session first turn).
+    const shell = this.options.spawnShell === true;
+    return (request: ClaudeCodeSpawnRequest) => {
+      const envKeys = Object.keys(request.env ?? {});
+      runtimeLogger.debug('spawn command', {
         command: request.command,
         cwd: request.cwd,
-        code,
-        signal,
+        argCount: request.args.length,
+        envKeyCount: envKeys.length,
+        envKeys,
       });
-    });
-    child.on('error', (error) => {
-      runtimeLogger.debug('spawn error', {
-        command: request.command,
+      const child = spawn(request.command, request.args, {
         cwd: request.cwd,
-        error: summarizeError(error),
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: request.env as NodeJS.ProcessEnv,
+        shell,
+        windowsHide: true,
       });
-    });
 
-    return {
-      stdin: child.stdin,
-      stdout: child.stdout,
-      get killed() {
-        return child.killed;
-      },
-      get exitCode() {
-        return child.exitCode;
-      },
-      kill: child.kill.bind(child),
-      on: child.on.bind(child),
-      once: child.once.bind(child),
-      off: child.off.bind(child),
+      request.signal?.addEventListener('abort', () => {
+        if (!child.killed) {
+          child.kill('SIGTERM');
+        }
+      }, { once: true });
+
+      child.on('exit', (code, signal) => {
+        runtimeLogger.debug('spawn exit', {
+          command: request.command,
+          cwd: request.cwd,
+          code,
+          signal,
+        });
+      });
+      child.on('error', (error) => {
+        runtimeLogger.debug('spawn error', {
+          command: request.command,
+          cwd: request.cwd,
+          error: summarizeError(error),
+        });
+      });
+
+      return {
+        stdin: child.stdin,
+        stdout: child.stdout,
+        get killed() {
+          return child.killed;
+        },
+        get exitCode() {
+          return child.exitCode;
+        },
+        kill: child.kill.bind(child),
+        on: child.on.bind(child),
+        once: child.once.bind(child),
+        off: child.off.bind(child),
+      };
     };
-  };
+  }
 
   private getSdk(): Promise<ClaudeCodeSdkFacade> {
     if (this.options.sdk) {

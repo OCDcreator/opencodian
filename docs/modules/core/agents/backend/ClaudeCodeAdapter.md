@@ -210,3 +210,9 @@ control await 完成后检查 map 仍指向原 session、sdkSessionId 仍相等�
 这些 mock 与语义测试证明插件 adapter 契约、错误处理和隔离；尚未证明外部实际 CLI 对 control 的实现、MCP 权限实际生效、样式被 prompt 使用或产品 UI 可达。ACK 不能晋升 Configuration Evidence 为 verified；没有把此 bounded slice 标成完整 T08/配置闭环或真实 runtime/UI 验收通过。
 
 本轮验证结果：上述三份聚焦 tests **3 suites / 284 tests pass**；adapter/Queue/两份 controls tests 的聚焦 ESLint **0 errors / 0 warnings**；四份文件的显式 noEmit 语义检查 **0 diagnostics**。首轮 styles fixture 将数组误作 it.each 参数行（2 tests failed）与 MCP method 复杂度 21 的 lint warning 均已修正：数据改对象包装，mode 改三值集合成员检查，未删除边界断言或放宽契约。最终 affected 是共享树传递依赖列表，不等于所有路径已测试。
+
+## 2026-10-05 external CLI query boundary
+
+Resolver-owned selections are refreshed from current settings at SDK options assembly, including after delayed SDK/MCP loading in the dedicated setModel/checkpoint probes. Path, environment and shell are captured together; the spawn callback retains the assembled shell. Explicit SDK/constructor executable and caller env/shell injection keep precedence. Invalid selections reject before query creation and cannot reuse a stale or bundled executable.
+
+Editing executable settings leaves existing persistent queries running with their original snapshot. A fresh query (including native resume) uses the current selection. Explicit restart validates before closing live queries; an invalid selection preserves them. Successful restart closes queries, and the next send resumes the same native session with current options. Request options alone are application evidence; native IDs/history and actual spawn need separate runtime evidence.

@@ -2359,7 +2359,11 @@ export class SettingsClaudeCodeSection {
         button
           .setButtonText(t('settings.claudeCode.runtimeBoundary.restartButton'))
           .onClick(async () => {
-            await this.restartClaudePersistentQueries('settings-change');
+            try {
+              await this.restartClaudePersistentQueries('settings-change');
+            } catch (error) {
+              new Notice(`${t('settings.claudeCode.runtimeBoundary.restartFailed')} ${error instanceof Error ? error.message : String(error)}`);
+            }
           });
       });
   }
@@ -2668,7 +2672,11 @@ export class SettingsClaudeCodeSection {
     }
 
     outputEl.empty();
-    if (!statuses || statuses.length === 0) {
+    if (statuses === null) {
+      outputEl.setText(t('settings.claudeCode.mcpRuntime.statusUnavailable'));
+      return;
+    }
+    if (statuses.length === 0) {
       outputEl.setText(t('settings.claudeCode.mcpRuntime.statusEmpty'));
       return;
     }

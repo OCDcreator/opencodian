@@ -93,3 +93,7 @@ OpenCode2Adapter owns the separate OpenCode 2 CLI/client protocol, session lifec
 Codex `willRetry` 保持非终止，单条已完成 assistant 以 native item/turn/text 收敛；工具、多 assistant 和未知成功状态不提供单条快照。
 
 Codex user item/owning-turn identity、attempt fencing、权威 beforeTurnId 映射、保守 native 协议版本守卫、目录缺失引用的同 ID 权威读取和逐发送模型快照留在既有 Codex adapter/client/normalizer owner。其他后端、SDK fallback、auxiliary 和公共架构边界不变。
+
+## 2026-10-05 Claude external executable lifecycle
+
+ClaudeCodeAdapter owns current CLI resolution for new/resumed queries and dedicated probes. It revalidates after asynchronous SDK/MCP loading, preserves injected SDK/path/env/shell ownership, and snapshots each spawn callback. Executable edits do not close persistent queries. Explicit restart validates first and closes only after a valid selection; next send keeps native identity/history while adopting the current executable. No other backend behavior changes.

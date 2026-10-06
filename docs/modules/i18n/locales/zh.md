@@ -653,3 +653,7 @@ OpenCode 2 inherited server permission mode has Chinese label and explanation.
 ## 2026-10-05 Codex 消息前分支与恢复
 
 补充旧 Codex 历史无法唯一映射原生消息身份时的分叉不可用提示，与英文 key 对齐。
+
+## 2026-10-05 Claude 可执行文件文案
+
+说明保存保留已有 query，新 query/显式重启采用当前有效选择，无效路径拒绝且不复用旧 CLI。通用重启失败提示不承诺保留 query，因为关闭过程可能已开始。

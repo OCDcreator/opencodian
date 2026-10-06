@@ -94,3 +94,7 @@ English and Chinese strings distinguish OpenCode 1 and 2 and label the OpenCode 
 ## 2026-10-05 Codex 消息前分支与恢复
 
 中英文同步显示旧 Codex 历史 native identity 无法唯一映射时的不可用状态。
+
+## 2026-10-05 Claude CLI lifecycle
+
+English and Chinese copy describe executable snapshot/restart boundaries and explicit restart failures without claiming runtime verification or guaranteeing query preservation after a generic close failure.

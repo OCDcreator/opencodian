@@ -1027,6 +1027,15 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(claudeAdapter.restartPersistentQueries).toHaveBeenCalledWith('settings-change');
     });
 
+    it('reports an invalid restart without rejecting the settings click', async () => {
+      const claudeAdapter = { restartPersistentQueries: jest.fn().mockRejectedValue(new Error('invalid CLI selection')) };
+      const plugin = createPlugin({ claudeAdapter });
+      const section = new SettingsClaudeCodeSection({ plugin: plugin as OpenCodianPlugin, createSectionHeading });
+      section.attachTabbed(document.createElement('div'), 'runtime');
+      await expect(findButton(t('settings.claudeCode.runtimeBoundary.restartButton')).onClick?.()).resolves.toBeUndefined();
+      expect(claudeAdapter.restartPersistentQueries).toHaveBeenCalledWith('settings-change');
+    });
+
     it('renders sanitized context usage readback on demand without saving settings', async () => {
       const claudeAdapter = {
         getContextUsage: jest.fn().mockResolvedValue({
@@ -1925,6 +1934,67 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         ...textAreaRecords,
         ...dropdownRecords,
       ].filter(record => record.name !== t('settings.claudeCode.sessionControls.server')).some((record) => record.name.toLowerCase().includes('mcp'))).toBe(false);
+    });
+
+    it.each([
+      {
+        label: 'null',
+        statuses: null,
+        statusKey: 'settings.claudeCode.mcpRuntime.statusUnavailable' as const,
+      },
+      {
+        label: 'an authoritative empty array',
+        statuses: [],
+        statusKey: 'settings.claudeCode.mcpRuntime.statusEmpty' as const,
+      },
+    ])('renders SDK MCP runtime status $label readback distinctly', async ({ statuses, statusKey }) => {
+      const claudeAdapter = {
+        getMcpServerCount: jest.fn().mockReturnValue(1),
+        getMcpServerNames: jest.fn().mockReturnValue(['alpha-mcp']),
+        getMcpServerRuntimeStatuses: jest.fn().mockResolvedValue(statuses),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'mcp');
+
+      const inspection = findButton(t('settings.claudeCode.mcpRuntime.inspectButton')).onClick?.();
+      const statusReadbackEl = containerEl.querySelector('[data-claude-code-mcp-runtime-status="true"]');
+      expect(statusReadbackEl?.textContent).toBe(t('settings.claudeCode.mcpRuntime.statusLoading'));
+      await inspection;
+
+      expect(claudeAdapter.getMcpServerRuntimeStatuses).toHaveBeenCalledTimes(1);
+      expect(statusReadbackEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(statusReadbackEl?.textContent).toBe(t(statusKey));
+      expect(statusReadbackEl?.querySelector('.opencodian-claude-code-mcp-runtime-status-row')).toBeNull();
+      expect(plugin.saveSettings).not.toHaveBeenCalled();
+    });
+
+    it('renders SDK MCP runtime status failure when the adapter throws', async () => {
+      const claudeAdapter = {
+        getMcpServerCount: jest.fn().mockReturnValue(1),
+        getMcpServerNames: jest.fn().mockReturnValue(['alpha-mcp']),
+        getMcpServerRuntimeStatuses: jest.fn().mockRejectedValue(new Error('runtime status failed')),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'mcp');
+
+      await findButton(t('settings.claudeCode.mcpRuntime.inspectButton')).onClick?.();
+
+      const statusReadbackEl = containerEl.querySelector('[data-claude-code-mcp-runtime-status="true"]');
+      expect(claudeAdapter.getMcpServerRuntimeStatuses).toHaveBeenCalledTimes(1);
+      expect(statusReadbackEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(statusReadbackEl?.textContent).toBe(t('settings.claudeCode.mcpRuntime.statusFailed'));
+      expect(statusReadbackEl?.querySelector('.opencodian-claude-code-mcp-runtime-status-row')).toBeNull();
+      expect(plugin.saveSettings).not.toHaveBeenCalled();
     });
 
     it('renders the MCP runtime empty state as read-only discovery in the MCP tab', () => {

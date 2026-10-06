@@ -1,13 +1,16 @@
 /* eslint-disable max-lines -- Adapter coverage keeps session, resume, model catalog, permission, and streaming fixtures together for one backend contract. */
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { AgentCapability } from '../../../../../src/core/agents/AgentCapability';
 import {
   ClaudeCodeAdapter,
+  type ClaudeCodeAdapterOptions,
   type ClaudeCodeSdkFacade,
   type ClaudeCodeSdkLoader,
   createClaudeCodePermissionBridge,
 } from '../../../../../src/core/agents/backend';
+import { resolveClaudeCodeProcess } from '../../../../../src/core/agents/backend/ClaudeCodeProcessResolver';
 import {
   clearPromptSuggestionSink,
   getPromptSuggestionSink,
@@ -2703,6 +2706,211 @@ describe('ClaudeCodeAdapter', () => {
     expect(processResolver).toHaveBeenCalledWith({ settings: getDefaultClaudeCodeBackendSettings() });
     expect(sdk.query.mock.calls[0][0].options.pathToClaudeCodeExecutable).toBe('/usr/local/bin/claude');
     expect(sdk.query.mock.calls[0][0].options.env).toEqual({ PATH: '/usr/local/bin' });
+  });
+
+  // eslint-disable-next-line max-lines-per-function -- Exercise live selection at SDK query, persistent runtime, and native spawn seams.
+  describe('live external executable selection', () => {
+    function createFixture(overrides: Partial<ClaudeCodeAdapterOptions> = {}, platform: NodeJS.Platform = 'darwin') {
+      const settings = { ...getDefaultClaudeCodeBackendSettings(), executablePath: '/old/claude' };
+      const nativeEnv = { PATH: '/native-a', SELECTION: 'old' };
+      const available = new Set(['/old/claude', '/new/claude', '/new/claude.cmd', join('/native-b', 'claude')]);
+      const sdk = createSdk([]);
+      const processResolver = jest.fn((input) => resolveClaudeCodeProcess({
+        ...input, platform, env: nativeEnv, existsSync: (candidate) => available.has(candidate),
+      }));
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault', settings, sdkLoader: async () => sdk, processResolver, ...overrides,
+      });
+      return { adapter, settings, nativeEnv, available, sdk, processResolver };
+    }
+
+    afterEach(() => jest.restoreAllMocks());
+
+    it('uses a changed setting for the next fresh SDK query', async () => {
+      const settings = { ...getDefaultClaudeCodeBackendSettings(), executablePath: '/old/claude' };
+      const sdk = createSdk([]);
+      const processResolver = jest.fn((input) => resolveClaudeCodeProcess({
+        ...input,
+        platform: 'darwin',
+        env: { PATH: '/native/bin' },
+        existsSync: (candidate) => ['/old/claude', '/new/claude'].includes(candidate),
+      }));
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings,
+        sdkLoader: async () => sdk,
+        processResolver,
+      });
+
+      settings.executablePath = '/new/claude';
+      const sessionId = await adapter.createSession();
+      await collectAsync(adapter.sendMessage({ sessionId, content: 'hello' }));
+
+      expect(sdk.query).toHaveBeenCalledTimes(1);
+      expect(sdk.query.mock.calls[0][0].options.pathToClaudeCodeExecutable).toBe('/new/claude');
+    });
+
+    it('clears the configured path and resolves the current native PATH and env for read-only and diagnostic queries', async () => {
+      const { adapter, settings, nativeEnv, sdk } = createFixture();
+      settings.executablePath = '';
+      nativeEnv.PATH = '/native-b';
+      nativeEnv.SELECTION = 'current';
+      await adapter.getRuntimeCatalog();
+      await adapter.runDiagnosticPrompt({ prompt: 'hello', persistSession: false });
+
+      expect(sdk.query).toHaveBeenCalledTimes(2);
+      for (const [input] of sdk.query.mock.calls) {
+        expect(input.options.pathToClaudeCodeExecutable).toBe(join('/native-b', 'claude'));
+        expect(input.options.env).toEqual(expect.objectContaining({ PATH: expect.stringContaining('/native-b'), SELECTION: 'current' }));
+        expect(input.options.permissionMode).toBe('default');
+        expect(input.options.allowDangerouslySkipPermissions).not.toBe(true);
+      }
+    });
+
+    it.each(['invalid explicit path', 'cleared path without native CLI', 'missing selected file'])('fails closed after selecting %s', async (selection) => {
+      const { adapter, settings, available, sdk } = createFixture();
+      if (selection === 'missing selected file') available.delete('/old/claude');
+      else settings.executablePath = selection === 'invalid explicit path' ? '/missing/claude' : '';
+      if (!settings.executablePath) available.clear();
+      const sessionId = await adapter.createSession();
+
+      expect(await collectAsync(adapter.sendMessage({ sessionId, content: 'hello' }))).toContainEqual({
+        type: 'error', content: expect.stringContaining('Install Claude Code CLI or configure'),
+      });
+      await expect(adapter.runDiagnosticPrompt({ prompt: 'hello' })).rejects.toThrow('Install Claude Code CLI or configure');
+      expect(await adapter.getRuntimeCatalog()).toBeNull();
+      expect(sdk.query).not.toHaveBeenCalled();
+    });
+
+    it('preserves caller env and shell overrides across a live path change', async () => {
+      const processEnv = { PATH: '/caller/bin', CALLER: 'retained' };
+      const { adapter, settings, sdk } = createFixture({ processEnv, spawnShell: false }, 'win32');
+      const spawn = jest.spyOn(jest.requireActual<typeof import('child_process')>('child_process'), 'spawn').mockImplementation(() => { throw new Error('mock spawn'); });
+      settings.executablePath = '/new/claude.cmd';
+      await adapter.runDiagnosticPrompt({ prompt: 'hello' });
+      const options = sdk.query.mock.calls[0][0].options;
+
+      expect(options.pathToClaudeCodeExecutable).toBe('/new/claude.cmd');
+      expect(options.env).toEqual(processEnv);
+      expect(() => options.spawnClaudeCodeProcess({ command: '/new/claude.cmd', args: [], env: options.env })).toThrow('mock spawn');
+      expect(spawn).toHaveBeenCalledWith('/new/claude.cmd', [], expect.objectContaining({ env: processEnv, shell: false }));
+    });
+
+    it.each([false, true])('preserves an explicit constructor path with injected SDK=%s', async (injectSdk) => {
+      const sdk = createSdk([]);
+      const processResolver = jest.fn();
+      const settings = getDefaultClaudeCodeBackendSettings();
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault', settings, pathToClaudeCodeExecutable: '/injected/claude',
+        processEnv: { CALLER: 'retained' }, spawnShell: true, processResolver,
+        ...(injectSdk ? { sdk } : { sdkLoader: async () => sdk }),
+      });
+      settings.executablePath = '/missing/claude';
+      await adapter.runDiagnosticPrompt({ prompt: 'hello' });
+
+      expect(processResolver).not.toHaveBeenCalled();
+      expect(sdk.query.mock.calls[0][0].options).toEqual(expect.objectContaining({
+        pathToClaudeCodeExecutable: '/injected/claude', env: { CALLER: 'retained' },
+      }));
+    });
+
+    it('keeps an active persistent query through setting changes and applies the selection after explicit restart', async () => {
+      const { adapter, settings, sdk } = createFixture();
+      const queue = createAsyncQueue<unknown>();
+      const closeQueue = queue.close;
+      const close = jest.fn(() => closeQueue());
+      sdk.query.mockReturnValueOnce(Object.assign(queue, { close }));
+      const sessionId = await adapter.createSession();
+      const firstTurn = collectAsync(adapter.sendMessage({ sessionId, content: 'first' }));
+      await waitForExpect(() => expect(sdk.query).toHaveBeenCalledTimes(1));
+
+      settings.executablePath = '/missing/claude';
+      expect(close).not.toHaveBeenCalled();
+      queue.push({ type: 'result', subtype: 'success' });
+      await firstTurn;
+      await expect(adapter.restartPersistentQueries('invalid-selection')).rejects.toThrow('Install Claude Code CLI or configure');
+      expect(close).not.toHaveBeenCalled();
+      const secondTurn = collectAsync(adapter.sendMessage({ sessionId, content: 'second' }));
+      queue.push({ type: 'result', subtype: 'success' });
+      await secondTurn;
+      expect(sdk.query).toHaveBeenCalledTimes(1);
+      expect(close).not.toHaveBeenCalled();
+
+      settings.executablePath = '/new/claude';
+      const freshSessionId = await adapter.createSession();
+      await collectAsync(adapter.sendMessage({ sessionId: freshSessionId, content: 'fresh session' }));
+      expect(sdk.query).toHaveBeenCalledTimes(2);
+      expect(sdk.query.mock.calls[1][0].options.pathToClaudeCodeExecutable).toBe('/new/claude');
+      expect(close).not.toHaveBeenCalled();
+      await adapter.restartPersistentQueries('settings-change');
+      expect(close).toHaveBeenCalledTimes(1);
+      await collectAsync(adapter.sendMessage({ sessionId, content: 'after restart' }));
+      expect(sdk.query).toHaveBeenCalledTimes(3);
+      expect(sdk.query.mock.calls[0][0].options.pathToClaudeCodeExecutable).toBe('/old/claude');
+      expect(sdk.query.mock.calls[2][0].options.pathToClaudeCodeExecutable).toBe('/new/claude');
+      adapter.dispose();
+    });
+
+  });
+
+  describe('dedicated probe executable async boundary', () => {
+    async function runDelayedProbe(boundary: string, probe: string, invalid: boolean) {
+      const settings = { ...getDefaultClaudeCodeBackendSettings(), executablePath: '/old/claude' };
+      const nativeEnv = { PATH: '/native-a', SELECTION: 'old' };
+      const sdk = createSdk([]);
+      sdk.query.mockImplementation(() => { throw new Error('query boundary reached'); });
+      let release!: () => void;
+      let started!: () => void;
+      const ready = new Promise<void>(resolve => { started = resolve; });
+      const pending = new Promise<void>(resolve => { release = resolve; });
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault', settings,
+        sdkLoader: async () => {
+          if (boundary === 'sdk') { started(); await pending; }
+          return sdk;
+        },
+        processResolver: input => resolveClaudeCodeProcess({
+          ...input, platform: 'win32', env: nativeEnv,
+          existsSync: candidate => ['/old/claude', '/new/claude.cmd'].includes(candidate),
+        }),
+      });
+      if (boundary === 'mcp') {
+        jest.spyOn(adapter as unknown as { loadMcpConfig(): Promise<void> }, 'loadMcpConfig')
+          .mockImplementation(async () => { started(); await pending; });
+      }
+      const result = (probe === 'setModel' ? adapter.runSetModelLiveProbe('sonnet') : adapter.runCheckpointRewindProbe())
+        .catch(error => error as Error);
+      await ready;
+      settings.executablePath = invalid ? '/missing/claude' : '/new/claude.cmd';
+      nativeEnv.SELECTION = 'current';
+      release();
+      const error = await result as Error;
+      adapter.dispose();
+      return { error, sdk };
+    }
+
+    it.each([['sdk', 'setModel'], ['mcp', 'setModel'], ['sdk', 'checkpoint'], ['mcp', 'checkpoint']])(
+      'rejects invalid selection after delayed %s for %s before query', async (boundary, probe) => {
+        const { error, sdk } = await runDelayedProbe(boundary, probe, true);
+        expect(error.message).toContain('Install Claude Code CLI or configure');
+        expect(sdk.query).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([['sdk', 'setModel'], ['mcp', 'setModel'], ['sdk', 'checkpoint'], ['mcp', 'checkpoint']])(
+      'uses current path/env/shell after delayed %s for %s', async (boundary, probe) => {
+        const { error, sdk } = await runDelayedProbe(boundary, probe, false);
+        expect(error.message).toContain('query boundary reached');
+        const options = sdk.query.mock.calls[0][0].options;
+        expect(options.pathToClaudeCodeExecutable).toBe('/new/claude.cmd');
+        expect(options.env.SELECTION).toBe('current');
+        const spawn = jest.spyOn(jest.requireActual<typeof import('child_process')>('child_process'), 'spawn')
+          .mockImplementation(() => { throw new Error('mock spawn'); });
+        expect(() => options.spawnClaudeCodeProcess({ command: '/new/claude.cmd', args: [], env: options.env })).toThrow('mock spawn');
+        expect(spawn).toHaveBeenCalledWith('/new/claude.cmd', [], expect.objectContaining({ shell: true, env: options.env }));
+        spawn.mockRestore();
+      },
+    );
   });
 
   it('injects permission bridge canUseTool into SDK options', async () => {

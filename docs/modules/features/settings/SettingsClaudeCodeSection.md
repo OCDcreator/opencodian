@@ -88,3 +88,7 @@ acknowledged 只表示请求确认：output styles 展示 SDK 实际返回目录
 PiClaudeSessionControlsUI.test.ts 正式覆盖成功/无active session/unsupported/failure、MCP三个值、server缺失、wrong session 与迟到响应，断言 saveSettings 未调用、outputStyle 未改变、runtime 不误标有效。现有 SettingsClaudeCodeSection.test.ts 的无 config authoring 断言排除新增单会话 server 输入。native-t12 的 Claude SDK 0.3.283/CLI 2.1.272 样式目录作为消费证据；deny-all session 无 server，MCP mutation 仍 unavailable，不能据方法存在推测行为通过。
 
 Mac native-t12 兼容性补充：SDK 0.3.283 方法存在但 CLI 2.1.204 拒绝 reload_output_styles，UI 按 adapter failed 显示失败且 runtime evidence failed，不凭方法存在标有效。PiClaudeSessionControlsUI.test.ts 包含该具体拒绝回归；Windows CLI 2.1.272 返回目录的证据不能泛化到旧 CLI。
+
+## 2026-10-05 Claude executable lifecycle
+
+Executable help describes active-query preservation and the current selection at new-query/explicit-restart boundaries. Failed explicit restart displays the adapter error and preserves active queries. MCP readback distinguishes unavailable `null`, authoritative empty `[]`, and thrown failure; unavailable runtime is never labelled empty or verified.
