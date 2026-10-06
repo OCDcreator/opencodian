@@ -37,3 +37,14 @@ CodeGraph 没有 init。修改前 qualified symbol callers/impact 使用 depth=1
 原始范围为 64 cases、17 profiles、34 profile-platform 单元。这里只记录子条件增量；app-server darwin/win32、sdk-fallback darwin 仍为 partial，sdk-fallback win32 尚未执行。没有整组通过统计。其它历史缺项保存在 `original-scope.json`，后续逐项关联，不能把局部通过换算为整组通过。
 
 `preservation-codex-stage.json` 的 32 个检查全部 unchanged：主仓库、旧多后端工作树的 HEAD/status/diff/未提交文件，四个原始 JSON 账本，Codex auth/config，以及原标准 Test Vault main.js。所有本轮写入和进程限于独立工作树、owned artifact 根及两个隔离库。
+
+## 同阶段追加：Windows fallback、兼容和实际重载
+
+- 第二个修复构建 `REMAINDER.20261007.codex5`：main.js SHA256 `a2425266ff35164c3c038d917ba2ee49beb6acc6bab2208e4f17388c0bb34530`；manifest/styles 与 codex4 相同。两个隔离库实际 loaded 值已核对，build、copy、readback 顺序记录在 `deployment-codex5.json` / `windows-deploy-codex5.json`。旧 codex4 业务回合保留原身份。
+- Windows SDK fallback 实测完成。owned launcher 只让 app-server 返回 78，exec 转发真实 0.160.1。runtime appServer=false/sdk=true。on-request 在 native generation 前被 fail-closed 拒绝（`windows-fallback-strict-notice.json`）；真实 session modal 选择 never 后发送 Luna/high，native `01a11279-2164-7a53-96e3-8b696930aaa7`、JSONL turn_context 与 provider request/response 都一致，terminal nonce 一次（`windows-fallback-native-readback.json`、`windows-fallback-provider-evidence.json`）。不提升完整 sdk-fallback win32 profile。
+- Windows 0.158.0 真正独立安装 native exe SHA256 `af02050cc0c95f5aeb714af2c1077e635c58e9896c13c89d75099cf5b96477be`。实际 app-server 握手，native `01a1127d-1ac7-7100-9f9f-616e8467747c` 两轮回复并召回首轮 token，Luna/high，源 turn/message IDs 一致（`windows-compat-loaded-settled.json`、`windows-compat-first-complete.json`、`windows-compat-second-complete.json`）。
+- 实测发现 Obsidian 1.13.7 没有 reloadPlugin，旧 Reload 按钮只提示手动重载，实际仍运行旧 executable。增加顺序 unloadPlugin/loadPlugin fallback，保存必须先完成，false load 是失败。按钮实际点击后恢复 enabled=true，实际 executable/握手切至 0.158.0，原 fallback 历史 ID 保留（`windows-new-reload-real-click.json`、`windows-compat-loaded-settled.json`、`windows-compat-view-preservation.json`）。读回发生在加载完成前的错误保留，没有将其计为失败重载。
+- 此修改 owner 为 feature.settings-codex；reloadOpenCodian 1 direct caller，depth=1，2 nodes，均同模块。先运行新增控制取得 3 failed，再修复到 38 tests pass；focused lint/typecheck pass；module/owner 文档同步。CodeGraph sync/affected 保存在 codex5 文件。
+- 最终阶段 `verify-codex5-retry.log`：15 gates PASS、965 suites / 10007 tests、0 lint warning。首次 worker SIGSEGV 日志保留；对应 suite 单跑 12/12 pass，再运行完整 verify。
+
+- 兼容 0.158.0 的第二次真实 Reload 后 PID 改变，native ID、两个 user/turn IDs、四条消息及 JSONL SHA256 `eb37a54e1263d2cc5f52525d65b5f62025a726a7643dd75094b8c707f13a0bb1` 保持；native status 为 notLoaded，恢复 UI 历史和 native 文件读取正确，未据此声称已加载继续生成（`windows-compat-after-real-reload.json`）。

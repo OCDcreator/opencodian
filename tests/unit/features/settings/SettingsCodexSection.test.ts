@@ -15,7 +15,7 @@ type TestPlugin = {
   saveSettings: jest.Mock;
   app: {
     workspace: Record<string, unknown>;
-    plugins?: { reloadPlugin?: jest.Mock };
+    plugins?: { reloadPlugin?: jest.Mock; unloadPlugin?: jest.Mock; loadPlugin?: jest.Mock };
   };
   manifest: { id: string };
   agentServiceRegistry: { get: jest.Mock };
@@ -270,6 +270,60 @@ describe('SettingsCodexSection stable surface', () => {
     await reload?.onClick?.();
 
     expect(noticeSpy).toHaveBeenLastCalledWith(t('settings.codex.reload.manual'));
+  });
+
+  it('waits for settings persistence and unload before using the host load fallback', async () => {
+    const plugin = createPlugin();
+    let finishSave!: () => void;
+    let finishUnload!: () => void;
+    plugin.saveSettings.mockReturnValueOnce(new Promise<void>((resolve) => { finishSave = resolve; }));
+    const unloadPlugin = jest.fn().mockReturnValue(new Promise<void>((resolve) => { finishUnload = resolve; }));
+    const loadPlugin = jest.fn().mockResolvedValue(true);
+    plugin.app.plugins = { unloadPlugin, loadPlugin };
+    const section = new SettingsCodexSection({ plugin: plugin as never, createSectionHeading });
+    section.attach(document.createElement('div'));
+
+    const pending = buttonRecords.find((record) => record.name === t('settings.codex.reload.name'))?.onClick?.();
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+    expect(unloadPlugin).not.toHaveBeenCalled();
+    finishSave();
+    await Promise.resolve();
+    expect(unloadPlugin).toHaveBeenCalledWith('opencodian');
+    expect(loadPlugin).not.toHaveBeenCalled();
+    finishUnload();
+    await pending;
+    expect(loadPlugin).toHaveBeenCalledTimes(1);
+    expect(loadPlugin).toHaveBeenCalledWith('opencodian');
+  });
+
+  it('preserves the running plugin when saving the reload settings fails', async () => {
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    const plugin = createPlugin();
+    plugin.saveSettings.mockRejectedValueOnce(new Error('disk unavailable'));
+    const unloadPlugin = jest.fn();
+    const loadPlugin = jest.fn();
+    plugin.app.plugins = { unloadPlugin, loadPlugin };
+    new SettingsCodexSection({ plugin: plugin as never, createSectionHeading }).attach(document.createElement('div'));
+
+    await buttonRecords.find((record) => record.name === t('settings.codex.reload.name'))?.onClick?.();
+
+    expect(unloadPlugin).not.toHaveBeenCalled();
+    expect(loadPlugin).not.toHaveBeenCalled();
+    expect(noticeSpy).toHaveBeenLastCalledWith(t('settings.codex.reload.failed'));
+  });
+
+  it('reports a false host load result as a failed reload', async () => {
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    const plugin = createPlugin();
+    const unloadPlugin = jest.fn().mockResolvedValue(undefined);
+    const loadPlugin = jest.fn().mockResolvedValue(false);
+    plugin.app.plugins = { unloadPlugin, loadPlugin };
+    new SettingsCodexSection({ plugin: plugin as never, createSectionHeading }).attach(document.createElement('div'));
+
+    await buttonRecords.find((record) => record.name === t('settings.codex.reload.name'))?.onClick?.();
+
+    expect(loadPlugin).toHaveBeenCalledWith('opencodian');
+    expect(noticeSpy).toHaveBeenLastCalledWith(t('settings.codex.reload.failed'));
   });
 
   it('shows a manual recovery instruction when plugin reload rejects', async () => {

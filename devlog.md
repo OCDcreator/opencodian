@@ -16,6 +16,7 @@
 - SDK fallback 每 turn 捕获模型/effort 并刷新同 native ID 的 wrapper；nonfatal warning/reconnect 不再提前显示发送失败，terminal error 保持失败。
 - Codex readback/MCP/session 目录透传权限拒绝；partial 保留已有目录，双语固定说明避免暴露原始错误。
 - 权限卡取消 unresolved turn sticky header，并增加 composer scroll padding；Windows native 长 command 卡鼠标拒绝实测成功，Mac hidden 布局条件单独记录。
+- Codex 显式重载在没有 reloadPlugin 的 Obsidian 宿主上使用顺序 unload/load，先等待设置保存；Windows 实际按钮切换至独立 0.158.0，并保留会话历史。Windows SDK fallback 的 never 正向请求和 on-request fail-closed 已取得 native/provider 证据。
 - 版本保持 1.1.37；构建身份、Mac/Windows 实机证据、待审兼容 fork/清理和未测条件见 `docs/status/backend-remaining-codex-acceptance-2026-10-07.md`。
 
 ## 2026-10-06 v1.1.37：定向后端修复与 macOS 主路径验收
