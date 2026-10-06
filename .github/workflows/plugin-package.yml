@@ -17,6 +17,7 @@ jobs:
     env:
       PLUGIN_ARTIFACT_NAME: opencodian-plugin-${{ github.sha }}
       OPENCODIAN_BUILD_ID: ci-${{ github.sha }}
+      NODE_OPTIONS: --test-reporter=tap
     steps:
       - name: Checkout
         uses: actions/checkout@v7

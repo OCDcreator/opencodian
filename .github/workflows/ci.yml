@@ -7,6 +7,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # Node 24 defaults to spec for child node --test; wrappers assert TAP summaries.
+  NODE_OPTIONS: --test-reporter=tap
+
 jobs:
   desktop-tests:
     strategy:

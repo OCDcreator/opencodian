@@ -18,6 +18,7 @@ jobs:
       PLUGIN_ARTIFACT_NAME: opencodian-plugin-${{ gitea.sha }}
       OPENCODIAN_BUILD_ID: ci-${{ gitea.sha }}
       PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+      NODE_OPTIONS: --test-reporter=tap
     steps:
       - name: Checkout
         uses: actions/checkout@v7
