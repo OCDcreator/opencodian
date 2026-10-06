@@ -11,6 +11,13 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-10-06 v1.1.37：定向后端修复与 macOS 主路径验收
+
+- Pi 修复模型/effort 控件刷新、继承文案与会话独立保存恢复；Codex 接通原生消息/turn 身份、消息前 fork、子会话目录和逐发送模型，保留 fail-closed 及缓存清理；Claude 修复当前外部 CLI/env/shell 快照、await 后复验和 invalid restart 前置拒绝。
+- ZCode 项目插件开关已验证实际技能加载和重载恢复，保存说明明确区分有效目录与执行。OpenCode 2 local-native 及 OpenCode 1 legacy HTTP/SSE 通过指定实机路径，没有为验收制造永久补丁；审计包与普通 rollout 的证据归属分别保留。
+- Node 24 CI 显式使用 TAP reporter，解决已有 wrapper 的输出格式断言；不修改测试场景或后端逻辑。功能提交与发布版本同步分开。
+- 验收范围和剩余边界见 `docs/status/backend-macos-scoped-acceptance-2026-10-06.md`。完整 profiles、Windows、auxiliary、兼容/remote 矩阵及历史 listener 401 尚未闭合，本版不宣称六后端全量完成。
+
 ## 2026-09-30 Codex 后端全面接入 0.159 app-server 能力面 + 跨后端统一能力缝
 
 对照本机 codex 0.159.0 的 `app-server generate-json-schema` 精确协议面（/tmp/codex-schema-0159），把插件从 0.144.1 时代的 wire 绑定补齐到当前上游能力，全部由「统一 capability 接口 + 各后端按需声明」的既有架构承载，聊天层零新 UX 体系。编排方式：1 个计划文件（.tmp/codex-full-integration-plan.md）+ 两波共 8 个并行子代理 + 独立审查代理（GO，2 个 should-fix 已修）。
