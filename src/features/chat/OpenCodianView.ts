@@ -274,6 +274,7 @@ import {
 import {
   type ComposerInputSubmission,
   MessageSendPreparationService,
+  type SendMessageModelOptions,
 } from './services/MessageSendPreparationService';
 import { ModifiedFilesSidebarCoordinator } from './services/ModifiedFilesSidebarCoordinator';
 import {
@@ -4869,16 +4870,22 @@ export class OpenCodianView extends ItemView {
   }
 
   /** Get model options for sendMessage */
-  private getSendMessageOptions(): { provider?: string; model?: string; variant?: string } {
+  private getSendMessageOptions(): SendMessageModelOptions {
     const current = this.getCurrentSessionModel();
-    if (!current) {
-      return {};
-    }
-
+    const effective = this.currentConversation?.backend === 'codex'
+      ? this.conversationSessionSettingsCoordinator.resolveEffectiveSettings(this.currentConversation)
+      : undefined;
     return {
-      provider: current.provider,
-      model: current.model,
-      variant: this.getCurrentEffortVariant(),
+      ...(current ? { provider: current.provider, model: current.model, variant: this.getCurrentEffortVariant() } : {}),
+      ...(effective ? { codexOptions: {
+        model: effective.codexModelOverride,
+        sandboxMode: effective.codexSandboxMode,
+        approvalPolicy: effective.codexApprovalPolicy,
+        modelReasoningEffort: effective.codexModelReasoningEffort,
+        additionalDirectories: [...(effective.codexAdditionalDirectories ?? [])],
+        networkAccessEnabled: effective.codexNetworkAccessEnabled,
+        webSearchMode: effective.codexWebSearchMode,
+      } } : {}),
     };
   }
 

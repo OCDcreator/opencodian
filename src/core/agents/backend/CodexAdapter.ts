@@ -2557,7 +2557,7 @@ export class CodexAdapter
     // either is missing the turn fails closed with an actionable error
     // instead of silently falling back to a less restrictive path. 'never'
     // may use the existing fallback; 'inherit' omits the override entirely.
-    const policy = this.options.approvalPolicy ?? 'inherit';
+    const policy = this.captureAttemptOptions(request.options?.codexOptions as AttemptOptions | undefined).approvalPolicy ?? 'inherit';
     if (policy === 'untrusted' || policy === 'on-request') {
       if (!this.canUseAppServerChat() || typeof this.approvalHost.collectApproval !== 'function') {
         yield {
@@ -2588,7 +2588,7 @@ export class CodexAdapter
 
   private async *sendMessageViaSdk(request: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
     const threadOptions = this.buildThreadOptions({
-      ...this.captureAttemptOptions(),
+      ...this.captureAttemptOptions(request.options?.codexOptions as AttemptOptions | undefined),
       ...(typeof request.options?.model === 'string' && request.options.model.trim()
         ? { model: request.options.model.trim() } : {}),
       ...(typeof request.options?.variant === 'string' && CODEX_EFFORT_VARIANTS.includes(request.options.variant as CodexReasoningEffort)
@@ -3497,16 +3497,17 @@ export class CodexAdapter
    * app-server attempt. Called BEFORE any await so mid-flight mutations to
    * this.options do not leak into the attempt's thread/turn options or evidence.
    */
-  private captureAttemptOptions(): AttemptOptions {
+  private captureAttemptOptions(overrides?: AttemptOptions): AttemptOptions {
+    const source = { ...this.options, ...overrides };
     return {
-      ...(this.options.model !== undefined ? { model: this.options.model } : {}),
-      ...(this.options.workingDirectory !== undefined ? { workingDirectory: this.options.workingDirectory } : {}),
-      ...(this.options.sandboxMode !== undefined ? { sandboxMode: this.options.sandboxMode } : {}),
-      ...(this.options.additionalDirectories ? { additionalDirectories: [...this.options.additionalDirectories] } : {}),
-      ...(this.options.networkAccessEnabled !== undefined ? { networkAccessEnabled: this.options.networkAccessEnabled } : {}),
-      ...(this.options.webSearchMode !== undefined ? { webSearchMode: this.options.webSearchMode } : {}),
-      ...(this.options.approvalPolicy !== undefined ? { approvalPolicy: this.options.approvalPolicy } : {}),
-      ...(this.options.modelReasoningEffort !== undefined ? { modelReasoningEffort: this.options.modelReasoningEffort } : {}),
+      ...(source.model !== undefined ? { model: source.model } : {}),
+      ...(source.workingDirectory !== undefined ? { workingDirectory: source.workingDirectory } : {}),
+      ...(source.sandboxMode !== undefined ? { sandboxMode: source.sandboxMode } : {}),
+      ...(source.additionalDirectories ? { additionalDirectories: [...source.additionalDirectories] } : {}),
+      ...(source.networkAccessEnabled !== undefined ? { networkAccessEnabled: source.networkAccessEnabled } : {}),
+      ...(source.webSearchMode !== undefined ? { webSearchMode: source.webSearchMode } : {}),
+      ...(source.approvalPolicy !== undefined ? { approvalPolicy: source.approvalPolicy } : {}),
+      ...(source.modelReasoningEffort !== undefined ? { modelReasoningEffort: source.modelReasoningEffort } : {}),
     };
   }
 
@@ -3519,7 +3520,7 @@ export class CodexAdapter
   private beginAppServerAttempt(sessionId: string, sendOptions?: Record<string, unknown>): AppServerAttempt {
     const logicalSessionId = this.logicalSessionKey(sessionId);
     const options: AttemptOptions = {
-      ...this.captureAttemptOptions(),
+      ...this.captureAttemptOptions(sendOptions?.codexOptions as AttemptOptions | undefined),
       ...(typeof sendOptions?.model === 'string' && sendOptions.model.trim()
         ? { model: sendOptions.model.trim() } : {}),
       ...(typeof sendOptions?.variant === 'string' && CODEX_EFFORT_VARIANTS.some((variant) => variant === sendOptions.variant)

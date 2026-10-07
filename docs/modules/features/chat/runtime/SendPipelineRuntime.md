@@ -1,5 +1,7 @@
 # SendPipelineRuntime
 
+> 2026-10-08：发送在首次 slash-command await 前固定 initiating tab；后续 preparation 只处理该目标，避免快速切换把草稿送往其它会话。
+
 > 2026-10-05：透传可选的 reconcileCodexFinalText callback；仅在 Codex 单条原生完成文本需要收敛时调用，保留旧 host 结构与其他后端行为。
 > 2026-09-21 (advantage-parity R-F2)：R-B3 `onTurnSnapshotBegin` 将 `Conversation.linkedNotePath` 合入既有 file/current-note context paths，并以 `Set` 去重；不改变 EditRevertService capture 或回退语义。
 > 2026-09-21 (advantage-parity R-F1)：sendQueuedFollowUp 消费后即时通知队列变化（后台 tab 也先出队再决策）。

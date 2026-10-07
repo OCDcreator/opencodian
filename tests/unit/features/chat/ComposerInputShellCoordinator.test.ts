@@ -325,7 +325,8 @@ describe('ComposerInputShellCoordinator', () => {
     expect(fixture.host.submitMessage).toHaveBeenCalledWith({
       kind: 'prompt',
       content: 'Hello coordinator',
-    });
+    }, expect.any(Function));
+    fixture.host.submitMessage.mock.calls[0][1]?.('accepted');
     expect(fixture.host.addChosenFileContextToActiveTab).toHaveBeenCalledTimes(1);
     expect(fixture.textarea.value).toBe('');
   });
@@ -2012,5 +2013,41 @@ describe('ComposerInputShellCoordinator — image paste and drag-drop', () => {
 
     const chips = fixture.container.querySelectorAll('.opencodian-composer-image-chip');
     expect(chips.length).toBe(1);
+  });
+});
+
+
+describe('Composer prompt preparation acknowledgement', () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+  beforeEach(() => installCoordinatorDomMocks());
+  afterEach(() => restoreCoordinatorDomMocks(originalResizeObserver));
+  it('retains a plain-text draft until the preparation result and keeps it on rejection', () => {
+    const fixture = createFixture();
+    fixture.textarea.value = 'pending original draft';
+    fixture.sendBtn.click();
+    expect(fixture.textarea.value).toBe('pending original draft');
+    expect(fixture.sendBtn.disabled).toBe(true);
+    const outcome = fixture.host.submitMessage.mock.calls[0][1];
+    expect(outcome).toEqual(expect.any(Function));
+    outcome?.('rejected');
+    expect(fixture.textarea.value).toBe('pending original draft');
+    expect(fixture.sendBtn.disabled).toBe(false);
+  });
+
+  it.each(['accepted', 'queued'] as const)('clears an unchanged plain draft only after %s', (result) => {
+    const fixture = createFixture();
+    fixture.textarea.value = 'accepted original draft';
+    fixture.sendBtn.click();
+    fixture.host.submitMessage.mock.calls[0][1]?.(result);
+    expect(fixture.textarea.value).toBe('');
+  });
+
+  it('does not clear text edited while preparation was pending', () => {
+    const fixture = createFixture();
+    fixture.textarea.value = 'initial draft';
+    fixture.sendBtn.click();
+    fixture.textarea.value = 'new draft typed during preparation';
+    fixture.host.submitMessage.mock.calls[0][1]?.('accepted');
+    expect(fixture.textarea.value).toBe('new draft typed during preparation');
   });
 });

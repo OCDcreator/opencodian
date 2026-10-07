@@ -23,7 +23,7 @@ type Harness = {
   conversationSessionSettingsCoordinator: ConversationSessionSettingsCoordinator;
   createConversationSessionSettingsCoordinatorHost(): ConstructorParameters<typeof ConversationSessionSettingsCoordinator>[0];
   createComposerInputShellCoordinatorHost(): ComposerInputShellCoordinatorHost;
-  getCurrentSessionModel(): { provider: string; model: string };
+  getCurrentSessionModel(): { provider: string; model: string } | null;
   getCurrentEffortVariant(): string | undefined;
   getSendMessageOptions(): { provider?: string; model?: string; variant?: string };
 };
@@ -94,5 +94,30 @@ describe('Codex composer session effort', () => {
     await view.conversationSessionSettingsCoordinator.saveConversationOverrides(a, { codexModelReasoningEffort: 'low' });
     expect(update).toHaveBeenCalled();
     expect(view.effortSelector.callbacks.getVariant()).toBe('low');
+  });
+});
+
+
+describe('Codex send safety snapshot', () => {
+  it('captures all effective session settings before another tab becomes active', () => {
+    const a = conversation('a', 'low');
+    a.sessionSettings = { ...a.sessionSettings, codexSandboxMode: 'workspace-write', codexApprovalPolicy: 'on-request', codexAdditionalDirectories: ['/private/a'], codexNetworkAccessEnabled: true, codexWebSearchMode: 'live' };
+    const view = harness(a);
+    const options = view.getSendMessageOptions() as ReturnType<Harness['getSendMessageOptions']> & { codexOptions?: Record<string, unknown> };
+    view.currentConversation = conversation('b', 'high');
+    a.sessionSettings.codexAdditionalDirectories?.push('/later');
+    expect(options.codexOptions).toEqual(expect.objectContaining({ sandboxMode: 'workspace-write', approvalPolicy: 'on-request', modelReasoningEffort: 'low', additionalDirectories: ['/private/a'], networkAccessEnabled: true, webSearchMode: 'live' }));
+  });
+});
+
+
+describe('Codex send snapshot while the model picker has no row', () => {
+  it('still captures the effective conversation model instead of the mutable adapter model', () => {
+    const a = conversation('a', 'low');
+    a.sessionSettings = { ...a.sessionSettings, codexModelOverride: 'owned-session-model' };
+    const view = harness(a);
+    view.getCurrentSessionModel = () => null;
+    const options = view.getSendMessageOptions() as { codexOptions?: Record<string, unknown> };
+    expect(options.codexOptions?.model).toBe('owned-session-model');
   });
 });

@@ -46,6 +46,8 @@ export interface SendMessageModelOptions {
   provider?: string;
   model?: string;
   variant?: string;
+  /** Immutable effective Codex settings captured for the sending conversation. */
+  codexOptions?: Record<string, unknown>;
   /** One-shot structured-output schema for Claude Code `/json` trigger. Not persisted. */
   outputFormat?: Record<string, unknown>;
 }
@@ -373,18 +375,26 @@ export class MessageSendPreparationService {
     options: PrepareMessageSendOptions,
   ): Promise<PreparedMessageSend | null> {
     const tabId = options.targetTabId ?? this.host.getActiveTabId();
-    if (!tabId || !this.isTargetTabActive(options.targetTabId)) {
+    if (!tabId || !this.isTargetTabActive(tabId)) {
       this.notifyPreparationOutcome(options, 'rejected');
       return null;
     }
     // Check server availability BEFORE creating a conversation/session,
     // so we never bootstrap an orphan session when the backend is disabled/offline.
     const earlyAvailability = await this.host.getServerAvailability();
+    if (!this.isTargetTabActive(tabId)) {
+      this.notifyPreparationOutcome(options, 'rejected');
+      return null;
+    }
     if (earlyAvailability !== 'running' && earlyAvailability !== 'external') {
       if (!(await this.ensureServerReadyForChat(earlyAvailability))) {
         this.notifyPreparationOutcome(options, 'rejected');
         return null;
       }
+    }
+    if (!this.isTargetTabActive(tabId)) {
+      this.notifyPreparationOutcome(options, 'rejected');
+      return null;
     }
     const conversation = await this.host.ensureConversationReady();
     if (!conversation) {
@@ -397,7 +407,7 @@ export class MessageSendPreparationService {
       this.notifyPreparationOutcome(options, 'rejected');
       return null;
     }
-    if (!this.isTargetTabActive(options.targetTabId) || !this.host.ensureTabRuntime(tabId)) {
+    if (!this.isTargetTabActive(tabId) || !this.host.ensureTabRuntime(tabId)) {
       this.notifyPreparationOutcome(options, 'rejected');
       return null;
     }
@@ -415,12 +425,22 @@ export class MessageSendPreparationService {
     const draftContextItems = this.composerSendContext.getDraftContextItems(tabId);
     const availability = await this.host.getServerAvailability();
     await this.refreshStatusSurfaces();
+    if (!this.isTargetTabActive(tabId)) {
+      this.resetPreparingLifecycle(tabId);
+      this.notifyPreparationOutcome(options, 'rejected');
+      return null;
+    }
     if (availability !== 'running' && availability !== 'external') {
       if (!(await this.ensureServerReadyForChat(availability))) {
         this.resetPreparingLifecycle(tabId);
         this.notifyPreparationOutcome(options, 'rejected');
         return null;
       }
+    }
+    if (!this.isTargetTabActive(tabId)) {
+      this.resetPreparingLifecycle(tabId);
+      this.notifyPreparationOutcome(options, 'rejected');
+      return null;
     }
     const usesModelCatalog = this.host.shouldUseModelCatalog(conversation);
     const modelOptions = usesModelCatalog ? await this.prepareModelOptions(tabId) : {};
@@ -498,6 +518,11 @@ export class MessageSendPreparationService {
     const skillExpansion = conversation.backend === 'pi' || conversation.backend === 'zcode' || conversation.backend === 'opencode2'
       ? { syntheticParts: [] }
       : await this.skillContentExpander.expand(requestContent);
+    if (!this.isTargetTabActive(tabId)) {
+      this.resetPreparingLifecycle(tabId);
+      this.notifyPreparationOutcome(options, 'rejected');
+      return null;
+    }
     const syntheticTextParts: PromptSyntheticTextPartInput[] = [
       ...(options.syntheticTextParts ?? []),
       ...skillExpansion.syntheticParts.map((part) => ({
@@ -520,16 +545,20 @@ export class MessageSendPreparationService {
       images: options.images,
     });
     const writeTicket = this.host.createConversationWriteTicket(conversation.id);
+    let messageRecorded = false;
     const writeApplied = await this.host.commitConversationWrite(
       conversation,
       writeTicket,
       'optimistic-user-message',
       () => {
+        // The write may wait behind an earlier save; check at its actual commit.
+        if (!this.isTargetTabActive(tabId)) return;
         conversation.messages.push(userMessage);
+        messageRecorded = true;
         conversation.updatedAt = userMessage.timestamp;
       },
     );
-    if (!writeApplied) {
+    if (!writeApplied || !messageRecorded) {
       this.resetPreparingLifecycle(tabId);
       this.notifyPreparationOutcome(options, 'rejected');
       return null;
@@ -543,7 +572,8 @@ export class MessageSendPreparationService {
     this.host.armBackgroundTaskIndicatorForUserMessage(userMessage, tabId);
     this.host.startConversationSyncLoop();
     this.host.setAutoScrollEnabled(tabId, true);
-    await this.host.renderMessage(userMessage);
+    // An accepted background turn stays persisted; its next activation renders it.
+    if (this.isTargetTabActive(tabId)) await this.host.renderMessage(userMessage);
     this.host.scrollToBottom({ tabId, enableAutoScroll: true });
     const conversationBackend = conversation.backend ?? 'opencode';
     const shouldBootstrapTitle = this.isFirstUserMessage(conversation)
@@ -700,13 +730,17 @@ export class MessageSendPreparationService {
 
   private async prepareModelOptions(tabId: TabId): Promise<SendMessageModelOptions | null> {
     if (!this.host.hasLoadedModelCatalog()) await this.host.loadAvailableModels();
+    if (!this.isTargetTabActive(tabId)) {
+      this.resetPreparingLifecycle(tabId);
+      return null;
+    }
     const modelOptions = this.host.getSendMessageOptions();
     const modelAvailable = await this.host.ensureSelectedModelAvailable(
       modelOptions.provider,
       modelOptions.model,
     );
     if (!modelAvailable) {
-      await this.host.appendModelUnavailableNoticeMessage();
+      if (this.isTargetTabActive(tabId)) await this.host.appendModelUnavailableNoticeMessage();
       this.resetPreparingLifecycle(tabId);
       return null;
     }

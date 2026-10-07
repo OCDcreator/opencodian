@@ -575,3 +575,17 @@ describe('CodexAdapter — in-flight cancellation via epoch (item A round 8)', (
     expect(adapter.getLatestThreadEffectiveEvidence()).toBeNull();
   });
 });
+
+
+describe('CodexAdapter per-send settings snapshot', () => {
+  beforeEach(() => resetMocks());
+  it('uses the captured sending conversation for thread and turn permissions', async () => {
+    const adapter = wiredAdapter();
+    adapter.setApprovalHost({ collectApproval: jest.fn().mockResolvedValue(null) });
+    await adapter.start();
+    const chunks = [];
+    for await (const chunk of adapter.sendMessage({ sessionId: 'codex-local-snapshot-a', content: 'go', options: { codexOptions: { sandboxMode: 'read-only', approvalPolicy: 'on-request', modelReasoningEffort: 'low' } } })) chunks.push(chunk);
+    expect(mockStartThread).toHaveBeenCalledWith(expect.objectContaining({ sandbox: 'read-only', approvalPolicy: 'on-request' }));
+    expect(mockStartTurn).toHaveBeenCalledWith(expect.objectContaining({ approvalPolicy: 'on-request', effort: 'low' }));
+  });
+});

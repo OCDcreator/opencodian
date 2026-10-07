@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "9a71abde7bc92a975add391fde64028ffc0494fd084c579e6ca9ea44055f1a75",
+  "digest": "4e78c4f811347bb86167807cc26abb76271972ef33e935b675a2cac4d7f014f3",
   "recordCount": 796,
   "records": [
     {
@@ -326,7 +326,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexAdapter.ts",
-      "sha256": "ff87a72a165071ba00e0743b55d82969cbfbb8bf4ed22b77c62eb63f19ec1e3e"
+      "sha256": "fd1d753b7ca8ca5e25e8720bea940f593e310adae23d9621428fdb101d5e9768"
     },
     {
       "kind": "src",
@@ -1401,7 +1401,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
-      "sha256": "d9a1972be00d464c5b929543096f79431559c44f6954ec2dcb15f88c11ae9771"
+      "sha256": "747bc2f8a34157167cc0aec8389fc9db11f67c3f0ae1a137f8af34c75252f757"
     },
     {
       "kind": "src",
@@ -1576,7 +1576,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/SendPipelineRuntime.ts",
-      "sha256": "eeecbb2c67c647dab1161ce099082161a608b08a0a902a7d2d4aa1e2b2c2e3ab"
+      "sha256": "a58f9cab4d2ffba4a3081381280a79d38b5e5918556862a21fbfd63e1036ebbc"
     },
     {
       "kind": "src",
@@ -1841,7 +1841,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ComposerInputShellCoordinator.ts",
-      "sha256": "0ade42743f9b48f6c27fb140be876527e02751c0b301a5edbda52ed48f8cf729"
+      "sha256": "ee8c5b3fe11720a1d661c5e33fb056c2fd6d3f934a1de62a0049a64f508b6c54"
     },
     {
       "kind": "src",
@@ -2111,7 +2111,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/MessageSendPreparationService.ts",
-      "sha256": "91f49519297777b4cf62b3a281188b6e86c20d7cc5b3dbb5140df8b9937b95f8"
+      "sha256": "0af45044e0fdd105381c241da823f87bf576f0e947328b4ffa97b06725b06787"
     },
     {
       "kind": "src",
@@ -3984,7 +3984,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-07T20:34:38.598Z",
-  "headShaAtGeneration": "56059fb4dbde5d87e319284cb58dcd498a999da5",
+  "generatedAt": "2026-10-07T21:29:54.223Z",
+  "headShaAtGeneration": "743d14f0a875dd04a6892fb6ebb683ce460fce51",
   "graphifyVersion": "graphify 0.8.50"
 }

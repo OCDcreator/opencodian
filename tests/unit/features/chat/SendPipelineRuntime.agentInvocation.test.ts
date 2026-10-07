@@ -217,7 +217,7 @@ describe('SendPipelineRuntime agent invocation', () => {
 
     await runtime.sendMessage(input);
 
-    expect(preparationPort.prepareMessageSend).toHaveBeenCalledWith(input);
+    expect(preparationPort.prepareMessageSend).toHaveBeenCalledWith({ ...input, targetTabId: 'tab-1' });
     expect(host.sendStreamMessage).toHaveBeenCalledTimes(1);
     expect(host.sendStreamMessage).toHaveBeenCalledWith(preparedSend.conversation, 'Hello', {
       sessionId: 'session-1',

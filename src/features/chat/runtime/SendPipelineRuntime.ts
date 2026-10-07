@@ -244,7 +244,12 @@ export class SendPipelineRuntime {
   ) {}
 
   async sendMessage(input: string | PrepareMessageSendOptions): Promise<void> {
-    let preparationOptions = typeof input === 'string' ? { content: input } : input;
+    const initialOptions = typeof input === 'string' ? { content: input } : input;
+    // Bind the send before slash-command expansion yields to tab navigation.
+    let preparationOptions: PrepareMessageSendOptions = {
+      ...initialOptions,
+      targetTabId: initialOptions.targetTabId ?? this.host.getActiveTabId() ?? undefined,
+    };
     let content = preparationOptions.content;
 
     // Detect and strip the `/json ` structured-output trigger before any further processing.

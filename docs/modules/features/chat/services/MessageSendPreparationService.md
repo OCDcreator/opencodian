@@ -1,4 +1,6 @@
 # MessageSendPreparationService
+
+> 2026-10-08：preflight 在 readiness、model/context 异步准备后及实际 optimistic write 回调内核对 initiating tab；切换发生在接收前返回 rejected，保留 composer 草稿且不追加消息。消息已接收后允许所属 tab 后台运行，跳过对其它活动 tab 的渲染。模型选项携带有效 Codex 会话设置快照。
 OpenCode 2 skips OpenCode 1 skill-content expansion. The v2 adapter resolves slash skill names against the native v2 catalog and supplies native skill IDs to prompt admission.
 
 OpenCode 2 conversations enter first-message title bootstrap and AI title generation through their own backend seam.

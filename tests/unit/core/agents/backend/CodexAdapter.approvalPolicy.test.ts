@@ -213,3 +213,17 @@ describe('CodexAdapter approval-policy resolution', () => {
     expect(adapter.hasCapability(AgentCapability.Permissions)).toBe(true);
   });
 });
+
+
+describe('CodexAdapter captured fallback policy', () => {
+  beforeEach(() => resetMocks());
+  it('refuses SDK fallback for a captured on-request turn even when another tab changed the adapter to never', async () => {
+    const sdk = createMockCodex();
+    const adapter = new CodexAdapter({ createAppServerClient: () => null, createCodex: async () => sdk, approvalPolicy: 'never' });
+    await adapter.start();
+    const chunks: StreamChunk[] = [];
+    for await (const chunk of adapter.sendMessage({ sessionId: 'captured-strict', content: 'go', options: { codexOptions: { approvalPolicy: 'on-request' } } })) chunks.push(chunk);
+    expect(chunks).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'error', content: expect.stringContaining('requires') })]));
+    expect(sdk.startThread).not.toHaveBeenCalled();
+  });
+});

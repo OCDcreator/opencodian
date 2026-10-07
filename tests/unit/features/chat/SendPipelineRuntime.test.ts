@@ -50,7 +50,7 @@ describe('SendPipelineRuntime', () => {
 
     await runtime.sendMessage('Hello');
 
-    expect(preparationPort.prepareMessageSend).toHaveBeenCalledWith({ content: 'Hello' });
+    expect(preparationPort.prepareMessageSend).toHaveBeenCalledWith({ content: 'Hello', targetTabId: 'tab-1' });
     expect(preparationPort.enterStreamingState).not.toHaveBeenCalled();
     expect(host.sendStreamMessage).not.toHaveBeenCalled();
     expect(finalizationPort.finalizeAfterStream).not.toHaveBeenCalled();
@@ -159,5 +159,17 @@ describe('SendPipelineRuntime', () => {
     expect(host.onTurnSnapshotBegin).toHaveBeenCalledWith(expect.objectContaining({
       contextPaths: ['drafts/plan.md'],
     }));
+  });
+});
+
+
+describe('SendPipelineRuntime preparation identity', () => {
+  it('captures the initiating tab before the slash-command await', async () => {
+    const controller = createStreamController();
+    const host = createHost(createTabRuntime(), controller);
+    const preparation = createPreparationPort(null);
+    const slash = { tryRunSlashCommand: jest.fn(async () => { host.getActiveTabId.mockReturnValue('tab-2'); return false; }) };
+    await new SendPipelineRuntime(host, preparation, createFinalizationPort(), slash).sendMessage('tab-1 draft');
+    expect(preparation.prepareMessageSend).toHaveBeenCalledWith(expect.objectContaining({ targetTabId: 'tab-1', content: 'tab-1 draft' }));
   });
 });

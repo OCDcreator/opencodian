@@ -48,7 +48,7 @@ describe('SendPipelineRuntime queued follow-up sends', () => {
 
     await runtime.sendMessage('Hello');
 
-    expect(preparationPort.prepareMessageSend).toHaveBeenNthCalledWith(1, { content: 'Hello' });
+    expect(preparationPort.prepareMessageSend).toHaveBeenNthCalledWith(1, { content: 'Hello', targetTabId: 'tab-1' });
     expect(preparationPort.consumeQueuedFollowUpSend).toHaveBeenCalledWith('tab-1');
     expect(preparationPort.prepareMessageSend).toHaveBeenNthCalledWith(2, {
       content: 'Queued follow-up',
