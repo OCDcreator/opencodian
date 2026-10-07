@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "0601c7da25737595bddc1cc7843d5114d83351373f0e3cac2a66e4b2d11a17c8",
+  "digest": "1f82f0f0cc907946cf81e0313698231cbded67b1279d85844d02c0efeb47f591",
   "recordCount": 796,
   "records": [
     {
@@ -1401,7 +1401,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
-      "sha256": "1a9f34a468d583c54fe656d90b64c8c3866ab9bfcfbff04bfaeceb2e68a02bfb"
+      "sha256": "89cccd9d067f129a090782611fb8f0080c7a7a704c3dc074deac5569bd0a39e1"
     },
     {
       "kind": "src",
@@ -3984,7 +3984,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-07T18:31:01.837Z",
-  "headShaAtGeneration": "eda735c73db6f76376231a89fb563001ddca9d40",
+  "generatedAt": "2026-10-07T19:54:30.181Z",
+  "headShaAtGeneration": "697242bbedeba16a6d02a42b5db03b36d272e727",
   "graphifyVersion": "graphify 0.8.50"
 }

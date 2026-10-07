@@ -821,6 +821,7 @@ export class OpenCodianView extends ItemView {
           (adapter as { updateWebSearchMode(m: string | undefined): void })
             .updateWebSearchMode(overrides.webSearchMode);
         }
+        this.effortSelector?.updateDisplay();
       },
       agentServiceRegistry: this.plugin.agentServiceRegistry,
       openBackendSessionAsConversation: async (sessionId, title) => {
@@ -1063,13 +1064,13 @@ export class OpenCodianView extends ItemView {
           getVariant: () => this.getCurrentEffortVariant(),
           onVariantChange: async (variant: string | undefined) => {
             if (this.isCodexConversationActive()) {
-              // Codex effort: write back to persisted settings and update the
-              // adapter so subsequent thread creation uses the new value.
+              const conversation = this.currentConversation;
+              if (!conversation) return;
               const effort = (variant ?? 'medium') as CodexReasoningEffort;
-              this.plugin.settings.backendSettings.codex.modelReasoningEffort = effort;
-              await this.plugin.saveSettings();
-              this.currentVariant = effort;
-              this.updateCodexAdapterEffort(effort);
+              await this.conversationSessionSettingsCoordinator.saveConversationOverrides(conversation, {
+                ...conversation.sessionSettings,
+                codexModelReasoningEffort: effort,
+              });
               return;
             }
             const current = this.getCurrentSessionModel();
@@ -4845,6 +4846,11 @@ export class OpenCodianView extends ItemView {
   }
 
   private getCurrentEffortVariant(): string | undefined {
+    if (this.isCodexConversationActive()) {
+      return this.conversationSessionSettingsCoordinator?.resolveEffectiveSettings(
+        this.currentConversation,
+      ).codexModelReasoningEffort ?? this.plugin.settings.backendSettings.codex.modelReasoningEffort;
+    }
     if (this.currentConversation?.backend === 'pi') {
       const current = this.getCurrentSessionModel();
       return current
@@ -4858,19 +4864,6 @@ export class OpenCodianView extends ItemView {
     return this.currentConversation?.backend === 'zcode'
       ? `zcode:${this.currentConversation.id}:${modelRef}`
       : modelRef;
-  }
-
-  /**
-   * Push a new reasoning-effort value into the live Codex adapter so that
-   * subsequent thread creation/resume uses the updated level.
-   * This does NOT affect already-running threads.
-   */
-  private updateCodexAdapterEffort(effort: CodexReasoningEffort): void {
-    const adapter = this.plugin.agentServiceRegistry?.get('codex');
-    if (adapter && 'updateModelReasoningEffort' in adapter) {
-      (adapter as { updateModelReasoningEffort(e: CodexReasoningEffort): void })
-        .updateModelReasoningEffort(effort);
-    }
   }
 
   /** Get model options for sendMessage */
