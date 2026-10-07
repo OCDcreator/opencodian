@@ -115,3 +115,5 @@ OpenCode 2 auxiliary scopes own all HOME/XDG/DB/temp roots, and native permissio
 2026-10-07: Session catalog evidence is owned by AgentBackendRouting; OpenCode 2 emits bounded partial read errors with admitted records/cursor, never synthetic session IDs.
 
 2026-10-07：目录失败 DTO/Error/classifier 由 shared.foundation 承载；AgentBackendRouting 兼容 re-export，OpenCode2Adapter 直接引用同一构造器，保持浏览器 partial 行为。
+
+2026-10-07：OpenCodeAuxScope readiness 单次请求有界且可取消，防止挂起 /config 绕过 60 秒启动上界。失败时 teardown，不进入未验证 native aux session。

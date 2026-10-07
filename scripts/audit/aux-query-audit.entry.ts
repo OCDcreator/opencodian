@@ -462,7 +462,7 @@ async function runWriteInducementControl(context: AuditContext, backend: Backend
     let ready = false;
     while (Date.now() < deadline) {
       try {
-        const response = await fetch(scopeUrl(baseUrl, '/config', context.vault));
+        const response = await fetch(scopeUrl(baseUrl, '/config', context.vault), { signal: AbortSignal.timeout(Math.min(2000, deadline - Date.now())) });
         if (response.ok) { ready = true; break; }
       } catch {
         // Not listening yet.

@@ -11,6 +11,10 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-10-07 OpenCode auxiliary readiness 上界
+
+FA880 实测发现 /config 单次请求挂起使 60 秒 readiness 循环无法退出。每次 probe 增加取消 signal 与最多 2 秒独立 Promise.race；positive control 同步加入 timeout。失败仍释放 scope，native deny/tool 验证保持 fail-closed。
+
 ## 2026-10-07 OpenCode 1 目录分页
 
 修复默认 100 条目录被当作完整列表：SDK facade 保留 x-next-cursor，lifecycle 有界读取全部页并保留中途失败数据。共享分页失败契约迁入 foundation，routing 保持兼容导出。无游标旧接口的非空 fallback 明确为 partial。

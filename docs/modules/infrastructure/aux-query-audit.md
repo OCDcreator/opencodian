@@ -72,3 +72,5 @@ child exit 0 自身不能成为 pass。backend 不一致、execution 不明、pa
 OpenCode 2 positive control now requires exact bytes including LF. The independent native agent wildcard deny may be followed only by additional deny rules; allow/ask still fails. First turn, follow-up, image, parent/native list isolation and removal of the full owned root are separate real-model checks.
 
 The ordered-deny suffix audit uses a reverse index loop compatible with the repository TypeScript target; it does not depend on `Array.findLastIndex`.
+
+2026-10-07：OpenCode positive control 的 readiness GET /config 加入每次最多 2 秒 AbortSignal.timeout，仍受 60 秒总 deadline。真实 generation、write inducement 与 byte/residue 判定保持原要求；readiness 超时不算通过。
