@@ -395,6 +395,16 @@ export class ZCodeInteractionBridge {
     entry.settle({ action: 'decline' });
   }
 
+  /** Drop a matching ask already resolved by native timeout or another host. */
+  settleNativeResolvedRequest(sessionId: string, requestId: string): void {
+    const entry = this.pending.get(requestId);
+    if (!entry || entry.sessionId !== sessionId || entry.settled) return;
+    const reason = 'Request already resolved by the ZCode runtime.';
+    entry.settle(entry.kind === 'permission'
+      ? { decision: 'deny', reason }
+      : { action: 'cancel', reason });
+  }
+
   /**
    * Teardown: settle every pending ask of a session (or all) so a stopped
    * session / dead process / backend switch can never leave an approval

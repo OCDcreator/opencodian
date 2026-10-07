@@ -27,3 +27,5 @@ tools still require their own decision.
 ## 验证
 
 tests/unit/core/agents/backend/ZCodeAdapter.interactions.test.ts：批准/拒绝/问答应答（选项顺序与问题键保留）/会话与 always 映射（无原生写）/未知形状 fail-closed/过期与错配应答/重复应答恰一次/stop 落定（deny/cancel）。
+
+Native `permission.resolved` is authoritative for the exact session/request ID. A timeout or another host resolution removes that pending question/permission and rejects late answers; unrelated requests and session approval state remain intact. The existing authoritative question UI monitor then dismisses the stale card. Question-keyed array answers remain supported by the installed runtime and are not rewritten.

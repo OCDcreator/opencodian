@@ -107,3 +107,5 @@ ClaudeCodeAdapter owns current CLI resolution for new/resumed queries and dedica
 2026-10-07：ZCode generic aux 的只读边界包含独立 HOME/workspace/config 和创建前原生插件禁用回读；工具表不能约束 hook 子进程。消息 fork 使用当前 Protocol 1 的 target discriminated union，原生失败继续向上传递。
 
 ZCode state.updated 的单项 current-model projection 与 session/read 使用同一 catalog 合并边界；native process exit 清除当前 transport 的 startPromise，保持新握手与迟到退出的身份隔离。
+
+ZCode interaction state follows exact native `permission.resolved` identities, including native question auto-continue; pending reads cannot retain answerable expired cards.

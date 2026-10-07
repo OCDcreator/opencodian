@@ -1283,6 +1283,9 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
     if (!event?.sessionId) {
       return;
     }
+    if (event.type === 'permission.resolved' && typeof event.payload['requestId'] === 'string') {
+      this.interactions.settleNativeResolvedRequest(event.sessionId, event.payload['requestId']);
+    }
     if (event.type === 'session.updated') {
       const payload = event.payload;
       const taskId = payload['taskId'];

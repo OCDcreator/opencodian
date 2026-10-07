@@ -74,3 +74,5 @@ tests/unit/core/agents/backend/ZCodeAdapter.test.ts、ZCodeAdapterWiring.test.ts
 ## 2026-10-07 非预期进程退出后的重连
 
 只在退出回调仍属于当前 transport 时，清空该 transport 与已经完成的 startPromise，再结束所属 runs/asks 并显示 error。下一次 start 必须创建新 owned 进程并重新握手；旧进程的迟到 exit 保留原有身份守卫，不能破坏新连接。真实 SIGKILL 测试先复现旧 promise 返回后 transport-not-running，随后重做 official/patched 后台恢复。
+
+Native `permission.resolved` is authoritative for the exact session/request ID. A timeout or another host resolution removes that pending question/permission and rejects late answers; unrelated requests and session approval state remain intact. The existing authoritative question UI monitor then dismisses the stale card. Question-keyed array answers remain supported by the installed runtime and are not rewritten.
