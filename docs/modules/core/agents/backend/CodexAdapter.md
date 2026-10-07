@@ -105,3 +105,11 @@
 单条、无工具的 completed assistant 以匹配当前 thread/turn 的 `item/completed` 最终文本和真实 item ID 发出收敛 metadata；成功状态未知、多个 assistant item 或工具活动不会冒充一条权威文本。
 
 app-server live user item 以本次 attempt、native thread 与最终 turn/start ID 归属；早到 identity 暂存，旧 turn、外 thread、重放及失效 attempt 不持久化。getSessionMessages 保留 native user item ID 和 owning turn。目标 fork 先 thread/read 唯一映射 user item→turn，再传 beforeTurnId；unknown/foreign/ambiguous/active/unsupported 均拒绝，无 whole-thread fallback。无目标 fork 原行为保持。目录保留 native 默认分页与 active/archived 去重；对 fork 返回 ID 和插件持久化 Codex 引用的缺失行做同 ID 权威读取，native preview 为空时仅以权威 user 正文作展示标题，绝不据正文猜 identity。精确读取失败保留 partial。发送模型和 effort 来自本次会话选项快照，不改全局默认；请求、thread configured 回读与 turn effective 证据不可混称。
+
+
+## 2026-10-08 Codex compatibility and failed negotiation cleanup
+
+Failed app-server negotiation stops the owned client before SDK fallback. Before-turn fork keeps the native 0.160+ contract and admits only the separately verified 0.158.0 alternative: authoritative inactive source/target, inclusive lastTurnId prefix or revert of the newly created child, exact child lineage and prefix readback. Unsafe/missing readback or failed revert cannot become fork success; the parent is never reverted. Unknown and other older versions remain unavailable.
+
+
+Codex CLI account/model fallback reads snapshot the current provider-domain environment, including CODEX_HOME, for each execFile call without mutating the renderer process environment. The bounded output/timeout and native-first behavior stay intact.

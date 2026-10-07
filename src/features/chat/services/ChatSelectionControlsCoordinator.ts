@@ -1010,6 +1010,11 @@ export class ChatSelectionControlsCoordinator {
     if (this.modelSelectorSearchInput) {
       this.modelSelectorSearchInput.value = '';
     }
+    // A startup CLI fallback may finish before native model/list is ready.
+    if (!this.modelSelectionRuntime.hasLoadedModelCatalog()
+      || this.modelSelectionRuntime.getAvailableProviders().length === 0) {
+      void this.reloadModelCatalog();
+    }
     this.renderModelList();
 
     window.setTimeout(() => {

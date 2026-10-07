@@ -1042,7 +1042,19 @@ async function main(): Promise<void> {
         checks.push({ name: 'final audit vault bytes/residue', ok: residue.length === 0, detail: JSON.stringify(residue) });
         // Remove only the audit note we created; leave all unexpected files as evidence.
         fs.unlinkSync(notePath);
-        if (fs.readdirSync(vault).length === 0) fs.rmdirSync(vault);
+        if (fs.readdirSync(vault).length === 0) {
+          // Windows can retain the native process cwd briefly after stop().
+          // Retry only this empty owned directory; unexpected residue is never removed.
+          for (let attempt = 0; ; attempt++) {
+            try { fs.rmdirSync(vault); break; }
+            catch (error) {
+              const code = (error as NodeJS.ErrnoException).code;
+              if (process.platform !== 'win32' || !['EBUSY', 'EPERM'].includes(code ?? '') || attempt >= 20) throw error;
+              await new Promise(resolve => setTimeout(resolve, 100));
+              if (fs.readdirSync(vault).length !== 0) throw error;
+            }
+          }
+        }
       } catch (error) { checks.push({ name: 'audit vault cleanup', ok: false, detail: 'audit operation failed; raw runtime details withheld' }); }
       const passed = !!outcome && checks.length > 0 && checks.every((check) => check.ok);
       outcomes.push({ backend: id, passed, status: passed ? 'passed' : 'failed', execution: 'real-model', checks,

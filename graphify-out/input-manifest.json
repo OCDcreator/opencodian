@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "812a600035119e3d5faec2775f43fe68df3b6741f813d2a694d93956d01aea4f",
+  "digest": "19269b6681cc635dfca56a40458b848ed8ff0198275463f32cc2f6fcb4750567",
   "recordCount": 796,
   "records": [
     {
@@ -326,12 +326,12 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexAdapter.ts",
-      "sha256": "c025a1c3aec74c871499969a90bd6c31e6091b65dceef36b2972953954bb935e"
+      "sha256": "b373959b959eb8a1068738450248962a0c7f57f6d7b12db26c4cb5af3a8480b0"
     },
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexAppServerClient.ts",
-      "sha256": "59206d0fdb3532fa852fe53c96ed5fcff25e301f926c4a04765c4c0dfc22e214"
+      "sha256": "05ea9a9678a61622279e4eb163cd8d57060f0dd6f90c8dff498b9699901f3eb0"
     },
     {
       "kind": "src",
@@ -1736,7 +1736,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ChatSelectionControlsCoordinator.ts",
-      "sha256": "5e73ff77724bd5638e36313c764250b189758a81d15c055d5aa9a1ff0acd4b2d"
+      "sha256": "4b2cbe9f055d8074233da06290fb3e8157a06c1738f86e507440286cdc8f4454"
     },
     {
       "kind": "src",
@@ -3984,7 +3984,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-07T15:52:11.783Z",
-  "headShaAtGeneration": "bf5d498adb16d319658941ce6fe300caf2d40c9b",
+  "generatedAt": "2026-10-07T16:59:44.421Z",
+  "headShaAtGeneration": "5d11fd0770d3edafde253f12857f599c26878913",
   "graphifyVersion": "graphify 0.8.50"
 }

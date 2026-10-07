@@ -78,3 +78,8 @@
 ## 2026-10-05 Codex 消息前分支与恢复
 
 forkThread 可传 beforeTurnId，仅在 native initialize 版本满足已核验的 0.160.0+ 契约时放行；未知/旧版本不会发送目标 fork。getThreadsCatalog 保留原有 native 默认来源和分页语义，缺失 child 的精确 ID 读取由 adapter 补充；不猜 sourceKinds 全集。static transcript delegate 保留可选原生身份字段。
+
+
+## 2026-10-08 Codex compatibility and failed negotiation cleanup
+
+Failed app-server negotiation stops the owned client before SDK fallback. Before-turn fork keeps the native 0.160+ contract and admits only the separately verified 0.158.0 alternative: authoritative inactive source/target, inclusive lastTurnId prefix or revert of the newly created child, exact child lineage and prefix readback. Unsafe/missing readback or failed revert cannot become fork success; the parent is never reverted. Unknown and other older versions remain unavailable.

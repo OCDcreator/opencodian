@@ -179,6 +179,22 @@ async function createFixture(options: FixtureOptions = {}) {
 }
 
 describe('ChatSelectionControlsCoordinator', () => {
+  it('refreshes a startup-empty catalog when the model picker opens, then uses the loaded snapshot', async () => {
+    const fixture = await createFixture({ loadModelCatalogData: { catalogBundle: null, providers: [] } });
+    fixture.host.loadModelCatalogData.mockResolvedValue({ catalogBundle: null, providers: [{ id: 'late', name: 'Late backend', models: [{ id: 'ready', name: 'Ready native model' }] }] });
+    const initialReads = fixture.host.loadModelCatalogData.mock.calls.length;
+    fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-trigger')!.click();
+    await settleAsyncWork(); await settleAsyncWork();
+    expect(fixture.coordinator.getAvailableProviders().map(p => p.id)).toEqual(['late']);
+    expect(fixture.toolbarEl.querySelector('.opencodian-model-dropdown [role="option"]')?.textContent).toContain('Ready native model');
+    expect(fixture.host.loadModelCatalogData).toHaveBeenCalledTimes(initialReads + 1);
+    fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-trigger')!.click();
+    fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-trigger')!.click();
+    await settleAsyncWork();
+    expect(fixture.host.loadModelCatalogData).toHaveBeenCalledTimes(initialReads + 1);
+    fixture.coordinator.destroy();
+  });
+
   beforeEach(() => {
     HTMLElement.prototype.scrollIntoView = jest.fn();
   });

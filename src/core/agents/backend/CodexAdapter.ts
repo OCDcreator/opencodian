@@ -707,17 +707,17 @@ export class CodexAdapter
           this.setAppServerCapabilitiesAvailable(false);
         }
       } catch (err) {
+        // A failed negotiation still owns its socket and spawned process.
+        // Release them before dropping the client or entering SDK fallback.
+        this.appServerClient?.stop();
+        this.appServerClient = null;
+        this.setAppServerCapabilitiesAvailable(false);
         if (isExecutableMissingError(err)) {
-          this.appServerClient?.stop();
-          this.appServerClient = null;
-          this.setAppServerCapabilitiesAvailable(false);
           throw new Error(`Codex executable could not be started: ${err instanceof Error ? err.message : String(err)}. Verify the executable path in Codex settings, then reload OpenCodian.`);
         }
         logger.warn('Codex app-server negotiation failed; preserving SDK chat without context usage', {
           error: err instanceof Error ? err.message : String(err),
         });
-        this.appServerClient = null;
-        this.setAppServerCapabilitiesAvailable(false);
       }
 
       this.setStatus('connected');
@@ -802,7 +802,7 @@ export class CodexAdapter
 
     const codexPath = this.options.codexPathOverride ?? 'codex';
     return new Promise((resolve) => {
-      execFile(codexPath, ['doctor', '--json'], { timeout: 15000 }, (err, stdout, stderr) => {
+      execFile(codexPath, ['doctor', '--json'], { timeout: 15000, ...(this.options.getExtraEnv ? { env: { ...process.env, ...this.options.getExtraEnv() } } : {}) }, (err, stdout, stderr) => {
         const output = stdout || stderr || '';
         try {
           const parsed = JSON.parse(output);
@@ -864,7 +864,7 @@ export class CodexAdapter
   private getModelListFromCli(): Promise<CodexModelSummary[] | null> {
     const codexPath = this.options.codexPathOverride ?? 'codex';
     return new Promise((resolve) => {
-      execFile(codexPath, ['debug', 'models'], { timeout: 15000, maxBuffer: 512 * 1024 }, (err, stdout, stderr) => {
+      execFile(codexPath, ['debug', 'models'], { timeout: 15000, maxBuffer: 512 * 1024, ...(this.options.getExtraEnv ? { env: { ...process.env, ...this.options.getExtraEnv() } } : {}) }, (err, stdout, stderr) => {
         const output = stdout || stderr || '';
         try {
           const parsed = JSON.parse(output);

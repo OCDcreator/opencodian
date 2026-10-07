@@ -91,3 +91,8 @@ Selection, history sync, recovery and slash command services recognize OpenCode 
 Codex 模型目录发送准备和旧历史身份恢复在既有服务 owner 内闭合；旧历史只接受 native ID/唯一 owning-turn 证据，文本/下标猜测拒绝。Codex fork 继承其 session settings。
 
 2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.chat-services` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+
+## 2026-10-08 Cold-start model catalog retry
+
+Opening the model picker refreshes an unloaded/empty catalog through the existing reloadModelCatalog path. This retries a startup CLI fallback after native model/list becomes ready. A populated snapshot is reused; no synthetic model or new runtime owner is introduced.

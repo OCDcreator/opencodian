@@ -11,6 +11,14 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-10-08 Codex 冷启动目录与 provider-domain fallback
+
+FA880 actual CLI trace showed early debug/models reads outside the configured CODEX_HOME and an empty composer cache after native readiness. CLI account/model fallback now uses the current domain env; opening an empty picker retries the existing native catalog path.
+
+## 2026-10-08 Codex 兼容 fork 与协商清理
+
+0.158.0 使用已实测 lastTurnId 和仅针对新 child 的 revert 替代接口，严格回读 lineage 与历史前缀；未知版本仍拒绝。app-server 协商失败先释放 owned client，再进入 SDK fallback。
+
 ## 2026-10-07 OpenCode auxiliary readiness 上界
 
 FA880 实测发现 /config 单次请求挂起使 60 秒 readiness 循环无法退出。每次 probe 增加取消 signal 与最多 2 秒独立 Promise.race；positive control 同步加入 timeout。失败仍释放 scope，native deny/tool 验证保持 fail-closed。

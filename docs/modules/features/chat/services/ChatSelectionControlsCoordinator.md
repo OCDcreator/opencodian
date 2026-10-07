@@ -107,3 +107,8 @@ The OpenCode 2 model picker reads the native model catalog and default model. Th
 OpenCode 2 now has a permission/agent selector: inherited Build, ask, allow and Plan. Changes are applied to the selected native session, read back, then persisted for subsequent turns.
 
 2026-10-02：Pi 模型目录绑定使用本工具栏所属 conversation 的 backend 与 backendSessionId；动态思考等级回读传入同一 Pi 会话，不因 Markdown 聚焦或其他标签页的全局默认值而读错会话。新建会话未物化时显式使用 catalog 范围。
+
+
+## 2026-10-08 Cold-start model catalog retry
+
+Opening the model picker refreshes an unloaded/empty catalog through the existing reloadModelCatalog path. This retries a startup CLI fallback after native model/list becomes ready. A populated snapshot is reused; no synthetic model or new runtime owner is introduced.

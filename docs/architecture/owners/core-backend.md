@@ -117,3 +117,11 @@ OpenCode 2 auxiliary scopes own all HOME/XDG/DB/temp roots, and native permissio
 2026-10-07：目录失败 DTO/Error/classifier 由 shared.foundation 承载；AgentBackendRouting 兼容 re-export，OpenCode2Adapter 直接引用同一构造器，保持浏览器 partial 行为。
 
 2026-10-07：OpenCodeAuxScope readiness 单次请求有界且可取消，防止挂起 /config 绕过 60 秒启动上界。失败时 teardown，不进入未验证 native aux session。
+
+
+## 2026-10-08 Codex compatibility and failed negotiation cleanup
+
+Failed app-server negotiation stops the owned client before SDK fallback. Before-turn fork keeps the native 0.160+ contract and admits only the separately verified 0.158.0 alternative: authoritative inactive source/target, inclusive lastTurnId prefix or revert of the newly created child, exact child lineage and prefix readback. Unsafe/missing readback or failed revert cannot become fork success; the parent is never reverted. Unknown and other older versions remain unavailable.
+
+
+Codex CLI account/model fallback reads snapshot the current provider-domain environment, including CODEX_HOME, for each execFile call without mutating the renderer process environment. The bounded output/timeout and native-first behavior stay intact.
