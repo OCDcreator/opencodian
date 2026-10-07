@@ -91,6 +91,91 @@ function createSyncRuntime(overrides: Partial<MockSyncRuntime> = {}): MockSyncRu
 }
 
 describe('OpenCodeSessionLifecycleCoordinator', () => {
+  it('retains valid rows from a malformed page without requesting later pages', async () => {
+    const host = createHost(createSdk());
+    const read = jest.fn().mockResolvedValue({ data: [{ id: 'valid' }, { id: '' }, null], nextCursor: 'later' });
+    Object.assign(host, { readSdkSessionCatalogPage: read });
+    await expect(new OpenCodeSessionLifecycleCoordinator(host, createSyncRuntime()).listSessions())
+      .rejects.toMatchObject({ result: { status: 'partial', data: [{ id: 'valid' }], errorReason: 'Invalid session catalog response' } });
+    expect(read).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses cursor pagination when the SDK rollout is disabled', async () => {
+    const host = createHost(createSdk(), { shouldUseSdkCrud: jest.fn(() => false) });
+    const sdkRead = jest.fn();
+    const legacyRead = jest.fn().mockResolvedValueOnce({ data: [{ id: 'one' }], nextCursor: 'next' })
+      .mockResolvedValueOnce({ data: [{ id: 'two' }], nextCursor: null });
+    Object.assign(host, { readSdkSessionCatalogPage: sdkRead, readLegacySessionCatalogPage: legacyRead });
+    await expect(new OpenCodeSessionLifecycleCoordinator(host, createSyncRuntime()).listSessions())
+      .resolves.toEqual([{ id: 'one' }, { id: 'two' }]);
+    expect(sdkRead).not.toHaveBeenCalled();
+  });
+
+  it('bounds an endless stream of new cursors and retains the next cursor', async () => {
+    const host = createHost(createSdk());
+    let index = 0;
+    const read = jest.fn().mockImplementation(async () => ({ data: [{ id: 's-' + index }], nextCursor: 'c-' + ++index }));
+    Object.assign(host, { readSdkSessionCatalogPage: read });
+    await expect(new OpenCodeSessionLifecycleCoordinator(host, createSyncRuntime()).listSessions())
+      .rejects.toMatchObject({ result: { status: 'partial', nextCursor: 'c-100', errorReason: 'Session catalog page limit exceeded' } });
+    expect(read).toHaveBeenCalledTimes(100);
+  });
+
+  it('reads every cursor page and deduplicates native ids', async () => {
+    const host = createHost(createSdk());
+    const rows = Array.from({ length: 205 }, (_, i) => ({ id: 's-' + i, title: 'Session', time: { created: i, updated: i } }));
+    const read = jest.fn().mockResolvedValueOnce({ data: rows.slice(0, 100), nextCursor: 'c1' })
+      .mockResolvedValueOnce({ data: rows.slice(99, 199), nextCursor: 'c2' })
+      .mockResolvedValueOnce({ data: rows.slice(199), nextCursor: null });
+    Object.assign(host, { readSdkSessionCatalogPage: read });
+    const coordinator = new OpenCodeSessionLifecycleCoordinator(host, createSyncRuntime());
+    await expect(coordinator.listSessions()).resolves.toEqual(rows);
+    expect(read.mock.calls).toEqual([[{ limit: 100 }], [{ limit: 100, cursor: 'c1' }], [{ limit: 100, cursor: 'c2' }]]);
+  });
+
+  it('retains admitted rows and the failed cursor after a permission failure', async () => {
+    const host = createHost(createSdk());
+    const rows = [{ id: 's-1', title: 'Session', time: { created: 1, updated: 1 } }];
+    const read = jest.fn().mockResolvedValueOnce({ data: rows, nextCursor: 'next' })
+      .mockRejectedValueOnce(Object.assign(new Error('private endpoint'), { status: 403 }));
+    Object.assign(host, { readSdkSessionCatalogPage: read });
+    const coordinator = new OpenCodeSessionLifecycleCoordinator(host, createSyncRuntime());
+    await expect(coordinator.listSessions()).rejects.toMatchObject({ result: {
+      status: 'partial', data: rows, nextCursor: 'next', errorReason: 'Permission denied',
+    } });
+    expect(host.getLegacy).not.toHaveBeenCalled();
+  });
+
+  it('rejects cursor cycles while retaining unique admitted rows', async () => {
+    const host = createHost(createSdk());
+    const rows = [{ id: 's-1', title: 'Session', time: { created: 1, updated: 1 } }];
+    Object.assign(host, { readSdkSessionCatalogPage: jest.fn().mockResolvedValue({ data: rows, nextCursor: 'repeat' }) });
+    await expect(new OpenCodeSessionLifecycleCoordinator(host, createSyncRuntime()).listSessions())
+      .rejects.toMatchObject({ result: { status: 'partial', data: rows, nextCursor: 'repeat' } });
+  });
+
+  it('uses legacy cursor reads when SDK paging is absent', async () => {
+    const host = createHost(createSdk());
+    const rows = [{ id: 'legacy', title: 'Session', time: { created: 1, updated: 1 } }];
+    const legacy = jest.fn().mockResolvedValue({ data: rows, nextCursor: null });
+    Object.assign(host, { readSdkSessionCatalogPage: jest.fn().mockRejectedValue(new Error('SDK path unavailable')),
+      readLegacySessionCatalogPage: legacy });
+    await expect(new OpenCodeSessionLifecycleCoordinator(host, createSyncRuntime()).listSessions()).resolves.toEqual(rows);
+    expect(legacy).toHaveBeenCalledWith({ limit: 100 });
+  });
+
+  it('does not claim completeness when the server has no cursor route', async () => {
+    const sdk = createSdk({ list: jest.fn().mockResolvedValue([{ id: 'fallback' }]) });
+    const host = createHost(sdk);
+    const missing = Object.assign(new Error('missing route'), { status: 404 });
+    Object.assign(host, { readSdkSessionCatalogPage: jest.fn().mockRejectedValue(missing),
+      readLegacySessionCatalogPage: jest.fn().mockRejectedValue(missing) });
+    await expect(new OpenCodeSessionLifecycleCoordinator(host, createSyncRuntime()).listSessions())
+      .rejects.toMatchObject({ result: { status: 'partial', data: [{ id: 'fallback' }], nextCursor: null,
+        errorReason: 'Session catalog pagination is unavailable' } });
+    expect(sdk.list).toHaveBeenCalledWith({ limit: 1000 });
+  });
+
   it('creates sessions across transports and tracks the current session id', async () => {
     const sdk = createSdk({
       create: jest.fn().mockResolvedValue({ id: 'sdk-session' }),
@@ -146,6 +231,31 @@ describe('OpenCodeSessionLifecycleCoordinator', () => {
       expect.any(Error),
     );
     expect(host.getLegacy).toHaveBeenCalledWith('/session');
+  });
+
+  it('preserves denied directory failures after both transports fail', async () => {
+    const sdk = createSdk({ list: jest.fn().mockRejectedValue(new Error('SDK unavailable')) });
+    const denied = Object.assign(new Error('Unauthorized'), { status: 401 });
+    const host = createHost(sdk, { getLegacy: jest.fn().mockRejectedValue(denied) });
+    const coordinator = new OpenCodeSessionLifecycleCoordinator(host, createSyncRuntime());
+    await expect(coordinator.listSessions()).rejects.toBe(denied);
+  });
+
+  it('refuses malformed directory responses instead of returning an empty catalog', async () => {
+    const sdk = createSdk({ list: jest.fn().mockResolvedValue({ data: 'invalid' }) });
+    const host = createHost(sdk, { getLegacy: jest.fn().mockResolvedValue({ invalid: true }) });
+    const coordinator = new OpenCodeSessionLifecycleCoordinator(host, createSyncRuntime());
+    await expect(coordinator.listSessions()).rejects.toThrow('Invalid session catalog response');
+    expect(host.getLegacy).toHaveBeenCalledWith('/session');
+  });
+
+  it('falls back after a malformed SDK directory response', async () => {
+    const sdk = createSdk({ list: jest.fn().mockResolvedValue(null) });
+    const sessions = [{ id: 'legacy-valid', title: 'Valid', time: { created: 1, updated: 2 } }];
+    const host = createHost(sdk, { getLegacy: jest.fn().mockResolvedValue(sessions) });
+    const coordinator = new OpenCodeSessionLifecycleCoordinator(host, createSyncRuntime());
+    await expect(coordinator.listSessions()).resolves.toEqual(sessions);
+    expect(host.getLegacy).toHaveBeenCalledTimes(1);
   });
 
   it('keeps session get fallback in the lifecycle owner', async () => {

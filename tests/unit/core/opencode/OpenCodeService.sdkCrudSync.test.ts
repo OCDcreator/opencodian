@@ -28,6 +28,16 @@ async function flushSyncEventBatch(): Promise<void> {
 }
 
 describe('OpenCodeService SDK session lifecycle', () => {
+  it('forwards directory scope and cursor response headers on the legacy paging route', async () => {
+    service.setVaultPath('C:\\vault');
+    mockRequestUrl.mockResolvedValueOnce({ status: 200, json: [{ id: 'one' }], headers: { 'X-Next-Cursor': 'next' } })
+      .mockResolvedValueOnce({ status: 200, json: [{ id: 'two' }], headers: {} });
+    await expect(service.listSessions()).resolves.toEqual([{ id: 'one' }, { id: 'two' }]);
+    const urls = mockRequestUrl.mock.calls.map(([request]) => new URL(request.url));
+    expect(urls.map((url) => url.searchParams.get('directory'))).toEqual(['C:/vault', 'C:/vault']);
+    expect(urls.map((url) => url.searchParams.get('cursor'))).toEqual([null, 'next']);
+  });
+
   it('uses SDK createSession when rollout flags are enabled', async () => {
     service = createServiceWithSdkFlags();
     mockSdkClient.session.create.mockResolvedValue({
@@ -79,7 +89,7 @@ describe('OpenCodeService SDK session lifecycle', () => {
     expect(mockRequestUrl).not.toHaveBeenCalled();
   });
 
-  it('falls back to legacy HTTP for read-only listSessions failures', async () => {
+  it('falls back to legacy cursor HTTP when SDK paging is absent', async () => {
     service = createServiceWithSdkFlags();
     mockSdkClient.session.list.mockRejectedValue(new Error('sdk read failed'));
     mockRequestUrl.mockResolvedValue({
@@ -92,9 +102,9 @@ describe('OpenCodeService SDK session lifecycle', () => {
 
     expect(sessions).toHaveLength(1);
     expect(sessions[0].id).toBe('legacy-session');
-    expect(mockSdkClient.session.list).toHaveBeenCalled();
+    expect(mockSdkClient.session.list).not.toHaveBeenCalled();
     expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
-      url: 'http://127.0.0.1:4196/session',
+      url: 'http://127.0.0.1:4196/experimental/session?limit=100',
       method: 'GET',
     }));
   });

@@ -89,3 +89,5 @@ The chat view routes OpenCode 2 model, permission, form, slash catalog, context 
 ## 2026-10-05 Codex 消息前分支与恢复
 
 OpenCodianView 只转发 Codex 目录恢复到插件既有桥，保持 view/runtime ownership 分离。
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.chat-shell` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。

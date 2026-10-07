@@ -1,4 +1,5 @@
 import { createLogger } from '../../shared';
+import { backendSessionCatalogFailure, BackendSessionCatalogReadError } from '../../shared/sessionCatalogReadback';
 import type { SessionTodo } from '../types';
 import type { OpenCodeSessionSnapshotToken, SessionMessage } from './types';
 
@@ -51,7 +52,7 @@ export interface OpenCodeSessionLifecycleSdk {
   abort(request: { sessionID: string }): Promise<unknown>;
   create(request?: { title?: string }): Promise<unknown>;
   get(request: { sessionID: string }): Promise<unknown>;
-  list(): Promise<unknown>;
+  list(request?: { limit?: number }): Promise<unknown>;
   messages(request: { sessionID: string }): Promise<unknown>;
   todo(request: { sessionID: string }): Promise<unknown>;
   status(): Promise<unknown>;
@@ -74,10 +75,23 @@ export type OpenCodeSessionLifecycleSyncRuntime = Pick<
   'subscribeToSessionTodoUpdates' | 'subscribeToSessionStatusUpdates' | 'subscribeToSessionSyncEvents'
 >;
 
+export interface OpenCodeSessionCatalogPageRequest {
+  limit: number;
+  cursor?: string;
+}
+
+export interface OpenCodeSessionCatalogPage {
+  data: unknown;
+  nextCursor: string | null;
+}
+
 export interface OpenCodeSessionLifecycleCoordinatorHost {
   shouldUseSdkAbort(): boolean;
   shouldUseSdkCrud(): boolean;
   getSdkSession(): OpenCodeSessionLifecycleSdk;
+  readSdkSessionCatalogPage?(request: OpenCodeSessionCatalogPageRequest): Promise<OpenCodeSessionCatalogPage>;
+  readLegacySessionCatalogPage?(request: OpenCodeSessionCatalogPageRequest): Promise<OpenCodeSessionCatalogPage>;
+  readLegacySessionCatalogFallback?(): Promise<unknown>;
   postLegacy<T>(path: string, body: unknown): Promise<T>;
   getLegacy<T>(path: string): Promise<T>;
   patchLegacy<T>(path: string, body: unknown): Promise<T>;
@@ -162,20 +176,96 @@ export class OpenCodeSessionLifecycleCoordinator {
   }
 
   async listSessions(): Promise<Session[]> {
+    const readPage = this.host.shouldUseSdkCrud() && this.host.readSdkSessionCatalogPage
+      ? this.host.readSdkSessionCatalogPage.bind(this.host)
+      : this.host.readLegacySessionCatalogPage?.bind(this.host);
+    if (readPage) return this.readPagedSessionCatalog(readPage);
     if (this.host.shouldUseSdkCrud()) {
       try {
         const response = await this.host.getSdkSession().list();
-        return Array.isArray(response) ? response as Session[] : [];
+        if (!Array.isArray(response)) throw new Error('Invalid session catalog response');
+        return response as Session[];
       } catch (error) {
         this.host.logServiceWarning('session.list', 'SDK session.list failed, falling back to legacy HTTP', error);
       }
     }
 
-    try {
-      return await this.host.getLegacy<Session[]>('/session');
-    } catch {
-      return [];
+    const response = await this.host.getLegacy<unknown>('/session');
+    if (!Array.isArray(response)) throw new Error('Invalid session catalog response');
+    return response as Session[];
+  }
+
+  private async readPagedSessionCatalog(
+    readPage: (request: OpenCodeSessionCatalogPageRequest) => Promise<OpenCodeSessionCatalogPage>,
+  ): Promise<Session[]> {
+    const sessions = new Map<string, Session>();
+    const cursors = new Set<string>();
+    let cursor: string | undefined;
+    const fail = (errorReason: string, status: 'failed' | 'unavailable' = 'failed'): never => {
+      throw new BackendSessionCatalogReadError({ status: sessions.size ? 'partial' : status,
+        data: [...sessions.values()], nextCursor: cursor ?? null, errorReason });
+    };
+    for (let count = 0; count < 100; count += 1) {
+      const request = { limit: 100, ...(cursor ? { cursor } : {}) };
+      let page: OpenCodeSessionCatalogPage;
+      try {
+        try {
+          page = await readPage(request);
+        } catch (error) {
+          if (count !== 0 || !this.host.shouldUseSdkCrud() || !this.host.readLegacySessionCatalogPage) throw error;
+          readPage = this.host.readLegacySessionCatalogPage.bind(this.host);
+          page = await readPage(request);
+        }
+      } catch (error) {
+        const failure = backendSessionCatalogFailure(error);
+        if (count === 0 && failure.status === 'unavailable') return this.readUnpagedSessionCatalogFallback();
+        return fail(failure.errorReason, failure.status);
+      }
+      if (!Array.isArray(page.data)) return fail('Invalid session catalog response');
+      if (!this.admitSessionCatalogRows(page.data, sessions)) return fail('Invalid session catalog response');
+      const next = page.nextCursor;
+      if (next === null) return [...sessions.values()];
+      if (typeof next !== 'string' || !next.trim() || !page.data.length || cursors.has(next)) {
+        return fail('Invalid session catalog cursor');
+      }
+      cursors.add(next);
+      cursor = next;
     }
+    return fail('Session catalog page limit exceeded');
+  }
+
+  private admitSessionCatalogRows(data: unknown[], sessions: Map<string, Session>): boolean {
+    let valid = true;
+    for (const value of data) {
+      const id = (value as { id?: unknown } | null)?.id;
+      if (!value || typeof value !== 'object' || typeof id !== 'string' || !id.trim()) {
+        valid = false;
+        continue;
+      }
+      if (!sessions.has(id)) sessions.set(id, value as Session);
+    }
+    return valid;
+  }
+
+  private async readUnpagedSessionCatalogFallback(): Promise<Session[]> {
+    let response: unknown;
+    try {
+      if (this.host.shouldUseSdkCrud()) {
+        try {
+          response = await this.host.getSdkSession().list({ limit: 1000 });
+        } catch {
+          response = await (this.host.readLegacySessionCatalogFallback?.() ?? this.host.getLegacy('/session?limit=1000'));
+        }
+      } else {
+        response = await (this.host.readLegacySessionCatalogFallback?.() ?? this.host.getLegacy('/session?limit=1000'));
+      }
+    } catch (error) {
+      throw new BackendSessionCatalogReadError({ ...backendSessionCatalogFailure(error), data: [], nextCursor: null });
+    }
+    if (!Array.isArray(response)) throw new Error('Invalid session catalog response');
+    if (!response.length) return [];
+    throw new BackendSessionCatalogReadError({ status: 'partial', data: response, nextCursor: null,
+      errorReason: 'Session catalog pagination is unavailable' });
   }
 
   async getSessionMessages(sessionId: string): Promise<SessionMessage[]> {

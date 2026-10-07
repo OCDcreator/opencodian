@@ -71,3 +71,5 @@ OpenCode 2 has a separate backend identity and normalized connection settings; p
 ## 2026-10-05 Codex 消息前分支与恢复
 
 增加可选 Codex owning-turn 字段，native item ID 与 turn ID 的语义分别保留；没有 runtime 回读时不提供 fabricated effective evidence。
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `core.types` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。

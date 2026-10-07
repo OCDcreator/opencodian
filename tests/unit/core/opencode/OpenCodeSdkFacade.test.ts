@@ -118,6 +118,18 @@ const createFacade = (clientOverrides: Record<string, unknown> = {}) => {
 };
 
 describe('OpenCodeSdkFacade', () => {
+  it('preserves raw cursor headers while unwrapping session data', async () => {
+    const list = jest.fn().mockResolvedValue({ data: [{ id: 'native' }], response: { headers: new Headers({ 'x-next-cursor': 'next' }) } });
+    const { facade } = createFacade({ experimental: { session: { list } } });
+    await expect(facade.readSessionCatalogPage({ limit: 100, cursor: 'previous' })).resolves.toEqual({ data: [{ id: 'native' }], nextCursor: 'next' });
+    expect(list).toHaveBeenCalledWith({ limit: 100, cursor: 'previous' }, { responseStyle: 'fields' });
+  });
+
+  it('rejects a data-only paging response instead of inventing a terminal cursor', async () => {
+    const { facade } = createFacade({ experimental: { session: { list: jest.fn().mockResolvedValue([{ id: 'native' }]) } } });
+    await expect(facade.readSessionCatalogPage({ limit: 100 })).rejects.toThrow(/metadata/);
+  });
+
   it('exposes all expected SDK namespaces', () => {
     const { facade } = createFacade();
     expect(SDK_FACADE_NAMESPACE_NAMES.every((name) => name in facade)).toBe(true);

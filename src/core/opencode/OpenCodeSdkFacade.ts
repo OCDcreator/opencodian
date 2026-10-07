@@ -1,6 +1,7 @@
 import { createLogger } from '../../shared';
 import { createSdkClient, type CreateSdkClientOptions } from './createSdkClient';
 import { attachOpenCodeAppAgents } from './OpenCodeAppCatalogSidecar';
+import type { OpenCodeSessionCatalogPage, OpenCodeSessionCatalogPageRequest } from './OpenCodeSessionLifecycleCoordinator';
 import { extractSdkErrorCause } from './sdkErrorClassification';
 import type { SdkEvent, SdkOpencodeClient } from './sdkTypes';
 
@@ -398,6 +399,20 @@ export class OpenCodeSdkFacade implements OpenCodeSdkFacadeClient {
     this.v2 = this.createNamespaceFacade('v2');
     this.vcs = this.createNamespaceFacade('vcs');
     this.worktree = this.createNamespaceFacade('worktree');
+  }
+
+  async readSessionCatalogPage(request: OpenCodeSessionCatalogPageRequest): Promise<OpenCodeSessionCatalogPage> {
+    try {
+      const result = await this.invokeSdkFunction(['experimental', 'session'], ['experimental', 'session', 'list'],
+        [request, { responseStyle: 'fields' }]);
+      const response = (result as { response?: { headers?: { get(name: string): string | null } } } | null)?.response;
+      if (!response?.headers || typeof response.headers.get !== 'function') {
+        throw new Error('Session catalog response metadata is unavailable');
+      }
+      return { data: unwrapSdkResponse(result), nextCursor: response.headers.get('x-next-cursor') };
+    } catch (error) {
+      throw normalizeSdkError(error);
+    }
   }
 
   getConnectionSignature(): string {

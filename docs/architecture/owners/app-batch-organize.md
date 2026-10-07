@@ -42,3 +42,5 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 
 ## Change log
 - 2026-09-18 (FlowText R-B5): owner registered with the initial coordinator + organize/confirm modals.
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `app.batch-organize` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。

@@ -71,3 +71,5 @@ BackendSessionBrowserModal 保留 native user identity 的 resume seed；目录�
 Codex 会话浏览器从结构化目录结果保留权限拒绝分类，现有 status renderer 只显示固定本地化说明；不改变 session identity、resume/fork 或其他 backend 的列表契约。
 
 2026-10-07: The backend session browser renders the shared catalog evidence, keeping partial data and credential-free failure classifications distinct from empty complete reads.
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.chat-ui` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。

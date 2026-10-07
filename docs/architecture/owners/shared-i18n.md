@@ -106,3 +106,5 @@ English and Chinese copy describe executable snapshot/restart boundaries and exp
 中英文目录新增 Codex catalog 权限拒绝状态与固定说明，原始 errorReason 不作为翻译参数或可见文本。
 
 2026-10-07: Shared session directory denial copy is backend-neutral in both locales.
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `shared.i18n` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。

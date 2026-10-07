@@ -9,6 +9,7 @@ import path from 'node:path';
 import type { OpenCodeClient } from '@opencode/client';
 
 import { appendObsidianContextBlocks } from '../../../shared/obsidianContext';
+import { backendSessionCatalogFailure, BackendSessionCatalogReadError } from '../../../shared/sessionCatalogReadback';
 import { prependMemoryInjection } from '../../memory';
 import { prependObsidianToolingInjection } from '../../obsidianTooling';
 import { createSdkFetch } from '../../opencode/sdkFetch';
@@ -16,7 +17,6 @@ import type { ChatMessage, ContextUsageSnapshot, QuestionRequest, SessionDiffEnt
 import type { OpenCode2BackendSettings } from '../../types/settings';
 import { AgentCapability, type BackendCapabilities } from '../AgentCapability';
 import { AUX_DENIED_CAPABILITIES, type AuxQueryResult, type AuxQuerySession, type AuxQuerySessionConfig, type AuxQueryTurnRequest } from './AgentAuxQueryCapability';
-import { backendSessionCatalogFailure, BackendSessionCatalogReadError } from './AgentBackendRouting';
 import type { InlineCompletionSession, InlineCompletionSessionConfig } from './AgentInlineCompletionCapability';
 import type {
   AgentBranchCapability,

@@ -11,6 +11,15 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-10-07 OpenCode 1 目录分页
+
+修复默认 100 条目录被当作完整列表：SDK facade 保留 x-next-cursor，lifecycle 有界读取全部页并保留中途失败数据。共享分页失败契约迁入 foundation，routing 保持兼容导出。无游标旧接口的非空 fallback 明确为 partial。
+
+## 2026-10-07 OpenCode 1 目录失败与空目录边界
+
+- Session lifecycle 保留 SDK 到 legacy 的有效 fallback，但无效响应与最终读取失败继续传播；目录 UI 不再将拒绝视为空配置。
+- 新增三项真实失败语义回归，并关联两端隔离库 native/legacy/remote 实测。
+
 ## 2026-10-07 — 会话目录异常与 OpenCode 2 partial 分页
 
 - 空目录、读取失败、权限拒绝和方法不可用分别返回权威目录状态；拒绝说明使用固定双语文字。

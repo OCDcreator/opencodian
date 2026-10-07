@@ -50,3 +50,5 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 ## 2026-10-06 Codex catalog permission denial
 
 CodexReadbackModal 和 CodexMcpServerDetailModal 从结构化目录失败中识别权限拒绝，只展示固定本地化说明。状态、已读取 partial 条目和重试流程仍由原 modal 持有，不新增目录真值或跨 owner 配置权。
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.settings-codex` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。

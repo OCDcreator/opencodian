@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "580b51dac430c6638ba785fc9adde1e6cd6d74acd9affb1a0a3302686c3541e5",
-  "recordCount": 795,
+  "digest": "cfd8ff9f742792cc9d222819e913666fe856b002fa2431fc17160fd4f5a10fcb",
+  "recordCount": 796,
   "records": [
     {
       "kind": "ignore",
@@ -151,7 +151,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/AgentBackendRouting.ts",
-      "sha256": "6952eaa54723c2ffe3c2a15c65f65893d845d467f9373293105463eb6c6a011f"
+      "sha256": "41e4bc4d3cc9f37ff80b475b1e8bb559094e5feacb40cdf2c29138603ad59847"
     },
     {
       "kind": "src",
@@ -436,7 +436,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/OpenCode2Adapter.ts",
-      "sha256": "5b8fc91cca55cb9310955f78c0fe9909d5a7366a982f3a1e040d82d031de656d"
+      "sha256": "e76029a5e1ffdfdb6e9ed1caf9bb367a69269b954a3717edac2a13bcab80416c"
     },
     {
       "kind": "src",
@@ -1011,12 +1011,12 @@
     {
       "kind": "src",
       "key": "src/core/opencode/OpenCodeSdkFacade.ts",
-      "sha256": "bd2d8e9d1dfb06cbd7edbb7ea87f40950d0f35eadcd5ede3031ad07946be3ba2"
+      "sha256": "fdddf25ba27086bec4227f8bdf548eaab35bd65be51390263624553436ec6c70"
     },
     {
       "kind": "src",
       "key": "src/core/opencode/OpenCodeService.ts",
-      "sha256": "0a9775d35d17e35148df0aa22eeecc94c48c1dcf631b4b14b5ff96ad37d9101c"
+      "sha256": "507ee8bee47b9ac833e75923d5b3f91f058e451b2b2178b1b8752a79cdacbe9b"
     },
     {
       "kind": "src",
@@ -1036,7 +1036,7 @@
     {
       "kind": "src",
       "key": "src/core/opencode/OpenCodeSessionLifecycleCoordinator.ts",
-      "sha256": "61dc912b973778c00363d9140ec2f689d50ac15101004af726adbb0c0c532582"
+      "sha256": "3aa77e8eed43886134ab38d53b82760e8381893d185c042e146bb9fcbbd86307"
     },
     {
       "kind": "src",
@@ -3495,6 +3495,11 @@
     },
     {
       "kind": "src",
+      "key": "src/shared/sessionCatalogReadback.ts",
+      "sha256": "78f409be6e174ed5c9cb28b13b40319c59ad663a647c996d9e68f280a4ba60d6"
+    },
+    {
+      "kind": "src",
       "key": "src/shared/tokenEstimate.ts",
       "sha256": "af9c43f1fe4275785c35cba9f3442299209f6a64f061ea3d7e01b078f5e11b76"
     },
@@ -3979,7 +3984,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-07T11:05:26.506Z",
-  "headShaAtGeneration": "098d04c24f11d38d91fefcd98fde3c6840d79d55",
+  "generatedAt": "2026-10-07T13:53:59.054Z",
+  "headShaAtGeneration": "6c7c51bd94eabfed17f07e4de3d4009d9e46abeb",
   "graphifyVersion": "graphify 0.8.50"
 }

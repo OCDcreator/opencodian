@@ -380,6 +380,17 @@ export class OpenCodeService {
       shouldUseSdkAbort: () => this.shouldUseSdk('sdkAbort'),
       shouldUseSdkCrud: () => this.shouldUseSdk('sdkCrud'),
       getSdkSession: () => this.sdk.session,
+      readSdkSessionCatalogPage: (request) => this.sdk.readSessionCatalogPage(request),
+      readLegacySessionCatalogPage: async ({ limit, cursor }) => {
+        let nextCursor: string | null = null;
+        const query = new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) });
+        const data = await this.get<unknown>(`/experimental/session?${query}`, {
+          includeDirectory: true,
+          onResponseHeaders: (headers) => { nextCursor = new Headers(headers).get('x-next-cursor'); },
+        });
+        return { data, nextCursor };
+      },
+      readLegacySessionCatalogFallback: () => this.get('/session?limit=1000', { includeDirectory: true }),
       postLegacy: (path, body) => this.post(path, body),
       getLegacy: (path) => this.get(path),
       patchLegacy: (path, body) => this.patch(path, body),
@@ -738,7 +749,8 @@ export class OpenCodeService {
   /** HTTP GET helper using Obsidian's requestUrl */
   private async get<T>(
     path: string,
-    options: { includeDirectory?: boolean; traceContext?: OpenCodeTraceContext } = {},
+    options: { includeDirectory?: boolean; traceContext?: OpenCodeTraceContext;
+      onResponseHeaders?: (headers: Record<string, string>) => void } = {},
   ): Promise<T> {
     this.ensureBaseUrl();
     const url = this.buildScopedUrl(path, options.includeDirectory ?? false);
@@ -748,10 +760,12 @@ export class OpenCodeService {
       headers: this.getRequestHeaders(),
     }, options.traceContext);
 
+    options.onResponseHeaders?.(response.headers ?? {});
+
     // Check for error status codes
     if (response.status >= 400) {
       const errorText = response.text?.substring(0, 200) ?? 'Unknown error';
-      throw new Error(`HTTP ${response.status} from ${path}: ${errorText}`);
+      throw Object.assign(new Error(`HTTP ${response.status} from ${path}: ${errorText}`), { status: response.status });
     }
 
     if (typeof response.json === 'object' && response.json !== null) {

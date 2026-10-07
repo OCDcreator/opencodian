@@ -52,3 +52,5 @@ The new core.backend-pi owner isolates the external Pi process service. shared.u
 - 2026-09-17: MCP 摘要字段表补 `search_query` / `searchQuery`（同时在 search 类与通用回退列表前部），避免这类调用在字段回退里取到 `content_size` 之类的配置项；`.streaming-error-block` 改用 `--opencodian-status-error-subtle` / `-border` 令牌并把正文降为 `--text-normal` / `--text-muted`，因为原来的 `--background-modifier-error` 底 + `--text-error` 字在实测主题下对比度约 1:1。摘要分类规则仍只在本 owner 维护，不在 feature 层复刻。
 
 - 2026-09-18 (FlowText 批次 B)：owner manifest 随 R-B1/R-B2 更新——新增 `src/shared/contextGroupPlan.ts` 归属 `shared.foundation`；本 owner 的边界与职责未变。
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `shared.utils-streaming` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。

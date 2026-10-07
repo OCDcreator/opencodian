@@ -311,6 +311,7 @@ docs/modules/
 │   └── jsx-shim.md
 ├── shared/
 │   ├── contextPath.md
+│   ├── sessionCatalogReadback.md
 │   ├── index.md
 │   ├── logger.md
 │   ├── obsidianContext.md

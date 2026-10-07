@@ -46,3 +46,5 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 ## 2026-10-05 external CLI boundary
 
 Settings edits persist without implicitly replacing the live Claude query. Explicit restart errors are visible and keep active queries. Runtime MCP status distinguishes `null` unavailable from authoritative `[]` empty. The settings surface owns copy/error presentation; ClaudeCodeAdapter owns executable validation and native lifecycle.
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.settings-claude` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。

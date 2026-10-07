@@ -39,7 +39,7 @@ coordinator 持有以下共享流程：
 - `createSession()`：按 `sdkCrud` 选择 SDK `session.create()` 或 legacy `POST /session`，并在需要时更新 current session 指针；未显式传入标题时会发送空 payload，让 OpenCode 官方 session 创建逻辑写入 `"New session - <ISO>"` 默认标题，以便首条真实用户消息后的官方后台标题生成能够命中。
 - `getSessionInfo()`：按 `sdkCrud` 优先走 SDK `session.get()`，失败后回退到 legacy `GET /session/:id`，供 revert filtering、context usage 与 session control 共用。
 - `abortSession()`：按独立 `sdkAbort` 优先走 SDK `session.abort()`，失败后回退到 legacy `POST /session/:id/abort`；空 session id 仍保持 no-op。
-- `listSessions()`：优先走 SDK，失败后记录 warning 并回退到 legacy `GET /session`。
+- `listSessions()`：生产 host 使用 SDK experimental.session.list 或 legacy GET /experimental/session 的 x-next-cursor，limit=100，最多 100 页。去重 native ID；权限/格式/游标循环/中途失败经共享 BackendSessionCatalogReadError 保留已读数据与失败游标。首个 SDK 页不可读时尝试同一 legacy route；首个分页 route 不可用时再读 /session?limit=1000，非空结果标记 partial，不能声称完整。空成功仍是权威空目录。未配置 page reader 的兼容 host 保留原 session.list/legacy 数组入口。
 - `getSessionMessages()`：优先走 SDK `session.messages()`，统一经过 revert-state 过滤、tool-name 观测与 canonical snapshot 写入；SDK 失败时回退到 legacy `/session/:id/message`。
 - `getSessionTodos()` / `getSessionStatuses()`：优先走 SDK，失败后分别回退到 legacy `/todo` 与 `/status`，并复用 `OpenCodeService` 的 normalizer。
 - `deleteSession()` / `updateSessionTitle()`：保持现有 mutation 语义，不在 SDK mutation 失败时额外引入新 fallback。
@@ -99,3 +99,5 @@ graph TD
 ### 2026-10-02 T10 cycle fix
 
 Snapshot token and message/part contracts are imported from `./types` with type-only imports. `Message`, `Part`, `SessionMessage` remain available through this module via type re-export; their definitions are unchanged. Lifecycle no longer depends on the state-store implementation for its host token contract. No lifecycle method body changed.
+
+2026-10-07：新增 OpenCodeSessionCatalogPageRequest/Page 与 optional cursor reader host seams。分页只在 lifecycle owner 维护；admitSessionCatalogRows 保留有效 ID，坏行不能变成 complete。共享失败契约避免跨 owner 反向依赖。
