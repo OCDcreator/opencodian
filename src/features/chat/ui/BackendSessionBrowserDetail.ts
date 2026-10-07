@@ -1,28 +1,34 @@
 import {
+  backendSessionCatalogFailure,
   getBackendSessionDetail,
   getBackendSessionPreview,
   getBackendSessionTurnsPage,
   hasBackendSessionTurnsPage,
-  listBackendSessions,
   type NormalizedSessionDetail,
   type NormalizedSessionMessagesPage,
   type NormalizedSessionPreviewMessage,
   type NormalizedSessionPreviewPart,
   type NormalizedSessionRow,
+  readBackendSessionsCatalog,
 } from '../../../core/agents/backend/AgentBackendRouting';
 import type { AgentServiceRegistry } from '../../../core/agents/backend/AgentServiceRegistry';
 import type { AppServerCatalogReadResult } from '../../../core/agents/backend/CodexAppServerClient';
 import { t } from '../../../i18n';
 
-/** Browser inspection consumes Codex evidence without changing legacy backends. */
+/** Catalog evidence keeps failure/absence distinct from authoritative empty success. */
 export async function readBackendSessionCatalog(registry: AgentServiceRegistry | null, includeSessionIds?: readonly string[]): Promise<AppServerCatalogReadResult<NormalizedSessionRow>> {
   const active = registry?.getActive();
   const codex = active?.kind === 'codex' ? active as unknown as {
     getSessionCatalog?: (options?: { includeSessionIds?: readonly string[] }) => Promise<AppServerCatalogReadResult<NormalizedSessionRow>>;
   } : null;
-  if (codex?.getSessionCatalog) return includeSessionIds
-    ? codex.getSessionCatalog({ includeSessionIds }) : codex.getSessionCatalog();
-  return { status: 'complete', data: await listBackendSessions(registry), nextCursor: null };
+  if (codex?.getSessionCatalog) {
+    try {
+      return includeSessionIds ? await codex.getSessionCatalog({ includeSessionIds }) : await codex.getSessionCatalog();
+    } catch (error) {
+      return { ...backendSessionCatalogFailure(error), data: [], nextCursor: null };
+    }
+  }
+  return readBackendSessionsCatalog(registry);
 }
 
 export function renderBackendSessionCatalogStatus(listEl: HTMLElement, state: AppServerCatalogReadResult<unknown>['status'] | 'loading', permissionDenied = false): void {
@@ -33,12 +39,12 @@ export function renderBackendSessionCatalogStatus(listEl: HTMLElement, state: Ap
   const messages = {
     loading: t('chat.backendSessions.loading'),
     partial: t('chat.backendSessions.catalogPartial'),
-    failed: t(permissionDenied ? 'settings.codex.readback.messagePermissionDenied' : 'chat.backendSessions.catalogFailed'),
+    failed: t(permissionDenied ? 'chat.backendSessions.catalogPermissionDenied' : 'chat.backendSessions.catalogFailed'),
     unavailable: t('chat.backendSessions.catalogUnavailable'),
   };
   listEl.createEl('p', { text: messages[state], attr: { role: 'status', 'aria-live': 'polite' } });
   if (state === 'partial' && permissionDenied) {
-    listEl.createEl('p', { text: t('settings.codex.readback.messagePermissionDenied'), attr: { role: 'status', 'aria-live': 'polite' } });
+    listEl.createEl('p', { text: t('chat.backendSessions.catalogPermissionDenied'), attr: { role: 'status', 'aria-live': 'polite' } });
   }
 }
 

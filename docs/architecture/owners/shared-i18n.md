@@ -104,3 +104,5 @@ English and Chinese copy describe executable snapshot/restart boundaries and exp
 ## 2026-10-06 Codex catalog permission denial
 
 中英文目录新增 Codex catalog 权限拒绝状态与固定说明，原始 errorReason 不作为翻译参数或可见文本。
+
+2026-10-07: Shared session directory denial copy is backend-neutral in both locales.

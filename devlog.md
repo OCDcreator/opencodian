@@ -11,6 +11,12 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-10-07 — 会话目录异常与 OpenCode 2 partial 分页
+
+- 空目录、读取失败、权限拒绝和方法不可用分别返回权威目录状态；拒绝说明使用固定双语文字。
+- OpenCode 2 短页继续遵循 native cursor；重复 ID 去重，页中途失败保留已读条目与 cursor，重复 cursor 不再静默标记完整。
+- 目录浏览器不生成假 session ID，不呈现原始异常中的凭据。
+
 ## 2026-10-07 — 补全池关闭期间的迟到笔记重建
 
 - 全局 teardown 在 await 前摘除旧 entry 并推进 disposal generation。

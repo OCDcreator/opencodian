@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "1536cc7948531858ef238c063cae7a2f8398b179a675bfd91ad1ac14e6912f3e",
+  "digest": "580b51dac430c6638ba785fc9adde1e6cd6d74acd9affb1a0a3302686c3541e5",
   "recordCount": 795,
   "records": [
     {
@@ -151,7 +151,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/AgentBackendRouting.ts",
-      "sha256": "b91d8c1af5f35efb7b2f36b725a7313f17eacb87b728e8bd601f23a3cd845463"
+      "sha256": "6952eaa54723c2ffe3c2a15c65f65893d845d467f9373293105463eb6c6a011f"
     },
     {
       "kind": "src",
@@ -436,7 +436,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/OpenCode2Adapter.ts",
-      "sha256": "aa3cb02b7ddde31de0684f824b43a47f9d77a2e2153535cd670965898831f2bf"
+      "sha256": "5b8fc91cca55cb9310955f78c0fe9909d5a7366a982f3a1e040d82d031de656d"
     },
     {
       "kind": "src",
@@ -2481,7 +2481,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/ui/BackendSessionBrowserDetail.ts",
-      "sha256": "67842cbf17845b019b00b75eda8ca4894acf46e321e6c7a22df596a23291e644"
+      "sha256": "13bd7ea3fbb11815973648c708d68f4ddd0126bc785dd7ba1eba71a12373d9fe"
     },
     {
       "kind": "src",
@@ -3066,7 +3066,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsBackendSection.ts",
-      "sha256": "8052d6c4b254343f25c44330e9484808aa9bce884ed4fbaeefdfcf6a36187a8c"
+      "sha256": "0c54d4bf320294552eecc67bc99d53aab82c5e4e5de28a398f86f0c2b4a4019e"
     },
     {
       "kind": "src",
@@ -3391,7 +3391,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "18747bb7160eb0f7ff72fc718d840f4287fb077525fe2d188573125510728bf1"
+      "sha256": "6a49101423bb4cf9d9b652b7fb56b0ec5231215511034d4c5337df4531ed89d6"
     },
     {
       "kind": "src",
@@ -3401,7 +3401,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "48c78811d82b1a0a6f8805fd1b9a8386629e4e6e95a38f6ad1398e387fd24fcb"
+      "sha256": "375a7e035552468af23bcbbac71adc032516a413951c54171850323878881c94"
     },
     {
       "kind": "src",
@@ -3979,7 +3979,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-07T10:15:06.374Z",
-  "headShaAtGeneration": "3601d3f06d0a49e5041c84a2a46397b032c2d85d",
+  "generatedAt": "2026-10-07T11:05:26.506Z",
+  "headShaAtGeneration": "098d04c24f11d38d91fefcd98fde3c6840d79d55",
   "graphifyVersion": "graphify 0.8.50"
 }

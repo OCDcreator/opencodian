@@ -152,7 +152,7 @@ describe.each(['en', 'zh'] as const)('Codex session browser native catalogs (%s)
     modal.onOpen();
     await flushUI();
     expect(modal.contentEl.querySelector('[data-session-catalog-failure="permission-denied"]')).toBeTruthy();
-    expect(modal.contentEl.textContent).toContain(t('settings.codex.readback.messagePermissionDenied'));
+    expect(modal.contentEl.textContent).toContain(t('chat.backendSessions.catalogPermissionDenied'));
     expect(modal.contentEl.textContent).not.toContain('secret-thread-token');
     f.request.mockResolvedValue({ data: [], nextCursor: null });
     Array.from(modal.contentEl.querySelectorAll('button')).find((button) => button.textContent === t('chat.backendSessions.refreshButton'))!.click();
@@ -173,7 +173,7 @@ describe.each(['en', 'zh'] as const)('Codex session browser native catalogs (%s)
     await flushUI();
     expect(modal.contentEl.querySelector('[data-session-catalog-state="partial"]')).toBeTruthy();
     expect(modal.contentEl.querySelector('[data-session-id="native-A"]')).toBeTruthy();
-    expect(modal.contentEl.textContent).toContain(t('settings.codex.readback.messagePermissionDenied'));
+    expect(modal.contentEl.textContent).toContain(t('chat.backendSessions.catalogPermissionDenied'));
     expect(modal.contentEl.textContent).not.toContain('secret-thread-page');
   });
 

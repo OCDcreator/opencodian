@@ -49,3 +49,5 @@ The shared backend chooser exposes Pi and mounts SettingsPiSection when enabled.
 ## 2026-09-27 OpenCode 2 compatibility
 
 Settings expose OpenCode 1 and 2 separately and provide local executable or remote server controls for OpenCode 2.
+
+2026-10-07: OpenCode 2 directory read controls render classified state and fixed bilingual text on failed/denied/absent endpoints.

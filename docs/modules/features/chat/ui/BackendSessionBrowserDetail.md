@@ -45,3 +45,5 @@
 ## 2026-10-06 Codex catalog permission denial
 
 renderBackendSessionCatalogStatus 接收可选 permissionDenied，只改变固定双语说明与 data-session-catalog-failure；状态仍为 failed/partial，已读取条目由 browser 原所有者管理。
+
+2026-10-07: The shared session browser consumes catalog evidence for every backend, preserves partial data and renders fixed bilingual denial/unavailable/failure messages. Unexpected Codex catalog rejections also become classified failures rather than raw exception text.

@@ -16,6 +16,7 @@ import type { ChatMessage, ContextUsageSnapshot, QuestionRequest, SessionDiffEnt
 import type { OpenCode2BackendSettings } from '../../types/settings';
 import { AgentCapability, type BackendCapabilities } from '../AgentCapability';
 import { AUX_DENIED_CAPABILITIES, type AuxQueryResult, type AuxQuerySession, type AuxQuerySessionConfig, type AuxQueryTurnRequest } from './AgentAuxQueryCapability';
+import { backendSessionCatalogFailure, BackendSessionCatalogReadError } from './AgentBackendRouting';
 import type { InlineCompletionSession, InlineCompletionSessionConfig } from './AgentInlineCompletionCapability';
 import type {
   AgentBranchCapability,
@@ -227,18 +228,29 @@ export class OpenCode2Adapter implements AgentService, AgentChatCapability, Agen
 
   async listSessions(): Promise<unknown[]> {
     const client = await this.ready();
-    const sessions: unknown[] = [];
+    const sessions = new Map<string, unknown>();
     const seenCursors = new Set<string>();
     let cursor: string | undefined;
-    do {
-      const page = await client.session.list({ directory: this.options.workingDirectory, limit: 100, ...(cursor ? { cursor } : {}) });
-      sessions.push(...page.data);
-      const next = page.cursor.next ?? undefined;
-      if (page.data.length < 100 || !next || seenCursors.has(next)) break;
+    const fail = (errorReason: string, status: 'failed' | 'unavailable' = 'failed'): never => {
+      throw new BackendSessionCatalogReadError({ status: sessions.size ? 'partial' : status,
+        data: [...sessions.values()], nextCursor: cursor ?? null, errorReason });
+    };
+    for (let count = 0; count < 100; count += 1) {
+      const page = await client.session.list({ directory: this.options.workingDirectory, limit: 100, ...(cursor ? { cursor } : {}) })
+        .catch((error: unknown) => { const failure = backendSessionCatalogFailure(error); return fail(failure.errorReason, failure.status); });
+      if (!Array.isArray(page.data)) fail('Invalid session catalog response');
+      for (const session of page.data) {
+        if (!session || typeof session.id !== 'string' || !session.id.trim()) fail('Invalid session catalog identity');
+        if (!sessions.has(session.id)) sessions.set(session.id, session);
+      }
+      const next = page.cursor?.next ?? undefined;
+      if (next === undefined) return [...sessions.values()];
+      if (typeof next !== 'string' || !next.trim()) fail('Invalid session catalog cursor');
+      if (seenCursors.has(next)) fail('Session catalog cursor repeated');
       seenCursors.add(next);
       cursor = next;
-    } while (cursor);
-    return sessions;
+    }
+    return fail('Session catalog page limit exceeded');
   }
 
   async getSession(sessionId: string): Promise<unknown | null> {

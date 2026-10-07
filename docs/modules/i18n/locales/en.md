@@ -655,3 +655,5 @@ Describe active-query preservation, new-query/current-selection boundaries and i
 ## 2026-10-06 Codex catalog permission denial
 
 新增 settings.codex.readback.statusPermissionDenied / messagePermissionDenied，用于 Codex 目录读取被拒绝的固定状态和重试说明。原始服务错误不插入翻译参数。
+
+2026-10-07: Added backend-neutral session catalog permission-denied copy for OpenCode 2 and shared browsers.

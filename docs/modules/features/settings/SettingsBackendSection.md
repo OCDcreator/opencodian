@@ -59,3 +59,5 @@ Pi 加入已实现后端选择。仅启用 Pi 时挂载独立 SettingsPiSection�
 ## 2026-09-27 OpenCode 2 compatibility
 
 The backend list exposes OpenCode 1 and 2 separately; OpenCode 2 settings select local executable or remote URL/password.
+
+2026-10-07: OpenCode 2 catalog reads keep fixed denied/unavailable/failed state text and data-catalog-state. Raw upstream exception messages are not rendered in this catalog read surface.

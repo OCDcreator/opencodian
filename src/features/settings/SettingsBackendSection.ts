@@ -1,6 +1,7 @@
 import { Notice, Setting } from 'obsidian';
 
 import { IMPLEMENTED_AGENT_BACKENDS } from '../../core/agents/backend';
+import { backendSessionCatalogFailure } from '../../core/agents/backend/AgentBackendRouting';
 import type { OpenCode2Adapter } from '../../core/agents/backend/OpenCode2Adapter';
 import type { AgentBackendKind } from '../../core/types/chat';
 import { t, type TranslationKey } from '../../i18n';
@@ -134,9 +135,16 @@ export class SettingsBackendSection {
           } | undefined;
           const summary = await adapter?.readConfigurationSummary?.();
           if (!summary) throw new Error('OpenCode 2 adapter unavailable');
+          catalogStatus.setAttribute('data-catalog-state', 'complete');
           catalogStatus.setText(t('settings.agent.opencode2.catalog.summary', summary));
           await this.renderOpenCode2Management(management);
-        } catch (error) { catalogStatus.setText(error instanceof Error ? error.message : String(error)); }
+        } catch (error) {
+          const failure = backendSessionCatalogFailure(error);
+          catalogStatus.setAttribute('data-catalog-state', failure.status);
+          catalogStatus.setText(t(failure.errorReason === 'Permission denied'
+            ? 'chat.backendSessions.catalogPermissionDenied'
+            : failure.status === 'unavailable' ? 'chat.backendSessions.catalogUnavailable' : 'chat.backendSessions.catalogFailed'));
+        }
         finally { button.setDisabled(false); }
       }));
   }

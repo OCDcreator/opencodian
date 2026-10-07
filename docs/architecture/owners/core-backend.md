@@ -111,3 +111,5 @@ ZCode state.updated 的单项 current-model projection 与 session/read 使用�
 ZCode interaction state follows exact native `permission.resolved` identities, including native question auto-continue; pending reads cannot retain answerable expired cards.
 
 OpenCode 2 auxiliary scopes own all HOME/XDG/DB/temp roots, and native permission normalization may only narrow the verified wildcard deny.
+
+2026-10-07: Session catalog evidence is owned by AgentBackendRouting; OpenCode 2 emits bounded partial read errors with admitted records/cursor, never synthetic session IDs.

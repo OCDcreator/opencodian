@@ -61,3 +61,5 @@ OpenCode 2.0.18 `SessionMessagesQuery` permits `order` only on the first page. I
 Auxiliary CLI scopes override HOME/USERPROFILE, every XDG data/config/cache/state root, OPENCODE_DB and temporary-directory aliases as well as OPENCODE_TEST_HOME. The native agent reader locates the last wildcard deny and requires every later rule to remain deny. Current runtime-added browser deny is valid; a later allow/ask or missing wildcard deny still fails closed. Session wildcard deny remains an exact native readback requirement.
 
 After owned process stop, cleanup resolves and checks the created scope realpath against the expected temporary parent and generated prefix, then removes the complete private root. Native DB/cache/log residue cannot be silently retained by empty-directory rmdir attempts.
+
+2026-10-07: Session paging follows every native cursor even on short pages, deduplicates IDs and bounds reads to 100 pages. A failed page preserves admitted records and the cursor; cycles/invalid identity/cursor fail visibly instead of returning a complete truncated list.
