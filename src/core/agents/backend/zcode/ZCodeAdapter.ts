@@ -363,6 +363,10 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
         if (this.transport !== transport) {
           return;
         }
+        // A fulfilled startup promise belongs to the process that just exited.
+        // Clear it with the current transport so start() performs a new handshake.
+        this.startPromise = null;
+        this.transport = null;
         this.closeAllRuns();
         this.interactions.settlePendingForTeardown();
         if (this.currentStatus === 'connected' || this.currentStatus === 'connecting') {
@@ -1053,7 +1057,7 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
     await this.ensureSessionActive(transport, sessionId);
     const result = asRecordValue(await transport.request('session/fork', {
       sessionId,
-      ...(messageID ? { messageId: messageID } : {}),
+      ...(messageID ? { target: { kind: 'message', messageId: messageID } } : {}),
     }));
     const session = asRecordValue(result['session']);
     const snapshotSession = asRecordValue(asRecordValue(result['snapshot'])['session']);

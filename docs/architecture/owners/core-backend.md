@@ -1,4 +1,6 @@
 # Owner: core.backend
+
+> 2026-10-07：ZCode 辅助存储所有权包含独立的 native `sessionDbPath`；每个 scope 同时覆盖 `ZCODE_SESSION_DB_PATH` 和 `ZCODE_SESSION_DB`，以及 `ZCODE_STORAGE_DIR`。仅请求 storage 根不能证明数据库隔离。
 > 2026-10-07：ClaudeCodeScopedSessionStore 隔离原生 transcript IO，复用到 SDK 静态目录、消息、分支、重命名和导入；query 仍经原 SDK/CLI 路径写入指定 config 根。不得用宿主 env 临时改写或绕过 resume identity 校验解决目录不一致。
 > 2026-10-06：Codex SDK fallback 每轮以独立选项快照恢复同 native thread，应用 UI 模型/effort 覆盖并保留严格权限 gate；SDK 非致命 ErrorItem 只作诊断事件，fatal thread/turn 仍为 error。边界与 canonical state 未扩展。
 > 2026-10-02（reviewed continuation，用户已授权）：ClaudeCodeAdapter 的 MCP permission override 与 output-style reload 复用现有 active persistent query，以 native session ID 选择目标；缺方法/失效会话返回 unavailable，响应/会话竞态失败不提升为 runtime verified。SDK 回执仅 acknowledged，刷新样式列表不代表选中样式或新模型输出；配置三轴与 UI 验收另记。Codex 删除默认须同 ID absence 回读 verified；pending/failed/admitted 期间 deleted 通知不得擦掉恢复身份、alias 和 evidence/cache，同 ID retry 可通过权威 absence 收敛。显式 forgetSession 不发 native delete/archive，UI 暴露另记 partial；backend owner 保留这些状态所有权。
@@ -101,3 +103,7 @@ Codex user item/owning-turn identity、attempt fencing、权威 beforeTurnId 映
 ClaudeCodeAdapter owns current CLI resolution for new/resumed queries and dedicated probes. It revalidates after asynchronous SDK/MCP loading, preserves injected SDK/path/env/shell ownership, and snapshots each spawn callback. Executable edits do not close persistent queries. Explicit restart validates first and closes only after a valid selection; next send keeps native identity/history while adopting the current executable. No other backend behavior changes.
 
 2026-10-06：ZCodeManagementService 保存证据的 runtime 值继续限定为原生 effective catalog；application 在保存时保持 pending。会话新建/重连恢复及插件执行的独立观察不由 secure writer 推断，不新增状态所有者或绕过 revision/archive/fail-closed。
+
+2026-10-07：ZCode generic aux 的只读边界包含独立 HOME/workspace/config 和创建前原生插件禁用回读；工具表不能约束 hook 子进程。消息 fork 使用当前 Protocol 1 的 target discriminated union，原生失败继续向上传递。
+
+ZCode state.updated 的单项 current-model projection 与 session/read 使用同一 catalog 合并边界；native process exit 清除当前 transport 的 startPromise，保持新握手与迟到退出的身份隔离。

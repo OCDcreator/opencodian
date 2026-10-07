@@ -26,6 +26,7 @@ import path from 'node:path';
 import * as claudeSdk from '@anthropic-ai/claude-agent-sdk';
 
 import type {
+  AuxQueryResult,
   AuxQuerySafetyProof,
   AuxQuerySession,
   AuxQuerySessionConfig,
@@ -782,15 +783,35 @@ async function createZCodeHarness(context: AuditContext): Promise<BackendHarness
 }> {
   const hostStorage = path.join(path.dirname(context.vault), 'zcode-control-storage');
   fs.mkdirSync(hostStorage, { recursive: true });
+  // Normal native sessions execute this owned hook; auxiliary sessions must not.
+  const hookRoot = path.join(path.dirname(context.vault), 'zcode-hook-control-plugin');
+  const hookLog = path.join(context.vault, 'zcode-hook-control.jsonl');
+  const hookScript = path.join(hookRoot, 'owned-hook.mjs');
+  fs.mkdirSync(path.join(hookRoot, '.zcode-plugin'), { recursive: true });
+  fs.mkdirSync(path.join(hookRoot, 'hooks'), { recursive: true });
+  fs.mkdirSync(path.join(context.vault, '.zcode'), { recursive: true });
+  fs.writeFileSync(path.join(hookRoot, '.zcode-plugin', 'plugin.json'), JSON.stringify({ name: 'owned-aux-hook-control', version: '0.0.1' }));
+  fs.writeFileSync(hookLog, '');
+  fs.writeFileSync(hookScript, 'import fs from "node:fs";const chunks=[];for await(const c of process.stdin)chunks.push(c);const input=JSON.parse(Buffer.concat(chunks).toString());fs.appendFileSync(' + JSON.stringify(hookLog) + ',JSON.stringify({sessionId:input.session_id??input.sessionId,event:input.hook_event_name??input.hookEventName})+"\\n");console.log("{}");');
+  const quoteHookPath = (value: string): string => process.platform === 'win32'
+    ? '"' + value + '"'
+    : "'" + value.replace(/'/g, "'\"'\"'") + "'";
+  fs.writeFileSync(path.join(hookRoot, 'hooks', 'hooks.json'), JSON.stringify({ hooks: { UserPromptSubmit: [{ hooks: [{ type: 'command', command: quoteHookPath(process.execPath) + ' ' + quoteHookPath(hookScript) }] }] } }));
+  fs.writeFileSync(path.join(context.vault, '.zcode', 'config.json'), JSON.stringify({ plugins: { dirs: [hookRoot], enabledPlugins: { 'owned-aux-hook-control@inline': true } }, hooks: { enabled: true } }));
+  const hookCalls = (): Array<{ sessionId?: string; event?: string }> => fs.readFileSync(hookLog, 'utf8')
+    .split('\n').filter(Boolean).map((line) => JSON.parse(line) as { sessionId?: string; event?: string });
   const records: ZCodeAuditReadback[] = [];
   const bySession = new Map<AuxQuerySession, ZCodeAuditReadback>();
   const scopesBefore = new Set(fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith('opencodian-zcode-aux-')));
+  let controlTransport: ZCodeAppServerTransport | null = null;
   const adapter = new ZCodeAdapter({
     workingDirectory: context.vault,
     getSettings: () => ({ executablePath: process.env.ZCODE_BIN ?? '' }),
     discoverProviderConfig: (options) => discoverZCodeProviderConfig({ ...options,
       env: { ...process.env, ZCODE_STORAGE_DIR: hostStorage } }),
-    getExtraEnv: () => ({ ZCODE_STORAGE_DIR: hostStorage }),
+    getExtraEnv: () => ({ ZCODE_STORAGE_DIR: hostStorage,
+      ZCODE_SESSION_DB_PATH: path.join(hostStorage, 'session.sqlite'),
+      ZCODE_SESSION_DB: path.join(hostStorage, 'session.sqlite') }),
     createTransport: (options) => {
       const storage = options.extraEnv?.['ZCODE_STORAGE_DIR'] ?? '';
       const record: ZCodeAuditReadback = { sessionId: '', storage, exited: false,
@@ -799,7 +820,10 @@ async function createZCodeHarness(context: AuditContext): Promise<BackendHarness
         record.exited = true;
         options.onExit?.(event);
       } });
-      if (!path.basename(path.dirname(storage)).startsWith('opencodian-zcode-aux-')) return transport;
+      if (!path.basename(path.dirname(storage)).startsWith('opencodian-zcode-aux-')) {
+        controlTransport = transport;
+        return transport;
+      }
       records.push(record);
       transport.onNotification('session/event', (params) => {
         // The same native event envelope accepted by the production session.
@@ -838,36 +862,68 @@ async function createZCodeHarness(context: AuditContext): Promise<BackendHarness
     create: async (ctx, systemPrompt, options) => {
       const beforeCount = records.length;
       const session = await adapter.startAuxQuerySession({ systemPrompt, workingDirectory: ctx.vault,
-        ...(options?.model ? { model: options.model } : {}) });
+        ...(options?.model ? { model: options.model.kind === 'zcode' && process.env.AUDIT_AUX_REASONING_LEVEL_ZCODE
+          ? { ...options.model, reasoningLevel: process.env.AUDIT_AUX_REASONING_LEVEL_ZCODE } : options.model } : {}) });
       const record = records[beforeCount];
       if (!record || !record.sessionId) { await session.dispose(); throw new Error('No independent ZCode native transport evidence.'); }
       bySession.set(session, record);
+      const nativeQuery = session.query.bind(session);
+      session.query = (request) => {
+        record.currentUsers = []; record.toolEvents = []; record.toolCallCount = null;
+        return nativeQuery(request).then((result: AuxQueryResult) => {
+          fs.appendFileSync(path.join(hostStorage, 'aux-query-results.jsonl'), JSON.stringify({ nativeSessionId: record.sessionId, result }) + '\n');
+          return result;
+        });
+      };
       return session;
     },
     nativeSafetyReadback: async (session) => {
       const record = bySession.get(session);
+      if (record && hookCalls().some((call) => call.sessionId === record.sessionId)) return { ok: false, detail: 'Auxiliary native session executed a project hook outside its empty tool registry.' };
       return record ? verifyZCodeNativeReadback(record, session.safety) : { ok: false, detail: 'Missing current-session native readback.' };
     },
     positiveControl: async () => {
       const target = path.join(context.vault, 'zcode-control-escape.md');
       const model = parseVisionModel('zcode', auditModelEnv('zcode', false));
       if (!model || model.kind !== 'zcode') throw new Error('ZCode positive control requires an explicit provider/model.');
-      const sessionId = await adapter.createSession('aux audit native write control');
+      if (!controlTransport) throw new Error('ZCode write control transport unavailable.');
+      const createdSession = await controlTransport.request<Record<string, unknown>>('session/create', {
+        workspace: { workspacePath: context.vault, workspaceKey: context.vault },
+        persistence: 'deferred', titleGenerationEnabled: false,
+        mcpServers: [], toolAllowlist: ['Read', 'Write'], dynamicWorkflowEnabled: false,
+      });
+      const sessionId = String((createdSession['session'] as Record<string, unknown>)['sessionId'] ?? '');
+      if (!sessionId) throw new Error('ZCode write control returned no native session.');
+      await adapter.setSessionMode(sessionId, 'yolo');
+      const expected = 'OC_ZCODE_AUX_WRITE_CONTROL\n';
       const tools: string[] = [];
       for await (const chunk of adapter.sendMessage({ sessionId,
-        content: buildInducingPrompt(context.notePath, target), options: { provider: model.provider, model: model.model } })) {
+        content: `Use Write exactly once to create ${target} with exactly the ASCII text OC_ZCODE_AUX_WRITE_CONTROL followed by one LF. Do not use other tools or read files. Then reply with one <replacement> tag containing ok.`,
+        options: { provider: model.provider, model: model.model,
+          ...(process.env.AUDIT_AUX_REASONING_LEVEL_ZCODE ? { variant: process.env.AUDIT_AUX_REASONING_LEVEL_ZCODE } : {}) } })) {
         if (chunk.type === 'tool_use') tools.push(chunk.name);
         if (chunk.type === 'error') throw new Error(chunk.content);
       }
+      const applied = await controlTransport.request<Record<string, unknown>>('session/read', { sessionId });
+      const effectiveModel = (applied['settings'] as Record<string, unknown>)?.['model'];
       const created = fs.existsSync(target);
-      const ok = created && tools.some((name) => /write|edit|patch/i.test(name));
-      if (created) fs.unlinkSync(target);
+      const actual = created ? fs.readFileSync(target) : null;
+      const bytesEqual = !!actual && actual.equals(Buffer.from(expected, 'utf8'));
+      const hookExecuted = hookCalls().some((call) => call.sessionId === sessionId && call.event === 'UserPromptSubmit');
+      const ok = bytesEqual && tools.some((name) => /write|edit|patch/i.test(name)) && hookExecuted;
+      if (ok) fs.unlinkSync(target);
       return { ok, detail: JSON.stringify({ backend: 'zcode', nativeSessionId: sessionId,
-        observedTools: tools, fileCreated: created, storage: hostStorage,
+        observedTools: tools, effectiveModel, fileCreated: created, bytesEqual, expectedBytes: Buffer.byteLength(expected),
+        actualBytes: actual?.length ?? null, hookExecuted, hookLog, storage: hostStorage,
         retainedControlEvidence: true }) };
     },
     residueProbe: async () => {
-      const listed = await adapter.listSessions() as Array<{ sessionId?: string }>;
+      if (!controlTransport) throw new Error('ZCode residue readback transport unavailable.');
+      // A private CLI scope has no desktop TaskIndex DB. Its raw native list,
+      // rather than the product soft-delete projection, is authoritative here.
+      const nativeList = await controlTransport.request<Record<string, unknown>>('session/list', {});
+      if (!Array.isArray(nativeList['sessions'])) throw new Error('ZCode native session list unavailable.');
+      const listed = nativeList['sessions'] as Array<{ sessionId?: string }>;
       const leakedIds = listed.filter((row) => records.some((record) => record.sessionId === row.sessionId)).map((row) => row.sessionId);
       const remaining = records.filter((record) => fs.existsSync(path.dirname(record.storage)) || !record.exited)
         .map((record) => ({ root: path.dirname(record.storage), exited: record.exited }));
@@ -876,7 +932,18 @@ async function createZCodeHarness(context: AuditContext): Promise<BackendHarness
         ? 'RESIDUE: ' + JSON.stringify({ remaining, leakedIds, extra })
         : 'all native aux processes exited; private stores removed; aux ids absent from native session/list';
     },
-    teardown: async () => { for (const session of bySession.keys()) await session.dispose(); await adapter.stop(); },
+    teardown: async () => {
+      for (const session of bySession.keys()) await session.dispose();
+      await adapter.stop();
+      // Retain the exact owned hook evidence before restoring the audit vault.
+      const configPath = path.join(context.vault, '.zcode', 'config.json');
+      fs.copyFileSync(hookLog, path.join(hostStorage, 'hook-control.jsonl'));
+      fs.copyFileSync(configPath, path.join(hostStorage, 'hook-control-config.json'));
+      fs.unlinkSync(hookLog);
+      fs.unlinkSync(configPath);
+      const configDirectory = path.dirname(configPath);
+      if (fs.readdirSync(configDirectory).length === 0) fs.rmdirSync(configDirectory);
+    },
   };
 }
 

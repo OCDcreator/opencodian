@@ -11,6 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-10-07 ZCode 剩余验收与辅助编辑保护
+
+- 修复 ZCode 辅助进程继承会话数据库别名、官方 reasoning_delta 被误判的问题。
+- 实机证明项目 hook 可以绕过空工具表后，改为私有 HOME/workspace/config，并在创建会话前用两次原生插件目录确认全部禁用；必跑审计增加 hook 正负控制，严格 LF 写入要求不变。
+- 修复 ZCode 消息锚点 fork 参数，采用当前 Protocol 1 的 target.kind=message。
+- 修复 state.updated 单项 current-model 投影覆盖完整目录、第二会话合法模型被拒绝的问题。
+- 修复 owned app-server 非预期退出后的旧 startPromise 复用；当前连接退出才清空，迟到 predecessor exit 继续被忽略。
+- 修复行内接受等待 native 清理后覆盖新修改的竞态；快照检查与单次 editor.replaceRange 连续执行，整篇确认后重新读取范围。
+- 保留 1.1.37；实机证据分别记录 BUILD_ID，不将单项通过外推为完整 profile/platform 通过。
+
 ## 2026-10-07 Codex 剩余修复：SDK 模型与目录拒绝分类
 
 - SDK fallback 每 turn 捕获模型/effort 并刷新同 native ID 的 wrapper；nonfatal warning/reconnect 不再提前显示发送失败，terminal error 保持失败。

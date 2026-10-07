@@ -205,7 +205,7 @@ export class ZCodeAuxQuerySession implements AuxQuerySession {
       enforcedPolicy: 'none',
       effectiveTools: initialTools,
       deniedCapabilities: AUX_DENIED_CAPABILITIES,
-      mechanism: 'isolated ZCode app-server with empty toolAllowlist, no MCP/dynamic workflow, and native session/messages info.tools readback',
+      mechanism: 'private HOME/workspace and natively disabled plugins, empty toolAllowlist, no MCP/dynamic workflow, and current session/messages info.tools readback',
     };
   }
 
@@ -220,14 +220,26 @@ export class ZCodeAuxQuerySession implements AuxQuerySession {
     let instance: ZCodeAuxQuerySession | null = null;
     const exitPromise = new Promise<void>((resolve) => { exitResolve = resolve; });
     try {
+      // Stop project discovery at this owned workspace and isolate user hooks.
+      fs.mkdirSync(path.join(scope.root, '.git'));
+      fs.mkdirSync(path.join(scope.root, '.zcode'));
+      const configPath = path.join(scope.root, '.zcode', 'config.json');
+      const privateConfig = { hooks: { enabled: false, events: {} }, plugins: { dirs: [], enabledPlugins: {} as Record<string, boolean> } };
+      fs.writeFileSync(configPath, JSON.stringify(privateConfig), { mode: 0o600 });
+      const workspace = { workspaceKey: scope.root, workspacePath: scope.root };
       const createTransport = options.createTransport ?? ((transportOptions) => new ZCodeAppServerTransport(transportOptions));
       transport = createTransport({
         launch: options.launch,
-        workingDirectory,
+        workingDirectory: scope.root,
         requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
         extraEnv: {
           ...(options.providerConfigEnv ?? {}),
+          HOME: scope.root,
+          USERPROFILE: scope.root,
+          ZCODE_DATA_BASE_DIR: path.join(scope.root, 'data-base'),
           ZCODE_STORAGE_DIR: scope.storage,
+          ZCODE_SESSION_DB_PATH: path.join(scope.storage, 'session.sqlite'),
+          ZCODE_SESSION_DB: path.join(scope.storage, 'session.sqlite'),
         },
         onExit: () => {
           exitConfirmed = true;
@@ -237,8 +249,38 @@ export class ZCodeAuxQuerySession implements AuxQuerySession {
       });
       await transport.start();
       await transport.request('runtime/capabilities', {});
+      // Tool allowlists do not restrict hook subprocesses. Disable every native
+      // plugin in the private project and confirm the complete catalog before
+      // creating a session, when SessionStart hooks could already execute.
+      const listed = asRecord(await transport.request('plugins/list', { workspace }))['plugins'];
+      if (!Array.isArray(listed)) throw new Error('ZCode auxiliary plugin isolation was unavailable.');
+      const ids = new Set<string>();
+      for (const value of listed) {
+        const plugin = asRecord(value);
+        const id = asString(plugin['id']);
+        if (!/^[a-zA-Z0-9][a-zA-Z0-9._:@/-]{0,255}$/.test(id)
+          || typeof plugin['enabled'] !== 'boolean' || ids.has(id)) {
+          throw new Error('ZCode auxiliary plugin catalog was invalid.');
+        }
+        ids.add(id);
+        privateConfig.plugins.enabledPlugins[id] = false;
+      }
+      fs.writeFileSync(configPath, JSON.stringify(privateConfig), { mode: 0o600 });
+      const verified = asRecord(await transport.request('plugins/list', { workspace }))['plugins'];
+      if (!Array.isArray(verified) || verified.length !== ids.size) {
+        throw new Error('ZCode auxiliary plugin isolation was not confirmed.');
+      }
+      const verifiedIds = new Set<string>();
+      for (const value of verified) {
+        const plugin = asRecord(value);
+        const id = asString(plugin['id']);
+        if (!ids.has(id) || verifiedIds.has(id) || plugin['enabled'] !== false) {
+          throw new Error('ZCode auxiliary plugin isolation was not confirmed.');
+        }
+        verifiedIds.add(id);
+      }
       const created = asRecord(await transport.request('session/create', {
-        workspace: { workspaceKey: workingDirectory, workspacePath: workingDirectory },
+        workspace,
         persistence: 'deferred',
         titleGenerationEnabled: false,
         mcpServers: [],
@@ -393,12 +435,12 @@ export class ZCodeAuxQuerySession implements AuxQuerySession {
           const kind = asString(event.payload['kind']);
           // Tool-call deltas have occurred in version-adjacent runtime builds.
           // A new or untyped delta cannot establish a read-only turn either.
-          if (kind !== 'text_delta' && kind !== 'thinking_delta') {
+          if (kind !== 'text_delta' && kind !== 'reasoning_delta' && kind !== 'thinking_delta') {
             await this.stopAndDispose();
             return { success: false, error: 'ZCode auxiliary turn emitted an unverified streaming event; the read-only contract was not met.' };
           }
-          const delta = asRecord(event.payload['delta']);
-          const text = kind === 'text_delta' ? asString(event.payload['delta']) : asString(delta['text']);
+          // Native reasoning has its own channel and is never replacement text.
+          const text = kind === 'text_delta' ? asString(event.payload['delta']) : '';
           if (text) { streamed += text; request.onTextChunk?.(streamed); }
           continue;
         }

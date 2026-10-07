@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "digest": "176a6fdf5c637e212c1f3e5bb945b707a4a9ee55d061a83b49293c09d01cc628",
+  "digest": "2d88c8f3eefe9998e4a9624738c9b0bdf4f6bca1ad3ec1019d5c241329641568",
   "recordCount": 795,
   "records": [
     {
       "kind": "ignore",
       "key": ".gitignore",
-      "sha256": "e31adde0c853ff117738104fe9e5e88c4545dad51c04c245e2a47cb6a63a4795"
+      "sha256": "7e96a4b9bfb7e654f7c36b4eb5d7e929173a60066cdf4628990c378ea336fe5a"
     },
     {
       "kind": "ignore",
@@ -511,7 +511,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
-      "sha256": "d2f082b9de6ddfbdc5307c462ac437ed2949da8462567d840e3fb6852c8a0222"
+      "sha256": "2671e58e491a57c89c225bbadd80e4aaa8d9d14777510107edf2ba224ec74e77"
     },
     {
       "kind": "src",
@@ -521,7 +521,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/zcode/ZCodeAuxQuerySession.ts",
-      "sha256": "0cc647ad00c01b1a7904e37403cd6ca18a5d28f7e4635846c2cbd6522228fb07"
+      "sha256": "37654ab7ece1481b810ab27e5cfb9a12e5d6e67bf4240b2cea1c221d9f5b544a"
     },
     {
       "kind": "src",
@@ -556,7 +556,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/zcode/ZCodeModelCatalog.ts",
-      "sha256": "0d37188e28957435a2935f298da6c83096930f16a534ca1e123a27f25d53d3d8"
+      "sha256": "c647e7ea882ac970e8d90a33c1ac1a4bb92f838539d5524272f8d2533b79434b"
     },
     {
       "kind": "src",
@@ -2641,7 +2641,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditAccept.ts",
-      "sha256": "0e287558fbfe59a0065ea363c9cb6ba6aca5a4d25cb47d9faad2dcd9d9810b65"
+      "sha256": "b40b16499c49a05452f3cf69212ff36308896349df7bab9e3fc1b85b4c1cfebc"
     },
     {
       "kind": "src",
@@ -3979,7 +3979,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-07T01:56:27.303Z",
-  "headShaAtGeneration": "cd14ff75d9307904e07b8f438a2706059527f8ee",
+  "generatedAt": "2026-10-07T06:42:57.784Z",
+  "headShaAtGeneration": "3b7eb1d671b12278432125c461f81fcd3f3cd658",
   "graphifyVersion": "graphify 0.8.50"
 }

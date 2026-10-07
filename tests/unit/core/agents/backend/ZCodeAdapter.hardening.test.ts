@@ -136,6 +136,23 @@ describe('ZCodeAdapter — protocol negotiation and restart hardening', () => {
     adapter.dispose();
   });
 
+  it('restarts after an unexpected current-process exit without returning the old startup promise', async () => {
+    const adapter = startAdapter();
+    await adapter.start();
+    const firstExit = capturedExits[0];
+    firstExit?.({ exitCode: null, signal: 'SIGKILL' });
+    expect(adapter.status).toBe('error');
+    await adapter.start();
+    expect(transports).toHaveLength(2);
+    expect(transports[1].request).toHaveBeenCalledWith('runtime/capabilities', {});
+    expect(adapter.status).toBe('connected');
+    firstExit?.({ exitCode: null, signal: 'SIGKILL' });
+    expect(adapter.status).toBe('connected');
+    await adapter.createSession();
+    expect(transports[1].request).toHaveBeenCalledWith('session/create', expect.anything());
+    adapter.dispose();
+  });
+
   it('captures slash commands from the snapshot root (real-snapshot wiring regression)', async () => {
     const adapter = startAdapter();
     await adapter.start();

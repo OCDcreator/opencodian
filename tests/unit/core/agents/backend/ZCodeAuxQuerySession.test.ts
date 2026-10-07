@@ -100,6 +100,18 @@ class FakeAuxTransport implements ZCodeAuxTransport {
   private emit(method: string, params: Record<string, unknown>): void { this.handlers.get(method)?.(params); }
 }
 
+
+/** Independent startup fake; the existing turn fake remains unchanged. */
+class HookFreeAuxTransport extends FakeAuxTransport {
+  async request<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T> {
+    if (method === 'plugins/list') {
+      this.requests.push({ method, ...(params ? { params } : {}) });
+      return { plugins: [] } as T;
+    }
+    return super.request<T>(method, params);
+  }
+}
+
 describe('ZCodeAuxQuerySession', () => {
   const tempBase = path.join(process.cwd(), '.tmp');
   fs.mkdirSync(tempBase, { recursive: true });
@@ -137,7 +149,7 @@ describe('ZCodeAuxQuerySession', () => {
       ...(turnTimeoutMs !== undefined ? { turnTimeoutMs } : {}),
       tempParent,
       createTransport: (options) => {
-        const fake = new FakeAuxTransport(options, mode);
+        const fake = new HookFreeAuxTransport(options, mode);
         lastTransport = fake;
         return fake;
       },
@@ -158,6 +170,76 @@ describe('ZCodeAuxQuerySession', () => {
     }]);
     await session.dispose();
     expect(auxRoots()).toEqual(before);
+  });
+
+  it('overrides both inherited database aliases with this auxiliary scope', async () => {
+    let env: Record<string, string> | undefined;
+    const session = await ZCodeAuxQuerySession.create({
+      launch,
+      providerConfigEnv: {
+        ZCODE_SESSION_DB_PATH: '/outside/main.sqlite',
+        ZCODE_SESSION_DB: '/outside/legacy.sqlite',
+      },
+      workingDirectory: '/vault', systemPrompt: 'Read only.', tempParent,
+      createTransport: (options) => {
+        env = options.extraEnv;
+        return new HookFreeAuxTransport(options);
+      },
+    });
+    try {
+      const expected = path.join(env?.['ZCODE_STORAGE_DIR'] ?? '', 'session.sqlite');
+      expect(expected).toContain('opencodian-zcode-aux-');
+      expect(env?.['ZCODE_SESSION_DB_PATH']).toBe(expected);
+      expect(env?.['ZCODE_SESSION_DB']).toBe(expected);
+      await expect(session.query({ prompt: 'Read-only first turn.' })).resolves.toEqual({
+        success: true, text: 'AUX_OK', toolCalls: [],
+      });
+    } finally {
+      await session.dispose();
+    }
+  });
+
+  it.each(['reasoning_delta', 'thinking_delta'])('accepts %s without mixing reasoning into replacement text', async (kind) => {
+    const session = await create();
+    const fake = lastTransport as FakeAuxTransport;
+    const nativeRequest = fake.request.bind(fake);
+    fake.request = async (method, params) => {
+      if (method === 'session/send') {
+        (fake as unknown as { emit(method: string, params: Record<string, unknown>): void }).emit('session/event', {
+          type: 'model.streaming', sessionId: 'aux-session',
+          payload: { kind, delta: kind === 'reasoning_delta' ? 'reasoning test fixture' : { text: 'reasoning test fixture' } },
+        });
+      }
+      return nativeRequest(method, params);
+    };
+    const onTextChunk = jest.fn();
+    try {
+      await expect(session.query({ prompt: 'Return only replacement text.', onTextChunk })).resolves.toEqual({
+        success: true, text: 'AUX_OK', toolCalls: [],
+      });
+      expect(onTextChunk).not.toHaveBeenCalled();
+    } finally {
+      await session.dispose();
+    }
+  });
+
+  it.each(['tool_input_delta', 'tool_call', 'unknown_delta'])('rejects %s while the native tool table is empty', async (kind) => {
+    const session = await create();
+    const fake = lastTransport as FakeAuxTransport;
+    const nativeRequest = fake.request.bind(fake);
+    fake.request = async (method, params) => {
+      if (method === 'session/send') {
+        (fake as unknown as { emit(method: string, params: Record<string, unknown>): void }).emit('session/event', {
+          type: 'model.streaming', sessionId: 'aux-session', payload: { kind, delta: 'fixture' },
+        });
+      }
+      return nativeRequest(method, params);
+    };
+    await expect(session.query({ prompt: 'Return only replacement text.' })).resolves.toEqual({
+      success: false,
+      error: 'ZCode auxiliary turn emitted an unverified streaming event; the read-only contract was not met.',
+    });
+    await session.dispose();
   });
 
   it('rejects a widened native message tool readback and cleans up', async () => {
@@ -241,4 +323,78 @@ describe('ZCodeAuxQuerySession', () => {
     await session.dispose();
     expect(auxRoots()).toEqual(before);
   });
+
+});
+
+
+describe('ZCodeAuxQuerySession private hook startup', () => {
+  const tempParent = fs.mkdtempSync(path.join(process.cwd(), '.tmp', 'zcode-aux-hook-unit-'));
+  function auxRoots(): string[] {
+    return fs.readdirSync(tempParent).filter((name) => name.startsWith('opencodian-zcode-aux-'));
+  }
+  afterAll(() => { fs.rmdirSync(tempParent); });
+  it('isolates HOME and workspace, and disables all plugins before session creation', async () => {
+    let transport: HookFreeAuxTransport | undefined;
+    let env: Record<string, string> | undefined;
+    let cwd = '';
+    let reads = 0;
+    let config: Record<string, unknown> | undefined;
+    const session = await ZCodeAuxQuerySession.create({
+      launch, workingDirectory: '/vault', systemPrompt: 'Read only.', tempParent,
+      providerConfigEnv: { HOME: '/real-user', USERPROFILE: '/real-user', ZCODE_DATA_BASE_DIR: '/real-data' },
+      createTransport: (options) => {
+        env = options.extraEnv;
+        cwd = options.workingDirectory ?? '';
+        transport = new HookFreeAuxTransport(options);
+        const original = transport.request.bind(transport);
+        transport.request = async <T = unknown>(method: string, params?: Record<string, unknown>): Promise<T> => {
+          if (method === 'plugins/list') {
+            reads += 1;
+            config = JSON.parse(fs.readFileSync(path.join(cwd, '.zcode/config.json'), 'utf8')) as Record<string, unknown>;
+            return { plugins: [{ id: 'owned@inline', enabled: reads === 1 }] } as T;
+          }
+          return original<T>(method, params);
+        };
+        return transport;
+      },
+    });
+    try {
+      expect(env?.['HOME']).toBe(cwd);
+      expect(env?.['USERPROFILE']).toBe(cwd);
+      expect(env?.['ZCODE_DATA_BASE_DIR']).toBe(path.join(cwd, 'data-base'));
+      expect(cwd).not.toBe('/vault');
+      expect(fs.existsSync(path.join(cwd, '.git'))).toBe(true);
+      expect(config).toEqual({ hooks: { enabled: false, events: {} }, plugins: { dirs: [], enabledPlugins: { 'owned@inline': false } } });
+      expect(reads).toBe(2);
+      expect(transport?.requests.find((r) => r.method === 'session/create')?.params?.['workspace']).toEqual({ workspaceKey: cwd, workspacePath: cwd });
+    } finally { await session.dispose(); }
+  });
+
+  it.each(['missing', 'enabled', 'changed', 'duplicate'])('rejects %s plugin isolation before session creation', async (mode) => {
+    const before = auxRoots();
+    let transport: HookFreeAuxTransport | undefined;
+    let reads = 0;
+    await expect(ZCodeAuxQuerySession.create({
+      launch, workingDirectory: '/vault', systemPrompt: 'Read only.', tempParent,
+      createTransport: (options) => {
+        transport = new HookFreeAuxTransport(options);
+        const original = transport.request.bind(transport);
+        transport.request = async <T = unknown>(method: string, params?: Record<string, unknown>): Promise<T> => {
+          if (method === 'plugins/list') {
+            reads += 1;
+            if (mode === 'missing') return {} as T;
+            return { plugins: reads === 1 ? [{ id: 'owned@inline', enabled: true }] : mode === 'changed'
+              ? [{ id: 'unexpected@inline', enabled: false }]
+              : mode === 'duplicate' ? [{ id: 'owned@inline', enabled: false }, { id: 'owned@inline', enabled: false }]
+                : [{ id: 'owned@inline', enabled: true }] } as T;
+          }
+          return original<T>(method, params);
+        };
+        return transport;
+      },
+    })).rejects.toThrow('plugin isolation');
+    expect(transport?.requests.some((r) => r.method === 'session/create')).toBe(false);
+    expect(auxRoots()).toEqual(before);
+  });
+
 });

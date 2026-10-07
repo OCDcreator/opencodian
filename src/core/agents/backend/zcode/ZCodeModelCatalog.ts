@@ -374,8 +374,18 @@ export class ZCodeModelSurface {
     const merged = patchZCodeCatalogSettings(this.catalogSettingsBase ?? {}, patch);
     const parsed = parseZCodeCatalogSnapshot(merged);
     if (parsed) {
-      this.catalog = parsed;
-      this.catalogSettingsBase = merged;
+      // Live session broadcasts also contain the current-model projection.
+      // It is not a replacement for the complete create/resume catalog.
+      const current = parsed.currentModel;
+      const projected = parsed.models.length === 1 && current
+        && parsed.models[0].providerId === current.providerId
+        && parsed.models[0].modelId === current.modelId;
+      if (projected) {
+        this.captureCatalogSnapshot({ settings: merged });
+      } else {
+        this.catalog = parsed;
+        this.catalogSettingsBase = merged;
+      }
     }
   }
 

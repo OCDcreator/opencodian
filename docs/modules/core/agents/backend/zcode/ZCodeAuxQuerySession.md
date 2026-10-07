@@ -1,5 +1,9 @@
 # ZCodeAuxQuerySession
 
+2026-10-07：每个辅助会话同时覆盖 `ZCODE_STORAGE_DIR`、`ZCODE_SESSION_DB_PATH` 和兼容别名 `ZCODE_SESSION_DB`，数据库固定为本会话拥有根内的 `storage/session.sqlite`。只覆盖 storage 根不足以隔离用户配置中单独声明的 sessionDbPath；继承主聊天的任一数据库别名也必须被覆盖。provider 配置路径仍只读引用。空工具表、逐回合 native 工具事件门禁及拥有根清理规则保持。
+
+同次修复接受当前官方 schema 的 `reasoning_delta` 和历史 `thinking_delta`；推理渠道不拼入替换正文，也不触发正文 streaming callback。`tool_call`、`tool_input_delta`、未知 streaming kind、缺失/非零工具计数及非空 native 工具表仍拒绝回合。
+
 > 源码: `src/core/agents/backend/zcode/ZCodeAuxQuerySession.ts`
 
 ## 职责
@@ -32,3 +36,7 @@ marker、realpath、父目录直系关系和保留前缀，仅删除这个专属
 只指向当轮新生成的、原本不存在的 Vault 测试路径：该路径未产生，排除
 `.obsidian` 的 1,950 条内容清单及每文件 SHA-256 前后一致。脱敏记录位于
 `.visual-evidence/zcode-continued/zcode-aux-native-audit-2026-09-24.md`。
+
+## 2026-10-07 Hook 隔离边界
+
+空原生工具表不能约束 hook 子进程。辅助进程现使用自身 HOME/USERPROFILE、数据目录与 workspace；自建 `.git` 停止继承项目发现，私有 `.zcode/config.json` 禁用 hooks 并逐项禁用原生插件。两次 plugins/list 必须是完整、唯一、同一 ID 集合，第二次每项 enabled=false；缺失、未知、重复、仍启用均在 session/create 前拒绝。真实提供者文件仍通过绝对只读引用传入，不改用户配置或凭据。辅助 workspace 不再指向真实笔记库；选区文本与图片仍走原请求，工具表和每轮事件审计不变。

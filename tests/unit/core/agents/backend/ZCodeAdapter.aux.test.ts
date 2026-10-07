@@ -96,6 +96,16 @@ class FakeTransport {
   private emit(method: string, params: Record<string, unknown>): void { this.notifications.get(method)?.(params); }
 }
 
+class HookFreeFakeTransport extends FakeTransport {
+  async request<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T> {
+    if (method === 'plugins/list') {
+      this.calls.push({ method, ...(params ? { params } : {}) });
+      return { plugins: [] } as T;
+    }
+    return super.request<T>(method, params);
+  }
+}
+
 describe('ZCodeAdapter auxiliary-query wiring', () => {
   let adapter: ZCodeAdapter;
   let constructions: TransportConstruction[];
@@ -107,7 +117,7 @@ describe('ZCodeAdapter auxiliary-query wiring', () => {
       resolveRuntime: () => readyResolution,
       discoverProviderConfig: () => providerConfig,
       createTransport: (options) => {
-        const transport = new FakeTransport(options, constructions.length === 0 ? 'chat' : 'aux');
+        const transport = new HookFreeFakeTransport(options, constructions.length === 0 ? 'chat' : 'aux');
         constructions.push({ options, transport });
         return transport as unknown as ZCodeAppServerTransport;
       },

@@ -118,3 +118,7 @@ dev-debug.log
 # Kimi debug session artifacts
 _kimi_dbg/
 kimi-debug-session_*.zip
+
+# Isolated, task-owned native acceptance fixtures and temporary runtimes
+.acceptance-audit/
+.acceptance-tmp/

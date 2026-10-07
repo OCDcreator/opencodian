@@ -25,3 +25,7 @@
 ## 验证
 
 tests/unit/core/agents/backend/ZCodeModelCatalog.test.ts：全量解析、无目录→null、patch 合并、模型校验（解析默认档/未知模型/档位不支持/spec-less 模型/必需未给）、思考级与模式枚举校验。
+
+## 2026-10-07 state.updated 当前模型投影
+
+原生 state.updated 的 model.available 也可能仅含 current 那一项；这不是完整模型目录。此时复用已有 captureCatalogSnapshot 合并路径，更新 current/options/mode/thought 状态并保留 create/resume 学到的目录。非当前模型投影仍按原 state patch 替换，未知模型和档位的拒绝规则不变。实机复现 64/65 项降为 1，合法 Luna 原生直接切换成功，插件的两会话复测验证此修复。
