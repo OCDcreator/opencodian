@@ -1,5 +1,7 @@
 # CodexElicitationBridge
 
+> 2026-10-08：elicitation host 通过 params.threadId 和 getTabIdForSession 路由到所属 tab；所属 tab 缺失返回 null。CodexElicitationCardRequest.signal 传递所属回合取消，view 复用已有可取消 question-card 收集流程。
+
 > **源码**: `src/core/agents/backend/CodexElicitationBridge.ts`
 > **状态**: [REVIEW]
 > **新增**: 2026-09-30 — Codex 0.159.0 `mcpServer/elicitation/request` 桥接（form/url 两种渲染模式 + wire param 类型 + host seam），镜像 `ClaudeCodeElicitationBridge` 模式；按 3+ 复用阈值规则不抽公共 helper（当前仅 2 个 consumer）。

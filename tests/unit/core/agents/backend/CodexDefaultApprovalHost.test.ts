@@ -206,3 +206,24 @@ describe('Codex approval owning tab', () => {
     expect(collectResponse).not.toHaveBeenCalled();
   });
 });
+
+describe('Codex user input owning tab', () => {
+  it('routes the native question with its cancellation to its owning tab', async () => {
+    const collectResponse = jest.fn().mockResolvedValue({ status: 'cancelled' });
+    const getTabIdForSession = jest.fn(() => 'owner-tab');
+    const context = { getActiveTabId: () => 'other-tab', getTabIdForSession, questionCardRenderer: { collectResponse } };
+    const request = { id: 'input-1', sessionId: 'thread-1', questions: [] };
+    const signal = new AbortController().signal;
+    await createCodexApprovalBridgeHost(() => context).collectQuestionAnswers!(request, signal);
+    expect(getTabIdForSession).toHaveBeenCalledWith('thread-1');
+    expect(collectResponse).toHaveBeenCalledWith(request, 'owner-tab', signal);
+  });
+
+  it('does not show a native question after its owning tab is gone', async () => {
+    const collectResponse = jest.fn().mockResolvedValue({ status: 'answered', answers: [['late']] });
+    const context = { getActiveTabId: () => 'other-tab', getTabIdForSession: () => null, questionCardRenderer: { collectResponse } };
+    const request = { id: 'input-1', sessionId: 'closed-thread', questions: [] };
+    await expect(createCodexApprovalBridgeHost(() => context).collectQuestionAnswers!(request)).resolves.toBeNull();
+    expect(collectResponse).not.toHaveBeenCalled();
+  });
+});

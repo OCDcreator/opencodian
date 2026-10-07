@@ -243,6 +243,8 @@ export interface CodexElicitationCardRequest {
   questionRequest: QuestionRequest;
   /** Original wire params, preserved for coercion and advanced rendering. */
   params: CodexMcpElicitationWireParams;
+  /** Owning turn cancellation settles a pending card. */
+  signal?: AbortSignal;
 }
 
 /** User outcome collected by the elicitation card renderer. */
@@ -269,6 +271,7 @@ export interface CodexElicitationCardRenderer {
  */
 export interface CodexElicitationHostContext {
   getActiveTabId: () => string | null;
+  getTabIdForSession?: (sessionId: string) => string | null;
   elicitationCardRenderer?: CodexElicitationCardRenderer;
 }
 
@@ -294,7 +297,10 @@ export function createCodexElicitationBridgeHost(
       if (!ctx.elicitationCardRenderer) {
         return null;
       }
-      const tabId = ctx.getActiveTabId();
+      const tabId = ctx.getTabIdForSession
+        ? ctx.getTabIdForSession(request.params.threadId)
+        : ctx.getActiveTabId();
+      if (ctx.getTabIdForSession && !tabId) return null;
       return ctx.elicitationCardRenderer.collectResponse(request, tabId);
     },
   };

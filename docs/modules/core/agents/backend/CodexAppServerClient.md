@@ -1,5 +1,7 @@
 # CodexAppServerClient
 
+> 2026-10-08：五条 typed server-request 注册透传可选请求取消 signal，旧的无 signal 调用契约保持。signal 生命周期来自 transport 的逐请求控制器。
+
 > **源码**: `src/core/agents/backend/CodexAppServerClient.ts`
 > **状态**: [RUNTIME_ADJUNCT]
 > **Updated**: 2026-06-14 — split wire types into `CodexAppServerClientTypes`, transport/lifecycle into `CodexAppServerTransport`, normalization helpers into `CodexAppServerClientNormalization`; `CodexAppServerClient extends CodexAppServerTransport` and re-exports types via `export *`

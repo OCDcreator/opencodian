@@ -2171,50 +2171,55 @@ export class CodexAppServerClient extends CodexAppServerTransport {
   registerCommandExecutionApprovalHandler(
     handler: (
       params: AppServerCommandExecutionApprovalParams,
+      signal?: AbortSignal,
     ) => AppServerCommandExecutionApprovalResponse | Promise<AppServerCommandExecutionApprovalResponse>,
   ): void {
-    this.registerServerRequestHandler('item/commandExecution/requestApproval', (params) =>
-      handler(params as AppServerCommandExecutionApprovalParams));
+    this.registerServerRequestHandler('item/commandExecution/requestApproval', (params, signal) =>
+      handler(params as AppServerCommandExecutionApprovalParams, ...(signal ? [signal] : [])));
   }
 
   /** Register the handler for `item/fileChange/requestApproval`. */
   registerFileChangeApprovalHandler(
     handler: (
       params: AppServerFileChangeApprovalParams,
+      signal?: AbortSignal,
     ) => AppServerFileChangeApprovalResponse | Promise<AppServerFileChangeApprovalResponse>,
   ): void {
-    this.registerServerRequestHandler('item/fileChange/requestApproval', (params) =>
-      handler(params as AppServerFileChangeApprovalParams));
+    this.registerServerRequestHandler('item/fileChange/requestApproval', (params, signal) =>
+      handler(params as AppServerFileChangeApprovalParams, ...(signal ? [signal] : [])));
   }
 
   /** Register the handler for `item/permissions/requestApproval`. */
   registerPermissionsApprovalHandler(
     handler: (
       params: AppServerPermissionsApprovalParams,
+      signal?: AbortSignal,
     ) => AppServerPermissionsApprovalResponse | Promise<AppServerPermissionsApprovalResponse>,
   ): void {
-    this.registerServerRequestHandler('item/permissions/requestApproval', (params) =>
-      handler(params as AppServerPermissionsApprovalParams));
+    this.registerServerRequestHandler('item/permissions/requestApproval', (params, signal) =>
+      handler(params as AppServerPermissionsApprovalParams, ...(signal ? [signal] : [])));
   }
 
   /** Register the handler for `item/tool/requestUserInput`. */
   registerToolUserInputHandler(
     handler: (
       params: AppServerToolUserInputParams,
+      signal?: AbortSignal,
     ) => AppServerToolUserInputResponse | Promise<AppServerToolUserInputResponse>,
   ): void {
-    this.registerServerRequestHandler('item/tool/requestUserInput', (params) =>
-      handler(params as AppServerToolUserInputParams));
+    this.registerServerRequestHandler('item/tool/requestUserInput', (params, signal) =>
+      handler(params as AppServerToolUserInputParams, ...(signal ? [signal] : [])));
   }
 
   /** Register the handler for `mcpServer/elicitation/request`. */
   registerMcpElicitationHandler(
     handler: (
       params: AppServerMcpElicitationParams,
+      signal?: AbortSignal,
     ) => AppServerMcpElicitationResponse | Promise<AppServerMcpElicitationResponse>,
   ): void {
-    this.registerServerRequestHandler('mcpServer/elicitation/request', (params) =>
-      handler(params as AppServerMcpElicitationParams));
+    this.registerServerRequestHandler('mcpServer/elicitation/request', (params, signal) =>
+      handler(params as AppServerMcpElicitationParams, ...(signal ? [signal] : [])));
   }
 
   /**

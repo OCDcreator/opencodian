@@ -580,7 +580,7 @@ export type AppServerItem =
  * throw to send an error reply. The server expects approval callbacks to reply
  * with `{ decision: ReviewDecision }`.
  */
-export type AppServerServerRequestHandler = (params: unknown) => unknown | Promise<unknown>;
+export type AppServerServerRequestHandler = (params: unknown, signal?: AbortSignal) => unknown | Promise<unknown>;
 
 /**
  * Optional wire-traffic observer for the Codex app-server transport. When passed

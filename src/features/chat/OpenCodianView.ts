@@ -2005,12 +2005,12 @@ export class OpenCodianView extends ItemView {
     // Dynamic `item/tool/requestUserInput` seam: the adapter hands over a
     // ready QuestionRequest and the raw resolution result flows back.
     this.plugin.codexApprovalHostContext.questionCardRenderer = {
-      collectResponse: async (request, tabId) => {
+      collectResponse: async (request, tabId, signal) => {
         try {
           return await this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(
             request,
             tabId,
-            { applyResolution: false, forceInline: true },
+            { applyResolution: false, forceInline: true, signal },
           );
         } finally {
           this.questionRuntimeServices.inlineCardRenderer.clear(tabId);
@@ -2025,7 +2025,7 @@ export class OpenCodianView extends ItemView {
           const result = await this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(
             request.questionRequest,
             tabId,
-            { applyResolution: false, forceInline: true },
+            { applyResolution: false, forceInline: true, signal: request.signal },
           );
           if (result.status === 'rejected') {
             return { action: 'decline' };

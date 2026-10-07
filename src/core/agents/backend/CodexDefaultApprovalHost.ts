@@ -54,6 +54,7 @@ export interface CodexQuestionCardRenderer {
   collectResponse(
     request: QuestionRequest,
     tabId: string | null,
+    signal?: AbortSignal,
   ): Promise<CodexApprovalResolutionResult>;
 }
 
@@ -110,13 +111,17 @@ export function createCodexApprovalBridgeHost(
 
     async collectQuestionAnswers(
       request: QuestionRequest,
+      signal?: AbortSignal,
     ): Promise<CodexApprovalResolutionResult | null> {
       const ctx = getContext();
       if (!ctx.questionCardRenderer) {
         return null;
       }
-      const tabId = ctx.getActiveTabId();
-      return ctx.questionCardRenderer.collectResponse(request, tabId);
+      const tabId = ctx.getTabIdForSession
+        ? ctx.getTabIdForSession(request.sessionId)
+        : ctx.getActiveTabId();
+      if (ctx.getTabIdForSession && !tabId) return null;
+      return ctx.questionCardRenderer.collectResponse(request, tabId, ...(signal ? [signal] : []));
     },
   };
 }

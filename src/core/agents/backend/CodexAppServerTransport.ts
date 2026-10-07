@@ -81,6 +81,8 @@ export class CodexAppServerTransport {
   protected notificationHandlers = new Map<string, Set<(params: unknown) => void>>();
   /** Server-initiated request handlers (method+id messages). One per method. */
   protected serverRequestHandlers = new Map<string, AppServerServerRequestHandler>();
+  /** Outstanding native requests, scoped to this connection and exact request ID. */
+  private serverRequestControllers = new Map<number | string, { controller: AbortController; threadId?: string }>();
   protected initialized = false;
   /** Native initialize response, never inferred from the configured CLI path. */
   protected serverUserAgent: string | null = null;
@@ -306,6 +308,9 @@ export class CodexAppServerTransport {
       pending.reject(error);
     }
     this.pending.clear();
+    const requests = [...this.serverRequestControllers.values()];
+    this.serverRequestControllers.clear();
+    for (const request of requests) request.controller.abort();
   }
 
   private beginReconnect(): void {
@@ -522,6 +527,7 @@ export class CodexAppServerTransport {
 
     // Notification: `method`, no `id`.
     if (hasMethod) {
+      if (method === 'serverRequest/resolved') this.resolveServerRequest(msg.params);
       this.notifyObserver(() => this.wireObserver?.onNotification?.({ method, params: msg.params }));
       const handlers = this.notificationHandlers.get(method);
       if (handlers) {
@@ -538,6 +544,17 @@ export class CodexAppServerTransport {
     logger.warn('Unrecognized JSON-RPC message', { data: data.slice(0, 200) });
   }
 
+  /** Native resolution cancels only the exact pending request and owning thread. */
+  private resolveServerRequest(params: unknown): void {
+    if (!params || typeof params !== 'object') return;
+    const resolution = params as { requestId?: unknown; threadId?: unknown };
+    if (typeof resolution.requestId !== 'number' && typeof resolution.requestId !== 'string') return;
+    const request = this.serverRequestControllers.get(resolution.requestId);
+    if (!request || (request.threadId && request.threadId !== resolution.threadId)) return;
+    this.serverRequestControllers.delete(resolution.requestId);
+    request.controller.abort();
+  }
+
   /**
    * Dispatch a server-initiated JSON-RPC request (message with both `method`
    * and `id`). Invokes the registered handler, then sends back the appropriate
@@ -546,17 +563,31 @@ export class CodexAppServerTransport {
    * `-32603 Internal error` reply carrying the handler's message.
    */
   private handleServerRequest(id: number | string, method: string, params: unknown): void {
+    if (this.serverRequestControllers.has(id)) {
+      logger.warn('Ignoring duplicate pending native server request', { method, id });
+      return;
+    }
     const handler = this.serverRequestHandlers.get(method);
     if (!handler) {
       logger.warn('No server-request handler registered; replying method-not-found', { method, id });
       this.sendServerRequestReply(id, undefined, { code: -32601, message: `Method not found: ${method}` });
       return;
     }
+    const threadId = params && typeof params === 'object' && 'threadId' in params
+      && typeof params.threadId === 'string' ? params.threadId : undefined;
+    const request = { controller: new AbortController(), threadId };
+    this.serverRequestControllers.set(id, request);
     Promise.resolve()
-      .then(() => handler(params))
+      .then(() => request.controller.signal.aborted ? undefined : handler(params, request.controller.signal))
       .then(
-        (result) => this.sendServerRequestReply(id, result, undefined),
+        (result) => {
+          if (this.serverRequestControllers.get(id) !== request) return;
+          this.serverRequestControllers.delete(id);
+          this.sendServerRequestReply(id, result, undefined);
+        },
         (err) => {
+          if (this.serverRequestControllers.get(id) !== request) return;
+          this.serverRequestControllers.delete(id);
           const message = err instanceof Error ? err.message : String(err);
           logger.warn('Server-request handler threw', { method, id, error: message });
           this.sendServerRequestReply(id, undefined, { code: -32603, message });

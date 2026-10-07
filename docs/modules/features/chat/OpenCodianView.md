@@ -1,5 +1,7 @@
 # OpenCodianView
 
+> 2026-10-08：Codex tool-user-input 和 MCP elicitation 接线把所属回合 signal 传给既有 showQuestionDialog；后台问题按 native session 解析到所属 tab，Stop 后卡片收集取消并清理，不接受迟到回答。
+
 > 2026-10-08：getSendMessageOptions 只装配既有 session-settings coordinator 的有效 Codex 设置，复制 additionalDirectories，随本次请求传递；不新增 runtime ownership。
 
 > 2026-10-08：Codex approval host wiring 提供既有 tab/session 映射，并将 adapter 的取消信号交给 question flow；view 只装配 ports，不持有审批 waiter。

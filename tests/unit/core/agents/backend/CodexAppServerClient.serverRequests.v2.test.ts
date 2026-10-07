@@ -107,7 +107,8 @@ describe('CodexAppServerClient 0.159.0 server-request registrations', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    expect(handler).toHaveBeenCalledWith(params);
+    expect(handler.mock.calls[0][0]).toEqual(params);
+    expect(handler.mock.calls[0][1].aborted).toBe(false);
     expect(lastSentMessage()).toEqual({
       jsonrpc: '2.0',
       id: 501,
@@ -125,7 +126,8 @@ describe('CodexAppServerClient 0.159.0 server-request registrations', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    expect(handler).toHaveBeenCalledWith(params);
+    expect(handler.mock.calls[0][0]).toEqual(params);
+    expect(handler.mock.calls[0][1].aborted).toBe(false);
     expect(lastSentMessage()).toEqual({ jsonrpc: '2.0', id: 502, result: { decision: 'acceptForSession' } });
   });
 
@@ -145,7 +147,8 @@ describe('CodexAppServerClient 0.159.0 server-request registrations', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    expect(handler).toHaveBeenCalledWith(params);
+    expect(handler.mock.calls[0][0]).toEqual(params);
+    expect(handler.mock.calls[0][1].aborted).toBe(false);
     expect(lastSentMessage()).toEqual({
       jsonrpc: '2.0',
       id: 503,
@@ -166,7 +169,8 @@ describe('CodexAppServerClient 0.159.0 server-request registrations', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    expect(handler).toHaveBeenCalledWith(params);
+    expect(handler.mock.calls[0][0]).toEqual(params);
+    expect(handler.mock.calls[0][1].aborted).toBe(false);
     expect(lastSentMessage()).toEqual({ jsonrpc: '2.0', id: 504, result: { answers: [{ answers: ['blue'] }] } });
   });
 
@@ -180,7 +184,8 @@ describe('CodexAppServerClient 0.159.0 server-request registrations', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    expect(handler).toHaveBeenCalledWith(params);
+    expect(handler.mock.calls[0][0]).toEqual(params);
+    expect(handler.mock.calls[0][1].aborted).toBe(false);
     expect(lastSentMessage()).toEqual({ jsonrpc: '2.0', id: 505, result: { action: 'accept', content: { apiKey: 'x' } } });
   });
 

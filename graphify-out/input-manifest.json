@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "4e78c4f811347bb86167807cc26abb76271972ef33e935b675a2cac4d7f014f3",
+  "digest": "1dfb1c48515d9faed44be1f5ce830482c4710728df9b05a35d2b8ae17b555f63",
   "recordCount": 796,
   "records": [
     {
@@ -326,12 +326,12 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexAdapter.ts",
-      "sha256": "fd1d753b7ca8ca5e25e8720bea940f593e310adae23d9621428fdb101d5e9768"
+      "sha256": "cf1a1ee0263cacc2ca8714027e97df8031af2754d10a2338241f6059629341bb"
     },
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexAppServerClient.ts",
-      "sha256": "05ea9a9678a61622279e4eb163cd8d57060f0dd6f90c8dff498b9699901f3eb0"
+      "sha256": "4b1dab883287043c90c7cb0dcf0d50c0c111543601d98b0eccdb1b726c24c947"
     },
     {
       "kind": "src",
@@ -341,7 +341,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexAppServerClientTypes.ts",
-      "sha256": "0b8c0374b070e5c2ac021f75e78af42763430512992bae757128bae44418cb19"
+      "sha256": "79d8cd09fab7f5a3bea33afaf7fbae7118b6f2282087456a1add5ccac65d54dd"
     },
     {
       "kind": "src",
@@ -351,7 +351,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexAppServerTransport.ts",
-      "sha256": "464bb3ef6f89cf5bdb4ef74fb0bd2a0f55ea918f3a1946e7851bf0a6f1017da0"
+      "sha256": "c488b303f1b6ee216444adf901ab028b696ed54861c2ec6ad7d4f61b11f98f8c"
     },
     {
       "kind": "src",
@@ -361,12 +361,12 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexDefaultApprovalHost.ts",
-      "sha256": "5da9fc2a2ef0a761c086f06e1713765c283730b709e64f6f65604deb1633f0c2"
+      "sha256": "9e634599c10ed0a70f7a2d135cc582b7e1e555b1408fd4ecb2e9eb2165b52959"
     },
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexElicitationBridge.ts",
-      "sha256": "c3ab263596335f7154de0d02bc03f18949f217fb73ad8fb245f28276570c484f"
+      "sha256": "47a7560ea19348021c1c091cca85dbb9bdf7e032a6e2a0b67336697c40e5b7e0"
     },
     {
       "kind": "src",
@@ -1401,7 +1401,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
-      "sha256": "747bc2f8a34157167cc0aec8389fc9db11f67c3f0ae1a137f8af34c75252f757"
+      "sha256": "91427a3f877232aaa0ac04c91defba2be747631177a30bae124384ebfd69cf8f"
     },
     {
       "kind": "src",
@@ -3984,7 +3984,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-07T21:29:54.223Z",
-  "headShaAtGeneration": "743d14f0a875dd04a6892fb6ebb683ce460fce51",
+  "generatedAt": "2026-10-07T23:42:01.577Z",
+  "headShaAtGeneration": "93eda159ddd52350528013ed6a8b0f066da092c8",
   "graphifyVersion": "graphify 0.8.50"
 }

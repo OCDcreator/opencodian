@@ -1,5 +1,11 @@
 # CodexAdapter
 
+> 2026-10-08：native request_user_input 的选项按上游互斥语义映射为单选，Other 输入保留；MCP 表单 array 多选由独立 schema 路径处理。
+
+> 2026-10-08：审批、tool-user-input、MCP elicitation 组合所属 turn 与单条 native request 的生命周期；超时取消仅清该问题，不中断 main turn。组合监听器在结果/异常/取消后移除，不依赖新版本 AbortSignal.any。
+
+> 2026-10-08：MCP form/url 和 tool-user-input 提问使用所属 native thread 的 AbortSignal；已停止回合不收集新回答，等待期间停止后取消收集，迟到 accept/answered 不会回传有效回答。tool-user-input 的 QuestionRequest.sessionId 保留 native thread ID。
+
 > 2026-10-08：请求可携带 Codex 会话设置快照；approval fail-closed 判定、app-server attempt 和 SDK ThreadOptions 使用该快照，避免发送准备期间其它 tab 修改共享 adapter 设置。无快照的旧调用保持现有选项来源。
 
 > 2026-10-08：审批收集绑定所属 foreground turn 的 AbortSignal；取消后即便 host 迟到返回 approve，adapter 仍只回复 denied。其它会话 controller 不受影响。

@@ -159,7 +159,8 @@ describe('CodexAppServerClient server-request dispatch', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(handler).toHaveBeenCalledWith({ command: ['ls', '-la'], cwd: '/tmp' });
+    expect(handler.mock.calls[0][0]).toEqual({ command: ['ls', '-la'], cwd: '/tmp' });
+    expect(handler.mock.calls[0][1].aborted).toBe(false);
   });
 
   it('sends a JSON-RPC result reply after the handler resolves', async () => {
@@ -297,4 +298,110 @@ describe('CodexAppServerClient server-request dispatch', () => {
     const reply = lastSentMessage();
     expect(reply.error).toEqual({ code: -32601, message: expect.any(String) });
   });
+});
+
+describe('CodexAppServerClient server-request lifetime', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockWsInstance.send.mockClear();
+    mockWsInstance.close.mockClear();
+    mockWsInstance.readyState = 1;
+    mockWsInstance.onopen = null;
+    mockWsInstance.onmessage = null;
+    mockWsInstance.onerror = null;
+    mockWsInstance.onclose = null;
+  });
+
+  it('cancels the exact resolved native request and drops its late reply', async () => {
+    const client = await createInitializedClient();
+    let answer!: (value: unknown) => void;
+    let signal: AbortSignal | undefined;
+    const handler = jest.fn((_params, requestSignal) => { signal = requestSignal; return new Promise(resolve => { answer = resolve; }); });
+    client.registerServerRequestHandler('mcpServer/elicitation/request', handler);
+    mockWsInstance.onmessage?.({ data: JSON.stringify({ id: 42, method: 'mcpServer/elicitation/request', params: { threadId: 'owner' } }) });
+    await Promise.resolve();
+    mockWsInstance.onmessage?.({ data: JSON.stringify({ method: 'serverRequest/resolved', params: { threadId: 'owner', requestId: 42 } }) });
+    expect(signal?.aborted).toBe(true);
+    answer({ action: 'accept', content: { value: 'late' } });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(mockWsInstance.send).not.toHaveBeenCalled();
+    client.stop();
+  });
+
+  it('keeps an unresolved request when the resolution belongs to a different thread', async () => {
+    const client = await createInitializedClient();
+    let answer!: (value: unknown) => void;
+    let signal: AbortSignal | undefined;
+    client.registerServerRequestHandler('mcpServer/elicitation/request', (_params, requestSignal) => { signal = requestSignal; return new Promise(resolve => { answer = resolve; }); });
+    mockWsInstance.onmessage?.({ data: JSON.stringify({ id: 43, method: 'mcpServer/elicitation/request', params: { threadId: 'owner' } }) });
+    await Promise.resolve();
+    mockWsInstance.onmessage?.({ data: JSON.stringify({ method: 'serverRequest/resolved', params: { threadId: 'other', requestId: 43 } }) });
+    expect(signal?.aborted).toBe(false);
+    answer({ action: 'decline' });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(lastSentMessage()).toEqual({ jsonrpc: '2.0', id: 43, result: { action: 'decline' } });
+    client.stop();
+  });
+
+  it('cancels pending collection on stop without replying into a closed or later socket', async () => {
+    const client = await createInitializedClient();
+    let answer!: (value: unknown) => void;
+    let signal: AbortSignal | undefined;
+    client.registerServerRequestHandler('mcpServer/elicitation/request', (_params, requestSignal) => { signal = requestSignal; return new Promise(resolve => { answer = resolve; }); });
+    mockWsInstance.onmessage?.({ data: JSON.stringify({ id: 44, method: 'mcpServer/elicitation/request', params: { threadId: 'owner' } }) });
+    await Promise.resolve();
+    client.stop();
+    expect(signal?.aborted).toBe(true);
+    answer({ action: 'accept' });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(mockWsInstance.send).not.toHaveBeenCalled();
+  });
+
+  it('ignores a duplicate native request while one collection is pending', async () => {
+    const client = await createInitializedClient();
+    let answer!: (value: unknown) => void;
+    const handler = jest.fn(() => new Promise(resolve => { answer = resolve; }));
+    client.registerServerRequestHandler('mcpServer/elicitation/request', handler);
+    const data = JSON.stringify({ id: 45, method: 'mcpServer/elicitation/request', params: { threadId: 'owner' } });
+    mockWsInstance.onmessage?.({ data });
+    mockWsInstance.onmessage?.({ data });
+    await Promise.resolve();
+    expect(handler).toHaveBeenCalledTimes(1);
+    answer({ action: 'accept' });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(mockWsInstance.send).toHaveBeenCalledTimes(1);
+    client.stop();
+  });
+
+  it('does not let an old resolved request answer a reused native id', async () => {
+    const client = await createInitializedClient();
+    const answers: Array<(value: unknown) => void> = [];
+    client.registerServerRequestHandler('mcpServer/elicitation/request', () => new Promise(resolve => { answers.push(resolve); }));
+    mockWsInstance.onmessage?.({ data: JSON.stringify({ id: 46, method: 'mcpServer/elicitation/request', params: { threadId: 'old' } }) });
+    await Promise.resolve();
+    mockWsInstance.onmessage?.({ data: JSON.stringify({ method: 'serverRequest/resolved', params: { threadId: 'old', requestId: 46 } }) });
+    mockWsInstance.onmessage?.({ data: JSON.stringify({ id: 46, method: 'mcpServer/elicitation/request', params: { threadId: 'new' } }) });
+    await Promise.resolve();
+    answers[0]({ action: 'accept', content: { value: 'old' } });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(mockWsInstance.send).not.toHaveBeenCalled();
+    answers[1]({ action: 'decline' });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(mockWsInstance.send).toHaveBeenCalledTimes(1);
+    expect(lastSentMessage()).toEqual({ jsonrpc: '2.0', id: 46, result: { action: 'decline' } });
+    client.stop();
+  });
+
+  it('does not begin collection when native resolves before asynchronous dispatch', async () => {
+    const client = await createInitializedClient();
+    const handler = jest.fn().mockResolvedValue({ action: 'accept' });
+    client.registerServerRequestHandler('mcpServer/elicitation/request', handler);
+    mockWsInstance.onmessage?.({ data: JSON.stringify({ id: 47, method: 'mcpServer/elicitation/request', params: { threadId: 'owner' } }) });
+    mockWsInstance.onmessage?.({ data: JSON.stringify({ method: 'serverRequest/resolved', params: { threadId: 'owner', requestId: 47 } }) });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(handler).not.toHaveBeenCalled();
+    expect(mockWsInstance.send).not.toHaveBeenCalled();
+    client.stop();
+  });
+
 });

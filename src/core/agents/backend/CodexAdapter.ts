@@ -312,7 +312,7 @@ export type CodexApprovalDecision =
  */
 export interface CodexApprovalBridgeHost {
   collectApproval?(request: CodexApprovalRequest): Promise<CodexApprovalDecision | null>;
-  collectQuestionAnswers?(request: QuestionRequest): Promise<CodexApprovalResolutionResult | null>;
+  collectQuestionAnswers?(request: QuestionRequest, signal?: AbortSignal): Promise<CodexApprovalResolutionResult | null>;
 }
 
 /** Structural supertype of the question-card resolution result the tool-user-input seam consumes. */
@@ -1747,27 +1747,27 @@ export class CodexAdapter
     }
     this.appServerClient.registerServerRequestHandler(
       'execCommandApproval',
-      (params) => this.handleApproval('execCommand', params),
+      (params, signal) => this.handleApproval('execCommand', params, signal),
     );
     this.appServerClient.registerServerRequestHandler(
       'applyPatchApproval',
-      (params) => this.handleApproval('applyPatch', params),
+      (params, signal) => this.handleApproval('applyPatch', params, signal),
     );
     if (typeof this.appServerClient.registerCommandExecutionApprovalHandler === 'function') {
-      this.appServerClient.registerCommandExecutionApprovalHandler((params) =>
-        this.handleCommandExecutionApproval(params));
+      this.appServerClient.registerCommandExecutionApprovalHandler((params, signal) =>
+        this.handleCommandExecutionApproval(params, signal));
     }
     if (typeof this.appServerClient.registerFileChangeApprovalHandler === 'function') {
-      this.appServerClient.registerFileChangeApprovalHandler((params) =>
-        this.handleFileChangeApproval(params));
+      this.appServerClient.registerFileChangeApprovalHandler((params, signal) =>
+        this.handleFileChangeApproval(params, signal));
     }
     if (typeof this.appServerClient.registerPermissionsApprovalHandler === 'function') {
-      this.appServerClient.registerPermissionsApprovalHandler((params) =>
-        this.handlePermissionsApproval(params));
+      this.appServerClient.registerPermissionsApprovalHandler((params, signal) =>
+        this.handlePermissionsApproval(params, signal));
     }
     if (typeof this.appServerClient.registerToolUserInputHandler === 'function') {
-      this.appServerClient.registerToolUserInputHandler((params) =>
-        this.handleToolUserInput(params));
+      this.appServerClient.registerToolUserInputHandler((params, signal) =>
+        this.handleToolUserInput(params, signal));
     }
     this.approvalHandlersRegistered = true;
   }
@@ -1802,7 +1802,7 @@ export class CodexAdapter
     if (typeof client.registerMcpElicitationHandler !== 'function') {
       return;
     }
-    client.registerMcpElicitationHandler((params) => this.handleMcpElicitation(params));
+    client.registerMcpElicitationHandler((params, signal) => this.handleMcpElicitation(params, signal));
     this.elicitationHandlersRegistered = true;
   }
 
@@ -1815,40 +1815,64 @@ export class CodexAdapter
     this.elicitationHandlersRegistered = false;
   }
 
+  /** Combine the request lifetime and owning turn without requiring AbortSignal.any. */
+  private createServerRequestSignal(threadId: string | undefined, requestSignal?: AbortSignal): { signal?: AbortSignal; dispose: () => void } {
+    const turnSignal = threadId ? this.activeControllers.get(this.logicalSessionKey(threadId))?.signal : undefined;
+    const sources = [requestSignal, turnSignal].filter((signal): signal is AbortSignal => signal !== undefined);
+    if (sources.length < 2 || sources[0] === sources[1]) {
+      return { signal: sources[0], dispose: () => {} };
+    }
+    const controller = new AbortController();
+    const cancel = (): void => controller.abort();
+    for (const signal of sources) {
+      signal.addEventListener('abort', cancel, { once: true });
+      if (signal.aborted) cancel();
+    }
+    return {
+      signal: controller.signal,
+      dispose: () => {
+        for (const signal of sources) signal.removeEventListener('abort', cancel);
+      },
+    };
+  }
+
   /**
    * Shared approval-collection core: collects the host decision for a
    * pre-built request and traces every outcome. Fails closed: a missing host,
    * a throwing host, or a cancelled card all produce `{ decision: 'denied' }`.
    */
-  private async collectApprovalDecision(request: CodexApprovalRequest): Promise<CodexApprovalDecision> {
+  private async collectApprovalDecision(request: CodexApprovalRequest, requestSignal?: AbortSignal): Promise<CodexApprovalDecision> {
     const collect = this.approvalHost.collectApproval;
     const threadId = readThreadIdFromParams(request.raw);
-    const signal = threadId
-      ? this.activeControllers.get(this.logicalSessionKey(threadId))?.signal
-      : undefined;
-    if (signal?.aborted) return { decision: 'denied' };
-    if (!collect) {
-      this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: 'denied', reason: 'no_host', threadId }));
-      return { decision: 'denied' };
-    }
-    this.trace((port) => port.recordToolInteraction(undefined, 'approval.request', { kind: request.kind, threadId, summary: request.summary }));
-    let decision: CodexApprovalDecision | null;
+    const lifetime = this.createServerRequestSignal(threadId, requestSignal);
+    const signal = lifetime.signal;
     try {
-      decision = await collect(signal ? { ...request, signal } : request);
-    } catch (err) {
-      logger.warn('Approval host threw; defaulting to denied', {
-        kind: request.kind,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: 'denied', reason: 'host_threw', threadId }));
-      return { decision: 'denied' };
+      if (signal?.aborted) return { decision: 'denied' };
+      if (!collect) {
+        this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: 'denied', reason: 'no_host', threadId }));
+        return { decision: 'denied' };
+      }
+      this.trace((port) => port.recordToolInteraction(undefined, 'approval.request', { kind: request.kind, threadId, summary: request.summary }));
+      let decision: CodexApprovalDecision | null;
+      try {
+        decision = await collect(signal ? { ...request, signal } : request);
+      } catch (err) {
+        logger.warn('Approval host threw; defaulting to denied', {
+          kind: request.kind,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: 'denied', reason: 'host_threw', threadId }));
+        return { decision: 'denied' };
+      }
+      if (!decision || signal?.aborted) {
+        this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: 'denied', reason: 'host_cancelled', threadId }));
+        return { decision: 'denied' };
+      }
+      this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: decision.decision, threadId }));
+      return decision;
+    } finally {
+      lifetime.dispose();
     }
-    if (!decision || signal?.aborted) {
-      this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: 'denied', reason: 'host_cancelled', threadId }));
-      return { decision: 'denied' };
-    }
-    this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: decision.decision, threadId }));
-    return decision;
   }
 
   /**
@@ -1858,25 +1882,27 @@ export class CodexAdapter
    * Defaults to a safe `denied` decision when the host is absent, throws, or
    * cancels.
    */
-  private async handleApproval(kind: 'execCommand' | 'applyPatch', params: unknown): Promise<{ decision: string }> {
+  private async handleApproval(kind: 'execCommand' | 'applyPatch', params: unknown, signal?: AbortSignal): Promise<{ decision: string }> {
     const request = this.normalizeApprovalRequest(kind, params);
-    const decision = await this.collectApprovalDecision(request);
+    const decision = await this.collectApprovalDecision(request, signal);
     return { decision: decision.decision };
   }
 
   /** v2 `item/commandExecution/requestApproval` → question card → wire decision. */
   private async handleCommandExecutionApproval(
     params: AppServerCommandExecutionApprovalParams,
+    signal?: AbortSignal,
   ): Promise<AppServerCommandExecutionApprovalResponse> {
-    const decision = await this.collectApprovalDecision(this.normalizeCommandExecutionApproval(params));
+    const decision = await this.collectApprovalDecision(this.normalizeCommandExecutionApproval(params), signal);
     return { decision: this.mapCommandExecutionWireDecision(decision) };
   }
 
   /** v2 `item/fileChange/requestApproval` → question card → wire decision. */
   private async handleFileChangeApproval(
     params: AppServerFileChangeApprovalParams,
+    signal?: AbortSignal,
   ): Promise<AppServerFileChangeApprovalResponse> {
-    const decision = await this.collectApprovalDecision(this.normalizeFileChangeApproval(params));
+    const decision = await this.collectApprovalDecision(this.normalizeFileChangeApproval(params), signal);
     return { decision: this.mapFileChangeWireDecision(decision) };
   }
 
@@ -1889,8 +1915,9 @@ export class CodexAdapter
    */
   private async handlePermissionsApproval(
     params: AppServerPermissionsApprovalParams,
+    signal?: AbortSignal,
   ): Promise<AppServerPermissionsApprovalResponse> {
-    const decision = await this.collectApprovalDecision(this.normalizePermissionsApproval(params));
+    const decision = await this.collectApprovalDecision(this.normalizePermissionsApproval(params), signal);
     if (decision.decision === 'approved') {
       return { permissions: this.echoGrantedProfile(params.permissions), scope: 'turn' };
     }
@@ -1903,56 +1930,65 @@ export class CodexAdapter
   /** Dynamic `item/tool/requestUserInput` → question card → per-question answers. */
   private async handleToolUserInput(
     params: AppServerToolUserInputParams,
+    requestSignal?: AbortSignal,
   ): Promise<AppServerToolUserInputResponse> {
     const collect = this.approvalHost.collectQuestionAnswers;
     const threadId = typeof params.threadId === 'string' ? params.threadId : undefined;
-    if (!collect) {
-      this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.declined', { reason: 'no_host', threadId }));
-      return this.emptyToolUserInputResponse();
-    }
-    const questionRequest: QuestionRequest = {
-      id: `codex-tool-input-${params.itemId}`,
-      sessionId: 'codex',
-      questions: (params.questions ?? []).map((question) => {
-        const options = (question.options ?? []).map((option) => ({
-          label: option.label,
-          description: option.description,
-        }));
-        return {
-          question: question.question,
-          header: question.header,
-          options,
-          multiple: options.length > 0,
-          custom: options.length === 0 || question.isOther === true,
-        };
-      }),
-    };
-    this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.request', {
-      threadId,
-      itemId: params.itemId,
-      questionCount: questionRequest.questions.length,
-    }));
-    let result: CodexApprovalResolutionResult | null;
+    const lifetime = this.createServerRequestSignal(threadId, requestSignal);
+    const signal = lifetime.signal;
     try {
-      result = await collect(questionRequest);
-    } catch (err) {
-      logger.warn('Tool user-input host threw; returning empty answers', {
-        error: err instanceof Error ? err.message : String(err),
+      if (signal?.aborted) return this.emptyToolUserInputResponse();
+      if (!collect) {
+        this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.declined', { reason: 'no_host', threadId }));
+        return this.emptyToolUserInputResponse();
+      }
+      const questionRequest: QuestionRequest = {
+        id: `codex-tool-input-${params.itemId}`,
+        sessionId: threadId ?? 'codex',
+        questions: (params.questions ?? []).map((question) => {
+          const options = (question.options ?? []).map((option) => ({
+            label: option.label,
+            description: option.description,
+          }));
+          return {
+            question: question.question,
+            header: question.header,
+            options,
+            // Native request_user_input options are mutually exclusive.
+          multiple: false,
+            custom: options.length === 0 || question.isOther === true,
+          };
+        }),
+      };
+      this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.request', {
+        threadId,
+        itemId: params.itemId,
+        questionCount: questionRequest.questions.length,
+      }));
+      let result: CodexApprovalResolutionResult | null;
+      try {
+        result = await collect(questionRequest, ...(signal ? [signal] : []));
+      } catch (err) {
+        logger.warn('Tool user-input host threw; returning empty answers', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return this.emptyToolUserInputResponse();
+      }
+      if (!result || result.status !== 'answered' || signal?.aborted) {
+        this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.unanswered', { threadId, itemId: params.itemId }));
+        return this.emptyToolUserInputResponse();
+      }
+      // Wire shape (Codex 0.159.0 schema dump): answers maps each question id
+      // to its selected/typed answers.
+      const answersByQuestionId: Record<string, { answers: string[] }> = {};
+      (params.questions ?? []).forEach((question, index) => {
+        answersByQuestionId[question.id] = { answers: [...(result.answers?.[index] ?? [])] };
       });
-      return this.emptyToolUserInputResponse();
+      this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.answered', { threadId, itemId: params.itemId }));
+      return { answers: answersByQuestionId };
+    } finally {
+      lifetime.dispose();
     }
-    if (!result || result.status !== 'answered') {
-      this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.unanswered', { threadId, itemId: params.itemId }));
-      return this.emptyToolUserInputResponse();
-    }
-    // Wire shape (Codex 0.159.0 schema dump): answers maps each question id
-    // to its selected/typed answers.
-    const answersByQuestionId: Record<string, { answers: string[] }> = {};
-    (params.questions ?? []).forEach((question, index) => {
-      answersByQuestionId[question.id] = { answers: [...(result.answers?.[index] ?? [])] };
-    });
-    this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.answered', { threadId, itemId: params.itemId }));
-    return { answers: answersByQuestionId };
   }
 
   /** Fail-closed empty reply for the tool-user-input route. */
@@ -1961,7 +1997,7 @@ export class CodexAdapter
   }
 
   /** `mcpServer/elicitation/request` → elicitation card → accept/decline/cancel. */
-  private async handleMcpElicitation(params: unknown): Promise<AppServerMcpElicitationResponse> {
+  private async handleMcpElicitation(params: unknown, requestSignal?: AbortSignal): Promise<AppServerMcpElicitationResponse> {
     const collect = this.elicitationHost.collectElicitation;
     if (!collect) {
       this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.cancelled', { reason: 'no_host' }));
@@ -1971,23 +2007,30 @@ export class CodexAdapter
       logger.warn('Ignoring malformed mcpServer/elicitation/request params');
       return { action: 'cancel' };
     }
-    if (params.mode === 'url') {
-      return this.handleUrlElicitation(params, collect);
+    const lifetime = this.createServerRequestSignal(params.threadId, requestSignal);
+    try {
+      if (params.mode === 'url') {
+        return await this.handleUrlElicitation(params, collect, lifetime.signal);
+      }
+      if (params.mode !== 'form') {
+        // The openai/form dialect uses a schema shape this bridge cannot
+        // render; declining lets the MCP server apply its default behavior.
+        logger.warn('Declining unsupported Codex elicitation mode', { mode: params.mode, serverName: params.serverName });
+        this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.declined', { reason: 'unsupported_mode', mode: params.mode, serverName: params.serverName }));
+        return { action: 'decline' };
+      }
+      return await this.handleFormElicitation(params, collect, lifetime.signal);
+    } finally {
+      lifetime.dispose();
     }
-    if (params.mode !== 'form') {
-      // The openai/form dialect uses a schema shape this bridge cannot
-      // render; declining lets the MCP server apply its default behavior.
-      logger.warn('Declining unsupported Codex elicitation mode', { mode: params.mode, serverName: params.serverName });
-      this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.declined', { reason: 'unsupported_mode', mode: params.mode, serverName: params.serverName }));
-      return { action: 'decline' };
-    }
-    return this.handleFormElicitation(params, collect);
   }
 
   private async handleUrlElicitation(
     params: CodexElicitationUrlParams,
     collect: NonNullable<CodexElicitationBridgeHost['collectElicitation']>,
+    signal?: AbortSignal,
   ): Promise<AppServerMcpElicitationResponse> {
+    if (signal?.aborted) return { action: 'cancel' };
     if (!/^https?:\/\//i.test(params.url)) {
       logger.warn('Declining Codex elicitation with non-http(s) URL', { serverName: params.serverName });
       this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.declined', { reason: 'url_scheme_rejected', serverName: params.serverName }));
@@ -2005,12 +2048,12 @@ export class CodexAdapter
     this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.request', { mode: 'url', serverName: params.serverName, threadId: params.threadId }));
     let response;
     try {
-      response = await collect({ questionRequest, params });
+      response = await collect({ questionRequest, params, ...(signal ? { signal } : {}) });
     } catch (err) {
       logger.warn('Elicitation host threw; cancelling', { error: err instanceof Error ? err.message : String(err) });
       return { action: 'cancel' };
     }
-    if (!response) {
+    if (!response || signal?.aborted) {
       return { action: 'cancel' };
     }
     this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.decision', { mode: 'url', action: response.action }));
@@ -2020,17 +2063,19 @@ export class CodexAdapter
   private async handleFormElicitation(
     params: CodexElicitationFormParams,
     collect: NonNullable<CodexElicitationBridgeHost['collectElicitation']>,
+    signal?: AbortSignal,
   ): Promise<AppServerMcpElicitationResponse> {
+    if (signal?.aborted) return { action: 'cancel' };
     const questionRequest = buildCodexElicitationQuestionRequest(params);
     this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.request', { mode: 'form', serverName: params.serverName, threadId: params.threadId }));
     let response;
     try {
-      response = await collect({ questionRequest, params });
+      response = await collect({ questionRequest, params, ...(signal ? { signal } : {}) });
     } catch (err) {
       logger.warn('Elicitation host threw; cancelling', { error: err instanceof Error ? err.message : String(err) });
       return { action: 'cancel' };
     }
-    if (!response) {
+    if (!response || signal?.aborted) {
       return { action: 'cancel' };
     }
     if (response.action !== 'accept') {

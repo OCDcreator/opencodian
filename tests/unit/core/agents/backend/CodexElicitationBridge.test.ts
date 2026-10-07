@@ -9,8 +9,8 @@ const mockRegisterServerRequestHandler = jest.fn();
 const mockUnregisterServerRequestHandler = jest.fn();
 const mockAppServerClientStart = jest.fn().mockResolvedValue(undefined);
 const mockAppServerClientStop = jest.fn();
-let elicitationHandler: ((params: unknown) => unknown) | null = null;
-const mockRegisterMcpElicitationHandler = jest.fn((handler: (params: unknown) => unknown) => {
+let elicitationHandler: ((params: unknown, signal?: AbortSignal) => unknown) | null = null;
+const mockRegisterMcpElicitationHandler = jest.fn((handler: (params: unknown, signal?: AbortSignal) => unknown) => {
   elicitationHandler = handler;
 });
 
@@ -37,6 +37,7 @@ import {
   buildCodexElicitationUrlQuestionRequest,
   type CodexElicitationFormParams,
   type CodexElicitationUrlParams,
+  createCodexElicitationBridgeHost,
 } from '../../../../../src/core/agents/backend/CodexElicitationBridge';
 
 function createMockCodex(): unknown {
@@ -270,6 +271,73 @@ describe('CodexAdapter mcpServer/elicitation/request handler', () => {
     await adapter.stop();
   });
 
+  it.each([FORM_PARAMS, URL_PARAMS])('cancels an already stopped owning turn without opening or collecting a form', async (params) => {
+    const collectElicitation = jest.fn().mockResolvedValue({ action: 'accept', answers: [['staging']] });
+    const adapter = createStartedAdapter({ collectElicitation });
+    await adapter.start();
+    const controller = new AbortController();
+    (adapter as unknown as { activeControllers: Map<string, AbortController> }).activeControllers.set('thread-1', controller);
+    controller.abort();
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+    await expect(elicitationHandler!(params)).resolves.toEqual({ action: 'cancel' });
+    expect(collectElicitation).not.toHaveBeenCalled();
+    expect(openSpy).not.toHaveBeenCalled();
+    openSpy.mockRestore();
+    await adapter.stop();
+  });
+
+  it.each([FORM_PARAMS, URL_PARAMS])('passes owning cancellation to the card and rejects a late accept', async (params) => {
+    const controller = new AbortController();
+    const collectElicitation = jest.fn(async (_request) => {
+      controller.abort();
+      return { action: 'accept', answers: [['staging']] };
+    });
+    const adapter = createStartedAdapter({ collectElicitation });
+    await adapter.start();
+    (adapter as unknown as { activeControllers: Map<string, AbortController> }).activeControllers.set('thread-1', controller);
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+    await expect(elicitationHandler!(params)).resolves.toEqual({ action: 'cancel' });
+    expect(collectElicitation).toHaveBeenCalledTimes(1);
+    expect(collectElicitation.mock.calls[0][0].signal).toBe(controller.signal);
+    openSpy.mockRestore();
+    await adapter.stop();
+  });
+
+  it('combines native request expiry with the owning turn and cleans both listeners', async () => {
+    const turn = new AbortController();
+    const request = new AbortController();
+    const removeTurn = jest.spyOn(turn.signal, 'removeEventListener');
+    const removeRequest = jest.spyOn(request.signal, 'removeEventListener');
+    let answer!: (value: unknown) => void;
+    const collectElicitation = jest.fn(() => new Promise(resolve => { answer = resolve; }));
+    const adapter = createStartedAdapter({ collectElicitation });
+    await adapter.start();
+    (adapter as unknown as { activeControllers: Map<string, AbortController> }).activeControllers.set('thread-1', turn);
+    const pending = elicitationHandler!(FORM_PARAMS, request.signal);
+    const cardSignal = collectElicitation.mock.calls[0][0].signal as AbortSignal;
+    request.abort();
+    answer({ action: 'accept', answers: [['staging']] });
+    await expect(pending).resolves.toEqual({ action: 'cancel' });
+    expect(cardSignal.aborted).toBe(true);
+    expect(turn.signal.aborted).toBe(false);
+    expect(removeTurn).toHaveBeenCalledTimes(1);
+    expect(removeRequest).toHaveBeenCalledTimes(1);
+    await adapter.stop();
+  });
+
+  it('also preserves Stop when a native request lifetime is present', async () => {
+    const turn = new AbortController();
+    const request = new AbortController();
+    const collectElicitation = jest.fn(async () => { turn.abort(); return { action: 'accept', answers: [['staging']] }; });
+    const adapter = createStartedAdapter({ collectElicitation });
+    await adapter.start();
+    (adapter as unknown as { activeControllers: Map<string, AbortController> }).activeControllers.set('thread-1', turn);
+    await expect(elicitationHandler!(FORM_PARAMS, request.signal)).resolves.toEqual({ action: 'cancel' });
+    expect(collectElicitation.mock.calls[0][0].signal.aborted).toBe(true);
+    expect(request.signal.aborted).toBe(false);
+    await adapter.stop();
+  });
+
   it('declines the unsupported openai/form mode gracefully', async () => {
     const collectElicitation = jest.fn();
     const adapter = createStartedAdapter({ collectElicitation });
@@ -293,5 +361,24 @@ describe('CodexAdapter mcpServer/elicitation/request handler', () => {
 
     await expect(elicitationHandler!({ nope: true })).resolves.toEqual({ action: 'cancel' });
     await adapter.stop();
+  });
+});
+
+describe('Codex elicitation owning tab', () => {
+  it('keeps a background form on its native owning tab', async () => {
+    const collectResponse = jest.fn().mockResolvedValue({ action: 'cancel' });
+    const getTabIdForSession = jest.fn(() => 'owner-tab');
+    const host = createCodexElicitationBridgeHost(() => ({ getActiveTabId: () => 'other-tab', getTabIdForSession, elicitationCardRenderer: { collectResponse } }));
+    const request = { questionRequest: buildCodexElicitationQuestionRequest(FORM_PARAMS), params: FORM_PARAMS };
+    await host.collectElicitation!(request);
+    expect(getTabIdForSession).toHaveBeenCalledWith('thread-1');
+    expect(collectResponse).toHaveBeenCalledWith(request, 'owner-tab');
+  });
+
+  it('does not show an orphaned form in the active tab', async () => {
+    const collectResponse = jest.fn().mockResolvedValue({ action: 'accept' });
+    const host = createCodexElicitationBridgeHost(() => ({ getActiveTabId: () => 'other-tab', getTabIdForSession: () => null, elicitationCardRenderer: { collectResponse } }));
+    await expect(host.collectElicitation!({ questionRequest: buildCodexElicitationQuestionRequest(FORM_PARAMS), params: FORM_PARAMS })).resolves.toBeNull();
+    expect(collectResponse).not.toHaveBeenCalled();
   });
 });
