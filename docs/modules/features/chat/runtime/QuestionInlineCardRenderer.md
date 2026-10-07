@@ -1,4 +1,6 @@
 # QuestionInlineCardRenderer
+
+> 2026-10-08：可选 AbortSignal 使取消的 foreground approval 立即结束收集并清除对应卡片；pre-aborted 不挂载，完成后释放 listener/timer。request ID 与 card 实例检查避免旧取消清理其它会话或新卡片。
 > 2026-09-25 (FA880): While a native authoritative question ask is visible inline, its original tab/session/requestId is checked every 500ms. A lost process, cancel, or removed native ask resolves the inline wait with null and removes the stale card without sending an answer. Callback-only backends retain the existing behavior.
 
 > **源码**: `src/features/chat/runtime/QuestionInlineCardRenderer.ts`

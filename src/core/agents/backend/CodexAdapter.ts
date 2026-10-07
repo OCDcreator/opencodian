@@ -288,6 +288,8 @@ export interface CodexApprovalRequest {
   readonly reason?: string | null;
   /** Original server params, preserved for advanced rendering. */
   readonly raw: unknown;
+  /** Owning foreground turn cancellation, for settling the UI collection. */
+  readonly signal?: AbortSignal;
 }
 
 /**
@@ -1821,6 +1823,10 @@ export class CodexAdapter
   private async collectApprovalDecision(request: CodexApprovalRequest): Promise<CodexApprovalDecision> {
     const collect = this.approvalHost.collectApproval;
     const threadId = readThreadIdFromParams(request.raw);
+    const signal = threadId
+      ? this.activeControllers.get(this.logicalSessionKey(threadId))?.signal
+      : undefined;
+    if (signal?.aborted) return { decision: 'denied' };
     if (!collect) {
       this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: 'denied', reason: 'no_host', threadId }));
       return { decision: 'denied' };
@@ -1828,7 +1834,7 @@ export class CodexAdapter
     this.trace((port) => port.recordToolInteraction(undefined, 'approval.request', { kind: request.kind, threadId, summary: request.summary }));
     let decision: CodexApprovalDecision | null;
     try {
-      decision = await collect(request);
+      decision = await collect(signal ? { ...request, signal } : request);
     } catch (err) {
       logger.warn('Approval host threw; defaulting to denied', {
         kind: request.kind,
@@ -1837,7 +1843,7 @@ export class CodexAdapter
       this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: 'denied', reason: 'host_threw', threadId }));
       return { decision: 'denied' };
     }
-    if (!decision) {
+    if (!decision || signal?.aborted) {
       this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: 'denied', reason: 'host_cancelled', threadId }));
       return { decision: 'denied' };
     }

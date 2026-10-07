@@ -65,6 +65,7 @@ export interface CodexQuestionCardRenderer {
  */
 export interface CodexApprovalHostContext {
   getActiveTabId: () => string | null;
+  getTabIdForSession?: (sessionId: string) => string | null;
   approvalCardRenderer?: CodexApprovalCardRenderer;
   questionCardRenderer?: CodexQuestionCardRenderer;
   elicitationCardRenderer?: CodexElicitationCardRenderer;
@@ -97,7 +98,13 @@ export function createCodexApprovalBridgeHost(
       if (!ctx.approvalCardRenderer) {
         return null;
       }
-      const tabId = ctx.getActiveTabId();
+      const threadId = typeof request.raw === 'object' && request.raw !== null
+        && 'threadId' in request.raw && typeof request.raw.threadId === 'string'
+        ? request.raw.threadId : undefined;
+      const tabId = threadId && ctx.getTabIdForSession
+        ? ctx.getTabIdForSession(threadId)
+        : ctx.getActiveTabId();
+      if (threadId && ctx.getTabIdForSession && !tabId) return null;
       return ctx.approvalCardRenderer.collectResponse(request, tabId);
     },
 

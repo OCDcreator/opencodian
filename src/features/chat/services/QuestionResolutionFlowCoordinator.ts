@@ -33,6 +33,7 @@ export interface QuestionResolutionFlowCoordinatorPorts {
 export interface QuestionResolutionFlowOptions {
   applyResolution?: boolean;
   forceInline?: boolean;
+  signal?: AbortSignal;
 }
 
 export type QuestionResolutionFlowResult =
@@ -58,6 +59,7 @@ export class QuestionResolutionFlowCoordinator {
     tabId: TabId | null = this.host.getActiveTabId(),
     options: QuestionResolutionFlowOptions = {},
   ): Promise<QuestionResolutionFlowResult> {
+    if (options.signal?.aborted) return { status: 'cancelled' };
     if (
       !options.forceInline
       && await this.ports.dockCoordinator.waitForDockResolutionIfEnabled(request, tabId)
@@ -68,6 +70,7 @@ export class QuestionResolutionFlowCoordinator {
     const action = await this.ports.inlineResolutionAction.collectResolutionAction(
       request,
       tabId,
+      ...(options.signal ? [options.signal] : []),
     );
     if (!action) {
       return { status: 'cancelled' };

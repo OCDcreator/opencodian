@@ -529,3 +529,38 @@ describe('QuestionInlineCardRenderer keyboard interaction', () => {
     await expect(customCase.responsePromise).resolves.toEqual({ type: 'reject' });
   });
 });
+
+
+describe('QuestionInlineCardRenderer turn cancellation', () => {
+  afterEach(() => { document.body.replaceChildren(); });
+
+  it('does not mount a pre-aborted question', async () => {
+    const { renderer, runtime } = createRendererHarness();
+    const controller = new AbortController();
+    controller.abort();
+    const collect = renderer.collectAction.bind(renderer) as (...args: unknown[]) => Promise<unknown>;
+    const pending = collect(createQuestionRequest(), 'all', 'tab-1', controller.signal);
+    await expect(Promise.race([pending, Promise.resolve('still pending')])).resolves.toBeNull();
+    expect(runtime.questionInlineCardEl).toBeNull();
+  });
+
+  it('settles only the target card on abort and never applies a late user answer', async () => {
+    const a = createRendererHarness();
+    const b = createRendererHarness();
+    const controller = new AbortController();
+    const collect = a.renderer.collectAction.bind(a.renderer) as (...args: unknown[]) => Promise<unknown>;
+    const pending = collect(createQuestionRequest(), 'all', 'tab-1', controller.signal);
+    const other = b.renderer.collectAction(createSingleSelectRequest(), 'all', 'tab-1');
+    await flushInlineRender();
+    const detached = a.runtime.questionInlineCardEl!;
+    controller.abort();
+    await flushInlineRender();
+    await expect(Promise.race([pending, Promise.resolve('still pending')])).resolves.toBeNull();
+    expect(a.runtime.questionInlineCardEl).toBeNull();
+    expect(b.runtime.questionInlineCardEl?.isConnected).toBe(true);
+    detached.querySelector<HTMLButtonElement>('.is-submit')?.click();
+    await expect(pending).resolves.toBeNull();
+    b.runtime.questionInlineCardEl?.querySelector<HTMLButtonElement>('.is-reject')?.click();
+    await expect(other).resolves.toEqual({ type: 'reject' });
+  });
+});

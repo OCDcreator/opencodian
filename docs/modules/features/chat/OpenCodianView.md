@@ -1,4 +1,6 @@
 # OpenCodianView
+
+> 2026-10-08：Codex approval host wiring 提供既有 tab/session 映射，并将 adapter 的取消信号交给 question flow；view 只装配 ports，不持有审批 waiter。
 > 2026-10-08：Codex footer 和发送 variant 统一读取既有 `ConversationSessionSettingsCoordinator` 的有效会话 effort；忽略其它 tab 遗留的 `currentVariant`。footer 选择委托该 coordinator 持久化 `codexModelReasoningEffort`，不修改主默认；会话覆盖应用后刷新 effort 显示。保存、native runtime 应用与 SDK thread invalidation 仍由既有 session-settings owner 管理。
 
 OpenCode 2 slash autocomplete now enters the backend catalog path even when no OpenCode 1 config manager is present. Its Session Change Sidebar requests native `session.diff` through `ModifiedFilesSidebarCoordinator`; the view only routes the active backend/session and does not store diff state.

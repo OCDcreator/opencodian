@@ -186,3 +186,23 @@ describe('mapCodexApprovalResolution', () => {
     expect(result).toEqual({ decision: 'denied' });
   });
 });
+
+
+describe('Codex approval owning tab', () => {
+  it('routes a native request to its owning session tab when a different tab is active', async () => {
+    const collectResponse = jest.fn(async () => ({ decision: 'denied' as const }));
+    const context = { getActiveTabId: () => 'other-tab', getTabIdForSession: jest.fn(() => 'owner-tab'), approvalCardRenderer: { collectResponse } };
+    const request = execCommandRequest({ raw: { threadId: 'thread-owner', turnId: 'turn-owner' } });
+    await createCodexApprovalBridgeHost(() => context).collectApproval!(request);
+    expect(context.getTabIdForSession).toHaveBeenCalledWith('thread-owner');
+    expect(collectResponse).toHaveBeenCalledWith(request, 'owner-tab');
+  });
+
+  it('declines without displaying an approval when the native thread has no owning tab', async () => {
+    const collectResponse = jest.fn(async () => ({ decision: 'approved' as const }));
+    const context = { getActiveTabId: () => 'other-tab', getTabIdForSession: () => null, approvalCardRenderer: { collectResponse } };
+    const request = execCommandRequest({ raw: { threadId: 'closed-thread' } });
+    await expect(createCodexApprovalBridgeHost(() => context).collectApproval!(request)).resolves.toBeNull();
+    expect(collectResponse).not.toHaveBeenCalled();
+  });
+});

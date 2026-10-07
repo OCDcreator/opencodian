@@ -1984,6 +1984,8 @@ export class OpenCodianView extends ItemView {
       return;
     }
     this.plugin.codexApprovalHostContext.getActiveTabId = () => this.getActiveTabId();
+    this.plugin.codexApprovalHostContext.getTabIdForSession = (sessionId) =>
+      this.tabManager?.getAllTabs().find((tab) => this.getSessionIdForTab(tab.id) === sessionId)?.id ?? null;
     this.plugin.codexApprovalHostContext.approvalCardRenderer = {
       collectResponse: async (request, tabId) => {
         try {
@@ -1991,7 +1993,7 @@ export class OpenCodianView extends ItemView {
           const result = await this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(
             questionRequest,
             tabId,
-            { applyResolution: false, forceInline: true },
+            { applyResolution: false, forceInline: true, signal: request.signal },
           );
           return mapCodexApprovalResolution(result, request);
         } finally {

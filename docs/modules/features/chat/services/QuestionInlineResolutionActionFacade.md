@@ -1,5 +1,7 @@
 # QuestionInlineResolutionActionFacade
 
+> 2026-10-08：可选 signal 透传给 inline renderer；取消返回 null，不执行 backend question write。
+
 > **源码**: `src/features/chat/services/QuestionInlineResolutionActionFacade.ts`
 > **状态**: [REVIEW]
 

@@ -1,4 +1,6 @@
 # CodexAdapter
+
+> 2026-10-08：审批收集绑定所属 foreground turn 的 AbortSignal；取消后即便 host 迟到返回 approve，adapter 仍只回复 denied。其它会话 controller 不受影响。
 > 2026-10-06：SDK fallback 每轮在 await 前捕获模型、effort 与权限选项，并应用请求的 model/variant 覆盖；SDK ThreadOptions 不可变，因此每轮重建同 native ID 的 resume wrapper，保持原生历史且不把会话覆盖写入全局默认。显式 untrusted/on-request 仍要求 app-server 与 approval bridge，不因 fallback 放宽。验收发现 UI Luna 与 native gpt-6-sol 错配，由该修复消除。
 > 2026-09-21 (advantage-parity R-F7)：options 新增 `getExtraEnv`：SDK 构造（抽出私有 `constructSdkClient`）与 app-server transport 均注入域 env——SDK 设 `env` 后不再继承 process.env，故以 `toPlainStringEnv(process.env)` 为底复制（extra 非空才设，保持既有行为逐字节一致）。
 

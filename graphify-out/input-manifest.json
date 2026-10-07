@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "1f82f0f0cc907946cf81e0313698231cbded67b1279d85844d02c0efeb47f591",
+  "digest": "9a71abde7bc92a975add391fde64028ffc0494fd084c579e6ca9ea44055f1a75",
   "recordCount": 796,
   "records": [
     {
@@ -326,7 +326,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexAdapter.ts",
-      "sha256": "b373959b959eb8a1068738450248962a0c7f57f6d7b12db26c4cb5af3a8480b0"
+      "sha256": "ff87a72a165071ba00e0743b55d82969cbfbb8bf4ed22b77c62eb63f19ec1e3e"
     },
     {
       "kind": "src",
@@ -361,7 +361,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexDefaultApprovalHost.ts",
-      "sha256": "1025ccc14052fefe8a658a6d4e299eda30917dc6ad3c4a200056c54ad539e556"
+      "sha256": "5da9fc2a2ef0a761c086f06e1713765c283730b709e64f6f65604deb1633f0c2"
     },
     {
       "kind": "src",
@@ -1356,7 +1356,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/ChatPluginPort.ts",
-      "sha256": "57574221e4ad115c9b266f0ac17a36780218d9c558521b7e453ed971b2915c1f"
+      "sha256": "8cd59c3de872b4032d0ebe5cf63976d73036d00cdbd1c0be34371dee2fd0ee50"
     },
     {
       "kind": "src",
@@ -1401,7 +1401,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
-      "sha256": "89cccd9d067f129a090782611fb8f0080c7a7a704c3dc074deac5569bd0a39e1"
+      "sha256": "d9a1972be00d464c5b929543096f79431559c44f6954ec2dcb15f88c11ae9771"
     },
     {
       "kind": "src",
@@ -1551,7 +1551,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/QuestionInlineCardRenderer.ts",
-      "sha256": "d91f92bb7dff45f5bd64d8ca7354c59e19d996e909c1f1b8ec86e3f127b060ef"
+      "sha256": "f711d23fd5d68de0de9a94f85df877823ed3cfb285f9bc217cbe39dcb3048dfc"
     },
     {
       "kind": "src",
@@ -2206,7 +2206,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/QuestionInlineResolutionActionFacade.ts",
-      "sha256": "0e2c890c3483940af46bea90f49c250026a6a8c963129ad9c6a1376894ab8acd"
+      "sha256": "16f75f15c904e093952658d6de6c2df9c13c08eaeb7bdb11d05bf62d89c7d7d0"
     },
     {
       "kind": "src",
@@ -2221,7 +2221,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/QuestionResolutionFlowCoordinator.ts",
-      "sha256": "d21ca06695dbee645fafea7cf58fbbc7c84ef254a03969c1fb058f139291e46e"
+      "sha256": "aec89af8b21722b1730b5a104c8edf0f97ddaee616075ea346f8d836118e8602"
     },
     {
       "kind": "src",
@@ -3984,7 +3984,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-07T19:54:30.181Z",
-  "headShaAtGeneration": "697242bbedeba16a6d02a42b5db03b36d272e727",
+  "generatedAt": "2026-10-07T20:34:38.598Z",
+  "headShaAtGeneration": "56059fb4dbde5d87e319284cb58dcd498a999da5",
   "graphifyVersion": "graphify 0.8.50"
 }

@@ -1,5 +1,7 @@
 # QuestionResolutionFlowCoordinator
 
+> 2026-10-08：forceInline 收集支持可选 signal；pre-aborted 请求直接 cancelled，其余沿既有 inline action facade 传给 renderer。
+
 > **源码**: `src/features/chat/services/QuestionResolutionFlowCoordinator.ts`
 > **状态**: [REVIEW]
 

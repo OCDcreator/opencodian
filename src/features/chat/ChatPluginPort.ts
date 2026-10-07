@@ -136,6 +136,7 @@ export interface ChatPluginPort extends TabRuntimePluginSource {
     | 'approvalCardRenderer'
     | 'elicitationCardRenderer'
     | 'getActiveTabId'
+    | 'getTabIdForSession'
     | 'questionCardRenderer'
   >;
   opencodeConfigManager: Pick<

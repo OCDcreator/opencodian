@@ -32,11 +32,13 @@ export class QuestionInlineResolutionActionFacade {
   async collectResolutionAction(
     request: QuestionRequest,
     tabId: TabId | null = this.host.getActiveTabId(),
+    signal?: AbortSignal,
   ): Promise<QuestionResolutionExecutionAction | null> {
     const action = await this.inlineCardRenderer.collectAction(
       request,
       this.host.getQuestionDisplayMode(),
       tabId,
+      ...(signal ? [signal] : []),
     );
 
     if (!action) {
