@@ -125,3 +125,8 @@ Failed app-server negotiation stops the owned client before SDK fallback. Before
 
 
 Codex CLI account/model fallback reads snapshot the current provider-domain environment, including CODEX_HOME, for each execFile call without mutating the renderer process environment. The bounded output/timeout and native-first behavior stay intact.
+
+
+## 2026-10-08 Codex auxiliary cancellation
+
+Timeout, request abort, explicit cancel and dispose settle locally within the original budget and interrupt the exact admitted native turn once. A late turn/start acknowledgement after local cancellation is interrupted using its captured owned thread/turn ID, so it cannot survive the cancelled request. Pre-aborted requests send no native turn. Failed/interrupted native terminals cannot admit partial replacement text. Read-only sandbox, no network, never approvals and ephemeral readback remain required.

@@ -11,6 +11,10 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-10-08 Codex auxiliary native 取消传播
+
+真实四秒补全取消只结束本地结果，没有发送 native interrupt；迟到 turn/start ACK 还可能漏掉 abort。新增本地预算内结束、exact owned turn 中断和迟到 ACK 中断；预取消零请求、failed/interrupted terminal 不接受部分替换文本。只读和预算门禁保持不变。
+
 ## 2026-10-08 Codex 冷启动目录与 provider-domain fallback
 
 FA880 actual CLI trace showed early debug/models reads outside the configured CODEX_HOME and an empty composer cache after native readiness. CLI account/model fallback now uses the current domain env; opening an empty picker retries the existing native catalog path.

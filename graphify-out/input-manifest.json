@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "19269b6681cc635dfca56a40458b848ed8ff0198275463f32cc2f6fcb4750567",
+  "digest": "0601c7da25737595bddc1cc7843d5114d83351373f0e3cac2a66e4b2d11a17c8",
   "recordCount": 796,
   "records": [
     {
@@ -181,7 +181,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/auxiliary/CodexAuxQuerySession.ts",
-      "sha256": "6cb31fb0a430306170c3a670c55a3697eb7c2f11daadcfab7b644877d2c3c331"
+      "sha256": "1686dc04080c7acd071be2db797fa43b66230d738e6bbc20276ee29ce311f975"
     },
     {
       "kind": "src",
@@ -3984,7 +3984,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-07T16:59:44.421Z",
-  "headShaAtGeneration": "5d11fd0770d3edafde253f12857f599c26878913",
+  "generatedAt": "2026-10-07T18:31:01.837Z",
+  "headShaAtGeneration": "eda735c73db6f76376231a89fb563001ddca9d40",
   "graphifyVersion": "graphify 0.8.50"
 }
