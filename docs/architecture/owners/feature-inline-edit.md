@@ -73,3 +73,5 @@ Run before merge: `npm run typecheck`, `npm run check:module-docs`.
 OpenCode 2 provider-qualified model references pass through the existing inline edit/completion model resolution owners; the backend still owns read-only verification.
 
 2026-10-07：接受路径的最终映射范围与快照检查在整篇确认之后执行，并与单次 editor.replaceRange 连续运行；辅助进程清理在写入后启动，不能成为允许旧快照覆盖新编辑的时间窗口。真实 Mac/Windows ZCode 编辑器接受、拒绝与 dirty snapshot 证据使用独立构建身份记录。
+
+2026-10-07: the warm completion pool owns a disposal generation separate from exclusive chat warming. Global teardown detaches old entries before awaits, and note/model rebuilds revalidate after disposal. This prevents late editor work from recreating a session after toggle-off or deleting a newer enable-cycle entry.

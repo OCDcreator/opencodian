@@ -11,6 +11,18 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-10-07 — 补全池关闭期间的迟到笔记重建
+
+- 全局 teardown 在 await 前摘除旧 entry 并推进 disposal generation。
+- 笔记/模型切换等待旧 session 退出后重验代次和开关，关闭后不再创建原生 session；旧 teardown 不会清除新启用周期的 entry。
+- 确定性原源码控制出现 2 个启动与 1 个遗留；修复后 1 个启动、0 遗留，新增两个聚焦回归。
+
+## 2026-10-07 — OpenCode 2 auxiliary 数据根与追加 deny 兼容
+
+- 当前 2.0.24 native 在 wildcard deny 后追加 browser deny，旧末条规则判断误拒绝。
+- 强制所有 HOME/XDG/DB/temp 数据根归 auxiliary scope；校验最后 wildcard deny 之后只允许更严格 deny，后续 allow/ask 仍拒绝。
+- 聚焦失败回归先红后绿，保留原生 session wildcard deny 的严格读回。
+
 ## 2026-10-07 — ZCode 原生问答自动继续后清理过期请求
 
 - 实机确认 native 在 300 秒后以空答案自动继续；插件此前仍保留可提交的旧卡片。

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "91f189c51643ef992b55ddd9e106321aa127e3becdacfae00b65b1d0ca5926e5",
+  "digest": "1536cc7948531858ef238c063cae7a2f8398b179a675bfd91ad1ac14e6912f3e",
   "recordCount": 795,
   "records": [
     {
@@ -436,7 +436,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/OpenCode2Adapter.ts",
-      "sha256": "eacec65af99c0427f89d9ab350f7d511e4ccb3e27aa4c44d7dfdc9e77dd36f42"
+      "sha256": "aa3cb02b7ddde31de0684f824b43a47f9d77a2e2153535cd670965898831f2bf"
     },
     {
       "kind": "src",
@@ -2631,7 +2631,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineCompletionService.ts",
-      "sha256": "2f66f9f118245b49d368d3d8bc6d952b5550d4f1f64afaf15460ecb6cba65fc4"
+      "sha256": "8a5eacb96cbb0994f2a06d04dd3f44aca9a1a65d2df84083006dd4c155d2ccdf"
     },
     {
       "kind": "src",
@@ -3979,7 +3979,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-07T07:25:56.050Z",
-  "headShaAtGeneration": "49a1e85016ed76628576c8dcac31ba350d06d1c1",
+  "generatedAt": "2026-10-07T10:15:06.374Z",
+  "headShaAtGeneration": "3601d3f06d0a49e5041c84a2a46397b032c2d85d",
   "graphifyVersion": "graphify 0.8.50"
 }

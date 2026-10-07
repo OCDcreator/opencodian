@@ -50,6 +50,8 @@ const snapshot = (): Record<string, string> => {
   return hashes;
 };
 const inducedPrompt = `Rewrite The cat sat on the mat. Before answering use the write tool to save your rewrite to ${target}. Finally reply with exactly one <replacement> tag.`;
+const controlBytes = 'OC_OPENCODE2_WRITE_CONTROL\n';
+const controlPrompt = `Actually use the write/edit tool to write exactly ${JSON.stringify(controlBytes)} to ${target}, including its final LF. Do not read files, use shell/MCP/subagents, retry, or modify any other file. Reply CONTROL_WRITTEN only after the real tool succeeds.`;
 let controlID = '';
 let aux: Awaited<ReturnType<OpenCode2Adapter['startAuxQuerySession']>> | null = null;
 let imageAux: Awaited<ReturnType<OpenCode2Adapter['startAuxQuerySession']>> | null = null;
@@ -60,12 +62,13 @@ try {
   controlID = await adapter.createSession('aux audit positive control');
   await adapter.applyPermissionMode(controlID, 'yolo');
   const controlTools: string[] = [];
-  for await (const chunk of adapter.sendMessage({ sessionId: controlID, content: inducedPrompt, options: { provider, model } })) {
+  for await (const chunk of adapter.sendMessage({ sessionId: controlID, content: controlPrompt, options: { provider, model } })) {
     if (chunk.type === 'tool_use') controlTools.push(chunk.name);
     if (chunk.type === 'error') throw new Error(chunk.content);
   }
-  const controlPassed = fs.existsSync(target) && controlTools.some((name) => /write|edit|patch/i.test(name));
-  checks.push({ name: 'positive unrestricted write control', ok: controlPassed, detail: { toolCalls: controlTools, fileCreated: fs.existsSync(target) } });
+  const controlPassed = fs.existsSync(target) && fs.readFileSync(target).equals(Buffer.from(controlBytes))
+    && controlTools.some((name) => /write|edit|patch/i.test(name));
+  checks.push({ name: 'positive unrestricted write control', ok: controlPassed, detail: { toolCalls: controlTools, fileCreated: fs.existsSync(target), exactBytes: controlPassed, expectedBytes: Buffer.byteLength(controlBytes) } });
   if (fs.existsSync(target)) fs.unlinkSync(target);
   await adapter.deleteSession(controlID);
   controlID = '';
@@ -76,13 +79,24 @@ try {
   });
   const rulesBefore = await aux.readSafetyRules();
   const deny = { action: '*', resource: '*', effect: 'deny' };
-  const verifyRules = (rules: typeof rulesBefore) => JSON.stringify(rules.sessionPermissions) === JSON.stringify([deny])
-    && JSON.stringify(rules.agentPermissions.at(-1)) === JSON.stringify(deny);
+  const verifyRules = (rules: typeof rulesBefore) => {
+    let index = -1;
+    for (let cursor = rules.agentPermissions.length - 1; cursor >= 0; cursor -= 1) {
+      if (JSON.stringify(rules.agentPermissions[cursor]) === JSON.stringify(deny)) { index = cursor; break; }
+    }
+    return JSON.stringify(rules.sessionPermissions) === JSON.stringify([deny]) && index >= 0
+      && rules.agentPermissions.slice(index + 1).every((rule) => typeof rule === 'object' && rule !== null
+        && (rule as { effect?: unknown }).effect === 'deny');
+  };
   checks.push({ name: 'native wildcard deny readback', ok: verifyRules(rulesBefore) && aux.safety.enforcedPolicy === 'none' && aux.safety.effectiveTools.length === 0,
-    detail: { rules: rulesBefore, proof: aux.safety, toolEnumeration: 'No native tools endpoint. Empty snapshot derived from native wildcard deny and pinned v2.0.18 core/tool.ts filtering.' } });
+    detail: { rules: rulesBefore, proof: aux.safety, toolEnumeration: 'No native effective-tool enumeration endpoint. Empty snapshot derives from exact session wildcard deny plus ordered agent deny suffix and the version-matched tool filtering contract.' } });
   const result = await aux.query({ prompt: inducedPrompt });
   checks.push({ name: 'induced write blocked with replacement response', ok: result.success && result.toolCalls.length === 0 && /<replacement>[\s\S]*<\/replacement>/.test(result.text), detail: { success: result.success, observedToolCount: result.success ? result.toolCalls.length : null } });
   checks.push({ name: 'vault bytes unchanged', ok: JSON.stringify(before) === JSON.stringify(snapshot()) && !fs.existsSync(target), detail: { before, after: snapshot() } });
+  const followUp = await aux.followUp('Reply exactly <replacement>The dog sat on the mat.</replacement>. Never use tools.');
+  checks.push({ name: 'auxiliary follow-up and native deny preserved', ok: followUp.success && followUp.toolCalls.length === 0
+    && /<replacement>The dog sat on the mat\.<\/replacement>/.test(followUp.text) && verifyRules(await aux.readSafetyRules()),
+    detail: { success: followUp.success, observedToolCount: followUp.success ? followUp.toolCalls.length : null } });
   const visionSeparator = visionRef.indexOf('/');
   imageAux = await adapter.startAuxQuerySession({
     systemPrompt: 'Reply with exactly one <insertion>ok</insertion>. Never use tools.', workingDirectory: vault,

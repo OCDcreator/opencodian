@@ -127,6 +127,7 @@ export class InlineCompletionService {
   private readonly entries = new Map<string, PoolEntry>();
   /** Latest R-F4 exclusive warm request; cancels older backend snapshots. */
   private exclusiveWarmGeneration = 0;
+  private disposalGeneration = 0;
   /** Consecutive turn failures per backend (across rebuilds). */
   private readonly turnFailures = new Map<AgentBackendKind, number>();
   /** Backends that may not run completions until the next enable cycle. */
@@ -238,6 +239,8 @@ export class InlineCompletionService {
       return { ok: false, error: { reason: 'unsupported', backend: target.backend } };
     }
     if (this.isExclusiveWarmInvalidated(exclusiveGeneration)) return this.supersededResult();
+    const disposalGeneration = this.disposalGeneration;
+    if (!this.options.host.isEnabled()) return { ok: false, error: { reason: 'disabled' } };
     const workingDirectory = target.workingDirectory;
     const key = this.keyFor(target);
     const modelRef = describeModelRef(target.model);
@@ -247,6 +250,9 @@ export class InlineCompletionService {
       // Model or note switched: the native context must not survive. Rebuild
       // through the adapter's own read-only construction (reset semantics).
       await this.disposeEntry(entry);
+      if (disposalGeneration !== this.disposalGeneration || !this.options.host.isEnabled()) {
+        return this.supersededResult();
+      }
       entry = undefined;
     }
     if (!entry) {
@@ -396,8 +402,10 @@ export class InlineCompletionService {
     // before it starts its captured target. Invalidate that snapshot first so
     // toggle-off remains a strict zero-session state.
     this.exclusiveWarmGeneration += 1;
-    await Promise.all([...this.entries.values()].map((entry) => this.disposeEntry(entry)));
+    this.disposalGeneration += 1;
+    const entries = [...this.entries.values()];
     this.entries.clear();
+    await Promise.all(entries.map((entry) => this.disposeEntry(entry)));
   }
 
   // ---------------------------------------------------------------------------

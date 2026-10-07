@@ -2,7 +2,7 @@
 /** OpenCode 2 transport boundary. V2 has a separate CLI, HTTP API and event schema. */
 import { type ChildProcessWithoutNullStreams,spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { mkdtemp, rmdir } from 'node:fs/promises';
+import { mkdtemp, realpath, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -563,6 +563,16 @@ export class OpenCode2Adapter implements AgentService, AgentChatCapability, Agen
       workingDirectory: root,
       getSettings: () => ({ ...settings, mode: 'local', permissionMode: 'inherit' }),
       extraEnv: {
+        HOME: root,
+        USERPROFILE: root,
+        XDG_DATA_HOME: root,
+        XDG_CONFIG_HOME: configDir,
+        XDG_CACHE_HOME: root,
+        XDG_STATE_HOME: root,
+        OPENCODE_DB: path.join(root, 'aux.db'),
+        TMPDIR: root,
+        TMP: root,
+        TEMP: root,
         OPENCODE_TEST_HOME: root,
         OPENCODE_CONFIG_DIR: configDir,
         OPENCODE_CONFIG_PROJECT_DISABLE: '1',
@@ -572,15 +582,25 @@ export class OpenCode2Adapter implements AgentService, AgentChatCapability, Agen
       },
     });
     let sessionId = '';
+    const removeOwnedScope = async () => {
+      const [realRoot, realParent] = await Promise.all([realpath(root), realpath(os.tmpdir())]);
+      if (path.dirname(realRoot) !== realParent || !path.basename(realRoot).startsWith('opencodian-opencode2-aux-')) {
+        throw new Error('OpenCode 2 auxiliary scope ownership check failed');
+      }
+      await rm(realRoot, { recursive: true, force: true, maxRetries: 2, retryDelay: 30 });
+    };
     const verify = async () => {
       const native = await isolated.ready();
       const [session, agent] = await Promise.all([
         native.session.get({ sessionID: sessionId }),
         native.agent.get({ agentID: 'opencodian-aux', location: { directory: root } }),
       ]);
+      const wildcardDenyIndex = agent.data.permissions.findLastIndex((rule) =>
+        rule.effect === 'deny' && rule.action === '*' && rule.resource === '*');
       if (session.agent !== 'opencodian-aux' || JSON.stringify(session.permissions) !== JSON.stringify(permissions)
-        || agent.data.permissions.at(-1)?.effect !== 'deny' || agent.data.permissions.at(-1)?.action !== '*'
-        || agent.data.permissions.at(-1)?.resource !== '*') throw new Error('OpenCode 2 auxiliary deny rules failed readback');
+        || wildcardDenyIndex < 0 || agent.data.permissions.slice(wildcardDenyIndex + 1).some((rule) => rule.effect !== 'deny')) {
+        throw new Error('OpenCode 2 auxiliary deny rules failed readback');
+      }
       return { agentPermissions: agent.data.permissions, sessionPermissions: session.permissions ?? [] };
     };
     try {
@@ -599,8 +619,7 @@ export class OpenCode2Adapter implements AgentService, AgentChatCapability, Agen
     } catch (error) {
       if (sessionId) await isolated.deleteSession(sessionId).catch(() => {});
       await isolated.stop();
-      await rmdir(configDir).catch(() => {});
-      await rmdir(root).catch(() => {});
+      await removeOwnedScope();
       throw error;
     }
     let disposed = false;
@@ -655,8 +674,7 @@ export class OpenCode2Adapter implements AgentService, AgentChatCapability, Agen
         await isolated.cancelStream(sessionId).catch(() => {});
         try { await isolated.deleteSession(sessionId); } finally {
           await isolated.stop();
-          await rmdir(configDir).catch(() => {});
-          await rmdir(root).catch(() => {});
+          await removeOwnedScope();
         }
       },
     };

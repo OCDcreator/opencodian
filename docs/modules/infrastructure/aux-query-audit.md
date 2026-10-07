@@ -68,3 +68,7 @@ child exit 0 自身不能成为 pass。backend 不一致、execution 不明、pa
 正常会话必须实际执行独立 owned plugin 的 UserPromptSubmit hook，并通过原 27-byte LF 写入控制；辅助会话每轮除原生工具表、tool events、terminal tool count 外还要求 hook 日志中无该 native ID。Hook fixture 仅位于审计根，不使用或改写用户插件/信任配置。旧仅工具表的审计不能证明 hook 只读限制。
 
 可选 `AUDIT_AUX_REASONING_LEVEL_ZCODE` 同时作用于正向 Write 控制和辅助会话；值仍经真实模型目录校验，正向报告记录 session/read 的有效 model，不能靠测试 setter 冒称应用。未设置时保持原生模型默认档位。
+
+OpenCode 2 positive control now requires exact bytes including LF. The independent native agent wildcard deny may be followed only by additional deny rules; allow/ask still fails. First turn, follow-up, image, parent/native list isolation and removal of the full owned root are separate real-model checks.
+
+The ordered-deny suffix audit uses a reverse index loop compatible with the repository TypeScript target; it does not depend on `Array.findLastIndex`.

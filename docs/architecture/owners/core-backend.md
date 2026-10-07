@@ -109,3 +109,5 @@ ClaudeCodeAdapter owns current CLI resolution for new/resumed queries and dedica
 ZCode state.updated 的单项 current-model projection 与 session/read 使用同一 catalog 合并边界；native process exit 清除当前 transport 的 startPromise，保持新握手与迟到退出的身份隔离。
 
 ZCode interaction state follows exact native `permission.resolved` identities, including native question auto-continue; pending reads cannot retain answerable expired cards.
+
+OpenCode 2 auxiliary scopes own all HOME/XDG/DB/temp roots, and native permission normalization may only narrow the verified wildcard deny.
