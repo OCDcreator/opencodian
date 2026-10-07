@@ -1197,6 +1197,7 @@ describe('ClaudeCodeAdapter', () => {
     }));
     await expect(collectAsync(call.prompt)).resolves.toEqual([{
       type: 'user',
+      uuid: expect.stringMatching(/^[0-9a-f-]{36}$/),
       parent_tool_use_id: null,
       message: { role: 'user', content: 'hello' },
     }]);
@@ -1408,6 +1409,7 @@ describe('ClaudeCodeAdapter', () => {
     const prompts = await collectAsync(call.prompt);
     expect(prompts).toEqual([{
       type: 'user',
+      uuid: expect.stringMatching(/^[0-9a-f-]{36}$/),
       parent_tool_use_id: null,
       message: {
         role: 'user',
@@ -1440,6 +1442,7 @@ describe('ClaudeCodeAdapter', () => {
     const prompts = await collectAsync(call.prompt);
     expect(prompts).toEqual([{
       type: 'user',
+      uuid: expect.stringMatching(/^[0-9a-f-]{36}$/),
       parent_tool_use_id: null,
       message: { role: 'user', content: 'say hello' },
     }]);
@@ -1476,6 +1479,7 @@ describe('ClaudeCodeAdapter', () => {
     await expect(nextFrom(prompts[0])).resolves.toEqual({
       value: {
         type: 'user',
+        uuid: expect.stringMatching(/^[0-9a-f-]{36}$/),
         parent_tool_use_id: null,
         message: { role: 'user', content: 'first' },
       },
@@ -1505,6 +1509,7 @@ describe('ClaudeCodeAdapter', () => {
     await expect(nextFrom(prompts[1])).resolves.toEqual({
       value: {
         type: 'user',
+        uuid: expect.stringMatching(/^[0-9a-f-]{36}$/),
         parent_tool_use_id: null,
         message: { role: 'user', content: 'second' },
       },
@@ -1553,6 +1558,7 @@ describe('ClaudeCodeAdapter', () => {
     await expect(nextFrom(prompts[0])).resolves.toEqual({
       value: {
         type: 'user',
+        uuid: expect.stringMatching(/^[0-9a-f-]{36}$/),
         parent_tool_use_id: null,
         message: { role: 'user', content: 'first' },
       },
@@ -1588,6 +1594,7 @@ describe('ClaudeCodeAdapter', () => {
     await expect(nextFrom(prompts[0])).resolves.toEqual({
       value: {
         type: 'user',
+        uuid: expect.stringMatching(/^[0-9a-f-]{36}$/),
         parent_tool_use_id: null,
         message: { role: 'user', content: 'second' },
       },
@@ -5502,5 +5509,57 @@ describe('ClaudeCodeAdapter – sink registration on real product path', () => {
     expect(getPromptSuggestionSink()).toBeNull();
 
     clearPromptSuggestionSink();
+  });
+});
+
+
+describe('Claude prompt UUID native verification', () => {
+  it('uses the native result client UUID without an extra transcript read', async () => {
+    let uuid: string | undefined;
+    const sdk = createSdk([]);
+    sdk.query.mockImplementation(({ prompt }) => Object.assign((async function* () {
+      yield { type: 'system', subtype: 'init', session_id: 'owned-native' };
+      const submitted = await prompt[Symbol.asyncIterator]().next();
+      uuid = submitted.value?.uuid;
+      yield { type: 'result', subtype: 'success', session_id: 'owned-native', user_message_uuid: uuid, result: 'done' };
+    })(), { close: jest.fn() }));
+    const adapter = new ClaudeCodeAdapter({ vaultPath: '/vault', settings: getDefaultClaudeCodeBackendSettings(), sdk });
+    const session = await adapter.createSession('owned result identity');
+    const chunks = await collectAsync(adapter.sendMessage({ sessionId: session, content: 'owned prompt' }));
+    expect(chunks.filter((chunk) => chunk.type === 'user_message_identity')).toEqual([
+      { type: 'user_message_identity', uuid, sessionId: 'owned-native' },
+    ]);
+    expect(sdk.getSessionMessages).not.toHaveBeenCalled();
+    await adapter.stop();
+  });
+
+  it('binds the submitted prompt only after native history confirms its client UUID', async () => {
+    let promptUuid: string | undefined;
+    const sdk = createSdk([]);
+    sdk.query.mockImplementation(({ prompt }) => Object.assign((async function* () {
+      yield { type: 'system', subtype: 'init', session_id: 'owned-native' };
+      const submitted = await prompt[Symbol.asyncIterator]().next();
+      promptUuid = submitted.value?.uuid;
+      yield { type: 'result', subtype: 'success', session_id: 'owned-native', result: 'done' };
+    })(), { close: jest.fn() }));
+    sdk.getSessionMessages.mockImplementation(async () => [{ type: 'user', uuid: promptUuid, message: { role: 'user', content: 'owned prompt' } }]);
+    const adapter = new ClaudeCodeAdapter({ vaultPath: '/vault', settings: getDefaultClaudeCodeBackendSettings(), sdk });
+    const session = await adapter.createSession('owned prompt identity');
+    const chunks = await collectAsync(adapter.sendMessage({ sessionId: session, content: 'owned prompt' }));
+    expect(promptUuid).toMatch(/^[0-9a-f-]{36}$/);
+    expect(chunks).toContainEqual({ type: 'user_message_identity', uuid: promptUuid, sessionId: 'owned-native' });
+    await adapter.stop();
+  });
+
+  it('keeps identity unavailable when native history cannot confirm the submitted UUID', async () => {
+    const sdk = createSdk([{ type: 'system', subtype: 'init', session_id: 'owned-native' },
+      { type: 'result', subtype: 'success', session_id: 'owned-native', result: 'done' }]);
+    sdk.getSessionMessages.mockRejectedValue(new Error('owned native history unavailable'));
+    const adapter = new ClaudeCodeAdapter({ vaultPath: '/vault', settings: getDefaultClaudeCodeBackendSettings(), sdk });
+    const session = await adapter.createSession('owned unavailable identity');
+    const chunks = await collectAsync(adapter.sendMessage({ sessionId: session, content: 'owned prompt' }));
+    expect(chunks.filter((chunk) => chunk.type === 'user_message_identity')).toEqual([]);
+    expect(chunks.some((chunk) => chunk.type === 'text' && chunk.content === 'done')).toBe(true);
+    await adapter.stop();
   });
 });

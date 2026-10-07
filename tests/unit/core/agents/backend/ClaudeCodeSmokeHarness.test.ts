@@ -251,6 +251,7 @@ describe('ClaudeCode smoke harness', () => {
     const queuedPrompt = await input[Symbol.asyncIterator]().next();
     expect(queuedPrompt.value).toEqual({
       type: 'user',
+      uuid: expect.stringMatching(/^[0-9a-f-]{36}$/),
       parent_tool_use_id: null,
       message: {
         role: 'user',

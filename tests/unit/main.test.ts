@@ -608,6 +608,26 @@ describe('OpenCodianPlugin.onload', () => {
 });
 
 describe('OpenCodianPlugin backend bootstrap', () => {
+  it('reads project Claude MCP before vault-scoped services are composed', async () => {
+    const vaultPath = fs.mkdtempSync(path.join(os.tmpdir(), 'opencodian-claude-mcp-bootstrap-'));
+    try {
+      fs.mkdirSync(path.join(vaultPath, '.opencode'));
+      fs.writeFileSync(path.join(vaultPath, '.opencode', 'opencode.jsonc'), JSON.stringify({
+        mcp: { owned: { type: 'local', enabled: true, command: ['node', 'owned-mcp.mjs'] } },
+      }));
+      const plugin = new OpenCodianPlugin() as unknown as {
+        app: { vault: { adapter: { basePath: string } } };
+        readClaudeMcpServers(): Promise<unknown>;
+      };
+      plugin.app = { vault: { adapter: { basePath: vaultPath } } };
+      await expect(plugin.readClaudeMcpServers()).resolves.toEqual({
+        owned: { type: 'stdio', command: 'node', args: ['owned-mcp.mjs'] },
+      });
+    } finally {
+      fs.rmSync(vaultPath, { recursive: true, force: true });
+    }
+  });
+
   // Track the bootstrapped plugin + vault dir so afterEach can dispose the
   // DiagnosticsRuntimeCoordinator (3 real trace services) and clean up, avoiding
   // storage_degraded/ENOTEMPTY leaks (Phase 3 Task 11 made the coordinator real).

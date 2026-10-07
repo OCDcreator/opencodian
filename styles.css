@@ -2160,8 +2160,9 @@ body[data-opencodian-provider-icon-mode="color"] {
   margin-bottom: var(--opencodian-sticky-push-gap);
 }
 
-/* Keep pending questions reachable beneath long sticky user messages. */
-.opencodian-messages .opencodian-turn:has(.opencodian-question-inline:not(.opencodian-question-inline--resolved)) .opencodian-turn-header {
+/* Keep pending questions and permissions reachable beneath long user messages. */
+.opencodian-messages .opencodian-turn:has(.opencodian-question-inline:not(.opencodian-question-inline--resolved)) .opencodian-turn-header,
+.opencodian-messages .opencodian-turn:has(.opencodian-permission-inline[data-permission-card="true"]:not([data-state="terminal"])) .opencodian-turn-header {
   position: relative;
   z-index: auto;
 }

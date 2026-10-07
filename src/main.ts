@@ -2948,12 +2948,15 @@ export default class OpenCodianPlugin extends Plugin {
 
   /** Project MCP servers for the Claude adapter; missing manager/reader stays an empty config. */
   private async readClaudeMcpServers(): Promise<Awaited<ReturnType<typeof adaptMcpConfigForClaude>>> {
-    if (!this.opencodeConfigManager) {
-      return {};
-    }
     try {
+      // The active Claude adapter starts before configureVaultScopedServices.
+      // Read the same project source without caching a false empty catalog.
+      const vaultPath = getVaultBasePath(this.app);
+      const configManager = this.opencodeConfigManager
+        ?? (vaultPath ? new OpencodeConfigManager(vaultPath) : null);
+      if (!configManager) return {};
       const { McpConfigService } = await import('./core/config/McpConfigService');
-      const mcpConfigService = new McpConfigService(this.opencodeConfigManager);
+      const mcpConfigService = new McpConfigService(configManager);
       return adaptMcpConfigForClaude(await mcpConfigService.readProjectServers());
     } catch {
       return {};

@@ -27,3 +27,5 @@ chat and auxiliary sessions alike.
 
 Node hosts (audit runner, unit tests) never need the shim: plain
 `new AbortController()` is Node's own there and passes every check.
+
+SDK 的同步 abort listener 使用 Node setTimeout/clearTimeout 对以支持 teardown `.unref()`；调用结束和 listener 抛错均恢复 renderer timer。重复 abort 恰一次发出事件。真实 Aux Accept/Reject/dispose 必须回读，不能把预览关闭当作 editor 写入成功。

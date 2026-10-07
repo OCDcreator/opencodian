@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "e6ec2c00cc2e7476a5cd9ef7da9400d34c42c41977b3e2c05ab24c36a30dec66",
-  "recordCount": 794,
+  "digest": "176a6fdf5c637e212c1f3e5bb945b707a4a9ee55d061a83b49293c09d01cc628",
+  "recordCount": 795,
   "records": [
     {
       "kind": "ignore",
@@ -206,7 +206,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/ClaudeCodeAdapter.ts",
-      "sha256": "610fc2d9590113fd778aa9c11d763ba357533a9492f029fe4ab6fe4889b2aad8"
+      "sha256": "6b609a12a419e64ea3887e1968116b6b5dc3a9b7585070d87d132e5bb9b0022f"
     },
     {
       "kind": "src",
@@ -250,8 +250,13 @@
     },
     {
       "kind": "src",
+      "key": "src/core/agents/backend/ClaudeCodeScopedSessionStore.ts",
+      "sha256": "26086a176e017bf4d3f80b4ca87ba8c6f15179e111464702a34734ba724dc9b8"
+    },
+    {
+      "kind": "src",
       "key": "src/core/agents/backend/ClaudeCodeSdkAbortShim.ts",
-      "sha256": "9195b67469c2238218ae72b88cb54f9df16260b82c9dee1ef53286b26395ec90"
+      "sha256": "54b4cc82dc297b5e890b5afdf7a6cfce0085c6d7b3962033697cc0df9f092d10"
     },
     {
       "kind": "src",
@@ -261,7 +266,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/ClaudeCodeStreamNormalizer.ts",
-      "sha256": "7df0159798ed6f87cd1f517650e9e706ed9ab8abd3691823b4f6af47c3ac303a"
+      "sha256": "a488a1f99809c8d58c0b9cc4c7ab2d8315b69aeaa6b6bd1995343136be23e7cc"
     },
     {
       "kind": "src",
@@ -3401,7 +3406,7 @@
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "b3b3c16ca470ffa5a78fe6969c889e2c09282bac0fc1bdc381919d33f0e425b5"
+      "sha256": "d69f51d21173510d512e09935c4c84013b3eca4868ded371dd73e0bb04cf3dca"
     },
     {
       "kind": "src",
@@ -3516,7 +3521,7 @@
     {
       "kind": "src",
       "key": "src/style/base/core.css",
-      "sha256": "1a1c164571a1ceb23d2813259e65e86f6e0904a85f443d67418f6fa0b62c283b"
+      "sha256": "97f88b61006096470659c22c26ffe7d6cb3e6dda5136ebe9c24ea32d6ee540ea"
     },
     {
       "kind": "src",
@@ -3974,7 +3979,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-06T20:54:03.460Z",
-  "headShaAtGeneration": "cb4f7ba5e713f34021cb50ffb06cc70d0249d05b",
+  "generatedAt": "2026-10-07T01:56:27.303Z",
+  "headShaAtGeneration": "cd14ff75d9307904e07b8f438a2706059527f8ee",
   "graphifyVersion": "graphify 0.8.50"
 }

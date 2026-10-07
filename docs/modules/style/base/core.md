@@ -1,4 +1,5 @@
 # Core Styles
+> 2026-10-07：同一暂时取消 sticky header 的规则扩展到待回答 permission 卡；已完成或 terminal 卡不匹配，避免长用户消息遮住 Allow/Reject 按钮。CSS 不改变权限回调或 native 请求语义；构建后的 Mac/Windows 鼠标命中及拒写结果单独验收。
 > 2026-10-07：消息区增加基于 `--opencodian-composer-stack-height` 的 `scroll-padding-bottom`，让原生权限卡底部控件可滚动到输入区上方。当前 turn 含 unresolved `.opencodian-question-inline` 时，header 使用普通相对定位并取消局部 z-index，避免长用户消息吸附后覆盖选择项；回答完成后恢复既有 sticky 行为。Windows 可见隔离宿主的 native 长 command 卡已通过 Deny/Submit 鼠标点击；Mac hidden 宿主的 composer 高度测量停滞仍单独记录，不以手动调用测量方法声称生命周期修复。
 > 2026-09-21 (advantage-parity R-F5)：新增基于 container query 的宽面板会话 rail 布局；窄面板自动保持原消息布局，rail 使用既有 Obsidian 主题变量与可读焦点态。
 > 2026-09-21 (advantage-parity R-F5 visual follow-up)：rail item 明确覆盖宿主 button 固定高度（`height:auto !important`、`min-height:52px`），title/date 保持两个 12px、1.4 line-height 行，避免宽面板中基线重叠。

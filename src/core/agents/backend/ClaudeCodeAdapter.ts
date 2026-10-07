@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- Claude Code adapter owns SDK query lifecycle, session identity, permissions, MCP refresh, and model catalog wiring for the same backend boundary. */
+import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -82,6 +83,7 @@ import {
   isTurnBoundaryMessage,
   readConversationResetId,
 } from './ClaudeCodeQueue';
+import { scopeClaudeSessionCatalog } from './ClaudeCodeScopedSessionStore';
 import type { WarmQueryHandle } from './ClaudeCodeSdkLoader';
 import { ClaudeCodeStreamNormalizer } from './ClaudeCodeStreamNormalizer';
 import {
@@ -397,8 +399,8 @@ export interface ClaudeCodeSdkFacade {
   listSubagents?(sessionId: string, options?: { dir?: string; sessionStore?: unknown }): Promise<string[]>;
   getSubagentMessages?(sessionId: string, agentId: string, options?: { dir?: string; limit?: number; offset?: number; sessionStore?: unknown }): Promise<unknown[]>;
   importSessionToStore?(sessionId: string, store: unknown, options?: { dir?: string; includeSubagents?: boolean; batchSize?: number }): Promise<void>;
-  forkSession?(sessionId: string, options?: { dir?: string; upToMessageId?: string; title?: string }): Promise<{ sessionId: string }>;
-  renameSession?(sessionId: string, title: string, options?: { dir?: string }): Promise<void>;
+  forkSession?(sessionId: string, options?: { dir?: string; upToMessageId?: string; title?: string; sessionStore?: unknown }): Promise<{ sessionId: string }>;
+  renameSession?(sessionId: string, title: string, options?: { dir?: string; sessionStore?: unknown }): Promise<void>;
   startup?(params?: { options?: unknown; initializeTimeoutMs?: number }): Promise<WarmQueryHandle>;
 }
 
@@ -4917,6 +4919,7 @@ export class ClaudeCodeAdapter
       ? `You MUST return your complete response ONLY through the StructuredOutput tool using the provided JSON schema. Do NOT output markdown code blocks, JSON fences, explanations, or any conversational text outside the structured output.\n\n${request.content}`
       : request.content;
     const prompt = createUserPrompt(promptContent, request.images);
+    prompt.uuid = randomUUID();
     session.messages.push(prompt);
     let runtime: ClaudeCodeSessionRuntime;
     let traceContext: ClaudeTraceContext | undefined;
@@ -4998,6 +5001,8 @@ export class ClaudeCodeAdapter
           yield chunk;
         }
         if (isTurnBoundaryMessage(item.message)) {
+          const identity = await this.confirmSubmittedPromptIdentity(session.sdkSessionId, prompt.uuid, chunks);
+          if (identity) yield identity;
           runtimeLogger.debug('sendMessage complete', {
             sessionId: request.sessionId,
             sawChunk,
@@ -5061,6 +5066,23 @@ export class ClaudeCodeAdapter
     if (session) {
       this.closeRuntime(session);
     }
+  }
+
+  /** Older CLIs lack prompt echo/result UUID; confirm through the SDK transcript. */
+  private async confirmSubmittedPromptIdentity(sessionId: string | undefined, uuid: string, chunks: readonly StreamChunk[]): Promise<StreamChunk | undefined> {
+    if (!sessionId || chunks.some((chunk) => chunk.type === 'user_message_identity' && chunk.uuid === uuid)) return undefined;
+    try {
+      const sdk = await this.getSdk();
+      const messages = await sdk.getSessionMessages?.(sessionId, { dir: this.options.vaultPath });
+      if (messages?.some((entry) => entry !== null && typeof entry === 'object'
+        && (entry as { type?: unknown; uuid?: unknown }).type === 'user'
+        && (entry as { uuid?: unknown }).uuid === uuid)) {
+        return { type: 'user_message_identity', uuid, sessionId };
+      }
+    } catch (error) {
+      sessionLogger.debug('submitted prompt identity readback unavailable', { error: summarizeError(error) });
+    }
+    return undefined;
   }
 
   async setModel(model?: string): Promise<void> {
@@ -6359,7 +6381,7 @@ export class ClaudeCodeAdapter
   private getSdk(): Promise<ClaudeCodeSdkFacade> {
     if (this.options.sdk) {
       runtimeLogger.debug('SDK load', { source: 'injected' });
-      return Promise.resolve(this.options.sdk);
+      return Promise.resolve(this.scopeSdkSessionCatalog(this.options.sdk));
     }
     if (!this.options.sdkLoader) {
       runtimeLogger.debug('SDK load', { source: 'missing-loader' });
@@ -6371,7 +6393,19 @@ export class ClaudeCodeAdapter
     } else {
       runtimeLogger.debug('SDK load', { source: 'cache' });
     }
-    return this.sdkLoadPromise;
+    return this.sdkLoadPromise.then((sdk) => this.scopeSdkSessionCatalog(sdk));
+  }
+
+  private scopeSdkSessionCatalog(sdk: ClaudeCodeSdkFacade): ClaudeCodeSdkFacade {
+    const configDir = (this.options.settings.env.CLAUDE_CONFIG_DIR
+      ?? this.getDomainEnvironment()?.CLAUDE_CONFIG_DIR
+      ?? this.options.processEnv?.CLAUDE_CONFIG_DIR
+      ?? process.env.CLAUDE_CONFIG_DIR);
+    const projectDirName = (this.options.settings.env.CLAUDE_CODE_PROJECT_DIR_NAME
+      ?? this.getDomainEnvironment()?.CLAUDE_CODE_PROJECT_DIR_NAME
+      ?? this.options.processEnv?.CLAUDE_CODE_PROJECT_DIR_NAME
+      ?? process.env.CLAUDE_CODE_PROJECT_DIR_NAME);
+    return configDir !== undefined ? scopeClaudeSessionCatalog(sdk, configDir, projectDirName) : sdk;
   }
 
   private requireSession(sessionId: string): ClaudeCodeSessionState {
