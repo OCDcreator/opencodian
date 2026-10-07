@@ -74,3 +74,6 @@ OpenCode 2 positive control now requires exact bytes including LF. The independe
 The ordered-deny suffix audit uses a reverse index loop compatible with the repository TypeScript target; it does not depend on `Array.findLastIndex`.
 
 2026-10-07：OpenCode positive control 的 readiness GET /config 加入每次最多 2 秒 AbortSignal.timeout，仍受 60 秒总 deadline。真实 generation、write inducement 与 byte/residue 判定保持原要求；readiness 超时不算通过。
+
+
+2026-10-08：Windows Codex native stop 后 cwd 的短时 EBUSY 由最终 audit cleanup 的最多 2 秒重试处理；只重试最初已验证为空的 owned vault 非递归 rmdir，每次重查空目录，新增 residue 或持续失败仍 audit failed。权限/拒写/字节/ephemeral/session 残留门禁保持不变。
