@@ -62,9 +62,10 @@ export class PendingIndicatorController {
   schedule(
     runtime: SendPipelineTabRuntime,
     onShown: (payload: { pendingMessage: string; revealReason: 'pending-timeout' }) => void,
+    isCurrentStream: () => boolean = () => true,
   ): void {
     this.pendingTimeoutId = window.setTimeout(() => {
-      if (!runtime.isStreaming) {
+      if (!isCurrentStream() || !runtime.isStreaming) {
         return;
       }
 

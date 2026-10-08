@@ -66,7 +66,7 @@ export class StreamChunkRouter {
 
       for await (const chunk of stream) {
         this.trace.noteRawChunk(chunk);
-        if (!this.options.runtime.isStreaming) {
+        if (!this.isCurrentStream() || !this.options.runtime.isStreaming) {
           logger.debug('Streaming cancelled, breaking loop');
           this.streamInterrupted = true;
           this.trace.logStage('stream-loop-break-not-streaming');
@@ -118,7 +118,7 @@ export class StreamChunkRouter {
         pendingMessage,
         revealReason,
       });
-    });
+    }, () => this.isCurrentStream());
     this.trace.logStage('trace-armed', {
       activeModelId: this.options.preparedSend.activeModelId,
       pendingMessage: this.pendingIndicator.message,
@@ -267,6 +267,7 @@ export class StreamChunkRouter {
     }
 
     await this.options.streamController.handleChunk(streamingChunk);
+    if (!this.isCurrentStream()) return;
     const isFirstVisibleText = !this.receivedFirstVisibleContent
       && streamingChunk.type === 'text'
       && streamingChunk.content.length > 0;
@@ -280,7 +281,8 @@ export class StreamChunkRouter {
 
   private async injectFallbackErrorIfNeeded(): Promise<void> {
     if (
-      !this.options.runtime.isStreaming
+      !this.isCurrentStream()
+      || !this.options.runtime.isStreaming
       || this.receivedMeaningfulChunk
       || this.latestErrorMessage
       || !this.options.streamController
@@ -298,7 +300,7 @@ export class StreamChunkRouter {
   }
 
   private async dispatchDoneIfNeeded(): Promise<void> {
-    if (!this.options.runtime.isStreaming || !this.options.streamController) {
+    if (!this.isCurrentStream() || !this.options.runtime.isStreaming || !this.options.streamController) {
       return;
     }
 
@@ -323,7 +325,7 @@ export class StreamChunkRouter {
   }
 
   private async renderErrorToStreamController(): Promise<void> {
-    if (!this.options.streamController || !this.latestErrorMessage) {
+    if (!this.isCurrentStream() || !this.options.streamController || !this.latestErrorMessage) {
       return;
     }
 
@@ -375,7 +377,7 @@ export class StreamChunkRouter {
       ? STREAM_IDLE_TIMEOUT_MS
       : STREAM_NO_VISIBLE_CONTENT_TIMEOUT_MS;
     this.timeoutId = window.setTimeout(() => {
-      if (!this.options.runtime.isStreaming) {
+      if (!this.isCurrentStream() || !this.options.runtime.isStreaming) {
         return;
       }
 
@@ -406,8 +408,13 @@ export class StreamChunkRouter {
 
   private resetStreamingState(): void {
     this.clearStreamTimeout();
+    if (!this.isCurrentStream()) return;
     this.options.runtime.isStreaming = false;
     this.options.host.syncTabStreamLikeState(this.options.preparedSend.tabId);
+  }
+
+  private isCurrentStream(): boolean {
+    return this.options.isCurrentStream?.() ?? true;
   }
 
   private getTraceState(): SendPipelineTraceState {

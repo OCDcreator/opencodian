@@ -1554,7 +1554,7 @@ export class OpenCodianView extends ItemView {
       return null;
     }
 
-    if (!paneState.runtime.streamController) {
+    if (!paneState.runtime.streamController?.isStreaming()) {
       paneState.runtime.streamController = new StreamController({
         containerEl: paneState.messagesEl,
         markdownService: this.markdownService,

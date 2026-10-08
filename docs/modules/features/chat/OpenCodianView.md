@@ -850,3 +850,8 @@ Pi 完成后 bypass OpenCode canonical projection（其数据不属于 Pi 会话
 
 
 > 2026-10-08 ZCode selection: 会话级 model override 与每模型 reasoning override 经既有保存/归一化链持久化，null 档位继承 native 模型默认；view 重载与切会话分别回读，保存失败只回滚发起会话。保存值不代替 native options 生效证据。
+
+
+## 2026-10-08 每轮流归属
+
+取消后立即启动下一轮时，以独立 streamRunToken 绑定每次发送。旧 iterator 的延迟 chunk/final 不得修改新轮次的 streaming 状态、用量、pending 指示、shell 或队列；旧回复只用自身 controller 和捕获的 DOM 保存。结束或取消的 controller 在下一轮替换，仍在运行的 controller 保留。异步 shell 收尾之后再次检查归属；晚到错误和定时器也受相同边界约束。

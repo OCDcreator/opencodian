@@ -165,3 +165,8 @@ chunk router 现在由 `runtime/StreamChunkRouter.ts` 承接，并继续下钻�
 - 不能把 `MessageSendPreparationService` 或 `MessageFinalizationService` 的职责重新回灌进 runtime host
 
 - 2026-09-13: sendMessage finally 块触发可选 onTurnSettled 观察者（fire-and-forget，记忆抽取的回合结束信号）。
+
+
+## 2026-10-08 每轮流归属
+
+取消后立即启动下一轮时，以独立 streamRunToken 绑定每次发送。旧 iterator 的延迟 chunk/final 不得修改新轮次的 streaming 状态、用量、pending 指示、shell 或队列；旧回复只用自身 controller 和捕获的 DOM 保存。结束或取消的 controller 在下一轮替换，仍在运行的 controller 保留。异步 shell 收尾之后再次检查归属；晚到错误和定时器也受相同边界约束。

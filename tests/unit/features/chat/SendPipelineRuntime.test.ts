@@ -11,6 +11,89 @@ import {
   SendPipelineRuntime,
 } from './SendPipelineRuntime.testSupport';
 
+describe('SendPipelineRuntime cancelled-turn ownership', () => {
+  it('keeps a replacement turn streaming when a cancelled predecessor delivers its late final', async () => {
+    const state = createTabRuntime();
+    const oldController = createStreamController();
+    const newController = createStreamController();
+    const oldPrepared = createPreparedSend();
+    oldPrepared.conversation.backend = 'zcode';
+    const nextUser = createUserMessage({ id: 'user-next', content: 'Next', timestamp: 2 });
+    const nextPrepared = createPreparedSend({
+      conversation: oldPrepared.conversation, userMessage: nextUser, messageID: 'message-next',
+    });
+    const preparation = createPreparationPort(oldPrepared);
+    preparation.prepareMessageSend.mockResolvedValueOnce(oldPrepared).mockResolvedValueOnce(nextPrepared);
+    preparation.enterStreamingState.mockImplementation(() => { state.isStreaming = true; });
+    const finalization = createFinalizationPort();
+    let releaseOld!: () => void;
+    let releaseNext!: () => void;
+    let oldReady!: () => void;
+    let nextReady!: () => void;
+    const oldHeld = new Promise<void>((resolve) => { releaseOld = resolve; });
+    const nextHeld = new Promise<void>((resolve) => { releaseNext = resolve; });
+    const oldStarted = new Promise<void>((resolve) => { oldReady = resolve; });
+    const nextStarted = new Promise<void>((resolve) => { nextReady = resolve; });
+    async function* oldStream() {
+      yield { type: 'text', content: 'Old answer' } as const;
+      yield { type: 'message_metadata', messageId: 'native-old', timestamp: 10 } as const;
+      oldReady();
+      await oldHeld;
+      yield { type: 'text', content: 'MUST_NOT_REAPPEAR' } as const;
+      yield { type: 'message_stop' } as const;
+    }
+    async function* nextStream() {
+      yield { type: 'text', content: 'Next answer' } as const;
+      nextReady();
+      await nextHeld;
+      yield { type: 'message_metadata', messageId: 'native-next', timestamp: 20 } as const;
+      yield { type: 'message_stop' } as const;
+    }
+    const host = createHost(state, oldController);
+    host.sendStreamMessage.mockReturnValueOnce(oldStream()).mockReturnValueOnce(nextStream());
+    host.getOrCreateTabStreamController.mockReturnValueOnce(oldController).mockReturnValueOnce(newController);
+    const shells: HTMLElement[] = [];
+    host.createAssistantMessageElement.mockImplementation(() => {
+      const messageEl = document.body.createDiv();
+      const contentEl = messageEl.createDiv();
+      state.streamingMessageEl = messageEl;
+      state.streamingContentEl = contentEl;
+      shells.push(messageEl);
+      return { messageEl, contentEl };
+    });
+    const pipeline = new SendPipelineRuntime(host, preparation, finalization);
+    const first = pipeline.sendMessage('Old');
+    await oldStarted;
+    state.isStreaming = false;
+    oldController.cancelStream();
+    oldPrepared.conversation.messages.push(nextUser);
+    const second = pipeline.sendMessage('Next');
+    await nextStarted;
+    releaseOld();
+    await first;
+
+    expect(state.isStreaming).toBe(true);
+    expect(state.streamingMessageEl).toBe(shells[1]);
+    expect(newController.handleChunk).not.toHaveBeenCalledWith({ type: 'done' });
+    expect(oldController.handleChunk).not.toHaveBeenCalledWith({ type: 'text', content: 'MUST_NOT_REAPPEAR' });
+    expect(shells[0]?.dataset.messageId).toBe('native-old');
+    expect(shells[1]?.dataset.messageId).toBeUndefined();
+    expect(oldPrepared.conversation.messages).toContainEqual(expect.objectContaining({
+      content: 'Old answer', sourceMessageId: 'native-old', streamState: 'interrupted',
+    }));
+    expect(finalization.finalizeAfterStream).not.toHaveBeenCalled();
+    expect(preparation.consumeQueuedFollowUpSend).not.toHaveBeenCalled();
+
+    releaseNext();
+    await second;
+    expect(state.isStreaming).toBe(false);
+    expect(finalization.finalizeAfterStream).toHaveBeenCalledTimes(1);
+    expect(oldPrepared.conversation.messages.filter((message) => message.role === 'assistant').map((message) => message.content))
+      .toEqual(['Old answer', 'Next answer']);
+  });
+
+});
+
 describe('SendPipelineRuntime', () => {
   beforeEach(() => {
     jest.clearAllMocks();
