@@ -112,6 +112,10 @@ export class StreamController {
     });
   }
 
+  private ownsStreamState(state: StreamState): boolean {
+    return this.state === state && state.isStreaming;
+  }
+
   async handleChunk(chunk: StreamChunk): Promise<void> {
 
     
@@ -120,6 +124,7 @@ export class StreamController {
       return;
     }
 
+    const streamState = this.state;
     switch (chunk.type) {
       case 'thinking':
         await this.handleThinkingChunk(chunk);
@@ -146,76 +151,80 @@ export class StreamController {
         break;
     }
 
+    if (!this.ownsStreamState(streamState)) return;
     if (chunk.type !== 'done' && chunk.type !== 'text') {
       this.scrollToBottom?.();
     }
   }
 
   private async handleThinkingChunk(chunk: ThinkingChunk): Promise<void> {
+    const state = this.state;
     await this.flushPendingTextRender();
+    if (!this.ownsStreamState(state)) return;
     await this.finalizeCurrentTextRender();
-    this.finalizeTextBlock();
+    if (!this.ownsStreamState(state)) return;
+    this.finalizeTextBlock(state);
 
     if (chunk.partId
-      && this.state.currentThinkingState?.partId
-      && this.state.currentThinkingState.partId !== chunk.partId) {
-      this.finalizeThinkingBlock();
+      && state.currentThinkingState?.partId
+      && state.currentThinkingState.partId !== chunk.partId) {
+      this.finalizeThinkingBlock(state);
+      if (!this.ownsStreamState(state)) return;
     }
 
-    if (!this.state.currentThinkingState && chunk.partId && chunk.durationSeconds !== undefined) {
+    if (!state.currentThinkingState && chunk.partId && chunk.durationSeconds !== undefined) {
       if (this.updateStoredThinkingDuration(chunk.partId, chunk.durationSeconds)) {
         return;
       }
     }
 
-    if (!this.state.currentThinkingState) {
+    if (!state.currentThinkingState) {
       if (!chunk.content) {
         return;
       }
 
-      this.state.currentThinkingState = this.thinkingRenderer.create(
-        this.state.currentContentEl!
+      state.currentThinkingState = this.thinkingRenderer.create(
+        state.currentContentEl!
       );
       this.callbacks.onThinkingStart?.();
+      if (!this.ownsStreamState(state)) return;
     }
 
-    if (chunk.partId && !this.state.currentThinkingState.partId) {
-      this.state.currentThinkingState.partId = chunk.partId;
+    if (chunk.partId && !state.currentThinkingState.partId) {
+      state.currentThinkingState.partId = chunk.partId;
     }
 
     if (chunk.durationSeconds !== undefined) {
-      this.thinkingRenderer.updateDuration(this.state.currentThinkingState, chunk.durationSeconds);
+      this.thinkingRenderer.updateDuration(state.currentThinkingState, chunk.durationSeconds);
     }
 
     if (!chunk.content) {
       return;
     }
 
-    await this.thinkingRenderer.appendContent(this.state.currentThinkingState, chunk.content);
+    await this.thinkingRenderer.appendContent(state.currentThinkingState, chunk.content);
   }
 
   private handleTextChunk(content: string): void {
-    this.finalizeThinkingBlock();
-    this.callbacks.onTextAppend?.(content);
-
-    if (!this.state.currentTextEl) {
-      this.state.currentTextEl = this.state.currentContentEl!.createDiv({
-        cls: 'streaming-text-block',
-      });
-      this.state.currentTextContent = '';
+    const state = this.state;
+    this.finalizeThinkingBlock(state);
+    if (!this.ownsStreamState(state)) return;
+    if (!state.currentTextEl) {
+      state.currentTextEl = state.currentContentEl!.createDiv({ cls: 'streaming-text-block' });
+      state.currentTextContent = '';
     }
-
-    this.state.currentTextContent += content;
+    state.currentTextContent += content;
+    this.callbacks.onTextAppend?.(content);
+    if (!this.ownsStreamState(state)) return;
     this.logDebugStage('text-buffer-appended', {
-      deltaLength: content.length,
-      deltaPreview: this.previewText(content),
-      bufferedTextLength: this.state.currentTextContent.length,
-      persistedBlockCount: this.state.contentBlocks.length,
+      deltaLength: content.length, deltaPreview: this.previewText(content),
+      bufferedTextLength: state.currentTextContent.length,
+      persistedBlockCount: state.contentBlocks.length,
     });
     this.scheduleTextRender();
   }
 
-  private upsertToolCallContentBlock(toolCall: ToolCallInfo): void {
+  private upsertToolCallContentBlock(toolCall: ToolCallInfo, state = this.state): void {
     const persistedToolCall: ToolCallInfo = {
       id: toolCall.id,
       name: toolCall.name,
@@ -227,26 +236,54 @@ export class StreamController {
       resultVisibility: toolCall.resultVisibility,
     };
 
-    const existingBlock = this.state.contentBlocks.find((block) =>
+    const existingBlock = state.contentBlocks.find((block) =>
       block.type === 'tool_call' && block.toolCall.id === toolCall.id,
     );
 
     if (existingBlock?.type === 'tool_call') {
       existingBlock.toolCall = persistedToolCall;
     } else {
-      this.state.contentBlocks.push({
+      state.contentBlocks.push({
         type: 'tool_call',
         toolCall: persistedToolCall,
       });
     }
 
-    this.state.persistedToolCallIds.add(toolCall.id);
+    state.persistedToolCallIds.add(toolCall.id);
     this.logDebugStage('tool-call-persisted', {
       toolId: toolCall.id,
       status: toolCall.status,
       hasResult: typeof toolCall.result === 'string',
-      persistedBlockCount: this.state.contentBlocks.length,
+      persistedBlockCount: state.contentBlocks.length,
     });
+  }
+
+  private mergeToolCallChunk(
+    toolCall: ToolCallInfo,
+    chunk: {
+      kind?: ToolCallInfo['kind'];
+      input: Record<string, unknown>;
+      name: string;
+      toolMetadata?: Record<string, unknown>;
+      resultVisibility?: 'visible' | 'hidden';
+    },
+  ): void {
+    if (chunk.kind) {
+      toolCall.kind = chunk.kind;
+    }
+    toolCall.resultVisibility = chunk.resultVisibility
+      ?? this.resolveToolResultVisibility(chunk.name, chunk.kind)
+      ?? toolCall.resultVisibility;
+    const newInput = chunk.input || {};
+    if (Object.keys(newInput).length > 0) {
+      toolCall.input = { ...toolCall.input, ...newInput };
+    }
+    if (chunk.toolMetadata) {
+      toolCall.toolMetadata = {
+        ...(toolCall.toolMetadata ?? {}),
+        ...chunk.toolMetadata,
+      };
+    }
   }
 
   private async handleToolUseChunk(
@@ -263,38 +300,9 @@ export class StreamController {
       return;
     }
 
-    await this.flushPendingTextRender();
-    this.finalizeThinkingBlock();
-    await this.finalizeCurrentTextRender();
-    this.finalizeTextBlock();
-
-    const existingToolCall = this.state.toolCalls.get(chunk.id);
-    if (existingToolCall) {
-      if (chunk.kind) {
-        existingToolCall.kind = chunk.kind;
-      }
-      existingToolCall.resultVisibility = chunk.resultVisibility
-        ?? this.resolveToolResultVisibility(chunk.name, chunk.kind)
-        ?? existingToolCall.resultVisibility;
-      const newInput = chunk.input || {};
-      if (Object.keys(newInput).length > 0) {
-        existingToolCall.input = { ...existingToolCall.input, ...newInput };
-      }
-      if (chunk.toolMetadata) {
-        existingToolCall.toolMetadata = {
-          ...(existingToolCall.toolMetadata ?? {}),
-          ...chunk.toolMetadata,
-        };
-      }
-
-      const toolEl = this.state.toolCallElements.get(chunk.id);
-      if (toolEl) {
-        this.toolRenderer.updateHeader(toolEl, existingToolCall);
-      }
-      return;
-    }
-
-    const toolCall: ToolCallInfo = {
+    const streamState = this.state;
+    const existingToolCall = streamState.toolCalls.get(chunk.id);
+    const toolCall: ToolCallInfo = existingToolCall ?? {
       id: chunk.id,
       name: chunk.name,
       kind: chunk.kind,
@@ -305,43 +313,59 @@ export class StreamController {
       status: 'running',
     };
 
-    this.state.toolCalls.set(chunk.id, toolCall);
-    this.callbacks.onToolCallStart?.(toolCall);
+    // Capture received identity/input before markdown can yield to cancellation
+    // or to a tool_result. Rendering still waits for the preceding text boundary.
+    if (existingToolCall) {
+      this.mergeToolCallChunk(existingToolCall, chunk);
+    } else {
+      streamState.toolCalls.set(chunk.id, toolCall);
+      this.callbacks.onToolCallStart?.(toolCall);
+    }
 
-    if (!this.state.currentContentEl) {
+    if (!this.ownsStreamState(streamState)) return;
+    await this.flushPendingTextRender();
+    if (!this.ownsStreamState(streamState)) return;
+    this.finalizeThinkingBlock(streamState);
+    if (!this.ownsStreamState(streamState)) return;
+    await this.finalizeCurrentTextRender();
+    if (!this.ownsStreamState(streamState)) return;
+    this.finalizeTextBlock(streamState);
+    if (toolCall.result !== undefined) {
+      this.upsertToolCallContentBlock(toolCall, streamState);
+    }
+
+    if (existingToolCall) {
+      const toolEl = streamState.toolCallElements.get(chunk.id);
+      if (toolEl) {
+        this.toolRenderer.updateHeader(toolEl, toolCall);
+      }
+      return;
+    }
+
+    if (!streamState.currentContentEl) {
       logger.error('currentContentEl is null, cannot render tool');
       return;
     }
 
-    const toolEl = this.toolRenderer.render(this.state.currentContentEl, toolCall);
-    this.state.toolCallElements.set(chunk.id, toolEl);
+    this.renderToolCall(streamState, toolCall);
   }
 
   private handleToolResultChunk(chunk: { id: string; content: string; isError?: boolean }): void {
-
-    const toolCall = this.state.toolCalls.get(chunk.id);
-    if (!toolCall) {
-
-      return;
-    }
-
+    const state = this.state;
+    const toolCall = state.toolCalls.get(chunk.id);
+    if (!toolCall) return;
     toolCall.result = chunk.content;
     toolCall.status = chunk.isError ? 'error' : 'completed';
-
-    const toolEl = this.state.toolCallElements.get(chunk.id);
-    if (toolEl) {
-      this.toolRenderer.updateResult(toolEl, toolCall);
-    }
-
-    this.upsertToolCallContentBlock(toolCall);
-    this.logDebugStage('tool-result-finalized', {
-      toolId: toolCall.id,
-      status: toolCall.status,
-      resultLength: chunk.content.length,
-      persistedBlockCount: this.state.contentBlocks.length,
-    });
-
+    const toolEl = state.toolCallElements.get(chunk.id);
+    // If text is still flushing, tool_use/cancellation owns the ordered upsert.
+    if (toolEl) this.upsertToolCallContentBlock(toolCall, state);
     this.callbacks.onToolCallEnd?.(toolCall);
+    if (!this.ownsStreamState(state)) return;
+    if (toolEl) this.toolRenderer.updateResult(toolEl, toolCall);
+    this.logDebugStage('tool-result-finalized', {
+      toolId: toolCall.id, status: toolCall.status,
+      resultLength: chunk.content.length, persistedBlockCount: state.contentBlocks.length,
+    });
   }
 
   private resolveToolResultVisibility(
@@ -354,13 +378,18 @@ export class StreamController {
   }
 
   private async handleErrorChunk(chunk: ErrorChunk): Promise<void> {
+    const state = this.state;
     await this.flushPendingTextRender();
-    this.finalizeThinkingBlock();
+    if (!this.ownsStreamState(state)) return;
+    this.finalizeThinkingBlock(state);
+    if (!this.ownsStreamState(state)) return;
     await this.finalizeCurrentTextRender();
-    this.finalizeTextBlock();
+    if (!this.ownsStreamState(state)) return;
+    this.finalizeTextBlock(state);
     this.callbacks.onError?.(chunk.content);
+    if (!this.ownsStreamState(state)) return;
 
-    const errorEl = this.state.currentContentEl!.createDiv({
+    const errorEl = state.currentContentEl!.createDiv({
       cls: 'streaming-error-block',
     });
 
@@ -378,25 +407,31 @@ export class StreamController {
   }
 
   private async handleDoneChunk(): Promise<void> {
+    const state = this.state;
     this.logDebugStage('done-received', {
-      bufferedTextLength: this.state.currentTextContent.length,
-      persistedBlockCount: this.state.contentBlocks.length,
-      openToolCallCount: this.state.toolCalls.size,
-      openThinkingBlock: Boolean(this.state.currentThinkingState),
+      bufferedTextLength: state.currentTextContent.length,
+      persistedBlockCount: state.contentBlocks.length,
+      openToolCallCount: state.toolCalls.size,
+      openThinkingBlock: Boolean(state.currentThinkingState),
     });
     await this.flushPendingTextRender();
+    if (!this.ownsStreamState(state)) return;
     await this.finalizeCurrentTextRender();
-    this.flushOpenContentBlocks();
-    this.finalizeToolCalls();
-    this.state.isStreaming = false;
+    if (!this.ownsStreamState(state)) return;
+    this.flushOpenContentBlocks(state);
+    if (!this.ownsStreamState(state)) return;
+    this.finalizeToolCalls(state);
+    if (!this.ownsStreamState(state)) return;
+    state.isStreaming = false;
     this.callbacks.onDone?.();
+    if (this.state !== state) return;
     this.logDebugStage('done-flushed', {
-      persistedBlockCount: this.state.contentBlocks.length,
-      blockTypes: this.state.contentBlocks.map((block) => block.type),
+      persistedBlockCount: state.contentBlocks.length,
+      blockTypes: state.contentBlocks.map((block) => block.type),
     });
 
     if (this.onStreamComplete) {
-      this.onStreamComplete(this.state.contentBlocks);
+      this.onStreamComplete(state.contentBlocks);
     }
   }
 
@@ -428,7 +463,9 @@ export class StreamController {
     }
 
     this.textRenderRequested = false;
-    const targetEl = this.state.currentTextEl;
+    const state = this.state;
+    const targetEl = state.currentTextEl;
+    if (!targetEl) return;
     const content = this.state.currentTextContent;
     const generation = this.textRenderGeneration;
     const renderPromise = this.renderMarkdownText(
@@ -437,6 +474,10 @@ export class StreamController {
       generation,
       () => this.ownsTextRenderTarget(targetEl, generation),
     );
+    if (generation !== this.textRenderGeneration || this.state !== state) {
+      await renderPromise;
+      return;
+    }
     const trackedPromise = renderPromise
       .finally(() => {
         if (this.textRenderInFlight === trackedPromise) {
@@ -453,6 +494,7 @@ export class StreamController {
   }
 
   private async flushPendingTextRender(): Promise<void> {
+    const generation = this.textRenderGeneration;
     if (this.textRenderTimerId !== null) {
       window.clearTimeout(this.textRenderTimerId);
       this.textRenderTimerId = null;
@@ -461,12 +503,15 @@ export class StreamController {
     if (this.textRenderInFlight) {
       await this.textRenderInFlight;
     }
+    if (generation !== this.textRenderGeneration) return;
 
     if (this.textRenderRequested) {
       await this.renderPendingText();
+      if (generation !== this.textRenderGeneration) return;
       if (this.textRenderInFlight) {
         await this.textRenderInFlight;
       }
+      if (generation !== this.textRenderGeneration) return;
       if (this.textRenderRequested) {
         await this.flushPendingTextRender();
       }
@@ -491,6 +536,7 @@ export class StreamController {
     generation = this.textRenderGeneration,
     isOwned: () => boolean = () => this.ownsTextRenderTarget(targetEl, generation),
   ): Promise<void> {
+    const state = this.state;
     const previousHeight = targetEl.offsetHeight;
     if (previousHeight > 0) {
       targetEl.style.minHeight = `${previousHeight}px`;
@@ -508,6 +554,7 @@ export class StreamController {
         }
 
         targetEl.replaceChildren(...Array.from(stagingEl.childNodes));
+        if (!this.ownsStreamState(state)) return;
         this.lastTextRenderAt = Date.now();
         this.lastRenderedTextContent = content;
         this.scrollToBottom?.();
@@ -551,29 +598,26 @@ export class StreamController {
       && targetEl.isConnected;
   }
 
-  private finalizeThinkingBlock(): void {
-    if (!this.state.currentThinkingState) return;
-
-    const durationSeconds = this.thinkingRenderer.finalize(this.state.currentThinkingState);
-
+  private finalizeThinkingBlock(state = this.state, notify = true): void {
+    const thinking = state.currentThinkingState;
+    if (!thinking) return;
+    state.currentThinkingState = null;
+    const elapsed = Math.max(0, (Date.now() - thinking.startTime) / 1000);
+    const durationSeconds = thinking.resolvedDurationSeconds
+      ?? (elapsed < 10 ? Math.round(elapsed * 10) / 10 : Math.round(elapsed));
+    thinking.resolvedDurationSeconds = durationSeconds;
     const thinkingBlock: ThinkingContentBlock = {
-      type: 'thinking',
-      content: this.state.currentThinkingState.content,
-      partId: this.state.currentThinkingState.partId ?? undefined,
-      durationSeconds,
+      type: 'thinking', content: thinking.content,
+      partId: thinking.partId ?? undefined, durationSeconds,
     };
-    this.state.contentBlocks.push(thinkingBlock);
-
-    if (this.state.currentThinkingState.partId) {
-      this.state.thinkingBlocksByPartId.set(this.state.currentThinkingState.partId, thinkingBlock);
-      this.state.thinkingBlockElements.set(
-        this.state.currentThinkingState.partId,
-        this.state.currentThinkingState.wrapperEl,
-      );
+    state.contentBlocks.push(thinkingBlock);
+    if (thinking.partId) {
+      state.thinkingBlocksByPartId.set(thinking.partId, thinkingBlock);
+      state.thinkingBlockElements.set(thinking.partId, thinking.wrapperEl);
     }
-
-    this.callbacks.onThinkingEnd?.(durationSeconds);
-    this.state.currentThinkingState = null;
+    // Detach and persist before finalize can call Markdown I/O and reenter.
+    this.thinkingRenderer.finalize(thinking);
+    if (notify && this.ownsStreamState(state)) this.callbacks.onThinkingEnd?.(durationSeconds);
   }
 
   private updateStoredThinkingDuration(partId: string, durationSeconds: number): boolean {
@@ -592,92 +636,104 @@ export class StreamController {
     return true;
   }
 
-  private finalizeTextBlock(): void {
-    if (!this.state.currentTextContent) return;
+  private finalizeTextBlock(state = this.state): void {
+    if (!state.currentTextContent) return;
 
-    this.state.contentBlocks.push({
+    state.contentBlocks.push({
       type: 'text',
-      content: this.state.currentTextContent,
+      content: state.currentTextContent,
     });
-    this.logDebugStage('text-block-finalized', {
-      textLength: this.state.currentTextContent.length,
-      textPreview: this.previewText(this.state.currentTextContent),
-      persistedBlockCount: this.state.contentBlocks.length,
-    });
-
-    this.state.currentTextEl = null;
-    this.state.currentTextContent = '';
-    this.lastTextRenderAt = 0;
-    this.lastRenderedTextContent = '';
-  }
-
-  private finalizeToolCalls(): void {
-    for (const toolCall of this.state.toolCalls.values()) {
-      if (toolCall.status === 'running' || toolCall.status === 'pending') {
-        toolCall.status = 'completed';
-        this.callbacks.onToolCallEnd?.(toolCall);
-
-        const toolEl = this.state.toolCallElements.get(toolCall.id);
-        if (toolEl) {
-          this.toolRenderer.updateResult(toolEl, toolCall);
-        }
-      }
-
-      if (!this.state.persistedToolCallIds.has(toolCall.id)) {
-        this.upsertToolCallContentBlock(toolCall);
-      }
+    const finalizedContent = state.currentTextContent;
+    state.currentTextEl = null;
+    state.currentTextContent = '';
+    if (this.state === state) {
+      this.lastTextRenderAt = 0;
+      this.lastRenderedTextContent = '';
     }
+    this.logDebugStage('text-block-finalized', {
+      textLength: finalizedContent.length,
+      textPreview: this.previewText(finalizedContent),
+      persistedBlockCount: state.contentBlocks.length,
+    });
 
-    this.state.toolCalls.clear();
-    this.state.toolCallElements.clear();
   }
 
-  private flushOpenContentBlocks(): void {
-    this.finalizeThinkingBlock();
-    this.finalizeTextBlock();
+  private finalizeToolCalls(state = this.state): void {
+    for (const toolCall of [...state.toolCalls.values()]) {
+      if (!this.ownsStreamState(state)) return;
+      const needsEnd = toolCall.status === 'running' || toolCall.status === 'pending';
+      if (needsEnd) toolCall.status = 'completed';
+      this.upsertToolCallContentBlock(toolCall, state);
+      if (needsEnd) this.callbacks.onToolCallEnd?.(toolCall);
+      if (!this.ownsStreamState(state)) return;
+      const toolEl = state.toolCallElements.get(toolCall.id);
+      if (toolEl) this.toolRenderer.updateResult(toolEl, toolCall);
+    }
+    state.toolCalls.clear();
+    state.toolCallElements.clear();
+  }
+
+  private flushOpenContentBlocks(state = this.state, notify = true): void {
+    this.finalizeThinkingBlock(state, notify);
+    this.finalizeTextBlock(state);
+  }
+
+  private renderToolCall(state: StreamState, toolCall: ToolCallInfo, stopped = false): void {
+    const stagingEl = document.createElement('div');
+    const toolEl = this.toolRenderer.render(stagingEl, toolCall);
+    if (this.state !== state || state.isStreaming === stopped || !state.currentContentEl) {
+      this.toolRenderer.cleanup(toolEl);
+      return;
+    }
+    if (!stopped) state.toolCallElements.set(toolCall.id, toolEl);
+    state.currentContentEl.appendChild(toolEl);
   }
 
   cancelStream(): void {
-    this.clearPendingTextRender();
-    void this.finalizeCurrentTextRender();
-    this.flushOpenContentBlocks();
-    this.state.isStreaming = false;
-    this.logDebugStage('cancel-stream', {
-      persistedBlockCount: this.state.contentBlocks.length,
-      bufferedTextLength: this.state.currentTextContent.length,
-    });
+    this.stopStream('cancel');
   }
 
-  /**
-   * Handle stream timeout - mark all running tool calls as error
-   */
+  /** Local timeout preserves confirmed outcomes and closes the same ownership boundary. */
   timeoutStream(): void {
+    this.stopStream('timeout');
+  }
+
+  private stopStream(ending: 'cancel' | 'timeout'): void {
+    const state = this.state;
+    if (!state.isStreaming) return;
+    // Close and detach registries before any renderer/callback can reenter.
+    state.isStreaming = false;
+    const tools = [...state.toolCalls.values()];
+    const elements = new Map(state.toolCallElements);
+    state.toolCalls.clear();
+    state.toolCallElements.clear();
     this.clearPendingTextRender();
-    void this.finalizeCurrentTextRender();
-    this.flushOpenContentBlocks();
-
-    // Mark all running/pending tool calls as error
-    for (const [toolId, toolCall] of this.state.toolCalls) {
-      if (toolCall.status === 'running' || toolCall.status === 'pending') {
-        toolCall.status = 'error';
-        toolCall.result = 'Request timeout';
-        
-        // Update UI
-        const toolEl = this.state.toolCallElements.get(toolId);
-        if (toolEl) {
-          this.toolRenderer.updateResult(toolEl, toolCall);
-        }
-
-        this.upsertToolCallContentBlock(toolCall);
+    const textEl = state.currentTextEl;
+    const text = state.currentTextContent;
+    const generation = this.textRenderGeneration;
+    this.flushOpenContentBlocks(state, false);
+    for (const tool of tools) {
+      if (tool.status === 'pending' || tool.status === 'running') {
+        tool.status = ending === 'cancel' ? 'interrupted' : 'error';
+        if (ending === 'timeout') tool.result = 'Request timeout';
       }
+      this.upsertToolCallContentBlock(tool, state);
     }
-
-    this.state.toolCalls.clear();
-    this.state.toolCallElements.clear();
-    this.state.isStreaming = false;
-    this.logDebugStage('timeout-stream', {
-      persistedBlockCount: this.state.contentBlocks.length,
-      openToolCallCount: this.state.toolCalls.size,
+    if (this.state !== state) return;
+    if (textEl && text) {
+      // Final paint uses captured bytes only; it emits no scroll/stream callback.
+      void this.renderMarkdownText(textEl, text, generation, () =>
+        this.state === state && generation === this.textRenderGeneration && textEl.isConnected,
+      ).catch(() => undefined);
+    }
+    for (const tool of tools) {
+      if (this.state !== state) return;
+      const toolEl = elements.get(tool.id);
+      if (toolEl) this.toolRenderer.updateResult(toolEl, tool);
+      else this.renderToolCall(state, tool, true);
+    }
+    this.logDebugStage(ending === 'cancel' ? 'cancel-stream' : 'timeout-stream', {
+      persistedBlockCount: state.contentBlocks.length, openToolCallCount: state.toolCalls.size,
     });
   }
 

@@ -117,3 +117,8 @@ OpenCodianView (显示 tool call)
 - 元数据中的数字支持 string 和 number 两种类型
 
 
+
+
+## 2026-10-08 未完成工具的本地中断状态
+
+取消本地流时仍保存尚未收到结果的工具 call ID、参数和 interrupted 状态；不把本地停止推断为原生成功/失败，也不触发完成回调。已收到的终态和结果保持不变。卡片显示“原生工具结果尚未确认”，不显示运行中 spinner；历史归一保留该状态，后续权威 native completed/error 可以覆盖。

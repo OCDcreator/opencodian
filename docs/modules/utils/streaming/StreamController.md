@@ -118,3 +118,29 @@ tool call 不再只是“收到结果时 append 一次”那么简单。控制�
 - 文本节流降低了抖动，但也意味着 chunk 到达和 DOM 完成渲染之间存在一个短暂缓冲窗口。
 - `renderStoredContentBlocks()` 同样会跳过内部结构化输出工具块。
 - 如果没有显式传入 `onCollapsibleToggle`，controller 会回退复用 `scrollToBottom`，保证老调用方仍有基本的滚动行为。
+
+
+## 2026-10-08 未完成工具的本地中断状态
+
+取消本地流时仍保存尚未收到结果的工具 call ID、参数和 interrupted 状态；不把本地停止推断为原生成功/失败，也不触发完成回调。已收到的终态和结果保持不变。卡片显示“原生工具结果尚未确认”，不显示运行中 spinner；历史归一保留该状态，后续权威 native completed/error 可以覆盖。
+
+
+## 2026-10-09 B1：Markdown 等待期间的工具取消边界
+
+`handleToolUseChunk()` 在首次 await 前把已接收的工具 ID、完整 input、kind、metadata 与 result visibility 登记到本次 `StreamState`；重复事件先合并参数/metadata。新工具在登记时触发一次 start 回调，保证等待期间真实 `tool_result` 仍能匹配原工具，并按原样记录 completed/error 与结果。工具 DOM 仍等前文的 Markdown 边界完成后再渲染。
+
+工具 handler 捕获所属 state，并在异步边界后检查取消/重启；过期 handler 不创建 running 卡片、调用新的 start 回调或触碰替代流。公共分派在工具 handler 返回后同样检查所属 state，避免旧工具回调继续触发当前滚动。文本 flush 另捕获 render generation，等待返回后 generation 已变化即停止，不再消费替代流的渲染请求。
+
+`cancelStream()` 扫描已登记工具：未终结者保存为 interrupted，已收到的真实 completed/error 保持不变。工具若因 Markdown 等待尚未创建 DOM，取消时也按已确定的本地状态创建卡片；不把本地取消当成 native 成功，不伪造工具 end 或流完成回调。取消后的迟到 result/done 由 streaming gate 拒绝。
+
+现有 `StreamController.test.ts` 新增真实 Promise/DOM 行为回归：hold Markdown → 接收工具 → cancel → release；另覆盖第二次 await、等待期间真实成功/错误 result、重复输入合并、同 controller 重启与独立替代 controller。这里的 DOM 回归不代替固定构建的 Mac/FA880 native/reload 验收。
+
+等待期间先到的真实 tool_result 立即更新登记对象及真实 end 回调，但在工具 DOM 尚未建立时推迟写入 contentBlocks，待原工具 handler 完成前文边界或 cancel 同步 flush 后再落盘，保证文本/工具时间顺序；不取消继续流的成功和错误结果也有对应回归。
+
+## 2026-10-09 B2/B3 统一取消所有权
+
+全部 async chunk handler 在 await 返回后核对原 StreamState 与 streaming 所有权；公共分派同样阻止过期 scroll。thinking 已 append 到本轮时取消同步保存；仍在前文 Markdown 等待、尚未 append 的 thinking 不在停止后补入，取消后新到的任何 chunk 均拒绝。
+
+cancel/timeout 复用同一 owner 内 stopStream：先关闭 streaming、快照并清空工具 maps，再持久化原状态并调用 renderer。重复及renderer一次cancel重入均幂等；正常工具首次render先在detached staging完成，只有原流仍拥有时才附加和登记，避免重入时重复卡。confirmed结果在外部回调前写入原state，不覆盖替代流；done只有原流仍拥有时完成，onDone启动替代流后不派发旧onStreamComplete。最后的文本paint只使用cancel前捕获的字节，且不产生scroll/terminal回调。
+
+固定取消矩阵A24/B6/C4/D1/E8/F1在现有ToolCallRenderer.lifecycle.test.ts执行；原B1和S1测试保留。CSS映射说明补齐streaming-content.md，源码和styles暂存未改。

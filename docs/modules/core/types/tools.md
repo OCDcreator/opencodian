@@ -115,3 +115,6 @@ pending → running → completed
 | Glob | `{ pattern: string, path?: string }` |
 | Grep | `{ pattern: string, path?: string, output_limit?: number }` |
 | LS | `{ path: string }` |
+
+
+2026-10-08：ToolCallStatus 新增 interrupted，表示本地流结束时未取得原生工具终态；与 completed/error/blocked 分开保存。真实 native 结果回读仍可覆盖该状态。

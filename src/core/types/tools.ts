@@ -2,7 +2,7 @@
  * Tool-related type definitions
  */
 
-export type ToolCallStatus = 'pending' | 'running' | 'completed' | 'error' | 'blocked';
+export type ToolCallStatus = 'pending' | 'running' | 'completed' | 'error' | 'blocked' | 'interrupted';
 
 /** Tool call information */
 export interface ToolCallInfo {

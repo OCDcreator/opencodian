@@ -359,7 +359,7 @@ export interface ContentBlock {
   toolKind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'image' | 'unknown';
   toolInput?: Record<string, unknown>;
   toolMetadata?: Record<string, unknown>;
-  toolStatus?: 'pending' | 'running' | 'completed' | 'error' | 'blocked';
+  toolStatus?: 'pending' | 'running' | 'completed' | 'error' | 'blocked' | 'interrupted';
   toolResult?: string;
   toolResultVisibility?: 'visible' | 'hidden';
   subagentId?: string;
@@ -499,7 +499,7 @@ export interface ToolCallInfo {
   kind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'image' | 'unknown';
   input: Record<string, unknown>;
   toolMetadata?: Record<string, unknown>;
-  status?: 'pending' | 'running' | 'completed' | 'error' | 'blocked';
+  status?: 'pending' | 'running' | 'completed' | 'error' | 'blocked' | 'interrupted';
   result?: string;
   resultVisibility?: 'visible' | 'hidden';
   isExpanded?: boolean;

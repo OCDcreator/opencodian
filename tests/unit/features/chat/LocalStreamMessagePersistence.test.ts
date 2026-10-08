@@ -328,7 +328,7 @@ describe('persistLocalStreamOutcome local persistence details', () => {
 
     await persistLocalStreamOutcome({
       host,
-      preparedSend: createPreparedSend(conversation),
+      preparedSend: { ...createPreparedSend(conversation), userMessage: conversation.messages[2] },
       runtime: createRuntime(),
       outcome: createOutcome({
         finalizedAssistantMessageId: 'assistant-source-2',
@@ -515,4 +515,33 @@ describe('persistLocalStreamOutcome provisional warning removal', () => {
     expect(conversation.messages.some((m) => m.noticeMeta?.kind === 'codex-provisional-warning')).toBe(false);
     expect(conversation.messages.some((m) => m.noticeMeta?.kind === 'background-task-completion')).toBe(true);
   });
+});
+
+
+describe('persistLocalStreamOutcome delayed turn placement', () => {
+  it.each(['streamErrorNoticeMessage', 'interruptedNoticeMessage'] as const)(
+    'keeps a late %s in the initiating user turn without regressing activity times',
+    async (noticeKey) => {
+      const oldUser: ChatMessage = { id: 'user-old', role: 'user', content: 'Old', timestamp: 1 };
+      const nextUser: ChatMessage = { id: 'user-next', role: 'user', content: 'Next', timestamp: 15 };
+      const nextReply: ChatMessage = { id: 'native-next', role: 'assistant', content: 'Next answer', timestamp: 20 };
+      const conversation = createConversation([oldUser, nextUser, nextReply]);
+      conversation.updatedAt = 30; conversation.lastResponseAt = 20;
+      const preparedSend = createPreparedSend(conversation); preparedSend.userMessage = { ...oldUser };
+      const notice: ChatMessage = {
+        id: 'notice-old', role: 'assistant', content: 'Old response stopped', timestamp: 10,
+        displayStyle: 'notice', noticeTone: 'error',
+      };
+      await persistLocalStreamOutcome({
+        host: createHost(), preparedSend, runtime: createRuntime(), logAssistantFinalizationStage: jest.fn(),
+        outcome: createOutcome({
+          finalizedTimestamp: 10, shouldSyncFromServer: false, hasStreamContentBlocks: false,
+          streamContentBlocks: [], [noticeKey]: notice,
+        }),
+      });
+      expect(conversation.messages.map((message) => message.id)).toEqual(['user-old', 'notice-old', 'user-next', 'native-next']);
+      expect(conversation.updatedAt).toBe(30);
+      expect(conversation.lastResponseAt).toBe(20);
+    },
+  );
 });

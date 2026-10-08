@@ -3013,6 +3013,7 @@ export const enTranslations = {
   'chat.message.toolUse': 'Using tool',
   'chat.message.toolResult': 'Tool result',
   'chat.stream.cancelledToast': 'Streaming cancelled',
+  'chat.tool.interruptedOutcome': "Stream interrupted. Native tool outcome is unknown.",
   'chat.stream.interruptedBadge': 'Interrupted',
   'chat.stream.interruptedNoticeTitle': 'Response stopped',
   'chat.stream.interruptedNoticeBody': 'Generation was stopped before any reply text was produced.',

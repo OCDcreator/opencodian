@@ -3013,6 +3013,7 @@ export const zhTranslations = {
   'chat.message.toolUse': '使用工具',
   'chat.message.toolResult': '工具结果',
   'chat.stream.cancelledToast': '已中断生成',
+  'chat.tool.interruptedOutcome': "流已中断。原生工具结果尚未确认。",
   'chat.stream.interruptedBadge': '已中断',
   'chat.stream.interruptedNoticeTitle': '回复已中断',
   'chat.stream.interruptedNoticeBody': '本次生成在输出可见回复前已被停止。',

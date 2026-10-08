@@ -52,3 +52,12 @@ persistLocalStreamOutcome(options): Promise<void>
 Codex 权威单条 assistant text 与 native item/turn ID 先保存，再调用可选的当前会话重绘 callback 修正重试的显示残留；没有权威快照不会改写流内容。
 
 Codex user sourceMessageId/sourceTurnId 在同一 conversation write 中持久化；无 assistant body 的身份收敛也使用既有 backend-session finalization 路径。
+
+
+## 2026-10-09 S1：迟到取消回复的原轮次与时间
+
+取消旧 send 的末尾可能晚于同 tab 替代 send 完成。旧 finalizer 仍保存自己的实际内容与 source message/turn ID；本模块在既有 serialized write 内根据 preparedSend.userMessage 的稳定本地 ID（或已知 sourceMessageId）定位发起 user，把本地 assistant/错误 notice/中断 notice 插到该 user 后、下一条 user 前，保留该轮已有消息。不会按结果时间全局排序、猜测 native 身份或丢弃 stale 回复。若原 user 已不存在，仍保留原有尾部写入保底，不按内容/时间猜另一轮。
+
+updatedAt、lastResponseAt 分别取当前已保存值与本次 finalizedTimestamp 的最大值，避免迟到旧回复回退最近活动时间。消息自身 timestamp 与 native identity 保持真实原值。锚点查找、插入与时间更新均在 commitConversationWrite 的 write 回调中执行，使用提交时的当前数组。
+
+既有 SendPipelineRuntime 测试覆盖 A取消后B启动，分别 A先释放/B先释放；真实 ConversationWriteSerializationService 参与两次保存，检查全量 user+assistant 顺序、保存镜像、render grouping、最新时间和替代轮次运行所有权。对应 LocalStreamMessagePersistence 测试检查迟到 error/interrupted notice、复制 user anchor 及 updatedAt 高于末次响应的情况。这是代码层回归，固定候选实机 B06/取消生命周期仍需独立验收。

@@ -1,3 +1,5 @@
+import { buildMessageRenderGroups } from '../../../../src/features/chat/renderGroups';
+import { ConversationWriteSerializationService } from '../../../../src/features/chat/services/ConversationWriteSerializationService';
 import {
   createAsyncStream,
   createFinalizationPort,
@@ -12,13 +14,13 @@ import {
 } from './SendPipelineRuntime.testSupport';
 
 describe('SendPipelineRuntime cancelled-turn ownership', () => {
-  it('keeps a replacement turn streaming when a cancelled predecessor delivers its late final', async () => {
+  it.each(['old-first', 'next-first'])('preserves cancelled turn placement when replies release %s', async (releaseOrder) => {
     const state = createTabRuntime();
     const oldController = createStreamController();
     const newController = createStreamController();
     const oldPrepared = createPreparedSend();
     oldPrepared.conversation.backend = 'zcode';
-    const nextUser = createUserMessage({ id: 'user-next', content: 'Next', timestamp: 2 });
+    const nextUser = createUserMessage({ id: 'user-next', content: 'Next', timestamp: 15 });
     const nextPrepared = createPreparedSend({
       conversation: oldPrepared.conversation, userMessage: nextUser, messageID: 'message-next',
     });
@@ -50,6 +52,19 @@ describe('SendPipelineRuntime cancelled-turn ownership', () => {
       yield { type: 'message_stop' } as const;
     }
     const host = createHost(state, oldController);
+    const serialization = new ConversationWriteSerializationService({ scope: 'instance' });
+    const saved: string[][] = [];
+    host.saveConversation.mockImplementation(async (conversation) => {
+      saved.push(conversation.messages.map((message) => message.id));
+    });
+    host.createConversationWriteTicket.mockImplementation((id) => serialization.createTicket(id));
+    host.commitConversationWrite.mockImplementation(async (conversation, ticket, reason, write) => {
+      const result = await serialization.commit({ conversation, ticket, reason, write: async () => {
+        await write();
+        await host.saveConversation(conversation);
+      } });
+      return result.applied;
+    });
     host.sendStreamMessage.mockReturnValueOnce(oldStream()).mockReturnValueOnce(nextStream());
     host.getOrCreateTabStreamController.mockReturnValueOnce(oldController).mockReturnValueOnce(newController);
     const shells: HTMLElement[] = [];
@@ -69,27 +84,38 @@ describe('SendPipelineRuntime cancelled-turn ownership', () => {
     oldPrepared.conversation.messages.push(nextUser);
     const second = pipeline.sendMessage('Next');
     await nextStarted;
+    if (releaseOrder === 'next-first') { releaseNext(); await second; }
     releaseOld();
     await first;
 
-    expect(state.isStreaming).toBe(true);
-    expect(state.streamingMessageEl).toBe(shells[1]);
-    expect(newController.handleChunk).not.toHaveBeenCalledWith({ type: 'done' });
     expect(oldController.handleChunk).not.toHaveBeenCalledWith({ type: 'text', content: 'MUST_NOT_REAPPEAR' });
     expect(shells[0]?.dataset.messageId).toBe('native-old');
-    expect(shells[1]?.dataset.messageId).toBeUndefined();
     expect(oldPrepared.conversation.messages).toContainEqual(expect.objectContaining({
       content: 'Old answer', sourceMessageId: 'native-old', streamState: 'interrupted',
     }));
-    expect(finalization.finalizeAfterStream).not.toHaveBeenCalled();
-    expect(preparation.consumeQueuedFollowUpSend).not.toHaveBeenCalled();
-
-    releaseNext();
-    await second;
+    const replacementStillRunning = releaseOrder === 'old-first';
+    expect(state.isStreaming).toBe(replacementStillRunning);
+    expect(state.streamingMessageEl).toBe(replacementStillRunning ? shells[1] : null);
+    expect(newController.handleChunk.mock.calls.some(([chunk]) => chunk.type === 'done')).toBe(!replacementStillRunning);
+    expect(shells[1]?.dataset.messageId).toBe(replacementStillRunning ? undefined : 'native-next');
+    expect(finalization.finalizeAfterStream).toHaveBeenCalledTimes(replacementStillRunning ? 0 : 1);
+    expect(preparation.consumeQueuedFollowUpSend.mock.calls.length === 0).toBe(replacementStillRunning);
+    if (releaseOrder === 'old-first') {
+      releaseNext();
+      await second;
+    }
     expect(state.isStreaming).toBe(false);
     expect(finalization.finalizeAfterStream).toHaveBeenCalledTimes(1);
     expect(oldPrepared.conversation.messages.filter((message) => message.role === 'assistant').map((message) => message.content))
       .toEqual(['Old answer', 'Next answer']);
+    const expectedOrder = ['user-1', 'native-old', 'user-next', 'native-next'];
+    expect(oldPrepared.conversation.messages.map((message) => message.id)).toEqual(expectedOrder);
+    expect(saved.at(-1)).toEqual(expectedOrder);
+    expect(buildMessageRenderGroups(oldPrepared.conversation.messages).map((group) => group.messages.map((message) => message.id)))
+      .toEqual(expectedOrder.map((id) => [id]));
+    expect(oldPrepared.conversation.updatedAt).toBe(20);
+    expect(oldPrepared.conversation.lastResponseAt).toBe(20);
+    expect(serialization.getVersion(oldPrepared.conversation.id)).toBe(2);
   });
 
 });

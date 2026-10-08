@@ -55,7 +55,7 @@ export type StreamChunk =
 // Tool Call Types
 // ============================================
 
-export type ToolCallStatus = 'pending' | 'running' | 'completed' | 'error' | 'blocked';
+export type ToolCallStatus = 'pending' | 'running' | 'completed' | 'error' | 'blocked' | 'interrupted';
 
 export interface ToolCallInfo {
   id: string;

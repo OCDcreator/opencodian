@@ -1,18 +1,18 @@
-# Graph Report - src  (2026-10-08)
+# Graph Report - src  (2026-10-09)
 
 ## Corpus Check
-- 739 files · ~981,513 words
+- 739 files · ~982,087 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 15155 nodes · 41032 edges · 358 communities (269 shown, 89 thin omitted)
+- 15160 nodes · 41055 edges · 364 communities (277 shown, 87 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 46 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Source digest: `26c9b97064b2da24ee8de50419d8e4c4744892d954e75e34d9445ed4181d849a`
-- Generated at: 2026-10-08T12:24:18.880Z
-- HEAD at generation: `1735ccbfcb55d26523f41a165e3eb7be34afbb1e` (informational only; the content digest is the correctness signal)
+- Source digest: `edfc66f25451c6ef6751f855015445b53c54b83e2aadda59d41d395d955c64e9`
+- Generated at: 2026-10-08T18:29:16.539Z
+- HEAD at generation: `969f7d4f3ab794d12bfe6b44b42b6e29bae8ccd0` (informational only; the content digest is the correctness signal)
 - Run `npm run graphify:update:src` after `src/`, tsconfig, package/lock, ignore rules, wrapper or Graphify version changes.
 ## Community Hubs (Navigation)
 - [[_COMMUNITY_Community 0|Community 0]]
@@ -350,7 +350,6 @@
 - [[_COMMUNITY_Community 332|Community 332]]
 - [[_COMMUNITY_Community 333|Community 333]]
 - [[_COMMUNITY_Community 334|Community 334]]
-- [[_COMMUNITY_Community 335|Community 335]]
 - [[_COMMUNITY_Community 336|Community 336]]
 - [[_COMMUNITY_Community 337|Community 337]]
 - [[_COMMUNITY_Community 338|Community 338]]
@@ -363,16 +362,21 @@
 - [[_COMMUNITY_Community 345|Community 345]]
 - [[_COMMUNITY_Community 346|Community 346]]
 - [[_COMMUNITY_Community 347|Community 347]]
-- [[_COMMUNITY_Community 348|Community 348]]
+- [[_COMMUNITY_Community 349|Community 349]]
 - [[_COMMUNITY_Community 350|Community 350]]
 - [[_COMMUNITY_Community 351|Community 351]]
 - [[_COMMUNITY_Community 352|Community 352]]
 - [[_COMMUNITY_Community 353|Community 353]]
 - [[_COMMUNITY_Community 354|Community 354]]
-- [[_COMMUNITY_Community 355|Community 355]]
+- [[_COMMUNITY_Community 356|Community 356]]
+- [[_COMMUNITY_Community 357|Community 357]]
+- [[_COMMUNITY_Community 358|Community 358]]
+- [[_COMMUNITY_Community 359|Community 359]]
+- [[_COMMUNITY_Community 360|Community 360]]
+- [[_COMMUNITY_Community 361|Community 361]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `t()` - 1547 edges
+1. `t()` - 1548 edges
 2. `TabId` - 433 edges
 3. `OpenCodianView` - 313 edges
 4. `OpenCodianPlugin` - 313 edges
@@ -384,640 +388,632 @@
 10. `StreamChunk` - 135 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `RestoreConfirmation` --references--> `ArchiveHistoryEntryIdentity`  [EXTRACTED]
-  features/settings/ClaudeSettingsMutationController.ts → core/agents/backend/ConfigurationArchiveService.ts
 - `ConfigSourceRenderContext` --references--> `PluginManagementService`  [EXTRACTED]
   features/settings/SettingsPluginSection.ts → core/config/PluginManagementService.ts
-- `FuzzyMatchResult` --references--> `SlashCommandMenuItem`  [EXTRACTED]
-  features/chat/services/slashCommandMenuFilter.ts → core/config/slashCommandCatalog.ts
+- `SlashCommandMenuCatalogCacheEntry` --references--> `SlashCommandMenuItem`  [EXTRACTED]
+  features/chat/services/SlashCommandMenuCatalogCache.ts → core/config/slashCommandCatalog.ts
+- `SlashCommandMenuCatalogPendingLoad` --references--> `SlashCommandMenuItem`  [EXTRACTED]
+  features/chat/services/SlashCommandMenuCatalogCache.ts → core/config/slashCommandCatalog.ts
+- `CachedFacade` --references--> `OpenCodeSdkFacade`  [EXTRACTED]
+  features/settings/SettingsPluginEvidenceCoordinator.ts → core/opencode/OpenCodeSdkFacade.ts
 - `normalizeSessionCommandPath()` --calls--> `normalizeContextPath()`  [EXTRACTED]
-  core/opencode/OpenCodeSessionControlOrchestrator.ts → shared/contextPath.ts
-- `normalizeSessionCommandExternalContextPaths()` --calls--> `normalizeContextPath()`  [EXTRACTED]
   core/opencode/OpenCodeSessionControlOrchestrator.ts → shared/contextPath.ts
 
 ## Import Cycles
 - 1-file cycle: `core/opencode/diagnostics/types.ts -> core/opencode/diagnostics/types.ts`
-- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsServerSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
-- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsUiSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
-- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsPanelChrome.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
-- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsPluginSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
-- 3-file cycle: `features/settings/OpenCodianSettingsView.ts -> main.ts -> features/settings/SettingsViewRegistrar.ts -> features/settings/OpenCodianSettingsView.ts`
-- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsDebugSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
-- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsUserSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
-- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsPluginUpdateSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
-- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsMcpSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
-- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsAcpSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
-- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsCodexSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
-- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsModelSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
-- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsClaudeCodeSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
-- 3-file cycle: `features/settings/CostEstimateSettingsRow.ts -> main.ts -> features/settings/OpenCodianSettings.ts -> features/settings/CostEstimateSettingsRow.ts`
-- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsConversationSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
-- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsTabbedRenderer.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
-- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsAgentsSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
 - 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsCommandsSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
-- 4-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsTabbedRenderer.ts -> features/settings/SettingsServerSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
+- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsPanelChrome.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
+- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsSkillSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
+- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsCodexSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
+- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsUserSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
+- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsTabbedRenderer.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
+- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsAcpSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
+- 3-file cycle: `features/settings/OpenCodianSettingsView.ts -> main.ts -> features/settings/SettingsViewRegistrar.ts -> features/settings/OpenCodianSettingsView.ts`
+- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsPluginSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
+- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsModelSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
+- 3-file cycle: `features/settings/CostEstimateSettingsRow.ts -> main.ts -> features/settings/OpenCodianSettings.ts -> features/settings/CostEstimateSettingsRow.ts`
+- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsAgentsSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
+- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsClaudeCodeSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
+- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsConversationSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
+- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsDebugSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
+- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsFormatterSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
+- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsMcpSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
+- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsPluginUpdateSection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
+- 3-file cycle: `features/settings/OpenCodianSettings.ts -> features/settings/SettingsSecuritySection.ts -> main.ts -> features/settings/OpenCodianSettings.ts`
 
-## Communities (358 total, 89 thin omitted)
+## Communities (364 total, 87 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.02
-Nodes (121): QuestionInlineCardAction, QuestionInlineCardRenderer, QuestionInlineCardRendererHost, QuestionInlineCardRuntimeState, QuestionInputState, SingleQuestionAction, SingleQuestionPromptOptions, appendQuestionResolutionCard() (+113 more)
+Nodes (250): OpenCodeServerConfig, TabRuntimeSettings, UNIFIED_FONT_OPTIONS, COMPLETION_OVERRIDE_BACKENDS, OVERRIDE_BACKENDS, SettingsInlineEditSectionOptions, InputPanelNumericStyleControlConfig, DEFAULT_CONTEXT_WINDOWS (+242 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.02
-Nodes (152): hasCapability(), AuxQueryImageAttachment, Locale, executeInlineEditAccept(), InlineEditAcceptDeps, InlineEditAcceptEdit, buildInlineEditAnchor(), BuildInlineEditAnchorOptions (+144 more)
+Nodes (160): ClaudeCodeAuxSessionOptions, BackendModelSelectorProvider, buildClaudeCodeModelSelectorProviders(), buildCodexModelSelectorProviders(), CLAUDE_CODE_EFFORT_VARIANTS, ClaudeCodeModelCatalogEntry, CODEX_EFFORT_VARIANTS, CodexAuthMode (+152 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.02
-Nodes (183): OpenCodeServerConfig, TabRuntimeSettings, ContextGroupsSettingsHost, SettingsContextGroupsSectionOptions, DEFAULT_CONTEXT_WINDOWS, ModelInfo, ModelProvider, applyChatVimNavigationKey() (+175 more)
+Cohesion: 0.03
+Nodes (46): applyPassiveScrollMeasurement(), applyUserScrollIntent(), AutoScrollSnapshot, getDistanceFromBottom(), getProgrammaticScrollGuardDelayMs(), hasProgrammaticScrollGuard(), isNearBottom(), ScrollMetrics (+38 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.02
-Nodes (6): OpenCodianView, ChatDiagnosticsCoordinatorFactory, ChatServerAvailability, SendMessageModelOptions, QuestionRuntimeQuestionApiPort, applyMcpAuthOutcomeToContainer()
+Nodes (51): buildMessageRenderGroups(), flattenContentBlocks(), injectLiveCompactionDivider(), isMergeableAssistantMessage(), LiveCompactionDividerInjectionOptions, mergeAssistantMessagesForRender(), MessageRenderGroup, tagCompactionSummaries() (+43 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.03
-Nodes (66): WireHiddenAdaptersOptions, OpenCode2AdapterOptions, CodexTracePort, PiAdapter, PiAdapterOptions, PI_CONFIG_COMMANDS, PI_OPTIONAL_RPC_COMMANDS, PI_RPC_COMMANDS (+58 more)
+Cohesion: 0.02
+Nodes (7): hasCapability(), OpenCodianView, resolveAdapter(), ChatDiagnosticsCoordinatorFactory, ChatServerAvailability, SendMessageModelOptions, applyMcpAuthOutcomeToContainer()
 
 ### Community 5 - "Community 5"
 Cohesion: 0.03
-Nodes (46): SessionCommandTemplateContext, supportsQuestionActivationRefresh(), TabConversationActivationBridge, ClaudeUserMessageIdentityBackfillService, ConversationAuthoritativeMessageMergeHost, mergePiNativeConversationMessages(), ConversationAuthoritativeReloadCoordinator, ConversationAuthoritativeReloadCoordinatorDependencies (+38 more)
+Nodes (71): AutoInternalLinkProcessor, supportsQuestionActivationRefresh(), TabConversationActivationBridge, applyProcessorToContent(), applyProcessorToMessageText(), AssistantAutoInternalLinkService, ChatAutoInternalLinkLogStage, ChatAutoInternalLinkOutcome (+63 more)
 
 ### Community 6 - "Community 6"
 Cohesion: 0.03
-Nodes (65): AgentCapability, BackendCapabilities, getAgentServiceRegistry(), OPENCODE_FULL_CAPABILITIES, disposedSession(), WarmableAuxSession, WarmInlineCompletionSession, AgentAuxQueryCapability (+57 more)
+Nodes (80): AgentCapability, BackendCapabilities, getAgentServiceRegistry(), OPENCODE_FULL_CAPABILITIES, AUX_IMAGE_EXTENSIONS, CodexAuxSessionOptions, CodexEffectiveSettings, logger (+72 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.03
-Nodes (66): accumulateAssistantText(), CLAUDE_AUX_ALLOWED_TOOLS, CLAUDE_AUX_DISALLOWED_TOOLS, ClaudeAuxPromptQueue, ClaudeAuxQueryHandle, ClaudeAuxSdkFacade, ClaudeAuxSdkHandle, ClaudeCodeAuxQuerySession (+58 more)
+Cohesion: 0.02
+Nodes (71): getActiveBackendCapabilities(), CAPABILITY_CHANGE_REFRESH_CAPABILITIES, ConversationRevertState, DeferredQuestionRequest, logger, TabPaneState, BackgroundTaskIndicatorCoordinator, BackgroundTaskIndicatorCoordinatorHost (+63 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.04
-Nodes (8): ClaudeCodeAdapter, ClaudeCodeDiagnosticPromptResult, resolveComparableSessionIds(), formatJsonPreview(), readMessagePreview(), renderMessagePreviewList(), SettingsCapabilityLabSection, truncate()
+Cohesion: 0.03
+Nodes (90): SettingsZCodeHost, ZCodeBackendSettings, isZCodeDeferredSessionMissingError(), readBackgroundEnding(), readBackgroundLaunches(), readManualCompactionEvent(), ZCodeAdapter, ZCodeAdapterOptions (+82 more)
 
 ### Community 9 - "Community 9"
 Cohesion: 0.02
-Nodes (56): AssistantNoticeCardRendererHost, BackgroundTaskIndicatorCoordinator, BackgroundTaskRuntimeWiring, ChatRuntime, ChatRuntimeComposition, ChatRuntimeCompositionHost, ConversationRuntimeResult, ConversationRuntimeWiring (+48 more)
+Nodes (90): createClaudeTraceDiagnosticsPort(), createCodexTraceDiagnosticsPort(), createOpenCodeTraceDiagnosticsPort(), OpenCodeTraceDiagnosticsPort, OpenCodeTraceStoreStatus, OpenCodeTraceSummary, logger, setLocale() (+82 more)
 
 ### Community 10 - "Community 10"
 Cohesion: 0.03
-Nodes (43): emitPromptSuggestionSessionChange(), findPromptSuggestionScope(), applyPassiveScrollMeasurement(), applyUserScrollIntent(), AutoScrollSnapshot, getDistanceFromBottom(), getProgrammaticScrollGuardDelayMs(), hasProgrammaticScrollGuard() (+35 more)
+Nodes (114): CatalogClaudeAgentResourceHistoryOptions, CLAUDE_AGENT_RESOURCE, CLAUDE_AGENTS_DIR, ClaudeAgentResourceContext, ClaudeAgentResourceHistoryOptions, ClaudeAgentResourceInfo, ClaudeAgentResourceMutationResult, ClaudeAgentResourceReadResult (+106 more)
 
 ### Community 11 - "Community 11"
 Cohesion: 0.03
-Nodes (61): BackgroundTaskIndicatorCompletionNoticePort, BackgroundTaskIndicatorCoordinatorDependencies, BackgroundTaskIndicatorCoordinatorHost, BackgroundTaskIndicatorInlinePanelPort, BackgroundTaskIndicatorLiveSignalPort, BackgroundTaskIndicatorRenderOptions, BackgroundTaskIndicatorTabRuntimePort, BackgroundTaskIndicatorTimelinePort (+53 more)
+Nodes (108): AppServerCatalogReadError, AppServerSkillGroupEnvelope, classifySteerError(), EFFECTIVE_FIELD_KEYS, EffectiveFieldApplication, EffectiveReadbackStatus, extractThreadEffectiveSettings(), FieldApplicationStatus (+100 more)
 
 ### Community 12 - "Community 12"
 Cohesion: 0.03
-Nodes (86): getLocale(), logger, setLocale(), TranslationKey, TranslationParams, translations, inlineCompletionGhostExtension(), InlineCompletionTarget (+78 more)
+Nodes (59): CollapsibleOptions, CollapsibleState, disposeCollapsiblesWithin(), disposersByWrapper, SetupCollapsibleOptions, ConversationHydrationOutcomeBridge, getOpenCodeActivationSessionId(), TabConversationStatePort (+51 more)
 
 ### Community 13 - "Community 13"
 Cohesion: 0.03
-Nodes (115): CatalogClaudeAgentResourceHistoryOptions, CLAUDE_AGENT_RESOURCE, CLAUDE_AGENTS_DIR, ClaudeAgentResourceContext, ClaudeAgentResourceHistoryOptions, ClaudeAgentResourceInfo, ClaudeAgentResourceMutationResult, ClaudeAgentResourceReadResult (+107 more)
+Nodes (89): BackgroundTaskStreamTriggerCoordinatorHost, BackgroundConversationPostSyncHandoffCoordinator, BackgroundConversationPostSyncHandoffCoordinatorHost, BackgroundConversationPostSyncRefreshPort, BackgroundTabPostSyncOptions, BackgroundTaskPostSyncBaseOptions, SignalBackgroundTaskPostSyncOptions, BackgroundConversationPostSyncHandoffServices (+81 more)
 
 ### Community 14 - "Community 14"
 Cohesion: 0.03
-Nodes (33): OpenCodeMessageNormalizationMapper, SessionActivityStatus, BackgroundTaskStreamTriggerCoordinator, ClaudeTaskSessionState, ClaudeTaskStatus, logger, SessionTodoCoordinator, SessionTodoCoordinatorHost (+25 more)
+Nodes (53): BackgroundTaskIndicatorCompletionNoticePort, BackgroundTaskIndicatorCoordinatorDependencies, BackgroundTaskIndicatorInlinePanelPort, BackgroundTaskIndicatorLiveSignalPort, BackgroundTaskIndicatorRenderOptions, BackgroundTaskIndicatorTabRuntimePort, BackgroundTaskIndicatorTimelinePort, BackgroundTaskInlinePanelRenderer (+45 more)
 
 ### Community 15 - "Community 15"
 Cohesion: 0.03
-Nodes (20): setAgentServiceRegistry(), detectChangedBackends(), hasSessionCreationCapability(), createRequestUrlImageGenTransport(), createInlineEditAutoLinkProcessor(), createInlineEditPluginHost(), environmentFingerprintsEqual(), OpenCodianPlugin (+12 more)
+Nodes (66): SessionSyncEventUpdate, ConversationLoadRuntimeBridgeHost, ConversationSyncLoadRuntimeHostAdapterHost, ConversationSyncLoadRuntimeHosts, createConversationSyncLoadRuntimeHosts(), BackgroundTaskPostSyncResult, BackgroundTabConversationPostSyncRouteOptions, ConversationSyncBackgroundPostSyncHandoffPort (+58 more)
 
 ### Community 16 - "Community 16"
-Cohesion: 0.04
-Nodes (5): createClaudeProjectAgent(), discoverClaudeProjectAgents(), createClaudeProjectCommand(), discoverClaudeProjectCommands(), SettingsClaudeCodeSection
+Cohesion: 0.03
+Nodes (19): t(), CodexChatSurfaceBinding, ConversationHistoryDialogService, getFriendlyServerStartErrorMessage(), getUnavailableServerMessage(), UnavailableServerAvailability, ContextWindowOverrideModal, ContextWindowOverrideModalHost (+11 more)
 
 ### Community 17 - "Community 17"
-Cohesion: 0.03
-Nodes (14): CodexAdapter, isExecutableMissingError(), AppServerThreadEffectiveEvidence, buildEffectiveEvidenceWithApplication(), buildUniformEffectiveEvidence(), EffectiveFieldWiring, threadPhaseApplication(), turnSuccessApplication() (+6 more)
-
-### Community 18 - "Community 18"
-Cohesion: 0.03
-Nodes (68): SessionSyncEventUpdate, ConversationLoadRuntimeBridgeHost, ConversationSyncLoadRuntimeHostAdapterHost, ConversationSyncLoadRuntimeHosts, createConversationSyncLoadRuntimeHosts(), BackgroundTaskPostSyncResult, BackgroundTabConversationPostSyncRouteOptions, ConversationSyncBackgroundPostSyncHandoffPort (+60 more)
+Cohesion: 0.04
+Nodes (42): accumulateAssistantText(), CLAUDE_AUX_ALLOWED_TOOLS, CLAUDE_AUX_DISALLOWED_TOOLS, ClaudeAuxPromptQueue, ClaudeAuxQueryHandle, ClaudeAuxSdkFacade, ClaudeAuxSdkHandle, ClaudeCodeAuxQuerySession (+34 more)
 
 ### Community 19 - "Community 19"
-Cohesion: 0.03
-Nodes (27): CodexDebugPanel, t(), CodexChatSurfaceBinding, ConversationHistoryDialogService, formatMissingContextEntryNotice(), getFriendlyServerStartErrorMessage(), getUnavailableServerMessage(), UnavailableServerAvailability (+19 more)
+Cohesion: 0.04
+Nodes (12): CodexAdapter, isExecutableMissingError(), AppServerThreadEffectiveEvidence, buildEffectiveEvidenceWithApplication(), buildUniformEffectiveEvidence(), EffectiveFieldWiring, threadPhaseApplication(), turnSuccessApplication() (+4 more)
 
 ### Community 20 - "Community 20"
 Cohesion: 0.03
-Nodes (80): BackgroundTaskStreamTriggerCoordinatorHost, BackgroundConversationPostSyncHandoffCoordinator, BackgroundConversationPostSyncHandoffCoordinatorHost, BackgroundConversationPostSyncRefreshPort, BackgroundTabPostSyncOptions, BackgroundTaskPostSyncBaseOptions, SignalBackgroundTaskPostSyncOptions, BackgroundConversationPostSyncHandoffServices (+72 more)
+Nodes (80): emitPromptSuggestionSessionChange(), findPromptSuggestionScope(), syncUserMessageStreamingActionState(), ConversationHydrationOutcomeBridgeHost, ConversationHydrationRenderBridgeHost, ConversationTransitionBridgeHost, createTabActivationBridgeHosts(), TabActivationBridgeHostFactoryHost (+72 more)
 
 ### Community 21 - "Community 21"
 Cohesion: 0.03
-Nodes (92): BackendModelSelectorProvider, buildCodexModelSelectorProviders(), CLAUDE_CODE_EFFORT_VARIANTS, ClaudeCodeModelCatalogEntry, CODEX_EFFORT_VARIANTS, CodexAuthMode, CodexCatalogAdapter, OFFICIAL_ALIAS_MODELS (+84 more)
+Nodes (14): setAgentServiceRegistry(), detectChangedBackends(), hasSessionCreationCapability(), createInlineEditAutoLinkProcessor(), createInlineEditPluginHost(), environmentFingerprintsEqual(), OpenCodianPlugin, provider (+6 more)
 
 ### Community 22 - "Community 22"
-Cohesion: 0.04
-Nodes (77): WarmInlineCompletionSessionOptions, archiveBackendSession(), BackendPaginatedSessionHistoryCapability, BackendSessionItemsPageOptions, BackendSessionMessagesReadOptions, BackendSessionTurnsPageOptions, extractSessionDetailFields(), extractTimestamp() (+69 more)
+Cohesion: 0.03
+Nodes (8): AssistantMessageResponse, getDebugTextPreview(), getRecordId(), OpenCodeService, OpenCodeStreamingAssistantTail, Message, OpenCodeSessionMessageWithParts, Part
 
 ### Community 23 - "Community 23"
-Cohesion: 0.03
-Nodes (46): adapter, adapter, ShudingState, DiamondState, getInputPanelGlassRefractionCssVariables(), registerBuiltinGlassAdapters(), getAllGlassAdapters(), getGlassAdapter() (+38 more)
+Cohesion: 0.04
+Nodes (44): OpenCodeToolContentAssembly, AssistantCopyContentSource, extractAssistantStructuredTextCopyContent(), resolveAssistantCopyContent(), AssistantErrorRenderer, AssistantErrorRendererHost, AssistantStreamErrorRenderOptions, AssistantErrorFooterPayloadOptions (+36 more)
 
 ### Community 24 - "Community 24"
 Cohesion: 0.03
-Nodes (84): ClaudeCodeAuxSessionOptions, CheckpointCandidateResult, CheckpointPhase1RewindResult, CheckpointPhase1StreamResult, CheckpointPhase2StreamResult, CheckpointRewindActualResult, CheckpointRewindProbeResult, CLAUDE_CODE_EFFORT_VALUES (+76 more)
+Nodes (61): buildClaudeCodeElicitationContent(), buildClaudeCodeElicitationQuestionRequest(), buildClaudeCodeUserDialogQuestionRequest(), buildClaudeCodeUserDialogResult(), ElicitationContent, ElicitationScalarContent, ElicitationSchemaProperty, getHeader() (+53 more)
 
 ### Community 25 - "Community 25"
 Cohesion: 0.05
-Nodes (3): SettingsFormatterSection, OpencodeFormatterEntryConfig, OpencodeLspEntryConfig
+Nodes (10): PluginEntry, PluginEnvironmentSnapshot, PluginManagementService, OpenCodeEventUnsubscribe, PluginEvidenceSnapshot, SettingsPluginEvidenceCoordinator, SettingsPluginEvidencePresenter, SettingsPluginEvidencePresenterOptions (+2 more)
 
 ### Community 26 - "Community 26"
-Cohesion: 0.03
-Nodes (6): BuiltPromptSendPayload, buildCanonicalConversationFingerprintPayload(), getDebugTextPreview(), getRecordId(), OpenCodeService, Session
+Cohesion: 0.06
+Nodes (66): MemoryBackendService, MemoryExtractionOutcome, MemoryInjectionOutcome, buildExtractionSystemPrompt(), buildExtractionUserPrompt(), countUserProse(), evaluateExtractionGate(), ExtractionMemory (+58 more)
 
 ### Community 27 - "Community 27"
 Cohesion: 0.04
-Nodes (96): TrailingAssistantPatchPlanningContext, applyTrailingAssistantPatchTailState(), buildTrailingAssistantPatchExecutionPlan(), buildTrailingAssistantPatchExecutionPlanFromExecutionTailPlanningContext(), buildTrailingAssistantPatchExecutionTailInputs(), buildTrailingAssistantPatchExecutionTailPlanningContext(), buildTrailingAssistantPatchExecutionTailPlanningContextFromInputs(), buildTrailingAssistantPatchExecutionTailPlanParts() (+88 more)
+Nodes (58): logger, OpenCodeAvailableModelsResult, OpenCodeCatalogModelEntry, OpenCodeCatalogProviderEntry, OpenCodeCatalogQueryCoordinatorHost, OpenCodeCatalogResponseLogContext, OpenCodeProviderDirectoryResult, OpenCodeSdkFileListInput (+50 more)
 
 ### Community 28 - "Community 28"
-Cohesion: 0.05
-Nodes (30): ClaudeSettingsSourceCandidate, ConfigurationEvidence, appendText(), bindDisclosure(), CLAUDE_SETTINGS_ORIGIN_KEYS, ClaudeSettingsContextSourcesHost, ClaudeSettingsContextSourcesPresenter, claudeSettingsScopeLabel() (+22 more)
+Cohesion: 0.06
+Nodes (28): appendText(), bindDisclosure(), CLAUDE_SETTINGS_ORIGIN_KEYS, ClaudeSettingsContextSourcesHost, ClaudeSettingsContextSourcesPresenter, claudeSettingsScopeLabel(), ClaudeSettingsSwitchDecision, clearChildren() (+20 more)
 
 ### Community 29 - "Community 29"
-Cohesion: 0.04
-Nodes (78): SettingsZCodeHost, ZCodeBackendSettings, ZCodeAdapterOptions, ZCodeAdapterRuntimeDiagnostics, ZCodeHandshakeState, logger, normalizeZCodeHandshakeFailure(), PendingRequest (+70 more)
+Cohesion: 0.05
+Nodes (63): archiveBackendSession(), BackendPaginatedSessionHistoryCapability, BackendSessionItemsPageOptions, BackendSessionMessagesReadOptions, BackendSessionTurnsPageOptions, extractSessionDetailFields(), extractTimestamp(), extractTitleSummary() (+55 more)
 
 ### Community 30 - "Community 30"
-Cohesion: 0.04
-Nodes (48): buildAnnotationEntry(), escapeBlockText(), excerptOf(), PdfAnnotationPayload, pdfSelectionLink(), extractPages(), TextItemLike, PdfIndexFileSystem (+40 more)
+Cohesion: 0.05
+Nodes (43): EMPTY_CAPABILITIES, AgentCatalogService, AgentInvocationPromptPart, AgentInvocationService, AgentInvocationSource, EMPTY_RESOLVED, ChildSessionGraphService, AGENT_FILE_ROOT_PATTERNS (+35 more)
 
 ### Community 31 - "Community 31"
-Cohesion: 0.06
-Nodes (46): CliSpawnFn, ObsidianCliProbeResult, probeObsidianCli(), ProbeObsidianCliInput, buildGateScript(), GateScriptInput, shSingleQuotedList(), ObsidianToolingApprovalChoice (+38 more)
+Cohesion: 0.05
+Nodes (30): McpConfigService, McpServerOwnership, McpServerSnapshot, McpServerEditorModal, McpServerEditorModalOptions, McpServerStatusModal, McpServerStatusModalOptions, redactMcpSensitiveText() (+22 more)
 
 ### Community 32 - "Community 32"
 Cohesion: 0.04
-Nodes (68): syncUserMessageStreamingActionState(), createTabActivationBridgeHosts(), TabActivationBridgeHostFactoryHost, TabActivationBridgeHosts, ConversationRevertState, createTabActivationRuntimeBridgeHosts(), TabActivationRuntimeBridgeHosts, TabActivationRuntimeBridgeTabManager (+60 more)
+Nodes (73): ClaudeCodeDebugPanelRenderOptions, CodexDebugPanelRenderOptions, OpenCodeDebugPanelRenderOptions, ClaudeCodeDebugPanelOptions, ClaudeTraceDiagnosticsPort, CodexDebugPanelOptions, CodexTraceDiagnosticsPort, DebugModuleGroupConfig (+65 more)
 
 ### Community 33 - "Community 33"
 Cohesion: 0.06
-Nodes (73): linkFileAtCommit(), renameFileAtCommit(), unlinkFileAtCommit(), AllowlistedFileSnapshotResult, applyJsoncPathEdits(), archiveCurrentDeleted(), archiveCurrentOverwrite(), assertWithinAllowlistedRoot() (+65 more)
+Nodes (46): CliSpawnFn, ObsidianCliProbeResult, probeObsidianCli(), ProbeObsidianCliInput, buildGateScript(), GateScriptInput, shSingleQuotedList(), ObsidianToolingApprovalChoice (+38 more)
 
 ### Community 34 - "Community 34"
-Cohesion: 0.06
-Nodes (18): ConversationTabLifecycleRecoveryPort, ConversationTabLifecycleRecoveryTabManager, logger, Tab, TabBar, TabBarCallbacks, TabManager, CloseTabResult (+10 more)
+Cohesion: 0.05
+Nodes (10): logger, SkillCatalogService, SkillCatalogServiceHost, SkillInfo, SkillSourceGroups, queueSkillServiceRestart(), restartLocalServiceAfterSkillCatalogWrite(), SettingsSkillSection (+2 more)
 
 ### Community 35 - "Community 35"
 Cohesion: 0.05
-Nodes (75): agentFilePath(), createClaudeProjectAgentTyped(), deleteClaudeProjectAgent(), isSafeAgentName(), updateClaudeProjectAgent(), validateClaudeAgentContent(), commandFilePath(), createClaudeProjectCommandTyped() (+67 more)
+Nodes (5): formatJsonPreview(), readMessagePreview(), renderMessagePreviewList(), SettingsCapabilityLabSection, truncate()
 
 ### Community 36 - "Community 36"
 Cohesion: 0.05
-Nodes (23): AppServerCatalogReadError, AppServerThreadMutationError, classifySteerError(), CodexAppServerClient, errorToReason(), hooksReadbackFromGroups(), isAppServerMethodNotFoundError(), isHooksRouteUnavailable() (+15 more)
+Nodes (75): agentFilePath(), createClaudeProjectAgentTyped(), deleteClaudeProjectAgent(), isSafeAgentName(), updateClaudeProjectAgent(), commandFilePath(), createClaudeProjectCommandTyped(), defaultClaudeCommandContent() (+67 more)
+
+### Community 37 - "Community 37"
+Cohesion: 0.05
+Nodes (48): ResolvedModelSelection, buildModelSelectorDisplayState(), BuildModelSelectorDisplayStateOptions, buildModelOptionValue(), highlightModelOption(), navigateModelList(), parseModelOptionValue(), scrollToCurrentModel() (+40 more)
 
 ### Community 38 - "Community 38"
-Cohesion: 0.05
-Nodes (13): ClaudeCodeRuntimeAbortController, extractModelUsageFromRaw(), isOpenCodianLocalClaudeSessionId(), isSdkResultError(), mergeTraceError(), resolveDiagnosticSessionId(), resolveSendOptionOverrides(), summarizeError() (+5 more)
+Cohesion: 0.07
+Nodes (53): compareModelCatalogs(), createUnavailableModelCatalogComparison(), difference(), ModelCatalogComparison, sortedSet(), ModelCatalogState, ModelCatalogStateMode, ModelCatalogStateService (+45 more)
 
 ### Community 39 - "Community 39"
-Cohesion: 0.06
-Nodes (45): ResolvedModelSelection, buildModelSelectorDisplayState(), BuildModelSelectorDisplayStateOptions, buildModelOptionValue(), highlightModelOption(), navigateModelList(), parseModelOptionValue(), scrollToCurrentModel() (+37 more)
-
-### Community 40 - "Community 40"
-Cohesion: 0.06
-Nodes (22): OpenCodeTracePort, ExistingServerProcessInfo, LocalSidecarEndpointResolver, LocalSidecarEndpointResolverRuntime, ManagedServerAdoptionOutcome, OccupiedLocalEndpointResolution, SidecarCommandClassification, LOCAL_SERVER_SANITIZED_ENV_KEYS (+14 more)
+Cohesion: 0.04
+Nodes (48): WarmInlineCompletionSessionOptions, AgentServiceInfo, ActiveChangeHandler, AgentServiceRegistry, CapabilityChangeHandler, logger, IMPLEMENTED_AGENT_BACKENDS, buildCanvasNodeRewriteRequest() (+40 more)
 
 ### Community 41 - "Community 41"
-Cohesion: 0.06
-Nodes (38): EMPTY_CAPABILITIES, getActiveBackendCapabilities(), AgentInvocationPromptPart, AgentInvocationService, AgentInvocationSource, EMPTY_RESOLVED, ChildSessionGraphService, AGENT_FILE_ROOT_PATTERNS (+30 more)
+Cohesion: 0.05
+Nodes (75): adapter, applyEdgeBulge(), applyFilterLayerState(), BASE_PYRAMID_VERTICES, bounds2(), buildBackdropFilterValue(), buildFallbackBackdropFilterValue(), buildHullEdges() (+67 more)
 
 ### Community 42 - "Community 42"
 Cohesion: 0.05
-Nodes (17): buildMessageRenderGroups(), flattenContentBlocks(), injectLiveCompactionDivider(), isMergeableAssistantMessage(), LiveCompactionDividerInjectionOptions, mergeAssistantMessagesForRender(), MessageRenderGroup, tagCompactionSummaries() (+9 more)
+Nodes (54): BatchExecuteOutcome, BatchOrganizeCoordinator, BatchPreview, BatchPreviewOutcome, BatchRevertResult, logger, sanitizeFrontmatter(), scopeNeedsContent() (+46 more)
 
 ### Community 43 - "Community 43"
-Cohesion: 0.04
-Nodes (58): logger, OpenCodeAvailableModelsResult, OpenCodeCatalogModelEntry, OpenCodeCatalogProviderEntry, OpenCodeCatalogQueryCoordinatorHost, OpenCodeCatalogResponseLogContext, OpenCodeProviderDirectoryResult, OpenCodeSdkFileListInput (+50 more)
-
-### Community 44 - "Community 44"
-Cohesion: 0.06
-Nodes (18): isZCodeDeferredSessionMissingError(), readBackgroundEnding(), readBackgroundLaunches(), readManualCompactionEvent(), ZCodeAdapter, ZCodeAppServerTransport, hasInvalidZCodeImageAttachment(), SUPPORTED_MEDIA_TYPES (+10 more)
-
-### Community 45 - "Community 45"
 Cohesion: 0.05
 Nodes (36): cloneMessagesBeforeForkTarget(), chooseForkTarget(), ForkTarget, ForkTargetModal, ForkTargetModalOptions, ConversationHydrationOutcomePort, ConversationLoadRuntimeBridge, ConversationLoadRuntimeOptions (+28 more)
 
+### Community 44 - "Community 44"
+Cohesion: 0.05
+Nodes (21): ConversationSessionSignalBackgroundTaskPort, ConversationSessionSignalRuntime, ConversationSessionSignalRuntimeHost, ConversationSessionTabResolutionPort, ConversationSessionTabResolver, ConversationSessionTabResolverHost, ConversationTabLifecycleRecoveryPort, ConversationTabLifecycleRecoveryTabManager (+13 more)
+
+### Community 45 - "Community 45"
+Cohesion: 0.09
+Nodes (22): ClaudeCodeDebugSettingsPort, ActiveTurnState, ArmedCapture, asRecord(), byteLength(), chunkEnvelope(), ClaudeSessionTraceService, ClaudeSessionTraceServiceOptions (+14 more)
+
 ### Community 46 - "Community 46"
-Cohesion: 0.06
-Nodes (29): ModelCatalogState, ModelCatalogStateMode, ModelCatalogProvider, describeModelAvailabilitySummary(), describeProviderAvailabilityProbe(), describeProviderDirectorySummary(), describeProviderModels(), getCatalogPlaceholderReason() (+21 more)
+Cohesion: 0.05
+Nodes (47): scoreChunk(), buildAnnotationEntry(), escapeBlockText(), excerptOf(), PdfAnnotationPayload, pdfSelectionLink(), extractPages(), TextItemLike (+39 more)
 
 ### Community 47 - "Community 47"
-Cohesion: 0.08
-Nodes (20): ActiveRunState, ArmedCapture, logger, OpenCodeSessionTraceService, OpenCodeSessionTraceServiceOptions, inspectOpenCodeIngressEvent(), OpenCodeIngressAnomaly, OpenCodeIngressInspection (+12 more)
+Cohesion: 0.04
+Nodes (52): createSdkClient(), CreateSdkClientOptions, attachOpenCodeAppAgents(), appendSdkErrorStatus(), createConnectionIdentity(), describeSdkError(), extractSdkErrorMessage(), fingerprintAuthHeaders() (+44 more)
 
 ### Community 48 - "Community 48"
-Cohesion: 0.09
-Nodes (22): ActiveTurnState, ArmedCapture, asRecord(), byteLength(), chunkEnvelope(), ClaudeSessionTraceService, collectClaudeCodeKnownSecrets(), identifiersFrom() (+14 more)
+Cohesion: 0.04
+Nodes (42): ConversationCompactionHelpTopic, LiquidGlassSettingHelpModal, HELP_LINKS, OpenCodeProjectConfigHelpModal, OpenCodeProjectConfigHelpTopic, logger, ProjectConfigFileWatcherOptions, ChatVimNavigationKeyFields (+34 more)
 
 ### Community 49 - "Community 49"
 Cohesion: 0.05
-Nodes (61): buildAddHookGroupEdit(), buildAddHookHandlerEdit(), buildClaudeHookGroupEdit(), buildClaudeHookHandlerEdit(), buildDeleteHookGroupEdit(), buildDeleteHookHandlerEdit(), buildMoveHookGroupEdit(), buildMoveHookHandlerEdit() (+53 more)
+Nodes (4): ClaudeCodeAdapter, isClaudeAgentSdkBundledExecutablePath(), resolveComparableSessionIds(), resolveDiagnosticSessionId()
 
 ### Community 50 - "Community 50"
-Cohesion: 0.06
-Nodes (26): compareModelCatalogs(), createUnavailableModelCatalogComparison(), difference(), ModelCatalogComparison, sortedSet(), ModelCatalogStateService, ProviderDirectoryStatus, ProviderDirectorySnapshot (+18 more)
+Cohesion: 0.05
+Nodes (61): buildAddHookGroupEdit(), buildAddHookHandlerEdit(), buildClaudeHookGroupEdit(), buildClaudeHookHandlerEdit(), buildDeleteHookGroupEdit(), buildDeleteHookHandlerEdit(), buildMoveHookGroupEdit(), buildMoveHookHandlerEdit() (+53 more)
 
 ### Community 51 - "Community 51"
-Cohesion: 0.04
-Nodes (43): OpenCodeSdkCapabilityEvidence, OpenCodeSdkCapabilitySnapshot, CapabilityLabBackendTabDescriptor, CapabilityLabBackendTabRenderContext, CapabilityLabBackendTabsController, CapabilityLabBackendTabsOptions, CapabilityLabBackendTabState, createCapabilityLabBackendTabs() (+35 more)
+Cohesion: 0.05
+Nodes (31): adapter, adapter, getInputPanelGlassRefractionCssVariables(), registerBuiltinGlassAdapters(), getAllGlassAdapters(), getGlassAdapter(), glassAdapterRegistry, registerGlassAdapter() (+23 more)
 
 ### Community 52 - "Community 52"
-Cohesion: 0.03
-Nodes (55): AppServerAccountUsageDailyBucket, AppServerAccountUsageSummary, AppServerAppSummary, AppServerDeprecationNotice, AppServerFileChangeApprovalDecision, AppServerFileChangeApprovalParams, AppServerFileChangeApprovalResponse, AppServerHooksReadbackStatus (+47 more)
+Cohesion: 0.04
+Nodes (54): channelCallbacks, createPromptSuggestionChannel(), globalSessionCallbacks, onPromptSuggestionSessionChange(), onPromptSuggestionSinkChange(), PromptSuggestionSink, SessionCallback, SinkChangeCallback (+46 more)
 
 ### Community 53 - "Community 53"
 Cohesion: 0.06
-Nodes (8): deletePromptSuggestionChannel(), removePromptSuggestionScope(), ComposerInputShellCoordinator, escapeHtmlAttribute(), escapeHtmlContent(), readActiveBackendDisplayNameFromPlugin(), resolveTextareaMaxHeightFallback(), ComposerInputSubmission
+Nodes (35): buildChatAppearanceCustomCss(), fontLoader, getChatAppearanceBackgroundSizeValue(), getChatAppearanceCssVariables(), logger, OpenCodianSettingsRuntimeCoordinator, OpenCodianSettingsRuntimeCoordinatorHost, ChatSurfaceAppearanceCoordinator (+27 more)
 
 ### Community 54 - "Community 54"
-Cohesion: 0.04
-Nodes (43): createSdkClient(), CreateSdkClientOptions, attachOpenCodeAppAgents(), appendSdkErrorStatus(), createConnectionIdentity(), describeSdkError(), extractSdkErrorMessage(), fingerprintAuthHeaders() (+35 more)
+Cohesion: 0.08
+Nodes (10): OpencodeConfigManager, OpencodeCompactionConfig, OpencodeConfig, OpencodeConfig, PermissionAction, PermissionConfig, PermissionMode, PermissionReplyInput (+2 more)
 
 ### Community 55 - "Community 55"
 Cohesion: 0.05
-Nodes (60): AppServerSkillGroupEnvelope, EFFECTIVE_FIELD_KEYS, EffectiveFieldApplication, EffectiveReadbackStatus, extractThreadEffectiveSettings(), FieldApplicationStatus, isAppServerSkill(), isGroupedSkillCandidate() (+52 more)
+Nodes (16): AppServerThreadMutationError, CodexAppServerClient, errorToReason(), isAppServerMethodNotFoundError(), isHooksRouteUnavailable(), normalizePluginListResult(), AppServerCatalogListOptions, AppServerCatalogPage (+8 more)
 
 ### Community 56 - "Community 56"
-Cohesion: 0.06
-Nodes (25): McpConfigService, McpServerOwnership, McpServerOwnershipMap, McpServerSnapshot, McpServerEditorModalOptions, McpServerStatusModal, redactMcpSensitiveText(), redactMcpTechnicalDetails() (+17 more)
+Cohesion: 0.04
+Nodes (43): OpenCodeSdkCapabilityEvidence, OpenCodeSdkCapabilitySnapshot, CapabilityLabBackendTabDescriptor, CapabilityLabBackendTabRenderContext, CapabilityLabBackendTabsController, CapabilityLabBackendTabsOptions, CapabilityLabBackendTabState, createCapabilityLabBackendTabs() (+35 more)
 
 ### Community 57 - "Community 57"
-Cohesion: 0.06
-Nodes (39): deriveAuditFingerprint(), deriveInstructionSummary(), RemoteControlAudit, RemoteControlAuditEvent, RemoteControlAuditOptions, RemoteControlInstructionDigest, RemoteControlRequestSource, deriveTokenFingerprint() (+31 more)
+Cohesion: 0.05
+Nodes (42): BuildInlineEditAnchorOptions, installInlineEditContextDrop(), InlineEditImageChipModel, activeOverlays, InlineEditInputOverlay, InlineEditOverlayCallbacks, InlineEditOverlayContextChip, InlineEditOverlayState (+34 more)
 
 ### Community 58 - "Community 58"
-Cohesion: 0.06
-Nodes (59): logger, ModelConfigModalOpenOptions, RestartFailureStage, SourceInventoryMode, SourceLoadFailure, createModelConfigKeyValueState(), createModelConfigModalSnapshot(), isBlankProviderState() (+51 more)
-
-### Community 59 - "Community 59"
-Cohesion: 0.06
-Nodes (70): COMPLETION_OVERRIDE_BACKENDS, OVERRIDE_BACKENDS, SettingsInlineEditSectionOptions, areChatAppearanceSettingsEqual(), resolveThemeChatAppearance(), getDefaultChatAppearanceSettings(), getDefaultInputPanelGlassRefractionSettings(), getDefaultInputPanelGlassRefractionSvgFilterSettings() (+62 more)
-
-### Community 60 - "Community 60"
 Cohesion: 0.07
 Nodes (41): ArchiveContext, ArchiveEntry, ArchiveEntryIdentity, ArchiveEntryPreflight, archiveFileExtension(), archiveHistoryDescriptorIdentityMatches(), ArchiveHistoryDescriptorReadOutcome, archiveHistoryDescriptorStateMatches() (+33 more)
 
+### Community 59 - "Community 59"
+Cohesion: 0.06
+Nodes (5): deletePromptSuggestionChannel(), removePromptSuggestionScope(), ComposerInputShellCoordinator, escapeHtmlAttribute(), escapeHtmlContent()
+
+### Community 60 - "Community 60"
+Cohesion: 0.04
+Nodes (28): OpenCodeDebugSettingsPort, OpenCodeSessionTraceSettings, TraceStoreStatus, DiagnosticRunToken, ChatDiagnosticsBackendPorts, ChatDiagnosticsCoordinator, ChatDiagnosticsCoordinatorHost, ChatDiagnosticsCoordinatorViewHost (+20 more)
+
 ### Community 61 - "Community 61"
-Cohesion: 0.05
-Nodes (42): buildImageEmbedText(), buildImageGenerationRequest(), BuiltImageGenerationRequest, configText(), decodeBase64ToBytes(), decodeBodyText(), decodeImageGenerationResponse(), describeHttpFailure() (+34 more)
+Cohesion: 0.06
+Nodes (22): ClaudeTaskSessionState, ClaudeTaskStatus, logger, SessionTodoCoordinatorHost, SessionTodoCoordinatorRuntimeState, SessionTodoNoticeMessageOptions, VALID_CLAUDE_TASK_STATUSES, SessionTodoDockCoordinator (+14 more)
 
 ### Community 62 - "Community 62"
 Cohesion: 0.06
-Nodes (42): MarkdownRenderScheduler, formatMcpSummaryField(), getFirstScalarMcpFallback(), getMcpSummaryFromFields(), getMcpToolSummary(), getPathTail(), MCP_ARGUMENT_FIELDS, MCP_GENERIC_SUMMARY_FIELDS (+34 more)
+Nodes (31): PiCommandName, PiConfigurationDocument, PendingRequest, piRecord, PiRpcClient, resolvePiCommand(), resolvePiSdkCli(), appendPiContentBlocks() (+23 more)
 
 ### Community 63 - "Community 63"
-Cohesion: 0.06
-Nodes (32): arrayBuffersEqual(), BackupMetadata, cloneArrayBuffer(), DEFAULT_PLUGIN_UPDATE_PERSISTED_STATE, formatError(), isRecord(), normalizePersistedState(), PackageValidationError (+24 more)
+Cohesion: 0.07
+Nodes (43): logger, QuestionDockPendingRequestCommitOptions, QuestionDockPort, QuestionDockPresentationSyncOptions, QuestionDockQueueDeferredRequest, QuestionDockRenderStatePort, QuestionDockResolutionActionPort, QuestionDockResolutionApplyOptions (+35 more)
 
 ### Community 64 - "Community 64"
-Cohesion: 0.07
-Nodes (39): disposeCollapsiblesWithin(), ConversationHydrationRenderContext, ConversationTransitionSnapshot, LoadedConversationTransitionContext, ConversationKeyedReconcileDelegate, beginConversationRenderSurfacePass(), ConversationAssistantShellRenderPort, ConversationAssistantTailRenderPort (+31 more)
+Cohesion: 0.06
+Nodes (39): applyClaudeProviderPreset(), ClaudeProviderConfigLayer, ClaudeProviderConfigMutationError, ClaudeProviderConfigSnapshot, ClaudeProviderMutationOptions, ClaudeProviderPresetValidation, cloneJsonRecord(), isMissingFileError() (+31 more)
 
 ### Community 65 - "Community 65"
-Cohesion: 0.05
-Nodes (64): adapter, applyFilterLayerState(), BASE_PYRAMID_VERTICES, bounds2(), buildBackdropFilterValue(), buildFallbackBackdropFilterValue(), buildHullEdges(), CAMERA (+56 more)
+Cohesion: 0.07
+Nodes (42): AuthenticatedRestoreSlotResolution, CLAUDE_SETTINGS_PRIORITY, ClaudeSettingsSourceService, errorCode(), EVIDENCE_ABSENT, EVIDENCE_FAILED, EVIDENCE_VERIFIED, EVIDENCE_WRITTEN (+34 more)
 
 ### Community 66 - "Community 66"
 Cohesion: 0.07
-Nodes (54): MemoryExtractionOutcome, MemoryInjectionOutcome, assessHygiene(), buildHygieneNotice(), HygieneAssessment, MemoryInjectionPlan, MemorySkipReason, planMemoryInjection() (+46 more)
+Nodes (64): linkFileAtCommit(), renameFileAtCommit(), unlinkFileAtCommit(), AllowlistedFileSnapshotResult, archiveCurrentDeleted(), archiveCurrentOverwrite(), assertWithinAllowlistedRoot(), atomicCreateFile() (+56 more)
 
 ### Community 67 - "Community 67"
 Cohesion: 0.07
-Nodes (58): assembleModelCatalog(), assembleServerModelCatalog(), filterCatalogToProviderIds(), ModelCatalogAssemblyResult, ModelServerCatalogAssemblyResult, projectEffectiveCatalog(), ProviderAvailabilityProbePlan, ProviderAvailabilityProbePlanStatus (+50 more)
+Nodes (37): deriveAuditFingerprint(), deriveInstructionSummary(), RemoteControlAudit, RemoteControlAuditEvent, RemoteControlAuditOptions, RemoteControlInstructionDigest, RemoteControlRequestSource, deriveTokenFingerprint() (+29 more)
 
 ### Community 68 - "Community 68"
-Cohesion: 0.09
-Nodes (6): OpencodeConfigManager, OpencodeCompactionConfig, OpencodeConfig, PermissionAction, PermissionConfig, ToolPermission
+Cohesion: 0.06
+Nodes (41): QuestionInlineCardAction, QuestionInlineCardRendererHost, QuestionInlineCardRuntimeState, QuestionInputState, SingleQuestionAction, SingleQuestionPromptOptions, QuestionResolutionCoordinatorHost, StreamingInlineCardRuntimeState (+33 more)
 
 ### Community 69 - "Community 69"
-Cohesion: 0.09
-Nodes (18): ActiveTurnState, ArmedCapture, byteLength(), CodexSessionTraceService, logger, readTurnError(), CodexTraceRingBufferEntry, CODEX_TRACE_SCHEMA_VERSION (+10 more)
+Cohesion: 0.05
+Nodes (38): buildImageEmbedText(), buildImageGenerationRequest(), BuiltImageGenerationRequest, configText(), decodeBase64ToBytes(), decodeBodyText(), decodeImageGenerationResponse(), describeHttpFailure() (+30 more)
 
 ### Community 70 - "Community 70"
 Cohesion: 0.05
-Nodes (22): OpenCodeCatalogQueryCoordinatorDebugMetadata, AvailableModelsResult, cloneSettings(), deepClonePlain(), deepCloneValue(), isPlainRecord(), logger, ModelSummary (+14 more)
+Nodes (42): wireHiddenAdapters(), WireHiddenAdaptersOptions, CodexAdapterOptions, CodexCliResolution, CodexCliResolverEnv, CodexCliResolverOptions, expandHomeDirectory(), getCodexCliErrorMessage() (+34 more)
 
 ### Community 71 - "Community 71"
-Cohesion: 0.05
-Nodes (25): DiagnosticRunToken, ChatDiagnosticsBackendPorts, ChatDiagnosticsCoordinator, ChatDiagnosticsCoordinatorHost, ChatDiagnosticsCoordinatorViewHost, createChatDiagnosticsCoordinatorFactory(), failClosedChatDiagnosticsCoordinatorFactory, noTraceBackendPorts (+17 more)
+Cohesion: 0.09
+Nodes (47): appendSdkSignalChunk(), appendUsageChunk(), ClaudeCodeStreamNormalizer, ClaudeCodeStreamNormalizerOptions, ClaudeCodeStreamNormalizerState, createClaudeCodeStreamNormalizer(), isRecord(), isTextBlock() (+39 more)
 
 ### Community 72 - "Community 72"
-Cohesion: 0.09
-Nodes (48): appendSdkSignalChunk(), AppendToolUseChunkContext, appendUsageChunk(), ClaudeCodeStreamNormalizer, ClaudeCodeStreamNormalizerOptions, ClaudeCodeStreamNormalizerState, createClaudeCodeStreamNormalizer(), isRecord() (+40 more)
+Cohesion: 0.07
+Nodes (26): isPasswordFailure(), assessTextLayer(), checkAttachLimits(), ComposerContextActionAttachmentBuilderPort, ComposerContextActionService, ComposerContextPickerActionService, ComposerContextPickerActionServiceOptions, ComposerContextPickerAttachmentBuilderPort (+18 more)
 
 ### Community 73 - "Community 73"
-Cohesion: 0.08
-Nodes (20): cloneMessage(), clonePart(), cloneState(), isPlainRecord(), OpenCodeSessionStateStore, OpenCodeStreamMutation, OpenCodeCanonicalMessageInfo, OpenCodeCanonicalPart (+12 more)
-
-### Community 74 - "Community 74"
 Cohesion: 0.06
 Nodes (32): isSdkCapabilitySupportedByLookup(), classifyProbeFailure(), GlobalHealthEvidence, hasMinimumServer117Hint(), isFunction(), isRecord(), isVersionAtLeast117(), logger (+24 more)
 
+### Community 74 - "Community 74"
+Cohesion: 0.09
+Nodes (7): EditRevertActionResult, isMarkdownPath(), isRevertibleTextPath(), planRoundEvictions(), EditRevertService, EditRevertTurnBeginInfo, EditRevertWriteToolInfo
+
 ### Community 75 - "Community 75"
 Cohesion: 0.07
-Nodes (37): tokenize(), emptyManifest(), logger, shardPathFor(), VaultIndexService, yieldToLoop(), buildVaultIndexEntry(), chunkNote() (+29 more)
+Nodes (57): applyFilterLayerStyles(), applyShellStyles(), buildBackdropFilterValue(), buildEdgeBandWeight(), buildFallbackBackdropFilterValue(), buildFilterLayerBoxShadow(), captureDatasetSnapshot(), captureStyleSnapshot() (+49 more)
 
 ### Community 76 - "Community 76"
 Cohesion: 0.07
-Nodes (33): applyClaudeProviderPreset(), ClaudeProviderConfigSnapshot, ClaudeProviderPresetValidation, cloneJsonRecord(), isMissingFileError(), isOfficialPreset(), isRecord(), loadWritableSettings() (+25 more)
+Nodes (3): ChatAppearanceStyleGroup, SettingsStyleControls, SettingsStyleSection
 
 ### Community 77 - "Community 77"
-Cohesion: 0.07
-Nodes (35): AuthenticatedRestoreSlotResolution, CLAUDE_SETTINGS_PRIORITY, ClaudeSettingsSourceService, errorCode(), EVIDENCE_ABSENT, EVIDENCE_FAILED, EVIDENCE_VERIFIED, EVIDENCE_WRITTEN (+27 more)
-
-### Community 78 - "Community 78"
-Cohesion: 0.06
-Nodes (15): ChatHeaderPresenter, ChatHeaderPresenterHost, HeaderActionButtonConfig, logger, readActiveBackendFromPlugin(), readOpenCodianPlugin(), SERVER_STATUS_CLASS_NAMES, SERVER_STATUS_KEY_BY_AVAILABILITY (+7 more)
-
-### Community 79 - "Community 79"
 Cohesion: 0.08
 Nodes (58): applyBackdropFilterValue(), applyGlassTint(), applyInstanceMarker(), applyShellInteractiveStyles(), buildFallbackBackdropFilterValue(), buildSvgBackdropFilterValue(), clamp(), cleanupInstanceArtifacts() (+50 more)
 
+### Community 78 - "Community 78"
+Cohesion: 0.11
+Nodes (11): ArmedCapture, OpenCodeSessionTraceService, OpenCodeBootstrapContext, OpenCodeDiagnosticRunToken, OpenCodeTraceChannelId, OpenCodeTraceContext, OpenCodeTraceEventLink, OpenCodeTraceEventV1 (+3 more)
+
+### Community 79 - "Community 79"
+Cohesion: 0.06
+Nodes (47): buildFuzzyProviderIdCandidates(), BUILTIN_ICON_BY_SOURCE, BUILTIN_ICON_DEFINITIONS, BuiltinIconDefinition, computeMatchScore(), createDefinition(), findBuiltinIcon(), formatBuiltinSource() (+39 more)
+
+### Community 80 - "Community 80"
+Cohesion: 0.05
+Nodes (3): OpenCodeCatalogQueryCoordinator, McpServerStatus, McpServerActionContext
+
 ### Community 81 - "Community 81"
+Cohesion: 0.05
+Nodes (25): AvailableModelDirectory, buildContextUsageSnapshot(), buildMessageLevelContextUsageSnapshot(), buildOpenCodeCurrentContextUsage(), buildSessionLevelContextUsageSnapshot(), buildTokenBreakdown(), findLatestAssistantWithTokens(), ModelMetadata (+17 more)
+
+### Community 83 - "Community 83"
+Cohesion: 0.10
+Nodes (19): cloneMessage(), clonePart(), cloneState(), isPlainRecord(), OpenCodeSessionStateStore, OpenCodeStreamMutation, OpenCodeCanonicalMessageInfo, OpenCodeCanonicalPart (+11 more)
+
+### Community 84 - "Community 84"
+Cohesion: 0.07
+Nodes (7): PiAdapter, PiAvailableThinkingLevelsResult, PiExtensionStatusSnapshot, PiModelInfo, PiUnavailableCommandResult, PiSessionInfo, PiSessionStore
+
+### Community 85 - "Community 85"
 Cohesion: 0.05
 Nodes (53): ASSISTANT_DEBUG_STAGE_ALLOWLIST, buildTrailingAssistantPatchCompletionDebugLogPlan(), buildTrailingAssistantPatchDebugFinalLogInputs(), buildTrailingAssistantPatchDebugFinalLogInputsContract(), buildTrailingAssistantPatchDebugFinalLogPayload(), buildTrailingAssistantPatchDebugFinalLogPayloadContractFromInputs(), buildTrailingAssistantPatchDebugFinalLogPlan(), buildTrailingAssistantPatchDebugFinalLogPlanContract() (+45 more)
 
-### Community 82 - "Community 82"
-Cohesion: 0.08
-Nodes (20): AUTH_ERROR_PATTERNS, detectMcpAuthError(), applyMcpRetryOutcome(), cssEscape(), getMcpServerName(), McpAuthOutcome, McpRetryOutcome, renderMcpExpandedContent() (+12 more)
-
-### Community 83 - "Community 83"
-Cohesion: 0.07
-Nodes (25): AssistantMessageResponse, SessionShellInput, logger, OpenCodeSessionLifecycleCoordinatorHost, OpenCodeSessionLifecycleSdk, OpenCodeSessionLifecycleSyncRuntime, SessionStatusUpdate, SessionTodoUpdate (+17 more)
-
-### Community 84 - "Community 84"
-Cohesion: 0.09
-Nodes (10): ModelConfigModal, parseAddProviderJsonDraft(), resolveModelConfigJsonDraftValue(), tryParseAddProviderJsonDraft(), ModelConfigSavePlan, createEmptyProvider(), hydrateWorkspaceState(), ProviderFormState (+2 more)
-
-### Community 85 - "Community 85"
-Cohesion: 0.07
-Nodes (26): ClaudeCodePermissionBridgeHostContext, ChatOpenCodeService, ChatPluginPort, ChatPluginSettings, ConversationCachePinProvider, OpenCodianSettingsRuntimeCoordinator, TabRuntimePluginSource, BUILTIN_THEME_PRESETS (+18 more)
-
 ### Community 86 - "Community 86"
-Cohesion: 0.09
-Nodes (52): findBuiltinIcon(), getBuiltinIcon(), getModelsDevLogoUrl(), parseBuiltinSource(), assetToDataUrl(), createResolvedAsset(), failedIconIds, getCachePathForEntry() (+44 more)
-
-### Community 87 - "Community 87"
-Cohesion: 0.07
-Nodes (50): AttemptOptions, CodexModelSummary, classifyReminderType(), detectOmoMessageMeta(), detectSystemReminder(), detectUserInjection(), getFirstMeaningfulLine(), normalizeMultilineText() (+42 more)
-
-### Community 88 - "Community 88"
-Cohesion: 0.06
-Nodes (22): AssistantErrorRenderer, AssistantNoticeRenderHost, renderAssistantNoticeCardAndFooter(), renderAssistantPlaceholderAsNotice(), renderPersistedAssistantNotice(), AssistantPlainTextFallbackRenderOptions, renderAssistantPlainTextFallbackContent(), AssistantShellRenderer (+14 more)
-
-### Community 89 - "Community 89"
 Cohesion: 0.07
 Nodes (20): ContextFileCatalogBuildRunner, ContextFileCatalogBuildRunnerOptions, compareContextFileEntries(), ContextFileCatalog, ContextFileCatalogIndex, ContextFileEntry, ContextFileExtensionBucket, createContextFileEntry() (+12 more)
 
+### Community 88 - "Community 88"
+Cohesion: 0.08
+Nodes (39): SlashCommandCatalogSource, buildObjectReplacementPatch(), buildProjectAgentOptionsPatch(), buildProjectAgentPermissionPatch(), buildProjectAgentToolsPatch(), buildTaskAllowlistPermission(), cloneJsonValue(), cloneOptions() (+31 more)
+
+### Community 89 - "Community 89"
+Cohesion: 0.08
+Nodes (32): emptyManifest(), logger, shardPathFor(), VaultIndexService, yieldToLoop(), buildVaultIndexEntry(), chunkNote(), collectHeadingLineNumbers() (+24 more)
+
 ### Community 90 - "Community 90"
-Cohesion: 0.07
-Nodes (52): buildExtractionSystemPrompt(), buildExtractionUserPrompt(), countUserProse(), evaluateExtractionGate(), ExtractionMemory, extractionSourceTag(), ExtractionTranscriptLine, fileTouchesOfMessage() (+44 more)
-
-### Community 91 - "Community 91"
-Cohesion: 0.05
-Nodes (31): ComposerContextEventBridge, ComposerContextLifecycleBridge, ComposerContextGroupsPort, ComposerContextPickerActionService, ComposerContextPickerActionServiceOptions, ComposerContextPickerAttachmentBuilderPort, ComposerContextPickerCatalogPort, ComposerContextPickerServerContextPort (+23 more)
-
-### Community 92 - "Community 92"
-Cohesion: 0.06
-Nodes (3): OpenCodeCatalogQueryCoordinator, McpServerStatus, McpServerStatusModalOptions
-
-### Community 94 - "Community 94"
-Cohesion: 0.08
-Nodes (52): applyFilterLayerStyles(), applyShellStyles(), buildBackdropFilterValue(), buildEdgeBandWeight(), buildFallbackBackdropFilterValue(), buildFilterLayerBoxShadow(), captureDatasetSnapshot(), captureStyleSnapshot() (+44 more)
-
-### Community 95 - "Community 95"
-Cohesion: 0.09
-Nodes (19): CodexStreamNormalizer, CodexStreamNormalizerOptions, CodexStreamNormalizerState, createCodexStreamNormalizer(), takeSuffix(), tryParseJson(), StreamChunk, ZCodeActiveRun (+11 more)
-
-### Community 96 - "Community 96"
-Cohesion: 0.09
-Nodes (39): isRecord(), SlashCommandCatalogSource, buildObjectReplacementPatch(), buildProjectAgentOptionsPatch(), buildProjectAgentPermissionPatch(), buildProjectAgentToolsPatch(), buildTaskAllowlistPermission(), cloneJsonValue() (+31 more)
-
-### Community 97 - "Community 97"
-Cohesion: 0.06
-Nodes (30): AVAILABILITY_REASON_KEYS, AvailabilityKind, CapabilityDisclosureRowOptions, CapabilityStatusTone, describeCapabilityAvailability(), isUnsupportedResult(), localizeCapabilityReason(), queryCapabilities() (+22 more)
-
-### Community 99 - "Community 99"
-Cohesion: 0.08
-Nodes (11): ArchiveHistoryTarget, OpencodeConfigSourceScope, isConflict(), isSuccess(), logger, OpencodeConfigModal, OpencodeConfigModalOptions, pathBasename() (+3 more)
-
-### Community 100 - "Community 100"
-Cohesion: 0.07
-Nodes (33): channelCallbacks, createPromptSuggestionChannel(), globalSessionCallbacks, onPromptSuggestionSessionChange(), onPromptSuggestionSinkChange(), PromptSuggestionSink, SessionCallback, SinkChangeCallback (+25 more)
-
-### Community 101 - "Community 101"
-Cohesion: 0.06
-Nodes (20): createFocusContextPreview(), resolveFocusContextPreview(), ContextPickerFocusPreviewPort, ContextPickerFocusRuntimePort, ContextPickerInteractionBridge, FocusContextEventBridgeHost, FocusContextEventPreviewPort, FocusContextEventRuntimePort (+12 more)
-
-### Community 102 - "Community 102"
-Cohesion: 0.08
-Nodes (27): addPricedTokens(), buildUnpricedCostDetails(), CostAccumulator, EffectivePricing, hasConfiguredRate(), inferProviderId(), isRecord(), JsonRecord (+19 more)
-
-### Community 103 - "Community 103"
-Cohesion: 0.09
-Nodes (15): expandHomeDir(), MemoryBackendService, compactionMarkerCount(), formatTranscriptForPrompt(), toExtractionLines(), MemoryInjectionRequest, MemoryLintReport, MemoryForgetNameModal (+7 more)
-
-### Community 104 - "Community 104"
 Cohesion: 0.10
 Nodes (3): ChatSelectionControlsCoordinator, getActiveCodexView(), readActiveBackendFromPlugin()
 
-### Community 105 - "Community 105"
+### Community 91 - "Community 91"
+Cohesion: 0.09
+Nodes (9): ExistingServerProcessInfo, LocalSidecarEndpointResolverRuntime, ManagedServerAdoptionOutcome, OccupiedLocalEndpointResolution, SidecarCommandClassification, ServerManager, ManagedServerState, ServerDiagnostics (+1 more)
+
+### Community 92 - "Community 92"
+Cohesion: 0.06
+Nodes (20): createFocusContextPreview(), resolveFocusContextPreview(), ContextPickerFocusPreviewPort, ContextPickerFocusRuntimePort, ContextPickerInteractionBridge, FocusContextEventBridgeHost, FocusContextEventPreviewPort, FocusContextEventRuntimePort (+12 more)
+
+### Community 93 - "Community 93"
+Cohesion: 0.08
+Nodes (43): ContextGroupAttachCandidate, ContextGroupAttachPlan, ContextGroupAttachPlanOptions, ContextGroupResolvedEntry, ContextGroupSummary, summarizeContextGroup(), asNonEmptyString(), buildSidebarModel() (+35 more)
+
+### Community 94 - "Community 94"
 Cohesion: 0.08
 Nodes (23): buildComposerContextChipStates(), ComposerContextChipState, FocusContextPreview, getContextTargetKey(), getPromptContextTargetKey(), removeDraftContextItemsByTarget(), upsertDraftContextItem(), ComposerContextActionServiceHost (+15 more)
 
+### Community 95 - "Community 95"
+Cohesion: 0.05
+Nodes (44): AVAILABILITY_REASON_KEYS, AvailabilityKind, CapabilityStatusTone, describeCapabilityAvailability(), isUnsupportedResult(), localizeCapabilityReason(), queryCapabilities(), renderCapabilityDisclosureRows() (+36 more)
+
+### Community 96 - "Community 96"
+Cohesion: 0.08
+Nodes (39): formatMcpSummaryField(), getFirstScalarMcpFallback(), getMcpSummaryFromFields(), getMcpToolSummary(), getPathTail(), MCP_ARGUMENT_FIELDS, MCP_GENERIC_SUMMARY_FIELDS, MCP_PATH_LIKE_FIELDS (+31 more)
+
+### Community 97 - "Community 97"
+Cohesion: 0.09
+Nodes (33): PENDING_MESSAGES, PendingIndicatorController, extractStructuredOutputTrigger(), logger, SendPipelineHostDependencies, SendPipelineRuntime, SendPipelineSlashCommandPort, shouldRefreshOpenCodeDiagnosticsHeader() (+25 more)
+
+### Community 98 - "Community 98"
+Cohesion: 0.07
+Nodes (38): auxFetchTransport(), AuxHttpRequest, AuxHttpResponse, AuxTransport, accumulateAssistantText(), AUX_IMAGE_EXTENSIONS, collectToolCalls(), isAbortError() (+30 more)
+
+### Community 99 - "Community 99"
+Cohesion: 0.08
+Nodes (39): ClaudeCodeElicitationCardRenderer, ClaudeCodePermissionCardRenderer, ClaudeCodeQuestionCardRenderer, createClaudeCodePermissionBridgeHost(), PermissionRequestChunk, buildAskUserQuestionInput(), ClaudeCodeApprovalDecision, ClaudeCodePermissionBridge (+31 more)
+
+### Community 100 - "Community 100"
+Cohesion: 0.07
+Nodes (26): CodexAppServerWireObserver, CodexDebugSettingsPort, ClaudeTraceRingBufferEntry, ActiveTurnState, ArmedCapture, byteLength(), CodexSessionTraceServiceOptions, logger (+18 more)
+
+### Community 101 - "Community 101"
+Cohesion: 0.07
+Nodes (30): ImageGenerationMimeType, hasParentDirectorySegment(), isAbsoluteFilePath(), isSafeVaultRelativePath(), sanitizeVaultFileBaseName(), toVaultRelativePath(), ATTACHMENT_EXTENSIONS, buildConversationMarkdown() (+22 more)
+
+### Community 102 - "Community 102"
+Cohesion: 0.10
+Nodes (5): OpencodeConfigSourceCandidate, ModelConfigModal, createModelConfigModalSnapshot(), ModelConfigSavePlan, createEmptyProvider()
+
+### Community 103 - "Community 103"
+Cohesion: 0.07
+Nodes (28): MergeSlashCommandCatalogOptions, SessionCommandInput, SessionCommandTemplateContext, executeCompactSession(), collectRuntimeSkillNames(), CompactSessionOpenCodeService, expandMdFileCommandTemplate(), extractAgentFromArguments() (+20 more)
+
+### Community 104 - "Community 104"
+Cohesion: 0.07
+Nodes (10): cloneSettings(), cloneSettings(), OpenCodeServiceLifecycleCoordinator, OpenCodeSettingsRestartDecision, OpenCodeSettingsUpdatePlan, resolveSdkFeatureFlags(), InlineEditSettingsHost, LoadSettingsFileOptions (+2 more)
+
 ### Community 106 - "Community 106"
-Cohesion: 0.06
-Nodes (39): createClaudeTraceDiagnosticsPort(), createCodexTraceDiagnosticsPort(), createOpenCodeTraceDiagnosticsPort(), getSettingPageCtor(), advanceHighlight(), DropdownKeydownContext, enhancedSelects, enhanceSettingsDropdownComponent() (+31 more)
+Cohesion: 0.08
+Nodes (38): DiamondProjectedFace, applyDisplacementSnapshot(), applyHostTransform(), buildBackdropFilterValue(), buildFallbackBackdropFilterValue(), clamp(), createFaceSvgElement(), createStageLayerElement() (+30 more)
 
 ### Community 107 - "Community 107"
-Cohesion: 0.06
-Nodes (23): AvailableModelDirectory, buildContextUsageSnapshot(), buildMessageLevelContextUsageSnapshot(), buildOpenCodeCurrentContextUsage(), buildSessionLevelContextUsageSnapshot(), buildTokenBreakdown(), findLatestAssistantWithTokens(), ModelMetadata (+15 more)
+Cohesion: 0.08
+Nodes (23): AppServerStreamMapResult, addPricedTokens(), buildUnpricedCostDetails(), CostAccumulator, hasConfiguredRate(), inferProviderId(), isRecord(), JsonRecord (+15 more)
 
 ### Community 108 - "Community 108"
 Cohesion: 0.08
-Nodes (40): ClaudeCodeElicitationCardRenderer, ClaudeCodePermissionCardRenderer, ClaudeCodeQuestionCardRenderer, createClaudeCodePermissionBridgeHost(), PermissionRequestChunk, buildAskUserQuestionInput(), ClaudeCodeApprovalDecision, ClaudeCodeCanUseToolContext (+32 more)
+Nodes (36): ArchiveHistoryEntrySummary, safeWriteFile(), applyTomlScalarEdits(), ARRAY_STRING_KEYS, buildProjectConfigEdits(), CODEX_PROJECT_ALLOWED_ARRAY_KEYS, CODEX_PROJECT_ALLOWED_KEYS, CODEX_PROJECT_ALLOWED_SCALAR_KEYS (+28 more)
 
 ### Community 109 - "Community 109"
-Cohesion: 0.07
-Nodes (6): extractRenderableToolMetadata(), getDebugTextPreview(), OpenCodeStreamEventTransformer, resolveReasoningDurationSeconds(), resolveToolResultVisibility(), isInternalStructuredOutputTool()
+Cohesion: 0.08
+Nodes (35): buildCommandScopedAgent(), cloneConfigObject(), cloneConfigValue(), getCommandScopedAgentId(), getCommandScopedAgentMetadata(), isCommandScopedAgentForCommand(), isCommandScopedAgentId(), mergeConfigObjects() (+27 more)
 
 ### Community 110 - "Community 110"
-Cohesion: 0.08
-Nodes (45): ContextGroupAttachCandidate, ContextGroupAttachPlan, ContextGroupAttachPlanOptions, ContextGroupResolvedEntry, ContextGroupSummary, summarizeContextGroup(), asNonEmptyString(), buildSidebarModel() (+37 more)
+Cohesion: 0.10
+Nodes (28): clearProviderIconCache(), getProviderCacheEntries(), getProviderIconCacheState(), resolveProviderIconUrl(), warmProviderIcons(), selectBuiltinIcon(), areEquivalentProviderIconEntries(), createBuiltinEntry() (+20 more)
 
 ### Community 111 - "Community 111"
-Cohesion: 0.06
-Nodes (38): ClaudeCodeDebugPanelRenderOptions, CodexDebugPanelRenderOptions, OpenCodeDebugPanelRenderOptions, ClaudeCodeDebugPanelOptions, ClaudeCodeDebugSettingsPort, ClaudeTraceDiagnosticsPort, CodexDebugPanelOptions, CodexDebugSettingsPort (+30 more)
-
-### Community 112 - "Community 112"
 Cohesion: 0.07
-Nodes (23): InlineEditInputOverlay, syncInlineEditConfigChip(), syncInlineEditImageGenChip(), bindInlineEditOverlayDismissal(), escapeAnchors, InlineEditDismissalHandlers, InlineEditDismissalHost, verdictFor() (+15 more)
+Nodes (21): CatalogRelevantEventPayload, deepCloneJsonLike(), EVENT_SOURCES, logger, OpenCodeEventListener, OpenCodeEventSource, OpenCodeEventSubscriptionCoordinator, OpenCodeEventSubscriptionCoordinatorHost (+13 more)
 
 ### Community 113 - "Community 113"
-Cohesion: 0.08
-Nodes (29): ImageGenerationMimeType, isSafeVaultRelativePath(), sanitizeVaultFileBaseName(), ATTACHMENT_EXTENSIONS, buildConversationMarkdown(), BuildConversationMarkdownResult, formatLocalDateTime(), formatToolInput() (+21 more)
+Cohesion: 0.09
+Nodes (5): MarkdownAgentWorkspaceService, SurfaceAgent, SurfaceAgentFile, SettingsAgentsSection, OpencodeAgentMode
 
 ### Community 114 - "Community 114"
 Cohesion: 0.08
-Nodes (36): ArchiveHistoryEntrySummary, safeWriteFile(), applyTomlScalarEdits(), ARRAY_STRING_KEYS, buildProjectConfigEdits(), CODEX_PROJECT_ALLOWED_ARRAY_KEYS, CODEX_PROJECT_ALLOWED_KEYS, CODEX_PROJECT_ALLOWED_SCALAR_KEYS (+28 more)
+Nodes (7): ClaudeCodeRuntimeAbortController, normalizeRuntimeCatalogAgents(), normalizeRuntimeCatalogCommands(), resolveSendOptionOverrides(), summarizeError(), summarizeSendOptions(), registerPromptSuggestionSink()
 
 ### Community 115 - "Community 115"
-Cohesion: 0.10
-Nodes (30): PENDING_MESSAGES, PendingIndicatorController, extractStructuredOutputTrigger(), logger, SendPipelineHostDependencies, SendPipelineRuntime, SendPipelineSlashCommandPort, STRUCTURED_OUTPUT_FIXED_SCHEMA (+22 more)
+Cohesion: 0.09
+Nodes (15): ContextBreakdownCharCounts, ContextBreakdownTokenMap, ContextDisplayTokenBreakdown, ContextUsageSummary, ContextModelInfo, ContextSessionInfo, ContextUsageService, TimestampRefreshMode (+7 more)
 
 ### Community 117 - "Community 117"
-Cohesion: 0.09
-Nodes (27): buildInterruptedAssistantNotice(), buildStreamErrorNotice(), applyCodexNativeTextSnapshot(), buildLocalStreamOutcome(), logger, logInterruptedAssistantPersistence(), logInterruptedNoticePersistence(), markCanonicalAssistantTakeoverPending() (+19 more)
+Cohesion: 0.10
+Nodes (40): assembleModelCatalog(), assembleServerModelCatalog(), filterCatalogToProviderIds(), projectEffectiveCatalog(), ProviderAvailabilityProbePlan, ProviderAvailabilityProbePlanStatus, ProviderDirectoryRuntimeResult, resolveProviderAvailabilityProbePlan() (+32 more)
 
 ### Community 118 - "Community 118"
-Cohesion: 0.08
-Nodes (15): getActiveSecondaryTabId(), LEGACY_PRIMARY_TAB_ID_MAP, LEGACY_SECONDARY_TAB_ID_MAP, PRIMARY_TAB_MAP, resolvePrimaryTabId(), resolveSecondaryTabId(), SETTINGS_PRIMARY_TABS, SettingsPrimaryTab (+7 more)
+Cohesion: 0.14
+Nodes (4): CodexSessionTraceService, CodexDiagnosticRunToken, CodexTraceContext, CodexTraceEventV1
 
 ### Community 119 - "Community 119"
 Cohesion: 0.08
-Nodes (4): AppServerPluginMarketplaceEntry, AppServerPluginSummary, SettingsCodexPluginsSection, SettingsCodexSection
+Nodes (19): AppServerMcpResource, AppServerMcpResourceReadResult, AppServerMcpServerStatus, McpOauthLoginResult, CodexMcpServerDetailAdapterLike, CodexMcpServerDetailModal, CodexMcpServerDetailModalHost, McpModalState (+11 more)
 
 ### Community 120 - "Community 120"
 Cohesion: 0.09
-Nodes (27): BatchExecuteOutcome, BatchOrganizeCoordinator, BatchPreview, BatchPreviewOutcome, BatchRevertResult, logger, sanitizeFrontmatter(), scopeNeedsContent() (+19 more)
+Nodes (3): getDebugTextPreview(), OpenCodeStreamEventTransformer, resolveReasoningDurationSeconds()
 
 ### Community 121 - "Community 121"
-Cohesion: 0.10
-Nodes (18): isPasswordFailure(), assessTextLayer(), checkAttachLimits(), ComposerContextActionAttachmentBuilderPort, ComposerContextActionService, ContextAttachmentBuilder, FileContextKind, logger (+10 more)
+Cohesion: 0.06
+Nodes (26): ComposerContextEventBridge, ComposerContextLifecycleBridge, ComposerContextGroupsPort, ComposerContextPickerServerContextPort, ComposerContextActionPort, ComposerContextAttachmentBuilderPort, ComposerContextCoordinatorPort, ComposerContextFileCatalogPort (+18 more)
 
 ### Community 122 - "Community 122"
 Cohesion: 0.07
-Nodes (43): ClaudeCodeDebugChannelSettings, DEBUG_MODULE_KEYS, DEBUG_MODULE_REGISTRY, DEBUG_MODULE_SCOPE_PATTERNS, DebugModuleDefinition, DebugModuleSettings, getDefaultClaudeCodeDebugChannelSettings(), getDefaultDebugModuleSettings() (+35 more)
+Nodes (25): MdCommandEntry, getAttachedOpenCodeAppAgents(), OPEN_CODE_APP_AGENTS_PROMISE_KEY, OpenCodeAppAgentsCarrier, collectMarkdownFiles(), CommandMdFile, loadCommandsFromConfigDir(), loadCommandsFromMdFiles() (+17 more)
+
+### Community 123 - "Community 123"
+Cohesion: 0.10
+Nodes (32): logger, OpenCodeContextPartSerializer, OpenCodeContextPartSerializerHost, utf8ByteLength(), PromptRequestPart, contextPathFromFileUrl(), isAbsoluteContextPath(), isWindowsDrivePath() (+24 more)
 
 ### Community 124 - "Community 124"
-Cohesion: 0.10
-Nodes (34): logger, OpenCodeContextPartSerializer, OpenCodeContextPartSerializerHost, utf8ByteLength(), PromptRequestPart, contextPathFromFileUrl(), isAbsoluteContextPath(), isWindowsDrivePath() (+26 more)
+Cohesion: 0.09
+Nodes (8): LinkedNoteSidebarState, EditRevertPreview, EditRevertSidebarModel, SessionDiffEntry, EditRevertPreviewModalOptions, ModifiedFilesRevertActions, ModifiedFilesSidebar, ModifiedFilesSidebarAvailability
 
 ### Community 125 - "Community 125"
-Cohesion: 0.10
-Nodes (6): MarkdownAgentFs, SystemAgentGuardService, SurfaceAgent, SurfaceAgentFile, SettingsAgentsSection, OpencodeAgentMode
+Cohesion: 0.09
+Nodes (41): buildTrailingAssistantPatchCompletionDebugPlan(), buildTrailingAssistantPatchCompletionDebugPlanFromTailOutcomePlanningContext(), buildTrailingAssistantPatchCompletionDebugPlanningContext(), buildTrailingAssistantPatchCompletionDebugPlanningContextInputs(), buildTrailingAssistantPatchCompletionDebugPlanningContextShape(), buildTrailingAssistantPatchCompletionDebugPlanningContextSourceContract(), buildTrailingAssistantPatchCompletionDebugSourceContractFromTailOutcomePlanningContext(), buildTrailingAssistantPatchCompletionDebugSummaryPlan() (+33 more)
 
 ### Community 126 - "Community 126"
-Cohesion: 0.09
-Nodes (15): MergeSlashCommandCatalogOptions, SlashCommandCatalogEntry, appendSyntheticBuiltinCommands(), SYNTHETIC_BUILTIN_COMMAND_IDS, buildNextHiddenSlashCommands(), CommandCatalogRenderContext, logger, SettingsCommandsSection (+7 more)
+Cohesion: 0.08
+Nodes (28): buildConversationMetaFromStoredRecord(), ConversationListDiagnosticEntry, ConversationMetadataAdapter, ConversationMetadataCache, ConversationMetaEnvelope, getUtf8ByteLength(), logger, MutableConversationListDiagnostics (+20 more)
 
 ### Community 127 - "Community 127"
-Cohesion: 0.06
-Nodes (31): extractStructuredErrorMessage(), extractStructuredErrorName(), inferSseEventName(), OpenCodeStreamEvent, OpenCodeStreamEventOutcome, OpenCodeStreamEventTransformerHost, OpenCodeStreamingEventHandler, OpenCodeStreamingEventHandlerContext (+23 more)
+Cohesion: 0.09
+Nodes (4): CodexDebugPanel, OpenCodeDebugPanel, getElectronDialog(), SettingsDebugSection
 
 ### Community 128 - "Community 128"
-Cohesion: 0.08
-Nodes (18): AgentMentionCandidateService, AgentMentionCandidateServiceHost, normalizeRuntimeAgents(), AgentMentionCandidate, AgentMentionComposerController, AgentMentionComposerControllerHost, AgentMentionMode, AgentMentionPillSpan (+10 more)
+Cohesion: 0.12
+Nodes (41): getModelsDevLogoUrl(), parseBuiltinSource(), assetToDataUrl(), createResolvedAsset(), failedIconIds, getCachePathForEntry(), getEntryRuntimeKey(), inFlightIconLoads (+33 more)
 
 ### Community 129 - "Community 129"
-Cohesion: 0.08
-Nodes (25): AssistantCopyContentSource, extractAssistantStructuredTextCopyContent(), resolveAssistantCopyContent(), AssistantErrorRendererHost, AssistantStreamErrorRenderOptions, AssistantErrorFooterPayloadOptions, AssistantFooterPayload, AssistantNoticeFooterPayloadOptions (+17 more)
+Cohesion: 0.07
+Nodes (33): executeInlineEditAccept(), InlineEditAcceptDeps, InlineEditAcceptEdit, buildInlineEditAnchor(), rebuildAnchorForMode(), InlineEditEditorContext, InlineEditOpenOptions, InlineEditPhase (+25 more)
+
+### Community 130 - "Community 130"
+Cohesion: 0.07
+Nodes (40): applyTrailingAssistantPatchTailState(), buildTrailingAssistantPatchExecutionPlan(), buildTrailingAssistantPatchExecutionPlanFromExecutionTailPlanningContext(), buildTrailingAssistantPatchExecutionTailInputs(), buildTrailingAssistantPatchExecutionTailPlanningContext(), buildTrailingAssistantPatchExecutionTailPlanningContextFromInputs(), buildTrailingAssistantPatchExecutionTailPlanParts(), buildTrailingAssistantPatchExecutionTailPlanPartsFromExecutionTailPlanningContext() (+32 more)
 
 ### Community 131 - "Community 131"
-Cohesion: 0.08
-Nodes (17): checkMemorySyncTreeRoot(), ensureGitFileLines(), ensureMemorySyncRepo(), git(), GITATTRIBUTES_REQUIRED, GITIGNORE_REQUIRED, MemoryGitSyncService, MemorySyncResult (+9 more)
-
-### Community 132 - "Community 132"
 Cohesion: 0.09
-Nodes (30): auxFetchTransport(), AuxHttpRequest, AuxHttpResponse, AuxTransport, buildExternalDirectoryPatterns(), buildScopeConfig(), delay(), escapeGlob() (+22 more)
-
-### Community 133 - "Community 133"
-Cohesion: 0.09
-Nodes (18): AppServerMcpResource, AppServerMcpServerStatus, CodexMcpServerDetailAdapterLike, CodexMcpServerDetailModal, CodexMcpServerDetailModalHost, createCodexMcpServerDetailHost(), McpModalState, ExpandedState (+10 more)
-
-### Community 134 - "Community 134"
-Cohesion: 0.08
-Nodes (24): buildChatAppearanceCustomCss(), fontLoader, getChatAppearanceBackgroundSizeValue(), getChatAppearanceCssVariables(), ChatSurfaceAppearanceCoordinator, canInjectAsLink(), CN_FONT_OPTIONS, CSP_LINK_ALLOWED_ORIGINS (+16 more)
+Nodes (11): filterModelPickerGroups(), findModelPickerOption(), findModelPickerOptionByRef(), ModelPickerGroup, ModelPickerOption, ModelPickerModal, ModelPickerModalOptions, describeModelCatalogComparison() (+3 more)
 
 ### Community 135 - "Community 135"
-Cohesion: 0.07
-Nodes (31): MdCommandEntry, SessionCommandInput, collectMarkdownFiles(), CommandMdFile, loadCommandsFromConfigDir(), loadCommandsFromMdFiles(), logger, parseFrontmatter() (+23 more)
+Cohesion: 0.09
+Nodes (30): Locale, buildInlineEditImageNote(), buildInlineEditRequest(), buildInlineEditRequestForAnchor(), buildInlineEditSystemPrompt(), classifyInlineEditClarification(), describeInlineEditFailure(), escapeXmlAttribute() (+22 more)
 
 ### Community 136 - "Community 136"
 Cohesion: 0.11
 Nodes (27): buildFragmentWithLinks(), createWikilinkElement(), createWikilinkPattern(), extractLinkTarget(), fileExistsInVault(), findWikilinks(), processFileLinks(), ProcessFileLinksOptions (+19 more)
 
-### Community 138 - "Community 138"
+### Community 137 - "Community 137"
 Cohesion: 0.07
 Nodes (39): buildClipPath(), CAMERA_FORWARD, CAMERA_RIGHT, CAMERA_TAN_HALF_FOV, CAMERA_UP, clamp(), computeBounds(), convexHull() (+31 more)
 
+### Community 138 - "Community 138"
+Cohesion: 0.11
+Nodes (27): BuiltinIconLibraryId, BuiltinIconLobehubMetadata, LobehubCachePathOptions, ProviderIconEntryResolution, BuiltinIconOption, LobehubIconPreviewState, ProviderIconAssetCandidate, ProviderIconCacheEntry (+19 more)
+
 ### Community 139 - "Community 139"
-Cohesion: 0.07
-Nodes (21): ConversationHydrationOutcomeBridge, ConversationHydrationOutcomeBridgeHost, getOpenCodeActivationSessionId(), TabConversationStatePort, TabViewActivationPort, ConversationHydrationRenderBridge, ConversationHydrationRenderBridgeHost, ConversationHydrationRenderPort (+13 more)
+Cohesion: 0.08
+Nodes (28): attachContextEntryToEdit(), attachContextGroupById(), attachContextGroupToEdit(), attachImageToEdit(), buildContextGroupAttachNotices(), contextPickerCandidates(), InlineEditAttachmentCoordinator, InlineEditAttachmentCoordinatorDeps (+20 more)
 
 ### Community 140 - "Community 140"
 Cohesion: 0.09
-Nodes (15): logger, normalizeDiffEntries(), normalizeMessageInfo(), normalizePart(), OpenCodeSyncEventRuntimeCoordinator, OpenCodeSyncEventRuntimeCoordinatorHost, RawSyncEvent, RawSyncEventProperties (+7 more)
+Nodes (19): OpenCodeCatalogToolIdentityContext, OpenCodeAgentPart, OpenCodeAgentSourceSpan, OpenCodeChatRole, OpenCodeFilePart, OpenCodeMessagePart, OpenCodeTextPart, extractRenderableToolMetadata() (+11 more)
 
 ### Community 141 - "Community 141"
 Cohesion: 0.09
-Nodes (5): OpenCodeDebugPanel, getElectronDialog(), SettingsDebugSection, getRecentLogEntries(), getRecentLogTextForEntries()
+Nodes (15): logger, normalizeDiffEntries(), normalizeMessageInfo(), normalizePart(), OpenCodeSyncEventRuntimeCoordinator, OpenCodeSyncEventRuntimeCoordinatorHost, RawSyncEvent, RawSyncEventProperties (+7 more)
 
 ### Community 142 - "Community 142"
-Cohesion: 0.10
-Nodes (14): byteLength(), defaultUserDataDirectory(), resolveDefaultTraceDirectory(), sha256(), TraceRedactionResult, TraceRedactionStats, TraceRedactor, TraceRedactorOptions (+6 more)
+Cohesion: 0.09
+Nodes (15): checkMemorySyncTreeRoot(), ensureGitFileLines(), ensureMemorySyncRepo(), git(), GITATTRIBUTES_REQUIRED, GITIGNORE_REQUIRED, MemoryGitSyncService, MemorySyncResult (+7 more)
 
 ### Community 143 - "Community 143"
-Cohesion: 0.07
-Nodes (31): buildFuzzyProviderIdCandidates(), BUILTIN_ICON_BY_SOURCE, BUILTIN_ICON_DEFINITIONS, BuiltinIconDefinition, computeMatchScore(), createDefinition(), FUZZY_DROPPABLE_SEGMENTS, FUZZY_GENERIC_TOKENS (+23 more)
+Cohesion: 0.11
+Nodes (21): SlashCommandMenuItem, replaceSlashTokenAtCursor(), SlashCommandMenuQuery, SlashCommandMenuCoordinator, SlashCommandMenuCoordinatorHost, buildSkillsCommandMenuItem(), extractSkillsQuery(), filterFuzzySlashCommandMenuItems() (+13 more)
 
 ### Community 144 - "Community 144"
-Cohesion: 0.09
-Nodes (26): setBackfillPersistenceHost(), ConversationWriteCommitOptions, ConversationWriteCommitResult, ConversationWriteQueueDepthDiagnostic, ConversationWriteQueueRejectedDiagnostic, ConversationWriteQueueTimeoutDiagnostic, ConversationWriteSerializationOptions, ConversationWriteSerializationState (+18 more)
+Cohesion: 0.10
+Nodes (18): ActiveRunState, logger, OpenCodeSessionTraceServiceOptions, inspectOpenCodeIngressEvent(), OpenCodeIngressAnomaly, OpenCodeIngressInspection, OpenCodeTraceReportBuilder, OpenCodeTraceStore (+10 more)
 
 ### Community 145 - "Community 145"
-Cohesion: 0.06
-Nodes (27): BuiltinEntryAction, BuiltinSearchController, BuiltinSearchEntry, BuiltinSearchScope, BuiltinStatusFilter, FORMATTER_BUILTIN_CATALOG, FormatterBuiltinDefinition, FormatterMode (+19 more)
-
-### Community 146 - "Community 146"
-Cohesion: 0.10
-Nodes (30): asRecord(), describeImageGenerationFailure(), detectImageMediaType(), ItemMapper, itemMappers, looksLikeBase64Image(), looksLikeFilePath(), mapAgentMessageDelta() (+22 more)
-
-### Community 147 - "Community 147"
-Cohesion: 0.07
-Nodes (21): buildVisibleSlashCommandMenuItems(), SlashCommandMenuItem, getAttachedOpenCodeAppAgents(), OPEN_CODE_APP_AGENTS_PROMISE_KEY, OpenCodeAppAgentsCarrier, AGENT_MENTION_CANDIDATES_PROMISE_KEY, AGENT_SELECTION_CANDIDATES_PROMISE_KEY, buildHiddenCommandCacheKey() (+13 more)
-
-### Community 148 - "Community 148"
 Cohesion: 0.09
 Nodes (19): isOpenCodeSettingsBackendActive(), resolveSettingsActiveBackend(), SettingsBackendStateLike, ToolDetailModalOptions, ToolFileInfo, ToolFileSource, VaultAdapterLike, SettingsToolFileService (+11 more)
 
-### Community 151 - "Community 151"
-Cohesion: 0.10
-Nodes (34): DiamondProjectedFace, applyDisplacementSnapshot(), applyHostTransform(), buildBackdropFilterValue(), buildFallbackBackdropFilterValue(), clamp(), createFaceSvgElement(), createStageLayerElement() (+26 more)
+### Community 146 - "Community 146"
+Cohesion: 0.08
+Nodes (4): cloneConversationListDiagnostics(), ConversationListDiagnostics, StorageService, ModelPricingCatalog
 
-### Community 152 - "Community 152"
-Cohesion: 0.14
-Nodes (14): ConfigurationScope, CandidateDefinition, defaultManagedConfigDir(), isENOENT(), mutationEvidence(), OpencodeConfigPathEdit, OpencodeConfigSourceMutationResult, OpencodeConfigSourceOrigin (+6 more)
+### Community 147 - "Community 147"
+Cohesion: 0.10
+Nodes (30): asRecord(), describeImageGenerationFailure(), detectImageMediaType(), ItemMapper, itemMappers, looksLikeBase64Image(), looksLikeFilePath(), mapAgentMessageDelta() (+22 more)
+
+### Community 148 - "Community 148"
+Cohesion: 0.13
+Nodes (15): ConfigurationScope, CandidateDefinition, defaultManagedConfigDir(), isENOENT(), mutationEvidence(), OpencodeConfigPathEdit, OpencodeConfigSourceMutationResult, OpencodeConfigSourceOrigin (+7 more)
+
+### Community 149 - "Community 149"
+Cohesion: 0.07
+Nodes (28): OpenCodeTracePort, LOCAL_SERVER_SANITIZED_ENV_KEYS, LocalServerLaunch, LocalServerLaunchSnapshot, LocalSidecarLaunchRuntimeOptions, LocalSidecarLaunchRuntimeResult, logger, OpenCodeCatalogQueryCoordinatorDebugMetadata (+20 more)
+
+### Community 151 - "Community 151"
+Cohesion: 0.13
+Nodes (31): CanvasDocument, CanvasNodeData, serializeCanvasDocument(), buildFileReferenceDocument(), buildSplitDocument(), canvasBaseFileName(), CanvasGenerationMode, CanvasGenerationResult (+23 more)
 
 ### Community 153 - "Community 153"
-Cohesion: 0.09
-Nodes (22): applyUserMessageTextHighlightSpans(), buildCodeFence(), extractExpandedSkillNames(), extractUserMessageAgentHighlightSpans(), extractUserMessageCommandHighlightSpans(), extractUserMessageTextHighlightSpans(), getHighlightClassName(), HTML_BLOCK_REGEX (+14 more)
+Cohesion: 0.08
+Nodes (31): extractRenderableToolMetadata(), extractStructuredErrorMessage(), extractStructuredErrorName(), inferSseEventName(), OpenCodeStreamEventTransformerHost, OpenCodeStreamingEventHandler, OpenCodeStreamingEventHandlerContext, OpenCodeStreamingPartUpdatedHandler (+23 more)
 
 ### Community 154 - "Community 154"
 Cohesion: 0.08
-Nodes (23): cloneFormatterConfigValue(), readFormatterConfigValue(), readLspConfigValue(), writeFormatterConfigValue(), writeLspConfigValue(), collectJsoncPathEdits(), jsonValuesEqual(), logger (+15 more)
+Nodes (28): logger, ModelConfigModalOpenOptions, RestartFailureStage, SourceInventoryMode, SourceLoadFailure, ProviderCheckState, assertModelExtraFieldKeyAllowed(), buildConfigPreview() (+20 more)
+
+### Community 155 - "Community 155"
+Cohesion: 0.08
+Nodes (17): AppServerCatalogReadResult, AppServerHookGroup, AppServerHookMetadata, AppServerHooksReadbackResult, AppServerListHooksOptions, createCodexMcpServerDetailHost(), CodexReadbackModal, CodexReadbackModalOptions (+9 more)
 
 ### Community 156 - "Community 156"
 Cohesion: 0.12
-Nodes (23): BuiltinIconLibraryId, BuiltinIconLobehubMetadata, LobehubCachePathOptions, ProviderIconEntryResolution, BuiltinIconOption, LobehubIconPreviewState, ProviderIconAssetCandidate, ProviderIconCacheEntry (+15 more)
+Nodes (14): OpenCodeStreamEventState, extractStructuredErrorMessage(), getDebugTextPreview(), logAssistantFinalizationDebug(), logger, OpenCodeStreamingAssistantSummary, OpenCodeStreamingAssistantTailLookupOptions, OpenCodeStreamingFinalizationCoordinator (+6 more)
 
 ### Community 157 - "Community 157"
-Cohesion: 0.11
-Nodes (19): buildClaudeCodeModelSelectorProviders(), ModelConfigModelListEditor, ModelConfigTextFieldConfig, getStructuredModelOptionsState(), readStringArrayOption(), readStringOption(), readThinkingObject(), setStructuredModelOption() (+11 more)
-
-### Community 158 - "Community 158"
-Cohesion: 0.07
-Nodes (24): AppServerAccountRateLimitsResult, AppServerAccountUsage, AppServerAccountUsageResult, AppServerModelProviderCapabilities, asString(), extractProviderSummaries(), extractSafeString(), GlobalCodexConfigFileState (+16 more)
+Cohesion: 0.10
+Nodes (8): ChatVimNavigationCoordinator, ChatVimNavigationCoordinatorHost, ChatVimNavigationKeys, isEditableTarget(), normalizeKey(), ConversationSessionRailCoordinator, ConversationWriteSerializationService, createConversationWriteSerializationState()
 
 ### Community 159 - "Community 159"
 Cohesion: 0.10
 Nodes (14): buildTitleGenerationPrompt(), buildTitleGenerationSystemPrompt(), normalizeTitleGenerationLocale(), TITLE_GENERATION_SYSTEM_PROMPT, TITLE_LANGUAGE_LABELS, TitleGenerationLocale, ConversationHistoryActionsHost, TitleGenerationConversation (+6 more)
 
 ### Community 160 - "Community 160"
-Cohesion: 0.12
-Nodes (8): LinkedNoteSidebarState, EditRevertSidebarModel, hasParentDirectorySegment(), isAbsoluteFilePath(), toVaultRelativePath(), ModifiedFilesRevertActions, ModifiedFilesSidebar, ModifiedFilesSidebarAvailability
+Cohesion: 0.09
+Nodes (33): classifyReminderType(), detectOmoMessageMeta(), detectSystemReminder(), detectUserInjection(), getFirstMeaningfulLine(), normalizeMultilineText(), parseCompletedBackgroundTasks(), parseReminderTasks() (+25 more)
 
 ### Community 161 - "Community 161"
 Cohesion: 0.10
@@ -1025,321 +1021,313 @@ Nodes (13): logger, RetainedSelectionHighlight, RetainedSelectionHighlightServic
 
 ### Community 162 - "Community 162"
 Cohesion: 0.11
-Nodes (20): asFiniteNumber(), asRecord(), asString(), classifyZCodeModeReadback(), mergeCatalogSettingsBase(), parseLevels(), parseZCodeCatalogSnapshot(), parseZCodeDefaultModel() (+12 more)
+Nodes (8): EditRevertRoundMeta, RoundState, EditRevertStore, logger, roundDirName(), sha256Hex(), StoredImage, EditRevertVaultWriteback
 
 ### Community 163 - "Community 163"
-Cohesion: 0.08
-Nodes (24): canComputeWordDiff(), computeWordDiff(), InlineEditDiffOp, renderDiffInto(), TOKEN_PATTERN, tokenizeForDiff(), InlineEditWidgetCallbacks, applyInlineEditEffect() (+16 more)
+Cohesion: 0.13
+Nodes (3): ToolCallRenderer, ToolCallInfo, ToolCallStatus
 
 ### Community 164 - "Community 164"
-Cohesion: 0.10
-Nodes (16): buildEmbeddingText(), cosineSimilarity(), createOpenAiCompatibleEmbeddingClient(), decodeFloat32(), EmbeddingClient, EmbeddingEndpointConfig, emptyManifest(), encodeFloat32() (+8 more)
+Cohesion: 0.11
+Nodes (20): asFiniteNumber(), asRecord(), asString(), classifyZCodeModeReadback(), mergeCatalogSettingsBase(), parseLevels(), parseZCodeCatalogSnapshot(), parseZCodeDefaultModel() (+12 more)
 
 ### Community 165 - "Community 165"
 Cohesion: 0.10
-Nodes (3): LocalProcessProbe, LocalSidecarProcessInspector, logger
+Nodes (12): ClaudeCodePermissionBridgeHostContext, ChatOpenCodeService, ChatPluginPort, ChatPluginSettings, ConversationCachePinProvider, getEnabledProviderIds(), ModelConfigService, extractModelConfig() (+4 more)
 
 ### Community 166 - "Community 166"
-Cohesion: 0.11
-Nodes (12): PermissionRequest, SessionPermissionTracker, asRecord(), asString(), normalizeZCodePermissionAsk(), normalizeZCodeQuestionAsk(), PendingInteraction, permissionAskSignature() (+4 more)
+Cohesion: 0.08
+Nodes (24): AppServerAccountRateLimitsResult, AppServerAccountUsage, AppServerAccountUsageResult, AppServerModelProviderCapabilities, asString(), extractProviderSummaries(), extractSafeString(), GlobalCodexConfigFileState (+16 more)
 
 ### Community 167 - "Community 167"
-Cohesion: 0.14
-Nodes (4): ContextUsageService, TabContextState, ContextCostDetails, ContextRing
+Cohesion: 0.12
+Nodes (7): SlashCommandCatalogEntry, buildNextHiddenSlashCommands(), SettingsCommandsSection, CatalogFilterTab, CatalogRenderCallbacks, getSourceChipLabel(), SlashCommandCatalogRenderer
 
 ### Community 168 - "Community 168"
-Cohesion: 0.11
-Nodes (18): buildModelPickerGroups(), filterModelPickerGroups(), findModelPickerOption(), findModelPickerOptionByRef(), ModelPickerGroup, ModelPickerOption, ModelPickerModal, ModelPickerModalOptions (+10 more)
+Cohesion: 0.10
+Nodes (3): LocalProcessProbe, LocalSidecarProcessInspector, logger
 
 ### Community 169 - "Community 169"
 Cohesion: 0.11
-Nodes (6): getCapabilityLabState(), getClaudeCodeAdapter(), renderBackendSessionCatalogStatus(), activityIcon(), BackendSessionBrowserModal, renderPreviewActivityLine()
+Nodes (15): AgentMentionComposerController, AgentMentionComposerControllerHost, AgentMentionMode, AgentMentionPillSpan, AgentMentionQuery, filterAgentMentionCandidates(), findSingleTextEdit(), getEmptyAgentMentionMenuStatus() (+7 more)
 
-### Community 171 - "Community 171"
-Cohesion: 0.09
-Nodes (16): AppServerCatalogReadResult, AppServerHookGroup, AppServerHookMetadata, AppServerHooksReadbackResult, AppServerListHooksOptions, CodexReadbackModal, CodexReadbackModalOptions, CodexReadbackModalState (+8 more)
+### Community 170 - "Community 170"
+Cohesion: 0.13
+Nodes (18): createModelConfigKeyValueState(), ModelConfigModalFlow, ModelConfigKeyValueEditorConfig, ModelConfigModelListEditor, ModelConfigModelListEditorOptions, ModelConfigSelectFieldConfig, ModelConfigSelectFieldOption, ModelKeyValueCollectionKey (+10 more)
 
 ### Community 172 - "Community 172"
-Cohesion: 0.12
-Nodes (4): PermissionConfigSummary, LiveOpenCodianPlugin, SettingsSecuritySection, PermissionMode
+Cohesion: 0.09
+Nodes (20): ClaudeCodeSessionState, extractModelUsageFromRaw(), ClaudeCodeAsyncQueue, ClaudeCodeImagePromptBlock, ClaudeCodeMcpPermissionModeOverride, ClaudeCodeMcpPermissionModeOverrideResult, ClaudeCodeOutputStylesReloadResult, ClaudeCodePromptContent (+12 more)
+
+### Community 173 - "Community 173"
+Cohesion: 0.09
+Nodes (15): CanvasGateDecision, CanvasRuntimeLike, CanvasGenerationFlowPorts, CanvasContextMenuHost, CanvasIntegrationPorts, CanvasLeafBridge, RewriteTarget, CanvasAuxTarget (+7 more)
 
 ### Community 174 - "Community 174"
 Cohesion: 0.12
-Nodes (17): OpenCodeCatalogToolIdentityContext, OpenCodeAgentPart, OpenCodeAgentSourceSpan, OpenCodeChatRole, OpenCodeFilePart, OpenCodeMessagePart, OpenCodeTextPart, extractRenderableToolMetadata() (+9 more)
+Nodes (4): PermissionConfigSummary, LiveOpenCodianPlugin, SettingsSecuritySection, PermissionMode
 
-### Community 176 - "Community 176"
-Cohesion: 0.14
-Nodes (7): BatchOrganizeModal, createButton(), notifyLeftoverFolders(), revertLastBatchAndNotify(), BatchPropertyOperation, BatchPropertyValue, parseBatchPropertyValue()
+### Community 175 - "Community 175"
+Cohesion: 0.13
+Nodes (5): InlineEditController, cleanupRejectedImageAsset(), InlineEditImageGenTurnState, releaseInlineEditImageAsset(), submitInlineEditImageGenerationTurn()
 
 ### Community 177 - "Community 177"
 Cohesion: 0.09
-Nodes (16): CAPABILITY_CHANGE_REFRESH_CAPABILITIES, ConversationRevertState, DeferredQuestionRequest, logger, TabPaneState, ChatSelectionControlsCoordinatorHost, ConversationSessionRailCoordinator, savePiConversationSelection() (+8 more)
+Nodes (28): BackupMetadata, DEFAULT_PLUGIN_UPDATE_PERSISTED_STATE, isRecord(), normalizePersistedState(), PackageValidationError, parseManifest(), parseVersion(), PluginPackage (+20 more)
 
 ### Community 178 - "Community 178"
-Cohesion: 0.12
-Nodes (11): buildRetrievalQuery(), computeGraphNeighbours(), foldRetrievalMatches(), GraphNeighbour, noteDisplayName(), ResolvedLinksMap, RetrievalMatch, logger (+3 more)
+Cohesion: 0.11
+Nodes (21): QuestionDockPort, QuestionDockSlotCoordinator, QuestionDockSlotCoordinatorHost, createQuestionPostResolutionRuntimeHostAdapter(), createQuestionRuntimeHosts(), createQuestionRuntimeServices(), QuestionRuntimeConversationSyncPort, QuestionRuntimeStatusRefreshPort (+13 more)
+
+### Community 179 - "Community 179"
+Cohesion: 0.08
+Nodes (23): TranslationKey, logger, DeleteConfirmOptions, CapabilityDisclosureRowOptions, ClaudeCodeHelpContent, ClaudeCodeHelpModal, CLAUDE_CLASSIC_TABS, CLAUDE_CODE_GROUP_COPY (+15 more)
 
 ### Community 180 - "Community 180"
-Cohesion: 0.10
-Nodes (28): resolveToolResultVisibility(), OpenCodeClassifiedToolPart, BASH_METADATA_FAILURE_PATTERNS, BASH_OUTPUT_FAILURE_PATTERNS, BLOCKED_RESULT_PATTERNS, getNumericMetadataValue(), hasBashFailureMarkers(), hasExplicitFailureMetadata() (+20 more)
+Cohesion: 0.11
+Nodes (14): buildEmbeddingText(), cosineSimilarity(), decodeFloat32(), EmbeddingEndpointConfig, emptyManifest(), encodeFloat32(), hashEmbeddingContent(), logger (+6 more)
 
 ### Community 181 - "Community 181"
+Cohesion: 0.13
+Nodes (4): QuestionDockCoordinator, QuestionDockResolutionIntent, QuestionResolutionApplyContext, QuestionRequest
+
+### Community 182 - "Community 182"
+Cohesion: 0.14
+Nodes (16): buildInterruptedAssistantNotice(), buildStreamErrorNotice(), applyCodexNativeTextSnapshot(), buildLocalStreamOutcome(), extractStructuredOutputDuplicateText(), filterDuplicateStructuredOutputContentBlocks(), filterDuplicateStructuredOutputTextBlocks(), getStreamedTextContent() (+8 more)
+
+### Community 183 - "Community 183"
+Cohesion: 0.12
+Nodes (9): AgentMentionCandidateService, AgentMentionCandidateServiceHost, normalizeRuntimeAgents(), AgentMentionCandidate, AgentMentionMenuItem, AgentCatalogRenderContext, SettingsProjectAgentEditor, SettingsProjectAgentEditorRenderOptions (+1 more)
+
+### Community 184 - "Community 184"
 Cohesion: 0.11
 Nodes (10): AnchoredOverlayLayout, AnchoredOverlayLayoutController, AnchoredOverlayLayoutInput, AnchoredOverlayLayoutOptions, calculateAnchoredOverlayLayout(), OverlayHorizontalAlignment, roundGeometry(), EffortSelector (+2 more)
 
-### Community 182 - "Community 182"
-Cohesion: 0.09
-Nodes (29): DiamondContext, DiamondSize, DiamondTransform, BASE_PYRAMID_VERTICES, CAMERA, clamp(), compileGlShader(), createGlProgram() (+21 more)
-
-### Community 183 - "Community 183"
-Cohesion: 0.15
-Nodes (4): AppServerStreamMapResult, ActiveTabContextUsageCoordinator, ContextUsageSnapshot, createEmptyTabContextState()
-
 ### Community 185 - "Community 185"
-Cohesion: 0.12
-Nodes (9): ACP_CUSTOM_ACTION, ACP_PRESETS, AcpActionConfig, AcpPresetActionConfig, AcpStackedFieldOptions, SettingsAcpSection, SettingsAcpSectionOptions, SettingsScrollArea (+1 more)
+Cohesion: 0.14
+Nodes (25): AttemptOptions, CodexModelSummary, ResolvedConversationSessionSettings, ShareInspectionEntry, BACKEND_DESCRIPTION_KEYS, costDescription(), CostEstimateBackend, getBackendPricingSettings() (+17 more)
+
+### Community 186 - "Community 186"
+Cohesion: 0.17
+Nodes (4): ArchiveHistoryTarget, isConflict(), isSuccess(), OpencodeConfigModal
 
 ### Community 187 - "Community 187"
-Cohesion: 0.11
-Nodes (26): applyBatchPropertyOperation(), applyRenameRule(), basenameOf(), BatchConflict, BatchConflictReason, BatchEditPropertiesParams, BatchMoveParams, BatchParamErrorCode (+18 more)
+Cohesion: 0.15
+Nodes (6): BatchOrganizeModal, createButton(), notifyLeftoverFolders(), revertLastBatchAndNotify(), BatchPropertyValue, parseBatchPropertyValue()
 
-### Community 188 - "Community 188"
-Cohesion: 0.14
-Nodes (27): getCommandScopedAgentId(), buildRuntimeSkillSourceMap(), BUILTIN_COMMAND_IDS, ClaudeRuntimeCommand, extractPluginSkillName(), inferSkillSource(), isCatalogRuntimeCommand(), isPathWithinRoot() (+19 more)
+### Community 189 - "Community 189"
+Cohesion: 0.13
+Nodes (9): buildRetrievalQuery(), computeGraphNeighbours(), foldRetrievalMatches(), GraphNeighbour, noteDisplayName(), ResolvedLinksMap, RetrievalMatch, logger (+1 more)
 
-### Community 192 - "Community 192"
+### Community 190 - "Community 190"
+Cohesion: 0.13
+Nodes (27): buildRuntimeSkillSourceMap(), buildVisibleSlashCommandMenuItems(), BUILTIN_COMMAND_IDS, ClaudeRuntimeCommand, extractPluginSkillName(), inferSkillSource(), isCatalogRuntimeCommand(), isPathWithinRoot() (+19 more)
+
+### Community 193 - "Community 193"
+Cohesion: 0.08
+Nodes (22): BuiltinEntryAction, BuiltinSearchController, BuiltinSearchEntry, BuiltinSearchScope, BuiltinStatusFilter, FORMATTER_BUILTIN_CATALOG, FormatterBuiltinDefinition, FormatterMode (+14 more)
+
+### Community 194 - "Community 194"
+Cohesion: 0.10
+Nodes (27): DiamondSize, BASE_PYRAMID_VERTICES, CAMERA, clamp(), compileGlShader(), createGlProgram(), createLiquidDiamondDemoWebGlRenderer(), createPlane() (+19 more)
+
+### Community 195 - "Community 195"
+Cohesion: 0.15
+Nodes (9): AppendToolUseChunkContext, CodexStreamNormalizer, CodexStreamNormalizerOptions, CodexStreamNormalizerState, createCodexStreamNormalizer(), takeSuffix(), tryParseJson(), StreamChunk (+1 more)
+
+### Community 196 - "Community 196"
 Cohesion: 0.13
 Nodes (6): AppServerServerRequestHandler, CodexAppServerTransport, JsonRpcInbound, JsonRpcRequest, logger, toPlainStringEnv()
 
-### Community 193 - "Community 193"
-Cohesion: 0.12
-Nodes (13): CanvasVaultPort, buildCanvasSplitPrompt(), buildCanvasSplitSystemPrompt(), CanvasSplitNoteInput, CanvasSplitParseResult, oversizeSplitNotes(), parseCanvasSplitProposal(), stripOneCodeFence() (+5 more)
-
-### Community 194 - "Community 194"
-Cohesion: 0.14
-Nodes (3): CanvasRuntimeLike, CanvasContextMenuHost, CanvasIntegrationController
-
-### Community 195 - "Community 195"
-Cohesion: 0.17
-Nodes (26): formatBuiltinSource(), resolveBuiltinIconMatch(), getProviderCacheEntries(), getProviderIconCacheState(), resolveProviderIconUrl(), warmProviderIcons(), getRecommendedBuiltinIcons(), getSelectedBuiltinSource() (+18 more)
+### Community 197 - "Community 197"
+Cohesion: 0.16
+Nodes (23): assessHygiene(), buildHygieneNotice(), HygieneAssessment, basename(), buildMemoryIndexBlock(), clipToByteBudget(), cutAtArchivedSection(), formatBytes() (+15 more)
 
 ### Community 198 - "Community 198"
-Cohesion: 0.13
-Nodes (8): CONTROLLER_SLOT, ControllerHandle, controllers, DocumentControllerSlots, SettingsTooltipController, SettingsTooltipPlacement, SettingsTooltipPosition, SettingsTooltipViewport
+Cohesion: 0.15
+Nodes (11): PermissionRequest, asRecord(), asString(), normalizeZCodePermissionAsk(), normalizeZCodeQuestionAsk(), PendingInteraction, permissionAskSignature(), questionAskSignature() (+3 more)
 
-### Community 199 - "Community 199"
+### Community 200 - "Community 200"
+Cohesion: 0.10
+Nodes (7): PermissionInlineCardButtons, PermissionInlineCardRenderer, PermissionInlineCardResult, PermissionRequestChunk, PermissionResponder, StreamingInlineCardRenderer, SessionPermissionTracker
+
+### Community 204 - "Community 204"
+Cohesion: 0.14
+Nodes (14): findWriteToolCalls(), CanvasGenerationRequest, CanvasVaultPort, buildCanvasSplitPrompt(), buildCanvasSplitSystemPrompt(), CanvasSplitNoteInput, CanvasSplitParseResult, CanvasSplitProposal (+6 more)
+
+### Community 205 - "Community 205"
 Cohesion: 0.15
 Nodes (11): buildClaudeSettingsCommonFieldEdit(), CLAUDE_SETTINGS_COMMON_FIELD_EVIDENCE, CLAUDE_SETTINGS_COMMON_FIELDS, ClaudeCommonFieldEditResult, ClaudeCommonFieldEvidence, ClaudeCommonFieldKind, ClaudeCommonFieldMeta, isPlainObject() (+3 more)
 
-### Community 200 - "Community 200"
+### Community 206 - "Community 206"
+Cohesion: 0.11
+Nodes (15): ActiveTabContextUsageConversation, ActiveTabContextUsageCoordinatorHost, ForegroundCompactionActionOptions, ForegroundCompactionActionResult, ForegroundCompactionActionStatus, ForegroundCompactionAvailability, ForegroundCompactionAvailabilityStatus, ForegroundCompactionControl (+7 more)
+
+### Community 207 - "Community 207"
 Cohesion: 0.12
 Nodes (24): ALLOWED_ICON_MIME_TYPES, assertByteLength(), buildCustomCacheFileName(), createCachedCustomEntry(), CreateCachedCustomEntryOptions, createEntryId(), detectIconMimeType(), getMimeTypeFromHeader() (+16 more)
 
-### Community 201 - "Community 201"
-Cohesion: 0.11
-Nodes (13): SuccessfulTrailingAssistantPatchTailMessages, SuccessfulTrailingAssistantPatchTargets, TrailingAssistantPatchContainerResult, TrailingAssistantPatchDomTarget, TrailingAssistantPatchNonMergeableTailFailurePlan, TrailingAssistantPatchNonTailSignatureResult, TrailingAssistantPatchPlanningDelegate, TrailingAssistantPatchPreflight (+5 more)
+### Community 208 - "Community 208"
+Cohesion: 0.12
+Nodes (24): AcceptedMatch, applyAutoInternalLinks(), applyInlineEditAutoLinks(), AutoInternalLinkOptions, AutoInternalLinkResult, AutoLinkCandidate, AutoLinkReferenceNote, AutoLinkStyle (+16 more)
 
-### Community 202 - "Community 202"
+### Community 209 - "Community 209"
 Cohesion: 0.11
 Nodes (22): convertHtmlToMarkdownLite(), decodeHtmlEntities(), extractFetchableHostname(), fetchOnce(), HostResolver, HTML_ENTITIES, isBlockedHostnameLiteral(), isPrivateIpAddress() (+14 more)
 
-### Community 203 - "Community 203"
+### Community 210 - "Community 210"
 Cohesion: 0.16
-Nodes (7): PluginUpdateBadgeVariant, SettingsPluginUpdateSection, SettingsPluginUpdateSectionOptions, comparePluginVersions(), PluginUpdateBackup, PluginUpdateRelease, PluginUpdateSnapshot
+Nodes (11): ZCodeActiveRun, asFiniteNumber(), asRecord(), asString(), readZCodeContextUsage(), toZCodeSessionEvent(), zCodeContextUsageFromReadback(), ZCodeFinalMessageSnapshot (+3 more)
 
-### Community 204 - "Community 204"
-Cohesion: 0.12
-Nodes (14): InlineCompletionTurnRequest, InlineCompletionTurnResult, ActiveCompletion, cancelledResult(), maxOutputTokens(), parseToolCalls(), settleCancellationWithinBudget(), ValidatedModelSelection (+6 more)
+### Community 211 - "Community 211"
+Cohesion: 0.15
+Nodes (5): isOpenCodianLocalClaudeSessionId(), isSdkResultError(), mergeTraceError(), summarizeSession(), clearPromptSuggestionSink()
 
-### Community 205 - "Community 205"
-Cohesion: 0.13
-Nodes (7): CodexAppServerWireObserver, ClaudeTraceRingBuffer, ClaudeTraceRingBufferEntry, byteSize(), CodexWireTraceBridge, threadIdOf(), ClaudeSdkTraceRecord
-
-### Community 206 - "Community 206"
+### Community 212 - "Community 212"
 Cohesion: 0.11
 Nodes (24): assertNodePayload(), assertWritableDocument(), assertWritableEdges(), assertWritableNodes(), CANVAS_EDGE_SIDES, CANVAS_NODE_TYPES, CanvasDocumentError, CanvasEdgeData (+16 more)
 
-### Community 207 - "Community 207"
-Cohesion: 0.11
-Nodes (8): PermissionInlineCardButtons, PermissionInlineCardRenderer, PermissionInlineCardResult, PermissionRequestChunk, PermissionResponder, StreamingInlineCardRenderer, StreamingInlineCardRendererHost, StreamingInlineCardRuntimeState
-
-### Community 208 - "Community 208"
-Cohesion: 0.13
-Nodes (23): AcceptedMatch, applyAutoInternalLinks(), AutoInternalLinkOptions, AutoInternalLinkResult, AutoLinkCandidate, AutoLinkReferenceNote, AutoLinkStyle, buildCandidates() (+15 more)
-
-### Community 209 - "Community 209"
+### Community 214 - "Community 214"
 Cohesion: 0.15
 Nodes (5): OpenCodeMessageContextOmoAssembler, OpenCodeMessageContextOmoAssembly, dedupeContextAttachments(), CompactionDividerMeta, MessageContextAttachment
 
-### Community 211 - "Community 211"
-Cohesion: 0.11
-Nodes (13): commitHistoryValue(), enhanceSearchInput(), pendingCommitTimeouts, pendingCommitValues, readHistory(), resolveBoundary(), SearchInputEnhancerOptions, writeHistory() (+5 more)
-
-### Community 212 - "Community 212"
-Cohesion: 0.14
-Nodes (7): EditRevertRoundMeta, RoundState, EditRevertStore, logger, roundDirName(), sha256Hex(), StoredImage
-
-### Community 213 - "Community 213"
-Cohesion: 0.13
-Nodes (13): getPerformanceTimestampMs(), buildConversationMetaFromStoredRecord(), cloneConversationListDiagnostics(), ConversationListDiagnosticEntry, ConversationListDiagnostics, ConversationMetadataAdapter, ConversationMetadataCache, ConversationMetaEnvelope (+5 more)
-
-### Community 215 - "Community 215"
-Cohesion: 0.11
-Nodes (6): ApplyClaudeProviderPresetResult, MigrateClaudeProviderModelsResult, ClaudeProviderPartialPersistence, SettingsClaudeProviderMetadataPersistenceCoordinator, SettingsClaudeProviderMetadataPersistenceCoordinatorOptions, ClaudeCodeBackendSettings
-
-### Community 216 - "Community 216"
-Cohesion: 0.18
-Nodes (9): PluginEnvironmentSnapshot, PluginEvidenceSnapshot, SettingsPluginEvidencePresenter, SettingsPluginEvidencePresenterOptions, ConfigSourceRenderContext, logger, PluginSourceFilter, PluginSourcePathRenderModel (+1 more)
-
-### Community 217 - "Community 217"
-Cohesion: 0.11
-Nodes (16): PromptSyntheticTextPartInput, logger, SkillContentExpander, SkillContentExpanderHost, SkillExpansionResult, SkillRecord, SkillSyntheticPart, ComposerSendContextPort (+8 more)
-
-### Community 218 - "Community 218"
-Cohesion: 0.12
-Nodes (14): ActiveTabContextUsageConversation, ForegroundCompactionActionOptions, ForegroundCompactionActionResult, ForegroundCompactionActionStatus, ForegroundCompactionAvailability, ForegroundCompactionAvailabilityStatus, ForegroundCompactionControl, logger (+6 more)
-
 ### Community 219 - "Community 219"
-Cohesion: 0.15
-Nodes (3): partitionExistingContextItems(), buildOptimisticUserMessage(), MessageSendPreparationService
+Cohesion: 0.13
+Nodes (14): InlineCompletionTurnRequest, InlineCompletionTurnResult, ActiveCompletion, cancelledResult(), maxOutputTokens(), parseToolCalls(), settleCancellationWithinBudget(), ValidatedModelSelection (+6 more)
 
 ### Community 220 - "Community 220"
-Cohesion: 0.13
-Nodes (6): clearProviderIconCache(), ProviderIconService, ProviderIconCacheSummary, ResolveIconUrlOptions, SelectBuiltinIconRequest, ProviderIconLibrary
+Cohesion: 0.12
+Nodes (21): AuxQueryImageAttachment, InlineEditAttachmentEdit, InlineEditAttachmentEditSource, ContextChipModel, ContextFooterState, contextGroupRows(), ContextPickerOptions, focusContextPickerSearch() (+13 more)
 
 ### Community 221 - "Community 221"
-Cohesion: 0.09
-Nodes (19): CatalogRelevantEventPayload, deepCloneJsonLike(), EVENT_SOURCES, logger, OpenCodeEventListener, OpenCodeEventSource, OpenCodeEventSubscriptionCoordinatorHost, OpenCodeEventSubscriptionInput (+11 more)
+Cohesion: 0.12
+Nodes (13): ChatHeaderPresenterHost, HeaderActionButtonConfig, logger, readActiveBackendFromPlugin(), readOpenCodianPlugin(), SERVER_STATUS_CLASS_NAMES, SERVER_STATUS_KEY_BY_AVAILABILITY, ServerStatusTranslationKey (+5 more)
+
+### Community 222 - "Community 222"
+Cohesion: 0.12
+Nodes (15): ACTION_CAPABILITY_IDS, isRecord(), matchesConfirmedTarget(), OpenCodeExperimentalAction, OpenCodeExperimentalActionCleanup, OpenCodeExperimentalActionConfirmation, OpenCodeExperimentalActionExecution, OpenCodeExperimentalActionRequest (+7 more)
 
 ### Community 223 - "Community 223"
+Cohesion: 0.14
+Nodes (17): applyJsoncPathEdits(), detectJsoncFormatting(), isPlainObject(), validateConfigurationContent(), countHooks(), HOOK_EVENTS, MCP_STATES, noEvidence (+9 more)
+
+### Community 224 - "Community 224"
+Cohesion: 0.18
+Nodes (4): expandHomeDir(), compactionMarkerCount(), MemoryRuntimeCoordinator, splitModelRef()
+
+### Community 225 - "Community 225"
+Cohesion: 0.15
+Nodes (22): assembleRelevantMemory(), CJK_STOPWORDS, EntryTokens, formatRecalledTopicFile(), frameRecall(), isVerbatimHit(), LATIN_STOPWORDS, lexicalCandidates() (+14 more)
+
+### Community 226 - "Community 226"
 Cohesion: 0.12
 Nodes (15): isTransientQuestionMutationError(), logger, normalizePermissionRequest(), normalizePermissionResponse(), normalizePermissionToolReference(), normalizeStringArray(), OpenCodePermissionSdk, OpenCodePermissionWireReply (+7 more)
 
-### Community 224 - "Community 224"
-Cohesion: 0.13
-Nodes (15): ACTION_CAPABILITY_IDS, isRecord(), matchesConfirmedTarget(), OpenCodeExperimentalAction, OpenCodeExperimentalActionCleanup, OpenCodeExperimentalActionConfirmation, OpenCodeExperimentalActionExecution, OpenCodeExperimentalActionRequest (+7 more)
-
-### Community 226 - "Community 226"
-Cohesion: 0.09
-Nodes (18): ClaudeCodeHelpContent, ClaudeCodeHelpModal, CLAUDE_CLASSIC_TABS, CLAUDE_CODE_GROUP_COPY, CLAUDE_EFFORT_LEVELS, CLAUDE_PERMISSION_MODES, CLAUDE_PROJECT_SOURCE_FILES, CLAUDE_SETTING_SOURCES (+10 more)
-
-### Community 227 - "Community 227"
-Cohesion: 0.18
-Nodes (12): McpServerEditorModal, AddFormState, buildMcpConfigFromFormState(), createDefaultMcpFormState(), isStringRecord(), mcpEntryToFormState(), McpFormValidationOptions, parseMcpKvPairs() (+4 more)
-
 ### Community 229 - "Community 229"
+Cohesion: 0.18
+Nodes (5): SettingsPluginUpdateSection, comparePluginVersions(), PluginUpdateBackup, PluginUpdateRelease, PluginUpdateSnapshot
+
+### Community 230 - "Community 230"
 Cohesion: 0.12
 Nodes (12): AcpClientManager, AcpClientManagerOptions, AcpManagedAgent, logger, AcpAgentConfig, AcpAgentRuntime, AcpConnectionState, AcpPermissionRequest (+4 more)
 
-### Community 230 - "Community 230"
+### Community 231 - "Community 231"
 Cohesion: 0.17
 Nodes (23): add3(), buildDisplacementTrace(), createPlane(), cross3(), dot3(), intersectCrystalFaces(), intersectRayTriangle(), inverseRotatePointWithTransform() (+15 more)
-
-### Community 231 - "Community 231"
-Cohesion: 0.19
-Nodes (19): CanvasDocument, CanvasNodeData, CanvasFileWritePort, CanvasFileWriteResult, CanvasGateDecision, CanvasNodeContent, CanvasNodeHandleLike, CanvasRuntimeProbe (+11 more)
 
 ### Community 232 - "Community 232"
 Cohesion: 0.13
 Nodes (17): createStageLayerElement(), createSvgElement(), elasticPosition(), estimateProjectionDelta(), formatNumber(), generateFilterId(), logger, maxRenderQuality() (+9 more)
 
 ### Community 233 - "Community 233"
-Cohesion: 0.13
-Nodes (12): CollapsibleOptions, CollapsibleState, disposersByWrapper, SetupCollapsibleOptions, AssistantNoticeCardRenderer, formatTurnDiffPathLabel(), NoticeActionType, truncateTurnDiffFilename() (+4 more)
+Cohesion: 0.12
+Nodes (11): RelevantNotesPort, VaultRetrievalSettingsSlice, VaultRetrievalSnippet, SelectedPdfSnippet, logger, PdfRetrievalQueryPort, SemanticRetrievalQueryPort, VaultRetrievalComposerCoordinator (+3 more)
 
 ### Community 234 - "Community 234"
+Cohesion: 0.14
+Nodes (8): TraceReportBuilder, DEFAULT_SHARED_TRACE_DIRECTORY, PersistedTraceIndex, QueuedRecord, TraceStoreOptions, TraceEventBase, TraceSummary, sanitizeDiagnosticReport()
+
+### Community 235 - "Community 235"
+Cohesion: 0.16
+Nodes (16): AssistantPlainTextFallbackRenderOptions, AssistantStructuredContentRenderOptions, renderAssistantStructuredContent(), appendQuestionResolutionCard(), appendQuestionResolutionCardFromRenderPlan(), buildQuestionAnswerMarkdown(), buildQuestionRejectedMarkdown(), getQuestionResolutionAnswerText() (+8 more)
+
+### Community 236 - "Community 236"
 Cohesion: 0.18
 Nodes (17): ChatAgentSelectionCoordinatorHost, createClaudeCodePermissionConfig(), createCodexSandboxConfig(), createOpenCode2PermissionConfig(), createOpenCodePermissionConfig(), createZCodeModeConfig(), PermissionModeConfig, PermissionModeOption (+9 more)
 
-### Community 236 - "Community 236"
-Cohesion: 0.15
-Nodes (8): BACKEND_DESCRIPTION_KEYS, costDescription(), CostEstimateBackend, getBackendPricingSettings(), refreshCostEstimateSettingsRows(), renderCostEstimateSettingsRow(), renderThirdPartyPricingIdentity(), ModelPricingModal
-
-### Community 237 - "Community 237"
-Cohesion: 0.12
-Nodes (19): StoragePluginPort, CORE_SETTINGS_PROFILE, extractPersistedCoreSettings(), extractPersistedUiSettings(), LoadSettingsFileOptions, logger, PersistedCoreSettings, PersistedSettingsFileProfile (+11 more)
-
-### Community 238 - "Community 238"
-Cohesion: 0.13
-Nodes (9): isRecordLike(), readCommandString(), readThreadIdFromParams(), AppServerCommandExecutionApprovalDecision, AppServerCommandExecutionApprovalParams, AppServerCommandExecutionApprovalResponse, AppServerGrantedPermissionProfile, AppServerPermissionsApprovalParams (+1 more)
-
 ### Community 239 - "Community 239"
+Cohesion: 0.18
+Nodes (6): MarkdownRenderScheduler, DEFAULT_OPTIONS, formatDurationSeconds(), normalizeDurationSeconds(), ThinkingBlockRenderer, ThinkingBlockState
+
+### Community 240 - "Community 240"
+Cohesion: 0.13
+Nodes (8): isRecordLike(), readCommandString(), readThreadIdFromParams(), AppServerCommandExecutionApprovalDecision, AppServerCommandExecutionApprovalParams, AppServerCommandExecutionApprovalResponse, AppServerToolUserInputParams, AppServerToolUserInputResponse
+
+### Community 241 - "Community 241"
 Cohesion: 0.13
 Nodes (18): LobehubManifestStaticVariant, AGENT_ICON_BY_BACKEND, AgentSwitcherIconConfig, AgentSwitcherOptions, FLOATING_SWITCHER_CLEANUP_BY_OWNER, FloatingSwitcherCleanup, LOBEHUB_ICON_MANIFEST_BY_ID, pinAgentSwitcherToSettingsEdge() (+10 more)
 
-### Community 240 - "Community 240"
+### Community 242 - "Community 242"
 Cohesion: 0.16
 Nodes (10): didTypeStandaloneHash(), filterInlineEditPresets(), findPresetTokenAtCursor(), InlineEditPresetMenuController, InlineEditPresetMenuHost, movePresetSelection(), PresetMenuRenderOptions, PresetMenuToken (+2 more)
 
-### Community 241 - "Community 241"
+### Community 243 - "Community 243"
 Cohesion: 0.16
 Nodes (21): coercePreferenceString(), coerceStringBoolean(), containsSecretValue(), EMPTY_GATES, EMPTY_PREFERENCES, isObject(), looksLikeSecretKey(), looksLikeSecretValue() (+13 more)
 
-### Community 242 - "Community 242"
+### Community 244 - "Community 244"
+Cohesion: 0.19
+Nodes (7): logger, OpenCodianStartupCoordinator, StartupExecuteOptions, StartupPerfEntry, StartupPerfTrace, formatDurationMs(), getPerformanceTimestampMs()
+
+### Community 245 - "Community 245"
 Cohesion: 0.12
 Nodes (13): AdditionalDirectoriesConfigBadgeCoordinator, LiveOpenCodianPluginWithClaudeDirectories, readAdditionalDirectoriesFromPlugin(), readOpenCodianPlugin(), CONTROLLER_SLOT, ControllerHandle, controllers, DocumentControllerSlots (+5 more)
 
-### Community 243 - "Community 243"
+### Community 246 - "Community 246"
 Cohesion: 0.12
 Nodes (7): BarRefreshCallback, ClearCallback, logger, PromptSuggestionAdapter, PromptSuggestionData, PromptSuggestionService, SuggestionCallback
 
-### Community 245 - "Community 245"
+### Community 247 - "Community 247"
+Cohesion: 0.13
+Nodes (16): canInjectAsLink(), CN_FONT_OPTIONS, CSP_LINK_ALLOWED_ORIGINS, EN_FONT_OPTIONS, extractPrimaryFontName(), findFontOptionById(), FONT_CATEGORY_LABELS, FONT_CATEGORY_ORDER (+8 more)
+
+### Community 249 - "Community 249"
 Cohesion: 0.15
 Nodes (11): arrayAccessors(), buildSecretId(), buildSecretPlaceholder(), hashText(), isRealSecretValue(), parseSecretPlaceholder(), SCALAR_SECRET_KEYS, SecretAccessor (+3 more)
 
-### Community 247 - "Community 247"
-Cohesion: 0.16
-Nodes (10): ClaudeCodeProcessMissingReason, ClaudeCodeProcessResolverEnv, expandHomeDirectory(), getAugmentedPath(), getDefaultClaudeCliCandidates(), getPathDelimiter(), getPathFallbacks(), getPathValue() (+2 more)
-
-### Community 248 - "Community 248"
-Cohesion: 0.15
-Nodes (17): serializeCanvasDocument(), buildFileReferenceDocument(), buildSplitDocument(), canvasBaseFileName(), CanvasGenerationMode, CanvasGenerationRequest, CanvasGenerationResult, CanvasGenerationService (+9 more)
-
 ### Community 250 - "Community 250"
-Cohesion: 0.26
-Nodes (3): ClaudeProviderConfigMutationError, SafeFileMutationResult, ScopedConfigurationResourceService
+Cohesion: 0.25
+Nodes (3): TabBar, TabBarItem, TabBarLayoutMode
 
-### Community 251 - "Community 251"
-Cohesion: 0.13
-Nodes (6): CanvasNodePickModal, CanvasNodePickRow, CanvasRewriteInstructionModal, CanvasRewritePreviewModal, CanvasRewritePreviewModalOptions, isSingleMermaidBlock()
-
-### Community 252 - "Community 252"
-Cohesion: 0.16
-Nodes (5): destroyState(), LiquidDiamondDemoController, releasePointerCaptureIfNeeded(), ChatVisualDemoCoordinator, ChatVisualDemoCoordinatorHost
+### Community 253 - "Community 253"
+Cohesion: 0.23
+Nodes (3): hasVisibleStreamingContent(), StreamChunkRouterHost, StreamChunkRouter
 
 ### Community 254 - "Community 254"
 Cohesion: 0.21
 Nodes (5): OpenCodeLegacySseStreamReader, OpenCodeLegacySseStreamReaderHost, OpenCodeSseReadState, OpenCodeSseStreamContext, OpenCodeSSEEvent
 
 ### Community 255 - "Community 255"
-Cohesion: 0.22
-Nodes (7): logger, OpenCodianStartupCoordinator, StartupExecuteOptions, StartupPerfEntry, StartupPerfTrace, formatDurationMs(), getRecentLogText()
+Cohesion: 0.20
+Nodes (14): ModelConfigTextFieldConfig, getStructuredModelOptionsState(), readStringArrayOption(), readStringOption(), readThinkingObject(), setStructuredModelOption(), setStructuredStringArrayOption(), setStructuredThinkingBudget() (+6 more)
 
-### Community 256 - "Community 256"
-Cohesion: 0.25
-Nodes (3): hasVisibleStreamingContent(), StreamChunkRouterHost, StreamChunkRouter
-
-### Community 258 - "Community 258"
-Cohesion: 0.18
-Nodes (4): AgentCatalogRenderContext, SettingsProjectAgentEditor, SettingsProjectAgentEditorRenderOptions, OpencodeAgentConfigRecord
-
-### Community 259 - "Community 259"
-Cohesion: 0.13
-Nodes (19): ALLOWED_SKILL_FRONTMATTER_KEYS, logger, parseSimpleFrontmatter(), restartLocalSkillService(), SettingsScrollArea, SettingsSkillSectionOptions, SKILL_CATALOG_RETRY_DELAYS_MS, SKILL_RESTART_RETRY_DELAYS_MS (+11 more)
-
-### Community 260 - "Community 260"
+### Community 257 - "Community 257"
 Cohesion: 0.21
 Nodes (7): logger, SettingsStylePresetSection, SettingsStylePresetSectionOptions, STYLE_ORDER, getBuiltinThemePresets(), ThemePresetDefinition, ThemeStyleId
 
-### Community 261 - "Community 261"
+### Community 259 - "Community 259"
 Cohesion: 0.11
-Nodes (10): normalizePluginListResult(), AppServerMarketplaceLoadErrorInfo, AppServerPluginInstallResult, AppServerPluginListOptions, AppServerPluginListResult, AppServerPluginReconcileResult, CodexPluginsAdapter, CodexPluginsGroupKind (+2 more)
+Nodes (11): OpenCodeStreamEvent, OpenCodeStreamEventOutcome, logger, OpenCodeStreamingLegacyStreamRequest, OpenCodeStreamingRuntimeAbortRequest, OpenCodeStreamingRuntimeContext, OpenCodeStreamingRuntimeCoordinatorHost, OpenCodeStreamingRuntimeEventTransformer (+3 more)
 
-### Community 262 - "Community 262"
+### Community 260 - "Community 260"
+Cohesion: 0.18
+Nodes (9): OpenCodeServerStatus, SettingsModelIconCacheRuntimeState, ModelConfigService, SettingsModelBlockOptions, SettingsModelSection, SettingsModelSectionActiveRuntime, SettingsModelSectionBodies, SettingsModelSectionOptions (+1 more)
+
+### Community 261 - "Community 261"
 Cohesion: 0.17
 Nodes (3): StoredThemeBackgroundAsset, THEME_BACKGROUND_MIME_TO_EXTENSION, ThemeBackgroundStorage
 
-### Community 263 - "Community 263"
+### Community 262 - "Community 262"
 Cohesion: 0.15
 Nodes (11): ClaudeManagedPlistInspection, ClaudeManagedSettingsDiscovery, ClaudeManagedSettingsDiscoveryOptions, ClaudeManagedSettingsOrigin, ClaudeManagedSettingsSlot, DEFAULT_MANAGED_CONFIG_DIRS, errorCode(), EVIDENCE_ABSENT (+3 more)
 
@@ -1351,115 +1339,139 @@ Nodes (18): add3(), buildDisplacementTrace(), createFace(), cross3(), dot3(), in
 Cohesion: 0.14
 Nodes (16): GlassOctahedronQualityTier, addObject(), CameraNode, createEnvironmentScene(), createGlassOctahedronThreeRenderer(), disposeSceneResources(), EulerLike, FresnelMaterialNode (+8 more)
 
-### Community 266 - "Community 266"
+### Community 268 - "Community 268"
 Cohesion: 0.19
-Nodes (12): AutoInternalLinkProcessor, applyProcessorToContent(), applyProcessorToMessageText(), AssistantAutoInternalLinkService, ChatAutoInternalLinkLogStage, ChatAutoInternalLinkOutcome, ChatAutoInternalLinkSkipReason, collectStoredReferenceNotes() (+4 more)
+Nodes (16): CLAUDE_SETTINGS_FILE_NAMES, ClaudeHookEntry, ClaudeHookGroup, ClaudeHooksConfig, ClaudeProjectSettingsFileName, ClaudeProjectSettingsInfo, countHooks(), discoverClaudeProjectSettings() (+8 more)
 
-### Community 267 - "Community 267"
-Cohesion: 0.15
-Nodes (8): VaultRetrievalSettingsSlice, logger, PdfRetrievalQueryPort, SemanticRetrievalQueryPort, VaultRetrievalComposerCoordinator, VaultRetrievalComposerCoordinatorDeps, VaultRetrievalComposerPort, VaultRetrievalQueryPort
+### Community 269 - "Community 269"
+Cohesion: 0.26
+Nodes (3): AppServerPluginMarketplaceEntry, AppServerPluginSummary, SettingsCodexPluginsSection
 
 ### Community 270 - "Community 270"
-Cohesion: 0.19
-Nodes (3): SkillInfo, SkillSourceGroups, SkillDetailModalOptions
+Cohesion: 0.16
+Nodes (13): resolveToolResultVisibility(), isInternalStructuredOutputTool(), BUILTIN_TOOL_DEFINITIONS, BuiltinToolDefinition, canonicalizeToolName(), createIdentity(), getNormalizedToolName(), getToolIdentity() (+5 more)
+
+### Community 271 - "Community 271"
+Cohesion: 0.18
+Nodes (13): AUTH_ERROR_PATTERNS, detectMcpAuthError(), applyMcpRetryOutcome(), cssEscape(), getMcpServerName(), McpAuthOutcome, McpRetryOutcome, renderMcpExpandedContent() (+5 more)
 
 ### Community 273 - "Community 273"
-Cohesion: 0.17
-Nodes (11): findWriteToolCalls(), buildCanvasNodeRewriteRequest(), buildCanvasNodeRewriteSystemPrompt(), CanvasNodeRewriteService, CanvasNodeRewriteServiceConfig, CanvasRewriteAdapter, CanvasRewriteInput, CanvasRewriteOutcome (+3 more)
-
-### Community 275 - "Community 275"
 Cohesion: 0.14
 Nodes (9): EMPTY_GHOST_STATE, InlineCompletionGhostDeps, inlineCompletionGhostField, InlineCompletionGhostPayload, InlineCompletionGhostState, AltGestureEvent, AltSoloGestureResult, AltSoloGestureTracker (+1 more)
 
-### Community 276 - "Community 276"
+### Community 274 - "Community 274"
 Cohesion: 0.18
 Nodes (6): PiMcpAuthMode, PiMcpConfigReadOptions, PiMcpConfigService, PiMcpConfigSnapshot, PiMcpServerDeclaration, PiMcpTransport
 
-### Community 280 - "Community 280"
+### Community 277 - "Community 277"
+Cohesion: 0.21
+Nodes (3): formatTimestamp(), ModelPricingModal, parseRate()
+
+### Community 279 - "Community 279"
 Cohesion: 0.19
 Nodes (11): computeBackendEnvironmentFingerprints(), computeEnvironmentFingerprint(), EnvironmentVariablesDomains, LegacyEnvironmentResolver, normalizeEnvironmentVariablesDomains(), resolveBackendEnvironment(), sanitizeVariableMap(), EnvironmentProviderRow (+3 more)
 
-### Community 282 - "Community 282"
+### Community 280 - "Community 280"
+Cohesion: 0.20
+Nodes (5): isDotHidden(), VaultIndexFileSystem, VaultChangeKind, VaultFileMeta, VaultIndexFs
+
+### Community 283 - "Community 283"
 Cohesion: 0.23
 Nodes (8): BadgeItem, BadgeKind, CodexRuntimeDefaultsBadgeCoordinator, LiveOpenCodianPlugin, readAdditionalDirectories(), readNetworkAccessEnabled(), readOpenCodianPlugin(), readWebSearchMode()
 
-### Community 285 - "Community 285"
-Cohesion: 0.24
-Nodes (14): wireHiddenAdapters(), CodexCliResolverEnv, CodexCliResolverOptions, expandHomeDirectory(), getCodexCliErrorMessage(), getPathApi(), getPathDelimiter(), getPathFallbacks() (+6 more)
+### Community 284 - "Community 284"
+Cohesion: 0.17
+Nodes (11): isBlankProviderState(), ModelConfigModalSnapshotInput, readProviderOptionString(), resolveModelConfigJsonDraftValue(), syncProviderFormFromJsonDraft(), tryParseAddProviderJsonDraft(), extractModelExtraFields(), extractModelOptions() (+3 more)
 
-### Community 286 - "Community 286"
-Cohesion: 0.19
-Nodes (11): buildClaudeCodeElicitationContent(), buildClaudeCodeElicitationQuestionRequest(), buildClaudeCodeUserDialogQuestionRequest(), buildClaudeCodeUserDialogResult(), ElicitationContent, ElicitationScalarContent, ElicitationSchemaProperty, getHeader() (+3 more)
+### Community 285 - "Community 285"
+Cohesion: 0.18
+Nodes (5): controllers, SCROLL_INTENT_KEYS, SettingsPopoverController, SettingsPopoverDisplayOptions, SettingsPopoverPlacement
 
 ### Community 287 - "Community 287"
-Cohesion: 0.26
-Nodes (4): InlineCompletionController, applyInlineCompletionGhostEffect(), readInlineCompletionGhost(), InlineCompletionPoolError
+Cohesion: 0.13
+Nodes (8): AppServerMarketplaceLoadErrorInfo, AppServerPluginInstallResult, AppServerPluginListResult, AppServerPluginReconcileResult, CodexPluginsAdapter, CodexPluginsGroupKind, PluginsLoadContext, SettingsCodexPluginsSectionOptions
 
-### Community 290 - "Community 290"
-Cohesion: 0.23
-Nodes (3): EditRevertPreview, EditRevertPreviewModal, EditRevertPreviewModalOptions
+### Community 288 - "Community 288"
+Cohesion: 0.28
+Nodes (12): ModelCatalogModel, findCatalogModel(), findCatalogProvider(), ModelReference, pickCatalogDefaultModel(), pickCatalogProviderDefaultModel(), pickCatalogProviderFirstModel(), pickFirstCatalogModel() (+4 more)
 
-### Community 292 - "Community 292"
+### Community 289 - "Community 289"
 Cohesion: 0.15
 Nodes (10): DIRECTORY_PLUGIN_EXTENSIONS, DIRECTORY_PLUGIN_FOLDERS, PluginConfigSourceScope, PluginConfigSourceSnapshot, PluginDirectorySnapshot, PluginEntryKind, PluginEntryProvenance, PluginEntryScope (+2 more)
 
-### Community 294 - "Community 294"
-Cohesion: 0.23
-Nodes (3): isDotHidden(), VaultEmbeddingFileSystem, VaultEmbeddingFsAdapter
+### Community 290 - "Community 290"
+Cohesion: 0.26
+Nodes (4): InlineCompletionController, applyInlineCompletionGhostEffect(), readInlineCompletionGhost(), InlineCompletionPoolError
 
-### Community 300 - "Community 300"
+### Community 294 - "Community 294"
+Cohesion: 0.21
+Nodes (11): AppServerPreviewMessage, AppServerPreviewMessagePage, extractItemMessages(), normalizeActivityItem(), normalizeThreadItemsPageToPreviewMessages(), normalizeThreadList(), normalizeTurnsPageToPreviewMessages(), normalizeTurnsToPreviewMessages() (+3 more)
+
+### Community 296 - "Community 296"
+Cohesion: 0.22
+Nodes (11): appendNoticeMessage(), insertLocalMessageInTurn(), logger, logInterruptedAssistantPersistence(), logInterruptedNoticePersistence(), markCanonicalAssistantTakeoverPending(), persistBackendSessionIdentityIfNeeded(), persistLocalStreamOutcome() (+3 more)
+
+### Community 297 - "Community 297"
+Cohesion: 0.26
+Nodes (13): parseAddProviderJsonDraft(), buildAddProviderSavePlan(), buildAvailabilitySubset(), buildModelConfigSavePlan(), buildNextDisabledModelRefs(), buildWorkspaceSavePlan(), cloneUnmanagedProviderFields(), ProviderAvailabilitySubset (+5 more)
+
+### Community 298 - "Community 298"
+Cohesion: 0.21
+Nodes (10): getActiveSecondaryTabId(), LEGACY_PRIMARY_TAB_ID_MAP, LEGACY_SECONDARY_TAB_ID_MAP, PRIMARY_TAB_MAP, resolvePrimaryTabId(), resolveSecondaryTabId(), SETTINGS_PRIMARY_TABS, SettingsPrimaryTab (+2 more)
+
+### Community 302 - "Community 302"
 Cohesion: 0.28
 Nodes (5): ClaudeCatalogOptions, missing(), scopeClaudeSessionCatalog(), ScopedClaudeCatalogSdk, ScopedNativeSessionStore
 
-### Community 301 - "Community 301"
-Cohesion: 0.17
-Nodes (11): ContextBreakdownCharCounts, ContextBreakdownTokenMap, ContextDisplayTokenBreakdown, ContextUsageSummary, ContextModelInfo, ContextSessionInfo, TimestampRefreshMode, ContextBillingUsage (+3 more)
+### Community 303 - "Community 303"
+Cohesion: 0.22
+Nodes (7): canComputeWordDiff(), computeWordDiff(), InlineEditDiffOp, renderDiffInto(), TOKEN_PATTERN, tokenizeForDiff(), InlineEditPreviewWidget
 
 ### Community 304 - "Community 304"
-Cohesion: 0.35
-Nodes (11): buildCommandScopedAgent(), cloneConfigObject(), cloneConfigValue(), getCommandScopedAgentMetadata(), isCommandScopedAgentForCommand(), isCommandScopedAgentId(), mergeConfigObjects(), normalizeCommandSamplingValue() (+3 more)
+Cohesion: 0.23
+Nodes (3): PdfIndexFileSystem, PdfFileMeta, PdfIndexFs
 
-### Community 305 - "Community 305"
+### Community 308 - "Community 308"
 Cohesion: 0.23
 Nodes (8): CompletionViewState, INITIAL_VIEW_STATE, InlineCompletionControllerOptions, ensureInlineCompletionGhostField(), setInlineCompletionGhost, buildInlineCompletionWindows(), getEditorView(), isEditorView()
 
-### Community 308 - "Community 308"
-Cohesion: 0.24
-Nodes (5): ChatVimNavigationCoordinator, ChatVimNavigationCoordinatorHost, ChatVimNavigationKeys, isEditableTarget(), normalizeKey()
-
-### Community 310 - "Community 310"
+### Community 312 - "Community 312"
 Cohesion: 0.30
 Nodes (4): DEFAULT_SANDBOX_SETTINGS, readSandboxSettingsFromPlugin(), SandboxConfigBadgeCoordinator, ClaudeCodeSandboxSettings
 
 ### Community 313 - "Community 313"
+Cohesion: 0.17
+Nodes (12): buildTrailingAssistantPatchTailOutcomeExecutionTailPlanSourceContract(), buildTrailingAssistantPatchTailOutcomePlanningContext(), buildTrailingAssistantPatchTailOutcomePlanningContextInputs(), buildTrailingAssistantPatchTailOutcomePlanningContextShape(), buildTrailingAssistantPatchTailOutcomePlanParts(), buildTrailingAssistantPatchTailOutcomePlans(), buildTrailingAssistantPatchTailOutcomePlansFromChildPlans(), buildTrailingAssistantPatchTailOutcomePlansFromExecutionTailPlanningContext() (+4 more)
+
+### Community 315 - "Community 315"
 Cohesion: 0.29
 Nodes (3): managementText(), SettingsZCodeSection, shortenPath()
 
-### Community 314 - "Community 314"
-Cohesion: 0.20
-Nodes (4): cloneConversationMetadataOnly(), ConversationFullMessageCache, ConversationFullMessageCacheOptions, ConversationFullMessageCacheSnapshot
+### Community 316 - "Community 316"
+Cohesion: 0.25
+Nodes (8): EffectivePricing, PRICE_FIELDS, PriceField, ContextCostCompleteness, ContextCostSource, ModelPricingCatalogEntry, ModelPricingOverride, ModelPricingRates
 
-### Community 315 - "Community 315"
+### Community 317 - "Community 317"
 Cohesion: 0.25
 Nodes (10): buildInlineCompletionSystemPrompt(), findProtocolTag(), FORBIDDEN_TAG_PATTERNS, inlineCompletionPrefixTail(), InlineCompletionValidation, InlineCompletionWindows, overlapsPrefixTail(), SYSTEM_PROMPT_EN() (+2 more)
 
-### Community 316 - "Community 316"
-Cohesion: 0.27
-Nodes (3): logger, SkillCatalogService, SkillCatalogServiceHost
+### Community 318 - "Community 318"
+Cohesion: 0.29
+Nodes (4): PiConfigurationSnapshot, PiSettingField, SettingsPiConfigurationSection, valueAt()
 
-### Community 320 - "Community 320"
+### Community 321 - "Community 321"
 Cohesion: 0.27
 Nodes (5): AcpNotification, AcpTransportOwner, translateAcpMessageChunk(), translateAcpToolCall(), translateAcpToolCallUpdate()
 
-### Community 321 - "Community 321"
+### Community 322 - "Community 322"
 Cohesion: 0.38
 Nodes (4): DiagnosticsRuntimeCoordinator, DiagnosticsBackendPorts, DiagnosticsRuntimeInputs, Logger
 
-### Community 322 - "Community 322"
+### Community 323 - "Community 323"
 Cohesion: 0.29
 Nodes (3): AppServerSetThreadGoalOptions, AppServerThreadGoal, AppServerThreadGoalStatus
 
-### Community 323 - "Community 323"
+### Community 324 - "Community 324"
 Cohesion: 0.31
 Nodes (10): intersectGlassOctahedron(), inverseRotateLocalPoint(), localDirectionToWorldDirection(), localPointToWorldPoint(), rotateLocalPoint(), rotateX(), rotateY(), rotateZ() (+2 more)
 
@@ -1467,41 +1479,57 @@ Nodes (10): intersectGlassOctahedron(), inverseRotateLocalPoint(), localDirectio
 Cohesion: 0.20
 Nodes (5): InlineEditKeyboardDeps, InlineEditKeyboardDispatcher, InlineEditKeyboardDispatcherDeps, InlineEditKeyboardEdit, KeyboardEditLike
 
-### Community 326 - "Community 326"
+### Community 329 - "Community 329"
 Cohesion: 0.28
-Nodes (9): applyEdgeBulge(), clamp(), length2(), pointEdgeDistance(), readNumberSetting(), renderDisplacementMap(), smoothStep(), updateTargetFromPointer() (+1 more)
+Nodes (8): createInlineEditStreamBatcher(), createInlineEditStreamSession(), findSafeScanEnd(), inlineEditFrameScheduler, InlineEditStreamHandlers, InlineEditStreamState, parseInlineEditStream(), TAG_TOKENS
+
+### Community 334 - "Community 334"
+Cohesion: 0.32
+Nodes (3): ServerReferenceContextAvailability, ServerReferenceContextCapabilityHost, ServerReferenceContextService
+
+### Community 338 - "Community 338"
+Cohesion: 0.38
+Nodes (3): AppServerGrantedPermissionProfile, AppServerPermissionsApprovalParams, AppServerPermissionsApprovalResponse
 
 ### Community 339 - "Community 339"
-Cohesion: 0.40
-Nodes (4): CanvasGenerationFlowPorts, CanvasIntegrationPorts, CanvasAuxTarget, EditRevertServicePort
+Cohesion: 0.38
+Nodes (3): AppServerFileChangeApprovalDecision, AppServerFileChangeApprovalParams, AppServerFileChangeApprovalResponse
 
-### Community 340 - "Community 340"
-Cohesion: 0.33
-Nodes (4): formatTimestamp(), parseRate(), PRICE_FIELDS, PriceField
+### Community 342 - "Community 342"
+Cohesion: 0.57
+Nodes (6): externalMemoryProjectDir(), hashWorkspacePath(), memoryIndexPath(), memoryProjectDir(), memoryProjectFile(), sanitizeProjectSlug()
 
-### Community 346 - "Community 346"
+### Community 343 - "Community 343"
+Cohesion: 0.29
+Nodes (5): buildTrailingAssistantPatchCompletionDebugLoggingContext(), buildTrailingAssistantPatchSkippedDebugPlanningContext(), buildTrailingAssistantPatchSuccessPlanningContextPlanSourceContract(), withTrailingAssistantTurnBodyScope(), TrailingAssistantPatchSuccessPlan
+
+### Community 350 - "Community 350"
 Cohesion: 0.40
 Nodes (4): Element, ElementClass, ElementType, IntrinsicElements
+
+### Community 351 - "Community 351"
+Cohesion: 0.67
+Nodes (3): INLINE_EDIT_BUILTIN_PRESET_IDS, listBuiltinInlineEditPresets(), listEffectiveInlineEditPresets()
 
 ## Knowledge Gaps
 - **1845 isolated node(s):** `logger`, `Stage`, `ScopeFields`, `FormRow`, `GITIGNORE_REQUIRED` (+1840 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **89 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **87 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `t()` connect `Community 19` to `Community 0`, `Community 1`, `Community 2`, `Community 3`, `Community 4`, `Community 5`, `Community 8`, `Community 9`, `Community 10`, `Community 11`, `Community 12`, `Community 13`, `Community 14`, `Community 15`, `Community 16`, `Community 21`, `Community 22`, `Community 23`, `Community 25`, `Community 28`, `Community 29`, `Community 30`, `Community 31`, `Community 34`, `Community 35`, `Community 37`, `Community 39`, `Community 41`, `Community 45`, `Community 46`, `Community 49`, `Community 51`, `Community 52`, `Community 53`, `Community 55`, `Community 56`, `Community 57`, `Community 58`, `Community 59`, `Community 61`, `Community 68`, `Community 71`, `Community 76`, `Community 77`, `Community 78`, `Community 82`, `Community 84`, `Community 87`, `Community 88`, `Community 89`, `Community 91`, `Community 96`, `Community 97`, `Community 98`, `Community 99`, `Community 100`, `Community 103`, `Community 104`, `Community 105`, `Community 106`, `Community 111`, `Community 112`, `Community 114`, `Community 116`, `Community 117`, `Community 118`, `Community 119`, `Community 120`, `Community 121`, `Community 123`, `Community 125`, `Community 126`, `Community 129`, `Community 130`, `Community 133`, `Community 134`, `Community 135`, `Community 137`, `Community 141`, `Community 144`, `Community 145`, `Community 147`, `Community 148`, `Community 149`, `Community 150`, `Community 153`, `Community 156`, `Community 157`, `Community 158`, `Community 160`, `Community 163`, `Community 164`, `Community 167`, `Community 168`, `Community 169`, `Community 171`, `Community 172`, `Community 175`, `Community 176`, `Community 177`, `Community 178`, `Community 179`, `Community 181`, `Community 184`, `Community 185`, `Community 186`, `Community 188`, `Community 190`, `Community 193`, `Community 194`, `Community 196`, `Community 197`, `Community 199`, `Community 203`, `Community 207`, `Community 209`, `Community 210`, `Community 211`, `Community 215`, `Community 216`, `Community 217`, `Community 218`, `Community 219`, `Community 224`, `Community 226`, `Community 227`, `Community 228`, `Community 231`, `Community 233`, `Community 234`, `Community 235`, `Community 236`, `Community 239`, `Community 240`, `Community 242`, `Community 244`, `Community 246`, `Community 251`, `Community 257`, `Community 258`, `Community 259`, `Community 260`, `Community 261`, `Community 270`, `Community 271`, `Community 272`, `Community 274`, `Community 277`, `Community 279`, `Community 280`, `Community 282`, `Community 284`, `Community 287`, `Community 288`, `Community 290`, `Community 297`, `Community 298`, `Community 299`, `Community 301`, `Community 302`, `Community 303`, `Community 305`, `Community 310`, `Community 311`, `Community 313`, `Community 317`, `Community 318`, `Community 319`, `Community 324`, `Community 327`, `Community 329`, `Community 332`, `Community 333`, `Community 335`, `Community 336`, `Community 337`, `Community 338`, `Community 340`, `Community 341`, `Community 343`, `Community 345`?**
-  _High betweenness centrality (0.242) - this node is a cross-community bridge._
-- **Why does `createLogger()` connect `Community 12` to `Community 0`, `Community 5`, `Community 6`, `Community 7`, `Community 11`, `Community 14`, `Community 18`, `Community 22`, `Community 23`, `Community 24`, `Community 29`, `Community 30`, `Community 31`, `Community 32`, `Community 34`, `Community 39`, `Community 40`, `Community 41`, `Community 43`, `Community 45`, `Community 46`, `Community 47`, `Community 48`, `Community 50`, `Community 51`, `Community 54`, `Community 55`, `Community 56`, `Community 58`, `Community 62`, `Community 69`, `Community 70`, `Community 71`, `Community 72`, `Community 74`, `Community 75`, `Community 78`, `Community 81`, `Community 83`, `Community 86`, `Community 96`, `Community 97`, `Community 99`, `Community 100`, `Community 102`, `Community 106`, `Community 107`, `Community 108`, `Community 110`, `Community 111`, `Community 115`, `Community 117`, `Community 120`, `Community 121`, `Community 122`, `Community 124`, `Community 126`, `Community 127`, `Community 132`, `Community 135`, `Community 140`, `Community 144`, `Community 154`, `Community 156`, `Community 161`, `Community 164`, `Community 165`, `Community 168`, `Community 177`, `Community 178`, `Community 182`, `Community 192`, `Community 195`, `Community 202`, `Community 212`, `Community 213`, `Community 216`, `Community 217`, `Community 218`, `Community 221`, `Community 223`, `Community 229`, `Community 232`, `Community 237`, `Community 243`, `Community 255`, `Community 259`, `Community 260`, `Community 267`, `Community 316`, `Community 321`?**
+- **Why does `t()` connect `Community 16` to `Community 0`, `Community 1`, `Community 2`, `Community 3`, `Community 4`, `Community 5`, `Community 6`, `Community 7`, `Community 8`, `Community 9`, `Community 10`, `Community 11`, `Community 14`, `Community 18`, `Community 21`, `Community 23`, `Community 24`, `Community 25`, `Community 26`, `Community 28`, `Community 29`, `Community 30`, `Community 31`, `Community 32`, `Community 33`, `Community 34`, `Community 35`, `Community 36`, `Community 37`, `Community 38`, `Community 39`, `Community 40`, `Community 42`, `Community 43`, `Community 44`, `Community 46`, `Community 48`, `Community 50`, `Community 51`, `Community 52`, `Community 56`, `Community 57`, `Community 59`, `Community 60`, `Community 61`, `Community 62`, `Community 63`, `Community 64`, `Community 65`, `Community 67`, `Community 68`, `Community 69`, `Community 72`, `Community 76`, `Community 86`, `Community 87`, `Community 88`, `Community 90`, `Community 94`, `Community 95`, `Community 96`, `Community 102`, `Community 103`, `Community 105`, `Community 108`, `Community 112`, `Community 113`, `Community 115`, `Community 116`, `Community 119`, `Community 122`, `Community 124`, `Community 127`, `Community 129`, `Community 131`, `Community 132`, `Community 133`, `Community 134`, `Community 135`, `Community 138`, `Community 139`, `Community 143`, `Community 145`, `Community 150`, `Community 154`, `Community 155`, `Community 157`, `Community 158`, `Community 163`, `Community 166`, `Community 167`, `Community 169`, `Community 170`, `Community 173`, `Community 174`, `Community 175`, `Community 179`, `Community 181`, `Community 182`, `Community 183`, `Community 184`, `Community 185`, `Community 186`, `Community 187`, `Community 188`, `Community 189`, `Community 190`, `Community 192`, `Community 193`, `Community 199`, `Community 200`, `Community 202`, `Community 203`, `Community 204`, `Community 205`, `Community 206`, `Community 213`, `Community 214`, `Community 215`, `Community 216`, `Community 217`, `Community 220`, `Community 221`, `Community 222`, `Community 224`, `Community 228`, `Community 229`, `Community 235`, `Community 236`, `Community 237`, `Community 238`, `Community 241`, `Community 242`, `Community 245`, `Community 248`, `Community 250`, `Community 251`, `Community 255`, `Community 256`, `Community 257`, `Community 260`, `Community 269`, `Community 272`, `Community 275`, `Community 276`, `Community 277`, `Community 278`, `Community 279`, `Community 281`, `Community 282`, `Community 283`, `Community 284`, `Community 287`, `Community 288`, `Community 290`, `Community 291`, `Community 292`, `Community 293`, `Community 297`, `Community 299`, `Community 300`, `Community 303`, `Community 305`, `Community 306`, `Community 307`, `Community 308`, `Community 312`, `Community 315`, `Community 316`, `Community 318`, `Community 319`, `Community 320`, `Community 328`, `Community 332`, `Community 333`, `Community 335`, `Community 336`, `Community 337`, `Community 340`, `Community 344`, `Community 345`, `Community 346`, `Community 351`, `Community 352`?**
+  _High betweenness centrality (0.235) - this node is a cross-community bridge._
+- **Why does `createLogger()` connect `Community 48` to `Community 1`, `Community 5`, `Community 6`, `Community 7`, `Community 8`, `Community 9`, `Community 11`, `Community 14`, `Community 15`, `Community 17`, `Community 20`, `Community 24`, `Community 27`, `Community 29`, `Community 30`, `Community 32`, `Community 33`, `Community 34`, `Community 37`, `Community 38`, `Community 39`, `Community 42`, `Community 43`, `Community 44`, `Community 45`, `Community 46`, `Community 47`, `Community 51`, `Community 52`, `Community 53`, `Community 56`, `Community 60`, `Community 61`, `Community 63`, `Community 68`, `Community 71`, `Community 72`, `Community 73`, `Community 81`, `Community 85`, `Community 88`, `Community 89`, `Community 93`, `Community 95`, `Community 96`, `Community 97`, `Community 98`, `Community 99`, `Community 100`, `Community 103`, `Community 107`, `Community 109`, `Community 110`, `Community 111`, `Community 122`, `Community 123`, `Community 126`, `Community 128`, `Community 131`, `Community 141`, `Community 144`, `Community 149`, `Community 154`, `Community 156`, `Community 161`, `Community 162`, `Community 168`, `Community 179`, `Community 180`, `Community 189`, `Community 194`, `Community 196`, `Community 206`, `Community 209`, `Community 221`, `Community 226`, `Community 230`, `Community 232`, `Community 233`, `Community 244`, `Community 246`, `Community 257`, `Community 259`, `Community 296`, `Community 322`?**
   _High betweenness centrality (0.068) - this node is a cross-community bridge._
-- **Why does `OpenCodianPlugin` connect `Community 15` to `Community 1`, `Community 2`, `Community 5`, `Community 8`, `Community 12`, `Community 13`, `Community 16`, `Community 19`, `Community 21`, `Community 22`, `Community 23`, `Community 24`, `Community 25`, `Community 26`, `Community 28`, `Community 30`, `Community 31`, `Community 35`, `Community 37`, `Community 50`, `Community 51`, `Community 56`, `Community 57`, `Community 58`, `Community 61`, `Community 63`, `Community 68`, `Community 69`, `Community 70`, `Community 75`, `Community 76`, `Community 84`, `Community 85`, `Community 87`, `Community 89`, `Community 93`, `Community 96`, `Community 97`, `Community 98`, `Community 102`, `Community 103`, `Community 106`, `Community 108`, `Community 111`, `Community 113`, `Community 114`, `Community 118`, `Community 119`, `Community 120`, `Community 123`, `Community 125`, `Community 126`, `Community 130`, `Community 134`, `Community 137`, `Community 141`, `Community 145`, `Community 148`, `Community 150`, `Community 156`, `Community 158`, `Community 164`, `Community 168`, `Community 170`, `Community 171`, `Community 172`, `Community 175`, `Community 177`, `Community 184`, `Community 185`, `Community 186`, `Community 193`, `Community 194`, `Community 196`, `Community 197`, `Community 203`, `Community 215`, `Community 216`, `Community 226`, `Community 236`, `Community 244`, `Community 257`, `Community 258`, `Community 259`, `Community 260`, `Community 261`, `Community 270`, `Community 271`, `Community 272`, `Community 280`, `Community 286`, `Community 287`, `Community 288`, `Community 302`, `Community 318`, `Community 319`, `Community 321`, `Community 339`, `Community 340`?**
-  _High betweenness centrality (0.050) - this node is a cross-community bridge._
+- **Why does `OpenCodianPlugin` connect `Community 21` to `Community 0`, `Community 1`, `Community 5`, `Community 9`, `Community 10`, `Community 16`, `Community 18`, `Community 22`, `Community 24`, `Community 25`, `Community 28`, `Community 30`, `Community 31`, `Community 32`, `Community 33`, `Community 34`, `Community 35`, `Community 36`, `Community 38`, `Community 39`, `Community 40`, `Community 42`, `Community 46`, `Community 48`, `Community 51`, `Community 53`, `Community 54`, `Community 56`, `Community 64`, `Community 65`, `Community 67`, `Community 69`, `Community 74`, `Community 76`, `Community 86`, `Community 87`, `Community 88`, `Community 89`, `Community 95`, `Community 99`, `Community 101`, `Community 102`, `Community 103`, `Community 104`, `Community 105`, `Community 107`, `Community 108`, `Community 113`, `Community 116`, `Community 118`, `Community 127`, `Community 131`, `Community 132`, `Community 134`, `Community 138`, `Community 139`, `Community 145`, `Community 146`, `Community 154`, `Community 155`, `Community 158`, `Community 165`, `Community 166`, `Community 167`, `Community 170`, `Community 173`, `Community 174`, `Community 175`, `Community 179`, `Community 180`, `Community 183`, `Community 185`, `Community 188`, `Community 193`, `Community 199`, `Community 202`, `Community 204`, `Community 213`, `Community 220`, `Community 224`, `Community 229`, `Community 248`, `Community 252`, `Community 256`, `Community 257`, `Community 260`, `Community 277`, `Community 278`, `Community 279`, `Community 287`, `Community 290`, `Community 293`, `Community 305`, `Community 316`, `Community 319`, `Community 322`, `Community 336`?**
+  _High betweenness centrality (0.049) - this node is a cross-community bridge._
 - **What connects `logger`, `Stage`, `ScopeFields` to the rest of the system?**
   _1845 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.021523786229668582 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.020218096080165046 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**
-  _Cohesion score 0.0207799965864482 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.01854345799233399 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**
-  _Cohesion score 0.023024594453165882 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.025075778451364012 - nodes in this community are weakly interconnected._

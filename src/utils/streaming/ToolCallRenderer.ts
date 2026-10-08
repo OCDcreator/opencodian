@@ -20,6 +20,7 @@ const STATUS_ICONS: Record<ToolCallStatus, string> = {
   completed: 'check',
   error: 'x',
   blocked: 'shield-off',
+  interrupted: 'pause',
 };
 
 const FALLBACK_TOOL_ICONS: Record<string, string> = {
@@ -186,6 +187,10 @@ export class ToolCallRenderer {
    *  initial render, the lazy first-expansion, and updateResult. */
   private populateExpandedContent(container: HTMLElement, toolCall: ToolCallInfo): void {
     container.empty();
+    if (toolCall.status === 'interrupted') {
+      container.createDiv({ cls: 'streaming-tool-pending', text: t('chat.tool.interruptedOutcome') });
+      return;
+    }
     if (this.isTaskTool(toolCall)) {
       this.renderTaskExpandedContent(container, toolCall);
     } else if (toolCall.kind === 'mcp') {
