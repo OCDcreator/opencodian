@@ -653,6 +653,7 @@ export default class OpenCodianPlugin extends Plugin {
         codexSettings: this.settings.backendSettings.codex,
         codexTracePort: this.codexTraceService,
         getPiSettings: () => this.settings.backendSettings.pi,
+        formatPiCommandCompleted: (command) => t('chat.pi.commandCompleted', { command }),
         getZCodeSettings: () => this.settings.backendSettings.zcode,
         getOpenCode2Settings: () => this.settings.backendSettings.opencode2,
         getCodexExtraEnv: () => this.getDomainEnvFor('codex'),

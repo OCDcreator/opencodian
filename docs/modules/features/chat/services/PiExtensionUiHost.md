@@ -13,3 +13,5 @@
 ## 验证
 
 SDK脚本验证9方法往返，Test Vault验证真实Obsidian主机，详见Pi验收报告。
+
+OAuth URL notices retain a request-ID scoped abort lifetime without a protocol response. Native login settlement cancels oauth-link, hides the authorization link, and releases its listener; ordinary timed notifications are unchanged.

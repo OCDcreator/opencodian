@@ -71,3 +71,5 @@ The composition root injects the OpenCode 2 settings callback into adapter wirin
 Codex native child 的目录恢复复用同 native ID 的本地 conversation，保留历史与 session model override；local forget/native delete 边界和其他后端路径不变。
 
 2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `app.composition` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+The plugin composition supplies Pi extension-command completion localization through the existing adapter wiring callback, keeping the Pi service boundary independent of the locale runtime.

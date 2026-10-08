@@ -6083,6 +6083,8 @@ export const zhTranslations = {
   'settings.zcode.management.authValue.required': "需要认证",
   'settings.zcode.management.authValue.failed': "认证失败",
   'settings.zcode.management.authValue.unknown': "未知",
+  'chat.pi.commandCompleted': '命令已执行：{command}',
+
 } as const;
 
 

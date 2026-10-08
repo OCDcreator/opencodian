@@ -41,3 +41,5 @@ wireHiddenAdapters 惰性注册 ZCodeAdapter（getZCodeSettings / getZCodeExtraE
 ## 2026-09-27 OpenCode 2 compatibility
 
 Registers OpenCode2Adapter when a Vault path and settings callback exist. Construction is lazy; the adapter starts only when selected.
+
+The plugin composition supplies Pi extension-command completion localization through the existing adapter wiring callback, keeping the Pi service boundary independent of the locale runtime.

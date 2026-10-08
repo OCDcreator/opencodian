@@ -96,3 +96,8 @@ Codex 模型目录发送准备和旧历史身份恢复在既有服务 owner 内�
 ## 2026-10-08 Cold-start model catalog retry
 
 Opening the model picker refreshes an unloaded/empty catalog through the existing reloadModelCatalog path. This retries a startup CLI fallback after native model/list becomes ready. A populated snapshot is reused; no synthetic model or new runtime owner is introduced.
+
+
+2026-10-07 Pi completion history reconcile 的纯 metadata/identity 合并放在现有 authoritative merge 模块；原生历史仍归 PiAdapter，不读取 SDK/进程或建立新会话真值。
+
+OAuth URL notices retain a request-ID scoped abort lifetime without a protocol response. Native login settlement cancels oauth-link, hides the authorization link, and releases its listener; ordinary timed notifications are unchanged.

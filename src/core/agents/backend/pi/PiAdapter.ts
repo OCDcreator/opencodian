@@ -2,7 +2,7 @@ import * as path from 'node:path';
 
 import { prependMemoryInjection } from '../../../memory';
 import { prependObsidianToolingInjection } from '../../../obsidianTooling';
-import type { ContextUsageSnapshot, StreamChunk } from '../../../types/chat';
+import type { ChatMessage, ContextUsageSnapshot, StreamChunk } from '../../../types/chat';
 import type { PiBackendSettings } from '../../../types/settings';
 import { AgentCapability, type BackendCapabilities } from '../../AgentCapability';
 import type { AgentAuxQueryCapability, AuxQuerySession, AuxQuerySessionConfig } from '../AgentAuxQueryCapability';
@@ -15,7 +15,7 @@ import { PI_CONFIG_COMMANDS, PI_OPTIONAL_RPC_COMMANDS, PI_RPC_COMMANDS, PI_SDK_C
 import { type PiLaunchOptions, type PiRecord, piRecord, type PiRpcPort } from './PiRpcClient';
 import { PiSessionRuntime } from './PiSessionRuntime';
 import { type PiSessionInfo, PiSessionStore } from './PiSessionStore';
-import { buildPiPrompt, buildPiUsageSnapshot, PiStreamMapper } from './PiStreamMapper';
+import { buildPiPrompt, buildPiUsageSnapshot, PiStreamMapper, toPiChatMessages } from './PiStreamMapper';
 
 export type { PiModelInfo } from './PiProtocol';
 export interface PiAdapterOptions {
@@ -27,6 +27,7 @@ export interface PiAdapterOptions {
   /** R-F7: extra env for spawned Pi service processes (domain environment). */
   getExtraEnv?: () => Record<string, string>;
   onUiRequest?: PiUiHandler;
+  formatCommandCompleted?: (command: string) => string;
 }
 
 /** AgentService facade. Per-session SDK services own execution and native state. */
@@ -133,6 +134,7 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
       workingDirectory: config.workingDirectory,
       executablePath,
       ...(servicePath ? { servicePath } : {}),
+      ...(this.options.getExtraEnv ? { getExtraEnv: this.options.getExtraEnv } : {}),
       ...(config.model ? { model: config.model } : {}),
       ...(config.turnTimeoutMs ? { turnTimeoutMs: config.turnTimeoutMs } : {}),
     });
@@ -211,6 +213,9 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
     const result = await this.command(id, 'get_messages');
     return Array.isArray(result.entries) ? result.entries : Array.isArray(result.messages) ? result.messages : [];
   }
+  async getChatMessages(id: string): Promise<ChatMessage[]> {
+    return toPiChatMessages(await this.getSessionMessages(id));
+  }
   async deleteSession(id: string): Promise<void> {
     await this.exclusive(id, async () => { this.runtime.close(id); await this.store.remove(id); });
   }
@@ -283,13 +288,16 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
       if (generation !== this.generation || run.cancelled) return;
       await this.prepareModel(client, request);
       if (run.cancelled || generation !== this.generation) return;
+      const before = await client.request({ type: 'get_messages' });
+      const knownMessageIds = new Set(Array.isArray(before.entries) ? before.entries.map(piRecord).map((entry) => entry.id) : []);
+      if (run.cancelled || generation !== this.generation) return;
       const mapper = new PiStreamMapper(id);
       yield* this.consumeRequest(client, request, mapper);
       const messages = await client.request({ type: 'get_messages' });
       const entries = Array.isArray(messages.entries) ? messages.entries.map(piRecord) : [];
-      const user = [...entries].reverse().find((entry) => entry.role === 'user');
+      const user = entries.find((entry) => entry.role === 'user' && typeof entry.id === 'string' && !knownMessageIds.has(entry.id));
       if (typeof user?.id === 'string') yield { type: 'user_message_identity', uuid: user.id, sessionId: id };
-      const assistant = [...entries].reverse().find((entry) => entry.role === 'assistant');
+      const assistant = [...entries].reverse().find((entry) => entry.role === 'assistant' && typeof entry.id === 'string' && !knownMessageIds.has(entry.id));
       if (typeof assistant?.id === 'string') yield { type: 'message_metadata', messageId: assistant.id, timestamp: Number(assistant.timestamp) || Date.now(), sessionId: id };
       yield { type: 'context_usage', snapshot: await this.getSessionContextUsageSnapshot(id) };
       yield { type: 'message_stop' };
@@ -349,6 +357,7 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
   }
 
   private async *consumeRequest(client: PiRpcPort, request: AgentChatSendRequest, mapper: PiStreamMapper): AsyncGenerator<StreamChunk> {
+    const extensionCommand = await this.readExtensionCommand(client, request.content);
     const queue: PiRecord[] = [];
     let wake: (() => void) | undefined;
     const enqueue = (event: PiRecord): void => { queue.push(event); wake?.(); };
@@ -367,8 +376,9 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
       const last = await client.request({ type: 'get_last_assistant_text' });
       const history = await client.request({ type: 'get_messages' });
       const finalMessage = Array.isArray(history.messages) ? [...history.messages].reverse().map(piRecord).find((m) => m.role === 'assistant') : undefined;
-      if (finalMessage?.stopReason === 'error') yield { type: 'error', content: String(finalMessage.errorMessage ?? 'Pi request failed.') };
+      if (mapper.sawAssistant && finalMessage?.stopReason === 'error') yield { type: 'error', content: String(finalMessage.errorMessage ?? 'Pi request failed.') };
       if (!mapper.hasText && typeof last.text === 'string' && last.text && mapper.sawAssistant) yield { type: 'text', content: last.text };
+      if (extensionCommand && !mapper.sawAssistant) yield { type: 'text', content: this.options.formatCommandCompleted?.(extensionCommand) ?? `Command completed: ${extensionCommand}` };
     } finally {
       unsubscribe();
       if (!completed) {
@@ -377,6 +387,17 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
         finally { clearTimeout(forceClose); }
       }
     }
+  }
+  private async readExtensionCommand(client: PiRpcPort, content: string): Promise<string | null> {
+    const name = content.trim().match(/^\/([^\s]+)(?:\s|$)/)?.[1];
+    if (!name) return null;
+    const catalog = await client.request({ type: 'get_commands' });
+    if (!Array.isArray(catalog.commands)) return null;
+    const registered = catalog.commands.some((entry) => {
+      const command = piRecord(entry);
+      return command.name === name && command.source === 'extension';
+    });
+    return registered ? `/${name}` : null;
   }
   private nativePath(info: PiSessionInfo): string { return info.sessionFile ? this.store.validateNativePath(info.sessionFile) : this.store.sessionPath(info.id); }
   private async bindNativeState(id: string): Promise<void> {

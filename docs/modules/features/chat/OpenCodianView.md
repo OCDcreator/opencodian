@@ -843,3 +843,7 @@ PiModelSelectionBinding 的 SDK 每模型档位使设置返回/reload 保留尚�
 ## 2026-10-05 Codex 消息前分支与恢复
 
 History 的 Codex 目录向浏览器转发持久化的 Codex native 引用 ID；Resume 转发到插件既有恢复桥，以复用同 native ID 的本地引用。身份恢复、native point-fork 和目录精确读取均由邻接 owner 承担，view 不新增 runtime ownership。
+
+2026-10-07 Pi 完成后同步复用现有 adapter-native 分支与 serialized conversation write；只从 PiAdapter.getChatMessages 取规范化历史，纯合并委托给既有 ConversationAuthoritativeMessageMergeCoordinator 模块。view 不持有第二套 Pi runtime/history state。
+
+Pi 完成后 bypass OpenCode canonical projection（其数据不属于 Pi 会话），进入现有 Pi getChatMessages native 回读和全文合并；不从 unrelated projection 宣称同步成功。

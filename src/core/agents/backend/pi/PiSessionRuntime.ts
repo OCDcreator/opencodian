@@ -76,6 +76,7 @@ export class PiSessionRuntime {
     if (message.type === 'extension_ui_cancel') { connection.dialogs.get(String(message.id))?.abort(); return; }
     if (message.type !== 'extension_ui_request') return;
     const needsResponse = ['select', 'confirm', 'input', 'editor'].includes(String(message.method));
+    const hasLifetime = needsResponse || (message.method === 'notify' && typeof message.url === 'string');
     const handle = this.options.onUiRequest;
     if (!handle) {
       if (needsResponse) connection.client.respond?.({ id: message.id, cancelled: true });
@@ -83,10 +84,13 @@ export class PiSessionRuntime {
     }
     const dialog = new AbortController();
     const id = String(message.id);
-    if (needsResponse) connection.dialogs.set(id, dialog);
-    void handle({ ...message, sessionId }, needsResponse ? dialog.signal : connection.abort.signal).then((response) => {
+    if (hasLifetime) {
+      connection.dialogs.get(id)?.abort();
+      connection.dialogs.set(id, dialog);
+    }
+    void handle({ ...message, sessionId }, hasLifetime ? dialog.signal : connection.abort.signal).then((response) => {
       if (needsResponse) connection.client.respond?.({ ...piRecord(response), id: message.id, ...(response ? {} : { cancelled: true }) });
     }).catch(() => { if (needsResponse) connection.client.respond?.({ id: message.id, cancelled: true }); })
-      .finally(() => { connection.dialogs.delete(id); });
+      .finally(() => { if (connection.dialogs.get(id) === dialog) connection.dialogs.delete(id); });
   }
 }

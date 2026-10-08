@@ -665,3 +665,5 @@ OpenCode 2 inherited server permission mode has Chinese label and explanation.
 新增 settings.codex.readback.statusPermissionDenied / messagePermissionDenied，与英文键对应，明确权限拒绝与普通失败的区别；不回显原始服务错误或认证信息。
 
 2026-10-07: 新增通用会话目录权限拒绝说明，与空目录、普通失败和不可用分别呈现。
+
+Includes the localized Pi extension-command completion status used only after a registered native command finishes without a model turn.

@@ -37,3 +37,13 @@ tests/unit/core/agents/backend/pi/，scripts/pi-sdk-acceptance.mjs，scripts/pi-
 getAvailableThinkingLevels(sessionId?:string) 与 getSessionEntries(sessionId:string,since?:string) 复用既有 allowlisted command。sessionId 使用 plugin-local store handle，经 requireSession 映射 native file；since 使用 native entry ID。typed facade 校验返回结构，原样保留动态 level 字符串、native id/parentId/leafId 和未知节点字段，旧SDK unavailable 不变为空数据。缺 local session handle 的 entries 在派发前拒绝。
 
 PiAdapter.uiReads.test.ts 覆盖动态 max/future strings、since/空原生历史、unavailable/failure、缺会话/坏结构。产品工作台与 Pi 模型绑定已有消费；真实 native 证据单独由 native-t12 提供，此 worker 未运行付费模型。
+
+2026-10-07 Pi queue history: prompt 前保存原生 entry ID 集合，收尾只将第一个新增 user ID 关联到本次 UI input；queued/steering user 不覆盖该身份，SDK command 没有新增 user 时不绑定旧 ID。getChatMessages 经既有 PiStreamMapper 提供完整规范化原生历史，供聊天收尾使用。
+
+辅助查询与内联补全原样透传同一 live getExtraEnv 回调到 PiAuxQuerySession/RPC spawn；当前 provider domain 环境在启动时读取，严格工具 allowlist/native readback 保持。
+
+Registered extension commands that complete successfully without an assistant turn receive a local command-completed status. Command registration and native prompt success are both required; unknown/failed commands are never promoted to success. Final message metadata is emitted only for an assistant entry created by the current send, preventing a previous turn identity from binding to a command status.
+
+Command confirmation text is formatted by an injected host callback; direct consumers receive a plain English fallback. PiAdapter retains the existing shared-contract-only isolation boundary.
+
+Bundled Pi service forwards modern ModelRuntime OAuth LoginOptions.getDeviceId from the configured installation SettingsManager; minimum AuthStorage login remains unchanged. Auth ACK is separate from browser authorization and credential activation.

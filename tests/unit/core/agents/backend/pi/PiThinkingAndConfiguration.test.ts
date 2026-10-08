@@ -4,5 +4,5 @@ import { join } from 'node:path';
 it('runs real Pi command/configuration handlers with isolated offline file fixtures', () => {
   const output = execFileSync(process.execPath, ['--test', '--test-reporter=tap', join(__dirname, 'PiThinkingAndConfiguration.test.mjs')], { cwd: process.cwd(), encoding: 'utf8', windowsHide: true });
   expect(output).toContain('# fail 0');
-  expect(output).toContain('# pass 4');
+  expect(output).toContain('# pass 8');
 }, 30000);

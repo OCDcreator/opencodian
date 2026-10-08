@@ -95,7 +95,9 @@ export async function startPiService(sdkPath, options, streams = process) {
   };
   host.ui = createExtensionUi(write, sdk.getMarkdownTheme?.());
   // Only explicit package management commands use persistent SDK settings.
-  host.packages = new sdk.DefaultPackageManager({ cwd, agentDir, settingsManager: sdk.SettingsManager.create(cwd, agentDir) });
+  const installationSettings = sdk.SettingsManager.create(cwd, agentDir);
+  host.getDeviceId = () => installationSettings.getOrCreateDeviceId();
+  host.packages = new sdk.DefaultPackageManager({ cwd, agentDir, settingsManager: installationSettings });
   host.packages.setProgressCallback((event) => write({ type: 'package_progress', ...event }));
   const factory = async ({ sessionManager, sessionStartEvent }) => {
     const services = await sdk.createAgentSessionServices({ cwd, agentDir, ...(modelRuntime ? { modelRuntime } : { authStorage: auth }), settingsManager: settings });

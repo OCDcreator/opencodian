@@ -8,6 +8,7 @@ import { PI_CONFIG_COMMANDS, PI_RPC_COMMANDS, PI_SDK_COMMANDS } from '../../../.
 import type { PiLaunchOptions, PiRecord, PiRpcPort } from '../../../../../../src/core/agents/backend/pi/PiRpcClient';
 import { buildPiPrompt, buildPiUsageSnapshot, PiStreamMapper, toPiChatMessages } from '../../../../../../src/core/agents/backend/pi/PiStreamMapper';
 import type { StreamChunk } from '../../../../../../src/core/types/chat';
+import { t } from '../../../../../../src/i18n';
 
 class FakeClient implements PiRpcPort {
   commands: PiRecord[] = [];
@@ -35,7 +36,7 @@ class FakeClient implements PiRpcPort {
       case 'prompt': await this.onPrompt(this); return {};
       case 'abort': this.pending?.(); return {};
       case 'get_last_assistant_text': return { text: 'Answer' };
-      case 'get_messages': return { messages: [{ role: 'assistant', content: 'Answer', stopReason: 'stop' }], entries: [{ id: 'u1', role: 'user', content: 'Question' }, { id: 'a1', role: 'assistant', content: 'Answer' }] };
+      case 'get_messages': return { messages: [{ role: 'assistant', content: 'Answer', stopReason: 'stop' }], entries: this.commands.some(command => command.type === 'prompt') ? [{ id: 'u1', role: 'user', content: 'Question' }, { id: 'a1', role: 'assistant', content: 'Answer' }] : [] };
       case 'get_session_stats': return { cost: 0.123, tokens: { input: 100, output: 20 }, contextUsage: { tokens: 500, contextWindow: 200000 } };
       default: return {};
     }
@@ -51,13 +52,39 @@ describe('Pi SDK service lifecycle', () => {
   let prompt: ((client: FakeClient) => Promise<void>) | undefined;
   beforeEach(async () => {
     directory = await fs.mkdtemp(path.join(tmpdir(), 'pi-unit-')); clients = []; prompt = undefined;
-    adapter = new PiAdapter({ workingDirectory: directory, sessionDirectory: directory, createClient: (options) => {
+    adapter = new PiAdapter({ workingDirectory: directory, sessionDirectory: directory, formatCommandCompleted: (command) => t('chat.pi.commandCompleted', { command }), createClient: (options) => {
       const client = new FakeClient(options); if (prompt) client.onPrompt = prompt; clients.push(client); return client;
     } });
   });
   afterEach(async () => { adapter.dispose(); await fs.rm(directory, { recursive: true, force: true }); });
   it('registers lazily and validates the service capability handshake', async () => {
     expect(clients).toHaveLength(0); await adapter.start(); expect(adapter.status).toBe('connected'); expect(adapter.getDefaultModel()).toEqual({ provider: 'test', model: 'one' });
+  });
+  it('reports a successful registered extension command without reusing an old assistant identity', async () => {
+    const id = await adapter.createSession('Command');
+    const client = clients[0]!;
+    const original = client.request.bind(client);
+    client.request = async (command) => {
+      if (command.type === 'get_commands') return { commands: [{ name: 'owned-plan', source: 'extension' }] };
+      if (command.type === 'get_messages') return { entries: [{ id: 'old-assistant', role: 'assistant', content: 'old answer' }] };
+      if (command.type === 'prompt') return {};
+      return original(command);
+    };
+    const chunks = await collect(adapter.sendMessage({ sessionId: id, content: '/owned-plan on' }));
+    expect(chunks).toContainEqual({ type: 'text', content: t('chat.pi.commandCompleted', { command: '/owned-plan' }) });
+    expect(chunks.some(chunk => chunk.type === 'message_metadata')).toBe(false);
+    expect(chunks.some(chunk => chunk.type === 'user_message_identity')).toBe(false);
+  });
+  it('does not turn an unknown or failed slash request into command success', async () => {
+    const id = await adapter.createSession('Unknown');
+    const client = clients[0]!;
+    const original = client.request.bind(client);
+    client.request = async command => {
+      if (command.type === 'get_commands') return { commands: [{ name: 'other', source: 'extension' }] };
+      if (command.type === 'prompt') throw new Error('command failed');
+      return original(command);
+    };
+    await expect(collect(adapter.sendMessage({ sessionId: id, content: '/owned-plan on' }))).rejects.toThrow('command failed');
   });
   it('retains the service between turns and emits native IDs plus actual cost/context', async () => {
     const id = await adapter.createSession('Chat');
@@ -113,6 +140,7 @@ describe('Pi SDK service lifecycle', () => {
   it('reads native history and persists title independently of other sessions', async () => {
     const a = await adapter.createSession('A'), b = await adapter.createSession('B');
     await adapter.updateSessionTitle(a, 'Renamed'); expect(await adapter.getSession(a)).toMatchObject({ title: 'Renamed' });
+    await collect(adapter.sendMessage({ sessionId: a, content: 'Question' }));
     expect(await adapter.getSessionMessages(a)).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'u1' })]));
     await adapter.deleteSession(a); expect(await adapter.getSession(a)).toBeNull(); expect(await adapter.getSession(b)).not.toBeNull();
   });

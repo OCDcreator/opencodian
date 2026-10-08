@@ -59,3 +59,47 @@ test('revision conflict and invalid known values fail without replacing the pers
   assert.throws(() => config.saveSettings({ scope: 'project', revision: before.scopes.project.revision, changes: { defaultThinkingLevel: 'not-a-level' } }), /unsupported value/);
   assert.equal(readFileSync(files.project, 'utf8'), raw);
 });
+
+test('modern OAuth receives the installation device ID callback and keeps cancellation separate', async () => {
+  const getDeviceId = () => '29dddf8f-78c8-4f07-8c62-314f183ace48';
+  let calls = 0;
+  const host = { sdk: {}, runtime: { session: { modelRegistry: {}, sessionManager: {} } }, auth: {}, getDeviceId,
+    ui: {}, modelRuntime: { async login(provider, method, interaction, options) {
+      calls += 1;
+      assert.equal(provider, 'openai');
+      assert.equal(method, 'oauth');
+      assert.equal(options?.getDeviceId, getDeviceId);
+      assert.equal(options.getDeviceId(), getDeviceId());
+      assert.equal(interaction.signal.aborted, false);
+      throw new Error('Login cancelled');
+    } } };
+  await assert.rejects(executeCommand(host, { type: 'login', provider: 'openai' }), /Login cancelled/);
+  assert.equal(calls, 1);
+  assert.equal(host.loginAbort, undefined);
+});
+test('minimum OAuth keeps the original AuthStorage login callback interface', async () => {
+  let calls = 0;
+  const host = { sdk: {}, runtime: { session: { modelRegistry: {}, sessionManager: {} } },
+    auth: { async login(provider, callbacks) { calls += 1; assert.equal(provider, 'openai-codex'); assert.ok(callbacks.signal); } }, ui: {} };
+  assert.deepEqual(await executeCommand(host, { type: 'login', provider: 'openai-codex' }), { authenticated: true });
+  assert.equal(calls, 1);
+  assert.equal(host.loginAbort, undefined);
+});
+
+test('OAuth settlement cancels the exact authorization URL notice', async () => {
+  const events = [];
+  const host = { sdk: {}, runtime: { session: { modelRegistry: {}, sessionManager: {} } },
+    auth: { async login() { throw new Error('Cancelled'); } }, ui: {}, send: event => events.push(event) };
+  await assert.rejects(executeCommand(host, { type: 'login', provider: 'openai-codex' }), /Cancelled/);
+  assert.deepEqual(events, [{ type: 'extension_ui_cancel', id: 'oauth-link' }]);
+});
+
+test('modern OAuth forwards an entered empty text value and distinguishes cancelled UI', async () => {
+  const host = { sdk: {}, runtime: { session: { modelRegistry: {}, sessionManager: {} } }, auth: {},
+    ui: { async ask() { return ''; } }, modelRuntime: { async login(_provider, _method, interaction) {
+      assert.equal(await interaction.prompt({ type: 'text', message: 'blank selects default' }), '');
+    } } };
+  assert.deepEqual(await executeCommand(host, { type: 'login', provider: 'github-copilot' }), { authenticated: true });
+  host.ui.ask = async () => undefined;
+  await assert.rejects(executeCommand(host, { type: 'login', provider: 'github-copilot' }), /Login cancelled/);
+});

@@ -204,7 +204,7 @@ export async function executeCommand(host, c) {
               if (!id) throw new Error('Login cancelled.'); return id;
             }
             const value = await host.ui.ask('input', { title: prompt.message, placeholder: prompt.placeholder }, { signal });
-            if (!value) throw new Error('Login cancelled.'); return value;
+            if (value === undefined) throw new Error('Login cancelled.'); return value;
           },
           notify: event => {
             if (event.type === 'auth_url') callbacks.onAuth(event);
@@ -212,10 +212,10 @@ export async function executeCommand(host, c) {
             else if (event.type === 'progress') callbacks.onProgress(event.message);
             else callbacks.onAuth({ instructions: event.message, url: event.links?.[0]?.url });
           },
-        });
+        }, { getDeviceId: host.getDeviceId });
         else await host.auth.login(required(c.provider, 'Provider'), callbacks);
         return { authenticated: true }; }
-      finally { host.loginAbort = undefined; }
+      finally { host.loginAbort = undefined; host.send?.({ type: 'extension_ui_cancel', id: 'oauth-link' }); }
     }
     case 'logout': await host.auth.logout(required(c.provider, 'Provider')); return { loggedOut: true };
     case 'get_packages': return { packages: host.packages.listConfiguredPackages() };

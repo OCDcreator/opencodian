@@ -130,3 +130,5 @@ Codex CLI account/model fallback reads snapshot the current provider-domain envi
 ## 2026-10-08 Codex auxiliary cancellation
 
 Timeout, request abort, explicit cancel and dispose settle locally within the original budget and interrupt the exact admitted native turn once. A late turn/start acknowledgement after local cancellation is interrupted using its captured owned thread/turn ID, so it cannot survive the cancelled request. Pre-aborted requests send no native turn. Failed/interrupted native terminals cannot admit partial replacement text. Read-only sandbox, no network, never approvals and ephemeral readback remain required.
+
+The plugin composition supplies Pi extension-command completion localization through the existing adapter wiring callback, keeping the Pi service boundary independent of the locale runtime.

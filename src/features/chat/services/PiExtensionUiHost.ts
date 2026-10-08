@@ -46,6 +46,15 @@ export async function presentPiUiRequest(app: App, request: PiServiceEvent, sign
     const notice = new Notice(String(request.message ?? ''), request.url ? 0 : 6000);
     if (typeof request.url === 'string' && /^https?:\/\//i.test(request.url)) {
       notice.noticeEl.createEl('a', { text: '打开登录页面 / Open sign-in page', href: request.url, attr: { target: '_blank', rel: 'noopener noreferrer' } });
+      return new Promise<void>((resolve) => {
+        const close = (): void => {
+          signal.removeEventListener('abort', close);
+          notice.hide();
+          resolve();
+        };
+        if (signal.aborted) close();
+        else signal.addEventListener('abort', close, { once: true });
+      });
     }
     return;
   }

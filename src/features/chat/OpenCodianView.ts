@@ -196,6 +196,7 @@ import {
   ComposerInputShellCoordinator,
   type ComposerInputShellCoordinatorHost,
 } from './services/ComposerInputShellCoordinator';
+import { mergePiNativeConversationMessages } from './services/ConversationAuthoritativeMessageMergeCoordinator';
 import {
   type ConversationAuthoritativeSyncCoordinator,
   type ConversationAuthoritativeSyncHost,
@@ -4250,9 +4251,10 @@ export class OpenCodianView extends ItemView {
     fingerprint: string;
     revertState: ConversationRevertState | null;
   }> {
-    if (conversation.backend === 'opencode2') {
+    const backend = conversation.backend;
+    if (backend === 'opencode2' || backend === 'pi') {
       const sessionId = getConversationBackendSessionId(conversation);
-      const adapter = this.plugin.agentServiceRegistry?.get('opencode2') as {
+      const adapter = this.plugin.agentServiceRegistry?.get(backend) as {
         getChatMessages?(id: string): Promise<ChatMessage[]>;
         getSessionRevertState?(id: string): Promise<ConversationRevertState | null>;
       } | undefined;
@@ -4272,7 +4274,7 @@ export class OpenCodianView extends ItemView {
       const bySourceId = new Map(previousMessages.filter((message) => message.sourceMessageId)
         .map((message) => [message.sourceMessageId, message]));
       const unmatched = previousMessages.filter((message) => !message.sourceMessageId);
-      const merged = visibleServerMessages.map((message) => {
+      const merged = backend === 'pi' ? mergePiNativeConversationMessages(previous, visibleServerMessages) : visibleServerMessages.map((message) => {
         const existing = bySourceId.get(message.sourceMessageId) ?? unmatched.find((candidate) =>
           candidate.role === message.role && (candidate.content === message.content
             || (candidate.role === 'user' && message.content.includes(candidate.content))));
@@ -4290,12 +4292,12 @@ export class OpenCodianView extends ItemView {
           toolCalls: message.toolCalls ?? existing.toolCalls,
         };
       });
-      merged.push(...notices);
+      if (backend !== 'pi') merged.push(...notices);
       const before = this.conversationIdentityRuntime.getConversationSyncFingerprint(previous);
       const after = this.conversationIdentityRuntime.getConversationSyncFingerprint(merged);
       if (before !== after) {
         const ticket = this.createConversationWriteTicket(conversation.id);
-        const applied = await this.commitConversationWrite(conversation, ticket, 'opencode2-server-sync', () => {
+        const applied = await this.commitConversationWrite(conversation, ticket, `${backend}-server-sync`, () => {
           conversation.messages = merged;
         });
         return { messages: applied ? merged : previous, changed: applied,
@@ -4324,7 +4326,7 @@ export class OpenCodianView extends ItemView {
     fingerprint: string;
     revertState: ConversationRevertState | null;
   } | null> {
-    if (conversation.backend === 'opencode2') return null;
+    if (conversation.backend === 'opencode2' || conversation.backend === 'pi') return null;
     const result = await this.conversationAuthoritativeSyncCoordinator.syncConversationMessagesFromCanonicalState(
       conversation,
       tabId,

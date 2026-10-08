@@ -395,3 +395,5 @@ Inline edit model choices read the OpenCode 2 native catalog when that backend i
 ## 2026-10-05 Codex 消息前分支与恢复
 
 createConversationFromBackendSession 对同一个已存在的 Codex native thread 复用本地 conversation，保留完整历史、native identity 和会话模型覆盖；其他后端仍走原创建路径。local forget 仍仅清本地引用，不删除 native thread。
+
+The plugin composition supplies Pi extension-command completion localization through the existing adapter wiring callback, keeping the Pi service boundary independent of the locale runtime.

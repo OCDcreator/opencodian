@@ -14,3 +14,7 @@ buildPiPrompt 保留文件/选择上下文与图片；buildPiUsageSnapshot 分�
 ## 验证
 
 PiAdapter.test.ts、SDK验收脚本、Test Vault；不得导入其他后端实现。
+
+2026-10-07 Pi native history 保留 assistant 的真实 provider/model ID；缺字段时保持 unavailable，不用当前 composer 模型补写历史身份。
+
+Native toolResult 同时更新同 tool ID 的 ToolCallInfo 和已有 tool_use content block 的 toolStatus/toolResult/toolMetadata。历史 renderer 读取 content block，拒写/error 不能在权威同步后退回 running。

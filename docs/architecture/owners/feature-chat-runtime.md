@@ -82,3 +82,6 @@ Codex 原生单条文本的纠正先通过 serialized write 保存，再经既�
 settled Codex footer 的最小刷新留在已有 composition callback，并守住 active tab、conversation ID 和 native thread 三个归属条件，不增加 view-local runtime owner。
 
 2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.chat-runtime` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+
+2026-10-07 成功 Pi prompt 进入既有 after-stream sync；SDK/process/history 读取仍经 adapter-native view 分支，不借用 OpenCode transport。

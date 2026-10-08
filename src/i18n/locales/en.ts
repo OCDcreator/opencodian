@@ -6084,6 +6084,8 @@ export const enTranslations = {
   'settings.zcode.management.authValue.required': "Required",
   'settings.zcode.management.authValue.failed': "Failed",
   'settings.zcode.management.authValue.unknown': "Unknown",
+  'chat.pi.commandCompleted': 'Command completed: {command}',
+
 } as const;
 
 

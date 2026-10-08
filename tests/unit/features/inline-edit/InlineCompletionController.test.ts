@@ -494,3 +494,47 @@ describe('InlineCompletionController IME guard (acceptance 6, controller side)',
     harness.destroy();
   });
 });
+
+
+describe('InlineCompletionController progressive failure cleanup', () => {
+  it.each(['cancelled', 'failed', 'rejected', 'write-tool'] as const)(
+    'clears a streamed candidate after a %s terminal result and ignores late chunks',
+    async (terminal) => {
+      const harness = makeHarness();
+      harness.setCursor(DOC.length);
+      harness.controller.trigger({ cm: harness.view } as never, 'notes/report.md');
+      await flush();
+      const deferred = harness.currentSession.deferreds[0]!;
+      deferred.request.onTextChunk?.(' a streamed candidate.');
+      expect(readInlineCompletionGhost(harness.view.state)).not.toBeNull();
+      if (terminal === 'rejected') deferred.reject(new Error('transport failed'));
+      else if (terminal === 'write-tool') {
+        deferred.resolve({ ok: true, text: ' unsafe candidate.', toolCalls: [{ name: 'write' }] });
+      } else deferred.resolve({ ok: false, cancelled: terminal === 'cancelled', error: 'stopped' });
+      await flush();
+      expect(readInlineCompletionGhost(harness.view.state)).toBeNull();
+      deferred.request.onTextChunk?.(' late candidate.');
+      expect(readInlineCompletionGhost(harness.view.state)).toBeNull();
+      expect(harness.controller.accept(harness.view)).toBe(false);
+      expect(harness.view.state.doc.toString()).toBe(DOC);
+      harness.destroy();
+    },
+  );
+
+  it('Esc aborts a progressive turn before its final response', async () => {
+    const harness = makeHarness();
+    harness.setCursor(DOC.length);
+    harness.controller.trigger({ cm: harness.view } as never, 'notes/report.md');
+    await flush();
+    const deferred = harness.currentSession.deferreds[0]!;
+    deferred.request.onTextChunk?.(' a pending candidate.');
+    expect(harness.pressKey('Escape')).toBe(true);
+    expect(deferred.request.signal?.aborted).toBe(true);
+    deferred.request.onTextChunk?.(' late candidate.');
+    deferred.resolve({ ok: true, text: ' late candidate.', toolCalls: [] });
+    await flush();
+    expect(readInlineCompletionGhost(harness.view.state)).toBeNull();
+    expect(harness.view.state.doc.toString()).toBe(DOC);
+    harness.destroy();
+  });
+});

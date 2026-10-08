@@ -80,6 +80,7 @@ export interface PiAuxSessionOptions {
   readonly workingDirectory: string;
   readonly executablePath: string;
   readonly servicePath?: string;
+  readonly getExtraEnv?: () => Record<string, string>;
   readonly turnTimeoutMs?: number;
 }
 
@@ -114,6 +115,7 @@ export class PiAuxQuerySession implements AuxQuerySession {
         sessionDirectory: scopeDir,
         executablePath: options.executablePath,
         ...(options.servicePath ? { servicePath: options.servicePath } : {}),
+        ...(options.getExtraEnv ? { getExtraEnv: options.getExtraEnv } : {}),
       });
 
       const state = await client.request({ type: 'get_state' }, 0);
@@ -180,7 +182,10 @@ export class PiAuxQuerySession implements AuxQuerySession {
   }
 
   cancel(): void {
-    this.turnAbort?.abort();
+    if (this.turnAbort) {
+      this.turnAbort.abort();
+      return;
+    }
     const client = this.client;
     if (client) {
       void Promise.resolve(client.request({ type: 'abort' }, 10_000)).catch((error: unknown) => {
@@ -236,13 +241,24 @@ export class PiAuxQuerySession implements AuxQuerySession {
     request: AuxQueryTurnRequest,
     includeSystemPrompt: boolean,
   ): Promise<AuxQueryResult> {
+    if (request.signal?.aborted) {
+      return { success: false, error: 'Pi auxiliary turn was cancelled.', cancelled: true };
+    }
     const abort = new AbortController();
     this.turnAbort = abort;
+    const sendAbort = () => {
+      void Promise.resolve(client.request({ type: 'abort' }, 10_000)).catch((error: unknown) => {
+        logger.debug('Pi auxiliary abort failed', error);
+      });
+    };
+    abort.signal.addEventListener('abort', sendAbort, { once: true });
+    const forwardAbort = () => abort.abort();
     const observed: AuxObservedToolCall[] = [];
     const seen = new Set<string>();
     let streamed = '';
     const unsubscribe = client.subscribe((event) => {
       const record = piRecord(event);
+      if (abort.signal.aborted) return;
       if (record.type === 'message_update') {
         // Progressive text emission (R-A3): same `text_delta` shape the chat
         // stream mapper consumes (PiStreamMapper.mapDelta). Render-only — the
@@ -265,10 +281,13 @@ export class PiAuxQuerySession implements AuxQuerySession {
       () => abort.abort(),
       this.options.turnTimeoutMs ?? DEFAULT_TURN_TIMEOUT_MS,
     );
-    request.signal?.addEventListener('abort', () => abort.abort(), { once: true });
+    request.signal?.addEventListener('abort', forwardAbort, { once: true });
 
     try {
       await this.applyModel(client);
+      if (abort.signal.aborted) {
+        return { success: false, error: 'Pi auxiliary turn was cancelled.', cancelled: true };
+      }
       const message = includeSystemPrompt
         ? `${this.options.systemPrompt}\n\n---\n\n${request.prompt}`
         : request.prompt;
@@ -287,6 +306,9 @@ export class PiAuxQuerySession implements AuxQuerySession {
         return { success: false, error: 'Pi auxiliary turn was cancelled.', cancelled: true };
       }
       const last = await client.request({ type: 'get_last_assistant_text' });
+      if (abort.signal.aborted) {
+        return { success: false, error: 'Pi auxiliary turn was cancelled.', cancelled: true };
+      }
       const text = typeof last.text === 'string' ? last.text : '';
       if (!text) {
         return { success: false, error: 'Pi auxiliary turn returned an empty response.' };
@@ -300,6 +322,8 @@ export class PiAuxQuerySession implements AuxQuerySession {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     } finally {
       clearTimeout(timeout);
+      request.signal?.removeEventListener('abort', forwardAbort);
+      abort.signal.removeEventListener('abort', sendAbort);
       unsubscribe();
       if (this.turnAbort === abort) this.turnAbort = null;
     }
