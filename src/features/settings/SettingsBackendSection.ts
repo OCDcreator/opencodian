@@ -267,19 +267,12 @@ export class SettingsBackendSection {
           .setValue(this.plugin.settings.activeBackend ?? '')
           .onChange(async (value) => {
             if (value) {
-              const previousActive = this.plugin.settings.activeBackend;
               this.plugin.settings.activeBackend = value as AgentBackendKind;
               // Sync registry active backend
               this.plugin.agentServiceRegistry?.setActive(value as AgentBackendKind);
               await this.plugin.saveSettings();
 
-              // Stop the previous adapter and start the new one
-              if (previousActive && previousActive !== value) {
-                try {
-                  const prevAdapter = this.plugin.agentServiceRegistry?.get(previousActive as AgentBackendKind);
-                  if (prevAdapter) { await prevAdapter.stop(); }
-                } catch { /* best effort */ }
-              }
+              // Keep other enabled adapters available to their existing conversation tabs.
               try {
                 const newAdapter = this.plugin.agentServiceRegistry?.get(value as AgentBackendKind);
                 if (newAdapter) { await newAdapter.start(); }
@@ -399,11 +392,9 @@ export class SettingsBackendSection {
 
     this.ensureValidBackendState();
 
-    // Lifecycle: only start/stop the adapter if the backend IS the active backend.
-    // Enabling a non-active backend should NOT start its adapter.
-    // Disabling a non-active backend only needs registry cleanup (done above).
+    // Start only the active backend; disabling owns teardown even after the default changed.
     try {
-      if (isActive) {
+      if (isActive || !enabled) {
         const adapter = this.plugin.agentServiceRegistry?.get(backend);
         if (adapter) {
           if (enabled) {

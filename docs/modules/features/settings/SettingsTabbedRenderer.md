@@ -73,3 +73,8 @@ Tabbed plugin 内容创建 `SettingsPluginSection` 后，必须通过 `setPlugin
 2026-09-18 `renderConversationContent` 追加 `SettingsImageGenerationSection.attachTabbed`（随二级 tab `image-generation` 显隐）。
 
 2026-09-22 zcode 主页签路由 `SettingsZCodeSection.attachTabbed`（与 pi 同模式）。
+
+
+## 2026-10-08 后台会话与默认后端切换
+
+默认后端选择只决定新会话/设置路由，保留其他已启用 adapter，避免中断后台 tab。禁用该后端和插件卸载负责释放资源；设置页头部按钮与默认后端下拉使用相同语义。两台桌面的长工具调用、目标取消/续聊及后端切换需单独验证，不能由设置 ACK 推断。
