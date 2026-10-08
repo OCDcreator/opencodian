@@ -601,15 +601,24 @@ export class ConversationLoadRecoveryCoordinator {
     forkedSessionId: string,
     targetMessage: ChatMessage,
   ): Promise<Conversation> {
-    return this.host.createConversationFromSession(forkedSessionId, {
+    const messages = cloneMessagesBeforeForkTarget(currentConversation.messages, targetMessage);
+    if (currentConversation.backend === 'claude-code') {
+      for (const message of messages) { delete message.sourceMessageId; delete message.sourceTurnId; }
+    }
+    const child = await this.host.createConversationFromSession(forkedSessionId, {
       title: this.buildForkTitle(currentConversation.title),
-      messages: cloneMessagesBeforeForkTarget(currentConversation.messages, targetMessage),
+      messages,
       currentNote: currentConversation.currentNote,
       externalContextPaths: currentConversation.externalContextPaths,
       backend: currentConversation.backend,
       ...(currentConversation.backend === 'codex' && currentConversation.sessionSettings
         ? { sessionSettings: structuredClone(currentConversation.sessionSettings) } : {}),
     });
+    if (child.backend === 'claude-code') {
+      try { await this.host.backfillClaudeUserMessageIdentities?.(child); }
+      catch { logger.warn('Claude fork child identity readback failed', { conversationId: child.id }); }
+    }
+    return child;
   }
 
   private async openForkInNewTab(

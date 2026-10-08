@@ -72,3 +72,5 @@ The send and slash command composition starts the selected OpenCode 2 adapter an
 
 为 ConversationLoadRecoveryCoordinator 注入 scoped Codex history 读取与既有 serialized conversation-write callback；不反向引用 feature 到 core，不改其他后端。
 Codex turn settled 后，仅在 tab/conversation/native thread 都仍匹配时刷新 user footer，把迟到的 native identity 接到 Fork 控件；保留原消息正文 DOM、滚动位置和其他后端路径。
+
+Claude Code also refreshes settled user footers after native identity arrives. The existing tab, conversation and native-session ownership checks remain; original body DOM and scroll position are preserved.

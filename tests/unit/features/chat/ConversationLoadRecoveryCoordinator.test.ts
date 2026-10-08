@@ -532,6 +532,27 @@ describe('ConversationLoadRecoveryCoordinator rewind and restore', () => {
 });
 
 describe('ConversationLoadRecoveryCoordinator forking', () => {
+  it('clears parent native identities from Claude clones and backfills the child before opening it', async () => {
+    const conversation = createBackendConversation('claude-parent', 'claude-code');
+    const before = createMessage('before', { sourceMessageId: 'parent-user', sourceTurnId: 'parent-turn' });
+    const target = createMessage('target', { sourceMessageId: 'target-user' });
+    conversation.messages = [before, target];
+    const tabs = new TabManager('New chat', { getMaxTabs: () => 4 }); tabs.createTab(conversation);
+    const child = createBackendConversation('child', 'claude-code');
+    const host = createHost(conversation, {
+      getTabManager: jest.fn(() => tabs),
+      createConversationFromSession: jest.fn().mockImplementation(async (_id, initial) => { child.messages = initial.messages; return child; }),
+      backfillClaudeUserMessageIdentities: jest.fn().mockImplementation(async c => { c.messages[0].sourceMessageId = 'child-user'; return true; }),
+    });
+    await new ConversationLoadRecoveryCoordinator(host, createPort()).handleForkRequest(target);
+    const cloned = host.createConversationFromSession.mock.calls[0][1].messages[0];
+    expect(cloned.sourceTurnId).toBeUndefined();
+    expect(host.backfillClaudeUserMessageIdentities).toHaveBeenCalledWith(child);
+    expect(child.messages[0].sourceMessageId).toBe('child-user');
+    expect(before.sourceMessageId).toBe('parent-user');
+    expect(before.sourceTurnId).toBe('parent-turn');
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -703,7 +724,7 @@ describe('ConversationLoadRecoveryCoordinator forking', () => {
     );
     expect(host.createConversationFromSession).toHaveBeenCalledWith('fork-session', {
       title: 'Fork: Claude Chat',
-      messages: [beforeMessage],
+      messages: [{ ...beforeMessage, sourceMessageId: undefined }],
       currentNote: 'Daily.md',
       backend: 'claude-code',
     });

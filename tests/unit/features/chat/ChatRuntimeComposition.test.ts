@@ -51,7 +51,7 @@ describe('ChatRuntimeComposition owner', () => {
     expect(typeof (v.sendPipelineRuntime as { sendMessage: unknown }).sendMessage).toBe('function');
   });
 
-  it('refreshes the visible settled Codex footer after native identity without replacing the message body', () => {
+  it.each(['codex', 'claude-code'] as const)('refreshes the visible settled %s footer after native identity without replacing the message body', (backend) => {
     const view = constructView();
     const v = view as unknown as {
       currentConversation: Conversation;
@@ -60,7 +60,7 @@ describe('ChatRuntimeComposition owner', () => {
       addUserMessageFooter(element: HTMLElement, message: unknown, copy: string): void;
       sendPipelineRuntime: { host: { onTurnSettled(info: { backend: string; conversationId: string; sessionId: string; tabId: string }): void } };
     };
-    v.currentConversation = { id: 'cx-owned', title: 'owned', backend: 'codex', backendSessionId: 'native-thread', createdAt: 1, updatedAt: 1,
+    v.currentConversation = { id: 'cx-owned', title: 'owned', backend, backendSessionId: 'native-thread', createdAt: 1, updatedAt: 1,
       messages: [{ id: 'local-user', role: 'user', content: 'owned', timestamp: 1, sourceMessageId: 'native-user', sourceTurnId: 'native-turn' }] };
     v.messagesContainer = document.createElement('div');
     v.messagesContainer.innerHTML = '<div class="opencodian-message" data-message-id="local-user"><span class="body">owned body</span><div class="opencodian-user-message-footer">Copy only</div></div>';
@@ -69,7 +69,7 @@ describe('ChatRuntimeComposition owner', () => {
     const footer = jest.spyOn(v, 'addUserMessageFooter').mockImplementation(element => {
       element.insertAdjacentHTML('beforeend', '<div class="opencodian-user-message-footer"><button>Fork</button></div>');
     });
-    const info = { backend: 'codex', conversationId: 'cx-owned', sessionId: 'native-thread', tabId: 'active-tab' };
+    const info = { backend, conversationId: 'cx-owned', sessionId: 'native-thread', tabId: 'active-tab' };
     v.sendPipelineRuntime.host.onTurnSettled({ ...info, tabId: 'background-tab' });
     expect(footer).not.toHaveBeenCalled();
     v.sendPipelineRuntime.host.onTurnSettled(info);

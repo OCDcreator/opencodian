@@ -2142,9 +2142,18 @@ export class ClaudeCodeAdapter
     if (!sdk.forkSession) {
       throw new Error('Claude Code forkSession is unavailable in this SDK.');
     }
+    let nativeForkPoint = messageID;
+    if (messageID) {
+      if (!sdk.getSessionMessages) throw new Error('Claude Code message-before fork requires native history.');
+      const messages = await sdk.getSessionMessages(sourceSessionId, { dir: this.options.vaultPath, includeSystemMessages: true }) as Array<{ uuid?: string; type?: string; message?: { content?: unknown } }>;
+      const index = messages.findIndex((message) => message.uuid === messageID);
+      if (index < 0) throw new Error('Claude Code fork target was not found in native history.');
+      nativeForkPoint = messages[index - 1]?.uuid;
+      if (!nativeForkPoint) throw new Error('This Claude Code SDK cannot fork an empty native prefix before the first message.');
+    }
     const result = await sdk.forkSession(sourceSessionId, {
       dir: this.options.vaultPath,
-      ...(messageID ? { upToMessageId: messageID } : {}),
+      ...(nativeForkPoint ? { upToMessageId: nativeForkPoint } : {}),
       title: `${state.title} (fork)`,
     });
     const forkedState: ClaudeCodeSessionState = {

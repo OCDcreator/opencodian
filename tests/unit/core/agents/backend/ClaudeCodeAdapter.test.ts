@@ -1664,6 +1664,7 @@ describe('ClaudeCodeAdapter', () => {
       lastModified: 123,
     });
     sdk.forkSession.mockResolvedValue({ sessionId: 'sdk-session-fork' });
+    sdk.getSessionMessages.mockResolvedValue([{ uuid: 'prior-entry', type: 'assistant' }, { uuid: 'message-1', type: 'user' }]);
     const adapter = new ClaudeCodeAdapter({
       vaultPath: '/vault',
       settings: getDefaultClaudeCodeBackendSettings(),
@@ -1693,7 +1694,7 @@ describe('ClaudeCodeAdapter', () => {
     expect(sdk.renameSession).toHaveBeenCalledWith('sdk-session-2', 'Renamed', { dir: '/vault' });
     expect(sdk.forkSession).toHaveBeenCalledWith('sdk-session-2', {
       dir: '/vault',
-      upToMessageId: 'message-1',
+      upToMessageId: 'prior-entry',
       title: 'Renamed (fork)',
     });
   });
@@ -5561,5 +5562,32 @@ describe('Claude prompt UUID native verification', () => {
     expect(chunks.filter((chunk) => chunk.type === 'user_message_identity')).toEqual([]);
     expect(chunks.some((chunk) => chunk.type === 'text' && chunk.content === 'done')).toBe(true);
     await adapter.stop();
+  });
+});
+
+describe('Claude message-before fork boundary', () => {
+  async function bound(history: unknown[]) {
+    const sdk = createSdk([{ type: 'system', subtype: 'init', session_id: 'owned-fork-parent' }]);
+    sdk.getSessionMessages.mockResolvedValue(history);
+    const adapter = new ClaudeCodeAdapter({ vaultPath: '/vault', settings: getDefaultClaudeCodeBackendSettings(), sdk });
+    const id = await adapter.createSession('Parent');
+    await collectAsync(adapter.sendMessage({ sessionId: id, content: 'bind' }));
+    return { adapter, id, sdk };
+  }
+  it('uses the previous native UUID for an inclusive SDK fork boundary', async () => {
+    const { adapter, id, sdk } = await bound([{ uuid: 'user-one', type: 'user' }, { uuid: 'assistant-one', type: 'assistant' }, { uuid: 'user-two', type: 'user' }]);
+    await adapter.forkSession(id, 'user-two');
+    expect(sdk.forkSession).toHaveBeenCalledWith('owned-fork-parent', expect.objectContaining({ upToMessageId: 'assistant-one' }));
+  });
+  it.each(['user-one', 'missing'])('refuses the unsafe target %s without creating a child', async target => {
+    const { adapter, id, sdk } = await bound([{ uuid: 'user-one', type: 'user' }]);
+    await expect(adapter.forkSession(id, target)).rejects.toThrow(target === 'missing' ? 'not found' : 'empty native prefix');
+    expect(sdk.forkSession).not.toHaveBeenCalled();
+  });
+  it('propagates native history failure without falling back to full clone', async () => {
+    const { adapter, id, sdk } = await bound([]);
+    sdk.getSessionMessages.mockRejectedValue(new Error('owned history failed'));
+    await expect(adapter.forkSession(id, 'target')).rejects.toThrow('owned history failed');
+    expect(sdk.forkSession).not.toHaveBeenCalled();
   });
 });

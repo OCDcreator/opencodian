@@ -221,3 +221,5 @@ Editing executable settings leaves existing persistent queries running with thei
 私有 `CLAUDE_CONFIG_DIR` 配合合法 `CLAUDE_CODE_PROJECT_DIR_NAME` 时，静态目录存储沿用 native 的项目别名；合法值为 1–64 个 ASCII 字母/数字/下划线/连字符，Windows 保留设备名无效，非法别名按 SDK 规则回退默认项目 key。宿主环境不变。
 
 每个普通 chat prompt 提交客户端 UUID；优先消费 SDK result 的 `user_message_uuid`，旧 CLI 缺少该字段时经 SDK transcript readback 确认后才绑定。目录读取失败保持身份 unavailable，不影响已确认的模型终态，也不伪造 source ID。
+
+消息前 fork 将 UI 目标 UUID 经 native 历史定位为前一个 chain entry 后调用 SDK 的 inclusive upToMessageId；首条之前的空前缀当前 SDK 及两个受支持替代接口均无法构建，fail-closed 提示。全会话 clone 保持 SDK 原行为。

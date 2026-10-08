@@ -1314,8 +1314,8 @@ export class ChatRuntimeComposition {
       }) => {
         host.plugin.memoryRuntime?.onTurnSettled(info);
         // User identity arrives after the optimistic footer was drawn. Refresh
-        // only this settled, visible Codex conversation's footer, preserving its body.
-        if (info.backend === 'codex' && host.getActiveTabId() === info.tabId
+        // only this settled, visible conversation's footer, preserving its body.
+        if ((info.backend === 'codex' || info.backend === 'claude-code') && host.getActiveTabId() === info.tabId
           && host.currentConversation?.id === info.conversationId
           && getConversationBackendSessionId(host.currentConversation) === info.sessionId) {
           const users = new Map(host.currentConversation.messages

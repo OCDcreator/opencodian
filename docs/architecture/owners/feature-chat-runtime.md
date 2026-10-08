@@ -85,3 +85,5 @@ settled Codex footer 的最小刷新留在已有 composition callback，并守�
 
 
 2026-10-07 成功 Pi prompt 进入既有 after-stream sync；SDK/process/history 读取仍经 adapter-native view 分支，不借用 OpenCode transport。
+
+Settled Claude Code turns reuse the existing scoped user-footer identity refresh alongside Codex; no new runtime owner or rerender of the message body is introduced.

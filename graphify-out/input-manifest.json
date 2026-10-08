@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "309f5f6435de1d867a5bd47b3d9cdd7ddc119f5bfb0049bcf61162cf57114a58",
+  "digest": "31d4d11f606813a1375a231b82bf297305a7267ac3357fb5e85232c067db96d8",
   "recordCount": 796,
   "records": [
     {
@@ -206,7 +206,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/ClaudeCodeAdapter.ts",
-      "sha256": "6b609a12a419e64ea3887e1968116b6b5dc3a9b7585070d87d132e5bb9b0022f"
+      "sha256": "8ca04d68ea6056a08e7c24dd8435d908b9e731aec63face2a2e9d2199c991c33"
     },
     {
       "kind": "src",
@@ -1501,7 +1501,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/ChatRuntimeComposition.ts",
-      "sha256": "c7a61ba64022e1a510b2bb59b32585e78abcd1534001e44b83755bd4ffcce5a0"
+      "sha256": "c33ae6fdafdec3b97524d2dc06ebe83c8fc9e433571b8e1a9d4e1e844098436b"
     },
     {
       "kind": "src",
@@ -1931,7 +1931,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ConversationLoadRecoveryCoordinator.ts",
-      "sha256": "fa199130a030175b9ddabefb1b95b07f1848fcc13c2b19205b80e1c9ffbfabdd"
+      "sha256": "6854e9a23e71c7db63bf585960ea8b02d641085ab17c1f820562f99afe218fe8"
     },
     {
       "kind": "src",
@@ -2676,7 +2676,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditController.ts",
-      "sha256": "d35511216fdeabe949b84b0d1201d83d0f72a958adc7ef92343f6b4a1faefd9c"
+      "sha256": "7636647f25468aec194a3a884e190528c4a040ae828e19a4c3544e2c7cdf67a4"
     },
     {
       "kind": "src",
@@ -2706,7 +2706,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditInputOverlay.ts",
-      "sha256": "56d9600b31f6ccfd34408c8f9ea3dec7be1a241327eb6a3441722c0d7d68390c"
+      "sha256": "4c6887fcf2815c03360102b5a24f9f59fcbac4168eff7dd382baabb65b480207"
     },
     {
       "kind": "src",
@@ -3984,7 +3984,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-08T03:38:27.162Z",
-  "headShaAtGeneration": "8fa9b17e19b9e171850870e6650464609f3790fb",
+  "generatedAt": "2026-10-08T05:36:32.093Z",
+  "headShaAtGeneration": "58f6f85db5127d3572e669c2920d859cde5d78ac",
   "graphifyVersion": "graphify 0.8.50"
 }
