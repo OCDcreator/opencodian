@@ -9292,6 +9292,7 @@ button.opencodian-edit-revert-preview-confirm.is-conflict {
 }
 
 .opencodian-settings {
+  container: opencodian-settings-pane / inline-size;
   --opencodian-settings-section-bg:
     color-mix(in srgb, var(--background-secondary) 88%, var(--background-primary));
   --opencodian-settings-section-border:
@@ -9622,6 +9623,52 @@ button.opencodian-edit-revert-preview-confirm.is-conflict {
   gap: var(--opencodian-settings-space-md);
   justify-content: flex-end;
   min-width: 0;
+}
+
+/* A Settings window can stay wide while its content pane or a nested form
+   row is narrow. Constrain controls to their own row rather than letting a
+   nowrap button rail paint over the label or outside the card. Compact
+   action-only Settings retain their owner-defined intrinsic sizing. */
+.opencodian-settings .setting-item:not(.opencodian-settings-direct-host):not(:is(
+  .opencodian-share-policy-setting,
+  .opencodian-skill-row-action,
+  .opencodian-tool-files-action,
+  .opencodian-tool-row-action,
+  .opencodian-acp-create-action,
+  .opencodian-acp-agent-actions,
+  .opencodian-agent-workspace-create-setting,
+  .opencodian-mcp-refresh-setting,
+  .opencodian-mcp-toolbar-add-setting,
+  .opencodian-mcp-overview-actions .setting-item,
+  .opencodian-mcp-server-row-actions .setting-item,
+  .opencodian-mcp-server-card-actions .setting-item
+)) {
+  container: opencodian-setting-row / inline-size;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.opencodian-settings .setting-item:not(.opencodian-settings-direct-host) > .setting-item-control {
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.opencodian-settings .setting-item-control > button:not(.opencodian-settings-dropdown-trigger) {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-height: 30px;
+  height: auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-settings .setting-item-control > input,
+.opencodian-settings .setting-item-control > textarea,
+.opencodian-settings .setting-item-control > select,
+.opencodian-settings .setting-item-control > .opencodian-settings-dropdown {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .opencodian-settings .opencodian-settings-content-shell[data-primary-tab="conversation"] > [data-section-block] {
@@ -11774,7 +11821,7 @@ button.opencodian-edit-revert-preview-confirm.is-conflict {
 }
 
 .opencodian-settings .opencodian-acp-agent-card-header .setting-item-control {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 .opencodian-settings .opencodian-acp-field-group {
@@ -12212,6 +12259,169 @@ button.opencodian-edit-revert-preview-confirm.is-conflict {
   .opencodian-skill-editor-textarea,
   .opencodian-skill-preview-content {
     min-height: 260px;
+  }
+}
+
+/* Keep the viewport rules for host chrome, but let the actual Settings
+   content width decide form layout in detached windows and editor panes. */
+@container opencodian-settings-pane (max-width: 720px) {
+  .opencodian-settings .opencodian-settings-panel-title {
+    flex-wrap: wrap;
+  }
+
+  .opencodian-settings .opencodian-settings-panel-title-actions,
+  .opencodian-settings .opencodian-agent-switcher-header-icons {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+
+  .opencodian-settings .opencodian-settings-content-shell .setting-item:not(.opencodian-settings-direct-host):not(:is(
+  .opencodian-share-policy-setting,
+  .opencodian-skill-row-action,
+  .opencodian-tool-files-action,
+  .opencodian-tool-row-action,
+  .opencodian-acp-create-action,
+  .opencodian-acp-agent-actions,
+  .opencodian-agent-workspace-create-setting,
+  .opencodian-mcp-refresh-setting,
+  .opencodian-mcp-toolbar-add-setting,
+  .opencodian-mcp-overview-actions .setting-item,
+  .opencodian-mcp-server-row-actions .setting-item,
+  .opencodian-mcp-server-card-actions .setting-item
+)),
+  .opencodian-settings .opencodian-settings-section .setting-item:not(.opencodian-settings-direct-host):not(:is(
+  .opencodian-share-policy-setting,
+  .opencodian-skill-row-action,
+  .opencodian-tool-files-action,
+  .opencodian-tool-row-action,
+  .opencodian-acp-create-action,
+  .opencodian-acp-agent-actions,
+  .opencodian-agent-workspace-create-setting,
+  .opencodian-mcp-refresh-setting,
+  .opencodian-mcp-toolbar-add-setting,
+  .opencodian-mcp-overview-actions .setting-item,
+  .opencodian-mcp-server-row-actions .setting-item,
+  .opencodian-mcp-server-card-actions .setting-item
+)) {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .opencodian-settings .opencodian-settings-content-shell .setting-item:not(.opencodian-settings-direct-host):not(:is(
+  .opencodian-share-policy-setting,
+  .opencodian-skill-row-action,
+  .opencodian-tool-files-action,
+  .opencodian-tool-row-action,
+  .opencodian-acp-create-action,
+  .opencodian-acp-agent-actions,
+  .opencodian-agent-workspace-create-setting,
+  .opencodian-mcp-refresh-setting,
+  .opencodian-mcp-toolbar-add-setting,
+  .opencodian-mcp-overview-actions .setting-item,
+  .opencodian-mcp-server-row-actions .setting-item,
+  .opencodian-mcp-server-card-actions .setting-item
+)) > .setting-item-control,
+  .opencodian-settings .opencodian-settings-section .setting-item:not(.opencodian-settings-direct-host):not(:is(
+  .opencodian-share-policy-setting,
+  .opencodian-skill-row-action,
+  .opencodian-tool-files-action,
+  .opencodian-tool-row-action,
+  .opencodian-acp-create-action,
+  .opencodian-acp-agent-actions,
+  .opencodian-agent-workspace-create-setting,
+  .opencodian-mcp-refresh-setting,
+  .opencodian-mcp-toolbar-add-setting,
+  .opencodian-mcp-overview-actions .setting-item,
+  .opencodian-mcp-server-row-actions .setting-item,
+  .opencodian-mcp-server-card-actions .setting-item
+)) > .setting-item-control {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .opencodian-settings .opencodian-debug-tab-header,
+  .opencodian-settings .opencodian-debug-help-item,
+  .opencodian-settings .opencodian-tool-files-header,
+  .opencodian-settings .opencodian-acp-agent-card-header,
+  .opencodian-settings .opencodian-acp-create-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .opencodian-settings .opencodian-debug-tab-badges,
+  .opencodian-settings .opencodian-tool-files-actions,
+  .opencodian-settings .opencodian-acp-agent-actions {
+    justify-content: flex-start;
+  }
+}
+
+/* Nested rows can be narrower than the pane. Spanning both existing tracks
+   preserves each owner's wide layout while keeping copy above controls. */
+@container opencodian-setting-row (max-width: 720px) {
+  .opencodian-settings .setting-item:not(.opencodian-settings-direct-host):not(:is(
+  .opencodian-share-policy-setting,
+  .opencodian-skill-row-action,
+  .opencodian-tool-files-action,
+  .opencodian-tool-row-action,
+  .opencodian-acp-create-action,
+  .opencodian-acp-agent-actions,
+  .opencodian-agent-workspace-create-setting,
+  .opencodian-mcp-refresh-setting,
+  .opencodian-mcp-toolbar-add-setting,
+  .opencodian-mcp-overview-actions .setting-item,
+  .opencodian-mcp-server-row-actions .setting-item,
+  .opencodian-mcp-server-card-actions .setting-item
+)) > .setting-item-info,
+  .opencodian-settings .setting-item:not(.opencodian-settings-direct-host):not(:is(
+  .opencodian-share-policy-setting,
+  .opencodian-skill-row-action,
+  .opencodian-tool-files-action,
+  .opencodian-tool-row-action,
+  .opencodian-acp-create-action,
+  .opencodian-acp-agent-actions,
+  .opencodian-agent-workspace-create-setting,
+  .opencodian-mcp-refresh-setting,
+  .opencodian-mcp-toolbar-add-setting,
+  .opencodian-mcp-overview-actions .setting-item,
+  .opencodian-mcp-server-row-actions .setting-item,
+  .opencodian-mcp-server-card-actions .setting-item
+)) > .setting-item-control {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .opencodian-settings .setting-item:not(.opencodian-settings-direct-host):not(:is(
+  .opencodian-share-policy-setting,
+  .opencodian-skill-row-action,
+  .opencodian-tool-files-action,
+  .opencodian-tool-row-action,
+  .opencodian-acp-create-action,
+  .opencodian-acp-agent-actions,
+  .opencodian-agent-workspace-create-setting,
+  .opencodian-mcp-refresh-setting,
+  .opencodian-mcp-toolbar-add-setting,
+  .opencodian-mcp-overview-actions .setting-item,
+  .opencodian-mcp-server-row-actions .setting-item,
+  .opencodian-mcp-server-card-actions .setting-item
+)) > .setting-item-info {
+    overflow-wrap: anywhere;
+  }
+
+  .opencodian-settings .setting-item:not(.opencodian-settings-direct-host):not(:is(
+  .opencodian-share-policy-setting,
+  .opencodian-skill-row-action,
+  .opencodian-tool-files-action,
+  .opencodian-tool-row-action,
+  .opencodian-acp-create-action,
+  .opencodian-acp-agent-actions,
+  .opencodian-agent-workspace-create-setting,
+  .opencodian-mcp-refresh-setting,
+  .opencodian-mcp-toolbar-add-setting,
+  .opencodian-mcp-overview-actions .setting-item,
+  .opencodian-mcp-server-row-actions .setting-item,
+  .opencodian-mcp-server-card-actions .setting-item
+)) > .setting-item-control {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
 
@@ -27394,13 +27604,13 @@ button.opencodian-edit-revert-preview-confirm.is-conflict {
 
 .opencodian-formatter-builtin-row > .setting-item .setting-item-control,
 .opencodian-formatter-custom-row > .setting-item .setting-item-control {
-  width: 260px;
+  width: min(260px, 100%);
   min-width: 0;
   justify-content: flex-end;
 }
 
 .opencodian-formatter-row-control {
-  width: 260px;
+  width: min(260px, 100%);
   min-width: 0;
   justify-content: flex-end;
 }

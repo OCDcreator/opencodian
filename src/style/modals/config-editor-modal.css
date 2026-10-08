@@ -5012,13 +5012,13 @@
 
 .opencodian-formatter-builtin-row > .setting-item .setting-item-control,
 .opencodian-formatter-custom-row > .setting-item .setting-item-control {
-  width: 260px;
+  width: min(260px, 100%);
   min-width: 0;
   justify-content: flex-end;
 }
 
 .opencodian-formatter-row-control {
-  width: 260px;
+  width: min(260px, 100%);
   min-width: 0;
   justify-content: flex-end;
 }

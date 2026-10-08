@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "37e893c26c64b3558a02df0b1e8c2cca3f43313d1916f8114662d77130235c99",
+  "digest": "bed34e1d23fea6832785ba438f8ce46d010b2108ef8b742843c563304cf0151b",
   "recordCount": 796,
   "records": [
     {
@@ -3661,7 +3661,7 @@
     {
       "kind": "src",
       "key": "src/style/components/settings-layout-contract.css",
-      "sha256": "f13f51ea11894290d90426197799a9a1c26db30e47c244fb5210674f8f6e5309"
+      "sha256": "eea6e6d4c661dad21282c76c9a38fec5a97f129903efe600354e8051a67f6a89"
     },
     {
       "kind": "src",
@@ -3711,7 +3711,7 @@
     {
       "kind": "src",
       "key": "src/style/modals/config-editor-modal.css",
-      "sha256": "7a8362465c65346ba90e3f4f8c39eaa540fdd8c039db2f1eeae20c08747b81fb"
+      "sha256": "5d4b3b2d8a35abb6c1b5d195823599b189cf00fa3dbea8963a972507a88d7d29"
     },
     {
       "kind": "src",
@@ -3984,7 +3984,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-08T06:54:45.871Z",
-  "headShaAtGeneration": "5ff54aeaccaefff0328561c4b0a2a2ea4e0b8d7f",
+  "generatedAt": "2026-10-08T10:19:58.725Z",
+  "headShaAtGeneration": "3d78a4e0881886c85f3110e563b68a645aa2ce7d",
   "graphifyVersion": "graphify 0.8.50"
 }
