@@ -94,3 +94,6 @@ OpenCodianView 只转发 Codex 目录恢复到插件既有桥，保持 view/runt
 
 
 2026-10-07 Pi queue history：view 的 native adapter 分支只转发规范化快照及 serialized write，纯 message metadata 合并由既有 feature.chat-services owner 承担；不增加 view-local Pi runtime ownership。
+
+
+> 2026-10-08 ZCode selection: 会话级 model override 与每模型 reasoning override 经既有保存/归一化链持久化，null 档位继承 native 模型默认；view 重载与切会话分别回读，保存失败只回滚发起会话。保存值不代替 native options 生效证据。

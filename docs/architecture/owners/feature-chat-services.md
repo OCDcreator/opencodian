@@ -103,3 +103,6 @@ Opening the model picker refreshes an unloaded/empty catalog through the existin
 OAuth URL notices retain a request-ID scoped abort lifetime without a protocol response. Native login settlement cancels oauth-link, hides the authorization link, and releases its listener; ordinary timed notifications are unchanged.
 
 Claude SDK forks rewrite native UUIDs. Fresh Claude prefix clones discard parent sourceMessageId/sourceTurnId and use the existing child identity readback before opening. Readback failure leaves identity unavailable rather than copying a parent UUID; original messages are not mutated.
+
+
+> 2026-10-08 ZCode selection: 会话级 model override 与每模型 reasoning override 经既有保存/归一化链持久化，null 档位继承 native 模型默认；view 重载与切会话分别回读，保存失败只回滚发起会话。保存值不代替 native options 生效证据。

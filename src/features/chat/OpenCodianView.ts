@@ -328,6 +328,7 @@ import {
   getActiveWebViewerTabContext,
 } from './services/WebViewerContextService';
 import { recoverEmptyZCodeConversationSession } from './services/ZCodeEmptySessionRecovery';
+import { saveZCodeConversationSelection } from './services/ZCodeModelSelectionBinding';
 import type { TabBar, TabId, TabManager } from './tabs';
 import { type BackendSessionBrowserHost,BackendSessionBrowserModal } from './ui/BackendSessionBrowserModal';
 import { ContextDetailModal } from './ui/ContextDetailModal';
@@ -1086,6 +1087,15 @@ export class OpenCodianView extends ItemView {
               }, (target) => this.plugin.saveConversation(target));
               return;
             }
+            if (conversation?.backend === 'zcode' && current) {
+              await saveZCodeConversationSelection(conversation, {
+                zcodeEffortOverrides: {
+                  ...conversation.sessionSettings?.zcodeEffortOverrides,
+                  [`${current.provider}/${current.model}`]: variant ?? null,
+                },
+              }, (target) => this.plugin.saveConversation(target));
+              return;
+            }
             this.currentVariant = this.normalizeEffortVariantForCurrentBackend(variant);
             if (current) {
               this.variantStore[this.getEffortStoreKey(`${current.provider}/${current.model}`)] = this.currentVariant;
@@ -1327,6 +1337,13 @@ export class OpenCodianView extends ItemView {
         const conversation = this.currentConversation;
         if (conversation?.backend === 'pi') {
           void savePiConversationSelection(conversation, { piModelOverride: selection },
+            (target) => this.plugin.saveConversation(target)).catch(() => {
+            if (this.currentConversation?.id === conversation.id) this.updateModelSelectorDisplay();
+          });
+          return true;
+        }
+        if (conversation?.backend === 'zcode') {
+          void saveZCodeConversationSelection(conversation, { zcodeModelOverride: selection },
             (target) => this.plugin.saveConversation(target)).catch(() => {
             if (this.currentConversation?.id === conversation.id) this.updateModelSelectorDisplay();
           });
@@ -4821,6 +4838,10 @@ export class OpenCodianView extends ItemView {
       && this.currentConversation.sessionSettings?.piModelOverride !== undefined) {
       return this.currentConversation.sessionSettings.piModelOverride;
     }
+    if (this.currentConversation?.backend === 'zcode'
+      && this.currentConversation.sessionSettings?.zcodeModelOverride !== undefined) {
+      return this.currentConversation.sessionSettings.zcodeModelOverride;
+    }
     const override = this.tabManager?.getActiveTabModelOverride() ?? null;
     if (!override || !this.isClaudeCodeConversationActive()) {
       return override;
@@ -4860,6 +4881,12 @@ export class OpenCodianView extends ItemView {
       const current = this.getCurrentSessionModel();
       return current
         ? this.currentConversation.sessionSettings?.piEffortOverrides?.[`${current.provider}/${current.model}`] ?? undefined
+        : undefined;
+    }
+    if (this.currentConversation?.backend === 'zcode') {
+      const current = this.getCurrentSessionModel();
+      return current
+        ? this.currentConversation.sessionSettings?.zcodeEffortOverrides?.[`${current.provider}/${current.model}`] ?? undefined
         : undefined;
     }
     return this.normalizeEffortVariantForCurrentBackend(this.currentVariant);

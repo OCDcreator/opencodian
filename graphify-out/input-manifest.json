@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "31d4d11f606813a1375a231b82bf297305a7267ac3357fb5e85232c067db96d8",
+  "digest": "37e893c26c64b3558a02df0b1e8c2cca3f43313d1916f8114662d77130235c99",
   "recordCount": 796,
   "records": [
     {
@@ -1271,7 +1271,7 @@
     {
       "kind": "src",
       "key": "src/core/types/chat.ts",
-      "sha256": "e42c3379f877c5681657533ba0c01cdea7ed92fd329c9f9f64e75e84f48d82f9"
+      "sha256": "6b907e278546b7df2871401224be977604770442db64029745e52898026a1b5d"
     },
     {
       "kind": "src",
@@ -1401,7 +1401,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
-      "sha256": "1ed557e57a083fadfa2937b3388790d194f2c0987a33d0bb5d97ccb107470e3e"
+      "sha256": "3c954a56802aa22918055b3a043dd41facd087e4584faaad04d782db020a611f"
     },
     {
       "kind": "src",
@@ -2446,7 +2446,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ZCodeModelSelectionBinding.ts",
-      "sha256": "7a37bd875ea820997847115aa5aa945afa7649bc13a312101268a1b13b75bdc5"
+      "sha256": "9fcbd612205f91f7a3ab338abf89f4395cb1ef28e6467873ce5232458379eef3"
     },
     {
       "kind": "src",
@@ -3984,7 +3984,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-08T05:36:32.093Z",
-  "headShaAtGeneration": "58f6f85db5127d3572e669c2920d859cde5d78ac",
+  "generatedAt": "2026-10-08T06:54:45.871Z",
+  "headShaAtGeneration": "5ff54aeaccaefff0328561c4b0a2a2ea4e0b8d7f",
   "graphifyVersion": "graphify 0.8.50"
 }

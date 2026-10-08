@@ -232,6 +232,9 @@ export interface ConversationSessionSettings {
   /** Pi composer overrides apply on the next send; null means inherit. */
   piModelOverride?: { provider: string; model: string } | null;
   piEffortOverrides?: Record<string, string | null>;
+  /** ZCode composer choices persist per conversation; null reasoning inherits the model default. */
+  zcodeModelOverride?: { provider: string; model: string } | null;
+  zcodeEffortOverrides?: Record<string, string | null>;
   codexSandboxMode?: CodexSandboxMode | null;
   codexModelReasoningEffort?: CodexReasoningEffort | null;
   codexModelOverride?: string | null;
@@ -301,18 +304,25 @@ export function normalizeConversationSessionSettings(
   }
 
   const normalized: Record<string, unknown> = {};
-  if (value.piModelOverride === null) {
-    normalized.piModelOverride = null;
-  } else if (value.piModelOverride && typeof value.piModelOverride === 'object') {
-    const provider = normalizeNullableString(value.piModelOverride.provider);
-    const model = normalizeNullableString(value.piModelOverride.model);
-    if (provider && model) normalized.piModelOverride = { provider, model };
-  }
-  if (value.piEffortOverrides && typeof value.piEffortOverrides === 'object' && !Array.isArray(value.piEffortOverrides)) {
-    const efforts = Object.fromEntries(Object.entries(value.piEffortOverrides)
-      .map(([ref, effort]) => [ref, normalizeNullableString(effort)])
-      .filter(([ref, effort]) => typeof ref === 'string' && ref.includes('/') && effort !== undefined));
-    if (Object.keys(efforts).length) normalized.piEffortOverrides = efforts;
+  for (const [modelKey, effortKey] of [
+    ['piModelOverride', 'piEffortOverrides'],
+    ['zcodeModelOverride', 'zcodeEffortOverrides'],
+  ] as const) {
+    const modelOverride = value[modelKey];
+    if (modelOverride === null) {
+      normalized[modelKey] = null;
+    } else if (modelOverride && typeof modelOverride === 'object') {
+      const provider = normalizeNullableString(modelOverride.provider);
+      const model = normalizeNullableString(modelOverride.model);
+      if (provider && model) normalized[modelKey] = { provider, model };
+    }
+    const effortOverrides = value[effortKey];
+    if (effortOverrides && typeof effortOverrides === 'object' && !Array.isArray(effortOverrides)) {
+      const efforts = Object.fromEntries(Object.entries(effortOverrides)
+        .map(([ref, effort]) => [ref, normalizeNullableString(effort)])
+        .filter(([ref, effort]) => typeof ref === 'string' && ref.includes('/') && effort !== undefined));
+      if (Object.keys(efforts).length) normalized[effortKey] = efforts;
+    }
   }
 
   if (value.chatFontSizePx === null) {

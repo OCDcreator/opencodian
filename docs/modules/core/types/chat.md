@@ -232,3 +232,6 @@ AgentBackendKind includes opencode2. Persisted conversations use their backend I
 message_metadata 可带 nativeText/sourceTurnId，仅代表原生已完成单条文本快照；不作为模型 effective 回读，也不替换未确认、工具或多消息回合。
 
 ChatMessage 与 user_message_identity 增加可选 Codex sourceTurnId；它与 sourceMessageId 的 user item ID 不同。字段缺失不产生猜测身份，其他后端继续使用原契约。
+
+
+> 2026-10-08 ZCode selection: 会话级 model override 与每模型 reasoning override 经既有保存/归一化链持久化，null 档位继承 native 模型默认；view 重载与切会话分别回读，保存失败只回滚发起会话。保存值不代替 native options 生效证据。

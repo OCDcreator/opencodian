@@ -847,3 +847,6 @@ History 的 Codex 目录向浏览器转发持久化的 Codex native 引用 ID；
 2026-10-07 Pi 完成后同步复用现有 adapter-native 分支与 serialized conversation write；只从 PiAdapter.getChatMessages 取规范化历史，纯合并委托给既有 ConversationAuthoritativeMessageMergeCoordinator 模块。view 不持有第二套 Pi runtime/history state。
 
 Pi 完成后 bypass OpenCode canonical projection（其数据不属于 Pi 会话），进入现有 Pi getChatMessages native 回读和全文合并；不从 unrelated projection 宣称同步成功。
+
+
+> 2026-10-08 ZCode selection: 会话级 model override 与每模型 reasoning override 经既有保存/归一化链持久化，null 档位继承 native 模型默认；view 重载与切会话分别回读，保存失败只回滚发起会话。保存值不代替 native options 生效证据。
