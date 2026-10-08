@@ -79,7 +79,9 @@ PiModelSelectionBinding owns Pi selector policy; send preparation and slash disp
 `ChatSelectionControlsCoordinatorHost` gained `getApp(): App`, and `ChatSelectionControlsCoordinator` forwards it as the new `app` field when rendering the model list, so provider group header icons resolve through the same route as the async icon cache. Resolution rules stay with `shared.utils-icons`; this owner only passes the host through.
 
 - 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
-- 2026-09-17: `PiExtensionUiHost` 收窄主机面：只渲染需要用户回复的四个对话框方法，以及能落到既有界面的 `notify` / `set_editor_text` / `setTitle`；`setStatus` / `setWidget`（Pi 终端状态行，第三方 MCP 扩展用它报告服务器数量）不再落地。这两个方法官方不需要响应，忽略不会阻塞 RPC 往返（`PiSessionRuntime` 只对 select/confirm/input/editor 回包）。> 2026-09-24 (票 06)：ChatSelectionControlsCoordinator 增包 bindZCodeModelSelection（zcode 活动时接管选择器、实时目录+档位 variants）；SlashCommandMenuCatalogCache 新增 loadZCodeRuntimeCommands 口与 zcode 分支；新增 ZCodeModelSelectionBinding。
+- 2026-10-09（Pi standard UI）：`PiExtensionUiHost` 补齐标准 setStatus/setWidget 的文本投影，并将 setTitle 映射为同 view header 下方的可见 transient 文本（空串隐藏）。本 owner 持有 App/session/当前连接 signal 隔离的临时 UI 及节点所有权；旧/aborted signal 不能夺回替换连接。View 只在既有身份/layout/close 接缝转发，多 leaf 同步、关闭只解绑该 view；无 native/conversation/tab title 写入或新的 runtime owner。四类 dialog 回包、五类 fire-and-forget 零回包分类不变；九方法代码验证不外推 startup ask/cancel/custom message 或两机 UI 完成。原 2026-09-17 刻意忽略 status/widget 的宿主策略已由此标准文本适配替代。
+
+> 2026-09-24 (票 06)：ChatSelectionControlsCoordinator 增包 bindZCodeModelSelection（zcode 活动时接管选择器、实时目录+档位 variants）；SlashCommandMenuCatalogCache 新增 loadZCodeRuntimeCommands 口与 zcode 分支；新增 ZCodeModelSelectionBinding。
 
 ## 2026-09-27 OpenCode 2 compatibility
 

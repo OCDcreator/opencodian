@@ -1570,6 +1570,35 @@
   padding: 10px 12px 6px;
 }
 
+/* Standard Pi RPC text projections follow the existing Obsidian composer. */
+.opencodian-container .opencodian-pi-extension-title,
+.opencodian-input-area .opencodian-pi-extension-status,
+.opencodian-composer-content .opencodian-pi-extension-widget {
+  min-width: 0;
+  max-width: 100%;
+  color: var(--text-normal);
+  font-family: var(--font-interface);
+  font-size: var(--font-ui-small);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.opencodian-container > .opencodian-header + .opencodian-pi-extension-title {
+  flex: 0 0 auto;
+  padding: 4px var(--opencodian-chat-edge-gap, 12px);
+  font-weight: 600;
+}
+
+.opencodian-input-area > .opencodian-pi-extension-status {
+  margin-top: 4px;
+}
+
+.opencodian-composer-content > .opencodian-pi-extension-widget {
+  margin-block: 4px;
+}
+
 .opencodian-composer-context-row {
   display: flex;
   flex-wrap: wrap;

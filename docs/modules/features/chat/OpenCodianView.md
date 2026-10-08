@@ -1,5 +1,7 @@
 # OpenCodianView
 
+> 2026-10-09（Pi standard UI）：仅三处现有生命周期接缝转发到 PiExtensionUiHost：setCurrentConversation 写回后同步当前 backend/session；scheduleComposerLayoutSync 先幂等同步投影再沿用既有 composer 调度；onClose 在拆除 DOM/coordinator 前释放此 view 绑定。App 身份使用 ItemView.app，临时 status/widget/title、signal/节点所有权均在 host，不写会话/native/tab 标题或新增 view runtime 真值。title 是同 view header 下的 transient 文本，空串隐藏；其它后端/空会话卸下旧投影。
+
 > 2026-10-08：Codex tool-user-input 和 MCP elicitation 接线把所属回合 signal 传给既有 showQuestionDialog；后台问题按 native session 解析到所属 tab，Stop 后卡片收集取消并清理，不接受迟到回答。
 
 > 2026-10-08：getSendMessageOptions 只装配既有 session-settings coordinator 的有效 Codex 设置，复制 additionalDirectories，随本次请求传递；不新增 runtime ownership。

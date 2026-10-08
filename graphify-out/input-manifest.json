@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "edfc66f25451c6ef6751f855015445b53c54b83e2aadda59d41d395d955c64e9",
+  "digest": "e4333950cea25231d8799c6eddc7844cc1c52c8929847e2de7739d3a930af64e",
   "recordCount": 796,
   "records": [
     {
@@ -1401,7 +1401,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
-      "sha256": "ff1a3f2e264c9b7acf96858c6f58e9e05a3e0eeda47ffbcb190e8bcd449b95fc"
+      "sha256": "4df5c2414989770f6d47a08034d60b24cf57429b2b0727d672ec48be2c3747bf"
     },
     {
       "kind": "src",
@@ -2146,7 +2146,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/PiExtensionUiHost.ts",
-      "sha256": "3ba9dd87f89820d6bb75cef765a211515dc58824631daba8d077027dfa22c7c6"
+      "sha256": "6df00da113f7bac9dad865f02e07aba1065719d0c227a2f0951b763d241d013a"
     },
     {
       "kind": "src",
@@ -3686,7 +3686,7 @@
     {
       "kind": "src",
       "key": "src/style/features/chat-assistant.css",
-      "sha256": "f1e103b3cbc0a3c7d9a81ea876620942f8708cbc1ed68285759ed81c5248b9e1"
+      "sha256": "e8d1c75c6010d7411d539b4e2c12b5709e50db5e1ac784377765f592361784dd"
     },
     {
       "kind": "src",
@@ -3984,7 +3984,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-08T18:29:16.539Z",
-  "headShaAtGeneration": "969f7d4f3ab794d12bfe6b44b42b6e29bae8ccd0",
+  "generatedAt": "2026-10-08T20:19:58.577Z",
+  "headShaAtGeneration": "f135d2fba7e26af3807c7dc00c12b9ad0c8f48fe",
   "graphifyVersion": "graphify 0.8.50"
 }

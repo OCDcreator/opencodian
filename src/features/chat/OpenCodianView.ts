@@ -282,6 +282,7 @@ import {
   PersistentAssistantNoticeService,
   type PersistentAssistantNoticeServiceHost,
 } from './services/PersistentAssistantNoticeService';
+import { releasePiUiView, syncPiUiView } from './services/PiExtensionUiHost';
 import { savePiConversationSelection } from './services/PiModelSelectionBinding';
 import type { QuestionDockSlotCoordinator } from './services/QuestionDockSlotCoordinator';
 import type { QuestionRuntimeServices } from './services/QuestionRuntimeHostAdapter';
@@ -2221,6 +2222,7 @@ export class OpenCodianView extends ItemView {
       getTabMessagesContainer: (tabId) => this.getTabPaneState(tabId)?.messagesEl ?? null,
       setCurrentConversation: (conversation) => {
         this.currentConversation = conversation;
+        syncPiUiView(this.app, this.containerEl, conversation);
         this.refreshModifiedFilesSidebar();
         if (!conversation) {
           this.childSessionGraphCoordinator.clearGraph();
@@ -3096,6 +3098,7 @@ export class OpenCodianView extends ItemView {
   }
 
   async onClose() {
+    releasePiUiView(this.app, this.containerEl);
     this.activeTabContextUsageCoordinator.dispose();
     this.backgroundTaskInlinePanelRenderer.disposeNativeTaskWatch();
     this.plugin.unregisterConversationCachePinProvider(this.conversationCachePinProvider);
@@ -3749,6 +3752,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private scheduleComposerLayoutSync(): void {
+    syncPiUiView(this.app, this.containerEl, this.currentConversation);
     this.composerInputShellCoordinator.scheduleLayoutSync();
   }
 
