@@ -191,21 +191,24 @@ async function resolveCodexModelProviders(): Promise<ModelSelectorProvider[] | n
 
 /**
  * Wrap a ModelSelectionRuntimeHost with Codex-aware overrides.
- * When Codex is the active backend, intercepts catalog loading, default
+ * Prefer the toolbar's owned conversation, with legacy active-leaf/global
+ * routing only when the host supplies no backend. For Codex, intercept catalog loading, default
  * selection, model availability, and model override to use Codex-specific
  * logic. Falls through to the original host for non-Codex backends.
  */
-function wrapHostForCodex(host: ModelSelectionRuntimeHost): ModelSelectionRuntimeHost {
+function wrapHostForCodex(
+  host: ModelSelectionRuntimeHost & Pick<ChatSelectionControlsCoordinatorHost, 'getOwnConversation'>,
+): ModelSelectionRuntimeHost {
   return {
     ...host,
-    preserveRequestedModel: () => readActiveBackendFromPlugin() === 'codex'
+    preserveRequestedModel: () => (host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'codex'
       || host.preserveRequestedModel?.() === true,
     async loadModelCatalogData() {
-      if (readActiveBackendFromPlugin() === 'opencode2') {
+      if ((host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'opencode2') {
         const adapter = readOpenCodianPlugin()?.agentServiceRegistry?.get?.('opencode2') as OpenCode2Adapter | undefined;
         return { catalogBundle: null, providers: await adapter?.getModelSelectorProviders() ?? [] };
       }
-      if (readActiveBackendFromPlugin() === 'codex') {
+      if ((host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'codex') {
         const providers = await resolveCodexModelProviders();
         if (providers) return { catalogBundle: null, providers };
         return { catalogBundle: null, providers: [] };
@@ -213,37 +216,37 @@ function wrapHostForCodex(host: ModelSelectionRuntimeHost): ModelSelectionRuntim
       return host.loadModelCatalogData();
     },
     getDefaultModelSelection() {
-      if (readActiveBackendFromPlugin() === 'opencode2') {
+      if ((host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'opencode2') {
         const adapter = readOpenCodianPlugin()?.agentServiceRegistry?.get?.('opencode2') as OpenCode2Adapter | undefined;
         return adapter?.getDefaultModelSelection() ?? null;
       }
-      if (readActiveBackendFromPlugin() === 'codex') {
+      if ((host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'codex') {
         const model = readOpenCodianPlugin()?.settings?.backendSettings?.codex?.model?.trim() ?? '';
         return model ? { provider: CODEX_PROVIDER_ID, model } : null;
       }
       return host.getDefaultModelSelection();
     },
     async isModelAvailableOnServer(provider: string, model: string) {
-      if (readActiveBackendFromPlugin() === 'opencode2') {
+      if ((host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'opencode2') {
         const adapter = readOpenCodianPlugin()?.agentServiceRegistry?.get?.('opencode2') as OpenCode2Adapter | undefined;
         const providers = await adapter?.getModelSelectorProviders() ?? [];
         return providers.some((item) => item.id === provider && item.models.some((entry) => entry.id === model));
       }
-      if (readActiveBackendFromPlugin() === 'codex') {
+      if ((host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'codex') {
         return Boolean(provider && model);
       }
       return host.isModelAvailableOnServer(provider, model);
     },
     getActiveTabModelOverride() {
       const override = host.getActiveTabModelOverride();
-      if (override && readActiveBackendFromPlugin() === 'codex') {
+      if (override && (host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'codex') {
         return override.provider === CODEX_PROVIDER_ID ? override : null;
       }
       return override;
     },
     setActiveTabModelOverride(selection) {
       // Handle Codex Custom sentinel: prompt for model name.
-      if (readActiveBackendFromPlugin() === 'codex' && selection?.model === CODEX_CUSTOM_MODEL_SENTINEL) {
+      if ((host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'codex' && selection?.model === CODEX_CUSTOM_MODEL_SENTINEL) {
         const custom = window.prompt(t('chat.modelSelector.codex.customPrompt'));
         if (!custom?.trim()) return false;
         selection = { provider: selection.provider, model: custom.trim() };

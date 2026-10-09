@@ -1,5 +1,7 @@
 # OpenCodianView
 
+> 2026-10-09（Claude requested model）：现有 selection host 为本视图所属 Claude conversation 启用 `preserveRequestedModel`；catalog/default/availability/effort 从所属后端读取，已加载 foreign catalog 不再替代 Claude 请求，缺失请求沿用既有 unavailable 校验。发送仅在「所属 Claude、无合法 backend-scoped tab override、全局 Claude model.trim() 为空、当前选择 claude-code/default」时省略 model，provider 和 Claude variant/effort 保留。UI Default 与原生 model omission 分开；显式全局 default、显式 claude-code/default tab 覆盖、anthropic/claude 下名为 default 的模型及合法 custom model 均完整转发。不改全局设置、tab 持久化、catalog、adapter 或 builder；unit fixtures 只证明选择与请求组装，不证明原生继承或运行时验收。
+
 > 2026-10-09（Codex model snapshot）：getSendMessageOptions 从既有会话设置 coordinator 一次解析的有效模型同时构造顶层与 codexOptions.model；null/undefined 继承当前全局模型，真正未配置时省略模型。getBackendScopedActiveTabModelOverride 让 selector 使用同一会话模型。Codex direct host setter 捕获所属 conversation，调用既有 saveConversationOverrides 保存一次；默认选择或 clear 写 null，失败恢复该次 conversation 的 settings/updatedAt，仅当前仍为所属会话时刷新显示，不写临时 tab/global。Codex 菜单通过既有独立 persist 路径保存一次，不同时调用 direct setter。没有新 owner 或 CodexAdapter 源码修改；这些请求约束不证明 physical 模型或 native 实机通过。
 
 > 2026-10-09（Pi standard UI）：仅三处现有生命周期接缝转发到 PiExtensionUiHost：setCurrentConversation 写回后同步当前 backend/session；scheduleComposerLayoutSync 先幂等同步投影再沿用既有 composer 调度；onClose 在拆除 DOM/coordinator 前释放此 view 绑定。App 身份使用 ItemView.app，临时 status/widget/title、signal/节点所有权均在 host，不写会话/native/tab 标题或新增 view runtime 真值。title 是同 view header 下的 transient 文本，空串隐藏；其它后端/空会话卸下旧投影。

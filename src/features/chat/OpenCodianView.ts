@@ -1298,12 +1298,13 @@ export class OpenCodianView extends ItemView {
   private createChatSelectionControlsCoordinatorHost(): ChatSelectionControlsCoordinatorHost {
     return {
       getOwnConversation: () => this.currentConversation,
+      preserveRequestedModel: () => this.currentConversation?.backend === 'claude-code',
       getApp: () => this.app,
       registerEscapeHandler: (handler) => {
         this.escapeHandlers.push(handler);
       },
       loadModelCatalogData: async () => {
-        if (this.isClaudeCodeConversationActive()) {
+        if ((this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'claude-code') {
           const adapter = this.plugin.agentServiceRegistry?.get('claude-code') as {
             supportedModels?: () => Promise<Array<{ id: string; name: string; provider?: string }>>;
           } | undefined;
@@ -1329,7 +1330,11 @@ export class OpenCodianView extends ItemView {
           providers,
         };
       },
-      getActiveTabModelOverride: () => this.getBackendScopedActiveTabModelOverride(),
+      getActiveTabModelOverride: () => {
+        const override = this.getBackendScopedActiveTabModelOverride();
+        return this.currentConversation?.backend === 'claude-code'
+          && override && !this.isClaudeCodeModelProvider(override.provider) ? null : override;
+      },
       setActiveTabModelOverride: (selection) => {
         if (!this.tabManager?.getActiveTab()) {
           return false;
@@ -1377,7 +1382,7 @@ export class OpenCodianView extends ItemView {
         return true;
       },
       getDefaultModelSelection: () => {
-        if (this.isClaudeCodeConversationActive()) {
+        if ((this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'claude-code') {
           const model = this.plugin.settings.backendSettings.claudeCode.model.trim() || 'default';
           return {
             provider: CLAUDE_CODE_PROVIDER_ID,
@@ -1398,7 +1403,7 @@ export class OpenCodianView extends ItemView {
       },
       getModelSourceMode: () => this.plugin.settings.modelSourceMode,
       isModelAvailableOnServer: async (provider, model) => {
-        if (this.isClaudeCodeConversationActive()) {
+        if ((this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'claude-code') {
           return Boolean(provider && model);
         }
         return this.plugin.modelConfigService
@@ -1416,12 +1421,13 @@ export class OpenCodianView extends ItemView {
           this.effortSelector?.updateDisplay();
           return;
         }
-        if (this.isClaudeCodeConversationActive()) {
+        if ((this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'claude-code') {
           const current = this.getCurrentSessionModel();
           if (current) {
             const modelRef = `${current.provider}/${current.model}`;
             const saved = this.variantStore[modelRef];
-            this.currentVariant = this.normalizeEffortVariantForCurrentBackend(saved);
+            this.currentVariant = saved && CLAUDE_CODE_EFFORT_VARIANTS.some((candidate) => candidate === saved)
+              ? saved : this.plugin.settings.backendSettings.claudeCode.effort;
           } else {
             this.currentVariant = undefined;
           }
@@ -4939,8 +4945,18 @@ export class OpenCodianView extends ItemView {
     const current = effective
       ? (codexModel ? { provider: 'codex', model: codexModel } : null)
       : this.getCurrentSessionModel();
+    const isOwnedClaude = this.currentConversation?.backend === 'claude-code';
+    const claudeOverride = isOwnedClaude ? this.getBackendScopedActiveTabModelOverride() : null;
+    const isSyntheticClaudeDefault = isOwnedClaude
+      && !(claudeOverride && this.isClaudeCodeModelProvider(claudeOverride.provider))
+      && !this.plugin.settings.backendSettings.claudeCode.model.trim()
+      && current?.provider === CLAUDE_CODE_PROVIDER_ID && current.model === 'default';
+    const variant = !current ? undefined : isOwnedClaude
+      ? (this.currentVariant && CLAUDE_CODE_EFFORT_VARIANTS.some((candidate) => candidate === this.currentVariant)
+          ? this.currentVariant : this.plugin.settings.backendSettings.claudeCode.effort)
+      : this.getCurrentEffortVariant();
     return {
-      ...(current ? { provider: current.provider, model: current.model, variant: this.getCurrentEffortVariant() } : {}),
+      ...(current ? { provider: current.provider, ...(!isSyntheticClaudeDefault ? { model: current.model } : {}), variant } : {}),
       ...(effective ? { codexOptions: {
         model: codexModel,
         sandboxMode: effective.codexSandboxMode,
