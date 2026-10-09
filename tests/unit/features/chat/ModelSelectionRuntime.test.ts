@@ -425,3 +425,13 @@ describe('ModelSelectionRuntime asynchronous catalogue ownership', () => {
     expect(host.syncActiveTabContextUsageIdentity).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('ModelSelectionRuntime explicit requested-model preservation hook', () => {
+  it('preserves a missing requested model with the hook and refuses availability instead of sending the fallback', async () => {
+    const fixture = createRuntimeFixture({ activeTabModelOverride: { provider: 'openai', model: 'owned-unlisted' } });
+    fixture.host.preserveRequestedModel = () => true;
+    await fixture.runtime.reloadModelCatalog();
+    expect(fixture.runtime.getCurrentSessionModel()).toEqual({ provider: 'openai', model: 'owned-unlisted' });
+    expect(await fixture.runtime.ensureSelectedModelAvailable('openai', 'owned-unlisted')).toBe(false);
+  });
+});

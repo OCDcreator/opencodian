@@ -1336,6 +1336,29 @@ export class OpenCodianView extends ItemView {
         }
 
         const conversation = this.currentConversation;
+        if (conversation?.backend === 'codex') {
+          const model = selection?.model.trim();
+          if (selection && (selection.provider !== 'codex' || !model || model === '__codex_custom__')) return false;
+          const previous = conversation.sessionSettings;
+          const previousUpdatedAt = conversation.updatedAt;
+          const globalModel = this.plugin.settings.backendSettings.codex.model?.trim();
+          const save = this.conversationSessionSettingsCoordinator.saveConversationOverrides(conversation, {
+            ...previous,
+            codexModelOverride: selection === null || model === globalModel ? null : model,
+          });
+          const pendingSettings = conversation.sessionSettings;
+          void save.then(() => {
+            if (this.currentConversation?.id === conversation.id) this.updateModelSelectorDisplay();
+          }, () => {
+            if (conversation.sessionSettings === pendingSettings) {
+              conversation.sessionSettings = previous;
+              conversation.updatedAt = previousUpdatedAt;
+            }
+            if (this.currentConversation?.id === conversation.id) this.updateModelSelectorDisplay();
+            new Notice(t('chat.modelSelector.codex.applyFailed'));
+          });
+          return true;
+        }
         if (conversation?.backend === 'pi') {
           void savePiConversationSelection(conversation, { piModelOverride: selection },
             (target) => this.plugin.saveConversation(target)).catch(() => {
@@ -4838,6 +4861,11 @@ export class OpenCodianView extends ItemView {
   }
 
   private getBackendScopedActiveTabModelOverride(): ModelSelectorSelection | null {
+    if (this.currentConversation?.backend === 'codex') {
+      const model = this.conversationSessionSettingsCoordinator
+        .resolveEffectiveSettings(this.currentConversation).codexModelOverride?.trim();
+      return model ? { provider: 'codex', model } : null;
+    }
     if (this.currentConversation?.backend === 'pi'
       && this.currentConversation.sessionSettings?.piModelOverride !== undefined) {
       return this.currentConversation.sessionSettings.piModelOverride;
@@ -4904,14 +4932,17 @@ export class OpenCodianView extends ItemView {
 
   /** Get model options for sendMessage */
   private getSendMessageOptions(): SendMessageModelOptions {
-    const current = this.getCurrentSessionModel();
     const effective = this.currentConversation?.backend === 'codex'
       ? this.conversationSessionSettingsCoordinator.resolveEffectiveSettings(this.currentConversation)
       : undefined;
+    const codexModel = effective?.codexModelOverride?.trim();
+    const current = effective
+      ? (codexModel ? { provider: 'codex', model: codexModel } : null)
+      : this.getCurrentSessionModel();
     return {
       ...(current ? { provider: current.provider, model: current.model, variant: this.getCurrentEffortVariant() } : {}),
       ...(effective ? { codexOptions: {
-        model: effective.codexModelOverride,
+        model: codexModel,
         sandboxMode: effective.codexSandboxMode,
         approvalPolicy: effective.codexApprovalPolicy,
         modelReasoningEffort: effective.codexModelReasoningEffort,

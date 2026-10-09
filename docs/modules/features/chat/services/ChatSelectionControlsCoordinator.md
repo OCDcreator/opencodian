@@ -1,5 +1,7 @@
 # ChatSelectionControlsCoordinator
 
+> 2026-10-09（Codex requested model）：wrapHostForCodex 通过已有 preserveRequestedModel hook 保留请求模型，缺失项沿用既有可用性校验拒绝而非静默首行替换，空全局模型为未配置。selectModel 的 Codex 菜单入口在 prompt 前捕获 conversation，Custom prompt 一次且 cancel/blank 零写入；解析后的字符串交给未修改的 persistCodexModelOverride 单次保存，跳过同样会保存的 direct host setter。成功/失败显示和 context 同步仅刷新仍属于原 conversation 的视图；失败不调用后来 active B 的 setter 回滚。非 Codex switch 路径与 catalog/auth 决策保留。
+
 Send-time model validation retries a loaded but empty catalog. A restored ZCode
 session can briefly return an empty catalog during startup; that first snapshot
 does not permanently block sends once the native catalog becomes available.
