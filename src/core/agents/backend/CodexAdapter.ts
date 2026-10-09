@@ -2602,15 +2602,10 @@ export class CodexAdapter
     // either is missing the turn fails closed with an actionable error
     // instead of silently falling back to a less restrictive path. 'never'
     // may use the existing fallback; 'inherit' omits the override entirely.
-    const policy = this.captureAttemptOptions(request.options?.codexOptions as AttemptOptions | undefined).approvalPolicy ?? 'inherit';
-    if (policy === 'untrusted' || policy === 'on-request') {
-      if (!this.canUseAppServerChat() || typeof this.approvalHost.collectApproval !== 'function') {
-        yield {
-          type: 'error',
-          content: `Codex approval policy "${policy}" requires the Codex app-server and an approval bridge, which are unavailable. Start the Codex backend or switch the approval policy to "inherit" or "never".`,
-        };
-        return;
-      }
+    const preflightError = this.getSendMessagePreflightError(request.options?.codexOptions as Record<string, unknown> | undefined);
+    if (preflightError) {
+      yield { type: 'error', content: preflightError };
+      return;
     }
 
     if (this.canUseAppServerChat()) {
@@ -2619,6 +2614,16 @@ export class CodexAdapter
     }
 
     yield* this.sendMessageViaSdk(request);
+  }
+
+  /** Read-only policy check shared by composer preflight and the send boundary. */
+  getSendMessagePreflightError(codexOptions?: Record<string, unknown>): string | null {
+    const policy = this.captureAttemptOptions(codexOptions as AttemptOptions | undefined).approvalPolicy ?? 'inherit';
+    if ((policy === 'untrusted' || policy === 'on-request')
+      && (!this.canUseAppServerChat() || typeof this.approvalHost.collectApproval !== 'function')) {
+      return `Codex approval policy "${policy}" requires the Codex app-server and an approval bridge, which are unavailable. Start the Codex backend or switch the approval policy to "inherit" or "never".`;
+    }
+    return null;
   }
 
   /**

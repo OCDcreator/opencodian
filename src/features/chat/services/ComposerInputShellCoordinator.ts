@@ -1077,7 +1077,7 @@ export class ComposerInputShellCoordinator {
     // Toggle custom placeholder overlay visibility
     const isEmpty = !this.inputTextareaEl.value;
     if (this.placeholderOverlayEl) {
-      this.placeholderOverlayEl.classList.toggle('is-hidden', isEmpty);
+      this.placeholderOverlayEl.classList.toggle('is-hidden', !isEmpty);
     }
 
     const maxHeight = this.resolveTextareaMaxHeight();

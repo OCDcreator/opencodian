@@ -1,5 +1,7 @@
 # ComposerInputShellCoordinator
 
+> 2026-10-09（composer placeholder）：占位 overlay 仅在 textarea.value 为空时显示，`is-hidden` 只用于非空值。用户 input、Pi `set_editor_text` 发出的同一 input 事件及 accepted/queued 后清稿均沿用既有 syncTextareaHeight；不改高度、overflow、layout 调度或 placeholder CSS/display 策略。现有 composer fixture 回归覆盖空白→输入→清空、accepted 清稿与真实 Pi host 程序写入/清空路径。
+
 > 2026-10-08：纯文本与图像 prompt 均等待 onPreparationOutcome；accepted/queued 后仅清空尚未编辑的原草稿，rejected 与准备异常保留内容。准备中禁用重复发送，迟到回调不影响重建后的 textarea。command/shell 原有路径不变。
 > 2026-09-24 (ZCode image recovery)：图片提交等待发送预检结果后才清空 textarea/chips；ZCode 模型不支持图片或原生目录不可读时，`rejected` 回调保留原草稿并显示 backend-specific Notice，用户可换模型后重试。accepted/queued 才会消费草稿。
 > 2026-09-21 (advantage-parity R-F1)：composer content 顶部新增队列条宿主元素（setQueuedFollowUpBarElement host 缝，chips 行之上）。

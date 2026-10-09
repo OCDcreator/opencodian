@@ -1,5 +1,7 @@
 # CodexAdapter
 
+> 2026-10-09（strict composer preflight）：`getSendMessagePreflightError(codexOptions)` 是无副作用的后端判定，复用既有 `captureAttemptOptions` 的 per-turn 优先规则、app-server chat 可用性与 approval bridge 检查。`untrusted`/`on-request` 不满足时返回同一可见诊断；`never`/`inherit` 保持原 fallback 语义。发送边界调用同一函数复检，直接调用与 preflight 后连接/bridge 变化仍 fail-closed；不创建线程、模型回合或新策略真值。
+
 > 2026-10-08：native request_user_input 的选项按上游互斥语义映射为单选，Other 输入保留；MCP 表单 array 多选由独立 schema 路径处理。
 
 > 2026-10-08：审批、tool-user-input、MCP elicitation 组合所属 turn 与单条 native request 的生命周期；超时取消仅清该问题，不中断 main turn。组合监听器在结果/异常/取消后移除，不依赖新版本 AbortSignal.any。

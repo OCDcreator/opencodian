@@ -209,6 +209,10 @@ export interface MessageSendPreparationHost {
   shouldUseModelCatalog(conversation: Conversation): boolean;
   ensureSelectedModelAvailable(provider: string | undefined, model: string | undefined): Promise<boolean>;
   appendModelUnavailableNoticeMessage(): Promise<void>;
+  /** Backend-owned Codex guard; checked before accepting or consuming a draft. */
+  getCodexSendPreflightError?(
+    codexOptions?: Record<string, unknown>,
+  ): string | null | Promise<string | null>;
   /**
    * Native ZCode catalog proof for the selected model. `unavailable` is a
    * safe refusal: image sends may not proceed on a stale or unobserved model
@@ -317,6 +321,9 @@ export interface MessageSendPreparationHostDependencies {
   reloadModelCatalog: () => Promise<void>;
   getSendMessageOptions: () => SendMessageModelOptions;
   appendModelUnavailableNoticeMessage: () => Promise<void>;
+  getCodexSendPreflightError?: (
+    codexOptions?: Record<string, unknown>,
+  ) => string | null | Promise<string | null>;
   getZCodeImageInputSupport?: (
     sessionId: string,
     model: SendMessageModelOptions,
@@ -370,7 +377,7 @@ export class MessageSendPreparationService {
     });
   }
 
-  // eslint-disable-next-line complexity -- Send preflight deliberately keeps readiness, model, canonical seed, and follow-up enqueue ordering together.
+  // eslint-disable-next-line complexity, max-lines-per-function -- Send preflight keeps readiness, model/policy rejection, canonical seed and queue ordering together; extracting its bounded Codex gate would split acceptance ownership.
   async prepareMessageSend(
     options: PrepareMessageSendOptions,
   ): Promise<PreparedMessageSend | null> {
@@ -422,7 +429,8 @@ export class MessageSendPreparationService {
       return null;
     }
     this.host.transitionTabSessionLifecycle(tabId, 'preparing', 'send-preflight');
-    const draftContextItems = this.composerSendContext.getDraftContextItems(tabId);
+    let draftContextItems = conversation.backend === 'codex'
+      ? [] : this.composerSendContext.getDraftContextItems(tabId);
     const availability = await this.host.getServerAvailability();
     await this.refreshStatusSurfaces();
     if (!this.isTargetTabActive(tabId)) {
@@ -447,6 +455,30 @@ export class MessageSendPreparationService {
     if (!modelOptions) {
       this.notifyPreparationOutcome(options, 'rejected');
       return null;
+    }
+    if (conversation.backend === 'codex') {
+      const unavailableReason = 'Codex send preflight is unavailable. Start the Codex backend before sending.';
+      let preflightError: string | null = unavailableReason;
+      try {
+        if (this.host.getCodexSendPreflightError) {
+          preflightError = await this.host.getCodexSendPreflightError(modelOptions.codexOptions);
+        }
+      } catch (error) {
+        preflightError = error instanceof Error ? error.message : String(error);
+      }
+      if (!this.isTargetTabActive(tabId)) {
+        this.resetPreparingLifecycle(tabId);
+        this.notifyPreparationOutcome(options, 'rejected');
+        return null;
+      }
+      // Only an explicit null admits the send; a missing/malformed guard fails closed.
+      if (preflightError !== null) {
+        new Notice(preflightError || unavailableReason);
+        this.resetPreparingLifecycle(tabId);
+        this.notifyPreparationOutcome(options, 'rejected');
+        return null;
+      }
+      draftContextItems = this.composerSendContext.getDraftContextItems(tabId);
     }
     if (!(await this.verifyImageInputBeforeOptimisticAppend(conversation, backendSessionId, modelOptions, options.images))) {
       this.resetPreparingLifecycle(tabId);
@@ -944,6 +976,10 @@ export function createMessageSendPreparationHost(
     },
     ensureSelectedModelAvailable: (provider, model) => selectionCtrl.ensureSelectedModelAvailable(provider, model),
     appendModelUnavailableNoticeMessage: () => deps.appendModelUnavailableNoticeMessage(),
+    getCodexSendPreflightError: (codexOptions) =>
+      deps.getCodexSendPreflightError
+        ? deps.getCodexSendPreflightError(codexOptions)
+        : 'Codex send preflight is unavailable. Start the Codex backend before sending.',
     getZCodeImageInputSupport: (sessionId, model) =>
       deps.getZCodeImageInputSupport?.(sessionId, model) ?? Promise.resolve('unavailable'),
     buildStructuredPromptSendPayload: (content, options) => openCodeService.buildStructuredPromptSendPayload(content, options),

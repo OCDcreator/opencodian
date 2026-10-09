@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "e4333950cea25231d8799c6eddc7844cc1c52c8929847e2de7739d3a930af64e",
+  "digest": "efa70696da8c5e585ab7938e4fa737c1ba56d70efbe6f98412a4d15b7502fb36",
   "recordCount": 796,
   "records": [
     {
@@ -326,7 +326,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexAdapter.ts",
-      "sha256": "cf1a1ee0263cacc2ca8714027e97df8031af2754d10a2338241f6059629341bb"
+      "sha256": "027ccf2012a7a746981ba3535830b7e35bc87f5918cb8eae98490e300f07d410"
     },
     {
       "kind": "src",
@@ -1501,7 +1501,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/ChatRuntimeComposition.ts",
-      "sha256": "c33ae6fdafdec3b97524d2dc06ebe83c8fc9e433571b8e1a9d4e1e844098436b"
+      "sha256": "310a3236dbf269aa3eee081c380a568d8b40c078a06b64bed971bab6626b2355"
     },
     {
       "kind": "src",
@@ -1841,7 +1841,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ComposerInputShellCoordinator.ts",
-      "sha256": "ee8c5b3fe11720a1d661c5e33fb056c2fd6d3f934a1de62a0049a64f508b6c54"
+      "sha256": "8636ed307a0eb2356b4a5b42776065a801125a6581bf262b6ed237be7d307b9c"
     },
     {
       "kind": "src",
@@ -2111,7 +2111,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/MessageSendPreparationService.ts",
-      "sha256": "0af45044e0fdd105381c241da823f87bf576f0e947328b4ffa97b06725b06787"
+      "sha256": "00adeb67960a63725cf55281d30b523192f45d7de506d48955c980d13ff38990"
     },
     {
       "kind": "src",
@@ -3984,7 +3984,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-08T20:19:58.577Z",
-  "headShaAtGeneration": "f135d2fba7e26af3807c7dc00c12b9ad0c8f48fe",
+  "generatedAt": "2026-10-09T01:54:54.191Z",
+  "headShaAtGeneration": "ec5c396de1188caab015cb48b1c7339eb0f9b948",
   "graphifyVersion": "graphify 0.8.50"
 }

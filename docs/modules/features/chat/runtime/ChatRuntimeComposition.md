@@ -1,5 +1,7 @@
 # ChatRuntimeComposition
 
+> 2026-10-09（Codex preaccepted guard）：既有 interaction wiring 把 MessageSendPreparationService 的 Codex preflight 口接到当前 registry 的 CodexAdapter `getSendMessagePreflightError`，透传 sending conversation 已捕获的 per-turn codexOptions。adapter/guard 缺失返回非空 unavailable reason，production fail-closed；composition 不复制 approval policy 判定、不启动后端、不改模型/档位、普通 accepted 或 queued 语义。后端发送边界复用同一 guard 复检。
+
 The slash execution host receives a narrow `refreshSessionChangeSidebar` callback. It is invoked after undo/redo's visible sync and delegated to the view, where the modified-files coordinator performs the native OpenCode 2 diff read.
 
 2026-09-26：ZCode 回合在仍属于当前可见标签/会话时结束后，装配层请求选择控件从该会话的原生读回刷新模式。此举使从斜杠 `/plan` 进入 Plan 的同会话控制显示跟上真实状态；切换标签后的旧回合不覆盖当前会话。

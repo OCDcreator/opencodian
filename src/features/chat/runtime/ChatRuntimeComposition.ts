@@ -1189,6 +1189,14 @@ export class ChatRuntimeComposition {
         reloadModelCatalog: () => host.reloadModelCatalog(),
         getSendMessageOptions: () => host.getSendMessageOptions(),
         appendModelUnavailableNoticeMessage: () => host.appendModelUnavailableNoticeMessage(),
+        getCodexSendPreflightError: (codexOptions?: Record<string, unknown>) => {
+          const adapter = host.plugin.agentServiceRegistry?.get('codex') as {
+            getSendMessagePreflightError?(options?: Record<string, unknown>): string | null;
+          } | undefined;
+          return adapter?.getSendMessagePreflightError
+            ? adapter.getSendMessagePreflightError(codexOptions)
+            : 'Codex send preflight is unavailable. Start the Codex backend before sending.';
+        },
         getZCodeImageInputSupport: (sessionId: string, model: SendMessageModelOptions) =>
           getZCodeImageInputSupport(host.plugin.agentServiceRegistry, sessionId, model),
         openCodeService: host.plugin.openCodeService,
