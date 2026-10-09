@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "a1e367383d65a27fd29d26fe611576be0f01b7c559a3b417f81c6dea59f6358a",
+  "digest": "8f6363bba0a835c93adb91b49b2662096be1de1f9e92478bbdacddab0f653b03",
   "recordCount": 796,
   "records": [
     {
@@ -1271,7 +1271,7 @@
     {
       "kind": "src",
       "key": "src/core/types/chat.ts",
-      "sha256": "bec9eaff0e7b6f1ce8dea4f5f169d586b9513abdd391cf687951c4154aa3856c"
+      "sha256": "5ed375ac4dc8711024020a4536825bac675f6dc5ff203af1862dbbe321ca32f3"
     },
     {
       "kind": "src",
@@ -1401,7 +1401,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
-      "sha256": "e8777925dc72c005da5a0ea7b03ce1423103a6e5094e98f7884843a66264b893"
+      "sha256": "fb9a58f4990cf76ce761ae812fa7148b2cb148a1d015b497b03e4bfeec8f4f3c"
     },
     {
       "kind": "src",
@@ -3984,7 +3984,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-09T09:31:51.769Z",
-  "headShaAtGeneration": "5e95723bf1e42af7d63dac4d9e3487e9be91ba11",
+  "generatedAt": "2026-10-09T12:36:27.586Z",
+  "headShaAtGeneration": "fe5d2d5b45f611f552d3c8d978631498ea11f3ad",
   "graphifyVersion": "graphify 0.8.50"
 }

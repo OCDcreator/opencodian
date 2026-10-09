@@ -1341,6 +1341,29 @@ export class OpenCodianView extends ItemView {
         }
 
         const conversation = this.currentConversation;
+        if (conversation?.backend === 'claude-code') {
+          const model = selection?.model.trim();
+          if (selection && (!this.isClaudeCodeModelProvider(selection.provider) || !model)) return false;
+          const previous = conversation.sessionSettings;
+          const previousUpdatedAt = conversation.updatedAt;
+          const pendingSettings = {
+            ...previous,
+            claudeModelOverride: selection ? { provider: selection.provider, model: model! } : null,
+          };
+          conversation.sessionSettings = pendingSettings;
+          conversation.updatedAt = Date.now();
+          void this.plugin.saveConversation(conversation).then(() => {
+            if (this.currentConversation?.id === conversation.id) this.updateModelSelectorDisplay();
+          }, () => {
+            if (conversation.sessionSettings === pendingSettings) {
+              conversation.sessionSettings = previous;
+              conversation.updatedAt = previousUpdatedAt;
+            }
+            if (this.currentConversation?.id === conversation.id) this.updateModelSelectorDisplay();
+            new Notice(t('settings.claudeCode.configuration.saveFailed'));
+          });
+          return true;
+        }
         if (conversation?.backend === 'codex') {
           const model = selection?.model.trim();
           if (selection && (selection.provider !== 'codex' || !model || model === '__codex_custom__')) return false;
@@ -4867,6 +4890,11 @@ export class OpenCodianView extends ItemView {
   }
 
   private getBackendScopedActiveTabModelOverride(): ModelSelectorSelection | null {
+    if (this.currentConversation?.backend === 'claude-code'
+      && this.currentConversation.sessionSettings?.claudeModelOverride !== undefined) {
+      const override = this.currentConversation.sessionSettings.claudeModelOverride;
+      return override && this.isClaudeCodeModelProvider(override.provider) ? override : null;
+    }
     if (this.currentConversation?.backend === 'codex') {
       const model = this.conversationSessionSettingsCoordinator
         .resolveEffectiveSettings(this.currentConversation).codexModelOverride?.trim();

@@ -4,6 +4,7 @@ import type { ClaudeCodeModelCatalogEntry } from '../../../../src/core/agents/ba
 import { ClaudeCodeAdapter } from '../../../../src/core/agents/backend/ClaudeCodeAdapter';
 import type { ClaudeCodeSdkOptionsShape } from '../../../../src/core/agents/backend/ClaudeCodeOptionsBuilder';
 import type { ResolvedModelSelection } from '../../../../src/core/config/modelConfig';
+import { StorageService } from '../../../../src/core/storage/StorageService';
 import type { Conversation } from '../../../../src/core/types/chat';
 import { type ClaudeCodeBackendSettings, getDefaultClaudeCodeBackendSettings } from '../../../../src/core/types/settings';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
@@ -156,6 +157,27 @@ function modelBoundary(options: ClaudeCodeSdkOptionsShape) {
 
 function assertNoNativeCalls(): void {
   for (const call of blockedNativeCalls.splice(0)) expect(call).not.toHaveBeenCalled();
+}
+
+function persistThroughStorage(view: ViewHarness) {
+  const files = new Map<string, string>();
+  const adapter = {
+    basePath: '/synthetic-claude-history-vault',
+    exists: jest.fn(async (path: string) => files.has(path)),
+    read: jest.fn(async (path: string) => {
+      const data = files.get(path);
+      if (data === undefined) throw new Error(`Missing synthetic file: ${path}`);
+      return data;
+    }),
+    write: jest.fn(async (path: string, data: string) => { files.set(path, data); }),
+  };
+  const storage = new StorageService({ app: { vault: { adapter } } } as unknown as ConstructorParameters<typeof StorageService>[0]);
+  view.plugin.saveConversation.mockImplementation((target: Conversation) => storage.saveConversation(target));
+  return { storage, files };
+}
+
+async function settleSelectionSave(): Promise<void> {
+  for (let i = 0; i < 12; i++) await Promise.resolve();
 }
 
 function wrapperFixture(ownerBackend: string | undefined, globalBackend: string) {
@@ -402,6 +424,113 @@ describe('Claude requested selection and send isolation through the production v
     expect(view.getCurrentSessionModelResolution().status).toBe('available');
     expect(view.getSendMessageOptions()).toEqual({ ...foreignSelection, variant: undefined });
     expect(view.plugin.saveSettings).not.toHaveBeenCalled();
+    expect(view.tabManager.setActiveTabModelOverride).not.toHaveBeenCalled();
+  });
+});
+
+describe('Claude selector persistence through storage and History restoration', () => {
+  const supportedModels = [
+    { id: 'sonnet', name: 'Sonnet', provider: 'claude-code' },
+    { id: 'opus', name: 'Opus', provider: 'claude-code' },
+  ];
+
+  it('restores each owned conversation model after storage round-trip and loss of both tab and view caches', async () => {
+    const a = conversation('history-a');
+    const b = conversation('history-b');
+    a.backendSessionId = 'native-a';
+    a.messages = [{ id: 'first-turn', role: 'user', content: 'synthetic history canary', timestamp: 1 }];
+    const { view, runtime, wrappedHost, tabs } = harness({ active: a, supportedModels, globalBackend: 'codex' });
+    const { storage, files } = persistThroughStorage(view);
+    const settingsBefore = JSON.stringify(view.plugin.settings);
+    await runtime.reloadModelCatalog();
+    expect(wrappedHost.setActiveTabModelOverride({ provider: 'claude-code', model: 'sonnet' })).toBe(true);
+    await settleSelectionSave();
+    view.currentConversation = b;
+    expect(wrappedHost.setActiveTabModelOverride({ provider: 'claude-code', model: 'opus' })).toBe(true);
+    await settleSelectionSave();
+    expect(files.has('.opencodian/sessions/history-a.json')).toBe(true);
+    expect(files.has('.opencodian/sessions/history-b.json')).toBe(true);
+    const loadedA = await storage.loadFullConversation(a.id);
+    const loadedB = await storage.loadFullConversation(b.id);
+    expect(loadedA).toMatchObject({ id: a.id, backendSessionId: 'native-a', messages: a.messages });
+    expect(loadedB).not.toBeNull();
+    const restoredA = harness({ active: loadedA!, supportedModels, globalBackend: 'codex' });
+    const restoredB = harness({ active: loadedB!, supportedModels });
+    await restoredA.runtime.reloadModelCatalog();
+    await restoredB.runtime.reloadModelCatalog();
+    expect(restoredA.host.getActiveTabModelOverride()).toEqual({ provider: 'claude-code', model: 'sonnet' });
+    expect(restoredB.host.getActiveTabModelOverride()).toEqual({ provider: 'claude-code', model: 'opus' });
+    const capturedA = restoredA.view.getSendMessageOptions();
+    restoredA.view.currentConversation = loadedB!;
+    expect(capturedA).toEqual({ provider: 'claude-code', model: 'sonnet', variant: 'medium' });
+    expect(modelBoundary(sdkOptions(restoredA.view, capturedA))).toEqual({ ownModel: true, model: 'sonnet', effort: 'medium' });
+    expect(restoredB.view.getSendMessageOptions()).toEqual({ provider: 'claude-code', model: 'opus', variant: 'medium' });
+    expect(JSON.stringify(view.plugin.settings)).toBe(settingsBefore);
+    expect(view.plugin.saveSettings).not.toHaveBeenCalled();
+    expect(tabs.get(a.id)).toBeNull();
+  });
+
+  it('persists explicit Default while inheritance prevents a stale legacy tab override from returning', async () => {
+    const { view, runtime, wrappedHost, tabs } = harness({ globalModel: 'opus', supportedModels });
+    const { storage } = persistThroughStorage(view);
+    await runtime.reloadModelCatalog();
+    expect(wrappedHost.setActiveTabModelOverride(claudeDefault)).toBe(true);
+    await settleSelectionSave();
+    const explicit = await storage.loadFullConversation(view.currentConversation.id);
+    expect(explicit).not.toBeNull();
+    const restored = harness({ active: explicit!, globalModel: 'opus', supportedModels });
+    await restored.runtime.reloadModelCatalog();
+    expect(restored.view.getSendMessageOptions().model).toBe('default');
+    tabs.set(view.currentConversation.id, { provider: 'claude-code', model: 'sonnet' });
+    expect(wrappedHost.setActiveTabModelOverride(null)).toBe(true);
+    await settleSelectionSave();
+    expect(view.getBackendScopedActiveTabModelOverride()).toBeNull();
+    expect(view.getSendMessageOptions().model).toBe('opus');
+    const inherited = await storage.loadFullConversation(view.currentConversation.id);
+    const reloaded = harness({ active: inherited!, globalModel: 'opus', supportedModels, override: { provider: 'claude-code', model: 'sonnet' } });
+    expect(reloaded.view.getBackendScopedActiveTabModelOverride()).toBeNull();
+    expect(reloaded.view.getSendMessageOptions().model).toBe('opus');
+  });
+
+  it('rolls back a failed save on its originating conversation after the active tab changes', async () => {
+    const a = conversation('failed-a');
+    a.sessionSettings = { chatFontSizePx: 15 };
+    const previous = a.sessionSettings;
+    const b = conversation('unaffected-b');
+    const { view, runtime, wrappedHost, tabs } = harness({ active: a, supportedModels });
+    await runtime.reloadModelCatalog();
+    let rejectSave!: (error: Error) => void;
+    view.plugin.saveConversation.mockImplementation(() => new Promise<void>((_resolve, reject) => { rejectSave = reject; }));
+    expect(wrappedHost.setActiveTabModelOverride({ provider: 'claude-code', model: 'sonnet' })).toBe(true);
+    expect(view.plugin.saveConversation).toHaveBeenCalledWith(a);
+    view.currentConversation = b;
+    tabs.set(b.id, { provider: 'claude-code', model: 'opus' });
+    rejectSave(new Error('synthetic persistence failure'));
+    await settleSelectionSave();
+    expect(a.sessionSettings).toBe(previous);
+    expect(a.updatedAt).toBe(1);
+    expect(b.sessionSettings).toBeUndefined();
+    expect(view.getBackendScopedActiveTabModelOverride()).toEqual({ provider: 'claude-code', model: 'opus' });
+    expect(view.tabManager.setActiveTabModelOverride).not.toHaveBeenCalled();
+    expect(view.plugin.saveSettings).not.toHaveBeenCalled();
+  });
+
+  it('keeps a newer model choice when an earlier save rejects late', async () => {
+    const { view, runtime, wrappedHost } = harness({ supportedModels });
+    await runtime.reloadModelCatalog();
+    let rejectEarlier!: (error: Error) => void;
+    view.plugin.saveConversation
+      .mockImplementationOnce(() => new Promise<void>((_resolve, reject) => { rejectEarlier = reject; }))
+      .mockResolvedValueOnce(undefined);
+    expect(wrappedHost.setActiveTabModelOverride({ provider: 'claude-code', model: 'sonnet' })).toBe(true);
+    expect(wrappedHost.setActiveTabModelOverride({ provider: 'claude-code', model: 'opus' })).toBe(true);
+    const newer = view.currentConversation.sessionSettings;
+    const updatedAt = view.currentConversation.updatedAt;
+    rejectEarlier(new Error('synthetic earlier save failure'));
+    await settleSelectionSave();
+    expect(view.currentConversation.sessionSettings).toBe(newer);
+    expect(view.currentConversation.updatedAt).toBe(updatedAt);
+    expect(view.getSendMessageOptions().model).toBe('opus');
     expect(view.tabManager.setActiveTabModelOverride).not.toHaveBeenCalled();
   });
 });

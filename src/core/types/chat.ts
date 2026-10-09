@@ -229,6 +229,8 @@ export interface SessionDiffEntry {
 
 export interface ConversationSessionSettings {
   chatFontSizePx?: number | null;
+  /** Claude composer model persists per conversation; null means inherit. */
+  claudeModelOverride?: { provider: string; model: string } | null;
   /** Pi composer overrides apply on the next send; null means inherit. */
   piModelOverride?: { provider: string; model: string } | null;
   piEffortOverrides?: Record<string, string | null>;
@@ -304,10 +306,7 @@ export function normalizeConversationSessionSettings(
   }
 
   const normalized: Record<string, unknown> = {};
-  for (const [modelKey, effortKey] of [
-    ['piModelOverride', 'piEffortOverrides'],
-    ['zcodeModelOverride', 'zcodeEffortOverrides'],
-  ] as const) {
+  for (const modelKey of ['claudeModelOverride', 'piModelOverride', 'zcodeModelOverride'] as const) {
     const modelOverride = value[modelKey];
     if (modelOverride === null) {
       normalized[modelKey] = null;
@@ -316,6 +315,8 @@ export function normalizeConversationSessionSettings(
       const model = normalizeNullableString(modelOverride.model);
       if (provider && model) normalized[modelKey] = { provider, model };
     }
+  }
+  for (const effortKey of ['piEffortOverrides', 'zcodeEffortOverrides'] as const) {
     const effortOverrides = value[effortKey];
     if (effortOverrides && typeof effortOverrides === 'object' && !Array.isArray(effortOverrides)) {
       const efforts = Object.fromEntries(Object.entries(effortOverrides)

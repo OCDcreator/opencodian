@@ -1,4 +1,7 @@
 # Chat Types
+
+`ConversationSessionSettings.claudeModelOverride` stores a nullable `{ provider, model }` selection for the owning Claude conversation. `null` inherits the Claude global model; an explicit model named `default` remains a real override. The normalizer trims valid provider/model strings, drops malformed selections, and preserves this field across the existing storage save/load round-trip without changing Pi, ZCode, or Codex fields.
+
 `SessionDiffEntry` and persisted `TurnDiffNoticeEntry` carry optional `statsUnavailable` when a backend exposes only a write-tool file hint and no native snapshot statistics. Numeric zero values remain storage-compatible placeholders and must not be rendered as verified `+0/-0`.
 > 2026-09-21 (advantage-parity R-F2)：`Conversation` 与 `ConversationMeta` 增可选 `linkedNotePath`（vault-relative 显式草稿绑定，不属于 `ConversationSessionSettings`）。
 > 2026-09-21 (advantage-parity R-E4)：PromptContextItem / MessageContextAttachment 新增 retrievalChannel（lexical | semantic）。
