@@ -2,6 +2,8 @@
 
 本文件记录有限验收结果、保留条件及下一批执行范围，不声明六后端或全部 profile/platform 验收完成。
 
+按本文提示词执行的 FA880 OpenCode 2 remote 重载恢复与回忆批次已在 2026-10-10 完成：一次 UI Send / 一次 SDK prompt / 零重发，同 native 回忆及观测范围内恢复通过，53 个非目标完整会话对象保持。详见 [本批有限验收结果](backend-acceptance-fa880-oc2-reload-recall-2026-10-10.md)。下方提示词保留作本批历史执行范围；本批一次发送预算已消耗，完整 B01/B12、local-native 启动和 Aux/editor 仍未晋升。
+
 ## 提交与运行状态
 
 2026-10-10 核查时，原仓库 main 为 `eb3f1dc81f622392a6c996e247b63ed93f6648d7`，续接工作树为 `/Users/dht/.codex/worktrees/opencodian-remaining-acceptance/opencodian`，分支 `codex/opencodian-remaining-acceptance-1006`，HEAD 为 `60350ea2735371d188c3f1b04290b5762abb508f`。两工作树均无未提交更改。续接分支已有 30 个提交；这些提交未合并至 main，本批不推送、合并或发布。
@@ -43,7 +45,7 @@
 
 1. 继续使用 `/Users/dht/.codex/worktrees/opencodian-remaining-acceptance/opencodian` 的 `codex/opencodian-remaining-acceptance-1006`。先核对最新 HEAD/status，保留后来更改。本交接文档的提交发生在 `60350ea27` 之后，不能把后续 docs-only HEAD 变化当成运行候选失效。
 2. 读取本交接文档；原范围入口为 `/Users/dht/.codex/visualizations/2026/10/08/01a11c15-b6d1-7e71-aea5-1af2db7d4cf9/continuation-2026-10-09/ledger.json` 中 `NB-FA880-OC2-MAIN1` 与 `WP-FA880-OC2-ENV`。只查有关条件，不重建 1,906 行矩阵或重新统计全部 profiles。
-3. 旧一轮 remote 成功和恢复的原始核验在该目录 `oc2-main-v6-actual-turn-restoration-coordinator.json`。它证明 production remote client 连接手动 owned native 服务（历史端口 16940）的一个真实回合，不是插件 local-native CLI 启动证明。旧记录保留 `REMAINDER.20261009.composer1` 身份。
+3. 旧一轮 remote 成功和恢复的原始核验在该目录 `oc2-main-v6-actual-turn-restoration-coordinator.json`。它证明 production remote client 连接手动 owned native 服务（历史 PID 16940；2026-10-10 实测端口为 4297）的一个真实回合，不是插件 local-native CLI 启动证明。旧记录保留 `REMAINDER.20261009.composer1` 身份。
 4. 当前固定运行候选优先复用 `REMAINDER.20261009.clauderestore1`；准确冻结清单见 `/Users/dht/.codex/visualizations/2026/10/09/01a1206f-d99a-7310-9d63-a33120bb2a4c/opencodian-model-acceptance/candidate-clauderestore1/freeze.json`。源码/产物一致则复用验证，只在实际磁盘/加载不匹配时进行一次有序复制与加载，不能为新日期重建。
 
 ### QA 执行
