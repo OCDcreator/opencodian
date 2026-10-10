@@ -53,8 +53,10 @@ export interface InlineEditTurnOptions {
 
 export class InlineEditService {
   private session: AuxQuerySession | null = null;
-  private starting: Promise<AuxQuerySession> | null = null;
+  private starting: Promise<AuxQuerySession | InlineEditOutcome> | null = null;
   private disposed = false;
+  private disposing: Promise<void> | null = null;
+  private startupGeneration = 0;
 
   constructor(private readonly config: InlineEditServiceConfig) {}
 
@@ -78,8 +80,12 @@ export class InlineEditService {
     if (!built.ok) {
       return { status: 'error', reason: built.error };
     }
+    const generation = this.startupGeneration;
     const session = await this.ensureSession();
     if ('status' in session) return session;
+    if (this.disposed || generation !== this.startupGeneration) {
+      return { status: 'error', reason: 'cancelled' };
+    }
     const signal = this.config.signal;
     const prompt = options.images?.length
       ? `${built.prompt}\n\n${buildInlineEditImageNote(this.config.locale, request)}`
@@ -111,18 +117,24 @@ export class InlineEditService {
 
   /** Cancel the in-flight turn; the session stays alive for a retry. */
   cancel(): void {
+    this.startupGeneration += 1;
     this.session?.cancel();
   }
 
   /** Idempotent teardown of the native session. */
   async dispose(): Promise<void> {
-    if (this.disposed) return;
+    if (this.disposed) {
+      await this.disposing;
+      return;
+    }
     this.disposed = true;
     const session = this.session;
     this.session = null;
-    this.starting = null;
-    if (!session) return;
-    await session.dispose();
+    // The pending start owns late-session cleanup; keep teardown awaitable.
+    this.disposing = session
+      ? session.dispose()
+      : this.starting?.then(() => {}) ?? Promise.resolve();
+    await this.disposing;
   }
 
   // ---------------------------------------------------------------------------
@@ -130,6 +142,7 @@ export class InlineEditService {
   // ---------------------------------------------------------------------------
 
   private async ensureSession(): Promise<AuxQuerySession | InlineEditOutcome> {
+    if (this.disposed) return { status: 'error', reason: 'cancelled' };
     if (this.session) return this.session;
     if (this.starting) {
       try {
@@ -151,20 +164,28 @@ export class InlineEditService {
       return { status: 'error', reason: 'model-unavailable', detail: resolved.error };
     }
     const effort = this.config.adapter.getEffort?.() ?? null;
-    this.starting = capability.startAuxQuerySession({
+    const generation = this.startupGeneration;
+    const starting = capability.startAuxQuerySession({
       systemPrompt: buildInlineEditSystemPrompt(this.config.locale),
       workingDirectory: this.config.workingDirectory,
       ...(resolved.model ? { model: resolved.model } : {}),
       ...(effort ? { effort } : {}),
-    });
-    try {
-      const session = await this.starting;
+    }).then<AuxQuerySession | InlineEditOutcome, InlineEditOutcome>(async (session) => {
+      if (this.disposed || generation !== this.startupGeneration) {
+        // All startup waiters share this single late-session teardown.
+        await session.dispose();
+        return { status: 'error', reason: 'cancelled' };
+      }
       this.session = session;
       return session;
+    }, (error: unknown) => this.describeStartFailure(error));
+    this.starting = starting;
+    try {
+      return await starting;
     } catch (error) {
       return this.describeStartFailure(error);
     } finally {
-      this.starting = null;
+      if (this.starting === starting) this.starting = null;
     }
   }
 

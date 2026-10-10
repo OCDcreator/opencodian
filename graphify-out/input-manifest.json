@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "8f6363bba0a835c93adb91b49b2662096be1de1f9e92478bbdacddab0f653b03",
+  "digest": "a40cea97b68ba5bc8393e23173a5353aa39824c6538b26fff9eaba333d72599b",
   "recordCount": 796,
   "records": [
     {
@@ -2761,7 +2761,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineEditService.ts",
-      "sha256": "8f198faba6eb32faba6c4240068e6059b688463f8eb133ab67185f2f44082628"
+      "sha256": "cc9600fb10f2a12bbb045fbd34d3f38babf3c2a35b9e2df8b80d7f407c866a32"
     },
     {
       "kind": "src",
@@ -3956,7 +3956,7 @@
     {
       "kind": "tool",
       "key": "graphify-version",
-      "sha256": "3743012c1f0a4169ff074ffacae1312a05745afae16e874a4a80c3061b2624b3"
+      "sha256": "b51978f2277743327d67f2e691d74d1915bc4705f49837c36ab7ef8a2ab92ca8"
     },
     {
       "kind": "tsconfig",
@@ -3984,7 +3984,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-09T12:36:27.586Z",
-  "headShaAtGeneration": "fe5d2d5b45f611f552d3c8d978631498ea11f3ad",
-  "graphifyVersion": "graphify 0.8.50"
+  "generatedAt": "2026-10-10T17:42:57.655Z",
+  "headShaAtGeneration": "5958f9a19952813b687e84ccd023fd0d5ac08502",
+  "graphifyVersion": "graphify 0.9.36"
 }
