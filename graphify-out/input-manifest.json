@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "a40cea97b68ba5bc8393e23173a5353aa39824c6538b26fff9eaba333d72599b",
+  "digest": "b629211de6ea181f7dd8d2cc2b27500f3963b69760f7095f438504075472389a",
   "recordCount": 796,
   "records": [
     {
@@ -2616,7 +2616,7 @@
     {
       "kind": "src",
       "key": "src/features/inline-edit/InlineCompletionController.ts",
-      "sha256": "3a30a1d9ea1ff7ea2827fcf278554075e71b4412b474b72971c779b4cbf00307"
+      "sha256": "1cf126730cfeed999fc8edfdc8ffe0448f4bf0dd5aa439bdc4a9ed5096ad6379"
     },
     {
       "kind": "src",
@@ -3956,7 +3956,7 @@
     {
       "kind": "tool",
       "key": "graphify-version",
-      "sha256": "b51978f2277743327d67f2e691d74d1915bc4705f49837c36ab7ef8a2ab92ca8"
+      "sha256": "3743012c1f0a4169ff074ffacae1312a05745afae16e874a4a80c3061b2624b3"
     },
     {
       "kind": "tsconfig",
@@ -3984,7 +3984,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-10T17:42:57.655Z",
-  "headShaAtGeneration": "5958f9a19952813b687e84ccd023fd0d5ac08502",
-  "graphifyVersion": "graphify 0.9.36"
+  "generatedAt": "2026-10-11T09:47:36.147Z",
+  "headShaAtGeneration": "c403d1a16b5b32bbde92ed0badac96c59765ce2b",
+  "graphifyVersion": "graphify 0.8.50"
 }

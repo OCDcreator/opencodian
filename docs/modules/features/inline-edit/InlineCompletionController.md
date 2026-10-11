@@ -12,7 +12,7 @@ R-C3 的每编辑器状态机。池是全局的，正确性状态在这：每视
 - `trigger(editor, notePath)`：前置链按成本排序——enabled → 无活动行内编辑（两功能不共存，§3.2.7）→ 有 EditorView → 非组合态 → 非 readOnly → 有宿主笔记 → 取消旧态 → 建窗 → `pool.obtain()` → `complete()`
 - `onEditorActivity`：键入/选区移动（ghost 扩展 updateListener）走 `cancelForView`（abort + 代数 + 清 ghost effect）
 - `accept(view)`（Tab）：读 ghost → §4.2 位置与前缀尾一致性校验（漂移即丢弃，绝不拼接）→ **单事务** `dispatch({ changes, selection, effects: 清 ghost, userEvent: 'input.complete' })`（单步撤销，验收 3）
-- `dismiss(view)`（Esc）：清 effect + abort，文档零变化（验收 4）
+- `dismiss(view)`（Esc）：该视图仍有 pending turn（含 `pool.obtain()` 等待和首个 chunk 之前）或 live ghost 时，走 `cancelForView` 清 effect + abort，文档零变化（验收 4）；两者均无时不消费按键
 - 每回合过 `findWriteToolCalls`：命中 → `pool.reportWriteToolViolation` + 丢弃建议（§3.2.3）
 - 流式 chunk 与最终结果同一条 `showValidated` 路径：代数检查 → `validateCompletion` → 光标漂移检查 → setGhost
 
@@ -27,4 +27,4 @@ R-C3 的每编辑器状态机。池是全局的，正确性状态在这：每视
 - 前置链的顺序即成本序，不要把需要编辑器状态的检查挪到门控之前
 - `reportPoolError` 的 `unsupported` / `capability-unavailable` / `model-unavailable` 必须经**必填** `notify`（生产为 main.ts 注入的 Obsidian `Notice`）如实上报；`disabled`（门控路径）与 `session-unavailable`（池已上报）有意静默。`notify` 漏配在编译期失败（R-C3-D1 回归护栏），组合级证明见 `tests/unit/main/inlineCompletionNotifyWiring.test.ts`
 
-Progressive suggestions retain their turn abort controller until settlement. Failed, cancelled, rejected, or write-tool violating turns invalidate their generation and clear the ghost, so late chunks cannot resurrect a discarded candidate; Esc aborts a turn even after it has streamed text.
+Progressive suggestions retain their turn abort controller until settlement. Failed, cancelled, rejected, or write-tool violating turns invalidate their generation and clear the ghost, so late chunks cannot resurrect a discarded candidate. Esc checks pending turn ownership independently from visible ghost text: cancellation before the first chunk invalidates that view's generation and aborts its signal, so late chunks/final results cannot become a ghost or be accepted by Tab. Other views on the same controller keep their own generation and signal. The existing real-CM6/real-pool controller suite covers pending pool acquisition, active turns before/after a chunk, settled ghosts, late delivery and no-pending key fallthrough.

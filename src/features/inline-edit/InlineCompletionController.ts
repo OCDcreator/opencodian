@@ -178,12 +178,13 @@ export class InlineCompletionController {
   }
 
   /**
-   * Esc with a live ghost: dismiss only — the document is untouched
-   * (acceptance 4). Returns whether the key was consumed.
+   * Esc cancels a pending turn (including before its first chunk) or clears
+   * a live ghost. The document is untouched (acceptance 4); without either,
+   * the key falls through to the editor's other handlers.
    */
   dismiss(view: EditorView): boolean {
     const ghost = readInlineCompletionGhost(view.state);
-    if (!ghost) return false;
+    if (!ghost && !this.views.get(view)?.abort) return false;
     this.cancelForView(view);
     return true;
   }
