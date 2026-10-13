@@ -11,6 +11,12 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-10-13 v1.1.38：Codex app-server 传输 null 帧防护
+
+- `CodexAppServerTransport.handleMessage` 增加非对象帧防护：JSON 字面量 `null`/标量/数组帧此前在 `msg.id` 解引用处抛未捕获 TypeError 并冒泡出 `ws.onmessage`；现统一路由到既有 "Unrecognized JSON-RPC message" 告警路径，连接与后续请求不受影响，语义对齐 ZCode 解析器既有 `isPlainObject` 加固。
+- 缺陷由矩阵接力第 18 批 owned loopback WebSocket 验收发现（WIRE018-MALFORMED null 控制帧，修复前进程退出、观测原样保留）；修复经真实 ws socket 复测（零异常、零 observer 事件、恢复请求成功），回归用例落在 `CodexAppServerTransport.wireObserver.test.ts`。
+- 完整 verify 15/15（lint 0/0）；标准 Test Vault 部署后运行时 BUILD_ID 验证通过。ZCode 已排查确认无同型缺陷。
+
 ## 2026-10-06 v1.1.37：定向后端修复与 macOS 主路径验收
 
 - Pi 修复模型/effort 控件刷新、继承文案与会话独立保存恢复；Codex 接通原生消息/turn 身份、消息前 fork、子会话目录和逐发送模型，保留 fail-closed 及缓存清理；Claude 修复当前外部 CLI/env/shell 快照、await 后复验和 invalid restart 前置拒绝。
