@@ -243,4 +243,34 @@ describe('CodexAppServerTransport wire observer', () => {
     await expect(request).rejects.toThrow('JSON-RPC request timeout for slow/request');
     expect(responses).toContainEqual(expect.objectContaining({ ok: false, error: 'JSON-RPC request timeout for slow/request' }));
   });
+
+  it('survives non-envelope JSON frames without observer events and stays usable', async () => {
+    const events: string[] = [];
+    await startClient({
+      onNotification: ({ method }) => events.push(`n:${method}`),
+      onServerRequest: ({ method }) => events.push(`s:${method}`),
+      onResponse: ({ ok }) => events.push(`r:${ok}`),
+    });
+    const warn = jest.spyOn(console, 'warn').mockImplementation();
+    try {
+      warn.mockClear();
+      events.length = 0;
+      // Regression (matrix relay 018): a literal JSON `null` frame used to
+      // throw an uncaught TypeError on `msg.id` and kill the host process;
+      // scalars and arrays already fell through to the warn path.
+      for (const frame of ['null', '42', '"scalar"', 'true', '[]']) {
+        expect(() => mockWsInstance.onmessage?.({ data: frame })).not.toThrow();
+      }
+      const unrecognized = warn.mock.calls.filter((call) => JSON.stringify(call).includes('Unrecognized JSON-RPC message'));
+      expect(unrecognized).toHaveLength(5);
+      expect(events).toEqual([]);
+      // The connection and JSON-RPC main path stay alive after the frames.
+      mockWsInstance.onmessage?.({
+        data: JSON.stringify({ jsonrpc: '2.0', method: 'warning', params: {} }),
+      });
+      expect(events).toEqual(['n:warning']);
+    } finally {
+      warn.mockRestore();
+    }
+  });
 });

@@ -475,6 +475,13 @@ export class CodexAppServerTransport {
       return;
     }
 
+    // `null`, scalars and arrays are valid JSON but not RPC envelopes; property
+    // access on null would otherwise throw out of the ws onmessage listener.
+    if (msg === null || typeof msg !== 'object' || Array.isArray(msg)) {
+      logger.warn('Unrecognized JSON-RPC message', { data: data.slice(0, 200) });
+      return;
+    }
+
     const id = msg.id;
     const hasId = id !== undefined && id !== null;
     const method = msg.method;

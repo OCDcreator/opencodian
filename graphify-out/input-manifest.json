@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "d733518207e948d405ff21aa632e0f93fbf8040eb3b9db8b0f075b2523b01941",
+  "digest": "57943e64f9495920dd09ed890e0bcfa5099512b03b5b333ae38ba370a19b1b66",
   "recordCount": 794,
   "records": [
     {
@@ -346,7 +346,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexAppServerTransport.ts",
-      "sha256": "464bb3ef6f89cf5bdb4ef74fb0bd2a0f55ea918f3a1946e7851bf0a6f1017da0"
+      "sha256": "88d2b03af610c8e8c390be33d84f568dd308e6c408bd357d43b0bdf307a8ab51"
     },
     {
       "kind": "src",
@@ -3974,7 +3974,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-06T11:17:25.416Z",
-  "headShaAtGeneration": "137562889423606f83866ebd39c39dcfcc71f9ea",
+  "generatedAt": "2026-10-13T06:44:28.758Z",
+  "headShaAtGeneration": "fef2541d7ff9f4d836e4ac3afd89c5ac177a43a9",
   "graphifyVersion": "graphify 0.9.31"
 }

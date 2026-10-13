@@ -1,4 +1,5 @@
 # Owner: core.backend
+> 2026-10-13（矩阵接力 018）：CodexAppServerTransport.handleMessage 增加非对象帧防护——JSON null/标量/数组帧路由到既有 Unrecognized 告警路径，不再于 `msg.id` 解引用处抛未捕获异常击穿 ws.onmessage；语义对齐 ZCode 解析器的 isPlainObject 加固。修复经 owned loopback WebSocket 实机复测（修复前 null 帧致命、修复后零异常且连接保持），回归用例与全量 verify 落 main。
 > 2026-10-02（reviewed continuation，用户已授权）：ClaudeCodeAdapter 的 MCP permission override 与 output-style reload 复用现有 active persistent query，以 native session ID 选择目标；缺方法/失效会话返回 unavailable，响应/会话竞态失败不提升为 runtime verified。SDK 回执仅 acknowledged，刷新样式列表不代表选中样式或新模型输出；配置三轴与 UI 验收另记。Codex 删除默认须同 ID absence 回读 verified；pending/failed/admitted 期间 deleted 通知不得擦掉恢复身份、alias 和 evidence/cache，同 ID retry 可通过权威 absence 收敛。显式 forgetSession 不发 native delete/archive，UI 暴露另记 partial；backend owner 保留这些状态所有权。
 > 2026-10-02（接入修复 T05/T08）：Codex catalog 由现有 client 保留分页 cursor、跨页去重和 partial failure；native mutation admission 与 failed/unavailable 分开，adapter 失败保留恢复身份，显式 local forget 不分派 native delete。ACK 不作为终态/readback 证明。Claude 新 control 的 SDK 类型契约与 adapter 业务接线分别验收；实施记录列明图门禁及尚未执行的 runtime/UI 场景，不能仅因 SDK 方法存在宣称能力完整。
 > 2026-09-30 (Codex 0.159 app-server integration)：

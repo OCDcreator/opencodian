@@ -1,6 +1,7 @@
 # CodexAppServerTransport
 > 2026-09-30（Codex 0.159.0 协议升级）：**WebSocket 断线重连**。意外 close（非 stop()/dispose）时：reject 全部 pending 请求（错误信息 `App-server WebSocket closed unexpectedly; pending request aborted`，绝不悬挂）→ 指数退避重连（1s/2s/4s/8s/16s，最多 5 次尝试，约 31s 预算）→ 复用已存 wsUrl 重新 `connectAndInitialize`（重跑 initialize 握手；server-request handler 注册表从不随 close 清除，自动恢复）→ 成功调用 `onReconnect`、预算耗尽调用 `onReconnectFailed(error)`（fail-closed：此后原始 request 立即拒绝，下一次 `start()` 会完整 respawn 新进程）。`stop()` 设置 `stopRequested`、取消退避 sleep，绝不触发重连。重连期间调用 `start()` 会 await 进行中的 reconnectPromise 而不是 spawn 第二个进程。新增连接状态 `reconnecting`（wire observer）。构造函数 options 新增 `onReconnect?` / `onReconnectFailed?`。JSON-RPC 错误现在把 `code`/`data` 附在 Error 上（message 不变），供 `isAppServerMethodNotFoundError` 等谓词分类。
 
+> 2026-10-13：`handleMessage` 畸形帧防护（矩阵接力 018 修复）。JSON 字面量 `null` 帧此前在 `msg.id` 解引用处抛未捕获 TypeError 并冒泡出 `ws.onmessage` 击穿到进程级；`null`/标量/数组等非对象帧现在与无法解析的文本同样路由到 Unrecognized 告警路径并 return，连接与后续请求不受影响。
 > **源码**: `src/core/agents/backend/CodexAppServerTransport.ts`
 
 > **源码**: `src/core/agents/backend/CodexAppServerTransport.ts`
@@ -23,7 +24,7 @@
 - WebSocket reconnect：意外 close 后的指数退避重连、握手重跑、`onReconnect` / `onReconnectFailed` 回调、pending 请求 clear-reject；`stop()` 绝不重连（2026-09-30，详见顶部条目）
 - initialize 声明 `experimentalApi: true` 与 `requestAttestation: false`；此协商是否成功决定 Codex adapter 是否能启用真实会话上下文能力
 - `stop()`: 关闭 WebSocket，终止子进程，清理 pending requests
-- `handleMessage()`: JSON-RPC 三路分发（普通响应 / 通知 / 服务端请求），此前服务端请求被误当响应并静默丢弃，现已修正
+- `handleMessage()`: JSON-RPC 三路分发（普通响应 / 通知 / 服务端请求），此前服务端请求被误当响应并静默丢弃，现已修正；`null`/标量/数组等非对象帧走 Unrecognized 告警路径（2026-10-13）
 - `handleServerRequest()` / `sendServerRequestReply()`: 服务端发起 JSON-RPC 请求（带 `method`+`id`）的 dispatch + JSON-RPC 回写（成功回 `result`，缺 handler 回 `-32601`，handler 抛错回 `-32603`）
 - `request()`（protected）: 客户端发起 JSON-RPC 请求，带可选超时
 - WebSocket transport 使用静态 `ws` import，避免三件套发布时依赖未声明的 plugin-local package
