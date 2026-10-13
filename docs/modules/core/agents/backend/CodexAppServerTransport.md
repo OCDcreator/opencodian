@@ -3,6 +3,8 @@
 
 > 2026-10-08：transport 持有逐 request ID 的取消控制器；serverRequest/resolved 仅按相同请求 ID 与 native thread 取消。断连/Stop 也取消并清空旧请求；重复 pending ID 只收集一次，已解决/旧 connection 的迟到结果不发送。
 
+> 2026-10-13：`handleMessage` 畸形帧防护（矩阵接力 018 修复）。JSON 字面量 `null` 帧此前在 `msg.id` 解引用处抛未捕获 TypeError 并冒泡出 `ws.onmessage` 击穿到进程级；`null`/标量/数组等非对象帧现在与无法解析的文本同样路由到 Unrecognized 告警路径并 return，连接与后续请求不受影响。
+
 > **源码**: `src/core/agents/backend/CodexAppServerTransport.ts`
 
 > **源码**: `src/core/agents/backend/CodexAppServerTransport.ts`
@@ -25,7 +27,7 @@
 - WebSocket reconnect：意外 close 后的指数退避重连、握手重跑、`onReconnect` / `onReconnectFailed` 回调、pending 请求 clear-reject；`stop()` 绝不重连（2026-09-30，详见顶部条目）
 - initialize 声明 `experimentalApi: true` 与 `requestAttestation: false`；此协商是否成功决定 Codex adapter 是否能启用真实会话上下文能力
 - `stop()`: 关闭 WebSocket，终止子进程，清理 pending requests
-- `handleMessage()`: JSON-RPC 三路分发（普通响应 / 通知 / 服务端请求），此前服务端请求被误当响应并静默丢弃，现已修正
+- `handleMessage()`: JSON-RPC 三路分发（普通响应 / 通知 / 服务端请求），此前服务端请求被误当响应并静默丢弃，现已修正；`null`/标量/数组等非对象帧走 Unrecognized 告警路径（2026-10-13）
 - `handleServerRequest()` / `sendServerRequestReply()`: 服务端发起 JSON-RPC 请求（带 `method`+`id`）的 dispatch + JSON-RPC 回写（成功回 `result`，缺 handler 回 `-32601`，handler 抛错回 `-32603`）
 - `request()`（protected）: 客户端发起 JSON-RPC 请求，带可选超时
 - WebSocket transport 使用静态 `ws` import，避免三件套发布时依赖未声明的 plugin-local package
