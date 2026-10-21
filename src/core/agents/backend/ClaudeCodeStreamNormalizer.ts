@@ -967,7 +967,19 @@ export class ClaudeCodeStreamNormalizer {
     chunks: StreamChunk[],
     sessionId: string | undefined,
   ): void {
+    if (readString(record.type) === 'result') {
+      const uuid = readNonEmptyString(record.user_message_uuid);
+      if (uuid) chunks.push({ type: 'user_message_identity', uuid, ...(sessionId ? { sessionId } : {}) });
+      return;
+    }
     if (readString(record.type) !== 'user') {
+      return;
+    }
+
+    // SDK tool results also have type=user and their own UUID. They are not
+    // the submitted human prompt and must not replace its fork/steer identity.
+    const content = readRecord(record.message)?.content;
+    if (Array.isArray(content) && content.some((block) => readString(readRecord(block)?.type) === 'tool_result')) {
       return;
     }
 

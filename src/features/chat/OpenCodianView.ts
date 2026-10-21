@@ -196,6 +196,7 @@ import {
   ComposerInputShellCoordinator,
   type ComposerInputShellCoordinatorHost,
 } from './services/ComposerInputShellCoordinator';
+import { mergePiNativeConversationMessages } from './services/ConversationAuthoritativeMessageMergeCoordinator';
 import {
   type ConversationAuthoritativeSyncCoordinator,
   type ConversationAuthoritativeSyncHost,
@@ -274,12 +275,14 @@ import {
 import {
   type ComposerInputSubmission,
   MessageSendPreparationService,
+  type SendMessageModelOptions,
 } from './services/MessageSendPreparationService';
 import { ModifiedFilesSidebarCoordinator } from './services/ModifiedFilesSidebarCoordinator';
 import {
   PersistentAssistantNoticeService,
   type PersistentAssistantNoticeServiceHost,
 } from './services/PersistentAssistantNoticeService';
+import { releasePiUiView, syncPiUiView } from './services/PiExtensionUiHost';
 import { savePiConversationSelection } from './services/PiModelSelectionBinding';
 import type { QuestionDockSlotCoordinator } from './services/QuestionDockSlotCoordinator';
 import type { QuestionRuntimeServices } from './services/QuestionRuntimeHostAdapter';
@@ -326,6 +329,7 @@ import {
   getActiveWebViewerTabContext,
 } from './services/WebViewerContextService';
 import { recoverEmptyZCodeConversationSession } from './services/ZCodeEmptySessionRecovery';
+import { saveZCodeConversationSelection } from './services/ZCodeModelSelectionBinding';
 import type { TabBar, TabId, TabManager } from './tabs';
 import { type BackendSessionBrowserHost,BackendSessionBrowserModal } from './ui/BackendSessionBrowserModal';
 import { ContextDetailModal } from './ui/ContextDetailModal';
@@ -821,6 +825,7 @@ export class OpenCodianView extends ItemView {
           (adapter as { updateWebSearchMode(m: string | undefined): void })
             .updateWebSearchMode(overrides.webSearchMode);
         }
+        this.effortSelector?.updateDisplay();
       },
       agentServiceRegistry: this.plugin.agentServiceRegistry,
       openBackendSessionAsConversation: async (sessionId, title) => {
@@ -1063,13 +1068,13 @@ export class OpenCodianView extends ItemView {
           getVariant: () => this.getCurrentEffortVariant(),
           onVariantChange: async (variant: string | undefined) => {
             if (this.isCodexConversationActive()) {
-              // Codex effort: write back to persisted settings and update the
-              // adapter so subsequent thread creation uses the new value.
+              const conversation = this.currentConversation;
+              if (!conversation) return;
               const effort = (variant ?? 'medium') as CodexReasoningEffort;
-              this.plugin.settings.backendSettings.codex.modelReasoningEffort = effort;
-              await this.plugin.saveSettings();
-              this.currentVariant = effort;
-              this.updateCodexAdapterEffort(effort);
+              await this.conversationSessionSettingsCoordinator.saveConversationOverrides(conversation, {
+                ...conversation.sessionSettings,
+                codexModelReasoningEffort: effort,
+              });
               return;
             }
             const current = this.getCurrentSessionModel();
@@ -1078,6 +1083,15 @@ export class OpenCodianView extends ItemView {
               await savePiConversationSelection(conversation, {
                 piEffortOverrides: {
                   ...conversation.sessionSettings?.piEffortOverrides,
+                  [`${current.provider}/${current.model}`]: variant ?? null,
+                },
+              }, (target) => this.plugin.saveConversation(target));
+              return;
+            }
+            if (conversation?.backend === 'zcode' && current) {
+              await saveZCodeConversationSelection(conversation, {
+                zcodeEffortOverrides: {
+                  ...conversation.sessionSettings?.zcodeEffortOverrides,
                   [`${current.provider}/${current.model}`]: variant ?? null,
                 },
               }, (target) => this.plugin.saveConversation(target));
@@ -1284,12 +1298,13 @@ export class OpenCodianView extends ItemView {
   private createChatSelectionControlsCoordinatorHost(): ChatSelectionControlsCoordinatorHost {
     return {
       getOwnConversation: () => this.currentConversation,
+      preserveRequestedModel: () => this.currentConversation?.backend === 'claude-code',
       getApp: () => this.app,
       registerEscapeHandler: (handler) => {
         this.escapeHandlers.push(handler);
       },
       loadModelCatalogData: async () => {
-        if (this.isClaudeCodeConversationActive()) {
+        if ((this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'claude-code') {
           const adapter = this.plugin.agentServiceRegistry?.get('claude-code') as {
             supportedModels?: () => Promise<Array<{ id: string; name: string; provider?: string }>>;
           } | undefined;
@@ -1315,15 +1330,72 @@ export class OpenCodianView extends ItemView {
           providers,
         };
       },
-      getActiveTabModelOverride: () => this.getBackendScopedActiveTabModelOverride(),
+      getActiveTabModelOverride: () => {
+        const override = this.getBackendScopedActiveTabModelOverride();
+        return this.currentConversation?.backend === 'claude-code'
+          && override && !this.isClaudeCodeModelProvider(override.provider) ? null : override;
+      },
       setActiveTabModelOverride: (selection) => {
         if (!this.tabManager?.getActiveTab()) {
           return false;
         }
 
         const conversation = this.currentConversation;
+        if (conversation?.backend === 'claude-code') {
+          const model = selection?.model.trim();
+          if (selection && (!this.isClaudeCodeModelProvider(selection.provider) || !model)) return false;
+          const previous = conversation.sessionSettings;
+          const previousUpdatedAt = conversation.updatedAt;
+          const pendingSettings = {
+            ...previous,
+            claudeModelOverride: selection ? { provider: selection.provider, model: model! } : null,
+          };
+          conversation.sessionSettings = pendingSettings;
+          conversation.updatedAt = Date.now();
+          void this.plugin.saveConversation(conversation).then(() => {
+            if (this.currentConversation?.id === conversation.id) this.updateModelSelectorDisplay();
+          }, () => {
+            if (conversation.sessionSettings === pendingSettings) {
+              conversation.sessionSettings = previous;
+              conversation.updatedAt = previousUpdatedAt;
+            }
+            if (this.currentConversation?.id === conversation.id) this.updateModelSelectorDisplay();
+            new Notice(t('settings.claudeCode.configuration.saveFailed'));
+          });
+          return true;
+        }
+        if (conversation?.backend === 'codex') {
+          const model = selection?.model.trim();
+          if (selection && (selection.provider !== 'codex' || !model || model === '__codex_custom__')) return false;
+          const previous = conversation.sessionSettings;
+          const previousUpdatedAt = conversation.updatedAt;
+          const globalModel = this.plugin.settings.backendSettings.codex.model?.trim();
+          const save = this.conversationSessionSettingsCoordinator.saveConversationOverrides(conversation, {
+            ...previous,
+            codexModelOverride: selection === null || model === globalModel ? null : model,
+          });
+          const pendingSettings = conversation.sessionSettings;
+          void save.then(() => {
+            if (this.currentConversation?.id === conversation.id) this.updateModelSelectorDisplay();
+          }, () => {
+            if (conversation.sessionSettings === pendingSettings) {
+              conversation.sessionSettings = previous;
+              conversation.updatedAt = previousUpdatedAt;
+            }
+            if (this.currentConversation?.id === conversation.id) this.updateModelSelectorDisplay();
+            new Notice(t('chat.modelSelector.codex.applyFailed'));
+          });
+          return true;
+        }
         if (conversation?.backend === 'pi') {
           void savePiConversationSelection(conversation, { piModelOverride: selection },
+            (target) => this.plugin.saveConversation(target)).catch(() => {
+            if (this.currentConversation?.id === conversation.id) this.updateModelSelectorDisplay();
+          });
+          return true;
+        }
+        if (conversation?.backend === 'zcode') {
+          void saveZCodeConversationSelection(conversation, { zcodeModelOverride: selection },
             (target) => this.plugin.saveConversation(target)).catch(() => {
             if (this.currentConversation?.id === conversation.id) this.updateModelSelectorDisplay();
           });
@@ -1333,7 +1405,7 @@ export class OpenCodianView extends ItemView {
         return true;
       },
       getDefaultModelSelection: () => {
-        if (this.isClaudeCodeConversationActive()) {
+        if ((this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'claude-code') {
           const model = this.plugin.settings.backendSettings.claudeCode.model.trim() || 'default';
           return {
             provider: CLAUDE_CODE_PROVIDER_ID,
@@ -1354,7 +1426,7 @@ export class OpenCodianView extends ItemView {
       },
       getModelSourceMode: () => this.plugin.settings.modelSourceMode,
       isModelAvailableOnServer: async (provider, model) => {
-        if (this.isClaudeCodeConversationActive()) {
+        if ((this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'claude-code') {
           return Boolean(provider && model);
         }
         return this.plugin.modelConfigService
@@ -1372,12 +1444,13 @@ export class OpenCodianView extends ItemView {
           this.effortSelector?.updateDisplay();
           return;
         }
-        if (this.isClaudeCodeConversationActive()) {
+        if ((this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'claude-code') {
           const current = this.getCurrentSessionModel();
           if (current) {
             const modelRef = `${current.provider}/${current.model}`;
             const saved = this.variantStore[modelRef];
-            this.currentVariant = this.normalizeEffortVariantForCurrentBackend(saved);
+            this.currentVariant = saved && CLAUDE_CODE_EFFORT_VARIANTS.some((candidate) => candidate === saved)
+              ? saved : this.plugin.settings.backendSettings.claudeCode.effort;
           } else {
             this.currentVariant = undefined;
           }
@@ -1534,7 +1607,7 @@ export class OpenCodianView extends ItemView {
       return null;
     }
 
-    if (!paneState.runtime.streamController) {
+    if (!paneState.runtime.streamController?.isStreaming()) {
       paneState.runtime.streamController = new StreamController({
         containerEl: paneState.messagesEl,
         markdownService: this.markdownService,
@@ -1983,6 +2056,8 @@ export class OpenCodianView extends ItemView {
       return;
     }
     this.plugin.codexApprovalHostContext.getActiveTabId = () => this.getActiveTabId();
+    this.plugin.codexApprovalHostContext.getTabIdForSession = (sessionId) =>
+      this.tabManager?.getAllTabs().find((tab) => this.getSessionIdForTab(tab.id) === sessionId)?.id ?? null;
     this.plugin.codexApprovalHostContext.approvalCardRenderer = {
       collectResponse: async (request, tabId) => {
         try {
@@ -1990,7 +2065,7 @@ export class OpenCodianView extends ItemView {
           const result = await this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(
             questionRequest,
             tabId,
-            { applyResolution: false, forceInline: true },
+            { applyResolution: false, forceInline: true, signal: request.signal },
           );
           return mapCodexApprovalResolution(result, request);
         } finally {
@@ -2001,12 +2076,12 @@ export class OpenCodianView extends ItemView {
     // Dynamic `item/tool/requestUserInput` seam: the adapter hands over a
     // ready QuestionRequest and the raw resolution result flows back.
     this.plugin.codexApprovalHostContext.questionCardRenderer = {
-      collectResponse: async (request, tabId) => {
+      collectResponse: async (request, tabId, signal) => {
         try {
           return await this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(
             request,
             tabId,
-            { applyResolution: false, forceInline: true },
+            { applyResolution: false, forceInline: true, signal },
           );
         } finally {
           this.questionRuntimeServices.inlineCardRenderer.clear(tabId);
@@ -2021,7 +2096,7 @@ export class OpenCodianView extends ItemView {
           const result = await this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(
             request.questionRequest,
             tabId,
-            { applyResolution: false, forceInline: true },
+            { applyResolution: false, forceInline: true, signal: request.signal },
           );
           if (result.status === 'rejected') {
             return { action: 'decline' };
@@ -2199,6 +2274,7 @@ export class OpenCodianView extends ItemView {
       getTabMessagesContainer: (tabId) => this.getTabPaneState(tabId)?.messagesEl ?? null,
       setCurrentConversation: (conversation) => {
         this.currentConversation = conversation;
+        syncPiUiView(this.app, this.containerEl, conversation);
         this.refreshModifiedFilesSidebar();
         if (!conversation) {
           this.childSessionGraphCoordinator.clearGraph();
@@ -3074,6 +3150,7 @@ export class OpenCodianView extends ItemView {
   }
 
   async onClose() {
+    releasePiUiView(this.app, this.containerEl);
     this.activeTabContextUsageCoordinator.dispose();
     this.backgroundTaskInlinePanelRenderer.disposeNativeTaskWatch();
     this.plugin.unregisterConversationCachePinProvider(this.conversationCachePinProvider);
@@ -3727,6 +3804,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private scheduleComposerLayoutSync(): void {
+    syncPiUiView(this.app, this.containerEl, this.currentConversation);
     this.composerInputShellCoordinator.scheduleLayoutSync();
   }
 
@@ -4246,9 +4324,10 @@ export class OpenCodianView extends ItemView {
     fingerprint: string;
     revertState: ConversationRevertState | null;
   }> {
-    if (conversation.backend === 'opencode2') {
+    const backend = conversation.backend;
+    if (backend === 'opencode2' || backend === 'pi') {
       const sessionId = getConversationBackendSessionId(conversation);
-      const adapter = this.plugin.agentServiceRegistry?.get('opencode2') as {
+      const adapter = this.plugin.agentServiceRegistry?.get(backend) as {
         getChatMessages?(id: string): Promise<ChatMessage[]>;
         getSessionRevertState?(id: string): Promise<ConversationRevertState | null>;
       } | undefined;
@@ -4268,7 +4347,7 @@ export class OpenCodianView extends ItemView {
       const bySourceId = new Map(previousMessages.filter((message) => message.sourceMessageId)
         .map((message) => [message.sourceMessageId, message]));
       const unmatched = previousMessages.filter((message) => !message.sourceMessageId);
-      const merged = visibleServerMessages.map((message) => {
+      const merged = backend === 'pi' ? mergePiNativeConversationMessages(previous, visibleServerMessages) : visibleServerMessages.map((message) => {
         const existing = bySourceId.get(message.sourceMessageId) ?? unmatched.find((candidate) =>
           candidate.role === message.role && (candidate.content === message.content
             || (candidate.role === 'user' && message.content.includes(candidate.content))));
@@ -4286,12 +4365,12 @@ export class OpenCodianView extends ItemView {
           toolCalls: message.toolCalls ?? existing.toolCalls,
         };
       });
-      merged.push(...notices);
+      if (backend !== 'pi') merged.push(...notices);
       const before = this.conversationIdentityRuntime.getConversationSyncFingerprint(previous);
       const after = this.conversationIdentityRuntime.getConversationSyncFingerprint(merged);
       if (before !== after) {
         const ticket = this.createConversationWriteTicket(conversation.id);
-        const applied = await this.commitConversationWrite(conversation, ticket, 'opencode2-server-sync', () => {
+        const applied = await this.commitConversationWrite(conversation, ticket, `${backend}-server-sync`, () => {
           conversation.messages = merged;
         });
         return { messages: applied ? merged : previous, changed: applied,
@@ -4320,7 +4399,7 @@ export class OpenCodianView extends ItemView {
     fingerprint: string;
     revertState: ConversationRevertState | null;
   } | null> {
-    if (conversation.backend === 'opencode2') return null;
+    if (conversation.backend === 'opencode2' || conversation.backend === 'pi') return null;
     const result = await this.conversationAuthoritativeSyncCoordinator.syncConversationMessagesFromCanonicalState(
       conversation,
       tabId,
@@ -4811,9 +4890,23 @@ export class OpenCodianView extends ItemView {
   }
 
   private getBackendScopedActiveTabModelOverride(): ModelSelectorSelection | null {
+    if (this.currentConversation?.backend === 'claude-code'
+      && this.currentConversation.sessionSettings?.claudeModelOverride !== undefined) {
+      const override = this.currentConversation.sessionSettings.claudeModelOverride;
+      return override && this.isClaudeCodeModelProvider(override.provider) ? override : null;
+    }
+    if (this.currentConversation?.backend === 'codex') {
+      const model = this.conversationSessionSettingsCoordinator
+        .resolveEffectiveSettings(this.currentConversation).codexModelOverride?.trim();
+      return model ? { provider: 'codex', model } : null;
+    }
     if (this.currentConversation?.backend === 'pi'
       && this.currentConversation.sessionSettings?.piModelOverride !== undefined) {
       return this.currentConversation.sessionSettings.piModelOverride;
+    }
+    if (this.currentConversation?.backend === 'zcode'
+      && this.currentConversation.sessionSettings?.zcodeModelOverride !== undefined) {
+      return this.currentConversation.sessionSettings.zcodeModelOverride;
     }
     const override = this.tabManager?.getActiveTabModelOverride() ?? null;
     if (!override || !this.isClaudeCodeConversationActive()) {
@@ -4845,10 +4938,21 @@ export class OpenCodianView extends ItemView {
   }
 
   private getCurrentEffortVariant(): string | undefined {
+    if (this.isCodexConversationActive()) {
+      return this.conversationSessionSettingsCoordinator?.resolveEffectiveSettings(
+        this.currentConversation,
+      ).codexModelReasoningEffort ?? this.plugin.settings.backendSettings.codex.modelReasoningEffort;
+    }
     if (this.currentConversation?.backend === 'pi') {
       const current = this.getCurrentSessionModel();
       return current
         ? this.currentConversation.sessionSettings?.piEffortOverrides?.[`${current.provider}/${current.model}`] ?? undefined
+        : undefined;
+    }
+    if (this.currentConversation?.backend === 'zcode') {
+      const current = this.getCurrentSessionModel();
+      return current
+        ? this.currentConversation.sessionSettings?.zcodeEffortOverrides?.[`${current.provider}/${current.model}`] ?? undefined
         : undefined;
     }
     return this.normalizeEffortVariantForCurrentBackend(this.currentVariant);
@@ -4860,30 +4964,36 @@ export class OpenCodianView extends ItemView {
       : modelRef;
   }
 
-  /**
-   * Push a new reasoning-effort value into the live Codex adapter so that
-   * subsequent thread creation/resume uses the updated level.
-   * This does NOT affect already-running threads.
-   */
-  private updateCodexAdapterEffort(effort: CodexReasoningEffort): void {
-    const adapter = this.plugin.agentServiceRegistry?.get('codex');
-    if (adapter && 'updateModelReasoningEffort' in adapter) {
-      (adapter as { updateModelReasoningEffort(e: CodexReasoningEffort): void })
-        .updateModelReasoningEffort(effort);
-    }
-  }
-
   /** Get model options for sendMessage */
-  private getSendMessageOptions(): { provider?: string; model?: string; variant?: string } {
-    const current = this.getCurrentSessionModel();
-    if (!current) {
-      return {};
-    }
-
+  private getSendMessageOptions(): SendMessageModelOptions {
+    const effective = this.currentConversation?.backend === 'codex'
+      ? this.conversationSessionSettingsCoordinator.resolveEffectiveSettings(this.currentConversation)
+      : undefined;
+    const codexModel = effective?.codexModelOverride?.trim();
+    const current = effective
+      ? (codexModel ? { provider: 'codex', model: codexModel } : null)
+      : this.getCurrentSessionModel();
+    const isOwnedClaude = this.currentConversation?.backend === 'claude-code';
+    const claudeOverride = isOwnedClaude ? this.getBackendScopedActiveTabModelOverride() : null;
+    const isSyntheticClaudeDefault = isOwnedClaude
+      && !(claudeOverride && this.isClaudeCodeModelProvider(claudeOverride.provider))
+      && !this.plugin.settings.backendSettings.claudeCode.model.trim()
+      && current?.provider === CLAUDE_CODE_PROVIDER_ID && current.model === 'default';
+    const variant = !current ? undefined : isOwnedClaude
+      ? (this.currentVariant && CLAUDE_CODE_EFFORT_VARIANTS.some((candidate) => candidate === this.currentVariant)
+          ? this.currentVariant : this.plugin.settings.backendSettings.claudeCode.effort)
+      : this.getCurrentEffortVariant();
     return {
-      provider: current.provider,
-      model: current.model,
-      variant: this.getCurrentEffortVariant(),
+      ...(current ? { provider: current.provider, ...(!isSyntheticClaudeDefault ? { model: current.model } : {}), variant } : {}),
+      ...(effective ? { codexOptions: {
+        model: codexModel,
+        sandboxMode: effective.codexSandboxMode,
+        approvalPolicy: effective.codexApprovalPolicy,
+        modelReasoningEffort: effective.codexModelReasoningEffort,
+        additionalDirectories: [...(effective.codexAdditionalDirectories ?? [])],
+        networkAccessEnabled: effective.codexNetworkAccessEnabled,
+        webSearchMode: effective.codexWebSearchMode,
+      } } : {}),
     };
   }
 

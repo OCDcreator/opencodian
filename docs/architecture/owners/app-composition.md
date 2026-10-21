@@ -1,4 +1,5 @@
 # Owner: app.composition
+> 2026-10-07：Claude MCP loader 可能在 configureVaultScopedServices 之前调用；组合读取使用现有 manager，尚未装配时从当前 vault 创建同类 project config reader。避免启动阶段把暂未准备的 manager 缓存为有效空 MCP 配置；不启动额外 OpenCode 服务。
 > 2026-10-02（reviewed continuation，用户已授权）：Codex conversation 删除消费 native mutation 结果；failed/unavailable 或仅 admitted 时保留 storage、conversation 与 cache，原生 verified 后才提交本地删除。显式 local forget 与无 native thread 的本地草稿另行区分。main 在 native/storage await 后按 conversation ID 重查本地提交位置，避免并发删除或同 ID 重复完成误删邻项；只拥有删除流程的组合与本地提交，native ID/alias、原生回读和重试状态仍属于 Codex backend。
 > 2026-09-30 (Codex 0.159 integration)：main.ts 抽出 `wireCodexBridgeHosts()`，负责构造 codex approval + elicitation bridge hosts；bridge 运行时所有权仍留在 adapter 边界内。
 > 2026-09-22 (ZCode 票 01)：main.ts 的 wireHiddenAdapters 装配传入 `getZCodeSettings` 与 `getZCodeExtraEnv`（`getDomainEnvFor('zcode')`）；ZCode 仅装配，运行时状态留在 zcode adapter 边界内。
@@ -68,3 +69,16 @@ The composition root injects the OpenCode 2 settings callback into adapter wirin
 ## 2026-10-05 Codex 消息前分支与恢复
 
 Codex native child 的目录恢复复用同 native ID 的本地 conversation，保留历史与 session model override；local forget/native delete 边界和其他后端路径不变。
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `app.composition` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+The plugin composition supplies Pi extension-command completion localization through the existing adapter wiring callback, keeping the Pi service boundary independent of the locale runtime.
+
+## 2026-10-13 诊断报告输出策略
+
+`buildDiagnosticReport` 在原报告组装末端选择共享 sanitizer 的严格 URL 策略；app.composition 仅拥有该输出策略选择，不新增 collector 或 runtime owner。完整 userinfo/fragment 隐藏，安全 endpoint/query 与报告结构保持。Pi 配置/状态没有新增到通用报告；mock clipboard/file 输出与 validation build 只提供源验证，不晋升 native 候选或矩阵条件。
+
+
+## 2026-10-13 Claude elicitation admission handling
+
+既有 handleClaudeCodeElicitation 负责收住 core.backend builder 的 schema 拒绝并返回 decline/cancel，拒绝时不准入 renderer、不记录输入或异常文本。正常 card/content 与 tab 回调路径保留；schema 校验仍归 core.backend，不向 main 新增运行时所有者。当前验证仅是生产 handler 与注入 renderer 的合成测试，未部署或取得 native/UI 验收。

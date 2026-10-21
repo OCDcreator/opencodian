@@ -1,4 +1,5 @@
 # Owner: feature.settings-codex
+> 2026-10-07：本 owner 的 Codex 显式重载操作等待设置保存后调用宿主 reload 接口；缺少 reloadPlugin 时使用顺序 unloadPlugin/loadPlugin，保留 enabled 状态并将保存失败和 false load 作为失败。没有把宿主生命周期责任迁移到 main 或 backend。
 > 2026-09-30 (Codex 0.159 integration)：
 > - 新增 `SettingsCodexPluginsSection`（插件市场/已安装浏览器，install/uninstall/reconcile，backend 不可用时诚实状态），注册为第 7 个 tab。
 > - `SettingsCodexAccountSurface` 增加 usage 分析卡片（全 null 空态）；approval 下拉不再含 `untrusted`。
@@ -45,3 +46,9 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 - 2026-09-18 (FlowText 批次 B)：owner manifest 随 R-B1/R-B2 更新——新增 `src/shared/contextGroupPlan.ts` 归属 `shared.foundation`；本 owner 的边界与职责未变。
 
 2026-10-02：模型、权限、MCP 与 loaded threads 读回面消费 Codex catalog 结果，保留 partial 及错误边界；候选 gatewayOAuth/MCP App/disabledPluginIds 的 T11 探测与生产默认关闭分别记录。
+
+## 2026-10-06 Codex catalog permission denial
+
+CodexReadbackModal 和 CodexMcpServerDetailModal 从结构化目录失败中识别权限拒绝，只展示固定本地化说明。状态、已读取 partial 条目和重试流程仍由原 modal 持有，不新增目录真值或跨 owner 配置权。
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.settings-codex` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。

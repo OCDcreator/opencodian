@@ -15,7 +15,7 @@
 
 ## Surface Contract
 
-- `.opencodian-settings`：设置界面 token 作用域，所有 `--opencodian-settings-*` 变量都从 Obsidian 主题变量派生。
+- `.opencodian-settings`：设置界面 token 作用域，所有 `--opencodian-settings-*` 变量都从 Obsidian 主题变量派生；同时拥有 `opencodian-settings-pane` inline-size 容器，按实际设置内容宽度响应，而非仅依赖整个窗口。
 - `--opencodian-settings-form-row-*`：普通设置项的 shadcn-style Card + Field row token。它是 `--opencodian-settings-row-*` 的当前标准实现，背景必须保持中性，状态色只允许进入 badge、文字、outline 或真实 Alert/Empty surface。
 - `.opencodian-settings-panel-title` / `.opencodian-settings-panel-title-actions`：设置页标题行。左侧保留 `SettingsPanelChrome` 的 OpenCodian logo / wordmark，action slot 右对齐承载 active backend icon switcher；它是标题 row，不是内容卡片。标题行上方 spacing 为 `12px`，品牌块左侧 padding 为 `0`，标题行右侧 padding 为 `56px`，用于避开 Obsidian 设置 modal 的关闭按钮区域。
 - `.opencodian-settings-quick-nav` / `.opencodian-settings-tab-primary` / `.opencodian-settings-tab-secondary`：classic 与 tabbed 的同级 navigation-shell surface。它们可以显示 active / hover / focus 状态，但不承担内容卡片视觉。
@@ -32,6 +32,7 @@
 - `.opencodian-debug-tab-shell` / `.opencodian-debug-tab-header` / `.opencodian-debug-tab-body` / `.opencodian-debug-tab-badge`：Debug 五个二级标签共享的 shadcn-inspired settings shell。它提供紧凑标题、说明、badge rail 和中性内容栈；不引入 React/Radix/Tailwind，也不改变 tab id 或设置保存语义。
 - `.opencodian-debug-global-panel` / `.opencodian-debug-modules` / `.opencodian-debug-export` / `.opencodian-debug-workbench`：调试页四个来源子标签统一跟随 Debug tab shell + neutral Field row 语法。Plugin 的全局日志开关、Plugin/OpenCode 的模块开关、Claude Code 的 SDK 诊断块、Export 的路径/动作/控制台帮助都位于同宽 shell body 内，不再混用裸 setting row、外边距扩宽、object-card 或局部卡片。
 - `.opencodian-debug-status-strip` / `.opencodian-debug-channel-list` / `.opencodian-debug-log-preview`：Claude Code 调试工作台内部布局。SDK 诊断状态使用 muted metadata rows 表达；普通 channel/module/export rows 使用 `--opencodian-settings-form-row-*`，不使用 `--opencodian-settings-object-*`、`interactive-accent`、purple/violet 或整行状态色边框。日志预览采用 ScrollArea-like bounded `pre`，不使用 dashboard 式指标卡或嵌套重卡片。
+- 普通 `.setting-item`（排除直接宿主行以及 Tools/Skills/ACP/MCP/分享等无标题的紧凑操作栏）拥有 `opencodian-setting-row` inline-size 容器。控件组统一换行，直接按钮允许长标签换行并限制到控件宽度；dropdown trigger 保留原有截断语义。pane 或嵌套 row 小于等于 720px 时，说明在上、控件在下，沿用原 DOM/键盘顺序。路径输入与按钮可以分行；ACP 操作组也允许换行。
 - `@media (max-width: 720px)`：tabbed settings 在窄宽下收紧 editor-area padding，primary/secondary tabs 允许换行，content shell、Debug tab shell、Debug header、ordinary setting rows、wide text rows、help rows 和 Debug channel rows 退为单列；Debug 描述和 block desc 使用 `overflow-wrap: anywhere`，确保 `server/config/model/streaming` 等长 token 不撑破行宽。
 - `.opencodian-theme-style-card` / `.opencodian-style-input-lock-note` / `.opencodian-debug-help-item`：在本轮只映射到 object token weight，不把样式设置、debug help 等复杂区域完整迁移成统一 object-card。
 
@@ -157,3 +158,8 @@ Rule: never apply one hierarchy rule globally across both layout modes. In class
 ## Tab Bar Scrolling
 
 当一级标签数量超过可视宽度时，`.opencodian-settings-tabs-primary` 启用水平滚动（`overflow-x: auto`），隐藏滚动条高度为 4px，保持标签栏不换行（`flex-wrap: nowrap`）。
+
+
+2026-10-08 设置按钮布局回归：容器只隔离普通 Field row 的 inline-size，紧凑 action-only Setting 保留各 owner 的 intrinsic/flex 宽度；pane query 只改已有 grid 的列定义，不把 flex/block/隐藏行改为 grid。原生隐藏 select 和 Obsidian measuring probe 不参与可见布局断言；真正的按钮可见性、row 边界和 root 横向范围均需实机检查。
+
+页头品牌与后端 icon rail 在 pane 不超过 720px 时允许整组/组内换行，并限制到页头宽度，保留品牌、原生图标、按钮顺序和关闭区预留。Mac 六个后端按钮的 150% 缩放越界作为独立实机回归。

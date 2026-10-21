@@ -152,6 +152,25 @@ describe('SettingsTabbedRenderer', () => {
     expect(plugin.onChatWarmSessionBackendChanged).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps another enabled backend alive when switching the default for new chats', () => {
+    const { plugin, renderer } = createRendererState({
+      enabledBackends: ['zcode', 'pi'],
+      activeBackend: 'zcode',
+    });
+    const previous = { start: jest.fn(), stop: jest.fn().mockResolvedValue(undefined) };
+    const next = { start: jest.fn().mockResolvedValue(undefined), stop: jest.fn() };
+    Object.assign(plugin.agentServiceRegistry, {
+      get: jest.fn((kind) => kind === 'zcode' ? previous : next),
+    });
+
+    (renderer as unknown as { switchAgent: (agent: AgentBackendKind) => void }).switchAgent('pi');
+
+    expect(plugin.settings.activeBackend).toBe('pi');
+    expect(plugin.agentServiceRegistry.setActive).toHaveBeenCalledWith('pi');
+    expect(next.start).toHaveBeenCalledTimes(1);
+    expect(previous.stop).not.toHaveBeenCalled();
+  });
+
   it('shows and routes the Pi backend tab with the same backend visibility rules', () => {
     const renderPi = jest.spyOn(SettingsPiSection.prototype, 'attachTabbed').mockImplementation(() => {});
     const { renderer } = createRendererState({ primaryTabId: 'pi', secondaryTabs: { pi: 'providers' }, enabledBackends: ['opencode', 'pi'], activeBackend: 'pi' });

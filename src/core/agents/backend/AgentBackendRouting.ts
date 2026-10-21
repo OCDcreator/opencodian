@@ -1,3 +1,5 @@
+import { backendSessionCatalogFailure, BackendSessionCatalogReadError, type BackendSessionCatalogResult } from '../../../shared/sessionCatalogReadback';
+export { backendSessionCatalogFailure, BackendSessionCatalogReadError, type BackendSessionCatalogResult } from '../../../shared/sessionCatalogReadback';
 import type { AgentBackendKind, Conversation } from '../../types/chat';
 import { AgentCapability } from '../AgentCapability';
 import type {
@@ -479,44 +481,64 @@ export async function listBackendSessions(
   registry: AgentServiceRegistry | null | undefined,
 ): Promise<NormalizedSessionRow[]> {
   const active = getActiveSessionBackendService(registry);
-  if (!active || typeof active.listSessions !== 'function') {
-    return [];
-  }
-
-  let rawSessions: unknown;
+  if (!active || typeof active.listSessions !== 'function') return [];
   try {
-    rawSessions = await active.listSessions();
-  } catch {
-    return [];
+    const raw = await active.listSessions();
+    return Array.isArray(raw) ? normalizeSessionCatalogRows(active.kind, raw) : [];
+  } catch (error) {
+    return error instanceof BackendSessionCatalogReadError ? normalizeSessionCatalogRows(active.kind, error.result.data) : [];
   }
-  if (!Array.isArray(rawSessions)) {
-    return [];
-  }
+}
 
-    return rawSessions.filter((s): s is Record<string, unknown> => s !== null && typeof s === 'object').map((record, idx) => {
-      let shareUrl: string | null = null;
-      const share = active.kind === 'opencode' && record.share && typeof record.share === 'object'
-        ? record.share as Record<string, unknown>
-        : null;
-      if (share) {
-        const url = share.url;
-        if (typeof url === 'string' && url.trim().length > 0) {
-          shareUrl = url;
-        }
-      }
+function sessionCatalogRecordId(record: Record<string, unknown>): string | null {
+  const id = record.id ?? record.sessionId;
+  return typeof id === 'string' && id.trim() ? id : null;
+}
 
-      return {
-        id: String(record.id ?? record.sessionId ?? `session-${idx}`),
-        title: String(record.title ?? record.summary ?? ''),
-        shareUrl,
-        updatedAt: typeof record.updatedAt === 'number'
-          ? record.updatedAt
-          : typeof (record.time as Record<string, unknown> | undefined)?.updated === 'number'
-            ? (record.time as Record<string, unknown>).updated as number
-            : null,
-        ...(record.archived === true ? { archived: true } : {}),
-      };
+function normalizeSessionCatalogRows(kind: AgentBackendKind, raw: unknown[]): NormalizedSessionRow[] {
+  const rows = new Map<string, NormalizedSessionRow>();
+  for (const value of raw) {
+    if (!value || typeof value !== 'object') continue;
+    const record = value as Record<string, unknown>;
+    const id = sessionCatalogRecordId(record);
+    if (!id || rows.has(id)) continue;
+    const share = kind === 'opencode' && record.share && typeof record.share === 'object'
+      ? record.share as Record<string, unknown> : null;
+    rows.set(id, {
+      id,
+      title: String(record.title ?? record.summary ?? ''),
+      shareUrl: typeof share?.url === 'string' && share.url.trim() ? share.url : null,
+      updatedAt: typeof record.updatedAt === 'number' ? record.updatedAt
+        : typeof (record.time as Record<string, unknown> | undefined)?.updated === 'number'
+          ? (record.time as Record<string, unknown>).updated as number : null,
+      ...(record.archived === true ? { archived: true } : {}),
     });
+  }
+  return [...rows.values()];
+}
+
+/** Browser reads distinguish authoritative empty success from absent/failed catalog routes. */
+export async function readBackendSessionsCatalog(
+  registry: AgentServiceRegistry | null | undefined,
+): Promise<BackendSessionCatalogResult<NormalizedSessionRow>> {
+  const active = getActiveSessionBackendService(registry);
+  if (!active || typeof active.listSessions !== 'function') {
+    return { status: 'unavailable', data: [], nextCursor: null, errorReason: 'Session catalog is unavailable' };
+  }
+  try {
+    const raw = await active.listSessions();
+    if (!Array.isArray(raw)) throw new Error('Invalid session catalog response');
+    const data = normalizeSessionCatalogRows(active.kind, raw);
+    const invalid = raw.some((value) => !value || typeof value !== 'object'
+      || !sessionCatalogRecordId(value as Record<string, unknown>));
+    return invalid ? { status: data.length ? 'partial' : 'failed', data, nextCursor: null, errorReason: 'Invalid session catalog response' }
+      : { status: 'complete', data, nextCursor: null };
+  } catch (error) {
+    if (error instanceof BackendSessionCatalogReadError) {
+      return { ...error.result, data: normalizeSessionCatalogRows(active.kind, error.result.data) };
+    }
+    return { ...backendSessionCatalogFailure(error), data: [], nextCursor: null };
+  }
 }
 
 /**

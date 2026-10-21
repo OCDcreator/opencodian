@@ -651,3 +651,16 @@ OpenCode 2 inherited server permission mode has English label and explanation.
 Describe active-query preservation, new-query/current-selection boundaries and invalid-path rejection. The generic explicit-restart failure notice does not claim queries were preserved because closing may already have started.
 
 2026-10-06: ZCode management help distinguishes new sessions, already loaded snapshots and sessions restored after reconnect. Save outcomes label session application and effective catalog separately and state that catalog verification does not prove plugin execution. Mirrors zh.
+
+## 2026-10-06 Codex catalog permission denial
+
+新增 settings.codex.readback.statusPermissionDenied / messagePermissionDenied，用于 Codex 目录读取被拒绝的固定状态和重试说明。原始服务错误不插入翻译参数。
+
+2026-10-07: Added backend-neutral session catalog permission-denied copy for OpenCode 2 and shared browsers.
+
+Includes the localized Pi extension-command completion status used only after a registered native command finishes without a model turn.
+
+
+## 2026-10-08 未完成工具的本地中断状态
+
+取消本地流时仍保存尚未收到结果的工具 call ID、参数和 interrupted 状态；不把本地停止推断为原生成功/失败，也不触发完成回调。已收到的终态和结果保持不变。卡片显示“原生工具结果尚未确认”，不显示运行中 spinner；历史归一保留该状态，后续权威 native completed/error 可以覆盖。

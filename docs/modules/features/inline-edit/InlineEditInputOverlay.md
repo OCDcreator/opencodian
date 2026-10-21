@@ -44,3 +44,5 @@
 ## R-C2 扩展
 
 2026-09-18 配置行新增生图切换 chip（`opencodian-inline-edit-chip-imagegen`，sparkles）：state 新增 `imageGen: { available; form }`，callbacks 新增 `onToggleImageGen?`；available=false 或 null 时隐藏。点击由 controller 循环 off/line/inline，active 态有 accent 高亮。
+
+input 阶段的模型/effort/上下文刷新保留当前 textarea draft；generating 和新输入轮次沿用显式清空行为。

@@ -7,7 +7,7 @@ OpenCode 2 runtime catalog refresh renders native MCP connections and integratio
 
 ## 概述
 
-`SettingsBackendSection` 负责 `General > Agent Management` 设置面板。它管理当前已实现 agent backend 的启用范围与当前 active agent，并在任意 backend 开关变化时以 best-effort 方式同步 runtime 生命周期（start/stop adapter）。切换 active backend 时也会停止旧 adapter 并启动新 adapter。
+`SettingsBackendSection` 负责 `General > Agent Management` 设置面板。它管理当前已实现 agent backend 的启用范围与当前 active agent，并在任意 backend 开关变化时以 best-effort 方式同步 runtime 生命周期（start/stop adapter）。切换默认 backend 只启动新 adapter；仍启用的旧 adapter 保留给现有会话。
 
 2026-06-28：本 section 同步纳入智能体管理 Settings UI 第一阶段重构。它是截图中 `通用 > 智能体管理` 的真实 owner，现在复用 agent settings control surface：外层挂载 `.opencodian-agent-settings-shell.opencodian-backend-agent-surface`，默认智能体使用 compact Form/Card row，已启用智能体列表使用 scroll/list 风格的低调数据行，状态通过 badge 与 `data-backend-agent-*` 属性表达，而不是把 active/enabled/off 文案塞进大卡片或重复标题。
 
@@ -23,7 +23,7 @@ OpenCode 2 runtime catalog refresh renders native MCP connections and integratio
 - 在当前 active backend 被禁用时回退到 enabled 列表中的第一个 backend
 - 更新设置时同步 `AgentServiceRegistry` 的 enabled/active 状态，触发聊天视图的 active-backend change 监听
 - **通用生命周期**：启用/禁用任意 backend 时调用对应 adapter 的 `start()`/`stop()`；OpenCode 在 adapter 不存在时回退到 `openCodeService`
-- **Active 切换生命周期**：切换 active backend 时停止旧 adapter 并启动新 adapter
+- **Active 切换生命周期**：切换 active backend 时启动新 adapter，保留其他已启用 adapter 的运行状态
 
 ## 公共导出
 
@@ -45,7 +45,7 @@ OpenCode 2 runtime catalog refresh renders native MCP connections and integratio
 - 样式只允许走 agent settings control surface，不应重新引入大色块、重阴影、嵌套卡片或 Sheet/Drawer 流程
 - badge 只表达状态，不改变 backend 启用、active fallback、adapter lifecycle 或保存逻辑
 - 任意 backend 的 start/stop 均为 best-effort：失败不应阻止设置保存或 UI 刷新
-- Active backend 切换时必须 stop 旧 adapter + start 新 adapter，避免 stale 状态
+- 默认 backend 切换不得终止其他 tab 的请求；禁用 backend 时停止其 adapter，包括先前启动、现已非默认的 adapter
 - 默认 backend 下拉或禁用 active backend 的 fallback 改变 active backend 后，必须调用 plugin 的 `onChatWarmSessionBackendChanged()`；R-F4 开启时由组合根排他地替换旧预热 session
 
 ## 2026-09-08 Pi 独立服务接入
@@ -59,3 +59,10 @@ Pi 加入已实现后端选择。仅启用 Pi 时挂载独立 SettingsPiSection�
 ## 2026-09-27 OpenCode 2 compatibility
 
 The backend list exposes OpenCode 1 and 2 separately; OpenCode 2 settings select local executable or remote URL/password.
+
+2026-10-07: OpenCode 2 catalog reads keep fixed denied/unavailable/failed state text and data-catalog-state. Raw upstream exception messages are not rendered in this catalog read surface.
+
+
+## 2026-10-08 后台会话与默认后端切换
+
+默认后端选择只决定新会话/设置路由，保留其他已启用 adapter，避免中断后台 tab。禁用该后端和插件卸载负责释放资源；设置页头部按钮与默认后端下拉使用相同语义。两台桌面的长工具调用、目标取消/续聊及后端切换需单独验证，不能由设置 ACK 推断。

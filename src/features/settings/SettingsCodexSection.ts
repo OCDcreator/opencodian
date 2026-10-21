@@ -242,15 +242,32 @@ export class SettingsCodexSection {
 
   private async reloadOpenCodian(): Promise<void> {
     const plugins = (this.plugin.app as unknown as {
-      plugins?: { reloadPlugin?: (pluginId: string) => Promise<void> };
+      plugins?: {
+        reloadPlugin?: (pluginId: string) => Promise<void>;
+        unloadPlugin?: (pluginId: string) => void | Promise<void>;
+        loadPlugin?: (pluginId: string) => Promise<boolean | void>;
+      };
     }).plugins;
-    if (typeof plugins?.reloadPlugin !== 'function') {
+    const reload = plugins?.reloadPlugin;
+    const unload = plugins?.unloadPlugin;
+    const load = plugins?.loadPlugin;
+    if (typeof reload !== 'function' && (typeof unload !== 'function' || typeof load !== 'function')) {
       new Notice(t('settings.codex.reload.manual'));
       return;
     }
 
     try {
-      await plugins.reloadPlugin(this.plugin.manifest.id);
+      // Persist the current executable before the running plugin is unloaded.
+      await this.plugin.saveSettings();
+      if (typeof reload === 'function') {
+        await reload.call(plugins, this.plugin.manifest.id);
+      } else if (typeof unload === 'function' && typeof load === 'function') {
+        // Current Obsidian hosts expose this pair instead of reloadPlugin.
+        await unload.call(plugins, this.plugin.manifest.id);
+        if (await load.call(plugins, this.plugin.manifest.id) === false) {
+          throw new Error('OpenCodian was not loaded by the host');
+        }
+      }
     } catch {
       new Notice(t('settings.codex.reload.failed'));
     }

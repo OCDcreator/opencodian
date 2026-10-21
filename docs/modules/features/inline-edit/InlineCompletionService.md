@@ -33,3 +33,7 @@ R-C3 的暖会话池（§3.2.4）：每 `backend × workingDirectory` 至多 1 �
 ## 2026-09-28 OpenCode 2 auxiliary integration
 
 Session model change detection includes opencode2 provider/model references.
+
+## 2026-10-07 teardown and note-switch race
+
+`disposeAll()` removes captured entries synchronously and advances a disposal generation before awaiting native teardown. A note/model rebuild paused on old-session disposal rechecks that generation and the enabled state before starting a replacement. A new enable-cycle entry survives the older teardown; a disabled or superseded request cannot revive a native session. Regression tests cover both orderings.

@@ -17,6 +17,73 @@
 - 缺陷由矩阵接力第 18 批 owned loopback WebSocket 验收发现（WIRE018-MALFORMED null 控制帧，修复前进程退出、观测原样保留）；修复经真实 ws socket 复测（零异常、零 observer 事件、恢复请求成功），回归用例落在 `CodexAppServerTransport.wireObserver.test.ts`。
 - 完整 verify 15/15（lint 0/0）；标准 Test Vault 部署后运行时 BUILD_ID 验证通过。ZCode 已排查确认无同型缺陷。
 
+## 2026-10-08 Codex auxiliary native 取消传播
+
+真实四秒补全取消只结束本地结果，没有发送 native interrupt；迟到 turn/start ACK 还可能漏掉 abort。新增本地预算内结束、exact owned turn 中断和迟到 ACK 中断；预取消零请求、failed/interrupted terminal 不接受部分替换文本。只读和预算门禁保持不变。
+
+## 2026-10-08 Codex 冷启动目录与 provider-domain fallback
+
+FA880 actual CLI trace showed early debug/models reads outside the configured CODEX_HOME and an empty composer cache after native readiness. CLI account/model fallback now uses the current domain env; opening an empty picker retries the existing native catalog path.
+
+## 2026-10-08 Codex 兼容 fork 与协商清理
+
+0.158.0 使用已实测 lastTurnId 和仅针对新 child 的 revert 替代接口，严格回读 lineage 与历史前缀；未知版本仍拒绝。app-server 协商失败先释放 owned client，再进入 SDK fallback。
+
+## 2026-10-07 OpenCode auxiliary readiness 上界
+
+FA880 实测发现 /config 单次请求挂起使 60 秒 readiness 循环无法退出。每次 probe 增加取消 signal 与最多 2 秒独立 Promise.race；positive control 同步加入 timeout。失败仍释放 scope，native deny/tool 验证保持 fail-closed。
+
+## 2026-10-07 OpenCode 1 目录分页
+
+修复默认 100 条目录被当作完整列表：SDK facade 保留 x-next-cursor，lifecycle 有界读取全部页并保留中途失败数据。共享分页失败契约迁入 foundation，routing 保持兼容导出。无游标旧接口的非空 fallback 明确为 partial。
+
+## 2026-10-07 OpenCode 1 目录失败与空目录边界
+
+- Session lifecycle 保留 SDK 到 legacy 的有效 fallback，但无效响应与最终读取失败继续传播；目录 UI 不再将拒绝视为空配置。
+- 新增三项真实失败语义回归，并关联两端隔离库 native/legacy/remote 实测。
+
+## 2026-10-07 — 会话目录异常与 OpenCode 2 partial 分页
+
+- 空目录、读取失败、权限拒绝和方法不可用分别返回权威目录状态；拒绝说明使用固定双语文字。
+- OpenCode 2 短页继续遵循 native cursor；重复 ID 去重，页中途失败保留已读条目与 cursor，重复 cursor 不再静默标记完整。
+- 目录浏览器不生成假 session ID，不呈现原始异常中的凭据。
+
+## 2026-10-07 — 补全池关闭期间的迟到笔记重建
+
+- 全局 teardown 在 await 前摘除旧 entry 并推进 disposal generation。
+- 笔记/模型切换等待旧 session 退出后重验代次和开关，关闭后不再创建原生 session；旧 teardown 不会清除新启用周期的 entry。
+- 确定性原源码控制出现 2 个启动与 1 个遗留；修复后 1 个启动、0 遗留，新增两个聚焦回归。
+
+## 2026-10-07 — OpenCode 2 auxiliary 数据根与追加 deny 兼容
+
+- 当前 2.0.24 native 在 wildcard deny 后追加 browser deny，旧末条规则判断误拒绝。
+- 强制所有 HOME/XDG/DB/temp 数据根归 auxiliary scope；校验最后 wildcard deny 之后只允许更严格 deny，后续 allow/ask 仍拒绝。
+- 聚焦失败回归先红后绿，保留原生 session wildcard deny 的严格读回。
+
+## 2026-10-07 — ZCode 原生问答自动继续后清理过期请求
+
+- 实机确认 native 在 300 秒后以空答案自动继续；插件此前仍保留可提交的旧卡片。
+- 接收 `permission.resolved` 的精确 session/request ID，清理对应 pending，拒绝迟到答案，保留其他会话和已有授权。
+- 正常单选/多选答案映射保持不变；两端 native 实测确认 Oak 与 Blue, Green 已生效。
+
+## 2026-10-07 ZCode 剩余验收与辅助编辑保护
+
+- 修复 ZCode 辅助进程继承会话数据库别名、官方 reasoning_delta 被误判的问题。
+- 实机证明项目 hook 可以绕过空工具表后，改为私有 HOME/workspace/config，并在创建会话前用两次原生插件目录确认全部禁用；必跑审计增加 hook 正负控制，严格 LF 写入要求不变。
+- 修复 ZCode 消息锚点 fork 参数，采用当前 Protocol 1 的 target.kind=message。
+- 修复 state.updated 单项 current-model 投影覆盖完整目录、第二会话合法模型被拒绝的问题。
+- 修复 owned app-server 非预期退出后的旧 startPromise 复用；当前连接退出才清空，迟到 predecessor exit 继续被忽略。
+- 修复行内接受等待 native 清理后覆盖新修改的竞态；快照检查与单次 editor.replaceRange 连续执行，整篇确认后重新读取范围。
+- 保留 1.1.37；实机证据分别记录 BUILD_ID，不将单项通过外推为完整 profile/platform 通过。
+
+## 2026-10-07 Codex 剩余修复：SDK 模型与目录拒绝分类
+
+- SDK fallback 每 turn 捕获模型/effort 并刷新同 native ID 的 wrapper；nonfatal warning/reconnect 不再提前显示发送失败，terminal error 保持失败。
+- Codex readback/MCP/session 目录透传权限拒绝；partial 保留已有目录，双语固定说明避免暴露原始错误。
+- 权限卡取消 unresolved turn sticky header，并增加 composer scroll padding；Windows native 长 command 卡鼠标拒绝实测成功，Mac hidden 布局条件单独记录。
+- Codex 显式重载在没有 reloadPlugin 的 Obsidian 宿主上使用顺序 unload/load，先等待设置保存；Windows 实际按钮切换至独立 0.158.0，并保留会话历史。Windows SDK fallback 的 never 正向请求和 on-request fail-closed 已取得 native/provider 证据。
+- 版本保持 1.1.37；构建身份、Mac/Windows 实机证据、待审兼容 fork/清理和未测条件见 `docs/status/backend-remaining-codex-acceptance-2026-10-07.md`。
+
 ## 2026-10-06 v1.1.37：定向后端修复与 macOS 主路径验收
 
 - Pi 修复模型/effort 控件刷新、继承文案与会话独立保存恢复；Codex 接通原生消息/turn 身份、消息前 fork、子会话目录和逐发送模型，保留 fail-closed 及缓存清理；Claude 修复当前外部 CLI/env/shell 快照、await 后复验和 invalid restart 前置拒绝。

@@ -505,3 +505,5 @@ The lifecycle host injects `beginCanonicalSnapshot` from the existing state stor
 ### 2026-10-02 T10 cycle fix
 
 The service imports `OpenCodeSessionSnapshotToken` type-only from the existing `./types` contract owner, separately from the runtime state-store import. Snapshot host wiring and all method bodies remain unchanged.
+
+2026-10-07：session lifecycle host 注入 SDK/legacy cursor readers；legacy /experimental/session 明确 includeDirectory，并透传 x-next-cursor。GET helper 仅增加可选 headers callback 与显式 HTTP status，翻页、去重、失败保留和上界仍归 lifecycle owner。

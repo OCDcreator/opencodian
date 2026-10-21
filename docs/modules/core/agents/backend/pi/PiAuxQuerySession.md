@@ -28,3 +28,7 @@
 - 若某个 Pi 版本不再暴露任何只读工具，会话直接拒绝；**不要**回退成"提示词约束 + 结果校验"
 - 临时作用域与会话文件在 `dispose()` 后必须消失；Pi 关闭进程后文件句柄可能短暂占用，删除前保留等待
 - 该模块属于 `core.backend-pi` owner 的目录，新增跨 backend 依赖需先更新 `PiBoundaryContract` 允许列表并说明理由
+
+- `getExtraEnv` 原样透传至 `PiRpcClient`，让辅助会话继承当前 Pi provider domain 环境；未提供回调时保留原来的进程环境继承。工具白名单、原生回读、失败拒绝和清理机制不变。
+
+Turn deadlines and external cancellation send the native `abort` immediately, once per active turn. Pre-aborted requests never dispatch a model or prompt, cancelled events/readbacks cannot emit suggestion text, and the external abort listener is removed at settlement.

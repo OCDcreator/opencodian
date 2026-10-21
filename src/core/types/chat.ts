@@ -229,9 +229,14 @@ export interface SessionDiffEntry {
 
 export interface ConversationSessionSettings {
   chatFontSizePx?: number | null;
+  /** Claude composer model persists per conversation; null means inherit. */
+  claudeModelOverride?: { provider: string; model: string } | null;
   /** Pi composer overrides apply on the next send; null means inherit. */
   piModelOverride?: { provider: string; model: string } | null;
   piEffortOverrides?: Record<string, string | null>;
+  /** ZCode composer choices persist per conversation; null reasoning inherits the model default. */
+  zcodeModelOverride?: { provider: string; model: string } | null;
+  zcodeEffortOverrides?: Record<string, string | null>;
   codexSandboxMode?: CodexSandboxMode | null;
   codexModelReasoningEffort?: CodexReasoningEffort | null;
   codexModelOverride?: string | null;
@@ -301,18 +306,24 @@ export function normalizeConversationSessionSettings(
   }
 
   const normalized: Record<string, unknown> = {};
-  if (value.piModelOverride === null) {
-    normalized.piModelOverride = null;
-  } else if (value.piModelOverride && typeof value.piModelOverride === 'object') {
-    const provider = normalizeNullableString(value.piModelOverride.provider);
-    const model = normalizeNullableString(value.piModelOverride.model);
-    if (provider && model) normalized.piModelOverride = { provider, model };
+  for (const modelKey of ['claudeModelOverride', 'piModelOverride', 'zcodeModelOverride'] as const) {
+    const modelOverride = value[modelKey];
+    if (modelOverride === null) {
+      normalized[modelKey] = null;
+    } else if (modelOverride && typeof modelOverride === 'object') {
+      const provider = normalizeNullableString(modelOverride.provider);
+      const model = normalizeNullableString(modelOverride.model);
+      if (provider && model) normalized[modelKey] = { provider, model };
+    }
   }
-  if (value.piEffortOverrides && typeof value.piEffortOverrides === 'object' && !Array.isArray(value.piEffortOverrides)) {
-    const efforts = Object.fromEntries(Object.entries(value.piEffortOverrides)
-      .map(([ref, effort]) => [ref, normalizeNullableString(effort)])
-      .filter(([ref, effort]) => typeof ref === 'string' && ref.includes('/') && effort !== undefined));
-    if (Object.keys(efforts).length) normalized.piEffortOverrides = efforts;
+  for (const effortKey of ['piEffortOverrides', 'zcodeEffortOverrides'] as const) {
+    const effortOverrides = value[effortKey];
+    if (effortOverrides && typeof effortOverrides === 'object' && !Array.isArray(effortOverrides)) {
+      const efforts = Object.fromEntries(Object.entries(effortOverrides)
+        .map(([ref, effort]) => [ref, normalizeNullableString(effort)])
+        .filter(([ref, effort]) => typeof ref === 'string' && ref.includes('/') && effort !== undefined));
+      if (Object.keys(efforts).length) normalized[effortKey] = efforts;
+    }
   }
 
   if (value.chatFontSizePx === null) {
@@ -349,7 +360,7 @@ export interface ContentBlock {
   toolKind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'image' | 'unknown';
   toolInput?: Record<string, unknown>;
   toolMetadata?: Record<string, unknown>;
-  toolStatus?: 'pending' | 'running' | 'completed' | 'error' | 'blocked';
+  toolStatus?: 'pending' | 'running' | 'completed' | 'error' | 'blocked' | 'interrupted';
   toolResult?: string;
   toolResultVisibility?: 'visible' | 'hidden';
   subagentId?: string;
@@ -489,7 +500,7 @@ export interface ToolCallInfo {
   kind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'image' | 'unknown';
   input: Record<string, unknown>;
   toolMetadata?: Record<string, unknown>;
-  status?: 'pending' | 'running' | 'completed' | 'error' | 'blocked';
+  status?: 'pending' | 'running' | 'completed' | 'error' | 'blocked' | 'interrupted';
   result?: string;
   resultVisibility?: 'visible' | 'hidden';
   isExpanded?: boolean;

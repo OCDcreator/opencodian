@@ -1,3 +1,6 @@
+import { existsSync, writeFileSync } from 'node:fs';
+import { isAbsolute } from 'node:path';
+
 /** Public SDK business operations. No eval and no arbitrary method invocation. */
 export const RPC_COMMANDS = ['prompt', 'steer', 'follow_up', 'abort', 'new_session', 'get_state', 'set_model', 'cycle_model', 'get_available_models', 'set_thinking_level', 'cycle_thinking_level', 'get_available_thinking_levels', 'set_steering_mode', 'set_follow_up_mode', 'compact', 'set_auto_compaction', 'set_auto_retry', 'abort_retry', 'bash', 'abort_bash', 'get_session_stats', 'export_html', 'switch_session', 'fork', 'clone', 'get_fork_messages', 'get_entries', 'get_last_assistant_text', 'set_session_name', 'get_messages', 'get_commands'];
 export const SDK_COMMANDS = ['get_tree', 'navigate_tree', 'label_entry', 'list_sessions', 'import_session', 'export_jsonl', 'get_tools', 'set_tools', 'get_resources', 'reload', 'clear_queue', 'get_queue', 'abort_compaction', 'abort_branch_summary', 'get_auth', 'set_api_key', 'login', 'logout', 'get_packages', 'install_package', 'remove_package', 'update_package', 'set_scoped_models'];
@@ -41,6 +44,16 @@ function nativeMessages(manager) {
     if (['compaction', 'branch_summary'].includes(entry.type)) return [{ ...identity, role: 'custom', customType: entry.type, content: entry.summary, display: true, timestamp: Date.parse(entry.timestamp) }];
     return [];
   });
+}
+
+/** Preserve the SDK-created branch before an older runtime reopens its file. */
+export function persistNativeBranch(manager, file) {
+  if (typeof file !== 'string' || !isAbsolute(file)) throw new Error('Pi fork did not provide an absolute persistent native session file.');
+  if (existsSync(file)) return;
+  const header = manager.getHeader();
+  const entries = manager.getEntries();
+  if (header?.type !== 'session' || header.id !== manager.getSessionId()) throw new Error('Pi fork returned an invalid native session header.');
+  writeFileSync(file, [header, ...entries].map(entry => JSON.stringify(entry)).join('\n') + '\n', { flag: 'wx' });
 }
 
 export async function executeCommand(host, c) {
@@ -98,11 +111,15 @@ export async function executeCommand(host, c) {
     case 'export_html': return { path: await s.exportToHtml(c.outputPath || undefined) };
     case 'export_jsonl': return { path: s.exportToJsonl(required(c.outputPath, 'Output path')) };
     case 'switch_session': return host.runtime.switchSession(required(c.sessionPath, 'Session file'), { cwdOverride: host.cwd });
-    case 'fork': return host.runtime.fork(required(c.entryId, 'Entry'), { position: 'before' });
+    case 'fork':
     case 'clone': {
-      const leaf = manager.getLeafId();
-      if (!leaf) throw new Error('Cannot clone an empty session.');
-      return host.runtime.fork(leaf, { position: 'at' });
+      const entryId = c.type === 'clone' ? manager.getLeafId() : required(c.entryId, 'Entry');
+      if (!entryId) throw new Error('Cannot clone an empty session.');
+      const result = await host.runtime.fork(entryId, { position: c.type === 'clone' ? 'at' : 'before' });
+      if (result?.cancelled) return result;
+      const branch = host.runtime.session;
+      persistNativeBranch(branch.sessionManager, branch.sessionFile);
+      return result;
     }
     case 'get_fork_messages': return { messages: s.getUserMessagesForForking() };
     case 'get_entries': {
@@ -187,7 +204,7 @@ export async function executeCommand(host, c) {
               if (!id) throw new Error('Login cancelled.'); return id;
             }
             const value = await host.ui.ask('input', { title: prompt.message, placeholder: prompt.placeholder }, { signal });
-            if (!value) throw new Error('Login cancelled.'); return value;
+            if (value === undefined) throw new Error('Login cancelled.'); return value;
           },
           notify: event => {
             if (event.type === 'auth_url') callbacks.onAuth(event);
@@ -195,10 +212,10 @@ export async function executeCommand(host, c) {
             else if (event.type === 'progress') callbacks.onProgress(event.message);
             else callbacks.onAuth({ instructions: event.message, url: event.links?.[0]?.url });
           },
-        });
+        }, { getDeviceId: host.getDeviceId });
         else await host.auth.login(required(c.provider, 'Provider'), callbacks);
         return { authenticated: true }; }
-      finally { host.loginAbort = undefined; }
+      finally { host.loginAbort = undefined; host.send?.({ type: 'extension_ui_cancel', id: 'oauth-link' }); }
     }
     case 'logout': await host.auth.logout(required(c.provider, 'Provider')); return { loggedOut: true };
     case 'get_packages': return { packages: host.packages.listConfiguredPackages() };

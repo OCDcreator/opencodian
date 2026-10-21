@@ -132,13 +132,6 @@ export class CodexAuxQuerySession implements AuxQuerySession {
 
   cancel(): void {
     this.turnAbort?.abort();
-    const threadId = this.threadId;
-    const turnId = this.currentTurnId;
-    if (threadId && turnId) {
-      void this.options.client.interruptTurn(threadId, turnId).catch((error: unknown) => {
-        logger.debug('Codex auxiliary interrupt failed', error);
-      });
-    }
   }
 
   async dispose(): Promise<void> {
@@ -253,14 +246,17 @@ export class CodexAuxQuerySession implements AuxQuerySession {
     }
   }
 
-  private currentTurnId: string | null = null;
-
   private async executeTurn(request: AuxQueryTurnRequest): Promise<AuxQueryResult> {
+    if (request.signal?.aborted) {
+      return { success: false, error: 'Codex auxiliary turn was cancelled.', cancelled: true };
+    }
     const threadId = this.threadId as string;
     const abort = new AbortController();
     this.turnAbort = abort;
     this.observedTools = [];
-    this.currentTurnId = null;
+    let nativeTurnId: string | null = null;
+    let interruptRequested = false;
+    let finished = false;
 
     let text = '';
     let toolUseSeen = false;
@@ -282,7 +278,13 @@ export class CodexAuxQuerySession implements AuxQuerySession {
 
     this.subscription = this.options.client.subscribeToThreadNotifications(threadId, (event) => {
       if (event.method === 'turn/completed') {
-        settle({ success: true, text, toolCalls: [...this.observedTools] });
+        const terminal = (event.params as { turn?: { status?: string; error?: unknown } } | undefined)?.turn;
+        if (terminal?.status === 'failed' || terminal?.status === 'interrupted' || terminal?.error) {
+          settle({ success: false, error: 'Codex auxiliary turn did not complete successfully.',
+            ...(terminal?.status === 'interrupted' ? { cancelled: true } : {}) });
+        } else {
+          settle({ success: true, text, toolCalls: [...this.observedTools] });
+        }
         return;
       }
       const mapped = mapAppServerNotification({
@@ -306,11 +308,24 @@ export class CodexAuxQuerySession implements AuxQuerySession {
       }
     });
 
+    const interruptOwnedTurn = (): void => {
+      if (!nativeTurnId || interruptRequested) return;
+      interruptRequested = true;
+      void this.options.client.interruptTurn(threadId, nativeTurnId).catch(() => {
+        logger.debug('Codex auxiliary native interrupt failed.');
+      });
+    };
+    const onAbort = (): void => {
+      settle({ success: false, error: 'Codex auxiliary turn was cancelled.', cancelled: true });
+      interruptOwnedTurn();
+    };
+    abort.signal.addEventListener('abort', onAbort, { once: true });
+    const externalAbort = (): void => abort.abort();
+    request.signal?.addEventListener('abort', externalAbort, { once: true });
     const timeout = setTimeout(
       () => abort.abort(),
       this.options.turnTimeoutMs ?? DEFAULT_TURN_TIMEOUT_MS,
     );
-    request.signal?.addEventListener('abort', () => abort.abort(), { once: true });
 
     const completion = new Promise<AuxQueryResult>((resolve) => {
       settled = resolve;
@@ -324,40 +339,35 @@ export class CodexAuxQuerySession implements AuxQuerySession {
       input = built.input;
       imageTempDir = built.imageTempDir;
     } catch (error) {
+      finished = true;
       clearTimeout(timeout);
+      request.signal?.removeEventListener('abort', externalAbort);
+      abort.signal.removeEventListener('abort', onAbort);
       this.subscription.dispose();
       this.subscription = null;
+      if (this.turnAbort === abort) this.turnAbort = null;
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error),
       };
     }
 
-    try {
-      const turn = await this.options.client.startTurn({
-        threadId,
-        input,
-        cwd: this.options.workingDirectory,
-        approvalPolicy: 'never',
-        sandboxPolicy: { type: 'readOnly', networkAccess: false },
-        ...(this.resolveModelId() ? { model: this.resolveModelId() as string } : {}),
-        ...(this.options.effort ? { effort: this.options.effort } : {}),
-      });
-      this.currentTurnId = turn?.id ?? null;
-    } catch (error) {
-      clearTimeout(timeout);
-      this.subscription.dispose();
-      this.subscription = null;
-      this.cleanupImageTempDir(imageTempDir);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
-
-    abort.signal.addEventListener('abort', () => {
-      settle({ success: false, error: 'Codex auxiliary turn was cancelled.', cancelled: true });
-    }, { once: true });
+    void this.options.client.startTurn({
+      threadId,
+      input,
+      cwd: this.options.workingDirectory,
+      approvalPolicy: 'never',
+      sandboxPolicy: { type: 'readOnly', networkAccess: false },
+      ...(this.resolveModelId() ? { model: this.resolveModelId() as string } : {}),
+      ...(this.options.effort ? { effort: this.options.effort } : {}),
+    }).then(turn => {
+      nativeTurnId = turn?.id ?? null;
+      // The request may outlive the local cancellation budget. Never let a
+      // late acknowledgement leave an admitted owned turn running.
+      if (abort.signal.aborted || this.disposed) interruptOwnedTurn();
+    }, error => {
+      if (!finished) settle({ success: false, error: error instanceof Error ? error.message : String(error) });
+    });
 
     try {
       const result = await completion;
@@ -367,12 +377,14 @@ export class CodexAuxQuerySession implements AuxQuerySession {
       }
       return result;
     } finally {
+      finished = true;
       clearTimeout(timeout);
+      request.signal?.removeEventListener('abort', externalAbort);
+      abort.signal.removeEventListener('abort', onAbort);
       this.subscription?.dispose();
       this.subscription = null;
       this.cleanupImageTempDir(imageTempDir);
       if (this.turnAbort === abort) this.turnAbort = null;
-      this.currentTurnId = null;
     }
   }
 

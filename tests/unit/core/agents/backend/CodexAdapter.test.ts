@@ -22,6 +22,9 @@ import {
   CodexAdapter,
   type CodexAdapterOptions,
 } from '../../../../../src/core/agents/backend';
+import type { Conversation } from '../../../../../src/core/types/chat';
+import { OpenCodianView } from '../../../../../src/features/chat/OpenCodianView';
+import { ConversationSessionSettingsCoordinator } from '../../../../../src/features/chat/services/ConversationSessionSettingsCoordinator';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -748,6 +751,79 @@ describe('CodexAdapter', () => {
   // -------------------------------------------------------------------------
 
   describe('model passthrough', () => {
+    it('reports SDK reconnect progress without masking a final turn failure', async () => {
+      const options = createAdapterOptions();
+      const adapter = new CodexAdapter(options);
+      await adapter.start();
+      const sessionId = await adapter.createSession();
+      options._mockCodex._mockThread.runStreamed.mockResolvedValue({
+        events: (async function* () {
+          yield { type: 'error', message: 'Reconnecting... 2/5 (connection lost)' };
+          yield { type: 'turn.failed', error: { message: 'Retry limit exceeded' } };
+        })(),
+      });
+      const chunks = [];
+      for await (const chunk of adapter.sendMessage({ sessionId, content: 'retry' })) { chunks.push(chunk); }
+      expect(chunks).toEqual([
+        { type: 'backend_event', source: 'codex', event: 'informational', status: 'retrying',
+          name: 'reconnecting', metadata: { message: 'Reconnecting... 2/5 (connection lost)' } },
+        { type: 'error', content: 'Retry limit exceeded' },
+      ]);
+    });
+
+    it('applies each SDK turn model and effort without leaking them to another session', async () => {
+      const options = createAdapterOptions({
+        model: 'default-model', modelReasoningEffort: 'low', approvalPolicy: 'never',
+      });
+      const adapter = new CodexAdapter(options);
+      await adapter.start();
+      const first = await adapter.createSession();
+      const second = await adapter.createSession();
+      options._mockCodex._mockThread.runStreamed.mockImplementation(async () => ({
+        events: (async function* () {
+          yield { type: 'thread.started', thread_id: 'sdk-owned-thread' };
+          yield { type: 'turn.started' };
+          yield { type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 1 } };
+        })(),
+      }));
+      for await (const chunk of adapter.sendMessage({
+        sessionId: first, content: 'one', options: { model: 'selected-model', variant: 'high' },
+      })) { void chunk; }
+      expect(options._mockCodex.startThread).toHaveBeenLastCalledWith(expect.objectContaining({
+        model: 'selected-model', modelReasoningEffort: 'high', approvalPolicy: 'never',
+      }));
+      for await (const chunk of adapter.sendMessage({
+        sessionId: first, content: 'two', options: { model: 'next-model', variant: 'medium' },
+      })) { void chunk; }
+      expect(options._mockCodex.resumeThread).toHaveBeenLastCalledWith(
+        'sdk-owned-thread', expect.objectContaining({ model: 'next-model', modelReasoningEffort: 'medium' }),
+      );
+      for await (const chunk of adapter.sendMessage({ sessionId: second, content: 'other' })) { void chunk; }
+      expect(options._mockCodex.startThread).toHaveBeenLastCalledWith(expect.objectContaining({
+        model: 'default-model', modelReasoningEffort: 'low',
+      }));
+    });
+
+    it('refreshes SDK options on a cached thread while preserving its native id', async () => {
+      const options = createAdapterOptions({ model: 'default-model', modelReasoningEffort: 'low' });
+      const adapter = new CodexAdapter(options);
+      await adapter.start();
+      const sessionId = await adapter.createSession();
+      options._mockCodex._mockThread.runStreamed.mockImplementation(async () => ({
+        events: (async function* () {
+          yield { type: 'thread.started', thread_id: 'cached-native-thread' };
+          yield { type: 'turn.started' };
+          yield { type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 1 } };
+        })(),
+      }));
+      for await (const chunk of adapter.sendMessage({ sessionId, content: 'before' })) { void chunk; }
+      adapter.updateModelReasoningEffort('high');
+      for await (const chunk of adapter.sendMessage({ sessionId, content: 'after' })) { void chunk; }
+      expect(options._mockCodex.resumeThread).toHaveBeenLastCalledWith(
+        'cached-native-thread', expect.objectContaining({ model: 'default-model', modelReasoningEffort: 'high' }),
+      );
+    });
+
     it('passes model option to startThread via buildThreadOptions', async () => {
       const options = createAdapterOptions({ model: 'o4-mini' });
       const adapter = new CodexAdapter(options);
@@ -1537,5 +1613,50 @@ describe('CodexAdapter', () => {
       const threadOpts = options._mockCodex.startThread.mock.calls[0][0] as Record<string, unknown>;
       expect(threadOpts.webSearchMode).toBeUndefined();
     });
+  });
+});
+
+type SnapshotView = {
+  currentConversation: Conversation;
+  plugin: { settings: { backendSettings: { codex: { model: string; modelReasoningEffort: string; sandboxMode: string; additionalDirectories: string; networkAccessEnabled: boolean; webSearchMode: string } } } };
+  conversationSessionSettingsCoordinator: ConversationSessionSettingsCoordinator;
+  createConversationSessionSettingsCoordinatorHost(): ConstructorParameters<typeof ConversationSessionSettingsCoordinator>[0];
+  getSendMessageOptions(): { model?: string; variant?: string; codexOptions?: Record<string, unknown> };
+};
+
+function productionViewSnapshot() {
+  const a: Conversation = { id: 'owned-a', backend: 'codex', backendSessionId: 'thread-1', title: 'a', createdAt: 1, updatedAt: 1, messages: [], sessionSettings: { codexModelOverride: 'gpt-5.6-terra', codexModelReasoningEffort: 'low', codexApprovalPolicy: 'never' } };
+  const view = Object.assign(Object.create(OpenCodianView.prototype), {
+    currentConversation: a,
+    getCurrentSessionModel: () => ({ provider: 'codex', model: 'gpt-5.6-luna' }),
+    plugin: { settings: { backendSettings: { codex: { model: 'gpt-5.6-luna', modelReasoningEffort: 'high', sandboxMode: 'read-only', additionalDirectories: '', networkAccessEnabled: false, webSearchMode: 'disabled' } } } },
+  }) as SnapshotView;
+  view.conversationSessionSettingsCoordinator = new ConversationSessionSettingsCoordinator(view.createConversationSessionSettingsCoordinatorHost());
+  const snapshot = view.getSendMessageOptions();
+  view.currentConversation = { ...a, id: 'owned-b', sessionSettings: { codexModelOverride: 'other-tab-model' } };
+  view.plugin.settings.backendSettings.codex.model = 'later-default';
+  return { snapshot, a, view };
+}
+
+describe('Codex SDK receives the production view model snapshot', () => {
+  it.each(['start', 'resume'])('uses captured A model at SDK %s despite stale picker and later default changes', async (mode) => {
+    const { snapshot, a } = productionViewSnapshot();
+    const options = createAdapterOptions({ model: 'mutable-adapter-default' });
+    const adapter = new CodexAdapter(options);
+    await adapter.start();
+    const sessionId = mode === 'start' ? await adapter.createSession() : 'thread-1';
+    options._mockCodex._mockThread.runStreamed.mockResolvedValue({ events: (async function* () {
+      yield { type: 'thread.started', thread_id: 'thread-1' };
+      yield { type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 1 } };
+    })() });
+    for await (const chunk of adapter.sendMessage({ sessionId, content: 'owned snapshot', options: snapshot })) void chunk;
+    const expectedOptions = expect.objectContaining({ model: 'gpt-5.6-terra', modelReasoningEffort: 'low' });
+    const wireCall = mode === 'start' ? options._mockCodex.startThread : options._mockCodex.resumeThread;
+    const expectedArgs = mode === 'start' ? [expectedOptions] : ['thread-1', expectedOptions];
+    expect(wireCall).toHaveBeenCalledWith(...expectedArgs);
+    expect(snapshot.model).toBe('gpt-5.6-terra');
+    expect(snapshot.codexOptions?.model).toBe('gpt-5.6-terra');
+    expect(a.sessionSettings?.codexModelOverride).toBe('gpt-5.6-terra');
+    await adapter.stop();
   });
 });

@@ -33,7 +33,26 @@ function getHeader(
 export function buildClaudeCodeElicitationQuestionRequest(
   request: ElicitationRequest,
 ): QuestionRequest {
+  const schema = request.requestedSchema;
+  if (schema !== undefined) {
+    if (typeof schema !== 'object' || schema === null || Array.isArray(schema)) {
+      throw new Error('Unsupported Claude elicitation schema');
+    }
+    if (schema.type !== undefined && schema.type !== 'object') {
+      throw new Error('Unsupported Claude elicitation schema');
+    }
+    const properties = schema.properties;
+    if (properties !== undefined && (typeof properties !== 'object' || properties === null || Array.isArray(properties))) {
+      throw new Error('Unsupported Claude elicitation schema');
+    }
+  }
   const schemaProperties = getSchemaProperties(request.requestedSchema);
+  if (Object.values(schemaProperties).some(property => (
+    typeof property !== 'object' || property === null || Array.isArray(property)
+    || (property.type !== undefined && (typeof property.type !== 'string' || !['string', 'number', 'integer', 'boolean', 'array'].includes(property.type)))
+  ))) {
+    throw new Error('Unsupported Claude elicitation schema');
+  }
   const schemaQuestions = Object.entries(schemaProperties).map(([key, property]) => {
     const options = Array.isArray(property.enum)
       ? property.enum

@@ -237,3 +237,24 @@ describe('CodexAdapter approval bridge wiring', () => {
     expect(mockUnregisterServerRequestHandler).toHaveBeenCalledWith('applyPatchApproval');
   });
 });
+
+
+describe('Codex approval turn cancellation signal', () => {
+  beforeEach(() => { jest.clearAllMocks(); });
+  it('passes the owning turn signal and refuses an approval that resolves after cancellation', async () => {
+    const adapter = new CodexAdapter({ codexPathOverride: '/path/to/codex', createCodex: jest.fn().mockResolvedValue(createMockCodex()) });
+    let finish!: (value: { decision: 'approved' }) => void;
+    const collectApproval = jest.fn(() => new Promise<{ decision: 'approved' }>((resolve) => { finish = resolve; }));
+    adapter.setApprovalHost({ collectApproval });
+    await adapter.start();
+    const controller = new AbortController();
+    const internal = adapter as unknown as { activeControllers: Map<string, AbortController> };
+    internal.activeControllers.set('thread-owner', controller);
+    const pending = registeredHandler('execCommandApproval')!({ threadId: 'thread-owner', command: ['echo', 'owned'] });
+    await Promise.resolve();
+    expect(collectApproval.mock.calls[0][0]).toEqual(expect.objectContaining({ signal: controller.signal }));
+    adapter.cancelStream('thread-owner');
+    finish({ decision: 'approved' });
+    await expect(pending).resolves.toEqual({ decision: 'denied' });
+  });
+});

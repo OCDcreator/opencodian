@@ -36,3 +36,7 @@
 - 不在这里持久化 session/history；normalizer 只负责把 SDK `session_id` 作为 metadata、把 SDK user message `uuid` 作为 `user_message_identity` 传下去，真正的 identity alias、`sourceMessageId` 写入与 conversation 保存属于 adapter / send pipeline。
 - 新增 Claude 特有 stream 事件时先补 fixture 测试，再扩展转换逻辑。
 - 2026-09-08：归一化 Claude SDK 0.3.263 的稳定系统信号：`informational`、`control_request_progress`、`background_tasks_changed`、`thinking_tokens`、`model_refusal_fallback/no_fallback`、`worker_shutting_down`。它们进入类型化 `backend_event` 诊断通道；拒答撤回 UUID 被保留为元数据，但在消息渲染尚无可靠 SDK UUID 身份映射前不执行猜测式 DOM/持久化删除。
+
+`user_message_identity` 仅归属提交的人类 prompt；SDK `type=user` 的 `tool_result` 承载回合工具结果，不得用其 UUID 覆盖原用户的 fork/steer identity。工具结果的既有展示仍由内容归一化处理。修复不重写已持久化的历史 source IDs。
+
+每个普通 chat prompt 提交客户端 UUID；优先消费 SDK result 的 `user_message_uuid`，旧 CLI 缺少该字段时经 SDK transcript readback 确认后才绑定。目录读取失败保持身份 unavailable，不影响已确认的模型终态，也不伪造 source ID。

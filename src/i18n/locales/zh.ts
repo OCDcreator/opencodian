@@ -466,6 +466,8 @@ export const zhTranslations = {
   'settings.codex.readback.statusLoading': '加载中',
   'settings.codex.readback.statusUnavailable': '不可用',
   'settings.codex.readback.statusFailed': '失败',
+  'settings.codex.readback.statusPermissionDenied': '权限拒绝',
+  'settings.codex.readback.messagePermissionDenied': 'Codex 拒绝访问此目录。请检查当前账号和工作区权限，再重新打开此视图。',
   'settings.codex.readback.statusEmpty': '无内容',
   'settings.codex.readback.statusCount': '{count} 项',
   'settings.quickNav.title': '快捷跳转',
@@ -3011,6 +3013,7 @@ export const zhTranslations = {
   'chat.message.toolUse': '使用工具',
   'chat.message.toolResult': '工具结果',
   'chat.stream.cancelledToast': '已中断生成',
+  'chat.tool.interruptedOutcome': "流已中断。原生工具结果尚未确认。",
   'chat.stream.interruptedBadge': '已中断',
   'chat.stream.interruptedNoticeTitle': '回复已中断',
   'chat.stream.interruptedNoticeBody': '本次生成在输出可见回复前已被停止。',
@@ -6045,8 +6048,9 @@ export const zhTranslations = {
   'settings.codex.readback.messagePartial': "部分条目未能加载。重新打开以重试完整目录。",
   'settings.codex.readback.messagePartialReload': "部分条目未能加载。刷新以重试完整目录。",
   'chat.backendSessions.catalogPartial': "目录不完整，部分会话未能加载；刷新可重试。",
+  'chat.backendSessions.catalogPermissionDenied': '后端拒绝访问此目录。请检查当前账号和工作区权限，再重新打开此视图。',
   'chat.backendSessions.catalogFailed': "会话目录加载失败，刷新可重试。",
-  'chat.backendSessions.catalogUnavailable': "Codex 原生会话目录不可用。",
+  'chat.backendSessions.catalogUnavailable': "原生会话目录不可用。",
   'settings.zcode.management.declarationCounts': "{path} · 插件 {plugins} · MCP {mcp} · hooks {hooks}",
   'settings.zcode.management.pluginDetails': "来源：{source} · MCP {mcp} · hooks {hooks}{missing}",
   'settings.zcode.management.outcome': "{status} · 持久化：{persistence} · 会话应用：{application} · 有效目录：{runtime}。此次保存尚未验证插件执行。",
@@ -6080,6 +6084,8 @@ export const zhTranslations = {
   'settings.zcode.management.authValue.required': "需要认证",
   'settings.zcode.management.authValue.failed': "认证失败",
   'settings.zcode.management.authValue.unknown': "未知",
+  'chat.pi.commandCompleted': '命令已执行：{command}',
+
 } as const;
 
 

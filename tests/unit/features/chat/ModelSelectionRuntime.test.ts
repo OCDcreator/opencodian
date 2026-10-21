@@ -380,3 +380,58 @@ describe('ModelSelectionRuntime selection behavior', () => {
     expect(await runtime.ensureSelectedModelAvailable('claude-code', 'default')).toBe(true);
   });
 });
+
+
+describe('ModelSelectionRuntime asynchronous catalogue ownership', () => {
+  it('does not restore a previous backend catalogue after controls reset', async () => {
+    const { host, runtime, availableProviders } = createRuntimeFixture();
+    let resolveOld!: (value: { catalogBundle: null; providers: ModelSelectorProvider[] }) => void;
+    host.loadModelCatalogData.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve; }));
+    const oldLoad = runtime.reloadModelCatalog();
+    runtime.reset();
+    resolveOld({ catalogBundle: null, providers: availableProviders });
+    await oldLoad;
+    expect(runtime.hasLoadedModelCatalog()).toBe(false);
+    expect(runtime.getAvailableProviders()).toEqual([]);
+    expect(host.syncActiveTabContextUsageIdentity).not.toHaveBeenCalled();
+  });
+
+  it('retains the newest catalogue when an older backend responds last', async () => {
+    const { host, runtime, availableProviders } = createRuntimeFixture();
+    let resolveOld!: (value: { catalogBundle: null; providers: ModelSelectorProvider[] }) => void;
+    host.loadModelCatalogData.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve; }));
+    const oldLoad = runtime.reloadModelCatalog();
+    runtime.reset();
+    host.loadModelCatalogData.mockResolvedValueOnce({ catalogBundle: null, providers: [{
+      id: 'krill-gpt', name: 'krill-gpt', models: [{ id: 'gpt-5.6-luna', name: 'Luna' }],
+    }] });
+    await runtime.reloadModelCatalog();
+    resolveOld({ catalogBundle: null, providers: availableProviders });
+    await oldLoad;
+    expect(runtime.getAvailableProviders().map(provider => provider.id)).toEqual(['krill-gpt']);
+    expect(host.syncActiveTabContextUsageIdentity).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a superseded refresh even without rebuilding controls', async () => {
+    const { host, runtime, availableProviders } = createRuntimeFixture();
+    let resolveOld!: (value: { catalogBundle: null; providers: ModelSelectorProvider[] }) => void;
+    host.loadModelCatalogData.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve; }));
+    const oldLoad = runtime.reloadModelCatalog();
+    host.loadModelCatalogData.mockResolvedValueOnce({ catalogBundle: null, providers: [] });
+    await runtime.reloadModelCatalog();
+    resolveOld({ catalogBundle: null, providers: availableProviders });
+    await oldLoad;
+    expect(runtime.getAvailableProviders()).toEqual([]);
+    expect(host.syncActiveTabContextUsageIdentity).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ModelSelectionRuntime explicit requested-model preservation hook', () => {
+  it('preserves a missing requested model with the hook and refuses availability instead of sending the fallback', async () => {
+    const fixture = createRuntimeFixture({ activeTabModelOverride: { provider: 'openai', model: 'owned-unlisted' } });
+    fixture.host.preserveRequestedModel = () => true;
+    await fixture.runtime.reloadModelCatalog();
+    expect(fixture.runtime.getCurrentSessionModel()).toEqual({ provider: 'openai', model: 'owned-unlisted' });
+    expect(await fixture.runtime.ensureSelectedModelAvailable('openai', 'owned-unlisted')).toBe(false);
+  });
+});

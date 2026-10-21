@@ -52,3 +52,5 @@ Completed OpenCode 2 turns schedule server history reconciliation through their 
 纯文本 Codex 回合只有在 completed、无终止错误、native snapshot 与本轮 user owning turn 相同且无工具 block 时，才用权威最终文本收敛重试留下的 partial；其他后端和复杂回合保持原流数据。
 
 可选 owning turn 从 routed stream 透传至本地持久化 outcome；缺失时保持既有输出结构。
+
+2026-10-07 成功的 Pi prompt 与 OpenCode 两路径一样触发完成后的权威同步；Pi 同步走自己的 adapter，不请求 OpenCode service。失败、超时和中断保持本地路径；Codex、Claude、ZCode 的既有路由不变。

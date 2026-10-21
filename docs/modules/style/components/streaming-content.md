@@ -34,3 +34,7 @@
 - 工具状态色（running/completed/error/blocked）是关键信号，改色前先评估可辨识性。
 - 输出区字体分层（正文 vs monospace 行日志）不要混淆，否则可读性明显下降。
 - 修改后执行 `npm run build:css`（或完整 `npm run build`）。
+
+## 2026-10-09 本地工具中断状态
+
+已有 .streaming-tool-status.status-interrupted 与 status-blocked 共用 --color-orange；interrupted 使用 pause 状态图标及原生结果未确认文案，不继承 running spinner，不代表 native 成功或失败。此处仅补齐原有 CSS 修改的映射说明；没有改 CSS 或生成 styles.css。

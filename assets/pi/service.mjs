@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { BUSY_ALLOWED, executeCommand } from './commands.mjs';
+import { BUSY_ALLOWED, executeCommand, persistNativeBranch } from './commands.mjs';
 import { createConfigurationService, startConfigurationTransport } from './configuration.mjs';
 import { createExtensionUi } from './extension-ui.mjs';
 
@@ -26,21 +26,44 @@ export async function loadModelThinkingLevels(sdkPath) {
   return undefined;
 }
 
+const guardedSessionManagers = new WeakSet();
+
 export async function startPiService(sdkPath, options, streams = process) {
-  const write = (message) => streams.stdout.write(`${JSON.stringify(message)}\n`);
+  const rawStdoutWrite = streams.stdout.write.bind(streams.stdout);
+  const write = (message) => rawStdoutWrite(`${JSON.stringify(message)}\n`);
   // Extension console output belongs to stderr, never to JSONL framing.
   console.log = (...args) => streams.stderr.write(`${args.map(String).join(' ')}\n`);
+  if (streams === process) {
+    const guard = await import(pathToFileURL(join(dirname(sdkPath), 'core/output-guard.js')).href);
+    if (typeof guard.takeOverStdout !== 'function') throw new Error('Pi SDK stdout protection is unavailable. Review service compatibility.');
+    // The SDK also uses this guard to send inherited npm/git output to stderr.
+    guard.takeOverStdout();
+  }
   const sdk = await import(pathToFileURL(sdkPath).href);
   const getSupportedThinkingLevels = sdk.ModelRuntime ? await loadModelThinkingLevels(sdkPath) : undefined;
   const { FileSettingsStorage } = await import(pathToFileURL(join(dirname(sdkPath), 'core/settings-manager.js')).href);
   const configuration = createConfigurationService({ ...sdk, FileSettingsStorage }, resolve(options.workingDirectory), options.agentDirectory || sdk.getAgentDir());
-  if (options.configurationOnly) return startConfigurationTransport(configuration, sdk.VERSION, streams);
+  if (options.configurationOnly) return startConfigurationTransport(configuration, sdk.VERSION, {
+    stdin: streams.stdin, stdout: { write: rawStdoutWrite }, stderr: streams.stderr,
+  });
   // The CLI's two non-root helpers are isolated here and exercised by upgrade acceptance.
   const { resolveModelScope } = await import(pathToFileURL(join(dirname(sdkPath), 'core/model-resolver.js')).href);
   const { resizeImage } = await import(pathToFileURL(join(dirname(sdkPath), 'utils/image-resize.js')).href);
   if (typeof resolveModelScope !== 'function' || typeof resizeImage !== 'function') throw new Error('Pi SDK helper compatibility changed. Review the service upgrade.');
   for (const name of ['createAgentSessionRuntime', 'createAgentSessionServices', 'createAgentSessionFromServices', 'SettingsManager', 'SessionManager']) {
     if (!sdk[name]) throw new Error(`Pi SDK ${sdk.VERSION ?? 'unknown'} does not provide ${name}. Upgrade compatibility needs review.`);
+  }
+  const Manager = sdk.SessionManager;
+  const createBranch = Manager.prototype.createBranchedSession;
+  if (typeof createBranch === 'function' && !guardedSessionManagers.has(Manager)) {
+    // Minimum SDK reopens this returned path immediately, while an empty
+    // branch is still only buffered. Preserve public native data first.
+    Manager.prototype.createBranchedSession = function(entryId) {
+      const file = createBranch.call(this, entryId);
+      if (file) persistNativeBranch(this, file);
+      return file;
+    };
+    guardedSessionManagers.add(Manager);
   }
   const cwd = resolve(options.workingDirectory);
   const agentDir = options.agentDirectory || sdk.getAgentDir();
@@ -72,7 +95,9 @@ export async function startPiService(sdkPath, options, streams = process) {
   };
   host.ui = createExtensionUi(write, sdk.getMarkdownTheme?.());
   // Only explicit package management commands use persistent SDK settings.
-  host.packages = new sdk.DefaultPackageManager({ cwd, agentDir, settingsManager: sdk.SettingsManager.create(cwd, agentDir) });
+  const installationSettings = sdk.SettingsManager.create(cwd, agentDir);
+  host.getDeviceId = () => installationSettings.getOrCreateDeviceId();
+  host.packages = new sdk.DefaultPackageManager({ cwd, agentDir, settingsManager: installationSettings });
   host.packages.setProgressCallback((event) => write({ type: 'package_progress', ...event }));
   const factory = async ({ sessionManager, sessionStartEvent }) => {
     const services = await sdk.createAgentSessionServices({ cwd, agentDir, ...(modelRuntime ? { modelRuntime } : { authStorage: auth }), settingsManager: settings });
@@ -186,8 +211,9 @@ export async function startPiService(sdkPath, options, streams = process) {
 }
 
 if (import.meta.url.startsWith('file:') && process.argv[1] && pathToFileURL(realpathSync(process.argv[1])).href === import.meta.url) {
+  const writeStartupError = process.stdout.write.bind(process.stdout);
   startPiService(process.argv[2], JSON.parse(process.argv[3])).catch((error) => {
-    process.stdout.write(`${JSON.stringify({ type: 'transport_error', error: `Pi service startup: ${error.message}` })}\n`);
+    writeStartupError(`${JSON.stringify({ type: 'transport_error', error: `Pi service startup: ${error.message}` })}\n`);
     process.exitCode = 1;
   });
 }

@@ -197,3 +197,8 @@ StreamController.handleToolResultChunk(chunk)
 - 结果渲染截断为 20 行，大输出可能丢失信息
 - Obsidian 内置的 `.copy-code-button` 不在此处处理（由 MarkdownRenderer 处理）
 - OpenCode 风格的 `server_tool` 若未携带结构化 kind，也会通过统一 identity 层做保守识别，不再直接掉回扳手
+
+
+## 2026-10-08 未完成工具的本地中断状态
+
+取消本地流时仍保存尚未收到结果的工具 call ID、参数和 interrupted 状态；不把本地停止推断为原生成功/失败，也不触发完成回调。已收到的终态和结果保持不变。卡片显示“原生工具结果尚未确认”，不显示运行中 spinner；历史归一保留该状态，后续权威 native completed/error 可以覆盖。

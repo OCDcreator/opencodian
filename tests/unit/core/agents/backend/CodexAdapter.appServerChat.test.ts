@@ -418,6 +418,7 @@ describe('CodexAdapter app-server chat lifecycle', () => {
 
     const chunks = await collectStream(adapter, 'codex-local-sdk');
 
+    expect(mockAppServerStop).toHaveBeenCalledTimes(1);
     expect(adapter.hasCapability(AgentCapability.Context)).toBe(false);
     expect(sdk.startThread).toHaveBeenCalledTimes(1);
     expect(chunks).toContainEqual({ type: 'message_stop' });

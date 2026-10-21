@@ -100,3 +100,11 @@ English and Chinese strings distinguish OpenCode 1 and 2 and label the OpenCode 
 English and Chinese copy describe executable snapshot/restart boundaries and explicit restart failures without claiming runtime verification or guaranteeing query preservation after a generic close failure.
 
 2026-10-06：ZCode 项目插件双语文案明确新会话、已加载快照和重连恢复的配置边界；保存结果区分会话应用、有效目录与尚未验证的插件执行。现有 translation keys 和参数保持不变。
+
+## 2026-10-06 Codex catalog permission denial
+
+中英文目录新增 Codex catalog 权限拒绝状态与固定说明，原始 errorReason 不作为翻译参数或可见文本。
+
+2026-10-07: Shared session directory denial copy is backend-neutral in both locales.
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `shared.i18n` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。

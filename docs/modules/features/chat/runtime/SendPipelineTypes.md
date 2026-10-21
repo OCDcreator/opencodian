@@ -58,3 +58,8 @@
 LocalStreamOutcome 的可选 assistant owning turn / native text render 标志及 persistence callback 只用于已确认的 Codex 单条文本收敛。
 
 resolvedUserMessageTurnId 可选贯穿 router trace/outcome；不改变其他后端已使用的 resolvedUserMessageIdentity 类型与输出。
+
+
+## 2026-10-08 每轮流归属
+
+取消后立即启动下一轮时，以独立 streamRunToken 绑定每次发送。旧 iterator 的延迟 chunk/final 不得修改新轮次的 streaming 状态、用量、pending 指示、shell 或队列；旧回复只用自身 controller 和捕获的 DOM 保存。结束或取消的 controller 在下一轮替换，仍在运行的 controller 保留。异步 shell 收尾之后再次检查归属；晚到错误和定时器也受相同边界约束。

@@ -1,4 +1,5 @@
 # OpenCodian 模块功能文档
+> 2026-10-07 增量：[ClaudeCodeScopedSessionStore](core/agents/backend/ClaudeCodeScopedSessionStore.md) 记录 Claude 域 config 根的原生目录接缝和文件边界。
 
 > 按源码模块组织的项目文档群。`module-docs.config.json` 定义源码到文档的一对一映射，`src/**/*.ts(x)` 与 `src/style/**/*.css` 原则上都应在 `docs/modules/` 下拥有一篇对应文档。
 
@@ -310,6 +311,7 @@ docs/modules/
 │   └── jsx-shim.md
 ├── shared/
 │   ├── contextPath.md
+│   ├── sessionCatalogReadback.md
 │   ├── index.md
 │   ├── logger.md
 │   ├── obsidianContext.md

@@ -79,10 +79,12 @@ export class CodexMcpServerDetailModal extends Modal {
     this.busy = true;
     this.setState('loading');
     let nextState: McpModalState = 'failed';
+    let permissionDenied = false;
     try {
       if (this.host.getMcpServerStatusCatalog) {
         const result = await this.host.getMcpServerStatusCatalog();
         this.servers = result.data;
+        permissionDenied = result.status !== 'complete' && /(?:permission|access) denied|\b(?:EACCES|EPERM)\b/i.test(result.errorReason);
         nextState = result.status === 'complete' ? result.data.length > 0 ? 'success' : 'empty' : result.status;
         return;
       }
@@ -102,11 +104,11 @@ export class CodexMcpServerDetailModal extends Modal {
       this.servers = [];
     } finally {
       this.busy = false;
-      this.setState(nextState);
+      this.setState(nextState, permissionDenied);
     }
   }
 
-  private setState(state: McpModalState): void {
+  private setState(state: McpModalState, permissionDenied = false): void {
     if (!this.contentAreaEl || !this.statusValueEl) {
       return;
     }
@@ -114,6 +116,7 @@ export class CodexMcpServerDetailModal extends Modal {
     this.state = state;
     this.contentAreaEl.empty();
     this.statusValueEl.setAttribute('data-mcp-state', state);
+    this.statusValueEl.setAttribute('data-mcp-failure', permissionDenied ? 'permission-denied' : '');
     this.statusValueEl.setAttribute('role', 'status');
     this.statusValueEl.setAttribute('aria-live', 'polite');
     this.statusValueEl.setAttribute('aria-busy', String(state === 'loading'));
@@ -128,8 +131,8 @@ export class CodexMcpServerDetailModal extends Modal {
         this.renderStateMessage(t('settings.codex.mcpDetail.unavailable'));
         return;
       case 'failed':
-        this.statusValueEl.setText(t('settings.codex.readback.statusFailed'));
-        this.renderStateMessage(t('settings.codex.mcpDetail.failed'));
+        this.statusValueEl.setText(t(permissionDenied ? 'settings.codex.readback.statusPermissionDenied' : 'settings.codex.readback.statusFailed'));
+        this.renderStateMessage(t(permissionDenied ? 'settings.codex.readback.messagePermissionDenied' : 'settings.codex.mcpDetail.failed'));
         return;
       case 'empty':
         this.statusValueEl.setText(t('settings.codex.readback.statusEmpty'));
@@ -141,6 +144,7 @@ export class CodexMcpServerDetailModal extends Modal {
           ? t('settings.codex.readback.statusPartial', { count: this.servers.length })
           : t('settings.codex.readback.statusCount', { count: this.servers.length }));
         if (state === 'partial') this.renderStateMessage(t('settings.codex.readback.messagePartialReload'));
+        if (state === 'partial' && permissionDenied) this.renderStateMessage(t('settings.codex.readback.messagePermissionDenied'));
         this.renderSuccessContent(this.contentAreaEl);
         this.applyFocusServer();
         return;

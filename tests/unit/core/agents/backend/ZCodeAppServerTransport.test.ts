@@ -256,3 +256,59 @@ describe('ZCodeAppServerTransport', () => {
     expect((replies[0]['error'] as { code: number }).code).toBe(-32603);
   });
 });
+
+// MATRIX012: actual parser/transport + bridge; all stdio is the injected fake child.
+const matrix012BridgeClass = jest.requireActual<typeof import('../../../../../src/core/agents/backend/zcode/ZCodeInteractionBridge')>('../../../../../src/core/agents/backend/zcode/ZCodeInteractionBridge').ZCodeInteractionBridge;
+const matrix012TransportFixture = async () => {
+  const bridge = new matrix012BridgeClass(), child = createFakeChild();
+  const counts = { nativeSpawnAttempts: 0, fakeSpawnCalls: 0, realFsReads: 0, configWrites: 0, modelAdmissions: 0, toolAdmissions: 0, httpAdmissions: 0, askHandlerCalls: 0, pendingSettles: 0 };
+  const cp = jest.requireActual<typeof import('node:child_process')>('node:child_process'), fs = jest.requireActual<typeof import('node:fs')>('node:fs');
+  for (const method of ['spawn', 'spawnSync', 'exec', 'execSync', 'execFile', 'execFileSync', 'fork'] as const) jest.spyOn(cp, method).mockImplementation(() => { counts.nativeSpawnAttempts++; throw new Error('FAKE_MATRIX012_native_forbidden'); });
+  for (const method of ['readFileSync', 'existsSync', 'readdirSync', 'statSync'] as const) jest.spyOn(fs, method).mockImplementation(() => { counts.realFsReads++; throw new Error('FAKE_MATRIX012_real_fs_forbidden'); });
+  for (const method of ['writeFileSync', 'mkdirSync'] as const) jest.spyOn(fs, method).mockImplementation(() => { counts.configWrites++; throw new Error('FAKE_MATRIX012_config_write_forbidden'); });
+  const inputs: unknown[] = [], cards: unknown[] = [], notifications: unknown[] = [], violations: string[] = [], states: unknown[] = [], snapshots: unknown[] = [], settles: unknown[] = [], captured: Promise<void>[] = [], watched = new WeakSet<object>();
+  const spawnImpl = (() => { counts.fakeSpawnCalls++; return child as unknown as ReturnType<typeof import('node:child_process').spawn>; }) as typeof import('node:child_process').spawn;
+  const transport = new ZCodeAppServerTransport({ launch: { ...launch, command: '/FAKE_MATRIX012_no_binary', entryPath: '/FAKE_MATRIX012_no_binary', extraEnv: {} }, baseEnv: {}, spawnImpl, onNotification: (method, params) => { notifications.push({ method, params }); }, onProtocolViolation: reason => { violations.push(reason); }, requestTimeoutMs: 100 });
+  const route = (params: Record<string, unknown>) => {
+    counts.askHandlerCalls++; const reply = bridge.registerAskForAdapter('user-input', params, (sessionId, chunk) => { cards.push({ sessionId, chunk }); });
+    captured.push(reply.then(body => { states.push({ status: 'resolved', body }); }, error => { states.push({ status: 'rejected', error: String(error) }); }));
+    const pending = (bridge as unknown as { pending: Map<string, { settled: boolean; settle: (body: unknown) => void }> }).pending;
+    for (const entry of pending.values()) if (!watched.has(entry)) { watched.add(entry); const settle = entry.settle; entry.settle = body => { if (!entry.settled) { counts.pendingSettles++; settles.push(body); } settle(body); }; }
+    return reply;
+  };
+  const inject = (input: Record<string, unknown>) => { inputs.push(input); child.stdout.emit('data', JSON.stringify(input) + '\n'); };
+  const frames = () => child.stdin.write.mock.calls.map(call => JSON.parse(call[0].trim()) as Record<string, unknown>);
+  const checkpoint = (label: string) => { snapshots.push({ label, cards: JSON.parse(JSON.stringify(cards)) as unknown, questions: bridge.getPending('user-input'), permissions: bridge.getPending('permission'), frames: frames(), counts: { ...counts } }); };
+  const cleanup = async () => { checkpoint('before-owned-teardown'); bridge.settlePendingForTeardown('FAKE_MATRIX012_A'); await Promise.all(captured); await Promise.resolve(); checkpoint('after-owned-teardown'); child.exitCode = 0; child.emit('exit', 0, null); transport.dispose(); console.warn('MATRIX012_ACTUAL ' + JSON.stringify({ fullName: expect.getState().currentTestName, inputs, cards, states, settles, snapshots, notifications, violations, frames: frames(), ndjsonWrites: child.stdin.write.mock.calls.map(call => call[0]), counts, fakeChildKillCalls: child.kill.mock.calls, nativeObserved: null, providerObserved: null })); jest.restoreAllMocks(); jest.useRealTimers(); };
+  await transport.start(); return { bridge, transport, route, inject, frames, checkpoint, cleanup, counts, cards, notifications, violations };
+};
+const matrix012TransportTick = async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); };
+
+describe('MATRIX012 transport controls', () => {
+  it('MATRIX012 zero-admission smoke transport', async () => {
+    const f = await matrix012TransportFixture(); try { f.checkpoint('smoke'); expect(f.transport.isAlive).toBe(true); expect(f.frames()).toEqual([]); expect(f.counts).toEqual({ nativeSpawnAttempts: 0, fakeSpawnCalls: 1, realFsReads: 0, configWrites: 0, modelAdmissions: 0, toolAdmissions: 0, httpAdmissions: 0, askHandlerCalls: 0, pendingSettles: 0 }); } finally { await f.cleanup(); }
+  }, 2000);
+  it('MATRIX012 ZC012-10 two RPC IDs retain one native semantic resolution and two envelopes', async () => {
+    const f = await matrix012TransportFixture(); try {
+      f.transport.onServerRequest('interaction/requestUserInput', f.route); const params = { requestId: 'FAKE_MATRIX012_native_A', sessionId: 'FAKE_MATRIX012_A', questions: [{ question: 'FAKE_MATRIX012_q', options: [{ label: 'alpha' }] }] };
+      f.inject({ id: 'FAKE_MATRIX012_rpc_A', method: 'interaction/requestUserInput', params }); f.inject({ id: 'FAKE_MATRIX012_rpc_B', method: 'interaction/requestUserInput', params }); f.checkpoint('two-RPC-one-pending'); expect(f.cards).toHaveLength(1); expect(f.bridge.getPending('user-input')).toHaveLength(1); expect(f.frames()).toEqual([]);
+      f.bridge.replyToQuestion(params.requestId, [['alpha']]); await matrix012TransportTick(); f.checkpoint('resolved'); expect(f.frames()).toEqual([{ id: 'FAKE_MATRIX012_rpc_A', result: { action: 'accept', content: { answers: { FAKE_MATRIX012_q: ['alpha'] } } } }, { id: 'FAKE_MATRIX012_rpc_B', result: { action: 'accept', content: { answers: { FAKE_MATRIX012_q: ['alpha'] } } } }]);
+      expect(f.frames().some(frame => 'jsonrpc' in frame)).toBe(false); expect(f.counts.pendingSettles).toBe(1); expect(f.counts.askHandlerCalls).toBe(2); expect(f.counts.nativeSpawnAttempts).toBe(0); expect(f.counts.modelAdmissions).toBe(0); expect(f.counts.toolAdmissions).toBe(0);
+    } finally { await f.cleanup(); }
+  }, 2000);
+  it.each([['ZC012-11-unknown-method', 'FAKE_MATRIX012_unknown', -32601], ['ZC012-11-handler-throw', 'interaction/requestUserInput', -32603]])('MATRIX012 %s retains original envelope ID and no pending leak', async (id, method, code) => {
+    const f = await matrix012TransportFixture(); try {
+      f.transport.onServerRequest('interaction/requestUserInput', () => { f.counts.askHandlerCalls++; throw new Error('FAKE_MATRIX012_handler_failure'); }); const rpcId = `FAKE_MATRIX012_rpc_${id}`;
+      f.inject({ id: rpcId, method, params: { requestId: `FAKE_MATRIX012_native_${id}`, sessionId: 'FAKE_MATRIX012_A' } }); await matrix012TransportTick(); f.checkpoint('structured-error');
+      expect(f.frames()).toHaveLength(1); expect(f.frames()[0]).toMatchObject({ id: rpcId, error: { code } }); expect(f.frames()[0]).not.toHaveProperty('jsonrpc'); expect(f.bridge.getPending('user-input')).toEqual([]); expect(f.cards).toEqual([]); expect(f.counts.pendingSettles).toBe(0); expect(f.counts.nativeSpawnAttempts).toBe(0); expect(f.counts.toolAdmissions).toBe(0); expect(f.counts.modelAdmissions).toBe(0);
+    } finally { await f.cleanup(); }
+  }, 2000);
+  it('MATRIX012 ZC012-12 future notification keeps parser alive without replying or changing pending ask', async () => {
+    const f = await matrix012TransportFixture(); try {
+      f.transport.onServerRequest('interaction/requestUserInput', f.route); const params = { requestId: 'FAKE_MATRIX012_pending', sessionId: 'FAKE_MATRIX012_A', questions: [{ question: 'FAKE_MATRIX012_q', options: [{ label: 'alpha' }] }] };
+      f.inject({ id: 'FAKE_MATRIX012_legitimate_rpc', method: 'interaction/requestUserInput', params }); const before = f.bridge.getPending('user-input'); f.inject({ method: 'FAKE_MATRIX012_future_notification', params: { requestId: params.requestId, sessionId: params.sessionId, future: true } }); await matrix012TransportTick(); f.checkpoint('future-notification');
+      expect(f.transport.isAlive).toBe(true); expect(f.frames()).toEqual([]); expect(f.bridge.getPending('user-input')).toEqual(before); expect(f.counts.askHandlerCalls).toBe(1); expect(f.cards).toHaveLength(1); expect(f.counts.pendingSettles).toBe(0); expect(f.violations).toEqual([]); expect(f.notifications).toEqual([{ method: 'FAKE_MATRIX012_future_notification', params: { requestId: params.requestId, sessionId: params.sessionId, future: true } }]);
+      f.bridge.replyToQuestion(params.requestId, [['alpha']]); await matrix012TransportTick(); expect(f.frames()).toEqual([{ id: 'FAKE_MATRIX012_legitimate_rpc', result: { action: 'accept', content: { answers: { FAKE_MATRIX012_q: ['alpha'] } } } }]); expect(f.counts.nativeSpawnAttempts).toBe(0); expect(f.counts.toolAdmissions).toBe(0); expect(f.counts.modelAdmissions).toBe(0);
+    } finally { await f.cleanup(); }
+  }, 2000);
+});

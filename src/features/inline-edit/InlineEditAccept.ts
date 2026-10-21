@@ -83,6 +83,23 @@ export async function executeInlineEditAccept(
   const preview = edit.preview;
   if (!preview) return;
 
+  const text = preview.mode === 'insertion' && edit.preserveWhitespace !== true
+    ? normalizeInsertionText(preview.text)
+    : preview.text;
+
+  if (edit.anchor.mode === 'document') {
+    // Whole-document accepts replace almost everything the user has; the
+    // degraded before/after view is weak review, so a second confirmation
+    // gates the single write (R-A6 验收 6). Fail closed when no confirmer is
+    // wired: no confirmation, no write.
+    const confirmed = await (deps.confirmDocumentReplace?.({
+      notePath: edit.anchor.notePath,
+      charCount: text.length,
+    }) ?? Promise.resolve(false));
+    if (!deps.isCurrent(edit)) return;
+    if (!confirmed) return;
+  }
+
   const range = readInlineEditRange(edit.editorView.state, edit.editId);
   if (!range) {
     deps.notify(t('inlineEdit.error.editorUnavailable'));
@@ -111,54 +128,36 @@ export async function executeInlineEditAccept(
     return;
   }
 
-  const text = preview.mode === 'insertion' && edit.preserveWhitespace !== true
-    ? normalizeInsertionText(preview.text)
-    : preview.text;
-
-  if (edit.anchor.mode === 'document') {
-    // Whole-document accepts replace almost everything the user has; the
-    // degraded before/after view is weak review, so a second confirmation
-    // gates the single write (R-A6 验收 6). Fail closed when no confirmer is
-    // wired: no confirmation, no write.
-    const confirmed = await (deps.confirmDocumentReplace?.({
-      notePath: edit.anchor.notePath,
-      charCount: text.length,
-    }) ?? Promise.resolve(false));
-    if (!deps.isCurrent(edit)) return;
-    if (!confirmed) return;
-  }
-
   // The dirty check passed: this write now owns the asset (taken so the
   // closeEdit teardown cannot treat a successful insert as an orphan).
   const assetPath = edit.imageGen?.takePendingAsset() ?? null;
 
-  void deps.closeEdit(edit.editId).then(() => {
+  try {
     const start = edit.editor.offsetToPos(range.from);
     const end = edit.editor.offsetToPos(range.to);
-    // Single transaction: Ctrl+Z undoes the whole inline edit in one step —
-    // whole-document edits included (R-A6 验收 4).
-    try {
-      edit.editor.replaceRange(text, start, end);
-    } catch (error) {
-      // W-ref write failure (R-C2): the asset stays on disk and its actual
-      // path is reported; the document is unchanged because the transaction
-      // never applied. The round closes now — no write will be recorded (D2).
-      if (assetPath) {
-        deps.endImageAssetCapture?.();
-        deps.notify(t('inlineEdit.imageGen.notice.insertFailedKeepAsset', { path: assetPath }));
-        return;
-      }
-      deps.notify(t('inlineEdit.error.applyFailed', {
-        message: error instanceof Error ? error.message : String(error),
-      }));
+    // No await separates the final snapshot check from this single write.
+    edit.editor.replaceRange(text, start, end);
+  } catch (error) {
+    void deps.closeEdit(edit.editId);
+    // W-ref failure keeps the asset and reports its actual path.
+    if (assetPath) {
+      deps.endImageAssetCapture?.();
+      deps.notify(t('inlineEdit.imageGen.notice.insertFailedKeepAsset', { path: assetPath }));
       return;
     }
-    // The paired reference write applied: record it explicitly (order
-    // matters — record before close) and free the round so one-click revert
-    // is available immediately (D2).
+    deps.notify(t('inlineEdit.error.applyFailed', {
+      message: error instanceof Error ? error.message : String(error),
+    }));
+    return;
+  }
+  try {
+    // Record the paired reference write before close, preserving D2 order.
     if (assetPath) {
       deps.noteImageReferenceWrite?.(edit.anchor.notePath);
       deps.endImageAssetCapture?.();
     }
-  });
+  } finally {
+    // Native process exit may be slow; cleanup starts after the editor write.
+    void deps.closeEdit(edit.editId);
+  }
 }

@@ -60,3 +60,7 @@ The new core.backend-pi owner isolates the external Pi process service. core.ope
 - 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
 
 2026-10-02：T10 统一 SDK/legacy fallback 的单次生成、取消与拒绝边界；快照/权威撤回 owner 保留消息与 part 删除屏障，并区分读取期间的新同步事件。新增有限深度影响与竞态回归在六后端实施记录追踪。
+
+2026-10-07：目录读取只将有效数组（包括权威空数组）作为成功；SDK 读取/格式错误可沿既有 legacy GET /session fallback。最终失败继续向调用方传播，由 browser 现有固定错误分类区分 denied/failed/unavailable，禁止吞成空目录。
+
+2026-10-07：OpenCode 1 目录游标循环归 OpenCodeSessionLifecycleCoordinator；SDK facade 保留响应头，service 只注入带 directory scope 的 transport callbacks。读取失败保留已读页，旧无游标接口的非空结果保守标记 partial。

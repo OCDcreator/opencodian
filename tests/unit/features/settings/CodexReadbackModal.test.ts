@@ -37,6 +37,26 @@ afterEach(() => {
 });
 
 describe('CodexReadbackModal', () => {
+  it.each(['en', 'zh'] as const)('distinguishes catalog permission denial without exposing raw error text (%s)', async (locale) => {
+    setLocale(locale);
+    const modal = new CodexReadbackModal<TestItem>({
+      app: {} as App,
+      title: 'Test readback', intro: 'Intro', readonlyNote: 'Read-only', refreshNote: 'Refresh',
+      loadingText: 'Loading', unavailableText: 'Unavailable', failedText: 'Failed', emptyText: 'Empty',
+      fetchCatalog: async () => ({ status: 'failed', data: [], nextCursor: null, errorReason: 'Permission denied: Bearer secret-catalog-token' }),
+      renderItems: () => {},
+    });
+    modal.onOpen();
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+    const status = modal.contentEl.querySelector('[data-readback-state]');
+    expect(status?.getAttribute('data-readback-state')).toBe('failed');
+    expect(status?.getAttribute('data-readback-failure')).toBe('permission-denied');
+    expect(status?.textContent).toBe(t('settings.codex.readback.statusPermissionDenied'));
+    expect(modal.contentEl.textContent).toContain(t('settings.codex.readback.messagePermissionDenied'));
+    expect(modal.contentEl.textContent).not.toContain('secret-catalog-token');
+  });
+
   it('renders shell with intro, notes, and status badge on open', () => {
     const modal = createModal();
     modal.onOpen();

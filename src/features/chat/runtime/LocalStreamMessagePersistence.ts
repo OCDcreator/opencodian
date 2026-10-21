@@ -77,7 +77,7 @@ export async function persistLocalStreamOutcome(options: {
 
     persistLocalMessage = () => {
       writeShellDataset(runtime.streamingMessageEl, assistantMessage);
-      preparedSend.conversation.messages.push(assistantMessage);
+      insertLocalMessageInTurn(preparedSend, assistantMessage);
       logAssistantFinalizationStage('local-assistant-message-appended', {
         conversationMessageCount: preparedSend.conversation.messages.length,
         message: host.summarizeChatMessageForDebug(assistantMessage),
@@ -86,7 +86,7 @@ export async function persistLocalStreamOutcome(options: {
   } else if (outcome.streamErrorNoticeMessage) {
     persistLocalMessage = () => {
       appendNoticeMessage({
-        conversation: preparedSend.conversation,
+        preparedSend,
         host,
         message: outcome.streamErrorNoticeMessage as ChatMessage,
         logAssistantFinalizationStage,
@@ -97,7 +97,7 @@ export async function persistLocalStreamOutcome(options: {
     logInterruptedNoticePersistence(host, preparedSend, outcome.interruptedNoticeMessage);
     persistLocalMessage = () => {
       appendNoticeMessage({
-        conversation: preparedSend.conversation,
+        preparedSend,
         host,
         message: outcome.interruptedNoticeMessage as ChatMessage,
         logAssistantFinalizationStage,
@@ -136,8 +136,8 @@ export async function persistLocalStreamOutcome(options: {
         if (outcome.resolvedUserMessageTurnId) preparedSend.userMessage.sourceTurnId = outcome.resolvedUserMessageTurnId;
       }
       persistLocalMessage?.();
-      preparedSend.conversation.updatedAt = outcome.finalizedTimestamp;
-      preparedSend.conversation.lastResponseAt = outcome.finalizedTimestamp;
+      preparedSend.conversation.updatedAt = Math.max(preparedSend.conversation.updatedAt, outcome.finalizedTimestamp);
+      preparedSend.conversation.lastResponseAt = Math.max(preparedSend.conversation.lastResponseAt ?? 0, outcome.finalizedTimestamp);
     },
   );
   if (!writeApplied) {
@@ -228,16 +228,30 @@ function markCanonicalAssistantTakeoverPending(
   messageEl.dataset.canonicalSyncPending = 'true';
 }
 
+function insertLocalMessageInTurn(preparedSend: PreparedMessageSend, message: ChatMessage): void {
+  const { messages } = preparedSend.conversation;
+  const user = preparedSend.userMessage;
+  const userIndex = messages.findIndex((candidate) => candidate.role === 'user'
+    && (candidate.id === user.id
+      || (Boolean(user.sourceMessageId) && candidate.sourceMessageId === user.sourceMessageId)));
+  const nextUserIndex = userIndex < 0 ? -1 : messages.findIndex(
+    (candidate, index) => index > userIndex && candidate.role === 'user',
+  );
+  // Preserve existing content if the initiating user has since been removed;
+  // never infer a different turn from reply timing or text.
+  messages.splice(nextUserIndex < 0 ? messages.length : nextUserIndex, 0, message);
+}
+
 function appendNoticeMessage(options: {
-  conversation: PreparedMessageSend['conversation'];
+  preparedSend: PreparedMessageSend;
   host: LocalStreamPersistenceHost;
   message: ChatMessage;
   logAssistantFinalizationStage: (stage: string, payload?: Record<string, unknown>) => void;
   stage: string;
 }): void {
-  options.conversation.messages.push(options.message);
+  insertLocalMessageInTurn(options.preparedSend, options.message);
   options.logAssistantFinalizationStage(options.stage, {
-    conversationMessageCount: options.conversation.messages.length,
+    conversationMessageCount: options.preparedSend.conversation.messages.length,
     latestAssistantMessage: options.host.summarizeChatMessageForDebug(options.message),
   });
 }

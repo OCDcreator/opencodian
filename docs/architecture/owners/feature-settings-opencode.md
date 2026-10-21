@@ -49,3 +49,7 @@ The shared backend chooser exposes Pi and mounts SettingsPiSection when enabled.
 ## 2026-09-27 OpenCode 2 compatibility
 
 Settings expose OpenCode 1 and 2 separately and provide local executable or remote server controls for OpenCode 2.
+
+2026-10-07: OpenCode 2 directory read controls render classified state and fixed bilingual text on failed/denied/absent endpoints.
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.settings-opencode` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。

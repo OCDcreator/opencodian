@@ -130,7 +130,8 @@
   color: var(--color-red);
 }
 
-.streaming-tool-status.status-blocked {
+.streaming-tool-status.status-blocked,
+.streaming-tool-status.status-interrupted {
   color: var(--color-orange);
 }
 

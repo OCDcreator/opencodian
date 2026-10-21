@@ -65,3 +65,11 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 
 BackendSessionBrowserModal 保留 native user identity 的 resume seed；目录分页与 partial 状态继续由 backend catalog owner 提供。
 浏览器/detail seam 仅透传可选的本地 Codex native 引用，缺失 child 的权威读取仍属 backend owner。
+
+## 2026-10-06 Codex catalog permission denial
+
+Codex 会话浏览器从结构化目录结果保留权限拒绝分类，现有 status renderer 只显示固定本地化说明；不改变 session identity、resume/fork 或其他 backend 的列表契约。
+
+2026-10-07: The backend session browser renders the shared catalog evidence, keeping partial data and credential-free failure classifications distinct from empty complete reads.
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.chat-ui` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。

@@ -9,6 +9,11 @@
 
 const REDACTED = '[REDACTED]';
 
+export interface DiagnosticSanitizerOptions {
+  /** Strict output consumers hide all URL userinfo and fragments. */
+  urlPolicy?: 'strict';
+}
+
 const PRIVATE_KEY_BLOCK_PATTERN = /(-----BEGIN PRIVATE KEY-----)[\s\S]*?(-----END PRIVATE KEY-----)/g;
 
 /**
@@ -23,17 +28,18 @@ export const DIAGNOSTIC_REDACTION_PATTERNS = [
   // PEM private-key blocks — replace entire block
   PRIVATE_KEY_BLOCK_PATTERN,
 
+  // Finite sensitive CLI names, separate or equal values; never consume the next flag.
+  /((?:^|[\s,;])(?:--?(?:token|api[_-]?key|client[_-]?secret|password|secret|credentials|authorization)|\/(?:token|api[_-]?key|client[_-]?secret|password|secret|credentials|authorization))(?:[ \t]*=[ \t]*|[ \t]+))("[^"\r\n]*"|'[^'\r\n]*'|(?!-)[^\s,;"'}]+)/gim,
+
   // Authorization: Bearer <token>
   /(authorization\s*[:=]\s*bearer\s+)([^\s,;]+)/gi,
   // Authorization: <value>  (non-bearer, e.g. basic or raw token)
-  /(authorization\s*[:=]\s*(?!bearer\s+))([^\s,;]+(?:\s+[^\s,;]+)?)/gi,
+  /(authorization\s*[:=]\s*(?!bearer\s+)(?:basic\s+)?)([^\s,;"'}]+)/gi,
   // bearer <token>  (standalone)
   /(bearer\s+)([^\s,;]+)/gi,
 
   // key=value / key: value assignments for common secret names (not query-string params)
-  /((?:^|[ \t,;])(?:api[_-]?key|token|secret|password)\s*[:=]\s*)([^\s,;]+)/gim,
-  // CLI flags --token <value> / --api-key <value>
-  /((?:--(?:token|api[_-]?key|secret|password)|\/(?:token|api[_-]?key|secret|password))\s+)([^\s,;]+)/gi,
+  /((?:^|[ \t,;])(?:api[_-]?key|client[_-]?secret|token|secret|password|credentials)\s*[:=]\s*)([^\s,;"'}]+)/gim,
 
   // URL-embedded passwords: https://user:password@host
   /(https?:\/\/[^/\s:@]+:)([^@\s/]+)(@)/gi,
@@ -41,7 +47,7 @@ export const DIAGNOSTIC_REDACTION_PATTERNS = [
   /(:\/\/[^\s:@/]+:)([^@\s/]+)(@)/gi,
 
   // Query-string secret params (catch-all: matches any param name containing a secret keyword)
-  /([?&][^=&\s]*(?:token|access[_-]?token|api[_-]?key|secret|password)[^=&\s]*=)([^&\s]+)/gi,
+  /([?&][^=&\s]*(?:token|access[_-]?token|api[_-]?key|secret|password|credentials|authorization)[^=&\s]*=)([^&\s#"'<>\\,;)}]+)/gi,
 
   // Environment-variable style: API_KEY=sk-ant-... at start of line
   /^([ \t]*(?:[A-Z][A-Z0-9_]*_)?API_KEY\s*[:=]\s*)([^\s,;]+)/gim,
@@ -61,10 +67,26 @@ export const DIAGNOSTIC_REDACTION_PATTERNS = [
  * @param text - The raw diagnostic report text.
  * @returns The sanitized text with sensitive values replaced by `[REDACTED]`.
  */
-export function sanitizeDiagnosticReport(text: string): string {
+export function sanitizeDiagnosticReport(text: string, options: DiagnosticSanitizerOptions = {}): string {
   if (typeof text !== 'string') {
     return text;
   }
+
+  const urlSanitized = options.urlPolicy === 'strict'
+    ? text.replace(/\b([a-z][a-z\d+.-]*:\/\/)([^\s"'<>\\,;)}]+)/gi, (_match, scheme: string, remainder: string) => {
+      // Quotes, JSON escapes and prose punctuation delimit diagnostic URL text.
+      const suffix = remainder.match(/[.\]]+$/)?.[0] ?? '';
+      const url = suffix ? remainder.slice(0, -suffix.length) : remainder;
+      const fragmentAt = url.indexOf('#');
+      const endpoint = fragmentAt < 0 ? url : url.slice(0, fragmentAt);
+      const authorityEnd = endpoint.search(/[/?]/);
+      const authority = authorityEnd < 0 ? endpoint : endpoint.slice(0, authorityEnd);
+      const tail = authorityEnd < 0 ? '' : endpoint.slice(authorityEnd);
+      const userinfoEnd = authority.lastIndexOf('@');
+      const safeAuthority = userinfoEnd < 0 ? authority : `${REDACTED}@${authority.slice(userinfoEnd + 1)}`;
+      return `${scheme}${safeAuthority}${tail}${fragmentAt < 0 ? '' : `#${REDACTED}`}${suffix}`;
+    })
+    : text;
 
   return DIAGNOSTIC_REDACTION_PATTERNS.reduce((sanitized, pattern) => {
     pattern.lastIndex = 0;
@@ -82,5 +104,5 @@ export function sanitizeDiagnosticReport(text: string): string {
 
       return `${prefix}${REDACTED}${suffix ?? ''}`;
     });
-  }, text);
+  }, urlSanitized);
 }

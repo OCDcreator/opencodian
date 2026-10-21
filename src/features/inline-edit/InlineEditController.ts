@@ -373,6 +373,7 @@ export class InlineEditController {
 
   private renderInput(edit: ActiveEdit): void {
     if (this.findEdit(edit.editId) !== edit) return;
+    const draft = edit.phase === 'input' ? edit.overlay?.getDraftValue() : undefined;
     if (!edit.overlay) {
       edit.overlay = new InlineEditInputOverlay(edit.editorView, {
         editId: edit.editId,
@@ -406,7 +407,7 @@ export class InlineEditController {
       reply: edit.reply,
       error: edit.error,
       busy: edit.phase === 'generating',
-      value: edit.instruction,
+      value: draft ?? edit.instruction,
       placeholder: placeholderForMode(edit.anchor.mode),
       model: inlineEditModelChipState(this.pickEdit(edit)),
       effort: inlineEditEffortChipState(this.pickEdit(edit)),

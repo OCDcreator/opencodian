@@ -55,3 +55,5 @@ D2 补充（同日）：`accept()` 把 `getImageGeneration()` deps 的 `noteRefe
 ## R-C2 后续调整：预览分发迁出
 
 2026-09-18（同一提交）`renderPreview` / `clearStreamingPreview` / `renderStreamingPreview` 的装饰分发体迁至 `InlineEditWidgets`（`dispatchInlineEditPreview` 等，经 `previewDispatch` host 桥调用），`renderStreamingReply` 留在 controller。行为不变（controller 单测全绿），仅为 max-lines 预算的结构性迁移。
+
+input 阶段的模型/effort/上下文刷新保留当前 textarea draft；generating 和新输入轮次沿用显式清空行为。

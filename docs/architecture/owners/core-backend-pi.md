@@ -44,3 +44,20 @@ v1.1.14安装边界：用户自行安装官方Pi，缺失时直接报错；插�
 
 Pi auxiliary 查询与普通聊天使用同一官方 runtime 解析路径：`PiAdapter.startAuxQuerySession()` 把空 executable（含未提供 settings 回调）交给 `PiRpcClient` 自动发现，显式配置原样透传。默认路径不绕过 `PiAuxQuerySession` 的原生 `set_tools` / `get_tools` allowlist 回读；缺失或无效 runtime、工具集不匹配仍由既有 owner 拒绝。
 2026-10-05 current-sdk Pi continuation：PiModelInfo 可带官方安装 SDK 返回的 per-model thinkingLevels；service 从公开 pi-ai/models helper 读取，不切换活动 native 模型、不写默认值。聊天请求/原生回读的所有权仍在既有 adapter/session service；UI 会话 override 在 chat owner 保存，发送优先级不变。helper 不可用时不猜档位；minimum/legacy/Windows 未纳入本轮验收。
+
+2026-10-07 Windows startup：SDK 配置的 npm package 自动安装输出曾污染 JSONL；独立 service 采用 SDK 已有 output-guard，协议 writer 保留原始 stdout，SDK package/extension 输出隔离在 stderr。owner inspector 未映射 assets 路径，实际责任依据本 owner 的既有 SDK service 边界。`startPiService` CodeGraph 唯一定义，0 个直接 function/method callers，depth=1 nodeCount=2，同文件范围。
+
+## Empty native fork persistence
+
+The Pi command service persists the SDK-created header and entries for a fork with no conversation before PiAdapter restores the parent actor. The SDK deliberately defers that file; returning only its path would lose native identity and model context when the child is opened. Existing persisted files are not rewritten, cancelled forks do not write, and a persistence failure rejects the operation. No private SDK flush method or fabricated entry is used.
+
+Minimum SDK compatibility: the service wraps the public `SessionManager.createBranchedSession` method inside its own process, persisting an empty branch before the older runtime immediately reopens it. The public SDK creates the header, native ID, parentSession and entries. The wrapper is installed once per SDK constructor, skips in-memory branches and existing files, and rejects relative paths. Current SDK and direct empty-root forks use the same persistence boundary.
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `core.backend-pi` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+
+2026-10-07 Pi native prompt identity 与完整历史归 adapter：每次 prompt 的第一个新增原生 user 是 UI 请求的身份；后续 steering/follow-up entry 保持独立。getChatMessages 复用本 owner 规范化器并保留 provider/model。
+
+Current Pi ModelRuntime OAuth receives the SDK LoginOptions installation device ID callback. It uses a persistent SDK SettingsManager scoped to the configured agent directory, distinct from per-session settings overlays; minimum AuthStorage keeps its existing callback interface.
+
+Modern AuthInteraction text input forwards the entered string, including empty strings (GitHub public-domain default), and reserves undefined for UI cancellation; provider validation remains authoritative. Legacy AuthStorage allowEmpty semantics are unchanged.

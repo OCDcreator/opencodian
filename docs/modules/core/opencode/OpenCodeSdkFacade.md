@@ -38,3 +38,5 @@
 
 - 这层的目标是“SDK 全接口接入”，不是“每个接口都立即有独立 UI”。
 - `tool.list()` 只代表 OpenCode registry 工具，不包含 MCP 工具；MCP 仍需结合 `mcp.status` 和运行时观察处理。
+
+2026-10-07：新增 readSessionCatalogPage：仍走集中 invokeSdkFunction 与 normalizeSdkError，单次请求使用 responseStyle=fields，unwrap data 后只保留 x-next-cursor。缺少响应头 metadata 时拒绝，不能把 data-only 响应当作末页。

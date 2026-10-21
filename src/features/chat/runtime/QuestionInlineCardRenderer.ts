@@ -47,23 +47,40 @@ export class QuestionInlineCardRenderer {
     request: QuestionRequest,
     displayMode: QuestionDisplayMode,
     tabId: TabId | null = this.host.getActiveTabId(),
+    signal?: AbortSignal,
   ): Promise<QuestionInlineCardAction | null> {
+    if (signal?.aborted) return null;
     const action = displayMode === 'single'
       ? this.collectSequentialQuestionAction(request, tabId)
       : this.collectGroupedQuestionAction(request, tabId);
-    if (!this.host.isRequestPending) return action;
+    if (!this.host.isRequestPending && !signal) return action;
+    const card = this.host.getTabRuntimeState(tabId)?.questionInlineCardEl;
+    card?.setAttribute('data-question-request-id', request.id);
     let timer: number | null = null;
+    let onAbort: (() => void) | undefined;
     const lost = new Promise<null>((resolve) => {
-      timer = window.setInterval(() => {
-        void this.host.isRequestPending?.(request, tabId).then((pending) => {
-          if (!pending) resolve(null);
-        }).catch(() => { /* An uncertain read cannot dismiss the card. */ });
-      }, 500);
+      if (signal) {
+        onAbort = () => resolve(null);
+        signal.addEventListener('abort', onAbort, { once: true });
+        if (signal.aborted) onAbort();
+      }
+      if (this.host.isRequestPending) {
+        timer = window.setInterval(() => {
+          void this.host.isRequestPending?.(request, tabId).then((pending) => {
+            if (!pending) resolve(null);
+          }).catch(() => { /* An uncertain read cannot dismiss the card. */ });
+        }, 500);
+      }
     });
-    const result = await Promise.race([action, lost]);
-    if (timer !== null) window.clearInterval(timer);
-    if (!result) this.clear(tabId);
-    return result;
+    try {
+      const result = await Promise.race([action, lost]);
+      if (!result && this.host.getTabRuntimeState(tabId)?.questionInlineCardEl === card
+        && card?.getAttribute('data-question-request-id') === request.id) this.clear(tabId);
+      return result;
+    } finally {
+      if (timer !== null) window.clearInterval(timer);
+      if (onAbort) signal?.removeEventListener('abort', onAbort);
+    }
   }
 
   getOrCreateCard(

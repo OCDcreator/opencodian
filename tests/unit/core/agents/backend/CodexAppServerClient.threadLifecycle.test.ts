@@ -202,6 +202,61 @@ describe('CodexAppServerClient persisted thread actions', () => {
         .toEqual(supported ? [{ threadId: 'parent', beforeTurnId: 'turn-2' }] : []);
       client.stop();
     });
+    it.each([1, 0])('forks before turn %i using the verified 0.158 alternative without reverting the parent', async index => {
+      const proc = createMockProcess(); mockSpawn.mockReturnValue(proc); emitWsUrl(proc.stdout!);
+      setTimeout(() => mockWsInstance.onopen?.(), 10);
+      const client = new CodexAppServerClient({ codexPathOverride: '/path/to/codex' });
+      const turns = [{ id: 'turn-1', status: 'completed' }, { id: 'turn-2', status: 'completed' }];
+      const source = { ...SAMPLE_THREAD, id: 'parent', turns, status: { type: 'idle' } };
+      let child = { ...source, id: 'owned-child', forkedFromId: 'parent' };
+      const requests: Array<{ method: string; params?: Record<string, unknown> }> = [];
+      mockWsInstance.send.mockImplementation((data: string) => {
+        const msg = JSON.parse(data); requests.push(msg);
+        let result: unknown;
+        if (msg.method === 'initialize') result = { userAgent: 'Codex Desktop/0.158.0 (macos)' };
+        if (msg.method === 'thread/read') result = { thread: msg.params.threadId === 'parent' ? source : child };
+        if (msg.method === 'thread/fork') {
+          child = { ...child, turns: msg.params.lastTurnId ? turns.slice(0, 1) : turns };
+          result = { thread: child };
+        }
+        if (msg.method === 'thread/revert') { child = { ...child, turns: [] }; result = { thread: child }; }
+        if (msg.id) setTimeout(() => simulateResponse(msg.id, result), 1);
+      });
+      const result = await client.forkThread('parent', { beforeTurnId: turns[index].id });
+      expect(result?.thread.turns.map(turn => turn.id)).toEqual(turns.slice(0, index).map(turn => turn.id));
+      expect(source.turns).toHaveLength(2);
+      expect(requests.filter(r => r.method === 'thread/revert').map(r => r.params))
+        .toEqual(index === 0 ? [{ threadId: 'owned-child', beforeTurnId: 'turn-1' }] : []);
+      expect(requests.find(r => r.method === 'thread/fork')?.params)
+        .toEqual(index ? { threadId: 'parent', lastTurnId: 'turn-1' } : { threadId: 'parent' });
+      client.stop();
+    });
+
+    it.each(['active-parent', 'missing-turn', 'parent-child', 'wrong-lineage', 'wrong-prefix', 'revert-failed'])('refuses unsafe 0.158 readback: %s', async fault => {
+      const proc = createMockProcess(); mockSpawn.mockReturnValue(proc); emitWsUrl(proc.stdout!);
+      setTimeout(() => mockWsInstance.onopen?.(), 10);
+      const client = new CodexAppServerClient({ codexPathOverride: '/path/to/codex' });
+      const source = { ...SAMPLE_THREAD, id: 'parent', turns: [{ id: fault === 'missing-turn' ? 'wrong' : 'turn-1', status: 'completed' }], status: { type: fault === 'active-parent' ? 'active' : 'idle' } };
+      const child = { ...source, id: fault === 'parent-child' ? 'parent' : 'owned-child', forkedFromId: fault === 'wrong-lineage' ? 'wrong' : 'parent' };
+      const mutations: string[] = [];
+      mockWsInstance.send.mockImplementation((data: string) => {
+        const msg = JSON.parse(data);
+        let result: unknown;
+        if (msg.method === 'initialize') result = { userAgent: 'Codex Desktop/0.158.0 (macos)' };
+        if (msg.method === 'thread/read') result = { thread: msg.params.threadId === 'parent' ? source : child };
+        if (msg.method === 'thread/fork') result = { thread: child };
+        if (msg.method === 'thread/revert') {
+          mutations.push(msg.params.threadId);
+          if (fault === 'revert-failed') { setTimeout(() => simulateError(msg.id, { code: -32600, message: 'controlled revert refusal' }), 1); return; }
+          result = { thread: child };
+        }
+        if (msg.id) setTimeout(() => simulateResponse(msg.id, result), 1);
+      });
+      expect(await client.forkThread('parent', { beforeTurnId: 'turn-1' })).toBeNull();
+      expect(mutations).not.toContain('parent');
+      client.stop();
+    });
+
     it('returns the forked thread from app-server response', async () => {
       const proc = createMockProcess();
       mockSpawn.mockReturnValue(proc);

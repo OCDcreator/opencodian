@@ -9,6 +9,7 @@ declare const PI_SERVICE_SOURCE: string | undefined;
 // avoids filesystem writes and Windows command-line limits without consuming RPC data.
 const PI_SERVICE_BOOTSTRAP = `
 const input = process.stdin;
+const writeStartupError = process.stdout.write.bind(process.stdout);
 const receiveSource = async () => {
   const source = input.read(Number(process.argv[1]));
   if (!source) return;
@@ -17,7 +18,7 @@ const receiveSource = async () => {
     const service = await import('data:text/javascript;base64,' + source.toString('base64'));
     await service.startPiService(process.argv[2], JSON.parse(process.argv[3]));
   } catch (error) {
-    process.stdout.write(JSON.stringify({ type: 'transport_error', error: 'Pi service startup: ' + error.message }) + '\\n');
+    writeStartupError(JSON.stringify({ type: 'transport_error', error: 'Pi service startup: ' + error.message }) + '\\n');
     process.exitCode = 1;
   }
 };

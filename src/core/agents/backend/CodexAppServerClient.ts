@@ -1516,10 +1516,11 @@ export class CodexAppServerClient extends CodexAppServerTransport {
     }
   }
 
-  /** Point-fork requires the verified 0.160.0+ native contract; older/unknown versions fail closed. */
+  /** Point-fork uses native 0.160.0+ or the separately verified 0.158.0 alternative. */
   supportsBeforeTurnFork(): boolean {
     const version = this.serverUserAgent?.match(/\/(\d+)\.(\d+)\.(\d+)(?:\s|$)/);
-    return !!version && (Number(version[1]) > 0 || Number(version[2]) >= 160);
+    return (!!version && (Number(version[1]) > 0 || Number(version[2]) >= 160))
+      || /\/0\.158\.0(?:\s|$)/.test(this.serverUserAgent ?? '');
   }
 
   async forkThread(threadId: string, options?: { beforeTurnId?: string }): Promise<AppServerForkResult | null> {
@@ -1528,6 +1529,9 @@ export class CodexAppServerClient extends CodexAppServerTransport {
       throw new Error('Codex before-turn fork is unavailable for this native app-server');
     }
     try {
+      if (options?.beforeTurnId && /\/0\.158\.0(?:\s|$)/.test(this.serverUserAgent ?? '')) {
+        return await this.forkLegacyThreadBeforeTurn(threadId, options.beforeTurnId);
+      }
       const result = (await this.request('thread/fork', {
         threadId,
         ...(options?.beforeTurnId ? { beforeTurnId: options.beforeTurnId } : {}),
@@ -1540,6 +1544,40 @@ export class CodexAppServerClient extends CodexAppServerTransport {
       });
       return null;
     }
+  }
+
+  /** Verified 0.158.0 alternative: inclusive fork, or revert only the new owned child. */
+  private async forkLegacyThreadBeforeTurn(threadId: string, beforeTurnId: string): Promise<AppServerForkResult> {
+    const source = await this.readThread(threadId, true);
+    const matches = source?.turns.filter(turn => turn.id === beforeTurnId) ?? [];
+    if (!source || source.id !== threadId || matches.length !== 1 || source.status?.type === 'active'
+      || !['completed', 'interrupted', 'failed'].includes(matches[0].status ?? '')) {
+      throw new Error('Codex compatibility fork requires one inactive authoritative turn');
+    }
+    const index = source.turns.indexOf(matches[0]);
+    const prefix = source.turns.slice(0, index).map(turn => turn.id);
+    const result = await this.request('thread/fork', {
+      threadId, ...(index > 0 ? { lastTurnId: source.turns[index - 1].id } : {}),
+    }) as AppServerForkResult;
+    const childId = result?.thread?.id;
+    if (!childId || childId === threadId) throw new Error('Codex compatibility fork returned an unsafe child identity');
+    let child = await this.readThread(childId, true);
+    if (!child || child.id !== childId || child.forkedFromId !== threadId) {
+      throw new Error('Codex compatibility fork child lineage is unverified');
+    }
+    if (index === 0) {
+      if (JSON.stringify(child.turns.map(turn => turn.id)) !== JSON.stringify(source.turns.map(turn => turn.id))) {
+        throw new Error('Codex compatibility fork child history is unverified');
+      }
+      // Never revert the parent. A rejected/failed revert never becomes a fork success.
+      await this.request('thread/revert', { threadId: childId, beforeTurnId });
+      child = await this.readThread(childId, true);
+    }
+    if (!child || child.id !== childId || child.forkedFromId !== threadId
+      || JSON.stringify(child.turns.map(turn => turn.id)) !== JSON.stringify(prefix)) {
+      throw new Error('Codex compatibility fork prefix is unverified');
+    }
+    return { ...result, thread: child };
   }
 
   async archiveThread(threadId: string): Promise<boolean> {
@@ -2133,50 +2171,55 @@ export class CodexAppServerClient extends CodexAppServerTransport {
   registerCommandExecutionApprovalHandler(
     handler: (
       params: AppServerCommandExecutionApprovalParams,
+      signal?: AbortSignal,
     ) => AppServerCommandExecutionApprovalResponse | Promise<AppServerCommandExecutionApprovalResponse>,
   ): void {
-    this.registerServerRequestHandler('item/commandExecution/requestApproval', (params) =>
-      handler(params as AppServerCommandExecutionApprovalParams));
+    this.registerServerRequestHandler('item/commandExecution/requestApproval', (params, signal) =>
+      handler(params as AppServerCommandExecutionApprovalParams, ...(signal ? [signal] : [])));
   }
 
   /** Register the handler for `item/fileChange/requestApproval`. */
   registerFileChangeApprovalHandler(
     handler: (
       params: AppServerFileChangeApprovalParams,
+      signal?: AbortSignal,
     ) => AppServerFileChangeApprovalResponse | Promise<AppServerFileChangeApprovalResponse>,
   ): void {
-    this.registerServerRequestHandler('item/fileChange/requestApproval', (params) =>
-      handler(params as AppServerFileChangeApprovalParams));
+    this.registerServerRequestHandler('item/fileChange/requestApproval', (params, signal) =>
+      handler(params as AppServerFileChangeApprovalParams, ...(signal ? [signal] : [])));
   }
 
   /** Register the handler for `item/permissions/requestApproval`. */
   registerPermissionsApprovalHandler(
     handler: (
       params: AppServerPermissionsApprovalParams,
+      signal?: AbortSignal,
     ) => AppServerPermissionsApprovalResponse | Promise<AppServerPermissionsApprovalResponse>,
   ): void {
-    this.registerServerRequestHandler('item/permissions/requestApproval', (params) =>
-      handler(params as AppServerPermissionsApprovalParams));
+    this.registerServerRequestHandler('item/permissions/requestApproval', (params, signal) =>
+      handler(params as AppServerPermissionsApprovalParams, ...(signal ? [signal] : [])));
   }
 
   /** Register the handler for `item/tool/requestUserInput`. */
   registerToolUserInputHandler(
     handler: (
       params: AppServerToolUserInputParams,
+      signal?: AbortSignal,
     ) => AppServerToolUserInputResponse | Promise<AppServerToolUserInputResponse>,
   ): void {
-    this.registerServerRequestHandler('item/tool/requestUserInput', (params) =>
-      handler(params as AppServerToolUserInputParams));
+    this.registerServerRequestHandler('item/tool/requestUserInput', (params, signal) =>
+      handler(params as AppServerToolUserInputParams, ...(signal ? [signal] : [])));
   }
 
   /** Register the handler for `mcpServer/elicitation/request`. */
   registerMcpElicitationHandler(
     handler: (
       params: AppServerMcpElicitationParams,
+      signal?: AbortSignal,
     ) => AppServerMcpElicitationResponse | Promise<AppServerMcpElicitationResponse>,
   ): void {
-    this.registerServerRequestHandler('mcpServer/elicitation/request', (params) =>
-      handler(params as AppServerMcpElicitationParams));
+    this.registerServerRequestHandler('mcpServer/elicitation/request', (params, signal) =>
+      handler(params as AppServerMcpElicitationParams, ...(signal ? [signal] : [])));
   }
 
   /**

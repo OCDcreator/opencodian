@@ -180,15 +180,14 @@ describe('SettingsBackendSection', () => {
       expect(adapters.codex.stop).toHaveBeenCalledTimes(1);
     });
 
-    it('does NOT stop codex adapter when disabling codex while codex is NOT active', async () => {
+    it('stops a previously started adapter when disabling it after another backend becomes active', async () => {
       const { plugin, adapters } = createPluginMock({ settings: { ...DEFAULT_SETTINGS, enabledBackends: ['opencode', 'codex'], activeBackend: 'opencode' } });
       const section = new SettingsBackendSection({ plugin, requestDisplayRefresh: jest.fn() });
 
       await (section as unknown as { setBackendEnabled: (b: AgentBackendKind, e: boolean) => Promise<void> })
         .setBackendEnabled('codex', false);
 
-      // codex adapter should NOT be stopped because it was never started (not active)
-      expect(adapters.codex.stop).not.toHaveBeenCalled();
+      expect(adapters.codex.stop).toHaveBeenCalledTimes(1);
     });
 
     it('starts the adapter when enabling the currently active backend', async () => {
@@ -248,25 +247,34 @@ describe('SettingsBackendSection', () => {
       expect(onChatWarmSessionBackendChanged).toHaveBeenCalledTimes(1);
     });
 
-    it('stops previous adapter and starts new adapter on switch', async () => {
+    it('switches the real dropdown without stopping another enabled adapter', async () => {
       const { plugin, adapters, registry } = createPluginMock();
+      let onChange: ((value: string) => Promise<void>) | undefined;
+      jest.spyOn(Setting.prototype, 'addDropdown').mockImplementation(function addDropdown(callback) {
+        const dropdown = {
+          addOption: jest.fn(),
+          setValue: jest.fn().mockReturnThis(),
+          onChange: jest.fn((handler) => {
+            onChange = handler;
+            return dropdown;
+          }),
+        };
+        callback(dropdown as never);
+        return this;
+      });
       const refresh = jest.fn();
       const section = new SettingsBackendSection({ plugin, requestDisplayRefresh: refresh });
-      const containerEl = document.createElement('div');
-      section.attach(containerEl);
+      (section as unknown as { addDefaultBackendSetting: (element: HTMLElement) => void })
+        .addDefaultBackendSetting(document.createElement('div'));
 
-      // Simulate switching from opencode to codex via the dropdown onChange logic
-      const previousActive = (plugin as Record<string, unknown>).settings as { activeBackend: string };
-      previousActive.activeBackend = 'codex';
-      registry.setActive('codex');
-      await (plugin as Record<string, { (): Promise<void>; (): Promise<void> }>).saveSettings();
+      await onChange?.('codex');
 
-      // Stop old, start new — this is what the dropdown onChange does
-      await adapters.opencode.stop();
-      await adapters.codex.start();
-
-      expect(adapters.opencode.stop).toHaveBeenCalledTimes(1);
+      expect(plugin.settings.activeBackend).toBe('codex');
+      expect(registry.getActiveKind()).toBe('codex');
+      expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+      expect(adapters.opencode.stop).not.toHaveBeenCalled();
       expect(adapters.codex.start).toHaveBeenCalledTimes(1);
+      expect(refresh).toHaveBeenCalledTimes(1);
     });
   });
 });

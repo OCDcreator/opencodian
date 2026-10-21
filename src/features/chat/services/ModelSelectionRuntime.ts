@@ -53,12 +53,15 @@ export class ModelSelectionRuntime {
   private availableProviders: ModelSelectorProvider[] = [];
   private modelCatalogBundle: ModelCatalogBundle | null = null;
   private hasLoadedCatalog = false;
+  private catalogLoadGeneration = 0;
 
   constructor(private readonly host: ModelSelectionRuntimeHost) {}
 
   async reloadModelCatalog(): Promise<void> {
+    const generation = ++this.catalogLoadGeneration;
     try {
       const { catalogBundle, providers } = await this.host.loadModelCatalogData();
+      if (generation !== this.catalogLoadGeneration) return;
       this.applyCatalogData(catalogBundle, providers);
       this.host.syncActiveTabContextUsageIdentity();
     } catch (error) {
@@ -67,6 +70,7 @@ export class ModelSelectionRuntime {
   }
 
   reset(): void {
+    this.catalogLoadGeneration += 1;
     this.availableModels = [];
     this.availableProviders = [];
     this.modelCatalogBundle = null;

@@ -244,7 +244,12 @@ export class SendPipelineRuntime {
   ) {}
 
   async sendMessage(input: string | PrepareMessageSendOptions): Promise<void> {
-    let preparationOptions = typeof input === 'string' ? { content: input } : input;
+    const initialOptions = typeof input === 'string' ? { content: input } : input;
+    // Bind the send before slash-command expansion yields to tab navigation.
+    let preparationOptions: PrepareMessageSendOptions = {
+      ...initialOptions,
+      targetTabId: initialOptions.targetTabId ?? this.host.getActiveTabId() ?? undefined,
+    };
     let content = preparationOptions.content;
 
     // Detect and strip the `/json ` structured-output trigger before any further processing.
@@ -271,12 +276,14 @@ export class SendPipelineRuntime {
     }
 
     const isOpenCode = (preparedSend.conversation.backend ?? 'opencode') === 'opencode';
+    let isCurrentStream = () => true;
     try {
       const execution = this.createStreamingExecution(preparedSend, content);
       if (!execution) {
         return;
       }
 
+      isCurrentStream = execution.isCurrentStream;
       this.host.onTurnSnapshotBegin?.({
         conversationId: preparedSend.conversation.id,
         backend: preparedSend.conversation.backend ?? 'opencode',
@@ -299,6 +306,7 @@ export class SendPipelineRuntime {
         stream: execution.stream,
         streamController: execution.streamController,
         contentEl: execution.contentEl,
+        isCurrentStream,
       }).consume();
       const localFinalization = await new StreamLocalFinalizer({
         host: this.host,
@@ -306,8 +314,11 @@ export class SendPipelineRuntime {
         runtime: execution.runtime,
         streamController: execution.streamController,
         routedStream,
+        isCurrentStream,
+        streamElements: { messageEl: execution.messageEl, contentEl: execution.contentEl },
       }).finalize();
 
+      if (!isCurrentStream()) return;
       await this.messageFinalizationService.finalizeAfterStream({
         conversation: preparedSend.conversation,
         tabId: preparedSend.tabId,
@@ -340,13 +351,17 @@ export class SendPipelineRuntime {
       }, undefined);
       // R-B3: close the edit-revert capture round (post-turn grace starts).
       this.safeTrace(() => {
-        this.host.onTurnSnapshotEnd?.(preparedSend.conversation.id);
+        if (isCurrentStream()) this.host.onTurnSnapshotEnd?.(preparedSend.conversation.id);
       }, undefined);
     }
-    await this.sendQueuedFollowUp(preparedSend.tabId);
+    await this.sendQueuedFollowUp(preparedSend.tabId, isCurrentStream);
   }
 
-  private async sendQueuedFollowUp(tabId: PreparedMessageSend['tabId']): Promise<void> {
+  private async sendQueuedFollowUp(
+    tabId: PreparedMessageSend['tabId'],
+    isCurrentStream: () => boolean,
+  ): Promise<void> {
+    if (!isCurrentStream()) return;
     const queuedSend = this.messageSendPreparationService.consumeQueuedFollowUpSend(tabId);
     if (!queuedSend) {
       return;
@@ -416,12 +431,17 @@ export class SendPipelineRuntime {
     stream: ReturnType<SendPipelineExecutionHost['sendStreamMessage']>;
     streamController: SendPipelineStreamController | null;
     contentEl: HTMLElement;
+    messageEl: HTMLElement;
+    isCurrentStream(): boolean;
   } | null {
     const runtime = this.host.getTabRuntimeState(preparedSend.tabId);
     if (!runtime) {
       return null;
     }
 
+    const streamRunToken = Symbol('chat-stream');
+    runtime.streamRunToken = streamRunToken;
+    runtime.pendingEditedFiles = new Set<string>();
     this.messageSendPreparationService.enterStreamingState(preparedSend.tabId);
     const backendSessionId = getConversationBackendSessionId(preparedSend.conversation);
     const diagnosticRunToken = this.claimDiagnosticRunToken(preparedSend, backendSessionId);
@@ -461,6 +481,8 @@ export class SendPipelineRuntime {
       stream,
       streamController,
       contentEl: streamElements.contentEl,
+      messageEl: streamElements.messageEl,
+      isCurrentStream: () => runtime.streamRunToken === streamRunToken,
     };
   }
 }

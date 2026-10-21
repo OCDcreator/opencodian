@@ -28,3 +28,5 @@
 - `KNOWN_OPENCODE_TOOLS` 是启动前可写出的静态目录；启动后必须与 `/experimental/tool/ids` 对齐，新工具出现时验证会失败而不是静默放行
 - 环境变量白名单（`OPENCODE_CONFIG` / `OPENCODE_PURE`）是隔离契约的一部分，新增注入前先确认不会扩大配置作用域
 - 该文件只被 `OpenCodeAuxQuerySession` 使用；scope 是共享的温实例，**每会话**的原生 session 由会话对象负责创建与删除
+
+2026-10-07：readiness 每次 transport probe 带可取消 signal 和独立最多 2 秒 Promise.race，总上界仍为 60 秒。即使 transport 不响应 abort，也会重试或失败退出；readiness 成功后仍需完整 native agent/tools deny 验证，未弱化 fail-closed。

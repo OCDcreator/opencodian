@@ -1,7 +1,9 @@
 import { WorkspaceLeaf } from 'obsidian';
 
+import { CodexAdapter } from '../../../../src/core/agents/backend/CodexAdapter';
 import { type Conversation, DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
+import type { MessageSendPreparationHost } from '../../../../src/features/chat/services/MessageSendPreparationService';
 
 jest.mock('../../../../src/core/opencode', () => ({
   OpenCodeService: class OpenCodeService {},
@@ -20,7 +22,7 @@ jest.mock('../../../../src/core/opencode', () => ({
  *     expose tab-runtime state reads through the coordinator.
  */
 describe('ChatRuntimeComposition owner', () => {
-  function constructView(questionCardPosition: 'above_input' | 'below_input' = 'below_input'): OpenCodianView {
+  function constructView(questionCardPosition: 'above_input' | 'below_input' = 'below_input', codexAdapter?: unknown): OpenCodianView {
     const plugin = {
       settings: {
         ...DEFAULT_SETTINGS,
@@ -32,6 +34,7 @@ describe('ChatRuntimeComposition owner', () => {
       storage: {},
       claudeCodePermissionHostContext: null,
       codexApprovalHostContext: null,
+      agentServiceRegistry: { get: (backend: string) => backend === 'codex' ? codexAdapter : undefined },
       unregisterConversationCachePinProvider: () => {},
       registerConversationCachePinProvider: () => ({}),
       app: {
@@ -51,7 +54,32 @@ describe('ChatRuntimeComposition owner', () => {
     expect(typeof (v.sendPipelineRuntime as { sendMessage: unknown }).sendMessage).toBe('function');
   });
 
-  it('refreshes the visible settled Codex footer after native identity without replacing the message body', () => {
+  it('wires real Codex per-turn preflight through the production composition and preparation host', async () => {
+    const sdk = { startThread: jest.fn(), resumeThread: jest.fn() };
+    const adapter = new CodexAdapter({ createCodex: jest.fn().mockResolvedValue(sdk), createAppServerClient: () => null, approvalPolicy: 'on-request' });
+    await adapter.start();
+    try {
+      const view = constructView('below_input', adapter);
+      const preparation = (view as unknown as { messageSendPreparationService: { host: MessageSendPreparationHost } }).messageSendPreparationService;
+      expect(await preparation.host.getCodexSendPreflightError?.({ approvalPolicy: 'never', modelReasoningEffort: 'low' })).toBeNull();
+      expect(await preparation.host.getCodexSendPreflightError?.({ approvalPolicy: 'inherit' })).toBeNull();
+      expect(await preparation.host.getCodexSendPreflightError?.({ approvalPolicy: 'untrusted' })).toContain('"untrusted"');
+      expect(await preparation.host.getCodexSendPreflightError?.()).toContain('"on-request"');
+      expect(sdk.startThread).not.toHaveBeenCalled();
+      expect(sdk.resumeThread).not.toHaveBeenCalled();
+    } finally {
+      await adapter.stop();
+    }
+  });
+
+  it('refuses a missing production Codex adapter guard instead of admitting the send', async () => {
+    const view = constructView('below_input', {});
+    const preparation = (view as unknown as { messageSendPreparationService: { host: MessageSendPreparationHost } }).messageSendPreparationService;
+    expect(await preparation.host.getCodexSendPreflightError?.({ approvalPolicy: 'on-request' }))
+      .toBe('Codex send preflight is unavailable. Start the Codex backend before sending.');
+  });
+
+  it.each(['codex', 'claude-code'] as const)('refreshes the visible settled %s footer after native identity without replacing the message body', (backend) => {
     const view = constructView();
     const v = view as unknown as {
       currentConversation: Conversation;
@@ -60,7 +88,7 @@ describe('ChatRuntimeComposition owner', () => {
       addUserMessageFooter(element: HTMLElement, message: unknown, copy: string): void;
       sendPipelineRuntime: { host: { onTurnSettled(info: { backend: string; conversationId: string; sessionId: string; tabId: string }): void } };
     };
-    v.currentConversation = { id: 'cx-owned', title: 'owned', backend: 'codex', backendSessionId: 'native-thread', createdAt: 1, updatedAt: 1,
+    v.currentConversation = { id: 'cx-owned', title: 'owned', backend, backendSessionId: 'native-thread', createdAt: 1, updatedAt: 1,
       messages: [{ id: 'local-user', role: 'user', content: 'owned', timestamp: 1, sourceMessageId: 'native-user', sourceTurnId: 'native-turn' }] };
     v.messagesContainer = document.createElement('div');
     v.messagesContainer.innerHTML = '<div class="opencodian-message" data-message-id="local-user"><span class="body">owned body</span><div class="opencodian-user-message-footer">Copy only</div></div>';
@@ -69,7 +97,7 @@ describe('ChatRuntimeComposition owner', () => {
     const footer = jest.spyOn(v, 'addUserMessageFooter').mockImplementation(element => {
       element.insertAdjacentHTML('beforeend', '<div class="opencodian-user-message-footer"><button>Fork</button></div>');
     });
-    const info = { backend: 'codex', conversationId: 'cx-owned', sessionId: 'native-thread', tabId: 'active-tab' };
+    const info = { backend, conversationId: 'cx-owned', sessionId: 'native-thread', tabId: 'active-tab' };
     v.sendPipelineRuntime.host.onTurnSettled({ ...info, tabId: 'background-tab' });
     expect(footer).not.toHaveBeenCalled();
     v.sendPipelineRuntime.host.onTurnSettled(info);

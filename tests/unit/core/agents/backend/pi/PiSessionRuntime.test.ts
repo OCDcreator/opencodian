@@ -55,3 +55,30 @@ describe('Pi UI lifetime', () => {
     runtime.dispose();
   });
 });
+
+describe('Pi OAuth URL lifetime', () => {
+  it('cancels a URL notice by native request ID without replying to a notification', async () => {
+    let emit!: (event: PiRecord) => void;
+    let signal!: AbortSignal;
+    const respond = jest.fn();
+    const runtime = new PiSessionRuntime({ workingDirectory: '/tmp', sessionDirectory: '/tmp', servicePath: '/service',
+      createClient: () => ({
+        request: async () => ({ serviceProtocol: 1, commands: [...PI_RPC_COMMANDS, ...PI_SDK_COMMANDS, ...PI_CONFIG_COMMANDS] }),
+        subscribe: listener => { emit = listener; return () => {}; }, close: jest.fn(), respond,
+      }),
+      onUiRequest: (_request, current) => new Promise(resolve => {
+        signal = current;
+        current.addEventListener('abort', () => resolve());
+      }),
+    });
+    await runtime.get('session');
+    emit({ type: 'extension_ui_request', method: 'notify', id: 'oauth-link', url: 'https://auth.example.test/start' });
+    emit({ type: 'extension_ui_cancel', id: 'different' });
+    expect(signal.aborted).toBe(false);
+    emit({ type: 'extension_ui_cancel', id: 'oauth-link' });
+    expect(signal.aborted).toBe(true);
+    await Promise.resolve();
+    expect(respond).not.toHaveBeenCalled();
+    runtime.dispose();
+  });
+});

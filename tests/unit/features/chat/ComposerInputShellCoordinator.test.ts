@@ -1,4 +1,7 @@
 /* eslint-disable max-lines -- This suite intentionally keeps shared DOM fixture helpers and coordinator interaction coverage together. */
+import { type App, capturedNotices, clearCapturedNotices } from 'obsidian';
+
+import { CodexAdapter } from '../../../../src/core/agents/backend/CodexAdapter';
 import {
   clearPromptSuggestionSink,
   emitPromptSuggestionSessionChange,
@@ -11,7 +14,21 @@ import {
   ComposerInputShellCoordinator,
   type ComposerInputShellCoordinatorHost,
 } from '../../../../src/features/chat/services/ComposerInputShellCoordinator';
+import { type MessageSendPreparationOutcome, MessageSendPreparationService } from '../../../../src/features/chat/services/MessageSendPreparationService';
+import { presentPiUiRequest } from '../../../../src/features/chat/services/PiExtensionUiHost';
 import { t } from '../../../../src/i18n';
+import {
+  createComposerSendContext,
+  createConversation,
+  createHost as createPreparationHost,
+} from './MessageSendPreparationService.testSupport';
+import {
+  createFinalizationPort,
+  createHost as createPipelineHost,
+  createStreamController,
+  createTabRuntime,
+  SendPipelineRuntime,
+} from './SendPipelineRuntime.testSupport';
 
 class ResizeObserverMock {
   static instances: ResizeObserverMock[] = [];
@@ -325,7 +342,8 @@ describe('ComposerInputShellCoordinator', () => {
     expect(fixture.host.submitMessage).toHaveBeenCalledWith({
       kind: 'prompt',
       content: 'Hello coordinator',
-    });
+    }, expect.any(Function));
+    fixture.host.submitMessage.mock.calls[0][1]?.('accepted');
     expect(fixture.host.addChosenFileContextToActiveTab).toHaveBeenCalledTimes(1);
     expect(fixture.textarea.value).toBe('');
   });
@@ -520,7 +538,7 @@ describe('ComposerInputShellCoordinator', () => {
 
 });
 
-describe('ComposerInputShellCoordinator placeholder and availability', () => {
+describe('ComposerInputShellCoordinator placeholder visibility', () => {
   const originalResizeObserver = globalThis.ResizeObserver;
 
   beforeEach(() => {
@@ -530,6 +548,78 @@ describe('ComposerInputShellCoordinator placeholder and availability', () => {
   afterEach(() => {
     restoreCoordinatorDomMocks(originalResizeObserver);
   });
+
+  it('shows the placeholder for a blank draft, hides it on input, and restores it after clearing', () => {
+    const fixture = createFixture({ shouldMountAgentSelector: false });
+    const placeholder = fixture.container.querySelector('.opencodian-input-placeholder');
+
+    expect(fixture.textarea.value).toBe('');
+    expect(placeholder?.classList.contains('is-hidden')).toBe(false);
+    fixture.setTextareaScrollHeight(96);
+    fixture.textarea.value = 'Typed composer text';
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(placeholder?.classList.contains('is-hidden')).toBe(true);
+    expect(fixture.textarea.style.height).toBe('96px');
+    fixture.setTextareaScrollHeight(24);
+    fixture.textarea.value = '';
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(placeholder?.classList.contains('is-hidden')).toBe(false);
+    expect(fixture.textarea.style.height).toBe('24px');
+  });
+
+  it('restores the placeholder when accepted send preparation clears the submitted draft', () => {
+    const fixture = createFixture({ shouldMountAgentSelector: false });
+    const placeholder = fixture.container.querySelector('.opencodian-input-placeholder');
+    fixture.textarea.value = 'Draft accepted by host';
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(fixture.host.submitMessage).toHaveBeenCalledTimes(1);
+    fixture.host.submitMessage.mock.calls[0][1]?.('accepted');
+
+    expect(fixture.textarea.value).toBe('');
+    expect(placeholder?.classList.contains('is-hidden')).toBe(false);
+  });
+
+  it('hides and restores the placeholder through Pi programmatic editor input events', async () => {
+    const fixture = createFixture({ shouldMountAgentSelector: false });
+    fixture.host.onComposerInputChanged = jest.fn();
+    const placeholder = fixture.container.querySelector('.opencodian-input-placeholder');
+    const view = {
+      containerEl: fixture.surfaceRoot,
+      currentConversation: { backend: 'pi', backendSessionId: 'owned-composer-placeholder' },
+    };
+    const app = { workspace: { getLeavesOfType: () => [{ view }] } } as unknown as App;
+    const connection = new AbortController();
+
+    try {
+      await presentPiUiRequest(app, {
+        type: 'extension_ui_request', id: 'placeholder-set', method: 'set_editor_text',
+        sessionId: 'owned-composer-placeholder', text: 'I11/A/composer\nsecond line',
+      }, connection.signal);
+      expect(fixture.textarea.value).toBe('I11/A/composer\nsecond line');
+      expect(fixture.host.onComposerInputChanged).toHaveBeenCalledTimes(1);
+      expect(fixture.host.onComposerInputChanged).toHaveBeenLastCalledWith('I11/A/composer\nsecond line');
+      expect(placeholder?.classList.contains('is-hidden')).toBe(true);
+
+      await presentPiUiRequest(app, {
+        type: 'extension_ui_request', id: 'placeholder-clear', method: 'set_editor_text',
+        sessionId: 'owned-composer-placeholder', text: '',
+      }, connection.signal);
+      expect(fixture.textarea.value).toBe('');
+      expect(fixture.host.onComposerInputChanged).toHaveBeenCalledTimes(2);
+      expect(fixture.host.onComposerInputChanged).toHaveBeenLastCalledWith('');
+      expect(placeholder?.classList.contains('is-hidden')).toBe(false);
+    } finally {
+      connection.abort();
+    }
+  });
+
+});
+
+describe('ComposerInputShellCoordinator placeholder and availability', () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+  beforeEach(() => installCoordinatorDomMocks());
+  afterEach(() => restoreCoordinatorDomMocks(originalResizeObserver));
 
   it('reflects a Codex-specific placeholder when the active backend is codex', () => {
     const restoreApp = mockGlobalApp({
@@ -2012,5 +2102,187 @@ describe('ComposerInputShellCoordinator — image paste and drag-drop', () => {
 
     const chips = fixture.container.querySelectorAll('.opencodian-composer-image-chip');
     expect(chips.length).toBe(1);
+  });
+});
+
+
+describe('Composer prompt preparation acknowledgement', () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+  beforeEach(() => installCoordinatorDomMocks());
+  afterEach(() => restoreCoordinatorDomMocks(originalResizeObserver));
+  it('retains a plain-text draft until the preparation result and keeps it on rejection', () => {
+    const fixture = createFixture();
+    fixture.textarea.value = 'pending original draft';
+    fixture.sendBtn.click();
+    expect(fixture.textarea.value).toBe('pending original draft');
+    expect(fixture.sendBtn.disabled).toBe(true);
+    const outcome = fixture.host.submitMessage.mock.calls[0][1];
+    expect(outcome).toEqual(expect.any(Function));
+    outcome?.('rejected');
+    expect(fixture.textarea.value).toBe('pending original draft');
+    expect(fixture.sendBtn.disabled).toBe(false);
+  });
+
+  it.each(['accepted', 'queued'] as const)('clears an unchanged plain draft only after %s', (result) => {
+    const fixture = createFixture();
+    fixture.textarea.value = 'accepted original draft';
+    fixture.sendBtn.click();
+    fixture.host.submitMessage.mock.calls[0][1]?.(result);
+    expect(fixture.textarea.value).toBe('');
+  });
+
+  it('does not clear text edited while preparation was pending', () => {
+    const fixture = createFixture();
+    fixture.textarea.value = 'initial draft';
+    fixture.sendBtn.click();
+    fixture.textarea.value = 'new draft typed during preparation';
+    fixture.host.submitMessage.mock.calls[0][1]?.('accepted');
+    expect(fixture.textarea.value).toBe('new draft typed during preparation');
+  });
+});
+
+describe('Composer Codex preflight draft recovery', () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+  beforeEach(() => {
+    installCoordinatorDomMocks();
+    installImageEventDomMocks();
+    clearCapturedNotices();
+  });
+  afterEach(() => restoreCoordinatorDomMocks(originalResizeObserver));
+
+  it.each(['on-request', 'untrusted'] as const)('keeps the exact draft and image chip on unsupported %s before accepting or dispatching', async (approvalPolicy) => {
+    const fixture = createFixture({ hasImageInputCapability: true, shouldMountAgentSelector: false });
+    fixture.textarea.dispatchEvent(createPasteEvent([createImageFile('strict-draft.png', 'image/png')]));
+    await flushAsync();
+    flushAnimationFrames();
+    const chip = fixture.container.querySelector('.opencodian-composer-image-chip');
+    expect(chip).not.toBeNull();
+    const runStreamed = jest.fn().mockResolvedValue({ events: (async function* () {})() });
+    const sdk = { startThread: jest.fn(() => ({ runStreamed })), resumeThread: jest.fn(() => ({ runStreamed })) };
+    const adapter = new CodexAdapter({
+      createCodex: jest.fn().mockResolvedValue(sdk), createAppServerClient: () => null,
+      model: 'gpt-6-sol', approvalPolicy: 'inherit',
+    });
+    await adapter.start();
+    const conversation = { ...createConversation(), backend: 'codex', backendSessionId: 'owned-strict-draft' };
+    const codexOptions = { model: 'gpt-6-sol', approvalPolicy, modelReasoningEffort: 'low' };
+    const prepHost = createPreparationHost(conversation, [], {
+      shouldUseModelCatalog: jest.fn(() => true),
+      getSendMessageOptions: jest.fn(() => ({ provider: 'codex', model: 'gpt-6-sol', variant: 'low', codexOptions })),
+      getCodexSendPreflightError: jest.fn(options => adapter.getSendMessagePreflightError(options)),
+      planMemoryInjection: jest.fn().mockResolvedValue(null),
+    });
+    const context = createComposerSendContext();
+    const preparation = new MessageSendPreparationService(prepHost, context);
+    const pipelineHost = createPipelineHost(createTabRuntime(), createStreamController());
+    pipelineHost.sendStreamMessage.mockImplementation((_conversation, content, options) =>
+      adapter.sendMessage({ sessionId: 'owned-strict-draft', content, options }));
+    const pipeline = new SendPipelineRuntime(pipelineHost, preparation, createFinalizationPort());
+    const outcomes: MessageSendPreparationOutcome[] = [];
+    let completion: Promise<void> | undefined;
+    fixture.host.submitMessage.mockImplementation((submission, callback) => {
+      if (submission.kind !== 'prompt') throw new Error('Expected a prompt');
+      completion = pipeline.sendMessage({ content: submission.content, images: submission.images,
+        onPreparationOutcome: outcome => { outcomes.push(outcome); callback?.(outcome); },
+      });
+      return completion;
+    });
+    fixture.textarea.value = 'Exact strict draft\nsecond line';
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+    try {
+      fixture.sendBtn.click();
+      expect(completion).toBeDefined();
+      await completion;
+      expect(outcomes).toEqual(['rejected']);
+      expect(fixture.textarea.value).toBe('Exact strict draft\nsecond line');
+      expect(fixture.container.querySelector('.opencodian-composer-image-chip')).toBe(chip);
+      expect(fixture.sendBtn.disabled).toBe(false);
+      expect(capturedNotices).toEqual([adapter.getSendMessagePreflightError(codexOptions)]);
+      expect(conversation.messages).toHaveLength(0);
+      expect(prepHost.seedCanonicalUserMessage).not.toHaveBeenCalled();
+      expect(prepHost.planMemoryInjection).not.toHaveBeenCalled();
+      expect(context.getDraftContextItems).not.toHaveBeenCalled();
+      expect(context.resolvePersistentContextItems).not.toHaveBeenCalled();
+      expect(pipelineHost.sendStreamMessage).not.toHaveBeenCalled();
+      expect(sdk.startThread).not.toHaveBeenCalled();
+      expect(sdk.resumeThread).not.toHaveBeenCalled();
+      expect(runStreamed).not.toHaveBeenCalled();
+    } finally {
+      await adapter.stop();
+    }
+  });
+
+  it.each(['rejected', 'accepted'] as const)('keeps newly typed text when an awaited preflight later returns %s', async (result) => {
+    const fixture = createFixture({ shouldMountAgentSelector: false });
+    let releasePreflight!: (reason: string | null) => void;
+    let preflightStarted!: () => void;
+    const held = new Promise<string | null>(resolve => { releasePreflight = resolve; });
+    const entered = new Promise<void>(resolve => { preflightStarted = resolve; });
+    const conversation = { ...createConversation(), backend: 'codex', backendSessionId: 'owned-await' };
+    const prepHost = createPreparationHost(conversation, [], {
+      shouldUseModelCatalog: jest.fn(() => true),
+      getCodexSendPreflightError: jest.fn(() => { preflightStarted(); return held; }),
+    });
+    const preparation = new MessageSendPreparationService(prepHost, createComposerSendContext());
+    let completion: Promise<unknown> | undefined;
+    const outcomes: MessageSendPreparationOutcome[] = [];
+    fixture.host.submitMessage.mockImplementation((submission, callback) => {
+      if (submission.kind !== 'prompt') throw new Error('Expected a prompt');
+      completion = preparation.prepareMessageSend({ content: submission.content,
+        onPreparationOutcome: outcome => { outcomes.push(outcome); callback?.(outcome); },
+      });
+      return completion.then(() => undefined);
+    });
+    fixture.textarea.value = 'Original draft';
+    fixture.sendBtn.click();
+    await entered;
+    fixture.textarea.value = 'New draft during actual preflight await';
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    releasePreflight(result === 'rejected' ? 'Owned strict rejection' : null);
+    await completion;
+
+    expect(outcomes).toEqual([result]);
+    expect(fixture.textarea.value).toBe('New draft during actual preflight await');
+    expect(fixture.sendBtn.disabled).toBe(false);
+    expect(conversation.messages).toHaveLength(result === 'rejected' ? 0 : 1);
+  });
+
+  it('keeps the newly active tab draft when the sending tab changes during actual preflight', async () => {
+    const fixture = createFixture({ shouldMountAgentSelector: false });
+    let release!: () => void;
+    let enter!: () => void;
+    const held = new Promise<null>(resolve => { release = () => resolve(null); });
+    const entered = new Promise<void>(resolve => { enter = resolve; });
+    const conversation = { ...createConversation(), backend: 'codex', backendSessionId: 'owned-tab-switch' };
+    const prepHost = createPreparationHost(conversation, [], {
+      shouldUseModelCatalog: jest.fn(() => true),
+      getCodexSendPreflightError: jest.fn(() => { enter(); return held; }),
+    });
+    const context = createComposerSendContext();
+    const preparation = new MessageSendPreparationService(prepHost, context);
+    let completion: Promise<unknown> | undefined;
+    const outcomes: MessageSendPreparationOutcome[] = [];
+    fixture.host.submitMessage.mockImplementation((submission, callback) => {
+      if (submission.kind !== 'prompt') throw new Error('Expected a prompt');
+      completion = preparation.prepareMessageSend({ content: submission.content,
+        onPreparationOutcome: outcome => { outcomes.push(outcome); callback?.(outcome); },
+      });
+      return completion.then(() => undefined);
+    });
+    fixture.textarea.value = 'Original sending tab draft';
+    fixture.sendBtn.click();
+    await entered;
+    prepHost.getActiveTabId.mockReturnValue('new-active-tab');
+    fixture.textarea.value = 'New active tab draft';
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    release();
+    await completion;
+
+    expect(outcomes).toEqual(['rejected']);
+    expect(fixture.textarea.value).toBe('New active tab draft');
+    expect(conversation.messages).toHaveLength(0);
+    expect(context.getDraftContextItems).not.toHaveBeenCalled();
+    expect(capturedNotices).toEqual([]);
   });
 });

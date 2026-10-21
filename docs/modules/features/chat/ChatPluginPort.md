@@ -1,4 +1,6 @@
 # ChatPluginPort
+
+> 2026-10-08：Codex approval context 的窄 Pick 增加可选 getTabIdForSession，只供 view 转发既有 tab/session 映射；无新增状态或 runtime ownership。
 > 2026-09-21 (advantage-parity R-F5/R-F6)：chat settings pick now includes the opt-in session rail/Vim navigation toggles and normalized key fields consumed by the view coordinators.
 > 2026-09-20 (advantage-parity R-D1)：port 新增 `exportConversationMarkdownById(conversationId)`，历史菜单导出按钮经该缝触达插件层。
 > 2026-09-30：`codexApprovalHostContext` 的 Pick 扩至 `approvalCardRenderer` / `questionCardRenderer` / `elicitationCardRenderer` / `getActiveTabId`（v2 审批 + tool user input + MCP elicitation 共用同一 plugin context 对象）。

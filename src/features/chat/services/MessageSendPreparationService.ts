@@ -46,6 +46,8 @@ export interface SendMessageModelOptions {
   provider?: string;
   model?: string;
   variant?: string;
+  /** Immutable effective Codex settings captured for the sending conversation. */
+  codexOptions?: Record<string, unknown>;
   /** One-shot structured-output schema for Claude Code `/json` trigger. Not persisted. */
   outputFormat?: Record<string, unknown>;
 }
@@ -207,6 +209,10 @@ export interface MessageSendPreparationHost {
   shouldUseModelCatalog(conversation: Conversation): boolean;
   ensureSelectedModelAvailable(provider: string | undefined, model: string | undefined): Promise<boolean>;
   appendModelUnavailableNoticeMessage(): Promise<void>;
+  /** Backend-owned Codex guard; checked before accepting or consuming a draft. */
+  getCodexSendPreflightError?(
+    codexOptions?: Record<string, unknown>,
+  ): string | null | Promise<string | null>;
   /**
    * Native ZCode catalog proof for the selected model. `unavailable` is a
    * safe refusal: image sends may not proceed on a stale or unobserved model
@@ -315,6 +321,9 @@ export interface MessageSendPreparationHostDependencies {
   reloadModelCatalog: () => Promise<void>;
   getSendMessageOptions: () => SendMessageModelOptions;
   appendModelUnavailableNoticeMessage: () => Promise<void>;
+  getCodexSendPreflightError?: (
+    codexOptions?: Record<string, unknown>,
+  ) => string | null | Promise<string | null>;
   getZCodeImageInputSupport?: (
     sessionId: string,
     model: SendMessageModelOptions,
@@ -368,23 +377,31 @@ export class MessageSendPreparationService {
     });
   }
 
-  // eslint-disable-next-line complexity -- Send preflight deliberately keeps readiness, model, canonical seed, and follow-up enqueue ordering together.
+  // eslint-disable-next-line complexity, max-lines-per-function -- Send preflight keeps readiness, model/policy rejection, canonical seed and queue ordering together; extracting its bounded Codex gate would split acceptance ownership.
   async prepareMessageSend(
     options: PrepareMessageSendOptions,
   ): Promise<PreparedMessageSend | null> {
     const tabId = options.targetTabId ?? this.host.getActiveTabId();
-    if (!tabId || !this.isTargetTabActive(options.targetTabId)) {
+    if (!tabId || !this.isTargetTabActive(tabId)) {
       this.notifyPreparationOutcome(options, 'rejected');
       return null;
     }
     // Check server availability BEFORE creating a conversation/session,
     // so we never bootstrap an orphan session when the backend is disabled/offline.
     const earlyAvailability = await this.host.getServerAvailability();
+    if (!this.isTargetTabActive(tabId)) {
+      this.notifyPreparationOutcome(options, 'rejected');
+      return null;
+    }
     if (earlyAvailability !== 'running' && earlyAvailability !== 'external') {
       if (!(await this.ensureServerReadyForChat(earlyAvailability))) {
         this.notifyPreparationOutcome(options, 'rejected');
         return null;
       }
+    }
+    if (!this.isTargetTabActive(tabId)) {
+      this.notifyPreparationOutcome(options, 'rejected');
+      return null;
     }
     const conversation = await this.host.ensureConversationReady();
     if (!conversation) {
@@ -397,7 +414,7 @@ export class MessageSendPreparationService {
       this.notifyPreparationOutcome(options, 'rejected');
       return null;
     }
-    if (!this.isTargetTabActive(options.targetTabId) || !this.host.ensureTabRuntime(tabId)) {
+    if (!this.isTargetTabActive(tabId) || !this.host.ensureTabRuntime(tabId)) {
       this.notifyPreparationOutcome(options, 'rejected');
       return null;
     }
@@ -412,9 +429,15 @@ export class MessageSendPreparationService {
       return null;
     }
     this.host.transitionTabSessionLifecycle(tabId, 'preparing', 'send-preflight');
-    const draftContextItems = this.composerSendContext.getDraftContextItems(tabId);
+    let draftContextItems = conversation.backend === 'codex'
+      ? [] : this.composerSendContext.getDraftContextItems(tabId);
     const availability = await this.host.getServerAvailability();
     await this.refreshStatusSurfaces();
+    if (!this.isTargetTabActive(tabId)) {
+      this.resetPreparingLifecycle(tabId);
+      this.notifyPreparationOutcome(options, 'rejected');
+      return null;
+    }
     if (availability !== 'running' && availability !== 'external') {
       if (!(await this.ensureServerReadyForChat(availability))) {
         this.resetPreparingLifecycle(tabId);
@@ -422,11 +445,40 @@ export class MessageSendPreparationService {
         return null;
       }
     }
+    if (!this.isTargetTabActive(tabId)) {
+      this.resetPreparingLifecycle(tabId);
+      this.notifyPreparationOutcome(options, 'rejected');
+      return null;
+    }
     const usesModelCatalog = this.host.shouldUseModelCatalog(conversation);
     const modelOptions = usesModelCatalog ? await this.prepareModelOptions(tabId) : {};
     if (!modelOptions) {
       this.notifyPreparationOutcome(options, 'rejected');
       return null;
+    }
+    if (conversation.backend === 'codex') {
+      const unavailableReason = 'Codex send preflight is unavailable. Start the Codex backend before sending.';
+      let preflightError: string | null = unavailableReason;
+      try {
+        if (this.host.getCodexSendPreflightError) {
+          preflightError = await this.host.getCodexSendPreflightError(modelOptions.codexOptions);
+        }
+      } catch (error) {
+        preflightError = error instanceof Error ? error.message : String(error);
+      }
+      if (!this.isTargetTabActive(tabId)) {
+        this.resetPreparingLifecycle(tabId);
+        this.notifyPreparationOutcome(options, 'rejected');
+        return null;
+      }
+      // Only an explicit null admits the send; a missing/malformed guard fails closed.
+      if (preflightError !== null) {
+        new Notice(preflightError || unavailableReason);
+        this.resetPreparingLifecycle(tabId);
+        this.notifyPreparationOutcome(options, 'rejected');
+        return null;
+      }
+      draftContextItems = this.composerSendContext.getDraftContextItems(tabId);
     }
     if (!(await this.verifyImageInputBeforeOptimisticAppend(conversation, backendSessionId, modelOptions, options.images))) {
       this.resetPreparingLifecycle(tabId);
@@ -498,6 +550,11 @@ export class MessageSendPreparationService {
     const skillExpansion = conversation.backend === 'pi' || conversation.backend === 'zcode' || conversation.backend === 'opencode2'
       ? { syntheticParts: [] }
       : await this.skillContentExpander.expand(requestContent);
+    if (!this.isTargetTabActive(tabId)) {
+      this.resetPreparingLifecycle(tabId);
+      this.notifyPreparationOutcome(options, 'rejected');
+      return null;
+    }
     const syntheticTextParts: PromptSyntheticTextPartInput[] = [
       ...(options.syntheticTextParts ?? []),
       ...skillExpansion.syntheticParts.map((part) => ({
@@ -520,16 +577,20 @@ export class MessageSendPreparationService {
       images: options.images,
     });
     const writeTicket = this.host.createConversationWriteTicket(conversation.id);
+    let messageRecorded = false;
     const writeApplied = await this.host.commitConversationWrite(
       conversation,
       writeTicket,
       'optimistic-user-message',
       () => {
+        // The write may wait behind an earlier save; check at its actual commit.
+        if (!this.isTargetTabActive(tabId)) return;
         conversation.messages.push(userMessage);
+        messageRecorded = true;
         conversation.updatedAt = userMessage.timestamp;
       },
     );
-    if (!writeApplied) {
+    if (!writeApplied || !messageRecorded) {
       this.resetPreparingLifecycle(tabId);
       this.notifyPreparationOutcome(options, 'rejected');
       return null;
@@ -543,7 +604,8 @@ export class MessageSendPreparationService {
     this.host.armBackgroundTaskIndicatorForUserMessage(userMessage, tabId);
     this.host.startConversationSyncLoop();
     this.host.setAutoScrollEnabled(tabId, true);
-    await this.host.renderMessage(userMessage);
+    // An accepted background turn stays persisted; its next activation renders it.
+    if (this.isTargetTabActive(tabId)) await this.host.renderMessage(userMessage);
     this.host.scrollToBottom({ tabId, enableAutoScroll: true });
     const conversationBackend = conversation.backend ?? 'opencode';
     const shouldBootstrapTitle = this.isFirstUserMessage(conversation)
@@ -700,13 +762,17 @@ export class MessageSendPreparationService {
 
   private async prepareModelOptions(tabId: TabId): Promise<SendMessageModelOptions | null> {
     if (!this.host.hasLoadedModelCatalog()) await this.host.loadAvailableModels();
+    if (!this.isTargetTabActive(tabId)) {
+      this.resetPreparingLifecycle(tabId);
+      return null;
+    }
     const modelOptions = this.host.getSendMessageOptions();
     const modelAvailable = await this.host.ensureSelectedModelAvailable(
       modelOptions.provider,
       modelOptions.model,
     );
     if (!modelAvailable) {
-      await this.host.appendModelUnavailableNoticeMessage();
+      if (this.isTargetTabActive(tabId)) await this.host.appendModelUnavailableNoticeMessage();
       this.resetPreparingLifecycle(tabId);
       return null;
     }
@@ -910,6 +976,10 @@ export function createMessageSendPreparationHost(
     },
     ensureSelectedModelAvailable: (provider, model) => selectionCtrl.ensureSelectedModelAvailable(provider, model),
     appendModelUnavailableNoticeMessage: () => deps.appendModelUnavailableNoticeMessage(),
+    getCodexSendPreflightError: (codexOptions) =>
+      deps.getCodexSendPreflightError
+        ? deps.getCodexSendPreflightError(codexOptions)
+        : 'Codex send preflight is unavailable. Start the Codex backend before sending.',
     getZCodeImageInputSupport: (sessionId, model) =>
       deps.getZCodeImageInputSupport?.(sessionId, model) ?? Promise.resolve('unavailable'),
     buildStructuredPromptSendPayload: (content, options) => openCodeService.buildStructuredPromptSendPayload(content, options),

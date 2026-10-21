@@ -1,3 +1,5 @@
+import { capturedNotices, clearCapturedNotices } from 'obsidian';
+
 import {
   createMessageSendPreparationHost,
   MessageSendPreparationService,
@@ -227,6 +229,21 @@ describe('createMessageSendPreparationHost', () => {
     expect(deps.getActiveTabId).toHaveBeenCalledTimes(1);
   });
 
+  it('forwards the Codex guard without converting a synchronous admitted null into rejection', async () => {
+    const deps = createDeps();
+    const options = { approvalPolicy: 'never', modelReasoningEffort: 'low' };
+    deps.getCodexSendPreflightError = jest.fn(() => null);
+    const host = createMessageSendPreparationHost(deps);
+    expect(await host.getCodexSendPreflightError?.(options)).toBeNull();
+    expect(deps.getCodexSendPreflightError).toHaveBeenCalledWith(options);
+  });
+
+  it('fails closed when flat dependencies lack the production Codex guard', async () => {
+    const host = createMessageSendPreparationHost(createDeps());
+    expect(await host.getCodexSendPreflightError?.({ approvalPolicy: 'on-request' }))
+      .toBe('Codex send preflight is unavailable. Start the Codex backend before sending.');
+  });
+
   it('produces a host usable by MessageSendPreparationService', async () => {
     const deps = createDeps();
     deps.chatSelectionControlsCoordinator = {
@@ -262,5 +279,99 @@ describe('createMessageSendPreparationHost', () => {
 
     expect(result?.modelOptions).toMatchObject({ provider: 'krill', model: 'gpt-6-sol', variant: 'none' });
     expect(deps.chatSelectionControlsCoordinator.ensureSelectedModelAvailable).toHaveBeenCalledWith('krill', 'gpt-6-sol');
+  });
+});
+
+describe('MessageSendPreparationService Codex preflight ordering', () => {
+  beforeEach(() => { jest.clearAllMocks(); clearCapturedNotices(); });
+
+  it.each(['missing', 'throwing', 'malformed'] as const)('fails closed on a %s guard before draft context, memory or optimistic append', async (kind) => {
+    const conversation = { ...createConversation(), backend: 'codex', backendSessionId: 'owned-preflight' };
+    const host = createHost(conversation, [], {
+      shouldUseModelCatalog: jest.fn(() => true),
+      planMemoryInjection: jest.fn().mockResolvedValue(null),
+      ...(kind === 'throwing' ? { getCodexSendPreflightError: jest.fn(() => { throw new Error('Owned preflight error'); }) } : {}),
+      ...(kind === 'malformed' ? { getCodexSendPreflightError: jest.fn().mockResolvedValue(undefined) } : {}),
+    });
+    const context = createComposerSendContext();
+    const service = new MessageSendPreparationService(host, context);
+    const outcome = jest.fn();
+    const result = await service.prepareMessageSend({ content: 'Keep draft', onPreparationOutcome: outcome });
+
+    expect(result).toBeNull();
+    expect(outcome.mock.calls).toEqual([['rejected']]);
+    expect(capturedNotices).toEqual([kind === 'throwing' ? 'Owned preflight error' : 'Codex send preflight is unavailable. Start the Codex backend before sending.']);
+    expect(context.getDraftContextItems).not.toHaveBeenCalled();
+    expect(context.resolvePersistentContextItems).not.toHaveBeenCalled();
+    expect(host.planMemoryInjection).not.toHaveBeenCalled();
+    expect(host.commitConversationWrite).not.toHaveBeenCalled();
+    expect(host.seedCanonicalUserMessage).not.toHaveBeenCalled();
+    expect(conversation.messages).toHaveLength(0);
+    expect(host.transitionTabSessionLifecycle).toHaveBeenLastCalledWith('tab-1', 'idle', 'send-preflight-aborted');
+  });
+
+  it('uses the captured per-turn Codex options and checks the target tab after the awaited guard', async () => {
+    const conversation = { ...createConversation(), backend: 'codex', backendSessionId: 'owned-preflight' };
+    const codexOptions = { approvalPolicy: 'never', model: 'owned-model', modelReasoningEffort: 'low' };
+    let release!: (reason: string | null) => void;
+    let enter!: () => void;
+    const held = new Promise<string | null>(resolve => { release = resolve; });
+    const entered = new Promise<void>(resolve => { enter = resolve; });
+    const host = createHost(conversation, [], {
+      shouldUseModelCatalog: jest.fn(() => true),
+      getSendMessageOptions: jest.fn(() => ({ provider: 'codex', model: 'owned-model', variant: 'low', codexOptions })),
+      getCodexSendPreflightError: jest.fn(() => { enter(); return held; }),
+      planMemoryInjection: jest.fn().mockResolvedValue(null),
+    });
+    const context = createComposerSendContext();
+    const service = new MessageSendPreparationService(host, context);
+    const outcome = jest.fn();
+    const pending = service.prepareMessageSend({ content: 'Keep draft', onPreparationOutcome: outcome });
+    await entered;
+    expect(host.getCodexSendPreflightError).toHaveBeenCalledWith(codexOptions);
+    host.getActiveTabId.mockReturnValue('other-tab');
+    release(null);
+
+    expect(await pending).toBeNull();
+    expect(outcome.mock.calls).toEqual([['rejected']]);
+    expect(context.getDraftContextItems).not.toHaveBeenCalled();
+    expect(host.commitConversationWrite).not.toHaveBeenCalled();
+    expect(capturedNotices).toEqual([]);
+    expect(conversation.messages).toHaveLength(0);
+  });
+
+  it('keeps busy queue ownership before preflight and acknowledges queued exactly once', async () => {
+    const conversation = { ...createConversation(), backend: 'codex', backendSessionId: 'owned-queued' };
+    const host = createHost(conversation, [], {
+      isTabForegroundBusy: jest.fn(() => true), queueFollowUpSend: jest.fn(() => true),
+      getCodexSendPreflightError: jest.fn(() => 'strict unavailable'),
+    });
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+    const outcome = jest.fn();
+    expect(await service.prepareMessageSend({ content: 'Queue owned draft', onPreparationOutcome: outcome })).toBeNull();
+    expect(host.queueFollowUpSend).toHaveBeenCalledWith('tab-1', expect.objectContaining({ content: 'Queue owned draft' }));
+    expect(outcome.mock.calls).toEqual([['queued']]);
+    expect(host.getCodexSendPreflightError).not.toHaveBeenCalled();
+    expect(host.getSendMessageOptions).not.toHaveBeenCalled();
+    expect(capturedNotices).toEqual([]);
+  });
+
+  it.each(['codex', 'opencode'] as const)('keeps normal accepted preparation and model/image payload for %s', async (backend) => {
+    const conversation = { ...createConversation(), backend, backendSessionId: 'owned-admitted' };
+    const codexOptions = { approvalPolicy: 'never', model: 'owned-model', modelReasoningEffort: 'low' };
+    const host = createHost(conversation, [], {
+      shouldUseModelCatalog: jest.fn(() => true),
+      getSendMessageOptions: jest.fn(() => ({ provider: backend, model: 'owned-model', variant: 'low', codexOptions })),
+      getCodexSendPreflightError: jest.fn(() => null),
+    });
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+    const outcome = jest.fn();
+    const images = [{ data: 'iVBORw0KGgo=', mediaType: 'image/png' as const, filename: 'owned.png' }];
+    const result = await service.prepareMessageSend({ content: 'Accepted draft', images, onPreparationOutcome: outcome });
+    expect(result?.modelOptions).toEqual({ provider: backend, model: 'owned-model', variant: 'low', codexOptions });
+    expect(result?.images).toBe(images);
+    expect(outcome.mock.calls).toEqual([['accepted']]);
+    expect(host.getCodexSendPreflightError).toHaveBeenCalledTimes(backend === 'codex' ? 1 : 0);
+    expect(conversation.messages).toHaveLength(1);
   });
 });

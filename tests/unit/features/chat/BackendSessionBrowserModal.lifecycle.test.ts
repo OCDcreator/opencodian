@@ -20,10 +20,10 @@ jest.mock('../../../../src/core/agents/backend/AgentBackendRouting', () => ({
   forkBackendSession: jest.fn().mockResolvedValue({ id: 'forked-1', title: 'Forked' }),
   archiveBackendSession: jest.fn().mockResolvedValue(true),
   unarchiveBackendSession: jest.fn().mockResolvedValue(true),
-  listBackendSessions: jest.fn().mockResolvedValue([
+  readBackendSessionsCatalog: jest.fn().mockResolvedValue({ status: 'complete', nextCursor: null, data: [
     { id: 'session-1', title: 'First', shareUrl: null, updatedAt: Date.now(), archived: false },
     { id: 'session-2', title: 'Second', shareUrl: null, updatedAt: Date.now(), archived: true },
-  ]),
+  ] }),
   getBackendSessionPreview: jest.fn().mockResolvedValue([]),
 }));
 

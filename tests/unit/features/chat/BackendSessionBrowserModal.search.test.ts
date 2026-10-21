@@ -11,7 +11,7 @@ import {
 
 jest.mock('../../../../src/core/agents/backend/AgentBackendRouting', () => ({
   ...jest.requireActual('../../../../src/core/agents/backend/AgentBackendRouting'),
-  listBackendSessions: jest.fn(),
+  readBackendSessionsCatalog: jest.fn(),
   getBackendSessionPreview: jest.fn().mockResolvedValue([]),
   getBackendSessionDetail: jest.fn().mockResolvedValue(null),
   forkBackendSession: jest.fn(),
@@ -19,7 +19,7 @@ jest.mock('../../../../src/core/agents/backend/AgentBackendRouting', () => ({
   unarchiveBackendSession: jest.fn(),
 }));
 
-const { listBackendSessions } = jest.requireMock('../../../../src/core/agents/backend/AgentBackendRouting');
+const { readBackendSessionsCatalog } = jest.requireMock('../../../../src/core/agents/backend/AgentBackendRouting');
 
 function createHost(overrides?: Partial<BackendSessionBrowserHost>): BackendSessionBrowserHost {
   const mockService = {
@@ -49,12 +49,12 @@ async function openModal(host: BackendSessionBrowserHost): Promise<BackendSessio
 
 describe('BackendSessionBrowserModal search filtering', () => {
   beforeEach(() => {
-    listBackendSessions.mockResolvedValue([
+    readBackendSessionsCatalog.mockResolvedValue({ status: 'complete', nextCursor: null, data: [
       { id: 's1', title: 'Build a React app', shareUrl: null, updatedAt: Date.now() },
       { id: 's2', title: 'Debug Python script', shareUrl: null, updatedAt: Date.now() },
       { id: 's3', title: 'Refactor database schema', shareUrl: null, updatedAt: Date.now() },
       { id: 's4', title: 'Write unit tests', shareUrl: null, updatedAt: Date.now() },
-    ]);
+    ] });
   });
 
   afterEach(() => {

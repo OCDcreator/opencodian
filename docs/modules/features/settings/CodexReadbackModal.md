@@ -78,3 +78,7 @@ Replaced the separate status bar + loose paragraphs with a compact inspection-pa
 ## 2026-10-02 Codex local forget / complete catalog UI
 
 新增可选 fetchCatalog，优先消费 AppServerCatalogReadResult；fetchItems 保留兼容。状态新增 partial：以 typed `settings.codex.readback.statusPartial`（count）/`messagePartial` 展示本地化的部分计数和关闭重开重试提示，并渲染已读条目；failed/unavailable/empty 各自区分。英中正式 UI 测试都覆盖分页第二页失败后的提示与 native ID 保留。status badge 具 role=status、aria-live、aria-busy。完整 refresh 通过关闭重开完成。
+
+## 2026-10-06 Codex catalog permission denial
+
+结构化目录的 failed/partial 结果可识别 permission/access denied、EACCES、EPERM。界面保留 failed 或 partial 状态，同时显示固定双语权限说明；data-readback-failure 标记 permission-denied。原始 errorReason 不写入 DOM，普通失败、空目录和不支持的方法仍独立显示。

@@ -433,7 +433,7 @@ describe('ZCodeAdapter — native session lifecycle', () => {
     await expect(adapter.forkSession('sess_a', 'msg_7')).resolves.toEqual({ id: 'sess_fork', title: 'Fork of A' });
     expect(calls.at(-1)).toEqual({
       method: 'session/fork',
-      params: { sessionId: 'sess_a', messageId: 'msg_7' },
+      params: { sessionId: 'sess_a', target: { kind: 'message', messageId: 'msg_7' } },
     });
   });
 

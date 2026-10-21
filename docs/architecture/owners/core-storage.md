@@ -58,3 +58,5 @@ The new core.backend-pi owner isolates the external Pi process service. core.sto
 - 2026-09-20 (advantage-parity R-D1)：本 owner 新增对话导出职责——`ConversationMarkdownExporter.ts`（会话 → vault Markdown 笔记：纯新增手动导出 + 默认关闭的自动导出刷新，附件内容寻址去重；私有状态 `.opencodian/conversation-export-state.json`）。文件名/路径清洗函数下沉到 `shared.foundation` 的 `vault.ts`（`sanitizeVaultFileBaseName` / `isSafeVaultRelativePath`，`ImageAssetStorage` 保留历史名再导出）。
 
 2026-10-02：Codex 本地遗忘的提交路径采用严格存储删除确认，文件不存在可幂等收敛，其他 I/O 失败向调用者传播；只有存储确认后才能清理本地 adapter identity、缓存与标签。兼容既有普通删除调用，正式回归覆盖真实 adapter.remove 的 EACCES 与缺失路径。
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `core.storage` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。

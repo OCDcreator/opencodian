@@ -105,6 +105,82 @@ describe('CodexApprovalPolicy — type layer', () => {
   });
 });
 
+describe('CodexAdapter shared send preflight', () => {
+  beforeEach(() => resetMocks());
+
+  it.each(['on-request', 'untrusted'] as const)('rejects %s before dispatch when the app-server is absent', async (approvalPolicy) => {
+    const sdk = createMockCodex();
+    const adapter = new CodexAdapter({
+      createCodex: jest.fn().mockResolvedValue(sdk),
+      createAppServerClient: () => null,
+    });
+    adapter.setApprovalHost({ collectApproval: jest.fn().mockResolvedValue({ decision: 'approved' }) });
+    await adapter.start();
+    const options = { approvalPolicy };
+    const reason = adapter.getSendMessagePreflightError(options);
+    expect(reason).toContain(`approval policy "${approvalPolicy}"`);
+    const chunks: StreamChunk[] = [];
+    for await (const chunk of adapter.sendMessage({ sessionId: 'owned-preflight', content: 'go', options: { codexOptions: options } })) chunks.push(chunk);
+    expect(chunks).toEqual([{ type: 'error', content: reason }]);
+    expect(sdk.startThread).not.toHaveBeenCalled();
+    expect(sdk.resumeThread).not.toHaveBeenCalled();
+    expect(sdk.thread.runStreamed).not.toHaveBeenCalled();
+    await adapter.stop();
+  });
+
+  it.each(['never', 'inherit'] as const)('admits default %s SDK fallback without a bridge', async (approvalPolicy) => {
+    const sdk = createMockCodex();
+    const adapter = new CodexAdapter({ createCodex: jest.fn().mockResolvedValue(sdk), createAppServerClient: () => null, approvalPolicy });
+    await adapter.start();
+    expect(adapter.getSendMessagePreflightError()).toBeNull();
+    expect(sdk.startThread).not.toHaveBeenCalled();
+    expect(sdk.thread.runStreamed).not.toHaveBeenCalled();
+    await collectStream(adapter, 'owned-preflight');
+    expect(sdk.thread.runStreamed).toHaveBeenCalledTimes(1);
+    await adapter.stop();
+  });
+
+  it('honors per-turn options before defaults without mutating the default policy', async () => {
+    const adapter = new CodexAdapter({ createCodex: jest.fn().mockResolvedValue(createMockCodex()), createAppServerClient: () => null, approvalPolicy: 'on-request' });
+    await adapter.start();
+    expect(adapter.getSendMessagePreflightError({ approvalPolicy: 'never' })).toBeNull();
+    expect(adapter.getSendMessagePreflightError({ approvalPolicy: 'inherit' })).toBeNull();
+    expect(adapter.getSendMessagePreflightError()).toContain('"on-request"');
+    adapter.updateApprovalPolicy('never');
+    expect(adapter.getSendMessagePreflightError({ approvalPolicy: 'untrusted' })).toContain('"untrusted"');
+    expect(adapter.getSendMessagePreflightError()).toBeNull();
+    await adapter.stop();
+  });
+
+  it.each(['on-request', 'untrusted'] as const)('admits %s only with the app-server and approval bridge', async (approvalPolicy) => {
+    const adapter = new CodexAdapter({ createCodex: jest.fn().mockResolvedValue(createMockCodex()), approvalPolicy });
+    await adapter.start();
+    expect(adapter.getSendMessagePreflightError()).toContain('approval bridge');
+    adapter.setApprovalHost({ collectApproval: jest.fn().mockResolvedValue({ decision: 'approved' }) });
+    expect(adapter.getSendMessagePreflightError()).toBeNull();
+    expect(mockStartTurn).not.toHaveBeenCalled();
+    await collectStream(adapter, 'owned-preflight');
+    expect(mockStartTurn).toHaveBeenCalledTimes(1);
+    expect(mockStartTurn).toHaveBeenCalledWith(expect.objectContaining({ approvalPolicy }));
+    await adapter.stop();
+  });
+
+  it('rechecks the same guard when the bridge disappears after a successful preflight', async () => {
+    const sdk = createMockCodex();
+    const adapter = new CodexAdapter({ createCodex: jest.fn().mockResolvedValue(sdk), approvalPolicy: 'on-request' });
+    adapter.setApprovalHost({ collectApproval: jest.fn().mockResolvedValue({ decision: 'approved' }) });
+    await adapter.start();
+    expect(adapter.getSendMessagePreflightError()).toBeNull();
+    adapter.setApprovalHost({});
+    expect(await collectStream(adapter, 'owned-preflight')).toEqual([
+      { type: 'error', content: adapter.getSendMessagePreflightError() },
+    ]);
+    expect(mockStartTurn).not.toHaveBeenCalled();
+    expect(sdk.thread.runStreamed).not.toHaveBeenCalled();
+    await adapter.stop();
+  });
+});
+
 describe('CodexAdapter approval-policy resolution', () => {
   beforeEach(() => resetMocks());
 
@@ -211,5 +287,19 @@ describe('CodexAdapter approval-policy resolution', () => {
   it('declares the Permissions capability surface is unaffected', () => {
     const adapter = new CodexAdapter({ createCodex: jest.fn().mockResolvedValue(createMockCodex()) });
     expect(adapter.hasCapability(AgentCapability.Permissions)).toBe(true);
+  });
+});
+
+
+describe('CodexAdapter captured fallback policy', () => {
+  beforeEach(() => resetMocks());
+  it('refuses SDK fallback for a captured on-request turn even when another tab changed the adapter to never', async () => {
+    const sdk = createMockCodex();
+    const adapter = new CodexAdapter({ createAppServerClient: () => null, createCodex: async () => sdk, approvalPolicy: 'never' });
+    await adapter.start();
+    const chunks: StreamChunk[] = [];
+    for await (const chunk of adapter.sendMessage({ sessionId: 'captured-strict', content: 'go', options: { codexOptions: { approvalPolicy: 'on-request' } } })) chunks.push(chunk);
+    expect(chunks).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'error', content: expect.stringContaining('requires') })]));
+    expect(sdk.startThread).not.toHaveBeenCalled();
   });
 });

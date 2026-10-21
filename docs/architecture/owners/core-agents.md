@@ -49,3 +49,5 @@ The new core.backend-pi owner isolates the external Pi process service. core.age
 - 2026-09-15: 新增 `AgentCapability.AuxQuery`（`aux-query`）：backend 无关的一次性只读辅助查询能力标识，供 inline edit 按可选能力收窄调用（`AgentAuxQueryCapability`）。
 
 - 2026-09-18 (FlowText 批次 B)：owner manifest 随 R-B1/R-B2 更新——新增 `src/shared/contextGroupPlan.ts` 归属 `shared.foundation`；本 owner 的边界与职责未变。
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `core.agents` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。

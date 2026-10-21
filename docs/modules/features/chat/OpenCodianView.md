@@ -1,5 +1,20 @@
 # OpenCodianView
 
+> 2026-10-09（Claude History model restore）：Claude selection host captures its owning conversation and saves `sessionSettings.claudeModelOverride` through the existing `plugin.saveConversation` path. History restores the persisted model before considering the legacy tab cache; explicit `null` inherits and prevents a stale tab choice from returning, while explicit `default` remains a requested model. A failed save restores that conversation's prior settings/timestamp only if the failed write still owns the pending settings reference, and refreshes the selector only when that conversation is still active. No global setting or temporary tab is written. Existing availability and SDK model/effort handling remain in effect; focused storage/selector tests do not establish native runtime acceptance.
+
+> 2026-10-09（Claude requested model）：现有 selection host 为本视图所属 Claude conversation 启用 `preserveRequestedModel`；catalog/default/availability/effort 从所属后端读取，已加载 foreign catalog 不再替代 Claude 请求，缺失请求沿用既有 unavailable 校验。发送仅在「所属 Claude、无合法 backend-scoped tab override、全局 Claude model.trim() 为空、当前选择 claude-code/default」时省略 model，provider 和 Claude variant/effort 保留。UI Default 与原生 model omission 分开；显式全局 default、显式 claude-code/default tab 覆盖、anthropic/claude 下名为 default 的模型及合法 custom model 均完整转发。不改全局设置、tab 持久化、catalog、adapter 或 builder；unit fixtures 只证明选择与请求组装，不证明原生继承或运行时验收。
+
+> 2026-10-09（Codex model snapshot）：getSendMessageOptions 从既有会话设置 coordinator 一次解析的有效模型同时构造顶层与 codexOptions.model；null/undefined 继承当前全局模型，真正未配置时省略模型。getBackendScopedActiveTabModelOverride 让 selector 使用同一会话模型。Codex direct host setter 捕获所属 conversation，调用既有 saveConversationOverrides 保存一次；默认选择或 clear 写 null，失败恢复该次 conversation 的 settings/updatedAt，仅当前仍为所属会话时刷新显示，不写临时 tab/global。Codex 菜单通过既有独立 persist 路径保存一次，不同时调用 direct setter。没有新 owner 或 CodexAdapter 源码修改；这些请求约束不证明 physical 模型或 native 实机通过。
+
+> 2026-10-09（Pi standard UI）：仅三处现有生命周期接缝转发到 PiExtensionUiHost：setCurrentConversation 写回后同步当前 backend/session；scheduleComposerLayoutSync 先幂等同步投影再沿用既有 composer 调度；onClose 在拆除 DOM/coordinator 前释放此 view 绑定。App 身份使用 ItemView.app，临时 status/widget/title、signal/节点所有权均在 host，不写会话/native/tab 标题或新增 view runtime 真值。title 是同 view header 下的 transient 文本，空串隐藏；其它后端/空会话卸下旧投影。
+
+> 2026-10-08：Codex tool-user-input 和 MCP elicitation 接线把所属回合 signal 传给既有 showQuestionDialog；后台问题按 native session 解析到所属 tab，Stop 后卡片收集取消并清理，不接受迟到回答。
+
+> 2026-10-08：getSendMessageOptions 只装配既有 session-settings coordinator 的有效 Codex 设置，复制 additionalDirectories，随本次请求传递；不新增 runtime ownership。
+
+> 2026-10-08：Codex approval host wiring 提供既有 tab/session 映射，并将 adapter 的取消信号交给 question flow；view 只装配 ports，不持有审批 waiter。
+> 2026-10-08：Codex footer 和发送 variant 统一读取既有 `ConversationSessionSettingsCoordinator` 的有效会话 effort；忽略其它 tab 遗留的 `currentVariant`。footer 选择委托该 coordinator 持久化 `codexModelReasoningEffort`，不修改主默认；会话覆盖应用后刷新 effort 显示。保存、native runtime 应用与 SDK thread invalidation 仍由既有 session-settings owner 管理。
+
 OpenCode 2 slash autocomplete now enters the backend catalog path even when no OpenCode 1 config manager is present. Its Session Change Sidebar requests native `session.diff` through `ModifiedFilesSidebarCoordinator`; the view only routes the active backend/session and does not store diff state.
 The background task renderer receives OpenCode 2 native child-task read and interrupt callbacks alongside the existing ZCode callbacks; the view does not own task status.
 The real tab activation writeback refreshes sidebar identity immediately after assigning `currentConversation`. TabBar clicks bypass the view's older wrapper, so refreshing only in that wrapper is insufficient.
@@ -836,3 +851,15 @@ PiModelSelectionBinding 的 SDK 每模型档位使设置返回/reload 保留尚�
 ## 2026-10-05 Codex 消息前分支与恢复
 
 History 的 Codex 目录向浏览器转发持久化的 Codex native 引用 ID；Resume 转发到插件既有恢复桥，以复用同 native ID 的本地引用。身份恢复、native point-fork 和目录精确读取均由邻接 owner 承担，view 不新增 runtime ownership。
+
+2026-10-07 Pi 完成后同步复用现有 adapter-native 分支与 serialized conversation write；只从 PiAdapter.getChatMessages 取规范化历史，纯合并委托给既有 ConversationAuthoritativeMessageMergeCoordinator 模块。view 不持有第二套 Pi runtime/history state。
+
+Pi 完成后 bypass OpenCode canonical projection（其数据不属于 Pi 会话），进入现有 Pi getChatMessages native 回读和全文合并；不从 unrelated projection 宣称同步成功。
+
+
+> 2026-10-08 ZCode selection: 会话级 model override 与每模型 reasoning override 经既有保存/归一化链持久化，null 档位继承 native 模型默认；view 重载与切会话分别回读，保存失败只回滚发起会话。保存值不代替 native options 生效证据。
+
+
+## 2026-10-08 每轮流归属
+
+取消后立即启动下一轮时，以独立 streamRunToken 绑定每次发送。旧 iterator 的延迟 chunk/final 不得修改新轮次的 streaming 状态、用量、pending 指示、shell 或队列；旧回复只用自身 controller 和捕获的 DOM 保存。结束或取消的 controller 在下一轮替换，仍在运行的 controller 保留。异步 shell 收尾之后再次检查归属；晚到错误和定时器也受相同边界约束。

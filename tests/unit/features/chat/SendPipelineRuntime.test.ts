@@ -1,3 +1,5 @@
+import { buildMessageRenderGroups } from '../../../../src/features/chat/renderGroups';
+import { ConversationWriteSerializationService } from '../../../../src/features/chat/services/ConversationWriteSerializationService';
 import {
   createAsyncStream,
   createFinalizationPort,
@@ -10,6 +12,113 @@ import {
   type MockedSlashCommandPort,
   SendPipelineRuntime,
 } from './SendPipelineRuntime.testSupport';
+
+describe('SendPipelineRuntime cancelled-turn ownership', () => {
+  it.each(['old-first', 'next-first'])('preserves cancelled turn placement when replies release %s', async (releaseOrder) => {
+    const state = createTabRuntime();
+    const oldController = createStreamController();
+    const newController = createStreamController();
+    const oldPrepared = createPreparedSend();
+    oldPrepared.conversation.backend = 'zcode';
+    const nextUser = createUserMessage({ id: 'user-next', content: 'Next', timestamp: 15 });
+    const nextPrepared = createPreparedSend({
+      conversation: oldPrepared.conversation, userMessage: nextUser, messageID: 'message-next',
+    });
+    const preparation = createPreparationPort(oldPrepared);
+    preparation.prepareMessageSend.mockResolvedValueOnce(oldPrepared).mockResolvedValueOnce(nextPrepared);
+    preparation.enterStreamingState.mockImplementation(() => { state.isStreaming = true; });
+    const finalization = createFinalizationPort();
+    let releaseOld!: () => void;
+    let releaseNext!: () => void;
+    let oldReady!: () => void;
+    let nextReady!: () => void;
+    const oldHeld = new Promise<void>((resolve) => { releaseOld = resolve; });
+    const nextHeld = new Promise<void>((resolve) => { releaseNext = resolve; });
+    const oldStarted = new Promise<void>((resolve) => { oldReady = resolve; });
+    const nextStarted = new Promise<void>((resolve) => { nextReady = resolve; });
+    async function* oldStream() {
+      yield { type: 'text', content: 'Old answer' } as const;
+      yield { type: 'message_metadata', messageId: 'native-old', timestamp: 10 } as const;
+      oldReady();
+      await oldHeld;
+      yield { type: 'text', content: 'MUST_NOT_REAPPEAR' } as const;
+      yield { type: 'message_stop' } as const;
+    }
+    async function* nextStream() {
+      yield { type: 'text', content: 'Next answer' } as const;
+      nextReady();
+      await nextHeld;
+      yield { type: 'message_metadata', messageId: 'native-next', timestamp: 20 } as const;
+      yield { type: 'message_stop' } as const;
+    }
+    const host = createHost(state, oldController);
+    const serialization = new ConversationWriteSerializationService({ scope: 'instance' });
+    const saved: string[][] = [];
+    host.saveConversation.mockImplementation(async (conversation) => {
+      saved.push(conversation.messages.map((message) => message.id));
+    });
+    host.createConversationWriteTicket.mockImplementation((id) => serialization.createTicket(id));
+    host.commitConversationWrite.mockImplementation(async (conversation, ticket, reason, write) => {
+      const result = await serialization.commit({ conversation, ticket, reason, write: async () => {
+        await write();
+        await host.saveConversation(conversation);
+      } });
+      return result.applied;
+    });
+    host.sendStreamMessage.mockReturnValueOnce(oldStream()).mockReturnValueOnce(nextStream());
+    host.getOrCreateTabStreamController.mockReturnValueOnce(oldController).mockReturnValueOnce(newController);
+    const shells: HTMLElement[] = [];
+    host.createAssistantMessageElement.mockImplementation(() => {
+      const messageEl = document.body.createDiv();
+      const contentEl = messageEl.createDiv();
+      state.streamingMessageEl = messageEl;
+      state.streamingContentEl = contentEl;
+      shells.push(messageEl);
+      return { messageEl, contentEl };
+    });
+    const pipeline = new SendPipelineRuntime(host, preparation, finalization);
+    const first = pipeline.sendMessage('Old');
+    await oldStarted;
+    state.isStreaming = false;
+    oldController.cancelStream();
+    oldPrepared.conversation.messages.push(nextUser);
+    const second = pipeline.sendMessage('Next');
+    await nextStarted;
+    if (releaseOrder === 'next-first') { releaseNext(); await second; }
+    releaseOld();
+    await first;
+
+    expect(oldController.handleChunk).not.toHaveBeenCalledWith({ type: 'text', content: 'MUST_NOT_REAPPEAR' });
+    expect(shells[0]?.dataset.messageId).toBe('native-old');
+    expect(oldPrepared.conversation.messages).toContainEqual(expect.objectContaining({
+      content: 'Old answer', sourceMessageId: 'native-old', streamState: 'interrupted',
+    }));
+    const replacementStillRunning = releaseOrder === 'old-first';
+    expect(state.isStreaming).toBe(replacementStillRunning);
+    expect(state.streamingMessageEl).toBe(replacementStillRunning ? shells[1] : null);
+    expect(newController.handleChunk.mock.calls.some(([chunk]) => chunk.type === 'done')).toBe(!replacementStillRunning);
+    expect(shells[1]?.dataset.messageId).toBe(replacementStillRunning ? undefined : 'native-next');
+    expect(finalization.finalizeAfterStream).toHaveBeenCalledTimes(replacementStillRunning ? 0 : 1);
+    expect(preparation.consumeQueuedFollowUpSend.mock.calls.length === 0).toBe(replacementStillRunning);
+    if (releaseOrder === 'old-first') {
+      releaseNext();
+      await second;
+    }
+    expect(state.isStreaming).toBe(false);
+    expect(finalization.finalizeAfterStream).toHaveBeenCalledTimes(1);
+    expect(oldPrepared.conversation.messages.filter((message) => message.role === 'assistant').map((message) => message.content))
+      .toEqual(['Old answer', 'Next answer']);
+    const expectedOrder = ['user-1', 'native-old', 'user-next', 'native-next'];
+    expect(oldPrepared.conversation.messages.map((message) => message.id)).toEqual(expectedOrder);
+    expect(saved.at(-1)).toEqual(expectedOrder);
+    expect(buildMessageRenderGroups(oldPrepared.conversation.messages).map((group) => group.messages.map((message) => message.id)))
+      .toEqual(expectedOrder.map((id) => [id]));
+    expect(oldPrepared.conversation.updatedAt).toBe(20);
+    expect(oldPrepared.conversation.lastResponseAt).toBe(20);
+    expect(serialization.getVersion(oldPrepared.conversation.id)).toBe(2);
+  });
+
+});
 
 describe('SendPipelineRuntime', () => {
   beforeEach(() => {
@@ -50,7 +159,7 @@ describe('SendPipelineRuntime', () => {
 
     await runtime.sendMessage('Hello');
 
-    expect(preparationPort.prepareMessageSend).toHaveBeenCalledWith({ content: 'Hello' });
+    expect(preparationPort.prepareMessageSend).toHaveBeenCalledWith({ content: 'Hello', targetTabId: 'tab-1' });
     expect(preparationPort.enterStreamingState).not.toHaveBeenCalled();
     expect(host.sendStreamMessage).not.toHaveBeenCalled();
     expect(finalizationPort.finalizeAfterStream).not.toHaveBeenCalled();
@@ -159,5 +268,17 @@ describe('SendPipelineRuntime', () => {
     expect(host.onTurnSnapshotBegin).toHaveBeenCalledWith(expect.objectContaining({
       contextPaths: ['drafts/plan.md'],
     }));
+  });
+});
+
+
+describe('SendPipelineRuntime preparation identity', () => {
+  it('captures the initiating tab before the slash-command await', async () => {
+    const controller = createStreamController();
+    const host = createHost(createTabRuntime(), controller);
+    const preparation = createPreparationPort(null);
+    const slash = { tryRunSlashCommand: jest.fn(async () => { host.getActiveTabId.mockReturnValue('tab-2'); return false; }) };
+    await new SendPipelineRuntime(host, preparation, createFinalizationPort(), slash).sendMessage('tab-1 draft');
+    expect(preparation.prepareMessageSend).toHaveBeenCalledWith(expect.objectContaining({ targetTabId: 'tab-1', content: 'tab-1 draft' }));
   });
 });

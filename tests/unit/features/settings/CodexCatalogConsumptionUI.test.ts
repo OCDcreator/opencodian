@@ -67,6 +67,18 @@ afterEach(() => { jest.restoreAllMocks(); document.body.innerHTML = ''; setLocal
 
 describe.each(catalogs.flatMap((catalog) => (['en', 'zh'] as const).map((locale) => ({ ...catalog, locale }))))('$route settings button consumes complete catalog evidence ($locale)', (catalog) => {
   beforeEach(() => { setLocale(catalog.locale); });
+  it('retains partial rows when a later page is denied and displays a safe permission message', async () => {
+    const { controls, request } = fixture();
+    request.mockResolvedValueOnce({ data: [catalog.row('native-A')], nextCursor: 'page-2' });
+    request.mockRejectedValueOnce(new Error('Permission denied: secret-denied-page'));
+    const modal = launch(controls, catalog.method);
+    await flushUI();
+    expect(state(modal)).toBe('partial');
+    expect(modal.contentEl.querySelector(catalog.selector)?.getAttribute(catalog.idAttribute)).toBe('native-A');
+    expect(modal.contentEl.textContent).toContain(t('settings.codex.readback.messagePermissionDenied'));
+    expect(modal.contentEl.textContent).not.toContain('secret-denied-page');
+  });
+
   it('renders two pages, deduplicates native IDs, and never performs a write', async () => {
     const { controls, request } = fixture();
     request.mockImplementation(async (method, params) => {
@@ -132,6 +144,38 @@ describe.each(['en', 'zh'] as const)('Codex session browser native catalogs (%s)
       loadConversation: jest.fn(), showNotice: jest.fn(), isStreaming: () => false,
     });
   }
+
+  it('distinguishes permission denial and clears its marker on a successful refresh', async () => {
+    const f = fixture();
+    f.request.mockRejectedValue(new Error('Permission denied: secret-thread-token'));
+    const modal = browser(f);
+    modal.onOpen();
+    await flushUI();
+    expect(modal.contentEl.querySelector('[data-session-catalog-failure="permission-denied"]')).toBeTruthy();
+    expect(modal.contentEl.textContent).toContain(t('chat.backendSessions.catalogPermissionDenied'));
+    expect(modal.contentEl.textContent).not.toContain('secret-thread-token');
+    f.request.mockResolvedValue({ data: [], nextCursor: null });
+    Array.from(modal.contentEl.querySelectorAll('button')).find((button) => button.textContent === t('chat.backendSessions.refreshButton'))!.click();
+    await flushUI();
+    expect(modal.contentEl.querySelector('[data-session-catalog-state="complete"]')).toBeTruthy();
+    expect(modal.contentEl.querySelector('[data-session-catalog-failure="permission-denied"]')).toBeNull();
+  });
+
+  it('keeps first-page native identities when permission is denied on a later page', async () => {
+    const f = fixture();
+    f.request.mockImplementation(async (_method, params) => {
+      if (params.archived) return { data: [], nextCursor: null };
+      if (params.cursor) throw new Error('Permission denied: secret-thread-page');
+      return { data: [{ id: 'native-A', name: 'Title', updatedAt: 1 }], nextCursor: 'page-2' };
+    });
+    const modal = browser(f);
+    modal.onOpen();
+    await flushUI();
+    expect(modal.contentEl.querySelector('[data-session-catalog-state="partial"]')).toBeTruthy();
+    expect(modal.contentEl.querySelector('[data-session-id="native-A"]')).toBeTruthy();
+    expect(modal.contentEl.textContent).toContain(t('chat.backendSessions.catalogPermissionDenied'));
+    expect(modal.contentEl.textContent).not.toContain('secret-thread-page');
+  });
 
   it('merges active/archived pages, retains native selection through refresh, and resumes by native ID', async () => {
     const f = fixture();

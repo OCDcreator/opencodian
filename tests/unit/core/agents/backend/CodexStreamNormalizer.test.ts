@@ -891,11 +891,15 @@ describe('CodexStreamNormalizer', () => {
   // -------------------------------------------------------------------------
 
   describe('error item', () => {
-    it('emits error chunk', () => {
+    it('preserves a non-fatal SDK item as diagnostic evidence without failing the send', () => {
       const chunks = normalizer.transformEvent(
         mockItemStarted(errorItem('err-1', 'non-fatal failure')) as never,
       );
-      expect(chunks).toEqual([{ type: 'error', content: 'non-fatal failure' }]);
+      expect(chunks).toEqual([{
+        type: 'backend_event', source: 'codex', event: 'informational',
+        status: 'warning', name: 'non-fatal-error',
+        id: 'err-1', metadata: { message: 'non-fatal failure' },
+      }]);
     });
   });
 

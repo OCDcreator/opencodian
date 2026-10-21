@@ -1,6 +1,6 @@
 import { getNormalizedToolName } from './toolIdentity';
 
-export type ToolExecutionStatus = 'pending' | 'running' | 'completed' | 'error' | 'blocked';
+export type ToolExecutionStatus = 'pending' | 'running' | 'completed' | 'error' | 'blocked' | 'interrupted';
 
 export interface ToolExecutionStateLike {
   status?: string;
@@ -180,6 +180,10 @@ export function resolveToolExecutionStatus(
 
   if (isToolExecutionError(options)) {
     return 'error';
+  }
+
+  if (state?.status !== 'completed' && (state?.status === 'interrupted' || storedStatus === 'interrupted')) {
+    return 'interrupted';
   }
 
   const hasResult = resolveToolResultText(state, options.result) !== undefined;

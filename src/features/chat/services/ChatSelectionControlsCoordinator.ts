@@ -191,19 +191,24 @@ async function resolveCodexModelProviders(): Promise<ModelSelectorProvider[] | n
 
 /**
  * Wrap a ModelSelectionRuntimeHost with Codex-aware overrides.
- * When Codex is the active backend, intercepts catalog loading, default
+ * Prefer the toolbar's owned conversation, with legacy active-leaf/global
+ * routing only when the host supplies no backend. For Codex, intercept catalog loading, default
  * selection, model availability, and model override to use Codex-specific
  * logic. Falls through to the original host for non-Codex backends.
  */
-function wrapHostForCodex(host: ModelSelectionRuntimeHost): ModelSelectionRuntimeHost {
+function wrapHostForCodex(
+  host: ModelSelectionRuntimeHost & Pick<ChatSelectionControlsCoordinatorHost, 'getOwnConversation'>,
+): ModelSelectionRuntimeHost {
   return {
     ...host,
+    preserveRequestedModel: () => (host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'codex'
+      || host.preserveRequestedModel?.() === true,
     async loadModelCatalogData() {
-      if (readActiveBackendFromPlugin() === 'opencode2') {
+      if ((host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'opencode2') {
         const adapter = readOpenCodianPlugin()?.agentServiceRegistry?.get?.('opencode2') as OpenCode2Adapter | undefined;
         return { catalogBundle: null, providers: await adapter?.getModelSelectorProviders() ?? [] };
       }
-      if (readActiveBackendFromPlugin() === 'codex') {
+      if ((host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'codex') {
         const providers = await resolveCodexModelProviders();
         if (providers) return { catalogBundle: null, providers };
         return { catalogBundle: null, providers: [] };
@@ -211,37 +216,37 @@ function wrapHostForCodex(host: ModelSelectionRuntimeHost): ModelSelectionRuntim
       return host.loadModelCatalogData();
     },
     getDefaultModelSelection() {
-      if (readActiveBackendFromPlugin() === 'opencode2') {
+      if ((host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'opencode2') {
         const adapter = readOpenCodianPlugin()?.agentServiceRegistry?.get?.('opencode2') as OpenCode2Adapter | undefined;
         return adapter?.getDefaultModelSelection() ?? null;
       }
-      if (readActiveBackendFromPlugin() === 'codex') {
+      if ((host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'codex') {
         const model = readOpenCodianPlugin()?.settings?.backendSettings?.codex?.model?.trim() ?? '';
-        return { provider: CODEX_PROVIDER_ID, model };
+        return model ? { provider: CODEX_PROVIDER_ID, model } : null;
       }
       return host.getDefaultModelSelection();
     },
     async isModelAvailableOnServer(provider: string, model: string) {
-      if (readActiveBackendFromPlugin() === 'opencode2') {
+      if ((host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'opencode2') {
         const adapter = readOpenCodianPlugin()?.agentServiceRegistry?.get?.('opencode2') as OpenCode2Adapter | undefined;
         const providers = await adapter?.getModelSelectorProviders() ?? [];
         return providers.some((item) => item.id === provider && item.models.some((entry) => entry.id === model));
       }
-      if (readActiveBackendFromPlugin() === 'codex') {
+      if ((host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'codex') {
         return Boolean(provider && model);
       }
       return host.isModelAvailableOnServer(provider, model);
     },
     getActiveTabModelOverride() {
       const override = host.getActiveTabModelOverride();
-      if (override && readActiveBackendFromPlugin() === 'codex') {
+      if (override && (host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'codex') {
         return override.provider === CODEX_PROVIDER_ID ? override : null;
       }
       return override;
     },
     setActiveTabModelOverride(selection) {
       // Handle Codex Custom sentinel: prompt for model name.
-      if (readActiveBackendFromPlugin() === 'codex' && selection?.model === CODEX_CUSTOM_MODEL_SENTINEL) {
+      if ((host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'codex' && selection?.model === CODEX_CUSTOM_MODEL_SENTINEL) {
         const custom = window.prompt(t('chat.modelSelector.codex.customPrompt'));
         if (!custom?.trim()) return false;
         selection = { provider: selection.provider, model: custom.trim() };
@@ -1010,6 +1015,11 @@ export class ChatSelectionControlsCoordinator {
     if (this.modelSelectorSearchInput) {
       this.modelSelectorSearchInput.value = '';
     }
+    // A startup CLI fallback may finish before native model/list is ready.
+    if (!this.modelSelectionRuntime.hasLoadedModelCatalog()
+      || this.modelSelectionRuntime.getAvailableProviders().length === 0) {
+      void this.reloadModelCatalog();
+    }
     this.renderModelList();
 
     window.setTimeout(() => {
@@ -1142,37 +1152,46 @@ export class ChatSelectionControlsCoordinator {
   }
 
   private selectModel(provider: string, model: string): boolean {
-    // Codex sentinel already resolved by wrapped host; persist + show next-thread notice.
     const isCodex = readActiveBackendFromPlugin() === 'codex';
     const activeView = isCodex ? getActiveCodexView() : null;
-    if (isCodex && !activeView) {
+    if (isCodex && (!activeView || provider !== CODEX_PROVIDER_ID)) {
       new Notice(t('chat.modelSelector.codex.applyFailed'));
       return false;
     }
-
-    const previousOverride = this.host.getActiveTabModelOverride();
-    const didSwitch = this.modelSelectionRuntime.switchModel(provider, model, {
-      // The Codex save coordinator owns the async success/failure feedback.
-      notify: !isCodex,
-    });
-    if (!didSwitch) {
-      return false;
-    }
-    this.updateModelSelectorDisplay();
-    if (isCodex) {
-      // Only show the next-thread success notice after the active conversation
-      // save resolves. Failed saves roll back both the conversation snapshot
-      // and the ephemeral tab override so the UI cannot claim a false success.
-      void this.persistCodexModelOverride(model, activeView).then((saved) => {
+    if (isCodex && activeView) {
+      const conversation = activeView.currentConversation;
+      if (model === CODEX_CUSTOM_MODEL_SENTINEL) {
+        model = window.prompt(t('chat.modelSelector.codex.customPrompt'))?.trim() ?? '';
+      } else {
+        model = model.trim();
+      }
+      if (!model || model === CODEX_CUSTOM_MODEL_SENTINEL) return false;
+      // Direct setters and menu selections reuse the same session coordinator,
+      // but the menu's existing persistence path owns this operation's one save.
+      const capturedView = {
+        currentConversation: conversation,
+        conversationSessionSettingsCoordinator: activeView.conversationSessionSettingsCoordinator,
+      };
+      void this.persistCodexModelOverride(model, capturedView).then((saved) => {
+        if (activeView.currentConversation !== conversation) return;
+        this.host.syncActiveTabContextUsageIdentity();
+        this.updateModelSelectorDisplay();
         if (saved) {
           this.showCodexModelNextThreadNotice(activeView);
         } else {
-          this.host.setActiveTabModelOverride(previousOverride);
-          this.updateModelSelectorDisplay();
           new Notice(t('chat.modelSelector.codex.applyFailed'));
         }
       });
+      if (activeView.currentConversation === conversation) {
+        this.host.syncActiveTabContextUsageIdentity();
+        this.updateModelSelectorDisplay();
+      }
+      return true;
     }
+
+    const didSwitch = this.modelSelectionRuntime.switchModel(provider, model);
+    if (!didSwitch) return false;
+    this.updateModelSelectorDisplay();
     return true;
   }
 

@@ -11,3 +11,6 @@
 ## 验证
 
 装配路径与语义由 adapter 层 ZCodeAdapter.models.test.ts 覆盖（目录捕获、校验、边界）；`ZCodeModelSelectionBinding.test.ts` 覆盖 deferred 会话读失败时仍使用 create 快照模型。
+
+
+> 2026-10-08 ZCode selection: 会话级 model override 与每模型 reasoning override 经既有保存/归一化链持久化，null 档位继承 native 模型默认；view 重载与切会话分别回读，保存失败只回滚发起会话。保存值不代替 native options 生效证据。

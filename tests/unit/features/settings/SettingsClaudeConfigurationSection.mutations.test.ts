@@ -1,3 +1,7 @@
+import { lstat, mkdir, mkdtemp, readdir, readFile, realpath, rmdir, unlink, writeFile } from 'node:fs/promises';
+import * as path from 'node:path';
+
+import { ClaudeSettingsSourceService } from '../../../../src/core/agents/backend/ClaudeSettingsSourceService';
 import { type ClaudeSettingsServiceBoundary, SettingsClaudeConfigurationSection } from '../../../../src/features/settings/SettingsClaudeConfigurationSection';
 import { candidate, fakePlugin, flushMicrotasks, projectRevision, readOk, stubService } from './SettingsClaudeConfigurationSection.testSupport';
 
@@ -11,6 +15,94 @@ const deferred = <T,>() => {
   const promise = new Promise<T>((next) => { resolve = next; });
   return { promise, resolve };
 };
+
+describe('matrix006 Claude dual-field saves with production filesystem CAS', () => {
+  it.each([false, true])('serializes rapid saves and preserves both fields or external bytes (external=%s)', async (external) => {
+    const fixtureRoot = path.resolve('.tmp');
+    await mkdir(fixtureRoot, { recursive: true });
+    const workspace = await mkdtemp(path.join(fixtureRoot, 'matrix006-cas-'));
+    const releases = [deferred<void>(), deferred<void>()];
+    const results = [deferred<Awaited<ReturnType<ClaudeSettingsServiceBoundary['write']>>>(), deferred<Awaited<ReturnType<ClaudeSettingsServiceBoundary['write']>>>()];
+    try {
+      const source = new ClaudeSettingsSourceService(workspace, {
+        home: path.join(workspace, 'fake-home'), managedConfigDir: path.join(workspace, 'fake-managed'),
+        managedPreferencesDir: path.join(workspace, 'fake-preferences'), username: 'fixture-user',
+        archiveRootPath: path.join(workspace, 'archive'),
+      });
+      const target = source.getDefaultProjectSettingsPath();
+      await mkdir(path.dirname(target));
+      await writeFile(target, '{"model":"fixture-old","cleanupPeriodDays":30,"unrelated":"kept"}');
+      const initial = await source.read(target);
+      if (initial.status !== 'success') throw new Error('Fixture read failed');
+      let dispatched = 0;
+      // Only release timing is controlled. Persistence and revision checks execute the production writer.
+      const write = jest.fn(async (params: Parameters<ClaudeSettingsServiceBoundary['write']>[0]) => {
+        const index = dispatched++;
+        await releases[index].promise;
+        const result = await source.write(params);
+        results[index].resolve(result);
+        return result;
+      });
+      const body = document.body.appendChild(document.createElement('div'));
+      new SettingsClaudeConfigurationSection({
+        plugin: fakePlugin(workspace) as never,
+        sourceService: stubService({ read: source.read.bind(source), write,
+          getDefaultProjectSettingsPath: () => target, getDefaultGlobalSettingsPath: () => source.getDefaultGlobalSettingsPath() }),
+      }).render(body);
+      const model = body.querySelector('[data-claude-config-field="model"]') as HTMLInputElement;
+      const cleanup = body.querySelector('[data-claude-config-field="cleanupPeriodDays"]') as HTMLInputElement;
+      const draft = body.querySelector('[data-claude-config-draft]') as HTMLTextAreaElement;
+      const save = body.querySelector('[data-claude-config-save]') as HTMLButtonElement;
+      for (let attempt = 0; !draft.value && attempt < 100; attempt++) await flushMicrotasks();
+      expect(JSON.parse(draft.value)).toEqual({ model: 'fixture-old', cleanupPeriodDays: 30, unrelated: 'kept' });
+      model.value = 'fixture-new';
+      model.dispatchEvent(new Event('change'));
+      save.click();
+      cleanup.value = '45';
+      cleanup.dispatchEvent(new Event('change'));
+      save.click();
+      save.click();
+      expect(write).toHaveBeenCalledTimes(1);
+      expect(save.disabled).toBe(true);
+      expect(JSON.parse(write.mock.calls[0][0].content)).toEqual({ model: 'fixture-new', cleanupPeriodDays: 30, unrelated: 'kept' });
+      expect(write.mock.calls[0][0].expectedRevision).toEqual(initial.source.revision);
+      releases[0].resolve();
+      const first = await results[0].promise;
+      for (let attempt = 0; save.disabled && attempt < 100; attempt++) await flushMicrotasks();
+      expect(first.result.status).toBe('success');
+      expect(JSON.parse(await readFile(target, 'utf8'))).toEqual({ model: 'fixture-new', cleanupPeriodDays: 30, unrelated: 'kept' });
+      expect(JSON.parse(draft.value)).toEqual({ model: 'fixture-new', cleanupPeriodDays: 45, unrelated: 'kept' });
+      expect(save.disabled).toBe(false);
+      save.click();
+      expect(write).toHaveBeenCalledTimes(2);
+      expect(write.mock.calls[1][0]).toEqual({ targetPath: target, content: draft.value,
+        expectedRevision: first.result.status === 'success' ? first.result.revision : null });
+      const externalBytes = '{ "external": "fixture-external", "unrelated": "external-kept" }\n';
+      if (external) await writeFile(target, externalBytes);
+      releases[1].resolve();
+      const second = await results[1].promise;
+      for (let attempt = 0; save.disabled && attempt < 100; attempt++) await flushMicrotasks();
+      expect(second.result.status).toBe(external ? 'conflict' : 'success');
+      expect(JSON.parse(draft.value)).toEqual({ model: 'fixture-new', cleanupPeriodDays: 45, unrelated: 'kept' });
+      expect(await readFile(target, 'utf8')).toBe(external ? externalBytes : draft.value);
+      expect(body.querySelector('[data-claude-config-status]')?.getAttribute('data-claude-config-status-level')).toBe(external ? 'error' : 'ok');
+      expect((body.querySelector('[data-claude-config-compare]') as HTMLButtonElement).hidden).toBe(!external);
+      expect(second.evidence).toEqual({ persistence: external ? 'failed' : 'verified',
+        application: external ? 'unavailable' : 'pending', runtime: 'unavailable' });
+    } finally {
+      releases.forEach(release => release.resolve());
+      // Non-recursive cleanup is confined to the unique fixture this test created.
+      expect(await realpath(workspace)).toBe(workspace);
+      expect(workspace.startsWith(fixtureRoot + path.sep)).toBe(true);
+      for (const entry of (await readdir(workspace, { recursive: true })).sort((a, b) => b.split(path.sep).length - a.split(path.sep).length)) {
+        const owned = path.join(workspace, entry);
+        if ((await lstat(owned)).isDirectory()) await rmdir(owned);
+        else await unlink(owned);
+      }
+      await rmdir(workspace);
+    }
+  });
+});
 
 describe('SettingsClaudeConfigurationSection compare and mutation controller · compare and history', () => {
   it('shows a localized non-mutating draft/disk compare without replacing the draft', async () => {

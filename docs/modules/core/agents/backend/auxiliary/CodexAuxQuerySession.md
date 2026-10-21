@@ -30,3 +30,8 @@
 - aux 系统提示词走 `thread/start` 的 `developerInstructions`（Codex 自己的 thread 指令注入点，已对 codex-cli 0.154.0 用行为实验验证；字段见 `codex app-server generate-json-schema` 的 `ThreadStartParams`）。它保留 Codex 自身的 base instructions，因此模型仍知道怎么用工具；安全论证不依赖这段文本。仓库里「Codex 没有 instructions 接缝」的旧说法已过时
 - Codex 在只读 sandbox 内仍保留 shell 工具，因此服务层的写类审计会把任何 shell 调用视为违规并丢弃结果（`docs/requirements/inline-edit.md` §5.5）；这是有意为之的 fail-closed 行为
 - 回读失败（`getThreadEffectiveSettings` 为空）必须直接拒绝会话，禁止只依赖请求参数
+
+
+## 2026-10-08 Codex auxiliary cancellation
+
+Timeout, request abort, explicit cancel and dispose settle locally within the original budget and interrupt the exact admitted native turn once. A late turn/start acknowledgement after local cancellation is interrupted using its captured owned thread/turn ID, so it cannot survive the cancelled request. Pre-aborted requests send no native turn. Failed/interrupted native terminals cannot admit partial replacement text. Read-only sandbox, no network, never approvals and ephemeral readback remain required.

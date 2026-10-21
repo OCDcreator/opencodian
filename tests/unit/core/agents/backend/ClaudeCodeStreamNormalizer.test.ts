@@ -921,3 +921,19 @@ describe('ClaudeCodeStreamNormalizer', () => {
     }]);
   });
 });
+
+
+describe('Claude human prompt identity', () => {
+  it('keeps the submitted prompt UUID across native tool-result user messages', () => {
+    const normalizer = createClaudeCodeStreamNormalizer();
+    const prompt = normalizer.transformSDKMessage({ type: 'user', uuid: 'human-prompt', session_id: 'owned-native',
+      message: { role: 'user', content: [{ type: 'text', text: 'Use the owned tool' }] } });
+    expect(prompt).toContainEqual({ type: 'user_message_identity', uuid: 'human-prompt', sessionId: 'owned-native' });
+    const result = normalizer.transformSDKMessage({ type: 'user', uuid: 'tool-result', session_id: 'owned-native',
+      message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'owned-call', content: 'Denied', is_error: true }] } });
+    expect(result.filter((chunk) => chunk.type === 'user_message_identity')).toEqual([]);
+    const following = normalizer.transformSDKMessage({ type: 'user', uuid: 'next-human', session_id: 'owned-native',
+      message: { role: 'user', content: 'A real follow-up' } });
+    expect(following).toContainEqual({ type: 'user_message_identity', uuid: 'next-human', sessionId: 'owned-native' });
+  });
+});

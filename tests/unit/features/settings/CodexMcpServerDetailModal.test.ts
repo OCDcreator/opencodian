@@ -46,6 +46,30 @@ afterEach(() => {
 });
 
 describe('CodexMcpServerDetailModal — server list and reload', () => {
+  it.each(['en', 'zh'] as const)('distinguishes denied catalog access and clears it after a successful reload (%s)', async (locale) => {
+    setLocale(locale);
+    const host = createHost({
+      getMcpServerStatusCatalog: jest.fn()
+        .mockResolvedValueOnce({ status: 'failed', data: [], nextCursor: null, errorReason: 'Permission denied: Bearer secret-mcp-token' })
+        .mockResolvedValueOnce({ status: 'complete', data: [serverStatus('restored-server')], nextCursor: null }),
+    });
+    const modal = createModal(host);
+    modal.onOpen();
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+    const status = modal.contentEl.querySelector('[data-mcp-state]');
+    expect(status?.getAttribute('data-mcp-state')).toBe('failed');
+    expect(status?.getAttribute('data-mcp-failure')).toBe('permission-denied');
+    expect(status?.textContent).toBe(t('settings.codex.readback.statusPermissionDenied'));
+    expect(modal.contentEl.textContent).not.toContain('secret-mcp-token');
+    const reload = modal.contentEl.querySelector('.opencodian-codex-mcp-detail-toolbar button') as HTMLButtonElement;
+    reload.click();
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    expect(status?.getAttribute('data-mcp-state')).toBe('success');
+    expect(status?.getAttribute('data-mcp-failure')).toBe('');
+    expect(modal.contentEl.textContent).toContain('restored-server');
+  });
+
   it('loads and renders server list on open', async () => {
     const host = createHost({
       getMcpServerStatus: jest.fn().mockResolvedValue([

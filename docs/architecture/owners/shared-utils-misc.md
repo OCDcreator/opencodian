@@ -36,3 +36,5 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 The new core.backend-pi owner isolates the external Pi process service. shared.utils-misc retains its existing responsibilities; Pi process lifecycle, RPC compatibility and native history must not be added to this owner.
 
 - 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `shared.utils-misc` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。

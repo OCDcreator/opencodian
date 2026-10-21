@@ -1,5 +1,9 @@
 # ChatSelectionControlsCoordinator
 
+> 2026-10-09（selection wrapper 所属会话）：`wrapHostForCodex` 的既有 preserve/catalog/default/availability/override/custom 分支优先读取 `host.getOwnConversation()?.backend`，仅无所属 backend 时沿用 active leaf/global fallback。这样本地 Claude toolbar 不会读取另一叶子的 Codex/OpenCode 2 模型，反向本地 Codex 仍保留严格选择、provider 过滤与 Custom prompt；legacy 无 owner host 保持既有行为。参数仅窄增既有可选 `getOwnConversation` 类型，不新增 helper、constructor 或 generic runtime 策略。
+
+> 2026-10-09（Codex requested model）：wrapHostForCodex 通过已有 preserveRequestedModel hook 保留请求模型，缺失项沿用既有可用性校验拒绝而非静默首行替换，空全局模型为未配置。selectModel 的 Codex 菜单入口在 prompt 前捕获 conversation，Custom prompt 一次且 cancel/blank 零写入；解析后的字符串交给未修改的 persistCodexModelOverride 单次保存，跳过同样会保存的 direct host setter。成功/失败显示和 context 同步仅刷新仍属于原 conversation 的视图；失败不调用后来 active B 的 setter 回滚。非 Codex switch 路径与 catalog/auth 决策保留。
+
 Send-time model validation retries a loaded but empty catalog. A restored ZCode
 session can briefly return an empty catalog during startup; that first snapshot
 does not permanently block sends once the native catalog becomes available.
@@ -107,3 +111,8 @@ The OpenCode 2 model picker reads the native model catalog and default model. Th
 OpenCode 2 now has a permission/agent selector: inherited Build, ask, allow and Plan. Changes are applied to the selected native session, read back, then persisted for subsequent turns.
 
 2026-10-02：Pi 模型目录绑定使用本工具栏所属 conversation 的 backend 与 backendSessionId；动态思考等级回读传入同一 Pi 会话，不因 Markdown 聚焦或其他标签页的全局默认值而读错会话。新建会话未物化时显式使用 catalog 范围。
+
+
+## 2026-10-08 Cold-start model catalog retry
+
+Opening the model picker refreshes an unloaded/empty catalog through the existing reloadModelCatalog path. This retries a startup CLI fallback after native model/list becomes ready. A populated snapshot is reused; no synthetic model or new runtime owner is introduced.

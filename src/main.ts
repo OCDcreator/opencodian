@@ -653,6 +653,7 @@ export default class OpenCodianPlugin extends Plugin {
         codexSettings: this.settings.backendSettings.codex,
         codexTracePort: this.codexTraceService,
         getPiSettings: () => this.settings.backendSettings.pi,
+        formatPiCommandCompleted: (command) => t('chat.pi.commandCompleted', { command }),
         getZCodeSettings: () => this.settings.backendSettings.zcode,
         getOpenCode2Settings: () => this.settings.backendSettings.opencode2,
         getCodexExtraEnv: () => this.getDomainEnvFor('codex'),
@@ -1327,7 +1328,12 @@ export default class OpenCodianPlugin extends Plugin {
       return { action: 'cancel' };
     }
 
-    const questionRequest = buildClaudeCodeElicitationQuestionRequest(request);
+    let questionRequest: ReturnType<typeof buildClaudeCodeElicitationQuestionRequest>;
+    try {
+      questionRequest = buildClaudeCodeElicitationQuestionRequest(request);
+    } catch {
+      return { action: options.signal.aborted ? 'cancel' : 'decline' };
+    }
     const response = await renderer.collectResponse(questionRequest, ctx.getActiveTabId());
     if (!response) {
       return { action: 'cancel' };
@@ -2389,7 +2395,7 @@ export default class OpenCodianPlugin extends Plugin {
       '',
     ].join('\n');
 
-    return sanitizeDiagnosticReport(raw);
+    return sanitizeDiagnosticReport(raw, { urlPolicy: 'strict' });
   }
 
   async writeDiagnosticLogFile(targetDirectory: string, source = 'manual'): Promise<string> {
@@ -2948,12 +2954,15 @@ export default class OpenCodianPlugin extends Plugin {
 
   /** Project MCP servers for the Claude adapter; missing manager/reader stays an empty config. */
   private async readClaudeMcpServers(): Promise<Awaited<ReturnType<typeof adaptMcpConfigForClaude>>> {
-    if (!this.opencodeConfigManager) {
-      return {};
-    }
     try {
+      // The active Claude adapter starts before configureVaultScopedServices.
+      // Read the same project source without caching a false empty catalog.
+      const vaultPath = getVaultBasePath(this.app);
+      const configManager = this.opencodeConfigManager
+        ?? (vaultPath ? new OpencodeConfigManager(vaultPath) : null);
+      if (!configManager) return {};
       const { McpConfigService } = await import('./core/config/McpConfigService');
-      const mcpConfigService = new McpConfigService(this.opencodeConfigManager);
+      const mcpConfigService = new McpConfigService(configManager);
       return adaptMcpConfigForClaude(await mcpConfigService.readProjectServers());
     } catch {
       return {};

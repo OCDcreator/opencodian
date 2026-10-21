@@ -1,5 +1,7 @@
 # Chat Assistant Styles
 
+2026-10-09（Pi standard UI）：在既有文件内新增 scoped `.opencodian-pi-extension-title`、`.opencodian-pi-extension-status`、`.opencodian-pi-extension-widget` 文本样式，使用 Obsidian text/font 变量、pre-wrap 与 overflow-wrap。transient title 在同 view header 下，status 在输入区内，widget 随 host 放在编辑器上/下；无额外卡片、动画、观察器或滚动所有权。空内容由 host 卸下，不留样式占位。此 CSS 的模块文档映射有效，architecture owner inspector 仍 unresolved；指定文件责任不新增 manifest owner 事实。
+
 2026-09-26：聊天内联卡片沿用同一套 Obsidian card 变量（背景、边框、圆角、阴影），后台任务、权限与问题卡的状态以图标、文字和操作层级表达。样式需与真实聊天 DOM 及对应渲染模块一同验收。
 
 2026-09-18（R-C1）：`.opencodian-composer-context-chip.is-vault-retrieval` 与 `.opencodian-context-chip-origin-badge`——整库检索注入 chips 的“检索”徽标样式（accent 18% 混色、6px 圆角、10px/600 字重小标签；composer chips 与已发送用户消息的附件 chips 共用）。

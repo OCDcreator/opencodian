@@ -288,6 +288,8 @@ export interface CodexApprovalRequest {
   readonly reason?: string | null;
   /** Original server params, preserved for advanced rendering. */
   readonly raw: unknown;
+  /** Owning foreground turn cancellation, for settling the UI collection. */
+  readonly signal?: AbortSignal;
 }
 
 /**
@@ -310,7 +312,7 @@ export type CodexApprovalDecision =
  */
 export interface CodexApprovalBridgeHost {
   collectApproval?(request: CodexApprovalRequest): Promise<CodexApprovalDecision | null>;
-  collectQuestionAnswers?(request: QuestionRequest): Promise<CodexApprovalResolutionResult | null>;
+  collectQuestionAnswers?(request: QuestionRequest, signal?: AbortSignal): Promise<CodexApprovalResolutionResult | null>;
 }
 
 /** Structural supertype of the question-card resolution result the tool-user-input seam consumes. */
@@ -707,17 +709,17 @@ export class CodexAdapter
           this.setAppServerCapabilitiesAvailable(false);
         }
       } catch (err) {
+        // A failed negotiation still owns its socket and spawned process.
+        // Release them before dropping the client or entering SDK fallback.
+        this.appServerClient?.stop();
+        this.appServerClient = null;
+        this.setAppServerCapabilitiesAvailable(false);
         if (isExecutableMissingError(err)) {
-          this.appServerClient?.stop();
-          this.appServerClient = null;
-          this.setAppServerCapabilitiesAvailable(false);
           throw new Error(`Codex executable could not be started: ${err instanceof Error ? err.message : String(err)}. Verify the executable path in Codex settings, then reload OpenCodian.`);
         }
         logger.warn('Codex app-server negotiation failed; preserving SDK chat without context usage', {
           error: err instanceof Error ? err.message : String(err),
         });
-        this.appServerClient = null;
-        this.setAppServerCapabilitiesAvailable(false);
       }
 
       this.setStatus('connected');
@@ -802,7 +804,7 @@ export class CodexAdapter
 
     const codexPath = this.options.codexPathOverride ?? 'codex';
     return new Promise((resolve) => {
-      execFile(codexPath, ['doctor', '--json'], { timeout: 15000 }, (err, stdout, stderr) => {
+      execFile(codexPath, ['doctor', '--json'], { timeout: 15000, ...(this.options.getExtraEnv ? { env: { ...process.env, ...this.options.getExtraEnv() } } : {}) }, (err, stdout, stderr) => {
         const output = stdout || stderr || '';
         try {
           const parsed = JSON.parse(output);
@@ -864,7 +866,7 @@ export class CodexAdapter
   private getModelListFromCli(): Promise<CodexModelSummary[] | null> {
     const codexPath = this.options.codexPathOverride ?? 'codex';
     return new Promise((resolve) => {
-      execFile(codexPath, ['debug', 'models'], { timeout: 15000, maxBuffer: 512 * 1024 }, (err, stdout, stderr) => {
+      execFile(codexPath, ['debug', 'models'], { timeout: 15000, maxBuffer: 512 * 1024, ...(this.options.getExtraEnv ? { env: { ...process.env, ...this.options.getExtraEnv() } } : {}) }, (err, stdout, stderr) => {
         const output = stdout || stderr || '';
         try {
           const parsed = JSON.parse(output);
@@ -1745,27 +1747,27 @@ export class CodexAdapter
     }
     this.appServerClient.registerServerRequestHandler(
       'execCommandApproval',
-      (params) => this.handleApproval('execCommand', params),
+      (params, signal) => this.handleApproval('execCommand', params, signal),
     );
     this.appServerClient.registerServerRequestHandler(
       'applyPatchApproval',
-      (params) => this.handleApproval('applyPatch', params),
+      (params, signal) => this.handleApproval('applyPatch', params, signal),
     );
     if (typeof this.appServerClient.registerCommandExecutionApprovalHandler === 'function') {
-      this.appServerClient.registerCommandExecutionApprovalHandler((params) =>
-        this.handleCommandExecutionApproval(params));
+      this.appServerClient.registerCommandExecutionApprovalHandler((params, signal) =>
+        this.handleCommandExecutionApproval(params, signal));
     }
     if (typeof this.appServerClient.registerFileChangeApprovalHandler === 'function') {
-      this.appServerClient.registerFileChangeApprovalHandler((params) =>
-        this.handleFileChangeApproval(params));
+      this.appServerClient.registerFileChangeApprovalHandler((params, signal) =>
+        this.handleFileChangeApproval(params, signal));
     }
     if (typeof this.appServerClient.registerPermissionsApprovalHandler === 'function') {
-      this.appServerClient.registerPermissionsApprovalHandler((params) =>
-        this.handlePermissionsApproval(params));
+      this.appServerClient.registerPermissionsApprovalHandler((params, signal) =>
+        this.handlePermissionsApproval(params, signal));
     }
     if (typeof this.appServerClient.registerToolUserInputHandler === 'function') {
-      this.appServerClient.registerToolUserInputHandler((params) =>
-        this.handleToolUserInput(params));
+      this.appServerClient.registerToolUserInputHandler((params, signal) =>
+        this.handleToolUserInput(params, signal));
     }
     this.approvalHandlersRegistered = true;
   }
@@ -1800,7 +1802,7 @@ export class CodexAdapter
     if (typeof client.registerMcpElicitationHandler !== 'function') {
       return;
     }
-    client.registerMcpElicitationHandler((params) => this.handleMcpElicitation(params));
+    client.registerMcpElicitationHandler((params, signal) => this.handleMcpElicitation(params, signal));
     this.elicitationHandlersRegistered = true;
   }
 
@@ -1813,36 +1815,64 @@ export class CodexAdapter
     this.elicitationHandlersRegistered = false;
   }
 
+  /** Combine the request lifetime and owning turn without requiring AbortSignal.any. */
+  private createServerRequestSignal(threadId: string | undefined, requestSignal?: AbortSignal): { signal?: AbortSignal; dispose: () => void } {
+    const turnSignal = threadId ? this.activeControllers.get(this.logicalSessionKey(threadId))?.signal : undefined;
+    const sources = [requestSignal, turnSignal].filter((signal): signal is AbortSignal => signal !== undefined);
+    if (sources.length < 2 || sources[0] === sources[1]) {
+      return { signal: sources[0], dispose: () => {} };
+    }
+    const controller = new AbortController();
+    const cancel = (): void => controller.abort();
+    for (const signal of sources) {
+      signal.addEventListener('abort', cancel, { once: true });
+      if (signal.aborted) cancel();
+    }
+    return {
+      signal: controller.signal,
+      dispose: () => {
+        for (const signal of sources) signal.removeEventListener('abort', cancel);
+      },
+    };
+  }
+
   /**
    * Shared approval-collection core: collects the host decision for a
    * pre-built request and traces every outcome. Fails closed: a missing host,
    * a throwing host, or a cancelled card all produce `{ decision: 'denied' }`.
    */
-  private async collectApprovalDecision(request: CodexApprovalRequest): Promise<CodexApprovalDecision> {
+  private async collectApprovalDecision(request: CodexApprovalRequest, requestSignal?: AbortSignal): Promise<CodexApprovalDecision> {
     const collect = this.approvalHost.collectApproval;
     const threadId = readThreadIdFromParams(request.raw);
-    if (!collect) {
-      this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: 'denied', reason: 'no_host', threadId }));
-      return { decision: 'denied' };
-    }
-    this.trace((port) => port.recordToolInteraction(undefined, 'approval.request', { kind: request.kind, threadId, summary: request.summary }));
-    let decision: CodexApprovalDecision | null;
+    const lifetime = this.createServerRequestSignal(threadId, requestSignal);
+    const signal = lifetime.signal;
     try {
-      decision = await collect(request);
-    } catch (err) {
-      logger.warn('Approval host threw; defaulting to denied', {
-        kind: request.kind,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: 'denied', reason: 'host_threw', threadId }));
-      return { decision: 'denied' };
+      if (signal?.aborted) return { decision: 'denied' };
+      if (!collect) {
+        this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: 'denied', reason: 'no_host', threadId }));
+        return { decision: 'denied' };
+      }
+      this.trace((port) => port.recordToolInteraction(undefined, 'approval.request', { kind: request.kind, threadId, summary: request.summary }));
+      let decision: CodexApprovalDecision | null;
+      try {
+        decision = await collect(signal ? { ...request, signal } : request);
+      } catch (err) {
+        logger.warn('Approval host threw; defaulting to denied', {
+          kind: request.kind,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: 'denied', reason: 'host_threw', threadId }));
+        return { decision: 'denied' };
+      }
+      if (!decision || signal?.aborted) {
+        this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: 'denied', reason: 'host_cancelled', threadId }));
+        return { decision: 'denied' };
+      }
+      this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: decision.decision, threadId }));
+      return decision;
+    } finally {
+      lifetime.dispose();
     }
-    if (!decision) {
-      this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: 'denied', reason: 'host_cancelled', threadId }));
-      return { decision: 'denied' };
-    }
-    this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: decision.decision, threadId }));
-    return decision;
   }
 
   /**
@@ -1852,25 +1882,27 @@ export class CodexAdapter
    * Defaults to a safe `denied` decision when the host is absent, throws, or
    * cancels.
    */
-  private async handleApproval(kind: 'execCommand' | 'applyPatch', params: unknown): Promise<{ decision: string }> {
+  private async handleApproval(kind: 'execCommand' | 'applyPatch', params: unknown, signal?: AbortSignal): Promise<{ decision: string }> {
     const request = this.normalizeApprovalRequest(kind, params);
-    const decision = await this.collectApprovalDecision(request);
+    const decision = await this.collectApprovalDecision(request, signal);
     return { decision: decision.decision };
   }
 
   /** v2 `item/commandExecution/requestApproval` → question card → wire decision. */
   private async handleCommandExecutionApproval(
     params: AppServerCommandExecutionApprovalParams,
+    signal?: AbortSignal,
   ): Promise<AppServerCommandExecutionApprovalResponse> {
-    const decision = await this.collectApprovalDecision(this.normalizeCommandExecutionApproval(params));
+    const decision = await this.collectApprovalDecision(this.normalizeCommandExecutionApproval(params), signal);
     return { decision: this.mapCommandExecutionWireDecision(decision) };
   }
 
   /** v2 `item/fileChange/requestApproval` → question card → wire decision. */
   private async handleFileChangeApproval(
     params: AppServerFileChangeApprovalParams,
+    signal?: AbortSignal,
   ): Promise<AppServerFileChangeApprovalResponse> {
-    const decision = await this.collectApprovalDecision(this.normalizeFileChangeApproval(params));
+    const decision = await this.collectApprovalDecision(this.normalizeFileChangeApproval(params), signal);
     return { decision: this.mapFileChangeWireDecision(decision) };
   }
 
@@ -1883,8 +1915,9 @@ export class CodexAdapter
    */
   private async handlePermissionsApproval(
     params: AppServerPermissionsApprovalParams,
+    signal?: AbortSignal,
   ): Promise<AppServerPermissionsApprovalResponse> {
-    const decision = await this.collectApprovalDecision(this.normalizePermissionsApproval(params));
+    const decision = await this.collectApprovalDecision(this.normalizePermissionsApproval(params), signal);
     if (decision.decision === 'approved') {
       return { permissions: this.echoGrantedProfile(params.permissions), scope: 'turn' };
     }
@@ -1897,56 +1930,80 @@ export class CodexAdapter
   /** Dynamic `item/tool/requestUserInput` → question card → per-question answers. */
   private async handleToolUserInput(
     params: AppServerToolUserInputParams,
+    requestSignal?: AbortSignal,
   ): Promise<AppServerToolUserInputResponse> {
+    if (!isRecordLike(params)) return this.emptyToolUserInputResponse();
     const collect = this.approvalHost.collectQuestionAnswers;
     const threadId = typeof params.threadId === 'string' ? params.threadId : undefined;
-    if (!collect) {
-      this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.declined', { reason: 'no_host', threadId }));
-      return this.emptyToolUserInputResponse();
-    }
-    const questionRequest: QuestionRequest = {
-      id: `codex-tool-input-${params.itemId}`,
-      sessionId: 'codex',
-      questions: (params.questions ?? []).map((question) => {
-        const options = (question.options ?? []).map((option) => ({
-          label: option.label,
-          description: option.description,
-        }));
-        return {
-          question: question.question,
-          header: question.header,
-          options,
-          multiple: options.length > 0,
-          custom: options.length === 0 || question.isOther === true,
-        };
-      }),
-    };
-    this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.request', {
-      threadId,
-      itemId: params.itemId,
-      questionCount: questionRequest.questions.length,
-    }));
-    let result: CodexApprovalResolutionResult | null;
+    const lifetime = this.createServerRequestSignal(threadId, requestSignal);
+    const signal = lifetime.signal;
     try {
-      result = await collect(questionRequest);
-    } catch (err) {
-      logger.warn('Tool user-input host threw; returning empty answers', {
-        error: err instanceof Error ? err.message : String(err),
+      if (signal?.aborted) return this.emptyToolUserInputResponse();
+      const rawQuestions: unknown = params.questions;
+      if (!Array.isArray(rawQuestions) || rawQuestions.some((question) => (
+        !isRecordLike(question)
+        || typeof question.id !== 'string'
+        || typeof question.question !== 'string'
+        || typeof question.header !== 'string'
+        || (question.isOther !== undefined && typeof question.isOther !== 'boolean')
+        || (question.isSecret !== undefined && typeof question.isSecret !== 'boolean')
+        || (question.options != null && (!Array.isArray(question.options) || question.options.some((option) => (
+          !isRecordLike(option) || typeof option.label !== 'string' || typeof option.description !== 'string'
+        ))))
+      ))) {
+        return this.emptyToolUserInputResponse();
+      }
+      if (!collect) {
+        this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.declined', { reason: 'no_host', threadId }));
+        return this.emptyToolUserInputResponse();
+      }
+      const questionRequest: QuestionRequest = {
+        id: `codex-tool-input-${params.itemId}`,
+        sessionId: threadId ?? 'codex',
+        questions: (params.questions ?? []).map((question) => {
+          const options = (question.options ?? []).map((option) => ({
+            label: option.label,
+            description: option.description,
+          }));
+          return {
+            question: question.question,
+            header: question.header,
+            options,
+            // Native request_user_input options are mutually exclusive.
+          multiple: false,
+            custom: options.length === 0 || question.isOther === true,
+          };
+        }),
+      };
+      this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.request', {
+        threadId,
+        itemId: params.itemId,
+        questionCount: questionRequest.questions.length,
+      }));
+      let result: CodexApprovalResolutionResult | null;
+      try {
+        result = await collect(questionRequest, ...(signal ? [signal] : []));
+      } catch (err) {
+        logger.warn('Tool user-input host threw; returning empty answers', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return this.emptyToolUserInputResponse();
+      }
+      if (!result || result.status !== 'answered' || signal?.aborted) {
+        this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.unanswered', { threadId, itemId: params.itemId }));
+        return this.emptyToolUserInputResponse();
+      }
+      // Wire shape (Codex 0.159.0 schema dump): answers maps each question id
+      // to its selected/typed answers.
+      const answersByQuestionId: Record<string, { answers: string[] }> = {};
+      (params.questions ?? []).forEach((question, index) => {
+        answersByQuestionId[question.id] = { answers: [...(result.answers?.[index] ?? [])] };
       });
-      return this.emptyToolUserInputResponse();
+      this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.answered', { threadId, itemId: params.itemId }));
+      return { answers: answersByQuestionId };
+    } finally {
+      lifetime.dispose();
     }
-    if (!result || result.status !== 'answered') {
-      this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.unanswered', { threadId, itemId: params.itemId }));
-      return this.emptyToolUserInputResponse();
-    }
-    // Wire shape (Codex 0.159.0 schema dump): answers maps each question id
-    // to its selected/typed answers.
-    const answersByQuestionId: Record<string, { answers: string[] }> = {};
-    (params.questions ?? []).forEach((question, index) => {
-      answersByQuestionId[question.id] = { answers: [...(result.answers?.[index] ?? [])] };
-    });
-    this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.answered', { threadId, itemId: params.itemId }));
-    return { answers: answersByQuestionId };
   }
 
   /** Fail-closed empty reply for the tool-user-input route. */
@@ -1955,7 +2012,7 @@ export class CodexAdapter
   }
 
   /** `mcpServer/elicitation/request` → elicitation card → accept/decline/cancel. */
-  private async handleMcpElicitation(params: unknown): Promise<AppServerMcpElicitationResponse> {
+  private async handleMcpElicitation(params: unknown, requestSignal?: AbortSignal): Promise<AppServerMcpElicitationResponse> {
     const collect = this.elicitationHost.collectElicitation;
     if (!collect) {
       this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.cancelled', { reason: 'no_host' }));
@@ -1965,23 +2022,70 @@ export class CodexAdapter
       logger.warn('Ignoring malformed mcpServer/elicitation/request params');
       return { action: 'cancel' };
     }
-    if (params.mode === 'url') {
-      return this.handleUrlElicitation(params, collect);
+    const lifetime = this.createServerRequestSignal(params.threadId, requestSignal);
+    try {
+      if (lifetime.signal?.aborted) return { action: 'cancel' };
+      if (params.mode === 'url') {
+        return await this.handleUrlElicitation(params, collect, lifetime.signal);
+      }
+      if (params.mode !== 'form') {
+        // The openai/form dialect uses a schema shape this bridge cannot
+        // render; declining lets the MCP server apply its default behavior.
+        logger.warn('Declining unsupported Codex elicitation mode', { mode: params.mode, serverName: params.serverName });
+        this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.declined', { reason: 'unsupported_mode', mode: params.mode, serverName: params.serverName }));
+        return { action: 'decline' };
+      }
+      const schema: unknown = params.requestedSchema;
+      if (schema !== undefined) {
+        if (!isRecordLike(schema)) return { action: 'decline' };
+        if (schema.type !== 'object' && !(schema.type === undefined && schema.properties === undefined)) {
+          return { action: 'decline' };
+        }
+        if (schema.properties !== undefined) {
+          if (!isRecordLike(schema.properties)) return { action: 'decline' };
+          if (!Object.values(schema.properties).every((property) => {
+            if (!isRecordLike(property)) return false;
+            if (property.type !== undefined && (typeof property.type !== 'string' || !['string', 'number', 'integer', 'boolean', 'array'].includes(property.type))) {
+              return false;
+            }
+            if (property.properties !== undefined
+              || ![property.title, property.description].every((value) => value == null || typeof value === 'string')) {
+              return false;
+            }
+            if (property.items !== undefined && !isRecordLike(property.items)) return false;
+            const items = isRecordLike(property.items) ? property.items : undefined;
+            if (items && ((items.type !== undefined && items.type !== 'string') || items.properties !== undefined)) {
+              return false;
+            }
+            return [property.enum, property.enumNames ?? undefined, items?.enum].every((values) => (
+              values === undefined || (Array.isArray(values) && values.every((value) => typeof value === 'string'))
+            )) && [property.oneOf, items?.anyOf].every((options) => (
+              options === undefined || (Array.isArray(options) && options.every((option) => (
+                isRecordLike(option) && typeof option.const === 'string' && typeof option.title === 'string'
+              )))
+            ));
+          })) {
+            return { action: 'decline' };
+          }
+        }
+      }
+      try {
+        return await this.handleFormElicitation(params, collect, lifetime.signal);
+      } catch (err) {
+        logger.warn('Declining malformed Codex elicitation form', { error: err instanceof Error ? err.message : String(err) });
+        return { action: lifetime.signal?.aborted ? 'cancel' : 'decline' };
+      }
+    } finally {
+      lifetime.dispose();
     }
-    if (params.mode !== 'form') {
-      // The openai/form dialect uses a schema shape this bridge cannot
-      // render; declining lets the MCP server apply its default behavior.
-      logger.warn('Declining unsupported Codex elicitation mode', { mode: params.mode, serverName: params.serverName });
-      this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.declined', { reason: 'unsupported_mode', mode: params.mode, serverName: params.serverName }));
-      return { action: 'decline' };
-    }
-    return this.handleFormElicitation(params, collect);
   }
 
   private async handleUrlElicitation(
     params: CodexElicitationUrlParams,
     collect: NonNullable<CodexElicitationBridgeHost['collectElicitation']>,
+    signal?: AbortSignal,
   ): Promise<AppServerMcpElicitationResponse> {
+    if (signal?.aborted) return { action: 'cancel' };
     if (!/^https?:\/\//i.test(params.url)) {
       logger.warn('Declining Codex elicitation with non-http(s) URL', { serverName: params.serverName });
       this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.declined', { reason: 'url_scheme_rejected', serverName: params.serverName }));
@@ -1999,12 +2103,12 @@ export class CodexAdapter
     this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.request', { mode: 'url', serverName: params.serverName, threadId: params.threadId }));
     let response;
     try {
-      response = await collect({ questionRequest, params });
+      response = await collect({ questionRequest, params, ...(signal ? { signal } : {}) });
     } catch (err) {
       logger.warn('Elicitation host threw; cancelling', { error: err instanceof Error ? err.message : String(err) });
       return { action: 'cancel' };
     }
-    if (!response) {
+    if (!response || signal?.aborted) {
       return { action: 'cancel' };
     }
     this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.decision', { mode: 'url', action: response.action }));
@@ -2014,17 +2118,19 @@ export class CodexAdapter
   private async handleFormElicitation(
     params: CodexElicitationFormParams,
     collect: NonNullable<CodexElicitationBridgeHost['collectElicitation']>,
+    signal?: AbortSignal,
   ): Promise<AppServerMcpElicitationResponse> {
+    if (signal?.aborted) return { action: 'cancel' };
     const questionRequest = buildCodexElicitationQuestionRequest(params);
     this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.request', { mode: 'form', serverName: params.serverName, threadId: params.threadId }));
     let response;
     try {
-      response = await collect({ questionRequest, params });
+      response = await collect({ questionRequest, params, ...(signal ? { signal } : {}) });
     } catch (err) {
       logger.warn('Elicitation host threw; cancelling', { error: err instanceof Error ? err.message : String(err) });
       return { action: 'cancel' };
     }
-    if (!response) {
+    if (!response || signal?.aborted) {
       return { action: 'cancel' };
     }
     if (response.action !== 'accept') {
@@ -2551,15 +2657,10 @@ export class CodexAdapter
     // either is missing the turn fails closed with an actionable error
     // instead of silently falling back to a less restrictive path. 'never'
     // may use the existing fallback; 'inherit' omits the override entirely.
-    const policy = this.options.approvalPolicy ?? 'inherit';
-    if (policy === 'untrusted' || policy === 'on-request') {
-      if (!this.canUseAppServerChat() || typeof this.approvalHost.collectApproval !== 'function') {
-        yield {
-          type: 'error',
-          content: `Codex approval policy "${policy}" requires the Codex app-server and an approval bridge, which are unavailable. Start the Codex backend or switch the approval policy to "inherit" or "never".`,
-        };
-        return;
-      }
+    const preflightError = this.getSendMessagePreflightError(request.options?.codexOptions as Record<string, unknown> | undefined);
+    if (preflightError) {
+      yield { type: 'error', content: preflightError };
+      return;
     }
 
     if (this.canUseAppServerChat()) {
@@ -2568,6 +2669,16 @@ export class CodexAdapter
     }
 
     yield* this.sendMessageViaSdk(request);
+  }
+
+  /** Read-only policy check shared by composer preflight and the send boundary. */
+  getSendMessagePreflightError(codexOptions?: Record<string, unknown>): string | null {
+    const policy = this.captureAttemptOptions(codexOptions as AttemptOptions | undefined).approvalPolicy ?? 'inherit';
+    if ((policy === 'untrusted' || policy === 'on-request')
+      && (!this.canUseAppServerChat() || typeof this.approvalHost.collectApproval !== 'function')) {
+      return `Codex approval policy "${policy}" requires the Codex app-server and an approval bridge, which are unavailable. Start the Codex backend or switch the approval policy to "inherit" or "never".`;
+    }
+    return null;
   }
 
   /**
@@ -2581,9 +2692,16 @@ export class CodexAdapter
   }
 
   private async *sendMessageViaSdk(request: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
+    const threadOptions = this.buildThreadOptions({
+      ...this.captureAttemptOptions(request.options?.codexOptions as AttemptOptions | undefined),
+      ...(typeof request.options?.model === 'string' && request.options.model.trim()
+        ? { model: request.options.model.trim() } : {}),
+      ...(typeof request.options?.variant === 'string' && CODEX_EFFORT_VARIANTS.includes(request.options.variant as CodexReasoningEffort)
+        ? { modelReasoningEffort: request.options.variant as AttemptOptions['modelReasoningEffort'] } : {}),
+    });
     let thread: Thread | null;
     try {
-      thread = this.resolveOrCreateThread(request.sessionId);
+      thread = this.resolveOrCreateThread(request.sessionId, threadOptions);
     } catch (err) {
       yield {
         type: 'error',
@@ -2623,6 +2741,15 @@ export class CodexAdapter
       });
 
       for await (const event of streamed.events as AsyncIterable<ThreadEvent>) {
+        // exec JSON reports retry progress as an error event even when the
+        // same turn later succeeds. Keep terminal failures on the error path.
+        if (event.type === 'error' && event.message.startsWith('Reconnecting...')) {
+          yield {
+            type: 'backend_event', source: 'codex', event: 'informational',
+            status: 'retrying', name: 'reconnecting', metadata: { message: event.message },
+          };
+          continue;
+        }
         if (event.type === 'thread.started') {
           this.aliasSession(request.sessionId, event.thread_id, { resumed: false, via: 'sdk' });
         }
@@ -3475,16 +3602,17 @@ export class CodexAdapter
    * app-server attempt. Called BEFORE any await so mid-flight mutations to
    * this.options do not leak into the attempt's thread/turn options or evidence.
    */
-  private captureAttemptOptions(): AttemptOptions {
+  private captureAttemptOptions(overrides?: AttemptOptions): AttemptOptions {
+    const source = { ...this.options, ...overrides };
     return {
-      ...(this.options.model !== undefined ? { model: this.options.model } : {}),
-      ...(this.options.workingDirectory !== undefined ? { workingDirectory: this.options.workingDirectory } : {}),
-      ...(this.options.sandboxMode !== undefined ? { sandboxMode: this.options.sandboxMode } : {}),
-      ...(this.options.additionalDirectories ? { additionalDirectories: [...this.options.additionalDirectories] } : {}),
-      ...(this.options.networkAccessEnabled !== undefined ? { networkAccessEnabled: this.options.networkAccessEnabled } : {}),
-      ...(this.options.webSearchMode !== undefined ? { webSearchMode: this.options.webSearchMode } : {}),
-      ...(this.options.approvalPolicy !== undefined ? { approvalPolicy: this.options.approvalPolicy } : {}),
-      ...(this.options.modelReasoningEffort !== undefined ? { modelReasoningEffort: this.options.modelReasoningEffort } : {}),
+      ...(source.model !== undefined ? { model: source.model } : {}),
+      ...(source.workingDirectory !== undefined ? { workingDirectory: source.workingDirectory } : {}),
+      ...(source.sandboxMode !== undefined ? { sandboxMode: source.sandboxMode } : {}),
+      ...(source.additionalDirectories ? { additionalDirectories: [...source.additionalDirectories] } : {}),
+      ...(source.networkAccessEnabled !== undefined ? { networkAccessEnabled: source.networkAccessEnabled } : {}),
+      ...(source.webSearchMode !== undefined ? { webSearchMode: source.webSearchMode } : {}),
+      ...(source.approvalPolicy !== undefined ? { approvalPolicy: source.approvalPolicy } : {}),
+      ...(source.modelReasoningEffort !== undefined ? { modelReasoningEffort: source.modelReasoningEffort } : {}),
     };
   }
 
@@ -3497,7 +3625,7 @@ export class CodexAdapter
   private beginAppServerAttempt(sessionId: string, sendOptions?: Record<string, unknown>): AppServerAttempt {
     const logicalSessionId = this.logicalSessionKey(sessionId);
     const options: AttemptOptions = {
-      ...this.captureAttemptOptions(),
+      ...this.captureAttemptOptions(sendOptions?.codexOptions as AttemptOptions | undefined),
       ...(typeof sendOptions?.model === 'string' && sendOptions.model.trim()
         ? { model: sendOptions.model.trim() } : {}),
       ...(typeof sendOptions?.variant === 'string' && CODEX_EFFORT_VARIANTS.some((variant) => variant === sendOptions.variant)
@@ -3941,61 +4069,60 @@ export class CodexAdapter
     return id.startsWith('codex-local-');
   }
 
-  private buildThreadOptions(): ThreadOptions {
+  private buildThreadOptions(options: AttemptOptions = this.options): ThreadOptions {
     return {
       // Codex SDK >= 0.152 records a caller-defined source on newly created
       // threads. Keep this stable and product-owned instead of exposing a raw
       // user override that could fragment attribution.
       threadSource: 'opencodian',
-      ...(this.options.workingDirectory
-        ? { workingDirectory: this.options.workingDirectory }
+      ...(options.workingDirectory
+        ? { workingDirectory: options.workingDirectory }
         : {}),
-      ...(this.options.model
-        ? { model: this.options.model }
+      ...(options.model
+        ? { model: options.model }
         : {}),
-      ...(this.options.sandboxMode
-        ? { sandboxMode: this.options.sandboxMode }
+      ...(options.sandboxMode
+        ? { sandboxMode: options.sandboxMode }
         : {}),
-      ...(this.options.modelReasoningEffort
-        ? { modelReasoningEffort: this.options.modelReasoningEffort }
+      ...(options.modelReasoningEffort
+        ? { modelReasoningEffort: options.modelReasoningEffort }
         : {}),
-      ...(this.options.additionalDirectories?.length
-        ? { additionalDirectories: [...this.options.additionalDirectories] }
+      ...(options.additionalDirectories?.length
+        ? { additionalDirectories: [...options.additionalDirectories] }
         : {}),
-      ...(this.options.networkAccessEnabled !== undefined
-        ? { networkAccessEnabled: this.options.networkAccessEnabled }
+      ...(options.networkAccessEnabled !== undefined
+        ? { networkAccessEnabled: options.networkAccessEnabled }
         : {}),
-      ...(this.options.webSearchMode
-        ? { webSearchMode: this.options.webSearchMode }
+      ...(options.webSearchMode
+        ? { webSearchMode: options.webSearchMode }
         : {}),
+      ...(options.approvalPolicy && options.approvalPolicy !== 'inherit'
+        ? { approvalPolicy: options.approvalPolicy } : {}),
       // Obsidian vaults are not typically Git repositories; skip the
       // Codex CLI's git-trust check to avoid immediate rejection.
       skipGitRepoCheck: true,
     };
   }
 
-  private resolveOrCreateThread(sessionId: string): Thread | null {
+  private resolveOrCreateThread(sessionId: string, threadOptions = this.buildThreadOptions()): Thread | null {
     if (!this.codex) {
       return null;
     }
 
     const entry = this.resolveSession(sessionId);
 
-    // Existing thread object
-    if (entry?.thread) {
-      return entry.thread;
-    }
-
-    // Session has a thread ID but no Thread object (adapter may have been restarted)
-    if (entry?.threadId) {
-      const thread = this.codex.resumeThread(entry.threadId, this.buildThreadOptions());
+    // SDK ThreadOptions are immutable. Refresh the wrapper for every turn
+    // while retaining the native thread ID and its persisted history.
+    const nativeThreadId = entry?.threadId ?? entry?.thread?.id;
+    if (entry && nativeThreadId) {
+      const thread = this.codex.resumeThread(nativeThreadId, threadOptions);
       entry.thread = thread;
       return thread;
     }
 
     // Known provisional session without thread → start new
     if (entry) {
-      const thread = this.codex.startThread(this.buildThreadOptions());
+      const thread = this.codex.startThread(threadOptions);
       entry.thread = thread;
       return thread;
     }
@@ -4004,7 +4131,7 @@ export class CodexAdapter
     //  - provisional-looking → start new thread (caller explicitly created a local session)
     //  - anything else → treat as a real thread ID and attempt resume
     if (this.isProvisionalId(sessionId)) {
-      const thread = this.codex.startThread(this.buildThreadOptions());
+      const thread = this.codex.startThread(threadOptions);
       this.sessions.set(sessionId, {
         provisionalId: sessionId,
         threadId: null,
@@ -4015,7 +4142,7 @@ export class CodexAdapter
 
     // Treat as a real Codex thread ID → resume.
     // If the ID is invalid, the SDK will throw; sendMessage() will yield it as an error chunk.
-    const thread = this.codex.resumeThread(sessionId, this.buildThreadOptions());
+    const thread = this.codex.resumeThread(sessionId, threadOptions);
     this.sessions.set(sessionId, {
       provisionalId: sessionId,
       threadId: sessionId,

@@ -1,6 +1,7 @@
 import { Notice, Setting } from 'obsidian';
 
 import { IMPLEMENTED_AGENT_BACKENDS } from '../../core/agents/backend';
+import { backendSessionCatalogFailure } from '../../core/agents/backend/AgentBackendRouting';
 import type { OpenCode2Adapter } from '../../core/agents/backend/OpenCode2Adapter';
 import type { AgentBackendKind } from '../../core/types/chat';
 import { t, type TranslationKey } from '../../i18n';
@@ -134,9 +135,16 @@ export class SettingsBackendSection {
           } | undefined;
           const summary = await adapter?.readConfigurationSummary?.();
           if (!summary) throw new Error('OpenCode 2 adapter unavailable');
+          catalogStatus.setAttribute('data-catalog-state', 'complete');
           catalogStatus.setText(t('settings.agent.opencode2.catalog.summary', summary));
           await this.renderOpenCode2Management(management);
-        } catch (error) { catalogStatus.setText(error instanceof Error ? error.message : String(error)); }
+        } catch (error) {
+          const failure = backendSessionCatalogFailure(error);
+          catalogStatus.setAttribute('data-catalog-state', failure.status);
+          catalogStatus.setText(t(failure.errorReason === 'Permission denied'
+            ? 'chat.backendSessions.catalogPermissionDenied'
+            : failure.status === 'unavailable' ? 'chat.backendSessions.catalogUnavailable' : 'chat.backendSessions.catalogFailed'));
+        }
         finally { button.setDisabled(false); }
       }));
   }
@@ -259,19 +267,12 @@ export class SettingsBackendSection {
           .setValue(this.plugin.settings.activeBackend ?? '')
           .onChange(async (value) => {
             if (value) {
-              const previousActive = this.plugin.settings.activeBackend;
               this.plugin.settings.activeBackend = value as AgentBackendKind;
               // Sync registry active backend
               this.plugin.agentServiceRegistry?.setActive(value as AgentBackendKind);
               await this.plugin.saveSettings();
 
-              // Stop the previous adapter and start the new one
-              if (previousActive && previousActive !== value) {
-                try {
-                  const prevAdapter = this.plugin.agentServiceRegistry?.get(previousActive as AgentBackendKind);
-                  if (prevAdapter) { await prevAdapter.stop(); }
-                } catch { /* best effort */ }
-              }
+              // Keep other enabled adapters available to their existing conversation tabs.
               try {
                 const newAdapter = this.plugin.agentServiceRegistry?.get(value as AgentBackendKind);
                 if (newAdapter) { await newAdapter.start(); }
@@ -391,11 +392,9 @@ export class SettingsBackendSection {
 
     this.ensureValidBackendState();
 
-    // Lifecycle: only start/stop the adapter if the backend IS the active backend.
-    // Enabling a non-active backend should NOT start its adapter.
-    // Disabling a non-active backend only needs registry cleanup (done above).
+    // Start only the active backend; disabling owns teardown even after the default changed.
     try {
-      if (isActive) {
+      if (isActive || !enabled) {
         const adapter = this.plugin.agentServiceRegistry?.get(backend);
         if (adapter) {
           if (enabled) {

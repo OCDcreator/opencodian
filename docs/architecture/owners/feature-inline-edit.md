@@ -71,3 +71,11 @@ Run before merge: `npm run typecheck`, `npm run check:module-docs`.
 ## 2026-09-28 OpenCode 2 auxiliary integration
 
 OpenCode 2 provider-qualified model references pass through the existing inline edit/completion model resolution owners; the backend still owns read-only verification.
+
+2026-10-07：接受路径的最终映射范围与快照检查在整篇确认之后执行，并与单次 editor.replaceRange 连续运行；辅助进程清理在写入后启动，不能成为允许旧快照覆盖新编辑的时间窗口。真实 Mac/Windows ZCode 编辑器接受、拒绝与 dirty snapshot 证据使用独立构建身份记录。
+
+2026-10-07: the warm completion pool owns a disposal generation separate from exclusive chat warming. Global teardown detaches old entries before awaits, and note/model rebuilds revalidate after disposal. This prevents late editor work from recreating a session after toggle-off or deleting a newer enable-cycle entry.
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.inline-edit` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+Claude message-before fork resolves the predecessor native chain UUID before using the SDK inclusive boundary and refuses an unavailable empty prefix. Inline input refresh preserves the current draft in input phase, including delayed catalog loads, without changing generating/new-round clear behavior.

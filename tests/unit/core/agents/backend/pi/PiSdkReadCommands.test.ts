@@ -62,7 +62,7 @@ function publicReadFixture(overrides: Partial<OfflineSdkFixture> = {}) {
 
 it('runs the offline SDK read-command contract through the standard unit test entrypoint', () => {
   const testFile = path.join(__dirname, 'PiSdkReadCommands.test.mjs');
-  const report = execFileSync(process.execPath, ['--test', testFile], {
+  const report = execFileSync(process.execPath, ['--test', '--test-reporter=tap', testFile], {
     cwd: root, encoding: 'utf8', windowsHide: true,
   });
   expect(report).toContain('# fail 0');

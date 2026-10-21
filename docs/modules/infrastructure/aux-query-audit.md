@@ -1,5 +1,9 @@
 # 六后端辅助查询审计（T06）
 
+2026-10-07：ZCode 正向控制与辅助会话都显式使用各自的 `session.sqlite`，同时覆盖两个数据库环境别名。正向控制通过真实 `session/create` 限制为 Read/Write、空 MCP 和关闭 dynamic workflow，再由同会话 `setMode` 回读确认 yolo；只允许固定测试文件和精确 `OC_ZCODE_AUX_WRITE_CONTROL` 加一个 LF，字节不等时保留失败产物。每次辅助 query 开始先清空该次 native 观察，未发出追问不能复用上一回合的空工具表。首次旧审计曾打开用户全局数据库，不能作为零残留证据；历史会话保留，新结果须单独绑定构建和数据库路径。
+
+私有 CLI 的 residue 检查直接使用同一 owned transport 的原生 `session/list`，要求真实 sessions 数组；不调用需要桌面 TaskIndex 数据库的产品软删除投影。辅助 ID 缺席、各原生 child 已退出及全部自有 scope 已移除必须同时成立。
+
 源码：`scripts/audit/run-aux-query-audit.mjs`、`scripts/audit/aux-query-audit.entry.ts`、`scripts/audit/opencode2-aux-query-audit.entry.ts`。
 
 统一 runner 默认按顺序调度 `opencode / opencode2 / claude-code / codex / pi / zcode`，也允许任意已知后端组合。完整参数列表在创建缓存、打包或启动任何后端之前校验；未知 backend / option 立即失败。OpenCode 2 继续使用独立 native entry 和 HTTP bridge，不能用通用后端 proof 替代其版本、正控和 wildcard deny 读回。
@@ -58,3 +62,18 @@ child exit 0 自身不能成为 pass。backend 不一致、execution 不明、pa
 测试覆盖六后端默认/混合调度、未知 backend、互斥 offline flag、failed/blocked precedence、负向 report schema、ZCode provider/model 和 generic/sessionless 区别、当前回合 native 读回负向样例、严格字节快照、带禁止 native/network 拦截器的六后端 preflight、OpenCode 2 native 验收保留。追加回归覆盖 Codex start 成功后 active/archived 分别拒绝、stop 恰好一次且必须等待、stop 自身拒绝仍保留原错误，以及显式 control/OpenCode 专属 fallback 的实际 HTTP 请求 JSON 与配置摘要匹配。测试 bundle 只在测试中暴露审计函数并注入 client/process/HTTP seams，不改变运行入口或启动真实 CLI。测试中的合成结构只证明契约逻辑，不能作为 real-model pass 的证据。
 
 2026-10-02 T06 本轮只执行 offline bundle/preflight、聚焦契约及入口类型检查；六后端真实模型 gate 均未运行。
+
+## ZCode hook 正负控制（2026-10-07）
+
+正常会话必须实际执行独立 owned plugin 的 UserPromptSubmit hook，并通过原 27-byte LF 写入控制；辅助会话每轮除原生工具表、tool events、terminal tool count 外还要求 hook 日志中无该 native ID。Hook fixture 仅位于审计根，不使用或改写用户插件/信任配置。旧仅工具表的审计不能证明 hook 只读限制。
+
+可选 `AUDIT_AUX_REASONING_LEVEL_ZCODE` 同时作用于正向 Write 控制和辅助会话；值仍经真实模型目录校验，正向报告记录 session/read 的有效 model，不能靠测试 setter 冒称应用。未设置时保持原生模型默认档位。
+
+OpenCode 2 positive control now requires exact bytes including LF. The independent native agent wildcard deny may be followed only by additional deny rules; allow/ask still fails. First turn, follow-up, image, parent/native list isolation and removal of the full owned root are separate real-model checks.
+
+The ordered-deny suffix audit uses a reverse index loop compatible with the repository TypeScript target; it does not depend on `Array.findLastIndex`.
+
+2026-10-07：OpenCode positive control 的 readiness GET /config 加入每次最多 2 秒 AbortSignal.timeout，仍受 60 秒总 deadline。真实 generation、write inducement 与 byte/residue 判定保持原要求；readiness 超时不算通过。
+
+
+2026-10-08：Windows Codex native stop 后 cwd 的短时 EBUSY 由最终 audit cleanup 的最多 2 秒重试处理；只重试最初已验证为空的 owned vault 非递归 rmdir，每次重查空目录，新增 residue 或持续失败仍 audit failed。权限/拒写/字节/ephemeral/session 残留门禁保持不变。

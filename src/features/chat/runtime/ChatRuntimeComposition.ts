@@ -1189,6 +1189,14 @@ export class ChatRuntimeComposition {
         reloadModelCatalog: () => host.reloadModelCatalog(),
         getSendMessageOptions: () => host.getSendMessageOptions(),
         appendModelUnavailableNoticeMessage: () => host.appendModelUnavailableNoticeMessage(),
+        getCodexSendPreflightError: (codexOptions?: Record<string, unknown>) => {
+          const adapter = host.plugin.agentServiceRegistry?.get('codex') as {
+            getSendMessagePreflightError?(options?: Record<string, unknown>): string | null;
+          } | undefined;
+          return adapter?.getSendMessagePreflightError
+            ? adapter.getSendMessagePreflightError(codexOptions)
+            : 'Codex send preflight is unavailable. Start the Codex backend before sending.';
+        },
         getZCodeImageInputSupport: (sessionId: string, model: SendMessageModelOptions) =>
           getZCodeImageInputSupport(host.plugin.agentServiceRegistry, sessionId, model),
         openCodeService: host.plugin.openCodeService,
@@ -1314,8 +1322,8 @@ export class ChatRuntimeComposition {
       }) => {
         host.plugin.memoryRuntime?.onTurnSettled(info);
         // User identity arrives after the optimistic footer was drawn. Refresh
-        // only this settled, visible Codex conversation's footer, preserving its body.
-        if (info.backend === 'codex' && host.getActiveTabId() === info.tabId
+        // only this settled, visible conversation's footer, preserving its body.
+        if ((info.backend === 'codex' || info.backend === 'claude-code') && host.getActiveTabId() === info.tabId
           && host.currentConversation?.id === info.conversationId
           && getConversationBackendSessionId(host.currentConversation) === info.sessionId) {
           const users = new Map(host.currentConversation.messages

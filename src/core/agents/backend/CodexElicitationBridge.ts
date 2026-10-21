@@ -102,8 +102,17 @@ const ACCEPT_LABEL = 'Accept';
 const DECLINE_LABEL = 'Decline';
 
 function getEnumOptions(property: CodexElicitationPropertySchema): Array<{ label: string; description: string }> {
-  if (property.oneOf && property.oneOf.length > 0) {
-    return property.oneOf.map((option) => ({ label: option.const, description: option.title }));
+  const constOptions = property.oneOf && property.oneOf.length > 0
+    ? property.oneOf
+    : property.enum == null && property.items?.enum == null ? property.items?.anyOf : undefined;
+  if (constOptions !== undefined) {
+    if (!Array.isArray(constOptions) || constOptions.some((option) => (
+      typeof option !== 'object' || option === null
+      || typeof option.const !== 'string' || typeof option.title !== 'string'
+    ))) {
+      throw new Error('Malformed Codex elicitation enum options');
+    }
+    return constOptions.map((option) => ({ label: option.const, description: option.title }));
   }
   const rawEnum = property.enum ?? property.items?.enum ?? [];
   const names = property.enumNames ?? [];
@@ -243,6 +252,8 @@ export interface CodexElicitationCardRequest {
   questionRequest: QuestionRequest;
   /** Original wire params, preserved for coercion and advanced rendering. */
   params: CodexMcpElicitationWireParams;
+  /** Owning turn cancellation settles a pending card. */
+  signal?: AbortSignal;
 }
 
 /** User outcome collected by the elicitation card renderer. */
@@ -269,6 +280,7 @@ export interface CodexElicitationCardRenderer {
  */
 export interface CodexElicitationHostContext {
   getActiveTabId: () => string | null;
+  getTabIdForSession?: (sessionId: string) => string | null;
   elicitationCardRenderer?: CodexElicitationCardRenderer;
 }
 
@@ -294,7 +306,10 @@ export function createCodexElicitationBridgeHost(
       if (!ctx.elicitationCardRenderer) {
         return null;
       }
-      const tabId = ctx.getActiveTabId();
+      const tabId = ctx.getTabIdForSession
+        ? ctx.getTabIdForSession(request.params.threadId)
+        : ctx.getActiveTabId();
+      if (ctx.getTabIdForSession && !tabId) return null;
       return ctx.elicitationCardRenderer.collectResponse(request, tabId);
     },
   };

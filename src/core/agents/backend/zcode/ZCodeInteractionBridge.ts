@@ -154,7 +154,11 @@ export function normalizeZCodeQuestionAsk(params: unknown): QuestionRequest | nu
       custom: true,
     };
   });
-  if (questions.length === 0 || questions.some((question) => !question.question || question.options.length === 0)) {
+  if (questions.length === 0
+    || questions.some((question) => !question.question
+      || question.options.length === 0
+      || question.options.some((option) => !option.label))
+    || new Set(questions.map((question) => question.question)).size !== questions.length) {
     return null;
   }
   return { id: requestId, sessionId, questions };
@@ -393,6 +397,16 @@ export class ZCodeInteractionBridge {
   rejectQuestion(requestID: string): void {
     const entry = this.requirePending(requestID, 'user-input');
     entry.settle({ action: 'decline' });
+  }
+
+  /** Drop a matching ask already resolved by native timeout or another host. */
+  settleNativeResolvedRequest(sessionId: string, requestId: string): void {
+    const entry = this.pending.get(requestId);
+    if (!entry || entry.sessionId !== sessionId || entry.settled) return;
+    const reason = 'Request already resolved by the ZCode runtime.';
+    entry.settle(entry.kind === 'permission'
+      ? { decision: 'deny', reason }
+      : { action: 'cancel', reason });
   }
 
   /**

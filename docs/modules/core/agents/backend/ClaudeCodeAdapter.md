@@ -1,4 +1,5 @@
 # ClaudeCodeAdapter
+> 2026-10-07：getSdk 为域级绝对 CLAUDE_CONFIG_DIR 使用 `ClaudeCodeScopedSessionStore` 包装静态会话目录方法，避免 query 写入隔离根而恢复校验读取用户全局根。每次调用解析当前 env；仍严格验证 native identity，不跳过 catalog 校验，不修改宿主 env，不给正常 query 注入 sessionStore。
 > 2026-09-30 (B5 other-backends-audit): `CLAUDE_CODE_PHASE1_CAPABILITIES` 集合注释明确 `TurnSteering` 为有意不声明——Claude Agent SDK 无 mid-turn steer 接缝，mid-turn 输入经持久 query 的 input 队列串行化（`runtime.input.push`），活跃回合结束后才生效；chat 层因此对本后端渲染 queue-only 状态（by design）。同时把 职责 中的能力清单同步为当前集合（补 `Images`/`AuxQuery`/`InlineCompletion`）。能力集合精确锁定测试见 `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` 的 "declares Claude Code Phase 1 capabilities"。
 
 > 2026-09-21 (advantage-parity R-F7)：options 新增 `getDomainEnvironment`（live accessor，免适配器重建）；五个 buildClaudeCodeOptions 调用点传 `domainEnv`；aux 会话 env 叠加域 env（base env < domains）。
@@ -216,3 +217,9 @@ control await 完成后检查 map 仍指向原 session、sdkSessionId 仍相等�
 Resolver-owned selections are refreshed from current settings at SDK options assembly, including after delayed SDK/MCP loading in the dedicated setModel/checkpoint probes. Path, environment and shell are captured together; the spawn callback retains the assembled shell. Explicit SDK/constructor executable and caller env/shell injection keep precedence. Invalid selections reject before query creation and cannot reuse a stale or bundled executable.
 
 Editing executable settings leaves existing persistent queries running with their original snapshot. A fresh query (including native resume) uses the current selection. Explicit restart validates before closing live queries; an invalid selection preserves them. Successful restart closes queries, and the next send resumes the same native session with current options. Request options alone are application evidence; native IDs/history and actual spawn need separate runtime evidence.
+
+私有 `CLAUDE_CONFIG_DIR` 配合合法 `CLAUDE_CODE_PROJECT_DIR_NAME` 时，静态目录存储沿用 native 的项目别名；合法值为 1–64 个 ASCII 字母/数字/下划线/连字符，Windows 保留设备名无效，非法别名按 SDK 规则回退默认项目 key。宿主环境不变。
+
+每个普通 chat prompt 提交客户端 UUID；优先消费 SDK result 的 `user_message_uuid`，旧 CLI 缺少该字段时经 SDK transcript readback 确认后才绑定。目录读取失败保持身份 unavailable，不影响已确认的模型终态，也不伪造 source ID。
+
+消息前 fork 将 UI 目标 UUID 经 native 历史定位为前一个 chain entry 后调用 SDK 的 inclusive upToMessageId；首条之前的空前缀当前 SDK 及两个受支持替代接口均无法构建，fail-closed 提示。全会话 clone 保持 SDK 原行为。

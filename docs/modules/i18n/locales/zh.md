@@ -659,3 +659,16 @@ OpenCode 2 inherited server permission mode has Chinese label and explanation.
 说明保存保留已有 query，新 query/显式重启采用当前有效选择，无效路径拒绝且不复用旧 CLI。通用重启失败提示不承诺保留 query，因为关闭过程可能已开始。
 
 2026-10-06：ZCode 管理帮助区分新会话、当前已加载快照及重连后恢复会话；保存结果分别标注“会话应用”和“有效目录”，明确目录回读不等于插件执行。与 en 对齐。
+
+## 2026-10-06 Codex catalog permission denial
+
+新增 settings.codex.readback.statusPermissionDenied / messagePermissionDenied，与英文键对应，明确权限拒绝与普通失败的区别；不回显原始服务错误或认证信息。
+
+2026-10-07: 新增通用会话目录权限拒绝说明，与空目录、普通失败和不可用分别呈现。
+
+Includes the localized Pi extension-command completion status used only after a registered native command finishes without a model turn.
+
+
+## 2026-10-08 未完成工具的本地中断状态
+
+取消本地流时仍保存尚未收到结果的工具 call ID、参数和 interrupted 状态；不把本地停止推断为原生成功/失败，也不触发完成回调。已收到的终态和结果保持不变。卡片显示“原生工具结果尚未确认”，不显示运行中 spinner；历史归一保留该状态，后续权威 native completed/error 可以覆盖。

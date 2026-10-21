@@ -1,4 +1,8 @@
+import { Notice } from 'obsidian';
+
 import type { ZCodeAdapter } from '../../../core/agents/backend/zcode';
+import type { Conversation, ConversationSessionSettings } from '../../../core/types/chat';
+import { t } from '../../../i18n';
 import type { ModelSelectorProvider, ModelSelectorSelection } from '../ui/modelSelector/types';
 import type { ModelSelectionRuntimeHost } from './ModelSelectionRuntime';
 
@@ -83,3 +87,22 @@ export function bindZCodeModelSelection(
 }
 
 export type { ZCodeAdapter };
+
+/** Persist only the originating ZCode conversation and restore a failed save. */
+export async function saveZCodeConversationSelection(
+  conversation: Conversation,
+  patch: Pick<ConversationSessionSettings, 'zcodeModelOverride' | 'zcodeEffortOverrides'>,
+  save: (conversation: Conversation) => Promise<void>,
+): Promise<void> {
+  if (conversation.backend !== 'zcode') throw new Error('ZCode selection requires a ZCode conversation.');
+  const previous = conversation.sessionSettings;
+  const next = { ...previous, ...patch };
+  conversation.sessionSettings = next;
+  try {
+    await save(conversation);
+  } catch (error) {
+    if (conversation.sessionSettings === next) conversation.sessionSettings = previous;
+    new Notice(t('configEditor.notice.saveError'));
+    throw error;
+  }
+}

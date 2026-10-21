@@ -35,3 +35,5 @@ Run before merge: `npm run typecheck`, `npm run module-docs`, `npm run build`.
 - **Fixed fail-closed order**: Host → method/path → token → body → single-flight → execute. Every pre-execute rejection is audited.
 - **The audit must stay content-free**: instruction = length + hash prefix; token = fingerprint; dual redaction (hardened TraceRedactor with dynamically collected known secrets + report sanitizer on export). Do not add a "debug content capture" switch in this owner.
 - Do not cross `forbiddenDependencies`; do not replicate canonical state in another owner; changes here must update the matching `docs/modules/**` pages.
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `core.remotecontrol` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。

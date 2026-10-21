@@ -59,3 +59,9 @@ The new core.backend-pi owner isolates the external Pi process service. shared.f
 
 - 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
 - 2026-09-17: `shared/brandingWordmark.ts` 新增 `OPENCODIAN_APP_ICON_ID`（app 标记图标 id 的单一来源，供入口注册与各界面渲染引用），无新增运行时归属。
+
+2026-10-07：目录读取结果和 credential-free 错误分类由 shared/sessionCatalogReadback 承载，供 routing/OpenCode 1 lifecycle/OpenCode 2 复用，不持有后端状态。
+
+## 2026-10-13 诊断净化契约
+
+既有 `diagnosticSecretSanitizer` owner 继续拥有有限敏感 flag/赋值和 URL 净化纯逻辑；可选严格 URL 策略隐藏完整 userinfo/fragment，默认用户名契约保留。仅通用报告与 Pi 状态显示显式选择严格输出，不新增 runtime owner、helper 或共享可变状态。已审跨模块调用范围只授权此纯逻辑及两个指定消费者；其它 caller runtime 保持。源码回归不等于完整 S08/native/UI/profile 验收。

@@ -41,3 +41,9 @@
 ## 2026-10-02 Codex local forget / complete catalog UI
 
 新增同 owner 的 readBackendSessionCatalog 与 renderBackendSessionCatalogStatus，集中 Codex catalog evidence 消费及列表状态展示；partial/failed/unavailable 提示通过 typed `chat.backendSessions.catalogPartial` / `catalogFailed` / `catalogUnavailable` 本地化，loading 复用既有 key。英中正式 UI 测试断言提示、partial 重试与 native ID 保留；不持有 runtime state，不新增文件。既有 detail/transcript turns 分页保留原行为；非 Codex 或旧 injected adapter 继续 legacy session list。
+
+## 2026-10-06 Codex catalog permission denial
+
+renderBackendSessionCatalogStatus 接收可选 permissionDenied，只改变固定双语说明与 data-session-catalog-failure；状态仍为 failed/partial，已读取条目由 browser 原所有者管理。
+
+2026-10-07: The shared session browser consumes catalog evidence for every backend, preserves partial data and renders fixed bilingual denial/unavailable/failure messages. Unexpected Codex catalog rejections also become classified failures rather than raw exception text.

@@ -71,3 +71,9 @@ SettingsPiSection owns the Pi settings surface through a narrow host. Credential
 - 2026-09-15: 新增 `SettingsInlineEditSection`（`inlineEditEnabled` 总开关 + 按 backend 键控的模型覆盖，输入即校验）并挂到设置页。该分节按结构类型接收插件（settings + saveSettings），以避免 feature → app 依赖边。
 
 - 2026-09-17: `SettingsPiSection` 新增只读 `mcp` 二级标签（排在 execution 与 resources 之间）：声明清单来自 `core.backend-pi` 的 `PiMcpConfigService`（读 Pi 的配置文件），运行时状态来自 `PiAdapter.getExtensionStatus()`（扩展上报文本）。该页无任何写操作、也不解析上报文本；没有适配器实例时清单仍能渲染，所以 `attachTabbed` 的 mcp 分支排在 `if (!adapter)` 之前。构造器第二参数可注入配置读取器供测试。
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.settings-shell` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+## 2026-10-13 Pi 状态显示输出边界
+
+`SettingsPiSection.mcpStatus` 在 statuses/message 的 DOM 文本输出点选择共享 sanitizer 的严格 URL 策略。此 owner 仅控制显示：PiAdapter 缓存/RPC 对象保持，不解析连接状态，不新增 Copy UI，不接管 Pi 运行时；safe 文本、时间、role 与布局保持。typed mock → JSDOM 回归不能替代 Pi native/UI/profile 验收。

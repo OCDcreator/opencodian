@@ -1,4 +1,19 @@
 # CodexAdapter
+
+> 2026-10-13：`handleToolUserInput` 在 host 调用前检查整个 questions/options 形状；null question/option、非数组 questions/options、非法文本/布尔字段返回既有 `{answers:{}}`，不部分构卡。类型允许的缺省/null options 保持自由文本，原 question ID、顺序、答案副本、所属 thread/tab 与取消/dispose 保持。`handleMcpElicitation` 在构卡前拒绝 null/非对象/数组 schema 或 properties、未知/嵌套 property 与非法 enum/const 选项，返回 decline（已取消时 cancel）；已声明 primitive、合法空 object 或缺 schema 的确认卡保持。form builder 异常在此 handler 内转为本地 structured refusal；不改变 form helper、URL/openai dialect 或真实 RPC envelope。合成 source 观察不证明 native/provider 行为。
+
+> 2026-10-09（strict composer preflight）：`getSendMessagePreflightError(codexOptions)` 是无副作用的后端判定，复用既有 `captureAttemptOptions` 的 per-turn 优先规则、app-server chat 可用性与 approval bridge 检查。`untrusted`/`on-request` 不满足时返回同一可见诊断；`never`/`inherit` 保持原 fallback 语义。发送边界调用同一函数复检，直接调用与 preflight 后连接/bridge 变化仍 fail-closed；不创建线程、模型回合或新策略真值。
+
+> 2026-10-08：native request_user_input 的选项按上游互斥语义映射为单选，Other 输入保留；MCP 表单 array 多选由独立 schema 路径处理。
+
+> 2026-10-08：审批、tool-user-input、MCP elicitation 组合所属 turn 与单条 native request 的生命周期；超时取消仅清该问题，不中断 main turn。组合监听器在结果/异常/取消后移除，不依赖新版本 AbortSignal.any。
+
+> 2026-10-08：MCP form/url 和 tool-user-input 提问使用所属 native thread 的 AbortSignal；已停止回合不收集新回答，等待期间停止后取消收集，迟到 accept/answered 不会回传有效回答。tool-user-input 的 QuestionRequest.sessionId 保留 native thread ID。
+
+> 2026-10-08：请求可携带 Codex 会话设置快照；approval fail-closed 判定、app-server attempt 和 SDK ThreadOptions 使用该快照，避免发送准备期间其它 tab 修改共享 adapter 设置。无快照的旧调用保持现有选项来源。
+
+> 2026-10-08：审批收集绑定所属 foreground turn 的 AbortSignal；取消后即便 host 迟到返回 approve，adapter 仍只回复 denied。其它会话 controller 不受影响。
+> 2026-10-06：SDK fallback 每轮在 await 前捕获模型、effort 与权限选项，并应用请求的 model/variant 覆盖；SDK ThreadOptions 不可变，因此每轮重建同 native ID 的 resume wrapper，保持原生历史且不把会话覆盖写入全局默认。显式 untrusted/on-request 仍要求 app-server 与 approval bridge，不因 fallback 放宽。验收发现 UI Luna 与 native gpt-6-sol 错配，由该修复消除。
 > 2026-09-21 (advantage-parity R-F7)：options 新增 `getExtraEnv`：SDK 构造（抽出私有 `constructSdkClient`）与 app-server transport 均注入域 env——SDK 设 `env` 后不再继承 process.env，故以 `toPlainStringEnv(process.env)` 为底复制（extra 非空才设，保持既有行为逐字节一致）。
 
 > **Updated**: 2026-09-30 — Codex 0.159.0 全面接入（B1 codex-adapter-core）：`steerTurn`（`AgentTurnSteeringCapability`，app-server path only，capability 动态声明/摘除）、`updateSessionTitle`→`thread/name/set`、`deleteSession`→`thread/delete`（保留 interrupt active turn）、goal pause/resume（`pauseThreadGoal`/`resumeThreadGoal` → `thread/goal/set {status}`）、v2 审批桥（`item/commandExecution|fileChange|permissions/requestApproval` + `item/tool/requestUserInput`）、MCP elicitation 桥（独立 `CodexElicitationBridge.ts`）、transport 重连整合（onReconnect 重 resume loaded threads + 中断 in-flight streams；onReconnectFailed → error chunk + status error）、`deprecationNotice`（trace + console warn + 一次性 Notice）、settings 透传 seam（`readAccountUsage`/`listCodexPlugins`/`listInstalledCodexPlugins`/`installCodexPlugin`/`uninstallCodexPlugin`/`reconcileCodexPlugins`，供 B4 设置 UI 消费）。
@@ -104,3 +119,11 @@
 单条、无工具的 completed assistant 以匹配当前 thread/turn 的 `item/completed` 最终文本和真实 item ID 发出收敛 metadata；成功状态未知、多个 assistant item 或工具活动不会冒充一条权威文本。
 
 app-server live user item 以本次 attempt、native thread 与最终 turn/start ID 归属；早到 identity 暂存，旧 turn、外 thread、重放及失效 attempt 不持久化。getSessionMessages 保留 native user item ID 和 owning turn。目标 fork 先 thread/read 唯一映射 user item→turn，再传 beforeTurnId；unknown/foreign/ambiguous/active/unsupported 均拒绝，无 whole-thread fallback。无目标 fork 原行为保持。目录保留 native 默认分页与 active/archived 去重；对 fork 返回 ID 和插件持久化 Codex 引用的缺失行做同 ID 权威读取，native preview 为空时仅以权威 user 正文作展示标题，绝不据正文猜 identity。精确读取失败保留 partial。发送模型和 effort 来自本次会话选项快照，不改全局默认；请求、thread configured 回读与 turn effective 证据不可混称。
+
+
+## 2026-10-08 Codex compatibility and failed negotiation cleanup
+
+Failed app-server negotiation stops the owned client before SDK fallback. Before-turn fork keeps the native 0.160+ contract and admits only the separately verified 0.158.0 alternative: authoritative inactive source/target, inclusive lastTurnId prefix or revert of the newly created child, exact child lineage and prefix readback. Unsafe/missing readback or failed revert cannot become fork success; the parent is never reverted. Unknown and other older versions remain unavailable.
+
+
+Codex CLI account/model fallback reads snapshot the current provider-domain environment, including CODEX_HOME, for each execFile call without mutating the renderer process environment. The bounded output/timeout and native-first behavior stay intact.

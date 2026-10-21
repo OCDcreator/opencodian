@@ -1,5 +1,7 @@
 # CodexAppServerClientTypes
 
+> 2026-10-08：AppServerServerRequestHandler 增加可选第二个 AbortSignal 参数，由 transport 在 native request 已解决或连接结束时取消。旧的一参 handler 仍可注册。
+
 > **源码**: `src/core/agents/backend/CodexAppServerClientTypes.ts`
 > **状态**: [RUNTIME_ADJUNCT]
 

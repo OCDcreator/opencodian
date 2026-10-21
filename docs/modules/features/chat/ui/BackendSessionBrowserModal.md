@@ -79,3 +79,7 @@ Codex 列表经 readBackendSessionCatalog 消费 getSessionCatalog 完整目录�
 
 Resume seed 保留 Codex userMessage 的 sourceMessageId/sourceTurnId，展示用 id 优先采用该原生 item ID；无 native identity 的 legacy preview 仍是不可用于 native cut point 的展示快照。
 目录刷新把可选的持久化 Codex native 引用交给已有读取 seam，确保插件重载后仍可找到未进入 native 默认列表的同一个 child。
+
+## 2026-10-06 Codex catalog permission denial
+
+会话目录保留结构化失败的权限拒绝分类；loading 和成功刷新清空旧标记。partial 保留 native IDs 与已读取行，失败不冒称空目录，不回显 errorReason。

@@ -130,6 +130,21 @@ describe('CodexAdapter.getModelList', () => {
     expect(result).toBeNull();
   });
 
+  it('uses the current provider environment for each CLI fallback read without changing host env', async () => {
+    mockExecFile.mockImplementation((_cmd, _args, _opts, cb) => {
+      (cb as ExecFileCallback)(null, EMPTY_MODELS_OUTPUT, '');
+    });
+    const hostHome = process.env.CODEX_HOME;
+    let domain = { CODEX_HOME: '/owned/codex-A' };
+    const adapter = new CodexAdapter({ getExtraEnv: () => domain });
+    await adapter.getModelList();
+    domain = { CODEX_HOME: '/owned/codex-B' };
+    await adapter.getModelList();
+    expect(mockExecFile.mock.calls.map(call => (call[2] as { env?: NodeJS.ProcessEnv }).env?.CODEX_HOME))
+      .toEqual(['/owned/codex-A', '/owned/codex-B']);
+    expect(process.env.CODEX_HOME).toBe(hostHome);
+  });
+
   it('passes codexPathOverride and correct args to execFile', async () => {
     mockExecFile.mockImplementation((_cmd, _args, _opts, cb) => {
       (cb as ExecFileCallback)(null, EMPTY_MODELS_OUTPUT, '');

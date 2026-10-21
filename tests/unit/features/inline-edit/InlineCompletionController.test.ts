@@ -250,11 +250,7 @@ describe('InlineCompletionController trigger', () => {
     expect(request.suffix).toBe('');
     expect(request.maxChars).toBe(300);
 
-    harness.currentSession.deferreds[0]!.resolve({
-      ok: true,
-      text: ' the next fiscal year.',
-      toolCalls: [],
-    });
+    harness.currentSession.deferreds[0]!.resolve({ ok: true, text: ' the next fiscal year.', toolCalls: [] });
     await flush();
     const ghost = readInlineCompletionGhost(harness.view.state);
     expect(ghost?.text).toBe(' the next fiscal year.');
@@ -318,6 +314,80 @@ describe('InlineCompletionController trigger', () => {
 });
 
 describe('InlineCompletionController cancellation (acceptance 2)', () => {
+  it('Esc before the first chunk aborts the turn and prevents late ghost or Tab insertion', async () => {
+    const harness = makeHarness();
+    harness.setCursor(DOC.length);
+    harness.controller.trigger({ cm: harness.view } as never, 'notes/report.md');
+    await flush();
+    const deferred = harness.currentSession.deferreds[0]!;
+    expect(readInlineCompletionGhost(harness.view.state)).toBeNull();
+
+    // Exercise the real keymap while complete() is pending but no text has
+    // arrived, then let a backend that missed abort deliver both paths late.
+    const escapeConsumed = harness.pressKey('Escape');
+    const aborted = deferred.request.signal?.aborted;
+    deferred.request.onTextChunk?.(' a late candidate.');
+    deferred.resolve({ ok: true, text: ' a late candidate.', toolCalls: [] });
+    await flush();
+    const lateGhost = readInlineCompletionGhost(harness.view.state)?.text ?? null;
+    const tabConsumed = harness.pressKey('Tab');
+    const text = harness.view.state.doc.toString();
+    const documentWrites = harness.docTransactions.length;
+    harness.destroy();
+
+    expect({ escapeConsumed, aborted, lateGhost, tabConsumed, text, documentWrites }).toEqual({
+      escapeConsumed: true, aborted: true, lateGhost: null,
+      tabConsumed: false, text: DOC, documentWrites: 0,
+    });
+  });
+
+  it('Esc while the pool is starting prevents the later session from receiving a turn', async () => {
+    const harness = makeHarness();
+    harness.setCursor(DOC.length);
+    harness.controller.trigger({ cm: harness.view } as never, 'notes/report.md');
+    // The real pool has not resolved its asynchronous obtain() yet.
+    const escapeConsumed = harness.pressKey('Escape');
+    await flush();
+    expect(escapeConsumed).toBe(true);
+    expect(harness.startedSessions).toHaveLength(1);
+    expect(harness.currentSession.deferreds).toHaveLength(0);
+    expect(readInlineCompletionGhost(harness.view.state)).toBeNull();
+    expect(harness.pressKey('Tab')).toBe(false);
+    expect(harness.view.state.doc.toString()).toBe(DOC);
+    harness.destroy();
+  });
+
+  it('Esc before the first chunk cancels only that view on a shared controller', async () => {
+    const harness = makeHarness();
+    harness.setCursor(DOC.length);
+    // Reuse the same registered extension callbacks and controller in a
+    // second real editor, with its own view/request state.
+    const otherView = new EditorView({ state: harness.view.state, parent: document.body });
+    harness.controller.trigger({ cm: harness.view } as never, 'notes/report.md');
+    await flush();
+    const first = harness.currentSession.deferreds[0]!;
+    harness.controller.trigger({ cm: otherView } as never, 'notes/other.md');
+    await flush();
+    const other = harness.currentSession.deferreds[1]!;
+
+    expect(harness.pressKey('Escape')).toBe(true);
+    expect(first.request.signal?.aborted).toBe(true);
+    expect(other.request.signal?.aborted).toBe(false);
+    other.resolve({ ok: true, text: ' the other view.', toolCalls: [] });
+    first.request.onTextChunk?.(' a late candidate.');
+    first.resolve({ ok: true, text: ' a late candidate.', toolCalls: [] });
+    await flush();
+    expect(readInlineCompletionGhost(harness.view.state)).toBeNull();
+    expect(harness.controller.accept(harness.view)).toBe(false);
+    expect(readInlineCompletionGhost(otherView.state)?.text).toBe(' the other view.');
+    expect(harness.controller.accept(otherView)).toBe(true);
+    expect(harness.view.state.doc.toString()).toBe(DOC);
+    expect(otherView.state.doc.toString()).toBe(DOC + ' the other view.');
+    otherView.destroy();
+    otherView.dom.remove();
+    harness.destroy();
+  });
+
   it('typing cancels the in-flight turn and late results are dropped', async () => {
     const harness = makeHarness();
     const cursor = DOC.length;
@@ -369,14 +439,11 @@ describe('InlineCompletionController cancellation (acceptance 2)', () => {
   it('Esc clears the ghost with the document untouched (acceptance 4)', async () => {
     const harness = makeHarness();
     const before = harness.view.state.doc.toString();
+    expect(harness.pressKey('Escape')).toBe(false);
     harness.setCursor(DOC.length);
     harness.controller.trigger({ cm: harness.view } as never, 'notes/report.md');
     await flush();
-    harness.currentSession.deferreds[0]!.resolve({
-      ok: true,
-      text: ' the next fiscal year.',
-      toolCalls: [],
-    });
+    harness.currentSession.deferreds[0]!.resolve({ ok: true, text: ' the next fiscal year.', toolCalls: [] });
     await flush();
     expect(readInlineCompletionGhost(harness.view.state)).not.toBeNull();
 
@@ -386,6 +453,7 @@ describe('InlineCompletionController cancellation (acceptance 2)', () => {
     expect(harness.view.state.doc.toString()).toBe(before);
     // …and directly: Esc is not consumed when no ghost exists.
     expect(harness.controller.dismiss(harness.view)).toBe(false);
+    expect(harness.pressKey('Escape')).toBe(false);
     harness.destroy();
   });
 });
@@ -396,11 +464,7 @@ describe('InlineCompletionController accept (acceptance 3)', () => {
     harness.setCursor(DOC.length);
     harness.controller.trigger({ cm: harness.view } as never, 'notes/report.md');
     await flush();
-    harness.currentSession.deferreds[0]!.resolve({
-      ok: true,
-      text: ' the next fiscal year.',
-      toolCalls: [],
-    });
+    harness.currentSession.deferreds[0]!.resolve({ ok: true, text: ' the next fiscal year.', toolCalls: [] });
     await flush();
 
     harness.docTransactions.length = 0;
@@ -423,11 +487,7 @@ describe('InlineCompletionController accept (acceptance 3)', () => {
     harness.setCursor(DOC.length);
     harness.controller.trigger({ cm: harness.view } as never, 'notes/report.md');
     await flush();
-    harness.currentSession.deferreds[0]!.resolve({
-      ok: true,
-      text: ' the next fiscal year.',
-      toolCalls: [],
-    });
+    harness.currentSession.deferreds[0]!.resolve({ ok: true, text: ' the next fiscal year.', toolCalls: [] });
     await flush();
     // The user edits the tail of the prefix while the ghost is up: the doc
     // change cleared the ghost at the field level, and a manual re-show of a
@@ -453,11 +513,7 @@ describe('InlineCompletionController write-tool audit (design §3.2.3)', () => {
     harness.setCursor(DOC.length);
     harness.controller.trigger({ cm: harness.view } as never, 'notes/report.md');
     await flush();
-    harness.currentSession.deferreds[0]!.resolve({
-      ok: true,
-      text: ' hostile edit.',
-      toolCalls: [{ name: 'Write' }],
-    });
+    harness.currentSession.deferreds[0]!.resolve({ ok: true, text: ' hostile edit.', toolCalls: [{ name: 'Write' }] });
     await flush();
     expect(readInlineCompletionGhost(harness.view.state)).toBeNull();
     expect(harness.violation).toEqual({ tools: ['Write'] });
@@ -471,11 +527,7 @@ describe('InlineCompletionController write-tool audit (design §3.2.3)', () => {
     harness.setCursor(DOC.length);
     harness.controller.trigger({ cm: harness.view } as never, 'notes/report.md');
     await flush();
-    harness.currentSession.deferreds[0]!.resolve({
-      ok: true,
-      text: ' clean text.',
-      toolCalls: [{ name: 'read' }],
-    });
+    harness.currentSession.deferreds[0]!.resolve({ ok: true, text: ' clean text.', toolCalls: [{ name: 'read' }] });
     await flush();
     expect(harness.violation).toBeNull();
     expect(readInlineCompletionGhost(harness.view.state)?.text).toBe(' clean text.');
@@ -491,6 +543,50 @@ describe('InlineCompletionController IME guard (acceptance 6, controller side)',
     harness.controller.trigger({ cm: harness.view } as never, 'notes/report.md');
     await flush();
     expect(harness.startedSessions).toHaveLength(0);
+    harness.destroy();
+  });
+});
+
+
+describe('InlineCompletionController progressive failure cleanup', () => {
+  it.each(['cancelled', 'failed', 'rejected', 'write-tool'] as const)(
+    'clears a streamed candidate after a %s terminal result and ignores late chunks',
+    async (terminal) => {
+      const harness = makeHarness();
+      harness.setCursor(DOC.length);
+      harness.controller.trigger({ cm: harness.view } as never, 'notes/report.md');
+      await flush();
+      const deferred = harness.currentSession.deferreds[0]!;
+      deferred.request.onTextChunk?.(' a streamed candidate.');
+      expect(readInlineCompletionGhost(harness.view.state)).not.toBeNull();
+      if (terminal === 'rejected') deferred.reject(new Error('transport failed'));
+      else if (terminal === 'write-tool') {
+        deferred.resolve({ ok: true, text: ' unsafe candidate.', toolCalls: [{ name: 'write' }] });
+      } else deferred.resolve({ ok: false, cancelled: terminal === 'cancelled', error: 'stopped' });
+      await flush();
+      expect(readInlineCompletionGhost(harness.view.state)).toBeNull();
+      deferred.request.onTextChunk?.(' late candidate.');
+      expect(readInlineCompletionGhost(harness.view.state)).toBeNull();
+      expect(harness.controller.accept(harness.view)).toBe(false);
+      expect(harness.view.state.doc.toString()).toBe(DOC);
+      harness.destroy();
+    },
+  );
+
+  it('Esc aborts a progressive turn before its final response', async () => {
+    const harness = makeHarness();
+    harness.setCursor(DOC.length);
+    harness.controller.trigger({ cm: harness.view } as never, 'notes/report.md');
+    await flush();
+    const deferred = harness.currentSession.deferreds[0]!;
+    deferred.request.onTextChunk?.(' a pending candidate.');
+    expect(harness.pressKey('Escape')).toBe(true);
+    expect(deferred.request.signal?.aborted).toBe(true);
+    deferred.request.onTextChunk?.(' late candidate.');
+    deferred.resolve({ ok: true, text: ' late candidate.', toolCalls: [] });
+    await flush();
+    expect(readInlineCompletionGhost(harness.view.state)).toBeNull();
+    expect(harness.view.state.doc.toString()).toBe(DOC);
     harness.destroy();
   });
 });

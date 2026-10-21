@@ -34,3 +34,5 @@ export class ConversationAuthoritativeMessageMergeCoordinator {
 - `ConversationAuthoritativeSyncCoordinator`：把 optimistic user hydration 需要的 single-message merge 委托给本模块
 - `ConversationAuthoritativeReloadCoordinator`：把 conversation-level authoritative merge 委托给本模块，不重复实现 field/model merge 规则
 - `OpenCodianView`：不直接感知这些 merge 细节，只继续通过 `ConversationAuthoritativeSyncCoordinator` 的 host seam 暴露依赖
+
+2026-10-07 mergePiNativeConversationMessages 接受已经规范化的 Pi 原生快照，不读取进程或 SDK。它按 native source ID/内容保存本地 user ID、图片和附件；逐个恢复 queued user/assistant，替换合并流中的 contentBlocks/tools；修复已明确属于另一 native user 的缓存身份。没有 native entry 的 SDK command input 与本地 notice 保留；无权威匹配的本地输入清除旧 native 身份。

@@ -23,6 +23,7 @@
  */
 
 import { EventEmitter } from 'node:events';
+import { clearTimeout as nodeClearTimeout, setTimeout as nodeSetTimeout } from 'node:timers';
 
 /** The duck-typed abort surface handed to the bundled SDK. */
 export interface RendererSafeAbortController {
@@ -57,7 +58,19 @@ export function createRendererSafeAbortController(): RendererSafeAbortController
       if (aborted) return;
       aborted = true;
       reason = nextReason ?? new Error('This operation was aborted');
-      emitter.emit('abort', { type: 'abort', target: signal });
+      // SDK subprocess teardown schedules an unref'ed timeout inside its abort
+      // listener. Renderer timers return a number, so use the Node timer pair
+      // only while those synchronous listeners execute.
+      const previousSetTimeout = globalThis.setTimeout;
+      const previousClearTimeout = globalThis.clearTimeout;
+      try {
+        globalThis.setTimeout = nodeSetTimeout as typeof globalThis.setTimeout;
+        globalThis.clearTimeout = nodeClearTimeout as typeof globalThis.clearTimeout;
+        emitter.emit('abort', { type: 'abort', target: signal });
+      } finally {
+        globalThis.setTimeout = previousSetTimeout;
+        globalThis.clearTimeout = previousClearTimeout;
+      }
     },
     signal,
   };

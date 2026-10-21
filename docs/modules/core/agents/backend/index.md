@@ -1,4 +1,5 @@
 # backend/index
+> 2026-10-07：内部 `ClaudeCodeScopedSessionStore` 由 adapter 直接消费，复用官方 SessionStore 支持域 config 根中的 native catalog/fork/rename/import；不增加 barrel 导出，不接管正常 query 存储。
 
 > **源码**: `src/core/agents/backend/index.ts`
 > **最近更新**: 2026-07-26 — `ClaudeProjectSettingsDiscovery` 保持只读 discover/open；创建与完整 settings mutation 已移交 `ClaudeSettingsSourceService`，barrel 不再导出旧的 `createClaudeProjectSettingsFile`。

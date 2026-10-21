@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- App-server evidence lifecycle and production-view snapshot assertions share the existing thread/turn transport fixture. */
 /**
  * CodexAdapter three-axis runtime evidence lifecycle tests (round 3 item 1).
  *
@@ -9,6 +10,9 @@
  */
 import { CodexAdapter } from '../../../../../src/core/agents/backend/CodexAdapter';
 import type { StreamChunk } from '../../../../../src/core/types/chat';
+import type { Conversation } from '../../../../../src/core/types/chat';
+import { OpenCodianView } from '../../../../../src/features/chat/OpenCodianView';
+import { ConversationSessionSettingsCoordinator } from '../../../../../src/features/chat/services/ConversationSessionSettingsCoordinator';
 
 const mockAppServerStart = jest.fn<Promise<void>, []>();
 const mockStartThread = jest.fn();
@@ -573,5 +577,62 @@ describe('CodexAdapter — in-flight cancellation via epoch (item A round 8)', (
     expect(mockClient.interruptTurn).toHaveBeenCalledWith('thread-active-delete', 'turn-active-delete');
     expect(await adapter.getContextUsageSnapshot('thread-active-delete')).toBeNull();
     expect(adapter.getLatestThreadEffectiveEvidence()).toBeNull();
+  });
+});
+
+
+describe('CodexAdapter per-send settings snapshot', () => {
+  beforeEach(() => resetMocks());
+  it('uses the captured sending conversation for thread and turn permissions', async () => {
+    const adapter = wiredAdapter();
+    adapter.setApprovalHost({ collectApproval: jest.fn().mockResolvedValue(null) });
+    await adapter.start();
+    const chunks = [];
+    for await (const chunk of adapter.sendMessage({ sessionId: 'codex-local-snapshot-a', content: 'go', options: { codexOptions: { sandboxMode: 'read-only', approvalPolicy: 'on-request', modelReasoningEffort: 'low' } } })) chunks.push(chunk);
+    expect(mockStartThread).toHaveBeenCalledWith(expect.objectContaining({ sandbox: 'read-only', approvalPolicy: 'on-request' }));
+    expect(mockStartTurn).toHaveBeenCalledWith(expect.objectContaining({ approvalPolicy: 'on-request', effort: 'low' }));
+  });
+});
+
+type SnapshotView = {
+  currentConversation: Conversation;
+  plugin: { settings: { backendSettings: { codex: { model: string; modelReasoningEffort: string; sandboxMode: string; additionalDirectories: string; networkAccessEnabled: boolean; webSearchMode: string } } } };
+  conversationSessionSettingsCoordinator: ConversationSessionSettingsCoordinator;
+  createConversationSessionSettingsCoordinatorHost(): ConstructorParameters<typeof ConversationSessionSettingsCoordinator>[0];
+  getSendMessageOptions(): { model?: string; variant?: string; codexOptions?: Record<string, unknown> };
+};
+
+function productionViewSnapshot() {
+  const a: Conversation = { id: 'owned-a', backend: 'codex', backendSessionId: 'thread-1', title: 'a', createdAt: 1, updatedAt: 1, messages: [], sessionSettings: { codexModelOverride: 'gpt-5.6-terra', codexModelReasoningEffort: 'low', codexApprovalPolicy: 'never' } };
+  const view = Object.assign(Object.create(OpenCodianView.prototype), {
+    currentConversation: a,
+    getCurrentSessionModel: () => ({ provider: 'codex', model: 'gpt-5.6-luna' }),
+    plugin: { settings: { backendSettings: { codex: { model: 'gpt-5.6-luna', modelReasoningEffort: 'high', sandboxMode: 'read-only', additionalDirectories: '', networkAccessEnabled: false, webSearchMode: 'disabled' } } } },
+  }) as SnapshotView;
+  view.conversationSessionSettingsCoordinator = new ConversationSessionSettingsCoordinator(view.createConversationSessionSettingsCoordinatorHost());
+  const snapshot = view.getSendMessageOptions();
+  view.currentConversation = { ...a, id: 'owned-b', sessionSettings: { codexModelOverride: 'other-tab-model' } };
+  view.plugin.settings.backendSettings.codex.model = 'later-default';
+  return { snapshot, a, view };
+}
+
+describe('Codex app-server receives the production view model snapshot', () => {
+  beforeEach(() => resetMocks());
+  it.each(['start', 'resume'])('uses one captured model for thread %s and turn after another conversation/default changes', async (mode) => {
+    const { snapshot, a } = productionViewSnapshot();
+    const adapter = wiredAdapter();
+    await adapter.start();
+    mockClient.getThreadEffectiveSettings.mockReturnValue(null);
+    const sessionId = mode === 'start' ? 'codex-local-view-model' : 'thread-1';
+    for await (const chunk of adapter.sendMessage({ sessionId, content: 'owned snapshot', options: snapshot })) void chunk;
+    const expectedOptions = expect.objectContaining({ model: 'gpt-5.6-terra' });
+    const wireCall = mode === 'start' ? mockStartThread : mockResumeThread;
+    const expectedArgs = mode === 'start' ? [expectedOptions] : ['thread-1', expectedOptions];
+    expect(wireCall).toHaveBeenCalledWith(...expectedArgs);
+    expect(mockStartTurn).toHaveBeenCalledWith(expect.objectContaining({ threadId: 'thread-1', model: 'gpt-5.6-terra', effort: 'low' }));
+    expect(adapter.getThreadEffectiveEvidence(sessionId).model.runtime).toBe('unavailable');
+    expect(snapshot.codexOptions?.model).toBe('gpt-5.6-terra');
+    expect(a.sessionSettings?.codexModelOverride).toBe('gpt-5.6-terra');
+    await adapter.stop();
   });
 });

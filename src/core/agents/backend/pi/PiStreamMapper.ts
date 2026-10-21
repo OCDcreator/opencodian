@@ -108,6 +108,10 @@ export function toPiChatMessages(entries: unknown[]): ChatMessage[] {
       if (owner) {
         owner.tool.result = toolResultText(entry); owner.tool.toolMetadata = piRecord(entry.details);
         owner.tool.status = entry.isError ? 'error' : 'completed';
+        const block = owner.message.contentBlocks?.find((candidate) => candidate.type === 'tool_use' && candidate.toolId === owner.tool.id);
+        if (block) {
+          block.toolStatus = owner.tool.status; block.toolResult = owner.tool.result; block.toolMetadata = owner.tool.toolMetadata;
+        }
         const images = imageContent(entry.content); owner.message.content += images;
         if (images) owner.message.contentBlocks?.push({ type: 'text', text: images });
       }
@@ -117,6 +121,9 @@ export function toPiChatMessages(entries: unknown[]): ChatMessage[] {
     if (!['user', 'assistant', 'custom'].includes(String(entry.role))) continue;
     const message: ChatMessage = { id: String(entry.id), sourceMessageId: String(entry.id), role: entry.role === 'user' ? 'user' : 'assistant',
       content: textContent(entry.content), timestamp: Number(entry.timestamp) || Date.now(), images: nativeImages(entry.content) };
+    if (entry.role === 'assistant' && typeof entry.provider === 'string' && entry.provider && typeof entry.model === 'string' && entry.model) {
+      message.modelId = `${entry.provider}/${entry.model}`;
+    }
     if (entry.role === 'custom') { message.displayStyle = 'notice'; message.noticeTitle = String(entry.customType ?? 'Pi'); }
     appendPiContentBlocks(message, entry, tools);
     messages.push(message);

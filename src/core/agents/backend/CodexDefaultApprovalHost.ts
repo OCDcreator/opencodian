@@ -54,6 +54,7 @@ export interface CodexQuestionCardRenderer {
   collectResponse(
     request: QuestionRequest,
     tabId: string | null,
+    signal?: AbortSignal,
   ): Promise<CodexApprovalResolutionResult>;
 }
 
@@ -65,6 +66,7 @@ export interface CodexQuestionCardRenderer {
  */
 export interface CodexApprovalHostContext {
   getActiveTabId: () => string | null;
+  getTabIdForSession?: (sessionId: string) => string | null;
   approvalCardRenderer?: CodexApprovalCardRenderer;
   questionCardRenderer?: CodexQuestionCardRenderer;
   elicitationCardRenderer?: CodexElicitationCardRenderer;
@@ -97,19 +99,29 @@ export function createCodexApprovalBridgeHost(
       if (!ctx.approvalCardRenderer) {
         return null;
       }
-      const tabId = ctx.getActiveTabId();
+      const threadId = typeof request.raw === 'object' && request.raw !== null
+        && 'threadId' in request.raw && typeof request.raw.threadId === 'string'
+        ? request.raw.threadId : undefined;
+      const tabId = threadId && ctx.getTabIdForSession
+        ? ctx.getTabIdForSession(threadId)
+        : ctx.getActiveTabId();
+      if (threadId && ctx.getTabIdForSession && !tabId) return null;
       return ctx.approvalCardRenderer.collectResponse(request, tabId);
     },
 
     async collectQuestionAnswers(
       request: QuestionRequest,
+      signal?: AbortSignal,
     ): Promise<CodexApprovalResolutionResult | null> {
       const ctx = getContext();
       if (!ctx.questionCardRenderer) {
         return null;
       }
-      const tabId = ctx.getActiveTabId();
-      return ctx.questionCardRenderer.collectResponse(request, tabId);
+      const tabId = ctx.getTabIdForSession
+        ? ctx.getTabIdForSession(request.sessionId)
+        : ctx.getActiveTabId();
+      if (ctx.getTabIdForSession && !tabId) return null;
+      return ctx.questionCardRenderer.collectResponse(request, tabId, ...(signal ? [signal] : []));
     },
   };
 }

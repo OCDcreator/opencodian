@@ -1,5 +1,8 @@
 # Owner: core.backend
 > 2026-10-13（矩阵接力 018）：CodexAppServerTransport.handleMessage 增加非对象帧防护——JSON null/标量/数组帧路由到既有 Unrecognized 告警路径，不再于 `msg.id` 解引用处抛未捕获异常击穿 ws.onmessage；语义对齐 ZCode 解析器的 isPlainObject 加固。修复经 owned loopback WebSocket 实机复测（修复前 null 帧致命、修复后零异常且连接保持），回归用例与全量 verify 落 main。
+> 2026-10-07：ZCode 辅助存储所有权包含独立的 native `sessionDbPath`；每个 scope 同时覆盖 `ZCODE_SESSION_DB_PATH` 和 `ZCODE_SESSION_DB`，以及 `ZCODE_STORAGE_DIR`。仅请求 storage 根不能证明数据库隔离。
+> 2026-10-07：ClaudeCodeScopedSessionStore 隔离原生 transcript IO，复用到 SDK 静态目录、消息、分支、重命名和导入；query 仍经原 SDK/CLI 路径写入指定 config 根。不得用宿主 env 临时改写或绕过 resume identity 校验解决目录不一致。
+> 2026-10-06：Codex SDK fallback 每轮以独立选项快照恢复同 native thread，应用 UI 模型/effort 覆盖并保留严格权限 gate；SDK 非致命 ErrorItem 只作诊断事件，fatal thread/turn 仍为 error。边界与 canonical state 未扩展。
 > 2026-10-02（reviewed continuation，用户已授权）：ClaudeCodeAdapter 的 MCP permission override 与 output-style reload 复用现有 active persistent query，以 native session ID 选择目标；缺方法/失效会话返回 unavailable，响应/会话竞态失败不提升为 runtime verified。SDK 回执仅 acknowledged，刷新样式列表不代表选中样式或新模型输出；配置三轴与 UI 验收另记。Codex 删除默认须同 ID absence 回读 verified；pending/failed/admitted 期间 deleted 通知不得擦掉恢复身份、alias 和 evidence/cache，同 ID retry 可通过权威 absence 收敛。显式 forgetSession 不发 native delete/archive，UI 暴露另记 partial；backend owner 保留这些状态所有权。
 > 2026-10-02（接入修复 T05/T08）：Codex catalog 由现有 client 保留分页 cursor、跨页去重和 partial failure；native mutation admission 与 failed/unavailable 分开，adapter 失败保留恢复身份，显式 local forget 不分派 native delete。ACK 不作为终态/readback 证明。Claude 新 control 的 SDK 类型契约与 adapter 业务接线分别验收；实施记录列明图门禁及尚未执行的 runtime/UI 场景，不能仅因 SDK 方法存在宣称能力完整。
 > 2026-09-30 (Codex 0.159 app-server integration)：
@@ -68,6 +71,8 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 - Do not cross `forbiddenDependencies`.
 - Do not replicate canonical state in another owner.
 - Changes here must update the matching `docs/modules/**` page (via `module-docs.config.json`).
+- Codex app-server form/tool-input handlers validate the entire raw shape before host/card admission; malformed or unsupported properties/options receive a local decline/cancel or empty answers response. Preserve known empty/schema-less form fallback, declared optional null tool options, native question IDs/order, answer copies and request/turn lifetime disposal. `items.anyOf` const/title options follow existing oneOf/enum/items.enum precedence without filtering invalid entries. Synthetic handler bodies are not RPC-envelope/native/provider continuation evidence.
+- ZCode user-input normalization requires non-empty normalized option labels and unique question text before card/pending registration; invalid options or duplicate text reject the entire request. Source fixture evidence does not prove native/UI acceptance.
 - Archive history descriptor identity preserves exact filesystem device/inode IDs using bigint stats and decimal-string tokens; Windows NTFS IDs must never be rounded through JavaScript Number. Confinement, state and content integrity checks remain mandatory before restore.
 - Run `npm run inspect:owner -- <this owner or a path>` for an always-fresh summary.
 
@@ -100,3 +105,39 @@ Codex user item/owning-turn identity、attempt fencing、权威 beforeTurnId 映
 ClaudeCodeAdapter owns current CLI resolution for new/resumed queries and dedicated probes. It revalidates after asynchronous SDK/MCP loading, preserves injected SDK/path/env/shell ownership, and snapshots each spawn callback. Executable edits do not close persistent queries. Explicit restart validates first and closes only after a valid selection; next send keeps native identity/history while adopting the current executable. No other backend behavior changes.
 
 2026-10-06：ZCodeManagementService 保存证据的 runtime 值继续限定为原生 effective catalog；application 在保存时保持 pending。会话新建/重连恢复及插件执行的独立观察不由 secure writer 推断，不新增状态所有者或绕过 revision/archive/fail-closed。
+
+2026-10-07：ZCode generic aux 的只读边界包含独立 HOME/workspace/config 和创建前原生插件禁用回读；工具表不能约束 hook 子进程。消息 fork 使用当前 Protocol 1 的 target discriminated union，原生失败继续向上传递。
+
+ZCode state.updated 的单项 current-model projection 与 session/read 使用同一 catalog 合并边界；native process exit 清除当前 transport 的 startPromise，保持新握手与迟到退出的身份隔离。
+
+ZCode interaction state follows exact native `permission.resolved` identities, including native question auto-continue; pending reads cannot retain answerable expired cards.
+
+OpenCode 2 auxiliary scopes own all HOME/XDG/DB/temp roots, and native permission normalization may only narrow the verified wildcard deny.
+
+2026-10-07: Session catalog evidence is owned by AgentBackendRouting; OpenCode 2 emits bounded partial read errors with admitted records/cursor, never synthetic session IDs.
+
+2026-10-07：目录失败 DTO/Error/classifier 由 shared.foundation 承载；AgentBackendRouting 兼容 re-export，OpenCode2Adapter 直接引用同一构造器，保持浏览器 partial 行为。
+
+2026-10-07：OpenCodeAuxScope readiness 单次请求有界且可取消，防止挂起 /config 绕过 60 秒启动上界。失败时 teardown，不进入未验证 native aux session。
+
+
+## 2026-10-08 Codex compatibility and failed negotiation cleanup
+
+Failed app-server negotiation stops the owned client before SDK fallback. Before-turn fork keeps the native 0.160+ contract and admits only the separately verified 0.158.0 alternative: authoritative inactive source/target, inclusive lastTurnId prefix or revert of the newly created child, exact child lineage and prefix readback. Unsafe/missing readback or failed revert cannot become fork success; the parent is never reverted. Unknown and other older versions remain unavailable.
+
+
+Codex CLI account/model fallback reads snapshot the current provider-domain environment, including CODEX_HOME, for each execFile call without mutating the renderer process environment. The bounded output/timeout and native-first behavior stay intact.
+
+
+## 2026-10-08 Codex auxiliary cancellation
+
+Timeout, request abort, explicit cancel and dispose settle locally within the original budget and interrupt the exact admitted native turn once. A late turn/start acknowledgement after local cancellation is interrupted using its captured owned thread/turn ID, so it cannot survive the cancelled request. Pre-aborted requests send no native turn. Failed/interrupted native terminals cannot admit partial replacement text. Read-only sandbox, no network, never approvals and ephemeral readback remain required.
+
+The plugin composition supplies Pi extension-command completion localization through the existing adapter wiring callback, keeping the Pi service boundary independent of the locale runtime.
+
+Claude message-before fork resolves the predecessor native chain UUID before using the SDK inclusive boundary and refuses an unavailable empty prefix. Inline input refresh preserves the current draft in input phase, including delayed catalog loads, without changing generating/new-round clear behavior.
+
+
+## 2026-10-13 Claude elicitation schema admission
+
+ClaudeCodeElicitationBridge 的既有 builder 拥有 raw schema/properties/property 形状与支持类型的建卡前检查。畸形或未知字段类型抛出固定安全拒绝错误，由 app.composition 的既有 handler 转成 decline/cancel；不引入 nullable 传播或新 runtime owner。SettingsCapabilityLab 的合法 synthetic wiring probe 保持只读。此项 source/mock 证据不晋升 native/UI/profile 矩阵。

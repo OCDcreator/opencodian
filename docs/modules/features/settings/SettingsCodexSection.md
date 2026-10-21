@@ -11,6 +11,7 @@
 
 > **更新**: 新增 `resources` 二级 tab，委托给 `SettingsCodexResourcesSection` 渲染 Codex 项目/全局 skills 与 agents 管理（当前 P0 UI 项目可编辑、全局只读；P1 通过共享 `allowlisted-root` 契约开放全局 CRUD）。
 > **更新**: 2026-07-26 G9 Codex credential hardening — native Provider configuration is external-managed/read-only; legacy plugin credentials are masked and confirmation-gated for clearing.
+> **更新**: 2026-10-07 — 显式 Reload 操作先等待当前 settings 持久化，优先使用宿主 `reloadPlugin`；Obsidian 1.13.7 没有该方法时使用同一 plugin ID 的顺序 `unloadPlugin` → `loadPlugin`，保留 enabled 注册状态。保存失败不卸载；load 返回 false/抛错显示 failed；两种接口均不存在才给手动重载说明。单独保存可执行路径仍不重启当前会话。
 > **更新**: 2026-07-28 — Connection tab adds a persisted user CLI executable path and explicit plugin-reload action. Saving never touches an active session; reload warns that it terminates active Codex turns.
 > **更新**: 2026-07-29 — Main Codex page/group headings share the Account rhythm: `4px` title-to-description and `16px` description-to-controls; the cost estimate group uses `16px` title-to-controls. Classic top-level ribbons remain an intentional host exception.
 

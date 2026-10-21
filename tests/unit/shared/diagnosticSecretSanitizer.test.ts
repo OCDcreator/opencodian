@@ -250,3 +250,60 @@ describe('DIAGNOSTIC_REDACTION_PATTERNS', () => {
     }
   });
 });
+
+describe('MATRIX010 strict URL output policy', () => {
+  it('hides complete userinfo and fragments while preserving endpoint and safe query', () => {
+    const input = 'https://ordinary-user:private-value@example.test/mcp?access_token=query-value&mode=safe#opaque-fragment';
+    expect(sanitizeDiagnosticReport(input, { urlPolicy: 'strict' })).toBe(
+      'https://[REDACTED]@example.test/mcp?access_token=[REDACTED]&mode=safe#[REDACTED]',
+    );
+  });
+
+  it('keeps the default username contract and leaves unrelated text intact in strict mode', () => {
+    const url = 'https://ordinary-user:private-value@example.test/mcp?mode=safe#section';
+    expect(sanitizeDiagnosticReport(url)).toBe('https://ordinary-user:[REDACTED]@example.test/mcp?mode=safe#section');
+    const ordinary = 'safe-mcp ready; https://example.test/mcp?mode=safe --port 4096';
+    expect(sanitizeDiagnosticReport(ordinary, { urlPolicy: 'strict' })).toBe(ordinary);
+  });
+
+  it('preserves JSON and multiple URL boundaries with repeated credentials', () => {
+    const input = JSON.stringify({ first: 'https://shared-value:shared-value@example.test/a?token=shared-value&mode=safe#shared-value', second: 'ssh://shared-value@example.test/b?mode=safe#shared-value', note: 'safe tail' });
+    const output = sanitizeDiagnosticReport(input, { urlPolicy: 'strict' });
+    expect(JSON.parse(output)).toEqual({
+      first: 'https://[REDACTED]@example.test/a?token=[REDACTED]&mode=safe#[REDACTED]',
+      second: 'ssh://[REDACTED]@example.test/b?mode=safe#[REDACTED]',
+      note: 'safe tail',
+    });
+    expect(output).not.toContain('shared-value');
+  });
+
+  it('keeps punctuation and neighbouring prose outside URL fragments', () => {
+    const input = '(https://alice:secret@example.test/a?mode=safe#hidden), https://bob@example.test/b#hidden. safe tail';
+    expect(sanitizeDiagnosticReport(input, { urlPolicy: 'strict' })).toBe(
+      '(https://[REDACTED]@example.test/a?mode=safe#[REDACTED]), https://[REDACTED]@example.test/b#[REDACTED]. safe tail',
+    );
+  });
+});
+
+describe('MATRIX010 sensitive flags', () => {
+  it.each(['--token', '-token', '--api-key', '--api_key', '--client_secret', '--PASSWORD', '--secret', '--credentials', '--authorization', '--TOKEN', '-API_KEY', '--Authorization', '--Client-Secret']) (
+    'redacts separate and equal %s values without removing a following port or adjacent flag', (flag) => {
+      const input = `safe-mcp ${flag} FAKE_MATRIX010_FIRST ${flag}=FAKE_MATRIX010_SECOND --port 4096`;
+      const output = sanitizeDiagnosticReport(input);
+      expect(output).toBe(`safe-mcp ${flag} [REDACTED] ${flag}=[REDACTED] --port 4096`);
+    },
+  );
+
+  it('preserves a following CLI flag when a sensitive flag has no value', () => {
+    const input = 'safe-mcp --token --port 4096 --authorization=FAKE_MATRIX010_AUTH --verbose';
+    expect(sanitizeDiagnosticReport(input)).toBe('safe-mcp --token --port 4096 --authorization=[REDACTED] --verbose');
+  });
+
+  it('redacts a quoted value and labelled assignments without changing unrelated words', () => {
+    const input = 'safe-mcp --credentials "FAKE_MATRIX010 quoted value" client_secret=FAKE_MATRIX010_CLIENT credentials: FAKE_MATRIX010_CREDENTIALS --port 4096';
+    const output = sanitizeDiagnosticReport(input);
+    expect(output).toBe('safe-mcp --credentials [REDACTED] client_secret=[REDACTED] credentials: [REDACTED] --port 4096');
+    const ordinary = 'tokenizer credentials-file --tokenizer public --port 4096';
+    expect(sanitizeDiagnosticReport(ordinary)).toBe(ordinary);
+  });
+});

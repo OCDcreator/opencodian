@@ -53,6 +53,7 @@ Pricing readiness (2026-09-10): the shell supplies catalog subscription and per-
 Run before merge: `npm run typecheck`, `npm run module-docs`, `npm run build`.
 
 ## Recent change notes
+- **2026-10-09 Codex model selection:** the view reads the effective model from the current conversation and captures that same value in the top-level send options and `codexOptions`. Direct model setters save the captured conversation through the existing session settings coordinator; failure restores only that operation's still-current settings. Default/null selections inherit the global model. Other tab state and other backend selection paths keep their existing ownership.
 - **Turn change record visibility:** the chat plugin port exposes the global `showTurnChangeRecords` display preference to the runtime without making the shell a second store for persisted notices.
 - **Session sidebar hydration:** the shell passes the active conversation's persisted messages to the modified-files coordinator and refreshes that surface when active-backend capabilities hydrate, after plugin-reload first-tab restore, after new-tab or current-tab identity actually changes (conversation id or backend session id), and after a Turn Change Record persists successfully. Creation wrappers do not refresh for max-tabs/no-op returns with unchanged identity, avoiding duplicate work while preventing stale previous-session diffs.
 - **Turn-diff host seam:** `createAssistantNoticeCardRendererHost()` exposes the two narrow turn-diff capabilities — `resolveVaultRelativePath()` (shared `toVaultRelativePath()` + `getVaultBasePath()`) and `openVaultFile()` (vault-relative `workspace.openLinkText()`); the shell owns the Obsidian side effects so the runtime renderer stays `App`-free.
@@ -89,3 +90,11 @@ The chat view routes OpenCode 2 model, permission, form, slash catalog, context 
 ## 2026-10-05 Codex 消息前分支与恢复
 
 OpenCodianView 只转发 Codex 目录恢复到插件既有桥，保持 view/runtime ownership 分离。
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.chat-shell` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+
+2026-10-07 Pi queue history：view 的 native adapter 分支只转发规范化快照及 serialized write，纯 message metadata 合并由既有 feature.chat-services owner 承担；不增加 view-local Pi runtime ownership。
+
+
+> 2026-10-08 ZCode selection: 会话级 model override 与每模型 reasoning override 经既有保存/归一化链持久化，null 档位继承 native 模型默认；view 重载与切会话分别回读，保存失败只回滚发起会话。保存值不代替 native options 生效证据。

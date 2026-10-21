@@ -274,6 +274,21 @@ describe('ZCodeAdapter — native readback and turn boundaries', () => {
     expect(models).toHaveLength(2);
   });
 
+  it('keeps other selectable models when a native broadcast projects only the current model', async () => {
+    await startAdapter();
+    await adapter.createSession();
+    notificationHandler?.({ patch: { model: {
+      available: [snapshotSettings.model.available[0]],
+      current: { providerId: 'opencode-go', modelId: 'grok-4.5', options: { reasoningLevel: 'high' } },
+    } } });
+    expect((await adapter.getAvailableModels()).map((model) => model.modelId)).toEqual([
+      'grok-4.5', 'mimo-v2.6-pro',
+    ]);
+    await expect(adapter.setSessionModel('sess_a', {
+      providerId: 'opencode-go', modelId: 'mimo-v2.6-pro', reasoningLevel: 'disabled',
+    })).resolves.toBeUndefined();
+  });
+
   it('applies the conversation override at the turn boundary via request options', async () => {
     await startAdapter();
     await adapter.createSession();

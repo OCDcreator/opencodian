@@ -56,6 +56,7 @@ Pricing readiness (2026-09-10): the context usage coordinator fills unavailable 
 Run before merge: `npm run typecheck`, `npm run module-docs`.
 
 ## Recent change notes
+- **2026-10-09 Codex model selection:** the model menu resolves custom input before saving and keeps the existing menu persistence path as its one save owner. Direct setters use the view host path instead. Both paths target the initiating conversation; a later tab switch cannot redirect save or feedback. The Codex wrapper preserves a requested model during catalog refresh, including unavailable requests, and leaves an unconfigured default empty so send validation remains authoritative.
 - **Selection stability:** focus preview and retained-highlight capture receive the same resolved MarkdownView/editor, including parameterless selectionchange refreshes. Polling must not alternate a valid editor capture with a missing-editor clear. Composer/conversation focus still preserves a valid selection, while editor deselection clears it.
 - **Authoritative-sync preservation:** persistent assistant notices share the conversation write queue with authoritative sync. A notice for the currently visible conversation is committed to that live conversation object even when the caller still holds a detached same-ID reference. Valid turn-change records are persisted before visible rendering, deduplicated by their anchored user-message ID, and narrowly rebased if they arrive after merge calculation but before serialized commit; malformed or generic local notices do not receive that preservation rule.
 - **Session sidebar fallback:** `ModifiedFilesSidebarCoordinator` keeps cached OpenCode `session.diff` as the primary source, but when that cache is empty it may derive a reload-safe, file-deduplicated fallback from the active conversation's persisted Turn Change Records. The fallback is gated by both a ready capability state and a non-null OpenCode session id.
@@ -79,7 +80,9 @@ PiModelSelectionBinding owns Pi selector policy; send preparation and slash disp
 `ChatSelectionControlsCoordinatorHost` gained `getApp(): App`, and `ChatSelectionControlsCoordinator` forwards it as the new `app` field when rendering the model list, so provider group header icons resolve through the same route as the async icon cache. Resolution rules stay with `shared.utils-icons`; this owner only passes the host through.
 
 - 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
-- 2026-09-17: `PiExtensionUiHost` 收窄主机面：只渲染需要用户回复的四个对话框方法，以及能落到既有界面的 `notify` / `set_editor_text` / `setTitle`；`setStatus` / `setWidget`（Pi 终端状态行，第三方 MCP 扩展用它报告服务器数量）不再落地。这两个方法官方不需要响应，忽略不会阻塞 RPC 往返（`PiSessionRuntime` 只对 select/confirm/input/editor 回包）。> 2026-09-24 (票 06)：ChatSelectionControlsCoordinator 增包 bindZCodeModelSelection（zcode 活动时接管选择器、实时目录+档位 variants）；SlashCommandMenuCatalogCache 新增 loadZCodeRuntimeCommands 口与 zcode 分支；新增 ZCodeModelSelectionBinding。
+- 2026-10-09（Pi standard UI）：`PiExtensionUiHost` 补齐标准 setStatus/setWidget 的文本投影，并将 setTitle 映射为同 view header 下方的可见 transient 文本（空串隐藏）。本 owner 持有 App/session/当前连接 signal 隔离的临时 UI 及节点所有权；旧/aborted signal 不能夺回替换连接。View 只在既有身份/layout/close 接缝转发，多 leaf 同步、关闭只解绑该 view；无 native/conversation/tab title 写入或新的 runtime owner。四类 dialog 回包、五类 fire-and-forget 零回包分类不变；九方法代码验证不外推 startup ask/cancel/custom message 或两机 UI 完成。原 2026-09-17 刻意忽略 status/widget 的宿主策略已由此标准文本适配替代。
+
+> 2026-09-24 (票 06)：ChatSelectionControlsCoordinator 增包 bindZCodeModelSelection（zcode 活动时接管选择器、实时目录+档位 variants）；SlashCommandMenuCatalogCache 新增 loadZCodeRuntimeCommands 口与 zcode 分支；新增 ZCodeModelSelectionBinding。
 
 ## 2026-09-27 OpenCode 2 compatibility
 
@@ -89,3 +92,20 @@ Selection, history sync, recovery and slash command services recognize OpenCode 
 ## 2026-10-05 Codex 消息前分支与恢复
 
 Codex 模型目录发送准备和旧历史身份恢复在既有服务 owner 内闭合；旧历史只接受 native ID/唯一 owning-turn 证据，文本/下标猜测拒绝。Codex fork 继承其 session settings。
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.chat-services` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+
+## 2026-10-08 Cold-start model catalog retry
+
+Opening the model picker refreshes an unloaded/empty catalog through the existing reloadModelCatalog path. This retries a startup CLI fallback after native model/list becomes ready. A populated snapshot is reused; no synthetic model or new runtime owner is introduced.
+
+
+2026-10-07 Pi completion history reconcile 的纯 metadata/identity 合并放在现有 authoritative merge 模块；原生历史仍归 PiAdapter，不读取 SDK/进程或建立新会话真值。
+
+OAuth URL notices retain a request-ID scoped abort lifetime without a protocol response. Native login settlement cancels oauth-link, hides the authorization link, and releases its listener; ordinary timed notifications are unchanged.
+
+Claude SDK forks rewrite native UUIDs. Fresh Claude prefix clones discard parent sourceMessageId/sourceTurnId and use the existing child identity readback before opening. Readback failure leaves identity unavailable rather than copying a parent UUID; original messages are not mutated.
+
+
+> 2026-10-08 ZCode selection: 会话级 model override 与每模型 reasoning override 经既有保存/归一化链持久化，null 档位继承 native 模型默认；view 重载与切会话分别回读，保存失败只回滚发起会话。保存值不代替 native options 生效证据。

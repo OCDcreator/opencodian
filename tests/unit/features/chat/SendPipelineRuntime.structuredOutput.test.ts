@@ -62,7 +62,7 @@ describe('SendPipelineRuntime structured output trigger', () => {
 
     await runtime.sendMessage('/jsontell me a joke');
 
-    expect(preparationPort.prepareMessageSend).toHaveBeenCalledWith({ content: '/jsontell me a joke' });
+    expect(preparationPort.prepareMessageSend).toHaveBeenCalledWith({ content: '/jsontell me a joke', targetTabId: 'tab-1' });
   });
 
   it('produces a schema with additionalProperties:false at root for Codex strict-mode compatibility', async () => {

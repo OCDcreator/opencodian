@@ -221,21 +221,14 @@ export class SettingsTabbedRenderer {
   }
 
   private switchAgent(agent: AgentBackendKind): void {
-    const previousActive = this.getActiveBackend();
     this.syncToActiveBackend(agent);
     this.deps.plugin.settings.activeBackend = agent;
     this.deps.plugin.agentServiceRegistry?.setActive(agent);
     void this.deps.plugin.saveSettings();
     this.deps.plugin.onChatWarmSessionBackendChanged?.();
 
-    // Stop previous adapter and start the new active adapter
+    // Other enabled adapters may still serve background tabs. Disable/unload owns their teardown.
     try {
-      if (previousActive && previousActive !== agent) {
-        const prevAdapter = this.deps.plugin.agentServiceRegistry?.get(previousActive);
-        if (prevAdapter) {
-          prevAdapter.stop().catch(() => { /* best effort */ });
-        }
-      }
       const newAdapter = this.deps.plugin.agentServiceRegistry?.get(agent);
       if (newAdapter) {
         newAdapter.start().catch(() => { /* best effort */ });

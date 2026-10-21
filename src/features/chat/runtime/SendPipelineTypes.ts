@@ -41,6 +41,8 @@ export interface DiagnosticRunToken {
 
 export interface SendPipelineTabRuntime {
   isStreaming: boolean;
+  /** Per-send ownership; an old iterator must not finish a replacement turn. */
+  streamRunToken?: symbol;
   streamingMessageEl: HTMLElement | null;
   streamingContentEl: HTMLElement | null;
   pendingEditedFiles: Set<string>;
@@ -322,6 +324,7 @@ export interface SendPipelineTraceState {
 }
 
 export interface StreamChunkRouterOptions {
+  isCurrentStream?: () => boolean;
   host: StreamChunkRouterHost;
   preparedSend: PreparedMessageSend;
   runtime: SendPipelineTabRuntime;
@@ -358,6 +361,8 @@ export interface LocalStreamOutcome {
 }
 
 export interface StreamLocalFinalizerOptions {
+  isCurrentStream?: () => boolean;
+  streamElements?: SendPipelineStreamElements;
   host: StreamLocalFinalizerHost;
   preparedSend: PreparedMessageSend;
   runtime: SendPipelineTabRuntime;

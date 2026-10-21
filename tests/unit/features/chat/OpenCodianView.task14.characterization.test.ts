@@ -43,4 +43,27 @@ describe('Task 14 OpenCodianView plugin-seam characterization', () => {
     ]));
     expect(invalidate).toHaveBeenCalledTimes(1);
   });
+  it('keeps a live controller but replaces a cancelled controller before the next turn', () => {
+    const messagesEl = document.body.createDiv();
+    const prior = { isStreaming: jest.fn(() => false) };
+    const pane = { messagesEl, runtime: { streamController: prior } };
+    const view = Object.assign(Object.create(OpenCodianView.prototype), {
+      markdownService: {},
+      ensureTabMessagesPane: jest.fn(() => pane),
+      getActiveTabId: jest.fn(() => 'tab-1'),
+    }) as unknown as {
+      getOrCreateTabStreamController(tabId: string): {
+        startStream(element: HTMLElement): void;
+        cancelStream(): void;
+      };
+    };
+
+    const first = view.getOrCreateTabStreamController('tab-1');
+    expect(first).not.toBe(prior);
+    first.startStream(messagesEl.createDiv());
+    expect(view.getOrCreateTabStreamController('tab-1')).toBe(first);
+    first.cancelStream();
+    expect(view.getOrCreateTabStreamController('tab-1')).not.toBe(first);
+  });
+
 });

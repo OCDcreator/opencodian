@@ -30,7 +30,7 @@ import { InlineEditController } from '../../../../src/features/inline-edit/Inlin
 import type { InlineEditHost } from '../../../../src/features/inline-edit/InlineEditHost';
 import type { InlineEditRequest } from '../../../../src/features/inline-edit/InlineEditPrompt';
 import { canApplyEdit } from '../../../../src/features/inline-edit/InlineEditService';
-import type { InlineEditHostAdapter, InlineEditOutcome } from '../../../../src/features/inline-edit/InlineEditTypes';
+import type { InlineEditChoice, InlineEditHostAdapter, InlineEditOutcome } from '../../../../src/features/inline-edit/InlineEditTypes';
 import {
   readInlineEditPreviewIds,
   readInlineEditRange,
@@ -44,6 +44,7 @@ interface RecordedWrite {
 }
 
 interface HarnessOptions {
+  readonly listModels?: () => Promise<readonly InlineEditChoice[]>;
   readonly maxConcurrentEdits?: number;
   readonly documentModeEnabled?: boolean;
   readonly confirmResult?: boolean;
@@ -91,6 +92,7 @@ function makeHarness(options: HarnessOptions = {}): Harness {
   const capability = {} as AgentAuxQueryCapability;
   const adapter: InlineEditHostAdapter = {
     kind: 'opencode',
+    ...(options.listModels ? { listModels: options.listModels } : {}),
     displayName: 'OpenCode',
     getAuxQuery: () => capability,
     resolveModel: () => ({ ok: true, model: null }),
@@ -194,6 +196,21 @@ async function openCursorPreview(h: Harness, at: number): Promise<void> {
 }
 
 describe('InlineEditController parallel edits (R-A5)', () => {
+  it('retains the typed draft when delayed model catalogue loading completes', async () => {
+    let finish!: (models: readonly InlineEditChoice[]) => void;
+    const models = new Promise<readonly InlineEditChoice[]>((resolve) => { finish = resolve; });
+    const h = makeHarness({ listModels: () => models });
+    h.view.dispatch({ selection: { anchor: 0, head: 5 } });
+    h.controller.open(h.editor, { file: { path: 'note.md' } });
+    const field = bars(h.view)[0]!.querySelector<HTMLTextAreaElement>('.opencodian-inline-edit-field')!;
+    field.value = 'Keep this typed draft';
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    finish([]);
+    await flush();
+    expect(field.value).toBe('Keep this typed draft');
+    await h.controller.close();
+    h.view.destroy();
+  });
   it('keeps a selection rewrite and a cursor insertion coexisting; accepting the first maps the second', async () => {
     const h = makeHarness();
     const betaFrom = posOf(DOC, 'beta');

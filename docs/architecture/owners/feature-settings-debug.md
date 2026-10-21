@@ -51,6 +51,7 @@ Run before merge: `npm run typecheck`, `npm run check:module-docs`, `npm run dia
 - `ClaudeCodeDebugPanel` is the complete Claude workbench owner. It receives narrow settings/diagnostics ports and section callbacks rather than the full plugin, trace service, store, or report builder. `debugChannels` for console logs and `sessionTrace.consoleChannels` for trace capture remain independent.
 - The three settings composition paths create OpenCode, Codex, and Claude diagnostics ports at their boundaries. The adapters preserve app-owned service/store/report ownership and expose no mutable service map.
 - Changes here must update the matching `docs/modules/**` page (via `module-docs.config.json`).
+- `addDiagnosticActionsSetting` 的复制诊断与导出诊断 catch 仅记录固定的动作失败说明，Notice 使用现有 `copyFailed` / `generateFailed` 文案；不将原始异常或其字段送入 console、recent-log 或 Notice。成功报告、剪贴板、文件导出和路径持久化语义保持不变。
 - Run `npm run inspect:owner -- <this owner or a path>` for an always-fresh summary.
 
 ## Pi owner boundary review (2026-09-08)
@@ -60,3 +61,5 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 - 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
 
 - 2026-09-18 (FlowText 批次 B)：owner manifest 随 R-B1/R-B2 更新——新增 `src/shared/contextGroupPlan.ts` 归属 `shared.foundation`；本 owner 的边界与职责未变。
+
+2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.settings-debug` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。

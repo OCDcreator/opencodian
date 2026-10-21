@@ -261,6 +261,9 @@ export class InlineEditInputOverlay {
     this.scheduleSync();
   }
 
+  /** Keep the current draft across model/context refreshes. */
+  getDraftValue(): string | undefined { return this.field?.value; }
+
   /** Refresh rendered content without recreating the input (keeps focus). */
   update(state: InlineEditOverlayState): void {
     this.state = state;

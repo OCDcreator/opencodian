@@ -73,3 +73,5 @@ export class ModelSelectionRuntime {
 ## Pi 严格选择
 
 2026-09-08：新增可选 preserveRequestedModel。仅 Pi 绑定启用，保留不可用的原请求让发送门禁明确拒绝，不静默选择目录第一项。其他后端的默认解析和异步时序保持不变。
+
+目录加载以递增 generation 归属当前请求；reset（控件重建/后端切换）和较新 refresh 都会使旧异步结果失效。旧结果不覆盖当前目录，也不更新当前 tab 的 context 身份。

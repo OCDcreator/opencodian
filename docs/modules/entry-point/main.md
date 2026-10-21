@@ -1,4 +1,5 @@
 # Plugin Entry Point (main.ts)
+> 2026-10-07：readClaudeMcpServers 在 vault-scoped services 尚未组合时，按当前 vault 创建同类 OpencodeConfigManager 读取 project MCP，避免 active Claude 的提前 start 缓存空配置。配置来源及 adaptMcpConfigForClaude 规则保持一致，不启动 OpenCode 服务。
 > 2026-09-21 (advantage-parity R-F4)：`chatWarmSessionEnabled`（默认关、strict boolean load）复用唯一 `InlineCompletionService`；pool host 由 R-C3 / R-F4 任一开关启用。R-F4 启动、开关开启与两个 active-backend settings 入口均调 `prewarmExclusive()`，只构造一个空的只读 aux session；任一开关关闭仅在另一个也关闭时 `disposeAll()`，不破坏仍启用的一侧。
 > 2026-09-21 (advantage-parity R-F2)：startup metadata preload 和 `createConversationFromSession` 均保真 `linkedNotePath`；在 `loadConversations` 完成后由 plugin 单例注册 vault rename listener，逐条保存所有匹配绑定并通知打开的 chat view 刷新，不依赖 view mount 且不会重复监听。
 > 2026-09-21 (advantage-parity R-F7)：构造缝注入各后端域 env（ClaudeCodeAdapter `getDomainEnvironment`、wireHiddenAdapters `getCodexExtraEnv`/`getPiExtraEnv`、OpenCodeService `getExtraServerSpawnEnv`，统一经 `getDomainEnvFor`）；`refreshEnvironmentFingerprints` 在 loadSettings 尾部与 saveSettings 后比较 runtime.json 上次指纹——变化即本地化 Notice 列出受影响后端并保存新指纹（首次运行静默、未变不重写、失败仅记日志）。
@@ -394,3 +395,14 @@ Inline edit model choices read the OpenCode 2 native catalog when that backend i
 ## 2026-10-05 Codex 消息前分支与恢复
 
 createConversationFromBackendSession 对同一个已存在的 Codex native thread 复用本地 conversation，保留完整历史、native identity 和会话模型覆盖；其他后端仍走原创建路径。local forget 仍仅清本地引用，不删除 native thread。
+
+The plugin composition supplies Pi extension-command completion localization through the existing adapter wiring callback, keeping the Pi service boundary independent of the locale runtime.
+
+## 2026-10-13 通用报告的严格 URL 输出边界
+
+`buildDiagnosticReport` 在组装完成后显式调用 `sanitizeDiagnosticReport(raw, { urlPolicy: 'strict' })`：URL 完整 userinfo 与 fragment 隐藏，host/path、安全 query 和报告章节保持。报告的 collector、启动流程及原 mock 输入来源不变；没有新增 Pi 配置或扩展状态 collector，不能据此声称 Pi 数据进入通用报告。既有 settings 输出控制覆盖真实 builder → sanitizer → 捕获的 clipboard/mockfs；main 新回归覆盖 JSON 内多个 URL。此证据为 source/mock 范围，validation build 不替换原 native 候选，也不部署到 Test Vault。
+
+
+## 2026-10-13 Claude elicitation 拒绝入口
+
+`handleClaudeCodeElicitation` 只在既有 handler 内接住 builder 的安全拒绝：返回 decline，若 signal 已取消则返回 cancel；拒绝路径不调用 renderer/getActiveTabId，也不输出 raw schema 或异常文本。正常 accept/decline/cancel、URL preview、typed answers/content 和原 tab 归属保持。合成回归直接调用生产 handler 并注入 renderer，原测试前缀不变；真实 Obsidian/SDK/native roundtrip 不由该测试证明。

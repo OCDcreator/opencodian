@@ -276,7 +276,7 @@ Ordinary settings rows use a local shadcn-style Card + Field pattern implemented
 - **Default surface:** form rows stay neutral and host-themed, with `background-primary` carrying most of the mix. They must not use large-area warning, error, rose, amber, permission, or accent tint.
 - **State scope:** status color belongs in badges, inline error/help text, focus outlines, low-chroma borders, or real Alert/Empty surfaces. A normal row must not become an Alert simply because a permission is ask/deny or inherited/overridden.
 - **Nested-card prohibition:** when a section, row-card, editor panel, or modal card already owns border/background/radius, child ordinary `Setting` rows must become flat Fields. Descriptions, empty states, textareas, and button footers must not be wrapped in another full setting card.
-- **Layout:** desktop rows use two columns, `minmax(0, 1fr)` plus a compact control column; long text rows opt into `.opencodian-wide-text-setting`; below `720px`, rows collapse to one column with controls left-aligned.
+- **Layout:** desktop rows use two columns, `minmax(0, 1fr)` plus a compact control column; long text rows opt into `.opencodian-wide-text-setting`; at a Settings pane or nested row width of `720px` or less, rows collapse to one column with controls left-aligned. Native button groups wrap within the control region, and long button labels wrap without clipping; dropdown triggers retain their compact truncation.
 - **Exclusions:** readback/proof/status panels, destructive confirmations, modal editor cards, chat/composer surfaces, permission dialogs, and streaming error blocks keep their owner-specific state styling.
 
 ### Capability Lab Backend Tabs

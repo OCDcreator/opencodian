@@ -466,6 +466,8 @@ export const enTranslations = {
   'settings.codex.readback.statusLoading': 'Loading',
   'settings.codex.readback.statusUnavailable': 'Unavailable',
   'settings.codex.readback.statusFailed': 'Failed',
+  'settings.codex.readback.statusPermissionDenied': 'Permission denied',
+  'settings.codex.readback.messagePermissionDenied': 'Codex refused access to this catalog. Check the current account and workspace permissions, then reopen this view.',
   'settings.codex.readback.statusEmpty': 'Empty',
   'settings.codex.readback.statusCount': '{count} item(s)',
   'settings.quickNav.title': 'Quick Jump',
@@ -3011,6 +3013,7 @@ export const enTranslations = {
   'chat.message.toolUse': 'Using tool',
   'chat.message.toolResult': 'Tool result',
   'chat.stream.cancelledToast': 'Streaming cancelled',
+  'chat.tool.interruptedOutcome': "Stream interrupted. Native tool outcome is unknown.",
   'chat.stream.interruptedBadge': 'Interrupted',
   'chat.stream.interruptedNoticeTitle': 'Response stopped',
   'chat.stream.interruptedNoticeBody': 'Generation was stopped before any reply text was produced.',
@@ -6046,8 +6049,9 @@ export const enTranslations = {
   'settings.codex.readback.messagePartial': "Some entries could not be loaded. Reopen to retry the full catalog.",
   'settings.codex.readback.messagePartialReload': "Some entries could not be loaded. Reload to retry the full catalog.",
   'chat.backendSessions.catalogPartial': "Partial catalog. Some sessions could not be loaded; refresh to retry.",
+  'chat.backendSessions.catalogPermissionDenied': 'The backend refused access to this catalog. Check the current account and workspace permissions, then reopen this view.',
   'chat.backendSessions.catalogFailed': "Session catalog failed to load. Refresh to retry.",
-  'chat.backendSessions.catalogUnavailable': "Codex native session catalog is unavailable.",
+  'chat.backendSessions.catalogUnavailable': "The native session catalog is unavailable.",
   'settings.zcode.management.declarationCounts': "{path} · plugins {plugins} · MCP {mcp} · hooks {hooks}",
   'settings.zcode.management.pluginDetails': "Source: {source} · MCP {mcp} · hooks {hooks}{missing}",
   'settings.zcode.management.outcome': "{status} · persistence: {persistence} · session application: {application} · effective catalog: {runtime}. Plugin execution is not verified by this save.",
@@ -6081,6 +6085,8 @@ export const enTranslations = {
   'settings.zcode.management.authValue.required': "Required",
   'settings.zcode.management.authValue.failed': "Failed",
   'settings.zcode.management.authValue.unknown': "Unknown",
+  'chat.pi.commandCompleted': 'Command completed: {command}',
+
 } as const;
 
 

@@ -243,7 +243,7 @@ describe('ComposerInputShellCoordinator agent mention menu', () => {
           },
         ],
       },
-    });
+    }, expect.any(Function));
   });
 
   it('renders selected agent mentions as metadata-backed composer pills', async () => {
@@ -336,7 +336,7 @@ describe('ComposerInputShellCoordinator agent mention menu', () => {
           },
         ],
       },
-    });
+    }, expect.any(Function));
   });
 
   it('keeps the selected mention source span when the same token was typed manually earlier', async () => {
@@ -375,7 +375,7 @@ describe('ComposerInputShellCoordinator agent mention menu', () => {
           },
         ],
       },
-    });
+    }, expect.any(Function));
   });
 });
 

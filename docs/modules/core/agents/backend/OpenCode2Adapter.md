@@ -55,3 +55,13 @@ OpenCode 2.0.18 removes `todowrite` during v1 history migration and has no repla
 ## 2026-10-02 T10 native history pagination
 
 OpenCode 2.0.18 `SessionMessagesQuery` permits `order` only on the first page. Its opaque cursor carries the requested ordering; combining `cursor` and `order` is rejected by the native handler. `listAllMessages()` therefore sends ascending order on page one and only the cursor on later pages. A later-page failure rejects the history read rather than returning a partial conversation as complete. Native OpenCode 2 IDs remain local to this adapter and are never delegated to OpenCode 1 SDK v2 facade. Focused regression: `OpenCode2Adapter.t10.test.ts`. Upstream baseline: tag `v2.0.18`, commit `cd9a14a6b688d4021bee381dfd39d2cef9c0f862`, `packages/protocol/src/groups/message.ts` and `packages/server/src/handlers/message.ts`. This regression is protocol-fixture evidence; real native and UI acceptance require their own evidence.
+
+## 2026-10-07 auxiliary environment and ordered deny rules
+
+Auxiliary CLI scopes override HOME/USERPROFILE, every XDG data/config/cache/state root, OPENCODE_DB and temporary-directory aliases as well as OPENCODE_TEST_HOME. The native agent reader locates the last wildcard deny and requires every later rule to remain deny. Current runtime-added browser deny is valid; a later allow/ask or missing wildcard deny still fails closed. Session wildcard deny remains an exact native readback requirement.
+
+After owned process stop, cleanup resolves and checks the created scope realpath against the expected temporary parent and generated prefix, then removes the complete private root. Native DB/cache/log residue cannot be silently retained by empty-directory rmdir attempts.
+
+2026-10-07: Session paging follows every native cursor even on short pages, deduplicates IDs and bounds reads to 100 pages. A failed page preserves admitted records and the cursor; cycles/invalid identity/cursor fail visibly instead of returning a complete truncated list.
+
+2026-10-07：目录失败契约直接导入 shared/sessionCatalogReadback；routing 兼容 re-export 指向同一 Error 构造器，分页逻辑与公开行为不变。

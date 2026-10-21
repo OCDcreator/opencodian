@@ -52,6 +52,7 @@ export interface WireHiddenAdaptersOptions {
   /** R-F7: resolved domain env injected into the owned ZCode app-server process. */
   getZCodeExtraEnv?: () => Record<string, string>;
   onPiUiRequest?: PiUiHandler;
+  formatPiCommandCompleted?: (command: string) => string;
 }
 
 /**
@@ -104,6 +105,7 @@ export function wireHiddenAdapters(options: WireHiddenAdaptersOptions): void {
       tracePort: options.codexTracePort,
     }));
     registry.register(new PiAdapter({ workingDirectory: vaultPath, getSettings: options.getPiSettings,
+      formatCommandCompleted: options.formatPiCommandCompleted,
       ...(options.getPiExtraEnv ? { getExtraEnv: options.getPiExtraEnv } : {}),
       servicePath: options.pluginDir ? path.join(options.pluginDir, 'assets', 'pi', 'service.mjs') : '', onUiRequest: options.onPiUiRequest }));
     registry.register(new ZCodeAdapter({

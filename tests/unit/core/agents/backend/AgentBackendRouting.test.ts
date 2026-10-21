@@ -647,7 +647,7 @@ describe('listBackendSessions', () => {
     ]);
   });
 
-  it('falls back gracefully for records missing most fields', async () => {
+  it('keeps native IDs for sparse rows and excludes records with no identity', async () => {
     const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
       listSessions: async () => [
         { id: 'ses-minimal' },
@@ -656,10 +656,9 @@ describe('listBackendSessions', () => {
     });
     const registry = createMockRegistry(new Map([['opencode', adapter]]));
     const result = await listBackendSessions(registry);
-    expect(result).toHaveLength(2);
+    expect(result).toHaveLength(1);
     expect(result[0].id).toBe('ses-minimal');
     expect(result[0].title).toBe('');
-    expect(result[1].id).toMatch(/^session-/); // generated fallback
   });
 
   it('returns empty array when listSessions returns a non-array', async () => {

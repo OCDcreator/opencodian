@@ -147,9 +147,9 @@ export interface ComposerInputShellCoordinatorHost {
   showProcessingBlockedNotice(): void;
   getComposerInputMode(): ComposerInputMode;
   /**
-   * Prompt submissions with image attachments retain their visible draft until
+   * Prompt submissions retain their visible draft until
    * send preparation explicitly accepts or queues them. This prevents a
-   * rejected model capability from silently discarding user-provided files.
+   * rejected preflight from silently discarding user-provided text or files.
    */
   submitMessage(
     submission: ComposerInputSubmission,
@@ -252,7 +252,7 @@ export class ComposerInputShellCoordinator {
   private addImageBtnEl: HTMLButtonElement | null = null;
   private imageChipContainerEl: HTMLElement | null = null;
   private attachedImages: ImageAttachment[] = [];
-  private imageSubmissionPending = false;
+  private promptSubmissionPending = false;
   private fileInputEl: HTMLInputElement | null = null;
   private imageDropSurfaceEl: HTMLElement | null = null;
 
@@ -683,7 +683,7 @@ export class ComposerInputShellCoordinator {
     }
 
     this.sendBtnEl.empty();
-    this.sendBtnEl.disabled = this.isComposerInteractionDisabled() || this.imageSubmissionPending;
+    this.sendBtnEl.disabled = this.isComposerInteractionDisabled() || this.promptSubmissionPending;
     if (this.host.isActiveTabStreaming()) {
       setIcon(this.sendBtnEl, 'square');
       this.sendBtnEl.addClass('opencodian-stop-btn');
@@ -866,7 +866,7 @@ export class ComposerInputShellCoordinator {
     this.addImageBtnEl = null;
     this.imageChipContainerEl = null;
     this.attachedImages = [];
-    this.imageSubmissionPending = false;
+    this.promptSubmissionPending = false;
     this.fileInputEl?.remove();
     this.fileInputEl = null;
     this.slashCommandMenuEl = null;
@@ -969,7 +969,7 @@ export class ComposerInputShellCoordinator {
       return;
     }
 
-    if (this.imageSubmissionPending) {
+    if (this.promptSubmissionPending) {
       return;
     }
 
@@ -1005,8 +1005,8 @@ export class ComposerInputShellCoordinator {
     }
 
     this.promptSuggestionService.clearActiveOnTurnStart();
-    if (submission.kind === 'prompt' && submission.images?.length) {
-      this.submitImagePromptWithRecovery(submission, rawContent, [...submission.images]);
+    if (submission.kind === 'prompt') {
+      this.submitPromptWithRecovery(submission, rawContent, [...(submission.images ?? [])]);
       return;
     }
     void this.host.submitMessage(submission);
@@ -1014,33 +1014,36 @@ export class ComposerInputShellCoordinator {
   }
 
   /**
-   * Image sends wait for the preparation decision. The callback is reached
-   * before streaming begins, so a ZCode model that cannot receive images
-   * leaves both the text and chips exactly where the user can correct them.
+   * Prompt sends wait for the preparation decision. The callback is reached
+   * before streaming begins; a rejected preflight leaves the submitted text
+   * and chips available for correction, including a tab change during awaits.
    */
-  private submitImagePromptWithRecovery(
+  private submitPromptWithRecovery(
     submission: Extract<ComposerInputSubmission, { kind: 'prompt' }>,
     submittedText: string,
     submittedImages: readonly ImageAttachment[],
   ): void {
-    this.imageSubmissionPending = true;
+    const submittedTextarea = this.inputTextareaEl;
+    this.promptSubmissionPending = true;
     this.updateSendButtonState();
     const onPreparationOutcome = (outcome: MessageSendPreparationOutcome): void => {
-      this.imageSubmissionPending = false;
+      if (this.inputTextareaEl !== submittedTextarea) return;
+      this.promptSubmissionPending = false;
       this.updateSendButtonState();
-      if (outcome === 'rejected' || !this.isUnchangedImageDraft(submittedText, submittedImages)) {
+      if (outcome === 'rejected' || !this.isUnchangedPromptDraft(submittedText, submittedImages)) {
         return;
       }
       this.clearSubmittedDraft();
     };
     void Promise.resolve(this.host.submitMessage(submission, onPreparationOutcome)).catch((error) => {
-      this.imageSubmissionPending = false;
+      if (this.inputTextareaEl !== submittedTextarea) return;
+      this.promptSubmissionPending = false;
       this.updateSendButtonState();
-      logger.warn('Image prompt submission failed before preparation completed', { error });
+      logger.warn('Prompt submission failed before preparation completed', { error });
     });
   }
 
-  private isUnchangedImageDraft(
+  private isUnchangedPromptDraft(
     submittedText: string,
     submittedImages: readonly ImageAttachment[],
   ): boolean {
@@ -1074,7 +1077,7 @@ export class ComposerInputShellCoordinator {
     // Toggle custom placeholder overlay visibility
     const isEmpty = !this.inputTextareaEl.value;
     if (this.placeholderOverlayEl) {
-      this.placeholderOverlayEl.classList.toggle('is-hidden', isEmpty);
+      this.placeholderOverlayEl.classList.toggle('is-hidden', !isEmpty);
     }
 
     const maxHeight = this.resolveTextareaMaxHeight();

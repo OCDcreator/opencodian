@@ -1,6 +1,32 @@
 import { normalizeConversationSessionSettings } from '../../../../src/core/types/chat';
 
 describe('conversation session settings normalization', () => {
+  it('round-trips Claude model aliases, explicit Default and inheritance', () => {
+    for (const override of [
+      { provider: ' anthropic ', model: ' sonnet ' },
+      { provider: 'claude-code', model: 'default' },
+      null,
+    ]) {
+      const expected = override ? { provider: override.provider.trim(), model: override.model.trim() } : null;
+      const normalized = normalizeConversationSessionSettings({ claudeModelOverride: override });
+      expect(normalized).toEqual({ claudeModelOverride: expected });
+      expect(normalizeConversationSessionSettings(JSON.parse(JSON.stringify(normalized)))).toEqual(normalized);
+    }
+  });
+
+  it('drops malformed Claude models while preserving other backend overrides', () => {
+    for (const override of [{ provider: '', model: 'sonnet' }, { provider: 'claude-code', model: '  ' }, []]) {
+      expect(normalizeConversationSessionSettings({
+        claudeModelOverride: override,
+        piModelOverride: { provider: 'pi', model: 'pi-model' },
+        codexModelOverride: 'codex-model',
+      } as unknown as Parameters<typeof normalizeConversationSessionSettings>[0])).toEqual({
+        piModelOverride: { provider: 'pi', model: 'pi-model' },
+        codexModelOverride: 'codex-model',
+      });
+    }
+  });
+
   it('round-trips Pi model and per-model effort overrides, including explicit inheritance', () => {
     const value = {
       piModelOverride: { provider: '  pi-provider ', model: ' model-a ' },

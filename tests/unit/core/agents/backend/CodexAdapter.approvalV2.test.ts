@@ -317,8 +317,48 @@ describe('item/tool/requestUserInput (CodexAdapter v2 bridge)', () => {
       });
       const request = collectQuestionAnswers.mock.calls[0][0];
       expect(request.questions).toHaveLength(2);
-      expect(request.questions[0].multiple).toBe(true);
+      expect(request.questions[0].multiple).toBe(false);
       expect(request.questions[1].custom).toBe(true);
+      await adapter.stop();
+    });
+
+    it('preserves the native thread and owning signal while rejecting a late user answer', async () => {
+      const controller = new AbortController();
+      const collectQuestionAnswers = jest.fn(async (_request, _signal) => {
+        controller.abort();
+        return { status: 'answered', answers: [['production'], ['late answer']] };
+      });
+      const adapter = await createStartedAdapter({ collectApproval: jest.fn(), collectQuestionAnswers });
+      (adapter as unknown as { activeControllers: Map<string, AbortController> }).activeControllers.set('thread-1', controller);
+      const handler = registeredV2.get('toolUserInput')! as (params: unknown) => Promise<unknown>;
+      await expect(handler(USER_INPUT_PARAMS)).resolves.toEqual({ answers: {} });
+      expect(collectQuestionAnswers).toHaveBeenCalledTimes(1);
+      expect(collectQuestionAnswers.mock.calls[0][0].sessionId).toBe('thread-1');
+      expect(collectQuestionAnswers.mock.calls[0][1]).toBe(controller.signal);
+      await adapter.stop();
+    });
+
+    it('returns empty answers without collecting a question for a stopped turn', async () => {
+      const controller = new AbortController();
+      controller.abort();
+      const collectQuestionAnswers = jest.fn().mockResolvedValue({ status: 'answered', answers: [['production']] });
+      const adapter = await createStartedAdapter({ collectApproval: jest.fn(), collectQuestionAnswers });
+      (adapter as unknown as { activeControllers: Map<string, AbortController> }).activeControllers.set('thread-1', controller);
+      const handler = registeredV2.get('toolUserInput')! as (params: unknown) => Promise<unknown>;
+      await expect(handler(USER_INPUT_PARAMS)).resolves.toEqual({ answers: {} });
+      expect(collectQuestionAnswers).not.toHaveBeenCalled();
+      await adapter.stop();
+    });
+
+    it('renders native mutually exclusive options as one choice, while retaining Other input', async () => {
+      const collectQuestionAnswers = jest.fn().mockResolvedValue({ status: 'answered', answers: [['production'], ['literal']] });
+      const adapter = await createStartedAdapter({ collectApproval: jest.fn(), collectQuestionAnswers });
+      const handler = registeredV2.get('toolUserInput')! as (params: unknown) => Promise<unknown>;
+      const params = { ...USER_INPUT_PARAMS, questions: [{ ...USER_INPUT_PARAMS.questions[0], isOther: true }] };
+      await handler(params);
+      const request = collectQuestionAnswers.mock.calls[0][0];
+      expect(request.questions[0].multiple).toBe(false);
+      expect(request.questions[0].custom).toBe(true);
       await adapter.stop();
     });
 

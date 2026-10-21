@@ -1,4 +1,5 @@
 # CodexStreamNormalizer
+> 2026-10-06：SDK 0.158.0 的 ErrorItem 契约是 non-fatal；映射为带 item ID/message 的 codex non_fatal_error 诊断事件，不生成“发送失败”。独立的 ThreadErrorEvent、turn.failed 与 SDK 异常继续输出 error。真实 CLI 0.160.1 的配置/hook 警告曾在成功回复旁误显示为发送失败。
 
 > **源码**: `src/core/agents/backend/CodexStreamNormalizer.ts`
 > **状态**: [RUNTIME_PROVEN]

@@ -500,15 +500,28 @@ function toForwardSlashes(value: string): string {
 async function waitForHealth(baseUrl: string, directory: string, transport: AuxTransport): Promise<void> {
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(new Error('OpenCode auxiliary readiness probe timed out.'));
+      }, Math.min(2000, deadline - Date.now()));
+    });
     try {
-      const response = await transport(scopeUrl(baseUrl, '/config', directory));
+      const response = await Promise.race([
+        transport(scopeUrl(baseUrl, '/config', directory), { signal: controller.signal }),
+        timeout,
+      ]);
       if (response.ok) {
         return;
       }
     } catch {
-      // Server socket is not accepting yet.
+      // Startup or a single probe failed; safety verification is still required.
+    } finally {
+      clearTimeout(timer);
     }
-    await delay(400);
+    await delay(Math.min(400, Math.max(0, deadline - Date.now())));
   }
   throw new Error('OpenCode auxiliary scope did not become ready in time.');
 }

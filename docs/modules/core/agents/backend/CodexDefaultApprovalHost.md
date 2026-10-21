@@ -1,5 +1,9 @@
 # CodexDefaultApprovalHost
 
+> 2026-10-08：tool-user-input 与审批一样通过 getTabIdForSession 解析 native 所属 tab；已关闭/未知 tab 返回 null，不转到当前 tab。可选 signal 原样传给 question renderer，旧的无该 port 调用保留 active-tab fallback。
+
+> 2026-10-08：approval host 使用 native raw.threadId 和可选 getTabIdForSession 路由到所属 tab；thread 已无所属 tab 时返回 null，不能显示在其它活动 tab。无该路由 port 的旧调用保留原行为。
+
 > **源码**: `src/core/agents/backend/CodexDefaultApprovalHost.ts`
 > **状态**: [REVIEW]
 > **Updated**: 2026-09-30 — 扩展至 Codex 0.159.0 v2 审批：`CodexApprovalKind` 增加 `commandExecution`/`fileChange`/`permissions`，approval question card 增加 execpolicy/network amendment 选项；context 新增 `questionCardRenderer`（`item/tool/requestUserInput`）与 `elicitationCardRenderer`（`mcpServer/elicitation/request`，类型来自 `CodexElicitationBridge.ts`）。

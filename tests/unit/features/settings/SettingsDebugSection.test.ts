@@ -1,5 +1,6 @@
 /* eslint-disable max-lines, max-lines-per-function -- Debug settings tests share Obsidian Setting mocks and tab/classic grouping regressions. */
 
+import fs from 'fs';
 import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 
@@ -7,8 +8,8 @@ import { DEFAULT_SETTINGS, getCurrentPlatformKey } from '../../../../src/core/ty
 import { createOpenCodeTraceDiagnosticsPort } from '../../../../src/features/settings/debug/types';
 import { SettingsDebugSection } from '../../../../src/features/settings/SettingsDebugSection';
 import { setLocale, t } from '../../../../src/i18n';
-import type OpenCodianPlugin from '../../../../src/main';
-import { clearRecentLogs, createLogger, setDebugLoggingEnabled, setDebugModuleEnabled } from '../../../../src/shared';
+import OpenCodianPlugin from '../../../../src/main';
+import { clearRecentLogs, createLogger, getRecentLogText, setDebugLoggingEnabled, setDebugModuleEnabled } from '../../../../src/shared';
 import { CLAUDE_CODE_DEBUG_CHANNEL_IDS, DEBUG_MODULE_REGISTRY } from '../../../../src/shared/debugModules';
 
 interface MockToggleControl {
@@ -727,4 +728,147 @@ describe('SettingsDebugSection', () => {
     expect(noticeSpy).toHaveBeenCalledWith(t('settings.debug.actions.clearLogsSuccess'));
     expect(noticeSpy).toHaveBeenCalledWith(t('settings.debug.actions.copyVersionSuccess'));
   });
+});
+
+// Finite original Pi flags plus generic-report flag spellings. These values are synthetic.
+const matrix008Shapes = [
+  ...['--token', '-token', '--api-key', '--api_key', '--client_secret', '--PASSWORD', '--secret', '--credentials', '--authorization']
+    .flatMap((flag, index) => ['independent', 'equal'].map(form => {
+      const secret = `FAKE_MATRIX008_FLAG_${index}_${form}`;
+      return { id: `${flag}/${form}`, input: `safe-mcp ${flag}${form === 'equal' ? '=' : ' '}${secret} --port 4096`, forbidden: [secret], safe: ['safe-mcp', '--port 4096'] };
+    })),
+  { id: 'url-password', input: 'https://safe-user:FAKE_MATRIX008_URL_PASSWORD@fixture.invalid/mcp?mode=safe#section', forbidden: ['FAKE_MATRIX008_URL_PASSWORD'], safe: ['fixture.invalid/mcp', 'mode=safe'] },
+  { id: 'url-query', input: 'https://fixture.invalid/mcp?access_token=FAKE_MATRIX008_URL_QUERY&mode=safe', forbidden: ['FAKE_MATRIX008_URL_QUERY'], safe: ['fixture.invalid/mcp', 'mode=safe'] },
+  { id: 'url-labelled-fragment', input: 'https://fixture.invalid/mcp#token=FAKE_MATRIX008_LABELLED_FRAGMENT', forbidden: ['FAKE_MATRIX008_LABELLED_FRAGMENT'], safe: ['fixture.invalid/mcp'] },
+  { id: 'url-unlabelled-fragment', input: 'https://fixture.invalid/mcp#FAKE_MATRIX008_UNLABELLED_FRAGMENT', forbidden: ['FAKE_MATRIX008_UNLABELLED_FRAGMENT'], safe: ['fixture.invalid/mcp'] },
+  { id: 'url-distinct', input: 'https://FAKE_MATRIX008_DISTINCT_USER:FAKE_MATRIX008_DISTINCT_PASSWORD@fixture.invalid/mcp?access_token=FAKE_MATRIX008_DISTINCT_QUERY&mode=safe#FAKE_MATRIX008_DISTINCT_FRAGMENT', forbidden: ['FAKE_MATRIX008_DISTINCT_USER', 'FAKE_MATRIX008_DISTINCT_PASSWORD', 'FAKE_MATRIX008_DISTINCT_QUERY', 'FAKE_MATRIX008_DISTINCT_FRAGMENT'], safe: ['fixture.invalid/mcp', 'mode=safe'] },
+  { id: 'url-reused', input: 'https://FAKE_MATRIX008_REUSED_VALUE:FAKE_MATRIX008_REUSED_VALUE@fixture.invalid/mcp?access_token=FAKE_MATRIX008_REUSED_VALUE&mode=safe#FAKE_MATRIX008_REUSED_VALUE', forbidden: ['FAKE_MATRIX008_REUSED_VALUE'], safe: ['fixture.invalid/mcp', 'mode=safe'] },
+];
+
+
+type Matrix008Shape = typeof matrix008Shapes[number];
+
+function recordMatrix008Sink(shape: Matrix008Shape, sink: string, output: string, source: string): void {
+  process.stdout.write(`MATRIX008_SINK ${JSON.stringify({ caseId: shape.id, sink, source, input: shape.input, output, forbidden: shape.forbidden, safe: shape.safe })}\n`);
+}
+
+function createMatrix008ReportPlugin(input: string): DebugSectionPlugin {
+  const plugin = createPlugin(JSON.parse(JSON.stringify(DEFAULT_SETTINGS)));
+  const receiver = Object.assign(plugin, {
+    app: { vault: { adapter: { basePath: '/fixture.invalid/vault' } } },
+    manifest: { name: 'OpenCodian fixture', id: 'opencodian', version: '1.1.37' },
+    openCodeService: {
+      checkHealth: jest.fn().mockResolvedValue(true),
+      getServerStatus: jest.fn().mockReturnValue('safe-mcp running'),
+      isServerProcessRunning: jest.fn().mockReturnValue(false),
+      getServerDiagnostics: jest.fn().mockReturnValue({ syntheticMetadata: input }),
+    },
+    startupCoordinator: {
+      getStartupPerfSummaryLines: jest.fn().mockReturnValue(['safe startup fixture']),
+      getStartupPerformanceDiagnosisLines: jest.fn().mockReturnValue([]),
+    },
+  });
+  // Real builder and real sanitizer; no plugin constructor/onload or live service.
+  plugin.buildDiagnosticReport = jest.fn(OpenCodianPlugin.prototype.buildDiagnosticReport.bind(receiver as unknown as OpenCodianPlugin));
+  plugin.writeDiagnosticLogFile = OpenCodianPlugin.prototype.writeDiagnosticLogFile.bind(receiver as unknown as OpenCodianPlugin);
+  return plugin;
+}
+
+describe('MATRIX008 joined diagnostic report sinks', () => {
+  const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+  const buildDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'BUILD_ID');
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    setLocale('en');
+    toggleRecords.length = 0;
+    textRecords.length = 0;
+    buttonRecords.length = 0;
+    clearRecentLogs();
+    mockClipboard();
+    mockSettingPrototype();
+    Object.defineProperty(globalThis, 'BUILD_ID', { configurable: true, value: 'FAKE_MATRIX008_BUILD', writable: true });
+    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue('2026-10-12T00:00:00.000Z');
+    jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    clearRecentLogs();
+    document.body.innerHTML = '';
+    if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor);
+    else Reflect.deleteProperty(navigator, 'clipboard');
+    if (buildDescriptor) Object.defineProperty(globalThis, 'BUILD_ID', buildDescriptor);
+    else Reflect.deleteProperty(globalThis, 'BUILD_ID');
+  });
+
+  it.each(matrix008Shapes.flatMap(shape => ['report', 'clipboard', 'mockfs'].map(sink => ({ ...shape, sink }))))(
+    'MATRIX008 $id excludes fake sensitive values from $sink through the real builder',
+    async (shape) => {
+      const plugin = createMatrix008ReportPlugin(shape.input);
+      const reportSpy = plugin.buildDiagnosticReport as jest.MockedFunction<DebugSectionPlugin['buildDiagnosticReport']>;
+      const mkdir = jest.spyOn(fs.promises, 'mkdir').mockResolvedValue(undefined);
+      const writeFile = jest.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined);
+      let output: string;
+      let checks: Array<[unknown, unknown]> = [];
+      if (shape.sink === 'clipboard') {
+        createSection(plugin);
+        const copy = findButton(t('settings.debug.actions.copy'));
+        await copy?.onClick?.();
+        const clipboard = navigator.clipboard.writeText as jest.MockedFunction<typeof navigator.clipboard.writeText>;
+        checks = [[copy?.onClick !== undefined, true], [reportSpy.mock.calls[0], ['copy-diagnostics']], [clipboard.mock.calls.length, 1]];
+        output = clipboard.mock.calls[0]?.[0] ?? '';
+      } else if (shape.sink === 'mockfs') {
+        await plugin.writeDiagnosticLogFile('/fixture.invalid/export', 'MATRIX008-export');
+        checks = [
+          [mkdir.mock.calls[0], ['/fixture.invalid/export', { recursive: true }]],
+          [writeFile.mock.calls.length, 1],
+          [writeFile.mock.calls[0]?.[0], '/fixture.invalid/export/opencodian-debug-2026-10-12T00-00-00-000Z.log'],
+        ];
+        output = String(writeFile.mock.calls[0]?.[1] ?? '');
+      } else {
+        output = await plugin.buildDiagnosticReport('MATRIX008-report');
+      }
+      for (const [actual, expected] of checks) expect(actual).toEqual(expected);
+      recordMatrix008Sink(shape, shape.sink, output, 'controlled getServerDiagnostics syntheticMetadata -> actual buildDiagnosticReport -> actual sanitizer');
+      for (const safe of shape.safe) expect(output).toContain(safe);
+      expect(output).toContain('# OpenCodian Diagnostic Report');
+      expect(shape.forbidden.filter(secret => output.includes(secret))).toEqual([]);
+    },
+  );
+
+  const errors = [
+    { id: 'error-independent-equal', input: 'safe-mcp --token FAKE_MATRIX008_ERROR_TOKEN --api-key=FAKE_MATRIX008_ERROR_KEY', forbidden: ['FAKE_MATRIX008_ERROR_TOKEN', 'FAKE_MATRIX008_ERROR_KEY'], safe: ['safe-mcp'] },
+    matrix008Shapes.find(shape => shape.id === 'url-distinct')!,
+  ];
+  it.each(errors.flatMap(shape => ['copy', 'export'].flatMap(route => ['Notice', 'console-error', 'recent-log'].map(sink => ({ ...shape, route, sink }))))) (
+    'MATRIX008 $id excludes fake values from $route rejection $sink',
+    async (shape) => {
+      const plugin = createMatrix008ReportPlugin(shape.input);
+      const notice = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const error = new Error(`safe-mcp transport failure ${shape.input}`);
+      error.stack = error.message;
+      plugin.settings.debugLogPaths[getCurrentPlatformKey()] = '/fixture.invalid/export';
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      jest.spyOn(fs.promises, 'mkdir').mockResolvedValue(undefined);
+      jest.spyOn(fs.promises, 'writeFile').mockRejectedValue(error);
+      const clipboard = jest.spyOn(navigator.clipboard, 'writeText').mockRejectedValue(error);
+      createSection(plugin);
+      const action = findButton(t(shape.route === 'copy' ? 'settings.debug.actions.copy' : 'settings.debug.actions.generate'));
+      expect(action?.onClick).toBeDefined();
+      await action?.onClick?.();
+      const rejectionSink = shape.route === 'copy' ? clipboard : fs.promises.writeFile;
+      expect(rejectionSink).toHaveBeenCalledTimes(1);
+      const outputs = {
+        Notice: notice.mock.calls.map(call => String(call[0])).join('\n'),
+        'console-error': consoleError.mock.calls.map(call => call.map(value => value instanceof Error ? value.stack || value.message : String(value)).join(' ')).join('\n'),
+        'recent-log': getRecentLogText(),
+      };
+      const output = outputs[shape.sink as keyof typeof outputs];
+      recordMatrix008Sink(shape, `${shape.route}-${shape.sink}`, output, 'raw fake Error from mock clipboard/writeFile rejection -> actual handler -> actual logger/Notice');
+      expect(output).not.toBe('');
+      expect(shape.forbidden.filter(secret => output.includes(secret))).toEqual([]);
+    },
+  );
 });

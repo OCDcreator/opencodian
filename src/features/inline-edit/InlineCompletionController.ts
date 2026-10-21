@@ -178,12 +178,13 @@ export class InlineCompletionController {
   }
 
   /**
-   * Esc with a live ghost: dismiss only — the document is untouched
-   * (acceptance 4). Returns whether the key was consumed.
+   * Esc cancels a pending turn (including before its first chunk) or clears
+   * a live ghost. The document is untouched (acceptance 4); without either,
+   * the key falls through to the editor's other handlers.
    */
   dismiss(view: EditorView): boolean {
     const ghost = readInlineCompletionGhost(view.state);
-    if (!ghost) return false;
+    if (!ghost && !this.views.get(view)?.abort) return false;
     this.cancelForView(view);
     return true;
   }
@@ -220,6 +221,7 @@ export class InlineCompletionController {
     const obtained = await this.options.pool.obtain();
     if (this.isStale(view, request.generation)) return;
     if (!obtained.ok) {
+      this.cancelForView(view);
       this.reportPoolError(obtained.error);
       return;
     }
@@ -235,7 +237,7 @@ export class InlineCompletionController {
           // Progressive ghost: every chunk is stale-checked, validated, and
           // position-checked exactly like a final result (first chunk = first
           // byte of the latency budget).
-          if (this.isStale(view, request.generation)) return;
+          if (request.abort.signal.aborted || this.isStale(view, request.generation)) return;
           this.showValidated(view, request, accumulated, maxChars);
         },
       });
@@ -245,13 +247,15 @@ export class InlineCompletionController {
       if (!request.abort.signal.aborted && !this.isStale(view, request.generation)) {
         this.options.pool.reportTurnFailure(backend);
       }
+      if (!this.isStale(view, request.generation)) this.cancelForView(view);
       return;
     }
     if (this.isStale(view, request.generation)) return;
-    if (!result.ok) {
-      if (!result.cancelled) {
+    if (!result.ok || request.abort.signal.aborted) {
+      if (!result.ok && !result.cancelled && !request.abort.signal.aborted) {
         this.options.pool.reportTurnFailure(backend);
       }
+      this.cancelForView(view);
       return;
     }
     this.options.pool.reportTurnSuccess(backend);
@@ -262,10 +266,13 @@ export class InlineCompletionController {
     // notice. The ghost never entered the document, so nothing else is needed.
     const violations = findWriteToolCalls(result.toolCalls);
     if (violations.length > 0) {
+      this.cancelForView(view);
       this.options.pool.reportWriteToolViolation(backend, displayName, violations);
       return;
     }
     this.showValidated(view, request, result.text, maxChars);
+    const state = this.views.get(view);
+    if (state) state.abort = null;
   }
 
   /** Validate and display one candidate (final or streamed), stale-checked. */
@@ -289,8 +296,6 @@ export class InlineCompletionController {
     // renderer simply shows nothing for this candidate.
     if (!validated.ok) return;
     if (this.cursorDrifted(view, request.pos, request.prefixTail)) return;
-    const state = this.views.get(view);
-    if (state) state.abort = null;
     applyInlineCompletionGhostEffect(view, setInlineCompletionGhost.of({
       pos: request.pos,
       text: validated.text,

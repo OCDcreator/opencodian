@@ -193,3 +193,7 @@ MCP 服务器详情弹窗改为默认折叠每个 server section，只露出固�
 ## 2026-10-02 Codex local forget / complete catalog UI
 
 共享 host factory 转发 getMcpServerStatusCatalog，settings/chat 同时可达；loadAndRender 优先结构化结果，旧 getMcpServerStatus 数组兼容。partial 保留 server sections 与原生 data-mcp-server-name，并通过 typed `settings.codex.readback.statusPartial`（count）/`messagePartialReload` 展示部分目录提示；英中正式 UI 测试覆盖 settings/chat 入口和第二页失败后的 server identity 保留；加载徽章具 aria-live/aria-busy。打开 inspection 本身只调用 mcpServerStatus/list；既有 Reload/OAuth/resource 操作仍是用户显式动作。
+
+## 2026-10-06 Codex catalog permission denial
+
+MCP 目录的权限拒绝单独显示固定双语说明，data-mcp-failure 标记 permission-denied。partial 保留已读取服务器，成功重载或下一次 loading 清空旧拒绝标记；不展示原始 errorReason 或认证值。

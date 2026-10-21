@@ -58,3 +58,7 @@
 ## 2026-10-05 Codex 消息前分支与恢复
 
 Codex preview 透传可选 sourceMessageId/sourceTurnId；展示用 ID 与权威 native identity 分开，其他后端无这些字段时保留原输出。
+
+2026-10-07: `readBackendSessionsCatalog` distinguishes authoritative empty success, failed/permission-denied/unavailable routes and partial admitted pages. It exposes fixed classifications only, normalizes/deduplicates native IDs, and excludes malformed identity rows; the legacy array helper returns the same admitted data without inventing IDs.
+
+2026-10-07：目录结果、BackendSessionCatalogReadError 与 backendSessionCatalogFailure 移到 shared/sessionCatalogReadback，保持本模块兼容 re-export 与既有 browser 分类/instanceof 身份；partial 数据归一化行为不变。

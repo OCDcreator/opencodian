@@ -1,5 +1,7 @@
 # ChatRuntimeComposition
 
+> 2026-10-09（Codex preaccepted guard）：既有 interaction wiring 把 MessageSendPreparationService 的 Codex preflight 口接到当前 registry 的 CodexAdapter `getSendMessagePreflightError`，透传 sending conversation 已捕获的 per-turn codexOptions。adapter/guard 缺失返回非空 unavailable reason，production fail-closed；composition 不复制 approval policy 判定、不启动后端、不改模型/档位、普通 accepted 或 queued 语义。后端发送边界复用同一 guard 复检。
+
 The slash execution host receives a narrow `refreshSessionChangeSidebar` callback. It is invoked after undo/redo's visible sync and delegated to the view, where the modified-files coordinator performs the native OpenCode 2 diff read.
 
 2026-09-26：ZCode 回合在仍属于当前可见标签/会话时结束后，装配层请求选择控件从该会话的原生读回刷新模式。此举使从斜杠 `/plan` 进入 Plan 的同会话控制显示跟上真实状态；切换标签后的旧回合不覆盖当前会话。
@@ -72,3 +74,5 @@ The send and slash command composition starts the selected OpenCode 2 adapter an
 
 为 ConversationLoadRecoveryCoordinator 注入 scoped Codex history 读取与既有 serialized conversation-write callback；不反向引用 feature 到 core，不改其他后端。
 Codex turn settled 后，仅在 tab/conversation/native thread 都仍匹配时刷新 user footer，把迟到的 native identity 接到 Fork 控件；保留原消息正文 DOM、滚动位置和其他后端路径。
+
+Claude Code also refreshes settled user footers after native identity arrives. The existing tab, conversation and native-session ownership checks remain; original body DOM and scroll position are preserved.
