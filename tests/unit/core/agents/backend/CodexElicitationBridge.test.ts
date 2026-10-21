@@ -194,17 +194,6 @@ describe('CodexAdapter mcpServer/elicitation/request handler', () => {
     await adapter.stop();
   });
 
-  it('does not register the handler without a host', async () => {
-    const adapter = new CodexAdapter({
-      codexPathOverride: '/path/to/codex',
-      createCodex: jest.fn().mockResolvedValue(createMockCodex()),
-    });
-    await adapter.start();
-
-    expect(mockRegisterMcpElicitationHandler).not.toHaveBeenCalled();
-    await adapter.stop();
-  });
-
   it('accepts a form elicitation with schema-coerced content', async () => {
     const collectElicitation = jest.fn().mockResolvedValue({
       action: 'accept',

@@ -131,6 +131,7 @@ import {
   type CodexElicitationBridgeHost,
   type CodexElicitationFormParams,
   type CodexElicitationUrlParams,
+  type CodexMcpElicitationWireParams,
   isCodexElicitationDecline,
   isCodexElicitationWireParams,
 } from './CodexElicitationBridge';
@@ -138,6 +139,14 @@ import { CodexStreamNormalizer } from './CodexStreamNormalizer';
 import type { CodexTraceContext, CodexTracePort } from './diagnostics/types';
 
 const logger = createLogger('CodexAdapter');
+
+/**
+ * How long a `mcpServer/elicitation/request` frame that arrived before the
+ * elicitation host was wired waits for `setElicitationHost`. Mirrors the 60s
+ * turn-watchdog window: past it the owning turn is already considered stalled,
+ * so holding the card longer cannot reach the user.
+ */
+const ELICITATION_HOST_WAIT_TIMEOUT_MS = 60_000;
 
 function isExecutableMissingError(error: unknown): boolean {
   return Boolean(error && typeof error === 'object' && (error as NodeJS.ErrnoException).code === 'ENOENT');
@@ -326,6 +335,25 @@ interface CodexSessionEntry {
   provisionalId: string;
   threadId: string | null;
   thread: Thread | null;
+}
+
+/**
+ * A `mcpServer/elicitation/request` frame that arrived before the elicitation
+ * host was wired. The entry holds the frame's combined request/turn lifetime;
+ * it settles with `{ action: 'cancel' }` on abort, on the host-wait timeout,
+ * or when the adapter tears down — it never hangs and never fabricates a user
+ * answer. When the host arrives, the original frame is dispatched unchanged.
+ */
+interface PendingElicitation {
+  params: CodexMcpElicitationWireParams;
+  /** Combined native-request + owning-turn lifetime captured at arrival. */
+  signal?: AbortSignal;
+  resolve: (response: AppServerMcpElicitationResponse | Promise<AppServerMcpElicitationResponse>) => void;
+  timer: ReturnType<typeof setTimeout>;
+  /** Abort listener that settles the entry as cancelled; removed on flush. */
+  onAbort: () => void;
+  /** Releases the combined lifetime's abort listeners. */
+  disposeLifetime: () => void;
 }
 
 /** Final two-axis outcome for a foreground `thread/compact/start` request. */
@@ -535,14 +563,24 @@ export class CodexAdapter
   private approvalHandlersRegistered = false;
 
   /**
-   * MCP elicitation bridge host. Set via `setElicitationHost`. When set (and
-   * the app-server client is available), the `mcpServer/elicitation/request`
-   * handler is registered so server-initiated elicitations reach the question
-   * card UI and the reply is sent back as a JSON-RPC result.
+   * MCP elicitation bridge host. Set via `setElicitationHost`. The
+   * `mcpServer/elicitation/request` handler is registered as soon as the
+   * app-server client is available — even before any host is wired — so a
+   * server-initiated elicitation can never hit the transport's -32601
+   * fallback. When a frame arrives before the host exists, it is pended (see
+   * `pendingElicitations`) and dispatched the moment the host is set.
    */
   private elicitationHost: CodexElicitationBridgeHost = {};
   /** Whether the elicitation handler is currently registered on the client. */
   private elicitationHandlersRegistered = false;
+  /**
+   * Elicitation frames pended because they arrived before `setElicitationHost`
+   * wired the host. Keyed by an adapter-local id; every entry settles within
+   * `ELICITATION_HOST_WAIT_TIMEOUT_MS`, on abort, or on teardown.
+   */
+  private pendingElicitations = new Map<number, PendingElicitation>();
+  /** Monotonic key source for `pendingElicitations`. */
+  private nextPendingElicitationId = 0;
 
   /**
    * Latest active turn id per app-server thread, tracked from the persistent
@@ -696,7 +734,8 @@ export class CodexAdapter
           this.setAppServerCapabilitiesAvailable(true);
           // Wire approval handlers if a host was set before start.
           this.registerApprovalHandlers();
-          // Wire the MCP elicitation handler if a host was set before start.
+          // Register the MCP elicitation route as soon as the client exists
+          // (host or not) so early frames pend instead of hitting -32601.
           this.registerElicitationHandlers();
           // Track active turn ids per thread for turn steering.
           this.subscribeToTurnTracking();
@@ -1725,10 +1764,14 @@ export class CodexAdapter
    * Set the host callback that surfaces MCP elicitations to the UI. Same
    * lifecycle as `setApprovalHost`: registers `mcpServer/elicitation/request`
    * immediately when the client is running, else on the next `start()`.
+   * Registration no longer requires the host callback, so the handler exists
+   * from client start onward; frames that arrived hostless while waiting are
+   * flushed to this host right after it is set.
    */
   setElicitationHost(host: CodexElicitationBridgeHost): void {
     this.elicitationHost = host;
     this.registerElicitationHandlers();
+    this.flushPendingElicitations();
   }
 
   /**
@@ -1790,13 +1833,17 @@ export class CodexAdapter
     this.approvalHandlersRegistered = false;
   }
 
-  /** Register the `mcpServer/elicitation/request` handler; idempotent. */
+  /**
+   * Register the `mcpServer/elicitation/request` handler; idempotent. Unlike
+   * the approval bridge, registration does NOT require the host callback:
+   * registering the route as soon as the client exists closes the race where
+   * a server-initiated elicitation arrives before `setElicitationHost` ran
+   * (the frame used to fall through to the transport's -32601 reply and the
+   * form card was never rendered). Hostless frames are pended instead.
+   */
   private registerElicitationHandlers(): void {
     const client = this.appServerClient;
     if (!client || this.elicitationHandlersRegistered) {
-      return;
-    }
-    if (!this.elicitationHost.collectElicitation) {
       return;
     }
     if (typeof client.registerMcpElicitationHandler !== 'function') {
@@ -1806,13 +1853,117 @@ export class CodexAdapter
     this.elicitationHandlersRegistered = true;
   }
 
-  /** Remove the elicitation handler; afterwards the route answers -32601. */
+  /**
+   * Remove the elicitation handler; afterwards the route answers -32601. Any
+   * elicitation still pended for a host settles as cancelled so no JSON-RPC
+   * reply is left hanging across teardown.
+   */
   private unregisterElicitationHandlers(): void {
+    this.cancelPendingElicitations('adapter_stopped');
     if (!this.appServerClient || !this.elicitationHandlersRegistered) {
       return;
     }
     this.appServerClient.unregisterServerRequestHandler('mcpServer/elicitation/request');
     this.elicitationHandlersRegistered = false;
+  }
+
+  /**
+   * Hold a valid elicitation whose host is not wired yet. The entry binds the
+   * frame's combined request/turn lifetime plus the host-wait timeout; it is
+   * dispatched by `flushPendingElicitations` when `setElicitationHost` runs,
+   * and otherwise settles as `{ action: 'cancel' }` — never left hanging.
+   */
+  private pendElicitation(
+    params: CodexMcpElicitationWireParams,
+    lifetime: { signal?: AbortSignal; dispose: () => void },
+  ): Promise<AppServerMcpElicitationResponse> {
+    const id = this.nextPendingElicitationId++;
+    let resolve!: (response: AppServerMcpElicitationResponse) => void;
+    const promise = new Promise<AppServerMcpElicitationResponse>((settle) => {
+      resolve = settle;
+    });
+    const entry: PendingElicitation = {
+      params,
+      ...(lifetime.signal ? { signal: lifetime.signal } : {}),
+      resolve,
+      timer: setTimeout(() => {
+        this.settlePendingElicitation(id, { action: 'cancel' }, 'host_wait_timeout');
+      }, ELICITATION_HOST_WAIT_TIMEOUT_MS),
+      onAbort: () => this.settlePendingElicitation(id, { action: 'cancel' }, 'host_wait_aborted'),
+      disposeLifetime: lifetime.dispose,
+    };
+    this.pendingElicitations.set(id, entry);
+    entry.signal?.addEventListener('abort', entry.onAbort, { once: true });
+    this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.pending', {
+      mode: params.mode,
+      serverName: params.serverName,
+      threadId: params.threadId,
+      reason: 'host_not_wired',
+    }));
+    logger.warn('Elicitation arrived before the host was wired; holding it for setElicitationHost', {
+      serverName: params.serverName,
+      mode: params.mode,
+    });
+    return promise;
+  }
+
+  /** Settle one pended elicitation and release its lifetime bookkeeping. */
+  private settlePendingElicitation(
+    id: number,
+    response: AppServerMcpElicitationResponse,
+    reason: 'host_wired' | 'host_wait_aborted' | 'host_wait_timeout' | 'adapter_stopped',
+  ): void {
+    const entry = this.pendingElicitations.get(id);
+    if (!entry) {
+      return;
+    }
+    this.pendingElicitations.delete(id);
+    clearTimeout(entry.timer);
+    entry.signal?.removeEventListener('abort', entry.onAbort);
+    entry.disposeLifetime();
+    this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.pending.settled', {
+      mode: entry.params.mode,
+      serverName: entry.params.serverName,
+      threadId: entry.params.threadId,
+      reason,
+      action: response.action,
+    }));
+    entry.resolve(response);
+  }
+
+  /**
+   * Dispatch every pended elicitation to the freshly wired host, preserving
+   * the original wire params and the captured request/turn lifetime. The
+   * combined signal stays armed during dispatch so a turn abort still settles
+   * the card as cancelled through the normal elicitation flow.
+   */
+  private flushPendingElicitations(): void {
+    const collect = this.elicitationHost.collectElicitation;
+    if (!collect || this.pendingElicitations.size === 0) {
+      return;
+    }
+    for (const id of [...this.pendingElicitations.keys()]) {
+      const entry = this.pendingElicitations.get(id);
+      if (!entry) {
+        continue;
+      }
+      // Take the entry out of the pending set first: from here on its outcome
+      // belongs to the normal host flow, not the pending bookkeeping.
+      this.pendingElicitations.delete(id);
+      clearTimeout(entry.timer);
+      entry.signal?.removeEventListener('abort', entry.onAbort);
+      entry.resolve(this.dispatchElicitation(entry.params, collect, {
+        signal: entry.signal,
+        dispose: entry.disposeLifetime,
+      }));
+    }
+  }
+
+  /** Cancel every pended elicitation (adapter teardown path). */
+  private cancelPendingElicitations(reason: 'adapter_stopped'): void {
+    for (const id of [...this.pendingElicitations.keys()]) {
+      this.settlePendingElicitation(id, { action: 'cancel' }, reason);
+    }
   }
 
   /** Combine the request lifetime and owning turn without requiring AbortSignal.any. */
@@ -2011,72 +2162,99 @@ export class CodexAdapter
     return { answers: {} };
   }
 
-  /** `mcpServer/elicitation/request` → elicitation card → accept/decline/cancel. */
+  /**
+   * `mcpServer/elicitation/request` → elicitation card → accept/decline/cancel.
+   * When the host is not wired yet, the valid frame is pended — bound to its
+   * request/turn lifetime plus a bounded host-wait timeout — and dispatched by
+   * `flushPendingElicitations` once `setElicitationHost` runs. It is never
+   * cancelled as "no host" merely because the wiring raced the frame.
+   */
   private async handleMcpElicitation(params: unknown, requestSignal?: AbortSignal): Promise<AppServerMcpElicitationResponse> {
-    const collect = this.elicitationHost.collectElicitation;
-    if (!collect) {
-      this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.cancelled', { reason: 'no_host' }));
-      return { action: 'cancel' };
-    }
     if (!isCodexElicitationWireParams(params)) {
       logger.warn('Ignoring malformed mcpServer/elicitation/request params');
       return { action: 'cancel' };
     }
     const lifetime = this.createServerRequestSignal(params.threadId, requestSignal);
+    if (lifetime.signal?.aborted) {
+      lifetime.dispose();
+      return { action: 'cancel' };
+    }
+    const collect = this.elicitationHost.collectElicitation;
+    if (!collect) {
+      return this.pendElicitation(params, lifetime);
+    }
+    return this.dispatchElicitation(params, collect, lifetime);
+  }
+
+  /** Run the elicitation mode handlers under one combined request/turn lifetime. */
+  private async dispatchElicitation(
+    params: CodexMcpElicitationWireParams,
+    collect: NonNullable<CodexElicitationBridgeHost['collectElicitation']>,
+    lifetime: { signal?: AbortSignal; dispose: () => void },
+  ): Promise<AppServerMcpElicitationResponse> {
     try {
-      if (lifetime.signal?.aborted) return { action: 'cancel' };
-      if (params.mode === 'url') {
-        return await this.handleUrlElicitation(params, collect, lifetime.signal);
-      }
-      if (params.mode !== 'form') {
-        // The openai/form dialect uses a schema shape this bridge cannot
-        // render; declining lets the MCP server apply its default behavior.
-        logger.warn('Declining unsupported Codex elicitation mode', { mode: params.mode, serverName: params.serverName });
-        this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.declined', { reason: 'unsupported_mode', mode: params.mode, serverName: params.serverName }));
-        return { action: 'decline' };
-      }
-      const schema: unknown = params.requestedSchema;
-      if (schema !== undefined) {
-        if (!isRecordLike(schema)) return { action: 'decline' };
-        if (schema.type !== 'object' && !(schema.type === undefined && schema.properties === undefined)) {
-          return { action: 'decline' };
-        }
-        if (schema.properties !== undefined) {
-          if (!isRecordLike(schema.properties)) return { action: 'decline' };
-          if (!Object.values(schema.properties).every((property) => {
-            if (!isRecordLike(property)) return false;
-            if (property.type !== undefined && (typeof property.type !== 'string' || !['string', 'number', 'integer', 'boolean', 'array'].includes(property.type))) {
-              return false;
-            }
-            if (property.properties !== undefined
-              || ![property.title, property.description].every((value) => value == null || typeof value === 'string')) {
-              return false;
-            }
-            if (property.items !== undefined && !isRecordLike(property.items)) return false;
-            const items = isRecordLike(property.items) ? property.items : undefined;
-            if (items && ((items.type !== undefined && items.type !== 'string') || items.properties !== undefined)) {
-              return false;
-            }
-            return [property.enum, property.enumNames ?? undefined, items?.enum].every((values) => (
-              values === undefined || (Array.isArray(values) && values.every((value) => typeof value === 'string'))
-            )) && [property.oneOf, items?.anyOf].every((options) => (
-              options === undefined || (Array.isArray(options) && options.every((option) => (
-                isRecordLike(option) && typeof option.const === 'string' && typeof option.title === 'string'
-              )))
-            ));
-          })) {
-            return { action: 'decline' };
-          }
-        }
-      }
-      try {
-        return await this.handleFormElicitation(params, collect, lifetime.signal);
-      } catch (err) {
-        logger.warn('Declining malformed Codex elicitation form', { error: err instanceof Error ? err.message : String(err) });
-        return { action: lifetime.signal?.aborted ? 'cancel' : 'decline' };
-      }
+      return await this.runElicitation(params, collect, lifetime.signal);
     } finally {
       lifetime.dispose();
+    }
+  }
+
+  /** Mode dispatch + schema admission for one elicitation frame. */
+  private async runElicitation(
+    params: CodexMcpElicitationWireParams,
+    collect: NonNullable<CodexElicitationBridgeHost['collectElicitation']>,
+    signal?: AbortSignal,
+  ): Promise<AppServerMcpElicitationResponse> {
+    if (signal?.aborted) return { action: 'cancel' };
+    if (params.mode === 'url') {
+      return await this.handleUrlElicitation(params, collect, signal);
+    }
+    if (params.mode !== 'form') {
+      // The openai/form dialect uses a schema shape this bridge cannot
+      // render; declining lets the MCP server apply its default behavior.
+      logger.warn('Declining unsupported Codex elicitation mode', { mode: params.mode, serverName: params.serverName });
+      this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.declined', { reason: 'unsupported_mode', mode: params.mode, serverName: params.serverName }));
+      return { action: 'decline' };
+    }
+    const schema: unknown = params.requestedSchema;
+    if (schema !== undefined) {
+      if (!isRecordLike(schema)) return { action: 'decline' };
+      if (schema.type !== 'object' && !(schema.type === undefined && schema.properties === undefined)) {
+        return { action: 'decline' };
+      }
+      if (schema.properties !== undefined) {
+        if (!isRecordLike(schema.properties)) return { action: 'decline' };
+        if (!Object.values(schema.properties).every((property) => {
+          if (!isRecordLike(property)) return false;
+          if (property.type !== undefined && (typeof property.type !== 'string' || !['string', 'number', 'integer', 'boolean', 'array'].includes(property.type))) {
+            return false;
+          }
+          if (property.properties !== undefined
+            || ![property.title, property.description].every((value) => value == null || typeof value === 'string')) {
+            return false;
+          }
+          if (property.items !== undefined && !isRecordLike(property.items)) return false;
+          const items = isRecordLike(property.items) ? property.items : undefined;
+          if (items && ((items.type !== undefined && items.type !== 'string') || items.properties !== undefined)) {
+            return false;
+          }
+          return [property.enum, property.enumNames ?? undefined, items?.enum].every((values) => (
+            values === undefined || (Array.isArray(values) && values.every((value) => typeof value === 'string'))
+          )) && [property.oneOf, items?.anyOf].every((options) => (
+            options === undefined || (Array.isArray(options) && options.every((option) => (
+              isRecordLike(option) && typeof option.const === 'string' && typeof option.title === 'string'
+            )))
+          ));
+        })) {
+          return { action: 'decline' };
+        }
+      }
+    }
+    try {
+      return await this.handleFormElicitation(params, collect, signal);
+    } catch (err) {
+      logger.warn('Declining malformed Codex elicitation form', { error: err instanceof Error ? err.message : String(err) });
+      return { action: signal?.aborted ? 'cancel' : 'decline' };
     }
   }
 
