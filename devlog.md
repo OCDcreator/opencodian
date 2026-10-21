@@ -11,6 +11,14 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-10-21 v2.0.0 发布与 CI 双修复（graphify envelope / NODE_OPTIONS reporter）
+
+`zcode/retire-opencode1-backend` 快进合入 main，`release:major` 升版 2.0.0（manifest/versions.json 同步，bump 提交连带 graphify 刷新）；Test Vault 已部署 `main.202610212308` 构建。发布链路当天暴露并修复两个预置问题：
+
+- **graphify freshness 连红（今早日程性红根因）**：freshness 摘要含 `tool:graphify-version`，解析顺序 repo `.graphify-venv` → 系统 python。主检出 venv 为 0.9.31（与 CI pin 一致），但在无 venv 的 worktree/系统 python（0.9.36）下刷新会把 envelope 记成新版本 → CI 重算失配。误升 CI pin 到 0.9.36 一次后回退 0.9.31 对齐已提交 envelope。结论：graphify 刷新必须在主检出跑。
+- **CI 注入的 `NODE_OPTIONS=--test-reporter=tap` 与自起子进程测试冲突**：4 个 Pi 套件 + 2 个 infra 套件 spawn `node --test --test-reporter=tap` 时继承该变量 → 双 reporter 零 destination，Node 24.21 `ERR_INVALID_ARG_VALUE`（本地无此变量所以全绿，双 runner 均红）。六处调用点派生时清空 `NODE_OPTIONS`，已用同环境本地模拟验证。
+- **bump 推送窗口丢失**：携带版本变更的两次 push 的 GitHub 事件未触发任何工作流（运行创建正常、非配额；后续推送与 dispatch 均正常）。发布检测按 push 范围判 `changed`，窗口丢失后不再自动发布；从转绿的 plugin-package 运行下载 CI 产物手动 `gh release create v2.0.0`（tag 指向含全部修复的 `b78098f3`，产物内 BUILD_ID `ci-b78098f3…`）。`check:release-health` 38 版本全绿，main plugin-package 恢复绿。
+
 ## 2026-10-21 OpenCode 1 后端静默退役（转向 opencode2）
 
 OpenCode 1 后端（kind `opencode`）从可选运行面整体摘除，代码保留休眠供存量会话与回滚：
