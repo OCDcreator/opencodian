@@ -58,7 +58,6 @@ import { loadClaudeCodeSdk } from './core/agents/backend/ClaudeCodeSdkLoader';
 import { CodexAdapter } from './core/agents/backend/CodexAdapter';
 import { type CodexApprovalHostContext, createCodexApprovalBridgeHost } from './core/agents/backend/CodexDefaultApprovalHost';
 import { createCodexElicitationBridgeHost } from './core/agents/backend/CodexElicitationBridge';
-import { OpenCodeAdapter } from './core/agents/backend/OpenCodeAdapter';
 import { OpenCodeService, SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from './core/opencode';
 import { RemoteControlService } from './core/remotecontrol';
 import { OpenCodeSessionTraceService } from './core/opencode/diagnostics';
@@ -621,10 +620,11 @@ export default class OpenCodianPlugin extends Plugin {
         },
       );
 
-      // Wire agent service registry
+      // Wire agent service registry. OpenCode 1 is retired: its adapter is not
+      // registered, so routing treats stored 'opencode' conversations as a
+      // backend-unavailable owner while their local history stays readable.
       this.agentServiceRegistry = new AgentServiceRegistry();
-      const openCodeAdapter = new OpenCodeAdapter(this.openCodeService);
-      const userAdapters: import('./core/agents/backend/AgentService').AgentService[] = [openCodeAdapter];
+      const userAdapters: import('./core/agents/backend/AgentService').AgentService[] = [];
       const vaultPath = getVaultBasePath(this.app);
       if (vaultPath) {
         const permissionHost = createClaudeCodePermissionBridgeHost(() => this.claudeCodePermissionHostContext);
@@ -690,8 +690,7 @@ export default class OpenCodianPlugin extends Plugin {
       this.wireCodexBridgeHosts();
 
       // Auto-start the active adapter so it reaches connected state.
-      // OpenCodeAdapter.start() is idempotent (ServerManager returns if already running).
-      // Non-OpenCode adapters (Codex, Claude-Code) create their connection here.
+      // Adapters (Codex, Claude-Code, OpenCode 2, ...) create their connection here.
       const activeKind = this.agentServiceRegistry.getActiveKind();
       if (activeKind) {
         const activeAdapter = this.agentServiceRegistry.get(activeKind);
@@ -2873,11 +2872,8 @@ export default class OpenCodianPlugin extends Plugin {
     logger.debug(`Server status changed: ${status}`);
     this.settingsTab?.refreshServerStatusDisplay();
     broadcastServerStatusToSettingsViews(this);
-    // Forward to adapter for registry-level status subscribers
-    const adapter = this.agentServiceRegistry?.get('opencode');
-    if (adapter && 'notifyStatusChange' in adapter) {
-      (adapter as import('./core/agents/backend/OpenCodeAdapter').OpenCodeAdapter).notifyStatusChange(status);
-    }
+    // OpenCode 1 no longer registers an adapter, so there is no registry-level
+    // status forward here anymore.
     if (status === 'running') {
       this.runtimeCoordinator.invalidateSlashCommandMenuCatalogs({ preload: true });
     }

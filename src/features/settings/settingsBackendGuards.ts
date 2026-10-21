@@ -5,7 +5,8 @@ export interface SettingsBackendStateLike {
 
 export function resolveSettingsActiveBackend(settings?: SettingsBackendStateLike | null): string | undefined {
   if (!settings) {
-    return 'opencode';
+    // OpenCode 1 is retired; the implicit fallback must not resolve to it.
+    return 'opencode2';
   }
   const activeBackend = settings.activeBackend;
   const enabledBackends = Array.isArray(settings.enabledBackends)

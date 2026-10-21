@@ -501,6 +501,8 @@ describe('SettingsSecuritySection', () => {
   it('updates permission mode, refreshes config status, and keeps remote restart blocked', async () => {
     const { app, plugin } = createPlugin({
       settings: {
+        activeBackend: 'opencode',
+        enabledBackends: ['opencode'],
         autoRestartOnPermissionChange: true,
         server: { ...DEFAULT_SETTINGS.server, mode: 'remote' },
       },
@@ -557,7 +559,7 @@ describe('SettingsSecuritySection', () => {
 
   it('restarts the local service from the config action button', async () => {
     jest.useFakeTimers();
-    const { app, plugin } = createPlugin();
+    const { app, plugin } = createPlugin({ settings: { activeBackend: 'opencode', enabledBackends: ['opencode'] } });
     const section = createSecuritySection({
       app,
       plugin: plugin as unknown as OpenCodianPlugin,
@@ -584,7 +586,7 @@ describe('SettingsSecuritySection', () => {
   });
 
   it('injects a temp archive root into both the section manager and the test helper manager', async () => {
-    const { app, archiveRootPath, configManager, plugin, basePath } = createPlugin();
+    const { app, archiveRootPath, configManager, plugin, basePath } = createPlugin({ settings: { activeBackend: 'opencode', enabledBackends: ['opencode'] } });
     await configManager?.write({ permission: { '*': 'ask', bash: 'ask' } });
     const section = createSecuritySection({
       app,
@@ -605,7 +607,7 @@ describe('SettingsSecuritySection', () => {
   });
 
   it('parses export paths and blocked commands before saving', async () => {
-    const { app, plugin } = createPlugin();
+    const { app, plugin } = createPlugin({ settings: { activeBackend: 'opencode', enabledBackends: ['opencode'] } });
     const section = createSecuritySection({
       app,
       plugin: plugin as unknown as OpenCodianPlugin,
@@ -629,6 +631,10 @@ describe('SettingsSecuritySection', () => {
   it('syncs blocked commands to OpenCode bash deny patterns', async () => {
     const { app, configManager, plugin } = createPlugin({
       settings: {
+        // Legacy v1-active state: the sync path only runs with OpenCode 1
+        // active, which is retired from the default surface.
+        activeBackend: 'opencode',
+        enabledBackends: ['opencode'],
         blockedCommands: {
           ...DEFAULT_SETTINGS.blockedCommands,
           [currentPlatformKey]: ['rm -rf'],
@@ -670,6 +676,8 @@ describe('SettingsSecuritySection', () => {
   it('restarts the local service after blocked commands are synced when auto restart is enabled', async () => {
     const { app, plugin } = createPlugin({
       settings: {
+        activeBackend: 'opencode',
+        enabledBackends: ['opencode'],
         autoRestartOnPermissionChange: true,
       },
     });
@@ -713,6 +721,8 @@ describe('SettingsSecuritySection', () => {
   it('preserves custom bash permission rules while replacing plugin-managed blocked commands', async () => {
     const { app, configManager, plugin } = createPlugin({
       settings: {
+        activeBackend: 'opencode',
+        enabledBackends: ['opencode'],
         blockedCommands: {
           ...DEFAULT_SETTINGS.blockedCommands,
           [currentPlatformKey]: ['rm -rf'],

@@ -193,6 +193,10 @@ function createPlugin(overrides?: Partial<ConversationSectionPlugin['settings']>
   return {
     settings: {
       ...DEFAULT_SETTINGS,
+      // Legacy v1-active state: compaction/sharing/questions sub-settings are
+      // OpenCode 1 owned and retired from the default surface.
+      activeBackend: 'opencode',
+      enabledBackends: ['opencode'],
       ...overrides,
     },
     saveSettings: jest.fn().mockResolvedValue(undefined),

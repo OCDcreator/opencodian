@@ -662,6 +662,10 @@ function createSettingsTab(layoutMode: 'classic' | 'tabbed' = 'classic') {
     },
     settings: {
       ...DEFAULT_SETTINGS,
+      // Legacy v1-active state: quick-nav order and title-row icon tests cover
+      // OpenCode 1 owned tabs retired from the default surface.
+      activeBackend: 'opencode',
+      enabledBackends: ['opencode'],
       settingsLayoutMode: layoutMode,
       settingsTabbedPrimaryTab: 'general',
       settingsTabbedSecondaryTabByPrimary: { general: 'basic' },
@@ -1212,8 +1216,8 @@ describe('OpenCodianSettingTab title styling', () => {
 
   it('keeps the branded title visible and places backend icons inline in the title row', () => {
     const { tab } = createSettingsTab('tabbed');
-    tab.plugin.settings.enabledBackends = ['opencode', 'claude-code'];
-    tab.plugin.settings.activeBackend = 'opencode';
+    tab.plugin.settings.enabledBackends = ['opencode2', 'claude-code'];
+    tab.plugin.settings.activeBackend = 'opencode2';
 
     tab.display();
 
@@ -1228,7 +1232,7 @@ describe('OpenCodianSettingTab title styling', () => {
     expect(headingEl?.querySelector('.opencodian-logo')).not.toBeNull();
     expect(actionsEl).not.toBeNull();
     expect(iconButtons.map((button) => button.getAttribute('aria-label'))).toEqual([
-      'OpenCode 1',
+      'OpenCode 2',
       'Claude Code',
     ]);
     expect(iconButtons[0]?.getAttribute('aria-pressed')).toBe('true');

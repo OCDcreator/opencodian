@@ -235,7 +235,9 @@ describe('SettingsTabbedRenderer', () => {
   });
 
   it('shows MCP as a top-level tab before formatter and language servers', () => {
-    const { renderer } = createRendererState();
+    // OpenCode 1 is retired: its backend-gated tabs only render under an
+    // explicit legacy v1-active state, so pin that state for ordering coverage.
+    const { renderer } = createRendererState({ enabledBackends: ['opencode'], activeBackend: 'opencode' });
     const containerEl = document.createElement('div');
 
     renderer.renderDisplay(containerEl);
@@ -347,8 +349,8 @@ describe('SettingsTabbedRenderer', () => {
 
   it('keeps the branded title row and switches backend from header icon buttons', () => {
     const { renderer, plugin, setActive, requestDisplayRefresh } = createRendererState({
-      enabledBackends: ['opencode', 'claude-code'],
-      activeBackend: 'opencode',
+      enabledBackends: ['opencode2', 'claude-code'],
+      activeBackend: 'opencode2',
     });
     const containerEl = document.createElement('div');
     const titleEl = containerEl.createEl('h2', { cls: 'opencodian-settings-panel-title' });
@@ -405,8 +407,8 @@ describe('SettingsTabbedRenderer', () => {
 
   it('does not accumulate duplicate floating backend rails across rerenders', () => {
     const { renderer } = createRendererState({
-      enabledBackends: ['opencode', 'claude-code'],
-      activeBackend: 'opencode',
+      enabledBackends: ['opencode2', 'claude-code'],
+      activeBackend: 'opencode2',
     });
     const containerEl = document.createElement('div');
     const titleEl = containerEl.createEl('h2', { cls: 'opencodian-settings-panel-title' });
@@ -480,9 +482,13 @@ describe('SettingsTabbedRenderer', () => {
     });
 
     for (const [primaryTabId, secondaryTabId] of Object.entries(secondaryByPrimary)) {
+      // The map includes retired OpenCode 1 tabs, so pin the legacy v1-active
+      // state to keep iterating every registered primary tab.
       const { renderer } = createRendererState({
         primaryTabId,
         secondaryTabs: secondaryByPrimary,
+        enabledBackends: ['opencode'],
+        activeBackend: 'opencode',
       });
       const containerEl = document.createElement('div');
 
@@ -551,6 +557,8 @@ describe('SettingsTabbedRenderer tab content routing', () => {
     const { renderer } = createRendererState({
       primaryTabId: 'plugins',
       secondaryTabs: { plugins: 'overview' },
+      enabledBackends: ['opencode'],
+      activeBackend: 'opencode',
     });
     const containerEl = document.createElement('div');
 
@@ -568,6 +576,8 @@ describe('SettingsTabbedRenderer tab content routing', () => {
     const { renderer } = createRendererState({
       primaryTabId: 'model',
       secondaryTabs: { model: 'common' },
+      enabledBackends: ['opencode'],
+      activeBackend: 'opencode',
     });
     const containerEl = document.createElement('div');
 
@@ -585,6 +595,8 @@ describe('SettingsTabbedRenderer tab content routing', () => {
     const { renderer } = createRendererState({
       primaryTabId: 'formatter',
       secondaryTabs: { formatter: 'overview' },
+      enabledBackends: ['opencode'],
+      activeBackend: 'opencode',
     });
     const containerEl = document.createElement('div');
 
@@ -617,6 +629,8 @@ describe('SettingsTabbedRenderer tab content routing', () => {
     const { renderer } = createRendererState({
       primaryTabId: 'server',
       secondaryTabs: { server: 'connection', mcp: 'overview' },
+      enabledBackends: ['opencode'],
+      activeBackend: 'opencode',
     });
     const containerEl = document.createElement('div');
 

@@ -41,6 +41,9 @@ function createPlugin(options: { permission?: unknown; serverMode?: 'local' | 'r
     },
     settings: {
       ...DEFAULT_SETTINGS,
+      // Legacy v1-active state: the tools section is OpenCode 1 owned.
+      activeBackend: 'opencode',
+      enabledBackends: ['opencode'],
       server: {
         ...DEFAULT_SETTINGS.server,
         mode: options.serverMode ?? 'local',

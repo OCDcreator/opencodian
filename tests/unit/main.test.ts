@@ -715,7 +715,10 @@ describe('OpenCodianPlugin backend bootstrap', () => {
     ).handleBootstrapOpenCodeRuntime(null);
     bootstrappedPlugin = plugin;
 
-    expect(plugin.agentServiceRegistry.get('opencode')).toBeDefined();
+    // OpenCode 1 is retired: its adapter is no longer registered, while the
+    // hidden wiring still registers OpenCode 2 alongside Claude Code.
+    expect(plugin.agentServiceRegistry.get('opencode')).toBeUndefined();
+    expect(plugin.agentServiceRegistry.get('opencode2')).toBeDefined();
     const claudeAdapter = plugin.agentServiceRegistry.get('claude-code') as ClaudeCodeAdapter & {
       options: { pathToClaudeCodeExecutable?: string };
     };

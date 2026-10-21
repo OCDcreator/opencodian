@@ -82,8 +82,9 @@ describe('Codex hidden wiring', () => {
     });
 
     it('contains only user-facing backends', () => {
-      // OpenCode 1 and 2 remain distinct user-facing backends.
-      expect(IMPLEMENTED_AGENT_BACKENDS).toEqual(['opencode', 'opencode2', 'claude-code', 'codex', 'pi', 'zcode']);
+      // OpenCode 1 is retired from the selectable surface; OpenCode 2 is the
+      // remaining OpenCode generation.
+      expect(IMPLEMENTED_AGENT_BACKENDS).toEqual(['opencode2', 'claude-code', 'codex', 'pi', 'zcode']);
     });
   });
 
@@ -105,7 +106,8 @@ describe('Codex hidden wiring', () => {
       const active = registry.setEnabledBackends(['opencode', 'claude-code']);
 
       expect(registry.isEnabled('codex')).toBe(false);
-      expect(active).toBe('opencode');
+      // Retired OpenCode 1 never wins the default active pick.
+      expect(active).toBe('claude-code');
     });
 
     it('listEnabled() excludes codex after hidden registration', () => {
@@ -134,7 +136,8 @@ describe('Codex hidden wiring', () => {
       registry.register(new CodexAdapter({ workingDirectory: '/tmp/vault' }));
       registry.setEnabledBackends(['opencode']);
 
-      expect(registry.getActive()?.kind).toBe('opencode');
+      // Retired OpenCode 1 alone can no longer become the active backend.
+      expect(registry.getActive()?.kind).toBeUndefined();
     });
   });
 

@@ -542,11 +542,12 @@ describe('ClaudeCode smoke harness', () => {
     expect(chunks).toContainEqual({ type: 'text', content: 'Query returned 1.' });
   });
 
-  it('OpenCode backend remains registered alongside Claude Code', async () => {
-    expect(IMPLEMENTED_AGENT_BACKENDS).toContain('opencode');
+  it('keeps OpenCode 1 retired while Claude Code remains user-facing', async () => {
+    expect(IMPLEMENTED_AGENT_BACKENDS).not.toContain('opencode');
+    expect(IMPLEMENTED_AGENT_BACKENDS).toContain('opencode2');
     expect(IMPLEMENTED_AGENT_BACKENDS).toContain('claude-code');
     expect(IMPLEMENTED_AGENT_BACKENDS).toContain('pi');
     expect(IMPLEMENTED_AGENT_BACKENDS).toContain('zcode');
-    expect(IMPLEMENTED_AGENT_BACKENDS.length).toBe(6);
+    expect(IMPLEMENTED_AGENT_BACKENDS.length).toBe(5);
   });
 });

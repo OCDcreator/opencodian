@@ -162,6 +162,9 @@ function renderConversationSettings(settings: Partial<typeof DEFAULT_SETTINGS> =
   const plugin = {
     settings: {
       ...DEFAULT_SETTINGS,
+      // Legacy v1-active state for OpenCode 1 owned conversation sub-settings.
+      activeBackend: 'opencode',
+      enabledBackends: ['opencode'],
       titleMode: 'default',
       questionDisplayMode: 'all',
       questionCardPosition: 'inline',
@@ -406,6 +409,9 @@ describe('OpenCodian conversation settings', () => {
     const plugin = {
       settings: {
         ...DEFAULT_SETTINGS,
+        // Legacy v1-active state: AI title generation is OpenCode 1 owned.
+        activeBackend: 'opencode',
+        enabledBackends: ['opencode'],
         titleMode: 'ai',
         aiTitleModel: 'openai/gpt-4.1',
       },

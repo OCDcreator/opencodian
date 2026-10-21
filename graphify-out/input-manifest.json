@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "fb6217effeff914be5e5e69be880fc9ceaa9d4c0937002278e658a0faf7b3f7b",
+  "digest": "59ca88c82ba8c0cd5d6c96c3d1f33cbf28a319d42efa3703d0027468b66d24d2",
   "recordCount": 796,
   "records": [
     {
@@ -166,7 +166,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/AgentServiceRegistry.ts",
-      "sha256": "f318940436e2839ec20367204225ca4fae239a80ad922e2a574227f36d3e8291"
+      "sha256": "7e272b6c88f26cde17d25990768189914e2beb88ec1df040dc87f63d55bb5494"
     },
     {
       "kind": "src",
@@ -431,7 +431,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/index.ts",
-      "sha256": "1f772cd196fdbf43bbcd5e29f79d08ffb05c2a3da080b8e42df5ac98d6e22b06"
+      "sha256": "316e59234458a8b9a1ac5358935a6dfed99cbbea49fc655ce626d76e5246ea04"
     },
     {
       "kind": "src",
@@ -1306,12 +1306,12 @@
     {
       "kind": "src",
       "key": "src/core/types/settings.ts",
-      "sha256": "5cdb38dcde646524480d568e29ecdfbbadf6fd275c27ed4903b4955ade3691bb"
+      "sha256": "d9992929f364e6f1b027105380e8b0a63bf4f2e0c3e19d55fbe657c85cbe32a8"
     },
     {
       "kind": "src",
       "key": "src/core/types/settingsLoadNormalization.ts",
-      "sha256": "da9ab590f9d451b0aa401845f41caa02f86194f28cd741a38ecc7c59ad5b7ad2"
+      "sha256": "db3da37bbf378b8e2efc009d33f26b56cf53f2d14b0be12d3fe05c8bd21b928b"
     },
     {
       "kind": "src",
@@ -3061,7 +3061,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/settingsBackendGuards.ts",
-      "sha256": "d70a875d90d1f7b91901c47ed20898cdf99bc535431ad891749561ca5c7672d4"
+      "sha256": "bea98c1b4af2dc0d07aa617767d806384af7fd5600dd0c1cd44cabea3dce8a89"
     },
     {
       "kind": "src",
@@ -3406,7 +3406,7 @@
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "d2446b8edc1ee61656ee216b95ccee5e7db8a742d3d5ac2724c689e37268b534"
+      "sha256": "0aceeecdb8cdb49c8a6bdf36b714fa8deaafe58976e46e35c5ce1597f8f76529"
     },
     {
       "kind": "src",
@@ -3984,7 +3984,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-21T12:24:55.356Z",
-  "headShaAtGeneration": "1fcf846825918cf4f5420f30784a4c33545c88ba",
+  "generatedAt": "2026-10-21T14:51:08.555Z",
+  "headShaAtGeneration": "a731d60139d6f62aa583d87a58dc31659f804070",
   "graphifyVersion": "graphify 0.9.36"
 }

@@ -82,3 +82,8 @@ The plugin composition supplies Pi extension-command completion localization thr
 ## 2026-10-13 Claude elicitation admission handling
 
 既有 handleClaudeCodeElicitation 负责收住 core.backend builder 的 schema 拒绝并返回 decline/cancel，拒绝时不准入 renderer、不记录输入或异常文本。正常 card/content 与 tab 回调路径保留；schema 校验仍归 core.backend，不向 main 新增运行时所有者。当前验证仅是生产 handler 与注入 renderer 的合成测试，未部署或取得 native/UI 验收。
+
+
+## 2026-10-21 OpenCode 1 backend retirement
+
+Bootstrap 不再构造/注册 `OpenCodeAdapter`：`AgentServiceRegistry` 中不存在 `opencode` adapter，`handleOpenCodeServerStatusChange` 移除已死的 registry 转发。`OpenCodeService` 仍休眠构造（memory runtime 与 legacy 只读引用；本地 server 自启动本就受 active-backend 门控）。默认后端经 core.types 归一化为 `opencode2`，由 wiring 层注册 `OpenCode2Adapter`。存量 `opencode` conversation owner 不改写，routing 视为不可用后端。

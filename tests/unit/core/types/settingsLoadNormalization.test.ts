@@ -82,7 +82,7 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
     expect(state.settings.backendSettings.codex.executablePath).toBe('~/bin/codex');
   });
 
-  it('keeps opencode enabled for a fresh install with no persisted settings', () => {
+  it('keeps opencode2 enabled for a fresh install with no persisted settings', () => {
     const state = prepareLoadedSettingsBootstrapState({
       core: {
         data: null,
@@ -100,9 +100,59 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
       shouldPersist: false,
     });
 
-    expect(state.settings.enabledBackends).toEqual(['opencode']);
-    expect(state.settings.activeBackend).toBe('opencode');
+    expect(state.settings.enabledBackends).toEqual(['opencode2']);
+    expect(state.settings.activeBackend).toBe('opencode2');
     expect(state.settings.showTurnChangeRecords).toBe(true);
+  });
+
+  it('silently migrates stored OpenCode 1 selections to opencode2 on load', () => {
+    const state = prepareLoadedSettingsBootstrapState({
+      core: {
+        data: {
+          enabledBackends: ['opencode', 'opencode2', 'claude-code'],
+          activeBackend: 'opencode',
+        },
+        filePath: '.opencodian/settings.core.json',
+        source: 'primary',
+        shouldPersist: false,
+      },
+      ui: {
+        data: null,
+        filePath: '.opencodian/settings.ui.json',
+        source: 'missing',
+        shouldPersist: false,
+      },
+      writable: true,
+      shouldPersist: false,
+    });
+
+    expect(state.settings.enabledBackends).toEqual(['opencode2', 'claude-code']);
+    expect(state.settings.activeBackend).toBe('opencode2');
+  });
+
+  it('falls back to defaults when every stored backend is retired or unknown', () => {
+    const state = prepareLoadedSettingsBootstrapState({
+      core: {
+        data: {
+          enabledBackends: ['opencode', 'future-backend'],
+          activeBackend: 'opencode',
+        },
+        filePath: '.opencodian/settings.core.json',
+        source: 'primary',
+        shouldPersist: false,
+      },
+      ui: {
+        data: null,
+        filePath: '.opencodian/settings.ui.json',
+        source: 'missing',
+        shouldPersist: false,
+      },
+      writable: true,
+      shouldPersist: false,
+    });
+
+    expect(state.settings.enabledBackends).toEqual(['opencode2']);
+    expect(state.settings.activeBackend).toBe('opencode2');
   });
 
   it('defaults missing or invalid turn-change display settings to enabled', () => {
@@ -192,8 +242,9 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
       shouldPersist: false,
     });
 
-    // codex is now an implemented backend — it should be preserved
-    expect(state.settings.enabledBackends).toEqual(['codex', 'opencode']);
+    // codex is now an implemented backend — it should be preserved; stored
+    // OpenCode 1 silently migrates to opencode2.
+    expect(state.settings.enabledBackends).toEqual(['codex', 'opencode2']);
     expect(state.settings.activeBackend).toBe('codex');
   });
 
@@ -230,7 +281,7 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
       shouldPersist: false,
     });
 
-    expect(state.settings.enabledBackends).toEqual(['claude-code', 'opencode']);
+    expect(state.settings.enabledBackends).toEqual(['claude-code', 'opencode2']);
     expect(state.settings.activeBackend).toBe('claude-code');
     expect(state.settings.backendSettings.claudeCode).toEqual({
       executablePath: '~/bin/claude',

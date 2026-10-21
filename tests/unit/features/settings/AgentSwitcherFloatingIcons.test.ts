@@ -17,7 +17,7 @@ describe('renderAgentSwitcherFloatingIcons', () => {
 
     renderAgentSwitcherFloatingIcons(containerEl, {
       selectedAgent: 'claude-code',
-      enabledAgents: ['opencode', 'claude-code'],
+      enabledAgents: ['opencode2', 'claude-code'],
       onSelect,
     });
 
@@ -52,7 +52,7 @@ describe('renderAgentSwitcherFloatingIcons', () => {
     expect(buttons[1]?.getAttribute('aria-pressed')).toBe('true');
 
     buttons[0]?.click();
-    expect(onSelect).toHaveBeenCalledWith('opencode' satisfies AgentBackendKind);
+    expect(onSelect).toHaveBeenCalledWith('opencode2' satisfies AgentBackendKind);
 
     containerEl.remove();
     floatingEl?.remove();
@@ -64,7 +64,7 @@ describe('renderAgentSwitcherFloatingIcons', () => {
 
     renderAgentSwitcherFloatingIcons(containerEl, {
       selectedAgent: 'claude-code',
-      enabledAgents: ['opencode', 'claude-code'],
+      enabledAgents: ['opencode2', 'claude-code'],
       onSelect: jest.fn(),
     });
 
@@ -89,7 +89,7 @@ describe('renderAgentSwitcherFloatingIcons', () => {
     const modalOnSelect = jest.fn();
     const renderOptions = {
       selectedAgent: 'claude-code' as const,
-      enabledAgents: ['opencode', 'claude-code'] as const,
+      enabledAgents: ['opencode2', 'claude-code'] as const,
       onSelect: editorOnSelect,
     };
 
@@ -120,7 +120,7 @@ describe('renderAgentSwitcherFloatingIcons', () => {
     expect(modalFloatingEl?.querySelectorAll('.opencodian-agent-switcher-icon')).toHaveLength(2);
 
     modalFloatingEl?.querySelector<HTMLButtonElement>('.opencodian-agent-switcher-icon')?.click();
-    expect(modalOnSelect).toHaveBeenCalledWith('opencode' satisfies AgentBackendKind);
+    expect(modalOnSelect).toHaveBeenCalledWith('opencode2' satisfies AgentBackendKind);
     expect(editorOnSelect).not.toHaveBeenCalled();
 
     modalEl.remove();
@@ -138,7 +138,7 @@ describe('renderAgentSwitcherFloatingIcons', () => {
     const modalContainerEl = modalEl.createDiv();
     const renderOptions = {
       selectedAgent: 'claude-code' as const,
-      enabledAgents: ['opencode', 'claude-code'] as const,
+      enabledAgents: ['opencode2', 'claude-code'] as const,
       onSelect: jest.fn(),
     };
 
@@ -175,8 +175,8 @@ describe('renderAgentSwitcherFloatingIcons', () => {
     const containerEl = document.createElement('div');
 
     renderAgentSwitcherFloatingIcons(containerEl, {
-      selectedAgent: 'opencode',
-      enabledAgents: ['opencode', 'claude-code'],
+      selectedAgent: 'opencode2',
+      enabledAgents: ['opencode2', 'claude-code'],
       onSelect: jest.fn(),
     });
     const floatingEl = document.body.querySelector<HTMLElement>('.opencodian-agent-switcher-floating');
@@ -204,7 +204,7 @@ describe('renderAgentSwitcherHeaderIcons', () => {
 
     renderAgentSwitcherHeaderIcons(containerEl, {
       selectedAgent: 'claude-code',
-      enabledAgents: ['opencode', 'claude-code'],
+      enabledAgents: ['opencode2', 'claude-code'],
       onSelect,
     });
 
@@ -221,7 +221,7 @@ describe('renderAgentSwitcherHeaderIcons', () => {
 
     expect(groupEl).not.toBeNull();
     expect(buttons).toHaveLength(2);
-    expect(buttons[0]?.getAttribute('aria-label')).toBe('OpenCode 1');
+    expect(buttons[0]?.getAttribute('aria-label')).toBe('OpenCode 2');
     expect(buttons[1]?.getAttribute('aria-label')).toBe('Claude Code');
     expect(buttons[1]?.getAttribute('aria-pressed')).toBe('true');
     expect(opencodeIconEl?.dataset.lobehubIcon).toBe('opencode');
@@ -234,7 +234,7 @@ describe('renderAgentSwitcherHeaderIcons', () => {
     );
 
     buttons[0]?.click();
-    expect(onSelect).toHaveBeenCalledWith('opencode' satisfies AgentBackendKind);
+    expect(onSelect).toHaveBeenCalledWith('opencode2' satisfies AgentBackendKind);
   });
 });
 

@@ -22,6 +22,9 @@ function createSettingsView(layoutMode: 'classic' | 'tabbed' = 'classic') {
     },
     settings: {
       ...DEFAULT_SETTINGS,
+      // Legacy v1-active state for the OpenCode 1 owned plugin-subtab tests.
+      activeBackend: 'opencode',
+      enabledBackends: ['opencode'],
       settingsLayoutMode: layoutMode,
       settingsTabbedPrimaryTab: 'general',
       settingsTabbedSecondaryTabByPrimary: { general: 'basic' },

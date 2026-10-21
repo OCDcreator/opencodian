@@ -10,7 +10,7 @@
 ## 关键导出
 
 - `SettingsBackendStateLike`: active backend 判定所需的最小 settings shape。
-- `resolveSettingsActiveBackend()`: 如果 `activeBackend` 仍在 `enabledBackends` 中就返回它，否则回退到第一个 enabled backend；缺少 settings 时保留 legacy OpenCode 默认。
+- `resolveSettingsActiveBackend()`: 如果 `activeBackend` 仍在 `enabledBackends` 中就返回它，否则回退到第一个 enabled backend；缺少 settings 时返回 `opencode2`（OpenCode 1 退役后的默认后端，2026-10-21 起不再解析为 `opencode`）。
 - `isOpenCodeSettingsBackendActive()`: 判断当前设置 surface 是否应允许 OpenCode-owned callback 执行。
 
 ## 使用场景
@@ -20,5 +20,5 @@ Server、MCP、Tools、Tool detail modal、Formatter/LSP 和 Security settings �
 ## 注意事项
 
 - 这里的 fallback 必须与 settings tab 可见性和相邻 owner 保持一致：`activeBackend` 无效时使用 `enabledBackends[0]`。
-- 缺少 settings 的旧测试/mock 环境默认视为 OpenCode active，避免破坏 legacy 单后端调用方。
+- 缺少 settings 的旧测试/mock 环境现在视为非 OpenCode 1 active；需要覆盖 legacy v1 路径的测试必须显式设置 `activeBackend: 'opencode'` + `enabledBackends: ['opencode']`。
 - 该 helper 只判断设置页 callback 是否可以进入 OpenCode-owned seam；它不替代 `AgentServiceRegistry` 的 runtime routing。

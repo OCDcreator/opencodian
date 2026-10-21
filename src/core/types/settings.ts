@@ -4235,8 +4235,8 @@ export function normalizeConversationExportSettings(raw: unknown): ConversationE
 /** Default settings */
 export const DEFAULT_SETTINGS: OpenCodianSettings = {
   userName: '',
-  activeBackend: 'opencode',
-  enabledBackends: ['opencode'],
+  activeBackend: 'opencode2',
+  enabledBackends: ['opencode2'],
   inlineEditEnabled: true,
   inlineEditSelectionAffordance: true,
   inlineEditTriggerAt: false,

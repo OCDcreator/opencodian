@@ -11,6 +11,17 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-10-21 OpenCode 1 后端静默退役（转向 opencode2）
+
+OpenCode 1 后端（kind `opencode`）从可选运行面整体摘除，代码保留休眠供存量会话与回滚：
+
+- `IMPLEMENTED_AGENT_BACKENDS` 摘除 `opencode`（`backend/index.ts`）——设置页后端下拉/启用开关与 settings 加载归一化随之自动排除；v1 专属设置主标签（server/model/agents/commands/mcp/formatter/plugins/security/skills/tools）依赖既有 `backendRequired` 门控自动隐藏，未改布局注册表。
+- `DEFAULT_SETTINGS` 默认后端 `opencode`/`['opencode']` → `opencode2`/`['opencode2']`；`settingsLoadNormalization` 新增 `migrateRetiredBackendKind()` / `normalizeEnabledBackendsWithRetirement()`，存量 `opencode` enabled/active 静默映射为 `opencode2`（去重、空列表回退默认）；设置主标签默认回退 `'server'` → `'general'`（渲染器本就对不可见标签自愈回退）。
+- `main.ts` 不再构造/注册 `OpenCodeAdapter`（`OpenCodeService` 保留休眠构造，供 memory runtime 与 legacy 只读引用；本地 server 自启动本就受 `activeBackend !== 'opencode'` 门控），`handleOpenCodeServerStatusChange` 移除已死的 registry 转发；`AgentServiceRegistry.pickDefaultActive()` 偏好 `opencode` → `opencode2`；`settingsBackendGuards` 的 null-settings 回退同步改为 `opencode2`。
+- 存量 `opencode` conversation 不改写 owner：routing 查不到 adapter 即视为不可用后端，本地历史仍可读；不把 v1 session ID 伪装成 opencode2。
+
+测试：受影响 8 个套件更新（后端清单断言 ×3、bootstrap 注册断言、TabbedRenderer v1 标签改显式 legacy 状态、SecuritySection 7 个 v1 行为用例补显式 `activeBackend: 'opencode'`）。
+
 ## 2026-10-21 三个 022 实机验收发现的修复
 
 Mac 实机 I02/I03 验收（`~/.codex/artifacts/opencodian/native-ui-2026-10-21/`，022 提案授权执行）暴露三个缺陷，本批全部修复：

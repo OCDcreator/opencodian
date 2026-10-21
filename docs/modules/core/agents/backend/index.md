@@ -14,18 +14,18 @@
 
 ## 职责
 
-- 导出 `IMPLEMENTED_AGENT_BACKENDS`，作为设置归一化与 UI 过滤的运行时白名单；当前包含 `opencode`、`claude-code` 与 `codex`
+- 导出 `IMPLEMENTED_AGENT_BACKENDS`，作为设置归一化与 UI 过滤的运行时白名单；当前包含 `opencode2`、`claude-code`、`codex`、`pi` 与 `zcode`（`opencode` 已于 2026-10-21 退役摘除）
 - 重新导出 `AgentService.ts` 中的核心接口、状态类型、共享 disposable 类型、chat/session 请求类型和可选 capability interface
-- 导出 `OpenCodeAdapter` 作为当前 OpenCode backend 的 adapter 实现
+- 导出 `OpenCodeAdapter`（legacy OpenCode 1 实现，main.ts 已不再注册；导出保留供存量会话与回滚）
 - 导出 backend routing helper，供入口、聊天视图和发送管线按 conversation owner / active backend 做 capability narrowing
-- 导出 Claude Code adapter、runtime catalog readback 类型、project skill/command/agent/settings discovery helper（settings helper 仅 discover/open）、model catalog projection、SDK loader、options builder、MCP config adapter、MCP elicitation bridge、process resolver、stream normalizer 与 permission bridge；`claude-code` 已可在设置中显式启用，默认仍保持 OpenCode
+- 导出 Claude Code adapter、runtime catalog readback 类型、project skill/command/agent/settings discovery helper（settings helper 仅 discover/open）、model catalog projection、SDK loader、options builder、MCP config adapter、MCP elicitation bridge、process resolver、stream normalizer 与 permission bridge；`claude-code` 已可在设置中显式启用，默认后端为 `opencode2`（2026-10-21 起）
 - 导出 `AgentServiceRegistry` 作为 adapter 注册与 active backend 解析 owner
 - 导出 Codex adapter 骨架与 stream normalizer；`codex` 已加入 `IMPLEMENTED_AGENT_BACKENDS`，在 UI 暴露为用户可选后端
 - 保持 type-only 导出与 value 导出分层，避免 barrel 额外引入运行时副作用
 
 ## 公共导出
 
-- `IMPLEMENTED_AGENT_BACKENDS`: 已实现 backend kind 的 readonly tuple，用 `AgentBackendKind` 约束元素类型；当前为 `['opencode', 'claude-code', 'codex']`。
+- `IMPLEMENTED_AGENT_BACKENDS`: 已实现 backend kind 的 readonly tuple，用 `AgentBackendKind` 约束元素类型；当前为 `['opencode2', 'claude-code', 'codex', 'pi', 'zcode']`。
 - `AgentServiceRegistry`: backend adapter 注册、启用状态和 active backend 解析 owner。
 - `getConversationChatBackendService` / `getConversationSessionBackendService` / `getActiveSessionBackendService`: backend routing helper。
 - `OpenCodeAdapter`: OpenCode backend 的 `AgentService` adapter 实现。
@@ -111,3 +111,7 @@ IMPLEMENTED_AGENT_BACKENDS 新增 zcode；导出 zcode 包符号（ZCodeAdapter�
 ## 2026-09-27 OpenCode 2 compatibility
 
 The public backend set and barrel now include opencode2 and OpenCode2Adapter. OpenCode 1 and 2 retain separate session and transport identities.
+
+## 2026-10-21 OpenCode 1 退役（静默摘除）
+
+`IMPLEMENTED_AGENT_BACKENDS` 摘除 `opencode`：OpenCode 1 不再出现在设置页后端选择/启用面。settings 加载归一化把存量 `opencode` enabled/active 静默迁移为 `opencode2`（见 `settingsLoadNormalization` 模块页）；`DEFAULT_SETTINGS` 默认后端改为 `opencode2`。`OpenCodeAdapter` 仍从 barrel 导出，但 `main.ts` 不再注册，routing 对存量 `opencode` conversation 返回不可用后端（本地历史仍可读）。`AgentServiceRegistry.pickDefaultActive()` 默认偏好改为 `opencode2`。

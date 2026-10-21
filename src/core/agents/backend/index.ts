@@ -7,7 +7,10 @@
 
 import type { AgentBackendKind } from '../../types/chat';
 
-export const IMPLEMENTED_AGENT_BACKENDS: readonly AgentBackendKind[] = ['opencode', 'opencode2', 'claude-code', 'codex', 'pi', 'zcode'];
+// 'opencode' (OpenCode 1) is retired from the selectable runtime surface; the
+// kind, adapter and settings stay in the codebase for stored conversations and
+// rollback, so nothing may re-add it to this whitelist without a product call.
+export const IMPLEMENTED_AGENT_BACKENDS: readonly AgentBackendKind[] = ['opencode2', 'claude-code', 'codex', 'pi', 'zcode'];
 
 export {
   wireHiddenAdapters,

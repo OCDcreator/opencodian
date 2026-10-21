@@ -121,17 +121,25 @@ describe('AgentServiceRegistry', () => {
       const active = registry.setEnabledBackends(['opencode', 'claude-code']);
       expect(registry.isEnabled('opencode')).toBe(true);
       expect(registry.isEnabled('claude-code')).toBe(true);
-      expect(active).toBe('opencode');
+      // Retired OpenCode 1 never wins the default active pick.
+      expect(active).toBe('claude-code');
     });
 
-    it('prefers opencode as default active', () => {
+    it('prefers opencode2 as default active', () => {
+      registry.register(createMockAdapter('claude-code'));
+      registry.register(createMockAdapter('opencode2'));
+      const active = registry.setEnabledBackends(['claude-code', 'opencode2']);
+      expect(active).toBe('opencode2');
+    });
+
+    it('does not prefer retired OpenCode 1 as default active', () => {
       registry.register(createMockAdapter('claude-code'));
       registry.register(createMockAdapter('opencode'));
-      const active = registry.setEnabledBackends(['claude-code', 'opencode']);
-      expect(active).toBe('opencode');
+      const active = registry.setEnabledBackends(['opencode', 'claude-code']);
+      expect(active).toBe('claude-code');
     });
 
-    it('uses first enabled if opencode not available', () => {
+    it('uses first enabled if opencode2 not available', () => {
       registry.register(createMockAdapter('claude-code'));
       const active = registry.setEnabledBackends(['claude-code']);
       expect(active).toBe('claude-code');

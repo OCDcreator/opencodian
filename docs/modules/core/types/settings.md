@@ -56,7 +56,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `OpenCodianSettings` | 完整设置接口（约 40 个字段） |
 | `DEFAULT_SETTINGS` | 默认设置常量对象 |
 
-`OpenCodianSettings` 现在包含 backend 管理字段：`activeBackend` 表示新会话默认 backend，`enabledBackends` 表示设置页当前启用的 backend 集合。Phase 0 默认值固定为 `opencode` / `['opencode']`，非 OpenCode backend 只作为 UI 可见性和后续迁移占位。
+`OpenCodianSettings` 现在包含 backend 管理字段：`activeBackend` 表示新会话默认 backend，`enabledBackends` 表示设置页当前启用的 backend 集合。2026-10-21 OpenCode 1 退役后默认值固定为 `opencode2` / `['opencode2']`；更早快照中的 `opencode` / `['opencode']` 由 `settingsLoadNormalization` 静默迁移，不再作为可选默认出现。
 
 `modelPricingOverrides` 是插件侧按 `providerId/可选 endpoint/modelId` 保存的局部 USD/百万 Token 覆盖表。四个单价类别可独立为 `null`，其语义是“按端点精确覆盖 → Provider 通用覆盖 → models.dev 目录回退，或保持不可估算”，不是免费；它不会写入 `opencode.json`，也不会改变 Claude/Codex 订阅账单。
 

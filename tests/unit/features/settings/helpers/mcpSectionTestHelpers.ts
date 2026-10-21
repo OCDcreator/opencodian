@@ -217,6 +217,12 @@ export function createPlugin(snapshot?: Partial<McpServerSnapshot>): McpSectionP
 
   return {
     app: {},
+    // Legacy v1-active state: the MCP section is OpenCode 1 owned and retired
+    // from the default surface; null settings no longer resolve to 'opencode'.
+    settings: {
+      activeBackend: 'opencode',
+      enabledBackends: ['opencode'],
+    },
     opencodeConfigManager: {
       exists: jest.fn().mockResolvedValue(false),
       read: jest.fn().mockResolvedValue({}),

@@ -173,6 +173,10 @@ function createPlugin(overrides?: Partial<ServerSectionPlugin['settings']['serve
   return {
     settings: {
       ...DEFAULT_SETTINGS,
+      // Legacy v1-active state: this section is OpenCode 1 owned and retired
+      // from the default surface.
+      activeBackend: 'opencode',
+      enabledBackends: ['opencode'],
       server: {
         ...DEFAULT_SETTINGS.server,
         ...overrides,

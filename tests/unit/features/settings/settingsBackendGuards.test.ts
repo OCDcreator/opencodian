@@ -17,12 +17,13 @@ describe('settingsBackendGuards', () => {
     expect(
       resolveSettingsActiveBackend({
         activeBackend: 'missing-backend',
-        enabledBackends: ['opencode', 'claude-code'],
+        enabledBackends: ['opencode2', 'claude-code'],
       }),
-    ).toBe('opencode');
+    ).toBe('opencode2');
   });
 
-  it('preserves legacy OpenCode-active behavior when settings are unavailable', () => {
-    expect(isOpenCodeSettingsBackendActive(undefined)).toBe(true);
+  it('treats unavailable settings as retired-backend inactive (opencode2)', () => {
+    expect(isOpenCodeSettingsBackendActive(undefined)).toBe(false);
+    expect(resolveSettingsActiveBackend(undefined)).toBe('opencode2');
   });
 });

@@ -57,7 +57,7 @@ R-C4：`normalizeVaultRetrievalSettingsOnLoad` 的返回类型与合并输出新
 
 Capability Lab 的 `capabilityLabSelectedBackend` 在最终 settings merge 时通过 `normalizeCapabilityLabSelectedBackend()` 清洗。任意非空 descriptor id 会被 trim 后保留，使未来 backend 不需要修改启动归一化白名单；当前不存在的 id 由 tabs controller 对照 descriptor 集忽略，再按 `activeBackend` → descriptor 第一项解析初始选择。该字段不会参与 active backend 或 enabled backend 归一化。
 
-最终 settings merge 会用 `IMPLEMENTED_AGENT_BACKENDS` 过滤 `enabledBackends`，并在 `activeBackend` 不在 enabled 列表中时回退到第一个 enabled backend。当前实现只保留 `opencode`，避免旧快照或手写设置启用尚未接入的 backend。`backendSettings.claudeCode` 仍会归一化并持久保留，作为隐藏 foundation，不能因此把 Claude 暴露成已实现 backend；该最终 merge 边界也会重新调用 `normalizeBackendSettings()`，确保旧 snapshot 缺失的 `claudeCode.sessionTrace` 补齐默认值、五个 channel map、合法 console preset 与 trim 后的 storage directory。
+最终 settings merge 会用 `IMPLEMENTED_AGENT_BACKENDS` 过滤 `enabledBackends`，并在 `activeBackend` 不在 enabled 列表中时回退到第一个 enabled backend。2026-10-21 OpenCode 1 退役后，过滤前会先把存量 `opencode` 静默映射为 `opencode2`（去重；`migrateRetiredBackendKind()` / `normalizeEnabledBackendsWithRetirement()`），过滤结果为空时回退 `DEFAULT_SETTINGS.enabledBackends`；`activeBackend` 为 `opencode` 时同样按 `opencode2` 解析。存量 conversation 的 backend owner 不在此层改写。`backendSettings.claudeCode` 仍会归一化并持久保留，作为隐藏 foundation，不能因此把 Claude 暴露成已实现 backend；该最终 merge 边界也会重新调用 `normalizeBackendSettings()`，确保旧 snapshot 缺失的 `claudeCode.sessionTrace` 补齐默认值、五个 channel map、合法 console preset 与 trim 后的 storage directory。
 
 ### server / theme / input-panel 迁移
 

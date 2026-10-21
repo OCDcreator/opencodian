@@ -63,3 +63,6 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 - 2026-09-18 (FlowText 批次 B)：owner manifest 随 R-B1/R-B2 更新——新增 `src/shared/contextGroupPlan.ts` 归属 `shared.foundation`；本 owner 的边界与职责未变。
 
 2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.settings-plugin` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+
+- 2026-10-21: OpenCode 1 退役——`settingsBackendGuards.resolveSettingsActiveBackend()` 的 null-settings 回退从 `opencode` 改为 `opencode2`，v1-owned settings section（Server/MCP/Tools/Formatter/Security）在默认状态下不再进入 OpenCode-owned mutation seam；覆盖 legacy v1 路径的测试需显式设置 `activeBackend: 'opencode'`。

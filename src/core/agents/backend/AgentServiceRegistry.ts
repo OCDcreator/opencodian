@@ -264,12 +264,15 @@ export class AgentServiceRegistry {
   // -------------------------------------------------------------------------
 
   private pickDefaultActive(): AgentBackendKind | null {
-    // Prefer 'opencode' if enabled, otherwise first enabled
-    if (this.enabledKinds.has('opencode')) {
-      return 'opencode';
+    // Prefer 'opencode2' if enabled, otherwise first enabled. OpenCode 1 is
+    // retired from the selectable surface and never wins the default pick.
+    if (this.enabledKinds.has('opencode2')) {
+      return 'opencode2';
     }
     for (const kind of this.enabledKinds) {
-      return kind;
+      if (kind !== 'opencode') {
+        return kind;
+      }
     }
     return null;
   }

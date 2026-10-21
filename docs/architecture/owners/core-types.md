@@ -76,3 +76,6 @@ OpenCode 2 has a separate backend identity and normalized connection settings; p
 
 
 > 2026-10-08 ZCode selection: 会话级 model override 与每模型 reasoning override 经既有保存/归一化链持久化，null 档位继承 native 模型默认；view 重载与切会话分别回读，保存失败只回滚发起会话。保存值不代替 native options 生效证据。
+
+
+> 2026-10-21 OpenCode 1 退役：`DEFAULT_SETTINGS` 默认后端改为 `opencode2` / `['opencode2']`；`settingsLoadNormalization` 新增 `migrateRetiredBackendKind()` / `normalizeEnabledBackendsWithRetirement()`，把存量 `opencode` enabled/active 静默迁移为 `opencode2`（去重、空结果回退默认），设置主标签默认回退 `'server'` → `'general'`。`AgentBackendKind` 联合与 `BackendSettings.opencode` 结构保留，存量 conversation owner 不改写。

@@ -14,7 +14,7 @@
 - 提供 `getActive()`、`getActiveKind()`、`get()`、`listEnabled()`、`listAll()`、`isEnabled()` 等查询入口
 - 通过 `onActiveChange()` 通知 active backend 切换
 - 通过 `onCapabilitiesChange()` 转发已注册 adapter 的动态 capability 变化，并在替换、注销和 `dispose()` 时释放对应订阅
-- 默认优先选择已启用的 `opencode`，否则选择第一个已启用 backend
+- 默认优先选择已启用的 `opencode2`，否则选择第一个已启用 backend；OpenCode 1 已于 2026-10-21 退役，不再赢得默认选择
 - `onActiveChange()` 允许广播 `null`，表示当前没有任何已启用 backend
 
 ## 依赖

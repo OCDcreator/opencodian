@@ -146,3 +146,8 @@ ClaudeCodeElicitationBridge 的既有 builder 拥有 raw schema/properties/prope
 ## 2026-10-21 Codex elicitation host-wiring race
 
 CodexAdapter 的 `mcpServer/elicitation/request` 路由注册不再以 elicitation host 已接线为前提：app-server client 可用即注册（消除帧先到、host 后接线时落入 transport -32601 的窗口）。host 缺失到达的合法帧进入 adapter 内 `pendingElicitations` 挂起，绑定该请求的 request/turn AbortSignal 与 60 秒上界（对齐 turn watchdog）；abort、超时与 adapter stop 均按既有 cancel 语义 settle，绝不悬挂或伪造回答。`setElicitationHost` 接线后立即按原始 wire params 派发挂起帧，combined signal 在派发期间保持武装。挂起/派发簿记属于既有 core.backend owner（CodexAdapter 内部），不新增 runtime owner，不改变 approval 桥注册条件与 CodexElicitationBridge 的纯 helper 边界；回归见 `CodexElicitationBridge.test.ts` host-wiring race 组。
+
+
+## 2026-10-21 OpenCode 1 backend retirement
+
+`IMPLEMENTED_AGENT_BACKENDS` 摘除 `opencode`：设置归一化与 UI 过滤不再暴露 OpenCode 1，`main.ts` 不再注册 `OpenCodeAdapter`，`AgentServiceRegistry.pickDefaultActive()` 默认偏好改为 `opencode2`。`OpenCodeAdapter` 与 `src/core/opencode/**` 代码保留（休眠，供存量会话、legacy 只读引用与回滚）；存量 `opencode` conversation owner 不改写，routing 视为不可用后端。设置默认后端与存量迁移归 core.types 的 settingsLoadNormalization 所有（`migrateRetiredBackendKind()`）。

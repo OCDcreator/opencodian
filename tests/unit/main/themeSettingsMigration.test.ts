@@ -427,7 +427,9 @@ function createPluginWithSavedSettings(savedSettings: Record<string, unknown>): 
     await plugin.loadSettings();
 
     expect(plugin.settings.settingsLayoutMode).toBe('classic');
-    expect(plugin.settings.settingsTabbedPrimaryTab).toBe('server');
+    // OpenCode 1 retirement: the v1-only server tab can no longer be the
+    // default landing tab.
+    expect(plugin.settings.settingsTabbedPrimaryTab).toBe('general');
     expect(plugin.settings.settingsTabbedSecondaryTabByPrimary).toEqual({});
   });
 

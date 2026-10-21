@@ -625,6 +625,29 @@ function normalizeRemoteControlSettingsOnLoad(
   };
 }
 
+/**
+ * OpenCode 1 retirement: stored 'opencode' selections silently migrate to the
+ * OpenCode 2 backend. Conversations keep their original backend owner; only
+ * the selectable/enabled surface is remapped.
+ */
+function migrateRetiredBackendKind(kind: AgentBackendKind): AgentBackendKind {
+  return kind === 'opencode' ? 'opencode2' : kind;
+}
+
+function normalizeEnabledBackendsWithRetirement(saved: unknown): AgentBackendKind[] {
+  if (!Array.isArray(saved)) {
+    return [...DEFAULT_SETTINGS.enabledBackends];
+  }
+  const kinds = new Set<AgentBackendKind>();
+  for (const value of saved) {
+    const kind = migrateRetiredBackendKind(value as AgentBackendKind);
+    if (IMPLEMENTED_AGENT_BACKENDS.includes(kind)) {
+      kinds.add(kind);
+    }
+  }
+  return kinds.size > 0 ? [...kinds] : [...DEFAULT_SETTINGS.enabledBackends];
+}
+
 function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | null): LoadSettingsNormalizationResult {
   const normalizedModelProviderPluginDebugSettings = normalizeModelProviderPluginDebugSettings(savedSettings);
   const { normalizedServer, shouldMigrateLegacyLocalDefaultPort } = normalizeServerSettingsOnLoad(savedSettings);
@@ -654,7 +677,7 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
   );
   const normalizedTabbedPrimaryTab = normalizeSettingsTabbedPrimaryTab(
     savedSettings?.settingsTabbedPrimaryTab,
-    'server',
+    'general',
   );
   const migratedTabbedSettings = normalizedTabbedPrimaryTab === 'server'
     && normalizedTabbedSecondaryTabByPrimary.server === 'mcp'
@@ -669,12 +692,14 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
           primaryTab: normalizedTabbedPrimaryTab,
           secondaryTabByPrimary: normalizedTabbedSecondaryTabByPrimary,
         };
-  const normalizedEnabledBackends: AgentBackendKind[] = Array.isArray(normalizedSettings?.enabledBackends)
-    ? normalizedSettings.enabledBackends.filter((backend): backend is AgentBackendKind =>
-      IMPLEMENTED_AGENT_BACKENDS.includes(backend as AgentBackendKind))
-    : [...DEFAULT_SETTINGS.enabledBackends];
-  const normalizedActiveBackend = normalizedEnabledBackends.includes(normalizedSettings?.activeBackend as AgentBackendKind)
-    ? normalizedSettings?.activeBackend as AgentBackendKind
+  const normalizedEnabledBackends: AgentBackendKind[] = normalizeEnabledBackendsWithRetirement(
+    normalizedSettings?.enabledBackends,
+  );
+  const migratedActiveBackend = migrateRetiredBackendKind(
+    normalizedSettings?.activeBackend as AgentBackendKind,
+  );
+  const normalizedActiveBackend = normalizedEnabledBackends.includes(migratedActiveBackend)
+    ? migratedActiveBackend
     : normalizedEnabledBackends[0];
 
   return {
