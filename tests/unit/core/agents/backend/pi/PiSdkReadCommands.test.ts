@@ -64,6 +64,8 @@ it('runs the offline SDK read-command contract through the standard unit test en
   const testFile = path.join(__dirname, 'PiSdkReadCommands.test.mjs');
   const report = execFileSync(process.execPath, ['--test', '--test-reporter=tap', testFile], {
     cwd: root, encoding: 'utf8', windowsHide: true,
+    // CI exports NODE_OPTIONS=--test-reporter=tap; the child must not inherit a second reporter.
+    env: { ...process.env, NODE_OPTIONS: '' },
   });
   expect(report).toContain('# fail 0');
 });
