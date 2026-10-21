@@ -11,6 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-10-21 三个 022 实机验收发现的修复
+
+Mac 实机 I02/I03 验收（`~/.codex/artifacts/opencodian/native-ui-2026-10-21/`，022 提案授权执行）暴露三个缺陷，本批全部修复：
+
+- **Codex elicitation host-wiring 注册时序竞态**（`be93e70f`）：`CodexAdapter.registerElicitationHandlers` 原把路由注册绑死在 `elicitationHost.collectElicitation` 已接线前提上，而 host 仅在 main.ts onload 注入、注册又需等 client 握手完成——帧落在该窗口即被 transport -32601 吞掉、表单卡永不渲染（验收 wire trace 的 watchdog retroactive 记录实证）。现 client 可用即注册；帧先到而 host 未接线时挂入 pending 队列（绑定 request/turn 组合 AbortSignal，60 秒对齐 turn watchdog，abort/超时按既有 cancel 语义 settle，trace 记 `elicitation.pending`/`elicitation.pending.settled`），host 接线后按原始 wire params 派发。新增 5 用例时序回归（`CodexElicitationHostWiring.test.ts`）。
+- **窄面板问答卡按钮被 composer 遮挡**（`3dad41d1`）：`.opencodian-input-area` 绝对定位叠在消息窗格上，可达性依赖 `--opencodian-composer-stack-height` 测量快照；窄面板下快照偏小时按钮中心恒落入 composer 命中盒（验收 elementFromPoint 实证）。`ScrollManager.ensureComposerOverlayScrollReserve()` 在卡 pin 时实测 composer 高度，偏小时写行内 stopgap 扩展滚动预留 +16px 安全间距；shadcn 静态布局几何判定自动 no-op；不改 CSS、不动 container-type、不破坏滚动恢复。
+- **send/stop 同坐标 morphing 控件静默吞点击**（`3dad41d1`）：取消 turn 后 200ms settle 窗口内控件按当前态收敛显示但禁用，杜绝「点了没发出去也不报错」的语义过渡丢失；窗口结束按 `isActiveTabStreaming()` 实况重挂。
+
+验证：lint 0 errors/0 warnings；typecheck 通过；全量 986 suites / 10629 tests 通过；module-docs 781/781；F1 另经 Chromium 实测（真实 styles.css + 修复代码，stale 布局复现遮挡 → stopgap 后 padding 56→187px、maxScrollTop 462→593px、按钮高出 composer 壳顶 35px、命中链首元素即按钮）。两个修复分别由子代理在独立 worktree 完成后集成；022 执行的全部证据与 4 条预算修正案见包目录。
+
 ## 2026-10-13 v1.1.38：Codex app-server 传输 null 帧防护
 
 - `CodexAppServerTransport.handleMessage` 增加非对象帧防护：JSON 字面量 `null`/标量/数组帧此前在 `msg.id` 解引用处抛未捕获 TypeError 并冒泡出 `ws.onmessage`；现统一路由到既有 "Unrecognized JSON-RPC message" 告警路径，连接与后续请求不受影响，语义对齐 ZCode 解析器既有 `isPlainObject` 加固。
