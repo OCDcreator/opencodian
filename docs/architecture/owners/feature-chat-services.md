@@ -109,3 +109,5 @@ Claude SDK forks rewrite native UUIDs. Fresh Claude prefix clones discard parent
 
 
 > 2026-10-08 ZCode selection: 会话级 model override 与每模型 reasoning override 经既有保存/归一化链持久化，null 档位继承 native 模型默认；view 重载与切会话分别回读，保存失败只回滚发起会话。保存值不代替 native options 生效证据。
+
+> 2026-10-21（chat 卡片 UI 修复）：`ScrollManager` 新增 `ensureComposerOverlayScrollReserve()`（F1：composer 叠加高度实测 > 预留快照时给 pane 写行内 stack-height stopgap，兼容 shadcn 静态布局 no-op）；`ComposerInputShellCoordinator` 新增 send/stop cancel settle window（F2：cancel 后控件立即收敛并禁用 200ms，窗口内点击吞掉，结束后按 streaming 实况恢复 send/stop）。均为本 owner 内的既有文件扩展，无新增模块与依赖边界变化。

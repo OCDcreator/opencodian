@@ -36,6 +36,16 @@ import { SlashCommandMenuCoordinator } from './SlashCommandMenuCoordinator';
 
 const COMPOSER_TEXTAREA_MAX_HEIGHT = 240;
 
+/**
+ * F2 SEND-STOP-COLLISION: send and stop are one morphing control at the same
+ * coordinates. After a cancel, trailing stream teardown can leave a short
+ * window where the control's click semantics are still in flux; a click in
+ * that window used to re-hit the transitional control and silently drop the
+ * drafted message. The control therefore converges immediately and stays
+ * disabled (unclickable) for this window before re-arming as send.
+ */
+const SEND_CANCEL_SETTLE_WINDOW_MS = 200;
+
 function resolveTextareaMaxHeightFallback(value: number | undefined): number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 120 && value <= 480
     ? value
@@ -253,6 +263,7 @@ export class ComposerInputShellCoordinator {
   private imageChipContainerEl: HTMLElement | null = null;
   private attachedImages: ImageAttachment[] = [];
   private promptSubmissionPending = false;
+  private cancelSettleTimeoutId: number | null = null;
   private fileInputEl: HTMLInputElement | null = null;
   private imageDropSurfaceEl: HTMLElement | null = null;
 
@@ -512,8 +523,14 @@ export class ComposerInputShellCoordinator {
       },
     });
     this.sendBtnEl.addEventListener('click', () => {
+      if (this.isCancelSettlePending()) {
+        // The control is converging after a cancel; a click in this window
+        // would land on the transitional control instead of sending.
+        return;
+      }
       if (this.host.isActiveTabStreaming()) {
         this.host.cancelStreaming();
+        this.beginCancelSettleWindow();
       } else {
         this.trySubmitCurrentInput();
       }
@@ -683,7 +700,8 @@ export class ComposerInputShellCoordinator {
     }
 
     this.sendBtnEl.empty();
-    this.sendBtnEl.disabled = this.isComposerInteractionDisabled() || this.promptSubmissionPending;
+    this.sendBtnEl.disabled =
+      this.isComposerInteractionDisabled() || this.promptSubmissionPending || this.isCancelSettlePending();
     if (this.host.isActiveTabStreaming()) {
       setIcon(this.sendBtnEl, 'square');
       this.sendBtnEl.addClass('opencodian-stop-btn');
@@ -696,6 +714,34 @@ export class ComposerInputShellCoordinator {
     this.sendBtnEl.addClass('opencodian-send-btn');
     this.sendBtnEl.removeClass('opencodian-stop-btn');
     this.host.setTooltipLabel(this.sendBtnEl, t('chat.input.sendMessage'), 'top');
+  }
+
+  /**
+   * F2: converge the send/stop control after a cancel. The host flip happens
+   * synchronously inside `cancelStreaming()`, so re-rendering here presents the
+   * converged affordance right away; the control stays disabled until the
+   * settle window elapses so the next click cannot land on a transitional
+   * control. If the turn is still streaming when the window elapses (cancel
+   * did not take effect), the control re-arms as an enabled stop button.
+   */
+  private beginCancelSettleWindow(): void {
+    this.clearCancelSettleWindow();
+    this.cancelSettleTimeoutId = window.setTimeout(() => {
+      this.cancelSettleTimeoutId = null;
+      this.updateSendButtonState();
+    }, SEND_CANCEL_SETTLE_WINDOW_MS);
+    this.updateSendButtonState();
+  }
+
+  private isCancelSettlePending(): boolean {
+    return this.cancelSettleTimeoutId !== null;
+  }
+
+  private clearCancelSettleWindow(): void {
+    if (this.cancelSettleTimeoutId !== null) {
+      window.clearTimeout(this.cancelSettleTimeoutId);
+      this.cancelSettleTimeoutId = null;
+    }
   }
 
   scheduleLayoutSync(): void {
@@ -832,6 +878,7 @@ export class ComposerInputShellCoordinator {
 
   destroy(): void {
     this.clearScheduledLayoutSync();
+    this.clearCancelSettleWindow();
     this.teardownImageDropSurface();
     this.inputContainerResizeObserver?.disconnect();
     this.inputContainerResizeObserver = null;

@@ -863,3 +863,7 @@ Pi 完成后 bypass OpenCode canonical projection（其数据不属于 Pi 会话
 ## 2026-10-08 每轮流归属
 
 取消后立即启动下一轮时，以独立 streamRunToken 绑定每次发送。旧 iterator 的延迟 chunk/final 不得修改新轮次的 streaming 状态、用量、pending 指示、shell 或队列；旧回复只用自身 controller 和捕获的 DOM 保存。结束或取消的 controller 在下一轮替换，仍在运行的 controller 保留。异步 shell 收尾之后再次检查归属；晚到错误和定时器也受相同边界约束。
+
+## 2026-10-21 窄面板问答卡按钮可达（F1）
+
+`keepQuestionCardPinnedToBottom()` 现在在 pin/滚动前先调用 `ScrollManager.ensureComposerOverlayScrollReserve()`，对 `.opencodian-input-area` 实测 composer 叠加高度：当 pane 的 `--opencodian-composer-stack-height` 预留快照小于实测值时给 pane 写行内 stopgap 变量，避免 pending 问答卡按钮在窄面板下被 composer 命中盒覆盖（后台 tab 的 pane 一并处理；composer 为 view 共享）。`setComposerStackHeight()` writeback 在权威测量值变化时清除这些 pane 级 stopgap，未变化时保持不动，避免无关 rAF 布局同步清掉仍需要的预留。view 不新增 runtime ownership：几何判定在 `ScrollManager`，本模块只转发元素。

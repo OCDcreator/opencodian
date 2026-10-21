@@ -98,3 +98,5 @@ OpenCodianView 只转发 Codex 目录恢复到插件既有桥，保持 view/runt
 
 
 > 2026-10-08 ZCode selection: 会话级 model override 与每模型 reasoning override 经既有保存/归一化链持久化，null 档位继承 native 模型默认；view 重载与切会话分别回读，保存失败只回滚发起会话。保存值不代替 native options 生效证据。
+
+> 2026-10-21（chat 卡片 UI 修复）：`keepQuestionCardPinnedToBottom()` 在 pin 前调用 `ScrollManager.ensureComposerOverlayScrollReserve()` 实测 composer 叠加并补 pane 预留（F1，含后台 tab）；`setComposerStackHeight()` writeback 在权威测量值变化时清除 pane 级 stopgap。view 只转发元素，几何判定留在 feature.chat-services。

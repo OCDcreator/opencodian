@@ -295,6 +295,7 @@ import {
 } from './services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
 import { QueuedFollowUpBarCoordinator } from './services/QueuedFollowUpBarCoordinator';
 import {
+  ensureComposerOverlayScrollReserve,
   SettledScrollScheduler,
 } from './services/ScrollManager';
 import {
@@ -1135,7 +1136,23 @@ export class OpenCodianView extends ItemView {
         this.handleComposerInputSubmission(submission, onPreparationOutcome),
       loadSlashCommandMenuItems: () => this.loadSlashCommandMenuItems(),
       setComposerStackHeight: (stackHeight) => {
-        this.chatContainerEl?.style.setProperty('--opencodian-composer-stack-height', `${stackHeight}px`);
+        const containerEl = this.chatContainerEl;
+        if (!containerEl) {
+          return;
+        }
+        const nextStackHeight = `${stackHeight}px`;
+        const didChange =
+          containerEl.style.getPropertyValue('--opencodian-composer-stack-height') !== nextStackHeight;
+        containerEl.style.setProperty('--opencodian-composer-stack-height', nextStackHeight);
+        if (!didChange) {
+          return;
+        }
+        // The authoritative measurement loop just produced a fresh composer
+        // height; pane-level stopgap reserves applied while a pending question
+        // card was on screen are superseded and must not shadow the fresh value.
+        for (const paneEl of containerEl.querySelectorAll<HTMLElement>('.opencodian-messages')) {
+          paneEl.style.removeProperty('--opencodian-composer-stack-height');
+        }
       },
       scheduleSettledScrollToBottomIfNeeded: () => {
         this.scheduleSettledScrollToBottomIfNeeded();
@@ -5114,6 +5131,19 @@ export class OpenCodianView extends ItemView {
   }
 
   private keepQuestionCardPinnedToBottom(tabId: TabId | null): void {
+    // F1 NARROW-CARD-OVERLAP: the composer overlays the pane bottom, and the
+    // pane's bottom reserve is driven by a measured stack-height snapshot. When
+    // that snapshot under-counts the live composer stack (narrow panes wrap it
+    // taller), the pending card's action buttons stay inside the composer's hit
+    // box at every scroll position. Re-check the reserve against the live
+    // overlay before pinning, mirroring the element the authoritative
+    // measurement reads; run it for background tabs too — the composer is
+    // shared, and the pane the card lives on is the one that must stay
+    // clickable.
+    ensureComposerOverlayScrollReserve(
+      this.getTabPaneState(tabId)?.messagesEl ?? null,
+      this.inputContainer,
+    );
     if (this.getActiveTabId() !== tabId) {
       return;
     }

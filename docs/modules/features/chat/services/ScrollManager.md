@@ -20,6 +20,7 @@
 
 ```typescript
 export const LATE_CONTENT_SCROLL_REAPPLY_WINDOW_MS = 1500;
+export const COMPOSER_OVERLAY_SCROLL_RESERVE_GAP_PX = 16;
 
 export function isElementNearBottom(messagesEl: HTMLElement, threshold?: number): boolean;
 export function armProgrammaticScrollGuard(
@@ -50,6 +51,11 @@ export function restoreElementScrollAfterRender(
   snapshot: ConversationScrollRestoreSnapshot,
   options?: RestoreElementScrollOptions,
 ): void;
+export function readEffectiveComposerStackHeightPx(messagesEl: HTMLElement): number;
+export function ensureComposerOverlayScrollReserve(
+  messagesEl: HTMLElement | null,
+  overlayEl: HTMLElement | null,
+): ComposerOverlayScrollReserveOutcome | null;
 export class SettledScrollScheduler {
   schedule(executor: () => void): void;
   clear(): void;
@@ -64,6 +70,7 @@ export class SettledScrollScheduler {
 - `restoreElementScrollAfterRender()` 的 `lateContentReapplyWindowMs`（取 `LATE_CONTENT_SCROLL_REAPPLY_WINDOW_MS` = 1500）只在 anchor 模式且带 anchorMessageId 时生效：窗口内以 capture 相位监听容器 `load` 事件并逐帧重放 anchor 位置；最后一次应用后用户滚动（scrollTop 偏离最后应用值）会立即 dispose 纠正，窗口结束自动停止
 - `restoreElementScrollAfterRender()` 的首次同步恢复之后会安排一次 deferred rAF；若用户在此期间改变 `scrollTop` 或 runtime 标记 `userScrollIntentDuringHydration`，该帧会取消且不会覆盖用户位置。程序化滚动仍受 `programmaticScrollGuardUntil` 保护。
 - `restoreElementScrollAfterRender()` 可通过 `isRestoreCurrent` 绑定 render/pane transaction；初次应用、rAF、late-load 重放和延迟清理都会检查 token，新 render 接管后旧 anchor listener 会被 dispose
+- `ensureComposerOverlayScrollReserve()`（2026-10-21，F1 NARROW-CARD-OVERLAP）修复窄面板下 pending 问答卡操作按钮被 composer 覆盖的问题：`.opencodian-messages` 的底部预留是 `calc(var(--opencodian-composer-stack-height) + 16px)`，变量来自 `ComposerInputShellCoordinator` 对 composer 高度的测量快照；快照偏小（窄面板 composer 换行变高、观察帧丢失）时，滚到底按钮仍落在 composer 命中盒内。该 helper 在问答卡渲染时对 `.opencodian-input-area` 实测几何，仅当实测高度超过当前生效预留时，给 pane 写入行内 `--opencodian-composer-stack-height` stopgap（CSS calc 随即按实测高度 + 16px 扩展滚动余量）；composer 未叠加（shadcn 静态布局）或预留已足够时为 no-op。权威测量回路（`OpenCodianView` 的 `setComposerStackHeight` writeback）产出新值时会清除这些 stopgap，避免旧行内值遮蔽新测量。
 
 ## 与 `OpenCodianView` 的关系
 

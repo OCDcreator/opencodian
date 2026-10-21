@@ -2286,3 +2286,88 @@ describe('Composer Codex preflight draft recovery', () => {
     expect(capturedNotices).toEqual([]);
   });
 });
+
+describe('Composer send/stop cancel settle window', () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    installCoordinatorDomMocks();
+  });
+
+  afterEach(() => {
+    restoreCoordinatorDomMocks(originalResizeObserver);
+    jest.useRealTimers();
+  });
+
+  it('converges to a disabled send control after cancel and swallows clicks until the window elapses', async () => {
+    const fixture = createFixture();
+    fixture.setStreaming(true);
+    fixture.coordinator.updateSendButtonState();
+    expect(fixture.sendBtn.classList.contains('opencodian-stop-btn')).toBe(true);
+    expect(fixture.sendBtn.disabled).toBe(false);
+
+    fixture.sendBtn.click();
+    expect(fixture.host.cancelStreaming).toHaveBeenCalledTimes(1);
+    // The transition window disables the control immediately so the next
+    // physical click cannot land on the transitional control.
+    expect(fixture.sendBtn.disabled).toBe(true);
+
+    // The view-side bridge flips the runtime state and refreshes the control;
+    // it must present the converged send affordance while still disabled.
+    fixture.setStreaming(false);
+    fixture.coordinator.updateSendButtonState();
+    expect(fixture.sendBtn.classList.contains('opencodian-send-btn')).toBe(true);
+    expect(fixture.sendBtn.disabled).toBe(true);
+
+    // A click inside the settle window must not re-hit the control.
+    fixture.sendBtn.click();
+    expect(fixture.host.cancelStreaming).toHaveBeenCalledTimes(1);
+
+    jest.advanceTimersByTime(200);
+    expect(fixture.sendBtn.disabled).toBe(false);
+
+    // After the window the same coordinate sends the drafted prompt.
+    fixture.textarea.value = 'retry prompt';
+    fixture.sendBtn.click();
+    await flushAsync();
+    expect(fixture.host.submitMessage).toHaveBeenCalledWith(
+      { kind: 'prompt', content: 'retry prompt' },
+      expect.any(Function),
+    );
+  });
+
+  it('re-arms an enabled stop control when the turn keeps streaming through the settle window', () => {
+    const fixture = createFixture();
+    fixture.setStreaming(true);
+    fixture.coordinator.updateSendButtonState();
+
+    fixture.sendBtn.click();
+    expect(fixture.host.cancelStreaming).toHaveBeenCalledTimes(1);
+    expect(fixture.sendBtn.disabled).toBe(true);
+
+    jest.advanceTimersByTime(200);
+    // The cancel did not take effect: the control re-arms as an enabled stop
+    // button so the turn can be cancelled again.
+    expect(fixture.sendBtn.disabled).toBe(false);
+    expect(fixture.sendBtn.classList.contains('opencodian-stop-btn')).toBe(true);
+
+    fixture.sendBtn.click();
+    expect(fixture.host.cancelStreaming).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not start a settle window on a plain send click', async () => {
+    const fixture = createFixture();
+    fixture.textarea.value = 'plain send';
+    fixture.sendBtn.click();
+
+    expect(fixture.host.cancelStreaming).not.toHaveBeenCalled();
+
+    // Settle the prompt preparation acknowledgement the view host would call.
+    fixture.host.submitMessage.mock.calls[0]?.[1]?.('accepted');
+    await flushAsync();
+    expect(fixture.sendBtn.disabled).toBe(false);
+    jest.advanceTimersByTime(200);
+    expect(fixture.sendBtn.disabled).toBe(false);
+  });
+});

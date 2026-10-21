@@ -1,5 +1,6 @@
 import {
   captureElementScrollRestoreSnapshot,
+  ensureComposerOverlayScrollReserve,
   isElementNearBottom,
   restoreElementScrollAfterRender,
   scrollElementToBottom,
@@ -183,6 +184,97 @@ describe('ScrollManager', () => {
 
     expect(messagesEl.scrollTop).toBe(360);
     expect(restored).toHaveBeenLastCalledWith(360);
+  });
+});
+
+describe('ensureComposerOverlayScrollReserve', () => {
+  afterEach(() => {
+    document.body.replaceChildren();
+  });
+
+  function createOverlayingPane(reservePx: string | null): HTMLElement {
+    const messagesEl = document.createElement('div');
+    if (reservePx !== null) {
+      messagesEl.style.setProperty('--opencodian-composer-stack-height', reservePx);
+    }
+    document.body.appendChild(messagesEl);
+    // Pane spans the full chat container; the overlay rises from its bottom.
+    setRect(messagesEl, { top: 0, bottom: 800 });
+    return messagesEl;
+  }
+
+  function createComposerOverlay(heightPx: number): HTMLElement {
+    const overlayEl = document.createElement('div');
+    document.body.appendChild(overlayEl);
+    // Absolutely-positioned composer stack anchored at the pane bottom.
+    setRect(overlayEl, { top: 800 - heightPx, bottom: 800 });
+    return overlayEl;
+  }
+
+  function createDockedComposerOverlay(heightPx: number): HTMLElement {
+    // shadcn-style static layout: the composer sits below the pane bottom.
+    const overlayEl = document.createElement('div');
+    document.body.appendChild(overlayEl);
+    setRect(overlayEl, { top: 800, bottom: 800 + heightPx });
+    return overlayEl;
+  }
+
+  it('applies a pane-level stopgap reserve when the live composer is taller than the effective reserve', () => {
+    const messagesEl = createOverlayingPane('120px');
+    const overlayEl = createComposerOverlay(193);
+
+    const outcome = ensureComposerOverlayScrollReserve(messagesEl, overlayEl);
+
+    // The stale 120px snapshot under-counts the live 193px stack, so the
+    // pane-level variable must be raised to the live height (the CSS calc adds
+    // its own +16px gap) — otherwise a pending question card's buttons stay
+    // inside the composer's hit box at max scroll.
+    expect(outcome).toEqual({ effectiveReservePx: 120, appliedReservePx: 193 });
+    expect(messagesEl.style.getPropertyValue('--opencodian-composer-stack-height')).toBe('193px');
+  });
+
+  it('treats a missing measured reserve as zero and reserves the live composer height', () => {
+    const messagesEl = createOverlayingPane(null);
+    const overlayEl = createComposerOverlay(193);
+
+    const outcome = ensureComposerOverlayScrollReserve(messagesEl, overlayEl);
+
+    expect(outcome).toEqual({ effectiveReservePx: 0, appliedReservePx: 193 });
+    expect(messagesEl.style.getPropertyValue('--opencodian-composer-stack-height')).toBe('193px');
+  });
+
+  it('leaves the pane untouched when the effective reserve already covers the live composer', () => {
+    const messagesEl = createOverlayingPane('200px');
+    const overlayEl = createComposerOverlay(193);
+
+    const outcome = ensureComposerOverlayScrollReserve(messagesEl, overlayEl);
+
+    expect(outcome).toEqual({ effectiveReservePx: 200, appliedReservePx: null });
+    expect(messagesEl.style.getPropertyValue('--opencodian-composer-stack-height')).toBe('200px');
+  });
+
+  it('is a no-op when the composer is docked below the pane instead of overlaying it', () => {
+    const messagesEl = createOverlayingPane('10px');
+    const overlayEl = createDockedComposerOverlay(193);
+
+    const outcome = ensureComposerOverlayScrollReserve(messagesEl, overlayEl);
+
+    expect(outcome).toBeNull();
+    expect(messagesEl.style.getPropertyValue('--opencodian-composer-stack-height')).toBe('10px');
+  });
+
+  it('is a no-op for disconnected panes or overlays and for zero-height overlays', () => {
+    const detachedPane = document.createElement('div');
+    detachedPane.style.setProperty('--opencodian-composer-stack-height', '10px');
+    const connectedPane = createOverlayingPane('10px');
+    const detachedOverlay = document.createElement('div');
+    const connectedOverlay = createComposerOverlay(193);
+    const zeroHeightOverlay = createComposerOverlay(0);
+
+    expect(ensureComposerOverlayScrollReserve(detachedPane, connectedOverlay)).toBeNull();
+    expect(ensureComposerOverlayScrollReserve(connectedPane, detachedOverlay)).toBeNull();
+    expect(ensureComposerOverlayScrollReserve(connectedPane, zeroHeightOverlay)).toBeNull();
+    expect(connectedPane.style.getPropertyValue('--opencodian-composer-stack-height')).toBe('10px');
   });
 });
 

@@ -180,6 +180,85 @@ export function resolveEffectiveScrollRestoreSnapshot(
 }
 
 /**
+ * Safety gap the messages pane keeps between its last content and the top of
+ * the composer overlay. Mirrors the `+ 16px` baked into the `.opencodian-messages`
+ * padding-bottom / scroll-padding-bottom calc in `src/style/base/core.css`.
+ */
+export const COMPOSER_OVERLAY_SCROLL_RESERVE_GAP_PX = 16;
+
+const COMPOSER_STACK_HEIGHT_CSS_VAR = '--opencodian-composer-stack-height';
+
+/**
+ * Reads the stack height the pane's CSS reserve currently resolves against.
+ * A pane-level inline override (see `ensureComposerOverlayScrollReserve`)
+ * wins over the container-level value measured by the composer layout sync.
+ */
+export function readEffectiveComposerStackHeightPx(messagesEl: HTMLElement): number {
+  const inlineValue = messagesEl.style.getPropertyValue(COMPOSER_STACK_HEIGHT_CSS_VAR);
+  const rawValue = inlineValue
+    || (typeof getComputedStyle === 'function'
+      ? getComputedStyle(messagesEl).getPropertyValue(COMPOSER_STACK_HEIGHT_CSS_VAR)
+      : '');
+  const parsed = Number.parseFloat(rawValue);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export interface ComposerOverlayScrollReserveOutcome {
+  /** The reserve the pane resolved against before this call, in px. */
+  effectiveReservePx: number;
+  /** Set when a pane-level stopgap reserve was applied, in px. */
+  appliedReservePx: number | null;
+}
+
+/**
+ * Keeps the messages pane's bottom scroll reserve tall enough for the live
+ * composer overlay so end-of-stream content — notably a pending question
+ * card's action buttons — stays reachable by real pointer events at any panel
+ * width (F1 NARROW-CARD-OVERLAP).
+ *
+ * The CSS reserve is `calc(var(--opencodian-composer-stack-height) + 16px)`
+ * where the variable is a JS-measured snapshot of the composer stack. When
+ * that snapshot under-counts the live overlay (narrow panes wrap the composer
+ * taller; any missed observer frame leaves it stale), max scroll still leaves
+ * the buttons inside the composer's hit box. This measures the overlay live
+ * and, only when the effective reserve is too small, applies a pane-level
+ * stopgap variable — the CSS calc then reserves the full live height plus the
+ * gap. The authoritative `setComposerStackHeight` writeback clears the stopgap
+ * once a fresh measurement supersedes it.
+ *
+ * The overlay is the absolutely-positioned composer stack root (the
+ * `.opencodian-input-area`), mirroring what the authoritative measurement
+ * reads. No-op when it is not actually overlaying the pane (the shadcn theme
+ * docks the composer statically below the pane, so no reserve is needed) or
+ * when the reserve is already sufficient.
+ */
+export function ensureComposerOverlayScrollReserve(
+  messagesEl: HTMLElement | null,
+  overlayEl: HTMLElement | null,
+): ComposerOverlayScrollReserveOutcome | null {
+  if (!messagesEl?.isConnected || !overlayEl?.isConnected) {
+    return null;
+  }
+
+  const overlayRect = overlayEl.getBoundingClientRect();
+  const paneRect = messagesEl.getBoundingClientRect();
+  if (!(overlayRect.height > 0) || overlayRect.top >= paneRect.bottom - 0.5) {
+    return null;
+  }
+
+  const requiredReservePx = Math.ceil(overlayRect.height);
+  const effectiveReservePx = readEffectiveComposerStackHeightPx(messagesEl);
+  // The CSS calc adds the same gap to both the measured and the required
+  // reserve, so comparing the variables directly is gap-invariant.
+  if (effectiveReservePx + 0.5 >= requiredReservePx) {
+    return { effectiveReservePx, appliedReservePx: null };
+  }
+
+  messagesEl.style.setProperty(COMPOSER_STACK_HEIGHT_CSS_VAR, `${requiredReservePx}px`);
+  return { effectiveReservePx, appliedReservePx: requiredReservePx };
+}
+
+/**
  * Owns the double-requestAnimationFrame scheduling used to defer scroll-to-bottom
  * until layout has settled. Extracted from OpenCodianView so that the rAF frame
  * ID and cancellation logic live in scroll-owned code, not in the view itself.
