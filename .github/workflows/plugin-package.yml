@@ -38,7 +38,7 @@ jobs:
       - name: Setup Graphify
         run: |
           python -m venv .graphify-venv
-          .graphify-venv/bin/python -m pip install --upgrade "graphifyy==0.9.36"
+          .graphify-venv/bin/python -m pip install --upgrade "graphifyy==0.9.31"
           .graphify-venv/bin/python -m graphify --version
 
       - name: Detect version release
