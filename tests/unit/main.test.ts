@@ -1506,3 +1506,141 @@ describe('OpenCodianPlugin R-F9 file-menu attach delegation', () => {
     expect(item.mime).toBe('application/x-directory');
   });
 });
+describe('MATRIX010 diagnostic report strict URL consumer', () => {
+  it('hides every URL credential and fragment in JSON metadata while preserving report sections', async () => {
+    const receiver = {
+      settings: JSON.parse(JSON.stringify(DEFAULT_SETTINGS)) as typeof DEFAULT_SETTINGS,
+      app: { vault: { adapter: { basePath: '/fixture.invalid/vault' } } },
+      manifest: { name: 'OpenCodian fixture', id: 'opencodian', version: '1.1.37' },
+      openCodeService: {
+        checkHealth: jest.fn().mockResolvedValue(true),
+        getServerStatus: jest.fn().mockReturnValue('safe-mcp running'),
+        isServerProcessRunning: jest.fn().mockReturnValue(false),
+        getServerDiagnostics: jest.fn().mockReturnValue({
+          first: 'https://FAKE_MATRIX010_USER:FAKE_MATRIX010_PASSWORD@example.test/mcp?token=FAKE_MATRIX010_QUERY&mode=safe#FAKE_MATRIX010_FRAGMENT',
+          second: 'ssh://FAKE_MATRIX010_USER@example.test/other#FAKE_MATRIX010_FRAGMENT',
+        }),
+      },
+      startupCoordinator: {
+        getStartupPerfSummaryLines: jest.fn().mockReturnValue(['safe startup fixture']),
+        getStartupPerformanceDiagnosisLines: jest.fn().mockReturnValue([]),
+      },
+    };
+    const report = await OpenCodianPlugin.prototype.buildDiagnosticReport.call(receiver as unknown as OpenCodianPlugin, 'MATRIX010-report');
+    for (const secret of ['FAKE_MATRIX010_USER', 'FAKE_MATRIX010_PASSWORD', 'FAKE_MATRIX010_QUERY', 'FAKE_MATRIX010_FRAGMENT']) expect(report).not.toContain(secret);
+    for (const safe of ['# OpenCodian Diagnostic Report', '## Server', '## Startup Performance', 'safe startup fixture', 'example.test/mcp', 'example.test/other', 'mode=safe']) expect(report).toContain(safe);
+    const metadata = report.split('\n').find(line => line.startsWith('Diagnostics: '))?.slice('Diagnostics: '.length) ?? '';
+    expect(JSON.parse(metadata)).toEqual({
+      first: 'https://[REDACTED]@example.test/mcp?token=[REDACTED]&mode=safe#[REDACTED]',
+      second: 'ssh://[REDACTED]@example.test/other#[REDACTED]',
+    });
+  });
+});
+
+
+describe('Claude reviewed continuation renderer admission', () => {
+  type Request = import('@anthropic-ai/claude-agent-sdk').ElicitationRequest;
+  type Result = import('@anthropic-ai/claude-agent-sdk').ElicitationResult;
+  const handle = (OpenCodianPlugin.prototype as unknown as {
+    handleClaudeCodeElicitation(request: Request, options: { signal: AbortSignal }): Promise<Result>;
+  }).handleClaudeCodeElicitation;
+
+  function host(response: unknown = { action: 'accept', answers: [['Accept']] }) {
+    const collectResponse = jest.fn().mockResolvedValue(response);
+    const getActiveTabId = jest.fn().mockReturnValue('claude-owned-tab');
+    const receiver = {
+      claudeCodePermissionHostContext: { elicitationCardRenderer: { collectResponse }, getActiveTabId },
+    } as unknown as OpenCodianPlugin;
+    return { receiver, collectResponse, getActiveTabId };
+  }
+
+  it.each([
+    ['string properties', { properties: 'FAKE_CLAUDE_REJECT' }],
+    ['null properties', { properties: null }],
+    ['array properties', { properties: [] }],
+    ['null property', { properties: { value: null } }],
+    ['array property', { properties: { value: [] } }],
+    ['unknown property type', { properties: { value: { type: 'object' } } }],
+    ['non-string property type', { properties: { value: { type: ['string'] } } }],
+    ['null schema', null],
+    ['array schema', []],
+    ['unknown root type', { type: 'array', properties: {} }],
+  ])('declines %s without admitting a renderer card', async (_name, requestedSchema) => {
+    const { receiver, collectResponse, getActiveTabId } = host();
+    const request = { serverName: 'fixture', message: 'Prompt', mode: 'form', requestedSchema } as Request;
+    await expect(handle.call(receiver, request, { signal: new AbortController().signal }))
+      .resolves.toEqual({ action: 'decline' });
+    expect(collectResponse).not.toHaveBeenCalled();
+    expect(getActiveTabId).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, {}, { type: 'object', properties: {} }])('preserves a known empty form %j', async requestedSchema => {
+    const { receiver, collectResponse } = host();
+    const request: Request = { serverName: 'fixture', message: 'Prompt', mode: 'form', requestedSchema };
+    await expect(handle.call(receiver, request, { signal: new AbortController().signal }))
+      .resolves.toEqual({ action: 'accept', content: { Prompt: 'Accept' } });
+    expect(collectResponse).toHaveBeenCalledTimes(1);
+    expect(collectResponse).toHaveBeenCalledWith(expect.objectContaining({
+      sessionId: 'claude-code',
+      questions: [expect.objectContaining({ options: [{ label: 'Accept', description: '' }, { label: 'Decline', description: '' }] })],
+    }), 'claude-owned-tab');
+  });
+
+  it('preserves typed content, question order and array answer ownership', async () => {
+    const answers = [['red'], ['2.5'], ['7'], ['yes'], ['red', 'blue']];
+    const { receiver, collectResponse } = host({ action: 'accept', answers });
+    const request: Request = {
+      serverName: 'fixture', message: 'Prompt', mode: 'form', elicitationId: 'fixture-elicitation',
+      requestedSchema: { type: 'object', properties: {
+        text: { type: 'string', enum: ['red', 'blue'] }, number: { type: 'number' },
+        integer: { type: 'integer' }, boolean: { type: 'boolean' }, list: { type: 'array', enum: ['red', 'blue'] },
+      } },
+    };
+    const result = await handle.call(receiver, request, { signal: new AbortController().signal });
+    expect(result).toEqual({ action: 'accept', content: { text: 'red', number: 2.5, integer: 7, boolean: true, list: ['red', 'blue'] } });
+    expect(collectResponse.mock.calls[0][0].questions.map((question: { question: string }) => question.question))
+      .toEqual(['text', 'number', 'integer', 'boolean', 'list']);
+    answers[4].push('later');
+    expect(result.content?.list).toEqual(['red', 'blue']);
+  });
+
+  it('preserves URL preview and explicit decline', async () => {
+    const { receiver, collectResponse } = host({ action: 'accept', answers: [['Decline']] });
+    const request: Request = { serverName: 'fixture', message: 'Prompt', mode: 'url', url: 'https://fixture.invalid/auth' };
+    await expect(handle.call(receiver, request, { signal: new AbortController().signal })).resolves.toEqual({ action: 'decline' });
+    expect(collectResponse.mock.calls[0][0].questions[0].options[0].preview).toBe('https://fixture.invalid/auth');
+  });
+
+  it('cancels an aborted request before card construction', async () => {
+    const { receiver, collectResponse } = host();
+    const controller = new AbortController();
+    controller.abort();
+    const request: Request = { serverName: 'fixture', message: 'Prompt', requestedSchema: { properties: null } };
+    await expect(handle.call(receiver, request, { signal: controller.signal })).resolves.toEqual({ action: 'cancel' });
+    expect(collectResponse).not.toHaveBeenCalled();
+  });
+
+  it.each([null, { action: 'decline' }, { action: 'cancel' }])('preserves renderer resolution %j', async response => {
+    const { receiver } = host(response);
+    const request: Request = { serverName: 'fixture', message: 'Prompt' };
+    await expect(handle.call(receiver, request, { signal: new AbortController().signal }))
+      .resolves.toEqual({ action: response?.action ?? 'cancel' });
+  });
+
+  it('keeps the real settings wiring probe synthetic and valid', async () => {
+    const { SettingsCapabilityLabSection } = await import('../../src/features/settings/SettingsCapabilityLabSection');
+    const updateRuntimeProof = jest.fn();
+    const receiver = { plugin: { claudeCodePermissionHostContext: {} }, updateRuntimeProof };
+    const output = document.createElement('div');
+    const probe = (SettingsCapabilityLabSection.prototype as unknown as {
+      runMcpElicitationWiringProbe(output: HTMLElement): Promise<void>;
+    }).runMcpElicitationWiringProbe;
+    await probe.call(receiver, output);
+    expect(output.textContent).toContain('MCP Elicitation wiring probe (synthetic)');
+    const preview = JSON.parse(output.querySelector('pre')?.textContent ?? '{}');
+    expect(preview.mappedQuestionRequest.questions.map((question: { question: string }) => question.question))
+      .toEqual(['scope', 'labels', 'note']);
+    expect(preview.mappedQuestionRequest.questions[1].multiple).toBe(true);
+    expect(updateRuntimeProof).toHaveBeenCalledWith('MCP Elicitation', 'wiring', output);
+  });
+});

@@ -1,7 +1,11 @@
+import type * as fs from 'node:fs';
+import nodeFs from 'node:fs';
+import nodeOs from 'node:os';
+
 import { type App, Setting } from 'obsidian';
 
 import type { PiAdapter } from '../../../../src/core/agents/backend/pi/PiAdapter';
-import type { PiMcpConfigService } from '../../../../src/core/agents/backend/pi/PiMcpConfigService';
+import { PiMcpConfigService } from '../../../../src/core/agents/backend/pi/PiMcpConfigService';
 import { getActiveSecondaryTabId,getPrimaryTabDefinition } from '../../../../src/features/settings/settingsLayoutRegistry';
 import { SettingsPiConfigurationSection } from '../../../../src/features/settings/SettingsPiConfigurationSection';
 import { SettingsPiSection } from '../../../../src/features/settings/SettingsPiSection';
@@ -92,5 +96,125 @@ describe('Pi native settings integration', () => {
     await buttonCallbacks[1]();
     expect(command).toHaveBeenCalledWith(undefined, 'save_configuration', { scope: 'project', revision: 'p', changes: { 'compaction.reserveTokens': 456 } });
     expect(saved).toHaveBeenCalledWith(['compaction.reserveTokens']);
+  });
+});
+
+// Finite original Pi flags plus generic-report flag spellings. These values are synthetic.
+const matrix008Shapes = [
+  ...['--token', '-token', '--api-key', '--api_key', '--client_secret', '--PASSWORD', '--secret', '--credentials', '--authorization']
+    .flatMap((flag, index) => ['independent', 'equal'].map(form => {
+      const secret = `FAKE_MATRIX008_FLAG_${index}_${form}`;
+      return { id: `${flag}/${form}`, input: `safe-mcp ${flag}${form === 'equal' ? '=' : ' '}${secret} --port 4096`, forbidden: [secret], safe: ['safe-mcp', '--port 4096'] };
+    })),
+  { id: 'url-password', input: 'https://safe-user:FAKE_MATRIX008_URL_PASSWORD@fixture.invalid/mcp?mode=safe#section', forbidden: ['FAKE_MATRIX008_URL_PASSWORD'], safe: ['fixture.invalid/mcp', 'mode=safe'] },
+  { id: 'url-query', input: 'https://fixture.invalid/mcp?access_token=FAKE_MATRIX008_URL_QUERY&mode=safe', forbidden: ['FAKE_MATRIX008_URL_QUERY'], safe: ['fixture.invalid/mcp', 'mode=safe'] },
+  { id: 'url-labelled-fragment', input: 'https://fixture.invalid/mcp#token=FAKE_MATRIX008_LABELLED_FRAGMENT', forbidden: ['FAKE_MATRIX008_LABELLED_FRAGMENT'], safe: ['fixture.invalid/mcp'] },
+  { id: 'url-unlabelled-fragment', input: 'https://fixture.invalid/mcp#FAKE_MATRIX008_UNLABELLED_FRAGMENT', forbidden: ['FAKE_MATRIX008_UNLABELLED_FRAGMENT'], safe: ['fixture.invalid/mcp'] },
+  { id: 'url-distinct', input: 'https://FAKE_MATRIX008_DISTINCT_USER:FAKE_MATRIX008_DISTINCT_PASSWORD@fixture.invalid/mcp?access_token=FAKE_MATRIX008_DISTINCT_QUERY&mode=safe#FAKE_MATRIX008_DISTINCT_FRAGMENT', forbidden: ['FAKE_MATRIX008_DISTINCT_USER', 'FAKE_MATRIX008_DISTINCT_PASSWORD', 'FAKE_MATRIX008_DISTINCT_QUERY', 'FAKE_MATRIX008_DISTINCT_FRAGMENT'], safe: ['fixture.invalid/mcp', 'mode=safe'] },
+  { id: 'url-reused', input: 'https://FAKE_MATRIX008_REUSED_VALUE:FAKE_MATRIX008_REUSED_VALUE@fixture.invalid/mcp?access_token=FAKE_MATRIX008_REUSED_VALUE&mode=safe#FAKE_MATRIX008_REUSED_VALUE', forbidden: ['FAKE_MATRIX008_REUSED_VALUE'], safe: ['fixture.invalid/mcp', 'mode=safe'] },
+];
+
+
+describe('MATRIX008 Pi extension-status output negatives', () => {
+  beforeEach(() => { setLocale('zh'); document.body.innerHTML = ''; });
+  afterEach(() => { jest.restoreAllMocks(); document.body.innerHTML = ''; });
+
+  it.each(matrix008Shapes.flatMap(shape => ['statuses', 'message'].map(position => ({ ...shape, position }))))(
+    'MATRIX008 $id excludes fake values from Pi $position JSDOM projection',
+    (shape) => {
+      const snapshot: ReturnType<PiAdapter['getExtensionStatus']> = {
+        statuses: { mcp: shape.position === 'statuses' ? shape.input : 'safe-mcp connected' },
+        message: shape.position === 'message' ? shape.input : 'safe-mcp ready',
+        updatedAt: 1,
+      };
+      const getExtensionStatus = jest.fn(() => snapshot);
+      const adapter = { getExtensionStatus } as unknown as PiAdapter;
+      const host = {
+        settings: { backendSettings: {} }, saveSettings: async () => {},
+        agentServiceRegistry: { get: () => adapter },
+      };
+      const container = document.body.createDiv();
+      new SettingsPiSection(host as never).attachTabbed(container, 'mcp');
+      const selector = shape.position === 'statuses' ? '.opencodian-pi-mcp-status-line' : '.opencodian-pi-mcp-status-message';
+      const output = container.querySelector(selector)?.textContent ?? '';
+      process.stdout.write(`MATRIX008_SINK ${JSON.stringify({ caseId: shape.id, sink: `pi-${shape.position}-JSDOM`, source: 'typed controlled getExtensionStatus -> actual mcpStatus; upstream RPC not executed', input: shape.input, output, forbidden: shape.forbidden, safe: shape.safe })}\n`);
+      expect(getExtensionStatus).toHaveBeenCalledTimes(1);
+      expect(container.querySelectorAll('button')).toHaveLength(0);
+      for (const safe of shape.safe) expect(output).toContain(safe);
+      expect(shape.forbidden.filter(secret => output.includes(secret))).toEqual([]);
+    },
+  );
+});
+
+describe('MATRIX008 Pi declaration reader to settings descriptions', () => {
+  beforeEach(() => { setLocale('zh'); document.body.innerHTML = ''; });
+  afterEach(() => { jest.restoreAllMocks(); document.body.innerHTML = ''; });
+
+  it.each([
+    { id: 'declaration-flags-distinct', entry: { command: 'safe-mcp', args: ['--token', 'FAKE_MATRIX008_DECL_TOKEN', '--api-key=FAKE_MATRIX008_DECL_KEY', '--port', '4096'] }, forbidden: ['FAKE_MATRIX008_DECL_TOKEN', 'FAKE_MATRIX008_DECL_KEY'], safe: ['safe-mcp', '--port 4096'] },
+    { id: 'declaration-url-distinct', entry: { url: 'https://FAKE_MATRIX008_DECL_USER:FAKE_MATRIX008_DECL_PASSWORD@fixture.invalid/mcp?access_token=FAKE_MATRIX008_DECL_QUERY#FAKE_MATRIX008_DECL_FRAGMENT' }, forbidden: ['FAKE_MATRIX008_DECL_USER', 'FAKE_MATRIX008_DECL_PASSWORD', 'FAKE_MATRIX008_DECL_QUERY', 'FAKE_MATRIX008_DECL_FRAGMENT'], safe: ['fixture.invalid/mcp'] },
+    { id: 'declaration-url-reused', entry: { url: 'https://FAKE_MATRIX008_DECL_REUSED:FAKE_MATRIX008_DECL_REUSED@fixture.invalid/mcp?access_token=FAKE_MATRIX008_DECL_REUSED#FAKE_MATRIX008_DECL_REUSED' }, forbidden: ['FAKE_MATRIX008_DECL_REUSED'], safe: ['fixture.invalid/mcp'] },
+  ])('MATRIX008 $id excludes fake values through the real declaration reader', (shape) => {
+    const home = '/fixture.invalid/home';
+    const workingDirectory = '/fixture.invalid/vault';
+    const configPath = `${home}/.pi/agent/mcp.json`;
+    const input = JSON.stringify({ mcpServers: { 'safe-mcp': shape.entry } });
+    const readFile = jest.spyOn(nodeFs, 'readFileSync').mockImplementation(((file: fs.PathOrFileDescriptor) => {
+      expect(file).toBe(configPath);
+      return input;
+    }) as typeof nodeFs.readFileSync);
+    jest.spyOn(nodeOs, 'homedir').mockReturnValue(home);
+    const service = new PiMcpConfigService();
+    const read = service.read.bind(service);
+    jest.spyOn(service, 'read').mockImplementation(options => read({ ...options, homeDir: home, env: { PI_MCP_CONFIG_MODE: 'exclusive' } }));
+    const descriptions: string[] = [];
+    jest.spyOn(Setting.prototype, 'setDesc').mockImplementation(function (desc: string) { descriptions.push(desc); return this; });
+    const host = { app: { vault: { adapter: { basePath: workingDirectory } } } as unknown as App, settings: { backendSettings: {} }, saveSettings: async () => {} };
+    const container = document.body.createDiv();
+    new SettingsPiSection(host, service).attachTabbed(container, 'mcp');
+    const output = descriptions.join('\n');
+    process.stdout.write(`MATRIX008_SINK ${JSON.stringify({ caseId: shape.id, sink: 'pi-description-Setting', source: 'synthetic fs.readFileSync -> actual PiMcpConfigService -> actual SettingsPiSection setDesc; no Copy action', input, output, forbidden: shape.forbidden, safe: shape.safe })}\n`);
+    expect(readFile).toHaveBeenCalledTimes(1);
+    expect(service.read).toHaveBeenCalledWith({ workingDirectory });
+    expect(container.querySelectorAll('button')).toHaveLength(0);
+    for (const safe of shape.safe) expect(output).toContain(safe);
+    expect(shape.forbidden.filter(secret => output.includes(secret))).toEqual([]);
+  });
+});
+
+describe('MATRIX010 Pi status strict output boundary', () => {
+  beforeEach(() => { setLocale('zh'); document.body.innerHTML = ''; });
+  afterEach(() => { jest.restoreAllMocks(); document.body.innerHTML = ''; });
+
+  it('sanitizes every status and message while preserving safe text, time, role and cached bytes', () => {
+    const snapshot: ReturnType<PiAdapter['getExtensionStatus']> = {
+      statuses: {
+        mcp: 'safe-mcp https://FAKE_MATRIX010_USER:FAKE_MATRIX010_PASSWORD@example.test/mcp?token=FAKE_MATRIX010_QUERY&mode=safe#FAKE_MATRIX010_FRAGMENT',
+        another: 'https://FAKE_MATRIX010_USER@example.test/other#FAKE_MATRIX010_FRAGMENT',
+        safe: '🔌 safe-mcp connected --port 4096',
+      },
+      message: 'safe-mcp https://FAKE_MATRIX010_USER@example.test/mcp?mode=safe#FAKE_MATRIX010_FRAGMENT ready',
+      updatedAt: 1,
+    };
+    const before = JSON.stringify(snapshot);
+    const getExtensionStatus = jest.fn(() => snapshot);
+    const adapter = { getExtensionStatus } as unknown as PiAdapter;
+    const host = { settings: { backendSettings: {} }, saveSettings: async () => {}, agentServiceRegistry: { get: () => adapter } };
+    const read: PiMcpConfigService['read'] = () => ({ servers: [], sources: [], exclusive: false });
+    const config = { read } as PiMcpConfigService;
+    const container = document.body.createDiv();
+    new SettingsPiSection(host, config).attachTabbed(container, 'mcp');
+    const lines = Array.from(container.querySelectorAll('.opencodian-pi-mcp-status-line')).map(line => line.textContent);
+    expect(lines).toEqual([
+      'safe-mcp https://[REDACTED]@example.test/mcp?token=[REDACTED]&mode=safe#[REDACTED]',
+      'https://[REDACTED]@example.test/other#[REDACTED]',
+      '🔌 safe-mcp connected --port 4096',
+    ]);
+    expect(container.querySelector('.opencodian-pi-mcp-status-message')?.textContent).toBe('safe-mcp https://[REDACTED]@example.test/mcp?mode=safe#[REDACTED] ready');
+    expect(container.querySelector('.opencodian-pi-mcp-status')?.getAttribute('role')).toBe('status');
+    expect(container.querySelector('.opencodian-pi-mcp-status-meta')?.textContent).toContain(new Date(1).toLocaleTimeString());
+    expect(container.querySelectorAll('button')).toHaveLength(0);
+    expect(getExtensionStatus).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(snapshot)).toBe(before);
   });
 });

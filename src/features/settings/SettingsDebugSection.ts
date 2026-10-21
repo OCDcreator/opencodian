@@ -560,8 +560,8 @@ export class SettingsDebugSection {
               const report = await this.plugin.buildDiagnosticReport('copy-diagnostics');
               await navigator.clipboard.writeText(report);
               new Notice(t('settings.debug.actions.copySuccess'));
-            } catch (error) {
-              logger.error('Failed to copy diagnostics:', error);
+            } catch {
+              logger.error('Failed to copy diagnostics:');
               new Notice(t('settings.debug.actions.copyFailed'));
             }
           });
@@ -578,10 +578,9 @@ export class SettingsDebugSection {
               if (outputPath) {
                 new Notice(t('settings.debug.actions.generateSuccess', { path: outputPath }));
               }
-            } catch (error) {
-              logger.error('Failed to generate diagnostics file:', error);
-              const message = error instanceof Error ? error.message : t('settings.debug.actions.generateFailed');
-              new Notice(message);
+            } catch {
+              logger.error('Failed to generate diagnostics file:');
+              new Notice(t('settings.debug.actions.generateFailed'));
             }
           });
       })

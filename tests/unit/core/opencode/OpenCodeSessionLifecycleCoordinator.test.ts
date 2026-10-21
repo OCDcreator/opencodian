@@ -12,6 +12,7 @@ import type {
   SessionSyncEventUpdate,
 } from '../../../../src/core/opencode/OpenCodeSyncEventRuntimeCoordinator';
 import type { SessionTodo } from '../../../../src/core/types';
+import { BackendSessionCatalogReadError } from '../../../../src/shared/sessionCatalogReadback';
 
 type MockHost = OpenCodeSessionLifecycleCoordinatorHost & {
   shouldUseSdkAbort: jest.Mock<boolean, []>;
@@ -89,6 +90,75 @@ function createSyncRuntime(overrides: Partial<MockSyncRuntime> = {}): MockSyncRu
     ...overrides,
   } as MockSyncRuntime;
 }
+
+describe('matrix006 OpenCode session catalog negative controls', () => {
+  it('preserves first-admitted duplicate values and order across three cursor pages', async () => {
+    const sdk = createSdk();
+    const host = createHost(sdk);
+    const first = [{ id: 'z', title: 'first-z' }, { id: 'a', title: 'first-a' }];
+    const read = jest.fn().mockResolvedValueOnce({ data: first, nextCursor: 'page-2' })
+      .mockResolvedValueOnce({ data: [{ id: 'a', title: 'late-a' }, { id: 'm', title: 'first-m' }], nextCursor: 'page-3' })
+      .mockResolvedValueOnce({ data: [{ id: 'z', title: 'late-z' }, { id: 'b', title: 'first-b' }], nextCursor: null });
+    Object.assign(host, { readSdkSessionCatalogPage: read });
+    await expect(new OpenCodeSessionLifecycleCoordinator(host, createSyncRuntime()).listSessions())
+      .resolves.toEqual([...first, { id: 'm', title: 'first-m' }, { id: 'b', title: 'first-b' }]);
+    expect(read.mock.calls).toEqual([[{ limit: 100 }], [{ limit: 100, cursor: 'page-2' }], [{ limit: 100, cursor: 'page-3' }]]);
+    expect(sdk.list).not.toHaveBeenCalled();
+    expect(host.getLegacy).not.toHaveBeenCalled();
+  });
+
+  it.each(['denied', 'read-failed', 'method-absent', 'missing-cursor'])('retains page-2 data and failed cursor for %s without fallback', async (failure) => {
+    const sdk = createSdk();
+    const host = createHost(sdk);
+    const admitted = [{ id: 'first', title: 'admitted' }];
+    const extra = [{ id: 'second', title: 'admitted-before-cursor-check' }];
+    const read = jest.fn().mockResolvedValueOnce({ data: admitted, nextCursor: 'failed-page-2' });
+    if (failure === 'missing-cursor') read.mockResolvedValueOnce({ data: extra });
+    else read.mockRejectedValueOnce(Object.assign(new Error('FAKE-MATRIX006-PRIVATE-ERROR'), {
+      status: failure === 'denied' ? 403 : failure === 'method-absent' ? 404 : 500,
+    }));
+    const legacy = jest.fn();
+    Object.assign(host, { readSdkSessionCatalogPage: read, readLegacySessionCatalogPage: legacy });
+    const error = await new OpenCodeSessionLifecycleCoordinator(host, createSyncRuntime()).listSessions().catch(value => value);
+    expect(error).toBeInstanceOf(BackendSessionCatalogReadError);
+    expect(error.result).toEqual({ status: 'partial', data: failure === 'missing-cursor' ? [...admitted, ...extra] : admitted,
+      nextCursor: 'failed-page-2', errorReason: failure === 'denied' ? 'Permission denied'
+        : failure === 'method-absent' ? 'Session catalog is unavailable'
+        : failure === 'missing-cursor' ? 'Invalid session catalog cursor' : 'Session catalog read failed' });
+    expect(read.mock.calls).toEqual([[{ limit: 100 }], [{ limit: 100, cursor: 'failed-page-2' }]]);
+    expect(legacy).not.toHaveBeenCalled();
+    expect(sdk.list).not.toHaveBeenCalled();
+    expect(host.getLegacy).not.toHaveBeenCalled();
+    expect(error.message).not.toContain('FAKE-MATRIX006-PRIVATE-ERROR');
+  });
+
+  it.each(['empty', 'read-failed', 'denied', 'method-absent'])('distinguishes authoritative empty from %s on the first page', async (outcome) => {
+    const failure = Object.assign(new Error('FAKE-MATRIX006-PRIVATE-ERROR'), {
+      status: outcome === 'denied' ? 401 : outcome === 'method-absent' ? 404 : 500,
+    });
+    const sdk = createSdk({ list: jest.fn().mockRejectedValue(failure) });
+    const host = createHost(sdk);
+    const read = outcome === 'empty' ? jest.fn().mockResolvedValue({ data: [], nextCursor: null }) : jest.fn().mockRejectedValue(failure);
+    const legacy = jest.fn().mockRejectedValue(failure);
+    const fallback = jest.fn().mockRejectedValue(failure);
+    Object.assign(host, { readSdkSessionCatalogPage: read, readLegacySessionCatalogPage: legacy, readLegacySessionCatalogFallback: fallback });
+    const result = await new OpenCodeSessionLifecycleCoordinator(host, createSyncRuntime()).listSessions()
+      .then(data => ({ data, error: null }), (error: BackendSessionCatalogReadError) => ({ data: null, error }));
+    expect(result.data).toEqual(outcome === 'empty' ? [] : null);
+    const catalogErrorMatcher = expect.any(BackendSessionCatalogReadError);
+    expect(result.error).toEqual(outcome === 'empty' ? null : catalogErrorMatcher);
+    expect(result.error?.result ?? null).toEqual(outcome === 'empty' ? null : {
+      status: outcome === 'method-absent' ? 'unavailable' : 'failed', data: [], nextCursor: null,
+      errorReason: outcome === 'denied' ? 'Permission denied' : outcome === 'method-absent' ? 'Session catalog is unavailable' : 'Session catalog read failed',
+    });
+    expect(result.error?.message ?? '').not.toContain('FAKE-MATRIX006-PRIVATE-ERROR');
+    expect(legacy.mock.calls).toEqual(outcome === 'empty' ? [] : [[{ limit: 100 }]]);
+    expect(read.mock.calls).toEqual([[{ limit: 100 }]]);
+    expect(sdk.list.mock.calls).toEqual(outcome === 'method-absent' ? [[{ limit: 1000 }]] : []);
+    expect(fallback).toHaveBeenCalledTimes(outcome === 'method-absent' ? 1 : 0);
+    expect(host.getLegacy).not.toHaveBeenCalled();
+  });
+});
 
 describe('OpenCodeSessionLifecycleCoordinator', () => {
   it('retains valid rows from a malformed page without requesting later pages', async () => {

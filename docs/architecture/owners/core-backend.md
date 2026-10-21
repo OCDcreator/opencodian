@@ -71,6 +71,8 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 - Do not cross `forbiddenDependencies`.
 - Do not replicate canonical state in another owner.
 - Changes here must update the matching `docs/modules/**` page (via `module-docs.config.json`).
+- Codex app-server form/tool-input handlers validate the entire raw shape before host/card admission; malformed or unsupported properties/options receive a local decline/cancel or empty answers response. Preserve known empty/schema-less form fallback, declared optional null tool options, native question IDs/order, answer copies and request/turn lifetime disposal. `items.anyOf` const/title options follow existing oneOf/enum/items.enum precedence without filtering invalid entries. Synthetic handler bodies are not RPC-envelope/native/provider continuation evidence.
+- ZCode user-input normalization requires non-empty normalized option labels and unique question text before card/pending registration; invalid options or duplicate text reject the entire request. Source fixture evidence does not prove native/UI acceptance.
 - Archive history descriptor identity preserves exact filesystem device/inode IDs using bigint stats and decimal-string tokens; Windows NTFS IDs must never be rounded through JavaScript Number. Confinement, state and content integrity checks remain mandatory before restore.
 - Run `npm run inspect:owner -- <this owner or a path>` for an always-fresh summary.
 
@@ -134,3 +136,8 @@ Timeout, request abort, explicit cancel and dispose settle locally within the or
 The plugin composition supplies Pi extension-command completion localization through the existing adapter wiring callback, keeping the Pi service boundary independent of the locale runtime.
 
 Claude message-before fork resolves the predecessor native chain UUID before using the SDK inclusive boundary and refuses an unavailable empty prefix. Inline input refresh preserves the current draft in input phase, including delayed catalog loads, without changing generating/new-round clear behavior.
+
+
+## 2026-10-13 Claude elicitation schema admission
+
+ClaudeCodeElicitationBridge 的既有 builder 拥有 raw schema/properties/property 形状与支持类型的建卡前检查。畸形或未知字段类型抛出固定安全拒绝错误，由 app.composition 的既有 handler 转成 decline/cancel；不引入 nullable 传播或新 runtime owner。SettingsCapabilityLab 的合法 synthetic wiring probe 保持只读。此项 source/mock 证据不晋升 native/UI/profile 矩阵。

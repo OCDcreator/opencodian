@@ -9,6 +9,7 @@ import type { PiBackendSettings } from '../../core/types/settings';
 import { normalizePiBackendSettings } from '../../core/types/settings';
 import { t } from '../../i18n';
 import { getVaultBasePath } from '../../shared';
+import { sanitizeDiagnosticReport } from '../../shared/diagnosticSecretSanitizer';
 import { PiWorkbenchModal } from './PiWorkbenchModal';
 import { SettingsPiConfigurationSection } from './SettingsPiConfigurationSection';
 import { SettingsPiProvidersSection } from './SettingsPiProvidersSection';
@@ -197,8 +198,8 @@ export class SettingsPiSection {
       return;
     }
     const block = container.createDiv({ cls: 'opencodian-pi-mcp-status', attr: { role: 'status' } });
-    for (const line of lines) block.createDiv({ cls: 'opencodian-pi-mcp-status-line', text: line });
-    if (snapshot.message) block.createDiv({ cls: 'opencodian-pi-mcp-status-message', text: snapshot.message });
+    for (const line of lines) block.createDiv({ cls: 'opencodian-pi-mcp-status-line', text: sanitizeDiagnosticReport(line, { urlPolicy: 'strict' }) });
+    if (snapshot.message) block.createDiv({ cls: 'opencodian-pi-mcp-status-message', text: sanitizeDiagnosticReport(snapshot.message, { urlPolicy: 'strict' }) });
     container.createEl('p', {
       cls: 'setting-item-description opencodian-pi-mcp-status-meta',
       text: t('settings.pi.mcp.status.updatedAt', { time: new Date(snapshot.updatedAt).toLocaleTimeString() }),

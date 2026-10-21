@@ -1,5 +1,7 @@
 # CodexAdapter
 
+> 2026-10-13：`handleToolUserInput` 在 host 调用前检查整个 questions/options 形状；null question/option、非数组 questions/options、非法文本/布尔字段返回既有 `{answers:{}}`，不部分构卡。类型允许的缺省/null options 保持自由文本，原 question ID、顺序、答案副本、所属 thread/tab 与取消/dispose 保持。`handleMcpElicitation` 在构卡前拒绝 null/非对象/数组 schema 或 properties、未知/嵌套 property 与非法 enum/const 选项，返回 decline（已取消时 cancel）；已声明 primitive、合法空 object 或缺 schema 的确认卡保持。form builder 异常在此 handler 内转为本地 structured refusal；不改变 form helper、URL/openai dialect 或真实 RPC envelope。合成 source 观察不证明 native/provider 行为。
+
 > 2026-10-09（strict composer preflight）：`getSendMessagePreflightError(codexOptions)` 是无副作用的后端判定，复用既有 `captureAttemptOptions` 的 per-turn 优先规则、app-server chat 可用性与 approval bridge 检查。`untrusted`/`on-request` 不满足时返回同一可见诊断；`never`/`inherit` 保持原 fallback 语义。发送边界调用同一函数复检，直接调用与 preflight 后连接/bridge 变化仍 fail-closed；不创建线程、模型回合或新策略真值。
 
 > 2026-10-08：native request_user_input 的选项按上游互斥语义映射为单选，Other 输入保留；MCP 表单 array 多选由独立 schema 路径处理。

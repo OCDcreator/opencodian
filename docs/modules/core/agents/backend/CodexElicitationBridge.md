@@ -1,5 +1,7 @@
 # CodexElicitationBridge
 
+> 2026-10-13：`getEnumOptions` 按非空 `oneOf`、`enum`、`items.enum`、`items.anyOf` 的优先级解析选项，保留 const/title 及原顺序。被选中的 const 选项数组必须全部合法，非法元素抛出本地错误，不通过过滤保留部分选项。app-server handler 在构卡前拒绝非法 form；合法空 schema 的确认卡保持。此合同仅经合成 source 验证，不代表 native/provider 继续生成验收。
+
 > 2026-10-08：elicitation host 通过 params.threadId 和 getTabIdForSession 路由到所属 tab；所属 tab 缺失返回 null。CodexElicitationCardRequest.signal 传递所属回合取消，view 复用已有可取消 question-card 收集流程。
 
 > **源码**: `src/core/agents/backend/CodexElicitationBridge.ts`

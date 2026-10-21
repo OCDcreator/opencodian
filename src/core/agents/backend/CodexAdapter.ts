@@ -1932,12 +1932,27 @@ export class CodexAdapter
     params: AppServerToolUserInputParams,
     requestSignal?: AbortSignal,
   ): Promise<AppServerToolUserInputResponse> {
+    if (!isRecordLike(params)) return this.emptyToolUserInputResponse();
     const collect = this.approvalHost.collectQuestionAnswers;
     const threadId = typeof params.threadId === 'string' ? params.threadId : undefined;
     const lifetime = this.createServerRequestSignal(threadId, requestSignal);
     const signal = lifetime.signal;
     try {
       if (signal?.aborted) return this.emptyToolUserInputResponse();
+      const rawQuestions: unknown = params.questions;
+      if (!Array.isArray(rawQuestions) || rawQuestions.some((question) => (
+        !isRecordLike(question)
+        || typeof question.id !== 'string'
+        || typeof question.question !== 'string'
+        || typeof question.header !== 'string'
+        || (question.isOther !== undefined && typeof question.isOther !== 'boolean')
+        || (question.isSecret !== undefined && typeof question.isSecret !== 'boolean')
+        || (question.options != null && (!Array.isArray(question.options) || question.options.some((option) => (
+          !isRecordLike(option) || typeof option.label !== 'string' || typeof option.description !== 'string'
+        ))))
+      ))) {
+        return this.emptyToolUserInputResponse();
+      }
       if (!collect) {
         this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.declined', { reason: 'no_host', threadId }));
         return this.emptyToolUserInputResponse();
@@ -2009,6 +2024,7 @@ export class CodexAdapter
     }
     const lifetime = this.createServerRequestSignal(params.threadId, requestSignal);
     try {
+      if (lifetime.signal?.aborted) return { action: 'cancel' };
       if (params.mode === 'url') {
         return await this.handleUrlElicitation(params, collect, lifetime.signal);
       }
@@ -2019,7 +2035,46 @@ export class CodexAdapter
         this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.declined', { reason: 'unsupported_mode', mode: params.mode, serverName: params.serverName }));
         return { action: 'decline' };
       }
-      return await this.handleFormElicitation(params, collect, lifetime.signal);
+      const schema: unknown = params.requestedSchema;
+      if (schema !== undefined) {
+        if (!isRecordLike(schema)) return { action: 'decline' };
+        if (schema.type !== 'object' && !(schema.type === undefined && schema.properties === undefined)) {
+          return { action: 'decline' };
+        }
+        if (schema.properties !== undefined) {
+          if (!isRecordLike(schema.properties)) return { action: 'decline' };
+          if (!Object.values(schema.properties).every((property) => {
+            if (!isRecordLike(property)) return false;
+            if (property.type !== undefined && (typeof property.type !== 'string' || !['string', 'number', 'integer', 'boolean', 'array'].includes(property.type))) {
+              return false;
+            }
+            if (property.properties !== undefined
+              || ![property.title, property.description].every((value) => value == null || typeof value === 'string')) {
+              return false;
+            }
+            if (property.items !== undefined && !isRecordLike(property.items)) return false;
+            const items = isRecordLike(property.items) ? property.items : undefined;
+            if (items && ((items.type !== undefined && items.type !== 'string') || items.properties !== undefined)) {
+              return false;
+            }
+            return [property.enum, property.enumNames ?? undefined, items?.enum].every((values) => (
+              values === undefined || (Array.isArray(values) && values.every((value) => typeof value === 'string'))
+            )) && [property.oneOf, items?.anyOf].every((options) => (
+              options === undefined || (Array.isArray(options) && options.every((option) => (
+                isRecordLike(option) && typeof option.const === 'string' && typeof option.title === 'string'
+              )))
+            ));
+          })) {
+            return { action: 'decline' };
+          }
+        }
+      }
+      try {
+        return await this.handleFormElicitation(params, collect, lifetime.signal);
+      } catch (err) {
+        logger.warn('Declining malformed Codex elicitation form', { error: err instanceof Error ? err.message : String(err) });
+        return { action: lifetime.signal?.aborted ? 'cancel' : 'decline' };
+      }
     } finally {
       lifetime.dispose();
     }

@@ -45,3 +45,10 @@
 
 - `buildClaudeCodeUserDialogQuestionRequest(request)`：把 `UserDialogRequest` 转成共享问题卡。`refusal_fallback_prompt` 有已知 payload 契约（`originalModel` / `fallbackModel` / `apiRefusalCategory?` / `guidanceText?` / `retractedMessageUuids?`，契约从 CLI 2.1.x 二进制提取），映射为 "Retry with fallback model / Edit prompt" 两选项；未知 dialogKind 生成通用说明卡。
 - `buildClaudeCodeUserDialogResult(dialogKind, response)`：问题卡应答映射回 `UserDialogResult`——接受 `retry_fallback` / `edit_prompt`（CLI 内部枚举）；cancel/decline/null/未知应答一律 `{behavior:'cancelled'}`，即 CLI 应用对话框默认行为（与未接线时完全一致，fail-safe）。
+
+
+## 2026-10-13 畸形表单的建卡前拒绝
+
+`buildClaudeCodeElicitationQuestionRequest` 在既有函数内检查 requestedSchema、properties 与 property 的对象形状，并仅接受未声明 type 或 string/number/integer/boolean/array 类型。非对象、null、数组形状与未知字段类型在返回问题卡前抛出固定安全错误。无 schema、合法空对象/空 properties、URL preview 与已支持字段的选项、顺序、content coercion 保持原路径。main 的宿主 handler 接住拒绝并返回 decline（已 abort 则 cancel），不调用 renderer、不记录原始 schema 或异常文本。
+
+原 MATRIX014 八项负控断言保持原文；补充 main handler 的零 renderer 拒绝与合法正控，并直接回归只读 Capability Lab synthetic wiring probe。验证范围是 source/mock，未调用真实 SDK/model/native/UI、未部署，不晋升原矩阵 profile。

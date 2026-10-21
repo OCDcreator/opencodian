@@ -51,6 +51,7 @@ Run before merge: `npm run typecheck`, `npm run check:module-docs`, `npm run dia
 - `ClaudeCodeDebugPanel` is the complete Claude workbench owner. It receives narrow settings/diagnostics ports and section callbacks rather than the full plugin, trace service, store, or report builder. `debugChannels` for console logs and `sessionTrace.consoleChannels` for trace capture remain independent.
 - The three settings composition paths create OpenCode, Codex, and Claude diagnostics ports at their boundaries. The adapters preserve app-owned service/store/report ownership and expose no mutable service map.
 - Changes here must update the matching `docs/modules/**` page (via `module-docs.config.json`).
+- `addDiagnosticActionsSetting` 的复制诊断与导出诊断 catch 仅记录固定的动作失败说明，Notice 使用现有 `copyFailed` / `generateFailed` 文案；不将原始异常或其字段送入 console、recent-log 或 Notice。成功报告、剪贴板、文件导出和路径持久化语义保持不变。
 - Run `npm run inspect:owner -- <this owner or a path>` for an always-fresh summary.
 
 ## Pi owner boundary review (2026-09-08)

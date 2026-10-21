@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "b629211de6ea181f7dd8d2cc2b27500f3963b69760f7095f438504075472389a",
+  "digest": "735877f91c17698d9bd9044a4c91c2d2fd0811f9333880dd230f45442b49e6f7",
   "recordCount": 796,
   "records": [
     {
@@ -216,7 +216,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/ClaudeCodeElicitationBridge.ts",
-      "sha256": "f0de62463706981c00e2567614ff54f035e105e671832cc42a9bdc4b6779b5ca"
+      "sha256": "0abaf584787a0d3efbe53a226573150cea446ab19a03a91608ce0d64ee0ce865"
     },
     {
       "kind": "src",
@@ -326,7 +326,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexAdapter.ts",
-      "sha256": "027ccf2012a7a746981ba3535830b7e35bc87f5918cb8eae98490e300f07d410"
+      "sha256": "b83dfc3a75ae34d64d9a40140300645e5cddb7603c60cdc146cfb12a928531f7"
     },
     {
       "kind": "src",
@@ -351,7 +351,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexAppServerTransport.ts",
-      "sha256": "c488b303f1b6ee216444adf901ab028b696ed54861c2ec6ad7d4f61b11f98f8c"
+      "sha256": "b1981bce120d612fdee6ec197b08aa9ee2701157788ab8d4829ff540c286d32f"
     },
     {
       "kind": "src",
@@ -366,7 +366,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexElicitationBridge.ts",
-      "sha256": "47a7560ea19348021c1c091cca85dbb9bdf7e032a6e2a0b67336697c40e5b7e0"
+      "sha256": "5b5716a6f78508df89aee2bfe92d761622e515b7efd95dc40be856b04a5a5dde"
     },
     {
       "kind": "src",
@@ -546,7 +546,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/zcode/ZCodeInteractionBridge.ts",
-      "sha256": "7905e92e39b801d6882e9d30e092565630e98445df830a2299ca347d38f1d388"
+      "sha256": "e551a205f2f845099689dc0cb23eb302db8b5c179feaf951b2339e108d4e9307"
     },
     {
       "kind": "src",
@@ -3151,7 +3151,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsDebugSection.ts",
-      "sha256": "c82e9e1424f00da6fed6128ceabc54be65fd7f5531695594935e7fbc52a858d6"
+      "sha256": "f9fdcc0b9a36ce157a86bca91430f587be8e085adef304758aedb5c84f0c3294"
     },
     {
       "kind": "src",
@@ -3231,7 +3231,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsPiSection.ts",
-      "sha256": "be47c94d861102e87585773866439452e769035d9fe0d333f6ded01206270dba"
+      "sha256": "73a1ebe04ae6fb621fb9cfb4be65dc5619ee4ab277cb497291aa1b527ed732f0"
     },
     {
       "kind": "src",
@@ -3406,7 +3406,7 @@
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "dc6605423e029fcbb763c99bc394163156250df63f7e90c4cc23574dea0d5b1c"
+      "sha256": "d2446b8edc1ee61656ee216b95ccee5e7db8a742d3d5ac2724c689e37268b534"
     },
     {
       "kind": "src",
@@ -3461,7 +3461,7 @@
     {
       "kind": "src",
       "key": "src/shared/diagnosticSecretSanitizer.ts",
-      "sha256": "382b5b7db3fa6b2ac102c9ac8a1d6ec8e50e8e560ced81a9390fd949e3f1c5ed"
+      "sha256": "d881135066ab441dde781e2fabfb5c5d30bad7103d5a78e2cd00c41cad984bda"
     },
     {
       "kind": "src",
@@ -3956,7 +3956,7 @@
     {
       "kind": "tool",
       "key": "graphify-version",
-      "sha256": "3743012c1f0a4169ff074ffacae1312a05745afae16e874a4a80c3061b2624b3"
+      "sha256": "b51978f2277743327d67f2e691d74d1915bc4705f49837c36ab7ef8a2ab92ca8"
     },
     {
       "kind": "tsconfig",
@@ -3984,7 +3984,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-11T09:47:36.147Z",
-  "headShaAtGeneration": "c403d1a16b5b32bbde92ed0badac96c59765ce2b",
-  "graphifyVersion": "graphify 0.8.50"
+  "generatedAt": "2026-10-13T06:28:50.897Z",
+  "headShaAtGeneration": "7a1f0fa9ab869c85bc89c7335ef7cf14510743d9",
+  "graphifyVersion": "graphify 0.9.36"
 }

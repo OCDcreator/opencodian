@@ -397,3 +397,12 @@ Inline edit model choices read the OpenCode 2 native catalog when that backend i
 createConversationFromBackendSession 对同一个已存在的 Codex native thread 复用本地 conversation，保留完整历史、native identity 和会话模型覆盖；其他后端仍走原创建路径。local forget 仍仅清本地引用，不删除 native thread。
 
 The plugin composition supplies Pi extension-command completion localization through the existing adapter wiring callback, keeping the Pi service boundary independent of the locale runtime.
+
+## 2026-10-13 通用报告的严格 URL 输出边界
+
+`buildDiagnosticReport` 在组装完成后显式调用 `sanitizeDiagnosticReport(raw, { urlPolicy: 'strict' })`：URL 完整 userinfo 与 fragment 隐藏，host/path、安全 query 和报告章节保持。报告的 collector、启动流程及原 mock 输入来源不变；没有新增 Pi 配置或扩展状态 collector，不能据此声称 Pi 数据进入通用报告。既有 settings 输出控制覆盖真实 builder → sanitizer → 捕获的 clipboard/mockfs；main 新回归覆盖 JSON 内多个 URL。此证据为 source/mock 范围，validation build 不替换原 native 候选，也不部署到 Test Vault。
+
+
+## 2026-10-13 Claude elicitation 拒绝入口
+
+`handleClaudeCodeElicitation` 只在既有 handler 内接住 builder 的安全拒绝：返回 decline，若 signal 已取消则返回 cancel；拒绝路径不调用 renderer/getActiveTabId，也不输出 raw schema 或异常文本。正常 accept/decline/cancel、URL preview、typed answers/content 和原 tab 归属保持。合成回归直接调用生产 handler 并注入 renderer，原测试前缀不变；真实 Obsidian/SDK/native roundtrip 不由该测试证明。

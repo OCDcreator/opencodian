@@ -73,3 +73,12 @@ Codex native child 的目录恢复复用同 native ID 的本地 conversation，�
 2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `app.composition` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
 
 The plugin composition supplies Pi extension-command completion localization through the existing adapter wiring callback, keeping the Pi service boundary independent of the locale runtime.
+
+## 2026-10-13 诊断报告输出策略
+
+`buildDiagnosticReport` 在原报告组装末端选择共享 sanitizer 的严格 URL 策略；app.composition 仅拥有该输出策略选择，不新增 collector 或 runtime owner。完整 userinfo/fragment 隐藏，安全 endpoint/query 与报告结构保持。Pi 配置/状态没有新增到通用报告；mock clipboard/file 输出与 validation build 只提供源验证，不晋升 native 候选或矩阵条件。
+
+
+## 2026-10-13 Claude elicitation admission handling
+
+既有 handleClaudeCodeElicitation 负责收住 core.backend builder 的 schema 拒绝并返回 decline/cancel，拒绝时不准入 renderer、不记录输入或异常文本。正常 card/content 与 tab 回调路径保留；schema 校验仍归 core.backend，不向 main 新增运行时所有者。当前验证仅是生产 handler 与注入 renderer 的合成测试，未部署或取得 native/UI 验收。

@@ -77,6 +77,7 @@ section 直接编辑 `settings.debugRefreshIntervalMs`。logger 侧会用该值�
 
 - `Copy recent diagnostics`：调用 `buildDiagnosticReport('copy-diagnostics')`
 - `Generate log file`：调用 `writeDiagnosticLogFile(targetDirectory, 'settings-export')`
+- 这两项动作失败时，catch 只向 logger 输出固定的动作失败说明，不传递原始异常、message、stack 或其它异常字段；Notice 分别使用现有 `copyFailed` / `generateFailed` 本地化文案。该边界同时保护 console 与 recent-log，不依赖报告 sanitizer 处理原始 Error。成功报告、剪贴板写入、文件导出及路径持久化流程保持原有语义。
 - `Clear recent logs`：清空 logger 最近缓存
 - `Copy version / BUILD_ID`：复制 `OpenCodian <version> BUILD_ID=<id>`
 - 日志导出路径输入标记 `.opencodian-wide-text-setting`，复用设置页长文本字段布局，让 macOS/Windows 路径 placeholder 不再挤在默认短控制列里

@@ -1328,7 +1328,12 @@ export default class OpenCodianPlugin extends Plugin {
       return { action: 'cancel' };
     }
 
-    const questionRequest = buildClaudeCodeElicitationQuestionRequest(request);
+    let questionRequest: ReturnType<typeof buildClaudeCodeElicitationQuestionRequest>;
+    try {
+      questionRequest = buildClaudeCodeElicitationQuestionRequest(request);
+    } catch {
+      return { action: options.signal.aborted ? 'cancel' : 'decline' };
+    }
     const response = await renderer.collectResponse(questionRequest, ctx.getActiveTabId());
     if (!response) {
       return { action: 'cancel' };
@@ -2390,7 +2395,7 @@ export default class OpenCodianPlugin extends Plugin {
       '',
     ].join('\n');
 
-    return sanitizeDiagnosticReport(raw);
+    return sanitizeDiagnosticReport(raw, { urlPolicy: 'strict' });
   }
 
   async writeDiagnosticLogFile(targetDirectory: string, source = 'manual'): Promise<string> {

@@ -73,3 +73,11 @@ buildClaudeCodeDiagnosticReport() → raw text → sanitizeDiagnosticReport() �
 - 这是一个尽力而为的净化器，不能替代安全审查
 - 新增敏感值模式时应在 `tests/unit/shared/diagnosticSecretSanitizer.test.ts` 中同步添加覆盖
 - 该模块不依赖任何 Obsidian API 或其他项目模块，便于独立测试
+
+## 2026-10-13 有限 flag 与显式 URL 输出策略
+
+`sanitizeDiagnosticReport(text, options?)` 接收 `DiagnosticSanitizerOptions`，`urlPolicy: 'strict'` 隐藏 URL 的完整 userinfo 与完整 fragment；host/path 和安全 query 保留，敏感 query 值仍替换为 `[REDACTED]`。默认调用继续保留普通 URL 用户名和 fragment，保留既有调用者契约。严格 URL 文本扫描以空白、引号、JSON 转义及常见诊断标点为词法边界，测试覆盖多个 URL 和重复凭据。
+
+有限敏感 flag 名单为 token、api-key/api_key、client-secret/client_secret、password、secret、credentials、authorization；支持单/双短横线、独立/等号值及大小写，保留后续 `--port 4096`。Authorization raw 值不会再吞掉下一个 CLI flag。净化仍为有限文本模式，不能保证任意未标记自由文本凭据消失。
+
+通用 `buildDiagnosticReport` 与 Pi `mcpStatus` 显式选择严格策略；TraceReportBuilder、TraceStore、Claude 诊断 caller 保持默认调用。回归位于既有 shared、main 和 settings 测试；mock 输入和 JSDOM 输出不证明 native RPC、真实 UI/剪贴板/文件导出或完整 S08。

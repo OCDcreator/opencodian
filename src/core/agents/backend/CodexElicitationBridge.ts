@@ -102,8 +102,17 @@ const ACCEPT_LABEL = 'Accept';
 const DECLINE_LABEL = 'Decline';
 
 function getEnumOptions(property: CodexElicitationPropertySchema): Array<{ label: string; description: string }> {
-  if (property.oneOf && property.oneOf.length > 0) {
-    return property.oneOf.map((option) => ({ label: option.const, description: option.title }));
+  const constOptions = property.oneOf && property.oneOf.length > 0
+    ? property.oneOf
+    : property.enum == null && property.items?.enum == null ? property.items?.anyOf : undefined;
+  if (constOptions !== undefined) {
+    if (!Array.isArray(constOptions) || constOptions.some((option) => (
+      typeof option !== 'object' || option === null
+      || typeof option.const !== 'string' || typeof option.title !== 'string'
+    ))) {
+      throw new Error('Malformed Codex elicitation enum options');
+    }
+    return constOptions.map((option) => ({ label: option.const, description: option.title }));
   }
   const rawEnum = property.enum ?? property.items?.enum ?? [];
   const names = property.enumNames ?? [];

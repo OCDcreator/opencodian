@@ -28,3 +28,9 @@ Pi主标签与ClaudeCode/Codex采用同一注册/section shell契约；二级页
 - **状态是文本不是结构**：扩展走 RPC UI 通道上报，插件只保留原文（`setStatus` 各键 + 最后一条 `notify`），不做正则解析——解析人类可读文本会随扩展措辞变化而悄悄失效。
 - 该页在**没有适配器实例时也可渲染**（与其它子页不同）：声明清单只依赖文件，不需要 Pi 进程。`attachTabbed` 因此把 mcp 分支放在 `if (!adapter)` 之前。
 - 测试通过构造器第二参数注入 `PiMcpConfigService` 替身；测试环境里 `Setting.setName/setDesc` 是 no-op，所以行内容用 spy 捕获断言。
+
+## 2026-10-13 MCP 状态显示脱敏
+
+`mcpStatus` 对每条非空 `statuses` 文本及 `message` 在写入 DOM 时调用共享 sanitizer 的 `urlPolicy: 'strict'`。完整 URL userinfo/fragment 和有限敏感 flag 值隐藏，正常状态文本、host/path/安全 query、时间、role 和布局保持。PiAdapter 缓存及 RPC/receive/protocol 对象保持原字节；没有新增 Copy 控件，也不把状态解释为结构化连接结果。
+
+MATRIX008 typed status → 实际 mcpStatus → JSDOM 控制及新增多条状态/缓存不变回归属于 source/mock 证据；不是 Pi native、真实 UI 或 Pi-to-generic-report provenance。严格消费者不再要求 url-password fixture 的 `safe-user` 保留，host/path/mode=safe 与所有敏感值缺失断言仍保留。

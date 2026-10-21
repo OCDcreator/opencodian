@@ -154,7 +154,11 @@ export function normalizeZCodeQuestionAsk(params: unknown): QuestionRequest | nu
       custom: true,
     };
   });
-  if (questions.length === 0 || questions.some((question) => !question.question || question.options.length === 0)) {
+  if (questions.length === 0
+    || questions.some((question) => !question.question
+      || question.options.length === 0
+      || question.options.some((option) => !option.label))
+    || new Set(questions.map((question) => question.question)).size !== questions.length) {
     return null;
   }
   return { id: requestId, sessionId, questions };
