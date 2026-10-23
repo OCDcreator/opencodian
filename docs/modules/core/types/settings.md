@@ -503,3 +503,8 @@ ZCode remains completion-only: `INLINE_COMPLETION_BACKENDS` adds `zcode` to the 
 Focused regression tests cover the settings callbacks' saved JSON snapshots, the `prepareLoadedSettingsBootstrapState()` reload boundary, remounted controls, the real inline-edit model chain and the production completion target's session configuration. Dedicated completion overrides take precedence over edit overrides; absent overrides retain the edit/chat fallback chain. These unit tests prove persistence normalization and request application at the mocked backend seam; real OpenCode 2 runtime readback and Obsidian host interaction remain unverified.
 
 2026-10-02 T07：仅 PiBackendSettings.thinkingLevel 与 normalizePiBackendSettings 新增 max 持久化允许值，保留既有 xhigh 等历史值。PiAdapter.uiReads.test.ts 验证 max 不被 normalization 清空；此 allowlist 仅保障设置 roundtrip，模型支持列表必须来自当前 Pi session SDK readback。
+
+
+## 2026-10-23 DSH backend
+
+`BackendSettings.dsh` 保存可执行文件路径、工作目录、附加参数和环境变量，profile 固定归一为 `acp`。`normalizeDshBackendSettings` 清理无效输入，环境变量保留字符串原值并排除无效键和 NUL；默认路径和目录留空，由本地发现和当前 vault 决定。既有设置加载时补齐该结构，不自动启用 DSH。

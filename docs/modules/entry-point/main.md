@@ -407,3 +407,8 @@ The plugin composition supplies Pi extension-command completion localization thr
 ## 2026-10-13 Claude elicitation 拒绝入口
 
 `handleClaudeCodeElicitation` 只在既有 handler 内接住 builder 的安全拒绝：返回 decline，若 signal 已取消则返回 cancel；拒绝路径不调用 renderer/getActiveTabId，也不输出 raw schema 或异常文本。正常 accept/decline/cancel、URL preview、typed answers/content 和原 tab 归属保持。合成回归直接调用生产 handler 并注入 renderer，原测试前缀不变；真实 Obsidian/SDK/native roundtrip 不由该测试证明。
+
+
+## 2026-10-23 DSH backend
+
+插件组合层向 `wireHiddenAdapters` 注入 DSH 设置和 `dsh` 域环境变量，并将该域纳入环境指纹列表。子进程、协议和会话所有权留在 `DshAdapter`；`main.ts` 不另建 DSH 运行时，也不启动退役的 OpenCode 1。

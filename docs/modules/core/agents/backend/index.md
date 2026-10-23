@@ -115,3 +115,8 @@ The public backend set and barrel now include opencode2 and OpenCode2Adapter. Op
 ## 2026-10-21 OpenCode 1 退役（静默摘除）
 
 `IMPLEMENTED_AGENT_BACKENDS` 摘除 `opencode`：OpenCode 1 不再出现在设置页后端选择/启用面。settings 加载归一化把存量 `opencode` enabled/active 静默迁移为 `opencode2`（见 `settingsLoadNormalization` 模块页）；`DEFAULT_SETTINGS` 默认后端改为 `opencode2`。`OpenCodeAdapter` 仍从 barrel 导出，但 `main.ts` 不再注册，routing 对存量 `opencode` conversation 返回不可用后端（本地历史仍可读）。`AgentServiceRegistry.pickDefaultActive()` 默认偏好改为 `opencode2`。
+
+
+## 2026-10-23 DSH backend
+
+`IMPLEMENTED_AGENT_BACKENDS` 新增 `dsh` 并导出 `DshAdapter`；可选择的后端成为 OpenCode 2、Claude Code、Codex、Pi、ZCode 和 DeepSeek Harness 六个。OpenCode 1 的退役、旧会话 owner 和默认 `opencode2` 语义保持。

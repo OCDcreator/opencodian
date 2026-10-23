@@ -43,3 +43,8 @@
 ## 2026-09-27 OpenCode 2 compatibility
 
 The OpenCode 2 choice shares the OpenCode icon but has its own backend identity and label.
+
+
+## 2026-10-23 DSH backend
+
+新增 `opencodian-dsh` 图标并绑定 `dsh` 后端。图形使用官方 `website/public/favicon.svg` 的路径与蓝色 `#4D6BFE`，将原始 50×50 viewBox 缩放到 Obsidian 的 100×100 图标坐标；原始 SVG 保存在 `assets/dsh-favicon.svg`。

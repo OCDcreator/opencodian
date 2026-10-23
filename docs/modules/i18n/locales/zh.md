@@ -672,3 +672,9 @@ Includes the localized Pi extension-command completion status used only after a 
 ## 2026-10-08 未完成工具的本地中断状态
 
 取消本地流时仍保存尚未收到结果的工具 call ID、参数和 interrupted 状态；不把本地停止推断为原生成功/失败，也不触发完成回调。已收到的终态和结果保持不变。卡片显示“原生工具结果尚未确认”，不显示运行中 spinner；历史归一保留该状态，后续权威 native completed/error 可以覆盖。
+
+
+## 2026-10-23 DSH backend
+
+新增 DSH 后端名称、ACP 连接说明、CLI/桌面包路径、工作目录、连接测试和四种连接状态的中文文案。键名与英文 locale 对齐，设置页继续通过 `t()` 读取。
+会话浏览器另有 DSH 续接说明，明确 native 上下文可继续，而此前消息不会导入。

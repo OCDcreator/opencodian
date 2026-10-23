@@ -108,3 +108,7 @@ English and Chinese copy describe executable snapshot/restart boundaries and exp
 2026-10-07: Shared session directory denial copy is backend-neutral in both locales.
 
 2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `shared.i18n` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+## 2026-10-23 DSH connection copy
+
+中英文 locale 增加相同的 DSH 后端、路径、工作目录和连接状态键。文案描述本地 ACP 连接；状态取自 adapter，不把连接成功描述成模型账号或真实聊天验收通过。

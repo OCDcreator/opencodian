@@ -83,3 +83,7 @@ Resume seed 保留 Codex userMessage 的 sourceMessageId/sourceTurnId，展示�
 ## 2026-10-06 Codex catalog permission denial
 
 会话目录保留结构化失败的权限拒绝分类；loading 和成功刷新清空旧标记。partial 保留 native IDs 与已读取行，失败不冒称空目录，不回显 errorReason。
+
+## 2026-10-23 DSH resume without imported history
+
+DSH 的 ACP 会话可以续接原生上下文，但首期 adapter 不提供 transcript replay。预览读取返回 `null` 时显示专门说明，明确此前消息不会导入，恢复后只展示新消息；恢复仍保留 `dsh` owner 和原始 native session ID，不伪造空的权威历史。

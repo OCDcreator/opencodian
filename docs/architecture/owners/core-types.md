@@ -79,3 +79,7 @@ OpenCode 2 has a separate backend identity and normalized connection settings; p
 
 
 > 2026-10-21 OpenCode 1 退役：`DEFAULT_SETTINGS` 默认后端改为 `opencode2` / `['opencode2']`；`settingsLoadNormalization` 新增 `migrateRetiredBackendKind()` / `normalizeEnabledBackendsWithRetirement()`，把存量 `opencode` enabled/active 静默迁移为 `opencode2`（去重、空结果回退默认），设置主标签默认回退 `'server'` → `'general'`。`AgentBackendKind` 联合与 `BackendSettings.opencode` 结构保留，存量 conversation owner 不改写。
+
+## 2026-10-23 DSH identity and settings
+
+本 owner 增加 `AgentBackendKind.dsh` 和 `BackendSettings.dsh` 的默认/归一化契约。启动路径、工作目录、参数和环境归设置持久化所有；ACP 连接/会话状态仍归 core.backend。旧配置补齐 DSH 默认结构，但不自动启用新后端或改写既有会话 owner。

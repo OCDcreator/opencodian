@@ -53,3 +53,7 @@ Settings expose OpenCode 1 and 2 separately and provide local executable or remo
 2026-10-07: OpenCode 2 directory read controls render classified state and fixed bilingual text on failed/denied/absent endpoints.
 
 2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.settings-opencode` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+## 2026-10-23 DSH connection settings
+
+既有 `SettingsBackendSection` 增加 DSH 启用项和可执行路径/工作目录/测试连接控件。控件只保存 core.types 设置或调用 core.backend 的 `start()`；不创建原生会话、发送模型提示或持有持久连接 listener。

@@ -87,3 +87,7 @@ The plugin composition supplies Pi extension-command completion localization thr
 ## 2026-10-21 OpenCode 1 backend retirement
 
 Bootstrap 不再构造/注册 `OpenCodeAdapter`：`AgentServiceRegistry` 中不存在 `opencode` adapter，`handleOpenCodeServerStatusChange` 移除已死的 registry 转发。`OpenCodeService` 仍休眠构造（memory runtime 与 legacy 只读引用；本地 server 自启动本就受 active-backend 门控）。默认后端经 core.types 归一化为 `opencode2`，由 wiring 层注册 `OpenCode2Adapter`。存量 `opencode` conversation owner 不改写，routing 视为不可用后端。
+
+## 2026-10-23 DSH composition
+
+组合层向既有 backend wiring 提供 DSH 设置读取及 `dsh` 域环境变量，并将该域纳入环境指纹计算。子进程与会话生命周期留在 core.backend；本 owner 不增加 DSH 原生运行时状态。

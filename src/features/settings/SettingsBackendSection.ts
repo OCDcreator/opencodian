@@ -19,6 +19,7 @@ const ALL_BACKEND_OPTIONS: Array<{
   { id: 'copilot', labelKey: 'settings.agent.name.copilot', descriptionKey: 'settings.agent.copilot.desc' },
   { id: 'pi', labelKey: 'settings.agent.name.pi', descriptionKey: 'settings.agent.pi.desc' },
   { id: 'zcode', labelKey: 'settings.agent.name.zcode', descriptionKey: 'settings.agent.zcode.desc' },
+  { id: 'dsh', labelKey: 'settings.agent.name.dsh', descriptionKey: 'settings.agent.dsh.desc' },
 ];
 
 export const BACKEND_OPTIONS = ALL_BACKEND_OPTIONS.filter(
@@ -52,6 +53,51 @@ export class SettingsBackendSection {
     this.addChatWarmSessionSetting(shellEl);
     this.addEnabledBackendsSettings(shellEl);
     this.addOpenCode2Settings(shellEl);
+    this.addDshSettings(shellEl);
+  }
+
+  private addDshSettings(containerEl: HTMLElement): void {
+    if (!this.getEnabledBackends().includes('dsh')) return;
+    const settings = this.plugin.settings.backendSettings.dsh;
+    const group = containerEl.createDiv({ cls: 'opencodian-backend-agent-group' });
+    group.createEl('h4', { cls: 'opencodian-settings-subsection-heading', text: t('settings.agent.dsh.connection') });
+    new Setting(group)
+      .setName(t('settings.agent.dsh.executable'))
+      .setDesc(t('settings.agent.dsh.executable.desc'))
+      .addText((input) => input
+        .setPlaceholder('dsh')
+        .setValue(settings.executablePath)
+        .onChange(async (value) => {
+          settings.executablePath = value.trim();
+          await this.plugin.saveSettings();
+        }));
+    new Setting(group)
+      .setName(t('settings.agent.dsh.workingDirectory'))
+      .setDesc(t('settings.agent.dsh.workingDirectory.desc'))
+      .addText((input) => input
+        .setPlaceholder(t('settings.agent.dsh.workingDirectory.placeholder'))
+        .setValue(settings.workingDirectory)
+        .onChange(async (value) => {
+          settings.workingDirectory = value.trim();
+          await this.plugin.saveSettings();
+        }));
+    const status = group.createDiv({ cls: 'setting-item-description', text: t('settings.agent.dsh.status.disconnected') });
+    const adapter = this.plugin.agentServiceRegistry?.get('dsh');
+    const statusKey = (): TranslationKey => `settings.agent.dsh.status.${adapter?.status ?? 'disconnected'}`;
+    status.setText(t(statusKey()));
+    new Setting(group).setName(t('settings.agent.dsh.connection'))
+      .addButton((button) => button.setButtonText(t('settings.agent.dsh.testConnection')).onClick(async () => {
+        button.setDisabled(true);
+        status.setText(t('settings.agent.dsh.status.connecting'));
+        try {
+          if (!adapter) throw new Error(t('settings.agent.dsh.status.unavailable'));
+          await adapter.start();
+          status.setText(t(statusKey()));
+        } catch (error) {
+          status.setText(t('settings.agent.dsh.status.error'));
+          new Notice(error instanceof Error ? error.message : String(error));
+        } finally { button.setDisabled(false); }
+      }));
   }
 
   private addOpenCode2Settings(containerEl: HTMLElement): void {

@@ -173,3 +173,6 @@ AI title generation can run for OpenCode 2 conversations when selected in settin
 ## 2026-10-05 Codex 消息前分支与恢复
 
 Codex 也经过现有模型 catalog 的发送准备，将会话模型/variant 带入 send options；其 native availability/运行回读仍由 Codex adapter 负责，UI 选择不能冒充 effective。
+## DSH skill expansion boundary (2026-10-23)
+
+DSH sends skip the legacy OpenCode skill catalog expansion, as Pi, ZCode and OpenCode 2 already do. Raw prompt text and explicit synthetic/context parts retain the existing structured send path; sending a DSH message does not call `loadSkills()` on the dormant OpenCode service.

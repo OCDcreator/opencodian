@@ -11,6 +11,14 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-10-23 v2.0.1：DSH 本地 ACP 后端
+
+- 新增第六后端 DeepSeek Harness（`dsh`），保留 OpenCode 1 的退役状态；使用官方 SVG 图标，提供本地可执行路径、工作目录与测试连接设置。
+- 通过本地 ACP stdio 接入文本流、思考内容、工具状态与权限交互；支持原生会话创建、分页列举、关闭和按原生 ID 恢复。恢复上下文时明确提示不导入此前消息。
+- 各会话独立管理运行与取消；处理超时、迟到响应、进程退出和 stdin EPIPE，清理自有进程与待处理请求。仅声明已实现能力，模型选择、多模态、MCP 管理和行内功能暂未接入。
+- macOS 已验证插件加载、真实 ACP 连接及原生会话创建/列举/关闭/恢复；未发送模型提示词，真实模型对话、工具与权限往返以及 Windows 运行时仍待验收。
+- 版本由 `2.0.0` 提升到 `2.0.1`，同步 package、lock、manifest、兼容性索引与构建 manifest。本次仅作本地提交，未发布远程版本。
+
 ## 2026-10-21 v2.0.0 发布与 CI 双修复（graphify envelope / NODE_OPTIONS reporter）
 
 `zcode/retire-opencode1-backend` 快进合入 main，`release:major` 升版 2.0.0（manifest/versions.json 同步，bump 提交连带 graphify 刷新）；Test Vault 已部署 `main.202610212308` 构建。发布链路当天暴露并修复两个预置问题：

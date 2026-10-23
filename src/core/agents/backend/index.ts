@@ -10,7 +10,7 @@ import type { AgentBackendKind } from '../../types/chat';
 // 'opencode' (OpenCode 1) is retired from the selectable runtime surface; the
 // kind, adapter and settings stay in the codebase for stored conversations and
 // rollback, so nothing may re-add it to this whitelist without a product call.
-export const IMPLEMENTED_AGENT_BACKENDS: readonly AgentBackendKind[] = ['opencode2', 'claude-code', 'codex', 'pi', 'zcode'];
+export const IMPLEMENTED_AGENT_BACKENDS: readonly AgentBackendKind[] = ['opencode2', 'claude-code', 'codex', 'pi', 'zcode', 'dsh'];
 
 export {
   wireHiddenAdapters,
@@ -252,6 +252,7 @@ export {
   type CodexStreamNormalizerOptions,
   createCodexStreamNormalizer,
 } from './CodexStreamNormalizer';
+export { DshAdapter, type DshAdapterOptions } from './DshAdapter';
 export { OpenCode2Adapter } from './OpenCode2Adapter';
 export { OpenCodeAdapter } from './OpenCodeAdapter';
 export {

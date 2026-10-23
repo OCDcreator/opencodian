@@ -655,10 +655,12 @@ export default class OpenCodianPlugin extends Plugin {
         getPiSettings: () => this.settings.backendSettings.pi,
         formatPiCommandCompleted: (command) => t('chat.pi.commandCompleted', { command }),
         getZCodeSettings: () => this.settings.backendSettings.zcode,
+        getDshSettings: () => this.settings.backendSettings.dsh,
         getOpenCode2Settings: () => this.settings.backendSettings.opencode2,
         getCodexExtraEnv: () => this.getDomainEnvFor('codex'),
         getPiExtraEnv: () => this.getDomainEnvFor('pi'),
         getZCodeExtraEnv: () => this.getDomainEnvFor('zcode'),
+        getDshExtraEnv: () => this.getDomainEnvFor('dsh'),
         onPiUiRequest: (request, signal) => presentPiUiRequest(this.app, request, signal),
       });
       this.agentServiceRegistry.setEnabledBackends(this.settings.enabledBackends);
@@ -2977,6 +2979,7 @@ export default class OpenCodianPlugin extends Plugin {
       'codex',
       'copilot',
       'pi',
+      'dsh',
       ...Object.keys(this.settings.environmentVariables.providers),
     ]);
     return [...backends].sort((left, right) => left.localeCompare(right));

@@ -73,3 +73,7 @@ Codex 会话浏览器从结构化目录结果保留权限拒绝分类，现有 s
 2026-10-07: The backend session browser renders the shared catalog evidence, keeping partial data and credential-free failure classifications distinct from empty complete reads.
 
 2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.chat-ui` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+## 2026-10-23 DSH history boundary
+
+会话浏览器为 DSH 的原生 ID 续接显示“此前记录不导入”的说明。原生上下文恢复仍由 core.backend 负责；UI 不把缺少 transcript 能力包装成已导入完整历史，forced backend 继续决定恢复会话的 owner。

@@ -1086,6 +1086,44 @@ export function normalizeZCodeBackendSettings(value: unknown): ZCodeBackendSetti
   };
 }
 
+/** Local DeepSeek Harness ACP backend settings. Desktop attach is intentionally deferred. */
+export interface DshBackendSettings {
+  /** Optional user-installed `dsh` CLI or bundled Electron-as-Node launcher. */
+  executablePath: string;
+  /** Optional working-directory override; empty uses the current vault. */
+  workingDirectory: string;
+  /** Additional launcher arguments appended after the fixed `--profile acp` flags. */
+  args: string[];
+  /** Environment overrides for the owned DSH process. */
+  env: Record<string, string>;
+  /** The only supported first-release transport profile. */
+  profile: 'acp';
+}
+
+export function normalizeDshBackendSettings(value: unknown): DshBackendSettings {
+  const source = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  const text = (key: string): string => typeof source[key] === 'string' ? (source[key] as string).trim() : '';
+  const args = Array.isArray(source.args)
+    ? source.args.filter((entry): entry is string => typeof entry === 'string').map((entry) => entry.trim()).filter(Boolean)
+    : [];
+  const envSource = source.env && typeof source.env === 'object' && !Array.isArray(source.env)
+    ? source.env as Record<string, unknown>
+    : {};
+  const env = Object.fromEntries(
+    Object.entries(envSource)
+      .filter((entry): entry is [string, string] => /^[A-Za-z_][A-Za-z0-9_]*$/.test(entry[0]) && typeof entry[1] === 'string' && !entry[1].includes('\0')),
+  );
+  return {
+    executablePath: text('executablePath'),
+    workingDirectory: text('workingDirectory'),
+    args,
+    env,
+    profile: 'acp',
+  };
+}
+
 export interface BackendSettings {
   opencode: {
     sessionTrace: OpenCodeSessionTraceSettings;
@@ -1095,6 +1133,7 @@ export interface BackendSettings {
   codex: CodexBackendSettings;
   pi: PiBackendSettings;
   zcode: ZCodeBackendSettings;
+  dsh: DshBackendSettings;
 }
 
 /** OpenCode 2 has a distinct API and process from the 1.x OpenCode server. */
@@ -1224,6 +1263,7 @@ export function getDefaultBackendSettings(): BackendSettings {
     codex: getDefaultCodexBackendSettings(),
     pi: normalizePiBackendSettings(undefined),
     zcode: normalizeZCodeBackendSettings(undefined),
+    dsh: normalizeDshBackendSettings(undefined),
   };
 }
 
@@ -1598,7 +1638,7 @@ export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBa
 
 export function normalizeBackendSettings(value: unknown): BackendSettings {
   const candidate = value && typeof value === 'object' && !Array.isArray(value)
-    ? value as { opencode?: unknown; opencode2?: unknown; claudeCode?: unknown; codex?: unknown; pi?: unknown; zcode?: unknown }
+    ? value as { opencode?: unknown; opencode2?: unknown; claudeCode?: unknown; codex?: unknown; pi?: unknown; zcode?: unknown; dsh?: unknown }
     : {};
   return {
     opencode: normalizeOpenCodeBackendSettings(candidate.opencode),
@@ -1607,6 +1647,7 @@ export function normalizeBackendSettings(value: unknown): BackendSettings {
     codex: normalizeCodexBackendSettings(candidate.codex),
     pi: normalizePiBackendSettings(candidate.pi),
     zcode: normalizeZCodeBackendSettings(candidate.zcode),
+    dsh: normalizeDshBackendSettings(candidate.dsh),
   };
 }
 

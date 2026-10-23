@@ -867,3 +867,8 @@ Pi 完成后 bypass OpenCode canonical projection（其数据不属于 Pi 会话
 ## 2026-10-21 窄面板问答卡按钮可达（F1）
 
 `keepQuestionCardPinnedToBottom()` 现在在 pin/滚动前先调用 `ScrollManager.ensureComposerOverlayScrollReserve()`，对 `.opencodian-input-area` 实测 composer 叠加高度：当 pane 的 `--opencodian-composer-stack-height` 预留快照小于实测值时给 pane 写行内 stopgap 变量，避免 pending 问答卡按钮在窄面板下被 composer 命中盒覆盖（后台 tab 的 pane 一并处理；composer 为 view 共享）。`setComposerStackHeight()` writeback 在权威测量值变化时清除这些 pane 级 stopgap，未变化时保持不动，避免无关 rAF 布局同步清掉仍需要的预留。view 不新增 runtime ownership：几何判定在 `ScrollManager`，本模块只转发元素。
+
+
+## 2026-10-23 DSH backend
+
+权限卡片将 `dsh` 的回复和取消交给该 tab 会话所属的 adapter，与 ZCode/OpenCode 2 共用现有权限 UI。DSH 权限不回落到 `openCodeService`；视图只转发请求，不持有 ACP 请求 ID 或子进程。

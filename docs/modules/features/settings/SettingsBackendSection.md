@@ -66,3 +66,8 @@ The backend list exposes OpenCode 1 and 2 separately; OpenCode 2 settings select
 ## 2026-10-08 后台会话与默认后端切换
 
 默认后端选择只决定新会话/设置路由，保留其他已启用 adapter，避免中断后台 tab。禁用该后端和插件卸载负责释放资源；设置页头部按钮与默认后端下拉使用相同语义。两台桌面的长工具调用、目标取消/续聊及后端切换需单独验证，不能由设置 ACK 推断。
+
+
+## 2026-10-23 DSH backend
+
+后端启用列表新增 DeepSeek Harness。启用后显示 CLI/桌面包路径、工作目录及“测试连接”；空路径走自动发现，空目录使用当前 vault。测试连接只启动适配器并读取状态，不创建会话或发送模型提示。控件挂载不订阅持久状态回调，避免设置页重建后残留 DOM listener。

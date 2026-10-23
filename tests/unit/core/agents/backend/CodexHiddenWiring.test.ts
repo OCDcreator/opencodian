@@ -84,7 +84,7 @@ describe('Codex hidden wiring', () => {
     it('contains only user-facing backends', () => {
       // OpenCode 1 is retired from the selectable surface; OpenCode 2 is the
       // remaining OpenCode generation.
-      expect(IMPLEMENTED_AGENT_BACKENDS).toEqual(['opencode2', 'claude-code', 'codex', 'pi', 'zcode']);
+      expect(IMPLEMENTED_AGENT_BACKENDS).toEqual(['opencode2', 'claude-code', 'codex', 'pi', 'zcode', 'dsh']);
     });
   });
 

@@ -547,7 +547,7 @@ export class MessageSendPreparationService {
     const requestContent = isClaudeBackend
       ? options.content
       : this.agentInvocationService.removeMentionFallbackText(options.content, resolvedAgentInvocation);
-    const skillExpansion = conversation.backend === 'pi' || conversation.backend === 'zcode' || conversation.backend === 'opencode2'
+    const skillExpansion = conversation.backend === 'pi' || conversation.backend === 'zcode' || conversation.backend === 'opencode2' || conversation.backend === 'dsh'
       ? { syntheticParts: [] }
       : await this.skillContentExpander.expand(requestContent);
     if (!this.isTargetTabActive(tabId)) {

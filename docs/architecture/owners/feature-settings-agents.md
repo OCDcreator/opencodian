@@ -57,3 +57,7 @@ Pi图标由AgentSwitcherFloatingIcons单处注册用户SVG形状，三种后端�
 The agent switcher identifies OpenCode 2 independently and reuses the OpenCode visual icon.
 
 2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.settings-agents` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+## 2026-10-23 DSH switcher icon
+
+后端切换器使用官方 DeepSeek Harness favicon 路径和蓝色，原始文件随 assets 保留。图标映射归本 owner；`dsh` 的启用/连接真值继续来自后端 registry，图标本身不代表连接成功。

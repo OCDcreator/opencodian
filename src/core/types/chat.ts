@@ -748,7 +748,7 @@ export type StreamChunk =
   | { type: 'user_message_identity'; uuid: string; sessionId?: string; sourceTurnId?: string };
 
 /** Logical agent backend identity. Determines which adapter owns a session. */
-export type AgentBackendKind = 'opencode' | 'opencode2' | 'claude-code' | 'codex' | 'copilot' | 'pi' | 'zcode';
+export type AgentBackendKind = 'opencode' | 'opencode2' | 'claude-code' | 'codex' | 'copilot' | 'pi' | 'zcode' | 'dsh';
 
 /** Conversation metadata */
 export interface ConversationMeta {

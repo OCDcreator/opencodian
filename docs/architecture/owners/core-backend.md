@@ -151,3 +151,7 @@ CodexAdapter 的 `mcpServer/elicitation/request` 路由注册不再以 elicitati
 ## 2026-10-21 OpenCode 1 backend retirement
 
 `IMPLEMENTED_AGENT_BACKENDS` 摘除 `opencode`：设置归一化与 UI 过滤不再暴露 OpenCode 1，`main.ts` 不再注册 `OpenCodeAdapter`，`AgentServiceRegistry.pickDefaultActive()` 默认偏好改为 `opencode2`。`OpenCodeAdapter` 与 `src/core/opencode/**` 代码保留（休眠，供存量会话、legacy 只读引用与回滚）；存量 `opencode` conversation owner 不改写，routing 视为不可用后端。设置默认后端与存量迁移归 core.types 的 settingsLoadNormalization 所有（`migrateRetiredBackendKind()`）。
+
+## 2026-10-23 DSH ACP backend
+
+`DshAdapter` 与私有 `dsh/DshAcpClient` 在本 owner 内拥有本地 DeepSeek Harness 的 ACP 子进程、握手、请求关联、会话恢复、逐会话取消及权限回复。注册层只注入设置/环境，聊天视图只转发权限。能力仅声明 Chat、Sessions、Permissions、Thinking；不把 `session/close` 当成删除历史，不复用休眠的 OpenCode 1 服务，也不连接桌面私有 Web host。

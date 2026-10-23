@@ -5167,7 +5167,7 @@ export class OpenCodianView extends ItemView {
         tabId,
         (requestId, reply) => {
           const conversation = this.getConversationForTab(tabId);
-          if (conversation?.backend === 'zcode' || conversation?.backend === 'opencode2') {
+          if (conversation?.backend === 'zcode' || conversation?.backend === 'opencode2' || conversation?.backend === 'dsh') {
             const adapter = this.plugin.agentServiceRegistry?.get(conversation.backend) as {
               respondToPermission?(id: string, decision: typeof reply): Promise<void>;
             } | undefined;
@@ -5176,7 +5176,7 @@ export class OpenCodianView extends ItemView {
           }
           return this.plugin.openCodeService.respondToPermission(requestId, reply);
         },
-        (this.getConversationForTab(tabId)?.backend === 'zcode' || this.getConversationForTab(tabId)?.backend === 'opencode2')
+        (this.getConversationForTab(tabId)?.backend === 'zcode' || this.getConversationForTab(tabId)?.backend === 'opencode2' || this.getConversationForTab(tabId)?.backend === 'dsh')
           ? async () => {
               const backend = this.getConversationForTab(tabId)?.backend;
               const adapter = backend ? this.plugin.agentServiceRegistry?.get(backend) as {

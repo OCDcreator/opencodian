@@ -43,3 +43,8 @@ wireHiddenAdapters 惰性注册 ZCodeAdapter（getZCodeSettings / getZCodeExtraE
 Registers OpenCode2Adapter when a Vault path and settings callback exist. Construction is lazy; the adapter starts only when selected.
 
 The plugin composition supplies Pi extension-command completion localization through the existing adapter wiring callback, keeping the Pi service boundary independent of the locale runtime.
+
+
+## 2026-10-23 DSH backend
+
+`wireHiddenAdapters` 在存在 vault 路径时惰性注册 `DshAdapter`，注入 `getDshSettings` 和 `getDshExtraEnv`。注册不启动进程；选择后端或测试连接时才启动本地 ACP 子进程，工作目录默认取当前 vault。

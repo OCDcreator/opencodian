@@ -548,6 +548,7 @@ describe('ClaudeCode smoke harness', () => {
     expect(IMPLEMENTED_AGENT_BACKENDS).toContain('claude-code');
     expect(IMPLEMENTED_AGENT_BACKENDS).toContain('pi');
     expect(IMPLEMENTED_AGENT_BACKENDS).toContain('zcode');
-    expect(IMPLEMENTED_AGENT_BACKENDS.length).toBe(5);
+    expect(IMPLEMENTED_AGENT_BACKENDS).toContain('dsh');
+    expect(IMPLEMENTED_AGENT_BACKENDS.length).toBe(6);
   });
 });

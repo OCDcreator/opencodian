@@ -10,12 +10,13 @@
 
 import * as path from 'node:path';
 
-import type { CodexBackendSettings, OpenCode2BackendSettings, PiBackendSettings, ZCodeBackendSettings } from '../../types/settings';
+import type { CodexBackendSettings, DshBackendSettings, OpenCode2BackendSettings, PiBackendSettings, ZCodeBackendSettings } from '../../types/settings';
 import type { AgentService } from './AgentService';
 import type { AgentServiceRegistry } from './AgentServiceRegistry';
 import { CodexAdapter } from './CodexAdapter';
 import { resolveCodexCli } from './CodexCliResolver';
 import type { CodexTracePort } from './diagnostics/types';
+import { DshAdapter } from './DshAdapter';
 import { OpenCode2Adapter } from './OpenCode2Adapter';
 import { PiAdapter } from './pi/PiAdapter';
 import type { PiUiHandler } from './pi/PiProtocol';
@@ -45,12 +46,14 @@ export interface WireHiddenAdaptersOptions {
   getOpenCode2Settings?: () => OpenCode2BackendSettings;
   /** ZCode-specific settings from plugin configuration. */
   getZCodeSettings?: () => ZCodeBackendSettings;
+  getDshSettings?: () => DshBackendSettings;
   /** R-F7: resolved domain env injected into spawned Pi service processes. */
   getPiExtraEnv?: () => Record<string, string>;
   /** R-F7: resolved domain env injected into Codex CLI / app-server processes. */
   getCodexExtraEnv?: () => Record<string, string>;
   /** R-F7: resolved domain env injected into the owned ZCode app-server process. */
   getZCodeExtraEnv?: () => Record<string, string>;
+  getDshExtraEnv?: () => Record<string, string>;
   onPiUiRequest?: PiUiHandler;
   formatPiCommandCompleted?: (command: string) => string;
 }
@@ -113,5 +116,18 @@ export function wireHiddenAdapters(options: WireHiddenAdaptersOptions): void {
       ...(options.getZCodeSettings ? { getSettings: options.getZCodeSettings } : {}),
       ...(options.getZCodeExtraEnv ? { getExtraEnv: options.getZCodeExtraEnv } : {}),
     }));
+    registerDshAdapter(registry, vaultPath, options);
   }
+}
+
+function registerDshAdapter(
+  registry: AgentServiceRegistry,
+  vaultPath: string,
+  options: WireHiddenAdaptersOptions,
+): void {
+  registry.register(new DshAdapter({
+    workingDirectory: vaultPath,
+    getSettings: options.getDshSettings ?? (() => ({ executablePath: '', workingDirectory: '', args: [], env: {}, profile: 'acp' })),
+    ...(options.getDshExtraEnv ? { getExtraEnv: options.getDshExtraEnv } : {}),
+  }));
 }

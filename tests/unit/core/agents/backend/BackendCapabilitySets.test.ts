@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import { AgentCapability } from '../../../../../src/core/agents/AgentCapability';
+import { DshAdapter } from '../../../../../src/core/agents/backend/DshAdapter';
 import { OpenCode2Adapter } from '../../../../../src/core/agents/backend/OpenCode2Adapter';
 import { OpenCodeAdapter } from '../../../../../src/core/agents/backend/OpenCodeAdapter';
 import { PiAdapter } from '../../../../../src/core/agents/backend/pi/PiAdapter';
@@ -140,6 +141,23 @@ describe('backend capability sets', () => {
     ]);
     expect(adapter.hasCapability(AgentCapability.TurnSteering)).toBe(false);
     expect(steerMethodOf(adapter)).toBeUndefined();
+  });
+
+  it('DshAdapter exposes only ACP-proven chat/session/permission/thinking capabilities', () => {
+    const adapter = new DshAdapter({
+      workingDirectory: '/vault',
+      getSettings: () => ({ executablePath: '', workingDirectory: '', args: [], env: {}, profile: 'acp' }),
+    });
+
+    expect(adapter.kind).toBe('dsh');
+    expectCapabilitySet(adapter.capabilities, [
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+      AgentCapability.Permissions,
+      AgentCapability.Thinking,
+    ]);
+    expect(adapter.hasCapability(AgentCapability.Models)).toBe(false);
+    expect(adapter.hasCapability(AgentCapability.Tools)).toBe(false);
   });
 });
 

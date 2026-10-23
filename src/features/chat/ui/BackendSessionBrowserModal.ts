@@ -423,7 +423,7 @@ export class BackendSessionBrowserModal extends Modal {
     if (!preview || preview.length === 0) {
       this.previewEl.createEl('p', {
         cls: 'opencodian-backend-session-browser-preview-empty',
-        text: t('chat.backendSessions.previewEmpty'),
+        text: t(preview === null && (this.host.forcedBackendKind ?? this.host.getActiveBackendKind()) === 'dsh' ? 'chat.backendSessions.dshResumeWithoutHistory' : 'chat.backendSessions.previewEmpty'),
       });
       return;
     }
