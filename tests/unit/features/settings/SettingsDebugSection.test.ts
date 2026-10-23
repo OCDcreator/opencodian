@@ -3,6 +3,7 @@
 import fs from 'fs';
 import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
+import { join } from 'path';
 
 import { DEFAULT_SETTINGS, getCurrentPlatformKey } from '../../../../src/core/types';
 import { SettingsDebugSection } from '../../../../src/features/settings/debug/SettingsDebugSection';
@@ -823,7 +824,7 @@ describe('MATRIX008 joined diagnostic report sinks', () => {
         checks = [
           [mkdir.mock.calls[0], ['/fixture.invalid/export', { recursive: true }]],
           [writeFile.mock.calls.length, 1],
-          [writeFile.mock.calls[0]?.[0], '/fixture.invalid/export/opencodian-debug-2026-10-12T00-00-00-000Z.log'],
+          [writeFile.mock.calls[0]?.[0], join('/fixture.invalid/export', 'opencodian-debug-2026-10-12T00-00-00-000Z.log')],
         ];
         output = String(writeFile.mock.calls[0]?.[1] ?? '');
       } else {
