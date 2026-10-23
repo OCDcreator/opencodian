@@ -5,6 +5,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 const service=new URL('../../../../../../assets/pi/service.mjs',import.meta.url).href;
 const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'pi-output-regression-'));
@@ -26,7 +27,7 @@ test('rejects a protected service startup failure through JSONL',async()=>{
  const pkg=path.join(scratch,'bootstrap-sdk');fs.mkdirSync(path.join(pkg,'dist'),{recursive:true});fs.writeFileSync(path.join(pkg,'package.json'),JSON.stringify({name:'@mariozechner/pi-coding-agent',bin:{pi:'dist/cli.js'}}));fs.writeFileSync(path.join(pkg,'dist','cli.js'),'');fs.writeFileSync(path.join(pkg,'dist','index.js'),'');
  const binary=path.join(pkg,'dist','pi');fs.symlinkSync(path.join(pkg,'dist','cli.js'),binary);const executable=path.join(pkg,'dist',process.platform==='win32'?'node.exe':'node');fs.symlinkSync(process.execPath,executable);
  const outfile=path.join(scratch,'client.cjs');const source="export async function startPiService(){process.stdout.write=process.stderr.write.bind(process.stderr);throw new Error('OWNED_STARTUP_FAILURE');}";
- await build({entryPoints:[new URL('../../../../../../src/core/agents/backend/pi/PiRpcClient.ts',import.meta.url).pathname],outfile,bundle:true,platform:'node',format:'cjs',define:{PI_SERVICE_SOURCE:JSON.stringify(source)},logLevel:'silent'});
+ await build({entryPoints:[fileURLToPath(new URL('../../../../../../src/core/agents/backend/pi/PiRpcClient.ts',import.meta.url))],outfile,bundle:true,platform:'node',format:'cjs',define:{PI_SERVICE_SOURCE:JSON.stringify(source)},logLevel:'silent'});
  const require=createRequire(import.meta.url);const {PiRpcClient}=require(outfile);const client=new PiRpcClient({workingDirectory:scratch,sessionDirectory:scratch,executablePath:binary});
  try{await assert.rejects(client.request({type:'get_state'},1000),/OWNED_STARTUP_FAILURE/);}finally{client.close();}
 });

@@ -1,3 +1,6 @@
+import childProcess, { type ChildProcessWithoutNullStreams } from 'node:child_process';
+import path from 'node:path';
+
 import { describe, expect, it, jest } from '@jest/globals';
 
 import {
@@ -99,18 +102,20 @@ describe('resolveDshLaunch', () => {
 
   it('prefers the configured PATH CLI before deterministic Desktop fallback', () => {
     const base = { executablePath: '', workingDirectory: '', args: [], env: {}, profile: 'acp' } as const;
-    expect(resolveDshLaunch(base, { PATH: '/tools:/other' }, {
-      platform: 'darwin', homedir: '/home/test', isExecutable: (candidate) => candidate === '/tools/dsh',
-    }).command).toBe('/tools/dsh');
+    const cliPath = path.join('/tools', 'dsh');
+    const desktopExecutable = path.join('/Applications/DeepSeek Harness.app', 'Contents', 'MacOS', 'DeepSeek Harness');
+    expect(resolveDshLaunch(base, { PATH: ['/tools', '/other'].join(path.delimiter) }, {
+      platform: 'darwin', homedir: '/home/test', isExecutable: (candidate) => candidate === cliPath,
+    }).command).toBe(cliPath);
     const desktop = resolveDshLaunch(base, { PATH: '/none' }, {
       platform: 'darwin', homedir: '/home/test',
-      isExecutable: (candidate) => candidate === '/Applications/DeepSeek Harness.app/Contents/MacOS/DeepSeek Harness',
+      isExecutable: (candidate) => candidate === desktopExecutable,
     });
     expect(desktop).toMatchObject({
-      command: '/Applications/DeepSeek Harness.app/Contents/MacOS/DeepSeek Harness',
+      command: desktopExecutable,
       env: { PATH: '/none', ELECTRON_RUN_AS_NODE: '1' },
     });
-    expect(desktop.args[0]).toContain('DeepSeek Harness.app/Contents/Resources/app.asar/dsh/');
+    expect(desktop.args[0]).toBe(path.join('/Applications/DeepSeek Harness.app', 'Contents', 'Resources', 'app.asar', 'dsh', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js'));
   });
 
   it('accepts only a native Windows executable and rejects command shims', () => {
@@ -198,34 +203,26 @@ describe('DshAcpClient transport', () => {
     await expect(exited.start()).rejects.toThrow('process exited');
   });
 
-  it('contains stdin EPIPE when the child closes fd0 but remains alive', async () => {
-    const script = `
-const fs = require('node:fs');
-process.stdin.setEncoding('utf8');
-let input = '';
-process.stdin.on('data', (chunk) => {
-  input += chunk;
-  const newline = input.indexOf('\\n');
-  if (newline < 0) return;
-  const request = JSON.parse(input.slice(0, newline));
-  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: ${JSON.stringify(HANDSHAKE)} }) + '\\n');
-  setTimeout(() => fs.closeSync(0), 5);
-});
-setInterval(() => {}, 1000);
-`;
+  it('contains stdin EPIPE while the child remains alive', async () => {
+    const spawn = jest.spyOn(childProcess, 'spawn');
     const protocolErrors: Error[] = [];
-    const client = new DshAcpClient({
-      cwd: process.cwd(),
-      launch: { command: process.execPath, args: ['-e', script], env: {} },
-      requestTimeoutMs: 250,
+    const client = clientFor('() => {}', {
       onProtocolError: (error) => protocolErrors.push(error),
     });
-    await client.start();
-    await new Promise((resolve) => setTimeout(resolve, 30));
-    await expect(client.listSessions()).rejects.toThrow(/EPIPE|stdin|transport/i);
-    expect(protocolErrors).toEqual([expect.objectContaining({ code: 'EPIPE' })]);
-    expect(client.isStarted).toBe(false);
-    await client.stop();
+    try {
+      await client.start();
+      const child = spawn.mock.results[0].value as ChildProcessWithoutNullStreams;
+      expect(child.exitCode).toBeNull();
+      const pending = client.listSessions();
+      // Exercise the real stdin error listener without OS-specific fd0 close semantics.
+      child.stdin.emit('error', Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }));
+      await expect(pending).rejects.toThrow(/EPIPE|stdin|transport/i);
+      expect(protocolErrors).toEqual([expect.objectContaining({ code: 'EPIPE' })]);
+      expect(client.isStarted).toBe(false);
+    } finally {
+      await client.stop();
+      spawn.mockRestore();
+    }
   });
 
   it('can stop an in-flight start and then start a fresh process', async () => {

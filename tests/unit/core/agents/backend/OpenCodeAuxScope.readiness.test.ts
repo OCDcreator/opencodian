@@ -30,14 +30,26 @@ function verificationResponse(url: string): AuxHttpResponse {
   return response({});
 }
 
-describe('OpenCodeAuxScope bounded readiness', () => {
+describe.each<NodeJS.Platform>(['darwin', 'win32'])('OpenCodeAuxScope bounded readiness (%s)', (platform) => {
+  const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')!;
   beforeEach(() => {
+    Object.defineProperty(process, 'platform', { ...originalPlatform, value: platform });
     jest.useFakeTimers();
     const child = Object.assign(new EventEmitter(), { pid: 1, stdout: new EventEmitter(), stderr: new EventEmitter(),
       exitCode: null, signalCode: 'SIGTERM', kill: jest.fn() });
-    jest.mocked(spawn).mockReturnValue(child as never);
+    jest.mocked(spawn).mockImplementation((command) => {
+      if (command === 'taskkill') {
+        const killer = new EventEmitter();
+        setTimeout(() => killer.emit('exit', 0), 0);
+        return killer as never;
+      }
+      return child as never;
+    });
   });
-  afterEach(() => jest.useRealTimers());
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', originalPlatform);
+    jest.useRealTimers();
+  });
 
   it('aborts a hung readiness request and retries before native safety verification', async () => {
     const signals: Array<AbortSignal | undefined> = [];

@@ -1,6 +1,7 @@
 import type * as fs from 'node:fs';
 import nodeFs from 'node:fs';
 import nodeOs from 'node:os';
+import * as path from 'node:path';
 
 import { type App, Setting } from 'obsidian';
 
@@ -157,7 +158,7 @@ describe('MATRIX008 Pi declaration reader to settings descriptions', () => {
   ])('MATRIX008 $id excludes fake values through the real declaration reader', (shape) => {
     const home = '/fixture.invalid/home';
     const workingDirectory = '/fixture.invalid/vault';
-    const configPath = `${home}/.pi/agent/mcp.json`;
+    const configPath = path.join(home, '.pi', 'agent', 'mcp.json');
     const input = JSON.stringify({ mcpServers: { 'safe-mcp': shape.entry } });
     const readFile = jest.spyOn(nodeFs, 'readFileSync').mockImplementation(((file: fs.PathOrFileDescriptor) => {
       expect(file).toBe(configPath);
