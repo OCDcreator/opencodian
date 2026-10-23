@@ -52,5 +52,5 @@ imageEmbedWidthSuffix(width): string;
 
 - `src/core/storage/ImageAssetStorage.ts`：成功结果交给它落盘（W-asset）。
 - `src/features/inline-edit/InlineEditImageGen.ts`：行内入口编排。
-- `src/features/chat/services/ImageGenerationChatController.ts`：聊天入口编排。
+- `src/features/chat/services/integrations/ImageGenerationChatController.ts`：聊天入口编排。
 - `src/main.ts`：组合根，构造服务并注入 `createRequestUrlImageGenTransport()`。

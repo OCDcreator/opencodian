@@ -5,8 +5,8 @@ import {
   createQuestionTodoBackgroundTaskActivationViewHostAdapter,
   type QuestionTodoBackgroundTaskActivationViewHost,
   type QuestionTodoBackgroundTaskActivationViewHostAdapterHost,
-} from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskActivationHostAdapter';
-import type { QuestionTodoStatusRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoStatusRefreshCoordinator';
+} from '../../../../src/features/chat/services/questions/QuestionTodoBackgroundTaskActivationHostAdapter';
+import type { QuestionTodoStatusRefreshCoordinator } from '../../../../src/features/chat/services/questions/QuestionTodoStatusRefreshCoordinator';
 
 type QuestionTodoActivationRefreshPort = Pick<
   QuestionTodoStatusRefreshCoordinator,

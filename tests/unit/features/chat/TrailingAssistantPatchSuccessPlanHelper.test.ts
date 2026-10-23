@@ -1,4 +1,4 @@
-import { buildTrailingAssistantPatchSuccessPlanFromParts } from '../../../../src/features/chat/services/trailingAssistantPatchExecution';
+import { buildTrailingAssistantPatchSuccessPlanFromParts } from '../../../../src/features/chat/services/sync/trailingAssistantPatchExecution';
 
 describe('TrailingAssistantPatchSuccessPlanHelper', () => {
   it('builds the final success-plan shape from execution, tail-outcome, and turn-body parts', () => {

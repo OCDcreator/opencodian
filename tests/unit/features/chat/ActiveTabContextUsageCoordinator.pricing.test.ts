@@ -2,8 +2,8 @@ import type { App } from 'obsidian';
 
 import { ModelPricingService } from '../../../../src/core/config/ModelPricingService';
 import { type ContextUsageSnapshot, createEmptyTabContextState, type TabContextState } from '../../../../src/core/types';
-import { ActiveTabContextUsageCoordinator, type ActiveTabContextUsageCoordinatorHost } from '../../../../src/features/chat/services/ActiveTabContextUsageCoordinator';
-import { ContextUsageService } from '../../../../src/features/chat/services/ContextUsageService';
+import { ActiveTabContextUsageCoordinator, type ActiveTabContextUsageCoordinatorHost } from '../../../../src/features/chat/services/context/ActiveTabContextUsageCoordinator';
+import { ContextUsageService } from '../../../../src/features/chat/services/context/ContextUsageService';
 import { ContextDetailModal } from '../../../../src/features/chat/ui/ContextDetailModal';
 
 function snapshot(sessionId: string): ContextUsageSnapshot {

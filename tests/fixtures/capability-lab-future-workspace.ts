@@ -1,5 +1,5 @@
-import { createCapabilityLabBackendTabs } from '../../src/features/settings/capabilityLabBackendTabs';
-import { createCapabilityLabBackendWorkspace } from '../../src/features/settings/capabilityLabBackendWorkspace';
+import { createCapabilityLabBackendTabs } from '../../src/features/settings/capabilities/capabilityLabBackendTabs';
+import { createCapabilityLabBackendWorkspace } from '../../src/features/settings/capabilities/capabilityLabBackendWorkspace';
 
 declare const containerEl: HTMLElement;
 

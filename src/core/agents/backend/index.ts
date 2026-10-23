@@ -80,14 +80,14 @@ export {
   type TaskBudgetReadbackProbeResult,
   type ToolAliasesReadbackProbeResult,
   type WarmStartupProbeResult,
-} from './ClaudeCodeAdapter';
+} from './claude/ClaudeCodeAdapter';
 export {
   buildClaudeCodeElicitationContent,
   buildClaudeCodeElicitationQuestionRequest,
   buildClaudeCodeUserDialogQuestionRequest,
   buildClaudeCodeUserDialogResult,
   normalizeClaudeCodeElicitationContent,
-} from './ClaudeCodeElicitationBridge';
+} from './claude/ClaudeCodeElicitationBridge';
 export {
   adaptMcpConfigForClaude,
   type ClaudeCodeMcpHttpConfig,
@@ -95,13 +95,13 @@ export {
   type ClaudeCodeMcpServersMap,
   type ClaudeCodeMcpSseConfig,
   type ClaudeCodeMcpStdioConfig,
-} from './ClaudeCodeMcpConfigAdapter';
+} from './claude/ClaudeCodeMcpConfigAdapter';
 export {
   buildClaudeCodeOptions,
   type ClaudeCodeOptionsBuilderInput,
   type ClaudeCodeSdkOptionsShape,
   type ClaudeCodeSdkThinking,
-} from './ClaudeCodeOptionsBuilder';
+} from './claude/ClaudeCodeOptionsBuilder';
 export {
   type ClaudeCodeApprovalDecision,
   type ClaudeCodeCanUseToolContext,
@@ -112,26 +112,26 @@ export {
   type ClaudeCodePermissionUpdate,
   type ClaudeCodeQuestionDecision,
   createClaudeCodePermissionBridge,
-} from './ClaudeCodePermissionBridge';
+} from './claude/ClaudeCodePermissionBridge';
 export {
   type ClaudeCodeProcessMissingReason,
   type ClaudeCodeProcessResolution,
   type ClaudeCodeProcessResolverEnv,
   type ClaudeCodeProcessResolverOptions,
   resolveClaudeCodeProcess,
-} from './ClaudeCodeProcessResolver';
+} from './claude/ClaudeCodeProcessResolver';
 export {
   type ClaudeAgentSdkImporter,
   type ClaudeAgentSdkModule,
   type ClaudeCodeSdkLoaderOptions,
   loadClaudeCodeSdk,
   type WarmQueryHandle,
-} from './ClaudeCodeSdkLoader';
+} from './claude/ClaudeCodeSdkLoader';
 export {
   ClaudeCodeStreamNormalizer,
   type ClaudeCodeStreamNormalizerOptions,
   createClaudeCodeStreamNormalizer,
-} from './ClaudeCodeStreamNormalizer';
+} from './claude/ClaudeCodeStreamNormalizer';
 export {
   type ClaudeAgentWriteResult,
   type ClaudeProjectAgentInfo,
@@ -143,7 +143,7 @@ export {
   readClaudeAgentContent,
   updateClaudeProjectAgent,
   validateClaudeAgentContent,
-} from './ClaudeProjectAgentDiscovery';
+} from './claude/ClaudeProjectAgentDiscovery';
 export {
   type ClaudeCommandWriteResult,
   type ClaudeProjectCommandInfo,
@@ -155,7 +155,7 @@ export {
   readClaudeCommandContent,
   updateClaudeProjectCommand,
   validateClaudeCommandContent,
-} from './ClaudeProjectCommandDiscovery';
+} from './claude/ClaudeProjectCommandDiscovery';
 export {
   applyClaudeProviderPreset,
   type ApplyClaudeProviderPresetResult,
@@ -169,7 +169,7 @@ export {
   readClaudeProviderConfigSnapshot,
   resolveClaudeProviderGlobalEffectiveValue,
   validateClaudeProviderPreset,
-} from './ClaudeProjectProviderConfig';
+} from './claude/ClaudeProjectProviderConfig';
 export {
   type ClaudeHookEntry,
   type ClaudeHookGroup,
@@ -177,7 +177,7 @@ export {
   type ClaudeProjectSettingsInfo,
   discoverClaudeProjectSettings,
   openClaudeProjectSettingsFile,
-} from './ClaudeProjectSettingsDiscovery';
+} from './claude/ClaudeProjectSettingsDiscovery';
 export {
   type ClaudeProjectSkillInfo,
   type ClaudeSkillWriteResult,
@@ -189,7 +189,7 @@ export {
   readClaudeSkillContent,
   updateClaudeProjectSkill,
   validateClaudeSkillContent,
-} from './ClaudeProjectSkillDiscovery';
+} from './claude/ClaudeProjectSkillDiscovery';
 export {
   CodexAdapter,
   type CodexAdapterOptions,
@@ -198,7 +198,7 @@ export {
   type CodexApprovalKind,
   type CodexApprovalRequest,
   type CodexFactory,
-} from './CodexAdapter';
+} from './codex/CodexAdapter';
 export {
   buildCodexApprovalQuestionRequest,
   type CodexApprovalCardRenderer,
@@ -206,7 +206,7 @@ export {
   type CodexApprovalResolutionResult,
   createCodexApprovalBridgeHost,
   mapCodexApprovalResolution,
-} from './CodexDefaultApprovalHost';
+} from './codex/CodexDefaultApprovalHost';
 export {
   buildCodexElicitationContent,
   buildCodexElicitationQuestionRequest,
@@ -224,7 +224,7 @@ export {
   createCodexElicitationBridgeHost,
   isCodexElicitationDecline,
   isCodexElicitationWireParams,
-} from './CodexElicitationBridge';
+} from './codex/CodexElicitationBridge';
 export {
   type CodexAgentInfo,
   type CodexResourceWriteError,
@@ -246,22 +246,22 @@ export {
   updateCodexProjectSkill,
   validateCodexAgentContent,
   validateCodexSkillContent,
-} from './CodexProjectResourceDiscovery';
+} from './codex/CodexProjectResourceDiscovery';
 export {
   CodexStreamNormalizer,
   type CodexStreamNormalizerOptions,
   createCodexStreamNormalizer,
-} from './CodexStreamNormalizer';
-export { DshAdapter, type DshAdapterOptions } from './DshAdapter';
-export { OpenCode2Adapter } from './OpenCode2Adapter';
-export { OpenCodeAdapter } from './OpenCodeAdapter';
+} from './codex/CodexStreamNormalizer';
 export {
   assertWithinRoot,
   atomicWriteFile,
   isSafeResourceName,
   type ProjectResourceWriteError,
   toWriteErrorCode,
-} from './ProjectResourceSecureWrite';
+} from './configuration/ProjectResourceSecureWrite';
+export { DshAdapter, type DshAdapterOptions } from './dsh/DshAdapter';
+export { OpenCode2Adapter } from './opencode/OpenCode2Adapter';
+export { OpenCodeAdapter } from './opencode/OpenCodeAdapter';
 export {
   ZCodeAdapter,
   type ZCodeAdapterOptions,

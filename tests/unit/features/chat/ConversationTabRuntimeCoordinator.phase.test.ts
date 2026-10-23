@@ -5,16 +5,16 @@ import {
   type ConversationTabRuntimeCoordinatorHost,
   type ConversationTabRuntimeCoordinatorPorts,
   type ConversationTabRuntimeState,
-} from '../../../../src/features/chat/services/ConversationTabRuntimeCoordinator';
+} from '../../../../src/features/chat/services/conversation/ConversationTabRuntimeCoordinator';
 import {
   type TabMessagesPaneCoordinator,
   type TabMessagesPaneState,
-} from '../../../../src/features/chat/services/TabMessagesPaneCoordinator';
+} from '../../../../src/features/chat/services/conversation/TabMessagesPaneCoordinator';
 import {
   createInitialTabSessionLifecycleState,
   deriveTabSessionPhase,
   type TabSessionLifecycleState,
-} from '../../../../src/features/chat/services/TabSessionPhase';
+} from '../../../../src/features/chat/services/conversation/TabSessionPhase';
 import { type TabBar, type TabId, TabManager } from '../../../../src/features/chat/tabs';
 
 interface TestRuntimeState extends ConversationTabRuntimeState {

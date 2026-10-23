@@ -12,7 +12,7 @@ import {
   readBackendSessionsCatalog,
 } from '../../../core/agents/backend/AgentBackendRouting';
 import type { AgentServiceRegistry } from '../../../core/agents/backend/AgentServiceRegistry';
-import type { AppServerCatalogReadResult } from '../../../core/agents/backend/CodexAppServerClient';
+import type { AppServerCatalogReadResult } from '../../../core/agents/backend/codex/CodexAppServerClient';
 import { t } from '../../../i18n';
 
 /** Catalog evidence keeps failure/absence distinct from authoritative empty success. */

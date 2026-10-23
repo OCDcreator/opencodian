@@ -1,5 +1,5 @@
-import { CodexAdapter } from '../../../../../src/core/agents/backend/CodexAdapter';
-import type { AppServerThreadMutationResult } from '../../../../../src/core/agents/backend/CodexAppServerClientTypes';
+import { CodexAdapter } from '../../../../../src/core/agents/backend/codex/CodexAdapter';
+import type { AppServerThreadMutationResult } from '../../../../../src/core/agents/backend/codex/CodexAppServerClientTypes';
 
 const mockStart = jest.fn<Promise<void>, []>();
 const mockCompact = jest.fn();
@@ -7,8 +7,8 @@ const mockDeleteThreadResult = jest.fn<Promise<AppServerThreadMutationResult>, [
 let handlers = new Map<string, (event: { method: string; params: Record<string, unknown> }) => void>();
 let synchronousSubscriptionEvent: { method: string; params: Record<string, unknown> } | null = null;
 
-jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => {
-  const actual = jest.requireActual('../../../../../src/core/agents/backend/CodexAppServerClient');
+jest.mock('../../../../../src/core/agents/backend/codex/CodexAppServerClient', () => {
+  const actual = jest.requireActual('../../../../../src/core/agents/backend/codex/CodexAppServerClient');
   return {
     ...actual,
     CodexAppServerClient: jest.fn().mockImplementation(() => ({

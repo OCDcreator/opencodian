@@ -4,15 +4,15 @@ import type {
   ChatMessage,
   Conversation,
 } from '../../../../src/core/types';
-import type { ConversationSyncBackgroundPostSyncRouter } from '../../../../src/features/chat/services/ConversationSyncBackgroundPostSyncRouter';
+import type { ConversationSyncBackgroundPostSyncRouter } from '../../../../src/features/chat/services/sync/ConversationSyncBackgroundPostSyncRouter';
 import {
   ConversationSyncBridge,
   type ConversationSyncBridgeHost,
   type ConversationSyncBridgeOrchestration,
   type ConversationSyncBridgeRuntimeCoordinator,
   type ConversationSyncBridgeSyncResult,
-} from '../../../../src/features/chat/services/ConversationSyncBridge';
-import type { ConversationSyncVisiblePostSyncRouter } from '../../../../src/features/chat/services/ConversationSyncVisiblePostSyncRouter';
+} from '../../../../src/features/chat/services/sync/ConversationSyncBridge';
+import type { ConversationSyncVisiblePostSyncRouter } from '../../../../src/features/chat/services/sync/ConversationSyncVisiblePostSyncRouter';
 
 type Mocked<T> = {
   [Key in keyof T]:

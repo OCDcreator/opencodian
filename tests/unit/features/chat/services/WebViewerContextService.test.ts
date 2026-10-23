@@ -11,7 +11,7 @@ import {
   buildWebViewerContextItem,
   getActiveWebViewerTabContext,
   isWebViewerAvailable,
-} from '../../../../../src/features/chat/services/WebViewerContextService';
+} from '../../../../../src/features/chat/services/context/WebViewerContextService';
 
 function fakeApp(options: {
   webviewerEnabled?: boolean;

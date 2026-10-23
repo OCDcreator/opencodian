@@ -1,5 +1,5 @@
 import type { SlashCommandMenuItem } from '../../../../src/core/config/slashCommandCatalog';
-import { renderSlashCommandMenu } from '../../../../src/features/chat/services/slashCommandMenuRenderer';
+import { renderSlashCommandMenu } from '../../../../src/features/chat/services/commands/slashCommandMenuRenderer';
 import { setLocale } from '../../../../src/i18n';
 
 function menuItem(overrides: Partial<SlashCommandMenuItem> = {}): SlashCommandMenuItem {

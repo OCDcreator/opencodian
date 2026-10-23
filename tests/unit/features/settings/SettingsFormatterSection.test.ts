@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 
-import { SettingsFormatterSection } from '../../../../src/features/settings/SettingsFormatterSection';
+import { SettingsFormatterSection } from '../../../../src/features/settings/general/SettingsFormatterSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 

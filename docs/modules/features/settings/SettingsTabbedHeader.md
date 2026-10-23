@@ -25,3 +25,8 @@
 
 - 本模块只处理 tabbed settings 的标题行和 renderer 自有正文 DOM，不应创建一级 / 二级 tab，也不应直接路由内容 section。
 - 标题行 action slot 是 active backend 快速切换入口，不替代 `SettingsBackendSection` 的启用 / 禁用 backend 管理。
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/features/settings/SettingsTabbedHeader.ts`。
+- 随目录调整更新的依赖：`src/features/settings/resources/AgentSwitcherFloatingIcons.ts`。

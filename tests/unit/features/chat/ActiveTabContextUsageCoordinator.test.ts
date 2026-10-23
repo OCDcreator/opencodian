@@ -9,7 +9,7 @@ import {
 import {
   ActiveTabContextUsageCoordinator,
   type ActiveTabContextUsageCoordinatorHost,
-} from '../../../../src/features/chat/services/ActiveTabContextUsageCoordinator';
+} from '../../../../src/features/chat/services/context/ActiveTabContextUsageCoordinator';
 import type {
   ModelSelectorKnownModelInfo,
   ModelSelectorSelection,

@@ -1,8 +1,8 @@
-import type { AgentSelectionCandidate } from '../../../../src/features/chat/services/AgentMentionCandidateService';
+import type { AgentSelectionCandidate } from '../../../../src/features/chat/services/composer/AgentMentionCandidateService';
 import {
   ChatAgentSelectionCoordinator,
   type ChatAgentSelectionCoordinatorHost,
-} from '../../../../src/features/chat/services/ChatAgentSelectionCoordinator';
+} from '../../../../src/features/chat/services/selection/ChatAgentSelectionCoordinator';
 
 class ResizeObserverMock {
   static readonly instances: ResizeObserverMock[] = [];

@@ -3,7 +3,7 @@ import {
   QuestionResolutionFlowCoordinator,
   type QuestionResolutionFlowCoordinatorHost,
   type QuestionResolutionFlowCoordinatorPorts,
-} from '../../../../src/features/chat/services/QuestionResolutionFlowCoordinator';
+} from '../../../../src/features/chat/services/questions/QuestionResolutionFlowCoordinator';
 import type { TabId } from '../../../../src/features/chat/tabs';
 import { setLocale } from '../../../../src/i18n';
 

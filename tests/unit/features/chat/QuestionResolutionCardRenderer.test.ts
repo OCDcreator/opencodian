@@ -6,7 +6,7 @@ import {
   buildQuestionRejectedMarkdown,
   buildQuestionResolutionCardRenderPlan,
   populateQuestionResolutionCard,
-} from '../../../../src/features/chat/runtime/QuestionResolutionCardRenderer';
+} from '../../../../src/features/chat/runtime/rendering/QuestionResolutionCardRenderer';
 import { t } from '../../../../src/i18n';
 
 function createQuestionRequest(): QuestionRequest {

@@ -1,7 +1,7 @@
 import { AgentCapability } from '../../../../../src/core/agents/AgentCapability';
 import type { AgentService, AgentSessionCapability } from '../../../../../src/core/agents/backend/AgentService';
 import type { AgentBackendKind } from '../../../../../src/core/types/chat';
-import { TitleGenerationService } from '../../../../../src/features/chat/services/TitleGenerationService';
+import { TitleGenerationService } from '../../../../../src/features/chat/services/title/TitleGenerationService';
 
 describe('TitleGenerationService', () => {
   function createMockPlugin(overrides: Partial<{

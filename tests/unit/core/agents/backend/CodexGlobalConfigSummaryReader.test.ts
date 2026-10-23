@@ -9,7 +9,7 @@ import {
   readGlobalCodexConfigSummary,
   resolveGlobalCodexConfigPath,
   sanitizeConfigUrl,
-} from '../../../../../src/core/agents/backend/CodexGlobalConfigSummaryReader';
+} from '../../../../../src/core/agents/backend/codex/CodexGlobalConfigSummaryReader';
 
 describe('resolveGlobalCodexConfigPath', () => {
   const originalCodexHome = process.env.CODEX_HOME;

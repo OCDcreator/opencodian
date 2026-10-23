@@ -1,5 +1,5 @@
-import { buildMessageRenderGroups } from '../../../../src/features/chat/renderGroups';
-import { ConversationWriteSerializationService } from '../../../../src/features/chat/services/ConversationWriteSerializationService';
+import { buildMessageRenderGroups } from '../../../../src/features/chat/rendering/renderGroups';
+import { ConversationWriteSerializationService } from '../../../../src/features/chat/services/conversation/ConversationWriteSerializationService';
 import {
   createAsyncStream,
   createFinalizationPort,

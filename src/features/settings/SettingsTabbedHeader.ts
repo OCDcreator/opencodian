@@ -1,5 +1,5 @@
 import type { AgentBackendKind } from '../../core/types/chat';
-import { renderAgentSwitcherHeaderIcons } from './AgentSwitcherFloatingIcons';
+import { renderAgentSwitcherHeaderIcons } from './resources/AgentSwitcherFloatingIcons';
 
 export interface SettingsTabbedHeaderOptions {
   selectedAgent: AgentBackendKind | undefined;

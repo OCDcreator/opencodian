@@ -7,7 +7,7 @@ import { createLogger } from '../../shared';
 import type {
   ArchiveHistoryCatalogOutcome,
   JsoncPathEdit,
-} from '../agents/backend/ProjectResourceSecureWrite';
+} from '../agents/backend/configuration/ProjectResourceSecureWrite';
 import type {
   OpencodeAgentConfig, OpencodeAgentConfigRecord, OpencodeCommandConfig,
   OpencodeCommandConfigRecord, OpencodeCompactionConfig, OpencodeConfig,

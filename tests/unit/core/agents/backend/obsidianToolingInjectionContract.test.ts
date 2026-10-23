@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-import { OpenCodeAdapter } from '../../../../../src/core/agents/backend/OpenCodeAdapter';
+import { OpenCodeAdapter } from '../../../../../src/core/agents/backend/opencode/OpenCodeAdapter';
 
 const SRC_ROOT = join(__dirname, '..', '..', '..', '..', '..', 'src');
 
@@ -64,13 +64,13 @@ describe('R-B4 tooling injection: backend-agnostic options-bag contract', () => 
   });
 
   it('claude-code prefixes the message content with the injection', () => {
-    const source = readFileSync(join(SRC_ROOT, 'core', 'agents', 'backend', 'ClaudeCodeAdapter.ts'), 'utf8');
+    const source = readFileSync(join(SRC_ROOT, 'core', 'agents', 'backend', 'claude', 'ClaudeCodeAdapter.ts'), 'utf8');
     expect(source).toContain('prependObsidianToolingInjection');
     expect(source).toContain('prependMemoryInjection');
   });
 
   it('codex prefixes the message content with the injection', () => {
-    const source = readFileSync(join(SRC_ROOT, 'core', 'agents', 'backend', 'CodexAdapter.ts'), 'utf8');
+    const source = readFileSync(join(SRC_ROOT, 'core', 'agents', 'backend', 'codex', 'CodexAdapter.ts'), 'utf8');
     expect(source).toContain('prependObsidianToolingInjection');
     expect(source).toContain('prependMemoryInjection');
   });
@@ -83,9 +83,9 @@ describe('R-B4 tooling injection: backend-agnostic options-bag contract', () => 
 
   it('every adapter seam consumes the SAME options-bag key (no per-backend divergence)', () => {
     for (const adapterPath of [
-      join(SRC_ROOT, 'core', 'agents', 'backend', 'OpenCodeAdapter.ts'),
-      join(SRC_ROOT, 'core', 'agents', 'backend', 'ClaudeCodeAdapter.ts'),
-      join(SRC_ROOT, 'core', 'agents', 'backend', 'CodexAdapter.ts'),
+      join(SRC_ROOT, 'core', 'agents', 'backend', 'opencode', 'OpenCodeAdapter.ts'),
+      join(SRC_ROOT, 'core', 'agents', 'backend', 'claude', 'ClaudeCodeAdapter.ts'),
+      join(SRC_ROOT, 'core', 'agents', 'backend', 'codex', 'CodexAdapter.ts'),
       join(SRC_ROOT, 'core', 'agents', 'backend', 'pi', 'PiAdapter.ts'),
     ]) {
       const source = readFileSync(adapterPath, 'utf8');

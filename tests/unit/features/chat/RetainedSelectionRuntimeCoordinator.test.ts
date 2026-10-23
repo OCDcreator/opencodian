@@ -3,7 +3,7 @@ import type { Editor, MarkdownView } from 'obsidian';
 import {
   RetainedSelectionRuntimeCoordinator,
   type RetainedSelectionRuntimeCoordinatorHost,
-} from '../../../../src/features/chat/services/RetainedSelectionRuntimeCoordinator';
+} from '../../../../src/features/chat/services/context/RetainedSelectionRuntimeCoordinator';
 
 function createHarness() {
   const editor = { id: 'editor' } as unknown as Editor;

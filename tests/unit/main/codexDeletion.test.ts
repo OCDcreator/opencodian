@@ -1,9 +1,9 @@
 import { AgentCapability } from '../../../src/core/agents/AgentCapability';
 import { AgentServiceRegistry } from '../../../src/core/agents/backend/AgentServiceRegistry';
-import { CodexAdapter, type CodexFactory } from '../../../src/core/agents/backend/CodexAdapter';
-import { CodexAppServerClient } from '../../../src/core/agents/backend/CodexAppServerClient';
+import { CodexAdapter, type CodexFactory } from '../../../src/core/agents/backend/codex/CodexAdapter';
+import { CodexAppServerClient } from '../../../src/core/agents/backend/codex/CodexAppServerClient';
 import type { Conversation } from '../../../src/core/types';
-import { ConversationTabLifecycleRecoveryCoordinator } from '../../../src/features/chat/services/ConversationTabLifecycleRecoveryCoordinator';
+import { ConversationTabLifecycleRecoveryCoordinator } from '../../../src/features/chat/services/conversation/ConversationTabLifecycleRecoveryCoordinator';
 import { TabManager } from '../../../src/features/chat/tabs/TabManager';
 import OpenCodianPlugin from '../../../src/main';
 

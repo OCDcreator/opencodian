@@ -112,3 +112,9 @@ English and Chinese copy describe executable snapshot/restart boundaries and exp
 ## 2026-10-23 DSH connection copy
 
 中英文 locale 增加相同的 DSH 后端、路径、工作目录和连接状态键。文案描述本地 ACP 连接；状态取自 adapter，不把连接成功描述成模型账号或真实聊天验收通过。
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/i18n`、`src/i18n/locales`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

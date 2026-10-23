@@ -5,7 +5,7 @@ import type { PluginEnvironmentSnapshot } from '../../../../src/core/config/Plug
 import { PluginManagementService } from '../../../../src/core/config/PluginManagementService';
 import type { PluginEvidenceSnapshot } from '../../../../src/core/opencode/OpenCodeEventSubscriptionCoordinator';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
-import { SettingsPluginSection } from '../../../../src/features/settings/SettingsPluginSection';
+import { SettingsPluginSection } from '../../../../src/features/settings/general/SettingsPluginSection';
 import type OpenCodianPlugin from '../../../../src/main';
 
 export interface MockButtonControl {

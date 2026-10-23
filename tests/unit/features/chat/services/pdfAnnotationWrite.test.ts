@@ -3,7 +3,7 @@ import {
   buildAnnotationEntry,
 } from '../../../../../src/core/pdf/pdfAnnotation';
 import type { Conversation } from '../../../../../src/core/types';
-import { PdfChatIntegration } from '../../../../../src/features/chat/services/PdfChatIntegration';
+import { PdfChatIntegration } from '../../../../../src/features/chat/services/integrations/PdfChatIntegration';
 import {
   CONVERSATION_ID,
   createHarnessService,

@@ -8,7 +8,7 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 
-import { ClaudeSettingsSourceService } from '../../../../../src/core/agents/backend/ClaudeSettingsSourceService';
+import { ClaudeSettingsSourceService } from '../../../../../src/core/agents/backend/claude/ClaudeSettingsSourceService';
 
 describe('ClaudeSettingsSourceService managed drop-in escaping symlink', () => {
   it('rejects inventory when managed-settings.d is an escaping symlink', async () => {

@@ -2,7 +2,7 @@ import {
   type BackgroundTaskCompletionNoticeSegment,
   type BackgroundTaskNoticeStateRuntime,
   BackgroundTaskNoticeStateService,
-} from '../../../../src/features/chat/services/BackgroundTaskNoticeStateService';
+} from '../../../../src/features/chat/services/background/BackgroundTaskNoticeStateService';
 import { t } from '../../../../src/i18n';
 
 function createService(options?: {

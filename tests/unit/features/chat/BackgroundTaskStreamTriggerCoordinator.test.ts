@@ -3,7 +3,7 @@ import {
   BackgroundTaskStreamTriggerCoordinator,
   type BackgroundTaskStreamTriggerCoordinatorHost,
   type BackgroundTaskStreamTriggerRuntime,
-} from '../../../../src/features/chat/runtime/BackgroundTaskStreamTriggerCoordinator';
+} from '../../../../src/features/chat/runtime/background/BackgroundTaskStreamTriggerCoordinator';
 
 function createToolCall(overrides: Partial<ToolCallInfo> = {}): ToolCallInfo {
   return {

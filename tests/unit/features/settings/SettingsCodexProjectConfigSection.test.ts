@@ -3,8 +3,8 @@ import * as fsPromises from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import type { FileRevision } from '../../../../src/core/agents/backend/ProjectResourceSecureWrite';
-import { SettingsCodexProjectConfigSection } from '../../../../src/features/settings/SettingsCodexProjectConfigSection';
+import type { FileRevision } from '../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite';
+import { SettingsCodexProjectConfigSection } from '../../../../src/features/settings/backends/codex/SettingsCodexProjectConfigSection';
 
 function makePlugin(vaultPath: string) {
   return {

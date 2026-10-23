@@ -1,7 +1,7 @@
 import {
   type AppServerStreamState,
   mapAppServerNotification,
-} from '../../../../../src/core/agents/backend/CodexAppServerStreamMapper';
+} from '../../../../../src/core/agents/backend/codex/CodexAppServerStreamMapper';
 
 function streamState(): AppServerStreamState {
   return {

@@ -17,7 +17,7 @@
 
 ```text
 上游: 无
-下游: src/features/chat/services/TitleGenerationService.ts
+下游: src/features/chat/services/title/TitleGenerationService.ts
 ```
 
 ## 核心类型 / 接口
@@ -86,7 +86,7 @@ buildTitleGenerationSystemPrompt('en')
 
 ## 与其他模块的交互
 
-- `src/features/chat/services/TitleGenerationService.ts` 在每次生成标题前调用 `normalizeTitleGenerationLocale()`、`buildTitleGenerationPrompt()` 和 `buildTitleGenerationSystemPrompt()`。
+- `src/features/chat/services/title/TitleGenerationService.ts` 在每次生成标题前调用 `normalizeTitleGenerationLocale()`、`buildTitleGenerationPrompt()` 和 `buildTitleGenerationSystemPrompt()`。
 - 响应解析、长度二次裁剪和临时 session 生命周期都不在这个模块里。
 
 ## 注意事项

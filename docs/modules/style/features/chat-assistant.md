@@ -52,7 +52,7 @@
 ## 关联 TS 组件
 
 - `src/features/chat/OpenCodianView.ts`
-- `src/features/chat/services/ComposerInputShellCoordinator.ts`
+- `src/features/chat/services/composer/ComposerInputShellCoordinator.ts`
 - `src/features/chat/ui/QuestionDock.ts`
 - `src/features/chat/ui/SessionTodoDock.ts`
 - `src/features/chat/ui/ContextRing.ts`

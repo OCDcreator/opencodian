@@ -14,7 +14,7 @@ import {
   type ClaudeCodeSandboxSettings,
   getDefaultClaudeCodeBackendSettings,
 } from '../../../../../src/core/types';
-import { SandboxConfigBadgeCoordinator } from '../../../../../src/features/chat/services/SandboxConfigBadgeCoordinator';
+import { SandboxConfigBadgeCoordinator } from '../../../../../src/features/chat/services/selection/SandboxConfigBadgeCoordinator';
 import { t } from '../../../../../src/i18n';
 
 // ---------------------------------------------------------------------------

@@ -20,7 +20,7 @@ export function getOpenCodianWordmarkDataUrl(theme: 'light' | 'dark'): string;
 
 - `main.ts`：注册图标（`registerAppIcon`）与侧边栏 ribbon 按钮。
 - `features/settings/SettingsPanelChrome.ts`：设置面板标题同时渲染两个 theme 版本。
-- `features/chat/services/ChatHeaderPresenter.ts`：聊天 header 按当前 CSS theme 选择一个版本，并在 `css-change` 时更新。
+- `features/chat/services/surface/ChatHeaderPresenter.ts`：聊天 header 按当前 CSS theme 选择一个版本，并在 `css-change` 时更新。
 - `features/chat/OpenCodianView.ts` 与 `features/inline-edit/{InlineEditInputOverlay,InlineEditSelectionAffordance,InlineEditWidgets}.ts`：渲染 app 标记。
 
 ## 注意事项

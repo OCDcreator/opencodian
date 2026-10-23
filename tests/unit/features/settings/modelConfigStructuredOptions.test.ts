@@ -4,8 +4,8 @@ import {
   setStructuredStringArrayOption,
   setStructuredThinkingBudget,
   setStructuredThinkingType,
-} from '../../../../src/features/settings/modelConfigStructuredOptions';
-import type { KeyValueFieldState } from '../../../../src/features/settings/modelConfigWorkspace';
+} from '../../../../src/features/settings/models/modelConfigStructuredOptions';
+import type { KeyValueFieldState } from '../../../../src/features/settings/models/modelConfigWorkspace';
 
 function field(key: string, value: string): KeyValueFieldState {
   return {

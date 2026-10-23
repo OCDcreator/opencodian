@@ -3,7 +3,7 @@ import type {
   ForegroundCompactionActionOptions,
   ForegroundCompactionActionResult,
   ForegroundCompactionControl,
-} from '../services/ActiveTabContextUsageCoordinator';
+} from '../services/context/ActiveTabContextUsageCoordinator';
 
 export interface ContextDetailModalCompactionCoordinator {
   getForegroundCompactionControl(): ForegroundCompactionControl;

@@ -5,8 +5,8 @@ import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 
 import { DEFAULT_SETTINGS, getCurrentPlatformKey } from '../../../../src/core/types';
+import { SettingsDebugSection } from '../../../../src/features/settings/debug/SettingsDebugSection';
 import { createOpenCodeTraceDiagnosticsPort } from '../../../../src/features/settings/debug/types';
-import { SettingsDebugSection } from '../../../../src/features/settings/SettingsDebugSection';
 import { setLocale, t } from '../../../../src/i18n';
 import OpenCodianPlugin from '../../../../src/main';
 import { clearRecentLogs, createLogger, getRecentLogText, setDebugLoggingEnabled, setDebugModuleEnabled } from '../../../../src/shared';

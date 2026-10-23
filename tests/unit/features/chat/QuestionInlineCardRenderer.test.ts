@@ -2,8 +2,8 @@ import type {
   QuestionDisplayMode,
   QuestionRequest,
 } from '../../../../src/core/types';
-import { QuestionInlineCardRenderer } from '../../../../src/features/chat/runtime/QuestionInlineCardRenderer';
-import { StreamingInlineCardRenderer } from '../../../../src/features/chat/runtime/StreamingInlineCardRenderer';
+import { QuestionInlineCardRenderer } from '../../../../src/features/chat/runtime/rendering/QuestionInlineCardRenderer';
+import { StreamingInlineCardRenderer } from '../../../../src/features/chat/runtime/rendering/StreamingInlineCardRenderer';
 
 function createRendererHarness() {
   const messageEl = document.createElement('div');

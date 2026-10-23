@@ -4,7 +4,7 @@ import {
   type CapabilityLabBackendTabDescriptor,
   type CapabilityLabBackendTabsController,
   createCapabilityLabBackendTabs,
-} from '../../../../src/features/settings/capabilityLabBackendTabs';
+} from '../../../../src/features/settings/capabilities/capabilityLabBackendTabs';
 
 interface TestDescriptorOptions {
   readonly id: string;

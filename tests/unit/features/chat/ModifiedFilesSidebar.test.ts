@@ -3,7 +3,7 @@ import { type App, Component } from 'obsidian';
 import { Modal } from 'obsidian';
 
 import type { ChatMessage, SessionDiffEntry } from '../../../../src/core/types/chat';
-import { ModifiedFilesSidebarCoordinator } from '../../../../src/features/chat/services/ModifiedFilesSidebarCoordinator';
+import { ModifiedFilesSidebarCoordinator } from '../../../../src/features/chat/services/conversation/ModifiedFilesSidebarCoordinator';
 import { ModifiedFilesSidebar } from '../../../../src/features/chat/ui/ModifiedFilesSidebar';
 import { t } from '../../../../src/i18n';
 import type { EditRevertPreview } from '../../../../src/shared';

@@ -20,7 +20,7 @@ import type {
   ChatImageGenerationOutcome,
   GeneratedImageCandidate,
   ImageGenerationChatController,
-} from '../services/ImageGenerationChatController';
+} from '../services/integrations/ImageGenerationChatController';
 
 type InsertForm = 'line' | 'inline';
 

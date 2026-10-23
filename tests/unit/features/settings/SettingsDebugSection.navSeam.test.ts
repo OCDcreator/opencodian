@@ -3,7 +3,7 @@
 import { Setting } from 'obsidian';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
-import { SettingsDebugSection } from '../../../../src/features/settings/SettingsDebugSection';
+import { SettingsDebugSection } from '../../../../src/features/settings/debug/SettingsDebugSection';
 import { getPrimaryTabDefinition } from '../../../../src/features/settings/settingsLayoutRegistry';
 import { setLocale } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';

@@ -4,7 +4,7 @@ import {
   type BackgroundConversationPostSyncHandoffViewHostAdapterHost,
   createBackgroundConversationPostSyncHandoffServices,
   createBackgroundConversationPostSyncHandoffViewHostAdapter,
-} from '../../../../src/features/chat/services/BackgroundConversationPostSyncHandoffHostAdapter';
+} from '../../../../src/features/chat/services/sync/BackgroundConversationPostSyncHandoffHostAdapter';
 
 type Mocked<T> = {
   [Key in keyof T]:

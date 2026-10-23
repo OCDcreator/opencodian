@@ -2,14 +2,14 @@ import type { App, MarkdownView } from 'obsidian';
 
 import {
   createFocusContextPreview,
-} from '../../../../src/features/chat/composerContext';
-import { ComposerContextRuntimeStore } from '../../../../src/features/chat/services/ComposerContextRuntimeStore';
-import type { ComposerContextRuntimeState } from '../../../../src/features/chat/services/ComposerContextViewHostAdapter';
+} from '../../../../src/features/chat/rendering/composerContext';
+import { ComposerContextRuntimeStore } from '../../../../src/features/chat/services/composer/ComposerContextRuntimeStore';
+import type { ComposerContextRuntimeState } from '../../../../src/features/chat/services/composer/ComposerContextViewHostAdapter';
 import {
   createFocusContextServices,
   type FocusContextPreviewWritebackHost,
   type FocusContextRuntimeViewHost,
-} from '../../../../src/features/chat/services/FocusContextHostAdapter';
+} from '../../../../src/features/chat/services/context/FocusContextHostAdapter';
 import type { TabId } from '../../../../src/features/chat/tabs';
 
 type Mocked<T> = {

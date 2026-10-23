@@ -6,7 +6,7 @@ import {
   ConversationAuthoritativeSyncCoordinator,
   type ConversationAuthoritativeSyncHost,
   type ConversationAuthoritativeSyncRuntime,
-} from '../../../../src/features/chat/services/ConversationAuthoritativeSyncCoordinator';
+} from '../../../../src/features/chat/services/sync/ConversationAuthoritativeSyncCoordinator';
 
 type Mocked<T> = {
   [Key in keyof T]:

@@ -5,7 +5,7 @@ import type {
 import {
   QuestionInlineResolutionActionFacade,
   type QuestionInlineResolutionActionFacadeHost,
-} from '../../../../src/features/chat/services/QuestionInlineResolutionActionFacade';
+} from '../../../../src/features/chat/services/questions/QuestionInlineResolutionActionFacade';
 import type { TabId } from '../../../../src/features/chat/tabs';
 
 function createQuestionRequest(overrides?: Partial<QuestionRequest>): QuestionRequest {

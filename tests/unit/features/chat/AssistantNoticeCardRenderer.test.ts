@@ -1,5 +1,5 @@
 import type { ChatMessage, TurnDiffNoticeEntry } from '../../../../src/core/types';
-import { AssistantNoticeCardRenderer } from '../../../../src/features/chat/runtime/AssistantNoticeCardRenderer';
+import { AssistantNoticeCardRenderer } from '../../../../src/features/chat/runtime/rendering/AssistantNoticeCardRenderer';
 import { t } from '../../../../src/i18n';
 import { toVaultRelativePath } from '../../../../src/shared';
 

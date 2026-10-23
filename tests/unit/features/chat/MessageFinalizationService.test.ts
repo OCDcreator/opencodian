@@ -2,7 +2,7 @@ import {
   type MessageFinalizationHost,
   MessageFinalizationService,
   shouldSyncAfterStream,
-} from '../../../../src/features/chat/services/MessageFinalizationService';
+} from '../../../../src/features/chat/services/send/MessageFinalizationService';
 import { OpenCodeService } from '../../core/opencode/OpenCodeService.testSupport';
 import { createConversation, createHost, createMessage } from './MessageFinalizationService.testSupport';
 

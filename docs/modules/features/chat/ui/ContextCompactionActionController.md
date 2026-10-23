@@ -30,3 +30,8 @@ ZCode `session/compact` 返回受理但无独立终态/用量核验时，状态�
 ## 关系
 
 `ContextDetailModal` 仅持有 controller，并在 `onOpen`/`onClose` 调用 `render`/`dispose`；`dispose()` 会清除当前 surface 的 in-flight 引用，`isClosed` 与 surface-generation fences 共同阻止 late result 写入重建后的 surface；`ActiveTabContextUsageCoordinator` 持有 tab/session stale identity、后端精确 session dispatch 与 verified 后 `refreshFromServer()`，保证此模块不合成 token usage。
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/features/chat/ui/ContextCompactionActionController.ts`。
+- 随目录调整更新的依赖：`src/features/chat/services/context/ActiveTabContextUsageCoordinator.ts`。

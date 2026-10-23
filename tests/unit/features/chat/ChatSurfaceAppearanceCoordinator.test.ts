@@ -2,7 +2,7 @@ import { getDefaultChatAppearanceSettings } from '../../../../src/core/types';
 import {
   ChatSurfaceAppearanceCoordinator,
   type ChatSurfaceAppearanceCoordinatorHost,
-} from '../../../../src/features/chat/services/ChatSurfaceAppearanceCoordinator';
+} from '../../../../src/features/chat/services/surface/ChatSurfaceAppearanceCoordinator';
 
 type MockedChatSurfaceAppearanceHost = {
   [Key in keyof ChatSurfaceAppearanceCoordinatorHost]:

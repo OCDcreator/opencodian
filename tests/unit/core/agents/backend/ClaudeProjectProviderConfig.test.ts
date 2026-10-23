@@ -10,13 +10,13 @@ import {
   readClaudeProviderConfigSnapshot,
   resolveClaudeProviderGlobalEffectiveValue,
   validateClaudeProviderPreset,
-} from '../../../../../src/core/agents/backend/ClaudeProjectProviderConfig';
+} from '../../../../../src/core/agents/backend/claude/ClaudeProjectProviderConfig';
 import {
   listConfigurationArchiveHistory,
   ProjectResourceError,
   readAllowlistedFileSnapshot,
-} from '../../../../../src/core/agents/backend/ProjectResourceSecureWrite';
-import * as projectResourceSecureWrite from '../../../../../src/core/agents/backend/ProjectResourceSecureWrite';
+} from '../../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite';
+import * as projectResourceSecureWrite from '../../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite';
 import type { ClaudeProviderPreset } from '../../../../../src/core/types/settings';
 
 describe('ClaudeProjectProviderConfig', () => {
@@ -211,8 +211,8 @@ describe('ClaudeProjectProviderConfig mutation safety and validation', () => {
     const outsideRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'opencodian-claude-outside-'));
     let planted = false;
     let claudeRootGuardCalls = 0;
-    const secureWriteModule = '../../../../../src/core/agents/backend/ProjectResourceSecureWrite';
-    const providerConfigModule = '../../../../../src/core/agents/backend/ClaudeProjectProviderConfig';
+    const secureWriteModule = '../../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite';
+    const providerConfigModule = '../../../../../src/core/agents/backend/claude/ClaudeProjectProviderConfig';
 
     // Reload only this public mutation seam with a guard wrapper. The wrapper
     // plants the symlink after writeLocalSettings' first proof (call 2: call 1
@@ -220,7 +220,7 @@ describe('ClaudeProjectProviderConfig mutation safety and validation', () => {
     // deterministic without replacing the filesystem mutation itself.
     jest.resetModules();
     jest.doMock(secureWriteModule, () => {
-      const actual = jest.requireActual(secureWriteModule) as typeof import('../../../../../src/core/agents/backend/ProjectResourceSecureWrite');
+      const actual = jest.requireActual(secureWriteModule) as typeof import('../../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite');
       return {
         ...actual,
         assertWithinRoot: async (basePath: string, targetPath: string): Promise<void> => {
@@ -237,7 +237,7 @@ describe('ClaudeProjectProviderConfig mutation safety and validation', () => {
     });
 
     try {
-      const { applyClaudeProviderPreset: applyWithRace } = await import(providerConfigModule) as typeof import('../../../../../src/core/agents/backend/ClaudeProjectProviderConfig');
+      const { applyClaudeProviderPreset: applyWithRace } = await import(providerConfigModule) as typeof import('../../../../../src/core/agents/backend/claude/ClaudeProjectProviderConfig');
       await expect(applyWithRace(
         tempRoot,
         preset({ extraEnv: {} }),

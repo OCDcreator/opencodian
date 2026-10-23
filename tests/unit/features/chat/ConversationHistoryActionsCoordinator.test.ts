@@ -2,8 +2,8 @@ import type { AgentBackendKind } from '../../../../src/core/types/chat';
 import {
   ConversationHistoryActionsCoordinator,
   type ConversationHistoryActionsHost,
-} from '../../../../src/features/chat/services/ConversationHistoryActionsCoordinator';
-import { ConversationHistoryDialogService } from '../../../../src/features/chat/services/ConversationHistoryDialogService';
+} from '../../../../src/features/chat/services/conversation/ConversationHistoryActionsCoordinator';
+import { ConversationHistoryDialogService } from '../../../../src/features/chat/services/conversation/ConversationHistoryDialogService';
 import { t } from '../../../../src/i18n';
 
 function createConversation(

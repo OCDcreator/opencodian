@@ -14,11 +14,11 @@
 
 import { Modal, Setting } from 'obsidian';
 
-import { SettingsCodexResourcesSection } from '../../../../src/features/settings/SettingsCodexResourcesSection';
+import { SettingsCodexResourcesSection } from '../../../../src/features/settings/backends/codex/SettingsCodexResourcesSection';
 
 // Mock the backend CRUD + discovery so the section's success path runs without
 // touching the filesystem and renders an empty list per group.
-jest.mock('../../../../src/core/agents/backend/CodexProjectResourceDiscovery', () => ({
+jest.mock('../../../../src/core/agents/backend/codex/CodexProjectResourceDiscovery', () => ({
   createCodexSkillResource: jest.fn().mockResolvedValue({ status: 'success', targetPath: '/vault/.agents/skills/x/SKILL.md', revision: { canonicalPath: '/vault/.agents/skills/x/SKILL.md', mtimeMs: 1, size: 1, sha256: 'a'.repeat(64) } }),
   createCodexAgentResource: jest.fn().mockResolvedValue({ status: 'success', targetPath: '/vault/.codex/agents/x.toml', revision: { canonicalPath: '/vault/.codex/agents/x.toml', mtimeMs: 1, size: 1, sha256: 'a'.repeat(64) } }),
   updateCodexSkillResource: jest.fn().mockResolvedValue({ status: 'success' }),
@@ -61,7 +61,7 @@ jest.mock('../../../../src/core/agents/backend', () => ({
 }));
 
 const backend = jest.requireMock('../../../../src/core/agents/backend') as Record<string, jest.Mock>;
-const scopedBackend = jest.requireMock('../../../../src/core/agents/backend/CodexProjectResourceDiscovery') as Record<string, jest.Mock>;
+const scopedBackend = jest.requireMock('../../../../src/core/agents/backend/codex/CodexProjectResourceDiscovery') as Record<string, jest.Mock>;
 
 /**
  * Capture create-modal interactions: the text-field setter (mocked

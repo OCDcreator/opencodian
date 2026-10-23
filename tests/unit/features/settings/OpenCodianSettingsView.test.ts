@@ -3,8 +3,8 @@ import * as os from 'os';
 import * as path from 'path';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
+import { SettingsPluginSection } from '../../../../src/features/settings/general/SettingsPluginSection';
 import { OpenCodianSettingsView } from '../../../../src/features/settings/OpenCodianSettingsView';
-import { SettingsPluginSection } from '../../../../src/features/settings/SettingsPluginSection';
 import { setLocale } from '../../../../src/i18n';
 
 function createSettingsView(layoutMode: 'classic' | 'tabbed' = 'classic') {

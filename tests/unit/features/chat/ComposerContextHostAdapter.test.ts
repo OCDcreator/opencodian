@@ -1,13 +1,13 @@
 import type { App, MarkdownView, TFile } from 'obsidian';
 
 import type { PromptContextItem } from '../../../../src/core/types';
-import type { ComposerContextRuntimeState } from '../../../../src/features/chat/services/ComposerContextRuntimeStore';
+import type { ComposerContextRuntimeState } from '../../../../src/features/chat/services/composer/ComposerContextRuntimeStore';
 import {
   type ComposerContextViewHost,
   createComposerContextServices,
   type FocusContextPreviewWritebackHost,
   type FocusContextRuntimeViewHost,
-} from '../../../../src/features/chat/services/ComposerContextViewFacade';
+} from '../../../../src/features/chat/services/composer/ComposerContextViewFacade';
 import type { TabId } from '../../../../src/features/chat/tabs';
 import { chooseContextFiles } from '../../../../src/features/chat/ui/ContextFilePickerModal';
 

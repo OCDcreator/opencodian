@@ -2,7 +2,7 @@ const mockGlassShow = jest.fn().mockResolvedValue(undefined);
 const mockGlassDestroy = jest.fn();
 const mockGlassIsVisible = jest.fn(() => false);
 
-jest.mock('../../../../../src/features/chat/glassOctahedronDemo', () => ({
+jest.mock('../../../../../src/features/chat/demos/glassOctahedronDemo', () => ({
   GlassOctahedronDemoController: jest.fn().mockImplementation(() => ({
     show: mockGlassShow,
     destroy: mockGlassDestroy,
@@ -14,7 +14,7 @@ const mockDiamondShow = jest.fn();
 const mockDiamondDestroy = jest.fn();
 const mockDiamondIsVisible = jest.fn(() => false);
 
-jest.mock('../../../../../src/features/chat/liquidDiamondDemo', () => ({
+jest.mock('../../../../../src/features/chat/demos/liquidDiamondDemo', () => ({
   LiquidDiamondDemoController: jest.fn().mockImplementation(() => ({
     show: mockDiamondShow,
     destroy: mockDiamondDestroy,
@@ -25,7 +25,7 @@ jest.mock('../../../../../src/features/chat/liquidDiamondDemo', () => ({
 import {
   ChatVisualDemoCoordinator,
   type ChatVisualDemoCoordinatorHost,
-} from '../../../../../src/features/chat/services/ChatVisualDemoCoordinator';
+} from '../../../../../src/features/chat/services/demos/ChatVisualDemoCoordinator';
 
 const mockShowNotice = jest.fn();
 const mockLogWarn = jest.fn();

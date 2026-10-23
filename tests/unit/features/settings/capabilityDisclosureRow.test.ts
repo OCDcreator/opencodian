@@ -6,7 +6,7 @@ import type {
   OpenCodeUnsupportedCapabilityResult,
 } from '../../../../src/core/opencode/OpenCodeSdkCapabilityDiscoveryCoordinator';
 import { resolveCapabilityAvailability } from '../../../../src/core/opencode/OpenCodeSdkCapabilityState';
-import { renderCapabilityDisclosureRows } from '../../../../src/features/settings/capabilityDisclosureRow';
+import { renderCapabilityDisclosureRows } from '../../../../src/features/settings/capabilities/capabilityDisclosureRow';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 

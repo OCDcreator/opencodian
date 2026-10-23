@@ -1,4 +1,4 @@
-import { buildTrailingAssistantPatchTurnBodyScopePlan } from '../../../../src/features/chat/services/trailingAssistantPatchExecution';
+import { buildTrailingAssistantPatchTurnBodyScopePlan } from '../../../../src/features/chat/services/sync/trailingAssistantPatchExecution';
 
 describe('TrailingAssistantPatchTurnBodyScopePlanHelper', () => {
   it('returns a passthrough plan when no runtime is available', () => {

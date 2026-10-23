@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { SettingsCapabilityLabSection } from '../../../../src/features/settings/SettingsCapabilityLabSection';
+import { SettingsCapabilityLabSection } from '../../../../src/features/settings/capabilities/SettingsCapabilityLabSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 

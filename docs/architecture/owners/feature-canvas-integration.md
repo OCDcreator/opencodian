@@ -41,3 +41,9 @@ Run before merge: `npm run typecheck`, `npm run check:module-docs`.
 New owner per flowtext-c5-design §3.0, mirroring `feature.inline-edit`: UI mounted inside a foreign host view (Obsidian's canvas) with its own gate, entries and modal surface. Deliberately NOT inside `feature.chat-*` (the chat owners must not absorb foreign-view runtime) and not in `app.composition` (composition only). The aux session and vault snapshot seams are injected through narrow ports, so the owner stays backend-agnostic and testable without Obsidian.
 
 2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.canvas-integration` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/features/canvas-integration`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

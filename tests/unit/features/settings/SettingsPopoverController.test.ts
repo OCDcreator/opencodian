@@ -1,4 +1,4 @@
-import { SettingsPopoverController } from '../../../../src/features/settings/SettingsPopoverController';
+import { SettingsPopoverController } from '../../../../src/features/settings/controls/SettingsPopoverController';
 
 function mockRect(element: HTMLElement, rect: Partial<DOMRect>): void {
   Object.defineProperty(element, 'getBoundingClientRect', {

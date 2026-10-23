@@ -1,9 +1,9 @@
+import { ConversationRenderService } from '../../../../src/features/chat/services/rendering/ConversationRenderService';
 import {
   ChatHeaderPresenter,
   type ChatHeaderPresenterHost,
   type ChatServerAvailability,
-} from '../../../../src/features/chat/services/ChatHeaderPresenter';
-import { ConversationRenderService } from '../../../../src/features/chat/services/ConversationRenderService';
+} from '../../../../src/features/chat/services/surface/ChatHeaderPresenter';
 import { t } from '../../../../src/i18n';
 
 type MockApp = {

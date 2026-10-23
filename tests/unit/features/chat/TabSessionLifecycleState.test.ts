@@ -3,7 +3,7 @@ import {
   deriveTabSessionPhaseFromLifecycle,
   isForegroundBusyTabSessionPhase,
   transitionTabSessionLifecycle,
-} from '../../../../src/features/chat/services/TabSessionLifecycleState';
+} from '../../../../src/features/chat/services/conversation/TabSessionLifecycleState';
 
 describe('TabSessionLifecycleState', () => {
   it('starts idle and treats idle as not foreground busy', () => {

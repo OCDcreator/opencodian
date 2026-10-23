@@ -1,11 +1,11 @@
 import {
   TabViewActivationBridge,
   type TabViewActivationBridgeHost,
-} from '../../../../src/features/chat/runtime/TabViewActivationBridge';
-import type { ActiveTabContextUsageCoordinator } from '../../../../src/features/chat/services/ActiveTabContextUsageCoordinator';
-import type { FocusContextPreviewCoordinator } from '../../../../src/features/chat/services/FocusContextPreviewCoordinator';
-import type { QuestionTodoActivationRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoActivationRefreshCoordinator';
-import type { BackgroundTaskActivationIndicatorPort as BackgroundTaskActivationIndicatorSourcePort } from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskActivationHostAdapter';
+} from '../../../../src/features/chat/runtime/activation/TabViewActivationBridge';
+import type { ActiveTabContextUsageCoordinator } from '../../../../src/features/chat/services/context/ActiveTabContextUsageCoordinator';
+import type { FocusContextPreviewCoordinator } from '../../../../src/features/chat/services/context/FocusContextPreviewCoordinator';
+import type { QuestionTodoActivationRefreshCoordinator } from '../../../../src/features/chat/services/questions/QuestionTodoActivationRefreshCoordinator';
+import type { BackgroundTaskActivationIndicatorPort as BackgroundTaskActivationIndicatorSourcePort } from '../../../../src/features/chat/services/questions/QuestionTodoBackgroundTaskActivationHostAdapter';
 
 type ActiveTabContextUsagePort = Pick<
   ActiveTabContextUsageCoordinator,

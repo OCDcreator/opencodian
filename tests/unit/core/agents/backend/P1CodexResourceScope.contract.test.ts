@@ -20,7 +20,7 @@ import {
   updateCodexAgentResource,
   updateCodexSkillResource,
   validateCodexAgentContent,
-} from '../../../../../src/core/agents/backend/CodexProjectResourceDiscovery';
+} from '../../../../../src/core/agents/backend/codex/CodexProjectResourceDiscovery';
 
 describe('P1-A scoped Codex resource contract', () => {
   let sandboxPath: string;

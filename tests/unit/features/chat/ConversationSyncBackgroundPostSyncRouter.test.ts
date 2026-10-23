@@ -1,11 +1,11 @@
 import type { Conversation } from '../../../../src/core/types';
-import type { BackgroundTaskPostSyncResult } from '../../../../src/features/chat/services/BackgroundConversationPostSyncHandoffCoordinator';
+import type { BackgroundTaskPostSyncResult } from '../../../../src/features/chat/services/sync/BackgroundConversationPostSyncHandoffCoordinator';
 import {
   type ConversationSyncBackgroundPostSyncHandoffPort,
   ConversationSyncBackgroundPostSyncRouter,
   type ConversationSyncBackgroundPostSyncRouterHost,
   type ConversationSyncBackgroundPostSyncRouterRuntime,
-} from '../../../../src/features/chat/services/ConversationSyncBackgroundPostSyncRouter';
+} from '../../../../src/features/chat/services/sync/ConversationSyncBackgroundPostSyncRouter';
 
 type Mocked<T> = {
   [Key in keyof T]:

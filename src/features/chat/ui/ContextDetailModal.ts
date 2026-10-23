@@ -2,7 +2,7 @@ import { App, Modal } from 'obsidian';
 
 import type { ContextBreakdownSegment, ContextUsageSnapshot, Conversation, TabContextState } from '../../../core/types';
 import { getLocale, t } from '../../../i18n';
-import { ContextUsageService } from '../services/ContextUsageService';
+import { ContextUsageService } from '../services/context/ContextUsageService';
 import {
   ContextCompactionActionController,
   type ContextDetailModalCompactionCoordinator,

@@ -1,4 +1,4 @@
-import { resolveCodexCli } from '../../../../../src/core/agents/backend/CodexCliResolver';
+import { resolveCodexCli } from '../../../../../src/core/agents/backend/codex/CodexCliResolver';
 
 // Exercise both platform branches without inheriting the Jest host's path API.
 jest.mock('path', () => jest.requireActual<typeof import('path')>('path').posix);

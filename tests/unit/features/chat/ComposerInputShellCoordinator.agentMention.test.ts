@@ -1,13 +1,13 @@
 import type { SlashCommandMenuItem } from '../../../../src/core/config/slashCommandCatalog';
-import type { AgentMentionCandidate } from '../../../../src/features/chat/services/AgentMentionComposerController';
-import {
-  ComposerInputShellCoordinator,
-  type ComposerInputShellCoordinatorHost,
-} from '../../../../src/features/chat/services/ComposerInputShellCoordinator';
 import {
   attachAgentMentionCandidatesToSlashCommandMenuItems,
   attachAgentSelectionCandidatesToSlashCommandMenuItems,
-} from '../../../../src/features/chat/services/SlashCommandMenuCatalogCache';
+} from '../../../../src/features/chat/services/commands/SlashCommandMenuCatalogCache';
+import type { AgentMentionCandidate } from '../../../../src/features/chat/services/composer/AgentMentionComposerController';
+import {
+  ComposerInputShellCoordinator,
+  type ComposerInputShellCoordinatorHost,
+} from '../../../../src/features/chat/services/composer/ComposerInputShellCoordinator';
 import { t } from '../../../../src/i18n';
 
 class ResizeObserverMock {

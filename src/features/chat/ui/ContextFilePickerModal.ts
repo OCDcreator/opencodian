@@ -2,7 +2,7 @@ import type { App, TFile, TFolder } from 'obsidian';
 import { Modal, setIcon,TFile as TFileClass } from 'obsidian';
 
 import { t } from '../../../i18n';
-import type { ContextFileCatalog, ContextFileEntry } from '../services/ContextFileCatalogService';
+import type { ContextFileCatalog, ContextFileEntry } from '../services/context/ContextFileCatalogService';
 
 const MAX_RENDERED_FILES = 200;
 const ALL_EXTENSION_FILTER = '__all__';

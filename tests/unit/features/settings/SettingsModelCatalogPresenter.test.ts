@@ -2,8 +2,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { getProviderPrimaryDisabledReason } from '../../../../src/features/settings/SettingsModelCatalogAvailability';
-import { SettingsModelCatalogPresenter } from '../../../../src/features/settings/SettingsModelCatalogPresenter';
+import { getProviderPrimaryDisabledReason } from '../../../../src/features/settings/models/SettingsModelCatalogAvailability';
+import { SettingsModelCatalogPresenter } from '../../../../src/features/settings/models/SettingsModelCatalogPresenter';
 import * as i18n from '../../../../src/i18n';
 
 function createCatalogState() {

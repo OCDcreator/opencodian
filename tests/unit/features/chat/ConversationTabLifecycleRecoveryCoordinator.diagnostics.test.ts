@@ -2,7 +2,7 @@ import {
   ConversationTabLifecycleRecoveryCoordinator,
   type ConversationTabLifecycleRecoveryHost,
   type ConversationTabLifecycleRecoveryPort,
-} from '../../../../src/features/chat/services/ConversationTabLifecycleRecoveryCoordinator';
+} from '../../../../src/features/chat/services/conversation/ConversationTabLifecycleRecoveryCoordinator';
 import { TabManager } from '../../../../src/features/chat/tabs/TabManager';
 
 describe('ConversationTabLifecycleRecoveryCoordinator diagnostics cancellation', () => {

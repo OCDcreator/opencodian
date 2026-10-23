@@ -1,7 +1,7 @@
 import { Setting } from 'obsidian';
 
 import type { ModelCatalogBundle } from '../../../../src/core/config';
-import { SettingsModelSection } from '../../../../src/features/settings/SettingsModelSection';
+import { SettingsModelSection } from '../../../../src/features/settings/models/SettingsModelSection';
 import { t } from '../../../../src/i18n';
 import { ProviderIconService } from '../../../../src/utils/icons';
 

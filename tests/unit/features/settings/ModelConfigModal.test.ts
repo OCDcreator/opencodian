@@ -3,7 +3,7 @@ import * as obsidian from 'obsidian';
 import { Modal } from 'obsidian';
 
 import type { ModelCatalogBundle } from '../../../../src/core/config';
-import { ModelConfigModal } from '../../../../src/features/settings/ModelConfigModal';
+import { ModelConfigModal } from '../../../../src/features/settings/models/ModelConfigModal';
 import { t } from '../../../../src/i18n';
 import { ProviderIconService } from '../../../../src/utils/icons/ProviderIconService';
 

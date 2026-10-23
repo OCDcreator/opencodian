@@ -1,7 +1,7 @@
 import type { App } from 'obsidian';
 
 import type { PiServiceEvent } from '../../../../../src/core/agents/backend/pi/PiProtocol';
-import { presentPiUiRequest, releasePiUiView, syncPiUiView } from '../../../../../src/features/chat/services/PiExtensionUiHost';
+import { presentPiUiRequest, releasePiUiView, syncPiUiView } from '../../../../../src/features/chat/services/integrations/PiExtensionUiHost';
 
 interface TestView {
   containerEl: HTMLElement;

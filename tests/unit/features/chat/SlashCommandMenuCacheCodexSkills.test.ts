@@ -1,7 +1,7 @@
 import {
   SlashCommandMenuCatalogCache,
   type SlashCommandMenuCatalogCacheHost,
-} from '../../../../src/features/chat/services/SlashCommandMenuCatalogCache';
+} from '../../../../src/features/chat/services/commands/SlashCommandMenuCatalogCache';
 
 function createCodexHost(
   overrides: Partial<SlashCommandMenuCatalogCacheHost> = {},

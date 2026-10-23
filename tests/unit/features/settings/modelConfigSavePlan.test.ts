@@ -3,16 +3,16 @@ import {
   createModelConfigModalSnapshot,
   parseAddProviderJsonDraft,
   syncProviderFormFromJsonDraft,
-} from '../../../../src/features/settings/modelConfigModalState';
+} from '../../../../src/features/settings/models/modelConfigModalState';
 import {
   buildModelConfigSavePlan,
   serializeProviderConfig,
-} from '../../../../src/features/settings/modelConfigSavePlan';
+} from '../../../../src/features/settings/models/modelConfigSavePlan';
 import type {
   KeyValueFieldState,
   ModelFormState,
   ProviderFormState,
-} from '../../../../src/features/settings/modelConfigWorkspace';
+} from '../../../../src/features/settings/models/modelConfigWorkspace';
 import { t } from '../../../../src/i18n';
 
 function field(key: string, value: string): KeyValueFieldState {

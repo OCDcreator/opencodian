@@ -13,7 +13,7 @@ const mockListThreads = jest.fn();
 const mockAppServerClientStart = jest.fn().mockResolvedValue(undefined);
 const mockAppServerClientStop = jest.fn();
 
-jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => {
+jest.mock('../../../../../src/core/agents/backend/codex/CodexAppServerClient', () => {
   const MockClient = jest.fn().mockImplementation(() => ({
     start: mockAppServerClientStart,
     stop: mockAppServerClientStop,

@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import type { App } from 'obsidian';
 
-import { ConversationCompactionHelpModal } from '../../../../src/features/settings/ConversationCompactionHelpModal';
+import { ConversationCompactionHelpModal } from '../../../../src/features/settings/general/ConversationCompactionHelpModal';
 import { setLocale } from '../../../../src/i18n';
 
 describe('ConversationCompactionHelpModal', () => {

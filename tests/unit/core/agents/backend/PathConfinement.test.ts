@@ -13,7 +13,7 @@ import {
   isWithinRoot,
   PathConfinementError,
   resolveAnchorRealpath,
-} from '../../../../../src/core/agents/backend/PathConfinement';
+} from '../../../../../src/core/agents/backend/configuration/PathConfinement';
 
 function tmpDir(prefix: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));

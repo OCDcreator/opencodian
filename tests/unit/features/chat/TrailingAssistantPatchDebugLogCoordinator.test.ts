@@ -1,4 +1,4 @@
-import { buildTrailingAssistantPatchDebugLogPlanFromLoggingContext } from '../../../../src/features/chat/services/trailingAssistantPatchDebug';
+import { buildTrailingAssistantPatchDebugLogPlanFromLoggingContext } from '../../../../src/features/chat/services/sync/trailingAssistantPatchDebug';
 
 describe('TrailingAssistantPatchDebugLogCoordinator', () => {
   it('coordinates completion debug logging contexts into final log plans', () => {

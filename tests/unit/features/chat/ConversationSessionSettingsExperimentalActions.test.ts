@@ -2,7 +2,7 @@ import type { Conversation } from '../../../../src/core/types';
 import {
   ConversationSessionSettingsCoordinator,
   type ConversationSessionSettingsCoordinatorHost,
-} from '../../../../src/features/chat/services/ConversationSessionSettingsCoordinator';
+} from '../../../../src/features/chat/services/conversation/ConversationSessionSettingsCoordinator';
 
 jest.mock('../../../../src/features/chat/ui/ConversationSessionSettingsModal', () => ({
   ConversationSessionSettingsModal: jest.fn().mockImplementation((_app, options) => ({

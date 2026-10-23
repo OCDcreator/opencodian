@@ -61,3 +61,9 @@ Minimum SDK compatibility: the service wraps the public `SessionManager.createBr
 Current Pi ModelRuntime OAuth receives the SDK LoginOptions installation device ID callback. It uses a persistent SDK SettingsManager scoped to the configured agent directory, distinct from per-session settings overlays; minimum AuthStorage keeps its existing callback interface.
 
 Modern AuthInteraction text input forwards the entered string, including empty strings (GitHub public-domain default), and reserves undefined for UI cancellation; provider validation remains authoritative. Legacy AuthStorage allowEmpty semantics are unchanged.
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/core/agents/backend/pi`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

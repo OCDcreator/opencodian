@@ -1,9 +1,9 @@
 import type { QuestionRequest } from '../../../../src/core/types';
-import type { QuestionDockRenderStateFacade } from '../../../../src/features/chat/services/QuestionDockRenderStateFacade';
+import type { QuestionDockRenderStateFacade } from '../../../../src/features/chat/services/questions/QuestionDockRenderStateFacade';
 import {
   QuestionDockResolutionActionFacade,
   type QuestionDockResolutionActionFacadeHost,
-} from '../../../../src/features/chat/services/QuestionDockResolutionActionFacade';
+} from '../../../../src/features/chat/services/questions/QuestionDockResolutionActionFacade';
 import type { TabId } from '../../../../src/features/chat/tabs';
 
 interface TestRuntimeState {

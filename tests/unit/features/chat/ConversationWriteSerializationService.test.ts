@@ -1,7 +1,7 @@
 import type { Conversation } from '../../../../src/core/types';
 import {
   ConversationWriteSerializationService,
-} from '../../../../src/features/chat/services/ConversationWriteSerializationService';
+} from '../../../../src/features/chat/services/conversation/ConversationWriteSerializationService';
 
 function createConversation(id = 'conversation-1'): Conversation {
   return {

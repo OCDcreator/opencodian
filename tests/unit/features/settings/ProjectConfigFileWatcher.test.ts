@@ -1,6 +1,6 @@
 import type { App, EventRef } from 'obsidian';
 
-import { ProjectConfigFileWatcher } from '../../../../src/features/settings/ProjectConfigFileWatcher';
+import { ProjectConfigFileWatcher } from '../../../../src/features/settings/backends/opencode/ProjectConfigFileWatcher';
 
 type VaultEventName = 'create' | 'modify' | 'delete' | 'rename';
 

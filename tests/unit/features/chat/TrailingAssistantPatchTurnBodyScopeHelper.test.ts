@@ -1,7 +1,7 @@
 import {
   type TrailingAssistantPatchTurnBodyScopePlan,
   withTrailingAssistantTurnBodyScope,
-} from '../../../../src/features/chat/services/trailingAssistantPatchExecution';
+} from '../../../../src/features/chat/services/sync/trailingAssistantPatchExecution';
 
 function createScopePlan(
   overrides: Partial<Extract<TrailingAssistantPatchTurnBodyScopePlan, { runtime: object }>> = {},

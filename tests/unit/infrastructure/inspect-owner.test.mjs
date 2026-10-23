@@ -33,7 +33,7 @@ describe('inspect:owner — representative path resolution', () => {
   });
 
   test('resolves ChatDiagnosticsCoordinator to feature.chat-diagnostics through structured delegation', () => {
-    const { json, exitCode } = runInspectJson('src/features/chat/services/ChatDiagnosticsCoordinator.ts');
+    const { json, exitCode } = runInspectJson('src/features/chat/services/diagnostics/ChatDiagnosticsCoordinator.ts');
     expect(exitCode).toBe(0);
     expect(json.resolved).toBe(true);
     expect(json.owner.id).toBe('feature.chat-diagnostics');
@@ -48,13 +48,13 @@ describe('inspect:owner — representative path resolution', () => {
   });
 
   test('resolves a Codex backend path to core.backend', () => {
-    const { json, exitCode } = runInspectJson('src/core/agents/backend/CodexAdapter.ts');
+    const { json, exitCode } = runInspectJson('src/core/agents/backend/codex/CodexAdapter.ts');
     expect(exitCode).toBe(0);
     expect(json.owner.id).toBe('core.backend');
   });
 
   test('resolves a Claude backend path to core.backend', () => {
-    const { json, exitCode } = runInspectJson('src/core/agents/backend/ClaudeCodeAdapter.ts');
+    const { json, exitCode } = runInspectJson('src/core/agents/backend/claude/ClaudeCodeAdapter.ts');
     expect(exitCode).toBe(0);
     expect(json.owner.id).toBe('core.backend');
   });
@@ -66,7 +66,7 @@ describe('inspect:owner — representative path resolution', () => {
   });
 
   test('resolves a settings path to feature.settings-shell or delegate', () => {
-    const { json, exitCode } = runInspectJson('src/features/settings/SettingsDebugSection.ts');
+    const { json, exitCode } = runInspectJson('src/features/settings/debug/SettingsDebugSection.ts');
     expect(exitCode).toBe(0);
     expect(json.owner.id).toBe('feature.settings-debug');
   });

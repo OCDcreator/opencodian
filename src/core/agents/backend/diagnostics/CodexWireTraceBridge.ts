@@ -1,4 +1,4 @@
-import type { CodexAppServerWireObserver } from '../CodexAppServerClientTypes';
+import type { CodexAppServerWireObserver } from '../codex/CodexAppServerClientTypes';
 import type { CodexSessionTraceService } from './CodexSessionTraceService';
 import type { CodexWireRecord } from './types';
 

@@ -910,7 +910,7 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
   describe('per-backend export/flush ordering (source contract)', () => {
     it('Codex adapter exportConversationDiagnostics flushes ring + store BEFORE building the report', () => {
       const src = fs.readFileSync(
-        path.resolve(__dirname, '../../../../src/features/chat/services/CodexDiagnosticsHostAdapter.ts'),
+        path.resolve(__dirname, '../../../../src/features/chat/services/diagnostics/CodexDiagnosticsHostAdapter.ts'),
         'utf8',
       );
       const start = src.indexOf('async exportConversationDiagnostics(');
@@ -928,7 +928,7 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
 
     it('Claude adapter exportConversationDiagnostics flushes ring + store BEFORE building the report (same order as Codex)', () => {
       const src = fs.readFileSync(
-        path.resolve(__dirname, '../../../../src/features/chat/services/ClaudeDiagnosticsHostAdapter.ts'),
+        path.resolve(__dirname, '../../../../src/features/chat/services/diagnostics/ClaudeDiagnosticsHostAdapter.ts'),
         'utf8',
       );
       const start = src.indexOf('async exportConversationDiagnostics(');
@@ -945,7 +945,7 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
 
     it('OpenCode chat export (ChatDiagnosticsCoordinator) does NOT pre-flush — it resolves traceId, prompts for context, then builds the report directly', () => {
       const src = fs.readFileSync(
-        path.resolve(__dirname, '../../../../src/features/chat/services/ChatDiagnosticsCoordinator.ts'),
+        path.resolve(__dirname, '../../../../src/features/chat/services/diagnostics/ChatDiagnosticsCoordinator.ts'),
         'utf8',
       );
       // Find the coordinator-owned copySession menu onClick handler.
@@ -1018,7 +1018,7 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
 
       // SettingsDebugSection wires both export surfaces into the export block.
       const debugSrc = fs.readFileSync(
-        path.resolve(__dirname, '../../../../src/features/settings/SettingsDebugSection.ts'),
+        path.resolve(__dirname, '../../../../src/features/settings/debug/SettingsDebugSection.ts'),
         'utf8',
       );
       expect(debugSrc).toMatch(/buildDiagnosticReport/);

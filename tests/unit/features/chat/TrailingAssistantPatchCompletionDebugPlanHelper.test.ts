@@ -1,4 +1,4 @@
-import { buildTrailingAssistantPatchCompletionDebugPlan } from '../../../../src/features/chat/services/trailingAssistantPatchPlanning';
+import { buildTrailingAssistantPatchCompletionDebugPlan } from '../../../../src/features/chat/services/sync/trailingAssistantPatchPlanning';
 
 describe('TrailingAssistantPatchCompletionDebugPlanHelper', () => {
   it('builds the completion-debug plan from planning context', () => {

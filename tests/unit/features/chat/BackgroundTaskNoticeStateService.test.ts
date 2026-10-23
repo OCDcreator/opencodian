@@ -1,7 +1,7 @@
 import {
   type BackgroundTaskNoticeStateRuntime,
   BackgroundTaskNoticeStateService,
-} from '../../../../src/features/chat/services/BackgroundTaskNoticeStateService';
+} from '../../../../src/features/chat/services/background/BackgroundTaskNoticeStateService';
 import { t } from '../../../../src/i18n';
 
 describe('BackgroundTaskNoticeStateService', () => {

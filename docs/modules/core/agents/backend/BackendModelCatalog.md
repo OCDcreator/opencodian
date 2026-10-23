@@ -28,3 +28,8 @@ The deprecated `ClaudeCodeModelCatalog.ts` re-exports everything from this modul
 
 - `CODEX_EFFORT_VARIANTS` now mirrors Codex SDK 0.153.4: `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra`, and `persistent`.
 - Every discovered Codex model exposes the same ordered variants to the composer selector.
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/core/agents/backend/BackendModelCatalog.ts`。
+- 随目录调整更新的依赖：`src/core/agents/backend/codex/CodexAdapter.ts`。

@@ -2,7 +2,7 @@ import type { ChatMessage } from '../../../../../src/core/types';
 import {
   UserMessageFooterRenderer,
   type UserMessageFooterRendererHost,
-} from '../../../../../src/features/chat/runtime/UserMessageFooterRenderer';
+} from '../../../../../src/features/chat/runtime/rendering/UserMessageFooterRenderer';
 
 describe('UserMessageFooterRenderer', () => {
   function createHost(partial: Partial<UserMessageFooterRendererHost> = {}): UserMessageFooterRendererHost {

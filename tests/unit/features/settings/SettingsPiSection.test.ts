@@ -6,9 +6,9 @@ import { type App, Setting } from 'obsidian';
 
 import type { PiAdapter } from '../../../../src/core/agents/backend/pi/PiAdapter';
 import { PiMcpConfigService } from '../../../../src/core/agents/backend/pi/PiMcpConfigService';
+import { SettingsPiConfigurationSection } from '../../../../src/features/settings/backends/pi/SettingsPiConfigurationSection';
+import { SettingsPiSection } from '../../../../src/features/settings/backends/pi/SettingsPiSection';
 import { getActiveSecondaryTabId,getPrimaryTabDefinition } from '../../../../src/features/settings/settingsLayoutRegistry';
-import { SettingsPiConfigurationSection } from '../../../../src/features/settings/SettingsPiConfigurationSection';
-import { SettingsPiSection } from '../../../../src/features/settings/SettingsPiSection';
 import { setLocale } from '../../../../src/i18n';
 
 describe('Pi native settings integration', () => {

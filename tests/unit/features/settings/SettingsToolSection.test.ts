@@ -2,7 +2,7 @@ import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
-import { SettingsToolSection } from '../../../../src/features/settings/SettingsToolSection';
+import { SettingsToolSection } from '../../../../src/features/settings/resources/SettingsToolSection';
 import { setLocale, t } from '../../../../src/i18n';
 
 interface MockButtonControl {

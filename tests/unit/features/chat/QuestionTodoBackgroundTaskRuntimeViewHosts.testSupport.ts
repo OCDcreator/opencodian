@@ -3,10 +3,10 @@ import type { Conversation, QuestionRequest, SessionTodo } from '../../../../src
 import type {
   QuestionTodoBackgroundTaskRuntimeServiceBundleHost,
   TabConversationSyncFingerprintRuntimePort,
-} from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
+} from '../../../../src/features/chat/services/questions/QuestionTodoBackgroundTaskRuntimeServiceBundle';
 import type {
   QuestionTodoStatusRefreshRuntime,
-} from '../../../../src/features/chat/services/QuestionTodoStatusRefreshCoordinator';
+} from '../../../../src/features/chat/services/questions/QuestionTodoStatusRefreshCoordinator';
 
 type Mocked<T> = {
   [Key in keyof T]:

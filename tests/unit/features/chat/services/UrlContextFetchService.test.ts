@@ -23,7 +23,7 @@ import {
   isPrivateIpv6,
   UrlContextFetchService,
   type UrlFetchResult,
-} from '../../../../../src/features/chat/services/UrlContextFetchService';
+} from '../../../../../src/features/chat/services/context/UrlContextFetchService';
 
 describe('SSRF address guards', () => {
   it('classifies private IPv4 ranges', () => {

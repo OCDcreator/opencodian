@@ -1,5 +1,5 @@
 import type { ChatMessage } from '../../../../src/core/types';
-import { AssistantShellViewHostAdapter } from '../../../../src/features/chat/runtime/AssistantShellViewHostAdapter';
+import { AssistantShellViewHostAdapter } from '../../../../src/features/chat/runtime/rendering/AssistantShellViewHostAdapter';
 import type { MarkdownRenderService } from '../../../../src/utils/markdown';
 
 function createMockMarkdownService() {

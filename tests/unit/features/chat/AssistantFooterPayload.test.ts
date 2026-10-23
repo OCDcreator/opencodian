@@ -5,7 +5,7 @@ import {
   buildPersistedAssistantFooterPayload,
   buildPseudoStreamAssistantFooterPayload,
   resolvePersistedAssistantFooterStatusLabel,
-} from '../../../../src/features/chat/runtime/AssistantFooterPayload';
+} from '../../../../src/features/chat/runtime/rendering/AssistantFooterPayload';
 
 describe('AssistantFooterPayload', () => {
   it('assembles timestamp copy content model and status for persisted assistant messages', () => {

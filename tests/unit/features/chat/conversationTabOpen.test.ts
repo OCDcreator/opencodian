@@ -5,7 +5,7 @@ jest.mock('../../../../src/core/opencode', () => ({
 }));
 
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
-import { ConversationLoadRecoveryCoordinator } from '../../../../src/features/chat/services/ConversationLoadRecoveryCoordinator';
+import { ConversationLoadRecoveryCoordinator } from '../../../../src/features/chat/services/conversation/ConversationLoadRecoveryCoordinator';
 
 function createView(overrides: Record<string, unknown> = {}): OpenCodianView {
   return new OpenCodianView(new WorkspaceLeaf(), {

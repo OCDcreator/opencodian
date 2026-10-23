@@ -1,0 +1,559 @@
+/**
+ * OpenCodeAdapter — wraps the existing OpenCodeService behind the
+ * AgentService interface.
+ *
+ * This is the first adapter and serves as the reference implementation.
+ * It does NOT change any OpenCodeService internals — it only delegates.
+ *
+ * OpenCode supports all capabilities except native mid-turn steering, so
+ * this adapter implements every capability interface in addition to the
+ * core AgentService; TurnSteering stays undeclared (see
+ * OPENCODE_LEGACY_CAPABILITIES below — the real steer seam lives in
+ * OpenCode2Adapter).
+ *
+ * See docs/requirements/multi-agent-foundation/03-opencode-adapter.md.
+ */
+
+import { requestUrl } from 'obsidian';
+
+import { extractMemoryInjection } from '../../../memory';
+import { extractObsidianToolingInjection } from '../../../obsidianTooling';
+import type { PromptSyntheticTextPartInput } from '../../../opencode/OpenCodePromptRequestBuilder';
+import type { OpenCodeService } from '../../../opencode/OpenCodeService';
+import type { AgentBackendKind } from '../../../types/chat';
+import {
+  AgentCapability,
+  type BackendCapabilities,
+  OPENCODE_FULL_CAPABILITIES,
+} from '../../AgentCapability';
+import type {
+  AgentAuxQueryCapability,
+  AuxQuerySession,
+  AuxQuerySessionConfig,
+} from '../AgentAuxQueryCapability';
+import type {
+  AgentInlineCompletionCapability,
+  InlineCompletionSession,
+  InlineCompletionSessionConfig,
+} from '../AgentInlineCompletionCapability';
+import { INLINE_COMPLETION_TURN_TIMEOUT_MS } from '../AgentInlineCompletionCapability';
+import type {
+  AgentAuthCapability,
+  AgentBranchCapability,
+  AgentChatCapability,
+  AgentConfigCapability,
+  AgentConnectionStatus,
+  AgentMcpCapability,
+  AgentModelCapability,
+  AgentPermissionCapability,
+  AgentQuestionCapability,
+  AgentService,
+  AgentServiceInfo,
+  AgentSessionCapability,
+  AgentTodoCapability,
+  AgentToolCapability,
+  Disposable,
+  StatusChangeHandler,
+} from '../AgentService';
+import type { AuxTransport } from '../auxiliary/AuxTransport';
+import { OpenCodeAuxQuerySession } from '../auxiliary/OpenCodeAuxQuerySession';
+import { OPENCODE_AUX_AGENT, OpenCodeAuxScope } from '../auxiliary/OpenCodeAuxScope';
+import {
+  type WarmableAuxSession,
+  WarmInlineCompletionSession,
+} from '../auxiliary/WarmInlineCompletionSession';
+
+function auxAbortError(): Error {
+  const error = new Error('Aborted');
+  error.name = 'AbortError';
+  return error;
+}
+
+/**
+ * Obsidian renderer transport for auxiliary-scope HTTP. Raw `fetch` to
+ * localhost is blocked by the app CSP, so auxiliary traffic goes through
+ * `requestUrl` like every other plugin request (see src/core/opencode/sdkFetch.ts).
+ * `requestUrl` cannot abort in flight; aborting stops the wait while the
+ * session's server-side `/abort` call stops the actual generation.
+ */
+const auxRequestUrlTransport: AuxTransport = (url, request = {}) => {
+  const send = (async () => {
+    const response = await requestUrl({
+      url,
+      method: request.method ?? 'GET',
+      ...(request.headers ? { headers: request.headers } : {}),
+      ...(request.body !== undefined ? { body: request.body } : {}),
+      throw: false,
+    });
+    const text = response.text;
+    return {
+      ok: response.status >= 200 && response.status < 300,
+      status: response.status,
+      text: async () => text,
+      json: async () => JSON.parse(text) as unknown,
+    };
+  })();
+  const signal = request.signal;
+  if (!signal) return send;
+  if (signal.aborted) return Promise.reject(auxAbortError());
+  const aborted = new Promise<never>((_, reject) => {
+    signal.addEventListener('abort', () => reject(auxAbortError()), { once: true });
+  });
+  aborted.catch(() => { /* the race loser must not surface as unhandled */ });
+  return Promise.race([send, aborted]);
+};
+
+/**
+ * Maps OpenCodeService server status strings to AgentConnectionStatus.
+ */
+function mapServerStatus(status: string): AgentConnectionStatus {
+  switch (status) {
+    case 'running':
+    case 'ready':
+      return 'connected';
+    case 'starting':
+    case 'stopping':
+      return 'connecting';
+    case 'stopped':
+    case 'not_configured':
+      return 'disconnected';
+    default:
+      if (status.includes('error') || status.includes('fail')) {
+        return 'error';
+      }
+      return 'disconnected';
+  }
+}
+
+/**
+ * The legacy HTTP/SSE adapter declares every capability EXCEPT TurnSteering:
+ * it has no native mid-turn steer seam — mid-turn input is serialized through
+ * the normal send queue — so claiming 'turn-steering' would advertise a steer
+ * affordance that can only fail at click time. OpenCode2Adapter owns the real
+ * steerTurn() (delivery 'steer'). Keep this exclusion deliberate: a future
+ * native steer seam on this adapter must add steerTurn() AND remove this
+ * filter in the same change.
+ */
+const OPENCODE_LEGACY_CAPABILITIES: BackendCapabilities = Object.freeze(
+  new Set<AgentCapability>(
+    [...OPENCODE_FULL_CAPABILITIES].filter((cap) => cap !== AgentCapability.TurnSteering),
+  ),
+);
+
+/**
+ * OpenCodeAdapter wraps an existing OpenCodeService instance and
+ * exposes it through the AgentService interface.
+ */
+export class OpenCodeAdapter
+  implements
+    AgentService,
+    AgentChatCapability,
+    AgentSessionCapability,
+    AgentBranchCapability,
+    AgentTodoCapability,
+    AgentQuestionCapability,
+    AgentPermissionCapability,
+    AgentModelCapability,
+    AgentMcpCapability,
+    AgentConfigCapability,
+    AgentToolCapability,
+    AgentAuthCapability,
+    AgentAuxQueryCapability,
+    AgentInlineCompletionCapability
+{
+  readonly kind: AgentBackendKind = 'opencode';
+  readonly displayName = 'OpenCode';
+  readonly description = 'OpenCode AI coding agent';
+  readonly capabilities = OPENCODE_LEGACY_CAPABILITIES;
+
+  private statusChangeHandlers = new Set<StatusChangeHandler>();
+  private auxScope: OpenCodeAuxScope | null = null;
+
+  constructor(private readonly service: OpenCodeService) {}
+
+  // -------------------------------------------------------------------------
+  // AgentService core
+  // -------------------------------------------------------------------------
+
+  hasCapability(cap: AgentCapability): boolean {
+    return this.capabilities.has(cap);
+  }
+
+  get status(): AgentConnectionStatus {
+    return mapServerStatus(this.service.getServerStatus());
+  }
+
+  getInfo(): AgentServiceInfo {
+    return {
+      kind: this.kind,
+      displayName: this.displayName,
+      description: this.description,
+      status: this.status,
+      capabilities: this.capabilities,
+    };
+  }
+
+  async start(): Promise<void> {
+    await this.service.start();
+  }
+
+  async stop(): Promise<void> {
+    await this.service.stop();
+  }
+
+  dispose(): void {
+    // Only clear adapter-level state; the underlying OpenCodeService
+    // is disposed separately by the plugin's onunload.
+    this.statusChangeHandlers.clear();
+    const scope = this.auxScope;
+    this.auxScope = null;
+    if (scope) {
+      void scope.dispose().catch(() => { /* Scope teardown is best-effort. */ });
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // AgentAuxQueryCapability
+  // -------------------------------------------------------------------------
+
+  /**
+   * Start a read-only auxiliary session on an isolated OpenCode scope.
+   *
+   * Rejects when the isolated scope cannot be verified read-only; see
+   * docs/requirements/inline-edit.md §5.4.
+   */
+  async startAuxQuerySession(config: AuxQuerySessionConfig): Promise<AuxQuerySession> {
+    const configuredPath = this.service.getSettingsSnapshot().server.local.executablePath;
+    const scope = this.auxScope ?? new OpenCodeAuxScope({
+      workingDirectory: config.workingDirectory,
+      ...(configuredPath.trim() ? { executablePath: configuredPath.trim() } : {}),
+      transport: auxRequestUrlTransport,
+    });
+    this.auxScope = scope;
+    try {
+      return await OpenCodeAuxQuerySession.create({
+        systemPrompt: config.systemPrompt,
+        workingDirectory: config.workingDirectory,
+        scope,
+        agentName: OPENCODE_AUX_AGENT,
+        transport: auxRequestUrlTransport,
+        ...(config.model ? { model: config.model } : {}),
+        ...(config.turnTimeoutMs ? { turnTimeoutMs: config.turnTimeoutMs } : {}),
+      });
+    } catch (error) {
+      this.auxScope = null;
+      await scope.dispose().catch(() => { /* Scope teardown is best-effort. */ });
+      throw error instanceof Error ? error : new Error(String(error));
+    }
+  }
+
+  /**
+   * Start a warm, reusable completion session inside the same isolated scope
+   * the aux sessions use (R-C3). The scope is process-warm and shared; the
+   * wrapper owns turn serialization and reset-through-recreate so each turn
+   * keeps the cold, stateless request semantics. Rejects when the scope cannot
+   * be verified read-only — same fail-closed proof as inline edit.
+   */
+  async startInlineCompletionSession(config: InlineCompletionSessionConfig): Promise<InlineCompletionSession> {
+    const startAux = async (): Promise<WarmableAuxSession> =>
+      await this.startAuxQuerySession({
+        systemPrompt: config.systemPrompt,
+        workingDirectory: config.workingDirectory,
+        turnTimeoutMs: INLINE_COMPLETION_TURN_TIMEOUT_MS,
+        ...(config.model ? { model: config.model } : {}),
+      });
+    const initial = await startAux();
+    return WarmInlineCompletionSession.create({
+      backend: this.kind,
+      session: initial,
+      recreate: startAux,
+    });
+  }
+
+  onStatusChange(handler: StatusChangeHandler): Disposable {
+    this.statusChangeHandlers.add(handler);
+    return { dispose: () => this.statusChangeHandlers.delete(handler) };
+  }
+
+  /**
+   * Notify listeners of a status change.
+   * Called by the registry when it detects the underlying service status
+   * has changed (e.g. via the existing onServerStatusChange callback).
+   */
+  notifyStatusChange(status: string): void {
+    const mapped = mapServerStatus(status);
+    for (const handler of this.statusChangeHandlers) {
+      try {
+        handler(mapped);
+      } catch {
+        // Swallow handler errors
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Direct delegation — expose the underlying OpenCodeService for
+  // consumers that need OpenCode-specific methods not on the interface.
+  // -------------------------------------------------------------------------
+
+  /** Underlying OpenCodeService for direct access when needed. */
+  get underlying(): OpenCodeService {
+    return this.service;
+  }
+
+  // -------------------------------------------------------------------------
+  // AgentChatCapability
+  // -------------------------------------------------------------------------
+
+  async *sendMessage(request: { sessionId: string; content: string; options?: Record<string, unknown> }) {
+    const options = { ...(request.options ?? {}) };
+    // Backend-neutral memory seam: translate the injection into a synthetic
+    // text part so it reaches the model as context, not user prose.
+    const memoryInjection = extractMemoryInjection(options);
+    // Backend-neutral Obsidian-tooling seam (R-B4): same translation, once
+    // per context epoch, riding its own options-bag key.
+    const toolingInjection = extractObsidianToolingInjection(options);
+    const syntheticParts = [
+      ...(Array.isArray(options.syntheticTextParts)
+        ? (options.syntheticTextParts as PromptSyntheticTextPartInput[])
+        : []),
+      ...(memoryInjection
+        ? [{
+            text: memoryInjection,
+            ignored: false,
+            metadata: { kind: 'memory-injection' },
+          } satisfies PromptSyntheticTextPartInput]
+        : []),
+      ...(toolingInjection
+        ? [{
+            text: toolingInjection,
+            ignored: false,
+            metadata: { kind: 'obsidian-tooling-injection' },
+          } satisfies PromptSyntheticTextPartInput]
+        : []),
+    ];
+    yield* this.service.sendMessage(request.content, {
+      ...options,
+      ...(syntheticParts.length > 0 ? { syntheticTextParts: syntheticParts } : {}),
+      sessionId: request.sessionId,
+    });
+  }
+
+  cancelStream(sessionId: string): void {
+    this.service.cancelStream(sessionId);
+  }
+
+  // -------------------------------------------------------------------------
+  // AgentSessionCapability
+  // -------------------------------------------------------------------------
+
+  async createSession(title?: string, options?: Record<string, unknown>): Promise<string> {
+    return this.service.createSession(title, options as Parameters<OpenCodeService['createSession']>[1]);
+  }
+
+  async listSessions(): Promise<unknown[]> {
+    return this.service.listSessions();
+  }
+
+  async getSession(sessionId: string): Promise<unknown | null> {
+    try {
+      return await this.service.getSessionInfo(sessionId);
+    } catch {
+      return null;
+    }
+  }
+
+  async deleteSession(sessionId: string): Promise<void> {
+    await this.service.deleteSession(sessionId);
+  }
+
+  async updateSessionTitle(sessionId: string, title: string): Promise<void> {
+    await this.service.updateSessionTitle(sessionId, title);
+  }
+
+  async getSessionMessages(sessionId: string): Promise<unknown[]> {
+    return this.service.getSessionMessages(sessionId);
+  }
+
+  // -------------------------------------------------------------------------
+  // AgentBranchCapability
+  // -------------------------------------------------------------------------
+
+  async forkSession(sessionId: string, messageID?: string): Promise<{ id: string; title: string }> {
+    return this.service.forkSession(sessionId, messageID);
+  }
+
+  async revertSession(sessionId: string, messageID: string, partID?: string): Promise<boolean> {
+    return this.service.revertSession(sessionId, messageID, partID);
+  }
+
+  async unrevertSession(sessionId: string): Promise<boolean> {
+    return this.service.unrevertSession(sessionId);
+  }
+
+  async getSessionRevertState(sessionId: string): Promise<{ messageID: string; partID?: string } | null> {
+    return this.service.getSessionRevertState(sessionId);
+  }
+
+  async getSessionDiff(sessionId: string, messageID?: string) {
+    return this.service.getSessionDiff(sessionId, messageID);
+  }
+
+  async getSessionChildren(sessionId: string): Promise<unknown[]> {
+    return this.service.getSessionChildren(sessionId);
+  }
+
+  // -------------------------------------------------------------------------
+  // AgentTodoCapability
+  // -------------------------------------------------------------------------
+
+  async getSessionTodos(sessionId: string): Promise<unknown[]> {
+    return this.service.getSessionTodos(sessionId);
+  }
+
+  subscribeToSessionTodoUpdates(handler: (update: unknown) => void): Disposable {
+    const unsub = this.service.subscribeToSessionTodoUpdates(handler as never);
+    return { dispose: unsub };
+  }
+
+  // -------------------------------------------------------------------------
+  // AgentQuestionCapability
+  // -------------------------------------------------------------------------
+
+  async getPendingQuestions(): Promise<unknown[]> {
+    return this.service.getPendingQuestions();
+  }
+
+  async replyToQuestion(requestID: string, answers: string[][]): Promise<void> {
+    return this.service.replyToQuestion(requestID, answers);
+  }
+
+  async rejectQuestion(requestID: string): Promise<void> {
+    return this.service.rejectQuestion(requestID);
+  }
+
+  // -------------------------------------------------------------------------
+  // AgentPermissionCapability
+  // -------------------------------------------------------------------------
+
+  async getPendingPermissions(): Promise<unknown[]> {
+    return this.service.getPendingPermissions();
+  }
+
+  async respondToPermission(requestID: string, reply: unknown, message?: string): Promise<void> {
+    return this.service.respondToPermission(requestID, reply as never, message);
+  }
+
+  // -------------------------------------------------------------------------
+  // AgentModelCapability
+  // -------------------------------------------------------------------------
+
+  async getAvailableModels(options?: Record<string, unknown>): Promise<unknown> {
+    return this.service.getAvailableModels(options);
+  }
+
+  async getProviderDirectory(options?: Record<string, unknown>): Promise<unknown> {
+    return this.service.getProviderDirectory(options);
+  }
+
+  async getResolvedModelConfig(options?: Record<string, unknown>): Promise<unknown> {
+    return this.service.getResolvedModelConfig(options);
+  }
+
+  // -------------------------------------------------------------------------
+  // AgentMcpCapability
+  // -------------------------------------------------------------------------
+
+  getMcpServerSnapshot(): unknown {
+    return this.service.getMcpServerSnapshot();
+  }
+
+  async getMcpStatus(): Promise<unknown> {
+    return this.service.getMcpStatus();
+  }
+
+  async addMcpServer(name: string, config: Record<string, unknown>): Promise<unknown> {
+    return this.service.addMcpServer(name, config);
+  }
+
+  async connectMcpServer(name: string): Promise<boolean> {
+    return this.service.connectMcpServer(name);
+  }
+
+  async disconnectMcpServer(name: string): Promise<boolean> {
+    return this.service.disconnectMcpServer(name);
+  }
+
+  async refreshMcpServerStatus(): Promise<unknown> {
+    return this.service.refreshMcpServerStatus();
+  }
+
+  async removeMcpAuth(name: string): Promise<unknown> {
+    return this.service.removeMcpAuth(name);
+  }
+
+  async authenticateMcp(name: string): Promise<unknown> {
+    return this.service.authenticateMcp(name);
+  }
+
+  subscribeToCatalogUpdates(handler: (update: unknown) => void): Disposable {
+    const unsub = this.service.subscribeToCatalogUpdates(handler as never);
+    return { dispose: unsub };
+  }
+
+  // -------------------------------------------------------------------------
+  // AgentConfigCapability
+  // -------------------------------------------------------------------------
+
+  getSettingsSnapshot(): unknown {
+    return this.service.getSettingsSnapshot();
+  }
+
+  async updateSettings(settings: unknown): Promise<void> {
+    return this.service.updateSettings(settings as never);
+  }
+
+  setVaultPath(path: string): void {
+    this.service.setVaultPath(path);
+  }
+
+  async reapplyCompactionConfigFromProjectConfig(compaction: unknown): Promise<unknown> {
+    return this.service.reapplyCompactionConfigFromProjectConfig(compaction as never);
+  }
+
+  // -------------------------------------------------------------------------
+  // AgentToolCapability
+  // -------------------------------------------------------------------------
+
+  async listTools(providerID: string, modelID: string, options?: { refresh?: boolean }): Promise<unknown[]> {
+    return this.service.listTools(providerID, modelID, options);
+  }
+
+  getToolCatalogSnapshot(): unknown {
+    return this.service.getToolCatalogSnapshot();
+  }
+
+  getCapabilitySnapshot(): unknown {
+    return this.service.getCapabilitySnapshot();
+  }
+
+  async refreshToolIds(): Promise<string[]> {
+    return this.service.refreshToolIds();
+  }
+
+  // -------------------------------------------------------------------------
+  // AgentAuthCapability
+  // -------------------------------------------------------------------------
+
+  async getProviderAuthMethods(): Promise<unknown> {
+    return this.service.getProviderAuthMethods();
+  }
+
+  async authorizeProviderOAuth(providerID: string): Promise<unknown> {
+    return this.service.authorizeProviderOAuth(providerID);
+  }
+
+  async completeProviderOAuth(providerID: string, code: string, method?: number): Promise<unknown> {
+    return this.service.completeProviderOAuth(providerID, code, method);
+  }
+}

@@ -29,8 +29,8 @@
 > Cross-owner access is read-only snapshot/command/event. Do not replicate this state as a second writable truth source.
 
 ## Entrypoints
-- `src/features/chat/runtime/SendPipelineRuntime.ts`
-- `src/features/chat/runtime/BackgroundTaskIndicatorCoordinator.ts`
+- `src/features/chat/runtime/send/SendPipelineRuntime.ts`
+- `src/features/chat/runtime/background/BackgroundTaskIndicatorCoordinator.ts`
 - `src/features/chat/runtime/ChatRuntimeComposition.ts` — composition owner that assembles the full chat runtime (surface/identity/render/background/conversation/interaction phases) into a single `ChatRuntime` struct the view destructures. Owns no disposal; receives the view only as the structural `ChatRuntimeCompositionHost`. See Task 15.
 
 ## Dependency surface
@@ -87,3 +87,9 @@ settled Codex footer 的最小刷新留在已有 composition callback，并守�
 2026-10-07 成功 Pi prompt 进入既有 after-stream sync；SDK/process/history 读取仍经 adapter-native view 分支，不借用 OpenCode transport。
 
 Settled Claude Code turns reuse the existing scoped user-footer identity refresh alongside Codex; no new runtime owner or rerender of the message body is introduced.
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/features/chat/runtime`、`src/features/chat/runtime/activation`、`src/features/chat/runtime/background`、`src/features/chat/runtime/rendering`、`src/features/chat/runtime/send`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

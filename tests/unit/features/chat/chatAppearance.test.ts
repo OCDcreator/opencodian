@@ -6,7 +6,7 @@ import {
   buildChatAppearanceCustomCss,
   getChatAppearanceCssVariables,
   getInputPanelGlassRefractionCssVariables,
-} from '../../../../src/features/chat/chatAppearance';
+} from '../../../../src/features/chat/rendering/chatAppearance';
 
 describe('chatAppearance utilities', () => {
   it('should map chat appearance settings to CSS variables', () => {

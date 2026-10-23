@@ -2,7 +2,7 @@ import type { VaultRetrievalSnippet } from '../../../../../src/core/memory';
 import type { PromptContextItem } from '../../../../../src/core/types';
 import {
   VaultRetrievalComposerCoordinator,
-} from '../../../../../src/features/chat/services/VaultRetrievalComposerCoordinator';
+} from '../../../../../src/features/chat/services/context/VaultRetrievalComposerCoordinator';
 
 function snippet(overrides: Partial<VaultRetrievalSnippet> & { path: string }): VaultRetrievalSnippet {
   return {

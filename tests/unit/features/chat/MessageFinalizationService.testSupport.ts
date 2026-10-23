@@ -5,7 +5,7 @@ import type {
 import {
   type MessageFinalizationHost,
   type MessageFinalizationSyncResult,
-} from '../../../../src/features/chat/services/MessageFinalizationService';
+} from '../../../../src/features/chat/services/send/MessageFinalizationService';
 import { OpenCodeService } from '../../core/opencode/OpenCodeService.testSupport';
 
 export function createMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {

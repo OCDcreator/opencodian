@@ -6,7 +6,7 @@ import {
   createClaudeProjectSkill,
   discoverClaudeProjectSkills,
   discoverClaudeSkillResources,
-} from '../../../../../src/core/agents/backend/ClaudeProjectSkillDiscovery';
+} from '../../../../../src/core/agents/backend/claude/ClaudeProjectSkillDiscovery';
 
 describe('ClaudeProjectSkillDiscovery', () => {
   let tempRoot: string;

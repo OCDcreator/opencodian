@@ -8,12 +8,12 @@ import {
   getClaudeResourceTargetPath,
   resolveClaudeResourceScopeStatus,
   SettingsClaudeResourcesSection,
-} from '../../../../src/features/settings/SettingsClaudeResourcesSection';
-import { getCodexResourceEditorMode, getCodexResourceTargetPath } from '../../../../src/features/settings/SettingsCodexResourcesSection';
-import { SettingsCodexResourcesSection } from '../../../../src/features/settings/SettingsCodexResourcesSection';
-import { SettingsCodexSection } from '../../../../src/features/settings/SettingsCodexSection';
+} from '../../../../src/features/settings/backends/claude/SettingsClaudeResourcesSection';
+import { getCodexResourceEditorMode, getCodexResourceTargetPath } from '../../../../src/features/settings/backends/codex/SettingsCodexResourcesSection';
+import { SettingsCodexResourcesSection } from '../../../../src/features/settings/backends/codex/SettingsCodexResourcesSection';
+import { SettingsCodexSection } from '../../../../src/features/settings/backends/codex/SettingsCodexSection';
 
-jest.mock('../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery', () => ({
+jest.mock('../../../../src/core/agents/backend/claude/ClaudeProjectCommandDiscovery', () => ({
   discoverClaudeCommandResources: jest.fn().mockResolvedValue([]),
   createClaudeCommandResource: jest.fn(),
   updateClaudeCommandResource: jest.fn(),
@@ -27,7 +27,7 @@ jest.mock('../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery', (
   validateClaudeCommandContent: jest.fn().mockReturnValue(null),
 }));
 
-jest.mock('../../../../src/core/agents/backend/ClaudeProjectSkillDiscovery', () => ({
+jest.mock('../../../../src/core/agents/backend/claude/ClaudeProjectSkillDiscovery', () => ({
   discoverClaudeSkillResources: jest.fn().mockResolvedValue([]),
   createClaudeSkillResource: jest.fn(),
   updateClaudeSkillResource: jest.fn(),
@@ -41,7 +41,7 @@ jest.mock('../../../../src/core/agents/backend/ClaudeProjectSkillDiscovery', () 
   validateClaudeSkillContent: jest.fn().mockReturnValue(null),
 }));
 
-jest.mock('../../../../src/core/agents/backend/ClaudeProjectAgentDiscovery', () => ({
+jest.mock('../../../../src/core/agents/backend/claude/ClaudeProjectAgentDiscovery', () => ({
   discoverClaudeAgentResources: jest.fn().mockResolvedValue([]),
   createClaudeAgentResource: jest.fn(),
   updateClaudeAgentResource: jest.fn(),
@@ -55,7 +55,7 @@ jest.mock('../../../../src/core/agents/backend/ClaudeProjectAgentDiscovery', () 
   validateClaudeAgentContent: jest.fn().mockReturnValue(null),
 }));
 
-jest.mock('../../../../src/core/agents/backend/CodexProjectResourceDiscovery', () => ({
+jest.mock('../../../../src/core/agents/backend/codex/CodexProjectResourceDiscovery', () => ({
   discoverCodexSkillResources: jest.fn().mockResolvedValue([]),
   createCodexSkillResource: jest.fn(),
   updateCodexSkillResource: jest.fn(),
@@ -136,7 +136,7 @@ describe('P1 resource settings surface', () => {
   });
 
   it('renders scope, target path, and revision metadata from scoped discovery', async () => {
-    const command = await import('../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery');
+    const command = await import('../../../../src/core/agents/backend/claude/ClaudeProjectCommandDiscovery');
     (command.discoverClaudeCommandResources as jest.Mock).mockResolvedValueOnce([{
       name: 'review', description: 'Review', filePath: '/vault/.claude/commands/review.md', relativePath: '.claude/commands/review.md',
       readonly: false, scope: 'project', revision: { canonicalPath: '/vault/.claude/commands/review.md', mtimeMs: 1, size: 4, sha256: 'a'.repeat(64) },
@@ -158,7 +158,7 @@ describe('P1 resource settings surface', () => {
   });
 
   it('retains the editor modal and draft when the expected revision conflicts', async () => {
-    const command = await import('../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery');
+    const command = await import('../../../../src/core/agents/backend/claude/ClaudeProjectCommandDiscovery');
     (command.discoverClaudeCommandResources as jest.Mock).mockResolvedValue([{
       name: 'review', description: 'Review', filePath: '/vault/.claude/commands/review.md', relativePath: '.claude/commands/review.md',
       readonly: false, scope: 'project', revision: { canonicalPath: '/vault/.claude/commands/review.md', mtimeMs: 1, size: 4, sha256: 'a'.repeat(64) },
@@ -184,7 +184,7 @@ describe('P1 resource settings surface', () => {
   });
 
   it('uses the scoped safe reader and keeps the modal open without exposing bytes on read conflict', async () => {
-    const command = await import('../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery');
+    const command = await import('../../../../src/core/agents/backend/claude/ClaudeProjectCommandDiscovery');
     const revision = { canonicalPath: '/vault/.claude/commands/review.md', mtimeMs: 1, size: 4, sha256: 'a'.repeat(64) };
     (command.discoverClaudeCommandResources as jest.Mock).mockResolvedValue([{
       name: 'review', description: 'Review', filePath: '/vault/.claude/commands/review.md', relativePath: '.claude/commands/review.md',
@@ -212,7 +212,7 @@ describe('P1 resource settings surface', () => {
   });
 
   it('renders typed invalid-path read failure and never falls back to an existing resource template', async () => {
-    const command = await import('../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery');
+    const command = await import('../../../../src/core/agents/backend/claude/ClaudeProjectCommandDiscovery');
     const revision = { canonicalPath: '/vault/.claude/commands/symlinked.md', mtimeMs: 1, size: 4, sha256: 'b'.repeat(64) };
     (command.discoverClaudeCommandResources as jest.Mock).mockResolvedValue([{
       name: 'symlinked', description: 'Symlinked', filePath: '/vault/.claude/commands/symlinked.md', relativePath: '.claude/commands/symlinked.md',
@@ -241,10 +241,10 @@ describe('P1 resource settings surface', () => {
   ])('fails closed when %s delete confirmation is undefined', async (_label, backend) => {
     const revision = { canonicalPath: backend === 'claude' ? '/vault/.claude/commands/review.md' : '/vault/.agents/skills/review/SKILL.md', mtimeMs: 1, size: 4, sha256: 'a'.repeat(64) };
     if (backend === 'claude') {
-      const command = await import('../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery');
+      const command = await import('../../../../src/core/agents/backend/claude/ClaudeProjectCommandDiscovery');
       (command.discoverClaudeCommandResources as jest.Mock).mockResolvedValue([{ name: 'review', description: 'Review', filePath: revision.canonicalPath, relativePath: '.claude/commands/review.md', readonly: false, scope: 'project', revision }]);
     } else {
-      const codex = await import('../../../../src/core/agents/backend/CodexProjectResourceDiscovery');
+      const codex = await import('../../../../src/core/agents/backend/codex/CodexProjectResourceDiscovery');
       (codex.discoverCodexSkillResources as jest.Mock).mockResolvedValue([{ name: 'review', description: 'Review', skillMdPath: revision.canonicalPath, relativePath: '.agents/skills/review', readonly: false, scope: 'project', revision }]);
     }
     (window.confirm as jest.Mock).mockReturnValue(undefined);
@@ -258,13 +258,13 @@ describe('P1 resource settings surface', () => {
     (container.querySelector(backend === 'claude' ? '.opencodian-claude-resource-delete' : '.opencodian-codex-resource-delete') as HTMLButtonElement).click();
     await flush();
     const deleteMock = backend === 'claude'
-      ? (await import('../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery')).deleteClaudeCommandResource as jest.Mock
-      : (await import('../../../../src/core/agents/backend/CodexProjectResourceDiscovery')).deleteCodexSkillResource as jest.Mock;
+      ? (await import('../../../../src/core/agents/backend/claude/ClaudeProjectCommandDiscovery')).deleteClaudeCommandResource as jest.Mock
+      : (await import('../../../../src/core/agents/backend/codex/CodexProjectResourceDiscovery')).deleteCodexSkillResource as jest.Mock;
     expect(deleteMock).not.toHaveBeenCalled();
   });
 
   it('calls MarkdownRenderer only for markdown Preview and uses a div preview container', async () => {
-    const command = await import('../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery');
+    const command = await import('../../../../src/core/agents/backend/claude/ClaudeProjectCommandDiscovery');
     const revision = { canonicalPath: '/vault/.claude/commands/review.md', mtimeMs: 1, size: 4, sha256: 'c'.repeat(64) };
     (command.discoverClaudeCommandResources as jest.Mock).mockResolvedValue([{
       name: 'review', description: 'Review', filePath: revision.canonicalPath, relativePath: '.claude/commands/review.md',
@@ -290,7 +290,7 @@ describe('P1 resource settings surface', () => {
   });
 
   it('routes Codex Skill and Agent editor loads through their scoped safe readers', async () => {
-    const codex = await import('../../../../src/core/agents/backend/CodexProjectResourceDiscovery');
+    const codex = await import('../../../../src/core/agents/backend/codex/CodexProjectResourceDiscovery');
     const skillRevision = { canonicalPath: '/vault/.agents/skills/review/SKILL.md', mtimeMs: 1, size: 4, sha256: 'd'.repeat(64) };
     const agentRevision = { canonicalPath: '/vault/.codex/agents/reviewer.toml', mtimeMs: 2, size: 5, sha256: 'e'.repeat(64) };
     (codex.discoverCodexSkillResources as jest.Mock).mockResolvedValue([{
@@ -319,7 +319,7 @@ describe('P1 resource settings surface', () => {
   });
 
   it('uses the revision returned by the scoped reader when saving a Claude draft', async () => {
-    const command = await import('../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery');
+    const command = await import('../../../../src/core/agents/backend/claude/ClaudeProjectCommandDiscovery');
     const listedRevision = { canonicalPath: '/vault/.claude/commands/review.md', mtimeMs: 1, size: 4, sha256: 'a'.repeat(64) };
     const loadedRevision = { canonicalPath: '/vault/.claude/commands/review.md', mtimeMs: 2, size: 18, sha256: 'b'.repeat(64) };
     (command.discoverClaudeCommandResources as jest.Mock).mockResolvedValue([{
@@ -350,7 +350,7 @@ describe('P1 resource settings surface', () => {
   });
 
   it('uses the revision returned by the scoped reader when saving a Codex draft', async () => {
-    const codex = await import('../../../../src/core/agents/backend/CodexProjectResourceDiscovery');
+    const codex = await import('../../../../src/core/agents/backend/codex/CodexProjectResourceDiscovery');
     const listedRevision = { canonicalPath: '/vault/.agents/skills/review/SKILL.md', mtimeMs: 1, size: 4, sha256: 'c'.repeat(64) };
     const loadedRevision = { canonicalPath: '/vault/.agents/skills/review/SKILL.md', mtimeMs: 2, size: 18, sha256: 'd'.repeat(64) };
     (codex.discoverCodexSkillResources as jest.Mock).mockResolvedValue([{
@@ -431,7 +431,7 @@ describe('P1 resource settings surface', () => {
   });
 
   it('shows history at group level so a deleted target can be restored with null expected revision', async () => {
-    const command = await import('../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery');
+    const command = await import('../../../../src/core/agents/backend/claude/ClaudeProjectCommandDiscovery');
     const identity = 'opaque-history-id' as any;
     (command.catalogClaudeCommandResourceHistory as jest.Mock).mockResolvedValue({
       status: 'success',
@@ -459,7 +459,7 @@ describe('P1 resource settings surface', () => {
   });
 
   it('keeps the Claude history modal and selected restore entry on revision conflict', async () => {
-    const command = await import('../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery');
+    const command = await import('../../../../src/core/agents/backend/claude/ClaudeProjectCommandDiscovery');
     const identity = 'conflicting-history-entry' as any;
     (command.catalogClaudeCommandResourceHistory as jest.Mock).mockResolvedValue({
       status: 'success',
@@ -492,7 +492,7 @@ describe('P1 resource settings surface', () => {
   });
 
   it('passes the Claude revision captured when History opened, not a later discovery', async () => {
-    const command = await import('../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery');
+    const command = await import('../../../../src/core/agents/backend/claude/ClaudeProjectCommandDiscovery');
     const openedRevision = { canonicalPath: '/vault/.claude/commands/review.md', mtimeMs: 1, size: 10, sha256: 'a'.repeat(64) };
     const laterRevision = { canonicalPath: '/vault/.claude/commands/review.md', mtimeMs: 2, size: 11, sha256: 'b'.repeat(64) };
     let historyOpened = false;
@@ -522,7 +522,7 @@ describe('P1 resource settings surface', () => {
   });
 
   it('passes the Codex revision captured when History opened, not a later discovery', async () => {
-    const codex = await import('../../../../src/core/agents/backend/CodexProjectResourceDiscovery');
+    const codex = await import('../../../../src/core/agents/backend/codex/CodexProjectResourceDiscovery');
     const openedRevision = { canonicalPath: '/vault/.agents/skills/review/SKILL.md', mtimeMs: 1, size: 10, sha256: 'c'.repeat(64) };
     const laterRevision = { canonicalPath: '/vault/.agents/skills/review/SKILL.md', mtimeMs: 2, size: 11, sha256: 'd'.repeat(64) };
     let historyOpened = false;
@@ -554,7 +554,7 @@ describe('P1 resource settings surface', () => {
   });
 
   it('does not present an archive failure as an empty history list', async () => {
-    const command = await import('../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery');
+    const command = await import('../../../../src/core/agents/backend/claude/ClaudeProjectCommandDiscovery');
     (command.catalogClaudeCommandResourceHistory as jest.Mock).mockResolvedValue({ status: 'archive-failed', cause: 'manifest invalid' });
     const openSpy = jest.spyOn(Modal.prototype, 'open').mockImplementation(() => undefined);
     const container = document.createElement('div');
@@ -568,7 +568,7 @@ describe('P1 resource settings surface', () => {
   });
 
   it('keeps markdown Preview available while Codex Agent remains TOML source-only', async () => {
-    const codex = await import('../../../../src/core/agents/backend/CodexProjectResourceDiscovery');
+    const codex = await import('../../../../src/core/agents/backend/codex/CodexProjectResourceDiscovery');
     const revision = { canonicalPath: '/vault/x', mtimeMs: 1, size: 1, sha256: 'a'.repeat(64) };
     (codex.discoverCodexSkillResources as jest.Mock).mockResolvedValue([{ name: 'skill', description: '', skillMdPath: '/vault/.agents/skills/skill/SKILL.md', relativePath: '', readonly: false, scope: 'project', revision }]);
     (codex.discoverCodexAgentResources as jest.Mock).mockResolvedValue([{ name: 'agent', description: '', agentTomlPath: '/vault/.codex/agents/agent.toml', relativePath: '', readonly: false, scope: 'project', revision }]);
@@ -580,7 +580,7 @@ describe('P1 resource settings surface', () => {
   });
 
   it('does not mount a Markdown preview pane in the Codex Agent TOML editor', async () => {
-    const codex = await import('../../../../src/core/agents/backend/CodexProjectResourceDiscovery');
+    const codex = await import('../../../../src/core/agents/backend/codex/CodexProjectResourceDiscovery');
     const revision = { canonicalPath: '/vault/.codex/agents/agent.toml', mtimeMs: 1, size: 1, sha256: 'a'.repeat(64) };
     (codex.discoverCodexAgentResources as jest.Mock).mockResolvedValue([{
       name: 'agent', description: '', agentTomlPath: revision.canonicalPath, relativePath: '.codex/agents/agent.toml',
@@ -601,7 +601,7 @@ describe('P1 resource settings surface', () => {
   });
 
   it('replaces the Claude resource host after create/update/delete reloads', async () => {
-    const command = await import('../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery');
+    const command = await import('../../../../src/core/agents/backend/claude/ClaudeProjectCommandDiscovery');
     const revisions = {
       initial: { canonicalPath: '/vault/.claude/commands/review.md', mtimeMs: 1, size: 8, sha256: 'a'.repeat(64) },
       created: { canonicalPath: '/vault/.claude/commands/review.md', mtimeMs: 2, size: 9, sha256: 'b'.repeat(64) },

@@ -10,7 +10,7 @@ import {
 import {
   SlashCommandMenuCatalogCache,
   type SlashCommandMenuCatalogCacheHost,
-} from '../../../../../src/features/chat/services/SlashCommandMenuCatalogCache';
+} from '../../../../../src/features/chat/services/commands/SlashCommandMenuCatalogCache';
 
 function makeRuntimeCommand(name: string, source: 'command' | 'skill' | 'mcp') {
   return { name, source, template: `/${name}`, hints: [] };
@@ -230,7 +230,7 @@ describe('SlashCommandMenuCatalogCache @agent backend isolation', () => {
   }
 
   it('Claude-context @agent candidates contain Claude runtime agents', async () => {
-    const { loadAgentMentionCandidatesFromSlashCommandMenuItems } = await import('../../../../../src/features/chat/services/SlashCommandMenuCatalogCache');
+    const { loadAgentMentionCandidatesFromSlashCommandMenuItems } = await import('../../../../../src/features/chat/services/commands/SlashCommandMenuCatalogCache');
     const cache = new SlashCommandMenuCatalogCache(createClaudeHostWithAgents());
     const items = await cache.load();
 
@@ -241,7 +241,7 @@ describe('SlashCommandMenuCatalogCache @agent backend isolation', () => {
   });
 
   it('Claude-context @agent candidates exclude OpenCode runtime/project agents', async () => {
-    const { loadAgentMentionCandidatesFromSlashCommandMenuItems } = await import('../../../../../src/features/chat/services/SlashCommandMenuCatalogCache');
+    const { loadAgentMentionCandidatesFromSlashCommandMenuItems } = await import('../../../../../src/features/chat/services/commands/SlashCommandMenuCatalogCache');
     // Even if someone accidentally returns OpenCode agents, Claude host should not use them
     const host = createClaudeHostWithAgents();
     const cache = new SlashCommandMenuCatalogCache(host);
@@ -253,7 +253,7 @@ describe('SlashCommandMenuCatalogCache @agent backend isolation', () => {
   });
 
   it('Claude-context without loadClaudeRuntimeAgents returns empty agent candidates', async () => {
-    const { loadAgentMentionCandidatesFromSlashCommandMenuItems } = await import('../../../../../src/features/chat/services/SlashCommandMenuCatalogCache');
+    const { loadAgentMentionCandidatesFromSlashCommandMenuItems } = await import('../../../../../src/features/chat/services/commands/SlashCommandMenuCatalogCache');
     const host = createClaudeHostWithAgents();
     delete (host as unknown as Record<string, unknown>).loadClaudeRuntimeAgents;
     const cache = new SlashCommandMenuCatalogCache(host);
@@ -264,7 +264,7 @@ describe('SlashCommandMenuCatalogCache @agent backend isolation', () => {
   });
 
   it('OpenCode-context @agent candidates are not affected by Claude agent seam', async () => {
-    const { loadAgentMentionCandidatesFromSlashCommandMenuItems } = await import('../../../../../src/features/chat/services/SlashCommandMenuCatalogCache');
+    const { loadAgentMentionCandidatesFromSlashCommandMenuItems } = await import('../../../../../src/features/chat/services/commands/SlashCommandMenuCatalogCache');
     // OpenCode host has no loadClaudeRuntimeAgents — should not error
     const cache = new SlashCommandMenuCatalogCache(createOpenCodeHostWithAgents());
     const items = await cache.load();

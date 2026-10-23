@@ -5,7 +5,7 @@ import {
   QuestionTodoStatusRefreshCoordinator,
   type QuestionTodoStatusRefreshCoordinatorHost,
   type QuestionTodoStatusRefreshRuntime,
-} from '../../../../src/features/chat/services/QuestionTodoStatusRefreshCoordinator';
+} from '../../../../src/features/chat/services/questions/QuestionTodoStatusRefreshCoordinator';
 
 type MockedQuestionTodoStatusRefreshHost = {
   [Key in keyof QuestionTodoStatusRefreshCoordinatorHost]:

@@ -7,14 +7,14 @@
 
 - **Layer:** `feature` (may import layers: shared, core, feature)
 - **Risk:** medium
-- **Include:** `src/features/settings/SettingsStyleSection.ts`, `src/features/settings/settingsStyleControls.ts`, `src/features/settings/SettingsStyleInputPanelSection.ts`, `src/features/settings/SettingsStyleLiquidGlassInputControls.ts`, `src/features/settings/SettingsStylePresetSection.ts`, `src/features/settings/SettingsStyleBackgroundSection.ts`, `src/features/settings/InputFontRegistry.ts`, `src/features/settings/LiquidGlassSettingHelpModal.ts`
+- **Include:** `src/features/settings/appearance/SettingsStyleSection.ts`, `src/features/settings/appearance/settingsStyleControls.ts`, `src/features/settings/appearance/SettingsStyleInputPanelSection.ts`, `src/features/settings/appearance/SettingsStyleLiquidGlassInputControls.ts`, `src/features/settings/appearance/SettingsStylePresetSection.ts`, `src/features/settings/appearance/SettingsStyleBackgroundSection.ts`, `src/features/settings/appearance/InputFontRegistry.ts`, `src/features/settings/appearance/LiquidGlassSettingHelpModal.ts`
 
 ## Responsibilities
 - settings style sections, controls, presets, background, input panel and liquid glass controls
 - input font registry
 
 ## Entrypoints
-- `src/features/settings/SettingsStyleSection.ts`
+- `src/features/settings/appearance/SettingsStyleSection.ts`
 
 ## Dependency surface
 - **Allowed owner dependencies:** `shared.foundation`, `shared.utils-glass`, `core.theme`, `core.types`
@@ -46,3 +46,9 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 - 2026-09-18 (FlowText 批次 B)：owner manifest 随 R-B1/R-B2 更新——新增 `src/shared/contextGroupPlan.ts` 归属 `shared.foundation`；本 owner 的边界与职责未变。
 
 2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.settings-style` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/features/settings/appearance`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

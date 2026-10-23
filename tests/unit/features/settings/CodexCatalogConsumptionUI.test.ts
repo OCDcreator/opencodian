@@ -1,11 +1,11 @@
 import { type App, Modal, Setting } from 'obsidian';
 
 import { AgentCapability } from '../../../../src/core/agents/AgentCapability';
-import { CodexAdapter } from '../../../../src/core/agents/backend/CodexAdapter';
-import { CodexAppServerClient } from '../../../../src/core/agents/backend/CodexAppServerClient';
+import { CodexAdapter } from '../../../../src/core/agents/backend/codex/CodexAdapter';
+import { CodexAppServerClient } from '../../../../src/core/agents/backend/codex/CodexAppServerClient';
 import { BackendSessionBrowserModal } from '../../../../src/features/chat/ui/BackendSessionBrowserModal';
-import { CodexMcpServerDetailModal, createCodexMcpServerDetailHost } from '../../../../src/features/settings/CodexMcpServerDetailModal';
-import { SettingsCodexReadbackControls } from '../../../../src/features/settings/SettingsCodexReadbackControls';
+import { CodexMcpServerDetailModal, createCodexMcpServerDetailHost } from '../../../../src/features/settings/backends/codex/CodexMcpServerDetailModal';
+import { SettingsCodexReadbackControls } from '../../../../src/features/settings/backends/codex/SettingsCodexReadbackControls';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 

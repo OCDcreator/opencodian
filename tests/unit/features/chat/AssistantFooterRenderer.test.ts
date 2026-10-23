@@ -2,7 +2,7 @@ import type { ChatMessage } from '../../../../src/core/types';
 import {
   AssistantFooterRenderer,
   type AssistantFooterRendererHost,
-} from '../../../../src/features/chat/runtime/AssistantFooterRenderer';
+} from '../../../../src/features/chat/runtime/rendering/AssistantFooterRenderer';
 
 describe('AssistantFooterRenderer', () => {
   function createRenderer() {

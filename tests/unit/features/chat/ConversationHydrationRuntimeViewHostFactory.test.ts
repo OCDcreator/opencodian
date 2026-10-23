@@ -1,15 +1,15 @@
 import * as collapsible from '../../../../src/features/chat/rendering/collapsible';
-import { ConversationHydrationOutcomeBridge } from '../../../../src/features/chat/runtime/ConversationHydrationOutcomeBridge';
-import { ConversationHydrationRenderBridge } from '../../../../src/features/chat/runtime/ConversationHydrationRenderBridge';
-import { ConversationTransitionBridge } from '../../../../src/features/chat/runtime/ConversationTransitionBridge';
-import { TabConversationStateBridge } from '../../../../src/features/chat/runtime/TabConversationStateBridge';
-import { TabViewActivationBridge } from '../../../../src/features/chat/runtime/TabViewActivationBridge';
+import { ConversationHydrationOutcomeBridge } from '../../../../src/features/chat/runtime/activation/ConversationHydrationOutcomeBridge';
+import { ConversationHydrationRenderBridge } from '../../../../src/features/chat/runtime/activation/ConversationHydrationRenderBridge';
+import { ConversationTransitionBridge } from '../../../../src/features/chat/runtime/activation/ConversationTransitionBridge';
+import { TabConversationStateBridge } from '../../../../src/features/chat/runtime/activation/TabConversationStateBridge';
+import { TabViewActivationBridge } from '../../../../src/features/chat/runtime/activation/TabViewActivationBridge';
 import {
   assembleConversationHydrationRuntime,
   type ConversationHydrationRuntimeViewHost,
   createConversationHydrationRuntimeBridges,
   createConversationHydrationRuntimeViewHosts,
-} from '../../../../src/features/chat/services/ConversationHydrationRuntimeViewHostFactory';
+} from '../../../../src/features/chat/services/sync/ConversationHydrationRuntimeViewHostFactory';
 
 type Mocked<T> = {
   [Key in keyof T]:

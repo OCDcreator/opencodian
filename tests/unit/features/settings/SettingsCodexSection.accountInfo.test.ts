@@ -1,4 +1,4 @@
-import { SettingsCodexAccountSurface } from '../../../../src/features/settings/SettingsCodexAccountSurface';
+import { SettingsCodexAccountSurface } from '../../../../src/features/settings/backends/codex/SettingsCodexAccountSurface';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 

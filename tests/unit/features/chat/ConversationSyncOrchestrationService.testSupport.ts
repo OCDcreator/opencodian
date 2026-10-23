@@ -8,10 +8,10 @@ import {
   ConversationSyncOrchestrationService,
   type ConversationSyncScheduler,
   type ConversationSyncSignalRuntime,
-} from '../../../../src/features/chat/services/ConversationSyncOrchestrationService';
+} from '../../../../src/features/chat/services/sync/ConversationSyncOrchestrationService';
 import type {
   TabConversationSyncContext,
-} from '../../../../src/features/chat/services/ConversationSyncRuntimeCoordinator';
+} from '../../../../src/features/chat/services/sync/ConversationSyncRuntimeCoordinator';
 import type { TabData } from '../../../../src/features/chat/tabs';
 
 export type { TabConversationSyncContext };

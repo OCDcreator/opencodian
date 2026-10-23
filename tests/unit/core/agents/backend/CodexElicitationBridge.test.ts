@@ -14,8 +14,8 @@ const mockRegisterMcpElicitationHandler = jest.fn((handler: (params: unknown, si
   elicitationHandler = handler;
 });
 
-jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => {
-  const actual = jest.requireActual('../../../../../src/core/agents/backend/CodexAppServerClient');
+jest.mock('../../../../../src/core/agents/backend/codex/CodexAppServerClient', () => {
+  const actual = jest.requireActual('../../../../../src/core/agents/backend/codex/CodexAppServerClient');
   return {
     ...actual,
     CodexAppServerClient: jest.fn().mockImplementation(() => ({
@@ -30,7 +30,7 @@ jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => {
   };
 });
 
-import { CodexAdapter } from '../../../../../src/core/agents/backend/CodexAdapter';
+import { CodexAdapter } from '../../../../../src/core/agents/backend/codex/CodexAdapter';
 import {
   buildCodexElicitationContent,
   buildCodexElicitationQuestionRequest,
@@ -38,7 +38,7 @@ import {
   type CodexElicitationFormParams,
   type CodexElicitationUrlParams,
   createCodexElicitationBridgeHost,
-} from '../../../../../src/core/agents/backend/CodexElicitationBridge';
+} from '../../../../../src/core/agents/backend/codex/CodexElicitationBridge';
 
 function createMockCodex(): unknown {
   return {
@@ -402,8 +402,8 @@ jest.mock('fs/promises', () => Object.fromEntries(['readFile', 'readdir', 'stat'
 
 import type { Codex } from '@openai/codex-sdk';
 
-import type { CodexAppServerClient } from '../../../../../src/core/agents/backend/CodexAppServerClient';
-import type { CodexElicitationCardRequest, CodexElicitationHostResponse } from '../../../../../src/core/agents/backend/CodexElicitationBridge';
+import type { CodexAppServerClient } from '../../../../../src/core/agents/backend/codex/CodexAppServerClient';
+import type { CodexElicitationCardRequest, CodexElicitationHostResponse } from '../../../../../src/core/agents/backend/codex/CodexElicitationBridge';
 
 /* eslint-disable jest/no-conditional-expect -- This finite it.each driver selects named schema partitions; every registered scenario runs assertions. Keep the frozen per-partition fail-closed oracles unchanged. */
 describe('MATRIX014 Codex synthetic registered handler', () => {

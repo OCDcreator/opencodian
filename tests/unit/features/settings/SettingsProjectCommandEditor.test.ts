@@ -7,8 +7,8 @@ import type { OpencodeCommandConfigRecord } from '../../../../src/core/types';
 import {
   type ProjectCommandEditorSource,
   SettingsProjectCommandEditor,
-} from '../../../../src/features/settings/SettingsProjectCommandEditor';
-import { TextareaSizeMemory } from '../../../../src/features/settings/TextareaSizeMemory';
+} from '../../../../src/features/settings/backends/opencode/SettingsProjectCommandEditor';
+import { TextareaSizeMemory } from '../../../../src/features/settings/controls/TextareaSizeMemory';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 

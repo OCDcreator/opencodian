@@ -5,7 +5,7 @@ import * as path from 'path';
 import {
   discoverClaudeProjectSettings,
   openClaudeProjectSettingsFile,
-} from '../../../../../src/core/agents/backend/ClaudeProjectSettingsDiscovery';
+} from '../../../../../src/core/agents/backend/claude/ClaudeProjectSettingsDiscovery';
 
 describe('ClaudeProjectSettingsDiscovery', () => {
   let tempRoot: string;

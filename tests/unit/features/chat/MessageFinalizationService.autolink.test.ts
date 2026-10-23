@@ -18,12 +18,12 @@
 import { TFile } from 'obsidian';
 
 import type { ChatMessage, Conversation, PromptContextItem } from '../../../../src/core/types';
-import { AssistantAutoInternalLinkService } from '../../../../src/features/chat/services/AssistantAutoInternalLinkService';
+import { AssistantAutoInternalLinkService } from '../../../../src/features/chat/services/rendering/AssistantAutoInternalLinkService';
 import {
   type MessageFinalizationHost,
   MessageFinalizationService,
   type MessageFinalizationSyncResult,
-} from '../../../../src/features/chat/services/MessageFinalizationService';
+} from '../../../../src/features/chat/services/send/MessageFinalizationService';
 import { createInlineEditAutoLinkProcessor } from '../../../../src/features/inline-edit/InlineEditAutoLink';
 import { createConversation, createHost, createMessage } from './MessageFinalizationService.testSupport';
 

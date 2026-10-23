@@ -1,0 +1,61 @@
+# PersistentAssistantNoticeService
+
+> **源码**: `src/features/chat/services/send/PersistentAssistantNoticeService.ts`
+> **状态**: [REVIEW]
+
+## 概述
+
+`PersistentAssistantNoticeService` 把 `OpenCodianView` 里“把 assistant notice 追加进 conversation 并同步可见/隐藏 tab 后续动作”的共享逻辑独立出来，专门负责：
+
+- 用统一的 `displayStyle: 'notice'` 结构构造持久化 assistant notice message
+- 按 `title + content + tone` 扫描 conversation 历史，供 session todo / background task stale / completion notice 做 persisted dedupe
+- 通过共享 conversation write serialization state 先写入并保存 notice、更新 sync fingerprint，再在当前可见会话里渲染并触发 hydration/scroll 后续动作
+- 在隐藏 tab 会话里只做持久化与 fingerprint 写回，再标记 tab attention
+
+它不决定 notice 何时出现，也不生成 session todo / background task 的 fingerprint 与文案；这些规则仍分别由 `SessionTodoStateService` 与 `BackgroundTaskNoticeStateService` 持有。
+
+## 公开接口
+
+```typescript
+export interface PersistentAssistantNoticeServiceHost {
+  getCurrentConversation(): Conversation | null;
+  getActiveTabId(): TabId | null;
+  getConversationSyncRuntime(): TabConversationSyncFingerprintRuntimePort;
+  renderAssistantMessage(message: ChatMessage): Promise<void>;
+  saveConversation(conversation: Conversation): Promise<void>;
+  handleVisibleNoticeMessageAppended(): void;
+  setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
+}
+
+export class PersistentAssistantNoticeService {
+  hasMatchingMessage(...): boolean;
+  appendMessage(...): Promise<void>;
+}
+```
+
+## 关键行为
+
+### persisted dedupe
+
+- `hasMatchingMessage()` 只检查 assistant notice message，不会把普通 assistant turn 或 inline notice 误当成 persisted dedupe 命中
+- dedupe key 保持为 `title + content + tone`，与 session todo stale notice、background-task stale notice 的既有持久化规则一致
+
+### visible / hidden append 路由
+
+- `appendMessage()` 通过 `ConversationWriteSerializationService` 与 authoritative sync / send finalization 共用 conversation 级写入队列；notice 会先进入 conversation、完成保存并写回 sync fingerprint，之后才允许可见会话 render，避免 UI 已出现但 canonical rerender 仍读不到本地记录
+- 调用方若仍持有同一 conversation id 的 detached 旧对象，而当前可见会话已经换成新的 live 对象，`appendMessage()` 会把 notice 写入并保存 live 对象；不会只把卡片画进 DOM、却把持久化记录留在随后会被 authoritative sync 淘汰的旧引用里
+- 可见 notice render 也保持在同一 serialized write 内，防止排在其后的 authoritative sync 在 notice 尚未落到 DOM 时抢先应用；提交成功后可见会话走 hydration pending-layout / settled-scroll follow-up，隐藏 tab 走 attention 标记
+- `noticeActions` 与 `noticeMeta` 会原样透传，供 model-unavailable notice 与 background-task completion notice 继续复用
+- post-sync 调用方可传入 `isCurrent` lease；写序列排队等待后、save/fingerprint/render await 后及 attention 前均重新校验，失效时不写入新 conversation。
+
+## 与 `OpenCodianView` 的边界
+
+- `SessionTodoStateService` 与 `BackgroundTaskNoticeStateService` 仍负责各自 notice 的状态机、文案和 dedupe 时机
+- `OpenCodianView` 只提供 assistant-message render/save/tab-runtime host bridge，并把 fingerprint 计算与 tab writeback seam 作为 `TabConversationSyncFingerprintRuntimePort` 直接交给本服务；该 port 类型与 question/todo/background-task runtime bundle 共用，避免保留额外 pass-through provider
+- 这让 P2 `question / todo / background task` lane 继续把 session todo 与 background task 共用的 persisted-notice ownership 从主 view 迁到 dedicated service
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/features/chat/services/send/PersistentAssistantNoticeService.ts`。
+- 原位置：`src/features/chat/services/PersistentAssistantNoticeService.ts`；文件名、导出接口与业务职责保持不变。
+- 随目录调整更新的依赖：`src/features/chat/services/conversation/ConversationWriteSerializationService.ts`、`src/features/chat/services/questions/QuestionTodoBackgroundTaskRuntimeServiceBundle.ts`。

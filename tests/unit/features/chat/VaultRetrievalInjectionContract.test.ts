@@ -1,9 +1,9 @@
 import { OpenCodeContextPartSerializer } from '../../../../src/core/opencode/OpenCodeContextPartSerializer';
 import { OpenCodePromptRequestBuilder } from '../../../../src/core/opencode/OpenCodePromptRequestBuilder';
 import type { PromptContextItem } from '../../../../src/core/types';
-import { ComposerContextRuntimeStore } from '../../../../src/features/chat/services/ComposerContextRuntimeStore';
-import { buildOptimisticUserMessage } from '../../../../src/features/chat/services/MessageSendPreparationService';
-import { MessageSendPreparationService } from '../../../../src/features/chat/services/MessageSendPreparationService';
+import { ComposerContextRuntimeStore } from '../../../../src/features/chat/services/composer/ComposerContextRuntimeStore';
+import { buildOptimisticUserMessage } from '../../../../src/features/chat/services/send/MessageSendPreparationService';
+import { MessageSendPreparationService } from '../../../../src/features/chat/services/send/MessageSendPreparationService';
 import {
   buildContextAttachment,
   buildObsidianContextTag,

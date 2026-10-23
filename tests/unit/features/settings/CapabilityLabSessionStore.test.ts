@@ -1,4 +1,4 @@
-import { CapabilityLabSessionStore } from '../../../../src/features/settings/SettingsCapabilityLabSection';
+import { CapabilityLabSessionStore } from '../../../../src/features/settings/capabilities/SettingsCapabilityLabSection';
 
 describe('CapabilityLabSessionStore', () => {
   it('round-trips entries through append and load', async () => {

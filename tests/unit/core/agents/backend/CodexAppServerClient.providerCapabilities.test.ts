@@ -29,7 +29,7 @@ const MockWebSocket = jest.fn().mockImplementation(() => mockWsInstance);
 
 jest.mock('ws', () => MockWebSocket);
 
-import { CodexAppServerClient } from '../../../../../src/core/agents/backend/CodexAppServerClient';
+import { CodexAppServerClient } from '../../../../../src/core/agents/backend/codex/CodexAppServerClient';
 
 function emitWsUrl(proc: EventEmitter) {
   setTimeout(() => {

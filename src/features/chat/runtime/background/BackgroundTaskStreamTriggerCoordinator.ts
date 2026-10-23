@@ -1,0 +1,166 @@
+import type { ToolCallInfo } from '../../../../core/types';
+import type { BackgroundTaskLiveSignalCoordinator } from '../../services/background/BackgroundTaskLiveSignalCoordinator';
+import type { BackgroundTaskCompletionInfo } from '../../services/background/BackgroundTaskNoticeStateService';
+import type {
+  BackgroundTaskLaunchInfo,
+  BackgroundTaskTimelineService,
+} from '../../services/background/BackgroundTaskTimelineService';
+import type { TabId } from '../../tabs';
+import type { BackgroundTaskIndicatorCoordinator } from './BackgroundTaskIndicatorCoordinator';
+
+type BackgroundTaskIndicatorRenderPort = Pick<BackgroundTaskIndicatorCoordinator, 'renderIfNeeded'>;
+type BackgroundTaskStreamLiveSignalPort = Pick<
+  BackgroundTaskLiveSignalCoordinator,
+  'armAuthoritativeSyncGate' | 'hasIndicator'
+>;
+type BackgroundTaskTriggerTimelinePort = Pick<
+  BackgroundTaskTimelineService,
+  'upsertLaunch' | 'upsertCompletionFromToolCall'
+>;
+
+export interface BackgroundTaskStreamTriggerRuntime {
+  backgroundTaskStartedAt: number | null;
+  backgroundTaskModeTag: string | null;
+  backgroundTaskLaunches: Map<string, BackgroundTaskLaunchInfo>;
+  backgroundTaskCompletedTasks: Map<string, BackgroundTaskCompletionInfo>;
+  backgroundTaskWaitingForFollowUp: boolean;
+  backgroundTaskStaleNoticeFingerprint: string | null;
+}
+
+export interface BackgroundTaskStreamTriggerCoordinatorHost {
+  getActiveTabId(): TabId | null;
+  getTabRuntimeState(tabId: TabId | null): BackgroundTaskStreamTriggerRuntime | null;
+  applyStreamingTodoSnapshotFromTool(toolCall: ToolCallInfo, tabId: TabId | null): void;
+  getSessionIdForTab(tabId: TabId | null): string | null;
+  refreshTabSessionTodos(
+    tabId: TabId | null,
+    sessionId: string,
+    options?: { suppressErrors?: boolean },
+  ): Promise<unknown>;
+  resetBackgroundTaskIndicator(tabId: TabId | null): void;
+}
+
+export class BackgroundTaskStreamTriggerCoordinator {
+  constructor(
+    private readonly indicatorCoordinator: BackgroundTaskIndicatorRenderPort,
+    private readonly timelineService: BackgroundTaskTriggerTimelinePort,
+    private readonly liveSignalCoordinator: BackgroundTaskStreamLiveSignalPort,
+    private readonly host: BackgroundTaskStreamTriggerCoordinatorHost,
+  ) {}
+
+  async handleToolCallStart(
+    toolCall: ToolCallInfo,
+    tabId: TabId | null = this.host.getActiveTabId(),
+  ): Promise<void> {
+    const runtime = this.host.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return;
+    }
+
+    this.host.applyStreamingTodoSnapshotFromTool(toolCall, tabId);
+
+    if (!this.isBackgroundTaskTool(toolCall.name, runtime)) {
+      return;
+    }
+
+    if (!runtime.backgroundTaskStartedAt) {
+      runtime.backgroundTaskStartedAt = Date.now();
+    }
+
+    this.liveSignalCoordinator.armAuthoritativeSyncGate(tabId);
+    runtime.backgroundTaskStaleNoticeFingerprint = null;
+    this.timelineService.upsertLaunch(
+      {
+        id: toolCall.id,
+        input: toolCall.input ?? {},
+        toolMetadata: toolCall.toolMetadata,
+      },
+      runtime.backgroundTaskLaunches,
+    );
+    runtime.backgroundTaskWaitingForFollowUp = false;
+    await this.indicatorCoordinator.renderIfNeeded(tabId);
+  }
+
+  async handleToolCallEnd(
+    toolCall: ToolCallInfo,
+    tabId: TabId | null = this.host.getActiveTabId(),
+  ): Promise<void> {
+    const runtime = this.host.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return;
+    }
+
+    this.host.applyStreamingTodoSnapshotFromTool(toolCall, tabId);
+
+    if (this.isTodoTool(toolCall.name)) {
+      const sessionId = this.host.getSessionIdForTab(tabId);
+      if (sessionId) {
+        await this.host.refreshTabSessionTodos(tabId, sessionId, { suppressErrors: true });
+      }
+    }
+
+    if (!this.isBackgroundTaskTool(toolCall.name, runtime)) {
+      return;
+    }
+
+    this.timelineService.upsertLaunch(
+      {
+        id: toolCall.id,
+        input: toolCall.input ?? {},
+        toolMetadata: toolCall.toolMetadata,
+        result: toolCall.result,
+      },
+      runtime.backgroundTaskLaunches,
+    );
+    if (toolCall.status === 'completed' || toolCall.status === 'error') {
+      this.timelineService.upsertCompletionFromToolCall(
+        {
+          id: toolCall.id,
+          input: toolCall.input ?? {},
+          toolMetadata: toolCall.toolMetadata,
+          result: toolCall.result,
+        },
+        runtime.backgroundTaskCompletedTasks,
+      );
+    }
+    this.liveSignalCoordinator.armAuthoritativeSyncGate(tabId);
+    runtime.backgroundTaskStaleNoticeFingerprint = null;
+    await this.indicatorCoordinator.renderIfNeeded(tabId);
+  }
+
+  async finalizeAfterPrimaryStream(
+    tabId: TabId | null = this.host.getActiveTabId(),
+  ): Promise<void> {
+    const runtime = this.host.getTabRuntimeState(tabId);
+    if (!runtime || !this.liveSignalCoordinator.hasIndicator(tabId)) {
+      return;
+    }
+
+    if (runtime.backgroundTaskLaunches.size === 0) {
+      this.host.resetBackgroundTaskIndicator(tabId);
+      return;
+    }
+
+    runtime.backgroundTaskWaitingForFollowUp = true;
+    await this.indicatorCoordinator.renderIfNeeded(tabId);
+  }
+
+  private isBackgroundTaskTool(
+    toolName: string,
+    _runtime: Pick<BackgroundTaskStreamTriggerRuntime, 'backgroundTaskModeTag'>,
+  ): boolean {
+    return toolName === 'task';
+  }
+
+  private isTodoTool(toolName: string): boolean {
+    // OpenCode TodoWrite tools
+    if (toolName === 'todowrite' || toolName === 'todoread') {
+      return true;
+    }
+
+    // Claude Code Task* tools — normalized names (case-insensitive canonicalization)
+    const canonical = toolName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+    return canonical === 'taskcreate' || canonical === 'taskupdate'
+      || canonical === 'tasklist' || canonical === 'taskget';
+  }
+}

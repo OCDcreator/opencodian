@@ -1,7 +1,7 @@
 import {
   AssistantNoticeFooterFinalizer,
   type AssistantNoticeFooterFinalizerHost,
-} from '../../../../src/features/chat/runtime/AssistantNoticeFooterFinalizer';
+} from '../../../../src/features/chat/runtime/rendering/AssistantNoticeFooterFinalizer';
 
 describe('AssistantNoticeFooterFinalizer', () => {
   it('finalizes notice assistant footers with the assembled payload', () => {

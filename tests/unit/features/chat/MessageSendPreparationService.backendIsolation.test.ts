@@ -1,4 +1,4 @@
-import { MessageSendPreparationService } from '../../../../src/features/chat/services/MessageSendPreparationService';
+import { MessageSendPreparationService } from '../../../../src/features/chat/services/send/MessageSendPreparationService';
 import { createComposerSendContext, createConversation, createHost } from './MessageSendPreparationService.testSupport';
 
 describe('MessageSendPreparationService backend isolation', () => {

@@ -4,7 +4,7 @@ import type { PromptContextItem } from '../../../../src/core/types';
 import {
   ComposerContextActionService,
   type ComposerContextActionServiceHost,
-} from '../../../../src/features/chat/services/ComposerContextActionService';
+} from '../../../../src/features/chat/services/composer/ComposerContextActionService';
 
 function createContextItem(overrides: Partial<PromptContextItem> = {}): PromptContextItem {
   return {

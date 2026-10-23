@@ -4,7 +4,7 @@ import type {
 import {
   type ConversationSyncBridgePortBuilderHost,
   createConversationSyncBridgePorts,
-} from '../../../../src/features/chat/services/ConversationSyncBridge';
+} from '../../../../src/features/chat/services/sync/ConversationSyncBridge';
 
 type Mocked<T> = {
   [Key in keyof T]:

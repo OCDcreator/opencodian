@@ -1,5 +1,5 @@
 import type { PluginUpdateSnapshot } from '../../../../src/core/update/PluginUpdateService';
-import { SettingsPluginUpdateSection } from '../../../../src/features/settings/SettingsPluginUpdateSection';
+import { SettingsPluginUpdateSection } from '../../../../src/features/settings/general/SettingsPluginUpdateSection';
 import { setLocale } from '../../../../src/i18n';
 
 function createSnapshot(overrides: Record<string, unknown> = {}) {

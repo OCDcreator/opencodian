@@ -11,29 +11,41 @@ import { App, PluginSettingTab, Setting } from 'obsidian';
 import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
-import { refreshCostEstimateSettingsRows } from './CostEstimateSettingsRow';
+import { SettingsStyleSection } from './appearance/SettingsStyleSection';
+import { SettingsAcpSection } from './backends/acp/SettingsAcpSection';
+import { SettingsClaudeCodeSection } from './backends/claude/SettingsClaudeCodeSection';
+import { SettingsCodexSection } from './backends/codex/SettingsCodexSection';
+import { refreshCostEstimateSettingsRows } from './backends/opencode/CostEstimateSettingsRow';
+import { SettingsCommandsSection } from './backends/opencode/SettingsCommandsSection';
+import { SettingsServerSection } from './backends/opencode/SettingsServerSection';
+import { SettingsPiSection } from './backends/pi/SettingsPiSection';
+import { SettingsZCodeSection } from './backends/zcode/SettingsZCodeSection';
+import {
+  enhanceSettingsDropdowns,
+  type SettingsDropdownsEnhancerHandle,
+} from './controls/SettingsDropdownControl';
+import { SettingsDebugSection } from './debug/SettingsDebugSection';
 import {
   createClaudeTraceDiagnosticsPort,
   createCodexTraceDiagnosticsPort,
   createOpenCodeTraceDiagnosticsPort,
 } from './debug/types';
-import { SettingsAcpSection } from './SettingsAcpSection';
-import { SettingsAgentsSection } from './SettingsAgentsSection';
-import { SettingsClaudeCodeSection } from './SettingsClaudeCodeSection';
-import { SettingsCodexSection } from './SettingsCodexSection';
-import { SettingsCommandsSection } from './SettingsCommandsSection';
-import { SettingsContextGroupsSection } from './SettingsContextGroupsSection';
-import { SettingsConversationSection } from './SettingsConversationSection';
-import { SettingsDebugSection } from './SettingsDebugSection';
-import {
-  enhanceSettingsDropdowns,
-  type SettingsDropdownsEnhancerHandle,
-} from './SettingsDropdownControl';
-import { SettingsFormatterSection } from './SettingsFormatterSection';
-import { SettingsImageGenerationSection } from './SettingsImageGenerationSection';
-import { SettingsInlineEditSection } from './SettingsInlineEditSection';
-import { SettingsMcpSection } from './SettingsMcpSection';
-import { SettingsModelSection } from './SettingsModelSection';
+import { SettingsConversationSection } from './general/SettingsConversationSection';
+import { SettingsFormatterSection } from './general/SettingsFormatterSection';
+import { SettingsImageGenerationSection } from './general/SettingsImageGenerationSection';
+import { SettingsInlineEditSection } from './general/SettingsInlineEditSection';
+import { SettingsPluginSection } from './general/SettingsPluginSection';
+import { SettingsPluginUpdateSection } from './general/SettingsPluginUpdateSection';
+import { SettingsRemoteControlSection } from './general/SettingsRemoteControlSection';
+import { SettingsSecuritySection } from './general/SettingsSecuritySection';
+import { SettingsUiSection } from './general/SettingsUiSection';
+import { SettingsUserSection } from './general/SettingsUserSection';
+import { SettingsMcpSection } from './mcp/SettingsMcpSection';
+import { SettingsModelSection } from './models/SettingsModelSection';
+import { SettingsAgentsSection } from './resources/SettingsAgentsSection';
+import { SettingsContextGroupsSection } from './resources/SettingsContextGroupsSection';
+import { SettingsSkillSection } from './resources/SettingsSkillSection';
+import { SettingsToolSection } from './resources/SettingsToolSection';
 import {
   addSettingHelpButton,
   applyInlineCodeText,
@@ -45,20 +57,8 @@ import {
   setSettingDescWithFormatting,
   setSettingNameWithFormatting,
 } from './SettingsPanelChrome';
-import { SettingsPiSection } from './SettingsPiSection';
-import { SettingsPluginSection } from './SettingsPluginSection';
-import { SettingsPluginUpdateSection } from './SettingsPluginUpdateSection';
-import { SettingsRemoteControlSection } from './SettingsRemoteControlSection';
 import { SettingsSectionCoordinator } from './SettingsSectionCoordinator';
-import { SettingsSecuritySection } from './SettingsSecuritySection';
-import { SettingsServerSection } from './SettingsServerSection';
-import { SettingsSkillSection } from './SettingsSkillSection';
-import { SettingsStyleSection } from './SettingsStyleSection';
 import { SettingsTabbedRenderer } from './SettingsTabbedRenderer';
-import { SettingsToolSection } from './SettingsToolSection';
-import { SettingsUiSection } from './SettingsUiSection';
-import { SettingsUserSection } from './SettingsUserSection';
-import { SettingsZCodeSection } from './SettingsZCodeSection';
 
 export class OpenCodianSettingTab extends PluginSettingTab {
   plugin: OpenCodianPlugin;

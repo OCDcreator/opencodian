@@ -2,8 +2,8 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 
-import { computeFileRevision } from '../../../../../src/core/agents/backend/ProjectResourceSecureWrite';
-import { ScopedConfigurationResourceService } from '../../../../../src/core/agents/backend/ScopedConfigurationResourceService';
+import { computeFileRevision } from '../../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite';
+import { ScopedConfigurationResourceService } from '../../../../../src/core/agents/backend/configuration/ScopedConfigurationResourceService';
 
 describe('ScopedConfigurationResourceService', () => {
   let sandboxPath: string;

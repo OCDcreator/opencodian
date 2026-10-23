@@ -1,0 +1,93 @@
+# CodexAppServerClient
+
+> 2026-10-08：五条 typed server-request 注册透传可选请求取消 signal，旧的无 signal 调用契约保持。signal 生命周期来自 transport 的逐请求控制器。
+
+> **源码**: `src/core/agents/backend/codex/CodexAppServerClient.ts`
+> **状态**: [RUNTIME_ADJUNCT]
+> **Updated**: 2026-06-14 — split wire types into `CodexAppServerClientTypes`, transport/lifecycle into `CodexAppServerTransport`, normalization helpers into `CodexAppServerClientNormalization`; `CodexAppServerClient extends CodexAppServerTransport` and re-exports types via `export *`
+
+> **Codex 0.159.0 协议升级（2026-09-30）**: 新增类型化路由 —— `steerTurn(threadId, expectedTurnId, input, options?)`（`turn/steer`；结果判别 ok/rejected(结构化 steer error)/unavailable(-32601)，供 adapter 动态摘除 turn-steering capability）、`listThreadItems(threadId, options?)` / `listThreadTurns(threadId, options?)`（锚点/游标分页，itemsView 默认 summary）、`setThreadName` / `deleteThread`（boolean 仅 ACK；effective-settings cache 在 delete-result verified 后清理）、`addThreadAttachment` / `listThreadAttachments` / `removeThreadAttachment`、插件家族 `listPlugins` / `readPlugin` / `listInstalledPlugins` / `installPlugin` / `uninstallPlugin` / `reconcilePlugins` / `readPluginSkill`（route 不可用统一返回 null，load errors 保留在结果内）。`getAccountUsage({ threadId? })` 支持 per-thread 估计（无参时保持 parameterless，已验证 wire 假设）；`setThreadGoal` 的 objective 变为可选并新增 `options.status`（暂停/恢复）。导出共享谓词 `isAppServerMethodNotFoundError(error)`（匹配 -32601 code 或 method-not-found 类 message），`isHooksRouteUnavailable` 与 `startThreadCompaction` 复用它。五个 0.159.0 server→client 请求路由的类型化注册：`registerCommandExecutionApprovalHandler` / `registerFileChangeApprovalHandler` / `registerPermissionsApprovalHandler` / `registerToolUserInputHandler` / `registerMcpElicitationHandler`（桥接实现归 adapter 层；未注册仍回 -32601）。`subscribeToDeprecationNotice(handler)` 提供专用 deprecationNotice 回调；`subscribeToThreadNotifications` 扩展订阅 `thread/name/updated`、`thread/goal/updated|cleared`、`thread/deleted`、`thread/attachment/updated`。
+
+> **P1 grouped skills readback（2026-07-24）**: `listSkillGroups({ cwd, forceReload? })` 与 `normalizeSkillsListGroupedResult(raw, defaultCwd?)` 保留 app-server 的 `{ cwd, skills, errors }` 分组，接受 0.144.1 的 `{ data: SkillsListEntry[] }`、旧数组/单组/扁平形态；缺失 cwd 仅在调用方显式传入 defaultCwd 时回填，否则为 null。skill 保留 source/shortDescription/interface/dependencies，error 保留 path/message，畸形项 fail-soft 丢弃。route 不可用时 `listSkillGroups()` 返回 null，使设置页可区别“不可用”与“成功但为空”。既有 `listSkills()` / `normalizeSkillsListResult()` 继续返回原字段集合与原顺序的扁平列表，供聊天菜单使用；grouped API 不改变菜单架构。`subscribeToSkillsChanged(handler)` 行为不变。
+
+> **新增（运行时证据，2026-07-24）**: `startThread` / `resumeThread` 在返回 thread 的同时，**防御式捕获**响应中服务端确认的有效设置（`AppServerThreadEffectiveSettings`），按 threadId 缓存。形状对齐 Codex 0.144.1 bindings：`sandbox` 为判别对象 `AppServerSandboxPolicy`（dangerFullAccess/readOnly/workspaceWrite）、`activePermissionProfile` 为 `{id, extends?}`、`approvalPolicy` 为标量或粒度对象；裸字符串 sandbox/profile 被丢弃（非合法 binding）。`getThreadEffectiveSettings(threadId)` 读取最近一次捕获结果，无回显时返回 null。**三轴证据**由生产路径 `buildEffectiveEvidenceWithApplication(application, runtimeStatus, effective)` 独立计算 application/runtime（`application` 由 `threadPhaseApplication` / `turnSuccessApplication` 按实际 wiring 生成）：只有实际写入请求的字段才可得 application=verified，只有本次响应含字段才可得 runtime=verified；`buildUniformEffectiveEvidence('pending'|'failed'|'unavailable', wired)` 供生命周期（请求前 pending、请求失败 failed、app-server 不可用 unavailable）。请求侧 turn 选项**绝不**当作 runtime verified。`startThread`/`resumeThread` 返回类型保持 `AppServerThread | null` 不变（向后兼容）。
+
+> **T05 slice（2026-10-02，离线回归）**：新增 catalog 页 API 与完整读取、原生 mutation 结果及同 ID 回读；分页遍历和证据判定留在 client，不新增 adapter runtime 状态。真实 CLI/UI 尚未验收，不能将本条视为 T05 整体完成。
+
+## Catalog 与 mutation 契约
+
+- `listThreadsPage`、`listModelsPage`、`listPermissionProfilesPage`、`listMcpServerStatusPage`、`listLoadedThreadsPage` 沿用 items/turns 的 `{ data, nextCursor } | null` 页契约；失败/不支持/畸形页返回 null，旧版终页未带 cursor 时归一为 null。loaded 原生 string ID 转为既有 `{ id }` 形状。
+- Page API 本轮尚无设置/UI 消费者，接线状态为 partial；分页错误/游标尚未呈现为 UI 的 partial/failed 状态，不能声称完整产品目录已验收。
+- 原 `listThreads` 保持单页数组契约（aux 审计调用者不变）；`listAllThreads` 按 archive 分区遍历全部页。`listModels`、`listPermissionProfiles`、`listMcpServerStatus`、`listLoadedThreads` 保持数组返回类型并读取完整目录，保留每页 filter/limit/cursor，按原生 id 或 MCP name 去重；空页有下一游标时继续，重复游标拒绝。
+- 全量线程读取失败抛 `AppServerCatalogReadError.result { status: partial|failed|unavailable, data, nextCursor, errorReason }`，保留已读页和失败游标。其他既有数组 API 保留第一页失败返回 [] 的兼容行为；后续页失败抛 partial，不静默交付截断目录。
+- `setThreadNameResult`、`deleteThreadResult`、`archiveThreadResult` 返回带 operation/native threadId 的 `admitted|verified|failed|unavailable`。ACK 必须是原生空对象或兼容 true；false/missing/malformed ACK 为 failed，-32601 为 unavailable，其他错误为 failed。旧 boolean API 仍只代表 ACK，不做额外回读，也不能代表 verified。
+- Result API 默认回读（`{ readback: false }` 可只取 admission）：rename 要求 `thread/read` 返回同一 ID 和精确 name；delete 只接受精确包含同一 ID 的已识别 not-found 原生错误，null/offline/auth/另一个 ID 绝不证明不存在；archive 要求完整 archived 目录包含同一 ID。匹配后才返回 verified；名称不同/仍存在为 `admitted + readback.failed`，不可读为 `admitted + readback.unavailable`。不做后台轮询，不将请求 echo 伪造为 runtime 证据。
+- 删除只有同 ID absence `verified` 后才清 client effective-settings cache；admitted/failed/unavailable（含 ACK 后 readback 断连）均保留缓存。legacy boolean true 仍只表示 admission，不清 cache、不证明远端终态；adapter 只有 verified 才进行默认本地清理。
+- RC-CX-02：ACK 已删除但回读断连后，retry 的 `thread/delete` 若只报同 ID 精确已识别 absence 错误，可再走同 ID `thread/read` absence probe。probe 同 ID明确不存在才返回 verified；offline/auth/unsupported/不同 ID/可读/null 仍 failed 并保留 readback 原因及 cache。任意 mutation 异常、false/malformed ACK 不触发该 probe；rename/archive 和共享 readback 方法契约未改。专属 `CodexDeletion.retry.test.ts` 保留修前 fail/修后 pass 离线证据。
+
+## 概述
+
+`CodexAppServerClient` 是 Codex 本地 app-server 的类型化客户端。2026-07-22 起，实验 API 协商成功时它也是 Codex 的主 chat send/stream 路径；协商失败时 `CodexAdapter` 才保持 SDK 聊天回退且不挂载会话 Context Ring。
+
+进程生命周期与 JSON-RPC plumbing 已拆入基类 `CodexAppServerTransport`；wire 类型拆入 `CodexAppServerClientTypes`（本文件通过 `export *` 重新导出）；transcript 归一化纯函数拆入 `CodexAppServerClientNormalization`（本文件保留向后兼容的静态 delegate）。本文件只保留类型化的 app-server API wrapper。
+
+## 职责
+
+- 通过 JSON-RPC 2.0 over WebSocket 与本地 `codex app-server` 通信
+- `start()`: 启动 app-server 子进程 (`codex app-server --listen ws://127.0.0.1:0`)，从 stdout 和 stderr 扫描 WebSocket URL（Codex CLI 将 listening URL 输出到 stderr），连接并初始化 JSON-RPC 会话
+- `stop()`: 关闭 WebSocket，终止子进程，清理 pending requests
+- `listThreads(options?)`: 调用 `thread/list` 获取 persisted thread 列表。支持 `limit` 与 `archived` 过滤：`archived: true` 仅返回归档 threads，`archived: false` 仅返回非归档 threads；不传 `archived` 时由服务器默认返回非归档 threads
+- `readThread(threadId, includeTurns)`: 调用 `thread/read` 获取单个 thread 的元数据和 turns
+- `startThread(options)` / `resumeThread(threadId, options)`: 通过实验 API 新建或恢复主聊天 thread；当前模型、cwd、sandbox、审批和 web-search config 在此边界生效
+- `startTurn(options)` / `interruptTurn(threadId, turnId)`: 启动/取消 app-server 回合；输出经异步通知到达，不能以 SDK 错误作为静默切换信号
+- `startThreadCompaction(threadId, options?)`: 发送精确 `{ threadId }` 到 `thread/compact/start`。真实 0.144.1 的空 `{}` ACK 只表示请求 accepted，不能显示为完成；非空 ACK 是 `malformed`，route/transport、invalid-thread 与 timeout 也保持可区分。运行时完成由 adapter 独立监听 `contextCompaction` + token usage
+- `subscribeToThreadNotifications(threadId, handler)`: 订阅并按 thread ID 隔离 `thread/tokenUsage/updated`、turn、item、warning/error 通知，支持并发 Codex 会话
+- `listPermissionProfiles(options)`: 调用 `permissionProfile/list` 获取可用权限配置文件列表（Checkpoint 15C）；支持可选 `cwd`、`limit`、`cursor` 参数；返回 `AppServerPermissionProfile[]`（含 `id` 和可选 `description`）
+- `getAccountRateLimits()`: 调用 `account/rateLimits/read` 获取账号速率限制信息（Checkpoint 15D / 15R）；返回 `AppServerAccountRateLimitsResult { rateLimits, errorReason? }`。环境相关（与 `account/usage/read` 相同）：ChatGPT 鉴权账号返回真实 `AppServerRateLimits`（含 `rateLimits` 和可选 `rateLimitsByLimitId`），API-key 鉴权返回 `chatgpt authentication required to read rate limits` 错误；`errorReason` 透传给 UI 以显示精确原因（含 `codex login` 提示），而不是笼统的 "unavailable"
+- `getAccountRead()`: 调用 `account/read` 获取账号/认证信息（Round 3）；返回 app-server 响应（含 `account.type`、`account.email`、`account.planType`、`requiresOpenaiAuth` 等），错误或不可用时返回 `null`
+- `listModels(options?)`: 调用 `model/list` 获取可用模型列表（Checkpoint 15B / Round 2）；返回 `AppServerModel[]`（含 `id`、`model`、`displayName`、可选 `description`、`defaultReasoningEffort`、`inputModalities`、`serviceTiers`、`upgradeInfo`）
+- `listSkillGroups(options?)`: 设置页专用的 additive readback，保留 skills/list 的 cwd 分组和 server errors；不得替换聊天目录使用的扁平 `listSkills()`
+- `listHooks(options?)`: 只读调用 `hooks/list`，发送 `{ cwds?: string[] }`，保留每个 cwd 的 hooks/warnings/errors 与已证实的 HookMetadata 字段（`key`/`eventName`/`handlerType` 为必需身份字段）；返回 `available|empty|unavailable|failed|malformed` outcome，绝不提供 hooks 写入或删除能力
+- `listMcpServerStatus()`: 调用 `mcpServerStatus/list` 获取 MCP 服务器运行时状态（Checkpoint 15N）；返回 `AppServerMcpServerStatus[]`（含 `name`、可选 `serverInfo`、`tools`、`resources`、`resourceTemplates`、`authStatus`）；请求超时 30 秒以覆盖慢速 MCP 探测
+- `reloadMcpServers()`: 调用 `config/mcpServer/reload` 请求 app-server 重新读取 MCP 配置；返回是否成功
+- `mcpServerToolCall(threadId, server, tool, toolArguments)`: **16A 新增**。调用 `mcpServer/tool/call` 直接执行 MCP 工具调用。先 `thread/resume`（幂等）加载 thread，然后发送 `{ threadId, server, tool, arguments }`。返回 `AppServerMcpToolCallResult { content: [{ type, text }], isError, errorReason? }`。用于 inline retry 功能：当聊天中的 MCP 工具块失败时，用户可以重新执行完全相同的 server/tool/arguments 来验证修复
+- `mcpServerOauthLogin(name, options?)`: 调用 `mcpServer/oauth/login` 触发 MCP 服务器 OAuth 流程，监听 `mcpServer/oauthLogin/completed` 通知确认完成；在 `finally` 中清理通知 handler 和超时 timer，避免 success/timeout/request-failure 任意路径泄漏 handler
+- `addNotificationHandler(method, handler)` / `removeNotificationHandler(method, handler)`: 通用 JSON-RPC 通知订阅接口，用于 `mcpServer/oauthLogin/completed` 等异步事件
+- `handleMessage()` 三路分发（Round 4）：(1) 普通响应（`id` 无 `method`）→ 解析 pending 请求；(2) 通知（`method` 无 `id`）→ notification handlers；(3) **服务端请求（`method` + `id`）**→ `handleServerRequest()`。此前服务端请求被误当响应并静默丢弃，现已修正
+- `registerServerRequestHandler(method, handler)` / `unregisterServerRequestHandler(method)`（Round 4）：服务端发起 JSON-RPC 请求（带 `method`+`id`，如 `execCommandApproval` / `applyPatchApproval`）的处理器注册表。每个 method 至多一个 handler；handler 返回值作为 JSON-RPC `result` 回写（审批场景应返回 `{ decision: ReviewDecision }`）。无 handler 时回写 `-32601 Method not found`；handler 抛错/拒绝时回写 `-32603 Internal error`。**Round 5**：`CodexAdapter.setApprovalHost()` 现通过此注册表把 `execCommandApproval` / `applyPatchApproval` 接到 host 回调（adapter 层 wiring 已落地并有测试，UI 卡片集成 + 运行时触发证明仍待后续）。**0.159.0**：client 提供五个 v2 路由的类型化注册（见顶部条目），业务桥接归 adapter 层
+- 提供静态归一化方法 `normalizeThreadList()` 和 `normalizeTurnsToPreviewMessages()`，把 app-server 原始数据转换为 `AgentBackendRouting` 可消费的形状
+  - `normalizeThreadList()` 现在保留 `archived` 布尔字段，使 `BackendSessionBrowserModal` 可以区分并渲染归档 threads
+  - `normalizeTurnsToPreviewMessages()` 从 `userMessage.content[]`（提取 `type === 'text'` 的部分）和 `agentMessage.text` 中提取对话文本；非文本 item（`reasoning`、`mcpToolCall`、`webSearch`、`fileChange`、`contextCompaction`）被有意跳过，因为 preview/detail 专注于对话文本
+
+## 维护约束
+
+- 主聊天仅在 `initialize.capabilities.experimentalApi=true` 成功协商后使用该客户端；协商失败才回退 `@openai/codex-sdk`，并且回退模式不得展示估算为精确的 Codex 上下文百分比。
+- foreground compaction 没有 SDK fallback：只有 app-server-owned 的真实 thread 才能调用；`thread/compact/start` 的 ACK 不是 token 降低或 context 已压缩的证据
+- App-server 生命周期由 `CodexAdapter` 管理：`start()` 时初始化，`stop()` 时清理。
+- App-server 启动是 best-effort：如果子进程 spawn 失败或 WebSocket 连接超时，`CodexAdapter` 会捕获异常并降级为仅使用 in-memory sessions。
+- 协议生成的类型 (`AppServerThread`, `AppServerTurn`, `AppServerItem`) 基于本地 `codex app-server generate-ts` 输出，但在此文件中做了最小化内联以避免额外的生成步骤依赖。
+- `AppServerItem`  union 已验证匹配真实 app-server 输出：包括 `userMessage`（含 `content[]` 文本数组）、`agentMessage`（含 `text` 字符串）、`reasoning`、`mcpToolCall`、`webSearch`、`fileChange`、`contextCompaction`。
+- Checkpoint 15E（基于 `codex-cli 0.137.0`）曾确认 generated `ClientRequest` 不包含 `account/usage/read` 变体；但 account/auth re-audit round 在 bundled `codex-cli 0.139.0` 上重新验证：该路由 **已存在**于 `ClientRequest` union，并且在 ChatGPT 鉴权账号下返回真实的 `summary`/`dailyUsageBuckets` payload（lifetimeTokens、peakDailyTokens、longestRunningTurnSec、currentStreakDays、longestStreakDays + daily buckets）。仅在 API-key 鉴权下返回 `chatgpt authentication required` 错误。
+- `account/usage/read` 的请求形状比 `account/rateLimits/read` 更严格：最小修补明确去掉了空 `params`，以匹配无参 JSON-RPC request 假设。`getAccountUsage()` 现在返回 `AppServerAccountUsageResult`（`{ usage, errorReason? }`），把 app-server 的真实错误原因（例如 `chatgpt authentication required to read token usage`）透传给 UI，以便 readback 面板显示精确的 `codex login` 提示，而不是笼统的 "unavailable"。ordinary settings seam 已重新公开（不再 `hidden`），并按环境降级。
+- Checkpoint 15R：`account/rateLimits/read` 共享相同的环境相关性（API-key 鉴权下返回 `chatgpt authentication required to read rate limits`）。`getAccountRateLimits()` 现在返回 `AppServerAccountRateLimitsResult`（`{ rateLimits, errorReason? }`），复刻 usage 的诚实降级模式，把精确原因透传给 readback UI。
+- Checkpoint 15R 审批范围评估：0.139.0 app-server 通过 `ServerRequest` union（服务器发起、带 `method`+`id` 的 JSON-RPC 请求）投递审批回调（`execCommandApproval` / `applyPatchApproval` + v2 `item/*/requestApproval`）。**Round 4 已落地基础设施切片**：`handleMessage()` 现三路分发（响应 / 通知 / 服务端请求），新增 `registerServerRequestHandler` / `unregisterServerRequestHandler` 注册表 + JSON-RPC 回写路径（成功回 `result`，缺 handler 回 `-32601`，handler 抛错回 `-32603`）。**Round 5 已落地 adapter wiring**：`CodexAdapter.setApprovalHost()` 注册 `execCommandApproval` / `applyPatchApproval` handler → 归一化 params → host 回调 → `{ decision }` 回写（12 测试覆盖）。仍待后续：(1) view-host 把 host 回调接到现有 permission card / question UI；(2) 针对真正触发审批的 permission profile 跑运行时验证
+- 不在这里实现 approval、model catalog、account readback 等更大的 app-server seam。
+
+## 2026-10-02 Codex local forget / complete catalog UI
+
+新增结构化完整目录 `AppServerCatalogReadResult<T>` 与五个 `get*Catalog` 方法，复用现有 `collectCatalog` 分页/原生 identity 去重/游标循环保护。完整读取返回 complete（包括空数组）；首屏连接失败为 failed、-32601 为 unavailable，后页失败为 partial 并保留 rows/nextCursor。旧 Page 和 array 方法保留兼容契约。仅 catalog list RPC，UI inspection 不写配置。
+
+## 2026-10-05 Codex 消息前分支与恢复
+
+forkThread 可传 beforeTurnId，仅在 native initialize 版本满足已核验的 0.160.0+ 契约时放行；未知/旧版本不会发送目标 fork。getThreadsCatalog 保留原有 native 默认来源和分页语义，缺失 child 的精确 ID 读取由 adapter 补充；不猜 sourceKinds 全集。static transcript delegate 保留可选原生身份字段。
+
+
+## 2026-10-08 Codex compatibility and failed negotiation cleanup
+
+Failed app-server negotiation stops the owned client before SDK fallback. Before-turn fork keeps the native 0.160+ contract and admits only the separately verified 0.158.0 alternative: authoritative inactive source/target, inclusive lastTurnId prefix or revert of the newly created child, exact child lineage and prefix readback. Unsafe/missing readback or failed revert cannot become fork success; the parent is never reverted. Unknown and other older versions remain unavailable.
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/core/agents/backend/codex/CodexAppServerClient.ts`。
+- 原位置：`src/core/agents/backend/CodexAppServerClient.ts`；文件名、导出接口与业务职责保持不变。
+- 随目录调整更新的依赖：`src/core/agents/backend/codex/CodexAppServerClientNormalization.ts`、`src/core/agents/backend/codex/CodexAppServerClientTypes.ts`、`src/core/agents/backend/codex/CodexAppServerTransport.ts`、`src/core/agents/backend/configuration/ProjectResourceSecureWrite.ts`。

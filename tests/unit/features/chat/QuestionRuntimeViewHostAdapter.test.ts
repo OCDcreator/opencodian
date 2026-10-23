@@ -2,14 +2,14 @@ import type {
   QuestionDisplayMode,
   QuestionRequest,
 } from '../../../../src/core/types';
-import type { QuestionRuntimeState } from '../../../../src/features/chat/services/QuestionRuntimeHostAdapter';
+import type { QuestionRuntimeState } from '../../../../src/features/chat/services/questions/QuestionRuntimeHostAdapter';
 import {
   createQuestionRuntimeViewHostAdapter,
   type QuestionRuntimeQuestionApiPort,
   type QuestionRuntimeSettingsPort,
   type QuestionRuntimeTabAttentionPort,
   type QuestionRuntimeViewHostAdapterHost,
-} from '../../../../src/features/chat/services/QuestionRuntimeViewHostAdapter';
+} from '../../../../src/features/chat/services/questions/QuestionRuntimeViewHostAdapter';
 import type { QuestionDockRenderState } from '../../../../src/features/chat/ui/QuestionDock';
 
 type Mocked<T> = {

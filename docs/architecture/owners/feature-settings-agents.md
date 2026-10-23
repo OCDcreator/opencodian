@@ -10,15 +10,15 @@
 
 - **Layer:** `feature` (may import layers: shared, core, feature)
 - **Risk:** medium
-- **Include:** `src/features/settings/SettingsAgentsSection.ts`, `src/features/settings/AgentSwitcherChips.ts`, `src/features/settings/AgentSwitcherFloatingIcons.ts`, `src/features/settings/SettingsSkillSection.ts`, `src/features/settings/SlashCommandCatalogRenderer.ts`, `src/features/settings/SettingsToolSection.ts`, `src/features/settings/SettingsToolDetailModal.ts`, `src/features/settings/SettingsToolFileService.ts`, `src/features/settings/capabilityDisclosureRow.ts`, `src/features/settings/capabilityLabBackendTabs.ts`, `src/features/settings/capabilityLabBackendWorkspace.ts`, `src/features/settings/SettingsCapabilityLabSection.ts`
+- **Include:** `src/features/settings/resources/SettingsAgentsSection.ts`, `src/features/settings/resources/AgentSwitcherChips.ts`, `src/features/settings/resources/AgentSwitcherFloatingIcons.ts`, `src/features/settings/resources/SettingsSkillSection.ts`, `src/features/settings/resources/SlashCommandCatalogRenderer.ts`, `src/features/settings/resources/SettingsToolSection.ts`, `src/features/settings/resources/SettingsToolDetailModal.ts`, `src/features/settings/resources/SettingsToolFileService.ts`, `src/features/settings/capabilities/capabilityDisclosureRow.ts`, `src/features/settings/capabilities/capabilityLabBackendTabs.ts`, `src/features/settings/capabilities/capabilityLabBackendWorkspace.ts`, `src/features/settings/capabilities/SettingsCapabilityLabSection.ts`
 
 ## Responsibilities
 - agents, skill, tool and capability-lab settings sections
 - agent switcher chips and floating icons, slash command catalog renderer
 
 ## Entrypoints
-- `src/features/settings/SettingsAgentsSection.ts`
-- `src/features/settings/SettingsCapabilityLabSection.ts`
+- `src/features/settings/resources/SettingsAgentsSection.ts`
+- `src/features/settings/capabilities/SettingsCapabilityLabSection.ts`
 
 ## Dependency surface
 - **Allowed owner dependencies:** `shared.foundation`, `core.agents`, `core.config`, `core.types`
@@ -61,3 +61,9 @@ The agent switcher identifies OpenCode 2 independently and reuses the OpenCode v
 ## 2026-10-23 DSH switcher icon
 
 后端切换器使用官方 DeepSeek Harness favicon 路径和蓝色，原始文件随 assets 保留。图标映射归本 owner；`dsh` 的启用/连接真值继续来自后端 registry，图标本身不代表连接成功。
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/features/settings/capabilities`、`src/features/settings/resources`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

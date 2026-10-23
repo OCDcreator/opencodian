@@ -8,7 +8,7 @@
 
 import { capturedNotices, clearCapturedNotices } from 'obsidian';
 
-import { SettingsCodexPluginsSection } from '../../../../src/features/settings/SettingsCodexPluginsSection';
+import { SettingsCodexPluginsSection } from '../../../../src/features/settings/backends/codex/SettingsCodexPluginsSection';
 import { setLocale, t } from '../../../../src/i18n';
 
 type AdapterMocks = {

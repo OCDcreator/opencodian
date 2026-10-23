@@ -6,7 +6,7 @@ import {
   type SendPipelineHostDependencies,
   type SendPipelineStreamController,
   type SendPipelineTabRuntime,
-} from '../../../../src/features/chat/runtime/SendPipelineRuntime';
+} from '../../../../src/features/chat/runtime/send/SendPipelineRuntime';
 import type { ContentBlock, StreamChunk } from '../../../../src/utils/streaming';
 
 function createTabRuntime(): SendPipelineTabRuntime {

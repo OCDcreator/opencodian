@@ -113,3 +113,8 @@ render() → 文件按钮列表
 > 2026-09-18 (R-A7)：改为**多选**选择器 `chooseContextFiles()`，返回 `(TFile|TFolder)[]`；目录条目与文件一起列出（folder 图标 + 完整路径，仅在「全部」过滤器下出现），行点击切换勾选态，底部「附加 N 项」按钮一次性解析所有勾选条目；Esc/关闭解析空数组。vault 外路径永远不会从这里流出——返回值是 vault 对象实例，不是路径字符串。
 
 ## 维护约束
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/features/chat/ui/ContextFilePickerModal.ts`。
+- 随目录调整更新的依赖：`src/features/chat/services/context/ContextFileCatalogService.ts`。

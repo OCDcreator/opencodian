@@ -17,8 +17,8 @@
 
 ## 关联 TS 组件
 
-- `src/features/settings/capabilityDisclosureRow.ts`（生成 `.opencodian-capability-disclosure` / `.opencodian-capability-row` / `.opencodian-capability-disclosure-footer`）
-- `src/features/settings/SettingsServerSection.ts`（生成 `.opencodian-capability-disclosure-host` / `.opencodian-experimental-capability-gates`）
+- `src/features/settings/capabilities/capabilityDisclosureRow.ts`（生成 `.opencodian-capability-disclosure` / `.opencodian-capability-row` / `.opencodian-capability-disclosure-footer`）
+- `src/features/settings/backends/opencode/SettingsServerSection.ts`（生成 `.opencodian-capability-disclosure-host` / `.opencodian-experimental-capability-gates`）
 - 复用 `.opencodian-capability-disclosure-host` 的同级 section：`SettingsModelSection`、`SettingsSecuritySection`、`SettingsSkillSection`、`SettingsAgentsSection`、`SettingsCommandsSection`、`SettingsMcpSection`。
 
 ## 修改注意点

@@ -1,7 +1,7 @@
 import {
   TabRuntimeStateBridge,
   type TabRuntimeStateBridgeHost,
-} from '../../../../src/features/chat/runtime/TabRuntimeStateBridge';
+} from '../../../../src/features/chat/runtime/activation/TabRuntimeStateBridge';
 
 describe('TabRuntimeStateBridge', () => {
   function createBridge(options?: {

@@ -21,3 +21,8 @@
 - `../services/ImageGenerationChatController.ts`：全部生成/插入动作。
 - `src/main.ts`：`openImageGenerationCard(prefill)` 构造并打开。
 - `src/style/modals/image-generation-modal.css`：结果布局与错误条样式。
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/features/chat/ui/ImageGenerationModal.ts`。
+- 随目录调整更新的依赖：`src/features/chat/services/integrations/ImageGenerationChatController.ts`。

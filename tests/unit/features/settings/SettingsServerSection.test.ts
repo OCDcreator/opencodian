@@ -8,7 +8,7 @@ jest.mock('obsidian', () => ({
 }));
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
-import { SettingsServerSection } from '../../../../src/features/settings/SettingsServerSection';
+import { SettingsServerSection } from '../../../../src/features/settings/backends/opencode/SettingsServerSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 

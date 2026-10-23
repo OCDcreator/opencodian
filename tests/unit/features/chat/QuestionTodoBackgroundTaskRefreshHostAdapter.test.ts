@@ -4,20 +4,20 @@ import type {
   QuestionRequest,
   SessionTodo,
 } from '../../../../src/core/types';
-import type {
-  BackgroundConversationPostSyncHandoffViewHost,
-} from '../../../../src/features/chat/services/BackgroundConversationPostSyncHandoffHostAdapter';
 import {
   createQuestionTodoBackgroundTaskRefreshServices,
   createQuestionTodoBackgroundTaskRefreshViewHostAdapter,
   type QuestionTodoBackgroundTaskRefreshViewHost,
   type QuestionTodoBackgroundTaskRefreshViewHostAdapterHost,
-} from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRefreshHostAdapter';
-import type { QuestionTodoStatusRefreshRuntime } from '../../../../src/features/chat/services/QuestionTodoStatusRefreshCoordinator';
+} from '../../../../src/features/chat/services/questions/QuestionTodoBackgroundTaskRefreshHostAdapter';
+import type { QuestionTodoStatusRefreshRuntime } from '../../../../src/features/chat/services/questions/QuestionTodoStatusRefreshCoordinator';
+import type {
+  BackgroundConversationPostSyncHandoffViewHost,
+} from '../../../../src/features/chat/services/sync/BackgroundConversationPostSyncHandoffHostAdapter';
 import type {
   VisibleConversationPostSyncOutcome,
   VisibleConversationPostSyncStateCoordinator,
-} from '../../../../src/features/chat/services/VisibleConversationPostSyncStateCoordinator';
+} from '../../../../src/features/chat/services/sync/VisibleConversationPostSyncStateCoordinator';
 
 type Mocked<T> = {
   [Key in keyof T]:

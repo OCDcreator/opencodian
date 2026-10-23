@@ -5,7 +5,7 @@ import {
 import {
   type ConversationSyncLoadRuntimeViewHost,
   createConversationSyncLoadRuntimeViewHosts,
-} from '../../../../src/features/chat/services/ConversationSyncLoadRuntimeViewHostFactory';
+} from '../../../../src/features/chat/services/sync/ConversationSyncLoadRuntimeViewHostFactory';
 import type { TabData } from '../../../../src/features/chat/tabs';
 
 type Mocked<T> = {

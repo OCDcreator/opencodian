@@ -1,6 +1,6 @@
 import {
   createQuestionTodoBackgroundTaskRuntimeViewHosts,
-} from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
+} from '../../../../src/features/chat/services/questions/QuestionTodoBackgroundTaskRuntimeServiceBundle';
 import {
   createBackgroundTaskIndicatorCoordinator,
   createBackgroundTaskLiveSignalCoordinator,

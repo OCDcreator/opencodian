@@ -5,7 +5,7 @@ import {
   filterModelPickerGroups,
   findModelPickerOption,
   findModelPickerOptionByRef,
-} from '../../../../src/features/settings/modelPicker';
+} from '../../../../src/features/settings/models/modelPicker';
 
 describe('modelPicker helpers', () => {
   const config: OpencodeModelConfigSubset = {

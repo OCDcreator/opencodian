@@ -42,3 +42,9 @@ Run before merge: `npm run typecheck`, `npm run check:module-docs`.
 The design (flowtext-c5-design §3.0) sanctioned a new owner for the same reason as `core.pdf`: a real subsystem (schema + layout + atomic-write semantics + gate decision) that candidate hosts cannot take — `core.storage` owns revert snapshots, not canvas JSON semantics; `feature.canvas-integration` is the foreign-host UI bridge and must not own the write contract; putting the schema into `app.composition` would grow `main.ts` runtime ownership. This is the sanctioned high-risk isolation provision, not a thin adapter.
 
 2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `core.canvas` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/core/canvas`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

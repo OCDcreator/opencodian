@@ -1,6 +1,6 @@
 import * as obsidian from 'obsidian';
 
-import { ToolDetailModal } from '../../../../src/features/settings/SettingsToolDetailModal';
+import { ToolDetailModal } from '../../../../src/features/settings/resources/SettingsToolDetailModal';
 import { setLocale, t } from '../../../../src/i18n';
 
 function createPlugin() {

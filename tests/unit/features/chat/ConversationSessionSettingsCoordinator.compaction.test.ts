@@ -5,7 +5,7 @@ import type {
 import {
   ConversationSessionSettingsCoordinator,
   type ConversationSessionSettingsCoordinatorHost,
-} from '../../../../src/features/chat/services/ConversationSessionSettingsCoordinator';
+} from '../../../../src/features/chat/services/conversation/ConversationSessionSettingsCoordinator';
 
 function createConversation(
   overrides?: ConversationSessionSettings,

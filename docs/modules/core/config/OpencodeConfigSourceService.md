@@ -77,3 +77,8 @@ OpenCode 是否重新加载、实际合并了哪个层、runtime effective value
 - `parseError` 不阻止 raw editor 展示原始 bytes，但任何 path edit 会 fail closed，直到用户通过 raw editor 提交一份合法 JSONC。
 - `restore()` 的 target 可由成功 revision 或 conflict revision 推导；设置区块本身仍应保留 history 所属 target 上下文，不依赖失败 outcome 猜测路径。
 - 聊天资源菜单与 slash/agent catalog 不消费本模块；P1 不改变其既有扁平目录架构。
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/core/config/OpencodeConfigSourceService.ts`。
+- 随目录调整更新的依赖：`src/core/agents/backend/configuration/ConfigurationArchiveService.ts`、`src/core/agents/backend/configuration/ProjectResourceSecureWrite.ts`。

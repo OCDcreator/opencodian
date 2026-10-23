@@ -1,9 +1,9 @@
 import type { PromptContextItem } from '../../../../src/core/types';
-import type { FocusContextPreview } from '../../../../src/features/chat/composerContext';
+import type { FocusContextPreview } from '../../../../src/features/chat/rendering/composerContext';
 import {
   type ComposerContextRuntimeState,
   ComposerContextRuntimeStore,
-} from '../../../../src/features/chat/services/ComposerContextRuntimeStore';
+} from '../../../../src/features/chat/services/composer/ComposerContextRuntimeStore';
 import type { TabId } from '../../../../src/features/chat/tabs';
 
 function createContextItem(

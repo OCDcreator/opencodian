@@ -2,11 +2,11 @@
 
 import { Modal, Setting } from 'obsidian';
 
-import { SettingsClaudeResourcesSection } from '../../../../src/features/settings/SettingsClaudeResourcesSection';
-import { SettingsCodexResourcesSection } from '../../../../src/features/settings/SettingsCodexResourcesSection';
+import { SettingsClaudeResourcesSection } from '../../../../src/features/settings/backends/claude/SettingsClaudeResourcesSection';
+import { SettingsCodexResourcesSection } from '../../../../src/features/settings/backends/codex/SettingsCodexResourcesSection';
 import { setLocale, t } from '../../../../src/i18n';
 
-jest.mock('../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery', () => ({
+jest.mock('../../../../src/core/agents/backend/claude/ClaudeProjectCommandDiscovery', () => ({
   discoverClaudeCommandResources: jest.fn().mockResolvedValue([]),
   createClaudeCommandResource: jest.fn(),
   updateClaudeCommandResource: jest.fn(),
@@ -17,7 +17,7 @@ jest.mock('../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery', (
   validateClaudeCommandContent: jest.fn().mockReturnValue(null),
 }));
 
-jest.mock('../../../../src/core/agents/backend/ClaudeProjectSkillDiscovery', () => ({
+jest.mock('../../../../src/core/agents/backend/claude/ClaudeProjectSkillDiscovery', () => ({
   discoverClaudeSkillResources: jest.fn().mockResolvedValue([]),
   createClaudeSkillResource: jest.fn(),
   updateClaudeSkillResource: jest.fn(),
@@ -28,7 +28,7 @@ jest.mock('../../../../src/core/agents/backend/ClaudeProjectSkillDiscovery', () 
   validateClaudeSkillContent: jest.fn().mockReturnValue(null),
 }));
 
-jest.mock('../../../../src/core/agents/backend/ClaudeProjectAgentDiscovery', () => ({
+jest.mock('../../../../src/core/agents/backend/claude/ClaudeProjectAgentDiscovery', () => ({
   discoverClaudeAgentResources: jest.fn().mockResolvedValue([]),
   createClaudeAgentResource: jest.fn(),
   updateClaudeAgentResource: jest.fn(),
@@ -39,7 +39,7 @@ jest.mock('../../../../src/core/agents/backend/ClaudeProjectAgentDiscovery', () 
   validateClaudeAgentContent: jest.fn().mockReturnValue(null),
 }));
 
-jest.mock('../../../../src/core/agents/backend/CodexProjectResourceDiscovery', () => ({
+jest.mock('../../../../src/core/agents/backend/codex/CodexProjectResourceDiscovery', () => ({
   discoverCodexSkillResources: jest.fn().mockResolvedValue([]),
   createCodexSkillResource: jest.fn(),
   updateCodexSkillResource: jest.fn(),
@@ -143,7 +143,7 @@ describe('resource mutation safety — DOM deferred promises', () => {
   });
 
   it('guards Claude Create against double activation and restores button state after a thrown write', async () => {
-    const command = await import('../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery');
+    const command = await import('../../../../src/core/agents/backend/claude/ClaudeProjectCommandDiscovery');
     const pending = deferred<never>();
     (command.discoverClaudeCommandResources as jest.Mock).mockResolvedValue([claudeCommandItem()]);
     (command.createClaudeCommandResource as jest.Mock).mockReturnValue(pending.promise);
@@ -169,7 +169,7 @@ describe('resource mutation safety — DOM deferred promises', () => {
   });
 
   it('guards Claude Delete against double activation and restores icon state after a rejected write', async () => {
-    const command = await import('../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery');
+    const command = await import('../../../../src/core/agents/backend/claude/ClaudeProjectCommandDiscovery');
     const pending = deferred<never>();
     (command.discoverClaudeCommandResources as jest.Mock).mockResolvedValue([claudeCommandItem()]);
     (command.deleteClaudeCommandResource as jest.Mock).mockReturnValue(pending.promise);
@@ -191,7 +191,7 @@ describe('resource mutation safety — DOM deferred promises', () => {
   });
 
   it('guards Claude Restore against double activation and restores button state after a rejected write', async () => {
-    const command = await import('../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery');
+    const command = await import('../../../../src/core/agents/backend/claude/ClaudeProjectCommandDiscovery');
     const pending = deferred<never>();
     (command.catalogClaudeCommandResourceHistory as jest.Mock).mockResolvedValue({ status: 'success', targets: [historyTarget(claudeRevision.canonicalPath, 'claude', 'command')] });
     (command.discoverClaudeCommandResources as jest.Mock).mockResolvedValue([claudeCommandItem()]);
@@ -218,7 +218,7 @@ describe('resource mutation safety — DOM deferred promises', () => {
   });
 
   it('guards Codex Create against double activation and restores button state after a thrown write', async () => {
-    const codex = await import('../../../../src/core/agents/backend/CodexProjectResourceDiscovery');
+    const codex = await import('../../../../src/core/agents/backend/codex/CodexProjectResourceDiscovery');
     const pending = deferred<never>();
     (codex.discoverCodexSkillResources as jest.Mock).mockResolvedValue([codexSkillItem()]);
     (codex.createCodexSkillResource as jest.Mock).mockReturnValue(pending.promise);
@@ -244,7 +244,7 @@ describe('resource mutation safety — DOM deferred promises', () => {
   });
 
   it('guards Codex Delete against double activation and restores icon state after a resolved write', async () => {
-    const codex = await import('../../../../src/core/agents/backend/CodexProjectResourceDiscovery');
+    const codex = await import('../../../../src/core/agents/backend/codex/CodexProjectResourceDiscovery');
     const pending = deferred<{ status: 'success'; targetPath: string }>();
     (codex.discoverCodexSkillResources as jest.Mock).mockResolvedValue([codexSkillItem()]);
     (codex.deleteCodexSkillResource as jest.Mock).mockReturnValue(pending.promise);
@@ -266,7 +266,7 @@ describe('resource mutation safety — DOM deferred promises', () => {
   });
 
   it('guards Codex Restore against double activation and restores button state after a rejected write', async () => {
-    const codex = await import('../../../../src/core/agents/backend/CodexProjectResourceDiscovery');
+    const codex = await import('../../../../src/core/agents/backend/codex/CodexProjectResourceDiscovery');
     const pending = deferred<never>();
     (codex.catalogCodexSkillResourceHistory as jest.Mock).mockResolvedValue({ status: 'success', targets: [historyTarget(codexRevision.canonicalPath, 'codex', 'skill')] });
     (codex.discoverCodexSkillResources as jest.Mock).mockResolvedValue([codexSkillItem()]);
@@ -293,7 +293,7 @@ describe('resource mutation safety — DOM deferred promises', () => {
   });
 
   it.each([false, undefined] as const)('fails closed for Claude Delete confirmation=%s', async (answer) => {
-    const command = await import('../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery');
+    const command = await import('../../../../src/core/agents/backend/claude/ClaudeProjectCommandDiscovery');
     (command.discoverClaudeCommandResources as jest.Mock).mockResolvedValue([claudeCommandItem()]);
     (window.confirm as jest.Mock).mockReturnValue(answer as unknown as boolean);
     const container = document.createElement('div');
@@ -305,7 +305,7 @@ describe('resource mutation safety — DOM deferred promises', () => {
   });
 
   it.each([false, undefined] as const)('fails closed for Claude Restore confirmation=%s', async (answer) => {
-    const command = await import('../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery');
+    const command = await import('../../../../src/core/agents/backend/claude/ClaudeProjectCommandDiscovery');
     (command.catalogClaudeCommandResourceHistory as jest.Mock).mockResolvedValue({ status: 'success', targets: [historyTarget(claudeRevision.canonicalPath, 'claude', 'command')] });
     (command.discoverClaudeCommandResources as jest.Mock).mockResolvedValue([claudeCommandItem()]);
     (window.confirm as jest.Mock).mockReturnValue(answer as unknown as boolean);
@@ -321,7 +321,7 @@ describe('resource mutation safety — DOM deferred promises', () => {
   });
 
   it.each([false, undefined] as const)('fails closed for Codex Delete confirmation=%s', async (answer) => {
-    const codex = await import('../../../../src/core/agents/backend/CodexProjectResourceDiscovery');
+    const codex = await import('../../../../src/core/agents/backend/codex/CodexProjectResourceDiscovery');
     (codex.discoverCodexSkillResources as jest.Mock).mockResolvedValue([codexSkillItem()]);
     (window.confirm as jest.Mock).mockReturnValue(answer as unknown as boolean);
     const container = document.createElement('div');
@@ -333,7 +333,7 @@ describe('resource mutation safety — DOM deferred promises', () => {
   });
 
   it.each([false, undefined] as const)('fails closed for Codex Restore confirmation=%s', async (answer) => {
-    const codex = await import('../../../../src/core/agents/backend/CodexProjectResourceDiscovery');
+    const codex = await import('../../../../src/core/agents/backend/codex/CodexProjectResourceDiscovery');
     (codex.catalogCodexSkillResourceHistory as jest.Mock).mockResolvedValue({ status: 'success', targets: [historyTarget(codexRevision.canonicalPath, 'codex', 'skill')] });
     (codex.discoverCodexSkillResources as jest.Mock).mockResolvedValue([codexSkillItem()]);
     (window.confirm as jest.Mock).mockReturnValue(answer as unknown as boolean);

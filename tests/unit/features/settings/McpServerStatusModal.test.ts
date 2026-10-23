@@ -6,7 +6,7 @@ import {
   redactMcpSensitiveText,
   redactMcpTechnicalDetails,
   summarizeCommand,
-} from '../../../../src/features/settings/McpServerStatusModal';
+} from '../../../../src/features/settings/mcp/McpServerStatusModal';
 import { setLocale, t } from '../../../../src/i18n';
 
 describe('McpServerStatusModal', () => {

@@ -2,7 +2,7 @@ import { Setting, type TextComponent } from 'obsidian';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { prepareLoadedSettingsBootstrapState } from '../../../../src/core/types/settingsLoadNormalization';
-import { SettingsInlineEditSection } from '../../../../src/features/settings/SettingsInlineEditSection';
+import { SettingsInlineEditSection } from '../../../../src/features/settings/general/SettingsInlineEditSection';
 import { setLocale, t } from '../../../../src/i18n';
 
 interface CapturedTextControl {

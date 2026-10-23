@@ -8,10 +8,10 @@ import * as path from 'path';
 import type {
   type ConfigurationAllowlist,
   type FileRevision,
-} from '../../../../../src/core/agents/backend/ProjectResourceSecureWrite';
+} from '../../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite';
 
-type SecureWriteModule = typeof import('../../../../../src/core/agents/backend/ProjectResourceSecureWrite');
-type CommitOperationsModule = typeof import('../../../../../src/core/agents/backend/ConfigurationFileCommitOperations');
+type SecureWriteModule = typeof import('../../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite');
+type CommitOperationsModule = typeof import('../../../../../src/core/agents/backend/configuration/ConfigurationFileCommitOperations');
 type CommitRenameArgs = Parameters<CommitOperationsModule['renameFileAtCommit']>;
 type CommitLinkArgs = Parameters<CommitOperationsModule['linkFileAtCommit']>;
 type CommitUnlinkArgs = Parameters<CommitOperationsModule['unlinkFileAtCommit']>;
@@ -51,12 +51,12 @@ function isTargetPath(value: string | Buffer | URL, target: string): boolean {
 
 function loadSecureWriteModule(): SecureWriteModule {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- load after the commit facade spy is installed.
-  return require('../../../../../src/core/agents/backend/ProjectResourceSecureWrite') as SecureWriteModule;
+  return require('../../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite') as SecureWriteModule;
 }
 
 function loadCommitOperationsModule(): CommitOperationsModule {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- share the exact facade module instance with the source loaded next.
-  return require('../../../../../src/core/agents/backend/ConfigurationFileCommitOperations') as CommitOperationsModule;
+  return require('../../../../../src/core/agents/backend/configuration/ConfigurationFileCommitOperations') as CommitOperationsModule;
 }
 
 function installExternalMutationAtCommit(target: string, content: string): {

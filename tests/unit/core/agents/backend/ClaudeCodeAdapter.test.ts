@@ -10,7 +10,7 @@ import {
   type ClaudeCodeSdkLoader,
   createClaudeCodePermissionBridge,
 } from '../../../../../src/core/agents/backend';
-import { resolveClaudeCodeProcess } from '../../../../../src/core/agents/backend/ClaudeCodeProcessResolver';
+import { resolveClaudeCodeProcess } from '../../../../../src/core/agents/backend/claude/ClaudeCodeProcessResolver';
 import {
   clearPromptSuggestionSink,
   getPromptSuggestionSink,
@@ -140,7 +140,7 @@ describe('ClaudeCodeAdapter', () => {
   });
 
   it('does not depend on chat feature-layer types for context usage snapshots', () => {
-    const source = readFileSync('src/core/agents/backend/ClaudeCodeAdapter.ts', 'utf8');
+    const source = readFileSync('src/core/agents/backend/claude/ClaudeCodeAdapter.ts', 'utf8');
 
     expect(source).not.toContain('../../../features/chat');
   });

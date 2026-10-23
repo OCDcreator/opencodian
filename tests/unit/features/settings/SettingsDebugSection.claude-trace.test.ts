@@ -5,8 +5,8 @@ import { Setting } from 'obsidian';
 import { tmpdir } from 'os';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
+import { SettingsDebugSection } from '../../../../src/features/settings/debug/SettingsDebugSection';
 import { createClaudeTraceDiagnosticsPort } from '../../../../src/features/settings/debug/types';
-import { SettingsDebugSection } from '../../../../src/features/settings/SettingsDebugSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 import { clearRecentLogs, setDebugLoggingEnabled, setDebugModuleEnabled } from '../../../../src/shared';

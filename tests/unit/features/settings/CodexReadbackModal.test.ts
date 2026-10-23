@@ -1,6 +1,6 @@
 import type { App } from 'obsidian';
 
-import { CodexReadbackModal } from '../../../../src/features/settings/CodexReadbackModal';
+import { CodexReadbackModal } from '../../../../src/features/settings/backends/codex/CodexReadbackModal';
 import { setLocale, t } from '../../../../src/i18n';
 
 interface TestItem {

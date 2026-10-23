@@ -6,7 +6,7 @@ import {
 import type { AgentService } from '../../../../src/core/agents/backend/AgentService';
 import type { AgentBackendKind, Conversation } from '../../../../src/core/types/chat';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
-import type { UserMessageFooterRendererHost } from '../../../../src/features/chat/runtime/UserMessageFooterRenderer';
+import type { UserMessageFooterRendererHost } from '../../../../src/features/chat/runtime/rendering/UserMessageFooterRenderer';
 
 type FooterHostHarness = OpenCodianView & {
   plugin: { agentServiceRegistry: { get(kind: AgentBackendKind): AgentService | undefined } };

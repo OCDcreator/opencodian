@@ -10,14 +10,14 @@
 
 - **Layer:** `feature` (may import layers: shared, core, feature)
 - **Risk:** medium
-- **Include:** `src/features/settings/SettingsCodexSection.ts`, `src/features/settings/SettingsCodexProjectConfigSection.ts`, `src/features/settings/SettingsCodexAccountSurface.ts`, `src/features/settings/SettingsCodexLegacyCredentialControl.ts`, `src/features/settings/SettingsCodexReadbackControls.ts`, `src/features/settings/SettingsCodexResourcesSection.ts`, `src/features/settings/CodexMcpServerDetailModal.ts`, `src/features/settings/CodexMcpServerDetailRenderers.ts`, `src/features/settings/CodexProjectConfigFormModel.ts`, `src/features/settings/CodexReadbackModal.ts`
+- **Include:** `src/features/settings/backends/codex/SettingsCodexSection.ts`, `src/features/settings/backends/codex/SettingsCodexProjectConfigSection.ts`, `src/features/settings/backends/codex/SettingsCodexAccountSurface.ts`, `src/features/settings/backends/codex/SettingsCodexLegacyCredentialControl.ts`, `src/features/settings/backends/codex/SettingsCodexReadbackControls.ts`, `src/features/settings/backends/codex/SettingsCodexResourcesSection.ts`, `src/features/settings/backends/codex/CodexMcpServerDetailModal.ts`, `src/features/settings/backends/codex/CodexMcpServerDetailRenderers.ts`, `src/features/settings/backends/codex/CodexProjectConfigFormModel.ts`, `src/features/settings/backends/codex/CodexReadbackModal.ts`
 
 ## Responsibilities
 - Codex settings sections, project config, account surface, credentials, readback controls, resources
 - Codex MCP server detail modal
 
 ## Entrypoints
-- `src/features/settings/SettingsCodexSection.ts`
+- `src/features/settings/backends/codex/SettingsCodexSection.ts`
 
 ## Dependency surface
 - **Allowed owner dependencies:** `shared.foundation`, `core.types`
@@ -52,3 +52,9 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 CodexReadbackModal 和 CodexMcpServerDetailModal 从结构化目录失败中识别权限拒绝，只展示固定本地化说明。状态、已读取 partial 条目和重试流程仍由原 modal 持有，不新增目录真值或跨 owner 配置权。
 
 2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.settings-codex` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/features/settings/backends/codex`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

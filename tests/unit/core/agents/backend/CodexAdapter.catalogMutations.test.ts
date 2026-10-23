@@ -1,8 +1,8 @@
-import { CodexAdapter, type CodexFactory } from '../../../../../src/core/agents/backend/CodexAdapter';
+import { CodexAdapter, type CodexFactory } from '../../../../../src/core/agents/backend/codex/CodexAdapter';
 import {
   AppServerThreadMutationError,
   CodexAppServerClient,
-} from '../../../../../src/core/agents/backend/CodexAppServerClient';
+} from '../../../../../src/core/agents/backend/codex/CodexAppServerClient';
 
 function createFixture(withServer = true) {
   const client = new CodexAppServerClient({ codexPathOverride: '/fixture/codex' });

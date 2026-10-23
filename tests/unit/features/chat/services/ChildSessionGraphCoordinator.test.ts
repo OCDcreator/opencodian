@@ -9,7 +9,7 @@ import type {
 import {
   ChildSessionGraphCoordinator,
   type ChildSessionGraphCoordinatorHost,
-} from '../../../../../src/features/chat/services/ChildSessionGraphCoordinator';
+} from '../../../../../src/features/chat/services/conversation/ChildSessionGraphCoordinator';
 
 type Mocked<T> = {
   [Key in keyof T]:

@@ -5,14 +5,14 @@ import type {
   Conversation,
 } from '../../../../src/core/types';
 import {
+  createInitialTabSessionLifecycleState,
+  transitionTabSessionLifecycle,
+} from '../../../../src/features/chat/services/conversation/TabSessionPhase';
+import {
   type ConversationSyncRuntime,
   ConversationSyncRuntimeCoordinator,
   type ConversationSyncRuntimeCoordinatorOptions,
-} from '../../../../src/features/chat/services/ConversationSyncRuntimeCoordinator';
-import {
-  createInitialTabSessionLifecycleState,
-  transitionTabSessionLifecycle,
-} from '../../../../src/features/chat/services/TabSessionPhase';
+} from '../../../../src/features/chat/services/sync/ConversationSyncRuntimeCoordinator';
 
 describe('ConversationSyncRuntimeCoordinator', () => {
   function createConversation(overrides?: Partial<Conversation>): Conversation {

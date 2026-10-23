@@ -27,16 +27,16 @@ import type {
   ChatMessage,
   Conversation,
 } from '../../../../src/core/types';
-import { AssistantAutoInternalLinkService } from '../../../../src/features/chat/services/AssistantAutoInternalLinkService';
-import {
-  ConversationAuthoritativeSyncCoordinator,
-  type ConversationAuthoritativeSyncHost,
-} from '../../../../src/features/chat/services/ConversationAuthoritativeSyncCoordinator';
+import { AssistantAutoInternalLinkService } from '../../../../src/features/chat/services/rendering/AssistantAutoInternalLinkService';
 import {
   type ConversationCanonicalRenderSource,
   ConversationRenderService,
-} from '../../../../src/features/chat/services/ConversationRenderService';
-import { MessageFinalizationService } from '../../../../src/features/chat/services/MessageFinalizationService';
+} from '../../../../src/features/chat/services/rendering/ConversationRenderService';
+import { MessageFinalizationService } from '../../../../src/features/chat/services/send/MessageFinalizationService';
+import {
+  ConversationAuthoritativeSyncCoordinator,
+  type ConversationAuthoritativeSyncHost,
+} from '../../../../src/features/chat/services/sync/ConversationAuthoritativeSyncCoordinator';
 import { createInlineEditAutoLinkProcessor } from '../../../../src/features/inline-edit/InlineEditAutoLink';
 import {
   createHost as createRenderHost,

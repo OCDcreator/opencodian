@@ -4,7 +4,7 @@ import {
   injectLiveCompactionDivider,
   mergeAssistantMessagesForRender,
   tagCompactionSummaries,
-} from '../../../../src/features/chat/renderGroups';
+} from '../../../../src/features/chat/rendering/renderGroups';
 
 function createMessage(overrides: Partial<ChatMessage>): ChatMessage {
   return {

@@ -6,7 +6,7 @@ import { isLocalServerMode } from '../../core/types';
 import type { AgentBackendKind } from '../../core/types/chat';
 import { comparePluginVersions, type PluginUpdateService } from '../../core/update/PluginUpdateService';
 import { OpenCodianView } from '../../features/chat/OpenCodianView';
-import { UserMessageFooterRenderer } from '../../features/chat/runtime/UserMessageFooterRenderer';
+import { UserMessageFooterRenderer } from '../../features/chat/runtime/rendering/UserMessageFooterRenderer';
 import { t } from '../../i18n';
 import { createLogger, formatDurationMs, getPerformanceTimestampMs } from '../../shared';
 

@@ -4,7 +4,7 @@ import {
   type ConversationScrollRestoreSnapshot,
   resolveEffectiveScrollRestoreSnapshot,
   restoreElementScrollAfterRender,
-} from '../../../../src/features/chat/services/ScrollManager';
+} from '../../../../src/features/chat/services/rendering/ScrollManager';
 
 /**
  * Faithful jsdom scroll-pane model: message rects derive from live scrollTop

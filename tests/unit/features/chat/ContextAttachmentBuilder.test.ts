@@ -4,11 +4,11 @@ import { MarkdownView, TFile, TFolder } from 'obsidian';
 import { TextEncoder } from 'util';
 
 import type { ServerMode } from '../../../../src/core/types/settings';
-import type { FocusContextPreview } from '../../../../src/features/chat/composerContext';
+import type { FocusContextPreview } from '../../../../src/features/chat/rendering/composerContext';
 import {
   ContextAttachmentBuilder,
   REMOTE_CONTEXT_TEXT_LIMIT_BYTES,
-} from '../../../../src/features/chat/services/ContextAttachmentBuilder';
+} from '../../../../src/features/chat/services/context/ContextAttachmentBuilder';
 import { t } from '../../../../src/i18n';
 
 global.TextEncoder = TextEncoder as unknown as typeof global.TextEncoder;

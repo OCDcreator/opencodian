@@ -1,15 +1,15 @@
 import type { App } from 'obsidian';
 
 import type { ClaudeCodeModelCatalogEntry } from '../../../../src/core/agents/backend/BackendModelCatalog';
-import { ClaudeCodeAdapter } from '../../../../src/core/agents/backend/ClaudeCodeAdapter';
-import type { ClaudeCodeSdkOptionsShape } from '../../../../src/core/agents/backend/ClaudeCodeOptionsBuilder';
+import { ClaudeCodeAdapter } from '../../../../src/core/agents/backend/claude/ClaudeCodeAdapter';
+import type { ClaudeCodeSdkOptionsShape } from '../../../../src/core/agents/backend/claude/ClaudeCodeOptionsBuilder';
 import type { ResolvedModelSelection } from '../../../../src/core/config/modelConfig';
 import { StorageService } from '../../../../src/core/storage/StorageService';
 import type { Conversation } from '../../../../src/core/types/chat';
 import { type ClaudeCodeBackendSettings, getDefaultClaudeCodeBackendSettings } from '../../../../src/core/types/settings';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
-import { ChatSelectionControlsCoordinator, type ChatSelectionControlsCoordinatorHost } from '../../../../src/features/chat/services/ChatSelectionControlsCoordinator';
-import type { ModelSelectionRuntime, ModelSelectionRuntimeHost } from '../../../../src/features/chat/services/ModelSelectionRuntime';
+import { ChatSelectionControlsCoordinator, type ChatSelectionControlsCoordinatorHost } from '../../../../src/features/chat/services/selection/ChatSelectionControlsCoordinator';
+import type { ModelSelectionRuntime, ModelSelectionRuntimeHost } from '../../../../src/features/chat/services/selection/ModelSelectionRuntime';
 import type { ModelSelectorProvider, ModelSelectorSelection } from '../../../../src/features/chat/ui/modelSelector/types';
 
 type SendOptions = { provider?: string; model?: string; variant?: string };

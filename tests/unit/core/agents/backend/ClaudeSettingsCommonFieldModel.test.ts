@@ -7,8 +7,8 @@ import {
   buildClaudeSettingsCommonFieldEdit,
   CLAUDE_SETTINGS_COMMON_FIELD_EVIDENCE,
   CLAUDE_SETTINGS_COMMON_FIELDS,
-} from '../../../../../src/core/agents/backend/ClaudeSettingsCommonFieldModel';
-import { applyJsoncPathEdits } from '../../../../../src/core/agents/backend/ProjectResourceSecureWrite';
+} from '../../../../../src/core/agents/backend/claude/ClaudeSettingsCommonFieldModel';
+import { applyJsoncPathEdits } from '../../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite';
 
 describe('ClaudeSettingsCommonFieldModel', () => {
   it('exposes the exact SDK-grounded catalog and provenance', () => {

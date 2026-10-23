@@ -11,7 +11,7 @@ import {
   computeGraphNeighbours,
   foldRetrievalMatches,
   noteDisplayName,
-} from '../../../../src/features/chat/RelevantNotesModel';
+} from '../../../../src/features/chat/retrieval/RelevantNotesModel';
 
 describe('computeGraphNeighbours', () => {
   const links = {

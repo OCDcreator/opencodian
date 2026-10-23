@@ -6,7 +6,7 @@ jest.mock('obsidian', () => ({
 }));
 
 import type { McpServerSnapshot, McpServerStatus } from '../../../../src/core/opencode/types';
-import { SettingsMcpSection } from '../../../../src/features/settings/SettingsMcpSection';
+import { SettingsMcpSection } from '../../../../src/features/settings/mcp/SettingsMcpSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 import {

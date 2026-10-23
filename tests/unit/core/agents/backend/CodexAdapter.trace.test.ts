@@ -1,4 +1,4 @@
-import { CodexAdapter } from '../../../../../src/core/agents/backend/CodexAdapter';
+import { CodexAdapter } from '../../../../../src/core/agents/backend/codex/CodexAdapter';
 import type { CodexTraceContext,CodexTracePort } from '../../../../../src/core/agents/backend/diagnostics/types';
 
 let notificationHandler: ((event: { method: string; params: unknown }) => void) | null = null;
@@ -19,8 +19,8 @@ const mockClient = {
   registerServerRequestHandler: jest.fn(),
 };
 
-jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => {
-  const actual = jest.requireActual('../../../../../src/core/agents/backend/CodexAppServerClient');
+jest.mock('../../../../../src/core/agents/backend/codex/CodexAppServerClient', () => {
+  const actual = jest.requireActual('../../../../../src/core/agents/backend/codex/CodexAppServerClient');
   return { ...actual, CodexAppServerClient: jest.fn(() => mockClient) };
 });
 

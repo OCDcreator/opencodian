@@ -3,14 +3,14 @@
  */
 
 import { AgentCapability } from '../../../../../src/core/agents/AgentCapability';
-import { CodexAdapter } from '../../../../../src/core/agents/backend/CodexAdapter';
+import { CodexAdapter } from '../../../../../src/core/agents/backend/codex/CodexAdapter';
 
 const mockForkThread = jest.fn();
 const mockArchiveThread = jest.fn();
 const mockUnarchiveThread = jest.fn();
 const mockReadThread = jest.fn();
 
-jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => ({
+jest.mock('../../../../../src/core/agents/backend/codex/CodexAppServerClient', () => ({
   CodexAppServerClient: jest.fn().mockImplementation(() => ({
     start: jest.fn(),
     stop: jest.fn(),

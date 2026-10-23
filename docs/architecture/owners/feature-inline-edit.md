@@ -79,3 +79,9 @@ OpenCode 2 provider-qualified model references pass through the existing inline 
 2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.inline-edit` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
 
 Claude message-before fork resolves the predecessor native chain UUID before using the SDK inclusive boundary and refuses an unavailable empty prefix. Inline input refresh preserves the current draft in input phase, including delayed catalog loads, without changing generating/new-round clear behavior.
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/features/inline-edit`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

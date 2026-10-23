@@ -30,7 +30,7 @@ import {
   safeRestoreFile,
   safeWriteFile,
   validateConfigurationContent,
-} from '../../../../../src/core/agents/backend/ProjectResourceSecureWrite';
+} from '../../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite';
 
 jest.mock('node:fs/promises', () => ({ ...jest.requireActual('node:fs/promises') }));
 

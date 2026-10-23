@@ -3,7 +3,7 @@ import {
   type BackgroundTaskLiveSignalCoordinatorHostBuilderHost,
   type BackgroundTaskLiveSignalRuntime,
   createBackgroundTaskLiveSignalCoordinatorHost,
-} from '../../../../src/features/chat/services/BackgroundTaskLiveSignalCoordinator';
+} from '../../../../src/features/chat/services/background/BackgroundTaskLiveSignalCoordinator';
 
 type Mocked<T> = {
   [Key in keyof T]:

@@ -35,3 +35,8 @@
 ## 2026-10-08 Codex auxiliary cancellation
 
 Timeout, request abort, explicit cancel and dispose settle locally within the original budget and interrupt the exact admitted native turn once. A late turn/start acknowledgement after local cancellation is interrupted using its captured owned thread/turn ID, so it cannot survive the cancelled request. Pre-aborted requests send no native turn. Failed/interrupted native terminals cannot admit partial replacement text. Read-only sandbox, no network, never approvals and ephemeral readback remain required.
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/core/agents/backend/auxiliary/CodexAuxQuerySession.ts`。
+- 随目录调整更新的依赖：`src/core/agents/backend/codex/CodexAppServerClient.ts`、`src/core/agents/backend/codex/CodexAppServerClientTypes.ts`、`src/core/agents/backend/codex/CodexAppServerStreamMapper.ts`。

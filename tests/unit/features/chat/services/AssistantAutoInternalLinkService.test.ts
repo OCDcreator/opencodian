@@ -14,7 +14,7 @@
  */
 
 import type { ChatMessage, Conversation, PromptContextItem } from '../../../../../src/core/types';
-import { AssistantAutoInternalLinkService } from '../../../../../src/features/chat/services/AssistantAutoInternalLinkService';
+import { AssistantAutoInternalLinkService } from '../../../../../src/features/chat/services/rendering/AssistantAutoInternalLinkService';
 
 function createContextItem(overrides: Partial<PromptContextItem> = {}): PromptContextItem {
   return {

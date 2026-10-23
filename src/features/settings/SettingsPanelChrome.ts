@@ -3,7 +3,7 @@ import { App, setIcon,Setting } from 'obsidian';
 import { setLocale, t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { getOpenCodianWordmarkDataUrl } from '../../shared/brandingWordmark';
-import { EnvironmentVariablesModal } from './EnvironmentVariablesModal';
+import { EnvironmentVariablesModal } from './models/EnvironmentVariablesModal';
 
 export interface SettingHelpButtonConfig {
   tooltip: string;

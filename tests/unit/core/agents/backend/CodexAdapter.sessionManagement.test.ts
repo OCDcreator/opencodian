@@ -16,8 +16,8 @@ const mockInterruptTurn = jest.fn();
 const mockSetThreadGoal = jest.fn();
 const mockClearThreadEffectiveSettings = jest.fn();
 
-jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => {
-  const actual = jest.requireActual('../../../../../src/core/agents/backend/CodexAppServerClient');
+jest.mock('../../../../../src/core/agents/backend/codex/CodexAppServerClient', () => {
+  const actual = jest.requireActual('../../../../../src/core/agents/backend/codex/CodexAppServerClient');
   return {
     ...actual,
     CodexAppServerClient: jest.fn().mockImplementation(() => ({
@@ -37,7 +37,7 @@ jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => {
   };
 });
 
-import { CodexAdapter } from '../../../../../src/core/agents/backend/CodexAdapter';
+import { CodexAdapter } from '../../../../../src/core/agents/backend/codex/CodexAdapter';
 
 function createMockCodex(): unknown {
   return {

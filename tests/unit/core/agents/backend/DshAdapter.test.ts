@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import type { DshAcpClientOptions, DshJsonObject } from '../../../../../src/core/agents/backend/dsh/DshAcpClient';
-import { DshAdapter } from '../../../../../src/core/agents/backend/DshAdapter';
+import { DshAdapter } from '../../../../../src/core/agents/backend/dsh/DshAdapter';
 import type { StreamChunk } from '../../../../../src/core/types/chat';
 import type { DshBackendSettings } from '../../../../../src/core/types/settings';
 

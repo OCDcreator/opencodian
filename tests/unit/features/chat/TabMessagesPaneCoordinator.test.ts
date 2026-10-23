@@ -1,9 +1,9 @@
-import { SettledScrollScheduler } from '../../../../src/features/chat/services/ScrollManager';
 import {
   TabMessagesPaneCoordinator,
   type TabMessagesPaneCoordinatorHost,
   type TabMessagesPaneRuntimeState,
-} from '../../../../src/features/chat/services/TabMessagesPaneCoordinator';
+} from '../../../../src/features/chat/services/conversation/TabMessagesPaneCoordinator';
+import { SettledScrollScheduler } from '../../../../src/features/chat/services/rendering/ScrollManager';
 
 interface TestRuntimeState extends TabMessagesPaneRuntimeState {
   streamController: {

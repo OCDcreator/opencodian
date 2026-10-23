@@ -8,7 +8,7 @@ import {
   createSessionTodoCoordinator,
   type SessionTodoRuntimeState,
   type SessionTodoViewHost,
-} from '../../../../src/features/chat/services/SessionTodoHostAdapter';
+} from '../../../../src/features/chat/services/questions/SessionTodoHostAdapter';
 
 type Mocked<T> = {
   [Key in keyof T]:

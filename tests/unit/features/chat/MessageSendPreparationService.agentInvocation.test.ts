@@ -3,11 +3,11 @@ import type {
   PromptRequestPart,
 } from '../../../../src/core/opencode/OpenCodePromptRequestBuilder';
 import type { Conversation } from '../../../../src/core/types';
-import type { ComposerSendContextPort } from '../../../../src/features/chat/services/ComposerContextViewFacade';
+import type { ComposerSendContextPort } from '../../../../src/features/chat/services/composer/ComposerContextViewFacade';
 import {
   type MessageSendPreparationHost,
   MessageSendPreparationService,
-} from '../../../../src/features/chat/services/MessageSendPreparationService';
+} from '../../../../src/features/chat/services/send/MessageSendPreparationService';
 
 function createConversation(): Conversation {
   return {

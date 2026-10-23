@@ -1,7 +1,7 @@
 import type { TabContextState } from '../../../core/types';
 import { t } from '../../../i18n';
 import { TooltipLayerController } from '../../../shared/TooltipLayerController';
-import { ContextUsageService } from '../services/ContextUsageService';
+import { ContextUsageService } from '../services/context/ContextUsageService';
 
 const RADIUS = 13.4;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;

@@ -1,6 +1,6 @@
 import { TFile, TFolder } from 'obsidian';
 
-import { ContextFileCatalogIndex } from '../../../../src/features/chat/services/ContextFileCatalogIndex';
+import { ContextFileCatalogIndex } from '../../../../src/features/chat/services/context/ContextFileCatalogIndex';
 
 function createFolder(path: string): TFolder {
   const folder = new TFolder();

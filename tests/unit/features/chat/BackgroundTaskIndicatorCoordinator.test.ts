@@ -2,7 +2,7 @@ import type { Conversation } from '../../../../src/core/types';
 import {
   BackgroundTaskIndicatorCoordinator,
   type BackgroundTaskIndicatorCoordinatorHost,
-} from '../../../../src/features/chat/runtime/BackgroundTaskIndicatorCoordinator';
+} from '../../../../src/features/chat/runtime/background/BackgroundTaskIndicatorCoordinator';
 
 function createConversation(): Conversation {
   return {

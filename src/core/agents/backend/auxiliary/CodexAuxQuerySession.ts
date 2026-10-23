@@ -37,9 +37,9 @@ import type {
   BackendModelSelection,
 } from '../AgentAuxQueryCapability';
 import { AUX_DENIED_CAPABILITIES } from '../AgentAuxQueryCapability';
-import { CodexAppServerClient } from '../CodexAppServerClient';
-import type { AppServerTurnStartOptions } from '../CodexAppServerClientTypes';
-import { type AppServerStreamState,mapAppServerNotification } from '../CodexAppServerStreamMapper';
+import { CodexAppServerClient } from '../codex/CodexAppServerClient';
+import type { AppServerTurnStartOptions } from '../codex/CodexAppServerClientTypes';
+import { type AppServerStreamState,mapAppServerNotification } from '../codex/CodexAppServerStreamMapper';
 
 const logger = createLogger('CodexAuxQuerySession');
 

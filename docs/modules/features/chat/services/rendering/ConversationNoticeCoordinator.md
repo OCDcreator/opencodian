@@ -1,0 +1,122 @@
+# ConversationNoticeCoordinator
+
+> **源码**: `src/features/chat/services/rendering/ConversationNoticeCoordinator.ts`
+> **状态**: [REVIEW]
+
+## 概述
+
+`ConversationNoticeCoordinator` 把 `OpenCodianView` 里与 conversation notice 相关的编排收束起来：空对话 notice、stream error notice、turn diff notice，以及 notice action 路由。
+
+它不负责 notice 的持久化保存，也不负责 notice card 的渲染；这些仍分别交给 `PersistentAssistantNoticeService` 和 `AssistantNoticeCardRenderer`。
+
+## 导入关系
+
+```text
+上游: OpenCodianView
+下游: PersistentAssistantNoticeService, AssistantNoticeRenderer, AssistantNoticeCardRenderer
+```
+
+## 核心类型 / 接口
+
+```typescript
+export interface ConversationNoticeCoordinatorHost {
+  getCurrentSessionModel(): ModelSelectorSelection | null;
+  formatModelId(model: ModelSelectorSelection | null | undefined): string | undefined;
+  isConversationRewound(): boolean;
+  getActiveTabId(): TabId | null;
+  getSessionDiff(sessionId: string, sourceMessageId: string): Promise<SessionDiffEntry[]>;
+  getCachedSessionDiffEntries(sessionId: string): SessionDiffEntry[];
+  appendPersistentNotice(options: PersistentAssistantNoticeMessageOptions): Promise<void>;
+  refreshSessionChangeSidebar(): void;
+  renderBackgroundTaskIndicatorIfNeeded(tabId: TabId | null): Promise<void>;
+  handleRestoreRewindRequest(): Promise<void>;
+  openPluginSettingsPreservingScroll(): void;
+  hasAnyEnabledBackend(): boolean;
+  hasBackendConnection(): boolean;
+}
+
+export class ConversationNoticeCoordinator {
+  getFriendlyStreamErrorMessage(rawMessage: string, backend?: AgentBackendKind): string;
+  createStreamErrorNotice(message: string): ChatMessage;
+  shouldRenderEmptyConversationNotice(): boolean;
+  createEmptyConversationNotice(): ChatMessage;
+  appendTurnDiffNoticeIfNeeded(...): Promise<void>;
+  formatDiffNoticeMarkdown(entries: SessionDiffEntry[]): string;
+  routeNoticeAction(actionType: ...): Promise<void>;
+}
+```
+
+## 核心逻辑
+
+### 空对话与 rewind notice
+
+- `shouldRenderEmptyConversationNotice()` 只读 host 的 rewind 状态
+- `createEmptyConversationNotice()` 现在会先区分四类 chat surface 空状态：
+  - rewind：保留原有 rewind warning notice
+  - 没有任何 enabled backend：返回 warning notice，引导用户去启用 backend，而不是继续显示“输入消息开始对话”
+  - backend 已启用但当前不可连接：返回 warning notice，并从全局插件设置读取当前 backend display name，使用 `chat.empty.backendOffline.titleWithBackend` / `descriptionWithBackend` 在文案中点出 backend 名称，引导用户检查对应 backend / server 设置
+  - 只有在 backend 可用时才回落到普通 empty-state
+
+### stream error notice
+
+- `createStreamErrorNotice()` 复用 `AssistantNoticeRenderer.buildStreamErrorNotice()`，统一补上当前模型 id
+- `getFriendlyStreamErrorMessage()` 把原始流错误字符串映射为用户友好文案：网络错误 → server connection，opencode not found → binary missing，空消息 → backend-aware no response，其余 → send failed + 原文
+- 2026-09-19（R-B2 发送路径对齐）：新增 `file not found` 分支——后端读取器抛出的“文件不存在”错误一律改写为「发送消息失败 + `chat.context.notice.groupMissing`」词汇，只露出从原始错误中提取的文件名（vault 相对名），绝不把原始异常文本或绝对机器路径送进聊天表面；无法解析路径时仍如实报告有条目被跳过。原始错误保留在日志/trace
+- 空消息在 OpenCode 保留既有 server-no-response 指引；Claude Code 改为“未返回可显示内容”，避免用户被错误引导到 OpenCode 服务设置
+
+### OpenCode 2 turn changes
+
+- OpenCode 2 queries native `session.diff(from: sourceMessageId)` at turn completion even when no write-tool file hint was emitted. A non-empty native result becomes the immutable Turn Change Record; the current Session Change Sidebar is then refreshed from a separate full-session native read.
+- An empty native turn diff produces no card and still refreshes the sidebar. OpenCode 1 retains its existing file-hint gate and cached-diff fallback.
+- In a non-Git OpenCode 2 vault, a successful write-tool file hint may create a limited immutable record with `statsUnavailable`; it never asserts status or line counts. A completed background child gets a separate record anchored to the originating user turn and child session ID, leaving the foreground record unchanged.
+- Claude Code backend 的 SDK/stream 错误保留 Claude Code 标签，不再被映射成 OpenCode server connection failure，避免用户在 Claude 后端失败时被引导去排查 OpenCode 本地服务。
+
+### turn diff notice
+
+- `appendTurnDiffNoticeIfNeeded()` 先查当前 session 的 live diff，再回退 cached diff，最后回退 edited file 列表
+- 生成的 notice 使用窄类型、冻结的 `TurnDiffNoticeMeta`：`sourceMessageId` 只存在于 `noticeMeta`，文件 entries 是只读本地快照，不写入 `ChatMessage.sourceMessageId`，因此不会污染 canonical user/assistant message identity
+- 同一用户 source anchor 已有 turn diff notice 时直接去重；generic client-only notice 不会因为此规则而扩大保留范围
+- `appendPersistentNotice()` 成功完成后才调用中性的 `refreshSessionChangeSidebar()` host seam，使刚持久化的 Turn Change Record 立即更新 Session Change Sidebar；所有 early return 与持久化失败路径都不刷新
+- **OpenCode-only diff gate**: `backend !== 'opencode'` 时直接返回。`getSessionDiff` 与 `getCachedSessionDiffEntries` 是 OpenCode-specific API，暂无 backend-neutral 等价物。Claude 等 backend 的 diff surface 未稳定完成前不伪造 diff notice。
+- `formatDiffNoticeMarkdown()` 输出 vault 链接、diff stats 与 status
+- 只有 active tab 才会补发 background task indicator
+
+### notice action 路由
+
+- `routeNoticeAction()` 只处理 `open_model_settings` 与 `restore_rewind`
+- `open_model_settings` 通过 host 打开 settings 并保留滚动位置
+
+## 关键方法
+
+| 方法 / 导出 | 说明 |
+|-------------|------|
+| `getFriendlyStreamErrorMessage()` | 将原始流错误字符串映射为用户友好文案 |
+| `createStreamErrorNotice()` | 生成 stream error assistant notice |
+| `shouldRenderEmptyConversationNotice()` | 判断是否应显示 empty notice |
+| `createEmptyConversationNotice()` | 生成 normal / rewind / no-backend / backend-offline empty notice；backend-offline 会本地读取 active backend display name 并点出 backend 名称 |
+| `appendTurnDiffNoticeIfNeeded()` | 为编辑过的文件补发 turn diff notice |
+| `formatDiffNoticeMarkdown()` | 格式化 diff notice markdown |
+| `routeNoticeAction()` | 路由 notice action |
+
+## 与其他模块的交互
+
+- 依赖 `PersistentAssistantNoticeService` 完成 notice 持久化
+- 依赖 `OpenCodeService` 提供 session diff 与 cached diff
+- 依赖 `ChatSelectionControlsCoordinator` 提供模型 id 格式化
+- 依赖 `OpenCodianView` host seam 执行 rewind、settings、Session Change Sidebar refresh 和 background task indicator 后续动作
+
+## 注意事项
+
+- `open_model_settings` 的滚动恢复逻辑仍由 view host 负责
+- model-unavailable notice 仍归 `ChatSelectionControlsCoordinator`，不要迁移进这个 coordinator
+- `renderBackgroundTaskIndicatorIfNeeded()` 的 host seam 允许透传 `isCurrent` lease；notice 侧若在会话切换窗口调用该入口，不得丢掉 lease。
+
+### 2026-09-28 parity continuation
+
+Turn diff notices support OpenCode 2 session IDs and native diff readback while keeping the OpenCode 1 cache isolated.
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/features/chat/services/rendering/ConversationNoticeCoordinator.ts`。
+- 原位置：`src/features/chat/services/ConversationNoticeCoordinator.ts`；文件名、导出接口与业务职责保持不变。
+- 随目录调整更新的依赖：`src/features/chat/runtime/rendering/AssistantNoticeRenderer.ts`、`src/features/chat/services/send/PersistentAssistantNoticeService.ts`。

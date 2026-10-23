@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import { Scope } from 'obsidian';
 import * as path from 'path';
 
-import { enhanceSettingsDropdowns, enhanceSettingsSelect, isEnhanceableRealSelect } from '../../../../src/features/settings/SettingsDropdownControl';
+import { enhanceSettingsDropdowns, enhanceSettingsSelect, isEnhanceableRealSelect } from '../../../../src/features/settings/controls/SettingsDropdownControl';
 
 type ScopeBinding = { key: string | null; func: (event: KeyboardEvent) => false | void };
 

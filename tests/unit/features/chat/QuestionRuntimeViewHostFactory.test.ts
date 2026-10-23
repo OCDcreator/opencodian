@@ -2,19 +2,19 @@ import type {
   QuestionDisplayMode,
   QuestionRequest,
 } from '../../../../src/core/types';
-import { StreamingInlineCardRenderer } from '../../../../src/features/chat/runtime/StreamingInlineCardRenderer';
-import type { QuestionRuntimeState } from '../../../../src/features/chat/services/QuestionRuntimeHostAdapter';
+import { StreamingInlineCardRenderer } from '../../../../src/features/chat/runtime/rendering/StreamingInlineCardRenderer';
+import type { QuestionRuntimeState } from '../../../../src/features/chat/services/questions/QuestionRuntimeHostAdapter';
 import type {
   QuestionRuntimeQuestionApiPort,
   QuestionRuntimeSettingsPort,
   QuestionRuntimeTabAttentionPort,
-} from '../../../../src/features/chat/services/QuestionRuntimeViewHostAdapter';
+} from '../../../../src/features/chat/services/questions/QuestionRuntimeViewHostAdapter';
 import {
   createQuestionRuntimeBundle,
   createQuestionRuntimeViewHost,
   type QuestionRuntimeBundlePorts,
   type QuestionRuntimeViewHostFactoryHost,
-} from '../../../../src/features/chat/services/QuestionRuntimeViewHostFactory';
+} from '../../../../src/features/chat/services/questions/QuestionRuntimeViewHostFactory';
 import type { QuestionDockRenderState } from '../../../../src/features/chat/ui/QuestionDock';
 
 type Mocked<T> = {

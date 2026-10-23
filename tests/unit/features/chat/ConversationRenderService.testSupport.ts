@@ -1,5 +1,5 @@
-jest.mock('../../../../src/features/chat/services/ScrollManager', () => {
-  const actual = jest.requireActual('../../../../src/features/chat/services/ScrollManager');
+jest.mock('../../../../src/features/chat/services/rendering/ScrollManager', () => {
+  const actual = jest.requireActual('../../../../src/features/chat/services/rendering/ScrollManager');
   return {
     ...actual,
     captureElementScrollRestoreSnapshot: jest.fn(() => ({
@@ -26,11 +26,11 @@ import {
   type ConversationRenderHost,
   ConversationRenderService,
   getIncrementalRenderedMessageUpdate,
-} from '../../../../src/features/chat/services/ConversationRenderService';
+} from '../../../../src/features/chat/services/rendering/ConversationRenderService';
 import {
   captureElementScrollRestoreSnapshot,
   restoreElementScrollAfterRender,
-} from '../../../../src/features/chat/services/ScrollManager';
+} from '../../../../src/features/chat/services/rendering/ScrollManager';
 
 export {
   captureElementScrollRestoreSnapshot,

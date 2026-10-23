@@ -24,12 +24,12 @@ import {
   CLAUDE_CODE_EFFORT_VARIANTS,
   CLAUDE_CODE_PROVIDER_ID,
   CODEX_EFFORT_VARIANTS,
-} from '../../core/agents/backend/ClaudeCodeModelCatalog';
+} from '../../core/agents/backend/claude/ClaudeCodeModelCatalog';
 import {
   buildCodexApprovalQuestionRequest,
   mapCodexApprovalResolution,
-} from '../../core/agents/backend/CodexDefaultApprovalHost';
-import type { CodexElicitationCardRequest, CodexElicitationHostResponse } from '../../core/agents/backend/CodexElicitationBridge';
+} from '../../core/agents/backend/codex/CodexDefaultApprovalHost';
+import type { CodexElicitationCardRequest, CodexElicitationHostResponse } from '../../core/agents/backend/codex/CodexElicitationBridge';
 import {
   type ResolvedModelSelection,
 } from '../../core/config/modelConfig';
@@ -73,264 +73,264 @@ import { applyMcpAuthOutcomeToContainer, applyMcpRetryOutcome, getMcpServerName 
 import {
   CodexMcpServerDetailModal,
   createCodexMcpServerDetailHost,
-} from '../settings/CodexMcpServerDetailModal';
+} from '../settings/backends/codex/CodexMcpServerDetailModal';
 import type { ChatPluginPort } from './ChatPluginPort';
-import {
-  type FocusContextPreview,
-} from './composerContext';
 import { disposeCollapsiblesWithin } from './rendering/collapsible';
 import {
-  type AssistantNoticeCardRenderer,
-  type AssistantNoticeCardRendererHost,
-} from './runtime/AssistantNoticeCardRenderer';
+  type FocusContextPreview,
+} from './rendering/composerContext';
 import {
-  AssistantShellViewHostAdapter,
-  type AssistantShellViewHostAdapterHost,
-} from './runtime/AssistantShellViewHostAdapter';
+  TabConversationActivationBridge,
+} from './runtime/activation/TabConversationActivationBridge';
+import {
+  TabConversationStateBridge,
+} from './runtime/activation/TabConversationStateBridge';
+import {
+  TabRuntimeStateBridge,
+} from './runtime/activation/TabRuntimeStateBridge';
+import {
+  TabViewActivationBridge,
+} from './runtime/activation/TabViewActivationBridge';
 import {
   BackgroundTaskIndicatorCoordinator,
   type BackgroundTaskIndicatorCoordinatorHost,
-} from './runtime/BackgroundTaskIndicatorCoordinator';
+} from './runtime/background/BackgroundTaskIndicatorCoordinator';
 import {
   BackgroundTaskInlinePanelRenderer,
   type BackgroundTaskInlinePanelRendererHost,
-} from './runtime/BackgroundTaskInlinePanelRenderer';
+} from './runtime/background/BackgroundTaskInlinePanelRenderer';
 import {
   BackgroundTaskStreamTriggerCoordinator,
-} from './runtime/BackgroundTaskStreamTriggerCoordinator';
+} from './runtime/background/BackgroundTaskStreamTriggerCoordinator';
 import { ChatRuntimeComposition } from './runtime/ChatRuntimeComposition';
 import {
+  type AssistantNoticeCardRenderer,
+  type AssistantNoticeCardRendererHost,
+} from './runtime/rendering/AssistantNoticeCardRenderer';
+import {
+  AssistantShellViewHostAdapter,
+  type AssistantShellViewHostAdapterHost,
+} from './runtime/rendering/AssistantShellViewHostAdapter';
+import {
   PermissionInlineCardRenderer,
-} from './runtime/PermissionInlineCardRenderer';
-import {
-  summarizeChatMessageForDebug,
-} from './runtime/SendPipelineDebugSummaries';
-import {
-  type SendPipelineRuntime,
-} from './runtime/SendPipelineRuntime';
+} from './runtime/rendering/PermissionInlineCardRenderer';
 import {
   StreamingInlineCardRenderer,
   type StreamingInlineCardRendererHost,
-} from './runtime/StreamingInlineCardRenderer';
-import {
-  TabConversationActivationBridge,
-} from './runtime/TabConversationActivationBridge';
-import {
-  TabConversationStateBridge,
-} from './runtime/TabConversationStateBridge';
-import {
-  TabRuntimeStateBridge,
-} from './runtime/TabRuntimeStateBridge';
-import {
-  TabViewActivationBridge,
-} from './runtime/TabViewActivationBridge';
+} from './runtime/rendering/StreamingInlineCardRenderer';
 import {
   UserMessageContentRenderer,
   type UserMessageContentRendererHost,
-} from './runtime/UserMessageContentRenderer';
+} from './runtime/rendering/UserMessageContentRenderer';
 import {
   UserMessageFooterRenderer,
   type UserMessageFooterRendererHost,
-} from './runtime/UserMessageFooterRenderer';
+} from './runtime/rendering/UserMessageFooterRenderer';
 import {
-  ActiveTabContextUsageCoordinator,
-  type ActiveTabContextUsageCoordinatorHost,
-  type ForegroundCompactionActionOptions,
-  type ForegroundCompactionActionResult,
-  type ForegroundCompactionAvailability,
-} from './services/ActiveTabContextUsageCoordinator';
+  summarizeChatMessageForDebug,
+} from './runtime/send/SendPipelineDebugSummaries';
+import {
+  type SendPipelineRuntime,
+} from './runtime/send/SendPipelineRuntime';
 import {
   type BackgroundTaskCompletionInfo,
   BackgroundTaskCompletionNoticeService,
   type BackgroundTaskCompletionNoticeServiceHost,
-} from './services/BackgroundTaskCompletionNoticeService';
+} from './services/background/BackgroundTaskCompletionNoticeService';
 import {
   BackgroundTaskLiveSignalCoordinator,
   type BackgroundTaskLiveSignalCoordinatorHostBuilderHost,
-} from './services/BackgroundTaskLiveSignalCoordinator';
+} from './services/background/BackgroundTaskLiveSignalCoordinator';
 import {
   BackgroundTaskNoticeStateService,
   type BackgroundTaskNoticeStateServiceHost,
-} from './services/BackgroundTaskNoticeStateService';
+} from './services/background/BackgroundTaskNoticeStateService';
 import {
   type BackgroundTaskLaunchInfo,
   type BackgroundTaskSegment,
   BackgroundTaskTimelineService,
   type BackgroundTaskTimelineServiceHost,
   type BackgroundTaskViewHost,
-} from './services/BackgroundTaskTimelineService';
-import {
-  ChatDiagnosticsCoordinator,
-  type ChatDiagnosticsCoordinatorFactory,
-  failClosedChatDiagnosticsCoordinatorFactory,
-} from './services/ChatDiagnosticsCoordinator';
-import {
-  type ChatHeaderPresenter,
-  type ChatHeaderPresenterHost,
-  type ChatServerAvailability,
-} from './services/ChatHeaderPresenter';
-import {
-  ChatSelectionControlsCoordinator,
-  type ChatSelectionControlsCoordinatorHost,
-} from './services/ChatSelectionControlsCoordinator';
-import {
-  ChatSurfaceAppearanceCoordinator,
-  type ChatSurfaceAppearanceCoordinatorHost,
-} from './services/ChatSurfaceAppearanceCoordinator';
-import { ChatVimNavigationCoordinator } from './services/ChatVimNavigationCoordinator';
-import {
-  ChatVisualDemoCoordinator,
-} from './services/ChatVisualDemoCoordinator';
-import {
-  ChildSessionGraphCoordinator,
-  type ChildSessionGraphCoordinatorHost,
-} from './services/ChildSessionGraphCoordinator';
-import { CodexChatSurfaceBinding } from './services/CodexChatSurfaceBinding';
+} from './services/background/BackgroundTaskTimelineService';
+import { SlashCommandMenuCatalogCache } from './services/commands/SlashCommandMenuCatalogCache';
 import {
   ComposerContextViewFacade,
   type ComposerContextViewHost,
   type FocusContextPreviewWritebackHost,
   type FocusContextRuntimeViewHost,
-} from './services/ComposerContextViewFacade';
+} from './services/composer/ComposerContextViewFacade';
 import {
   ComposerInputShellCoordinator,
   type ComposerInputShellCoordinatorHost,
-} from './services/ComposerInputShellCoordinator';
-import { mergePiNativeConversationMessages } from './services/ConversationAuthoritativeMessageMergeCoordinator';
+} from './services/composer/ComposerInputShellCoordinator';
 import {
-  type ConversationAuthoritativeSyncCoordinator,
-  type ConversationAuthoritativeSyncHost,
-} from './services/ConversationAuthoritativeSyncCoordinator';
+  ActiveTabContextUsageCoordinator,
+  type ActiveTabContextUsageCoordinatorHost,
+  type ForegroundCompactionActionOptions,
+  type ForegroundCompactionActionResult,
+  type ForegroundCompactionAvailability,
+} from './services/context/ActiveTabContextUsageCoordinator';
+import { buildPendingUrlContextItem } from './services/context/UrlContextFetchService';
+import { VaultRetrievalComposerCoordinator } from './services/context/VaultRetrievalComposerCoordinator';
+import {
+  buildWebViewerContextItem,
+  getActiveWebViewerTabContext,
+} from './services/context/WebViewerContextService';
+import {
+  ChildSessionGraphCoordinator,
+  type ChildSessionGraphCoordinatorHost,
+} from './services/conversation/ChildSessionGraphCoordinator';
 import {
   ConversationHistoryActionsCoordinator,
   type ConversationHistoryActionsHost,
-} from './services/ConversationHistoryActionsCoordinator';
-import {
-  type ConversationHydrationRuntimeBridges,
-  type ConversationHydrationRuntimeViewHost,
-} from './services/ConversationHydrationRuntimeViewHostFactory';
-import type { ConversationIdentityRuntime } from './services/ConversationIdentityRuntime';
+} from './services/conversation/ConversationHistoryActionsCoordinator';
+import type { ConversationIdentityRuntime } from './services/conversation/ConversationIdentityRuntime';
 import {
   ConversationLoadRecoveryCoordinator,
-} from './services/ConversationLoadRecoveryCoordinator';
-import {
-  ConversationNoticeCoordinator,
-  type ConversationNoticeCoordinatorHost,
-} from './services/ConversationNoticeCoordinator';
-import {
-  hasInterruptedLocalAssistantTail,
-} from './services/ConversationRenderRuntime';
-import {
-  ConversationRenderService,
-  type ConversationUserMessageRenderFrame,
-} from './services/ConversationRenderService';
-import { ConversationSessionRailCoordinator } from './services/ConversationSessionRailCoordinator';
+} from './services/conversation/ConversationLoadRecoveryCoordinator';
+import { ConversationSessionRailCoordinator } from './services/conversation/ConversationSessionRailCoordinator';
 import {
   ConversationSessionSettingsCoordinator,
   type ConversationSessionSettingsCoordinatorHost,
-} from './services/ConversationSessionSettingsCoordinator';
+} from './services/conversation/ConversationSessionSettingsCoordinator';
 import {
   ConversationSessionSignalRuntime,
   type ConversationSessionSignalRuntimeHost,
-} from './services/ConversationSessionSignalRuntime';
-import {
-  ConversationSyncBridge,
-  type ConversationSyncBridgePorts,
-} from './services/ConversationSyncBridge';
-import {
-  type ConversationSyncRuntimeAssemblyViewHost,
-} from './services/ConversationSyncHostAdapter';
-import {
-  ConversationSyncOrchestrationService,
-} from './services/ConversationSyncOrchestrationService';
-import {
-  ConversationSyncRuntimeCoordinator,
-} from './services/ConversationSyncRuntimeCoordinator';
+} from './services/conversation/ConversationSessionSignalRuntime';
 import {
   type ConversationTabLifecycleRecoveryHost,
-} from './services/ConversationTabLifecycleRecoveryCoordinator';
+} from './services/conversation/ConversationTabLifecycleRecoveryCoordinator';
 import {
   ConversationTabOpenCoordinator,
   type ConversationTabOpenHost,
-} from './services/ConversationTabOpenCoordinator';
+} from './services/conversation/ConversationTabOpenCoordinator';
 import {
   type ConversationTabRuntimeCoordinator,
   type ConversationTabRuntimeState,
   type TabBarMutableState,
-} from './services/ConversationTabRuntimeCoordinator';
+} from './services/conversation/ConversationTabRuntimeCoordinator';
 import {
   type ConversationViewStateHost,
-} from './services/ConversationViewStateService';
+} from './services/conversation/ConversationViewStateService';
 import {
   ConversationWriteSerializationService,
   type ConversationWriteTicket,
-} from './services/ConversationWriteSerializationService';
-import {
-  InputPanelAppearanceCoordinator,
-  type InputPanelAppearanceCoordinatorHost,
-} from './services/InputPanelAppearanceCoordinator';
-import {
-  MessageFinalizationService,
-} from './services/MessageFinalizationService';
-import {
-  type ComposerInputSubmission,
-  MessageSendPreparationService,
-  type SendMessageModelOptions,
-} from './services/MessageSendPreparationService';
-import { ModifiedFilesSidebarCoordinator } from './services/ModifiedFilesSidebarCoordinator';
-import {
-  PersistentAssistantNoticeService,
-  type PersistentAssistantNoticeServiceHost,
-} from './services/PersistentAssistantNoticeService';
-import { releasePiUiView, syncPiUiView } from './services/PiExtensionUiHost';
-import { savePiConversationSelection } from './services/PiModelSelectionBinding';
-import type { QuestionDockSlotCoordinator } from './services/QuestionDockSlotCoordinator';
-import type { QuestionRuntimeServices } from './services/QuestionRuntimeHostAdapter';
-import type { QuestionRuntimeQuestionApiPort } from './services/QuestionRuntimeViewHostAdapter';
-import {
-  type QuestionRuntimeViewHostFactoryHost,
-} from './services/QuestionRuntimeViewHostFactory';
-import {
-  type TabConversationSyncFingerprintRuntimePort,
-} from './services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
-import { QueuedFollowUpBarCoordinator } from './services/QueuedFollowUpBarCoordinator';
-import {
-  ensureComposerOverlayScrollReserve,
-  SettledScrollScheduler,
-} from './services/ScrollManager';
-import {
-  type SessionTodoCoordinator,
-  type SessionTodoViewHost,
-} from './services/SessionTodoHostAdapter';
-import { SlashCommandMenuCatalogCache } from './services/SlashCommandMenuCatalogCache';
+} from './services/conversation/ConversationWriteSerializationService';
+import { ModifiedFilesSidebarCoordinator } from './services/conversation/ModifiedFilesSidebarCoordinator';
 import {
   type TabActivationRuntimeHostProviderHost,
-} from './services/TabActivationRuntimeHostProvider';
+} from './services/conversation/TabActivationRuntimeHostProvider';
 import {
   type TabActivationConversationSyncRuntimePort,
-} from './services/TabActivationRuntimeViewHostFactory';
+} from './services/conversation/TabActivationRuntimeViewHostFactory';
 import {
   TabMessagesPaneCoordinator,
   type TabMessagesPaneCoordinatorHost,
   type TabMessagesPaneState,
-} from './services/TabMessagesPaneCoordinator';
+} from './services/conversation/TabMessagesPaneCoordinator';
 import {
   createInitialTabSessionLifecycleState,
-} from './services/TabSessionPhase';
-import type { TitleGenerationService } from './services/TitleGenerationService';
+} from './services/conversation/TabSessionPhase';
+import { recoverEmptyZCodeConversationSession } from './services/conversation/ZCodeEmptySessionRecovery';
+import {
+  ChatVisualDemoCoordinator,
+} from './services/demos/ChatVisualDemoCoordinator';
+import {
+  ChatDiagnosticsCoordinator,
+  type ChatDiagnosticsCoordinatorFactory,
+  failClosedChatDiagnosticsCoordinatorFactory,
+} from './services/diagnostics/ChatDiagnosticsCoordinator';
+import { CodexChatSurfaceBinding } from './services/integrations/CodexChatSurfaceBinding';
+import { releasePiUiView, syncPiUiView } from './services/integrations/PiExtensionUiHost';
+import type { QuestionDockSlotCoordinator } from './services/questions/QuestionDockSlotCoordinator';
+import type { QuestionRuntimeServices } from './services/questions/QuestionRuntimeHostAdapter';
+import type { QuestionRuntimeQuestionApiPort } from './services/questions/QuestionRuntimeViewHostAdapter';
+import {
+  type QuestionRuntimeViewHostFactoryHost,
+} from './services/questions/QuestionRuntimeViewHostFactory';
+import {
+  type TabConversationSyncFingerprintRuntimePort,
+} from './services/questions/QuestionTodoBackgroundTaskRuntimeServiceBundle';
+import {
+  type SessionTodoCoordinator,
+  type SessionTodoViewHost,
+} from './services/questions/SessionTodoHostAdapter';
+import {
+  ConversationNoticeCoordinator,
+  type ConversationNoticeCoordinatorHost,
+} from './services/rendering/ConversationNoticeCoordinator';
+import {
+  hasInterruptedLocalAssistantTail,
+} from './services/rendering/ConversationRenderRuntime';
+import {
+  ConversationRenderService,
+  type ConversationUserMessageRenderFrame,
+} from './services/rendering/ConversationRenderService';
+import {
+  ensureComposerOverlayScrollReserve,
+  SettledScrollScheduler,
+} from './services/rendering/ScrollManager';
+import {
+  ChatSelectionControlsCoordinator,
+  type ChatSelectionControlsCoordinatorHost,
+} from './services/selection/ChatSelectionControlsCoordinator';
+import { savePiConversationSelection } from './services/selection/PiModelSelectionBinding';
+import { saveZCodeConversationSelection } from './services/selection/ZCodeModelSelectionBinding';
+import {
+  MessageFinalizationService,
+} from './services/send/MessageFinalizationService';
+import {
+  type ComposerInputSubmission,
+  MessageSendPreparationService,
+  type SendMessageModelOptions,
+} from './services/send/MessageSendPreparationService';
+import {
+  PersistentAssistantNoticeService,
+  type PersistentAssistantNoticeServiceHost,
+} from './services/send/PersistentAssistantNoticeService';
+import { QueuedFollowUpBarCoordinator } from './services/send/QueuedFollowUpBarCoordinator';
+import {
+  type ChatHeaderPresenter,
+  type ChatHeaderPresenterHost,
+  type ChatServerAvailability,
+} from './services/surface/ChatHeaderPresenter';
+import {
+  ChatSurfaceAppearanceCoordinator,
+  type ChatSurfaceAppearanceCoordinatorHost,
+} from './services/surface/ChatSurfaceAppearanceCoordinator';
+import { ChatVimNavigationCoordinator } from './services/surface/ChatVimNavigationCoordinator';
+import {
+  InputPanelAppearanceCoordinator,
+  type InputPanelAppearanceCoordinatorHost,
+} from './services/surface/InputPanelAppearanceCoordinator';
+import { mergePiNativeConversationMessages } from './services/sync/ConversationAuthoritativeMessageMergeCoordinator';
+import {
+  type ConversationAuthoritativeSyncCoordinator,
+  type ConversationAuthoritativeSyncHost,
+} from './services/sync/ConversationAuthoritativeSyncCoordinator';
+import {
+  type ConversationHydrationRuntimeBridges,
+  type ConversationHydrationRuntimeViewHost,
+} from './services/sync/ConversationHydrationRuntimeViewHostFactory';
+import {
+  ConversationSyncBridge,
+  type ConversationSyncBridgePorts,
+} from './services/sync/ConversationSyncBridge';
+import {
+  type ConversationSyncRuntimeAssemblyViewHost,
+} from './services/sync/ConversationSyncHostAdapter';
+import {
+  ConversationSyncOrchestrationService,
+} from './services/sync/ConversationSyncOrchestrationService';
+import {
+  ConversationSyncRuntimeCoordinator,
+} from './services/sync/ConversationSyncRuntimeCoordinator';
 import {
   createDebugLogCallbacks,
   logAssistantFinalizationDebug,
   previewLogText,
-} from './services/trailingAssistantPatchDebug';
-import { buildPendingUrlContextItem } from './services/UrlContextFetchService';
-import { VaultRetrievalComposerCoordinator } from './services/VaultRetrievalComposerCoordinator';
-import {
-  buildWebViewerContextItem,
-  getActiveWebViewerTabContext,
-} from './services/WebViewerContextService';
-import { recoverEmptyZCodeConversationSession } from './services/ZCodeEmptySessionRecovery';
-import { saveZCodeConversationSelection } from './services/ZCodeModelSelectionBinding';
+} from './services/sync/trailingAssistantPatchDebug';
+import type { TitleGenerationService } from './services/title/TitleGenerationService';
 import type { TabBar, TabId, TabManager } from './tabs';
 import { type BackendSessionBrowserHost,BackendSessionBrowserModal } from './ui/BackendSessionBrowserModal';
 import { ContextDetailModal } from './ui/ContextDetailModal';
@@ -587,7 +587,7 @@ export class OpenCodianView extends ItemView {
    * TabRuntimeViewSource by shape; exposing it explicitly keeps the composition owner from
    * receiving the full view (no god-object leak).
    */
-  private get tabRuntimeViewSource(): import('./services/ConversationTabRuntimeCoordinator').TabRuntimeViewSource {
+  private get tabRuntimeViewSource(): import('./services/conversation/ConversationTabRuntimeCoordinator').TabRuntimeViewSource {
     return this;
   }
 
@@ -1186,7 +1186,7 @@ export class OpenCodianView extends ItemView {
 
   private handleComposerInputSubmission(
     submission: ComposerInputSubmission,
-    onPreparationOutcome?: (outcome: import('./services/MessageSendPreparationService').MessageSendPreparationOutcome) => void,
+    onPreparationOutcome?: (outcome: import('./services/send/MessageSendPreparationService').MessageSendPreparationOutcome) => void,
   ): Promise<void> | void {
     if (submission.kind === 'shell') {
       logger.warn('Ignoring shell composer submission because the stable shell runtime is not enabled in this view', {
@@ -4780,7 +4780,7 @@ export class OpenCodianView extends ItemView {
     const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
       getMcpServerStatus?: () => Promise<unknown[] | null>;
       reloadMcpServers?: () => Promise<boolean>;
-      triggerMcpServerOAuth?: (name: string, options?: { scopes?: string[]; timeoutSecs?: number; onAuthorizationUrl?: (url: string) => void }) => Promise<import('../../core/agents/backend/CodexAppServerClient').McpOauthLoginResult | null>;
+      triggerMcpServerOAuth?: (name: string, options?: { scopes?: string[]; timeoutSecs?: number; onAuthorizationUrl?: (url: string) => void }) => Promise<import('../../core/agents/backend/codex/CodexAppServerClient').McpOauthLoginResult | null>;
       readMcpServerResource?: (server: string, uri: string) => Promise<unknown>;
     } | null;
     if (!adapter) {
@@ -4798,7 +4798,7 @@ export class OpenCodianView extends ItemView {
       return;
     }
     const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
-      triggerMcpServerOAuth?: (name: string, options?: { scopes?: string[]; timeoutSecs?: number; onAuthorizationUrl?: (url: string) => void }) => Promise<import('../../core/agents/backend/CodexAppServerClient').McpOauthLoginResult | null>;
+      triggerMcpServerOAuth?: (name: string, options?: { scopes?: string[]; timeoutSecs?: number; onAuthorizationUrl?: (url: string) => void }) => Promise<import('../../core/agents/backend/codex/CodexAppServerClient').McpOauthLoginResult | null>;
     } | null;
     if (!adapter?.triggerMcpServerOAuth) {
       return;
@@ -4849,7 +4849,7 @@ export class OpenCodianView extends ItemView {
         server: string,
         tool: string,
         toolArguments: Record<string, unknown>,
-      ) => Promise<import('../../core/agents/backend/CodexAppServerClient').AppServerMcpToolCallResult | null>;
+      ) => Promise<import('../../core/agents/backend/codex/CodexAppServerClient').AppServerMcpToolCallResult | null>;
     } | null;
     if (!adapter?.retryMcpToolCall) {
       applyMcpRetryOutcome(this.contentEl, toolCall.id, {

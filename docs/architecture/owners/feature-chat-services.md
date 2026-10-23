@@ -38,10 +38,10 @@ Pricing readiness (2026-09-10): the context usage coordinator fills unavailable 
 > Cross-owner access is read-only snapshot/command/event. Do not replicate this state as a second writable truth source.
 
 ## Entrypoints
-- `src/features/chat/services/ScrollManager.ts`
-- `src/features/chat/services/ContextUsageService.ts`
-- `src/features/chat/services/SlashCommandMenuCatalogCache.ts`
-- `src/features/chat/services/TitleGenerationService.ts`
+- `src/features/chat/services/rendering/ScrollManager.ts`
+- `src/features/chat/services/context/ContextUsageService.ts`
+- `src/features/chat/services/commands/SlashCommandMenuCatalogCache.ts`
+- `src/features/chat/services/title/TitleGenerationService.ts`
 
 ## Dependency surface
 - **Allowed owner dependencies:** `shared.foundation`, `shared.diagnostics`, `core.types`, `core.prompts`
@@ -115,3 +115,9 @@ Claude SDK forks rewrite native UUIDs. Fresh Claude prefix clones discard parent
 ## 2026-10-23 DSH send preparation
 
 DSH 发送跳过 OpenCode 1 专属技能目录展开，保留通用上下文和显式 synthetic parts 的准备过程。DSH 原生提示构造与执行由 core.backend 负责，本 owner 不为其读取 OpenCode 的技能或模型目录。
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/features/chat/services/background`、`src/features/chat/services/commands`、`src/features/chat/services/composer`、`src/features/chat/services/context`、`src/features/chat/services/conversation`、`src/features/chat/services/integrations`、`src/features/chat/services/questions`、`src/features/chat/services/rendering`、`src/features/chat/services/selection`、`src/features/chat/services/send`、`src/features/chat/services/surface`、`src/features/chat/services/sync`、`src/features/chat/services/title`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

@@ -1,5 +1,5 @@
 import type { ChatMessage } from '../../../../src/core/types';
-import { cloneMessagesBeforeForkTarget } from '../../../../src/features/chat/forkMessages';
+import { cloneMessagesBeforeForkTarget } from '../../../../src/features/chat/rendering/forkMessages';
 
 function createMessage(
   overrides: Partial<ChatMessage> & Pick<ChatMessage, 'id' | 'role' | 'content' | 'timestamp'>,

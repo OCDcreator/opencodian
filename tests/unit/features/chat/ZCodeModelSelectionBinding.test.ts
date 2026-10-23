@@ -1,5 +1,5 @@
-import type { ModelSelectionRuntimeHost } from '../../../../src/features/chat/services/ModelSelectionRuntime';
-import { bindZCodeModelSelection } from '../../../../src/features/chat/services/ZCodeModelSelectionBinding';
+import type { ModelSelectionRuntimeHost } from '../../../../src/features/chat/services/selection/ModelSelectionRuntime';
+import { bindZCodeModelSelection } from '../../../../src/features/chat/services/selection/ZCodeModelSelectionBinding';
 
 describe('ZCode first native model selection', () => {
   it('uses session/create readback when a deferred session cannot yet be read', async () => {

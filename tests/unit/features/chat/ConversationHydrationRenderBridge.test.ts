@@ -2,8 +2,8 @@
 import {
   ConversationHydrationRenderBridge,
   type ConversationHydrationRenderBridgeHost,
-} from '../../../../src/features/chat/runtime/ConversationHydrationRenderBridge';
-import type { ScrollRuntimeState } from '../../../../src/features/chat/services/ScrollManager';
+} from '../../../../src/features/chat/runtime/activation/ConversationHydrationRenderBridge';
+import type { ScrollRuntimeState } from '../../../../src/features/chat/services/rendering/ScrollManager';
 
 /**
  * Faithful jsdom scroll-pane model: message rects are derived from the live

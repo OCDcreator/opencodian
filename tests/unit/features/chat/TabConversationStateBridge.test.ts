@@ -2,7 +2,7 @@ import type { Conversation } from '../../../../src/core/types';
 import {
   TabConversationStateBridge,
   type TabConversationStateBridgeHost,
-} from '../../../../src/features/chat/runtime/TabConversationStateBridge';
+} from '../../../../src/features/chat/runtime/activation/TabConversationStateBridge';
 
 function createConversation(id = 'conversation-1'): Conversation {
   return {

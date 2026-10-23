@@ -4,7 +4,7 @@ import {
   createEmptyTabContextState,
   getDefaultContextWindow,
 } from '../../../../src/core/types';
-import { ContextUsageService } from '../../../../src/features/chat/services/ContextUsageService';
+import { ContextUsageService } from '../../../../src/features/chat/services/context/ContextUsageService';
 
 describe('ContextUsageService identity and totals', () => {
   it('stores session metadata while syncing identity', () => {

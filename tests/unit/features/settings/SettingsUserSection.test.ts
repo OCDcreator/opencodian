@@ -1,7 +1,7 @@
 import { Setting } from 'obsidian';
 
-import { SettingsUserSection } from '../../../../src/features/settings/SettingsUserSection';
-import { TextareaSizeMemory } from '../../../../src/features/settings/TextareaSizeMemory';
+import { TextareaSizeMemory } from '../../../../src/features/settings/controls/TextareaSizeMemory';
+import { SettingsUserSection } from '../../../../src/features/settings/general/SettingsUserSection';
 import { setLocale, t } from '../../../../src/i18n';
 
 interface MockTextControl {

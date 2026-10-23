@@ -40,7 +40,7 @@ const IMAGEGEN_TS = 'src/features/chat/ui/ImageGenerationModal.ts';
 const INLINE_EDIT_CONFIRM_TS = 'src/features/inline-edit/InlineEditConfirmModal.ts';
 const CANVAS_REWRITE_TS = 'src/features/canvas-integration/CanvasRewriteModals.ts';
 const CANVAS_GENERATE_TS = 'src/features/canvas-integration/CanvasGenerationFlow.ts';
-const PDF_ANNOTATION_TS = 'src/features/chat/services/PdfAnnotationPreviewModal.ts';
+const PDF_ANNOTATION_TS = 'src/features/chat/services/integrations/PdfAnnotationPreviewModal.ts';
 
 /** Every plugin modal root class covered by the shared contrast contract. */
 const CONTRAST_MODAL_CLASSES = [

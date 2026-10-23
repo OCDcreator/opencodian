@@ -2,7 +2,7 @@ import type { ChatMessage } from '../../../../src/core/types';
 import {
   createTabActivationConversationSyncRuntimePort,
   type TabActivationConversationSyncRuntimePortHost,
-} from '../../../../src/features/chat/services/TabActivationRuntimeViewHostFactory';
+} from '../../../../src/features/chat/services/conversation/TabActivationRuntimeViewHostFactory';
 
 type Mocked<T> = {
   [Key in keyof T]:

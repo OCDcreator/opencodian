@@ -60,3 +60,9 @@ The new core.backend-pi owner isolates the external Pi process service. core.sto
 2026-10-02：Codex 本地遗忘的提交路径采用严格存储删除确认，文件不存在可幂等收敛，其他 I/O 失败向调用者传播；只有存储确认后才能清理本地 adapter identity、缓存与标签。兼容既有普通删除调用，正式回归覆盖真实 adapter.remove 的 EACCES 与缺失路径。
 
 2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `core.storage` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/core/storage`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

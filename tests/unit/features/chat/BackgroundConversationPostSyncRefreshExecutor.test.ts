@@ -1,17 +1,17 @@
 import type { Conversation } from '../../../../src/core/types';
-import {
-  BackgroundConversationPostSyncRefreshExecutor,
-  type BackgroundTaskPostSyncRefreshPort,
-} from '../../../../src/features/chat/services/BackgroundConversationPostSyncRefreshExecutor';
 import type {
   BackgroundTabConversationRefreshPlanOptions,
   PostSyncQuestionTodoRefreshPlanBuilder,
   SignalSyncedBackgroundConversationRefreshPlanOptions,
-} from '../../../../src/features/chat/services/PostSyncQuestionTodoRefreshPlanBuilder';
+} from '../../../../src/features/chat/services/questions/PostSyncQuestionTodoRefreshPlanBuilder';
 import type {
   PostSyncQuestionTodoStatusRefreshOptions,
   QuestionTodoStatusRefreshCoordinator,
-} from '../../../../src/features/chat/services/QuestionTodoStatusRefreshCoordinator';
+} from '../../../../src/features/chat/services/questions/QuestionTodoStatusRefreshCoordinator';
+import {
+  BackgroundConversationPostSyncRefreshExecutor,
+  type BackgroundTaskPostSyncRefreshPort,
+} from '../../../../src/features/chat/services/sync/BackgroundConversationPostSyncRefreshExecutor';
 
 type QuestionTodoStatusRefreshPort = Pick<
   QuestionTodoStatusRefreshCoordinator,

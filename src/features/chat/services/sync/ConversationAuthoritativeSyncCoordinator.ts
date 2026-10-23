@@ -1,0 +1,432 @@
+import type { OpenCodeService } from '../../../../core/opencode';
+import type {
+  ChatMessage,
+  Conversation,
+} from '../../../../core/types';
+import { getConversationBackendSessionId } from '../../../../core/types';
+import { createLogger } from '../../../../shared';
+import type { TabId } from '../../tabs';
+import type { ConversationWriteTicket } from '../conversation/ConversationWriteSerializationService';
+import type { AutoInternalLinkTurnRewriter } from '../rendering/AssistantAutoInternalLinkService';
+import { ConversationAuthoritativeMessageMergeCoordinator } from './ConversationAuthoritativeMessageMergeCoordinator';
+import { ConversationAuthoritativeReloadCoordinator } from './ConversationAuthoritativeReloadCoordinator';
+
+const logger = createLogger('OpenCodianView');
+
+type OpenCodeSessionMessages = Awaited<ReturnType<OpenCodeService['getSessionMessages']>>;
+type OpenCodeSessionMessage = OpenCodeSessionMessages[number];
+
+interface LatestServerUserMessageHydration {
+  hydratedMessage: ChatMessage;
+  rawServerUserText: string;
+}
+
+interface HydratedUserMessageMismatchContext {
+  sessionId: string;
+  optimisticMessageId: string;
+  rawServerUserText: string;
+}
+
+interface HydratedOptimisticUserMessageUpdate {
+  conversation: Conversation;
+  ticket: ConversationWriteTicket;
+  optimisticIndex: number;
+  optimisticMessage: ChatMessage;
+  mergedHydratedMessage: ChatMessage;
+  tabId: TabId | null;
+}
+
+export interface ConversationAuthoritativeSyncRuntime {
+  lastConversationSyncFingerprint: string | null;
+  lastInterruptedSyncPreservationLogFingerprint: string | null;
+}
+
+export interface ConversationAuthoritativeSyncRevertState {
+  messageID: string;
+  partID?: string;
+}
+
+export interface ConversationAuthoritativeSyncResult {
+  messages: ChatMessage[];
+  changed: boolean;
+  fingerprint: string;
+  revertState: ConversationAuthoritativeSyncRevertState | null;
+}
+
+export interface ConversationAuthoritativeSyncHost {
+  getVaultBasePath(): string | undefined;
+  getTabRuntimeState(tabId: TabId | null): ConversationAuthoritativeSyncRuntime | null;
+  getCurrentConversationId(): string | null;
+  getCurrentConversationRevertState(): ConversationAuthoritativeSyncRevertState | null;
+  getActiveTabId(): TabId | null;
+  getSessionMessages(sessionId: string): Promise<OpenCodeSessionMessages>;
+  getCanonicalSessionMessages(sessionId: string): OpenCodeSessionMessages | null;
+  getSessionRevertState(
+    sessionId: string,
+  ): Promise<ConversationAuthoritativeSyncRevertState | null>;
+  hydrateOpenCodeMessage(
+    info: OpenCodeSessionMessage['info'],
+    parts: OpenCodeSessionMessage['parts'],
+    vaultBasePath: string | undefined,
+  ): ChatMessage;
+  shouldRenderConversationMessage(message: ChatMessage): boolean;
+  getConversationSyncFingerprint(messages: ChatMessage[]): string;
+  getInterruptedSyncPreservationLogFingerprint(
+    conversation: Conversation,
+    messages: ChatMessage[],
+  ): string;
+  createConversationWriteTicket(conversationId: string): ConversationWriteTicket;
+  commitConversationWrite(
+    conversation: Conversation,
+    ticket: ConversationWriteTicket,
+    reason: string,
+    write: () => void | Promise<void>,
+  ): Promise<boolean>;
+  logOmoBackgroundTaskDiagnostics(
+    conversation: Conversation,
+    previousMessages: ChatMessage[],
+    nextMessages: ChatMessage[],
+  ): void;
+  markBackgroundTaskAuthoritativeSync(tabId: TabId | null, reason: string): void;
+  refreshContextUsageAfterActiveConversationSync(
+    conversation: Conversation,
+    tabId: TabId | null,
+  ): Promise<void>;
+  armBackgroundTaskIndicatorForUserMessage(message: ChatMessage, tabId: TabId | null): void;
+  updateHydratedUserMessageRuntimeAnchors(
+    conversation: Conversation,
+    optimisticMessage: ChatMessage,
+    mergedHydratedMessage: ChatMessage,
+    tabId: TabId | null,
+  ): void;
+  rerenderSingleUserMessage(previousMessageId: string, message: ChatMessage): Promise<void>;
+  renderBackgroundTaskIndicatorIfNeeded(
+    tabId?: TabId | null,
+    options?: { isCurrent?: () => boolean },
+  ): Promise<void>;
+  summarizeChatMessageForDebug(
+    message: ChatMessage | null | undefined,
+  ): Record<string, unknown> | null;
+  logAssistantFinalizationDebug(label: string, payload: unknown): void;
+  stringifyLogPayload(payload: unknown): string;
+  getLogPreview(text: string, maxLength?: number): string;
+}
+
+export class ConversationAuthoritativeSyncCoordinator {
+  private readonly messageMergeCoordinator: ConversationAuthoritativeMessageMergeCoordinator;
+  private readonly reloadCoordinator: ConversationAuthoritativeReloadCoordinator;
+
+  constructor(
+    private readonly host: ConversationAuthoritativeSyncHost,
+    /**
+     * R-B1 (chat): optional auto-internal-link turn rewriter. When present,
+     * every authoritative merge re-applies the pass to the text it adopts, so
+     * a client-side auto-link rewrite survives the resync instead of being
+     * silently replaced by raw server text. Absent ⇒ byte-identical merge.
+     */
+    private readonly autoInternalLinks?: AutoInternalLinkTurnRewriter,
+  ) {
+    this.messageMergeCoordinator = new ConversationAuthoritativeMessageMergeCoordinator(host);
+    this.reloadCoordinator = new ConversationAuthoritativeReloadCoordinator({
+      host,
+      mergeSyncedConversationMessages: (existingMessages, syncedMessages, verbose, backend) =>
+        this.mergeSyncedMessagesWithAutoInternalLinks(existingMessages, syncedMessages, verbose, backend),
+    });
+  }
+
+  /**
+   * Authoritative merge + R-B1 rewrite survival. The merge adopts server text
+   * for every matched message, which would drop the auto-link rewrite the
+   * stored conversation carries; re-applying the shared pass to the merged
+   * array (before any fingerprint is computed from it) keeps a single source
+   * of truth: server text + the deterministic link rule. Idempotent, so
+   * re-applying over already-linked text changes nothing.
+   */
+  private mergeSyncedMessagesWithAutoInternalLinks(
+    existingMessages: ChatMessage[],
+    syncedMessages: ChatMessage[],
+    verbose: boolean,
+    backend?: string,
+  ): ChatMessage[] {
+    const merged = this.messageMergeCoordinator.mergeSyncedConversationMessages(
+      existingMessages,
+      syncedMessages,
+      verbose,
+      backend,
+    );
+    this.autoInternalLinks?.applyToTurnMessages(merged);
+    return merged;
+  }
+
+  mergeClientOnlyMessageFields(
+    existingMessage: ChatMessage,
+    syncedMessage: ChatMessage,
+    verbose = true,
+    backend?: string,
+  ): ChatMessage {
+    return this.messageMergeCoordinator.mergeClientOnlyMessageFields(
+      existingMessage,
+      syncedMessage,
+      verbose,
+      backend,
+    );
+  }
+
+  async syncLatestUserMessageFromServer(
+    conversation: Conversation,
+    optimisticMessageId: string,
+    tabId: TabId | null,
+  ): Promise<void> {
+    // Authoritative server sync is OpenCode-specific: the message shape,
+    // hydration path, and canonical state all assume OpenCode semantics.
+    // Skip for other backends until a backend-neutral sync contract exists.
+    if (conversation.backend && conversation.backend !== 'opencode') {
+      return;
+    }
+    const sessionId = getConversationBackendSessionId(conversation);
+    if (!sessionId) {
+      return;
+    }
+
+    try {
+      const ticket = this.host.createConversationWriteTicket(conversation.id);
+      const hydration = await this.getLatestServerUserMessageHydration(sessionId);
+      if (!hydration) {
+        return;
+      }
+
+      this.logLatestServerUserMessageHydration(sessionId, optimisticMessageId, hydration);
+      const optimisticIndex = conversation.messages.findIndex(
+        (message) => message.id === optimisticMessageId,
+      );
+      if (optimisticIndex < 0) {
+        return;
+      }
+
+      const optimisticMessage = conversation.messages[optimisticIndex];
+      const hydratedMessage = hydration.hydratedMessage;
+      if (this.hasVisibleTextMismatchForHydratedUserMessage(
+        optimisticMessage,
+        hydratedMessage,
+        {
+          sessionId,
+          optimisticMessageId,
+          rawServerUserText: hydration.rawServerUserText,
+        },
+      )) {
+        return;
+      }
+
+      const mergedHydratedMessage = this.mergeClientOnlyMessageFields(
+        optimisticMessage,
+        hydratedMessage,
+      );
+      if (!this.hasHydratedOptimisticUserMessageChanged(
+        optimisticMessage,
+        mergedHydratedMessage,
+      )) {
+        this.logSkippedUnchangedHydratedUserMessage(
+          sessionId,
+          optimisticMessageId,
+          hydratedMessage,
+        );
+        return;
+      }
+
+      await this.applyHydratedOptimisticUserMessage({
+        conversation,
+        ticket,
+        optimisticIndex,
+        optimisticMessage,
+        mergedHydratedMessage,
+        tabId,
+      });
+      logger.debug(`Applied hydrated server user message to optimistic bubble: ${this.host.stringifyLogPayload({
+        sessionId,
+        optimisticMessageId,
+        sourceMessageId: mergedHydratedMessage.sourceMessageId ?? null,
+        omoDetected: Boolean(mergedHydratedMessage.omo),
+        omoKind: mergedHydratedMessage.omo?.kind ?? null,
+      })}`);
+    } catch (error) {
+      logger.debug('Failed to hydrate optimistic user message from server', error);
+    }
+  }
+
+  async syncConversationMessagesFromServer(
+    conversation: Conversation,
+    tabId: TabId | null,
+    reason = 'unspecified',
+    options?: { suppressVerboseLogs?: boolean },
+  ): Promise<ConversationAuthoritativeSyncResult> {
+    return this.reloadCoordinator.syncConversationMessagesFromServer(
+      conversation,
+      tabId,
+      reason,
+      options,
+    );
+  }
+
+  async syncConversationMessagesFromCanonicalState(
+    conversation: Conversation,
+    tabId: TabId | null,
+    reason = 'sync-event',
+    options?: { suppressVerboseLogs?: boolean },
+  ): Promise<ConversationAuthoritativeSyncResult | null> {
+    return this.reloadCoordinator.syncConversationMessagesFromCanonicalState(
+      conversation,
+      tabId,
+      reason,
+      options,
+    );
+  }
+
+  private async getLatestServerUserMessageHydration(
+    sessionId: string,
+  ): Promise<LatestServerUserMessageHydration | null> {
+    const serverMessages = await this.host.getSessionMessages(sessionId);
+    const latestServerUser = [...serverMessages].reverse().find((message) => message.info.role === 'user');
+    if (!latestServerUser) {
+      return null;
+    }
+
+    const hydratedMessage = this.host.hydrateOpenCodeMessage(
+      latestServerUser.info,
+      latestServerUser.parts,
+      this.host.getVaultBasePath(),
+    );
+    const rawServerUserText = latestServerUser.parts
+      .filter((part) => typeof part.text === 'string')
+      .map((part) => part.text as string)
+      .join('');
+
+    return { hydratedMessage, rawServerUserText };
+  }
+
+  private logLatestServerUserMessageHydration(
+    sessionId: string,
+    optimisticMessageId: string,
+    hydration: LatestServerUserMessageHydration,
+  ): void {
+    const { hydratedMessage, rawServerUserText } = hydration;
+    logger.debug(`Hydrated latest server user message: ${this.host.stringifyLogPayload({
+      sessionId,
+      optimisticMessageId,
+      sourceMessageId: hydratedMessage.sourceMessageId ?? null,
+      rawTextPreview: this.host.getLogPreview(rawServerUserText),
+      visibleTextPreview: this.host.getLogPreview(
+        this.getVisibleUserMessageText(hydratedMessage),
+      ),
+      omoDetected: Boolean(hydratedMessage.omo),
+      omoKind: hydratedMessage.omo?.kind ?? null,
+      omoModeTag: hydratedMessage.omo?.kind === 'user-injection'
+        ? hydratedMessage.omo.modeTag
+        : null,
+    })}`);
+  }
+
+  private hasVisibleTextMismatchForHydratedUserMessage(
+    optimisticMessage: ChatMessage,
+    hydratedMessage: ChatMessage,
+    context: HydratedUserMessageMismatchContext,
+  ): boolean {
+    const optimisticVisibleText = this.getVisibleUserMessageText(optimisticMessage).trim();
+    const hydratedVisibleText = this.getVisibleUserMessageText(hydratedMessage).trim();
+    if (!optimisticVisibleText || !hydratedVisibleText || optimisticVisibleText === hydratedVisibleText) {
+      return false;
+    }
+
+    logger.debug(`Skipped optimistic user message hydration due to visible text mismatch: ${this.host.stringifyLogPayload({
+      sessionId: context.sessionId,
+      optimisticMessageId: context.optimisticMessageId,
+      optimisticVisibleTextPreview: this.host.getLogPreview(optimisticVisibleText),
+      hydratedVisibleTextPreview: this.host.getLogPreview(hydratedVisibleText),
+      rawTextPreview: this.host.getLogPreview(context.rawServerUserText),
+      omoDetected: Boolean(hydratedMessage.omo),
+      omoKind: hydratedMessage.omo?.kind ?? null,
+    })}`);
+    return true;
+  }
+
+  private getVisibleUserMessageText(message: ChatMessage): string {
+    if (message.contentBlocks && message.contentBlocks.length > 0) {
+      const visibleText = message.contentBlocks
+        .filter((block) => block.type === 'text' && typeof block.text === 'string')
+        .map((block) => block.text as string)
+        .join('');
+      if (visibleText.trim()) {
+        return visibleText;
+      }
+    }
+
+    return message.content ?? '';
+  }
+
+  private hasHydratedOptimisticUserMessageChanged(
+    optimisticMessage: ChatMessage,
+    mergedHydratedMessage: ChatMessage,
+  ): boolean {
+    return optimisticMessage.sourceMessageId !== mergedHydratedMessage.sourceMessageId
+      || optimisticMessage.content !== mergedHydratedMessage.content
+      || JSON.stringify(optimisticMessage.omo ?? null)
+        !== JSON.stringify(mergedHydratedMessage.omo ?? null)
+      || JSON.stringify(optimisticMessage.contextAttachments ?? null)
+        !== JSON.stringify(mergedHydratedMessage.contextAttachments ?? null);
+  }
+
+  private logSkippedUnchangedHydratedUserMessage(
+    sessionId: string,
+    optimisticMessageId: string,
+    hydratedMessage: ChatMessage,
+  ): void {
+    logger.debug(`Skipped optimistic user message hydration because nothing changed: ${this.host.stringifyLogPayload({
+      sessionId,
+      optimisticMessageId,
+      sourceMessageId: hydratedMessage.sourceMessageId ?? null,
+      omoDetected: Boolean(hydratedMessage.omo),
+      omoKind: hydratedMessage.omo?.kind ?? null,
+    })}`);
+  }
+
+  private async applyHydratedOptimisticUserMessage(
+    update: HydratedOptimisticUserMessageUpdate,
+  ): Promise<void> {
+    const {
+      conversation,
+      ticket,
+      optimisticIndex,
+      optimisticMessage,
+      mergedHydratedMessage,
+      tabId,
+    } = update;
+    const writeApplied = await this.host.commitConversationWrite(
+      conversation,
+      ticket,
+      'latest-user-hydration',
+      () => {
+        conversation.messages.splice(optimisticIndex, 1, mergedHydratedMessage);
+      },
+    );
+    if (!writeApplied) {
+      return;
+    }
+
+    this.host.armBackgroundTaskIndicatorForUserMessage(mergedHydratedMessage, tabId);
+    this.host.updateHydratedUserMessageRuntimeAnchors(
+      conversation,
+      optimisticMessage,
+      mergedHydratedMessage,
+      tabId,
+    );
+
+    if (
+      this.host.getCurrentConversationId() !== conversation.id
+      || this.host.getActiveTabId() !== tabId
+    ) {
+      return;
+    }
+
+    await this.host.rerenderSingleUserMessage(optimisticMessage.id, mergedHydratedMessage);
+    await this.host.renderBackgroundTaskIndicatorIfNeeded(tabId);
+  }
+}

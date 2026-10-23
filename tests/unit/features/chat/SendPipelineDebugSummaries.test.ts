@@ -4,7 +4,7 @@ import {
   summarizeContentBlocksForDebug,
   summarizeCoreStreamChunkForDebug,
   summarizeRenderedStreamChunkForDebug,
-} from '../../../../src/features/chat/runtime/SendPipelineDebugSummaries';
+} from '../../../../src/features/chat/runtime/send/SendPipelineDebugSummaries';
 import type { StreamChunk as StreamingChunk } from '../../../../src/utils/streaming';
 
 describe('summarizeContentBlocksForDebug', () => {

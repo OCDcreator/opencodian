@@ -7,7 +7,7 @@ import type { AgentBackendKind } from '../../../../src/core/types/chat';
 import {
   BACKEND_OPTIONS,
   SettingsBackendSection,
-} from '../../../../src/features/settings/SettingsBackendSection';
+} from '../../../../src/features/settings/backends/opencode/SettingsBackendSection';
 import { setLocale } from '../../../../src/i18n';
 
 // ---------------------------------------------------------------------------

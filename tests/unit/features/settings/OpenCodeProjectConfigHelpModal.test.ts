@@ -1,6 +1,6 @@
 import type { App } from 'obsidian';
 
-import { OpenCodeProjectConfigHelpModal } from '../../../../src/features/settings/OpenCodeProjectConfigHelpModal';
+import { OpenCodeProjectConfigHelpModal } from '../../../../src/features/settings/backends/opencode/OpenCodeProjectConfigHelpModal';
 import { setLocale, t } from '../../../../src/i18n';
 
 describe('OpenCodeProjectConfigHelpModal', () => {

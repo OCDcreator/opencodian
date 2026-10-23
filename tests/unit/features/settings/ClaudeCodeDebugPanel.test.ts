@@ -380,7 +380,7 @@ describe('ClaudeCodeDebugPanel', () => {
       'utf8',
     );
     const sectionSource = fs.readFileSync(
-      path.resolve(__dirname, '../../../../src/features/settings/SettingsDebugSection.ts'),
+      path.resolve(__dirname, '../../../../src/features/settings/debug/SettingsDebugSection.ts'),
       'utf8',
     );
     const typesSource = fs.readFileSync(

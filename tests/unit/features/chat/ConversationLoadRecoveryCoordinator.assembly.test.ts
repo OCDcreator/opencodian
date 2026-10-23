@@ -5,7 +5,7 @@ import {
   assembleConversationLoadRecovery,
   type ConversationLoadRecoveryAssemblyDependencies,
   type ConversationLoadRecoveryHostDependencies,
-} from '../../../../src/features/chat/services/ConversationLoadRecoveryCoordinator';
+} from '../../../../src/features/chat/services/conversation/ConversationLoadRecoveryCoordinator';
 
 function createConversation(id: string, title = `Chat ${id}`): Conversation {
   return {

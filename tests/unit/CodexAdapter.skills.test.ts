@@ -4,11 +4,11 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import type { CodexFactory } from '../../src/core/agents/backend/CodexAdapter';
-import { CodexAdapter } from '../../src/core/agents/backend/CodexAdapter';
-import { CodexAppServerClient } from '../../src/core/agents/backend/CodexAppServerClient';
+import type { CodexFactory } from '../../src/core/agents/backend/codex/CodexAdapter';
+import { CodexAdapter } from '../../src/core/agents/backend/codex/CodexAdapter';
+import { CodexAppServerClient } from '../../src/core/agents/backend/codex/CodexAppServerClient';
 
-jest.mock('../../src/core/agents/backend/CodexAppServerClient', () => {
+jest.mock('../../src/core/agents/backend/codex/CodexAppServerClient', () => {
   const mockConstructor = jest.fn();
   (mockConstructor as any).normalizeThreadList = jest.fn((threads: any[]) =>
     threads.map((t: any) => ({

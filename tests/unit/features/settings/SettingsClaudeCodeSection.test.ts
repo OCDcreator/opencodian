@@ -8,8 +8,8 @@ import {
   DEFAULT_SETTINGS,
   getDefaultClaudeCodeBackendSettings,
 } from '../../../../src/core/types';
-import { SettingsClaudeCodeSection } from '../../../../src/features/settings/SettingsClaudeCodeSection';
-import { SettingsClaudeConfigurationSection } from '../../../../src/features/settings/SettingsClaudeConfigurationSection';
+import { SettingsClaudeCodeSection } from '../../../../src/features/settings/backends/claude/SettingsClaudeCodeSection';
+import { SettingsClaudeConfigurationSection } from '../../../../src/features/settings/backends/claude/SettingsClaudeConfigurationSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 

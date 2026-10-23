@@ -21,8 +21,8 @@ const mockRegisterFileChangeApprovalHandler = jest.fn((h: Handler) => registered
 const mockRegisterPermissionsApprovalHandler = jest.fn((h: Handler) => registeredV2.set('permissions', h));
 const mockRegisterToolUserInputHandler = jest.fn((h: Handler) => registeredV2.set('toolUserInput', h));
 
-jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => {
-  const actual = jest.requireActual('../../../../../src/core/agents/backend/CodexAppServerClient');
+jest.mock('../../../../../src/core/agents/backend/codex/CodexAppServerClient', () => {
+  const actual = jest.requireActual('../../../../../src/core/agents/backend/codex/CodexAppServerClient');
   return {
     ...actual,
     CodexAppServerClient: jest.fn().mockImplementation(() => ({
@@ -40,8 +40,8 @@ jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => {
   };
 });
 
-import type { CodexApprovalDecision, CodexApprovalRequest } from '../../../../../src/core/agents/backend/CodexAdapter';
-import { CodexAdapter } from '../../../../../src/core/agents/backend/CodexAdapter';
+import type { CodexApprovalDecision, CodexApprovalRequest } from '../../../../../src/core/agents/backend/codex/CodexAdapter';
+import { CodexAdapter } from '../../../../../src/core/agents/backend/codex/CodexAdapter';
 
 function createMockCodex(): unknown {
   return {

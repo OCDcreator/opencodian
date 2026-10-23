@@ -1,0 +1,83 @@
+# ConversationViewStateService
+
+> **源码**: `src/features/chat/services/conversation/ConversationViewStateService.ts`
+> **状态**: [REVIEW]
+
+## 概述
+
+`ConversationViewStateService` 负责 `OpenCodianView` 里一条最难读的装载主链路：tab 激活，以及 conversation hydration 装载编排。
+
+它不接管聊天视图的 DOM 所有权，也不直接依赖插件实例；而是通过 `ConversationViewStateHost` 回调向 `OpenCodianView` 请求：
+
+- tab/pane activation 分支所需的 tab 数据入口
+
+首开 tab bootstrap / persisted restore 决策现在已经转交给 `services/ConversationLoadRecoveryCoordinator.ts`；loaded-conversation 切换前的 cleanup 与 hydration preflight shell，则继续通过 `runtime/ConversationTransitionBridge.ts` 单独承接；其中消息容器的 rehydrating class / scroll-restore shell 由 `runtime/ConversationHydrationRenderBridge.ts` 提供底层 scroll/class bridge，conversation resolve / server-sync 判定进一步交给 `runtime/ConversationLoadRuntimeBridge.ts`，而消息装载完成后的 background-task rebuild / rerender / post-render outcome / baseline 则再下沉到 `runtime/ConversationHydrationOutcomeBridge.ts`。
+
+为了定位“恢复某个会话时明显卡顿”的问题，这个 service 现在还会输出 `[conversation-load]` 阶段日志，把 resolve、messages load、hydration outcome、tail refresh 等主要步骤拆开记时。
+
+## 公开接口
+
+```typescript
+export interface LoadConversationOptions {
+  forceServerSync?: boolean;
+  preserveScrollPosition?: boolean;
+}
+
+export interface ConversationViewStateHost {
+  // 省略若干 host 回调
+}
+
+export type TabConversationActivationPort = Pick<
+  TabConversationActivationBridge,
+  | 'applyEmptyTabActivation'
+  | 'applyLoadedConversationActivation'
+  | 'applyStreamingConversationActivation'
+>;
+
+export type TabViewActivationPort = Pick<
+  TabViewActivationBridge,
+  'applyActivationPreflight' | 'applyLoadedConversationHydrationTail'
+>;
+
+export class ConversationViewStateService {
+  activateTab(tabId: string): Promise<void>;
+  loadConversation(id: string, options?: LoadConversationOptions): Promise<void>;
+}
+```
+
+## 关键行为
+
+### tab 激活编排
+
+- tab 激活入口现在先委托 `runtime/TabViewActivationBridge.ts` 统一处理 pane 切换、focus preview、question dock 和 todo dock 预刷新
+- streaming tab 走快速路径，不触发完整 conversation reload，并把 active-conversation/session 写回、sync baseline 与 streaming activation outcome 统一转交给 `runtime/TabConversationActivationBridge.ts`
+- 普通 conversation tab 统一转入 `loadConversation(..., { preserveScrollPosition: true })`
+- empty-tab 分支的 active conversation 清空、消息区 shell reset 与 empty-state outcome，现在也先转交给 `runtime/TabConversationActivationBridge.ts`
+- streaming / empty-tab 分支的 activation shell 与 UI outcome 现在都通过 activation bridge + `TabViewActivationBridge` 共享，loaded conversation 的消息装载 outcome 则通过 `ConversationHydrationOutcomeBridge` + `TabViewActivationBridge` 统一编排
+
+### conversation hydration
+
+- `loadConversation()` 现在按 tab 固定目标并维护 per-tab load generation：请求开始时 pin 住当时的 active tab 并 bump 该 tab 的 generation；在关键 await 之后、activation 之前、逐条渲染之前（经 `shouldContinueRender`）、scroll restore 之前与 hydration tail 之前都校验 generation 与 active tab 身份，过期装载立即返回（已进入 hydration shell 的分支走 `abortLoadedConversationTransition()` 释放 rehydrating class），绝不采用后来变化的 activeTabId，也不会往新 tab activate/render/restore
+- streaming conversation 的 resolve 之后同样先确认 active tab 未切走再进入 streaming activation
+- 切换前先通过 `ConversationTransitionBridge` 处理旧 conversation 的标题生成与背景任务指示器清理
+- loaded conversation 的 resolve / reload retry 与是否触发 `load-conversation` server sync，现在先委托给 `ConversationLoadRuntimeBridge`
+- 装载时仍保留 hydration lifecycle 的 `finally` 保护，但 begin/end shell 已通过 `ConversationTransitionBridge` 收束
+- scroll restore 的 snapshot / restore 与 `is-rehydrating` class shell 现在通过 `ConversationHydrationRenderBridge` 复用 `ScrollManager`，保持 bottom / anchor / distance 语义
+- loaded conversation 的 `currentConversation` / active-tab conversation / session reset 写回现在先委托给 `TabConversationActivationBridge`，再由它复用 `TabConversationStateBridge`
+- loaded conversation 的 background-task runtime rebuild、消息重渲与 sync baseline 提交，现在先转交给 `ConversationHydrationOutcomeBridge`
+- loaded conversation 在消息重渲后的 background-task indicator、todo dock、question dock、status / pending question / session todo refresh，则由 `ConversationHydrationOutcomeBridge` 继续复用 `TabViewActivationBridge`
+- hydrate 尾段的 composer layout、model selector 与 context usage snapshot 刷新同样转交给 `TabViewActivationBridge`
+- 每次成功装载还会输出一条汇总日志，带上消息数和各阶段耗时，方便和 `StorageService` / `OpenCodianView.onOpen()` 的启动日志交叉比对
+
+## 与 `OpenCodianView` 的边界
+
+- `OpenCodianView` 仍保留真实 UI render、插件服务装配、tab runtime 状态、scroll metrics 和后台同步实现
+- `ConversationLoadRecoveryCoordinator` 现在负责 first-open 的 load / restore / fallback 决策，以及 persisted restore 失败时的 state reset/flush
+- `ConversationViewStateService` 只负责决定“何时激活 / hydrate / 刷新”，不再逐项写入 active-tab conversation/session state，也不再直接触发 streaming/empty-tab activation shell、loaded-conversation activation state writeback、pane activation 预刷新、loaded-conversation 的 conversation resolve / server-sync 判定、preflight cleanup / hydration shell、消息装载后的 background-task rebuild / rerender / baseline commit、post-render background-task indicator / dock/status/question/todo outcome，或 hydration 尾段的 composer/model/context usage 写回
+- 这样后续继续拆 model selector 或消息区重渲时，可以沿着更清晰的 host 边界继续推进，而不必再把装载主链路塞回 view
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/features/chat/services/conversation/ConversationViewStateService.ts`。
+- 原位置：`src/features/chat/services/ConversationViewStateService.ts`；文件名、导出接口与业务职责保持不变。
+- 随目录调整更新的依赖：`src/features/chat/runtime/activation/ConversationHydrationOutcomeBridge.ts`、`src/features/chat/runtime/activation/ConversationLoadRuntimeBridge.ts`、`src/features/chat/runtime/activation/ConversationTransitionBridge.ts`、`src/features/chat/runtime/activation/TabConversationActivationBridge.ts`、`src/features/chat/runtime/activation/TabViewActivationBridge.ts`。

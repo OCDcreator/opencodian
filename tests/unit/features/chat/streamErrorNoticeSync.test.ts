@@ -4,7 +4,7 @@ import type { ChatMessage } from '../../../../src/core/types';
 import {
   type AssistantNoticeRenderHost,
   renderAssistantPlaceholderAsNotice,
-} from '../../../../src/features/chat/runtime/AssistantNoticeRenderer';
+} from '../../../../src/features/chat/runtime/rendering/AssistantNoticeRenderer';
 
 const openCodeMessageToChatMessage = jest.fn();
 

@@ -7,8 +7,8 @@ import {
   createConversationTabRuntimeCoordinatorHost,
   type TabBarMutableState,
   type TabRuntimeSettings,
-} from '../../../../src/features/chat/services/ConversationTabRuntimeCoordinator';
-import type { TabMessagesPaneCoordinator } from '../../../../src/features/chat/services/TabMessagesPaneCoordinator';
+} from '../../../../src/features/chat/services/conversation/ConversationTabRuntimeCoordinator';
+import type { TabMessagesPaneCoordinator } from '../../../../src/features/chat/services/conversation/TabMessagesPaneCoordinator';
 import {
   type TabBar,
   type TabId,

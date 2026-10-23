@@ -14,8 +14,8 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 
-import { ClaudeSettingsSourceService } from '../../../../../src/core/agents/backend/ClaudeSettingsSourceService';
-import type { ArchiveHistoryEntryIdentity } from '../../../../../src/core/agents/backend/ConfigurationArchiveService';
+import { ClaudeSettingsSourceService } from '../../../../../src/core/agents/backend/claude/ClaudeSettingsSourceService';
+import type { ArchiveHistoryEntryIdentity } from '../../../../../src/core/agents/backend/configuration/ConfigurationArchiveService';
 
 type Revision = { canonicalPath: string; mtimeMs: number; size: number; sha256: string };
 

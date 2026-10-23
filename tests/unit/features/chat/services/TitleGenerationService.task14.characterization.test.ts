@@ -1,5 +1,5 @@
 import { DEFAULT_SETTINGS } from '../../../../../src/core/types';
-import { TitleGenerationService } from '../../../../../src/features/chat/services/TitleGenerationService';
+import { TitleGenerationService } from '../../../../../src/features/chat/services/title/TitleGenerationService';
 
 describe('Task 14 TitleGenerationService plugin-port characterization', () => {
   it('uses the official title before fallback and never creates a temporary OpenCode session', async () => {

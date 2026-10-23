@@ -10,7 +10,7 @@
 import {
   normalizeSkillsListGroupedResult,
   normalizeSkillsListResult,
-} from '../../../../../src/core/agents/backend/CodexAppServerClient';
+} from '../../../../../src/core/agents/backend/codex/CodexAppServerClient';
 
 describe('normalizeSkillsListGroupedResult', () => {
   it('preserves multiple cwd groups, skill source metadata, and server errors', () => {

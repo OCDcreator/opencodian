@@ -1,7 +1,7 @@
 import type { App } from 'obsidian';
 
 import type { ModelPricingOverride } from '../../../../src/core/types';
-import { ModelPricingModal } from '../../../../src/features/settings/ModelPricingModal';
+import { ModelPricingModal } from '../../../../src/features/settings/models/ModelPricingModal';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 

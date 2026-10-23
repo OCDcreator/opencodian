@@ -2,12 +2,12 @@ import type { Conversation } from '../../../../src/core/types';
 import {
   TabConversationActivationBridge,
   type TabConversationActivationBridgeHost,
-} from '../../../../src/features/chat/runtime/TabConversationActivationBridge';
-import type { TabConversationStateBridge } from '../../../../src/features/chat/runtime/TabConversationStateBridge';
-import type { TabViewActivationBridge } from '../../../../src/features/chat/runtime/TabViewActivationBridge';
-import type { ActiveTabContextUsageCoordinator } from '../../../../src/features/chat/services/ActiveTabContextUsageCoordinator';
-import type { QuestionTodoActivationRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoActivationRefreshCoordinator';
-import type { BackgroundTaskActivationIndicatorPort as BackgroundTaskActivationIndicatorSourcePort } from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskActivationHostAdapter';
+} from '../../../../src/features/chat/runtime/activation/TabConversationActivationBridge';
+import type { TabConversationStateBridge } from '../../../../src/features/chat/runtime/activation/TabConversationStateBridge';
+import type { TabViewActivationBridge } from '../../../../src/features/chat/runtime/activation/TabViewActivationBridge';
+import type { ActiveTabContextUsageCoordinator } from '../../../../src/features/chat/services/context/ActiveTabContextUsageCoordinator';
+import type { QuestionTodoActivationRefreshCoordinator } from '../../../../src/features/chat/services/questions/QuestionTodoActivationRefreshCoordinator';
+import type { BackgroundTaskActivationIndicatorPort as BackgroundTaskActivationIndicatorSourcePort } from '../../../../src/features/chat/services/questions/QuestionTodoBackgroundTaskActivationHostAdapter';
 
 type TabConversationStatePort = Pick<
   TabConversationStateBridge,

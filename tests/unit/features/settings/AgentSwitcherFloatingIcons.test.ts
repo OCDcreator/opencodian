@@ -3,7 +3,7 @@ import {
   renderAgentSwitcherBackendIcon,
   renderAgentSwitcherFloatingIcons,
   renderAgentSwitcherHeaderIcons,
-} from '../../../../src/features/settings/AgentSwitcherFloatingIcons';
+} from '../../../../src/features/settings/resources/AgentSwitcherFloatingIcons';
 
 describe('renderAgentSwitcherFloatingIcons', () => {
   beforeEach(() => {

@@ -9,8 +9,8 @@
 
 /* eslint-disable max-lines-per-function -- Adapter test suite keeps lifecycle, session, DI, and sendMessage tests in one cohesive describe block. */
 
-jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => ({
-  ...jest.requireActual('../../../../../src/core/agents/backend/CodexAppServerClient'),
+jest.mock('../../../../../src/core/agents/backend/codex/CodexAppServerClient', () => ({
+  ...jest.requireActual('../../../../../src/core/agents/backend/codex/CodexAppServerClient'),
   CodexAppServerClient: jest.fn().mockImplementation(() => ({
     start: jest.fn().mockRejectedValue(new Error('app-server disabled in SDK adapter unit tests')),
     stop: jest.fn(),
@@ -24,7 +24,7 @@ import {
 } from '../../../../../src/core/agents/backend';
 import type { Conversation } from '../../../../../src/core/types/chat';
 import { OpenCodianView } from '../../../../../src/features/chat/OpenCodianView';
-import { ConversationSessionSettingsCoordinator } from '../../../../../src/features/chat/services/ConversationSessionSettingsCoordinator';
+import { ConversationSessionSettingsCoordinator } from '../../../../../src/features/chat/services/conversation/ConversationSessionSettingsCoordinator';
 
 // ---------------------------------------------------------------------------
 // Helpers

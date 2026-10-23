@@ -2,7 +2,7 @@ import {
   SkillCatalogService,
   type SkillCatalogServiceHost,
   type SkillInfo,
-} from '../../../../src/features/chat/services/SkillCatalogService';
+} from '../../../../src/features/chat/services/commands/SkillCatalogService';
 
 function createHost(
   overrides: Partial<SkillCatalogServiceHost> = {},

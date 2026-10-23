@@ -2,7 +2,7 @@ import type { ChatMessage } from '../../../../src/core/types';
 import {
   PersistedAssistantFooterFinalizer,
   type PersistedAssistantFooterFinalizerHost,
-} from '../../../../src/features/chat/runtime/PersistedAssistantFooterFinalizer';
+} from '../../../../src/features/chat/runtime/rendering/PersistedAssistantFooterFinalizer';
 
 describe('PersistedAssistantFooterFinalizer', () => {
   it('finalizes persisted assistant footers with the assembled payload', () => {

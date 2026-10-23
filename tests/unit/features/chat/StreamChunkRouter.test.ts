@@ -2,9 +2,9 @@ import type {
   SendPipelineStreamController,
   SendPipelineTabRuntime,
   StreamChunkRouterHost,
-} from '../../../../src/features/chat/runtime/SendPipelineTypes';
-import { StreamChunkRouter } from '../../../../src/features/chat/runtime/StreamChunkRouter';
-import type { PreparedMessageSend } from '../../../../src/features/chat/services/MessageSendPreparationService';
+} from '../../../../src/features/chat/runtime/send/SendPipelineTypes';
+import { StreamChunkRouter } from '../../../../src/features/chat/runtime/send/StreamChunkRouter';
+import type { PreparedMessageSend } from '../../../../src/features/chat/services/send/MessageSendPreparationService';
 
 function createHost(): jest.Mocked<StreamChunkRouterHost> {
   return {

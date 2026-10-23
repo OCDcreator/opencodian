@@ -3,7 +3,7 @@ import type {
 } from '../../../../src/core/opencode/OpenCodePromptRequestBuilder';
 import {
   buildOptimisticUserMessage,
-} from '../../../../src/features/chat/services/MessageSendPreparationService';
+} from '../../../../src/features/chat/services/send/MessageSendPreparationService';
 import {
   createPromptContextItem,
 } from './MessageSendPreparationService.testSupport';

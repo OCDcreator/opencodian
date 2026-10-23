@@ -33,9 +33,9 @@ const WT_ROOT = path.resolve(__dirname, '..', '..', '..', '..', '..');
 
 /** The four adapter sources; each must expose the capability honestly. */
 const ADAPTER_SOURCES: readonly { readonly file: string; readonly backend: AgentBackendKind }[] = [
-  { file: 'src/core/agents/backend/OpenCodeAdapter.ts', backend: 'opencode' },
-  { file: 'src/core/agents/backend/ClaudeCodeAdapter.ts', backend: 'claude-code' },
-  { file: 'src/core/agents/backend/CodexAdapter.ts', backend: 'codex' },
+  { file: 'src/core/agents/backend/opencode/OpenCodeAdapter.ts', backend: 'opencode' },
+  { file: 'src/core/agents/backend/claude/ClaudeCodeAdapter.ts', backend: 'claude-code' },
+  { file: 'src/core/agents/backend/codex/CodexAdapter.ts', backend: 'codex' },
   { file: 'src/core/agents/backend/pi/PiAdapter.ts', backend: 'pi' },
 ];
 
@@ -64,7 +64,7 @@ describe('inline-completion capability exposure matrix (§6.5)', () => {
   it('OpenCode adapter implements the capability interface', () => {
     // OpenCode's capability set is exhaustive (OPENCODE_FULL_CAPABILITIES),
     // so the honest-exposure evidence is the implements clause + method.
-    const source = readSource('src/core/agents/backend/OpenCodeAdapter.ts');
+    const source = readSource('src/core/agents/backend/opencode/OpenCodeAdapter.ts');
     expect(source).toMatch(/AgentInlineCompletionCapability\b/);
     expect(source).toMatch(/startInlineCompletionSession\(/);
   });

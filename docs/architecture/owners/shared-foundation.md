@@ -65,3 +65,9 @@ The new core.backend-pi owner isolates the external Pi process service. shared.f
 ## 2026-10-13 诊断净化契约
 
 既有 `diagnosticSecretSanitizer` owner 继续拥有有限敏感 flag/赋值和 URL 净化纯逻辑；可选严格 URL 策略隐藏完整 userinfo/fragment，默认用户名契约保留。仅通用报告与 Pi 状态显示显式选择严格输出，不新增 runtime owner、helper 或共享可变状态。已审跨模块调用范围只授权此纯逻辑及两个指定消费者；其它 caller runtime 保持。源码回归不等于完整 S08/native/UI/profile 验收。
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/shared`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

@@ -8,7 +8,7 @@ import {
   QuestionResolutionExecutionFacade,
   type QuestionResolutionExecutionFacadeHost,
   type QuestionResolutionExecutionLifecyclePort,
-} from '../../../../src/features/chat/services/QuestionResolutionExecutionFacade';
+} from '../../../../src/features/chat/services/questions/QuestionResolutionExecutionFacade';
 import { setLocale } from '../../../../src/i18n';
 
 function createQuestionRequest(overrides?: Partial<QuestionRequest>): QuestionRequest {

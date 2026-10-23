@@ -45,7 +45,7 @@ import type {
   Disposable,
   StatusChangeHandler,
 } from '../AgentService';
-import type { FileRevision } from '../ProjectResourceSecureWrite';
+import type { FileRevision } from '../configuration/ProjectResourceSecureWrite';
 import {
   normalizeZCodeHandshakeFailure,
   ZCodeAppServerTransport,

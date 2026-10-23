@@ -7,7 +7,7 @@ import type {
 import {
   InputPanelAppearanceCoordinator,
   type InputPanelAppearanceCoordinatorHost,
-} from '../../../../src/features/chat/services/InputPanelAppearanceCoordinator';
+} from '../../../../src/features/chat/services/surface/InputPanelAppearanceCoordinator';
 import {
   getGlassAdapter,
   type GlassEffectAdapter,

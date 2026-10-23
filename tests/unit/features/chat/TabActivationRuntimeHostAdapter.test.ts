@@ -1,7 +1,7 @@
 import {
   createTabActivationRuntimeBridgeHosts,
   type TabActivationRuntimeHostAdapterHost,
-} from '../../../../src/features/chat/runtime/TabActivationRuntimeHostAdapter';
+} from '../../../../src/features/chat/runtime/activation/TabActivationRuntimeHostAdapter';
 
 type Mocked<T> = {
   [Key in keyof T]:

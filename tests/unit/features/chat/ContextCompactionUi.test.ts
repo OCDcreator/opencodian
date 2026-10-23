@@ -14,7 +14,7 @@ import {
   type ActiveTabContextUsageCoordinatorHost,
   type ForegroundCompactionActionResult,
   type ForegroundCompactionControl,
-} from '../../../../src/features/chat/services/ActiveTabContextUsageCoordinator';
+} from '../../../../src/features/chat/services/context/ActiveTabContextUsageCoordinator';
 import {
   ContextDetailModal,
   type ContextDetailModalCompactionCoordinator,

@@ -7,11 +7,11 @@ import type {
   Conversation,
   PromptContextItem,
 } from '../../../../src/core/types';
-import type { ComposerSendContextPort } from '../../../../src/features/chat/services/ComposerContextViewFacade';
+import type { ComposerSendContextPort } from '../../../../src/features/chat/services/composer/ComposerContextViewFacade';
 import {
   type MessageSendPreparationHost,
   type MessageSendPreparationHostDependencies,
-} from '../../../../src/features/chat/services/MessageSendPreparationService';
+} from '../../../../src/features/chat/services/send/MessageSendPreparationService';
 
 export function createPromptContextItem(overrides: Partial<PromptContextItem> = {}): PromptContextItem {
   return {

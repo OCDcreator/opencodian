@@ -10,11 +10,11 @@ import {
   SendPipelineRuntime,
   type SendPipelineStreamController,
   type SendPipelineTabRuntime,
-} from '../../../../src/features/chat/runtime/SendPipelineRuntime';
+} from '../../../../src/features/chat/runtime/send/SendPipelineRuntime';
 import type {
   PreparedMessageSend,
   PrepareMessageSendOptions,
-} from '../../../../src/features/chat/services/MessageSendPreparationService';
+} from '../../../../src/features/chat/services/send/MessageSendPreparationService';
 import type {
   ContentBlock as StreamingContentBlock,
   StreamChunk as StreamingChunk,

@@ -4,7 +4,7 @@ import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 
 import type { OpencodeAgentConfigRecord } from '../../../../src/core/types';
-import { SettingsAgentsSection } from '../../../../src/features/settings/SettingsAgentsSection';
+import { SettingsAgentsSection } from '../../../../src/features/settings/resources/SettingsAgentsSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 

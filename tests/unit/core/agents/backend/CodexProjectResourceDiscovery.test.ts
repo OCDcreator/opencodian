@@ -23,8 +23,8 @@ import {
   updateCodexProjectSkill,
   validateCodexAgentContent,
   validateCodexSkillContent,
-} from '../../../../../src/core/agents/backend/CodexProjectResourceDiscovery';
-import { isSafeResourceName } from '../../../../../src/core/agents/backend/ProjectResourceSecureWrite';
+} from '../../../../../src/core/agents/backend/codex/CodexProjectResourceDiscovery';
+import { isSafeResourceName } from '../../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite';
 
 function tmpVault(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'opencodian-codex-res-'));

@@ -1,4 +1,4 @@
-import { resolveAssistantCopyContent } from '../../../../src/features/chat/runtime/AssistantCopyContent';
+import { resolveAssistantCopyContent } from '../../../../src/features/chat/runtime/rendering/AssistantCopyContent';
 
 describe('AssistantCopyContent', () => {
   it('joins structured text blocks for assistant copy content', () => {

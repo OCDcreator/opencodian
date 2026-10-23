@@ -1,7 +1,7 @@
 import {
   AssistantErrorRenderer,
   type AssistantErrorRendererHost,
-} from '../../../../src/features/chat/runtime/AssistantErrorRenderer';
+} from '../../../../src/features/chat/runtime/rendering/AssistantErrorRenderer';
 
 describe('AssistantErrorRenderer', () => {
   it('renders the local stream error block before delegating footer finalization', () => {

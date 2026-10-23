@@ -1,5 +1,5 @@
 import type { ChatMessage } from '../../../../src/core/types';
-import { injectLiveCompactionDivider } from '../../../../src/features/chat/renderGroups';
+import { injectLiveCompactionDivider } from '../../../../src/features/chat/rendering/renderGroups';
 
 function createMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {

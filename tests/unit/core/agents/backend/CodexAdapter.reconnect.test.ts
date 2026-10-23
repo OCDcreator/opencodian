@@ -27,8 +27,8 @@ const mockSubscribeToDeprecationNotice = jest.fn();
 let deprecationNoticeHandler: ((notice: { summary: string; details?: string | null }) => void) | null = null;
 const constructorOptions: Array<Record<string, unknown>> = [];
 
-jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => {
-  const actual = jest.requireActual('../../../../../src/core/agents/backend/CodexAppServerClient');
+jest.mock('../../../../../src/core/agents/backend/codex/CodexAppServerClient', () => {
+  const actual = jest.requireActual('../../../../../src/core/agents/backend/codex/CodexAppServerClient');
   return {
     ...actual,
     CodexAppServerClient: jest.fn().mockImplementation((options: Record<string, unknown>) => {
@@ -60,7 +60,7 @@ jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => {
 
 import { capturedNotices, clearCapturedNotices } from 'obsidian';
 
-import { CodexAdapter } from '../../../../../src/core/agents/backend/CodexAdapter';
+import { CodexAdapter } from '../../../../../src/core/agents/backend/codex/CodexAdapter';
 import type { StreamChunk } from '../../../../../src/core/types/chat';
 
 function createMockCodex(): unknown {

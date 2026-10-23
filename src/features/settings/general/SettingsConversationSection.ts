@@ -1,0 +1,2144 @@
+import type { App, ButtonComponent, ExtraButtonComponent, TextComponent } from 'obsidian';
+import { Notice, requestUrl, Setting } from 'obsidian';
+
+import {
+  getBackendSessionPreview,
+  listBackendSessions,
+  type NormalizedSessionPreviewMessage,
+  type NormalizedSessionPreviewPart,
+  type NormalizedSessionRow,
+} from '../../../core/agents/backend/AgentBackendRouting';
+import {
+  parseModelReference,
+  resolveModelSelection,
+} from '../../../core/config/modelConfig';
+import type { VaultIndexService } from '../../../core/memory';
+import type { ObsidianToolingStatusSnapshot } from '../../../core/obsidianTooling';
+import { OPENCODE_CAPABILITY_SETTINGS_SCHEMA_VERSION } from '../../../core/opencode/OpenCodeCapabilitySettingsMigration';
+import type {
+  OpencodeCompactionConfig,
+  OpencodeShareMode,
+  QuestionCardPosition,
+  QuestionDisplayMode,
+  TitleMode,
+} from '../../../core/types';
+import {
+  applyChatVimNavigationKey,
+  type ChatVimNavigationKeys,
+  type ChatVimNavigationKeySlot,
+  EDIT_REVERT_SNAPSHOT_LIMIT_MB_MAX,
+  EDIT_REVERT_SNAPSHOT_LIMIT_MB_MIN,
+  normalizeChatFontSizePx,
+  normalizeConversationExportDirectory,
+  normalizeConversationExportFilenameTemplate,
+  normalizeEditRevertSnapshotLimitMb,
+  normalizeObsidianToolingMode,
+  normalizeVaultRetrievalExcludedPaths,
+  normalizeVaultRetrievalMaxCharsPerNote,
+  normalizeVaultRetrievalTopK,
+  OBSIDIAN_TOOLING_MODES,
+} from '../../../core/types';
+import type { AgentBackendKind } from '../../../core/types/chat';
+import type { TranslationKey } from '../../../i18n';
+import { t } from '../../../i18n';
+import type OpenCodianPlugin from '../../../main';
+import { createLogger } from '../../../shared';
+import type { SettingHelpButtonConfig } from '../appearance/settingsStyleControls';
+import { OpenCodeProjectConfigHelpModal } from '../backends/opencode/OpenCodeProjectConfigHelpModal';
+import { ProjectConfigFileWatcher } from '../backends/opencode/ProjectConfigFileWatcher';
+import { describeCapabilityAvailability } from '../capabilities/capabilityDisclosureRow';
+import {
+  buildModelPickerGroups,
+  findModelPickerOptionByRef,
+  type ModelPickerGroup,
+} from '../models/modelPicker';
+import { ModelPickerModal } from '../models/ModelPickerModal';
+import {
+  ConversationCompactionHelpModal,
+  type ConversationCompactionHelpTopic,
+} from './ConversationCompactionHelpModal';
+
+const logger = createLogger('SettingsConversationSection');
+const OPENCODE_PUBLIC_SHARE_HOST = 'https://opncd.ai';
+const OPENCODE_PUBLIC_SHARE_PROBE_URL = `${OPENCODE_PUBLIC_SHARE_HOST}/api/share`;
+
+function parseNonNegativeInteger(value: string): number | null {
+  const num = Number(value);
+  if (!Number.isInteger(num) || num < 0) {
+    return null;
+  }
+  return num;
+}
+
+interface SettingsConversationSectionOptions {
+  app: App;
+  plugin: OpenCodianPlugin;
+  createSectionHeading: (
+    containerEl: HTMLElement,
+    title: string,
+    tooltip?: string,
+  ) => HTMLHeadingElement;
+  createSettingsBlock: (
+    containerEl: HTMLElement,
+    options: {
+      title: string;
+      description: string;
+      collapsible?: boolean;
+      defaultOpen?: boolean;
+      onToggle?: (isOpen: boolean) => void;
+    },
+  ) => HTMLElement;
+  addSettingHelpButton: (setting: Setting, helpButton: SettingHelpButtonConfig) => void;
+  setRefreshTitleModelsCallback: (callback?: () => void) => void;
+}
+
+interface ToggleValueControl {
+  setValue(value: boolean): unknown;
+}
+
+interface TextValueControl {
+  setValue(value: string): unknown;
+}
+
+interface DropdownValueControl {
+  setValue(value: string): unknown;
+}
+
+type ShareDiagnosticState = 'ok' | 'warning' | 'error' | 'pending';
+
+/**
+ * The three Vim key inputs plus the shared redraw. They are written and
+ * re-displayed together so no input can disagree with the saved settings.
+ */
+interface ChatVimNavigationKeyFields {
+  inputs: Partial<Record<ChatVimNavigationKeySlot, TextComponent>>;
+  refresh(): void;
+}
+
+interface ShareHostDiagnosticResult {
+  reachable: boolean;
+  detail?: string;
+}
+
+export class SettingsConversationSection {
+  private readonly app: App;
+  private readonly plugin: OpenCodianPlugin;
+  private readonly createSectionHeading: (
+    containerEl: HTMLElement,
+    title: string,
+    tooltip?: string,
+  ) => HTMLHeadingElement;
+  private readonly createSettingsBlock: (
+    containerEl: HTMLElement,
+    options: {
+      title: string;
+      description: string;
+      collapsible?: boolean;
+      defaultOpen?: boolean;
+      onToggle?: (isOpen: boolean) => void;
+    },
+  ) => HTMLElement;
+  private readonly addSettingHelpButton: (setting: Setting, helpButton: SettingHelpButtonConfig) => void;
+  private readonly setRefreshTitleModelsCallback: (callback?: () => void) => void;
+  private titleModelSetting: Setting | null = null;
+  private titleModelButton: ButtonComponent | null = null;
+  private titleModelWarningButton: ExtraButtonComponent | null = null;
+  private titleModelGroups: ModelPickerGroup[] = [];
+  private projectCompactionAutoControl: ToggleValueControl | null = null;
+  private projectCompactionPruneControl: ToggleValueControl | null = null;
+  private projectCompactionTailTurnsControl: TextValueControl | null = null;
+  private projectCompactionPreserveRecentTokensControl: TextValueControl | null = null;
+  private projectCompactionReservedControl: TextValueControl | null = null;
+  private projectShareModeControl: DropdownValueControl | null = null;
+  private shareModeDiagnosticValueEl: HTMLElement | null = null;
+  private shareHostDiagnosticStatusEl: HTMLElement | null = null;
+  private sharedSessionsContainerEl: HTMLElement | null = null;
+  private projectConfigWatcher: ProjectConfigFileWatcher | null = null;
+  private currentCompactionState: {
+    auto: boolean;
+    prune: boolean;
+    tailTurns: number;
+    preserveRecentTokens: number | undefined;
+    reserved: number | undefined;
+  } = { auto: true, prune: true, tailTurns: 2, preserveRecentTokens: undefined, reserved: undefined };
+  private currentShareMode: OpencodeShareMode = 'manual';
+
+  constructor(options: SettingsConversationSectionOptions) {
+    this.app = options.app;
+    this.plugin = options.plugin;
+    this.createSectionHeading = options.createSectionHeading;
+    this.createSettingsBlock = options.createSettingsBlock;
+    this.addSettingHelpButton = options.addSettingHelpButton;
+    this.setRefreshTitleModelsCallback = options.setRefreshTitleModelsCallback;
+  }
+
+  dispose(): void {
+    this.disposeProjectCompactionConfigListeners();
+    this.setRefreshTitleModelsCallback(undefined);
+    this.titleModelSetting = null;
+    this.titleModelButton = null;
+    this.titleModelWarningButton = null;
+    this.titleModelGroups = [];
+    this.projectCompactionAutoControl = null;
+    this.projectCompactionPruneControl = null;
+    this.projectCompactionTailTurnsControl = null;
+    this.projectCompactionPreserveRecentTokensControl = null;
+    this.projectCompactionReservedControl = null;
+    this.projectShareModeControl = null;
+    this.shareModeDiagnosticValueEl = null;
+    this.shareHostDiagnosticStatusEl = null;
+    this.sharedSessionsContainerEl = null;
+  }
+
+  private getActiveBackend(): AgentBackendKind | undefined {
+    const activeBackend = this.plugin.settings.activeBackend;
+    return activeBackend && this.plugin.settings.enabledBackends.includes(activeBackend)
+      ? activeBackend
+      : this.plugin.settings.enabledBackends[0];
+  }
+
+  private isOpenCodeActive(): boolean {
+    return this.getActiveBackend() === 'opencode';
+  }
+
+  private canSaveOpenCodeProjectConversationConfig(): boolean {
+    if (this.isOpenCodeActive()) {
+      return true;
+    }
+    new Notice(t('settings.conversation.projectConfig.openCodeOnly'));
+    return false;
+  }
+
+  attach(containerEl: HTMLElement): HTMLHeadingElement {
+    this.resetState();
+    this.setSharedCallbacks();
+
+    const headingEl = this.createSectionHeading(
+      containerEl,
+      t('settings.conversation.title'),
+      t('settings.quickNav.conversationDesc'),
+    );
+
+    const isOpenCodeActive = this.isOpenCodeActive();
+    const titleGenerationBodyEl = this.createSettingsBlock(containerEl, {
+      title: t('settings.titleGeneration.title'),
+      description: isOpenCodeActive
+        ? t('settings.titleGeneration.groupDesc')
+        : t('settings.titleGeneration.claudeGroupDesc'),
+    });
+    this.markSettingsTarget(titleGenerationBodyEl, 'title');
+    const compactionBodyEl = isOpenCodeActive
+      ? this.createSettingsBlock(containerEl, {
+          title: t('settings.conversation.compaction.projectNote'),
+          description: t('settings.conversation.compaction.projectNoteDesc'),
+        })
+      : null;
+    if (compactionBodyEl) {
+      this.markSettingsTarget(compactionBodyEl, 'compaction');
+    }
+    const sharingBodyEl = isOpenCodeActive
+      ? this.createSettingsBlock(containerEl, {
+          title: t('settings.conversation.share.projectNote'),
+          description: t('settings.conversation.share.projectNoteDesc'),
+        })
+      : null;
+    if (sharingBodyEl) {
+      this.markSettingsTarget(sharingBodyEl, 'sharing');
+    }
+    const experimentalBodyEl = isOpenCodeActive
+      ? this.createSettingsBlock(containerEl, {
+          title: t('settings.conversation.experimental.title'),
+          description: t('settings.conversation.experimental.groupDesc'),
+        })
+      : null;
+    if (experimentalBodyEl) {
+      this.markSettingsTarget(experimentalBodyEl, 'experimental');
+    }
+    const displayBodyEl = this.createSettingsBlock(containerEl, {
+      title: t('settings.conversation.display.title'),
+      description: t('settings.conversation.display.desc'),
+    });
+    this.markSettingsTarget(displayBodyEl, 'display');
+    const obsidianToolingBodyEl = this.createSettingsBlock(containerEl, {
+      title: t('settings.obsidianTooling.title'),
+      description: t('settings.obsidianTooling.groupDesc'),
+    });
+    this.markSettingsTarget(obsidianToolingBodyEl, 'obsidian-tooling');
+    const vaultRetrievalBodyEl = this.createSettingsBlock(containerEl, {
+      title: t('settings.vaultRetrieval.title'),
+      description: t('settings.vaultRetrieval.groupDesc'),
+    });
+    this.markSettingsTarget(vaultRetrievalBodyEl, 'vault-retrieval');
+    const pdfIndexBodyEl = this.createSettingsBlock(containerEl, {
+      title: t('settings.pdfIndex.title'),
+      description: t('settings.pdfIndex.groupDesc'),
+    });
+    this.markSettingsTarget(pdfIndexBodyEl, 'pdf-index');
+    const questionBodyEl = isOpenCodeActive
+      ? this.createSettingsBlock(containerEl, {
+          title: t('settings.conversation.questions.title'),
+          description: t('settings.conversation.questions.desc'),
+        })
+      : null;
+    if (questionBodyEl) {
+      this.markSettingsTarget(questionBodyEl, 'questions');
+    }
+    const renderingBodyEl = this.createSettingsBlock(containerEl, {
+      title: t('settings.conversation.rendering.title'),
+      description: t('settings.conversation.rendering.desc'),
+    });
+    this.markSettingsTarget(renderingBodyEl, 'rendering');
+
+    this.renderTitleBlock(titleGenerationBodyEl);
+    if (compactionBodyEl) {
+      this.renderCompactionBlock(compactionBodyEl);
+    }
+    if (sharingBodyEl) {
+      this.renderSharingBlock(sharingBodyEl);
+    }
+    if (experimentalBodyEl) {
+      this.renderExperimentalBlock(experimentalBodyEl);
+    }
+    this.renderDisplayBlock(displayBodyEl);
+    this.renderObsidianToolingBlock(obsidianToolingBodyEl);
+    this.renderVaultRetrievalBlock(vaultRetrievalBodyEl);
+    this.renderPdfIndexBlock(pdfIndexBodyEl);
+    if (questionBodyEl) {
+      this.renderQuestionsBlock(questionBodyEl);
+    }
+    this.renderRenderingBlock(renderingBodyEl);
+    this.renderExportBlock(containerEl);
+
+    this.finishAttach();
+
+    return headingEl;
+  }
+
+  attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {
+    this.resetState();
+    this.setSharedCallbacks();
+
+    const blocks: { id: string; render: (el: HTMLElement) => void }[] = [
+      { id: 'title', render: (el: HTMLElement) => this.renderTitleBlock(el) },
+      ...(this.isOpenCodeActive()
+        ? [
+            { id: 'compaction', render: (el: HTMLElement) => this.renderCompactionBlock(el) },
+            { id: 'sharing', render: (el: HTMLElement) => this.renderSharingBlock(el) },
+            { id: 'experimental', render: (el: HTMLElement) => this.renderExperimentalBlock(el) },
+          ]
+        : []),
+      { id: 'display', render: (el) => this.renderDisplayTabBlock(el) },
+      { id: 'obsidian-tooling', render: (el) => this.renderObsidianToolingBlock(el) },
+      { id: 'vault-retrieval', render: (el) => this.renderVaultRetrievalBlock(el) },
+      { id: 'pdf-index', render: (el) => this.renderPdfIndexBlock(el) },
+      { id: 'memory', render: (el) => this.renderMemoryBlock(el) },
+      { id: 'export', render: (el) => this.renderExportBlock(el) },
+      ...(this.isOpenCodeActive()
+        ? [{ id: 'questions', render: (el: HTMLElement) => this.renderQuestionsBlock(el) }]
+        : []),
+    ];
+
+    for (const block of blocks) {
+      const blockEl = containerEl.createDiv({
+        attr: {
+          'data-section-block': block.id,
+          'data-settings-target': `conversation-${block.id}`,
+        },
+      });
+      block.render(blockEl);
+      if (block.id !== secondaryTabId) {
+        blockEl.style.display = 'none';
+      }
+    }
+
+    this.finishAttach();
+  }
+
+  private resetState(): void {
+    this.disposeProjectCompactionConfigListeners();
+    this.titleModelSetting = null;
+    this.titleModelButton = null;
+    this.titleModelWarningButton = null;
+    this.titleModelGroups = [];
+    this.projectCompactionAutoControl = null;
+    this.projectCompactionPruneControl = null;
+    this.projectCompactionTailTurnsControl = null;
+    this.projectCompactionPreserveRecentTokensControl = null;
+    this.projectCompactionReservedControl = null;
+    this.projectShareModeControl = null;
+    this.shareModeDiagnosticValueEl = null;
+    this.sharedSessionsContainerEl = null;
+  }
+
+  private setSharedCallbacks(): void {
+    this.setRefreshTitleModelsCallback(() => {
+      void this.loadTitleModels();
+    });
+  }
+
+  private renderTitleBlock(containerEl: HTMLElement): void {
+    if (this.isOpenCodeActive()) {
+      this.addTitleModeSetting(containerEl);
+      this.addTitleModelSetting(containerEl);
+    } else {
+      this.addClaudeAutoTitleSetting(containerEl);
+    }
+  }
+
+  private renderMemoryBlock(containerEl: HTMLElement): void {
+    const blockEl = this.createSettingsBlock(containerEl, {
+      title: t('settings.conversation.memory.title'),
+      description: t('settings.conversation.memory.desc'),
+      defaultOpen: true,
+    });
+    new Setting(blockEl)
+      .setName(t('settings.conversation.memory.enableName'))
+      .setDesc(t('settings.conversation.memory.enableDesc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.memory.memoryBackendEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.memory.memoryBackendEnabled = value;
+            await this.plugin.saveSettings();
+            this.plugin.memoryRuntime?.onSettingsChanged();
+          });
+      });
+    new Setting(blockEl)
+      .setName(t('settings.conversation.memory.extractionName'))
+      .setDesc(t('settings.conversation.memory.extractionDesc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.memory.memoryExtractionEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.memory.memoryExtractionEnabled = value;
+            await this.plugin.saveSettings();
+            this.plugin.memoryRuntime?.onSettingsChanged();
+          });
+      });
+    new Setting(blockEl)
+      .setName(t('settings.conversation.memory.semanticRecallName'))
+      .setDesc(t('settings.conversation.memory.semanticRecallDesc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.memory.memorySemanticRecallEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.memory.memorySemanticRecallEnabled = value;
+            await this.plugin.saveSettings();
+            this.plugin.memoryRuntime?.onSettingsChanged();
+          });
+      });
+    new Setting(blockEl)
+      .setName(t('settings.conversation.memory.extractionModelName'))
+      .setDesc(t('settings.conversation.memory.extractionModelDesc'))
+      .addText((text) => {
+        text
+          .setPlaceholder('opencode-go/deepseek-flash')
+          .setValue(this.plugin.settings.memory.memoryExtractionModel)
+          .onChange(async (value) => {
+            this.plugin.settings.memory.memoryExtractionModel = value.trim();
+            await this.plugin.saveSettings();
+          });
+      });
+    new Setting(blockEl)
+      .setName(t('settings.conversation.memory.externalRootName'))
+      .setDesc(t('settings.conversation.memory.externalRootDesc'))
+      .addText((text) => {
+        text
+          .setPlaceholder('~/.zcode/cli/memories')
+          .setValue(this.plugin.settings.memory.memoryExternalRoot)
+          .onChange(async (value) => {
+            this.plugin.settings.memory.memoryExternalRoot = value.trim();
+            await this.plugin.saveSettings();
+            this.plugin.memoryRuntime?.onSettingsChanged();
+          });
+      });
+    new Setting(blockEl)
+      .setName(t('settings.conversation.memory.syncRemoteName'))
+      .setDesc(t('settings.conversation.memory.syncRemoteDesc'))
+      .addText((text) => {
+        text
+          .setPlaceholder('git@gitea.example.com:memories.git')
+          .setValue(this.plugin.settings.memory.memorySyncRemoteUrl)
+          .onChange(async (value) => {
+            this.plugin.settings.memory.memorySyncRemoteUrl = value.trim();
+            await this.plugin.saveSettings();
+            this.plugin.memoryRuntime?.onSettingsChanged();
+          });
+      });
+  }
+
+  private renderCompactionBlock(containerEl: HTMLElement): void {
+    this.addProjectCompactionSettings(containerEl);
+  }
+
+  private renderSharingBlock(containerEl: HTMLElement): void {
+    this.addProjectShareSettings(containerEl);
+  }
+
+  private renderExperimentalBlock(containerEl: HTMLElement): void {
+    const capabilityId = 'experimental.session.background';
+    const availability = this.plugin.openCodeService.requireSdkCapability(capabilityId);
+    const availabilityDetail = describeCapabilityAvailability(availability)
+      ?? t('settings.experimental.confirmationRequired');
+
+    new Setting(containerEl)
+      .setName(t('settings.conversation.experimental.background.name'))
+      .setDesc(`${t('settings.conversation.experimental.background.desc')} ${availabilityDetail}`)
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.isExperimentalGateEnabled(capabilityId))
+          .onChange(async (enabled) => {
+            if (!this.isOpenCodeActive()) {
+              toggle.setValue(this.isExperimentalGateEnabled(capabilityId));
+              new Notice(t('settings.conversation.projectConfig.openCodeOnly'));
+              return;
+            }
+            await this.setExperimentalGate(capabilityId, enabled);
+          }),
+      );
+  }
+
+  private isExperimentalGateEnabled(capabilityId: string): boolean {
+    return this.plugin.settings.opencodeCapabilities?.experimentalGates[capabilityId] ?? false;
+  }
+
+  private async setExperimentalGate(capabilityId: string, enabled: boolean): Promise<void> {
+    const current = this.plugin.settings.opencodeCapabilities;
+    this.plugin.settings.opencodeCapabilities = {
+      schemaVersion: current?.schemaVersion ?? OPENCODE_CAPABILITY_SETTINGS_SCHEMA_VERSION,
+      experimentalGates: {
+        ...current?.experimentalGates,
+        [capabilityId]: enabled,
+      },
+      preferences: { ...current?.preferences },
+      ...(current?.migrationReport ? { migrationReport: current.migrationReport } : {}),
+    };
+    await this.plugin.saveSettings();
+    await this.plugin.openCodeService.refreshSdkCapabilities();
+  }
+
+  private renderDisplayBlock(containerEl: HTMLElement): void {
+    this.addChatFontSizeSetting(containerEl);
+    this.addSessionRailSetting(containerEl);
+    this.addChatVimNavigationSettings(containerEl);
+    this.addTurnChangeRecordsSetting(containerEl);
+    this.addEditRevertSettings(containerEl);
+    this.addTurnCompletionSoundSettings(containerEl);
+  }
+
+  private renderDisplayTabBlock(containerEl: HTMLElement): void {
+    this.renderDisplayBlock(containerEl);
+    this.renderRenderingBlock(containerEl);
+  }
+
+  /** advantage-parity R-D3: turn-completion chime (off by default). */
+  private addTurnCompletionSoundSettings(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('chat.sound.turnCompletion.name'))
+      .setDesc(t('chat.sound.turnCompletion.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.turnCompletionSoundEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.turnCompletionSoundEnabled = value;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('chat.sound.turnCompletion.pathName'))
+      .setDesc(t('chat.sound.turnCompletion.pathDesc'))
+      .setClass('opencodian-wide-text-setting')
+      .addText((text) => {
+        text
+          .setPlaceholder(t('chat.sound.turnCompletion.pathPlaceholder'))
+          .setValue(this.plugin.settings.turnCompletionSoundPath)
+          .onChange(async (value) => {
+            this.plugin.settings.turnCompletionSoundPath = value.trim();
+            text.inputEl.title = this.plugin.settings.turnCompletionSoundPath;
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.title = this.plugin.settings.turnCompletionSoundPath;
+      });
+  }
+
+  private renderQuestionsBlock(containerEl: HTMLElement): void {
+    this.addQuestionDisplayModeSetting(containerEl);
+    this.addQuestionCardPositionSetting(containerEl);
+    this.addAnsweredQuestionCardsSetting(containerEl);
+  }
+
+  private renderRenderingBlock(containerEl: HTMLElement): void {
+    this.addUserMarkupRenderSetting(containerEl);
+  }
+
+  private finishAttach(): void {
+    this.updateTitleModelSettingVisibility();
+    if (this.isOpenCodeActive()) {
+      void this.loadTitleModels();
+      this.registerProjectConfigListeners();
+      void this.loadProjectConversationConfig();
+    }
+  }
+
+  private markSettingsTarget(bodyEl: HTMLElement, blockId: string): void {
+    const blockEl = bodyEl.closest<HTMLElement>('.opencodian-settings-block');
+    const targetEl = blockEl ?? bodyEl;
+    targetEl.dataset.sectionBlock = blockId;
+    targetEl.dataset.settingsTarget = `conversation-${blockId}`;
+  }
+
+  /**
+   * advantage-parity R-D1: conversation → vault Markdown export settings.
+   * The directory input validates through the same normalizer the exporter
+   * uses, so an unsafe path is refused here AND at write time.
+   */
+  private renderExportBlock(containerEl: HTMLElement): void {
+    const blockEl = this.createSettingsBlock(containerEl, {
+      title: t('settings.conversation.export.title'),
+      description: t('settings.conversation.export.groupDesc'),
+    });
+    this.markSettingsTarget(blockEl, 'export');
+
+    new Setting(blockEl)
+      .setName(t('settings.conversation.export.directory.name'))
+      .setDesc(t('settings.conversation.export.directory.desc'))
+      // Same wide-input class as the server executable/URL settings: path-like
+      // values must not clip in the 154px default control column.
+      .setClass('opencodian-wide-text-setting')
+      .addText((text) => {
+        text
+          .setPlaceholder('opencodian-conversations')
+          .setValue(this.plugin.settings.conversationExport.directory)
+          .onChange(async (value) => {
+            const normalized = normalizeConversationExportDirectory(value);
+            if (!normalized) {
+              new Notice(t('settings.conversation.export.directory.invalid'));
+              text.setValue(this.plugin.settings.conversationExport.directory);
+              return;
+            }
+            this.plugin.settings.conversationExport.directory = normalized;
+            text.setValue(normalized);
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.title = this.plugin.settings.conversationExport.directory;
+      });
+
+    new Setting(blockEl)
+      .setName(t('settings.conversation.export.template.name'))
+      .setDesc(t('settings.conversation.export.template.desc'))
+      .setClass('opencodian-wide-text-setting')
+      .addText((text) => {
+        text
+          .setPlaceholder('{$date}_{$topic}')
+          .setValue(this.plugin.settings.conversationExport.filenameTemplate)
+          .onChange(async (value) => {
+            this.plugin.settings.conversationExport.filenameTemplate
+              = normalizeConversationExportFilenameTemplate(value);
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.title = this.plugin.settings.conversationExport.filenameTemplate;
+      });
+
+    new Setting(blockEl)
+      .setName(t('settings.conversation.export.auto.name'))
+      .setDesc(t('settings.conversation.export.auto.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.conversationExport.autoExport)
+          .onChange(async (value) => {
+            this.plugin.settings.conversationExport.autoExport = value;
+            await this.plugin.saveSettings();
+          });
+      });
+  }
+
+  private registerProjectConfigListeners(): void {
+    const configManager = this.plugin.opencodeConfigManager;
+    if (!configManager) {
+      return;
+    }
+
+    this.projectConfigWatcher = new ProjectConfigFileWatcher({
+      app: this.app,
+      configPath: configManager.getConfigPath(),
+      onChange: () => {
+        void this.loadProjectConversationConfig();
+      },
+    });
+    this.projectConfigWatcher.start();
+  }
+
+  private disposeProjectCompactionConfigListeners(): void {
+    this.projectConfigWatcher?.dispose();
+    this.projectConfigWatcher = null;
+  }
+
+  private updateTitleModelSettingVisibility(): void {
+    if (!this.titleModelSetting) {
+      return;
+    }
+
+    this.titleModelSetting.settingEl.style.display = this.plugin.settings.titleMode === 'ai' ? '' : 'none';
+  }
+
+  private async loadTitleModels(): Promise<void> {
+    const selectedValue = this.plugin.settings.aiTitleModel;
+    const normalizedSelectedValue = selectedValue.trim();
+    let selectedLabel = normalizedSelectedValue;
+    let showUnavailableWarning = false;
+
+    try {
+      if (this.plugin.modelConfigService) {
+        const catalogs = await this.plugin.modelConfigService.getCatalogs(
+          this.plugin.settings.modelSourceMode,
+          this.plugin.settings.disabledModelRefs,
+        );
+        this.titleModelGroups = buildModelPickerGroups(catalogs.effective);
+
+        const selectedOption = findModelPickerOptionByRef(this.titleModelGroups, normalizedSelectedValue);
+        if (selectedOption) {
+          selectedLabel = `${selectedOption.providerName} / ${selectedOption.modelName}`;
+        } else if (normalizedSelectedValue) {
+          const parsedRef = parseModelReference(normalizedSelectedValue);
+          if (parsedRef) {
+            const resolution = resolveModelSelection(
+              catalogs.baseEffective,
+              catalogs.effective,
+              parsedRef.provider,
+              parsedRef.model,
+            );
+            selectedLabel = `${resolution.providerName || parsedRef.provider} / ${resolution.modelName || parsedRef.model}`;
+            showUnavailableWarning = resolution.status === 'unavailable';
+          } else {
+            selectedLabel = normalizedSelectedValue;
+          }
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to load AI title models:', error);
+      this.titleModelGroups = [];
+      selectedLabel = normalizedSelectedValue;
+    }
+
+    if (this.titleModelButton) {
+      this.titleModelButton.setButtonText(
+        selectedLabel || t('settings.titleGeneration.model.followCurrent'),
+      );
+      this.titleModelButton.setDisabled(this.titleModelGroups.length === 0 && !normalizedSelectedValue);
+    }
+
+    if (this.titleModelWarningButton) {
+      this.titleModelWarningButton.extraSettingsEl.style.display = showUnavailableWarning ? '' : 'none';
+      this.titleModelWarningButton.setTooltip(t('settings.titleGeneration.model.unavailableNotice'));
+    }
+
+    this.updateTitleModelSettingVisibility();
+  }
+
+  private addTitleModeSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.titleGeneration.mode.name'))
+      .setDesc(t('settings.titleGeneration.mode.desc'))
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption('default', t('settings.titleGeneration.mode.default'))
+          .addOption('ai', t('settings.titleGeneration.mode.ai'))
+          .setValue(this.plugin.settings.titleMode)
+          .onChange(async (value) => {
+            this.plugin.settings.titleMode = value as TitleMode;
+            await this.plugin.saveSettings();
+            this.updateTitleModelSettingVisibility();
+          });
+      });
+  }
+
+  private addClaudeAutoTitleSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.titleGeneration.claudeAutoTitle.name'))
+      .setDesc(t('settings.titleGeneration.claudeAutoTitle.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.backendSettings.claudeCode.autoTitle)
+          .onChange(async (value) => {
+            this.plugin.settings.backendSettings.claudeCode.autoTitle = value;
+            await this.plugin.saveSettings();
+          });
+      });
+  }
+
+  private addQuestionDisplayModeSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.conversation.questionDisplayMode.name'))
+      .setDesc(t('settings.conversation.questionDisplayMode.desc'))
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption('all', t('settings.conversation.questionDisplayMode.all'))
+          .addOption('single', t('settings.conversation.questionDisplayMode.single'))
+          .setValue(this.plugin.settings.questionDisplayMode)
+          .onChange(async (value) => {
+            this.plugin.settings.questionDisplayMode = value as QuestionDisplayMode;
+            await this.plugin.saveSettings();
+            this.plugin.refreshQuestionUi();
+          });
+      });
+  }
+
+  private addProjectCompactionSettings(containerEl: HTMLElement): void {
+    const autoSetting = new Setting(containerEl)
+      .setName(t('settings.conversation.compaction.auto.name'))
+      .setDesc(t('settings.conversation.compaction.auto.desc'))
+      .addToggle((toggle) => {
+        this.projectCompactionAutoControl = toggle;
+        toggle
+          .setValue(true)
+          .onChange(async (value) => {
+            if (!this.canSaveOpenCodeProjectConversationConfig()) {
+              this.projectCompactionAutoControl?.setValue(this.currentCompactionState.auto);
+              return;
+            }
+            this.currentCompactionState.auto = value;
+            await this.saveProjectCompactionConfig({ auto: value });
+          });
+      });
+    this.addCompactionHelpButton(autoSetting, 'auto');
+
+    const pruneSetting = new Setting(containerEl)
+      .setName(t('settings.conversation.compaction.prune.name'))
+      .setDesc(t('settings.conversation.compaction.prune.desc'))
+      .addToggle((toggle) => {
+        this.projectCompactionPruneControl = toggle;
+        toggle
+          .setValue(true)
+          .onChange(async (value) => {
+            if (!this.canSaveOpenCodeProjectConversationConfig()) {
+              this.projectCompactionPruneControl?.setValue(this.currentCompactionState.prune);
+              return;
+            }
+            this.currentCompactionState.prune = value;
+            await this.saveProjectCompactionConfig({ prune: value });
+          });
+      });
+    this.addCompactionHelpButton(pruneSetting, 'prune');
+
+    const tailTurnsSetting = new Setting(containerEl)
+      .setName(t('settings.conversation.compaction.tailTurns.name'))
+      .setDesc(t('settings.conversation.compaction.tailTurns.desc'))
+      .addText((text) => {
+        this.projectCompactionTailTurnsControl = text;
+        text.inputEl.type = 'number';
+        text.inputEl.min = '0';
+        text
+          .setPlaceholder('2')
+          .setValue('2')
+          .onChange(async (value) => {
+            if (!this.canSaveOpenCodeProjectConversationConfig()) {
+              this.resetCompactionTailTurnsInput();
+              return;
+            }
+            const parsed = parseNonNegativeInteger(value.trim());
+            if (parsed === null) {
+              this.resetCompactionTailTurnsInput();
+              return;
+            }
+            this.currentCompactionState.tailTurns = parsed;
+            await this.saveProjectCompactionConfig({ tail_turns: parsed });
+          });
+      });
+    this.addCompactionHelpButton(tailTurnsSetting, 'tailTurns');
+
+    const preserveRecentTokensSetting = new Setting(containerEl)
+      .setName(t('settings.conversation.compaction.preserveRecentTokens.name'))
+      .setDesc(t('settings.conversation.compaction.preserveRecentTokens.desc'))
+      .addText((text) => {
+        this.projectCompactionPreserveRecentTokensControl = text;
+        text.inputEl.type = 'number';
+        text.inputEl.min = '0';
+        text
+          .setPlaceholder(t('settings.conversation.compaction.followDefault'))
+          .setValue('')
+          .onChange(async (value) => {
+            if (!this.canSaveOpenCodeProjectConversationConfig()) {
+              this.resetCompactionPreserveRecentTokensInput();
+              return;
+            }
+            const trimmed = value.trim();
+            if (!trimmed) {
+              this.currentCompactionState.preserveRecentTokens = undefined;
+              await this.saveProjectCompactionConfig({ preserve_recent_tokens: undefined });
+              return;
+            }
+            const parsed = parseNonNegativeInteger(trimmed);
+            if (parsed === null) {
+              this.resetCompactionPreserveRecentTokensInput();
+              return;
+            }
+            this.currentCompactionState.preserveRecentTokens = parsed;
+            await this.saveProjectCompactionConfig({ preserve_recent_tokens: parsed });
+          });
+      });
+    this.addCompactionHelpButton(preserveRecentTokensSetting, 'preserveRecentTokens');
+
+    const reservedSetting = new Setting(containerEl)
+      .setName(t('settings.conversation.compaction.reserved.name'))
+      .setDesc(t('settings.conversation.compaction.reserved.desc'))
+      .addText((text) => {
+        this.projectCompactionReservedControl = text;
+        text.inputEl.type = 'number';
+        text.inputEl.min = '0';
+        text
+          .setPlaceholder(t('settings.conversation.compaction.followDefault'))
+          .setValue('')
+          .onChange(async (value) => {
+            if (!this.canSaveOpenCodeProjectConversationConfig()) {
+              this.resetCompactionReservedInput();
+              return;
+            }
+            const trimmed = value.trim();
+            if (!trimmed) {
+              this.currentCompactionState.reserved = undefined;
+              await this.saveProjectCompactionConfig({ reserved: undefined });
+              return;
+            }
+            const parsed = parseNonNegativeInteger(trimmed);
+            if (parsed === null) {
+              this.resetCompactionReservedInput();
+              return;
+            }
+            this.currentCompactionState.reserved = parsed;
+            await this.saveProjectCompactionConfig({ reserved: parsed });
+          });
+      });
+    this.addCompactionHelpButton(reservedSetting, 'reserved');
+  }
+
+  private addProjectShareSettings(containerEl: HTMLElement): void {
+    const policyEl = containerEl.createDiv({
+      cls: 'opencodian-share-policy-panel',
+    });
+    const policyHeaderEl = policyEl.createDiv({
+      cls: 'opencodian-share-policy-header',
+    });
+    const policyCopyEl = policyHeaderEl.createDiv({
+      cls: 'opencodian-share-policy-copy',
+    });
+    policyCopyEl.createDiv({
+      cls: 'opencodian-share-policy-title',
+      text: t('settings.conversation.share.mode.name'),
+    });
+    policyCopyEl.createDiv({
+      cls: 'opencodian-share-policy-desc',
+      text: t('settings.conversation.share.mode.desc'),
+    });
+    const policyControlEl = policyHeaderEl.createDiv({
+      cls: 'opencodian-share-policy-control',
+    });
+    const shareSetting = new Setting(policyControlEl)
+      .setName(t('settings.conversation.share.mode.name'))
+      .setDesc(t('settings.conversation.share.mode.desc'))
+      .addDropdown((dropdown) => {
+        this.projectShareModeControl = dropdown;
+        dropdown
+          .addOption('manual', t('settings.conversation.share.mode.manual'))
+          .addOption('auto', t('settings.conversation.share.mode.auto'))
+          .addOption('disabled', t('settings.conversation.share.mode.disabled'))
+          .setValue(this.currentShareMode)
+          .onChange(async (value) => {
+            if (!this.canSaveOpenCodeProjectConversationConfig()) {
+              this.projectShareModeControl?.setValue(this.currentShareMode);
+              return;
+            }
+            this.currentShareMode = value as OpencodeShareMode;
+            if (this.shareModeDiagnosticValueEl) {
+              this.setShareDiagnosticValue(
+                this.shareModeDiagnosticValueEl,
+                this.getShareModeDiagnosticText(),
+                this.currentShareMode === 'disabled' ? 'error' : 'ok',
+              );
+            }
+            await this.saveProjectShareConfig(this.currentShareMode);
+          });
+      });
+    shareSetting.settingEl.classList.add('opencodian-share-policy-setting');
+    this.addProjectConfigHelpButton(shareSetting, 'share');
+    this.addShareDiagnostics(policyEl);
+
+    this.sharedSessionsContainerEl = containerEl.createDiv({
+      cls: 'opencodian-shared-sessions',
+    });
+    void this.renderSharedSessionsList();
+  }
+
+  private addShareDiagnostics(containerEl: HTMLElement): void {
+    const detailsEl = containerEl.createEl('details', {
+      cls: 'opencodian-share-troubleshooting',
+    });
+    const summaryEl = detailsEl.createEl('summary', {
+      cls: 'opencodian-share-troubleshooting-summary',
+    });
+    summaryEl.createSpan({
+      cls: 'opencodian-share-troubleshooting-label',
+      text: t('settings.conversation.share.troubleshooting.summary'),
+    });
+    const statusEl = summaryEl.createSpan({
+      cls: 'opencodian-share-troubleshooting-status',
+      text: t('settings.conversation.share.diagnostics.notChecked'),
+      attr: { 'data-state': 'pending' },
+    });
+    this.shareHostDiagnosticStatusEl = statusEl;
+    const diagnosticsEl = detailsEl.createDiv({
+      cls: 'opencodian-share-diagnostics',
+    });
+    const checkButtonEl = diagnosticsEl.createEl('button', {
+      cls: 'opencodian-share-diagnostics-button',
+      text: t('settings.conversation.share.diagnostics.check'),
+      attr: { type: 'button', 'data-action': 'check-share-diagnostics' },
+    });
+    const rowsEl = diagnosticsEl.createDiv({
+      cls: 'opencodian-share-diagnostics-rows',
+    });
+    const modeValueEl = this.createShareDiagnosticRow(rowsEl, {
+      label: t('settings.conversation.share.diagnostics.mode'),
+      value: this.getShareModeDiagnosticText(),
+      state: this.currentShareMode === 'disabled' ? 'error' : 'ok',
+    });
+    this.shareModeDiagnosticValueEl = modeValueEl;
+    const serviceValueEl = this.createShareDiagnosticRow(rowsEl, {
+      label: t('settings.conversation.share.diagnostics.service'),
+      value: t('settings.conversation.share.diagnostics.notChecked'),
+      state: 'pending',
+    });
+    const networkValueEl = this.createShareDiagnosticRow(rowsEl, {
+      label: t('settings.conversation.share.diagnostics.network'),
+      value: t('settings.conversation.share.diagnostics.notChecked'),
+      state: 'pending',
+    });
+    checkButtonEl.addEventListener('click', () => {
+      void (async () => {
+        if (!this.canSaveOpenCodeProjectConversationConfig()) {
+          return;
+        }
+        checkButtonEl.disabled = true;
+        this.setShareDiagnosticValue(statusEl, t('settings.conversation.share.diagnostics.checking'), 'pending');
+        this.setShareDiagnosticValue(modeValueEl, this.getShareModeDiagnosticText(), this.currentShareMode === 'disabled' ? 'error' : 'ok');
+        this.setShareDiagnosticValue(serviceValueEl, t('settings.conversation.share.diagnostics.checking'), 'pending');
+        this.setShareDiagnosticValue(networkValueEl, t('settings.conversation.share.diagnostics.checking'), 'pending');
+        try {
+          const [serviceHealthy, shareHost] = await Promise.all([
+            this.plugin.openCodeService.checkHealth().catch(() => false),
+            this.checkPublicShareHostReachable(),
+          ]);
+          this.setShareDiagnosticValue(
+            serviceValueEl,
+            serviceHealthy
+              ? t('settings.conversation.share.diagnostics.serviceOk')
+              : t('settings.conversation.share.diagnostics.serviceError'),
+            serviceHealthy ? 'ok' : 'error',
+          );
+          this.setShareDiagnosticValue(
+            networkValueEl,
+            shareHost.reachable
+              ? t('settings.conversation.share.diagnostics.networkOk')
+              : t('settings.conversation.share.diagnostics.networkError', {
+                host: OPENCODE_PUBLIC_SHARE_HOST,
+                detail: shareHost.detail ?? t('settings.conversation.share.diagnostics.networkUnknownError'),
+              }),
+            shareHost.reachable ? 'ok' : 'warning',
+          );
+          this.setShareDiagnosticValue(
+            statusEl,
+            shareHost.reachable
+              ? t('settings.conversation.share.diagnostics.networkOk')
+              : t('settings.conversation.share.diagnostics.networkError', {
+                host: OPENCODE_PUBLIC_SHARE_HOST,
+                detail: shareHost.detail ?? t('settings.conversation.share.diagnostics.networkUnknownError'),
+              }),
+            shareHost.reachable ? 'ok' : 'warning',
+          );
+        } finally {
+          checkButtonEl.disabled = false;
+        }
+      })();
+    });
+  }
+
+  private createShareDiagnosticRow(
+    containerEl: HTMLElement,
+    options: { label: string; value: string; state: ShareDiagnosticState },
+  ): HTMLElement {
+    const rowEl = containerEl.createDiv({
+      cls: 'opencodian-share-diagnostic-row',
+    });
+    rowEl.createDiv({
+      cls: 'opencodian-share-diagnostic-label',
+      text: options.label,
+    });
+    const valueEl = rowEl.createDiv({
+      cls: 'opencodian-share-diagnostic-value',
+      text: options.value,
+      attr: { 'data-state': options.state },
+    });
+    return valueEl;
+  }
+
+  private setShareDiagnosticValue(valueEl: HTMLElement, text: string, state: ShareDiagnosticState): void {
+    valueEl.setText(text);
+    valueEl.dataset.state = state;
+  }
+
+  private getShareModeDiagnosticText(): string {
+    if (this.currentShareMode === 'disabled') {
+      return t('settings.conversation.share.diagnostics.modeDisabled');
+    }
+    return t('settings.conversation.share.diagnostics.modeEnabled', {
+      mode: this.getShareModeLabel(this.currentShareMode),
+    });
+  }
+
+  private async checkPublicShareHostReachable(): Promise<ShareHostDiagnosticResult> {
+    try {
+      const response = await requestUrl({
+        url: OPENCODE_PUBLIC_SHARE_PROBE_URL,
+        method: 'GET',
+        throw: false,
+      });
+      return {
+        reachable: response.status > 0,
+        detail: `HTTP ${response.status}`,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const lowerMessage = message.toLowerCase();
+      const detail = lowerMessage.includes('err_connection_closed') || lowerMessage.includes('ssl_error_syscall')
+        ? t('settings.conversation.share.diagnostics.networkProxyHint', { error: message })
+        : message;
+      return {
+        reachable: false,
+        detail,
+      };
+    }
+  }
+
+  private async renderSharedSessionsList(): Promise<void> {
+    const containerEl = this.sharedSessionsContainerEl;
+    if (!containerEl) {
+      return;
+    }
+
+    containerEl.empty();
+    const headerEl = containerEl.createDiv({
+      cls: 'opencodian-shared-sessions-header',
+    });
+    const copyEl = headerEl.createDiv({
+      cls: 'opencodian-shared-sessions-copy',
+    });
+    copyEl.createDiv({
+      cls: 'opencodian-shared-sessions-title',
+      text: t('settings.conversation.share.sharedSessions.title'),
+    });
+    copyEl.createDiv({
+      cls: 'opencodian-shared-sessions-desc',
+      text: t('settings.conversation.share.sharedSessions.desc'),
+    });
+    const toolsEl = headerEl.createDiv({
+      cls: 'opencodian-shared-sessions-tools',
+    });
+    const countEl = toolsEl.createDiv({
+      cls: 'opencodian-shared-sessions-count',
+      text: t('settings.conversation.share.sharedSessions.count', { count: '0' }),
+    });
+    this.createSharedSessionButton(toolsEl, 'refresh-shared-sessions', t('settings.conversation.share.sharedSessions.refresh'), async () => {
+      await this.renderSharedSessionsList();
+    });
+
+    try {
+      const sessions = await listBackendSessions(
+        this.plugin.agentServiceRegistry,
+      );
+      const sharedSessions = sessions.filter((row) => Boolean(row.shareUrl));
+      countEl.setText(t('settings.conversation.share.sharedSessions.count', {
+        count: String(sharedSessions.length),
+      }));
+
+      if (sharedSessions.length === 0) {
+        containerEl.createDiv({
+          cls: 'opencodian-shared-sessions-empty',
+          text: t('settings.conversation.share.sharedSessions.empty'),
+        });
+        return;
+      }
+
+      const listEl = containerEl.createDiv({
+        cls: 'opencodian-shared-sessions-list',
+      });
+      for (const row of sharedSessions) {
+        this.renderSharedSessionRow(listEl, row, row.shareUrl!);
+      }
+    } catch (error) {
+      logger.warn('Failed to load shared sessions:', error);
+      containerEl.createDiv({
+        cls: 'opencodian-shared-sessions-empty',
+        text: t('settings.conversation.share.sharedSessions.loadFailed'),
+      });
+    }
+  }
+
+  private renderSharedSessionRow(containerEl: HTMLElement, row: NormalizedSessionRow, shareUrl: string): void {
+    const rowEl = containerEl.createDiv({
+      cls: 'opencodian-shared-session-row',
+      attr: { 'data-shared-session-id': row.id },
+    });
+    const mainEl = rowEl.createDiv({
+      cls: 'opencodian-shared-session-main',
+    });
+    mainEl.createDiv({
+      cls: 'opencodian-shared-session-title',
+      text: row.title || t('chat.history.untitled'),
+    });
+    mainEl.createDiv({
+      cls: 'opencodian-shared-session-meta',
+      text: t('settings.conversation.share.sharedSessions.updated', {
+        value: this.formatTimestamp(row.updatedAt ?? undefined),
+      }),
+    });
+    mainEl.createDiv({
+      cls: 'opencodian-shared-session-url',
+      text: shareUrl,
+    });
+
+    const actionsEl = rowEl.createDiv({
+      cls: 'opencodian-shared-session-actions',
+    });
+    this.createSharedSessionButton(actionsEl, 'copy-shared-session-link', t('settings.conversation.share.sharedSessions.copy'), async () => {
+      await navigator.clipboard.writeText(shareUrl);
+      new Notice(t('settings.conversation.share.sharedSessions.copySuccess'));
+    });
+    this.createSharedSessionButton(actionsEl, 'preview-shared-session', t('settings.conversation.share.sharedSessions.preview'), async () => {
+      await this.toggleSharedSessionPreview(rowEl, row.id);
+    });
+    this.createSharedSessionButton(actionsEl, 'unshare-shared-session', t('settings.conversation.share.sharedSessions.unshare'), async () => {
+      // Defensive guard: sharing/unsharing is an OpenCode-specific write operation.
+      // The entire sharing block is already gated by isOpenCodeActive(), but this
+      // inner guard protects against backend switches while the settings page is open.
+      if (!this.isOpenCodeActive()) {
+        new Notice(t('settings.conversation.share.sharedSessions.unshareUnavailable'));
+        return;
+      }
+      await this.plugin.openCodeService.unshareSession(row.id);
+      new Notice(t('settings.conversation.share.sharedSessions.unshared'));
+      await this.renderSharedSessionsList();
+    });
+  }
+
+  private createSharedSessionButton(
+    containerEl: HTMLElement,
+    action: string,
+    text: string,
+    onClick: () => Promise<void>,
+  ): void {
+    const buttonEl = containerEl.createEl('button', {
+      cls: 'opencodian-shared-session-button',
+      text,
+      attr: { type: 'button', 'data-action': action },
+    });
+    buttonEl.addEventListener('click', () => {
+      void (async () => {
+        buttonEl.disabled = true;
+        try {
+          await onClick();
+        } finally {
+          buttonEl.disabled = false;
+        }
+      })();
+    });
+  }
+
+  private async toggleSharedSessionPreview(rowEl: HTMLElement, sessionId: string): Promise<void> {
+    const existingPreviewEl = rowEl.querySelector<HTMLElement>('[data-shared-session-preview]');
+    if (existingPreviewEl) {
+      existingPreviewEl.remove();
+      return;
+    }
+
+    const previewEl = rowEl.createDiv({
+      cls: 'opencodian-shared-session-preview',
+      attr: { 'data-shared-session-preview': sessionId },
+    });
+    previewEl.createDiv({
+      cls: 'opencodian-shared-session-preview-loading',
+      text: t('settings.conversation.share.sharedSessions.previewLoading'),
+    });
+
+    try {
+      const messages = await getBackendSessionPreview(
+        this.plugin.agentServiceRegistry,
+        sessionId,
+      );
+      previewEl.empty();
+      if (messages === null) {
+        previewEl.createDiv({
+          cls: 'opencodian-shared-sessions-empty',
+          text: t('settings.conversation.share.sharedSessions.previewFailed'),
+        });
+        return;
+      }
+      if (messages.length === 0) {
+        previewEl.createDiv({
+          cls: 'opencodian-shared-sessions-empty',
+          text: t('settings.conversation.share.sharedSessions.previewEmpty'),
+        });
+        return;
+      }
+      for (const message of messages) {
+        this.renderSharedSessionMessage(previewEl, message);
+      }
+    } catch (error) {
+      logger.warn('Failed to load shared session preview:', error);
+      previewEl.empty();
+      previewEl.createDiv({
+        cls: 'opencodian-shared-sessions-empty',
+        text: t('settings.conversation.share.sharedSessions.previewFailed'),
+      });
+    }
+  }
+
+  private renderSharedSessionMessage(containerEl: HTMLElement, message: NormalizedSessionPreviewMessage): void {
+    const messageEl = containerEl.createDiv({
+      cls: 'opencodian-shared-session-message',
+    });
+    messageEl.createDiv({
+      cls: 'opencodian-shared-session-message-role',
+      text: this.getNormalizedMessageRoleLabel(message.role),
+    });
+    const partsEl = messageEl.createDiv({
+      cls: 'opencodian-shared-session-message-parts',
+    });
+    for (const part of message.parts) {
+      this.renderSharedSessionPart(partsEl, part);
+    }
+  }
+
+  private renderSharedSessionPart(containerEl: HTMLElement, part: NormalizedSessionPreviewPart): void {
+    const text = typeof part.text === 'string' ? part.text : JSON.stringify(part, null, 2);
+    const shouldCollapse = part.type !== 'text' || text.length > 800;
+    if (shouldCollapse) {
+      const detailsEl = containerEl.createEl('details', {
+        cls: 'opencodian-shared-session-part opencodian-shared-session-part-collapsed',
+      });
+      detailsEl.createEl('summary', {
+        text: t('settings.conversation.share.sharedSessions.collapsedPart', {
+          type: part.type,
+        }),
+      });
+      detailsEl.createEl('pre', {
+        text,
+      });
+      return;
+    }
+
+    containerEl.createDiv({
+      cls: 'opencodian-shared-session-part',
+      text,
+    });
+  }
+
+  private getNormalizedMessageRoleLabel(role: string): string {
+    if (role === 'assistant') {
+      return t('settings.conversation.share.sharedSessions.assistant');
+    }
+    if (role === 'user') {
+      return t('settings.conversation.share.sharedSessions.user');
+    }
+    return role.trim() || 'unknown';
+  }
+
+  private getShareModeLabel(mode: OpencodeShareMode): string {
+    switch (mode) {
+      case 'auto':
+        return t('settings.conversation.share.mode.auto');
+      case 'disabled':
+        return t('settings.conversation.share.mode.disabled');
+      case 'manual':
+      default:
+        return t('settings.conversation.share.mode.manual');
+    }
+  }
+
+  private formatTimestamp(value: number | undefined): string {
+    if (!value) {
+      return t('settings.conversation.share.sharedSessions.unknownTime');
+    }
+    return new Date(value).toLocaleString();
+  }
+
+  private async loadProjectConversationConfig(): Promise<void> {
+    const configManager = this.plugin.opencodeConfigManager;
+    if (!configManager) {
+      return;
+    }
+
+    try {
+      const config = await configManager.getCompactionConfig() ?? {};
+      const state = {
+        auto: config.auto ?? true,
+        prune: config.prune ?? true,
+        tailTurns: config.tail_turns ?? 2,
+        preserveRecentTokens: config.preserve_recent_tokens ?? undefined,
+        reserved: config.reserved ?? undefined,
+      };
+      this.currentCompactionState = state;
+      this.setProjectCompactionUI({
+        auto: state.auto,
+        prune: state.prune,
+        tailTurns: state.tailTurns,
+        preserveRecentTokens: state.preserveRecentTokens ?? null,
+        reservedTokens: state.reserved ?? null,
+      });
+      const shareMode = await configManager.getShareConfig?.() ?? 'manual';
+      this.currentShareMode = shareMode;
+      this.projectShareModeControl?.setValue(shareMode);
+    } catch (error) {
+      logger.warn('Failed to load project conversation config:', error);
+    }
+  }
+
+  private setProjectCompactionUI(state: {
+    auto: boolean;
+    prune: boolean;
+    tailTurns: number;
+    preserveRecentTokens: number | null;
+    reservedTokens: number | null;
+  }): void {
+    if (this.projectCompactionAutoControl) {
+      this.projectCompactionAutoControl.setValue(state.auto);
+    }
+
+    if (this.projectCompactionPruneControl) {
+      this.projectCompactionPruneControl.setValue(state.prune);
+    }
+
+    if (this.projectCompactionTailTurnsControl) {
+      this.projectCompactionTailTurnsControl.setValue(String(state.tailTurns));
+    }
+
+    if (this.projectCompactionPreserveRecentTokensControl) {
+      this.projectCompactionPreserveRecentTokensControl
+        .setValue(state.preserveRecentTokens != null ? String(state.preserveRecentTokens) : '');
+    }
+
+    if (this.projectCompactionReservedControl) {
+      this.projectCompactionReservedControl
+        .setValue(state.reservedTokens != null ? String(state.reservedTokens) : '');
+    }
+  }
+
+  private resetCompactionTailTurnsInput(): void {
+    this.projectCompactionTailTurnsControl?.setValue(String(this.currentCompactionState.tailTurns));
+  }
+
+  private resetCompactionPreserveRecentTokensInput(): void {
+    this.projectCompactionPreserveRecentTokensControl?.setValue(
+      this.currentCompactionState.preserveRecentTokens != null
+        ? String(this.currentCompactionState.preserveRecentTokens)
+        : '',
+    );
+  }
+
+  private resetCompactionReservedInput(): void {
+    this.projectCompactionReservedControl?.setValue(
+      this.currentCompactionState.reserved != null
+        ? String(this.currentCompactionState.reserved)
+        : '',
+    );
+  }
+
+  private async saveProjectCompactionConfig(patch: OpencodeCompactionConfig): Promise<void> {
+    const configManager = this.plugin.opencodeConfigManager;
+    if (!configManager) {
+      new Notice(t('settings.conversation.compaction.configUnavailable'));
+      return;
+    }
+
+    try {
+      await configManager.updateCompactionConfig(patch);
+
+      const result = await this.plugin.openCodeService.reapplyCompactionConfigFromProjectConfig(patch);
+      new Notice(
+        result.status === 'applied'
+          ? t('settings.conversation.compaction.savedApplied')
+          : t('settings.conversation.compaction.savedDeferred'),
+      );
+    } catch (error) {
+      logger.warn('Failed to save project compaction config:', error);
+      new Notice(t('settings.conversation.compaction.saveFailed'));
+    }
+  }
+
+  private async saveProjectShareConfig(shareMode: OpencodeShareMode): Promise<void> {
+    const configManager = this.plugin.opencodeConfigManager;
+    if (!configManager?.updateShareConfig) {
+      new Notice(t('settings.conversation.share.configUnavailable'));
+      return;
+    }
+
+    try {
+      await configManager.updateShareConfig(shareMode);
+      await this.restartLocalServiceForProjectConfig('settings.conversation.share.restartFailed');
+      new Notice(t('settings.conversation.share.saved'));
+    } catch (error) {
+      logger.warn('Failed to save project share config:', error);
+      new Notice(t('settings.conversation.share.saveFailed'));
+    }
+  }
+
+  private addChatFontSizeSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.conversation.chatFontSizePx.name'))
+      .setDesc(t('settings.conversation.chatFontSizePx.desc'))
+      .addText((text) => {
+        text.inputEl.type = 'number';
+        text.inputEl.min = '10';
+        text.inputEl.max = '24';
+        text
+          .setPlaceholder(String(this.plugin.settings.chatFontSizePx))
+          .setValue(String(this.plugin.settings.chatFontSizePx))
+          .onChange(async (value) => {
+            const nextValue = this.parseChatFontSizePx(value);
+            if (nextValue === null) {
+              text.setValue(String(this.plugin.settings.chatFontSizePx));
+              return;
+            }
+
+            this.plugin.settings.chatFontSizePx = nextValue;
+            text.setValue(String(nextValue));
+            await this.saveGlobalSessionDefaults();
+          });
+      });
+  }
+
+  /** R-F5: the rail is a wide-pane enhancer and keeps the history dropdown intact. */
+  private addSessionRailSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.conversation.sessionRail.name'))
+      .setDesc(t('settings.conversation.sessionRail.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.chatSessionRailEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.chatSessionRailEnabled = value;
+            await this.plugin.saveSettings();
+            this.plugin.refreshConversationRendering();
+          });
+      });
+  }
+
+  /** R-F6: letters are opt-in, explicit, and normalized before persistence. */
+  private addChatVimNavigationSettings(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.conversation.vimNavigation.name'))
+      .setDesc(t('settings.conversation.vimNavigation.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.chatVimNavigationEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.chatVimNavigationEnabled = value;
+            await this.plugin.saveSettings();
+            this.plugin.refreshConversationRendering();
+          });
+      });
+
+    // All three key fields are written and re-displayed together: a save result
+    // that disagrees with any of the visible inputs is the bug this shape
+    // prevents (a refused edit used to leave two stale inputs on screen).
+    const fields: ChatVimNavigationKeyFields = {
+      inputs: {},
+      refresh: () => {
+        const keys = this.readChatVimNavigationKeys();
+        fields.inputs.up?.setValue(keys.up);
+        fields.inputs.down?.setValue(keys.down);
+        fields.inputs.composer?.setValue(keys.composer);
+      },
+    };
+
+    this.addChatVimNavigationKeySetting(containerEl, fields, {
+      key: 'up',
+      nameKey: 'settings.conversation.vimNavigation.upKey',
+      descriptionKey: 'settings.conversation.vimNavigation.upKeyDesc',
+    });
+    this.addChatVimNavigationKeySetting(containerEl, fields, {
+      key: 'down',
+      nameKey: 'settings.conversation.vimNavigation.downKey',
+      descriptionKey: 'settings.conversation.vimNavigation.downKeyDesc',
+    });
+    this.addChatVimNavigationKeySetting(containerEl, fields, {
+      key: 'composer',
+      nameKey: 'settings.conversation.vimNavigation.composerKey',
+      descriptionKey: 'settings.conversation.vimNavigation.composerKeyDesc',
+    });
+  }
+
+  private readChatVimNavigationKeys(): ChatVimNavigationKeys {
+    return {
+      up: this.plugin.settings.chatVimNavigationUpKey,
+      down: this.plugin.settings.chatVimNavigationDownKey,
+      composer: this.plugin.settings.chatVimNavigationComposerKey,
+    };
+  }
+
+  private addChatVimNavigationKeySetting(
+    containerEl: HTMLElement,
+    fields: ChatVimNavigationKeyFields,
+    copy: { key: ChatVimNavigationKeySlot; nameKey: TranslationKey; descriptionKey: TranslationKey },
+  ): void {
+    const { key } = copy;
+    new Setting(containerEl)
+      .setName(t(copy.nameKey))
+      .setDesc(t(copy.descriptionKey))
+      .addText((text) => {
+        fields.inputs[key] = text;
+        text.inputEl.maxLength = 1;
+        text
+          .setValue(this.readChatVimNavigationKeys()[key])
+          .onChange(async (value) => {
+            const update = applyChatVimNavigationKey(this.readChatVimNavigationKeys(), key, value);
+            if (update.rejected) {
+              // Keep the previous valid configuration and say so; do not
+              // silently reset the other two custom keys to their defaults.
+              fields.refresh();
+              new Notice(t('settings.conversation.vimNavigation.duplicateKeyNotice'));
+              return;
+            }
+            this.plugin.settings.chatVimNavigationUpKey = update.keys.up;
+            this.plugin.settings.chatVimNavigationDownKey = update.keys.down;
+            this.plugin.settings.chatVimNavigationComposerKey = update.keys.composer;
+            fields.refresh();
+            await this.plugin.saveSettings();
+          });
+      });
+  }
+
+  private addTurnChangeRecordsSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.conversation.showTurnChangeRecords.name'))
+      .setDesc(t('settings.conversation.showTurnChangeRecords.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.showTurnChangeRecords)
+          .onChange(async (value) => {
+            this.plugin.settings.showTurnChangeRecords = value;
+            await this.plugin.saveSettings();
+            this.plugin.refreshConversationRendering();
+          });
+      });
+  }
+
+  private addEditRevertSettings(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.conversation.editRevertEnabled.name'))
+      .setDesc(t('settings.conversation.editRevertEnabled.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.editRevertEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.editRevertEnabled = value;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.conversation.editRevertSnapshotLimitMb.name'))
+      .setDesc(t('settings.conversation.editRevertSnapshotLimitMb.desc'))
+      .addText((text) => {
+        text.inputEl.type = 'number';
+        text.inputEl.min = String(EDIT_REVERT_SNAPSHOT_LIMIT_MB_MIN);
+        text.inputEl.max = String(EDIT_REVERT_SNAPSHOT_LIMIT_MB_MAX);
+        text
+          .setPlaceholder(String(this.plugin.settings.editRevertSnapshotLimitMb))
+          .setValue(String(this.plugin.settings.editRevertSnapshotLimitMb))
+          .onChange(async (value) => {
+            const parsed = Number(value);
+            if (!Number.isFinite(parsed)) {
+              text.setValue(String(this.plugin.settings.editRevertSnapshotLimitMb));
+              return;
+            }
+            const nextValue = normalizeEditRevertSnapshotLimitMb(parsed);
+            this.plugin.settings.editRevertSnapshotLimitMb = nextValue;
+            text.setValue(String(nextValue));
+            await this.plugin.saveSettings();
+          });
+      });
+  }
+
+  /**
+   * R-C1 whole-vault retrieval: opt-in toggle plus its dual caps, exclusion
+   * rules and an honest index status with a manual rebuild. Off is the
+   * zero-cost default, so the toggle leads the block.
+   */
+  private renderVaultRetrievalBlock(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.vaultRetrieval.enable.name'))
+      .setDesc(t('settings.vaultRetrieval.enable.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.vaultRetrievalEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.vaultRetrievalEnabled = value;
+            await this.plugin.saveSettings();
+            await this.plugin.vaultIndexService?.onSettingsChanged();
+            statusSetting.setDesc(this.resolveVaultRetrievalStatusText());
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.vaultRetrieval.topK.name'))
+      .setDesc(t('settings.vaultRetrieval.topK.desc'))
+      .addText((text) => {
+        text.inputEl.type = 'number';
+        text.inputEl.min = '1';
+        text.inputEl.max = '20';
+        text
+          .setPlaceholder(String(this.plugin.settings.vaultRetrievalTopK))
+          .setValue(String(this.plugin.settings.vaultRetrievalTopK))
+          .onChange(async (value) => {
+            const parsed = Number(value);
+            if (!Number.isFinite(parsed)) {
+              text.setValue(String(this.plugin.settings.vaultRetrievalTopK));
+              return;
+            }
+            const nextValue = normalizeVaultRetrievalTopK(parsed);
+            this.plugin.settings.vaultRetrievalTopK = nextValue;
+            text.setValue(String(nextValue));
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.vaultRetrieval.maxChars.name'))
+      .setDesc(t('settings.vaultRetrieval.maxChars.desc'))
+      .addText((text) => {
+        text.inputEl.type = 'number';
+        text.inputEl.min = '500';
+        text.inputEl.max = '20000';
+        text
+          .setPlaceholder(String(this.plugin.settings.vaultRetrievalMaxCharsPerNote))
+          .setValue(String(this.plugin.settings.vaultRetrievalMaxCharsPerNote))
+          .onChange(async (value) => {
+            const parsed = Number(value);
+            if (!Number.isFinite(parsed)) {
+              text.setValue(String(this.plugin.settings.vaultRetrievalMaxCharsPerNote));
+              return;
+            }
+            const nextValue = normalizeVaultRetrievalMaxCharsPerNote(parsed);
+            this.plugin.settings.vaultRetrievalMaxCharsPerNote = nextValue;
+            text.setValue(String(nextValue));
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.vaultRetrieval.excludedPaths.name'))
+      .setDesc(t('settings.vaultRetrieval.excludedPaths.desc'))
+      .addTextArea((textArea) => {
+        textArea
+          .setPlaceholder('templates/\narchive/*')
+          .setValue(this.plugin.settings.vaultRetrievalExcludedPaths.join('\n'))
+          .onChange(async (value) => {
+            this.plugin.settings.vaultRetrievalExcludedPaths = normalizeVaultRetrievalExcludedPaths(
+              value.split('\n'),
+            );
+            await this.plugin.saveSettings();
+            await this.plugin.vaultIndexService?.onSettingsChanged();
+          });
+      });
+
+    const statusSetting = new Setting(containerEl)
+      .setName(t('settings.vaultRetrieval.status.name'))
+      .setDesc(this.resolveVaultRetrievalStatusText())
+      .addExtraButton((button) => {
+        button
+          .setIcon('refresh-cw')
+          .setTooltip(t('settings.vaultRetrieval.rebuild'))
+          .onClick(async () => {
+            const service = this.resolveVaultIndexService();
+            if (!service) {
+              new Notice(t('settings.vaultRetrieval.rebuildDisabled'));
+              return;
+            }
+            button.disabled = true;
+            try {
+              await service.invalidateAll();
+              await service.onSettingsChanged();
+              statusSetting.setDesc(this.resolveVaultRetrievalStatusText());
+              new Notice(t('settings.vaultRetrieval.rebuildDone'));
+            } finally {
+              button.disabled = false;
+            }
+          });
+      });
+
+    // R-E4: the optional embedding layer rides inside this block.
+    this.renderSemanticRetrievalSettings(containerEl);
+  }
+
+  /** Honest R-C1 index status line: off / indexed count / service absent. */
+  private resolveVaultRetrievalStatusText(): string {
+    if (!this.plugin.settings.vaultRetrievalEnabled) {
+      return t('settings.vaultRetrieval.status.off');
+    }
+    const service = this.resolveVaultIndexService();
+    if (!service || !service.isStarted()) {
+      return t('settings.vaultRetrieval.status.unknown');
+    }
+    return t('settings.vaultRetrieval.status.indexed', {
+      count: String(service.indexedNoteCount()),
+    });
+  }
+
+  /**
+   * R-E4: the semantic retrieval enhancement rows inside the vault-retrieval
+   * block (lexical stays the base; this is the optional embedding layer).
+   * The provider dropdown lists the user's custom providers; honest status
+   * text states not-configured / indexed count / absent service.
+   */
+  private renderSemanticRetrievalSettings(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.semanticRetrieval.enableName'))
+      .setDesc(t('settings.semanticRetrieval.enableDesc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.semanticRetrievalEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.semanticRetrievalEnabled = value;
+            await this.plugin.saveSettings();
+            await this.plugin.vaultEmbeddingIndexService?.onSettingsChanged(value);
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.semanticRetrieval.providerName'))
+      .setDesc(t('settings.semanticRetrieval.providerDesc'))
+      .addDropdown((dropdown) => {
+        dropdown.addOption('', t('settings.semanticRetrieval.providerDesc'));
+        for (const provider of this.plugin.settings.providers) {
+          dropdown.addOption(provider.id, provider.name || provider.id);
+        }
+        dropdown
+          .setValue(this.plugin.settings.semanticEmbeddingProvider)
+          .onChange(async (value) => {
+            this.plugin.settings.semanticEmbeddingProvider = value;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.semanticRetrieval.modelName'))
+      .setDesc(t('settings.semanticRetrieval.modelDesc'))
+      .setClass('opencodian-wide-text-setting')
+      .addText((text) => {
+        text
+          .setPlaceholder('text-embedding-3-small')
+          .setValue(this.plugin.settings.semanticEmbeddingModel)
+          .onChange(async (value) => {
+            this.plugin.settings.semanticEmbeddingModel = value.trim();
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.title = this.plugin.settings.semanticEmbeddingModel;
+      });
+  }
+
+  /**
+   * R-C4 PDF index: a single opt-in toggle plus an honest status line.
+   * Exclusion rules and the injection caps are intentionally shared with the
+   * R-C1 retrieval settings — no parallel knobs (design §3.2).
+   */
+  private renderPdfIndexBlock(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.pdfIndex.enable.name'))
+      .setDesc(t('settings.pdfIndex.enable.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.pdfIndexEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.pdfIndexEnabled = value;
+            await this.plugin.saveSettings();
+            await this.plugin.pdfIndexService?.onSettingsChanged();
+            statusSetting.setDesc(this.resolvePdfIndexStatusText());
+          });
+      });
+
+    const statusSetting = new Setting(containerEl)
+      .setName(t('settings.pdfIndex.status.name'))
+      .setDesc(this.resolvePdfIndexStatusText())
+      .addExtraButton((button) => {
+        button
+          .setIcon('refresh-cw')
+          .setTooltip(t('settings.pdfIndex.rebuild'))
+          .onClick(async () => {
+            const service = this.plugin.pdfIndexService;
+            if (!service) {
+              new Notice(t('settings.pdfIndex.rebuildDisabled'));
+              return;
+            }
+            button.disabled = true;
+            try {
+              await service.invalidateAll();
+              await service.onSettingsChanged();
+              statusSetting.setDesc(this.resolvePdfIndexStatusText());
+              new Notice(t('settings.pdfIndex.rebuildDone'));
+            } finally {
+              button.disabled = false;
+            }
+          });
+      });
+  }
+
+  /** Honest R-C4 index status line: off / building / indexed count. */
+  private resolvePdfIndexStatusText(): string {
+    if (!this.plugin.settings.pdfIndexEnabled) {
+      return t('settings.pdfIndex.status.off');
+    }
+    const service = this.plugin.pdfIndexService;
+    if (!service) {
+      return t('settings.pdfIndex.status.unknown');
+    }
+    const progress = service.onProgress();
+    if (service.isBuilding()) {
+      return t('settings.pdfIndex.status.building', {
+        done: String(progress.done),
+        total: String(progress.total),
+      });
+    }
+    return t('settings.pdfIndex.status.indexed', {
+      count: String(service.indexedPdfCount()),
+    });
+  }
+
+  private resolveVaultIndexService(): VaultIndexService | null {
+    return this.plugin.vaultIndexService ?? null;
+  }
+
+  /**
+   * R-B4 Obsidian native tooling: mode selector + honest availability status
+   * + install guidance. The status never lies: off / unsupported platforms /
+   * probe failures each render their own explicit message.
+   */
+  private renderObsidianToolingBlock(containerEl: HTMLElement): void {
+    const modeLabels: Record<string, string> = {
+      off: t('settings.obsidianTooling.mode.off'),
+      cli: t('settings.obsidianTooling.mode.cli'),
+      mcp: t('settings.obsidianTooling.mode.mcp'),
+    };
+
+    new Setting(containerEl)
+      .setName(t('settings.obsidianTooling.mode.name'))
+      .setDesc(t('settings.obsidianTooling.mode.desc'))
+      .addDropdown((dropdown) => {
+        for (const mode of OBSIDIAN_TOOLING_MODES) {
+          dropdown.addOption(mode, modeLabels[mode] ?? mode);
+        }
+        dropdown
+          .setValue(this.plugin.settings.obsidianToolingMode)
+          .onChange(async (value) => {
+            const nextMode = normalizeObsidianToolingMode(value);
+            dropdown.setValue(nextMode);
+            this.plugin.settings.obsidianToolingMode = nextMode;
+            await this.plugin.saveSettings();
+            await this.plugin.obsidianToolingRuntime?.applySettings();
+            statusSetting.setDesc(this.resolveObsidianToolingStatusText());
+          });
+      });
+
+    const statusSetting = new Setting(containerEl)
+      .setName(t('settings.obsidianTooling.status.name'))
+      .setDesc(this.resolveObsidianToolingStatusText())
+      .addExtraButton((button) => {
+        button
+          .setIcon('refresh-cw')
+          .setTooltip(t('settings.obsidianTooling.recheck'))
+          .onClick(async () => {
+            await this.plugin.obsidianToolingRuntime?.refreshProbe();
+            statusSetting.setDesc(this.resolveObsidianToolingStatusText());
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.obsidianTooling.guidance.name'))
+      .setDesc(t('settings.obsidianTooling.guidance.desc'));
+  }
+
+  /** Compose the honest status line from the runtime snapshot (never silent). */
+  private resolveObsidianToolingStatusText(): string {
+    const mode = this.plugin.settings.obsidianToolingMode;
+    if (mode === 'off') {
+      return t('settings.obsidianTooling.status.off');
+    }
+    if (mode === 'mcp') {
+      return t('settings.obsidianTooling.status.mcpReserved');
+    }
+    const snapshot: ObsidianToolingStatusSnapshot | null =
+      this.plugin.obsidianToolingRuntime?.getStatus() ?? null;
+    if (!snapshot) {
+      return t('settings.obsidianTooling.status.unknown');
+    }
+    if (!snapshot.desktopSupported) {
+      return t('settings.obsidianTooling.status.mobile');
+    }
+    if (!snapshot.platformSupported) {
+      return t('settings.obsidianTooling.status.windows');
+    }
+    const cli = snapshot.cli;
+    if (!cli) {
+      return t('settings.obsidianTooling.status.unknown');
+    }
+    switch (cli.status) {
+      case 'available':
+        return t('settings.obsidianTooling.status.available', { version: cli.version });
+      case 'not-found':
+        return t('settings.obsidianTooling.status.notFound');
+      case 'timeout':
+        return t('settings.obsidianTooling.status.timeout');
+      case 'error':
+        return t('settings.obsidianTooling.status.error', { detail: cli.detail });
+    }
+  }
+
+  private addQuestionCardPositionSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.conversation.questionCardPosition.name'))
+      .setDesc(t('settings.conversation.questionCardPosition.desc'))
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption('inline', t('settings.conversation.questionCardPosition.inline'))
+          .addOption('above_input', t('settings.conversation.questionCardPosition.aboveInput'))
+          .setValue(this.plugin.settings.questionCardPosition)
+          .onChange(async (value) => {
+            this.plugin.settings.questionCardPosition = value as QuestionCardPosition;
+            await this.plugin.saveSettings();
+            // refreshQuestionUi() already re-renders the conversation messages;
+            // calling refreshConversationRendering() too would fire a second
+            // concurrent full rerender and interleave message appends.
+            this.plugin.refreshQuestionUi();
+          });
+      });
+  }
+
+  private addAnsweredQuestionCardsSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.conversation.showAnsweredQuestionCards.name'))
+      .setDesc(t('settings.conversation.showAnsweredQuestionCards.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.showAnsweredQuestionCards)
+          .onChange(async (value) => {
+            this.plugin.settings.showAnsweredQuestionCards = value;
+            await this.plugin.saveSettings();
+            // refreshQuestionUi() already re-renders the conversation messages;
+            // calling refreshConversationRendering() too would fire a second
+            // concurrent full rerender and interleave message appends.
+            this.plugin.refreshQuestionUi();
+          });
+      });
+  }
+
+  private addTitleModelSetting(containerEl: HTMLElement): void {
+    this.titleModelSetting = new Setting(containerEl)
+      .setName(t('settings.titleGeneration.model.name'))
+      .setDesc(t('settings.titleGeneration.model.desc'))
+      .addButton((button) => {
+        this.titleModelButton = button;
+        button.onClick(() => {
+          new ModelPickerModal(this.app, {
+            title: t('settings.titleGeneration.model.pickerTitle'),
+            description: t('settings.titleGeneration.model.pickerDesc'),
+            groups: this.titleModelGroups,
+            selectedRef: this.plugin.settings.aiTitleModel,
+            emptySelectionLabel: t('settings.titleGeneration.model.followCurrent'),
+            onChoose: async (option) => {
+              this.plugin.settings.aiTitleModel = option?.ref ?? '';
+              await this.plugin.saveSettings();
+              await this.loadTitleModels();
+            },
+          }).open();
+        });
+      })
+      .addExtraButton((button) => {
+        this.titleModelWarningButton = button;
+        button
+          .setIcon('alert-triangle')
+          .setTooltip(t('settings.titleGeneration.model.unavailableNotice'))
+          .onClick(() => {
+            new Notice(t('settings.titleGeneration.model.unavailableNotice'));
+          });
+        button.extraSettingsEl.addClass('opencodian-title-model-warning-button');
+        button.extraSettingsEl.style.display = 'none';
+      });
+  }
+
+  private addUserMarkupRenderSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.conversation.userMarkupAsCodeBlocks.name'))
+      .setDesc(t('settings.conversation.userMarkupAsCodeBlocks.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.renderUserMarkupAsCodeBlocks)
+          .onChange(async (value) => {
+            this.plugin.settings.renderUserMarkupAsCodeBlocks = value;
+            await this.plugin.saveSettings();
+            this.plugin.refreshConversationRendering();
+          });
+      });
+  }
+
+  private parseChatFontSizePx(value: string): number | null {
+    const nextValue = Number.parseFloat(value.trim());
+    const roundedValue = Math.round(nextValue);
+    if (!Number.isFinite(nextValue) || roundedValue < 10 || roundedValue > 24) {
+      return null;
+    }
+
+    return normalizeChatFontSizePx(nextValue, this.plugin.settings.chatFontSizePx);
+  }
+
+  private async saveGlobalSessionDefaults(): Promise<void> {
+    await this.plugin.saveSettings({ reloadModels: false });
+    await this.plugin.reapplyConversationSessionDefaults();
+  }
+
+  private addCompactionHelpButton(setting: Setting, topic: ConversationCompactionHelpTopic): void {
+    this.addSettingHelpButton(setting, {
+      tooltip: t('settings.conversation.compaction.help.openDoc'),
+      onClick: () => {
+        new ConversationCompactionHelpModal(this.app, topic).open();
+      },
+    });
+  }
+
+  private addProjectConfigHelpButton(setting: Setting, topic: 'share'): void {
+    this.addSettingHelpButton(setting, {
+      tooltip: t('settings.projectConfigHelp.open'),
+      onClick: () => {
+        new OpenCodeProjectConfigHelpModal(this.app, topic).open();
+      },
+    });
+  }
+
+  private async restartLocalServiceForProjectConfig(failedNoticeKey: string): Promise<void> {
+    if (this.plugin.settings.server.mode !== 'local') {
+      new Notice(t('settings.server.remoteManageUnavailable'));
+      return;
+    }
+
+    try {
+      const isRunning = await this.plugin.openCodeService.checkHealth();
+      if (!isRunning) {
+        return;
+      }
+      await this.plugin.openCodeService.stop();
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await this.plugin.openCodeService.start();
+    } catch (error) {
+      logger.warn('Failed to restart OpenCode after project config update:', error);
+      new Notice(t(failedNoticeKey as never));
+    }
+  }
+}

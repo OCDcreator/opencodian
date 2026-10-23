@@ -3,11 +3,11 @@ import {
   buildComposerContextChipStates,
   type ComposerContextChipState,
   createFocusContextPreview,
-} from '../../../../src/features/chat/composerContext';
+} from '../../../../src/features/chat/rendering/composerContext';
 import {
   ComposerContextCoordinator,
   type ComposerContextCoordinatorHost,
-} from '../../../../src/features/chat/services/ComposerContextCoordinator';
+} from '../../../../src/features/chat/services/composer/ComposerContextCoordinator';
 
 function createContextItem(overrides: Partial<PromptContextItem> = {}): PromptContextItem {
   return {

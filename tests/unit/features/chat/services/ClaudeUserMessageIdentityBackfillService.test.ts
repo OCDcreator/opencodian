@@ -2,7 +2,7 @@ import { setAgentServiceRegistry } from '../../../../../src/core/agents/AgentCap
 import type { AgentChatCapability } from '../../../../../src/core/agents/backend/AgentService';
 import type { AgentServiceRegistry } from '../../../../../src/core/agents/backend/AgentServiceRegistry';
 import type { Conversation } from '../../../../../src/core/types';
-import { ClaudeUserMessageIdentityBackfillService, setBackfillPersistenceHost } from '../../../../../src/features/chat/services/ClaudeUserMessageIdentityBackfillService';
+import { ClaudeUserMessageIdentityBackfillService, setBackfillPersistenceHost } from '../../../../../src/features/chat/services/rendering/ClaudeUserMessageIdentityBackfillService';
 
 function makeMessage(role: 'user' | 'assistant', overrides: Partial<{ sourceMessageId: string | undefined; compactionDivider: boolean }> = {}) {
   return {

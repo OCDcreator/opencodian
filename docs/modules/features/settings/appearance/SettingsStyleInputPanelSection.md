@@ -1,0 +1,66 @@
+# SettingsStyleInputPanelSection
+
+2026-09-11：`applyFontSelection` 对 `InputFontLoader.ensureLoaded` 改为 `void` 调用——该方法对 CSP 受限 CDN 字体返回异步注入 Promise，这里只需 fire-and-forget。
+
+> **源码**: `src/features/settings/appearance/SettingsStyleInputPanelSection.ts`
+- 2026-09-17：输入面板组新增三个数值控件：左右留白 `composerInsetX`（0–40，默认 0）、上下留白 `composerInsetY`（0–40，默认 12）、输入区最大高度 `textareaMaxHeight`（120–480，步进 10，默认 240）。
+
+> **状态**: [REVIEW]
+
+## 概述
+
+`SettingsStyleInputPanelSection` 是 `SettingsStyleSection` 下的 input-panel 子区块 owner。它负责 input theme family/variant dropdown、操作按钮样式、上下文圆环样式、input radius 与 preset/glass-refraction 参数区、局部 rerender guard，以及 input-theme 保存后的 subsection 重建。
+
+这个 owner 的目标是把 input appearance lifecycle 从 style section 主 owner 里抽成一块相邻厚 seam，同时继续保留“只重绘 input subsection、不重建整页 settings”的行为。
+
+## 核心逻辑
+
+### 子区块挂载与重绘
+
+- `attach()` 创建 input subsection host，并立即按当前 `inputPanelTheme` 渲染
+- `refresh()` 每次都会清空 input-group host，并重新装配 dropdown、numeric control、glass/liquid-glass 参数区
+- `dispose()` 通过 `renderSessionId` 让异步保存后的 stale rerender 自动失效
+
+### Theme family 切换
+
+- `applyInputPanelThemeChange()` 只写回 `plugin.settings.inputPanelTheme` 并调用 `saveSettings({ applyUi: true })`
+- 保存完成后只在 owner 仍然存活时执行 `refresh()`，避免旧 settings 面板把 rerender 带回新实例
+- `glass-refraction` 与 `liquid-glass` family 仍沿用原来的 variant 归一化规则
+
+### 参数区拆分
+
+- preset input 参数继续复用来自 `settingsStyleControls.ts` 的 `addNumericStyleControl()` seam，保持 baseline/reset 语义一致
+- 输入区字体设置在本 owner 中提供 English / Chinese font 两个 dropdown，并写回 `chatAppearance.input.enFontFamily` / `cnFontFamily`
+- 字体 dropdown 的分组顺序、标签与选项都来自 `InputFontRegistry` 的常量；本 owner 只消费运行时值，不需要额外持有字体分类类型
+- `contextRingStyle` 作为 `chatAppearance.input` 的普通外观字段保存；切换时只调用 `plugin.updateChatAppearance()` + style apply/save，不触发 input subsection 重绘
+- glass refraction 参数与 SVG filter reset 仍在本 owner 内处理，因为它们与 theme-family 切换耦合
+- liquid glass 参数列表委托给 `SettingsStyleLiquidGlassInputControls`
+
+## 关键方法
+
+| 方法 | 说明 |
+|------|------|
+| `attach()` | 创建 input subsection host 并挂载当前 input appearance |
+| `refresh()` | 只重建 input subsection，不触碰整页 settings |
+| `applyInputPanelThemeChange()` | 保存新的 input theme，并在当前 owner 仍激活时局部重绘 |
+| `addGlassRefractionInputControls()` | 装配 glass-refraction 数值控制、SVG filter 与 reset |
+
+## 与其他模块的交互
+
+- `SettingsStyleSection.ts`: 持有 style section 的整体 lifecycle，并把 input subsection 装配委托给本 owner
+- `settingsStyleControls.ts`: 提供 numeric control / style-control / help-button 合约，供本 owner 复用
+- `SettingsStyleLiquidGlassInputControls.ts`: 负责 liquid glass adapter 参数表单与帮助按钮入口
+- `core/types/settings.ts`: 提供 input theme family/variant 与 glass-refraction 默认值、归一化规则
+- `utils/glass/index.ts`: 提供当前可用的 liquid glass adapters 目录
+
+## 注意事项
+
+- input subsection 必须继续保持局部重绘；不要因为新增参数而把整页 settings 重建重新引回 `SettingsStyleSection`
+- `renderSessionId` stale guard 是当前 owner 的关键回归边界，切换 theme 后不能让已销毁的 settings 面板重新渲染
+- liquid glass 参数解释与 adapter-specific setting 写回已经下沉到相邻 owner；不要再把这部分逻辑重新并回本文件
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/features/settings/appearance/SettingsStyleInputPanelSection.ts`。
+- 原位置：`src/features/settings/SettingsStyleInputPanelSection.ts`；文件名、导出接口与业务职责保持不变。
+- 随目录调整更新的依赖：`src/features/settings/appearance/InputFontRegistry.ts`、`src/features/settings/appearance/settingsStyleControls.ts`、`src/features/settings/appearance/SettingsStyleLiquidGlassInputControls.ts`。

@@ -6,7 +6,7 @@ import {
   removeDraftContextItemsByTarget,
   resolveFocusContextPreview,
   upsertDraftContextItem,
-} from '../../../../src/features/chat/composerContext';
+} from '../../../../src/features/chat/rendering/composerContext';
 
 function createContextItem(overrides: Partial<PromptContextItem> = {}): PromptContextItem {
   return {

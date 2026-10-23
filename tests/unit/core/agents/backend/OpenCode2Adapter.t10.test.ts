@@ -1,4 +1,4 @@
-import { OpenCode2Adapter } from '../../../../../src/core/agents/backend/OpenCode2Adapter';
+import { OpenCode2Adapter } from '../../../../../src/core/agents/backend/opencode/OpenCode2Adapter';
 
 function adapterWithClient(client: object) {
   const adapter = new OpenCode2Adapter({ workingDirectory: '/vault',

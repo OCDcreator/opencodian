@@ -7,11 +7,11 @@
  * approvalPolicy as either a known scalar or a granular object. Lifecycle
  * evidence mapping is covered by CodexAdapter evidence tests.
  */
-import { CodexAdapter } from '../../../../../src/core/agents/backend/CodexAdapter';
+import { CodexAdapter } from '../../../../../src/core/agents/backend/codex/CodexAdapter';
 import {
   buildUniformEffectiveEvidence,
   CodexAppServerClient,
-} from '../../../../../src/core/agents/backend/CodexAppServerClient';
+} from '../../../../../src/core/agents/backend/codex/CodexAppServerClient';
 
 const FULL_THREAD = {
   id: 'thread-1',

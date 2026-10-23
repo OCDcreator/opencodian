@@ -88,9 +88,9 @@ Claude Code 的 `info` / `debug` 日志额外受 `backendSettings.claudeCode.deb
 
 - `src/shared/debugModules.ts`: 提供模块注册表、默认值和 scope 映射
 - `src/main.ts`: 在设置加载 / 保存后同步 logger 全局状态，并输出 `always` 启动 build marker
-- `src/features/settings/SettingsDebugSection.ts`: 暴露 debug 总开关、模块开关、刷新间隔、清空缓存和诊断动作
-- `src/features/settings/SettingsDebugSection.ts`: Claude Code 页按 `moduleKey === 'claudeCode'` 与 channel 设置过滤最近日志预览
-- `src/features/chat/services/ActiveTabContextUsageCoordinator.ts`: 使用共享指纹节流避免 context-usage 轮询刷屏
+- `src/features/settings/debug/SettingsDebugSection.ts`: 暴露 debug 总开关、模块开关、刷新间隔、清空缓存和诊断动作
+- `src/features/settings/debug/SettingsDebugSection.ts`: Claude Code 页按 `moduleKey === 'claudeCode'` 与 channel 设置过滤最近日志预览
+- `src/features/chat/services/context/ActiveTabContextUsageCoordinator.ts`: 使用共享指纹节流避免 context-usage 轮询刷屏
 
 ## 注意事项
 

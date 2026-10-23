@@ -5,7 +5,7 @@
 
 ## 职责
 
-定义设置界面自绘下拉控件的通用样式。它配合 `src/features/settings/SettingsDropdownControl.ts` 使用，把原生 `<select>` 视觉隐藏，并渲染跨 macOS / Windows 一致的 trigger + 下方 listbox 菜单。
+定义设置界面自绘下拉控件的通用样式。它配合 `src/features/settings/controls/SettingsDropdownControl.ts` 使用，把原生 `<select>` 视觉隐藏，并渲染跨 macOS / Windows 一致的 trigger + 下方 listbox 菜单。
 
 ## 关键类名
 

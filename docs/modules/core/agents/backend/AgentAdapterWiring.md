@@ -48,3 +48,8 @@ The plugin composition supplies Pi extension-command completion localization thr
 ## 2026-10-23 DSH backend
 
 `wireHiddenAdapters` 在存在 vault 路径时惰性注册 `DshAdapter`，注入 `getDshSettings` 和 `getDshExtraEnv`。注册不启动进程；选择后端或测试连接时才启动本地 ACP 子进程，工作目录默认取当前 vault。
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/core/agents/backend/AgentAdapterWiring.ts`。
+- 随目录调整更新的依赖：`src/core/agents/backend/codex/CodexAdapter.ts`、`src/core/agents/backend/codex/CodexCliResolver.ts`、`src/core/agents/backend/dsh/DshAdapter.ts`、`src/core/agents/backend/opencode/OpenCode2Adapter.ts`。

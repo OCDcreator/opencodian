@@ -1,7 +1,7 @@
 import {
   ChatVimNavigationCoordinator,
   type ChatVimNavigationCoordinatorHost,
-} from '../../../../../src/features/chat/services/ChatVimNavigationCoordinator';
+} from '../../../../../src/features/chat/services/surface/ChatVimNavigationCoordinator';
 
 type MockedChatVimNavigationCoordinatorHost = {
   [Key in keyof ChatVimNavigationCoordinatorHost]: ChatVimNavigationCoordinatorHost[Key] extends (

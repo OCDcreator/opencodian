@@ -12,7 +12,7 @@ import {
   type DataviewApiLike,
   getDataviewApi,
   inlineDataviewBlocks,
-} from '../../../../../src/features/chat/services/DataviewContextInliner';
+} from '../../../../../src/features/chat/services/context/DataviewContextInliner';
 
 function fakeApi(render: (query: string) => string | Promise<string>): DataviewApiLike {
   return {

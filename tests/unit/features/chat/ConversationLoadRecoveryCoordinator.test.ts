@@ -11,7 +11,7 @@ import {
   type ConversationLoadRecoveryHostDependencies,
   type ConversationLoadRecoveryPort,
   createConversationLoadRecoveryHost,
-} from '../../../../src/features/chat/services/ConversationLoadRecoveryCoordinator';
+} from '../../../../src/features/chat/services/conversation/ConversationLoadRecoveryCoordinator';
 import { TabManager } from '../../../../src/features/chat/tabs/TabManager';
 import { t } from '../../../../src/i18n';
 

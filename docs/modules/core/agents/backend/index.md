@@ -67,31 +67,31 @@
 
 - `src/core/agents/backend/AgentService.ts`：核心类型导出面
 - `src/core/agents/backend/AgentBackendRouting.ts`：conversation/active backend capability routing helper
-- `src/core/agents/backend/OpenCodeAdapter.ts`：OpenCode adapter 实现
+- `src/core/agents/backend/opencode/OpenCodeAdapter.ts`：OpenCode adapter 实现
 - `src/core/agents/backend/AgentServiceRegistry.ts`：backend registry 实现
-- `src/core/agents/backend/ClaudeCodeAdapter.ts`：Claude Code adapter
-- `src/core/agents/backend/ClaudeProjectSkillDiscovery.ts`：Claude 项目 `.claude/skills` 文件系统 discovery helper
-- `src/core/agents/backend/ClaudeProjectCommandDiscovery.ts`：Claude 项目 `.claude/commands` 文件系统 discovery helper
-- `src/core/agents/backend/ClaudeProjectAgentDiscovery.ts`：Claude 项目 `.claude/agents` 文件系统 discovery helper
-- `src/core/agents/backend/ClaudeCodeModelCatalog.ts`：Claude Code composer model catalog 与 effort variants projection
-- `src/core/agents/backend/ClaudeCodeSdkLoader.ts`：官方 Claude Agent SDK dynamic import facade
-- `src/core/agents/backend/ClaudeCodeOptionsBuilder.ts`：Claude SDK options 形状 builder
-- `src/core/agents/backend/ClaudeCodeMcpConfigAdapter.ts`：OpenCodian MCP config 到 Claude SDK `mcpServers` 的配置桥接 helper
-- `src/core/agents/backend/ClaudeCodeElicitationBridge.ts`：Claude SDK `onElicitation` request/content 到 OpenCodian `QuestionRequest` 的 shape mapping helper；仅证明 wiring，不代表真实 MCP server roundtrip 已 pass
-- `src/core/agents/backend/ClaudeCodeProcessResolver.ts`：Claude process/executable 解析 helper
-- `src/core/agents/backend/ClaudeCodeStreamNormalizer.ts`：Claude SDK message 到 `StreamChunk` 的转换 helper
-- `src/core/agents/backend/ClaudeCodePermissionBridge.ts`：Claude `canUseTool` / `AskUserQuestion` 到 OpenCodian permission/question host 的桥接 helper
-- `src/core/agents/backend/CodexAdapter.ts`：Codex SDK adapter 骨架（Chat + Session）
-- `src/core/agents/backend/CodexCliResolver.ts`：用户安装 Codex CLI 的显式路径 / GUI PATH / Windows npm shim 解析；不读取插件私有 runtime
-- `src/core/agents/backend/CodexDefaultApprovalHost.ts`：Codex 审批 bridge 的默认 host 实现；连接 adapter 的 `setApprovalHost` 到 view 的 question/inline-card UI
-- `src/core/agents/backend/CodexElicitationBridge.ts`：Codex `mcpServer/elicitation/request` 桥（form/url builder + wire 类型 + host seam）；独立文件，与 Claude bridge 镜像但不共享 helper（2 consumers < 3+ 阈值）
-- `src/core/agents/backend/CodexStreamNormalizer.ts`：Codex SDK ThreadEvent → StreamChunk 转换器
-- `src/core/agents/backend/CodexAppServerClientTypes.ts`：从 `CodexAppServerClient` 拆出的纯 wire 类型模块（thread/model/account/MCP/review 等），由 `CodexAppServerClient` 通过 `export *` 重新导出
-- `src/core/agents/backend/CodexAppServerTransport.ts`：从 `CodexAppServerClient` 拆出的基类，负责 app-server 进程生命周期与 JSON-RPC 2.0 plumbing；`CodexAppServerClient extends CodexAppServerTransport`
-- `src/core/agents/backend/CodexAppServerClientNormalization.ts`：从 `CodexAppServerClient` 拆出的 transcript 归一化纯函数模块（`normalizeThreadList` / `normalizeTurnsToPreviewMessages`）
+- `src/core/agents/backend/claude/ClaudeCodeAdapter.ts`：Claude Code adapter
+- `src/core/agents/backend/claude/ClaudeProjectSkillDiscovery.ts`：Claude 项目 `.claude/skills` 文件系统 discovery helper
+- `src/core/agents/backend/claude/ClaudeProjectCommandDiscovery.ts`：Claude 项目 `.claude/commands` 文件系统 discovery helper
+- `src/core/agents/backend/claude/ClaudeProjectAgentDiscovery.ts`：Claude 项目 `.claude/agents` 文件系统 discovery helper
+- `src/core/agents/backend/claude/ClaudeCodeModelCatalog.ts`：Claude Code composer model catalog 与 effort variants projection
+- `src/core/agents/backend/claude/ClaudeCodeSdkLoader.ts`：官方 Claude Agent SDK dynamic import facade
+- `src/core/agents/backend/claude/ClaudeCodeOptionsBuilder.ts`：Claude SDK options 形状 builder
+- `src/core/agents/backend/claude/ClaudeCodeMcpConfigAdapter.ts`：OpenCodian MCP config 到 Claude SDK `mcpServers` 的配置桥接 helper
+- `src/core/agents/backend/claude/ClaudeCodeElicitationBridge.ts`：Claude SDK `onElicitation` request/content 到 OpenCodian `QuestionRequest` 的 shape mapping helper；仅证明 wiring，不代表真实 MCP server roundtrip 已 pass
+- `src/core/agents/backend/claude/ClaudeCodeProcessResolver.ts`：Claude process/executable 解析 helper
+- `src/core/agents/backend/claude/ClaudeCodeStreamNormalizer.ts`：Claude SDK message 到 `StreamChunk` 的转换 helper
+- `src/core/agents/backend/claude/ClaudeCodePermissionBridge.ts`：Claude `canUseTool` / `AskUserQuestion` 到 OpenCodian permission/question host 的桥接 helper
+- `src/core/agents/backend/codex/CodexAdapter.ts`：Codex SDK adapter 骨架（Chat + Session）
+- `src/core/agents/backend/codex/CodexCliResolver.ts`：用户安装 Codex CLI 的显式路径 / GUI PATH / Windows npm shim 解析；不读取插件私有 runtime
+- `src/core/agents/backend/codex/CodexDefaultApprovalHost.ts`：Codex 审批 bridge 的默认 host 实现；连接 adapter 的 `setApprovalHost` 到 view 的 question/inline-card UI
+- `src/core/agents/backend/codex/CodexElicitationBridge.ts`：Codex `mcpServer/elicitation/request` 桥（form/url builder + wire 类型 + host seam）；独立文件，与 Claude bridge 镜像但不共享 helper（2 consumers < 3+ 阈值）
+- `src/core/agents/backend/codex/CodexStreamNormalizer.ts`：Codex SDK ThreadEvent → StreamChunk 转换器
+- `src/core/agents/backend/codex/CodexAppServerClientTypes.ts`：从 `CodexAppServerClient` 拆出的纯 wire 类型模块（thread/model/account/MCP/review 等），由 `CodexAppServerClient` 通过 `export *` 重新导出
+- `src/core/agents/backend/codex/CodexAppServerTransport.ts`：从 `CodexAppServerClient` 拆出的基类，负责 app-server 进程生命周期与 JSON-RPC 2.0 plumbing；`CodexAppServerClient extends CodexAppServerTransport`
+- `src/core/agents/backend/codex/CodexAppServerClientNormalization.ts`：从 `CodexAppServerClient` 拆出的 transcript 归一化纯函数模块（`normalizeThreadList` / `normalizeTurnsToPreviewMessages`）
 - `src/core/agents/backend/diagnostics/`：Codex 会话 trace 子目录（见 `diagnostics/index.md`）——`types` 类型契约、`CodexSessionTraceService` trace runtime、`CodexTraceRingBuffer` 追溯式线记录缓冲、`CodexWireTraceBridge` 线流量桥；不经本 barrel 导出
 - `src/core/types/chat.ts`：提供 `AgentBackendKind` 类型约束
-- `src/core/agents/backend/ClaudeCodeElicitationBridge.ts`：除 elicitation 双向映射外，还导出 SDK >= 0.3.2xx `request_user_dialog` 的 `buildClaudeCodeUserDialogQuestionRequest` / `buildClaudeCodeUserDialogResult`（main.ts 宿主接线消费）
+- `src/core/agents/backend/claude/ClaudeCodeElicitationBridge.ts`：除 elicitation 双向映射外，还导出 SDK >= 0.3.2xx `request_user_dialog` 的 `buildClaudeCodeUserDialogQuestionRequest` / `buildClaudeCodeUserDialogResult`（main.ts 宿主接线消费）
 
 ## 维护约束
 
@@ -120,3 +120,8 @@ The public backend set and barrel now include opencode2 and OpenCode2Adapter. Op
 ## 2026-10-23 DSH backend
 
 `IMPLEMENTED_AGENT_BACKENDS` 新增 `dsh` 并导出 `DshAdapter`；可选择的后端成为 OpenCode 2、Claude Code、Codex、Pi、ZCode 和 DeepSeek Harness 六个。OpenCode 1 的退役、旧会话 owner 和默认 `opencode2` 语义保持。
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/core/agents/backend/index.ts`。
+- 随目录调整更新的依赖：`src/core/agents/backend/claude/ClaudeCodeAdapter.ts`、`src/core/agents/backend/claude/ClaudeCodeElicitationBridge.ts`、`src/core/agents/backend/claude/ClaudeCodeMcpConfigAdapter.ts`、`src/core/agents/backend/claude/ClaudeCodeOptionsBuilder.ts`、`src/core/agents/backend/claude/ClaudeCodePermissionBridge.ts`、`src/core/agents/backend/claude/ClaudeCodeProcessResolver.ts`、`src/core/agents/backend/claude/ClaudeCodeSdkLoader.ts`、`src/core/agents/backend/claude/ClaudeCodeStreamNormalizer.ts`、`src/core/agents/backend/claude/ClaudeProjectAgentDiscovery.ts`、`src/core/agents/backend/claude/ClaudeProjectCommandDiscovery.ts`、`src/core/agents/backend/claude/ClaudeProjectProviderConfig.ts`、`src/core/agents/backend/claude/ClaudeProjectSettingsDiscovery.ts`、`src/core/agents/backend/claude/ClaudeProjectSkillDiscovery.ts`、`src/core/agents/backend/codex/CodexAdapter.ts`、`src/core/agents/backend/codex/CodexDefaultApprovalHost.ts`、`src/core/agents/backend/codex/CodexElicitationBridge.ts`、`src/core/agents/backend/codex/CodexProjectResourceDiscovery.ts`、`src/core/agents/backend/codex/CodexStreamNormalizer.ts`、`src/core/agents/backend/dsh/DshAdapter.ts`、`src/core/agents/backend/opencode/OpenCode2Adapter.ts`、`src/core/agents/backend/opencode/OpenCodeAdapter.ts`、`src/core/agents/backend/configuration/ProjectResourceSecureWrite.ts`。

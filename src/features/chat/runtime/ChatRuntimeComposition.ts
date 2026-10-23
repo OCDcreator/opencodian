@@ -39,115 +39,115 @@ import type {
 import { getConversationBackendSessionId, getTurnDiffNoticeMeta } from '../../../core/types';
 import { t } from '../../../i18n';
 import { getVaultBasePath } from '../../../shared';
-// Host-interface return types (tightened from `unknown` to remove as-never casts at call sites).
-import type { AssistantNoticeCardRendererHost } from '../runtime/AssistantNoticeCardRenderer';
-import { AssistantNoticeCardRenderer } from '../runtime/AssistantNoticeCardRenderer';
-import type { AssistantShellViewHostAdapterHost } from '../runtime/AssistantShellViewHostAdapter';
-import { AssistantShellViewHostAdapter } from '../runtime/AssistantShellViewHostAdapter';
-import type { BackgroundTaskIndicatorCoordinatorHost } from '../runtime/BackgroundTaskIndicatorCoordinator';
-import { BackgroundTaskIndicatorCoordinator } from '../runtime/BackgroundTaskIndicatorCoordinator';
-import type { BackgroundTaskInlinePanelRendererHost } from '../runtime/BackgroundTaskInlinePanelRenderer';
-import { BackgroundTaskInlinePanelRenderer } from '../runtime/BackgroundTaskInlinePanelRenderer';
-import { BackgroundTaskStreamTriggerCoordinator } from '../runtime/BackgroundTaskStreamTriggerCoordinator';
-import { ConversationLoadRuntimeBridge } from '../runtime/ConversationLoadRuntimeBridge';
-import { PermissionInlineCardRenderer } from '../runtime/PermissionInlineCardRenderer';
-import {
-  summarizeChatMessageForDebug,
-  summarizeContentBlocksForDebug,
-  summarizeCoreStreamChunkForDebug,
-} from '../runtime/SendPipelineDebugSummaries';
-import type { SendPipelineDebugContentBlock,SendPipelineHostDependencies } from '../runtime/SendPipelineRuntime';
-import { createSendPipelineRuntimeHost,SendPipelineRuntime } from '../runtime/SendPipelineRuntime';
-import { shouldRefreshOpenCodeDiagnosticsHeader } from '../runtime/SendPipelineRuntime';
-import type { StreamingInlineCardRendererHost } from '../runtime/StreamingInlineCardRenderer';
-import { StreamingInlineCardRenderer } from '../runtime/StreamingInlineCardRenderer';
-import { TabConversationActivationBridge } from '../runtime/TabConversationActivationBridge';
-import { TabConversationStateBridge } from '../runtime/TabConversationStateBridge';
-import { TabRuntimeStateBridge } from '../runtime/TabRuntimeStateBridge';
-import { TabViewActivationBridge } from '../runtime/TabViewActivationBridge';
-import type { UserMessageContentRendererHost } from '../runtime/UserMessageContentRenderer';
-import { UserMessageContentRenderer } from '../runtime/UserMessageContentRenderer';
-import type { UserMessageFooterRendererHost } from '../runtime/UserMessageFooterRenderer';
-import { UserMessageFooterRenderer } from '../runtime/UserMessageFooterRenderer';
-import type { ActiveTabContextUsageCoordinatorHost } from '../services/ActiveTabContextUsageCoordinator';
-import { ActiveTabContextUsageCoordinator } from '../services/ActiveTabContextUsageCoordinator';
-import { AssistantAutoInternalLinkService } from '../services/AssistantAutoInternalLinkService';
-import type { BackgroundTaskCompletionNoticeServiceHost } from '../services/BackgroundTaskCompletionNoticeService';
-import { BackgroundTaskCompletionNoticeService } from '../services/BackgroundTaskCompletionNoticeService';
-import type { BackgroundTaskLiveSignalCoordinatorHostBuilderHost } from '../services/BackgroundTaskLiveSignalCoordinator';
-import { BackgroundTaskLiveSignalCoordinator } from '../services/BackgroundTaskLiveSignalCoordinator';
-import type { BackgroundTaskNoticeStateServiceHost } from '../services/BackgroundTaskNoticeStateService';
-import { BackgroundTaskNoticeStateService } from '../services/BackgroundTaskNoticeStateService';
-import type { BackgroundTaskViewHost } from '../services/BackgroundTaskTimelineService';
-import type { BackgroundTaskTimelineServiceHost } from '../services/BackgroundTaskTimelineService';
-import { BackgroundTaskTimelineService, createBackgroundTaskViewHost } from '../services/BackgroundTaskTimelineService';
-import type { ChatHeaderPresenterHost } from '../services/ChatHeaderPresenter';
-import { ChatHeaderPresenter } from '../services/ChatHeaderPresenter';
-import type { ChatSelectionControlsCoordinatorHost } from '../services/ChatSelectionControlsCoordinator';
-import { ChatSelectionControlsCoordinator } from '../services/ChatSelectionControlsCoordinator';
-import type { ChatSurfaceAppearanceCoordinatorHost } from '../services/ChatSurfaceAppearanceCoordinator';
-import { ChatSurfaceAppearanceCoordinator } from '../services/ChatSurfaceAppearanceCoordinator';
-import type { ChildSessionGraphCoordinatorHost } from '../services/ChildSessionGraphCoordinator';
-import { ChildSessionGraphCoordinator } from '../services/ChildSessionGraphCoordinator';
-import type { ComposerContextViewHost, FocusContextPreviewWritebackHost, FocusContextRuntimeViewHost } from '../services/ComposerContextViewFacade';
-import { ComposerContextViewFacade } from '../services/ComposerContextViewFacade';
-import type { ComposerInputShellCoordinatorHost } from '../services/ComposerInputShellCoordinator';
-import { ComposerInputShellCoordinator } from '../services/ComposerInputShellCoordinator';
-import type { ConversationAuthoritativeSyncHost } from '../services/ConversationAuthoritativeSyncCoordinator';
-import { ConversationAuthoritativeSyncCoordinator } from '../services/ConversationAuthoritativeSyncCoordinator';
-import type { ConversationHistoryActionsHost } from '../services/ConversationHistoryActionsCoordinator';
-import { ConversationHistoryActionsCoordinator } from '../services/ConversationHistoryActionsCoordinator';
-import type { ConversationHydrationRuntimeBridges, ConversationHydrationRuntimeViewHost } from '../services/ConversationHydrationRuntimeViewHostFactory';
-import {
-  assembleConversationHydrationRuntime,
-} from '../services/ConversationHydrationRuntimeViewHostFactory';
-import { ConversationIdentityRuntime } from '../services/ConversationIdentityRuntime';
+import type { BackgroundTaskCompletionNoticeServiceHost } from '../services/background/BackgroundTaskCompletionNoticeService';
+import { BackgroundTaskCompletionNoticeService } from '../services/background/BackgroundTaskCompletionNoticeService';
+import type { BackgroundTaskLiveSignalCoordinatorHostBuilderHost } from '../services/background/BackgroundTaskLiveSignalCoordinator';
+import { BackgroundTaskLiveSignalCoordinator } from '../services/background/BackgroundTaskLiveSignalCoordinator';
+import type { BackgroundTaskNoticeStateServiceHost } from '../services/background/BackgroundTaskNoticeStateService';
+import { BackgroundTaskNoticeStateService } from '../services/background/BackgroundTaskNoticeStateService';
+import type { BackgroundTaskViewHost } from '../services/background/BackgroundTaskTimelineService';
+import type { BackgroundTaskTimelineServiceHost } from '../services/background/BackgroundTaskTimelineService';
+import { BackgroundTaskTimelineService, createBackgroundTaskViewHost } from '../services/background/BackgroundTaskTimelineService';
+import type { ComposerContextViewHost, FocusContextPreviewWritebackHost, FocusContextRuntimeViewHost } from '../services/composer/ComposerContextViewFacade';
+import { ComposerContextViewFacade } from '../services/composer/ComposerContextViewFacade';
+import type { ComposerInputShellCoordinatorHost } from '../services/composer/ComposerInputShellCoordinator';
+import { ComposerInputShellCoordinator } from '../services/composer/ComposerInputShellCoordinator';
+import type { ActiveTabContextUsageCoordinatorHost } from '../services/context/ActiveTabContextUsageCoordinator';
+import { ActiveTabContextUsageCoordinator } from '../services/context/ActiveTabContextUsageCoordinator';
+import { ServerReferenceContextService } from '../services/context/ServerReferenceContextService';
+import type { ChildSessionGraphCoordinatorHost } from '../services/conversation/ChildSessionGraphCoordinator';
+import { ChildSessionGraphCoordinator } from '../services/conversation/ChildSessionGraphCoordinator';
+import type { ConversationHistoryActionsHost } from '../services/conversation/ConversationHistoryActionsCoordinator';
+import { ConversationHistoryActionsCoordinator } from '../services/conversation/ConversationHistoryActionsCoordinator';
+import { ConversationIdentityRuntime } from '../services/conversation/ConversationIdentityRuntime';
 import {
   assembleConversationLoadRecovery,
   ConversationLoadRecoveryCoordinator,
-} from '../services/ConversationLoadRecoveryCoordinator';
-import type { ConversationNoticeCoordinatorHost } from '../services/ConversationNoticeCoordinator';
-import { ConversationNoticeCoordinator } from '../services/ConversationNoticeCoordinator';
-import { ConversationRenderService, createConversationRenderHost } from '../services/ConversationRenderService';
-import type { ConversationSessionSettingsCoordinatorHost } from '../services/ConversationSessionSettingsCoordinator';
-import { ConversationSessionSettingsCoordinator } from '../services/ConversationSessionSettingsCoordinator';
-import type { ConversationSessionSignalRuntimeHost } from '../services/ConversationSessionSignalRuntime';
-import { ConversationSessionSignalRuntime } from '../services/ConversationSessionSignalRuntime';
-import type { ConversationSyncBridgePorts } from '../services/ConversationSyncBridge';
-import { ConversationSyncBridge } from '../services/ConversationSyncBridge';
-import type { ConversationSyncRuntimeAssemblyViewHost } from '../services/ConversationSyncHostAdapter';
-import { assembleConversationSyncRuntime } from '../services/ConversationSyncHostAdapter';
-import { ConversationSyncOrchestrationService } from '../services/ConversationSyncOrchestrationService';
-import { ConversationSyncRuntimeCoordinator } from '../services/ConversationSyncRuntimeCoordinator';
-import type { ConversationTabLifecycleRecoveryHost } from '../services/ConversationTabLifecycleRecoveryCoordinator';
-import type { ConversationTabOpenHost } from '../services/ConversationTabOpenCoordinator';
-import { ConversationTabOpenCoordinator } from '../services/ConversationTabOpenCoordinator';
-import type { TabRuntimeViewSource } from '../services/ConversationTabRuntimeCoordinator';
+} from '../services/conversation/ConversationLoadRecoveryCoordinator';
+import type { ConversationSessionSettingsCoordinatorHost } from '../services/conversation/ConversationSessionSettingsCoordinator';
+import { ConversationSessionSettingsCoordinator } from '../services/conversation/ConversationSessionSettingsCoordinator';
+import type { ConversationSessionSignalRuntimeHost } from '../services/conversation/ConversationSessionSignalRuntime';
+import { ConversationSessionSignalRuntime } from '../services/conversation/ConversationSessionSignalRuntime';
+import type { ConversationTabLifecycleRecoveryHost } from '../services/conversation/ConversationTabLifecycleRecoveryCoordinator';
+import type { ConversationTabOpenHost } from '../services/conversation/ConversationTabOpenCoordinator';
+import { ConversationTabOpenCoordinator } from '../services/conversation/ConversationTabOpenCoordinator';
+import type { TabRuntimeViewSource } from '../services/conversation/ConversationTabRuntimeCoordinator';
 import {
   assembleConversationTabRuntime,
   ConversationTabRuntimeCoordinator,
-} from '../services/ConversationTabRuntimeCoordinator';
-import type { ConversationViewStateHost } from '../services/ConversationViewStateService';
-import type { InputPanelAppearanceCoordinatorHost } from '../services/InputPanelAppearanceCoordinator';
-import { InputPanelAppearanceCoordinator } from '../services/InputPanelAppearanceCoordinator';
-import { createMessageFinalizationHost,MessageFinalizationService } from '../services/MessageFinalizationService';
+} from '../services/conversation/ConversationTabRuntimeCoordinator';
+import type { ConversationViewStateHost } from '../services/conversation/ConversationViewStateService';
+import { QuestionDockSlotCoordinator } from '../services/questions/QuestionDockSlotCoordinator';
+import type { QuestionRuntimeServices } from '../services/questions/QuestionRuntimeHostAdapter';
+import type { QuestionRuntimeViewHostFactoryHost } from '../services/questions/QuestionRuntimeViewHostFactory';
+import { createQuestionRuntimeBundle } from '../services/questions/QuestionRuntimeViewHostFactory';
+import type { TabConversationSyncFingerprintRuntimePort } from '../services/questions/QuestionTodoBackgroundTaskRuntimeServiceBundle';
+import {
+  createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam,
+} from '../services/questions/QuestionTodoBackgroundTaskRuntimeServiceBundle';
+import { AssistantAutoInternalLinkService } from '../services/rendering/AssistantAutoInternalLinkService';
+import type { ConversationNoticeCoordinatorHost } from '../services/rendering/ConversationNoticeCoordinator';
+import { ConversationNoticeCoordinator } from '../services/rendering/ConversationNoticeCoordinator';
+import { ConversationRenderService, createConversationRenderHost } from '../services/rendering/ConversationRenderService';
+import type { SettledScrollScheduler } from '../services/rendering/ScrollManager';
+import type { ChatSelectionControlsCoordinatorHost } from '../services/selection/ChatSelectionControlsCoordinator';
+import { ChatSelectionControlsCoordinator } from '../services/selection/ChatSelectionControlsCoordinator';
+import { createMessageFinalizationHost,MessageFinalizationService } from '../services/send/MessageFinalizationService';
 import {
   createMessageSendPreparationHost,
   MessageSendPreparationService,
   type SendMessageModelOptions,
-} from '../services/MessageSendPreparationService';
-import type { PersistentAssistantNoticeServiceHost } from '../services/PersistentAssistantNoticeService';
-import { PersistentAssistantNoticeService } from '../services/PersistentAssistantNoticeService';
-import { QuestionDockSlotCoordinator } from '../services/QuestionDockSlotCoordinator';
-import type { QuestionRuntimeServices } from '../services/QuestionRuntimeHostAdapter';
-import type { QuestionRuntimeViewHostFactoryHost } from '../services/QuestionRuntimeViewHostFactory';
-import { createQuestionRuntimeBundle } from '../services/QuestionRuntimeViewHostFactory';
-import type { TabConversationSyncFingerprintRuntimePort } from '../services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
+} from '../services/send/MessageSendPreparationService';
+import type { PersistentAssistantNoticeServiceHost } from '../services/send/PersistentAssistantNoticeService';
+import { PersistentAssistantNoticeService } from '../services/send/PersistentAssistantNoticeService';
+import type { ChatHeaderPresenterHost } from '../services/surface/ChatHeaderPresenter';
+import { ChatHeaderPresenter } from '../services/surface/ChatHeaderPresenter';
+import type { ChatSurfaceAppearanceCoordinatorHost } from '../services/surface/ChatSurfaceAppearanceCoordinator';
+import { ChatSurfaceAppearanceCoordinator } from '../services/surface/ChatSurfaceAppearanceCoordinator';
+import type { InputPanelAppearanceCoordinatorHost } from '../services/surface/InputPanelAppearanceCoordinator';
+import { InputPanelAppearanceCoordinator } from '../services/surface/InputPanelAppearanceCoordinator';
+import type { ConversationAuthoritativeSyncHost } from '../services/sync/ConversationAuthoritativeSyncCoordinator';
+import { ConversationAuthoritativeSyncCoordinator } from '../services/sync/ConversationAuthoritativeSyncCoordinator';
+import type { ConversationHydrationRuntimeBridges, ConversationHydrationRuntimeViewHost } from '../services/sync/ConversationHydrationRuntimeViewHostFactory';
 import {
-  createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam,
-} from '../services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
-import type { SettledScrollScheduler } from '../services/ScrollManager';
-import { ServerReferenceContextService } from '../services/ServerReferenceContextService';
+  assembleConversationHydrationRuntime,
+} from '../services/sync/ConversationHydrationRuntimeViewHostFactory';
+import type { ConversationSyncBridgePorts } from '../services/sync/ConversationSyncBridge';
+import { ConversationSyncBridge } from '../services/sync/ConversationSyncBridge';
+import type { ConversationSyncRuntimeAssemblyViewHost } from '../services/sync/ConversationSyncHostAdapter';
+import { assembleConversationSyncRuntime } from '../services/sync/ConversationSyncHostAdapter';
+import { ConversationSyncOrchestrationService } from '../services/sync/ConversationSyncOrchestrationService';
+import { ConversationSyncRuntimeCoordinator } from '../services/sync/ConversationSyncRuntimeCoordinator';
+import { ConversationLoadRuntimeBridge } from './activation/ConversationLoadRuntimeBridge';
+import { TabConversationActivationBridge } from './activation/TabConversationActivationBridge';
+import { TabConversationStateBridge } from './activation/TabConversationStateBridge';
+import { TabRuntimeStateBridge } from './activation/TabRuntimeStateBridge';
+import { TabViewActivationBridge } from './activation/TabViewActivationBridge';
+import type { BackgroundTaskIndicatorCoordinatorHost } from './background/BackgroundTaskIndicatorCoordinator';
+import { BackgroundTaskIndicatorCoordinator } from './background/BackgroundTaskIndicatorCoordinator';
+import type { BackgroundTaskInlinePanelRendererHost } from './background/BackgroundTaskInlinePanelRenderer';
+import { BackgroundTaskInlinePanelRenderer } from './background/BackgroundTaskInlinePanelRenderer';
+import { BackgroundTaskStreamTriggerCoordinator } from './background/BackgroundTaskStreamTriggerCoordinator';
+// Host-interface return types (tightened from `unknown` to remove as-never casts at call sites).
+import type { AssistantNoticeCardRendererHost } from './rendering/AssistantNoticeCardRenderer';
+import { AssistantNoticeCardRenderer } from './rendering/AssistantNoticeCardRenderer';
+import type { AssistantShellViewHostAdapterHost } from './rendering/AssistantShellViewHostAdapter';
+import { AssistantShellViewHostAdapter } from './rendering/AssistantShellViewHostAdapter';
+import { PermissionInlineCardRenderer } from './rendering/PermissionInlineCardRenderer';
+import type { StreamingInlineCardRendererHost } from './rendering/StreamingInlineCardRenderer';
+import { StreamingInlineCardRenderer } from './rendering/StreamingInlineCardRenderer';
+import type { UserMessageContentRendererHost } from './rendering/UserMessageContentRenderer';
+import { UserMessageContentRenderer } from './rendering/UserMessageContentRenderer';
+import type { UserMessageFooterRendererHost } from './rendering/UserMessageFooterRenderer';
+import { UserMessageFooterRenderer } from './rendering/UserMessageFooterRenderer';
+import {
+  summarizeChatMessageForDebug,
+  summarizeContentBlocksForDebug,
+  summarizeCoreStreamChunkForDebug,
+} from './send/SendPipelineDebugSummaries';
+import type { SendPipelineDebugContentBlock,SendPipelineHostDependencies } from './send/SendPipelineRuntime';
+import { createSendPipelineRuntimeHost,SendPipelineRuntime } from './send/SendPipelineRuntime';
+import { shouldRefreshOpenCodeDiagnosticsHeader } from './send/SendPipelineRuntime';
 
 interface ZCodeImageCatalogAdapter {
   start?(): Promise<void>;
@@ -179,23 +179,23 @@ async function getZCodeImageInputSupport(
     return 'unavailable';
   }
 }
-import type { SessionTodoCoordinator } from '../services/SessionTodoHostAdapter';
-import type { SessionTodoViewHost } from '../services/SessionTodoHostAdapter';
-import { createSessionTodoCoordinator } from '../services/SessionTodoHostAdapter';
-import { createSlashCommandExecutionHost, executeCompactSession } from '../services/SlashCommandExecutionHostFactory';
-import { SlashCommandExecutionService } from '../services/SlashCommandExecutionService';
-import type { TabActivationRuntimeHostProviderHost } from '../services/TabActivationRuntimeHostProvider';
-import type { TabActivationConversationSyncRuntimePort } from '../services/TabActivationRuntimeViewHostFactory';
+import { createSlashCommandExecutionHost, executeCompactSession } from '../services/commands/SlashCommandExecutionHostFactory';
+import { SlashCommandExecutionService } from '../services/commands/SlashCommandExecutionService';
+import { UrlContextFetchService } from '../services/context/UrlContextFetchService';
+import { VaultRetrievalComposerCoordinator } from '../services/context/VaultRetrievalComposerCoordinator';
+import type { TabActivationRuntimeHostProviderHost } from '../services/conversation/TabActivationRuntimeHostProvider';
+import type { TabActivationConversationSyncRuntimePort } from '../services/conversation/TabActivationRuntimeViewHostFactory';
 import {
   assembleTabActivationConversationSyncRuntimePort,
   createTabActivationRuntimeAssembly,
-} from '../services/TabActivationRuntimeViewHostFactory';
-import type { TabMessagesPaneCoordinatorHost } from '../services/TabMessagesPaneCoordinator';
-import { TabMessagesPaneCoordinator } from '../services/TabMessagesPaneCoordinator';
-import { TitleGenerationService } from '../services/TitleGenerationService';
-import { createDebugLogCallbacks } from '../services/trailingAssistantPatchDebug';
-import { UrlContextFetchService } from '../services/UrlContextFetchService';
-import { VaultRetrievalComposerCoordinator } from '../services/VaultRetrievalComposerCoordinator';
+} from '../services/conversation/TabActivationRuntimeViewHostFactory';
+import type { TabMessagesPaneCoordinatorHost } from '../services/conversation/TabMessagesPaneCoordinator';
+import { TabMessagesPaneCoordinator } from '../services/conversation/TabMessagesPaneCoordinator';
+import type { SessionTodoCoordinator } from '../services/questions/SessionTodoHostAdapter';
+import type { SessionTodoViewHost } from '../services/questions/SessionTodoHostAdapter';
+import { createSessionTodoCoordinator } from '../services/questions/SessionTodoHostAdapter';
+import { createDebugLogCallbacks } from '../services/sync/trailingAssistantPatchDebug';
+import { TitleGenerationService } from '../services/title/TitleGenerationService';
 import type { TabId } from '../tabs/types';
 
 /** Local alias relocated from OpenCodianView (pre-Task-15 line 389). */

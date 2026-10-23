@@ -1,4 +1,4 @@
-import { shouldRefreshOpenCodeDiagnosticsHeader } from '../../../../src/features/chat/runtime/SendPipelineRuntime';
+import { shouldRefreshOpenCodeDiagnosticsHeader } from '../../../../src/features/chat/runtime/send/SendPipelineRuntime';
 import {
   createAsyncStream,
   createFinalizationPort,

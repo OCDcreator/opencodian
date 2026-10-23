@@ -2,7 +2,7 @@ import {
   getFriendlyServerStartErrorMessage,
   getUnavailableServerMessage,
   MessageFinalizationService,
-} from '../../../../src/features/chat/services/MessageFinalizationService';
+} from '../../../../src/features/chat/services/send/MessageFinalizationService';
 import { createConversation, createHost } from './MessageFinalizationService.testSupport';
 
 describe('getFriendlyServerStartErrorMessage', () => {

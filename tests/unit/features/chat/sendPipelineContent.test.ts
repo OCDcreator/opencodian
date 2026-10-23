@@ -6,7 +6,7 @@ import {
   hasVisibleStreamingContent,
   isDuplicateStructuredOutputText,
   mapStreamingContentBlocksToMessageContentBlocks,
-} from '../../../../src/features/chat/runtime/sendPipelineContent';
+} from '../../../../src/features/chat/runtime/send/sendPipelineContent';
 
 describe('sendPipelineContent', () => {
   it('maps streaming content blocks into persisted message blocks', () => {

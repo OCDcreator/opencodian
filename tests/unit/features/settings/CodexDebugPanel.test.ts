@@ -307,7 +307,7 @@ describe('CodexDebugPanel', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
     const path = require('path') as typeof import('path');
     const sectionSource = fs.readFileSync(
-      path.resolve(__dirname, '../../../../src/features/settings/SettingsDebugSection.ts'),
+      path.resolve(__dirname, '../../../../src/features/settings/debug/SettingsDebugSection.ts'),
       'utf8',
     );
     const panelSource = fs.readFileSync(

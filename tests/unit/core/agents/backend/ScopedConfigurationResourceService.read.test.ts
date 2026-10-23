@@ -6,11 +6,11 @@ import * as path from 'path';
 import {
   computeFileRevision,
   type FileRevision,
-} from '../../../../../src/core/agents/backend/ProjectResourceSecureWrite';
+} from '../../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite';
 import {
   type ScopedConfigurationResourceReadResult,
   ScopedConfigurationResourceService,
-} from '../../../../../src/core/agents/backend/ScopedConfigurationResourceService';
+} from '../../../../../src/core/agents/backend/configuration/ScopedConfigurationResourceService';
 
 jest.mock('fs/promises', () => {
   const actual = jest.requireActual<typeof import('fs/promises')>('fs/promises');

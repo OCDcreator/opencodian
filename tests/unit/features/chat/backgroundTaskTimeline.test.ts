@@ -6,12 +6,12 @@ jest.mock('../../../../src/core/opencode', () => ({
 
 import type { ChatMessage } from '../../../../src/core/types';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
-import { BackgroundTaskIndicatorCoordinator } from '../../../../src/features/chat/runtime/BackgroundTaskIndicatorCoordinator';
-import { BackgroundTaskNoticeStateService } from '../../../../src/features/chat/services/BackgroundTaskNoticeStateService';
+import { BackgroundTaskIndicatorCoordinator } from '../../../../src/features/chat/runtime/background/BackgroundTaskIndicatorCoordinator';
+import { BackgroundTaskNoticeStateService } from '../../../../src/features/chat/services/background/BackgroundTaskNoticeStateService';
 import {
   BackgroundTaskTimelineService,
   type OmoBackgroundTaskLogState,
-} from '../../../../src/features/chat/services/BackgroundTaskTimelineService';
+} from '../../../../src/features/chat/services/background/BackgroundTaskTimelineService';
 
 function createView(): OpenCodianView {
   return new OpenCodianView(new WorkspaceLeaf(), {

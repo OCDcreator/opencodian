@@ -1,7 +1,7 @@
 import type { App } from 'obsidian';
 import { TFile, TFolder } from 'obsidian';
 
-import { ContextFileCatalogService } from '../../../../src/features/chat/services/ContextFileCatalogService';
+import { ContextFileCatalogService } from '../../../../src/features/chat/services/context/ContextFileCatalogService';
 
 function createFile(path: string): TFile {
   const file = new TFile();

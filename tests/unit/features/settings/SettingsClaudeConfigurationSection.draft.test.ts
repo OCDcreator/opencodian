@@ -1,4 +1,4 @@
-import { SettingsClaudeConfigurationSection } from '../../../../src/features/settings/SettingsClaudeConfigurationSection';
+import { SettingsClaudeConfigurationSection } from '../../../../src/features/settings/backends/claude/SettingsClaudeConfigurationSection';
 import { candidate, fakePlugin, flushMicrotasks, projectRevision, readOk, stubService } from './SettingsClaudeConfigurationSection.testSupport';
 
 describe('SettingsClaudeConfigurationSection draft and save lifecycle', () => {

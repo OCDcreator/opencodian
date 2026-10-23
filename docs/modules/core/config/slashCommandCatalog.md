@@ -62,7 +62,7 @@ export function buildVisibleSlashCommandMenuItems(
 
 ## 使用方
 
-- `src/features/settings/SettingsCommandsSection.ts`: 复用共享 merge 逻辑渲染 settings catalog + editor source
+- `src/features/settings/backends/opencode/SettingsCommandsSection.ts`: 复用共享 merge 逻辑渲染 settings catalog + editor source
 - `src/features/chat/OpenCodianView.ts`: 在 composer host seam 中读取 merged catalog，并交给 `ComposerInputShellCoordinator` 做 slash autocomplete menu
 
 ## 注意事项

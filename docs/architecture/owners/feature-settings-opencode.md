@@ -10,15 +10,15 @@ Pricing readiness (2026-09-10): CostEstimateSettingsRow can refresh backend-spec
 
 - **Layer:** `feature` (may import layers: shared, core, feature)
 - **Risk:** medium
-- **Include:** `src/features/settings/SettingsBackendSection.ts`, `src/features/settings/OpencodeConfigModal.ts`, `src/features/settings/OpenCodeProjectConfigHelpModal.ts`, `src/features/settings/projectAgentEditorConfig.ts`, `src/features/settings/ProjectConfigFileWatcher.ts`, `src/features/settings/SettingsProjectAgentEditor.ts`, `src/features/settings/SettingsProjectCommandEditor.ts`, `src/features/settings/SettingsServerSection.ts`, `src/features/settings/ServerSettingHelpModal.ts`, `src/features/settings/SettingsCommandsSection.ts`, `src/features/settings/CostEstimateSettingsRow.ts`
+- **Include:** `src/features/settings/backends/opencode/SettingsBackendSection.ts`, `src/features/settings/backends/opencode/OpencodeConfigModal.ts`, `src/features/settings/backends/opencode/OpenCodeProjectConfigHelpModal.ts`, `src/features/settings/backends/opencode/projectAgentEditorConfig.ts`, `src/features/settings/backends/opencode/ProjectConfigFileWatcher.ts`, `src/features/settings/backends/opencode/SettingsProjectAgentEditor.ts`, `src/features/settings/backends/opencode/SettingsProjectCommandEditor.ts`, `src/features/settings/backends/opencode/SettingsServerSection.ts`, `src/features/settings/backends/opencode/ServerSettingHelpModal.ts`, `src/features/settings/backends/opencode/SettingsCommandsSection.ts`, `src/features/settings/backends/opencode/CostEstimateSettingsRow.ts`
 
 ## Responsibilities
 - OpenCode backend/server sections, opencode config modal, project config help/file watcher
 - project agent/command editors, commands section, cost estimate row
 
 ## Entrypoints
-- `src/features/settings/OpencodeConfigModal.ts`
-- `src/features/settings/SettingsServerSection.ts`
+- `src/features/settings/backends/opencode/OpencodeConfigModal.ts`
+- `src/features/settings/backends/opencode/SettingsServerSection.ts`
 
 ## Dependency surface
 - **Allowed owner dependencies:** `shared.foundation`, `core.opencode`, `core.config`, `core.types`
@@ -57,3 +57,9 @@ Settings expose OpenCode 1 and 2 separately and provide local executable or remo
 ## 2026-10-23 DSH connection settings
 
 既有 `SettingsBackendSection` 增加 DSH 启用项和可执行路径/工作目录/测试连接控件。控件只保存 core.types 设置或调用 core.backend 的 `start()`；不创建原生会话、发送模型提示或持有持久连接 listener。
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/features/settings/backends/opencode`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

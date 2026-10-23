@@ -1,12 +1,12 @@
-import { ClaudeCodeAdapter, type ClaudeCodeSdkFacade } from '../../../../../src/core/agents/backend/ClaudeCodeAdapter';
+import { ClaudeCodeAdapter, type ClaudeCodeSdkFacade } from '../../../../../src/core/agents/backend/claude/ClaudeCodeAdapter';
 import {
   ClaudeCodeAsyncQueue,
   type ClaudeCodeMcpPermissionModeOverride,
   type ClaudeCodeQueuedPrompt,
   type ClaudeCodeRuntimeOutput,
   type ClaudeCodeSessionRuntime,
-} from '../../../../../src/core/agents/backend/ClaudeCodeQueue';
-import { ClaudeCodeStreamNormalizer } from '../../../../../src/core/agents/backend/ClaudeCodeStreamNormalizer';
+} from '../../../../../src/core/agents/backend/claude/ClaudeCodeQueue';
+import { ClaudeCodeStreamNormalizer } from '../../../../../src/core/agents/backend/claude/ClaudeCodeStreamNormalizer';
 import { getDefaultClaudeCodeBackendSettings } from '../../../../../src/core/types';
 
 interface TestSession {

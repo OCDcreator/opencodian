@@ -1,11 +1,11 @@
-import type { PostSyncQuestionTodoRefreshFacade } from '../../../../src/features/chat/services/PostSyncQuestionTodoRefreshFacade';
+import type { PostSyncQuestionTodoRefreshFacade } from '../../../../src/features/chat/services/questions/PostSyncQuestionTodoRefreshFacade';
 import {
   VisibleConversationPostSyncCoordinator,
-} from '../../../../src/features/chat/services/VisibleConversationPostSyncCoordinator';
+} from '../../../../src/features/chat/services/sync/VisibleConversationPostSyncCoordinator';
 import type {
   VisibleConversationPostSyncOutcome,
   VisibleConversationPostSyncStateCoordinator,
-} from '../../../../src/features/chat/services/VisibleConversationPostSyncStateCoordinator';
+} from '../../../../src/features/chat/services/sync/VisibleConversationPostSyncStateCoordinator';
 
 type VisibleConversationRefreshPort = Pick<
   PostSyncQuestionTodoRefreshFacade,

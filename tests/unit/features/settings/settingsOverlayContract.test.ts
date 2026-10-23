@@ -2,11 +2,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const files = [
-  'src/features/settings/settingsStyleControls.ts',
-  'src/features/settings/SettingsStyleBackgroundSection.ts',
-  'src/features/settings/SettingsModelIconCacheManager.ts',
-  'src/features/settings/SlashCommandCatalogRenderer.ts',
-  'src/features/settings/SettingsCapabilityLabSection.ts',
+  'src/features/settings/appearance/settingsStyleControls.ts',
+  'src/features/settings/appearance/SettingsStyleBackgroundSection.ts',
+  'src/features/settings/models/SettingsModelIconCacheManager.ts',
+  'src/features/settings/resources/SlashCommandCatalogRenderer.ts',
+  'src/features/settings/capabilities/SettingsCapabilityLabSection.ts',
 ];
 
 describe('settings overlay contract', () => {

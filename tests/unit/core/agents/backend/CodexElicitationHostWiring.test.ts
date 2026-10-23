@@ -22,8 +22,8 @@ const mockRegisterMcpElicitationHandler = jest.fn((handler: (params: unknown, si
   elicitationHandler = handler;
 });
 
-jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => {
-  const actual = jest.requireActual('../../../../../src/core/agents/backend/CodexAppServerClient');
+jest.mock('../../../../../src/core/agents/backend/codex/CodexAppServerClient', () => {
+  const actual = jest.requireActual('../../../../../src/core/agents/backend/codex/CodexAppServerClient');
   return {
     ...actual,
     CodexAppServerClient: jest.fn().mockImplementation(() => ({
@@ -38,8 +38,8 @@ jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => {
   };
 });
 
-import { CodexAdapter } from '../../../../../src/core/agents/backend/CodexAdapter';
-import type { CodexElicitationFormParams } from '../../../../../src/core/agents/backend/CodexElicitationBridge';
+import { CodexAdapter } from '../../../../../src/core/agents/backend/codex/CodexAdapter';
+import type { CodexElicitationFormParams } from '../../../../../src/core/agents/backend/codex/CodexElicitationBridge';
 
 function createMockCodex(): unknown {
   return {

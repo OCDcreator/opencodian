@@ -1,7 +1,7 @@
 import {
   isOpenCodeSettingsBackendActive,
   resolveSettingsActiveBackend,
-} from '../../../../src/features/settings/settingsBackendGuards';
+} from '../../../../src/features/settings/general/settingsBackendGuards';
 
 describe('settingsBackendGuards', () => {
   it('uses the configured active backend when it is enabled', () => {

@@ -8,8 +8,8 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 
-import { buildClaudeHookHandlerEdit } from '../../../../../src/core/agents/backend/ClaudeSettingsHookModel';
-import { ClaudeSettingsSourceService } from '../../../../../src/core/agents/backend/ClaudeSettingsSourceService';
+import { buildClaudeHookHandlerEdit } from '../../../../../src/core/agents/backend/claude/ClaudeSettingsHookModel';
+import { ClaudeSettingsSourceService } from '../../../../../src/core/agents/backend/claude/ClaudeSettingsSourceService';
 
 const mkService = async (sandbox: string) => {
   const home = path.join(sandbox, 'home');

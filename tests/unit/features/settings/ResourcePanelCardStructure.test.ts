@@ -13,8 +13,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { SettingsClaudeResourcesSection } from '../../../../src/features/settings/SettingsClaudeResourcesSection';
-import { SettingsCodexResourcesSection } from '../../../../src/features/settings/SettingsCodexResourcesSection';
+import { SettingsClaudeResourcesSection } from '../../../../src/features/settings/backends/claude/SettingsClaudeResourcesSection';
+import { SettingsCodexResourcesSection } from '../../../../src/features/settings/backends/codex/SettingsCodexResourcesSection';
 
 jest.mock('../../../../src/core/agents/backend', () => ({
   discoverClaudeProjectCommands: jest.fn().mockResolvedValue([]),

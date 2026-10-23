@@ -10,7 +10,7 @@ import {
   SessionTodoCoordinator,
   type SessionTodoCoordinatorHost,
   type SessionTodoCoordinatorRuntimeState,
-} from '../../../../src/features/chat/services/SessionTodoCoordinator';
+} from '../../../../src/features/chat/services/questions/SessionTodoCoordinator';
 
 type Mocked<T> = {
   [Key in keyof T]:

@@ -1,7 +1,7 @@
 import {
   buildTrailingAssistantPatchSuccessPlanFromChildPlans,
   buildTrailingAssistantPatchSuccessPlanFromChildPlanSource,
-} from '../../../../src/features/chat/services/trailingAssistantPatchExecution';
+} from '../../../../src/features/chat/services/sync/trailingAssistantPatchExecution';
 
 describe('TrailingAssistantPatchSuccessChildPlansHelper', () => {
   it('builds the final success plan from precomputed child plans', () => {

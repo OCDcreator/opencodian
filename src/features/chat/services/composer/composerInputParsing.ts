@@ -1,0 +1,348 @@
+import type { AgentMentionIntent } from '../../../../core/agents';
+import type {
+  CommandComposerSubmission,
+  ComposerInputMode,
+  ComposerInputSubmission,
+  PromptComposerSubmission,
+} from '../send/MessageSendPreparationService';
+
+function parseCommandSubmission(content: string): CommandComposerSubmission | null {
+  const trimmedContent = content.trim();
+  if (!trimmedContent || trimmedContent.startsWith('//')) {
+    return null;
+  }
+
+  // Strategy 1: /command at start of text (backward compatible)
+  if (trimmedContent.startsWith('/')) {
+    const commandBody = trimmedContent.slice(1);
+    if (!commandBody || /^\s/.test(commandBody)) {
+      return null;
+    }
+
+    const commandMatch = /^(\S+)(?:\s+([\s\S]*))?$/.exec(commandBody);
+    if (!commandMatch?.[1]) {
+      return null;
+    }
+
+    return {
+      kind: 'command',
+      rawContent: trimmedContent,
+      command: commandMatch[1],
+      arguments: commandMatch[2] ?? '',
+    };
+  }
+
+  // Strategy 2: /command after whitespace (e.g. "some text /command args")
+  // Use global regex and take the LAST match to prefer the rightmost /command.
+  const midRegex = /\s\/(\S+)/g;
+  let lastMidMatch: RegExpExecArray | null = null;
+  let currentMatch: RegExpExecArray | null;
+  while ((currentMatch = midRegex.exec(trimmedContent)) !== null) {
+    lastMidMatch = currentMatch;
+  }
+
+  if (!lastMidMatch?.[1]) {
+    return null;
+  }
+
+  // Reject // (e.g. "text //comment" should not be treated as a command)
+  const slashPosition = lastMidMatch.index + 1; // position of the '/' in full text
+  if (slashPosition > 0 && trimmedContent[slashPosition - 1] === '/') {
+    return null;
+  }
+
+  const precedingText = trimmedContent.slice(0, lastMidMatch.index).trim();
+  const commandName = lastMidMatch[1];
+  const afterCommand = trimmedContent.slice(lastMidMatch.index + lastMidMatch[0].length);
+  const argumentsText = afterCommand.trim();
+
+  // For mid-text commands, rawContent is the FULL original text so that if the
+  // slash command is not recognized, the send pipeline falls through to sending
+  // the complete text as a regular prompt (no data loss).
+  return {
+    kind: 'command',
+    rawContent: trimmedContent,
+    command: commandName,
+    arguments: argumentsText,
+    precedingText: precedingText || undefined,
+    originalContent: trimmedContent,
+  };
+}
+
+export function buildComposerInputSubmission(
+  content: string,
+  mode: ComposerInputMode = 'prompt',
+): ComposerInputSubmission | null {
+  const trimmedContent = content.trim();
+  if (!trimmedContent) {
+    return null;
+  }
+
+  if (mode === 'shell') {
+    return {
+      kind: 'shell',
+      rawContent: trimmedContent,
+      command: trimmedContent,
+    };
+  }
+
+  return parseCommandSubmission(trimmedContent) ?? {
+    kind: 'prompt',
+    content: trimmedContent,
+  };
+}
+
+export function buildComposerInputSubmissionWithAgentIntents(
+  content: string,
+  mode: ComposerInputMode,
+  mentions: AgentMentionIntent[],
+  primaryAgent: string | null | undefined,
+): ComposerInputSubmission | null {
+  const trimStartOffset = content.length - content.trimStart().length;
+  return decoratePromptSubmissionWithPrimaryAgent(
+    decoratePromptSubmissionWithAgentMentions(
+      buildComposerInputSubmission(content, mode),
+      shiftAgentMentionSourceSpans(mentions, -trimStartOffset),
+    ),
+    primaryAgent,
+  );
+}
+
+export function isCommandComposerText(content: string): boolean {
+  return parseCommandSubmission(content) !== null;
+}
+
+export function decoratePromptSubmissionWithAgentMentions(
+  submission: ComposerInputSubmission | null,
+  mentions: AgentMentionIntent[],
+): ComposerInputSubmission | null {
+  if (!submission || submission.kind !== 'prompt' || mentions.length === 0) {
+    return submission;
+  }
+
+  return {
+    ...submission,
+    invocationIntent: {
+      ...(submission.invocationIntent ?? {}),
+      kind: 'prompt',
+      mentions: [
+        ...getExistingMentions(submission),
+        ...mentions,
+      ],
+    },
+  };
+}
+
+export function shiftAgentMentionSourceSpans(
+  mentions: AgentMentionIntent[],
+  delta: number,
+): AgentMentionIntent[] {
+  if (delta === 0) {
+    return mentions;
+  }
+
+  return mentions.map((mention) => ({
+    ...mention,
+    source: mention.source
+      ? {
+        ...mention.source,
+        start: mention.source.start + delta,
+        end: mention.source.end + delta,
+      }
+      : undefined,
+  }));
+}
+
+export function decoratePromptSubmissionWithPrimaryAgent(
+  submission: ComposerInputSubmission | null,
+  primaryAgent: string | null | undefined,
+): ComposerInputSubmission | null {
+  const normalizedPrimaryAgent = primaryAgent?.trim();
+  if (!submission || submission.kind !== 'prompt' || !normalizedPrimaryAgent) {
+    return submission;
+  }
+
+  return {
+    ...submission,
+    invocationIntent: {
+      ...(submission.invocationIntent ?? {}),
+      kind: 'prompt',
+      primaryAgent: normalizedPrimaryAgent,
+    },
+  };
+}
+
+function getExistingMentions(
+  submission: PromptComposerSubmission,
+): readonly AgentMentionIntent[] {
+  return submission.invocationIntent?.mentions ?? [];
+}
+
+function isSlashCommandMidText(beforeCursor: string, slashIndex: number): boolean {
+  return beforeCursor.slice(0, slashIndex).trim().length > 0;
+}
+
+export interface SlashCommandMenuQuery {
+  query: string;
+  isMidText: boolean;
+}
+
+export function getSlashCommandMenuQuery(textarea: HTMLTextAreaElement): SlashCommandMenuQuery | null {
+  const selectionStart = textarea.selectionStart ?? textarea.value.length;
+  const selectionEnd = textarea.selectionEnd ?? selectionStart;
+  if (selectionStart !== selectionEnd) {
+    return null;
+  }
+
+  const beforeCursor = textarea.value.slice(0, selectionStart);
+  const prefixedSkillsMatch = /(?:^|\s)(\/skills(?:\s+\S*)?\s*)$/i.exec(beforeCursor);
+  if (prefixedSkillsMatch?.[1]) {
+    const slashIndex = prefixedSkillsMatch.index + prefixedSkillsMatch[0].indexOf('/');
+    const prefixedSkillsQuery = prefixedSkillsMatch[1].slice(1);
+    return {
+      query: /^skills\s*$/i.test(prefixedSkillsQuery)
+        ? 'skills '
+        : prefixedSkillsQuery,
+      isMidText: isSlashCommandMidText(beforeCursor, slashIndex),
+    };
+  }
+
+  let slashIndex = -1;
+  for (let i = beforeCursor.length - 1; i >= 0; i--) {
+    const ch = beforeCursor[i];
+    if (ch === '/') {
+      slashIndex = i;
+      break;
+    }
+
+    if (/\s/.test(ch)) {
+      break;
+    }
+  }
+
+  if (slashIndex < 0) {
+    return null;
+  }
+
+  if (slashIndex > 0 && !/\s/.test(beforeCursor[slashIndex - 1])) {
+    return null;
+  }
+
+  if (slashIndex > 0 && beforeCursor[slashIndex - 1] === '/') {
+    return null;
+  }
+  const searchText = beforeCursor.slice(slashIndex + 1);
+  if (/\s/.test(searchText) && !/^skills(?:\s+\S*)?$/i.test(searchText)) {
+    return null;
+  }
+
+  return {
+    query: searchText,
+    isMidText: isSlashCommandMidText(beforeCursor, slashIndex),
+  };
+}
+
+/**
+ * Detect a Codex `$skill-name` invocation token at the cursor, mirroring
+ * `getSlashCommandMenuQuery` but for the `$` trigger. Used only when the Codex
+ * backend is active so the same runtime skill catalog can be filtered/selected
+ * by typing `$`. Returns the text after `$` (or empty when only `$` is typed),
+ * or null when no `$` token is present at the cursor.
+ */
+export function getCodexSkillMenuQuery(textarea: HTMLTextAreaElement): SlashCommandMenuQuery | null {
+  const selectionStart = textarea.selectionStart ?? textarea.value.length;
+  const selectionEnd = textarea.selectionEnd ?? selectionStart;
+  if (selectionStart !== selectionEnd) {
+    return null;
+  }
+
+  const beforeCursor = textarea.value.slice(0, selectionStart);
+
+  let dollarIndex = -1;
+  for (let i = beforeCursor.length - 1; i >= 0; i--) {
+    const ch = beforeCursor[i];
+    if (ch === '$') {
+      dollarIndex = i;
+      break;
+    }
+    if (/\s/.test(ch)) {
+      break;
+    }
+  }
+
+  if (dollarIndex < 0) {
+    return null;
+  }
+
+  // The `$` must sit at a token boundary (start of input or after whitespace).
+  if (dollarIndex > 0 && !/\s/.test(beforeCursor[dollarIndex - 1])) {
+    return null;
+  }
+
+  const searchText = beforeCursor.slice(dollarIndex + 1);
+  // A space ends the skill name; Codex `$skill` takes no further args here.
+  if (/\s/.test(searchText)) {
+    return null;
+  }
+
+  return {
+    query: searchText,
+    isMidText: dollarIndex > 0,
+  };
+}
+
+/**
+ * Replace the /xxx slash token at the cursor position with `replacement`,
+ * preserving surrounding text. Returns the new value and cursor position.
+ */
+export function replaceSlashTokenAtCursor(
+  current: string,
+  cursorPos: number,
+  replacement: string,
+): { value: string; cursorPos: number } {
+  const beforeCursor = current.slice(0, cursorPos);
+  const prefixedSkillsMatch = /(?:^|\s)(\/skills(?:\s+\S*)?\s*)$/i.exec(beforeCursor);
+  if (prefixedSkillsMatch?.[1]) {
+    const start = prefixedSkillsMatch.index + prefixedSkillsMatch[0].indexOf('/');
+    let end = cursorPos;
+    while (end < current.length && !/\s/.test(current[end])) {
+      end++;
+    }
+
+    const before = current.slice(0, start);
+    const after = current.slice(end);
+    return {
+      value: before + replacement + after,
+      cursorPos: before.length + replacement.length,
+    };
+  }
+
+  let slashIndex = -1;
+  for (let i = beforeCursor.length - 1; i >= 0; i--) {
+    const ch = beforeCursor[i];
+    // Treat both `/` and `$` as trigger characters so the Codex `$skill-name`
+    // token is replaced correctly when a menu item is applied.
+    if (ch === '/' || ch === '$') {
+      slashIndex = i;
+      break;
+    }
+    if (/\s/.test(ch)) {
+      break;
+    }
+  }
+
+  if (slashIndex >= 0) {
+    let tokenEnd = slashIndex + 1;
+    while (tokenEnd < current.length && !/\s/.test(current[tokenEnd])) {
+      tokenEnd++;
+    }
+    const before = current.slice(0, slashIndex);
+    const after = current.slice(tokenEnd);
+    return {
+      value: before + replacement + after,
+      cursorPos: before.length + replacement.length,
+    };
+  }
+
+  return { value: replacement, cursorPos: replacement.length };
+}

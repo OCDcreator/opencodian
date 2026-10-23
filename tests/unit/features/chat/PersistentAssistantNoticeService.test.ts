@@ -1,11 +1,11 @@
-import { ConversationWriteSerializationService } from '../../../../src/features/chat/services/ConversationWriteSerializationService';
+import { ConversationWriteSerializationService } from '../../../../src/features/chat/services/conversation/ConversationWriteSerializationService';
+import type {
+  TabConversationSyncFingerprintRuntimePort,
+} from '../../../../src/features/chat/services/questions/QuestionTodoBackgroundTaskRuntimeServiceBundle';
 import {
   PersistentAssistantNoticeService,
   type PersistentAssistantNoticeServiceHost,
-} from '../../../../src/features/chat/services/PersistentAssistantNoticeService';
-import type {
-  TabConversationSyncFingerprintRuntimePort,
-} from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
+} from '../../../../src/features/chat/services/send/PersistentAssistantNoticeService';
 
 function createHost(options?: {
   currentConversation?: Record<string, unknown> | null;

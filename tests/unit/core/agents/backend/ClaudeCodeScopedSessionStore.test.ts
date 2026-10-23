@@ -4,8 +4,8 @@ import { isAbsolute, join, relative, sep } from 'node:path';
 
 import type { SessionStore } from '@anthropic-ai/claude-agent-sdk';
 
-import { ClaudeCodeAdapter, type ClaudeCodeSdkFacade } from '../../../../../src/core/agents/backend/ClaudeCodeAdapter';
-import { scopeClaudeSessionCatalog } from '../../../../../src/core/agents/backend/ClaudeCodeScopedSessionStore';
+import { ClaudeCodeAdapter, type ClaudeCodeSdkFacade } from '../../../../../src/core/agents/backend/claude/ClaudeCodeAdapter';
+import { scopeClaudeSessionCatalog } from '../../../../../src/core/agents/backend/claude/ClaudeCodeScopedSessionStore';
 import { getDefaultClaudeCodeBackendSettings } from '../../../../../src/core/types';
 
 const ID = '12345678-1234-1234-1234-123456789abc';

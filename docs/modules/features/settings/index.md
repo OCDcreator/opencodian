@@ -39,7 +39,7 @@ export { OpenCodianSettingTab } from './OpenCodianSettings';
 ## 与其他模块的交互
 
 - 主实现见 [OpenCodianSettings.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/settings/OpenCodianSettings.md)
-- 其他设置弹窗如 [ModelPickerModal.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/settings/ModelPickerModal.md)、[ModelConfigModal.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/settings/ModelConfigModal.md)、[OpencodeConfigModal.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/settings/OpencodeConfigModal.md) 由设置页直接调用
+- 其他设置弹窗如 [ModelPickerModal.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/settings/models/ModelPickerModal.md)、[ModelConfigModal.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/settings/models/ModelConfigModal.md)、[OpencodeConfigModal.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/settings/backends/opencode/OpencodeConfigModal.md) 由设置页直接调用
 
 ## 配置项
 
@@ -53,8 +53,8 @@ export { OpenCodianSettingTab } from './OpenCodianSettings';
 
 - `OpenCodianSettingTab` 的唯一消费方是 `main.ts` 中的 `this.addSettingTab(new OpenCodianSettingTab(...))` 调用，无其他外部消费方
 
-- [PiWorkbenchActions](PiWorkbenchActions.md)：Pi完整业务操作目录。
-- [PiWorkbenchModal](PiWorkbenchModal.md)：Pi分组管理工作台。
+- [PiWorkbenchActions](backends/pi/PiWorkbenchActions.md)：Pi完整业务操作目录。
+- [PiWorkbenchModal](backends/pi/PiWorkbenchModal.md)：Pi分组管理工作台。
 
-- [SettingsPiConfigurationSection](SettingsPiConfigurationSection.md)：51项原生设置。
-- [SettingsPiProvidersSection](SettingsPiProvidersSection.md)：完整自定义provider/models配置。
+- [SettingsPiConfigurationSection](backends/pi/SettingsPiConfigurationSection.md)：51项原生设置。
+- [SettingsPiProvidersSection](backends/pi/SettingsPiProvidersSection.md)：完整自定义provider/models配置。

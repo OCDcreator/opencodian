@@ -5,7 +5,7 @@ import {
   type CostEstimateBackend,
   refreshCostEstimateSettingsRows,
   renderCostEstimateSettingsRow,
-} from '../../../../src/features/settings/CostEstimateSettingsRow';
+} from '../../../../src/features/settings/backends/opencode/CostEstimateSettingsRow';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 

@@ -2,7 +2,7 @@ import type { Conversation } from '../../../../../src/core/types';
 import {
   type SlashCommandExecutionHost,
   SlashCommandExecutionService,
-} from '../../../../../src/features/chat/services/SlashCommandExecutionService';
+} from '../../../../../src/features/chat/services/commands/SlashCommandExecutionService';
 
 type MockedSlashCommandExecutionHost = {
   [Key in keyof SlashCommandExecutionHost]: SlashCommandExecutionHost[Key] extends (...args: infer Args) => infer Result

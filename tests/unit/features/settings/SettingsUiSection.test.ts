@@ -1,7 +1,7 @@
 import { Setting } from 'obsidian';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
-import { SettingsUiSection } from '../../../../src/features/settings/SettingsUiSection';
+import { SettingsUiSection } from '../../../../src/features/settings/general/SettingsUiSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 

@@ -10,7 +10,7 @@ import {
   readClaudeAgentResourceContent,
   restoreClaudeAgentResourceHistoryEntry,
   updateClaudeAgentResource,
-} from '../../../../../src/core/agents/backend/ClaudeProjectAgentDiscovery';
+} from '../../../../../src/core/agents/backend/claude/ClaudeProjectAgentDiscovery';
 import {
   catalogClaudeCommandResourceHistory,
   createClaudeCommandResource,
@@ -19,7 +19,7 @@ import {
   readClaudeCommandResourceContent,
   restoreClaudeCommandResourceHistoryEntry,
   updateClaudeCommandResource,
-} from '../../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery';
+} from '../../../../../src/core/agents/backend/claude/ClaudeProjectCommandDiscovery';
 import {
   catalogClaudeSkillResourceHistory,
   createClaudeSkillResource,
@@ -28,8 +28,8 @@ import {
   readClaudeSkillResourceContent,
   restoreClaudeSkillResourceHistoryEntry,
   updateClaudeSkillResource,
-} from '../../../../../src/core/agents/backend/ClaudeProjectSkillDiscovery';
-import { computeFileRevision } from '../../../../../src/core/agents/backend/ProjectResourceSecureWrite';
+} from '../../../../../src/core/agents/backend/claude/ClaudeProjectSkillDiscovery';
+import { computeFileRevision } from '../../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite';
 
 describe('P1-A scoped resource contract', () => {
   let sandboxPath: string;

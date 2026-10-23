@@ -9,7 +9,7 @@ import {
   getProgrammaticScrollGuardDelayMs,
   hasProgrammaticScrollGuard,
   isNearBottom,
-} from '../../../../src/features/chat/autoScrollState';
+} from '../../../../src/features/chat/rendering/autoScrollState';
 
 describe('autoScrollState', () => {
   const baseState: AutoScrollSnapshot = {

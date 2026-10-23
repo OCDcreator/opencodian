@@ -43,7 +43,7 @@ jest.mock('path', () => ({
   join: (...args: string[]) => args.join('/'),
 }));
 
-import { CodexAppServerClient } from '../../../../../src/core/agents/backend/CodexAppServerClient';
+import { CodexAppServerClient } from '../../../../../src/core/agents/backend/codex/CodexAppServerClient';
 
 // ---------------------------------------------------------------------------
 // Test helpers

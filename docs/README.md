@@ -4,6 +4,8 @@
 
 ## 从哪里开始看
 
+- [源码目录](architecture/source-layout.md)：按职责查找代码，以及新增文件的放置规则。
+
 - `architecture/README.md`
   - 面向开发者的整体架构总览，适合先建立系统心智模型。
 - `modules/README.md`

@@ -9,7 +9,7 @@ import type {
   ClaudeCodeMcpPermissionModeOverrideResult,
   ClaudeCodeOutputStylesReloadResult,
   ClaudeCodeSessionRuntime,
-} from '../../../../../src/core/agents/backend/ClaudeCodeQueue';
+} from '../../../../../src/core/agents/backend/claude/ClaudeCodeQueue';
 
 type RuntimeQuery = NonNullable<ClaudeCodeSessionRuntime['query']>;
 type Equal<T, U> = (<V>() => V extends T ? 1 : 2) extends (<V>() => V extends U ? 1 : 2) ? true : false;
@@ -101,7 +101,7 @@ describe('Claude SDK 0.3.283 control source/type contracts', () => {
 
   it('semantically checks the SDK-derived contracts and every negative compile assertion', () => {
     const testPath = resolve(process.cwd(), 'tests/unit/core/agents/backend/ClaudeCodeQueue.controlContracts.test.ts');
-    const queuePath = resolve(process.cwd(), 'src/core/agents/backend/ClaudeCodeQueue.ts');
+    const queuePath = resolve(process.cwd(), 'src/core/agents/backend/claude/ClaudeCodeQueue.ts');
     const program = ts.createProgram([testPath], {
       target: ts.ScriptTarget.ES2022,
       module: ts.ModuleKind.ESNext,

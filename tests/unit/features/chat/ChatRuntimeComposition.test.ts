@@ -1,9 +1,9 @@
 import { WorkspaceLeaf } from 'obsidian';
 
-import { CodexAdapter } from '../../../../src/core/agents/backend/CodexAdapter';
+import { CodexAdapter } from '../../../../src/core/agents/backend/codex/CodexAdapter';
 import { type Conversation, DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
-import type { MessageSendPreparationHost } from '../../../../src/features/chat/services/MessageSendPreparationService';
+import type { MessageSendPreparationHost } from '../../../../src/features/chat/services/send/MessageSendPreparationService';
 
 jest.mock('../../../../src/core/opencode', () => ({
   OpenCodeService: class OpenCodeService {},

@@ -7,14 +7,14 @@ import type {
   ArchiveHistoryTarget,
   ConfigurationEvidence,
   FileRevision,
-} from '../../../../src/core/agents/backend/ProjectResourceSecureWrite';
+} from '../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite';
 import type {
   OpencodeConfigSourceCandidate,
   OpencodeConfigSourceHistoryResult,
   OpencodeConfigSourceMutationOutcome,
   OpencodeConfigSourceReadResult,
 } from '../../../../src/core/config/OpencodeConfigSourceService';
-import { OpencodeConfigModal } from '../../../../src/features/settings/OpencodeConfigModal';
+import { OpencodeConfigModal } from '../../../../src/features/settings/backends/opencode/OpencodeConfigModal';
 import { setLocale, t } from '../../../../src/i18n';
 
 jest.mock('obsidian', () => {

@@ -4,10 +4,10 @@ import { AgentCapability } from '../../../../src/core/agents/AgentCapability';
 import { CODEX_CUSTOM_MODEL_SENTINEL } from '../../../../src/core/agents/backend/BackendModelCatalog';
 import type { Conversation } from '../../../../src/core/types/chat';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
-import { ChatSelectionControlsCoordinator, type ChatSelectionControlsCoordinatorHost } from '../../../../src/features/chat/services/ChatSelectionControlsCoordinator';
-import type { ComposerInputShellCoordinatorHost } from '../../../../src/features/chat/services/ComposerInputShellCoordinator';
-import { ConversationSessionSettingsCoordinator } from '../../../../src/features/chat/services/ConversationSessionSettingsCoordinator';
-import type { ModelSelectionRuntime, ModelSelectionRuntimeHost } from '../../../../src/features/chat/services/ModelSelectionRuntime';
+import type { ComposerInputShellCoordinatorHost } from '../../../../src/features/chat/services/composer/ComposerInputShellCoordinator';
+import { ConversationSessionSettingsCoordinator } from '../../../../src/features/chat/services/conversation/ConversationSessionSettingsCoordinator';
+import { ChatSelectionControlsCoordinator, type ChatSelectionControlsCoordinatorHost } from '../../../../src/features/chat/services/selection/ChatSelectionControlsCoordinator';
+import type { ModelSelectionRuntime, ModelSelectionRuntimeHost } from '../../../../src/features/chat/services/selection/ModelSelectionRuntime';
 import type { EffortSelector, EffortSelectorCallbacks } from '../../../../src/features/chat/ui/EffortSelector';
 
 const { capturedNotices, clearCapturedNotices } = jest.requireActual('obsidian') as { capturedNotices: string[]; clearCapturedNotices(): void };

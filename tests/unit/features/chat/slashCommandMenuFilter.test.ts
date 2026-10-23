@@ -1,5 +1,5 @@
 import type { SlashCommandMenuItem } from '../../../../src/core/config/slashCommandCatalog';
-import { filterSlashCommandMenuItems } from '../../../../src/features/chat/services/slashCommandMenuFilter';
+import { filterSlashCommandMenuItems } from '../../../../src/features/chat/services/commands/slashCommandMenuFilter';
 
 const items: SlashCommandMenuItem[] = [
   {

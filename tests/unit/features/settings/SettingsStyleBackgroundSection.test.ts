@@ -1,7 +1,7 @@
 import { Setting } from 'obsidian';
 
 import { DEFAULT_SETTINGS, getDefaultChatAppearanceSettings } from '../../../../src/core/types';
-import { SettingsStyleBackgroundSection } from '../../../../src/features/settings/SettingsStyleBackgroundSection';
+import { SettingsStyleBackgroundSection } from '../../../../src/features/settings/appearance/SettingsStyleBackgroundSection';
 import { setLocale } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 

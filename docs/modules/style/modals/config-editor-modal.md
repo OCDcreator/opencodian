@@ -35,19 +35,19 @@
 
 ## 关联 TS 组件
 
-- `src/features/settings/OpencodeConfigModal.ts`
-- `src/features/settings/ModelConfigJsonModal.ts`
-- `src/features/settings/ModelConfigModal.ts`
+- `src/features/settings/backends/opencode/OpencodeConfigModal.ts`
+- `src/features/settings/models/ModelConfigJsonModal.ts`
+- `src/features/settings/models/ModelConfigModal.ts`
 - `src/features/settings/OpenCodianSettings.ts`
-- `src/features/settings/ConversationCompactionHelpModal.ts`
-- `src/features/settings/SettingsAgentsSection.ts`
-- `src/features/settings/SettingsProjectAgentEditor.ts`
-- `src/features/settings/SettingsMcpSection.ts`
-- `src/features/settings/SettingsMcpAddForm.ts`
-- `src/features/settings/McpServerEditorModal.ts`
-- `src/features/settings/McpServerStatusModal.ts`
-- `src/features/settings/CodexMcpServerDetailModal.ts`
-- `src/features/settings/CodexReadbackModal.ts`
+- `src/features/settings/general/ConversationCompactionHelpModal.ts`
+- `src/features/settings/resources/SettingsAgentsSection.ts`
+- `src/features/settings/backends/opencode/SettingsProjectAgentEditor.ts`
+- `src/features/settings/mcp/SettingsMcpSection.ts`
+- `src/features/settings/mcp/SettingsMcpAddForm.ts`
+- `src/features/settings/mcp/McpServerEditorModal.ts`
+- `src/features/settings/mcp/McpServerStatusModal.ts`
+- `src/features/settings/backends/codex/CodexMcpServerDetailModal.ts`
+- `src/features/settings/backends/codex/CodexReadbackModal.ts`
 - `src/features/chat/ui/ConversationSessionSettingsModal.ts`
 - `src/features/chat/ui/ContextDetailModal.ts`
 
@@ -342,15 +342,15 @@ Guardrail: 不要在 `.opencodian-modal-card` 内再嵌套卡片；新增 modal 
 
 消费这些共享类的 modal TS 文件：
 
-- `src/features/settings/CodexMcpServerDetailModal.ts`（`.opencodian-modal-shell` / `-section` / `-card` + 新增 `.opencodian-codex-mcp-tool-entry-header` 与 `.is-hidden` schema 切换）
-- `src/features/settings/McpServerEditorModal.ts`（`.opencodian-modal-shell` / `-section` / `-card` / `-form-grid` / `-actions`，`.opencodian-mcp-form-*` 保留为 MCP 专属覆盖）
-- `src/features/settings/ModelConfigJsonModal.ts`（`.opencodian-modal-shell` / `-section` / `-actions` + `.opencodian-help-modal-section` / `-pre`）
-- `src/features/settings/OpencodeConfigModal.ts`（`.opencodian-modal-shell` / `-section` / `-actions` + 完整 `.opencodian-help-modal-*` 帮助 DOM，已弃用 `innerHTML` 帮助注入）
-- `src/features/settings/SettingsToolDetailModal.ts`（`.opencodian-modal-shell` / `-section` / `-actions`）
-- `src/features/settings/ConversationCompactionHelpModal.ts`（`.opencodian-help-modal-shell`）
-- `src/features/settings/ModifiedFilesSidebarHelpModal.ts`（`.opencodian-help-modal-shell`）
-- `src/features/settings/LiquidGlassSettingHelpModal.ts`（`.opencodian-help-modal-shell` / `-section`）
-- `src/features/settings/OpenCodeProjectConfigHelpModal.ts`（`.opencodian-help-modal-shell` / `-list` / `-actions`）
+- `src/features/settings/backends/codex/CodexMcpServerDetailModal.ts`（`.opencodian-modal-shell` / `-section` / `-card` + 新增 `.opencodian-codex-mcp-tool-entry-header` 与 `.is-hidden` schema 切换）
+- `src/features/settings/mcp/McpServerEditorModal.ts`（`.opencodian-modal-shell` / `-section` / `-card` / `-form-grid` / `-actions`，`.opencodian-mcp-form-*` 保留为 MCP 专属覆盖）
+- `src/features/settings/models/ModelConfigJsonModal.ts`（`.opencodian-modal-shell` / `-section` / `-actions` + `.opencodian-help-modal-section` / `-pre`）
+- `src/features/settings/backends/opencode/OpencodeConfigModal.ts`（`.opencodian-modal-shell` / `-section` / `-actions` + 完整 `.opencodian-help-modal-*` 帮助 DOM，已弃用 `innerHTML` 帮助注入）
+- `src/features/settings/resources/SettingsToolDetailModal.ts`（`.opencodian-modal-shell` / `-section` / `-actions`）
+- `src/features/settings/general/ConversationCompactionHelpModal.ts`（`.opencodian-help-modal-shell`）
+- `src/features/settings/general/ModifiedFilesSidebarHelpModal.ts`（`.opencodian-help-modal-shell`）
+- `src/features/settings/appearance/LiquidGlassSettingHelpModal.ts`（`.opencodian-help-modal-shell` / `-section`）
+- `src/features/settings/backends/opencode/OpenCodeProjectConfigHelpModal.ts`（`.opencodian-help-modal-shell` / `-list` / `-actions`）
 
 ## 2026-06-16 Shared inspection panel classes
 
@@ -406,7 +406,7 @@ MCP 详情弹窗改用共享 inspection-panel 布局：
 - `.opencodian-codex-mcp-resource-text` 复用 `.opencodian-inspection-code`。
 - focus server 高亮仍使用 `::before` 伪元素外框。
 - 保留 auth 徽章颜色变体：`-bearerToken`、`-none`、`-needs_auth`、`-notLoggedIn`、`-unsupported`。
-- `src/features/settings/ServerSettingHelpModal.ts`（`.opencodian-help-modal-shell` / `-section` / `-card` / `-pre` / `-list`，已弃用 `innerHTML` 帮助注入）
+- `src/features/settings/backends/opencode/ServerSettingHelpModal.ts`（`.opencodian-help-modal-shell` / `-section` / `-card` / `-pre` / `-list`，已弃用 `innerHTML` 帮助注入）
 
 ## 2026-07-21 Plugin evidence surface
 

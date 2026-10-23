@@ -3,7 +3,7 @@ import { type PdfIndexFs,PdfIndexService } from '../../../../src/core/pdf';
 import { pdfIndexFingerprint } from '../../../../src/core/pdf/pdfIndexFormat';
 import { PdfEngineLoader } from '../../../../src/core/pdf/pdfTextEngine';
 import type { PromptContextItem } from '../../../../src/core/types';
-import { VaultRetrievalComposerCoordinator } from '../../../../src/features/chat/services/VaultRetrievalComposerCoordinator';
+import { VaultRetrievalComposerCoordinator } from '../../../../src/features/chat/services/context/VaultRetrievalComposerCoordinator';
 import {
   buildContextAttachment,
   parseObsidianContextTag,

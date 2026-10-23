@@ -80,7 +80,7 @@ type ClaudeCodeDebugChannelId =
 
 - `src/shared/logger.ts`: 读取模块默认值、判断模块开关、解析默认 `moduleKey`
 - `src/core/types/settings.ts`: 复用默认值与归一化函数，持久化 `debugModuleSettings` / `debugRefreshIntervalMs`
-- `src/features/settings/SettingsDebugSection.ts`: 用注册表动态生成设置项
+- `src/features/settings/debug/SettingsDebugSection.ts`: 用注册表动态生成设置项
 - `tests/unit/shared/logger.test.ts`: 校验模块开关与节流契约
 
 ## 注意事项

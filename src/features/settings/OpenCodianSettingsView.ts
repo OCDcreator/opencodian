@@ -13,21 +13,32 @@ import { ItemView, Setting } from 'obsidian';
 import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
-import { createClaudeTraceDiagnosticsPort, createCodexTraceDiagnosticsPort, createOpenCodeTraceDiagnosticsPort } from './debug/types';
-import { SettingsAcpSection } from './SettingsAcpSection';
-import { SettingsAgentsSection } from './SettingsAgentsSection';
-import { SettingsClaudeCodeSection } from './SettingsClaudeCodeSection';
-import { SettingsCodexSection } from './SettingsCodexSection';
-import { SettingsCommandsSection } from './SettingsCommandsSection';
-import { SettingsConversationSection } from './SettingsConversationSection';
-import { SettingsDebugSection } from './SettingsDebugSection';
+import { SettingsStyleSection } from './appearance/SettingsStyleSection';
+import { SettingsAcpSection } from './backends/acp/SettingsAcpSection';
+import { SettingsClaudeCodeSection } from './backends/claude/SettingsClaudeCodeSection';
+import { SettingsCodexSection } from './backends/codex/SettingsCodexSection';
+import { SettingsCommandsSection } from './backends/opencode/SettingsCommandsSection';
+import { SettingsServerSection } from './backends/opencode/SettingsServerSection';
+import { SettingsPiSection } from './backends/pi/SettingsPiSection';
+import { SettingsZCodeSection } from './backends/zcode/SettingsZCodeSection';
 import {
   enhanceSettingsDropdowns,
   type SettingsDropdownsEnhancerHandle,
-} from './SettingsDropdownControl';
-import { SettingsFormatterSection } from './SettingsFormatterSection';
-import { SettingsMcpSection } from './SettingsMcpSection';
-import { SettingsModelSection } from './SettingsModelSection';
+} from './controls/SettingsDropdownControl';
+import { SettingsDebugSection } from './debug/SettingsDebugSection';
+import { createClaudeTraceDiagnosticsPort, createCodexTraceDiagnosticsPort, createOpenCodeTraceDiagnosticsPort } from './debug/types';
+import { SettingsConversationSection } from './general/SettingsConversationSection';
+import { SettingsFormatterSection } from './general/SettingsFormatterSection';
+import { SettingsPluginSection } from './general/SettingsPluginSection';
+import { SettingsPluginUpdateSection } from './general/SettingsPluginUpdateSection';
+import { SettingsSecuritySection } from './general/SettingsSecuritySection';
+import { SettingsUiSection } from './general/SettingsUiSection';
+import { SettingsUserSection } from './general/SettingsUserSection';
+import { SettingsMcpSection } from './mcp/SettingsMcpSection';
+import { SettingsModelSection } from './models/SettingsModelSection';
+import { SettingsAgentsSection } from './resources/SettingsAgentsSection';
+import { SettingsSkillSection } from './resources/SettingsSkillSection';
+import { SettingsToolSection } from './resources/SettingsToolSection';
 import {
   addSettingHelpButton,
   applyInlineCodeText,
@@ -40,19 +51,8 @@ import {
   setSettingDescWithFormatting,
   setSettingNameWithFormatting,
 } from './SettingsPanelChrome';
-import { SettingsPiSection } from './SettingsPiSection';
-import { SettingsPluginSection } from './SettingsPluginSection';
-import { SettingsPluginUpdateSection } from './SettingsPluginUpdateSection';
 import { SettingsSectionCoordinator } from './SettingsSectionCoordinator';
-import { SettingsSecuritySection } from './SettingsSecuritySection';
-import { SettingsServerSection } from './SettingsServerSection';
-import { SettingsSkillSection } from './SettingsSkillSection';
-import { SettingsStyleSection } from './SettingsStyleSection';
 import { SettingsTabbedRenderer, type TabRendererDependencies } from './SettingsTabbedRenderer';
-import { SettingsToolSection } from './SettingsToolSection';
-import { SettingsUiSection } from './SettingsUiSection';
-import { SettingsUserSection } from './SettingsUserSection';
-import { SettingsZCodeSection } from './SettingsZCodeSection';
 
 export class OpenCodianSettingsView extends ItemView {
   private readonly plugin: OpenCodianPlugin;

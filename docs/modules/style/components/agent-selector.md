@@ -17,7 +17,7 @@
 
 ## 关联 TS 组件
 
-- `src/features/chat/services/ChatAgentSelectionCoordinator.ts`
+- `src/features/chat/services/selection/ChatAgentSelectionCoordinator.ts`
 
 ## 修改注意点
 

@@ -1,23 +1,23 @@
 import type { Conversation } from '../../../../src/core/types';
 import {
   type QuestionTodoBackgroundTaskActivationServices,
-} from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskActivationHostAdapter';
-import * as QuestionTodoBackgroundTaskActivationHostAdapterModule from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskActivationHostAdapter';
+} from '../../../../src/features/chat/services/questions/QuestionTodoBackgroundTaskActivationHostAdapter';
+import * as QuestionTodoBackgroundTaskActivationHostAdapterModule from '../../../../src/features/chat/services/questions/QuestionTodoBackgroundTaskActivationHostAdapter';
 import {
   type QuestionTodoBackgroundTaskRefreshServices,
-} from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRefreshHostAdapter';
-import * as QuestionTodoBackgroundTaskRefreshHostAdapterModule from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRefreshHostAdapter';
+} from '../../../../src/features/chat/services/questions/QuestionTodoBackgroundTaskRefreshHostAdapter';
+import * as QuestionTodoBackgroundTaskRefreshHostAdapterModule from '../../../../src/features/chat/services/questions/QuestionTodoBackgroundTaskRefreshHostAdapter';
 import {
   assembleQuestionTodoBackgroundTaskRuntimeHost,
   createQuestionTodoBackgroundTaskRuntimeServiceBundle,
   createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam,
   type QuestionTodoBackgroundTaskRuntimeSeam,
   type QuestionTodoBackgroundTaskRuntimeServiceBundleHost,
-} from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
+} from '../../../../src/features/chat/services/questions/QuestionTodoBackgroundTaskRuntimeServiceBundle';
 import {
   type VisibleConversationPostSyncStateServices,
-} from '../../../../src/features/chat/services/VisibleConversationPostSyncStateHostAdapter';
-import * as VisibleConversationPostSyncStateHostAdapterModule from '../../../../src/features/chat/services/VisibleConversationPostSyncStateHostAdapter';
+} from '../../../../src/features/chat/services/sync/VisibleConversationPostSyncStateHostAdapter';
+import * as VisibleConversationPostSyncStateHostAdapterModule from '../../../../src/features/chat/services/sync/VisibleConversationPostSyncStateHostAdapter';
 
 function createSeam(): QuestionTodoBackgroundTaskRuntimeSeam {
   const backgroundTaskHost = {

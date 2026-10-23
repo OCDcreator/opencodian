@@ -17,8 +17,8 @@
 
 ## 关联组件
 
-- `src/features/settings/ProviderIconCacheModal.ts`
-- `src/features/settings/ProviderBuiltinIconPickerModal.ts`
+- `src/features/settings/models/icons/ProviderIconCacheModal.ts`
+- `src/features/settings/models/icons/ProviderBuiltinIconPickerModal.ts`
 
 ## 特殊交互或动画
 

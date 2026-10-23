@@ -4,12 +4,12 @@ import {
   DEFAULT_SETTINGS,
   getDefaultCodexBackendSettings,
 } from '../../../../src/core/types';
-import { CodexReadbackModal } from '../../../../src/features/settings/CodexReadbackModal';
-import { SettingsCodexSection } from '../../../../src/features/settings/SettingsCodexSection';
+import { CodexReadbackModal } from '../../../../src/features/settings/backends/codex/CodexReadbackModal';
+import { SettingsCodexSection } from '../../../../src/features/settings/backends/codex/SettingsCodexSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 
-jest.mock('../../../../src/features/settings/CodexReadbackModal', () => ({
+jest.mock('../../../../src/features/settings/backends/codex/CodexReadbackModal', () => ({
   CodexReadbackModal: jest.fn().mockImplementation(() => ({ open: jest.fn() })),
 }));
 

@@ -11,7 +11,7 @@ import {
   type ComposerContextGroupsPort,
   ComposerContextPickerActionService,
   type ComposerContextPickerActionServiceHost,
-} from '../../../../src/features/chat/services/ComposerContextPickerActionService';
+} from '../../../../src/features/chat/services/composer/ComposerContextPickerActionService';
 import { chooseContextFiles } from '../../../../src/features/chat/ui/ContextFilePickerModal';
 
 jest.mock('../../../../src/features/chat/ui/ContextFilePickerModal', () => ({

@@ -33,5 +33,5 @@ createOpenAiCompatibleEmbeddingClient({ baseUrl, apiKey, model }): EmbeddingClie
 ## 关联模块
 
 - `src/app/memory/VaultEmbeddingFileSystem.ts`：vault 适配（只读笔记、写仅限 embeddings 目录、2s 防抖变更监听）。
-- `src/features/chat/services/VaultRetrievalComposerCoordinator.ts`：合并注入（词面优先、语义补位、通道标注）。
+- `src/features/chat/services/context/VaultRetrievalComposerCoordinator.ts`：合并注入（词面优先、语义补位、通道标注）。
 - `src/core/memory/VaultIndexService.ts`：`VaultRetrievalSettingsSlice` 共享设置切片。

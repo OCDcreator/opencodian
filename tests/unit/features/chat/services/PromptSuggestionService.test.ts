@@ -2,7 +2,7 @@ import type { StreamChunk } from '../../../../../src/core/types/chat';
 import {
   type PromptSuggestionAdapter,
   PromptSuggestionService,
-} from '../../../../../src/features/chat/services/PromptSuggestionService';
+} from '../../../../../src/features/chat/services/send/PromptSuggestionService';
 
 describe('PromptSuggestionService – storage & active session', () => {
   let service: PromptSuggestionService;

@@ -1,7 +1,7 @@
 import type { ChildSessionGraph } from '../../../../src/core/agents';
 import {
   ChildSessionGraphCoordinator,
-} from '../../../../src/features/chat/services/ChildSessionGraphCoordinator';
+} from '../../../../src/features/chat/services/conversation/ChildSessionGraphCoordinator';
 
 function createCoordinator(
   messagesContainer: HTMLElement,

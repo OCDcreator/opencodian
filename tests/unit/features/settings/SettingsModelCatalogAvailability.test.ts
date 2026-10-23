@@ -14,7 +14,7 @@ import {
   getProviderServerConstraintBadge,
   type ProviderAvailabilityCheckState,
   type ProviderAvailabilityDisplayState,
-} from '../../../../src/features/settings/SettingsModelCatalogAvailability';
+} from '../../../../src/features/settings/models/SettingsModelCatalogAvailability';
 
 function createProvider(overrides: Partial<ModelCatalogProvider> = {}): ModelCatalogProvider {
   return {

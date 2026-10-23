@@ -1,6 +1,6 @@
 import { Setting } from 'obsidian';
 
-import { SettingsCodexLegacyCredentialControl } from '../../../../src/features/settings/SettingsCodexLegacyCredentialControl';
+import { SettingsCodexLegacyCredentialControl } from '../../../../src/features/settings/backends/codex/SettingsCodexLegacyCredentialControl';
 import { setLocale, t } from '../../../../src/i18n';
 
 type TestPlugin = {

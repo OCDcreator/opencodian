@@ -14,7 +14,7 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 
-import { ClaudeSettingsSourceService } from '../../../../../src/core/agents/backend/ClaudeSettingsSourceService';
+import { ClaudeSettingsSourceService } from '../../../../../src/core/agents/backend/claude/ClaudeSettingsSourceService';
 
 const sha256 = (s: string): string => createHash('sha256').update(s, 'utf8').digest('hex');
 

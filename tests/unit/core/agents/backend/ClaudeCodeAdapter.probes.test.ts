@@ -5,7 +5,7 @@ import {
   ClaudeCodeAdapter,
   type ClaudeCodeSdkFacade,
 } from '../../../../../src/core/agents/backend';
-import { ClaudeCodeStreamNormalizer } from '../../../../../src/core/agents/backend/ClaudeCodeStreamNormalizer';
+import { ClaudeCodeStreamNormalizer } from '../../../../../src/core/agents/backend/claude/ClaudeCodeStreamNormalizer';
 import { getDefaultClaudeCodeBackendSettings } from '../../../../../src/core/types';
 
 /**
@@ -2792,7 +2792,7 @@ describe('runMcpElicitationLiveProbe scanner', () => {
 });
 
 describe('runMcpElicitationLiveProbe integration', () => {
-  const processResolver = jest.requireActual<typeof import('../../../../../src/core/agents/backend/ClaudeCodeProcessResolver')>('../../../../../src/core/agents/backend/ClaudeCodeProcessResolver');
+  const processResolver = jest.requireActual<typeof import('../../../../../src/core/agents/backend/claude/ClaudeCodeProcessResolver')>('../../../../../src/core/agents/backend/claude/ClaudeCodeProcessResolver');
   const nodePath = path.resolve('/probe-node/bin', process.platform === 'win32' ? 'node.exe' : 'node');
   beforeEach(() => {
     jest.spyOn(processResolver, 'resolveExecutableCandidate').mockReturnValue(nodePath);
@@ -2946,15 +2946,15 @@ describe('runMcpElicitationLiveProbe integration', () => {
 
   it('falls back to bare node when PATH resolution fails', async () => {
     jest.resetModules();
-    jest.doMock('../../../../../src/core/agents/backend/ClaudeCodeProcessResolver', () => {
-      const actual = jest.requireActual('../../../../../src/core/agents/backend/ClaudeCodeProcessResolver');
+    jest.doMock('../../../../../src/core/agents/backend/claude/ClaudeCodeProcessResolver', () => {
+      const actual = jest.requireActual('../../../../../src/core/agents/backend/claude/ClaudeCodeProcessResolver');
       return {
         ...actual,
         resolveExecutableCandidate: jest.fn(() => null),
       };
     });
 
-    const { ClaudeCodeAdapter: IsolatedClaudeCodeAdapter } = await import('../../../../../src/core/agents/backend/ClaudeCodeAdapter');
+    const { ClaudeCodeAdapter: IsolatedClaudeCodeAdapter } = await import('../../../../../src/core/agents/backend/claude/ClaudeCodeAdapter');
     const sdk = createProbeSdk([
       {
         type: 'assistant',
@@ -2979,7 +2979,7 @@ describe('runMcpElicitationLiveProbe integration', () => {
     // rather than crashing the probe.
     expect(mcpServer.command).toBe('node');
 
-    jest.dontMock('../../../../../src/core/agents/backend/ClaudeCodeProcessResolver');
+    jest.dontMock('../../../../../src/core/agents/backend/claude/ClaudeCodeProcessResolver');
     jest.resetModules();
   });
 
@@ -3236,7 +3236,7 @@ describe('runMcpElicitationLiveProbe integration', () => {
   it('proves restrictedBuiltinTools hides MCP tools when not cleared', async () => {
     // Direct evidence: buildClaudeCodeOptions maps restrictedBuiltinTools to options.tools,
     // replacing the preset that includes MCP tools with a strict array.
-    const { buildClaudeCodeOptions } = await import('../../../../../src/core/agents/backend/ClaudeCodeOptionsBuilder');
+    const { buildClaudeCodeOptions } = await import('../../../../../src/core/agents/backend/claude/ClaudeCodeOptionsBuilder');
     const options = buildClaudeCodeOptions({
       vaultPath: '/vault',
       settings: {
@@ -3249,7 +3249,7 @@ describe('runMcpElicitationLiveProbe integration', () => {
   });
 
   it('proves disallowedTools can block MCP tool names', async () => {
-    const { buildClaudeCodeOptions } = await import('../../../../../src/core/agents/backend/ClaudeCodeOptionsBuilder');
+    const { buildClaudeCodeOptions } = await import('../../../../../src/core/agents/backend/claude/ClaudeCodeOptionsBuilder');
     const options = buildClaudeCodeOptions({
       vaultPath: '/vault',
       settings: {
@@ -3261,7 +3261,7 @@ describe('runMcpElicitationLiveProbe integration', () => {
   });
 
   it('proves strictMcpConfig is propagated to SDK options', async () => {
-    const { buildClaudeCodeOptions } = await import('../../../../../src/core/agents/backend/ClaudeCodeOptionsBuilder');
+    const { buildClaudeCodeOptions } = await import('../../../../../src/core/agents/backend/claude/ClaudeCodeOptionsBuilder');
     const options = buildClaudeCodeOptions({
       vaultPath: '/vault',
       settings: {

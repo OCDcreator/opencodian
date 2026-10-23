@@ -43,9 +43,9 @@ function writeFile(root: string, rel: string, body: string): void {
 describe('Claude resource discovery — Obsidian fs loader compatibility', () => {
   it('uses statically resolvable fs availability probes in every writable resource owner', () => {
     const sourcePaths = [
-      'src/core/agents/backend/ClaudeProjectAgentDiscovery.ts',
-      'src/core/agents/backend/ClaudeProjectCommandDiscovery.ts',
-      'src/core/agents/backend/ClaudeProjectSkillDiscovery.ts',
+      'src/core/agents/backend/claude/ClaudeProjectAgentDiscovery.ts',
+      'src/core/agents/backend/claude/ClaudeProjectCommandDiscovery.ts',
+      'src/core/agents/backend/claude/ClaudeProjectSkillDiscovery.ts',
     ];
 
     for (const sourcePath of sourcePaths) {

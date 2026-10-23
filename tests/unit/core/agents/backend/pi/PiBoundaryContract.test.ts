@@ -4,8 +4,8 @@ import * as path from 'node:path';
 import ts from 'typescript';
 
 import { normalizeBackendSettings, normalizePiBackendSettings } from '../../../../../../src/core/types/settings';
-import { SlashCommandExecutionService } from '../../../../../../src/features/chat/services/SlashCommandExecutionService';
-import { SlashCommandMenuCatalogCache } from '../../../../../../src/features/chat/services/SlashCommandMenuCatalogCache';
+import { SlashCommandExecutionService } from '../../../../../../src/features/chat/services/commands/SlashCommandExecutionService';
+import { SlashCommandMenuCatalogCache } from '../../../../../../src/features/chat/services/commands/SlashCommandMenuCatalogCache';
 
 describe('Pi backend isolation contract', () => {
   it('allows only shared contracts and Pi modules across the service boundary', () => {

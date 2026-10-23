@@ -4,7 +4,7 @@ import {
   ConversationTabOpenCoordinator,
   type ConversationTabOpenHost,
   type ConversationTabOpenPort,
-} from '../../../../src/features/chat/services/ConversationTabOpenCoordinator';
+} from '../../../../src/features/chat/services/conversation/ConversationTabOpenCoordinator';
 import { TabManager } from '../../../../src/features/chat/tabs/TabManager';
 import { t } from '../../../../src/i18n';
 

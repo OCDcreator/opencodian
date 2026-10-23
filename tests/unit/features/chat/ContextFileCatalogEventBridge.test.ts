@@ -3,7 +3,7 @@ import type { App, EventRef } from 'obsidian';
 import {
   ContextFileCatalogEventBridge,
   type ContextFileCatalogEventBridgeHost,
-} from '../../../../src/features/chat/services/ContextFileCatalogEventBridge';
+} from '../../../../src/features/chat/services/context/ContextFileCatalogEventBridge';
 
 type Mocked<T> = {
   [Key in keyof T]:

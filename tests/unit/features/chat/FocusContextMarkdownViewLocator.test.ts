@@ -4,7 +4,7 @@ import { MarkdownView, TFile } from 'obsidian';
 import {
   FocusContextMarkdownViewLocator,
   type FocusContextMarkdownViewLocatorHost,
-} from '../../../../src/features/chat/services/FocusContextMarkdownViewLocator';
+} from '../../../../src/features/chat/services/context/FocusContextMarkdownViewLocator';
 
 function createFile(path: string): TFile {
   const file = new TFile();

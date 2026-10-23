@@ -3,7 +3,7 @@ import {
   QuestionDockRenderStateFacade,
   type QuestionDockRenderStateFacadeHost,
   type QuestionDockRenderStateRuntimeState,
-} from '../../../../src/features/chat/services/QuestionDockRenderStateFacade';
+} from '../../../../src/features/chat/services/questions/QuestionDockRenderStateFacade';
 import type { TabId } from '../../../../src/features/chat/tabs';
 
 type Mocked<T> = {

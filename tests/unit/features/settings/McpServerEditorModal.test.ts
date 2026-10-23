@@ -6,8 +6,8 @@ jest.mock('obsidian', () => ({
 }));
 
 import type { McpConfigService } from '../../../../src/core/config/McpConfigService';
-import { McpServerEditorModal } from '../../../../src/features/settings/McpServerEditorModal';
-import { TextareaSizeMemory } from '../../../../src/features/settings/TextareaSizeMemory';
+import { TextareaSizeMemory } from '../../../../src/features/settings/controls/TextareaSizeMemory';
+import { McpServerEditorModal } from '../../../../src/features/settings/mcp/McpServerEditorModal';
 import { setLocale, t } from '../../../../src/i18n';
 import {
   changeText,

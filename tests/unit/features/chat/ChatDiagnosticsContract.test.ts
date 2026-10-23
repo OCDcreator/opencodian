@@ -20,10 +20,10 @@
 import type { Menu } from 'obsidian';
 import { createSourceFile, isClassDeclaration, isMethodDeclaration, ScriptTarget } from 'typescript';
 
-import type { ClaudeDiagnosticsHostAdapterHost } from '../../../../src/features/chat/services/ClaudeDiagnosticsHostAdapter';
-import { ClaudeDiagnosticsHostAdapter } from '../../../../src/features/chat/services/ClaudeDiagnosticsHostAdapter';
-import type { CodexDiagnosticsHostAdapterHost } from '../../../../src/features/chat/services/CodexDiagnosticsHostAdapter';
-import { CodexDiagnosticsHostAdapter } from '../../../../src/features/chat/services/CodexDiagnosticsHostAdapter';
+import type { ClaudeDiagnosticsHostAdapterHost } from '../../../../src/features/chat/services/diagnostics/ClaudeDiagnosticsHostAdapter';
+import { ClaudeDiagnosticsHostAdapter } from '../../../../src/features/chat/services/diagnostics/ClaudeDiagnosticsHostAdapter';
+import type { CodexDiagnosticsHostAdapterHost } from '../../../../src/features/chat/services/diagnostics/CodexDiagnosticsHostAdapter';
+import { CodexDiagnosticsHostAdapter } from '../../../../src/features/chat/services/diagnostics/CodexDiagnosticsHostAdapter';
 
 // ---------------------------------------------------------------------------
 // Minimal trace-service stubs. The adapters only call a handful of methods, so
@@ -115,7 +115,7 @@ function readChatDiagnosticsCoordinatorSource(): string {
   // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
   const path = require('path') as typeof import('path');
   return fs.readFileSync(
-    path.resolve(__dirname, '../../../../src/features/chat/services/ChatDiagnosticsCoordinator.ts'),
+    path.resolve(__dirname, '../../../../src/features/chat/services/diagnostics/ChatDiagnosticsCoordinator.ts'),
     'utf8',
   );
 }

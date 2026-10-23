@@ -13,7 +13,7 @@
 
 ```text
 上游: 无（独立工具，不依赖 Obsidian 或其他项目模块）
-下游: main.ts (buildDiagnosticReport), features/settings/SettingsDebugSection.ts (buildClaudeCodeDiagnosticReport)
+下游: main.ts (buildDiagnosticReport), features/settings/debug/SettingsDebugSection.ts (buildClaudeCodeDiagnosticReport)
 ```
 
 ## 核心类型 / 接口

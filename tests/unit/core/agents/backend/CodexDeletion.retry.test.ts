@@ -1,5 +1,5 @@
-import { CodexAdapter, type CodexFactory } from '../../../../../src/core/agents/backend/CodexAdapter';
-import { CodexAppServerClient } from '../../../../../src/core/agents/backend/CodexAppServerClient';
+import { CodexAdapter, type CodexFactory } from '../../../../../src/core/agents/backend/codex/CodexAdapter';
+import { CodexAppServerClient } from '../../../../../src/core/agents/backend/codex/CodexAppServerClient';
 import type { StreamChunk } from '../../../../../src/core/types/chat';
 
 function deferred<T>() {

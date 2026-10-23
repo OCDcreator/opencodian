@@ -47,3 +47,9 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 - 2026-09-18 (FlowText R-B4): owner registered with the initial implementation (catalog, gate script generator, request/decision schema, injection seam, probe, status contract).
 
 2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `core.obsidian-tooling` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/core/obsidianTooling`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

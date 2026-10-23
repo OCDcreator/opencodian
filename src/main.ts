@@ -4,7 +4,7 @@ import type { ElicitationRequest, ElicitationResult } from '@anthropic-ai/claude
 import type { Editor } from 'obsidian';
 import { addIcon, MarkdownView, Notice, normalizePath, Plugin, TFile, TFolder } from 'obsidian';
 import * as path from 'path';
-import { presentPiUiRequest } from './features/chat/services/PiExtensionUiHost';
+import { presentPiUiRequest } from './features/chat/services/integrations/PiExtensionUiHost';
 import { OPENCODIAN_APP_ICON_ID } from './shared/brandingWordmark';
 
 import { ModelConfigService, ModelPricingService, OpencodeConfigManager } from './core/config';
@@ -42,7 +42,7 @@ import {
   hasSessionCreationCapability,
 } from './core/agents/backend/AgentBackendRouting';
 import { AgentServiceRegistry } from './core/agents/backend/AgentServiceRegistry';
-import { ClaudeCodeAdapter } from './core/agents/backend/ClaudeCodeAdapter';
+import { ClaudeCodeAdapter } from './core/agents/backend/claude/ClaudeCodeAdapter';
 import { wireHiddenAdapters } from './core/agents/backend/AgentAdapterWiring';
 import {
   buildClaudeCodeElicitationContent,
@@ -50,14 +50,14 @@ import {
   buildClaudeCodeUserDialogQuestionRequest,
   buildClaudeCodeUserDialogResult,
   normalizeClaudeCodeElicitationContent,
-} from './core/agents/backend/ClaudeCodeElicitationBridge';
-import { adaptMcpConfigForClaude } from './core/agents/backend/ClaudeCodeMcpConfigAdapter';
-import { type ClaudeCodePermissionBridgeHostContext, createClaudeCodePermissionBridgeHost } from './core/agents/backend/ClaudeCodeDefaultPermissionHost';
-import { ClaudeCodePermissionBridge, createClaudeCodePermissionBridge } from './core/agents/backend/ClaudeCodePermissionBridge';
-import { loadClaudeCodeSdk } from './core/agents/backend/ClaudeCodeSdkLoader';
-import { CodexAdapter } from './core/agents/backend/CodexAdapter';
-import { type CodexApprovalHostContext, createCodexApprovalBridgeHost } from './core/agents/backend/CodexDefaultApprovalHost';
-import { createCodexElicitationBridgeHost } from './core/agents/backend/CodexElicitationBridge';
+} from './core/agents/backend/claude/ClaudeCodeElicitationBridge';
+import { adaptMcpConfigForClaude } from './core/agents/backend/claude/ClaudeCodeMcpConfigAdapter';
+import { type ClaudeCodePermissionBridgeHostContext, createClaudeCodePermissionBridgeHost } from './core/agents/backend/claude/ClaudeCodeDefaultPermissionHost';
+import { ClaudeCodePermissionBridge, createClaudeCodePermissionBridge } from './core/agents/backend/claude/ClaudeCodePermissionBridge';
+import { loadClaudeCodeSdk } from './core/agents/backend/claude/ClaudeCodeSdkLoader';
+import { CodexAdapter } from './core/agents/backend/codex/CodexAdapter';
+import { type CodexApprovalHostContext, createCodexApprovalBridgeHost } from './core/agents/backend/codex/CodexDefaultApprovalHost';
+import { createCodexElicitationBridgeHost } from './core/agents/backend/codex/CodexElicitationBridge';
 import { OpenCodeService, SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from './core/opencode';
 import { RemoteControlService } from './core/remotecontrol';
 import { OpenCodeSessionTraceService } from './core/opencode/diagnostics';
@@ -73,13 +73,13 @@ import {
 } from './core/memory';
 import { PdfIndexFileSystem } from './app/pdf/PdfIndexFileSystem';
 import { PdfEngineLoader, PdfIndexService } from './core/pdf';
-import { PdfChatIntegration } from './features/chat/services/PdfChatIntegration';
+import { PdfChatIntegration } from './features/chat/services/integrations/PdfChatIntegration';
 import { BatchOrganizeCoordinator, BatchOrganizeModal, BatchRevertConfirmModal } from './app/batchOrganize';
 import { CanvasIntegrationController } from './features/canvas-integration/CanvasIntegrationController';
 import { CanvasGenerationFlow, type CanvasPickedEntry } from './features/canvas-integration/CanvasGenerationFlow';
 import type { CanvasAuxTarget } from './features/canvas-integration/CanvasNodeRewriteService';
 import { chooseContextFiles } from './features/chat/ui/ContextFilePickerModal';
-import { ContextFileCatalogIndex, type ContextFileCatalog } from './features/chat/services/ContextFileCatalogIndex';
+import { ContextFileCatalogIndex, type ContextFileCatalog } from './features/chat/services/context/ContextFileCatalogIndex';
 import { ObsidianToolingCoordinator } from './app/obsidianTooling';
 import { migrateOpenCodeCapabilitySettings } from './core/opencode/OpenCodeCapabilitySettingsMigration';
 import { OpenCodianSettingsRuntimeCoordinator } from './core/runtime/OpenCodianSettingsRuntimeCoordinator';
@@ -93,16 +93,16 @@ import {
   ConversationMarkdownExportService,
   type ConversationExportVault,
 } from './core/storage/ConversationMarkdownExportService';
-import { TurnCompletionSoundService } from './features/chat/services/TurnCompletionSoundService';
+import { TurnCompletionSoundService } from './features/chat/services/send/TurnCompletionSoundService';
 import {
   buildWebViewerContextItem,
   getActiveWebViewerTabContext,
   isWebViewerAvailable,
-} from './features/chat/services/WebViewerContextService';
-import { RelevantNotesView, VIEW_TYPE_RELEVANT_NOTES } from './features/chat/RelevantNotesView';
+} from './features/chat/services/context/WebViewerContextService';
+import { RelevantNotesView, VIEW_TYPE_RELEVANT_NOTES } from './features/chat/retrieval/RelevantNotesView';
 import { ImageAssetStorage, type ImageAssetVault } from './core/storage/ImageAssetStorage';
 import { createRequestUrlImageGenTransport, ImageGenerationService } from './core/agents/imagegen/ImageGenerationService';
-import { ImageGenerationChatController, type ImageGenerationChatPorts } from './features/chat/services/ImageGenerationChatController';
+import { ImageGenerationChatController, type ImageGenerationChatPorts } from './features/chat/services/integrations/ImageGenerationChatController';
 import { ImageGenerationModal } from './features/chat/ui/ImageGenerationModal';
 import type { InlineEditImageGenDeps } from './features/inline-edit/InlineEditImageGen';
 import { PluginUpdateService } from './core/update/PluginUpdateService';
@@ -126,8 +126,8 @@ import {
 } from './core/types';
 import { prepareLoadedSettingsBootstrapState } from './core/types/settingsLoadNormalization';
 import { OpenCodianView } from './features/chat/OpenCodianView';
-import { createChatDiagnosticsCoordinatorFactory } from './features/chat/services/ChatDiagnosticsCoordinator';
-import { ContextAttachmentBuilder } from './features/chat/services/ContextAttachmentBuilder';
+import { createChatDiagnosticsCoordinatorFactory } from './features/chat/services/diagnostics/ChatDiagnosticsCoordinator';
+import { ContextAttachmentBuilder } from './features/chat/services/context/ContextAttachmentBuilder';
 import { OpenCodianSettingTab } from './features/settings/OpenCodianSettings';
 import { broadcastModelsLoadedToSettingsViews, broadcastServerStatusToSettingsViews, registerSettingsView } from './features/settings/SettingsViewRegistrar';
 import { getLocale, setLocale, t } from './i18n';

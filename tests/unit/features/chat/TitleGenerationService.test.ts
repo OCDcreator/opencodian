@@ -1,7 +1,7 @@
 /* eslint-disable max-lines-per-function -- Title generation tests keep the official-title and local-fallback harness inline for readable flow coverage. */
 import type { ModelCatalogBundle } from '../../../../src/core/config';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
-import { TitleGenerationService } from '../../../../src/features/chat/services/TitleGenerationService';
+import { TitleGenerationService } from '../../../../src/features/chat/services/title/TitleGenerationService';
 import type OpenCodianPlugin from '../../../../src/main';
 
 describe('TitleGenerationService', () => {

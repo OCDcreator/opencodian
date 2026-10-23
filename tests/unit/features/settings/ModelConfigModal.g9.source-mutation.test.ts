@@ -6,8 +6,8 @@ import * as obsidian from 'obsidian';
 
 import type { ModelCatalogBundle } from '../../../../src/core/config';
 import type { OpencodeConfigSourceCandidate } from '../../../../src/core/config/OpencodeConfigSourceService';
-import { ModelConfigModal } from '../../../../src/features/settings/ModelConfigModal';
-import { OpencodeConfigModal } from '../../../../src/features/settings/OpencodeConfigModal';
+import { OpencodeConfigModal } from '../../../../src/features/settings/backends/opencode/OpencodeConfigModal';
+import { ModelConfigModal } from '../../../../src/features/settings/models/ModelConfigModal';
 import { t } from '../../../../src/i18n';
 import { ProviderIconService } from '../../../../src/utils/icons/ProviderIconService';
 

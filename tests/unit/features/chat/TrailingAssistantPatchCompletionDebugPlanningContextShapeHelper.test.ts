@@ -1,4 +1,4 @@
-import { buildTrailingAssistantPatchCompletionDebugPlanningContextShape } from '../../../../src/features/chat/services/trailingAssistantPatchPlanning';
+import { buildTrailingAssistantPatchCompletionDebugPlanningContextShape } from '../../../../src/features/chat/services/sync/trailingAssistantPatchPlanning';
 
 describe('TrailingAssistantPatchCompletionDebugPlanningContextShapeHelper', () => {
   it('builds the final completion-debug planning-context shape from inputs', () => {

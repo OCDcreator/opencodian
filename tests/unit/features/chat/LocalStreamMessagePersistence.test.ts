@@ -1,11 +1,11 @@
 import type { ChatMessage, Conversation } from '../../../../src/core/types';
-import { persistLocalStreamOutcome } from '../../../../src/features/chat/runtime/LocalStreamMessagePersistence';
+import { persistLocalStreamOutcome } from '../../../../src/features/chat/runtime/send/LocalStreamMessagePersistence';
 import type {
   LocalStreamOutcome,
   LocalStreamPersistenceHost,
   SendPipelineTabRuntime,
-} from '../../../../src/features/chat/runtime/SendPipelineTypes';
-import type { PreparedMessageSend } from '../../../../src/features/chat/services/MessageSendPreparationService';
+} from '../../../../src/features/chat/runtime/send/SendPipelineTypes';
+import type { PreparedMessageSend } from '../../../../src/features/chat/services/send/MessageSendPreparationService';
 
 function createConversation(messages: ChatMessage[] = []): Conversation {
   return {

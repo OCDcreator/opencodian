@@ -53,7 +53,7 @@ describe('getActiveCodexView multi-leaf resolution', () => {
 
     // Import after mock is set up
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { readActiveBackendFromPlugin } = require('../../../../../src/features/chat/services/ChatSelectionControlsCoordinator');
+    const { readActiveBackendFromPlugin } = require('../../../../../src/features/chat/services/selection/ChatSelectionControlsCoordinator');
     // readActiveBackendFromPlugin should return 'codex' (active leaf's backend),
     // NOT 'opencode' (first leaf's backend).
     expect(readActiveBackendFromPlugin()).toBe('codex');
@@ -62,7 +62,7 @@ describe('getActiveCodexView multi-leaf resolution', () => {
   it('falls back to global setting when no active leaf has a conversation', () => {
     mockWorkspace(null);
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { readActiveBackendFromPlugin } = require('../../../../../src/features/chat/services/ChatSelectionControlsCoordinator');
+    const { readActiveBackendFromPlugin } = require('../../../../../src/features/chat/services/selection/ChatSelectionControlsCoordinator');
     expect(readActiveBackendFromPlugin()).toBe('opencode');
   });
 
@@ -73,7 +73,7 @@ describe('getActiveCodexView multi-leaf resolution', () => {
       currentConversation: { backend: 'codex', sessionSettings: {} },
     });
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { readActiveBackendFromPlugin } = require('../../../../../src/features/chat/services/ChatSelectionControlsCoordinator');
+    const { readActiveBackendFromPlugin } = require('../../../../../src/features/chat/services/selection/ChatSelectionControlsCoordinator');
     expect(readActiveBackendFromPlugin()).toBe('codex');
   });
 
@@ -83,7 +83,7 @@ describe('getActiveCodexView multi-leaf resolution', () => {
       currentConversation: { backend: 'codex', sessionSettings: {} },
     });
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { readActiveBackendFromPlugin } = require('../../../../../src/features/chat/services/ChatSelectionControlsCoordinator');
+    const { readActiveBackendFromPlugin } = require('../../../../../src/features/chat/services/selection/ChatSelectionControlsCoordinator');
     expect(readActiveBackendFromPlugin()).toBe('opencode');
   });
 });
@@ -94,7 +94,7 @@ describe('persistCodexModelOverride failure path', () => {
   it('returns false when no active view exists', async () => {
     mockWorkspace(null);
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mod = require('../../../../../src/features/chat/services/ChatSelectionControlsCoordinator');
+    const mod = require('../../../../../src/features/chat/services/selection/ChatSelectionControlsCoordinator');
     // With no active OpenCodian view, the composer must not enter the Codex
     // persistence path even if a global backend default exists.
     expect(mod.readActiveBackendFromPlugin()).not.toBe('codex');
@@ -108,7 +108,7 @@ describe('persistCodexModelOverride failure path', () => {
       // No conversationSessionSettingsCoordinator
     });
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { readActiveBackendFromPlugin } = require('../../../../../src/features/chat/services/ChatSelectionControlsCoordinator');
+    const { readActiveBackendFromPlugin } = require('../../../../../src/features/chat/services/selection/ChatSelectionControlsCoordinator');
     expect(readActiveBackendFromPlugin()).toBe('codex');
     // Even though backend is codex, persistence would fail because there's no coordinator.
     // The selectModel path would show applyFailed notice, not saved/next-thread.
@@ -132,7 +132,7 @@ describe('persistCodexModelOverride failure path', () => {
     });
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { ChatSelectionControlsCoordinator, getActiveCodexView } = require('../../../../../src/features/chat/services/ChatSelectionControlsCoordinator');
+    const { ChatSelectionControlsCoordinator, getActiveCodexView } = require('../../../../../src/features/chat/services/selection/ChatSelectionControlsCoordinator');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const persist = (Object.create(ChatSelectionControlsCoordinator.prototype) as any).persistCodexModelOverride;
     await expect(persist.call({}, 'o4-mini', getActiveCodexView())).resolves.toBe(true);
@@ -163,7 +163,7 @@ describe('persistCodexModelOverride failure path', () => {
     });
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { ChatSelectionControlsCoordinator, getActiveCodexView } = require('../../../../../src/features/chat/services/ChatSelectionControlsCoordinator');
+    const { ChatSelectionControlsCoordinator, getActiveCodexView } = require('../../../../../src/features/chat/services/selection/ChatSelectionControlsCoordinator');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const persist = (Object.create(ChatSelectionControlsCoordinator.prototype) as any).persistCodexModelOverride;
     await expect(persist.call({}, 'o4-mini', getActiveCodexView())).resolves.toBe(false);
@@ -177,7 +177,7 @@ describe('persistCodexModelOverride failure path', () => {
       currentConversation: { backend: 'codex', sessionSettings: {} },
     });
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { getActiveCodexView } = require('../../../../../src/features/chat/services/ChatSelectionControlsCoordinator');
+    const { getActiveCodexView } = require('../../../../../src/features/chat/services/selection/ChatSelectionControlsCoordinator');
     expect(getActiveCodexView()).toBeNull();
   });
 
@@ -187,7 +187,7 @@ describe('persistCodexModelOverride failure path', () => {
       currentConversation: { backend: 'codex', sessionSettings: {} },
     });
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { readActiveBackendFromPlugin } = require('../../../../../src/features/chat/services/ChatSelectionControlsCoordinator');
+    const { readActiveBackendFromPlugin } = require('../../../../../src/features/chat/services/selection/ChatSelectionControlsCoordinator');
     expect(readActiveBackendFromPlugin()).toBe('codex');
   });
 });

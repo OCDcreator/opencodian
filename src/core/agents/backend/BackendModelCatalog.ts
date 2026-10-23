@@ -1,5 +1,5 @@
 import type { ClaudeCodeEffort, CodexReasoningEffort } from '../../types/settings';
-import type { CodexModelSummary } from './CodexAdapter';
+import type { CodexModelSummary } from './codex/CodexAdapter';
 
 export const CLAUDE_CODE_PROVIDER_ID = 'claude-code';
 export const CLAUDE_CODE_PROVIDER_NAME = 'Claude Code';

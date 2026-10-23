@@ -6,7 +6,7 @@ import {
   selectQuestionDockGroup,
   selectQuestionDockQuestion,
   setQuestionDockDraftAnswer,
-} from '../../../../src/features/chat/services/QuestionDockInteractionState';
+} from '../../../../src/features/chat/services/questions/QuestionDockInteractionState';
 
 const request: QuestionRequest = {
   id: 'request-1',

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { SettingsClaudeConfigurationSection } from '../../../../src/features/settings/SettingsClaudeConfigurationSection';
+import { SettingsClaudeConfigurationSection } from '../../../../src/features/settings/backends/claude/SettingsClaudeConfigurationSection';
 import { setLocale } from '../../../../src/i18n';
 import { candidate, fakePlugin, flushMicrotasks, projectRevision, readOk, stubService } from './SettingsClaudeConfigurationSection.testSupport';
 

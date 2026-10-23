@@ -18,9 +18,9 @@ import {
   type ArchiveContext,
   ConfigurationArchiveService,
   OVERWRITE_RETENTION_LIMIT,
-} from '../../../../../src/core/agents/backend/ConfigurationArchiveService';
-import type { AllowlistMatch, FileRevision } from '../../../../../src/core/agents/backend/ProjectResourceSecureWrite';
-import { safeRestoreFile } from '../../../../../src/core/agents/backend/ProjectResourceSecureWrite';
+} from '../../../../../src/core/agents/backend/configuration/ConfigurationArchiveService';
+import type { AllowlistMatch, FileRevision } from '../../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite';
+import { safeRestoreFile } from '../../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite';
 
 jest.mock('node:fs/promises', () => ({ ...jest.requireActual('node:fs/promises') }));
 

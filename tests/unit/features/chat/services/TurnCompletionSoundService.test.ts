@@ -13,7 +13,7 @@ import {
   resolveTurnCompletionSoundSource,
   type TurnCompletionSoundHostState,
   TurnCompletionSoundService,
-} from '../../../../../src/features/chat/services/TurnCompletionSoundService';
+} from '../../../../../src/features/chat/services/send/TurnCompletionSoundService';
 
 function host(overrides: Partial<TurnCompletionSoundHostState> = {}): TurnCompletionSoundHostState {
   return {

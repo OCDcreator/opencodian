@@ -8,7 +8,7 @@ import * as path from 'path';
 import type { PluginEnvironmentSnapshot } from '../../../../src/core/config/PluginManagementService';
 import { PluginManagementService } from '../../../../src/core/config/PluginManagementService';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
-import { SettingsPluginSection } from '../../../../src/features/settings/SettingsPluginSection';
+import { SettingsPluginSection } from '../../../../src/features/settings/general/SettingsPluginSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 

@@ -1,4 +1,4 @@
-import { SettingsModelSection } from '../../../../src/features/settings/SettingsModelSection';
+import { SettingsModelSection } from '../../../../src/features/settings/models/SettingsModelSection';
 import { t } from '../../../../src/i18n';
 
 describe('SettingsModelSection availability footer', () => {

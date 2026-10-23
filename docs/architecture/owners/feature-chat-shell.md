@@ -104,3 +104,9 @@ OpenCodianView 只转发 Codex 目录恢复到插件既有桥，保持 view/runt
 ## 2026-10-23 DSH permission forwarding
 
 聊天视图把 DSH 权限卡片的回复和待办查询转发给 tab 会话所属 adapter。权限选项映射和 ACP request correlation 由 core.backend 管理，视图不通过 OpenCode 服务回答 DSH 请求。
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/features/chat`、`src/features/chat/retrieval`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

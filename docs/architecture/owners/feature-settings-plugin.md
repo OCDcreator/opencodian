@@ -13,15 +13,15 @@ Update progress (2026-09-10): SettingsPluginUpdateSection renders service-owned 
 
 - **Layer:** `feature` (may import layers: shared, core, feature)
 - **Risk:** medium
-- **Include:** `src/features/settings/SettingsPluginSection.ts`, `src/features/settings/SettingsPluginEvidenceCoordinator.ts`, `src/features/settings/SettingsPluginEvidencePresenter.ts`, `src/features/settings/SettingsPluginUpdateSection.ts`, `src/features/settings/SettingsConversationSection.ts`, `src/features/settings/ConversationCompactionHelpModal.ts`, `src/features/settings/SettingsSecuritySection.ts`, `src/features/settings/SettingsFormatterSection.ts`, `src/features/settings/SettingsAcpSection.ts`, `src/features/settings/SettingsUiSection.ts`, `src/features/settings/SettingsUserSection.ts`, `src/features/settings/settingsBackendGuards.ts`, `src/features/settings/providerPresets.ts`, `src/features/settings/ModifiedFilesSidebarHelpModal.ts`, `src/features/settings/ProviderBuiltinIconPickerModal.ts`, `src/features/settings/ProviderIconCacheModal.ts`
+- **Include:** `src/features/settings/general/SettingsPluginSection.ts`, `src/features/settings/general/SettingsPluginEvidenceCoordinator.ts`, `src/features/settings/general/SettingsPluginEvidencePresenter.ts`, `src/features/settings/general/SettingsPluginUpdateSection.ts`, `src/features/settings/general/SettingsConversationSection.ts`, `src/features/settings/general/ConversationCompactionHelpModal.ts`, `src/features/settings/general/SettingsSecuritySection.ts`, `src/features/settings/general/SettingsFormatterSection.ts`, `src/features/settings/backends/acp/SettingsAcpSection.ts`, `src/features/settings/general/SettingsUiSection.ts`, `src/features/settings/general/SettingsUserSection.ts`, `src/features/settings/general/settingsBackendGuards.ts`, `src/features/settings/models/providerPresets.ts`, `src/features/settings/general/ModifiedFilesSidebarHelpModal.ts`, `src/features/settings/models/icons/ProviderBuiltinIconPickerModal.ts`, `src/features/settings/models/icons/ProviderIconCacheModal.ts`
 
 ## Responsibilities
 - plugin, update, conversation, security, formatter, acp, ui and user settings sections
 - plugin evidence coordinator/presenter, provider icon cache/picker modals, provider presets
 
 ## Entrypoints
-- `src/features/settings/SettingsPluginSection.ts`
-- `src/features/settings/SettingsPluginUpdateSection.ts`
+- `src/features/settings/general/SettingsPluginSection.ts`
+- `src/features/settings/general/SettingsPluginUpdateSection.ts`
 
 ## Dependency surface
 - **Allowed owner dependencies:** `shared.foundation`, `shared.utils-icons`, `core.update`, `core.types`
@@ -66,3 +66,9 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 
 
 - 2026-10-21: OpenCode 1 退役——`settingsBackendGuards.resolveSettingsActiveBackend()` 的 null-settings 回退从 `opencode` 改为 `opencode2`，v1-owned settings section（Server/MCP/Tools/Formatter/Security）在默认状态下不再进入 OpenCode-owned mutation seam；覆盖 legacy v1 路径的测试需显式设置 `activeBackend: 'opencode'`。
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/features/settings/backends/acp`、`src/features/settings/general`、`src/features/settings/models`、`src/features/settings/models/icons`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

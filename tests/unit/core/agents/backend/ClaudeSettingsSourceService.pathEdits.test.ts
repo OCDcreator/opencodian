@@ -14,7 +14,7 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 
-import { ClaudeSettingsSourceService } from '../../../../../src/core/agents/backend/ClaudeSettingsSourceService';
+import { ClaudeSettingsSourceService } from '../../../../../src/core/agents/backend/claude/ClaudeSettingsSourceService';
 
 type PathEditsResult = {
   targetPath: string;

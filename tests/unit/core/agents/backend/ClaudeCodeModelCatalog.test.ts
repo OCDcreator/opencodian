@@ -7,8 +7,8 @@ import {
   CODEX_EFFORT_VARIANTS,
   CODEX_PROVIDER_ID,
   CODEX_PROVIDER_NAME,
-} from '../../../../../src/core/agents/backend/ClaudeCodeModelCatalog';
-import type { CodexModelSummary } from '../../../../../src/core/agents/backend/CodexAdapter';
+} from '../../../../../src/core/agents/backend/claude/ClaudeCodeModelCatalog';
+import type { CodexModelSummary } from '../../../../../src/core/agents/backend/codex/CodexAdapter';
 
 describe('ClaudeCodeModelCatalog', () => {
   it('exposes official Claude Code aliases with effort variants and merges SDK models', () => {

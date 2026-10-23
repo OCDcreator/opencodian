@@ -4,7 +4,7 @@
  * unknown/internal fields (once, rewakeMessage, future events/types) without
  * mutating the input or treating unknowns as a parse failure.
  */
-import { inspectClaudeSettingsHooks } from '../../../../../src/core/agents/backend/ClaudeSettingsHookModel';
+import { inspectClaudeSettingsHooks } from '../../../../../src/core/agents/backend/claude/ClaudeSettingsHookModel';
 
 describe('ClaudeSettingsHookModel inspect', () => {
   it('preserves document order, supported flags, and raw unknown/internal fields without mutating input', () => {

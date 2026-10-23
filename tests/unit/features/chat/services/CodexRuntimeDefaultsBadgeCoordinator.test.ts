@@ -1,4 +1,4 @@
-import { CodexRuntimeDefaultsBadgeCoordinator } from '../../../../../src/features/chat/services/CodexRuntimeDefaultsBadgeCoordinator';
+import { CodexRuntimeDefaultsBadgeCoordinator } from '../../../../../src/features/chat/services/selection/CodexRuntimeDefaultsBadgeCoordinator';
 
 type MockApp = {
   plugins?: {

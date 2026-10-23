@@ -3,9 +3,9 @@ import { readFileSync } from 'fs';
 import { requestUrl, Setting } from 'obsidian';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
-import { SettingsAcpSection } from '../../../../src/features/settings/SettingsAcpSection';
-import { SettingsSkillSection } from '../../../../src/features/settings/SettingsSkillSection';
-import { SettingsToolSection } from '../../../../src/features/settings/SettingsToolSection';
+import { SettingsAcpSection } from '../../../../src/features/settings/backends/acp/SettingsAcpSection';
+import { SettingsSkillSection } from '../../../../src/features/settings/resources/SettingsSkillSection';
+import { SettingsToolSection } from '../../../../src/features/settings/resources/SettingsToolSection';
 import { setLocale } from '../../../../src/i18n';
 
 const mockRequestUrl = requestUrl as jest.Mock;

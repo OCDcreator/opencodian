@@ -3,7 +3,7 @@ import type { App } from 'obsidian';
 import { PI_CONFIG_COMMANDS, PI_RPC_COMMANDS, PI_SDK_COMMANDS } from '../../../../../src/core/agents/backend/pi/PiProtocol';
 import type { PiRecord } from '../../../../../src/core/agents/backend/pi/PiRpcClient';
 import { PiSessionRuntime } from '../../../../../src/core/agents/backend/pi/PiSessionRuntime';
-import { presentPiUiRequest } from '../../../../../src/features/chat/services/PiExtensionUiHost';
+import { presentPiUiRequest } from '../../../../../src/features/chat/services/integrations/PiExtensionUiHost';
 
 jest.mock('obsidian', () => {
   const actual = jest.requireActual('obsidian');

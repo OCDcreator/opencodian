@@ -10,7 +10,7 @@ import {
 import {
   ConversationSessionSignalRuntime,
   type ConversationSessionSignalRuntimeHost,
-} from '../../../../src/features/chat/services/ConversationSessionSignalRuntime';
+} from '../../../../src/features/chat/services/conversation/ConversationSessionSignalRuntime';
 import type { TabData } from '../../../../src/features/chat/tabs';
 
 type Mocked<T> = {

@@ -4,7 +4,7 @@ import type { Conversation } from '../../../../src/core/types';
 import {
   CodexDiagnosticsHostAdapter,
   type CodexDiagnosticsHostAdapterHost,
-} from '../../../../src/features/chat/services/CodexDiagnosticsHostAdapter';
+} from '../../../../src/features/chat/services/diagnostics/CodexDiagnosticsHostAdapter';
 import { t } from '../../../../src/i18n';
 
 type DeferredCallback = () => void | Promise<void>;

@@ -6,7 +6,7 @@ import {
   loadAgentSelectionCandidatesFromSlashCommandMenuItems,
   SlashCommandMenuCatalogCache,
   type SlashCommandMenuCatalogCacheHost,
-} from '../../../../src/features/chat/services/SlashCommandMenuCatalogCache';
+} from '../../../../src/features/chat/services/commands/SlashCommandMenuCatalogCache';
 
 function createRuntimeCommand(
   overrides: Partial<RuntimeCommand> & { name: string },

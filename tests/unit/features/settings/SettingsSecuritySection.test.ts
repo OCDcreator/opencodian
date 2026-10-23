@@ -8,8 +8,8 @@ import * as path from 'path';
 
 import { OpencodeConfigManager } from '../../../../src/core/config';
 import { DEFAULT_SETTINGS, getCurrentPlatformKey } from '../../../../src/core/types';
-import { OpenCodeProjectConfigHelpModal } from '../../../../src/features/settings/OpenCodeProjectConfigHelpModal';
-import { SettingsSecuritySection } from '../../../../src/features/settings/SettingsSecuritySection';
+import { OpenCodeProjectConfigHelpModal } from '../../../../src/features/settings/backends/opencode/OpenCodeProjectConfigHelpModal';
+import { SettingsSecuritySection } from '../../../../src/features/settings/general/SettingsSecuritySection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 

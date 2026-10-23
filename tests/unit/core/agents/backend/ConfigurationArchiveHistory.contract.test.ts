@@ -18,7 +18,7 @@ import {
   safeDeleteFile,
   safeRestoreArchivedEntry,
   safeWriteFile,
-} from '../../../../../src/core/agents/backend/ProjectResourceSecureWrite';
+} from '../../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite';
 
 interface ArchiveReadSwapState {
   readonly entryPath: string;

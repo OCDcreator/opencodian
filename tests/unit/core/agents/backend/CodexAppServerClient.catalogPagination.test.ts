@@ -1,4 +1,4 @@
-import { AppServerCatalogReadError, CodexAppServerClient } from '../../../../../src/core/agents/backend/CodexAppServerClient';
+import { AppServerCatalogReadError, CodexAppServerClient } from '../../../../../src/core/agents/backend/codex/CodexAppServerClient';
 
 function createClient() {
   const client = new CodexAppServerClient({ codexPathOverride: '/fixture/codex' });

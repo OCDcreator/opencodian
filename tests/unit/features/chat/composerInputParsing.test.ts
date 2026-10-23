@@ -2,7 +2,7 @@ import {
   getCodexSkillMenuQuery,
   getSlashCommandMenuQuery,
   replaceSlashTokenAtCursor,
-} from '../../../../src/features/chat/services/composerInputParsing';
+} from '../../../../src/features/chat/services/composer/composerInputParsing';
 
 function createTextarea(value: string, cursorPos: number): HTMLTextAreaElement {
   const textarea = document.createElement('textarea');

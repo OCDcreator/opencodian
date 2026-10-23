@@ -2,19 +2,19 @@ import type {
   QuestionDisplayMode,
   QuestionRequest,
 } from '../../../../src/core/types';
-import { StreamingInlineCardRenderer } from '../../../../src/features/chat/runtime/StreamingInlineCardRenderer';
-import type { QuestionDockRenderStateFacadeHost } from '../../../../src/features/chat/services/QuestionDockRenderStateFacade';
-import type { QuestionInlineResolutionActionFacadeHost } from '../../../../src/features/chat/services/QuestionInlineResolutionActionFacade';
+import { StreamingInlineCardRenderer } from '../../../../src/features/chat/runtime/rendering/StreamingInlineCardRenderer';
+import type { QuestionDockRenderStateFacadeHost } from '../../../../src/features/chat/services/questions/QuestionDockRenderStateFacade';
+import type { QuestionInlineResolutionActionFacadeHost } from '../../../../src/features/chat/services/questions/QuestionInlineResolutionActionFacade';
 import {
   QuestionPostResolutionRuntimeFacade,
   type QuestionPostResolutionRuntimeFacadeHost,
   type QuestionPostResolutionRuntimeState,
-} from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
+} from '../../../../src/features/chat/services/questions/QuestionPostResolutionRuntimeFacade';
 import {
   createQuestionRejectExecutionAction,
   createQuestionReplyExecutionAction,
   QuestionResolutionExecutionFacade,
-} from '../../../../src/features/chat/services/QuestionResolutionExecutionFacade';
+} from '../../../../src/features/chat/services/questions/QuestionResolutionExecutionFacade';
 import {
   createQuestionPostResolutionRuntimeHostAdapter,
   createQuestionRuntimeHosts,
@@ -24,7 +24,7 @@ import {
   type QuestionRuntimeState,
   type QuestionRuntimeStatusRefreshPort,
   type QuestionRuntimeViewHost,
-} from '../../../../src/features/chat/services/QuestionRuntimeHostAdapter';
+} from '../../../../src/features/chat/services/questions/QuestionRuntimeHostAdapter';
 import type { TabId } from '../../../../src/features/chat/tabs';
 import type {
   QuestionDockCallbacks,

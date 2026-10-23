@@ -7,7 +7,7 @@ import {
   resolveComposerFontFamily,
   resolveFontCssFamily,
   UNIFIED_FONT_OPTIONS,
-} from '../../../../src/features/settings/InputFontRegistry';
+} from '../../../../src/features/settings/appearance/InputFontRegistry';
 
 const mockRequestUrl = requestUrl as jest.MockedFunction<typeof requestUrl>;
 

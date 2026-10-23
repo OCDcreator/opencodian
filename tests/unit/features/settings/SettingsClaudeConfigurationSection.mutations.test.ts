@@ -1,8 +1,8 @@
 import { lstat, mkdir, mkdtemp, readdir, readFile, realpath, rmdir, unlink, writeFile } from 'node:fs/promises';
 import * as path from 'node:path';
 
-import { ClaudeSettingsSourceService } from '../../../../src/core/agents/backend/ClaudeSettingsSourceService';
-import { type ClaudeSettingsServiceBoundary, SettingsClaudeConfigurationSection } from '../../../../src/features/settings/SettingsClaudeConfigurationSection';
+import { ClaudeSettingsSourceService } from '../../../../src/core/agents/backend/claude/ClaudeSettingsSourceService';
+import { type ClaudeSettingsServiceBoundary, SettingsClaudeConfigurationSection } from '../../../../src/features/settings/backends/claude/SettingsClaudeConfigurationSection';
 import { candidate, fakePlugin, flushMicrotasks, projectRevision, readOk, stubService } from './SettingsClaudeConfigurationSection.testSupport';
 
 const clearDocument = (): void => { document.body.innerHTML = ''; };

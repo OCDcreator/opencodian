@@ -47,3 +47,8 @@
 renderBackendSessionCatalogStatus 接收可选 permissionDenied，只改变固定双语说明与 data-session-catalog-failure；状态仍为 failed/partial，已读取条目由 browser 原所有者管理。
 
 2026-10-07: The shared session browser consumes catalog evidence for every backend, preserves partial data and renders fixed bilingual denial/unavailable/failure messages. Unexpected Codex catalog rejections also become classified failures rather than raw exception text.
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/features/chat/ui/BackendSessionBrowserDetail.ts`。
+- 随目录调整更新的依赖：`src/core/agents/backend/codex/CodexAppServerClient.ts`。

@@ -5,7 +5,7 @@ import {
   createClaudeCodePermissionConfig,
   PermissionModeSelectorCoordinator,
   type PermissionModeSelectorHost,
-} from '../../../../src/features/chat/services/PermissionModeSelectorCoordinator';
+} from '../../../../src/features/chat/services/selection/PermissionModeSelectorCoordinator';
 
 describe('Claude Code permission mode selector', () => {
   beforeEach(() => {

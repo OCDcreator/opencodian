@@ -11,7 +11,7 @@ import type { SessionDiffEntry } from '../../../core/types';
 import { t } from '../../../i18n';
 import type { EditRevertPreview, EditRevertSidebarModel } from '../../../shared';
 import { getFilePathBasename, toVaultRelativePath } from '../../../shared';
-import { ConversationRenderService } from '../services/ConversationRenderService';
+import { ConversationRenderService } from '../services/rendering/ConversationRenderService';
 import { EditRevertPreviewModal } from './EditRevertPreviewModal';
 
 export type ModifiedFilesSidebarAvailability = 'ready' | 'unavailable';

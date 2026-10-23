@@ -77,3 +77,9 @@ Codex 会话浏览器从结构化目录结果保留权限拒绝分类，现有 s
 ## 2026-10-23 DSH history boundary
 
 会话浏览器为 DSH 的原生 ID 续接显示“此前记录不导入”的说明。原生上下文恢复仍由 core.backend 负责；UI 不把缺少 transcript 能力包装成已导入完整历史，forced backend 继续决定恢复会话的 owner。
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/features/chat/ui`、`src/features/chat/ui/modelSelector`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

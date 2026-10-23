@@ -3,7 +3,7 @@ import { MarkdownView } from 'obsidian';
 import {
   FocusContextPreviewCoordinator,
   type FocusContextPreviewCoordinatorHost,
-} from '../../../../src/features/chat/services/FocusContextPreviewCoordinator';
+} from '../../../../src/features/chat/services/context/FocusContextPreviewCoordinator';
 
 type Mocked<T> = {
   [Key in keyof T]:

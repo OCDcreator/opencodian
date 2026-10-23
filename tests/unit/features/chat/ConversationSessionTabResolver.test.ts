@@ -2,7 +2,7 @@ import { type Conversation,createEmptyTabContextState } from '../../../../src/co
 import {
   ConversationSessionTabResolver,
   type ConversationSessionTabResolverHost,
-} from '../../../../src/features/chat/services/ConversationSessionTabResolver';
+} from '../../../../src/features/chat/services/conversation/ConversationSessionTabResolver';
 import type { TabData } from '../../../../src/features/chat/tabs';
 
 type Mocked<T> = {

@@ -19,3 +19,8 @@
 - `CodexAppServerWireObserver` 的权威定义在 `CodexAppServerClientTypes.ts`；bridge 只 type-only 导入它，避免本地契约漂移。
 - `onServiceOutput` 每个 chunk 动态检查 trace 开关：disabled 返回 `false` 让 transport 保持 legacy stderr 行为，enabled 返回 `true` 并将内容交给 service 的脱敏路径。
 - 桥与 service 存在构造期循环引用（service 持有 `wireBridge`，桥回调 service），通过 type-only import 保持编译期解耦。
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/core/agents/backend/diagnostics/CodexWireTraceBridge.ts`。
+- 随目录调整更新的依赖：`src/core/agents/backend/codex/CodexAppServerClientTypes.ts`。

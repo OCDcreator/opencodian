@@ -19,7 +19,7 @@ manager 不依赖 Obsidian vault adapter。所有旧结构化 helper 仍先 `rea
 
 ```text
 上游: jsonc-parser, path, obsidian Notice, src/shared/logger.ts, ProjectResourceSecureWrite types, OpencodeConfigSourceService, src/core/config/modelConfig.ts, src/core/types/permission.ts, src/core/types/opencodeConfig.ts
-下游: src/main.ts, src/features/settings/OpenCodianSettings.ts, src/features/settings/OpencodeConfigModal.ts, src/core/config/ModelConfigService.ts, src/core/config/PluginManagementService.ts
+下游: src/main.ts, src/features/settings/OpenCodianSettings.ts, src/features/settings/backends/opencode/OpencodeConfigModal.ts, src/core/config/ModelConfigService.ts, src/core/config/PluginManagementService.ts
 ```
 
 ## 核心类型 / 接口
@@ -246,11 +246,11 @@ manager 内提供了更细粒度的项目配置 helper，供当前 session setti
 ## 与其他模块的交互
 
 - `src/main.ts` 会在设置同步时创建并使用它来落地 `permissionMode`。
-- `src/features/settings/SettingsSecuritySection.ts` 通过 `summarizePermissionConfig()` 把 `.opencode` 权限规则转成 template/custom 状态文案，并通过 `syncManagedBashDenyPatterns()` 同步 blocked commands 到 OpenCode bash permissions。
-- `src/features/settings/SettingsToolSection.ts` 通过 `setToolPermission()` / `clearToolPermission()` 管理 `permission["*"]` 默认值与单工具覆盖。
+- `src/features/settings/general/SettingsSecuritySection.ts` 通过 `summarizePermissionConfig()` 把 `.opencode` 权限规则转成 template/custom 状态文案，并通过 `syncManagedBashDenyPatterns()` 同步 blocked commands 到 OpenCode bash permissions。
+- `src/features/settings/resources/SettingsToolSection.ts` 通过 `setToolPermission()` / `clearToolPermission()` 管理 `permission["*"]` 默认值与单工具覆盖。
 - `src/core/config/ModelConfigService.ts` 通过它读写模型相关字段所在的完整配置文件。
 - `src/core/config/PluginManagementService.ts` 通过它读写项目级 `plugin` 配置，并复用它暴露的 `.opencode` 路径。
-- `src/features/settings/OpencodeConfigModal.ts` 直接接受这个管理器实例；P1-B UI 应使用 source inventory/read/mutation/history facade，而不是自行拼接全局路径。
+- `src/features/settings/backends/opencode/OpencodeConfigModal.ts` 直接接受这个管理器实例；P1-B UI 应使用 source inventory/read/mutation/history facade，而不是自行拼接全局路径。
 - `src/core/config/OpencodeConfigSourceService.ts` 是 P1-B scope/source 与 safe mutation owner；manager 保留 legacy helper compatibility 并把所有结构化写入路由给它。
 
 ## 注意事项
@@ -300,3 +300,8 @@ OpenCode supports a top-level `share` mode in `.opencode/opencode.json`:
 3. `disabled` turns sharing off.
 
 `OpencodeConfigManager.getShareConfig()` returns only recognized modes, and `updateShareConfig(null)` removes the field so projects can inherit the upstream default instead of writing a redundant value.
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/core/config/OpencodeConfigManager.ts`。
+- 随目录调整更新的依赖：`src/core/agents/backend/configuration/ProjectResourceSecureWrite.ts`。

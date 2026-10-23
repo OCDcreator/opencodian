@@ -1,4 +1,4 @@
-import { ConversationNoticeCoordinator } from '../../../../src/features/chat/services/ConversationNoticeCoordinator';
+import { ConversationNoticeCoordinator } from '../../../../src/features/chat/services/rendering/ConversationNoticeCoordinator';
 import { t } from '../../../../src/i18n';
 
 describe('OpenCodianView turn diff notice routing', () => {

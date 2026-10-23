@@ -19,7 +19,7 @@
 import * as obsidian from 'obsidian';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
-import { SettingsDebugSection } from '../../../../src/features/settings/SettingsDebugSection';
+import { SettingsDebugSection } from '../../../../src/features/settings/debug/SettingsDebugSection';
 import { setLocale } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 import { clearRecentLogs, setDebugLoggingEnabled } from '../../../../src/shared';
@@ -268,7 +268,7 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
       const path = require('path') as typeof import('path');
       const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../../src/features/settings/SettingsDebugSection.ts'),
+        path.resolve(__dirname, '../../../../src/features/settings/debug/SettingsDebugSection.ts'),
         'utf8',
       );
       const tabbedStart = source.indexOf('  attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {');
@@ -349,7 +349,7 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
       const path = require('path') as typeof import('path');
       const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../../src/features/settings/SettingsDebugSection.ts'),
+        path.resolve(__dirname, '../../../../src/features/settings/debug/SettingsDebugSection.ts'),
         'utf8',
       );
       // SettingsDebugSection must not reference capability-lab (it is a separate owner).
@@ -379,7 +379,7 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
       const path = require('path') as typeof import('path');
       const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../../src/features/settings/SettingsDebugSection.ts'),
+        path.resolve(__dirname, '../../../../src/features/settings/debug/SettingsDebugSection.ts'),
         'utf8',
       );
       const attachStart = source.indexOf('  attach(containerEl: HTMLElement): HTMLHeadingElement {');
@@ -452,7 +452,7 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
       const path = require('path') as typeof import('path');
       const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../../src/features/settings/SettingsDebugSection.ts'),
+        path.resolve(__dirname, '../../../../src/features/settings/debug/SettingsDebugSection.ts'),
         'utf8',
       );
       const openCodeSource = fs.readFileSync(
@@ -494,7 +494,7 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
       const path = require('path') as typeof import('path');
       const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../../src/features/settings/SettingsDebugSection.ts'),
+        path.resolve(__dirname, '../../../../src/features/settings/debug/SettingsDebugSection.ts'),
         'utf8',
       );
       const start = source.indexOf('  private addPluginDebugSettings(');
@@ -515,7 +515,7 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
       const path = require('path') as typeof import('path');
       const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../../src/features/settings/SettingsDebugSection.ts'),
+        path.resolve(__dirname, '../../../../src/features/settings/debug/SettingsDebugSection.ts'),
         'utf8',
       );
       const groupsStart = source.indexOf('const DEBUG_MODULE_GROUPS:');

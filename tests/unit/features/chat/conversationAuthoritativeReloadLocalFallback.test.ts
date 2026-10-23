@@ -3,7 +3,7 @@ import type { ChatMessage } from '../../../../src/core/types';
 import {
   shouldBypassCanonicalSyncForInterruptedNotice,
   shouldPreserveInterruptedNoticeOnSync,
-} from '../../../../src/features/chat/services/conversationAuthoritativeReloadLocalFallback';
+} from '../../../../src/features/chat/services/sync/conversationAuthoritativeReloadLocalFallback';
 
 function makeInterruptedNotice(timestamp = 2000): ChatMessage {
   return {

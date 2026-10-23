@@ -10,7 +10,7 @@ import type { SlashCommandMenuItem } from '../../../../src/core/config/slashComm
 import {
   ComposerInputShellCoordinator,
   type ComposerInputShellCoordinatorHost,
-} from '../../../../src/features/chat/services/ComposerInputShellCoordinator';
+} from '../../../../src/features/chat/services/composer/ComposerInputShellCoordinator';
 import { setLocale, t } from '../../../../src/i18n';
 
 class ResizeObserverMock {

@@ -29,8 +29,8 @@
 
 - `src/core/config/OpencodeConfigManager.ts`: 负责最终 atomic write、config path 和默认配置读取。
 - `src/core/config/modelConfig.ts`: 复用 `parseOpencodeConfigText()` 与 `isRecord()`。
-- `src/features/settings/SettingsMcpSection.ts`: 用于 ownership resolution 和 delete flow。
-- `src/features/settings/McpServerEditorModal.ts`: 用于 add/edit 保存。
+- `src/features/settings/mcp/SettingsMcpSection.ts`: 用于 ownership resolution 和 delete flow。
+- `src/features/settings/mcp/McpServerEditorModal.ts`: 用于 add/edit 保存。
 
 ## 注意事项
 

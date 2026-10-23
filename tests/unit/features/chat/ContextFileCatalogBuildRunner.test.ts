@@ -1,6 +1,6 @@
 import { TFile } from 'obsidian';
 
-import { ContextFileCatalogBuildRunner } from '../../../../src/features/chat/services/ContextFileCatalogBuildRunner';
+import { ContextFileCatalogBuildRunner } from '../../../../src/features/chat/services/context/ContextFileCatalogBuildRunner';
 
 function createFile(path: string): TFile {
   const file = new TFile();

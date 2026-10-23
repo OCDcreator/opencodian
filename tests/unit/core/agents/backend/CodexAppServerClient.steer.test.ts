@@ -33,7 +33,7 @@ jest.mock('ws', () => MockWebSocket);
 import {
   CodexAppServerClient,
   isAppServerMethodNotFoundError,
-} from '../../../../../src/core/agents/backend/CodexAppServerClient';
+} from '../../../../../src/core/agents/backend/codex/CodexAppServerClient';
 
 function emitWsUrl(proc: EventEmitter) {
   setTimeout(() => {

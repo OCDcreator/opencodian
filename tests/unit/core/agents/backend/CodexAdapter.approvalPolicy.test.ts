@@ -8,7 +8,7 @@
  * resolved wire policy for the next turn.
  */
 import { AgentCapability } from '../../../../../src/core/agents/AgentCapability';
-import { CodexAdapter } from '../../../../../src/core/agents/backend/CodexAdapter';
+import { CodexAdapter } from '../../../../../src/core/agents/backend/codex/CodexAdapter';
 import { normalizeConversationSessionSettings } from '../../../../../src/core/types';
 import type { StreamChunk } from '../../../../../src/core/types/chat';
 import {
@@ -24,8 +24,8 @@ const mockStartTurn = jest.fn();
 const mockInterruptTurn = jest.fn();
 let notificationHandler: ((event: { method: string; params: unknown }) => void) | null = null;
 
-jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => {
-  const actual = jest.requireActual('../../../../../src/core/agents/backend/CodexAppServerClient');
+jest.mock('../../../../../src/core/agents/backend/codex/CodexAppServerClient', () => {
+  const actual = jest.requireActual('../../../../../src/core/agents/backend/codex/CodexAppServerClient');
   return {
     ...actual,
     CodexAppServerClient: jest.fn().mockImplementation(() => ({

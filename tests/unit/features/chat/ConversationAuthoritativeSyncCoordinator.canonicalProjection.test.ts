@@ -4,11 +4,11 @@ import type {
   ChatMessage,
   Conversation,
 } from '../../../../src/core/types';
+import { ConversationTurnViewModelBuilder } from '../../../../src/features/chat/services/rendering/ConversationTurnViewModelBuilder';
 import {
   ConversationAuthoritativeSyncCoordinator,
   type ConversationAuthoritativeSyncHost,
-} from '../../../../src/features/chat/services/ConversationAuthoritativeSyncCoordinator';
-import { ConversationTurnViewModelBuilder } from '../../../../src/features/chat/services/ConversationTurnViewModelBuilder';
+} from '../../../../src/features/chat/services/sync/ConversationAuthoritativeSyncCoordinator';
 import { OpenCodeService } from '../../core/opencode/OpenCodeService.testSupport';
 
 type Mocked<T> = {

@@ -4,7 +4,7 @@ import type {
   OpenCodeCanonicalSessionState,
 } from '../../../../src/core/opencode';
 import type { ChatMessage } from '../../../../src/core/types';
-import { ConversationTurnViewModelBuilder } from '../../../../src/features/chat/services/ConversationTurnViewModelBuilder';
+import { ConversationTurnViewModelBuilder } from '../../../../src/features/chat/services/rendering/ConversationTurnViewModelBuilder';
 import { OpenCodeService } from '../../core/opencode/OpenCodeService.testSupport';
 
 function createMessage(

@@ -14,7 +14,7 @@
 - `src/core/config/ModelConfigService.ts`
 - `src/core/opencode/OpenCodeService.ts`
 - `src/features/chat/OpenCodianView.ts`（模型选择下拉框）
-- `src/features/settings/ModelConfigModal.ts`
+- `src/features/settings/models/ModelConfigModal.ts`
 
 ## 核心类型 / 接口
 

@@ -1,4 +1,4 @@
-import { ContextPickerInteractionBridge } from '../../../../src/features/chat/services/ContextPickerInteractionBridge';
+import { ContextPickerInteractionBridge } from '../../../../src/features/chat/services/context/ContextPickerInteractionBridge';
 
 describe('ContextPickerInteractionBridge', () => {
   it('bridges picker begin and complete to retained-selection handoff and preview refresh', () => {

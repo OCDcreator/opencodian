@@ -6,7 +6,7 @@ import { OpenCodeSdkFacade } from '../../../../src/core/opencode/OpenCodeSdkFaca
 import type { OpenCodeService } from '../../../../src/core/opencode/OpenCodeService';
 import type { OpenCodianSettings } from '../../../../src/core/types/settings';
 import { getServerBaseUrl } from '../../../../src/core/types/settings';
-import { SettingsPluginEvidenceCoordinator } from '../../../../src/features/settings/SettingsPluginEvidenceCoordinator';
+import { SettingsPluginEvidenceCoordinator } from '../../../../src/features/settings/general/SettingsPluginEvidenceCoordinator';
 
 jest.mock('../../../../src/core/opencode/OpenCodeSdkFacade', () => ({
   OpenCodeSdkFacade: jest.fn(),

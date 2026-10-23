@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
+import { SettingsPluginSection } from '../../../../src/features/settings/general/SettingsPluginSection';
 import { OpenCodianSettingTab } from '../../../../src/features/settings/OpenCodianSettings';
-import { SettingsPluginSection } from '../../../../src/features/settings/SettingsPluginSection';
 import { SettingsSectionCoordinator } from '../../../../src/features/settings/SettingsSectionCoordinator';
 import { setLocale } from '../../../../src/i18n';
 import { setDebugLoggingEnabled } from '../../../../src/shared';

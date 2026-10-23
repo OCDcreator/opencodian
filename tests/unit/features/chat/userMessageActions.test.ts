@@ -1,4 +1,4 @@
-import { syncUserMessageStreamingActionState } from '../../../../src/features/chat/userMessageActions';
+import { syncUserMessageStreamingActionState } from '../../../../src/features/chat/rendering/userMessageActions';
 
 describe('syncUserMessageStreamingActionState', () => {
   it('toggles rewind and fork buttons with streaming state changes', () => {

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { SettingsTooltipController } from '../../../../src/features/settings/SettingsTooltipController';
+import { SettingsTooltipController } from '../../../../src/features/settings/controls/SettingsTooltipController';
 
 interface IsolatedSettingsTooltipControllerModule {
   SettingsTooltipController: {
@@ -12,7 +12,7 @@ interface IsolatedSettingsTooltipControllerModule {
 function loadSettingsTooltipControllerInIsolatedModule(): IsolatedSettingsTooltipControllerModule {
   let isolatedModule: IsolatedSettingsTooltipControllerModule | null = null;
   jest.isolateModules(() => {
-    isolatedModule = jest.requireActual('../../../../src/features/settings/SettingsTooltipController') as IsolatedSettingsTooltipControllerModule;
+    isolatedModule = jest.requireActual('../../../../src/features/settings/controls/SettingsTooltipController') as IsolatedSettingsTooltipControllerModule;
   });
   if (!isolatedModule) {
     throw new Error('Could not load an isolated SettingsTooltipController module');

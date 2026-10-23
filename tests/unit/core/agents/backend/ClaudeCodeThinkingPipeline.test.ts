@@ -1,5 +1,5 @@
-import { ClaudeCodeStreamNormalizer } from '../../../../../src/core/agents/backend/ClaudeCodeStreamNormalizer';
-import { mapStreamingContentBlocksToMessageContentBlocks } from '../../../../../src/features/chat/runtime/sendPipelineContent';
+import { ClaudeCodeStreamNormalizer } from '../../../../../src/core/agents/backend/claude/ClaudeCodeStreamNormalizer';
+import { mapStreamingContentBlocksToMessageContentBlocks } from '../../../../../src/features/chat/runtime/send/sendPipelineContent';
 import { StreamController } from '../../../../../src/utils/streaming';
 
 describe('Thinking end-to-end pipeline', () => {

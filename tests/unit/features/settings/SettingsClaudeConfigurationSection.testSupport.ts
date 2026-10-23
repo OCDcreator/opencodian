@@ -1,5 +1,5 @@
-import type { ClaudeSettingsSourceCandidate } from '../../../../src/core/agents/backend/ClaudeSettingsSourceService';
-import type { ClaudeSettingsServiceBoundary } from '../../../../src/features/settings/SettingsClaudeConfigurationSection';
+import type { ClaudeSettingsSourceCandidate } from '../../../../src/core/agents/backend/claude/ClaudeSettingsSourceService';
+import type { ClaudeSettingsServiceBoundary } from '../../../../src/features/settings/backends/claude/SettingsClaudeConfigurationSection';
 
 export const flushMicrotasks = async (): Promise<void> => {
   await new Promise((resolve) => setTimeout(resolve, 0));

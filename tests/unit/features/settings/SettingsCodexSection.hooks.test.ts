@@ -4,15 +4,15 @@ import { join } from 'node:path';
 
 import { Modal, Setting } from 'obsidian';
 
-import type { AppServerHooksReadbackResult } from '../../../../src/core/agents/backend/CodexAppServerClientTypes';
+import type { AppServerHooksReadbackResult } from '../../../../src/core/agents/backend/codex/CodexAppServerClientTypes';
 import {
   DEFAULT_SETTINGS,
   getDefaultCodexBackendSettings,
 } from '../../../../src/core/types';
 import {
   SettingsCodexHooksReadbackModal,
-} from '../../../../src/features/settings/SettingsCodexReadbackControls';
-import { SettingsCodexSection } from '../../../../src/features/settings/SettingsCodexSection';
+} from '../../../../src/features/settings/backends/codex/SettingsCodexReadbackControls';
+import { SettingsCodexSection } from '../../../../src/features/settings/backends/codex/SettingsCodexSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 

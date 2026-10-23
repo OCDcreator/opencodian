@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import { type App, Setting } from 'obsidian';
 
 import { PiMcpConfigService } from '../../../../../../src/core/agents/backend/pi/PiMcpConfigService';
-import { SettingsPiSection } from '../../../../../../src/features/settings/SettingsPiSection';
+import { SettingsPiSection } from '../../../../../../src/features/settings/backends/pi/SettingsPiSection';
 import { setLocale } from '../../../../../../src/i18n';
 
 const SENSITIVE_FLAGS = ['--token', '-token', '--api-key', '--client_secret', '--PASSWORD', '--credentials', '--authorization'];

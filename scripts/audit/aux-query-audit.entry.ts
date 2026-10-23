@@ -46,9 +46,9 @@ import {
   resolveOpenCodeExecutable,
   scopeUrl,
 } from '../../src/core/agents/backend/auxiliary/OpenCodeAuxScope';
-import type { ClaudeCodeSdkFacade } from '../../src/core/agents/backend/ClaudeCodeAdapter';
-import { CodexAppServerClient } from '../../src/core/agents/backend/CodexAppServerClient';
-import { resolveCodexCli } from '../../src/core/agents/backend/CodexCliResolver';
+import type { ClaudeCodeSdkFacade } from '../../src/core/agents/backend/claude/ClaudeCodeAdapter';
+import { CodexAppServerClient } from '../../src/core/agents/backend/codex/CodexAppServerClient';
+import { resolveCodexCli } from '../../src/core/agents/backend/codex/CodexCliResolver';
 import { PiAuxQuerySession } from '../../src/core/agents/backend/pi/PiAuxQuerySession';
 import { ZCodeAdapter } from '../../src/core/agents/backend/zcode/ZCodeAdapter';
 import { ZCodeAppServerTransport } from '../../src/core/agents/backend/zcode/ZCodeAppServerTransport';

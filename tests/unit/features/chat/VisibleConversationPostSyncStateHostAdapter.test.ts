@@ -3,7 +3,7 @@ import {
   createVisibleConversationPostSyncStateHosts,
   createVisibleConversationPostSyncStateServices,
   type VisibleConversationPostSyncStateViewHost,
-} from '../../../../src/features/chat/services/VisibleConversationPostSyncStateHostAdapter';
+} from '../../../../src/features/chat/services/sync/VisibleConversationPostSyncStateHostAdapter';
 
 type Mocked<T> = {
   [Key in keyof T]:

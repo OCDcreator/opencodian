@@ -14,7 +14,7 @@ import {
   type SafeFileMutationResult,
   safeWriteFile,
   validateConfigurationContent,
-} from '../ProjectResourceSecureWrite';
+} from '../configuration/ProjectResourceSecureWrite';
 import { ZCodeRemoteRequestError } from './ZCodeAppServerTransport';
 import { asRecordValue, ZCodeProtocolErrorCode } from './ZCodeProtocolTypes';
 

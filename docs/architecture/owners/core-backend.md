@@ -51,9 +51,9 @@
 
 ## Entrypoints
 - `src/core/agents/backend/index.ts`
-- `src/core/agents/backend/ClaudeCodeAdapter.ts`
-- `src/core/agents/backend/CodexAdapter.ts`
-- `src/core/agents/backend/OpenCodeAdapter.ts`
+- `src/core/agents/backend/claude/ClaudeCodeAdapter.ts`
+- `src/core/agents/backend/codex/CodexAdapter.ts`
+- `src/core/agents/backend/opencode/OpenCodeAdapter.ts`
 
 ## Dependency surface
 - **Allowed owner dependencies:** `shared.foundation`, `shared.diagnostics`, `core.types`
@@ -155,3 +155,9 @@ CodexAdapter 的 `mcpServer/elicitation/request` 路由注册不再以 elicitati
 ## 2026-10-23 DSH ACP backend
 
 `DshAdapter` 与私有 `dsh/DshAcpClient` 在本 owner 内拥有本地 DeepSeek Harness 的 ACP 子进程、握手、请求关联、会话恢复、逐会话取消及权限回复。注册层只注入设置/环境，聊天视图只转发权限。能力仅声明 Chat、Sessions、Permissions、Thinking；不把 `session/close` 当成删除历史，不复用休眠的 OpenCode 1 服务，也不连接桌面私有 Web host。
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/core/agents/backend`、`src/core/agents/backend/auxiliary`、`src/core/agents/backend/claude`、`src/core/agents/backend/codex`、`src/core/agents/backend/configuration`、`src/core/agents/backend/dsh`、`src/core/agents/backend/opencode`、`src/core/agents/backend/zcode`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

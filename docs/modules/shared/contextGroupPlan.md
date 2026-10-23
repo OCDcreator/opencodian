@@ -41,7 +41,7 @@ summarizeContextGroup(group: { id; name; entries: readonly unknown[] }): Context
 
 ```text
 上游: 无（零依赖纯函数）
-下游: features/inline-edit/InlineEditAttachments.ts, features/chat/services/ComposerContextPickerActionService.ts
+下游: features/inline-edit/InlineEditAttachments.ts, features/chat/services/composer/ComposerContextPickerActionService.ts
 ```
 
 ## 维护约束

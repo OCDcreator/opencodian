@@ -125,3 +125,8 @@ The editor-area settings view passes the same `renderPluginUpdateSection` seam t
 2026-09-09：编辑区经典布局在Pi激活时包含Pi独立设置与二级导航；tabbed模式复用共享Pi路由。
 
 2026-09-22：ZCode 激活时渲染 `SettingsZCodeSection`（与 Pi 同模式）；tabbed 模式复用共享 ZCode 路由。
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/features/settings/OpenCodianSettingsView.ts`。
+- 随目录调整更新的依赖：`src/features/settings/backends/acp/SettingsAcpSection.ts`、`src/features/settings/resources/SettingsAgentsSection.ts`、`src/features/settings/backends/claude/SettingsClaudeCodeSection.ts`、`src/features/settings/backends/codex/SettingsCodexSection.ts`、`src/features/settings/backends/opencode/SettingsCommandsSection.ts`、`src/features/settings/general/SettingsConversationSection.ts`、`src/features/settings/debug/SettingsDebugSection.ts`、`src/features/settings/controls/SettingsDropdownControl.ts`、`src/features/settings/general/SettingsFormatterSection.ts`、`src/features/settings/mcp/SettingsMcpSection.ts`、`src/features/settings/models/SettingsModelSection.ts`、`src/features/settings/backends/pi/SettingsPiSection.ts`、`src/features/settings/general/SettingsPluginSection.ts`、`src/features/settings/general/SettingsPluginUpdateSection.ts`、`src/features/settings/general/SettingsSecuritySection.ts`、`src/features/settings/backends/opencode/SettingsServerSection.ts`、`src/features/settings/resources/SettingsSkillSection.ts`、`src/features/settings/appearance/SettingsStyleSection.ts`、`src/features/settings/resources/SettingsToolSection.ts`、`src/features/settings/general/SettingsUiSection.ts`、`src/features/settings/general/SettingsUserSection.ts`、`src/features/settings/backends/zcode/SettingsZCodeSection.ts`。

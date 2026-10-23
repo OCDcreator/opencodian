@@ -91,3 +91,9 @@ Bootstrap 不再构造/注册 `OpenCodeAdapter`：`AgentServiceRegistry` 中不�
 ## 2026-10-23 DSH composition
 
 组合层向既有 backend wiring 提供 DSH 设置读取及 `dsh` 域环境变量，并将该域纳入环境指纹计算。子进程与会话生命周期留在 core.backend；本 owner 不增加 DSH 原生运行时状态。
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

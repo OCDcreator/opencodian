@@ -2,11 +2,11 @@ import type { PromptContextItem } from '../../../../src/core/types';
 import {
   createFocusContextPreview,
   type FocusContextPreview,
-} from '../../../../src/features/chat/composerContext';
+} from '../../../../src/features/chat/rendering/composerContext';
 import {
   ComposerContextChipActionService,
   type ComposerContextChipActionServiceHost,
-} from '../../../../src/features/chat/services/ComposerContextChipActionService';
+} from '../../../../src/features/chat/services/composer/ComposerContextChipActionService';
 
 function createContextItem(overrides: Partial<PromptContextItem> = {}): PromptContextItem {
   return {

@@ -1,5 +1,5 @@
 # OpenCodian 模块功能文档
-> 2026-10-07 增量：[ClaudeCodeScopedSessionStore](core/agents/backend/ClaudeCodeScopedSessionStore.md) 记录 Claude 域 config 根的原生目录接缝和文件边界。
+> 2026-10-07 增量：[ClaudeCodeScopedSessionStore](core/agents/backend/claude/ClaudeCodeScopedSessionStore.md) 记录 Claude 域 config 根的原生目录接缝和文件边界。
 
 > 按源码模块组织的项目文档群。`module-docs.config.json` 定义源码到文档的一对一映射，`src/**/*.ts(x)` 与 `src/style/**/*.css` 原则上都应在 `docs/modules/` 下拥有一篇对应文档。
 
@@ -33,350 +33,25 @@
 - `node scripts/check-module-doc-diff.mjs --range origin/main...HEAD` 可用于分支 / CI 以主干为基准的审核。
 - `npm run list:module-docs -- --range origin/main...HEAD` 输出某个 diff 范围内必须更新的模块文档与建议检查的聚合文档。
 
-### 当前基线
+### 当前覆盖
 
-- `src/**/*.ts(x)`: 当前共有 539 个 TypeScript 源码模块（不含 `*.d.ts`）
-- `src/style/**/*.css`: 当前共有 34 个样式模块（不含 `src/style/index.css` 聚合入口）
-- `module-docs.config.json`: 当前映射 347 个源码模块到 347 篇模块文档
-- `docs/modules/**/*.md`: 当前共有 581 篇模块与基础设施文档
+使用 `npm run check:module-docs:coverage` 获取当前覆盖情况；模块清单直接由源码与映射配置核对。
 
 ## 文档结构
 
-```text
-docs/modules/
-├── README.md                          ← 总索引与覆盖规则
-├── _TEMPLATE.md                       ← 统一文档模板
-├── _WORKFLOW.md                       ← 并行填充与增量更新工作流
-├── entry-point/
-│   └── main.md
-├── app/
-│   ├── diagnostics/
-│   │   ├── index.md
-│   │   ├── types.md
-│   │   └── DiagnosticsRuntimeCoordinator.md
-│   └── runtime/
-│       ├── index.md
-│       └── PluginRuntimeCoordinator.md
-├── core/
-│   ├── agents/
-│   │   ├── AgentCapability.md
-│   │   └── backend/
-│   │       ├── index.md
-│   │       ├── AgentService.md
-│   │       ├── ClaudeCodeModelCatalog.md
-│   │       ├── OpenCodeAdapter.md
-│   │       ├── AgentServiceRegistry.md
-│   │       └── diagnostics/          ← Codex 会话 trace（service / ring buffer / wire bridge / types）
-│   ├── config/
-│   │   ├── index.md
-│   │   ├── commandScopedAgent.md
-│   │   ├── modelCatalogComparison.md
-│   │   ├── ModelConfigService.md
-│   │   ├── OpencodeConfigManager.md
-│   │   ├── PluginManagementService.md
-│   │   └── modelConfig.md
-│   ├── opencode/
-│   │   ├── index.md
-│   │   ├── diagnostics/
-│   │   │   ├── index.md
-│   │   │   ├── types.md
-│   │   │   ├── OpenCodeSessionTraceService.md
-│   │   │   ├── OpenCodeTraceEventInspector.md
-│   │   │   ├── OpenCodeTraceRedactor.md
-│   │   │   ├── OpenCodeTraceReportBuilder.md
-│   │   │   └── OpenCodeTraceStore.md
-│   │   ├── LocalSidecarEndpointResolver.md
-│   │   ├── OpenCodeAppCatalogSidecar.md
-│   │   ├── OpenCodeCatalogStateStore.md
-│   │   ├── OpenCodeContextPartSerializer.md
-│   │   ├── OpenCodeEventSubscriptionCoordinator.md
-│   │   ├── OpenCodeMessageContextOmoAssembler.md
-│   │   ├── OpenCodeMessageNormalizationMapper.md
-│   │   ├── OpenCodePromptRequestBuilder.md
-│   │   ├── OpenCodeServiceLifecycleCoordinator.md
-│   │   ├── OpenCodeService.md
-│   │   ├── OpenCodeSessionStateStore.md
-│   │   ├── OpenCodeLegacySseStreamReader.md
-│   │   ├── OpenCodeStreamEventTransformer.md
-│   │   ├── OpenCodeStreamingFinalizationCoordinator.md
-│   │   ├── OpenCodeStreamingRuntimeCoordinator.md
-│   │   ├── OpenCodeSyncEventRuntimeCoordinator.md
-│   │   ├── ServerManager.md
-│   │   ├── createSdkClient.md
-│   │   ├── sdkFetch.md
-│   │   ├── sdkFeatureFlags.md
-│   │   ├── sdkTypes.md
-│   │   ├── omoCompat.md
-│   │   └── types.md
-│   ├── prompts/
-│   │   └── titleGeneration.md
-│   ├── runtime/
-│   │   ├── index.md
-│   │   ├── OpenCodianSettingsRuntimeCoordinator.md
-│   │   └── OpenCodianStartupCoordinator.md
-│   ├── security/
-│   │   ├── index.md
-│   │   └── BlocklistChecker.md
-│   ├── storage/
-│   │   ├── index.md
-│   │   └── StorageService.md
-│   ├── theme/
-│   │   └── index.md
-│   ├── tools/
-│   │   ├── index.md
-│   │   └── toolNames.md
-│   └── types/
-│       ├── index.md
-│       ├── chat.md
-│       ├── models.md
-│       ├── settings.md
-│       ├── opencodeConfig.md
-│       ├── permission.md
-│       └── tools.md
-├── features/
-│   ├── chat/
-│   │   ├── index.md
-│   │   ├── OpenCodianView.md
-│   │   ├── autoScrollState.md
-│   │   ├── chatAppearance.md
-│   │   ├── composerContext.md
-│   │   ├── forkMessages.md
-│   │   ├── glassOctahedronDemo.md
-│   │   ├── glassOctahedronDemoRefraction.md
-│   │   ├── glassOctahedronDemoThree.md
-│   │   ├── liquidDiamondDemo.md
-│   │   ├── liquidDiamondDemoWebgl.md
-│   │   ├── renderGroups.md
-│   │   ├── runtime/
-│   │   │   ├── AssistantCopyContent.md
-│   │   │   ├── AssistantErrorRenderer.md
-│   │   │   ├── AssistantFooterRenderer.md
-│   │   │   ├── AssistantFooterPayload.md
-│   │   │   ├── AssistantShellRenderer.md
-│   │   │   ├── AssistantShellViewHostAdapter.md
-│   │   │   ├── AssistantNoticeRenderer.md
-│   │   │   ├── AssistantPlainTextFallbackRenderer.md
-│   │   │   ├── AssistantStructuredContentRenderer.md
-│   │   │   ├── BackgroundTaskIndicatorCoordinator.md
-│   │   │   ├── BackgroundTaskInlinePanelRenderer.md
-│   │   │   ├── BackgroundTaskStreamTriggerCoordinator.md
-│   │   │   ├── ConversationHydrationOutcomeBridge.md
-│   │   │   ├── ConversationHydrationRenderBridge.md
-│   │   │   ├── ConversationLoadRuntimeBridge.md
-│   │   │   ├── ConversationTransitionBridge.md
-│   │   │   ├── PermissionInlineCardRenderer.md
-│   │   │   ├── QuestionInlineCardRenderer.md
-│   │   │   ├── QuestionResolutionCoordinator.md
-│   │   │   ├── QuestionResolutionCardRenderer.md
-│   │   │   ├── StreamingInlineCardRenderer.md
-│   │   │   ├── buildLocalStreamOutcome.md
-│   │   │   ├── LocalStreamMessagePersistence.md
-│   │   │   ├── PendingIndicatorController.md
-│   │   │   ├── sendPipelineContent.md
-│   │   │   ├── SendPipelineRuntime.md
-│   │   │   ├── SendPipelineTrace.md
-│   │   │   ├── SendPipelineTypes.md
-│   │   │   ├── StreamChunkRouter.md
-│   │   │   ├── StreamLocalFinalizer.md
-│   │   │   └── StreamShellFinalizer.md
-│   │   ├── userMessageActions.md
-│   │   ├── userMessageDisplay.md
-│   │   ├── rendering/
-│   │   │   └── collapsible.md
-│   │   ├── services/
-│   │   │   ├── ActiveTabContextUsageCoordinator.md
-│   │   │   ├── AgentMentionCandidateService.md
-│   │   │   ├── AgentMentionComposerController.md
-│   │   │   ├── AdditionalDirectoriesConfigBadgeCoordinator.md
-│   │   │   ├── ChatHeaderPresenter.md
-│   │   │   ├── CodexDiagnosticsHostAdapter.md
-│   │   │   ├── ChatVisualDemoCoordinator.md
-│   │   │   ├── CodexRuntimeDefaultsBadgeCoordinator.md
-│   │   │   ├── ChatSelectionControlsCoordinator.md
-│   │   │   ├── ComposerInputShellCoordinator.md
-│   │   │   ├── composerInputParsing.md
-│   │   │   ├── SlashCommandMenuCatalogCache.md
-│   │   │   ├── slashCommandMenuRenderer.md
-│   │   │   ├── InputPanelAppearanceCoordinator.md
-│   │   │   ├── InputPanelThemeRuntime.md
-│   │   │   ├── ModelSelectionRuntime.md
-│   │   │   ├── ComposerContextActionService.md
-│   │   │   ├── ComposerContextCoordinator.md
-│   │   │   ├── ContextAttachmentBuilder.md
-│   │   │   ├── ContextFileCatalogService.md
-│   │   │   ├── FocusContextRuntimeService.md
-│   │   │   ├── ContextUsageService.md
-│   │   │   ├── ConversationHistoryDialogService.md
-│   │   │   ├── ConversationRenderService.md
-│   │   │   ├── ConversationRenderRuntime.md
-│   │   │   ├── ConversationIdentityRuntime.md
-│   │   │   ├── ConversationTurnViewModelBuilder.md
-│   │   │   ├── ConversationTrailingAssistantPatchPlanner.md
-│   │   │   ├── ConversationLoadRecoveryCoordinator.md
-│   │   │   ├── ConversationNoticeCoordinator.md
-│   │   │   ├── ConversationTabLifecycleRecoveryCoordinator.md
-│   │   │   ├── ConversationTabOpenCoordinator.md
-│   │   │   ├── ConversationTabRuntimeCoordinator.md
-│   │   │   ├── ConversationViewStateService.md
-│   │   │   ├── MessageFinalizationService.md
-│   │   │   ├── MessageSendPreparationService.md
-│   │   │   ├── ModifiedFilesSidebarCoordinator.md
-│   │   │   ├── PermissionModeSelectorCoordinator.md
-│   │   │   ├── PersistentAssistantNoticeService.md
-│   │   │   ├── ScrollManager.md
-│   │   │   ├── TitleGenerationService.md
-│   │   │   ├── trailingAssistantPatchDebug.md
-│   │   │   ├── trailingAssistantPatchExecution.md
-│   │   │   ├── trailingAssistantPatchPlanning.md
-│   │   │   └── trailingAssistantPatchTypes.md
-│   │   ├── tabs/
-│   │   │   ├── index.md
-│   │   │   ├── Tab.md
-│   │   │   ├── TabBar.md
-│   │   │   ├── TabManager.md
-│   │   │   └── types.md
-│   │   └── ui/
-│   │       ├── AnchoredOverlayLayoutController.md
-│   │       ├── ContextDetailModal.md
-│   │       ├── ContextFilePickerModal.md
-│   │       ├── ContextRing.md
-│   │       ├── EffortSelector.md
-│   │       ├── modelSelector/
-│   │       │   ├── ModelSelectorDisplay.md
-│   │       │   ├── ModelSelectorInteractions.md
-│   │       │   ├── ModelSelectorRenderer.md
-│   │       │   └── types.md
-│   │       ├── NavigationSidebar.md
-│   │       ├── EditRevertPreviewModal.md
-│   │       ├── QuestionDock.md
-│   │       ├── questionDockState.md
-│   │       └── SessionTodoDock.md
-│   └── settings/
-│       ├── index.md
-│       ├── debug/
-│       │   ├── index.md                 ← debug 子目录 aggregate index（非 src/index.ts 映射）
-│       │   ├── OpenCodeDebugPanel.md
-│       │   ├── CodexDebugPanel.md
-│       │   ├── ClaudeCodeDebugPanel.md
-│       │   └── types.md
-│       ├── CodexMcpServerDetailModal.md
-│       ├── CodexReadbackModal.md
-│       ├── LiquidGlassSettingHelpModal.md
-│       ├── ModelConfigJsonModal.md
-│       ├── ModelConfigModelListEditor.md
-│       ├── ModelConfigModal.md
-│       ├── ModelConfigProviderEditor.md
-│       ├── ModelPickerModal.md
-│       ├── modelConfigWorkspace.md
-│       ├── modelPicker.md
-│       ├── OpencodeConfigModal.md
-│       ├── OpenCodianSettings.md
-│       ├── modelConfigModalState.md
-│       ├── modelConfigSavePlan.md
-│       ├── providerPresets.md
-│       ├── ProjectConfigFileWatcher.md
-│       ├── ProviderBuiltinIconPickerModal.md
-│       ├── ProviderIconCacheModal.md
-│       ├── searchInputEnhancer.md
-│       ├── SettingsDropdownControl.md
-│       ├── ServerSettingHelpModal.md
-│       ├── SettingsCommandsSection.md
-│       ├── SettingsCodexAccountSurface.md
-│       ├── SettingsCodexLegacyCredentialControl.md
-│       ├── SettingsCodexReadbackControls.md
-│       ├── SettingsCodexSection.md
-│       ├── SettingsModelCatalogCoordinator.md
-│       ├── SettingsModelCatalogAvailability.md
-│       ├── SettingsModelCatalogPresenter.md
-│       ├── SettingsModelIconCacheManager.md
-│       ├── SettingsModelSection.md
-│       ├── SettingsProjectCommandEditor.md
-│       ├── SettingsSectionCoordinator.md
-│       ├── SettingsSecuritySection.md
-│       ├── SettingsServerSection.md
-│       ├── SettingsStyleInputPanelSection.md
-│       ├── SettingsStyleLiquidGlassInputControls.md
-│       ├── SettingsStylePresetSection.md
-│       ├── SettingsStyleSection.md
-│       ├── SettingsStyleBackgroundSection.md
-│       ├── settingsStyleControls.md
-│       └── projectAgentEditorConfig.md
-├── i18n/
-│   ├── index.md
-│   └── locales/
-│       ├── index.md
-│       ├── en.md
-│       └── zh.md
-├── types/
-│   └── jsx-shim.md
-├── shared/
-│   ├── contextPath.md
-│   ├── sessionCatalogReadback.md
-│   ├── index.md
-│   ├── logger.md
-│   ├── obsidianContext.md
-│   ├── toolIdentity.md
-│   ├── toolExecution.md
-│   ├── vault.md
-│   ├── diagnostics/                  ← 后端无关 trace 基础设施（types / TraceRedactor / TraceStore / TraceReportBuilder）
-│   │   ├── index.md
-│   │   ├── types.md
-│   │   ├── TraceRedactor.md
-│   │   ├── TraceStore.md
-│   │   └── TraceReportBuilder.md
-│   └── modals/
-│       ├── index.md
-│       └── ForkTargetModal.md
-├── utils/
-│   ├── index.md
-│   ├── editorSelectionHighlight.md
-│   ├── glass/
-│   │   ├── index.md
-│   │   ├── builtin-adapters.md
-│   │   ├── registry.md
-│   │   ├── types.md
-│   │   └── adapters/
-│   │       ├── nikdelvin.md
-│   │       ├── shuding.md
-│   │       └── shudingDiamond.md
-│   ├── icons/
-│   │   ├── index.md
-│   │   ├── builtinIconRegistry.md
-│   │   ├── lobehubIconManifest.md
-│   │   ├── ProviderIconService.md
-│   │   ├── providerIconAssetCache.md
-│   │   ├── providerIconBuiltinSelection.md
-│   │   ├── providerIconCustomSources.md
-│   │   ├── providerIconEntryResolution.md
-│   │   └── providerIconTypes.md
-│   ├── markdown/
-│   │   ├── index.md
-│   │   ├── MarkdownRenderer.md
-│   │   ├── fileLink.md
-│   │   ├── imageEmbed.md
-│   │   └── types.md
-│   └── streaming/
-│       ├── index.md
-│       ├── mcpSummaryConfig.md
-│       ├── StreamController.md
-│       ├── ThinkingBlockRenderer.md
-│       ├── ToolCallRenderer.md
-│       └── types.md
-├── vendor/
-│   └── three.md
-├── style/
-│   ├── README.md
-│   ├── components/
-│   │   ├── permission-mode-selector.md
-│   │   ├── settings-claude-code.md
-│   │   └── settings-codex-account.md
-│   └── features/
-│       └── chat-assistant.md
-└── infrastructure/
-    ├── build-pipeline.md
-    ├── scripts.md
-    └── test-framework.md
-```
+模块目录镜像 `src/` 的职责层级；完整目录及新文件的放置规则见[源码目录](../architecture/source-layout.md)。
+
+| 目录 | 内容 |
+|---|---|
+| `entry-point/` | 插件入口 |
+| `app/` | 运行时装配与 Obsidian 接入 |
+| `core/` | 后端、配置、存储等领域模块 |
+| `features/chat/` | 聊天视图、运行时及按职责分组的服务 |
+| `features/settings/` | 设置入口、后端设置和功能分组 |
+| `features/` 其他目录 | 各自独立的功能 |
+| `shared/`、`utils/`、`i18n/`、`types/`、`vendor/` | 共用模块及声明 |
+| `style/` | 样式模块 |
+| `infrastructure/` | 构建、测试、脚本等非源码文档 |
 
 ## 编写约定
 
@@ -414,18 +89,18 @@ docs/modules/
 - [Pi RPC 传输](core/agents/backend/pi/PiRpcClient.md)
 - [Pi 会话元数据](core/agents/backend/pi/PiSessionStore.md)
 - [Pi 流式映射](core/agents/backend/pi/PiStreamMapper.md)
-- [Pi 模型选择绑定](features/chat/services/PiModelSelectionBinding.md)
-- [Pi 设置界面](features/settings/SettingsPiSection.md)
+- [Pi 模型选择绑定](features/chat/services/selection/PiModelSelectionBinding.md)
+- [Pi 设置界面](features/settings/backends/pi/SettingsPiSection.md)
 
 ## 聊天导航增量（2026-09-21）
 
-- [双栏会话管理栏](features/chat/services/ConversationSessionRailCoordinator.md)：R-F5 宽面板只读会话列表，复用历史会话的后端筛选与加载路径。
-- [Vim 风格聊天导航](features/chat/services/ChatVimNavigationCoordinator.md)：R-F6 opt-in 的 root-scoped w/s/i 键处理与输入/overlay 避让。
+- [双栏会话管理栏](features/chat/services/conversation/ConversationSessionRailCoordinator.md)：R-F5 宽面板只读会话列表，复用历史会话的后端筛选与加载路径。
+- [Vim 风格聊天导航](features/chat/services/surface/ChatVimNavigationCoordinator.md)：R-F6 opt-in 的 root-scoped w/s/i 键处理与输入/overlay 避让。
 
 ### Pi SDK 完整接入补充
 
 - core/agents/backend/pi/PiProtocol.md、PiSessionRuntime.md：版本化独立服务边界。
-- features/chat/services/PiExtensionUiHost.md：标准扩展UI。
-- features/settings/PiWorkbenchActions.md、PiWorkbenchModal.md：52项管理操作。
+- features/chat/services/integrations/PiExtensionUiHost.md：标准扩展UI。
+- features/settings/backends/pi/PiWorkbenchActions.md、PiWorkbenchModal.md：52项管理操作。
 
-- features/settings/SettingsPiConfigurationSection.md 与 SettingsPiProvidersSection.md：Pi原生持久配置页面。
+- features/settings/backends/pi/SettingsPiConfigurationSection.md 与 SettingsPiProvidersSection.md：Pi原生持久配置页面。

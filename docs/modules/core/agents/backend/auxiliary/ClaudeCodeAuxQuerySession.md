@@ -33,3 +33,8 @@
 - 模型回答中若出现 `tool_use`，说明工具没有被真正限制，应优先检查 `tools` 是否被其他选项覆盖
 
 > 2026-09-18 (R-C3)：新增 additive `warmUp()`——不提交任何回合、提前 `startSession()` 拉起 CLI 进程，使补全预热把 1–3s 的进程冷启动移出触发路径；首轮 `system/init` 只读验证与全部 enforcement 选项保持不变。
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/core/agents/backend/auxiliary/ClaudeCodeAuxQuerySession.ts`。
+- 随目录调整更新的依赖：`src/core/agents/backend/claude/ClaudeCodeOptionsBuilder.ts`、`src/core/agents/backend/claude/ClaudeCodeQueue.ts`、`src/core/agents/backend/claude/ClaudeCodeSdkAbortShim.ts`。

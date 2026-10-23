@@ -1,0 +1,322 @@
+import type { ChatMessage } from '../../../../core/types';
+import { getConversationBackendSessionId } from '../../../../core/types';
+import { createLogger } from '../../../../shared';
+import type { PreparedMessageSend } from '../../services/send/MessageSendPreparationService';
+import { mapStreamingContentBlocksToMessageContentBlocks } from './sendPipelineContent';
+import type {
+  LocalStreamOutcome,
+  LocalStreamPersistenceHost,
+  SendPipelineTabRuntime,
+} from './SendPipelineTypes';
+
+const logger = createLogger('LocalStreamMessagePersistence');
+
+export async function persistLocalStreamOutcome(options: {
+  host: LocalStreamPersistenceHost;
+  preparedSend: PreparedMessageSend;
+  runtime: SendPipelineTabRuntime;
+  outcome: LocalStreamOutcome;
+  logAssistantFinalizationStage: (stage: string, payload?: Record<string, unknown>) => void;
+}): Promise<void> {
+  const {
+    host,
+    preparedSend,
+    runtime,
+    outcome,
+    logAssistantFinalizationStage,
+  } = options;
+
+  let persistLocalMessage: (() => void) | null = null;
+
+  const shouldPersistStructuredOnlyAssistantMessage = outcome.structuredOutput !== undefined;
+  if ((outcome.hasStreamContentBlocks && outcome.streamContentBlocks) || shouldPersistStructuredOnlyAssistantMessage) {
+    const shouldPersistAssistantMessage = shouldPersistLocalAssistantMessage(
+      outcome,
+      runtime,
+    );
+    if (!shouldPersistAssistantMessage) {
+      markCanonicalAssistantTakeoverPending(
+        outcome.finalizedStreamingMessageEl,
+        outcome.finalizedAssistantMessageId,
+      );
+      await persistBackendSessionIdentityIfNeeded({
+        host,
+        preparedSend,
+        outcome,
+        logAssistantFinalizationStage,
+      });
+      logAssistantFinalizationStage('local-assistant-cache-deferred', {
+        finalizedAssistantMessageId: outcome.finalizedAssistantMessageId ?? null,
+        reason: 'canonical-sync-pending',
+      });
+      return;
+    }
+
+    const assistantMessage: ChatMessage = {
+      id: outcome.finalizedAssistantMessageId ?? `assistant-${outcome.finalizedTimestamp}`,
+      role: 'assistant',
+      content: outcome.streamedTextContent,
+      timestamp: outcome.finalizedTimestamp,
+      modelId: outcome.finalizedModelId,
+      sourceMessageId: outcome.finalizedAssistantMessageId,
+      ...(outcome.finalizedAssistantTurnId ? { sourceTurnId: outcome.finalizedAssistantTurnId } : {}),
+      streamState: outcome.shouldPersistInterruptedState ? 'interrupted' : undefined,
+      contentBlocks: outcome.streamContentBlocks
+        ? mapStreamingContentBlocksToMessageContentBlocks(outcome.streamContentBlocks)
+        : [],
+      questionResolution: runtime.pendingQuestionResolution ?? undefined,
+      structured: outcome.structuredOutput,
+    };
+    logAssistantFinalizationStage('local-assistant-message-built', {
+      message: host.summarizeChatMessageForDebug(assistantMessage),
+    });
+
+    if (outcome.shouldPersistInterruptedState) {
+      logInterruptedAssistantPersistence(host, preparedSend, assistantMessage);
+    }
+
+    persistLocalMessage = () => {
+      writeShellDataset(runtime.streamingMessageEl, assistantMessage);
+      insertLocalMessageInTurn(preparedSend, assistantMessage);
+      logAssistantFinalizationStage('local-assistant-message-appended', {
+        conversationMessageCount: preparedSend.conversation.messages.length,
+        message: host.summarizeChatMessageForDebug(assistantMessage),
+      });
+    };
+  } else if (outcome.streamErrorNoticeMessage) {
+    persistLocalMessage = () => {
+      appendNoticeMessage({
+        preparedSend,
+        host,
+        message: outcome.streamErrorNoticeMessage as ChatMessage,
+        logAssistantFinalizationStage,
+        stage: 'local-error-notice-appended',
+      });
+    };
+  } else if (outcome.interruptedNoticeMessage) {
+    logInterruptedNoticePersistence(host, preparedSend, outcome.interruptedNoticeMessage);
+    persistLocalMessage = () => {
+      appendNoticeMessage({
+        preparedSend,
+        host,
+        message: outcome.interruptedNoticeMessage as ChatMessage,
+        logAssistantFinalizationStage,
+        stage: 'local-interrupted-notice-appended',
+      });
+    };
+  }
+
+  if (!persistLocalMessage) {
+    await persistBackendSessionIdentityIfNeeded({
+      host,
+      preparedSend,
+      outcome,
+      logAssistantFinalizationStage,
+    });
+    return;
+  }
+
+  const previousBackendSessionId = getConversationBackendSessionId(preparedSend.conversation);
+  const writeTicket = host.createConversationWriteTicket(preparedSend.conversation.id);
+  const writeApplied = await host.commitConversationWrite(
+    preparedSend.conversation,
+    writeTicket,
+    'local-stream-finalization',
+    () => {
+      if (outcome.finalizedBackendSessionId) {
+        preparedSend.conversation.backendSessionId = outcome.finalizedBackendSessionId;
+        removeCodexProvisionalWarningIfUpgraded(
+          preparedSend.conversation,
+          previousBackendSessionId,
+          outcome.finalizedBackendSessionId,
+        );
+      }
+      if (outcome.resolvedUserMessageIdentity && !preparedSend.userMessage.sourceMessageId) {
+        preparedSend.userMessage.sourceMessageId = outcome.resolvedUserMessageIdentity;
+        if (outcome.resolvedUserMessageTurnId) preparedSend.userMessage.sourceTurnId = outcome.resolvedUserMessageTurnId;
+      }
+      persistLocalMessage?.();
+      preparedSend.conversation.updatedAt = Math.max(preparedSend.conversation.updatedAt, outcome.finalizedTimestamp);
+      preparedSend.conversation.lastResponseAt = Math.max(preparedSend.conversation.lastResponseAt ?? 0, outcome.finalizedTimestamp);
+    },
+  );
+  if (!writeApplied) {
+    logAssistantFinalizationStage('local-stream-finalization-write-skipped', {
+      conversationId: preparedSend.conversation.id,
+      messageCount: preparedSend.conversation.messages.length,
+    });
+    return;
+  }
+  if (outcome.requiresNativeTextRender && host.reconcileCodexFinalText) {
+    await host.reconcileCodexFinalText(preparedSend.conversation, preparedSend.tabId);
+  }
+
+  logAssistantFinalizationStage('conversation-saved-after-local-finalization', {
+    updatedAt: preparedSend.conversation.updatedAt,
+    lastResponseAt: preparedSend.conversation.lastResponseAt ?? null,
+    messageCount: preparedSend.conversation.messages.length,
+  });
+}
+
+async function persistBackendSessionIdentityIfNeeded(options: {
+  host: LocalStreamPersistenceHost;
+  preparedSend: PreparedMessageSend;
+  outcome: LocalStreamOutcome;
+  logAssistantFinalizationStage: (stage: string, payload?: Record<string, unknown>) => void;
+}): Promise<void> {
+  const sessionId = options.outcome.finalizedBackendSessionId;
+  const userMessageIdentity = options.outcome.resolvedUserMessageIdentity;
+  const needsSessionId = sessionId && getConversationBackendSessionId(options.preparedSend.conversation) !== sessionId;
+  const needsUserIdentity = userMessageIdentity && !options.preparedSend.userMessage.sourceMessageId;
+  if (!needsSessionId && !needsUserIdentity) {
+    return;
+  }
+
+  const previousBackendSessionId = getConversationBackendSessionId(options.preparedSend.conversation);
+  const writeTicket = options.host.createConversationWriteTicket(options.preparedSend.conversation.id);
+  const writeApplied = await options.host.commitConversationWrite(
+    options.preparedSend.conversation,
+    writeTicket,
+    'backend-session-id-finalization',
+    () => {
+      if (needsSessionId) {
+        options.preparedSend.conversation.backendSessionId = sessionId;
+        removeCodexProvisionalWarningIfUpgraded(
+          options.preparedSend.conversation,
+          previousBackendSessionId,
+          sessionId!,
+        );
+      }
+      if (needsUserIdentity) {
+        options.preparedSend.userMessage.sourceMessageId = userMessageIdentity;
+        if (options.outcome.resolvedUserMessageTurnId) options.preparedSend.userMessage.sourceTurnId = options.outcome.resolvedUserMessageTurnId;
+      }
+    },
+  );
+  options.logAssistantFinalizationStage(
+    writeApplied ? 'backend-session-id-finalized' : 'backend-session-id-finalization-skipped',
+    {
+      backendSessionId: sessionId,
+      resolvedUserMessageIdentity: userMessageIdentity,
+    },
+  );
+}
+
+function shouldPersistLocalAssistantMessage(
+  outcome: LocalStreamOutcome,
+  runtime: SendPipelineTabRuntime,
+): boolean {
+  if (!outcome.shouldSyncFromServer) {
+    return true;
+  }
+
+  return Boolean(
+    outcome.shouldPersistInterruptedState
+      || runtime.pendingQuestionResolution,
+  );
+}
+
+function markCanonicalAssistantTakeoverPending(
+  messageEl: HTMLElement | null,
+  assistantMessageId: string | undefined,
+): void {
+  if (!messageEl || !assistantMessageId) {
+    return;
+  }
+
+  messageEl.dataset.canonicalMessageId = assistantMessageId;
+  messageEl.dataset.canonicalSyncPending = 'true';
+}
+
+function insertLocalMessageInTurn(preparedSend: PreparedMessageSend, message: ChatMessage): void {
+  const { messages } = preparedSend.conversation;
+  const user = preparedSend.userMessage;
+  const userIndex = messages.findIndex((candidate) => candidate.role === 'user'
+    && (candidate.id === user.id
+      || (Boolean(user.sourceMessageId) && candidate.sourceMessageId === user.sourceMessageId)));
+  const nextUserIndex = userIndex < 0 ? -1 : messages.findIndex(
+    (candidate, index) => index > userIndex && candidate.role === 'user',
+  );
+  // Preserve existing content if the initiating user has since been removed;
+  // never infer a different turn from reply timing or text.
+  messages.splice(nextUserIndex < 0 ? messages.length : nextUserIndex, 0, message);
+}
+
+function appendNoticeMessage(options: {
+  preparedSend: PreparedMessageSend;
+  host: LocalStreamPersistenceHost;
+  message: ChatMessage;
+  logAssistantFinalizationStage: (stage: string, payload?: Record<string, unknown>) => void;
+  stage: string;
+}): void {
+  insertLocalMessageInTurn(options.preparedSend, options.message);
+  options.logAssistantFinalizationStage(options.stage, {
+    conversationMessageCount: options.preparedSend.conversation.messages.length,
+    latestAssistantMessage: options.host.summarizeChatMessageForDebug(options.message),
+  });
+}
+
+function writeShellDataset(messageEl: HTMLElement | null, message: ChatMessage): void {
+  if (!messageEl) {
+    return;
+  }
+
+  messageEl.dataset.messageId = message.id;
+  if (message.sourceMessageId) {
+    messageEl.dataset.sourceMessageId = message.sourceMessageId;
+  } else {
+    delete messageEl.dataset.sourceMessageId;
+  }
+}
+
+function logInterruptedAssistantPersistence(
+  host: LocalStreamPersistenceHost,
+  preparedSend: PreparedMessageSend,
+  message: ChatMessage,
+): void {
+  logger.debug(`Persisting interrupted assistant message after stream cancellation: ${host.stringifyLogPayload({
+    tabId: preparedSend.tabId,
+    conversationId: preparedSend.conversation.id,
+    sessionId: getConversationBackendSessionId(preparedSend.conversation),
+    messageId: message.id,
+    sourceMessageId: message.sourceMessageId ?? null,
+    contentPreview: host.getLogPreview(message.content, 160),
+    contentBlockCount: message.contentBlocks?.length ?? 0,
+  })}`);
+}
+
+function logInterruptedNoticePersistence(
+  host: LocalStreamPersistenceHost,
+  preparedSend: PreparedMessageSend,
+  message: ChatMessage,
+): void {
+  logger.debug(`Persisting interrupted assistant notice because no visible assistant content survived cancellation: ${host.stringifyLogPayload({
+    tabId: preparedSend.tabId,
+    conversationId: preparedSend.conversation.id,
+    sessionId: getConversationBackendSessionId(preparedSend.conversation),
+    noticeId: message.id,
+  })}`);
+}
+
+function removeCodexProvisionalWarningIfUpgraded(
+  conversation: PreparedMessageSend['conversation'],
+  previousSessionId: string | undefined,
+  newSessionId: string,
+): void {
+  const wasProvisional = !!previousSessionId && previousSessionId.startsWith('codex-local-');
+  const isNowReal = !newSessionId.startsWith('codex-local-');
+  if (!wasProvisional || !isNowReal) {
+    return;
+  }
+  const beforeCount = conversation.messages.length;
+  conversation.messages = conversation.messages.filter(
+    (message) => message.noticeMeta?.kind !== 'codex-provisional-warning',
+  );
+  const removedCount = beforeCount - conversation.messages.length;
+  if (removedCount > 0) {
+    logger.info('Removed stale Codex provisional warning after thread upgrade', {
+      conversationId: conversation.id,
+      removedCount,
+    });
+  }
+}

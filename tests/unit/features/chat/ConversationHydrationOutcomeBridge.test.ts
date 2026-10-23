@@ -5,10 +5,10 @@ import type {
 import {
   ConversationHydrationOutcomeBridge,
   type ConversationHydrationOutcomeBridgeHost,
-} from '../../../../src/features/chat/runtime/ConversationHydrationOutcomeBridge';
-import type { ConversationHydrationRenderPort } from '../../../../src/features/chat/runtime/ConversationHydrationRenderBridge';
-import type { TabConversationStateBridge } from '../../../../src/features/chat/runtime/TabConversationStateBridge';
-import type { TabViewActivationBridge } from '../../../../src/features/chat/runtime/TabViewActivationBridge';
+} from '../../../../src/features/chat/runtime/activation/ConversationHydrationOutcomeBridge';
+import type { ConversationHydrationRenderPort } from '../../../../src/features/chat/runtime/activation/ConversationHydrationRenderBridge';
+import type { TabConversationStateBridge } from '../../../../src/features/chat/runtime/activation/TabConversationStateBridge';
+import type { TabViewActivationBridge } from '../../../../src/features/chat/runtime/activation/TabViewActivationBridge';
 
 type TabConversationStatePort = Pick<
   TabConversationStateBridge,

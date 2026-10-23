@@ -1,10 +1,10 @@
 import type { App } from 'obsidian';
 
-import type { AppServerMcpResourceReadResult, AppServerMcpServerStatus } from '../../../../src/core/agents/backend/CodexAppServerClient';
+import type { AppServerMcpResourceReadResult, AppServerMcpServerStatus } from '../../../../src/core/agents/backend/codex/CodexAppServerClient';
 import {
   CodexMcpServerDetailModal,
   type CodexMcpServerDetailModalHost,
-} from '../../../../src/features/settings/CodexMcpServerDetailModal';
+} from '../../../../src/features/settings/backends/codex/CodexMcpServerDetailModal';
 import { setLocale } from '../../../../src/i18n';
 
 function createHost(overrides: Partial<CodexMcpServerDetailModalHost> = {}): CodexMcpServerDetailModalHost {

@@ -5,8 +5,8 @@
  * preserving matcher, unknown group/handler fields, sibling groups/events, and
  * unrelated top-level settings.
  */
-import { buildClaudeHookHandlerEdit } from '../../../../../src/core/agents/backend/ClaudeSettingsHookModel';
-import { applyJsoncPathEdits } from '../../../../../src/core/agents/backend/ProjectResourceSecureWrite';
+import { buildClaudeHookHandlerEdit } from '../../../../../src/core/agents/backend/claude/ClaudeSettingsHookModel';
+import { applyJsoncPathEdits } from '../../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite';
 
 const grp = (g: unknown): Record<string, unknown> => g as Record<string, unknown>;
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals';
 
-import { OpenCode2Adapter } from '../../../../../src/core/agents/backend/OpenCode2Adapter';
+import { OpenCode2Adapter } from '../../../../../src/core/agents/backend/opencode/OpenCode2Adapter';
 
 function adapterWithClient(client: object): OpenCode2Adapter {
   const adapter = new OpenCode2Adapter({

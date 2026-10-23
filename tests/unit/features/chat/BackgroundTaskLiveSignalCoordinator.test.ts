@@ -4,7 +4,7 @@ import {
   BackgroundTaskLiveSignalCoordinator,
   type BackgroundTaskLiveSignalLaunchInfo,
   type BackgroundTaskLiveSignalRuntime,
-} from '../../../../src/features/chat/services/BackgroundTaskLiveSignalCoordinator';
+} from '../../../../src/features/chat/services/background/BackgroundTaskLiveSignalCoordinator';
 import { setDebugLoggingEnabled } from '../../../../src/shared';
 
 describe('BackgroundTaskLiveSignalCoordinator', () => {

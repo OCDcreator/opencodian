@@ -5,7 +5,7 @@ import {
   getDefaultCodexBackendSettings,
 } from '../../../../src/core/types';
 import { BackendSessionBrowserModal } from '../../../../src/features/chat/ui/BackendSessionBrowserModal';
-import { SettingsCodexSection } from '../../../../src/features/settings/SettingsCodexSection';
+import { SettingsCodexSection } from '../../../../src/features/settings/backends/codex/SettingsCodexSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 

@@ -6,7 +6,7 @@ jest.mock('obsidian', () => ({
   Notice: jest.fn(),
 }));
 
-import { SettingsMcpSection } from '../../../../src/features/settings/SettingsMcpSection';
+import { SettingsMcpSection } from '../../../../src/features/settings/mcp/SettingsMcpSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 import {
@@ -19,7 +19,7 @@ import {
   mockSettingPrototype,
 } from './helpers/mcpSectionTestHelpers';
 
-jest.mock('../../../../src/features/settings/McpServerEditorModal', () => ({
+jest.mock('../../../../src/features/settings/mcp/McpServerEditorModal', () => ({
   McpServerEditorModal: jest.fn().mockImplementation((_app, options) => ({
     open: jest.fn(() => {
       options.onSaved?.({
@@ -31,15 +31,15 @@ jest.mock('../../../../src/features/settings/McpServerEditorModal', () => ({
   })),
 }));
 
-jest.mock('../../../../src/features/settings/McpServerStatusModal', () => ({
-  ...jest.requireActual('../../../../src/features/settings/McpServerStatusModal'),
+jest.mock('../../../../src/features/settings/mcp/McpServerStatusModal', () => ({
+  ...jest.requireActual('../../../../src/features/settings/mcp/McpServerStatusModal'),
   McpServerStatusModal: jest.fn().mockImplementation(() => ({
     open: jest.fn(),
   })),
 }));
 
-import { McpServerEditorModal } from '../../../../src/features/settings/McpServerEditorModal';
-import { McpServerStatusModal } from '../../../../src/features/settings/McpServerStatusModal';
+import { McpServerEditorModal } from '../../../../src/features/settings/mcp/McpServerEditorModal';
+import { McpServerStatusModal } from '../../../../src/features/settings/mcp/McpServerStatusModal';
 
 describe('SettingsMcpSection server actions', () => {
   beforeEach(() => {

@@ -3,8 +3,8 @@
  * JsoncPathEdit (array-replace at ['hooks', event]) for add / update-matcher /
  * delete / move, preserving unknown raw fields without mutating the input.
  */
-import { buildClaudeHookGroupEdit } from '../../../../../src/core/agents/backend/ClaudeSettingsHookModel';
-import { applyJsoncPathEdits } from '../../../../../src/core/agents/backend/ProjectResourceSecureWrite';
+import { buildClaudeHookGroupEdit } from '../../../../../src/core/agents/backend/claude/ClaudeSettingsHookModel';
+import { applyJsoncPathEdits } from '../../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite';
 
 const grp = (g: unknown): Record<string, unknown> => g as Record<string, unknown>;
 const hooksOf = (g: unknown): unknown[] => (Array.isArray(grp(g).hooks) ? grp(g).hooks : []) as unknown[];

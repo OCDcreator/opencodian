@@ -1,19 +1,19 @@
-jest.mock('../../../../src/features/chat/runtime/buildLocalStreamOutcome', () => ({
+jest.mock('../../../../src/features/chat/runtime/send/buildLocalStreamOutcome', () => ({
   buildLocalStreamOutcome: jest.fn(),
 }));
 
-jest.mock('../../../../src/features/chat/runtime/StreamShellFinalizer', () => ({
+jest.mock('../../../../src/features/chat/runtime/send/StreamShellFinalizer', () => ({
   finalizeStreamingShell: jest.fn(),
 }));
 
-jest.mock('../../../../src/features/chat/runtime/LocalStreamMessagePersistence', () => ({
+jest.mock('../../../../src/features/chat/runtime/send/LocalStreamMessagePersistence', () => ({
   persistLocalStreamOutcome: jest.fn(),
 }));
 
-import { buildLocalStreamOutcome } from '../../../../src/features/chat/runtime/buildLocalStreamOutcome';
-import { persistLocalStreamOutcome } from '../../../../src/features/chat/runtime/LocalStreamMessagePersistence';
-import { StreamLocalFinalizer } from '../../../../src/features/chat/runtime/StreamLocalFinalizer';
-import { finalizeStreamingShell } from '../../../../src/features/chat/runtime/StreamShellFinalizer';
+import { buildLocalStreamOutcome } from '../../../../src/features/chat/runtime/send/buildLocalStreamOutcome';
+import { persistLocalStreamOutcome } from '../../../../src/features/chat/runtime/send/LocalStreamMessagePersistence';
+import { StreamLocalFinalizer } from '../../../../src/features/chat/runtime/send/StreamLocalFinalizer';
+import { finalizeStreamingShell } from '../../../../src/features/chat/runtime/send/StreamShellFinalizer';
 
 describe('StreamLocalFinalizer', () => {
   beforeEach(() => {

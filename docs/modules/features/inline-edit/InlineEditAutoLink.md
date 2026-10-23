@@ -40,7 +40,7 @@ createInlineEditAutoLinkProcessor(deps: {
 
 ```text
 上游: obsidian（仅工厂部分）、无其他运行时依赖（纯函数可单测）
-下游: src/main.ts（host 桥接，行内编辑与聊天共用）、src/features/chat/services/AssistantAutoInternalLinkService.ts（聊天侧消费者）
+下游: src/main.ts（host 桥接，行内编辑与聊天共用）、src/features/chat/services/rendering/AssistantAutoInternalLinkService.ts（聊天侧消费者）
 ```
 
 ## 维护约束

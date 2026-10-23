@@ -3,7 +3,7 @@
 import type { App } from 'obsidian';
 
 import { type Conversation, createEmptyTabContextState, type TabContextState } from '../../../../src/core/types';
-import { ContextUsageService } from '../../../../src/features/chat/services/ContextUsageService';
+import { ContextUsageService } from '../../../../src/features/chat/services/context/ContextUsageService';
 import { ContextDetailModal } from '../../../../src/features/chat/ui/ContextDetailModal';
 import { setLocale } from '../../../../src/i18n';
 

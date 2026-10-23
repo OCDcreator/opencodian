@@ -1,5 +1,5 @@
 import type { TraceEventBase, TraceTerminalState } from '../../../../shared/diagnostics';
-import type { CodexAppServerWireObserver } from '../CodexAppServerClientTypes';
+import type { CodexAppServerWireObserver } from '../codex/CodexAppServerClientTypes';
 
 export const CLAUDE_TRACE_SCHEMA_VERSION = 1 as const;
 export const CLAUDE_TRACE_CHANNEL_IDS = ['lifecycle', 'stream-sync', 'tool-interaction', 'persistence-recovery', 'service-output'] as const;

@@ -1,0 +1,60 @@
+# UserMessageContentRenderer
+> 2026-09-21 (advantage-parity R-E4)：已发消息的检索附件徽标按 retrievalChannel 通道标注。
+> 2026-09-21 (advantage-parity R-E1)：已发消息的 url 附件 chip 带「抓取失败」徽标并改为系统浏览器打开源链接。
+
+> **源码**: `src/features/chat/runtime/rendering/UserMessageContentRenderer.ts`
+> **状态**: [REVIEW]
+
+## 概述
+
+R-C4：`getContextKindLabel` 增加 `pdf_document` / `pdf_selection` 标签（`chat.context.kind.pdfDocument` / `pdfSelection`）。
+
+
+`UserMessageContentRenderer` 是 user message body 的 DOM 组装模块。它把 visible text 渲染、context attachment chips、attached image gallery、OMO user injection 面板，以及 compaction divider 的渲染从 `OpenCodianView` 中抽出。
+
+## 已发送图片（2026-07-22）
+
+`renderUserMessageContent()` 在消息持久化的 `images` 存在时渲染 gallery。每张缩略图都是有可访问名称的按钮，点击复用 `ImagePreviewOverlay` 打开 data-URI 原图预览；这不会影响上下文附件 chip 或用户文本渲染。
+
+> 2026-09-18 (R-A7)：上下文附件 kind 标签支持 `folder`（`chat.context.kind.folder`）。
+>
+> 2026-09-18 (R-C1)：`contextAttachments` 中 `origin === 'vault-retrieval'` 的附件 chip 前缀渲染“检索”徽标（`opencodian-context-chip-origin-badge`，i18n `chat.context.originBadge.vaultRetrieval`）；无 origin 的旧附件渲染逐字节不变。
+
+## 维护约束
+
+- 正文和图片之后的 `.opencodian-user-message-controls` 将展开/收起按钮与上下文附件放在同一行；空间不足时每个附件可独立换行。短正文没有可见 toggle 且无附件时整行隐藏，OMO 原文折叠仍使用独立容器。
+
+- `UserMessageContentRenderer.renderUserMessageContent(container, message)`：在指定 content 容器内组装 user message body，返回 visible text
+- `UserMessageContentRenderer.renderCompactionDivider(messageEl, divider)`：在指定 message element 内渲染 compaction divider 分割线
+
+## Host 端口
+
+`UserMessageContentRendererHost` 由 view 实现，提供以下能力：
+
+- `getRenderUserMarkupAsCodeBlocks()`：是否把用户输入中的 CSS/JS/HTML 片段包装成 fenced code blocks
+- `renderMarkdownInto(container, markdown)`：把 markdown 渲染进指定容器
+- `scheduleActiveSettledScrollToBottomIfNeeded()`：在 collapsible toggle 时触发滚动到底部
+- `openContextAttachment(path)`：点击 context attachment chip 时打开对应文件
+
+## 设计目的
+
+- 让 `OpenCodianView` 不再直接持有 user message body 的 DOM 组装细节
+- 把 user text、context chips、attached images、OMO injection、compaction divider 统一为一个渲染关注点
+- 让 markdown 渲染与文件打开等副作用继续留在 view host，renderer 只负责 DOM 结构
+- 保持 `.opencodian-message-text`、`.opencodian-user-context-list`、`.opencodian-omo-injection` 等选择器不变
+- 在 markdown 渲染完成后通过独立的 inline invocation highlight 机制调用 `extractUserMessageTextHighlightSpans()`：既会读取 OpenCode native `agent` part 的 `source` span，把匹配的可见 `@agent` 文本包成 `.opencodian-message-highlight-agent`，也会读取 `message.parts` 中的 `skill-expansion` metadata，只把真实 expanded skill 对应的 `/skill` / `/skills skill` 包成 `.opencodian-message-highlight-skill`
+
+## 注意事项
+
+- renderer 内部使用 `prepareUserMessageMarkdownForDisplay()` 处理 code block 包装，但只在 `getRenderUserMarkupAsCodeBlocks()` 返回 true 时生效
+- `@agent` 与 skill slash 高亮不受 `renderUserMarkupAsCodeBlocks` 开关本身控制；它们只在渲染后的 textContent 与原始 visible text 完全一致时应用。如果 markdown/OMO 转换改变文本，renderer 会跳过 span 包裹以避免错位
+- collapsible 的 showMore/showLess label 通过 `t()` 从 i18n 获取
+- OMO injection 的 badge label（search/analyze/custom）和 headline 也走 i18n
+- compaction divider 的 live/auto/manual/overflow 文本同样走 i18n
+- context attachment chip 的 `aria-label` 使用 `getContextKindLabel()` 根据 kind 生成可访问文本
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/features/chat/runtime/rendering/UserMessageContentRenderer.ts`。
+- 原位置：`src/features/chat/runtime/UserMessageContentRenderer.ts`；文件名、导出接口与业务职责保持不变。
+- 随目录调整更新的依赖：`src/features/chat/rendering/userMessageDisplay.ts`。

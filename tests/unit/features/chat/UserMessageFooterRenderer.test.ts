@@ -2,7 +2,7 @@ import type { ChatMessage } from '../../../../src/core/types';
 import {
   UserMessageFooterRenderer,
   type UserMessageFooterRendererHost,
-} from '../../../../src/features/chat/runtime/UserMessageFooterRenderer';
+} from '../../../../src/features/chat/runtime/rendering/UserMessageFooterRenderer';
 import { setLocale, t } from '../../../../src/i18n';
 
 describe('UserMessageFooterRenderer', () => {

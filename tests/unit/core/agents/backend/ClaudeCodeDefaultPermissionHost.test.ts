@@ -1,7 +1,7 @@
 import {
   type ClaudeCodePermissionBridgeHostContext,
   createClaudeCodePermissionBridgeHost,
-} from '../../../../../src/core/agents/backend/ClaudeCodeDefaultPermissionHost';
+} from '../../../../../src/core/agents/backend/claude/ClaudeCodeDefaultPermissionHost';
 import type { QuestionRequest, StreamChunk } from '../../../../../src/core/types';
 
 type PermissionRequestChunk = Extract<StreamChunk, { type: 'permission_request' }>;

@@ -1,0 +1,387 @@
+import {
+  applyPassiveScrollMeasurement,
+  applyUserScrollIntent,
+  hasProgrammaticScrollGuard,
+} from '../../rendering/autoScrollState';
+import type { TabId } from '../../tabs';
+import {
+  isElementNearBottom,
+  scrollElementToBottom,
+  type ScrollToBottomOptions,
+  SettledScrollScheduler,
+} from '../rendering/ScrollManager';
+
+interface CancellableStreamController {
+  cancelStream(): void;
+}
+
+export interface TabMessagesPaneRuntimeState {
+  /** Detached body used while keyed reconcile awaits assistant rendering. */
+  stagedTurnBodyEl?: HTMLElement | null;
+  autoScrollEnabled: boolean;
+  isNearBottom: boolean;
+  programmaticScrollGuardUntil: number;
+  isHydratingConversation: boolean;
+  /**
+   * Nested hydration passes (e.g. a settings rerender running inside a
+   * conversation load) share the per-tab flag; only the outermost end may
+   * clear it, otherwise a sync deferral window opens mid-hydration.
+   */
+  hydrationDepth: number;
+  /** Set when a real scroll event occurs while hydration is in flight. */
+  userScrollIntentDuringHydration?: boolean;
+  pendingLayoutMutations: number;
+  suppressNextLayoutAutoScroll?: boolean;
+  isStreaming: boolean;
+  streamController?: CancellableStreamController | null;
+}
+
+export interface TabMessagesPaneState<
+  Runtime extends TabMessagesPaneRuntimeState = TabMessagesPaneRuntimeState,
+> {
+  tabId: TabId;
+  messagesEl: HTMLElement;
+  runtime: Runtime;
+  scrollHandler: () => void;
+  userInputHandler?: (event: Event) => void;
+  mutationObserver: MutationObserver | null;
+  resizeObserver: ResizeObserver | null;
+}
+
+export interface TabMessagesPaneCoordinatorHost<
+  Runtime extends TabMessagesPaneRuntimeState = TabMessagesPaneRuntimeState,
+> {
+  getMessagesShellEl(): HTMLElement | null;
+  getMessagesContainer(): HTMLElement | null;
+  setMessagesContainer(messagesEl: HTMLElement | null): void;
+  getActiveTabId(): TabId | null;
+  createRuntimeState(): Runtime;
+  applyChatScrollModeToMessagesEl(messagesEl: HTMLElement): void;
+  resetTurnState(): void;
+  restoreTurnStateFromActivePane(): void;
+  rebuildNavigationSidebar(): void;
+  destroyNavigationSidebar(): void;
+  updateNavigationSidebarVisibility(): void;
+  clearScheduledSignalConversationSync(tabId: TabId): void;
+  shouldAutoScroll(tabId: TabId | null): boolean;
+}
+
+export class TabMessagesPaneCoordinator<
+  Runtime extends TabMessagesPaneRuntimeState = TabMessagesPaneRuntimeState,
+> {
+  private readonly paneStates = new Map<TabId, TabMessagesPaneState<Runtime>>();
+
+  constructor(
+    private readonly host: TabMessagesPaneCoordinatorHost<Runtime>,
+    private readonly scrollScheduler: SettledScrollScheduler,
+  ) {}
+
+  getPaneState(tabId: TabId | null): TabMessagesPaneState<Runtime> | null {
+    if (!tabId) {
+      return null;
+    }
+
+    return this.paneStates.get(tabId) ?? null;
+  }
+
+  getRuntimeState(tabId: TabId | null): Runtime | null {
+    return this.getPaneState(tabId)?.runtime ?? null;
+  }
+
+  getMessagesEl(tabId: TabId | null): HTMLElement | null {
+    return this.getPaneState(tabId)?.messagesEl ?? null;
+  }
+
+  applyScrollModeToPanes(): boolean {
+    if (this.paneStates.size === 0) {
+      return false;
+    }
+
+    for (const paneState of this.paneStates.values()) {
+      this.host.applyChatScrollModeToMessagesEl(paneState.messagesEl);
+    }
+    return true;
+  }
+
+  ensureRuntimeState(tabId: TabId | null): Runtime | null {
+    if (!tabId) {
+      return null;
+    }
+
+    return this.ensurePane(tabId)?.runtime ?? null;
+  }
+
+  ensurePane(tabId: TabId): TabMessagesPaneState<Runtime> | null {
+    const existing = this.paneStates.get(tabId);
+    if (existing?.messagesEl?.isConnected) {
+      return existing;
+    }
+
+    const messagesShellEl = this.host.getMessagesShellEl();
+    if (!messagesShellEl) {
+      return null;
+    }
+    if (existing) {
+      // A shell rebuild can temporarily detach a cached pane without ending
+      // the tab runtime. Reattach the same node so active host references,
+      // stream state, observers, listeners, and DOM-only UI state stay valid.
+      messagesShellEl.appendChild(existing.messagesEl);
+      this.host.applyChatScrollModeToMessagesEl(existing.messagesEl);
+      return existing;
+    }
+
+    const messagesEl = messagesShellEl.createDiv({
+      cls: 'opencodian-messages opencodian-messages-pane',
+    });
+    messagesEl.dataset.tabId = tabId;
+    this.host.applyChatScrollModeToMessagesEl(messagesEl);
+
+    const scrollHandler = () => {
+      this.handleScroll(tabId);
+    };
+    messagesEl.addEventListener('scroll', scrollHandler, { passive: true });
+
+    const userInputHandler = (event: Event) => {
+      if (!this.isScrollIntentInput(event)) {
+        return;
+      }
+      const runtime = this.getRuntimeState(tabId);
+      if (!runtime) {
+        return;
+      }
+      // A real gesture/key input takes precedence over the short guard used
+      // to absorb clear/restore-induced scroll events. Clear it before the
+      // browser emits the resulting scroll event; only that scroll event may
+      // claim hydration user intent.
+      runtime.programmaticScrollGuardUntil = 0;
+    };
+    messagesEl.addEventListener('wheel', userInputHandler, { passive: true });
+    messagesEl.addEventListener('touchstart', userInputHandler, { passive: true });
+    messagesEl.addEventListener('keydown', userInputHandler);
+
+    const resizeObserver = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => {
+        this.handleLayoutChange(tabId);
+      })
+      : null;
+    const mutationObserver = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        mutation.addedNodes.forEach((node) => {
+          if (node instanceof HTMLElement) {
+            resizeObserver?.observe(node);
+          }
+        });
+        mutation.removedNodes.forEach((node) => {
+          if (node instanceof HTMLElement) {
+            resizeObserver?.unobserve(node);
+          }
+        });
+      }
+      this.handleLayoutChange(tabId);
+    });
+    mutationObserver.observe(messagesEl, { childList: true });
+
+    const paneState: TabMessagesPaneState<Runtime> = {
+      tabId,
+      messagesEl,
+      runtime: this.host.createRuntimeState(),
+      scrollHandler,
+      userInputHandler,
+      mutationObserver,
+      resizeObserver,
+    };
+    this.observePaneChildren(paneState);
+    this.paneStates.set(tabId, paneState);
+    return paneState;
+  }
+
+  setActivePane(tabId: TabId): void {
+    const activePaneState = this.ensurePane(tabId);
+    if (!activePaneState) {
+      this.clearActiveSurface();
+      return;
+    }
+
+    for (const [paneTabId, paneState] of this.paneStates) {
+      paneState.messagesEl.classList.toggle('is-active', paneTabId === tabId);
+    }
+
+    this.host.setMessagesContainer(activePaneState.messagesEl);
+    this.host.restoreTurnStateFromActivePane();
+    this.host.rebuildNavigationSidebar();
+    this.syncScrollMetrics(tabId, activePaneState.messagesEl);
+    if (activePaneState.runtime.autoScrollEnabled) {
+      if (this.host.shouldAutoScroll(tabId)) {
+        this.scrollScheduler.schedule(() => {
+          this.scrollToBottom(tabId);
+        });
+      }
+    }
+  }
+
+  removePane(tabId: TabId): void {
+    const paneState = this.paneStates.get(tabId);
+    if (!paneState) {
+      return;
+    }
+
+    const wasActivePane = this.host.getMessagesContainer() === paneState.messagesEl;
+    this.disposePane(paneState);
+    this.paneStates.delete(tabId);
+
+    if (wasActivePane) {
+      this.clearActiveSurface();
+    }
+  }
+
+  clearPanes(): void {
+    for (const paneState of this.paneStates.values()) {
+      this.disposePane(paneState);
+    }
+    this.paneStates.clear();
+    this.clearActiveSurface();
+  }
+
+  syncScrollMetrics(
+    tabId: TabId | null,
+    messagesEl: HTMLElement | null = this.getMessagesEl(tabId),
+  ): boolean {
+    if (!tabId || !messagesEl) {
+      return true;
+    }
+
+    const runtime = this.getRuntimeState(tabId);
+    if (!runtime) {
+      return true;
+    }
+
+    const nearBottom = isElementNearBottom(messagesEl);
+    const nextState = applyPassiveScrollMeasurement(runtime, nearBottom);
+    runtime.isNearBottom = nextState.isNearBottom;
+    if (this.host.getActiveTabId() === tabId) {
+      this.host.updateNavigationSidebarVisibility();
+    }
+    return nearBottom;
+  }
+
+  scrollToBottom(
+    tabId: TabId | null,
+    options: ScrollToBottomOptions = {},
+  ): void {
+    const paneState = this.getPaneState(tabId);
+    if (!paneState || !tabId) {
+      return;
+    }
+
+    scrollElementToBottom(paneState.messagesEl, paneState.runtime, options);
+    this.syncScrollMetrics(tabId, paneState.messagesEl);
+  }
+
+  suppressNextLayoutAutoScroll(tabId: TabId | null): boolean {
+    const runtime = this.getRuntimeState(tabId);
+    if (!runtime) {
+      return false;
+    }
+
+    runtime.suppressNextLayoutAutoScroll = true;
+    return true;
+  }
+
+  private observePaneChildren(paneState: TabMessagesPaneState<Runtime>): void {
+    paneState.resizeObserver?.observe(paneState.messagesEl);
+    for (const child of Array.from(paneState.messagesEl.children)) {
+      if (child instanceof HTMLElement) {
+        paneState.resizeObserver?.observe(child);
+      }
+    }
+  }
+
+  private handleScroll(tabId: TabId): void {
+    const paneState = this.getPaneState(tabId);
+    if (!paneState) {
+      return;
+    }
+
+    const nearBottom = this.syncScrollMetrics(tabId, paneState.messagesEl);
+    if (hasProgrammaticScrollGuard(paneState.runtime)) {
+      if (nearBottom) {
+        paneState.runtime.programmaticScrollGuardUntil = 0;
+      }
+      return;
+    }
+
+    if (paneState.runtime.isHydratingConversation) {
+      paneState.runtime.userScrollIntentDuringHydration = true;
+    }
+
+    const nextState = applyUserScrollIntent(paneState.runtime, nearBottom);
+    paneState.runtime.autoScrollEnabled = nextState.autoScrollEnabled;
+    paneState.runtime.isNearBottom = nextState.isNearBottom;
+  }
+
+  private handleLayoutChange(tabId: TabId): void {
+    const paneState = this.getPaneState(tabId);
+    if (!paneState) {
+      return;
+    }
+
+    if (paneState.runtime.isHydratingConversation) {
+      paneState.runtime.pendingLayoutMutations += 1;
+      this.syncScrollMetrics(tabId, paneState.messagesEl);
+      return;
+    }
+
+    const nearBottom = this.syncScrollMetrics(tabId, paneState.messagesEl);
+    if (hasProgrammaticScrollGuard(paneState.runtime) && nearBottom) {
+      paneState.runtime.programmaticScrollGuardUntil = 0;
+    }
+
+    const suppressAutoScroll = paneState.runtime.suppressNextLayoutAutoScroll === true;
+    if (suppressAutoScroll) {
+      paneState.runtime.suppressNextLayoutAutoScroll = false;
+    }
+
+    if (this.host.getActiveTabId() === tabId) {
+      if (paneState.runtime.isStreaming) {
+        return;
+      }
+      if (suppressAutoScroll) {
+        return;
+      }
+      if (this.host.shouldAutoScroll(tabId)) {
+        this.scrollScheduler.schedule(() => {
+          this.scrollToBottom(tabId);
+        });
+      }
+    }
+  }
+
+  private disposePane(paneState: TabMessagesPaneState<Runtime>): void {
+    paneState.runtime.streamController?.cancelStream();
+    this.host.clearScheduledSignalConversationSync(paneState.tabId);
+    paneState.messagesEl.removeEventListener('scroll', paneState.scrollHandler);
+    if (paneState.userInputHandler) {
+      paneState.messagesEl.removeEventListener('wheel', paneState.userInputHandler);
+      paneState.messagesEl.removeEventListener('touchstart', paneState.userInputHandler);
+      paneState.messagesEl.removeEventListener('keydown', paneState.userInputHandler);
+    }
+    paneState.mutationObserver?.disconnect();
+    paneState.resizeObserver?.disconnect();
+    paneState.messagesEl.remove();
+  }
+
+  private clearActiveSurface(): void {
+    this.host.setMessagesContainer(null);
+    this.host.resetTurnState();
+    this.host.destroyNavigationSidebar();
+  }
+
+  private isScrollIntentInput(event: Event): boolean {
+    if (event.type !== 'keydown') {
+      return true;
+    }
+
+    return event instanceof KeyboardEvent
+      && ['ArrowDown', 'ArrowUp', 'End', 'Home', 'PageDown', 'PageUp', ' ', 'Spacebar'].includes(event.key);
+  }
+}

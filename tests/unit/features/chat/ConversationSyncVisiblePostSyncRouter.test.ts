@@ -3,8 +3,8 @@ import {
   type ConversationSyncVisiblePostSyncResult,
   ConversationSyncVisiblePostSyncRouter,
   type ConversationSyncVisiblePostSyncRouterHost,
-} from '../../../../src/features/chat/services/ConversationSyncVisiblePostSyncRouter';
-import type { VisibleConversationPostSyncCoordinator } from '../../../../src/features/chat/services/VisibleConversationPostSyncCoordinator';
+} from '../../../../src/features/chat/services/sync/ConversationSyncVisiblePostSyncRouter';
+import type { VisibleConversationPostSyncCoordinator } from '../../../../src/features/chat/services/sync/VisibleConversationPostSyncCoordinator';
 
 type Mocked<T> = {
   [Key in keyof T]:

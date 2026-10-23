@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- This suite intentionally keeps shared DOM fixture helpers and coordinator interaction coverage together. */
 import { type App, capturedNotices, clearCapturedNotices } from 'obsidian';
 
-import { CodexAdapter } from '../../../../src/core/agents/backend/CodexAdapter';
+import { CodexAdapter } from '../../../../src/core/agents/backend/codex/CodexAdapter';
 import {
   clearPromptSuggestionSink,
   emitPromptSuggestionSessionChange,
@@ -13,9 +13,9 @@ import {
   buildComposerInputSubmission,
   ComposerInputShellCoordinator,
   type ComposerInputShellCoordinatorHost,
-} from '../../../../src/features/chat/services/ComposerInputShellCoordinator';
-import { type MessageSendPreparationOutcome, MessageSendPreparationService } from '../../../../src/features/chat/services/MessageSendPreparationService';
-import { presentPiUiRequest } from '../../../../src/features/chat/services/PiExtensionUiHost';
+} from '../../../../src/features/chat/services/composer/ComposerInputShellCoordinator';
+import { presentPiUiRequest } from '../../../../src/features/chat/services/integrations/PiExtensionUiHost';
+import { type MessageSendPreparationOutcome, MessageSendPreparationService } from '../../../../src/features/chat/services/send/MessageSendPreparationService';
 import { t } from '../../../../src/i18n';
 import {
   createComposerSendContext,

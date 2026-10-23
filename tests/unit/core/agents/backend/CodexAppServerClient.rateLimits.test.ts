@@ -38,7 +38,7 @@ jest.mock('ws', () => MockWebSocket);
 // Import class under test (AFTER mocks are established)
 // ---------------------------------------------------------------------------
 
-import { CodexAppServerClient } from '../../../../../src/core/agents/backend/CodexAppServerClient';
+import { CodexAppServerClient } from '../../../../../src/core/agents/backend/codex/CodexAppServerClient';
 
 // ---------------------------------------------------------------------------
 // Test helpers

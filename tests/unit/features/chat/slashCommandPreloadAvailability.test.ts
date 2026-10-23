@@ -11,7 +11,7 @@ import {
   loadAgentMentionCandidatesFromSlashCommandMenuItems,
   loadAgentSelectionCandidatesFromSlashCommandMenuItems,
   SlashCommandMenuCatalogCache,
-} from '../../../../src/features/chat/services/SlashCommandMenuCatalogCache';
+} from '../../../../src/features/chat/services/commands/SlashCommandMenuCatalogCache';
 
 const codexSkillItem: SlashCommandMenuItem = {
   id: 'opencodian-runtime-smoke-skill',

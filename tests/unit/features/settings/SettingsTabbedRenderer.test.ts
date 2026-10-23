@@ -4,21 +4,21 @@ import type { App } from 'obsidian';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import type { AgentBackendKind } from '../../../../src/core/types/chat';
-import { SettingsAgentsSection } from '../../../../src/features/settings/SettingsAgentsSection';
-import { SettingsClaudeCodeSection } from '../../../../src/features/settings/SettingsClaudeCodeSection';
-import { SettingsCommandsSection } from '../../../../src/features/settings/SettingsCommandsSection';
-import { SettingsConversationSection } from '../../../../src/features/settings/SettingsConversationSection';
-import { SettingsDebugSection } from '../../../../src/features/settings/SettingsDebugSection';
-import { SettingsFormatterSection } from '../../../../src/features/settings/SettingsFormatterSection';
-import { SettingsMcpSection } from '../../../../src/features/settings/SettingsMcpSection';
-import { SettingsModelSection } from '../../../../src/features/settings/SettingsModelSection';
-import { SettingsPiSection } from '../../../../src/features/settings/SettingsPiSection';
-import { SettingsPluginSection } from '../../../../src/features/settings/SettingsPluginSection';
-import { SettingsSecuritySection } from '../../../../src/features/settings/SettingsSecuritySection';
-import { SettingsServerSection } from '../../../../src/features/settings/SettingsServerSection';
-import { SettingsStyleSection } from '../../../../src/features/settings/SettingsStyleSection';
+import { SettingsStyleSection } from '../../../../src/features/settings/appearance/SettingsStyleSection';
+import { SettingsClaudeCodeSection } from '../../../../src/features/settings/backends/claude/SettingsClaudeCodeSection';
+import { SettingsCommandsSection } from '../../../../src/features/settings/backends/opencode/SettingsCommandsSection';
+import { SettingsServerSection } from '../../../../src/features/settings/backends/opencode/SettingsServerSection';
+import { SettingsPiSection } from '../../../../src/features/settings/backends/pi/SettingsPiSection';
+import { SettingsDebugSection } from '../../../../src/features/settings/debug/SettingsDebugSection';
+import { SettingsConversationSection } from '../../../../src/features/settings/general/SettingsConversationSection';
+import { SettingsFormatterSection } from '../../../../src/features/settings/general/SettingsFormatterSection';
+import { SettingsPluginSection } from '../../../../src/features/settings/general/SettingsPluginSection';
+import { SettingsSecuritySection } from '../../../../src/features/settings/general/SettingsSecuritySection';
+import { SettingsUiSection } from '../../../../src/features/settings/general/SettingsUiSection';
+import { SettingsMcpSection } from '../../../../src/features/settings/mcp/SettingsMcpSection';
+import { SettingsModelSection } from '../../../../src/features/settings/models/SettingsModelSection';
+import { SettingsAgentsSection } from '../../../../src/features/settings/resources/SettingsAgentsSection';
 import { SettingsTabbedRenderer } from '../../../../src/features/settings/SettingsTabbedRenderer';
-import { SettingsUiSection } from '../../../../src/features/settings/SettingsUiSection';
 import { setLocale } from '../../../../src/i18n';
 
 function createRendererState(options?: {
@@ -548,8 +548,8 @@ describe('SettingsTabbedRenderer tab content routing', () => {
   });
 
   it('does not wrap plugin tabs with the extra tab-panel shell', () => {
-    const { SettingsPluginSection } = jest.requireActual('../../../../src/features/settings/SettingsPluginSection') as {
-      SettingsPluginSection: typeof import('../../../../src/features/settings/SettingsPluginSection').SettingsPluginSection;
+    const { SettingsPluginSection } = jest.requireActual('../../../../src/features/settings/general/SettingsPluginSection') as {
+      SettingsPluginSection: typeof import('../../../../src/features/settings/general/SettingsPluginSection').SettingsPluginSection;
     };
     jest.spyOn(SettingsPluginSection.prototype, 'attachTabbed').mockImplementation((containerEl) => {
       containerEl.createDiv({ cls: 'plugin-tab-marker', text: 'plugin-tab-rendered' });

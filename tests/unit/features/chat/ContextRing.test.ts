@@ -1,5 +1,5 @@
 import { createEmptyTabContextState } from '../../../../src/core/types';
-import { ContextUsageService } from '../../../../src/features/chat/services/ContextUsageService';
+import { ContextUsageService } from '../../../../src/features/chat/services/context/ContextUsageService';
 import { ContextRing } from '../../../../src/features/chat/ui/ContextRing';
 import { TooltipLayerController } from '../../../../src/shared/TooltipLayerController';
 

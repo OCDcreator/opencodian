@@ -1,7 +1,7 @@
 import { type DropdownComponent, Setting, type TextComponent } from 'obsidian';
 
 import type { ZCodeBackendSettings } from '../../../../src/core/types/settings';
-import { type SettingsZCodeHost, SettingsZCodeSection } from '../../../../src/features/settings/SettingsZCodeSection';
+import { type SettingsZCodeHost, SettingsZCodeSection } from '../../../../src/features/settings/backends/zcode/SettingsZCodeSection';
 
 type ChangeHandler = (value: string) => Promise<void>;
 type Field = keyof ZCodeBackendSettings;

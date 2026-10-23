@@ -1,4 +1,4 @@
-import { ComposerContextEventBridge } from '../../../../src/features/chat/services/ComposerContextEventBridge';
+import { ComposerContextEventBridge } from '../../../../src/features/chat/services/composer/ComposerContextEventBridge';
 
 describe('ComposerContextEventBridge', () => {
   it('starts and disposes the focus and catalog bridges together', () => {

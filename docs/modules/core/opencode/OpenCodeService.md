@@ -53,7 +53,7 @@
 下游:
 - `src/main.ts`
 - `src/features/chat/OpenCodianView`
-- `src/features/chat/services/TitleGenerationService`
+- `src/features/chat/services/title/TitleGenerationService`
 - `src/core/config/ModelConfigService`
 - 单元测试
 ```

@@ -6,7 +6,7 @@ import type { ModelSourceMode } from '../../../../src/core/types/settings';
 import {
   ModelSelectionRuntime,
   type ModelSelectionRuntimeHost,
-} from '../../../../src/features/chat/services/ModelSelectionRuntime';
+} from '../../../../src/features/chat/services/selection/ModelSelectionRuntime';
 import type {
   ModelSelectorProvider,
   ModelSelectorSelection,

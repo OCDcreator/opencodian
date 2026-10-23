@@ -1,4 +1,4 @@
-import { buildTrailingAssistantPatchCompletionDebugPlanningContextInputs } from '../../../../src/features/chat/services/trailingAssistantPatchPlanning';
+import { buildTrailingAssistantPatchCompletionDebugPlanningContextInputs } from '../../../../src/features/chat/services/sync/trailingAssistantPatchPlanning';
 
 describe('TrailingAssistantPatchCompletionDebugPlanningContextInputsHelper', () => {
   it('builds planning-context shape inputs from tail state and summary plan', () => {

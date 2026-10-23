@@ -1,6 +1,6 @@
 import type { App } from 'obsidian';
 
-import { LiquidGlassSettingHelpModal } from '../../../../src/features/settings/LiquidGlassSettingHelpModal';
+import { LiquidGlassSettingHelpModal } from '../../../../src/features/settings/appearance/LiquidGlassSettingHelpModal';
 import { setLocale } from '../../../../src/i18n';
 
 describe('LiquidGlassSettingHelpModal', () => {

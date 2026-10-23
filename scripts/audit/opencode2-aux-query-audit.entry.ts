@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { OpenCode2Adapter } from '../../src/core/agents/backend/OpenCode2Adapter';
+import { OpenCode2Adapter } from '../../src/core/agents/backend/opencode/OpenCode2Adapter';
 import type { OpenCode2BackendSettings } from '../../src/core/types/settings';
 
 const executablePath = process.env.OPENCODE2_BIN;

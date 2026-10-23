@@ -1,11 +1,11 @@
 import type { PromptContextItem } from '../../../../src/core/types';
-import type { FocusContextPreview } from '../../../../src/features/chat/composerContext';
-import { buildComposerContextChipStates } from '../../../../src/features/chat/composerContext';
-import { ComposerContextRuntimeStore } from '../../../../src/features/chat/services/ComposerContextRuntimeStore';
+import type { FocusContextPreview } from '../../../../src/features/chat/rendering/composerContext';
+import { buildComposerContextChipStates } from '../../../../src/features/chat/rendering/composerContext';
+import { ComposerContextRuntimeStore } from '../../../../src/features/chat/services/composer/ComposerContextRuntimeStore';
 import {
   type ComposerContextRuntimeState,
   ComposerContextViewHostAdapter,
-} from '../../../../src/features/chat/services/ComposerContextViewHostAdapter';
+} from '../../../../src/features/chat/services/composer/ComposerContextViewHostAdapter';
 import type { TabId } from '../../../../src/features/chat/tabs';
 
 function createContextItem(

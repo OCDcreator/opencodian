@@ -4,10 +4,10 @@ import {
   type ConversationTabRuntimeCoordinatorHost,
   type ConversationTabRuntimeCoordinatorPorts,
   type ConversationTabRuntimeState,
-} from '../../../../src/features/chat/services/ConversationTabRuntimeCoordinator';
+} from '../../../../src/features/chat/services/conversation/ConversationTabRuntimeCoordinator';
 import type {
   TabMessagesPaneCoordinator,
-} from '../../../../src/features/chat/services/TabMessagesPaneCoordinator';
+} from '../../../../src/features/chat/services/conversation/TabMessagesPaneCoordinator';
 import type { TabBar, TabId } from '../../../../src/features/chat/tabs';
 
 function createRuntimeState(overrides: Partial<ConversationTabRuntimeState> = {}): ConversationTabRuntimeState {

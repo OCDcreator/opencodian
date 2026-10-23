@@ -1,7 +1,7 @@
 import {
   QuestionDockSlotCoordinator,
   type QuestionDockSlotCoordinatorHost,
-} from '../../../../src/features/chat/services/QuestionDockSlotCoordinator';
+} from '../../../../src/features/chat/services/questions/QuestionDockSlotCoordinator';
 
 type Mocked<T> = {
   [Key in keyof T]:

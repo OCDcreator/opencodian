@@ -3,7 +3,7 @@ import {
   type BackgroundTaskTimelineRuntime,
   BackgroundTaskTimelineService,
   type BackgroundTaskTimelineServiceHost,
-} from '../../../../src/features/chat/services/BackgroundTaskTimelineService';
+} from '../../../../src/features/chat/services/background/BackgroundTaskTimelineService';
 
 type MockedBackgroundTaskTimelineHost = {
   [Key in keyof BackgroundTaskTimelineServiceHost]:

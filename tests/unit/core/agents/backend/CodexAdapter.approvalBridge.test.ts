@@ -20,7 +20,7 @@ const mockUnregisterServerRequestHandler = jest.fn();
 const mockAppServerClientStart = jest.fn().mockResolvedValue(undefined);
 const mockAppServerClientStop = jest.fn();
 
-jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => ({
+jest.mock('../../../../../src/core/agents/backend/codex/CodexAppServerClient', () => ({
   CodexAppServerClient: jest.fn().mockImplementation(() => ({
     start: mockAppServerClientStart,
     stop: mockAppServerClientStop,
@@ -31,7 +31,7 @@ jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => (
   })),
 }));
 
-import { CodexAdapter } from '../../../../../src/core/agents/backend/CodexAdapter';
+import { CodexAdapter } from '../../../../../src/core/agents/backend/codex/CodexAdapter';
 
 function createMockCodex(): unknown {
   const mockThread = {

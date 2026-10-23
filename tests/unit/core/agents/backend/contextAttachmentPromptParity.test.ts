@@ -191,8 +191,8 @@ describe('attached-context backend parity (claude/codex seam)', () => {
   it('claude-code and codex consume the shared helper at the injection seam (per-epoch prefix first, context appended)', () => {
     const seamPattern = /appendObsidianContextBlocks\(\s*prependObsidianToolingInjection\(\s*prependMemoryInjection\(/;
     for (const adapterPath of [
-      join(SRC_ROOT, 'core', 'agents', 'backend', 'ClaudeCodeAdapter.ts'),
-      join(SRC_ROOT, 'core', 'agents', 'backend', 'CodexAdapter.ts'),
+      join(SRC_ROOT, 'core', 'agents', 'backend', 'claude', 'ClaudeCodeAdapter.ts'),
+      join(SRC_ROOT, 'core', 'agents', 'backend', 'codex', 'CodexAdapter.ts'),
     ]) {
       const source = readFileSync(adapterPath, 'utf8');
       expect(source).toMatch(seamPattern);
@@ -201,7 +201,7 @@ describe('attached-context backend parity (claude/codex seam)', () => {
 
   it('backends that already deliver context via request parts do not double-append', () => {
     for (const pathSuffix of [
-      join('core', 'agents', 'backend', 'OpenCodeAdapter.ts'),
+      join('core', 'agents', 'backend', 'opencode', 'OpenCodeAdapter.ts'),
       join('core', 'agents', 'backend', 'pi', 'PiAdapter.ts'),
       join('core', 'agents', 'backend', 'pi', 'PiStreamMapper.ts'),
     ]) {

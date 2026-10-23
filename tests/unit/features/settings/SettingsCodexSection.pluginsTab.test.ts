@@ -7,7 +7,7 @@ import {
   DEFAULT_SETTINGS,
   getDefaultCodexBackendSettings,
 } from '../../../../src/core/types';
-import { SettingsCodexSection } from '../../../../src/features/settings/SettingsCodexSection';
+import { SettingsCodexSection } from '../../../../src/features/settings/backends/codex/SettingsCodexSection';
 import { getPrimaryTabDefinition } from '../../../../src/features/settings/settingsLayoutRegistry';
 import { setLocale } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';

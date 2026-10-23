@@ -64,3 +64,9 @@ The new core.backend-pi owner isolates the external Pi process service. core.ope
 2026-10-07：目录读取只将有效数组（包括权威空数组）作为成功；SDK 读取/格式错误可沿既有 legacy GET /session fallback。最终失败继续向调用方传播，由 browser 现有固定错误分类区分 denied/failed/unavailable，禁止吞成空目录。
 
 2026-10-07：OpenCode 1 目录游标循环归 OpenCodeSessionLifecycleCoordinator；SDK facade 保留响应头，service 只注入带 directory scope 的 transport callbacks。读取失败保留已读页，旧无游标接口的非空结果保守标记 partial。
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/core/opencode`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

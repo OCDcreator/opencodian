@@ -3,7 +3,7 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { CodexAppServerClient } from '../../src/core/agents/backend/CodexAppServerClient';
+import { CodexAppServerClient } from '../../src/core/agents/backend/codex/CodexAppServerClient';
 
 describe('CodexAppServerClient.normalizeTurnsToPreviewMessages()', () => {
   it('extracts text from userMessage and agentMessage items', () => {
@@ -17,7 +17,7 @@ describe('CodexAppServerClient.normalizeTurnsToPreviewMessages()', () => {
       },
     ];
 
-    const result = CodexAppServerClient.normalizeTurnsToPreviewMessages(turns as unknown as import('../../src/core/agents/backend/CodexAppServerClient').AppServerTurn[]);
+    const result = CodexAppServerClient.normalizeTurnsToPreviewMessages(turns as unknown as import('../../src/core/agents/backend/codex/CodexAppServerClient').AppServerTurn[]);
 
     expect(result).toHaveLength(2);
     expect(result[0]).toEqual({ role: 'user', sourceMessageId: 'item-1', sourceTurnId: 'turn-1', parts: [{ type: 'text', text: 'Hello' }] });
@@ -40,7 +40,7 @@ describe('CodexAppServerClient.normalizeTurnsToPreviewMessages()', () => {
       },
     ];
 
-    const result = CodexAppServerClient.normalizeTurnsToPreviewMessages(turns as unknown as import('../../src/core/agents/backend/CodexAppServerClient').AppServerTurn[]);
+    const result = CodexAppServerClient.normalizeTurnsToPreviewMessages(turns as unknown as import('../../src/core/agents/backend/codex/CodexAppServerClient').AppServerTurn[]);
 
     expect(result).toHaveLength(5);
     expect(result[0]).toEqual({ role: 'user', sourceMessageId: 'item-1', sourceTurnId: 'turn-1', parts: [{ type: 'text', text: 'User prompt' }] });
@@ -60,7 +60,7 @@ describe('CodexAppServerClient.normalizeTurnsToPreviewMessages()', () => {
       },
     ];
 
-    const result = CodexAppServerClient.normalizeTurnsToPreviewMessages(turns as unknown as import('../../src/core/agents/backend/CodexAppServerClient').AppServerTurn[]);
+    const result = CodexAppServerClient.normalizeTurnsToPreviewMessages(turns as unknown as import('../../src/core/agents/backend/codex/CodexAppServerClient').AppServerTurn[]);
 
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({ role: 'activity', parts: [{ type: 'tool_call', text: 'standalone_tool' }] });
@@ -84,7 +84,7 @@ describe('CodexAppServerClient.normalizeTurnsToPreviewMessages()', () => {
       },
     ];
 
-    const result = CodexAppServerClient.normalizeTurnsToPreviewMessages(turns as unknown as import('../../src/core/agents/backend/CodexAppServerClient').AppServerTurn[]);
+    const result = CodexAppServerClient.normalizeTurnsToPreviewMessages(turns as unknown as import('../../src/core/agents/backend/codex/CodexAppServerClient').AppServerTurn[]);
 
     expect(result).toHaveLength(3);
     expect(result[0]).toEqual({ role: 'activity', parts: [{ type: 'file_change', text: 'src/a.ts (modified)' }] });
@@ -102,7 +102,7 @@ describe('CodexAppServerClient.normalizeTurnsToPreviewMessages()', () => {
       },
     ];
 
-    const result = CodexAppServerClient.normalizeTurnsToPreviewMessages(turns as unknown as import('../../src/core/agents/backend/CodexAppServerClient').AppServerTurn[]);
+    const result = CodexAppServerClient.normalizeTurnsToPreviewMessages(turns as unknown as import('../../src/core/agents/backend/codex/CodexAppServerClient').AppServerTurn[]);
 
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({ role: 'activity', parts: [{ type: 'file_change', text: 'README.md (change)' }] });
@@ -125,7 +125,7 @@ describe('CodexAppServerClient.normalizeTurnsToPreviewMessages()', () => {
       },
     ];
 
-    const result = CodexAppServerClient.normalizeTurnsToPreviewMessages(turns as unknown as import('../../src/core/agents/backend/CodexAppServerClient').AppServerTurn[]);
+    const result = CodexAppServerClient.normalizeTurnsToPreviewMessages(turns as unknown as import('../../src/core/agents/backend/codex/CodexAppServerClient').AppServerTurn[]);
 
     expect(result).toHaveLength(1);
     expect(result[0].role).toBe('user');
@@ -145,7 +145,7 @@ describe('CodexAppServerClient.normalizeTurnsToPreviewMessages()', () => {
       },
     ];
 
-    const result = CodexAppServerClient.normalizeTurnsToPreviewMessages(turns as unknown as import('../../src/core/agents/backend/CodexAppServerClient').AppServerTurn[]);
+    const result = CodexAppServerClient.normalizeTurnsToPreviewMessages(turns as unknown as import('../../src/core/agents/backend/codex/CodexAppServerClient').AppServerTurn[]);
 
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({ role: 'assistant', sourceMessageId: 'item-2', sourceTurnId: 'turn-1', parts: [{ type: 'text', text: 'I cannot see images.' }] });

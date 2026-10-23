@@ -1,9 +1,9 @@
 import type { Conversation } from '../../../../src/core/types';
-import type { TabActivationRuntimeHostProviderHost } from '../../../../src/features/chat/services/TabActivationRuntimeHostProvider';
+import type { TabActivationRuntimeHostProviderHost } from '../../../../src/features/chat/services/conversation/TabActivationRuntimeHostProvider';
 import {
   createTabActivationRuntimeAssembly,
   type TabActivationRuntimeAssemblyDeps,
-} from '../../../../src/features/chat/services/TabActivationRuntimeViewHostFactory';
+} from '../../../../src/features/chat/services/conversation/TabActivationRuntimeViewHostFactory';
 
 type Mocked<T> = {
   [Key in keyof T]:

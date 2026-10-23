@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import { describe, expect, it } from '@jest/globals';
 
-import { DshAdapter } from '../../../../../src/core/agents/backend/DshAdapter';
+import { DshAdapter } from '../../../../../src/core/agents/backend/dsh/DshAdapter';
 
 const liveDescribe = process.env.RUN_DSH_LIVE === '1' ? describe : describe.skip;
 

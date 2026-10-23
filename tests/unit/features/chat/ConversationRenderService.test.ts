@@ -4,7 +4,7 @@ import { join } from 'path';
 import {
   ConversationRenderService,
   createConversationRenderHost,
-} from '../../../../src/features/chat/services/ConversationRenderService';
+} from '../../../../src/features/chat/services/rendering/ConversationRenderService';
 import {
   createHost,
   createMessage,

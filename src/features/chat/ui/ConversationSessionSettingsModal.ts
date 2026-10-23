@@ -2,8 +2,8 @@
 import type { App } from 'obsidian';
 import { Modal } from 'obsidian';
 
-import type { CodexModelSummary } from '../../../core/agents/backend/CodexAdapter';
-import type { AppServerReviewResult, AppServerReviewTarget, AppServerThreadGoal } from '../../../core/agents/backend/CodexAppServerClient';
+import type { CodexModelSummary } from '../../../core/agents/backend/codex/CodexAdapter';
+import type { AppServerReviewResult, AppServerReviewTarget, AppServerThreadGoal } from '../../../core/agents/backend/codex/CodexAppServerClient';
 import type {
   ConversationSessionSettings,
   OpencodeShareMode,
@@ -19,7 +19,7 @@ import { t } from '../../../i18n';
 import {
   enhanceSettingsSelect,
   type SettingsDropdownControlHandle,
-} from '../../settings/SettingsDropdownControl';
+} from '../../settings/controls/SettingsDropdownControl';
 
 export interface ConversationSessionSettingsModalDefaults {
   chatFontSizePx: number;

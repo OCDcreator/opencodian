@@ -4,7 +4,7 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { CodexAppServerClient } from '../../src/core/agents/backend/CodexAppServerClient';
+import { CodexAppServerClient } from '../../src/core/agents/backend/codex/CodexAppServerClient';
 
 type Client = CodexAppServerClient;
 

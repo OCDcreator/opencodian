@@ -2,14 +2,14 @@ import type {
   Conversation,
   OpencodeCommandConfigRecord,
 } from '../../../../src/core/types';
-import type { FocusContextPreview } from '../../../../src/features/chat/composerContext';
+import type { FocusContextPreview } from '../../../../src/features/chat/rendering/composerContext';
 import {
   createSlashCommandExecutionHost,
-} from '../../../../src/features/chat/services/SlashCommandExecutionHostFactory';
+} from '../../../../src/features/chat/services/commands/SlashCommandExecutionHostFactory';
 import {
   type SlashCommandExecutionHost,
   SlashCommandExecutionService,
-} from '../../../../src/features/chat/services/SlashCommandExecutionService';
+} from '../../../../src/features/chat/services/commands/SlashCommandExecutionService';
 
 type SlashCommandExecutionHostDependencies = Parameters<
   typeof createSlashCommandExecutionHost

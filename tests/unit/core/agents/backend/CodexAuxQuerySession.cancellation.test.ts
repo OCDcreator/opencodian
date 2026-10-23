@@ -1,6 +1,6 @@
 import { CodexAuxQuerySession } from '../../../../../src/core/agents/backend/auxiliary/CodexAuxQuerySession';
-import type { CodexAppServerClient } from '../../../../../src/core/agents/backend/CodexAppServerClient';
-import type { AppServerThreadNotification } from '../../../../../src/core/agents/backend/CodexAppServerClientTypes';
+import type { CodexAppServerClient } from '../../../../../src/core/agents/backend/codex/CodexAppServerClient';
+import type { AppServerThreadNotification } from '../../../../../src/core/agents/backend/codex/CodexAppServerClientTypes';
 
 async function fixture() {
   let notify: (event: AppServerThreadNotification) => void = () => undefined;

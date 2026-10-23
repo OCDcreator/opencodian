@@ -8,7 +8,7 @@ import {
   parseProjectConfigFormValues,
   validateCodexProjectTomlContent,
   validateCodexProjectTomlKeys,
-} from '../../../../src/features/settings/CodexProjectConfigFormModel';
+} from '../../../../src/features/settings/backends/codex/CodexProjectConfigFormModel';
 
 describe('CodexProjectConfigFormModel allowlist', () => {
   it('allows only the safe behavior keys', () => {

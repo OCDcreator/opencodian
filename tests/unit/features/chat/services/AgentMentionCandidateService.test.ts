@@ -1,4 +1,4 @@
-import { AgentMentionCandidateService } from '../../../../../src/features/chat/services/AgentMentionCandidateService';
+import { AgentMentionCandidateService } from '../../../../../src/features/chat/services/composer/AgentMentionCandidateService';
 
 describe('AgentMentionCandidateService', () => {
   it('projects visible subagent/all catalog entries from runtime and project config', async () => {

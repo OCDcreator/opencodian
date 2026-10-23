@@ -811,9 +811,9 @@
       ],
       "entrypoints": [
         "src/core/agents/backend/index.ts",
-        "src/core/agents/backend/ClaudeCodeAdapter.ts",
-        "src/core/agents/backend/CodexAdapter.ts",
-        "src/core/agents/backend/OpenCodeAdapter.ts"
+        "src/core/agents/backend/claude/ClaudeCodeAdapter.ts",
+        "src/core/agents/backend/codex/CodexAdapter.ts",
+        "src/core/agents/backend/opencode/OpenCodeAdapter.ts"
       ],
       "allowedOwnerDependencies": [
         "shared.foundation",
@@ -1603,14 +1603,14 @@
       "id": "feature.chat-rendering",
       "layer": "feature",
       "include": [
-        "src/features/chat/autoScrollState.ts",
-        "src/features/chat/chatAppearance.ts",
-        "src/features/chat/composerContext.ts",
-        "src/features/chat/forkMessages.ts",
-        "src/features/chat/renderGroups.ts",
+        "src/features/chat/rendering/autoScrollState.ts",
+        "src/features/chat/rendering/chatAppearance.ts",
+        "src/features/chat/rendering/composerContext.ts",
+        "src/features/chat/rendering/forkMessages.ts",
+        "src/features/chat/rendering/renderGroups.ts",
         "src/features/chat/rendering/**",
-        "src/features/chat/userMessageActions.ts",
-        "src/features/chat/userMessageDisplay.ts"
+        "src/features/chat/rendering/userMessageActions.ts",
+        "src/features/chat/rendering/userMessageDisplay.ts"
       ],
       "delegatesTo": [],
       "responsibilities": [
@@ -1622,8 +1622,8 @@
         "chat appearance settings snapshot"
       ],
       "entrypoints": [
-        "src/features/chat/composerContext.ts",
-        "src/features/chat/renderGroups.ts"
+        "src/features/chat/rendering/composerContext.ts",
+        "src/features/chat/rendering/renderGroups.ts"
       ],
       "allowedOwnerDependencies": [
         "shared.foundation",
@@ -1663,8 +1663,8 @@
         "conversation sync load/hydration state"
       ],
       "entrypoints": [
-        "src/features/chat/runtime/SendPipelineRuntime.ts",
-        "src/features/chat/runtime/BackgroundTaskIndicatorCoordinator.ts",
+        "src/features/chat/runtime/send/SendPipelineRuntime.ts",
+        "src/features/chat/runtime/background/BackgroundTaskIndicatorCoordinator.ts",
         "src/features/chat/runtime/ChatRuntimeComposition.ts"
       ],
       "allowedOwnerDependencies": [
@@ -1715,10 +1715,10 @@
         "title generation service"
       ],
       "entrypoints": [
-        "src/features/chat/services/ScrollManager.ts",
-        "src/features/chat/services/ContextUsageService.ts",
-        "src/features/chat/services/SlashCommandMenuCatalogCache.ts",
-        "src/features/chat/services/TitleGenerationService.ts"
+        "src/features/chat/services/rendering/ScrollManager.ts",
+        "src/features/chat/services/context/ContextUsageService.ts",
+        "src/features/chat/services/commands/SlashCommandMenuCatalogCache.ts",
+        "src/features/chat/services/title/TitleGenerationService.ts"
       ],
       "allowedOwnerDependencies": [
         "shared.foundation",
@@ -1749,9 +1749,9 @@
       "id": "feature.chat-diagnostics",
       "layer": "feature",
       "include": [
-        "src/features/chat/services/ClaudeDiagnosticsHostAdapter.ts",
-        "src/features/chat/services/CodexDiagnosticsHostAdapter.ts",
-        "src/features/chat/services/ChatDiagnosticsCoordinator.ts"
+        "src/features/chat/services/diagnostics/ClaudeDiagnosticsHostAdapter.ts",
+        "src/features/chat/services/diagnostics/CodexDiagnosticsHostAdapter.ts",
+        "src/features/chat/services/diagnostics/ChatDiagnosticsCoordinator.ts"
       ],
       "delegatesTo": [],
       "responsibilities": [
@@ -1763,9 +1763,9 @@
         "chat diagnostics coordinator and host adapter state"
       ],
       "entrypoints": [
-        "src/features/chat/services/ClaudeDiagnosticsHostAdapter.ts",
-        "src/features/chat/services/CodexDiagnosticsHostAdapter.ts",
-        "src/features/chat/services/ChatDiagnosticsCoordinator.ts"
+        "src/features/chat/services/diagnostics/ClaudeDiagnosticsHostAdapter.ts",
+        "src/features/chat/services/diagnostics/CodexDiagnosticsHostAdapter.ts",
+        "src/features/chat/services/diagnostics/ChatDiagnosticsCoordinator.ts"
       ],
       "allowedOwnerDependencies": [
         "shared.foundation",
@@ -1872,11 +1872,11 @@
       "id": "feature.chat-demos",
       "layer": "feature",
       "include": [
-        "src/features/chat/glassOctahedronDemo.ts",
-        "src/features/chat/glassOctahedronDemoRefraction.ts",
-        "src/features/chat/glassOctahedronDemoThree.ts",
-        "src/features/chat/liquidDiamondDemo.ts",
-        "src/features/chat/liquidDiamondDemoWebgl.ts"
+        "src/features/chat/demos/glassOctahedronDemo.ts",
+        "src/features/chat/demos/glassOctahedronDemoRefraction.ts",
+        "src/features/chat/demos/glassOctahedronDemoThree.ts",
+        "src/features/chat/demos/liquidDiamondDemo.ts",
+        "src/features/chat/demos/liquidDiamondDemoWebgl.ts"
       ],
       "delegatesTo": [],
       "responsibilities": [
@@ -1885,8 +1885,8 @@
       ],
       "canonicalState": [],
       "entrypoints": [
-        "src/features/chat/liquidDiamondDemo.ts",
-        "src/features/chat/glassOctahedronDemo.ts"
+        "src/features/chat/demos/liquidDiamondDemo.ts",
+        "src/features/chat/demos/glassOctahedronDemo.ts"
       ],
       "allowedOwnerDependencies": [
         "shared.foundation",
@@ -1911,7 +1911,7 @@
       "id": "feature.chat-misc",
       "layer": "feature",
       "include": [
-        "src/features/chat/services/ChatVisualDemoCoordinator.ts"
+        "src/features/chat/services/demos/ChatVisualDemoCoordinator.ts"
       ],
       "delegatesTo": [],
       "responsibilities": [
@@ -1919,7 +1919,7 @@
       ],
       "canonicalState": [],
       "entrypoints": [
-        "src/features/chat/services/ChatVisualDemoCoordinator.ts"
+        "src/features/chat/services/demos/ChatVisualDemoCoordinator.ts"
       ],
       "allowedOwnerDependencies": [
         "shared.foundation",
@@ -2127,7 +2127,7 @@
       "id": "feature.settings-debug",
       "layer": "feature",
       "include": [
-        "src/features/settings/SettingsDebugSection.ts",
+        "src/features/settings/debug/SettingsDebugSection.ts",
         "src/features/settings/debug/**"
       ],
       "delegatesTo": [],
@@ -2143,7 +2143,7 @@
         "trace status and catalog state owned by app diagnostics services and exposed through narrow ports"
       ],
       "entrypoints": [
-        "src/features/settings/SettingsDebugSection.ts",
+        "src/features/settings/debug/SettingsDebugSection.ts",
         "src/features/settings/debug/OpenCodeDebugPanel.ts",
         "src/features/settings/debug/CodexDebugPanel.ts",
         "src/features/settings/debug/ClaudeCodeDebugPanel.ts"
@@ -2163,7 +2163,7 @@
         "feature.chat-diagnostics"
       ],
       "tests": [
-        "tests/unit/features/settings/SettingsDebugSection*",
+        "tests/unit/features/settings/debug/SettingsDebugSection*",
         "tests/unit/features/settings/OpenCodeDebugPanel*",
         "tests/unit/features/settings/CodexDebugPanel*",
         "tests/unit/features/settings/ClaudeCodeDebugPanel*"
@@ -2180,23 +2180,23 @@
       "id": "feature.settings-model-catalog",
       "layer": "feature",
       "include": [
-        "src/features/settings/SettingsModelCatalogAvailability.ts",
-        "src/features/settings/SettingsModelCatalogCoordinator.ts",
-        "src/features/settings/SettingsModelCatalogPresenter.ts",
-        "src/features/settings/SettingsModelIconCacheManager.ts",
-        "src/features/settings/SettingsModelSection.ts",
-        "src/features/settings/ModelConfigModal.ts",
-        "src/features/settings/modelConfigModalState.ts",
-        "src/features/settings/ModelConfigModelListEditor.ts",
-        "src/features/settings/ModelConfigProviderEditor.ts",
-        "src/features/settings/modelConfigSavePlan.ts",
-        "src/features/settings/modelConfigStructuredOptions.ts",
-        "src/features/settings/ModelConfigStructuredOptionsEditor.ts",
-        "src/features/settings/modelConfigWorkspace.ts",
-        "src/features/settings/modelPicker.ts",
-        "src/features/settings/ModelPickerModal.ts",
-        "src/features/settings/ModelPricingModal.ts",
-        "src/features/settings/ModelConfigJsonModal.ts"
+        "src/features/settings/models/SettingsModelCatalogAvailability.ts",
+        "src/features/settings/models/SettingsModelCatalogCoordinator.ts",
+        "src/features/settings/models/SettingsModelCatalogPresenter.ts",
+        "src/features/settings/models/SettingsModelIconCacheManager.ts",
+        "src/features/settings/models/SettingsModelSection.ts",
+        "src/features/settings/models/ModelConfigModal.ts",
+        "src/features/settings/models/modelConfigModalState.ts",
+        "src/features/settings/models/ModelConfigModelListEditor.ts",
+        "src/features/settings/models/ModelConfigProviderEditor.ts",
+        "src/features/settings/models/modelConfigSavePlan.ts",
+        "src/features/settings/models/modelConfigStructuredOptions.ts",
+        "src/features/settings/models/ModelConfigStructuredOptionsEditor.ts",
+        "src/features/settings/models/modelConfigWorkspace.ts",
+        "src/features/settings/models/modelPicker.ts",
+        "src/features/settings/models/ModelPickerModal.ts",
+        "src/features/settings/models/ModelPricingModal.ts",
+        "src/features/settings/models/ModelConfigJsonModal.ts"
       ],
       "delegatesTo": [],
       "responsibilities": [
@@ -2208,8 +2208,8 @@
         "model picker state"
       ],
       "entrypoints": [
-        "src/features/settings/SettingsModelCatalogPresenter.ts",
-        "src/features/settings/ModelConfigModal.ts"
+        "src/features/settings/models/SettingsModelCatalogPresenter.ts",
+        "src/features/settings/models/ModelConfigModal.ts"
       ],
       "allowedOwnerDependencies": [
         "shared.foundation",
@@ -2238,17 +2238,17 @@
       "id": "feature.settings-claude",
       "layer": "feature",
       "include": [
-        "src/features/settings/SettingsClaudeCodeSection.ts",
-        "src/features/settings/SettingsClaudeConfigurationSection.ts",
-        "src/features/settings/SettingsClaudeProviderMetadataPersistenceCoordinator.ts",
-        "src/features/settings/SettingsClaudeProvidersSection.ts",
-        "src/features/settings/SettingsClaudeResourcesSection.ts",
-        "src/features/settings/ClaudeCodeHelpModal.ts",
-        "src/features/settings/ClaudeSettingsCommonFieldsPresenter.ts",
-        "src/features/settings/ClaudeSettingsContextSourcesPresenter.ts",
-        "src/features/settings/ClaudeSettingsHookFieldControls.ts",
-        "src/features/settings/ClaudeSettingsHooksBuilder.ts",
-        "src/features/settings/ClaudeSettingsMutationController.ts"
+        "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts",
+        "src/features/settings/backends/claude/SettingsClaudeConfigurationSection.ts",
+        "src/features/settings/backends/claude/SettingsClaudeProviderMetadataPersistenceCoordinator.ts",
+        "src/features/settings/backends/claude/SettingsClaudeProvidersSection.ts",
+        "src/features/settings/backends/claude/SettingsClaudeResourcesSection.ts",
+        "src/features/settings/backends/claude/ClaudeCodeHelpModal.ts",
+        "src/features/settings/backends/claude/ClaudeSettingsCommonFieldsPresenter.ts",
+        "src/features/settings/backends/claude/ClaudeSettingsContextSourcesPresenter.ts",
+        "src/features/settings/backends/claude/ClaudeSettingsHookFieldControls.ts",
+        "src/features/settings/backends/claude/ClaudeSettingsHooksBuilder.ts",
+        "src/features/settings/backends/claude/ClaudeSettingsMutationController.ts"
       ],
       "delegatesTo": [],
       "responsibilities": [
@@ -2257,7 +2257,7 @@
       ],
       "canonicalState": [],
       "entrypoints": [
-        "src/features/settings/SettingsClaudeCodeSection.ts"
+        "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts"
       ],
       "allowedOwnerDependencies": [
         "shared.foundation",
@@ -2283,16 +2283,16 @@
       "id": "feature.settings-codex",
       "layer": "feature",
       "include": [
-        "src/features/settings/SettingsCodexSection.ts",
-        "src/features/settings/SettingsCodexProjectConfigSection.ts",
-        "src/features/settings/SettingsCodexAccountSurface.ts",
-        "src/features/settings/SettingsCodexLegacyCredentialControl.ts",
-        "src/features/settings/SettingsCodexReadbackControls.ts",
-        "src/features/settings/SettingsCodexResourcesSection.ts",
-        "src/features/settings/CodexMcpServerDetailModal.ts",
-        "src/features/settings/CodexMcpServerDetailRenderers.ts",
-        "src/features/settings/CodexProjectConfigFormModel.ts",
-        "src/features/settings/CodexReadbackModal.ts"
+        "src/features/settings/backends/codex/SettingsCodexSection.ts",
+        "src/features/settings/backends/codex/SettingsCodexProjectConfigSection.ts",
+        "src/features/settings/backends/codex/SettingsCodexAccountSurface.ts",
+        "src/features/settings/backends/codex/SettingsCodexLegacyCredentialControl.ts",
+        "src/features/settings/backends/codex/SettingsCodexReadbackControls.ts",
+        "src/features/settings/backends/codex/SettingsCodexResourcesSection.ts",
+        "src/features/settings/backends/codex/CodexMcpServerDetailModal.ts",
+        "src/features/settings/backends/codex/CodexMcpServerDetailRenderers.ts",
+        "src/features/settings/backends/codex/CodexProjectConfigFormModel.ts",
+        "src/features/settings/backends/codex/CodexReadbackModal.ts"
       ],
       "delegatesTo": [],
       "responsibilities": [
@@ -2301,7 +2301,7 @@
       ],
       "canonicalState": [],
       "entrypoints": [
-        "src/features/settings/SettingsCodexSection.ts"
+        "src/features/settings/backends/codex/SettingsCodexSection.ts"
       ],
       "allowedOwnerDependencies": [
         "shared.foundation",
@@ -2327,17 +2327,17 @@
       "id": "feature.settings-opencode",
       "layer": "feature",
       "include": [
-        "src/features/settings/SettingsBackendSection.ts",
-        "src/features/settings/OpencodeConfigModal.ts",
-        "src/features/settings/OpenCodeProjectConfigHelpModal.ts",
-        "src/features/settings/projectAgentEditorConfig.ts",
-        "src/features/settings/ProjectConfigFileWatcher.ts",
-        "src/features/settings/SettingsProjectAgentEditor.ts",
-        "src/features/settings/SettingsProjectCommandEditor.ts",
-        "src/features/settings/SettingsServerSection.ts",
-        "src/features/settings/ServerSettingHelpModal.ts",
-        "src/features/settings/SettingsCommandsSection.ts",
-        "src/features/settings/CostEstimateSettingsRow.ts"
+        "src/features/settings/backends/opencode/SettingsBackendSection.ts",
+        "src/features/settings/backends/opencode/OpencodeConfigModal.ts",
+        "src/features/settings/backends/opencode/OpenCodeProjectConfigHelpModal.ts",
+        "src/features/settings/backends/opencode/projectAgentEditorConfig.ts",
+        "src/features/settings/backends/opencode/ProjectConfigFileWatcher.ts",
+        "src/features/settings/backends/opencode/SettingsProjectAgentEditor.ts",
+        "src/features/settings/backends/opencode/SettingsProjectCommandEditor.ts",
+        "src/features/settings/backends/opencode/SettingsServerSection.ts",
+        "src/features/settings/backends/opencode/ServerSettingHelpModal.ts",
+        "src/features/settings/backends/opencode/SettingsCommandsSection.ts",
+        "src/features/settings/backends/opencode/CostEstimateSettingsRow.ts"
       ],
       "delegatesTo": [],
       "responsibilities": [
@@ -2346,8 +2346,8 @@
       ],
       "canonicalState": [],
       "entrypoints": [
-        "src/features/settings/OpencodeConfigModal.ts",
-        "src/features/settings/SettingsServerSection.ts"
+        "src/features/settings/backends/opencode/OpencodeConfigModal.ts",
+        "src/features/settings/backends/opencode/SettingsServerSection.ts"
       ],
       "allowedOwnerDependencies": [
         "shared.foundation",
@@ -2377,14 +2377,14 @@
       "id": "feature.settings-style",
       "layer": "feature",
       "include": [
-        "src/features/settings/SettingsStyleSection.ts",
-        "src/features/settings/settingsStyleControls.ts",
-        "src/features/settings/SettingsStyleInputPanelSection.ts",
-        "src/features/settings/SettingsStyleLiquidGlassInputControls.ts",
-        "src/features/settings/SettingsStylePresetSection.ts",
-        "src/features/settings/SettingsStyleBackgroundSection.ts",
-        "src/features/settings/InputFontRegistry.ts",
-        "src/features/settings/LiquidGlassSettingHelpModal.ts"
+        "src/features/settings/appearance/SettingsStyleSection.ts",
+        "src/features/settings/appearance/settingsStyleControls.ts",
+        "src/features/settings/appearance/SettingsStyleInputPanelSection.ts",
+        "src/features/settings/appearance/SettingsStyleLiquidGlassInputControls.ts",
+        "src/features/settings/appearance/SettingsStylePresetSection.ts",
+        "src/features/settings/appearance/SettingsStyleBackgroundSection.ts",
+        "src/features/settings/appearance/InputFontRegistry.ts",
+        "src/features/settings/appearance/LiquidGlassSettingHelpModal.ts"
       ],
       "delegatesTo": [],
       "responsibilities": [
@@ -2393,7 +2393,7 @@
       ],
       "canonicalState": [],
       "entrypoints": [
-        "src/features/settings/SettingsStyleSection.ts"
+        "src/features/settings/appearance/SettingsStyleSection.ts"
       ],
       "allowedOwnerDependencies": [
         "shared.foundation",
@@ -2423,10 +2423,10 @@
       "id": "feature.settings-mcp",
       "layer": "feature",
       "include": [
-        "src/features/settings/SettingsMcpSection.ts",
-        "src/features/settings/SettingsMcpAddForm.ts",
-        "src/features/settings/McpServerEditorModal.ts",
-        "src/features/settings/McpServerStatusModal.ts"
+        "src/features/settings/mcp/SettingsMcpSection.ts",
+        "src/features/settings/mcp/SettingsMcpAddForm.ts",
+        "src/features/settings/mcp/McpServerEditorModal.ts",
+        "src/features/settings/mcp/McpServerStatusModal.ts"
       ],
       "delegatesTo": [],
       "responsibilities": [
@@ -2434,7 +2434,7 @@
       ],
       "canonicalState": [],
       "entrypoints": [
-        "src/features/settings/SettingsMcpSection.ts"
+        "src/features/settings/mcp/SettingsMcpSection.ts"
       ],
       "allowedOwnerDependencies": [
         "shared.foundation",
@@ -2461,18 +2461,18 @@
       "id": "feature.settings-agents",
       "layer": "feature",
       "include": [
-        "src/features/settings/SettingsAgentsSection.ts",
-        "src/features/settings/AgentSwitcherChips.ts",
-        "src/features/settings/AgentSwitcherFloatingIcons.ts",
-        "src/features/settings/SettingsSkillSection.ts",
-        "src/features/settings/SlashCommandCatalogRenderer.ts",
-        "src/features/settings/SettingsToolSection.ts",
-        "src/features/settings/SettingsToolDetailModal.ts",
-        "src/features/settings/SettingsToolFileService.ts",
-        "src/features/settings/capabilityDisclosureRow.ts",
-        "src/features/settings/capabilityLabBackendTabs.ts",
-        "src/features/settings/capabilityLabBackendWorkspace.ts",
-        "src/features/settings/SettingsCapabilityLabSection.ts"
+        "src/features/settings/resources/SettingsAgentsSection.ts",
+        "src/features/settings/resources/AgentSwitcherChips.ts",
+        "src/features/settings/resources/AgentSwitcherFloatingIcons.ts",
+        "src/features/settings/resources/SettingsSkillSection.ts",
+        "src/features/settings/resources/SlashCommandCatalogRenderer.ts",
+        "src/features/settings/resources/SettingsToolSection.ts",
+        "src/features/settings/resources/SettingsToolDetailModal.ts",
+        "src/features/settings/resources/SettingsToolFileService.ts",
+        "src/features/settings/capabilities/capabilityDisclosureRow.ts",
+        "src/features/settings/capabilities/capabilityLabBackendTabs.ts",
+        "src/features/settings/capabilities/capabilityLabBackendWorkspace.ts",
+        "src/features/settings/capabilities/SettingsCapabilityLabSection.ts"
       ],
       "delegatesTo": [],
       "responsibilities": [
@@ -2481,8 +2481,8 @@
       ],
       "canonicalState": [],
       "entrypoints": [
-        "src/features/settings/SettingsAgentsSection.ts",
-        "src/features/settings/SettingsCapabilityLabSection.ts"
+        "src/features/settings/resources/SettingsAgentsSection.ts",
+        "src/features/settings/capabilities/SettingsCapabilityLabSection.ts"
       ],
       "allowedOwnerDependencies": [
         "shared.foundation",
@@ -2512,22 +2512,22 @@
       "id": "feature.settings-plugin",
       "layer": "feature",
       "include": [
-        "src/features/settings/SettingsPluginSection.ts",
-        "src/features/settings/SettingsPluginEvidenceCoordinator.ts",
-        "src/features/settings/SettingsPluginEvidencePresenter.ts",
-        "src/features/settings/SettingsPluginUpdateSection.ts",
-        "src/features/settings/SettingsConversationSection.ts",
-        "src/features/settings/ConversationCompactionHelpModal.ts",
-        "src/features/settings/SettingsSecuritySection.ts",
-        "src/features/settings/SettingsFormatterSection.ts",
-        "src/features/settings/SettingsAcpSection.ts",
-        "src/features/settings/SettingsUiSection.ts",
-        "src/features/settings/SettingsUserSection.ts",
-        "src/features/settings/settingsBackendGuards.ts",
-        "src/features/settings/providerPresets.ts",
-        "src/features/settings/ModifiedFilesSidebarHelpModal.ts",
-        "src/features/settings/ProviderBuiltinIconPickerModal.ts",
-        "src/features/settings/ProviderIconCacheModal.ts"
+        "src/features/settings/general/SettingsPluginSection.ts",
+        "src/features/settings/general/SettingsPluginEvidenceCoordinator.ts",
+        "src/features/settings/general/SettingsPluginEvidencePresenter.ts",
+        "src/features/settings/general/SettingsPluginUpdateSection.ts",
+        "src/features/settings/general/SettingsConversationSection.ts",
+        "src/features/settings/general/ConversationCompactionHelpModal.ts",
+        "src/features/settings/general/SettingsSecuritySection.ts",
+        "src/features/settings/general/SettingsFormatterSection.ts",
+        "src/features/settings/backends/acp/SettingsAcpSection.ts",
+        "src/features/settings/general/SettingsUiSection.ts",
+        "src/features/settings/general/SettingsUserSection.ts",
+        "src/features/settings/general/settingsBackendGuards.ts",
+        "src/features/settings/models/providerPresets.ts",
+        "src/features/settings/general/ModifiedFilesSidebarHelpModal.ts",
+        "src/features/settings/models/icons/ProviderBuiltinIconPickerModal.ts",
+        "src/features/settings/models/icons/ProviderIconCacheModal.ts"
       ],
       "delegatesTo": [],
       "responsibilities": [
@@ -2536,8 +2536,8 @@
       ],
       "canonicalState": [],
       "entrypoints": [
-        "src/features/settings/SettingsPluginSection.ts",
-        "src/features/settings/SettingsPluginUpdateSection.ts"
+        "src/features/settings/general/SettingsPluginSection.ts",
+        "src/features/settings/general/SettingsPluginUpdateSection.ts"
       ],
       "allowedOwnerDependencies": [
         "shared.foundation",
@@ -2708,7 +2708,7 @@
   "dependencyExceptions": [
     {
       "id": "task15-chat-runtime-composition-scc-member",
-      "baselineEdgeId": "src/app/runtime/PluginRuntimeCoordinator.ts;;src/features/chat/ChatPluginPort.ts;;src/features/chat/OpenCodianView.ts;;src/features/chat/runtime/ChatRuntimeComposition.ts;;src/features/chat/services/ChatHeaderPresenter.ts;;src/features/settings/AgentSwitcherFloatingIcons.ts;;src/features/settings/CostEstimateSettingsRow.ts;;src/features/settings/ModelConfigJsonModal.ts;;src/features/settings/ModelConfigModal.ts;;src/features/settings/ModelConfigProviderEditor.ts;;src/features/settings/ModelPricingModal.ts;;src/features/settings/OpenCodianSettings.ts;;src/features/settings/OpenCodianSettingsView.ts;;src/features/settings/ProviderBuiltinIconPickerModal.ts;;src/features/settings/ProviderIconCacheModal.ts;;src/features/settings/SettingsAcpSection.ts;;src/features/settings/SettingsAgentsSection.ts;;src/features/settings/SettingsBackendSection.ts;;src/features/settings/SettingsCapabilityLabSection.ts;;src/features/settings/SettingsClaudeCodeSection.ts;;src/features/settings/SettingsClaudeConfigurationSection.ts;;src/features/settings/SettingsClaudeProviderMetadataPersistenceCoordinator.ts;;src/features/settings/SettingsClaudeProvidersSection.ts;;src/features/settings/SettingsClaudeResourcesSection.ts;;src/features/settings/SettingsCodexAccountSurface.ts;;src/features/settings/SettingsCodexLegacyCredentialControl.ts;;src/features/settings/SettingsCodexProjectConfigSection.ts;;src/features/settings/SettingsCodexReadbackControls.ts;;src/features/settings/SettingsCodexResourcesSection.ts;;src/features/settings/SettingsCodexSection.ts;;src/features/settings/SettingsCommandsSection.ts;;src/features/settings/SettingsConversationSection.ts;;src/features/settings/SettingsDebugSection.ts;;src/features/settings/SettingsFormatterSection.ts;;src/features/settings/SettingsMcpSection.ts;;src/features/settings/SettingsModelCatalogCoordinator.ts;;src/features/settings/SettingsModelIconCacheManager.ts;;src/features/settings/SettingsModelSection.ts;;src/features/settings/SettingsPanelChrome.ts;;src/features/settings/SettingsPluginSection.ts;;src/features/settings/SettingsPluginUpdateSection.ts;;src/features/settings/SettingsProjectAgentEditor.ts;;src/features/settings/SettingsProjectCommandEditor.ts;;src/features/settings/SettingsSecuritySection.ts;;src/features/settings/SettingsServerSection.ts;;src/features/settings/SettingsSkillSection.ts;;src/features/settings/SettingsStyleBackgroundSection.ts;;src/features/settings/SettingsStyleInputPanelSection.ts;;src/features/settings/SettingsStyleLiquidGlassInputControls.ts;;src/features/settings/SettingsStylePresetSection.ts;;src/features/settings/SettingsStyleSection.ts;;src/features/settings/SettingsTabbedHeader.ts;;src/features/settings/SettingsTabbedRenderer.ts;;src/features/settings/SettingsToolDetailModal.ts;;src/features/settings/SettingsToolFileService.ts;;src/features/settings/SettingsToolSection.ts;;src/features/settings/SettingsUiSection.ts;;src/features/settings/SettingsUserSection.ts;;src/features/settings/SettingsViewRegistrar.ts;;src/features/settings/capabilityDisclosureRow.ts;;src/features/settings/settingsStyleControls.ts;;src/main.ts",
+      "baselineEdgeId": "src/app/runtime/PluginRuntimeCoordinator.ts;;src/features/chat/ChatPluginPort.ts;;src/features/chat/OpenCodianView.ts;;src/features/chat/runtime/ChatRuntimeComposition.ts;;src/features/chat/services/surface/ChatHeaderPresenter.ts;;src/features/settings/resources/AgentSwitcherFloatingIcons.ts;;src/features/settings/backends/opencode/CostEstimateSettingsRow.ts;;src/features/settings/models/ModelConfigJsonModal.ts;;src/features/settings/models/ModelConfigModal.ts;;src/features/settings/models/ModelConfigProviderEditor.ts;;src/features/settings/models/ModelPricingModal.ts;;src/features/settings/OpenCodianSettings.ts;;src/features/settings/OpenCodianSettingsView.ts;;src/features/settings/models/icons/ProviderBuiltinIconPickerModal.ts;;src/features/settings/models/icons/ProviderIconCacheModal.ts;;src/features/settings/backends/acp/SettingsAcpSection.ts;;src/features/settings/resources/SettingsAgentsSection.ts;;src/features/settings/backends/opencode/SettingsBackendSection.ts;;src/features/settings/capabilities/SettingsCapabilityLabSection.ts;;src/features/settings/backends/claude/SettingsClaudeCodeSection.ts;;src/features/settings/backends/claude/SettingsClaudeConfigurationSection.ts;;src/features/settings/backends/claude/SettingsClaudeProviderMetadataPersistenceCoordinator.ts;;src/features/settings/backends/claude/SettingsClaudeProvidersSection.ts;;src/features/settings/backends/claude/SettingsClaudeResourcesSection.ts;;src/features/settings/backends/codex/SettingsCodexAccountSurface.ts;;src/features/settings/backends/codex/SettingsCodexLegacyCredentialControl.ts;;src/features/settings/backends/codex/SettingsCodexProjectConfigSection.ts;;src/features/settings/backends/codex/SettingsCodexReadbackControls.ts;;src/features/settings/backends/codex/SettingsCodexResourcesSection.ts;;src/features/settings/backends/codex/SettingsCodexSection.ts;;src/features/settings/backends/opencode/SettingsCommandsSection.ts;;src/features/settings/general/SettingsConversationSection.ts;;src/features/settings/debug/SettingsDebugSection.ts;;src/features/settings/general/SettingsFormatterSection.ts;;src/features/settings/mcp/SettingsMcpSection.ts;;src/features/settings/models/SettingsModelCatalogCoordinator.ts;;src/features/settings/models/SettingsModelIconCacheManager.ts;;src/features/settings/models/SettingsModelSection.ts;;src/features/settings/SettingsPanelChrome.ts;;src/features/settings/general/SettingsPluginSection.ts;;src/features/settings/general/SettingsPluginUpdateSection.ts;;src/features/settings/backends/opencode/SettingsProjectAgentEditor.ts;;src/features/settings/backends/opencode/SettingsProjectCommandEditor.ts;;src/features/settings/general/SettingsSecuritySection.ts;;src/features/settings/backends/opencode/SettingsServerSection.ts;;src/features/settings/resources/SettingsSkillSection.ts;;src/features/settings/appearance/SettingsStyleBackgroundSection.ts;;src/features/settings/appearance/SettingsStyleInputPanelSection.ts;;src/features/settings/appearance/SettingsStyleLiquidGlassInputControls.ts;;src/features/settings/appearance/SettingsStylePresetSection.ts;;src/features/settings/appearance/SettingsStyleSection.ts;;src/features/settings/SettingsTabbedHeader.ts;;src/features/settings/SettingsTabbedRenderer.ts;;src/features/settings/resources/SettingsToolDetailModal.ts;;src/features/settings/resources/SettingsToolFileService.ts;;src/features/settings/resources/SettingsToolSection.ts;;src/features/settings/general/SettingsUiSection.ts;;src/features/settings/general/SettingsUserSection.ts;;src/features/settings/SettingsViewRegistrar.ts;;src/features/settings/capabilities/capabilityDisclosureRow.ts;;src/features/settings/appearance/settingsStyleControls.ts;;src/main.ts",
       "ruleId": "no-new-type-coupling-scc-members",
       "reason": "Task 15 relocated the four create*RuntimeWiring() methods + createSendPipelineHostDependencies out of OpenCodianView into a new src/features/chat/runtime/ChatRuntimeComposition.ts composition owner. The owner never directly imports OpenCodianView (no direct return edge), but it shares the same mixed SCC (62 members) because both files value-import the chat coordinators (ChatHeaderPresenter, ConversationAuthoritativeSyncCoordinator, AssistantShellViewHostAdapter, ...) which themselves sit in the pre-existing OpenCodianView/settings/main.ts mixed SCC. The composition owner inherits SCC membership from those shared coordinator value-imports — this is structural debt inheritance, NOT a new runtime cycle and NOT a new reverse edge (check:dependency-direction PASS, 0 new reverse edges; check:architecture-cycles: 0 new runtime SCC). Root cause is that the coordinators sit in the mixed SCC; retiring this exception requires moving those coordinators out of the SCC (Phase 5+ follow-up). Inventory APPROVED by codex/terra (4 rounds). Functional equivalence proven: characterization + owner tests + 337 chat suites (2168 tests) green, typecheck clean, lint 0/0.",
       "characterizationTests": [

@@ -17,8 +17,8 @@
 
 ## 关联 TS 组件
 
-- `src/features/settings/AgentSwitcherFloatingIcons.ts`
-- `src/features/settings/AgentSwitcherChips.ts`
+- `src/features/settings/resources/AgentSwitcherFloatingIcons.ts`
+- `src/features/settings/resources/AgentSwitcherChips.ts`
 - `src/features/settings/SettingsTabbedRenderer.ts`
 
 ## 修改注意点

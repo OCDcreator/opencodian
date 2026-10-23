@@ -1,5 +1,5 @@
-import type { ConversationNoticeCoordinatorHost } from '../../../../src/features/chat/services/ConversationNoticeCoordinator';
-import { ConversationNoticeCoordinator } from '../../../../src/features/chat/services/ConversationNoticeCoordinator';
+import type { ConversationNoticeCoordinatorHost } from '../../../../src/features/chat/services/rendering/ConversationNoticeCoordinator';
+import { ConversationNoticeCoordinator } from '../../../../src/features/chat/services/rendering/ConversationNoticeCoordinator';
 import { t } from '../../../../src/i18n';
 
 const mockGetCurrentSessionModel = jest.fn();

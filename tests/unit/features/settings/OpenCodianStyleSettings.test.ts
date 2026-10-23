@@ -4,9 +4,9 @@ import { Setting } from 'obsidian';
 
 import { getBuiltinThemePresets, getThemePresetDefinition } from '../../../../src/core/theme';
 import { DEFAULT_SETTINGS, getDefaultChatAppearanceSettings } from '../../../../src/core/types';
-import { SettingsStylePresetSection } from '../../../../src/features/settings/SettingsStylePresetSection';
-import { SettingsStyleSection } from '../../../../src/features/settings/SettingsStyleSection';
-import { TextareaSizeMemory } from '../../../../src/features/settings/TextareaSizeMemory';
+import { SettingsStylePresetSection } from '../../../../src/features/settings/appearance/SettingsStylePresetSection';
+import { SettingsStyleSection } from '../../../../src/features/settings/appearance/SettingsStyleSection';
+import { TextareaSizeMemory } from '../../../../src/features/settings/controls/TextareaSizeMemory';
 import { setLocale } from '../../../../src/i18n';
 
 interface MockDropdownControl {

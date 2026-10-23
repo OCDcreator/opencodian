@@ -6,7 +6,7 @@
 
 - **Layer:** `feature` (may import layers: shared, core, feature)
 - **Risk:** high
-- **Include:** `src/features/settings/SettingsDebugSection.ts`, `src/features/settings/debug/**`
+- **Include:** `src/features/settings/debug/SettingsDebugSection.ts`, `src/features/settings/debug/**`
 
 ## Responsibilities
 - shared debug section shell/router, plugin export actions, and platform/path/action/module helpers
@@ -22,7 +22,7 @@
 > Cross-owner access is read-only snapshot/command/event. Do not replicate this state as a second writable truth source.
 
 ## Entrypoints
-- `src/features/settings/SettingsDebugSection.ts`
+- `src/features/settings/debug/SettingsDebugSection.ts`
 - `src/features/settings/debug/OpenCodeDebugPanel.ts`
 - `src/features/settings/debug/CodexDebugPanel.ts`
 - `src/features/settings/debug/ClaudeCodeDebugPanel.ts`
@@ -33,7 +33,7 @@
 - **Adjacent owners** (prefer editing these when out of scope): `feature.settings-shell`, `feature.chat-diagnostics`
 
 ## Focused tests
-- `tests/unit/features/settings/SettingsDebugSection*`
+- `tests/unit/features/settings/debug/SettingsDebugSection*`
 - `tests/unit/features/settings/OpenCodeDebugPanel*`
 - `tests/unit/features/settings/CodexDebugPanel*`
 - `tests/unit/features/settings/ClaudeCodeDebugPanel*`
@@ -63,3 +63,9 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 - 2026-09-18 (FlowText 批次 B)：owner manifest 随 R-B1/R-B2 更新——新增 `src/shared/contextGroupPlan.ts` 归属 `shared.foundation`；本 owner 的边界与职责未变。
 
 2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.settings-debug` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/features/settings/debug`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

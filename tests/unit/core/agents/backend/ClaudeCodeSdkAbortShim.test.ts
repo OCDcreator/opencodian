@@ -1,4 +1,4 @@
-import { createRendererSafeAbortController } from '../../../../../src/core/agents/backend/ClaudeCodeSdkAbortShim';
+import { createRendererSafeAbortController } from '../../../../../src/core/agents/backend/claude/ClaudeCodeSdkAbortShim';
 
 describe('Claude renderer-safe abort teardown', () => {
   it('supports the SDK unref timeout and restores renderer timers after synchronous listeners', () => {

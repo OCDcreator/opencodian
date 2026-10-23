@@ -1,4 +1,4 @@
-import { TextareaSizeMemory } from '../../../../src/features/settings/TextareaSizeMemory';
+import { TextareaSizeMemory } from '../../../../src/features/settings/controls/TextareaSizeMemory';
 
 describe('TextareaSizeMemory', () => {
   beforeEach(() => {

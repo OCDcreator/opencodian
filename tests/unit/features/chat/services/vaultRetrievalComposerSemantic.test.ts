@@ -10,7 +10,7 @@ import type { PromptContextItem } from '../../../../../src/core/types';
 import {
   SemanticRetrievalQueryPort,
   VaultRetrievalComposerCoordinator,
-} from '../../../../../src/features/chat/services/VaultRetrievalComposerCoordinator';
+} from '../../../../../src/features/chat/services/context/VaultRetrievalComposerCoordinator';
 
 function baseSettings(overrides: Record<string, unknown> = {}) {
   return {

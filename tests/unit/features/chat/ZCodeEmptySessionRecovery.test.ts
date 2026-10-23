@@ -1,5 +1,5 @@
 import type { Conversation } from '../../../../src/core/types';
-import { recoverEmptyZCodeConversationSession } from '../../../../src/features/chat/services/ZCodeEmptySessionRecovery';
+import { recoverEmptyZCodeConversationSession } from '../../../../src/features/chat/services/conversation/ZCodeEmptySessionRecovery';
 
 function createConversation(overrides: Partial<Conversation> = {}): Conversation {
   return {

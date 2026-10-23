@@ -1,8 +1,8 @@
 import { AgentCapability } from '../../../../src/core/agents/AgentCapability';
 import { type Conversation, normalizeConversationSessionSettings } from '../../../../src/core/types/chat';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
-import type { ChatSelectionControlsCoordinatorHost } from '../../../../src/features/chat/services/ChatSelectionControlsCoordinator';
-import type { ComposerInputShellCoordinatorHost } from '../../../../src/features/chat/services/ComposerInputShellCoordinator';
+import type { ComposerInputShellCoordinatorHost } from '../../../../src/features/chat/services/composer/ComposerInputShellCoordinator';
+import type { ChatSelectionControlsCoordinatorHost } from '../../../../src/features/chat/services/selection/ChatSelectionControlsCoordinator';
 import type { EffortSelector, EffortSelectorCallbacks } from '../../../../src/features/chat/ui/EffortSelector';
 import { t } from '../../../../src/i18n';
 

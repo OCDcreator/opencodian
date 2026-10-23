@@ -13,7 +13,7 @@ import type { ImageGenerationModelConfig } from '../../../../../src/core/types';
 import {
   ImageGenerationChatController,
   type ImageGenerationChatPorts,
-} from '../../../../../src/features/chat/services/ImageGenerationChatController';
+} from '../../../../../src/features/chat/services/integrations/ImageGenerationChatController';
 
 const MODEL: ImageGenerationModelConfig = {
   id: 'm1',

@@ -1,9 +1,9 @@
-import type { FocusContextPreview } from '../../../../src/features/chat/composerContext';
-import { ComposerContextRuntimeStore } from '../../../../src/features/chat/services/ComposerContextRuntimeStore';
+import type { FocusContextPreview } from '../../../../src/features/chat/rendering/composerContext';
+import { ComposerContextRuntimeStore } from '../../../../src/features/chat/services/composer/ComposerContextRuntimeStore';
 import {
   type ComposerContextRuntimeState,
-} from '../../../../src/features/chat/services/ComposerContextViewHostAdapter';
-import { FocusContextViewHostAdapter } from '../../../../src/features/chat/services/FocusContextViewHostAdapter';
+} from '../../../../src/features/chat/services/composer/ComposerContextViewHostAdapter';
+import { FocusContextViewHostAdapter } from '../../../../src/features/chat/services/context/FocusContextViewHostAdapter';
 import type { TabId } from '../../../../src/features/chat/tabs';
 
 function createPreview(

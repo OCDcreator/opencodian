@@ -1,11 +1,11 @@
 import type { ChatMessage, Conversation } from '../../../../src/core/types';
-import { buildLocalStreamOutcome } from '../../../../src/features/chat/runtime/buildLocalStreamOutcome';
+import { buildLocalStreamOutcome } from '../../../../src/features/chat/runtime/send/buildLocalStreamOutcome';
 import type {
   SendPipelineStreamController,
   SendPipelineTabRuntime,
   StreamChunkRouterResult,
-} from '../../../../src/features/chat/runtime/SendPipelineRuntime';
-import type { PreparedMessageSend } from '../../../../src/features/chat/services/MessageSendPreparationService';
+} from '../../../../src/features/chat/runtime/send/SendPipelineRuntime';
+import type { PreparedMessageSend } from '../../../../src/features/chat/services/send/MessageSendPreparationService';
 
 function createConversation(messages: ChatMessage[] = []): Conversation {
   return {

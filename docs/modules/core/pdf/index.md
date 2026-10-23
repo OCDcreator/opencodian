@@ -12,9 +12,9 @@ R-C4 PDF 能力（`core.pdf` owner）的公开入口，re-export 文本层布局
 ```text
 上游: ./pdfTextLayout, ./pdfTextEngine, ./pdfIndexFormat, ./pdfIndexScoring,
       ./PdfIndexService, ./pdfAnnotation, ./pdfViewProbe
-下游: src/features/chat/services/ContextAttachmentBuilder.ts（一期提取）、
-      src/features/chat/services/VaultRetrievalComposerCoordinator.ts（二期注入）、
-      src/features/chat/services/PdfChatIntegration.ts（三期交互）、
+下游: src/features/chat/services/context/ContextAttachmentBuilder.ts（一期提取）、
+      src/features/chat/services/context/VaultRetrievalComposerCoordinator.ts（二期注入）、
+      src/features/chat/services/integrations/PdfChatIntegration.ts（三期交互）、
       src/app/pdf/PdfIndexFileSystem.ts（fs 适配器）、src/main.ts（组合）
 ```
 

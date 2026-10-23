@@ -1,23 +1,23 @@
 import type { ChatMessage } from '../../../../src/core/types';
 import type {
   ConversationHydrationOutcomePort,
-} from '../../../../src/features/chat/runtime/ConversationHydrationOutcomeBridge';
+} from '../../../../src/features/chat/runtime/activation/ConversationHydrationOutcomeBridge';
 import {
   type ConversationLoadRuntimePort,
-} from '../../../../src/features/chat/runtime/ConversationLoadRuntimeBridge';
+} from '../../../../src/features/chat/runtime/activation/ConversationLoadRuntimeBridge';
 import type {
   ConversationTransitionPort,
   LoadedConversationTransitionContext,
-} from '../../../../src/features/chat/runtime/ConversationTransitionBridge';
-import type { TabConversationActivationBridge } from '../../../../src/features/chat/runtime/TabConversationActivationBridge';
+} from '../../../../src/features/chat/runtime/activation/ConversationTransitionBridge';
+import type { TabConversationActivationBridge } from '../../../../src/features/chat/runtime/activation/TabConversationActivationBridge';
 import {
   TabViewActivationBridge,
   type TabViewActivationBridgeHost,
-} from '../../../../src/features/chat/runtime/TabViewActivationBridge';
-import type { ActiveTabContextUsageCoordinator } from '../../../../src/features/chat/services/ActiveTabContextUsageCoordinator';
-import { ConversationViewStateService } from '../../../../src/features/chat/services/ConversationViewStateService';
-import type { QuestionTodoActivationRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoActivationRefreshCoordinator';
-import type { BackgroundTaskActivationIndicatorPort } from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskActivationHostAdapter';
+} from '../../../../src/features/chat/runtime/activation/TabViewActivationBridge';
+import type { ActiveTabContextUsageCoordinator } from '../../../../src/features/chat/services/context/ActiveTabContextUsageCoordinator';
+import { ConversationViewStateService } from '../../../../src/features/chat/services/conversation/ConversationViewStateService';
+import type { QuestionTodoActivationRefreshCoordinator } from '../../../../src/features/chat/services/questions/QuestionTodoActivationRefreshCoordinator';
+import type { BackgroundTaskActivationIndicatorPort } from '../../../../src/features/chat/services/questions/QuestionTodoBackgroundTaskActivationHostAdapter';
 import { TabManager } from '../../../../src/features/chat/tabs/TabManager';
 
 function createConversation(id: string) {

@@ -1,8 +1,8 @@
 import {
   QuestionTodoActivationRefreshCoordinator,
   type QuestionTodoActivationRefreshCoordinatorHost,
-} from '../../../../src/features/chat/services/QuestionTodoActivationRefreshCoordinator';
-import type { QuestionTodoStatusRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoStatusRefreshCoordinator';
+} from '../../../../src/features/chat/services/questions/QuestionTodoActivationRefreshCoordinator';
+import type { QuestionTodoStatusRefreshCoordinator } from '../../../../src/features/chat/services/questions/QuestionTodoStatusRefreshCoordinator';
 
 type QuestionTodoActivationRefreshPort = Pick<
   QuestionTodoStatusRefreshCoordinator,

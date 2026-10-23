@@ -1,7 +1,7 @@
 import type { App, WorkspaceLeaf } from 'obsidian';
 
-import type { PdfChatIntegrationPorts } from '../../../../../src/features/chat/services/PdfChatIntegration';
-import { PdfChatIntegration } from '../../../../../src/features/chat/services/PdfChatIntegration';
+import type { PdfChatIntegrationPorts } from '../../../../../src/features/chat/services/integrations/PdfChatIntegration';
+import { PdfChatIntegration } from '../../../../../src/features/chat/services/integrations/PdfChatIntegration';
 
 /**
  * R-C4 live-acceptance repairs (D1/D2):

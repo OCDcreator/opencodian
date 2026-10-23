@@ -3,7 +3,7 @@ import {
   SessionTodoDockCoordinator,
   type SessionTodoDockCoordinatorHost,
   type SessionTodoDockCoordinatorRuntimeState,
-} from '../../../../src/features/chat/services/SessionTodoDockCoordinator';
+} from '../../../../src/features/chat/services/questions/SessionTodoDockCoordinator';
 import { setLocale } from '../../../../src/i18n';
 
 type Mocked<T> = {

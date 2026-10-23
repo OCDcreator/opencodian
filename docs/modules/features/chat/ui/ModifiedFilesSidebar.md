@@ -43,3 +43,8 @@ An entry marked `statsUnavailable` displays unavailable status and line statisti
 - 不替代 `ConversationNoticeCoordinator` 的 inline diff notice；这是额外的持久侧栏。
 - 不应在组件内拉取 OpenCode diff，保持数据来源单向：service cache -> view -> sidebar。
 - 如果未来需要跨 tab 显示，应继续由 `OpenCodianView` 根据 active conversation/session 选择 entries。
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/features/chat/ui/ModifiedFilesSidebar.ts`。
+- 随目录调整更新的依赖：`src/features/chat/services/rendering/ConversationRenderService.ts`。

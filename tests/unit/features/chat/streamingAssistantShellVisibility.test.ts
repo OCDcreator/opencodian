@@ -1,6 +1,6 @@
-import { AssistantShellRenderer } from '../../../../src/features/chat/runtime/AssistantShellRenderer';
-import { PermissionInlineCardRenderer } from '../../../../src/features/chat/runtime/PermissionInlineCardRenderer';
-import { StreamingInlineCardRenderer } from '../../../../src/features/chat/runtime/StreamingInlineCardRenderer';
+import { AssistantShellRenderer } from '../../../../src/features/chat/runtime/rendering/AssistantShellRenderer';
+import { PermissionInlineCardRenderer } from '../../../../src/features/chat/runtime/rendering/PermissionInlineCardRenderer';
+import { StreamingInlineCardRenderer } from '../../../../src/features/chat/runtime/rendering/StreamingInlineCardRenderer';
 
 describe('OpenCodianView streaming assistant shell visibility', () => {
   it('keeps deferred streaming assistant shells hidden until reveal is requested', () => {

@@ -30,7 +30,7 @@ const mockWsInstance = {
 const MockWebSocket = jest.fn().mockImplementation(() => mockWsInstance);
 jest.mock('ws', () => MockWebSocket);
 
-import { CodexAppServerClient } from '../../../../../src/core/agents/backend/CodexAppServerClient';
+import { CodexAppServerClient } from '../../../../../src/core/agents/backend/codex/CodexAppServerClient';
 
 function createMockProcess(): ReturnType<typeof SpawnFn> {
   const proc = new EventEmitter() as unknown as ReturnType<typeof SpawnFn>;

@@ -22,7 +22,7 @@
 ## 关联 TS 组件
 
 - `src/features/chat/OpenCodianView.ts`
-- `src/features/chat/services/ConversationHistoryActionsCoordinator.ts`
+- `src/features/chat/services/conversation/ConversationHistoryActionsCoordinator.ts`
 
 ## 修改注意点
 

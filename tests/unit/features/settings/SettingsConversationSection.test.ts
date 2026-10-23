@@ -4,7 +4,7 @@ import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 
 import { DEFAULT_SETTINGS, normalizeChatVimNavigationKeys } from '../../../../src/core/types';
-import { SettingsConversationSection } from '../../../../src/features/settings/SettingsConversationSection';
+import { SettingsConversationSection } from '../../../../src/features/settings/general/SettingsConversationSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 

@@ -11,7 +11,7 @@ import {
   CLAUDE_HOOK_HANDLER_TYPES,
   CLAUDE_HOOK_SCHEMA_EVIDENCE,
   CLAUDE_HOOK_TYPE_FIELDS,
-} from '../../../../../src/core/agents/backend/ClaudeSettingsHookSchema';
+} from '../../../../../src/core/agents/backend/claude/ClaudeSettingsHookSchema';
 
 describe('ClaudeSettingsHookSchema catalog', () => {
   it('exposes the precise 30-event / 5-handler catalog from CLI 2.1.204', () => {

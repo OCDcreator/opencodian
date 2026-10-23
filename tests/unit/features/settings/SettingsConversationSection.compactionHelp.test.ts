@@ -2,9 +2,9 @@ import type { App } from 'obsidian';
 import { Setting } from 'obsidian';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
-import { ConversationCompactionHelpModal } from '../../../../src/features/settings/ConversationCompactionHelpModal';
-import { OpenCodeProjectConfigHelpModal } from '../../../../src/features/settings/OpenCodeProjectConfigHelpModal';
-import { SettingsConversationSection } from '../../../../src/features/settings/SettingsConversationSection';
+import { OpenCodeProjectConfigHelpModal } from '../../../../src/features/settings/backends/opencode/OpenCodeProjectConfigHelpModal';
+import { ConversationCompactionHelpModal } from '../../../../src/features/settings/general/ConversationCompactionHelpModal';
+import { SettingsConversationSection } from '../../../../src/features/settings/general/SettingsConversationSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 

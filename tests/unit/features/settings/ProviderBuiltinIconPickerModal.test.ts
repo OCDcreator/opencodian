@@ -1,4 +1,4 @@
-import { ProviderBuiltinIconPickerModal } from '../../../../src/features/settings/ProviderBuiltinIconPickerModal';
+import { ProviderBuiltinIconPickerModal } from '../../../../src/features/settings/models/icons/ProviderBuiltinIconPickerModal';
 import { setLocale } from '../../../../src/i18n';
 import { ProviderIconService } from '../../../../src/utils/icons/ProviderIconService';
 

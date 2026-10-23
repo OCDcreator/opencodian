@@ -7,7 +7,7 @@ import {
   readBackendSessionsCatalog,
 } from '../../../../../src/core/agents/backend/AgentBackendRouting';
 import type { AgentServiceRegistry } from '../../../../../src/core/agents/backend/AgentServiceRegistry';
-import { OpenCode2Adapter } from '../../../../../src/core/agents/backend/OpenCode2Adapter';
+import { OpenCode2Adapter } from '../../../../../src/core/agents/backend/opencode/OpenCode2Adapter';
 
 function adapterWithList(list: (request: { cursor?: string }) => Promise<unknown>): OpenCode2Adapter {
   const adapter = new OpenCode2Adapter({

@@ -5,7 +5,7 @@ import type {
 import {
   ConversationAuthoritativeSyncCoordinator,
   type ConversationAuthoritativeSyncHost,
-} from '../../../../src/features/chat/services/ConversationAuthoritativeSyncCoordinator';
+} from '../../../../src/features/chat/services/sync/ConversationAuthoritativeSyncCoordinator';
 import { OpenCodeService } from '../../core/opencode/OpenCodeService.testSupport';
 
 type Mocked<T> = {

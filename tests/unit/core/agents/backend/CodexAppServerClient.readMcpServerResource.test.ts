@@ -27,7 +27,7 @@ jest.mock('path', () => ({
   join: (...args: string[]) => args.join('/'),
 }));
 
-import { CodexAppServerClient } from '../../../../../src/core/agents/backend/CodexAppServerClient';
+import { CodexAppServerClient } from '../../../../../src/core/agents/backend/codex/CodexAppServerClient';
 
 function createMockProcess(): ReturnType<typeof SpawnFn> {
   const proc = new EventEmitter() as unknown as ReturnType<typeof SpawnFn>;

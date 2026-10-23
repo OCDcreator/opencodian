@@ -1,6 +1,6 @@
 import type { QuestionRequest, QuestionResolution } from '../../../../src/core/types';
-import { renderAssistantPlainTextFallbackContent } from '../../../../src/features/chat/runtime/AssistantPlainTextFallbackRenderer';
-import { buildQuestionResolutionCardRenderPlan } from '../../../../src/features/chat/runtime/QuestionResolutionCardRenderer';
+import { renderAssistantPlainTextFallbackContent } from '../../../../src/features/chat/runtime/rendering/AssistantPlainTextFallbackRenderer';
+import { buildQuestionResolutionCardRenderPlan } from '../../../../src/features/chat/runtime/rendering/QuestionResolutionCardRenderer';
 import type { MarkdownRenderService } from '../../../../src/utils/markdown';
 
 function createQuestionRequest(): QuestionRequest {

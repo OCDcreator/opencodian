@@ -17,7 +17,7 @@ import { IMPLEMENTED_AGENT_BACKENDS } from '../../../../../src/core/agents/backe
 import { wireHiddenAdapters } from '../../../../../src/core/agents/backend/AgentAdapterWiring';
 import type { Disposable } from '../../../../../src/core/agents/backend/AgentService';
 import { AgentServiceRegistry } from '../../../../../src/core/agents/backend/AgentServiceRegistry';
-import { CodexAdapter } from '../../../../../src/core/agents/backend/CodexAdapter';
+import { CodexAdapter } from '../../../../../src/core/agents/backend/codex/CodexAdapter';
 import type { CodexTracePort } from '../../../../../src/core/agents/backend/diagnostics/types';
 import type { AgentBackendKind } from '../../../../../src/core/types/chat';
 

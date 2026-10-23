@@ -9,7 +9,7 @@ import type {
 import {
   ConversationSessionSettingsCoordinator,
   type ConversationSessionSettingsCoordinatorHost,
-} from '../../../../src/features/chat/services/ConversationSessionSettingsCoordinator';
+} from '../../../../src/features/chat/services/conversation/ConversationSessionSettingsCoordinator';
 
 jest.mock('../../../../src/core/agents/backend/AgentBackendRouting', () => ({
   readBackendSessionShareUrl: jest.fn().mockResolvedValue(null),
@@ -252,7 +252,7 @@ describe('ConversationSessionSettingsCoordinator share URL routing', () => {
 describe('ConversationSessionSettingsCoordinator Session-import audit', () => {
   const coordinatorPath = path.resolve(
     __dirname,
-    '../../../../src/features/chat/services/ConversationSessionSettingsCoordinator.ts',
+    '../../../../src/features/chat/services/conversation/ConversationSessionSettingsCoordinator.ts',
   );
   let source: string;
 

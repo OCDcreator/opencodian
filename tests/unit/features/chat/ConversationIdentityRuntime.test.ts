@@ -2,7 +2,7 @@ import type { ChatMessage, Conversation } from '../../../../src/core/types';
 import {
   ConversationIdentityRuntime,
   type ConversationIdentityRuntimeHost,
-} from '../../../../src/features/chat/services/ConversationIdentityRuntime';
+} from '../../../../src/features/chat/services/conversation/ConversationIdentityRuntime';
 
 type MockedHost = {
   [Key in keyof ConversationIdentityRuntimeHost]: ConversationIdentityRuntimeHost[Key] extends (

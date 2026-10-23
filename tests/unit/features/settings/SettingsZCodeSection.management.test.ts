@@ -1,7 +1,7 @@
 import { Setting, type ToggleComponent } from 'obsidian';
 
 import type { ZCodeManagementCatalog } from '../../../../src/core/agents/backend/zcode';
-import { type SettingsZCodeHost, SettingsZCodeSection } from '../../../../src/features/settings/SettingsZCodeSection';
+import { type SettingsZCodeHost, SettingsZCodeSection } from '../../../../src/features/settings/backends/zcode/SettingsZCodeSection';
 
 const catalog: ZCodeManagementCatalog = {
   configuration: { state: 'available', targetPath: '/vault/.zcode/config.json', revision: { canonicalPath: '/vault/.zcode/config.json', mtimeMs: 1, size: 2, sha256: 'abc' }, pluginOverrideCount: 0, mcpDeclarationCount: 0, hookDeclarationCount: 2 },

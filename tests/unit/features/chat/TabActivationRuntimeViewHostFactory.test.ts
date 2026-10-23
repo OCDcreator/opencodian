@@ -2,7 +2,7 @@ import type { Conversation } from '../../../../src/core/types';
 import {
   createTabActivationRuntimeViewHosts,
   type TabActivationRuntimeViewHostFactoryHost,
-} from '../../../../src/features/chat/services/TabActivationRuntimeViewHostFactory';
+} from '../../../../src/features/chat/services/conversation/TabActivationRuntimeViewHostFactory';
 
 type Mocked<T> = {
   [Key in keyof T]:

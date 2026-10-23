@@ -1,9 +1,9 @@
 import type { CodexAuthMode } from '../../../../../src/core/agents/backend/BackendModelCatalog';
-import type { CodexModelSummary } from '../../../../../src/core/agents/backend/CodexAdapter';
+import type { CodexModelSummary } from '../../../../../src/core/agents/backend/codex/CodexAdapter';
 import {
   CodexChatSurfaceBinding,
   type CodexChatSurfaceBindingHost,
-} from '../../../../../src/features/chat/services/CodexChatSurfaceBinding';
+} from '../../../../../src/features/chat/services/integrations/CodexChatSurfaceBinding';
 
 jest.mock('obsidian', () => ({
   Notice: class {

@@ -4,7 +4,7 @@ import { MarkdownView } from 'obsidian';
 import {
   FocusContextEventBridge,
   type FocusContextEventBridgeHost,
-} from '../../../../src/features/chat/services/FocusContextEventBridge';
+} from '../../../../src/features/chat/services/context/FocusContextEventBridge';
 
 type Mocked<T> = {
   [Key in keyof T]:

@@ -1,0 +1,42 @@
+# ModifiedFilesSidebarCoordinator
+> 2026-09-21 (advantage-parity R-F2)：`refresh` 额外转发只读 linked-note `{path, exists}` 显示状态；它不将绑定路径转换为 SessionDiffEntry，也不伪造文件数或行统计。
+> 2026-09-18 (R-B3): R-B3: `refreshRevertState(model, actions)` passes the backend-neutral `EditRevertSidebarModel` and the revert/restore callbacks through to the sidebar.
+
+> **源码**: `src/features/chat/services/conversation/ModifiedFilesSidebarCoordinator.ts`
+> **状态**: [REVIEW]
+
+## 概述
+
+`ModifiedFilesSidebarCoordinator` owns the modified-files sidebar lifecycle for the chat surface. It keeps the right-edge entry and panel instance together so `OpenCodianView` only delegates mount/refresh/destroy calls.
+
+## 公开接口
+
+```ts
+export class ModifiedFilesSidebarCoordinator {
+  mountSidebar(parentEl: HTMLElement, app: App): void;
+  refresh(sessionId: string | null, getEntries: (id: string) => SessionDiffEntry[] | Promise<SessionDiffEntry[]>, availability?: 'ready' | 'unavailable', persistedMessages?: readonly ChatMessage[]): void;
+  destroy(): void;
+}
+```
+
+## 关键行为
+
+- `mountSidebar()` replaces any existing `ModifiedFilesSidebar` before mounting into the nearest Chat `.opencodian-container`, so its percentage sizing and right inset resolve against the sidebar boundary rather than the wider workspace leaf.
+- `refresh()` reads the canonical cached `session.diff` through the injected session lookup when a session is available. A non-empty canonical cache always wins.
+- OpenCode 2 supplies an asynchronous native `session.diff` read. While it is pending the panel shows unavailable; an array result is authoritative even when empty after revert. A `null` result means native snapshots are unavailable (for example, a non-Git vault) and permits the persisted turn-record fallback. A rejected read stays unavailable instead of showing an old turn snapshot as current state.
+- Every refresh, remount and destroy invalidates older asynchronous results. A late diff from another tab/session cannot repaint the current sidebar.
+- Persisted records marked with a background child task ID add their files to the current session projection after the parent canonical read. A repeated path uses the latest child record, while the immutable parent and child cards remain separate.
+- When the canonical cache is empty and availability is `ready`, `refresh()` rebuilds the current Session Change Sidebar from persisted `turn-diff` Turn Change Records. It keeps the latest entry for each file while preserving stable first-seen file order, so repeated turns do not inflate the file count.
+- Capability gating affects whether canonical or persisted entries can be read, not whether the configured entry is discoverable. `unavailable` never exposes persisted OpenCode fallback data.
+- `destroy()` clears the sidebar and all DOM references for view close or navigation sidebar rebuild.
+
+## 边界
+
+- The coordinator does not decide the active conversation; callers pass the active session id.
+- The coordinator does not own canonical diff storage; OpenCode 1 uses `OpenCodeService.getCachedSessionDiffEntries()` with persisted Turn Change Records as fallback evidence, while OpenCode 2 reads its native diff directly.
+- `ModifiedFilesSidebar` still owns item rendering and file-open behavior.
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/features/chat/services/conversation/ModifiedFilesSidebarCoordinator.ts`。
+- 原位置：`src/features/chat/services/ModifiedFilesSidebarCoordinator.ts`；文件名、导出接口与业务职责保持不变。

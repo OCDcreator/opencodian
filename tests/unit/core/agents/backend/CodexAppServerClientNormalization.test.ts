@@ -8,14 +8,14 @@ import { describe, expect, it } from '@jest/globals';
 import {
   normalizeThreadItemsPageToPreviewMessages,
   normalizeTurnsPageToPreviewMessages,
-} from '../../../../../src/core/agents/backend/CodexAppServerClientNormalization';
+} from '../../../../../src/core/agents/backend/codex/CodexAppServerClientNormalization';
 import type {
   AppServerItem,
   AppServerThreadItemEntry,
   AppServerThreadItemsPage,
   AppServerThreadTurnsPage,
   AppServerTurn,
-} from '../../../../../src/core/agents/backend/CodexAppServerClientTypes';
+} from '../../../../../src/core/agents/backend/codex/CodexAppServerClientTypes';
 
 function makeTurn(id: string, items: AppServerItem[]): AppServerTurn {
   return { id, items };
@@ -56,7 +56,7 @@ describe('normalizeTurnsPageToPreviewMessages', () => {
   });
 
   it('matches the flat normalizeTurnsToPreviewMessages output shape exactly', async () => {
-    const { normalizeTurnsToPreviewMessages } = await import('../../../../../src/core/agents/backend/CodexAppServerClientNormalization');
+    const { normalizeTurnsToPreviewMessages } = await import('../../../../../src/core/agents/backend/codex/CodexAppServerClientNormalization');
     const turns = [
       makeTurn('turn-1', [
         { type: 'userMessage', id: 'u1', content: [{ type: 'text', text: 'q' }] },

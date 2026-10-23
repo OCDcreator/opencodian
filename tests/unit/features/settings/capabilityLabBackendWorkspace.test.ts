@@ -1,4 +1,4 @@
-import { createCapabilityLabBackendWorkspace } from '../../../../src/features/settings/capabilityLabBackendWorkspace';
+import { createCapabilityLabBackendWorkspace } from '../../../../src/features/settings/capabilities/capabilityLabBackendWorkspace';
 
 describe('createCapabilityLabBackendWorkspace', () => {
   it('accepts a future descriptor id and keeps raw identity out of generated DOM ids', () => {

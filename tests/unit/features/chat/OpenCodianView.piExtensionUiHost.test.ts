@@ -2,7 +2,7 @@ import type { App } from 'obsidian';
 
 import type { Conversation } from '../../../../src/core/types';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
-import { presentPiUiRequest } from '../../../../src/features/chat/services/PiExtensionUiHost';
+import { presentPiUiRequest } from '../../../../src/features/chat/services/integrations/PiExtensionUiHost';
 
 interface ViewSeams {
   createTabActivationRuntimeHostProviderHost(): { setCurrentConversation(conversation: Conversation | null): void };

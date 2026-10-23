@@ -1,8 +1,8 @@
-import type { ConversationHydrationRenderPort } from '../../../../src/features/chat/runtime/ConversationHydrationRenderBridge';
+import type { ConversationHydrationRenderPort } from '../../../../src/features/chat/runtime/activation/ConversationHydrationRenderBridge';
 import {
   ConversationTransitionBridge,
   type ConversationTransitionBridgeHost,
-} from '../../../../src/features/chat/runtime/ConversationTransitionBridge';
+} from '../../../../src/features/chat/runtime/activation/ConversationTransitionBridge';
 
 type MockedConversationHydrationRenderPort = {
   [Key in keyof ConversationHydrationRenderPort]:

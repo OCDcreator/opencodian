@@ -2,7 +2,7 @@ import {
   QuestionPostResolutionRuntimeFacade,
   type QuestionPostResolutionRuntimeFacadeHost,
   type QuestionPostResolutionRuntimeState,
-} from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
+} from '../../../../src/features/chat/services/questions/QuestionPostResolutionRuntimeFacade';
 import type { TabId } from '../../../../src/features/chat/tabs';
 
 type Mocked<T> = {

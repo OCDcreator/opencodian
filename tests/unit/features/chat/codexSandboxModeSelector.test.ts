@@ -15,7 +15,7 @@ import {
   createCodexSandboxConfig,
   PermissionModeSelectorCoordinator,
   type PermissionModeSelectorHost,
-} from '../../../../src/features/chat/services/PermissionModeSelectorCoordinator';
+} from '../../../../src/features/chat/services/selection/PermissionModeSelectorCoordinator';
 
 describe('Codex sandbox mode selector', () => {
   describe('createCodexSandboxConfig', () => {

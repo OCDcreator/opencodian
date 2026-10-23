@@ -1,4 +1,4 @@
-import type { AppServerThreadGoal } from '../../../../src/core/agents/backend/CodexAppServerClient';
+import type { AppServerThreadGoal } from '../../../../src/core/agents/backend/codex/CodexAppServerClient';
 import {
   ConversationSessionSettingsModal,
 } from '../../../../src/features/chat/ui/ConversationSessionSettingsModal';

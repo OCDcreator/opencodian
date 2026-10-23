@@ -35,12 +35,12 @@ import type {
   BackendModelSelection,
 } from '../AgentAuxQueryCapability';
 import { AUX_DENIED_CAPABILITIES } from '../AgentAuxQueryCapability';
-import type { ClaudeCodeSpawnClaudeCodeProcess } from '../ClaudeCodeOptionsBuilder';
-import { type ClaudeCodeQueuedPrompt,createUserPrompt } from '../ClaudeCodeQueue';
+import type { ClaudeCodeSpawnClaudeCodeProcess } from '../claude/ClaudeCodeOptionsBuilder';
+import { type ClaudeCodeQueuedPrompt,createUserPrompt } from '../claude/ClaudeCodeQueue';
 import {
   createRendererSafeAbortController,
   type RendererSafeAbortController,
-} from '../ClaudeCodeSdkAbortShim';
+} from '../claude/ClaudeCodeSdkAbortShim';
 
 const logger = createLogger('ClaudeCodeAuxQuerySession');
 

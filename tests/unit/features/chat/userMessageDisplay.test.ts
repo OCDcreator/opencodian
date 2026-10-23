@@ -2,7 +2,7 @@ import {
   applyUserMessageTextHighlightSpans,
   extractUserMessageTextHighlightSpans,
   prepareUserMessageMarkdownForDisplay,
-} from '../../../../src/features/chat/userMessageDisplay';
+} from '../../../../src/features/chat/rendering/userMessageDisplay';
 
 describe('prepareUserMessageMarkdownForDisplay', () => {
   it('converts raw style blocks into css code fences', () => {

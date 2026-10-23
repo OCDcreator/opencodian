@@ -1,5 +1,5 @@
-import { enhanceSearchInput } from '../../../../src/features/settings/searchInputEnhancer';
-import { SettingsPopoverController } from '../../../../src/features/settings/SettingsPopoverController';
+import { enhanceSearchInput } from '../../../../src/features/settings/controls/searchInputEnhancer';
+import { SettingsPopoverController } from '../../../../src/features/settings/controls/SettingsPopoverController';
 import { setLocale } from '../../../../src/i18n';
 
 function mockRect(element: HTMLElement, rect: Partial<DOMRect>): void {

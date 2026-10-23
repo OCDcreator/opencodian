@@ -7,10 +7,10 @@ import { PI_CONFIG_COMMANDS, PI_RPC_COMMANDS, PI_SDK_COMMANDS } from "../../../.
 import type { PiLaunchOptions, PiRecord, PiRpcPort } from "../../../../../../src/core/agents/backend/pi/PiRpcClient";
 import { toPiChatMessages } from "../../../../../../src/core/agents/backend/pi/PiStreamMapper";
 import type { ChatMessage, Conversation, StreamChunk } from "../../../../../../src/core/types/chat";
-import { buildLocalStreamOutcome } from "../../../../../../src/features/chat/runtime/buildLocalStreamOutcome";
-import type { SendPipelineTabRuntime, StreamChunkRouterResult } from "../../../../../../src/features/chat/runtime/SendPipelineTypes";
-import { mergePiNativeConversationMessages } from '../../../../../../src/features/chat/services/ConversationAuthoritativeMessageMergeCoordinator';
-import type { PreparedMessageSend } from "../../../../../../src/features/chat/services/MessageSendPreparationService";
+import { buildLocalStreamOutcome } from "../../../../../../src/features/chat/runtime/send/buildLocalStreamOutcome";
+import type { SendPipelineTabRuntime, StreamChunkRouterResult } from "../../../../../../src/features/chat/runtime/send/SendPipelineTypes";
+import type { PreparedMessageSend } from "../../../../../../src/features/chat/services/send/MessageSendPreparationService";
+import { mergePiNativeConversationMessages } from '../../../../../../src/features/chat/services/sync/ConversationAuthoritativeMessageMergeCoordinator';
 
 const nativeRows: PiRecord[] = [
  {id:'prior-user',role:'user',content:'Prior'}, {id:'prior-assistant',role:'assistant',content:[{type:'text',text:'Prior answer'}],provider:'krill-gpt',model:'gpt-5.6-luna',timestamp:2},

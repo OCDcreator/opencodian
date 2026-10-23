@@ -9,7 +9,7 @@ import type { Conversation } from '../../../../src/core/types/chat';
 import {
   createMessageFinalizationHost,
   type MessageFinalizationHostDependencies,
-} from '../../../../src/features/chat/services/MessageFinalizationService';
+} from '../../../../src/features/chat/services/send/MessageFinalizationService';
 
 function createTestConversation(
   overrides: Partial<Conversation> = {},

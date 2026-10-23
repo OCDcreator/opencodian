@@ -127,3 +127,8 @@ Modal grid + breakdown bar + raw messages + notes
 
 - `ContextBreakdownSegment` 的 `key` 值由 `ContextUsageService.getContextBreakdown()` 返回，包含 system / history / context 等 key，每个 key 对应 i18n 翻译 `context.breakdown.{key}`
 - 与 `ContextUsageService` 各方法返回类型的精确映射：`summarize()` → `{ percentage, tone, ringLabel, tooltip, isUnavailable, isCompacting, contextWindow }`，`getDisplayTokenBreakdown()` → `{ total, input, output, reasoning, cacheRead, cacheWrite }`，`getContextBreakdown()` → `ContextBreakdownSegment[]`（每个含 `key`, `tokens`, `percent`, `width`）
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/features/chat/ui/ContextDetailModal.ts`。
+- 随目录调整更新的依赖：`src/features/chat/services/context/ContextUsageService.ts`。

@@ -6,7 +6,7 @@ import * as path from 'path';
 import {
   type ConfigurationAllowlist,
   readAllowlistedFileSnapshot,
-} from '../../../../../src/core/agents/backend/ProjectResourceSecureWrite';
+} from '../../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite';
 
 jest.mock('fs/promises', () => {
   const actual = jest.requireActual<typeof import('fs/promises')>('fs/promises');

@@ -19,7 +19,7 @@
 
 ```text
 上游: ./ModelConfigService, ./ModelCatalogStateService, ./OpencodeConfigManager, ./PluginManagementService
-下游: src/main.ts, src/features/settings/OpenCodianSettings.ts, src/features/settings/OpencodeConfigModal.ts
+下游: src/main.ts, src/features/settings/OpenCodianSettings.ts, src/features/settings/backends/opencode/OpencodeConfigModal.ts
 ```
 
 ## 公开导出
@@ -57,7 +57,7 @@ barrel 没有转发 `commandScopedAgent.ts`、`formatterConfig.ts`、`modelConfi
 
 - `src/main.ts` 通过它创建 `OpencodeConfigManager` 和 `ModelConfigService`
 - `src/features/settings/OpenCodianSettings.ts` 通过它创建 `ModelCatalogStateService`、`OpencodeConfigManager` 与 `PluginManagementService`
-- `src/features/settings/OpencodeConfigModal.ts` 通过它接收 `OpencodeConfigManager`
+- `src/features/settings/backends/opencode/OpencodeConfigModal.ts` 通过它接收 `OpencodeConfigManager`
 
 `ProviderDirectorySnapshot` 跟随 `ModelCatalogBundle` 从 `ModelConfigService` 暴露，供设置页读取 provider directory / connected 诊断状态。它不是 `modelConfig.ts` 的通用 helper，也不应被用来扩展聊天模型选择目录。
 

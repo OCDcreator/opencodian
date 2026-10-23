@@ -1,4 +1,4 @@
-import type { AppServerReviewResult } from '../../../../src/core/agents/backend/CodexAppServerClient';
+import type { AppServerReviewResult } from '../../../../src/core/agents/backend/codex/CodexAppServerClient';
 import {
   ConversationSessionSettingsModal,
 } from '../../../../src/features/chat/ui/ConversationSessionSettingsModal';

@@ -8,9 +8,9 @@ import type { Conversation } from '../../../../src/core/types';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
 import { ChatRuntimeComposition } from '../../../../src/features/chat/runtime/ChatRuntimeComposition';
-import type { SendPipelineHostDependencies } from '../../../../src/features/chat/runtime/SendPipelineRuntime';
-import { createChatDiagnosticsCoordinatorFactory } from '../../../../src/features/chat/services/ChatDiagnosticsCoordinator';
-import { ChatHeaderPresenter, type ChatHeaderPresenterHost } from '../../../../src/features/chat/services/ChatHeaderPresenter';
+import type { SendPipelineHostDependencies } from '../../../../src/features/chat/runtime/send/SendPipelineRuntime';
+import { createChatDiagnosticsCoordinatorFactory } from '../../../../src/features/chat/services/diagnostics/ChatDiagnosticsCoordinator';
+import { ChatHeaderPresenter, type ChatHeaderPresenterHost } from '../../../../src/features/chat/services/surface/ChatHeaderPresenter';
 import {
   createAsyncStream,
   createFinalizationPort,

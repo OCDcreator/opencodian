@@ -41,3 +41,8 @@
 保存结果的 runtime 轴仅表示 fresh native effective catalog 回读，不是插件执行证明。application 继续保持 pending；不会因为保存成功、目录匹配或已有独立验收记录而自动提升本次保存。说明明确区分新会话、当前进程内已加载会话以及重连后恢复的会话：新建/重新物化时按 workspace 路径加载当前项目配置，当前进程中已加载的会话保留启动快照。
 
 当前 macOS app-bundled 0.16.9 的受控 presentations:pptx 观察：off 的新会话实际 Skill 调用返回 Skill not found；on 的另一新会话实际 Skill 调用 completed，结果包含已安装技能正文。插件重载更换 owned app-server 进程后，UI 恢复原 off 会话，native ID 与原 4 条历史记录内容保持；该会话再调用技能 completed，返回结果与 on 新会话一致，并正确回忆旧回复标记。项目配置原缺席状态和临时插件设置均已恢复。此证据只覆盖该插件的技能加载功能，不代表 PPTX 生成、hooks/MCP 或其他 profile 完成；目录回读不能代替会话应用/执行检查。
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/core/agents/backend/zcode/ZCodeManagementService.ts`。
+- 随目录调整更新的依赖：`src/core/agents/backend/configuration/ProjectResourceSecureWrite.ts`。

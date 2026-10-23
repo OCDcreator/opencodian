@@ -1,5 +1,5 @@
 import { PI_OPTIONAL_RPC_COMMANDS, PI_RPC_COMMANDS, PI_SDK_COMMANDS } from '../../../../src/core/agents/backend/pi/PiProtocol';
-import { PI_WORKBENCH_GROUPS } from '../../../../src/features/settings/PiWorkbenchActions';
+import { PI_WORKBENCH_GROUPS } from '../../../../src/features/settings/backends/pi/PiWorkbenchActions';
 
 it('exposes every service capability exactly once through a labeled Pi workbench action', () => {
   const actions = Object.values(PI_WORKBENCH_GROUPS).flat();

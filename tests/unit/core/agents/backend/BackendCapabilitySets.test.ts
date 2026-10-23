@@ -1,9 +1,9 @@
 import { describe, expect, it } from '@jest/globals';
 
 import { AgentCapability } from '../../../../../src/core/agents/AgentCapability';
-import { DshAdapter } from '../../../../../src/core/agents/backend/DshAdapter';
-import { OpenCode2Adapter } from '../../../../../src/core/agents/backend/OpenCode2Adapter';
-import { OpenCodeAdapter } from '../../../../../src/core/agents/backend/OpenCodeAdapter';
+import { DshAdapter } from '../../../../../src/core/agents/backend/dsh/DshAdapter';
+import { OpenCode2Adapter } from '../../../../../src/core/agents/backend/opencode/OpenCode2Adapter';
+import { OpenCodeAdapter } from '../../../../../src/core/agents/backend/opencode/OpenCodeAdapter';
 import { PiAdapter } from '../../../../../src/core/agents/backend/pi/PiAdapter';
 import { ZCodeAdapter } from '../../../../../src/core/agents/backend/zcode/ZCodeAdapter';
 import type { OpenCodeService } from '../../../../../src/core/opencode/OpenCodeService';

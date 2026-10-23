@@ -1,6 +1,6 @@
 import { capturedNotices, clearCapturedNotices } from 'obsidian';
 
-import { MessageSendPreparationService } from '../../../../src/features/chat/services/MessageSendPreparationService';
+import { MessageSendPreparationService } from '../../../../src/features/chat/services/send/MessageSendPreparationService';
 import { buildContextAttachment } from '../../../../src/shared';
 import {
   createComposerSendContext,

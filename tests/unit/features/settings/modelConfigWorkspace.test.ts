@@ -6,7 +6,7 @@ import {
   hydrateWorkspaceState,
   isSafeProviderExtraOptionForVisualEditor,
   normalizeFetchedModelsFromResponse,
-} from '../../../../src/features/settings/modelConfigWorkspace';
+} from '../../../../src/features/settings/models/modelConfigWorkspace';
 
 beforeEach(() => {
   (requestUrl as jest.Mock).mockReset();

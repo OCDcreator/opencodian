@@ -1,8 +1,8 @@
 import type {
   LocalStreamOutcome,
   StreamShellFinalizerHost,
-} from '../../../../../src/features/chat/runtime/SendPipelineTypes';
-import { finalizeStreamingShell } from '../../../../../src/features/chat/runtime/StreamShellFinalizer';
+} from '../../../../../src/features/chat/runtime/send/SendPipelineTypes';
+import { finalizeStreamingShell } from '../../../../../src/features/chat/runtime/send/StreamShellFinalizer';
 
 function createHost(partial: Partial<StreamShellFinalizerHost> = {}): StreamShellFinalizerHost {
   return {
@@ -35,7 +35,7 @@ describe('finalizeStreamingShell', () => {
   it('returns removed when message element is null', async () => {
     const host = createHost();
     const outcome = createOutcome({ finalizedStreamingMessageEl: null });
-    const result = await finalizeStreamingShell({ host, preparedSend: {} as unknown as import("../../../../../src/features/chat/services/MessageSendPreparationService").PreparedMessageSend, outcome });
+    const result = await finalizeStreamingShell({ host, preparedSend: {} as unknown as import("../../../../../src/features/chat/services/send/MessageSendPreparationService").PreparedMessageSend, outcome });
     expect(result).toBe('removed');
   });
 
@@ -53,7 +53,7 @@ describe('finalizeStreamingShell', () => {
       structuredOutput: { response: '{"greeting": "hello"}' },
     });
 
-    const result = await finalizeStreamingShell({ host, preparedSend: {} as unknown as import("../../../../../src/features/chat/services/MessageSendPreparationService").PreparedMessageSend, outcome });
+    const result = await finalizeStreamingShell({ host, preparedSend: {} as unknown as import("../../../../../src/features/chat/services/send/MessageSendPreparationService").PreparedMessageSend, outcome });
     expect(result).toBe('timestamp-added');
     expect(host.addTimestampWithCopyButton).toHaveBeenCalledWith(expect.objectContaining({
       messageEl,
@@ -85,7 +85,7 @@ describe('finalizeStreamingShell', () => {
       structuredOutput: { response: '{"greeting": "hello"}' },
     });
 
-    await finalizeStreamingShell({ host, preparedSend: {} as unknown as import("../../../../../src/features/chat/services/MessageSendPreparationService").PreparedMessageSend, outcome });
+    await finalizeStreamingShell({ host, preparedSend: {} as unknown as import("../../../../../src/features/chat/services/send/MessageSendPreparationService").PreparedMessageSend, outcome });
     expect(contentEl.querySelectorAll('.streaming-text-block').length).toBe(0);
   });
 
@@ -109,7 +109,7 @@ describe('finalizeStreamingShell', () => {
       structuredOutput: { response: '{"greeting": "hello"}' },
     });
 
-    await finalizeStreamingShell({ host, preparedSend: {} as unknown as import("../../../../../src/features/chat/services/MessageSendPreparationService").PreparedMessageSend, outcome });
+    await finalizeStreamingShell({ host, preparedSend: {} as unknown as import("../../../../../src/features/chat/services/send/MessageSendPreparationService").PreparedMessageSend, outcome });
     expect(contentEl.querySelectorAll('.streaming-text-block').length).toBe(1);
     expect(textBlock.textContent).toBe('Hello world');
   });
@@ -134,7 +134,7 @@ describe('finalizeStreamingShell', () => {
       structuredOutput: undefined,
     });
 
-    await finalizeStreamingShell({ host, preparedSend: {} as unknown as import("../../../../../src/features/chat/services/MessageSendPreparationService").PreparedMessageSend, outcome });
+    await finalizeStreamingShell({ host, preparedSend: {} as unknown as import("../../../../../src/features/chat/services/send/MessageSendPreparationService").PreparedMessageSend, outcome });
     expect(contentEl.querySelectorAll('.streaming-text-block').length).toBe(1);
   });
 
@@ -157,7 +157,7 @@ describe('finalizeStreamingShell', () => {
       streamErrorNoticeMessage: errorNotice,
     });
 
-    const result = await finalizeStreamingShell({ host, preparedSend: {} as unknown as import("../../../../../src/features/chat/services/MessageSendPreparationService").PreparedMessageSend, outcome });
+    const result = await finalizeStreamingShell({ host, preparedSend: {} as unknown as import("../../../../../src/features/chat/services/send/MessageSendPreparationService").PreparedMessageSend, outcome });
     expect(result).toBe('error-notice-rendered');
     expect(host.renderAssistantPlaceholderAsNotice).toHaveBeenCalledWith(
       messageEl,
@@ -178,7 +178,7 @@ describe('finalizeStreamingShell', () => {
       finalizedModelId: 'claude-sonnet',
     });
 
-    const result = await finalizeStreamingShell({ host, preparedSend: {} as unknown as import("../../../../../src/features/chat/services/MessageSendPreparationService").PreparedMessageSend, outcome });
+    const result = await finalizeStreamingShell({ host, preparedSend: {} as unknown as import("../../../../../src/features/chat/services/send/MessageSendPreparationService").PreparedMessageSend, outcome });
     expect(result).toBe('interrupted-notice-rendered');
     expect(host.renderAssistantPlaceholderAsNotice).toHaveBeenCalledWith(
       messageEl,
@@ -203,7 +203,7 @@ describe('finalizeStreamingShell', () => {
       shouldPersistInterruptedState: false,
     });
 
-    const result = await finalizeStreamingShell({ host, preparedSend: {} as unknown as import("../../../../../src/features/chat/services/MessageSendPreparationService").PreparedMessageSend, outcome });
+    const result = await finalizeStreamingShell({ host, preparedSend: {} as unknown as import("../../../../../src/features/chat/services/send/MessageSendPreparationService").PreparedMessageSend, outcome });
     expect(result).toBe('removed');
     expect(parent.contains(messageEl)).toBe(false);
   });

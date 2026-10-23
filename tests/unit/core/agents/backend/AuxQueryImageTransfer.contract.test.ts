@@ -23,7 +23,7 @@ import {
 import { CodexAuxQuerySession } from '../../../../../src/core/agents/backend/auxiliary/CodexAuxQuerySession';
 import { OpenCodeAuxQuerySession } from '../../../../../src/core/agents/backend/auxiliary/OpenCodeAuxQuerySession';
 import type { OpenCodeAuxScope } from '../../../../../src/core/agents/backend/auxiliary/OpenCodeAuxScope';
-import type { AppServerTurnStartOptions } from '../../../../../src/core/agents/backend/CodexAppServerClientTypes';
+import type { AppServerTurnStartOptions } from '../../../../../src/core/agents/backend/codex/CodexAppServerClientTypes';
 import type { PiRecord } from '../../../../../src/core/agents/backend/pi/PiRpcClient';
 
 const IMAGE: AuxQueryImageAttachment = {

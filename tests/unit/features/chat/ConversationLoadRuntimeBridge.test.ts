@@ -1,7 +1,7 @@
 import {
   ConversationLoadRuntimeBridge,
   type ConversationLoadRuntimeBridgeHost,
-} from '../../../../src/features/chat/runtime/ConversationLoadRuntimeBridge';
+} from '../../../../src/features/chat/runtime/activation/ConversationLoadRuntimeBridge';
 
 function createConversation(id: string, title = `Chat ${id}`) {
   return {

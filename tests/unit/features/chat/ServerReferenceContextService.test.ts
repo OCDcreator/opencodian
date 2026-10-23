@@ -1,7 +1,7 @@
 import {
   type ServerReferenceContextCapabilityHost,
   ServerReferenceContextService,
-} from '../../../../src/features/chat/services/ServerReferenceContextService';
+} from '../../../../src/features/chat/services/context/ServerReferenceContextService';
 
 type MockCapabilityHost = jest.Mocked<ServerReferenceContextCapabilityHost>;
 

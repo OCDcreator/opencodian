@@ -1,6 +1,6 @@
 import type { QuestionRequest, QuestionResolution } from '../../../../src/core/types';
-import { renderAssistantStructuredContent } from '../../../../src/features/chat/runtime/AssistantStructuredContentRenderer';
-import { buildQuestionResolutionCardRenderPlan } from '../../../../src/features/chat/runtime/QuestionResolutionCardRenderer';
+import { renderAssistantStructuredContent } from '../../../../src/features/chat/runtime/rendering/AssistantStructuredContentRenderer';
+import { buildQuestionResolutionCardRenderPlan } from '../../../../src/features/chat/runtime/rendering/QuestionResolutionCardRenderer';
 
 function createQuestionRequest(): QuestionRequest {
   return {

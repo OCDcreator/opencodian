@@ -2,7 +2,7 @@ import type { Conversation } from '../../../../../src/core/types';
 import {
   ConversationSessionRailCoordinator,
   type ConversationSessionRailHost,
-} from '../../../../../src/features/chat/services/ConversationSessionRailCoordinator';
+} from '../../../../../src/features/chat/services/conversation/ConversationSessionRailCoordinator';
 import { setLocale, t } from '../../../../../src/i18n';
 
 function conversation(id: string, title: string, updatedAt = 1000): Conversation {

@@ -1,12 +1,12 @@
-import { PostSyncQuestionTodoRefreshFacade } from '../../../../src/features/chat/services/PostSyncQuestionTodoRefreshFacade';
+import { PostSyncQuestionTodoRefreshFacade } from '../../../../src/features/chat/services/questions/PostSyncQuestionTodoRefreshFacade';
 import type {
   PostSyncQuestionTodoRefreshPlanBuilder,
   VisibleConversationRefreshPlanOptions,
-} from '../../../../src/features/chat/services/PostSyncQuestionTodoRefreshPlanBuilder';
+} from '../../../../src/features/chat/services/questions/PostSyncQuestionTodoRefreshPlanBuilder';
 import type {
   PostSyncQuestionTodoStatusRefreshOptions,
   QuestionTodoStatusRefreshCoordinator,
-} from '../../../../src/features/chat/services/QuestionTodoStatusRefreshCoordinator';
+} from '../../../../src/features/chat/services/questions/QuestionTodoStatusRefreshCoordinator';
 
 type QuestionTodoStatusRefreshPort = Pick<
   QuestionTodoStatusRefreshCoordinator,

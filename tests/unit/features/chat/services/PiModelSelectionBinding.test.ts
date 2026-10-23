@@ -1,5 +1,5 @@
-import { ModelSelectionRuntime, type ModelSelectionRuntimeHost } from '../../../../../src/features/chat/services/ModelSelectionRuntime';
-import { bindPiModelSelection, savePiConversationSelection } from '../../../../../src/features/chat/services/PiModelSelectionBinding';
+import { ModelSelectionRuntime, type ModelSelectionRuntimeHost } from '../../../../../src/features/chat/services/selection/ModelSelectionRuntime';
+import { bindPiModelSelection, savePiConversationSelection } from '../../../../../src/features/chat/services/selection/PiModelSelectionBinding';
 
 function originalHost(): ModelSelectionRuntimeHost {
   return {

@@ -1,9 +1,9 @@
-import type { ClaudeSettingsSourceCandidate } from '../../../../src/core/agents/backend/ClaudeSettingsSourceService';
+import type { ClaudeSettingsSourceCandidate } from '../../../../src/core/agents/backend/claude/ClaudeSettingsSourceService';
 import {
   isConfigurationSourceSelectable,
   resolveConfigurationScopeSelection,
   SettingsClaudeConfigurationSection,
-} from '../../../../src/features/settings/SettingsClaudeConfigurationSection';
+} from '../../../../src/features/settings/backends/claude/SettingsClaudeConfigurationSection';
 import { candidate, fakePlugin, flushMicrotasks, stubService } from './SettingsClaudeConfigurationSection.testSupport';
 
 describe('SettingsClaudeConfigurationSection scope selection model', () => {

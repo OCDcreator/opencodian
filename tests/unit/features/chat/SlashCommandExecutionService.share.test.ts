@@ -4,7 +4,7 @@ import type { Conversation } from '../../../../src/core/types';
 import {
   type SlashCommandExecutionHost,
   SlashCommandExecutionService,
-} from '../../../../src/features/chat/services/SlashCommandExecutionService';
+} from '../../../../src/features/chat/services/commands/SlashCommandExecutionService';
 import { t } from '../../../../src/i18n';
 
 type MockedSlashCommandExecutionHost = {

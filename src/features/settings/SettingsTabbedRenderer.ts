@@ -9,40 +9,40 @@ import { type App, setIcon, Setting } from 'obsidian';
 import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
-import { renderAgentSwitcherFloatingIcons } from './AgentSwitcherFloatingIcons';
+import { SettingsStyleSection } from './appearance/SettingsStyleSection';
+import { SettingsAcpSection } from './backends/acp/SettingsAcpSection';
+import { SettingsClaudeCodeSection } from './backends/claude/SettingsClaudeCodeSection';
+import { SettingsCodexSection } from './backends/codex/SettingsCodexSection';
+import { SettingsBackendSection } from './backends/opencode/SettingsBackendSection';
+import { SettingsCommandsSection } from './backends/opencode/SettingsCommandsSection';
+import { SettingsServerSection } from './backends/opencode/SettingsServerSection';
+import { SettingsPiSection } from './backends/pi/SettingsPiSection';
+import { SettingsZCodeSection } from './backends/zcode/SettingsZCodeSection';
+import { SettingsCapabilityLabSection } from './capabilities/SettingsCapabilityLabSection';
+import { SettingsDebugSection } from './debug/SettingsDebugSection';
 import { createClaudeTraceDiagnosticsPort, createCodexTraceDiagnosticsPort, createOpenCodeTraceDiagnosticsPort } from './debug/types';
-import { SettingsAcpSection } from './SettingsAcpSection';
-import { SettingsAgentsSection } from './SettingsAgentsSection';
-import { SettingsBackendSection } from './SettingsBackendSection';
-import { SettingsCapabilityLabSection } from './SettingsCapabilityLabSection';
-import { SettingsClaudeCodeSection } from './SettingsClaudeCodeSection';
-import { SettingsCodexSection } from './SettingsCodexSection';
-import { SettingsCommandsSection } from './SettingsCommandsSection';
-import { SettingsContextGroupsSection } from './SettingsContextGroupsSection';
-import { SettingsConversationSection } from './SettingsConversationSection';
-import { SettingsDebugSection } from './SettingsDebugSection';
-import { SettingsFormatterSection } from './SettingsFormatterSection';
-import { SettingsImageGenerationSection } from './SettingsImageGenerationSection';
-import { SettingsInlineEditSection } from './SettingsInlineEditSection';
+import { SettingsConversationSection } from './general/SettingsConversationSection';
+import { SettingsFormatterSection } from './general/SettingsFormatterSection';
+import { SettingsImageGenerationSection } from './general/SettingsImageGenerationSection';
+import { SettingsInlineEditSection } from './general/SettingsInlineEditSection';
+import { SettingsPluginSection } from './general/SettingsPluginSection';
+import { SettingsRemoteControlSection } from './general/SettingsRemoteControlSection';
+import { SettingsSecuritySection } from './general/SettingsSecuritySection';
+import { SettingsUiSection } from './general/SettingsUiSection';
+import { SettingsMcpSection } from './mcp/SettingsMcpSection';
+import { SettingsModelSection } from './models/SettingsModelSection';
+import { renderAgentSwitcherFloatingIcons } from './resources/AgentSwitcherFloatingIcons';
+import { SettingsAgentsSection } from './resources/SettingsAgentsSection';
+import { SettingsContextGroupsSection } from './resources/SettingsContextGroupsSection';
+import { SettingsSkillSection } from './resources/SettingsSkillSection';
+import { SettingsToolSection } from './resources/SettingsToolSection';
 import {
   getActiveSecondaryTabId,
   resolvePrimaryTabId,
   resolveSecondaryTabId,
   SETTINGS_PRIMARY_TABS,
 } from './settingsLayoutRegistry';
-import { SettingsMcpSection } from './SettingsMcpSection';
-import { SettingsModelSection } from './SettingsModelSection';
-import { SettingsPiSection } from './SettingsPiSection';
-import { SettingsPluginSection } from './SettingsPluginSection';
-import { SettingsRemoteControlSection } from './SettingsRemoteControlSection';
-import { SettingsSecuritySection } from './SettingsSecuritySection';
-import { SettingsServerSection } from './SettingsServerSection';
-import { SettingsSkillSection } from './SettingsSkillSection';
-import { SettingsStyleSection } from './SettingsStyleSection';
 import { refreshSettingsTabbedHeader } from './SettingsTabbedHeader';
-import { SettingsToolSection } from './SettingsToolSection';
-import { SettingsUiSection } from './SettingsUiSection';
-import { SettingsZCodeSection } from './SettingsZCodeSection';
 
 interface SettingHelpButtonConfig {
   tooltip: string;

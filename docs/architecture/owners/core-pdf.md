@@ -47,3 +47,9 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 A new owner was registered because the candidate hosts genuinely cannot take the subsystem: `core.memory` hosts note-token indexes (grafting pdf.js extraction, viewer probing and sidecar formatting there would mix an already-medium-risk owner with a version-sensitive dependency); `core.storage` owns revert snapshots, not PDF extraction; `feature.chat-services` is a feature-layer consumer and must not own a core engine loader. The design (flowtext-c4-design §3.0) sanctioned `core.pdf` for exactly this isolation: a real subsystem (extraction, caching, probing) wrapping a high-risk, version-sensitive dependency — the sanctioned exception to the "no new layers" rule, not a thin adapter.
 
 2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `core.pdf` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/core/pdf`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

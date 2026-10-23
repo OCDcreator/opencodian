@@ -5,7 +5,7 @@ import {
   restoreElementScrollAfterRender,
   scrollElementToBottom,
   SettledScrollScheduler,
-} from '../../../../src/features/chat/services/ScrollManager';
+} from '../../../../src/features/chat/services/rendering/ScrollManager';
 
 function installScrollMetrics(
   element: HTMLElement,

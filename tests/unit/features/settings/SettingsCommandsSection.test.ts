@@ -8,7 +8,7 @@ import type {
   OpencodeCommandConfigRecord,
   SlashCommandSkillMode,
 } from '../../../../src/core/types';
-import { SettingsCommandsSection } from '../../../../src/features/settings/SettingsCommandsSection';
+import { SettingsCommandsSection } from '../../../../src/features/settings/backends/opencode/SettingsCommandsSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 

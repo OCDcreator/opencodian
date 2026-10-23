@@ -8,8 +8,8 @@ import {
   createPostSyncQuestionTodoRefreshHosts,
   createPostSyncQuestionTodoRefreshServices,
   type PostSyncQuestionTodoRefreshViewHost,
-} from '../../../../src/features/chat/services/PostSyncQuestionTodoRefreshHostAdapter';
-import type { QuestionTodoStatusRefreshRuntime } from '../../../../src/features/chat/services/QuestionTodoStatusRefreshCoordinator';
+} from '../../../../src/features/chat/services/questions/PostSyncQuestionTodoRefreshHostAdapter';
+import type { QuestionTodoStatusRefreshRuntime } from '../../../../src/features/chat/services/questions/QuestionTodoStatusRefreshCoordinator';
 
 type Mocked<T> = {
   [Key in keyof T]:

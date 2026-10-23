@@ -2,10 +2,10 @@ import { type App, Setting } from 'obsidian';
 
 import type { PiAdapter } from '../../../../src/core/agents/backend/pi/PiAdapter';
 import { DEFAULT_SETTINGS, getDefaultClaudeCodeBackendSettings } from '../../../../src/core/types';
-import { PI_WORKBENCH_GROUPS } from '../../../../src/features/settings/PiWorkbenchActions';
-import { PiWorkbenchModal } from '../../../../src/features/settings/PiWorkbenchModal';
-import { SettingsClaudeCodeSection } from '../../../../src/features/settings/SettingsClaudeCodeSection';
-import { SettingsPiConfigurationSection } from '../../../../src/features/settings/SettingsPiConfigurationSection';
+import { SettingsClaudeCodeSection } from '../../../../src/features/settings/backends/claude/SettingsClaudeCodeSection';
+import { PI_WORKBENCH_GROUPS } from '../../../../src/features/settings/backends/pi/PiWorkbenchActions';
+import { PiWorkbenchModal } from '../../../../src/features/settings/backends/pi/PiWorkbenchModal';
+import { SettingsPiConfigurationSection } from '../../../../src/features/settings/backends/pi/SettingsPiConfigurationSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 

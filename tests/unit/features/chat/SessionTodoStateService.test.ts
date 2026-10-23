@@ -3,7 +3,7 @@ import {
   type SessionTodoStateRuntime,
   SessionTodoStateService,
   type SessionTodoStateServiceHost,
-} from '../../../../src/features/chat/services/SessionTodoStateService';
+} from '../../../../src/features/chat/services/questions/SessionTodoStateService';
 import { t } from '../../../../src/i18n';
 
 type AppendPersistentNoticeOptions =

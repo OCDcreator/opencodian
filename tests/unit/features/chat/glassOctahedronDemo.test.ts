@@ -25,11 +25,11 @@ jest.mock('../../../../src/core/opencode', () => ({
   OpenCodeService: class OpenCodeService {},
 }));
 
-jest.mock('../../../../src/features/chat/glassOctahedronDemoThree', () => ({
+jest.mock('../../../../src/features/chat/demos/glassOctahedronDemoThree', () => ({
   createGlassOctahedronThreeRenderer: mockCreateRenderer,
 }));
 
-jest.mock('../../../../src/features/chat/glassOctahedronDemoRefraction', () => ({
+jest.mock('../../../../src/features/chat/demos/glassOctahedronDemoRefraction', () => ({
   buildGlassOctahedronBackdropFilterValue: mockBuildBackdropFilterValue,
   buildGlassOctahedronLightBackdropFilterValue: mockBuildLightBackdropFilterValue,
   detectGlassOctahedronBackdropSupport: mockDetectBackdropSupport,
@@ -45,9 +45,9 @@ import {
 } from '../../../../src/core/types';
 import {
   GLASS_OCTAHEDRON_DEMO_STAGE_SIZE,
-} from '../../../../src/features/chat/glassOctahedronDemo';
+} from '../../../../src/features/chat/demos/glassOctahedronDemo';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
-import { ChatVisualDemoCoordinator } from '../../../../src/features/chat/services/ChatVisualDemoCoordinator';
+import { ChatVisualDemoCoordinator } from '../../../../src/features/chat/services/demos/ChatVisualDemoCoordinator';
 
 type GlassOctahedronViewHarness = OpenCodianView & {
   chatContainerEl: HTMLElement | null;

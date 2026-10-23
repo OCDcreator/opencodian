@@ -6,14 +6,14 @@
 
 - **Layer:** `feature` (may import layers: shared, core, feature)
 - **Risk:** medium
-- **Include:** `src/features/settings/SettingsClaudeCodeSection.ts`, `src/features/settings/SettingsClaudeConfigurationSection.ts`, `src/features/settings/SettingsClaudeProviderMetadataPersistenceCoordinator.ts`, `src/features/settings/SettingsClaudeProvidersSection.ts`, `src/features/settings/SettingsClaudeResourcesSection.ts`, `src/features/settings/ClaudeCodeHelpModal.ts`, `src/features/settings/ClaudeSettingsCommonFieldsPresenter.ts`, `src/features/settings/ClaudeSettingsContextSourcesPresenter.ts`, `src/features/settings/ClaudeSettingsHookFieldControls.ts`, `src/features/settings/ClaudeSettingsHooksBuilder.ts`, `src/features/settings/ClaudeSettingsMutationController.ts`
+- **Include:** `src/features/settings/backends/claude/SettingsClaudeCodeSection.ts`, `src/features/settings/backends/claude/SettingsClaudeConfigurationSection.ts`, `src/features/settings/backends/claude/SettingsClaudeProviderMetadataPersistenceCoordinator.ts`, `src/features/settings/backends/claude/SettingsClaudeProvidersSection.ts`, `src/features/settings/backends/claude/SettingsClaudeResourcesSection.ts`, `src/features/settings/backends/claude/ClaudeCodeHelpModal.ts`, `src/features/settings/backends/claude/ClaudeSettingsCommonFieldsPresenter.ts`, `src/features/settings/backends/claude/ClaudeSettingsContextSourcesPresenter.ts`, `src/features/settings/backends/claude/ClaudeSettingsHookFieldControls.ts`, `src/features/settings/backends/claude/ClaudeSettingsHooksBuilder.ts`, `src/features/settings/backends/claude/ClaudeSettingsMutationController.ts`
 
 ## Responsibilities
 - Claude settings sections, configuration, provider metadata, resources
 - Claude settings hooks builder and mutation controller
 
 ## Entrypoints
-- `src/features/settings/SettingsClaudeCodeSection.ts`
+- `src/features/settings/backends/claude/SettingsClaudeCodeSection.ts`
 
 ## Dependency surface
 - **Allowed owner dependencies:** `shared.foundation`, `core.types`
@@ -48,3 +48,9 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 Settings edits persist without implicitly replacing the live Claude query. Explicit restart errors are visible and keep active queries. Runtime MCP status distinguishes `null` unavailable from authoritative `[]` empty. The settings surface owns copy/error presentation; ClaudeCodeAdapter owns executable validation and native lifecycle.
 
 2026-10-07 owner manifest 核对：新增 `shared.foundation` 的 `src/shared/sessionCatalogReadback.ts`，统一目录读取结果与错误分类。本 owner `feature.settings-claude` 的路径映射、职责、canonical state 和依赖约束经核对保持原定义；目录读取仍由 backend/lifecycle owners 调用共享契约。
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/features/settings/backends/claude`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

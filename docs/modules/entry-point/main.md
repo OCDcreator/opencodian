@@ -412,3 +412,8 @@ The plugin composition supplies Pi extension-command completion localization thr
 ## 2026-10-23 DSH backend
 
 插件组合层向 `wireHiddenAdapters` 注入 DSH 设置和 `dsh` 域环境变量，并将该域纳入环境指纹列表。子进程、协议和会话所有权留在 `DshAdapter`；`main.ts` 不另建 DSH 运行时，也不启动退役的 OpenCode 1。
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/main.ts`。
+- 随目录调整更新的依赖：`src/features/chat/services/integrations/PiExtensionUiHost.ts`、`src/core/agents/backend/claude/ClaudeCodeAdapter.ts`、`src/core/agents/backend/claude/ClaudeCodeElicitationBridge.ts`、`src/core/agents/backend/claude/ClaudeCodeMcpConfigAdapter.ts`、`src/core/agents/backend/claude/ClaudeCodeDefaultPermissionHost.ts`、`src/core/agents/backend/claude/ClaudeCodePermissionBridge.ts`、`src/core/agents/backend/claude/ClaudeCodeSdkLoader.ts`、`src/core/agents/backend/codex/CodexAdapter.ts`、`src/core/agents/backend/codex/CodexDefaultApprovalHost.ts`、`src/core/agents/backend/codex/CodexElicitationBridge.ts`、`src/features/chat/services/integrations/PdfChatIntegration.ts`、`src/features/chat/services/context/ContextFileCatalogIndex.ts`、`src/features/chat/services/send/TurnCompletionSoundService.ts`、`src/features/chat/services/context/WebViewerContextService.ts`、`src/features/chat/retrieval/RelevantNotesView.ts`、`src/features/chat/services/integrations/ImageGenerationChatController.ts`、`src/features/chat/services/diagnostics/ChatDiagnosticsCoordinator.ts`、`src/features/chat/services/context/ContextAttachmentBuilder.ts`。

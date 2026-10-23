@@ -9,7 +9,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import type { SlashCommandMenuItem } from '../../../../src/core/config/slashCommandCatalog';
-import { SlashCommandMenuCoordinator } from '../../../../src/features/chat/services/SlashCommandMenuCoordinator';
+import { SlashCommandMenuCoordinator } from '../../../../src/features/chat/services/commands/SlashCommandMenuCoordinator';
 
 function fakeTextarea(value = '/'): HTMLTextAreaElement {
   return {

@@ -1,8 +1,8 @@
-import type { ModelPickerOption } from '../../../../src/features/settings/modelPicker';
-import { ModelPickerModal } from '../../../../src/features/settings/ModelPickerModal';
-import { SettingsModelCatalogCoordinator } from '../../../../src/features/settings/SettingsModelCatalogCoordinator';
+import type { ModelPickerOption } from '../../../../src/features/settings/models/modelPicker';
+import { ModelPickerModal } from '../../../../src/features/settings/models/ModelPickerModal';
+import { SettingsModelCatalogCoordinator } from '../../../../src/features/settings/models/SettingsModelCatalogCoordinator';
 
-jest.mock('../../../../src/features/settings/ModelPickerModal', () => ({
+jest.mock('../../../../src/features/settings/models/ModelPickerModal', () => ({
   ModelPickerModal: jest.fn().mockImplementation((_app, options) => ({
     open: jest.fn(),
     options,

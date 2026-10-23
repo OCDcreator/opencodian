@@ -4,7 +4,7 @@ import * as fsp from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import * as projectResourceSecureWrite from '../../../../src/core/agents/backend/ProjectResourceSecureWrite';
+import * as projectResourceSecureWrite from '../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite';
 import {
   type ArchiveHistoryEntryIdentity,
   type FileRevision,
@@ -12,7 +12,7 @@ import {
   readAllowlistedFileSnapshot,
   safeDeleteFile,
   safeWriteFile,
-} from '../../../../src/core/agents/backend/ProjectResourceSecureWrite';
+} from '../../../../src/core/agents/backend/configuration/ProjectResourceSecureWrite';
 import { OpencodeConfigManager } from '../../../../src/core/config/OpencodeConfigManager';
 import {
   OpencodeConfigSourceService,

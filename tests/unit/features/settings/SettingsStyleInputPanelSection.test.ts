@@ -2,9 +2,9 @@ import type { App } from 'obsidian';
 import { Setting } from 'obsidian';
 
 import { DEFAULT_SETTINGS, getDefaultChatAppearanceSettings } from '../../../../src/core/types';
-import { LiquidGlassSettingHelpModal } from '../../../../src/features/settings/LiquidGlassSettingHelpModal';
-import { SettingsStyleInputPanelSection } from '../../../../src/features/settings/SettingsStyleInputPanelSection';
-import { SettingsStyleLiquidGlassInputControls } from '../../../../src/features/settings/SettingsStyleLiquidGlassInputControls';
+import { LiquidGlassSettingHelpModal } from '../../../../src/features/settings/appearance/LiquidGlassSettingHelpModal';
+import { SettingsStyleInputPanelSection } from '../../../../src/features/settings/appearance/SettingsStyleInputPanelSection';
+import { SettingsStyleLiquidGlassInputControls } from '../../../../src/features/settings/appearance/SettingsStyleLiquidGlassInputControls';
 import { setLocale } from '../../../../src/i18n';
 import { registerBuiltinGlassAdapters } from '../../../../src/utils/glass/builtin-adapters';
 

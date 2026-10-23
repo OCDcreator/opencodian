@@ -1,5 +1,5 @@
 import { getDefaultClaudeCodeBackendSettings } from '../../../../src/core/types';
-import { SettingsClaudeProvidersSection } from '../../../../src/features/settings/SettingsClaudeProvidersSection';
+import { SettingsClaudeProvidersSection } from '../../../../src/features/settings/backends/claude/SettingsClaudeProvidersSection';
 import { setLocale,t } from '../../../../src/i18n';
 
 jest.mock('../../../../src/core/agents/backend', () => ({

@@ -6,11 +6,11 @@ jest.mock('../../../../src/utils/editorSelectionHighlight', () => ({
   showSelectionHighlight: jest.fn(),
 }));
 
-import type { FocusContextPreview } from '../../../../src/features/chat/composerContext';
+import type { FocusContextPreview } from '../../../../src/features/chat/rendering/composerContext';
 import {
   RetainedSelectionHighlightService,
   type RetainedSelectionHighlightServiceHost,
-} from '../../../../src/features/chat/services/RetainedSelectionHighlightService';
+} from '../../../../src/features/chat/services/context/RetainedSelectionHighlightService';
 import {
   hideSelectionHighlight,
   showSelectionHighlight,

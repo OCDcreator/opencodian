@@ -7,7 +7,7 @@ import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
 import {
   ChatSelectionControlsCoordinator,
   type ChatSelectionControlsCoordinatorHost,
-} from '../../../../src/features/chat/services/ChatSelectionControlsCoordinator';
+} from '../../../../src/features/chat/services/selection/ChatSelectionControlsCoordinator';
 import type {
   ModelSelectorProvider,
   ModelSelectorSelection,

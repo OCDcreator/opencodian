@@ -1,4 +1,4 @@
-import { ChatHeaderPresenter, type ChatHeaderPresenterHost } from '../../../../src/features/chat/services/ChatHeaderPresenter';
+import { ChatHeaderPresenter, type ChatHeaderPresenterHost } from '../../../../src/features/chat/services/surface/ChatHeaderPresenter';
 
 function createHost(): jest.Mocked<ChatHeaderPresenterHost> {
   return {

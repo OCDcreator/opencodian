@@ -20,3 +20,8 @@ Codex 一侧 `CodexTraceEventV1` 把 `schemaVersion` 固定为 `CODEX_TRACE_SCHE
 
 - `ClaudeTracePort` 与 `CodexTracePort` 都是 adapter 依赖的窄接口；具体 service 自有的 store、redactor、ring 和 timer 不应泄漏进该契约。
 - `CLAUDE_TRACE_CHANNEL_IDS` 与 `CODEX_TRACE_CHANNEL_IDS` 是设置归一化重建 channel map 的唯一权威来源；新增 channel 必须同步 settings UI 与 locale。
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/core/agents/backend/diagnostics/types.ts`。
+- 随目录调整更新的依赖：`src/core/agents/backend/codex/CodexAppServerClientTypes.ts`。

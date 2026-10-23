@@ -1,7 +1,7 @@
 import { App } from 'obsidian';
 
 import { AgentServiceRegistry } from '../../../../src/core/agents/backend/AgentServiceRegistry';
-import { DshAdapter } from '../../../../src/core/agents/backend/DshAdapter';
+import { DshAdapter } from '../../../../src/core/agents/backend/dsh/DshAdapter';
 import { normalizeDshBackendSettings } from '../../../../src/core/types/settings';
 import { type BackendSessionBrowserHost, BackendSessionBrowserModal } from '../../../../src/features/chat/ui/BackendSessionBrowserModal';
 import { t } from '../../../../src/i18n';

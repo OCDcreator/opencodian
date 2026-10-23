@@ -7,9 +7,9 @@ import {
   type OpenCodeDiagnosticsMenu,
   type OpenCodeDiagnosticsMenuItem,
   type OpenCodeTraceServicePort,
-} from '../../../../src/features/chat/services/ChatDiagnosticsCoordinator';
-import type { ClaudeDiagnosticsHostAdapterHost } from '../../../../src/features/chat/services/ClaudeDiagnosticsHostAdapter';
-import type { CodexDiagnosticsHostAdapterHost } from '../../../../src/features/chat/services/CodexDiagnosticsHostAdapter';
+} from '../../../../src/features/chat/services/diagnostics/ChatDiagnosticsCoordinator';
+import type { ClaudeDiagnosticsHostAdapterHost } from '../../../../src/features/chat/services/diagnostics/ClaudeDiagnosticsHostAdapter';
+import type { CodexDiagnosticsHostAdapterHost } from '../../../../src/features/chat/services/diagnostics/CodexDiagnosticsHostAdapter';
 import { t } from '../../../../src/i18n';
 
 interface CapturedMenuItem {

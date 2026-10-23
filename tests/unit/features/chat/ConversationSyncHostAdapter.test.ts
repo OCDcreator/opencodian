@@ -3,14 +3,14 @@ import {
   type Conversation,
   createEmptyTabContextState,
 } from '../../../../src/core/types';
-import type { ConversationSyncBridgeSyncResult } from '../../../../src/features/chat/services/ConversationSyncBridge';
+import type { ConversationSyncBridgeSyncResult } from '../../../../src/features/chat/services/sync/ConversationSyncBridge';
 import {
   assembleConversationSyncRuntime,
   type ConversationSyncRuntimeAssemblyViewHost,
   type ConversationSyncViewHost,
   createConversationSyncHosts,
-} from '../../../../src/features/chat/services/ConversationSyncHostAdapter';
-import type { ConversationSyncSignalRuntime } from '../../../../src/features/chat/services/ConversationSyncOrchestrationService';
+} from '../../../../src/features/chat/services/sync/ConversationSyncHostAdapter';
+import type { ConversationSyncSignalRuntime } from '../../../../src/features/chat/services/sync/ConversationSyncOrchestrationService';
 import type { TabData } from '../../../../src/features/chat/tabs';
 
 type Mocked<T> = {

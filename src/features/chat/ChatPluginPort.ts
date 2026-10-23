@@ -1,8 +1,8 @@
 import type { App, PluginManifest } from 'obsidian';
 
 import type { AgentServiceRegistry } from '../../core/agents/backend/AgentServiceRegistry';
-import type { ClaudeCodePermissionBridgeHostContext } from '../../core/agents/backend/ClaudeCodeDefaultPermissionHost';
-import type { CodexApprovalHostContext } from '../../core/agents/backend/CodexDefaultApprovalHost';
+import type { ClaudeCodePermissionBridgeHostContext } from '../../core/agents/backend/claude/ClaudeCodeDefaultPermissionHost';
+import type { CodexApprovalHostContext } from '../../core/agents/backend/codex/CodexDefaultApprovalHost';
 import type {
   ModelConfigService,
   ModelPricingService,
@@ -13,7 +13,7 @@ import type { OpenCodianSettingsRuntimeCoordinator } from '../../core/runtime/Op
 import type { Conversation, EditRevertServicePort, OpenCodianSettings } from '../../core/types';
 import type { AgentBackendKind } from '../../core/types/chat';
 import type { OpenCodianSettingTab } from '../settings/OpenCodianSettings';
-import type { TabRuntimePluginSource } from './services/ConversationTabRuntimeCoordinator';
+import type { TabRuntimePluginSource } from './services/conversation/ConversationTabRuntimeCoordinator';
 
 type ConversationCachePinProvider = () => Iterable<string>;
 

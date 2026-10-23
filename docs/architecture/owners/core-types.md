@@ -83,3 +83,9 @@ OpenCode 2 has a separate backend identity and normalized connection settings; p
 ## 2026-10-23 DSH identity and settings
 
 本 owner 增加 `AgentBackendKind.dsh` 和 `BackendSettings.dsh` 的默认/归一化契约。启动路径、工作目录、参数和环境归设置持久化所有；ACP 连接/会话状态仍归 core.backend。旧配置补齐 DSH 默认结构，但不自动启用新后端或改写既有会话 owner。
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/core/types`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

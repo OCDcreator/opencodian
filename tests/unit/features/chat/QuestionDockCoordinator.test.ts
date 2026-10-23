@@ -4,18 +4,18 @@ import {
   QuestionDockCoordinator,
   type QuestionDockCoordinatorHost,
   type QuestionDockRuntimeState,
-} from '../../../../src/features/chat/services/QuestionDockCoordinator';
+} from '../../../../src/features/chat/services/questions/QuestionDockCoordinator';
 import {
   QuestionDockRenderStateFacade,
   type QuestionDockRenderStateFacadeHost,
-} from '../../../../src/features/chat/services/QuestionDockRenderStateFacade';
-import { QuestionDockResolutionActionFacade } from '../../../../src/features/chat/services/QuestionDockResolutionActionFacade';
-import type { QuestionPostResolutionRuntimeFacade } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
+} from '../../../../src/features/chat/services/questions/QuestionDockRenderStateFacade';
+import { QuestionDockResolutionActionFacade } from '../../../../src/features/chat/services/questions/QuestionDockResolutionActionFacade';
+import type { QuestionPostResolutionRuntimeFacade } from '../../../../src/features/chat/services/questions/QuestionPostResolutionRuntimeFacade';
 import {
   createQuestionReplyExecutionAction,
   QuestionResolutionExecutionFacade,
   type QuestionResolutionExecutionFacadeHost,
-} from '../../../../src/features/chat/services/QuestionResolutionExecutionFacade';
+} from '../../../../src/features/chat/services/questions/QuestionResolutionExecutionFacade';
 import type { TabId } from '../../../../src/features/chat/tabs';
 import type {
   QuestionDockCallbacks,

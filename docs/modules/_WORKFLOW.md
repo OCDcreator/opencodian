@@ -117,21 +117,21 @@
 
 - `docs/modules/features/chat/index.md`
 - `docs/modules/features/chat/OpenCodianView.md`
-- `docs/modules/features/chat/autoScrollState.md`
-- `docs/modules/features/chat/chatAppearance.md`
-- `docs/modules/features/chat/composerContext.md`
-- `docs/modules/features/chat/forkMessages.md`
-- `docs/modules/features/chat/glassOctahedronDemo.md`
-- `docs/modules/features/chat/glassOctahedronDemoRefraction.md`
-- `docs/modules/features/chat/glassOctahedronDemoThree.md`
-- `docs/modules/features/chat/liquidDiamondDemo.md`
-- `docs/modules/features/chat/liquidDiamondDemoWebgl.md`
-- `docs/modules/features/chat/renderGroups.md`
-- `docs/modules/features/chat/userMessageActions.md`
-- `docs/modules/features/chat/userMessageDisplay.md`
+- `docs/modules/features/chat/rendering/autoScrollState.md`
+- `docs/modules/features/chat/rendering/chatAppearance.md`
+- `docs/modules/features/chat/rendering/composerContext.md`
+- `docs/modules/features/chat/rendering/forkMessages.md`
+- `docs/modules/features/chat/demos/glassOctahedronDemo.md`
+- `docs/modules/features/chat/demos/glassOctahedronDemoRefraction.md`
+- `docs/modules/features/chat/demos/glassOctahedronDemoThree.md`
+- `docs/modules/features/chat/demos/liquidDiamondDemo.md`
+- `docs/modules/features/chat/demos/liquidDiamondDemoWebgl.md`
+- `docs/modules/features/chat/rendering/renderGroups.md`
+- `docs/modules/features/chat/rendering/userMessageActions.md`
+- `docs/modules/features/chat/rendering/userMessageDisplay.md`
 - `docs/modules/features/chat/rendering/collapsible.md`
-- `docs/modules/features/chat/services/ContextUsageService.md`
-- `docs/modules/features/chat/services/TitleGenerationService.md`
+- `docs/modules/features/chat/services/context/ContextUsageService.md`
+- `docs/modules/features/chat/services/title/TitleGenerationService.md`
 
 **特点**
 
@@ -157,12 +157,12 @@
 - `docs/modules/features/chat/ui/SessionTodoDock.md`
 - `docs/modules/features/settings/index.md`
 - `docs/modules/features/settings/OpenCodianSettings.md`
-- `docs/modules/features/settings/ModelConfigModal.md`
-- `docs/modules/features/settings/ModelConfigJsonModal.md`
-- `docs/modules/features/settings/OpencodeConfigModal.md`
-- `docs/modules/features/settings/ProviderIconCacheModal.md`
-- `docs/modules/features/settings/ServerSettingHelpModal.md`
-- `docs/modules/features/settings/LiquidGlassSettingHelpModal.md`
+- `docs/modules/features/settings/models/ModelConfigModal.md`
+- `docs/modules/features/settings/models/ModelConfigJsonModal.md`
+- `docs/modules/features/settings/backends/opencode/OpencodeConfigModal.md`
+- `docs/modules/features/settings/models/icons/ProviderIconCacheModal.md`
+- `docs/modules/features/settings/backends/opencode/ServerSettingHelpModal.md`
+- `docs/modules/features/settings/appearance/LiquidGlassSettingHelpModal.md`
 
 **特点**
 

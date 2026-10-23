@@ -1,4 +1,4 @@
-import { buildTrailingAssistantPatchExecutionTailPlanParts } from '../../../../src/features/chat/services/trailingAssistantPatchExecution';
+import { buildTrailingAssistantPatchExecutionTailPlanParts } from '../../../../src/features/chat/services/sync/trailingAssistantPatchExecution';
 
 describe('TrailingAssistantPatchExecutionTailPlanPartsHelper', () => {
   it('builds execution/tail plan parts from precomputed child plans', () => {

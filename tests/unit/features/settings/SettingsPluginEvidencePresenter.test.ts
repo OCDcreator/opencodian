@@ -1,4 +1,4 @@
-import { SettingsPluginEvidencePresenter } from '../../../../src/features/settings/SettingsPluginEvidencePresenter';
+import { SettingsPluginEvidencePresenter } from '../../../../src/features/settings/general/SettingsPluginEvidencePresenter';
 import { setLocale, t } from '../../../../src/i18n';
 import { createConfigSnapshot, createEvidenceSnapshot } from './SettingsPluginSection.evidence.testSupport';
 

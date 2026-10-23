@@ -1,4 +1,4 @@
-import { UserMessageContentRenderer } from '../../../../src/features/chat/runtime/UserMessageContentRenderer';
+import { UserMessageContentRenderer } from '../../../../src/features/chat/runtime/rendering/UserMessageContentRenderer';
 
 function createRenderer() {
   const host = {

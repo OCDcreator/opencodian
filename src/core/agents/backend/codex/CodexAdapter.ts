@@ -1,0 +1,4445 @@
+/**
+ * CodexAdapter — wraps the Codex SDK behind the AgentService interface.
+ *
+ * This adapter implements AgentChatCapability and AgentSessionCapability,
+ * providing streaming chat and session management for OpenAI's Codex agent.
+ *
+ * The adapter uses a DI seam (CodexFactory) for the Codex SDK instance,
+ * allowing tests to inject mocks without requiring a real API key or
+ * network access.
+ *
+ * See docs/requirements/multi-agent-foundation/05-codex-adapter.md.
+ */
+/* eslint-disable max-lines -- CodexAdapter consolidates CLI diagnostic readback, SDK thread lifecycle, session tracking, and stream normalization behind a single AgentService boundary. Splitting these would add indirection without removing real complexity. */
+
+import { execFile } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import type { Codex, Thread, ThreadEvent, ThreadOptions, UserInput } from '@openai/codex-sdk';
+import { Notice } from 'obsidian';
+
+import { appendObsidianContextBlocks, createLogger } from '../../../../shared';
+import { prependMemoryInjection } from '../../../memory';
+import { prependObsidianToolingInjection } from '../../../obsidianTooling';
+import type { QuestionRequest } from '../../../types';
+import type { AgentBackendKind, ContextUsageSnapshot, ImageAttachment, StreamChunk } from '../../../types/chat';
+import type { CodexApprovalPolicy, CodexReasoningEffort } from '../../../types/settings';
+import { AgentCapability, type BackendCapabilities } from '../../AgentCapability';
+import type {
+  AgentAuxQueryCapability,
+  AuxQuerySession,
+  AuxQuerySessionConfig,
+} from '../AgentAuxQueryCapability';
+import type {
+  BackendSessionItemsPageOptions,
+  BackendSessionTurnsPageOptions,
+  NormalizedSessionMessagesPage,
+  NormalizedSessionRow,
+} from '../AgentBackendRouting';
+import type {
+  AgentInlineCompletionCapability,
+  InlineCompletionSession,
+  InlineCompletionSessionConfig,
+} from '../AgentInlineCompletionCapability';
+import { INLINE_COMPLETION_TURN_TIMEOUT_MS } from '../AgentInlineCompletionCapability';
+import type {
+  AgentChatCapability,
+  AgentChatSendRequest,
+  AgentConnectionStatus,
+  AgentForkCapability,
+  AgentService,
+  AgentSessionCapability,
+  AgentTurnSteeringCapability,
+  CapabilityChangeHandler,
+  Disposable,
+  StatusChangeHandler,
+} from '../AgentService';
+import { CodexAuxQuerySession, type CodexAuxSessionOptions } from '../auxiliary/CodexAuxQuerySession';
+import {
+  type WarmableAuxSession,
+  WarmInlineCompletionSession,
+} from '../auxiliary/WarmInlineCompletionSession';
+import { CODEX_EFFORT_VARIANTS } from '../BackendModelCatalog';
+import type { CodexTraceContext, CodexTracePort } from '../diagnostics/types';
+import {
+  type AppServerAccountRateLimitsResult,
+  type AppServerAccountUsage,
+  type AppServerAccountUsageResult,
+  type AppServerCatalogReadResult,
+  type AppServerCommandExecutionApprovalDecision,
+  type AppServerCommandExecutionApprovalParams,
+  type AppServerCommandExecutionApprovalResponse,
+  type AppServerFileChangeApprovalDecision,
+  type AppServerFileChangeApprovalParams,
+  type AppServerFileChangeApprovalResponse,
+  type AppServerGrantedPermissionProfile,
+  type AppServerHooksReadbackResult,
+  type AppServerListHooksOptions,
+  type AppServerMcpElicitationResponse,
+  type AppServerMcpResourceReadResult,
+  type AppServerMcpServerStatus,
+  type AppServerMcpToolCallResult,
+  type AppServerModel,
+  type AppServerModelProviderCapabilities,
+  type AppServerPermissionProfile,
+  type AppServerPermissionsApprovalParams,
+  type AppServerPermissionsApprovalResponse,
+  type AppServerPluginInstallResult,
+  type AppServerPluginListResult,
+  type AppServerPluginReconcileResult,
+  type AppServerReviewResult,
+  type AppServerReviewTarget,
+  type AppServerSetThreadGoalOptions,
+  type AppServerSkill,
+  type AppServerSkillGroup,
+  type AppServerThread,
+  type AppServerThreadCompactionAckResult,
+  type AppServerThreadEffectiveEvidence,
+  type AppServerThreadEffectiveSettings,
+  type AppServerThreadGoal,
+  type AppServerThreadGoalStatus,
+  AppServerThreadMutationError,
+  type AppServerThreadMutationResult,
+  type AppServerThreadStartOptions,
+  type AppServerToolUserInputParams,
+  type AppServerToolUserInputResponse,
+  type AppServerTurnStartOptions,
+  buildEffectiveEvidenceWithApplication,
+  buildUniformEffectiveEvidence,
+  CodexAppServerClient,
+  type EffectiveFieldWiring,
+  type McpOauthLoginResult,
+  threadPhaseApplication,
+  turnSuccessApplication,
+} from './CodexAppServerClient';
+import {
+  normalizeThreadItemsPageToPreviewMessages,
+  normalizeTurnsPageToPreviewMessages,
+} from './CodexAppServerClientNormalization';
+import {
+  type AppServerStreamState,
+  mapAppServerNotification,
+  readAppServerTurnError,
+} from './CodexAppServerStreamMapper';
+import { toPlainStringEnv } from './CodexAppServerTransport';
+import { type CodexCliResolution,getCodexCliErrorMessage } from './CodexCliResolver';
+import {
+  buildCodexElicitationContent,
+  buildCodexElicitationQuestionRequest,
+  buildCodexElicitationUrlQuestionRequest,
+  type CodexElicitationBridgeHost,
+  type CodexElicitationFormParams,
+  type CodexElicitationUrlParams,
+  type CodexMcpElicitationWireParams,
+  isCodexElicitationDecline,
+  isCodexElicitationWireParams,
+} from './CodexElicitationBridge';
+import { CodexStreamNormalizer } from './CodexStreamNormalizer';
+
+const logger = createLogger('CodexAdapter');
+
+/**
+ * How long a `mcpServer/elicitation/request` frame that arrived before the
+ * elicitation host was wired waits for `setElicitationHost`. Mirrors the 60s
+ * turn-watchdog window: past it the owning turn is already considered stalled,
+ * so holding the card longer cannot reach the user.
+ */
+const ELICITATION_HOST_WAIT_TIMEOUT_MS = 60_000;
+
+function isExecutableMissingError(error: unknown): boolean {
+  return Boolean(error && typeof error === 'object' && (error as NodeJS.ErrnoException).code === 'ENOENT');
+}
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+/** Factory function for creating a Codex SDK instance. */
+export type CodexFactory = () => Promise<Codex>;
+
+/**
+ * Optional app-server construction seam. Returning `null` explicitly models
+ * a failed/unavailable negotiation while preserving the SDK chat fallback.
+ */
+export type CodexAppServerClientFactory = () => CodexAppServerClient | null;
+
+/** Immutable snapshot of the option values that form one app-server attempt. */
+export interface AttemptOptions {
+  readonly model?: string;
+  readonly workingDirectory?: string;
+  readonly sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+  readonly additionalDirectories?: readonly string[];
+  readonly networkAccessEnabled?: boolean;
+  readonly webSearchMode?: 'disabled' | 'cached' | 'live';
+  readonly approvalPolicy?: CodexApprovalPolicy;
+  readonly modelReasoningEffort?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra' | 'persistent';
+}
+
+interface AppServerAttempt {
+  readonly sessionId: string;
+  readonly epoch: number;
+  readonly options: Readonly<AttemptOptions>;
+}
+
+export interface CodexAdapterOptions {
+  /** OpenAI API key. Falls back to CODEX_API_KEY / OPENAI_API_KEY env vars. */
+  apiKey?: string;
+  /** Model name passed as ThreadOptions.model → SDK --model CLI arg. Empty/undefined = SDK default. */
+  model?: string;
+  /** Sandbox mode passed as ThreadOptions.sandboxMode → SDK --sandbox CLI arg. */
+  sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+  /** Reasoning effort passed as ThreadOptions.modelReasoningEffort → SDK --config CLI arg. */
+  modelReasoningEffort?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra' | 'persistent';
+  /** Additional directories passed as ThreadOptions.additionalDirectories → SDK --add-dir per path. */
+  additionalDirectories?: readonly string[];
+  /** Network access passed as ThreadOptions.networkAccessEnabled → SDK --config CLI arg. */
+  networkAccessEnabled?: boolean;
+  /** Web search mode passed as ThreadOptions.webSearchMode → SDK --config CLI arg. */
+  webSearchMode?: 'disabled' | 'cached' | 'live';
+  /**
+   * Approval policy. 'inherit' (default) omits the override so the backend
+   * uses its own policy; 'untrusted'/'on-request' require an available
+   * app-server AND an approval bridge (fail closed otherwise); 'never' may
+   * use the existing SDK fallback.
+   */
+  approvalPolicy?: CodexApprovalPolicy;
+  /** Working directory for thread operations. */
+  workingDirectory?: string;
+  /**
+   * Absolute path to the Codex CLI binary.
+   * When provided, bypasses the SDK's require.resolve-based binary discovery
+   * (which fails in Obsidian's plugin loader because __filename points to
+   * Electron internals rather than the plugin directory).
+   */
+  codexPathOverride?: string;
+  /** Verified user-installed CLI resolution supplied during plugin startup. */
+  codexCliResolution?: CodexCliResolution;
+  /**
+   * advantage-parity R-F7: extra environment variables for the Codex CLI
+   * process (the resolved shared+`codex` domain env), read at SDK
+   * construction. When it yields a non-empty map the SDK gets
+   * `{...process.env, ...extra}` — the SDK otherwise inherits `process.env`
+   * wholesale, so the base is replicated to keep behavior identical.
+   */
+  getExtraEnv?: () => Record<string, string>;
+  /** DI seam: override the Codex SDK instance factory. */
+  createCodex?: CodexFactory;
+  /** DI seam: provide or deliberately disable the local app-server client. */
+  createAppServerClient?: CodexAppServerClientFactory;
+  /**
+   * Optional trace port for lifecycle/wire instrumentation. When present the
+   * adapter records thread-binding, turn begin/finish, notifications,
+   * approvals, and status changes through it (each guarded by `trace()` so a
+   * trace hook can never break the chat path). When absent, behavior is
+   * byte-for-byte identical to the un-instrumented adapter.
+   */
+  tracePort?: CodexTracePort;
+}
+
+export interface CodexModelSummary {
+  slug: string;
+  display_name: string;
+  visibility: string;
+  supported_in_api: boolean;
+  default_reasoning_level: string | null;
+  description: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Server-request approval bridge types
+// ---------------------------------------------------------------------------
+
+/**
+ * The server-request approval kinds wired in this slice. Covers the legacy
+ * `execCommandApproval` / `applyPatchApproval` routes plus the Codex 0.159.0
+ * v2 routes (`item/commandExecution/requestApproval`,
+ * `item/fileChange/requestApproval`, `item/permissions/requestApproval`).
+ */
+export type CodexApprovalKind = 'execCommand' | 'applyPatch' | 'commandExecution' | 'fileChange' | 'permissions';
+
+/** Server-proposed persistent network rule (allow/deny one host). */
+export interface CodexNetworkPolicyAmendment {
+  action: 'allow' | 'deny';
+  host: string;
+}
+
+/**
+ * Backend-neutral approval request surfaced to the UI host. Mirrors the
+ * ClaudeCodePermissionBridge host-callback pattern, but the Codex approval
+ * model is async server-push: approvals arrive as server-initiated JSON-RPC
+ * requests (`method` + `id`) over the app-server WebSocket, not as inline
+ * streaming callbacks. The `raw` field preserves the original server params
+ * for advanced rendering.
+ */
+export interface CodexApprovalRequest {
+  readonly kind: CodexApprovalKind;
+  /** Human-readable label for any approval kind. */
+  readonly summary: string;
+  /** Command line for command approvals; omitted otherwise. */
+  readonly command?: string;
+  /** Working directory for command/permissions approvals; omitted otherwise. */
+  readonly cwd?: string;
+  /** Number of file changes for legacy `applyPatch` approvals; omitted otherwise. */
+  readonly changeCount?: number;
+  /** v2 commandExecution: server-proposed execpolicy rules for approval. */
+  readonly proposedExecpolicyAmendment?: string[];
+  /** v2 commandExecution: server-proposed persistent network rules. */
+  readonly proposedNetworkPolicyAmendments?: CodexNetworkPolicyAmendment[];
+  /** v2 commandExecution: managed-network context. */
+  readonly networkApprovalContext?: { host: string; protocol: string } | null;
+  /** v2 fileChange: session-scoped write root being requested. */
+  readonly grantRoot?: string | null;
+  /** v2 permissions: the profile the agent asked for (echoed back on approve). */
+  readonly permissionRequest?: { fileSystem?: unknown; network?: unknown };
+  /** Optional server explanation (network access, extra write access, ...). */
+  readonly reason?: string | null;
+  /** Original server params, preserved for advanced rendering. */
+  readonly raw: unknown;
+  /** Owning foreground turn cancellation, for settling the UI collection. */
+  readonly signal?: AbortSignal;
+}
+
+/**
+ * Decision variants the UI can produce. Scalar values map onto both legacy
+ * and v2 wire decisions; the two amendment variants answer the v2
+ * `commandExecution` object decisions
+ * (`acceptWithExecpolicyAmendment` / `applyNetworkPolicyAmendment`).
+ */
+export type CodexApprovalDecision =
+  | { decision: 'approved' | 'approved_for_session' | 'denied' | 'abort' }
+  | { decision: 'accept_with_execpolicy_amendment'; execpolicyAmendment: string[] }
+  | { decision: 'apply_network_policy_amendment'; networkPolicyAmendment: CodexNetworkPolicyAmendment };
+
+/**
+ * Host callback seam for surfacing server-request approvals to the UI. Set via
+ * `CodexAdapter.setApprovalHost`. When the host returns `null` (cancelled) or
+ * no callback is available, the bridge defaults to a safe `denied` decision.
+ * `collectQuestionAnswers` serves the dynamic `item/tool/requestUserInput`
+ * route through the same inline-card UI.
+ */
+export interface CodexApprovalBridgeHost {
+  collectApproval?(request: CodexApprovalRequest): Promise<CodexApprovalDecision | null>;
+  collectQuestionAnswers?(request: QuestionRequest, signal?: AbortSignal): Promise<CodexApprovalResolutionResult | null>;
+}
+
+/** Structural supertype of the question-card resolution result the tool-user-input seam consumes. */
+export interface CodexApprovalResolutionResult {
+  status: 'answered' | 'rejected' | 'cancelled';
+  answers?: string[][];
+}
+
+/** Internal session tracking entry. */
+interface CodexSessionEntry {
+  provisionalId: string;
+  threadId: string | null;
+  thread: Thread | null;
+}
+
+/**
+ * A `mcpServer/elicitation/request` frame that arrived before the elicitation
+ * host was wired. The entry holds the frame's combined request/turn lifetime;
+ * it settles with `{ action: 'cancel' }` on abort, on the host-wait timeout,
+ * or when the adapter tears down — it never hangs and never fabricates a user
+ * answer. When the host arrives, the original frame is dispatched unchanged.
+ */
+interface PendingElicitation {
+  params: CodexMcpElicitationWireParams;
+  /** Combined native-request + owning-turn lifetime captured at arrival. */
+  signal?: AbortSignal;
+  resolve: (response: AppServerMcpElicitationResponse | Promise<AppServerMcpElicitationResponse>) => void;
+  timer: ReturnType<typeof setTimeout>;
+  /** Abort listener that settles the entry as cancelled; removed on flush. */
+  onAbort: () => void;
+  /** Releases the combined lifetime's abort listeners. */
+  disposeLifetime: () => void;
+}
+
+/** Final two-axis outcome for a foreground `thread/compact/start` request. */
+export interface CodexForegroundCompactionResult {
+  status: 'verified' | 'unavailable' | 'invalid-thread' | 'busy' | 'failed' | 'malformed' | 'timed-out';
+  /** True only after the server returned its empty `{}` ACK. */
+  acknowledged: boolean;
+  /** True only after matching compaction completion plus fresh token usage. */
+  runtimeVerified: boolean;
+  /** Whether a matching `item/started` was observed before completion. */
+  started: boolean;
+  /** Whether a matching `item/completed` was observed. */
+  completed: boolean;
+  /** Whether an authoritative post-request context snapshot was observed. */
+  tokenUsageObserved: boolean;
+  threadId?: string;
+  errorReason?: string;
+}
+
+export interface CodexForegroundCompactionOptions {
+  /** Bounded end-to-end wait for runtime evidence after the RPC request starts. */
+  timeoutMs?: number;
+  acknowledgementTimeoutMs?: number;
+  /** Called exactly once after an empty ACK; it is never a success callback. */
+  onAccepted?: () => void;
+}
+
+/** Side-effect-free preflight for foreground compaction controls. */
+export interface CodexForegroundCompactionAvailability {
+  status: 'available' | 'unavailable' | 'invalid-thread' | 'busy';
+  threadId?: string;
+}
+
+interface ForegroundCompactionGate extends CodexForegroundCompactionAvailability {
+  logicalSessionId?: string;
+  client?: CodexAppServerClient;
+}
+
+interface PendingForegroundCompaction {
+  readonly sessionId: string;
+  readonly threadId: string;
+  readonly epoch: number;
+  acknowledged: boolean;
+  /** False until immediately before the compact RPC is sent; pre-dispatch events are stale. */
+  requestDispatched: boolean;
+  started: boolean;
+  completed: boolean;
+  tokenUsageObserved: boolean;
+  itemId: string | null;
+  timer: ReturnType<typeof setTimeout> | null;
+  subscription: Disposable | null;
+  resolve: (result: CodexForegroundCompactionResult) => void;
+}
+
+/** Narrow record guard for defensive approval-param normalization. */
+function isRecordLike(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Best-effort threadId extraction from a server-request approval payload. */
+function readThreadIdFromParams(params: unknown): string | undefined {
+  if (!isRecordLike(params)) return undefined;
+  const candidate = params.threadId;
+  return typeof candidate === 'string' ? candidate : undefined;
+}
+
+/** Read a command string from an approval param that may be a string, array, or object. */
+function readCommandString(command: unknown): string {
+  if (typeof command === 'string') {
+    return command.trim();
+  }
+  if (Array.isArray(command)) {
+    return command.map((c) => String(c)).join(' ').trim();
+  }
+  if (isRecordLike(command)) {
+    const cmd = typeof command.command === 'string' ? command.command.trim() : '';
+    const args = Array.isArray(command.args)
+      ? command.args.map((a) => String(a)).join(' ').trim()
+      : '';
+    return [cmd, args].filter(Boolean).join(' ').trim();
+  }
+  return '';
+}
+
+// ---------------------------------------------------------------------------
+// Capabilities
+// ---------------------------------------------------------------------------
+
+/**
+ * Declared capabilities for the Codex adapter skeleton.
+ *
+ * Each capability is backed by evidence from the SDK smoke test
+ * (scripts/codex-sdk-smoke.mjs, checkpoint 1).
+ *
+ * MCP TRANSCRIPT SEAM BOUNDARY (Checkpoint 8C):
+ * AgentCapability.Mcp is intentionally NOT declared here.  The adapter
+ * does translate real Codex mcp_tool_call items into visible tool_use
+ * blocks (kind='mcp') via CodexStreamNormalizer — this transcript seam
+ * is runtime-proven.  However, AgentMcpCapability implies a much stronger
+ * management contract (getMcpServerSnapshot, connect/disconnect, auth
+ * flows, catalog subscriptions, etc.) which Codex does not yet satisfy.
+ * Do not add AgentCapability.Mcp until that stronger contract is truly
+ * implemented and proven.
+ */
+const CODEX_CAPABILITIES: BackendCapabilities = Object.freeze(
+  new Set<AgentCapability>([
+    AgentCapability.Chat,      // thread.runStreamed()
+    AgentCapability.Sessions,  // codex.startThread() / resumeThread()
+    AgentCapability.Fork,      // app-server thread/fork
+    AgentCapability.Thinking,  // reasoning items
+    AgentCapability.FileOps,   // file_change items
+    AgentCapability.Shell,     // command_execution items
+    AgentCapability.Todos,     // todo_list items via tool_use → SessionTodoDock
+    AgentCapability.Permissions, // sandbox mode selector (read-only/workspace-write/danger-full-access)
+    AgentCapability.Images,    // local_image input via temp-file translation
+    AgentCapability.Models,    // getModelList() (app-server model/list + codex debug models fallback)
+    AgentCapability.AuxQuery,  // startAuxQuerySession() via CodexAuxQuerySession (read-only sandbox, fail-closed)
+    AgentCapability.InlineCompletion, // startInlineCompletionSession() over the same read-only sandbox (R-C3)
+  ]),
+);
+
+// ---------------------------------------------------------------------------
+// CodexAdapter
+// ---------------------------------------------------------------------------
+
+/**
+ * AgentService adapter for OpenAI Codex.
+ *
+ * Implements AgentChatCapability for streaming chat and
+ * AgentSessionCapability for basic session lifecycle.
+ */
+export class CodexAdapter
+  implements
+    AgentService,
+    AgentChatCapability,
+    AgentSessionCapability,
+    AgentForkCapability,
+    AgentAuxQueryCapability,
+    AgentInlineCompletionCapability,
+    AgentTurnSteeringCapability
+{
+  readonly kind: AgentBackendKind = 'codex';
+  readonly displayName = 'Codex';
+  readonly description = 'OpenAI Codex coding agent';
+  private readonly capabilitySet = new Set<AgentCapability>(CODEX_CAPABILITIES);
+  get capabilities(): BackendCapabilities { return this.capabilitySet; }
+
+  private _status: AgentConnectionStatus = 'disconnected';
+  private codex: Codex | null = null;
+  private sessions = new Map<string, CodexSessionEntry>();
+  private readonly forkedThreadIds = new Set<string>();
+  private threadAlias = new Map<string, string>(); // threadId → provisionalId
+  private activeControllers = new Map<string, AbortController>();
+  private activeAppServerTurns = new Map<string, { threadId: string; turnId: string | null }>();
+  /**
+   * Most recent trace turn context per session (provisionalId-keyed), captured
+   * at `beginTurn` so `cancelStream`/`deleteSession` can finish the turn on the
+   * trace port without the adapter holding the service's internal thread map.
+   * Cleared alongside `activeAppServerTurns`.
+   */
+  private lastTurnContextBySession = new Map<string, CodexTraceContext>();
+  private appServerContextSnapshots = new Map<string, ContextUsageSnapshot>();
+  /** Independent from per-turn stream subscriptions; one foreground compaction per logical session. */
+  private pendingForegroundCompactions = new Map<string, PendingForegroundCompaction>();
+  /** Separate from turn-attempt epochs so compaction never invalidates a live stream. */
+  private foregroundCompactionEpochs = new Map<string, number>();
+  private nextForegroundCompactionEpoch = 0;
+  /**
+   * Per-session three-axis runtime evidence for thread effective settings,
+   * keyed by sessionId (NOT threadId) so the lifecycle can be set to `pending`
+   * before a start (when no thread id exists yet) and so concurrent sessions
+   * never bleed state. Not a global singleton — instance state on this adapter.
+   */
+  private sessionEffectiveEvidence = new Map<string, AppServerThreadEffectiveEvidence>();
+  /** Latest server-confirmed effective settings per session (for the readback consumer's value display). */
+  private sessionEffectiveSettings = new Map<string, AppServerThreadEffectiveSettings | null>();
+  /**
+   * Per-session IMMUTABLE attempt options snapshot captured before any await.
+   * Prevents mid-flight option mutations from fabricating false evidence or
+   * sending inconsistent thread/turn options. The snapshot freezes the actual
+   * VALUES (model, sandbox, approval, effort, etc.) that form the request.
+   */
+  private sessionAttemptOptions = new Map<string, Readonly<AttemptOptions>>();
+  /** Per-session attempt epoch; stop/deleteSession invalidates the current epoch so in-flight attempts abort. */
+  private sessionEpochs = new Map<string, number>();
+  /** Monotonic across stop/start so an old attempt can never ABA-match a new one. */
+  private nextAttemptEpoch = 0;
+  private lastEvidenceSessionId: string | null = null;
+  private statusHandlers = new Set<StatusChangeHandler>();
+  private capabilityHandlers = new Set<CapabilityChangeHandler>();
+  /**
+   * Primary local app-server transport. It owns the chat turn whenever the
+   * experimental protocol negotiates successfully, because that is where
+   * Codex publishes authoritative thread context usage notifications.
+   */
+  private appServerClient: CodexAppServerClient | null = null;
+
+  /**
+   * Server-request approval bridge host. Set via `setApprovalHost`. When set
+   * (and the app-server client is available), `execCommandApproval` /
+   * `applyPatchApproval` handlers are registered so server-initiated approval
+   * requests reach this host callback and the decision is replied back as a
+   * JSON-RPC `{ decision: ReviewDecision }` result.
+   */
+  private approvalHost: CodexApprovalBridgeHost = {};
+  /** Whether approval handlers are currently registered on the client. */
+  private approvalHandlersRegistered = false;
+
+  /**
+   * MCP elicitation bridge host. Set via `setElicitationHost`. The
+   * `mcpServer/elicitation/request` handler is registered as soon as the
+   * app-server client is available — even before any host is wired — so a
+   * server-initiated elicitation can never hit the transport's -32601
+   * fallback. When a frame arrives before the host exists, it is pended (see
+   * `pendingElicitations`) and dispatched the moment the host is set.
+   */
+  private elicitationHost: CodexElicitationBridgeHost = {};
+  /** Whether the elicitation handler is currently registered on the client. */
+  private elicitationHandlersRegistered = false;
+  /**
+   * Elicitation frames pended because they arrived before `setElicitationHost`
+   * wired the host. Keyed by an adapter-local id; every entry settles within
+   * `ELICITATION_HOST_WAIT_TIMEOUT_MS`, on abort, or on teardown.
+   */
+  private pendingElicitations = new Map<number, PendingElicitation>();
+  /** Monotonic key source for `pendingElicitations`. */
+  private nextPendingElicitationId = 0;
+
+  /**
+   * Latest active turn id per app-server thread, tracked from the persistent
+   * `turn/started` notification subscription. Powers `steerTurn` (which needs
+   * the exact `expectedTurnId`) and the reconnect interruption sweep.
+   */
+  private activeTurnIdByThread = new Map<string, string>();
+  /** Removes the persistent turn/started + turn/completed listeners, or null. */
+  private turnTrackingUnsubscribe: (() => void) | null = null;
+
+  /**
+   * Latest app-server goal state per thread, tracked from the
+   * `thread/goal/updated` / `thread/goal/cleared` notification stream and the
+   * adapter's own goal mutations. Gives consumers instant local goal reads
+   * without an RPC; `getThreadGoal()` remains the live-authoritative read.
+   */
+  private threadGoalByThread = new Map<string, AppServerThreadGoal>();
+
+  /**
+   * Every thread id the adapter started or resumed on the app-server. On a
+   * transport reconnect the adapter re-resumes these threads so the server
+   * re-attaches this client to their notification streams.
+   */
+  private loadedThreadIds = new Set<string>();
+  /** Keep retry identities through delete ACK/readback and late notifications. */
+  private pendingNativeDeletions = new Set<string>();
+
+  /**
+   * Error-chunk sinks for in-flight app-server streams, keyed by logical
+   * session id. A reconnect (or reconnect failure) delivers an interruption
+   * error through each sink so waiting generators terminate instead of
+   * hanging on a dead notification stream.
+   */
+  private streamInterruptSinks = new Map<string, (message: string) => void>();
+
+  /** Unsubscribe function for the `deprecationNotice` notification, or null. */
+  private deprecationNoticeUnsubscribe: (() => void) | null = null;
+  /** One-time UI nudge guard for the deprecation notice Notice. */
+  private deprecationNoticeShown = false;
+
+  /**
+   * Handlers notified when the Codex app-server emits `skills/changed`. The
+   * chat slash-command menu cache subscribes to this so it can invalidate
+   * immediately instead of waiting for the 120s TTL.
+   */
+  private skillsChangedHandlers = new Set<() => void>();
+  /** Unsubscribe function for the `skills/changed` notification, or null. */
+  private skillsChangedUnsubscribe: (() => void) | null = null;
+  /**
+   * One-shot flag: when set, the next `getRuntimeSkills()` call passes
+   * `forceReload: true` to `skills/list` (bypassing the app-server's cache)
+   * and then clears the flag. Set by `forceNextRuntimeSkillsReload()` after a
+   * plugin-authored project skill mutation (create/update/delete), because the
+   * app-server does not always emit `skills/changed` for files the plugin
+   * wrote itself. Normal menu opens leave this false and keep caching.
+   */
+  private forceReloadNextSkills = false;
+
+  /**
+   * Mutable options reference. Most fields are set once at construction,
+   * but `modelReasoningEffort` supports runtime updates from the chat
+   * toolbar effort selector without re-creating the adapter.
+   */
+  private options: CodexAdapterOptions;
+  /** Optional trace port; every instrumentation point optional-chains through `trace()`. */
+  private readonly tracePort?: CodexTracePort;
+
+  constructor(options: CodexAdapterOptions = {}) {
+    this.options = { ...options };
+    this.tracePort = options.tracePort;
+  }
+
+  // -------------------------------------------------------------------------
+  // AgentService core
+  // -------------------------------------------------------------------------
+
+  hasCapability(cap: AgentCapability): boolean {
+    return this.capabilities.has(cap);
+  }
+
+  get status(): AgentConnectionStatus {
+    return this._status;
+  }
+
+  /**
+   * SDK construction path. Auth is deferred to the SDK runtime: the Codex CLI
+   * supports multiple auth sources (explicit apiKey, OPENAI_API_KEY env var,
+   * ~/.codex/auth.json ChatGPT login, etc.). The adapter does NOT pre-check
+   * for an API key — auth failures surface naturally when thread.runStreamed()
+   * is called, which is the honest place to report them.
+   */
+  private async constructSdkClient(): Promise<void> {
+    const { Codex: CodexClass } = await import('@openai/codex-sdk');
+    const extraEnv = this.options.getExtraEnv?.() ?? {};
+    this.codex = new CodexClass({
+      ...(this.options.apiKey ? { apiKey: this.options.apiKey } : {}),
+      ...(this.options.workingDirectory ? { cwd: this.options.workingDirectory } : {}),
+      ...(this.options.codexPathOverride ? { codexPathOverride: this.options.codexPathOverride } : {}),
+      // R-F7: the SDK stops inheriting process.env when `env` is set, so
+      // the base is replicated under the domain overrides.
+      ...(Object.keys(extraEnv).length > 0
+        ? { env: { ...toPlainStringEnv(process.env), ...extraEnv } }
+        : {}),
+    });
+  }
+
+  async start(): Promise<void> {
+    if (this.codex) {
+      return;
+    }
+    this.setStatus('connecting');
+    try {
+      if (this.options.codexCliResolution?.mode === 'missing') {
+        throw new Error(getCodexCliErrorMessage(this.options.codexCliResolution));
+      }
+      if (this.options.createCodex) {
+        this.codex = await this.options.createCodex();
+      } else {
+        await this.constructSdkClient();
+      }
+
+      // The app-server is the primary Codex chat transport because it is the
+      // only local protocol that publishes authoritative context usage. The
+      // SDK remains a compatibility fallback solely when negotiation fails.
+      try {
+        // `wireBridge` belongs to the optional diagnostics port. Read it
+        // through the trace boundary as well: a defective getter must not
+        // prevent app-server startup or silently force ordinary chat onto the
+        // SDK fallback.
+        const wireBridge = this.trace((port) => port.wireBridge);
+        const appServerClient = this.options.createAppServerClient
+          ? this.options.createAppServerClient()
+          : new CodexAppServerClient({
+            codexPathOverride: this.options.codexPathOverride,
+            // Spawn the owned app-server inside the vault so project-scoped
+            // skills/agents resolve. Injected factories manage their own cwd.
+            ...(this.options.workingDirectory ? { workingDirectory: this.options.workingDirectory } : {}),
+            // R-F7: the resolved domain env reaches the primary transport too.
+            ...(this.options.getExtraEnv ? { getExtraEnv: this.options.getExtraEnv } : {}),
+            // Feed raw wire traffic into the trace port (no-op when absent).
+            ...(wireBridge ? { wireObserver: wireBridge } : {}),
+            // Reconnect integration: re-resume loaded threads and interrupt
+            // in-flight streams; surface a terminal failure when the backoff
+            // budget is exhausted.
+            onReconnect: () => this.handleAppServerReconnect(),
+            onReconnectFailed: (error) => this.handleAppServerReconnectFailed(error),
+          });
+        if (appServerClient) {
+          this.appServerClient = appServerClient;
+          await this.appServerClient.start();
+          this.setAppServerCapabilitiesAvailable(true);
+          // Wire approval handlers if a host was set before start.
+          this.registerApprovalHandlers();
+          // Register the MCP elicitation route as soon as the client exists
+          // (host or not) so early frames pend instead of hitting -32601.
+          this.registerElicitationHandlers();
+          // Track active turn ids per thread for turn steering.
+          this.subscribeToTurnTracking();
+          // Surface app-server deprecation notices (trace + one-time Notice).
+          this.subscribeToDeprecationNotice();
+          // Subscribe to skills/changed so the chat menu cache can invalidate
+          // immediately instead of relying solely on the 120s TTL.
+          this.subscribeToAppServerSkillsChanged();
+        } else {
+          this.setAppServerCapabilitiesAvailable(false);
+        }
+      } catch (err) {
+        // A failed negotiation still owns its socket and spawned process.
+        // Release them before dropping the client or entering SDK fallback.
+        this.appServerClient?.stop();
+        this.appServerClient = null;
+        this.setAppServerCapabilitiesAvailable(false);
+        if (isExecutableMissingError(err)) {
+          throw new Error(`Codex executable could not be started: ${err instanceof Error ? err.message : String(err)}. Verify the executable path in Codex settings, then reload OpenCodian.`);
+        }
+        logger.warn('Codex app-server negotiation failed; preserving SDK chat without context usage', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+
+      this.setStatus('connected');
+    } catch (err) {
+      this.codex = null;
+      if (this.appServerClient) {
+        try {
+          this.unregisterApprovalHandlers();
+          this.unregisterElicitationHandlers();
+          this.unsubscribeFromAppServerSkillsChanged();
+          this.appServerClient.stop();
+        } catch {
+          // Best-effort cleanup after a failed startup.
+        }
+        this.appServerClient = null;
+      }
+      this.setAppServerCapabilitiesAvailable(false);
+      this.setStatus('error');
+      throw err;
+    }
+  }
+
+  async stop(): Promise<void> {
+    for (const controller of this.activeControllers.values()) {
+      controller.abort();
+    }
+    this.activeControllers.clear();
+    this.activeAppServerTurns.clear();
+    this.clearPendingForegroundCompactions('unavailable', 'Codex adapter stopped');
+    this.appServerContextSnapshots.clear();
+    this.sessionEffectiveEvidence.clear();
+    this.sessionEffectiveSettings.clear();
+    this.sessionAttemptOptions.clear();
+    this.sessionEpochs.clear();
+    this.lastEvidenceSessionId = null;
+    this.codex = null;
+    this.activeTurnIdByThread.clear();
+    this.loadedThreadIds.clear();
+    this.threadGoalByThread.clear();
+    this.streamInterruptSinks.clear();
+    this.unsubscribeFromTurnTracking();
+    this.unsubscribeFromDeprecationNotice();
+    if (this.appServerClient) {
+      try {
+        this.unregisterApprovalHandlers();
+        this.unregisterElicitationHandlers();
+        this.unsubscribeFromAppServerSkillsChanged();
+        this.appServerClient.stop();
+      } catch {
+        // Best-effort cleanup
+      }
+      this.appServerClient = null;
+    }
+    this.setAppServerCapabilitiesAvailable(false);
+    this.setStatus('disconnected');
+  }
+
+  /**
+   * Read-only account info readback, preferring the app-server
+   * `account/read` route and falling back to `codex doctor --json`.
+   *
+   * The app-server route is the primary source because it queries the
+   * running server directly, returning richer account/auth data without
+   * spawning a CLI process.  The CLI diagnostic remains the fallback
+   * when the app-server client is unavailable.
+   *
+   * Returns null if both sources are unavailable or fail.
+   */
+  async getAccountInfo(): Promise<unknown | null> {
+    if (this.appServerClient) {
+      try {
+        const accountRead = await this.appServerClient.getAccountRead();
+        if (accountRead !== null) {
+          return accountRead;
+        }
+      } catch (err) {
+        logger.warn('App-server account/read failed; falling back to CLI diagnostic', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    const codexPath = this.options.codexPathOverride ?? 'codex';
+    return new Promise((resolve) => {
+      execFile(codexPath, ['doctor', '--json'], { timeout: 15000, ...(this.options.getExtraEnv ? { env: { ...process.env, ...this.options.getExtraEnv() } } : {}) }, (err, stdout, stderr) => {
+        const output = stdout || stderr || '';
+        try {
+          const parsed = JSON.parse(output);
+          resolve(parsed?.checks?.['auth.credentials']?.details ?? null);
+        } catch {
+          logger.debug('codex doctor output parse failed', {
+            error: err instanceof Error ? err.message : String(err),
+            outputLength: output.length,
+          });
+          resolve(null);
+        }
+      });
+    });
+  }
+
+  /**
+   * Read-only model list readback, preferring the app-server `model/list` route
+   * and falling back to the `codex debug models` CLI diagnostic.
+   *
+   * The app-server route is richer (`displayName`, `supportedReasoningEfforts`,
+   * `inputModalities`, `serviceTiers`, `upgradeInfo`) and is the preferred source
+   * for the model selector. The CLI diagnostic remains the fallback when the
+   * app-server client is unavailable.
+   *
+   * Returns null if neither source is available or returns no usable models.
+   */
+  async getModelList(): Promise<CodexModelSummary[] | null> {
+    // Prefer app-server model/list when available.
+    if (this.appServerClient) {
+      try {
+        const models = await this.appServerClient.listModels();
+        const filtered = models
+          .filter((m) => m.id && m.id.length > 0)
+          .map((m) => this.normalizeAppServerModel(m));
+        if (filtered.length > 0) {
+          return filtered;
+        }
+      } catch (err) {
+        logger.warn('App-server model/list failed; falling back to CLI diagnostic', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    return this.getModelListFromCli();
+  }
+
+  private normalizeAppServerModel(m: AppServerModel): CodexModelSummary {
+    return {
+      slug: m.model || m.id,
+      display_name: m.displayName || m.model || m.id,
+      visibility: 'list',
+      supported_in_api: true,
+      default_reasoning_level: m.defaultReasoningEffort ?? null,
+      description: m.description ?? null,
+    };
+  }
+
+  private getModelListFromCli(): Promise<CodexModelSummary[] | null> {
+    const codexPath = this.options.codexPathOverride ?? 'codex';
+    return new Promise((resolve) => {
+      execFile(codexPath, ['debug', 'models'], { timeout: 15000, maxBuffer: 512 * 1024, ...(this.options.getExtraEnv ? { env: { ...process.env, ...this.options.getExtraEnv() } } : {}) }, (err, stdout, stderr) => {
+        const output = stdout || stderr || '';
+        try {
+          const parsed = JSON.parse(output);
+          const models = Array.isArray(parsed?.models) ? parsed.models : [];
+          const filtered = models
+            .filter((m: Record<string, unknown>) => m.visibility !== 'hide' && m.supported_in_api === true)
+            .map((m: Record<string, unknown>) => ({
+              slug: String(m.slug ?? ''),
+              display_name: String(m.display_name ?? ''),
+              visibility: String(m.visibility ?? 'unknown'),
+              supported_in_api: Boolean(m.supported_in_api),
+              default_reasoning_level: m.default_reasoning_level != null ? String(m.default_reasoning_level) : null,
+              description: m.description != null ? String(m.description) : null,
+            }));
+          resolve(filtered.length > 0 ? filtered : null);
+        } catch {
+          logger.debug('codex debug models output parse failed', {
+            error: err instanceof Error ? err.message : String(err),
+            outputLength: output.length,
+          });
+          resolve(null);
+        }
+      });
+    });
+  }
+
+  /**
+   * Read-only runtime skill discovery via the app-server `skills/list` route.
+   *
+   * Returns the skills Codex resolves for the current vault cwd, scoped by
+   * `options.workingDirectory`. Each entry carries name/description/path/
+   * enabled/scope. This is the sole runtime truth for the Codex chat `/skills`
+   * and `$` menu — the plugin never invents candidates or writes global skills.
+   *
+   * Returns null when the app-server client is unavailable (e.g. negotiation
+   * failed and the adapter fell back to SDK-only chat). Returns an empty array
+   * when the route is reachable but reports no skills.
+   */
+  /**
+   * Force the next `getRuntimeSkills()` to bypass the app-server cache
+   * (`forceReload: true`). Used after a plugin-authored project skill mutation
+   * so the next `/skills` or `$` menu open reflects the change even when the
+   * app-server did not emit `skills/changed` for the plugin's own file write.
+   * One-shot: only the next read is affected; normal menu opens keep caching.
+   */
+  forceNextRuntimeSkillsReload(): void {
+    this.forceReloadNextSkills = true;
+  }
+
+  async getRuntimeSkills(): Promise<AppServerSkill[] | null> {
+    if (!this.appServerClient) {
+      // Still clear the one-shot flag so a later client attach doesn't carry it.
+      this.forceReloadNextSkills = false;
+      return null;
+    }
+    const forceReload = this.forceReloadNextSkills;
+    this.forceReloadNextSkills = false;
+    try {
+      return await this.appServerClient.listSkills({
+        ...(this.options.workingDirectory ? { cwd: this.options.workingDirectory } : {}),
+        ...(forceReload ? { forceReload: true } : {}),
+      });
+    } catch (err) {
+      logger.warn('App-server skills/list failed', { error: err instanceof Error ? err.message : String(err) });
+      return null;
+    }
+  }
+
+  /**
+   * Read the same runtime skill catalog without flattening cwd groups or
+   * discarding server discovery errors. Intended for settings readback only;
+   * chat callers continue to use `getRuntimeSkills()`.
+   */
+  async getRuntimeSkillGroups(): Promise<AppServerSkillGroup[] | null> {
+    const client = this.appServerClient;
+    if (!client) return null;
+    try {
+      return await client.listSkillGroups({ cwd: this.options.workingDirectory });
+    } catch (err) {
+      logger.warn('Grouped app-server skills/list failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Read Codex app-server hook metadata without exposing write semantics.
+   *
+   * The outcome deliberately keeps `empty`, `unavailable`, `failed`, and
+   * `malformed` distinct so settings/readback consumers never mistake a
+   * missing route or rejected request for a successful empty catalog.
+   */
+  async getHooksReadback(options?: AppServerListHooksOptions): Promise<AppServerHooksReadbackResult> {
+    const client = this.appServerClient;
+    if (!client) {
+      return { status: 'unavailable', groups: [] };
+    }
+    try {
+      const cwds = options?.cwds ?? (this.options.workingDirectory ? [this.options.workingDirectory] : undefined);
+      return await client.listHooks(cwds === undefined ? undefined : { cwds });
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      logger.warn('Failed to read Codex hooks from app-server', { error: reason });
+      return { status: 'failed', groups: [], errorReason: reason };
+    }
+  }
+
+  /**
+   * Read-only permission profile readback via the app-server adjunct client.
+   *
+   * Returns available permission profiles from the Codex app-server
+   * `permissionProfile/list` route. Each entry contains `id` and optional
+   * `description`.
+   *
+   * This is an app-server diagnostic surface, not a CLI command or SDK API.
+   * Returns null if the app-server client is unavailable or the request fails.
+   */
+  async getPermissionProfiles(): Promise<AppServerPermissionProfile[] | null> {
+    if (!this.appServerClient) {
+      return null;
+    }
+    try {
+      const profiles = await this.appServerClient.listPermissionProfiles({
+        ...(this.options.workingDirectory ? { cwd: this.options.workingDirectory } : {}),
+      });
+      return profiles.length > 0 ? profiles : null;
+    } catch (err) {
+      logger.warn('Failed to read permission profiles from app-server', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Read-only account rate limits readback via the app-server adjunct client.
+   *
+   * Returns account rate limit information from the Codex app-server
+   * `account/rateLimits/read` route. The response contains `rateLimits`
+   * and optional `rateLimitsByLimitId`.
+   *
+   * This is an app-server diagnostic surface, not a CLI command or SDK API.
+   * The route is environment-dependent: it returns real rate limit data when the
+   * active Codex account is signed in with ChatGPT auth, and returns a
+   * "chatgpt authentication required" error when the account uses API-key auth
+   * (or the ChatGPT session is absent). The result carries `errorReason` so the
+   * readback UI can show the honest reason instead of a generic "unavailable".
+   */
+  async getAccountRateLimits(): Promise<AppServerAccountRateLimitsResult> {
+    if (!this.appServerClient) {
+      return { rateLimits: null };
+    }
+    try {
+      return await this.appServerClient.getAccountRateLimits();
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      logger.warn('Failed to read account rate limits from app-server', {
+        error: reason,
+      });
+      return { rateLimits: null, errorReason: reason };
+    }
+  }
+
+  /**
+   * Read-only account usage readback via the app-server adjunct client.
+   *
+   * Returns account token usage information from the Codex app-server
+   * `account/usage/read` route. The response contains `summary`
+   * and optional `dailyUsageBuckets`.
+   *
+   * This is an app-server diagnostic surface, not a CLI command or SDK API.
+   * The route is environment-dependent: it returns real token usage when the
+   * active Codex account is signed in with ChatGPT auth, and returns a
+   * "chatgpt authentication required" error when the account uses API-key auth
+   * (or the ChatGPT session is absent). The result carries `errorReason` so the
+   * readback UI can show the honest reason instead of a generic "unavailable".
+   */
+  async getAccountUsage(): Promise<AppServerAccountUsageResult> {
+    if (!this.appServerClient) {
+      return { usage: null };
+    }
+    try {
+      return await this.appServerClient.getAccountUsage();
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      logger.warn('Failed to read account usage from app-server', {
+        error: reason,
+      });
+      return { usage: null, errorReason: reason };
+    }
+  }
+
+  /**
+   * Settings-facing account usage readback (B4 seam): unwraps the diagnostic
+   * `getAccountUsage()` result into the bare usage payload. Returns null when
+   * the app-server is unavailable or the account has no usage payload.
+   */
+  async readAccountUsage(): Promise<AppServerAccountUsage | null> {
+    const result = await this.getAccountUsage();
+    return result.usage;
+  }
+
+  /**
+   * Settings-facing plugin catalog readback (B4 seam): delegates to
+   * `plugin/list`. Returns null when the app-server client is unavailable or
+   * the route fails.
+   */
+  async listCodexPlugins(): Promise<AppServerPluginListResult | null> {
+    if (!this.appServerClient) {
+      return null;
+    }
+    try {
+      return await this.appServerClient.listPlugins();
+    } catch (err) {
+      logger.warn('Failed to list Codex plugins from app-server', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /** Settings-facing installed-plugin readback (B4 seam): delegates to `plugin/installed`. */
+  async listInstalledCodexPlugins(): Promise<AppServerPluginListResult | null> {
+    if (!this.appServerClient) {
+      return null;
+    }
+    try {
+      return await this.appServerClient.listInstalledPlugins();
+    } catch (err) {
+      logger.warn('Failed to list installed Codex plugins from app-server', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /** Settings-facing plugin install (B4 seam): delegates to `plugin/install`. */
+  async installCodexPlugin(
+    pluginName: string,
+    options?: { marketplacePath?: string; remoteMarketplaceName?: string },
+  ): Promise<AppServerPluginInstallResult | null> {
+    if (!this.appServerClient) {
+      return null;
+    }
+    try {
+      return await this.appServerClient.installPlugin(pluginName, options);
+    } catch (err) {
+      logger.warn('Failed to install Codex plugin via app-server', {
+        pluginName,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /** Settings-facing plugin uninstall (B4 seam): delegates to `plugin/uninstall`. */
+  async uninstallCodexPlugin(pluginId: string): Promise<boolean> {
+    if (!this.appServerClient) {
+      return false;
+    }
+    try {
+      return await this.appServerClient.uninstallPlugin(pluginId);
+    } catch (err) {
+      logger.warn('Failed to uninstall Codex plugin via app-server', {
+        pluginId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return false;
+    }
+  }
+
+  /** Settings-facing plugin reconcile (B4 seam): delegates to `plugin/reconcile`. */
+  async reconcileCodexPlugins(): Promise<AppServerPluginReconcileResult | null> {
+    if (!this.appServerClient) {
+      return null;
+    }
+    try {
+      return await this.appServerClient.reconcilePlugins();
+    } catch (err) {
+      logger.warn('Failed to reconcile Codex plugins via app-server', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Read-only model provider capabilities readback via the app-server adjunct client.
+   *
+   * Returns capability flags (`namespaceTools`, `imageGeneration`, `webSearch`)
+   * from the Codex app-server `modelProvider/capabilities/read` route.
+   * These are diagnostic flags indicating what the current model provider supports.
+   *
+   * This is an app-server diagnostic surface. Returns null if the app-server
+   * client is unavailable or the request fails.
+   */
+  async getModelProviderCapabilities(): Promise<AppServerModelProviderCapabilities | null> {
+    if (!this.appServerClient) {
+      return null;
+    }
+    try {
+      return await this.appServerClient.getModelProviderCapabilities();
+    } catch (err) {
+      logger.warn('Failed to read model provider capabilities from app-server', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Read-only MCP server status readback via the app-server adjunct client.
+   *
+   * Returns MCP server runtime status from the Codex app-server
+   * `mcpServerStatus/list` route. Each entry contains `name`, optional
+   * `serverInfo`, `tools`, `resources`, `resourceTemplates`, and `authStatus`.
+   *
+   * This is an app-server diagnostic surface, not an MCP management or
+   * authoring interface. Returns null if the app-server client is unavailable
+   * or the request fails.
+   */
+  async getMcpServerStatus(): Promise<AppServerMcpServerStatus[] | null> {
+    if (!this.appServerClient) {
+      return null;
+    }
+    try {
+      const statuses = await this.appServerClient.listMcpServerStatus();
+      return statuses.length > 0 ? statuses : null;
+    } catch (err) {
+      logger.warn('Failed to read MCP server status from app-server', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Ask the Codex app-server to reload its MCP server configuration.
+   *
+   * Calls the `config/mcpServer/reload` route. Returns `true` if the reload
+   * request was accepted, `false` otherwise. This does not edit project-level
+   * MCP settings; it only asks the running app-server to re-read its config.
+   */
+  async reloadMcpServers(): Promise<boolean> {
+    if (!this.appServerClient) {
+      return false;
+    }
+    try {
+      return await this.appServerClient.reloadMcpServers();
+    } catch (err) {
+      logger.warn('Failed to reload MCP servers via app-server', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Read a single MCP server resource via the app-server
+   * `mcpServer/resource/read` route.
+   *
+   * Returns the resource contents (read-only inspection surface), or null if
+   * the app-server client is unavailable.
+   */
+  async readMcpServerResource(server: string, uri: string): Promise<AppServerMcpResourceReadResult | null> {
+    if (!this.appServerClient) {
+      return null;
+    }
+    try {
+      return await this.appServerClient.readMcpServerResource(server, uri);
+    } catch (err) {
+      logger.warn('Failed to read MCP server resource via app-server', {
+        server,
+        uri,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Retry a single MCP tool call via the app-server
+   * `mcpServer/tool/call` route.
+   *
+   * Used by the inline chat recovery affordance: when a Codex MCP tool block
+   * fails (e.g. with an auth error), the user can re-run the exact same
+   * server/tool/arguments directly against the app-server to verify the fix.
+   * The result is surfaced inline on the same block. This is a constrained
+   * diagnostic retry — NOT a generic tool-call console and NOT a replacement
+   * for re-sending the message (the agent's conversation context is untouched).
+   * Returns null if the app-server client is unavailable.
+   */
+  async retryMcpToolCall(
+    backendSessionId: string,
+    server: string,
+    tool: string,
+    toolArguments: Record<string, unknown>,
+  ): Promise<AppServerMcpToolCallResult | null> {
+    if (!this.appServerClient) {
+      return null;
+    }
+    try {
+      return await this.appServerClient.mcpServerToolCall(backendSessionId, server, tool, toolArguments);
+    } catch (err) {
+      logger.warn('Failed to retry MCP tool call via app-server', {
+        backendSessionId,
+        server,
+        tool,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  async triggerMcpServerOAuth(
+    name: string,
+    options?: { scopes?: string[]; timeoutSecs?: number; onAuthorizationUrl?: (url: string) => void },
+  ): Promise<McpOauthLoginResult | null> {
+    if (!this.appServerClient) {
+      return null;
+    }
+    try {
+      return await this.appServerClient.mcpServerOauthLogin(name, options);
+    } catch (err) {
+      logger.warn('Failed to trigger MCP server OAuth via app-server', {
+        name,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return { outcome: 'failed', browserOpened: false, errorReason: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  async getThreadGoal(backendSessionId: string): Promise<AppServerThreadGoal | null> {
+    if (!this.appServerClient) {
+      return null;
+    }
+    try {
+      return await this.appServerClient.getThreadGoal(backendSessionId);
+    } catch (err) {
+      logger.warn('Failed to read thread goal', {
+        backendSessionId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Set or update a thread goal via `thread/goal/set`. Passing
+   * `options.status` alone pauses/resumes the existing goal without
+   * restating its objective; `objective` + `tokenBudget` create/update.
+   * `backendSessionId` must be the real thread id (the app-server routes are
+   * thread-scoped); use `pauseThreadGoal` / `resumeThreadGoal` for
+   * adapter-session aliasing.
+   */
+  async setThreadGoal(backendSessionId: string, objective: string, options?: AppServerSetThreadGoalOptions): Promise<AppServerThreadGoal | null> {
+    if (!this.appServerClient) {
+      return null;
+    }
+    try {
+      return await this.appServerClient.setThreadGoal(backendSessionId, objective, options);
+    } catch (err) {
+      logger.warn('Failed to set thread goal', {
+        backendSessionId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /** Pause an existing thread goal (status `paused`) without restating it. */
+  async pauseThreadGoal(sessionId: string): Promise<AppServerThreadGoal | null> {
+    return this.setThreadGoalStatus(sessionId, 'paused');
+  }
+
+  /** Resume a paused thread goal (status `active`). */
+  async resumeThreadGoal(sessionId: string): Promise<AppServerThreadGoal | null> {
+    return this.setThreadGoalStatus(sessionId, 'active');
+  }
+
+  private async setThreadGoalStatus(sessionId: string, status: AppServerThreadGoalStatus): Promise<AppServerThreadGoal | null> {
+    const client = this.appServerClient;
+    if (!client) {
+      return null;
+    }
+    const threadId = this.resolveThreadId(sessionId);
+    if (!threadId) {
+      return null;
+    }
+    try {
+      const goal = await client.setThreadGoal(threadId, undefined, { status });
+      if (goal) {
+        this.threadGoalByThread.set(threadId, goal);
+      }
+      return goal;
+    } catch (err) {
+      logger.warn('Failed to update thread goal status', {
+        threadId,
+        status,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  async clearThreadGoal(backendSessionId: string): Promise<boolean> {
+    if (!this.appServerClient) {
+      return false;
+    }
+    try {
+      return await this.appServerClient.clearThreadGoal(backendSessionId);
+    } catch (err) {
+      logger.warn('Failed to clear thread goal', {
+        backendSessionId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return false;
+    }
+  }
+
+  /** Structured catalogs are read-only UI evidence, without CLI/empty fallbacks. */
+  getModelsCatalog() {
+    return this.appServerClient?.getModelsCatalog() ?? Promise.resolve({ status: 'unavailable' as const, data: [], nextCursor: null, errorReason: 'Codex app-server unavailable' });
+  }
+
+  getPermissionProfilesCatalog() {
+    return this.appServerClient?.getPermissionProfilesCatalog({ ...(this.options.workingDirectory ? { cwd: this.options.workingDirectory } : {}) })
+      ?? Promise.resolve({ status: 'unavailable' as const, data: [], nextCursor: null, errorReason: 'Codex app-server unavailable' });
+  }
+
+  getMcpServerStatusCatalog() {
+    return this.appServerClient?.getMcpServerStatusCatalog() ?? Promise.resolve({ status: 'unavailable' as const, data: [], nextCursor: null, errorReason: 'Codex app-server unavailable' });
+  }
+
+  getLoadedThreadsCatalog() {
+    return this.appServerClient?.getLoadedThreadsCatalog() ?? Promise.resolve({ status: 'unavailable' as const, data: [], nextCursor: null, errorReason: 'Codex app-server unavailable' });
+  }
+
+  async listLoadedThreads(): Promise<Array<{ id: string }>> {
+    if (!this.appServerClient) {
+      return [];
+    }
+    try {
+      return await this.appServerClient.listLoadedThreads();
+    } catch (err) {
+      logger.warn('Failed to list loaded threads', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Fork a persisted Codex thread via the app-server.
+   *
+   * Implements AgentForkCapability. The new thread is created on the app-server
+   * and persisted to disk; the returned id can be used to resume it.
+   */
+  async forkSession(sessionId: string, messageID?: string): Promise<{ id: string; title: string }> {
+    if (!this.appServerClient) {
+      throw new Error('Codex app-server client is not available');
+    }
+    let beforeTurnId: string | undefined;
+    if (messageID !== undefined) {
+      await this.appServerClient.start();
+      if (!messageID.trim() || !this.appServerClient.supportsBeforeTurnFork()) {
+        throw new Error('Codex before-turn fork is unavailable; native identity cannot be safely applied');
+      }
+      if (this.activeControllers.has(this.logicalSessionKey(sessionId))) {
+        throw new Error('Cannot fork an active Codex session');
+      }
+      const source = await this.appServerClient.readThread(sessionId, true);
+      if (!source || source.id !== sessionId || !Array.isArray(source.turns)) {
+        throw new Error(`Cannot fork Codex session: foreign or unavailable identity ${messageID}`);
+      }
+      const matches = source.turns.flatMap((turn) => turn.items
+        .filter((item) => item.type === 'userMessage' && item.id === messageID)
+        .map(() => turn));
+      if (matches.length !== 1) {
+        throw new Error(`Cannot fork Codex session: identity ${messageID} is unknown or ambiguous`);
+      }
+      const owningTurn = matches[0];
+      if (!owningTurn.id || !['completed', 'interrupted', 'failed'].includes(owningTurn.status ?? '')
+        || source.status?.type === 'active' || this.activeControllers.has(this.logicalSessionKey(sessionId))) {
+        throw new Error(`Cannot fork Codex session: identity ${messageID} belongs to an active turn`);
+      }
+      beforeTurnId = owningTurn.id;
+    }
+    const result = beforeTurnId
+      ? await this.appServerClient.forkThread(sessionId, { beforeTurnId })
+      : await this.appServerClient.forkThread(sessionId);
+    if (!result?.thread?.id) {
+      throw new Error(`Failed to fork Codex session ${sessionId}`);
+    }
+    this.forkedThreadIds.add(result.thread.id);
+    const title = result.thread.name
+      || (typeof result.thread.preview === 'string' ? result.thread.preview.slice(0, 80) : '')
+      || '(untitled)';
+    return { id: result.thread.id, title };
+  }
+
+  /**
+   * Archive a persisted Codex thread via the app-server.
+   *
+   * Returns true if the archive request was accepted. Archives are visible in
+   * the app-server thread list but marked as archived.
+   */
+  async archiveSession(sessionId: string): Promise<boolean> {
+    if (!this.appServerClient) {
+      return false;
+    }
+    return this.appServerClient.archiveThread(sessionId);
+  }
+
+  /**
+   * Unarchive a previously archived Codex thread via the app-server.
+   */
+  async unarchiveSession(sessionId: string): Promise<boolean> {
+    if (!this.appServerClient) {
+      return false;
+    }
+    return this.appServerClient.unarchiveThread(sessionId);
+  }
+
+  /**
+   * Start a code review on the given Codex session.
+   *
+   * The session must have a real backend `threadId` (not a provisional id).
+   * The adapter first resumes (loads) the thread on the app-server, then
+   * calls `review/start` with the given target.  Returns the review turn
+   * info on success, or null if the app-server client is unavailable, the
+   * thread cannot be loaded, or the review/start request fails.
+   *
+   * Review progress and results arrive as async app-server notifications
+   * (`item/started`, `item/completed`, `turn/completed`); callers can
+   * subscribe via `appServerClient.addNotificationHandler()` if they hold
+   * a direct reference.
+   */
+  async startReview(
+    sessionId: string,
+    target: AppServerReviewTarget,
+  ): Promise<AppServerReviewResult | null> {
+    if (!this.appServerClient) {
+      return null;
+    }
+    // `review/start` requires a loaded thread. Resume first, then review.
+    await this.appServerClient.resumeThread(sessionId);
+    return this.appServerClient.startReview(sessionId, target);
+  }
+
+  dispose(): void {
+    this.stop();
+    this.sessions.clear();
+    this.threadAlias.clear();
+    this.statusHandlers.clear();
+  }
+
+  // -------------------------------------------------------------------------
+  // AgentAuxQueryCapability
+  // -------------------------------------------------------------------------
+
+  /**
+   * Start a read-only auxiliary session on an ephemeral Codex thread.
+   *
+   * Rejects when the app-server is unavailable or does not confirm the
+   * read-only sandbox in its own effective-settings report. See
+   * docs/requirements/inline-edit.md §5.4.
+   */
+  async startAuxQuerySession(config: AuxQuerySessionConfig): Promise<AuxQuerySession> {
+    const client = this.appServerClient;
+    if (!client) {
+      throw new Error(
+        'Codex auxiliary session requires a running app-server (read-only sandbox cannot be verified otherwise).',
+      );
+    }
+    let effort: CodexAuxSessionOptions['effort'];
+    if (config.effort) {
+      if (!CODEX_EFFORT_VARIANTS.includes(config.effort as CodexReasoningEffort)) {
+        throw new Error(`Unsupported Codex aux effort: ${config.effort}`);
+      }
+      effort = config.effort as CodexAuxSessionOptions['effort'];
+    }
+    return CodexAuxQuerySession.create({
+      systemPrompt: config.systemPrompt,
+      workingDirectory: config.workingDirectory,
+      client,
+      ...(config.model ? { model: config.model } : {}),
+      ...(effort ? { effort } : {}),
+      ...(config.turnTimeoutMs ? { turnTimeoutMs: config.turnTimeoutMs } : {}),
+    });
+  }
+
+  /**
+   * Start a warm completion session (R-C3) over the same read-only sandbox
+   * mechanics as inline edit: ephemeral thread, `sandbox=read-only`,
+   * `approvalPolicy=never`, verified against the app-server's effective
+   * settings. `reset()` rebuilds the ephemeral thread through this same
+   * construction; the app-server client (the warm part) is shared.
+   */
+  async startInlineCompletionSession(config: InlineCompletionSessionConfig): Promise<InlineCompletionSession> {
+    const startAux = async (): Promise<WarmableAuxSession> =>
+      await this.startAuxQuerySession({
+        systemPrompt: config.systemPrompt,
+        workingDirectory: config.workingDirectory,
+        turnTimeoutMs: INLINE_COMPLETION_TURN_TIMEOUT_MS,
+        ...(config.model ? { model: config.model } : {}),
+        ...(config.effort ? { effort: config.effort } : {}),
+      });
+    const initial = await startAux();
+    return WarmInlineCompletionSession.create({
+      backend: this.kind,
+      session: initial,
+      recreate: startAux,
+    });
+  }
+
+  /**
+   * Invalidate the cached SDK `Thread` object for a live session so the next
+   * `sendMessage()` re-resumes the backend thread with the adapter's CURRENT
+   * options (model, sandbox, effort, network, webSearch, additionalDirs).
+   *
+   * The TypeScript SDK freezes thread options (`_threadOptions`) at the moment
+   * a `Thread` is created via `startThread()` / `resumeThread()`, and each
+   * `runStreamed()` spawns a fresh `codex exec resume <threadId>` subprocess
+   * that reads those settings from CLI args. Mutating `this.options` via the
+   * `update*()` methods therefore does NOT affect an already-cached thread.
+   *
+   * Calling this after a settings change drops the cached `Thread` while
+   * keeping the real `threadId`, so the next turn re-resumes with the new
+   * CLI args AND preserves the full conversation history stored in the
+   * persisted rollout file. This is the honest "applies to the next turn in
+   * the current conversation" path — it does NOT use the app-server
+   * `thread/settings/update` route (which is app-server-only and unreachable
+   * from the SDK's per-turn `codex exec` subprocess).
+   *
+   * Returns `true` when a cached thread was actually dropped, `false` when
+   * there is no session, no real `threadId`, or no cached thread to drop.
+   * Safe to call mid-stream: the running turn already captured its `Thread`
+   * reference locally, so only the NEXT turn re-resumes.
+   */
+  invalidateLiveThread(sessionId: string): boolean {
+    const entry = this.resolveSession(sessionId);
+    if (!entry || !entry.threadId || !entry.thread) {
+      return false;
+    }
+    entry.thread = null;
+    return true;
+  }
+
+  /**
+   * Update the reasoning effort used for subsequent thread creation.
+   *
+   * This does **not** affect existing/resumed threads — only threads
+   * created or resumed after this call will use the new value.
+   * The UI must be honest that this is a "next thread" boundary.
+   */
+  updateModelReasoningEffort(effort: CodexAdapterOptions['modelReasoningEffort']): void {
+    this.options = {
+      ...this.options,
+      modelReasoningEffort: effort,
+    };
+  }
+
+  /**
+   * Update the sandbox mode used for subsequent thread creation/resume.
+   *
+   * This does **not** affect existing/resumed threads — only threads
+   * created or resumed after this call will use the new value.
+   * The UI must be honest that this is a "next thread" boundary.
+   */
+  updateSandboxMode(mode: CodexAdapterOptions['sandboxMode']): void {
+    this.options = {
+      ...this.options,
+      sandboxMode: mode,
+    };
+  }
+
+  updateModel(model: string | undefined): void {
+    this.options = {
+      ...this.options,
+      model: model && model.trim().length > 0 ? model.trim() : undefined,
+    };
+  }
+
+  /**
+   * Update the additional directories used for subsequent thread creation.
+   *
+   * This does **not** affect existing/resumed threads — only threads
+   * created or resumed after this call will use the new directories.
+   */
+  updateAdditionalDirectories(directories: readonly string[] | undefined): void {
+    this.options = {
+      ...this.options,
+      additionalDirectories:
+        directories && directories.length > 0 ? [...directories] : undefined,
+    };
+  }
+
+  /**
+   * Update whether network access is enabled for subsequent thread creation.
+   *
+   * This does **not** affect existing/resumed threads — only threads
+   * created or resumed after this call will use the new value.
+   */
+  updateNetworkAccessEnabled(enabled: boolean | undefined): void {
+    this.options = {
+      ...this.options,
+      networkAccessEnabled: enabled,
+    };
+  }
+
+  updateWebSearchMode(mode: CodexAdapterOptions['webSearchMode']): void {
+    this.options = {
+      ...this.options,
+      webSearchMode: mode,
+    };
+  }
+
+  /**
+   * Update the approval policy used for subsequent thread creation/resume.
+   *
+   * 'inherit' omits the approvalPolicy override; 'untrusted'/'on-request'
+   * require the app-server + approval bridge at turn time (fail closed
+   * otherwise); 'never' may use the SDK fallback. Does not affect an
+   * already-cached thread — only the next thread/turn boundary.
+   */
+  updateApprovalPolicy(policy: CodexApprovalPolicy): void {
+    this.options = {
+      ...this.options,
+      approvalPolicy: policy,
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // Server-request approval bridge
+  // -------------------------------------------------------------------------
+
+  /**
+   * Set the host callback that surfaces server-request approvals to the UI.
+   * If the app-server client is already running, the legacy
+   * (`execCommandApproval` / `applyPatchApproval`) and v2
+   * (`item/{commandExecution,fileChange,permissions}/requestApproval`,
+   * `item/tool/requestUserInput`) handlers are registered immediately;
+   * otherwise they are registered on the next successful `start()`. Calling
+   * this replaces the previous host; already-registered handlers read the
+   * host dynamically, so a host that loses its `collectApproval` callback
+   * safely degrades to `denied`.
+   */
+  setApprovalHost(host: CodexApprovalBridgeHost): void {
+    this.approvalHost = host;
+    this.registerApprovalHandlers();
+  }
+
+  /**
+   * Set the host callback that surfaces MCP elicitations to the UI. Same
+   * lifecycle as `setApprovalHost`: registers `mcpServer/elicitation/request`
+   * immediately when the client is running, else on the next `start()`.
+   * Registration no longer requires the host callback, so the handler exists
+   * from client start onward; frames that arrived hostless while waiting are
+   * flushed to this host right after it is set.
+   */
+  setElicitationHost(host: CodexElicitationBridgeHost): void {
+    this.elicitationHost = host;
+    this.registerElicitationHandlers();
+    this.flushPendingElicitations();
+  }
+
+  /**
+   * Register the legacy + v2 approval server-request handlers on the
+   * app-server client. Idempotent: a no-op when there is no client, no host
+   * callback, or handlers are already registered. The typed v2 registrations
+   * are guarded so injected client doubles without the 0.159.0 surface keep
+   * working (legacy routes stay registered).
+   */
+  private registerApprovalHandlers(): void {
+    if (!this.appServerClient || this.approvalHandlersRegistered) {
+      return;
+    }
+    if (!this.approvalHost.collectApproval) {
+      return;
+    }
+    this.appServerClient.registerServerRequestHandler(
+      'execCommandApproval',
+      (params, signal) => this.handleApproval('execCommand', params, signal),
+    );
+    this.appServerClient.registerServerRequestHandler(
+      'applyPatchApproval',
+      (params, signal) => this.handleApproval('applyPatch', params, signal),
+    );
+    if (typeof this.appServerClient.registerCommandExecutionApprovalHandler === 'function') {
+      this.appServerClient.registerCommandExecutionApprovalHandler((params, signal) =>
+        this.handleCommandExecutionApproval(params, signal));
+    }
+    if (typeof this.appServerClient.registerFileChangeApprovalHandler === 'function') {
+      this.appServerClient.registerFileChangeApprovalHandler((params, signal) =>
+        this.handleFileChangeApproval(params, signal));
+    }
+    if (typeof this.appServerClient.registerPermissionsApprovalHandler === 'function') {
+      this.appServerClient.registerPermissionsApprovalHandler((params, signal) =>
+        this.handlePermissionsApproval(params, signal));
+    }
+    if (typeof this.appServerClient.registerToolUserInputHandler === 'function') {
+      this.appServerClient.registerToolUserInputHandler((params, signal) =>
+        this.handleToolUserInput(params, signal));
+    }
+    this.approvalHandlersRegistered = true;
+  }
+
+  /**
+   * Remove the approval server-request handlers from the app-server client.
+   * After removal, matching server requests receive a `-32601 Method not
+   * found` reply (per the bridge contract) instead of being handled.
+   */
+  private unregisterApprovalHandlers(): void {
+    if (!this.appServerClient || !this.approvalHandlersRegistered) {
+      return;
+    }
+    this.appServerClient.unregisterServerRequestHandler('execCommandApproval');
+    this.appServerClient.unregisterServerRequestHandler('applyPatchApproval');
+    this.appServerClient.unregisterServerRequestHandler('item/commandExecution/requestApproval');
+    this.appServerClient.unregisterServerRequestHandler('item/fileChange/requestApproval');
+    this.appServerClient.unregisterServerRequestHandler('item/permissions/requestApproval');
+    this.appServerClient.unregisterServerRequestHandler('item/tool/requestUserInput');
+    this.approvalHandlersRegistered = false;
+  }
+
+  /**
+   * Register the `mcpServer/elicitation/request` handler; idempotent. Unlike
+   * the approval bridge, registration does NOT require the host callback:
+   * registering the route as soon as the client exists closes the race where
+   * a server-initiated elicitation arrives before `setElicitationHost` ran
+   * (the frame used to fall through to the transport's -32601 reply and the
+   * form card was never rendered). Hostless frames are pended instead.
+   */
+  private registerElicitationHandlers(): void {
+    const client = this.appServerClient;
+    if (!client || this.elicitationHandlersRegistered) {
+      return;
+    }
+    if (typeof client.registerMcpElicitationHandler !== 'function') {
+      return;
+    }
+    client.registerMcpElicitationHandler((params, signal) => this.handleMcpElicitation(params, signal));
+    this.elicitationHandlersRegistered = true;
+  }
+
+  /**
+   * Remove the elicitation handler; afterwards the route answers -32601. Any
+   * elicitation still pended for a host settles as cancelled so no JSON-RPC
+   * reply is left hanging across teardown.
+   */
+  private unregisterElicitationHandlers(): void {
+    this.cancelPendingElicitations('adapter_stopped');
+    if (!this.appServerClient || !this.elicitationHandlersRegistered) {
+      return;
+    }
+    this.appServerClient.unregisterServerRequestHandler('mcpServer/elicitation/request');
+    this.elicitationHandlersRegistered = false;
+  }
+
+  /**
+   * Hold a valid elicitation whose host is not wired yet. The entry binds the
+   * frame's combined request/turn lifetime plus the host-wait timeout; it is
+   * dispatched by `flushPendingElicitations` when `setElicitationHost` runs,
+   * and otherwise settles as `{ action: 'cancel' }` — never left hanging.
+   */
+  private pendElicitation(
+    params: CodexMcpElicitationWireParams,
+    lifetime: { signal?: AbortSignal; dispose: () => void },
+  ): Promise<AppServerMcpElicitationResponse> {
+    const id = this.nextPendingElicitationId++;
+    let resolve!: (response: AppServerMcpElicitationResponse) => void;
+    const promise = new Promise<AppServerMcpElicitationResponse>((settle) => {
+      resolve = settle;
+    });
+    const entry: PendingElicitation = {
+      params,
+      ...(lifetime.signal ? { signal: lifetime.signal } : {}),
+      resolve,
+      timer: setTimeout(() => {
+        this.settlePendingElicitation(id, { action: 'cancel' }, 'host_wait_timeout');
+      }, ELICITATION_HOST_WAIT_TIMEOUT_MS),
+      onAbort: () => this.settlePendingElicitation(id, { action: 'cancel' }, 'host_wait_aborted'),
+      disposeLifetime: lifetime.dispose,
+    };
+    this.pendingElicitations.set(id, entry);
+    entry.signal?.addEventListener('abort', entry.onAbort, { once: true });
+    this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.pending', {
+      mode: params.mode,
+      serverName: params.serverName,
+      threadId: params.threadId,
+      reason: 'host_not_wired',
+    }));
+    logger.warn('Elicitation arrived before the host was wired; holding it for setElicitationHost', {
+      serverName: params.serverName,
+      mode: params.mode,
+    });
+    return promise;
+  }
+
+  /** Settle one pended elicitation and release its lifetime bookkeeping. */
+  private settlePendingElicitation(
+    id: number,
+    response: AppServerMcpElicitationResponse,
+    reason: 'host_wired' | 'host_wait_aborted' | 'host_wait_timeout' | 'adapter_stopped',
+  ): void {
+    const entry = this.pendingElicitations.get(id);
+    if (!entry) {
+      return;
+    }
+    this.pendingElicitations.delete(id);
+    clearTimeout(entry.timer);
+    entry.signal?.removeEventListener('abort', entry.onAbort);
+    entry.disposeLifetime();
+    this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.pending.settled', {
+      mode: entry.params.mode,
+      serverName: entry.params.serverName,
+      threadId: entry.params.threadId,
+      reason,
+      action: response.action,
+    }));
+    entry.resolve(response);
+  }
+
+  /**
+   * Dispatch every pended elicitation to the freshly wired host, preserving
+   * the original wire params and the captured request/turn lifetime. The
+   * combined signal stays armed during dispatch so a turn abort still settles
+   * the card as cancelled through the normal elicitation flow.
+   */
+  private flushPendingElicitations(): void {
+    const collect = this.elicitationHost.collectElicitation;
+    if (!collect || this.pendingElicitations.size === 0) {
+      return;
+    }
+    for (const id of [...this.pendingElicitations.keys()]) {
+      const entry = this.pendingElicitations.get(id);
+      if (!entry) {
+        continue;
+      }
+      // Take the entry out of the pending set first: from here on its outcome
+      // belongs to the normal host flow, not the pending bookkeeping.
+      this.pendingElicitations.delete(id);
+      clearTimeout(entry.timer);
+      entry.signal?.removeEventListener('abort', entry.onAbort);
+      entry.resolve(this.dispatchElicitation(entry.params, collect, {
+        signal: entry.signal,
+        dispose: entry.disposeLifetime,
+      }));
+    }
+  }
+
+  /** Cancel every pended elicitation (adapter teardown path). */
+  private cancelPendingElicitations(reason: 'adapter_stopped'): void {
+    for (const id of [...this.pendingElicitations.keys()]) {
+      this.settlePendingElicitation(id, { action: 'cancel' }, reason);
+    }
+  }
+
+  /** Combine the request lifetime and owning turn without requiring AbortSignal.any. */
+  private createServerRequestSignal(threadId: string | undefined, requestSignal?: AbortSignal): { signal?: AbortSignal; dispose: () => void } {
+    const turnSignal = threadId ? this.activeControllers.get(this.logicalSessionKey(threadId))?.signal : undefined;
+    const sources = [requestSignal, turnSignal].filter((signal): signal is AbortSignal => signal !== undefined);
+    if (sources.length < 2 || sources[0] === sources[1]) {
+      return { signal: sources[0], dispose: () => {} };
+    }
+    const controller = new AbortController();
+    const cancel = (): void => controller.abort();
+    for (const signal of sources) {
+      signal.addEventListener('abort', cancel, { once: true });
+      if (signal.aborted) cancel();
+    }
+    return {
+      signal: controller.signal,
+      dispose: () => {
+        for (const signal of sources) signal.removeEventListener('abort', cancel);
+      },
+    };
+  }
+
+  /**
+   * Shared approval-collection core: collects the host decision for a
+   * pre-built request and traces every outcome. Fails closed: a missing host,
+   * a throwing host, or a cancelled card all produce `{ decision: 'denied' }`.
+   */
+  private async collectApprovalDecision(request: CodexApprovalRequest, requestSignal?: AbortSignal): Promise<CodexApprovalDecision> {
+    const collect = this.approvalHost.collectApproval;
+    const threadId = readThreadIdFromParams(request.raw);
+    const lifetime = this.createServerRequestSignal(threadId, requestSignal);
+    const signal = lifetime.signal;
+    try {
+      if (signal?.aborted) return { decision: 'denied' };
+      if (!collect) {
+        this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: 'denied', reason: 'no_host', threadId }));
+        return { decision: 'denied' };
+      }
+      this.trace((port) => port.recordToolInteraction(undefined, 'approval.request', { kind: request.kind, threadId, summary: request.summary }));
+      let decision: CodexApprovalDecision | null;
+      try {
+        decision = await collect(signal ? { ...request, signal } : request);
+      } catch (err) {
+        logger.warn('Approval host threw; defaulting to denied', {
+          kind: request.kind,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: 'denied', reason: 'host_threw', threadId }));
+        return { decision: 'denied' };
+      }
+      if (!decision || signal?.aborted) {
+        this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: 'denied', reason: 'host_cancelled', threadId }));
+        return { decision: 'denied' };
+      }
+      this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind: request.kind, decision: decision.decision, threadId }));
+      return decision;
+    } finally {
+      lifetime.dispose();
+    }
+  }
+
+  /**
+   * Handle a single legacy server-request approval: normalize params into a
+   * UI request, collect a decision from the host, and translate it into the
+   * `{ decision: ReviewDecision }` payload the legacy bridge replies with.
+   * Defaults to a safe `denied` decision when the host is absent, throws, or
+   * cancels.
+   */
+  private async handleApproval(kind: 'execCommand' | 'applyPatch', params: unknown, signal?: AbortSignal): Promise<{ decision: string }> {
+    const request = this.normalizeApprovalRequest(kind, params);
+    const decision = await this.collectApprovalDecision(request, signal);
+    return { decision: decision.decision };
+  }
+
+  /** v2 `item/commandExecution/requestApproval` → question card → wire decision. */
+  private async handleCommandExecutionApproval(
+    params: AppServerCommandExecutionApprovalParams,
+    signal?: AbortSignal,
+  ): Promise<AppServerCommandExecutionApprovalResponse> {
+    const decision = await this.collectApprovalDecision(this.normalizeCommandExecutionApproval(params), signal);
+    return { decision: this.mapCommandExecutionWireDecision(decision) };
+  }
+
+  /** v2 `item/fileChange/requestApproval` → question card → wire decision. */
+  private async handleFileChangeApproval(
+    params: AppServerFileChangeApprovalParams,
+    signal?: AbortSignal,
+  ): Promise<AppServerFileChangeApprovalResponse> {
+    const decision = await this.collectApprovalDecision(this.normalizeFileChangeApproval(params), signal);
+    return { decision: this.mapFileChangeWireDecision(decision) };
+  }
+
+  /**
+   * v2 `item/permissions/requestApproval` → question card → granted profile.
+   * Approve echoes the requested profile back (scope per the user's choice:
+   * Approve → `turn`, Approve for session → `session`); deny returns an empty
+   * grant, which the schema permits (all `GrantedPermissionProfile` fields
+   * are optional).
+   */
+  private async handlePermissionsApproval(
+    params: AppServerPermissionsApprovalParams,
+    signal?: AbortSignal,
+  ): Promise<AppServerPermissionsApprovalResponse> {
+    const decision = await this.collectApprovalDecision(this.normalizePermissionsApproval(params), signal);
+    if (decision.decision === 'approved') {
+      return { permissions: this.echoGrantedProfile(params.permissions), scope: 'turn' };
+    }
+    if (decision.decision === 'approved_for_session') {
+      return { permissions: this.echoGrantedProfile(params.permissions), scope: 'session' };
+    }
+    return { permissions: {} };
+  }
+
+  /** Dynamic `item/tool/requestUserInput` → question card → per-question answers. */
+  private async handleToolUserInput(
+    params: AppServerToolUserInputParams,
+    requestSignal?: AbortSignal,
+  ): Promise<AppServerToolUserInputResponse> {
+    if (!isRecordLike(params)) return this.emptyToolUserInputResponse();
+    const collect = this.approvalHost.collectQuestionAnswers;
+    const threadId = typeof params.threadId === 'string' ? params.threadId : undefined;
+    const lifetime = this.createServerRequestSignal(threadId, requestSignal);
+    const signal = lifetime.signal;
+    try {
+      if (signal?.aborted) return this.emptyToolUserInputResponse();
+      const rawQuestions: unknown = params.questions;
+      if (!Array.isArray(rawQuestions) || rawQuestions.some((question) => (
+        !isRecordLike(question)
+        || typeof question.id !== 'string'
+        || typeof question.question !== 'string'
+        || typeof question.header !== 'string'
+        || (question.isOther !== undefined && typeof question.isOther !== 'boolean')
+        || (question.isSecret !== undefined && typeof question.isSecret !== 'boolean')
+        || (question.options != null && (!Array.isArray(question.options) || question.options.some((option) => (
+          !isRecordLike(option) || typeof option.label !== 'string' || typeof option.description !== 'string'
+        ))))
+      ))) {
+        return this.emptyToolUserInputResponse();
+      }
+      if (!collect) {
+        this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.declined', { reason: 'no_host', threadId }));
+        return this.emptyToolUserInputResponse();
+      }
+      const questionRequest: QuestionRequest = {
+        id: `codex-tool-input-${params.itemId}`,
+        sessionId: threadId ?? 'codex',
+        questions: (params.questions ?? []).map((question) => {
+          const options = (question.options ?? []).map((option) => ({
+            label: option.label,
+            description: option.description,
+          }));
+          return {
+            question: question.question,
+            header: question.header,
+            options,
+            // Native request_user_input options are mutually exclusive.
+          multiple: false,
+            custom: options.length === 0 || question.isOther === true,
+          };
+        }),
+      };
+      this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.request', {
+        threadId,
+        itemId: params.itemId,
+        questionCount: questionRequest.questions.length,
+      }));
+      let result: CodexApprovalResolutionResult | null;
+      try {
+        result = await collect(questionRequest, ...(signal ? [signal] : []));
+      } catch (err) {
+        logger.warn('Tool user-input host threw; returning empty answers', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return this.emptyToolUserInputResponse();
+      }
+      if (!result || result.status !== 'answered' || signal?.aborted) {
+        this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.unanswered', { threadId, itemId: params.itemId }));
+        return this.emptyToolUserInputResponse();
+      }
+      // Wire shape (Codex 0.159.0 schema dump): answers maps each question id
+      // to its selected/typed answers.
+      const answersByQuestionId: Record<string, { answers: string[] }> = {};
+      (params.questions ?? []).forEach((question, index) => {
+        answersByQuestionId[question.id] = { answers: [...(result.answers?.[index] ?? [])] };
+      });
+      this.trace((port) => port.recordToolInteraction(undefined, 'toolUserInput.answered', { threadId, itemId: params.itemId }));
+      return { answers: answersByQuestionId };
+    } finally {
+      lifetime.dispose();
+    }
+  }
+
+  /** Fail-closed empty reply for the tool-user-input route. */
+  private emptyToolUserInputResponse(): AppServerToolUserInputResponse {
+    return { answers: {} };
+  }
+
+  /**
+   * `mcpServer/elicitation/request` → elicitation card → accept/decline/cancel.
+   * When the host is not wired yet, the valid frame is pended — bound to its
+   * request/turn lifetime plus a bounded host-wait timeout — and dispatched by
+   * `flushPendingElicitations` once `setElicitationHost` runs. It is never
+   * cancelled as "no host" merely because the wiring raced the frame.
+   */
+  private async handleMcpElicitation(params: unknown, requestSignal?: AbortSignal): Promise<AppServerMcpElicitationResponse> {
+    if (!isCodexElicitationWireParams(params)) {
+      logger.warn('Ignoring malformed mcpServer/elicitation/request params');
+      return { action: 'cancel' };
+    }
+    const lifetime = this.createServerRequestSignal(params.threadId, requestSignal);
+    if (lifetime.signal?.aborted) {
+      lifetime.dispose();
+      return { action: 'cancel' };
+    }
+    const collect = this.elicitationHost.collectElicitation;
+    if (!collect) {
+      return this.pendElicitation(params, lifetime);
+    }
+    return this.dispatchElicitation(params, collect, lifetime);
+  }
+
+  /** Run the elicitation mode handlers under one combined request/turn lifetime. */
+  private async dispatchElicitation(
+    params: CodexMcpElicitationWireParams,
+    collect: NonNullable<CodexElicitationBridgeHost['collectElicitation']>,
+    lifetime: { signal?: AbortSignal; dispose: () => void },
+  ): Promise<AppServerMcpElicitationResponse> {
+    try {
+      return await this.runElicitation(params, collect, lifetime.signal);
+    } finally {
+      lifetime.dispose();
+    }
+  }
+
+  /** Mode dispatch + schema admission for one elicitation frame. */
+  private async runElicitation(
+    params: CodexMcpElicitationWireParams,
+    collect: NonNullable<CodexElicitationBridgeHost['collectElicitation']>,
+    signal?: AbortSignal,
+  ): Promise<AppServerMcpElicitationResponse> {
+    if (signal?.aborted) return { action: 'cancel' };
+    if (params.mode === 'url') {
+      return await this.handleUrlElicitation(params, collect, signal);
+    }
+    if (params.mode !== 'form') {
+      // The openai/form dialect uses a schema shape this bridge cannot
+      // render; declining lets the MCP server apply its default behavior.
+      logger.warn('Declining unsupported Codex elicitation mode', { mode: params.mode, serverName: params.serverName });
+      this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.declined', { reason: 'unsupported_mode', mode: params.mode, serverName: params.serverName }));
+      return { action: 'decline' };
+    }
+    const schema: unknown = params.requestedSchema;
+    if (schema !== undefined) {
+      if (!isRecordLike(schema)) return { action: 'decline' };
+      if (schema.type !== 'object' && !(schema.type === undefined && schema.properties === undefined)) {
+        return { action: 'decline' };
+      }
+      if (schema.properties !== undefined) {
+        if (!isRecordLike(schema.properties)) return { action: 'decline' };
+        if (!Object.values(schema.properties).every((property) => {
+          if (!isRecordLike(property)) return false;
+          if (property.type !== undefined && (typeof property.type !== 'string' || !['string', 'number', 'integer', 'boolean', 'array'].includes(property.type))) {
+            return false;
+          }
+          if (property.properties !== undefined
+            || ![property.title, property.description].every((value) => value == null || typeof value === 'string')) {
+            return false;
+          }
+          if (property.items !== undefined && !isRecordLike(property.items)) return false;
+          const items = isRecordLike(property.items) ? property.items : undefined;
+          if (items && ((items.type !== undefined && items.type !== 'string') || items.properties !== undefined)) {
+            return false;
+          }
+          return [property.enum, property.enumNames ?? undefined, items?.enum].every((values) => (
+            values === undefined || (Array.isArray(values) && values.every((value) => typeof value === 'string'))
+          )) && [property.oneOf, items?.anyOf].every((options) => (
+            options === undefined || (Array.isArray(options) && options.every((option) => (
+              isRecordLike(option) && typeof option.const === 'string' && typeof option.title === 'string'
+            )))
+          ));
+        })) {
+          return { action: 'decline' };
+        }
+      }
+    }
+    try {
+      return await this.handleFormElicitation(params, collect, signal);
+    } catch (err) {
+      logger.warn('Declining malformed Codex elicitation form', { error: err instanceof Error ? err.message : String(err) });
+      return { action: signal?.aborted ? 'cancel' : 'decline' };
+    }
+  }
+
+  private async handleUrlElicitation(
+    params: CodexElicitationUrlParams,
+    collect: NonNullable<CodexElicitationBridgeHost['collectElicitation']>,
+    signal?: AbortSignal,
+  ): Promise<AppServerMcpElicitationResponse> {
+    if (signal?.aborted) return { action: 'cancel' };
+    if (!/^https?:\/\//i.test(params.url)) {
+      logger.warn('Declining Codex elicitation with non-http(s) URL', { serverName: params.serverName });
+      this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.declined', { reason: 'url_scheme_rejected', serverName: params.serverName }));
+      return { action: 'decline' };
+    }
+    try {
+      window.open(params.url, '_blank');
+    } catch (err) {
+      logger.warn('Failed to open Codex elicitation URL', {
+        url: params.url,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    const questionRequest = buildCodexElicitationUrlQuestionRequest(params);
+    this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.request', { mode: 'url', serverName: params.serverName, threadId: params.threadId }));
+    let response;
+    try {
+      response = await collect({ questionRequest, params, ...(signal ? { signal } : {}) });
+    } catch (err) {
+      logger.warn('Elicitation host threw; cancelling', { error: err instanceof Error ? err.message : String(err) });
+      return { action: 'cancel' };
+    }
+    if (!response || signal?.aborted) {
+      return { action: 'cancel' };
+    }
+    this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.decision', { mode: 'url', action: response.action }));
+    return { action: response.action };
+  }
+
+  private async handleFormElicitation(
+    params: CodexElicitationFormParams,
+    collect: NonNullable<CodexElicitationBridgeHost['collectElicitation']>,
+    signal?: AbortSignal,
+  ): Promise<AppServerMcpElicitationResponse> {
+    if (signal?.aborted) return { action: 'cancel' };
+    const questionRequest = buildCodexElicitationQuestionRequest(params);
+    this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.request', { mode: 'form', serverName: params.serverName, threadId: params.threadId }));
+    let response;
+    try {
+      response = await collect({ questionRequest, params, ...(signal ? { signal } : {}) });
+    } catch (err) {
+      logger.warn('Elicitation host threw; cancelling', { error: err instanceof Error ? err.message : String(err) });
+      return { action: 'cancel' };
+    }
+    if (!response || signal?.aborted) {
+      return { action: 'cancel' };
+    }
+    if (response.action !== 'accept') {
+      this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.decision', { mode: 'form', action: response.action }));
+      return { action: response.action };
+    }
+    if (isCodexElicitationDecline(questionRequest, response.answers)) {
+      this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.decision', { mode: 'form', action: 'decline' }));
+      return { action: 'decline' };
+    }
+    const content = buildCodexElicitationContent(questionRequest, response.answers ?? [], params);
+    this.trace((port) => port.recordToolInteraction(undefined, 'elicitation.decision', { mode: 'form', action: 'accept' }));
+    return { action: 'accept', content };
+  }
+
+  // ── Approval normalization + wire mapping ─────────────────────────────────
+
+  private normalizeApprovalRequest(kind: 'execCommand' | 'applyPatch', params: unknown): CodexApprovalRequest {
+    return kind === 'execCommand'
+      ? this.normalizeExecCommandApproval(params)
+      : this.normalizeApplyPatchApproval(params);
+  }
+
+  private normalizeExecCommandApproval(params: unknown): CodexApprovalRequest {
+    const p = isRecordLike(params) ? params : {};
+    const cwd = typeof p.cwd === 'string' ? p.cwd : undefined;
+    const command = readCommandString(p.command);
+    return {
+      kind: 'execCommand',
+      summary: command || '(unknown command)',
+      ...(command ? { command } : {}),
+      ...(cwd ? { cwd } : {}),
+      raw: params,
+    };
+  }
+
+  private normalizeApplyPatchApproval(params: unknown): CodexApprovalRequest {
+    const p = isRecordLike(params) ? params : {};
+    const changes = Array.isArray(p.changes) ? p.changes : [];
+    return {
+      kind: 'applyPatch',
+      summary: changes.length === 1 ? '1 file change' : `${changes.length} file changes`,
+      changeCount: changes.length,
+      raw: params,
+    };
+  }
+
+  /** v2 commandExecution: surface the command plus any proposed amendments. */
+  private normalizeCommandExecutionApproval(params: AppServerCommandExecutionApprovalParams): CodexApprovalRequest {
+    const command = readCommandString(params.command);
+    const networkAmendments: CodexNetworkPolicyAmendment[] = [];
+    for (const raw of params.proposedNetworkPolicyAmendments ?? []) {
+      if (
+        isRecordLike(raw)
+        && typeof raw.host === 'string'
+        && (raw.action === 'allow' || raw.action === 'deny')
+      ) {
+        networkAmendments.push({ action: raw.action, host: raw.host });
+      }
+    }
+    return {
+      kind: 'commandExecution',
+      summary: params.reason ?? command ?? '(unknown command)',
+      ...(command ? { command } : {}),
+      ...(params.cwd ? { cwd: params.cwd } : {}),
+      ...(params.proposedExecpolicyAmendment && params.proposedExecpolicyAmendment.length > 0
+        ? { proposedExecpolicyAmendment: params.proposedExecpolicyAmendment }
+        : {}),
+      ...(networkAmendments.length > 0 ? { proposedNetworkPolicyAmendments: networkAmendments } : {}),
+      ...(params.networkApprovalContext ? { networkApprovalContext: params.networkApprovalContext } : {}),
+      ...(params.reason ? { reason: params.reason } : {}),
+      raw: params,
+    };
+  }
+
+  /** v2 fileChange: a grant-root / reason request without a change list. */
+  private normalizeFileChangeApproval(params: AppServerFileChangeApprovalParams): CodexApprovalRequest {
+    return {
+      kind: 'fileChange',
+      summary: params.reason
+        ?? (params.grantRoot ? `write access under ${params.grantRoot}` : 'file changes'),
+      ...(params.grantRoot ? { grantRoot: params.grantRoot } : {}),
+      ...(params.reason ? { reason: params.reason } : {}),
+      raw: params,
+    };
+  }
+
+  /** v2 permissions: the requested profile; approve echoes it back. */
+  private normalizePermissionsApproval(params: AppServerPermissionsApprovalParams): CodexApprovalRequest {
+    return {
+      kind: 'permissions',
+      summary: params.reason ?? 'additional permissions',
+      cwd: params.cwd,
+      permissionRequest: params.permissions,
+      ...(params.reason ? { reason: params.reason } : {}),
+      raw: params,
+    };
+  }
+
+  private echoGrantedProfile(requested: { fileSystem?: unknown; network?: unknown }): AppServerGrantedPermissionProfile {
+    const granted: AppServerGrantedPermissionProfile = {};
+    if (requested.fileSystem !== undefined) {
+      granted.fileSystem = requested.fileSystem;
+    }
+    if (requested.network !== undefined) {
+      granted.network = requested.network;
+    }
+    return granted;
+  }
+
+  private mapCommandExecutionWireDecision(decision: CodexApprovalDecision): AppServerCommandExecutionApprovalDecision {
+    switch (decision.decision) {
+      case 'approved':
+        return 'accept';
+      case 'approved_for_session':
+        return 'acceptForSession';
+      case 'abort':
+        return 'cancel';
+      case 'accept_with_execpolicy_amendment':
+        return { acceptWithExecpolicyAmendment: { execpolicy_amendment: decision.execpolicyAmendment } };
+      case 'apply_network_policy_amendment':
+        return { applyNetworkPolicyAmendment: { network_policy_amendment: decision.networkPolicyAmendment } };
+      case 'denied':
+      default:
+        return 'decline';
+    }
+  }
+
+  private mapFileChangeWireDecision(decision: CodexApprovalDecision): AppServerFileChangeApprovalDecision {
+    switch (decision.decision) {
+      case 'approved':
+        return 'accept';
+      case 'approved_for_session':
+        return 'acceptForSession';
+      case 'abort':
+        return 'cancel';
+      case 'denied':
+      default:
+        return 'decline';
+    }
+  }
+
+  onStatusChange(handler: StatusChangeHandler): Disposable {
+    this.statusHandlers.add(handler);
+    return {
+      dispose: () => {
+        this.statusHandlers.delete(handler);
+      },
+    };
+  }
+
+  onCapabilitiesChange(handler: CapabilityChangeHandler): Disposable {
+    this.capabilityHandlers.add(handler);
+    return { dispose: () => this.capabilityHandlers.delete(handler) };
+  }
+
+  /**
+   * Register a handler invoked when the Codex app-server signals that its
+   * skill catalog changed (`skills/changed`). The handler receives no payload
+   * — it is a pure invalidation signal. Returns a Disposable that removes the
+   * handler. The chat slash-command menu cache uses this to drop stale entries
+   * immediately instead of waiting for the 120s TTL.
+   *
+   * No-op (returns a disposed Disposable) if there is no app-server client;
+   * the subscription is established lazily in `start()` once the client exists.
+   */
+  onSkillsChanged(handler: () => void): Disposable {
+    this.skillsChangedHandlers.add(handler);
+    return { dispose: () => this.skillsChangedHandlers.delete(handler) };
+  }
+
+  private notifySkillsChanged(): void {
+    for (const handler of this.skillsChangedHandlers) {
+      try {
+        handler();
+      } catch (err) {
+        logger.warn('skills/changed handler threw', { error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+  }
+
+  private subscribeToAppServerSkillsChanged(): void {
+    if (!this.appServerClient || this.skillsChangedUnsubscribe) {
+      return;
+    }
+    if (typeof this.appServerClient.subscribeToSkillsChanged !== 'function') {
+      return;
+    }
+    this.skillsChangedUnsubscribe = this.appServerClient.subscribeToSkillsChanged(() => this.notifySkillsChanged());
+  }
+
+  private unsubscribeFromAppServerSkillsChanged(): void {
+    if (this.skillsChangedUnsubscribe) {
+      try {
+        this.skillsChangedUnsubscribe();
+      } catch (err) {
+        logger.warn('Failed to unsubscribe from skills/changed', { error: err instanceof Error ? err.message : String(err) });
+      }
+      this.skillsChangedUnsubscribe = null;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Turn tracking / deprecation notice / reconnect integration
+  // -------------------------------------------------------------------------
+
+  /**
+   * Persistent `turn/started` / `turn/completed` tracking, independent from
+   * the per-turn stream subscriptions. The tracked per-thread active turn id
+   * is the `expectedTurnId` precondition for `turn/steer` and the sweep target
+   * for reconnect interruption. Registration is guarded so injected test
+   * doubles without notification support keep working.
+   */
+  private subscribeToTurnTracking(): void {
+    const client = this.appServerClient;
+    if (!client || this.turnTrackingUnsubscribe) {
+      return;
+    }
+    if (typeof client.addNotificationHandler !== 'function' || typeof client.removeNotificationHandler !== 'function') {
+      return;
+    }
+    const readThreadAndTurnId = (params: unknown): { threadId: string; turnId: string } | null => {
+      if (!isRecordLike(params)) return null;
+      const threadId = typeof params.threadId === 'string' ? params.threadId : null;
+      const turn = isRecordLike(params.turn) ? params.turn : null;
+      const turnId = turn && typeof turn.id === 'string' ? turn.id : null;
+      return threadId && turnId ? { threadId, turnId } : null;
+    };
+    const startedListener = (params: unknown): void => {
+      const ids = readThreadAndTurnId(params);
+      if (ids) {
+        this.activeTurnIdByThread.set(ids.threadId, ids.turnId);
+      }
+    };
+    const completedListener = (params: unknown): void => {
+      const ids = readThreadAndTurnId(params);
+      // Only clear when the completion matches the currently tracked turn;
+      // a straggler completion for an older turn must not drop the new one.
+      if (ids && this.activeTurnIdByThread.get(ids.threadId) === ids.turnId) {
+        this.activeTurnIdByThread.delete(ids.threadId);
+      }
+    };
+    client.addNotificationHandler('turn/started', startedListener);
+    client.addNotificationHandler('turn/completed', completedListener);
+    this.turnTrackingUnsubscribe = () => {
+      client.removeNotificationHandler('turn/started', startedListener);
+      client.removeNotificationHandler('turn/completed', completedListener);
+    };
+  }
+
+  private unsubscribeFromTurnTracking(): void {
+    if (this.turnTrackingUnsubscribe) {
+      try {
+        this.turnTrackingUnsubscribe();
+      } catch (err) {
+        logger.warn('Failed to unsubscribe from turn tracking', { error: err instanceof Error ? err.message : String(err) });
+      }
+      this.turnTrackingUnsubscribe = null;
+    }
+  }
+
+  private subscribeToDeprecationNotice(): void {
+    const client = this.appServerClient;
+    if (!client || this.deprecationNoticeUnsubscribe) {
+      return;
+    }
+    if (typeof client.subscribeToDeprecationNotice !== 'function') {
+      return;
+    }
+    this.deprecationNoticeUnsubscribe = client.subscribeToDeprecationNotice((notice) => {
+      this.handleDeprecationNotice(notice);
+    });
+  }
+
+  private unsubscribeFromDeprecationNotice(): void {
+    if (this.deprecationNoticeUnsubscribe) {
+      try {
+        this.deprecationNoticeUnsubscribe();
+      } catch (err) {
+        logger.warn('Failed to unsubscribe from deprecationNotice', { error: err instanceof Error ? err.message : String(err) });
+      }
+      this.deprecationNoticeUnsubscribe = null;
+    }
+  }
+
+  /** Trace + console warn + one-time Notice for an app-server deprecation notice. */
+  private handleDeprecationNotice(notice: { summary: string; details?: string | null }): void {
+    this.trace((port) => port.recordLifecycle('app_server.deprecation_notice', {
+      summary: notice.summary,
+      ...(notice.details ? { details: notice.details } : {}),
+    }));
+    logger.warn('Codex app-server deprecation notice', {
+      summary: notice.summary,
+      details: notice.details ?? null,
+    });
+    if (this.deprecationNoticeShown) {
+      return;
+    }
+    this.deprecationNoticeShown = true;
+    try {
+      new Notice(`Codex deprecation notice: ${notice.summary}`, 8000);
+    } catch (err) {
+      logger.warn('Failed to surface deprecation Notice', { error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  /**
+   * Transport reconnected (fresh handshake, handler registrations survive).
+   * Interrupt the in-flight streams first (their turns are dead), then
+   * re-resume every previously loaded thread so the server re-attaches this
+   * client to their notification streams.
+   */
+  private async handleAppServerReconnect(): Promise<void> {
+    this.trace((port) => port.recordLifecycle('app_server.reconnected', {
+      loadedThreads: this.loadedThreadIds.size,
+      inFlightTurns: this.activeAppServerTurns.size,
+    }));
+    logger.info('Codex app-server reconnected; interrupting in-flight turns and re-resuming threads', {
+      loadedThreads: this.loadedThreadIds.size,
+    });
+    this.interruptActiveStreams('Codex connection was re-established; the in-flight turn was interrupted. Please resend your message.');
+    const client = this.appServerClient;
+    if (!client) {
+      return;
+    }
+    const options = this.buildAppServerThreadOptions(this.captureAttemptOptions());
+    for (const threadId of [...this.loadedThreadIds]) {
+      try {
+        const thread = await client.resumeThread(threadId, options);
+        if (!thread?.id) {
+          this.loadedThreadIds.delete(threadId);
+        }
+      } catch (err) {
+        logger.warn('Failed to re-resume Codex thread after reconnect', {
+          threadId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+  }
+
+  /** Reconnect backoff budget exhausted: interrupt streams, trace, error status. */
+  private handleAppServerReconnectFailed(error: Error): void {
+    this.trace((port) => port.recordLifecycle('app_server.reconnect_failed', { error: error.message }));
+    this.trace((port) => port.markAnomaly(undefined, 'app_server.reconnect_failed', 'critical', { error: error.message }));
+    logger.error('Codex app-server reconnect failed', { error: error.message });
+    this.interruptActiveStreams(`Codex connection was lost and could not be re-established: ${error.message}`);
+    this.setStatus('error');
+  }
+
+  /**
+   * Deliver an interruption error to every in-flight app-server stream and
+   * clear their turn bookkeeping. Streams registered by stale attempts ignore
+   * the message via their own epoch guard.
+   */
+  private interruptActiveStreams(message: string): void {
+    for (const [sessionId, sink] of this.streamInterruptSinks) {
+      try {
+        sink(message);
+      } catch (err) {
+        logger.warn('Stream interrupt sink threw', {
+          sessionId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    for (const sessionId of this.activeAppServerTurns.keys()) {
+      const context = this.lastTurnContextBySession.get(sessionId);
+      if (context) {
+        this.lastTurnContextBySession.delete(sessionId);
+        this.trace((port) => port.finishTurn(context, 'incomplete', { reason: 'app_server_reconnect' }));
+      }
+    }
+    this.activeAppServerTurns.clear();
+    this.activeTurnIdByThread.clear();
+  }
+
+  /**
+   * Adapter-owned handling of the mapper's thread-scoped backend events. The
+   * chunks still pass through to the stream; this hook maintains local state
+   * that the stream cannot: goal tracking, title-rename trace evidence, and
+   * local invalidation (plus stream completion) on server-side deletion.
+   * `completeStream` only matters for `thread_deleted`: it releases the
+   * waiting generator so the mapper's error chunk drains instead of hanging.
+   */
+  private handleThreadBackendEvent(
+    chunk: Extract<StreamChunk, { type: 'backend_event' }>,
+    threadId: string,
+    sessionId: string,
+    completeStream: () => void,
+  ): void {
+    switch (chunk.event) {
+      case 'thread_renamed': {
+        const threadName = typeof chunk.metadata?.threadName === 'string' ? chunk.metadata.threadName : (chunk.content ?? '');
+        this.trace((port) => port.recordLifecycle('thread.renamed', { threadId, threadName }));
+        // No adapter-local title store exists: listSessions()/getSession()
+        // re-read titles from the app-server, and the chunk itself carries
+        // the new name to any stream consumer.
+        break;
+      }
+      case 'goal_updated': {
+        const goal = this.readTrackedGoal(chunk.metadata?.goal);
+        if (goal) {
+          this.threadGoalByThread.set(threadId, goal);
+          this.trace((port) => port.recordLifecycle('thread.goal_updated', { threadId, status: goal.status }));
+        }
+        break;
+      }
+      case 'goal_cleared': {
+        this.threadGoalByThread.delete(threadId);
+        this.trace((port) => port.recordLifecycle('thread.goal_cleared', { threadId }));
+        break;
+      }
+      case 'thread_deleted': {
+        if (this.pendingNativeDeletions.has(threadId)) {
+          // A notification drains the stream but cannot commit product deletion.
+          // The delete result owns cleanup after verified same-ID absence.
+          completeStream();
+          break;
+        }
+        this.invalidateLocalSessionForDeletedThread(threadId);
+        const activeTurn = this.activeAppServerTurns.get(sessionId);
+        if (activeTurn?.turnId && activeTurn.threadId === threadId) {
+          const context = this.lastTurnContextBySession.get(sessionId);
+          if (context) {
+            this.lastTurnContextBySession.delete(sessionId);
+            this.trace((port) => port.finishTurn(context, 'incomplete', { reason: 'thread_deleted' }));
+          }
+          this.activeAppServerTurns.delete(sessionId);
+          this.sessionEffectiveEvidence.set(sessionId, buildUniformEffectiveEvidence('failed', this.attemptWiringForSession(sessionId), 'Codex thread was deleted on the server'));
+          this.sessionEffectiveSettings.set(sessionId, null);
+          completeStream();
+        }
+        break;
+      }
+      default:
+        // deprecation_notice and all other backend events need no adapter-side
+        // action here (the persistent top-level deprecation subscription owns
+        // the trace + one-time Notice path).
+        break;
+    }
+  }
+
+  /** Defensive goal extraction from a goal_updated chunk's metadata. */
+  private readTrackedGoal(raw: unknown): AppServerThreadGoal | null {
+    if (!isRecordLike(raw) || typeof raw.threadId !== 'string' || typeof raw.objective !== 'string') {
+      return null;
+    }
+    return raw as unknown as AppServerThreadGoal;
+  }
+
+  /**
+   * Local-only invalidation for a thread the app-server reports as deleted
+   * (distinct from `deleteSession`, which also interrupts turns and calls
+   * `thread/delete`). Cleans the alias/session entry and every derived map so
+   * later lookups honestly report the session gone. Returns the logical
+   * session key that was removed, or null when the thread was unknown.
+   */
+  private invalidateLocalSessionForDeletedThread(threadId: string): string | null {
+    if (this.pendingNativeDeletions.has(threadId)) return null;
+    this.forkedThreadIds.delete(threadId);
+    const provisionalId = this.threadAlias.get(threadId);
+    this.threadAlias.delete(threadId);
+    this.loadedThreadIds.delete(threadId);
+    this.activeTurnIdByThread.delete(threadId);
+    this.threadGoalByThread.delete(threadId);
+    this.appServerContextSnapshots.delete(threadId);
+    this.appServerClient?.clearThreadEffectiveSettings?.(threadId);
+    if (!provisionalId) {
+      return null;
+    }
+    this.sessions.delete(provisionalId);
+    this.sessionEffectiveEvidence.delete(provisionalId);
+    this.sessionEffectiveSettings.delete(provisionalId);
+    this.sessionAttemptOptions.delete(provisionalId);
+    this.lastTurnContextBySession.delete(provisionalId);
+    if (this.lastEvidenceSessionId === provisionalId) {
+      this.lastEvidenceSessionId = null;
+    }
+    this.trace((port) => port.recordLifecycle('session.invalidated_server_delete', { threadId, provisionalId }));
+    return provisionalId;
+  }
+
+  /**
+   * Instant local read of a thread's most recently tracked goal state (from
+   * `thread/goal/updated` / `thread/goal/cleared` notifications or the
+   * adapter's own mutations). Returns null when nothing is tracked; use
+   * `getThreadGoal()` for the live-authoritative RPC read.
+   */
+  getTrackedThreadGoal(sessionId: string): AppServerThreadGoal | null {
+    const threadId = this.resolveThreadId(sessionId);
+    return threadId ? this.threadGoalByThread.get(threadId) ?? null : null;
+  }
+
+  // -------------------------------------------------------------------------
+  // AgentChatCapability
+  // -------------------------------------------------------------------------
+
+  async *sendMessage(rawRequest: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
+    // Codex exposes no per-turn instructions seam; the backend-neutral
+    // memory injection rides at the front of the message text. The R-B4
+    // Obsidian-tooling injection uses the same seam, after memory.
+    // Attached context (chips) is per-turn: it appends strictly after the
+    // per-epoch injection prefix and after the user text, rendered by the
+    // shared backend-neutral serializer so Codex receives the same
+    // <obsidian_context> text OpenCode/Pi deliver.
+    const request: AgentChatSendRequest = {
+      ...rawRequest,
+      content: appendObsidianContextBlocks(
+        prependObsidianToolingInjection(
+          prependMemoryInjection(rawRequest.content, rawRequest.options),
+          rawRequest.options,
+        ),
+        rawRequest.options,
+      ),
+    };
+    if (!this.codex) {
+      yield { type: 'error', content: 'Codex adapter not started' };
+      return;
+    }
+
+    // Approval-policy gating. Explicit untrusted/on-request require an
+    // available app-server AND a connected approval-collection bridge; if
+    // either is missing the turn fails closed with an actionable error
+    // instead of silently falling back to a less restrictive path. 'never'
+    // may use the existing fallback; 'inherit' omits the override entirely.
+    const preflightError = this.getSendMessagePreflightError(request.options?.codexOptions as Record<string, unknown> | undefined);
+    if (preflightError) {
+      yield { type: 'error', content: preflightError };
+      return;
+    }
+
+    if (this.canUseAppServerChat()) {
+      yield* this.sendMessageViaAppServer(request);
+      return;
+    }
+
+    yield* this.sendMessageViaSdk(request);
+  }
+
+  /** Read-only policy check shared by composer preflight and the send boundary. */
+  getSendMessagePreflightError(codexOptions?: Record<string, unknown>): string | null {
+    const policy = this.captureAttemptOptions(codexOptions as AttemptOptions | undefined).approvalPolicy ?? 'inherit';
+    if ((policy === 'untrusted' || policy === 'on-request')
+      && (!this.canUseAppServerChat() || typeof this.approvalHost.collectApproval !== 'function')) {
+      return `Codex approval policy "${policy}" requires the Codex app-server and an approval bridge, which are unavailable. Start the Codex backend or switch the approval policy to "inherit" or "never".`;
+    }
+    return null;
+  }
+
+  /**
+   * Resolve the wire approval policy for app-server thread/turn options.
+   * Returns undefined for 'inherit' (omit the field) so the backend uses its
+   * own default policy.
+   */
+  private resolveWireApprovalPolicy(): 'untrusted' | 'on-request' | 'never' | undefined {
+    const policy = this.options.approvalPolicy ?? 'inherit';
+    return policy === 'inherit' ? undefined : policy;
+  }
+
+  private async *sendMessageViaSdk(request: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
+    const threadOptions = this.buildThreadOptions({
+      ...this.captureAttemptOptions(request.options?.codexOptions as AttemptOptions | undefined),
+      ...(typeof request.options?.model === 'string' && request.options.model.trim()
+        ? { model: request.options.model.trim() } : {}),
+      ...(typeof request.options?.variant === 'string' && CODEX_EFFORT_VARIANTS.includes(request.options.variant as CodexReasoningEffort)
+        ? { modelReasoningEffort: request.options.variant as AttemptOptions['modelReasoningEffort'] } : {}),
+    });
+    let thread: Thread | null;
+    try {
+      thread = this.resolveOrCreateThread(request.sessionId, threadOptions);
+    } catch (err) {
+      yield {
+        type: 'error',
+        content: err instanceof Error ? err.message : String(err),
+      };
+      return;
+    }
+
+    if (!thread) {
+      yield { type: 'error', content: `Failed to resolve session: ${request.sessionId}` };
+      return;
+    }
+
+    const controller = new AbortController();
+    this.activeControllers.set(request.sessionId, controller);
+
+    // Extract structured-output schema from the backend-neutral outputFormat option.
+    const outputFormat = request.options?.outputFormat;
+    const outputSchema = outputFormat && typeof outputFormat === 'object' && 'schema' in outputFormat
+      ? outputFormat.schema
+      : undefined;
+
+    const normalizer = new CodexStreamNormalizer({
+      sessionId: request.sessionId,
+      outputSchema,
+    });
+
+    let tempDir: string | undefined;
+    try {
+      // Build Codex input: string for text-only, UserInput[] when images are present.
+      const input = this.buildCodexInput(request.content, request.images);
+      tempDir = input.tempDir;
+
+      const streamed = await thread.runStreamed(input.payload, {
+        signal: controller.signal,
+        ...(outputSchema !== undefined ? { outputSchema } : {}),
+      });
+
+      for await (const event of streamed.events as AsyncIterable<ThreadEvent>) {
+        // exec JSON reports retry progress as an error event even when the
+        // same turn later succeeds. Keep terminal failures on the error path.
+        if (event.type === 'error' && event.message.startsWith('Reconnecting...')) {
+          yield {
+            type: 'backend_event', source: 'codex', event: 'informational',
+            status: 'retrying', name: 'reconnecting', metadata: { message: event.message },
+          };
+          continue;
+        }
+        if (event.type === 'thread.started') {
+          this.aliasSession(request.sessionId, event.thread_id, { resumed: false, via: 'sdk' });
+        }
+
+        const chunks = normalizer.transformEvent(event);
+        for (const chunk of chunks) {
+          yield chunk;
+        }
+      }
+    } catch (err) {
+      yield {
+        type: 'error',
+        content: err instanceof Error ? err.message : String(err),
+      };
+    } finally {
+      this.activeControllers.delete(request.sessionId);
+      if (tempDir) {
+        this.safeRemoveTempDir(tempDir);
+      }
+    }
+  }
+
+  /**
+   * Primary app-server chat path. A successful protocol negotiation never
+   * silently falls through to SDK chat on a turn error: the same thread owns
+   * messages, approvals, cancellation, and authoritative context snapshots.
+   */
+  // eslint-disable-next-line complexity, max-lines-per-function -- dense async-generator handling streaming + evidence lifecycle + error recovery + trace instrumentation in one cohesive method.
+  private async *sendMessageViaAppServer(request: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
+    const client = this.appServerClient;
+    if (!client) {
+      yield { type: 'error', content: 'Codex app-server is not available' };
+      return;
+    }
+
+    const outputFormat = request.options?.outputFormat;
+    const outputSchema = outputFormat && typeof outputFormat === 'object' && 'schema' in outputFormat
+      ? outputFormat.schema
+      : undefined;
+    let tempDir: string | undefined;
+    let subscription: { dispose(): void } | null = null;
+    let ownedThreadId: string | null = null;
+    let ownedTurnId: string | null = null;
+    /** Trace turn context captured at `beginTurn`; shared with the subscription callback and completion/catch paths. */
+    let turnContext: CodexTraceContext | undefined;
+    const attempt = this.beginAppServerAttempt(request.sessionId, request.options);
+    const sessionId = attempt.sessionId;
+    const controller = new AbortController();
+    this.activeControllers.get(sessionId)?.abort();
+    this.activeControllers.set(sessionId, controller);
+
+    const pending: StreamChunk[] = [];
+    const streamedAgentMessageItemIds = new Set<string>();
+    const streamedReasoningItemIds = new Set<string>();
+    const streamState: AppServerStreamState = {
+      streamedAgentMessageItemIds,
+      streamedReasoningItemIds,
+      startedTodoItemIds: new Set<string>(),
+      outputSchema,
+    };
+    let wake: (() => void) | null = null;
+    let completed = false;
+    let turnSucceeded = false;
+    const pendingTurnCompletions: Array<{ id?: string; status?: string; error?: unknown }> = [];
+    const pendingUserMessageIdentities: Array<Extract<StreamChunk, { type: 'user_message_identity' }>> = [];
+    const nativeAssistantCompletions: Array<{ threadId: string; turnId: string; id: string; text: string }> = [];
+    const nativeActivityTurns = new Set<string>();
+    const enqueue = (chunk: StreamChunk): void => {
+      pending.push(chunk);
+      const resolve = wake;
+      wake = null;
+      resolve?.();
+    };
+    const acceptUserIdentity = (identity: Extract<StreamChunk, { type: 'user_message_identity' }>): StreamChunk[] => {
+      // Steering can add another user item to this turn. Wait for terminal
+      // ownership evidence rather than attaching the last candidate to the send.
+      if (identity.sessionId === ownedThreadId) pendingUserMessageIdentities.push(identity);
+      return [];
+    };
+    const collectNativeItem = (params: unknown, method: string): void => {
+      const itemParams = params as { threadId?: string; turnId?: string; item?: { id?: string; type?: string; text?: string } } | null;
+      if (itemParams?.threadId !== ownedThreadId || !itemParams?.turnId || !itemParams.item) return;
+      const item = itemParams.item;
+      if (method === 'item/completed' && item.type === 'agentMessage' && item.id && typeof item.text === 'string') {
+        nativeAssistantCompletions.push({ threadId: itemParams.threadId!, turnId: itemParams.turnId, id: item.id, text: item.text });
+      }
+      if (item.type && !['userMessage', 'agentMessage', 'reasoning'].includes(item.type)) nativeActivityTurns.add(itemParams.turnId);
+    };
+    const completeCurrentTurn = (completedTurn: { id?: string; status?: string; error?: unknown }): void => {
+      if (!ownedTurnId || completedTurn.id !== ownedTurnId) {
+        return;
+      }
+      const error = readAppServerTurnError(completedTurn.error);
+      turnSucceeded = completedTurn.status === 'completed' && !error;
+      this.applyTurnCompletionEvidence(sessionId, error, (msg: string) => enqueue({ type: 'error', content: msg }));
+      const ctx = turnContext;
+      if (ctx) {
+        this.trace((port) => port.finishTurn(ctx, error ? 'error' : 'completed', error ? { error } : undefined));
+      }
+      if (error) {
+        this.trace((port) => port.markAnomaly(ctx, 'turn.error_evidence', 'error', { error }));
+      }
+      completed = true;
+      const resolve = wake;
+      wake = null;
+      resolve?.();
+    };
+    // Reconnect integration: the transport delivers interruptions through
+    // this sink (guarded by the attempt epoch) so the waiting loop below
+    // terminates with an error chunk instead of hanging on a dead stream.
+    this.streamInterruptSinks.set(sessionId, (message: string) => {
+      if (!this.isCurrentAppServerAttempt(attempt)) {
+        return;
+      }
+      this.sessionEffectiveEvidence.set(sessionId, buildUniformEffectiveEvidence('failed', this.attemptWiringForSession(sessionId), message));
+      this.sessionEffectiveSettings.set(sessionId, null);
+      const ctx = turnContext;
+      if (ctx) {
+        this.trace((port) => port.finishTurn(ctx, 'incomplete', { reason: 'app_server_reconnect' }));
+      }
+      enqueue({ type: 'error', content: message });
+      completed = true;
+      const resolve = wake;
+      wake = null;
+      resolve?.();
+    });
+    controller.signal.addEventListener('abort', () => {
+      const resolve = wake;
+      wake = null;
+      resolve?.();
+    }, { once: true });
+
+    try {
+      const { thread, resumed: usedResume } = await this.resolveOrStartAppServerThread(attempt);
+      if (!thread) {
+        if (this.isCurrentAppServerAttempt(attempt)) {
+          yield { type: 'error', content: `Failed to resolve Codex session: ${request.sessionId}` };
+        }
+        return;
+      }
+      if (!this.isCurrentAppServerAttempt(attempt)) return;
+      this.aliasSession(sessionId, thread.id, { resumed: usedResume, via: 'app-server' });
+      ownedThreadId = thread.id;
+
+      subscription = client.subscribeToThreadNotifications(thread.id, (event) => {
+        if (!this.isCurrentAppServerAttempt(attempt)) return;
+        collectNativeItem(event.params, event.method);
+        const params = event.params as { turn?: { id?: string; status?: string; error?: unknown } } | null;
+        const completedTurn = params?.turn;
+        if (event.method === 'turn/completed') {
+          if (!ownedTurnId) {
+            // The app-server can deliver notifications before turn/start
+            // returns. Retain completions until the current turn ID is known,
+            // then accept only that exact turn; a prior turn on this thread
+            // must not finish or fail the new stream.
+            pendingTurnCompletions.push(completedTurn ?? {});
+            return;
+          }
+          if (completedTurn?.id !== ownedTurnId) {
+            return;
+          }
+        }
+        // Record every notification on the trace port before mapping. The turn
+        // context is set right after startTurn returns; notifications that
+        // arrive earlier (rare) are skipped to avoid fabricating a context.
+        if (turnContext) {
+          const ctx = turnContext;
+          this.trace((port) => port.recordTurnNotification(ctx, event.method, event.params));
+        }
+        const mapping = mapAppServerNotification({
+          event,
+          modelId: attempt.options.model ?? null,
+          sessionId,
+          streamState,
+          threadId: thread.id,
+        });
+        mapping.chunks = mapping.chunks.flatMap((chunk) => chunk.type === 'user_message_identity'
+          ? acceptUserIdentity(chunk) : [chunk]);
+        if (mapping.contextUsageSnapshot) {
+          this.appServerContextSnapshots.set(thread.id, mapping.contextUsageSnapshot);
+        }
+        for (const chunk of mapping.chunks) {
+          // Adapter-owned backend events (mapper-comment contract): maintain
+          // local goal state, react to server-side renames/deletes, and keep
+          // the stream from hanging when the thread is deleted mid-turn. The
+          // chunks still pass through to the stream unchanged.
+          if (chunk.type === 'backend_event') {
+            this.handleThreadBackendEvent(chunk, thread.id, sessionId, () => {
+              completed = true;
+              const resolve = wake;
+              wake = null;
+              resolve?.();
+            });
+          }
+          enqueue(chunk);
+        }
+        if (mapping.chunks.length === 0 && !mapping.contextUsageSnapshot) {
+          this.trace((port) => port.recordStreamSync(turnContext, 'notification.no_chunks', 'debug', { method: event.method }));
+        }
+        if (event.method === 'turn/completed') {
+          completeCurrentTurn(completedTurn ?? {});
+        }
+      });
+
+      const input = this.buildAppServerInput(request.content, request.images);
+      tempDir = input.tempDir;
+      const turnOptions: AppServerTurnStartOptions = {
+        threadId: thread.id,
+        input: input.payload,
+        ...this.buildAppServerTurnOptions(attempt.options, outputSchema),
+      };
+      const turn = await client.startTurn(turnOptions);
+      if (!this.isCurrentAppServerAttempt(attempt)) {
+        if (turn?.id) {
+          await client.interruptTurn(thread.id, turn.id);
+        }
+        return;
+      }
+      if (!turn?.id) {
+        this.sessionEffectiveEvidence.set(sessionId, buildUniformEffectiveEvidence('failed', this.attemptWiringForSession(sessionId), 'turn did not start'));
+        this.sessionEffectiveSettings.set(sessionId, null);
+        yield { type: 'error', content: 'Codex app-server did not start a turn' };
+        return;
+      }
+      this.activeAppServerTurns.set(sessionId, { threadId: thread.id, turnId: turn.id });
+      ownedTurnId = turn.id;
+      turnContext = this.trace((port) => port.beginTurn({
+        threadId: thread.id,
+        turnId: turn.id,
+        model: attempt.options.model ?? undefined,
+        ...(request.diagnosticRunToken ? { diagnosticRunToken: request.diagnosticRunToken } : {}),
+      }));
+      if (turnContext) {
+        this.lastTurnContextBySession.set(sessionId, turnContext);
+      }
+      for (const pendingTurnCompletion of pendingTurnCompletions) {
+        completeCurrentTurn(pendingTurnCompletion);
+      }
+      if (controller.signal.aborted) {
+        await client.interruptTurn(thread.id, turn.id);
+      }
+
+      yield { type: 'message_start' };
+      if (!this.isCurrentAppServerAttempt(attempt) || controller.signal.aborted) return;
+      yield {
+        type: 'message_metadata',
+        messageId: `${thread.id}::${crypto.randomUUID()}`,
+        timestamp: Date.now(),
+        sessionId: thread.id,
+        ...(attempt.options.model ? { modelId: attempt.options.model } : {}),
+      };
+      while (!completed && !controller.signal.aborted) {
+        if (pending.length === 0) {
+          await new Promise<void>((resolve) => { wake = resolve; });
+        }
+        while (pending.length > 0) {
+          if (!this.isCurrentAppServerAttempt(attempt) || controller.signal.aborted) return;
+          yield pending.shift()!;
+        }
+      }
+      while (pending.length > 0) {
+        if (!this.isCurrentAppServerAttempt(attempt) || controller.signal.aborted) return;
+        yield pending.shift()!;
+      }
+      if (this.isCurrentAppServerAttempt(attempt) && !controller.signal.aborted) {
+        const nativeUsers = [...new Map(pendingUserMessageIdentities
+          .filter((identity) => identity.sessionId === ownedThreadId && identity.sourceTurnId === ownedTurnId)
+          .map((identity) => [identity.uuid, identity])).values()];
+        if (nativeUsers.length === 1) yield nativeUsers[0];
+        const nativeMessages = [...new Map(nativeAssistantCompletions
+          .filter((message) => message.threadId === ownedThreadId && message.turnId === ownedTurnId)
+          .map((message) => [message.id, message])).values()];
+        if (turnSucceeded && nativeMessages.length === 1 && !nativeActivityTurns.has(ownedTurnId!)) {
+          const native = nativeMessages[0];
+          yield { type: 'message_metadata', messageId: native.id, timestamp: Date.now(), sessionId: thread.id,
+            sourceTurnId: native.turnId, nativeText: native.text,
+            ...(attempt.options.model ? { modelId: attempt.options.model } : {}) };
+        }
+        yield { type: 'message_stop' };
+      }
+    } catch (err) {
+      if (this.isCurrentAppServerAttempt(attempt)) {
+        const message = err instanceof Error ? err.message : 'turn/stream failed';
+        const ctx = turnContext;
+        this.sessionEffectiveEvidence.set(sessionId, buildUniformEffectiveEvidence('failed', this.attemptWiringForSession(sessionId), message));
+        this.sessionEffectiveSettings.set(sessionId, null);
+        if (ctx) {
+          this.trace((port) => port.finishTurn(ctx, 'error', { error: message }));
+        }
+        this.trace((port) => port.markAnomaly(ctx, 'turn.send_failed', 'error', { error: message }));
+        yield { type: 'error', content: err instanceof Error ? err.message : String(err) };
+      }
+    } finally {
+      subscription?.dispose();
+      this.streamInterruptSinks.delete(sessionId);
+      if (this.activeControllers.get(sessionId) === controller) {
+        this.activeControllers.delete(sessionId);
+      }
+      const activeTurn = this.activeAppServerTurns.get(sessionId);
+      if (activeTurn?.threadId === ownedThreadId && activeTurn.turnId === ownedTurnId) {
+        this.activeAppServerTurns.delete(sessionId);
+      }
+      // Stale turn-context guard: only clear what THIS stream set, so a later
+      // attempt on the same session keeps its own context.
+      if (turnContext && this.lastTurnContextBySession.get(sessionId) === turnContext) {
+        this.lastTurnContextBySession.delete(sessionId);
+      }
+      if (tempDir) {
+        this.safeRemoveTempDir(tempDir);
+      }
+    }
+  }
+
+  private canUseAppServerChat(): boolean {
+    return Boolean(
+      this.appServerClient
+      && this.capabilitySet.has(AgentCapability.Context)
+      && typeof this.appServerClient.startThread === 'function'
+      && typeof this.appServerClient.startTurn === 'function',
+    );
+  }
+
+  private async resolveOrStartAppServerThread(attempt: AppServerAttempt): Promise<{ thread: AppServerThread | null; resumed: boolean }> {
+    const client = this.appServerClient;
+    if (!client) {
+      return { thread: null, resumed: false };
+    }
+    const { sessionId } = attempt;
+    const entry = this.resolveSession(sessionId);
+    const knownThreadId = entry?.threadId
+      ?? (!this.isProvisionalId(sessionId) ? sessionId : null);
+    const resumed = Boolean(knownThreadId);
+    const options = this.buildAppServerThreadOptions(attempt.options);
+    let thread: AppServerThread | null;
+    try {
+      thread = knownThreadId
+        ? await client.resumeThread(knownThreadId, options)
+        : await client.startThread(options);
+    } catch (err) {
+      // A thrown rejection (e.g. transport failure before the client's inner
+      // catch) must flip pending → failed; it must never stay pending.
+      if (this.isCurrentAppServerAttempt(attempt)) {
+        this.sessionEffectiveEvidence.set(sessionId, buildUniformEffectiveEvidence('failed', this.attemptWiringForSession(sessionId), err instanceof Error ? err.message : 'thread start/resume threw'));
+        this.sessionEffectiveSettings.set(sessionId, null);
+      }
+      throw err;
+    }
+    // Check epoch: if stop/deleteSession invalidated this attempt, abort silently.
+    if (!this.isCurrentAppServerAttempt(attempt)) return { thread: null, resumed };
+    if (!thread?.id) {
+      // Request failed (start/resume returned null after an internal error).
+      this.sessionEffectiveEvidence.set(sessionId, buildUniformEffectiveEvidence('failed', this.attemptWiringForSession(sessionId), 'thread start/resume request failed'));
+      return { thread: null, resumed };
+    }
+    // Success: rebuild per-field evidence from THIS response only, with
+    // independent application (request wiring) and runtime (response echo)
+    // axes. A field the server did not echo becomes runtime `unavailable`; a
+    // field the plugin did not wire (e.g. approval under `inherit`) is
+    // application `not-applicable`. Stale state from a prior response is never
+    // inherited.
+    const captured = client.getThreadEffectiveSettings(thread.id);
+    this.sessionEffectiveSettings.set(sessionId, captured);
+    this.sessionEffectiveEvidence.set(sessionId, buildEffectiveEvidenceWithApplication(threadPhaseApplication(this.attemptWiringForSession(sessionId)), 'verified', captured));
+    const provisionalId = entry?.provisionalId ?? sessionId;
+    const existing = this.sessions.get(provisionalId);
+    if (existing) {
+      existing.threadId = thread.id;
+      existing.thread = null;
+    } else {
+      this.sessions.set(provisionalId, { provisionalId, threadId: thread.id, thread: null });
+    }
+    // Remember every started/resumed thread so a transport reconnect can
+    // re-resume them and re-attach this client to their notification streams.
+    this.loadedThreadIds.add(thread.id);
+    return { thread, resumed };
+  }
+
+  private buildAppServerThreadOptions(opts: AttemptOptions): AppServerThreadStartOptions {
+    const config: Record<string, unknown> = {};
+    if (opts.webSearchMode) {
+      config.web_search = opts.webSearchMode;
+    }
+    const wireApprovalPolicy = opts.approvalPolicy !== undefined && opts.approvalPolicy !== 'inherit' ? opts.approvalPolicy : undefined;
+    return {
+      ...(opts.model ? { model: opts.model } : {}),
+      ...(opts.workingDirectory ? { cwd: opts.workingDirectory } : {}),
+      ...(opts.sandboxMode ? { sandbox: opts.sandboxMode } : {}),
+      ...(wireApprovalPolicy ? { approvalPolicy: wireApprovalPolicy } : {}),
+      ...(Object.keys(config).length > 0 ? { config } : {}),
+    };
+  }
+
+  private buildAppServerTurnOptions(opts: AttemptOptions, outputSchema: unknown): Omit<AppServerTurnStartOptions, 'threadId' | 'input'> {
+    const writableRoots = [opts.workingDirectory, ...(opts.additionalDirectories ?? [])]
+      .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+      .filter((p, index, paths) => paths.indexOf(p) === index);
+    const networkAccess = opts.networkAccessEnabled === true;
+    const sandboxPolicy = opts.sandboxMode === 'danger-full-access'
+      ? { type: 'dangerFullAccess' as const }
+      : opts.sandboxMode === 'read-only'
+        ? { type: 'readOnly' as const, networkAccess }
+        : {
+          type: 'workspaceWrite' as const,
+          writableRoots,
+          networkAccess,
+          excludeTmpdirEnvVar: false,
+          excludeSlashTmp: false,
+        };
+    const wireApprovalPolicy = opts.approvalPolicy !== undefined && opts.approvalPolicy !== 'inherit' ? opts.approvalPolicy : undefined;
+    return {
+      ...(opts.workingDirectory ? { cwd: opts.workingDirectory } : {}),
+      ...(wireApprovalPolicy ? { approvalPolicy: wireApprovalPolicy } : {}),
+      sandboxPolicy,
+      ...(opts.model ? { model: opts.model } : {}),
+      ...(opts.modelReasoningEffort ? { effort: opts.modelReasoningEffort } : {}),
+      ...(outputSchema !== undefined ? { outputSchema } : {}),
+    };
+  }
+
+  private buildAppServerInput(
+    content: string,
+    images: ImageAttachment[] | undefined,
+  ): {
+    payload: AppServerTurnStartOptions['input'];
+    tempDir?: string;
+  } {
+    if (!images || images.length === 0) {
+      return { payload: [{ type: 'text', text: content, text_elements: [] }] };
+    }
+    const tempDir = mkdtempSync(join(tmpdir(), 'opencodian-codex-image-'));
+    const payload: AppServerTurnStartOptions['input'] = [{ type: 'text', text: content, text_elements: [] }];
+    for (const image of images) {
+      const ext = this.mediaTypeToExtension(image.mediaType);
+      const fileName = image.filename ?? `image-${Date.now()}.${ext}`;
+      const filePath = join(tempDir, fileName);
+      writeFileSync(filePath, Buffer.from(image.data, 'base64'));
+      payload.push({ type: 'localImage', path: filePath });
+    }
+    return { payload, tempDir };
+  }
+
+  // -------------------------------------------------------------------------
+  // Image input helpers
+  // -------------------------------------------------------------------------
+
+  /**
+   * Build Codex input from content and optional images.
+   *
+   * When images are present, writes each image to a temporary file and
+   * returns a UserInput array: one text entry + one local_image entry per
+   * image.  The temporary directory is returned so the caller can clean it
+   * up after the stream completes.
+   */
+  private buildCodexInput(
+    content: string,
+    images: ImageAttachment[] | undefined,
+  ): { payload: string | UserInput[]; tempDir?: string } {
+    if (!images || images.length === 0) {
+      return { payload: content };
+    }
+
+    const tempDir = mkdtempSync(join(tmpdir(), 'opencodian-codex-image-'));
+    const userInputs: UserInput[] = [{ type: 'text', text: content }];
+
+    for (const image of images) {
+      const ext = this.mediaTypeToExtension(image.mediaType);
+      const fileName = image.filename ?? `image-${Date.now()}.${ext}`;
+      const filePath = join(tempDir, fileName);
+      const buffer = Buffer.from(image.data, 'base64');
+      writeFileSync(filePath, buffer);
+      userInputs.push({ type: 'local_image', path: filePath });
+    }
+
+    return { payload: userInputs, tempDir };
+  }
+
+  private mediaTypeToExtension(mediaType: ImageAttachment['mediaType']): string {
+    switch (mediaType) {
+      case 'image/jpeg': return 'jpg';
+      case 'image/png': return 'png';
+      case 'image/gif': return 'gif';
+      case 'image/webp': return 'webp';
+      default: return 'bin';
+    }
+  }
+
+  private safeRemoveTempDir(tempDir: string): void {
+    try {
+      rmSync(tempDir, { recursive: true, force: true });
+    } catch {
+      // Best-effort cleanup; do not throw on failure.
+    }
+  }
+
+  cancelStream(sessionId: string): void {
+    const logicalKey = this.logicalSessionKey(sessionId);
+    const activeTurn = this.activeAppServerTurns.get(logicalKey);
+    if (activeTurn?.turnId && this.appServerClient) {
+      const activeContext = this.lastTurnContextBySession.get(logicalKey);
+      if (activeContext) {
+        this.trace((port) => port.finishTurn(activeContext, 'cancelled', { reason: 'user_cancel' }));
+      }
+      void this.appServerClient.interruptTurn(activeTurn.threadId, activeTurn.turnId);
+    }
+    const controller = this.activeControllers.get(logicalKey);
+    if (controller) {
+      controller.abort();
+      this.activeControllers.delete(logicalKey);
+    }
+  }
+
+  /**
+   * Implements `AgentTurnSteeringCapability` over the app-server `turn/steer`
+   * route: the text enters the CURRENT turn (tracked from `turn/started` per
+   * thread) instead of queueing a new message. Resolves `false` when there is
+   * no active turn, the SDK fallback path is in use, or the server rejects
+   * the injection — callers degrade honestly to queueing. A -32601
+   * (route unavailable) dynamically drops the `TurnSteering` capability.
+   */
+  async steerTurn(sessionId: string, text: string): Promise<boolean> {
+    const client = this.appServerClient;
+    if (!client || !this.capabilitySet.has(AgentCapability.TurnSteering)) {
+      return false;
+    }
+    const threadId = this.resolveThreadId(sessionId);
+    if (!threadId) {
+      return false;
+    }
+    const turnId = this.activeTurnIdByThread.get(threadId);
+    if (!turnId) {
+      logger.debug('steerTurn skipped: no active turn for thread', { threadId });
+      return false;
+    }
+    const result = await client.steerTurn(threadId, turnId, [{ type: 'text', text }]);
+    if (result.ok) {
+      this.trace((port) => port.recordLifecycle('turn.steered', { threadId, turnId }));
+      return true;
+    }
+    if (result.reason === 'unavailable') {
+      logger.debug('turn/steer unavailable on this server; dropping TurnSteering capability', { threadId });
+      this.setTurnSteeringCapabilityAvailable(false);
+      return false;
+    }
+    logger.debug('steerTurn rejected by app-server', {
+      threadId,
+      turnId,
+      code: result.error.code,
+      message: result.error.message,
+    });
+    this.trace((port) => port.recordLifecycle('turn.steer_rejected', {
+      threadId,
+      turnId,
+      code: result.error.code,
+    }));
+    return false;
+  }
+
+  /** Resolve a session id (provisional or thread alias) to a real thread id. */
+  private resolveThreadId(sessionId: string): string | null {
+    const entry = this.resolveSession(sessionId);
+    return entry?.threadId ?? (!this.isProvisionalId(sessionId) ? sessionId : null);
+  }
+
+  /** Return the most recent app-server-authoritative context snapshot. */
+  async getContextUsageSnapshot(sessionId: string): Promise<ContextUsageSnapshot | null> {
+    const entry = this.resolveSession(sessionId);
+    const threadId = entry?.threadId ?? (!this.isProvisionalId(sessionId) ? sessionId : null);
+    return threadId ? this.appServerContextSnapshots.get(threadId) ?? null : null;
+  }
+
+  /**
+   * Read the same local gates enforced by `compactForegroundThread` without
+   * creating a subscription, starting an RPC, or changing any runtime state.
+   */
+  getForegroundCompactionAvailability(sessionId: string): CodexForegroundCompactionAvailability {
+    const gate = this.resolveForegroundCompactionGate(sessionId);
+    return {
+      status: gate.status,
+      ...(gate.threadId ? { threadId: gate.threadId } : {}),
+    };
+  }
+
+  /**
+   * Request foreground context compaction on an app-server-owned current
+   * thread. The empty RPC ACK is deliberately exposed only through
+   * `onAccepted`; this promise resolves `verified` only after both independent
+   * runtime notifications have arrived, in either order.
+   */
+  async compactForegroundThread(
+    sessionId: string,
+    options: CodexForegroundCompactionOptions = {},
+  ): Promise<CodexForegroundCompactionResult> {
+    const gate = this.resolveForegroundCompactionGate(sessionId);
+    if (gate.status === 'unavailable') {
+      return this.foregroundCompactionResult('unavailable', { errorReason: 'Codex app-server is unavailable' });
+    }
+    if (gate.status === 'invalid-thread') {
+      return this.foregroundCompactionResult('invalid-thread', { errorReason: 'No app-server-owned thread is available for this session' });
+    }
+    if (gate.status === 'busy') {
+      return this.foregroundCompactionResult('busy', { threadId: gate.threadId, errorReason: 'A foreground app-server turn or compaction is still active' });
+    }
+    const { client, logicalSessionId, threadId } = gate;
+    // The `available` gate populates these fields atomically from the current
+    // adapter mapping. Keep this defensive fallback so a future gate change
+    // cannot turn a UI preflight race into an arbitrary RPC target.
+    if (!client || !logicalSessionId || !threadId) {
+      return this.foregroundCompactionResult('invalid-thread', { errorReason: 'Foreground compaction session changed before dispatch' });
+    }
+
+    const epoch = ++this.nextForegroundCompactionEpoch;
+    this.foregroundCompactionEpochs.set(logicalSessionId, epoch);
+    return new Promise<CodexForegroundCompactionResult>((resolve) => {
+      const pending: PendingForegroundCompaction = {
+        sessionId: logicalSessionId,
+        threadId,
+        epoch,
+        acknowledged: false,
+        requestDispatched: false,
+        started: false,
+        completed: false,
+        tokenUsageObserved: false,
+        itemId: null,
+        timer: null,
+        subscription: null,
+        resolve,
+      };
+      this.pendingForegroundCompactions.set(logicalSessionId, pending);
+      pending.subscription = client.subscribeToThreadNotifications(threadId, (event) => {
+        this.observeForegroundCompactionNotification(pending, event);
+      });
+      pending.timer = setTimeout(() => {
+        this.finishForegroundCompaction(pending, 'timed-out', 'Timed out waiting for Codex compaction runtime evidence');
+      }, options.timeoutMs ?? 120_000);
+
+      // This assignment is intentionally immediately before the RPC call:
+      // pre-request notifications and the cached snapshot cannot be reused.
+      pending.requestDispatched = true;
+      void client.startThreadCompaction(threadId, {
+        ...(options.acknowledgementTimeoutMs === undefined
+          ? {}
+          : { acknowledgementTimeoutMs: options.acknowledgementTimeoutMs }),
+      }).then((ack) => {
+        if (!this.isCurrentForegroundCompaction(pending)) return;
+        if (!ack.acknowledged || ack.status !== 'accepted') {
+          this.finishForegroundCompaction(pending, this.compactionAckFailureStatus(ack), ack.errorReason);
+          return;
+        }
+        pending.acknowledged = true;
+        try {
+          options.onAccepted?.();
+        } catch (err) {
+          logger.warn('Codex compaction accepted callback failed', { error: err instanceof Error ? err.message : String(err) });
+        }
+        this.maybeVerifyForegroundCompaction(pending);
+      }, (err) => {
+        if (this.isCurrentForegroundCompaction(pending)) {
+          this.finishForegroundCompaction(pending, 'failed', err instanceof Error ? err.message : String(err));
+        }
+      });
+    });
+  }
+
+  /** Shared, synchronous, no-RPC gate for availability readback and dispatch. */
+  private resolveForegroundCompactionGate(sessionId: string): ForegroundCompactionGate {
+    const client = this.appServerClient;
+    if (!client) return { status: 'unavailable' };
+    const logicalSessionId = this.logicalSessionKey(sessionId);
+    const entry = this.resolveSession(logicalSessionId);
+    const threadId = entry?.threadId;
+    // A provisional, arbitrary, or SDK-only session must never become an RPC
+    // target merely because it looks like a thread ID.
+    if (!entry || !threadId || this.threadAlias.get(threadId) !== logicalSessionId) {
+      return { status: 'invalid-thread' };
+    }
+    if (this.activeAppServerTurns.has(logicalSessionId) || this.pendingForegroundCompactions.has(logicalSessionId)) {
+      return { status: 'busy', threadId };
+    }
+    return { status: 'available', threadId, logicalSessionId, client };
+  }
+
+  private observeForegroundCompactionNotification(pending: PendingForegroundCompaction, event: import('./CodexAppServerClient').AppServerThreadNotification): void {
+    if (!pending.requestDispatched || !this.isCurrentForegroundCompaction(pending)) return;
+    const params = isRecordLike(event.params) ? event.params : null;
+    if (!params) return;
+    if (event.method === 'thread/tokenUsage/updated') {
+      const mapping = mapAppServerNotification({
+        event,
+        modelId: this.options.model ?? null,
+        sessionId: pending.sessionId,
+        threadId: pending.threadId,
+        streamState: { streamedAgentMessageItemIds: new Set(), streamedReasoningItemIds: new Set(), startedTodoItemIds: new Set(), outputSchema: undefined },
+      });
+      if (mapping.contextUsageSnapshot) {
+        this.appServerContextSnapshots.set(pending.threadId, mapping.contextUsageSnapshot);
+        pending.tokenUsageObserved = true;
+        this.maybeVerifyForegroundCompaction(pending);
+      }
+      return;
+    }
+    if (event.method === 'item/started' || event.method === 'item/completed') {
+      this.observeForegroundCompactionItem(pending, event.method, params);
+    }
+  }
+
+  private observeForegroundCompactionItem(
+    pending: PendingForegroundCompaction,
+    method: 'item/started' | 'item/completed',
+    params: Record<string, unknown>,
+  ): void {
+    const item = isRecordLike(params.item) ? params.item : null;
+    const itemId = item && typeof item.id === 'string' && item.id.trim() ? item.id : null;
+    if (!item || item.type !== 'contextCompaction' || !itemId) return;
+    if (method === 'item/started') {
+      if (pending.itemId && pending.itemId !== itemId) return;
+      pending.itemId = itemId;
+      pending.started = true;
+      return;
+    }
+    // The compact-start ACK has no operation identifier. A completion is
+    // therefore evidence only after this request observed a nonempty matching
+    // contextCompaction start; completion-only/replayed events cannot bind to
+    // the request and must remain unverified.
+    if (!pending.started || pending.itemId !== itemId) return;
+    pending.completed = true;
+    this.maybeVerifyForegroundCompaction(pending);
+  }
+
+  private maybeVerifyForegroundCompaction(pending: PendingForegroundCompaction): void {
+    if (pending.acknowledged && pending.started && pending.itemId && pending.completed && pending.tokenUsageObserved) {
+      this.finishForegroundCompaction(pending, 'verified');
+    }
+  }
+
+  private isCurrentForegroundCompaction(pending: PendingForegroundCompaction): boolean {
+    return this.pendingForegroundCompactions.get(pending.sessionId) === pending
+      && this.foregroundCompactionEpochs.get(pending.sessionId) === pending.epoch
+      && this.resolveSession(pending.sessionId)?.threadId === pending.threadId;
+  }
+
+  private compactionAckFailureStatus(ack: AppServerThreadCompactionAckResult): Exclude<CodexForegroundCompactionResult['status'], 'verified' | 'busy'> {
+    return ack.status === 'accepted' ? 'failed' : ack.status;
+  }
+
+  private foregroundCompactionResult(
+    status: CodexForegroundCompactionResult['status'],
+    details: Partial<Omit<CodexForegroundCompactionResult, 'status' | 'runtimeVerified'>> = {},
+  ): CodexForegroundCompactionResult {
+    return {
+      status,
+      acknowledged: details.acknowledged ?? false,
+      runtimeVerified: status === 'verified',
+      started: details.started ?? false,
+      completed: details.completed ?? false,
+      tokenUsageObserved: details.tokenUsageObserved ?? false,
+      ...(details.threadId ? { threadId: details.threadId } : {}),
+      ...(details.errorReason ? { errorReason: details.errorReason } : {}),
+    };
+  }
+
+  private finishForegroundCompaction(
+    pending: PendingForegroundCompaction,
+    status: CodexForegroundCompactionResult['status'],
+    errorReason?: string,
+  ): void {
+    if (this.pendingForegroundCompactions.get(pending.sessionId) !== pending) return;
+    if (pending.timer) clearTimeout(pending.timer);
+    pending.subscription?.dispose();
+    this.pendingForegroundCompactions.delete(pending.sessionId);
+    this.foregroundCompactionEpochs.delete(pending.sessionId);
+    pending.resolve(this.foregroundCompactionResult(status, {
+      acknowledged: pending.acknowledged,
+      started: pending.started,
+      completed: pending.completed,
+      tokenUsageObserved: pending.tokenUsageObserved,
+      threadId: pending.threadId,
+      ...(errorReason ? { errorReason } : {}),
+    }));
+  }
+
+  private clearPendingForegroundCompactions(
+    status: Exclude<CodexForegroundCompactionResult['status'], 'verified' | 'busy'>,
+    errorReason: string,
+    sessionId?: string,
+  ): void {
+    for (const pending of [...this.pendingForegroundCompactions.values()]) {
+      if (sessionId === undefined || pending.sessionId === sessionId) {
+        this.finishForegroundCompaction(pending, status, errorReason);
+      }
+    }
+  }
+
+  /**
+   * Return the server-confirmed effective settings for a session's thread, or
+   * null when no verified runtime readback is available (app-server
+   * unavailable, or an older server that did not echo effective fields).
+   * Request-side turn options are never reported here — only fields the
+   * server actually confirmed in its `thread/start` / `thread/resume` response.
+   */
+  getThreadEffectiveSettings(sessionId: string): AppServerThreadEffectiveSettings | null {
+    if (!this.appServerClient) {
+      return null;
+    }
+    const entry = this.resolveSession(sessionId);
+    const threadId = entry?.threadId ?? (!this.isProvisionalId(sessionId) ? sessionId : null);
+    if (!threadId) {
+      return null;
+    }
+    return this.appServerClient.getThreadEffectiveSettings(threadId);
+  }
+
+  /**
+   * Return honest per-field runtime evidence for a session's thread, tracking
+   * the request lifecycle (pending → verified/unavailable/failed). Reuses the
+   * shared three-axis ConfigurationEvidence; for this readback surface
+   * persistence is `not-applicable`. Never claims a request echo is runtime
+   * proof. Sessions are isolated (per-sessionId map, no global singleton).
+   */
+  getThreadEffectiveEvidence(sessionId: string): AppServerThreadEffectiveEvidence {
+    const logicalKey = this.logicalSessionKey(sessionId);
+    return this.sessionEffectiveEvidence.get(logicalKey)
+      ?? buildUniformEffectiveEvidence('unavailable', this.attemptWiringForSession(logicalKey), 'no app-server readback attempted for this session');
+  }
+
+  /**
+   * Return the evidence + server-confirmed values for the most recently
+   * started/resumed Codex session, or null when no session has attempted a
+   * readback. Used by the Capability Lab production consumer.
+   */
+  getLatestThreadEffectiveEvidence(): { sessionId: string; evidence: AppServerThreadEffectiveEvidence; settings: AppServerThreadEffectiveSettings | null } | null {
+    if (!this.lastEvidenceSessionId) {
+      return null;
+    }
+    const sessionId = this.lastEvidenceSessionId;
+    return {
+      sessionId,
+      evidence: this.getThreadEffectiveEvidence(sessionId),
+      settings: this.sessionEffectiveSettings.get(sessionId) ?? null,
+    };
+  }
+
+  /**
+   * Compute which effective fields the plugin actually wires into the app-server
+   * request/turn. Used for the `application` evidence axis — a field the plugin
+   * does not send (e.g. approval under `inherit`, or server-only fields like
+   * modelProvider) is `not-applicable`, never inferred from a runtime echo.
+   */
+  /**
+   * Capture an immutable snapshot of the current option values that form one
+   * app-server attempt. Called BEFORE any await so mid-flight mutations to
+   * this.options do not leak into the attempt's thread/turn options or evidence.
+   */
+  private captureAttemptOptions(overrides?: AttemptOptions): AttemptOptions {
+    const source = { ...this.options, ...overrides };
+    return {
+      ...(source.model !== undefined ? { model: source.model } : {}),
+      ...(source.workingDirectory !== undefined ? { workingDirectory: source.workingDirectory } : {}),
+      ...(source.sandboxMode !== undefined ? { sandboxMode: source.sandboxMode } : {}),
+      ...(source.additionalDirectories ? { additionalDirectories: [...source.additionalDirectories] } : {}),
+      ...(source.networkAccessEnabled !== undefined ? { networkAccessEnabled: source.networkAccessEnabled } : {}),
+      ...(source.webSearchMode !== undefined ? { webSearchMode: source.webSearchMode } : {}),
+      ...(source.approvalPolicy !== undefined ? { approvalPolicy: source.approvalPolicy } : {}),
+      ...(source.modelReasoningEffort !== undefined ? { modelReasoningEffort: source.modelReasoningEffort } : {}),
+    };
+  }
+
+  /** Resolve every provisional/thread alias to the one logical state-map key. */
+  private logicalSessionKey(sessionId: string): string {
+    return this.resolveSession(sessionId)?.provisionalId ?? sessionId;
+  }
+
+  /** Begin one immutable app-server attempt before its first await. */
+  private beginAppServerAttempt(sessionId: string, sendOptions?: Record<string, unknown>): AppServerAttempt {
+    const logicalSessionId = this.logicalSessionKey(sessionId);
+    const options: AttemptOptions = {
+      ...this.captureAttemptOptions(sendOptions?.codexOptions as AttemptOptions | undefined),
+      ...(typeof sendOptions?.model === 'string' && sendOptions.model.trim()
+        ? { model: sendOptions.model.trim() } : {}),
+      ...(typeof sendOptions?.variant === 'string' && CODEX_EFFORT_VARIANTS.some((variant) => variant === sendOptions.variant)
+        ? { modelReasoningEffort: sendOptions.variant as AttemptOptions['modelReasoningEffort'] } : {}),
+    };
+    const epoch = ++this.nextAttemptEpoch;
+    this.sessionEpochs.set(logicalSessionId, epoch);
+    this.sessionAttemptOptions.set(logicalSessionId, options);
+    this.sessionEffectiveEvidence.set(
+      logicalSessionId,
+      buildUniformEffectiveEvidence('pending', this.attemptWiringForSession(logicalSessionId), 'thread start/resume in flight'),
+    );
+    this.sessionEffectiveSettings.set(logicalSessionId, null);
+    this.lastEvidenceSessionId = logicalSessionId;
+    return { sessionId: logicalSessionId, epoch, options };
+  }
+
+  private isCurrentAppServerAttempt(attempt: AppServerAttempt): boolean {
+    return this.sessionEpochs.get(attempt.sessionId) === attempt.epoch;
+  }
+
+  private invalidateAppServerAttempt(sessionId: string): void {
+    this.sessionEpochs.delete(this.logicalSessionKey(sessionId));
+  }
+
+  /**
+   * Compute wiring from the per-session attempt snapshot. If no snapshot exists
+   * (no attempt has been made), returns all-false (honest: can't prove what
+   * was sent). Never re-reads mutable this.options for an in-flight attempt.
+   */
+  private attemptWiringForSession(sessionId: string): EffectiveFieldWiring {
+    const snap = this.sessionAttemptOptions.get(sessionId);
+    if (!snap) {
+      // No snapshot: cannot prove what was wired. For fields the plugin COULD
+      // wire (model/cwd/sandbox/approval/effort), report the lifecycle status
+      // honestly (unavailable — "can't tell"). Server-only fields that the
+      // plugin NEVER wires stay not-applicable.
+      return { model: true, modelProvider: false, cwd: true, sandbox: true, approvalPolicy: true, activePermissionProfile: false, reasoningEffort: true };
+    }
+    // Snapshot exists: use the frozen values from attempt start (immutable).
+    return {
+      model: !!snap.model,
+      modelProvider: false,
+      cwd: !!snap.workingDirectory,
+      sandbox: true,
+      approvalPolicy: snap.approvalPolicy !== undefined && snap.approvalPolicy !== 'inherit',
+      activePermissionProfile: false,
+      reasoningEffort: !!snap.modelReasoningEffort,
+    };
+  }
+
+  private applyTurnCompletionEvidence(sessionId: string, error: string | null, enqueue: (msg: string) => void): void {
+    const wiring = this.attemptWiringForSession(sessionId);
+    if (error) {
+      enqueue(error);
+      this.sessionEffectiveEvidence.set(sessionId, buildUniformEffectiveEvidence('failed', wiring, error));
+      this.sessionEffectiveSettings.set(sessionId, null);
+    } else {
+      const captured = this.sessionEffectiveSettings.get(sessionId) ?? null;
+      this.sessionEffectiveEvidence.set(sessionId, buildEffectiveEvidenceWithApplication(turnSuccessApplication(wiring), 'verified', captured));
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // AgentSessionCapability
+  // -------------------------------------------------------------------------
+
+  async createSession(_title?: string, _options?: Record<string, unknown>): Promise<string> {
+    const provisionalId = `codex-local-${crypto.randomUUID()}`;
+    this.sessions.set(provisionalId, {
+      provisionalId,
+      threadId: null,
+      thread: null,
+    });
+    this.trace((port) => port.recordLifecycle('session.created', { provisionalId }));
+    return provisionalId;
+  }
+
+  /** Explicit local forgetting never dispatches native archive/delete. */
+  async forgetSession(sessionId: string): Promise<void> {
+    return this.deleteSession(sessionId, { mode: 'forget-local' });
+  }
+
+  async deleteSession(sessionId: string, options: { mode?: 'delete-native' | 'forget-local' } = {}): Promise<void> {
+    const entry = this.resolveSession(sessionId);
+    // The logical session key is the provisionalId; resolveSession finds the
+    // entry whether sessionId is a provisional id or a real thread id/alias.
+    const logicalKey = entry?.provisionalId ?? sessionId;
+    const threadId = entry?.threadId ?? (!this.isProvisionalId(sessionId) ? sessionId : null);
+    // Native failure must leave identity, aliases and readback state recoverable.
+    if (threadId && options.mode !== 'forget-local') {
+      await this.verifyNativeSessionDeletion(threadId, logicalKey);
+    }
+    this.invalidateAppServerAttempt(logicalKey);
+    this.clearPendingForegroundCompactions('invalid-thread', 'Codex session was deleted', logicalKey);
+    const controller = this.activeControllers.get(logicalKey);
+    controller?.abort();
+    this.activeControllers.delete(logicalKey);
+    const activeTurn = this.activeAppServerTurns.get(logicalKey);
+    if (activeTurn?.turnId) {
+      const activeContext = this.lastTurnContextBySession.get(logicalKey);
+      if (activeContext) {
+        // Clear before the awaited interrupt so a concurrent/re-entrant delete
+        // cannot finish the same trace turn twice.
+        this.lastTurnContextBySession.delete(logicalKey);
+        this.trace((port) => port.finishTurn(activeContext, 'incomplete', { reason: 'session_deleted' }));
+      }
+    }
+    this.activeAppServerTurns.delete(logicalKey);
+    this.lastTurnContextBySession.delete(logicalKey);
+    if (entry?.threadId) {
+      this.threadAlias.delete(entry.threadId);
+    }
+    this.sessions.delete(logicalKey);
+    this.sessionEffectiveEvidence.delete(logicalKey);
+    this.sessionEffectiveSettings.delete(logicalKey);
+    this.sessionAttemptOptions.delete(logicalKey);
+    // Also clean by the passed key in case it differs from the logical key.
+    if (sessionId !== logicalKey) {
+      this.sessions.delete(sessionId);
+      this.sessionEffectiveEvidence.delete(sessionId);
+      this.sessionEffectiveSettings.delete(sessionId);
+      this.lastTurnContextBySession.delete(sessionId);
+    }
+    // Evict only after verified deletion or explicitly requested forgetting.
+    if (threadId) {
+      this.forkedThreadIds.delete(threadId);
+      this.pendingNativeDeletions.delete(threadId);
+      this.appServerClient?.clearThreadEffectiveSettings?.(threadId);
+      this.appServerContextSnapshots.delete(threadId);
+      this.loadedThreadIds.delete(threadId);
+      this.threadGoalByThread.delete(threadId);
+    }
+    if (this.lastEvidenceSessionId === logicalKey || this.lastEvidenceSessionId === sessionId) {
+      this.lastEvidenceSessionId = null;
+    }
+  }
+
+  /** Fail closed until a native delete has same-ID absence evidence. */
+  private async verifyNativeSessionDeletion(threadId: string, logicalKey: string): Promise<void> {
+    this.pendingNativeDeletions.add(threadId);
+    const client = this.appServerClient;
+    if (!client) {
+      throw new AppServerThreadMutationError({ operation: 'delete', threadId, status: 'unavailable', errorReason: 'Codex native deletion requires the app-server; use forgetSession for local cleanup' });
+    }
+    const turn = this.activeAppServerTurns.get(logicalKey);
+    if (turn?.turnId) {
+      try {
+        await client.interruptTurn(turn.threadId, turn.turnId);
+      } catch {
+        // Native delete still gets a chance to stop/remove the thread.
+      }
+    }
+    const outcome: AppServerThreadMutationResult = await client.deleteThreadResult?.(threadId) ?? {
+      operation: 'delete' as const, threadId,
+      status: await client.deleteThread(threadId) ? 'admitted' as const : 'failed' as const,
+    };
+    // A void completion promises local cleanup is safe. ACK alone cannot make
+    // that promise; retain aliases/evidence and expose a retryable result.
+    if (outcome.status !== 'verified' || outcome.operation !== 'delete' || outcome.threadId !== threadId) {
+      throw new AppServerThreadMutationError({
+        ...outcome,
+        status: outcome.status === 'verified' ? 'failed' : outcome.status,
+        errorReason: outcome.status === 'admitted'
+          ? `Codex deletion pending (admitted): native absence is not verified; local conversation retained. Retry deletion. ${outcome.readback?.errorReason ?? ''}`.trim()
+          : outcome.errorReason ?? 'Codex native deletion was not verified for the same thread ID',
+      });
+    }
+  }
+
+  async updateSessionTitle(
+    sessionId: string,
+    title: string,
+  ): Promise<void> {
+    const threadId = this.resolveThreadId(sessionId);
+    if (!threadId) return;
+    const client = this.appServerClient;
+    if (!client) {
+      throw new AppServerThreadMutationError({ operation: 'rename', threadId, status: 'unavailable', errorReason: 'Codex native rename requires the app-server' });
+    }
+    const outcome = await client.setThreadNameResult?.(threadId, title);
+    const renamed = outcome ? outcome.status === 'admitted' || outcome.status === 'verified' : await client.setThreadName(threadId, title);
+    if (!renamed) {
+      throw new AppServerThreadMutationError(outcome ?? { operation: 'rename', threadId, status: 'failed', errorReason: 'Codex native rename was not acknowledged' });
+    }
+    this.trace((port) => port.recordLifecycle('session.rename_admitted', {
+      threadId,
+      titleLength: title.length,
+    }));
+    // There is no adapter-local title field: listSessions/getSession re-read
+    // titles from the app-server, which emits `thread/name/updated` after a
+    // successful rename.
+  }
+
+  /** Browser evidence merges complete native partitions, retaining usable rows on failure. */
+  async getSessionCatalog(options?: { includeSessionIds?: readonly string[] }): Promise<AppServerCatalogReadResult<NormalizedSessionRow>> {
+    const rows = new Map<string, NormalizedSessionRow>();
+    for (const session of this.sessions.values()) {
+      const id = session.threadId ?? session.provisionalId;
+      rows.set(id, { id, title: '', shareUrl: null, updatedAt: null });
+    }
+    const client = this.appServerClient;
+    if (!client) return { status: 'unavailable', data: Array.from(rows.values()), nextCursor: null, errorReason: 'Codex app-server unavailable' };
+    const results = await Promise.all([
+      client.getThreadsCatalog({ archived: false }),
+      client.getThreadsCatalog({ archived: true }),
+    ]);
+    const activeIds = new Set(results[0].data.map((thread) => thread.id));
+    results.forEach((result, index) => {
+      for (const thread of CodexAppServerClient.normalizeThreadList(result.data)) {
+        // Active partition wins over archived duplicates; native metadata replaces drafts.
+        if (index === 1 && activeIds.has(thread.id)) continue;
+        rows.set(thread.id, { id: thread.id, title: thread.title, shareUrl: null, updatedAt: thread.updatedAt, archived: index === 1 });
+      }
+    });
+    const nativeIds = new Set(results.flatMap((result) => result.data.map((thread) => thread.id)));
+    const exactIds = [...new Set([...this.forkedThreadIds, ...(options?.includeSessionIds ?? [])])]
+      .filter((id) => id.trim() && !this.isProvisionalId(id) && !nativeIds.has(id));
+    let exactReadFailed = false;
+    let exactRowsRead = 0;
+    for (const id of exactIds) {
+      const thread = await client.readThread(id, true);
+      if (!thread || thread.id !== id) { exactReadFailed = true; continue; }
+      const preview = CodexAppServerClient.normalizeTurnsToPreviewMessages(thread.turns ?? [])
+        .find((message) => message.role === 'user')?.parts.map((part) => part.text).join('\n');
+      rows.set(id, { id, title: thread.name || thread.preview || preview?.slice(0, 80) || '(untitled)',
+        shareUrl: null, updatedAt: thread.updatedAt ? thread.updatedAt * 1000 : null,
+        ...(thread.archived !== undefined ? { archived: thread.archived } : {}) });
+      exactRowsRead++;
+    }
+    const data = Array.from(rows.values());
+    const failure = results.find((result) => result.status !== 'complete');
+    if (failure) {
+      const hasNativeRows = exactRowsRead > 0 || results.some((result) => result.data.length > 0);
+      return { ...failure, status: hasNativeRows ? 'partial' : failure.status, data };
+    }
+    if (exactReadFailed) return { status: 'partial', data, nextCursor: null, errorReason: 'A referenced Codex thread could not be read authoritatively' };
+    return { status: 'complete', data, nextCursor: null };
+  }
+
+  async listSessions(): Promise<unknown[]> {
+    // Start with in-memory sessions
+    const inMemorySessions = Array.from(this.sessions.values());
+    const result: Array<Record<string, unknown>> = inMemorySessions.map(entry => ({
+      id: entry.threadId ?? entry.provisionalId,
+      provisionalId: entry.provisionalId,
+      threadId: entry.threadId,
+    }));
+
+    // Query app-server for persisted threads and merge
+    if (this.appServerClient) {
+      try {
+        const client = this.appServerClient;
+        const listThreads = client.listAllThreads?.bind(client) ?? client.listThreads.bind(client);
+        const [activeThreads, archivedThreads] = await Promise.all([
+          listThreads({ limit: 50, archived: false }),
+          listThreads({ limit: 50, archived: true }),
+        ]);
+        const normalizedActive = CodexAppServerClient.normalizeThreadList(activeThreads);
+        // The app-server `thread/list` response does not echo an `archived` field
+        // on each thread row, even when queried with `archived: true`. The filter
+        // semantic is the source of truth: every thread returned by an
+        // `archived: true` query IS archived, so stamp it explicitly here.
+        const normalizedArchived = CodexAppServerClient.normalizeThreadList(archivedThreads).map(
+          (thread) => ({ ...thread, archived: true }),
+        );
+        const normalized = [...normalizedActive, ...normalizedArchived];
+        // Merge: app-server threads take precedence for those that exist in both.
+        // Update the dedup set as we add so the active query wins over any
+        // overlap with the archived query (kept robust even though the
+        // app-server partitions the two sets).
+        const existingIds = new Set(result.map(r => String(r.id)));
+        for (const thread of normalized) {
+          if (!existingIds.has(thread.id)) {
+            existingIds.add(thread.id);
+            result.push({
+              id: thread.id,
+              title: thread.title,
+              updatedAt: thread.updatedAt,
+              provisionalId: null,
+              threadId: thread.id,
+              archived: thread.archived,
+            });
+          }
+        }
+      } catch (err) {
+        logger.warn('Failed to list persisted threads from app-server', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        // Older injected clients retain their historical local-only fallback.
+        // The full-read API must propagate its failed/partial result.
+        if (typeof this.appServerClient.listAllThreads === 'function') throw err;
+      }
+    }
+
+    return result;
+  }
+
+  async getSession(sessionId: string): Promise<unknown | null> {
+    // Check in-memory first
+    const entry = this.resolveSession(sessionId);
+    if (entry) {
+      return {
+        id: entry.threadId ?? entry.provisionalId,
+        provisionalId: entry.provisionalId,
+        threadId: entry.threadId,
+      };
+    }
+
+    // Fall back to app-server for persisted threads
+    if (this.appServerClient) {
+      try {
+        const thread = await this.appServerClient.readThread(sessionId, false);
+        if (thread) {
+          return {
+            id: thread.id,
+            title: thread.name ?? thread.preview.slice(0, 80) ?? '(untitled)',
+            updatedAt: thread.updatedAt ? thread.updatedAt * 1000 : null,
+            provisionalId: null,
+            threadId: thread.id,
+          };
+        }
+      } catch (err) {
+        logger.warn('Failed to read persisted thread from app-server', {
+          threadId: sessionId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Read messages from a backend session via the app-server.
+   *
+   * Returns normalized messages in a shape that AgentBackendRouting
+   * can consume for preview/detail transcript readback.
+   */
+  async getSessionMessages(sessionId: string): Promise<unknown[]> {
+    if (!this.appServerClient) {
+      return [];
+    }
+
+    try {
+      const threadId = this.resolveThreadId(sessionId);
+      if (!threadId) return [];
+      const thread = await this.appServerClient.readThread(threadId, true);
+      if (!thread || thread.id !== threadId || !thread.turns) {
+        return [];
+      }
+
+      const previewMessages = CodexAppServerClient.normalizeTurnsToPreviewMessages(thread.turns);
+      // Return parts array so activity types (tool_call, file_change, web_search)
+      // survive the AgentBackendRouting.getBackendSessionPreview normalization.
+      return previewMessages.map((msg) => ({
+        role: msg.role,
+        content: msg.parts,
+        ...(msg.sourceMessageId ? { id: msg.sourceMessageId } : {}),
+        ...(msg.sourceMessageId ? { sourceMessageId: msg.sourceMessageId } : {}),
+        ...(msg.sourceTurnId ? { sourceTurnId: msg.sourceTurnId } : {}),
+      }));
+    } catch (err) {
+      logger.warn('Failed to read thread messages from app-server', {
+        threadId: sessionId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Paginated session-history seam (B3 consumption): one page of thread turns
+   * as normalized preview messages via `thread/turns/list` (itemsView
+   * `summary`). Returns null when the app-server client is unavailable, the
+   * thread cannot be resolved, or the page request fails — never throws.
+   */
+  async getSessionTurnsPage(
+    sessionId: string,
+    options?: BackendSessionTurnsPageOptions,
+  ): Promise<NormalizedSessionMessagesPage | null> {
+    const client = this.appServerClient;
+    const threadId = this.resolveThreadId(sessionId);
+    if (!client || !threadId) {
+      return null;
+    }
+    try {
+      const page = await client.listThreadTurns(threadId, {
+        cursor: options?.cursor ?? null,
+        ...(options?.limit !== undefined ? { limit: options.limit } : {}),
+        ...(options?.sortDirection !== undefined ? { sortDirection: options.sortDirection } : {}),
+        itemsView: 'summary',
+      });
+      return page ? normalizeTurnsPageToPreviewMessages(page) : null;
+    } catch (err) {
+      logger.warn('Failed to list thread turns page from app-server', {
+        threadId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Paginated per-turn item seam (B3 consumption): one page of one turn's
+   * items as normalized preview messages via `thread/items/list`. Returns
+   * null under the same contract as `getSessionTurnsPage` — never throws.
+   */
+  async getSessionTurnItemsPage(
+    sessionId: string,
+    options?: BackendSessionItemsPageOptions,
+  ): Promise<NormalizedSessionMessagesPage | null> {
+    const client = this.appServerClient;
+    const threadId = this.resolveThreadId(sessionId);
+    if (!client || !threadId) {
+      return null;
+    }
+    try {
+      const page = await client.listThreadItems(threadId, {
+        turnId: options?.turnId ?? null,
+        cursor: options?.cursor ?? null,
+        ...(options?.limit !== undefined ? { limit: options.limit } : {}),
+        ...(options?.sortDirection !== undefined ? { sortDirection: options.sortDirection } : {}),
+      });
+      return page ? normalizeThreadItemsPageToPreviewMessages(page) : null;
+    } catch (err) {
+      logger.warn('Failed to list thread items page from app-server', {
+        threadId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Internal helpers
+  // -------------------------------------------------------------------------
+
+  /** Check if a sessionId looks like a provisional local ID. */
+  private isProvisionalId(id: string): boolean {
+    return id.startsWith('codex-local-');
+  }
+
+  private buildThreadOptions(options: AttemptOptions = this.options): ThreadOptions {
+    return {
+      // Codex SDK >= 0.152 records a caller-defined source on newly created
+      // threads. Keep this stable and product-owned instead of exposing a raw
+      // user override that could fragment attribution.
+      threadSource: 'opencodian',
+      ...(options.workingDirectory
+        ? { workingDirectory: options.workingDirectory }
+        : {}),
+      ...(options.model
+        ? { model: options.model }
+        : {}),
+      ...(options.sandboxMode
+        ? { sandboxMode: options.sandboxMode }
+        : {}),
+      ...(options.modelReasoningEffort
+        ? { modelReasoningEffort: options.modelReasoningEffort }
+        : {}),
+      ...(options.additionalDirectories?.length
+        ? { additionalDirectories: [...options.additionalDirectories] }
+        : {}),
+      ...(options.networkAccessEnabled !== undefined
+        ? { networkAccessEnabled: options.networkAccessEnabled }
+        : {}),
+      ...(options.webSearchMode
+        ? { webSearchMode: options.webSearchMode }
+        : {}),
+      ...(options.approvalPolicy && options.approvalPolicy !== 'inherit'
+        ? { approvalPolicy: options.approvalPolicy } : {}),
+      // Obsidian vaults are not typically Git repositories; skip the
+      // Codex CLI's git-trust check to avoid immediate rejection.
+      skipGitRepoCheck: true,
+    };
+  }
+
+  private resolveOrCreateThread(sessionId: string, threadOptions = this.buildThreadOptions()): Thread | null {
+    if (!this.codex) {
+      return null;
+    }
+
+    const entry = this.resolveSession(sessionId);
+
+    // SDK ThreadOptions are immutable. Refresh the wrapper for every turn
+    // while retaining the native thread ID and its persisted history.
+    const nativeThreadId = entry?.threadId ?? entry?.thread?.id;
+    if (entry && nativeThreadId) {
+      const thread = this.codex.resumeThread(nativeThreadId, threadOptions);
+      entry.thread = thread;
+      return thread;
+    }
+
+    // Known provisional session without thread → start new
+    if (entry) {
+      const thread = this.codex.startThread(threadOptions);
+      entry.thread = thread;
+      return thread;
+    }
+
+    // Unknown session — distinguish provisional vs real thread ID:
+    //  - provisional-looking → start new thread (caller explicitly created a local session)
+    //  - anything else → treat as a real thread ID and attempt resume
+    if (this.isProvisionalId(sessionId)) {
+      const thread = this.codex.startThread(threadOptions);
+      this.sessions.set(sessionId, {
+        provisionalId: sessionId,
+        threadId: null,
+        thread,
+      });
+      return thread;
+    }
+
+    // Treat as a real Codex thread ID → resume.
+    // If the ID is invalid, the SDK will throw; sendMessage() will yield it as an error chunk.
+    const thread = this.codex.resumeThread(sessionId, threadOptions);
+    this.sessions.set(sessionId, {
+      provisionalId: sessionId,
+      threadId: sessionId,
+      thread,
+    });
+    return thread;
+  }
+
+  private resolveSession(sessionId: string): CodexSessionEntry | null {
+    // Direct lookup by provisionalId
+    const direct = this.sessions.get(sessionId);
+    if (direct) {
+      return direct;
+    }
+    // Alias lookup by threadId
+    const provisionalId = this.threadAlias.get(sessionId);
+    if (provisionalId) {
+      return this.sessions.get(provisionalId) ?? null;
+    }
+    return null;
+  }
+
+  /**
+   * Defensive wrapper for every trace-port call. Returns `undefined` (and logs
+   * a warning) when the port is absent or a hook throws, so a trace failure can
+   * NEVER break the chat/stream/approval path. Callers that consume a returned
+   * context must tolerate `undefined`.
+   */
+  private trace<T>(run: (port: CodexTracePort) => T): T | undefined {
+    if (!this.tracePort) return undefined;
+    try {
+      return run(this.tracePort);
+    } catch {
+      logger.warn('codex trace hook failed; continuing without trace data');
+      return undefined;
+    }
+  }
+
+  private aliasSession(provisionalId: string, threadId: string, meta?: { resumed?: boolean; via?: 'app-server' | 'sdk' }): void {
+    const entry = this.sessions.get(provisionalId);
+    if (entry) {
+      entry.threadId = threadId;
+    }
+    this.threadAlias.set(threadId, provisionalId);
+    this.trace((port) => port.bindThread({
+      threadId,
+      provisionalId,
+      resumed: meta?.resumed ?? false,
+      via: meta?.via ?? 'app-server',
+    }));
+  }
+
+  private setStatus(status: AgentConnectionStatus): void {
+    if (this._status === status) {
+      return;
+    }
+    this._status = status;
+    this.trace((port) => port.recordLifecycle('adapter.status', { status }));
+    for (const handler of this.statusHandlers) {
+      try {
+        handler(status);
+      } catch {
+        // Swallow handler errors — must not break status propagation.
+      }
+    }
+  }
+
+  /**
+   * Add/remove the capabilities that exist only while the app-server path is
+   * active: `Context` (authoritative usage snapshots) and `TurnSteering`
+   * (`turn/steer` has no SDK-fallback equivalent, so the SDK path must never
+   * advertise it). Emits `onCapabilitiesChange` only when the set actually
+   * changed.
+   */
+  private setAppServerCapabilitiesAvailable(available: boolean): void {
+    let changed: boolean;
+    if (available) {
+      changed = !this.capabilitySet.has(AgentCapability.Context)
+        || !this.capabilitySet.has(AgentCapability.TurnSteering);
+      this.capabilitySet.add(AgentCapability.Context);
+      this.capabilitySet.add(AgentCapability.TurnSteering);
+    } else {
+      const removedContext = this.capabilitySet.delete(AgentCapability.Context);
+      const removedSteering = this.capabilitySet.delete(AgentCapability.TurnSteering);
+      changed = removedContext || removedSteering;
+    }
+    if (!changed) {
+      return;
+    }
+    for (const handler of this.capabilityHandlers) {
+      try {
+        handler(new Set(this.capabilitySet));
+      } catch {
+        // Capability changes must not be blocked by a UI subscriber.
+      }
+    }
+  }
+
+  /**
+   * Narrow dynamic drop for the turn-steering capability: used when the
+   * server answers `turn/steer` with -32601 (route probing), without touching
+   * the `Context` capability that gates the whole app-server chat path.
+   */
+  private setTurnSteeringCapabilityAvailable(available: boolean): void {
+    const changed = available
+      ? !this.capabilitySet.has(AgentCapability.TurnSteering)
+      : this.capabilitySet.delete(AgentCapability.TurnSteering);
+    if (available) {
+      this.capabilitySet.add(AgentCapability.TurnSteering);
+    }
+    if (!changed) {
+      return;
+    }
+    for (const handler of this.capabilityHandlers) {
+      try {
+        handler(new Set(this.capabilitySet));
+      } catch {
+        // Capability changes must not be blocked by a UI subscriber.
+      }
+    }
+  }
+}

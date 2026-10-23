@@ -2,7 +2,7 @@ import { access } from 'node:fs/promises';
 
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 
-import { OpenCode2Adapter } from '../../../../../src/core/agents/backend/OpenCode2Adapter';
+import { OpenCode2Adapter } from '../../../../../src/core/agents/backend/opencode/OpenCode2Adapter';
 
 type Scope = { workingDirectory: string; extraEnv?: Record<string, string> };
 const deny = { action: '*', resource: '*', effect: 'deny' };

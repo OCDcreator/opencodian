@@ -6,7 +6,7 @@
  * on, and that project resources are never marked with the global/disabled
  * status. Covers the pure helper that drives the badge rendering.
  */
-import { resolveClaudeResourceScopeStatus } from '../../../../src/features/settings/SettingsClaudeResourcesSection';
+import { resolveClaudeResourceScopeStatus } from '../../../../src/features/settings/backends/claude/SettingsClaudeResourcesSection';
 
 describe('resolveClaudeResourceScopeStatus', () => {
   it('marks a global resource as discovered-not-enabled when user source is off', () => {

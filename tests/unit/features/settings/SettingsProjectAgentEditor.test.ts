@@ -3,8 +3,8 @@ import { Setting } from 'obsidian';
 import * as obsidian from 'obsidian';
 
 import type { OpencodeAgentConfigRecord } from '../../../../src/core/types';
-import { SettingsProjectAgentEditor } from '../../../../src/features/settings/SettingsProjectAgentEditor';
-import { TextareaSizeMemory } from '../../../../src/features/settings/TextareaSizeMemory';
+import { SettingsProjectAgentEditor } from '../../../../src/features/settings/backends/opencode/SettingsProjectAgentEditor';
+import { TextareaSizeMemory } from '../../../../src/features/settings/controls/TextareaSizeMemory';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 

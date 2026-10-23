@@ -1,10 +1,10 @@
 import type { ChatMessage } from '../../../../src/core/types';
 import {
   hasInterruptedLocalAssistantTail,
-} from '../../../../src/features/chat/services/ConversationRenderRuntime';
+} from '../../../../src/features/chat/services/rendering/ConversationRenderRuntime';
 import {
   getIncrementalRenderedMessageUpdate,
-} from '../../../../src/features/chat/services/ConversationRenderService';
+} from '../../../../src/features/chat/services/rendering/ConversationRenderService';
 
 function createMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {

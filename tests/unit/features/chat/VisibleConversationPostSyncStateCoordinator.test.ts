@@ -1,7 +1,7 @@
 import {
   VisibleConversationPostSyncStateCoordinator,
   type VisibleConversationPostSyncStateCoordinatorHost,
-} from '../../../../src/features/chat/services/VisibleConversationPostSyncStateCoordinator';
+} from '../../../../src/features/chat/services/sync/VisibleConversationPostSyncStateCoordinator';
 
 type MockedVisiblePostSyncStateHost = {
   [Key in keyof VisibleConversationPostSyncStateCoordinatorHost]:

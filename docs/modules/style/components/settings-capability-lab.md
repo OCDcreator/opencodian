@@ -57,5 +57,5 @@
 
 ## 修改注意点
 
-- 修改源码结构时同步 `docs/modules/features/settings/SettingsCapabilityLabSection.md` 的类名说明。
+- 修改源码结构时同步 `docs/modules/features/settings/capabilities/SettingsCapabilityLabSection.md` 的类名说明。
 - 修改 CSS 后运行 `npm run build:css` 或完整 `npm run build`，刷新根目录 `styles.css`。

@@ -38,4 +38,4 @@ isSafeVaultRelativeAssetPath(path): boolean;
 
 - `src/core/agents/imagegen/ImageGenerationService.ts`：上游数据源（生成结果）。
 - `src/main.ts`：组合根用 `app.vault` 组装 `ImageAssetVault`（`getAvailablePathForAttachments` 运行时已验证但当前 obsidian.d.ts 未收型，组合处用守卫 cast）。
-- `src/features/inline-edit/InlineEditImageGen.ts`、`src/features/chat/services/ImageGenerationChatController.ts`：两个入口通过注入 port 消费，不直接 import 本模块。
+- `src/features/inline-edit/InlineEditImageGen.ts`、`src/features/chat/services/integrations/ImageGenerationChatController.ts`：两个入口通过注入 port 消费，不直接 import 本模块。

@@ -15,13 +15,13 @@
  * Together these tests prove the host seam is testable without a live runtime.
  */
 
-import type { CodexApprovalRequest } from '../../../../../src/core/agents/backend/CodexAdapter';
+import type { CodexApprovalRequest } from '../../../../../src/core/agents/backend/codex/CodexAdapter';
 import {
   buildCodexApprovalQuestionRequest,
   type CodexApprovalHostContext,
   createCodexApprovalBridgeHost,
   mapCodexApprovalResolution,
-} from '../../../../../src/core/agents/backend/CodexDefaultApprovalHost';
+} from '../../../../../src/core/agents/backend/codex/CodexDefaultApprovalHost';
 
 function execCommandRequest(overrides?: Partial<CodexApprovalRequest>): CodexApprovalRequest {
   return {
@@ -258,8 +258,8 @@ jest.mock('fs/promises', () => Object.fromEntries(['readFile', 'readdir', 'stat'
 
 import type { Codex } from '@openai/codex-sdk';
 
-import { CodexAdapter as Matrix014CodexAdapter } from '../../../../../src/core/agents/backend/CodexAdapter';
-import type { CodexAppServerClient } from '../../../../../src/core/agents/backend/CodexAppServerClient';
+import { CodexAdapter as Matrix014CodexAdapter } from '../../../../../src/core/agents/backend/codex/CodexAdapter';
+import type { CodexAppServerClient } from '../../../../../src/core/agents/backend/codex/CodexAppServerClient';
 import type { QuestionRequest } from '../../../../../src/core/types';
 
 /* eslint-disable jest/no-conditional-expect -- This finite it.each driver selects named schema partitions; every registered scenario runs assertions. Keep the frozen per-partition fail-closed oracles unchanged. */

@@ -77,3 +77,9 @@ SettingsPiSection owns the Pi settings surface through a narrow host. Credential
 ## 2026-10-13 Pi 状态显示输出边界
 
 `SettingsPiSection.mcpStatus` 在 statuses/message 的 DOM 文本输出点选择共享 sanitizer 的严格 URL 策略。此 owner 仅控制显示：PiAdapter 缓存/RPC 对象保持，不解析连接状态，不新增 Copy UI，不接管 Pi 运行时；safe 文本、时间、role 与布局保持。typed mock → JSDOM 回归不能替代 Pi native/UI/profile 验收。
+
+## 目录定位（2026-10-23）
+
+当前源码目录：`src/features/settings`、`src/features/settings/backends/codex`、`src/features/settings/backends/pi`、`src/features/settings/backends/zcode`、`src/features/settings/controls`、`src/features/settings/general`、`src/features/settings/models`、`src/features/settings/resources`。
+
+目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。

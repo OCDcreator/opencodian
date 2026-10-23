@@ -2,7 +2,7 @@ import type { Conversation } from '../../../../src/core/types';
 import {
   PostSyncQuestionTodoRefreshPlanBuilder,
   type PostSyncQuestionTodoRefreshPlanBuilderHost,
-} from '../../../../src/features/chat/services/PostSyncQuestionTodoRefreshPlanBuilder';
+} from '../../../../src/features/chat/services/questions/PostSyncQuestionTodoRefreshPlanBuilder';
 
 type Mocked<T> = {
   [Key in keyof T]:

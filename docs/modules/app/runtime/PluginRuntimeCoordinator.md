@@ -19,7 +19,7 @@
 - `src/core/types`
 - `src/core/update/PluginUpdateService`
 - `src/features/chat/OpenCodianView`
-- `src/features/chat/runtime/UserMessageFooterRenderer`
+- `src/features/chat/runtime/rendering/UserMessageFooterRenderer`
 - `src/i18n`
 - `src/shared`
 
@@ -107,3 +107,8 @@ graph LR
 - 不要把 view 级 UI 细节复制进 coordinator；新增视图刷新行为优先由 `OpenCodianView` 提供稳定方法后再由本模块 fan out。
 - `ensureRuntimeWarmupReadyForSessionBootstrap()` 的 timer cancellation 和 promise reuse 是创建会话前的竞态保护，不要拆成 fire-and-forget。
 - `dispose()` 必须在 plugin unload 时调用，避免 pending timeout/frame 在卸载后继续触发。
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/app/runtime/PluginRuntimeCoordinator.ts`。
+- 随目录调整更新的依赖：`src/features/chat/runtime/rendering/UserMessageFooterRenderer.ts`。

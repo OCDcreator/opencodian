@@ -1,4 +1,4 @@
-import { AdditionalDirectoriesConfigBadgeCoordinator } from '../../../../../src/features/chat/services/AdditionalDirectoriesConfigBadgeCoordinator';
+import { AdditionalDirectoriesConfigBadgeCoordinator } from '../../../../../src/features/chat/services/selection/AdditionalDirectoriesConfigBadgeCoordinator';
 
 describe('AdditionalDirectoriesConfigBadgeCoordinator', () => {
   /* eslint-disable @typescript-eslint/no-explicit-any */

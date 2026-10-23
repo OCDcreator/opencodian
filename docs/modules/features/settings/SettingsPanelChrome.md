@@ -49,3 +49,8 @@
 
 - 这是展示壳层，不负责保存设置或跨 section 业务状态
 - title wordmark 由 [`brandingWordmark.md`](../../shared/brandingWordmark.md) 提供内联 data URL；其他运行时资源仍须由各自 owner 按部署契约解析
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/features/settings/SettingsPanelChrome.ts`。
+- 随目录调整更新的依赖：`src/features/settings/models/EnvironmentVariablesModal.ts`。

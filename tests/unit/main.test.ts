@@ -1631,7 +1631,7 @@ describe('Claude reviewed continuation renderer admission', () => {
   });
 
   it('keeps the real settings wiring probe synthetic and valid', async () => {
-    const { SettingsCapabilityLabSection } = await import('../../src/features/settings/SettingsCapabilityLabSection');
+    const { SettingsCapabilityLabSection } = await import('../../src/features/settings/capabilities/SettingsCapabilityLabSection');
     const updateRuntimeProof = jest.fn();
     const receiver = { plugin: { claudeCodePermissionHostContext: {} }, updateRuntimeProof };
     const output = document.createElement('div');

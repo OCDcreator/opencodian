@@ -52,3 +52,8 @@
 ## 2026-10-02 Codex local forget / complete catalog UI
 
 新增 `forgetConversation(id)` 窄接口；chat host forwarding 经 main 明确使用 forget-local mode。既有 deleteConversation 仍默认 native delete；View 不新增 runtime ownership。
+
+## 目录定位（2026-10-23）
+
+- 源码位置：`src/features/chat/ChatPluginPort.ts`。
+- 随目录调整更新的依赖：`src/core/agents/backend/claude/ClaudeCodeDefaultPermissionHost.ts`、`src/core/agents/backend/codex/CodexDefaultApprovalHost.ts`、`src/features/chat/services/conversation/ConversationTabRuntimeCoordinator.ts`。

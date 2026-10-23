@@ -12,7 +12,7 @@ import * as path from 'node:path';
 
 import type { JSONPath } from 'jsonc-parser';
 
-import { ConfigurationArchiveService } from '../agents/backend/ConfigurationArchiveService';
+import { ConfigurationArchiveService } from '../agents/backend/configuration/ConfigurationArchiveService';
 import {
   applyJsoncPathEdits,
   type ArchiveHistoryCatalogOutcome,
@@ -32,7 +32,7 @@ import {
   safeRestoreArchivedEntry,
   safeWriteFile,
   validateConfigurationContent,
-} from '../agents/backend/ProjectResourceSecureWrite';
+} from '../agents/backend/configuration/ProjectResourceSecureWrite';
 
 const OPENCODE_SCHEMA_URL = 'https://opencode.ai/config.json';
 const ARCHIVE_BACKEND = 'opencode';
