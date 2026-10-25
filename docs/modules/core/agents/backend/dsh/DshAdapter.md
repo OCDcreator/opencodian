@@ -17,7 +17,7 @@
 
 原生历史保留真实用户/助手消息、图片、native message ID 和工具结果，过滤原生规则/技能目录/runtime context 等内部 user-role 注入。共享预览将 native ID 保留为 sourceMessageId；工具结果通过 activity 文本导入，避免空占位。`forkSession` 使用原生事件边界与 buildForkSeed，不复制插件文本伪造原生分支。删除原生持久历史仍不可用，close 仅释放句柄。`getSession` 复用目录分页读取单会话元数据（官方标题/createdAt/updatedAt），路由层据此把 dsh 纳入官方标题读取映射。
 
-命令读取并执行于 native commands；原始 slash 文本不受 memory 前缀干扰。工具目录来自当前 agent schemas。问题交给 `DshQuestionBridge` 一次性回答/取消，聊天视图的问题应答路由将 dsh 指回本 adapter；权限回包绑定原 client/进程，未提供的持久允许不能被伪造——`always` 应答优先选择运行时提供的 `allow_always` 选项，否则降级为 `allow_once`（会话/持久记忆由权限卡渲染器的客户端 tracker 承担，与 zcode 回复映射一致），权限卡 chunk 的 patterns 为空数组而非选项名噪声。
+命令读取并执行于 native commands；原始 slash 文本不受 memory 前缀干扰。工具目录来自当前 agent schemas。问题交给 `DshQuestionBridge` 一次性回答/取消，聊天视图的问题应答路由将 dsh 指回本 adapter；权限回包绑定原 client/进程，未提供的持久允许不能被伪造——`always` 应答按偏好顺序先选运行时提供的 `allow_always` 选项、再回退 `allow_once`（不依赖选项数组顺序），`always`/`session` 的插件会话内记忆由权限卡渲染器的客户端 tracker 承担（与 zcode 回复映射一致），权限卡 chunk 的 patterns 为空数组而非选项名噪声。目录行在 adapter 边界把 ISO 时间戳归一为毫秒，供 extractTimestamp 类消费方与目录归一化直接使用。
 
 ## 辅助查询与生命周期
 

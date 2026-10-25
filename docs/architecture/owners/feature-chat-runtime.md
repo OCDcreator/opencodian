@@ -8,6 +8,7 @@
 > The native watch is armed on activation before a task exists and only fetches for the active tab; the renderer owns its timer cleanup.
 > 2026-09-25 (FA880): QuestionInlineCardRenderer now settles and removes an inline question whose original native ask disappears; process loss cannot leave its promise and answer buttons alive.
 > 2026-09-25 (FA880): PermissionInlineCardRenderer uses an optional native pending-read callback for ZCode. It removes actions and renders an explicit terminal card when the original ask expires or disconnects; callback-free backends keep their existing behavior.
+> 2026-10-25 (DSH gap remediation): PermissionInlineCardRenderer's session approval cache now also records "Allow always" clicks, not only "Allow for session". Backends whose runtime offers allow-once options only (DSH today) would otherwise re-prompt identical tools for the rest of the plugin session; for backends with a persistent always channel the client-side record is redundant within the session and does not widen scope.
 > 2026-09-21 (advantage-parity R-F2/R-F3)：SendPipelineRuntime 把绑定笔记去重合入 R-B3 发送前 snapshot candidates；turn/batch 结束冻结 post-image 供回退预览。发送与回退写路径仍复用既有边界，不自动写回绑定笔记。
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.

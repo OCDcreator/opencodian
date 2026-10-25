@@ -420,4 +420,33 @@ describe('DSH ACP prompt liveness and stderr diagnostics', () => {
     expect(message).not.toContain('sk-abcdefghijklmnopqrstuvwx');
     expect(client.recentStderr).toContain('[redacted]');
   });
+
+  it('carries the redacted tail in the startup rejection and redacts any-case bearer and short-header JWTs', async () => {
+    const failures: Error[] = [];
+    const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+    const client = new DshAcpClient({
+      cwd: process.cwd(),
+      launch: {
+        command: process.execPath,
+        args: ['-e', [
+          'process.stderr.write("auth failed: bearer synthetic_access_token_123456\\n");',
+          `process.stderr.write("token ${jwt}\\n");`,
+          'process.exit(4);',
+        ].join('')],
+        env: {},
+      },
+      requestTimeoutMs: 300,
+      onProtocolError: (error) => { failures.push(error); },
+    });
+    // The initialize rejection is what startup callers actually see; it must
+    // carry the diagnostic tail, not only the onProtocolError callback.
+    const rejection = await client.start().catch((error: Error) => error.message);
+    expect(rejection).toContain('DSH stderr tail');
+    expect(rejection).not.toContain('synthetic_access_token');
+    expect(rejection).not.toContain(jwt);
+    const callbackMessage = failures.map((error) => error.message).join('\n');
+    expect(callbackMessage).not.toContain('synthetic_access_token');
+    expect(callbackMessage).not.toContain(jwt);
+    expect(client.recentStderr).toContain('[redacted]');
+  });
 });

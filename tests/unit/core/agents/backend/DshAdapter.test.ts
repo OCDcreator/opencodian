@@ -396,6 +396,25 @@ describe('DshAdapter permission replies and metadata reads', () => {
     await adapter.stop();
   });
 
+  it("prefers the persistent allow regardless of the runtime's option order", async () => {
+    const { adapter, clients } = adapterFixture();
+    const sessionId = await adapter.createSession();
+    const client = clients[0];
+    const stream = collect(adapter.sendMessage({ sessionId, content: 'run' }));
+    await tick();
+    const permission = client.options.onPermissionRequest?.({
+      sessionId, toolCall: { title: 'shell' },
+      options: [{ optionId: 'once', kind: 'allow_once' }, { optionId: 'always', kind: 'allow_always' }],
+    });
+    await tick();
+    const [pending] = await adapter.getPendingPermissions() as Array<{ id: string }>;
+    await adapter.respondToPermission(pending.id, 'always');
+    await expect(permission).resolves.toEqual({ outcome: { outcome: 'selected', optionId: 'always' } });
+    client.resolvePrompt(sessionId);
+    await stream;
+    await adapter.stop();
+  });
+
   it('reads single-session metadata through the catalog seam', async () => {
     const { adapter, clients } = adapterFixture();
     await adapter.start();
@@ -405,6 +424,23 @@ describe('DshAdapter permission replies and metadata reads', () => {
     }] });
     await expect(adapter.getSession('s1')).resolves.toMatchObject({ id: 's1', title: 'Official title' });
     await expect(adapter.getSession('missing')).resolves.toBeNull();
+    await adapter.stop();
+  });
+
+  it('normalizes catalog ISO timestamps to epoch millis for routing consumers', async () => {
+    const { adapter, clients } = adapterFixture();
+    await adapter.start();
+    clients[0].list = async () => ({ sessions: [{
+      sessionId: 's1', title: 'T',
+      createdAt: '2026-10-24T00:00:00.000Z', updatedAt: '2026-10-25T12:00:00.000Z',
+    }] });
+    const session = await adapter.getSession('s1') as Record<string, unknown>;
+    // extractTimestamp-based detail/row consumers only accept numbers; ISO
+    // strings used to normalize to null there.
+    expect(session.createdAt).toBe(Date.parse('2026-10-24T00:00:00.000Z'));
+    expect(session.updatedAt).toBe(Date.parse('2026-10-25T12:00:00.000Z'));
+    const rows = await adapter.listSessions() as Array<Record<string, unknown>>;
+    expect(rows[0].updatedAt).toBe(Date.parse('2026-10-25T12:00:00.000Z'));
     await adapter.stop();
   });
 

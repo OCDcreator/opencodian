@@ -296,8 +296,17 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
       for (const value of sessions) {
         const record = asRecord(value);
         const sessionId = typeof record?.sessionId === 'string' ? record.sessionId.trim() : '';
-        if (!record || !sessionId) fail('Invalid session catalog identity');
-        if (!rows.has(sessionId)) rows.set(sessionId, { ...record, id: sessionId });
+        if (!record || !sessionId) return fail('Invalid session catalog identity');
+        if (!rows.has(sessionId)) {
+          // The native catalog emits ISO strings; routing/detail consumers
+          // (extractTimestamp, normalized rows) only accept epoch millis.
+          rows.set(sessionId, {
+            ...record,
+            id: sessionId,
+            createdAt: toEpochMillis(record.createdAt) ?? record.createdAt,
+            updatedAt: toEpochMillis(record.updatedAt) ?? record.updatedAt,
+          });
+        }
       }
       const nextCursor = page.nextCursor;
       if (nextCursor === undefined) return [...rows.values()];
@@ -599,13 +608,14 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
     if (!pending) throw new Error('DSH permission request is no longer active');
     // The native Harness offers allow-once/reject-once only. 'always' prefers a
     // persistent allow option when the runtime grows one and otherwise degrades
-    // to allow-once — persistence beyond the single request is tracked
-    // client-side by the permission card renderer, mirroring the zcode reply
-    // mapping. Resolving to 'cancelled' here would silently reject the tool.
-    const kinds = reply === 'once' ? ['allow_once']
-      : reply === 'always' ? ['allow_always', 'allow_once']
-        : ['reject_once', 'reject_always'];
-    const selected = pending.options.find((option) => kinds.includes(option.kind ?? ''));
+    // to allow-once — 'always'/'session' persistence within the plugin session
+    // is tracked client-side by the permission card renderer, mirroring the
+    // zcode reply mapping. Resolving to 'cancelled' here would silently reject
+    // the tool. The lookup is ordered by preference, not by option array order.
+    const selectByKinds = (kinds: string[]) => pending.options.find((option) => kinds.includes(option.kind ?? ''));
+    const selected = reply === 'once' ? selectByKinds(['allow_once'])
+      : reply === 'always' ? selectByKinds(['allow_always']) ?? selectByKinds(['allow_once'])
+        : selectByKinds(['reject_once', 'reject_always']);
     pending.resolve(selected
       ? { outcome: { outcome: 'selected', optionId: selected.optionId } }
       : { outcome: { outcome: 'cancelled' } });
@@ -945,6 +955,16 @@ function translateDshUpdate(update: DshJsonObject): StreamChunk | null {
 }
 
 function asRecord(value: unknown): DshJsonObject | null { return value && typeof value === 'object' && !Array.isArray(value) ? value as DshJsonObject : null; }
+
+/** Catalog timestamps arrive as ISO strings; numeric inputs pass through. */
+function toEpochMillis(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+  return null;
+}
 
 function contentText(value: unknown): string {
   if (typeof value === 'string') return value;

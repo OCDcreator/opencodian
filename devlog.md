@@ -18,6 +18,8 @@
 - 能力补齐：`DshAdapter.getSession()` 目录缝 + `readBackendSessionTitle` dsh `.title` 映射，DSH 会话官方标题轮询/详情读取不再恒空。
 - 评估后保持现状（理由见 `docs/status/dsh-gap-remediation-2026-10-25.md`）：ACP tools/commands 静默空目录（斜杠降级路径）、子代理事件以父工具调用形态投影、fork/createSession 不预写标题（官方标题自动生成）、`session/command`/`aux/state` 维持审计专用。结构受限项（删除、压缩、MCP OAuth、费用拆分、终端、后台任务、Windows 验收、wire 级 trace 服务）清单化。
 - 验证：verify 15 项门禁全 PASS，1002 套件 / 10738 测试通过（+10）；ACP 真实探针 2 项通过；native 探针 3 项因本机环境变化失败（未修改基线同样失败，隔离 HOME 下 provider 不可见，与代码无关，待环境恢复重验）。构建 `zcode-dsh-gap-remediation.202610251422`，分支 `zcode/dsh-gap-remediation`（基于 DSH 集成 checkpoint 27322547b）。
+- ACP 能力面调研（`docs/status/dsh-acp-capability-research-2026-10-25.md`）：装机 DSH ACP profile 实测只声明 close/list/resume + configOptions + mcp http；ACP v1 规范其余能力（斜杠命令目录、会话模式、Agent Plan、fs/terminal、session/delete、elicitation）上游均未实现，fork/compaction/usage/subagents 尚在 RFD 草案——原生扩展实现的就是这些草案能力，ACP 模式定位为兼容底线、能力扩张靠上游或原生通道；探针同时定位了 native 探针环境失败的根因（隔离 DSH_HOME 拿不到凭据服务的 API key）。
+- codex 独立复审（gpt-6-astra / effort=ultra / 只读）：1 P1 + 5 P2，全部核实修复——stderr 脱敏遗漏（大小写 bearer/短头 JWT/截断残端）、权限卡 always 无会话记忆（现与 session 同入客户端 tracker）、always 选项优先级按数组顺序失效（改两段偏好查找）、启动失败异常不携带诊断尾部、ISO 时间未转毫秒导致详情/目录时间为 null、迟到 stderr 缺子进程身份隔离；补反向排列/记忆行为/脱敏反例/时间跨路由/ACP 能力门控测试后全量门禁复验。
 
 ## 2026-10-24 DSH 原生通道、图片与行内查询（未发布）
 

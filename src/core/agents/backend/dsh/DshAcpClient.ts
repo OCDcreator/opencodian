@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- bounded transport owner: launch resolution, frame parsing, idle-gap timers, stderr diagnostics, and reverse-request handling stay in one adapter boundary (mirrors DshAdapter). */
 import { type ChildProcessWithoutNullStreams, spawn } from 'node:child_process';
 import { accessSync, constants, existsSync } from 'node:fs';
 import os from 'node:os';
@@ -200,6 +201,8 @@ export class DshAcpClient {
     // as a bare exit code with no diagnostic text anywhere in the plugin.
     child.stderr.setEncoding('utf8');
     child.stderr.on('data', (chunk: string) => {
+      // A restarted client must not adopt a previous child's late output.
+      if (this.child !== child) return;
       this.stderrTail = (this.stderrTail + chunk).slice(-STDERR_TAIL_BYTES);
     });
     child.stdout.on('data', (chunk: string) => this.handleStdout(child, chunk));
@@ -486,8 +489,12 @@ export class DshAcpClient {
 
   private protocolFailure(child: ChildProcessWithoutNullStreams, error: Error): void {
     if (this.child !== child) return;
-    this.options.onProtocolError?.(this.withStderrTail(error));
-    this.failAll(error);
+    const surfaced = this.withStderrTail(error);
+    this.options.onProtocolError?.(surfaced);
+    // Pending rejections carry the tail too: startup failures surface through
+    // the initialize rejection, and the suffix cannot break the prefix-anchored
+    // transport-uncertain classification in the adapter.
+    this.failAll(surfaced);
     this.started = false;
     const cleanup = this.stopChild(child);
     this.transportCleanup = cleanup;
@@ -503,8 +510,9 @@ export class DshAcpClient {
     this.child = null;
     this.started = false;
     this.activeSessions.clear();
-    this.failAll(error);
-    this.options.onProtocolError?.(this.withStderrTail(error));
+    const surfaced = this.withStderrTail(error);
+    this.failAll(surfaced);
+    this.options.onProtocolError?.(surfaced);
   }
 
   /** Last captured stderr lines, secret-shaped runs redacted. */
@@ -599,5 +607,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /** Collapse credential-shaped runs before stderr text is surfaced in errors. */
 function redactSecrets(text: string): string {
   return text
-    .replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9._~+/=-]{8,}|[A-Za-z0-9_-]{24,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})\b/g, '[redacted]');
+    // The Bearer scheme is case-insensitive (RFC 7235); redact its credential.
+    .replace(/\b(bearer\s+)[^\s'",;]{8,}/gi, '$1[redacted]')
+    // Provider-style keys, plus a leading orphan run created when the ring
+    // buffer truncated a key and dropped its "sk-" prefix mid-stream.
+    .replace(/\bsk-[A-Za-z0-9_-]{8,}/g, '[redacted]')
+    .replace(/^[A-Za-z0-9_+/=-]{24,}(?=[\s]|$)/, '[redacted]')
+    // JWTs: three base64url segments; a real JOSE header is short, so the
+    // first segment cannot carry a {24,} gate.
+    .replace(/\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\b/g, '[redacted]');
 }

@@ -5,15 +5,17 @@ import type { DshJsonObject } from '../../../../../src/core/agents/backend/dsh/D
 import { DshAdapter } from '../../../../../src/core/agents/backend/dsh/DshAdapter';
 import { adapterFixture, collect, FakeDshClient, MODEL_OPTIONS, settings, tick } from './DshAdapter.fixture';
 
+const HISTORY_MESSAGES = [
+  { id: 'u', role: 'user', sourceKind: 'user', content: [{ type: 'text', text: 'Look at this image' }] },
+  { id: 'internal', role: 'user', sourceKind: 'agent-instructions', content: [{ type: 'text', text: 'PRIVATE_NATIVE_INSTRUCTIONS' }] },
+  { id: 'runtime', role: 'user', sourceKind: 'runtime-context', content: [{ type: 'text', text: 'PRIVATE_RUNTIME_CONTEXT' }] },
+  { id: 'a', role: 'assistant', content: [{ type: 'text', text: 'Red' }] },
+  { id: 'tool', role: 'tool', toolCallId: 'c', content: [{ type: 'text', text: 'Actual tool result' }] },
+];
+
 describe('DshAdapter native configuration and media', () => {
   it('projects native chat history without presenting internal prompt injections as assistant replies', async () => {
-    const messages = [
-      { id: 'u', role: 'user', sourceKind: 'user', content: [{ type: 'text', text: 'Look at this image' }] },
-      { id: 'internal', role: 'user', sourceKind: 'agent-instructions', content: [{ type: 'text', text: 'PRIVATE_NATIVE_INSTRUCTIONS' }] },
-      { id: 'runtime', role: 'user', sourceKind: 'runtime-context', content: [{ type: 'text', text: 'PRIVATE_RUNTIME_CONTEXT' }] },
-      { id: 'a', role: 'assistant', content: [{ type: 'text', text: 'Red' }] },
-      { id: 'tool', role: 'tool', toolCallId: 'c', content: [{ type: 'text', text: 'Actual tool result' }] },
-    ];
+    const messages = HISTORY_MESSAGES;
     const adapter = new DshAdapter({ workingDirectory: '/vault', getSettings: settings,
       createClient: options => Object.assign(new FakeDshClient(options), {
         nativeRequest: async () => ({ messages }),

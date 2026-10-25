@@ -10,7 +10,7 @@
 ## 公开接口
 
 - `collectResponse()`：创建 permission inline card，渲染 tool/pattern/command/buttons，并等待 `once` / `always` / `session` / `reject`
-- `collectAndRespond()`：先检查 session approval cache；未命中时收集用户选择，并通过注入的 responder 回传 `always` / `once` / `reject`
+- `collectAndRespond()`：先检查 session approval cache；未命中时收集用户选择，并通过注入的 responder 回传 `always` / `once` / `reject`。`always` 与 `session` 都写入 session approval cache（2026-10-25）：`session` 本无服务端层级，而 `always` 在运行时只提供 allow-once 选项的后端（如 DSH）上若不记忆会对同类请求重复弹卡；对具备持久化通道的后端该记忆只是会话内冗余，不扩大范围
 - `clearSessionApprovals()`：清空当前插件运行期的 session approval cache
 - `PermissionInlineCardResult`：对 view 暴露的最小结果枚举
 

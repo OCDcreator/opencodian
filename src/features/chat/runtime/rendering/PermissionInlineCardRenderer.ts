@@ -45,7 +45,7 @@ export class PermissionInlineCardRenderer {
       return Boolean(isStillPending);
     }
 
-    if (result === 'session') {
+    if (result === 'session' || result === 'always') {
       this.sessionPermissionTracker.addSessionApproval(
         request.sessionID,
         request.permission,
@@ -57,6 +57,9 @@ export class PermissionInlineCardRenderer {
       // auto-approves matching requests within the current plugin session.
       // If the OpenCode server persists 'always' beyond session scope,
       // the user may see auto-approvals in future sessions for matching patterns.
+      // 'always' is remembered too: backends whose runtime only offers
+      // allow-once options (e.g. DSH) would otherwise re-prompt identical
+      // requests for the rest of the session.
       await respond(request.id, 'always');
       return true;
     }

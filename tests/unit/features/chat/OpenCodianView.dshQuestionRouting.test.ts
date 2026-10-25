@@ -11,11 +11,11 @@ type QuestionApiPort = {
   rejectQuestion(requestId: string): Promise<void>;
 };
 
-function viewFor(backend: Conversation['backend']) {
+function viewFor(backend: Conversation['backend'], options: { questionsCapability?: boolean } = {}) {
   const legacyReply = jest.fn(async () => {});
   const adapterReply = jest.fn(async () => {});
   const adapter = {
-    hasCapability: (capability: unknown) => capability === AgentCapability.Questions,
+    hasCapability: (capability: unknown) => capability === AgentCapability.Questions && options.questionsCapability !== false,
     getPendingQuestions: jest.fn(async () => []),
     replyToQuestion: adapterReply,
     rejectQuestion: jest.fn(async () => {}),
@@ -63,5 +63,13 @@ describe('DSH question card reply routing', () => {
     const { view } = viewFor('dsh');
     expect(() => view.getQuestionApiForTab('tab-1', { sessionId: 'another-session' }))
       .toThrow('no longer belongs to the target tab session');
+  });
+
+  it('fails closed when the adapter does not carry the Questions capability (e.g. ACP transport)', () => {
+    const { view, adapterReply, legacyReply } = viewFor('dsh', { questionsCapability: false });
+    expect(() => view.getQuestionApiForTab('tab-1', { sessionId: 'native-session' }))
+      .toThrow('dsh question responder unavailable');
+    expect(adapterReply).not.toHaveBeenCalled();
+    expect(legacyReply).not.toHaveBeenCalled();
   });
 });

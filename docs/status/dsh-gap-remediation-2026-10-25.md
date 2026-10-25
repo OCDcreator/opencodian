@@ -15,6 +15,21 @@
 | 会话目录 `updatedAt=createdAt`，"按最近更新"排序失真 | `service.mjs` 追踪每会话最后事件时间，`session/list` 优先返回进程内活跃时间，其次 `header.updatedAt`，最后 `createdAt`；同时透传 `createdAt` |
 | `getSession()` 缺失导致官方标题轮询、详情、分享检查对 dsh 全返 null | `DshAdapter.getSession` 复用目录分页返回单会话元数据行；`AgentBackendRouting.readBackendSessionTitle` 增加 dsh `.title` 映射，DSH 会话现可读官方标题 |
 
+## 独立复审与第二轮修复（同日）
+
+codex（`gpt-6-astra`，effort=ultra，只读）对 27322547b..d476bb70 做了独立审查：1 项 P1 + 5 项 P2，结论"需修复后合入"。全部发现均核实并修复：
+
+| 发现 | 修复 |
+| --- | --- |
+| F1 (P1) stderr 脱敏遗漏：小写 `bearer` 不匹配、JWT 头段长度门槛 `{24,}` 放过合法短头 JWT、环形缓冲截断 `sk-` 前缀后残余密钥暴露 | 正则重写：Bearer 大小写无关（RFC 7235）；JWT 改为三段 base64url 形态（头段 ≥10）；缓冲起始位置的 24+ 无空格符号串视为截断残端脱敏（仅缓冲头部，不误伤堆栈中的路径）。补小写 bearer/短头 JWT 反例测试 |
+| F2 (P2) 权限卡"始终允许"没有会话记忆：渲染器只在 `session` 时写 tracker，`always` 直接转发，同样请求会重复弹卡；注释与本文档的"持久记忆由 tracker 承担"声明不成立 | 渲染器 `always` 与 `session` 同样写入客户端 tracker（插件会话内即时放行；对有持久化通道的后端只是冗余、不扩大范围）。新增渲染器记忆测试：always 后同工具不再弹卡、once 不记忆 |
+| F3 (P2) `always` 未真正优先 `allow_always`：`options.find(kinds.includes)` 按 options 数组顺序，`[allow_once, allow_always]` 排列会选错；首轮测试恰好把 allow_always 放前面掩盖了问题 | 改为按偏好顺序的两段查找（先 `allow_always` 再 `allow_once`）。补反向排列测试 |
+| F4 (P2) 启动失败的 stderr 尾部只到 `onProtocolError` 回调，`start()` 抛出的还是原始错误 | `failAll` 与回调同样携带脱敏尾部（后缀追加不破坏前缀锚定的 transport-uncertain 分类）；补 start 拒绝带尾部的断言 |
+| F5 (P2) ISO 时间戳没有接通消费路径：`extractTimestamp`/目录归一化只认数字，详情与目录时间字段全为 null | `DshAdapter.listSessions` 在目录边界把 ISO 转毫秒（getSession 自动受益）；补跨路由时间字段断言 |
+| F6 (P2) stderr 监听缺子进程身份隔离：重启复用路径上旧子进程迟到输出污染新缓冲 | data 回调增加 `this.child === child` 检查（确定性单测难以稳定构造迟到窗口，依据审查建议以守卫代码与说明记录） |
+
+审查同时确认通过：patterns/permission 字段修正、contextUsage 保留（新会话 randomUUID 无 ID 复用路径）、getSession 分页语义、超时重挂无竞态（同步 pending 表操作）、Questions 路由（ACP 禁用时抛错属预期门控，已补测试）、iso() 回退链。
+
 ## 评估后保持现状的项（非缺陷）
 
 - **ACP 兼容模式 tools/commands 返回空数组**：这是 ACP 斜杠发送降级路径的一部分——抛错会打断把斜杠当普通 prompt 发送的回退。与 title/fork/aux 的 native-only 显式报错不同风格是有意的：前者是可用性降级，后者是能力缺失。
