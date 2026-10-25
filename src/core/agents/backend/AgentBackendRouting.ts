@@ -221,6 +221,13 @@ export async function readBackendSessionTitle(
     return typeof title === 'string' && title.trim() ? title.trim() : null;
   }
 
+  if (backend === 'dsh') {
+    // Harness title snapshots flow through the session catalog the same way;
+    // DshAdapter.getSession returns the catalog row with `.title`.
+    const title = record.title;
+    return typeof title === 'string' && title.trim() ? title.trim() : null;
+  }
+
   if (backend === 'claude-code') {
     const summary = record.summary;
     return typeof summary === 'string' && summary.trim() ? summary.trim() : null;

@@ -11,6 +11,14 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-10-25 DSH 缺口修复：权限/问题卡断路、超时误杀与可观测性（未发布）
+
+- 独立核查 2026-10-24 集成报告后修复两处 P0 断路：权限卡"始终/本会话允许"对 DSH 等效拒绝（`always` 现优先 `allow_always`、回退 `allow_once`，会话记忆由客户端 tracker 承担，对齐 zcode 映射；补齐 allow 放行测试）；DSH 问题卡 UI 应答路由回落 legacy 服务的白名单遗漏（`getQuestionApiForTab` 加入 dsh）。权限卡 patterns 不再把选项名当 pattern 噪声渲染。
+- 行为缺口修复：prompt 超时改为事件活跃感知的空闲间隔（`session/update` 重置计时，持续产出的长回合不再被误判 transport 不确定而杀连接）；stderr 由直接丢弃改为 8 KiB 有界缓冲 + 凭据脱敏 + 退出/协议错误附带尾部；上下文占用快照跨恢复保留；`session/list` 以进程内活跃时间修正 `updatedAt=createdAt` 失真并透传 `createdAt`。
+- 能力补齐：`DshAdapter.getSession()` 目录缝 + `readBackendSessionTitle` dsh `.title` 映射，DSH 会话官方标题轮询/详情读取不再恒空。
+- 评估后保持现状（理由见 `docs/status/dsh-gap-remediation-2026-10-25.md`）：ACP tools/commands 静默空目录（斜杠降级路径）、子代理事件以父工具调用形态投影、fork/createSession 不预写标题（官方标题自动生成）、`session/command`/`aux/state` 维持审计专用。结构受限项（删除、压缩、MCP OAuth、费用拆分、终端、后台任务、Windows 验收、wire 级 trace 服务）清单化。
+- 验证：verify 15 项门禁全 PASS，1002 套件 / 10738 测试通过（+10）；ACP 真实探针 2 项通过；native 探针 3 项因本机环境变化失败（未修改基线同样失败，隔离 HOME 下 provider 不可见，与代码无关，待环境恢复重验）。构建 `zcode-dsh-gap-remediation.202610251422`，分支 `zcode/dsh-gap-remediation`（基于 DSH 集成 checkpoint 27322547b）。
+
 ## 2026-10-24 DSH 原生通道、图片与行内查询（未发布）
 
 - 默认接入由 ACP 改为插件自有原生 Host 服务扩展，复用官方 SDK composition；保留显式 ACP 兼容模式，不修改已安装应用。

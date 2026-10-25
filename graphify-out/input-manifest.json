@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "b8929f40c498708ba7b70ab985056c43dbaeeaa0cacc29616eb77f47c47df994",
+  "digest": "a6da284a6819c06bf42ff7d6bd69da15abea29ddfc2f11533f50df43b171635f",
   "recordCount": 803,
   "records": [
     {
@@ -151,7 +151,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/AgentBackendRouting.ts",
-      "sha256": "182cfffd6bcde40e093b71841fff15468f44c906c5d9112d8bce5c845c6a23c0"
+      "sha256": "70e9d14779f374e292dd07421fe82889d9cdfd2749e29e77b53f48278059b3e5"
     },
     {
       "kind": "src",
@@ -446,12 +446,12 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/dsh/DshAcpClient.ts",
-      "sha256": "c8af39cb75b8ba33a5b7117248140cdaea2a635b787058a0543261999b3709c0"
+      "sha256": "1ca8a6d06ced05bb89b39bf24432b4a06135ac35f08ac219f9e19db675598bdb"
     },
     {
       "kind": "src",
       "key": "src/core/agents/backend/dsh/DshAdapter.ts",
-      "sha256": "2db5f0fbeaadd33bcb19a1e02bdc4e8d2986394e995149c82c6a03b87cc3cb63"
+      "sha256": "b33879b0b9824a4e26e71e7780da66e6e78fdcb47bc4a46a6d84a91a219e3d75"
     },
     {
       "kind": "src",
@@ -1411,7 +1411,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
-      "sha256": "64117e41009d824eed970f96ce10e4e108c8a474d1975459e9a4a7a9406d3814"
+      "sha256": "a038ff0e2916e18e2b1f8ea442683fee3a3d087266857bd315e91102653a7f1b"
     },
     {
       "kind": "src",
@@ -3991,7 +3991,7 @@
     {
       "kind": "tool",
       "key": "graphify-version",
-      "sha256": "d27ce4be2c503cc8256349f2efd107c22bd7b0dba071404ef1cb6a9b65bd3b77"
+      "sha256": "b51978f2277743327d67f2e691d74d1915bc4705f49837c36ab7ef8a2ab92ca8"
     },
     {
       "kind": "tsconfig",
@@ -4019,7 +4019,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-24T18:01:41.197Z",
-  "headShaAtGeneration": "c3ab43e81e2179ac5e03037f7e338e5b93bfd89d",
-  "graphifyVersion": "graphify 0.9.31"
+  "generatedAt": "2026-10-25T06:20:37.302Z",
+  "headShaAtGeneration": "27322547b446774c42708ab8de69b385e56cabf9",
+  "graphifyVersion": "graphify 0.9.36"
 }

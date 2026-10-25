@@ -59,7 +59,7 @@ interface TurnState {
 }
 
 interface PendingPermission {
-  readonly id: string; readonly sessionId: string;
+  readonly id: string; readonly sessionId: string; readonly permission: string;
   readonly options: DshAcpPermissionRequest['options'];
   readonly resolve: (response: DshAcpPermissionResponse) => void;
 }
@@ -146,7 +146,9 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
     this.resumePromises.clear();
     this.configurations.clear();
     this.reasoningDefaults.clear();
-    this.contextUsage.clear();
+    // Last-known context usage survives recovery: the native runtime only
+    // reports usage on the next assistant message, so zeroing it here would
+    // blank the chat's usage display until a fresh turn completes.
     this.reservedSession = null;
     this.catalogPromise = null;
     this.refreshCapabilities(null);
@@ -309,6 +311,14 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
 
   async deleteSession(_sessionId: string): Promise<void> {
     throw new Error('DSH ACP does not support deleting persisted sessions');
+  }
+
+  async getSession(sessionId: string): Promise<DshJsonObject | null> {
+    // Title/timestamp metadata comes from the harness title snapshots behind the
+    // same catalog the session browser reads; there is no single-session read.
+    const rows = await this.listSessions();
+    const match = rows.map((row) => asRecord(row)).find((row) => row && String(row.id) === sessionId);
+    return match ? { ...match } : null;
   }
 
   async updateSessionTitle(sessionId: string, title: string): Promise<void> {
@@ -576,8 +586,8 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
     return [...this.permissions.values()].map((permission) => ({
       id: permission.id,
       sessionID: permission.sessionId,
-      permission: String(permission.options[0]?.name ?? 'tool'),
-      patterns: permission.options.map((option) => option.name ?? option.optionId),
+      permission: permission.permission,
+      patterns: [],
     }));
   }
 
@@ -587,8 +597,13 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
     }
     const pending = this.permissions.get(requestID);
     if (!pending) throw new Error('DSH permission request is no longer active');
+    // The native Harness offers allow-once/reject-once only. 'always' prefers a
+    // persistent allow option when the runtime grows one and otherwise degrades
+    // to allow-once — persistence beyond the single request is tracked
+    // client-side by the permission card renderer, mirroring the zcode reply
+    // mapping. Resolving to 'cancelled' here would silently reject the tool.
     const kinds = reply === 'once' ? ['allow_once']
-      : reply === 'always' ? ['allow_always']
+      : reply === 'always' ? ['allow_always', 'allow_once']
         : ['reject_once', 'reject_always'];
     const selected = pending.options.find((option) => kinds.includes(option.kind ?? ''));
     pending.resolve(selected
@@ -679,14 +694,15 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
     const state = this.turns.get(request.sessionId);
     if (!state || state.cancelled || state.done) return Promise.resolve({ outcome: { outcome: 'cancelled' } });
     const id = `dsh-permission-${this.nextPermissionId++}`;
+    const permission = String(request.toolCall.title ?? request.toolCall.name ?? 'tool');
     return new Promise<DshAcpPermissionResponse>((resolve) => {
-      this.permissions.set(id, { id, sessionId: request.sessionId, options: request.options, resolve });
+      this.permissions.set(id, { id, sessionId: request.sessionId, permission, options: request.options, resolve });
       state.chunks.push({
         type: 'permission_request',
         id,
         sessionID: request.sessionId,
-        permission: String(request.toolCall.title ?? request.toolCall.name ?? 'tool'),
-        patterns: request.options.map((option) => option.name ?? option.optionId),
+        permission,
+        patterns: [],
         metadata: { options: request.options },
         always: request.options.filter((option) => option.kind === 'allow_always').map((option) => option.optionId),
       });

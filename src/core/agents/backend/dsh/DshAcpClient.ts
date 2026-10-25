@@ -44,9 +44,12 @@ export interface DshAcpClientOptions {
 
 interface PendingRequest {
   readonly method: string;
+  /** Present for session-scoped requests whose streamed updates prove the turn is alive. */
+  readonly sessionId?: string;
+  readonly timeoutMs: number;
   readonly resolve: (value: DshJsonValue) => void;
   readonly reject: (error: Error) => void;
-  readonly timeout: ReturnType<typeof setTimeout>;
+  timeout: ReturnType<typeof setTimeout>;
 }
 
 interface JsonRpcMessage {
@@ -62,6 +65,8 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 const DEFAULT_PROMPT_TIMEOUT_MS = 10 * 60_000;
 const DEFAULT_MAX_STDOUT_BUFFER_BYTES = 32 * 1024 * 1024;
 const MAX_PENDING_REQUESTS = 256;
+const STDERR_TAIL_BYTES = 8 * 1024;
+const STDERR_TAIL_EXCERPT_BYTES = 1_500;
 
 
 interface DshLaunchProbe {
@@ -155,6 +160,7 @@ export class DshAcpClient {
   private handshakeValue: DshJsonObject | null = null;
   private child: ChildProcessWithoutNullStreams | null = null;
   private stdoutBuffer = '';
+  private stderrTail = '';
   private nextRequestId = 1;
   private readonly pending = new Map<number, PendingRequest>();
   private readonly activeSessions = new Set<string>();
@@ -188,8 +194,14 @@ export class DshAcpClient {
     });
     this.child = child;
     this.stdoutBuffer = '';
+    this.stderrTail = '';
     child.stdout.setEncoding('utf8');
-    child.stderr.resume();
+    // Keep a bounded stderr tail: DSH startup/tool failures otherwise surface
+    // as a bare exit code with no diagnostic text anywhere in the plugin.
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (chunk: string) => {
+      this.stderrTail = (this.stderrTail + chunk).slice(-STDERR_TAIL_BYTES);
+    });
     child.stdout.on('data', (chunk: string) => this.handleStdout(child, chunk));
     child.stdin.on('error', (error) => this.protocolFailure(child, error));
     child.once('error', (error) => this.handleTransportEnd(child, error));
@@ -300,14 +312,35 @@ export class DshAcpClient {
     if (this.pending.size >= MAX_PENDING_REQUESTS) return Promise.reject(new Error('DSH ACP has too many pending requests'));
     const id = this.nextRequestId++;
     const promise = new Promise<DshJsonValue>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        if (!this.pending.delete(id)) return;
-        reject(new Error(`DSH ACP ${method} timed out`));
-      }, timeoutMs);
-      this.pending.set(id, { method, resolve, reject, timeout });
+      // A prompt only resolves when the whole turn ends, so its timeout is an
+      // idle gap: streamed session updates re-arm it while the turn is alive.
+      const sessionId = method === 'session/prompt' && typeof params.sessionId === 'string' ? params.sessionId : undefined;
+      const timeout = this.makeRequestTimeout(id, method, timeoutMs, reject);
+      this.pending.set(id, { method, sessionId, timeoutMs, resolve, reject, timeout });
     });
     child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
     return promise;
+  }
+
+  private makeRequestTimeout(
+    id: number,
+    method: string,
+    timeoutMs: number,
+    reject: (error: Error) => void,
+  ): ReturnType<typeof setTimeout> {
+    return setTimeout(() => {
+      if (!this.pending.delete(id)) return;
+      reject(new Error(`DSH ACP ${method} timed out`));
+    }, timeoutMs);
+  }
+
+  /** Session activity re-arms idle-gap timeouts for that session's pending prompts. */
+  private refreshSessionActivity(sessionId: string): void {
+    for (const [id, pending] of this.pending) {
+      if (pending.sessionId !== sessionId) continue;
+      clearTimeout(pending.timeout);
+      pending.timeout = this.makeRequestTimeout(id, pending.method, pending.timeoutMs, pending.reject);
+    }
   }
 
   private notify(method: string, params: DshJsonObject): void {
@@ -375,6 +408,7 @@ export class DshAcpClient {
       this.protocolFailure(child, new Error('DSH ACP emitted an invalid session/update notification'));
       return;
     }
+    this.refreshSessionActivity(params.sessionId);
     this.options.onUpdate?.({ sessionId: params.sessionId, update: update as DshJsonObject });
   }
 
@@ -452,7 +486,7 @@ export class DshAcpClient {
 
   private protocolFailure(child: ChildProcessWithoutNullStreams, error: Error): void {
     if (this.child !== child) return;
-    this.options.onProtocolError?.(error);
+    this.options.onProtocolError?.(this.withStderrTail(error));
     this.failAll(error);
     this.started = false;
     const cleanup = this.stopChild(child);
@@ -470,7 +504,21 @@ export class DshAcpClient {
     this.started = false;
     this.activeSessions.clear();
     this.failAll(error);
-    this.options.onProtocolError?.(error);
+    this.options.onProtocolError?.(this.withStderrTail(error));
+  }
+
+  /** Last captured stderr lines, secret-shaped runs redacted. */
+  get recentStderr(): string {
+    return redactSecrets(this.stderrTail);
+  }
+
+  private withStderrTail(error: Error): Error {
+    const tail = redactSecrets(this.stderrTail.trim());
+    if (!tail) return error;
+    const excerpt = tail.slice(-STDERR_TAIL_EXCERPT_BYTES);
+    const suffixed = new Error(`${error.message}\nDSH stderr tail:\n${excerpt}`);
+    suffixed.stack = error.stack;
+    return suffixed;
   }
 
   private async stopChild(child: ChildProcessWithoutNullStreams): Promise<void> {
@@ -546,4 +594,10 @@ function isPermissionResponse(value: unknown, optionIds: ReadonlySet<string>): v
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/** Collapse credential-shaped runs before stderr text is surfaced in errors. */
+function redactSecrets(text: string): string {
+  return text
+    .replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9._~+/=-]{8,}|[A-Za-z0-9_-]{24,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})\b/g, '[redacted]');
 }

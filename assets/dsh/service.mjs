@@ -21,6 +21,9 @@ export async function apply(ctx, config) {
   const transport = new JsonRpcLineTransport(process.stdin, process.stdout);
   const sessions = new Map();
   const auxiliary = new Map();
+  // Last streamed event time per session id; survives across opened sessions
+  // in this process so session/list ordering reflects real activity.
+  const lastActivity = new Map();
   let closing = false;
   let defaultRoute;
   const update = (id, value) => transport.notify('session/update', { sessionId: id, update: value });
@@ -134,6 +137,7 @@ export async function apply(ctx, config) {
   ctx.on('session/event', (session, event) => {
     const record = sessions.get(session.id);
     if (record?.handle.agent.session !== session) return;
+    lastActivity.set(session.id, event.time ?? Date.now());
     enqueue(record, async () => {
       const data = event.data;
       if (event.type === 'assistant/message') {
@@ -281,8 +285,14 @@ export async function apply(ctx, config) {
     async 'session/list'(params) {
       const rows = (await ctx.sessionQuery.listSessions()).filter((entry) => !params.cwd || entry.header.cwd === params.cwd);
       const titles = await ctx.sessionQuery.readTitleSnapshots(rows.map((entry) => entry.header.id));
+      const iso = (value) => { const date = new Date(value); return Number.isNaN(date.getTime()) ? null : date.toISOString(); };
       return { sessions: rows.map((entry, i) => ({ sessionId: entry.header.id, cwd: entry.header.cwd,
-        title: titles[i]?.status === 'fulfilled' ? titles[i].value.title?.title ?? '' : '', updatedAt: new Date(entry.header.createdAt).toISOString() })) };
+        title: titles[i]?.status === 'fulfilled' ? titles[i].value.title?.title ?? '' : '',
+        createdAt: iso(entry.header.createdAt) ?? new Date(0).toISOString(),
+        // In-process activity beats the header timestamps, which otherwise
+        // collapse every session's updated time onto its creation time.
+        updatedAt: iso(lastActivity.get(entry.header.id) ?? entry.header.updatedAt ?? entry.header.createdAt)
+          ?? iso(entry.header.createdAt) ?? new Date(0).toISOString() })) };
     },
     async 'session/close'(params) {
       const record = sessions.get(params.sessionId);

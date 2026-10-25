@@ -368,3 +368,56 @@ describe('DshAcpClient transport', () => {
     expect(client.isStarted).toBe(false);
   });
 });
+
+describe('DSH ACP prompt liveness and stderr diagnostics', () => {
+  it('re-arms the prompt idle-gap timeout while the session keeps streaming updates', async () => {
+    // Four updates 70ms apart end after 280ms; without activity refresh the
+    // 200ms prompt deadline would fire before the turn can settle.
+    const client = clientFor(`(message, io) => {
+      if (message.method === 'session/prompt') {
+        let ticks = 0;
+        const timer = setInterval(() => {
+          io.send({ jsonrpc: '2.0', method: 'session/update', params: {
+            sessionId: message.params.sessionId, update: { sessionUpdate: 'agent_message_chunk' }
+          } });
+          if (++ticks >= 4) { clearInterval(timer); io.respond(message, { stopReason: 'end_turn' }); }
+        }, 70);
+      }
+    }`, { requestTimeoutMs: 250, promptTimeoutMs: 200 });
+    try {
+      await client.start();
+      await expect(client.prompt('live', 'hello')).resolves.toEqual({ stopReason: 'end_turn' });
+    } finally {
+      await client.stop();
+    }
+  });
+
+  it('still times out a prompt turn that streams nothing', async () => {
+    const client = clientFor('(message) => { /* never answers prompts */ }', {
+      requestTimeoutMs: 250, promptTimeoutMs: 120,
+    });
+    await client.start();
+    await expect(client.prompt('silent', 'hello')).rejects.toThrow('session/prompt timed out');
+    await client.stop();
+  });
+
+  it('attaches a secret-redacted stderr tail to transport failure errors', async () => {
+    const failures: Error[] = [];
+    const client = new DshAcpClient({
+      cwd: process.cwd(),
+      launch: {
+        command: process.execPath,
+        args: ['-e', 'process.stderr.write("dsh boot failure sk-abcdefghijklmnopqrstuvwx\\n"); process.exit(3);'],
+        env: {},
+      },
+      requestTimeoutMs: 300,
+      onProtocolError: (error) => { failures.push(error); },
+    });
+    await expect(client.start()).rejects.toThrow('process exited');
+    const message = failures.map((error) => error.message).join('\n');
+    expect(message).toContain('DSH stderr tail');
+    expect(message).toContain('[redacted]');
+    expect(message).not.toContain('sk-abcdefghijklmnopqrstuvwx');
+    expect(client.recentStderr).toContain('[redacted]');
+  });
+});

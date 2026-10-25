@@ -342,3 +342,85 @@ describe('DshAdapter prompt and boundary behavior', () => {
     expect(adapter.status).toBe('error');
   });
 });
+
+describe('DshAdapter permission replies and metadata reads', () => {
+  it("maps 'always' to the offered allow-once option when no persistent allow exists", async () => {
+    const { adapter, clients } = adapterFixture();
+    const sessionId = await adapter.createSession();
+    const client = clients[0];
+    const stream = collect(adapter.sendMessage({ sessionId, content: 'run' }));
+    await tick();
+    const permission = client.options.onPermissionRequest?.({
+      sessionId,
+      toolCall: { toolCallId: 't1', title: 'shell' },
+      options: [{ optionId: 'allow-once', name: 'Allow once', kind: 'allow_once' }, { optionId: 'reject-once', name: 'Reject', kind: 'reject_once' }],
+    });
+    await tick();
+    const [pending] = await adapter.getPendingPermissions() as Array<{ id: string; permission: string; patterns: string[] }>;
+    expect(pending).toMatchObject({ permission: 'shell', patterns: [] });
+    await adapter.respondToPermission(pending.id, 'always');
+    // A cancelled resolution here would silently reject the tool call.
+    await expect(permission).resolves.toEqual({ outcome: { outcome: 'selected', optionId: 'allow-once' } });
+    client.resolvePrompt(sessionId);
+    const chunks = await stream;
+    expect(chunks).toContainEqual(expect.objectContaining({
+      type: 'permission_request', permission: 'shell', patterns: [], always: [],
+    }));
+    await adapter.stop();
+  });
+
+  it("prefers a runtime-offered persistent allow for 'always' and still admits plain 'once'", async () => {
+    const { adapter, clients } = adapterFixture();
+    const sessionId = await adapter.createSession();
+    const client = clients[0];
+    const stream = collect(adapter.sendMessage({ sessionId, content: 'run' }));
+    await tick();
+    const always = client.options.onPermissionRequest?.({
+      sessionId, toolCall: { title: 'shell' },
+      options: [{ optionId: 'always', kind: 'allow_always' }, { optionId: 'once', kind: 'allow_once' }],
+    });
+    await tick();
+    let [pending] = await adapter.getPendingPermissions() as Array<{ id: string }>;
+    await adapter.respondToPermission(pending.id, 'always');
+    await expect(always).resolves.toEqual({ outcome: { outcome: 'selected', optionId: 'always' } });
+
+    const once = client.options.onPermissionRequest?.({
+      sessionId, toolCall: { title: 'shell' }, options: [{ optionId: 'once', kind: 'allow_once' }],
+    });
+    await tick();
+    [pending] = await adapter.getPendingPermissions() as Array<{ id: string }>;
+    await adapter.respondToPermission(pending.id, 'once');
+    await expect(once).resolves.toEqual({ outcome: { outcome: 'selected', optionId: 'once' } });
+    client.resolvePrompt(sessionId);
+    await stream;
+    await adapter.stop();
+  });
+
+  it('reads single-session metadata through the catalog seam', async () => {
+    const { adapter, clients } = adapterFixture();
+    await adapter.start();
+    clients[0].list = async () => ({ sessions: [{
+      sessionId: 's1', cwd: '/vault', title: 'Official title',
+      createdAt: '2026-10-24T00:00:00.000Z', updatedAt: '2026-10-25T00:00:00.000Z',
+    }] });
+    await expect(adapter.getSession('s1')).resolves.toMatchObject({ id: 's1', title: 'Official title' });
+    await expect(adapter.getSession('missing')).resolves.toBeNull();
+    await adapter.stop();
+  });
+
+  it('keeps the last-known context usage snapshot across transport recovery', async () => {
+    const { adapter, clients } = adapterFixture();
+    const sessionId = await adapter.createSession();
+    const stream = collect(adapter.sendMessage({ sessionId, content: 'run' }));
+    await tick();
+    clients[0].emitUpdate(sessionId, { sessionUpdate: 'usage_update', used: 600, size: 1000 });
+    await tick();
+    expect(await adapter.getSessionContextUsageSnapshot(sessionId)).toMatchObject({ totalTokens: 600, contextWindow: 1000 });
+    clients[0].disconnect();
+    await stream;
+    // Recovery used to clear runtime state; usage only refreshes on the next
+    // native assistant message, so the last-known snapshot must survive it.
+    expect(await adapter.getSessionContextUsageSnapshot(sessionId)).toMatchObject({ totalTokens: 600 });
+    await adapter.stop();
+  });
+});

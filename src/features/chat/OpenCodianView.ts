@@ -3087,7 +3087,7 @@ export class OpenCodianView extends ItemView {
     }
 
     const conversation = this.getConversationForTab(resolvedTabId);
-    if (conversation?.backend !== 'zcode' && conversation?.backend !== 'opencode2') {
+    if (conversation?.backend !== 'zcode' && conversation?.backend !== 'opencode2' && conversation?.backend !== 'dsh') {
       return this.plugin.openCodeService;
     }
 

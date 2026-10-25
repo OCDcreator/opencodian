@@ -9,15 +9,15 @@
 - Chat、Sessions、Permissions、Thinking、Models、Context 为基础能力。原生模式还提供 AuxQuery、InlineCompletion、Questions、Fork、TurnSteering、Tools；断开时逻辑行内能力允许安全重连，但每次辅助构造必须证明只读。Images 由当前握手开放，原生再按所选模型确认 modality。
 - 模型/effort 来自原生 configOptions，opaque ID 原样保存和回传。发送前等待完整原生配置确认，失败不提交 prompt；会话选择只修改原生 agent selection，不覆盖全局默认。
 - MCP 声明整批校验后传入新建/恢复。原生模式可显式应用至全部空闲会话；单会话替换失败恢复旧声明。未实现通用 Mcp/OAuth 管理合同，不声明该通用 capability。
-- 用量只消费 native aggregate used/size。分类和费用缺失保持未知，`tokenBreakdownAvailable:false` 防止虚构零费用。
+- 用量只消费 native aggregate used/size。分类和费用缺失保持未知，`tokenBreakdownAvailable:false` 防止虚构零费用。最后已知占用快照跨断连/恢复保留：原生只在下一条助手消息刷新占用，恢复清零会把聊天占用显示错误地归零。
 
 ## 内容与历史
 
 `prepareDshPromptBlocks` 在既有 codec 内读取 Vault 选择器的本地图片字节，复用 PathConfinement，拒绝越界、符号链接逃逸、空文件、超限或变化中的文件；保留有序文本/图片/资源内容，memory 与 Obsidian context 各注入一次。取消期间不提交迟到 prompt。
 
-原生历史保留真实用户/助手消息、图片、native message ID 和工具结果，过滤原生规则/技能目录/runtime context 等内部 user-role 注入。共享预览将 native ID 保留为 sourceMessageId；工具结果通过 activity 文本导入，避免空占位。`forkSession` 使用原生事件边界与 buildForkSeed，不复制插件文本伪造原生分支。删除原生持久历史仍不可用，close 仅释放句柄。
+原生历史保留真实用户/助手消息、图片、native message ID 和工具结果，过滤原生规则/技能目录/runtime context 等内部 user-role 注入。共享预览将 native ID 保留为 sourceMessageId；工具结果通过 activity 文本导入，避免空占位。`forkSession` 使用原生事件边界与 buildForkSeed，不复制插件文本伪造原生分支。删除原生持久历史仍不可用，close 仅释放句柄。`getSession` 复用目录分页读取单会话元数据（官方标题/createdAt/updatedAt），路由层据此把 dsh 纳入官方标题读取映射。
 
-命令读取并执行于 native commands；原始 slash 文本不受 memory 前缀干扰。工具目录来自当前 agent schemas。问题交给 `DshQuestionBridge` 一次性回答/取消；权限回包绑定原 client/进程，未提供的持久允许不能被伪造。
+命令读取并执行于 native commands；原始 slash 文本不受 memory 前缀干扰。工具目录来自当前 agent schemas。问题交给 `DshQuestionBridge` 一次性回答/取消，聊天视图的问题应答路由将 dsh 指回本 adapter；权限回包绑定原 client/进程，未提供的持久允许不能被伪造——`always` 应答优先选择运行时提供的 `allow_always` 选项，否则降级为 `allow_once`（会话/持久记忆由权限卡渲染器的客户端 tracker 承担，与 zcode 回复映射一致），权限卡 chunk 的 patterns 为空数组而非选项名噪声。
 
 ## 辅助查询与生命周期
 

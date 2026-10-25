@@ -34,6 +34,7 @@ The real tab activation writeback refreshes sidebar identity immediately after a
 > 2026-09-25 (FA880): The ZCode permission card receives an original requestId/sessionId pending-read callback. A native timeout or lost process changes the card to a visible terminal state; approvals from another tab or request cannot satisfy it.
 
 > 2026-09-24（ZCode question card 路由）：question runtime 的 API resolver 以 card 所属 tab 和 request 原生 session 为键。ZCode `interaction/requestUserInput` 的提交/拒绝不再无条件落到 `openCodeService`；若 tab 已重绑到另一会话则安全拒绝，避免跨标签或跨后端误答。ZCode 原生 pending 空读回是权威结果，会清除该 tab 旧的 waiter-owned Dock 卡片；其他后端维持既有的竞态保活。
+> 2026-10-25（DSH 并入问题应答路由）：`getQuestionApiForTab` 的 adapter 白名单由 `zcode|opencode2` 扩为含 `dsh`——DSH 原生问题卡的提交/取消此前会错误落到 legacy `openCodeService` 并以 Notice 失败收场；权限应答白名单此前已含 dsh，本次补齐对称缝。
 
 > 2026-09-24（ZCode 续做）：当前会话后端决定能力门控、状态徽章图标与文字、权限响应路由。ZCode 模型/上下文/思考控件挂载后，模型 `reasoningLevel` 在下一回合经原生读回确认；ContextRing 从 ZCode 会话读回精确用量，详情沿活动标签会话隔离。跨后端切换须等目标会话加载或创建后才按其能力重建 composer toolbar，否则从 Pi 返回 ZCode 时模式控件会消失。
 > 2026-09-24（ZCode 空会话恢复）：在加载、恢复和跨后端切回 ZCode 后，视图先让窄恢复服务核对空本地消息与 native `SESSION_NOT_FOUND`，才重绑 replacement `backendSessionId` 并保存；有历史会话、stale await 和任何非缺失错误不重建。composer 草稿不参与此路径，故会保留；新会话读取已配置默认或原生默认后才刷新模型/模式控件。
