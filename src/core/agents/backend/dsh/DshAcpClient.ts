@@ -3,10 +3,11 @@ import { accessSync, constants, existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import type { DshBackendSettings } from '../../../types/settings';
+import type { DshBackendSettings, DshMcpServer } from '../../../types/settings';
+import { DSH_ACP_PROTOCOL_VERSION as ACP_PROTOCOL_VERSION, type DshJsonObject, type DshJsonValue, parseDshRpcId, validateDshHandshake,validateDshMcpServers } from './DshProtocolCodec';
 
-export type DshJsonValue = null | boolean | number | string | DshJsonValue[] | { [key: string]: DshJsonValue };
-export type DshJsonObject = Record<string, DshJsonValue>;
+export type { DshJsonObject, DshJsonValue } from './DshProtocolCodec';
+export { validateDshMcpServers } from './DshProtocolCodec';
 
 export interface DshLaunchSpec {
   command: string;
@@ -34,6 +35,7 @@ export interface DshAcpClientOptions {
   readonly cwd: string;
   readonly onUpdate?: (update: DshAcpUpdate) => void;
   readonly onPermissionRequest?: (request: DshAcpPermissionRequest) => Promise<DshAcpPermissionResponse>;
+  readonly onQuestionRequest?: (request: DshJsonObject) => Promise<DshJsonObject>;
   readonly onProtocolError?: (error: Error) => void;
   readonly requestTimeoutMs?: number;
   readonly promptTimeoutMs?: number;
@@ -56,11 +58,11 @@ interface JsonRpcMessage {
   error?: unknown;
 }
 
-const ACP_PROTOCOL_VERSION = 1;
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 const DEFAULT_PROMPT_TIMEOUT_MS = 10 * 60_000;
-const DEFAULT_MAX_STDOUT_BUFFER_BYTES = 1024 * 1024;
+const DEFAULT_MAX_STDOUT_BUFFER_BYTES = 32 * 1024 * 1024;
 const MAX_PENDING_REQUESTS = 256;
+
 
 interface DshLaunchProbe {
   readonly platform?: NodeJS.Platform;
@@ -150,6 +152,7 @@ function isExecutable(candidate: string): boolean {
 
 /** Narrow ACP JSON-RPC 2.0 stdio owner used by the first-class DSH adapter. */
 export class DshAcpClient {
+  private handshakeValue: DshJsonObject | null = null;
   private child: ChildProcessWithoutNullStreams | null = null;
   private stdoutBuffer = '';
   private nextRequestId = 1;
@@ -164,6 +167,7 @@ export class DshAcpClient {
   constructor(private readonly options: DshAcpClientOptions) {}
 
   get isStarted(): boolean { return this.started; }
+  get handshake(): DshJsonObject | null { return this.handshakeValue; }
 
   async start(): Promise<void> {
     if (this.started && this.child) return;
@@ -175,6 +179,7 @@ export class DshAcpClient {
   }
 
   private async startInternal(): Promise<void> {
+    this.handshakeValue = null;
     const child = spawn(this.options.launch.command, this.options.launch.args, {
       cwd: this.options.cwd,
       env: { ...process.env, ...this.options.launch.env },
@@ -198,8 +203,9 @@ export class DshAcpClient {
         clientCapabilities: {},
         clientInfo: { name: 'opencodian', version: '1.0.0' },
       });
-      validateHandshake(handshake);
+      validateDshHandshake(handshake);
       if (this.child !== child || child.exitCode !== null) throw new Error('DSH ACP start was cancelled');
+      this.handshakeValue = handshake;
       this.started = true;
     } catch (error) {
       await this.stopChild(child);
@@ -216,6 +222,7 @@ export class DshAcpClient {
 
   private async stopInternal(): Promise<void> {
     this.started = false;
+    this.handshakeValue = null;
     const child = this.child;
     this.failMatching((pending) => pending.method === 'session/prompt', new Error('DSH ACP client stopped'));
     let failure: unknown;
@@ -236,8 +243,8 @@ export class DshAcpClient {
 
   dispose(): void { void this.stop(); }
 
-  async newSession(cwd: string): Promise<DshJsonObject> {
-    const result = await this.requestObject('session/new', { cwd, mcpServers: [] });
+  async newSession(cwd: string, mcpServers: readonly DshMcpServer[] = []): Promise<DshJsonObject> {
+    const result = await this.requestObject('session/new', { cwd, mcpServers: validateDshMcpServers([...mcpServers]) });
     const sessionId = typeof result.sessionId === 'string' ? result.sessionId.trim() : '';
     if (!sessionId) throw new Error('DSH ACP session/new returned no session id');
     this.activeSessions.add(sessionId);
@@ -251,8 +258,8 @@ export class DshAcpClient {
     });
   }
 
-  async resumeSession(sessionId: string, cwd: string): Promise<DshJsonObject> {
-    const result = await this.requestObject('session/resume', { sessionId, cwd, mcpServers: [] });
+  async resumeSession(sessionId: string, cwd: string, mcpServers: readonly DshMcpServer[] = []): Promise<DshJsonObject> {
+    const result = await this.requestObject('session/resume', { sessionId, cwd, mcpServers: validateDshMcpServers([...mcpServers]) });
     this.activeSessions.add(sessionId);
     return result;
   }
@@ -267,16 +274,16 @@ export class DshAcpClient {
     return this.requestObject('session/set_config_option', { sessionId, configId, value });
   }
 
-  prompt(sessionId: string, text: string): Promise<DshJsonObject> {
+  prompt(sessionId: string, content: string | DshJsonObject[]): Promise<DshJsonObject> {
     return this.requestObject('session/prompt', {
       sessionId,
-      prompt: [{ type: 'text', text }],
+      prompt: typeof content === 'string' ? [{ type: 'text', text: content }] : content,
     }, this.options.promptTimeoutMs ?? DEFAULT_PROMPT_TIMEOUT_MS);
   }
 
   cancel(sessionId: string): void { this.notify('session/cancel', { sessionId }); }
 
-  private requestObject(method: string, params: DshJsonObject, timeoutMs?: number): Promise<DshJsonObject> {
+  protected requestObject(method: string, params: DshJsonObject, timeoutMs?: number): Promise<DshJsonObject> {
     return this.request(method, params, timeoutMs).then((value) => {
       if (!isRecord(value)) throw new Error(`DSH ACP ${method} returned a non-object result`);
       return value as DshJsonObject;
@@ -343,7 +350,7 @@ export class DshAcpClient {
       return;
     }
     const hasId = Object.prototype.hasOwnProperty.call(message, 'id');
-    const id = typeof message.id === 'number' && Number.isSafeInteger(message.id) ? message.id : null;
+    const id = parseDshRpcId(message.id);
     const method = typeof message.method === 'string' && message.method.length > 0 ? message.method : null;
     if (hasId && id === null) {
       this.protocolFailure(child, new Error('DSH ACP emitted an invalid JSON-RPC id'));
@@ -354,7 +361,7 @@ export class DshAcpClient {
       return;
     }
     if (id !== null) {
-      this.handleResponse(child, id, message);
+      if (typeof id === 'number') this.handleResponse(child, id, message);
       return;
     }
     if (!method) {
@@ -394,7 +401,12 @@ export class DshAcpClient {
     pending.resolve((message.result ?? null) as DshJsonValue);
   }
 
-  private async handleServerRequest(child: ChildProcessWithoutNullStreams, id: number, method: string, params: unknown): Promise<void> {
+  private async handleServerRequest(child: ChildProcessWithoutNullStreams, id: number | string, method: string, params: unknown): Promise<void> {
+    if (method === 'session/request_question' && this.options.onQuestionRequest && isRecord(params)) {
+      try { this.writeResponse(child, id, await this.options.onQuestionRequest(params as DshJsonObject)); }
+      catch (error) { this.writeResponse(child, id, undefined, { code: -32602, message: error instanceof Error ? error.message : 'Invalid Harness question' }); }
+      return;
+    }
     if (method !== 'session/request_permission') {
       this.writeResponse(child, id, undefined, { code: -32601, message: `Unsupported DSH ACP request: ${method}` });
       return;
@@ -430,7 +442,7 @@ export class DshAcpClient {
 
   private writeResponse(
     child: ChildProcessWithoutNullStreams,
-    id: number,
+    id: number | string,
     result?: unknown,
     error?: { code: number; message: string },
   ): void {
@@ -504,19 +516,6 @@ export class DshAcpClient {
       clearTimeout(pending.timeout);
       pending.reject(error);
     }
-  }
-}
-
-function validateHandshake(handshake: DshJsonObject): void {
-  if (handshake.protocolVersion !== ACP_PROTOCOL_VERSION) {
-    throw new Error(`DSH ACP protocol version mismatch: expected ${ACP_PROTOCOL_VERSION}, got ${String(handshake.protocolVersion)}`);
-  }
-  const agentInfo = isRecord(handshake.agentInfo) ? handshake.agentInfo : null;
-  if (!agentInfo || typeof agentInfo.name !== 'string' || typeof agentInfo.version !== 'string') {
-    throw new Error('DSH ACP initialize returned invalid agentInfo');
-  }
-  if (!isRecord(handshake.agentCapabilities) || !Array.isArray(handshake.authMethods)) {
-    throw new Error('DSH ACP initialize returned invalid capabilities');
   }
 }
 

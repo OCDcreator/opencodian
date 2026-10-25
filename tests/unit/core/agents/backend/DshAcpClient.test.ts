@@ -7,6 +7,7 @@ import {
   DshAcpClient,
   type DshAcpClientOptions,
   resolveDshLaunch,
+  validateDshMcpServers,
 } from '../../../../../src/core/agents/backend/dsh/DshAcpClient';
 
 const HANDSHAKE = {
@@ -15,6 +16,40 @@ const HANDSHAKE = {
   agentCapabilities: { sessionCapabilities: { list: {}, resume: {}, close: {} } },
   authMethods: [],
 };
+
+describe('DSH ACP MCP admission', () => {
+  it('preserves exact stdio and HTTP declaration values and rejects unsafe or duplicate declarations', () => {
+    const local = { name: 'local', command: path.resolve('node'), args: ['--stdio'], env: [{ name: 'TOKEN', value: ' exact ' }] };
+    const http = { type: 'http', name: 'remote', url: 'https://example.test/mcp', headers: [{ name: 'Authorization', value: 'Bearer fixture' }] };
+    expect(validateDshMcpServers([local, http])).toEqual([local, http]);
+    expect(() => validateDshMcpServers([local, local])).toThrow('Duplicate');
+    expect(() => validateDshMcpServers([{ ...local, command: 'relative-node' }])).toThrow('absolute');
+    expect(() => validateDshMcpServers([{ ...http, url: 'file:///private/config' }])).toThrow('HTTP(S)');
+    expect(() => validateDshMcpServers([{ ...http, headers: [{ name: 'Authorization', value: 'first\r\nInjected: x' }] }])).toThrow('Invalid');
+    expect(() => validateDshMcpServers([{ ...local, env: [{ name: 'bad-key', value: 'x' }] }])).toThrow('Invalid');
+    expect(() => validateDshMcpServers([{ ...http, type: 'sse' }])).toThrow('Unsupported');
+  });
+});
+
+describe('DSH ACP structured prompts', () => {
+  it('sends the exact MCP and content-block arrays through the native wire methods', async () => {
+    const client = clientFor(`(message, {respond}) => {
+      if (message.method === 'session/new') respond(message, {sessionId:'wire', received:message.params.mcpServers});
+      else if (message.method === 'session/prompt') respond(message, {received:message.params.prompt});
+      else if (message.method === 'session/close') respond(message, {});
+    }`);
+    try {
+      await client.start();
+      expect(client.handshake).toEqual(HANDSHAKE);
+      const mcp = [{ name: 'local', command: path.resolve('node'), args: [], env: [] }];
+      await expect(client.newSession(process.cwd(), mcp)).resolves.toMatchObject({ received: mcp });
+      const prompt = [{ type: 'text', text: 'look' }, { type: 'image', mimeType: 'image/png', data: 'YQ==' },
+        { type: 'resource_link', name: 'note', uri: 'file:///vault/note.md' }];
+      await expect(client.prompt('wire', prompt)).resolves.toEqual({ received: prompt });
+    } finally { await client.stop(); }
+    expect(client.handshake).toBeNull();
+  });
+});
 
 function fixtureScript(handler: string): string {
   return `

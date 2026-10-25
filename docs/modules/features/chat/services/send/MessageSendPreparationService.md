@@ -1,5 +1,7 @@
 # MessageSendPreparationService
 
+> 2026-10-24（DSH）：生产 host 的模型目录准入包含 DSH；聊天工具栏保存的 opaque model/provider 和 reasoning variant 进入 preparedSend，发送前验证所选模型，随后由 DshAdapter 原生应用并回读。该路径跳过 OpenCode 专属 skill 展开。回归覆盖生产 host → preparation → modelOptions，避免只验证菜单持久化却遗漏实际发送。
+
 > 2026-10-09（strict draft recovery）：foreground Codex send 捕获既有 model/codexOptions 后，经 host 调用 Codex-owned preflight；await 后重核 target tab。只有明确 `null` 才继续，missing/malformed/throwing guard 或 policy 诊断均在 image/memory/context/optimistic append/accepted 前 reset preparing、发一次 rejected，并显示非空 reason；tab 已切换则只拒绝旧发送。Codex draft context 延迟到 guard 通过后读取，其它 backend 保留原读取时点。普通 accepted 清稿、images/model/effort 与 busy queue 的 queued 所有权均不变；不在迟到 transport error 时恢复或覆盖新稿。
 
 > 2026-10-08：preflight 在 readiness、model/context 异步准备后及实际 optimistic write 回调内核对 initiating tab；切换发生在接收前返回 rejected，保留 composer 草稿且不追加消息。消息已接收后允许所属 tab 后台运行，跳过对其它活动 tab 的渲染。模型选项携带有效 Codex 会话设置快照。

@@ -16,7 +16,7 @@ export function highlightModelOption(
     option.removeClass('is-highlighted');
   });
 
-  const option = scrollContainer.querySelector<HTMLElement>(`[data-value="${value}"]`);
+  const option = Array.from(options).find((entry) => entry.dataset.value === value);
   if (!option) {
     return false;
   }
@@ -98,7 +98,8 @@ export function scrollToCurrentModel(
   }
 
   const value = buildModelOptionValue(currentSelection.provider, currentSelection.model);
-  const currentEl = scrollContainer.querySelector<HTMLElement>(`[data-value="${value}"]`);
+  const currentEl = Array.from(scrollContainer.querySelectorAll<HTMLElement>('.opencodian-model-option'))
+    .find((entry) => entry.dataset.value === value);
   if (!currentEl) {
     return false;
   }

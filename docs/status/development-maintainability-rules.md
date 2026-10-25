@@ -61,3 +61,7 @@ In these cases, stop and design a small controlled queue or ask for review inste
 Pi业务仅在core.backend-pi、专属工作台/UI主机和assets/pi中实现；共享入口按backend分流。29RPC/23SDK操作统一白名单、协议握手；SDK升级先运行完整能力验收。运行时设置内存隔离；禁止改变其余后端实现。
 
 Pi持久配置不能用工作台命令数量代表覆盖。新增后端必须注册与已有后端一致的主标签及分组，区分官方SDK、终端专用和插件会话存储作用域；配置保存、运行时应用与状态读回分别验证。
+
+## 2026-10-24 DSH 边界
+
+DSH 协议准入/内容编码放在复用的 DshProtocolCodec；adapter 保留会话与生命周期真值。完整 DSH 设置区独立于后端总开关组合层，通过窄 host 连接；OpenCodianView 只转发会话保存/回读。测试将故障可控的 transport fixture 与生命周期/功能场景分开。不得为开启 aux/inline 而移除 fail-closed 只读证明，也不得将关闭会话当作删除历史。

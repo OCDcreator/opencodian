@@ -172,7 +172,7 @@ export function describeModelSelection(
   }
   const tabModel = bridge.getActiveChatModel();
   if (tabModel?.model) {
-    const label = kind === 'opencode' || kind === 'opencode2' || kind === 'pi' || kind === 'zcode'
+    const label = kind === 'opencode' || kind === 'opencode2' || kind === 'pi' || kind === 'zcode' || kind === 'dsh'
       ? `${tabModel.provider}/${tabModel.model}`
       : tabModel.model;
     return { label, source: 'chat' };
@@ -244,6 +244,7 @@ export function parseModelOverride(
     case 'opencode':
     case 'opencode2':
     case 'pi':
+    case 'dsh':
     case 'zcode': {
       const separator = raw.indexOf('/');
       if (separator <= 0 || separator === raw.length - 1) return null;
@@ -266,7 +267,7 @@ export function normalizeTabModel(
   kind: AgentBackendKind,
   tabModel: { provider: string; model: string },
 ): BackendModelSelection {
-  if (kind === 'opencode' || kind === 'opencode2' || kind === 'pi' || kind === 'zcode') {
+  if (kind === 'opencode' || kind === 'opencode2' || kind === 'pi' || kind === 'zcode' || kind === 'dsh') {
     return { kind, provider: tabModel.provider, model: tabModel.model };
   }
   return kind === 'claude-code'

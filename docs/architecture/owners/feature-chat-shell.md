@@ -7,6 +7,7 @@
 > 2026-09-20 (advantage-parity R-D1)：OpenCodianView 的历史菜单 host 新增 exportConversationMarkdown 转发方法（导出逻辑不进视图）。
 
 # Owner: feature.chat-shell
+> 2026-10-24（DSH）：视图转发会话模型/推理持久化与后端独立 diff 读取；保存恢复和原生配置仍由 selection coordinator / adapter 承担，不引入视图内会话运行时。
 > 2026-09-30 (Codex 0.159 integration)：
 > - OpenCodianView capability-change 缝加固：`CAPABILITY_CHANGE_REFRESH_CAPABILITIES` churn guard + capability 变化时排队刷新 follow-up bar。
 > - `installCodexApprovalHostContext` 扩展 `questionCardRenderer`/`elicitationCardRenderer`；`ChatPluginPort` 的 context `Pick` 放宽。

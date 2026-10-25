@@ -66,6 +66,7 @@ export class ContextUsageService {
     // authoritative only for its originating backend session, so clear it and
     // its derived estimates/cost at that identity boundary.
     if (sessionChanged) {
+      next.tokenBreakdownAvailable = undefined;
       next.estimatedInputTokens = 0;
       next.estimatedOutputTokens = 0;
       next.streamInputTokens = 0;
@@ -201,6 +202,7 @@ export class ContextUsageService {
       },
     );
     this.applyOpenCodeUsageSnapshot(next, snapshot);
+    next.tokenBreakdownAvailable = snapshot.tokenBreakdownAvailable;
     return this.finalizeState(next);
   }
 
@@ -244,6 +246,7 @@ export class ContextUsageService {
     const isBackendReportedCost = state.costDetails?.source === 'backend-reported';
     return {
       sessionId: state.sessionId,
+      ...(state.tokenBreakdownAvailable === false ? { tokenBreakdownAvailable: false } : {}),
       sessionTitle: state.sessionTitle ?? '',
       createdAt: state.createdAt ?? Date.now(),
       updatedAt: state.updatedAt ?? Date.now(),

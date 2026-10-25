@@ -88,6 +88,14 @@ function createService(
 }
 
 describe('ModelPricingService', () => {
+  it('does not turn aggregate context occupancy into a free or locally priced bill', async () => {
+    const { service } = createService();
+    await service.refresh();
+    const aggregate = createSnapshot({ tokenBreakdownAvailable: false, totalTokens: 240,
+      inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: null });
+    expect(service.enrichContextUsageSnapshot(aggregate)).toMatchObject({ totalCost: null, costDetails: null });
+    expect(service.enrichContextUsageSnapshot({ ...aggregate, totalCost: 0.04 }).totalCost).toBe(0.04);
+  });
 
   it('normalizes and persists every priced models.dev entry on a manual refresh', async () => {
     const { service, storage } = createService();

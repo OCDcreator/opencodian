@@ -54,6 +54,7 @@ export interface SlashCommandMenuCatalogCacheHost {
   loadPiRuntimeCommands?(): Promise<Array<{ name: string; description?: string }>>;
   /** Optional: load ZCode runtime slash commands (from the live session snapshot catalog). */
   loadZCodeRuntimeCommands?(): Promise<readonly { name: string; description: string }[]>;
+  loadDshRuntimeCommands?(): Promise<Array<{ name: string; description?: string }>>;
   loadOpenCode2Commands?(): Promise<Array<{ name: string; description?: string }>>;
   loadOpenCode2Skills?(): Promise<Array<{ name: string; description?: string }>>;
   loadOpenCode2Agents?(): Promise<Array<{ id: string; name: string; description?: string; mode: 'primary' | 'subagent' | 'all'; hidden: boolean }>>;
@@ -354,6 +355,14 @@ export class SlashCommandMenuCatalogCache {
   }
 
   load(): Promise<SlashCommandMenuItem[]> {
+    if (this.host.getBackendKey?.() === 'dsh') return (this.host.loadDshRuntimeCommands?.() ?? Promise.resolve([])).then((commands) => {
+      const hidden = new Set(this.host.getHiddenCommandIds());
+      return commands.filter((command) => !hidden.has(command.name)).map((command) => ({
+        id: command.name, displayId: `/${command.name}`, description: command.description ?? '',
+        insertText: `/${command.name} `, runtimeAvailable: true, source: 'command' as const,
+        hasProjectOverride: false, subtask: false, isBuiltin: false,
+      }));
+    });
     if (this.host.getBackendKey?.() === 'opencode2') return Promise.all([
       this.host.loadOpenCode2Commands?.() ?? Promise.resolve([]),
       this.host.loadOpenCode2Skills?.() ?? Promise.resolve([]),

@@ -2,10 +2,13 @@ import { Notice, Setting } from 'obsidian';
 
 import { IMPLEMENTED_AGENT_BACKENDS } from '../../../../core/agents/backend';
 import { backendSessionCatalogFailure } from '../../../../core/agents/backend/AgentBackendRouting';
+import type { DshAdapter } from '../../../../core/agents/backend/dsh/DshAdapter';
+import { validateDshMcpServers } from '../../../../core/agents/backend/dsh/DshProtocolCodec';
 import type { OpenCode2Adapter } from '../../../../core/agents/backend/opencode/OpenCode2Adapter';
 import type { AgentBackendKind } from '../../../../core/types/chat';
 import { t, type TranslationKey } from '../../../../i18n';
 import type OpenCodianPlugin from '../../../../main';
+import { SettingsDshSection } from '../dsh/SettingsDshSection';
 
 const ALL_BACKEND_OPTIONS: Array<{
   id: AgentBackendKind;
@@ -53,51 +56,13 @@ export class SettingsBackendSection {
     this.addChatWarmSessionSetting(shellEl);
     this.addEnabledBackendsSettings(shellEl);
     this.addOpenCode2Settings(shellEl);
-    this.addDshSettings(shellEl);
-  }
-
-  private addDshSettings(containerEl: HTMLElement): void {
-    if (!this.getEnabledBackends().includes('dsh')) return;
-    const settings = this.plugin.settings.backendSettings.dsh;
-    const group = containerEl.createDiv({ cls: 'opencodian-backend-agent-group' });
-    group.createEl('h4', { cls: 'opencodian-settings-subsection-heading', text: t('settings.agent.dsh.connection') });
-    new Setting(group)
-      .setName(t('settings.agent.dsh.executable'))
-      .setDesc(t('settings.agent.dsh.executable.desc'))
-      .addText((input) => input
-        .setPlaceholder('dsh')
-        .setValue(settings.executablePath)
-        .onChange(async (value) => {
-          settings.executablePath = value.trim();
-          await this.plugin.saveSettings();
-        }));
-    new Setting(group)
-      .setName(t('settings.agent.dsh.workingDirectory'))
-      .setDesc(t('settings.agent.dsh.workingDirectory.desc'))
-      .addText((input) => input
-        .setPlaceholder(t('settings.agent.dsh.workingDirectory.placeholder'))
-        .setValue(settings.workingDirectory)
-        .onChange(async (value) => {
-          settings.workingDirectory = value.trim();
-          await this.plugin.saveSettings();
-        }));
-    const status = group.createDiv({ cls: 'setting-item-description', text: t('settings.agent.dsh.status.disconnected') });
-    const adapter = this.plugin.agentServiceRegistry?.get('dsh');
-    const statusKey = (): TranslationKey => `settings.agent.dsh.status.${adapter?.status ?? 'disconnected'}`;
-    status.setText(t(statusKey()));
-    new Setting(group).setName(t('settings.agent.dsh.connection'))
-      .addButton((button) => button.setButtonText(t('settings.agent.dsh.testConnection')).onClick(async () => {
-        button.setDisabled(true);
-        status.setText(t('settings.agent.dsh.status.connecting'));
-        try {
-          if (!adapter) throw new Error(t('settings.agent.dsh.status.unavailable'));
-          await adapter.start();
-          status.setText(t(statusKey()));
-        } catch (error) {
-          status.setText(t('settings.agent.dsh.status.error'));
-          new Notice(error instanceof Error ? error.message : String(error));
-        } finally { button.setDisabled(false); }
-      }));
+    new SettingsDshSection({
+      getSettings: () => this.plugin.settings.backendSettings.dsh,
+      isEnabled: () => this.getEnabledBackends().includes('dsh'),
+      getAdapter: () => this.plugin.agentServiceRegistry?.get('dsh') as DshAdapter | undefined,
+      validateMcpServers: validateDshMcpServers,
+      saveSettings: () => this.plugin.saveSettings(),
+    }).attach(shellEl);
   }
 
   private addOpenCode2Settings(containerEl: HTMLElement): void {

@@ -58,3 +58,7 @@ export class ContextUsageDisplayService {
 
 - 源码位置：`src/features/chat/services/context/ContextUsageDisplayService.ts`。
 - 原位置：`src/features/chat/services/ContextUsageDisplayService.ts`；文件名、导出接口与业务职责保持不变。
+
+## 2026-10-24 仅有聚合占用的显示
+
+聚合原生快照即使没有模型标识，也能显示可信 used/size 和比例；不会从消息长度制造 token 分类饼图。其他后端仍按既有模型/窗口规则处理未知状态。

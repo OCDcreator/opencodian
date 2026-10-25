@@ -96,3 +96,7 @@ export class ActiveTabContextUsageCoordinator {
 - 源码位置：`src/features/chat/services/context/ActiveTabContextUsageCoordinator.ts`。
 - 原位置：`src/features/chat/services/ActiveTabContextUsageCoordinator.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/features/chat/services/context/ContextUsageService.ts`。
+
+## 2026-10-24 DSH 原生占用
+
+DSH 加入定向 usage cache 回读；首次原生快照前保持未知窗口和费用，零占用的已确认快照仍有效。聚合标记随状态与持久快照保留，不调用其他后端获取替代数据。

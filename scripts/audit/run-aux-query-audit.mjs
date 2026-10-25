@@ -1,15 +1,16 @@
 #!/usr/bin/env node
-/** Six-backend real auxiliary-query audit; --preflight / --bundle-only never start a CLI. */
+/** Seven-backend real auxiliary-query audit; --preflight / --bundle-only never start a CLI. */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import esbuild from 'esbuild';
+import { bundleDshServiceSource } from '../build-utils.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '..', '..');
-export const AUDIT_BACKENDS = ['opencode', 'opencode2', 'claude-code', 'codex', 'pi', 'zcode'];
+export const AUDIT_BACKENDS = ['opencode', 'opencode2', 'claude-code', 'codex', 'pi', 'zcode', 'dsh'];
 
 export function selectAuditBackends(args) {
   const flags = new Set(['--preflight', '--bundle-only']);
@@ -23,9 +24,10 @@ export function selectAuditBackends(args) {
 /** A Node HTTP bridge only; no backend, model, or safety response is replaced. */
 export function auditBundleOptions(backend, outfile) {
   return {
-    entryPoints: [path.join(here, backend === 'opencode2' ? 'opencode2-aux-query-audit.entry.ts' : 'aux-query-audit.entry.ts')],
+    entryPoints: [path.join(here, backend === 'opencode2' ? 'opencode2-aux-query-audit.entry.ts' : backend === 'dsh' ? 'dsh-aux-query-audit.entry.ts' : 'aux-query-audit.entry.ts')],
     outfile, bundle: true, platform: 'node', format: 'esm', target: 'node20',
     packages: backend === 'opencode2' ? 'bundle' : 'external',
+    ...(backend === 'dsh' ? { define: { DSH_NATIVE_SERVICE_SOURCE: JSON.stringify(bundleDshServiceSource()) } } : {}),
     sourcemap: 'inline', logLevel: 'silent', absWorkingDir: repoRoot,
     banner: { js: "import { createRequire as auditCreateRequire } from 'node:module'; const require = auditCreateRequire(import.meta.url);" },
     plugins: [{

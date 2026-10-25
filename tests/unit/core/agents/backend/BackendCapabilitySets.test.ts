@@ -146,7 +146,7 @@ describe('backend capability sets', () => {
   it('DshAdapter exposes only ACP-proven chat/session/permission/thinking capabilities', () => {
     const adapter = new DshAdapter({
       workingDirectory: '/vault',
-      getSettings: () => ({ executablePath: '', workingDirectory: '', args: [], env: {}, profile: 'acp' }),
+      getSettings: () => ({ executablePath: '', workingDirectory: '', args: [], env: {}, profile: 'acp', transport: 'acp' }),
     });
 
     expect(adapter.kind).toBe('dsh');
@@ -155,8 +155,10 @@ describe('backend capability sets', () => {
       AgentCapability.Sessions,
       AgentCapability.Permissions,
       AgentCapability.Thinking,
+      AgentCapability.Models,
+      AgentCapability.Context,
     ]);
-    expect(adapter.hasCapability(AgentCapability.Models)).toBe(false);
+    expect(adapter.hasCapability(AgentCapability.Images)).toBe(false);
     expect(adapter.hasCapability(AgentCapability.Tools)).toBe(false);
   });
 });

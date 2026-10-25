@@ -77,3 +77,7 @@ The backend list exposes OpenCode 1 and 2 separately; OpenCode 2 settings select
 - 源码位置：`src/features/settings/backends/opencode/SettingsBackendSection.ts`。
 - 原位置：`src/features/settings/SettingsBackendSection.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/core/agents/backend/opencode/OpenCode2Adapter.ts`。
+
+## 2026-10-24 DSH 设置区分离
+
+后端启用/默认选择组合层将 DSH 的完整设置区交给 `SettingsDshSection`，仅注入设置读写、适配器窄控制面和统一 MCP 校验。保留原有 OpenCode 2 管理行为，避免把多个后端的设置逻辑继续堆入此模块。

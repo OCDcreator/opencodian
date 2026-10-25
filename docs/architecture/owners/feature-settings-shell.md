@@ -83,3 +83,7 @@ SettingsPiSection owns the Pi settings surface through a narrow host. Credential
 当前源码目录：`src/features/settings`、`src/features/settings/backends/codex`、`src/features/settings/backends/pi`、`src/features/settings/backends/zcode`、`src/features/settings/controls`、`src/features/settings/general`、`src/features/settings/models`、`src/features/settings/resources`。
 
 目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。
+
+## 2026-10-24 DSH 设置子区
+
+`backends/dsh/SettingsDshSection.ts` 是无运行时状态所有权的设置子区，通过窄 host 使用既有后端组合层传入的操作，保持此 owner 不直接依赖 core.backend 或 main.ts。原生会话、配置回读和 MCP 准入状态仍归后端 owner。

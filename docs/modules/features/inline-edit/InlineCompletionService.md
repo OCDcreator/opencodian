@@ -1,5 +1,7 @@
 # InlineCompletionService
 
+> 2026-10-24：补全池键保留 dsh provider/model 身份；DSH 原生辅助会话使用无 Agent/工具调度的 LLM 通道，并由后端逐次证明只读。共享超时、TTL、切换代际和写入检测保持一致。
+
 > 2026-09-24: 补全池身份可区分 ZCode provider/model/reasoningLevel，避免模型或推理档切换后复用旧目标。ZCode 直接生成实测 5.703 秒，超过共享 4 秒预算，当前没有对用户暴露该后端补全能力。
 
 > **源码**: `src/features/inline-edit/InlineCompletionService.ts`

@@ -260,25 +260,28 @@ describe('createMessageSendPreparationHost', () => {
     expect(deps.chatSelectionControlsCoordinator.hasLoadedModelCatalog).toHaveBeenCalled();
   });
 
-  it('passes the active ZCode tab model into the prepared send', async () => {
+  it.each([
+    { backend: 'zcode', provider: 'krill', model: 'gpt-6-sol', variant: 'none' },
+    { backend: 'dsh', provider: 'deepseek-official', model: '["deepseek-official","deepseek-flash"]', variant: 'off' },
+  ] as const)('passes the active $backend tab model into the prepared send', async ({ backend, provider, model, variant }) => {
     const deps = createDeps();
     deps.getCurrentConversation = jest.fn().mockReturnValue({
       ...createConversation(),
-      backend: 'zcode',
-      backendSessionId: 'zcode-session-1',
+      backend,
+      backendSessionId: `${backend}-session-1`,
     });
     deps.getSendMessageOptions = jest.fn().mockReturnValue({
-      provider: 'krill',
-      model: 'gpt-6-sol',
-      variant: 'none',
+      provider,
+      model,
+      variant,
     });
     const host = createMessageSendPreparationHost(deps);
     const service = new MessageSendPreparationService(host, createComposerSendContext());
 
     const result = await service.prepareMessageSend({ content: 'hello' });
 
-    expect(result?.modelOptions).toMatchObject({ provider: 'krill', model: 'gpt-6-sol', variant: 'none' });
-    expect(deps.chatSelectionControlsCoordinator.ensureSelectedModelAvailable).toHaveBeenCalledWith('krill', 'gpt-6-sol');
+    expect(result?.modelOptions).toMatchObject({ provider, model, variant });
+    expect(deps.chatSelectionControlsCoordinator.ensureSelectedModelAvailable).toHaveBeenCalledWith(provider, model);
   });
 });
 

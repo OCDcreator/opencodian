@@ -7,11 +7,12 @@ import {
   type CodexCatalogAdapter,
   resolveCodexModelCatalogFromAdapter,
 } from '../../../../core/agents/backend/BackendModelCatalog';
+import type { DshAdapter } from '../../../../core/agents/backend/dsh/DshAdapter';
 import type { OpenCode2Adapter } from '../../../../core/agents/backend/opencode/OpenCode2Adapter';
 import type { PiAdapter } from '../../../../core/agents/backend/pi/PiAdapter';
 import type { ZCodeAdapter } from '../../../../core/agents/backend/zcode';
 import type { ResolvedModelSelection } from '../../../../core/config/modelConfig';
-import { VIEW_TYPE_OPENCODIAN } from '../../../../core/types/chat';
+import { type Conversation, type ConversationSessionSettings, VIEW_TYPE_OPENCODIAN } from '../../../../core/types/chat';
 import type { ClaudeCodePermissionMode } from '../../../../core/types/settings';
 import type { CodexSandboxMode } from '../../../../core/types/settings';
 import type { PermissionMode } from '../../../../core/types/settings';
@@ -57,6 +58,7 @@ import { bindZCodeModelSelection } from './ZCodeModelSelectionBinding';
 export interface ChatSelectionControlsCoordinatorHost extends ModelSelectionRuntimeHost {
   /** Conversation owned by this toolbar, even when a Markdown leaf has focus. */
   getOwnConversation?(): { backend?: string; backendSessionId?: string } | null;
+  persistDshModelSelection?(selection: ModelSelectorSelection): Promise<boolean>;
   registerEscapeHandler(handler: () => boolean): void;
   /** Obsidian app, used to resolve local provider icon resource paths. */
   getApp(): App;
@@ -72,6 +74,29 @@ export interface ChatSelectionControlsCoordinatorHost extends ModelSelectionRunt
    * and must not be presented as applying to an in-flight turn).
    */
   isActiveTabStreaming?(): boolean;
+}
+
+/** Save only the originating DSH conversation, retaining a newer edit if this save fails late. */
+export async function saveDshConversationSelection(
+  conversation: Conversation,
+  patch: Pick<ConversationSessionSettings, 'dshModelOverride' | 'dshEffortOverrides'>,
+  save: (conversation: Conversation) => Promise<void>,
+): Promise<void> {
+  if (conversation.backend !== 'dsh') throw new Error('DSH selection requires a DSH conversation');
+  const previous = conversation.sessionSettings;
+  const updatedAt = conversation.updatedAt;
+  const next = { ...previous, ...patch };
+  conversation.sessionSettings = next;
+  conversation.updatedAt = Date.now();
+  try { await save(conversation); }
+  catch (error) {
+    if (conversation.sessionSettings === next) {
+      conversation.sessionSettings = previous;
+      conversation.updatedAt = updatedAt;
+    }
+    new Notice(t('configEditor.notice.saveError'));
+    throw error;
+  }
 }
 
 const MODEL_DROPDOWN_PREFERRED_WIDTH = 340;
@@ -202,8 +227,13 @@ function wrapHostForCodex(
   return {
     ...host,
     preserveRequestedModel: () => (host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'codex'
+      || (host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'dsh'
       || host.preserveRequestedModel?.() === true,
     async loadModelCatalogData() {
+      if ((host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'dsh') {
+        const adapter = readOpenCodianPlugin()?.agentServiceRegistry?.get?.('dsh') as DshAdapter | undefined;
+        return { catalogBundle: null, providers: await adapter?.getModelSelectorProviders(host.getOwnConversation?.()?.backendSessionId) ?? [] };
+      }
       if ((host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'opencode2') {
         const adapter = readOpenCodianPlugin()?.agentServiceRegistry?.get?.('opencode2') as OpenCode2Adapter | undefined;
         return { catalogBundle: null, providers: await adapter?.getModelSelectorProviders() ?? [] };
@@ -216,6 +246,10 @@ function wrapHostForCodex(
       return host.loadModelCatalogData();
     },
     getDefaultModelSelection() {
+      if ((host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'dsh') {
+        const adapter = readOpenCodianPlugin()?.agentServiceRegistry?.get?.('dsh') as DshAdapter | undefined;
+        return adapter?.getDefaultModelSelection(host.getOwnConversation?.()?.backendSessionId) ?? null;
+      }
       if ((host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'opencode2') {
         const adapter = readOpenCodianPlugin()?.agentServiceRegistry?.get?.('opencode2') as OpenCode2Adapter | undefined;
         return adapter?.getDefaultModelSelection() ?? null;
@@ -227,6 +261,11 @@ function wrapHostForCodex(
       return host.getDefaultModelSelection();
     },
     async isModelAvailableOnServer(provider: string, model: string) {
+      if ((host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'dsh') {
+        const adapter = readOpenCodianPlugin()?.agentServiceRegistry?.get?.('dsh') as DshAdapter | undefined;
+        const providers = await adapter?.getModelSelectorProviders(host.getOwnConversation?.()?.backendSessionId) ?? [];
+        return providers.some((item) => item.id === provider && item.models.some((entry) => entry.id === model));
+      }
       if ((host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'opencode2') {
         const adapter = readOpenCodianPlugin()?.agentServiceRegistry?.get?.('opencode2') as OpenCode2Adapter | undefined;
         const providers = await adapter?.getModelSelectorProviders() ?? [];
@@ -344,6 +383,7 @@ export class ChatSelectionControlsCoordinator {
    * plan request must not be overwritten by a later `build` projection.
    */
   private readonly zcodeModeBySession = new Map<string, string>();
+  private dshModelSelectionGeneration = 0;
   private readonly additionalDirectoriesBadge: AdditionalDirectoriesConfigBadgeCoordinator;
   private additionalDirectoriesBadgeContainer: HTMLElement | null = null;
   private readonly sandboxBadge: SandboxConfigBadgeCoordinator;
@@ -570,6 +610,7 @@ export class ChatSelectionControlsCoordinator {
   }
 
   destroy(): void {
+    ++this.dshModelSelectionGeneration;
     this.closeModelDropdown();
     this.destroyRuntimeOverflow();
     this.permissionSelector?.destroy();
@@ -1152,6 +1193,35 @@ export class ChatSelectionControlsCoordinator {
   }
 
   private selectModel(provider: string, model: string): boolean {
+    if (this.getSelectionBackend() === 'dsh') {
+      if (this.host.isActiveTabStreaming?.()) return false;
+      const adapter = readOpenCodianPlugin()?.agentServiceRegistry?.get?.('dsh') as DshAdapter | undefined;
+      const conversation = this.host.getOwnConversation?.();
+      if (!adapter) return false;
+      const generation = ++this.dshModelSelectionGeneration;
+      void (async () => {
+        try {
+          const config = await adapter.readSessionConfiguration(conversation?.backendSessionId);
+          const providers = await adapter.getModelSelectorProviders(config.sessionId);
+          if (!providers.some((item) => item.id === provider && item.models.some((entry) => entry.id === model)))
+            throw new Error(t('chat.dsh.configurationUnavailable'));
+          if (generation !== this.dshModelSelectionGeneration || this.host.getOwnConversation?.() !== conversation) return;
+          if (!await this.host.persistDshModelSelection?.({ provider, model }))
+            throw new Error(t('configEditor.notice.saveError'));
+          if (generation !== this.dshModelSelectionGeneration) return;
+          await adapter.setSessionConfigOption(config.sessionId, 'model', model);
+          if (generation !== this.dshModelSelectionGeneration
+            || this.host.getOwnConversation?.() !== conversation || this.getSelectionBackend() !== 'dsh') return;
+          await this.reloadModelCatalog();
+          this.updateModelSelectorDisplay();
+          this.host.updateEffortSelectorDisplay();
+        } catch (error) {
+          if (generation === this.dshModelSelectionGeneration && this.host.getOwnConversation?.() === conversation)
+            new Notice(error instanceof Error ? error.message : String(error));
+        }
+      })();
+      return true;
+    }
     const isCodex = readActiveBackendFromPlugin() === 'codex';
     const activeView = isCodex ? getActiveCodexView() : null;
     if (isCodex && (!activeView || provider !== CODEX_PROVIDER_ID)) {
@@ -1339,6 +1409,12 @@ export class ChatSelectionControlsCoordinator {
    */
   private buildBackendPermissionSelector(containerEl: HTMLElement): void {
     const activeBackend = this.getSelectionBackend();
+    if (activeBackend === 'dsh') {
+      // Permission requests are supported; ACP does not expose a permission-mode mutation.
+      this.permissionSelector?.destroy();
+      this.permissionSelector = null;
+      return;
+    }
 
     if (activeBackend === 'opencode2') {
       const config = createOpenCode2PermissionConfig();

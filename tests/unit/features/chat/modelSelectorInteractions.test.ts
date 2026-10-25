@@ -19,6 +19,19 @@ function disableOption(option: HTMLElement): HTMLElement {
 }
 
 describe('ModelSelectorInteractions', () => {
+  it('keeps JSON model identifiers opaque while highlighting, scrolling and selecting', () => {
+    const scrollContainer = document.createElement('div');
+    const model = '["deepseek-official","deepseek-flash"]';
+    const value = `deepseek-official::${model}`;
+    const option = createOption(value); scrollContainer.append(option);
+    expect(highlightModelOption(scrollContainer, value)).toBe(true);
+    expect(option.hasClass('is-highlighted')).toBe(true);
+    expect(scrollToCurrentModel(scrollContainer, { provider: 'deepseek-official', model })).toBe(true);
+    expect(option.scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
+    const onSelect = jest.fn();
+    expect(selectHighlightedModel(scrollContainer, onSelect)).toBe(true);
+    expect(onSelect).toHaveBeenCalledWith('deepseek-official', model);
+  });
   it('moves keyboard highlight and clamps at list boundaries', () => {
     const scrollContainer = document.createElement('div');
     const first = createOption('openai::gpt-5');

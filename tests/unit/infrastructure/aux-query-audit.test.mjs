@@ -54,9 +54,9 @@ beforeAll(() => {
     + JSON.stringify(bundle) + '), packages:"bundle", mainFields:["module","main"]}); console.log(JSON.stringify({compiled:true}));');
 }, 30000);
 
-test('default dispatch covers six; mixed OpenCode2/ZCode selection remains legal and deduplicated', () => {
+test('default dispatch covers seven; mixed OpenCode2/ZCode selection remains legal and deduplicated', () => {
   const result = evaluate('console.log(JSON.stringify([audit.selectAuditBackends([]), audit.selectAuditBackends(["opencode2", "zcode", "opencode2"])]));');
-  expect(result).toEqual([['opencode', 'opencode2', 'claude-code', 'codex', 'pi', 'zcode'], ['opencode2', 'zcode']]);
+  expect(result).toEqual([['opencode', 'opencode2', 'claude-code', 'codex', 'pi', 'zcode', 'dsh'], ['opencode2', 'zcode']]);
 });
 
 test('unknown backend and conflicting offline modes reject before dispatch', () => {
@@ -124,7 +124,7 @@ test('byte snapshot includes hidden/node_modules and empty directories; unreadab
   expect(result.rejected).toBe(true);
 });
 
-test('six backend preflight cannot spawn native CLI or use network even with explicit model settings', () => {
+test('seven backend preflight cannot spawn native CLI or use network even with explicit model settings', () => {
   const report = path.join(scratch, 'guarded-preflight.json');
   const out = spawnSync(process.execPath, [runner, '--preflight'], {
     cwd: repo, encoding:'utf8', timeout:60000,
@@ -137,7 +137,7 @@ test('six backend preflight cannot spawn native CLI or use network even with exp
   expect(out.status).toBe(2);
   expect(fs.existsSync(marker)).toBe(false);
   const value = JSON.parse(fs.readFileSync(report,'utf8'));
-  expect(value.outcomes).toHaveLength(6);
+  expect(value.outcomes).toHaveLength(7);
   expect(value.outcomes.every(item => item.status==='blocked' && item.passed===false && item.execution==='preflight')).toBe(true);
   expect(out.stdout + out.stderr).not.toContain('contract/fixture');
 }, 70000);

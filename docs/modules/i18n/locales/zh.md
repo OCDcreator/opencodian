@@ -678,3 +678,7 @@ Includes the localized Pi extension-command completion status used only after a 
 
 新增 DSH 后端名称、ACP 连接说明、CLI/桌面包路径、工作目录、连接测试和四种连接状态的中文文案。键名与英文 locale 对齐，设置页继续通过 `t()` 读取。
 会话浏览器另有 DSH 续接说明，明确 native 上下文可继续，而此前消息不会导入。
+
+## 2026-10-24 DSH 配置与限制文案
+
+新增模型/推理草稿配置、MCP 声明编辑与保存结果、图片握手可用性和当前通道限制的中文文案，与英文键对齐。明确区分请求的选择、原生确认与不可用功能。

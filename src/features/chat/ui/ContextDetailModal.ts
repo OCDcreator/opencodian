@@ -250,14 +250,15 @@ export class ContextDetailModal extends Modal {
   } {
     const currentUsage = summary.isUnavailable ? '-' : `${summary.percentage}%`;
     const contextLimit = summary.isUnavailable ? '-' : ContextUsageService.formatNumber(summary.contextWindow);
+    const hasBreakdown = hasCumulativeTokens && this.contextState?.tokenBreakdownAvailable !== false;
     return {
       total: this.formatCumulativeTokenCount(tokens.total, hasCumulativeTokens),
       usage: currentUsage,
       contextLimit,
-      input: this.formatCumulativeTokenCount(tokens.input, hasCumulativeTokens),
-      output: this.formatCumulativeTokenCount(tokens.output, hasCumulativeTokens),
-      reasoning: this.formatCumulativeTokenCount(tokens.reasoning, hasCumulativeTokens),
-      cache: hasCumulativeTokens
+      input: this.formatCumulativeTokenCount(tokens.input, hasBreakdown),
+      output: this.formatCumulativeTokenCount(tokens.output, hasBreakdown),
+      reasoning: this.formatCumulativeTokenCount(tokens.reasoning, hasBreakdown),
+      cache: hasBreakdown
         ? `${ContextUsageService.formatNumber(tokens.cacheRead)} / ${this.formatOptionalTokenCount(tokens.cacheWrite)}`
         : '-',
     };

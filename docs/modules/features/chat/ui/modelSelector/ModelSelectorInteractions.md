@@ -1,5 +1,7 @@
 # ModelSelectorInteractions
 
+> 2026-10-24：高亮和滚动直接比较 option.dataset.value，不把 opaque provider/model 拼入 CSS 选择器。DSH 的 JSON 模型 ID（含引号/方括号）可安全进行键盘高亮、定位和选择；未改写原生模型值。
+
 > **源码**: `src/features/chat/ui/modelSelector/ModelSelectorInteractions.ts`
 > **状态**: [REVIEW]
 

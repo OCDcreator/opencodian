@@ -3,6 +3,7 @@
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 
 # Owner: feature.chat-ui
+> 2026-10-24（DSH）：ContextDetailModal 显示原生占用总量；当 tokenBreakdownAvailable 为 false 时隐藏未知分类和费用计算，压缩入口继续遵守后端能力。
 > 2026-09-30 (Codex 0.159 integration)：
 > - `BackendSessionBrowserDetail`：分页 transcript 路径（`listThreadTurns` 摘要 + load-more 游标追加），保留 legacy 回退与 transcript-unavailable 占位。
 > - `ConversationSessionSettingsModal`：移除 codex `'untrusted'` approval 选项。

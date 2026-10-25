@@ -75,3 +75,9 @@ src/
 - 路径迁移要同步静态与动态导入、Jest mock、源码断言、审计脚本、owner 清单及文档链接，并核对迁移前后的模块依赖。
 
 2026-10-23 的整理仅调整路径与引用。后端选择、并发会话、发送流程、只读辅助查询规则和视觉实验的启用方式保持原状。实验依赖仍由现有构建流程处理。
+
+## 2026-10-24 DSH 补充定位
+
+- `src/core/agents/backend/dsh/DshProtocolCodec.ts`：共享 ACP 准入与内容编码，服务多个已有入口。
+- `src/features/settings/backends/dsh/SettingsDshSection.ts`：完整 DSH 设置子区，由现有后端组合层注入窄 host。
+- `tests/unit/core/agents/backend/DshAdapter.fixture.ts`：隔离 native process 依赖的故障可控夹具，分别支持 lifecycle 与 configuration/media 场景。

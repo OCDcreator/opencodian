@@ -183,6 +183,7 @@ export class ActiveTabContextUsageCoordinator {
     let nextState = this.restorePersistedSnapshot(this.createIdentityState(conversation), conversation);
     const sessionId = conversation ? getConversationBackendSessionId(conversation) : null;
     const persisted = conversation?.lastContextUsage;
+    if (conversation?.backend === 'dsh' && !nextState.preciseTokens) nextState = ContextUsageService.markUsageUnavailable(nextState);
     if (conversation?.backend === 'zcode' && sessionId && !(persisted?.sessionId === sessionId && persisted.totalTokens > 0)
       && !(this.getCurrentState().sessionId === sessionId && (this.getCurrentState().preciseTokens?.total ?? 0) > 0)) nextState = ContextUsageService.markUsageUnavailable(nextState);
     this.commitState(nextState);
@@ -250,7 +251,7 @@ export class ActiveTabContextUsageCoordinator {
     if (
       !expectedConversationId
       || !expectedSessionId
-      || !['opencode', 'claude-code', 'codex', 'pi', 'zcode'].includes(expectedBackend)
+      || !['opencode', 'claude-code', 'codex', 'pi', 'zcode', 'dsh'].includes(expectedBackend)
       || !this.host.hasActiveTab()
     ) {
       report('skipped');

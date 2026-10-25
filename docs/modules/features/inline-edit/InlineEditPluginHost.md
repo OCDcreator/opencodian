@@ -1,4 +1,6 @@
 # InlineEditPluginHost
+
+> 2026-10-24：模型覆盖解析、聊天模型继承和显示增加 dsh/provider/model 分支；不透明 DSH 模型值保留后端身份，由适配器验证。行内唯一写回仍是 InlineEditController 的 snapshot dirty-check 后 replaceRange。
 > 2026-09-24: ZCode 文本补全的模型覆盖解析保留 provider/model；通用行内编辑仍不因该解析而启用 ZCode。`reasoningLevel` 由适配器按实时目录和当前原生选择校验。
 > 2026-09-18 (R-B1/R-B2): bridge passthroughs for `listContextGroups` and `applyAutoInternalLinks`; both optional, keeping older hosts byte-identical.
 

@@ -104,3 +104,11 @@
 - features/settings/backends/pi/PiWorkbenchActions.md、PiWorkbenchModal.md：52项管理操作。
 
 - features/settings/backends/pi/SettingsPiConfigurationSection.md 与 SettingsPiProvidersSection.md：Pi原生持久配置页面。
+
+## DSH 扩展模块（2026-10-24）
+
+- [DshProtocolCodec](core/agents/backend/dsh/DshProtocolCodec.md)
+- [DshNativeClient](core/agents/backend/dsh/DshNativeClient.md)
+- [DshAuxQuerySession](core/agents/backend/dsh/DshAuxQuerySession.md)
+- [DshQuestionBridge](core/agents/backend/dsh/DshQuestionBridge.md)
+- [SettingsDshSection](features/settings/backends/dsh/SettingsDshSection.md)

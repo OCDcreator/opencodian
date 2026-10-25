@@ -248,3 +248,7 @@ ChatMessage 与 user_message_identity 增加可选 Codex sourceTurnId；它与 s
 ## 2026-10-23 DSH backend
 
 `AgentBackendKind` 增加 `dsh`。DeepSeek Harness 会话持久化独立的 backend owner 和 `backendSessionId`，通用路由按该 owner 查找适配器；不把其原生 session ID 写成 OpenCode 会话身份。
+
+## 2026-10-24 DSH 会话覆盖与聚合用量
+
+会话设置增加 `dshModelOverride`、`dshEffortOverrides`，随 conversation 保存/加载，保留 native opaque model value。上下文快照与 TabContextState 增加可选 `tokenBreakdownAvailable`；false 表示只有聚合占用，不能推导分类或本地费用。其他后端缺省值维持既有语义。

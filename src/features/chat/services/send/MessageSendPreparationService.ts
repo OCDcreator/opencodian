@@ -972,7 +972,7 @@ export function createMessageSendPreparationHost(
     formatModelId: (model) => selectionCtrl.formatModelId(model),
     shouldUseModelCatalog: (conversation) => {
       const backend = conversation.backend ?? 'opencode';
-      return backend === 'opencode' || backend === 'opencode2' || backend === 'claude-code' || backend === 'pi' || backend === 'zcode' || backend === 'codex';
+      return backend === 'opencode' || backend === 'opencode2' || backend === 'claude-code' || backend === 'pi' || backend === 'zcode' || backend === 'codex' || backend === 'dsh';
     },
     ensureSelectedModelAvailable: (provider, model) => selectionCtrl.ensureSelectedModelAvailable(provider, model),
     appendModelUnavailableNoticeMessage: () => deps.appendModelUnavailableNoticeMessage(),

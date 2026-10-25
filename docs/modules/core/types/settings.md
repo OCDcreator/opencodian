@@ -508,3 +508,7 @@ Focused regression tests cover the settings callbacks' saved JSON snapshots, the
 ## 2026-10-23 DSH backend
 
 `BackendSettings.dsh` 保存可执行文件路径、工作目录、附加参数和环境变量，profile 固定归一为 `acp`。`normalizeDshBackendSettings` 清理无效输入，环境变量保留字符串原值并排除无效键和 NUL；默认路径和目录留空，由本地发现和当前 vault 决定。既有设置加载时补齐该结构，不自动启用 DSH。
+
+## 2026-10-24 DSH MCP 声明
+
+`DshMcpServer` 描述 ACP stdio / HTTP 声明；`backendSettings.dsh.mcpServers` 默认空数组。归一化保留已有声明与畸形持久值，让统一运行时/UI 校验明确拒绝，不能悄悄丢弃服务器后报告保存成功。原生作用域是每次新建/恢复会话，已有连接不会被设置保存热替换。

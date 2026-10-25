@@ -79,3 +79,7 @@ Pi backend key 返回空目录，不展示 OpenCode 命令，也不触发 OpenCo
 - 源码位置：`src/features/chat/services/commands/SlashCommandMenuCatalogCache.ts`。
 - 原位置：`src/features/chat/services/SlashCommandMenuCatalogCache.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/features/chat/services/composer/AgentMentionCandidateService.ts`、`src/features/chat/services/composer/AgentMentionComposerController.ts`、`src/features/chat/services/context/CommandMdFileLoader.ts`。
+
+## 2026-10-24 DSH 通道隔离
+
+DSH ACP 没有 command/skill/agent catalog，目录加载直接返回空，不查询 OpenCode 配置或休眠服务。不能用其他后端的斜杠菜单伪装 DSH 原生能力。

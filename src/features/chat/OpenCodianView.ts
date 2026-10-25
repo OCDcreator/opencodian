@@ -273,6 +273,7 @@ import {
 import {
   ChatSelectionControlsCoordinator,
   type ChatSelectionControlsCoordinatorHost,
+  saveDshConversationSelection,
 } from './services/selection/ChatSelectionControlsCoordinator';
 import { savePiConversationSelection } from './services/selection/PiModelSelectionBinding';
 import { saveZCodeConversationSelection } from './services/selection/ZCodeModelSelectionBinding';
@@ -1080,6 +1081,15 @@ export class OpenCodianView extends ItemView {
             }
             const current = this.getCurrentSessionModel();
             const conversation = this.currentConversation;
+            if (conversation?.backend === 'dsh' && current) {
+              await saveDshConversationSelection(conversation, {
+                dshEffortOverrides: {
+                  ...conversation.sessionSettings?.dshEffortOverrides,
+                  [`${current.provider}/${current.model}`]: variant ?? null,
+                },
+              }, (target) => this.plugin.saveConversation(target));
+              return;
+            }
             if (conversation?.backend === 'pi' && current) {
               await savePiConversationSelection(conversation, {
                 piEffortOverrides: {
@@ -1404,6 +1414,13 @@ export class OpenCodianView extends ItemView {
           });
           return true;
         }
+        if (conversation?.backend === 'dsh') {
+          void saveDshConversationSelection(conversation, { dshModelOverride: selection },
+            (target) => this.plugin.saveConversation(target)).catch(() => {
+            if (this.currentConversation?.id === conversation.id) this.updateModelSelectorDisplay();
+          });
+          return true;
+        }
         if (conversation?.backend === 'pi') {
           void savePiConversationSelection(conversation, { piModelOverride: selection },
             (target) => this.plugin.saveConversation(target)).catch(() => {
@@ -1419,6 +1436,13 @@ export class OpenCodianView extends ItemView {
           return true;
         }
         this.tabManager.setActiveTabModelOverride(selection);
+        return true;
+      },
+      persistDshModelSelection: async (selection) => {
+        const conversation = this.currentConversation;
+        if (conversation?.backend !== 'dsh') return false;
+        await saveDshConversationSelection(conversation, { dshModelOverride: selection },
+          (target) => this.plugin.saveConversation(target));
         return true;
       },
       getDefaultModelSelection: () => {
@@ -1859,6 +1883,7 @@ export class OpenCodianView extends ItemView {
       loadOpenCode2Agents: () => (this.plugin.agentServiceRegistry?.get('opencode2') as { listAgents?(): Promise<Array<{ id: string; name: string; description?: string; mode: 'primary' | 'subagent' | 'all'; hidden: boolean }>> } | undefined)?.listAgents?.() ?? Promise.resolve([]),
       loadPiRuntimeCommands: () => (this.plugin.agentServiceRegistry?.get('pi') as { getRuntimeCommands?(): Promise<Array<{ name: string; description?: string }>> } | undefined)?.getRuntimeCommands?.() ?? Promise.resolve([]),
       loadZCodeRuntimeCommands: async () => (this.plugin.agentServiceRegistry?.get('zcode') as { getSlashCommands?(): readonly { name: string; description: string }[] } | undefined)?.getSlashCommands?.() ?? [],
+      loadDshRuntimeCommands: () => (this.plugin.agentServiceRegistry?.get('dsh') as { getRuntimeCommands?(sessionId?: string): Promise<Array<{ name: string; description?: string }>> } | undefined)?.getRuntimeCommands?.(this.currentConversation?.backendSessionId) ?? Promise.resolve([]),
       getHiddenCommandIds: () => this.plugin.settings.hiddenSlashCommands ?? [],
       loadProjectAgents: async () => (this.isClaudeCodeConversationActive() || this.isCodexConversationActive()) ? {} : (this.plugin.opencodeConfigManager?.getAgentConfig() ?? {}),
       loadProjectCommands: async () => (this.isClaudeCodeConversationActive() || this.isCodexConversationActive()) ? {} : (this.plugin.opencodeConfigManager?.getCommandConfig() ?? {}),
@@ -2193,8 +2218,8 @@ export class OpenCodianView extends ItemView {
       isConversationRewound: () => Boolean(this.currentConversationRevertState?.messageID),
       getActiveTabId: () => this.getActiveTabId(),
       getSessionDiff: (sessionId, sourceMessageId, backend = 'opencode') => {
-        if (backend === 'opencode2') {
-          const adapter = this.plugin.agentServiceRegistry?.get('opencode2') as {
+        if (backend === 'opencode2' || backend === 'dsh') {
+          const adapter = this.plugin.agentServiceRegistry?.get(backend) as {
             getSessionDiff?(id: string, from?: string): Promise<SessionDiffEntry[]>;
           } | undefined;
           return adapter?.getSessionDiff?.(sessionId, sourceMessageId) ?? Promise.resolve([]);
@@ -4907,6 +4932,9 @@ export class OpenCodianView extends ItemView {
   }
 
   private getBackendScopedActiveTabModelOverride(): ModelSelectorSelection | null {
+    if (this.currentConversation?.backend === 'dsh') {
+      return this.currentConversation.sessionSettings?.dshModelOverride ?? null;
+    }
     if (this.currentConversation?.backend === 'claude-code'
       && this.currentConversation.sessionSettings?.claudeModelOverride !== undefined) {
       const override = this.currentConversation.sessionSettings.claudeModelOverride;
@@ -4955,6 +4983,12 @@ export class OpenCodianView extends ItemView {
   }
 
   private getCurrentEffortVariant(): string | undefined {
+    if (this.currentConversation?.backend === 'dsh') {
+      const current = this.getCurrentSessionModel();
+      const override = current ? this.currentConversation.sessionSettings?.dshEffortOverrides?.[`${current.provider}/${current.model}`] : undefined;
+      const adapter = this.plugin.agentServiceRegistry?.get('dsh') as { getDefaultReasoningEffort?(sessionId?: string): string | undefined } | undefined;
+      return override ?? adapter?.getDefaultReasoningEffort?.(this.currentConversation.backendSessionId);
+    }
     if (this.isCodexConversationActive()) {
       return this.conversationSessionSettingsCoordinator?.resolveEffectiveSettings(
         this.currentConversation,

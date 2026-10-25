@@ -7,13 +7,15 @@ import {
 } from '../../../../src/core/types/settings';
 
 describe('normalizeDshBackendSettings', () => {
-  it('uses a safe ACP default', () => {
+  it('uses native transport and retains the legacy profile marker', () => {
     expect(normalizeDshBackendSettings(undefined)).toEqual({
       executablePath: '',
       workingDirectory: '',
       args: [],
       env: {},
       profile: 'acp',
+      transport: 'native',
+      mcpServers: [],
     });
     expect(getDefaultBackendSettings().dsh.profile).toBe('acp');
   });
@@ -31,6 +33,8 @@ describe('normalizeDshBackendSettings', () => {
       args: ['--flag'],
       env: { DSH_HOME: ' /tmp/dsh ' },
       profile: 'acp',
+      transport: 'native',
+      mcpServers: [],
     });
   });
 
@@ -41,6 +45,12 @@ describe('normalizeDshBackendSettings', () => {
       args: [],
       env: {},
       profile: 'acp',
+      transport: 'native',
+      mcpServers: [],
     });
+  });
+  it('preserves an explicit ACP compatibility choice', () => {
+    expect(normalizeDshBackendSettings({ transport: 'acp' }).transport).toBe('acp');
+    expect(normalizeDshBackendSettings({ transport: 'web' }).transport).toBe('native');
   });
 });

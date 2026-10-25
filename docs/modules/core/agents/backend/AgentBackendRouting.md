@@ -1,5 +1,7 @@
 # AgentBackendRouting
 
+> 2026-10-24：DSH 原生历史预览保留 native message id 为 sourceMessageId，使恢复后的消息引用仍对应原生事件边界。ACP 兼容模式无历史时保留明确提示；不触发其他后端的模型或历史 fallback。DSH 工具结果以 activity 文本参与共享导入，避免空占位消息。
+
 > **源码**: `src/core/agents/backend/AgentBackendRouting.ts`
 > **状态**: [REVIEW]
 

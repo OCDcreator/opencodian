@@ -350,6 +350,9 @@ export class ModelPricingService {
       };
     }
 
+    // Aggregate context occupancy is not a billable request ledger or a token split.
+    if (snapshot.tokenBreakdownAvailable === false) return { ...snapshot, totalCost: null, costDetails: null };
+
     return this.estimateWithLocalPricing(snapshot, identity);
   }
 

@@ -237,6 +237,9 @@ export interface ConversationSessionSettings {
   /** ZCode composer choices persist per conversation; null reasoning inherits the model default. */
   zcodeModelOverride?: { provider: string; model: string } | null;
   zcodeEffortOverrides?: Record<string, string | null>;
+  /** DSH retains the native opaque ACP model value; effort defaults come from native readback. */
+  dshModelOverride?: { provider: string; model: string } | null;
+  dshEffortOverrides?: Record<string, string | null>;
   codexSandboxMode?: CodexSandboxMode | null;
   codexModelReasoningEffort?: CodexReasoningEffort | null;
   codexModelOverride?: string | null;
@@ -306,7 +309,7 @@ export function normalizeConversationSessionSettings(
   }
 
   const normalized: Record<string, unknown> = {};
-  for (const modelKey of ['claudeModelOverride', 'piModelOverride', 'zcodeModelOverride'] as const) {
+  for (const modelKey of ['claudeModelOverride', 'piModelOverride', 'zcodeModelOverride', 'dshModelOverride'] as const) {
     const modelOverride = value[modelKey];
     if (modelOverride === null) {
       normalized[modelKey] = null;
@@ -316,7 +319,7 @@ export function normalizeConversationSessionSettings(
       if (provider && model) normalized[modelKey] = { provider, model };
     }
   }
-  for (const effortKey of ['piEffortOverrides', 'zcodeEffortOverrides'] as const) {
+  for (const effortKey of ['piEffortOverrides', 'zcodeEffortOverrides', 'dshEffortOverrides'] as const) {
     const effortOverrides = value[effortKey];
     if (effortOverrides && typeof effortOverrides === 'object' && !Array.isArray(effortOverrides)) {
       const efforts = Object.fromEntries(Object.entries(effortOverrides)
@@ -532,6 +535,8 @@ export interface OpenCodeCurrentContextUsage {
 }
 
 export interface ContextUsageSnapshot {
+  /** False when only aggregate context occupancy is reported by the backend. */
+  tokenBreakdownAvailable?: boolean;
   sessionId: string;
   sessionTitle: string;
   createdAt: number;
@@ -606,6 +611,7 @@ export interface ContextBreakdownSegment {
 
 /** Per-tab context usage state */
 export interface TabContextState {
+  tokenBreakdownAvailable?: boolean;
   estimatedInputTokens: number;
   estimatedOutputTokens: number;
   streamInputTokens: number;

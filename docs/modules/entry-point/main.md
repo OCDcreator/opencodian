@@ -1,4 +1,5 @@
 # Plugin Entry Point (main.ts)
+> 2026-10-24：行内模型目录读取增加 dsh 分支，通过已注册适配器 getModelSelectorProviders 获取其原生目录；不访问 OpenCode 服务，也不在组合根新增 DSH 运行时职责。
 > 2026-10-21（OpenCode 1 退役）：bootstrap 不再构造/注册 `OpenCodeAdapter`——`OpenCodeService` 仍休眠构造（供 memory runtime 与 legacy 只读引用，本地 server 自启动已有 active-backend 门控、永不触发），`AgentServiceRegistry` 中不存在 `opencode` adapter，routing 把存量 `opencode` conversation 视为不可用后端；`handleOpenCodeServerStatusChange` 移除 registry 转发。默认后端经 settings 归一化为 `opencode2`，由 wiring 层注册 `OpenCode2Adapter`。
 > 2026-10-07：readClaudeMcpServers 在 vault-scoped services 尚未组合时，按当前 vault 创建同类 OpencodeConfigManager 读取 project MCP，避免 active Claude 的提前 start 缓存空配置。配置来源及 adaptMcpConfigForClaude 规则保持一致，不启动 OpenCode 服务。
 > 2026-09-21 (advantage-parity R-F4)：`chatWarmSessionEnabled`（默认关、strict boolean load）复用唯一 `InlineCompletionService`；pool host 由 R-C3 / R-F4 任一开关启用。R-F4 启动、开关开启与两个 active-backend settings 入口均调 `prewarmExclusive()`，只构造一个空的只读 aux session；任一开关关闭仅在另一个也关闭时 `disposeAll()`，不破坏仍启用的一侧。

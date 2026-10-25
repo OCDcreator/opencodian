@@ -1087,6 +1087,11 @@ export function normalizeZCodeBackendSettings(value: unknown): ZCodeBackendSetti
 }
 
 /** Local DeepSeek Harness ACP backend settings. Desktop attach is intentionally deferred. */
+/** ACP session-scoped MCP declarations. Commands are native absolute executable paths. */
+export type DshMcpServer =
+  | { name: string; command: string; args: string[]; env: Array<{ name: string; value: string }> }
+  | { type: 'http'; name: string; url: string; headers: Array<{ name: string; value: string }> };
+
 export interface DshBackendSettings {
   /** Optional user-installed `dsh` CLI or bundled Electron-as-Node launcher. */
   executablePath: string;
@@ -1096,8 +1101,12 @@ export interface DshBackendSettings {
   args: string[];
   /** Environment overrides for the owned DSH process. */
   env: Record<string, string>;
-  /** The only supported first-release transport profile. */
+  /** Retained marker for settings written before the native transport was added. */
   profile: 'acp';
+  /** Native extension is the default; ACP remains an explicit compatibility option. */
+  transport?: 'native' | 'acp';
+  /** Applied when creating or resuming a native session, never hot-swapped into a running turn. */
+  mcpServers?: DshMcpServer[];
 }
 
 export function normalizeDshBackendSettings(value: unknown): DshBackendSettings {
@@ -1121,6 +1130,10 @@ export function normalizeDshBackendSettings(value: unknown): DshBackendSettings 
     args,
     env,
     profile: 'acp',
+    transport: source.transport === 'acp' ? 'acp' : 'native',
+    // Preserve invalid persisted declarations for the runtime/UI validator to reject;
+    // silently dropping a declaration would report a different configuration as saved.
+    mcpServers: source.mcpServers === undefined ? [] : source.mcpServers as DshMcpServer[],
   };
 }
 

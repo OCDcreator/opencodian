@@ -111,3 +111,7 @@ export interface ContextUsageSnapshot {
 - 源码位置：`src/features/chat/services/context/ContextUsageService.ts`。
 - 原位置：`src/features/chat/services/ContextUsageService.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/features/chat/services/context/ContextUsageDisplayService.ts`。
+
+## 2026-10-24 聚合快照的生命周期
+
+apply/createUsageSnapshot 传递 `tokenBreakdownAvailable`，session identity 改变时清除它。DSH 的 totalTokens 是原生当前上下文占用，不作为可计费请求明细；其费用保持 null，缺少的分类不参与估价。

@@ -1,113 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import type { DshAcpClientOptions, DshJsonObject } from '../../../../../src/core/agents/backend/dsh/DshAcpClient';
-import { DshAdapter } from '../../../../../src/core/agents/backend/dsh/DshAdapter';
-import type { StreamChunk } from '../../../../../src/core/types/chat';
-import type { DshBackendSettings } from '../../../../../src/core/types/settings';
-
-interface Deferred {
-  promise: Promise<DshJsonObject>;
-  resolve: (value: DshJsonObject) => void;
-  reject: (error: Error) => void;
-}
-
-function deferred(): Deferred {
-  let resolve!: Deferred['resolve'];
-  let reject!: Deferred['reject'];
-  const promise = new Promise<DshJsonObject>((accept, decline) => { resolve = accept; reject = decline; });
-  return { promise, resolve, reject };
-}
-
-class FakeDshClient {
-  isStarted = false;
-  readonly calls: Array<{ method: string; params?: unknown }> = [];
-  readonly prompts = new Map<string, Deferred[]>();
-  autoSettleCancel = true;
-  settlePromptsOnStop = true;
-  resumeGate: Deferred | null = null;
-  newSessionGate: Deferred | null = null;
-  stopError: Error | null = null;
-  list: (cursor?: string) => Promise<DshJsonObject> = async () => ({ sessions: [] });
-  private nextSession = 1;
-
-  constructor(readonly options: DshAcpClientOptions) {}
-
-  async start(): Promise<void> { this.isStarted = true; this.calls.push({ method: 'start' }); }
-  async stop(): Promise<void> {
-    this.isStarted = false;
-    this.calls.push({ method: 'stop' });
-    if (this.settlePromptsOnStop) {
-      for (const queue of this.prompts.values()) for (const prompt of queue) prompt.reject(new Error('stopped'));
-    }
-    if (this.stopError) throw this.stopError;
-  }
-  async newSession(cwd: string): Promise<DshJsonObject> {
-    const sessionId = `created-${this.nextSession++}`;
-    this.calls.push({ method: 'session/new', params: { cwd } });
-    return this.newSessionGate?.promise ?? { sessionId };
-  }
-  async listSessions(cwd?: string, cursor?: string): Promise<DshJsonObject> {
-    this.calls.push({ method: 'session/list', params: { cwd, cursor } });
-    return this.list(cursor);
-  }
-  async resumeSession(sessionId: string, cwd: string): Promise<DshJsonObject> {
-    this.calls.push({ method: 'session/resume', params: { sessionId, cwd } });
-    return this.resumeGate?.promise ?? { configOptions: [] };
-  }
-  prompt(sessionId: string, text: string): Promise<DshJsonObject> {
-    this.calls.push({ method: 'session/prompt', params: { sessionId, text } });
-    const turn = deferred();
-    const queue = this.prompts.get(sessionId) ?? [];
-    queue.push(turn);
-    this.prompts.set(sessionId, queue);
-    return turn.promise;
-  }
-  cancel(sessionId: string): void {
-    this.calls.push({ method: 'session/cancel', params: { sessionId } });
-    if (this.autoSettleCancel) this.resolvePrompt(sessionId);
-  }
-  resolvePrompt(sessionId: string, result: DshJsonObject = { stopReason: 'end_turn' }): void {
-    this.prompts.get(sessionId)?.shift()?.resolve(result);
-  }
-  rejectPrompt(sessionId: string, error: Error): void { this.prompts.get(sessionId)?.shift()?.reject(error); }
-  emitUpdate(sessionId: string, update: DshJsonObject): void {
-    this.options.onUpdate?.({ sessionId, update });
-  }
-  disconnect(): void {
-    this.isStarted = false;
-    this.options.onProtocolError?.(new Error('fixture disconnected'));
-  }
-}
-
-function settings(): DshBackendSettings {
-  return { executablePath: '/opt/dsh', workingDirectory: '/vault', args: [], env: {}, profile: 'acp' };
-}
-
-function adapterFixture(adapterOptions: { cancelTimeoutMs?: number } = {}) {
-  const current = settings();
-  const clients: FakeDshClient[] = [];
-  const adapter = new DshAdapter({
-    workingDirectory: '/vault',
-    getSettings: () => current,
-    createClient: (options) => {
-      const client = new FakeDshClient(options);
-      clients.push(client);
-      return client;
-    },
-    ...adapterOptions,
-  });
-  return { adapter, clients, current };
-}
-
-async function tick(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-async function collect(stream: AsyncGenerator<StreamChunk>): Promise<StreamChunk[]> {
-  const chunks: StreamChunk[] = [];
-  for await (const chunk of stream) chunks.push(chunk);
-  return chunks;
-}
+import { adapterFixture, collect, deferred, tick } from './DshAdapter.fixture';
 
 describe('DshAdapter', () => {
   it('resumes the known backend session on the first send after adapter restart', async () => {
@@ -308,10 +201,10 @@ describe('DshAdapter prompt and boundary behavior', () => {
     expect(chunks).toContainEqual({ type: 'tool_use', id: 't1', name: 'opaque', input: { rawInput: 'raw command' } });
     expect(chunks.filter((chunk) => chunk.type === 'tool_result')).toEqual([{
       type: 'tool_result', toolUseId: 't1',
-      content: '[DeepSeek Harness tool returned image content that this adapter cannot render]', isError: false,
+      content: '[DeepSeek Harness returned an invalid or unsupported image]', isError: false,
     }]);
     expect(chunks).toContainEqual({
-      type: 'text', content: '[DeepSeek Harness returned image content that this adapter cannot render]',
+      type: 'text', content: '[DeepSeek Harness returned an invalid or unsupported image]',
     });
     await adapter.stop();
   });
@@ -375,15 +268,16 @@ describe('DshAdapter prompt and boundary behavior', () => {
     await adapter.stop();
   });
 
-  it('reports delete, image input, and per-turn model overrides as unsupported', async () => {
-    const { adapter } = adapterFixture();
+  it('rejects deletion, unadvertised images and unknown native model choices without prompting', async () => {
+    const { adapter, clients } = adapterFixture();
     await expect(adapter.deleteSession('persisted')).rejects.toThrow('does not support deleting');
     await expect(collect(adapter.sendMessage({
       sessionId: 's1', content: 'image', images: [{ mediaType: 'image/png', data: 'AA==' }],
-    }))).rejects.toThrow('image prompts are not supported');
+    }))).rejects.toThrow('did not advertise image prompts');
     await expect(collect(adapter.sendMessage({
       sessionId: 's1', content: 'model', options: { model: 'deepseek-v4' },
-    }))).rejects.toThrow('model overrides are not supported');
+    }))).resolves.toContainEqual({ type: 'error', content: 'DSH model is not in the native session catalog' });
+    expect(clients[0].calls.some((call) => call.method === 'session/prompt')).toBe(false);
     await adapter.stop();
   });
 

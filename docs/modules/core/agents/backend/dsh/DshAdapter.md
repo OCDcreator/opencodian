@@ -2,34 +2,29 @@
 
 源码：`src/core/agents/backend/dsh/DshAdapter.ts`
 
-`DshAdapter` 是 DeepSeek Harness 的 first-class backend 适配器。首期只使
-用本地 DSH CLI 的 ACP stdio profile；它不连接桌面端的内部 Web host，也不
-猜测未公开的 localhost 或 WebSocket 接口。
+`core.backend` 内的 Harness 本地连接、会话、发送/取消、原生目录和交互 owner。默认使用 `DshNativeClient` 的原生扩展；显式 `transport: acp` 保留兼容模式。不连接桌面私有 Web host，不借用其他后端目录或斜杠 resolver。
 
-适配器负责：
+## 能力与配置
 
-- 启动和停止由它自己创建的 DSH ACP 子进程；
-- 创建、列举、恢复 DSH 原生 session，停止时关闭自己激活的句柄而保留持久历史；
-- 将 ACP `session/update` 映射为 OpenCodian 的文本、思考、工具结果和权限
-  请求流；
-- 按 session 保存取消代际；新发送等待原生 prompt 收敛，取消超时则关闭自有连接；
-- 将文本附件、显式 synthetic parts、笔记上下文、memory 和 Obsidian tooling 注入合并到原生文本提示；
-- 将 ACP 权限请求接入现有聊天权限卡片。
+- Chat、Sessions、Permissions、Thinking、Models、Context 为基础能力。原生模式还提供 AuxQuery、InlineCompletion、Questions、Fork、TurnSteering、Tools；断开时逻辑行内能力允许安全重连，但每次辅助构造必须证明只读。Images 由当前握手开放，原生再按所选模型确认 modality。
+- 模型/effort 来自原生 configOptions，opaque ID 原样保存和回传。发送前等待完整原生配置确认，失败不提交 prompt；会话选择只修改原生 agent selection，不覆盖全局默认。
+- MCP 声明整批校验后传入新建/恢复。原生模式可显式应用至全部空闲会话；单会话替换失败恢复旧声明。未实现通用 Mcp/OAuth 管理合同，不声明该通用 capability。
+- 用量只消费 native aggregate used/size。分类和费用缺失保持未知，`tokenBreakdownAvailable:false` 防止虚构零费用。
 
-能力集合声明首期实现的 Chat、Sessions、Permissions 和 Thinking。
-模型目录、MCP、图片、辅助查询、inline completion 和 transcript replay 仍
-保持不可用，调用方必须按能力检查处理。确定性协议测试不代表真实模型聊天验收；
-会话浏览器明确说明 DSH 续接不会导入此前的消息。
+## 内容与历史
 
-设置来源是 `backendSettings.dsh`，工作目录默认为当前 vault；空的可执行文件
-路径优先使用 PATH 中的 `dsh`，macOS 上则可使用已安装的 DeepSeek Harness
-桌面包作为 Electron-as-Node 的 ACP 运行时载体。
+`prepareDshPromptBlocks` 在既有 codec 内读取 Vault 选择器的本地图片字节，复用 PathConfinement，拒绝越界、符号链接逃逸、空文件、超限或变化中的文件；保留有序文本/图片/资源内容，memory 与 Obsidian context 各注入一次。取消期间不提交迟到 prompt。
 
-安装版 DSH 的 `session/list` 只返回持久化且未被激活的可恢复会话；当前连接
-持有的会话不会重复列出。launcher 设置改变时，存在活动句柄的连接必须先停止
-再重连；异常断线后的新连接按原 session ID 恢复，不复用过期句柄状态。
+原生历史保留真实用户/助手消息、图片、native message ID 和工具结果，过滤原生规则/技能目录/runtime context 等内部 user-role 注入。共享预览将 native ID 保留为 sourceMessageId；工具结果通过 activity 文本导入，避免空占位。`forkSession` 使用原生事件边界与 buildForkSeed，不复制插件文本伪造原生分支。删除原生持久历史仍不可用，close 仅释放句柄。
 
-## 目录定位（2026-10-23）
+命令读取并执行于 native commands；原始 slash 文本不受 memory 前缀干扰。工具目录来自当前 agent schemas。问题交给 `DshQuestionBridge` 一次性回答/取消；权限回包绑定原 client/进程，未提供的持久允许不能被伪造。
 
-- 源码位置：`src/core/agents/backend/dsh/DshAdapter.ts`。
-- 原位置：`src/core/agents/backend/DshAdapter.ts`；文件名、导出接口与业务职责保持不变。
+## 辅助查询与生命周期
+
+`DshAuxQuerySession` 直接调用原生 LLM，不创建 Agent、工具调度器或持久会话；空工具、无持久化/dispatcher、系统提示词 hash 和每次结果的安全证明均须通过。图片仅用内存 store。补全复用共享 WarmInlineCompletionSession 与既有池的超时、TTL 和代际规则。
+
+各聊天会话独立拥有 turn/native settlement、取消和连接代际。超时导致状态不确定时关闭自有连接；旧 generator、resume/config 响应不能影响替代 client。dispose 为终态。目录读取所需的预留草稿供下一次匹配工作目录/MCP 的新聊天复用，不每次刷新创建一个会话。
+
+## 验证
+
+ACP fixture 保留生命周期和兼容路径回归。`DshNative.live.test.ts` 验证真实模型/工具/命令目录、stdio/HTTP MCP、反向问题、私有启动及用户 profile 不变；`DshAdapter.live.test.ts` 单独验证 ACP。真实模型只读审计、图片与 Obsidian 产品路径分别记账，详见 `docs/status/dsh-integration-2026-10-24.md`。Windows 与真实权限卡片 UI 闭环不能由源码测试替代。

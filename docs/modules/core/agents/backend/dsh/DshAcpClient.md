@@ -1,25 +1,15 @@
 # DshAcpClient
 
+> 2026-10-24：现同时承载 ACP 兼容通道和 DshNativeClient 的原生扩展。反向请求接受数字或字符串 JSON-RPC ID，保留原 ID 及子进程归属；新增问题请求、原始 slash 文本和辅助 protected request 接缝。原生启动 profile 和私有文件归子类所有，父类不负责原生 profile 写入。
+
 源码：`src/core/agents/backend/dsh/DshAcpClient.ts`
 
-`DshAcpClient` 是 DSH ACP stdio 的窄传输层。它负责 newline-delimited
-JSON-RPC 2.0 的请求 ID 关联、stdout 增量分帧、`session/update` 通知、
-`session/request_permission` 服务端请求，以及只清理自己启动的子进程。
+`DshAcpClient` 拥有 DSH ACP newline-delimited JSON-RPC 2.0 stdio 传输：自有子进程、请求 ID、增量分帧、pending/超时、会话句柄、session/update 通知和权限服务端请求。
 
-启动时先发送 ACP `initialize`（protocol version 1），之后才把 adapter 状态
-标记为 connected。无效 JSON/帧、进程早退、请求超时有明确错误；未知服务端
-请求返回 JSON-RPC method-not-found。stdout 缓冲与 pending 请求数设有上界。
-权限回包绑定发起它的子进程，旧连接的迟到回复不能写入新进程。
-stdin 的断管错误也进入同一失败/清理路径，拒绝未完成请求；旧子进程迟到的
-流错误不能影响替换后的连接。
+启动只在 ACP v1 握手校验成功后报告 ready，并保留原生 handshake 供 adapter 进行动态图片能力判定。协议版本与握手校验来自 `DshProtocolCodec`。未知服务端方法返回 method-not-found；权限回包绑定原子进程，不能写入替代连接。
 
-停止会关闭本 client 激活的 session 句柄、结清 pending 请求并等待自有子进程
-退出；强制终止后仍等待实际退出。session close/flush 或进程退出失败会向上传播，
-不能报告干净断开；不会删除原生持久会话。
+`newSession` / `resumeSession` 先对整个 stdio/HTTP MCP 声明数组校验，再发送原生请求；不在验证中启动任何 MCP 子进程。`prompt` 接受文本或有序 ACP 内容块数组，保留图片与资源链接的 wire 结构。stdout 默认上限为 32 MiB，pending 上限和单请求超时仍有界；调用方可以覆盖测试上限。
 
-`resolveDshLaunch()` 支持显式 CLI 路径、PATH 中的 `dsh`，以及 macOS
-DeepSeek Harness.app 的 Electron-as-Node 载体。桌面 attach 仍不属于这个
-传输层的协议范围。
+停止关闭本 client 激活的会话、结清 pending 请求，并等待自有子进程实际退出。close/flush/进程退出失败向上传播；不删除持久历史。无效帧、EPIPE、进程退出和协议错误走同一故障/清理路径，旧子进程的迟到回调不能影响新连接。
 
-Windows 仅接受原生 `dsh.exe`，显式拒绝不能由无 shell spawn 启动的 `.cmd` /
-`.bat` shim；Windows 运行时仍需单独验证。
+`resolveDshLaunch` 继续支持显式 CLI、PATH `dsh`、macOS DeepSeek Harness.app 的 Electron-as-Node 载体。固定使用 ACP profile；Windows 仅接受原生 dsh.exe，不通过 shell 执行 .cmd/.bat。未连接桌面私有 Web host。

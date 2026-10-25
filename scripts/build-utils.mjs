@@ -8,6 +8,12 @@ export function bundlePiServiceSource(root = process.cwd()) {
     platform: 'node', format: 'esm', target: 'node20', write: false }).outputFiles[0].text;
 }
 
+/** Bundle the plugin-owned extension; official Harness packages resolve in the native process. */
+export function bundleDshServiceSource(root = process.cwd()) {
+  return buildSync({ entryPoints: [join(root, 'assets/dsh/service.mjs')], bundle: true,
+    platform: 'node', format: 'esm', target: 'node22', write: false }).outputFiles[0].text;
+}
+
 /**
  * Get current git branch name
  * @returns {string} Branch name or 'unknown' if git command fails

@@ -32,7 +32,7 @@ type ContextBreakdownTokenMap = Record<ContextBreakdownKey, number>;
 export class ContextUsageDisplayService {
   static summarize(state: TabContextState | null | undefined): ContextUsageSummary {
     const display = this.getCurrentContextSnapshot(state);
-    if (!state || !display.modelId || display.contextWindow <= 0) {
+    if (!state || (!display.modelId && state.tokenBreakdownAvailable !== false) || display.contextWindow <= 0) {
       return this.buildUnavailableSummary(state);
     }
 
@@ -106,6 +106,7 @@ export class ContextUsageDisplayService {
     messages: ChatMessage[],
     systemPrompt?: string | null,
   ): ContextBreakdownSegment[] {
+    if (state?.tokenBreakdownAvailable === false) return [];
     const inputTokens = this.getCurrentContextSnapshot(state).tokens.input;
     if (inputTokens <= 0) {
       return [];

@@ -293,7 +293,7 @@ export class SlashCommandExecutionService {
     if (currentConversation?.backend === 'pi') return false;
     // ZCode's visible catalog belongs to its own app-server. OpenCode's command
     // resolver can consume the text yet never change the ZCode session.
-    if (currentConversation?.backend === 'zcode') return false;
+    if (currentConversation?.backend === 'zcode' || currentConversation?.backend === 'dsh') return false;
     if (currentConversation && (currentConversation.backend ?? 'opencode') === 'claude-code') {
       return false;
     }

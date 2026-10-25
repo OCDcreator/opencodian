@@ -66,7 +66,7 @@ interface SettingsInlineEditSectionOptions {
 }
 
 /** Backends offered in the per-backend override list. */
-const OVERRIDE_BACKENDS: readonly AgentBackendKind[] = ['opencode', 'opencode2', 'claude-code', 'codex', 'pi'];
+const OVERRIDE_BACKENDS: readonly AgentBackendKind[] = ['opencode', 'opencode2', 'claude-code', 'codex', 'pi', 'dsh'];
 /** ZCode is text-completion-only; it must not appear on generic aux-edit rows. */
 const COMPLETION_OVERRIDE_BACKENDS: readonly AgentBackendKind[] = [...OVERRIDE_BACKENDS, 'zcode'];
 
@@ -479,6 +479,7 @@ function overrideExample(backend: AgentBackendKind): string {
     case 'opencode2':
     case 'pi':
     case 'zcode':
+    case 'dsh':
       return 'provider/model';
     case 'claude-code':
       return 'claude-sonnet-4-5';

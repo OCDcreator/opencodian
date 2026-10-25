@@ -1,4 +1,5 @@
 # Owner: core.config
+> 2026-10-24（DSH）：ModelPricingService 对仅有上下文占用总量的快照保留未知费用，不使用缺失的 token 分类估出零费用。
 > 2026-09-21 (advantage-parity R-F8)：catalog 边界新增 applyContextWindowOverrides + ModelConfigService 四面施加 + 设置访问器。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 

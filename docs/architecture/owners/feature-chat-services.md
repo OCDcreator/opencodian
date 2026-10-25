@@ -9,6 +9,7 @@
 > 2026-09-20 (advantage-parity R-D1)：ConversationHistoryActionsCoordinator 每条会话新增「导出为 Markdown 笔记」按钮（可选 host 方法，未提供不渲染）。
 
 # Owner: feature.chat-services
+> 2026-10-24（DSH）：selection coordinator 消费原生目录并绑定发起选择的会话；生产发送 host 把模型/推理覆盖送入 preparation 与 adapter；命令目录、权限模式与上下文读取按后端隔离。DSH 的 aggregate occupancy 不补用 OpenCode 数据。
 > 2026-10-02（reviewed continuation，用户已授权）：会话单删/批删的失败和 pending 不被渲染成整体成功；只清理已确认成功项的标签页，失败项保留选择、会话与可重试状态，并在必要时恢复有效 active tab。删除命令由 host 转发，服务不建立第二套 native deletion 真值，也不越过 backend 的 admission/readback 判定。
 > 2026-09-28: OpenCode 2 slash autocomplete uses its native command and skill catalog, independent of OpenCode 1 project config.
 > 2026-09-25 (FA880): QuestionRuntimeHostAdapter supplies the inline card an authoritative tab/session/requestId pending read, preserving other tabs and callback-only backends.

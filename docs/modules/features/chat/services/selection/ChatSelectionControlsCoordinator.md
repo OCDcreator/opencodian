@@ -122,3 +122,9 @@ Opening the model picker refreshes an unloaded/empty catalog through the existin
 - 源码位置：`src/features/chat/services/selection/ChatSelectionControlsCoordinator.ts`。
 - 原位置：`src/features/chat/services/ChatSelectionControlsCoordinator.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/core/agents/backend/opencode/OpenCode2Adapter.ts`、`src/features/chat/services/selection/AdditionalDirectoriesConfigBadgeCoordinator.ts`、`src/features/chat/services/selection/CodexRuntimeDefaultsBadgeCoordinator.ts`、`src/features/chat/services/selection/ModelSelectionRuntime.ts`、`src/features/chat/services/selection/PermissionModeSelectorCoordinator.ts`、`src/features/chat/services/selection/PiModelSelectionBinding.ts`、`src/features/chat/services/selection/SandboxConfigBadgeCoordinator.ts`、`src/features/chat/services/selection/ZCodeModelSelectionBinding.ts`。
+
+## 2026-10-24 DSH 目录与决定面
+
+模型目录、默认选择和可用性检查按工具栏自己的 conversation 路由到 DSH。先保存请求的模型选择，再设置 native session option 并读取完整结果；失败不静默换用其他模型。切 tab、重建/销毁工具栏与快速多次选择受代际及 originating conversation 约束，迟到工作不能创建幽灵连接或改写别的会话。
+
+DSH 的模型值保持不透明。推理 variants 仅来自该原生会话已观察到的精确模型配置。ACP 只提供权限请求，没有 mode mutation，因此不挂载 OpenCode 的 ASK/PLAN/YOLO 控件；原生权限卡片应答保持。

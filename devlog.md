@@ -11,6 +11,25 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-10-24 DSH 原生通道、图片与行内查询（未发布）
+
+- 默认接入由 ACP 改为插件自有原生 Host 服务扩展，复用官方 SDK composition；保留显式 ACP 兼容模式，不修改已安装应用。
+- 查明旧 ACP 默认模型 deepseek-v4-flash 与当前 deepseek-flash 不一致，以及 initialize 固定图片能力的问题；通过当前模型元数据和原生附件服务接入图片。
+- 接入原生历史投影、分叉、命令、工具目录、问题、权限、turn steering 与空闲会话 MCP 应用。
+- 行内编辑和补全使用原生 LLM 辅助通道，工具列表为空，不创建 Agent/调度器/持久会话；图片使用内存 store，真实模型只读审计独立记录。
+- 启动使用私有 profile 快照承接官方根配置写入，原用户 SDK 文件保持原字节，相对插件路径保持原解析基准；清理只 unlink 明确自有文件后 rmdir。
+- 实际界面补齐 Vault 选择器图片的受限字节读取；模型选择器按 dataset 比较 JSON 模型 ID，避免 CSS 查询异常；历史投影过滤内部规则注入并保留原生消息 ID、图片和工具结果。
+- macOS Test Vault 最终构建 `main.202610250207`：全量 10728 项测试及另行运行的 5 项真实协议探针通过；图片、分叉续接、行内接受/补全与撤销有独立证据。428 份原有会话字节不变，设置与界面恢复；未提交或发布。范围与剩余边界见 `docs/status/dsh-integration-2026-10-24.md`。
+
+## 2026-10-24 DSH ACP 剩余能力接线（早期实现，原生通道已取代）
+
+- 接入原生 model/reasoning configOptions、发送前严格回读和按 conversation 持久化；保留 opaque 选择，不用其他后端目录补齐。
+- 接入握手门控的图片、顺序内容/资源链接和 stdio/HTTP MCP 会话声明；MCP 声明保存与运行中连接状态分开。
+- 接入原生 aggregate context usage，未知 token 分类与费用不伪装为零；隔离斜杠目录、权限 mode 和上下文回读的 OpenCode fallback。
+- 补齐配置超时、替代 client/turn 收尾、迟到模型选择和 dispose 终态回归；无新增视图运行时 owner。
+- 真实界面发送发现 production preparation 的模型目录名单漏列 DSH；补入准入并以生产 host 回归验证 provider/model/variant 不再丢失。
+- 当前 ACP 缺少历史回放和只读 aux 控制面，行内能力继续 fail-closed；SDK/Host API 的存在不作为已接入或真实模型验收。
+
 ## 2026-10-23 v2.0.2：源码目录按职责分层
 
 - 按现有职责迁移 370 个源码文件，保留文件名、导出接口、owner 与业务逻辑；迁移前后 3,606 条模块依赖逐条一致。

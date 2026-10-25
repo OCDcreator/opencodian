@@ -62,3 +62,7 @@ backend token snapshot + modelPricingOverrides
 - OpenCode 自身 `opencode.json` 的 `cost` 与它上报的 session cost 仍优先；插件本地表只补足未上报成本的情况。
 - 目录更新先发布内存状态，再持久化；磁盘写入失败仍可用于本次会话估算，但 `refresh()` 会拒绝并允许重试。单个订阅者或诊断日志失败不能阻止其他订阅者和缓存写入。
 - 冷启动目录晚于 token snapshot 到达时，消费者通过订阅补算当前尚不可用的费用；已计价历史保留原值。消费端关闭时必须取消订阅。
+
+## 2026-10-24 聚合占用不作为账单
+
+`tokenBreakdownAvailable:false` 的快照仍可展示后端明确报告的费用，但不得进入本地按分类 token 估价。DSH 只报告 used/size，缺少分类不能变成各分类为零后算出的免费账单。

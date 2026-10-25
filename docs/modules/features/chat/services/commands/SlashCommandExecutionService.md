@@ -132,3 +132,7 @@ OpenCode 2 executes native slash commands and synthetic compact/undo/redo. Share
 - 源码位置：`src/features/chat/services/commands/SlashCommandExecutionService.ts`。
 - 原位置：`src/features/chat/services/SlashCommandExecutionService.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/features/chat/rendering/composerContext.ts`、`src/features/chat/services/context/CommandMdFileLoader.ts`、`src/features/chat/services/send/MessageSendPreparationService.ts`。
+
+## 2026-10-24 DSH 斜杠文本
+
+DSH 未提供原生命令调用，非插件自有快捷动作的斜杠文本保留在 DSH chat 发送路径，不进入 OpenCode runtime skill/command resolver。

@@ -1,4 +1,6 @@
 # 构建管线
+
+> 2026-10-24：bundleDshServiceSource 在 production/dev 与 DSH aux 审计中统一将 assets/dsh/service.mjs、auxiliary.mjs、launcher.mjs 合并为 DSH_NATIVE_SERVICE_SOURCE。只打包插件源码；官方 Harness 依赖来自用户安装。标准三文件发行包含全部扩展源码，不需要随 dist 复制 DSH SDK 或额外安装依赖。
 > 2026-10-07：聊天消息滚动增加 composer 高度对应的 scroll-padding；待回答 question 或 permission 所在回合暂时取消 sticky user header，防止长用户消息遮住选项、Submit 和 Allow/Reject。卡片移除或进入 terminal 状态后恢复原 sticky 规则。源 CSS 位于 src/style/base/core.css，构建仍生成 styles.css；CSS 无 CodeGraph symbol/owner 映射，实机鼠标与键盘验收独立记录。
 
 > **源码**: `esbuild.config.mjs`, `scripts/build.mjs`, `scripts/build-css.mjs`, `scripts/build-utils.mjs`, `scripts/package-plugin-artifact.mjs`

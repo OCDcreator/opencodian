@@ -132,3 +132,7 @@ Modal grid + breakdown bar + raw messages + notes
 
 - 源码位置：`src/features/chat/ui/ContextDetailModal.ts`。
 - 随目录调整更新的依赖：`src/features/chat/services/context/ContextUsageService.ts`。
+
+## 2026-10-24 分类未知显示
+
+对 `tokenBreakdownAvailable:false` 的快照，总量与上下文比例可见，输入/输出/推理/缓存分类显示 `-`，不能把结构占位的零当成原生报告值。费用与分类来源保持独立。

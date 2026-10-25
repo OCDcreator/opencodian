@@ -619,6 +619,9 @@ export async function getBackendSessionPreview(
   }
 
   const readCodexIdentity = (record: Record<string, unknown>) => {
+    if (historyService.kind === 'dsh') {
+      return typeof record.id === 'string' ? { sourceMessageId: record.id } : {};
+    }
     if (historyService.kind !== 'codex') return {};
     return {
       ...(typeof record.sourceMessageId === 'string' ? { sourceMessageId: record.sourceMessageId } : {}),

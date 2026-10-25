@@ -1199,8 +1199,8 @@ export default class OpenCodianPlugin extends Plugin {
         const models = await adapter?.getModelList?.();
         return (models ?? []).map((entry) => ({ id: entry.slug, label: entry.display_name || entry.slug }));
       }
-      if (kind === 'opencode2') {
-        const adapter = this.agentServiceRegistry?.get('opencode2') as {
+      if (kind === 'opencode2' || kind === 'dsh') {
+        const adapter = this.agentServiceRegistry?.get(kind) as {
           getModelSelectorProviders?(): Promise<Array<{ id: string; models: Array<{ id: string; name: string }> }>>;
         } | undefined;
         const providers = await adapter?.getModelSelectorProviders?.() ?? [];
