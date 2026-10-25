@@ -136,6 +136,11 @@ function inferProviderId(modelId: string | null): string | null {
   if (modelId.startsWith('gpt') || modelId.startsWith('o1') || modelId.startsWith('o3') || modelId.startsWith('o4')) {
     return 'openai';
   }
+  if (modelId.startsWith('deepseek')) {
+    // DSH reports the real harness model id while its config group label is a
+    // display name; pricing resolves from the model id like claude/gpt.
+    return 'deepseek';
+  }
   return null;
 }
 

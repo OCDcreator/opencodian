@@ -156,7 +156,20 @@ export async function apply(ctx, config) {
         }
         const size = session.requestContext()?.contextWindow;
         const meter = ctx.get('tokenMeter');
-        if (size && meter) await update(session.id, { sessionUpdate: 'usage_update', used: meter.measure(session).totalTokens, size });
+        if (size && meter) {
+          const measurement = meter.measure(session);
+          // After a real turn the meter anchors on the model's reported usage;
+          // forward that breakdown so cost/token displays stay honest. Without
+          // an anchor only the aggregate total is knowable.
+          const usage = measurement?.baseline?.kind === 'usage' ? measurement.baseline.usage : undefined;
+          await update(session.id, { sessionUpdate: 'usage_update', used: measurement.totalTokens, size,
+            ...(usage ? {
+              inputTokens: usage.inputTokens ?? 0,
+              outputTokens: usage.outputTokens ?? 0,
+              cacheReadTokens: usage.cacheReadTokens ?? 0,
+              cacheWriteTokens: typeof usage.cacheWriteTokens === 'number' ? usage.cacheWriteTokens : null,
+            } : {}) });
+        }
       } else if (event.type === 'tool/call') {
         let input; try { input = JSON.parse(data.arguments); } catch { input = { raw: data.arguments }; }
         await update(session.id, { sessionUpdate: 'tool_call', toolCallId: data.callId, title: data.name, rawInput: input });
@@ -323,6 +336,17 @@ export async function apply(ctx, config) {
     },
     'session/prompt': prompt,
     'session/history': (params) => history(params.sessionId),
+    async 'session/compact'(params) {
+      // Same seam the native /compact command rides; manual compaction errors
+      // (busy/changed/summary/commit/persistence) surface as JSON-RPC errors.
+      const record = requireSession(params.sessionId);
+      idle(record);
+      record.busy = true;
+      try {
+        const result = await ctx.get('compaction').compactNow(record.handle.agent, new AbortController().signal, 'opencodian-compact');
+        return { shadowed: result ? result.shadowedSeqs.length : 0, shadowedTokens: result ? result.shadowedTokenCount : 0 };
+      } finally { record.busy = false; }
+    },
     async 'session/fork'(params) {
       const source = await ctx.sessionQuery.readSession(params.sessionId);
       const boundary = params.messageId ? source.events.find((event) => (event.type === 'user/message' ? event.data : event.data?.message)?.id === params.messageId)?.seq

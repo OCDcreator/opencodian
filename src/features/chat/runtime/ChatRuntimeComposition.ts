@@ -1258,6 +1258,7 @@ export class ChatRuntimeComposition {
         getSlashCommandSkillMode: () => host.plugin.settings.slashCommandSkillMode,
         openCodeServiceSdk: host.plugin.openCodeService.sdk,
         getOpenCode2Adapter: () => host.plugin.agentServiceRegistry?.get('opencode2') as never ?? null,
+        getDshAdapter: () => host.plugin.agentServiceRegistry?.get('dsh') as never ?? null,
         openCodeService: host.plugin.openCodeService,
         runCompactSession: (sessionId: string) => executeCompactSession(
           sessionId,

@@ -2445,7 +2445,7 @@ export class OpenCodianView extends ItemView {
       },
       getForegroundCompactionAvailability: (sessionId): ForegroundCompactionAvailability => {
         const conversation = this.currentConversation;
-        if (conversation?.backend === 'zcode' || conversation?.backend === 'opencode2') {
+        if (conversation?.backend === 'zcode' || conversation?.backend === 'opencode2' || conversation?.backend === 'dsh') {
           return getConversationBackendSessionId(conversation) === sessionId
             ? { status: 'available', threadId: sessionId }
             : { status: 'invalid-thread' };
@@ -2486,6 +2486,22 @@ export class OpenCodianView extends ItemView {
               threadId: sessionId,
             };
           }).catch(() => ({ status: 'failed', acknowledged: false, runtimeVerified: false, started: false, completed: false, tokenUsageObserved: false, threadId: sessionId }));
+        }
+        if (conversation?.backend === 'dsh') {
+          // Native compaction is synchronous from the adapter's perspective:
+          // compactNow returns only after the summary committed, so a resolved
+          // call is accepted-and-completed; token-usage verification would
+          // require waiting for the next usage_update, which is not guaranteed
+          // within this call, so the result stays 'accepted'.
+          const adapter = this.plugin.agentServiceRegistry?.get('dsh') as {
+            compactSession?(id: string): Promise<boolean>;
+          } | undefined;
+          if (!adapter?.compactSession) return Promise.resolve({ status: 'unavailable', acknowledged: false, runtimeVerified: false, started: false, completed: false, tokenUsageObserved: false });
+          return adapter.compactSession(sessionId).then((compacted): ForegroundCompactionActionResult => ({
+            status: compacted ? 'accepted' : 'failed',
+            acknowledged: compacted, runtimeVerified: false, started: compacted,
+            completed: compacted, tokenUsageObserved: false, threadId: sessionId,
+          })).catch(() => ({ status: 'failed', acknowledged: false, runtimeVerified: false, started: false, completed: false, tokenUsageObserved: false, threadId: sessionId }));
         }
         if ((conversation?.backend ?? 'opencode') !== 'codex') {
           return Promise.resolve({

@@ -59,6 +59,19 @@ const payload = {
         },
       },
     },
+    deepseek: {
+      name: 'DeepSeek',
+      models: {
+        'deepseek-flash': {
+          name: 'DeepSeek Flash',
+          cost: {
+            input: 1,
+            output: 4,
+            cache_read: 0.1,
+          },
+        },
+      },
+    },
 };
 
 function deferred<T>() {
@@ -102,7 +115,7 @@ describe('ModelPricingService', () => {
 
     await service.refresh();
 
-    expect(service.getStatus()).toMatchObject({ entryCount: 3 });
+    expect(service.getStatus()).toMatchObject({ entryCount: 4 });
     expect(service.getCatalogEntry('openai', 'gpt-tiered')).toMatchObject({
       providerName: 'OpenAI',
       modelName: 'GPT Tiered',
@@ -126,7 +139,7 @@ describe('ModelPricingService', () => {
       await Promise.resolve();
     }
 
-    expect(service.getStatus()).toMatchObject({ entryCount: 3 });
+    expect(service.getStatus()).toMatchObject({ entryCount: 4 });
     expect(storage.saveModelPricingCatalog).toHaveBeenCalledTimes(1);
   });
 
@@ -168,8 +181,8 @@ describe('ModelPricingService', () => {
     save.resolve(undefined);
     const results = await Promise.all([first, second]);
     expect(results).toEqual([
-      expect.objectContaining({ entryCount: 3 }),
-      expect.objectContaining({ entryCount: 3 }),
+      expect.objectContaining({ entryCount: 4 }),
+      expect.objectContaining({ entryCount: 4 }),
     ]);
     const next = service.refresh();
     expect(next).not.toBe(first);
@@ -211,12 +224,12 @@ describe('ModelPricingService', () => {
     const rejection = Promise.allSettled([refresh]);
 
     await Promise.resolve();
-    expect(listener).toHaveReturnedWith(3);
+    expect(listener).toHaveReturnedWith(4);
     expect(service.getCatalogEntry('openai', 'gpt-test')).not.toBeNull();
     save.reject(new Error('disk full'));
     expect(await rejection).toEqual([{ status: 'rejected', reason: new Error('disk full') }]);
 
-    expect(service.getStatus().entryCount).toBe(3);
+    expect(service.getStatus().entryCount).toBe(4);
     await service.refresh();
     expect(storage.saveModelPricingCatalog).toHaveBeenCalledTimes(2);
     expect(listener).toHaveBeenCalledTimes(2);
@@ -236,7 +249,7 @@ describe('ModelPricingService', () => {
       if (loggingFails) throw new Error('diagnostics failed');
     });
     try {
-      await expect(service.refresh()).resolves.toMatchObject({ entryCount: 3 });
+      await expect(service.refresh()).resolves.toMatchObject({ entryCount: 4 });
 
       expect(disposed).not.toHaveBeenCalled();
       expect(failing).toHaveBeenCalledTimes(1);
@@ -265,6 +278,31 @@ describe('ModelPricingService', () => {
 });
 
 describe('ModelPricingService cost estimates', () => {
+  it('prices a DSH snapshot from the real model id when the harness group label is only a display name', async () => {
+    const { service } = createService();
+    await service.refresh();
+
+    // DSH keeps providerId null (the harness config group is not a pricing
+    // key); the real model id carries the identity, like claude/gpt prefixes.
+    const estimate = service.enrichContextUsageSnapshot(createSnapshot({
+      providerId: null,
+      providerName: 'deepseek-official',
+      modelId: 'deepseek-flash',
+      inputTokens: 1000000,
+      outputTokens: 1000000,
+      cacheReadTokens: 1000000,
+      cacheWriteTokens: 0,
+    }));
+
+    expect(estimate.costDetails).toMatchObject({
+      source: 'models-dev',
+      providerId: 'deepseek',
+      modelId: 'deepseek-flash',
+    });
+    // 1M input @1 + 1M output @4 + 1M cache-read @0.1 = 5.1
+    expect(estimate.totalCost).toBe(5.1);
+  });
+
   it('uses all reported token categories and keeps tiered price estimates explicitly approximate', async () => {
     const { service } = createService();
     await service.refresh();

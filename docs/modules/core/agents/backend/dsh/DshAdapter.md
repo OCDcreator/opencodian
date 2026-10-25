@@ -9,7 +9,8 @@
 - Chat、Sessions、Permissions、Thinking、Models、Context 为基础能力。原生模式还提供 AuxQuery、InlineCompletion、Questions、Fork、TurnSteering、Tools；断开时逻辑行内能力允许安全重连，但每次辅助构造必须证明只读。Images 由当前握手开放，原生再按所选模型确认 modality。
 - 模型/effort 来自原生 configOptions，opaque ID 原样保存和回传。发送前等待完整原生配置确认，失败不提交 prompt；会话选择只修改原生 agent selection，不覆盖全局默认。
 - MCP 声明整批校验后传入新建/恢复。原生模式可显式应用至全部空闲会话；单会话替换失败恢复旧声明。未实现通用 Mcp/OAuth 管理合同，不声明该通用 capability。
-- 用量只消费 native aggregate used/size。分类和费用缺失保持未知，`tokenBreakdownAvailable:false` 防止虚构零费用。最后已知占用快照跨断连/恢复保留：原生只在下一条助手消息刷新占用，恢复清零会把聊天占用显示错误地归零。
+- 原生模式授予 Compaction：`compactSession` 走原生 compaction seam（官方 `/compact` 同源），返回即表示摘要已提交；手动压缩失败（busy/changed/summary/commit/persistence，含"压不出更小摘要"）按 harness 消息抛错，运行回合拒绝。
+- 用量只消费 native aggregate used/size；真实回合后 meter 锚定模型上报 usage 时，`usage_update` 附带 input/output/cacheRead/cacheWrite 明细并置 `tokenBreakdownAvailable:true`，费用经 ModelPricingService 按 deepseek 模型 id 估算（快照 providerId 置 null——harness 配置组只是显示名，opaque 选择解码出真实模型 id）。分类缺失保持未知，`tokenBreakdownAvailable:false` 防止虚构零费用。最后已知占用快照跨断连/恢复保留：原生只在下一条助手消息刷新占用，恢复清零会把聊天占用显示错误地归零。
 
 ## 内容与历史
 

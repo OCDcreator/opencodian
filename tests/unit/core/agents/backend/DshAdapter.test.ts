@@ -459,4 +459,54 @@ describe('DshAdapter permission replies and metadata reads', () => {
     expect(await adapter.getSessionContextUsageSnapshot(sessionId)).toMatchObject({ totalTokens: 600 });
     await adapter.stop();
   });
+
+  it('projects the native usage breakdown only when the meter anchored on real usage', async () => {
+    const { adapter, clients } = adapterFixture();
+    const sessionId = await adapter.createSession();
+    const stream = collect(adapter.sendMessage({ sessionId, content: 'run' }));
+    await tick();
+    clients[0].emitUpdate(sessionId, { sessionUpdate: 'usage_update', used: 5739, size: 65536,
+      inputTokens: 361, outputTokens: 2, cacheReadTokens: 5376, cacheWriteTokens: 0 });
+    await tick();
+    expect(await adapter.getSessionContextUsageSnapshot(sessionId)).toMatchObject({
+      totalTokens: 5739, inputTokens: 361, outputTokens: 2,
+      cacheReadTokens: 5376, cacheWriteTokens: 0, tokenBreakdownAvailable: true,
+    });
+    clients[0].resolvePrompt(sessionId);
+    await stream;
+
+    // Without an anchor the aggregate stays honest: no fabricated breakdown.
+    const second = collect(adapter.sendMessage({ sessionId, content: 'again' }));
+    await tick();
+    clients[0].emitUpdate(sessionId, { sessionUpdate: 'usage_update', used: 700, size: 1000 });
+    await tick();
+    expect(await adapter.getSessionContextUsageSnapshot(sessionId)).toMatchObject({
+      totalTokens: 700, tokenBreakdownAvailable: false, cacheWriteTokens: null,
+    });
+    clients[0].resolvePrompt(sessionId);
+    await second;
+    await adapter.stop();
+  });
+
+  it('compacts a native session over the compaction seam and refuses busy or ACP transports', async () => {
+    const { adapter, clients } = adapterFixture();
+    const sessionId = await adapter.createSession();
+    const client = clients[0];
+    const nativeCalls: Array<{ method: string; params: unknown }> = [];
+    Object.assign(client, {
+      nativeRequest: async (method: string, params: Record<string, unknown>) => {
+        nativeCalls.push({ method, params });
+        return { shadowed: 3, shadowedTokens: 1200 };
+      },
+    });
+    await expect(adapter.compactSession(sessionId)).resolves.toBe(true);
+    expect(nativeCalls).toContainEqual({ method: 'session/compact', params: { sessionId } });
+
+    const stream = collect(adapter.sendMessage({ sessionId, content: 'run' }));
+    await tick();
+    await expect(adapter.compactSession(sessionId)).rejects.toThrow('idle session');
+    client.resolvePrompt(sessionId);
+    await stream;
+    await adapter.stop();
+  });
 });

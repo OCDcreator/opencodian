@@ -14,7 +14,7 @@
 1. backend 已上报 `totalCost` 时，保留该数值并标为 `backend-reported`。
 2. 对没有上报成本的 snapshot，优先用 `providerId + endpoint + modelId` 的精确用户覆盖。
 3. 精确覆盖缺失的 token 类别回退同一 `providerId + modelId` 的通用覆盖，再回退 models.dev。
-4. 没有手动 Provider 时，先从 `claude*` / `gpt*` 等模型 ID 推断；仍未知时只接受 models.dev 中唯一的 model-ID 匹配。多 provider 同名模型保持不可用，不猜价格。
+4. 没有手动 Provider 时，先从 `claude*` / `gpt*` / `deepseek*` 模型 ID 前缀推断（DSH 的 harness 配置组只是显示名，快照 `providerId` 为 null、真实模型 id 从 opaque 选择解码）；仍未知时只接受 models.dev 中唯一的 model-ID 匹配。多 provider 同名模型保持不可用，不猜价格。
 5. 没有匹配价格或计费类别不足时，成本保持 `null` 或标为 `partial`，绝不伪造免费成本。
 
 `models.dev` 是模型目录，不是供应商账单 API。因此 Claude Code 与 Codex 的结果都必须在 UI 中称为“本地 API 等价估算”，不能称作订阅费用。

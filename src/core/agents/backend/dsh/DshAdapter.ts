@@ -136,7 +136,7 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
       // construction still requires the native runtime proof before a query.
       ...(handshake?.nativeProtocol === 'opencodian.dsh-native/1' || handshake === null && this.options.getSettings().transport !== 'acp'
         ? [AgentCapability.AuxQuery, AgentCapability.InlineCompletion, AgentCapability.Questions,
-          AgentCapability.Fork, AgentCapability.TurnSteering, AgentCapability.Tools] : []),
+          AgentCapability.Fork, AgentCapability.TurnSteering, AgentCapability.Tools, AgentCapability.Compaction] : []),
     ]));
     for (const handler of this.capabilityHandlers) handler(this.capabilitiesValue);
   }
@@ -320,6 +320,21 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
 
   async deleteSession(_sessionId: string): Promise<void> {
     throw new Error('DSH ACP does not support deleting persisted sessions');
+  }
+
+  /**
+   * Manual compaction over the native compaction seam (the same one /compact
+   * rides). Returns true when the compaction ran — including the "no
+   * compactable history yet" no-op; manual-compaction failures (busy, changed
+   * history, summary, commit, persistence) throw with the harness message.
+   */
+  async compactSession(sessionId: string): Promise<boolean> {
+    const client = await this.ready();
+    if (!client.nativeRequest) throw new Error('DSH compaction requires the native transport');
+    await this.ensureSessionActive(client, sessionId);
+    if (this.turns.has(sessionId)) throw new Error('DSH compaction requires an idle session');
+    await client.nativeRequest('session/compact', { sessionId }, 180_000);
+    return true;
   }
 
   async getSession(sessionId: string): Promise<DshJsonObject | null> {
@@ -880,13 +895,24 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
     const previous = this.contextUsage.get(sessionId);
     const model = this.turns.get(sessionId)?.selection ?? null;
     const now = Date.now();
+    // The native meter only reports a breakdown once a real turn anchored the
+    // measurement on the model's reported usage; until then totals stay opaque.
+    const breakdownAvailable = typeof update.inputTokens === 'number' && typeof update.outputTokens === 'number';
+    const inputTokens = breakdownAvailable ? update.inputTokens as number : 0;
+    const outputTokens = breakdownAvailable ? update.outputTokens as number : 0;
+    const cacheReadTokens = typeof update.cacheReadTokens === 'number' ? update.cacheReadTokens as number : 0;
+    const cacheWriteTokens = typeof update.cacheWriteTokens === 'number' ? update.cacheWriteTokens as number : null;
     const snapshot: ContextUsageSnapshot = {
       sessionId, sessionTitle: '', createdAt: previous?.createdAt ?? now, updatedAt: now,
-      providerId: model?.provider ?? null, providerName: model?.provider ?? null,
-      modelId: model?.model ?? null, modelName: null,
+      // The harness config group (e.g. deepseek-official) is a display label,
+      // not a pricing-catalog provider; pricing resolves from the real model
+      // id decoded out of the opaque selection.
+      providerId: null, providerName: model?.provider ?? null,
+      modelId: decodeDshOpaqueModel(model?.model) ?? model?.model ?? null,
+      modelName: null,
       contextWindow: update.size, totalTokens: update.used,
-      inputTokens: 0, outputTokens: 0, reasoningTokens: 0, cacheReadTokens: 0,
-      cacheWriteTokens: null, totalCost: null, tokenBreakdownAvailable: false,
+      inputTokens, outputTokens, reasoningTokens: 0, cacheReadTokens, cacheWriteTokens,
+      totalCost: null, tokenBreakdownAvailable: breakdownAvailable,
     };
     this.contextUsage.set(sessionId, snapshot);
     return snapshot;
@@ -964,6 +990,17 @@ function toEpochMillis(value: unknown): number | null {
     if (!Number.isNaN(parsed)) return parsed;
   }
   return null;
+}
+
+/** Native model selections are opaque JSON arrays ["provider","model-id"]. */
+function decodeDshOpaqueModel(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.startsWith('[')) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) && typeof parsed[1] === 'string' && parsed[1] ? parsed[1] : null;
+  } catch {
+    return null;
+  }
 }
 
 function contentText(value: unknown): string {

@@ -42,6 +42,16 @@ codex（gpt-6-astra / ultra / 实机模式）验证揭露了此前"环境性失�
 
 验证证据：`.scratch/astra-verify-20261025/`（ACP 探针 2/2、native 凭据补种前后对照、独立边界反例测试、凭据复制清单不含内容）。
 
+## 第四轮：能力面实测与 Compaction/费用接入（同日深夜）
+
+回应"是否必须走 ACP"：默认通道本就不是 ACP——原生扩展骑在完整 SDK composition 上，`ctx.get()` 能拿到的服务远多于官方 ACP profile。一次性探针扩展（/tmp，凭据补种）在真实 rc.3 进程内实测：compaction/jobs/subagents/planMode/fs/web/tokenMeter/commands/sessionTitle 全部挂载可用，`/compact`、`/plan` 就在命令目录；todo/goal/workflow/skill/schedule/messageFeedback/authorization/credentials 未挂载，会话删除仍无持久 API（全 SDK 仅内存 Map 清理）——"上游受限"清单据此修正。
+
+已实施（均经真实模型回合验证）：
+
+- **上下文压缩（Compaction）**：service.mjs `session/compact` 直调原生 compaction seam（官方 `/compact` 同源 `compactNow`）；`DshAdapter.compactSession` + 原生模式能力位；view 压缩入口（availability/compactForegroundThread）与 `/compact` 斜杠（host factory `getDshAdapter` 分支）接线。真实验证：三轮长文会话（12,284 tokens）压缩影子化 16 条 / 6,266 tokens，下一回合占用降至 6,946；过小会话被 harness 诚实拒绝（"压不出更小摘要"，官方同语义）。
+- **token 分类与费用估算**：真实回合后 meter 锚定模型上报 usage，`usage_update` 附带 input/output/cacheRead/cacheWrite（实测 input 388 / output 2,421 / cacheRead 5,376）；快照 `tokenBreakdownAvailable:true`，`providerId` 置 null（harness 配置组是显示名）、真实模型 id 从 opaque 选择解码；`inferProviderId` 增加 `deepseek*` 前缀分支（与 claude/gpt 同构），models.dev 估算链路打通。
+- 服务面探针同时确认 **jobs/subagents/planMode 可用但本轮未接**（jobs 面板消费接口为 zcode 专用形状，接入待立项；planMode/`/plan` 命令用户已可用原生斜杠）。
+
 ## 评估后保持现状的项（非缺陷）
 
 - **ACP 兼容模式 tools/commands 返回空数组**：这是 ACP 斜杠发送降级路径的一部分——抛错会打断把斜杠当普通 prompt 发送的回退。与 title/fork/aux 的 native-only 显式报错不同风格是有意的：前者是可用性降级，后者是能力缺失。

@@ -21,6 +21,7 @@
 - ACP 能力面调研（`docs/status/dsh-acp-capability-research-2026-10-25.md`）：装机 DSH ACP profile 实测只声明 close/list/resume + configOptions + mcp http；ACP v1 规范其余能力（斜杠命令目录、会话模式、Agent Plan、fs/terminal、session/delete、elicitation）上游均未实现，fork/compaction/usage/subagents 尚在 RFD 草案——原生扩展实现的就是这些草案能力，ACP 模式定位为兼容底线、能力扩张靠上游或原生通道；探针同时定位了 native 探针环境失败的根因（隔离 DSH_HOME 拿不到凭据服务的 API key）。
 - codex 独立复审（gpt-6-astra / effort=ultra / 只读）：1 P1 + 5 P2，全部核实修复——stderr 脱敏遗漏（大小写 bearer/短头 JWT/截断残端）、权限卡 always 无会话记忆（现与 session 同入客户端 tracker）、always 选项优先级按数组顺序失效（改两段偏好查找）、启动失败异常不携带诊断尾部、ISO 时间未转毫秒导致详情/目录时间为 null、迟到 stderr 缺子进程身份隔离；补反向排列/记忆行为/脱敏反例/时间跨路由/ACP 能力门控测试后全量门禁复验。
 - Astra 实机验证（第三轮）：装机实为 0.2.1-rc.3，真实凭据在 `~/.dsh/.credentials.yaml`；凭据存在时 harness 进程内 `[llm-deepseek]` 日志写 stdout 打断 JSON-RPC 流（生产必中）——service.mjs 建立通道隔离（进程内日志改道 stderr、传输独占 stdout）；live 探针新增 `DSH_NATIVE_LIVE_CREDENTIALS` 凭据补种门禁，native 三探针在真实 rc.3+凭据环境 3/3 通过，此前"环境性失败"闭合。复审反例再修两处：残端规则排除 `/`（路径开头诊断不再误脱敏）、JWT 锚定 eyJ（点分标识符可读）；权限卡记忆写入移至应答成功之后。
+- 第四轮（能力面实测 + 压缩/费用接入）：进程内服务探针推翻"上游受限"判断——compaction/jobs/subagents/planMode/fs/web 均挂载可用；接入 Compaction（service.mjs `session/compact` → `DshAdapter.compactSession` → view/`/compact` 斜杠入口，真实验证影子化 16 条/6,266 tokens、占用 12.3k→6.9k）与 token 分类费用（usage_update 带 input/output/cache 明细、providerId 置 null 解码真实模型 id、`deepseek*` 前缀计价推断）；会话删除确认无持久 API，jobs/planMode 记录为可接待立项。
 
 ## 2026-10-24 DSH 原生通道、图片与行内查询（未发布）
 

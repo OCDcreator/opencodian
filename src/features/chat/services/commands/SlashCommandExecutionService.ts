@@ -95,6 +95,9 @@ export interface SlashCommandExecutionHostDependencies {
     revertSession(sessionId: string, messageID: string): Promise<boolean>;
     unrevertSession(sessionId: string): Promise<boolean>;
   } | null;
+  getDshAdapter?: () => {
+    compactSession(sessionId: string): Promise<boolean>;
+  } | null;
   openCodeService: {
     runSessionCommand(sessionId: string, input: SessionCommandInput): Promise<unknown>;
     revertSession(sessionId: string, messageID: string, partID?: string): Promise<boolean>;
@@ -427,7 +430,7 @@ export class SlashCommandExecutionService {
     const conversation = await this.prepareExecutionContext();
     const backend = conversation?.backend ?? 'opencode';
     const sessionId = conversation ? getConversationBackendSessionId(conversation) : undefined;
-    if (!sessionId || (backend !== 'opencode' && backend !== 'opencode2')) { new Notice(t('slashCommand.compact.noSession')); return true; }
+    if (!sessionId || (backend !== 'opencode' && backend !== 'opencode2' && backend !== 'dsh')) { new Notice(t('slashCommand.compact.noSession')); return true; }
     await this.host.runCompactSession(sessionId);
     return true;
   }
