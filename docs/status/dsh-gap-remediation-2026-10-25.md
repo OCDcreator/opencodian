@@ -30,6 +30,18 @@ codex（`gpt-6-astra`，effort=ultra，只读）对 27322547b..d476bb70 做了�
 
 审查同时确认通过：patterns/permission 字段修正、contextUsage 保留（新会话 randomUUID 无 ID 复用路径）、getSession 分页语义、超时重挂无竞态（同步 pending 表操作）、Questions 路由（ACP 禁用时抛错属预期门控，已补测试）、iso() 回退链。
 
+## 实机验证与第三轮修复（同日晚，Astra 独立验证触发）
+
+codex（gpt-6-astra / ultra / 实机模式）验证揭露了此前"环境性失败"的真相并触发一项生产级修复：
+
+- **装机版本实为 0.2.1-rc.3**（此前记录的 rc.2 已被用户更新）；`~/.dsh/llm-deepseek/files-v3.json` 是附件上传索引（214 条 records），**真实凭据在 `~/.dsh/.credentials.yaml`**。
+- **生产级缺陷（已修复）**：凭据存在时 provider 加载并在进程内把 `[llm-deepseek] ...` 日志写到 stdout，污染 JSON-RPC 帧流——`DshAcpClient` 按行解析遇到非 JSON 行即判协议失败杀连接。用户真实环境正是 rc.3+凭据，Test Vault 实跑必中。修复：`service.mjs` 建立通道隔离——`process.stdout.write` 整体改道 stderr（进程内日志保留诊断价值），JSON-RPC 传输独占经原始 fd 的专用 Writable。
+- **凭据补种门禁**：`DshNative.live.test.ts` 新增 `DSH_NATIVE_LIVE_CREDENTIALS=<真实 ~/.dsh>` 可选补种（复制 `.credentials.yaml` + llm store 进隔离根）。补种后 native 三探针在本机 **3/3 通过**（含真实模型/工具/命令目录、stdio/HTTP MCP、反向问题），此前记录的"环境性失败"就此闭合。
+- 复审第二轮静态反例的再修复：stderr 残端规则去掉 `/`（以路径开头的诊断不再被误脱敏为 `[redacted]`）；JWT 规则锚定 `eyJ`（JOSE 头 base64 形态），点分标识符（如 BUILD_ID、`DshNativeClient.startInternal.launch`）保持可读；权限卡 `always`/`session` 的记忆写入移到后端应答成功之后（应答失败不留过期批准）。补路径保留、点分保留、失败不记忆三条断言。
+- 已知既有语义（验证复现，非本轮引入，不改动）：session approval 按 tool+action+patterns 匹配，同工具不同输入共享 always 记忆（opencode/zcode 一直如此，渲染器注释已载明）。
+
+验证证据：`.scratch/astra-verify-20261025/`（ACP 探针 2/2、native 凭据补种前后对照、独立边界反例测试、凭据复制清单不含内容）。
+
 ## 评估后保持现状的项（非缺陷）
 
 - **ACP 兼容模式 tools/commands 返回空数组**：这是 ACP 斜杠发送降级路径的一部分——抛错会打断把斜杠当普通 prompt 发送的回退。与 title/fork/aux 的 native-only 显式报错不同风格是有意的：前者是可用性降级，后者是能力缺失。
@@ -47,3 +59,4 @@ codex（`gpt-6-astra`，effort=ultra，只读）对 27322547b..d476bb70 做了�
 - `npm run verify` 全部 15 项门禁 PASS（change scope、owner manifest/boundaries、依赖方向/循环/审批、module docs、graphify freshness、devlog order、lint 零告警、typecheck、全量测试、生产构建、生成 CSS）。全量测试 1002 套件 / 10738 项通过（基线 10728 + 新增 10），5 项真实协议套件默认跳过另行执行。
 - 真实协议探针：`DshAdapter.live.test.ts` 2 项通过（自有 stdio MCP 服务器挂载/退出、隔离会话创建/列表/关闭/恢复，均经本轮修改的传输层子进程）。`DshNative.live.test.ts` 3 项在当前本机环境失败：隔离 HOME 下 Harness `initialize` 报 `Harness has no available model provider`；**同一失败复现于未修改的 checkpoint 基线（zcode/dsh-native-integration @27322547b）**，属环境/上游变化（用户侧 provider 目录在隔离 DSH_HOME 下不可见），与本轮代码无关。原生运行时行为（超时重置、stderr 尾部、session/list 时间戳）因此只有单测级验证，待环境恢复后须重跑 native 探针与真实回合冒烟。
 - 最终构建 BUILD_ID：`zcode-dsh-gap-remediation.202610251422`（插件版本保持 `2.0.2`）。
+- 更新（第三轮后）：上述"待环境恢复重跑 native 探针"已闭合——`DSH_NATIVE_LIVE_CREDENTIALS` 补种 + stdout 通道隔离修复后，native 三探针在装机 rc.3 上 3/3 通过；最终构建 BUILD_ID 见部署记录。

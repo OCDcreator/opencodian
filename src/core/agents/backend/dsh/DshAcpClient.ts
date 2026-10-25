@@ -610,10 +610,12 @@ function redactSecrets(text: string): string {
     // The Bearer scheme is case-insensitive (RFC 7235); redact its credential.
     .replace(/\b(bearer\s+)[^\s'",;]{8,}/gi, '$1[redacted]')
     // Provider-style keys, plus a leading orphan run created when the ring
-    // buffer truncated a key and dropped its "sk-" prefix mid-stream.
+    // buffer truncated a key and dropped its "sk-" prefix mid-stream. The
+    // class excludes "/" so a leading path stays a readable diagnostic.
     .replace(/\bsk-[A-Za-z0-9_-]{8,}/g, '[redacted]')
-    .replace(/^[A-Za-z0-9_+/=-]{24,}(?=[\s]|$)/, '[redacted]')
-    // JWTs: three base64url segments; a real JOSE header is short, so the
-    // first segment cannot carry a {24,} gate.
-    .replace(/\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\b/g, '[redacted]');
+    .replace(/^[A-Za-z0-9_+=-]{24,}(?=[^A-Za-z0-9_+=-]|$)/, '[redacted]')
+    // JWTs: a JOSE header is base64url of a JSON object, so real JWTs start
+    // with the base64 of `{"` ("eyJ"); anchoring there keeps dotted
+    // identifiers (versions, paths, BUILD_IDs) readable in diagnostics.
+    .replace(/\beyJ[A-Za-z0-9_-]{7,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\b/g, '[redacted]');
 }

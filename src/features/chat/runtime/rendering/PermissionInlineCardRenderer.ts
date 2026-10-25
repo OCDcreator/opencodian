@@ -46,12 +46,6 @@ export class PermissionInlineCardRenderer {
     }
 
     if (result === 'session' || result === 'always') {
-      this.sessionPermissionTracker.addSessionApproval(
-        request.sessionID,
-        request.permission,
-        action,
-        request.patterns,
-      );
       // NOTE: The OpenCode SDK does not have a 'session' permission level.
       // We send 'always' to the server but track it client-side so it only
       // auto-approves matching requests within the current plugin session.
@@ -59,8 +53,16 @@ export class PermissionInlineCardRenderer {
       // the user may see auto-approvals in future sessions for matching patterns.
       // 'always' is remembered too: backends whose runtime only offers
       // allow-once options (e.g. DSH) would otherwise re-prompt identical
-      // requests for the rest of the session.
+      // requests for the rest of the session. The record is written only
+      // after the backend accepted the reply, so a failed response does not
+      // leave a stale approval behind.
       await respond(request.id, 'always');
+      this.sessionPermissionTracker.addSessionApproval(
+        request.sessionID,
+        request.permission,
+        action,
+        request.patterns,
+      );
       return true;
     }
 

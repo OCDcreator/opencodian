@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module';
+import { Writable } from 'node:stream';
 import { pathToFileURL } from 'node:url';
 import { randomUUID, createHash } from 'node:crypto';
 import { createAuxiliaryRuntime } from './auxiliary.mjs';
@@ -18,7 +19,14 @@ export async function apply(ctx, config) {
   const { UserQuestionError } = await load('@deepseek-ai/dsh-user-questions');
   const { admitEncodedImages } = await load('@deepseek-ai/dsh-attachment');
   const McpClient = await load('@deepseek-ai/dsh-mcp-client');
-  const transport = new JsonRpcLineTransport(process.stdin, process.stdout);
+  // The JSON-RPC channel owns stdout; any in-process console logging from the
+  // host (e.g. `[llm-deepseek] ...` once credentials make providers load) is
+  // rerouted to stderr, because the line framing would otherwise reject it as
+  // malformed JSON and tear down the connection.
+  const channelWrite = process.stdout.write.bind(process.stdout);
+  process.stdout.write = (chunk, encoding, callback) => process.stderr.write(chunk, encoding, callback);
+  const channelStdout = new Writable({ write(chunk, encoding, callback) { channelWrite(chunk, encoding, callback); } });
+  const transport = new JsonRpcLineTransport(process.stdin, channelStdout);
   const sessions = new Map();
   const auxiliary = new Map();
   // Last streamed event time per session id; survives across opened sessions

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,6 +8,23 @@ import { DshAdapter } from '../../../../../src/core/agents/backend/dsh/DshAdapte
 import type { DshBackendSettings } from '../../../../../src/core/types/settings';
 
 const live = process.env.RUN_DSH_NATIVE_LIVE === '1' ? describe : describe.skip;
+
+/**
+ * Isolated roots start credential-free, which providers treat as "no available
+ * model provider". Pointing DSH_NATIVE_LIVE_CREDENTIALS at a real ~/.dsh (the
+ * owner's machine) copies `.credentials.yaml` and the llm store into the root
+ * so the probes exercise the credential-present path a real vault runs.
+ */
+function seedCredentials(root: string): void {
+  const sourceDir = process.env.DSH_NATIVE_LIVE_CREDENTIALS;
+  if (!sourceDir) return;
+  const credentials = path.join(sourceDir, '.credentials.yaml');
+  const llmStore = path.join(sourceDir, 'llm-deepseek');
+  if (!existsSync(credentials)) throw new Error(`DSH_NATIVE_LIVE_CREDENTIALS has no .credentials.yaml: ${sourceDir}`);
+  mkdirSync(path.join(root, '.dsh'), { recursive: true });
+  copyFileSync(credentials, path.join(root, '.dsh', '.credentials.yaml'));
+  if (existsSync(llmStore)) cpSync(llmStore, path.join(root, '.dsh', 'llm-deepseek'), { recursive: true });
+}
 
 live('installed Harness native protocol (zero model requests)', () => {
   beforeAll(() => {
@@ -19,6 +36,7 @@ live('installed Harness native protocol (zero model requests)', () => {
 
   function fixture(args: string[] = []) {
     const root = mkdtempSync(path.join(os.tmpdir(), 'opencodian-dsh-native-test-'));
+    seedCredentials(root);
     const current: DshBackendSettings = { executablePath: '', workingDirectory: root, args, env: {}, profile: 'acp', transport: 'native', mcpServers: [] };
     const adapter = new DshAdapter({ workingDirectory: root, getSettings: () => current,
       getExtraEnv: () => ({ HOME: root, DSH_HOME: path.join(root, '.dsh'), XDG_CONFIG_HOME: path.join(root, '.config'), XDG_DATA_HOME: path.join(root, '.local/share') }) });

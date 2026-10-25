@@ -79,4 +79,21 @@ describe('permission card session memory', () => {
     await repeat;
     expect(respond).toHaveBeenCalledWith('p4', 'reject');
   });
+
+  it('does not memorize an approval whose backend reply failed', async () => {
+    const { renderer, cards } = rendererWithCardLog();
+    const failing = jest.fn(async () => { throw new Error('native reply failed'); });
+    const failedTurn = renderer.collectAndRespond(request('p1'), null, failing as unknown as (id: string, reply: PermissionReply) => Promise<void>);
+    await clickAction('always');
+    await expect(failedTurn).rejects.toThrow('native reply failed');
+
+    // The approval was never accepted, so the identical next request prompts again.
+    const respond = jest.fn(async () => {});
+    const retry = renderer.collectAndRespond(request('p2'), null, respond as unknown as (id: string, reply: PermissionReply) => Promise<void>);
+    await clickAction('reject');
+    await retry;
+    expect(cards).toHaveLength(2);
+    expect(respond).toHaveBeenCalledWith('p2', 'reject');
+    expect(respond).not.toHaveBeenCalledWith('p2', 'always');
+  });
 });

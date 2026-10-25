@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "fde7e58f96bc5239c5a682ca579a51479e9dd34b969101580a16f9be634fcaec",
+  "digest": "b008266b1ec439366792a52f0e74141e3aa4ddcb6cdee6de282b0952e94d447b",
   "recordCount": 803,
   "records": [
     {
@@ -446,7 +446,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/dsh/DshAcpClient.ts",
-      "sha256": "684de96ec3b2de5aa41cbdb2ab319b7d2190e7b8de644042659082a9635034ca"
+      "sha256": "18f000c2a0b7f9a1e67b71727a8b93f8ec5d50256f82af087b07de5557abe267"
     },
     {
       "kind": "src",
@@ -1601,7 +1601,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/rendering/PermissionInlineCardRenderer.ts",
-      "sha256": "066e6fba0750a1f4e8cfc7be5e1ee35b2650929e36a1b9ee8786678220321f3b"
+      "sha256": "fe74e5853fac9db7c3cdc10d18d1a93fe896495541a92b9df4a0f70ae8897453"
     },
     {
       "kind": "src",
@@ -4019,7 +4019,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-25T09:48:16.067Z",
-  "headShaAtGeneration": "d476bb70e781a1088747b1c62142fede97d61d3d",
+  "generatedAt": "2026-10-25T11:48:36.818Z",
+  "headShaAtGeneration": "c3c5069352696895167ad050e4c5661b0d40de33",
   "graphifyVersion": "graphify 0.9.36"
 }

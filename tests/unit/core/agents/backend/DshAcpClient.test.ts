@@ -429,8 +429,10 @@ describe('DSH ACP prompt liveness and stderr diagnostics', () => {
       launch: {
         command: process.execPath,
         args: ['-e', [
+          'process.stderr.write("/Users/dht/Projects/DeepSeekHarness/runtime failed to start\\n");',
           'process.stderr.write("auth failed: bearer synthetic_access_token_123456\\n");',
           `process.stderr.write("token ${jwt}\\n");`,
+          'process.stderr.write("build zcode-dsh-gap-remediation.202610251749 done\\n");',
           'process.exit(4);',
         ].join('')],
         env: {},
@@ -447,6 +449,10 @@ describe('DSH ACP prompt liveness and stderr diagnostics', () => {
     const callbackMessage = failures.map((error) => error.message).join('\n');
     expect(callbackMessage).not.toContain('synthetic_access_token');
     expect(callbackMessage).not.toContain(jwt);
+    // Dotted identifiers (versions, BUILD_IDs) must stay readable diagnostics.
+    expect(rejection).toContain('zcode-dsh-gap-remediation.202610251749');
+    // A leading path is a common benign diagnostic, not a truncated key.
+    expect(rejection).toContain('/Users/dht/Projects/DeepSeekHarness/runtime failed to start');
     expect(client.recentStderr).toContain('[redacted]');
   });
 });
