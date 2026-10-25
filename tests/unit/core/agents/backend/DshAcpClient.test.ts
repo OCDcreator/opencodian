@@ -241,18 +241,42 @@ describe('DshAcpClient transport', () => {
   it('contains stdin EPIPE while the child remains alive', async () => {
     const spawn = jest.spyOn(childProcess, 'spawn');
     const protocolErrors: Error[] = [];
-    const client = clientFor('() => {}', {
+    // A dedicated script that logs on stderr at startup (the shared fixture
+    // only invokes its handler for non-initialize messages).
+    const script = `
+process.stdin.setEncoding('utf8');
+process.stderr.write('dsh flush failed\\n');
+process.stdin.on('data', (chunk) => {
+  for (const line of chunk.split('\\n')) {
+    if (!line.trim()) continue;
+    const message = JSON.parse(line);
+    if (message.method === 'initialize') {
+      process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: ${JSON.stringify(HANDSHAKE)} }) + '\\n');
+    }
+  }
+});
+`;
+    const client = new DshAcpClient({
+      cwd: process.cwd(),
+      launch: { command: process.execPath, args: ['-e', script], env: {} },
+      requestTimeoutMs: 250,
       onProtocolError: (error) => protocolErrors.push(error),
     });
     try {
       await client.start();
       const child = spawn.mock.results[0].value as ChildProcessWithoutNullStreams;
       expect(child.exitCode).toBeNull();
+      for (let attempt = 0; attempt < 50 && !client.recentStderr; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
       const pending = client.listSessions();
       // Exercise the real stdin error listener without OS-specific fd0 close semantics.
       child.stdin.emit('error', Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }));
       await expect(pending).rejects.toThrow(/EPIPE|stdin|transport/i);
+      // The stderr-tail wrap mutates the message in place, so code survives
+      // alongside the diagnostic suffix.
       expect(protocolErrors).toEqual([expect.objectContaining({ code: 'EPIPE' })]);
+      expect(protocolErrors[0].message).toContain('DSH stderr tail');
       expect(client.isStarted).toBe(false);
     } finally {
       await client.stop();

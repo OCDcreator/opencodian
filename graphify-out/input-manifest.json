@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "b008266b1ec439366792a52f0e74141e3aa4ddcb6cdee6de282b0952e94d447b",
+  "digest": "dcb13b7d08d3fcf87c5598e19d58b7519e9486809e81a7bd2ce131e993f3cc0f",
   "recordCount": 803,
   "records": [
     {
@@ -446,7 +446,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/dsh/DshAcpClient.ts",
-      "sha256": "18f000c2a0b7f9a1e67b71727a8b93f8ec5d50256f82af087b07de5557abe267"
+      "sha256": "7895b785555503e181bb44f25ebd7a93dd0f7b1f6582ad950dc81cdfe0b8539e"
     },
     {
       "kind": "src",
@@ -4019,7 +4019,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-25T11:48:36.818Z",
-  "headShaAtGeneration": "c3c5069352696895167ad050e4c5661b0d40de33",
+  "generatedAt": "2026-10-25T12:20:01.778Z",
+  "headShaAtGeneration": "cef55756b71315c9b185722ea930feed7bf37106",
   "graphifyVersion": "graphify 0.9.36"
 }

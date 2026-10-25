@@ -523,10 +523,10 @@ export class DshAcpClient {
   private withStderrTail(error: Error): Error {
     const tail = redactSecrets(this.stderrTail.trim());
     if (!tail) return error;
-    const excerpt = tail.slice(-STDERR_TAIL_EXCERPT_BYTES);
-    const suffixed = new Error(`${error.message}\nDSH stderr tail:\n${excerpt}`);
-    suffixed.stack = error.stack;
-    return suffixed;
+    // Mutate in place so code/cause and the concrete error class survive;
+    // tests assert EPIPE codes through this same wrapping path.
+    error.message = `${error.message}\nDSH stderr tail:\n${tail.slice(-STDERR_TAIL_EXCERPT_BYTES)}`;
+    return error;
   }
 
   private async stopChild(child: ChildProcessWithoutNullStreams): Promise<void> {

@@ -37,8 +37,8 @@ codex（gpt-6-astra / ultra / 实机模式）验证揭露了此前"环境性失�
 - **装机版本实为 0.2.1-rc.3**（此前记录的 rc.2 已被用户更新）；`~/.dsh/llm-deepseek/files-v3.json` 是附件上传索引（214 条 records），**真实凭据在 `~/.dsh/.credentials.yaml`**。
 - **生产级缺陷（已修复）**：凭据存在时 provider 加载并在进程内把 `[llm-deepseek] ...` 日志写到 stdout，污染 JSON-RPC 帧流——`DshAcpClient` 按行解析遇到非 JSON 行即判协议失败杀连接。用户真实环境正是 rc.3+凭据，Test Vault 实跑必中。修复：`service.mjs` 建立通道隔离——`process.stdout.write` 整体改道 stderr（进程内日志保留诊断价值），JSON-RPC 传输独占经原始 fd 的专用 Writable。
 - **凭据补种门禁**：`DshNative.live.test.ts` 新增 `DSH_NATIVE_LIVE_CREDENTIALS=<真实 ~/.dsh>` 可选补种（复制 `.credentials.yaml` + llm store 进隔离根）。补种后 native 三探针在本机 **3/3 通过**（含真实模型/工具/命令目录、stdio/HTTP MCP、反向问题），此前记录的"环境性失败"就此闭合。
-- 复审第二轮静态反例的再修复：stderr 残端规则去掉 `/`（以路径开头的诊断不再被误脱敏为 `[redacted]`）；JWT 规则锚定 `eyJ`（JOSE 头 base64 形态），点分标识符（如 BUILD_ID、`DshNativeClient.startInternal.launch`）保持可读；权限卡 `always`/`session` 的记忆写入移到后端应答成功之后（应答失败不留过期批准）。补路径保留、点分保留、失败不记忆三条断言。
-- 已知既有语义（验证复现，非本轮引入，不改动）：session approval 按 tool+action+patterns 匹配，同工具不同输入共享 always 记忆（opencode/zcode 一直如此，渲染器注释已载明）。
+- 复审第二轮静态反例的再修复：stderr 残端规则去掉 `/`（以路径开头的诊断不再被误脱敏为 `[redacted]`）；JWT 规则锚定 `eyJ`（JOSE 头 base64 形态），点分标识符（如 BUILD_ID、`DshNativeClient.startInternal.launch`）保持可读；权限卡 `always`/`session` 的记忆写入移到后端应答成功之后（应答失败不留过期批准）；`withStderrTail` 改为原地附加 message（保留错误对象的 code/cause/具体类型，EPIPE 断言带 stderr 尾部一并覆盖）。补路径保留、点分保留、失败不记忆、EPIPE code 四条断言。
+- 已知既有语义（验证复现，非本轮引入，不改动）：session approval 按 tool+action+patterns 匹配，同工具不同输入共享 always 记忆（opencode/zcode 一直如此，渲染器注释已载明）。Astra 验证特别指出 zcode 的原生 offered response 可能是窄范围规则，渲染器层 always 记忆是会话内工具级——与 opencode 服务端"始终允许=整工具持久"的既有行为对齐，方向一致但宽于个别原生窄规则；作为产品语义接受并在此记录。
 
 验证证据：`.scratch/astra-verify-20261025/`（ACP 探针 2/2、native 凭据补种前后对照、独立边界反例测试、凭据复制清单不含内容）。
 
