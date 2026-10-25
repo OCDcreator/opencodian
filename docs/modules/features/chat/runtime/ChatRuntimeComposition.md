@@ -19,7 +19,6 @@ The slash execution host receives a narrow `refreshSessionChangeSidebar` callbac
 
 ## 概述
 
-- slash host 依赖新增 `getDshAdapter`（2026-10-25）：`/compact` 对 dsh 会话直达 `DshAdapter.compactSession`（原生 compaction seam），与 opencode2 的 `getOpenCode2Adapter` 同构。
 
 R-C4：`ComposerContextViewFacade.create` 传入 `loadPdfEngine`（懒加载引擎端口）；`VaultRetrievalComposerCoordinator` 增加 `pdfRetrieval: host.plugin.pdfIndexService`——`pdfIndexEnabled` 开启时 PDF 命中片段与笔记片段走同一托管 chips 流。插件结构类型相应声明 `pdfEngineLoader` / `pdfIndexService` 窄化端口。
 

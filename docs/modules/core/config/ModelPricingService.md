@@ -56,7 +56,9 @@ backend token snapshot + modelPricingOverrides
 
 ## 注意事项
 
-- provider/model ID 比较会 trim 并转小写；常见 `claude*` 与 `gpt*/o*/o4*` model 可分别推断 Anthropic/OpenAI provider。无 provider 的其它模型只会自动采用 models.dev 中唯一的同 model ID 条目。
+- provider/model ID 比较会 trim 并转小写；常见 `claude*`、`gpt*/o*/o4*`、`deepseek*` model 可分别推断 Anthropic/OpenAI/DeepSeek provider。无 provider 的其它模型只会自动采用 models.dev 中唯一的同 model ID 条目。
+- 前缀推断只定 provider，取价仍需 modelId 在目录中精确命中（`deepseek-coder-custom` 不会套用 `deepseek-flash` 单价）；同名模型经第三方网关转售时推断出的原厂价只是估算，不是实际账单。
+- 文件已超 500 行，顶部带 `max-lines` 豁免头；再加价格源或推断规则时优先拆分而非继续堆叠。
 - Base URL 只构成计费身份，永不参与 Claude Code 或 Codex 的连接配置；端点精确覆盖的空费率字段会逐类回退 Provider 通用覆盖与 models.dev。
 - 覆盖只影响之后计算的本地估算；已持久化的历史 snapshot 会保留当时的来源与费率说明，目录刷新不会改写历史金额。
 - OpenCode 自身 `opencode.json` 的 `cost` 与它上报的 session cost 仍优先；插件本地表只补足未上报成本的情况。
@@ -65,4 +67,4 @@ backend token snapshot + modelPricingOverrides
 
 ## 2026-10-24 聚合占用不作为账单
 
-`tokenBreakdownAvailable:false` 的快照仍可展示后端明确报告的费用，但不得进入本地按分类 token 估价。DSH 只报告 used/size，缺少分类不能变成各分类为零后算出的免费账单。
+`tokenBreakdownAvailable:false` 的快照仍可展示后端明确报告的费用，但不得进入本地按分类 token 估价。DSH 原生在 meter 锚定前只报告 used/size（真实会话的前几轮即如此），缺少分类不能变成各分类为零后算出的免费账单；锚定后 `usage_update` 带 input/output/cacheRead/cacheWrite 四项并置 `tokenBreakdownAvailable:true`，才按 deepseek 模型 id 估价（2026-10-25 实测第三轮起具备明细，cacheWrite 可为 null，不能假定四类费用始终已知）。

@@ -41,12 +41,6 @@ export function createSlashCommandExecutionHost(
     if (!adapter) throw new Error('OpenCode 2 adapter unavailable');
     return adapter;
   };
-  const isDsh = () => deps.getCurrentConversation()?.backend === 'dsh';
-  const dsh = () => {
-    const adapter = deps.getDshAdapter?.();
-    if (!adapter) throw new Error('DSH adapter unavailable');
-    return adapter;
-  };
   return {
     ensureConversationReady: async () => {
       if (!deps.getCurrentConversation()) await deps.createNewConversation();
@@ -86,9 +80,7 @@ export function createSlashCommandExecutionHost(
       : deps.openCodeService.runSessionCommand(sessionId, input),
     runCompactSession: (sessionId) => isOpenCode2()
       ? openCode2().compactSession(sessionId)
-      : isDsh()
-        ? dsh().compactSession(sessionId)
-        : deps.runCompactSession(sessionId),
+      : deps.runCompactSession(sessionId),
     revertSession: (sessionId, messageID) => isOpenCode2()
       ? openCode2().revertSession(sessionId, messageID)
       : deps.openCodeService.revertSession(sessionId, messageID),

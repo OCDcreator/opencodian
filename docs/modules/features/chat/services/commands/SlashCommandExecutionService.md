@@ -67,7 +67,7 @@ export class SlashCommandExecutionService {
 - `slashCommandSkillMode === 'direct'` 时，runtime `source === 'skill'` 可以直接用 `/skill-id arguments` 执行
 - `slashCommandSkillMode === 'skills-command'` 时，直接 `/skill-id` 不接管；只有 `/skills skill-id arguments` 会映射为真实 `session.command({ command: 'skill-id' })`
 - 如果某个 runtime command 同时也有 project override，direct `/command` 仍按该 runtime command 执行，不会被 `/skills` 前缀规则错误降级
-- `/compact` 在没有同名 project override 且 runtime catalog 未提供非内置条目时消费，先经过 server readiness 与当前 tab busy gate；opencode/opencode2/dsh 会话分别走各自的 manual compaction seam（dsh 经 `getDshAdapter.compactSession`，2026-10-25），无对应 active session 时显示专用 no-session notice
+- `/compact` 是 OpenCode-only synthetic command：只在没有同名 project override 且 runtime catalog 未提供非内置条目时消费，先经过 server readiness 与当前 tab busy gate，再用当前 OpenCode session 调用 view host 的 manual compaction seam；无 active OpenCode session 或非 OpenCode backend 时显示专用 no-session notice（DSH/zcode 的 `/compact` 斜杠在 resolver 即转发 raw prompt，由各自原生命令处理）
 - `/undo`、`/redo`、`/new`、`/share`、`/unshare` 是额外的 synthetic builtin commands，与 `/compact` 共享同一条检测路径：只在没有同名 project override 且 runtime 未提供非内置条目时走插件内置逻辑
   - `/undo`：查找当前会话最后一条用户消息的 `sourceMessageId`，调用 `revertSession()` 撤销，成功后触发 background sync；无 conversation / 无 session / 非 opencode backend / 无 sourceMessageId 各路径均显示对应 notice 并提前返回
   - `/redo`：调用 `unrevertSession()` 重做，成功后触发 background sync；与 `/undo` 共享一致的 `!conversation` null guard、backend gate 和 error-catch notice 模式

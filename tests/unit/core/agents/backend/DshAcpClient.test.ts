@@ -75,6 +75,17 @@ process.stdin.on('data', (chunk) => {
 `;
 }
 
+/** Child script that emits benign diagnostics plus a synthetic bearer/JWT pair. */
+function redactionProbeScript(jwt: string): string {
+  return [
+    'process.stderr.write("/Users/dht/Projects/DeepSeekHarness/runtime failed to start\\n");',
+    'process.stderr.write("auth failed: bearer synthetic_access_token_123456\\n");',
+    `process.stderr.write("token ${jwt}\\n");`,
+    'process.stderr.write("build zcode-dsh-gap-remediation.202610251749 done\\n");',
+    'process.exit(4);',
+  ].join('');
+}
+
 function clientFor(handler: string, options: Partial<DshAcpClientOptions> = {}): DshAcpClient {
   return new DshAcpClient({
     cwd: process.cwd(),
@@ -283,7 +294,9 @@ process.stdin.on('data', (chunk) => {
       spawn.mockRestore();
     }
   });
+});
 
+describe('DshAcpClient lifecycle and server requests', () => {
   it('can stop an in-flight start and then start a fresh process', async () => {
     const client = handshakeClient(HANDSHAKE, 50);
     const firstStart = client.start();
@@ -450,17 +463,7 @@ describe('DSH ACP prompt liveness and stderr diagnostics', () => {
     const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
     const client = new DshAcpClient({
       cwd: process.cwd(),
-      launch: {
-        command: process.execPath,
-        args: ['-e', [
-          'process.stderr.write("/Users/dht/Projects/DeepSeekHarness/runtime failed to start\\n");',
-          'process.stderr.write("auth failed: bearer synthetic_access_token_123456\\n");',
-          `process.stderr.write("token ${jwt}\\n");`,
-          'process.stderr.write("build zcode-dsh-gap-remediation.202610251749 done\\n");',
-          'process.exit(4);',
-        ].join('')],
-        env: {},
-      },
+      launch: { command: process.execPath, args: ['-e', redactionProbeScript(jwt)], env: {} },
       requestTimeoutMs: 300,
       onProtocolError: (error) => { failures.push(error); },
     });

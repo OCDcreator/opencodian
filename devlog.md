@@ -11,6 +11,13 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-10-26 DSH 第五轮：Astra 复审处置与压缩收束（未发布）
+
+- codex 第二次独立验证（gpt-6-astra / effort=ultra / 静态 + 实机，报告 `.scratch/astra-verify2-20261025/report.md`）结论"有条件可靠"：rc.3 原生压缩正常流程、prompt/compact 双向 busy 互斥、压缩后语境保留（Mira / 第三阶楼梯 / bluefish 三问全对）、token 四项明细投影与受控目录费用估算均获实机证据（三轮长文首压影子化 6 条/4,372 tokens 8.2s，再压 1 条/626，占用 11,802→8,225 ≈ -30%）；未复现 P1。
+- 按复审处置：(P3) 回退不可达的 DSH 斜杠 host 分支——`SlashCommandExecutionService` 对 zcode/dsh 在 resolver 提前交还 raw prompt，插件合成 `/compact` 分支永不触达，原生命令路径本就执行 `/compact`；撤掉 `getDshAdapter` 依赖、`SlashCommandExecutionHostFactory` dsh 分支及对应模块文档。(P2) 压缩取消收束：service.mjs `session/compact` 把 AbortController 存入 `record.admission`（`session/cancel` 可中止摘要），`DshAdapter.compactSession` 180s 超时后尽力 `client.cancel(sessionId)`，不再出现 UI 已失败而服务端仍忙。(P2) view 的 DSH 压缩可用性按 `AgentCapability.Compaction` 门控，ACP 会话不再展示随后必败的入口。(测试充分性) 压缩测试补真实 ACP-only fixture 拒绝断言；(P3) 状态文档"结构受限项"去掉已实现的压缩/费用并新增第五轮章节。
+- 保留为后续工作（复审 P2，牵涉共享压缩组件）：UI 区分 completed-unverified / no-op / 业务拒绝（当前 DSH 成功显示"已受理，等待权威验证"、失败折叠为通用文案）、向上透传 shadowed/shadowedTokens、"小摘要无法再变小"后的恢复实测、Obsidian GUI 点击验收。
+- 维护：`DshAcpClient.test.ts` transport describe 拆为 transport + lifecycle 两块（max-lines-per-function 归零），`ModelPricingService.ts` 文件行数豁免头。验证：verify 15 项门禁全 PASS，1003 套件 / 10748 测试；构建并部署 Test Vault `zcode-dsh-gap-remediation.202610260013`（三件套 + `assets/dsh` 字节一致）。
+
 ## 2026-10-25 DSH 缺口修复：权限/问题卡断路、超时误杀与可观测性（未发布）
 
 - 独立核查 2026-10-24 集成报告后修复两处 P0 断路：权限卡"始终/本会话允许"对 DSH 等效拒绝（`always` 现优先 `allow_always`、回退 `allow_once`，会话记忆由客户端 tracker 承担，对齐 zcode 映射；补齐 allow 放行测试）；DSH 问题卡 UI 应答路由回落 legacy 服务的白名单遗漏（`getQuestionApiForTab` 加入 dsh）。权限卡 patterns 不再把选项名当 pattern 噪声渲染。

@@ -42,6 +42,18 @@ codex（gpt-6-astra / ultra / 实机模式）验证揭露了此前"环境性失�
 
 验证证据：`.scratch/astra-verify-20261025/`（ACP 探针 2/2、native 凭据补种前后对照、独立边界反例测试、凭据复制清单不含内容）。
 
+## 第五轮：第二轮 Astra 实机复审与本轮处置（同日）
+
+codex（gpt-6-astra / ultra / 实机）对 9c97bd94..ac3eee73 复审，结论"有条件可靠"：实机全部通过（native 3/3、ACP 2/2、真压缩 shadowed 6/4,372 tokens 且二次压缩 1/626、双向 busy 互斥实测、压缩后语境保留三条事实全对、占用降 30.3%、token 明细真实、无锚点诚实降级、连接存活、Test Vault SHA-256 一致）。处置其发现：
+
+- P3 回退：slash host 的 `getDshAdapter` 分支确认为不可达死代码（DSH/zcode 斜杠在 resolver 即转发 raw prompt，`/compact` 由原生命令执行并已实测）——回退三处接线与文档，语义与 zcode 对齐。
+- P2 修复：压缩 admission 存入 `record.admission`（`session/cancel` 可中断摘要）；adapter 的 compact 超时（180s）后 best-effort 通知原生取消，避免服务端持续 busy；availability 按 `AgentCapability.Compaction` 门控（ACP 会话不再显示可用入口）。
+- P2 记录不改：compactSession 返回 boolean 是跨后端接口惯例（opencode2 同），no-op 与真压缩的区分（shadowed=0）留在原生 `/compact` 命令的官方文案里；UI 压缩结果显示"已受理待验证"与失败折叠为通用文案是共享 ForegroundCompactionAction 行为（zcode 同款），按共享组件改进另行立项。
+- P3 文档矛盾修正：本文件"结构受限项"清单移除压缩/token 分类（已在第四轮实施）。
+- 测试补齐：compact 测试补 ACP 拒绝断言（验证员指出标题声称但未断言）。
+
+其诚实披露：并行审查子代理因上游 503 未启动（单验证员完成）；静态超预算 40 秒；早期探针临时目录落在 /var/folders 而非 /tmp（已纠正）；未做 Obsidian GUI 点击与 180s 超时实测。证据：`.scratch/astra-verify2-20261025/`。
+
 ## 第四轮：能力面实测与 Compaction/费用接入（同日深夜）
 
 回应"是否必须走 ACP"：默认通道本就不是 ACP——原生扩展骑在完整 SDK composition 上，`ctx.get()` 能拿到的服务远多于官方 ACP profile。一次性探针扩展（/tmp，凭据补种）在真实 rc.3 进程内实测：compaction/jobs/subagents/planMode/fs/web/tokenMeter/commands/sessionTitle 全部挂载可用，`/compact`、`/plan` 就在命令目录；todo/goal/workflow/skill/schedule/messageFeedback/authorization/credentials 未挂载，会话删除仍无持久 API（全 SDK 仅内存 Map 清理）——"上游受限"清单据此修正。
@@ -61,7 +73,7 @@ codex（gpt-6-astra / ultra / 实机模式）验证揭露了此前"环境性失�
 
 ## 结构受限项（需 Harness 侧支持，本轮不实施）
 
-原生持久历史删除、上下文压缩（Compaction）、MCP OAuth 与服务器状态管理、费用/token 分类（原生只给聚合 used/size，无法诚实拆分）、独立终端管理、后台任务面板、subagents/todos 生态面、Windows 实机验收（win32 仅 PATH `dsh.exe`，`.cmd/.bat` 显式拒绝）。DSH session trace 服务（对标 Claude/Codex 三套 wire 级 trace）为后续工作，本轮以 stderr 捕获先解决急性观测缺口。
+原生持久历史删除（全 SDK 无持久删除 API）、MCP OAuth 与服务器状态管理、独立终端管理、后台任务面板（jobs/subagents 服务已探明挂载可用，接入待立项）、todo/goal/workflow/skill/schedule、Windows 实机验收（win32 仅 PATH `dsh.exe`，`.cmd/.bat` 显式拒绝）。上下文压缩与费用/token 分类已在第四轮实施并实机验证（见上）。DSH session trace 服务（对标 Claude/Codex 三套 wire 级 trace）为后续工作，本轮以 stderr 捕获先解决急性观测缺口。
 
 ## 验证
 

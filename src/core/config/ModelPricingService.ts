@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- pricing identity resolution, catalog normalization, overrides, and cost accumulation stay in one service boundary. */
 import { requestUrl } from 'obsidian';
 
 import { createLogger } from '../../shared/logger';

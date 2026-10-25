@@ -333,7 +333,16 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
     if (!client.nativeRequest) throw new Error('DSH compaction requires the native transport');
     await this.ensureSessionActive(client, sessionId);
     if (this.turns.has(sessionId)) throw new Error('DSH compaction requires an idle session');
-    await client.nativeRequest('session/compact', { sessionId }, 180_000);
+    try {
+      await client.nativeRequest('session/compact', { sessionId }, 180_000);
+    } catch (error) {
+      // A timed-out request leaves the summary possibly still running in the
+      // harness; notify cancellation (which aborts the compact admission) so
+      // the session does not stay busy until the late attempt finishes. Any
+      // other failure is a business error and keeps the connection alive.
+      if (error instanceof Error && /timed out/.test(error.message)) client.cancel(sessionId);
+      throw error;
+    }
     return true;
   }
 

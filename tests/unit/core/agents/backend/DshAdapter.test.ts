@@ -507,6 +507,13 @@ describe('DshAdapter permission replies and metadata reads', () => {
     await expect(adapter.compactSession(sessionId)).rejects.toThrow('idle session');
     client.resolvePrompt(sessionId);
     await stream;
+
+    // ACP-transport clients expose no nativeRequest; the capability gate must
+    // refuse rather than route compaction anywhere else.
+    const acpOnly = adapterFixture();
+    const acpSession = await acpOnly.adapter.createSession();
+    await expect(acpOnly.adapter.compactSession(acpSession)).rejects.toThrow('DSH compaction requires the native transport');
+    await acpOnly.adapter.stop();
     await adapter.stop();
   });
 });

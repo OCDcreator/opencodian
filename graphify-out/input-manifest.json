@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "07d2e0c62034ec07ef3ca55f78c7a3e2bb3b079a4e1d4e87c7d1baae6739fb9d",
+  "digest": "2f7dab689f482818b55a3a96bc696df6fa4f4c0a434ab1703bd191e9cc3ecef4",
   "recordCount": 803,
   "records": [
     {
@@ -451,7 +451,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/dsh/DshAdapter.ts",
-      "sha256": "a8f41074fd20b45a3d3c2f99c731100794721b23156e420b33f7a077d47824f2"
+      "sha256": "0a043322cb3e4525878e50e62c5df080264ea68bf695629acac5ebda7806d639"
     },
     {
       "kind": "src",
@@ -741,7 +741,7 @@
     {
       "kind": "src",
       "key": "src/core/config/ModelPricingService.ts",
-      "sha256": "07f5211e2352601b8a76e8a4de2b923e9265b55e494b8bb4233cdbb7300dbd11"
+      "sha256": "4113a3679de70c9aae0260580651aae43b90de758fb0cb1bd1cd60dd7f167aa0"
     },
     {
       "kind": "src",
@@ -1411,7 +1411,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
-      "sha256": "e7c4b425cbb816df83d54b695c45a256a14a7d537576a38de2ed238ffb324960"
+      "sha256": "12684b4da16adbbb8ae1bb335cdd8c6001d2ef2d26add6d4979a97795da4d90e"
     },
     {
       "kind": "src",
@@ -1536,7 +1536,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/ChatRuntimeComposition.ts",
-      "sha256": "e8f5ed3b244558ffbfd42069a64c5985c0509e90f848f857b98c7fb1db233e31"
+      "sha256": "c2daef47a7f993513739b8bddc31fcc2309eb5c636df0d4f30c0950997a1c061"
     },
     {
       "kind": "src",
@@ -1726,12 +1726,12 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/commands/SlashCommandExecutionHostFactory.ts",
-      "sha256": "3270fa67220eb7e5ba7521fdb9d89ded5b2758ca2078b70816098232002626a6"
+      "sha256": "95432cfc9953c9df4823058c1d43494823205e4a9d9d023e9771368bf1dbdae4"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/commands/SlashCommandExecutionService.ts",
-      "sha256": "686dbcfade1dfdd9af2df8c250c9532759f7dbf1e31d18dccf48758193df05f4"
+      "sha256": "f075ba340e054d57bde2e07217407ea23c8d4decb16b950c9b76ba9480bf272f"
     },
     {
       "kind": "src",
@@ -4019,7 +4019,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-25T15:06:31.831Z",
-  "headShaAtGeneration": "9c97bd94b201f4f5412acd24763a23e6065b122f",
+  "generatedAt": "2026-10-25T16:11:40.762Z",
+  "headShaAtGeneration": "ac3eee7302c67884ee8b5c6435886e33ceca5a5e",
   "graphifyVersion": "graphify 0.9.36"
 }

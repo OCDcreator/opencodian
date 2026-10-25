@@ -2446,6 +2446,12 @@ export class OpenCodianView extends ItemView {
       getForegroundCompactionAvailability: (sessionId): ForegroundCompactionAvailability => {
         const conversation = this.currentConversation;
         if (conversation?.backend === 'zcode' || conversation?.backend === 'opencode2' || conversation?.backend === 'dsh') {
+          if (conversation.backend === 'dsh') {
+            // ACP-transport DSH sessions never carry the Compaction capability;
+            // offering the entry point there would only end in a generic failure.
+            const adapter = this.plugin.agentServiceRegistry?.get('dsh') as { hasCapability?(capability: unknown): boolean } | undefined;
+            if (!adapter?.hasCapability?.(AgentCapability.Compaction)) return { status: 'unavailable' };
+          }
           return getConversationBackendSessionId(conversation) === sessionId
             ? { status: 'available', threadId: sessionId }
             : { status: 'invalid-thread' };

@@ -342,10 +342,12 @@ export async function apply(ctx, config) {
       const record = requireSession(params.sessionId);
       idle(record);
       record.busy = true;
+      const controller = new AbortController();
+      record.admission = controller;
       try {
-        const result = await ctx.get('compaction').compactNow(record.handle.agent, new AbortController().signal, 'opencodian-compact');
+        const result = await ctx.get('compaction').compactNow(record.handle.agent, controller.signal, 'opencodian-compact');
         return { shadowed: result ? result.shadowedSeqs.length : 0, shadowedTokens: result ? result.shadowedTokenCount : 0 };
-      } finally { record.busy = false; }
+      } finally { record.busy = false; record.admission = undefined; }
     },
     async 'session/fork'(params) {
       const source = await ctx.sessionQuery.readSession(params.sessionId);
