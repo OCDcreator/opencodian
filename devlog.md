@@ -11,14 +11,20 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
-## 2026-10-26 DSH 第五轮：Astra 复审处置与压缩收束（未发布）
+## 2026-10-26 v2.1.0：DSH 原生通道、压缩与费用明细发布
+
+- 版本同步为 `2.1.0`（minor：DSH 默认接入改为插件自有原生 Host 扩展并补齐压缩/费用能力，向后兼容）。`zcode/dsh-gap-remediation` 全部 8 个提交（27322547…c21a2b14）fast-forward 合入 main（基准 c3ab43e8，无合并提交）：原生通道/图片/行内查询、权限与问题卡断路修复、超时与可观测性、ACP 能力面调研、两轮 Astra 复审处置、原生 Compaction 与 token/费用明细。
+- 发布前先推 feature 分支跑 CI：Windows / macOS 全量测试与架构门均绿；ubuntu verify 只在 graphify 新鲜度红——zcode worktree 没有 repo 级 `.graphify-venv`，刷新落到系统 `graphify 0.9.36`，工具指纹与 CI pin `graphifyy==0.9.31` 不一致（与 2026-10-21 v2.0.0 连红同根因）。在发布 worktree 内建同版本 venv 后重刷，bump 提交连带 graphify 产物一起提交，CI pin 不动。
+- 本地 verify 15 项门禁全 PASS 后推 origin 与 gitea main；Plugin Package 以 manifest 版本变化触发 GitHub Release `v2.1.0`，随后 `check:release-health` 终验。
+
+## 2026-10-26 DSH 第五轮：Astra 复审处置与压缩收束（随 v2.1.0 发布）
 
 - codex 第二次独立验证（gpt-6-astra / effort=ultra / 静态 + 实机，报告 `.scratch/astra-verify2-20261025/report.md`）结论"有条件可靠"：rc.3 原生压缩正常流程、prompt/compact 双向 busy 互斥、压缩后语境保留（Mira / 第三阶楼梯 / bluefish 三问全对）、token 四项明细投影与受控目录费用估算均获实机证据（三轮长文首压影子化 6 条/4,372 tokens 8.2s，再压 1 条/626，占用 11,802→8,225 ≈ -30%）；未复现 P1。
 - 按复审处置：(P3) 回退不可达的 DSH 斜杠 host 分支——`SlashCommandExecutionService` 对 zcode/dsh 在 resolver 提前交还 raw prompt，插件合成 `/compact` 分支永不触达，原生命令路径本就执行 `/compact`；撤掉 `getDshAdapter` 依赖、`SlashCommandExecutionHostFactory` dsh 分支及对应模块文档。(P2) 压缩取消收束：service.mjs `session/compact` 把 AbortController 存入 `record.admission`（`session/cancel` 可中止摘要），`DshAdapter.compactSession` 180s 超时后尽力 `client.cancel(sessionId)`，不再出现 UI 已失败而服务端仍忙。(P2) view 的 DSH 压缩可用性按 `AgentCapability.Compaction` 门控，ACP 会话不再展示随后必败的入口。(测试充分性) 压缩测试补真实 ACP-only fixture 拒绝断言；(P3) 状态文档"结构受限项"去掉已实现的压缩/费用并新增第五轮章节。
 - 保留为后续工作（复审 P2，牵涉共享压缩组件）：UI 区分 completed-unverified / no-op / 业务拒绝（当前 DSH 成功显示"已受理，等待权威验证"、失败折叠为通用文案）、向上透传 shadowed/shadowedTokens、"小摘要无法再变小"后的恢复实测、Obsidian GUI 点击验收。
 - 维护：`DshAcpClient.test.ts` transport describe 拆为 transport + lifecycle 两块（max-lines-per-function 归零），`ModelPricingService.ts` 文件行数豁免头。验证：verify 15 项门禁全 PASS，1003 套件 / 10748 测试；构建并部署 Test Vault `zcode-dsh-gap-remediation.202610260013`（三件套 + `assets/dsh` 字节一致）。
 
-## 2026-10-25 DSH 缺口修复：权限/问题卡断路、超时误杀与可观测性（未发布）
+## 2026-10-25 DSH 缺口修复：权限/问题卡断路、超时误杀与可观测性（随 v2.1.0 发布）
 
 - 独立核查 2026-10-24 集成报告后修复两处 P0 断路：权限卡"始终/本会话允许"对 DSH 等效拒绝（`always` 现优先 `allow_always`、回退 `allow_once`，会话记忆由客户端 tracker 承担，对齐 zcode 映射；补齐 allow 放行测试）；DSH 问题卡 UI 应答路由回落 legacy 服务的白名单遗漏（`getQuestionApiForTab` 加入 dsh）。权限卡 patterns 不再把选项名当 pattern 噪声渲染。
 - 行为缺口修复：prompt 超时改为事件活跃感知的空闲间隔（`session/update` 重置计时，持续产出的长回合不再被误判 transport 不确定而杀连接）；stderr 由直接丢弃改为 8 KiB 有界缓冲 + 凭据脱敏 + 退出/协议错误附带尾部；上下文占用快照跨恢复保留；`session/list` 以进程内活跃时间修正 `updatedAt=createdAt` 失真并透传 `createdAt`。
@@ -30,7 +36,7 @@
 - Astra 实机验证（第三轮）：装机实为 0.2.1-rc.3，真实凭据在 `~/.dsh/.credentials.yaml`；凭据存在时 harness 进程内 `[llm-deepseek]` 日志写 stdout 打断 JSON-RPC 流（生产必中）——service.mjs 建立通道隔离（进程内日志改道 stderr、传输独占 stdout）；live 探针新增 `DSH_NATIVE_LIVE_CREDENTIALS` 凭据补种门禁，native 三探针在真实 rc.3+凭据环境 3/3 通过，此前"环境性失败"闭合。复审反例再修两处：残端规则排除 `/`（路径开头诊断不再误脱敏）、JWT 锚定 eyJ（点分标识符可读）；权限卡记忆写入移至应答成功之后。
 - 第四轮（能力面实测 + 压缩/费用接入）：进程内服务探针推翻"上游受限"判断——compaction/jobs/subagents/planMode/fs/web 均挂载可用；接入 Compaction（service.mjs `session/compact` → `DshAdapter.compactSession` → view/`/compact` 斜杠入口，真实验证影子化 16 条/6,266 tokens、占用 12.3k→6.9k）与 token 分类费用（usage_update 带 input/output/cache 明细、providerId 置 null 解码真实模型 id、`deepseek*` 前缀计价推断）；会话删除确认无持久 API，jobs/planMode 记录为可接待立项。
 
-## 2026-10-24 DSH 原生通道、图片与行内查询（未发布）
+## 2026-10-24 DSH 原生通道、图片与行内查询（随 v2.1.0 发布）
 
 - 默认接入由 ACP 改为插件自有原生 Host 服务扩展，复用官方 SDK composition；保留显式 ACP 兼容模式，不修改已安装应用。
 - 查明旧 ACP 默认模型 deepseek-v4-flash 与当前 deepseek-flash 不一致，以及 initialize 固定图片能力的问题；通过当前模型元数据和原生附件服务接入图片。
