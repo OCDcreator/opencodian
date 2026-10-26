@@ -674,3 +674,7 @@ Includes the localized Pi extension-command completion status used only after a 
 ## 2026-10-24 DSH 配置与限制文案
 
 新增模型/推理草稿配置、MCP 声明编辑与保存结果、图片握手可用性和当前通道限制的英文文案。明确草稿不等于全局持久默认、MCP 保存不等于热连接，native catalogue 缺失不使用其他后端补齐。
+
+## 2026-10-26 DSH UI wording
+
+Adds the independent composer input name, effort-save failure, DSH default/inheritance and next-send explanation, and MCP declaration/draft/application wording. Saved declarations and application counts are explicitly distinct from online server readback.

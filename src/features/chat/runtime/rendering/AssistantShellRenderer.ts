@@ -1,4 +1,5 @@
 import type { ChatMessage } from '../../../../core/types';
+import { TooltipLayerController } from '../../../../shared/TooltipLayerController';
 import { ConversationRenderService } from '../../services/rendering/ConversationRenderService';
 import type { TabId } from '../../tabs';
 import type { SendPipelineStreamElements } from '../send/SendPipelineTypes';
@@ -9,6 +10,7 @@ export interface AssistantShellRuntimeState {
 }
 
 export interface AssistantShellRendererHost {
+  getModelDisplayName?(modelId: string): string | undefined;
   getActiveTabId(): TabId | null;
   getTabRuntimeState(tabId: TabId | null): AssistantShellRuntimeState | null;
   ensureTurnBody(tabId: TabId | null): HTMLElement | null;
@@ -20,6 +22,8 @@ export interface AssistantShellRendererHost {
     reason: string,
   ): void;
 }
+
+let modelLabelId = 0;
 
 export interface AssistantShellTimestampOptions {
   messageEl: HTMLElement;
@@ -138,7 +142,12 @@ export class AssistantShellRenderer {
     if (modelId) {
       const modelEl = document.createElement('span');
       modelEl.className = 'opencodian-message-model-id';
-      modelEl.textContent = `· ${modelId}`;
+      modelEl.dataset.modelId = modelId;
+      modelEl.tabIndex = 0;
+      modelEl.setAttribute('role', 'note');
+      modelEl.classList.add('opencodian-tooltip-trigger');
+      this.updateModelDisplayName(modelEl, modelId);
+      TooltipLayerController.ensureForElement(modelEl);
       fragment.appendChild(modelEl);
     }
 
@@ -163,6 +172,25 @@ export class AssistantShellRenderer {
       messageEl.removeClass('is-streaming');
     }
     this.host.setStreamingAssistantMessageVisibility(messageEl, true, 'finalize-streaming-shell');
+  }
+
+  refreshModelDisplayNames(root: HTMLElement): void {
+    for (const modelEl of root.querySelectorAll<HTMLElement>('.opencodian-message-model-id[data-model-id]')) {
+      const modelId = modelEl.dataset.modelId;
+      if (modelId) this.updateModelDisplayName(modelEl, modelId);
+    }
+  }
+
+  private updateModelDisplayName(modelEl: HTMLElement, modelId: string): void {
+    const modelName = this.host.getModelDisplayName?.(modelId) || modelId;
+    const labelEl = modelEl.querySelector<HTMLElement>('.opencodian-visually-hidden')
+      ?? modelEl.ownerDocument.createElement('span');
+    labelEl.className = 'opencodian-visually-hidden';
+    labelEl.textContent = modelName === modelId ? modelId : `${modelName}. ${modelId}`;
+    if (!labelEl.id) labelEl.id = `opencodian-message-model-${++modelLabelId}`;
+    modelEl.replaceChildren(modelEl.ownerDocument.createTextNode(`· ${modelName}`), labelEl);
+    modelEl.setAttribute('aria-labelledby', labelEl.id);
+    modelEl.setAttribute('data-tooltip', modelName === modelId ? modelId : `${modelName}\n${modelId}`);
   }
 
   ensureAssistantTimestampRow(messageEl: HTMLElement, reserveSpace = false): HTMLElement {

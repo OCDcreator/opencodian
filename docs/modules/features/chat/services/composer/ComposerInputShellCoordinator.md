@@ -168,3 +168,7 @@ export class ComposerInputShellCoordinator {
 - 源码位置：`src/features/chat/services/composer/ComposerInputShellCoordinator.ts`。
 - 原位置：`src/features/chat/services/ComposerInputShellCoordinator.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/features/chat/services/composer/AgentMentionComposerController.ts`、`src/features/chat/services/selection/ChatAgentSelectionCoordinator.ts`、`src/features/chat/services/composer/composerInputParsing.ts`、`src/features/chat/services/send/MessageSendPreparationService.ts`、`src/features/chat/services/send/PromptSuggestionService.ts`、`src/features/chat/services/commands/SlashCommandMenuCatalogCache.ts`、`src/features/chat/services/commands/SlashCommandMenuCoordinator.ts`。
+
+## 2026-10-26 Composer 可访问名称
+
+Textarea 使用独立、每实例唯一的 visually-hidden 本地化标签，通过 aria-labelledby 关联；视觉 placeholder 继续 aria-hidden 且可随草稿隐藏。名称不会随输入消失，applyLocaleTexts 同步标签文本；不引入会触发宿主原生 tooltip 的 aria-label/title。发送、草稿和跨 tab 所有权不变。

@@ -56,3 +56,7 @@
 - 子会话返回面包屑和隐藏子会话关闭按钮在横向和 `below-header-vertical` 布局下分别共用 `opencodian-tab-bar-parent-breadcrumb*` / `opencodian-tab-bar-parent-close*` 类，调整尺寸时要避免挤压 tab 按钮和溢出菜单。
 - 如仅调整样式拼接产物，执行 `npm run build:css`；发版前以 `npm run build` 为准。
 - provider 图标颜色模式是全局变量开关，改这里时要同时检查聊天区、设置页、模型工作区和 provider icon modal 的预览表现。
+
+## 2026-10-26 Narrow Chat header
+
+A Chat-container query at 400px reflows the header into a brand row and a tab/actions row. The tab track reserves at least 44px and shared actions use a 6px gap; no header action is removed, and desktop viewport width does not select this layout.

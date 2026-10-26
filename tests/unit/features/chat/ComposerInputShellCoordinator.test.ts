@@ -539,6 +539,19 @@ describe('ComposerInputShellCoordinator', () => {
 });
 
 describe('ComposerInputShellCoordinator placeholder visibility', () => {
+  it('keeps a localized accessible name when the visual placeholder is hidden', () => {
+    const fixture = createFixture();
+    const nameId = fixture.textarea.getAttribute('aria-labelledby');
+    expect(nameId).toBeTruthy();
+    expect(fixture.container.querySelector(`#${nameId}`)?.textContent).toBe(t('chat.input.label'));
+    fixture.textarea.value = 'draft';
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(fixture.container.querySelector('.opencodian-input-placeholder')?.classList.contains('is-hidden')).toBe(true);
+    expect(fixture.container.querySelector(`#${nameId}`)?.textContent).toBe(t('chat.input.label'));
+    expect(fixture.textarea.hasAttribute('title')).toBe(false);
+    expect(fixture.textarea.hasAttribute('aria-label')).toBe(false);
+  });
+
   const originalResizeObserver = globalThis.ResizeObserver;
 
   beforeEach(() => {

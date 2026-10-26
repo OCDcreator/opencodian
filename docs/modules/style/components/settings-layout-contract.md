@@ -163,3 +163,7 @@ Rule: never apply one hierarchy rule globally across both layout modes. In class
 2026-10-08 设置按钮布局回归：容器只隔离普通 Field row 的 inline-size，紧凑 action-only Setting 保留各 owner 的 intrinsic/flex 宽度；pane query 只改已有 grid 的列定义，不把 flex/block/隐藏行改为 grid。原生隐藏 select 和 Obsidian measuring probe 不参与可见布局断言；真正的按钮可见性、row 边界和 root 横向范围均需实机检查。
 
 页头品牌与后端 icon rail 在 pane 不超过 720px 时允许整组/组内换行，并限制到页头宽度，保留品牌、原生图标、按钮顺序和关闭区预留。Mac 六个后端按钮的 150% 缩放越界作为独立实机回归。
+
+## 2026-10-26 DSH focus
+
+The DSH group scopes a visible 2px host-accent outline with offset to focused Setting rows, native fields, custom dropdown buttons and disclosure summaries. It preserves the shared row layout and does not restyle unrelated Settings surfaces.

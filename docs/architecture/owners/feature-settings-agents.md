@@ -1,4 +1,5 @@
 # Owner: feature.settings-agents
+> 2026-10-26（DSH UI 修复）：浮动 backend 轨的 resize 监听与 ResizeObserver/MutationObserver 绑定到容器所属 document.defaultView，清理时使用同一窗口。独立设置窗口真实缩放时重新测量容器边缘，避免沿用主窗口坐标；不新增设置或后端选择状态。
 > 2026-09-28：OpenCode 2 设置包含原生 MCP 连接状态、API 密钥/OAuth 认证、凭据切换与运行目录。原生配置覆盖层和 OpenCode 1 配置互相独立。
 > 2026-09-24 (票 06)：SettingsZCodeSection 新增三项持久化默认字段与重连时的斜杠目录失效调用。
 > 2026-09-22（二轮核查修复）：SettingsZCodeSection 的 provider 计数未知时显示「数量不可用」，移除 ?? 0 伪造。

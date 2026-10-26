@@ -179,6 +179,27 @@ async function createFixture(options: FixtureOptions = {}) {
 }
 
 describe('ChatSelectionControlsCoordinator', () => {
+  it('notifies the historical-label renderer after the catalog snapshot is ready', async () => {
+    const fixture = await createFixture();
+    const refreshHistoricalModelDisplayNames = jest.fn(() => {
+      expect(fixture.coordinator.getModelDisplayName('anthropic/claude-3-7-sonnet')).toBe('Claude 3.7 Sonnet');
+    });
+    Object.assign(fixture.host, { refreshHistoricalModelDisplayNames });
+
+    await fixture.coordinator.reloadModelCatalog();
+
+    expect(refreshHistoricalModelDisplayNames).toHaveBeenCalledTimes(1);
+    fixture.coordinator.destroy();
+  });
+
+  it('resolves metadata names from the recorded reference without borrowing the current model', async () => {
+    const fixture = await createFixture();
+    expect(fixture.coordinator.getModelDisplayName('openai/o4-mini')).toBe('o4-mini');
+    expect(fixture.coordinator.getModelDisplayName('anthropic/claude-3-7-sonnet')).toBe('Claude 3.7 Sonnet');
+    expect(fixture.coordinator.getModelDisplayName('missing/old-model')).toBeUndefined();
+    fixture.coordinator.destroy();
+  });
+
   it('refreshes a startup-empty catalog when the model picker opens, then uses the loaded snapshot', async () => {
     const fixture = await createFixture({ loadModelCatalogData: { catalogBundle: null, providers: [] } });
     fixture.host.loadModelCatalogData.mockResolvedValue({ catalogBundle: null, providers: [{ id: 'late', name: 'Late backend', models: [{ id: 'ready', name: 'Ready native model' }] }] });
@@ -350,6 +371,31 @@ describe('ChatSelectionControlsCoordinator', () => {
     expect(fixture.host.syncActiveTabContextUsageIdentity).toHaveBeenCalledTimes(2);
     expect(modelTrigger?.hasClass('is-open')).toBe(false);
     expect(fixture.host.restoreComposerInputFocus).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['Enter', ' ', 'ArrowDown'])('opens the model picker with %s and returns focus on Escape', async (key) => {
+    const fixture = await createFixture();
+    const trigger = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-trigger')!;
+    trigger.focus();
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+    const searchInput = fixture.toolbarEl.querySelector<HTMLInputElement>('.opencodian-model-dropdown-search-input')!;
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(document.activeElement).toBe(searchInput);
+    searchInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(trigger);
+    fixture.coordinator.destroy();
+  });
+
+  it('keeps the model picker closed when keyboard activation happens during streaming', async () => {
+    const fixture = await createFixture();
+    fixture.host.isActiveTabStreaming = jest.fn(() => true);
+    const trigger = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-trigger')!;
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    fixture.coordinator.destroy();
   });
 
   it('closes the model card from search Escape and restores trigger focus', async () => {

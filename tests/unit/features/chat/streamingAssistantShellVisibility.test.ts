@@ -3,6 +3,25 @@ import { PermissionInlineCardRenderer } from '../../../../src/features/chat/runt
 import { StreamingInlineCardRenderer } from '../../../../src/features/chat/runtime/rendering/StreamingInlineCardRenderer';
 
 describe('OpenCodianView streaming assistant shell visibility', () => {
+  it('shows a friendly recorded model name while retaining the exact reference for keyboard inspection', () => {
+    const modelId = 'deepseek-official/["deepseek-official","deepseek-flash"]';
+    const renderer = new AssistantShellRenderer({
+      getModelDisplayName: () => 'DeepSeek-V4.1-Flash',
+      getActiveTabId: () => 'tab-1', getTabRuntimeState: () => null,
+      ensureTurnBody: () => null, shouldAutoScroll: () => false,
+      scheduleSettledScrollToBottomIfNeeded: jest.fn(), setStreamingAssistantMessageVisibility: jest.fn(),
+    });
+    const messageEl = document.createElement('div');
+    renderer.addTimestampWithCopyButton({ messageEl, timestamp: 1, modelId });
+    const label = messageEl.querySelector<HTMLElement>('.opencodian-message-model-id')!;
+    expect(label.firstChild?.textContent).toBe('· DeepSeek-V4.1-Flash');
+    expect(label.dataset.modelId).toBe(modelId);
+    expect(label.getAttribute('data-tooltip')).toContain(modelId);
+    expect(label.tabIndex).toBe(0);
+    const nameId = label.getAttribute('aria-labelledby');
+    expect(label.querySelector(`#${nameId}`)?.textContent).toContain(modelId);
+  });
+
   it('keeps deferred streaming assistant shells hidden until reveal is requested', () => {
     const turnBody = document.createElement('div');
     const runtime = {

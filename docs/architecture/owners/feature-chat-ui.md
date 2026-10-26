@@ -3,6 +3,7 @@
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 
 # Owner: feature.chat-ui
+> 2026-10-26（DSH UI 修复）：EffortSelector 持有菜单焦点、单选语义、展开状态和保存反馈，支持方向键、Home/End、Enter/Space、Escape 与 Tab。保存由既有 host 执行；重复保存受控，失败保留选项和反馈，成功后仅在焦点仍位于菜单时回到入口，保存期间离开或卸载不抢焦。默认/显式 Off 及生效边界文案由 host 提供，组件不解析后端协议。
 > 2026-10-24（DSH）：ContextDetailModal 显示原生占用总量；当 tokenBreakdownAvailable 为 false 时隐藏未知分类和费用计算，压缩入口继续遵守后端能力。
 > 2026-09-30 (Codex 0.159 integration)：
 > - `BackendSessionBrowserDetail`：分页 transcript 路径（`listThreadTurns` 摘要 + load-more 游标追加），保留 legacy 回退与 transcript-unavailable 占位。
@@ -84,3 +85,6 @@ Codex 会话浏览器从结构化目录结果保留权限拒绝分类，现有 s
 当前源码目录：`src/features/chat/ui`、`src/features/chat/ui/modelSelector`。
 
 目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。
+
+
+2026-10-26 现场 Escape 补充：EffortSelector 暴露 handleEscape()，由宿主 Scope 在捕获阶段调用；组件继续独占 open/focus 状态，document 监听仅作独立组件回退。

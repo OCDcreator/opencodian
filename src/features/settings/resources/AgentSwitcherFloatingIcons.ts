@@ -159,6 +159,8 @@ function pinAgentSwitcherToSettingsEdge(
   anchorEl: HTMLElement,
 ): FloatingSwitcherCleanup {
   const ownerDocument = containerEl.ownerDocument;
+  const ownerWindow = ownerDocument.defaultView ?? window;
+  const { ResizeObserver: OwnerResizeObserver, MutationObserver: OwnerMutationObserver } = ownerWindow as Window & typeof globalThis;
   const syncPosition = () => {
     const rect = containerEl.getBoundingClientRect();
     floatingEl.style.setProperty(
@@ -175,12 +177,12 @@ function pinAgentSwitcherToSettingsEdge(
   syncPosition();
   syncModalVisibility();
   let cleanedUp = false;
-  const resizeObserver = typeof ResizeObserver !== 'undefined'
-    ? new ResizeObserver(syncPosition)
+  const resizeObserver = typeof OwnerResizeObserver !== 'undefined'
+    ? new OwnerResizeObserver(syncPosition)
     : null;
   let anchorWasConnected = ownerDocument.body.contains(anchorEl);
   let cleanup: FloatingSwitcherCleanup = () => {};
-  const mutationObserver = new MutationObserver(() => {
+  const mutationObserver = new OwnerMutationObserver(() => {
     const anchorIsConnected = ownerDocument.body.contains(anchorEl);
     if (!anchorWasConnected && anchorIsConnected) {
       anchorWasConnected = true;
@@ -201,7 +203,7 @@ function pinAgentSwitcherToSettingsEdge(
     }
 
     cleanedUp = true;
-    window.removeEventListener('resize', syncPosition);
+    ownerWindow.removeEventListener('resize', syncPosition);
     resizeObserver?.disconnect();
     mutationObserver.disconnect();
     floatingEl.remove();
@@ -212,7 +214,7 @@ function pinAgentSwitcherToSettingsEdge(
     return cleanup;
   }
 
-  window.addEventListener('resize', syncPosition);
+  ownerWindow.addEventListener('resize', syncPosition);
   resizeObserver?.observe(containerEl);
   mutationObserver.observe(ownerDocument.body, {
     childList: true,

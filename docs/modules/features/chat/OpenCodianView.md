@@ -884,3 +884,15 @@ Pi 完成后 bypass OpenCode canonical projection（其数据不属于 Pi 会话
 ## 2026-10-24 DSH 选择和用量转发
 
 视图把 DSH 模型/推理选择转发给现有 selection owner 的保存函数，按 originating conversation 保留失败回滚；不会借用其他后端 tab model override。发送读取该会话覆盖和原生推理默认值。上下文回读交给 DSH adapter，不能落入休眠的 OpenCodeService。视图未持有新的连接、配置状态或子进程。
+
+## 2026-10-26 DSH effort 表达与 footer 显示
+
+DSH effort selector 的 getVariant 读取显式会话覆盖，未覆盖时选中默认项；默认项标签附带 DSH 回读的默认强度，下一轮发送边界在菜单与 tooltip 中说明。实际发送仍使用 getCurrentEffortVariant 解析默认/覆盖，不修改 backend 行为。Assistant shell host 只转发 recorded-model 显示名查询给既有 selection coordinator，不在 view 新增目录或映射真值。
+
+
+## 2026-10-26 宿主 Escape 转发
+
+视图 Scope 在已有 popover/cancel 链之前调用 EffortSelector.handleEscape()；消费菜单关闭后立即返回，避免宿主 window 捕获阶段吞掉键盘事件并落入流式取消。视图只转发给当前 selector，不新增菜单状态或注册积累。
+
+
+2026-10-26 现场目录时序补充：selection host 的 refreshHistoricalModelDisplayNames 仅向当前 view 的 AssistantShellViewHostAdapter 转发 chatContainerEl；不增加目录、消息或选中模型状态。

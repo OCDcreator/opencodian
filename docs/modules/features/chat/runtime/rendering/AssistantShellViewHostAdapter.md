@@ -51,3 +51,6 @@ body rendering（`renderMessageBody` / `renderContentBlock` / `getAssistantBodyS
 - 源码位置：`src/features/chat/runtime/rendering/AssistantShellViewHostAdapter.ts`。
 - 原位置：`src/features/chat/runtime/AssistantShellViewHostAdapter.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/features/chat/runtime/rendering/AssistantErrorRenderer.ts`、`src/features/chat/runtime/rendering/AssistantFooterRenderer.ts`、`src/features/chat/runtime/rendering/AssistantNoticeRenderer.ts`、`src/features/chat/runtime/rendering/AssistantPlainTextFallbackRenderer.ts`、`src/features/chat/runtime/rendering/AssistantShellRenderer.ts`、`src/features/chat/runtime/rendering/AssistantStructuredContentRenderer.ts`、`src/features/chat/runtime/rendering/QuestionResolutionCardRenderer.ts`、`src/features/chat/runtime/send/sendPipelineContent.ts`、`src/features/chat/runtime/send/SendPipelineTypes.ts`。
+
+
+2026-10-26 现场目录时序补充：refreshModelDisplayNames(root) 将既有目录就绪通知转交 shell renderer，沿用原 renderer ownership，不触发 body 渲染或持久化。

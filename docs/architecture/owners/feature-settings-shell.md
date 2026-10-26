@@ -1,4 +1,5 @@
 # Owner: feature.settings-shell
+> 2026-10-26（DSH UI 修复）：DSH 设置字段与 MCP 声明编辑器使用与可见名称一致的 accessible name，连接状态使用独立 live region；配置回读本地化模型/推理名称。MCP 编辑器按规范化声明区分未保存草稿、已保存声明和空闲会话应用反馈，不以 JSON 排版或显式 stdio 类型误判差异。设置页继续调用既有保存/回读/apply host，应用计数不表示服务器在线状态。
 > 2026-10-02（T03）：ZCode 四字段控件 callback 合并当时最新的规范化 host state，并在 await save 前写回，避免 render snapshot 恢复其他字段旧值；classic/tabbed、快速输入与异步 save 完成顺序纳入组件回归。设置 shell 不增加后端 runtime 所有权；真实磁盘 persistence、native application/readback 和 host UI 证据仍独立。
 > 2026-09-30 (Codex 0.159 integration)：settingsLayoutRegistry 为 codex 注册新二级 tab `plugins`（排在 `resources` 之后）。
 > 2026-09-28：OpenCode 2 出现在已启用后端的行内编辑和补全模型覆盖列表中，示例使用 `provider/model`，与实际解析格式一致。

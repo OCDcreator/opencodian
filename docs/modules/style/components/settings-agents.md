@@ -65,3 +65,7 @@ Below `720px`, control rows collapse from copy/control columns to one column. Co
 - Do not turn advanced agent editing into a Sheet/Drawer; inline disclosure is the approved pattern.
 - Keep all colors derived from Obsidian variables or existing settings tokens.
 - After editing this CSS, run `npm run build:css` and keep root `styles.css` synchronized.
+
+## 2026-10-26 Backend badge legibility
+
+Backend badges use 11px functional text. Active/enabled foregrounds retain semantic hue but mix more host text-normal into the color; disabled badges use text-muted rather than text-faint. State remains expressed through text and existing shape as well as color.

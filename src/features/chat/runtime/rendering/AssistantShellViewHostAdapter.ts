@@ -117,6 +117,10 @@ export class AssistantShellViewHostAdapter {
     this.shellRenderer.addTimestampWithCopyButton(options);
   }
 
+  refreshModelDisplayNames(root: HTMLElement): void {
+    this.shellRenderer.refreshModelDisplayNames(root);
+  }
+
   finalizePersistedFooter(messageEl: HTMLElement, message: ChatMessage): void {
     this.footerRenderer.finalizePersistedFooter(messageEl, message);
   }

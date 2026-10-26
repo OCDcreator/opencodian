@@ -66,6 +66,11 @@
   min-height: 0;
 }
 
+.opencodian-settings .opencodian-dsh-settings :is(.setting-item, input, textarea, button, summary):focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
 .opencodian-settings .opencodian-settings-content-shell[data-primary-tab] {
   background: transparent;
   border: 0;

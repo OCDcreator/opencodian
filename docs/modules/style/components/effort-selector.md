@@ -25,3 +25,7 @@
 - options 使用 `box-sizing: border-box`；运行时从 trigger 右边缘锚定，并由共享控制器限制在 Chat 容器左右 8px 安全区。
 - 控件位于输入工具栏，宽度与字号改动会影响模型/权限选择器排布；不要把 `Medium` 压缩成 `M` 或中文单字母式缩写。
 - 修改后执行 `npm run build:css`（或完整 `npm run build`）。
+
+## 2026-10-26 Keyboard menu and guidance
+
+The effort menu is visible only while its owner has is-open; hover cannot keep a logically closed menu painted. Options retain visible focus and neutral selected styling. The open menu contains bounded, wrapping boundary guidance and live save-failure feedback; per-option hover tooltips are removed. The compact trigger allows model-default text up to 140px.

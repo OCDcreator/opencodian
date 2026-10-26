@@ -54,3 +54,7 @@ The OpenCode 2 choice shares the OpenCode icon but has its own backend identity 
 - 源码位置：`src/features/settings/resources/AgentSwitcherFloatingIcons.ts`。
 - 原位置：`src/features/settings/AgentSwitcherFloatingIcons.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/features/settings/backends/opencode/SettingsBackendSection.ts`。
+
+## 2026-10-26 独立窗口定位
+
+Floating rail 的 resize 监听、ResizeObserver 与 MutationObserver 使用 ownerDocument.defaultView 的窗口与构造器；解绑也在同一窗口执行。独立设置窗口只有 left 变化、容器宽度不变时仍同步几何；主窗口与独立窗口保持各自 rail 生命周期，不建立全局坐标。

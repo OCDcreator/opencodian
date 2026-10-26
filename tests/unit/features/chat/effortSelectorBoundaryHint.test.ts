@@ -146,19 +146,50 @@ describe('EffortSelector boundary hint', () => {
     expect(container.querySelector('.opencodian-effort-current-value')?.textContent).toBe('Medium');
   });
 
-  it('gives each dropdown option its own tooltip so hover changes the shared tooltip content', () => {
+  it('gives effort choices radio-menu semantics without tooltips covering the options', () => {
     const { container } = mount(makeCallbacks());
 
     const gears = Array.from(container.querySelectorAll<HTMLElement>('.opencodian-effort-gear'));
 
     expect(gears.map(gear => gear.textContent)).toEqual(['High', 'Medium', 'Low']);
-    expect(gears.map(gear => gear.getAttribute('data-tooltip'))).toEqual([
-      'Choose High effort. Controls how much reasoning budget the model spends before answering.',
-      'Choose Medium effort. Controls how much reasoning budget the model spends before answering.',
-      'Choose Low effort. Controls how much reasoning budget the model spends before answering.',
-    ]);
-    expect(gears.every(gear => gear.classList.contains('opencodian-tooltip-trigger'))).toBe(true);
-    expect(gears.every(gear => gear.getAttribute('data-tooltip-position') === 'left')).toBe(true);
+    expect(gears.every(gear => gear.getAttribute('role') === 'menuitemradio')).toBe(true);
+    expect(gears.map(gear => gear.getAttribute('aria-checked'))).toEqual(['false', 'true', 'false']);
+    expect(gears.every(gear => !gear.hasAttribute('data-tooltip'))).toBe(true);
+  });
+
+  it('supports keyboard selection, Escape and Tab without leaking Escape to the host', async () => {
+    let variant = 'medium';
+    const onVariantChange = jest.fn(async (value: string | undefined) => { variant = value ?? ''; });
+    const { container, selector } = mount(makeCallbacks({ getVariant: () => variant, onVariantChange }));
+    document.body.appendChild(container);
+    const trigger = container.querySelector<HTMLElement>('.opencodian-effort-current')!;
+    const hostEscape = jest.fn();
+    document.addEventListener('keydown', hostEscape);
+    trigger.focus();
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    const selected = container.querySelector<HTMLElement>('[aria-checked="true"]')!;
+    expect(document.activeElement).toBe(selected);
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    selected.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+    expect(document.activeElement?.textContent).toBe('Low');
+    document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
+    await Promise.resolve(); await Promise.resolve();
+    expect(onVariantChange).toHaveBeenCalledWith('low');
+    const nextTrigger = container.querySelector<HTMLElement>('.opencodian-effort-current')!;
+    expect(document.activeElement).toBe(nextTrigger);
+    nextTrigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
+    expect(document.activeElement?.textContent).toBe('Low');
+    hostEscape.mockClear();
+    document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    expect(nextTrigger.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(nextTrigger);
+    expect(hostEscape).not.toHaveBeenCalled();
+    nextTrigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    expect(nextTrigger.getAttribute('aria-expanded')).toBe('false');
+    document.removeEventListener('keydown', hostEscape);
+    selector.destroy();
+    container.remove();
   });
 
   it('keeps every custom tooltip trigger outside Obsidian native tooltip ownership', () => {
@@ -174,6 +205,49 @@ describe('EffortSelector boundary hint', () => {
     expect(triggers.map(findObsidianNativeTooltipOwner)).toEqual(
       triggers.map(() => null),
     );
+  });
+
+  it('does not reclaim focus when the user leaves during an async save', async () => {
+    let resolveSave: () => void = () => {};
+    const onVariantChange = jest.fn(() => new Promise<void>((resolve) => { resolveSave = resolve; }));
+    const { container, selector } = mount(makeCallbacks({ onVariantChange }));
+    const nextControl = document.createElement('button');
+    nextControl.textContent = 'Next control';
+    document.body.append(container, nextControl);
+    const trigger = container.querySelector<HTMLElement>('.opencodian-effort-current')!;
+    trigger.focus();
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    const selected = container.querySelector<HTMLElement>('[aria-checked="true"]')!;
+    selected.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
+    nextControl.focus();
+    resolveSave();
+    await Promise.resolve(); await Promise.resolve();
+
+    expect(onVariantChange).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(nextControl);
+    selector.destroy();
+    container.remove();
+    nextControl.remove();
+  });
+
+  it('prevents duplicate saves and keeps a failed choice open for retry', async () => {
+    let rejectSave: (reason: Error) => void = () => {};
+    const onVariantChange = jest.fn(() => new Promise<void>((_resolve, reject) => { rejectSave = reject; }));
+    const { container, selector } = mount(makeCallbacks({ onVariantChange }));
+    document.body.appendChild(container);
+    const trigger = container.querySelector<HTMLElement>('.opencodian-effort-current')!;
+    trigger.click();
+    const choice = container.querySelector<HTMLElement>('[role="menuitemradio"]')!;
+    choice.click();
+    choice.click();
+    expect(onVariantChange).toHaveBeenCalledTimes(1);
+    rejectSave(new Error('save failed'));
+    await Promise.resolve(); await Promise.resolve();
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(container.querySelector('.opencodian-effort-feedback')?.textContent).toBe('Could not save the reasoning level. Try again.');
+    expect(container.querySelector('[aria-busy="true"]')).toBeNull();
+    selector.destroy();
+    container.remove();
   });
 
   it('clamps the effort menu from its right edge when opened with the keyboard', () => {

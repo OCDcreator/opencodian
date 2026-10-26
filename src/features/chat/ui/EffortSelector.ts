@@ -17,6 +17,7 @@ import { AnchoredOverlayLayoutController } from './AnchoredOverlayLayoutControll
 const EFFORT_DROPDOWN_MINIMUM_WIDTH = 60;
 const EFFORT_DROPDOWN_SAFE_INSET = 8;
 let accessibleLabelId = 0;
+let effortMenuId = 0;
 
 export interface EffortSelectorCallbacks {
   /** Available variant names for the current model */
@@ -45,6 +46,8 @@ export class EffortSelector {
   private groupEl: HTMLElement | null = null;
   private callbacks: EffortSelectorCallbacks;
   private isMenuOpen = false;
+  private isSaving = false;
+  private readonly menuId = `opencodian-effort-menu-${++effortMenuId}`;
   private dropdownLayoutController: AnchoredOverlayLayoutController | null = null;
   private readonly handleDocumentMouseDown: (event: MouseEvent) => void;
   private readonly handleDocumentKeyDown: (event: KeyboardEvent) => void;
@@ -56,14 +59,19 @@ export class EffortSelector {
     const doc = this.container.ownerDocument;
     this.handleDocumentMouseDown = (event: MouseEvent) => {
       const target = event.target;
-      if (target instanceof Node && this.container.contains(target)) {
+      if (target && this.container.contains(target as Node)) {
         return;
       }
       this.closeMenu();
     };
     this.handleDocumentKeyDown = (event: KeyboardEvent) => {
+      if (!this.isMenuOpen) return;
       if (event.key === 'Escape') {
-        this.closeMenu();
+        event.preventDefault();
+        event.stopPropagation();
+        this.closeMenu(true);
+      } else if (event.key === 'Tab') {
+        this.closeMenu(true);
       }
     };
     doc.addEventListener('mousedown', this.handleDocumentMouseDown, true);
@@ -83,6 +91,8 @@ export class EffortSelector {
 
   private renderGears(): void {
     if (!this.gearsEl) return;
+    const restoreFocus = this.container.contains(this.container.ownerDocument.activeElement);
+    this.closeMenu();
     this.gearsEl.empty();
 
     const variants = this.callbacks.getVariants();
@@ -97,6 +107,8 @@ export class EffortSelector {
     currentEl.setAttribute('role', 'button');
     currentEl.setAttribute('tabindex', '0');
     currentEl.setAttribute('aria-haspopup', 'menu');
+    currentEl.setAttribute('aria-expanded', 'false');
+    currentEl.setAttribute('aria-controls', this.menuId);
     currentEl.addClass('opencodian-tooltip-trigger');
     currentEl.setAttribute('data-tooltip-position', 'top');
     currentEl.addEventListener('click', (event) => {
@@ -107,53 +119,66 @@ export class EffortSelector {
     currentEl.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
-        this.toggleMenu();
+        event.stopPropagation();
+        this.toggleMenu(true);
+      } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!this.isMenuOpen) this.toggleMenu();
+        this.focusOption(event.key === 'ArrowDown' ? 'first' : 'last');
       }
     });
 
     // Dropdown options
-    const optionsEl = this.gearsEl.createDiv({ cls: 'opencodian-effort-options' });
+    const optionsEl = this.gearsEl.createDiv({
+      cls: 'opencodian-effort-options',
+      attr: { id: this.menuId, role: 'menu' },
+    });
+    const menuLabel = optionsEl.createSpan({ cls: 'opencodian-visually-hidden', text: t('chat.effort.label') });
+    menuLabel.id = `${this.menuId}-label`;
+    optionsEl.setAttribute('aria-labelledby', menuLabel.id);
+    optionsEl.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Home' || event.key === 'End') {
+        event.preventDefault();
+        event.stopPropagation();
+        this.focusOption(event.key === 'Home' ? 'first' : event.key === 'End' ? 'last' : event.key === 'ArrowDown' ? 1 : -1);
+      }
+    });
     this.mountDropdownLayoutController(optionsEl);
 
-    if (allowDefaultOption) {
-      const defaultGear = optionsEl.createDiv({ cls: 'opencodian-effort-gear' });
-      defaultGear.setText(defaultLabel);
-      defaultGear.addClass('opencodian-tooltip-trigger');
-      defaultGear.setAttribute('data-tooltip-position', 'left');
-      defaultGear.setAttribute('data-tooltip', this.buildOptionTooltip(defaultLabel));
-      defaultGear.removeAttribute('title');
-      if (!currentVariant) {
-        defaultGear.addClass('selected');
-      }
-      defaultGear.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        await this.callbacks.onVariantChange(undefined);
-        this.closeMenu();
-        this.updateDisplay();
+    const choices: Array<{ variant: string | undefined; label: string }> = [
+      ...(allowDefaultOption ? [{ variant: undefined, label: defaultLabel }] : []),
+      ...[...variants].reverse().map((variant) => ({ variant, label: formatVariantLabel(variant) })),
+    ];
+    for (const { variant, label } of choices) {
+      const selected = variant === currentVariant || variant === undefined && !currentVariant;
+      const gearEl = optionsEl.createDiv({
+        cls: 'opencodian-effort-gear', text: label,
+        attr: { role: 'menuitemradio', tabindex: '-1', 'aria-checked': String(selected) },
       });
-    }
-
-    // Variant options (reverse order so highest effort is at top)
-    for (const variant of [...variants].reverse()) {
-      const gearEl = optionsEl.createDiv({ cls: 'opencodian-effort-gear' });
-      const optionLabel = formatVariantLabel(variant);
-      gearEl.setText(optionLabel);
-      gearEl.addClass('opencodian-tooltip-trigger');
-      gearEl.setAttribute('data-tooltip-position', 'left');
-      gearEl.setAttribute('data-tooltip', this.buildOptionTooltip(optionLabel));
-      gearEl.removeAttribute('title');
-
-      if (variant === currentVariant) {
+      if (selected) {
         gearEl.addClass('selected');
       }
-
-      gearEl.addEventListener('click', async (e) => {
+      gearEl.addEventListener('click', (e) => {
         e.stopPropagation();
-        await this.callbacks.onVariantChange(variant);
-        this.closeMenu();
-        this.updateDisplay();
+        void this.selectVariant(variant);
+      });
+      gearEl.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          event.stopPropagation();
+          void this.selectVariant(variant);
+        }
       });
     }
+    const hint = this.callbacks.getBoundaryHint?.()?.trim();
+    if (hint) {
+      const hintEl = optionsEl.createDiv({ cls: 'opencodian-effort-menu-hint', text: hint });
+      hintEl.id = `${this.menuId}-hint`;
+      optionsEl.setAttribute('aria-describedby', hintEl.id);
+    }
+    optionsEl.createDiv({ cls: 'opencodian-effort-feedback', attr: { role: 'status', 'aria-live': 'polite' } });
+    if (restoreFocus) currentEl.focus();
   }
 
   updateDisplay(): void {
@@ -182,6 +207,13 @@ export class EffortSelector {
     return this.container;
   }
 
+  /** Obsidian's Scope may consume Escape before document listeners run. */
+  handleEscape(): boolean {
+    if (!this.isMenuOpen) return false;
+    this.closeMenu(true);
+    return true;
+  }
+
   destroy(): void {
     const doc = this.container.ownerDocument;
     doc.removeEventListener('mousedown', this.handleDocumentMouseDown, true);
@@ -192,7 +224,7 @@ export class EffortSelector {
     this.container.remove();
   }
 
-  private toggleMenu(): void {
+  private toggleMenu(focusOption = false): void {
     if (this.isMenuOpen) {
       this.closeMenu();
       return;
@@ -200,13 +232,53 @@ export class EffortSelector {
     this.closeMenu();
     this.isMenuOpen = true;
     this.gearsEl?.addClass('is-open');
+    const current = this.gearsEl?.querySelector<HTMLElement>('.opencodian-effort-current');
+    current?.setAttribute('aria-expanded', 'true');
+    current?.removeClass('opencodian-tooltip-trigger');
+    TooltipLayerController.ensureForElement(this.container).hide();
     this.dropdownLayoutController?.observe();
     this.dropdownLayoutController?.sync();
+    if (focusOption) this.focusOption('selected');
   }
 
-  private closeMenu(): void {
+  private closeMenu(restoreFocus = false): void {
     this.isMenuOpen = false;
     this.gearsEl?.removeClass('is-open');
+    const current = this.gearsEl?.querySelector<HTMLElement>('.opencodian-effort-current');
+    current?.setAttribute('aria-expanded', 'false');
+    current?.addClass('opencodian-tooltip-trigger');
+    if (restoreFocus) current?.focus();
+  }
+
+  private focusOption(target: number | 'first' | 'last' | 'selected'): void {
+    const options = Array.from(this.gearsEl?.querySelectorAll<HTMLElement>('[role="menuitemradio"]') ?? []);
+    if (!options.length) return;
+    const active = options.indexOf(this.container.ownerDocument.activeElement as HTMLElement);
+    const index = target === 'first' ? 0 : target === 'last' ? options.length - 1
+      : target === 'selected' ? Math.max(0, options.findIndex((option) => option.getAttribute('aria-checked') === 'true'))
+        : (active + target + options.length) % options.length;
+    options.forEach((option, i) => { option.tabIndex = i === index ? 0 : -1; });
+    options[index]?.focus();
+  }
+
+  private async selectVariant(variant: string | undefined): Promise<void> {
+    if (this.isSaving) return;
+    this.isSaving = true;
+    const menu = this.gearsEl?.querySelector<HTMLElement>('.opencodian-effort-options');
+    menu?.setAttribute('aria-busy', 'true');
+    try {
+      await this.callbacks.onVariantChange(variant);
+      const restoreFocus = this.container.isConnected && Boolean(menu?.contains(this.container.ownerDocument.activeElement));
+      this.closeMenu();
+      this.updateDisplay();
+      if (restoreFocus) this.gearsEl?.querySelector<HTMLElement>('.opencodian-effort-current')?.focus();
+    } catch {
+      const feedback = menu?.querySelector<HTMLElement>('.opencodian-effort-feedback');
+      feedback?.setText(t('chat.effort.saveFailed'));
+    } finally {
+      this.isSaving = false;
+      menu?.removeAttribute('aria-busy');
+    }
   }
 
   private mountDropdownLayoutController(optionsEl: HTMLElement): void {
@@ -246,6 +318,7 @@ export class EffortSelector {
     this.groupEl.removeAttribute('data-tooltip');
     this.groupEl.removeAttribute('title');
     const currentEl = this.gearsEl?.querySelector<HTMLElement>('.opencodian-effort-current');
+    currentEl?.querySelector('[data-effort-accessible-label="true"]')?.remove();
 
     if (!currentLabel) {
       currentEl?.removeAttribute('aria-label');
@@ -278,9 +351,6 @@ export class EffortSelector {
     currentEl.removeAttribute('title');
   }
 
-  private buildOptionTooltip(label: string): string {
-    return t('chat.effort.optionTooltip', { effort: label });
-  }
 }
 
 function formatVariantLabel(variant: string): string {

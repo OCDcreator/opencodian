@@ -29,3 +29,15 @@ OpenCode 模式下，variants 来自当前 provider model catalog 的 `models[mo
 - `.opencodian-effort-label` 与 `.opencodian-effort-boundary-hint` 不再渲染；`.opencodian-effort-current` 是主 tooltip trigger，`.opencodian-effort-gear` 每一项也有独立 tooltip，鼠标在弹出菜单内移动时 tooltip 文案会随 hover 项更新，而不是停留在父级说明。
 - tooltip 回归测试必须从真实 `EffortSelector` DOM seam 检查每个 `.opencodian-tooltip-trigger[data-tooltip]` 的祖先链，确保不存在 Obsidian 会接管的 `[aria-label]` / `[title]` owner，并验证当前 control 的 hidden accessible carrier 与 `aria-labelledby` 保持同步。
 - 每次 variants 更新并重建 options DOM 时必须重建浮层控制器；destroy 时断开 observer，避免继续持有旧菜单节点。
+
+## 2026-10-26 键盘与默认语义修复
+
+- Effort trigger 同步 aria-expanded/controls；菜单为具名 menu，每个选项为 menuitemradio 并公开 aria-checked，使用单一 roving tabindex。Enter/Space 打开并聚焦当前选项；上下箭头、Home/End 移动，Enter/Space 选择，Escape 关闭并返回 trigger；Tab 关闭后继续正常焦点顺序。仅在菜单打开时消费 Escape，避免传给宿主关闭设置窗口。
+- 选择保存由既有 callback 承担；等待期间防重复提交，失败保留菜单与 live 反馈。成功后仅在焦点仍位于菜单时恢复入口；保存期间用户已 Tab/点击离开或组件已卸载时不抢回焦点，所有 backend 共用这一约束。
+- 菜单项不再有 hover tooltip；当前值 tooltip 在菜单打开时隐藏，边界说明在菜单内显示，避免遮挡选项。此条取代上文“每项独立 tooltip”的旧约束。
+- 默认/显式选项由 host 区分，组件继续不读取 backend 或保存设置。
+
+
+## 2026-10-26 宿主 Escape 验收补充
+
+`handleEscape()` 供 Obsidian Scope 优先关闭已打开的菜单并恢复入口焦点；菜单关闭时返回 false，让原有 Escape 链继续。document 监听保留为独立组件的回退，不能用其单元测试代替宿主捕获阶段验收。

@@ -4,6 +4,7 @@
 > 2026-09-21 (advantage-parity R-E1)：ChatRuntimeComposition 组合 UrlContextFetchService 并注入发送准备的 resolveUrlContextItems 缝。
 
 # Owner: feature.chat-runtime
+> 2026-10-26（DSH UI 修复）：AssistantShellRenderer 使用 shell 提供的目录查询显示历史消息模型名称；原始 provider/model 身份保留在 data 属性、焦点提示和可访问名称中。找不到目录项时显示原始身份，不借用当前会话模型，也不改写消息记录。
 > 2026-09-25 (FA880): BackgroundTaskInlinePanelRenderer displays native ZCode jobs separately from the foreground tool card, refreshing active jobs and surfacing cancel/failure/interrupted terminal states.
 > The native watch is armed on activation before a task exists and only fetches for the active tab; the renderer owns its timer cleanup.
 > 2026-09-25 (FA880): QuestionInlineCardRenderer now settles and removes an inline question whose original native ask disappears; process loss cannot leave its promise and answer buttons alive.
@@ -94,3 +95,6 @@ Settled Claude Code turns reuse the existing scoped user-footer identity refresh
 当前源码目录：`src/features/chat/runtime`、`src/features/chat/runtime/activation`、`src/features/chat/runtime/background`、`src/features/chat/runtime/rendering`、`src/features/chat/runtime/send`。
 
 目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。
+
+
+2026-10-26 现场目录时序补充：目录晚到时，AssistantShellViewHostAdapter/AssistantShellRenderer 只更新已存在 footer 的可见模型名、tooltip 和 AX 名称，完整历史身份保持不变，不重建 body。

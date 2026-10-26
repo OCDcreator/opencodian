@@ -128,3 +128,10 @@ Opening the model picker refreshes an unloaded/empty catalog through the existin
 模型目录、默认选择和可用性检查按工具栏自己的 conversation 路由到 DSH。先保存请求的模型选择，再设置 native session option 并读取完整结果；失败不静默换用其他模型。切 tab、重建/销毁工具栏与快速多次选择受代际及 originating conversation 约束，迟到工作不能创建幽灵连接或改写别的会话。
 
 DSH 的模型值保持不透明。推理 variants 仅来自该原生会话已观察到的精确模型配置。ACP 只提供权限请求，没有 mode mutation，因此不挂载 OpenCode 的 ASK/PLAN/YOLO 控件；原生权限卡片应答保持。
+
+## 2026-10-26 键盘与模型显示名
+
+模型 trigger 支持 Enter/Space 切换和 ArrowDown 打开，均经过原有 streaming 禁用判断，复用原搜索焦点与 Escape 返回路径。getModelDisplayName 仅按消息记录中的完整 provider/model 引用匹配已加载目录；未知引用返回 unavailable，不借用当前下一轮模型替换历史身份。原始模型引用和持久化格式不变。
+
+
+2026-10-26 现场目录时序补充：reloadModelCatalog 完成目录快照与工具栏更新后，调用可选 host.refreshHistoricalModelDisplayNames；修复 native 目录晚于历史 footer 首次绘制的情况。

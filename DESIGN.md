@@ -401,6 +401,7 @@ The Codex MCP server inspection modal follows the shared modal/inspection-panel 
 
 - **Style:** transparent or tonal background, 10-12px radius, Obsidian text colors, compact line height.
 - **Focus:** accent outline, border shift, or tonal lift. Do not add large glow.
+- **Names:** persistent field labels and independent accessible names are required. A visual placeholder, especially one hidden from accessibility APIs, cannot be the input name.
 - **Error / Disabled:** error color must be visible in both light and dark themes; disabled state should reduce contrast but keep labels readable.
 
 ### Settings Dropdowns
@@ -427,6 +428,9 @@ Settings dropdown menus may be wider than their trigger when option labels need 
 - **Assistant messages:** full-width readable flow with 13px text, 1.5 line height, transparent default background, and subtle hover elevation when theme backgrounds are active.
 - **Streaming and tools:** use inline rows, monospace tool names, muted summaries, and status icons. Structural rails are acceptable for tool/thinking content, but do not use colored side stripes as a generic card accent.
 - **Notices:** use cards for actual status or recovery needs, not for decorative grouping.
+- **Functional metadata:** timestamps, recorded model identity, and backend state badges have an 11px minimum. Keep metadata readable at rest instead of fading the entire row; derive secondary/status colors from host foreground tokens. Historical model labels resolve only from that message's recorded reference, with the exact reference available on keyboard focus and hover.
+- **Narrow header:** below a 400px Chat container, the brand occupies its own row; tab identity and header actions share the next row with at least 44px reserved for the tab track. The container width, not the desktop window width, selects this layout.
+- **Effort:** the trigger exposes expanded state and controls a keyboard radio menu. Next-send/default-inheritance guidance belongs inside the open menu; option tooltips must not cover choices. DSH model-default and explicit Off remain distinct selections.
 
 ## 6. Do's and Don'ts
 

@@ -7,6 +7,7 @@
 > 2026-09-20 (advantage-parity R-D1)：OpenCodianView 的历史菜单 host 新增 exportConversationMarkdown 转发方法（导出逻辑不进视图）。
 
 # Owner: feature.chat-shell
+> 2026-10-26（DSH UI 修复）：视图把 DSH 显式 effort 覆盖、原生默认显示值和下一轮生效说明交给既有 EffortSelector，并向消息 renderer 转发按历史模型身份查找显示名的只读方法。发送采用的有效值仍走原链路，视图不新增模型目录或协议状态。
 > 2026-10-24（DSH）：视图转发会话模型/推理持久化与后端独立 diff 读取；保存恢复和原生配置仍由 selection coordinator / adapter 承担，不引入视图内会话运行时。
 > 2026-09-30 (Codex 0.159 integration)：
 > - OpenCodianView capability-change 缝加固：`CAPABILITY_CHANGE_REFRESH_CAPABILITIES` churn guard + capability 变化时排队刷新 follow-up bar。
@@ -111,3 +112,9 @@ OpenCodianView 只转发 Codex 目录恢复到插件既有桥，保持 view/runt
 当前源码目录：`src/features/chat`、`src/features/chat/retrieval`。
 
 目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。
+
+
+2026-10-26 现场 Escape 补充：wireEventHandlers 的既有 Scope 先向当前 EffortSelector 转发关闭请求，再执行已有 popover/stream cancel 链；这是一条 UI 转发缝，不在 view 中复制菜单状态，也不按 composer 重建次数积累注册。
+
+
+2026-10-26 现场目录时序补充：selection 的目录就绪回调只把当前 chat 根转交既有 shell renderer adapter，保持 DOM 更新归 runtime renderer。

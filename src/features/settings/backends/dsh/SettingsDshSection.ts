@@ -28,35 +28,42 @@ export class SettingsDshSection {
   attach(containerEl: HTMLElement): void {
     if (!this.host.isEnabled()) return;
     const settings = this.host.getSettings();
-    const group = containerEl.createDiv({ cls: 'opencodian-backend-agent-group' });
+    const group = containerEl.createDiv({ cls: 'opencodian-backend-agent-group opencodian-dsh-settings' });
     group.createEl('h4', { cls: 'opencodian-settings-subsection-heading', text: t('settings.agent.dsh.connection') });
     new Setting(group).setName(t('settings.agent.dsh.transport')).setDesc(t('settings.agent.dsh.transport.desc'))
-      .addDropdown((dropdown) => dropdown
-        .addOption('native', t('settings.agent.dsh.transport.native')).addOption('acp', t('settings.agent.dsh.transport.acp'))
-        .setValue(settings.transport ?? 'native').onChange(async (value) => {
-          settings.transport = value === 'acp' ? 'acp' : 'native'; await this.host.saveSettings();
-        }));
+      .addDropdown((dropdown) => {
+        dropdown.selectEl.setAttribute('aria-label', t('settings.agent.dsh.transport'));
+        dropdown
+          .addOption('native', t('settings.agent.dsh.transport.native')).addOption('acp', t('settings.agent.dsh.transport.acp'))
+          .setValue(settings.transport ?? 'native').onChange(async (value) => {
+            settings.transport = value === 'acp' ? 'acp' : 'native'; await this.host.saveSettings();
+          });
+      });
     new Setting(group)
       .setName(t('settings.agent.dsh.executable'))
       .setDesc(t('settings.agent.dsh.executable.desc'))
-      .addText((input) => input
-        .setPlaceholder('dsh')
+      .addText((input) => {
+        input.inputEl.setAttribute('aria-label', t('settings.agent.dsh.executable'));
+        input.setPlaceholder('dsh')
         .setValue(settings.executablePath)
         .onChange(async (value) => {
           settings.executablePath = value.trim();
           await this.host.saveSettings();
-        }));
+        });
+      });
     new Setting(group)
       .setName(t('settings.agent.dsh.workingDirectory'))
       .setDesc(t('settings.agent.dsh.workingDirectory.desc'))
-      .addText((input) => input
-        .setPlaceholder(t('settings.agent.dsh.workingDirectory.placeholder'))
+      .addText((input) => {
+        input.inputEl.setAttribute('aria-label', t('settings.agent.dsh.workingDirectory'));
+        input.setPlaceholder(t('settings.agent.dsh.workingDirectory.placeholder'))
         .setValue(settings.workingDirectory)
         .onChange(async (value) => {
           settings.workingDirectory = value.trim();
           await this.host.saveSettings();
-        }));
-    const status = group.createDiv({ cls: 'setting-item-description', text: t('settings.agent.dsh.status.disconnected') });
+        });
+      });
+    const status = group.createDiv({ cls: 'setting-item-description', attr: { role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' } });
     const adapter = this.host.getAdapter();
     const statusKey = (): TranslationKey => `settings.agent.dsh.status.${adapter?.status ?? 'disconnected'}`;
     status.setText(t(statusKey()));
@@ -91,15 +98,27 @@ export class SettingsDshSection {
     const disclosure = container.createEl('details');
     disclosure.createEl('summary', { text: t('settings.agent.dsh.mcp') });
     let draft = JSON.stringify(settings.mcpServers ?? [], null, 2);
-    const row = new Setting(disclosure).setName(t('settings.agent.dsh.mcp'))
+    const serializeDeclarations = (value: unknown): string => JSON.stringify(this.host.validateMcpServers(value));
+    const hasUnsavedChanges = (): boolean => {
+      try {
+        return serializeDeclarations(JSON.parse(draft)) !== serializeDeclarations(settings.mcpServers ?? []);
+      } catch {
+        return draft !== JSON.stringify(settings.mcpServers ?? [], null, 2);
+      }
+    };
+    const row = new Setting(disclosure).setName(t('settings.agent.dsh.mcp.declarations'))
       .setDesc(t('settings.agent.dsh.mcp.desc')).setClass('opencodian-wide-text-setting');
+    const feedback = disclosure.createDiv({ cls: 'setting-item-description', attr: { role: 'status', 'aria-live': 'polite' } });
     row.addTextArea((input) => {
-      input.setValue(draft).setPlaceholder('[]').onChange((value) => { draft = value; });
+      input.setValue(draft).setPlaceholder('[]').onChange((value) => {
+        draft = value;
+        const message = hasUnsavedChanges() ? t('settings.agent.dsh.mcp.unsaved') : '';
+        if (feedback.textContent !== message) feedback.setText(message);
+      });
       input.inputEl.rows = 8;
-      input.inputEl.setAttribute('aria-label', t('settings.agent.dsh.mcp'));
+      input.inputEl.setAttribute('aria-label', t('settings.agent.dsh.mcp.declarations'));
       input.inputEl.addClass('opencodian-config-editor');
     });
-    const feedback = disclosure.createDiv({ cls: 'setting-item-description', attr: { role: 'status', 'aria-live': 'polite' } });
     row.addButton((button) => button.setButtonText(t('settings.agent.dsh.save')).onClick(async () => {
       button.setDisabled(true);
       feedback.empty();
@@ -123,7 +142,9 @@ export class SettingsDshSection {
           const adapter = this.host.getAdapter();
           if (!adapter?.applyMcpConfiguration) throw new Error(t('settings.agent.dsh.status.unavailable'));
           const count = await adapter.applyMcpConfiguration();
-          feedback.setText(t('settings.agent.dsh.mcp.applied', { count }));
+          const unsaved = hasUnsavedChanges();
+          feedback.setText(t('settings.agent.dsh.mcp.applied', { count })
+            + (unsaved ? ` ${t('settings.agent.dsh.mcp.draftNotApplied')}` : ''));
         } catch (error) { feedback.setText(error instanceof Error ? error.message : String(error)); }
         finally { button.setDisabled(false); }
       }));
@@ -141,8 +162,13 @@ export class SettingsDshSection {
       container.createEl('p', { cls: 'setting-item-description', text: t('chat.dsh.configurationUnavailable') });
     }
     for (const option of configuration.controls) {
-      new Setting(container).setName(option.name)
-        .setDesc(option.choices.find((choice) => choice.value === option.value)?.name ?? option.value);
+      const name = option.id === 'model' ? t('settings.agent.dsh.model')
+        : option.id === 'reasoning_effort' ? t('settings.agent.dsh.effort') : option.name;
+      const selected = option.choices.find((choice) => choice.value === option.value)?.name ?? option.value;
+      const separator = selected.indexOf(': ');
+      const value = separator > 0 && selected.slice(0, separator) === selected.slice(separator + 2)
+        ? selected.slice(separator + 2) : selected;
+      new Setting(container).setName(name).setDesc(value);
     }
   }
 

@@ -64,6 +64,7 @@ export interface ChatSelectionControlsCoordinatorHost extends ModelSelectionRunt
   getApp(): App;
   resolveProviderIconUrl(providerId: string): Promise<string | null>;
   updateEffortSelectorDisplay(): void;
+  refreshHistoricalModelDisplayNames?(): void;
   restoreComposerInputFocus(): void;
   /** OpenCode permission template mode (yolo/normal/plan). */
   getPermissionMode(): PermissionMode;
@@ -461,6 +462,7 @@ export class ChatSelectionControlsCoordinator {
     await this.modelSelectionRuntime.reloadModelCatalog();
     this.refreshModelOptions();
     this.updateModelSelectorDisplay();
+    this.host.refreshHistoricalModelDisplayNames?.();
   }
 
   async refreshZCodeSessionState(): Promise<void> {
@@ -503,6 +505,16 @@ export class ChatSelectionControlsCoordinator {
     model: Partial<ModelSelectorSelection> | null | undefined,
   ): string | undefined {
     return this.modelSelectionRuntime.formatModelId(model);
+  }
+
+  getModelDisplayName(modelId: string): string | undefined {
+    // Resolve the recorded reference, never the newly selected model: changing
+    // the next turn's model must not relabel a historical answer.
+    for (const provider of this.getAvailableProviders()) {
+      const model = provider.models.find((candidate) => `${provider.id}/${candidate.id}` === modelId);
+      if (model) return model.name || model.id;
+    }
+    return undefined;
   }
 
   async ensureSelectedModelAvailable(
@@ -941,6 +953,21 @@ export class ChatSelectionControlsCoordinator {
         return;
       }
       this.toggleModelDropdown();
+    });
+    this.modelSelectorTrigger.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'ArrowDown') {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      if (this.isModelSelectorStreamingDisabled()) {
+        return;
+      }
+      if (event.key === 'ArrowDown') {
+        this.openModelDropdown();
+      } else {
+        this.toggleModelDropdown();
+      }
     });
 
     this.modelDropdownClickOutsideHandler = (event: MouseEvent) => {

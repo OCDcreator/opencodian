@@ -998,6 +998,36 @@ body[data-opencodian-provider-icon-mode="color"] {
   margin: 0 12px;
 }
 
+@container (max-width: 400px) {
+  .opencodian-header {
+    display: grid;
+    grid-template-columns: minmax(44px, 1fr) auto;
+    gap: 8px;
+  }
+
+  .opencodian-header > .opencodian-title {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .opencodian-header > .opencodian-tab-bar-slot--header {
+    grid-row: 2;
+    grid-column: 1;
+    min-width: 44px;
+    margin: 0;
+  }
+
+  .opencodian-header > .opencodian-header-actions {
+    grid-row: 2;
+    grid-column: 2;
+  }
+
+  .opencodian-header-actions,
+  .opencodian-header-action-group {
+    gap: 6px;
+  }
+}
+
 .opencodian-tab-bar-slot--below-header {
   padding: 0 16px 10px;
   z-index: 30;

@@ -35,3 +35,10 @@
 - 源码位置：`src/features/chat/runtime/rendering/AssistantShellRenderer.ts`。
 - 原位置：`src/features/chat/runtime/AssistantShellRenderer.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/features/chat/services/rendering/ConversationRenderService.ts`、`src/features/chat/runtime/send/SendPipelineTypes.ts`。
+
+## 2026-10-26 模型元数据
+
+可选 host.getModelDisplayName 仅解析消息记录的模型引用。Footer 显示目录名称，同时在 data-model-id 保留原始身份；可聚焦的 custom tooltip 与 hidden accessible label 提供完整名称和引用，窄栏裁切仍可检查。未知模型保留原始引用，未更改任何消息持久化或上游映射。
+
+
+2026-10-26 现场目录时序补充：目录延迟就绪后，refreshModelDisplayNames 只重绘本 view 已存在的模型标签、tooltip 和可访问名称；保留 data-model-id 和 label id，不重建消息 body、不写会话。

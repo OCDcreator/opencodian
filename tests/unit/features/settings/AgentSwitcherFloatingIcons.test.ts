@@ -58,6 +58,37 @@ describe('renderAgentSwitcherFloatingIcons', () => {
     floatingEl?.remove();
   });
 
+  it('tracks the detached owner window even when only its left position changes', async () => {
+    const frame = document.createElement('iframe');
+    document.body.appendChild(frame);
+    const ownerWindow = frame.contentWindow!;
+    const ownerDocument = frame.contentDocument!;
+    // Create with the setup realm's Obsidian DOM helpers, then adopt into the
+    // detached document. The owner window is still the iframe after adoption.
+    const containerEl = document.createElement('div');
+    ownerDocument.body.appendChild(containerEl);
+    let left = 418;
+    jest.spyOn(containerEl, 'getBoundingClientRect').mockImplementation(() => ({
+      left, right: left + 396, top: 30, bottom: 866, width: 396, height: 836,
+      x: left, y: 30, toJSON: () => ({}),
+    }));
+
+    renderAgentSwitcherFloatingIcons(containerEl, {
+      selectedAgent: 'opencode2', enabledAgents: ['opencode2', 'claude-code'], onSelect: jest.fn(),
+    });
+    const floatingEl = ownerDocument.querySelector<HTMLElement>('.opencodian-agent-switcher-floating')!;
+    expect(floatingEl.style.getPropertyValue('--opencodian-agent-switcher-fixed-left')).toBe('418px');
+
+    left = 252;
+    ownerWindow.dispatchEvent(new Event('resize'));
+    expect(floatingEl.style.getPropertyValue('--opencodian-agent-switcher-fixed-left')).toBe('252px');
+
+    containerEl.remove();
+    await Promise.resolve();
+    expect(floatingEl.isConnected).toBe(false);
+    frame.remove();
+  });
+
   it('hides the editor-area switcher while an unrelated Obsidian settings modal is in front', async () => {
     const containerEl = document.createElement('div');
     document.body.appendChild(containerEl);

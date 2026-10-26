@@ -11,6 +11,13 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-10-26 v2.1.1：DSH 设置与 Chat 可用性修复发布
+
+- 版本同步为 `2.1.1`（patch：共享 UI 可用性修正与 DSH 设置状态表达，向后兼容）。修复 Chat 键盘/读屏、effort 默认与生效边界、宿主 Escape、窄窗口/窄 pane、设置字段焦点与连接播报、MCP 状态文案，以及历史模型 footer 在目录晚到后的刷新；保留完整 opaque 模型身份用于诊断，不改协议或消息记录。
+- 发布审查追加收口：异步保存仅在焦点仍位于菜单时恢复入口，用户离开或组件卸载不抢焦；MCP 草稿与已保存声明经同一验证器规范化比较，紧凑 JSON 和显式 `stdio` 不再误报；MCP 编辑器的可访问名称与可见“服务器声明”一致，并同步模块文档、owner 说明和维护规则。
+- 独立 Standards / Spec 审查及复核均为 non-block。聚焦 6 套件 84 项通过后，`npm run verify` 15 道门禁全 PASS：1004 套件 / 10769 项测试通过，Graphify、生成 CSS、lint、typecheck 与生产构建均绿。构建 `main.202610262219` 已部署 macOS Test Vault，三件套 SHA-256 一致，运行时读回 `OpenCodian 2.1.1 BUILD_ID=main.202610262219`；DSH 标签及 Effort 打开/Escape 运行态冒烟通过，431 个会话文件字节不变。
+- 验收边界保持 macOS 浅色主题；暗色、Windows、真实模型发送、权限卡、streaming 与 Native live 不在新增验收内。验收脚本两起意外写入的恢复过程与限制见 `.obsidian-debug/dsh-review-20261026/assessment-b/fix-20261026/remediation-summary.md`，不声称笔记 mtime/undo 历史精确恢复。
+
 ## 2026-10-26 v2.1.0：DSH 原生通道、压缩与费用明细发布
 
 - 版本同步为 `2.1.0`（minor：DSH 默认接入改为插件自有原生 Host 扩展并补齐压缩/费用能力，向后兼容）。`zcode/dsh-gap-remediation` 全部 8 个提交（27322547…c21a2b14）fast-forward 合入 main（基准 c3ab43e8，无合并提交）：原生通道/图片/行内查询、权限与问题卡断路修复、超时与可观测性、ACP 能力面调研、两轮 Astra 复审处置、原生 Compaction 与 token/费用明细。

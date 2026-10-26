@@ -1067,7 +1067,13 @@ export class OpenCodianView extends ItemView {
             const modelRef = `${current.provider}/${current.model}`;
             return this.findKnownModelInfo({ provider: current.provider, model: current.model })?.variants ?? [];
           },
-          getVariant: () => this.getCurrentEffortVariant(),
+          getVariant: () => {
+            if (this.currentConversation?.backend === 'dsh') {
+              const current = this.getCurrentSessionModel();
+              return current ? this.currentConversation.sessionSettings?.dshEffortOverrides?.[`${current.provider}/${current.model}`] ?? undefined : undefined;
+            }
+            return this.getCurrentEffortVariant();
+          },
           onVariantChange: async (variant: string | undefined) => {
             if (this.isCodexConversationActive()) {
               const conversation = this.currentConversation;
@@ -1123,13 +1129,21 @@ export class OpenCodianView extends ItemView {
             return current ? `${current.provider}/${current.model}` : '';
           },
           allowDefaultOption: () => !this.isClaudeCodeConversationActive() && !this.isCodexConversationActive(),
-          getDefaultOptionLabel: () => this.currentConversation?.backend === 'zcode'
-            ? t('chat.zcode.reasoning.modelDefault')
-            : this.currentConversation?.backend === 'pi' ? t('chat.effort.inherit.pi') : t('chat.effort.disabled'),
+          getDefaultOptionLabel: () => {
+            if (this.currentConversation?.backend === 'dsh') {
+              const adapter = this.plugin.agentServiceRegistry?.get('dsh') as { getDefaultReasoningEffort?(sessionId?: string): string | undefined } | undefined;
+              const effort = adapter?.getDefaultReasoningEffort?.(this.currentConversation.backendSessionId);
+              return effort ? t('chat.dsh.reasoning.modelDefault', { effort: effort.charAt(0).toUpperCase() + effort.slice(1) })
+                : t('chat.dsh.reasoning.inherit');
+            }
+            return this.currentConversation?.backend === 'zcode' ? t('chat.zcode.reasoning.modelDefault')
+              : this.currentConversation?.backend === 'pi' ? t('chat.effort.inherit.pi') : t('chat.effort.disabled');
+          },
           getBoundaryHint: () =>
             this.isCodexConversationActive() ? t('chat.effort.boundaryHint.codex')
               : this.currentConversation?.backend === 'zcode' ? t('chat.zcode.reasoning.boundaryHint')
-                : this.currentConversation?.backend === 'pi' ? t('chat.effort.boundaryHint.pi') : undefined,
+                : this.currentConversation?.backend === 'pi' ? t('chat.effort.boundaryHint.pi')
+                  : this.currentConversation?.backend === 'dsh' ? t('chat.dsh.reasoning.boundaryHint') : undefined,
         });
         this.effortSelector.updateDisplay();
       },
@@ -1325,6 +1339,11 @@ export class OpenCodianView extends ItemView {
   private createChatSelectionControlsCoordinatorHost(): ChatSelectionControlsCoordinatorHost {
     return {
       getOwnConversation: () => this.currentConversation,
+      refreshHistoricalModelDisplayNames: () => {
+        if (this.chatContainerEl) {
+          this.assistantShellViewHostAdapter?.refreshModelDisplayNames(this.chatContainerEl);
+        }
+      },
       preserveRequestedModel: () => this.currentConversation?.backend === 'claude-code',
       getApp: () => this.app,
       registerEscapeHandler: (handler) => {
@@ -3040,6 +3059,7 @@ export class OpenCodianView extends ItemView {
 
   private createAssistantShellViewHostAdapterHost(): AssistantShellViewHostAdapterHost {
     return {
+      getModelDisplayName: (modelId) => this.chatSelectionControlsCoordinator.getModelDisplayName(modelId),
       getActiveTabId: () => this.getActiveTabId(),
       getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
       ensureTurnBody: (tabId) => this.ensureTurnBody(tabId),
@@ -3908,6 +3928,9 @@ export class OpenCodianView extends ItemView {
   private wireEventHandlers() {
     this.scope = new Scope(this.app.scope);
     this.scope.register([], 'Escape', () => {
+      if (this.effortSelector?.handleEscape()) {
+        return false;
+      }
       for (const handler of this.escapeHandlers) {
         if (handler()) {
           return false;

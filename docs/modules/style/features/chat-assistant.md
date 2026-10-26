@@ -72,3 +72,7 @@
 本轮调整 `.opencodian-input-capability-hint`、`.opencodian-input-capability-hint-glyph` 与 `.opencodian-input-capability-hint-text`：它们不再占用 textarea 下方的一整行提示，也不再贴着 send 按钮，而是作为 context actions cluster 里的紧凑小按钮，和 add context / image attach 同区。当前唯一 capability chip 是 Claude Code 和 Codex backend 共用的 structured-output affordance（OpenCode 不显示），对用户展示为 `{ } JSON`；完整说明留在 tooltip，点击后仍只插入 `/json `，不会自动发送。
 
 本轮同步收口 prompt suggestion chip 样式：`.opencodian-suggestion-bar` 不再挂在 composer footer 或输入区顶部，而是作为最后一条 assistant message 的后继 sibling 插入同一个 turn body，视觉上紧跟该回复本身。`.opencodian-suggestion-chip` 继续是可点击 pill，点击后仅将文本插入 textarea，不会自动发送。这样 `{ } JSON` capability chip 留在 context actions，负责固定能力入口；prompt suggestion 则真正回到 assistant follow-up 的语义位置，不再与 add/send action 混成同一层。
+
+## 2026-10-26 Metadata and placeholder legibility
+
+Assistant timestamp/model text has an 11px CSS floor, retains full row opacity at rest, and mixes configured metadata colors toward the host normal foreground. The visual composer placeholder is no longer alpha-faded. Recorded model metadata has a visible keyboard-focus ring and a custom tooltip for the exact reference; raw IDs remain selectable and persisted unchanged.

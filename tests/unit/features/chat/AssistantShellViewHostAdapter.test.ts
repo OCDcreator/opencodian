@@ -11,7 +11,7 @@ function createMockMarkdownService() {
 }
 
 describe('AssistantShellViewHostAdapter', () => {
-  function createAdapter() {
+  function createAdapter(getModelDisplayName?: (modelId: string) => string | undefined) {
     const turnBody = document.createElement('div');
     const runtime = {
       streamingMessageEl: null as HTMLElement | null,
@@ -31,6 +31,7 @@ describe('AssistantShellViewHostAdapter', () => {
     const openTaskToolSession = jest.fn();
     const adapter = new AssistantShellViewHostAdapter(
       {
+        getModelDisplayName,
         getActiveTabId: () => 'tab-1',
         getTabRuntimeState: () => runtime,
         ensureTurnBody: () => turnBody,
@@ -56,6 +57,30 @@ describe('AssistantShellViewHostAdapter', () => {
       turnBody,
     };
   }
+
+  it('refreshes already rendered model labels when the native catalog becomes available', async () => {
+    const modelId = 'deepseek-official/["deepseek-official","deepseek-flash"]';
+    let ready = false;
+    const { adapter, turnBody, markdownService } = createAdapter((reference) =>
+      ready && reference === modelId ? 'DeepSeek-V4.1-Flash' : undefined);
+    const message: ChatMessage = {
+      id: 'late-catalog', role: 'assistant', content: 'Existing answer', timestamp: 1, modelId,
+    };
+    const messageEl = await adapter.renderPersistedAssistantMessage({ message });
+    const label = messageEl.querySelector<HTMLElement>('.opencodian-message-model-id')!;
+    expect(label.firstChild?.textContent).toBe(`· ${modelId}`);
+    ready = true;
+
+    (adapter as AssistantShellViewHostAdapter & { refreshModelDisplayNames(root: HTMLElement): void })
+      .refreshModelDisplayNames(turnBody);
+
+    expect(label.firstChild?.textContent).toBe('· DeepSeek-V4.1-Flash');
+    expect(label.dataset.modelId).toBe(modelId);
+    expect(label.getAttribute('data-tooltip')).toContain(modelId);
+    expect(label.querySelector(`#${label.getAttribute('aria-labelledby')}`)?.textContent).toContain(modelId);
+    expect(markdownService.render).toHaveBeenCalledTimes(1);
+    expect(message).toEqual({ id: 'late-catalog', role: 'assistant', content: 'Existing answer', timestamp: 1, modelId });
+  });
 
   it('renders notice placeholders through the shared notice host', async () => {
     const { adapter, renderNoticeCard, runtime } = createAdapter();

@@ -35,6 +35,7 @@ import {
 } from './composerInputParsing';
 
 const COMPOSER_TEXTAREA_MAX_HEIGHT = 240;
+let composerInputLabelId = 0;
 
 /**
  * F2 SEND-STOP-COLLISION: send and stop are one morphing control at the same
@@ -356,6 +357,12 @@ export class ComposerInputShellCoordinator {
       cls: 'opencodian-input',
       attr: { rows: '1' },
     });
+    const inputLabel = highlightContainerEl.createSpan({
+      cls: 'opencodian-visually-hidden',
+      text: t('chat.input.label'),
+    });
+    inputLabel.id = `opencodian-input-label-${++composerInputLabelId}`;
+    this.inputTextareaEl.setAttribute('aria-labelledby', inputLabel.id);
     this.inputTextareaEl.addEventListener('input', () => {
       this.syncTextareaHeight();
       if (this.host.shouldMountAgentSelector?.() !== false) {
@@ -684,8 +691,9 @@ export class ComposerInputShellCoordinator {
     }
 
     const placeholderText = this.resolveInputPlaceholder();
-    // aria-label removed — the custom placeholder overlay already provides the visual cue,
-    // and aria-label on the textarea caused an unwanted native tooltip on hover in Obsidian.
+    const labelId = this.inputTextareaEl?.getAttribute('aria-labelledby');
+    const inputLabel = labelId ? this.inputTextareaEl?.ownerDocument.getElementById(labelId) : null;
+    if (inputLabel) { inputLabel.textContent = t('chat.input.label'); }
     const textSpan = this.placeholderOverlayEl?.querySelector('.opencodian-input-placeholder-text');
     if (textSpan) { textSpan.textContent = placeholderText; }
     this.updateSendButtonState();

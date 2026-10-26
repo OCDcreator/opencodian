@@ -4,6 +4,7 @@ import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
 import type { ComposerInputShellCoordinatorHost } from '../../../../src/features/chat/services/composer/ComposerInputShellCoordinator';
 import type { ChatSelectionControlsCoordinatorHost } from '../../../../src/features/chat/services/selection/ChatSelectionControlsCoordinator';
 import type { EffortSelector, EffortSelectorCallbacks } from '../../../../src/features/chat/ui/EffortSelector';
+import { t } from '../../../../src/i18n';
 
 type DshHarness = {
   currentConversation: Conversation;
@@ -46,6 +47,21 @@ function effortCallbacks(view: DshHarness): EffortSelectorCallbacks {
 }
 
 describe('DSH composer persistence', () => {
+  it('distinguishes a model-default choice from explicit effort without changing send resolution', async () => {
+    const view = harness(conversation('default-ui'));
+    const callbacks = effortCallbacks(view);
+    expect(callbacks.getVariant()).toBeUndefined();
+    expect(callbacks.getDefaultOptionLabel?.()).toBe(t('chat.dsh.reasoning.modelDefault', { effort: 'Medium' }));
+    expect(callbacks.getBoundaryHint?.()).toBe(t('chat.dsh.reasoning.boundaryHint'));
+    expect(view.getSendMessageOptions().variant).toBe('medium');
+    await callbacks.onVariantChange('off');
+    expect(callbacks.getVariant()).toBe('off');
+    expect(view.getSendMessageOptions().variant).toBe('off');
+    await callbacks.onVariantChange(undefined);
+    expect(callbacks.getVariant()).toBeUndefined();
+    expect(view.getSendMessageOptions().variant).toBe('medium');
+  });
+
   it('persists two conversations independently and restores opaque model and effort choices after reload', async () => {
     const a = conversation('a');
     const b = conversation('b');
