@@ -33,13 +33,14 @@ type DebugSectionPlugin = Pick<
   'settings' | 'saveSettings' | 'logServerStatusSnapshot' | 'buildDiagnosticReport' | 'writeDiagnosticLogFile' | 'getDebugBuildIdentityText'
 >;
 
-// capability-lab is rendered by SettingsCapabilityLabSection (SettingsTabbedRenderer.ts:521 dispatch),
-// NOT by SettingsDebugSection.attachTabbed, so it is excluded from this registry↔render seam check.
+// capability-lab is rendered by SettingsCapabilityLabSection, and backend
+// trace panels are rendered through attachBackendTabbed inside the owning
+// backend workspace.
 const EXCLUDED_DEBUG_TABS = new Set(['capability-lab']);
+const BACKEND_DEBUG_TABS = new Set(['opencode', 'codex', 'claude-code']);
 
 function mockSettingPrototype(): void {
-  jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
-    (this as Setting & { __settingName?: string }).__settingName = name;
+  jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting) {
     return this;
   });
   jest.spyOn(Setting.prototype, 'setDesc').mockImplementation(function setDesc(this: Setting) {
@@ -111,11 +112,10 @@ function createPlugin(): DebugSectionPlugin {
   } as unknown as DebugSectionPlugin;
 }
 
-function createSectionHeading(containerEl: HTMLElement, title: string): HTMLHeadingElement {
-  const headingEl = document.createElement('h2');
-  headingEl.textContent = title;
-  containerEl.appendChild(headingEl);
-  return headingEl;
+function createSection(plugin: DebugSectionPlugin): SettingsDebugSection {
+  return new SettingsDebugSection({
+    plugin: plugin as unknown as OpenCodianPlugin,
+  });
 }
 
 describe('SettingsDebugSection debug nav seam (registry ↔ render)', () => {
@@ -136,83 +136,46 @@ describe('SettingsDebugSection debug nav seam (registry ↔ render)', () => {
     document.body.innerHTML = '';
   });
 
-  it('renders a visible block for every debug secondary tab the registry declares (except capability-lab)', () => {
+  it('renders a visible block for every generic debug secondary tab the registry declares', () => {
     const debugTab = getPrimaryTabDefinition('debug');
     expect(debugTab).toBeDefined();
-    const section = new SettingsDebugSection({
-      plugin: createPlugin() as unknown as OpenCodianPlugin,
-      createSectionHeading,
-    });
-
-    for (const secondary of debugTab!.secondaryTabs) {
-      if (EXCLUDED_DEBUG_TABS.has(secondary.id)) continue;
-      const containerEl = document.createElement('div');
-      document.body.appendChild(containerEl);
-      section.attachTabbed(containerEl, secondary.id);
-
-      const blockEl = containerEl.querySelector<HTMLElement>(`[data-section-block="${secondary.id}"]`);
-      expect(blockEl).not.toBeNull();
-      expect(blockEl!.style.display).not.toBe('none');
-    }
-  });
-
-  it('hides all sibling blocks when a given debug tab is active', () => {
-    const debugTab = getPrimaryTabDefinition('debug');
-    expect(debugTab).toBeDefined();
-    const registeredTabIds = debugTab!.secondaryTabs
-      .filter((tab) => !EXCLUDED_DEBUG_TABS.has(tab.id))
-      .map((tab) => tab.id);
-    const section = new SettingsDebugSection({
-      plugin: createPlugin() as unknown as OpenCodianPlugin,
-      createSectionHeading,
-    });
-
-    for (const activeTabId of registeredTabIds) {
-      const containerEl = document.createElement('div');
-      document.body.appendChild(containerEl);
-      section.attachTabbed(containerEl, activeTabId);
-
-      // Collect display states first, then assert outside the per-block conditional
-      // to satisfy jest/no-conditional-expect.
-      const blockStates = Array.from(containerEl.querySelectorAll<HTMLElement>('[data-section-block]')).map(
-        (blockEl) => ({ id: blockEl.dataset.sectionBlock as string, display: blockEl.style.display }),
-      );
-      const activeBlock = blockStates.find((state) => state.id === activeTabId);
-      const hiddenBlocks = blockStates.filter((state) => state.id !== activeTabId);
-
-      expect(activeBlock).toBeDefined();
-      expect(activeBlock!.display).not.toBe('none');
-      expect(hiddenBlocks.every((state) => state.display === 'none')).toBe(true);
-      expect(hiddenBlocks.map((state) => state.id).sort()).toEqual(
-        registeredTabIds.filter((id) => id !== activeTabId).sort(),
-      );
-    }
-  });
-
-  it('renders exactly the registry-declared debug blocks with no orphans (seam guard)', () => {
-    // If SettingsDebugSection.attachTabbed renders a block whose id is absent from the
-    // registry (or vice-versa), this assertion fails — which is exactly the leak this
-    // test exists to catch. Removing the codex entry from the registry makes codex an
-    // orphan block and turns this red.
-    const debugTab = getPrimaryTabDefinition('debug');
-    expect(debugTab).toBeDefined();
-    const expectedBlockIds = debugTab!.secondaryTabs
-      .filter((tab) => !EXCLUDED_DEBUG_TABS.has(tab.id))
+    const expectedIds = debugTab!.secondaryTabs
       .map((tab) => tab.id)
-      .sort();
+      .filter((id) => !EXCLUDED_DEBUG_TABS.has(id) && !BACKEND_DEBUG_TABS.has(id));
+    expect(expectedIds).toEqual(['plugin', 'export']);
 
-    const section = new SettingsDebugSection({
-      plugin: createPlugin() as unknown as OpenCodianPlugin,
-      createSectionHeading,
-    });
-    const containerEl = document.createElement('div');
-    document.body.appendChild(containerEl);
-    section.attachTabbed(containerEl, 'plugin');
+    const section = createSection(createPlugin());
+    for (const id of expectedIds) {
+      const containerEl = document.createElement('div');
+      document.body.appendChild(containerEl);
+      section.attachTabbed(containerEl, id);
+      const blocks = Array.from(containerEl.querySelectorAll<HTMLElement>('[data-section-block]'));
+      expect(blocks.map((block) => block.dataset.sectionBlock)).toEqual([id]);
+      expect(blocks[0]!.style.display).not.toBe('none');
+    }
+  });
 
-    const renderedBlockIds = Array.from(containerEl.querySelectorAll<HTMLElement>('[data-section-block]'))
-      .map((blockEl) => blockEl.dataset.sectionBlock as string)
-      .sort();
+  it('never renders another backend trace block in the generic debug tabs', () => {
+    const section = createSection(createPlugin());
+    for (const id of ['plugin', 'export'] as const) {
+      const containerEl = document.createElement('div');
+      document.body.appendChild(containerEl);
+      section.attachTabbed(containerEl, id);
+      const renderedIds = Array.from(containerEl.querySelectorAll<HTMLElement>('[data-section-block]'))
+        .map((block) => block.dataset.sectionBlock);
+      expect(renderedIds.some((rendered) => BACKEND_DEBUG_TABS.has(rendered ?? ''))).toBe(false);
+    }
+  });
 
-    expect(renderedBlockIds).toEqual(expectedBlockIds);
+  it('renders exactly the selected backend trace panel through attachBackendTabbed', () => {
+    const section = createSection(createPlugin());
+    for (const id of ['opencode', 'codex', 'claude-code'] as const) {
+      const containerEl = document.createElement('div');
+      document.body.appendChild(containerEl);
+      section.attachBackendTabbed(containerEl, id);
+      const renderedIds = Array.from(containerEl.querySelectorAll<HTMLElement>('[data-section-block]'))
+        .map((block) => block.dataset.sectionBlock);
+      expect(renderedIds).toEqual([id]);
+    }
   });
 });

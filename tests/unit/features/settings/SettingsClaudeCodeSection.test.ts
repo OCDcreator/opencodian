@@ -537,9 +537,9 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       });
       section.attachTabbed(containerEl, 'model-thinking');
 
-      expectGroupOrder(containerEl, ['thinking-effort']);
+      expectGroupOrder(containerEl, ['thinking-effort', 'title-inline-overrides']);
       expectClaudeCodeGroupChrome(containerEl);
-      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(1);
+      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(2);
     });
 
     it('keeps only thinking and effort controls; provider models are not SDK settings', () => {
@@ -621,6 +621,22 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
 
       await findDropdown(t('settings.claudeCode.effort.name')).onChange?.('high' as never);
       expect(plugin.settings.backendSettings.claudeCode.effort).toBe('high');
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+
+    it('renders and persists Claude auto-title only in the Claude workspace', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      expect(findToggle(t('settings.titleGeneration.claudeAutoTitle.name')).control.setValue)
+        .toHaveBeenCalledWith(plugin.settings.backendSettings.claudeCode.autoTitle);
+      await findToggle(t('settings.titleGeneration.claudeAutoTitle.name')).onChange?.(false as never);
+      expect(plugin.settings.backendSettings.claudeCode.autoTitle).toBe(false);
       expect(plugin.saveSettings).toHaveBeenCalled();
     });
 

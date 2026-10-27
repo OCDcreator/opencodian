@@ -396,7 +396,7 @@ describe('ClaudeCodeDebugPanel', () => {
       'utf8',
     ));
 
-    expect(sectionSource).toContain('this.claudeCodeDebugPanel.render(containerEl);');
+    expect(sectionSource).toContain('attachBackendTabbed(');
     expect(sectionSource).toContain('this.claudeCodeDebugPanel.render(claudeCodeBlockEl, { includeIntro: false });');
     expect(sectionSource).not.toMatch(/claudeTraceService|reportBuilder/);
     expect(panelSource).not.toMatch(/OpenCodianPlugin|claudeTraceService|reportBuilder|\.store|getCurrentPlatformDebugLogPath|fs\.existsSync/);

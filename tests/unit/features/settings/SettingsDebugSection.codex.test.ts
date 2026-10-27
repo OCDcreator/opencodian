@@ -170,7 +170,11 @@ function renderTabbed(secondaryTabId: string, plugin = createPlugin()) {
   });
   const containerEl = document.createElement('div');
   document.body.appendChild(containerEl);
-  section.attachTabbed(containerEl, secondaryTabId);
+  if (secondaryTabId === 'opencode' || secondaryTabId === 'codex' || secondaryTabId === 'claude-code') {
+    section.attachBackendTabbed(containerEl, secondaryTabId);
+  } else {
+    section.attachTabbed(containerEl, secondaryTabId);
+  }
   return { containerEl, plugin, section };
 }
 
@@ -298,7 +302,7 @@ describe('SettingsDebugSection codex block', () => {
     expect(codexBlock?.textContent).toContain(t('settings.debug.codex.status.traces'));
   });
 
-  it('keeps codex tab visible and other tabs hidden when codex is active', () => {
+  it('renders only the codex trace block for the codex backend workspace', () => {
     const { containerEl } = renderTabbed('codex');
     const blockDisplays = Array.from(containerEl.querySelectorAll('[data-section-block]')).map(
       (blockEl) => [
@@ -311,13 +315,7 @@ describe('SettingsDebugSection codex block', () => {
       'opencodian-debug-tab-shell-codex',
     )).toBe(true);
 
-    expect(blockDisplays).toEqual([
-      ['plugin', 'none'],
-      ['opencode', 'none'],
-      ['codex', ''],
-      ['claude-code', 'none'],
-      ['export', 'none'],
-    ]);
+    expect(blockDisplays).toEqual([['codex', '']]);
   });
 
   it('renders without crashing when codexTraceService is undefined', () => {

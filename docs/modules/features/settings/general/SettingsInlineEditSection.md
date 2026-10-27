@@ -49,3 +49,5 @@ OpenCode 2 appears in both enabled-backend override lists. Its inline edit and c
 
 - 源码位置：`src/features/settings/general/SettingsInlineEditSection.ts`。
 - 原位置：`src/features/settings/SettingsInlineEditSection.ts`；文件名、导出接口与业务职责保持不变。
+
+> 2026-10-27：共享页只保留共用开关、快捷键、预设、自动内链与补全上限；按后端存储的编辑/补全模型覆盖改由 `renderBackendModelOverrides` 在各后端工作区渲染。

@@ -199,7 +199,11 @@ function renderTabbed(secondaryTabId: string, plugin = createPlugin()): { contai
   });
   const containerEl = document.createElement('div');
   document.body.appendChild(containerEl);
-  section.attachTabbed(containerEl, secondaryTabId);
+  if (secondaryTabId === 'opencode' || secondaryTabId === 'codex' || secondaryTabId === 'claude-code') {
+    section.attachBackendTabbed(containerEl, secondaryTabId);
+  } else {
+    section.attachTabbed(containerEl, secondaryTabId);
+  }
   return { containerEl, plugin, section };
 }
 

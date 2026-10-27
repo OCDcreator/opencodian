@@ -6,6 +6,7 @@ import type { FileRevision } from '../../../../core/agents/backend/configuration
 import type { ZCodeAdapter, ZCodeAdapterRuntimeDiagnostics, ZCodeManagementCatalog, ZCodeManagementMutationResult } from '../../../../core/agents/backend/zcode';
 import { normalizeZCodeBackendSettings, type ZCodeBackendSettings } from '../../../../core/types/settings';
 import { t } from '../../../../i18n';
+import { SettingsInlineEditSection } from '../../general/SettingsInlineEditSection';
 
 /** Minimal host surface; keeps this section testable without the full plugin type. */
 export interface SettingsZCodeHost {
@@ -31,6 +32,13 @@ function shortenPath(filePath: string): string {
   return normalized.startsWith(`${normalizedHome}/`) ? `~/${normalized.slice(normalizedHome.length + 1)}` : filePath;
 }
 
+const ZCODE_TABS = ['connection', 'model', 'management'] as const;
+const ZCODE_TAB_LABEL_KEYS: Record<(typeof ZCODE_TABS)[number], Parameters<typeof t>[0]> = {
+  connection: 'settings.zcode.tab.connection',
+  model: 'settings.zcode.tab.model',
+  management: 'settings.zcode.tab.management',
+};
+
 /** Parent supplies locale entries; keep the surface usable until that handoff lands. */
 function managementText(key: string, fallback: string): string {
   const translated = t(key as Parameters<typeof t>[0]);
@@ -47,23 +55,42 @@ export class SettingsZCodeSection {
 
   attach(container: HTMLElement): void {
     container.createEl('h2', { text: t('settings.zcode.title') });
-    this.attachBody(container.createDiv());
+    for (const tab of ZCODE_TABS) this.renderTab(container, tab);
   }
 
-  attachTabbed(container: HTMLElement, _requested: string): void {
-    this.attachBody(container);
+  attachTabbed(container: HTMLElement, requested: string): void {
+    const tab = ZCODE_TABS.includes(requested as (typeof ZCODE_TABS)[number])
+      ? requested as (typeof ZCODE_TABS)[number]
+      : 'connection';
+    this.renderTab(container, tab, false);
   }
 
-  private attachBody(container: HTMLElement): void {
+  private renderTab(
+    container: HTMLElement,
+    tab: (typeof ZCODE_TABS)[number],
+    showSubheading = true,
+  ): void {
     const section = container.createDiv({
       cls: 'opencodian-settings-block opencodian-settings-section opencodian-zcode-settings',
-      attr: { 'data-settings-surface': 'section', 'data-settings-target': 'zcode-connection' },
+      attr: { 'data-settings-surface': 'section', 'data-settings-target': `zcode-${tab}` },
     });
+    if (showSubheading) {
+      section.createEl('h3', { text: t(ZCODE_TAB_LABEL_KEYS[tab]) });
+    }
     const body = section.createDiv({
       cls: 'opencodian-settings-block-body opencodian-settings-section-body',
       attr: { 'data-settings-surface': 'section-body' },
     });
-    body.createEl('h3', { text: t('settings.zcode.tab.connection') });
+    if (tab === 'connection') {
+      this.renderConnection(body);
+    } else if (tab === 'model') {
+      this.renderModel(body);
+    } else {
+      this.attachManagement(body);
+    }
+  }
+
+  private renderConnection(body: HTMLElement): void {
     body.createEl('p', { text: t('settings.zcode.description'), cls: 'setting-item-description' });
 
     // Initial values are a render snapshot; change handlers merge the latest host state.
@@ -84,6 +111,34 @@ export class SettingsZCodeSection {
           });
       });
 
+    const status = body.createDiv({ cls: 'opencodian-zcode-config-status', attr: { role: 'status' } });
+    this.renderDiagnostics(status);
+
+    new Setting(body)
+      .setName(t('settings.zcode.reconnect'))
+      .setDesc(t('settings.zcode.reconnect.help'))
+      .addButton((button) => {
+        button.setButtonText(t('settings.zcode.reconnect')).onClick(async () => {
+          button.setDisabled(true);
+          const adapter = this.adapter;
+          try {
+            if (adapter) {
+              await adapter.stop();
+              await adapter.start();
+            }
+            this.host.invalidateSlashCommandCatalog?.();
+          } catch {
+            // The adapter records the failure; the status block reports it.
+          } finally {
+            this.renderDiagnostics(status);
+            button.setDisabled(false);
+          }
+        });
+      });
+  }
+
+  private renderModel(body: HTMLElement): void {
+    const settings = normalizeZCodeBackendSettings(this.host.settings.backendSettings.zcode);
     new Setting(body)
       .setName(t('settings.zcode.model'))
       .setDesc(t('settings.zcode.model.desc'))
@@ -129,32 +184,7 @@ export class SettingsZCodeSection {
           await this.host.saveSettings();
         });
       });
-
-    const status = body.createDiv({ cls: 'opencodian-zcode-config-status', attr: { role: 'status' } });
-    this.renderDiagnostics(status);
-
-    new Setting(body)
-      .setName(t('settings.zcode.reconnect'))
-      .setDesc(t('settings.zcode.reconnect.help'))
-      .addButton((button) => {
-        button.setButtonText(t('settings.zcode.reconnect')).onClick(async () => {
-          button.setDisabled(true);
-          const adapter = this.adapter;
-          try {
-            if (adapter) {
-              await adapter.stop();
-              await adapter.start();
-            }
-            this.host.invalidateSlashCommandCatalog?.();
-          } catch {
-            // The adapter records the failure; the status block reports it.
-          } finally {
-            this.renderDiagnostics(status);
-            button.setDisabled(false);
-          }
-        });
-      });
-    this.attachManagement(body);
+    SettingsInlineEditSection.renderBackendModelOverrides(body, 'zcode', this.host as unknown as Parameters<typeof SettingsInlineEditSection.renderBackendModelOverrides>[2]);
   }
 
   private attachManagement(body: HTMLElement): void {

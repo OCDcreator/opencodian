@@ -98,3 +98,5 @@ Executable help describes active-query preservation and the current selection at
 - 源码位置：`src/features/settings/backends/claude/SettingsClaudeCodeSection.ts`。
 - 原位置：`src/features/settings/SettingsClaudeCodeSection.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/core/agents/backend/claude/ClaudeCodeProcessResolver.ts`、`src/core/agents/backend/claude/ClaudeCodeQueue.ts`、`src/core/agents/backend/claude/ClaudeProjectAgentDiscovery.ts`、`src/core/agents/backend/claude/ClaudeProjectCommandDiscovery.ts`、`src/core/agents/backend/claude/ClaudeProjectSkillDiscovery.ts`、`src/features/settings/backends/claude/ClaudeCodeHelpModal.ts`、`src/features/settings/backends/claude/SettingsClaudeConfigurationSection.ts`、`src/features/settings/backends/claude/SettingsClaudeProvidersSection.ts`、`src/features/settings/backends/claude/SettingsClaudeResourcesSection.ts`、`src/features/settings/controls/SettingsTooltipController.ts`、`src/features/settings/controls/TextareaSizeMemory.ts`。
+
+> 2026-10-27：运行时页移除技能/命令/Agent 的重复管理入口，保留资源标签为唯一编辑面；模型与 Thinking 页新增 Claude `autoTitle` 与 Claude 专属行内模型覆盖，并说明模型/提供商位于 Provider 与上下文配置工作台。

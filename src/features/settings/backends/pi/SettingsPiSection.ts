@@ -10,6 +10,7 @@ import { normalizePiBackendSettings } from '../../../../core/types/settings';
 import { t } from '../../../../i18n';
 import { getVaultBasePath } from '../../../../shared';
 import { sanitizeDiagnosticReport } from '../../../../shared/diagnosticSecretSanitizer';
+import { SettingsInlineEditSection } from '../../general/SettingsInlineEditSection';
 import { PiWorkbenchModal } from './PiWorkbenchModal';
 import { SettingsPiConfigurationSection } from './SettingsPiConfigurationSection';
 import { SettingsPiProvidersSection } from './SettingsPiProvidersSection';
@@ -65,6 +66,9 @@ export class SettingsPiSection {
     if (tab === 'account') { this.account(body, adapter); return; }
     if (tab === 'sessions') { this.sessions(body, adapter); return; }
     new SettingsPiConfigurationSection(adapter, keys => this.clearLegacyDefaults(keys), () => this.reconnect()).attach(body, tab);
+    if (tab === 'model') {
+      SettingsInlineEditSection.renderBackendModelOverrides(body, 'pi', this.host as unknown as Parameters<typeof SettingsInlineEditSection.renderBackendModelOverrides>[2]);
+    }
     if (tab === 'resources') this.workbench(body);
   }
 

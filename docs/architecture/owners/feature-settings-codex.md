@@ -58,3 +58,5 @@ CodexReadbackModal 和 CodexMcpServerDetailModal 从结构化目录失败中识�
 当前源码目录：`src/features/settings/backends/codex`。
 
 目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。
+
+> 2026-10-27：Codex 连接/模型推理搜索拆分，模型页承载 Codex 专属行内模型覆盖；新增 debug 二级页，classic 子页由共享本地导航逐页挂载。

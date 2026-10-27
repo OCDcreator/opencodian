@@ -512,3 +512,7 @@ Focused regression tests cover the settings callbacks' saved JSON snapshots, the
 ## 2026-10-24 DSH MCP 声明
 
 `DshMcpServer` 描述 ACP stdio / HTTP 声明；`backendSettings.dsh.mcpServers` 默认空数组。归一化保留已有声明与畸形持久值，让统一运行时/UI 校验明确拒绝，不能悄悄丢弃服务器后报告保存成功。原生作用域是每次新建/恢复会话，已有连接不会被设置保存热替换。
+
+> 2026-10-27：`INLINE_EDIT_BACKENDS` 加入 `dsh`，因为 DSH 适配器实现 `AgentAuxQueryCapability` 与行内补全能力；此前 DSH 覆盖能被 UI 显示但保存时会被规范化丢弃。仅修正设置归一化允许集，不改变后端协议。
+
+> 2026-10-27（二次审查）：`INLINE_EDIT_BACKENDS` 加入 `dsh`（DSH 适配器实现 aux query 与 inline completion）；此前 DSH 覆盖 UI 可见但保存时被规范化丢弃。未修改后端协议。

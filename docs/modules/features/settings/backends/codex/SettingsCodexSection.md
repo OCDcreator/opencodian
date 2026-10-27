@@ -125,3 +125,5 @@ The model catalog, permission profile, and loaded threads readbacks in the Resum
 - 源码位置：`src/features/settings/backends/codex/SettingsCodexSection.ts`。
 - 原位置：`src/features/settings/SettingsCodexSection.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/core/agents/backend/codex/CodexAdapter.ts`、`src/features/settings/backends/codex/CodexProjectConfigFormModel.ts`、`src/features/settings/backends/opencode/CostEstimateSettingsRow.ts`、`src/features/settings/backends/codex/SettingsCodexAccountSurface.ts`、`src/features/settings/backends/codex/SettingsCodexLegacyCredentialControl.ts`、`src/features/settings/backends/codex/SettingsCodexPluginsSection.ts`、`src/features/settings/backends/codex/SettingsCodexProjectConfigSection.ts`、`src/features/settings/backends/codex/SettingsCodexReadbackControls.ts`、`src/features/settings/backends/codex/SettingsCodexResourcesSection.ts`。
+
+> 2026-10-27：连接页只保留认证摘要、CLI 生命周期与历史凭据；模型/推理/搜索拆到新的 Model & reasoning 二级页并显示 Codex 专属行内模型覆盖。经典布局的子页由 SettingsTabbedRenderer 的本地导航按 registry 逐页挂载。

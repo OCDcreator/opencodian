@@ -7,12 +7,15 @@ import { setLocale, t } from '../../../../src/i18n';
 
 describe('SettingsDshSection accessible connection and readback', () => {
   const actions = new Map<string, () => Promise<void>>();
+  const textActions = new Map<string, (value: string) => Promise<void>>();
   let changeMcpDraft: (value: string) => void;
 
   beforeEach(() => {
     setLocale('en');
     actions.clear();
+    textActions.clear();
     jest.spyOn(Setting.prototype, 'setName').mockImplementation(function (this: Setting, name: string) {
+      (this as Setting & { __name?: string }).__name = name;
       this.settingEl.createDiv({ cls: 'setting-item-name', text: name });
       return this;
     });
@@ -33,7 +36,12 @@ describe('SettingsDshSection accessible connection and readback', () => {
       const inputEl = this.controlEl.createEl('input');
       const input = {
         inputEl,
-        setPlaceholder: jest.fn().mockReturnThis(), setValue: jest.fn().mockReturnThis(), onChange: jest.fn().mockReturnThis(),
+        setPlaceholder: jest.fn().mockReturnThis(),
+        setValue: jest.fn().mockReturnThis(),
+        onChange: jest.fn((handler: (value: string) => Promise<void>) => {
+          textActions.set((this as Setting & { __name?: string }).__name ?? '', handler);
+          return input;
+        }),
       };
       callback(input as never);
       return this;
@@ -79,19 +87,25 @@ describe('SettingsDshSection accessible connection and readback', () => {
         ],
       })),
     };
+    const inlineSettings = {
+      inlineEditModelOverrides: {} as Record<string, string>,
+      inlineCompletionModelOverrides: {} as Record<string, string>,
+    };
+    const inlineSave = jest.fn(async () => {});
     const host: DshSettingsHost = {
       getSettings: () => settings, isEnabled: () => true, getAdapter: () => adapter,
       validateMcpServers: validateDshMcpServers, saveSettings: jest.fn(async () => {}),
+      modelOverridesHost: { settings: inlineSettings, saveSettings: inlineSave },
     };
     const container = document.createElement('div');
     new SettingsDshSection(host).attach(container);
-    return { container, adapter, settings, host };
+    return { container, adapter, settings, host, inlineSettings, inlineSave };
   }
 
   it('names connection fields independently from placeholders and announces connection changes', async () => {
     const { container, adapter } = mount();
     expect(container.querySelector('select')?.getAttribute('aria-label')).toBe(t('settings.agent.dsh.transport'));
-    expect(Array.from(container.querySelectorAll('input')).map((input) => input.getAttribute('aria-label')))
+    expect(Array.from(container.querySelectorAll('input[aria-label]')).map((input) => input.getAttribute('aria-label')))
       .toEqual([t('settings.agent.dsh.executable'), t('settings.agent.dsh.workingDirectory')]);
     const status = container.querySelector('[role="status"]')!;
     expect(status.getAttribute('aria-live')).toBe('polite');
@@ -160,5 +174,109 @@ describe('SettingsDshSection accessible connection and readback', () => {
     expect(settings.mcpServers).toEqual([]);
     expect(host.saveSettings).toHaveBeenCalledTimes(1);
     expect(feedback.textContent).toBe(t('settings.agent.dsh.mcp.saved'));
+  });
+});
+
+describe('SettingsDshSection model overrides', () => {
+  const setLocaleForEach = () => setLocale('en');
+  beforeAll(setLocaleForEach);
+
+  function mountModel(layout: 'classic' | 'tabbed') {
+    const settingNames: string[] = [];
+    const textChanges = new Map<string, (value: string) => Promise<void>>();
+    jest.spyOn(Setting.prototype, 'setName').mockImplementation(function (this: Setting, name: string) {
+      settingNames.push(name);
+      (this as Setting & { __name?: string }).__name = name;
+      return this;
+    });
+    jest.spyOn(Setting.prototype, 'setDesc').mockReturnThis();
+    jest.spyOn(Setting.prototype, 'setClass').mockReturnThis();
+    jest.spyOn(Setting.prototype, 'addButton').mockReturnThis();
+    jest.spyOn(Setting.prototype, 'addToggle').mockReturnThis();
+    jest.spyOn(Setting.prototype, 'addDropdown').mockReturnThis();
+    jest.spyOn(Setting.prototype, 'addTextArea').mockReturnThis();
+    jest.spyOn(Setting.prototype, 'addText').mockImplementation(function (this: Setting, callback) {
+      const input = {
+        inputEl: document.createElement('input'),
+        setPlaceholder: () => input,
+        setValue: () => input,
+        onChange: (handler: (value: string) => Promise<void>) => {
+          textChanges.set((this as Setting & { __name?: string }).__name ?? '', handler);
+          return input;
+        },
+      };
+      callback(input as never);
+      return this;
+    });
+    const settings: DshBackendSettings = {
+      executablePath: '', workingDirectory: '', args: [], env: {}, profile: 'acp', transport: 'native',
+    };
+    const inlineSettings = {
+      inlineEditModelOverrides: {} as Record<string, string>,
+      inlineCompletionModelOverrides: {} as Record<string, string>,
+    };
+    const inlineSave = jest.fn(async () => {});
+    const host: DshSettingsHost = {
+      getSettings: () => settings,
+      isEnabled: () => true,
+      getAdapter: () => undefined,
+      validateMcpServers: validateDshMcpServers,
+      saveSettings: jest.fn(async () => {}),
+      modelOverridesHost: { settings: inlineSettings, saveSettings: inlineSave },
+    };
+    const container = document.createElement('div');
+    const section = new SettingsDshSection(host);
+    if (layout === 'classic') section.attach(container);
+    else section.attachTabbed(container, 'model');
+    return { container, inlineSettings, inlineSave, textChanges, settingNames };
+  }
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    document.body.innerHTML = '';
+  });
+
+  it.each(['classic', 'tabbed'] as const)(
+    'renders and saves both DSH model overrides in the %s layout',
+    async (layout) => {
+      const { container, inlineSettings, inlineSave, textChanges } = mountModel(layout);
+      const editName = t('settings.inlineEdit.override.name', { backend: 'dsh' });
+      const completionName = t('settings.inlineCompletion.modelOverride.name', { backend: 'dsh' });
+      expect(textChanges.has(editName)).toBe(true);
+      expect(textChanges.has(completionName)).toBe(true);
+      const blockEl = container.querySelector<HTMLElement>('[data-settings-target="dsh-model"]');
+      expect(blockEl).not.toBeNull();
+      const bodyEl = blockEl!.querySelector<HTMLElement>(':scope > .opencodian-settings-block-body');
+      expect(bodyEl).not.toBeNull();
+      expect(bodyEl?.dataset.settingsSurface).toBe('section-body');
+      expect(bodyEl?.querySelector('.opencodian-dsh-settings')).not.toBeNull();
+
+      await textChanges.get(editName)!('deepseek/edit');
+      await textChanges.get(completionName)!('deepseek/fast');
+      expect(inlineSettings.inlineEditModelOverrides.dsh).toBe('deepseek/edit');
+      expect(inlineSettings.inlineCompletionModelOverrides.dsh).toBe('deepseek/fast');
+      expect(inlineSave).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it('does not show DSH overrides on the connection tab', () => {
+    const { container } = mountModel('tabbed');
+    // mountModel('tabbed') renders model; render connection explicitly instead.
+    const connectionContainer = document.createElement('div');
+    const host: DshSettingsHost = {
+      getSettings: () => ({ executablePath: '', workingDirectory: '', args: [], env: {}, profile: 'acp', transport: 'native' }),
+      isEnabled: () => true,
+      getAdapter: () => undefined,
+      validateMcpServers: validateDshMcpServers,
+      saveSettings: jest.fn(async () => {}),
+      modelOverridesHost: {
+        settings: { inlineEditModelOverrides: {}, inlineCompletionModelOverrides: {} },
+        saveSettings: jest.fn(async () => {}),
+      },
+    };
+    new SettingsDshSection(host).attachTabbed(connectionContainer, 'connection');
+    expect(connectionContainer.querySelector('[data-settings-target="dsh-connection"]')).not.toBeNull();
+    expect(connectionContainer.textContent).not.toContain(t('settings.inlineEdit.override.name', { backend: 'dsh' }));
+    expect(container.querySelector('[data-settings-target="dsh-model"]')).not.toBeNull();
   });
 });

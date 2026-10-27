@@ -251,18 +251,12 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
   });
 
   // -------------------------------------------------------------------------
-  // Step 5: six tabbed debug subtabs (5 backend/export blocks + parent tab).
-  // attachTabbed renders exactly 5 debug-block shells: plugin, opencode, codex,
-  // claude-code, export. Task 13 must preserve the shell/router + export block
-  // in SettingsDebugSection while moving the three backend blocks into panels.
-  // The authoritative block inventory is the source contract (createDebugTabShell
-  // calls), confirmed behaviorally by shell count.
+  // Generic debug owns plugin logging + shared export. Backend trace panels
+  // are mounted inside their backend workspace via attachBackendTabbed.
   // -------------------------------------------------------------------------
 
-  describe('attachTabbed renders the five-block debug inventory', () => {
-    it('attachTabbed source invokes createDebugTabShell exactly five times (catches any added/removed shell)', () => {
-      // Count createDebugTabShell CALLS (not literal ids) so a sixth shell with
-      // any id — literal or variable — is caught.
+  describe('generic debug tab inventory', () => {
+    it('attachTabbed source renders only the plugin and export shells', () => {
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
       const fs = require('fs') as typeof import('fs');
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
@@ -275,47 +269,30 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
       const tabbedEnd = source.indexOf('  private createDebugTabShell(');
       expect(tabbedStart).toBeGreaterThan(-1);
       const tabbedBody = source.slice(tabbedStart, tabbedEnd);
-      // Exactly five createDebugTabShell( invocations in attachTabbed.
       const shellCalls = tabbedBody.match(/this\.createDebugTabShell\(/g);
-      expect(shellCalls).toHaveLength(5);
-      // And the five canonical ids appear (in case of id typos).
+      expect(shellCalls).toHaveLength(2);
       expect(tabbedBody.match(/id: 'plugin'/g)).toHaveLength(1);
-      expect(tabbedBody.match(/id: 'opencode'/g)).toHaveLength(1);
-      expect(tabbedBody.match(/id: 'codex'/g)).toHaveLength(1);
-      expect(tabbedBody.match(/id: 'claude-code'/g)).toHaveLength(1);
       expect(tabbedBody.match(/id: 'export'/g)).toHaveLength(1);
+      expect(tabbedBody).not.toContain("id: 'opencode'");
+      expect(tabbedBody).not.toContain("id: 'codex'");
+      expect(tabbedBody).not.toContain("id: 'claude-code'");
     });
 
-    it('attachTabbed renders without throwing', () => {
+    it('attachBackendTabbed renders one backend trace panel without throwing', () => {
       const plugin = createPlugin();
       attachTraceServices(plugin);
       const section = new SettingsDebugSection({ plugin: plugin as unknown as OpenCodianPlugin, createSectionHeading });
-      const containerEl = document.createElement('div');
-      document.body.appendChild(containerEl);
-      expect(() => section.attachTabbed(containerEl, 'plugin')).not.toThrow();
-    });
-
-    it('attachTabbed for the codex block does not throw (Codex is present, unlike legacy attach)', () => {
-      const plugin = createPlugin();
-      attachTraceServices(plugin);
-      const section = new SettingsDebugSection({ plugin: plugin as unknown as OpenCodianPlugin, createSectionHeading });
-      const containerEl = document.createElement('div');
-      document.body.appendChild(containerEl);
-      expect(() => section.attachTabbed(containerEl, 'codex')).not.toThrow();
+      for (const backend of ['opencode', 'codex', 'claude-code'] as const) {
+        const containerEl = document.createElement('div');
+        document.body.appendChild(containerEl);
+        expect(() => section.attachBackendTabbed(containerEl, backend)).not.toThrow();
+        expect(containerEl.querySelectorAll('[data-section-block]')).toHaveLength(1);
+      }
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Step 5 (cont.): the SIX debug secondary tabs in settingsLayoutRegistry.
-  //
-  // The debug section declares SIX secondary tabs: plugin, opencode, codex,
-  // claude-code, export, capability-lab. attachTabbed renders the first FIVE
-  // as block shells; capability-lab is rendered by a separate component.
-  // Task 13 must not drop or merge any of the six.
-  // -------------------------------------------------------------------------
-
-  describe('settingsLayoutRegistry declares six debug secondary tabs', () => {
-    it('the debug section registry declares exactly six secondary tabs including capability-lab', () => {
+  describe('settingsLayoutRegistry declares generic debug secondary tabs', () => {
+    it('the debug section registry declares plugin, export and capability-lab', () => {
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
       const fs = require('fs') as typeof import('fs');
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
@@ -324,56 +301,24 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
         path.resolve(__dirname, '../../../../src/features/settings/settingsLayoutRegistry.ts'),
         'utf8',
       );
-      const debugStart = source.indexOf("id: 'debug'");
+      const debugStart = source.indexOf("\n    id: 'debug',");
       expect(debugStart).toBeGreaterThan(-1);
-      // Slice to the next top-level section (next "id: '...'," at column 4).
       const afterDebug = source.slice(debugStart + 1);
       const nextSectionRel = afterDebug.search(/\n[/ ]{4}id: '/);
       const debugBody = nextSectionRel > 0
         ? source.slice(debugStart, debugStart + 1 + nextSectionRel)
         : source.slice(debugStart, debugStart + 1200);
       expect(debugBody).toContain("id: 'plugin'");
-      expect(debugBody).toContain("id: 'opencode'");
-      expect(debugBody).toContain("id: 'codex'");
-      expect(debugBody).toContain("id: 'claude-code'");
       expect(debugBody).toContain("id: 'export'");
       expect(debugBody).toContain("id: 'capability-lab'");
-      // Exactly six secondary tab entries in the debug section.
+      expect(debugBody).not.toContain("id: 'opencode'");
       const tabIdMatches = debugBody.match(/\{\s*id:\s*'[^']+',\s*labelKey:/g);
-      expect(tabIdMatches?.length).toBe(6);
-    });
-
-    it('attachTabbed renders FIVE block shells; capability-lab is NOT a SettingsDebugSection block', () => {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
-      const fs = require('fs') as typeof import('fs');
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
-      const path = require('path') as typeof import('path');
-      const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../../src/features/settings/debug/SettingsDebugSection.ts'),
-        'utf8',
-      );
-      // SettingsDebugSection must not reference capability-lab (it is a separate owner).
-      expect(source).not.toMatch(/capability-lab|capabilityLab/);
+      expect(tabIdMatches?.length).toBe(3);
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Step 5 (THE plan requirement): legacy non-tabbed attach OMITS Codex.
-  //
-  // The plan (Task 10 step 5 + Task 13) requires: "separately prove whether
-  // legacy non-tabbed attach is reachable and record its current Codex
-  // omission." attach() calls addPluginDebugSettings, openCodeDebugPanel.render,
-  // claudeCodeDebugPanel.render, addExportDebugSettings — it does NOT render
-  // the Codex panel. This is the documented inconsistency. Task 13 must
-  // NOT silently fix or permanently entrench it inside a pure-refactor commit;
-  // it must be handled as a separately-approved bugfix/cleanup.
-  // -------------------------------------------------------------------------
-
-  describe('legacy non-tabbed attach() omits Codex (documented inconsistency)', () => {
-    it('attach() renders plugin + opencode + claude-code + export but NOT codex', () => {
-      // Source-level contract: attach() does not render the Codex panel.
-      // A behavioral render would require the full Obsidian mock; the source
-      // contract is the authoritative proof of the omission.
+  describe('legacy non-tabbed attach() is generic-only', () => {
+    it('attach() renders plugin + export and no backend trace panel', () => {
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
       const fs = require('fs') as typeof import('fs');
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
@@ -385,31 +330,11 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
       const attachStart = source.indexOf('  attach(containerEl: HTMLElement): HTMLHeadingElement {');
       expect(attachStart).toBeGreaterThan(-1);
       const attachBody = source.slice(attachStart, attachStart + 500);
-      // attach() invokes the plugin, OpenCode panel, Claude, and export render paths...
       expect(attachBody).toContain('this.addPluginDebugSettings(');
-      expect(attachBody).toContain('this.openCodeDebugPanel.render(');
-      expect(attachBody).toContain('this.claudeCodeDebugPanel.render(');
       expect(attachBody).toContain('this.addExportDebugSettings(');
-      // ...but does NOT render the Codex panel.
+      expect(attachBody).not.toContain('this.openCodeDebugPanel.render(');
+      expect(attachBody).not.toContain('this.claudeCodeDebugPanel.render(');
       expect(attachBody).not.toContain('this.codexDebugPanel.render(');
-    });
-
-    it('attach() is reachable from the legacy non-tabbed settings view (OpenCodianSettingsView + OpenCodianSettings)', () => {
-      // Prove reachability: two call sites invoke debugSection.attach().
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
-      const fs = require('fs') as typeof import('fs');
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
-      const path = require('path') as typeof import('path');
-      const viewSrc = fs.readFileSync(
-        path.resolve(__dirname, '../../../../src/features/settings/OpenCodianSettingsView.ts'),
-        'utf8',
-      );
-      const settingsSrc = fs.readFileSync(
-        path.resolve(__dirname, '../../../../src/features/settings/OpenCodianSettings.ts'),
-        'utf8',
-      );
-      expect(viewSrc).toMatch(/debugSection\.attach\(containerEl\)/);
-      expect(settingsSrc).toMatch(/debugSection\.attach\(containerEl\)/);
     });
   });
 

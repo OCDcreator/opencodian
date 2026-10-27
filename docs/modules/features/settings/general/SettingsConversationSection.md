@@ -180,3 +180,7 @@ The classic `attach()` method remains the full-list owner, but both classic and 
 - 源码位置：`src/features/settings/general/SettingsConversationSection.ts`。
 - 原位置：`src/features/settings/SettingsConversationSection.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/features/settings/capabilities/capabilityDisclosureRow.ts`、`src/features/settings/general/ConversationCompactionHelpModal.ts`、`src/features/settings/models/modelPicker.ts`、`src/features/settings/models/ModelPickerModal.ts`、`src/features/settings/backends/opencode/OpenCodeProjectConfigHelpModal.ts`、`src/features/settings/backends/opencode/ProjectConfigFileWatcher.ts`、`src/features/settings/appearance/settingsStyleControls.ts`。
+
+> 2026-10-27：共享会话页移除后端专属标题编辑；问答题、Obsidian 工具与 PDF 索引保持通用可达；内存块同时进入经典布局；标题控件通过 `attachTitleBlock` 仅供 OpenCode 2 工作区挂载。
+
+> 2026-10-27（UI 验收修复）：`addTitleModelSetting` 创建按钮时同步写入当前 `aiTitleModel`；为空时使用 followCurrent 文案。异步目录加载完成、不可用提示和保存语义保持不变，避免加载期间出现 28px 无标签按钮。

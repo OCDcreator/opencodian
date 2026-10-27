@@ -2,6 +2,7 @@ import { Notice, Setting } from 'obsidian';
 
 import type { DshBackendSettings, DshMcpServer } from '../../../../core/types/settings';
 import { t, type TranslationKey } from '../../../../i18n';
+import { type InlineEditModelOverrideHost,SettingsInlineEditSection } from '../../general/SettingsInlineEditSection';
 
 interface DshSettingsConnectionPort {
   readonly status: 'disconnected' | 'connecting' | 'connected' | 'error';
@@ -19,16 +20,101 @@ export interface DshSettingsHost {
   getAdapter(): DshSettingsConnectionPort | undefined;
   validateMcpServers(value: unknown): DshMcpServer[];
   saveSettings(): Promise<void>;
+  modelOverridesHost?: InlineEditModelOverrideHost;
 }
 
-/** DSH connection, MCP declarations and native configuration readback. */
+const DSH_TABS: readonly { id: string; labelKey: TranslationKey }[] = [
+  { id: 'connection', labelKey: 'settings.dsh.tab.connection' },
+  { id: 'model', labelKey: 'settings.dsh.tab.model' },
+  { id: 'mcp', labelKey: 'settings.dsh.tab.mcp' },
+  { id: 'configuration', labelKey: 'settings.dsh.tab.configuration' },
+];
+
+/**
+ * DSH workspace: connection, MCP declarations and native configuration
+ * readback. The section is mounted only for the active DSH backend; it reads
+ * and writes `backendSettings.dsh` and never presents another backend's
+ * configuration as DSH.
+ */
 export class SettingsDshSection {
   constructor(private readonly host: DshSettingsHost) {}
 
   attach(containerEl: HTMLElement): void {
-    if (!this.host.isEnabled()) return;
+    for (const tab of DSH_TABS) {
+      this.renderTab(containerEl, tab.id, { showSubheading: true });
+    }
+  }
+
+  attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {
+    const tab = DSH_TABS.find((candidate) => candidate.id === secondaryTabId)?.id
+      ?? DSH_TABS[0].id;
+    this.renderTab(containerEl, tab, { showSubheading: false });
+  }
+
+  private renderTab(
+    containerEl: HTMLElement,
+    tabId: string,
+    options: { showSubheading: boolean },
+  ): void {
+    const blockEl = containerEl.createDiv({
+      cls: 'opencodian-settings-block opencodian-settings-section opencodian-dsh-settings',
+      attr: {
+        'data-settings-surface': 'section',
+        'data-settings-target': `dsh-${tabId}`,
+      },
+    });
+    if (options.showSubheading) {
+      blockEl.createEl('h3', {
+        cls: 'opencodian-settings-subheading',
+        text: t(DSH_TABS.find((candidate) => candidate.id === tabId)?.labelKey
+          ?? 'settings.dsh.tab.connection'),
+      });
+    }
+    const bodyEl = blockEl.createDiv({
+      cls: 'opencodian-settings-block-body opencodian-settings-section-body',
+      attr: { 'data-settings-surface': 'section-body' },
+    });
+    const group = bodyEl.createDiv({ cls: 'opencodian-backend-agent-group opencodian-dsh-settings' });
+    if (tabId === 'connection') {
+      this.renderConnection(group);
+      return;
+    }
+    if (tabId === 'model') {
+      this.renderModel(group);
+      return;
+    }
+    if (tabId === 'mcp') {
+      this.renderMcp(group);
+      return;
+    }
+    this.renderConfiguration(group);
+  }
+
+  private renderModel(group: HTMLElement): void {
+    group.createEl('h4', {
+      cls: 'opencodian-settings-subsection-heading',
+      text: t('settings.dsh.model.title'),
+    });
+    group.createEl('p', {
+      cls: 'setting-item-description',
+      text: t('settings.dsh.model.desc'),
+    });
+    if (!this.host.modelOverridesHost) {
+      group.createEl('p', {
+        cls: 'setting-item-description',
+        text: t('settings.dsh.model.unavailable'),
+      });
+      return;
+    }
+    SettingsInlineEditSection.renderBackendModelOverrides(
+      group,
+      'dsh',
+      this.host.modelOverridesHost,
+    );
+  }
+
+  private renderConnection(group: HTMLElement): void {
     const settings = this.host.getSettings();
-    const group = containerEl.createDiv({ cls: 'opencodian-backend-agent-group opencodian-dsh-settings' });
     group.createEl('h4', { cls: 'opencodian-settings-subsection-heading', text: t('settings.agent.dsh.connection') });
     new Setting(group).setName(t('settings.agent.dsh.transport')).setDesc(t('settings.agent.dsh.transport.desc'))
       .addDropdown((dropdown) => {
@@ -80,7 +166,15 @@ export class SettingsDshSection {
           new Notice(error instanceof Error ? error.message : String(error));
         } finally { button.setDisabled(false); }
       }));
+    group.createEl('p', { cls: 'setting-item-description', text: t('settings.agent.dsh.limits') });
+  }
+
+  private renderMcp(group: HTMLElement): void {
     this.addDshMcpSettings(group);
+    group.createEl('p', { cls: 'setting-item-description', text: t('settings.agent.dsh.limits') });
+  }
+
+  private renderConfiguration(group: HTMLElement): void {
     const configuration = group.createDiv();
     new Setting(group).setName(t('settings.agent.dsh.configuration'))
       .setDesc(t('settings.agent.dsh.configuration.desc'))
@@ -88,7 +182,7 @@ export class SettingsDshSection {
         button.setDisabled(true);
         try { await this.renderDshConfiguration(configuration); }
         catch (error) { new Notice(error instanceof Error ? error.message : String(error)); }
-        finally { status.setText(t(statusKey())); button.setDisabled(false); }
+        finally { button.setDisabled(false); }
       }));
     group.createEl('p', { cls: 'setting-item-description', text: t('settings.agent.dsh.limits') });
   }

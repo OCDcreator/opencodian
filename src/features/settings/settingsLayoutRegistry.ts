@@ -38,6 +38,20 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     ],
   },
   {
+    id: 'opencode2',
+    labelKey: 'settings.opencode2.title',
+    icon: 'terminal-square',
+    defaultSecondaryTabId: 'connection',
+    backendRequired: 'opencode2',
+    secondaryTabs: [
+      { id: 'connection', labelKey: 'settings.opencode2.tab.connection' },
+      { id: 'model', labelKey: 'settings.opencode2.tab.model' },
+      { id: 'auth', labelKey: 'settings.opencode2.tab.auth' },
+      { id: 'mcp', labelKey: 'settings.opencode2.tab.mcp' },
+      { id: 'resources', labelKey: 'settings.opencode2.tab.resources' },
+    ],
+  },
+  {
     id: 'claude-code',
     labelKey: 'settings.claudeCode.title',
     icon: 'sparkles',
@@ -53,6 +67,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
       { id: 'mcp', labelKey: 'settings.claudeCode.tab.mcp' },
       { id: 'skills-commands', labelKey: 'settings.claudeCode.tab.skillsCommands' },
       { id: 'agents', labelKey: 'settings.claudeCode.tab.agents' },
+      { id: 'debug', labelKey: 'settings.claudeCode.tab.debug' },
     ],
   },
   {
@@ -63,12 +78,27 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     backendRequired: 'codex',
     secondaryTabs: [
       { id: 'connection', labelKey: 'settings.codex.tab.connection' },
+      { id: 'model', labelKey: 'settings.codex.tab.model' },
       { id: 'permissions', labelKey: 'settings.codex.tab.permissions' },
       { id: 'project-config', labelKey: 'settings.codex.tab.projectConfig' },
       { id: 'resume-inspect', labelKey: 'settings.codex.tab.resumeInspect' },
       { id: 'account', labelKey: 'settings.codex.tab.account' },
       { id: 'resources', labelKey: 'settings.codex.tab.resources' },
       { id: 'plugins', labelKey: 'settings.codex.tab.plugins' },
+      { id: 'debug', labelKey: 'settings.codex.tab.debug' },
+    ],
+  },
+  {
+    id: 'dsh',
+    labelKey: 'settings.dsh.title',
+    icon: 'opencodian-dsh',
+    defaultSecondaryTabId: 'connection',
+    backendRequired: 'dsh',
+    secondaryTabs: [
+      { id: 'connection', labelKey: 'settings.dsh.tab.connection' },
+      { id: 'model', labelKey: 'settings.dsh.tab.model' },
+      { id: 'mcp', labelKey: 'settings.dsh.tab.mcp' },
+      { id: 'configuration', labelKey: 'settings.dsh.tab.configuration' },
     ],
   },
   {
@@ -97,6 +127,8 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     backendRequired: 'zcode',
     secondaryTabs: [
       { id: 'connection', labelKey: 'settings.zcode.tab.connection' },
+      { id: 'model', labelKey: 'settings.zcode.tab.model' },
+      { id: 'management', labelKey: 'settings.zcode.tab.management' },
     ],
   },
   {
@@ -130,11 +162,12 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     icon: 'messages-square',
     defaultSecondaryTabId: 'display',
     secondaryTabs: [
-      { id: 'title', labelKey: 'settings.conversation.tab.title' },
       { id: 'compaction', labelKey: 'settings.conversation.tab.compaction', backendRequired: 'opencode' },
       { id: 'sharing', labelKey: 'settings.conversation.tab.sharing', backendRequired: 'opencode' },
       { id: 'display', labelKey: 'settings.conversation.tab.display' },
-      { id: 'questions', labelKey: 'settings.conversation.tab.questions', backendRequired: 'opencode' },
+      { id: 'questions', labelKey: 'settings.conversation.tab.questions' },
+      { id: 'obsidian-tooling', labelKey: 'settings.conversation.tab.obsidianTooling' },
+      { id: 'pdf-index', labelKey: 'settings.conversation.tab.pdfIndex' },
       { id: 'memory', labelKey: 'settings.conversation.tab.memory' },
       { id: 'vault-retrieval', labelKey: 'settings.conversation.tab.vaultRetrieval' },
       { id: 'export', labelKey: 'settings.conversation.tab.export' },
@@ -247,9 +280,6 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     defaultSecondaryTabId: 'plugin',
     secondaryTabs: [
       { id: 'plugin', labelKey: 'settings.debug.tab.plugin' },
-      { id: 'opencode', labelKey: 'settings.debug.tab.opencode' },
-      { id: 'codex', labelKey: 'settings.debug.tab.codex' },
-      { id: 'claude-code', labelKey: 'settings.debug.tab.claudeCode' },
       { id: 'export', labelKey: 'settings.debug.tab.export' },
       { id: 'capability-lab', labelKey: 'settings.debug.tab.capabilityLab' },
     ],
@@ -308,14 +338,25 @@ const LEGACY_SECONDARY_TAB_ID_MAP: Record<string, Record<string, string>> = {
     language: 'basic',
     backend: 'agents',
   },
-  conversation: {
-    rendering: 'display',
-  },
   'claude-code': {
     'mcp-advanced': 'mcp',
     mcpAdvanced: 'mcp',
     limits: 'runtime',
     resources: 'skills-commands',
+  },
+  codex: {
+    runtime: 'model',
+  },
+  dsh: {
+    runtime: 'connection',
+  },
+  opencode2: {
+    catalog: 'resources',
+    integrations: 'auth',
+  },
+  conversation: {
+    rendering: 'display',
+    title: 'display',
   },
   security: {
     permissions: 'config',
@@ -325,6 +366,9 @@ const LEGACY_SECONDARY_TAB_ID_MAP: Record<string, Record<string, string>> = {
     modules: 'plugin',
     logs: 'export',
     actions: 'export',
+    opencode: 'capability-lab',
+    codex: 'capability-lab',
+    'claude-code': 'capability-lab',
   },
   plugins: {
     global: 'config-sources',
@@ -338,6 +382,31 @@ for (const tab of SETTINGS_PRIMARY_TABS) {
 export function getPrimaryTabDefinition(id: string): SettingsPrimaryTabDefinition | undefined {
   const normalizedId = LEGACY_PRIMARY_TAB_ID_MAP[id] ?? id;
   return PRIMARY_TAB_MAP.get(normalizedId);
+}
+
+/**
+ * The primary tab that is the backend's own workspace. Backend-owned legacy
+ * tabs (server/model/agents/...) intentionally do not qualify: only the tab
+ * whose id equals its backend id is a workspace entry.
+ */
+export function getBackendWorkspaceTab(
+  backend: AgentBackendKind,
+): SettingsPrimaryTabDefinition | undefined {
+  return SETTINGS_PRIMARY_TABS.find(
+    (tab) => tab.backendRequired === backend && tab.id === backend,
+  );
+}
+
+/**
+ * The workspaces that may appear in normal navigation. The active backend
+ * contributes at most one workspace; other enabled backends never leak their
+ * dedicated settings into the current host.
+ */
+export function getVisibleBackendWorkspaces(
+  activeBackend: AgentBackendKind | undefined,
+): AgentBackendKind[] {
+  if (!activeBackend) return [];
+  return getBackendWorkspaceTab(activeBackend) ? [activeBackend] : [];
 }
 
 export function resolvePrimaryTabId(candidate: string): string {

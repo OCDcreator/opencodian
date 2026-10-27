@@ -53,7 +53,10 @@ export class SettingsCodexProjectConfigSection {
   constructor(private readonly options: SettingsCodexProjectConfigSectionOptions) {}
 
   private getVaultPath(): string | null {
-    const adapter = this.options.plugin.app.vault.adapter;
+    const adapter = this.options.plugin.app?.vault?.adapter;
+    if (!adapter) {
+      return null;
+    }
     if ('getBasePath' in adapter && typeof adapter.getBasePath === 'function') {
       return adapter.getBasePath();
     }

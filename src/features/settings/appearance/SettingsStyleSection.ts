@@ -80,6 +80,7 @@ export class SettingsStyleSection {
     switch (secondaryTabId) {
       case 'presets':
         runtime.presetSection.attach(containerEl);
+        this.addResetAllSetting(containerEl);
         break;
       case 'background':
         runtime.backgroundStyleSection.attach(containerEl);

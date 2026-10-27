@@ -60,7 +60,10 @@ function mount(host: SettingsZCodeHost, layout: 'classic' | 'tabbed'): Record<Fi
   const section = new SettingsZCodeSection(host);
   const container = document.body.createDiv();
   if (layout === 'classic') section.attach(container);
-  else section.attachTabbed(container, 'connection');
+  else {
+    section.attachTabbed(container, 'connection');
+    section.attachTabbed(container, 'model');
+  }
 
   expect(textControls).toHaveLength(3);
   expect(modeControl).toBeDefined();

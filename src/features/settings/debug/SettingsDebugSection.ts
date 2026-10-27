@@ -173,15 +173,61 @@ export class SettingsDebugSection {
     const platformKey = getCurrentPlatformKey();
 
     this.addPluginDebugSettings(containerEl);
-    this.openCodeDebugPanel.render(containerEl);
-    this.claudeCodeDebugPanel.render(containerEl);
     this.addExportDebugSettings(containerEl, platformKey);
 
     return headingEl;
   }
 
+  /**
+   * Render only the backend-owned trace panels inside that backend's own
+   * workspace tab. Generic debug never mounts another backend's controls.
+   */
+  attachBackendTabbed(
+    containerEl: HTMLElement,
+    backend: 'opencode' | 'codex' | 'claude-code',
+  ): void {
+    if (backend === 'opencode') {
+      const opencodeBlockEl = this.createDebugTabShell(containerEl, {
+        id: 'opencode',
+        title: t('settings.debug.modules.opencode.title'),
+        description: t('settings.debug.modules.opencode.desc'),
+        badges: ['OpenCode', String(OPEN_CODE_DEBUG_MODULE_KEYS.length)],
+      });
+      this.openCodeDebugPanel.render(opencodeBlockEl, { includeIntro: false });
+      return;
+    }
+    if (backend === 'codex') {
+      const codexBlockEl = this.createDebugTabShell(containerEl, {
+        id: 'codex',
+        title: t('settings.debug.modules.codex.title'),
+        description: t('settings.debug.modules.codex.desc'),
+        badges: ['Codex', String(CODEX_TRACE_CHANNEL_IDS.length)],
+      });
+      this.codexDebugPanel.render(codexBlockEl, { includeIntro: false });
+      return;
+    }
+    const claudeCodeBlockEl = this.createDebugTabShell(containerEl, {
+      id: 'claude-code',
+      title: t('settings.debug.modules.claudeCode.title'),
+      description: t('settings.debug.modules.claudeCode.groupDesc'),
+      badges: ['Claude Code', String(CLAUDE_CODE_DEBUG_CHANNEL_IDS.length)],
+    });
+    this.claudeCodeDebugPanel.render(claudeCodeBlockEl, { includeIntro: false });
+  }
+
   attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {
     const platformKey = getCurrentPlatformKey();
+
+    if (secondaryTabId === 'export') {
+      const exportBlockEl = this.createDebugTabShell(containerEl, {
+        id: 'export',
+        title: t('settings.debug.export.title'),
+        description: t('settings.debug.export.desc'),
+        badges: [this.getDebugPathPlatformLabel(platformKey), 'BUILD_ID'],
+      });
+      this.addExportDebugSettings(exportBlockEl, platformKey, { includeIntro: false });
+      return;
+    }
 
     const pluginBlockEl = this.createDebugTabShell(containerEl, {
       id: 'plugin',
@@ -190,40 +236,6 @@ export class SettingsDebugSection {
       badges: [t('settings.debug.logging.name'), String(DEBUG_MODULE_GROUPS.plugin.length)],
     });
     this.addPluginDebugSettings(pluginBlockEl, { includeIntro: false });
-
-    const opencodeBlockEl = this.createDebugTabShell(containerEl, {
-      id: 'opencode',
-      title: t('settings.debug.modules.opencode.title'),
-      description: t('settings.debug.modules.opencode.desc'),
-      badges: ['OpenCode', String(OPEN_CODE_DEBUG_MODULE_KEYS.length)],
-    });
-    this.openCodeDebugPanel.render(opencodeBlockEl, { includeIntro: false });
-
-    const codexBlockEl = this.createDebugTabShell(containerEl, {
-      id: 'codex',
-      title: t('settings.debug.modules.codex.title'),
-      description: t('settings.debug.modules.codex.desc'),
-      badges: ['Codex', String(CODEX_TRACE_CHANNEL_IDS.length)],
-    });
-    this.codexDebugPanel.render(codexBlockEl, { includeIntro: false });
-
-    const claudeCodeBlockEl = this.createDebugTabShell(containerEl, {
-      id: 'claude-code',
-      title: t('settings.debug.modules.claudeCode.title'),
-      description: t('settings.debug.modules.claudeCode.groupDesc'),
-      badges: ['Claude Code', String(CLAUDE_CODE_DEBUG_CHANNEL_IDS.length)],
-    });
-    this.claudeCodeDebugPanel.render(claudeCodeBlockEl, { includeIntro: false });
-
-    const exportBlockEl = this.createDebugTabShell(containerEl, {
-      id: 'export',
-      title: t('settings.debug.export.title'),
-      description: t('settings.debug.export.desc'),
-      badges: [this.getDebugPathPlatformLabel(platformKey), 'BUILD_ID'],
-    });
-    this.addExportDebugSettings(exportBlockEl, platformKey, { includeIntro: false });
-
-    this.showActiveBlock(containerEl, secondaryTabId);
   }
 
   private createDebugTabShell(containerEl: HTMLElement, config: DebugTabShellConfig): HTMLElement {
@@ -740,13 +752,6 @@ export class SettingsDebugSection {
       return path.join(os.homedir(), candidatePath.slice(2));
     }
     return candidatePath;
-  }
-
-  private showActiveBlock(containerEl: HTMLElement, activeTabId: string): void {
-    containerEl.querySelectorAll('[data-section-block]').forEach((el) => {
-      const blockEl = el as HTMLElement;
-      blockEl.style.display = blockEl.dataset.sectionBlock === activeTabId ? '' : 'none';
-    });
   }
 
 }

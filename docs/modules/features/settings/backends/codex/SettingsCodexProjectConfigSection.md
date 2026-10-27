@@ -43,3 +43,5 @@ Vault-level `.codex/config.toml` editor. Manages exactly `<vault-root>/.codex/co
 - 源码位置：`src/features/settings/backends/codex/SettingsCodexProjectConfigSection.ts`。
 - 原位置：`src/features/settings/SettingsCodexProjectConfigSection.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/core/agents/backend/configuration/ProjectResourceSecureWrite.ts`、`src/features/settings/backends/codex/CodexProjectConfigFormModel.ts`。
+
+> 2026-10-27：读取项目配置前容忍缺失的 host vault adapter，返回 `invalid-path` 而不是抛出；不改变 TOML 读写契约。

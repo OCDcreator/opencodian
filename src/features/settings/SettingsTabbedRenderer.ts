@@ -13,7 +13,7 @@ import { SettingsStyleSection } from './appearance/SettingsStyleSection';
 import { SettingsAcpSection } from './backends/acp/SettingsAcpSection';
 import { SettingsClaudeCodeSection } from './backends/claude/SettingsClaudeCodeSection';
 import { SettingsCodexSection } from './backends/codex/SettingsCodexSection';
-import { SettingsBackendSection } from './backends/opencode/SettingsBackendSection';
+import { createSettingsDshSection, SettingsBackendSection, SettingsOpenCode2Section } from './backends/opencode/SettingsBackendSection';
 import { SettingsCommandsSection } from './backends/opencode/SettingsCommandsSection';
 import { SettingsServerSection } from './backends/opencode/SettingsServerSection';
 import { SettingsPiSection } from './backends/pi/SettingsPiSection';
@@ -38,6 +38,8 @@ import { SettingsSkillSection } from './resources/SettingsSkillSection';
 import { SettingsToolSection } from './resources/SettingsToolSection';
 import {
   getActiveSecondaryTabId,
+  getBackendWorkspaceTab,
+  getVisibleBackendWorkspaces,
   resolvePrimaryTabId,
   resolveSecondaryTabId,
   SETTINGS_PRIMARY_TABS,
@@ -85,6 +87,8 @@ export interface TabRendererDependencies {
   setServerState: (state: { healthy: boolean; status: ServerStatus }) => void;
   requestDisplayRefresh: () => void;
   renderUserContent: (containerEl: HTMLElement, secondaryTabId: string) => void;
+  /** Renders the shared OpenCode 2 title controls through the host's conversation section. */
+  renderConversationTitleSettings: (containerEl: HTMLElement) => void;
   renderLayoutModeSetting: (containerEl: HTMLElement) => void;
   renderLanguageSetting: (containerEl: HTMLElement) => void;
   renderSettingsInEditorAreaSetting: (containerEl: HTMLElement) => void;
@@ -95,6 +99,7 @@ export interface TabRendererDependencies {
 
 export class SettingsTabbedRenderer {
   private readonly deps: TabRendererDependencies;
+  private activeCodexSection: SettingsCodexSection | null = null;
 
   constructor(deps: TabRendererDependencies) { this.deps = deps; }
 
@@ -206,7 +211,7 @@ export class SettingsTabbedRenderer {
 
   /** Align the tabbed settings route with the active backend without refreshing or persisting it. */
   syncToActiveBackend(activeBackend: AgentBackendKind): void {
-    const backendPrimaryTab = SETTINGS_PRIMARY_TABS.find((tab) => tab.backendRequired === activeBackend);
+    const backendPrimaryTab = getBackendWorkspaceTab(activeBackend);
     const resolvedPrimary = backendPrimaryTab?.id ?? 'general';
     const resolvedSecondary = getActiveSecondaryTabId(
       resolvedPrimary,
@@ -270,6 +275,7 @@ export class SettingsTabbedRenderer {
     this.deps.requestDisplayRefresh();
   }
 
+  // eslint-disable-next-line complexity -- Flat registry dispatch; each case delegates to a focused renderer.
   private renderContent(
     containerEl: HTMLElement, primaryTabId: string,
     secondaryTabId: string,
@@ -282,10 +288,22 @@ export class SettingsTabbedRenderer {
         this.renderServerContent(containerEl, secondaryTabId);
         break;
       case 'claude-code':
-        this.renderClaudeCodeContent(containerEl, secondaryTabId);
+        this.renderBackendWorkspaceTab(containerEl, 'claude-code', secondaryTabId);
         break;
       case 'codex':
-        this.renderCodexContent(containerEl, secondaryTabId);
+        this.renderBackendWorkspaceTab(containerEl, 'codex', secondaryTabId);
+        break;
+      case 'pi':
+        this.renderBackendWorkspaceTab(containerEl, 'pi', secondaryTabId);
+        break;
+      case 'zcode':
+        this.renderBackendWorkspaceTab(containerEl, 'zcode', secondaryTabId);
+        break;
+      case 'opencode2':
+        this.renderBackendWorkspaceTab(containerEl, 'opencode2', secondaryTabId);
+        break;
+      case 'dsh':
+        this.renderBackendWorkspaceTab(containerEl, 'dsh', secondaryTabId);
         break;
       case 'model':
         this.renderModelContent(containerEl, secondaryTabId);
@@ -339,11 +357,7 @@ export class SettingsTabbedRenderer {
 
   private renderGeneralContent(containerEl: HTMLElement, secondaryTabId: string): void {
     if (secondaryTabId === 'agents') {
-      const backendSection = new SettingsBackendSection({
-        plugin: this.deps.plugin,
-        requestDisplayRefresh: () => { this.deps.requestDisplayRefresh(); },
-      });
-      backendSection.attach(containerEl);
+      this.renderBackendManagement(containerEl);
       return;
     }
 
@@ -396,20 +410,144 @@ export class SettingsTabbedRenderer {
   }
 
   private renderClaudeCodeContent(containerEl: HTMLElement, secondaryTabId: string): void {
-    const claudeCodeSection = new SettingsClaudeCodeSection({
-      plugin: this.deps.plugin,
-      createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
-    });
-    claudeCodeSection.attachTabbed(containerEl, secondaryTabId);
+    this.renderBackendWorkspaceTab(containerEl, 'claude-code', secondaryTabId);
   }
 
   private renderCodexContent(containerEl: HTMLElement, secondaryTabId: string): void {
-    const codexSection = new SettingsCodexSection({
+    this.renderBackendWorkspaceTab(containerEl, 'codex', secondaryTabId);
+  }
+
+  /**
+   * Single backend-workspace mount used by both tabbed navigation and the
+   * classic layout. Hosts supply the shared title-controls callback so the
+   * OpenCode 2 title widget always uses their live conversation section.
+   */
+  renderBackendWorkspaceTab(
+    containerEl: HTMLElement,
+    backend: AgentBackendKind,
+    secondaryTabId: string,
+  ): void {
+    // Any backend subpage switch (including Codex account -> debug) must release
+    // the previous Codex section before the old DOM is discarded.
+    this.disposeActiveCodexSection();
+    if ((backend === 'claude-code' || backend === 'codex') && secondaryTabId === 'debug') {
+      this.createDebugSection().attachBackendTabbed(containerEl, backend);
+      return;
+    }
+    switch (backend) {
+      case 'opencode2': {
+        new SettingsOpenCode2Section({
+          plugin: this.deps.plugin,
+          requestDisplayRefresh: () => { this.deps.requestDisplayRefresh(); },
+          renderTitleSettings: (hostEl) => { this.deps.renderConversationTitleSettings(hostEl); },
+        }).attachTabbed(containerEl, secondaryTabId);
+        return;
+      }
+      case 'claude-code':
+        new SettingsClaudeCodeSection({
+          plugin: this.deps.plugin,
+          createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
+        }).attachTabbed(containerEl, secondaryTabId);
+        return;
+      case 'codex': {
+        const codexSection = new SettingsCodexSection({
+          plugin: this.deps.plugin,
+          createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
+        });
+        this.activeCodexSection = codexSection;
+        this.deps.setCodexSection(codexSection);
+        codexSection.attachTabbed(containerEl, secondaryTabId);
+        return;
+      }
+      case 'pi':
+        new SettingsPiSection(this.deps.plugin).attachTabbed(containerEl, secondaryTabId);
+        return;
+      case 'zcode':
+        new SettingsZCodeSection(this.deps.plugin).attachTabbed(containerEl, secondaryTabId);
+        return;
+      case 'dsh':
+        createSettingsDshSection(this.deps.plugin).attachTabbed(containerEl, secondaryTabId);
+        return;
+      default:
+        return;
+    }
+  }
+
+  /** Backend management surface shared by the tabbed general tab and classic hosts. */
+  renderBackendManagement(containerEl: HTMLElement): void {
+    this.deps.createHeading(containerEl, t('settings.general.tab.agents'));
+    new SettingsBackendSection({
       plugin: this.deps.plugin,
-      createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
-    });
-    this.deps.setCodexSection(codexSection);
-    codexSection.attachTabbed(containerEl, secondaryTabId);
+      requestDisplayRefresh: () => { this.deps.requestDisplayRefresh(); },
+    }).attach(containerEl);
+  }
+
+  private disposeActiveCodexSection(): void {
+    const previous = this.activeCodexSection;
+    this.activeCodexSection = null;
+    this.deps.setCodexSection(null);
+    previous?.dispose();
+  }
+
+  /**
+   * Mount the active backend's workspace for the classic layout using the same
+   * registry visibility facts as the tabbed layout. Non-active enabled backends
+   * never mount here.
+   */
+  renderClassicBackendWorkspaces(containerEl: HTMLElement): void {
+    const activeBackend = this.getActiveBackend();
+    for (const backend of getVisibleBackendWorkspaces(activeBackend)) {
+      const definition = getBackendWorkspaceTab(backend);
+      if (!definition) continue;
+      this.deps.createHeading(containerEl, t(definition.labelKey));
+
+      const navEl = containerEl.createDiv({
+        cls: 'opencodian-settings-tabs-secondary opencodian-settings-classic-backend-tabs',
+      });
+      const bodyEl = containerEl.createDiv({
+        cls: 'opencodian-settings-classic-backend-body',
+      });
+      const saved = this.deps.plugin.settings.settingsTabbedSecondaryTabByPrimary[definition.id];
+      let activeSecondary = resolveSecondaryTabId(definition.id, saved ?? definition.defaultSecondaryTabId);
+      if (!definition.secondaryTabs.some((tab) => tab.id === activeSecondary)) {
+        activeSecondary = definition.defaultSecondaryTabId;
+      }
+
+      let previousTitleTab = false;
+      const renderSelected = (): void => {
+        if (previousTitleTab) {
+          this.deps.setRefreshTitleModelsCallback(undefined);
+        }
+        this.disposeActiveCodexSection();
+        bodyEl.empty();
+        this.renderBackendWorkspaceTab(bodyEl, backend, activeSecondary);
+        previousTitleTab = backend === 'opencode2' && activeSecondary === 'model';
+        for (const button of Array.from(navEl.querySelectorAll<HTMLButtonElement>('button'))) {
+          button.classList.toggle(
+            'opencodian-settings-tab-active',
+            button.dataset.tabId === activeSecondary,
+          );
+        }
+      };
+
+      for (const secondaryTab of definition.secondaryTabs) {
+        const button = navEl.createEl('button', {
+          cls: 'opencodian-settings-tab-secondary',
+          text: t(secondaryTab.labelKey),
+          attr: { type: 'button', 'data-tab-id': secondaryTab.id },
+        });
+        button.addEventListener('click', () => {
+          activeSecondary = secondaryTab.id;
+          this.deps.plugin.settings.settingsTabbedSecondaryTabByPrimary = {
+            ...this.deps.plugin.settings.settingsTabbedSecondaryTabByPrimary,
+            [definition.id]: secondaryTab.id,
+          };
+          void this.deps.plugin.saveSettings();
+          renderSelected();
+        });
+      }
+      renderSelected();
+    }
   }
 
   private renderModelContent(containerEl: HTMLElement, secondaryTabId: string): void {
@@ -431,15 +569,7 @@ export class SettingsTabbedRenderer {
   }
 
   private renderConversationContent(containerEl: HTMLElement, secondaryTabId: string): void {
-    const conversationSection = new SettingsConversationSection({
-      app: this.deps.app,
-      plugin: this.deps.plugin,
-      createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
-      createSettingsBlock: (hostEl, options) => this.deps.createSettingsBlock(hostEl, options),
-      addSettingHelpButton: (setting, helpButton) => this.deps.addSettingHelpButton(setting, helpButton),
-      setRefreshTitleModelsCallback: (callback) => { this.deps.setRefreshTitleModelsCallback(callback); },
-    });
-    conversationSection.attachTabbed(containerEl, secondaryTabId);
+    this.createConversationSection().attachTabbed(containerEl, secondaryTabId);
     new SettingsInlineEditSection({
       plugin: this.deps.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
@@ -452,6 +582,17 @@ export class SettingsTabbedRenderer {
       plugin: this.deps.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
     }).attachTabbed(containerEl, secondaryTabId);
+  }
+
+  private createConversationSection(): SettingsConversationSection {
+    return new SettingsConversationSection({
+      app: this.deps.app,
+      plugin: this.deps.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
+      createSettingsBlock: (hostEl, options) => this.deps.createSettingsBlock(hostEl, options),
+      addSettingHelpButton: (setting, helpButton) => this.deps.addSettingHelpButton(setting, helpButton),
+      setRefreshTitleModelsCallback: (callback) => { this.deps.setRefreshTitleModelsCallback(callback); },
+    });
   }
 
   private renderAgentsContent(containerEl: HTMLElement, secondaryTabId: string): void {
@@ -551,13 +692,17 @@ export class SettingsTabbedRenderer {
       capabilityLabSection.attachTabbed(containerEl, secondaryTabId);
       return;
     }
-    const debugSection = new SettingsDebugSection({
+    this.createDebugSection().attachTabbed(containerEl, secondaryTabId);
+  }
+
+  private createDebugSection(): SettingsDebugSection {
+    return new SettingsDebugSection({
       plugin: this.deps.plugin,
       getOpenCodeDiagnostics: () => createOpenCodeTraceDiagnosticsPort(this.deps.plugin.openCodeTraceService),
-      getCodexDiagnostics: () => createCodexTraceDiagnosticsPort(this.deps.plugin.codexTraceService), getClaudeDiagnostics: () => createClaudeTraceDiagnosticsPort(this.deps.plugin.claudeTraceService),
+      getCodexDiagnostics: () => createCodexTraceDiagnosticsPort(this.deps.plugin.codexTraceService),
+      getClaudeDiagnostics: () => createClaudeTraceDiagnosticsPort(this.deps.plugin.claudeTraceService),
       createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
     });
-    debugSection.attachTabbed(containerEl, secondaryTabId);
   }
 
   private renderUserContent(containerEl: HTMLElement, secondaryTabId: string): void {

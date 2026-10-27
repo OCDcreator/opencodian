@@ -88,3 +88,7 @@ Pi主标签使用用户SVG注册图标opencodian-pi，与后端状态和切换�
 2026-09-18 conversation 主 tab 二级 tab 新增 `image-generation`（后端无关，不设 backendRequired）。
 
 2026-09-22 主 tab 新增 `zcode`（icon: opencodian-zcode，backendRequired: zcode，二级 tab `connection`）。
+
+> 2026-10-27：新增 `opencode2`/`dsh` 工作区、Codex/ZCode 拆分标签与 Claude/Codex debug 标签；移除通用 title 与通用调试中的后端 trace 标签；新增 `getBackendWorkspaceTab`/`getVisibleBackendWorkspaces` 供两个宿主共用可见性。
+
+> 2026-10-27（二次审查）：DSH 工作区增加 `model` 二级页（连接 / 模型与行内 / MCP / 原生默认值）；classic 与 tabbed 均通过 registry 消费该顺序。

@@ -1079,10 +1079,6 @@ describe('SettingsConversationSection', () => {
 
     expect(blockRecords).toEqual([
       {
-        title: t('settings.titleGeneration.title'),
-        description: t('settings.titleGeneration.groupDesc'),
-      },
-      {
         title: t('settings.conversation.compaction.projectNote'),
         description: t('settings.conversation.compaction.projectNoteDesc'),
       },
@@ -1119,6 +1115,10 @@ describe('SettingsConversationSection', () => {
         description: t('settings.conversation.rendering.desc'),
       },
       {
+        title: t('settings.conversation.memory.title'),
+        description: t('settings.conversation.memory.desc'),
+      },
+      {
         title: t('settings.conversation.export.title'),
         description: t('settings.conversation.export.groupDesc'),
       },
@@ -1128,7 +1128,6 @@ describe('SettingsConversationSection', () => {
         (element) => element.dataset.settingsTarget,
       ),
       ).toEqual([
-      'conversation-title',
       'conversation-compaction',
       'conversation-sharing',
       'conversation-experimental',
@@ -1138,6 +1137,7 @@ describe('SettingsConversationSection', () => {
       'conversation-pdf-index',
       'conversation-questions',
       'conversation-rendering',
+      'conversation-memory',
       'conversation-export',
     ]);
   });
@@ -1446,5 +1446,76 @@ describe('SettingsConversationSection Vim key conflict handling', () => {
     });
     expect(reloaded).toEqual({ up: 'n', down: 'k', composer: 'p' });
     expect(upKey?.control.inputEl.value).toBe(reloaded.up);
+  });
+});
+
+describe('SettingsConversationSection title ownership', () => {
+  beforeEach(() => {
+    resetHarnessState();
+    installSettingMocks();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    document.body.innerHTML = '';
+  });
+
+  it('does not render a title editor in the shared conversation page for any backend', () => {
+    const opencode2Plugin = createPlugin({
+      activeBackend: 'opencode2',
+      enabledBackends: ['opencode2'],
+    });
+    const { containerEl } = createSection(opencode2Plugin);
+    expect(containerEl.textContent).not.toContain(t('settings.titleGeneration.title'));
+    expect(containerEl.textContent).not.toContain(t('settings.titleGeneration.claudeAutoTitle.name'));
+
+    resetHarnessState();
+    installSettingMocks();
+    const claudePlugin = createPlugin({
+      activeBackend: 'claude-code',
+      enabledBackends: ['claude-code'],
+    });
+    const claudeSection = createSection(claudePlugin);
+    expect(claudeSection.containerEl.textContent).not.toContain(t('settings.titleGeneration.claudeAutoTitle.name'));
+  });
+
+  it('renders OpenCode 2 title mode and backup model only through the workspace title mount', () => {
+    const plugin = createPlugin({
+      activeBackend: 'opencode2',
+      enabledBackends: ['opencode2'],
+    });
+    const section = new SettingsConversationSection({
+      app: createApp(),
+      plugin: plugin as unknown as OpenCodianPlugin,
+      createSectionHeading,
+      createSettingsBlock,
+      addSettingHelpButton: jest.fn(),
+      setRefreshTitleModelsCallback: jest.fn(),
+    });
+    const containerEl = document.createElement('div');
+    section.attachTitleBlock(containerEl);
+
+    expect(findDropdown(t('settings.titleGeneration.mode.name'))).toBeDefined();
+    expect(toggleRecords.some((record) => record.name === t('settings.titleGeneration.claudeAutoTitle.name'))).toBe(false);
+  });
+
+  it('renders no title controls for Claude in the shared title mount', () => {
+    const plugin = createPlugin({
+      activeBackend: 'claude-code',
+      enabledBackends: ['claude-code'],
+    });
+    const section = new SettingsConversationSection({
+      app: createApp(),
+      plugin: plugin as unknown as OpenCodianPlugin,
+      createSectionHeading,
+      createSettingsBlock,
+      addSettingHelpButton: jest.fn(),
+      setRefreshTitleModelsCallback: jest.fn(),
+    });
+    const containerEl = document.createElement('div');
+    section.attachTitleBlock(containerEl);
+
+    expect(containerEl.children).toHaveLength(0);
+    expect(findToggle(t('settings.titleGeneration.claudeAutoTitle.name'))).toBeUndefined();
   });
 });

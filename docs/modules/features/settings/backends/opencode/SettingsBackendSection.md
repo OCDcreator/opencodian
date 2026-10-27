@@ -81,3 +81,5 @@ The backend list exposes OpenCode 1 and 2 separately; OpenCode 2 settings select
 ## 2026-10-24 DSH 设置区分离
 
 后端启用/默认选择组合层将 DSH 的完整设置区交给 `SettingsDshSection`，仅注入设置读写、适配器窄控制面和统一 MCP 校验。保留原有 OpenCode 2 管理行为，避免把多个后端的设置逻辑继续堆入此模块。
+
+> 2026-10-27：通用智能体管理只保留默认后端、启用开关和共用预热策略；OpenCode 2/DSH 专属配置移到各自工作区，并新增共享脱敏的 catalog 失败分类 helper。

@@ -72,3 +72,7 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 当前源码目录：`src/features/settings/backends/acp`、`src/features/settings/general`、`src/features/settings/models`、`src/features/settings/models/icons`。
 
 目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。
+
+> 2026-10-27：设置宿主调整后插件日志/诊断入口保持在通用调试；本 owner 的日志、更新与诊断边界未变。
+
+> 2026-10-27（UI 验收修复）：会话标题备份模型按钮创建时同步设置当前模型或 followCurrent 标签；异步加载/不可用/保存语义不变。

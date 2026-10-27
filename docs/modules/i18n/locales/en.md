@@ -683,3 +683,7 @@ Adds the independent composer input name, effort-save failure, DSH default/inher
 ## 2026-10-27 Single-rail composer menu copy
 
 Adds `chat.composerMenu.*` keys for the attachment menu (attachment, add file/image, generate image, attach Web Viewer), the Agent/run-settings trigger and heading, and the real word/character status-bar counts. Existing context/image/image-generation keys remain in use for tooltips.
+
+> 2026-10-27: adds OpenCode 2/DSH workspace tab labels, Codex/ZCode split tab labels, Claude/Codex debug labels, Claude title/inline group copy, Obsidian tools/PDF index conversation labels, and backend-neutral question copy.
+
+> 2026-10-27 (second review): adds `settings.dsh.tab.model` and `settings.dsh.model.*` for the DSH inline override page; mirrors zh.

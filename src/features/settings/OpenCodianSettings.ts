@@ -18,8 +18,6 @@ import { SettingsCodexSection } from './backends/codex/SettingsCodexSection';
 import { refreshCostEstimateSettingsRows } from './backends/opencode/CostEstimateSettingsRow';
 import { SettingsCommandsSection } from './backends/opencode/SettingsCommandsSection';
 import { SettingsServerSection } from './backends/opencode/SettingsServerSection';
-import { SettingsPiSection } from './backends/pi/SettingsPiSection';
-import { SettingsZCodeSection } from './backends/zcode/SettingsZCodeSection';
 import {
   enhanceSettingsDropdowns,
   type SettingsDropdownsEnhancerHandle,
@@ -133,6 +131,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           this.lastKnownServerStatus = status;
         },
         requestDisplayRefresh: () => { this.display(); },
+        renderConversationTitleSettings: (el) => { this.getConversationSection().attachTitleBlock(el); },
         renderUserContent: (el, secondaryTabId) => {
           this.createUserSection().attachTabbed(el, secondaryTabId);
         },
@@ -385,11 +384,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     containerEl.dataset.settingsLayoutMode = 'classic';
 
     this.renderClassicGeneralSection(containerEl);
-    if (this.isActiveBackend('claude-code')) {
-      this.addClaudeCodeSettings(containerEl);
-    }
-    if (this.isActiveBackend('pi')) new SettingsPiSection(this.plugin).attach(containerEl);
-    if (this.isActiveBackend('zcode')) new SettingsZCodeSection(this.plugin).attach(containerEl);
+    this.getOrCreateTabbedRenderer().renderBackendManagement(containerEl);
+    this.getOrCreateTabbedRenderer().renderClassicBackendWorkspaces(containerEl);
     if (this.isActiveBackend('opencode')) {
       this.addServerSettings(containerEl);
       this.addModelSettings(containerEl);
@@ -541,14 +537,6 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     return serverSection.attach(containerEl);
   }
 
-  private addClaudeCodeSettings(containerEl: HTMLElement): HTMLHeadingElement {
-    this.claudeCodeSection ??= new SettingsClaudeCodeSection({
-      plugin: this.plugin,
-      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
-    });
-    return this.claudeCodeSection.attach(containerEl);
-  }
-
   private addMcpSettings(containerEl: HTMLElement): void {
     this.mcpSection = new SettingsMcpSection({
       plugin: this.plugin,
@@ -588,6 +576,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   }
 
   private addConversationSettings(containerEl: HTMLElement): HTMLHeadingElement {
+    return this.getConversationSection().attach(containerEl);
+  }
+
+  private getConversationSection(): SettingsConversationSection {
     this.conversationSection ??= new SettingsConversationSection({
       app: this.app,
       plugin: this.plugin,
@@ -598,7 +590,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         this.refreshTitleModelsCallback = callback;
       },
     });
-    return this.conversationSection.attach(containerEl);
+    return this.conversationSection;
   }
 
   private addInlineEditSettings(containerEl: HTMLElement): HTMLHeadingElement {
@@ -721,6 +713,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   }
 
   private addDebugSettings(containerEl: HTMLElement): HTMLHeadingElement {
+    return this.getDebugSection().attach(containerEl);
+  }
+
+  private getDebugSection(): SettingsDebugSection {
     this.debugSection ??= new SettingsDebugSection({
       plugin: this.plugin,
       getOpenCodeDiagnostics: () => createOpenCodeTraceDiagnosticsPort(this.plugin.openCodeTraceService),
@@ -728,7 +724,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       getClaudeDiagnostics: () => createClaudeTraceDiagnosticsPort(this.plugin.claudeTraceService),
       createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
     });
-    return this.debugSection.attach(containerEl);
+    return this.debugSection;
   }
 
   private addUserSettings(containerEl: HTMLElement): HTMLHeadingElement {

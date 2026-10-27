@@ -15,6 +15,7 @@ type TestPlugin = {
   saveSettings: jest.Mock;
   app: {
     workspace: Record<string, unknown>;
+    vault: { adapter: { getBasePath: () => string } };
     plugins?: { reloadPlugin?: jest.Mock; unloadPlugin?: jest.Mock; loadPlugin?: jest.Mock };
   };
   manifest: { id: string };
@@ -42,6 +43,11 @@ function createPlugin(): TestPlugin {
     saveSettings: jest.fn().mockResolvedValue(undefined),
     app: {
       workspace: {},
+      vault: {
+        adapter: {
+          getBasePath: () => '/vault',
+        },
+      },
       plugins: { reloadPlugin: jest.fn().mockResolvedValue(undefined) },
     },
     manifest: { id: 'opencodian' },
@@ -518,19 +524,16 @@ describe('SettingsCodexSection stable surface', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'connection');
 
-    // Connection owns apiKey, model, reasoning and web search. Sandbox,
-    // network, and additional directories moved to the Permissions tab.
+    // Connection owns executable/auth; model, reasoning and search moved to
+    // the dedicated Model & reasoning tab.
     expect(settingNames).toEqual([
       t('settings.codex.executablePath.name'),
       t('settings.codex.reload.name'),
       t('settings.codex.apiKey.name'),
-      t('settings.codex.model.name'),
-      t('settings.codex.reasoning.name'),
-      t('settings.codex.webSearch.name'),
     ]);
-    // The connection tab does not render resume/inspect or account surfaces.
+    expect(settingNames).not.toContain(t('settings.codex.model.name'));
     expect(containerEl.querySelector('[data-codex-account-card]')).toBeNull();
     expect(containerEl.querySelector('[data-codex-session-browser-info]')).toBeNull();
   });

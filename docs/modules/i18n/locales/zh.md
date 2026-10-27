@@ -691,3 +691,7 @@ Includes the localized Pi extension-command completion status used only after a 
 ## 2026-10-27 单轨 Composer 菜单文案
 
 新增 `chat.composerMenu.*`：附件菜单（添加附件、文件、图片、生成图片、附加网页标签页）、Agent/运行设置入口与标题、底部状态栏真实词数/字符数。原有上下文、图片与图片生成文案继续用于 tooltip。
+
+> 2026-10-27：新增 OpenCode 2/DSH 工作区标签、Codex/ZCode 拆分标签、Claude/Codex 调试标签、Claude 标题/行内模型分组文案、Obsidian 工具/PDF 索引会话标签，并将提问文案改为后端中立。
+
+> 2026-10-27（二次审查）：新增 `settings.dsh.tab.model` 与 `settings.dsh.model.*`，用于 DSH 行内覆盖页；与 en 同步。

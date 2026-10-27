@@ -26,8 +26,10 @@ describe('SETTINGS_PRIMARY_TABS', () => {
     const ids = SETTINGS_PRIMARY_TABS.map((t) => t.id);
     expect(ids).toEqual([
       'general',
+      'opencode2',
       'claude-code',
       'codex',
+      'dsh',
       'pi',
       'zcode',
       'server',
@@ -81,21 +83,45 @@ describe('SETTINGS_PRIMARY_TABS', () => {
     ]);
   });
 
-  it('exposes conversation sharing as its own secondary tab', () => {
+  it('keeps shared conversation tabs backend-neutral and exposes tooling/pdf entries', () => {
     const conversationTab = getPrimaryTabDefinition('conversation');
 
     expect(conversationTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual([
-      'title',
       'compaction',
       'sharing',
       'display',
       'questions',
+      'obsidian-tooling',
+      'pdf-index',
       'memory',
       'vault-retrieval',
       'export',
       'inline-edit',
       'context-groups',
       'image-generation',
+    ]);
+  });
+
+  it('moves OpenCode 2 title settings into the OpenCode 2 workspace', () => {
+    const opencode2Tab = getPrimaryTabDefinition('opencode2');
+    expect(opencode2Tab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual([
+      'connection',
+      'model',
+      'auth',
+      'mcp',
+      'resources',
+    ]);
+    expect(getPrimaryTabDefinition('conversation')!.secondaryTabs.some((tab) => tab.id === 'title')).toBe(false);
+  });
+
+  it('registers DSH as its own workspace with split tabs', () => {
+    const dshTab = getPrimaryTabDefinition('dsh');
+    expect(dshTab!.backendRequired).toBe('dsh');
+    expect(dshTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual([
+      'connection',
+      'model',
+      'mcp',
+      'configuration',
     ]);
   });
 
@@ -119,7 +145,7 @@ describe('SETTINGS_PRIMARY_TABS', () => {
 
     const conversationTab = getPrimaryTabDefinition('conversation');
     expect(conversationTab?.secondaryTabs.filter((tab) => tab.backendRequired === 'opencode').map((tab) => tab.id))
-      .toEqual(['compaction', 'sharing', 'questions']);
+      .toEqual(['compaction', 'sharing']);
     expect(getPrimaryTabDefinition('claude-code')?.backendRequired).toBe('claude-code');
   });
 
@@ -139,6 +165,7 @@ describe('SETTINGS_PRIMARY_TABS', () => {
       'mcp',
       'skills-commands',
       'agents',
+      'debug',
     ]);
     expect(claudeTab!.secondaryTabs.some((secondaryTab) => secondaryTab.id === 'resources')).toBe(false);
   });
@@ -159,9 +186,6 @@ describe('SETTINGS_PRIMARY_TABS', () => {
     expect(debugTab!.defaultSecondaryTabId).toBe('plugin');
     expect(debugTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual([
       'plugin',
-      'opencode',
-      'codex',
-      'claude-code',
       'export',
       'capability-lab',
     ]);
@@ -215,6 +239,10 @@ describe('resolveSecondaryTabId', () => {
     expect(resolveSecondaryTabId('debug', 'modules')).toBe('plugin');
     expect(resolveSecondaryTabId('debug', 'logs')).toBe('export');
     expect(resolveSecondaryTabId('debug', 'actions')).toBe('export');
+    expect(resolveSecondaryTabId('debug', 'opencode')).toBe('capability-lab');
+    expect(resolveSecondaryTabId('debug', 'codex')).toBe('capability-lab');
+    expect(resolveSecondaryTabId('debug', 'claude-code')).toBe('capability-lab');
+    expect(resolveSecondaryTabId('conversation', 'title')).toBe('display');
   });
 
   it('falls back to the first primary for unknown primary ids', () => {

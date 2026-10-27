@@ -142,3 +142,5 @@ R-C4：插件调试面板新增 `addPdfIntegrationStatusSetting`——如实显�
 
 - 源码位置：`src/features/settings/debug/SettingsDebugSection.ts`。
 - 原位置：`src/features/settings/SettingsDebugSection.ts`；文件名、导出接口与业务职责保持不变。
+
+> 2026-10-27：通用调试只渲染插件日志与共享导出；Claude/Codex trace 通过 `attachBackendTabbed` 在该后端工作区渲染，OpenCode 1 legacy trace 不再出现在通用调试导航。

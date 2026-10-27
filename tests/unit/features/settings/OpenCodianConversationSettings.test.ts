@@ -282,28 +282,24 @@ describe('OpenCodian conversation settings', () => {
     expect(renderUserMarkup?.control.setValue).toHaveBeenCalledWith(true);
   });
 
-  it('shows Claude title controls and hides OpenCode-only controls when Claude Code is active', () => {
+  it('keeps backend-specific title controls out of the shared conversation settings', () => {
     renderConversationSettings({
       activeBackend: 'claude-code',
-      enabledBackends: ['opencode', 'claude-code'],
+      enabledBackends: ['opencode2', 'claude-code'],
     });
 
-    const autoTitleToggle = toggleRecords.find(
-      (record) => record.name === t('settings.titleGeneration.claudeAutoTitle.name'),
-    );
-    expect(autoTitleToggle).toBeDefined();
-    expect(autoTitleToggle?.control.setValue).toHaveBeenCalledWith(true);
+    expect(
+      toggleRecords.find((record) => record.name === t('settings.titleGeneration.claudeAutoTitle.name')),
+    ).toBeUndefined();
     expect(dropdownRecords.find((record) => record.name === t('settings.titleGeneration.mode.name'))).toBeUndefined();
     expect(buttonRecords.find((record) => record.name === t('settings.titleGeneration.model.name'))).toBeUndefined();
+    // Shared question UI is backend-neutral and remains reachable.
     expect(
       dropdownRecords.find((record) => record.name === t('settings.conversation.questionDisplayMode.name')),
-    ).toBeUndefined();
+    ).toBeDefined();
     expect(
       dropdownRecords.find((record) => record.name === t('settings.conversation.questionCardPosition.name')),
-    ).toBeUndefined();
-    expect(
-      toggleRecords.find((record) => record.name === t('settings.conversation.showAnsweredQuestionCards.name')),
-    ).toBeUndefined();
+    ).toBeDefined();
     expect(
       toggleRecords.find((record) => record.name === t('settings.conversation.userMarkupAsCodeBlocks.name')),
     ).toBeDefined();
@@ -369,6 +365,43 @@ describe('OpenCodian conversation settings', () => {
     expect(plugin.refreshQuestionUi).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['openai/gpt-4.1', 'openai/gpt-4.1'],
+    ['', t('settings.titleGeneration.model.followCurrent')],
+  ])('labels the backup title model while the catalog is still loading (%s)', (aiTitleModel, expectedLabel) => {
+    const pending = new Promise<never>(() => undefined);
+    const plugin = {
+      settings: {
+        ...DEFAULT_SETTINGS,
+        activeBackend: 'opencode2',
+        enabledBackends: ['opencode2'],
+        titleMode: 'ai',
+        aiTitleModel,
+      },
+      modelConfigService: { getCatalogs: jest.fn(() => pending) },
+      openCodeService: {
+        requireSdkCapability: jest.fn().mockReturnValue({ kind: 'available' }),
+        refreshSdkCapabilities: jest.fn().mockResolvedValue({ entries: [], generatedAt: 0 }),
+      },
+      saveSettings: jest.fn().mockResolvedValue(undefined),
+      refreshConversationRendering: jest.fn(),
+      refreshQuestionUi: jest.fn(),
+    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
+    const tab = new OpenCodianSettingTab({} as App, plugin);
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    (tab as unknown as {
+      getConversationSection: () => { attachTitleBlock: (el: HTMLElement) => void };
+    }).getConversationSection().attachTitleBlock(containerEl);
+
+    const titleModelButton = buttonRecords.find(
+      (record) => record.name === t('settings.titleGeneration.model.name'),
+    );
+    expect(titleModelButton).toBeDefined();
+    expect(titleModelButton?.control.setButtonText).toHaveBeenLastCalledWith(expectedLabel);
+  });
+
   it('keeps an unavailable AI title model selected and shows a warning action', async () => {
     const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
     const modelConfigService = {
@@ -409,9 +442,8 @@ describe('OpenCodian conversation settings', () => {
     const plugin = {
       settings: {
         ...DEFAULT_SETTINGS,
-        // Legacy v1-active state: AI title generation is OpenCode 1 owned.
-        activeBackend: 'opencode',
-        enabledBackends: ['opencode'],
+        activeBackend: 'opencode2',
+        enabledBackends: ['opencode2'],
         titleMode: 'ai',
         aiTitleModel: 'openai/gpt-4.1',
       },
@@ -431,6 +463,9 @@ describe('OpenCodian conversation settings', () => {
     (tab as unknown as {
       addConversationSettings: (containerEl: HTMLElement) => HTMLHeadingElement;
     }).addConversationSettings(containerEl);
+    (tab as unknown as {
+      getConversationSection: () => { attachTitleBlock: (el: HTMLElement) => void };
+    }).getConversationSection().attachTitleBlock(containerEl);
 
     await Promise.resolve();
     await Promise.resolve();

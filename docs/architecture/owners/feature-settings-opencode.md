@@ -64,3 +64,5 @@ Settings expose OpenCode 1 and 2 separately and provide local executable or remo
 当前源码目录：`src/features/settings/backends/opencode`。
 
 目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。
+
+> 2026-10-27：`SettingsBackendSection` 只保留默认后端、启用开关与预热策略；OpenCode 2 连接/认证/MCP/资源工作区同 owner 托管（避免新增 settings SCC 成员）；catalog 失败使用固定脱敏分类。

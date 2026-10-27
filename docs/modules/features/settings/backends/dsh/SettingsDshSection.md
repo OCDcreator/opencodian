@@ -19,3 +19,9 @@ DSH 的连接、MCP 声明和原生默认值读取区。由现有 SettingsBacken
 - 接入方式、CLI 路径、工作目录和 MCP 声明编辑器使用与可见字段一致的可访问名称；连接状态节点从建立起具有 status / polite / atomic 语义。焦点样式限定于 DSH 设置组。
 - 原生 model/reasoning_effort 回读字段名称使用本地化标签；重复的 High: High 只显示一次 High，原生选项值和配置不被修改。
 - MCP disclosure 保留服务器上下文，内部编辑行改称服务器声明；草稿与已保存声明经同一验证器规范化后比较，JSON 排版或显式 `type: "stdio"` 不再造成未保存/未应用误报。真正的未保存草稿仍就地提示，应用后说明其不在本次应用内。保存/应用均不冒充在线状态回读。
+
+> 2026-10-27：DSH 改为独立工作区，二级页拆分为连接、MCP、原生默认值；只在 DSH 为当前后端时挂载，不再出现在通用智能体管理。
+
+> 2026-10-27（二次审查）：DSH 工作区新增“模型与行内”二级页，复用 `SettingsInlineEditSection.renderBackendModelOverrides` 提供 DSH 专属行内编辑/补全模型覆盖；连接页保持只读的模型/推理默认值说明与聊天工具栏入口。DSH 适配器实现 `AgentAuxQueryCapability` 与 `AgentInlineCompletionCapability`，覆盖值与通用 inline-edit 消费者一致。
+
+> 2026-10-27（UI 验收修复）：`renderTab` 在 section 外壳与 `opencodian-dsh-settings` group 之间补标准 `opencodian-settings-block-body opencodian-settings-section-body` + `data-settings-surface="section-body"` wrapper，使内层 h4 获得与相邻 section 一致的内边距；未新增 CSS 或硬编码间距。

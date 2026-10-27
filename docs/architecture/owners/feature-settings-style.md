@@ -52,3 +52,5 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 当前源码目录：`src/features/settings/appearance`。
 
 目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。
+
+> 2026-10-27：标签布局“预设”页补挂“重置全部会话样式”，与经典布局共用现有 reset 实现；无新样式 token 或依赖。

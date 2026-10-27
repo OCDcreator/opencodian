@@ -191,7 +191,11 @@ function createTabbedSection(secondaryTabId: string, plugin = createPlugin()) {
   });
   const containerEl = document.createElement('div');
   document.body.appendChild(containerEl);
-  section.attachTabbed(containerEl, secondaryTabId);
+  if (secondaryTabId === 'opencode' || secondaryTabId === 'codex' || secondaryTabId === 'claude-code') {
+    section.attachBackendTabbed(containerEl, secondaryTabId);
+  } else {
+    section.attachTabbed(containerEl, secondaryTabId);
+  }
   return {
     containerEl,
     plugin,
@@ -348,7 +352,8 @@ describe('SettingsDebugSection', () => {
 
     createSection(plugin);
 
-    for (const debugModule of DEBUG_MODULE_REGISTRY) {
+    const pluginModuleKeys = new Set(['app', 'settings', 'chat', 'contextUsage', 'tasks', 'storage', 'providerIcons', 'visuals']);
+    for (const debugModule of DEBUG_MODULE_REGISTRY.filter((entry) => pluginModuleKeys.has(entry.key))) {
       expect(findToggle(t(debugModule.labelKey as never))).toBeDefined();
     }
 
@@ -361,34 +366,36 @@ describe('SettingsDebugSection', () => {
     expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
   });
 
-  it('renders tabbed debug groups by diagnostic source', () => {
-    const { containerEl } = createTabbedSection('opencode');
-    const blockDisplays = Array.from(containerEl.querySelectorAll('[data-section-block]'))
-      .map((blockEl) => [
-        (blockEl as HTMLElement).dataset.sectionBlock,
-        (blockEl as HTMLElement).style.display,
-      ]);
+  it('renders generic debug tabs without another backend\'s controls', () => {
+    const { containerEl } = createTabbedSection('plugin');
+    const blockIds = Array.from(containerEl.querySelectorAll('[data-section-block]'))
+      .map((blockEl) => (blockEl as HTMLElement).dataset.sectionBlock);
 
-    expect(blockDisplays).toEqual([
-      ['plugin', 'none'],
-      ['opencode', ''],
-      ['codex', 'none'],
-      ['claude-code', 'none'],
-      ['export', 'none'],
-    ]);
+    expect(blockIds).toEqual(['plugin']);
     expect(containerEl.querySelector('[data-section-block="plugin"] h4')?.textContent).toBe(
       t('settings.debug.modules.plugin.title'),
     );
-    expect(containerEl.querySelector('[data-section-block="opencode"] h4')?.textContent).toBe(
-      t('settings.debug.modules.opencode.title'),
-    );
-    expect(containerEl.querySelector('[data-section-block="claude-code"] h4')?.textContent).toBe(
-      t('settings.debug.modules.claudeCode.title'),
-    );
-    expect(containerEl.querySelector('[data-section-block="export"] h4')?.textContent).toBe(
-      t('settings.debug.export.title'),
-    );
+    expect(containerEl.querySelector('[data-section-block="opencode"]')).toBeNull();
+    expect(containerEl.querySelector('[data-section-block="codex"]')).toBeNull();
+    expect(containerEl.querySelector('[data-section-block="claude-code"]')).toBeNull();
   });
+
+  it.each(['opencode', 'codex', 'claude-code'] as const)(
+    'renders only the %s trace panel inside its backend workspace',
+    (backend) => {
+      const { containerEl } = createTabbedSection(backend);
+      const blockIds = Array.from(containerEl.querySelectorAll('[data-section-block]'))
+        .map((blockEl) => (blockEl as HTMLElement).dataset.sectionBlock);
+      expect(blockIds).toEqual([backend]);
+      expect(containerEl.querySelector(`[data-section-block="${backend}"] h4`)?.textContent).toBe(
+        t(backend === 'claude-code'
+          ? 'settings.debug.modules.claudeCode.title'
+          : backend === 'codex'
+            ? 'settings.debug.modules.codex.title'
+            : 'settings.debug.modules.opencode.title'),
+      );
+    },
+  );
 
   it('keeps historically anomalous OpenCode traces marked after they are read', () => {
     const plugin = createPlugin();
@@ -424,59 +431,30 @@ describe('SettingsDebugSection', () => {
       .toContain('ses-read-critical');
   });
 
-  it('renders every tabbed debug source inside the shared settings shell', () => {
-    const { containerEl } = createTabbedSection('plugin');
-    const shellEls = Array.from(containerEl.querySelectorAll('[data-debug-tab-shell="true"]'));
-
-    expect(shellEls.map((el) => (el as HTMLElement).dataset.sectionBlock)).toEqual([
-      'plugin',
-      'opencode',
-      'codex',
-      'claude-code',
-      'export',
-    ]);
-    for (const shellEl of shellEls) {
+  it('renders each tabbed debug source inside its own shell', () => {
+    for (const id of ['plugin', 'export', 'opencode', 'codex', 'claude-code'] as const) {
+      const { containerEl } = createTabbedSection(id);
+      const shellEls = Array.from(containerEl.querySelectorAll('[data-debug-tab-shell="true"]'));
+      expect(shellEls.map((el) => (el as HTMLElement).dataset.sectionBlock)).toEqual([id]);
+      const shellEl = shellEls[0]!;
       expect(shellEl.classList.contains('opencodian-debug-tab-shell')).toBe(true);
       expect(shellEl.querySelector('.opencodian-debug-tab-header')).not.toBeNull();
       expect(shellEl.querySelector('.opencodian-debug-tab-body')).not.toBeNull();
       expect(shellEl.querySelector('.opencodian-debug-tab-badge')).not.toBeNull();
     }
-    expect(containerEl.querySelector('[data-section-block="plugin"]')?.textContent).toContain(
-      t('settings.debug.modules.plugin.desc'),
-    );
   });
 
   it('renders each tabbed debug shell title and description only once', () => {
-    const { containerEl } = createTabbedSection('plugin');
     const tabCopy = [
-      {
-        id: 'plugin',
-        title: t('settings.debug.modules.plugin.title'),
-        description: t('settings.debug.modules.plugin.desc'),
-      },
-      {
-        id: 'opencode',
-        title: t('settings.debug.modules.opencode.title'),
-        description: t('settings.debug.modules.opencode.desc'),
-      },
-      {
-        id: 'codex',
-        title: t('settings.debug.modules.codex.title'),
-        description: t('settings.debug.modules.codex.desc'),
-      },
-      {
-        id: 'claude-code',
-        title: t('settings.debug.modules.claudeCode.title'),
-        description: t('settings.debug.modules.claudeCode.groupDesc'),
-      },
-      {
-        id: 'export',
-        title: t('settings.debug.export.title'),
-        description: t('settings.debug.export.desc'),
-      },
+      { id: 'plugin', title: t('settings.debug.modules.plugin.title'), description: t('settings.debug.modules.plugin.desc') },
+      { id: 'opencode', title: t('settings.debug.modules.opencode.title'), description: t('settings.debug.modules.opencode.desc') },
+      { id: 'codex', title: t('settings.debug.modules.codex.title'), description: t('settings.debug.modules.codex.desc') },
+      { id: 'claude-code', title: t('settings.debug.modules.claudeCode.title'), description: t('settings.debug.modules.claudeCode.groupDesc') },
+      { id: 'export', title: t('settings.debug.export.title'), description: t('settings.debug.export.desc') },
     ] as const;
 
     for (const copy of tabCopy) {
+      const { containerEl } = createTabbedSection(copy.id);
       const shellEl = containerEl.querySelector(`[data-section-block="${copy.id}"]`);
       expect(shellEl).not.toBeNull();
       expect(countTextMatches(shellEl!, copy.title)).toBe(1);

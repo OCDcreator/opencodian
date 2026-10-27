@@ -201,6 +201,12 @@ export class SettingsConversationSection {
     return this.getActiveBackend() === 'opencode';
   }
 
+  /** Both OpenCode generations consume the shared `titleMode` field. */
+  private isOpenCode2TitleConsumerActive(): boolean {
+    const activeBackend = this.getActiveBackend();
+    return activeBackend === 'opencode2' || activeBackend === 'opencode';
+  }
+
   private canSaveOpenCodeProjectConversationConfig(): boolean {
     if (this.isOpenCodeActive()) {
       return true;
@@ -220,13 +226,6 @@ export class SettingsConversationSection {
     );
 
     const isOpenCodeActive = this.isOpenCodeActive();
-    const titleGenerationBodyEl = this.createSettingsBlock(containerEl, {
-      title: t('settings.titleGeneration.title'),
-      description: isOpenCodeActive
-        ? t('settings.titleGeneration.groupDesc')
-        : t('settings.titleGeneration.claudeGroupDesc'),
-    });
-    this.markSettingsTarget(titleGenerationBodyEl, 'title');
     const compactionBodyEl = isOpenCodeActive
       ? this.createSettingsBlock(containerEl, {
           title: t('settings.conversation.compaction.projectNote'),
@@ -274,22 +273,17 @@ export class SettingsConversationSection {
       description: t('settings.pdfIndex.groupDesc'),
     });
     this.markSettingsTarget(pdfIndexBodyEl, 'pdf-index');
-    const questionBodyEl = isOpenCodeActive
-      ? this.createSettingsBlock(containerEl, {
-          title: t('settings.conversation.questions.title'),
-          description: t('settings.conversation.questions.desc'),
-        })
-      : null;
-    if (questionBodyEl) {
-      this.markSettingsTarget(questionBodyEl, 'questions');
-    }
+    const questionBodyEl = this.createSettingsBlock(containerEl, {
+      title: t('settings.conversation.questions.title'),
+      description: t('settings.conversation.questions.desc'),
+    });
+    this.markSettingsTarget(questionBodyEl, 'questions');
     const renderingBodyEl = this.createSettingsBlock(containerEl, {
       title: t('settings.conversation.rendering.title'),
       description: t('settings.conversation.rendering.desc'),
     });
     this.markSettingsTarget(renderingBodyEl, 'rendering');
 
-    this.renderTitleBlock(titleGenerationBodyEl);
     if (compactionBodyEl) {
       this.renderCompactionBlock(compactionBodyEl);
     }
@@ -303,9 +297,8 @@ export class SettingsConversationSection {
     this.renderObsidianToolingBlock(obsidianToolingBodyEl);
     this.renderVaultRetrievalBlock(vaultRetrievalBodyEl);
     this.renderPdfIndexBlock(pdfIndexBodyEl);
-    if (questionBodyEl) {
-      this.renderQuestionsBlock(questionBodyEl);
-    }
+    this.markSettingsTarget(this.renderMemoryBlock(containerEl), 'memory');
+    this.renderQuestionsBlock(questionBodyEl);
     this.renderRenderingBlock(renderingBodyEl);
     this.renderExportBlock(containerEl);
 
@@ -319,7 +312,6 @@ export class SettingsConversationSection {
     this.setSharedCallbacks();
 
     const blocks: { id: string; render: (el: HTMLElement) => void }[] = [
-      { id: 'title', render: (el: HTMLElement) => this.renderTitleBlock(el) },
       ...(this.isOpenCodeActive()
         ? [
             { id: 'compaction', render: (el: HTMLElement) => this.renderCompactionBlock(el) },
@@ -328,14 +320,12 @@ export class SettingsConversationSection {
           ]
         : []),
       { id: 'display', render: (el) => this.renderDisplayTabBlock(el) },
+      { id: 'questions', render: (el) => this.renderQuestionsBlock(el) },
       { id: 'obsidian-tooling', render: (el) => this.renderObsidianToolingBlock(el) },
-      { id: 'vault-retrieval', render: (el) => this.renderVaultRetrievalBlock(el) },
       { id: 'pdf-index', render: (el) => this.renderPdfIndexBlock(el) },
       { id: 'memory', render: (el) => this.renderMemoryBlock(el) },
+      { id: 'vault-retrieval', render: (el) => this.renderVaultRetrievalBlock(el) },
       { id: 'export', render: (el) => this.renderExportBlock(el) },
-      ...(this.isOpenCodeActive()
-        ? [{ id: 'questions', render: (el: HTMLElement) => this.renderQuestionsBlock(el) }]
-        : []),
     ];
 
     for (const block of blocks) {
@@ -356,10 +346,10 @@ export class SettingsConversationSection {
 
   private resetState(): void {
     this.disposeProjectCompactionConfigListeners();
-    this.titleModelSetting = null;
-    this.titleModelButton = null;
-    this.titleModelWarningButton = null;
-    this.titleModelGroups = [];
+    // The title controls may be mounted by the OpenCode 2 workspace before or
+    // after the shared conversation section attaches. Only attachTitleBlock /
+    // dispose own that state so mounting the shared page cannot clear a live
+    // title widget.
     this.projectCompactionAutoControl = null;
     this.projectCompactionPruneControl = null;
     this.projectCompactionTailTurnsControl = null;
@@ -370,6 +360,13 @@ export class SettingsConversationSection {
     this.sharedSessionsContainerEl = null;
   }
 
+  private resetTitleState(): void {
+    this.titleModelSetting = null;
+    this.titleModelButton = null;
+    this.titleModelWarningButton = null;
+    this.titleModelGroups = [];
+  }
+
   private setSharedCallbacks(): void {
     this.setRefreshTitleModelsCallback(() => {
       void this.loadTitleModels();
@@ -377,15 +374,28 @@ export class SettingsConversationSection {
   }
 
   private renderTitleBlock(containerEl: HTMLElement): void {
-    if (this.isOpenCodeActive()) {
+    if (this.isOpenCode2TitleConsumerActive()) {
       this.addTitleModeSetting(containerEl);
       this.addTitleModelSetting(containerEl);
-    } else {
-      this.addClaudeAutoTitleSetting(containerEl);
     }
   }
 
-  private renderMemoryBlock(containerEl: HTMLElement): void {
+  /**
+   * OpenCode 2 workspace mount for the real title consumers
+   * (`titleMode` + `aiTitleModel`). Claude's `autoTitle` is edited in the
+   * Claude Code workspace; no other backend renders a title editor here.
+   */
+  attachTitleBlock(containerEl: HTMLElement): void {
+    this.resetTitleState();
+    this.setSharedCallbacks();
+    this.renderTitleBlock(containerEl);
+    this.updateTitleModelSettingVisibility();
+    if (this.isOpenCode2TitleConsumerActive()) {
+      void this.loadTitleModels();
+    }
+  }
+
+  private renderMemoryBlock(containerEl: HTMLElement): HTMLElement {
     const blockEl = this.createSettingsBlock(containerEl, {
       title: t('settings.conversation.memory.title'),
       description: t('settings.conversation.memory.desc'),
@@ -465,6 +475,8 @@ export class SettingsConversationSection {
             this.plugin.memoryRuntime?.onSettingsChanged();
           });
       });
+
+    return blockEl;
   }
 
   private renderCompactionBlock(containerEl: HTMLElement): void {
@@ -573,9 +585,7 @@ export class SettingsConversationSection {
   }
 
   private finishAttach(): void {
-    this.updateTitleModelSettingVisibility();
     if (this.isOpenCodeActive()) {
-      void this.loadTitleModels();
       this.registerProjectConfigListeners();
       void this.loadProjectConversationConfig();
     }
@@ -749,20 +759,6 @@ export class SettingsConversationSection {
             this.plugin.settings.titleMode = value as TitleMode;
             await this.plugin.saveSettings();
             this.updateTitleModelSettingVisibility();
-          });
-      });
-  }
-
-  private addClaudeAutoTitleSetting(containerEl: HTMLElement): void {
-    new Setting(containerEl)
-      .setName(t('settings.titleGeneration.claudeAutoTitle.name'))
-      .setDesc(t('settings.titleGeneration.claudeAutoTitle.desc'))
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.plugin.settings.backendSettings.claudeCode.autoTitle)
-          .onChange(async (value) => {
-            this.plugin.settings.backendSettings.claudeCode.autoTitle = value;
-            await this.plugin.saveSettings();
           });
       });
   }
@@ -2046,6 +2042,10 @@ export class SettingsConversationSection {
       .setDesc(t('settings.titleGeneration.model.desc'))
       .addButton((button) => {
         this.titleModelButton = button;
+        button.setButtonText(
+          this.plugin.settings.aiTitleModel.trim()
+          || t('settings.titleGeneration.model.followCurrent'),
+        );
         button.onClick(() => {
           new ModelPickerModal(this.app, {
             title: t('settings.titleGeneration.model.pickerTitle'),

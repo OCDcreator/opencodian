@@ -47,6 +47,7 @@ const INLINE_EDIT_BACKENDS: readonly AgentBackendKind[] = [
   'claude-code',
   'codex',
   'pi',
+  'dsh',
 ];
 /** Completion can additionally use ZCode's sessionless text-only path. */
 const INLINE_COMPLETION_BACKENDS: readonly AgentBackendKind[] = [...INLINE_EDIT_BACKENDS, 'zcode'];

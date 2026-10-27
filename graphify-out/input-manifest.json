@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "c81108cd153b47cdc3b246e492c63f1a1f748eb76eb125ad29a2b354ebed7f1f",
+  "digest": "426d0b530175ec19aac924f2df9fcf119233b5fc63249766c776d596428e038e",
   "recordCount": 803,
   "records": [
     {
@@ -1336,7 +1336,7 @@
     {
       "kind": "src",
       "key": "src/core/types/settings.ts",
-      "sha256": "80e175e7193b68da5568af42a10c8c9cf9277a3e28aa5a405b399d64e54639f6"
+      "sha256": "743f8a0012cebf9702fd1fc598661cae78b70041606f7e8fee34110bd546d4d4"
     },
     {
       "kind": "src",
@@ -2846,7 +2846,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/appearance/SettingsStyleSection.ts",
-      "sha256": "bddbfe4377eb156480709b75371795c4752d7b10b4e2903d575eda7c2d241eb7"
+      "sha256": "198820ca9414f47b723155133a54f76ceccfe356339926485645efeacdb1ece5"
     },
     {
       "kind": "src",
@@ -2886,7 +2886,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts",
-      "sha256": "766bc087610a8fa6dc45eab460a0149e5b34a64ee856308ae49bf63823bc3ec9"
+      "sha256": "ffb83f5a04f6c4738c6596350e71f9f1bb14e5fbb2ae6bd6119cc6a582c22890"
     },
     {
       "kind": "src",
@@ -2946,7 +2946,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/backends/codex/SettingsCodexProjectConfigSection.ts",
-      "sha256": "c72d129def7391c7711fde6c25b9ebf6196519807205a96a6ded65d85f986792"
+      "sha256": "07a9051d0fedeebd73713256284f09aa4008d0ad1a569ed7eaf0c4276b3b4278"
     },
     {
       "kind": "src",
@@ -2961,12 +2961,12 @@
     {
       "kind": "src",
       "key": "src/features/settings/backends/codex/SettingsCodexSection.ts",
-      "sha256": "f3e6640663c06b299b26046c40c37b8414c2cce53abc785ba1dd27f068733694"
+      "sha256": "70b61e41dc5d68e9be25a98635499b99c62e4e365edf7c45a11d70d94676bc5a"
     },
     {
       "kind": "src",
       "key": "src/features/settings/backends/dsh/SettingsDshSection.ts",
-      "sha256": "41f6363140cb87d7fa9bd55d43d619be5d77646b3d2a7842f440420ba09d0694"
+      "sha256": "c38621c3ca3723403558504bedcb5d8cba2c62184b2ddb7485c732704544f7f9"
     },
     {
       "kind": "src",
@@ -3001,7 +3001,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/backends/opencode/SettingsBackendSection.ts",
-      "sha256": "b14eb62bbdd5d391e81ea4a446df9c20ebce90696ac4e0dd49fa037e405b8307"
+      "sha256": "af8500e61c3c5eb093b51af220599651ee46141b1a9910aac1d4a3e8a80ccf99"
     },
     {
       "kind": "src",
@@ -3046,12 +3046,12 @@
     {
       "kind": "src",
       "key": "src/features/settings/backends/pi/SettingsPiSection.ts",
-      "sha256": "d4d9dd0a18b8ecbcb68f0ef70c5b89a9b543a32d2bc06e5532c495c4324ba5f5"
+      "sha256": "32e16d94fe7ce503e87c94e1cfc3a564319f11358802116a355a6a88411beb10"
     },
     {
       "kind": "src",
       "key": "src/features/settings/backends/zcode/SettingsZCodeSection.ts",
-      "sha256": "16cc12a2b1be8f137e35db2e329ba7a4dc7405fc6a73eb2b4917e822a1a9ad42"
+      "sha256": "1fde557b39d586f573f95ef8ebc38ed095dd1ecfb1a1d1fe2b7b1572f25f8fad"
     },
     {
       "kind": "src",
@@ -3116,7 +3116,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/debug/SettingsDebugSection.ts",
-      "sha256": "b96d208e9ddcc419d0c00aee82fa0f08fbeb9ca589c4004caa803ac35ed22b97"
+      "sha256": "aa23d9aa3c441fb960d0f1e97adffb8e7b31be83cfad00c1bc48648c77afe732"
     },
     {
       "kind": "src",
@@ -3141,7 +3141,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/general/SettingsConversationSection.ts",
-      "sha256": "9ecc5cde6d7a8927d97f4ebff752e971ac427579c473792bba4d892305b2a126"
+      "sha256": "8ec399871eae89f9b328a8b56e2c9640982d44f10e4866e590a5c18febccf991"
     },
     {
       "kind": "src",
@@ -3156,7 +3156,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/general/SettingsInlineEditSection.ts",
-      "sha256": "e58340ba0849b77a26f655f5fc57f2742638d82dd28de9ae78187bd69c23ec42"
+      "sha256": "4056179c2e71db842d537854b48a1ead093100b9d9a128da82436d6a29408d62"
     },
     {
       "kind": "src",
@@ -3336,12 +3336,12 @@
     {
       "kind": "src",
       "key": "src/features/settings/OpenCodianSettings.ts",
-      "sha256": "ec5efdb98c62ff6f3391d9235ae6d32ae83da79f6c01dcc39ca26abcd5abe3f7"
+      "sha256": "e9fc367cc9243f5ffbd5d6ebb1a123fe98448073a27bb30de9381d2b5dfe861e"
     },
     {
       "kind": "src",
       "key": "src/features/settings/OpenCodianSettingsView.ts",
-      "sha256": "bcd9b614686d15f605ff7ac97335662ed911f4c8492acfe515e3097764f2bb43"
+      "sha256": "c277289a8410a0087a673507d25f0597dfb80cf7e9dc6749505a689c8f51a4c6"
     },
     {
       "kind": "src",
@@ -3391,7 +3391,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/settingsLayoutRegistry.ts",
-      "sha256": "6ec75733b1613aff3f73a291140c8858e6661f61a33ed8612555fdd3c3bd890a"
+      "sha256": "60a7b5800d89dabf5acb4f2696834a98b9d21c6753d02da1dd4d923eea4902d9"
     },
     {
       "kind": "src",
@@ -3411,7 +3411,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsTabbedRenderer.ts",
-      "sha256": "b49f8cdfe15ff6e7086d74a510c1b4675a530f71c4dbcc3a6d28529c03b7d4d5"
+      "sha256": "db5f5c5f6ab46897a64bae51f2b289e7cd180c301de72907e2055030cdf6ba45"
     },
     {
       "kind": "src",
@@ -3426,7 +3426,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "416dccd9d1a7576ee3eee0edf5e27aca0b8c712d733974c0f42ba2522c717115"
+      "sha256": "4a5e84de27bcf6320c3656be120ce4fb91a3db86b4a684cb6aa3906a81a92913"
     },
     {
       "kind": "src",
@@ -3436,7 +3436,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "f0a1423645c64052dcdc6a4dff9205552d7c68ba5d1a94a796e1dfff62dc9909"
+      "sha256": "37683f34cc7d5ed8f79bd074fc37577e611219e95e37483da9a3366878dc8896"
     },
     {
       "kind": "src",
@@ -4019,7 +4019,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-27T06:32:40.761Z",
-  "headShaAtGeneration": "4459dd5fd639259dc0cd01219efb5841501027ba",
+  "generatedAt": "2026-10-27T09:28:08.035Z",
+  "headShaAtGeneration": "3c8f91e909f716590bdb5ab8c43c9a2a368dbf72",
   "graphifyVersion": "graphify 0.9.31"
 }

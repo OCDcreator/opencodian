@@ -42,7 +42,7 @@ it.each(['classic', 'tabbed'])('opens management at the real %s ZCode settings p
   const container = document.body.createDiv();
   const section = new SettingsZCodeSection(host);
   if (layout === 'classic') section.attach(container);
-  else section.attachTabbed(container, 'connection');
+  else section.attachTabbed(container, 'management');
   await flush();
   expect(container.querySelector('[data-settings-target="zcode-management"]')).not.toBeNull();
   expect(toggles[0]).toMatchObject({ value: true, disabled: false });

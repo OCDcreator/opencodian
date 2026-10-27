@@ -54,3 +54,5 @@ Settings edits persist without implicitly replacing the live Claude query. Expli
 当前源码目录：`src/features/settings/backends/claude`。
 
 目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。
+
+> 2026-10-27：Claude 工作区新增 debug 二级页；模型与 Thinking 页承载 `autoTitle` 与 Claude 专属行内模型覆盖，运行时页移除重复技能/命令/Agent 管理入口。

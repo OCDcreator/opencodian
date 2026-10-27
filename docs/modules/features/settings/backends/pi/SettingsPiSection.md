@@ -40,3 +40,5 @@ MATRIX008 typed status → 实际 mcpStatus → JSDOM 控制及新增多条状�
 - 源码位置：`src/features/settings/backends/pi/SettingsPiSection.ts`。
 - 原位置：`src/features/settings/SettingsPiSection.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/features/settings/backends/pi/PiWorkbenchModal.ts`、`src/features/settings/backends/pi/SettingsPiConfigurationSection.ts`、`src/features/settings/backends/pi/SettingsPiProvidersSection.ts`。
+
+> 2026-10-27：Pi 模型页追加 Pi 专属的行内编辑/补全模型覆盖；原有连接、执行、MCP、资源与高级分类不变。

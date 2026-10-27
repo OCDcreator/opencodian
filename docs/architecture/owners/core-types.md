@@ -90,3 +90,5 @@ OpenCode 2 has a separate backend identity and normalized connection settings; p
 当前源码目录：`src/core/types`。
 
 目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。
+
+> 2026-10-27（二次审查）：`INLINE_EDIT_BACKENDS` 加入 `dsh`，使 DSH 行内编辑覆盖在保存/重载后仍保留；仅设置归一化允许集，未改协议。

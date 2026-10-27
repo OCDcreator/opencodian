@@ -6,6 +6,9 @@ import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import type { AgentBackendKind } from '../../../../src/core/types/chat';
 import { SettingsStyleSection } from '../../../../src/features/settings/appearance/SettingsStyleSection';
 import { SettingsClaudeCodeSection } from '../../../../src/features/settings/backends/claude/SettingsClaudeCodeSection';
+import { SettingsCodexSection } from '../../../../src/features/settings/backends/codex/SettingsCodexSection';
+import { SettingsDshSection } from '../../../../src/features/settings/backends/dsh/SettingsDshSection';
+import { SettingsOpenCode2Section } from '../../../../src/features/settings/backends/opencode/SettingsBackendSection';
 import { SettingsCommandsSection } from '../../../../src/features/settings/backends/opencode/SettingsCommandsSection';
 import { SettingsServerSection } from '../../../../src/features/settings/backends/opencode/SettingsServerSection';
 import { SettingsPiSection } from '../../../../src/features/settings/backends/pi/SettingsPiSection';
@@ -45,6 +48,7 @@ function createRendererState(options?: {
   };
 
   const requestDisplayRefresh = jest.fn();
+  const setRefreshTitleModelsCallback = jest.fn();
   const renderLayoutModeSetting = jest.fn((containerEl: HTMLElement) => {
     containerEl.createDiv({ cls: 'layout-mode-marker', text: 'layout-mode-setting' });
   });
@@ -100,11 +104,13 @@ function createRendererState(options?: {
     getRefreshModelsCallback: () => undefined,
     getRefreshTitleModelsCallback: () => undefined,
     setRefreshModelsCallback: () => undefined,
-    setRefreshTitleModelsCallback: () => undefined,
+    setRefreshTitleModelsCallback: setRefreshTitleModelsCallback,
     getServerState: () => ({ healthy: false, status: 'stopped' as const }),
     setServerState: () => undefined,
     requestDisplayRefresh,
     renderUserContent,
+    renderConversationTitleSettings: jest.fn(),
+    setRefreshTitleModelsCallback,
     renderLayoutModeSetting,
     renderLanguageSetting,
     renderSettingsInEditorAreaSetting,
@@ -124,6 +130,7 @@ function createRendererState(options?: {
     renderPluginUpdateSection,
     renderUserContent,
     setActive,
+    setRefreshTitleModelsCallback,
   };
 }
 
@@ -301,13 +308,23 @@ describe('SettingsTabbedRenderer', () => {
 
     renderer.renderDisplay(containerEl);
 
-    // title, display, memory, vault-retrieval, export, inline-edit and
-    // context-groups are backend-agnostic, so they remain visible
+    // Every remaining conversation tab is backend-agnostic and stays reachable.
     const secondaryTabs = containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-secondary');
-    expect(secondaryTabs).toHaveLength(8);
-    expect(Array.from(secondaryTabs).map((tab) => tab.dataset.tabId)).toEqual(['title', 'display', 'memory', 'vault-retrieval', 'export', 'inline-edit', 'context-groups', 'image-generation']);
-    // compaction is OpenCode-only and filtered out; falls back to first visible secondary tab (title)
-    expectSingleContentShell(containerEl, 'conversation', 'title');
+    expect(secondaryTabs).toHaveLength(10);
+    expect(Array.from(secondaryTabs).map((tab) => tab.dataset.tabId)).toEqual([
+      'display',
+      'questions',
+      'obsidian-tooling',
+      'pdf-index',
+      'memory',
+      'vault-retrieval',
+      'export',
+      'inline-edit',
+      'context-groups',
+      'image-generation',
+    ]);
+    // compaction is OpenCode-only and filtered out; falls back to display.
+    expectSingleContentShell(containerEl, 'conversation', 'display');
   });
 
   it('shows only the active backend\'s owned tabs when OpenCode is the active backend', () => {
@@ -427,7 +444,7 @@ describe('SettingsTabbedRenderer', () => {
       general: 'basic',
       server: 'connection',
       model: 'common',
-      conversation: 'title',
+      conversation: 'display',
       agents: 'default',
       commands: 'mode',
       mcp: 'overview',
@@ -710,12 +727,12 @@ describe('SettingsTabbedRenderer tab content routing', () => {
     // title, display and memory are backend-agnostic, so they remain visible
     const secondaryTabs = containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-secondary');
     const secondaryIds = Array.from(secondaryTabs).map((tab) => tab.dataset.tabId);
-    expect(secondaryIds).toContain('title');
     expect(secondaryIds).toContain('display');
-    // compaction/sharing/questions are opencode-owned and filtered out when codex is active
+    expect(secondaryIds).toContain('questions');
+    // compaction/sharing stay OpenCode 1-owned; title is an OpenCode 2 workspace tab.
     expect(secondaryIds).not.toContain('compaction');
     expect(secondaryIds).not.toContain('sharing');
-    expect(secondaryIds).not.toContain('questions');
+    expect(secondaryIds).not.toContain('title');
   });
 });
 
@@ -811,5 +828,202 @@ describe('SettingsModelSection tabbed block visibility', () => {
     expect(blockEls[1]?.style.display).toBe('none');
     expect(blockEls[2]?.style.display).toBe('none');
     expect(blockEls[3]?.style.display).toBe('none');
+  });
+});
+
+
+describe('backend workspace reachability', () => {
+  beforeEach(() => {
+    setLocale('en');
+    document.body.innerHTML = '';
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('shows only the active OpenCode 2 workspace and mounts it once', () => {
+    const mount = jest.spyOn(SettingsOpenCode2Section.prototype, 'attachTabbed').mockImplementation(() => {});
+    const { renderer } = createRendererState({
+      primaryTabId: 'opencode2',
+      secondaryTabs: { opencode2: 'connection' },
+      enabledBackends: ['opencode2', 'claude-code', 'dsh'],
+      activeBackend: 'opencode2',
+    });
+    const containerEl = document.createElement('div');
+
+    renderer.renderDisplay(containerEl);
+
+    const labels = Array.from(containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-primary-label'))
+      .map((element) => element.textContent?.trim());
+    expect(labels).toContain('OpenCode 2');
+    expect(labels).not.toContain('DeepSeek Harness');
+    expect(labels).not.toContain('Claude Code');
+    expect(labels).not.toContain('Codex');
+    expect(mount).toHaveBeenCalledWith(expect.any(HTMLElement), 'connection');
+  });
+
+  it('shows only the active DSH workspace and mounts its split tabs', () => {
+    const mount = jest.spyOn(SettingsDshSection.prototype, 'attachTabbed').mockImplementation(() => {});
+    const { renderer } = createRendererState({
+      primaryTabId: 'dsh',
+      secondaryTabs: { dsh: 'mcp' },
+      enabledBackends: ['opencode2', 'dsh'],
+      activeBackend: 'dsh',
+    });
+    const containerEl = document.createElement('div');
+
+    renderer.renderDisplay(containerEl);
+
+    const labels = Array.from(containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-primary-label'))
+      .map((element) => element.textContent?.trim());
+    expect(labels).toContain('DeepSeek Harness');
+    expect(labels).not.toContain('OpenCode 2');
+    expect(mount).toHaveBeenCalledWith(expect.any(HTMLElement), 'mcp');
+  });
+
+  it('classic layout consumes the same registry visibility and mounts only the active workspace', () => {
+    const claudeAttach = jest.spyOn(SettingsClaudeCodeSection.prototype, 'attachTabbed').mockImplementation(() => {});
+    const codexAttach = jest.spyOn(SettingsCodexSection.prototype, 'attachTabbed').mockImplementation(() => {});
+    const openCode2Attach = jest.spyOn(SettingsOpenCode2Section.prototype, 'attachTabbed').mockImplementation(() => {});
+    const { renderer } = createRendererState({
+      enabledBackends: ['opencode2', 'claude-code', 'codex'],
+      activeBackend: 'claude-code',
+    });
+    const containerEl = document.createElement('div');
+
+    renderer.renderClassicBackendWorkspaces(containerEl);
+
+    expect(claudeAttach).toHaveBeenCalledTimes(1);
+    expect(codexAttach).not.toHaveBeenCalled();
+    expect(openCode2Attach).not.toHaveBeenCalled();
+  });
+
+  it('renders Claude backend debug only inside the Claude workspace tab', () => {
+    const debug = jest.spyOn(SettingsDebugSection.prototype, 'attachBackendTabbed').mockImplementation(() => {});
+    const claudeMount = jest.spyOn(SettingsClaudeCodeSection.prototype, 'attachTabbed').mockImplementation(() => {});
+    const { renderer } = createRendererState({
+      primaryTabId: 'claude-code',
+      secondaryTabs: { 'claude-code': 'debug' },
+      enabledBackends: ['claude-code'],
+      activeBackend: 'claude-code',
+    });
+    const containerEl = document.createElement('div');
+
+    renderer.renderDisplay(containerEl);
+
+    expect(debug).toHaveBeenCalledWith(expect.any(HTMLElement), 'claude-code');
+    expect(claudeMount).not.toHaveBeenCalled();
+  });
+
+  it('keeps backend debug panels out of the generic debug tab', () => {
+    const backendDebug = jest.spyOn(SettingsDebugSection.prototype, 'attachBackendTabbed').mockImplementation(() => {});
+    const { renderer } = createRendererState({
+      primaryTabId: 'debug',
+      secondaryTabs: { debug: 'plugin' },
+      enabledBackends: ['claude-code'],
+      activeBackend: 'claude-code',
+    });
+    const containerEl = document.createElement('div');
+
+    renderer.renderDisplay(containerEl);
+
+    expect(backendDebug).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('classic backend workspace navigation', () => {
+  beforeEach(() => {
+    setLocale('en');
+    document.body.innerHTML = '';
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('routes the Claude debug subpage to the backend debug mount, not the runtime default', () => {
+    const debug = jest.spyOn(SettingsDebugSection.prototype, 'attachBackendTabbed').mockImplementation(() => {});
+    const claudeMount = jest.spyOn(SettingsClaudeCodeSection.prototype, 'attachTabbed').mockImplementation(() => {});
+    const { renderer } = createRendererState({
+      enabledBackends: ['claude-code'],
+      activeBackend: 'claude-code',
+    });
+    const containerEl = document.createElement('div');
+
+    renderer.renderClassicBackendWorkspaces(containerEl);
+    const debugButton = containerEl.querySelector<HTMLButtonElement>('button[data-tab-id="debug"]');
+    expect(debugButton).not.toBeNull();
+    debugButton!.click();
+
+    expect(debug).toHaveBeenCalledWith(expect.any(HTMLElement), 'claude-code');
+    expect(claudeMount).toHaveBeenCalledWith(expect.any(HTMLElement), 'runtime');
+    expect(claudeMount).not.toHaveBeenCalledWith(expect.any(HTMLElement), 'debug');
+  });
+
+  it('mounts the DSH model subpage through the classic local navigation', () => {
+    const mount = jest.spyOn(SettingsDshSection.prototype, 'attachTabbed').mockImplementation(() => {});
+    const { renderer } = createRendererState({
+      enabledBackends: ['dsh'],
+      activeBackend: 'dsh',
+    });
+    const containerEl = document.createElement('div');
+
+    renderer.renderClassicBackendWorkspaces(containerEl);
+    const modelButton = containerEl.querySelector<HTMLButtonElement>('button[data-tab-id="model"]');
+    expect(modelButton).not.toBeNull();
+    modelButton!.click();
+
+    expect(mount).toHaveBeenCalledWith(expect.any(HTMLElement), 'model');
+  });
+
+  it('disposes the Codex account section before switching to the debug subpage', () => {
+    const dispose = jest.spyOn(SettingsCodexSection.prototype, 'dispose').mockImplementation(() => {});
+    const attachTabbed = jest.spyOn(SettingsCodexSection.prototype, 'attachTabbed').mockImplementation(() => {});
+    const debug = jest.spyOn(SettingsDebugSection.prototype, 'attachBackendTabbed').mockImplementation(() => {});
+    const { renderer } = createRendererState({
+      enabledBackends: ['codex'],
+      activeBackend: 'codex',
+    });
+    const containerEl = document.createElement('div');
+
+    renderer.renderClassicBackendWorkspaces(containerEl);
+    containerEl.querySelector<HTMLButtonElement>('button[data-tab-id="account"]')!.click();
+    const disposeAfterAccount = dispose.mock.calls.length;
+    containerEl.querySelector<HTMLButtonElement>('button[data-tab-id="debug"]')!.click();
+
+    expect(disposeAfterAccount).toBeGreaterThan(0);
+    expect(dispose.mock.calls.length).toBeGreaterThan(disposeAfterAccount);
+    expect(debug).toHaveBeenCalledWith(expect.any(HTMLElement), 'codex');
+    expect(attachTabbed).not.toHaveBeenCalledWith(expect.any(HTMLElement), 'debug');
+  });
+
+  it('disposes the previous Codex section and clears the title refresh callback when subpages change', () => {
+    const dispose = jest.spyOn(SettingsCodexSection.prototype, 'dispose').mockImplementation(() => {});
+    jest.spyOn(SettingsCodexSection.prototype, 'attachTabbed').mockImplementation(() => {});
+    const { renderer, setRefreshTitleModelsCallback } = createRendererState({
+      enabledBackends: ['opencode2', 'codex'],
+      activeBackend: 'opencode2',
+    });
+    const containerEl = document.createElement('div');
+
+    renderer.renderClassicBackendWorkspaces(containerEl);
+    const modelButton = containerEl.querySelector<HTMLButtonElement>('button[data-tab-id="model"]');
+    modelButton!.click();
+    const connectionButton = containerEl.querySelector<HTMLButtonElement>('button[data-tab-id="connection"]');
+    connectionButton!.click();
+    expect(setRefreshTitleModelsCallback).toHaveBeenCalledWith(undefined);
+
+    // Switch the active backend to Codex and exercise its own subpages.
+    renderer['deps'].plugin.settings.activeBackend = 'codex';
+    renderer['deps'].plugin.settings.enabledBackends = ['opencode2', 'codex'];
+    const codexContainer = document.createElement('div');
+    renderer.renderClassicBackendWorkspaces(codexContainer);
+    const modelTab = codexContainer.querySelector<HTMLButtonElement>('button[data-tab-id="model"]');
+    const connectionTab = codexContainer.querySelector<HTMLButtonElement>('button[data-tab-id="connection"]');
+    modelTab!.click();
+    connectionTab!.click();
+    expect(dispose).toHaveBeenCalled();
   });
 });

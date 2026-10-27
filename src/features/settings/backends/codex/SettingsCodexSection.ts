@@ -23,8 +23,9 @@ import {
   getDefaultBackendSettings,
   getDefaultCodexBackendSettings,
 } from '../../../../core/types/settings';
-import { t } from '../../../../i18n';
+import { t, type TranslationKey } from '../../../../i18n';
 import type OpenCodianPlugin from '../../../../main';
+import { SettingsInlineEditSection } from '../../general/SettingsInlineEditSection';
 import { renderCostEstimateSettingsRow } from '../opencode/CostEstimateSettingsRow';
 import type { CodexProjectConfigTomlDiagnostic } from './CodexProjectConfigFormModel';
 import { parseProjectConfigFormValues } from './CodexProjectConfigFormModel';
@@ -39,6 +40,28 @@ export interface SettingsCodexSectionOptions {
   plugin: OpenCodianPlugin;
   createSectionHeading: (containerEl: HTMLElement, title: string, tooltip?: string) => HTMLHeadingElement;
 }
+
+const CODEX_CLASSIC_TABS = [
+  'connection',
+  'model',
+  'permissions',
+  'project-config',
+  'resume-inspect',
+  'account',
+  'resources',
+  'plugins',
+] as const;
+
+const CODEX_TAB_LABEL_KEYS: Record<(typeof CODEX_CLASSIC_TABS)[number], TranslationKey> = {
+  connection: 'settings.codex.tab.connection',
+  model: 'settings.codex.tab.model',
+  permissions: 'settings.codex.tab.permissions',
+  'project-config': 'settings.codex.tab.projectConfig',
+  'resume-inspect': 'settings.codex.tab.resumeInspect',
+  account: 'settings.codex.tab.account',
+  resources: 'settings.codex.tab.resources',
+  plugins: 'settings.codex.tab.plugins',
+};
 
 export class SettingsCodexSection {
   private readonly plugin: OpenCodianPlugin;
@@ -107,7 +130,13 @@ export class SettingsCodexSection {
       t('settings.codex.title'),
       t('settings.codex.connection.desc'),
     );
-    this.renderTabContent(containerEl, 'connection');
+    for (const tabId of CODEX_CLASSIC_TABS) {
+      containerEl.createEl('h3', {
+        cls: 'opencodian-settings-subheading',
+        text: t(CODEX_TAB_LABEL_KEYS[tabId]),
+      });
+      this.renderTabContent(containerEl, tabId);
+    }
     return headingEl;
   }
 
@@ -188,10 +217,16 @@ export class SettingsCodexSection {
       return;
     }
 
+    if (resolvedTabId === 'model') {
+      this.renderRuntimeDefaultsGroup(bodyEl);
+      SettingsInlineEditSection.renderBackendModelOverrides(bodyEl, 'codex', this.plugin);
+      return;
+    }
+
     // Default / 'connection'
     this.renderConnectionSummary(bodyEl);
     this.renderCliLifecycleControls(bodyEl);
-    this.renderRuntimeDefaultsGroup(bodyEl);
+    this.legacyCredentialControl.render(bodyEl);
   }
 
   private renderConnectionSummary(bodyEl: HTMLElement): void {
@@ -296,7 +331,6 @@ export class SettingsCodexSection {
       attr: { 'data-codex-group-controls': 'runtime-defaults' },
     });
 
-    this.legacyCredentialControl.render(controlsEl);
     this.renderModelSetting(controlsEl);
     this.renderReasoningSetting(controlsEl);
     this.renderWebSearchSetting(controlsEl);

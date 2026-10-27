@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Editor-area settings host keeps the same section set as the Settings tab. */
 /**
  * OpenCodian Settings View (Editor Area)
  *
@@ -19,8 +20,6 @@ import { SettingsClaudeCodeSection } from './backends/claude/SettingsClaudeCodeS
 import { SettingsCodexSection } from './backends/codex/SettingsCodexSection';
 import { SettingsCommandsSection } from './backends/opencode/SettingsCommandsSection';
 import { SettingsServerSection } from './backends/opencode/SettingsServerSection';
-import { SettingsPiSection } from './backends/pi/SettingsPiSection';
-import { SettingsZCodeSection } from './backends/zcode/SettingsZCodeSection';
 import {
   enhanceSettingsDropdowns,
   type SettingsDropdownsEnhancerHandle,
@@ -29,6 +28,8 @@ import { SettingsDebugSection } from './debug/SettingsDebugSection';
 import { createClaudeTraceDiagnosticsPort, createCodexTraceDiagnosticsPort, createOpenCodeTraceDiagnosticsPort } from './debug/types';
 import { SettingsConversationSection } from './general/SettingsConversationSection';
 import { SettingsFormatterSection } from './general/SettingsFormatterSection';
+import { SettingsImageGenerationSection } from './general/SettingsImageGenerationSection';
+import { SettingsInlineEditSection } from './general/SettingsInlineEditSection';
 import { SettingsPluginSection } from './general/SettingsPluginSection';
 import { SettingsPluginUpdateSection } from './general/SettingsPluginUpdateSection';
 import { SettingsSecuritySection } from './general/SettingsSecuritySection';
@@ -37,6 +38,7 @@ import { SettingsUserSection } from './general/SettingsUserSection';
 import { SettingsMcpSection } from './mcp/SettingsMcpSection';
 import { SettingsModelSection } from './models/SettingsModelSection';
 import { SettingsAgentsSection } from './resources/SettingsAgentsSection';
+import { SettingsContextGroupsSection } from './resources/SettingsContextGroupsSection';
 import { SettingsSkillSection } from './resources/SettingsSkillSection';
 import { SettingsToolSection } from './resources/SettingsToolSection';
 import {
@@ -145,11 +147,9 @@ export class OpenCodianSettingsView extends ItemView {
 
   /** Called when the active backend changes while this editor-area settings view is open. */
   handleActiveBackendChange(backend: AgentBackendKind): void {
-    if (this.plugin.settings.settingsLayoutMode !== 'tabbed') {
-      return;
+    if (this.plugin.settings.settingsLayoutMode === 'tabbed') {
+      this.getOrCreateTabbedRenderer().syncToActiveBackend(backend);
     }
-
-    this.getOrCreateTabbedRenderer().syncToActiveBackend(backend);
     this.renderSettings();
   }
 
@@ -179,24 +179,30 @@ export class OpenCodianSettingsView extends ItemView {
     containerEl.dataset.settingsLayoutMode = 'classic';
 
     this.renderClassicGeneralSection(containerEl);
-    if (this.plugin.settings.activeBackend === 'pi') new SettingsPiSection(this.plugin).attach(containerEl); if (this.plugin.settings.activeBackend === 'zcode') new SettingsZCodeSection(this.plugin).attach(containerEl);
-    this.addClaudeCodeSettings(containerEl);
-    this.addServerSettings(containerEl);
-    this.addModelSettings(containerEl);
+    this.getOrCreateTabbedRenderer().renderBackendManagement(containerEl);
+    this.getOrCreateTabbedRenderer().renderClassicBackendWorkspaces(containerEl);
+    if (this.isActiveBackend('opencode')) {
+      this.addServerSettings(containerEl);
+      this.addModelSettings(containerEl);
+    }
     this.addConversationSettings(containerEl);
-    this.addAgentsSettings(containerEl);
-    this.addCommandsSettings(containerEl);
-    this.addMcpSettings(containerEl);
-    this.addFormatterSettings(containerEl);
-    this.addPluginSettings(containerEl);
-    this.addSecuritySettings(containerEl);
+    if (this.isActiveBackend('opencode')) {
+      this.addAgentsSettings(containerEl);
+      this.addCommandsSettings(containerEl);
+      this.addMcpSettings(containerEl);
+      this.addFormatterSettings(containerEl);
+      this.addPluginSettings(containerEl);
+      this.addSecuritySettings(containerEl);
+    }
     this.addUISettings(containerEl);
     this.addStyleSettings(containerEl);
     this.addDebugSettings(containerEl);
     this.addUserSettings(containerEl);
-    this.addSkillsSettings(containerEl);
-    this.addToolsSettings(containerEl);
-    this.addAcpSettings(containerEl);
+    if (this.isActiveBackend('opencode')) {
+      this.addSkillsSettings(containerEl);
+      this.addToolsSettings(containerEl);
+      this.addAcpSettings(containerEl);
+    }
 
     this.sectionCoordinator.finishDisplay();
   }
@@ -220,6 +226,14 @@ export class OpenCodianSettingsView extends ItemView {
 
   private renderPanelTitle(containerEl: HTMLElement): void {
     renderSettingsPanelTitle(containerEl, this.app as App, this.plugin);
+  }
+
+  private isActiveBackend(backend: AgentBackendKind): boolean {
+    const activeBackend = this.plugin.settings.activeBackend;
+    const resolvedBackend = activeBackend && this.plugin.settings.enabledBackends.includes(activeBackend)
+      ? activeBackend
+      : this.plugin.settings.enabledBackends[0];
+    return resolvedBackend === backend;
   }
 
   // ─── Tabbed renderer ───────────────────────────────────────────────
@@ -262,6 +276,7 @@ export class OpenCodianSettingsView extends ItemView {
       renderUserContent: (el, secondaryTabId) => {
         this.createUserSection().attachTabbed(el, secondaryTabId);
       },
+      renderConversationTitleSettings: (el) => { this.getConversationSection().attachTitleBlock(el); },
       renderLayoutModeSetting: (el) => { this.renderLayoutModeSetting(el); },
       renderLanguageSetting: (el) => { this.renderLanguageSetting(el); },
       renderSettingsInEditorAreaSetting: (el) => { this.renderSettingsInEditorAreaSetting(el); },
@@ -362,14 +377,6 @@ export class OpenCodianSettingsView extends ItemView {
     serverSection.attach(containerEl);
   }
 
-  private addClaudeCodeSettings(containerEl: HTMLElement): void {
-    this.claudeCodeSection ??= new SettingsClaudeCodeSection({
-      plugin: this.plugin,
-      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
-    });
-    this.claudeCodeSection.attach(containerEl);
-  }
-
   private addMcpSettings(containerEl: HTMLElement): void {
     this.mcpSection = new SettingsMcpSection({
       plugin: this.plugin,
@@ -409,6 +416,22 @@ export class OpenCodianSettingsView extends ItemView {
   }
 
   private addConversationSettings(containerEl: HTMLElement): void {
+    this.getConversationSection().attach(containerEl);
+    new SettingsInlineEditSection({
+      plugin: this.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
+    }).attach(containerEl);
+    new SettingsImageGenerationSection({
+      plugin: this.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
+    }).attach(containerEl);
+    new SettingsContextGroupsSection({
+      plugin: this.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
+    }).attach(containerEl);
+  }
+
+  private getConversationSection(): SettingsConversationSection {
     this.conversationSection ??= new SettingsConversationSection({
       app: this.app as App,
       plugin: this.plugin,
@@ -419,7 +442,22 @@ export class OpenCodianSettingsView extends ItemView {
         this.refreshTitleModelsCallback = callback;
       },
     });
-    this.conversationSection.attach(containerEl);
+    return this.conversationSection;
+  }
+
+  private getDebugSection(): SettingsDebugSection {
+    this.debugSection ??= new SettingsDebugSection({
+      plugin: this.plugin,
+      getOpenCodeDiagnostics: () => createOpenCodeTraceDiagnosticsPort(this.plugin.openCodeTraceService),
+      getCodexDiagnostics: () => createCodexTraceDiagnosticsPort(this.plugin.codexTraceService),
+      getClaudeDiagnostics: () => createClaudeTraceDiagnosticsPort(this.plugin.claudeTraceService),
+      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
+    });
+    return this.debugSection;
+  }
+
+  private addDebugSettings(containerEl: HTMLElement): void {
+    this.getDebugSection().attach(containerEl);
   }
 
   private addAgentsSettings(containerEl: HTMLElement): void {
@@ -485,17 +523,6 @@ export class OpenCodianSettingsView extends ItemView {
       addSettingHelpButton,
     });
     this.styleSection.attach(containerEl);
-  }
-
-  private addDebugSettings(containerEl: HTMLElement): void {
-    this.debugSection ??= new SettingsDebugSection({
-      plugin: this.plugin,
-      getOpenCodeDiagnostics: () => createOpenCodeTraceDiagnosticsPort(this.plugin.openCodeTraceService),
-      getCodexDiagnostics: () => createCodexTraceDiagnosticsPort(this.plugin.codexTraceService),
-      getClaudeDiagnostics: () => createClaudeTraceDiagnosticsPort(this.plugin.claudeTraceService),
-      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
-    });
-    this.debugSection.attach(containerEl);
   }
 
   private addUserSettings(containerEl: HTMLElement): void {

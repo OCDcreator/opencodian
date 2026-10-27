@@ -45,3 +45,5 @@ ZCode 后端的设置面（经典布局与页签布局共用）：可选运行�
 - 源码位置：`src/features/settings/backends/zcode/SettingsZCodeSection.ts`。
 - 原位置：`src/features/settings/SettingsZCodeSection.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/core/agents/backend/configuration/ProjectResourceSecureWrite.ts`。
+
+> 2026-10-27：ZCode 从单一“连接”页拆为连接、模型与模式、插件与 MCP 三个二级页；补全模型覆盖只在模型页显示，不扩大 aux-edit 边界。

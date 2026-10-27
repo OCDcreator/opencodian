@@ -18,7 +18,6 @@
 /* eslint-disable max-lines -- Claude Code settings keeps cross-layout tab rendering and persistence controls co-located for auditability. */
 
 import { Notice, setIcon, Setting } from 'obsidian';
-import * as path from 'path';
 
 import {
   type ClaudeCodeProcessResolution,
@@ -27,7 +26,6 @@ import {
 } from '../../../../core/agents/backend/claude/ClaudeCodeProcessResolver';
 import type { ClaudeCodeMcpPermissionModeOverride, ClaudeCodeMcpPermissionModeOverrideResult, ClaudeCodeOutputStylesReloadResult } from '../../../../core/agents/backend/claude/ClaudeCodeQueue';
 import type { ClaudeProjectAgentInfo } from '../../../../core/agents/backend/claude/ClaudeProjectAgentDiscovery';
-import type { ClaudeProjectCommandInfo } from '../../../../core/agents/backend/claude/ClaudeProjectCommandDiscovery';
 import type { ClaudeProjectSkillInfo } from '../../../../core/agents/backend/claude/ClaudeProjectSkillDiscovery';
 import {
   type ClaudeCodeEffort,
@@ -39,10 +37,10 @@ import {
 } from '../../../../core/types';
 import { t, type TranslationKey } from '../../../../i18n';
 import type OpenCodianPlugin from '../../../../main';
-import { getVaultBasePath } from '../../../../shared';
 import { BackendSessionBrowserModal } from '../../../chat/ui/BackendSessionBrowserModal';
 import { SettingsTooltipController } from '../../controls/SettingsTooltipController';
 import { TextareaSizeMemory } from '../../controls/TextareaSizeMemory';
+import { SettingsInlineEditSection } from '../../general/SettingsInlineEditSection';
 import { ClaudeCodeHelpContent, ClaudeCodeHelpModal } from './ClaudeCodeHelpModal';
 import { SettingsClaudeConfigurationSection } from './SettingsClaudeConfigurationSection';
 import { SettingsClaudeProvidersSection } from './SettingsClaudeProvidersSection';
@@ -152,6 +150,7 @@ type ClaudeCodeGroupId =
   | 'runtime-inspection'
   | 'diagnostics-logs'
   | 'thinking-effort'
+  | 'title-inline-overrides'
   | 'limits-budget'
   | 'prompt-behavior'
   | 'permission-mode'
@@ -208,6 +207,10 @@ const CLAUDE_CODE_GROUP_COPY: Record<ClaudeCodeGroupId, { titleKey: TranslationK
   'thinking-effort': {
     titleKey: 'settings.claudeCode.groups.thinkingEffort.title',
     descKey: 'settings.claudeCode.groups.thinkingEffort.desc',
+  },
+  'title-inline-overrides': {
+    titleKey: 'settings.claudeCode.groups.titleInlineOverrides.title',
+    descKey: 'settings.claudeCode.groups.titleInlineOverrides.desc',
   },
   'limits-budget': {
     titleKey: 'settings.claudeCode.groups.limitsBudget.title',
@@ -670,9 +673,10 @@ export class SettingsClaudeCodeSection {
     this.renderBackendSessionBrowserInfo(ecosystemEl);
 
     const projectFilesEl = this.createClaudeCodeGroup(containerEl, { id: 'project-files' });
-    this.renderClaudeProjectSkillsControls(projectFilesEl);
-    this.renderClaudeProjectCommandsControls(projectFilesEl);
-    this.renderClaudeProjectAgentsControls(projectFilesEl);
+    projectFilesEl.createEl('p', {
+      cls: 'setting-item-description',
+      text: t('settings.claudeCode.groups.projectFiles.manageInTabs'),
+    });
 
     const inspectionEl = this.createClaudeCodeGroup(containerEl, { id: 'runtime-inspection' });
     this.renderClaudeRuntimeCommandsControls(inspectionEl);
@@ -1014,336 +1018,7 @@ export class SettingsClaudeCodeSection {
     browseOnlyEl.createSpan({ text: t('settings.claudeCode.sessionBrowser.browseOnlyNotice') });
   }
 
-  // ─── Claude Project Skills discovery ───────────────────────────────
-
-  private renderClaudeProjectSkillsControls(containerEl: HTMLElement): void {
-    let outputEl: HTMLElement | null = null;
-    const getOutputEl = (): HTMLElement => {
-      outputEl ??= containerEl.createDiv({
-        cls: 'opencodian-settings-inline-notice opencodian-claude-code-project-skills',
-        attr: {
-          'data-claude-code-project-skills': 'true',
-        },
-      });
-      return outputEl;
-    };
-
-    new Setting(containerEl)
-      .setName(t('settings.claudeCode.projectSkills.name'))
-      .setDesc(t('settings.claudeCode.projectSkills.desc'))
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.claudeCode.projectSkills.scanButton'))
-          .onClick(async () => {
-            await this.renderClaudeProjectSkillsReadback(getOutputEl());
-          });
-      })
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.claudeCode.projectSkills.createButton'))
-          .onClick(async () => {
-            await this.handleCreateClaudeProjectSkill(getOutputEl());
-          });
-      });
-  }
-
-  private async renderClaudeProjectSkillsReadback(outputEl: HTMLElement): Promise<void> {
-    outputEl.empty();
-    outputEl.setText(t('settings.claudeCode.projectSkills.loading'));
-    const adapter = this.getClaudeAdapter() as ClaudeCodeRuntimeEcosystemAdapter | null;
-    if (typeof adapter?.getProjectClaudeSkills !== 'function') {
-      outputEl.setText(t('settings.claudeCode.projectSkills.empty'));
-      return;
-    }
-
-    let skills: ClaudeProjectSkillInfo[];
-    try {
-      skills = await adapter.getProjectClaudeSkills();
-    } catch {
-      outputEl.setText(t('settings.claudeCode.projectSkills.failed'));
-      return;
-    }
-
-    outputEl.empty();
-    if (skills.length === 0) {
-      outputEl.setText(t('settings.claudeCode.projectSkills.empty'));
-      return;
-    }
-
-    for (const skill of skills) {
-      const skillEl = outputEl.createDiv({
-        cls: 'opencodian-claude-code-project-skill-entry',
-        attr: {
-          'data-skill-name': skill.name,
-          'data-skill-path': skill.relativePath,
-        },
-      });
-      const label = skill.description
-        ? t('settings.claudeCode.projectSkills.skillEntry', { name: skill.name, description: skill.description })
-        : t('settings.claudeCode.projectSkills.skillEntryNoDesc', { name: skill.name });
-      skillEl.createEl('p', { text: label });
-      skillEl.createEl('p', {
-        cls: 'opencodian-settings-inline-notice',
-        text: t('settings.claudeCode.projectSkills.skillPath', { path: skill.relativePath }),
-      });
-      const openBtn = skillEl.createEl('button', {
-        cls: 'opencodian-claude-code-action-button',
-        text: t('settings.claudeCode.projectSkills.openButton'),
-      });
-      openBtn.addEventListener('click', () => {
-        void this.openFileInEditor(skill.skillMdPath);
-      });
-    }
-  }
-
-  private async handleCreateClaudeProjectSkill(outputEl: HTMLElement): Promise<void> {
-    const name = window.prompt(t('settings.claudeCode.projectSkills.createPrompt'));
-    if (!name?.trim()) return;
-
-    const vaultPath = this.plugin.app ? this.getVaultBasePath() : null;
-    if (!vaultPath) return;
-
-    // Check if skill already exists
-    const adapter = this.getClaudeAdapter() as ClaudeCodeRuntimeEcosystemAdapter | null;
-    if (typeof adapter?.getProjectClaudeSkills === 'function') {
-      const existing = await adapter.getProjectClaudeSkills();
-      if (existing.some((s) => s.name === name.trim())) {
-        new Notice(t('settings.claudeCode.projectSkills.alreadyExists'));
-        return;
-      }
-    }
-
-    const { createClaudeProjectSkill } = await import('../../../../core/agents/backend/claude/ClaudeProjectSkillDiscovery');
-    const filePath = await createClaudeProjectSkill(vaultPath, name.trim());
-    if (!filePath) {
-      new Notice(t('settings.claudeCode.projectSkills.createFailed'));
-      return;
-    }
-
-    await this.openFileInEditor(filePath);
-    // Re-scan to show the new skill
-    await this.renderClaudeProjectSkillsReadback(outputEl);
-  }
-
-  // ─── Claude Project Commands discovery & actions ──────────────────
-
-  private renderClaudeProjectCommandsControls(containerEl: HTMLElement): void {
-    let outputEl: HTMLElement | null = null;
-    const getOutputEl = (): HTMLElement => {
-      outputEl ??= containerEl.createDiv({
-        cls: 'opencodian-settings-inline-notice opencodian-claude-code-project-commands',
-        attr: {
-          'data-claude-code-project-commands': 'true',
-        },
-      });
-      return outputEl;
-    };
-
-    new Setting(containerEl)
-      .setName(t('settings.claudeCode.projectCommands.name'))
-      .setDesc(t('settings.claudeCode.projectCommands.desc'))
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.claudeCode.projectCommands.scanButton'))
-          .onClick(async () => {
-            await this.renderClaudeProjectCommandsReadback(getOutputEl());
-          });
-      })
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.claudeCode.projectCommands.createButton'))
-          .onClick(async () => {
-            await this.handleCreateClaudeProjectCommand(getOutputEl());
-          });
-      });
-  }
-
-  private async renderClaudeProjectCommandsReadback(outputEl: HTMLElement): Promise<void> {
-    outputEl.empty();
-    outputEl.setText(t('settings.claudeCode.projectCommands.loading'));
-
-    const vaultPath = this.getVaultBasePath();
-    if (!vaultPath) {
-      outputEl.setText(t('settings.claudeCode.projectCommands.empty'));
-      return;
-    }
-
-    let commands: ClaudeProjectCommandInfo[];
-    try {
-      const { discoverClaudeProjectCommands } = await import('../../../../core/agents/backend/claude/ClaudeProjectCommandDiscovery');
-      commands = await discoverClaudeProjectCommands(vaultPath);
-    } catch {
-      outputEl.setText(t('settings.claudeCode.projectCommands.failed'));
-      return;
-    }
-
-    outputEl.empty();
-    if (commands.length === 0) {
-      outputEl.setText(t('settings.claudeCode.projectCommands.empty'));
-      return;
-    }
-
-    for (const cmd of commands) {
-      const cmdEl = outputEl.createDiv({
-        cls: 'opencodian-claude-code-project-command-entry',
-        attr: {
-          'data-command-name': cmd.name,
-          'data-command-path': cmd.relativePath,
-        },
-      });
-      const label = cmd.description
-        ? t('settings.claudeCode.projectCommands.commandEntry', { name: cmd.name, description: cmd.description })
-        : t('settings.claudeCode.projectCommands.commandEntryNoDesc', { name: cmd.name });
-      cmdEl.createEl('p', { text: label });
-      cmdEl.createEl('p', {
-        cls: 'opencodian-settings-inline-notice',
-        text: t('settings.claudeCode.projectCommands.commandPath', { path: cmd.relativePath }),
-      });
-      const openBtn = cmdEl.createEl('button', {
-        cls: 'opencodian-claude-code-action-button',
-        text: t('settings.claudeCode.projectCommands.openButton'),
-      });
-      openBtn.addEventListener('click', () => {
-        void this.openFileInEditor(cmd.filePath);
-      });
-    }
-  }
-
-  private async handleCreateClaudeProjectCommand(outputEl: HTMLElement): Promise<void> {
-    const name = window.prompt(t('settings.claudeCode.projectCommands.createPrompt'));
-    if (!name?.trim()) return;
-
-    const vaultPath = this.plugin.app ? this.getVaultBasePath() : null;
-    if (!vaultPath) return;
-
-    // Check if command already exists
-    const { discoverClaudeProjectCommands, createClaudeProjectCommand } = await import('../../../../core/agents/backend/claude/ClaudeProjectCommandDiscovery');
-    const existing = await discoverClaudeProjectCommands(vaultPath);
-    if (existing.some((c) => c.name === name.trim())) {
-      new Notice(t('settings.claudeCode.projectCommands.alreadyExists'));
-      return;
-    }
-
-    const filePath = await createClaudeProjectCommand(vaultPath, name.trim());
-    if (!filePath) {
-      new Notice(t('settings.claudeCode.projectCommands.createFailed'));
-      return;
-    }
-
-    await this.openFileInEditor(filePath);
-    // Re-scan to show the new command
-    await this.renderClaudeProjectCommandsReadback(outputEl);
-  }
-
-  // ─── Claude Project Agents discovery & actions ───────────────────
-
-  private renderClaudeProjectAgentsControls(containerEl: HTMLElement): void {
-    let outputEl: HTMLElement | null = null;
-    const getOutputEl = (): HTMLElement => {
-      outputEl ??= containerEl.createDiv({
-        cls: 'opencodian-settings-inline-notice opencodian-claude-code-project-agents',
-        attr: {
-          'data-claude-code-project-agents': 'true',
-        },
-      });
-      return outputEl;
-    };
-
-    new Setting(containerEl)
-      .setName(t('settings.claudeCode.projectAgents.name'))
-      .setDesc(t('settings.claudeCode.projectAgents.desc'))
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.claudeCode.projectAgents.scanButton'))
-          .onClick(async () => {
-            await this.renderClaudeProjectAgentsReadback(getOutputEl());
-          });
-      })
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.claudeCode.projectAgents.createButton'))
-          .onClick(async () => {
-            await this.handleCreateClaudeProjectAgent(getOutputEl());
-          });
-      });
-  }
-
-  private async renderClaudeProjectAgentsReadback(outputEl: HTMLElement): Promise<void> {
-    outputEl.empty();
-    outputEl.setText(t('settings.claudeCode.projectAgents.loading'));
-
-    const vaultPath = this.getVaultBasePath();
-    if (!vaultPath) {
-      outputEl.setText(t('settings.claudeCode.projectAgents.empty'));
-      return;
-    }
-
-    let agents: ClaudeProjectAgentInfo[];
-    try {
-      const { discoverClaudeProjectAgents } = await import('../../../../core/agents/backend/claude/ClaudeProjectAgentDiscovery');
-      agents = await discoverClaudeProjectAgents(vaultPath);
-    } catch {
-      outputEl.setText(t('settings.claudeCode.projectAgents.failed'));
-      return;
-    }
-
-    outputEl.empty();
-    if (agents.length === 0) {
-      outputEl.setText(t('settings.claudeCode.projectAgents.empty'));
-      return;
-    }
-
-    for (const agent of agents) {
-      const agentEl = outputEl.createDiv({
-        cls: 'opencodian-claude-code-project-agent-entry',
-        attr: {
-          'data-agent-name': agent.name,
-          'data-agent-path': agent.relativePath,
-        },
-      });
-      const label = agent.description
-        ? t('settings.claudeCode.projectAgents.agentEntry', { name: agent.name, description: agent.description })
-        : t('settings.claudeCode.projectAgents.agentEntryNoDesc', { name: agent.name });
-      agentEl.createEl('p', { text: label });
-      agentEl.createEl('p', {
-        cls: 'opencodian-settings-inline-notice',
-        text: t('settings.claudeCode.projectAgents.agentPath', { path: agent.relativePath }),
-      });
-      const openBtn = agentEl.createEl('button', {
-        cls: 'opencodian-claude-code-action-button',
-        text: t('settings.claudeCode.projectAgents.openButton'),
-      });
-      openBtn.addEventListener('click', () => {
-        void this.openFileInEditor(agent.filePath);
-      });
-    }
-  }
-
-  private async handleCreateClaudeProjectAgent(outputEl: HTMLElement): Promise<void> {
-    const name = window.prompt(t('settings.claudeCode.projectAgents.createPrompt'));
-    if (!name?.trim()) return;
-
-    const vaultPath = this.plugin.app ? this.getVaultBasePath() : null;
-    if (!vaultPath) return;
-
-    // Check if agent already exists
-    const { discoverClaudeProjectAgents, createClaudeProjectAgent } = await import('../../../../core/agents/backend/claude/ClaudeProjectAgentDiscovery');
-    const existing = await discoverClaudeProjectAgents(vaultPath);
-    if (existing.some((a) => a.name === name.trim())) {
-      new Notice(t('settings.claudeCode.projectAgents.alreadyExists'));
-      return;
-    }
-
-    const filePath = await createClaudeProjectAgent(vaultPath, name.trim());
-    if (!filePath) {
-      new Notice(t('settings.claudeCode.projectAgents.createFailed'));
-      return;
-    }
-
-    await this.openFileInEditor(filePath);
-    // Re-scan to show the new agent
-    await this.renderClaudeProjectAgentsReadback(outputEl);
-  }
+  // ─── Session controls ─────────────────────────────────────────────
 
   /** Session controls only acknowledge a request; no plugin setting or effective flag is persisted. */
   private renderNativeSessionControls(containerEl: HTMLElement, kind: 'styles' | 'mcp'): void {
@@ -1425,20 +1100,7 @@ export class SettingsClaudeCodeSection {
 
   // ─── Shared helpers ────────────────────────────────────────────────
 
-  private getVaultBasePath(): string | null {
-    return getVaultBasePath(this.plugin.app);
-  }
 
-  private async openFileInEditor(absolutePath: string): Promise<void> {
-    try {
-      const vaultPath = this.getVaultBasePath();
-      if (!vaultPath) return;
-      const relativePath = path.relative(vaultPath, absolutePath).replace(/\\/g, '/');
-      await this.plugin.app.workspace.openLinkText(relativePath, '', 'tab');
-    } catch {
-      // Fallback: no-op
-    }
-  }
 
   // ─── Claude Runtime Commands discovery ─────────────────────────────
 
@@ -1966,6 +1628,18 @@ export class SettingsClaudeCodeSection {
       this.renderThinkingBudgetSetting(thinkingEl);
     }
     this.renderEffortSetting(thinkingEl);
+
+    const titleAndModelsEl = this.createClaudeCodeGroup(containerEl, { id: 'title-inline-overrides' });
+    new Setting(titleAndModelsEl)
+      .setName(t('settings.titleGeneration.claudeAutoTitle.name'))
+      .setDesc(t('settings.titleGeneration.claudeAutoTitle.desc'))
+      .addToggle((toggle) => toggle
+        .setValue(this.settings.autoTitle)
+        .onChange(async (value) => {
+          this.settings.autoTitle = value;
+          await this.saveSettings();
+        }));
+    SettingsInlineEditSection.renderBackendModelOverrides(titleAndModelsEl, 'claude-code', this.plugin);
   }
 
   private renderThinkingSetting(containerEl: HTMLElement): void {

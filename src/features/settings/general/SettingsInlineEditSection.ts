@@ -65,6 +65,16 @@ interface SettingsInlineEditSectionOptions {
   openHotkeySettings?: () => void;
 }
 
+/**
+ * Minimal host for the per-backend model override rows. Backend workspace
+ * sections already hold their settings object and save method, so they render
+ * only the rows that belong to their own workspace.
+ */
+export interface InlineEditModelOverrideHost {
+  settings: Partial<Pick<OpenCodianSettings, 'inlineEditModelOverrides' | 'inlineCompletionModelOverrides'>>;
+  saveSettings(): Promise<unknown>;
+}
+
 /** Backends offered in the per-backend override list. */
 const OVERRIDE_BACKENDS: readonly AgentBackendKind[] = ['opencode', 'opencode2', 'claude-code', 'codex', 'pi', 'dsh'];
 /** ZCode is text-completion-only; it must not appear on generic aux-edit rows. */
@@ -171,11 +181,6 @@ export class SettingsInlineEditSection {
 
     this.addHotkeyDiscoveryRow(containerEl);
 
-    for (const backend of OVERRIDE_BACKENDS) {
-      if (!this.plugin.settings.enabledBackends.includes(backend)) continue;
-      this.addOverrideRow(containerEl, backend);
-    }
-
     this.addAutoInternalLinkSettings(containerEl);
 
     this.addPresetPromptSettings(containerEl);
@@ -233,14 +238,8 @@ export class SettingsInlineEditSection {
           await this.plugin.saveSettings();
         }));
 
-    // R-C3: dedicated per-backend completion model override. Same override
-    // semantics and validation as the inline-edit rows above, but scoped to
-    // the completion pool's model resolution so a fast model can be pinned
-    // for completions without changing inline edit.
-    for (const backend of COMPLETION_OVERRIDE_BACKENDS) {
-      if (!this.plugin.settings.enabledBackends.includes(backend)) continue;
-      this.addCompletionModelOverrideRow(containerEl, backend);
-    }
+    // The per-backend completion model override is rendered inside the owning
+    // backend workspace via renderBackendModelOverrides().
 
     new Setting(containerEl)
       .setName(t('settings.inlineCompletion.hotkey.name'))
@@ -248,50 +247,75 @@ export class SettingsInlineEditSection {
   }
 
   /**
-   * R-C3: one text row per enabled backend for `inlineCompletionModelOverrides`.
-   * Empty = inherit (the completion target falls back to the inline-edit model
-   * chain, byte-identical to the behaviour before this setting existed);
-   * otherwise a backend-shaped model ref, rejected inline when malformed.
+   * Render the per-backend inline-edit and completion model overrides inside
+   * the owning backend workspace. Called by the OpenCode 2, Claude Code, Codex,
+   * Pi, ZCode and DSH model pages so the generic conversation page never edits
+   * another backend's stored override.
    */
-  private addCompletionModelOverrideRow(containerEl: HTMLElement, backend: AgentBackendKind): void {
+  static renderBackendModelOverrides(
+    containerEl: HTMLElement,
+    backend: AgentBackendKind,
+    host: InlineEditModelOverrideHost,
+  ): void {
+    if ((OVERRIDE_BACKENDS as readonly string[]).includes(backend)
+      && host.settings.inlineEditModelOverrides) {
+      SettingsInlineEditSection.renderOverrideRow(containerEl, backend, host, 'inline-edit');
+    }
+    if ((COMPLETION_OVERRIDE_BACKENDS as readonly string[]).includes(backend)
+      && host.settings.inlineCompletionModelOverrides) {
+      SettingsInlineEditSection.renderOverrideRow(containerEl, backend, host, 'completion');
+    }
+  }
+
+  private static renderOverrideRow(
+    containerEl: HTMLElement,
+    backend: AgentBackendKind,
+    host: InlineEditModelOverrideHost,
+    purpose: 'inline-edit' | 'completion',
+  ): void {
+    const nameKey = purpose === 'inline-edit'
+      ? 'settings.inlineEdit.override.name'
+      : 'settings.inlineCompletion.modelOverride.name';
+    const descKey = purpose === 'inline-edit'
+      ? 'settings.inlineEdit.override.desc'
+      : 'settings.inlineCompletion.modelOverride.desc';
+    const invalidKey = purpose === 'inline-edit'
+      ? 'settings.inlineEdit.override.invalid'
+      : 'settings.inlineCompletion.modelOverride.invalid';
     const setting = new Setting(containerEl)
-      .setName(t('settings.inlineCompletion.modelOverride.name', { backend }))
-      .setDesc(
-        t('settings.inlineCompletion.modelOverride.desc', {
-          backend,
-          example: overrideExample(backend),
-        }),
-      );
+      .setName(t(nameKey, { backend }))
+      .setDesc(t(descKey, { backend, example: overrideExample(backend) }));
 
     setting.addText((text) => {
+      const storedValue = purpose === 'inline-edit'
+        ? host.settings.inlineEditModelOverrides?.[backend]
+        : host.settings.inlineCompletionModelOverrides?.[backend];
       text.setPlaceholder(overrideExample(backend))
-        .setValue(this.plugin.settings.inlineCompletionModelOverrides[backend] ?? '')
-        .onChange(async (value) => {
-          const trimmed = value.trim();
-          const next: Partial<Record<AgentBackendKind, string>> = {
-            ...this.plugin.settings.inlineCompletionModelOverrides,
-          };
+        .setValue(storedValue ?? '')
+        .onChange(async (rawValue) => {
+          const trimmed = rawValue.trim();
+          const base = purpose === 'inline-edit'
+            ? (host.settings.inlineEditModelOverrides ?? {})
+            : (host.settings.inlineCompletionModelOverrides ?? {});
+          const next: Partial<Record<AgentBackendKind, string>> = { ...base };
           if (!trimmed) {
             delete next[backend];
-            setting.setDesc(t('settings.inlineCompletion.modelOverride.desc', {
-              backend,
-              example: overrideExample(backend),
-            }));
+            setting.setDesc(t(descKey, { backend, example: overrideExample(backend) }));
           } else if (parseModelOverride(backend, trimmed)) {
             next[backend] = trimmed;
-            setting.setDesc(t('settings.inlineCompletion.modelOverride.desc', {
-              backend,
-              example: overrideExample(backend),
-            }));
+            setting.setDesc(t(descKey, { backend, example: overrideExample(backend) }));
           } else {
-            // Keep the value visible but reject it, so the completion path never
+            // Keep the value visible but reject it, so the backend path never
             // silently falls back to a default model either.
-            setting.setDesc(t('settings.inlineCompletion.modelOverride.invalid', { backend }));
+            setting.setDesc(t(invalidKey, { backend }));
             return;
           }
-          const settings: OpenCodianSettings = this.plugin.settings;
-          settings.inlineCompletionModelOverrides = normalizeInlineCompletionModelOverrides(next);
-          await this.plugin.saveSettings();
+          if (purpose === 'inline-edit') {
+            host.settings.inlineEditModelOverrides = normalizeInlineEditModelOverrides(next);
+          } else {
+            host.settings.inlineCompletionModelOverrides = normalizeInlineCompletionModelOverrides(next);
+          }
+          await host.saveSettings();
         });
     });
   }
@@ -309,44 +333,6 @@ export class SettingsInlineEditSection {
     setting.addButton((button) => button
       .setButtonText(t('settings.inlineEdit.hotkey.action'))
       .onClick(() => { this.openHotkeySettings?.(); }));
-  }
-
-  private addOverrideRow(containerEl: HTMLElement, backend: AgentBackendKind): void {
-    const setting = new Setting(containerEl)
-      .setName(t('settings.inlineEdit.override.name', { backend }))
-      .setDesc(t('settings.inlineEdit.override.desc', { backend, example: overrideExample(backend) }));
-
-    setting.addText((text) => {
-      text.setPlaceholder(overrideExample(backend))
-        .setValue(this.plugin.settings.inlineEditModelOverrides[backend] ?? '')
-        .onChange(async (value) => {
-          const trimmed = value.trim();
-          const next: Partial<Record<AgentBackendKind, string>> = {
-            ...this.plugin.settings.inlineEditModelOverrides,
-          };
-          if (!trimmed) {
-            delete next[backend];
-            setting.setDesc(t('settings.inlineEdit.override.desc', {
-              backend,
-              example: overrideExample(backend),
-            }));
-          } else if (parseModelOverride(backend, trimmed)) {
-            next[backend] = trimmed;
-            setting.setDesc(t('settings.inlineEdit.override.desc', {
-              backend,
-              example: overrideExample(backend),
-            }));
-          } else {
-            // Keep the value visible but reject it, so the inline-edit path never
-            // silently falls back to a default model (design §9).
-            setting.setDesc(t('settings.inlineEdit.override.invalid', { backend }));
-            return;
-          }
-          const settings: OpenCodianSettings = this.plugin.settings;
-          settings.inlineEditModelOverrides = normalizeInlineEditModelOverrides(next);
-          await this.plugin.saveSettings();
-        });
-    });
   }
 
   // ---------------------------------------------------------------------------

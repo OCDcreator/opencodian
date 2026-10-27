@@ -851,6 +851,10 @@ describe('OpenCodianSettingTab layout shell', () => {
     };
 
     Object.assign(tab as unknown as Record<string, unknown>, {
+      getOrCreateTabbedRenderer: () => ({
+        renderBackendManagement: jest.fn(),
+        renderClassicBackendWorkspaces: jest.fn(),
+      }),
       addServerSettings: jest.fn(),
       addMcpSettings: jest.fn(),
       addModelSettings: jest.fn(),
@@ -910,6 +914,10 @@ describe('OpenCodianSettingTab layout shell', () => {
     };
 
     Object.assign(tab as unknown as Record<string, unknown>, {
+      getOrCreateTabbedRenderer: () => ({
+        renderBackendManagement: jest.fn(),
+        renderClassicBackendWorkspaces: jest.fn(),
+      }),
       addServerSettings: jest.fn(),
       addMcpSettings: jest.fn(),
       addModelSettings: jest.fn(),
@@ -950,6 +958,10 @@ describe('OpenCodianSettingTab layout shell', () => {
     };
 
     Object.assign(tab as unknown as Record<string, unknown>, {
+      getOrCreateTabbedRenderer: () => ({
+        renderBackendManagement: jest.fn(),
+        renderClassicBackendWorkspaces: jest.fn(),
+      }),
       addServerSettings: appendHeading('Server'),
       addMcpSettings: appendHeading('MCP'),
       addModelSettings: appendHeading('Model'),
@@ -989,6 +1001,10 @@ describe('OpenCodianSettingTab layout shell', () => {
     };
 
     Object.assign(tab as unknown as Record<string, unknown>, {
+      getOrCreateTabbedRenderer: () => ({
+        renderBackendManagement: jest.fn(),
+        renderClassicBackendWorkspaces: jest.fn(),
+      }),
       addServerSettings: appendHeading('Server'),
       addMcpSettings: appendHeading('MCP'),
       addModelSettings: appendHeading('Model'),
@@ -1018,7 +1034,7 @@ describe('OpenCodianSettingTab layout shell', () => {
     const labels = Array.from(
       tab.containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-settings-quick-nav-btn'),
     ).map((element) => element.textContent?.trim());
-    expect(labels).toEqual(['General', 'Claude Code', 'Conversation', 'UI', 'Style', 'Debug', 'User']);
+    expect(labels).toEqual(['General', 'Conversation', 'UI', 'Style', 'Debug', 'User']);
     expect(labels).not.toContain('Server');
     expect(labels).not.toContain('Model');
     expect(labels).not.toContain('Security');
@@ -1177,6 +1193,10 @@ describe('OpenCodianSettingTab title styling', () => {
   it('renders a branded settings title using the shared OpenCodian title logic', () => {
     const { tab } = createSettingsTab('classic');
     Object.assign(tab as unknown as Record<string, unknown>, {
+      getOrCreateTabbedRenderer: () => ({
+        renderBackendManagement: jest.fn(),
+        renderClassicBackendWorkspaces: jest.fn(),
+      }),
       addServerSettings: jest.fn(),
       addMcpSettings: jest.fn(),
       addModelSettings: jest.fn(),

@@ -88,3 +88,9 @@ SettingsPiSection owns the Pi settings surface through a narrow host. Credential
 ## 2026-10-24 DSH 设置子区
 
 `backends/dsh/SettingsDshSection.ts` 是无运行时状态所有权的设置子区，通过窄 host 使用既有后端组合层传入的操作，保持此 owner 不直接依赖 core.backend 或 main.ts。原生会话、配置回读和 MCP 准入状态仍归后端 owner。
+
+> 2026-10-27：两个设置宿主共用 `getBackendWorkspaceTab` / `getVisibleBackendWorkspaces` 与 SettingsTabbedRenderer 的后端管理/工作区挂载；经典布局使用本地二级导航逐页挂载，切换子页时清空旧 title refresh callback 并 dispose 旧 Codex section。
+
+> 2026-10-27（二次审查）：Codex section 在任意经典后端子页切换前统一 dispose 并清空引用（含 account→debug）；DSH 工作区新增 model 子页，复用共享行内覆盖组件。
+
+> 2026-10-27（UI 验收修复）：DSH renderTab 增加标准 section-body wrapper；标题备份模型按钮在创建时有可读初始标签。

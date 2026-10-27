@@ -81,3 +81,5 @@ The classic `attach()` method remains unchanged.
 - 源码位置：`src/features/settings/appearance/SettingsStyleSection.ts`。
 - 原位置：`src/features/settings/SettingsStyleSection.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/features/settings/appearance/SettingsStyleBackgroundSection.ts`、`src/features/settings/appearance/settingsStyleControls.ts`、`src/features/settings/appearance/SettingsStyleInputPanelSection.ts`、`src/features/settings/appearance/SettingsStylePresetSection.ts`、`src/features/settings/controls/TextareaSizeMemory.ts`。
+
+> 2026-10-27：标签布局的“预设”页补挂“重置全部会话样式”，与经典布局共用同一 reset 实现；不新增样式 token。

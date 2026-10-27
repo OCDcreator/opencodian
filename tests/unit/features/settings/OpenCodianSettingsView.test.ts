@@ -251,6 +251,10 @@ describe('OpenCodianSettingsView classic layout', () => {
     };
 
     Object.assign(view as unknown as Record<string, unknown>, {
+      getOrCreateTabbedRenderer: () => ({
+        renderBackendManagement: jest.fn(),
+        renderClassicBackendWorkspaces: jest.fn(),
+      }),
       renderClassicGeneralSection: appendHeading('General'),
       addServerSettings: appendHeading('Server'),
       addMcpSettings: appendHeading('MCP'),
@@ -282,8 +286,6 @@ describe('OpenCodianSettingsView classic layout', () => {
       heading.textContent,
     )).toEqual([
       'General',
-      'Claude Code',
-      'Project providers',
       'Server',
       'Model',
       'Conversation',
@@ -384,6 +386,10 @@ describe('OpenCodianSettingsView classic layout', () => {
     });
 
     Object.assign(view as unknown as Record<string, unknown>, {
+      getOrCreateTabbedRenderer: () => ({
+        renderBackendManagement: jest.fn(),
+        renderClassicBackendWorkspaces: jest.fn(),
+      }),
       renderClassicGeneralSection: appendHeading('General'),
       addServerSettings: appendHeading('Server'),
       addMcpSettings: appendHeading('MCP'),

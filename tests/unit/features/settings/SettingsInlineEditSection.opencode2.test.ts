@@ -31,10 +31,10 @@ function captureTextControls(): Map<string, CapturedTextControl> {
   return controls;
 }
 
-describe('OpenCode 2 inline model settings', () => {
+describe('per-backend inline model settings', () => {
   afterEach(() => { jest.restoreAllMocks(); });
 
-  it('shows separate edit and completion override controls when the backend is enabled', () => {
+  it('keeps per-backend override rows out of the shared inline-edit page', () => {
     setLocale('en');
     const names: string[] = [];
     jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
@@ -43,7 +43,7 @@ describe('OpenCode 2 inline model settings', () => {
     });
     const section = new SettingsInlineEditSection({
       plugin: {
-        settings: { ...DEFAULT_SETTINGS, enabledBackends: ['opencode2'] },
+        settings: { ...DEFAULT_SETTINGS, enabledBackends: ['opencode2', 'claude-code'] },
         saveSettings: jest.fn().mockResolvedValue(undefined),
       },
       createSectionHeading: (container, title) => container.createEl('h3', { text: title }),
@@ -51,13 +51,16 @@ describe('OpenCode 2 inline model settings', () => {
 
     section.attach(document.createElement('div'));
 
-    expect(names.filter((name) => name.includes('opencode2'))).toHaveLength(2);
+    expect(names.filter((name) => name.includes('opencode2'))).toHaveLength(0);
+    expect(names.filter((name) => name.includes('claude-code'))).toHaveLength(0);
+    expect(names).toContain(t('settings.inlineEdit.enabled.name'));
+    expect(names).toContain(t('settings.inlineCompletion.enabled.name'));
   });
 
   it.each([
     ['inlineEditModelOverrides', 'settings.inlineEdit.override.name'],
     ['inlineCompletionModelOverrides', 'settings.inlineCompletion.modelOverride.name'],
-  ] as const)('saves, reloads and clears the OpenCode 2 %s control', async (field, nameKey) => {
+  ] as const)('renders, saves, reloads and clears the OpenCode 2 %s workspace control', async (field, nameKey) => {
     setLocale('en');
     const controls = captureTextControls();
     const snapshots: string[] = [];
@@ -71,16 +74,16 @@ describe('OpenCode 2 inline model settings', () => {
       saveSettings: jest.fn(async () => { snapshots.push(JSON.stringify(plugin.settings)); }),
     };
     const existingOverrides = { ...plugin.settings[field] };
-    const mount = () => new SettingsInlineEditSection({
-      plugin,
-      createSectionHeading: (container, title) => container.createEl('h3', { text: title }),
-    }).attach(document.createElement('div'));
+    const mount = () => {
+      const host = document.createElement('div');
+      SettingsInlineEditSection.renderBackendModelOverrides(host, 'opencode2', plugin);
+      return host;
+    };
     mount();
 
     const rowName = t(nameKey, { backend: 'opencode2' });
     expect(controls.has(t('settings.inlineEdit.override.name', { backend: 'zcode' }))).toBe(false);
-    expect(controls.has(t('settings.inlineCompletion.modelOverride.name', { backend: 'zcode' }))).toBe(true);
-    expect(controls.get(rowName)).toBeDefined();
+    expect(controls.has(rowName)).toBe(true);
     await controls.get(rowName)!.change('  next/model  ');
 
     expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
@@ -116,5 +119,21 @@ describe('OpenCode 2 inline model settings', () => {
     await controls.get(rowName)!.change('   ');
     expect(plugin.saveSettings).toHaveBeenCalledTimes(2);
     expect(JSON.parse(snapshots[1])[field]).toEqual(existingOverrides);
+  });
+
+  it('renders only the completion override for ZCode because aux edit is not supported', () => {
+    setLocale('en');
+    const names: string[] = [];
+    jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
+      names.push(name);
+      return this;
+    });
+    SettingsInlineEditSection.renderBackendModelOverrides(
+      document.createElement('div'),
+      'zcode',
+      { settings: { ...DEFAULT_SETTINGS }, saveSettings: jest.fn() },
+    );
+
+    expect(names).toEqual([t('settings.inlineCompletion.modelOverride.name', { backend: 'zcode' })]);
   });
 });
