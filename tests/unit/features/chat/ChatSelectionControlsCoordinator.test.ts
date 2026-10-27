@@ -573,6 +573,17 @@ describe('ChatSelectionControlsCoordinator', () => {
     expect(dropdown.style.left).toBe('-20.2px');
     expect(dropdown.style.width).toBe('340px');
     expect(dropdown.style.minWidth).toBe('280px');
+
+    // A shorter effort label moves the right-aligned trigger. Its open
+    // dropdown must use the new anchor position to stay inside the chat.
+    jest.spyOn(selector, 'getBoundingClientRect').mockReturnValue({
+      left: 1197.2, right: 1304.2, top: 869, bottom: 899,
+      width: 107, height: 30, x: 1197.2, y: 869, toJSON: () => ({}),
+    });
+    fixture.host.getEffortDisplayLabel.mockReturnValue('High');
+    fixture.coordinator.updateModelSelectorEffortDisplay();
+
+    expect(dropdown.style.left).toBe('-105.2px');
   });
 
   it('resolves requested models against the loaded catalog and preserves base-catalog metadata lookups', async () => {

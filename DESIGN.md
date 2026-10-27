@@ -397,6 +397,12 @@ The Codex MCP server inspection modal follows the shared modal/inspection-panel 
 - **Resource rows:** keep the existing view action, but do not expose resource details while the server section is collapsed.
 - **Focus server:** when `focusServerName` matches, expand that section by default and apply the existing `.is-focused` highlight ring so the chat deep-link experience remains intact.
 
+### Effort Slider
+
+The combined model popover uses a compact capsule slider: a 28px theme-colored track, a white circular thumb, and one dot for every actual backend effort option. Keep the current full label in the header and native range accessible value; dots are decorative and never form a second focus target. Match dot centers to the thumb's inset travel range, preserve native keyboard/drag behavior, and retain the host's inherit/off and save semantics. Use a visible accent focus outline and native appearance in forced-color mode.
+
+The highest available effort adds a gently flowing teal/blue/lavender/pink spectrum, with a static version for reduced motion. All other steps keep ordinary theme fill. The thumb stays circular and centered on the track while pressed; host range offsets and active size changes must not shift it. Recalculate the open popover's anchor whenever its combined model/effort label changes.
+
 ### Inputs / Fields
 
 - **Style:** transparent or tonal background, 10-12px radius, Obsidian text colors, compact line height.

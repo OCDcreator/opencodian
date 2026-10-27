@@ -389,6 +389,7 @@ export class EffortSelector {
     slider.value = String(selectedIndex);
     slider.disabled = this.isSaving || choices.length <= 1;
     slider.setAttribute('aria-valuetext', selected.label);
+    slider.toggleClass('is-highest', choices.length > 1 && selectedIndex === maxIndex);
     output.setText(selected.label);
 
     ticks.empty();
@@ -396,9 +397,10 @@ export class EffortSelector {
       const tickEl = ticks.createSpan({
         cls: 'opencodian-effort-tick',
         text: choice.label,
-        attr: { title: choice.label },
       });
+      tickEl.style.setProperty('--opencodian-effort-step', `${maxIndex ? (index / maxIndex) * 100 : 0}%`);
       tickEl.toggleClass('is-active', index <= selectedIndex);
+      tickEl.toggleClass('is-selected', index === selectedIndex);
     });
     this.syncInlineProgress(selectedIndex, choices.length);
 
@@ -419,7 +421,8 @@ export class EffortSelector {
     labelEl.id = `${this.menuId}-inline-label`;
     this.inlineOutputEl = header.createSpan({ cls: 'opencodian-effort-panel-output' });
 
-    const slider = panel.createEl('input', {
+    const control = panel.createDiv({ cls: 'opencodian-effort-control' });
+    const slider = control.createEl('input', {
       cls: 'opencodian-effort-slider',
       attr: {
         type: 'range',
@@ -433,16 +436,18 @@ export class EffortSelector {
       if (!choice) return;
       this.inlineOutputEl?.setText(choice.label);
       slider.setAttribute('aria-valuetext', choice.label);
+      slider.toggleClass('is-highest', this.inlineChoices.length > 1 && index === this.inlineChoices.length - 1);
       this.syncInlineProgress(index, this.inlineChoices.length);
       this.inlineTicksEl?.querySelectorAll<HTMLElement>('.opencodian-effort-tick').forEach((tickEl, tickIndex) => {
         tickEl.toggleClass('is-active', tickIndex <= index);
+        tickEl.toggleClass('is-selected', tickIndex === index);
       });
     });
     slider.addEventListener('change', () => {
       void this.selectInlineVariant(Number(slider.value));
     });
 
-    this.inlineTicksEl = panel.createDiv({ cls: 'opencodian-effort-ticks', attr: { 'aria-hidden': 'true' } });
+    this.inlineTicksEl = control.createDiv({ cls: 'opencodian-effort-ticks', attr: { 'aria-hidden': 'true' } });
     this.inlineHintEl = panel.createDiv({ cls: 'opencodian-effort-panel-hint is-hidden' });
     this.inlineFeedbackEl = panel.createDiv({
       cls: 'opencodian-effort-panel-feedback',

@@ -10,58 +10,58 @@ function createMockMarkdownService() {
   } as unknown as MarkdownRenderService;
 }
 
-describe('AssistantShellViewHostAdapter', () => {
-  function createAdapter(getModelDisplayName?: (modelId: string) => string | undefined) {
-    const turnBody = document.createElement('div');
-    const runtime = {
-      streamingMessageEl: null as HTMLElement | null,
-      streamingContentEl: null as HTMLElement | null,
-    };
-    const scrollSpy = jest.fn();
-    const renderNoticeCard = jest.fn(async (container: HTMLElement, message: ChatMessage) => {
-      container.createDiv({
-        cls: `opencodian-chat-notice-card is-${message.noticeTone ?? 'info'}`,
-        text: `${message.noticeTitle ?? 'Notice'}:${message.content}`,
-      });
+function createBasicAdapter(getModelDisplayName?: (modelId: string) => string | undefined) {
+  const turnBody = document.createElement('div');
+  const runtime = {
+    streamingMessageEl: null as HTMLElement | null,
+    streamingContentEl: null as HTMLElement | null,
+  };
+  const scrollSpy = jest.fn();
+  const renderNoticeCard = jest.fn(async (container: HTMLElement, message: ChatMessage) => {
+    container.createDiv({
+      cls: `opencodian-chat-notice-card is-${message.noticeTone ?? 'info'}`,
+      text: `${message.noticeTitle ?? 'Notice'}:${message.content}`,
     });
-    const markdownService = createMockMarkdownService();
-    const getMarkdownService = jest.fn(() => markdownService);
-    const shouldRenderQuestionResolutionCards = jest.fn(() => false);
-    const suppressActiveLayoutAutoScrollOnce = jest.fn();
-    const openTaskToolSession = jest.fn();
-    const adapter = new AssistantShellViewHostAdapter(
-      {
-        getModelDisplayName,
-        getActiveTabId: () => 'tab-1',
-        getTabRuntimeState: () => runtime,
-        ensureTurnBody: () => turnBody,
-        shouldAutoScroll: () => true,
-        scheduleSettledScrollToBottomIfNeeded: scrollSpy,
-        setStreamingAssistantMessageVisibility: (messageEl, visible) => {
-          messageEl.hidden = !visible;
-        },
-        renderNoticeCard,
-        getMarkdownService,
-        shouldRenderQuestionResolutionCards,
-        suppressActiveLayoutAutoScrollOnce,
+  });
+  const markdownService = createMockMarkdownService();
+  const getMarkdownService = jest.fn(() => markdownService);
+  const shouldRenderQuestionResolutionCards = jest.fn(() => false);
+  const suppressActiveLayoutAutoScrollOnce = jest.fn();
+  const openTaskToolSession = jest.fn();
+  const adapter = new AssistantShellViewHostAdapter(
+    {
+      getModelDisplayName,
+      getActiveTabId: () => 'tab-1',
+      getTabRuntimeState: () => runtime,
+      ensureTurnBody: () => turnBody,
+      shouldAutoScroll: () => true,
+      scheduleSettledScrollToBottomIfNeeded: scrollSpy,
+      setStreamingAssistantMessageVisibility: (messageEl, visible) => {
+        messageEl.hidden = !visible;
       },
-      openTaskToolSession,
-    );
-
-    return {
-      adapter,
-      markdownService,
       renderNoticeCard,
-      runtime,
-      scrollSpy,
-      turnBody,
-    };
-  }
+      getMarkdownService,
+      shouldRenderQuestionResolutionCards,
+      suppressActiveLayoutAutoScrollOnce,
+    },
+    openTaskToolSession,
+  );
+
+  return {
+    adapter,
+    markdownService,
+    renderNoticeCard,
+    runtime,
+    scrollSpy,
+    turnBody,
+  };
+}
+describe('AssistantShellViewHostAdapter', () => {
 
   it('refreshes already rendered model labels when the native catalog becomes available', async () => {
     const modelId = 'deepseek-official/["deepseek-official","deepseek-flash"]';
     let ready = false;
-    const { adapter, turnBody, markdownService } = createAdapter((reference) =>
+    const { adapter, turnBody, markdownService } = createBasicAdapter((reference) =>
       ready && reference === modelId ? 'DeepSeek-V4.1-Flash' : undefined);
     const message: ChatMessage = {
       id: 'late-catalog', role: 'assistant', content: 'Existing answer', timestamp: 1, modelId,
@@ -83,7 +83,7 @@ describe('AssistantShellViewHostAdapter', () => {
   });
 
   it('renders notice placeholders through the shared notice host', async () => {
-    const { adapter, renderNoticeCard, runtime } = createAdapter();
+    const { adapter, renderNoticeCard, runtime } = createBasicAdapter();
     const { messageEl } = adapter.createAssistantMessageElement('tab-1', true);
     const noticeMessage: ChatMessage = {
       id: 'assistant-notice-1',
@@ -111,7 +111,7 @@ describe('AssistantShellViewHostAdapter', () => {
   });
 
   it('creates and renders persisted notices through the shared notice host', async () => {
-    const { adapter, renderNoticeCard, turnBody } = createAdapter();
+    const { adapter, renderNoticeCard, turnBody } = createBasicAdapter();
     const noticeMessage: ChatMessage = {
       id: 'assistant-notice-persisted-1',
       role: 'assistant',
@@ -139,7 +139,7 @@ describe('AssistantShellViewHostAdapter', () => {
   });
 
   it('renders persisted assistant messages through the shared body and footer helpers', async () => {
-    const { adapter, markdownService, turnBody } = createAdapter();
+    const { adapter, markdownService, turnBody } = createBasicAdapter();
     const message: ChatMessage = {
       id: 'assistant-persisted-1',
       role: 'assistant',
@@ -160,7 +160,7 @@ describe('AssistantShellViewHostAdapter', () => {
   });
 
   it('keeps a persisted failed tool card in the error state after a reload', async () => {
-    const { adapter } = createAdapter();
+    const { adapter } = createBasicAdapter();
     const message: ChatMessage = {
       id: 'assistant-tool-error',
       role: 'assistant',
@@ -176,7 +176,7 @@ describe('AssistantShellViewHostAdapter', () => {
   });
 
   it('renders persisted structured output as a collapsible JSON block', async () => {
-    const { adapter, turnBody } = createAdapter();
+    const { adapter, turnBody } = createBasicAdapter();
     const message: ChatMessage = {
       id: 'assistant-structured-1',
       role: 'assistant',
@@ -200,7 +200,7 @@ describe('AssistantShellViewHostAdapter', () => {
   });
 
   it('finalizes persisted assistant footers through the shared shell renderer', () => {
-    const { adapter, scrollSpy, turnBody } = createAdapter();
+    const { adapter, scrollSpy, turnBody } = createBasicAdapter();
     const { messageEl } = adapter.createAssistantMessageElement('tab-1', true);
     const message: ChatMessage = {
       id: 'assistant-1',
@@ -224,7 +224,7 @@ describe('AssistantShellViewHostAdapter', () => {
   });
 
   it('finalizes pseudo-stream assistant footers through the shared shell renderer', () => {
-    const { adapter, turnBody } = createAdapter();
+    const { adapter, turnBody } = createBasicAdapter();
     const { messageEl } = adapter.createAssistantMessageElement('tab-1', true);
 
     adapter.finalizePseudoStreamFooter(messageEl, {
@@ -239,7 +239,7 @@ describe('AssistantShellViewHostAdapter', () => {
   });
 
   it('renders local stream errors through the shared assistant error helper', () => {
-    const { adapter, turnBody } = createAdapter();
+    const { adapter, turnBody } = createBasicAdapter();
     const { messageEl, contentEl } = adapter.createAssistantMessageElement('tab-1', true);
 
     adapter.renderStreamError({

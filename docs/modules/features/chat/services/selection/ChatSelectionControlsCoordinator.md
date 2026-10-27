@@ -32,6 +32,7 @@ The ZCode model trigger stays hidden while the initial native catalog/current mo
 - 把 Model 的 search-first controls 与 scroll list 挂到共享 `ComposerPopoverFrame` content slot，维护每实例唯一的 combobox/listbox/option id、仅在打开态写入的 active-descendant、keyboard navigation、sticky header cleanup 与 provider icon 刷新，并保留 280px 列表视口；列表渲染时通过 `host.getApp()` 把 app 传给 renderer，用于解析 models.dev / LobeHub / 本地 bundled 三类图标 URL
 - 为 configured-only option 提供本地化 badge/tooltip 文案；鼠标与 Enter 选择、上下键导航均由 renderer/interaction helper 按禁用语义处理
 - model dropdown 通过共享 `AnchoredOverlayLayoutController` 按 Chat 容器边界同步 340px 首选宽度、280px 最小宽度与 8px 安全区
+- effort 标签刷新后，若 model dropdown 已打开，立即重新同步锚点位置；右对齐 toolbar 的文字变化会移动 selector 而不改变 Chat 容器大小，不能只依赖边界 ResizeObserver，避免弹层与最右侧 thumb 被容器裁切。
 - 统一更新当前模型显示、unavailable / unconfigured class、switch-model override 写回结果、unavailable notice 文案与 effort selector 连动；trigger tooltip 明确这是当前标签的发送覆盖，不是持久化 `ConversationSessionSettings`
 - 委托 `PermissionModeSelectorCoordinator` 维护 permission selector 的 mode label、selected state 与 dropdown open/close lifecycle
 - 通过共享 escape handler 收束两个 selector 的关闭行为；Scope Escape 会关闭实际打开的卡片并把焦点还给它的 trigger，避免落回 Obsidian app root

@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "digest": "a3159f8eecee5fb057bbe9b3a4412ec27103afbe45823bb4eaa0abf87d7d0123",
+  "digest": "a1ff92bf02d8c703fdbb3e524338cb88ebb5684ceeb1b50306a1bcf2afd0b8f5",
   "recordCount": 803,
   "records": [
     {
       "kind": "ignore",
       "key": ".gitignore",
-      "sha256": "7e96a4b9bfb7e654f7c36b4eb5d7e929173a60066cdf4628990c378ea336fe5a"
+      "sha256": "e2ddf38a0d823b3083b30993f66d05c4da69a8b3152e8de63771950ea488d79b"
     },
     {
       "kind": "ignore",
@@ -16,12 +16,12 @@
     {
       "kind": "package",
       "key": "package-lock.json",
-      "sha256": "5313729717da3125fc413b56ea8a80c9e6fd47f6925d5cc616e76e1d89b0a8ea"
+      "sha256": "04cbd351260f63b97a7fab8f517994508a75a1b766314abb98a8143f66683939"
     },
     {
       "kind": "package",
       "key": "package.json",
-      "sha256": "3ea3ddaa6c3d82396e864270ab7ecc4b4712e654d4ab7c31407a6ee632de2735"
+      "sha256": "328a6f32f72d17bbc71a71d44f076034b8bedf66cbdcd11077e222552f23fde3"
     },
     {
       "kind": "src",
@@ -2256,7 +2256,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/selection/ChatSelectionControlsCoordinator.ts",
-      "sha256": "50a9dc5c0ac45e1cfe37ef8f6a7e0dfe9fca7917c47b3c6f8a81181071774dfe"
+      "sha256": "03fefd340df6522b382d879db09872a17a8f615871c83966ed9719d7b1885289"
     },
     {
       "kind": "src",
@@ -2571,7 +2571,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/ui/EffortSelector.ts",
-      "sha256": "b920b5434dd21f955d714a637dca042750c34181bb4c1e714ecfa407591a966a"
+      "sha256": "06b6627acd0db556ea21f07569d35dc8c83d2184533618d6d4aed52e6822208d"
     },
     {
       "kind": "src",
@@ -3596,7 +3596,7 @@
     {
       "kind": "src",
       "key": "src/style/components/effort-selector.css",
-      "sha256": "ea397bc78e0c90822574e2dd980a7dc3a0d60766f21895520f9db1fbf47a4eac"
+      "sha256": "17bb009be7e6c5ac77d12a163933e422dcee4c084476f12d01ca4622d906d654"
     },
     {
       "kind": "src",
@@ -4019,7 +4019,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-27T04:54:17.982Z",
-  "headShaAtGeneration": "a7b04c1427a71a92e65fe800acc341ab5e7f9993",
+  "generatedAt": "2026-10-27T06:33:44.052Z",
+  "headShaAtGeneration": "4459dd5fd639259dc0cd01219efb5841501027ba",
   "graphifyVersion": "graphify 0.9.31"
 }

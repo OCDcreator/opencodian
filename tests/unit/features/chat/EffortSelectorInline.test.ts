@@ -112,6 +112,45 @@ describe('EffortSelector inline presentation', () => {
     expect(hint?.classList.contains('is-hidden')).toBe(false);
   });
 
+  it('enables the spectrum only at the highest actual option during preview and readback', () => {
+    let current = 'medium';
+    const { selector, container } = mount(makeCallbacks({ getVariant: () => current }));
+    const slider = getSlider(container);
+    expect(slider.classList.contains('is-highest')).toBe(false);
+
+    slider.value = slider.max;
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(slider.classList.contains('is-highest')).toBe(true);
+    expect(slider.getAttribute('aria-valuetext')).toBe('High');
+
+    slider.value = '1';
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(slider.classList.contains('is-highest')).toBe(false);
+
+    current = 'high';
+    selector.updateDisplay();
+    expect(slider.classList.contains('is-highest')).toBe(true);
+    current = 'low';
+    selector.updateDisplay();
+    expect(slider.classList.contains('is-highest')).toBe(false);
+  });
+
+  it('removes the highest-option spectrum when a save fails and the real value is restored', async () => {
+    const { container } = mount(makeCallbacks({
+      onVariantChange: jest.fn(async () => { throw new Error('save rejected'); }),
+    }));
+    const slider = getSlider(container);
+    slider.value = slider.max;
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+    slider.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAsync();
+
+    expect(slider.value).toBe('1');
+    expect(slider.classList.contains('is-highest')).toBe(false);
+    expect(slider.getAttribute('aria-valuetext')).toBe('Medium');
+    expect(container.querySelector('.opencodian-effort-panel-feedback')?.textContent).not.toBe('');
+  });
+
   it('hides itself when the current model exposes no effort axis', () => {
     const { selector, container } = mount(makeCallbacks({ getVariants: () => [] }));
 

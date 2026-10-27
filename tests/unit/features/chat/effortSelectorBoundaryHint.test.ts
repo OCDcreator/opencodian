@@ -192,6 +192,9 @@ describe('EffortSelector boundary hint', () => {
     container.remove();
   });
 
+});
+
+describe('EffortSelector save and layout', () => {
   it('keeps every custom tooltip trigger outside Obsidian native tooltip ownership', () => {
     const { container } = mount(makeCallbacks({
       getBoundaryHint: () => 'Applies to next turn',

@@ -90,3 +90,5 @@ Codex 会话浏览器从结构化目录结果保留权限拒绝分类，现有 s
 2026-10-26 现场 Escape 补充：EffortSelector 暴露 handleEscape()，由宿主 Scope 在捕获阶段调用；组件继续独占 open/focus 状态，document 监听仅作独立组件回退。
 
 2026-10-27 组合模型弹层：EffortSelector 增加 inline presentation，在模型 popover 下半部用真实 backend variants 驱动的离散 slider 呈现；popover presentation 与 handleEscape/focus 语义保留。ContextRing 仅移动到 composer 外状态栏，组件 API 与 modal 触发未变。
+
+2026-10-27 思考强度胶囊样式：EffortSelector 在原生 range 外增加局部 control 容器，装饰圆点按真实 variants 的数量对齐 thumb 中心，当前圆点跟随预览和回读隐藏。header 与 aria-valuetext 继续显示完整档位名，保存、default/inherit/off 及生效边界由原有 host callbacks 决定；未改变 owner 依赖或后端配置职责。

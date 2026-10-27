@@ -161,8 +161,8 @@
 .opencodian-effort-selector--inline .opencodian-effort-panel {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 9px 8px;
+  gap: 4px;
+  padding: 12px 10px 10px;
   border-top: 1px solid var(--background-modifier-border);
   min-width: 0;
 }
@@ -177,7 +177,9 @@
 }
 
 .opencodian-effort-panel-output {
+  min-width: 0;
   color: var(--text-normal);
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   white-space: nowrap;
@@ -185,109 +187,176 @@
   text-overflow: ellipsis;
 }
 
-.opencodian-effort-slider {
+.opencodian-effort-panel-label {
+  flex-shrink: 0;
+}
+
+.opencodian-effort-control {
+  --opencodian-effort-track-size: 28px;
+  --opencodian-effort-thumb-size: 28px;
+  --opencodian-effort-track: color-mix(in srgb, var(--text-normal) 12%, var(--background-secondary));
+  --opencodian-effort-fill-start: color-mix(in srgb, var(--interactive-accent) 78%, var(--color-green, #22c55e));
+  --opencodian-effort-fill-end: color-mix(in srgb, var(--interactive-accent) 80%, var(--color-blue, #3b82f6));
+  position: relative;
+  min-width: 0;
+  isolation: isolate;
+}
+
+input[type='range'].opencodian-effort-slider {
   --opencodian-effort-progress: 0%;
-  --opencodian-effort-track-size: 6px;
-  --opencodian-effort-thumb-size: 16px;
+  --slider-thumb-y: 0px;
+  --slider-thumb-y-active: 0px;
+  --slider-thumb-width: var(--opencodian-effort-thumb-size);
+  --slider-thumb-height: var(--opencodian-effort-thumb-size);
+  --slider-thumb-width-active: var(--opencodian-effort-thumb-size);
+  --slider-thumb-height-active: var(--opencodian-effort-thumb-size);
+  --slider-thumb-opacity-active: 1;
   display: block;
   width: 100%;
   box-sizing: border-box;
-  height: 24px;
+  height: 40px;
   margin: 0;
   padding: 0;
   appearance: none;
   -webkit-appearance: none;
   border: 0;
+  border-radius: 999px;
+  box-shadow: none;
   outline: none;
   background: transparent;
   cursor: pointer;
 }
 
-.opencodian-effort-slider::-webkit-slider-runnable-track {
+input[type='range'].opencodian-effort-slider::-webkit-slider-runnable-track {
   height: var(--opencodian-effort-track-size);
   border-radius: 999px;
   background:
     linear-gradient(
       to right,
-      var(--interactive-accent) 0,
-      var(--interactive-accent) var(--opencodian-effort-progress),
-      color-mix(in srgb, var(--interactive-accent) 20%, transparent) var(--opencodian-effort-progress),
-      color-mix(in srgb, var(--interactive-accent) 20%, transparent) 100%
-    );
+      transparent var(--opencodian-effort-progress),
+      var(--opencodian-effort-track) var(--opencodian-effort-progress)
+    ),
+    linear-gradient(to right, var(--opencodian-effort-fill-start), var(--opencodian-effort-fill-end));
 }
 
-.opencodian-effort-slider::-webkit-slider-thumb {
+input[type='range'].opencodian-effort-slider::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
   width: var(--opencodian-effort-thumb-size);
   height: var(--opencodian-effort-thumb-size);
   margin-top: calc((var(--opencodian-effort-track-size) - var(--opencodian-effort-thumb-size)) / 2);
-  border: 1px solid color-mix(in srgb, var(--interactive-accent) 50%, transparent);
+  top: 0;
+  transform: none;
+  box-sizing: border-box;
+  transition: none;
+  border: 0;
   border-radius: 50%;
-  background: var(--background-primary);
-  box-shadow: 0 1px 4px color-mix(in srgb, var(--background-modifier-box-shadow) 42%, transparent);
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 18%);
 }
 
-.opencodian-effort-slider::-moz-range-track {
+input[type='range'].opencodian-effort-slider::-moz-range-track {
   height: var(--opencodian-effort-track-size);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+  background: var(--opencodian-effort-track);
 }
 
-.opencodian-effort-slider::-moz-range-progress {
+input[type='range'].opencodian-effort-slider::-moz-range-progress {
   height: var(--opencodian-effort-track-size);
   border-radius: 999px;
-  background: var(--interactive-accent);
+  background: linear-gradient(to right, var(--opencodian-effort-fill-start), var(--opencodian-effort-fill-end));
 }
 
-.opencodian-effort-slider::-moz-range-thumb {
+input[type='range'].opencodian-effort-slider::-moz-range-thumb {
   width: var(--opencodian-effort-thumb-size);
   height: var(--opencodian-effort-thumb-size);
-  border: 1px solid color-mix(in srgb, var(--interactive-accent) 50%, transparent);
+  border: 0;
   border-radius: 50%;
-  background: var(--background-primary);
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 18%);
 }
 
-.opencodian-effort-slider:focus-visible {
-  outline: 1px solid var(--interactive-accent);
+input[type='range'].opencodian-effort-slider.is-highest::-webkit-slider-runnable-track {
+  background: linear-gradient(90deg, #34d399, #22d3ee, #60a5fa, #a78bfa, #f472b6, #34d399);
+  background-size: 200% 100%;
+  animation: opencodian-effort-spectrum 5s linear infinite;
+}
+
+input[type='range'].opencodian-effort-slider.is-highest::-moz-range-progress {
+  background: linear-gradient(90deg, #34d399, #22d3ee, #60a5fa, #a78bfa, #f472b6, #34d399);
+  background-size: 200% 100%;
+  animation: opencodian-effort-spectrum 5s linear infinite;
+}
+
+@keyframes opencodian-effort-spectrum {
+  from { background-position: 0% 50%; }
+  to { background-position: 200% 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  input[type='range'].opencodian-effort-slider.is-highest::-webkit-slider-runnable-track {
+    animation: none;
+  }
+
+  input[type='range'].opencodian-effort-slider.is-highest::-moz-range-progress {
+    animation: none;
+  }
+}
+
+input[type='range'].opencodian-effort-slider:focus-visible {
+  outline: 2px solid var(--interactive-accent);
   outline-offset: 3px;
-  border-radius: 4px;
 }
 
-.opencodian-effort-slider:disabled {
+input[type='range'].opencodian-effort-slider:disabled {
   cursor: default;
   opacity: 0.6;
 }
 
 .opencodian-effort-ticks {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding-inline: 1px;
-  color: var(--text-faint);
-  font-size: 10px;
-  line-height: 1.2;
+  position: absolute;
+  inset-inline: calc(var(--opencodian-effort-thumb-size) / 2);
+  top: 50%;
+  height: 0;
+  pointer-events: none;
 }
 
 .opencodian-effort-tick {
-  flex: 1 1 0;
-  min-width: 0;
+  position: absolute;
+  left: var(--opencodian-effort-step);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text-normal) 28%, var(--opencodian-effort-track));
+  transform: translate(-50%, -50%);
   overflow: hidden;
-  text-overflow: ellipsis;
+  color: transparent;
+  font-size: 0;
   white-space: nowrap;
-  text-align: center;
-}
-
-.opencodian-effort-tick:first-child {
-  text-align: start;
-}
-
-.opencodian-effort-tick:last-child {
-  text-align: end;
 }
 
 .opencodian-effort-tick.is-active {
-  color: var(--text-muted);
+  background: rgb(255 255 255 / 55%);
+}
+
+.opencodian-effort-tick.is-selected {
+  visibility: hidden;
+}
+
+input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks {
+  opacity: 0.6;
+}
+
+@media (forced-colors: active) {
+  input[type='range'].opencodian-effort-slider {
+    appearance: auto;
+    -webkit-appearance: auto;
+    accent-color: Highlight;
+  }
+
+  .opencodian-effort-ticks {
+    display: none;
+  }
 }
 
 .opencodian-effort-panel-hint,

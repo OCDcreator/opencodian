@@ -629,6 +629,11 @@ export class ChatSelectionControlsCoordinator {
       });
       effortEl.setAttribute('title', label);
     }
+    if (this.isModelDropdownOpen) {
+      // Updating the effort text can move the right-aligned trigger without
+      // resizing the chat boundary observed by the layout controller.
+      this.modelDropdownLayoutController?.sync();
+    }
   }
 
   /**

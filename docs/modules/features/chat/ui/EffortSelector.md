@@ -58,4 +58,6 @@ OpenCode 模式下，variants 来自当前 provider model catalog 的 `models[mo
 - `getDisplayLabel()` 供组合 trigger 读取当前 effort 标签；模型无 variants 或无 model 时返回空字符串，并给容器加 `is-hidden`。
 - 新增可选 `onDisplayChange`，在 `updateDisplay()` 完成后通知 embedding trigger 刷新「模型 · effort」文案；该回调不得反向调用 `updateDisplay()`，避免递归。
 
-滑块视觉翻译自 shadcn 官方 Slider（registry `ui/slider.tsx`）：轨道使用 primary 20%，填充使用 primary，Thumb 使用 primary 50% 边框、background 与阴影；WebKit / Firefox 伪元素分别实现，不使用第三方运行时依赖。真实 variant 数量与保存语义不因视觉映射改变。
+滑块采用 Codex / ZCode 截图中的胶囊式结构，并参考 Radix Slider 的 track / range / thumb 分层：28px 粗轨道、主题色填充、白色圆形 thumb、轨道内离散圆点。`opencodian-effort-control` 包含原生 range input 和不接收指针事件的装饰刻度层；刻度按真实选项数量等分，左右缩进半个 thumb，保证圆点与原生 thumb 的档位中心对齐。当前圆点隐藏在 thumb 下，input 预览和回读同时更新 `is-active` / `is-selected`。完整选项名仍由 header 与 `aria-valuetext` 提供，不把装饰圆点变成第二组可聚焦控件。WebKit / Firefox 分别实现；不引入第三方运行时依赖，不改变真实 variant 数量、保存或默认语义。
+
+最高真实档位（选项数大于 1 且位于最后一步）在 input 预览与回读时同步 `is-highest`，触发流动彩色轨道；退出最高档或保存失败回读后移除。`prefers-reduced-motion` 保留静态彩色轨道。组件覆盖宿主 slider thumb 的 top 和 active 尺寸变量，保持 thumb 圆心与轨道垂直中心一致。
