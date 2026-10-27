@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "426d0b530175ec19aac924f2df9fcf119233b5fc63249766c776d596428e038e",
+  "digest": "ec71740ce797a8feb006fff5eacbad3163261e4f7795a20a41e46890d580cb3c",
   "recordCount": 803,
   "records": [
     {
@@ -3401,7 +3401,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsSectionCoordinator.ts",
-      "sha256": "328ecf5494399a625d7cbdebaa1fbd028d734b672200c7689583d8dfddcc5618"
+      "sha256": "d1a86f3454838e9c5c427ff7776790a6cdc3c60da97a8b4e1aadeb2e38fdc051"
     },
     {
       "kind": "src",
@@ -4019,7 +4019,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-27T09:28:08.035Z",
-  "headShaAtGeneration": "3c8f91e909f716590bdb5ab8c43c9a2a368dbf72",
+  "generatedAt": "2026-10-27T10:44:38.258Z",
+  "headShaAtGeneration": "35c4680b48a2a7ef995bc3be105574cbc21f4a1a",
   "graphifyVersion": "graphify 0.9.31"
 }

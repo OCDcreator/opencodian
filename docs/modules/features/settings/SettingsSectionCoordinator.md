@@ -12,7 +12,7 @@
 - 在 `beginDisplay()` / `finishDisplay()` 之间管理 settings panel 的顶层重建流程
 - 通过 `createSectionHeading()` 记录顶层 section heading，并在完成渲染后按需生成 quick-nav
 - 在 quick-nav 点击跳转或外部 `scrollToSectionByTitle()` 导航时，根据真实滚动容器与当前 sticky quick-nav 可见高度计算目标 `scrollTop`，避免按钮换行后标题被滚过头；外部导航还可以按文本命中未注册进 quick-nav 的二级 block heading
-- 支持调用方显式提供 settings 滚动容器；标准设置页仍自动发现 Obsidian 的 vertical-tab 容器，editor-area settings view 则锁定自己的 `contentEl`
+- 支持调用方显式提供 settings 滚动容器；未显式指定时，先使用所属窗口的 computed style 判断插件根容器是否为 `overflow-y: auto/scroll` 的 viewport，再回退到缓存或 Obsidian 的 vertical-tab 容器，避免声明式/独立设置窗口里的内层滚动被误记为外层的 0；editor-area settings view 仍锁定自己的 `contentEl`
 - 在 classic quick-nav 上管理 body-level tooltip overlay，让提示可以越过 settings 滚动容器而不被裁切。quick-nav tooltip 使用独立的 CSS 类命名空间（`.opencodian-settings-quick-nav-tooltip-*`），z-index 为 2260，低于 settings popover (2280) 和 settings tooltip (2300)，保持在设置页 overlay 层级梯度的最底层；定位会根据按钮上下空间选择 top/bottom，避免提示框压住鼠标或被 quick-nav 按钮遮住
 - 维护 `prepareRestoreScrollOnNextOpen()` / `prepareScrollToSectionOnNextOpen()` 的打开意图
 - 在已显示的设置页被整页重建前捕获当前 `scrollTop`，再在 post-render 阶段绑定 scroll persistence，并用 `MutationObserver` + retry timers 恢复滚动位置

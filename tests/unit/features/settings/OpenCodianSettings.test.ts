@@ -135,6 +135,36 @@ function registerScrollRestoreSuiteHooks() {
 describe('SettingsSectionCoordinator scroll restore logging', () => {
   registerScrollRestoreSuiteHooks();
 
+  it.each(['auto', 'scroll'])('preserves the inner settings viewport across refresh when overflow-y is %s', (overflowY) => {
+    const { coordinator, containerEl, state } = createCoordinator();
+    const hostEl = document.createElement('div');
+    hostEl.className = 'vertical-tab-content';
+    containerEl.style.overflowY = overflowY;
+    const viewport = installClampedScrollState(containerEl, { clientHeight: 200, scrollHeight: 900 });
+    installClampedScrollState(hostEl, { clientHeight: 600, scrollHeight: 700 });
+    hostEl.appendChild(containerEl);
+    document.body.appendChild(hostEl);
+
+    coordinator.beginDisplay('Settings');
+    coordinator.finishDisplay();
+    jest.advanceTimersByTime(1);
+    containerEl.scrollTop = 250;
+    hostEl.scrollTop = 20;
+    containerEl.dispatchEvent(new Event('scroll'));
+
+    expect(state.settingsPanelScrollTop).toBe(250);
+
+    coordinator.beginDisplay('Settings');
+    // Chromium clamps the viewport's scroll position while its content is empty.
+    viewport.setScrollHeight(200);
+    viewport.setScrollHeight(900);
+    coordinator.finishDisplay();
+    jest.advanceTimersByTime(1);
+
+    expect(containerEl.scrollTop).toBe(250);
+    expect(hostEl.scrollTop).toBe(20);
+  });
+
   it('captures the current settings scroll before rebuilding the panel', () => {
     const { coordinator, containerEl, state } = createCoordinator();
     const scrollContainer = document.createElement('div');

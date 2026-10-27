@@ -735,6 +735,14 @@ export class SettingsSectionCoordinator {
       return explicitScrollContainer;
     }
 
+    // Declarative Settings can put the scroll viewport on our own root, inside
+    // Obsidian's vertical-tab host. Resolve its style in the owning window.
+    const overflowY = this.containerEl.ownerDocument.defaultView?.getComputedStyle(this.containerEl).overflowY;
+    if (overflowY === 'auto' || overflowY === 'scroll') {
+      this.settingsScrollContainerEl = this.containerEl;
+      return this.containerEl;
+    }
+
     if (
       this.settingsScrollContainerEl
       && this.settingsScrollContainerEl.isConnected
