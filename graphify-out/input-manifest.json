@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "a1ff92bf02d8c703fdbb3e524338cb88ebb5684ceeb1b50306a1bcf2afd0b8f5",
+  "digest": "c81108cd153b47cdc3b246e492c63f1a1f748eb76eb125ad29a2b354ebed7f1f",
   "recordCount": 803,
   "records": [
     {
@@ -3571,7 +3571,7 @@
     {
       "kind": "src",
       "key": "src/style/components/agent-switcher.css",
-      "sha256": "4ad53736fb003d08c2f1398d6bd89b5eff1f83c7b68a82cd79013d9a77901468"
+      "sha256": "ef61053fc91e7f916f7d48bea9d953e5354f82cc6bfefd0955e06128d4623ba9"
     },
     {
       "kind": "src",
@@ -4019,7 +4019,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-27T06:33:44.052Z",
+  "generatedAt": "2026-10-27T06:32:40.761Z",
   "headShaAtGeneration": "4459dd5fd639259dc0cd01219efb5841501027ba",
   "graphifyVersion": "graphify 0.9.31"
 }
