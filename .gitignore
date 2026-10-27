@@ -86,6 +86,7 @@ automation/runtime/
 
 # Local debug artifacts
 .obsidian-debug/
+.impeccable/
 .visual-evidence/
 tmp/
 /{outputDir}/
