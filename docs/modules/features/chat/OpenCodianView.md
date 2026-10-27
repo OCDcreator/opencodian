@@ -896,3 +896,9 @@ DSH effort selector 的 getVariant 读取显式会话覆盖，未覆盖时选中
 
 
 2026-10-26 现场目录时序补充：selection host 的 refreshHistoricalModelDisplayNames 仅向当前 view 的 AssistantShellViewHostAdapter 转发 chatContainerEl；不增加目录、消息或选中模型状态。
+
+## 2026-10-27 Composer 单轨与 effort 内联
+
+`createComposerInputShellCoordinatorHost()` 仍只提供 seam，不再由 shell 直接调用 `mountEffortSelector`：模型选择器在 footer 的模型 slot 中挂载，`ChatSelectionControlsCoordinator` 通过 selection host 的 `mountEffortSelector(container)` 把 effort 内联到模型弹层。两个 host 的 effort 构造收束到私有 `mountChatEffortSelector()`，共享同一套 variant / inherit / off / 后端 override 回调，避免两份逻辑漂移。
+
+selection host 新增 `getEffortDisplayLabel()`，组合 trigger 只读取当前 label；effort 变更后 EffortSelector 的 `onDisplayChange` 会调用 coordinator 的 `updateModelSelectorEffortDisplay()`，只刷新标签，不触发目录或 dropdown 重建。`mountSelectionControls` 的 `modelContainer` 由 shell 传入并原样转交。模型目录、会话归属、DSH/Pi/ZCode/Codex/Claude 持久化分支与多标签 streaming 所有权均未改。

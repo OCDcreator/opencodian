@@ -1,4 +1,5 @@
 # Chinese Locale
+> 2026-10-27：新增 `chat.effort.disabledShort`（关闭），供窄 Composer 的 effort 短标签使用；完整 `chat.effort.disabled` 仍在模型弹层展示。
 `modifiedFiles.statsUnavailable` 与 `modifiedFiles.statusUnavailable` 用于只有工具文件提示、没有权威原生快照统计和变更状态的记录。
 > 2026-09-30（B2 codex-stream-rendering）：新增 `chat.toolCard.image.*`（`statusGenerating` / `statusCompleted` / `statusFailed` / `revisedPrompt`），供 ToolCallRenderer 渲染的流式图像生成工具卡片使用；与 en 一一对应。
 > 2026-09-30（B4 codex plugins/usage）：新增 `settings.codex.tab.plugins` 与 `settings.codex.plugins.*` 组（浏览器标题/操作、市场+已安装分组、安装/卸载/对账通知、安装策略徽标、市场加载失败文案）以及 `settings.codex.accountSurface.usage.empty`（全 null 使用量的诚实空态）；与 en 一一对应。
@@ -686,3 +687,7 @@ Includes the localized Pi extension-command completion status used only after a 
 ## 2026-10-26 DSH 界面文案
 
 新增独立消息输入名称、effort 保存失败、DSH 默认继承与下一轮发送说明，以及 MCP 服务器声明/未保存草稿/应用反馈；保存和应用计数不表示在线状态回读。
+
+## 2026-10-27 单轨 Composer 菜单文案
+
+新增 `chat.composerMenu.*`：附件菜单（添加附件、文件、图片、生成图片、附加网页标签页）、Agent/运行设置入口与标题、底部状态栏真实词数/字符数。原有上下文、图片与图片生成文案继续用于 tooltip。

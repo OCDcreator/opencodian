@@ -64,6 +64,13 @@ export interface ChatSelectionControlsCoordinatorHost extends ModelSelectionRunt
   getApp(): App;
   resolveProviderIconUrl(providerId: string): Promise<string | null>;
   updateEffortSelectorDisplay(): void;
+  /**
+   * Mounts the effort control inside the model popover (inline presentation).
+   * Absent leaves the combined trigger as model-only.
+   */
+  mountEffortSelector?(container: HTMLElement): void;
+  /** Current effort label used by the combined "model · effort" trigger. */
+  getEffortDisplayLabel?(): string;
   refreshHistoricalModelDisplayNames?(): void;
   restoreComposerInputFocus(): void;
   /** OpenCode permission template mode (yolo/normal/plan). */
@@ -435,7 +442,12 @@ export class ChatSelectionControlsCoordinator {
     this.codexRuntimeDefaultsBadge = new CodexRuntimeDefaultsBadgeCoordinator();
   }
 
-  build(toolbarEl: HTMLElement, options?: { showModels?: boolean; showPermissions?: boolean }): void {
+  build(toolbarEl: HTMLElement, options?: {
+    showModels?: boolean;
+    showPermissions?: boolean;
+    /** When set, the model selector mounts here instead of inside `toolbarEl`. */
+    modelContainer?: HTMLElement;
+  }): void {
     this.destroy();
     this.toolbarEl = toolbarEl;
     this.registerEscapeHandler();
@@ -447,7 +459,7 @@ export class ChatSelectionControlsCoordinator {
       this.buildBackendPermissionSelector(toolbarEl.createDiv({ cls: 'opencodian-permission-selector' }));
     }
     if (showModels) {
-      this.mountModelSelector(toolbarEl.createDiv({ cls: 'opencodian-model-selector' }));
+      this.mountModelSelector((options?.modelContainer ?? toolbarEl).createDiv({ cls: 'opencodian-model-selector' }));
     }
     // Sandbox badge: self-gated by active backend.
     // syncSandboxBadge() reads the current backend from the plugin instance
@@ -579,6 +591,7 @@ export class ChatSelectionControlsCoordinator {
     if (textEl) {
       textEl.textContent = displayState.text;
     }
+    this.updateModelSelectorEffortDisplay();
 
     this.modelSelectorTrigger.setAttribute(
       'title',
@@ -586,8 +599,36 @@ export class ChatSelectionControlsCoordinator {
         ? t('chat.modelSelector.streamingDisabledTitle')
         : t('chat.modelSelector.currentTabOverrideTitle', { model: displayState.title }),
     );
-    void this.updateModelSelectorIcon(current?.provider ?? null, displayState.iconLabel);
+    void this.updateModelSelectorIcon(current, displayState.iconLabel);
     this.host.updateEffortSelectorDisplay();
+  }
+
+  /**
+   * Refreshes only the effort portion of the combined trigger. Effort changes
+   * call this through the host, so it must not re-enter
+   * `updateEffortSelectorDisplay()` (that would rebuild the inline control
+   * that just reported the change).
+   */
+  updateModelSelectorEffortDisplay(): void {
+    if (!this.modelSelectorTrigger) {
+      return;
+    }
+
+    const label = this.host.getEffortDisplayLabel?.() ?? '';
+    const separatorEl = this.modelSelectorTrigger.querySelector<HTMLElement>('.opencodian-model-trigger-separator');
+    const effortEl = this.modelSelectorTrigger.querySelector<HTMLElement>('.opencodian-model-trigger-effort');
+    const hasEffort = label.trim().length > 0;
+    separatorEl?.toggleClass('is-hidden', !hasEffort);
+    effortEl?.toggleClass('is-hidden', !hasEffort);
+    if (effortEl) {
+      effortEl.empty();
+      effortEl.createSpan({ cls: 'opencodian-model-trigger-effort-full', text: label });
+      effortEl.createSpan({
+        cls: 'opencodian-model-trigger-effort-short',
+        text: label === t('chat.effort.disabled') ? t('chat.effort.disabledShort') : '',
+      });
+      effortEl.setAttribute('title', label);
+    }
   }
 
   /**
@@ -933,9 +974,12 @@ export class ChatSelectionControlsCoordinator {
     });
     const triggerContent = this.modelSelectorTrigger.createDiv({ cls: 'opencodian-model-trigger-content' });
 
-    const iconWrapper = triggerContent.createSpan({ cls: 'opencodian-model-trigger-icon' });
-    setIcon(iconWrapper, 'bot');
+    triggerContent.createSpan({ cls: 'opencodian-model-trigger-icon' });
     triggerContent.createSpan({ cls: 'opencodian-model-trigger-text' });
+    triggerContent.createSpan({ cls: 'opencodian-model-trigger-separator is-hidden', text: '·' });
+    triggerContent.createSpan({ cls: 'opencodian-model-trigger-effort is-hidden' });
+    const chevronWrapper = triggerContent.createSpan({ cls: 'opencodian-model-trigger-chevron' });
+    setIcon(chevronWrapper, 'chevron-down');
 
     this.modelSelectorDropdown = containerEl.createDiv({
       cls: 'opencodian-model-dropdown',
@@ -1031,6 +1075,13 @@ export class ChatSelectionControlsCoordinator {
         'aria-label': t('chat.composerPopover.modelTitle'),
       },
     });
+
+    // Combined model/effort card: the existing provider/model picker stays on
+    // top; the real backend effort control mounts underneath it in the same
+    // popover, so there is no second trigger or duplicated effort menu.
+    this.host.mountEffortSelector?.(
+      this.modelPopoverFrame.contentEl.createDiv({ cls: 'opencodian-model-effort-slot' }),
+    );
 
     this.renderModelList();
   }
@@ -1369,55 +1420,59 @@ export class ChatSelectionControlsCoordinator {
     };
   }
 
-  private async updateModelSelectorIcon(providerId: string | null, iconLabel: string): Promise<void> {
-    if (!this.modelSelectorTrigger) {
-      return;
-    }
+  private getModelIconProviderCandidates(selection: ModelSelectorSelection | null): string[] {
+    if (!selection) return [];
+    const model = selection.model.toLowerCase();
+    const patterns: Array<[RegExp, string]> = [
+      [/deepseek/, 'deepseek'],
+      [/kimi|moonshot/, 'moonshot'],
+      [/claude/, 'anthropic'],
+      [/gpt|openai/, 'openai'],
+      [/glm|zhipu/, 'zhipu'],
+      [/gemini/, 'google'],
+      [/qwen/, 'qwen'],
+      [/minimax/, 'minimax'],
+      [/grok/, 'xai'],
+      [/mistral/, 'mistral'],
+      [/llama/, 'meta'],
+      [/mimo/, 'xiaomi'],
+    ];
+    const modelProvider = patterns.find(([pattern]) => pattern.test(model))?.[1];
+    return [...new Set([modelProvider, selection.provider].filter((value): value is string => Boolean(value)))];
+  }
 
-    const iconWrapper = this.modelSelectorTrigger.querySelector('.opencodian-model-trigger-icon');
-    if (!iconWrapper) {
-      return;
-    }
+  private async updateModelSelectorIcon(selection: ModelSelectorSelection | null, iconLabel: string): Promise<void> {
+    const iconWrapper = this.modelSelectorTrigger?.querySelector('.opencodian-model-trigger-icon');
+    if (!iconWrapper) return;
 
     const requestId = ++this.modelSelectorIconRequestId;
-
-    if (!providerId) {
-      iconWrapper.empty();
-      setIcon(iconWrapper as HTMLElement, 'bot');
-      this.currentModelTriggerIconUrl = null;
-      return;
+    const candidates = this.getModelIconProviderCandidates(selection);
+    let iconUrl: string | null = null;
+    for (const providerId of candidates) {
+      iconUrl = await this.host.resolveProviderIconUrl(providerId);
+      if (iconUrl) break;
     }
+    if (requestId !== this.modelSelectorIconRequestId) return;
 
-    const iconUrl = await this.host.resolveProviderIconUrl(providerId);
-    if (requestId !== this.modelSelectorIconRequestId) {
-      return;
-    }
-
-    if (iconUrl !== this.currentModelTriggerIconUrl) {
-      iconWrapper.empty();
-
-      if (iconUrl) {
-        const img = document.createElement('img');
-        img.classList.add('opencodian-provider-icon-image');
-        img.src = iconUrl;
-        img.alt = iconLabel;
-        img.title = iconLabel;
-        iconWrapper.appendChild(img);
-      } else {
-        setIcon(iconWrapper as HTMLElement, 'bot');
-      }
-
-      this.currentModelTriggerIconUrl = iconUrl;
-      return;
-    }
-
-    if (iconUrl) {
+    if (iconUrl === this.currentModelTriggerIconUrl) {
       const existingImg = iconWrapper.querySelector('img');
       if (existingImg) {
         existingImg.alt = iconLabel;
         existingImg.title = iconLabel;
       }
+      return;
     }
+
+    iconWrapper.empty();
+    this.currentModelTriggerIconUrl = iconUrl;
+    if (!iconUrl) return;
+
+    const img = document.createElement('img');
+    img.classList.add('opencodian-provider-icon-image');
+    img.src = iconUrl;
+    img.alt = iconLabel;
+    img.title = iconLabel;
+    iconWrapper.appendChild(img);
   }
 
   /**

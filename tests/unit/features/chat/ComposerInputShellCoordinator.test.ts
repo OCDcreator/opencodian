@@ -152,12 +152,15 @@ function createFixture(options: {
     getSlashCommandSkillMode: jest.fn(() => 'direct'),
     addChosenFileContextToActiveTab: jest.fn().mockResolvedValue(undefined),
     registerEscapeHandler: jest.fn(),
-    mountSelectionControls: jest.fn((toolbar) => {
+    mountSelectionControls: jest.fn((toolbar, selectionOptions) => {
       if (!options.renderHostControls) {
         return;
       }
       toolbar.createDiv({ cls: 'opencodian-permission-selector', text: 'permission' });
-      toolbar.createDiv({ cls: 'opencodian-model-selector', text: 'model' });
+      (selectionOptions.modelContainer ?? toolbar).createDiv({
+        cls: 'opencodian-model-selector',
+        text: 'model',
+      });
     }),
     mountContextUsageIndicator: jest.fn((container) => {
       if (!options.renderHostControls) {
@@ -311,6 +314,7 @@ function restoreCoordinatorDomMocks(originalResizeObserver: typeof ResizeObserve
   }
 }
 
+// eslint-disable-next-line max-lines-per-function -- shared DOM fixture and host mocks intentionally stay together.
 describe('ComposerInputShellCoordinator', () => {
   const originalResizeObserver = globalThis.ResizeObserver;
 
@@ -337,8 +341,18 @@ describe('ComposerInputShellCoordinator', () => {
     expect(fixture.host.attachSessionTodo).toHaveBeenCalledWith(fixture.container);
     expect(fixture.host.attachQuestionDock).toHaveBeenCalledWith(fixture.container);
     expect(fixture.host.mountSelectionControls).toHaveBeenCalledTimes(1);
+    expect(fixture.host.mountSelectionControls).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      expect.objectContaining({
+        showModels: true,
+        showPermissions: true,
+        modelContainer: expect.any(HTMLElement),
+      }),
+    );
     expect(fixture.host.mountContextUsageIndicator).toHaveBeenCalledTimes(1);
-    expect(fixture.host.mountEffortSelector).toHaveBeenCalledTimes(1);
+    // Effort now mounts inside the combined model popover, owned by the
+    // selection-coordinate host rather than the composer shell.
+    expect(fixture.host.mountEffortSelector).not.toHaveBeenCalled();
     expect(fixture.host.submitMessage).toHaveBeenCalledWith({
       kind: 'prompt',
       content: 'Hello coordinator',
@@ -385,10 +399,11 @@ describe('ComposerInputShellCoordinator', () => {
   it('registers the Agent card Escape handler through the view scope seam', () => {
     const fixture = createFixture();
 
-    expect(fixture.host.registerEscapeHandler).toHaveBeenCalledTimes(1);
+    // Agent menu escape + ChatAgentSelectionCoordinator escape.
+    expect(fixture.host.registerEscapeHandler).toHaveBeenCalledTimes(2);
   });
 
-  it('organizes the composer into a layered input-row and runtime-dock', () => {
+  it('organizes the composer into one footer plus an external status bar', () => {
     const fixture = createFixture({
       hasImageInputCapability: true,
       renderHostControls: true,
@@ -401,32 +416,105 @@ describe('ComposerInputShellCoordinator', () => {
 
     const inputRow = fixture.container.querySelector<HTMLElement>('.opencodian-composer-input-row');
     const contextActions = fixture.container.querySelector<HTMLElement>('.opencodian-composer-context-actions');
-    const runtimeDock = fixture.container.querySelector<HTMLElement>('.opencodian-composer-runtime-dock');
     const submitControls = fixture.container.querySelector<HTMLElement>('.opencodian-composer-submit-controls');
     const actionZone = fixture.container.querySelector<HTMLElement>('.opencodian-composer-action-zone');
-    const runtimeRail = fixture.container.querySelector<HTMLElement>('.opencodian-composer-runtime-rail');
+    const statusBar = fixture.container.querySelector<HTMLElement>('.opencodian-composer-status-bar');
+    const shell = fixture.container.querySelector<HTMLElement>('.opencodian-composer-shell');
+    const attachmentMenu = fixture.container.querySelector<HTMLElement>('.opencodian-composer-attachment-menu');
+    const agentMenu = fixture.container.querySelector<HTMLElement>('.opencodian-composer-agent-menu');
 
     expect(inputRow).toBeTruthy();
-    expect(runtimeDock).toBeTruthy();
+    expect(inputRow?.classList.contains('opencodian-composer-footer')).toBe(true);
     expect(actionZone).toBe(inputRow);
-    expect(runtimeRail).toBe(runtimeDock);
+    expect(fixture.container.querySelector('.opencodian-composer-runtime-dock')).toBeNull();
     expect(contextActions?.querySelector('.opencodian-composer-add-btn')).not.toBeNull();
     expect(contextActions?.querySelector('.opencodian-composer-image-btn')).not.toBeNull();
-    expect(contextActions?.querySelector('.opencodian-input-capability-hint')).not.toBeNull();
+    expect(contextActions?.querySelector('.opencodian-composer-model-slot')).not.toBeNull();
+    expect(attachmentMenu?.querySelector('.opencodian-composer-add-btn')).not.toBeNull();
+    expect(agentMenu?.querySelector('.opencodian-input-capability-hint')).not.toBeNull();
     expect(inputRow?.contains(contextActions)).toBe(true);
     expect(inputRow?.contains(submitControls)).toBe(true);
-    expect(inputRow?.querySelector('.opencodian-agent-selector')).toBeNull();
-    expect(inputRow?.querySelector('.opencodian-model-selector')).toBeNull();
-    expect(inputRow?.querySelector('.opencodian-permission-selector')).toBeNull();
-    expect(runtimeDock?.querySelector('.opencodian-agent-selector')).not.toBeNull();
-    expect(runtimeDock?.querySelector('.opencodian-input-toolbar')).not.toBeNull();
-    expect(runtimeDock?.querySelector('.opencodian-model-selector')).not.toBeNull();
-    expect(runtimeDock?.querySelector('.opencodian-permission-selector')).not.toBeNull();
-    expect(runtimeDock?.querySelector('.opencodian-context-usage-slot')).toBeNull();
-    expect(runtimeDock?.querySelector('.opencodian-send-btn')).toBeNull();
-    expect(submitControls?.querySelector('.opencodian-context-usage-slot')).not.toBeNull();
-    expect(submitControls?.querySelector('.opencodian-context-usage-ring')).not.toBeNull();
+    const permissionSlot = contextActions?.querySelector(':scope > .opencodian-composer-permission-slot');
+    const agentSlot = contextActions?.querySelector(':scope > .opencodian-composer-agent-slot');
+    expect(permissionSlot?.querySelector('.opencodian-permission-selector')).not.toBeNull();
+    expect(agentSlot?.querySelector('.opencodian-agent-selector')).not.toBeNull();
+    expect(permissionSlot?.nextElementSibling).toBe(agentSlot);
+    expect(agentMenu?.querySelector('.opencodian-agent-selector')).toBeNull();
+    expect(agentMenu?.querySelector('.opencodian-permission-selector')).toBeNull();
+    expect(agentMenu?.querySelector('.opencodian-model-selector')).toBeNull();
+    expect(contextActions?.querySelector('.opencodian-model-selector')).not.toBeNull();
     expect(submitControls?.querySelector('.opencodian-send-btn')).not.toBeNull();
+    expect(submitControls?.querySelector('.opencodian-context-usage-slot')).toBeNull();
+    expect(statusBar).toBeTruthy();
+    expect(shell?.contains(statusBar)).toBe(false);
+    expect(statusBar?.querySelector('.opencodian-context-usage-slot')).not.toBeNull();
+    expect(statusBar?.querySelector('.opencodian-context-usage-ring')).not.toBeNull();
+    expect(statusBar?.querySelector('.opencodian-composer-counts')).not.toBeNull();
+  });
+
+  it('collects attachment actions in the + menu and closes it after an action', () => {
+    const fixture = createFixture({
+      hasImageInputCapability: true,
+      composerCapabilityHint: {
+        text: t('chat.input.capabilityHint.jsonLabel'),
+        tooltip: t('chat.input.capabilityHint.jsonTooltip'),
+        insertText: '/json ',
+      },
+    });
+    const menu = fixture.container.querySelector<HTMLElement>('.opencodian-composer-attachment-menu');
+    const trigger = fixture.container.querySelector<HTMLButtonElement>('.opencodian-composer-attachment-trigger');
+
+    expect(trigger?.getAttribute('aria-expanded')).toBe('false');
+    trigger?.click();
+    expect(menu?.classList.contains('is-open')).toBe(true);
+    expect(trigger?.getAttribute('aria-expanded')).toBe('true');
+    expect(menu?.querySelector('.opencodian-composer-add-btn')).not.toBeNull();
+    expect(menu?.querySelector('.opencodian-composer-image-btn')).not.toBeNull();
+
+    fixture.addContextBtn.click();
+    expect(fixture.host.addChosenFileContextToActiveTab).toHaveBeenCalledTimes(1);
+    expect(menu?.classList.contains('is-open')).toBe(false);
+  });
+
+  it('keeps the capability hint in the auxiliary popover and closes it with Escape', () => {
+    const fixture = createFixture({
+      renderHostControls: true,
+      composerCapabilityHint: {
+        text: t('chat.input.capabilityHint.jsonLabel'),
+        tooltip: t('chat.input.capabilityHint.jsonTooltip'),
+        insertText: '/json ',
+      },
+    });
+    const menu = fixture.container.querySelector<HTMLElement>('.opencodian-composer-agent-menu');
+    const trigger = fixture.container.querySelector<HTMLButtonElement>('.opencodian-agent-settings-trigger');
+    const escapeHandler = fixture.host.registerEscapeHandler.mock.calls.at(-1)?.[0];
+
+    trigger?.click();
+    expect(menu?.classList.contains('is-open')).toBe(true);
+    expect(trigger?.getAttribute('aria-expanded')).toBe('true');
+    expect(menu?.querySelector('.opencodian-input-capability-hint')).not.toBeNull();
+    expect(menu?.querySelector('.opencodian-agent-selector')).toBeNull();
+    expect(menu?.querySelector('.opencodian-permission-selector')).toBeNull();
+
+    expect(escapeHandler?.()).toBe(true);
+    expect(menu?.classList.contains('is-open')).toBe(false);
+    expect(trigger?.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('reports real word and character counts in the status bar and clears them with the draft', () => {
+    const fixture = createFixture();
+    const counts = fixture.container.querySelector<HTMLElement>('.opencodian-composer-counts');
+
+    expect(counts?.classList.contains('is-hidden')).toBe(true);
+
+    fixture.textarea.value = 'hello world';
+    fixture.textarea.dispatchEvent(new Event('input'));
+    expect(counts?.classList.contains('is-hidden')).toBe(false);
+    expect(counts?.textContent).toBe(t('chat.composerMenu.inputCounts', { words: 2, characters: 11 }));
+
+    fixture.textarea.value = '';
+    fixture.textarea.dispatchEvent(new Event('input'));
+    expect(counts?.classList.contains('is-hidden')).toBe(true);
   });
 
   it('keeps the suggestion bar out of the composer footer and mounts it under the assistant turn body', () => {
@@ -477,7 +565,7 @@ describe('ComposerInputShellCoordinator', () => {
     ).toBe(t('chat.input.capabilityHint.jsonLabel'));
     expect(fixture.host.mountSelectionControls).toHaveBeenCalledTimes(2);
     expect(fixture.host.mountContextUsageIndicator).toHaveBeenCalledTimes(2);
-    expect(fixture.host.mountEffortSelector).toHaveBeenCalledTimes(2);
+    expect(fixture.host.mountEffortSelector).not.toHaveBeenCalled();
   });
 
   it('hides the agent selector dropdown for the Claude shape while keeping the @agent mention seam wired', () => {
@@ -505,35 +593,37 @@ describe('ComposerInputShellCoordinator', () => {
     fixture.coordinator.refreshToolbarControls();
     fixture.coordinator.refreshToolbarControls();
 
-    const submitControls = fixture.container.querySelector<HTMLElement>('.opencodian-composer-submit-controls');
-    expect(submitControls?.querySelectorAll('.opencodian-context-usage-slot')).toHaveLength(1);
-    expect(submitControls?.querySelectorAll('.opencodian-context-usage-ring')).toHaveLength(1);
+    const statusBar = fixture.container.querySelector<HTMLElement>('.opencodian-composer-status-bar');
+    expect(statusBar?.querySelectorAll('.opencodian-context-usage-slot')).toHaveLength(1);
+    expect(statusBar?.querySelectorAll('.opencodian-context-usage-ring')).toHaveLength(1);
     expect(fixture.host.mountContextUsageIndicator).toHaveBeenCalledTimes(3);
   });
 
-  it('mounts selection, context usage, and effort controls into the runtime-dock and submit cluster', () => {
+  it('mounts permission and agent into their own footer slots with the model to their right', () => {
     const fixture = createFixture({ renderHostControls: true });
 
     const toolbar = fixture.container.querySelector<HTMLElement>('.opencodian-input-toolbar');
-    const runtimeDock = fixture.container.querySelector<HTMLElement>('.opencodian-composer-runtime-dock');
-    const submitControls = fixture.container.querySelector<HTMLElement>('.opencodian-composer-submit-controls');
+    const permissionSlot = fixture.container.querySelector<HTMLElement>('.opencodian-composer-permission-slot');
+    const agentSlot = fixture.container.querySelector<HTMLElement>('.opencodian-composer-agent-slot');
+    const modelSlot = fixture.container.querySelector<HTMLElement>('.opencodian-composer-model-slot');
+    const statusBar = fixture.container.querySelector<HTMLElement>('.opencodian-composer-status-bar');
     const contextUsageSlot = fixture.container.querySelector('.opencodian-context-usage-slot');
     const selectionControlsTarget = fixture.host.mountSelectionControls.mock.calls[0]?.[0];
-    const effortTarget = fixture.host.mountEffortSelector.mock.calls[0]?.[0];
+    const modelContainerTarget = fixture.host.mountSelectionControls.mock.calls[0]?.[1]?.modelContainer;
     const permissionSelector = fixture.container.querySelector('.opencodian-permission-selector');
     const modelSelector = fixture.container.querySelector('.opencodian-model-selector');
-    const effortControl = fixture.container.querySelector('.opencodian-effort-control');
 
     expect(toolbar).toBeTruthy();
-    expect(runtimeDock?.contains(selectionControlsTarget ?? null)).toBe(true);
-    expect(runtimeDock?.contains(effortTarget ?? null)).toBe(true);
-    expect(runtimeDock?.contains(permissionSelector)).toBe(true);
-    expect(runtimeDock?.contains(modelSelector)).toBe(true);
-    expect(runtimeDock?.contains(effortControl)).toBe(true);
-    expect(submitControls?.contains(contextUsageSlot)).toBe(true);
+    expect(permissionSlot?.contains(selectionControlsTarget ?? null)).toBe(true);
+    expect(permissionSlot?.contains(permissionSelector)).toBe(true);
+    expect(agentSlot?.querySelector('.opencodian-agent-selector')).not.toBeNull();
+    expect(modelSlot).toBe(modelContainerTarget);
+    expect(modelSlot?.contains(modelSelector)).toBe(true);
+    expect(permissionSlot?.nextElementSibling).toBe(agentSlot);
+    expect(statusBar?.contains(contextUsageSlot)).toBe(true);
     expect(fixture.host.mountSelectionControls).toHaveBeenCalledTimes(1);
     expect(fixture.host.mountContextUsageIndicator).toHaveBeenCalledTimes(1);
-    expect(fixture.host.mountEffortSelector).toHaveBeenCalledTimes(1);
+    expect(fixture.host.mountEffortSelector).not.toHaveBeenCalled();
   });
 
 });
@@ -959,7 +1049,7 @@ describe('ComposerInputShellCoordinator — capability hint behaviors', () => {
       .toBe(t('chat.input.capabilityHint.jsonLabel'));
     expect(hintEl?.getAttribute('data-tooltip')).toBe(t('chat.input.capabilityHint.jsonTooltip'));
     expect(hintEl?.parentElement).toBe(
-      fixture.container.querySelector('.opencodian-composer-context-actions'),
+      fixture.container.querySelector('.opencodian-composer-capability-slot'),
     );
   });
 

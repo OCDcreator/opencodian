@@ -59,8 +59,6 @@ export class ChatAgentSelectionCoordinator {
     });
     const triggerContent = this.triggerEl.createDiv({ cls: 'opencodian-agent-trigger-content' });
 
-    const iconWrapper = triggerContent.createSpan({ cls: 'opencodian-agent-trigger-icon' });
-    setIcon(iconWrapper, 'at-sign');
     triggerContent.createSpan({ cls: 'opencodian-agent-trigger-text' });
     const chevronWrapper = triggerContent.createSpan({ cls: 'opencodian-agent-trigger-chevron' });
     setIcon(chevronWrapper, 'chevron-down');

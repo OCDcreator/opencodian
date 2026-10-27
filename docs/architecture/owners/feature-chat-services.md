@@ -126,3 +126,7 @@ DSH 发送跳过 OpenCode 1 专属技能目录展开，保留通用上下文和�
 
 
 2026-10-26 现场目录时序补充：selection reload 完成目录发布后通过可选 host 通知刷新历史模型名；服务不直接持有 renderer DOM 或修改历史消息。
+
+## 2026-10-27 单轨 Composer shell
+
+ComposerInputShellCoordinator 拥有新的单行底栏（附件 / permission / Agent / 模型·effort / send）与 composer 外状态栏；permission 与 Agent 使用独立 slots，Agent 仅在 capability 允许时挂载且不显示图标。selection controls 通过可选 `modelContainer` 分栏挂载，effort 由 ChatSelectionControlsCoordinator 在模型弹层内挂载。ContextRing 只换宿主位置，ContextDetailModal、context usage 数据与状态栏计数仍走既有 services。

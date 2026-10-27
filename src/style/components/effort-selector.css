@@ -146,3 +146,167 @@
   outline-offset: 3px;
 }
 
+
+/* ==================== Inline effort panel (combined model card) ==================== */
+.opencodian-effort-selector--inline {
+  display: block;
+  width: 100%;
+  flex-shrink: 1;
+}
+
+.opencodian-effort-selector--inline.is-hidden {
+  display: none;
+}
+
+.opencodian-effort-selector--inline .opencodian-effort-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 9px 8px;
+  border-top: 1px solid var(--background-modifier-border);
+  min-width: 0;
+}
+
+.opencodian-effort-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.opencodian-effort-panel-output {
+  color: var(--text-normal);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.opencodian-effort-slider {
+  --opencodian-effort-progress: 0%;
+  --opencodian-effort-track-size: 6px;
+  --opencodian-effort-thumb-size: 16px;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  outline: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.opencodian-effort-slider::-webkit-slider-runnable-track {
+  height: var(--opencodian-effort-track-size);
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      to right,
+      var(--interactive-accent) 0,
+      var(--interactive-accent) var(--opencodian-effort-progress),
+      color-mix(in srgb, var(--interactive-accent) 20%, transparent) var(--opencodian-effort-progress),
+      color-mix(in srgb, var(--interactive-accent) 20%, transparent) 100%
+    );
+}
+
+.opencodian-effort-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: var(--opencodian-effort-thumb-size);
+  height: var(--opencodian-effort-thumb-size);
+  margin-top: calc((var(--opencodian-effort-track-size) - var(--opencodian-effort-thumb-size)) / 2);
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 50%, transparent);
+  border-radius: 50%;
+  background: var(--background-primary);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--background-modifier-box-shadow) 42%, transparent);
+}
+
+.opencodian-effort-slider::-moz-range-track {
+  height: var(--opencodian-effort-track-size);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+}
+
+.opencodian-effort-slider::-moz-range-progress {
+  height: var(--opencodian-effort-track-size);
+  border-radius: 999px;
+  background: var(--interactive-accent);
+}
+
+.opencodian-effort-slider::-moz-range-thumb {
+  width: var(--opencodian-effort-thumb-size);
+  height: var(--opencodian-effort-thumb-size);
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 50%, transparent);
+  border-radius: 50%;
+  background: var(--background-primary);
+}
+
+.opencodian-effort-slider:focus-visible {
+  outline: 1px solid var(--interactive-accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.opencodian-effort-slider:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.opencodian-effort-ticks {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-inline: 1px;
+  color: var(--text-faint);
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.opencodian-effort-tick {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.opencodian-effort-tick:first-child {
+  text-align: start;
+}
+
+.opencodian-effort-tick:last-child {
+  text-align: end;
+}
+
+.opencodian-effort-tick.is-active {
+  color: var(--text-muted);
+}
+
+.opencodian-effort-panel-hint,
+.opencodian-effort-panel-feedback:not(:empty) {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-effort-panel-hint.is-hidden {
+  display: none;
+}
+
+.opencodian-effort-panel-feedback:empty {
+  display: none;
+}
+
+.opencodian-effort-panel[aria-busy='true'] {
+  opacity: 0.72;
+}

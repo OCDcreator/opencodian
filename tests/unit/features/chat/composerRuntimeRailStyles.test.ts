@@ -12,30 +12,30 @@ function extractRule(css: string, selector: string): string {
   return match?.[1] ?? '';
 }
 
-function extractRules(css: string, selector: string): string {
-  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const matches = Array.from(css.matchAll(new RegExp(`(?:^|\\n)${escapedSelector}\\s*\\{([\\s\\S]*?)\\n\\}`, 'gm')));
-  expect(matches.length).toBeGreaterThan(0);
-  return matches.map(match => match[1] ?? '').join('\n');
-}
 
 describe('composer runtime rail styles', () => {
-  it('keeps the runtime toolbar full width so overflow can anchor to the right edge', () => {
+  it('keeps the single composer footer on one line with a flexible model slot', () => {
     const css = readStyleFile('src/style/features/chat-assistant.css');
-    const toolbarRule = extractRule(css, '.opencodian-input-toolbar');
+    const footerRule = extractRule(css, '.opencodian-composer-footer');
+    const modelSlotRule = extractRule(css, '.opencodian-composer-model-slot');
+    const modelTextRule = extractRule(css, '.opencodian-composer-model-slot .opencodian-model-trigger-text');
+    const effortRule = extractRule(css, '.opencodian-model-trigger-effort');
 
-    expect(toolbarRule).toContain('width: 100%;');
+    expect(footerRule).toContain('flex-wrap: nowrap;');
+    expect(modelSlotRule).toContain('min-width: 0;');
+    expect(modelTextRule).toContain('min-width: 0;');
+    expect(effortRule).toContain('flex: 0 0 auto;');
+    expect(effortRule).toContain('white-space: nowrap;');
   });
 
-  it('places the runtime overflow trigger as the final right-side rail affordance', () => {
+  it('opens composer menus upward and keeps the status bar outside the composer card', () => {
     const css = readStyleFile('src/style/features/chat-assistant.css');
-    const effortRule = extractRules(css, '.opencodian-input-toolbar .opencodian-effort-slot');
-    const overflowRule = extractRule(css, '.opencodian-runtime-overflow');
+    const panelRule = extractRule(css, '.opencodian-composer-menu-panel');
+    const statusRule = extractRule(css, '.opencodian-composer-status-bar');
 
-    expect(effortRule).toContain('order: 998;');
-    expect(effortRule).toContain('margin-left: auto;');
-    expect(overflowRule).toContain('order: 999;');
-    expect(overflowRule).not.toContain('margin-left: auto;');
+    expect(panelRule).toContain('bottom: calc(100% + 6px);');
+    expect(statusRule).toContain('justify-content: space-between;');
+    expect(statusRule).toContain('min-height: 25px;');
   });
 
   it('uses a local bundled Newsreader face for composer input text', () => {

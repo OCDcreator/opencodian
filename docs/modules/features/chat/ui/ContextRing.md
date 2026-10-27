@@ -73,3 +73,7 @@ TabContextState → ContextUsageService.summarize() → ContextRing.update()
 
 - 源码位置：`src/features/chat/ui/ContextRing.ts`。
 - 随目录调整更新的依赖：`src/features/chat/services/context/ContextUsageService.ts`。
+
+## 2026-10-27 位置调整
+
+输入区改为单轨 Composer 后，`ContextRing` 从 composer 内的 submit cluster 移到 composer 卡片之外的底部状态栏左侧。组件本身、`ContextUsageService.summarize()` 数据流、`ContextDetailModal` 打开路径、键盘/焦点与 tooltip 行为均未改；仅由 `ComposerInputShellCoordinator.mountToolbarControls()` 把 host 的 `mountContextUsageIndicator()` 目标改为 `.opencodian-composer-context-slot`。状态栏作用域把 ring 缩到 26px，中心读数仍是主表达；`classic` 保持默认，`segmented` 仍可在设置中选择。

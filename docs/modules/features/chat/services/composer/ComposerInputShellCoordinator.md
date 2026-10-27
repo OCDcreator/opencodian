@@ -23,18 +23,18 @@
 
 它负责：
 
-- 创建 input tab bar slot、assistant-follow-up suggestion row、composer shell、context row、textarea、**layered composer**（context strip → textarea → action zone → runtime rail），以及挂在 composer shell 上方的 slash menu overlay
+- 创建 input tab bar slot、assistant-follow-up suggestion row、composer shell、context row、textarea、**single-rail composer**（context strip → textarea → footer），以及挂在 composer shell 上方的 slash menu overlay
 - 绑定 textarea Enter 提交、Shift+Enter 换行，以及 textarea 高度同步
 - 维护 `opencodian-input-highlight-backdrop`：一个位于 textarea 后方的镜像 div，将已追踪的 `@agent` 提及和已知 slash item 渲染为带样式的 `<span>`；selected `@agent` span 会携带 `data-type="agent"`、`data-name` 和 `data-value`，textarea 文本设为透明（`color: transparent`），仅保留 caret 可见，实现输入框内的富文本高亮而不影响原生复制行为
 - 在输入以 `/` 开头且光标仍停留在 command token 内时，把 slash autocomplete session 委托给 `SlashCommandMenuCoordinator`；`/skills <query>` 是允许继续显示 nested skill suggestions 的特殊前缀；加载中、无命令、无匹配或加载失败时保持可见状态提示，避免静默消失
 - 在 prompt mode 下把 `@agent` 查询交给 `AgentMentionComposerController`，选中后保留可见 `@name` 文本，并在 submit 时附加 `SurfaceInvocationIntent.mentions`。该 mention 路径由独立的 `shouldHandleAgentMentions` seam 控制，与 agent selector 下拉解耦：Claude Code 即使无 Subagents 能力也保留 mention（有 `loadClaudeRuntimeAgents` 数据源 + 原文保留通路），OpenCode/Codex 仍随能力判断
-- 在 `opencodian-composer-runtime-dock.opencodian-composer-runtime-rail` 内挂载 `ChatAgentSelectionCoordinator` 和 selection controls，提供 OpenCode default / primary agent、permission、model、badge 与 effort 控件；提交 prompt 时把该 composer 级选择附加为 `SurfaceInvocationIntent.primaryAgent`，选中后把焦点还给 textarea。agent selector 下拉的挂载由 `shouldMountAgentSelector`（纯 `AgentCapability.Subagents` 能力判断）决定，Claude Code / Codex 不声明该能力故不显示。runtime rail 位于玻璃壳内部底部，是低视觉权重的状态行，刻入玻璃样式会从 `.opencodian-composer-shell--action-buttons-etched` 自动级联
+- 在独立 footer slots 中按「附件 → permission → Agent → model/effort → send」挂载控件。Agent 使用 `ChatAgentSelectionCoordinator` 的真实当前选择，无图标，且仅在 `shouldMountAgentSelector` 允许时挂载；permission 由 selection controls 直接挂载，不混入 Agent 菜单。模型按钮与 effort 共用弹层
 - 统一处理 submit gate、send/stop affordance、add-context 按钮事件，以及 capability-gated 的图片附件按钮事件
 - 通过 `ResizeObserver` + `requestAnimationFrame` 维护 composer stack height，并触发 settled scroll
-- 把 selection controls 与 effort 挂到 runtime rail，把 context usage ring 挂到 submit cluster；add context、image attach 和 capability hint 留在 action zone 的 context actions cluster
+- 把 context usage ring 挂到 composer 外状态栏左侧，把字数统计挂到右侧；附件留在 `+` 菜单，capability hint 留在独立辅助弹层
 - 根据全局插件设置中的 `activeBackend` 调整 placeholder 文案：Codex backend 活跃时显示 `chat.input.placeholderCodex`，其余 backend 使用 host 提供的 placeholder
 - 当 host 报告的 composer availability state 为 `backend-offline` 时，从全局插件设置读取当前 backend display name，并使用 `chat.empty.backendOffline.titleWithBackend` / `descriptionWithBackend` 渲染带 backend 名称的外部 notice；这样 `OpenCodianView` 只需返回 generic offline state，backend 命名由输入区 owner 本地 decorate
-- 暴露 `refreshToolbarControls()`，允许 backend/capability 切换后只重挂 runtime-dock 内的 toolbar 子控件并同步刷新 capability hint，而不重建 textarea、context row 或 layered input 布局
+- 暴露 `refreshToolbarControls()`，允许 backend/capability 切换后只重挂 footer 内的子控件并同步刷新 capability hint，而不重建 textarea、context row 或 single-rail 布局
 - 拥有 `PromptSuggestionService` 实例，并将 `.opencodian-suggestion-bar` 挂到最后一条 assistant message 后面；该行语义上表示“这条 assistant 回复的下一步建议”，视觉上紧跟消息本身，而不是出现在 composer footer 或输入区顶部。当存在 active suggestion 时显示可点击的 `.opencodian-suggestion-chip`，点击后仅将 suggestion 文本插入 textarea（不会自动提交），并调用 `acceptActiveSuggestion()` 清除该 suggestion
 - 通过**模块级 channel bus** (`promptSuggestionSink.ts`) 与当前会话 backend session id 同步：`build()` 时创建独立 channel (`createPromptSuggestionChannel`)、在 container 上 stamp scope (`stampPromptSuggestionScope`)，并订阅该 channel 的 session 变更 (`onPromptSuggestionSessionChange`)；`TabActivationRuntimeHostProvider` 在 conversation 切换时通过 `findPromptSuggestionScope(messagesContainer)` 发现对应 channel，再经 `emitPromptSuggestionSessionChange(sessionId, channelId)` 推送新值。该设计把 prompt suggestion lifecycle 完全移出 `OpenCodianView`，解决 suggestion 可能早于 `backendSessionId` writeback 到达的 race，同时避免多视图交叉污染
 - `destroy()` 时移除 stamped scope (`removePromptSuggestionScope`) 并删除 channel (`deletePromptSuggestionChannel`)，防止 teardown 后残留 DOM attribute 导致 stale cross-talk
@@ -111,11 +111,11 @@ export class ComposerInputShellCoordinator {
 
 ## 关键行为
 
-- `build()` 一次性组装输入区 shell，并构建 **layered composer**：`opencodian-composer-content` 内部为 context strip → textarea → `opencodian-composer-input-row.opencodian-composer-action-zone` → `opencodian-composer-runtime-dock.opencodian-composer-runtime-rail`。action zone 左侧 `opencodian-composer-context-actions` 放 add context、image attach 和 compact `{ } JSON` capability hint，右侧 `opencodian-composer-submit-controls` 放 context usage ring 与 send/stop；runtime rail 位于 action zone 下方，放 agent/model/permission/badge/effort controls；textarea 被 `opencodian-input-highlight-container` 包裹，内含 `opencodian-input-highlight-backdrop` 和 textarea 两个同级元素
+- `build()` 一次性组装输入区 shell，并构建 **single-rail composer**：`opencodian-composer-content` 内部为 context strip → textarea → `opencodian-composer-input-row.opencodian-composer-action-zone`。footer 左侧按顺序为附件、permission slot、Agent slot、model slot，最右为 send/stop；context usage 与字数统计位于卡片外的 status bar。textarea 被 `opencodian-input-highlight-container` 包裹，内含 `opencodian-input-highlight-backdrop` 和 textarea 两个同级元素
 - 输入位置的直接 child 固定为 `Todo → QuestionDock → input tab slot → Composer`，所以标签是输入框的直接前导，且 Todo 始终在问题卡上方；实际标签是否挂到该 slot 仍由 `ConversationTabRuntimeCoordinator` 的位置设置决定，Header 与标题下方的挂载逻辑不在本模块改动
 - `build()` 之后会立即根据 host 的 composer availability state 同步输入壳层；当没有 enabled backend，或当前 backend 虽已启用但运行时不可连接时，textarea / add-context / send 会被禁用，但状态说明不再塞进 input wrapper，而是渲染为 composer 外部的 warning notice。coordinator 会从当前 chat DOM 自己推断活跃消息区与 empty-state notice：空会话继续复用消息区 empty-state notice；已有消息时则在消息区下缘、composer 上方显示 transient availability notice，避免把“当前 backend 不可用”写进输入框本体
-- `build()` / `refreshToolbarControls()` 在 runtime rail 挂载 toolbar 子控件后会清理空 slot；当当前 backend 没有 agent/model/permission/context/effort 控件可显示时，整个 `opencodian-input-toolbar` 会被移除（dock 在 `:empty` 时也通过 CSS 隐藏），避免空壳把 add/send 按钮悬在半空；refresh 时会同时清理旧的 context usage slot，避免 submit cluster 重复挂载
-- `refreshToolbarControls()` 会先销毁旧的 `ChatAgentSelectionCoordinator` DOM，再按最新 host capability gates 重建 agent selector、model/permission controls、context usage 和 effort slot，并立即重算 capability hint；selection/agent/effort 目标是 runtime rail，context usage 目标是 submit cluster，用于 Claude Code / OpenCode 切换时同时避免 OpenCode-only agent selector 与 Claude `{ } JSON` (`/json`) hint 的残留/延迟消失
+- `build()` / `refreshToolbarControls()` 在 footer 挂载子控件后会清理空 slot；当当前 backend 没有 permission/Agent/model/context/effort 控件可显示时，对应空容器会被移除，避免留下无内容间距；refresh 时会同时清理旧的 context usage slot，避免状态栏重复挂载
+- `refreshToolbarControls()` 会先销毁旧的 `ChatAgentSelectionCoordinator` DOM，再按最新 host capability gates 重建独立 Agent slot、permission/model controls、context usage 和模型内 effort slot，并立即重算 capability hint，用于 backend 切换时避免不支持的 Agent 或 capability 残留
 - `build()` 会预创建脱离 composer 的 `.opencodian-suggestion-bar`，真正显示时通过 `getPromptSuggestionMountTarget()` host seam 把它插到“最后一条 assistant message 之后”；`getPromptSuggestionPlacementRoot()` 提供 `MutationObserver` 监听根，确保消息列表重渲染、hydrate 或 turn 合并后 suggestion 仍能重新贴回最新 assistant turn，而不是掉回 composer 区
 - `build()` 设置 textarea 的 scroll 事件监听器，同步 backdrop 的 scrollTop 以保持滚动一致
 - `syncHighlightBackdrop()` 读取当前 textarea 内容和 `agentMentionController.resolveMentionPillSpans()` 返回的有效 mention spans，将文本分段拼接为 HTML：普通文本原样转义，`@agent` 段包裹在 `opencodian-input-highlight-agent` span 内，并写入 agent pill metadata；slash 高亮则先依赖已加载的 `slashCommandMenuCatalogItems` 做精确判定，只把 catalog 中真实存在的 `/command`、direct `/skill`，以及 prefixed mode 下存在的 `/skills skill-name` 包裹为高亮 span。普通命令使用 `opencodian-input-highlight-command`，直接或 prefixed skill 使用 `opencodian-input-highlight-skill`，裸 `/skills` 入口仍按 command 语义显示；拼错的 `/using-superpowert` 这类未知 token 不会上色
@@ -128,7 +128,7 @@ export class ComposerInputShellCoordinator {
 - `updateSendButtonState()` 根据 streaming state 切换 send/stop icon 与 class
 - **send/stop cancel settle window**（2026-10-21，F2 SEND-STOP-COLLISION）：send 与 stop 是同一坐标上的单个 morphing 控件。取消流式后紧接的点击可能落在过渡态控件上并静默吞掉草稿。现在 send/stop 点击在调用 `cancelStreaming()` 后立即进入 200ms settle window：`updateSendButtonState()` 即刻把控件收敛为当前状态的 affordance（通常已是 send icon），但保持 `disabled`（`updateSendButtonState` 的禁用条件新增 settle pending）；窗口内再次点击被 click handler 直接吞掉，不会二次 cancel 也不会提交。窗口结束时重新渲染：若 turn 已停止则恢复为可点击的 send，若仍在流式（cancel 未生效）则恢复为可点击的 stop。`destroy()` 会清掉挂起的 settle timer
 - `updateComposerAvailabilityState()` 消费 host 给出的高层 surface 状态；当状态为 `backend-offline` 时，本模块会本地读取 active backend display name 并渲染带名称的 notice，而不需要 `OpenCodianView` 直接提供 backend 名称。这样“无 backend”和“backend offline”的高层运行时所有权仍留在 `OpenCodianView`，但文案装饰下沉到输入区 owner
-- `renderCapabilityHint()` 向 host 查询可选的 `getComposerCapabilityHint()`，若返回非 null 结果则把 `.opencodian-input-capability-hint` 作为 context actions cluster 里的小按钮，和 add context / image attach 放在同一区域，并在 `build()`、`applyLocaleTexts()` 与 availability refresh 时刷新；若结果为 null 则移除该 element。host 可选返回 `insertText`，使 hint 变成可点击插入 affordance，而不是单纯文案。当前 fallback hint 是 Claude Code 和 Codex backend 共用的 structured-output chip（OpenCode 不显示）：对用户展示为 compact `{ } JSON`，tooltip 会解释“固定结构返回结果、便于复制到其他工具、点击不会自动发送”，点击后底层仍只向 textarea 前置 `/json `，结构上不污染 OpenCode-only 路径，也不暗示任意 schema authoring
+- `renderCapabilityHint()` 向 host 查询可选的 `getComposerCapabilityHint()`，若返回非 null 结果则把 `.opencodian-input-capability-hint` 作为独立辅助弹层里的菜单行，并在 `build()`、`applyLocaleTexts()` 与 availability refresh 时刷新；若结果为 null 则移除该 element 并隐藏弹层。host 可选返回 `insertText`，使 hint 变成可点击插入 affordance，而不是单纯文案。当前 fallback hint 是 Claude Code 和 Codex backend 共用的 structured-output chip（OpenCode 不显示）：对用户展示为 compact `{ } JSON`，tooltip 会解释“固定结构返回结果、便于复制到其他工具、点击不会自动发送”，点击后底层仍只向 textarea 前置 `/json `，结构上不污染 OpenCode-only 路径，也不暗示任意 schema authoring
 - `refreshSlashCommandMenu()` 只负责调用 `SlashCommandMenuCoordinator.refresh()`；菜单 coordinator 每次 slash query 刷新都会向 host 读取 merged visible menu items，再通过 `slashCommandMenuFilter.ts` 本地过滤。host 背后的 `SlashCommandMenuCatalogCache` 继续负责 TTL / pending promise / hidden-command cache key，因此设置页隐藏命令或切换 skill 模式后不会被 composer 层旧数组挡住，也不会每次按键直接打 SDK
 - slash catalog 首次异步加载完成后，coordinator 会重新执行一次 backdrop 高亮同步，这样输入中的已知 slash item 能在 catalog 到位后立即着色，而未知 token 会自动退回普通文本
 - `SlashCommandMenuCoordinator` 会把 `getSlashCommandSkillMode()` 传给过滤 helper；direct mode 直接展示 skill，prefixed mode 则顶层展示 `/skills` 并在 `/skills <query>` 下展示 nested skill suggestions
@@ -172,3 +172,19 @@ export class ComposerInputShellCoordinator {
 ## 2026-10-26 Composer 可访问名称
 
 Textarea 使用独立、每实例唯一的 visually-hidden 本地化标签，通过 aria-labelledby 关联；视觉 placeholder 继续 aria-hidden 且可随草稿隐藏。名称不会随输入消失，applyLocaleTexts 同步标签文本；不引入会触发宿主原生 tooltip 的 aria-label/title。发送、草稿和跨 tab 所有权不变。
+
+## 2026-10-27 单轨 Composer（权限、Agent、模型 · 思考强度）
+
+Composer 正文重新收束为「上下文 chips → textarea」两层；发送上方只有一条底栏，视觉顺序固定为：
+
+1. `+` 附件菜单：添加文件、图片、生成图片、Web Viewer 标签页；沿用原 host seam 与 capability gating。
+2. permission / sandbox / runtime badge：由 `ChatSelectionControlsCoordinator` 直接挂载到独立 permission slot，不再放进 Agent 菜单。
+3. Agent：由 `ChatAgentSelectionCoordinator` 直接挂载到独立 Agent slot，显示当前选择或默认 Agent，不渲染触发图标。`shouldMountAgentSelector()` 为 false 时整个 slot 为空，不支持 Agent 的后端不会显示占位按钮。
+4. 组合模型按钮：显示「模型 · 思考强度」，Chevron 紧跟内容而非被 `margin-left:auto` 推到 send 旁。模型图标优先按模型 ID 解析（DeepSeek、Moonshot、Anthropic 等），聚合网关只作后备；解析失败时隐藏图标，不回退机器人。模型名可截断，effort 保持可读；无 effort 轴时隐藏分隔符。
+5. 发送/停止按钮：仍在同一位置切换；cancel settle window、IME Enter、草稿、附件、queued follow-up、context chips 与 per-tab streaming 全部未改。
+
+底部状态栏位于 `.opencodian-composer-shell` 之外：左侧是既有 `ContextRing`，点击仍打开原 `ContextDetailModal`；右侧是字数统计，中间留作后续 session 指标扩展。
+
+`mountSelectionControls(toolbar, options)` 的 options 增加可选 `modelContainer`，permission 挂在独立 toolbar，model selector 挂到模型 slot。shell 不直接调用 `mountEffortSelector`；effort 由 `ChatSelectionControlsCoordinator` 挂在模型弹层下半部。capability hint 留在独立辅助弹层，不影响主控件顺序。
+
+菜单向上展开。窄于 500px 时通过 container query 收紧 permission、Agent 和模型间距，并使用独立 full/short 文本节点显示 effort 短标签（例如「关闭思考」→「关闭」），避免 CSS 伪元素导致读屏重复。

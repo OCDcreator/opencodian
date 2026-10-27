@@ -29,3 +29,7 @@
 ## 2026-10-26 Keyboard menu and guidance
 
 The effort menu is visible only while its owner has is-open; hover cannot keep a logically closed menu painted. Options retain visible focus and neutral selected styling. The open menu contains bounded, wrapping boundary guidance and live save-failure feedback; per-option hover tooltips are removed. The compact trigger allows model-default text up to 140px.
+
+## 2026-10-27 Inline effort panel
+
+Adds the `opencodian-effort-selector--inline` / `.opencodian-effort-panel` rules used inside the combined model popover: header label + current value, one discrete range slider, truncating tick labels with titles, boundary hint, and live save-failure feedback. Slider visuals follow the shadcn registry Slider: primary 20% track, primary fill, primary 50% Thumb border, background and shadow; WebKit and Firefox pseudo-elements remain separate. The panel hides itself with `.is-hidden` when the model/backend exposes no effort axis. Legacy popover rules are unchanged so the standalone selector still renders as before.

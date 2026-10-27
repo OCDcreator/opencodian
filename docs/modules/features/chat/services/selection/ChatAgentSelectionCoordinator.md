@@ -30,7 +30,7 @@ export class ChatAgentSelectionCoordinator {
 
 ## 关键行为
 
-- `mount()` 创建既有 trigger / dropdown，并把 Agent 内容挂到共享 `ComposerPopoverFrame` 的 content slot；frame 统一提供本地化标题、`Esc` 键帽及 Arrow / Enter / Esc footer，Agent 仍独立拥有列表标题、OpenCode default 与候选行
+- `mount()` 创建 trigger / dropdown，并把 Agent 内容挂到共享 `ComposerPopoverFrame` 的 content slot；frame 统一提供本地化标题、`Esc` 键帽及 Arrow / Enter / Esc footer，Agent 仍独立拥有列表标题、OpenCode default 与候选行。trigger 直接位于 Composer 的 Agent slot，不渲染图标，文本实时显示当前选择，未选择时显示默认 `Agent`
 - `reloadCatalog()` 通过 host seam 拉取 `primary` / `all` agent 候选；如果当前选择不再存在，则回退为 OpenCode default
 - `openDropdown()` 会先调用 `closePeerDropdowns()`，确保 Agent / permission / model 下拉框不会同时打开；dropdown 打开时会添加 `is-open` 类以触发 CSS 入场动画
 - dropdown 使用 `AnchoredOverlayLayoutController` 按最近的 `.opencodian-container` 计算 340px 首选宽度、272px 最小宽度和左右 8px 安全区；侧栏更窄时允许继续收缩

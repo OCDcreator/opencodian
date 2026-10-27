@@ -136,7 +136,12 @@ export interface ComposerInputShellCoordinatorHost {
   /** R-C1: turn boundary — the composer submitted; draft clearing happens in the pipeline. */
   onComposerSubmitted?(): void;
   registerEscapeHandler(handler: () => boolean): void;
-  mountSelectionControls(toolbar: HTMLElement, options: { showModels: boolean; showPermissions: boolean }): void;
+  mountSelectionControls(toolbar: HTMLElement, options: {
+    showModels: boolean;
+    showPermissions: boolean;
+    /** When set, the model selector mounts here instead of inside `toolbar`. */
+    modelContainer?: HTMLElement;
+  }): void;
   mountContextUsageIndicator(container: HTMLElement): void;
   mountEffortSelector(container: HTMLElement): void;
   /**
@@ -225,7 +230,31 @@ export class ComposerInputShellCoordinator {
   private composerInputRowEl: HTMLElement | null = null;
   private composerContextActionsEl: HTMLElement | null = null;
   private composerSubmitControlsEl: HTMLElement | null = null;
-  private composerRuntimeDockEl: HTMLElement | null = null;
+  private composerStatusBarEl: HTMLElement | null = null;
+  private composerContextUsageSlotEl: HTMLElement | null = null;
+  private composerCountsEl: HTMLElement | null = null;
+  private modelSlotEl: HTMLElement | null = null;
+  private permissionSlotEl: HTMLElement | null = null;
+  private agentSelectorSlotEl: HTMLElement | null = null;
+  private agentSettingsBodyEl: HTMLElement | null = null;
+  private agentToolbarEl: HTMLElement | null = null;
+  private capabilityHintSlotEl: HTMLElement | null = null;
+  private attachmentMenuEl: HTMLElement | null = null;
+  private attachmentMenuTriggerEl: HTMLButtonElement | null = null;
+  private attachmentMenuPanelEl: HTMLElement | null = null;
+  private agentMenuEl: HTMLElement | null = null;
+  private agentMenuTriggerEl: HTMLButtonElement | null = null;
+  private agentMenuPanelEl: HTMLElement | null = null;
+  private agentMenuTriggerTextEl: HTMLElement | null = null;
+  private agentMenuHeadingEl: HTMLElement | null = null;
+  private attachmentAddFileLabelEl: HTMLElement | null = null;
+  private attachmentAddImageLabelEl: HTMLElement | null = null;
+  private attachmentImageGenLabelEl: HTMLElement | null = null;
+  private attachmentWebViewerLabelEl: HTMLElement | null = null;
+  private isAttachmentMenuOpen = false;
+  private isAgentMenuOpen = false;
+  private hasRegisteredMenuEscapeHandler = false;
+  private menuDocumentClickHandler: ((event: MouseEvent) => void) | null = null;
   private addContextBtnEl: HTMLButtonElement | null = null;
   private sendBtnEl: HTMLButtonElement | null = null;
   private inputTextareaEl: HTMLTextAreaElement | null = null;
@@ -369,6 +398,7 @@ export class ComposerInputShellCoordinator {
         this.agentMentionController.syncContent(this.inputTextareaEl?.value ?? '');
       }
       this.syncHighlightBackdrop();
+      this.renderInputCounts();
       this.host.onComposerInputChanged?.(this.inputTextareaEl?.value ?? '');
       void this.refreshComposerSuggestionMenu();
     });
@@ -439,89 +469,28 @@ export class ComposerInputShellCoordinator {
     });
     this.slashCommandMenuEl.setAttribute('role', 'listbox');
 
-    // Layered composer (Obsidian-native input workbench):
-    //   context-row → textarea (focus) → input-row (+/image + ring + send) → runtime-dock
-    // The runtime-dock sits inside the glass shell so the etched action-button style
-    // cascades from `.opencodian-composer-shell--action-buttons-etched` automatically.
+    // Single-rail composer: attachment, permission, agent, model/effort, send.
+    // Context usage and input stats live in the external status bar.
     this.composerInputRowEl = composerContentEl.createDiv({
-      cls: 'opencodian-composer-input-row opencodian-composer-action-zone',
+      cls: 'opencodian-composer-input-row opencodian-composer-footer opencodian-composer-action-zone',
     });
     this.composerContextActionsEl = this.composerInputRowEl.createDiv({
-      cls: 'opencodian-composer-context-actions',
+      cls: 'opencodian-composer-context-actions opencodian-composer-footer-tools',
+    });
+    this.buildAttachmentMenu();
+    this.permissionSlotEl = this.composerContextActionsEl.createDiv({
+      cls: 'opencodian-composer-permission-slot',
+    });
+    this.agentSelectorSlotEl = this.composerContextActionsEl.createDiv({
+      cls: 'opencodian-composer-agent-slot',
+    });
+    this.buildAgentMenu();
+    this.modelSlotEl = this.composerContextActionsEl.createDiv({
+      cls: 'opencodian-composer-model-slot',
     });
     this.composerSubmitControlsEl = this.composerInputRowEl.createDiv({
       cls: 'opencodian-composer-submit-controls',
     });
-    this.composerRuntimeDockEl = composerContentEl.createDiv({
-      cls: 'opencodian-composer-runtime-dock opencodian-composer-runtime-rail',
-    });
-    this.addContextBtnEl = this.composerContextActionsEl.createEl('button', {
-      cls: 'opencodian-composer-add-btn opencodian-tooltip-trigger',
-      attr: {
-        type: 'button',
-        'aria-label': t('chat.context.addContext'),
-      },
-    });
-    setIcon(this.addContextBtnEl, 'plus');
-    this.host.setTooltipLabel(this.addContextBtnEl, t('chat.context.addContext'), 'top');
-    this.addContextBtnEl.addEventListener('click', () => {
-      void this.host.addChosenFileContextToActiveTab();
-    });
-
-    // Image attach button (capability-gated)
-    if (this.host.hasImageInputCapability?.()) {
-      this.addImageBtnEl = this.composerContextActionsEl.createEl('button', {
-        cls: 'opencodian-composer-image-btn opencodian-tooltip-trigger',
-        attr: {
-          type: 'button',
-          'aria-label': t('chat.image.attachImage'),
-        },
-      });
-      setIcon(this.addImageBtnEl, 'image');
-      this.host.setTooltipLabel(this.addImageBtnEl, t('chat.image.attachImage'), 'top');
-      this.addImageBtnEl.addEventListener('click', () => {
-        this.fileInputEl?.click();
-      });
-
-      // Hidden file input
-      this.fileInputEl = document.createElement('input');
-      this.fileInputEl.type = 'file';
-      this.fileInputEl.accept = 'image/jpeg,image/png,image/gif,image/webp';
-      this.fileInputEl.style.display = 'none';
-      this.fileInputEl.addEventListener('change', (event) => {
-        void this.handleFileSelection(event);
-      });
-      document.body.appendChild(this.fileInputEl);
-
-      // The entire conversation surface accepts images, not just the compact
-      // composer card. It is intentionally mounted on the chat root so users
-      // can drop while reading a turn and receive an explicit release affordance.
-      this.installImageDropSurface();
-    }
-
-    // R-C2 text-to-image button (host-gated): opens the generation card.
-    // Generation is plugin-side HTTP and never touches the conversation.
-    if (this.host.onRequestImageGeneration) {
-      const imageGenBtnEl = this.composerContextActionsEl.createEl('button', {
-        cls: 'opencodian-composer-imagegen-btn opencodian-tooltip-trigger',
-        attr: {
-          type: 'button',
-          'aria-label': t('chat.imageGen.button'),
-        },
-      });
-      setIcon(imageGenBtnEl, 'sparkles');
-      this.host.setTooltipLabel(imageGenBtnEl, t('chat.imageGen.button'), 'top');
-      imageGenBtnEl.addEventListener('click', () => {
-        this.host.onRequestImageGeneration?.();
-      });
-    }
-
-    // R-E2: attach the active Web Viewer tab (globe button). Rendered only
-    // when both host seams exist AND the current tab resolves to a webviewer
-    // context — the affordance never appears half-wired.
-    if (this.host.getActiveWebViewerTabContext && this.host.attachWebViewerTabContextToActiveTab) {
-      void this.setupWebViewerContextButton();
-    }
 
     this.sendBtnEl = this.composerSubmitControlsEl.createEl('button', {
       cls: 'opencodian-send-btn opencodian-tooltip-trigger',
@@ -542,11 +511,18 @@ export class ComposerInputShellCoordinator {
         this.trySubmitCurrentInput();
       }
     });
+
+    this.buildStatusBar(container);
+    this.installComposerMenuDismissal();
     this.updateSendButtonState();
     this.updateComposerAvailabilityState();
 
     this.mountToolbarControls();
     this.renderCapabilityHint();
+    if (!this.hasRegisteredMenuEscapeHandler) {
+      this.hasRegisteredMenuEscapeHandler = true;
+      this.host.registerEscapeHandler(() => this.closeComposerMenuFromEscape());
+    }
 
     this.initializeLayoutMetrics();
 
@@ -558,36 +534,320 @@ export class ComposerInputShellCoordinator {
     this.renderCapabilityHint();
   }
 
+  private buildAttachmentMenu(): void {
+    if (!this.composerContextActionsEl) {
+      return;
+    }
+
+    const menuEl = this.composerContextActionsEl.createDiv({
+      cls: 'opencodian-composer-menu opencodian-composer-attachment-menu',
+    });
+    this.attachmentMenuEl = menuEl;
+    const triggerEl = menuEl.createEl('button', {
+      cls: 'opencodian-composer-menu-trigger opencodian-composer-attachment-trigger opencodian-tooltip-trigger',
+      attr: {
+        type: 'button',
+        'aria-haspopup': 'menu',
+        'aria-expanded': 'false',
+        'aria-label': t('chat.composerMenu.attachment'),
+      },
+    });
+    this.attachmentMenuTriggerEl = triggerEl;
+    setIcon(triggerEl, 'plus');
+    this.host.setTooltipLabel(triggerEl, t('chat.composerMenu.attachment'), 'top');
+    triggerEl.addEventListener('click', (event) => {
+      event.stopPropagation();
+      this.toggleAttachmentMenu();
+    });
+
+    const panelEl = menuEl.createDiv({
+      cls: 'opencodian-composer-menu-panel opencodian-composer-attachment-panel',
+      attr: { role: 'menu' },
+    });
+    this.attachmentMenuPanelEl = panelEl;
+
+    this.addContextBtnEl = this.createComposerMenuItem(
+      panelEl,
+      'file-plus',
+      t('chat.composerMenu.addFile'),
+      'opencodian-composer-add-btn',
+    );
+    this.attachmentAddFileLabelEl = this.addContextBtnEl.querySelector('.opencodian-composer-menu-item-label');
+    this.addContextBtnEl.addEventListener('click', () => {
+      this.closeAttachmentMenu();
+      void this.host.addChosenFileContextToActiveTab();
+    });
+
+    // Image attach item (capability-gated)
+    if (this.host.hasImageInputCapability?.()) {
+      this.addImageBtnEl = this.createComposerMenuItem(
+        panelEl,
+        'image',
+        t('chat.composerMenu.addImage'),
+        'opencodian-composer-image-btn',
+      );
+      this.attachmentAddImageLabelEl = this.addImageBtnEl.querySelector('.opencodian-composer-menu-item-label');
+      this.addImageBtnEl.addEventListener('click', () => {
+        this.closeAttachmentMenu();
+        this.fileInputEl?.click();
+      });
+
+      // Hidden file input
+      this.fileInputEl = document.createElement('input');
+      this.fileInputEl.type = 'file';
+      this.fileInputEl.accept = 'image/jpeg,image/png,image/gif,image/webp';
+      this.fileInputEl.style.display = 'none';
+      this.fileInputEl.addEventListener('change', (event) => {
+        void this.handleFileSelection(event);
+      });
+      document.body.appendChild(this.fileInputEl);
+
+      // The entire conversation surface accepts images, not just the compact
+      // composer card. It is intentionally mounted on the chat root so users
+      // can drop while reading a turn and receive an explicit release affordance.
+      this.installImageDropSurface();
+    }
+
+    // R-C2 text-to-image entry (host-gated): opens the generation card.
+    // Generation is plugin-side HTTP and never touches the conversation.
+    if (this.host.onRequestImageGeneration) {
+      const imageGenBtnEl = this.createComposerMenuItem(
+        panelEl,
+        'sparkles',
+        t('chat.composerMenu.generateImage'),
+        'opencodian-composer-imagegen-btn',
+      );
+      this.attachmentImageGenLabelEl = imageGenBtnEl.querySelector('.opencodian-composer-menu-item-label');
+      imageGenBtnEl.addEventListener('click', () => {
+        this.closeAttachmentMenu();
+        this.host.onRequestImageGeneration?.();
+      });
+    }
+
+    // R-E2: attach the active Web Viewer tab (globe item). Rendered only
+    // when both host seams exist AND the current tab resolves to a webviewer
+    // context — the affordance never appears half-wired.
+    if (this.host.getActiveWebViewerTabContext && this.host.attachWebViewerTabContextToActiveTab) {
+      void this.setupWebViewerContextButton();
+    }
+  }
+
+  private buildAgentMenu(): void {
+    if (!this.composerContextActionsEl) {
+      return;
+    }
+
+    const menuEl = this.composerContextActionsEl.createDiv({
+      cls: 'opencodian-composer-menu opencodian-composer-agent-menu',
+    });
+    this.agentMenuEl = menuEl;
+    const triggerEl = menuEl.createEl('button', {
+      cls: 'opencodian-composer-menu-trigger opencodian-agent-settings-trigger opencodian-tooltip-trigger',
+      attr: {
+        type: 'button',
+        'aria-haspopup': 'dialog',
+        'aria-expanded': 'false',
+        'aria-label': t('chat.composerMenu.runSettings'),
+      },
+    });
+    this.agentMenuTriggerEl = triggerEl;
+    const iconEl = triggerEl.createSpan({ cls: 'opencodian-agent-settings-trigger-icon' });
+    setIcon(iconEl, 'bot');
+    this.agentMenuTriggerTextEl = triggerEl.createSpan({
+      cls: 'opencodian-agent-settings-trigger-text',
+      text: t('chat.agentSelector.trigger'),
+    });
+    const chevronEl = triggerEl.createSpan({ cls: 'opencodian-agent-settings-trigger-chevron' });
+    setIcon(chevronEl, 'chevron-down');
+    this.host.setTooltipLabel(triggerEl, t('chat.composerMenu.runSettings'), 'top');
+    triggerEl.addEventListener('click', (event) => {
+      event.stopPropagation();
+      this.toggleAgentMenu();
+    });
+
+    const panelEl = menuEl.createDiv({
+      cls: 'opencodian-composer-menu-panel opencodian-composer-agent-panel',
+      attr: { role: 'group', 'aria-label': t('chat.composerMenu.runSettings') },
+    });
+    this.agentMenuPanelEl = panelEl;
+    this.agentMenuHeadingEl = panelEl.createDiv({
+      cls: 'opencodian-composer-menu-heading',
+      text: t('chat.composerMenu.runSettings'),
+    });
+    this.agentSettingsBodyEl = panelEl.createDiv({ cls: 'opencodian-agent-settings-body' });
+    this.capabilityHintSlotEl = panelEl.createDiv({ cls: 'opencodian-composer-capability-slot' });
+  }
+
+  private createComposerMenuItem(
+    parentEl: HTMLElement,
+    icon: string,
+    label: string,
+    extraClass?: string,
+  ): HTMLButtonElement {
+    const itemEl = parentEl.createEl('button', {
+      cls: 'opencodian-composer-menu-item opencodian-tooltip-trigger',
+      attr: { type: 'button', role: 'menuitem' },
+    });
+    if (extraClass) {
+      itemEl.addClass(extraClass);
+    }
+    const iconEl = itemEl.createSpan({ cls: 'opencodian-composer-menu-item-icon' });
+    setIcon(iconEl, icon);
+    itemEl.createSpan({ cls: 'opencodian-composer-menu-item-label', text: label });
+    this.host.setTooltipLabel(itemEl, label, 'top');
+    return itemEl;
+  }
+
+  private buildStatusBar(container: HTMLElement): void {
+    this.composerStatusBarEl = container.createDiv({
+      cls: 'opencodian-composer-status-bar',
+    });
+    this.composerContextUsageSlotEl = this.composerStatusBarEl.createDiv({
+      cls: 'opencodian-composer-context-slot',
+    });
+    this.composerStatusBarEl.createDiv({ cls: 'opencodian-composer-status-middle' });
+    this.composerCountsEl = this.composerStatusBarEl.createSpan({
+      cls: 'opencodian-composer-counts is-hidden',
+    });
+    this.renderInputCounts();
+  }
+
   private mountToolbarControls(): void {
-    if (!this.composerRuntimeDockEl && !this.composerSubmitControlsEl && !this.composerShellEl) {
+    if (!this.permissionSlotEl || !this.agentSelectorSlotEl || !this.composerContextUsageSlotEl) {
       return;
     }
 
     this.agentSelectionController.destroy();
-    this.composerRuntimeDockEl?.querySelector(':scope > .opencodian-input-toolbar')?.remove();
-    this.composerSubmitControlsEl?.querySelector(':scope > .opencodian-context-usage-slot')?.remove();
+    this.agentToolbarEl?.remove();
+    this.agentToolbarEl = null;
+    this.permissionSlotEl.empty();
+    this.agentSelectorSlotEl.empty();
+    this.modelSlotEl?.empty();
+    this.composerContextUsageSlotEl.empty();
 
-    // Toolbar (model/agent/permission/effort/sandbox) lands in the runtime-dock — a low-weight
-    // status row below the input-row, inside the glass shell so etched style cascades.
-    const toolbarHost = this.composerRuntimeDockEl ?? this.composerShellEl;
-    if (!toolbarHost) {
-      return;
-    }
     const toolbarEl = document.createElement('div');
     toolbarEl.className = 'opencodian-input-toolbar';
-    toolbarHost.appendChild(toolbarEl);
+    this.agentToolbarEl = toolbarEl;
+    this.permissionSlotEl.appendChild(toolbarEl);
     if (this.host.shouldMountAgentSelector?.() !== false) {
-      this.agentSelectionController.mount(toolbarEl.createDiv({ cls: 'opencodian-agent-selector' }));
+      this.agentSelectionController.mount(this.agentSelectorSlotEl.createDiv({ cls: 'opencodian-agent-selector' }));
     }
-    this.host.mountSelectionControls(toolbarEl, {
-      showModels: true,   // Host will gate based on capability
-      showPermissions: true, // Host will gate based on capability
-    });
-    this.host.mountContextUsageIndicator((this.composerSubmitControlsEl ?? toolbarEl).createDiv({
+    if (this.modelSlotEl) {
+      this.host.mountSelectionControls(toolbarEl, {
+        showModels: true,
+        showPermissions: true,
+        modelContainer: this.modelSlotEl,
+      });
+    }
+    this.host.mountContextUsageIndicator(this.composerContextUsageSlotEl.createDiv({
       cls: 'opencodian-context-usage-slot',
     }));
-    this.host.mountEffortSelector(toolbarEl.createDiv({ cls: 'opencodian-effort-slot' }));
     this.pruneEmptyToolbar(toolbarEl);
+    this.syncAgentMenuVisibility();
+  }
+
+  private installComposerMenuDismissal(): void {
+    if (this.menuDocumentClickHandler) {
+      return;
+    }
+    const doc = this.composerShellEl?.ownerDocument ?? document;
+    this.menuDocumentClickHandler = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (!target) {
+        return;
+      }
+      if (this.isAttachmentMenuOpen && !this.attachmentMenuEl?.contains(target)) {
+        this.closeAttachmentMenu();
+      }
+      if (this.isAgentMenuOpen && !this.agentMenuEl?.contains(target)) {
+        this.closeAgentMenu();
+      }
+    };
+    doc.addEventListener('click', this.menuDocumentClickHandler, true);
+  }
+
+  private toggleAttachmentMenu(): void {
+    if (this.isAttachmentMenuOpen) {
+      this.closeAttachmentMenu();
+      return;
+    }
+    this.openAttachmentMenu();
+  }
+
+  private openAttachmentMenu(): void {
+    this.closeAgentMenu();
+    this.isAttachmentMenuOpen = true;
+    this.attachmentMenuEl?.addClass('is-open');
+    this.attachmentMenuTriggerEl?.addClass('is-open');
+    this.attachmentMenuTriggerEl?.setAttribute('aria-expanded', 'true');
+  }
+
+  private closeAttachmentMenu(restoreFocus = false): void {
+    this.isAttachmentMenuOpen = false;
+    this.attachmentMenuEl?.removeClass('is-open');
+    this.attachmentMenuTriggerEl?.removeClass('is-open');
+    this.attachmentMenuTriggerEl?.setAttribute('aria-expanded', 'false');
+    if (restoreFocus) {
+      this.attachmentMenuTriggerEl?.focus({ preventScroll: true });
+    }
+  }
+
+  private toggleAgentMenu(): void {
+    if (this.isAgentMenuOpen) {
+      this.closeAgentMenu();
+      return;
+    }
+    this.openAgentMenu();
+  }
+
+  private openAgentMenu(): void {
+    this.closeAttachmentMenu();
+    this.isAgentMenuOpen = true;
+    this.agentMenuEl?.addClass('is-open');
+    this.agentMenuTriggerEl?.addClass('is-open');
+    this.agentMenuTriggerEl?.setAttribute('aria-expanded', 'true');
+  }
+
+  private closeAgentMenu(restoreFocus = false): void {
+    this.isAgentMenuOpen = false;
+    this.agentMenuEl?.removeClass('is-open');
+    this.agentMenuTriggerEl?.removeClass('is-open');
+    this.agentMenuTriggerEl?.setAttribute('aria-expanded', 'false');
+    if (restoreFocus) {
+      this.agentMenuTriggerEl?.focus({ preventScroll: true });
+    }
+  }
+
+  private closeComposerMenuFromEscape(): boolean {
+    if (this.isAttachmentMenuOpen) {
+      this.closeAttachmentMenu(true);
+      return true;
+    }
+    if (this.isAgentMenuOpen) {
+      this.closeAgentMenu(true);
+      return true;
+    }
+    return false;
+  }
+
+  private syncAgentMenuVisibility(): void {
+    const hasContent = Boolean(this.capabilityHintEl?.isConnected);
+    this.agentMenuEl?.toggleClass('is-hidden', !hasContent);
+    if (!hasContent) {
+      this.closeAgentMenu();
+    }
+  }
+
+  private renderInputCounts(): void {
+    if (!this.composerCountsEl || !this.inputTextareaEl) {
+      return;
+    }
+    const value = this.inputTextareaEl.value;
+    const words = value.trim() ? value.trim().split(/\s+/u).length : 0;
+    this.composerCountsEl.setText(words === 0
+      ? ''
+      : t('chat.composerMenu.inputCounts', { words, characters: value.length }));
+    this.composerCountsEl.toggleClass('is-hidden', value.length === 0);
   }
 
   /**
@@ -605,18 +865,19 @@ export class ComposerInputShellCoordinator {
       this.activeCapabilityHint = null;
       this.capabilityHintEl?.remove();
       this.capabilityHintEl = null;
+      this.syncAgentMenuVisibility();
       return;
     }
 
-    if (!this.composerContextActionsEl) {
+    if (!this.capabilityHintSlotEl) {
       return;
     }
 
     this.activeCapabilityHint = hint;
 
     if (!this.capabilityHintEl) {
-      this.capabilityHintEl = this.composerContextActionsEl.createEl('button', {
-        cls: `${this.capabilityHintHostClass} opencodian-tooltip-trigger`,
+      this.capabilityHintEl = this.capabilityHintSlotEl.createEl('button', {
+        cls: `${this.capabilityHintHostClass} opencodian-composer-menu-item opencodian-tooltip-trigger`,
         attr: {
           type: 'button',
         },
@@ -637,10 +898,11 @@ export class ComposerInputShellCoordinator {
         text: '{ }',
       });
       this.capabilityHintEl.createSpan({
-        cls: `${this.capabilityHintHostClass}-text`,
+        cls: `${this.capabilityHintHostClass}-text opencodian-composer-menu-item-label`,
         text: hint.text,
       });
     }
+    this.syncAgentMenuVisibility();
   }
 
   /**
@@ -687,8 +949,23 @@ export class ComposerInputShellCoordinator {
 
   applyLocaleTexts(): void {
     if (this.addContextBtnEl) {
-      this.host.setTooltipLabel(this.addContextBtnEl, t('chat.context.addContext'), 'top');
+      this.host.setTooltipLabel(this.addContextBtnEl, t('chat.composerMenu.addFile'), 'top');
     }
+    this.attachmentAddFileLabelEl?.setText(t('chat.composerMenu.addFile'));
+    this.attachmentAddImageLabelEl?.setText(t('chat.composerMenu.addImage'));
+    this.attachmentImageGenLabelEl?.setText(t('chat.composerMenu.generateImage'));
+    this.attachmentWebViewerLabelEl?.setText(t('chat.composerMenu.attachWebViewer'));
+    if (this.attachmentMenuTriggerEl) {
+      this.attachmentMenuTriggerEl.setAttribute('aria-label', t('chat.composerMenu.attachment'));
+      this.host.setTooltipLabel(this.attachmentMenuTriggerEl, t('chat.composerMenu.attachment'), 'top');
+    }
+    if (this.agentMenuTriggerEl) {
+      this.agentMenuTriggerEl.setAttribute('aria-label', t('chat.composerMenu.runSettings'));
+      this.host.setTooltipLabel(this.agentMenuTriggerEl, t('chat.composerMenu.runSettings'), 'top');
+    }
+    this.agentMenuTriggerTextEl?.setText(t('chat.agentSelector.trigger'));
+    this.agentMenuHeadingEl?.setText(t('chat.composerMenu.runSettings'));
+    this.agentMenuPanelEl?.setAttribute('aria-label', t('chat.composerMenu.runSettings'));
 
     const placeholderText = this.resolveInputPlaceholder();
     const labelId = this.inputTextareaEl?.getAttribute('aria-labelledby');
@@ -700,6 +977,7 @@ export class ComposerInputShellCoordinator {
     this.updateComposerAvailabilityState();
     this.agentSelectionController.applyLocaleTexts();
     this.renderCapabilityHint();
+    this.renderInputCounts();
   }
 
   updateSendButtonState(): void {
@@ -834,6 +1112,7 @@ export class ComposerInputShellCoordinator {
       this.agentMentionController.syncContent(nextValue);
     }
     this.syncHighlightBackdrop();
+    this.renderInputCounts();
     this.inputTextareaEl.focus();
     const cursor = nextValue.length;
     this.inputTextareaEl.setSelectionRange(cursor, cursor);
@@ -887,6 +1166,12 @@ export class ComposerInputShellCoordinator {
   destroy(): void {
     this.clearScheduledLayoutSync();
     this.clearCancelSettleWindow();
+    if (this.menuDocumentClickHandler) {
+      (this.composerShellEl?.ownerDocument ?? document).removeEventListener('click', this.menuDocumentClickHandler, true);
+      this.menuDocumentClickHandler = null;
+    }
+    this.closeAttachmentMenu();
+    this.closeAgentMenu();
     this.teardownImageDropSurface();
     this.inputContainerResizeObserver?.disconnect();
     this.inputContainerResizeObserver = null;
@@ -907,8 +1192,28 @@ export class ComposerInputShellCoordinator {
     this.inputWrapperEl = null;
     this.composerInputRowEl = null;
     this.composerContextActionsEl = null;
-    this.composerRuntimeDockEl = null;
     this.composerSubmitControlsEl = null;
+    this.composerStatusBarEl = null;
+    this.composerContextUsageSlotEl = null;
+    this.composerCountsEl = null;
+    this.modelSlotEl = null;
+    this.permissionSlotEl = null;
+    this.agentSelectorSlotEl = null;
+    this.agentSettingsBodyEl = null;
+    this.agentToolbarEl = null;
+    this.capabilityHintSlotEl = null;
+    this.attachmentMenuEl = null;
+    this.attachmentMenuTriggerEl = null;
+    this.attachmentMenuPanelEl = null;
+    this.agentMenuEl = null;
+    this.agentMenuTriggerEl = null;
+    this.agentMenuPanelEl = null;
+    this.agentMenuTriggerTextEl = null;
+    this.agentMenuHeadingEl = null;
+    this.attachmentAddFileLabelEl = null;
+    this.attachmentAddImageLabelEl = null;
+    this.attachmentImageGenLabelEl = null;
+    this.attachmentWebViewerLabelEl = null;
     this.addContextBtnEl = null;
     this.sendBtnEl = null;
     this.inputTextareaEl = null;
@@ -1117,6 +1422,7 @@ export class ComposerInputShellCoordinator {
     this.clearAttachedImages();
     this.syncTextareaHeight();
     this.syncHighlightBackdrop();
+    this.renderInputCounts();
     this.agentMentionController.clear(this.slashCommandMenuEl);
   }
 
@@ -1152,10 +1458,16 @@ export class ComposerInputShellCoordinator {
     const state = this.resolveComposerAvailabilityState();
     const isDisabled = state.kind !== 'ready';
 
+    if (isDisabled) {
+      this.closeAttachmentMenu();
+      this.closeAgentMenu();
+    }
     this.composerShellEl?.toggleClass('is-composer-disabled', isDisabled);
     this.inputWrapperEl?.toggleClass('is-composer-disabled', isDisabled);
     this.inputTextareaEl?.toggleAttribute('disabled', isDisabled);
     this.addContextBtnEl?.toggleAttribute('disabled', isDisabled);
+    this.attachmentMenuTriggerEl?.toggleAttribute('disabled', isDisabled);
+    this.agentMenuTriggerEl?.toggleAttribute('disabled', isDisabled);
     this.updateSendButtonState();
     this.renderCapabilityHint();
     this.syncComposerAvailabilityObserver(isDisabled);
@@ -1789,24 +2101,32 @@ export class ComposerInputShellCoordinator {
    */
   private async setupWebViewerContextButton(): Promise<void> {
     const tab = await this.host.getActiveWebViewerTabContext?.() ?? null;
-    if (!tab || !this.composerContextActionsEl) {
+    if (!tab || !this.attachmentMenuPanelEl?.isConnected) {
       return;
     }
-    const btnEl = this.composerContextActionsEl.createEl('button', {
-      cls: 'opencodian-composer-webviewer-btn opencodian-tooltip-trigger',
+    const btnEl = this.attachmentMenuPanelEl.createEl('button', {
+      cls: 'opencodian-composer-menu-item opencodian-composer-webviewer-btn opencodian-tooltip-trigger',
       attr: {
         type: 'button',
+        role: 'menuitem',
         'aria-label': t('chat.webViewer.attachButton'),
       },
     });
-    setIcon(btnEl, 'globe');
+    const iconEl = btnEl.createSpan({ cls: 'opencodian-composer-menu-item-icon' });
+    setIcon(iconEl, 'globe');
+    this.attachmentWebViewerLabelEl = btnEl.createSpan({
+      cls: 'opencodian-composer-menu-item-label',
+      text: t('chat.composerMenu.attachWebViewer'),
+    });
     this.host.setTooltipLabel(btnEl, t('chat.webViewer.attachButton'), 'top');
     btnEl.addEventListener('click', async () => {
       const current = await this.host.getActiveWebViewerTabContext?.() ?? null;
       if (!current) {
         btnEl.remove();
+        this.attachmentWebViewerLabelEl = null;
         return;
       }
+      this.closeAttachmentMenu();
       this.host.attachWebViewerTabContextToActiveTab?.(current);
     });
   }

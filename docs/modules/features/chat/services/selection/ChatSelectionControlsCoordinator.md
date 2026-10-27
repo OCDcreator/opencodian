@@ -94,8 +94,8 @@ export class ChatSelectionControlsCoordinator {
 - model dropdown/search/list/selection display lifecycle 仍集中在 `ChatSelectionControlsCoordinator`；model catalog cache、selection resolution、switch-model notice 与 unavailable follow-up 已进一步收束到 `ModelSelectionRuntime`。Codex 选择会先验证 active `opencodian-view`，通过现有 `ConversationSessionSettingsCoordinator.saveConversationOverrides()` 写入 `codexModelOverride`；它关闭通用即时 notice，只有保存成功后才显示 next-thread / new-conversation 提示，失败时恢复会话与 tab override
 - OpenCode / Claude Code 的聊天模型选择仍写入 active-tab `modelOverride`，用于当前标签后续发送；Codex composer 选择是例外，会通过现有 session-settings coordinator 持久化 `codexModelOverride`，并仅在保存成功后显示 next-thread 反馈。
 - permission dropdown lifecycle 由 build-time `PermissionModeSelectorCoordinator` 承接，并仍通过 shared Escape handler 与 model dropdown 一起关闭
-- send pipeline options、`ModelCatalogStateService`、provider availability 语义与 icon fallback 顺序没有变化
-- 该模块刻意不接管 context usage、effort selector 或 input glass/theme；这些仍在相邻 owner 中维护
+- send pipeline options、`ModelCatalogStateService` 与 provider availability 语义不变；trigger 图标解析优先使用具体模型，再回退到 provider
+- 该模块不接管 context usage、effort 状态保存或 input glass/theme；inline effort 的 DOM 与选择语义仍由 `EffortSelector` 和 host callbacks 维护
 
 ## 2026-09-08 Pi 独立服务接入
 
@@ -135,3 +135,12 @@ DSH 的模型值保持不透明。推理 variants 仅来自该原生会话已观
 
 
 2026-10-26 现场目录时序补充：reloadModelCatalog 完成目录快照与工具栏更新后，调用可选 host.refreshHistoricalModelDisplayNames；修复 native 目录晚于历史 footer 首次绘制的情况。
+
+## 2026-10-27 组合模型/effort 弹层与分栏挂载
+
+- `build(toolbarEl, options)` 新增可选 `options.modelContainer`：permission / badge 挂在独立 footer toolbar，model selector 挂到右侧模型 slot。`build()` 仍然只执行一次 `destroy()`，不会因为分栏而重复销毁 permission selector。
+- 模型 trigger 改为「模型名 · 当前 effort」，Chevron 紧跟内容。模型名可截断，effort 使用 full/short 两个独立文本节点，窄栏显示 `chat.effort.disabledShort` 等短标签而不会重复朗读；`updateModelSelectorEffortDisplay()` 只刷新 effort，避免递归重建 inline control。
+- trigger 图标先按模型 ID 推导候选 provider，再回退到当前 provider；聚合网关不会抢在 DeepSeek/Moonshot/Anthropic 等具体模型图标之前。解析失败不渲染机器人占位图标，异步请求继续受 `modelSelectorIconRequestId` 代际保护。
+- `host.mountEffortSelector(container)` 由本 coordinator 在 `buildModelDropdown()` 内调用：effort 控件挂在现有 search + provider/model list 之下，形成同一个向上弹层。模型搜索、provider 分组、sticky headers、键盘导航、focus restore、disabledModelRefs / configured-only 过滤、streaming disabled 判断与原有 model 选择回调均未改。
+- 新增可选 `host.getEffortDisplayLabel()`；返回空串时 trigger 隐藏分隔符与 effort，保持无 effort 模型/后端只显示模型名。
+- model dropdown 仍通过 `AnchoredOverlayLayoutController` 按 `.opencodian-container` 边界定位；effort slot 位于列表下方，列表自身保持 280px 滚动视口。

@@ -77,6 +77,7 @@ describe('Codex sandbox mode selector', () => {
 
       const textEl = container.querySelector('.opencodian-permission-trigger-text');
       expect(textEl?.textContent).toBe('WS');
+      expect(container.querySelector('.opencodian-permission-trigger')?.getAttribute('aria-label')).toBe('WS');
 
       coordinator.destroy();
     });

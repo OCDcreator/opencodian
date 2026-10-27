@@ -41,3 +41,21 @@ OpenCode 模式下，variants 来自当前 provider model catalog 的 `models[mo
 ## 2026-10-26 宿主 Escape 验收补充
 
 `handleEscape()` 供 Obsidian Scope 优先关闭已打开的菜单并恢复入口焦点；菜单关闭时返回 false，让原有 Escape 链继续。document 监听保留为独立组件的回退，不能用其单元测试代替宿主捕获阶段验收。
+
+## 2026-10-27 内联 presentation（组合模型弹层）
+
+`EffortSelector` 新增 `EffortSelectorOptions.presentation`：
+
+- `popover`（默认）：原有 trigger + 向上菜单，行为与测试保持不变。
+- `inline`：不创建自己的 trigger / 下拉，直接把 effort 面板挂到调用方提供的容器；当前由 `ChatSelectionControlsCoordinator` 挂在模型弹层下半部。
+
+内联面板是一个离散 slider，步数严格来自 `getVariants()`：
+
+- `allowDefaultOption()` 为 true 时，default/inherit/off 是第 0 步，并映射回 `onVariantChange(undefined)`；后续步按 backend variants 的真实顺序排列（不再像 popover 那样反向展示）。
+- `allowDefaultOption()` 为 false（Claude Code / Codex）时不提供 off 步，只显示真实 variants。
+- slider 的 `aria-valuetext`、header output 与 tick 标签都使用真实选项名（`formatVariantLabel` 或 backend default label），不创建「低/标准/高/最高」这类固定假档位。
+- 变更走同一个 `onVariantChange`；保存期间禁用 slider 并防重复提交，失败显示 `chat.effort.saveFailed` 并回读当前值。boundary hint 仍通过 `getBoundaryHint()` 显示在面板内。
+- `getDisplayLabel()` 供组合 trigger 读取当前 effort 标签；模型无 variants 或无 model 时返回空字符串，并给容器加 `is-hidden`。
+- 新增可选 `onDisplayChange`，在 `updateDisplay()` 完成后通知 embedding trigger 刷新「模型 · effort」文案；该回调不得反向调用 `updateDisplay()`，避免递归。
+
+滑块视觉翻译自 shadcn 官方 Slider（registry `ui/slider.tsx`）：轨道使用 primary 20%，填充使用 primary，Thumb 使用 primary 50% 边框、background 与阴影；WebKit / Firefox 伪元素分别实现，不使用第三方运行时依赖。真实 variant 数量与保存语义不因视觉映射改变。

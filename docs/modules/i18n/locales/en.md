@@ -1,4 +1,5 @@
 # English Locale
+> 2026-10-27: added `chat.effort.disabledShort` (`Off`) for the narrow Composer trigger; the full `chat.effort.disabled` label remains in the model popover.
 `modifiedFiles.statsUnavailable` and `modifiedFiles.statusUnavailable` label file-hint records that have no authoritative native snapshot statistics or change status.
 > 2026-09-30 (B2 codex-stream-rendering): adds `chat.toolCard.image.*` (`statusGenerating` / `statusCompleted` / `statusFailed` / `revisedPrompt`) for the streaming image-generation tool card rendered by ToolCallRenderer; mirrors zh.
 > 2026-09-30 (B4 codex plugins/usage): adds `settings.codex.tab.plugins` plus the `settings.codex.plugins.*` group (browser heading/actions, marketplace+installed groups, install/uninstall/reconcile notices, install-policy badges, marketplace-load-error copy) and `settings.codex.accountSurface.usage.empty` (honest all-null usage state); mirrors zh.
@@ -678,3 +679,7 @@ Includes the localized Pi extension-command completion status used only after a 
 ## 2026-10-26 DSH UI wording
 
 Adds the independent composer input name, effort-save failure, DSH default/inheritance and next-send explanation, and MCP declaration/draft/application wording. Saved declarations and application counts are explicitly distinct from online server readback.
+
+## 2026-10-27 Single-rail composer menu copy
+
+Adds `chat.composerMenu.*` keys for the attachment menu (attachment, add file/image, generate image, attach Web Viewer), the Agent/run-settings trigger and heading, and the real word/character status-bar counts. Existing context/image/image-generation keys remain in use for tooltips.

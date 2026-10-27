@@ -118,3 +118,5 @@ OpenCodianView 只转发 Codex 目录恢复到插件既有桥，保持 view/runt
 
 
 2026-10-26 现场目录时序补充：selection 的目录就绪回调只把当前 chat 根转交既有 shell renderer adapter，保持 DOM 更新归 runtime renderer。
+
+2026-10-27 单轨 Composer：OpenCodianView 只调整 host 装配，把 `modelContainer` 转交 selection controls，并让 effort 由 selection host 内联到模型弹层；发送/停止、草稿、per-tab streaming、IME、附件与多标签状态仍由原 runtime owner 持有。状态栏移到 composer shell 之外，ContextRing 位置变化不改变 modal 或 context usage 数据流。

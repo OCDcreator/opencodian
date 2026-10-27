@@ -1006,6 +1006,7 @@ export class OpenCodianView extends ItemView {
         this.chatSelectionControlsCoordinator.build(toolbar, {
           showModels: options.showModels && hasCapability(this.caps, AgentCapability.Models),
           showPermissions: options.showPermissions && hasCapability(this.caps, AgentCapability.Permissions),
+          ...(options.modelContainer ? { modelContainer: options.modelContainer } : {}),
         });
       },
       shouldMountAgentSelector: () => {
@@ -1048,104 +1049,7 @@ export class OpenCodianView extends ItemView {
         this.activeTabContextUsageCoordinator.refreshContextUsageIndicator();
       },
       mountEffortSelector: (container) => {
-        if (!hasCapability(this.caps, AgentCapability.Thinking)) {
-          return;
-        }
-
-        this.effortContainerEl = container;
-        this.effortSelector = new EffortSelector(container, {
-          getVariants: () => {
-            if (this.isClaudeCodeConversationActive()) {
-              return [...CLAUDE_CODE_EFFORT_VARIANTS];
-            }
-            if (this.isCodexConversationActive()) {
-              return [...CODEX_EFFORT_VARIANTS];
-            }
-            const current = this.getCurrentSessionModel();
-            if (!current) return [];
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const modelRef = `${current.provider}/${current.model}`;
-            return this.findKnownModelInfo({ provider: current.provider, model: current.model })?.variants ?? [];
-          },
-          getVariant: () => {
-            if (this.currentConversation?.backend === 'dsh') {
-              const current = this.getCurrentSessionModel();
-              return current ? this.currentConversation.sessionSettings?.dshEffortOverrides?.[`${current.provider}/${current.model}`] ?? undefined : undefined;
-            }
-            return this.getCurrentEffortVariant();
-          },
-          onVariantChange: async (variant: string | undefined) => {
-            if (this.isCodexConversationActive()) {
-              const conversation = this.currentConversation;
-              if (!conversation) return;
-              const effort = (variant ?? 'medium') as CodexReasoningEffort;
-              await this.conversationSessionSettingsCoordinator.saveConversationOverrides(conversation, {
-                ...conversation.sessionSettings,
-                codexModelReasoningEffort: effort,
-              });
-              return;
-            }
-            const current = this.getCurrentSessionModel();
-            const conversation = this.currentConversation;
-            if (conversation?.backend === 'dsh' && current) {
-              await saveDshConversationSelection(conversation, {
-                dshEffortOverrides: {
-                  ...conversation.sessionSettings?.dshEffortOverrides,
-                  [`${current.provider}/${current.model}`]: variant ?? null,
-                },
-              }, (target) => this.plugin.saveConversation(target));
-              return;
-            }
-            if (conversation?.backend === 'pi' && current) {
-              await savePiConversationSelection(conversation, {
-                piEffortOverrides: {
-                  ...conversation.sessionSettings?.piEffortOverrides,
-                  [`${current.provider}/${current.model}`]: variant ?? null,
-                },
-              }, (target) => this.plugin.saveConversation(target));
-              return;
-            }
-            if (conversation?.backend === 'zcode' && current) {
-              await saveZCodeConversationSelection(conversation, {
-                zcodeEffortOverrides: {
-                  ...conversation.sessionSettings?.zcodeEffortOverrides,
-                  [`${current.provider}/${current.model}`]: variant ?? null,
-                },
-              }, (target) => this.plugin.saveConversation(target));
-              return;
-            }
-            this.currentVariant = this.normalizeEffortVariantForCurrentBackend(variant);
-            if (current) {
-              this.variantStore[this.getEffortStoreKey(`${current.provider}/${current.model}`)] = this.currentVariant;
-            }
-          },
-          getCurrentModel: () => {
-            if (this.isCodexConversationActive()) {
-              // Codex does not use the model catalog, but the effort selector
-              // needs a non-empty model string to stay visible.
-              return 'codex/default';
-            }
-            const current = this.getCurrentSessionModel();
-            return current ? `${current.provider}/${current.model}` : '';
-          },
-          allowDefaultOption: () => !this.isClaudeCodeConversationActive() && !this.isCodexConversationActive(),
-          getDefaultOptionLabel: () => {
-            if (this.currentConversation?.backend === 'dsh') {
-              const adapter = this.plugin.agentServiceRegistry?.get('dsh') as { getDefaultReasoningEffort?(sessionId?: string): string | undefined } | undefined;
-              const effort = adapter?.getDefaultReasoningEffort?.(this.currentConversation.backendSessionId);
-              return effort ? t('chat.dsh.reasoning.modelDefault', { effort: effort.charAt(0).toUpperCase() + effort.slice(1) })
-                : t('chat.dsh.reasoning.inherit');
-            }
-            return this.currentConversation?.backend === 'zcode' ? t('chat.zcode.reasoning.modelDefault')
-              : this.currentConversation?.backend === 'pi' ? t('chat.effort.inherit.pi') : t('chat.effort.disabled');
-          },
-          getBoundaryHint: () =>
-            this.isCodexConversationActive() ? t('chat.effort.boundaryHint.codex')
-              : this.currentConversation?.backend === 'zcode' ? t('chat.zcode.reasoning.boundaryHint')
-                : this.currentConversation?.backend === 'pi' ? t('chat.effort.boundaryHint.pi')
-                  : this.currentConversation?.backend === 'dsh' ? t('chat.dsh.reasoning.boundaryHint') : undefined,
-        });
-        this.effortSelector.updateDisplay();
+        this.mountChatEffortSelector(container);
       },
       isActiveTabStreaming: () => this.isActiveTabStreaming(),
       cancelStreaming: () => {
@@ -1187,6 +1091,115 @@ export class OpenCodianView extends ItemView {
       // plugin-side generation service are owned by the composition root.
       onRequestImageGeneration: () => { this.plugin.openImageGenerationCard(''); },
     };
+  }
+
+  /**
+   * Shared effort-control construction for both host seams. Production mounts
+   * it inline inside the combined model popover; tests and legacy callers may
+   * mount it into a standalone container, but the callbacks and semantics are
+   * identical either way.
+   */
+  private mountChatEffortSelector(container: HTMLElement): void {
+    if (!hasCapability(this.caps, AgentCapability.Thinking)) {
+      return;
+    }
+
+    this.effortSelector?.destroy();
+    this.effortContainerEl = container;
+    this.effortSelector = new EffortSelector(container, {
+      getVariants: () => {
+        if (this.isClaudeCodeConversationActive()) {
+          return [...CLAUDE_CODE_EFFORT_VARIANTS];
+        }
+        if (this.isCodexConversationActive()) {
+          return [...CODEX_EFFORT_VARIANTS];
+        }
+        const current = this.getCurrentSessionModel();
+        if (!current) return [];
+        return this.findKnownModelInfo({ provider: current.provider, model: current.model })?.variants ?? [];
+      },
+      getVariant: () => {
+        if (this.currentConversation?.backend === 'dsh') {
+          const current = this.getCurrentSessionModel();
+          return current ? this.currentConversation.sessionSettings?.dshEffortOverrides?.[`${current.provider}/${current.model}`] ?? undefined : undefined;
+        }
+        return this.getCurrentEffortVariant();
+      },
+      onVariantChange: async (variant: string | undefined) => {
+        if (this.isCodexConversationActive()) {
+          const conversation = this.currentConversation;
+          if (!conversation) return;
+          const effort = (variant ?? 'medium') as CodexReasoningEffort;
+          await this.conversationSessionSettingsCoordinator.saveConversationOverrides(conversation, {
+            ...conversation.sessionSettings,
+            codexModelReasoningEffort: effort,
+          });
+          return;
+        }
+        const current = this.getCurrentSessionModel();
+        const conversation = this.currentConversation;
+        if (conversation?.backend === 'dsh' && current) {
+          await saveDshConversationSelection(conversation, {
+            dshEffortOverrides: {
+              ...conversation.sessionSettings?.dshEffortOverrides,
+              [`${current.provider}/${current.model}`]: variant ?? null,
+            },
+          }, (target) => this.plugin.saveConversation(target));
+          return;
+        }
+        if (conversation?.backend === 'pi' && current) {
+          await savePiConversationSelection(conversation, {
+            piEffortOverrides: {
+              ...conversation.sessionSettings?.piEffortOverrides,
+              [`${current.provider}/${current.model}`]: variant ?? null,
+            },
+          }, (target) => this.plugin.saveConversation(target));
+          return;
+        }
+        if (conversation?.backend === 'zcode' && current) {
+          await saveZCodeConversationSelection(conversation, {
+            zcodeEffortOverrides: {
+              ...conversation.sessionSettings?.zcodeEffortOverrides,
+              [`${current.provider}/${current.model}`]: variant ?? null,
+            },
+          }, (target) => this.plugin.saveConversation(target));
+          return;
+        }
+        this.currentVariant = this.normalizeEffortVariantForCurrentBackend(variant);
+        if (current) {
+          this.variantStore[this.getEffortStoreKey(`${current.provider}/${current.model}`)] = this.currentVariant;
+        }
+      },
+      getCurrentModel: () => {
+        if (this.isCodexConversationActive()) {
+          // Codex does not use the model catalog, but the effort selector
+          // needs a non-empty model string to stay visible.
+          return 'codex/default';
+        }
+        const current = this.getCurrentSessionModel();
+        return current ? `${current.provider}/${current.model}` : '';
+      },
+      allowDefaultOption: () => !this.isClaudeCodeConversationActive() && !this.isCodexConversationActive(),
+      getDefaultOptionLabel: () => {
+        if (this.currentConversation?.backend === 'dsh') {
+          const adapter = this.plugin.agentServiceRegistry?.get('dsh') as { getDefaultReasoningEffort?(sessionId?: string): string | undefined } | undefined;
+          const effort = adapter?.getDefaultReasoningEffort?.(this.currentConversation.backendSessionId);
+          return effort ? t('chat.dsh.reasoning.modelDefault', { effort: effort.charAt(0).toUpperCase() + effort.slice(1) })
+            : t('chat.dsh.reasoning.inherit');
+        }
+        return this.currentConversation?.backend === 'zcode' ? t('chat.zcode.reasoning.modelDefault')
+          : this.currentConversation?.backend === 'pi' ? t('chat.effort.inherit.pi') : t('chat.effort.disabled');
+      },
+      getBoundaryHint: () =>
+        this.isCodexConversationActive() ? t('chat.effort.boundaryHint.codex')
+          : this.currentConversation?.backend === 'zcode' ? t('chat.zcode.reasoning.boundaryHint')
+            : this.currentConversation?.backend === 'pi' ? t('chat.effort.boundaryHint.pi')
+              : this.currentConversation?.backend === 'dsh' ? t('chat.dsh.reasoning.boundaryHint') : undefined,
+      onDisplayChange: () => {
+        this.chatSelectionControlsCoordinator?.updateModelSelectorEffortDisplay();
+      },
+    }, { presentation: 'inline' });
+    this.effortSelector.updateDisplay();
   }
 
   /**
@@ -1499,6 +1512,10 @@ export class OpenCodianView extends ItemView {
           providerId,
           this.plugin.settings.providerIconLibrary,
         ),
+      mountEffortSelector: (container) => {
+        this.mountChatEffortSelector(container);
+      },
+      getEffortDisplayLabel: () => this.effortSelector?.getDisplayLabel() ?? '',
       updateEffortSelectorDisplay: () => {
         if (this.currentConversation?.backend === 'pi') {
           this.effortSelector?.updateDisplay();

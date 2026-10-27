@@ -60,7 +60,7 @@ export class PermissionModeSelectorCoordinator {
 - host seam 使用 `string` 而不是 OpenCode-only `PermissionMode`，避免把两套 backend permission mode 类型混在同一个 UI owner 中
 - trigger 文案按 active backend 映射：OpenCode 继续显示 `YOLO` / `ASK` / `PLAN`，Claude Code 显示完整紧凑标签（`Ask first` / `Auto edit` / `Plan mode` / `Full access`，中文为 `变更前确认` / `自动编辑` / `计划模式` / `完全访问`），Codex 显示 `RO` / `WS` / `FULL`，并保留 `mode-*` class
 - trigger 携带 `data-permission-backend="opencode|claude-code|codex"`，用于运行时验证当前 selector 属于哪个 backend
-- `icon` 可选属性为每个 backend/mode 提供 lucide 图标；Claude Code 当前使用 `hand`、`shield-check`、`clipboard-list`、`shield-alert`，trigger 会随当前 mode 切换图标
+- `icon` 为每个 backend/mode 提供 lucide 图标。询问使用 `hand`，计划使用 `clipboard-list`，受控自动使用 `shield-check`，完全访问或高风险自动使用 `shield-alert`；Codex read-only 保留 `shield`，ZCode edit 使用 `pencil`。trigger 与菜单 option 共用同一图标映射，权限不只依赖颜色区分。窄 Composer 隐藏 trigger 文本和 Chevron，仅保留该权限图标，点击仍打开原菜单
 - 三种 backend 都把各自的内容挂入共享 `ComposerPopoverFrame`：统一的本地化标题、Esc keycap 与 Arrow / Enter / Esc footer 只负责呈现，backend mode catalog 与写回责任仍留在本 coordinator / host seam
 - `boundaryHint` 可选属性：若 config 提供了 `boundaryHint`，则 mount 时将其写入 trigger 的 `title` 属性，用于传达 selector 只影响后续 thread 创建的边界语义（Codex sandbox selector 默认启用此 hint）
 - option labels/descriptions 按 config 提供，OpenCode 仍复用 `settings.security.permissionMode.*` locale keys 与 fallback 文案；Claude Code 复用 `settings.claudeCode.permissionMode.*` labels 与 `chat.claudeCode.permissionMode.*` descriptions，其中 `bypassPermissions` 的 UI 可显示为 `完全访问` / `Full access`，但 description 必须保留它会绕过权限检查的语义；Codex 复用 `settings.codex.sandbox.*` labels 与 `chat.codex.sandboxMode.*` description locale keys

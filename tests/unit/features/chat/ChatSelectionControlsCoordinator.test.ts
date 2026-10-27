@@ -8,6 +8,12 @@ import {
   ChatSelectionControlsCoordinator,
   type ChatSelectionControlsCoordinatorHost,
 } from '../../../../src/features/chat/services/selection/ChatSelectionControlsCoordinator';
+import {
+  createCodexSandboxConfig,
+  createOpenCode2PermissionConfig,
+  createOpenCodePermissionConfig,
+  createZCodeModeConfig,
+} from '../../../../src/features/chat/services/selection/PermissionModeSelectorCoordinator';
 import type {
   ModelSelectorProvider,
   ModelSelectorSelection,
@@ -146,6 +152,10 @@ async function createFixture(options: FixtureOptions = {}) {
       providerId === 'anthropic' ? 'app://vault/provider-icons/anthropic.svg' : null,
     ),
     updateEffortSelectorDisplay: jest.fn(),
+    mountEffortSelector: jest.fn((container) => {
+      container.createDiv({ cls: 'opencodian-effort-selector opencodian-effort-selector--inline', text: 'effort' });
+    }),
+    getEffortDisplayLabel: jest.fn(() => 'Medium'),
     getPermissionMode: jest.fn(() => permissionMode),
     switchPermissionMode: jest.fn(async (mode) => {
       permissionMode = mode;
@@ -179,6 +189,21 @@ async function createFixture(options: FixtureOptions = {}) {
 }
 
 describe('ChatSelectionControlsCoordinator', () => {
+  it('distinguishes permission levels by icon shape across backends', () => {
+    expect(createOpenCode2PermissionConfig().options.map((option) => option.icon)).toEqual([
+      'shield-check', 'hand', 'shield-alert', 'clipboard-list',
+    ]);
+    expect(createOpenCodePermissionConfig().options.map((option) => option.icon)).toEqual([
+      'shield-alert', 'hand', 'clipboard-list',
+    ]);
+    expect(createCodexSandboxConfig().options.map((option) => option.icon)).toEqual([
+      'shield', 'shield-check', 'shield-alert',
+    ]);
+    expect(createZCodeModeConfig().options.map((option) => option.icon)).toEqual([
+      'clipboard-list', 'shield-check', 'pencil', 'shield-alert', 'shield-alert',
+    ]);
+  });
+
   it('notifies the historical-label renderer after the catalog snapshot is ready', async () => {
     const fixture = await createFixture();
     const refreshHistoricalModelDisplayNames = jest.fn(() => {
@@ -302,6 +327,32 @@ describe('ChatSelectionControlsCoordinator', () => {
     } finally {
       globalApp.app = previousApp;
     }
+  });
+
+  it('resolves the trigger icon from the model before an aggregate provider and never falls back to a robot', async () => {
+    const providers: ModelSelectorProvider[] = [{
+      id: 'ocgw',
+      name: 'Gateway',
+      models: [{ id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash', contextWindow: 1000000 }],
+    }];
+    const fixture = await createFixture({
+      defaultModelSelection: { provider: 'ocgw', model: 'deepseek-v4.1-flash' },
+      loadModelCatalogData: {
+        catalogBundle: createCatalogBundle(providers),
+        providers,
+      },
+    });
+    fixture.host.resolveProviderIconUrl.mockImplementation(async (providerId) =>
+      providerId === 'deepseek' ? 'app://vault/provider-icons/deepseek.svg' : null,
+    );
+
+    fixture.coordinator.updateModelSelectorDisplay();
+    await settleAsyncWork();
+
+    expect(fixture.host.resolveProviderIconUrl).toHaveBeenCalledWith('deepseek');
+    const trigger = fixture.toolbarEl.querySelector('.opencodian-model-trigger');
+    expect(trigger?.querySelector('img')?.getAttribute('src')).toBe('app://vault/provider-icons/deepseek.svg');
+    expect(trigger?.querySelector('[data-icon="bot"]')).toBeNull();
   });
 
   it('loads model selector state and routes model selection through the active-tab override seam', async () => {
@@ -1559,4 +1610,50 @@ describe('ChatSelectionControlsCoordinator', () => {
     /* eslint-enable @typescript-eslint/no-explicit-any */
   });
 
+});
+
+describe('ChatSelectionControlsCoordinator combined model · effort trigger', () => {
+  it('renders the model name with a visible effort label and mounts effort inside the model popover', async () => {
+    const fixture = await createFixture();
+
+    const trigger = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-trigger');
+    const separator = trigger?.querySelector<HTMLElement>('.opencodian-model-trigger-separator');
+    const effort = trigger?.querySelector<HTMLElement>('.opencodian-model-trigger-effort');
+    const dropdown = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-dropdown');
+
+    expect(trigger?.querySelector('.opencodian-model-trigger-text')?.textContent).toBe('Claude 3.7 Sonnet');
+    expect(separator?.classList.contains('is-hidden')).toBe(false);
+    expect(effort?.textContent).toBe('Medium');
+    expect(effort?.classList.contains('is-hidden')).toBe(false);
+    expect(trigger?.querySelector('.opencodian-model-trigger-chevron')).not.toBeNull();
+    expect(fixture.host.mountEffortSelector).toHaveBeenCalledTimes(1);
+    expect(
+      dropdown?.querySelector('.opencodian-model-effort-slot .opencodian-effort-selector'),
+    ).not.toBeNull();
+  });
+
+  it('omits the separator and effort label when the backend exposes no effort axis', async () => {
+    const fixture = await createFixture();
+    fixture.host.getEffortDisplayLabel.mockReturnValue('');
+
+    fixture.coordinator.updateModelSelectorEffortDisplay();
+
+    const trigger = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-trigger');
+    expect(trigger?.querySelector<HTMLElement>('.opencodian-model-trigger-separator')?.classList.contains('is-hidden')).toBe(true);
+    expect(trigger?.querySelector<HTMLElement>('.opencodian-model-trigger-effort')?.classList.contains('is-hidden')).toBe(true);
+  });
+
+  it('routes the model selector into modelContainer while keeping permission in the supplied toolbar', async () => {
+    const fixture = await createFixture();
+    const permissionHost = document.createElement('div');
+    const modelHost = document.createElement('div');
+    document.body.append(permissionHost, modelHost);
+
+    fixture.coordinator.build(permissionHost, { modelContainer: modelHost });
+    await settleAsyncWork();
+
+    expect(permissionHost.querySelector('.opencodian-permission-selector')).not.toBeNull();
+    expect(permissionHost.querySelector('.opencodian-model-selector')).toBeNull();
+    expect(modelHost.querySelector('.opencodian-model-selector')).not.toBeNull();
+  });
 });

@@ -68,18 +68,21 @@ export function createOpenCodePermissionConfig(): PermissionModeConfig {
         label: t('settings.security.permissionMode.yolo'),
         description: t('settings.security.permissionMode.yoloDescription')
           || 'Allow all tools without asking',
+        icon: 'shield-alert',
       },
       {
         id: 'normal',
         label: t('settings.security.permissionMode.normal'),
         description: t('settings.security.permissionMode.normalDescription')
           || 'Ask before executing tools',
+        icon: 'hand',
       },
       {
         id: 'plan',
         label: t('settings.security.permissionMode.plan'),
         description: t('settings.security.permissionMode.planDescription')
           || 'Review and approve all actions',
+        icon: 'clipboard-list',
       },
     ],
     displayMap: { yolo: 'YOLO', normal: 'ASK', plan: 'PLAN' } as Record<PermissionMode, string>,
@@ -88,12 +91,19 @@ export function createOpenCodePermissionConfig(): PermissionModeConfig {
 }
 
 export function createOpenCode2PermissionConfig(): PermissionModeConfig {
+  const icons = {
+    inherit: 'shield-check',
+    normal: 'hand',
+    yolo: 'shield-alert',
+    plan: 'clipboard-list',
+  } as const;
   return {
     backendLabel: 'opencode2',
     options: (['inherit', 'normal', 'yolo', 'plan'] as const).map((id) => ({
       id,
       label: t(`chat.opencode2.mode.${id}`),
       description: t(`chat.opencode2.mode.${id}.description`),
+      icon: icons[id],
     })),
     displayMap: { inherit: 'AUTO', normal: 'ASK', yolo: 'YOLO', plan: 'PLAN' },
     modeCssClasses: ['mode-inherit', 'mode-normal', 'mode-yolo', 'mode-plan'],
@@ -102,12 +112,20 @@ export function createOpenCode2PermissionConfig(): PermissionModeConfig {
 
 /** Native ZCode session mode; this is one axis, not OpenCode permission templates. */
 export function createZCodeModeConfig(): PermissionModeConfig {
+  const icons = {
+    plan: 'clipboard-list',
+    build: 'shield-check',
+    edit: 'pencil',
+    yolo: 'shield-alert',
+    auto: 'shield-alert',
+  } as const;
   return {
     backendLabel: 'zcode',
     options: (['plan', 'build', 'edit', 'yolo', 'auto'] as const).map((id) => ({
       id,
       label: t(`chat.zcode.mode.${id}`),
       description: t(`chat.zcode.mode.${id}.description`),
+      icon: icons[id],
     })),
     displayMap: {
       plan: 'PLAN', build: 'BUILD', edit: 'EDIT', yolo: 'YOLO', auto: 'AUTO',
@@ -175,18 +193,21 @@ export function createCodexSandboxConfig(): PermissionModeConfig {
         label: t('settings.codex.sandbox.readOnly'),
         description: t('chat.codex.sandboxMode.readOnly.description')
           || 'Filesystem reads only; no writes or shell execution',
+        icon: 'shield',
       },
       {
         id: 'workspace-write',
         label: t('settings.codex.sandbox.workspaceWrite'),
         description: t('chat.codex.sandboxMode.workspaceWrite.description')
           || 'Allow writes within the workspace directory',
+        icon: 'shield-check',
       },
       {
         id: 'danger-full-access',
         label: t('settings.codex.sandbox.dangerFullAccess'),
         description: t('chat.codex.sandboxMode.dangerFullAccess.description')
           || 'Full system access without sandbox restrictions',
+        icon: 'shield-alert',
       },
     ],
     displayMap: {
@@ -402,6 +423,7 @@ export class PermissionModeSelectorCoordinator {
       setIcon(iconEl, displayState.icon);
     }
 
+    triggerEl.setAttribute('aria-label', displayState.label);
     triggerEl.removeClass(...this.config.modeCssClasses);
     triggerEl.addClass(displayState.modeClass);
   }

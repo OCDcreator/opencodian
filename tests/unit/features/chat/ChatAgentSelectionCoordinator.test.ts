@@ -86,6 +86,7 @@ describe('ChatAgentSelectionCoordinator', () => {
     const trigger = fixture.container.querySelector<HTMLElement>('.opencodian-agent-trigger');
 
     expect(trigger?.textContent).toBe('Agent');
+    expect(trigger?.querySelector('.opencodian-agent-trigger-icon')).toBeNull();
     expect(trigger?.querySelector('.opencodian-agent-trigger-chevron')).not.toBeNull();
 
     trigger?.click();

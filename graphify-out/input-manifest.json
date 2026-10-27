@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "667d07bb99be919077c23de23badb71e0b5a657ea610c7f8ac41327fb3e01e70",
+  "digest": "a3159f8eecee5fb057bbe9b3a4412ec27103afbe45823bb4eaa0abf87d7d0123",
   "recordCount": 803,
   "records": [
     {
@@ -16,12 +16,12 @@
     {
       "kind": "package",
       "key": "package-lock.json",
-      "sha256": "5ef9b09e98b7c27438d60bdadecdd226bfdc3f0749703e46bed61fd37eb357e8"
+      "sha256": "5313729717da3125fc413b56ea8a80c9e6fd47f6925d5cc616e76e1d89b0a8ea"
     },
     {
       "kind": "package",
       "key": "package.json",
-      "sha256": "8cac1a0e0f2c29f6936aa68837098a5d83d57275eb8bf43d95dcaab12a503a6d"
+      "sha256": "3ea3ddaa6c3d82396e864270ab7ecc4b4712e654d4ab7c31407a6ee632de2735"
     },
     {
       "kind": "src",
@@ -1411,7 +1411,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
-      "sha256": "0bb087758d6f43c1d5dc0e854100ea68216aa84be0f605ac04212e71e9caf958"
+      "sha256": "dbc604e66c4fe75e1ac6deada1035dfeb42fc3de89ab7c8e2ccde6b09090ea3e"
     },
     {
       "kind": "src",
@@ -1816,7 +1816,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/composer/ComposerInputShellCoordinator.ts",
-      "sha256": "7c718d93cadbc196ca6ed6c3d9d980ba8afdc5dcbffd8e5cc8060018303582f2"
+      "sha256": "0030e0e3652743f9ff2a3c3c7d7d8b3478cd679be19b2b5e78434f8ce760bd62"
     },
     {
       "kind": "src",
@@ -2251,12 +2251,12 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/selection/ChatAgentSelectionCoordinator.ts",
-      "sha256": "0cb46d19a7bbe7e824bcd8b64f0a597be2568618f1007f40d5d4615e12c89f83"
+      "sha256": "4881312c2506d4165f5abc55d2fb3337580547b9a5b518641d5d9ec0110b1e45"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/selection/ChatSelectionControlsCoordinator.ts",
-      "sha256": "830790755de16fa4a7c4fb35864bcacd9e5e4b438cba0d8a46336e19b9f5fa76"
+      "sha256": "50a9dc5c0ac45e1cfe37ef8f6a7e0dfe9fca7917c47b3c6f8a81181071774dfe"
     },
     {
       "kind": "src",
@@ -2271,7 +2271,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/selection/PermissionModeSelectorCoordinator.ts",
-      "sha256": "a34c3d67e9f1211a9a40bbba8ca33362dec273372d6e89673cee058584bf99e1"
+      "sha256": "cb080fd59f18bd4babb41d8b3db309efb14c858298c9992e919343d8792d1bc4"
     },
     {
       "kind": "src",
@@ -2571,7 +2571,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/ui/EffortSelector.ts",
-      "sha256": "45e8519019ea9ec848b0de3f30cc14323db548ed8e46c829c62e0a1364254427"
+      "sha256": "b920b5434dd21f955d714a637dca042750c34181bb4c1e714ecfa407591a966a"
     },
     {
       "kind": "src",
@@ -3426,7 +3426,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "85b7e10b11a708fc839d839b520ae27cccd2f993e9b39a7c983fad49a1938dd4"
+      "sha256": "416dccd9d1a7576ee3eee0edf5e27aca0b8c712d733974c0f42ba2522c717115"
     },
     {
       "kind": "src",
@@ -3436,7 +3436,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "753de5ca790d75e1b13563543acbf62ba64817d2c4617bd153363b4cc3129dbb"
+      "sha256": "f0a1423645c64052dcdc6a4dff9205552d7c68ba5d1a94a796e1dfff62dc9909"
     },
     {
       "kind": "src",
@@ -3596,7 +3596,7 @@
     {
       "kind": "src",
       "key": "src/style/components/effort-selector.css",
-      "sha256": "b1a3a04a3e843fd91e84ebe3f6523199d7ab8a8c9d4c5da24231170fbcff01d8"
+      "sha256": "ea397bc78e0c90822574e2dd980a7dc3a0d60766f21895520f9db1fbf47a4eac"
     },
     {
       "kind": "src",
@@ -3721,7 +3721,7 @@
     {
       "kind": "src",
       "key": "src/style/features/chat-assistant.css",
-      "sha256": "d5a0edb780f29ae7768180262162251c0870732d890a45e92f0102cadf8dd649"
+      "sha256": "469e140207394bc370e9897d59e4cb1fb01ebff11c629c007bc14fa5df22cb42"
     },
     {
       "kind": "src",
@@ -4019,7 +4019,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-26T14:17:33.153Z",
-  "headShaAtGeneration": "950c8067602b09b72647c6f704784a7f5dea15b7",
+  "generatedAt": "2026-10-27T04:54:17.982Z",
+  "headShaAtGeneration": "a7b04c1427a71a92e65fe800acc341ab5e7f9993",
   "graphifyVersion": "graphify 0.9.31"
 }

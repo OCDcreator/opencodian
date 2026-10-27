@@ -120,3 +120,5 @@ English and Chinese copy describe executable snapshot/restart boundaries and exp
 当前源码目录：`src/i18n`、`src/i18n/locales`。
 
 目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。
+
+2026-10-27 单轨 Composer 文案：中英文新增 `chat.composerMenu.*`（附件菜单、运行设置、真实词数/字符数），键集保持对齐；未引入 backend 能力或状态断言。
