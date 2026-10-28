@@ -145,7 +145,7 @@
       ],
       "delegatesTo": [],
       "responsibilities": [
-        "compose the backend-neutral memory runtime: vault filesystem adapter, settings snapshot, OpenCode-backed extraction/reflection model invoker",
+        "compose backend-neutral memory: vault/shared filesystems, workspace and agent notebooks, settings, owning-backend read-only auxiliary invocation",
         "observe turn-settled and compaction signals and schedule fail-soft per-turn extraction and compaction reflection",
         "register memory maintenance commands (status/lint/list/forget) against the coordinator"
       ],
@@ -159,14 +159,13 @@
         "shared.foundation",
         "shared.i18n",
         "core.memory",
-        "core.opencode",
         "core.storage",
-        "core.types"
+        "core.types",
+        "core.backend"
       ],
       "forbiddenDependencies": [
         "feature.chat-runtime",
         "feature.chat-services",
-        "core.backend",
         "core.backend-pi"
       ],
       "adjacentOwners": [

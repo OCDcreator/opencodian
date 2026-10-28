@@ -22,9 +22,18 @@ describe('DshNativeClient owned launch files', () => {
     const launch = { command: process.execPath, args: [path.resolve('fixture-dsh-bin.js'), '--profile', 'acp'], env: {} };
     return { launch, client: new DshNativeClient({ launch, cwd: process.cwd() }) };
   }
+  it('runs an npm CLI with external Node instead of the embedding Electron executable', async () => {
+    const launch = { command: process.execPath, args: ['--profile', 'acp'], env: {} };
+    const client = new DshNativeClient({ launch, cwd: process.cwd() });
+    try {
+      await client.start();
+      expect(launch.command).toBe('node');
+    } finally { await client.stop(); }
+  });
   it('uses an SDK launch overlay and removes exactly its own private files on concurrent stop', async () => {
     const { client, launch } = fixture();
     await client.start();
+    expect(launch.command).toBe(process.execPath);
     const launcher = launch.args[0]; const scope = path.dirname(launcher);
     const patch = path.join(scope, 'native.patch.yml');
     expect(readFileSync(launcher, 'utf8')).toContain('launchNativeRuntime');

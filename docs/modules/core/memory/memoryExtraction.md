@@ -17,3 +17,5 @@
 | `buildExtractionSystemPrompt/UserPrompt` | 蒸馏提示词（转录 24K 字符截断） |
 | `parseExtractionResponse()` | 防御解析；批内去重、类型白名单、长度钳制、≤1 条 |
 | `extractionSourceTag()` | `extracted <session[:12]>` 来源标签 |
+
+2026-10-28：实际提取执行器已迁至 memoryAgentExtraction，原 ≤1 JSON 解析函数仅保留兼容调用，不再是后台主路径。evaluateExtractionGate 按水位后的整个切片检查 ≥3 词或 ≥8 CJK 字符，历史已写记忆不阻止新一轮；completedAgentTranscripts 仅提取 completed 的命名 task/agent 实质正文。

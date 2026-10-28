@@ -60,6 +60,19 @@ describe('ExternalMemoryFileSystem', () => {
     expect(fs.nativeAbsolutePath(file)).toBe(nodePath.resolve(file));
   });
 
+  it('rejects symlinks escaping the configured root, including a symlinked bucket', async () => {
+    const fs = new ExternalMemoryFileSystem(root);
+    const bucket = nodePath.join(root, 'projects', 'bucket', 'memory');
+    await fs.mkdir(bucket);
+    const link = nodePath.join(bucket, 'escape.md');
+    nodeFs.symlinkSync(nodePath.join(nodeOs.tmpdir(), 'outside-memory-topic.md'), link);
+    await expect(fs.validatePath(bucket, link)).rejects.toThrow();
+    await expect(fs.validatePath(bucket, nodePath.join(root, 'outside.md'))).rejects.toThrow();
+    const linkedBucket = nodePath.join(root, 'linked-bucket');
+    nodeFs.symlinkSync(nodeOs.tmpdir(), linkedBucket, 'dir');
+    await expect(fs.validatePath(linkedBucket, nodePath.join(linkedBucket, 'x.md'))).rejects.toThrow();
+  });
+
   it('expands a ~ root so one settings value works on every host', async () => {
     const fs = new ExternalMemoryFileSystem('~/.opencodian-extmem-probe');
     expect(fs.resolvedRoot).toBe(nodePath.join(nodeOs.homedir(), '.opencodian-extmem-probe'));

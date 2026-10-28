@@ -22,3 +22,5 @@
 
 - 硬不变量：barrel 之后的任何模块都不得 import 智能体后端适配器、`OpenCodeService`、feature 或 app 模块；基础设施接触只能经由 `MemoryFileSystem` / `MemoryModelInvoker` 端口（由 `app.memory-runtime` 绑定）。
 - 行为规格来自参考实现 opencode-zmem 的冻结决策 D1–D29；本仓适配偏差以 D-O 系列记录在 `docs/architecture/owners/core-memory.md` 与 devlog。
+
+2026-10-28：内部 memoryAgentExtraction 模块承担高风险暂存/校验/写入边界，MemoryRecallSelector 位于既有 memoryRecall 模块；core barrel 继续不依赖后端。

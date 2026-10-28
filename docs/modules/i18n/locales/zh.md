@@ -1,4 +1,5 @@
 # Chinese Locale
+> 2026-10-27：OpenCode 2 新增八个功能子页及 `settings.opencode2.workspace.*` 文案，说明自动目录同步、覆盖来源、配置草稿、认证及应用/保存反馈。
 > 2026-10-27：新增 `chat.effort.disabledShort`（关闭），供窄 Composer 的 effort 短标签使用；完整 `chat.effort.disabled` 仍在模型弹层展示。
 `modifiedFiles.statsUnavailable` 与 `modifiedFiles.statusUnavailable` 用于只有工具文件提示、没有权威原生快照统计和变更状态的记录。
 > 2026-09-30（B2 codex-stream-rendering）：新增 `chat.toolCard.image.*`（`statusGenerating` / `statusCompleted` / `statusFailed` / `revisedPrompt`），供 ToolCallRenderer 渲染的流式图像生成工具卡片使用；与 en 一一对应。
@@ -695,3 +696,5 @@ Includes the localized Pi extension-command completion status used only after a 
 > 2026-10-27：新增 OpenCode 2/DSH 工作区标签、Codex/ZCode 拆分标签、Claude/Codex 调试标签、Claude 标题/行内模型分组文案、Obsidian 工具/PDF 索引会话标签，并将提问文案改为后端中立。
 
 > 2026-10-27（二次审查）：新增 `settings.dsh.tab.model` 与 `settings.dsh.model.*`，用于 DSH 行内覆盖页；与 en 同步。
+
+2026-10-28：记忆设置补充六后端模型、逐回合正文召回、跨机身份/别名、代理笔记本及可选向量召回的说明与 JSON 校验文案。

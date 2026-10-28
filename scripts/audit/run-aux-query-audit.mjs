@@ -27,6 +27,10 @@ export function auditBundleOptions(backend, outfile) {
     entryPoints: [path.join(here, backend === 'opencode2' ? 'opencode2-aux-query-audit.entry.ts' : backend === 'dsh' ? 'dsh-aux-query-audit.entry.ts' : 'aux-query-audit.entry.ts')],
     outfile, bundle: true, platform: 'node', format: 'esm', target: 'node20',
     packages: backend === 'opencode2' ? 'bundle' : 'external',
+    // jsonc-parser's UMD entry keeps a relative require('./impl/format'). Keep
+    // it as a normal runtime dependency so the bundled OpenCode 2 audit can
+    // execute from its temporary output directory.
+    ...(backend === 'opencode2' ? { external: ['jsonc-parser'] } : {}),
     ...(backend === 'dsh' ? { define: { DSH_NATIVE_SERVICE_SOURCE: JSON.stringify(bundleDshServiceSource()) } } : {}),
     sourcemap: 'inline', logLevel: 'silent', absWorkingDir: repoRoot,
     banner: { js: "import { createRequire as auditCreateRequire } from 'node:module'; const require = auditCreateRequire(import.meta.url);" },

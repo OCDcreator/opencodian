@@ -92,6 +92,17 @@ describe('evaluateExtractionGate (D26)', () => {
   const root = ROOT_NATIVE;
   const bucket = BUCKET;
 
+  it('uses independent Latin and CJK thresholds and scans the whole fresh slice', () => {
+    const base = { lastExtractedMessageCount: 0, projectDir: bucket, memoryRootNative: root };
+    expect(evaluateExtractionGate({ ...base, lines: toExtractionLines([msg({ role: 'user', content: '知道了' })]) }).proceed).toBe(false);
+    expect(evaluateExtractionGate({ ...base, lines: toExtractionLines([
+      msg({ role: 'user', content: '以后请先给出结论再说原因' }), msg({ role: 'user', content: '好' }),
+    ]) }).proceed).toBe(true);
+    expect(evaluateExtractionGate({ ...base, lastExtractedMessageCount: 1, lines: toExtractionLines([
+      msg({ role: 'user', content: 'please remember this preference' }), msg({ role: 'user', content: 'hi' }),
+    ]) }).proceed).toBe(false);
+  });
+
   it('skips empty transcripts and non-grown transcripts', () => {
     const base = { lastExtractedMessageCount: 0, projectDir: bucket, memoryRootNative: root };
     expect(evaluateExtractionGate({ lines: [], ...base }).skipReason).toBe('empty-transcript');

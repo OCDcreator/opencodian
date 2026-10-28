@@ -50,7 +50,9 @@ export class DshNativeClient extends DshAcpClient {
     await writeFile(service, DSH_NATIVE_SERVICE_SOURCE, { mode: 0o600 });
     await writeFile(patch, `- id: sdk-jsonrpc-server\n  disabled: true\n- insert:\n    - id: opencodian-native\n      name: ${JSON.stringify(service)}\n      inject: [sdkAppStartup, loader]\n      config:\n        nativeAnchor: ${JSON.stringify(nativeAnchor)}\n`, { mode: 0o600 });
     await writeFile(launcher, `import { launchNativeRuntime } from './service.mjs';\nawait launchNativeRuntime(${JSON.stringify({ nativeAnchor, scope, args: args.slice(profile + 2) })});\n`, { mode: 0o600 });
-    this.nativeOptions.launch.command = profile > 0 ? this.baseCommand : process.execPath;
+    // npm CLIs run under the external Node on PATH. In Obsidian,
+    // process.execPath is the embedding Electron app and cannot host this CLI.
+    this.nativeOptions.launch.command = profile > 0 ? this.baseCommand : 'node';
     this.nativeOptions.launch.env.ELECTRON_RUN_AS_NODE = '1';
     this.nativeOptions.launch.args.splice(0, this.nativeOptions.launch.args.length, launcher);
   }

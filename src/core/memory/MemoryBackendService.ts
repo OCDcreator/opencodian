@@ -8,13 +8,11 @@
  * reflected in the returned outcome, never thrown into a user turn.
  */
 
+import { runMemoryAgent } from './memoryAgentExtraction';
 import {
-  buildExtractionSystemPrompt,
-  buildExtractionUserPrompt,
   evaluateExtractionGate,
   extractionSourceTag,
   formatTranscriptForPrompt,
-  parseExtractionResponse,
   toExtractionLines,
 } from './memoryExtraction';
 import { planMemoryInjection, transcriptHasInjectionThisEpoch } from './memoryInjection';
@@ -34,22 +32,19 @@ import {
   memoryProjectDir,
   modelMemoryRootDisplay,
 } from './memoryPaths';
-import {
-  formatRecalledTopicFile,
-  lexicalCandidates,
-  type SelectedMemory,
-} from './memoryRecall';
+import { assembleRelevantMemory, MemoryRecallSelector, type SelectedMemory } from './memoryRecall';
 import {
   buildReflectionSystemPrompt,
   buildReflectionUserPrompt,
   parseReflectionResponse,
   planReflectionWrites,
 } from './memoryReflection';
+import { scanForSecrets } from './memorySecretScan';
 import {
-  planProvenanceWrites,
   writeMemoryWrites,
 } from './memoryStore';
 import type {
+  MemoryEmbeddingInvoker,
   MemoryFileSystem,
   MemoryMetricEvent,
   MemoryModelInvoker,
@@ -57,9 +52,6 @@ import type {
   MemoryTranscriptMessage,
 } from './memoryTypes';
 import { byteLength } from './memoryTypes';
-
-/** How many lexical candidates get their bodies injected (semantic recall on). */
-const SEMANTIC_RECALL_TOP_N = 3;
 
 const METRICS_PATH = `${MEMORY_STORE_ROOT}/metrics.jsonl`;
 
@@ -70,6 +62,7 @@ export type MemoryInjectionOutcome = {
   protocolBytes: number;
   recalledPaths: string[];
   skippedSecretGuard: string[];
+  recalledContentCharacters?: number;
 };
 
 export type MemoryExtractionOutcome = {
@@ -84,6 +77,8 @@ export type MemoryExtractionOutcome = {
 export class MemoryBackendService {
   readonly projectDir: string;
   readonly indexPath: string;
+  private readonly agentKey?: string;
+  private readonly selector: MemoryRecallSelector;
   private readonly metricsFs: MemoryFileSystem;
 
   /**
@@ -98,11 +93,14 @@ export class MemoryBackendService {
     overrides?: {
       projectDir?: string;
       metricsFs?: MemoryFileSystem;
+      agentKey?: string;
     },
   ) {
     this.projectDir = overrides?.projectDir ?? memoryProjectDir(workspacePath);
     this.indexPath = `${this.projectDir}/MEMORY.md`;
     this.metricsFs = overrides?.metricsFs ?? fs;
+    this.agentKey = overrides?.agentKey;
+    this.selector = new MemoryRecallSelector(fs, this.projectDir);
   }
 
   /** Native absolute memory dir for protocol text / logging. */
@@ -113,6 +111,7 @@ export class MemoryBackendService {
   /** D22 twin: ensure the bucket exists; never auto-create MEMORY.md. */
   async ensureRoot(): Promise<void> {
     try {
+      await this.fs.validatePath?.(this.projectDir, this.projectDir);
       if (!(await this.fs.exists(this.projectDir))) {
         await this.fs.mkdir(this.projectDir);
       }
@@ -123,6 +122,7 @@ export class MemoryBackendService {
 
   async readIndex(): Promise<string | null> {
     try {
+      await this.fs.validatePath?.(this.projectDir, this.indexPath);
       return await this.fs.readFile(this.indexPath);
     } catch {
       return null;
@@ -150,6 +150,10 @@ export class MemoryBackendService {
     settings: MemorySettingsSnapshot;
     alreadyInjectedThisEpochOverride?: boolean;
     nowMs?: number;
+    invoker?: MemoryModelInvoker;
+    embedding?: MemoryEmbeddingInvoker | null;
+    alreadyRecalledPaths?: string[];
+    alreadyRecalledContentCharacters?: number;
   }): Promise<MemoryInjectionOutcome> {
     try {
       const settings = input.settings;
@@ -168,8 +172,8 @@ export class MemoryBackendService {
 
       const already =
         input.alreadyInjectedThisEpochOverride === true ||
-        transcriptHasInjectionThisEpoch(input.messages);
-      if (already) {
+        transcriptHasInjectionThisEpoch(input.messages, this.memoryRootNative());
+      if (already && !settings.memorySemanticRecallEnabled) {
         // Same reasoning as disabled: per-turn epoch skips must not grow
         // the metrics journal.
         return {
@@ -188,15 +192,21 @@ export class MemoryBackendService {
 
       let selectorResult: SelectedMemory[] | null = null;
       if (settings.memorySemanticRecallEnabled && input.latestUserText.trim()) {
-        selectorResult = await this.selectRecallBodies(
-          input.latestUserText,
-          manifest,
-          [],
-          input.nowMs ?? Date.now(),
-        );
+        selectorResult = await this.selector.select({ query: input.latestUserText, manifest,
+          alreadyRecalledPaths: input.alreadyRecalledPaths ?? [], nowMs: input.nowMs ?? Date.now(),
+          invoker: input.invoker, embedding: input.embedding });
       }
 
+      if (already) {
+        const recall = assembleRelevantMemory({ selected: selectorResult,
+          alreadyRecalledPaths: input.alreadyRecalledPaths,
+          alreadyRecalledContentCharacters: input.alreadyRecalledContentCharacters });
+        return { text: recall.relevantMemory, skippedReason: recall.relevantMemory ? null : 'already-injected-this-epoch',
+          indexBytes: 0, protocolBytes: 0, recalledPaths: recall.recalledPaths,
+          skippedSecretGuard: recall.skippedSecretGuard, recalledContentCharacters: recall.recalledContentCharacters };
+      }
       const plan = planMemoryInjection({
+        agentKey: this.agentKey,
         messages: input.messages,
         memoryIndexContent: indexContent,
         manifest,
@@ -205,6 +215,8 @@ export class MemoryBackendService {
         modelMemoryIndexPath: this.fs.nativeAbsolutePath(this.indexPath),
         alreadyInjectedThisEpoch: already,
         selectorResult,
+        alreadyRecalledPaths: input.alreadyRecalledPaths,
+        alreadyRecalledContentCharacters: input.alreadyRecalledContentCharacters,
       });
 
       return await this.recordInjectionMetric(
@@ -216,6 +228,7 @@ export class MemoryBackendService {
           protocolBytes: plan.protocolBytes,
           recalledPaths: plan.recalledPaths,
           skippedSecretGuard: plan.skippedSecretGuard,
+          recalledContentCharacters: plan.recalledContentCharacters,
         },
         plan.skippedReason ?? `injected ${plan.protocolBytes}B protocol + ${plan.indexBytes}B index`,
       );
@@ -245,7 +258,9 @@ export class MemoryBackendService {
     invoker: MemoryModelInvoker;
     /** Message count at the previous extraction for this conversation. */
     lastExtractedMessageCount: number;
+    isCurrent?: () => boolean;
   }): Promise<MemoryExtractionOutcome> {
+    let modelCalls = 0;
     /**
      * Steady-state skips (disabled, transcript-not-grown, prose threshold)
      * are not events: they must not write metrics on every turn or a dark
@@ -275,9 +290,10 @@ export class MemoryBackendService {
         return steadySkip('extraction-disabled');
       }
       const lines = toExtractionLines(input.messages);
+      const watermark = toExtractionLines(input.messages.slice(0, input.lastExtractedMessageCount)).length;
       const gate = evaluateExtractionGate({
         lines,
-        lastExtractedMessageCount: input.lastExtractedMessageCount,
+        lastExtractedMessageCount: watermark,
         projectDir: this.projectDir,
         memoryRootNative: this.memoryRootNative(),
       });
@@ -287,69 +303,19 @@ export class MemoryBackendService {
         return steadySkip(reason);
       }
 
-      const [indexContent, manifest] = await Promise.all([
-        this.readIndex(),
-        this.buildManifest(),
-      ]);
-      const system = buildExtractionSystemPrompt();
-      const user = buildExtractionUserPrompt({
-        transcript: formatTranscriptForPrompt(lines),
-        indexContent,
-      });
-      const reply = await input.invoker.invoke({
-        system,
-        user,
-        modelRef: input.settings.memoryExtractionModel,
-        title: 'opencodian memory extraction',
-      });
-      const memories = parseExtractionResponse(reply);
-      if (memories.length === 0) {
-        await this.appendMetric({
-          ts: Date.now(),
-          kind: 'extraction-skipped',
-          conversationId: input.conversationId,
-          detail: 'model-returned-empty',
-          bytes: 0,
-        });
-        return { status: 'skipped', skipReason: 'model-returned-empty', writtenCount: 0, writtenFiles: [], modelCalls: 1 };
-      }
-
-      const plan = planProvenanceWrites({
-        memories,
-        projectDir: this.projectDir,
-        existingFilenames: manifest.map((e) => e.filename),
-        source: extractionSourceTag(input.sessionId),
-      });
-      if (plan.writes.length === 0) {
-        await this.appendMetric({
-          ts: Date.now(),
-          kind: 'extraction-skipped',
-          conversationId: input.conversationId,
-          detail: 'filename-conflict',
-          bytes: 0,
-        });
-        return { status: 'skipped', skipReason: 'filename-conflict', writtenCount: 0, writtenFiles: [], modelCalls: 1 };
-      }
-      await this.ensureRoot();
-      const written = await writeMemoryWrites({
-        fs: this.fs,
-        writes: plan.writes,
-        indexPath: this.indexPath,
-      });
-      await this.appendMetric({
-        ts: Date.now(),
-        kind: 'extraction',
-        conversationId: input.conversationId,
-        detail: `wrote ${written} file(s) [${plan.writes.map((w) => w.filename).join(', ')}]`,
-        bytes: plan.writes.reduce((n, w) => n + byteLength(w.content), 0),
-      });
-      return {
-        status: 'written',
-        skipReason: null,
-        writtenCount: written,
-        writtenFiles: plan.writes.map((w) => w.filename),
-        modelCalls: 1,
-      };
+      const [indexContent, manifest] = await Promise.all([this.readIndex(), this.buildManifest()]);
+      const result = await runMemoryAgent({ fs: this.fs, projectDir: this.projectDir,
+        indexContent, manifest, transcript: formatTranscriptForPrompt(lines.slice(watermark)),
+        source: extractionSourceTag(input.sessionId), invoker: { invoke: request => {
+          modelCalls++;
+          return input.invoker.invoke(request);
+        } },
+        modelRef: input.settings.memoryExtractionModel, isCurrent: input.isCurrent, agentKey: this.agentKey });
+      const written = result.writtenFiles.length;
+      await this.appendMetric({ ts: Date.now(), kind: written ? 'extraction' : 'extraction-skipped',
+        conversationId: input.conversationId, detail: written ? `wrote ${written} file(s)` : 'model-returned-empty', bytes: 0 });
+      return { status: written ? 'written' : 'skipped', skipReason: written ? null : 'model-returned-empty',
+        writtenCount: written, writtenFiles: result.writtenFiles, modelCalls: result.modelCalls };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       await this.appendMetric({
@@ -359,7 +325,7 @@ export class MemoryBackendService {
         detail: `error: ${message}`,
         bytes: 0,
       }).catch(() => undefined);
-      return { status: 'error', skipReason: null, writtenCount: 0, writtenFiles: [], modelCalls: 1, error: message };
+      return { status: 'error', skipReason: null, writtenCount: 0, writtenFiles: [], modelCalls, error: message };
     }
   }
 
@@ -368,6 +334,7 @@ export class MemoryBackendService {
    * full transcript with `compacted <session>` provenance. Never throws.
    */
   async runReflection(input: {
+    isCurrent?: () => boolean;
     conversationId: string;
     messages: ReadonlyArray<MemoryTranscriptMessage>;
     sessionId: string;
@@ -394,6 +361,7 @@ export class MemoryBackendService {
         }),
         modelRef: input.settings.memoryExtractionModel,
         title: 'opencodian memory reflection',
+        purpose: 'reflection',
       });
       const memories = parseReflectionResponse(reply);
       if (memories.length === 0) {
@@ -412,7 +380,11 @@ export class MemoryBackendService {
         existingFilenames: manifest.map((e) => e.filename),
         sourceSessionID: input.sessionId,
       });
+      plan.writes = plan.writes.filter(write => !scanForSecrets(write.content).hit);
+      if (input.isCurrent && !input.isCurrent()) throw new Error('memory-settings-changed');
       await this.ensureRoot();
+      for (const write of plan.writes) await this.fs.validatePath?.(this.projectDir, write.filePath);
+      await this.fs.validatePath?.(this.projectDir, this.indexPath);
       const written = await writeMemoryWrites({
         fs: this.fs,
         writes: plan.writes,
@@ -492,30 +464,6 @@ export class MemoryBackendService {
     return { removed };
   }
 
-  private async selectRecallBodies(
-    query: string,
-    manifest: TopicManifestEntry[],
-    alreadyRecalledPaths: string[],
-    nowMs: number,
-  ): Promise<SelectedMemory[]> {
-    const candidates = lexicalCandidates(query, manifest).slice(0, SEMANTIC_RECALL_TOP_N);
-    const out: SelectedMemory[] = [];
-    for (const entry of candidates) {
-      if (alreadyRecalledPaths.includes(entry.filePath)) continue;
-      const raw = await this.fs.readFile(entry.filePath).catch(() => null);
-      if (raw === null) continue;
-      out.push(
-        formatRecalledTopicFile({
-          filePath: entry.filePath,
-          mtimeMs: entry.mtimeMs,
-          nowMs,
-          rawContent: raw,
-        }),
-      );
-    }
-    return out;
-  }
-
   private async recordInjectionMetric(
     conversationId: string,
     outcome: MemoryInjectionOutcome,
@@ -530,6 +478,7 @@ export class MemoryBackendService {
     };
     await this.appendMetric(event).catch(() => undefined);
     if (outcome.text) {
+      await this.fs.validatePath?.(this.projectDir, `${this.projectDir}/.last-injection.json`);
       await this.fs.writeFile(
         `${this.projectDir}/.last-injection.json`,
         JSON.stringify(event, null, 2),

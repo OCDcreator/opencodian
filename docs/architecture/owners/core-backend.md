@@ -1,4 +1,6 @@
 # Owner: core.backend
+
+2026-10-27：OpenCode 2 配置覆盖验证支持 JSONC 注释和尾逗号；解析失败在修改设置/启动服务前返回。原生读回、活动 turn 保护、远程只读和失败恢复仍归适配器持有，设置 UI 不绕过该边界。
 > 2026-10-24：DSH 默认由 DshNativeClient 承载原生运行时扩展，ACP 为兼容选项。原生历史/分叉/命令/问题/MCP 和辅助 LLM 归本 owner；DshAuxQuerySession 校验无 Agent/工具调度/持久化的安全边界，DshQuestionBridge 拥有问题结算。私有 profile 接收启动器写入，用户 SDK 配置只读；assets/dsh 仅为嵌入式插件源码。新增模块分别映射同名模块文档，未新增服务 owner 或 feature 依赖。
 > 2026-10-13（矩阵接力 018）：CodexAppServerTransport.handleMessage 增加非对象帧防护——JSON null/标量/数组帧路由到既有 Unrecognized 告警路径，不再于 `msg.id` 解引用处抛未捕获异常击穿 ws.onmessage；语义对齐 ZCode 解析器的 isPlainObject 加固。修复经 owned loopback WebSocket 实机复测（修复前 null 帧致命、修复后零异常且连接保持），回归用例与全量 verify 落 main。
 > 2026-10-07：ZCode 辅助存储所有权包含独立的 native `sessionDbPath`；每个 scope 同时覆盖 `ZCODE_SESSION_DB_PATH` 和 `ZCODE_SESSION_DB`，以及 `ZCODE_STORAGE_DIR`。仅请求 storage 根不能证明数据库隔离。
@@ -166,3 +168,5 @@ CodexAdapter 的 `mcpServer/elicitation/request` 路由注册不再以 elicitati
 ## 2026-10-24 DSH ACP 扩展
 
 DshAdapter 在既有 owner 内维护逐会话配置、原生目录/推理选择和 aggregate usage；DshProtocolCodec 集中隔离 MCP 进程/HTTP 声明准入、握手与多模态内容编码。无新的服务 owner，未使用桌面私有 Web host。图片声明遵循当前握手；aux/inline 不以提示词限制替代运行时只读证明。配置 timeout、旧生成器收尾和 dispose 均维护自有 client/turn 归属。
+
+2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `core.backend` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。

@@ -115,6 +115,25 @@ describe('OpenCode2Adapter protocol boundary', () => {
     expect(settings.configContent).toBe('{"compaction":{"auto":false}}');
   });
 
+  it('preserves JSONC comments and trailing commas while verifying native values', async () => {
+    const settings = { mode: 'local' as const, executablePath: 'opencode2', baseUrl: '', password: '', configContent: '' };
+    const adapter = new OpenCode2Adapter({ workingDirectory: '/vault', getSettings: () => settings });
+    Object.assign(adapter, { ready: async () => ({ config: { get: async () => [{ type: 'document', info: { compaction: { auto: false } } }] } }) });
+    const content = '{\n // preserve\n "compaction":{"auto":false},\n}';
+    await adapter.validateConfigContent(content);
+    expect(settings.configContent).toBe(content);
+  });
+
+  it('rejects malformed JSONC before mutating settings or reconnecting', async () => {
+    const settings = { mode: 'local' as const, executablePath: 'opencode2', baseUrl: '', password: '', configContent: '{"original":true}' };
+    const adapter = new OpenCode2Adapter({ workingDirectory: '/vault', getSettings: () => settings });
+    const ready = jest.fn();
+    Object.assign(adapter, { ready });
+    await expect(adapter.validateConfigContent('{ broken')).rejects.toThrow('invalid JSONC');
+    expect(settings.configContent).toBe('{"original":true}');
+    expect(ready).not.toHaveBeenCalled();
+  });
+
   it('accepts the native normalized agent and command model reference', async () => {
     const settings = { mode: 'local' as const, executablePath: 'opencode2', baseUrl: '', password: '', configContent: '' };
     const adapter = new OpenCode2Adapter({ workingDirectory: '/vault', getSettings: () => settings });

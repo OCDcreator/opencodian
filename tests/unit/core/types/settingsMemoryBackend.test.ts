@@ -1,6 +1,16 @@
 import { normalizeMemoryBackendUserSettings } from '../../../../src/core/types/settings';
 
 describe('memory backend settings normalization', () => {
+  it('preserves backend-specific models and cross-host identity while dropping unsupported model keys', () => {
+    const out = normalizeMemoryBackendUserSettings({ memoryWorkspaceIdentity: ' team-vault ',
+      memoryWorkspacePathAliases: { '/mac/vault': ' C:/Write/vault ', invalid: 42 },
+      memoryModelOverrides: { codex: ' gpt-fixture ', 'claude-code': ' haiku ', unknown: 'foreign' },
+      memoryAgentNotebooksEnabled: false, memoryAgentStorageRoot: ' ~/.zcode/agent-memory ', memoryEmbeddingEnabled: true });
+    expect(out).toMatchObject({ memoryWorkspaceIdentity: 'team-vault', memoryWorkspacePathAliases: { '/mac/vault': 'C:/Write/vault' },
+      memoryModelOverrides: { codex: 'gpt-fixture', 'claude-code': 'haiku' }, memoryAgentNotebooksEnabled: false,
+      memoryAgentStorageRoot: '~/.zcode/agent-memory', memoryEmbeddingEnabled: true });
+    expect(out.memoryModelOverrides).not.toHaveProperty('unknown');
+  });
   it('defaults the shared-store fields to empty and drops non-strings', () => {
     expect(normalizeMemoryBackendUserSettings(undefined)).toMatchObject({
       memoryExternalRoot: '',

@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import type { OpenCodeClient } from '@opencode/client';
+import { parse, type ParseError } from 'jsonc-parser';
 
 import { appendObsidianContextBlocks } from '../../../../shared/obsidianContext';
 import { backendSessionCatalogFailure, BackendSessionCatalogReadError } from '../../../../shared/sessionCatalogReadback';
@@ -466,7 +467,9 @@ export class OpenCode2Adapter implements AgentService, AgentChatCapability, Agen
     const settings = this.options.getSettings();
     if (settings.mode !== 'local') throw new Error('OpenCode 2 config overlays require local mode');
     if (this.turns.size) throw new Error('Wait for OpenCode 2 active turns before changing configuration');
-    const input = content.trim() ? JSON.parse(content) as unknown : {};
+    const parseErrors: ParseError[] = [];
+    const input: unknown = content.trim() ? parse(content, parseErrors, { allowTrailingComma: true }) : {};
+    if (parseErrors.length) throw new Error('OpenCode 2 configuration contains invalid JSONC');
     if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('OpenCode 2 configuration must be a JSON object');
     const previous = settings.configContent;
     settings.configContent = content.trim();

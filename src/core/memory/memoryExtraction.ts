@@ -161,7 +161,12 @@ export function countUserProse(text: string): number {
 export function transcriptHasExtractableProse(
   lines: ReadonlyArray<ExtractionTranscriptLine>,
 ): boolean {
-  return countUserProse(lastUserTurnFromLines(lines)) >= MIN_USER_PROSE_WORDS;
+  return lines.some(line => {
+    if (line.role !== 'user') return false;
+    const words = line.text.replace(/[^\p{L}\p{N}\s]+/gu, ' ').split(/\s+/u).filter(Boolean).length;
+    const cjk = (line.text.match(/[\u4e00-\u9fff]/gu) ?? []).length;
+    return words >= MIN_USER_PROSE_WORDS || cjk >= MIN_USER_PROSE_CJK_CHARS;
+  });
 }
 
 /**
@@ -183,10 +188,11 @@ export function evaluateExtractionGate(input: {
   if (lines.length <= input.lastExtractedMessageCount) {
     return { proceed: false, skipReason: 'transcript-not-grown' };
   }
-  if (!transcriptHasExtractableProse(lines)) {
+  const freshLines = lines.slice(Math.max(0, input.lastExtractedMessageCount));
+  if (!transcriptHasExtractableProse(freshLines)) {
     return { proceed: false, skipReason: 'user-prose-below-threshold' };
   }
-  if (memoryWritePaths(lines, input.projectDir, input.memoryRootNative).length > 0) {
+  if (memoryWritePaths(freshLines, input.projectDir, input.memoryRootNative).length > 0) {
     return { proceed: false, skipReason: 'turn-wrote-memory' };
   }
   return { proceed: true, skipReason: null };
@@ -283,4 +289,28 @@ export function parseExtractionResponse(text: string): ExtractionMemory[] {
 /** `extracted <sessionID first 12 chars>` provenance tag for frontmatter. */
 export function extractionSourceTag(sourceSessionID: string): string {
   return provenanceTag('extracted', sourceSessionID);
+}
+
+/** Only completed, named task output is evidence for an agent notebook.
+ * Native backends that persist no substantive result yield no invented transcript.
+ */
+export function completedAgentTranscripts(messages: ReadonlyArray<MemoryTranscriptMessage>): Array<{
+  key: string; agent: string; messages: MemoryTranscriptMessage[]; fingerprint: string;
+}> {
+  const out = [];
+  let user: MemoryTranscriptMessage | undefined;
+  for (const message of messages) {
+    if (message.role === 'user') user = message;
+    for (const call of message.toolCalls ?? []) {
+      if (call.status !== 'completed' || (call.kind !== 'task' && !/^(task|agent)$/iu.test(call.name ?? ''))) continue;
+      const rawAgent = call.input?.subagent_type ?? call.input?.agent_type ?? call.input?.agent;
+      if (typeof rawAgent !== 'string' || !rawAgent.trim() || typeof call.result !== 'string' || call.result.length < 160) continue;
+      const key = call.id ?? `${message.id ?? ''}:${rawAgent}`;
+      const result = call.result.slice(-24_000);
+      out.push({ key, agent: rawAgent.trim(), fingerprint: result,
+        messages: [user ?? { role: 'user' as const, content: 'Review the completed agent findings for reusable lessons.' },
+          { role: 'assistant' as const, content: result }] });
+    }
+  }
+  return out;
 }

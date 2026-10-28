@@ -1,5 +1,7 @@
 # 构建管线
 
+2026-10-28：后端 facade 依赖固定为 Claude Agent SDK 0.3.312、Codex SDK 0.165.0、OpenCode 2 Client 2.2.0；休眠的 OpenCode 1 SDK 更新为 1.19.5，选择面不变。外部 CLI/桌面运行时版本与插件 SDK 分开核对，见 [后端版本核对](../../status/backend-runtime-versions-2026-10-28.md)。
+
 > 2026-10-24：bundleDshServiceSource 在 production/dev 与 DSH aux 审计中统一将 assets/dsh/service.mjs、auxiliary.mjs、launcher.mjs 合并为 DSH_NATIVE_SERVICE_SOURCE。只打包插件源码；官方 Harness 依赖来自用户安装。标准三文件发行包含全部扩展源码，不需要随 dist 复制 DSH SDK 或额外安装依赖。
 > 2026-10-07：聊天消息滚动增加 composer 高度对应的 scroll-padding；待回答 question 或 permission 所在回合暂时取消 sticky user header，防止长用户消息遮住选项、Submit 和 Allow/Reject。卡片移除或进入 terminal 状态后恢复原 sticky 规则。源 CSS 位于 src/style/base/core.css，构建仍生成 styles.css；CSS 无 CodeGraph symbol/owner 映射，实机鼠标与键盘验收独立记录。
 

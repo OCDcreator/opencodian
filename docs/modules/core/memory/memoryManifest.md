@@ -13,3 +13,5 @@
 |------|------|
 | `buildTopicManifest(fs, projectDir)` | 异步构建清单，按文件名排序 |
 | `TopicManifestEntry` | 清单条目；importance 非法回退 3 |
+
+2026-10-28：读取每个主题前调用可选 validatePath，由真实 FS 通过共享 PathConfinement 拒绝目录或文件链接逃逸；单文件失败跳过清单条目。

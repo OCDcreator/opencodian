@@ -15,6 +15,7 @@
 
 ## Surface Contract
 
+- `.setting-item.opencodian-settings-direct-host:not(.setting-item-heading)`：声明式设置的挂载行必须归零 padding，选择器特异性需覆盖 Obsidian `.setting-group .setting-item:not(.setting-item-heading)`，否则宿主默认上下各 20px 会制造一段多余的外层滚动。直接子级 `.opencodian-settings` 使用自然高度、`overflow: visible` 和 `max-height: none`，整页只由外层 Obsidian viewport 滚动；编辑区设置根仍保留自己的滚动。
 - `.opencodian-settings`：设置界面 token 作用域，所有 `--opencodian-settings-*` 变量都从 Obsidian 主题变量派生；同时拥有 `opencodian-settings-pane` inline-size 容器，按实际设置内容宽度响应，而非仅依赖整个窗口。
 - `--opencodian-settings-form-row-*`：普通设置项的 shadcn-style Card + Field row token。它是 `--opencodian-settings-row-*` 的当前标准实现，背景必须保持中性，状态色只允许进入 badge、文字、outline 或真实 Alert/Empty surface。
 - `.opencodian-settings-panel-title` / `.opencodian-settings-panel-title-actions`：设置页标题行。左侧保留 `SettingsPanelChrome` 的 OpenCodian logo / wordmark，action slot 右对齐承载 active backend icon switcher；它是标题 row，不是内容卡片。标题行上方 spacing 为 `12px`，品牌块左侧 padding 为 `0`，标题行右侧 padding 为 `56px`，用于避开 Obsidian 设置 modal 的关闭按钮区域。

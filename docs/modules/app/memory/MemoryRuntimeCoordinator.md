@@ -3,30 +3,22 @@
 > **源码**: `src/app/memory/MemoryRuntimeCoordinator.ts`
 > **状态**: [REVIEW]
 
-## 概述
+app.memory-runtime 的组合入口。将通用 core.memory 绑定到 Vault/外部文件系统、设置和会话所属后端的 AgentAuxQueryCapability；main.ts 只传 registry、会话读取端口和可选 embedding 客户端。已移除旧 OpenCodeService 临时会话依赖。
 
-`app.memory-runtime` owner 的实现（镜像 `DiagnosticsRuntimeCoordinator` 组合模式）：构造 vault FS 适配器 + `MemoryBackendService` + OpenCode invoker，维护每会话的注入纪元 / 抽取水位 / 压缩标记计数，防抖后触发每轮抽取与压缩反思，并注册记忆维护命令（状态 / 体检 / 遗忘）。全部入口 fail-soft。
+| 方法 | 行为 |
+|---|---|
+| planInjection | 按会话与实际目录维护索引纪元、正文去重及字符预算；逐回合召回；设置代次变化或卸载后丢弃过期结果 |
+| onTurnSettled | 每会话防抖，统一队列串行执行，避免不同会话互相跳过或并发更新索引 |
+| invokeModel | 读取已保存的 backend，确认 enabled，必要时启动该适配器，创建只读辅助会话；验证 runtime safety 和实际 tool calls，finally dispose |
+| runExtractionGuarded | 失败不推进消息水位；当前未处理消息切片供操作循环提取 |
+| runReflectionGuarded | 压缩标记增长后先反思；失败保留重试机会 |
+| runAgentExtraction | 从已完成且具备实质正文的命名 task/agent 结果提取独立笔记本；按任务与结果水位去重 |
+| onSettingsChanged / dispose | 使旧任务代次失效、取消辅助会话；卸载清理定时器和同步服务 |
 
-## 关键方法
+模型按 memoryModelOverrides[backend] / memorySelectorModelOverrides[backend] → 会话选择或有效 context usage → 后端默认解析；遗留 memoryExtractionModel 仅兼容 OpenCode 2，不泄漏到其他后端。Claude/Codex 使用模型 ID，其他后端使用 provider/model。未知、退休、禁用或缺能力后端 fail-soft，绝不改发当前活动后端。
 
-| 方法 | 说明 |
-|------|------|
-| `planInjection()` | 纪元去重后委托 service；返回 `{text} \| null`，绝不抛错 |
-| `onTurnSettled()` | 防抖（默认 1500ms，可注入覆盖）→ 读会话消息 → 压缩标记增加则先反思再抽取 |
-| `registerCommands()` | 命令面板注册 status / lint / forget（forget 走输入模态，确认制） |
-| `invokeModel()` | 临时 OpenCode 会话（`setCurrent:false`，finally 删除）+ `provider/model` 解析 |
+提取与反思使用辅助后端标准 180 秒预算，筛选为 30 秒。仅 Codex/ZCode 的原生辅助能力需要连接启动；Pi/Claude 直接建立隔离辅助通道，OpenCode 2 自身 ready 保证连接。
 
-## 数据流
+存储保留 vault-local 路径；共享模式使用 zmem 的 projects/<bucket>/memory，workspaceIdentity 优先于 workspacePathAliases。代理笔记本位于 agent-memory/<sanitized-key>，可显式指定独立根以共享 ZCode 用户级目录，使用长版 Persistent Agent Memory 协议。状态/体检/遗忘命令默认作用于项目桶。
 
-```text
-MessageSendPreparationService ──planMemoryInjection──> 本类 ──> service.planInjection
-SendPipelineRuntime(finally) ──onTurnSettled──> 防抖 ──> runExtraction / runReflection ──> OpenCodeService 临时会话
-```
-
-## 边界与约束
-
-- 禁止 import 任何 feature 层与后端适配器；聊天接线反向经宿主端口流入。
-- `VaultMemoryFileSystem.mtimeMs` 经 node fs stat（dotfile 不被 Obsidian 索引），失败返回 null。
-- `VaultMemoryFileSystem.listFiles` 消费 Obsidian `DataAdapter.list()` 的 `ListedFiles`（`files` 为全路径字符串数组，非 TFile 对象），映射为 basename 返回。
-- git 同步：`ensureService()` 在（外部根, 远程 URL）接线变化时重建 `MemoryGitSyncService`；抽取/反思写入成功与 forget 删除后 `scheduleSync()`（5s 防抖），状态命令末尾附同步行。
-- 共享存储模式：设置 `memoryExternalRoot` 非空时，`ensureService()` 用 `ExternalMemoryFileSystem` + `externalMemoryProjectDir`（`<root>/projects/<桶>/memory`，zmem / ZCode 同构）重建服务，metrics 仍写 vault 内的 `VaultMemoryFileSystem`；根切换会清空注入纪元 / 抽取水位 / 压缩计数（协议文本指向新存储，每会话应重新注入一次）。
+Git 同步独立于任何聊天后端，覆盖 memoryExternalRoot 整棵树；成功写入/遗忘后 scheduleSync。独立 agent 根位于该树外时不被此同步覆盖。设置和会话内容未被后台调用修改。接口模拟不等于原生/UI验收；各后端辅助通道仍受本机配置和运行时只读能力约束。

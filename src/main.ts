@@ -545,6 +545,7 @@ export default class OpenCodianPlugin extends Plugin {
     setLocale(this.settings.locale as 'en' | 'zh');
   }
 
+  // eslint-disable-next-line max-lines-per-function -- startup composition is kept in one ordered lifecycle step.
   private async handleBootstrapOpenCodeRuntime(
     initialManagedServerState: LoadedManagedServerState,
   ): Promise<void> {
@@ -673,7 +674,14 @@ export default class OpenCodianPlugin extends Plugin {
       // memory runtime on the plugin's behalf (app.memory-runtime owner).
       this.memoryRuntime = new MemoryRuntimeCoordinator({
         app: this.app,
-        openCodeService: this.openCodeService,
+        registry: this.agentServiceRegistry,
+        getConversationContext: async (id) => this.storage.loadFullConversation(id),
+        getEmbeddingClient: () => {
+          const client = this.resolveSemanticEmbeddingClient();
+          if (!client) return null;
+          const provider = this.settings.providers.find(entry => entry.id === this.settings.semanticEmbeddingProvider);
+          return Object.assign(client, { cacheKey: JSON.stringify([provider?.baseUrl, this.settings.semanticEmbeddingProvider, this.settings.semanticEmbeddingModel]) });
+        },
         getSettings: () => this.settings.memory,
         getConversationMessages: async (conversationId) => {
           try {

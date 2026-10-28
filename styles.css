@@ -3782,7 +3782,8 @@ img.opencodian-model-provider-header-icon {
   margin-left: 0 !important;
 }
 
-.opencodian-settings {
+.opencodian-settings,
+.vertical-tab-content:has(.opencodian-settings-direct-host) {
   --opencodian-settings-scrollbar-size: 8px;
   --opencodian-settings-scrollbar-radius: 999px;
   --opencodian-settings-scrollbar-track:
@@ -3799,12 +3800,14 @@ img.opencodian-model-provider-header-icon {
     color-mix(in srgb, var(--background-primary) 68%, transparent);
   --opencodian-settings-scrollbar-shadow:
     color-mix(in srgb, var(--background-modifier-border-hover) 46%, transparent);
-  overflow-y: auto;
-  max-height: 100%;
-  padding-right: 6px;
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: var(--opencodian-settings-scrollbar-thumb) transparent;
+}
+
+.opencodian-settings {
+  overflow-y: auto;
+  max-height: 100%;
   padding: 0 20px 20px;
 }
 
@@ -3812,22 +3815,26 @@ img.opencodian-model-provider-header-icon {
   justify-content: space-between;
 }
 
-.opencodian-settings:hover {
+.opencodian-settings:hover,
+.vertical-tab-content:has(.opencodian-settings-direct-host):hover {
   scrollbar-color: var(--opencodian-settings-scrollbar-thumb-hover) transparent;
 }
 
-.opencodian-settings::-webkit-scrollbar {
+.opencodian-settings::-webkit-scrollbar,
+.vertical-tab-content:has(.opencodian-settings-direct-host)::-webkit-scrollbar {
   width: var(--opencodian-settings-scrollbar-size);
   height: var(--opencodian-settings-scrollbar-size);
 }
 
-.opencodian-settings::-webkit-scrollbar-track {
+.opencodian-settings::-webkit-scrollbar-track,
+.vertical-tab-content:has(.opencodian-settings-direct-host)::-webkit-scrollbar-track {
   background: var(--opencodian-settings-scrollbar-track);
   border-radius: var(--opencodian-settings-scrollbar-radius);
   box-shadow: inset 0 0 0 1px var(--opencodian-settings-scrollbar-track-border);
 }
 
-.opencodian-settings::-webkit-scrollbar-thumb {
+.opencodian-settings::-webkit-scrollbar-thumb,
+.vertical-tab-content:has(.opencodian-settings-direct-host)::-webkit-scrollbar-thumb {
   background:
     linear-gradient(
       180deg,
@@ -3922,7 +3929,8 @@ img.opencodian-model-provider-header-icon {
 }
 
 
-.opencodian-settings:hover::-webkit-scrollbar-thumb {
+.opencodian-settings:hover::-webkit-scrollbar-thumb,
+.vertical-tab-content:has(.opencodian-settings-direct-host):hover::-webkit-scrollbar-thumb {
   background:
     linear-gradient(
       180deg,
@@ -3937,7 +3945,8 @@ img.opencodian-model-provider-header-icon {
     );
 }
 
-.opencodian-settings::-webkit-scrollbar-thumb:hover {
+.opencodian-settings::-webkit-scrollbar-thumb:hover,
+.vertical-tab-content:has(.opencodian-settings-direct-host)::-webkit-scrollbar-thumb:hover {
   background:
     linear-gradient(
       180deg,
@@ -9558,7 +9567,7 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
 
 
 /* components/settings-layout-contract.css */
-.setting-item.opencodian-settings-direct-host {
+.setting-item.opencodian-settings-direct-host:not(.setting-item-heading) {
   display: block;
   min-width: 0;
   margin: 0;
@@ -9567,6 +9576,15 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+}
+
+/* Declarative Settings already has an Obsidian scroll viewport outside this
+   mounting row. Let content size naturally so only that outer viewport scrolls. */
+.opencodian-settings-direct-host > .opencodian-settings {
+  height: auto;
+  max-height: none;
+  overflow: visible;
+  scrollbar-gutter: auto;
 }
 
 .opencodian-settings {
@@ -12713,6 +12731,276 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
     width: 100%;
     justify-content: flex-start;
   }
+}
+
+
+/* components/settings-opencode2.css */
+/* OpenCode 2: shadcn Card/Field, Badge, Alert and ScrollArea
+ * expressed with host-themed Obsidian DOM. No framework runtime required. */
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section {
+  --oc2-gap: var(--opencodian-settings-space-lg);
+  --oc2-section-gap: var(--opencodian-settings-space-2xl);
+  --oc2-radius: var(--opencodian-settings-form-row-radius);
+  --oc2-border: var(--background-modifier-border);
+  --oc2-muted: var(--text-muted);
+  --oc2-surface: var(--background-primary);
+  --oc2-secondary: var(--background-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-xl);
+  min-width: 0;
+  container-type: inline-size;
+  overflow: visible;
+  color: var(--text-normal);
+  font-family: var(--font-interface);
+  font-size: 13px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.opencodian-opencode2-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--opencodian-settings-space-xl);
+}
+
+.opencodian-opencode2-settings h3,
+.opencodian-opencode2-settings h4,
+.opencodian-opencode2-settings h5 {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-interface);
+  letter-spacing: normal;
+  font-weight: 600;
+}
+
+.opencodian-opencode2-settings h3 { font-size: 16px; }
+.opencodian-opencode2-settings h4 { font-size: 14px; }
+.opencodian-opencode2-settings h5 { font-size: 13px; }
+.opencodian-opencode2-header p { margin: var(--opencodian-settings-space-sm) 0 0; max-width: 65ch; }
+
+.opencodian-opencode2-settings .setting-item-description {
+  color: var(--oc2-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.opencodian-opencode2-sync {
+  display: flex;
+  align-items: center;
+  gap: var(--opencodian-settings-space-md);
+  flex-shrink: 0;
+  color: var(--oc2-muted);
+  font-size: 11px;
+}
+
+.opencodian-opencode2-scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--opencodian-settings-space-md);
+  padding: var(--opencodian-settings-space-lg) var(--opencodian-settings-space-lg);
+  border: 1px solid var(--oc2-border);
+  border-radius: var(--oc2-radius);
+  background: var(--oc2-secondary);
+  color: var(--oc2-muted);
+  font-size: 12px;
+}
+
+.opencodian-opencode2-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: var(--opencodian-settings-space-sm);
+  padding: 1px var(--opencodian-settings-space-sm);
+  border: 1px solid var(--oc2-border);
+  border-radius: calc(var(--opencodian-settings-radius-inline) - 2px);
+  background: var(--oc2-surface);
+  color: var(--oc2-muted);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.opencodian-opencode2-body,
+.opencodian-opencode2-group,
+.opencodian-opencode2-disclosure-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oc2-gap);
+  min-width: 0;
+}
+
+.opencodian-opencode2-body { gap: var(--oc2-section-gap); }
+.opencodian-opencode2-group > p { margin: calc(-1 * var(--opencodian-settings-space-xs)) 0 0; }
+
+.opencodian-opencode2-settings .setting-item {
+  margin: 0;
+  padding: var(--opencodian-settings-space-lg) calc(var(--opencodian-settings-space-lg) + 2px);
+  border: 1px solid var(--oc2-border);
+  border-radius: var(--oc2-radius);
+  background: var(--oc2-surface);
+  box-shadow: none;
+}
+
+.opencodian-opencode2-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 36%);
+  align-items: center;
+  gap: var(--opencodian-settings-space-xl);
+}
+
+.opencodian-opencode2-settings .setting-item-info { min-width: 0; margin: 0; }
+.opencodian-opencode2-settings .setting-item-name { font-size: 13px; font-weight: 500; }
+.opencodian-opencode2-settings .setting-item-control { min-width: 0; gap: var(--opencodian-settings-space-md); }
+
+.opencodian-opencode2-field input,
+.opencodian-opencode2-field select,
+.opencodian-opencode2-field textarea {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--oc2-border);
+  border-radius: var(--opencodian-settings-radius-inline);
+  background: var(--oc2-surface);
+  color: var(--text-normal);
+  font-size: 13px;
+}
+
+.opencodian-opencode2-settings textarea {
+  min-height: 110px;
+  padding: var(--opencodian-settings-space-lg);
+  resize: vertical;
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  line-height: 1.65;
+  caret-color: var(--interactive-accent);
+}
+
+.opencodian-opencode2-settings input::placeholder,
+.opencodian-opencode2-settings textarea::placeholder { color: var(--text-muted); opacity: 1; }
+.opencodian-opencode2-wide { grid-template-columns: minmax(0, 1fr); }
+.opencodian-opencode2-wide .setting-item-control { flex-direction: column; align-items: stretch; }
+.opencodian-opencode2-field-error { color: var(--text-error); font-size: 12px; }
+.opencodian-opencode2-field-error:empty { display: none; }
+
+.opencodian-opencode2-disclosure {
+  min-width: 0;
+  padding-top: var(--opencodian-settings-space-lg);
+  border-top: 1px solid var(--oc2-border);
+}
+
+.opencodian-opencode2-disclosure > summary { cursor: pointer; font-size: 12px; font-weight: 600; }
+.opencodian-opencode2-disclosure[open] > summary { margin-bottom: var(--opencodian-settings-space-lg); }
+
+.opencodian-opencode2-notice {
+  margin: 0;
+  padding: var(--opencodian-settings-space-lg) var(--opencodian-settings-space-lg);
+  border: 1px solid var(--oc2-border);
+  border-radius: var(--opencodian-settings-radius-inline);
+  background: var(--oc2-secondary);
+  color: var(--oc2-muted);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-opencode2-toolbar,
+.opencodian-opencode2-resource-tabs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--opencodian-settings-space-md);
+}
+
+.opencodian-opencode2-toolbar input { flex: 1; min-width: 120px; }
+.opencodian-opencode2-resource-tabs { padding: var(--opencodian-settings-space-xs); border: 1px solid var(--oc2-border); border-radius: var(--opencodian-settings-radius-inline); width: fit-content; }
+.opencodian-opencode2-resource-tabs button { box-shadow: none; background: transparent; }
+.opencodian-opencode2-resource-tabs button[aria-pressed="true"] { background: var(--background-modifier-hover); font-weight: 600; }
+
+.opencodian-opencode2-split {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--oc2-border);
+  border-radius: var(--oc2-radius);
+}
+
+.opencodian-opencode2-list {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--opencodian-settings-space-xs);
+  max-height: 560px;
+  overflow: auto;
+  padding: var(--opencodian-settings-space-sm);
+  border-inline-end: 1px solid var(--oc2-border);
+  background: var(--oc2-secondary);
+}
+
+.opencodian-opencode2-list button {
+  display: block;
+  height: auto;
+  min-height: 48px;
+  padding: var(--opencodian-settings-space-md);
+  border: 1px solid transparent;
+  border-radius: var(--opencodian-settings-radius-inline);
+  background: transparent;
+  box-shadow: none;
+  text-align: start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-opencode2-list button[aria-pressed="true"] { border-color: var(--oc2-border); background: var(--oc2-surface); }
+.opencodian-opencode2-list-meta { display: block; margin-top: calc(var(--opencodian-settings-space-sm) / 2); color: var(--oc2-muted); font-size: 11px; }
+.opencodian-opencode2-editor { display: flex; flex-direction: column; gap: var(--oc2-gap); padding: var(--opencodian-settings-space-xl); min-width: 0; }
+.opencodian-settings .opencodian-opencode2-settings .opencodian-opencode2-editor .setting-item { padding: 0; border: none; border-radius: 0; background: transparent; }
+.opencodian-opencode2-editor .opencodian-opencode2-field { grid-template-columns: minmax(0, 1fr); }
+.opencodian-opencode2-catalog-list { max-height: 300px; overflow: auto; border: 1px solid var(--oc2-border); border-radius: var(--opencodian-settings-radius-inline); }
+.opencodian-opencode2-catalog-item { padding: var(--opencodian-settings-space-md) var(--opencodian-settings-space-lg); border-bottom: 1px solid var(--oc2-border); overflow-wrap: anywhere; }
+.opencodian-opencode2-catalog-item:last-child { border-bottom: none; }
+.opencodian-opencode2-rules { display: flex; flex-direction: column; border: 1px solid var(--oc2-border); border-radius: var(--opencodian-settings-radius-inline); }
+.opencodian-opencode2-rules > div { display: flex; align-items: center; flex-wrap: wrap; gap: var(--opencodian-settings-space-md); padding: var(--opencodian-settings-space-md) var(--opencodian-settings-space-lg); border-bottom: 1px solid var(--oc2-border); }
+.opencodian-opencode2-rules > div:last-child { border-bottom: none; }
+.opencodian-opencode2-rules code { flex: 1; min-width: 0; font-size: 12px; overflow-wrap: anywhere; }
+.opencodian-opencode2-raw { width: 100%; min-height: 240px; }
+
+.opencodian-opencode2-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--opencodian-settings-space-md);
+  padding-top: calc(var(--opencodian-settings-space-lg) + 2px);
+  border-top: 1px solid var(--oc2-border);
+}
+
+.opencodian-opencode2-save-status { flex: 1; min-width: 180px; color: var(--oc2-muted); font-size: 12px; }
+.opencodian-opencode2-footer [data-action="apply"] { background: var(--interactive-accent); color: var(--text-on-accent); }
+.opencodian-opencode2-settings button:focus-visible,
+.opencodian-opencode2-settings input:focus-visible,
+.opencodian-opencode2-settings select:focus-visible,
+.opencodian-opencode2-settings textarea:focus-visible,
+.opencodian-opencode2-settings summary:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.opencodian-opencode2-settings button:disabled { cursor: not-allowed; opacity: .55; }
+
+@container (max-width: 720px) {
+  .opencodian-opencode2-header { flex-direction: column; gap: var(--opencodian-settings-space-lg); }
+  .opencodian-opencode2-field { grid-template-columns: minmax(0, 1fr); gap: var(--opencodian-settings-space-lg); }
+  .opencodian-opencode2-field .setting-item-control { justify-content: flex-start; }
+  .opencodian-opencode2-split { grid-template-columns: 155px minmax(0, 1fr); }
+}
+
+@container (max-width: 480px) {
+  .opencodian-opencode2-split { grid-template-columns: minmax(0, 1fr); }
+  .opencodian-opencode2-list { flex-direction: row; max-height: 140px; border-inline-end: none; border-bottom: 1px solid var(--oc2-border); }
+  .opencodian-opencode2-list button { flex: 0 0 130px; }
+  .opencodian-opencode2-sync { flex-wrap: wrap; }
+  .opencodian-opencode2-save-status { flex-basis: 100%; }
 }
 
 

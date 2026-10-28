@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "ec71740ce797a8feb006fff5eacbad3163261e4f7795a20a41e46890d580cb3c",
-  "recordCount": 803,
+  "digest": "eb0c299fc926f9202cd5a13f50754cd6f1bd1e67203a45b057515b09621c6334",
+  "recordCount": 806,
   "records": [
     {
       "kind": "ignore",
@@ -16,12 +16,12 @@
     {
       "kind": "package",
       "key": "package-lock.json",
-      "sha256": "04cbd351260f63b97a7fab8f517994508a75a1b766314abb98a8143f66683939"
+      "sha256": "691f2d33eba9c6b75b45d4ca88c6641418428bc28f3369e40272c33351b28930"
     },
     {
       "kind": "package",
       "key": "package.json",
-      "sha256": "328a6f32f72d17bbc71a71d44f076034b8bedf66cbdcd11077e222552f23fde3"
+      "sha256": "a52a1dc176c0d71083c664265bf8f3ea4c51232b22e2b4ee9fca99ecc56852ae"
     },
     {
       "kind": "src",
@@ -56,7 +56,7 @@
     {
       "kind": "src",
       "key": "src/app/memory/ExternalMemoryFileSystem.ts",
-      "sha256": "31716bdd6086502291d99864426cfcc20bdfc551e2a7196e79d6da9305c280cc"
+      "sha256": "158baa9f077efa3a1502126e101839c0a04419f05c499240438b3724a0160d24"
     },
     {
       "kind": "src",
@@ -71,7 +71,7 @@
     {
       "kind": "src",
       "key": "src/app/memory/MemoryRuntimeCoordinator.ts",
-      "sha256": "78c53202c74a8fe0009b6624fda15891498905dfd1ee64acde2e0ad3101b4019"
+      "sha256": "cce5ea60814d13e1b81b04003c696dc87d041b7b01139845e7b4bbd192524970"
     },
     {
       "kind": "src",
@@ -82,6 +82,11 @@
       "kind": "src",
       "key": "src/app/memory/VaultIndexFileSystem.ts",
       "sha256": "4c62ec0829f009a37782c3cb524485edae1aab1d99ac4d6454e33ac1fe42b2f7"
+    },
+    {
+      "kind": "src",
+      "key": "src/app/memory/VaultMemoryFileSystem.ts",
+      "sha256": "67dbc3b01224d5b5cbcb4b439ec87ca47ba1e4567b289749e97baa170329d7f1"
     },
     {
       "kind": "src",
@@ -461,7 +466,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/dsh/DshNativeClient.ts",
-      "sha256": "cd421034fbbe414b40ff5f06acac8123cd295773cd33cf2469e968da0a4baaea"
+      "sha256": "5f29648c7fd847dc54ce469fbf9ebc327eefe480aa1deda6ddf538b683002bf7"
     },
     {
       "kind": "src",
@@ -481,7 +486,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/opencode/OpenCode2Adapter.ts",
-      "sha256": "431c8f12b859275c7d99dcdabd6be08b0e204858f8f1e54b70b36b240040255a"
+      "sha256": "edc38a6411edc39136b4a106ff1cc8aebb15ed4ada8760362317908e1ad757d9"
     },
     {
       "kind": "src",
@@ -496,7 +501,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/pi/PiAuxQuerySession.ts",
-      "sha256": "5d0c2d9caf9092b77ed2b7f3517bcd3f05f04b929fe1317d5268498a89ee54ab"
+      "sha256": "b9b768b1821a4162917e1dcca7aa10ac46bfc8f2745107f57c892b926f496b74"
     },
     {
       "kind": "src",
@@ -770,13 +775,18 @@
     },
     {
       "kind": "src",
+      "key": "src/core/memory/memoryAgentExtraction.ts",
+      "sha256": "b046ff02c5982721e8e6364334cc9a7311501d31c9060222602a90e3ae1caada"
+    },
+    {
+      "kind": "src",
       "key": "src/core/memory/MemoryBackendService.ts",
-      "sha256": "182e3ab233338e072c7603fb1c169a0f38bcd3883c445011cf41fee79d6adcf1"
+      "sha256": "119f644429b44fe8d6bc5c9fd6afde779728201f5bd35dd75dacc923f9e04d36"
     },
     {
       "kind": "src",
       "key": "src/core/memory/memoryExtraction.ts",
-      "sha256": "14fdcbbffc87080673793d4aee8ac721621b417c1579003e4f3667a4aa58e42e"
+      "sha256": "684eb9f44f13cc9b723b7d4328e1007891f1803ce827a24c411981bd2cf3aed9"
     },
     {
       "kind": "src",
@@ -791,37 +801,37 @@
     {
       "kind": "src",
       "key": "src/core/memory/memoryIndexFormat.ts",
-      "sha256": "745c25d7cb407982bb6121e0557c120e522e5211fb8e0ecec8236e029559d5b0"
+      "sha256": "0bc921a1ae1adf78062434b7c14b76e07e0a6a1018cdcf28c662342fcbb6c3d1"
     },
     {
       "kind": "src",
       "key": "src/core/memory/memoryInjection.ts",
-      "sha256": "0d75dbe58a2e50fe792ef5b5b3c042643892e9e3982accd869b532cca35ba66f"
+      "sha256": "bcd4426ad19c9d39895e558bdae44eace792c18d7b1f976531276e1f7ab54720"
     },
     {
       "kind": "src",
       "key": "src/core/memory/memoryMaintenance.ts",
-      "sha256": "b7f04c24386abc234ae0e6bb78121424fd21461d2017912e851afd5e78262717"
+      "sha256": "77905eb6efc8b78350e1aabe8c58b2f071562f67beea6ae628a41264a90e510e"
     },
     {
       "kind": "src",
       "key": "src/core/memory/memoryManifest.ts",
-      "sha256": "54306e7b26d27ac1c2e36e4ead2a3d0042dc675ebd4151fdab792152518897a3"
+      "sha256": "62d01c2294d5d298a1f1a5c98ed91aa7c33c414314f0e47fc327a73e94fdf163"
     },
     {
       "kind": "src",
       "key": "src/core/memory/memoryPaths.ts",
-      "sha256": "b2d3ae8bd7b13f3840def0c16933dc4b87869efd7bec7d9030992a649f903251"
+      "sha256": "1f375d78d163879366d2851bb9f23862f22aab0cdab8be658b214f0a0497ceee"
     },
     {
       "kind": "src",
       "key": "src/core/memory/memoryProtocol.ts",
-      "sha256": "bcb75a88989c2ca2d04bb1c77e06b2957d4ebf9d1896700c396aeefc600c9d87"
+      "sha256": "ae1506d0d31ed4605d0adc1b112aab84728818e9d65fb17cac2a7d8a2ad6e845"
     },
     {
       "kind": "src",
       "key": "src/core/memory/memoryRecall.ts",
-      "sha256": "28d79cea87dd33ceb3cf1d03a28f8e5ac1e4295be0938b2e16a70e30843e9b70"
+      "sha256": "624c583e5a12d00b783ea1586b82f3ed64bce986727610ec8158269c2bf0528e"
     },
     {
       "kind": "src",
@@ -831,7 +841,7 @@
     {
       "kind": "src",
       "key": "src/core/memory/memorySecretScan.ts",
-      "sha256": "74bccee4ade453159ad838acc211102a325e246d3529ff986100d557b940145a"
+      "sha256": "6eb89b95a4951371b2f31aed29d83156d42a7e362847b90a2a9555568fa7a97e"
     },
     {
       "kind": "src",
@@ -841,7 +851,7 @@
     {
       "kind": "src",
       "key": "src/core/memory/memoryTypes.ts",
-      "sha256": "c6a7900cd75273071443485bba7431b35d0b74bbfb7d3bc1f6705af1195e32b2"
+      "sha256": "fb10ad95cdaa58d0eecf952a175226c87348a6fe7c30fd05610901beca578f23"
     },
     {
       "kind": "src",
@@ -1336,7 +1346,7 @@
     {
       "kind": "src",
       "key": "src/core/types/settings.ts",
-      "sha256": "743f8a0012cebf9702fd1fc598661cae78b70041606f7e8fee34110bd546d4d4"
+      "sha256": "460bd39d3ce14cebf9ba03c89a53d72a3b707bff7ce0e455cc9aafdba794e0e2"
     },
     {
       "kind": "src",
@@ -3001,7 +3011,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/backends/opencode/SettingsBackendSection.ts",
-      "sha256": "af8500e61c3c5eb093b51af220599651ee46141b1a9910aac1d4a3e8a80ccf99"
+      "sha256": "ad95be8024e93c6edc03f1375120e88500c3cb48e16feb338cc6f0c6ffb756e7"
     },
     {
       "kind": "src",
@@ -3141,7 +3151,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/general/SettingsConversationSection.ts",
-      "sha256": "8ec399871eae89f9b328a8b56e2c9640982d44f10e4866e590a5c18febccf991"
+      "sha256": "80220c06a1a367396f01b18803e1fc345ac8dff1723017bd2d7cff5cfc231576"
     },
     {
       "kind": "src",
@@ -3391,7 +3401,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/settingsLayoutRegistry.ts",
-      "sha256": "60a7b5800d89dabf5acb4f2696834a98b9d21c6753d02da1dd4d923eea4902d9"
+      "sha256": "f83bcc6103bc3426d2b72a7bed27f6e5e751de802529d3e0b061b08c5b9fac7a"
     },
     {
       "kind": "src",
@@ -3426,7 +3436,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "4a5e84de27bcf6320c3656be120ce4fb91a3db86b4a684cb6aa3906a81a92913"
+      "sha256": "a0e51d9bac38939eb9bd93535f44aeb3e927f59f2eae6b8bd50699d980f0d60f"
     },
     {
       "kind": "src",
@@ -3436,12 +3446,12 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "37683f34cc7d5ed8f79bd074fc37577e611219e95e37483da9a3366878dc8896"
+      "sha256": "26347493e6fe959faff17426a483d28ab133823da23efd98802c338385918b4d"
     },
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "188ed4484f3c213a9e4e02add809cd664e7ac843e0364b5de5841d5455c5efcf"
+      "sha256": "494f39839c09cd7a79d5223d3995f393a42b640f7d07e4d1258aeb095c885b87"
     },
     {
       "kind": "src",
@@ -3621,7 +3631,7 @@
     {
       "kind": "src",
       "key": "src/style/components/model-selector.css",
-      "sha256": "fcdd945ee40a867963617735048332385ee2f6a6049ad74dc6d8ceeb4380cab4"
+      "sha256": "a420a04ffb140e9377e29f560bc13b61114e02c10236fe21ae18a80bfa2e20eb"
     },
     {
       "kind": "src",
@@ -3696,12 +3706,17 @@
     {
       "kind": "src",
       "key": "src/style/components/settings-layout-contract.css",
-      "sha256": "b74c7750672a378cc0c0f94d4d343ea1851e98807b6f821a0fac29e8e6871732"
+      "sha256": "ebe84e7d2a83c204946f9bd4624602d6794edd203e1023e2b36fbda695b34537"
     },
     {
       "kind": "src",
       "key": "src/style/components/settings-model-pricing.css",
       "sha256": "78cd8b81d1bc801392f2b629b66558650a0f3b6af4ccd18ed10a4c3c39315190"
+    },
+    {
+      "kind": "src",
+      "key": "src/style/components/settings-opencode2.css",
+      "sha256": "f1c8a2f0ea4be89ca46920567f655acdf049f037f60175daed743f2f8b3a3921"
     },
     {
       "kind": "src",
@@ -3736,7 +3751,7 @@
     {
       "kind": "src",
       "key": "src/style/index.css",
-      "sha256": "930ad92400c90b0cce2b388b3b0359cd5cfe07511f22b291363bef33ba0d3caf"
+      "sha256": "32846897bfd8275d0182d967c008ce4f83127200a94612ae2515d8cb929ae54c"
     },
     {
       "kind": "src",
@@ -4019,7 +4034,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-27T10:44:38.258Z",
-  "headShaAtGeneration": "35c4680b48a2a7ef995bc3be105574cbc21f4a1a",
+  "generatedAt": "2026-10-28T11:45:35.448Z",
+  "headShaAtGeneration": "c7f9badffbe17da038efd1af773a71ec19f0f533",
   "graphifyVersion": "graphify 0.9.31"
 }

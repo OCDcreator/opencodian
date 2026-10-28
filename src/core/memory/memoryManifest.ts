@@ -97,6 +97,7 @@ export async function buildTopicManifest(
     let raw: string | null;
     let mtimeMs: number | null;
     try {
+      await fs.validatePath?.(projectDir, filePath);
       raw = await fs.readFile(filePath);
       mtimeMs = await fs.mtimeMs(filePath);
     } catch {

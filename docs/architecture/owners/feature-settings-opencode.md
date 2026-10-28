@@ -1,4 +1,6 @@
 # Owner: feature.settings-opencode
+
+2026-10-27：OpenCode 2 工作区按八个功能页组织；当前插件实例共享目录缓存和本地进程覆盖草稿，结构化 JSONC 更新保留其他字段。编辑、同步及应用反馈仍归现有 `SettingsBackendSection` owner，不新增跨模块运行时所有者。专属 CSS 只影响该工作区。
 > 2026-10-24（DSH）：SettingsBackendSection 将 DSH 控件委托给现有 settings-shell owner 下的 SettingsDshSection；只组装设置/连接读取端口，MCP 校验复用 core.backend 的协议边界。
 > 2026-09-22 (ZCode 票 01)：OpenCodianSettings 经典布局在 ZCode 激活时渲染 SettingsZCodeSection（与 pi 同模式）；设置面只读 adapter 诊断快照，不持有 ZCode 运行时状态。
 > 2026-09-21 (advantage-parity R-F4)：SettingsBackendSection 在默认 backend 旁增加默认关闭的聊天预热 toggle；下拉切换与禁用 active backend 后的 fallback 通知组合根排他预热。设置面只发宿主命令，不持有 pool。
@@ -66,3 +68,5 @@ Settings expose OpenCode 1 and 2 separately and provide local executable or remo
 目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。
 
 > 2026-10-27：`SettingsBackendSection` 只保留默认后端、启用开关与预热策略；OpenCode 2 连接/认证/MCP/资源工作区同 owner 托管（避免新增 settings SCC 成员）；catalog 失败使用固定脱敏分类。
+
+2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `feature.settings-opencode` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。

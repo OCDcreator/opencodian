@@ -17,6 +17,7 @@
 - 选择态：`.is-open`、`.is-unavailable`、`.is-unconfigured`、`.is-highlighted`、`.is-selected`。
 - configured-only 禁用态：`.opencodian-model-option.is-configured-only` 与 `.opencodian-model-option-availability`，使用中性 muted 样式、稳定 badge 最小宽度，并覆盖 hover/highlight 背景。
 - 设置页通用：`.opencodian-settings*`、`.opencodian-settings-quick-nav*`、`.opencodian-settings-tabs-*`、`.opencodian-settings-tab-*`、`.opencodian-settings-tooltip-layer` / `-bubble` / `-arrow`（`SettingsTooltipController` body-level overlay）、`.opencodian-capability-lab-session-detail`。
+- 声明式设置的 `.vertical-tab-content:has(.opencodian-settings-direct-host)` 与插件根共享 scrollbar token、track/thumb/hover 样式，把完整页面滚动条放在宿主外侧；插件根在 direct-host 内的自然高度与 overflow 由 `settings-layout-contract.css` 覆盖。editor-area `contentEl` 继续自行滚动，列表内部的独立 ScrollArea 不受此页面级修复影响。
 - `.opencodian-settings h3` 只提供 host-default reset；Settings section/group hierarchy 的 typography、alignment 和 rhythm 由 `settings-layout-contract.css` 的 shared heading contract 与 owner stack 负责，不能重新写入 `24px/16px` 的 blanket heading margin。
 - 编辑区设置页：`.workspace-leaf-content[data-type="opencodian-settings-view"] > .view-content.opencodian-settings` 是 editor-area 专用根选择器；padding、classic quick-nav 顶部贴合、tabbed 标题行对齐都应落在 `.view-content` 上，避免把设置 UI 挂到 Obsidian leaf 外壳。
 - 样式面板通用：`.opencodian-style-*`、`.opencodian-theme-*`、滚动条规则（含 `.opencodian-history-scroll` 皮肤）。

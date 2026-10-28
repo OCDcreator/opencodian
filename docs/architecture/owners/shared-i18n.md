@@ -126,3 +126,5 @@ English and Chinese copy describe executable snapshot/restart boundaries and exp
 > 2026-10-27：新增 OpenCode 2/DSH 工作区、Codex/ZCode 拆分标签、Claude/Codex debug、Claude 标题/行内模型、Obsidian 工具/PDF 索引文案，并将提问文案改为后端中立；en/zh 同步。
 
 > 2026-10-27（二次审查）：新增 DSH 模型/行内覆盖标签与说明，en/zh 同步。
+
+2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `shared.i18n` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。

@@ -92,3 +92,5 @@ Codex 会话浏览器从结构化目录结果保留权限拒绝分类，现有 s
 2026-10-27 组合模型弹层：EffortSelector 增加 inline presentation，在模型 popover 下半部用真实 backend variants 驱动的离散 slider 呈现；popover presentation 与 handleEscape/focus 语义保留。ContextRing 仅移动到 composer 外状态栏，组件 API 与 modal 触发未变。
 
 2026-10-27 思考强度胶囊样式：EffortSelector 在原生 range 外增加局部 control 容器，装饰圆点按真实 variants 的数量对齐 thumb 中心，当前圆点跟随预览和回读隐藏。header 与 aria-valuetext 继续显示完整档位名，保存、default/inherit/off 及生效边界由原有 host callbacks 决定；未改变 owner 依赖或后端配置职责。
+
+2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `feature.chat-ui` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。

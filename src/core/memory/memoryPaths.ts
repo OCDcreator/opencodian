@@ -9,7 +9,38 @@
  */
 
 import { createHash } from 'node:crypto';
+import { homedir } from 'node:os';
 import * as nodePath from 'node:path';
+
+export interface MemoryWorkspaceIdentity {
+  workspaceIdentity?: string;
+  workspacePathAliases?: Readonly<Record<string, string>>;
+}
+
+function expandIdentityPath(value: string): string {
+  const text = value.trim();
+  if (text === '~') return homedir();
+  return /^~[/\\]/u.test(text) ? nodePath.join(homedir(), ...text.slice(2).split(/[/\\]+/u)) : text;
+}
+
+export function memoryWorkspaceBucket(workspacePath: string, options: MemoryWorkspaceIdentity = {}): string {
+  const identity = options.workspaceIdentity?.trim();
+  if (identity) return `project-${createHash('sha256').update(identity).digest('hex').slice(0, 16)}`;
+  const resolved = nodePath.resolve(expandIdentityPath(workspacePath));
+  const compare = (value: string) => process.platform === 'win32' ? value.toLowerCase() : value;
+  for (const [from, to] of Object.entries(options.workspacePathAliases ?? {})) {
+    if (!to.trim() || compare(nodePath.resolve(expandIdentityPath(from))) !== compare(resolved)) continue;
+    const canonical = to.trim();
+    const name = canonical.split(/[/\\]+/u).filter(Boolean).pop() ?? 'project';
+    return `${sanitizeProjectSlug(name)}-${createHash('sha256').update(canonical).digest('hex').slice(0, 16)}`;
+  }
+  return `${sanitizeProjectSlug(nodePath.basename(resolved) || 'project')}-${hashWorkspacePath(resolved)}`;
+}
+
+export function memoryAgentKey(agent: string): string | null {
+  const key = agent.replace(/[^a-zA-Z0-9_-]/g, '-');
+  return key || null;
+}
 
 /** Vault-relative root that contains all per-workspace memory buckets. */
 export const MEMORY_STORE_ROOT = '.opencodian/memory';
@@ -35,10 +66,8 @@ export function hashWorkspacePath(workspacePath: string): string {
 }
 
 /** Vault-relative project bucket dir: `.opencodian/memory/projects/<slug>-<hash16>`. */
-export function memoryProjectDir(workspacePath: string): string {
-  const resolved = nodePath.resolve(workspacePath);
-  const slug = sanitizeProjectSlug(nodePath.basename(resolved) || 'project');
-  return `${MEMORY_STORE_ROOT}/projects/${slug}-${hashWorkspacePath(workspacePath)}`;
+export function memoryProjectDir(workspacePath: string, options: MemoryWorkspaceIdentity = {}): string {
+  return `${MEMORY_STORE_ROOT}/projects/${memoryWorkspaceBucket(workspacePath, options)}`;
 }
 
 /** Vault-relative path of a file directly inside the project bucket. */
@@ -59,11 +88,9 @@ export function memoryIndexPath(workspacePath: string): string {
  * pointing the external root at either system's store base makes all three
  * operate on one physical tree.
  */
-export function externalMemoryProjectDir(externalRoot: string, workspacePath: string): string {
+export function externalMemoryProjectDir(externalRoot: string, workspacePath: string, options: MemoryWorkspaceIdentity = {}): string {
   const resolvedRoot = nodePath.resolve(externalRoot);
-  const resolved = nodePath.resolve(workspacePath);
-  const slug = sanitizeProjectSlug(nodePath.basename(resolved) || 'project');
-  return nodePath.join(resolvedRoot, 'projects', `${slug}-${hashWorkspacePath(workspacePath)}`, 'memory');
+  return nodePath.join(resolvedRoot, 'projects', memoryWorkspaceBucket(workspacePath, options), 'memory');
 }
 
 /**

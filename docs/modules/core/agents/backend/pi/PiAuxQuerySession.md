@@ -9,6 +9,8 @@
 
 ## 职责
 
+- 2026-10-28：显式 Pi 模型在 PiRpcClient 启动配置中传入 provider/model，避免 SDK 在后续 set_model 之前先用已失效的全局默认模型初始化失败；工具白名单及原生回读保持原约束。
+
 - 在系统临时目录创建会话作用域，直接用 `PiRpcClient` 启动（不经过插件的 `PiSessionStore`），使辅助会话不出现在插件会话列表、也不在 vault 落 `.pi` 残留
 - 校验 `serviceProtocol`，`new_session` 后取 `get_tools` 的原生工具目录，与只读候选集（read/grep/find/ls/glob）求交集
 - `set_tools` 下发白名单，再用 `get_tools` 回读 `active`：必须与白名单**完全一致**，且不得残留任何写类工具（bash/powershell/edit/write/patch/task 等），否则拒绝会话（fail closed）

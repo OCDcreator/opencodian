@@ -3,7 +3,7 @@
  * runtime (`app.memory-runtime`). Mirrors the `DiagnosticsRuntimeCoordinator`
  * pattern: `main.ts` never touches memory services directly; this class
  * binds the backend-neutral `core.memory` core to concrete infrastructure
- * (Obsidian vault adapter filesystem, `OpenCodeService` throwaway-session
+ * (Obsidian vault adapter filesystem, owning-backend read-only auxiliary-session
  * model invoker) and exposes the narrow `MemoryRuntimePort` plus the
  * maintenance command surface.
  *
@@ -11,16 +11,17 @@
  * surface in or block a user turn.
  */
 
-import * as nodeFs from 'node:fs';
 import * as nodePath from 'node:path';
 
-import { App, Modal, normalizePath, Notice, Setting } from 'obsidian';
+import { App, Modal, Notice, Setting } from 'obsidian';
 
+import { type AgentAuxQueryCapability, AUX_DENIED_CAPABILITIES, type AuxQuerySession, type BackendModelSelection,findWriteToolCalls } from '../../core/agents/backend/AgentAuxQueryCapability';
+import type { AgentServiceRegistry } from '../../core/agents/backend/AgentServiceRegistry';
 import {
   compactionMarkerCount,
+  completedAgentTranscripts,
   externalMemoryProjectDir,
   MemoryBackendService,
-  type MemoryFileSystem,
   type MemoryLintReport,
   type MemoryModelInvoker,
   type MemoryRuntimePort,
@@ -28,119 +29,78 @@ import {
   type MemoryStatusReport,
   type MemoryTranscriptMessage,
 } from '../../core/memory';
-import type { OpenCodeService } from '../../core/opencode/OpenCodeService';
+import { MEMORY_STORE_ROOT, memoryAgentKey, type MemoryEmbeddingInvoker,memoryProjectDir } from '../../core/memory';
+import type { AgentBackendKind, Conversation } from '../../core/types/chat';
 import { t } from '../../i18n';
 import { expandHomeDir, ExternalMemoryFileSystem } from './ExternalMemoryFileSystem';
 import { MemoryGitSyncService } from './MemoryGitSyncService';
+import { VaultMemoryFileSystem } from './VaultMemoryFileSystem';
+export { VaultMemoryFileSystem } from './VaultMemoryFileSystem';
 
 /** Debounce between turn settle and background distillation (ms). */
 const TURN_SETTLE_DELAY_MS = 1_500;
 
-/**
- * `MemoryFileSystem` over the Obsidian vault adapter, rooted at the vault
- * base. All writes go through `normalizePath` (repo storage convention).
- * `mtimeMs` resolves through node fs when available (hidden dotfolders are
- * not indexed by Obsidian) and degrades to null.
- */
-export class VaultMemoryFileSystem implements MemoryFileSystem {
-  constructor(private readonly app: App) {}
-
-  private adapter(): {
-    exists(path: string): Promise<boolean>;
-    read(path: string): Promise<string>;
-    write(path: string, data: string): Promise<void>;
-    mkdir(path: string): Promise<void>;
-    list(path: string): Promise<{ files: string[]; folders: string[] }>;
-    remove(path: string): Promise<void>;
-  } {
-    return this.app.vault.adapter as never;
-  }
-
-  private async ensureParent(relativePath: string): Promise<void> {
-    const parts = normalizePath(relativePath).split('/');
-    for (let i = 1; i < parts.length; i++) {
-      const dir = parts.slice(0, i).join('/');
-      if (!(await this.adapter().exists(dir))) {
-        await this.adapter().mkdir(dir).catch(() => undefined);
-      }
-    }
-  }
-
-  async readFile(relativePath: string): Promise<string | null> {
-    try {
-      if (!(await this.adapter().exists(normalizePath(relativePath)))) return null;
-      return await this.adapter().read(normalizePath(relativePath));
-    } catch {
-      return null;
-    }
-  }
-
-  async writeFile(relativePath: string, content: string): Promise<void> {
-    const normalized = normalizePath(relativePath);
-    await this.ensureParent(normalized);
-    await this.adapter().write(normalized, content);
-  }
-
-  async exists(relativePath: string): Promise<boolean> {
-    try {
-      return await this.adapter().exists(normalizePath(relativePath));
-    } catch {
-      return false;
-    }
-  }
-
-  async listFiles(relativePath: string): Promise<string[]> {
-    // Obsidian's DataAdapter.list() returns full vault-relative path strings
-    // (ListedFiles), not TFile objects.
-    const listing = await this.adapter().list(normalizePath(relativePath));
-    return listing.files.map((f) => nodePath.basename(f));
-  }
-
-  async mkdir(relativePath: string): Promise<void> {
-    await this.ensureParent(relativePath);
-  }
-
-  async remove(relativePath: string): Promise<void> {
-    await this.adapter().remove(normalizePath(relativePath));
-  }
-
-  async mtimeMs(relativePath: string): Promise<number | null> {
-    try {
-      const absolute = this.nativeAbsolutePath(relativePath);
-      const stat = await nodeFs.promises.stat(absolute);
-      return stat.mtimeMs;
-    } catch {
-      return null;
-    }
-  }
-
-  nativeAbsolutePath(relativePath: string): string {
-    const base = (this.app.vault.adapter as { basePath?: string }).basePath ?? '';
-    return nodePath.join(base, normalizePath(relativePath));
-  }
-}
-
-/** Parse `provider/model` into its parts (empty strings when absent). */
-function splitModelRef(modelRef: string): { provider: string; model: string } {
-  const trimmed = modelRef.trim();
-  if (!trimmed) return { provider: '', model: '' };
-  const slash = trimmed.indexOf('/');
-  if (slash <= 0) return { provider: '', model: trimmed };
-  return {
-    provider: trimmed.slice(0, slash),
-    model: trimmed.slice(slash + 1),
-  };
-}
-
 export interface MemoryRuntimeCoordinatorOptions {
   readonly app: App;
-  readonly openCodeService: OpenCodeService;
+  readonly registry: Pick<AgentServiceRegistry, 'get' | 'isEnabled'>;
+  readonly getConversationContext: (id: string) => Promise<Pick<Conversation, 'backend' | 'backendAgentId' | 'backendSessionId' | 'sessionSettings' | 'lastContextUsage'> | null>;
+  readonly getEmbeddingClient?: () => MemoryEmbeddingInvoker | null;
   readonly getSettings: () => MemorySettingsSnapshot;
   readonly getConversationMessages: (
     conversationId: string,
   ) => Promise<ReadonlyArray<MemoryTranscriptMessage> | null>;
   /** Test hook: override the turn-settle debounce (default 1500ms). */
   readonly turnSettleDelayMs?: number;
+}
+
+type MemoryConversationContext = NonNullable<Awaited<ReturnType<MemoryRuntimeCoordinatorOptions['getConversationContext']>>>;
+type MemoryAuxAdapter = AgentAuxQueryCapability & {
+  getDefaultModel?: () => { provider: string; model: string } | null;
+  getDefaultModelSelection?: (sessionId?: string) => { provider: string; model: string } | null;
+};
+
+function conversationModel(kind: AgentBackendKind, context: MemoryConversationContext): { provider: string; model: string } | null {
+  const session = context.sessionSettings;
+  let selected: { provider: string; model: string } | null | undefined;
+  switch (kind) {
+    case 'claude-code': selected = session?.claudeModelOverride; break;
+    case 'pi': selected = session?.piModelOverride; break;
+    case 'zcode': selected = session?.zcodeModelOverride; break;
+    case 'dsh': selected = session?.dshModelOverride; break;
+  }
+  if (selected) return selected;
+  const usage = context.lastContextUsage;
+  return usage?.providerId && usage.modelId ? { provider: usage.providerId, model: usage.modelId } : null;
+}
+
+function resolveMemoryModel(input: {
+  kind: Exclude<AgentBackendKind, 'opencode' | 'copilot'>;
+  context: MemoryConversationContext;
+  settings: MemorySettingsSnapshot;
+  fallback: { provider: string; model: string } | null;
+  request: Parameters<MemoryModelInvoker['invoke']>[0];
+}): BackendModelSelection | undefined {
+  const { kind, context, settings, fallback, request } = input;
+  const override = request.purpose === 'selection' ? settings.memorySelectorModelOverrides?.[kind]
+    : settings.memoryModelOverrides?.[kind] || (kind === 'opencode2' ? request.modelRef : '');
+  const pair = conversationModel(kind, context) || fallback;
+  const bare = kind === 'claude-code' || kind === 'codex';
+  const raw = override?.trim() || (kind === 'codex' ? context.sessionSettings?.codexModelOverride?.trim() : '')
+    || (pair ? (bare ? pair.model : `${pair.provider}/${pair.model}`) : '');
+  if (!raw) return undefined;
+  if (/\s/u.test(raw)) throw new Error('invalid-memory-model-reference');
+  if (kind === 'claude-code' || kind === 'codex') return { kind, model: raw };
+  const slash = raw.indexOf('/');
+  if (slash <= 0 || slash === raw.length - 1) throw new Error('invalid-memory-model-reference');
+  return { kind, provider: raw.slice(0, slash), model: raw.slice(slash + 1) };
+}
+
+function validateMemoryAuxiliary(aux: AuxQuerySession, kind: AgentBackendKind): void {
+  const proof = aux.safety;
+  if (proof.backend !== kind || !['none', 'read-only-allowlist'].includes(proof.enforcedPolicy)
+    || (proof.enforcedPolicy === 'none' && proof.effectiveTools.length > 0)
+    || AUX_DENIED_CAPABILITIES.some(cap => !proof.deniedCapabilities.includes(cap))
+    || findWriteToolCalls(proof.effectiveTools.map(name => ({ name }))).length) throw new Error('memory-auxiliary-safety-rejected');
 }
 
 export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
@@ -152,7 +112,12 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
   private sync: MemoryGitSyncService | null = null;
   /** Identity the sync service was built for (root + remote url). */
   private syncKey = '__unset__';
-  private readonly invoker: MemoryModelInvoker;
+  private readonly sessions = new Set<AuxQuerySession>();
+  private readonly recalled = new Map<string, { epoch: number; paths: string[]; characters: number }>();
+  private readonly timers = new Map<string, number>();
+  private queue: Promise<void> = Promise.resolve();
+  private generation = 0;
+  private readonly agentWatermarks = new Map<string, string>();
 
   /** Per-conversation transcript watermark already distilled. */
   private readonly extractionWatermarks = new Map<string, number>();
@@ -160,8 +125,6 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
   private readonly injectedEpochs = new Map<string, number>();
   /** Compaction-marker count at the last settle observation. */
   private readonly compactionCounts = new Map<string, number>();
-  private extractionInFlight = false;
-  private reflectionInFlight = false;
   private disposed = false;
 
   private readonly turnSettleDelayMs: number;
@@ -170,9 +133,6 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
     this.turnSettleDelayMs = options.turnSettleDelayMs ?? TURN_SETTLE_DELAY_MS;
     this.fs = new VaultMemoryFileSystem(options.app);
     this.vaultBasePath = (options.app.vault.adapter as { basePath?: string }).basePath ?? '.';
-    this.invoker = {
-      invoke: (input) => this.invokeModel(input),
-    };
     // Plugin load with a pre-configured sync remote starts syncing without
     // waiting for the first memory operation.
     this.ensureSyncService((this.settings().memoryExternalRoot ?? '').trim());
@@ -186,24 +146,30 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
    * resets per-conversation epoch state — the injected protocol text names a
    * different store, so every conversation deserves one fresh epoch.
    */
-  private ensureService(): MemoryBackendService {
-    const root = (this.settings().memoryExternalRoot ?? '').trim();
-    const rootKey = root.toLowerCase();
+  private ensureService(agentKey?: string | null): MemoryBackendService {
+    const settings = this.settings();
+    const root = (settings.memoryExternalRoot ?? '').trim();
+    const identity = { workspaceIdentity: settings.memoryWorkspaceIdentity, workspacePathAliases: settings.memoryWorkspacePathAliases };
+    const agent = settings.memoryAgentNotebooksEnabled !== false && agentKey ? memoryAgentKey(agentKey) : null;
+    const agentRoot = settings.memoryAgentStorageRoot?.trim();
+    const rootKey = JSON.stringify([root, identity, agent, agentRoot]);
     if (this.service && this.serviceRootKey === rootKey) return this.service;
-    if (root) {
-      const expandedRoot = expandHomeDir(root);
+    if (root || (agent && agentRoot)) {
+      const expandedRoot = expandHomeDir(agent && agentRoot ? agentRoot : root);
       const externalFs = new ExternalMemoryFileSystem(expandedRoot);
       this.service = new MemoryBackendService(externalFs, this.vaultBasePath, {
-        projectDir: externalMemoryProjectDir(expandedRoot, this.vaultBasePath),
+        projectDir: agent ? nodePath.join(expandedRoot, ...(agentRoot ? [] : ['agent-memory']), agent)
+          : externalMemoryProjectDir(expandedRoot, this.vaultBasePath, identity),
         metricsFs: this.fs,
+        agentKey: agent ?? undefined,
       });
     } else {
-      this.service = new MemoryBackendService(this.fs, this.vaultBasePath);
+      this.service = new MemoryBackendService(this.fs, this.vaultBasePath, {
+        projectDir: agent ? `${MEMORY_STORE_ROOT}/agent-memory/${agent}` : memoryProjectDir(this.vaultBasePath, identity),
+        agentKey: agent ?? undefined,
+      });
     }
     this.serviceRootKey = rootKey;
-    this.extractionWatermarks.clear();
-    this.injectedEpochs.clear();
-    this.compactionCounts.clear();
     this.ensureSyncService(root);
     return this.service;
   }
@@ -215,7 +181,7 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
    */
   private ensureSyncService(rawRoot: string): void {
     const remoteUrl = (this.settings().memorySyncRemoteUrl ?? '').trim();
-    const key = `${rawRoot.toLowerCase()};;${remoteUrl.toLowerCase()}`;
+    const key = `${rawRoot};;${remoteUrl}`;
     if (this.syncKey === key) return;
     this.sync?.dispose();
     if (rawRoot && remoteUrl) {
@@ -243,18 +209,31 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
     try {
       // Resolve the service first: a root switch resets epoch state, and the
       // already-injected check below must observe that reset.
-      const service = this.ensureService();
+      if (this.disposed || !this.settings().memoryBackendEnabled) return null;
+      const generation = this.generation;
+      const context = await this.options.getConversationContext(input.conversationId);
+      const service = this.ensureService(context?.backendAgentId);
+      const key = `${input.conversationId}:${service.projectDir}`;
       const epoch = compactionMarkerCount(input.messages);
-      const alreadyInjected = this.injectedEpochs.get(input.conversationId) === epoch;
+      const alreadyInjected = this.injectedEpochs.get(key) === epoch;
+      const recall = this.recalled.get(key);
+      const sameEpoch = recall?.epoch === epoch;
       const outcome = await service.planInjection({
         conversationId: input.conversationId,
         messages: input.messages,
         latestUserText: input.latestUserText,
         settings: this.settings(),
+        invoker: this.invokerFor(input.conversationId),
+        embedding: this.settings().memoryEmbeddingEnabled ? this.options.getEmbeddingClient?.() : null,
+        alreadyRecalledPaths: sameEpoch ? recall.paths : [],
+        alreadyRecalledContentCharacters: sameEpoch ? recall.characters : 0,
         ...(alreadyInjected ? { alreadyInjectedThisEpochOverride: true } : {}),
       });
+      if (this.disposed || generation !== this.generation) return null;
       if (outcome.text) {
-        this.injectedEpochs.set(input.conversationId, epoch);
+        this.injectedEpochs.set(key, epoch);
+        this.recalled.set(key, { epoch, paths: [...(sameEpoch ? recall.paths : []), ...outcome.recalledPaths],
+          characters: outcome.recalledContentCharacters ?? (sameEpoch ? recall.characters : 0) });
         // Injection starts a fresh epoch for distillation watermarks too:
         // the injected block is context, not a distilled user turn.
       }
@@ -267,15 +246,28 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
   onTurnSettled(input: { conversationId: string; sessionId?: string }): void {
     try {
       if (this.disposed || !this.settings().memoryBackendEnabled) return;
-      window.setTimeout(() => {
-        void this.handleTurnSettled(input);
+      const pending = this.timers.get(input.conversationId);
+      if (pending !== undefined) window.clearTimeout(pending);
+      const timer = window.setTimeout(() => {
+        this.timers.delete(input.conversationId);
+        this.queue = this.queue.then(() => this.handleTurnSettled(input)).catch(() => undefined);
       }, this.turnSettleDelayMs);
+      this.timers.set(input.conversationId, timer);
     } catch {
       // fail-soft
     }
   }
 
   onSettingsChanged(): void {
+    this.generation++;
+    this.recalled.clear();
+    this.agentWatermarks.clear();
+    this.injectedEpochs.clear();
+    this.extractionWatermarks.clear();
+    this.compactionCounts.clear();
+    this.service = null;
+    this.serviceRootKey = '__unset__';
+    for (const session of this.sessions) session.cancel();
     if (!this.settings().memoryBackendEnabled) {
       this.extractionWatermarks.clear();
       this.injectedEpochs.clear();
@@ -396,6 +388,13 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
 
   dispose(): void {
     this.disposed = true;
+    this.generation++;
+    for (const timer of this.timers.values()) window.clearTimeout(timer);
+    this.timers.clear();
+    this.recalled.clear();
+    this.agentWatermarks.clear();
+    for (const session of this.sessions) { session.cancel(); void session.dispose().catch(() => undefined); }
+    this.sessions.clear();
     this.sync?.dispose();
     this.sync = null;
     this.extractionWatermarks.clear();
@@ -426,16 +425,33 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
       // since the last observation triggers one reflection pass.
       const markers = compactionMarkerCount(messages);
       const lastMarkers = this.compactionCounts.get(input.conversationId) ?? 0;
-      this.compactionCounts.set(input.conversationId, markers);
       if (markers > lastMarkers && settings.memoryExtractionEnabled) {
-        await this.runReflectionGuarded(input, messages);
+        const reflected = await this.runReflectionGuarded(input, messages);
+        if (reflected) this.compactionCounts.set(input.conversationId, markers);
       }
 
       if (settings.memoryExtractionEnabled) {
         await this.runExtractionGuarded(input, messages);
+        await this.runAgentExtraction(input, messages);
       }
     } catch {
       // fail-soft by contract
+    }
+  }
+
+  private async runAgentExtraction(input: { conversationId: string; sessionId?: string }, messages: ReadonlyArray<MemoryTranscriptMessage>): Promise<void> {
+    if (this.settings().memoryAgentNotebooksEnabled === false) return;
+    const generation = this.generation;
+    for (const agent of completedAgentTranscripts(messages)) {
+      const key = `${input.conversationId}:${agent.key}`;
+      if (this.agentWatermarks.get(key) === agent.fingerprint) continue;
+      const outcome = await this.ensureService(agent.agent).runExtraction({
+        conversationId: input.conversationId, sessionId: `${input.sessionId ?? input.conversationId}:${agent.key}`,
+        settings: this.settings(), invoker: this.invokerFor(input.conversationId), messages: agent.messages,
+        lastExtractedMessageCount: 0, isCurrent: () => !this.disposed && generation === this.generation,
+      });
+      if (outcome.status !== 'error') this.agentWatermarks.set(key, agent.fingerprint);
+      if (outcome.status === 'written') this.sync?.scheduleSync();
     }
   }
 
@@ -443,75 +459,80 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
     input: { conversationId: string; sessionId?: string },
     messages: ReadonlyArray<MemoryTranscriptMessage>,
   ): Promise<void> {
-    if (this.extractionInFlight) return;
-    this.extractionInFlight = true;
-    try {
-      const outcome = await this.ensureService().runExtraction({
+    const generation = this.generation;
+    const context = await this.options.getConversationContext(input.conversationId);
+    const service = this.ensureService(context?.backendAgentId);
+    const outcome = await service.runExtraction({
         conversationId: input.conversationId,
         sessionId: input.sessionId ?? input.conversationId,
         settings: this.settings(),
-        invoker: this.invoker,
+        invoker: this.invokerFor(input.conversationId),
+        isCurrent: () => !this.disposed && this.generation === generation,
         lastExtractedMessageCount: this.extractionWatermarks.get(input.conversationId) ?? 0,
         messages,
       });
-      if (outcome.status === 'written') this.sync?.scheduleSync();
-    } finally {
-      this.extractionWatermarks.set(input.conversationId, messages.length);
-      this.extractionInFlight = false;
-    }
+    if (outcome.status === 'written') this.sync?.scheduleSync();
+    if (outcome.status !== 'error') this.extractionWatermarks.set(input.conversationId, messages.length);
   }
 
   private async runReflectionGuarded(
     input: { conversationId: string; sessionId?: string },
     messages: ReadonlyArray<MemoryTranscriptMessage>,
-  ): Promise<void> {
-    if (this.reflectionInFlight) return;
-    this.reflectionInFlight = true;
-    try {
-      const outcome = await this.ensureService().runReflection({
+  ): Promise<boolean> {
+    const generation = this.generation;
+    const context = await this.options.getConversationContext(input.conversationId);
+    const service = this.ensureService(context?.backendAgentId);
+    const outcome = await service.runReflection({
         conversationId: input.conversationId,
         sessionId: input.sessionId ?? input.conversationId,
         settings: this.settings(),
-        invoker: this.invoker,
+        invoker: this.invokerFor(input.conversationId),
+        isCurrent: () => !this.disposed && this.generation === generation,
         messages,
       });
-      if (outcome.status === 'written') this.sync?.scheduleSync();
+    if (outcome.status === 'written') this.sync?.scheduleSync();
+    return outcome.status !== 'error';
+  }
+
+  private invokerFor(conversationId: string): MemoryModelInvoker {
+    return { invoke: input => this.invokeModel(input, conversationId) };
+  }
+
+  /** Isolated read-only auxiliary query on the persisted conversation owner. */
+  private async invokeModel(input: Parameters<MemoryModelInvoker['invoke']>[0], conversationId: string): Promise<string> {
+    const generation = this.generation;
+    const context = await this.options.getConversationContext(conversationId);
+    const kind = context?.backend;
+    if (!kind || kind === 'opencode' || kind === 'copilot' || !this.options.registry.isEnabled(kind)) {
+      throw new Error('memory-backend-unavailable');
+    }
+    const adapter = this.options.registry.get(kind) as MemoryAuxAdapter | undefined;
+    if (!adapter?.startAuxQuerySession) throw new Error('memory-auxiliary-capability-unavailable');
+    // Pi/Claude construct their auxiliary runtime independently; starting chat
+    // first would bind a background query to an unrelated native default model.
+    if (['codex', 'zcode'].includes(kind) && adapter.status !== 'connected') await adapter.start();
+    const settings = this.settings();
+    const model = resolveMemoryModel({ kind, context, settings, request: input,
+      fallback: adapter.getDefaultModel?.() ?? adapter.getDefaultModelSelection?.(context.backendSessionId) ?? null });
+    if (this.disposed || generation !== this.generation || !settings.memoryBackendEnabled) throw new Error('memory-runtime-inactive');
+    const aux = await adapter.startAuxQuerySession({ systemPrompt: input.system,
+      workingDirectory: this.vaultBasePath, model,
+      turnTimeoutMs: input.purpose === 'selection' ? 30_000 : 180_000 });
+    this.sessions.add(aux);
+    try {
+      if (this.disposed || generation !== this.generation) throw new Error('memory-runtime-inactive');
+      validateMemoryAuxiliary(aux, kind);
+      const response = await aux.query({ prompt: input.user });
+      if (!response.success) throw new Error(response.error);
+      if (findWriteToolCalls(response.toolCalls).length) throw new Error('memory-auxiliary-write-observed');
+      if (this.disposed || generation !== this.generation) throw new Error('memory-runtime-inactive');
+      return response.text;
     } finally {
-      this.reflectionInFlight = false;
+      this.sessions.delete(aux);
+      await aux.dispose();
     }
   }
 
-  /**
-   * One-shot JSON distillation on a throwaway OpenCode session. The session
-   * is created with `setCurrent: false` and always deleted, so memory
-   * distillation never pollutes the user's conversation list.
-   */
-  private async invokeModel(input: {
-    system: string;
-    user: string;
-    modelRef: string;
-    title: string;
-  }): Promise<string> {
-    const service = this.options.openCodeService;
-    const sessionId = await service.createSession(input.title, { setCurrent: false });
-    try {
-      const { provider, model } = splitModelRef(input.modelRef);
-      const response = await service.requestAssistantResponse(input.user, {
-        sessionId,
-        system: input.system,
-        format: { type: 'text' },
-        ...(provider ? { provider } : {}),
-        ...(model ? { model } : {}),
-      });
-      return response?.content ?? '';
-    } finally {
-      try {
-        await service.deleteSession(sessionId);
-      } catch {
-        // best-effort cleanup
-      }
-    }
-  }
 }
 
 /** Tiny input modal for the forget flow (confirm-first by design). */

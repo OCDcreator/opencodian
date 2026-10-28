@@ -16,7 +16,7 @@ type Equal<T, U> = (<V>() => V extends T ? 1 : 2) extends (<V>() => V extends U 
 
 // The explicit noEmit semantic check below validates these type assertions and
 // negative compile cases even when Jest uses isolatedModules transpilation.
-describe('Claude SDK 0.3.283 control source/type contracts', () => {
+describe('Claude SDK 0.3.312 control source/type contracts', () => {
   it('keeps the two optional runtime methods exactly equal to the official Query methods', () => {
     const exactContracts: [
       Equal<NonNullable<RuntimeQuery['setMcpPermissionModeOverride']>, Query['setMcpPermissionModeOverride']>,
@@ -135,6 +135,6 @@ describe('Claude SDK 0.3.283 control source/type contracts', () => {
     const packagePath = resolve(process.cwd(), 'node_modules/@anthropic-ai/claude-agent-sdk/package.json');
     const sdkPackage = JSON.parse(readFileSync(packagePath, 'utf8')) as { version: string };
 
-    expect(sdkPackage.version).toBe('0.3.283');
+    expect(sdkPackage.version).toBe('0.3.312');
   });
 });

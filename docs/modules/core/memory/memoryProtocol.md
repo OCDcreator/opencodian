@@ -17,3 +17,5 @@
 ## 边界与约束
 
 - 协议文本无产品名（branding 中性）；引用的归档尾标常量来自 `memoryIndexFormat.ARCHIVED_SECTION_MARKER`。
+
+2026-10-28：索引预算文案改为 25,000 字符；新增从当前 opencode-zmem 移植的 buildAgentMemoryProtocol（user scope、独立代理目录、长版记忆分类/正文结构/读取与陈旧校验规则）。项目协议继续使用既有 Lane Split。

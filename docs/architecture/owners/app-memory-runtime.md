@@ -9,7 +9,7 @@
 - **Include:** `src/app/memory/**`
 
 ## Responsibilities
-- compose the backend-neutral memory runtime: vault-local or shared external filesystem adapter (per `memoryExternalRoot`, with `~` expansion for cross-host synced settings), settings snapshot, OpenCode-backed extraction/reflection model invoker
+- compose the backend-neutral memory runtime: vault-local or shared external filesystem adapter (per `memoryExternalRoot`, with `~` expansion for cross-host synced settings), settings snapshot, owning-backend read-only auxiliary extraction/reflection/selection invoker
 - observe turn-settled and compaction signals and schedule fail-soft per-turn extraction and compaction reflection
 - register memory maintenance commands (status/lint/list/forget) against the coordinator
 - when a shared external root plus a git remote URL are configured, sync the whole memory tree through `MemoryGitSyncService` (shared protocol with opencode-zmem: cross-plugin lock, main branch, identical ignore rules)
@@ -23,8 +23,8 @@
 - `MemoryRuntimeCoordinator` (`src/app/memory/MemoryRuntimeCoordinator.ts`)
 
 ## Dependency surface
-- **Allowed owner dependencies:** `shared.foundation`, `shared.i18n`, `core.memory`, `core.opencode`, `core.storage`, `core.types`
-- **Forbidden dependencies:** `feature.chat-runtime`, `feature.chat-services`, `core.backend`, `core.backend-pi` (no adapter imports; chat wiring flows the other way through host ports)
+- **Allowed owner dependencies:** `shared.foundation`, `shared.i18n`, `core.memory`, `core.backend`, `core.storage`, `core.types`
+- **Forbidden dependencies:** `feature.chat-runtime`, `feature.chat-services`, `core.backend-pi` (no adapter imports; chat wiring flows the other way through host ports)
 - **Adjacent owners:** `app.composition`, `core.memory`
 
 ## Focused tests
@@ -35,11 +35,11 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 
 ## Hard invariants
 - Every entry point is fail-soft: a memory failure must never surface in or block a user turn. Injection planning, extraction, reflection and metrics writes all swallow-and-log.
-- The coordinator is the only place allowed to bind `core.memory` ports to concrete infrastructure (Obsidian vault adapter filesystem, `OpenCodeService` temp-session model invoker).
+- The coordinator is the only place allowed to bind `core.memory` ports to concrete infrastructure (Obsidian vault adapter filesystem, owning-backend AgentAuxQueryCapability invoker).
 - The vault filesystem port consumes Obsidian's `DataAdapter.list()` as `ListedFiles` (plain full-path strings, not TFile objects); `listFiles` maps entries to basenames before returning.
 - Shared-store mode routes buckets to `<root>/projects/<slug>-<hash16>/memory` (the opencode-zmem / ZCode workspace-memory layout) through `ExternalMemoryFileSystem`; the metrics journal always stays in the vault, and a root switch resets per-conversation epoch state.
 - Git sync is fail-soft and lock-serialized with opencode-zmem on the same tree; per-machine diagnostics (`.last-injection.json`, `metrics.jsonl`) never enter the repository.
-- The model invoker uses throwaway sessions (`setCurrent: false`, deleted in `finally`) so memory distillation never pollutes the user's conversation list.
+- The model invoker uses isolated read-only auxiliary sessions, audits effective tools and observed calls, then disposes in finally; no chat send or active-session mutation occurs.
 - Metrics (`metrics.jsonl`) are append-only diagnostics under the store root; they are never cleaned automatically.
 
 - 2026-09-15: Owner 模型新增 `feature.inline-edit`（行内编辑：CM6 内嵌输入框 + 原位词级 diff + 单次 `replaceRange` 落盘），owner 表已更新；本 owner 的边界与职责未变。
@@ -53,3 +53,5 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 当前源码目录：`src/app/memory`。
 
 目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。
+
+2026-10-28：app.memory-runtime 允许依赖 core.backend 的通用辅助能力、registry 与共享 PathConfinement，禁止具体后端反向导入。VaultMemoryFileSystem 拆为独立复用适配器。main.ts 仅传端口，后台任务以持久化会话 backend 为 owner；无有效只读能力时报告失败，不改发活动后端。Git 同步仍独立于 backend。

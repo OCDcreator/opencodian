@@ -114,6 +114,7 @@ export class PiAuxQuerySession implements AuxQuerySession {
         workingDirectory: options.workingDirectory,
         sessionDirectory: scopeDir,
         executablePath: options.executablePath,
+        ...(options.model?.kind === 'pi' ? { provider: options.model.provider, model: options.model.model } : {}),
         ...(options.servicePath ? { servicePath: options.servicePath } : {}),
         ...(options.getExtraEnv ? { getExtraEnv: options.getExtraEnv } : {}),
       });

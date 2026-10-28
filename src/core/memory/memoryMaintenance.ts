@@ -128,9 +128,11 @@ export async function forgetMemory(input: {
     (e) => e.filename.toLowerCase() === `${slug}.md` || e.name.toLowerCase() === slug,
   );
   for (const target of targets) {
+    await input.fs.validatePath?.(input.projectDir, target.filePath);
     await input.fs.remove(target.filePath).catch(() => undefined);
   }
   if (targets.length > 0) {
+    await input.fs.validatePath?.(input.projectDir, input.indexPath);
     const current = await input.fs.readFile(input.indexPath).catch(() => null);
     await input.fs.writeFile(
       input.indexPath,

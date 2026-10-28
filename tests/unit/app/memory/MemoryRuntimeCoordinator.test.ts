@@ -6,8 +6,10 @@ import {
   MemoryRuntimeCoordinator,
   VaultMemoryFileSystem,
 } from '../../../../src/app/memory';
+import { AUX_DENIED_CAPABILITIES, type AuxQuerySessionConfig } from '../../../../src/core/agents/backend/AgentAuxQueryCapability';
 import type { MemorySettingsSnapshot } from '../../../../src/core/memory';
 import { hashWorkspacePath, MEMORY_STORE_ROOT } from '../../../../src/core/memory';
+import type { AgentBackendKind } from '../../../../src/core/types/chat';
 
 /**
  * Minimal fake of the Obsidian App surface the coordinator touches:
@@ -53,34 +55,26 @@ function createFakeApp(vaultPath = '/vault') {
   return { app, files, dirs };
 }
 
-function fakeOpenCodeService(reply: string) {
-  const calls: Array<{ title: string; content: string; system?: string; provider?: string; model?: string }> = [];
-  let nextSession = 0;
+function fakeOpenCodeService(reply: string, kind = 'opencode2') {
+  const calls: Array<{ title: string; content: string; system: string; provider?: string; model?: string }> = [];
   const created: string[] = [];
   const deleted: string[] = [];
-  const service = {
-    async createSession(title: string, options?: { setCurrent?: boolean }) {
-      expect(options?.setCurrent).toBe(false);
-      const id = `mem-session-${++nextSession}`;
+  const adapter = {
+    status: 'connected',
+    async start() {},
+    async startAuxQuerySession(config: AuxQuerySessionConfig) {
+      const id = 'aux-' + (created.length+1);
       created.push(id);
-      calls.push({ title, content: '' });
-      return id;
-    },
-    async deleteSession(id: string) {
-      deleted.push(id);
-    },
-    async requestAssistantResponse(content: string, options?: Record<string, unknown>) {
-      const last = calls[calls.length - 1];
-      if (last) {
-        last.content = content;
-        last.system = options?.system as string | undefined;
-        last.provider = options?.provider as string | undefined;
-        last.model = options?.model as string | undefined;
-      }
-      return { id: 'assistant-1', role: 'assistant', content: reply, timestamp: Date.now() };
+      const call = { title: 'memory', content: '', system: config.systemPrompt,
+        provider: config.model && 'provider' in config.model ? config.model.provider : undefined, model: config.model?.model };
+      calls.push(call);
+      return { queryId: id, safety: { backend: kind, enforcedPolicy: 'none', effectiveTools: [], deniedCapabilities: AUX_DENIED_CAPABILITIES, mechanism: 'fixture readback' },
+        async query(input: { prompt: string }) { call.content = input.prompt; return { success: true, text: reply, toolCalls: [] }; },
+        cancel() {}, async dispose() { if (!deleted.includes(id)) deleted.push(id); } };
     },
   };
-  return { service: service as never, calls, created, deleted };
+  const registry = { get: (requested: string) => requested === kind ? adapter : undefined, isEnabled: () => true };
+  return { service: registry as never, calls, created, deleted };
 }
 
 const settings = (over: Partial<MemorySettingsSnapshot> = {}): MemorySettingsSnapshot => ({
@@ -94,16 +88,18 @@ const settings = (over: Partial<MemorySettingsSnapshot> = {}): MemorySettingsSna
 });
 
 function makeCoordinator(over: {
+  backend?: AgentBackendKind;
   reply?: string;
   settings?: MemorySettingsSnapshot;
   messages?: Array<{ role: 'user' | 'assistant'; content: string; summary?: boolean; summaryKind?: string }>;
 }) {
   const { app, files } = createFakeApp();
-  const opencode = fakeOpenCodeService(over.reply ?? '{"memories":[]}');
+  const opencode = fakeOpenCodeService(over.reply ?? '{"memories":[]}', over.backend ?? 'opencode2');
   let currentMessages = over.messages ?? [];
   const coordinator = new MemoryRuntimeCoordinator({
     app,
-    openCodeService: opencode.service,
+    registry: opencode.service,
+    getConversationContext: async () => ({ backend: over.backend ?? 'opencode2' }),
     getSettings: () => over.settings ?? settings(),
     getConversationMessages: async () => currentMessages,
     turnSettleDelayMs: 0,
@@ -159,7 +155,8 @@ describe('MemoryRuntimeCoordinator shared-store mode', () => {
       let snapshot = settings({ memoryExternalRoot: tmp });
       const coordinator = new MemoryRuntimeCoordinator({
         app: app as never,
-        openCodeService: fakeOpenCodeService('{}') as never,
+        registry: fakeOpenCodeService('{}').service,
+        getConversationContext: async () => ({ backend: 'opencode2' }),
         getSettings: () => snapshot,
         getConversationMessages: async () => null,
         turnSettleDelayMs: 0,
@@ -201,7 +198,8 @@ describe('MemoryRuntimeCoordinator shared-store mode', () => {
       let snapshot = settings({ memoryExternalRoot: tmpA });
       const coordinator = new MemoryRuntimeCoordinator({
         app: app as never,
-        openCodeService: fakeOpenCodeService('{}') as never,
+        registry: fakeOpenCodeService('{}').service,
+        getConversationContext: async () => ({ backend: 'opencode2' }),
         getSettings: () => snapshot,
         getConversationMessages: async () => null,
         turnSettleDelayMs: 0,
@@ -223,6 +221,56 @@ describe('MemoryRuntimeCoordinator shared-store mode', () => {
 });
 
 describe('MemoryRuntimeCoordinator wiring', () => {
+  it.each<AgentBackendKind>(['opencode2', 'claude-code', 'codex', 'pi', 'zcode', 'dsh'])(
+    'extracts, recalls, reflects and forgets through the %s owning backend', async backend => {
+      const h = makeCoordinator({ backend, settings: settings({ memoryExtractionModel: '', memorySemanticRecallEnabled: true }),
+        reply: JSON.stringify({ memories: [{ name: 'answer-style', description: 'answer style', type: 'feedback', body: 'Trigger: questions\nWhy: mobile reading\nHow to apply: concise answers' }] }),
+        messages: [{ role: 'user', content: 'Please remember to use concise answers because I read on my phone.' }, { role: 'assistant', content: 'Understood.' }],
+      });
+      h.coordinator.onTurnSettled({ conversationId: 'owned', sessionId: 'native-owner' });
+      await flushMicrotasks();
+      await h.coordinator['queue'];
+      const recalled = await h.coordinator.planInjection({ conversationId: 'owned', messages: [], latestUserText: 'answer-style' });
+      expect(recalled?.text).toContain('concise answers');
+      h.setMessages([{ role: 'user', content: 'We prefer concise answers because of mobile reading.' },
+        { role: 'assistant', content: 'compacted', summary: true }]);
+      h.coordinator.onTurnSettled({ conversationId: 'owned', sessionId: 'native-owner' });
+      await flushMicrotasks();
+      await h.coordinator['queue'];
+      expect(h.opencode.calls.some(call => call.system.includes('compacted'))).toBe(true);
+      expect(h.opencode.created).toEqual(h.opencode.deleted);
+      expect((await h.coordinator.status()).topicFiles).toBe(1);
+      expect((await h.coordinator.forget('answer-style')).removed).toEqual(['answer-style.md']);
+      h.coordinator.dispose();
+    },
+  );
+
+  it('uses persisted ownership after the active backend changes, and applies per-backend models', async () => {
+    const { app } = createFakeApp();
+    const claude = fakeOpenCodeService('{"memories":[]}', 'claude-code');
+    const coordinator = new MemoryRuntimeCoordinator({ app, registry: claude.service,
+      getSettings: () => settings({ memoryExtractionModel: 'foreign/model', memoryModelOverrides: { 'claude-code': 'haiku' } }),
+      getConversationContext: async () => ({ backend: 'claude-code' }),
+      getConversationMessages: async () => [{ role: 'user', content: 'Please remember to explain the reason for every decision.' }], turnSettleDelayMs: 0 });
+    coordinator.onTurnSettled({ conversationId: 'claude-owned' });
+    await flushMicrotasks();
+    await coordinator['queue'];
+    expect(claude.calls[0].model).toBe('haiku');
+    expect(claude.calls[0].provider).toBeUndefined();
+    expect(claude.created).toEqual(claude.deleted);
+    coordinator.dispose();
+  });
+
+  it('does not fall back to an active backend when a stored owner is retired', async () => {
+    const h = makeCoordinator({ backend: 'opencode', messages: [{ role: 'user', content: 'Please remember to answer briefly from now on.' }] });
+    h.coordinator.onTurnSettled({ conversationId: 'legacy' });
+    await flushMicrotasks();
+    await h.coordinator['queue'];
+    expect(h.opencode.created).toEqual([]);
+    expect(h.coordinator['extractionWatermarks'].has('legacy')).toBe(false);
+    h.coordinator.dispose();
+  });
+
   it('planInjection returns a framed block once per epoch and null afterwards', async () => {
     const h = makeCoordinator({});
     const first = await h.coordinator.planInjection({
@@ -275,7 +323,7 @@ describe('MemoryRuntimeCoordinator wiring', () => {
     expect(h.opencode.created).toEqual(h.opencode.deleted);
     expect(h.opencode.calls[0].provider).toBe('opencode-go');
     expect(h.opencode.calls[0].model).toBe('deepseek-flash');
-    expect(h.opencode.calls[0].system).toContain('distill durable memories');
+    expect(h.opencode.calls[0].system).toContain('Extract durable memories');
 
     // The memory landed on disk with provenance + index line.
     const bucketPrefix = `${MEMORY_STORE_ROOT}/projects/`;
@@ -303,11 +351,13 @@ describe('MemoryRuntimeCoordinator wiring', () => {
     ]);
     h.coordinator.onTurnSettled({ conversationId: 'c1' });
     await flushMicrotasks();
+    await h.coordinator['queue'];
     expect(h.opencode.calls).toHaveLength(1);
 
     // Same transcript again → watermark gate, no extra call.
     h.coordinator.onTurnSettled({ conversationId: 'c1' });
     await flushMicrotasks();
+    await h.coordinator['queue'];
     expect(h.opencode.calls).toHaveLength(1);
   });
 
@@ -320,13 +370,15 @@ describe('MemoryRuntimeCoordinator wiring', () => {
     ];
     const coordinator = new MemoryRuntimeCoordinator({
       app,
-      openCodeService: opencode.service,
+      registry: opencode.service,
+    getConversationContext: async () => ({ backend: 'opencode2' }),
       getSettings: () => settings(),
       getConversationMessages: async () => messages,
       turnSettleDelayMs: 0,
     });
     coordinator.onTurnSettled({ conversationId: 'c1', sessionId: 'ses_x' });
     await flushMicrotasks();
+    await coordinator['queue'];
     expect(opencode.calls).toHaveLength(1); // extraction only, no reflection yet
 
     messages = [
@@ -336,6 +388,7 @@ describe('MemoryRuntimeCoordinator wiring', () => {
     ];
     coordinator.onTurnSettled({ conversationId: 'c1', sessionId: 'ses_x' });
     await flushMicrotasks();
+    await coordinator['queue'];
     // reflection + extraction for the new epoch
     expect(opencode.calls.length).toBeGreaterThanOrEqual(2);
     expect(opencode.calls.some((c) => c.system!.includes('compact'))).toBe(true);

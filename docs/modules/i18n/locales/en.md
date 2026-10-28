@@ -1,4 +1,5 @@
 # English Locale
+> 2026-10-27: OpenCode 2 has eight functional subpages and `settings.opencode2.workspace.*` copy for automatic catalogs, source overrides, configuration drafts, authentication, and separate apply/save feedback.
 > 2026-10-27: added `chat.effort.disabledShort` (`Off`) for the narrow Composer trigger; the full `chat.effort.disabled` label remains in the model popover.
 `modifiedFiles.statsUnavailable` and `modifiedFiles.statusUnavailable` label file-hint records that have no authoritative native snapshot statistics or change status.
 > 2026-09-30 (B2 codex-stream-rendering): adds `chat.toolCard.image.*` (`statusGenerating` / `statusCompleted` / `statusFailed` / `revisedPrompt`) for the streaming image-generation tool card rendered by ToolCallRenderer; mirrors zh.
@@ -687,3 +688,5 @@ Adds `chat.composerMenu.*` keys for the attachment menu (attachment, add file/im
 > 2026-10-27: adds OpenCode 2/DSH workspace tab labels, Codex/ZCode split tab labels, Claude/Codex debug labels, Claude title/inline group copy, Obsidian tools/PDF index conversation labels, and backend-neutral question copy.
 
 > 2026-10-27 (second review): adds `settings.dsh.tab.model` and `settings.dsh.model.*` for the DSH inline override page; mirrors zh.
+
+2026-10-28：记忆设置补充六后端模型、逐回合正文召回、跨机身份/别名、代理笔记本及可选向量召回的说明与 JSON 校验文案。

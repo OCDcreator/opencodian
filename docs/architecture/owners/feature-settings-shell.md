@@ -94,3 +94,5 @@ SettingsPiSection owns the Pi settings surface through a narrow host. Credential
 > 2026-10-27（二次审查）：Codex section 在任意经典后端子页切换前统一 dispose 并清空引用（含 account→debug）；DSH 工作区新增 model 子页，复用共享行内覆盖组件。
 
 > 2026-10-27（UI 验收修复）：DSH renderTab 增加标准 section-body wrapper；标题备份模型按钮在创建时有可读初始标签。
+
+2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `feature.settings-shell` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。

@@ -437,17 +437,89 @@ export class SettingsConversationSection {
             this.plugin.memoryRuntime?.onSettingsChanged();
           });
       });
-    new Setting(blockEl)
-      .setName(t('settings.conversation.memory.extractionModelName'))
-      .setDesc(t('settings.conversation.memory.extractionModelDesc'))
-      .addText((text) => {
-        text
-          .setPlaceholder('opencode-go/deepseek-flash')
-          .setValue(this.plugin.settings.memory.memoryExtractionModel)
-          .onChange(async (value) => {
-            this.plugin.settings.memory.memoryExtractionModel = value.trim();
+    const backends = { opencode2: 'OpenCode 2', 'claude-code': 'Claude Code', codex: 'Codex', pi: 'Pi', zcode: 'ZCode', dsh: 'DSH' };
+    const active = this.plugin.settings.activeBackend ?? '';
+    let selected: string = Object.prototype.hasOwnProperty.call(backends, active) ? active : 'opencode2';
+    const modelsEl = blockEl.createDiv();
+    const renderModels = () => {
+      modelsEl.empty();
+      new Setting(modelsEl).setName(t('settings.conversation.memory.modelBackendName'))
+        .setDesc(t('settings.conversation.memory.modelBackendDesc')).addDropdown(dropdown => {
+          for (const [value, label] of Object.entries(backends)) dropdown.addOption(value, label);
+          dropdown.setValue(selected).onChange(value => { selected = value as typeof selected; renderModels(); });
+        });
+      const model = this.plugin.settings.memory.memoryModelOverrides?.[selected]
+        ?? (selected === 'opencode2' ? this.plugin.settings.memory.memoryExtractionModel : '');
+      const placeholder = selected === 'claude-code' || selected === 'codex' ? 'model' : 'provider/model';
+      new Setting(modelsEl).setName(t('settings.conversation.memory.extractionModelName'))
+        .setDesc(t('settings.conversation.memory.extractionModelDesc')).addText(text => {
+          text.setPlaceholder(placeholder).setValue(model).onChange(async value => {
+            this.plugin.settings.memory.memoryModelOverrides ??= {};
+            this.plugin.settings.memory.memoryModelOverrides[selected] = value.trim();
+            if (selected === 'opencode2') this.plugin.settings.memory.memoryExtractionModel = value.trim();
             await this.plugin.saveSettings();
           });
+        });
+      new Setting(modelsEl).setName(t('settings.conversation.memory.selectorModelName'))
+        .setDesc(t('settings.conversation.memory.selectorModelDesc')).addText(text => {
+          text.setPlaceholder(placeholder).setValue(this.plugin.settings.memory.memorySelectorModelOverrides?.[selected] ?? '').onChange(async value => {
+            this.plugin.settings.memory.memorySelectorModelOverrides ??= {};
+            this.plugin.settings.memory.memorySelectorModelOverrides[selected] = value.trim();
+            await this.plugin.saveSettings();
+          });
+        });
+    };
+    renderModels();
+    new Setting(blockEl).setName(t('settings.conversation.memory.embeddingName'))
+      .setDesc(t('settings.conversation.memory.embeddingDesc')).addToggle(toggle => {
+        toggle.setValue(this.plugin.settings.memory.memoryEmbeddingEnabled ?? false).onChange(async value => {
+          this.plugin.settings.memory.memoryEmbeddingEnabled = value;
+          await this.plugin.saveSettings();
+          this.plugin.memoryRuntime?.onSettingsChanged();
+        });
+      });
+    new Setting(blockEl).setName(t('settings.conversation.memory.identityName'))
+      .setDesc(t('settings.conversation.memory.identityDesc')).addText(text => {
+        text.setValue(this.plugin.settings.memory.memoryWorkspaceIdentity ?? '').onChange(async value => {
+          this.plugin.settings.memory.memoryWorkspaceIdentity = value.trim();
+          await this.plugin.saveSettings();
+          this.plugin.memoryRuntime?.onSettingsChanged();
+        });
+      });
+    new Setting(blockEl).setName(t('settings.conversation.memory.aliasesName'))
+      .setDesc(t('settings.conversation.memory.aliasesDesc')).addTextArea(text => {
+        text.setValue(JSON.stringify(this.plugin.settings.memory.memoryWorkspacePathAliases ?? {}, null, 2)).onChange(async value => {
+          try {
+            const aliases: unknown = JSON.parse(value || '{}');
+            if (!aliases || Array.isArray(aliases) || typeof aliases !== 'object'
+              || Object.values(aliases).some(item => typeof item !== 'string')) throw new Error('invalid-aliases');
+            this.plugin.settings.memory.memoryWorkspacePathAliases = aliases as Record<string, string>;
+            text.inputEl.setCustomValidity('');
+            text.inputEl.removeAttribute('aria-invalid');
+            await this.plugin.saveSettings();
+            this.plugin.memoryRuntime?.onSettingsChanged();
+          } catch {
+            text.inputEl.setCustomValidity(t('settings.conversation.memory.aliasesInvalid'));
+            text.inputEl.setAttribute('aria-invalid', 'true');
+            text.inputEl.reportValidity();
+          }
+        });
+      });
+    new Setting(blockEl).setName(t('settings.conversation.memory.agentName'))
+      .setDesc(t('settings.conversation.memory.agentDesc')).addToggle(toggle => {
+        toggle.setValue(this.plugin.settings.memory.memoryAgentNotebooksEnabled !== false).onChange(async value => {
+          this.plugin.settings.memory.memoryAgentNotebooksEnabled = value;
+          await this.plugin.saveSettings();
+          this.plugin.memoryRuntime?.onSettingsChanged();
+        });
+      });
+    new Setting(blockEl).setName(t('settings.conversation.memory.agentRootName'))
+      .setDesc(t('settings.conversation.memory.agentRootDesc')).addText(text => {
+        text.setPlaceholder('~/.zcode/agent-memory').setValue(this.plugin.settings.memory.memoryAgentStorageRoot ?? '').onChange(async value => {
+          this.plugin.settings.memory.memoryAgentStorageRoot = value.trim();
+          await this.plugin.saveSettings();
+          this.plugin.memoryRuntime?.onSettingsChanged();
+        });
       });
     new Setting(blockEl)
       .setName(t('settings.conversation.memory.externalRootName'))

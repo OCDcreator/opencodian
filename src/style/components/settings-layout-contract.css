@@ -1,4 +1,4 @@
-.setting-item.opencodian-settings-direct-host {
+.setting-item.opencodian-settings-direct-host:not(.setting-item-heading) {
   display: block;
   min-width: 0;
   margin: 0;
@@ -7,6 +7,15 @@
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+}
+
+/* Declarative Settings already has an Obsidian scroll viewport outside this
+   mounting row. Let content size naturally so only that outer viewport scrolls. */
+.opencodian-settings-direct-host > .opencodian-settings {
+  height: auto;
+  max-height: none;
+  overflow: visible;
+  scrollbar-gutter: auto;
 }
 
 .opencodian-settings {

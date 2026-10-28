@@ -184,3 +184,5 @@ The classic `attach()` method remains the full-list owner, but both classic and 
 > 2026-10-27：共享会话页移除后端专属标题编辑；问答题、Obsidian 工具与 PDF 索引保持通用可达；内存块同时进入经典布局；标题控件通过 `attachTitleBlock` 仅供 OpenCode 2 工作区挂载。
 
 > 2026-10-27（UI 验收修复）：`addTitleModelSetting` 创建按钮时同步写入当前 `aiTitleModel`；为空时使用 followCurrent 文案。异步目录加载完成、不可用提示和保存语义保持不变，避免加载期间出现 28px 无标签按钮。
+
+2026-10-28：工作区记忆控件增加后端模型选择（与活动后端切换无关）、召回筛选模型、跨机身份/路径别名、代理笔记本和向量召回；JSON 别名输入非法时保留原值并设置原生校验/aria-invalid。身份/目录改变会使旧后台任务失效。复用原 Setting 行布局，不新增滚动容器。

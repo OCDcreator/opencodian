@@ -13,6 +13,8 @@ Config readback recognizes native normalized `provider/model#variant` references
 
 ## Responsibility
 
+2026-10-27：`validateConfigContent` 使用 `jsonc-parser` 读取注释和尾逗号，在修改设置或重连前拒绝格式错误与非对象根。原生读回比较解析后的值；保存和启动环境保留原始 JSONC 文本。活动 turn、远程写入限制及失败恢复规则不变。
+
 Owns the OpenCode 2.x transport boundary. OpenCode 2 uses `@opencode/client` and a separate `@opencode/cli` process with the `/api` protocol; it must not pass its session IDs into OpenCode 1's `OpenCodeService`.
 
 Local mode starts the user selected executable with a random process password, a loopback ephemeral port and Obsidian CORS origin. Remote mode uses the configured URL/password. The server version must start with `2.`. A changed connection setting triggers a reconnect before the next operation.

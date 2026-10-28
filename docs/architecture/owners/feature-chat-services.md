@@ -131,3 +131,5 @@ DSH 发送跳过 OpenCode 1 专属技能目录展开，保留通用上下文和�
 ## 2026-10-27 单轨 Composer shell
 
 ComposerInputShellCoordinator 拥有新的单行底栏（附件 / permission / Agent / 模型·effort / send）与 composer 外状态栏；permission 与 Agent 使用独立 slots，Agent 仅在 capability 允许时挂载且不显示图标。selection controls 通过可选 `modelContainer` 分栏挂载，effort 由 ChatSelectionControlsCoordinator 在模型弹层内挂载。ContextRing 只换宿主位置，ContextDetailModal、context usage 数据与状态栏计数仍走既有 services。
+
+2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `feature.chat-services` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。

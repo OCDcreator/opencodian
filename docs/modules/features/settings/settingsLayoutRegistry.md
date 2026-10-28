@@ -1,4 +1,6 @@
 # settingsLayoutRegistry
+
+2026-10-27：OpenCode 2 使用本地品牌图标 `opencodian-opencode2`，子标签为 connection/model/agents/permissions/mcp/resources/context/advanced。旧 auth/integrations 路由到 model，models/extensions 别名分别路由到 model/mcp；其他后端保持原定义。
 > 2026-09-30 (B4): Codex primary tab 新增 `plugins` 二级 tab（`settings.codex.tab.plugins`），排在 `resources` 之后，承载 `SettingsCodexPluginsSection` 插件浏览器。
 > 2026-09-20 (advantage-parity R-D1): conversation 主 tab 的 secondary tabs 在 `vault-retrieval` 后新增 `export`（backend 无关）。
 > 2026-09-18 (R-C6): Security 主 tab 新增二级 tab `remote`（`settings.security.tab.remote`），承载 R-C6 远程驱动设置；其余二级 tab 不变。

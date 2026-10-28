@@ -34,6 +34,14 @@ export interface MemorySettingsSnapshot {
    * personal.
    */
   readonly memorySyncRemoteUrl: string;
+  readonly memoryWorkspaceIdentity?: string;
+  readonly memoryWorkspacePathAliases?: Readonly<Record<string, string>>;
+  /** Overrides for the owning backend; legacy memoryExtractionModel applies to OpenCode only. */
+  readonly memoryModelOverrides?: Readonly<Record<string, string>>;
+  readonly memorySelectorModelOverrides?: Readonly<Record<string, string>>;
+  readonly memoryAgentNotebooksEnabled?: boolean;
+  readonly memoryAgentStorageRoot?: string;
+  readonly memoryEmbeddingEnabled?: boolean;
 }
 
 export const DEFAULT_MEMORY_SETTINGS: MemorySettingsSnapshot = {
@@ -43,6 +51,13 @@ export const DEFAULT_MEMORY_SETTINGS: MemorySettingsSnapshot = {
   memoryExtractionModel: '',
   memoryExternalRoot: '',
   memorySyncRemoteUrl: '',
+  memoryWorkspaceIdentity: '',
+  memoryWorkspacePathAliases: {},
+  memoryModelOverrides: {},
+  memorySelectorModelOverrides: {},
+  memoryAgentNotebooksEnabled: true,
+  memoryAgentStorageRoot: '',
+  memoryEmbeddingEnabled: false,
 };
 
 /** Structural slice of a persisted chat message the memory core needs. */
@@ -57,9 +72,13 @@ export interface MemoryTranscriptMessage {
   readonly compactionDivider?: { auto?: boolean } | null;
   /** Tool calls recorded on the message (write detection for the extraction gate). */
   readonly toolCalls?: ReadonlyArray<{
+    id?: string;
     name?: string;
+    kind?: string;
     input?: Record<string, unknown>;
     status?: string;
+    result?: string;
+    toolMetadata?: Record<string, unknown>;
   }>;
   /** Raw backend parts (best-effort synthetic-part marker detection). */
   readonly parts?: unknown;
@@ -88,6 +107,8 @@ export interface MemoryFileSystem {
   mtimeMs(relativePath: string): Promise<number | null>;
   /** Native (OS-separator) absolute path for showing the model / logging. */
   nativeAbsolutePath(relativePath: string): string;
+  /** App adapters enforce realpath/symlink confinement before model-mediated I/O. */
+  validatePath?(root: string, target: string): Promise<void>;
 }
 
 /** Model-invoker port for plugin-side distillation (extraction / reflection). */
@@ -102,7 +123,13 @@ export interface MemoryModelInvoker {
     user: string;
     modelRef: string;
     title: string;
+    purpose?: 'extraction' | 'reflection' | 'selection';
   }): Promise<string>;
+}
+
+export interface MemoryEmbeddingInvoker {
+  readonly cacheKey?: string;
+  embed(inputs: readonly string[]): Promise<number[][]>;
 }
 
 /**
@@ -144,7 +171,8 @@ const utf8Encoder = typeof TextEncoder !== 'undefined'
   : null;
 
 /**
- * UTF-8 byte length (CJK-correct). Never use `String.length` for budgets.
+ * UTF-8 byte length for transport/body budgets (CJK-correct).
+ * Index budgets deliberately use JS characters to match zmem.
  * Falls back to Buffer when TextEncoder is unavailable (jsdom tests).
  */
 export function byteLength(text: string): number {

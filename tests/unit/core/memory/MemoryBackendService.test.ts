@@ -33,6 +33,51 @@ function fakeInvoker(reply: string): MemoryModelInvoker & { calls: number } {
 }
 
 describe('MemoryBackendService injection flow', () => {
+  it('recalls new relevant bodies on later turns, deduplicates within an epoch and keeps the index first-turn only', async () => {
+    const fs = new InMemoryMemoryFileSystem('/vault');
+    const service = new MemoryBackendService(fs, '/vault/my-vault');
+    await fs.writeFile(`${service.projectDir}/answer-style.md`, '---\nname: answer-style\ndescription: concise answers\nmetadata:\n  type: feedback\n---\nAnswer concisely.');
+    await fs.writeFile(`${service.projectDir}/language.md`, '---\nname: language\ndescription: Chinese language\nmetadata:\n  type: user\n---\nUse Chinese.');
+    const config = settings({ memorySemanticRecallEnabled: true });
+    const first = await service.planInjection({ conversationId: 'c', messages: [], latestUserText: 'answer-style', settings: config });
+    expect(first.text).toContain('Answer concisely.');
+    const next = await service.planInjection({ conversationId: 'c', messages: [], latestUserText: 'language', settings: config,
+      alreadyInjectedThisEpochOverride: true, alreadyRecalledPaths: first.recalledPaths, alreadyRecalledContentCharacters: first.recalledContentCharacters });
+    expect(next.text).toContain('Use Chinese.');
+    expect(next.text).not.toContain(MEMORY_INJECTION_OPEN_MARKER);
+    const repeat = await service.planInjection({ conversationId: 'c', messages: [], latestUserText: 'answer-style language', settings: config,
+      alreadyInjectedThisEpochOverride: true, alreadyRecalledPaths: [...first.recalledPaths, ...next.recalledPaths] });
+    expect(repeat.text).toBeNull();
+  });
+
+  it('uses embedding semantics without lexical overlap, caches unchanged topics and falls back when the endpoint fails', async () => {
+    const fs = new InMemoryMemoryFileSystem('/vault');
+    const service = new MemoryBackendService(fs, '/vault/my-vault');
+    await fs.writeFile(`${service.projectDir}/tone.md`, '---\nname: tone\ndescription: brief responses\n---\nUse concise prose.');
+    const calls: string[][] = [];
+    const embed = jest.fn(async (texts: readonly string[]) => {
+      calls.push([...texts]);
+      return texts.map(() => [1, 0]);
+    });
+    const input = { conversationId: 'c', messages: [], settings: settings({ memorySemanticRecallEnabled: true }), embedding: { embed } };
+    const first = await service.planInjection({ ...input, latestUserText: 'short and direct' });
+    expect(first.text).toContain('Use concise prose.');
+    await service.planInjection({ ...input, latestUserText: 'brief response' });
+    expect(calls.filter(batch => batch[0]?.includes('Use concise prose.'))).toHaveLength(1);
+    const fallback = await service.planInjection({ ...input, latestUserText: 'brief response', embedding: { embed: async () => { throw new Error('offline'); } } });
+    expect(fallback.text).toContain('Use concise prose.');
+  });
+
+  it('ranks lexical candidates with the owning-backend model and falls back on malformed replies', async () => {
+    const fs = new InMemoryMemoryFileSystem('/vault');
+    const service = new MemoryBackendService(fs, '/vault/my-vault');
+    await fs.writeFile(`${service.projectDir}/tone.md`, '---\nname: tone\ndescription: brief responses\n---\nKeep it brief.');
+    const invoke = jest.fn(async () => 'invalid JSON');
+    const out = await service.planInjection({ conversationId: 'c', messages: [], latestUserText: 'brief responses', settings: settings({ memorySemanticRecallEnabled: true }), invoker: { invoke } });
+    expect(invoke).toHaveBeenCalledWith(expect.objectContaining({ purpose: 'selection' }));
+    expect(out.text).toContain('Keep it brief.');
+  });
+
   it('first turn injects protocol+index; second turn of the same epoch skips', async () => {
     const fs = new InMemoryMemoryFileSystem('/vault');
     const service = new MemoryBackendService(fs, '/vault/my-vault');
@@ -78,7 +123,7 @@ describe('MemoryBackendService injection flow', () => {
 
     const skipped = await service.planInjection({
       conversationId: 'c1',
-      messages: [msg({ role: 'user', content: 'turn', parts: [{ text: MEMORY_INJECTION_OPEN_MARKER }] })],
+      messages: [msg({ role: 'user', content: 'turn', parts: [{ text: `${MEMORY_INJECTION_OPEN_MARKER}\n${service.memoryRootNative()}` }] })],
       latestUserText: 'turn',
       settings: settings(),
     });

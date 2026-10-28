@@ -12,6 +12,17 @@ import {
 } from '../../../../src/core/memory/memoryPaths';
 
 describe('memoryPaths', () => {
+  it('shares a canonical bucket across machines through identity or path aliases', () => {
+    const identity = { workspaceIdentity: 'team-vault' };
+    expect(externalMemoryProjectDir('/shared', '/mac/vault', identity)).toBe(
+      externalMemoryProjectDir('/shared', '/windows/vault', identity),
+    );
+    expect(externalMemoryProjectDir('/shared', '/mac/vault', {
+      workspacePathAliases: { '/mac/vault': 'C:/Write/vault' },
+    })).toBe(externalMemoryProjectDir('/shared', '/different/vault', {
+      workspacePathAliases: { '/different/vault': 'C:/Write/vault' },
+    }));
+  });
   it('sanitizes project slugs to lowercase [a-z0-9._-] with a 48-char cap', () => {
     expect(sanitizeProjectSlug('My Cool Vault')).toBe('my-cool-vault');
     expect(sanitizeProjectSlug('大写中文项目')).toBe('project');

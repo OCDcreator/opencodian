@@ -472,7 +472,8 @@ img.opencodian-model-provider-header-icon {
   margin-left: 0 !important;
 }
 
-.opencodian-settings {
+.opencodian-settings,
+.vertical-tab-content:has(.opencodian-settings-direct-host) {
   --opencodian-settings-scrollbar-size: 8px;
   --opencodian-settings-scrollbar-radius: 999px;
   --opencodian-settings-scrollbar-track:
@@ -489,12 +490,14 @@ img.opencodian-model-provider-header-icon {
     color-mix(in srgb, var(--background-primary) 68%, transparent);
   --opencodian-settings-scrollbar-shadow:
     color-mix(in srgb, var(--background-modifier-border-hover) 46%, transparent);
-  overflow-y: auto;
-  max-height: 100%;
-  padding-right: 6px;
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: var(--opencodian-settings-scrollbar-thumb) transparent;
+}
+
+.opencodian-settings {
+  overflow-y: auto;
+  max-height: 100%;
   padding: 0 20px 20px;
 }
 
@@ -502,22 +505,26 @@ img.opencodian-model-provider-header-icon {
   justify-content: space-between;
 }
 
-.opencodian-settings:hover {
+.opencodian-settings:hover,
+.vertical-tab-content:has(.opencodian-settings-direct-host):hover {
   scrollbar-color: var(--opencodian-settings-scrollbar-thumb-hover) transparent;
 }
 
-.opencodian-settings::-webkit-scrollbar {
+.opencodian-settings::-webkit-scrollbar,
+.vertical-tab-content:has(.opencodian-settings-direct-host)::-webkit-scrollbar {
   width: var(--opencodian-settings-scrollbar-size);
   height: var(--opencodian-settings-scrollbar-size);
 }
 
-.opencodian-settings::-webkit-scrollbar-track {
+.opencodian-settings::-webkit-scrollbar-track,
+.vertical-tab-content:has(.opencodian-settings-direct-host)::-webkit-scrollbar-track {
   background: var(--opencodian-settings-scrollbar-track);
   border-radius: var(--opencodian-settings-scrollbar-radius);
   box-shadow: inset 0 0 0 1px var(--opencodian-settings-scrollbar-track-border);
 }
 
-.opencodian-settings::-webkit-scrollbar-thumb {
+.opencodian-settings::-webkit-scrollbar-thumb,
+.vertical-tab-content:has(.opencodian-settings-direct-host)::-webkit-scrollbar-thumb {
   background:
     linear-gradient(
       180deg,
@@ -612,7 +619,8 @@ img.opencodian-model-provider-header-icon {
 }
 
 
-.opencodian-settings:hover::-webkit-scrollbar-thumb {
+.opencodian-settings:hover::-webkit-scrollbar-thumb,
+.vertical-tab-content:has(.opencodian-settings-direct-host):hover::-webkit-scrollbar-thumb {
   background:
     linear-gradient(
       180deg,
@@ -627,7 +635,8 @@ img.opencodian-model-provider-header-icon {
     );
 }
 
-.opencodian-settings::-webkit-scrollbar-thumb:hover {
+.opencodian-settings::-webkit-scrollbar-thumb:hover,
+.vertical-tab-content:has(.opencodian-settings-direct-host)::-webkit-scrollbar-thumb:hover {
   background:
     linear-gradient(
       180deg,

@@ -40,15 +40,18 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
   {
     id: 'opencode2',
     labelKey: 'settings.opencode2.title',
-    icon: 'terminal-square',
+    icon: 'opencodian-opencode2',
     defaultSecondaryTabId: 'connection',
     backendRequired: 'opencode2',
     secondaryTabs: [
       { id: 'connection', labelKey: 'settings.opencode2.tab.connection' },
       { id: 'model', labelKey: 'settings.opencode2.tab.model' },
-      { id: 'auth', labelKey: 'settings.opencode2.tab.auth' },
+      { id: 'agents', labelKey: 'settings.opencode2.tab.agents' },
+      { id: 'permissions', labelKey: 'settings.opencode2.tab.permissions' },
       { id: 'mcp', labelKey: 'settings.opencode2.tab.mcp' },
       { id: 'resources', labelKey: 'settings.opencode2.tab.resources' },
+      { id: 'context', labelKey: 'settings.opencode2.tab.context' },
+      { id: 'advanced', labelKey: 'settings.opencode2.tab.advanced' },
     ],
   },
   {
@@ -352,7 +355,10 @@ const LEGACY_SECONDARY_TAB_ID_MAP: Record<string, Record<string, string>> = {
   },
   opencode2: {
     catalog: 'resources',
-    integrations: 'auth',
+    integrations: 'model',
+    auth: 'model',
+    models: 'model',
+    extensions: 'mcp',
   },
   conversation: {
     rendering: 'display',

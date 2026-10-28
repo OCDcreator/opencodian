@@ -117,7 +117,7 @@ describe('OpenCode 2 workspace ownership', () => {
     expect(container.textContent).toContain(t('settings.opencode2.model.title'));
   });
 
-  it('reads MCP only after an explicit catalog read and keeps the adapter call in the workspace', async () => {
+  it('automatically reads MCP in the OpenCode 2 workspace', async () => {
     const plugin = createPlugin();
     captureSettingControls();
     const container = document.createElement('div');
@@ -127,8 +127,7 @@ describe('OpenCode 2 workspace ownership', () => {
       renderTitleSettings: jest.fn(),
     }).attachTabbed(container, 'mcp');
 
-    expect(plugin.adapter.readManagementCatalog).not.toHaveBeenCalled();
-    expect(container.querySelector('details')).toBeNull();
+    expect(plugin.adapter.readManagementCatalog).toHaveBeenCalledTimes(1);
   });
 });
 

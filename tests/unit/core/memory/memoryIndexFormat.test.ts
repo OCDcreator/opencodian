@@ -24,6 +24,9 @@ function entry(overrides: Partial<TopicManifestEntry> & { filename: string }): T
 }
 
 describe('formatMemoryIndexContent caps (D13/D28)', () => {
+  it('uses the current zmem character cap for Chinese indexes', () => {
+    expect(formatMemoryIndexContent('中'.repeat(9000))).toBe('中'.repeat(9000));
+  });
   it('passes through small indexes unchanged', () => {
     const content = '# Memory Index\n\n- [A](a.md) — hook';
     expect(formatMemoryIndexContent(content)).toBe(content);
@@ -51,12 +54,12 @@ describe('formatMemoryIndexContent caps (D13/D28)', () => {
     expect(bodyLines.length).toBeLessThanOrEqual(200);
   });
 
-  it('keeps the final output within the 25KB UTF-8 budget for all-CJK content', () => {
+  it('keeps the final output within the 25000-character budget for all-CJK content', () => {
     const cjkLine = (i: number) => `- [主题${i}](topic-${i}.md) — ${'很长的中文钩子描述'.repeat(12)}`;
     const big = [...Array.from({ length: 240 }, (_, i) => cjkLine(i))].join('\n');
     expect(byteLength(big)).toBeGreaterThan(25_000);
     const out = formatMemoryIndexContent(big, true);
-    expect(byteLength(out)).toBeLessThanOrEqual(25_000);
+    expect(out.length).toBeLessThanOrEqual(25_000);
   });
 
   it('never cuts a multibyte character in half (CJK byte safety)', () => {

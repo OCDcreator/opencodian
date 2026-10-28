@@ -15,7 +15,7 @@
 - vault-wide lexical retrieval index (R-C1): pure chunking/scoring/truncation core plus the fs-injected background index service over `.opencodian/vault-index` — lexical only by the §10 Q3 decision (no embedding, no vector store, no new dependency)
 
 ## Canonical state (truth home)
-- workspace memory store layout rules and index budget caps (200 lines / 25KB, archived tail marker)
+- workspace memory store layout rules and index budget caps (200 lines / 25,000 characters, archived tail marker)
 - injection/extraction/reflection planning contracts (option shapes, epoch markers, provenance tags)
 - vault retrieval index layout rules (`.opencodian/vault-index` manifest + shards, 512KB shard / 100MB manifest caps, SOFT_CHUNK_CHARS bisection, ≥2-distinct-token selection gate, per-note truncation cap)
 
@@ -39,8 +39,8 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 
 ## Hard invariants
 - **Backend neutrality is the reason this owner exists**: no module under `src/core/memory/**` may import an agent backend adapter, the OpenCode service, or any feature/app module. All backend contact happens through ports (`MemoryFileSystem`, `MemoryModelInvoker`) injected by `app.memory-runtime`.
-- All byte math uses the shared `byteLength()` helper (UTF-8 code-point safe, CJK correct) — never `String.length`.
-- The store is pure Markdown on the filesystem port; no vector store, no SQLite, no dedicated memory CRUD tool.
+- Transport/body byte math uses `byteLength()`; the MEMORY.md index deliberately uses JS characters (25,000), matching current zmem.
+- Persistent memory is pure Markdown on the filesystem port. Optional embedding vectors stay in memory; no vector database or SQLite. Model-mediated writes are owned by the bounded memoryAgentExtraction broker.
 - Injection-side secret guard only withholds content from injection; it never edits files on disk.
 - **R-C1 retrieval shares the lexical-only stance**: the index stores tokens + line numbers, never note bodies; snippet text is re-read at injection time and passes the same `scanForSecrets` guard. The service is dormant unless `vaultRetrievalEnabled` turns on — off means no listeners, no indexing and byte-identical outgoing requests (contract-tested).
 - Behavior is the frozen decision set of the reference implementation `opencode-zmem` (D1–D29); deviations are recorded as D-O decisions in the devlog and this page.
@@ -50,7 +50,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 | ID | Deviation | Reason |
 |----|-----------|--------|
 | D-O3 | protocol+index injected once per context epoch (marker-detected from the persisted transcript), not on every LLM request | the plugin-side seam is message-layer (`AgentChatSendRequest.options.memoryInjection`), and the server-side transcript accumulates user messages — per-request injection would duplicate |
-| D-O7 | semantic recall ships lexical + lite-model selection only; the embedding channel is intentionally not ported | the product constraints explicitly reject embedding/vector retrieval; storage must stay pure Markdown |
+| D-O7 (superseded 2026-10-28) | optional in-memory embedding now precedes model/lexical selection | user requested full current-zmem alignment; Markdown remains canonical and the channel defaults off |
 | D-O1 | store root is `<vault>/.opencodian/memory/projects/<slug>-<hash16>/` | opencodian anchors every backend cwd to the vault; keeping the bucket inside the vault keeps model file-writes permission-free for all backends |
 | D-O2 | opt-in shared-store mode: `memoryExternalRoot` maps buckets to `<root>/projects/<slug>-<hash16>/memory` (zmem / ZCode layout), metrics stay in the vault | lets opencode-zmem, OpenCodian and ZCode workspace memory operate on one physical tree without format migration; `~` expansion keeps one synced settings value valid on every host |
 
@@ -65,3 +65,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 当前源码目录：`src/core/memory`。
 
 目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。
+
+2026-10-28：六后端共享同一存储/提取/召回/反思核心；protocol+index 每纪元一次，正文逐回合去重。提取原生通道保持只读，由插件校验并执行直接 Markdown 子文件 Read/Edit/Write，明确拒绝 shell 和任意路径。代理笔记本由有正文的完成任务证据驱动；无正文不构造替代证据。新增的安全写入模块隔离高风险边界，未增加后端依赖。
+
+2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `core.memory` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。

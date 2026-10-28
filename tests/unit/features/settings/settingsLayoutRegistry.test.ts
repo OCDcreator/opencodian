@@ -107,9 +107,12 @@ describe('SETTINGS_PRIMARY_TABS', () => {
     expect(opencode2Tab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual([
       'connection',
       'model',
-      'auth',
+      'agents',
+      'permissions',
       'mcp',
       'resources',
+      'context',
+      'advanced',
     ]);
     expect(getPrimaryTabDefinition('conversation')!.secondaryTabs.some((tab) => tab.id === 'title')).toBe(false);
   });

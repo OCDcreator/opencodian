@@ -1,6 +1,17 @@
 # SettingsBackendSection
 
-OpenCode 2 runtime catalog refresh renders native MCP connections and integration authentication. API keys stay in password inputs and go to the native server; OAuth has external authorization, code completion, status readback and cancellation. Agent/command/skill/plugin names are displayed from the native catalog; their local definitions stay in the version-specific configuration overlay.
+OpenCode 2 renders eight functional pages: connection/runtime, models/providers, agents, ordered tool permissions, MCP/plugins, instruction/skill/command/reference sources, context, and advanced JSONC. Native authentication and MCP connections remain backed by the adapter.
+
+## 2026-10-27 OpenCode 2 工作区
+
+- 挂载时自动读取目录，同一插件实例的 WeakMap 保存 30 秒缓存和并发 promise；连接参数改变后建立独立范围，旧请求不会写回新范围。失败保留已有目录并使用固定脱敏文案。
+- 八页共用插件本地进程覆盖草稿。`jsonc-parser.modify/applyEdits` 更新指定路径并保留未知字段和注释；局部无效输入跨标签保留并阻止应用。
+- 保存先调用 `validateConfigContent` 并获得原生读回，再保存插件设置；成功后草稿采用适配器确认的规范化文本，避免首尾空白被误判为外部修改。失败保留草稿，外部 `configContent` 变更阻止旧草稿覆盖。
+- 范围明确为当前 Vault 的插件管理本地服务覆盖，不冒充项目文件或全局文件写入。远程定义只读，认证和原生 MCP 连接仍可操作。
+- 列表/原位编辑覆盖 providers、agents、mcp.servers、commands、references；移除只删除插件覆盖。instructions/skills 编辑发现来源，不写入任意来源文件。
+- permissions/policies 按 v2 有序数组保存；compaction/media/tool_output/snapshots、watcher/formatter/shell/worktree 及选定实验字段使用当前 v2 字段形状。
+- 官方 OpenCode SVG 本地注册；宿主主题下的 Card/Field/Badge/Alert/ScrollArea 样式限定在 `.opencodian-opencode2-settings`，720px/480px 容器宽度收起表单列和列表列。
+- 聚焦测试：`SettingsOpenCode2Workspace.test.ts`；认证继续支持 API Key/OAuth/环境变量，密钥不保存到草稿。
 
 > **源码**: `src/features/settings/backends/opencode/SettingsBackendSection.ts`
 > **状态**: [REVIEW]

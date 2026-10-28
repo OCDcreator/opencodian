@@ -14,6 +14,7 @@ import * as nodeFs from 'node:fs';
 import * as nodeOs from 'node:os';
 import * as nodePath from 'node:path';
 
+import { confinedComponentWalk, isWithinRoot, resolveAnchorRealpath } from '../../core/agents/backend/configuration/PathConfinement';
 import type { MemoryFileSystem } from '../../core/memory';
 
 /** Expand a leading `~` / `~/segment` against the user home directory. */
@@ -92,5 +93,11 @@ export class ExternalMemoryFileSystem implements MemoryFileSystem {
 
   nativeAbsolutePath(absolutePath: string): string {
     return nodePath.resolve(absolutePath);
+  }
+
+  async validatePath(root: string, target: string): Promise<void> {
+    if (!isWithinRoot(this.root, root) || !isWithinRoot(root, target)) throw new Error('memory-path-rejected');
+    const anchor = await confinedComponentWalk(await resolveAnchorRealpath(this.root), nodePath.relative(this.root, root).split(nodePath.sep).filter(Boolean));
+    await confinedComponentWalk(anchor, nodePath.relative(root, target).split(nodePath.sep).filter(Boolean));
   }
 }

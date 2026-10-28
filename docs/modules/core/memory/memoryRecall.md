@@ -19,3 +19,5 @@
 ## 边界与约束
 
 - 语义召回默认关闭；开启后本仓 shipped 路径 = 词法选择 + 正文注入（零额外模型调用）。
+
+2026-10-28：新增 MemoryRecallSelector，选择顺序为直接提及 → 可选 embedding → 词法预筛+可选模型筛选 → 词法回退。模型文件名必须属于候选清单；每轮至多 3 条，纪元内正文预算和文件去重由 runtime/service 维护。向量仅驻内存，按内容与 endpoint/model cacheKey 失效，单批 16 条、至多 128 个候选主题，密钥文件不送入 embedding。

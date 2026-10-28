@@ -13,9 +13,9 @@
  */
 
 import { assessHygiene, buildHygieneNotice } from './memoryHygiene';
-import { buildMemoryIndexBlock } from './memoryIndexFormat';
+import { buildMemoryIndexBlock, formatIndexForInjection } from './memoryIndexFormat';
 import type { TopicManifestEntry } from './memoryManifest';
-import { buildMemoryProtocol, MEMORY_INJECTION_OPEN_MARKER } from './memoryProtocol';
+import { buildAgentMemoryProtocol, buildMemoryProtocol, MEMORY_INJECTION_OPEN_MARKER } from './memoryProtocol';
 import { assembleRelevantMemory, type SelectedMemory } from './memoryRecall';
 import type {
   MemorySettingsSnapshot,
@@ -50,7 +50,10 @@ export type MemoryInjectionPlan = {
  */
 export function transcriptHasInjectionThisEpoch(
   messages: ReadonlyArray<MemoryTranscriptMessage>,
+  memoryRoot?: string,
 ): boolean {
+  const matches = (text: string): boolean => text.includes(MEMORY_INJECTION_OPEN_MARKER)
+    && (!memoryRoot || text.includes(memoryRoot));
   let hasInjection = false;
   for (const message of messages) {
     if (message.summary || message.compactionDivider) {
@@ -58,7 +61,7 @@ export function transcriptHasInjectionThisEpoch(
       continue;
     }
     if (message.role !== 'user') continue;
-    if (typeof message.content === 'string' && message.content.includes(MEMORY_INJECTION_OPEN_MARKER)) {
+    if (typeof message.content === 'string' && matches(message.content)) {
       hasInjection = true;
       continue;
     }
@@ -69,7 +72,7 @@ export function transcriptHasInjectionThisEpoch(
           part
           && typeof part === 'object'
           && typeof (part as { text?: unknown }).text === 'string'
-          && ((part as { text: string }).text as string).includes(MEMORY_INJECTION_OPEN_MARKER)
+          && matches((part as { text: string }).text)
         ) {
           hasInjection = true;
           break;
@@ -85,6 +88,7 @@ export function transcriptHasInjectionThisEpoch(
  * passed in, so tests are deterministic without any filesystem or model.
  */
 export function planMemoryInjection(input: {
+  agentKey?: string;
   messages: ReadonlyArray<MemoryTranscriptMessage>;
   memoryIndexContent: string | null | undefined;
   manifest?: TopicManifestEntry[];
@@ -129,7 +133,9 @@ export function planMemoryInjection(input: {
     };
   }
 
-  const protocol = buildMemoryProtocol(input.memoryRootDisplay);
+  const protocol = input.agentKey ? buildAgentMemoryProtocol({ memoryRoot: input.memoryRootDisplay,
+    indexContent: formatIndexForInjection(input.memoryIndexContent ?? '', input.manifest) })
+    : buildMemoryProtocol(input.memoryRootDisplay);
   const indexPrefix =
     typeof input.memoryIndexContent === 'string' && input.memoryIndexContent.trim().length > 0
       ? buildMemoryIndexBlock(
@@ -167,7 +173,7 @@ export function planMemoryInjection(input: {
     '',
     protocol,
   ];
-  if (indexPrefix) body.push('', indexPrefix);
+  if (indexPrefix && !input.agentKey) body.push('', indexPrefix);
   if (recall.relevantMemory) body.push('', recall.relevantMemory);
   if (hygieneNotice) body.push('', hygieneNotice);
   body.push('', '[/OPENCODIAN MEMORY]');

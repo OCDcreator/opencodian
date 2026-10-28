@@ -1,5 +1,11 @@
 import { scanForSecrets } from '../../../../src/core/memory/memorySecretScan';
 
+it('matches the current zmem credential shapes without blocking bare git object ids', () => {
+  expect(scanForSecrets('commit 0123456789abcdef0123456789abcdef01234567').hit).toBe(false);
+  expect(scanForSecrets('st_12345678-1234-1234-1234-123456789abc').hit).toBe(true);
+  expect(scanForSecrets('eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJmaXh0dXJlIn0.signature').hit).toBe(true);
+});
+
 describe('scanForSecrets (credential guard, tuned to prefer misses)', () => {
   it('stays quiet on normal prose', () => {
     expect(scanForSecrets('The task-list was risk-free and the bearer of responsibilities did nothing.').hit).toBe(false);

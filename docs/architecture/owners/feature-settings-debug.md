@@ -71,3 +71,5 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。
 
 > 2026-10-27：通用调试只渲染插件日志、共享导出与 capability lab 入口；Claude/Codex trace 通过 `attachBackendTabbed` 在各自后端工作区渲染，OpenCode 1 legacy trace 不再出现在通用调试导航。
+
+2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `feature.settings-debug` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。

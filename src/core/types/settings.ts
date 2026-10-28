@@ -4165,12 +4165,30 @@ export interface MemoryBackendUserSettings {
    * with opencode-zmem; empty = off). Requires `memoryExternalRoot`.
    */
   memorySyncRemoteUrl: string;
+  memoryWorkspaceIdentity?: string;
+  memoryWorkspacePathAliases?: Record<string, string>;
+  memoryModelOverrides?: Record<string, string>;
+  memorySelectorModelOverrides?: Record<string, string>;
+  memoryAgentNotebooksEnabled?: boolean;
+  memoryAgentStorageRoot?: string;
+  memoryEmbeddingEnabled?: boolean;
 }
 
 /** Unknown shapes fall back field-by-field to the safe defaults. */
 export function normalizeMemoryBackendUserSettings(value: unknown): MemoryBackendUserSettings {
   const candidate = (typeof value === 'object' && value !== null ? value : {}) as Partial<MemoryBackendUserSettings>;
   const fallback = DEFAULT_SETTINGS.memory;
+  const stringMap = (raw: unknown, models = false): Record<string, string> => {
+    const out: Record<string, string> = {};
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+    const backends = ['opencode2', 'claude-code', 'codex', 'pi', 'zcode', 'dsh'];
+    for (const [key, item] of Object.entries(raw).slice(0, 128)) {
+      if (typeof item !== 'string' || !key.trim() || !item.trim() || key === '__proto__' || key === 'constructor') continue;
+      if (models && !backends.includes(key)) continue;
+      out[key.trim().slice(0, 500)] = item.trim().slice(0, 500);
+    }
+    return out;
+  };
   return {
     memoryBackendEnabled: typeof candidate.memoryBackendEnabled === 'boolean'
       ? candidate.memoryBackendEnabled
@@ -4187,6 +4205,13 @@ export function normalizeMemoryBackendUserSettings(value: unknown): MemoryBacken
     memoryExternalRoot: typeof candidate.memoryExternalRoot === 'string'
       ? candidate.memoryExternalRoot.trim().slice(0, 300)
       : fallback.memoryExternalRoot,
+    memoryWorkspaceIdentity: typeof candidate.memoryWorkspaceIdentity === 'string' ? candidate.memoryWorkspaceIdentity.trim().slice(0, 500) : '',
+    memoryWorkspacePathAliases: stringMap(candidate.memoryWorkspacePathAliases),
+    memoryModelOverrides: stringMap(candidate.memoryModelOverrides, true),
+    memorySelectorModelOverrides: stringMap(candidate.memorySelectorModelOverrides, true),
+    memoryAgentNotebooksEnabled: typeof candidate.memoryAgentNotebooksEnabled === 'boolean' ? candidate.memoryAgentNotebooksEnabled : true,
+    memoryAgentStorageRoot: typeof candidate.memoryAgentStorageRoot === 'string' ? candidate.memoryAgentStorageRoot.trim().slice(0, 500) : '',
+    memoryEmbeddingEnabled: candidate.memoryEmbeddingEnabled === true,
     memorySyncRemoteUrl: typeof candidate.memorySyncRemoteUrl === 'string'
       ? candidate.memorySyncRemoteUrl.trim().slice(0, 500)
       : fallback.memorySyncRemoteUrl,
@@ -4457,6 +4482,13 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
     memoryExtractionModel: '',
     memoryExternalRoot: '',
     memorySyncRemoteUrl: '',
+    memoryWorkspaceIdentity: '',
+    memoryWorkspacePathAliases: {},
+    memoryModelOverrides: {},
+    memorySelectorModelOverrides: {},
+    memoryAgentNotebooksEnabled: true,
+    memoryAgentStorageRoot: '',
+    memoryEmbeddingEnabled: false,
   },
 
   locale: 'en',

@@ -98,3 +98,5 @@ Settled Claude Code turns reuse the existing scoped user-footer identity refresh
 
 
 2026-10-26 现场目录时序补充：目录晚到时，AssistantShellViewHostAdapter/AssistantShellRenderer 只更新已存在 footer 的可见模型名、tooltip 和 AX 名称，完整历史身份保持不变，不重建 body。
+
+2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `feature.chat-runtime` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。

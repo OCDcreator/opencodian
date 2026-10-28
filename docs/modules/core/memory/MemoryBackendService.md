@@ -28,5 +28,7 @@
 
 ## 边界与约束
 
-- 本类不 import 任何后端；语义召回 shipped 路径为词法选择（≤3 条正文注入），无每回合模型调用。
+- 本类不 import 任何后端；MemoryRecallSelector 优先直接提及，再可选向量、词法+模型筛选，失败降级词法；每轮最多 3 条正文、纪元内共享预算。
 - 构造器可选覆盖 `{ projectDir, metricsFs }`：共享存储模式下 `projectDir` 指向外部绝对桶目录（zmem/ZCode 布局），`metricsFs` 让 metrics 日志留在 vault 内的文件系统上。
+
+2026-10-28：runExtraction 改用 memoryAgentExtraction 的受限 Read/Edit/Write 循环，可读改已有记忆及创建多文件；提取只处理水位后的消息，压缩标记不计入有效消息数。模型失败返回实际已尝试调用数。索引注入按实际目录检测持久化标记，切换共享桶不被旧桶标记阻止；runReflection 写前密钥和路径校验，模型调用经相同后端端口。可选 agentKey 选择独立代理协议。

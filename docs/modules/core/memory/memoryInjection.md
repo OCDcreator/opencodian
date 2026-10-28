@@ -18,3 +18,5 @@
 ## 边界与约束
 
 - 偏离 zmem 的 per-request system.transform：本仓接缝在消息层且服务端转录会累积，故每 context epoch 注入一次（首回合 + 压缩后重注入）。
+
+2026-10-28：索引与协议保持每纪元一次，正文由 service 在已注入后的每轮继续召回。transcriptHasInjectionThisEpoch 可限定实际目录，旧桶标记不抑制新桶。agentKey 选择 Persistent Agent Memory 长协议与经过归档/字符限制的代理索引。

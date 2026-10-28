@@ -516,3 +516,5 @@ Focused regression tests cover the settings callbacks' saved JSON snapshots, the
 > 2026-10-27：`INLINE_EDIT_BACKENDS` 加入 `dsh`，因为 DSH 适配器实现 `AgentAuxQueryCapability` 与行内补全能力；此前 DSH 覆盖能被 UI 显示但保存时会被规范化丢弃。仅修正设置归一化允许集，不改变后端协议。
 
 > 2026-10-27（二次审查）：`INLINE_EDIT_BACKENDS` 加入 `dsh`（DSH 适配器实现 aux query 与 inline completion）；此前 DSH 覆盖 UI 可见但保存时被规范化丢弃。未修改后端协议。
+
+2026-10-28：memory 设置增加 workspaceIdentity/pathAliases、六后端独立模型与 selector 模型、agent notebooks/root、embedding 开关；字段分别归一化，未知模型后端键被丢弃，原开关、共享根、Git remote 和提取模型保留。
