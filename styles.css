@@ -9640,11 +9640,18 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
 /* Form hosts own the gap across rows, nested editors and status messages.
    Adjacent-row margins cannot cover cards separated by a wrapper. */
 .opencodian-settings .opencodian-settings-form-stack,
+.opencodian-settings .opencodian-settings-ui-content,
+.opencodian-settings .opencodian-settings-ui-tab-options,
 .opencodian-settings .opencodian-style-input-controls {
   display: flex;
   flex-direction: column;
   gap: var(--opencodian-settings-space-lg);
   min-width: 0;
+}
+
+/* Disabling tabs leaves the dynamic host mounted without an extra gap. */
+.opencodian-settings .opencodian-settings-ui-tab-options:empty {
+  display: none;
 }
 
 .opencodian-settings .opencodian-settings-quick-nav {
