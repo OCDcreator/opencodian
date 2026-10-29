@@ -317,7 +317,7 @@ describe('MemoryRuntimeCoordinator wiring', () => {
     });
     h.coordinator.onTurnSettled({ conversationId: 'c1', sessionId: 'ses_main1' });
     await flushMicrotasks();
-    await flushMicrotasks();
+    await h.coordinator['queue'];
 
     expect(h.opencode.calls).toHaveLength(1);
     expect(h.opencode.created).toEqual(h.opencode.deleted);
