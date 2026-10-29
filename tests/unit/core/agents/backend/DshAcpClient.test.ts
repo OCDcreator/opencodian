@@ -104,10 +104,15 @@ process.stdin.setEncoding('utf8');
 let input = '';
 process.stdin.on('data', (chunk) => {
   input += chunk;
-  const newline = input.indexOf('\\n');
-  if (newline < 0) return;
-  const request = JSON.parse(input.slice(0, newline));
-  setTimeout(() => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: ${JSON.stringify(result)} }) + '\\n'), ${delayMs});
+  for (;;) {
+    const newline = input.indexOf('\\n');
+    if (newline < 0) return;
+    const line = input.slice(0, newline);
+    input = input.slice(newline + 1);
+    if (!line.trim()) continue;
+    const request = JSON.parse(line);
+    setTimeout(() => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: ${JSON.stringify(result)} }) + '\\n'), ${delayMs});
+  }
 });
 `;
   return new DshAcpClient({
