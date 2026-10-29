@@ -33,6 +33,7 @@ import {
   getSlashCommandMenuQuery,
   isCommandComposerText,
 } from './composerInputParsing';
+import { ComposerInvocationEditor } from './ComposerInvocationEditor';
 
 const COMPOSER_TEXTAREA_MAX_HEIGHT = 240;
 let composerInputLabelId = 0;
@@ -53,7 +54,7 @@ function resolveTextareaMaxHeightFallback(value: number | undefined): number {
     : COMPOSER_TEXTAREA_MAX_HEIGHT;
 }
 const COMPOSER_AVAILABILITY_NOTICE_GAP_PX = 8;
-const INPUT_HIGHLIGHT_SLASH_REGEX = /(^|\s)(\/(?:skills|skill)(?:\s+\S+)?|\/\S+)/g;
+const INPUT_HIGHLIGHT_SLASH_REGEX = /(^|\s)(\/skills(?:[ \t]+\S+)?(?=\s|$)|[/$]\S+)/g;
 
 const logger = createLogger('ComposerInputShellCoordinator');
 
@@ -258,6 +259,7 @@ export class ComposerInputShellCoordinator {
   private addContextBtnEl: HTMLButtonElement | null = null;
   private sendBtnEl: HTMLButtonElement | null = null;
   private inputTextareaEl: HTMLTextAreaElement | null = null;
+  private invocationEditor: ComposerInvocationEditor | null = null;
   private highlightBackdropEl: HTMLElement | null = null;
   private placeholderOverlayEl: HTMLElement | null = null;
   private availabilityNoticeEl: HTMLElement | null = null;
@@ -1345,7 +1347,7 @@ export class ComposerInputShellCoordinator {
     const selectedAgentId = this.shouldHandleAgentFeatures
       ? this.agentSelectionController.getSelectedAgentId()
       : undefined;
-    const submission = buildComposerInputSubmissionWithAgentIntents(
+    let submission = buildComposerInputSubmissionWithAgentIntents(
       rawContent,
       this.host.getComposerInputMode(),
       mentionIntents,
@@ -1357,6 +1359,10 @@ export class ComposerInputShellCoordinator {
     );
     if (submission === null) {
       return;
+    }
+    if (submission.kind === 'command' && this.extractKnownSlashHighlightMatches(rawContent)
+      .some((span) => span.kind === 'skill' && rawContent.slice(0, span.start).trim() === '')) {
+      submission = { kind: 'prompt', content: rawContent.trim() };
     }
 
     // Attach images to prompt submissions when present
@@ -1434,6 +1440,12 @@ export class ComposerInputShellCoordinator {
     if (!this.inputTextareaEl) {
       return;
     }
+
+    if (ComposerInvocationEditor.isSupported() && !this.invocationEditor?.owns(this.inputTextareaEl)) {
+      this.invocationEditor?.destroy();
+      this.invocationEditor = new ComposerInvocationEditor(this.inputTextareaEl);
+    }
+    this.invocationEditor?.sync(this.resolveTextareaMaxHeight());
 
     // Toggle custom placeholder overlay visibility
     const isEmpty = !this.inputTextareaEl.value;
@@ -1725,9 +1737,7 @@ export class ComposerInputShellCoordinator {
     // selector as `/`. Detect it here and route to the slash menu exactly like
     // `/` so no intermediate agent/command logic can clear the textarea or hide
     // the menu. This must run before any input-state reset.
-    const codexSkillQuery = this.host.isCodexBackendActive?.()
-      ? getCodexSkillMenuQuery(textarea)
-      : null;
+    const codexSkillQuery = getCodexSkillMenuQuery(textarea);
     if (slashQuery !== null || codexSkillQuery !== null) {
       this.agentMentionController.clear(this.slashCommandMenuEl);
       await this.refreshSlashCommandMenu();
@@ -1813,6 +1823,7 @@ export class ComposerInputShellCoordinator {
 
     const content = textarea.value;
     if (!content) {
+      this.invocationEditor?.setTokens([]);
       backdrop.empty();
       backdrop.scrollTop = 0;
       return;
@@ -1843,6 +1854,7 @@ export class ComposerInputShellCoordinator {
 
     // Sort by position and render
     spans.sort((a, b) => a.start - b.start);
+    this.invocationEditor?.setTokens(spans);
 
     let html = '';
     let lastIndex = 0;
@@ -1888,7 +1900,19 @@ export class ComposerInputShellCoordinator {
   }
 
   private getKnownSlashHighlightKind(token: string): 'command' | 'skill' | null {
-    if (!this.slashCommandMenuCatalogItems || !token.startsWith('/')) {
+    if (!this.slashCommandMenuCatalogItems) {
+      return null;
+    }
+
+    if (token.startsWith('$')) {
+      return this.host.isCodexBackendActive?.()
+        && this.slashCommandMenuCatalogItems.some((item) => item.source === 'codex-skill'
+          && (item.insertText?.trim() ?? `$${item.id}`) === token)
+        ? 'skill'
+        : null;
+    }
+
+    if (!token.startsWith('/')) {
       return null;
     }
 
@@ -1917,7 +1941,8 @@ export class ComposerInputShellCoordinator {
       return null;
     }
 
-    const catalogItem = this.slashCommandMenuCatalogItems.find((item) => item.id === commandId);
+    const catalogItem = this.slashCommandMenuCatalogItems.find((item) => item.source !== 'codex-skill'
+      && (item.insertText?.trim() ?? `/${item.id}`) === token);
     if (!catalogItem) {
       return null;
     }

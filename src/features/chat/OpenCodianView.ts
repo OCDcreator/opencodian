@@ -33,7 +33,7 @@ import type { CodexElicitationCardRequest, CodexElicitationHostResponse } from '
 import {
   type ResolvedModelSelection,
 } from '../../core/config/modelConfig';
-import type { SlashCommandMenuItem } from '../../core/config/slashCommandCatalog';
+import type { NativeSlashCommand, SlashCommandMenuItem } from '../../core/config/slashCommandCatalog';
 import {
   type SessionActivityStatus,
 } from '../../core/opencode';
@@ -1225,6 +1225,14 @@ export class OpenCodianView extends ItemView {
     submission: ComposerInputSubmission,
     onPreparationOutcome?: (outcome: import('./services/send/MessageSendPreparationService').MessageSendPreparationOutcome) => void,
   ): Promise<void> | void {
+    // Codex app-server exposes actions as methods, not slash prompt syntax.
+    if (submission.kind === 'command' && (this.isCodexConversationActive()
+      || (this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'pi')) {
+      if (submission.command === 'new') return this.createNewConversation().then(() => {});
+      if (submission.command === 'compact') {
+        return this.activeTabContextUsageCoordinator.compactForegroundThread().then(() => {});
+      }
+    }
     if (submission.kind === 'shell') {
       logger.warn('Ignoring shell composer submission because the stable shell runtime is not enabled in this view', {
         commandPreview: previewLogText(submission.command, 120),
@@ -1246,15 +1254,10 @@ export class OpenCodianView extends ItemView {
   }
 
   private loadSlashCommandMenuItems(): Promise<SlashCommandMenuItem[]> {
-    const isZCode = (this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'zcode';
-    const isOpenCode2 = (this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'opencode2';
-    if (!this.isOpenCodeBackendActive() && !isOpenCode2 && !this.isClaudeCodeConversationActive() && !this.isCodexConversationActive() && !isZCode) {
-      return Promise.resolve([]);
-    }
-
-    // Codex skills come from the app-server via the cache host's
-    // loadCodexRuntimeSkills seam, so Codex does not require opencodeConfigManager.
-    if (!this.plugin.opencodeConfigManager && !isOpenCode2 && !this.isClaudeCodeConversationActive() && !this.isCodexConversationActive() && !isZCode) {
+    const backend = this.currentConversation?.backend ?? this.plugin.settings.activeBackend ?? 'opencode2';
+    const native = ['opencode2', 'claude-code', 'codex', 'pi', 'zcode', 'dsh'].includes(backend);
+    if (native ? !this.plugin.settings.enabledBackends.includes(backend)
+      : !this.isOpenCodeBackendActive() || !this.plugin.opencodeConfigManager) {
       return Promise.resolve([]);
     }
 
@@ -1262,29 +1265,19 @@ export class OpenCodianView extends ItemView {
   }
 
   private scheduleSlashCommandMenuPreload(): void {
-    const isZCode = (this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'zcode';
-    const isOpenCode2 = (this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'opencode2';
-    if (!this.isOpenCodeBackendActive() && !isOpenCode2 && !this.isClaudeCodeConversationActive() && !this.isCodexConversationActive() && !isZCode) {
-      return;
-    }
-
     if (this.slashCommandMenuPreloadTimerId !== null) {
       window.clearTimeout(this.slashCommandMenuPreloadTimerId);
     }
 
     this.slashCommandMenuPreloadTimerId = window.setTimeout(() => {
       this.slashCommandMenuPreloadTimerId = null;
-      if (!this.plugin.opencodeConfigManager && !isZCode && !isOpenCode2) {
-        return;
-      }
-
       void this.getServerAvailability().then((availability) => {
         if (availability === 'disabled' || availability === 'offline' || availability === 'checking') {
           return;
         }
 
-        this.slashCommandMenuCatalogCache.warm();
-      });
+        return this.loadSlashCommandMenuItems();
+      }).catch((error) => { logger.debug('Failed to preload slash command menu:', error); });
     }, 0);
   }
 
@@ -1917,9 +1910,16 @@ export class OpenCodianView extends ItemView {
       loadOpenCode2Commands: () => (this.plugin.agentServiceRegistry?.get('opencode2') as { listCommands?(): Promise<Array<{ name: string; description?: string }>> } | undefined)?.listCommands?.() ?? Promise.resolve([]),
       loadOpenCode2Skills: () => (this.plugin.agentServiceRegistry?.get('opencode2') as { listSkills?(): Promise<Array<{ name: string; description?: string }>> } | undefined)?.listSkills?.() ?? Promise.resolve([]),
       loadOpenCode2Agents: () => (this.plugin.agentServiceRegistry?.get('opencode2') as { listAgents?(): Promise<Array<{ id: string; name: string; description?: string; mode: 'primary' | 'subagent' | 'all'; hidden: boolean }>> } | undefined)?.listAgents?.() ?? Promise.resolve([]),
-      loadPiRuntimeCommands: () => (this.plugin.agentServiceRegistry?.get('pi') as { getRuntimeCommands?(): Promise<Array<{ name: string; description?: string }>> } | undefined)?.getRuntimeCommands?.() ?? Promise.resolve([]),
-      loadZCodeRuntimeCommands: async () => (this.plugin.agentServiceRegistry?.get('zcode') as { getSlashCommands?(): readonly { name: string; description: string }[] } | undefined)?.getSlashCommands?.() ?? [],
-      loadDshRuntimeCommands: () => (this.plugin.agentServiceRegistry?.get('dsh') as { getRuntimeCommands?(sessionId?: string): Promise<Array<{ name: string; description?: string }>> } | undefined)?.getRuntimeCommands?.(this.currentConversation?.backendSessionId) ?? Promise.resolve([]),
+      loadPiRuntimeCommands: () => (this.plugin.agentServiceRegistry?.get('pi') as { getRuntimeCommands?(): Promise<NativeSlashCommand[]> } | undefined)?.getRuntimeCommands?.() ?? Promise.resolve([]),
+      loadZCodeRuntimeCommands: async () => {
+        const adapter = this.plugin.agentServiceRegistry?.get('zcode') as {
+          getRuntimeCommands?(): Promise<NativeSlashCommand[]>;
+          getSlashCommands?(): readonly NativeSlashCommand[];
+        } | undefined;
+        return adapter?.getRuntimeCommands ? adapter.getRuntimeCommands() : adapter?.getSlashCommands?.() ?? [];
+      },
+      loadZCodeRuntimeSkills: () => (this.plugin.agentServiceRegistry?.get('zcode') as { getRuntimeSkills?(sessionId?: string): Promise<NativeSlashCommand[]> } | undefined)?.getRuntimeSkills?.(this.currentConversation?.backendSessionId) ?? Promise.resolve([]),
+      loadDshRuntimeCommands: () => (this.plugin.agentServiceRegistry?.get('dsh') as { getRuntimeCommands?(sessionId?: string): Promise<NativeSlashCommand[]> } | undefined)?.getRuntimeCommands?.(this.currentConversation?.backendSessionId) ?? Promise.resolve([]),
       getHiddenCommandIds: () => this.plugin.settings.hiddenSlashCommands ?? [],
       loadProjectAgents: async () => (this.isClaudeCodeConversationActive() || this.isCodexConversationActive()) ? {} : (this.plugin.opencodeConfigManager?.getAgentConfig() ?? {}),
       loadProjectCommands: async () => (this.isClaudeCodeConversationActive() || this.isCodexConversationActive()) ? {} : (this.plugin.opencodeConfigManager?.getCommandConfig() ?? {}),
@@ -1940,7 +1940,7 @@ export class OpenCodianView extends ItemView {
       loadClaudeRuntimeCommands: async () => {
         if (!this.isClaudeCodeConversationActive()) return null;
         const adapter = this.plugin.agentServiceRegistry?.get('claude-code') as {
-          getRuntimeCatalog?: () => Promise<{ commands: Array<{ name: string; description?: string }> } | null>;
+          getRuntimeCatalog?: () => Promise<{ commands: NativeSlashCommand[] } | null>;
         } | undefined;
         const catalog = await adapter?.getRuntimeCatalog?.();
         return catalog?.commands ?? null;
@@ -1961,13 +1961,8 @@ export class OpenCodianView extends ItemView {
         const skills = await adapter?.getRuntimeSkills?.();
         return skills ?? null;
       },
-      getBackendKey: () => (this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'pi'
-        ? 'pi'
-        : (this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'zcode'
-          ? 'zcode'
-          : (this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'opencode2'
-            ? 'opencode2'
-          : this.isClaudeCodeConversationActive() ? 'claude-code' : (this.isCodexConversationActive() ? 'codex' : 'opencode'),
+      getBackendKey: () => this.currentConversation?.backend ?? this.plugin.settings.activeBackend ?? 'opencode2',
+      getContextKey: () => this.currentConversation?.backendSessionId ?? this.currentConversation?.id ?? 'draft',
       getSlashCommandCapabilityKey: () => {
         // Fold the current v2.command.list / v2.skill.list capability
         // availability into the cache key. When server support flips, the key

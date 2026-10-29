@@ -53,7 +53,10 @@ describe('Pi backend isolation contract', () => {
       loadProjectAgents: failOnForeignRead, loadProjectCommands: failOnForeignRead,
       loadRuntimeCommands: failOnForeignRead, loadRuntimeSkills: failOnForeignRead,
     });
-    await expect(cache.load()).resolves.toEqual([]);
+    await expect(cache.load()).resolves.toEqual([
+      expect.objectContaining({ id: 'new', source: 'command' }),
+      expect.objectContaining({ id: 'compact', source: 'command' }),
+    ]);
     const commands = new SlashCommandExecutionService({
       getCurrentConversation: () => ({ backend: 'pi' }),
       getRuntimeSkills: failOnForeignRead, runSessionCommand: failOnForeignRead,

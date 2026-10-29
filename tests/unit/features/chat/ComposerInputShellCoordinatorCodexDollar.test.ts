@@ -80,8 +80,8 @@ function renderedMenuText(container: HTMLElement): Array<string | null> {
   );
 }
 
-function menuHasSkillsEntry(container: HTMLElement): boolean {
-  return renderedMenuText(container).some((text) => text !== null && /skills/i.test(text));
+function menuHasEmptyState(container: HTMLElement): boolean {
+  return container.querySelector('.opencodian-slash-command-menu [role="status"]') !== null;
 }
 
 function type(textarea: HTMLTextAreaElement, value: string, cursor?: number): void {
@@ -109,14 +109,13 @@ describe('ComposerInputShellCoordinator — Codex `$` trigger (real DOM)', () =>
     delete (globalThis as typeof globalThis & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver;
   });
 
-  it('opens the skill selector on `$missing` (no skills) showing the /skills entry, without clearing the textarea', async () => {
+  it('shows a visible empty state on `$missing` without adding a command or clearing the textarea', async () => {
     const fixture = createCodexFixture([]); // zero codex skills
     type(fixture.textarea, '$missing');
 
     await flushAsync();
 
-    // Menu is NOT blank — the /skills capability entry is present.
-    expect(menuHasSkillsEntry(fixture.container)).toBe(true);
+    expect(menuHasEmptyState(fixture.container)).toBe(true);
     // The user's input is preserved (the bug cleared it).
     expect(fixture.textarea.value).toBe('$missing');
   });
@@ -127,11 +126,11 @@ describe('ComposerInputShellCoordinator — Codex `$` trigger (real DOM)', () =>
 
     await flushAsync();
 
-    expect(menuHasSkillsEntry(fixture.container)).toBe(true);
+    expect(menuHasEmptyState(fixture.container)).toBe(true);
     expect(fixture.textarea.value).toBe('use $missing');
   });
 
-  it('lists matching skills for `$cod` plus the /skills entry', async () => {
+  it('lists matching skills for `$cod` without a command entry', async () => {
     const fixture = createCodexFixture([
       codexSkillItem('code-review', 'Review code'),
       codexSkillItem('git-flow', 'Git workflow'),
@@ -142,7 +141,7 @@ describe('ComposerInputShellCoordinator — Codex `$` trigger (real DOM)', () =>
 
     const texts = renderedMenuText(fixture.container);
     expect(texts.some((x) => x && /code-review/i.test(x))).toBe(true);
-    expect(texts.some((x) => x && /skills/i.test(x))).toBe(true);
+    expect(texts.some((x) => x && /\/skills/i.test(x))).toBe(false);
     expect(texts.some((x) => x && /git-flow/i.test(x))).toBe(false);
   });
 
@@ -164,6 +163,39 @@ describe('ComposerInputShellCoordinator — Codex `$` trigger (real DOM)', () =>
     expect(fixture.textarea.value).toContain('$code-review ');
     expect(fixture.textarea.value).toContain('use ');
     expect(fixture.host.submitMessage).not.toHaveBeenCalled();
+    expect(fixture.container.querySelector('.opencodian-input-highlight-skill')?.textContent)
+      .toBe('$code-review');
+  });
+
+  it('styles known native skills between surrounding text while leaving unknown tokens plain', async () => {
+    const fixture = createCodexFixture([codexSkillItem('code-review', 'Review code')]);
+    type(fixture.textarea, '$cod');
+    await flushAsync();
+    fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    type(fixture.textarea, '请使用 $code-review 检查\n$unknown /tmp/report.txt $100');
+    await flushAsync();
+
+    expect(Array.from(fixture.container.querySelectorAll('.opencodian-input-highlight-skill'),
+      (el) => el.textContent)).toEqual(['$code-review']);
+    expect(fixture.container.querySelector('.opencodian-input-highlight-command')).toBeNull();
+    expect(fixture.container.querySelector('.opencodian-input-highlight-backdrop')?.textContent)
+      .toBe(fixture.textarea.value);
+    expect(fixture.textarea.value).toBe('请使用 $code-review 检查\n$unknown /tmp/report.txt $100');
+  });
+
+  it('does not style slash aliases or dollar skills after leaving the Codex backend', async () => {
+    const fixture = createCodexFixture([codexSkillItem('code-review', 'Review code')]);
+    type(fixture.textarea, '$cod');
+    await flushAsync();
+    type(fixture.textarea, '/code-review ');
+    await flushAsync();
+    expect(fixture.container.querySelector('.opencodian-input-highlight-command')).toBeNull();
+    expect(fixture.container.querySelector('.opencodian-input-highlight-skill')).toBeNull();
+
+    fixture.host.isCodexBackendActive!.mockReturnValue(false);
+    type(fixture.textarea, '$code-review ');
+    await flushAsync();
+    expect(fixture.container.querySelector('.opencodian-input-highlight-skill')).toBeNull();
   });
 
   it('does NOT clear the textarea when no skill matches `$zzz`', async () => {
@@ -172,8 +204,7 @@ describe('ComposerInputShellCoordinator — Codex `$` trigger (real DOM)', () =>
 
     await flushAsync();
 
-    // Still shows the /skills entry (not blank) and keeps input intact.
-    expect(menuHasSkillsEntry(fixture.container)).toBe(true);
+    expect(menuHasEmptyState(fixture.container)).toBe(true);
     expect(fixture.textarea.value).toBe('$zzz');
   });
 });

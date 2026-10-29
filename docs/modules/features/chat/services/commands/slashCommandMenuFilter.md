@@ -1,5 +1,7 @@
 # slashCommandMenuFilter
 
+> 2026-10-29：新增显式前端 trigger 分支：`/` 混合命令/技能，`$` 仅技能，兼容手输 `/skills query`。原生目录项保持自己的 insertText，legacy prefixed 模式只在序列化阶段写 `/skills name`。Codex 仅展示技能以及已有 API 承接的 new/compact，隐藏 OpenCode 专属合成命令。
+
 > **源码**: `src/features/chat/services/commands/slashCommandMenuFilter.ts`
 > **状态**: [REVIEW]
 
@@ -44,3 +46,7 @@ export function filterSlashCommandMenuItems(
 
 - 源码位置：`src/features/chat/services/commands/slashCommandMenuFilter.ts`。
 - 原位置：`src/features/chat/services/slashCommandMenuFilter.ts`；文件名、导出接口与业务职责保持不变。
+
+## 2026-10-28：原生命令与技能弹框
+
+/skills 继续统一浏览，但 nativeSkill 项保留原生 insertText：OpenCode 2、Claude、ZCode、DSH 使用 /name，Pi 使用 /skill:name，Codex 继续 。旧 OpenCode 的展开语法保留为 /skills name。

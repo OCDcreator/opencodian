@@ -174,6 +174,7 @@ export interface AppServerTurnStartOptions {
   threadId: string;
   input: Array<
     | { type: 'text'; text: string; text_elements: [] }
+    | { type: 'skill'; name: string; path: string }
     | { type: 'localImage'; path: string }
   >;
   cwd?: string;
@@ -645,11 +646,10 @@ export interface AppServerUserInputTextElement { byteRange: { start: number; end
 export type AppServerUserInputImageDetail = 'auto' | 'low' | 'high' | 'original';
 
 /**
- * UserInput union accepted by `turn/steer` (and `turn/start`). Matches the
- * Codex 0.159.0 UserInput binding: text (with optional UI text elements),
- * image (by url or fileId), and localImage (by absolute path).
+ * UserInput accepted by turn/steer and turn/start: text, images and explicit skills.
  */
 export type AppServerUserInput = { type: 'text'; text: string; text_elements?: AppServerUserInputTextElement[] }
+  | { type: 'skill'; name: string; path: string }
   | { type: 'image'; url?: string; fileId?: string; detail?: AppServerUserInputImageDetail | null }
   | { type: 'localImage'; path: string; detail?: AppServerUserInputImageDetail | null };
 

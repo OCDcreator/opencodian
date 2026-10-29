@@ -167,11 +167,10 @@ describe('SlashCommandMenuCatalogCache startLoad backend gating', () => {
     const cache = new SlashCommandMenuCatalogCache(createClaudeHost());
     const items = await cache.load();
 
-    // Should only have claude-runtime entries
+    // The SDK's unmarked commands are native user/project/plugin skills.
     const sources = items.map((item) => item.source);
-    expect(sources).toContain('claude-runtime');
+    expect(sources).toContain('skill');
     expect(sources).not.toContain('command');
-    expect(sources).not.toContain('skill');
     expect(sources).not.toContain('md-command');
     expect(sources).not.toContain('project');
 

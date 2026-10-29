@@ -1,5 +1,7 @@
 # SlashCommandMenuCatalogCache
 
+> 2026-10-29：Pi 原生 get_commands 不提供 TUI 的 new/compact；composer 目录补入这两个已有插件 API 承接的操作，仍尊重 hidden ids，重名时保留原生目录项。其余命令/技能保持原生来源。
+
 OpenCode 2 loads native command and skill names with its own backend key, adds applicable builtins, and leaves upstream-unavailable sharing commands out of the menu. It does not read OpenCode 1 project command or agent config for this catalog.
 The same native agent catalog supplies `@agent` mention candidates and the primary agent selector, excluding hidden agents and excluding subagent-only entries from the primary selector.
 
@@ -83,3 +85,7 @@ Pi backend key 返回空目录，不展示 OpenCode 命令，也不触发 OpenCo
 ## 2026-10-24 DSH 通道隔离
 
 DSH ACP 没有 command/skill/agent catalog，目录加载直接返回空，不查询 OpenCode 配置或休眠服务。不能用其他后端的斜杠菜单伪装 DSH 原生能力。
+
+## 2026-10-28：原生命令与技能弹框
+
+补齐六后端原生目录：OpenCode 2 命令/技能分组并去重；Claude 用 builtin 标记区分技能并保持内置同名命令优先；Codex 保持 skills/list 与 ；Pi 保留 /skill:name；ZCode 合并会话技能引用目录；DSH 保留原生技能来源。所有目录尊重隐藏项，Claude/Codex 不调用旧 OpenCode loaders，缓存按后端与会话隔离。

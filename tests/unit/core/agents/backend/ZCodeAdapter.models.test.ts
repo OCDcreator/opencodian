@@ -148,6 +148,31 @@ afterEach(() => {
 });
 
 describe('ZCodeAdapter — live model catalog and boundaries', () => {
+  it('loads native workspace commands before creating any session', async () => {
+    await startAdapter();
+    const request = (adapter as unknown as { transport: { request: jest.Mock<(method: string, params?: Record<string, unknown>) => Promise<unknown>> } }).transport.request;
+    const original = request.getMockImplementation()!;
+    request.mockImplementation(async (method, params) => method === 'workspace/readPresentation'
+      ? { slashCommands: [{ name: 'compact', description: 'Compact', source: 'builtin' }] }
+      : original(method, params));
+    await expect(adapter.getRuntimeCommands()).resolves.toEqual([{ name: 'compact', description: 'Compact', source: 'builtin' }]);
+    expect(request).not.toHaveBeenCalledWith('session/create', expect.anything());
+  });
+  it('reads the native skill reference catalog in the current workspace', async () => {
+    await startAdapter();
+    const request = (adapter as unknown as { transport: { request: jest.Mock<(method: string, params?: Record<string, unknown>) => Promise<unknown>> } }).transport.request;
+    const original = request.getMockImplementation()!;
+    request.mockImplementation(async (method, params) => method === 'skills/referenceCatalog'
+      ? { authority: 'workspace', skills: [
+        { name: 'design', description: 'Design a form', enabled: true },
+        { name: 'disabled', enabled: false },
+      ] }
+      : original(method, params));
+    await expect(adapter.getRuntimeSkills()).resolves.toEqual([{ name: 'design', description: 'Design a form', source: 'skill' }]);
+    expect(request).toHaveBeenCalledWith('skills/referenceCatalog', {
+      workspace: { workspacePath: '/vault', workspaceKey: '/vault' },
+    });
+  });
   it('reports the catalog honestly unavailable until a snapshot is observed', async () => {
     await startAdapter();
     await expect(adapter.getAvailableModels()).rejects.toThrow('catalog unavailable');

@@ -29,3 +29,7 @@
 ## 验证
 
 ACP fixture 保留生命周期和兼容路径回归。`DshNative.live.test.ts` 验证真实模型/工具/命令目录、stdio/HTTP MCP、反向问题、私有启动及用户 profile 不变；`DshAdapter.live.test.ts` 单独验证 ACP。真实模型只读审计、图片与 Obsidian 产品路径分别记账，详见 `docs/status/dsh-integration-2026-10-24.md`。Windows 与真实权限卡片 UI 闭环不能由源码测试替代。
+
+## 2026-10-28：原生命令与技能弹框
+
+getRuntimeCommands 保留原生服务返回的 source: skill；目录包含 commands 注册表与当前 agent scope 下允许用户调用的技能，命令重名优先。ACP 兼容传输没有 nativeRequest 时不伪造目录。

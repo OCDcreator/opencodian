@@ -94,6 +94,13 @@ describe('Pi SDK service lifecycle', () => {
     expect(clients).toHaveLength(1); expect(clients[0].closed).toBe(false);
     await collect(adapter.sendMessage({ sessionId: id, content: 'Continue' })); expect(clients).toHaveLength(1);
   });
+  it('keeps native skill commands and arguments intact when memory/tooling context is enabled', async () => {
+    const id = await adapter.createSession('Skill');
+    await collect(adapter.sendMessage({ sessionId: id, content: '/skill:design a form', options: {
+      memoryInjection: 'Remember project context', obsidianToolingInjection: 'Tooling context',
+    } }));
+    expect(clients[0].commands.find((command) => command.type === 'prompt')?.message).toBe('/skill:design a form');
+  });
   it('does not end on agent_end before retry and compaction complete', async () => {
     const sequence: string[] = [];
     prompt = async (client) => {

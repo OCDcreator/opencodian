@@ -70,3 +70,7 @@ export function buildVisibleSlashCommandMenuItems(
 - 不要把这层合并规则重新复制回 `SettingsCommandsSection`、`ComposerInputShellCoordinator` 或 `OpenCodeService`
 - 这里只负责 catalog merge / menu 投影，不接管 runtime placeholder expansion 或 `runSessionCommand()` 执行
 - markdown command 输入使用 core-local `MdCommandEntry` 结构类型，避免 core catalog 反向导入 chat service loader
+
+## 2026-10-28：原生命令与技能弹框
+
+增加 NativeSlashCommand 与 buildNativeSlashCommandMenuItems，供 Pi、ZCode、DSH 投影原生目录。统一去重、隐藏和命令优先规则，并保留技能分类与原生 insertText。菜单 nativeSkill 标记使 /skills 浏览沿用后端调用语法。

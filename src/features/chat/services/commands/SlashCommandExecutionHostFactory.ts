@@ -35,7 +35,7 @@ export async function executeCompactSession(
 export function createSlashCommandExecutionHost(
   deps: SlashCommandExecutionHostDependencies,
 ): SlashCommandExecutionHost {
-  const isOpenCode2 = () => deps.getCurrentConversation()?.backend === 'opencode2';
+  const isOpenCode2 = () => (deps.getCurrentConversation()?.backend ?? deps.getActiveBackend?.()) === 'opencode2';
   const openCode2 = () => {
     const adapter = deps.getOpenCode2Adapter?.();
     if (!adapter) throw new Error('OpenCode 2 adapter unavailable');
@@ -47,6 +47,7 @@ export function createSlashCommandExecutionHost(
       return deps.getCurrentConversation();
     },
     getCurrentConversation: () => deps.getCurrentConversation(),
+    getActiveBackend: () => deps.getActiveBackend?.(),
     getActiveTabId: () => deps.getActiveTabId(),
     ensureTabRuntime: (tabId) => Boolean(tabId && deps.ensureTabRuntimeState(tabId)),
     isTabForegroundBusy: (tabId) => (tabId ? deps.isTabForegroundBusy(tabId) : false),

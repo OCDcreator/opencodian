@@ -2,7 +2,7 @@ import { MessageSendPreparationService } from '../../../../src/features/chat/ser
 import { createComposerSendContext, createConversation, createHost } from './MessageSendPreparationService.testSupport';
 
 describe('MessageSendPreparationService backend isolation', () => {
-  it.each(['dsh', 'pi', 'zcode', 'opencode2'] as const)(
+  it.each(['dsh', 'pi', 'zcode', 'opencode2', 'claude-code', 'codex'] as const)(
     'keeps %s prompts independent from the legacy OpenCode skill catalog',
     async (backend) => {
       const conversation = {
@@ -12,6 +12,7 @@ describe('MessageSendPreparationService backend isolation', () => {
       };
       const host = createHost(conversation, [], {
         loadSkills: jest.fn().mockRejectedValue(new Error('Legacy service must not be queried')),
+        getCodexSendPreflightError: () => null,
       });
       const service = new MessageSendPreparationService(host, createComposerSendContext());
 

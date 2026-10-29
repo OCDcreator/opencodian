@@ -270,7 +270,8 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
     // The R-B4 Obsidian-tooling injection uses the same seam, after memory.
     const request: AgentChatSendRequest = {
       ...rawRequest,
-      content: prependObsidianToolingInjection(
+      // Native command parsing requires the original first token and exact args.
+      content: rawRequest.content.trimStart().startsWith('/') ? rawRequest.content : prependObsidianToolingInjection(
         prependMemoryInjection(rawRequest.content, rawRequest.options),
         rawRequest.options,
       ),

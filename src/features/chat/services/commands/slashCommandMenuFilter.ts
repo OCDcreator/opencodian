@@ -7,6 +7,8 @@ interface FuzzyMatchResult {
 }
 
 export interface SlashCommandMenuFilterOptions {
+  /** Frontend trigger; native invocation text is serialized by each catalog item. */
+  trigger?: '/' | '$';
   skillMode: SlashCommandSkillMode;
   skillsCommandDescription: string;
   isMidText?: boolean;
@@ -96,7 +98,7 @@ function buildPrefixedSkillMenuItem(item: SlashCommandMenuItem): SlashCommandMen
   return {
     ...item,
     displayId: `skills ${item.id}`,
-    insertText: `/skills ${item.id} `,
+    insertText: item.nativeSkill ? item.insertText : `/skills ${item.id} `,
   };
 }
 
@@ -119,6 +121,20 @@ export function filterSlashCommandMenuItems(
   query: string,
   options?: SlashCommandMenuFilterOptions,
 ): SlashCommandMenuItem[] {
+  if (options?.trigger) {
+    const skillsOnly = options.trigger === '$' || isSkillsPrefixQuery(query);
+    const needle = isSkillsPrefixQuery(query) ? extractSkillsQuery(query) : query;
+    const candidates = items.filter((item) => item.source !== 'skills-command'
+      && (!skillsOnly || item.source === 'skill' || item.source === 'codex-skill')
+      && (!options.codexSkillMode || item.source === 'codex-skill' || item.id === 'new' || item.id === 'compact'));
+    return filterFuzzySlashCommandMenuItems(candidates, needle).map((item) => {
+      if (item.source === 'codex-skill') return { ...item, insertText: item.insertText ?? `$${item.id} ` };
+      if (item.source === 'skill' && !item.nativeSkill && options.skillMode === 'skills-command') {
+        return { ...item, insertText: `/skills ${item.id} ` };
+      }
+      return item;
+    });
+  }
   const isMidText = options?.isMidText === true;
   const isCodex = options?.codexSkillMode === true;
   const skillItems = items.filter((item) => item.source === 'skill');

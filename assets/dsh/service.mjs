@@ -8,7 +8,7 @@ export { launchNativeRuntime } from './launcher.mjs';
 // This plugin is mounted in the user's installed Harness, using a per-launch
 // overlay. All native imports belong to that installation, never this bundle.
 export const name = 'opencodian-native';
-export const inject = ['agents', 'llm', 'sessions', 'sessionQuery', 'tools', 'attachments'];
+export const inject = ['agents', 'llm', 'sessions', 'sessionQuery', 'tools', 'attachments', 'skills', 'workingDirectory'];
 export async function apply(ctx, config) {
   const requireNative = createRequire(config.nativeAnchor);
   const load = async (name) => import(pathToFileURL(requireNative.resolve(name)).href);
@@ -399,7 +399,15 @@ export async function apply(ctx, config) {
       return { servers: [...record.mcp.values()].map(({ declaration }) => ({ name: declaration.name, connected: true })),
         tools: ctx.tools.schemas(record.handle.agent).map((tool) => tool.name) };
     },
-    async 'session/commands'(params) { return { commands: ctx.get('commands')?.list(requireSession(params.sessionId).handle.agent) ?? [] }; },
+    async 'session/commands'(params) {
+      const agent = requireSession(params.sessionId).handle.agent;
+      const commands = ctx.get('commands')?.list(agent) ?? [];
+      const cwd = await ctx.workingDirectory.ensure(agent);
+      const skills = await ctx.get('skills')?.list({ cwd, scope: agent }) ?? [];
+      const names = new Set(commands.map(command => command.name));
+      return { commands: [...commands, ...skills.filter(skill => skill.invocation?.userInvocable === true && !names.has(skill.name))
+        .map(skill => ({ name: skill.name, description: skill.description, source: 'skill' }))] };
+    },
     async 'session/command'(params) {
       const record = requireSession(params.sessionId); idle(record);
       const result = await ctx.commands.execute(record.handle.agent, params.line, [], new AbortController().signal);

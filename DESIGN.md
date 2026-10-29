@@ -13,6 +13,10 @@ colors:
   ink-graphite: "#0f172a"
   ink-void: "#020617"
   canvas-light: "#f8fafc"
+  composer-skill-light: "#7453b0"
+  composer-skill-dark: "#bda5e6"
+  composer-command-light: "#566270"
+  composer-command-dark: "#b5c0cc"
   lavender-tint: "#f5f3ff"
   rose-tint: "#fff1f2"
 typography:
@@ -239,6 +243,7 @@ OpenCodian uses a hybrid elevation system. Default Obsidian surfaces are mostly 
 ### Chips
 
 - **Style:** 9px to 999px radius, compact height, semantic text color, and tonal background.
+- **Composer commands and skills:** follow ZCode desktop prompt mentions: inline icon plus name at interface font weight 500, 16px Lucide icon, 4px gap and top alignment. Skills use WandSparkles and violet foreground; commands use SquareSlash and slate foreground. The label hides invocation prefixes while the editor document retains native backend syntax for copy and sending. Tokens are atomic for cursor and deletion. `/` lists commands plus skills; `$` lists skills for every backend.
 - **State:** selection/context chips should truncate safely, show enough path or source identity to be useful, and avoid growing the composer.
 - **Risk:** status chips must preserve warning/error contrast.
 - **Header status chip:** server/backend health in the chat header defaults to a compact 28px shadcn-style badge. At rest it shows the active backend identity plus a small status ring/dot overlay; OpenCode must reuse the same brandmark SVG as the title logo, while other backends may use their provider SVGs. Hover/focus expands the same badge internally to reveal the text label. Connected/running states stay static, checking/starting may use a subtle pulse, and offline/error states change shape/tone without relying on color alone. Do not use vertical divider lines between header action groups; group by rhythm and state behavior instead.

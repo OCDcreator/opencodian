@@ -42,7 +42,7 @@ export class SlashCommandMenuCoordinator {
   private selectedIndex = 0;
   private runId = 0;
   private status: SlashCommandMenuStatus = 'idle';
-  private query: SlashCommandMenuQuery | null = null;
+  private query: (SlashCommandMenuQuery & { trigger?: '/' | '$' }) | null = null;
 
   constructor(private readonly host: SlashCommandMenuCoordinatorHost) {}
 
@@ -102,9 +102,11 @@ export class SlashCommandMenuCoordinator {
 
     // When the Codex backend is active, also honor the `$skill-name` trigger
     // so users can filter/select the same runtime skills by typing `$`.
-    const query = this.host.isCodexSkillMode?.()
-      ? (getCodexSkillMenuQuery(textarea) ?? getSlashCommandMenuQuery(textarea))
-      : getSlashCommandMenuQuery(textarea);
+    const skillQuery = getCodexSkillMenuQuery(textarea);
+    const slashQuery = getSlashCommandMenuQuery(textarea);
+    const query = skillQuery
+      ? { ...skillQuery, trigger: '$' as const }
+      : slashQuery ? { ...slashQuery, trigger: '/' as const } : null;
     if (query === null) {
       this.clear();
       return;
@@ -252,6 +254,9 @@ export class SlashCommandMenuCoordinator {
   }
 
   private syncStateWithCurrentContext(): void {
+    // A refresh owns the next catalog. Re-filtering the previous backend's
+    // items here would replace loading with a selectable stale menu.
+    if (this.status === 'loading') return;
     const catalogItems = this.host.getCatalogItems();
     if (this.query === null || !catalogItems) {
       return;
@@ -269,10 +274,11 @@ export class SlashCommandMenuCoordinator {
 
   private filterItems(
     items: SlashCommandMenuItem[],
-    query: SlashCommandMenuQuery,
+    query: SlashCommandMenuQuery & { trigger?: '/' | '$' },
   ): SlashCommandMenuItem[] {
     return filterSlashCommandMenuItems(items, query.query, {
       skillMode: this.host.getSkillMode(),
+      trigger: query.trigger,
       skillsCommandDescription: t('slashCommand.skillsCommand.description'),
       isMidText: query.isMidText,
       ...(this.host.isCodexSkillMode?.() ? { codexSkillMode: true } : {}),

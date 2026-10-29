@@ -184,3 +184,7 @@ DSH sends skip the legacy OpenCode skill catalog expansion, as Pi, ZCode and Ope
 - 源码位置：`src/features/chat/services/send/MessageSendPreparationService.ts`。
 - 原位置：`src/features/chat/services/MessageSendPreparationService.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/features/chat/rendering/composerContext.ts`、`src/features/chat/runtime/send/SendPipelineTypes.ts`、`src/features/chat/services/composer/ComposerContextViewFacade.ts`、`src/features/chat/services/conversation/ConversationWriteSerializationService.ts`、`src/features/chat/services/conversation/TabSessionPhase.ts`。
+
+## 2026-10-28：原生命令与技能弹框
+
+只有旧 OpenCode 会话使用 SkillContentExpander。其余六后端保留自己的技能调用/附件处理，Claude 和 Codex 不再请求 OpenCode 技能目录或注入其它后端技能正文。

@@ -2,10 +2,12 @@ import type { Command as RuntimeCommand } from '@opencode-ai/sdk/v2/client';
 import * as path from 'path';
 
 import {
+  buildNativeSlashCommandMenuItems,
   buildRuntimeSkillSourceMap,
   buildVisibleSlashCommandMenuItems,
   type MdCommandEntry,
   mergeSlashCommandCatalog,
+  type NativeSlashCommand,
   type SlashCommandCatalogEntry,
   type SlashCommandMenuItem,
 } from '../../../../core/config/slashCommandCatalog';
@@ -38,7 +40,7 @@ export interface SlashCommandMenuCatalogCacheHost {
   loadRuntimeCommands(): Promise<unknown>;
   loadRuntimeSkills(): Promise<unknown>;
   /** Optional: load Claude Code runtime commands for the slash menu. Returns null or undefined when not applicable. */
-  loadClaudeRuntimeCommands?(): Promise<Array<{ name: string; description?: string }> | null | undefined>;
+  loadClaudeRuntimeCommands?(): Promise<NativeSlashCommand[] | null | undefined>;
   /** Optional: load Claude Code runtime agents for the @agent mention menu. Returns null or undefined when not applicable. */
   loadClaudeRuntimeAgents?(): Promise<Array<{ name: string; description?: string }> | null | undefined>;
   /**
@@ -51,10 +53,12 @@ export interface SlashCommandMenuCatalogCacheHost {
   loadCodexRuntimeSkills?(): Promise<Array<{ name: string; description?: string; enabled?: boolean; scope?: string }> | null | undefined>;
   /** Optional: returns a short backend discriminator for cache key partitioning. Return different values for different backends (e.g. 'opencode', 'claude-code', 'codex'). */
   getBackendKey?(): string;
-  loadPiRuntimeCommands?(): Promise<Array<{ name: string; description?: string }>>;
+  getContextKey?(): string;
+  loadPiRuntimeCommands?(): Promise<NativeSlashCommand[]>;
   /** Optional: load ZCode runtime slash commands (from the live session snapshot catalog). */
-  loadZCodeRuntimeCommands?(): Promise<readonly { name: string; description: string }[]>;
-  loadDshRuntimeCommands?(): Promise<Array<{ name: string; description?: string }>>;
+  loadZCodeRuntimeCommands?(): Promise<readonly NativeSlashCommand[]>;
+  loadZCodeRuntimeSkills?(): Promise<NativeSlashCommand[]>;
+  loadDshRuntimeCommands?(): Promise<NativeSlashCommand[]>;
   loadOpenCode2Commands?(): Promise<Array<{ name: string; description?: string }>>;
   loadOpenCode2Skills?(): Promise<Array<{ name: string; description?: string }>>;
   loadOpenCode2Agents?(): Promise<Array<{ id: string; name: string; description?: string; mode: 'primary' | 'subagent' | 'all'; hidden: boolean }>>;
@@ -89,7 +93,7 @@ type SlashCommandCatalogLoadInputs = [
   OpencodeCommandConfigRecord,
   OpencodeAgentConfigRecord,
   MdCommandEntry[] | undefined,
-  Array<{ name: string; description?: string }> | null | undefined,
+  NativeSlashCommand[] | null | undefined,
   Array<{ name: string; description?: string }> | null | undefined,
   Array<{ name: string; description?: string; enabled?: boolean; scope?: string }> | null | undefined,
 ];
@@ -355,27 +359,26 @@ export class SlashCommandMenuCatalogCache {
   }
 
   load(): Promise<SlashCommandMenuItem[]> {
-    if (this.host.getBackendKey?.() === 'dsh') return (this.host.loadDshRuntimeCommands?.() ?? Promise.resolve([])).then((commands) => {
-      const hidden = new Set(this.host.getHiddenCommandIds());
-      return commands.filter((command) => !hidden.has(command.name)).map((command) => ({
-        id: command.name, displayId: `/${command.name}`, description: command.description ?? '',
-        insertText: `/${command.name} `, runtimeAvailable: true, source: 'command' as const,
-        hasProjectOverride: false, subtask: false, isBuiltin: false,
-      }));
-    });
+    const backend = this.host.getBackendKey?.();
+    if (backend === 'pi' || backend === 'zcode' || backend === 'dsh') return this.loadNativeItems(backend);
     if (this.host.getBackendKey?.() === 'opencode2') return Promise.all([
       this.host.loadOpenCode2Commands?.() ?? Promise.resolve([]),
       this.host.loadOpenCode2Skills?.() ?? Promise.resolve([]),
       this.host.loadOpenCode2Agents?.() ?? Promise.resolve([]),
     ]).then(([commands, skills, agents]) => {
       const hidden = new Set(this.host.getHiddenCommandIds());
-      const entries: SlashCommandCatalogEntry[] = [...commands, ...skills].map((entry) => ({
+      const skillNames = new Set(skills.map((skill) => skill.name));
+      const unique = new Map([...skills, ...commands].map((entry) => [entry.name, entry]));
+      const entries: SlashCommandCatalogEntry[] = [...unique.values()].map((entry) => ({
         id: entry.name, template: `/${entry.name}`, description: entry.description ?? '',
         agent: '', model: '', hasProjectOverride: false, hidden: hidden.has(entry.name),
-        runtimeAvailable: true, source: 'command', subtask: false, isBuiltin: false,
+        runtimeAvailable: true, source: skillNames.has(entry.name) ? 'skill' : 'command', subtask: false, isBuiltin: false,
       }));
       const items = buildVisibleSlashCommandMenuItems(appendSyntheticBuiltinCommands(entries, hidden)
         .filter((entry) => entry.id !== 'share' && entry.id !== 'unshare'));
+      for (const item of items) {
+        if (item.source === 'skill') { item.nativeSkill = true; item.insertText = `/${item.id} `; }
+      }
       attachAgentMentionCandidatesToSlashCommandMenuItems(items, agents.filter((agent) => !agent.hidden).map((agent) => ({
         id: agent.id, displayName: agent.name, description: agent.description ?? '', mode: agent.mode,
       })));
@@ -384,16 +387,6 @@ export class SlashCommandMenuCatalogCache {
       })));
       return items;
     });
-    if (this.host.getBackendKey?.() === 'pi') return (this.host.loadPiRuntimeCommands?.() ?? Promise.resolve([])).then((commands) => commands.map((command) => ({
-      id: command.name, displayId: `/${command.name}`, description: command.description ?? '',
-      insertText: `/${command.name} `, runtimeAvailable: true, source: 'command' as const,
-      hasProjectOverride: false, subtask: false, isBuiltin: false,
-    })));
-    if (this.host.getBackendKey?.() === 'zcode') return (this.host.loadZCodeRuntimeCommands?.() ?? Promise.resolve([])).then((commands) => commands.map((command) => ({
-      id: command.name, displayId: `/${command.name}`, description: command.description ?? '',
-      insertText: `/${command.name} `, runtimeAvailable: true, source: 'command' as const,
-      hasProjectOverride: false, subtask: false, isBuiltin: false,
-    })));
     const key = this.buildCacheKey();
     const now = this.now();
 
@@ -410,6 +403,26 @@ export class SlashCommandMenuCatalogCache {
     }
 
     return this.startLoad(key);
+  }
+
+  private async loadNativeItems(backend: 'pi' | 'zcode' | 'dsh'): Promise<SlashCommandMenuItem[]> {
+    const commands = backend === 'pi'
+      ? await this.host.loadPiRuntimeCommands?.() ?? []
+      : backend === 'dsh'
+        ? await this.host.loadDshRuntimeCommands?.() ?? []
+        : await this.host.loadZCodeRuntimeCommands?.() ?? [];
+    const skills = backend === 'zcode' ? await this.host.loadZCodeRuntimeSkills?.() ?? [] : [];
+    const hidden = new Set(this.host.getHiddenCommandIds());
+    const items = buildNativeSlashCommandMenuItems(commands, skills, hidden);
+    if (backend === 'pi') {
+      for (const id of ['new', 'compact']) {
+        if (!hidden.has(id) && !items.some((item) => item.id === id)) items.push({
+          id, description: '', source: 'command', insertText: `/${id} `,
+          hasProjectOverride: false, runtimeAvailable: true, subtask: false, isBuiltin: true,
+        });
+      }
+    }
+    return items;
   }
 
   warm(): void {
@@ -439,7 +452,7 @@ export class SlashCommandMenuCatalogCache {
     // cache key. When `v2.command.list`/`v2.skill.list` support flips, the key
     // mismatches and the next `load()` rebuilds the catalog.
     const capabilityKey = this.host.getSlashCommandCapabilityKey?.() ?? 'default';
-    return `${hiddenKey}:${backendKey}:${capabilityKey}`;
+    return `${hiddenKey}:${backendKey}:${capabilityKey}:${this.host.getContextKey?.() ?? ''}`;
   }
 
   private now(): number {
@@ -457,10 +470,10 @@ export class SlashCommandMenuCatalogCache {
   ): Promise<SlashCommandCatalogLoadInputs> {
     const skipNonCodex = isCodexBackend;
     return Promise.all([
-      skipNonCodex ? Promise.resolve([]) : this.host.loadRuntimeCommands(),
-      skipNonCodex ? Promise.resolve([]) : this.host.loadRuntimeSkills().catch(() => []),
-      skipNonCodex ? Promise.resolve({}) : this.host.loadProjectCommands(),
-      skipNonCodex ? Promise.resolve({}) : this.host.loadProjectAgents(),
+      (skipNonCodex || isClaudeBackend) ? Promise.resolve([]) : this.host.loadRuntimeCommands(),
+      (skipNonCodex || isClaudeBackend) ? Promise.resolve([]) : this.host.loadRuntimeSkills().catch(() => []),
+      (skipNonCodex || isClaudeBackend) ? Promise.resolve({}) : this.host.loadProjectCommands(),
+      (skipNonCodex || isClaudeBackend) ? Promise.resolve({}) : this.host.loadProjectAgents(),
       // Do not load .opencode/commands/*.md for Claude or Codex backend
       (isClaudeBackend || isCodexBackend)
         ? Promise.resolve([])
@@ -540,7 +553,7 @@ export class SlashCommandMenuCatalogCache {
       }
       const hiddenCommandIds = new Set(this.host.getHiddenCommandIds());
       const claudeRuntimeCommands = Array.isArray(claudeRuntimeResult) && claudeRuntimeResult.length > 0
-        ? claudeRuntimeResult.map((cmd) => ({
+        ? [...claudeRuntimeResult].sort((left, right) => Number(right.builtin === true) - Number(left.builtin === true)).map((cmd) => ({
             name: cmd.name,
             description: cmd.description,
           }))
@@ -557,12 +570,22 @@ export class SlashCommandMenuCatalogCache {
       // Do not append OpenCode synthetic builtins for Claude backend
       const finalCatalog = isClaudeBackend ? mergedCatalog : appendSyntheticBuiltinCommands(mergedCatalog, hiddenCommandIds);
       const items = buildVisibleSlashCommandMenuItems(finalCatalog);
+      if (isClaudeBackend && claudeRuntimeResult) {
+        // The SDK marks its own commands builtin:true; unmarked rows are user/plugin skills.
+        const builtins = new Set(claudeRuntimeResult.filter((command) => command.builtin === true).map((command) => command.name));
+        const nativeSkills = new Set(claudeRuntimeResult.filter((command) => !builtins.has(command.name)).map((command) => command.name));
+        for (const item of items) {
+          if (nativeSkills.has(item.id)) {
+            item.source = 'skill'; item.nativeSkill = true; item.insertText = `/${item.id} `;
+          }
+        }
+      }
       // Append Codex runtime skills as menu items. These are runtime-only:
       // they are never persisted and never enter the OpenCode session-command
       // path. Selecting one inserts the raw `$skill-name ` text that Codex
       // interprets natively.
       if (isCodexBackend && codexSkillsResult && Array.isArray(codexSkillsResult)) {
-        const codexItems = buildCodexSkillMenuItems(codexSkillsResult);
+        const codexItems = buildCodexSkillMenuItems(codexSkillsResult.filter((skill) => !hiddenCommandIds.has(skill.name)));
         items.push(...codexItems);
       }
       attachAgentMentionCandidatesToSlashCommandMenuItems(items, agentMentionCandidates);

@@ -431,6 +431,7 @@ export interface ClaudeCodeRuntimeCatalogCommand {
   description?: string;
   argumentHint?: string;
   aliases: string[];
+  builtin?: boolean;
 }
 
 export interface ClaudeCodeRuntimeCatalogAgent {
@@ -923,6 +924,7 @@ function normalizeRuntimeCatalogCommands(value: unknown): ClaudeCodeRuntimeCatal
         ...(description ? { description } : {}),
         ...(argumentHint ? { argumentHint } : {}),
         aliases: normalizeRuntimeCatalogAliases(record.aliases),
+        ...(typeof record.builtin === 'boolean' ? { builtin: record.builtin } : {}),
       };
     })
     .filter((entry): entry is ClaudeCodeRuntimeCatalogCommand => Boolean(entry))

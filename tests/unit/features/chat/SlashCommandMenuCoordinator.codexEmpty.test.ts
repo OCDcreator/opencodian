@@ -68,7 +68,7 @@ type SlashCommandMenuCoordinatorHostLike = {
 };
 
 describe('SlashCommandMenuCoordinator — Codex empty-skills selection', () => {
-  it('invokes onCodexSkillsEmpty and clears when /skills is selected with no codex skills', async () => {
+  it('does not select a synthetic /skills command when the catalog has no skills', async () => {
     const onCodexSkillsEmpty = jest.fn();
     const host = makeHost({
       getCatalogItems: () => [skillsEntryItem()], // no codex-skill items
@@ -81,7 +81,7 @@ describe('SlashCommandMenuCoordinator — Codex empty-skills selection', () => {
     // Enter selects the highlighted /skills entry
     coordinator.tryHandleKeydown({ key: 'Enter', preventDefault: () => undefined } as unknown as KeyboardEvent);
 
-    expect(onCodexSkillsEmpty).toHaveBeenCalledTimes(1);
+    expect(onCodexSkillsEmpty).not.toHaveBeenCalled();
   });
 
   it('does NOT invoke onCodexSkillsEmpty when codex skills exist (normal expand)', async () => {

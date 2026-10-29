@@ -3132,8 +3132,9 @@ export class CodexAdapter
         }
       });
 
-      const input = this.buildAppServerInput(request.content, request.images);
+      const input = await this.buildAppServerInput(request.content, request.images);
       tempDir = input.tempDir;
+      if (!this.isCurrentAppServerAttempt(attempt)) return;
       const turnOptions: AppServerTurnStartOptions = {
         threadId: thread.id,
         input: input.payload,
@@ -3347,18 +3348,29 @@ export class CodexAdapter
     };
   }
 
-  private buildAppServerInput(
+  private async buildAppServerInput(
     content: string,
     images: ImageAttachment[] | undefined,
-  ): {
+  ): Promise<{
     payload: AppServerTurnStartOptions['input'];
     tempDir?: string;
-  } {
+  }> {
+    const skillInputs: AppServerTurnStartOptions['input'] = [];
+    if (/(?:^|\s)\$\S+/.test(content)) {
+      const skills = await this.getRuntimeSkills();
+      for (const skill of skills ?? []) {
+        const escaped = skill.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (skill.enabled !== false && skill.path
+          && new RegExp(`(?:^|\\s)\\$${escaped}(?=$|\\s)`).test(content)) {
+          skillInputs.push({ type: 'skill', name: skill.name, path: skill.path });
+        }
+      }
+    }
     if (!images || images.length === 0) {
-      return { payload: [{ type: 'text', text: content, text_elements: [] }] };
+      return { payload: [{ type: 'text', text: content, text_elements: [] }, ...skillInputs] };
     }
     const tempDir = mkdtempSync(join(tmpdir(), 'opencodian-codex-image-'));
-    const payload: AppServerTurnStartOptions['input'] = [{ type: 'text', text: content, text_elements: [] }];
+    const payload: AppServerTurnStartOptions['input'] = [{ type: 'text', text: content, text_elements: [] }, ...skillInputs];
     for (const image of images) {
       const ext = this.mediaTypeToExtension(image.mediaType);
       const fileName = image.filename ?? `image-${Date.now()}.${ext}`;

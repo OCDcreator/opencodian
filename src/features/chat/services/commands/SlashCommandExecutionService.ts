@@ -38,6 +38,7 @@ export interface SlashCommandExecutionHost {
   ensureConversationReady(): Promise<Conversation | null>;
   /** Returns the current active conversation without side effects, or null. */
   getCurrentConversation?(): Conversation | null;
+  getActiveBackend?(): Conversation['backend'];
   getActiveTabId(): TabId | null;
   ensureTabRuntime(tabId: TabId | null): boolean;
   isTabForegroundBusy(tabId: TabId | null): boolean;
@@ -75,6 +76,7 @@ export interface SlashCommandExecutionHost {
 
 export interface SlashCommandExecutionHostDependencies {
   getCurrentConversation: () => Conversation | null;
+  getActiveBackend?: () => Conversation['backend'];
   createNewConversation: () => Promise<void>;
   getActiveTabId: () => TabId | null;
   ensureTabRuntimeState: (tabId: TabId) => unknown;
@@ -290,11 +292,12 @@ export class SlashCommandExecutionService {
     // Claude natively handles its own /commands; intercepting them here
     // would route through OpenCode's runSessionCommand which rejects non-opencode backends.
     const currentConversation = this.host.getCurrentConversation?.();
-    if (currentConversation?.backend === 'pi') return false;
+    const backend = currentConversation?.backend ?? this.host.getActiveBackend?.();
+    if (backend === 'pi' || backend === 'codex') return false;
     // ZCode's visible catalog belongs to its own app-server. OpenCode's command
     // resolver can consume the text yet never change the ZCode session.
-    if (currentConversation?.backend === 'zcode' || currentConversation?.backend === 'dsh') return false;
-    if (currentConversation && (currentConversation.backend ?? 'opencode') === 'claude-code') {
+    if (backend === 'zcode' || backend === 'dsh') return false;
+    if (backend === 'claude-code') {
       return false;
     }
 

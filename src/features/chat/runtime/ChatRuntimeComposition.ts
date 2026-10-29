@@ -1238,6 +1238,7 @@ export class ChatRuntimeComposition {
     const slashCommandExecutionService = new SlashCommandExecutionService(
       createSlashCommandExecutionHost({
         getCurrentConversation: () => host.currentConversation,
+        getActiveBackend: () => host.plugin.settings.activeBackend,
         createNewConversation: async () => { await host.createNewConversation(); },
         getActiveTabId: () => host.getActiveTabId(),
         ensureTabRuntimeState: (tabId: TabId) => host.ensureTabRuntimeState(tabId),
@@ -1255,8 +1256,7 @@ export class ChatRuntimeComposition {
         ensureServerReadyForChat: (availability: unknown) =>
           messageSendPreparationService.ensureServerReadyForChat(availability as never),
         opencodeConfigManager: host.plugin.opencodeConfigManager,
-        getSlashCommandSkillMode: () => host.plugin.settings.slashCommandSkillMode,
-        openCodeServiceSdk: host.plugin.openCodeService.sdk,
+        getSlashCommandSkillMode: () => host.plugin.settings.slashCommandSkillMode, openCodeServiceSdk: host.plugin.openCodeService.sdk,
         getOpenCode2Adapter: () => host.plugin.agentServiceRegistry?.get('opencode2') as never ?? null,
         openCodeService: host.plugin.openCodeService,
         runCompactSession: (sessionId: string) => executeCompactSession(

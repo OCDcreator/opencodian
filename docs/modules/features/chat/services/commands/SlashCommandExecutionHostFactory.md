@@ -59,3 +59,7 @@ After the visible conversation sync used by slash undo/redo, the host refreshes 
 - 源码位置：`src/features/chat/services/commands/SlashCommandExecutionHostFactory.ts`。
 - 原位置：`src/features/chat/services/SlashCommandExecutionHostFactory.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/features/chat/services/context/CommandMdFileLoader.ts`、`src/features/chat/services/commands/SlashCommandExecutionService.ts`。
+
+## 2026-10-28：原生命令与技能弹框
+
+向执行 owner 转发 activeBackend，使新草稿的原生 slash 不触发旧 OpenCode 目录请求。保留插件本地 image 分支及 OpenCode 2 原生执行。

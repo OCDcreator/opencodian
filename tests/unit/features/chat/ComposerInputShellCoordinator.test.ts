@@ -1267,7 +1267,7 @@ describe('ComposerInputShellCoordinator — slash menu core behaviors', () => {
     ).toBeNull();
   });
 
-  it('shows only skill suggestions for a slash trigger mid-sentence after whitespace', async () => {
+  it('shows skills and commands for a slash trigger mid-sentence after whitespace', async () => {
     const fixture = createFixture();
     fixture.setSlashCommandMenuItems([
       slashItem('review', 'Review changes'),
@@ -1282,9 +1282,9 @@ describe('ComposerInputShellCoordinator — slash menu core behaviors', () => {
     const menuItems = Array.from(
       fixture.container.querySelectorAll<HTMLElement>('.opencodian-slash-command-menu-item'),
     );
-    expect(menuItems).toHaveLength(1);
+    expect(menuItems).toHaveLength(2);
     expect(menuItems[0]?.textContent).toContain('/analyze');
-    expect(menuItems[0]?.textContent).not.toContain('/review');
+    expect(menuItems[1]?.textContent).toContain('/review');
   });
 
   it('does not trigger slash menu for // at start of input', async () => {

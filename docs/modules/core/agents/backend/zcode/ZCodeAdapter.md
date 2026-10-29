@@ -1,5 +1,7 @@
 # ZCodeAdapter
 
+> 2026-10-29（技能 token 适配）：getRuntimeSkills 保留 referenceCatalog 返回的 path；session/send 前把目录中匹配的 `/name` 或 `$name` 序列化为官方桌面端使用的 `[$name](<path>)` 引用。普通命令与未知 token 原样保留，路径只取自当前后端目录。
+
 > 2026-10-02 T09：增加 `getManagementCatalog` / `setManagedPluginEnabled`，将当前 owned transport 与 workspace 绑定到 ZCodeManagementService。管理读取不隐式 start/session/create/send；断开和无 workspace 时 unavailable；停止/更换 transport 后旧异步响应拒绝。只增加 ZCode 管理接口，不更改 main/chat 消费者。项目插件保存通过 shared revision/archive secure-write，独立 hooks/MCP mutation 不可用；详见 [ZCodeManagementService](ZCodeManagementService.md)。
 
 > 2026-09-26（原生斜杠发送边界）：`sendMessage` 将 `/goal`、`/compact`、`/plan` 的控制请求与普通模型发送分开。目标写入经同会话 `session/read.projection.target` 确认；有 `targetId` 的目标执行只消费对应真实回合，跳过无正文控制回合。压缩仅在原生终态及会话读回确认后返回成功；Plan 通过独立原生计划状态读回确认，空任务不发送空模型提示。控制分支和事件流拆成 adapter 内部方法，以保持发送入口的复杂度门禁，不增加跨模块转发层。
@@ -81,3 +83,9 @@ Native `permission.resolved` is authoritative for the exact session/request ID. 
 
 - 源码位置：`src/core/agents/backend/zcode/ZCodeAdapter.ts`。
 - 随目录调整更新的依赖：`src/core/agents/backend/configuration/ProjectResourceSecureWrite.ts`。
+
+## 2026-10-28：原生命令与技能弹框
+
+getRuntimeSkills(sessionId?) 对接 skills/referenceCatalog。草稿使用工作区目录；已有会话先恢复 resident session，再按 sessionId 读取会话权威目录，不回退工作区。仅 enabled: true 项进入菜单；旧运行时 MethodNotFound 返回空目录，其余失败交给菜单错误态。
+
+getRuntimeCommands() 读取 workspace/readPresentation 的 slashCommands，使首个新草稿无需创建会话即可展示真实命令。旧运行时缺少该方法时只回退已观察到的会话快照，不硬编码命令目录。

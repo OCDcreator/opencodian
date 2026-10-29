@@ -165,7 +165,7 @@ describe('ComposerInputShellCoordinator skill slash modes', () => {
     ]);
   });
 
-  it('opens skill-only slash autocomplete for a bare slash between surrounding spaces', async () => {
+  it('opens command and skill autocomplete for a bare slash between surrounding spaces', async () => {
     const fixture = createFixture();
     fixture.setMenuItems([
       slashItem('review', 'Review changes'),
@@ -178,6 +178,7 @@ describe('ComposerInputShellCoordinator skill slash modes', () => {
     await flushAsync();
 
     expect(getRenderedMenuText(fixture.container)).toEqual([
+      expect.stringContaining('/review'),
       expect.stringContaining('/refactor'),
     ]);
   });
@@ -219,6 +220,20 @@ describe('ComposerInputShellCoordinator skill slash modes', () => {
     expect(getRenderedHighlightText(fixture.container, 'opencodian-input-highlight-skill')).toEqual(['/writing-skills']);
   });
 
+  it.each(['skill:agent-browser', 'skills-helper'])('keeps the full native skill name %s in the selected tag', async (id) => {
+    const fixture = createFixture();
+    fixture.setSkillMode('skills-command');
+    fixture.setMenuItems([slashItem(id, 'Native skill', 'skill', { nativeSkill: true, insertText: `/${id} ` })]);
+    fixture.textarea.value = '/skills ';
+    fixture.textarea.setSelectionRange(8, 8);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+    fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+
+    expect(fixture.textarea.value).toBe(`/${id} `);
+    expect(getRenderedHighlightText(fixture.container)).toEqual([`/${id}`]);
+  });
+
   it('keeps highlighting a known direct skill after the cursor moves past the token', async () => {
     const fixture = createFixture();
     fixture.setMenuItems([
@@ -247,7 +262,7 @@ describe('ComposerInputShellCoordinator skill slash modes', () => {
 describe('ComposerInputShellCoordinator prefixed skill slash mode', () => {
   registerSkillSlashModeHooks();
 
-  it('uses a /skills prefix entry and nested skill suggestions when skill mode is prefixed', async () => {
+  it('lists skills beside commands while retaining legacy /skills input and serialization', async () => {
     const fixture = createFixture();
     fixture.setSkillMode('skills-command');
     fixture.setMenuItems([
@@ -263,19 +278,19 @@ describe('ComposerInputShellCoordinator prefixed skill slash mode', () => {
 
     expect(getRenderedMenuText(fixture.container)).toEqual([
       expect.stringContaining('/review'),
-      expect.stringContaining('/skills'),
+      expect.stringContaining('/build-mcp-server'),
+      expect.stringContaining('/frontend-design'),
     ]);
 
-    const prefixedEntry = Array.from(
-      fixture.container.querySelectorAll<HTMLElement>('.opencodian-slash-command-menu-item'),
-    ).find((item) => item.textContent?.includes('/skills'));
-    prefixedEntry?.click();
+    fixture.textarea.value = '/skills ';
+    fixture.textarea.setSelectionRange(8, 8);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
     await flushAsync();
 
     expect(fixture.textarea.value).toBe('/skills ');
     expect(getRenderedMenuText(fixture.container)).toEqual([
-      expect.stringContaining('/skills build-mcp-server'),
-      expect.stringContaining('/skills frontend-design'),
+      expect.stringContaining('/build-mcp-server'),
+      expect.stringContaining('/frontend-design'),
     ]);
 
     fixture.textarea.value = '/skills build';
@@ -285,7 +300,7 @@ describe('ComposerInputShellCoordinator prefixed skill slash mode', () => {
 
     const nestedItem = fixture.container.querySelector<HTMLElement>('.opencodian-slash-command-menu-item');
     expect(getRenderedMenuText(fixture.container)).toHaveLength(1);
-    expect(nestedItem?.textContent).toContain('/skills build-mcp-server');
+    expect(nestedItem?.textContent).toContain('/build-mcp-server');
 
     nestedItem?.click();
 
@@ -306,8 +321,8 @@ describe('ComposerInputShellCoordinator prefixed skill slash mode', () => {
     await flushAsync();
 
     expect(getRenderedMenuText(fixture.container)).toEqual([
-      expect.stringContaining('/skills agent-browser'),
-      expect.stringContaining('/skills frontend-design'),
+      expect.stringContaining('/agent-browser'),
+      expect.stringContaining('/frontend-design'),
     ]);
 
     fixture.setMenuItems([
@@ -317,7 +332,7 @@ describe('ComposerInputShellCoordinator prefixed skill slash mode', () => {
     await flushAsync();
 
     expect(getRenderedMenuText(fixture.container)).toEqual([
-      expect.stringContaining('/skills writing-skills'),
+      expect.stringContaining('/writing-skills'),
     ]);
   });
 
@@ -338,8 +353,8 @@ describe('ComposerInputShellCoordinator prefixed skill slash mode', () => {
     await flushAsync();
 
     expect(getRenderedMenuText(fixture.container)).toEqual([
-      expect.stringContaining('/skills agent-browser'),
-      expect.stringContaining('/skills frontend-design'),
+      expect.stringContaining('/agent-browser'),
+      expect.stringContaining('/frontend-design'),
     ]);
   });
 
@@ -360,8 +375,8 @@ describe('ComposerInputShellCoordinator prefixed skill slash mode', () => {
     await flushAsync();
 
     expect(getRenderedMenuText(fixture.container)).toEqual([
-      expect.stringContaining('/skills agent-browser'),
-      expect.stringContaining('/skills frontend-design'),
+      expect.stringContaining('/agent-browser'),
+      expect.stringContaining('/frontend-design'),
     ]);
   });
 
@@ -408,8 +423,8 @@ describe('ComposerInputShellCoordinator prefixed skill slash mode', () => {
     await flushAsync();
 
     expect(getRenderedMenuText(fixture.container)).toEqual([
-      expect.stringContaining('/skills agent-browser'),
-      expect.stringContaining('/skills frontend-design'),
+      expect.stringContaining('/agent-browser'),
+      expect.stringContaining('/frontend-design'),
     ]);
   });
 });
@@ -468,12 +483,12 @@ describe('ComposerInputShellCoordinator skill slash presentation', () => {
       fixture.container.querySelectorAll<HTMLElement>('.opencodian-slash-command-menu-item'),
     );
 
-    expect(menuItems[0]?.textContent).toContain('/skills claude-md-improver');
+    expect(menuItems[0]?.textContent).toContain('/claude-md-improver');
     expect(menuItems[0]?.textContent).toContain('插件提供：claude-md-management');
     expect(menuItems[1]?.textContent).toContain('当前项目（OpenCode）');
   });
 
-  it('re-syncs an open menu when the skill mode changes to prefixed', async () => {
+  it('keeps all command and skill entries when native serialization mode changes', async () => {
     const fixture = createFixture();
     fixture.setMenuItems([
       slashItem('review', 'Review changes'),
@@ -496,7 +511,7 @@ describe('ComposerInputShellCoordinator skill slash presentation', () => {
 
     expect(getRenderedMenuText(fixture.container)).toEqual([
       expect.stringContaining('/review'),
-      expect.stringContaining('/skills'),
+      expect.stringContaining('/x-reader/video'),
     ]);
   });
 });

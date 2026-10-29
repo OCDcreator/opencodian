@@ -13,3 +13,7 @@
 - 文本快照优先于资源链接，避免把选区附件扩展为整个文件。Memory/tooling 前缀与 Obsidian context 后缀由调用方提供，编码器不导入项目/聊天运行时。
 
 验证覆盖真实 wire 数组、图片顺序/去重、MCP 声明准入及未知内容的拒绝；不把协议夹具当成真实模型多模态验收。
+
+## 2026-10-28：原生命令与技能弹框
+
+prepareDshPromptBlocks 保持 slash 技能文本在用户消息首行，将 memory/tooling prefix 移到附加上下文位置，保留其内容及图片顺序。原生命令仍由 native service 的 rawText 精确分派。

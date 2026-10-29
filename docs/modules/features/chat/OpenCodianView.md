@@ -1,5 +1,7 @@
 # OpenCodianView
 
+> 2026-10-29：Codex composer 的 new/compact 分别转到现有 createNewConversation 与 activeTabContextUsageCoordinator.compactForegroundThread，不把不受 app-server 支持的 slash 文本发给模型。其余后端继续按原生目录与现有发送链路执行。
+
 > 2026-10-09（Claude History model restore）：Claude selection host captures its owning conversation and saves `sessionSettings.claudeModelOverride` through the existing `plugin.saveConversation` path. History restores the persisted model before considering the legacy tab cache; explicit `null` inherits and prevents a stale tab choice from returning, while explicit `default` remains a requested model. A failed save restores that conversation's prior settings/timestamp only if the failed write still owns the pending settings reference, and refreshes the selector only when that conversation is still active. No global setting or temporary tab is written. Existing availability and SDK model/effort handling remain in effect; focused storage/selector tests do not establish native runtime acceptance.
 
 > 2026-10-09（Claude requested model）：现有 selection host 为本视图所属 Claude conversation 启用 `preserveRequestedModel`；catalog/default/availability/effort 从所属后端读取，已加载 foreign catalog 不再替代 Claude 请求，缺失请求沿用既有 unavailable 校验。发送仅在「所属 Claude、无合法 backend-scoped tab override、全局 Claude model.trim() 为空、当前选择 claude-code/default」时省略 model，provider 和 Claude variant/effort 保留。UI Default 与原生 model omission 分开；显式全局 default、显式 claude-code/default tab 覆盖、anthropic/claude 下名为 default 的模型及合法 custom model 均完整转发。不改全局设置、tab 持久化、catalog、adapter 或 builder；unit fixtures 只证明选择与请求组装，不证明原生继承或运行时验收。
@@ -902,3 +904,7 @@ DSH effort selector 的 getVariant 读取显式会话覆盖，未覆盖时选中
 `createComposerInputShellCoordinatorHost()` 仍只提供 seam，不再由 shell 直接调用 `mountEffortSelector`：模型选择器在 footer 的模型 slot 中挂载，`ChatSelectionControlsCoordinator` 通过 selection host 的 `mountEffortSelector(container)` 把 effort 内联到模型弹层。两个 host 的 effort 构造收束到私有 `mountChatEffortSelector()`，共享同一套 variant / inherit / off / 后端 override 回调，避免两份逻辑漂移。
 
 selection host 新增 `getEffortDisplayLabel()`，组合 trigger 只读取当前 label；effort 变更后 EffortSelector 的 `onDisplayChange` 会调用 coordinator 的 `updateModelSelectorEffortDisplay()`，只刷新标签，不触发目录或 dropdown 重建。`mountSelectionControls` 的 `modelContainer` 由 shell 传入并原样转交。模型目录、会话归属、DSH/Pi/ZCode/Codex/Claude 持久化分支与多标签 streaming 所有权均未改。
+
+## 2026-10-28：原生命令与技能弹框
+
+六个可选后端均独立加载命令/技能目录，无需 OpenCode 1 配置管理器。DSH 不再回落旧后端；ZCode 技能目录绑定当前 backendSessionId；预载走相同可用性入口，缓存 key 包含当前会话身份。

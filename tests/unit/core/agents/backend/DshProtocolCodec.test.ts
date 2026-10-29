@@ -8,6 +8,12 @@ import { buildDshPromptBlocks, prepareDshPromptBlocks } from '../../../../../src
 const image = { mediaType: 'image/png', data: 'YQ==' };
 
 describe('DSH ordered content admission', () => {
+  it('keeps a native skill on the first line and retains memory plus attached context', async () => {
+    const blocks = await prepareDshPromptBlocks({ content: '/design a form' }, {
+      prefix: '[MEMORY]', suffix: '[CONTEXT]', supportsImages: false, attachmentRoot: '/vault',
+    });
+    expect(blocks).toEqual([{ type: 'text', text: '/design a form\n\n[MEMORY]\n\n[CONTEXT]' }]);
+  });
   it('preserves text/image order and adds context once while removing duplicate representations', () => {
     const blocks = buildDshPromptBlocks({ content: 'fallback', images: [image], options: { requestParts: [
       { type: 'text', text: 'before' },

@@ -1,5 +1,7 @@
 # CodexAppServerClientTypes
 
+> 2026-10-29：AppServerUserInput 增补官方 UserInput 的 skill 分支（name/path），用于选中技能的显式 turn/start 调用。
+
 > 2026-10-08：AppServerServerRequestHandler 增加可选第二个 AbortSignal 参数，由 transport 在 native request 已解决或连接结束时取消。旧的一参 handler 仍可注册。
 
 > **源码**: `src/core/agents/backend/codex/CodexAppServerClientTypes.ts`

@@ -1,5 +1,9 @@
 # Chat Assistant Styles
 
+> 2026-10-29：富文本输入区使用 ZCode 桌面端的图标+名称 token。技能/命令前景色采用 ZCode 的 light/dark 语义色；CodeMirror 内容区继承现有 composer 字体、内边距与高度上限。textarea 镜像仅作为无布局能力环境的 fallback。
+
+> 2026-10-29：composer 命令与技能镜像高亮共用中性 6px 圆角标签，使用 host 派生的 invocation-bg/border tokens；绘制外扩留白而不改变文字布局，保留多行换行、textarea 光标和 forced-colors 原生文本回退。
+
 2026-10-09（Pi standard UI）：在既有文件内新增 scoped `.opencodian-pi-extension-title`、`.opencodian-pi-extension-status`、`.opencodian-pi-extension-widget` 文本样式，使用 Obsidian text/font 变量、pre-wrap 与 overflow-wrap。transient title 在同 view header 下，status 在输入区内，widget 随 host 放在编辑器上/下；无额外卡片、动画、观察器或滚动所有权。空内容由 host 卸下，不留样式占位。此 CSS 的模块文档映射有效，architecture owner inspector 仍 unresolved；指定文件责任不新增 manifest owner 事实。
 
 2026-09-26：聊天内联卡片沿用同一套 Obsidian card 变量（背景、边框、圆角、阴影），后台任务、权限与问题卡的状态以图标、文字和操作层级表达。样式需与真实聊天 DOM 及对应渲染模块一同验收。

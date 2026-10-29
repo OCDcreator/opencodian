@@ -151,7 +151,11 @@ export async function prepareDshPromptBlocks(request: DshPromptRequest,
       parts.push({ ...part, url: `data:${part.mime};base64,${data.subarray(0, size).toString('base64')}` });
     } finally { await handle.close(); }
   }
-  return buildDshPromptBlocks({ ...request, options: { ...request.options, requestParts: parts } }, prefix, suffix, supportsImages);
+  // Harness skill invocation is anchored to the user's first line. Native
+  // command dispatch has its separate rawText; preserve attached context here.
+  const nativeSlash = request.content.trimStart().startsWith('/');
+  return buildDshPromptBlocks({ ...request, options: { ...request.options, requestParts: parts } },
+    nativeSlash ? '' : prefix, [nativeSlash ? prefix : '', suffix].filter(Boolean).join('\n\n'), supportsImages);
 }
 
 function appendDshImages(blocks: DshJsonObject[], images: NonNullable<DshPromptRequest['images']>, covered: Map<string, number>, supported: boolean): void {

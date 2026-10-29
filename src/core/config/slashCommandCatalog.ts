@@ -69,11 +69,41 @@ export interface SlashCommandMenuItem {
   displayId?: string;
   hasProjectOverride: boolean;
   insertText?: string;
+  /** Keep the backend's own invocation when browsing through /skills. */
+  nativeSkill?: boolean;
   runtimeAvailable: boolean;
   source: SlashCommandMenuItemSource;
   skillSource?: SlashCommandSkillSource;
   subtask: boolean;
   isBuiltin: boolean;
+}
+
+export interface NativeSlashCommand {
+  name: string;
+  description?: string;
+  source?: string;
+  builtin?: boolean;
+}
+
+/** Project each native catalog without replacing its invocation grammar. */
+export function buildNativeSlashCommandMenuItems(
+  commands: readonly NativeSlashCommand[], skills: readonly NativeSlashCommand[], hidden: Set<string>,
+): SlashCommandMenuItem[] {
+  const entries = new Map<string, NativeSlashCommand>();
+  // A command owns a colliding name in the native runners.
+  for (const entry of [...commands, ...skills.map((skill) => ({ ...skill, source: 'skill' }))]) {
+    const name = entry.name.trim();
+    if (name && !entries.has(name) && !hidden.has(name)) entries.set(name, { ...entry, name });
+  }
+  return [...entries.values()].map((entry) => {
+    const isSkill = entry.source === 'skill' || entry.name.startsWith('skill:');
+    return {
+      id: entry.name, displayId: `/${entry.name}`, description: entry.description ?? '',
+      insertText: `/${entry.name} `, runtimeAvailable: true, source: isSkill ? 'skill' : 'command',
+      ...(isSkill ? { nativeSkill: true } : {}), hasProjectOverride: false, subtask: false,
+      isBuiltin: entry.builtin === true || entry.source === 'builtin',
+    };
+  });
 }
 
 export interface MdCommandEntry {

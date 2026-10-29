@@ -1,5 +1,9 @@
 # ComposerInputShellCoordinator
 
+> 2026-10-29（统一入口与 ZCode token）：所有后端的 `/` 同时列出命令与技能，`$` 只列技能；skill mode 只影响原生序列化。输入区接入 `ComposerInvocationEditor`，展示为图标与名称组成的原子标签，底层仍保存各目录项的 insertText。技能提交进入 prompt 准备确认通路，预检失败保留草稿。现有 textarea draft/selection/focus 接口保留。
+
+> 2026-10-29（命令/技能标签）：命令与技能使用 Codex 桌面端风格的中性圆角标签，并复用 textarea 镜像层保留复制、编辑、撤销和发送原文。高亮按当前目录中的真实 insertText 精确匹配；Codex `$技能名` 仅在 Codex 后端且目录存在对应 codex-skill 时识别，Pi `/skill:技能名` 与其他后端 `/技能名` 保留原生语法。未知 token、路径和金额保持普通文本，prefixed `/skills 技能名` 兼容既有模式。
+
 > 2026-10-09（composer placeholder）：占位 overlay 仅在 textarea.value 为空时显示，`is-hidden` 只用于非空值。用户 input、Pi `set_editor_text` 发出的同一 input 事件及 accepted/queued 后清稿均沿用既有 syncTextareaHeight；不改高度、overflow、layout 调度或 placeholder CSS/display 策略。现有 composer fixture 回归覆盖空白→输入→清空、accepted 清稿与真实 Pi host 程序写入/清空路径。
 
 > 2026-10-08：纯文本与图像 prompt 均等待 onPreparationOutcome；accepted/queued 后仅清空尚未编辑的原草稿，rejected 与准备异常保留内容。准备中禁用重复发送，迟到回调不影响重建后的 textarea。command/shell 原有路径不变。

@@ -19219,9 +19219,110 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
 /* ── Input highlight backdrop (renders styled @agent mentions behind the textarea) ── */
 
 .opencodian-input-highlight-container {
+  --opencodian-composer-invocation-bg: color-mix(in srgb, var(--text-normal) 8%, var(--background-primary));
+  --opencodian-composer-invocation-border: color-mix(in srgb, var(--text-normal) 14%, var(--background-primary));
   position: relative;
   width: 100%;
   min-height: 68px;
+}
+
+/* ZCode's prompt mention anatomy: inline icon + name, separate from native send text. */
+.opencodian-input-highlight-container.has-invocation-editor > textarea.opencodian-input {
+  position: absolute;
+  width: 1px;
+  height: 1px !important;
+  min-height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.has-invocation-editor > .opencodian-input-highlight-backdrop {
+  display: none;
+}
+
+.opencodian-invocation-editor.cm-editor {
+  color: var(--text-normal);
+  background: transparent;
+  outline: none;
+}
+
+.opencodian-invocation-editor .cm-scroller {
+  max-height: var(--opencodian-invocation-max-height, 240px);
+  overflow: auto;
+  font-family: var(--opencodian-composer-font-family, "OpenCodian Newsreader", Georgia, serif);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.opencodian-invocation-editor .cm-content {
+  min-width: 0;
+  flex: 1 1 0;
+  min-height: 68px;
+  padding: 12px 6px 10px;
+  caret-color: var(--text-normal);
+}
+
+.opencodian-invocation-editor .cm-line {
+  padding: 0;
+}
+
+.opencodian-invocation-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  vertical-align: top;
+  font-family: var(--font-interface);
+  font-weight: 500;
+  cursor: default;
+  border-radius: 4px;
+}
+
+.opencodian-invocation-token--skill {
+  color: var(--opencodian-skill-token-foreground, #7453b0);
+}
+
+.opencodian-invocation-token--command {
+  color: var(--opencodian-command-token-foreground, #566270);
+}
+
+.theme-dark .opencodian-invocation-token--skill {
+  --opencodian-skill-token-foreground: #bda5e6;
+}
+
+.theme-dark .opencodian-invocation-token--command {
+  --opencodian-command-token-foreground: #b5c0cc;
+}
+
+.opencodian-invocation-token--agent {
+  color: var(--text-warning);
+}
+
+.opencodian-invocation-token-label {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opencodian-invocation-token-icon,
+.opencodian-invocation-token-icon svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  stroke-width: 1.5;
+}
+
+.opencodian-invocation-editor .cm-selectionBackground {
+  background: var(--text-selection);
+}
+
+@media (forced-colors: active) {
+  .opencodian-invocation-token {
+    color: CanvasText;
+    outline: 1px solid CanvasText;
+  }
 }
 
 .opencodian-input-highlight-backdrop {
@@ -19291,16 +19392,18 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
   -webkit-box-decoration-break: clone;
 }
 
-.opencodian-input-highlight-command {
-  color: var(--color-blue, oklch(62% 0.14 255));
-  background: color-mix(in srgb, var(--color-blue, oklch(62% 0.14 255)) 36%, var(--background-primary));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-blue, oklch(62% 0.14 255)) 46%, transparent);
-}
-
+.opencodian-input-highlight-command,
 .opencodian-input-highlight-skill {
-  color: var(--text-success, var(--color-green));
-  background: color-mix(in srgb, var(--text-success, var(--color-green)) 34%, var(--background-primary));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-success, var(--color-green)) 46%, transparent);
+  display: inline;
+  border-radius: 6px;
+  color: var(--text-normal);
+  background: var(--opencodian-composer-invocation-bg);
+  /* Paint the chip inset without changing textarea wrapping or caret metrics. */
+  box-shadow: 0 0 0 2px var(--opencodian-composer-invocation-bg);
+  outline: 1px solid var(--opencodian-composer-invocation-border);
+  outline-offset: 1px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 .opencodian-input-highlight-container .opencodian-input::selection {

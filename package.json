@@ -59,6 +59,7 @@
   "author": "OpenCodian Team",
   "license": "MIT",
   "devDependencies": {
+    "@codemirror/commands": "6.8.1",
     "@colbymchenry/codegraph": "1.5.0",
     "@lobehub/icons": "5.18.0",
     "@types/jest": "^30.0.0",

@@ -43,6 +43,20 @@ live('installed Harness native protocol (zero model requests)', () => {
     return { root, current, adapter };
   }
 
+  it('lists user-invocable skills through the installed Harness registry', async () => {
+    const { root, adapter } = fixture();
+    for (const [name, userInvocable] of [['owned-visible', true], ['owned-hidden', false]] as const) {
+      const directory = path.join(root, '.dsh/skills', name);
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(path.join(directory, 'SKILL.md'), `---\nname: ${name}\ndescription: Owned skill catalog probe\nuser-invocable: ${userInvocable}\n---\nRead the user request.\n`);
+    }
+    try {
+      const commands = await adapter.getRuntimeCommands();
+      expect(commands).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'owned-visible', source: 'skill' })]));
+      expect(commands.some((command) => command.name === 'owned-hidden')).toBe(false);
+    } finally { await adapter.stop(); }
+  }, 45_000);
+
   it('lists actual models/tools/commands, updates MCP over stdio and HTTP, and stops owned children', async () => {
     const { root, adapter, current } = fixture();
     const methods: string[] = [];

@@ -117,6 +117,20 @@ describe('ZCodeAdapter — cancellable streaming chat', () => {
     await startAdapter();
   });
 
+  it('serializes selected skills as native path-backed references before session/send', async () => {
+    const original = fake.sendBehavior;
+    fake.sendBehavior = async (method, params) => method === 'skills/referenceCatalog'
+      ? { skills: [{ name: 'design', path: '/vault/skills/design/SKILL.md', enabled: true }] }
+      : original(method, params);
+    const stream = collect(adapter.sendMessage({ sessionId: 'sess_a', content: '/design 请检查' }));
+    await tick();
+    expect(fake.request).toHaveBeenCalledWith('session/send', {
+      sessionId: 'sess_a', content: '[$design](</vault/skills/design/SKILL.md>) 请检查',
+    });
+    fake.emitSessionEvent({ type: 'turn.completed', seq: 1, sessionId: 'sess_a', payload: { resultType: 'success', response: 'OK' } });
+    await stream;
+  });
+
   it('answers the runtime materialization asks so session/create cannot deadlock', () => {
     const preferences = fake.serverHandlers.get('session/requestRuntimePreferences');
     const mcpAuth = fake.serverHandlers.get('interaction/requestOfficialMcpAuthHeaders');

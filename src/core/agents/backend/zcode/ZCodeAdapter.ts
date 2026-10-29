@@ -500,7 +500,8 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
       });
       for (const chunk of control.terminalChunks ?? []) yield chunk;
       if (control.terminalChunks) return;
-      const { promptText, goalTargetId } = control;
+      const { goalTargetId } = control;
+      const promptText = await this.serializeSkillReferences(control.promptText, id);
       // The backend-neutral memory and Obsidian-tooling injections ride at the
       // front of the prompt text, matching the other prompt-prefix adapters.
       const content = prependObsidianToolingInjection(
@@ -1212,6 +1213,66 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
   }
   getSlashCommands(): readonly ZCodeSlashCommandEntry[] {
     return this.modelSurface.getSlashCommands();
+  }
+
+  /** Workspace presentation is available before a native session is created. */
+  async getRuntimeCommands(): Promise<Array<{ name: string; description: string; source: string }>> {
+    await this.start();
+    const transport = this.requireTransport();
+    const workspacePath = path.resolve(this.options.workingDirectory ?? process.cwd());
+    try {
+      const result = asRecordValue(await transport.request('workspace/readPresentation', {
+        workspace: { workspacePath, workspaceKey: workspacePath.replace(/\\/g, '/') },
+      }));
+      if (!Array.isArray(result['slashCommands'])) throw new Error('ZCode returned an invalid slash command catalog');
+      return result['slashCommands'].flatMap((value) => {
+        const command = asRecordValue(value);
+        return typeof command['name'] === 'string' ? [{ name: command['name'],
+          description: typeof command['description'] === 'string' ? command['description'] : '',
+          source: typeof command['source'] === 'string' ? command['source'] : 'command' }] : [];
+      });
+    } catch (error) {
+      if (error instanceof ZCodeRemoteRequestError && error.code === -32601) return [...this.getSlashCommands()];
+      throw error;
+    }
+  }
+
+  /** Native reference catalog: resident sessions retain their own skill authority. */
+  async getRuntimeSkills(sessionId?: string): Promise<Array<{ name: string; description: string; source: 'skill'; path?: string }>> {
+    await this.start();
+    const transport = this.requireTransport();
+    if (sessionId) await this.ensureSessionActive(transport, sessionId);
+    const workspacePath = path.resolve(this.options.workingDirectory ?? process.cwd());
+    try {
+      const result = asRecordValue(await transport.request('skills/referenceCatalog', {
+        workspace: { workspacePath, workspaceKey: workspacePath.replace(/\\/g, '/') },
+        ...(sessionId ? { sessionId } : {}),
+      }));
+      if (!Array.isArray(result['skills'])) throw new Error('ZCode returned an invalid skill reference catalog');
+      return result['skills'].flatMap((value) => {
+        const skill = asRecordValue(value);
+        return skill['enabled'] === true && typeof skill['name'] === 'string'
+          ? [{ name: skill['name'], description: typeof skill['description'] === 'string' ? skill['description'] : '', source: 'skill' as const,
+            ...(typeof skill['path'] === 'string' ? { path: skill['path'] } : {}) }]
+          : [];
+      });
+    } catch (error) {
+      if (error instanceof ZCodeRemoteRequestError && error.code === -32601) return [];
+      throw error;
+    }
+  }
+
+  private async serializeSkillReferences(content: string, sessionId: string): Promise<string> {
+    if (!/(?:^|\s)[/$]\S+/.test(content)) return content;
+    const skills = await this.getRuntimeSkills(sessionId);
+    const byName = new Map(skills.map((skill) => [skill.name, skill]));
+    return content.replace(/(^|\s)[/$](\S+)/g, (original, prefix: string, name: string) => {
+      const skill = byName.get(name);
+      if (!skill?.path) return original;
+      const label = `$${name}`.replace(/[\\[\]]/g, '\\$&');
+      const destination = skill.path.replace(/\\/g, '/').replace(/>/g, '\\>');
+      return `${prefix}[${label}](<${destination}>)`;
+    });
   }
   /** Persisted default model from settings (conversation overrides stay distinct). */
   getDefaultModel(): { provider: string; model: string } | null {

@@ -1,5 +1,9 @@
 # SlashCommandMenuCoordinator
 
+> 2026-10-29：`$` 技能查询不再限定 Codex；query 带前端 trigger 交给过滤器。`/` 使用命令+技能目录，`$` 使用纯技能目录，选中后写入当前后端原生 insertText。目录为空或无匹配时显示状态行，不向 `$` 菜单混入 `/skills` 命令。
+
+> 2026-10-29：目录刷新期间保留 loading 状态，禁止 render/key handling 用上个后端的 catalog 覆盖它。慢响应切换时旧技能不可被 Tab/Enter 选中；新目录完成后才恢复筛选与键盘选择。
+
 > **源码**: `src/features/chat/services/commands/SlashCommandMenuCoordinator.ts`
 > **状态**: [REVIEW]
 

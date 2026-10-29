@@ -440,7 +440,7 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
     return (await this.listTools('', '')).map((tool) => String((tool as Record<string, unknown>).name ?? '')).filter(Boolean);
   }
 
-  async getRuntimeCommands(forSessionId?: string): Promise<Array<{ name: string; description?: string }>> {
+  async getRuntimeCommands(forSessionId?: string): Promise<Array<{ name: string; description?: string; source?: string }>> {
     const client = await this.ready();
     if (!client.nativeRequest) return [];
     const sessionId = await this.ensureConfigurationSession(forSessionId ?? this.reservedSession?.id ?? [...this.sessions][0]);
@@ -448,7 +448,8 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
     if (!Array.isArray(result.commands)) throw new Error('Harness returned an invalid command catalog');
     return result.commands.flatMap((value) => {
       const command = asRecord(value);
-      return typeof command?.name === 'string' ? [{ name: command.name, description: String(command.description ?? '') }] : [];
+      return typeof command?.name === 'string' ? [{ name: command.name, description: String(command.description ?? ''),
+        ...(command.source === 'skill' ? { source: 'skill' } : {}) }] : [];
     });
   }
 

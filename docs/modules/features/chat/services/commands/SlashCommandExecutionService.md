@@ -136,3 +136,7 @@ OpenCode 2 executes native slash commands and synthetic compact/undo/redo. Share
 ## 2026-10-24 DSH 斜杠文本
 
 DSH 未提供原生命令调用，非插件自有快捷动作的斜杠文本保留在 DSH chat 发送路径，不进入 OpenCode runtime skill/command resolver。
+
+## 2026-10-28：原生命令与技能弹框
+
+Claude、Codex、Pi、ZCode、DSH 的命令交回各自发送路径，包括尚未创建 conversation 的草稿；不查询旧 OpenCode 的技能或命令。插件本地 image 仍优先处理。

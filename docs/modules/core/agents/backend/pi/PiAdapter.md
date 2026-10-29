@@ -47,3 +47,7 @@ Registered extension commands that complete successfully without an assistant tu
 Command confirmation text is formatted by an injected host callback; direct consumers receive a plain English fallback. PiAdapter retains the existing shared-contract-only isolation boundary.
 
 Bundled Pi service forwards modern ModelRuntime OAuth LoginOptions.getDeviceId from the configured installation SettingsManager; minimum AuthStorage login remains unchanged. Auth ACK is separate from browser authorization and credential activation.
+
+## 2026-10-28：原生命令与技能弹框
+
+原生 slash 命令和 /skill:name 保留首 token 与原始参数，不把 memory/tooling 前缀混入命令参数；普通提示继续注入上下文。get_commands 返回的 extension、prompt 与 skill 来源由聊天目录保留。

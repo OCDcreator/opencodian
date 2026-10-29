@@ -229,3 +229,7 @@ Editing executable settings leaves existing persistent queries running with thei
 - 源码位置：`src/core/agents/backend/claude/ClaudeCodeAdapter.ts`。
 - 原位置：`src/core/agents/backend/ClaudeCodeAdapter.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/core/agents/backend/claude/ClaudeCodeMcpConfigAdapter.ts`、`src/core/agents/backend/claude/ClaudeCodeOptionsBuilder.ts`、`src/core/agents/backend/claude/ClaudeCodePermissionBridge.ts`、`src/core/agents/backend/claude/ClaudeCodeProcessResolver.ts`、`src/core/agents/backend/claude/ClaudeCodeQueue.ts`、`src/core/agents/backend/claude/ClaudeCodeScopedSessionStore.ts`、`src/core/agents/backend/claude/ClaudeCodeSdkLoader.ts`、`src/core/agents/backend/claude/ClaudeCodeStreamNormalizer.ts`、`src/core/agents/backend/claude/ClaudeProjectSkillDiscovery.ts`。
+
+## 2026-10-28：原生命令与技能弹框
+
+运行时命令目录保留 SDK 的 builtin 标记：true 为 Claude 自带命令，未标记行为用户、项目或插件技能。聊天目录据此分组；不扫描或借用 OpenCode 技能。
