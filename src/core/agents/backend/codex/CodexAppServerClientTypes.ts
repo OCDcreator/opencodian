@@ -15,9 +15,7 @@
 
 /** Raw thread shape from app-server thread/list and thread/read. */
 export interface AppServerThread {
-  id: string;
-  sessionId: string;
-  preview: string;
+  id: string; sessionId: string; preview: string;
   createdAt: number;
   updatedAt: number;
   cwd: string;
@@ -174,7 +172,7 @@ export interface AppServerTurnStartOptions {
   threadId: string;
   input: Array<
     | { type: 'text'; text: string; text_elements: [] }
-    | { type: 'skill'; name: string; path: string }
+    | { type: 'skill' | 'mention'; name: string; path: string }
     | { type: 'localImage'; path: string }
   >;
   cwd?: string;

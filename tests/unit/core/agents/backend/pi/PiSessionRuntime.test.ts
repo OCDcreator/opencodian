@@ -3,6 +3,24 @@ import type { PiRecord } from '../../../../../../src/core/agents/backend/pi/PiRp
 import { PiSessionRuntime } from '../../../../../../src/core/agents/backend/pi/PiSessionRuntime';
 
 describe('Pi optional command handshake', () => {
+  it('reads only existing runtime slots without launching or switching a source session', async () => {
+    const request = jest.fn(async () => ({ serviceProtocol: 1, commands: [...PI_RPC_COMMANDS, ...PI_SDK_COMMANDS, ...PI_CONFIG_COMMANDS] }));
+    const client = { request, subscribe: () => () => {}, close: jest.fn() };
+    const createClient = jest.fn(() => client);
+    const runtime = new PiSessionRuntime({ workingDirectory: '/fixture', sessionDirectory: '/fixture', servicePath: '/service', createClient });
+    try {
+      await expect(runtime.getExisting('source')).resolves.toBeNull();
+      expect(createClient).not.toHaveBeenCalled();
+      await runtime.get('source');
+      request.mockClear();
+      await expect(runtime.getExisting('source')).resolves.toBe(client);
+      await expect(runtime.getExisting('inactive')).resolves.toBeNull();
+      expect(request).not.toHaveBeenCalled();
+      expect(createClient).toHaveBeenCalledTimes(1);
+      runtime.close('source');
+      await expect(runtime.getExisting('source')).resolves.toBeNull();
+    } finally { runtime.dispose(); }
+  });
   it.each([true, false])('accepts the mandatory protocol with optional commands available=%s', async (available) => {
     const close = jest.fn();
     const client = {

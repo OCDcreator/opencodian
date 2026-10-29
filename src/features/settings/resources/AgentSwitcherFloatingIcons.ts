@@ -2,10 +2,7 @@ import { addIcon, setIcon } from 'obsidian';
 
 import type { AgentBackendKind } from '../../../core/types/chat';
 import { t } from '../../../i18n';
-import {
-  LOBEHUB_ICON_MANIFEST,
-  type LobehubManifestStaticVariant,
-} from '../../../utils/icons/lobehubIconManifest';
+import type { LobehubManifestStaticVariant } from '../../../utils/icons/lobehubIconManifest';
 import { BACKEND_OPTIONS } from '../backends/opencode/SettingsBackendSection';
 
 interface AgentSwitcherIconConfig {
@@ -14,7 +11,45 @@ interface AgentSwitcherIconConfig {
   variant?: LobehubManifestStaticVariant;
 }
 
-const LOBEHUB_ICON_MANIFEST_BY_ID = new Map(LOBEHUB_ICON_MANIFEST.map((entry) => [entry.iconId, entry]));
+/**
+ * @license LobeHub backend artwork, @lobehub/icons-static-svg 1.101.0.
+ * https://github.com/lobehub/lobe-icons
+ *
+ * MIT License
+ *
+ * Copyright (c) 2023 LobeHub
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+// Fixed backend marks are embedded once, shared by Settings and Chat, and work offline.
+const BUNDLED_AGENT_ICON_SVGS: Record<string, string> = {
+  "opencode": "<svg fill=\"currentColor\" fill-rule=\"evenodd\" height=\"1em\" style=\"flex:none;line-height:1\" viewBox=\"0 0 24 24\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><title>opencode</title><path d=\"M16 6H8v12h8V6zm4 16H4V2h16v20z\"></path></svg>",
+  "claudecode": "<svg height=\"1em\" style=\"flex:none;line-height:1\" viewBox=\"0 0 24 24\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><title>Claude Code</title><path clip-rule=\"evenodd\" d=\"M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z\" fill=\"#D97757\" fill-rule=\"evenodd\"></path></svg>",
+  "codex": "<svg height=\"1em\" style=\"flex:none;line-height:1\" viewBox=\"0 0 24 24\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><title>Codex</title><path d=\"M19.503 0H4.496A4.496 4.496 0 000 4.496v15.007A4.496 4.496 0 004.496 24h15.007A4.496 4.496 0 0024 19.503V4.496A4.496 4.496 0 0019.503 0z\" fill=\"#fff\"></path><path d=\"M9.064 3.344a4.578 4.578 0 012.285-.312c1 .115 1.891.54 2.673 1.275.01.01.024.017.037.021a.09.09 0 00.043 0 4.55 4.55 0 013.046.275l.047.022.116.057a4.581 4.581 0 012.188 2.399c.209.51.313 1.041.315 1.595a4.24 4.24 0 01-.134 1.223.123.123 0 00.03.115c.594.607.988 1.33 1.183 2.17.289 1.425-.007 2.71-.887 3.854l-.136.166a4.548 4.548 0 01-2.201 1.388.123.123 0 00-.081.076c-.191.551-.383 1.023-.74 1.494-.9 1.187-2.222 1.846-3.711 1.838-1.187-.006-2.239-.44-3.157-1.302a.107.107 0 00-.105-.024c-.388.125-.78.143-1.204.138a4.441 4.441 0 01-1.945-.466 4.544 4.544 0 01-1.61-1.335c-.152-.202-.303-.392-.414-.617a5.81 5.81 0 01-.37-.961 4.582 4.582 0 01-.014-2.298.124.124 0 00.006-.056.085.085 0 00-.027-.048 4.467 4.467 0 01-1.034-1.651 3.896 3.896 0 01-.251-1.192 5.189 5.189 0 01.141-1.6c.337-1.112.982-1.985 1.933-2.618.212-.141.413-.251.601-.33.215-.089.43-.164.646-.227a.098.098 0 00.065-.066 4.51 4.51 0 01.829-1.615 4.535 4.535 0 011.837-1.388zm3.482 10.565a.637.637 0 000 1.272h3.636a.637.637 0 100-1.272h-3.636zM8.462 9.23a.637.637 0 00-1.106.631l1.272 2.224-1.266 2.136a.636.636 0 101.095.649l1.454-2.455a.636.636 0 00.005-.64L8.462 9.23z\" fill=\"url(#lobe-icons-codex-_R_0_)\"></path><defs><linearGradient gradientUnits=\"userSpaceOnUse\" id=\"lobe-icons-codex-_R_0_\" x1=\"12\" x2=\"12\" y1=\"3\" y2=\"21\"><stop stop-color=\"#B1A7FF\"></stop><stop offset=\".5\" stop-color=\"#7A9DFF\"></stop><stop offset=\"1\" stop-color=\"#3941FF\"></stop></linearGradient></defs></svg>",
+  "githubcopilot": "<svg fill=\"currentColor\" fill-rule=\"evenodd\" height=\"1em\" style=\"flex:none;line-height:1\" viewBox=\"0 0 24 24\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><title>GithubCopilot</title><path d=\"M19.245 5.364c1.322 1.36 1.877 3.216 2.11 5.817.622 0 1.2.135 1.592.654l.73.964c.21.278.323.61.323.955v2.62c0 .339-.173.669-.453.868C20.239 19.602 16.157 21.5 12 21.5c-4.6 0-9.205-2.583-11.547-4.258-.28-.2-.452-.53-.453-.868v-2.62c0-.345.113-.679.321-.956l.73-.963c.392-.517.974-.654 1.593-.654l.029-.297c.25-2.446.81-4.213 2.082-5.52 2.461-2.54 5.71-2.851 7.146-2.864h.198c1.436.013 4.685.323 7.146 2.864zm-7.244 4.328c-.284 0-.613.016-.962.05-.123.447-.305.85-.57 1.108-1.05 1.023-2.316 1.18-2.994 1.18-.638 0-1.306-.13-1.851-.464-.516.165-1.012.403-1.044.996a65.882 65.882 0 00-.063 2.884l-.002.48c-.002.563-.005 1.126-.013 1.69.002.326.204.63.51.765 2.482 1.102 4.83 1.657 6.99 1.657 2.156 0 4.504-.555 6.985-1.657a.854.854 0 00.51-.766c.03-1.682.006-3.372-.076-5.053-.031-.596-.528-.83-1.046-.996-.546.333-1.212.464-1.85.464-.677 0-1.942-.157-2.993-1.18-.266-.258-.447-.661-.57-1.108-.32-.032-.64-.049-.96-.05zm-2.525 4.013c.539 0 .976.426.976.95v1.753c0 .525-.437.95-.976.95a.964.964 0 01-.976-.95v-1.752c0-.525.437-.951.976-.951zm5 0c.539 0 .976.426.976.95v1.753c0 .525-.437.95-.976.95a.964.964 0 01-.976-.95v-1.752c0-.525.437-.951.976-.951zM7.635 5.087c-1.05.102-1.935.438-2.385.906-.975 1.037-.765 3.668-.21 4.224.405.394 1.17.657 1.995.657h.09c.649-.013 1.785-.176 2.73-1.11.435-.41.705-1.433.675-2.47-.03-.834-.27-1.52-.63-1.813-.39-.336-1.275-.482-2.265-.394zm6.465.394c-.36.292-.6.98-.63 1.813-.03 1.037.24 2.06.675 2.47.968.957 2.136 1.104 2.776 1.11h.044c.825 0 1.59-.263 1.995-.657.555-.556.765-3.187-.21-4.224-.45-.468-1.335-.804-2.385-.906-.99-.088-1.875.058-2.265.394zM12 7.615c-.24 0-.525.015-.84.044.03.16.045.336.06.526l-.001.159a2.94 2.94 0 01-.014.25c.225-.022.425-.027.612-.028h.366c.187 0 .387.006.612.028-.015-.146-.015-.277-.015-.409.015-.19.03-.365.06-.526a9.29 9.29 0 00-.84-.044z\"></path></svg>",
+};
+const BUNDLED_AGENT_ICON_URLS = new Map<string, Record<'light' | 'dark', string>>(
+  Object.entries(BUNDLED_AGENT_ICON_SVGS).map(([id, svg]) => [id, {
+    light: `data:image/svg+xml,${encodeURIComponent(svg.replace(/currentColor/g, '#211E1E'))}`,
+    dark: `data:image/svg+xml,${encodeURIComponent(svg.replace(/currentColor/g, '#F1ECEC'))}`,
+  }]),
+);
 
 // User-supplied Pi artwork, scaled from its 800-unit viewBox to Obsidian's 100-unit icon canvas.
 export const PI_BACKEND_ICON = 'opencodian-pi';
@@ -158,15 +193,53 @@ function pinAgentSwitcherToSettingsEdge(
   floatingEl: HTMLElement,
   anchorEl: HTMLElement,
 ): FloatingSwitcherCleanup {
-  const ownerDocument = containerEl.ownerDocument;
-  const ownerWindow = ownerDocument.defaultView ?? window;
-  const { ResizeObserver: OwnerResizeObserver, MutationObserver: OwnerMutationObserver } = ownerWindow as Window & typeof globalThis;
+  let ownerDocument = containerEl.ownerDocument;
+  let ownerWindow = ownerDocument.defaultView ?? window;
+  let resizeObserver: ResizeObserver | null = null;
+  let mutationObserver: MutationObserver | null = null;
+  let anchorWasConnected = false;
+  let cleanedUp = false;
+
+  const disconnectOwner = () => {
+    ownerWindow.removeEventListener('resize', syncPosition);
+    ownerWindow.removeEventListener('pagehide', cleanup);
+    resizeObserver?.disconnect();
+    mutationObserver?.disconnect();
+  };
+  const cleanup = () => {
+    if (cleanedUp) {
+      return;
+    }
+    cleanedUp = true;
+    disconnectOwner();
+    floatingEl.remove();
+  };
   const syncPosition = () => {
+    if (cleanedUp) {
+      return;
+    }
+    if (!anchorEl.isConnected) {
+      if (anchorWasConnected) cleanup();
+      return;
+    }
+    // Obsidian may render in the vault document, then adopt the settings
+    // content into a separate window. Follow the connected anchor's owner.
+    if (ownerDocument !== anchorEl.ownerDocument) {
+      disconnectOwner();
+      ownerDocument = anchorEl.ownerDocument;
+      ownerWindow = ownerDocument.defaultView ?? window;
+      observeOwner();
+    }
+    anchorWasConnected = true;
+    if (floatingEl.parentElement !== ownerDocument.body) {
+      ownerDocument.body.appendChild(floatingEl);
+    }
     const rect = containerEl.getBoundingClientRect();
     floatingEl.style.setProperty(
       '--opencodian-agent-switcher-fixed-left',
       `${Math.max(0, Math.round(rect.left))}px`,
     );
+    syncModalVisibility();
   };
   const syncModalVisibility = () => {
     const modalInFront = isUnrelatedSettingsModalOpen(ownerDocument, containerEl);
@@ -174,53 +247,23 @@ function pinAgentSwitcherToSettingsEdge(
     floatingEl.setAttribute('aria-hidden', modalInFront ? 'true' : 'false');
   };
 
-  syncPosition();
-  syncModalVisibility();
-  let cleanedUp = false;
-  const resizeObserver = typeof OwnerResizeObserver !== 'undefined'
-    ? new OwnerResizeObserver(syncPosition)
-    : null;
-  let anchorWasConnected = ownerDocument.body.contains(anchorEl);
-  let cleanup: FloatingSwitcherCleanup = () => {};
-  const mutationObserver = new OwnerMutationObserver(() => {
-    const anchorIsConnected = ownerDocument.body.contains(anchorEl);
-    if (!anchorWasConnected && anchorIsConnected) {
-      anchorWasConnected = true;
-      syncPosition();
-      syncModalVisibility();
-      return;
-    }
-    if (anchorWasConnected && !anchorIsConnected) {
-      cleanup();
-      return;
-    }
-    syncModalVisibility();
-  });
-
-  cleanup = () => {
-    if (cleanedUp) {
-      return;
-    }
-
-    cleanedUp = true;
-    ownerWindow.removeEventListener('resize', syncPosition);
-    resizeObserver?.disconnect();
-    mutationObserver.disconnect();
-    floatingEl.remove();
-  };
-
-  ownerDocument.body.appendChild(floatingEl);
-  if (!ownerDocument.body.contains(floatingEl)) {
-    return cleanup;
+  function observeOwner(): void {
+    const { ResizeObserver: OwnerResizeObserver, MutationObserver: OwnerMutationObserver } = ownerWindow as Window & typeof globalThis;
+    resizeObserver = typeof OwnerResizeObserver !== 'undefined'
+      ? new OwnerResizeObserver(syncPosition)
+      : null;
+    mutationObserver = new OwnerMutationObserver(syncPosition);
+    ownerWindow.addEventListener('resize', syncPosition);
+    ownerWindow.addEventListener('pagehide', cleanup);
+    // Layout observation also detects a page first connected in another
+    // document, whose body mutations cannot reach the original observer.
+    resizeObserver?.observe(containerEl);
+    mutationObserver.observe(ownerDocument.body, { childList: true, subtree: true });
   }
 
-  ownerWindow.addEventListener('resize', syncPosition);
-  resizeObserver?.observe(containerEl);
-  mutationObserver.observe(ownerDocument.body, {
-    childList: true,
-    subtree: true,
-  });
-
+  observeOwner();
+  syncPosition();
+  queueMicrotask(syncPosition);
   return cleanup;
 }
 
@@ -265,9 +308,9 @@ function renderThemeIconImage(
     cls: `opencodian-agent-switcher-lobehub-img opencodian-agent-switcher-lobehub-img--${theme}`,
     attr: {
       alt: '',
-      decoding: 'async',
+      decoding: 'sync',
       draggable: 'false',
-      loading: 'lazy',
+      loading: 'eager',
       src,
     },
   });
@@ -278,33 +321,5 @@ function resolveLobehubAgentIconUrls(icon: AgentSwitcherIconConfig): Record<'lig
     return null;
   }
 
-  const manifestEntry = LOBEHUB_ICON_MANIFEST_BY_ID.get(icon.iconId);
-  const preferredVariants: LobehubManifestStaticVariant[] = [
-    icon.variant ?? 'color',
-    'mono',
-  ];
-
-  for (const variant of preferredVariants) {
-    const variantEntry = manifestEntry?.variants[variant];
-    if (!variantEntry?.staticSupport) {
-      continue;
-    }
-
-    if (variantEntry.urls.webp?.light && variantEntry.urls.webp.dark) {
-      return variantEntry.urls.webp;
-    }
-
-    if (variantEntry.urls.png?.light && variantEntry.urls.png.dark) {
-      return variantEntry.urls.png;
-    }
-
-    if (variantEntry.urls.svg) {
-      return {
-        light: variantEntry.urls.svg,
-        dark: variantEntry.urls.svg,
-      };
-    }
-  }
-
-  return null;
+  return BUNDLED_AGENT_ICON_URLS.get(icon.iconId) ?? null;
 }

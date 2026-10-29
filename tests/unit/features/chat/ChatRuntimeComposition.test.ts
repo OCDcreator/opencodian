@@ -3,6 +3,7 @@ import { WorkspaceLeaf } from 'obsidian';
 import { CodexAdapter } from '../../../../src/core/agents/backend/codex/CodexAdapter';
 import { type Conversation, DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
+import { encodePromptReference } from '../../../../src/features/chat/services/context/PromptReferenceService';
 import type { MessageSendPreparationHost } from '../../../../src/features/chat/services/send/MessageSendPreparationService';
 
 jest.mock('../../../../src/core/opencode', () => ({
@@ -52,6 +53,40 @@ describe('ChatRuntimeComposition owner', () => {
     // full surface→identity→render→background→conversation→interaction chain completed.
     expect(v.sendPipelineRuntime).toBeDefined();
     expect(typeof (v.sendPipelineRuntime as { sendMessage: unknown }).sendMessage).toBe('function');
+  });
+
+  it.each([false, true])('loads a current-Vault source transcript without activating another backend or native source session (resident=%s)', async (resident) => {
+    const source: Conversation = { id: 'source', title: 'Prior', backend: 'zcode', backendSessionId: 'native-source',
+      createdAt: 1, updatedAt: 2, messages: [{ id: 'history', role: 'user', content: 'Persisted evidence', timestamp: 1 }] };
+    const target: Conversation = { id: 'target', title: 'Target', backend: 'dsh', backendSessionId: 'native-target', createdAt: 1, updatedAt: 2, messages: [] };
+    const nativeRead = jest.fn();
+    const safeRead = jest.fn().mockResolvedValue(resident ? [{ role: 'assistant', content: 'Native evidence' }] : null);
+    const load = jest.fn().mockResolvedValue(source);
+    const v = constructView() as unknown as {
+      app: { vault: { adapter: { basePath: string }; getAllLoadedFiles(): unknown[] } };
+      plugin: { getConversations(): Conversation[]; getConversationById: typeof load; settings: { activeBackend: string }; agentServiceRegistry: { get: jest.Mock } };
+      currentConversation: Conversation;
+      messageSendPreparationService: { host: MessageSendPreparationHost };
+      composerInputShellCoordinator: { host: { loadPromptReferenceCandidates(query: string): Promise<Array<{ reference: Parameters<typeof encodePromptReference>[0] }>> } };
+    };
+    v.app.vault.adapter = { basePath: process.cwd() };
+    v.app.vault.getAllLoadedFiles = () => [];
+    v.plugin.getConversations = () => [{ ...source, messages: [] }, target];
+    v.plugin.getConversationById = load;
+    v.plugin.agentServiceRegistry.get = jest.fn().mockImplementation((kind: string) => kind === 'zcode'
+      ? { getSessionMessages: nativeRead, getPromptReferenceMessages: safeRead } : undefined);
+    v.currentConversation = target;
+    const selectedBackend = v.plugin.settings.activeBackend;
+    const candidates = await v.composerInputShellCoordinator.host.loadPromptReferenceCandidates('Prior');
+    const result = await v.messageSendPreparationService.host.preparePromptReferences?.(encodePromptReference(candidates[0].reference), target);
+    expect(load).toHaveBeenCalledWith('source');
+    expect(result?.sessionReferences[0]).toEqual(expect.objectContaining(resident
+      ? { source: 'backend', text: 'assistant: Native evidence' }
+      : { source: 'plugin-cache', text: 'user: Persisted evidence' }));
+    expect(safeRead).toHaveBeenCalledWith('native-source');
+    expect(nativeRead).not.toHaveBeenCalled();
+    expect(v.currentConversation).toBe(target);
+    expect(v.plugin.settings.activeBackend).toBe(selectedBackend);
   });
 
   it('wires real Codex per-turn preflight through the production composition and preparation host', async () => {

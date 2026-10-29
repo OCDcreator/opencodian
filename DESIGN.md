@@ -247,6 +247,8 @@ OpenCodian uses a hybrid elevation system. Default Obsidian surfaces are mostly 
 - **State:** selection/context chips should truncate safely, show enough path or source identity to be useful, and avoid growing the composer.
 - **Risk:** status chips must preserve warning/error contrast.
 - **Header status chip:** server/backend health in the chat header defaults to a compact 28px shadcn-style badge. At rest it shows the active backend identity plus a small status ring/dot overlay; OpenCode must reuse the same brandmark SVG as the title logo, while other backends may use their provider SVGs. Hover/focus expands the same badge internally to reveal the text label. Connected/running states stay static, checking/starting may use a subtle pulse, and offline/error states change shape/tone without relying on color alone. Do not use vertical divider lines between header action groups; group by rhythm and state behavior instead.
+- **Header resource reuse and settings entry:** fixed backend marks are embedded theme-aware SVG resources shared by Settings and Chat. Reopening Settings must show them immediately without network access; status polling retains the existing icon node while the backend is unchanged. The backend status chip is the settings entry; do not add a duplicate global settings gear. Session settings and diagnostics remain separate actions.
+- **Responsive brand name:** the Chat title mark and wordmark keep their intrinsic proportions. At a Chat container width of 480px or less, hide only the wordmark and retain the fixed-size mark. Above 480px show the complete wordmark; never shrink its lettering to fit.
 
 ### Cards / Containers
 
@@ -268,7 +270,8 @@ Agent, Permission, and Model remain three independent Chat overlays, but share a
 - **Shared spacing:** 4px list inset; 8px Command item horizontal padding; 6px row radius; 32px compact rows; 44px only when an Agent or Permission description needs two text lines; 36px header/footer and search height.
 - **Header/footer:** sentence-case title at 12px/600; muted 11px keycap; shortcut labels are compact metadata, separated by space rather than visually competing with content.
 - **Command item:** default is transparent; hover, roving highlight, and selected use the same low-chroma `var(--background-modifier-hover)` surface. Selected state has no extra border, box-shadow, or decorative rail; a checkmark and 600 label weight establish selection.
-- **Model input/group:** Search is a full-width CommandInput-like strip with only a bottom separator. Provider headings are sticky, 11px muted labels on the popover surface, with no repeated full-width borders or imported font.
+- **Model input/group:** Search is a full-width CommandInput-like strip with only a bottom separator. Provider headings are sticky disclosure buttons with a chevron, provider icon, 11px muted label and matching model count on the popover surface. Each provider folds independently with Chat-view lifetime state; nonempty model/provider search opens matching groups. Folded groups keep a 32px keyboard-focusable heading and omit model options from navigation and selection. Keep the opaque heading surface, accent focus outline and existing scroll owner, with no repeated full-width borders or imported font.
+- **ZCode catalog readiness:** switching to ZCode loads its native workspace providers and models before a conversation exists. Show the selector with the native workspace default once loaded; an existing conversation keeps its own observed selection. Discovery must not create a persisted chat or dispatch a model turn.
 - **Permission semantics:** danger/safe remain explicit through icon/check/compact label color and accessible text. Neutral selected background remains shared with all cards; semantic color must never flood a whole row or the enclosing card.
 - **Accessibility/motion:** preserve the existing trigger focus restoration, roving focus, `aria-activedescendant`, and 280px Model scroll owner. Focus uses a visible 2px Obsidian accent outline. Motion is at most 120ms opacity/transform and is removed under `prefers-reduced-motion`.
 
@@ -410,6 +413,12 @@ The highest available effort adds a gently flowing teal/blue/lavender/pink spect
 
 ### Inputs / Fields
 
+Composer `@` references reuse the inline invocation icon/name token and atomic editing behavior. Files use `file-text`, folders `folder`, sessions `messages-square`, plugin/app entries `puzzle`, and MCP resources `database`. File, folder, session and resource text derives from `--text-accent`; plugin/app text follows the existing skill foreground. Group labels and session dates use `--font-ui-smaller`. Candidate groups only appear when they contain usable entries for the selected backend.
+
+Reference group headings are full-width disclosure buttons with a chevron, label and matching count. Each group folds independently while its heading remains visible; the current Chat view retains fold state. A nonempty search automatically opens every matching group when results load; empty searches and unrelated groups keep their current fold state. A group can still be folded manually within the current results. Keyboard option navigation skips folded groups, and focus stays in the composer after pointer toggles. Headers use 32px minimum height, 6px radius, host hover and a visible accent focus outline.
+
+The `/` browser reuses this disclosure anatomy for Commands and Skills, keeping command rows before skill rows and preserving relevance within each group. Both groups fold independently with Chat-view lifetime state. The dedicated `$` browser remains a flat skill list, immediately usable even if Skills is folded under `/`.
+
 - **Style:** transparent or tonal background, 10-12px radius, Obsidian text colors, compact line height.
 - **Focus:** accent outline, border shift, or tonal lift. Do not add large glow.
 - **Names:** persistent field labels and independent accessible names are required. A visual placeholder, especially one hidden from accessibility APIs, cannot be the input name.
@@ -429,6 +438,7 @@ Settings dropdown menus may be wider than their trigger when option labels need 
 
 ### Navigation
 
+- **Settings backend rail:** the capsule belongs to the connected Settings surface and its actual window. Pre-rendering, adopting content into a detached window, closing Settings, and reopening must never leave a rail over the vault file explorer. Preserve its existing hover expansion and backend controls; position and lifetime follow the owning surface.
 - **Sidebar:** low-opacity by default, reveals on hover or focus, icon-only 28px controls, 6px radius, glass background.
 - **Tabs:** preserve per-tab runtime identity. Do not visually imply a single global stream when multiple conversations can be active.
 - **Dropdowns:** bottom-aligned near the composer, 14px radius, max-height with internal scrolling, sticky provider headers where needed.

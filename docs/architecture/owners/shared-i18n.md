@@ -1,4 +1,8 @@
 # Owner: shared.i18n
+
+2026-10-29：同步 `/` 菜单“命令”“技能”折叠分类标题；分类状态与实际条目由聊天菜单 owner 决定。
+
+2026-10-29：中英文同步统一 `@` 的文件／会话／插件／资源／代理分组及加载、空目录、无匹配和失败状态。翻译文案不推断后端能力；未接通目录由运行时层隐藏。
 > 2026-10-26（DSH UI 修复）：中英文目录同步输入框名称、effort 保存失败、DSH 模型默认/显式 Off/下一轮生效，以及 MCP 草稿与已保存声明的区别。翻译层只提供消息表，不承担原生配置生效或在线状态判断。
 > 2026-10-24（DSH）：中英文同步提供 MCP 声明保存、原生默认值读取、图片握手状态与协议限制说明；会话模型/推理编辑入口统一指向聊天工具栏。
 > 2026-09-30 (Codex 0.159 integration)：locale parity 保持（两侧各 5868 键）；新增 `chat.toolCard.image.*`（4 键）、`chat.backendSessions.detailLoadMore`/`detailLoadMoreRetry`/`detailTranscriptUnavailable`、`settings.codex.tab.plugins` + plugins 分节 + usage 文案；两侧同步移除 `settings.codex.approvalPolicy.untrusted`。

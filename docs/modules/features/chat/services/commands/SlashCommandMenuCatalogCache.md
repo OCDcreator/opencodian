@@ -1,5 +1,7 @@
 # SlashCommandMenuCatalogCache
 
+Claude's mention and selection sidecars share the same visible identity projection; mention entries additionally carry `hidden: false`. This preserves native catalog isolation while keeping both views aligned.
+
 > 2026-10-29：Pi 原生 get_commands 不提供 TUI 的 new/compact；composer 目录补入这两个已有插件 API 承接的操作，仍尊重 hidden ids，重名时保留原生目录项。其余命令/技能保持原生来源。
 
 OpenCode 2 loads native command and skill names with its own backend key, adds applicable builtins, and leaves upstream-unavailable sharing commands out of the menu. It does not read OpenCode 1 project command or agent config for this catalog.

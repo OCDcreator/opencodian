@@ -37,7 +37,12 @@ export class ConversationAuthoritativeMessageMergeCoordinator {
 
     return {
       ...syncedMessage,
+      ...(existingMessage.role === 'user' && (existingMessage.sessionReferences?.length || existingMessage.promptReferences?.length)
+        ? { content: existingMessage.content, contentBlocks: existingMessage.contentBlocks }
+        : {}),
       contextAttachments,
+      sessionReferences: existingMessage.sessionReferences ?? syncedMessage.sessionReferences,
+      promptReferences: existingMessage.promptReferences ?? syncedMessage.promptReferences,
       questionResolution: syncedMessage.questionResolution ?? existingMessage.questionResolution,
       structured: shouldPreserveStructured ? existingMessage.structured : syncedMessage.structured,
     };
@@ -224,6 +229,8 @@ export function mergePiNativeConversationMessages(existing: ChatMessage[], nativ
       content: message.role === 'user' ? previous.content : message.content,
       images: message.role === 'user' ? previous.images ?? message.images : message.images,
       contextAttachments: message.role === 'user' ? previous.contextAttachments : message.contextAttachments,
+      sessionReferences: previous.sessionReferences ?? message.sessionReferences,
+      promptReferences: previous.promptReferences ?? message.promptReferences,
       questionResolution: message.questionResolution ?? previous.questionResolution,
       contentBlocks: message.contentBlocks, toolCalls: message.toolCalls,
     };

@@ -1,15 +1,20 @@
 import type { AgentMentionIntent } from '../../../../core/agents';
+import type { PromptReference, PromptReferenceCandidate } from '../../../../core/types';
 import {
+  type AgentMentionMenuGroup,
   type AgentMentionMenuItem,
+  getAgentMentionMenuGroup,
   renderAgentMentionMenu,
   type SlashCommandMenuStatus,
 } from '../commands/slashCommandMenuRenderer';
+import { encodePromptReference, parsePromptReferences } from '../context/PromptReferenceService';
 
 type AgentMentionMode = 'primary' | 'subagent' | 'all' | null;
 
 export interface AgentMentionCandidate extends AgentMentionMenuItem {
   mode: AgentMentionMode;
   hidden?: boolean;
+  reference?: PromptReference;
 }
 
 interface AgentMentionQuery {
@@ -35,6 +40,9 @@ export interface AgentMentionPillSpan {
 export interface AgentMentionComposerControllerHost {
   getComposerInputMode(): 'prompt' | 'shell';
   loadAgentMentionCandidates?(): Promise<AgentMentionCandidate[]>;
+  loadPromptReferenceCandidates?(query?: string): Promise<PromptReferenceCandidate[]>;
+  getPromptReferenceContextKey?(): string;
+  getTextarea?(): HTMLTextAreaElement | null;
   scheduleLayoutSync(): void;
   onMentionInserted(): void;
   onLoadFailed(error: unknown): void;
@@ -49,6 +57,8 @@ export class AgentMentionComposerController {
   private query: AgentMentionQuery | null = null;
   private trackedMentions: TrackedAgentMention[] = [];
   private lastContent: string | null = null;
+  private contextKey: string | undefined;
+  private readonly collapsedGroups = new Set<AgentMentionMenuGroup>();
 
   constructor(private readonly host: AgentMentionComposerControllerHost) {}
 
@@ -74,6 +84,7 @@ export class AgentMentionComposerController {
   }
 
   getQuery(textarea: HTMLTextAreaElement): AgentMentionQuery | null {
+    this.syncReferenceContext();
     if (this.host.getComposerInputMode() !== 'prompt') {
       return null;
     }
@@ -85,25 +96,24 @@ export class AgentMentionComposerController {
     }
 
     const beforeCursor = textarea.value.slice(0, selectionStart);
-    const match = /(^|[\s])@(\S*)$/.exec(beforeCursor);
+    const match = /(^|[\s\p{Script=Han}\u3000-\u303f\uff00-\uffef])@(?:"([^"\r\n]*)|([^\s@]*))$/u.exec(beforeCursor);
     if (!match) {
       return null;
     }
 
-    const queryText = match[2] ?? '';
-    const mentionText = `@${queryText}`;
-    return {
-      query: queryText,
-      start: selectionStart - mentionText.length,
-      end: selectionStart,
-    };
+    const queryText = match[2] ?? match[3] ?? '';
+    const mentionText = `@${match[2] === undefined ? '' : '"'}${queryText}`;
+    const start = selectionStart - mentionText.length;
+    if (parsePromptReferences(textarea.value).some((span) => start >= span.start && start < span.end)) return null;
+    return { query: queryText, start, end: selectionStart };
   }
 
   async refresh(
     query: AgentMentionQuery,
     menuEl: HTMLElement | null,
   ): Promise<void> {
-    if (!this.host.loadAgentMentionCandidates) {
+    this.syncReferenceContext();
+    if (!this.host.loadAgentMentionCandidates && !this.host.loadPromptReferenceCandidates) {
       this.clear(menuEl);
       return;
     }
@@ -111,19 +121,37 @@ export class AgentMentionComposerController {
     this.query = query;
 
     const currentRunId = ++this.runId;
+    const contextKey = this.contextKey;
+    this.candidates = null;
     this.visibleCandidates = [];
     this.selectedIndex = 0;
     this.status = 'loading';
     this.render(menuEl);
 
     try {
-      const candidates = this.candidates ?? await this.host.loadAgentMentionCandidates();
-      if (currentRunId !== this.runId) {
-        return;
-      }
+      const results = await Promise.allSettled([
+        this.host.loadAgentMentionCandidates?.() ?? Promise.resolve([]),
+        this.host.loadPromptReferenceCandidates?.(query.query) ?? Promise.resolve([]),
+      ]);
+      if (currentRunId !== this.runId || contextKey !== this.host.getPromptReferenceContextKey?.()) return;
 
+      const agents = results[0].status === 'fulfilled' ? results[0].value : [];
+      const references = results[1].status === 'fulfilled' ? results[1].value : [];
+      const candidates: AgentMentionCandidate[] = [
+        ...references.map((candidate) => ({ id: candidate.id, displayName: candidate.label,
+          description: candidate.description, mode: null, reference: candidate.reference,
+          referenceKind: candidate.kind, updatedAt: candidate.updatedAt })),
+        ...agents,
+      ];
+      for (const result of results) if (result.status === 'rejected') this.host.onLoadFailed(result.reason);
+      if (candidates.length === 0 && results.some((result) => result.status === 'rejected')) {
+        throw new Error('Reference candidates could not be loaded');
+      }
       this.candidates = candidates;
       this.visibleCandidates = filterAgentMentionCandidates(candidates, query.query);
+      if (query.query.trim()) {
+        for (const candidate of this.visibleCandidates) this.collapsedGroups.delete(getAgentMentionMenuGroup(candidate));
+      }
       this.selectedIndex = 0;
       this.status = this.visibleCandidates.length > 0
         ? 'idle'
@@ -148,37 +176,28 @@ export class AgentMentionComposerController {
     textarea: HTMLTextAreaElement | null,
     menuEl: HTMLElement | null,
   ): boolean {
-    if (this.tryProtectTrackedMentionEdit(event, textarea)) {
-      return true;
-    }
+    this.syncReferenceContext();
+    if (this.tryProtectTrackedMentionEdit(event, textarea)) return true;
 
     this.syncStateWithCurrentContext();
 
-    if (this.visibleCandidates.length === 0) {
-      if (event.key === 'Escape' && this.status !== 'idle') {
-        event.preventDefault();
-        this.clear(menuEl);
-        return true;
-      }
-
-      return false;
-    }
-
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      this.moveSelection(1, menuEl);
-      return true;
-    }
-
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      this.moveSelection(-1, menuEl);
-      return true;
-    }
-
-    if (event.key === 'Escape') {
+    if (event.key === 'Escape' && (this.visibleCandidates.length > 0 || this.status !== 'idle')) {
       event.preventDefault();
       this.clear(menuEl);
+      return true;
+    }
+    if (this.visibleCandidates.length === 0) return false;
+
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      this.moveSelection(event.key === 'ArrowDown' ? 1 : -1, menuEl);
+      return true;
+    }
+
+    if (event.key === 'Tab' && event.shiftKey) return false;
+    if (event.key === 'Tab' && this.selectedIndex < 0 && menuEl) {
+      event.preventDefault();
+      menuEl.querySelector<HTMLButtonElement>('button[data-group]')?.focus();
       return true;
     }
 
@@ -192,13 +211,9 @@ export class AgentMentionComposerController {
   }
 
   resolveMentionIntents(content: string): AgentMentionIntent[] {
-    return this.resolveMentionPillSpans(content).map((tracked) => ({
-      agentId: tracked.agentId,
-      source: {
-        value: tracked.value,
-        start: tracked.start,
-        end: tracked.end,
-      },
+    return this.resolveMentionPillSpans(content).map(({ agentId, value, start, end }) => ({
+      agentId,
+      source: { value, start, end },
     }));
   }
 
@@ -222,6 +237,7 @@ export class AgentMentionComposerController {
   }
 
   syncContent(content: string): void {
+    this.syncReferenceContext();
     if (this.lastContent === null) {
       this.lastContent = content;
       return;
@@ -239,18 +255,23 @@ export class AgentMentionComposerController {
     this.lastContent = content;
   }
 
+  resolveReferencePillSpans(content: string): Array<{
+    start: number; end: number; value: string; kind: PromptReference['kind']; label: string;
+  }> {
+    return parsePromptReferences(content).map(({ start, end, reference }) => ({
+      start, end, value: content.slice(start, end), kind: reference.kind, label: reference.label,
+    }));
+  }
+
   clearTrackedMentions(): void {
     this.trackedMentions = [];
     this.lastContent = null;
   }
 
   private moveSelection(delta: number, menuEl: HTMLElement | null): void {
-    if (this.visibleCandidates.length === 0) {
-      return;
-    }
-
-    const itemCount = this.visibleCandidates.length;
-    this.selectedIndex = (this.selectedIndex + delta + itemCount) % itemCount;
+    const indexes = this.selectableIndexes();
+    if (!indexes.length) return;
+    this.selectedIndex = indexes[(indexes.indexOf(this.selectedIndex) + delta + indexes.length) % indexes.length];
     this.render(menuEl);
     scrollSelectedItemIntoView(menuEl);
   }
@@ -259,6 +280,7 @@ export class AgentMentionComposerController {
     textarea: HTMLTextAreaElement | null,
     menuEl: HTMLElement | null,
   ): void {
+    this.syncReferenceContext();
     this.syncStateWithCurrentContext();
 
     const item = this.visibleCandidates[this.selectedIndex];
@@ -267,7 +289,7 @@ export class AgentMentionComposerController {
       return;
     }
 
-    const mentionValue = `@${item.id}`;
+    const mentionValue = item.reference ? encodePromptReference(item.reference) : `@${item.id}`;
     const replacement = `${mentionValue} `;
     const nextValue = [
       textarea.value.slice(0, query.start),
@@ -279,7 +301,7 @@ export class AgentMentionComposerController {
     textarea.value = nextValue;
     textarea.focus();
     textarea.setSelectionRange(nextCursor, nextCursor);
-    this.trackedMentions.push({
+    if (!item.reference) this.trackedMentions.push({
       agentId: item.id,
       value: mentionValue,
       start: query.start,
@@ -321,8 +343,8 @@ export class AgentMentionComposerController {
     selectionStart: number,
     selectionEnd: number,
     key: string,
-  ): AgentMentionPillSpan | null {
-    for (const mention of this.resolveMentionPillSpans(content)) {
+  ): { start: number; end: number } | null {
+    for (const mention of [...this.resolveMentionPillSpans(content), ...this.resolveReferencePillSpans(content)]) {
       const selectedWholeMention = selectionStart <= mention.start && selectionEnd >= mention.end;
       if (selectionStart === selectionEnd) {
         const cursor = selectionStart;
@@ -349,9 +371,7 @@ export class AgentMentionComposerController {
   }
 
   private render(menuEl: HTMLElement | null): void {
-    if (!menuEl) {
-      return;
-    }
+    if (!menuEl) return;
 
     this.syncStateWithCurrentContext();
 
@@ -360,21 +380,35 @@ export class AgentMentionComposerController {
       items: this.visibleCandidates,
       selectedIndex: this.selectedIndex,
       status: this.status,
+      unified: Boolean(this.host.loadPromptReferenceCandidates),
+      collapsedGroups: this.collapsedGroups,
+      onToggleGroup: (group) => {
+        const restoreFocus = menuEl.contains(document.activeElement);
+        if (this.collapsedGroups.has(group)) this.collapsedGroups.delete(group);
+        else this.collapsedGroups.add(group);
+        this.render(menuEl);
+        if (restoreFocus) menuEl.querySelector<HTMLButtonElement>(`button[data-group="${group}"]`)?.focus();
+      },
       onHoverItem: (index) => {
-        if (this.selectedIndex === index) {
-          return;
-        }
+        if (this.selectedIndex === index) return;
 
         this.selectedIndex = index;
         this.render(menuEl);
       },
       onSelectItem: (index) => {
         this.selectedIndex = index;
-        this.applySelectedCandidate(document.activeElement as HTMLTextAreaElement | null, menuEl);
+        this.applySelectedCandidate(this.host.getTextarea?.() ?? document.activeElement as HTMLTextAreaElement | null, menuEl);
       },
     });
 
     this.host.scheduleLayoutSync();
+  }
+
+  private syncReferenceContext(): void {
+    const key = this.host.getPromptReferenceContextKey?.();
+    if (key === this.contextKey) return;
+    this.contextKey = key;
+    this.reset();
   }
 
   private syncStateWithCurrentContext(): void {
@@ -383,13 +417,16 @@ export class AgentMentionComposerController {
     }
 
     this.visibleCandidates = filterAgentMentionCandidates(this.candidates, this.query.query);
-    this.selectedIndex = Math.min(
-      this.selectedIndex,
-      Math.max(0, this.visibleCandidates.length - 1),
-    );
+    const indexes = this.selectableIndexes();
+    if (!indexes.includes(this.selectedIndex)) this.selectedIndex = indexes.find((index) => index >= this.selectedIndex) ?? indexes[0] ?? -1;
     this.status = this.visibleCandidates.length > 0
       ? 'idle'
       : getEmptyAgentMentionMenuStatus(this.candidates);
+  }
+
+  private selectableIndexes(): number[] {
+    return this.visibleCandidates.flatMap((candidate, index) =>
+      this.host.loadPromptReferenceCandidates && this.collapsedGroups.has(getAgentMentionMenuGroup(candidate)) ? [] : [index]);
   }
 }
 
@@ -398,19 +435,21 @@ export function filterAgentMentionCandidates(
   query: string,
 ): AgentMentionCandidate[] {
   const visibleCandidates = candidates.filter((candidate) =>
-    !candidate.hidden && (candidate.mode === 'subagent' || candidate.mode === 'all'));
+    !candidate.hidden && (candidate.reference || candidate.mode === 'subagent' || candidate.mode === 'all'));
   const normalizedQuery = query.trim().toLowerCase();
-  if (!normalizedQuery) {
-    return visibleCandidates;
-  }
-
   return visibleCandidates
     .map((candidate) => ({
       candidate,
-      score: scoreAgentMentionCandidate(candidate, normalizedQuery),
+      score: normalizedQuery ? scoreAgentMentionCandidate(candidate, normalizedQuery) : 1,
     }))
     .filter((entry) => entry.score > 0)
-    .sort((left, right) => right.score - left.score)
+    .sort((left, right) => {
+      const groups: Record<PromptReference['kind'] | 'agent', number> = {
+        file: 0, folder: 0, session: 1, plugin: 2, app: 2, 'mcp-resource': 3, agent: 4,
+      };
+      return groups[left.candidate.reference?.kind ?? 'agent']
+        - groups[right.candidate.reference?.kind ?? 'agent'] || right.score - left.score;
+    })
     .map((entry) => entry.candidate);
 }
 
@@ -512,8 +551,8 @@ function findSingleTextEdit(
 }
 
 function isAgentMentionTokenBoundary(content: string, start: number, end: number): boolean {
-  const before = start === 0 || /[\s([{"']/.test(content[start - 1] ?? '');
-  const after = end === content.length || /[\s.,!?;:)\]}"']/.test(content[end] ?? '');
+  const before = start === 0 || /[\s([{"'\p{Script=Han}\u3000-\u303f\uff00-\uffef]/u.test(content[start - 1] ?? '');
+  const after = end === content.length || /[\s.,!?;:)\]}"'\p{Script=Han}\u3000-\u303f\uff00-\uffef]/u.test(content[end] ?? '');
   return before && after;
 }
 

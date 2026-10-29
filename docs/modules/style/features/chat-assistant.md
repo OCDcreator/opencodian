@@ -1,5 +1,7 @@
 # Chat Assistant Styles
 
+2026-10-29：引用分类使用全宽 32px disclosure 行，继承界面字体与字号，提供箭头、数量、主题 hover 和可见焦点。展开内容维持原候选的 4px 节奏；折叠容器保留原生 hidden 行为。
+
 > 2026-10-29：富文本输入区使用 ZCode 桌面端的图标+名称 token。技能/命令前景色采用 ZCode 的 light/dark 语义色；CodeMirror 内容区继承现有 composer 字体、内边距与高度上限。textarea 镜像仅作为无布局能力环境的 fallback。
 
 > 2026-10-29：composer 命令与技能镜像高亮共用中性 6px 圆角标签，使用 host 派生的 invocation-bg/border tokens；绘制外扩留白而不改变文字布局，保留多行换行、textarea 光标和 forced-colors 原生文本回退。
@@ -88,3 +90,10 @@ Assistant timestamp/model text has an 11px CSS floor, retains full row opacity a
 新增向上展开的 `.opencodian-composer-menu-panel` 与 ghost `.opencodian-composer-menu-item`。附件、permission、Agent 和模型 trigger 默认透明、无边框、无阴影，仅 hover/open 使用低强度底色；send 保留强调样式。500px 以下通过 container query 收紧间距，permission 只显示权限语义图标并隐藏文本/Chevron，effort 使用独立 full/short 文本节点显示短标签而不造成读屏重复。模型名允许截断，模型图标与 effort 保持可见。
 
 Composer 卡片外新增 `.opencodian-composer-status-bar`：左侧 `.opencodian-composer-context-slot` 承载既有 ContextRing（26px，中心读数保留），右侧 `.opencodian-composer-counts`，中间 `.opencodian-composer-status-middle` 留空。`opencodian-input-area:has(...)` 的 z-index 提升条件加入新菜单 `.opencodian-composer-menu.is-open`。capability hint 在独立辅助弹层内复用 `.opencodian-input-capability-hint` 但改为菜单行布局。
+## 2026-10-29 统一 @ 引用菜单与标签
+
+文件、文件夹、会话和 MCP 引用延续现有 invocation token 结构，使用 Obsidian accent；插件/应用复用 skill foreground。菜单分组、16px Lucide 图标和 tabular-nums 日期复用 slash menu 的截断、hover、选中和窄栏约束，标题使用界面字体。引用标签身份与 kind 由 composer 提供，CSS 不判断后端能力。
+
+# 2026-10-29: Reference typography
+
+Reference group headings and session dates use Obsidian's `--font-ui-smaller` so they follow the user's interface text size.

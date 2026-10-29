@@ -20,7 +20,7 @@ import * as path from 'node:path';
 import { prependMemoryInjection } from '../../../memory';
 import { prependObsidianToolingInjection } from '../../../obsidianTooling';
 import type { PermissionReply, PermissionRequest, QuestionRequest } from '../../../types';
-import type { ContextUsageSnapshot, StreamChunk } from '../../../types/chat';
+import type { ContextUsageSnapshot, NativePromptMention, StreamChunk } from '../../../types/chat';
 import { AgentCapability, type BackendCapabilities } from '../../AgentCapability';
 import type {
   AgentAuxQueryCapability,
@@ -480,6 +480,7 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
       // before subscribing, including the first send after process recovery.
       await this.ensureSessionActive(transport, id);
       await transport.request('session/subscribe', { sessionId: id, deliveryKind: 'desktop-continuous' });
+      await this.validateNativeMentions(rawRequest.options?.nativeMentions, id);
       await this.modelSurface.prepareModelForSend(transport, (sid) => this.ensureSessionActive(transport, sid), rawRequest);
       if (rawRequest.images?.length) {
         const imageReady = await verifyZCodeImageModelForSend({
@@ -790,6 +791,16 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
     }));
     const messages = result['messages'];
     return Array.isArray(messages) ? messages : [];
+  }
+
+  /** References may read resident sources, but must never resume or activate them. */
+  async getPromptReferenceMessages(sessionId: string): Promise<unknown[] | null> {
+    const transport = this.transport;
+    if (!transport) return null;
+    try {
+      const result = asRecordValue(await transport.request('session/messages', { sessionId }));
+      return Array.isArray(result['messages']) ? result['messages'] : null;
+    } catch { return null; }
   }
 
   /**
@@ -1207,6 +1218,19 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
     return this.modelSurface.getAvailableModels();
   }
 
+  /** Workspace-owned native catalog/default, available before the first conversation is created. */
+  async getWorkspaceModelCatalog(): Promise<{
+    models: ZCodeModelCatalog['models']; defaultModel: { provider: string; model: string } | null;
+  }> {
+    await this.start();
+    const transport = this.requireTransport();
+    const catalog = await this.modelSurface.getWorkspaceModelCatalog(
+      transport, this.options.workingDirectory ?? '', () => this.transport === transport,
+    );
+    const current = catalog.currentModel;
+    return { models: catalog.models, defaultModel: current ? { provider: current.providerId, model: current.modelId } : null };
+  }
+
   getObservedModel(): { provider: string; model: string } | null {
     const current = this.modelSurface.getAvailableModelCatalog()?.currentModel;
     return current ? { provider: current.providerId, model: current.modelId } : null;
@@ -1259,6 +1283,50 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
     } catch (error) {
       if (error instanceof ZCodeRemoteRequestError && error.code === -32601) return [];
       throw error;
+    }
+  }
+
+  /** Session-owned plugin identities are not interchangeable with the draft workspace catalog. */
+  async getRuntimeMentionCandidates(sessionId?: string): Promise<NativePromptMention[]> {
+    await this.start();
+    const transport = this.requireTransport();
+    if (sessionId) await this.ensureSessionActive(transport, sessionId);
+    const workspacePath = path.resolve(this.options.workingDirectory ?? process.cwd());
+    try {
+      const result = asRecordValue(await transport.request('plugins/referenceCatalog', {
+        workspace: { workspacePath, workspaceKey: workspacePath.replace(/\\/g, '/') },
+        ...(sessionId ? { sessionId } : {}),
+      }));
+      if (!Array.isArray(result['plugins'])) throw new Error('ZCode returned an invalid plugin reference catalog');
+      return result['plugins'].flatMap((value) => {
+        const plugin = asRecordValue(value);
+        const id = plugin['pluginId'];
+        const name = plugin['displayName'] ?? plugin['name'];
+        return plugin['enabled'] === true && typeof id === 'string' && id.length <= 256
+          && /^[A-Za-z0-9][A-Za-z0-9._-]*@[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id) && typeof name === 'string'
+          && Array.isArray(plugin['conflictingPluginIds']) && plugin['conflictingPluginIds'].length === 0
+          ? [{ kind: 'plugin' as const, backend: 'zcode' as const, id, label: name, nativePath: `plugin://${id}`,
+            ...(typeof plugin['description'] === 'string' ? { description: plugin['description'] } : {}) }]
+          : [];
+      });
+    } catch (error) {
+      if (error instanceof ZCodeRemoteRequestError && error.code === -32601) return [];
+      throw error;
+    }
+  }
+
+  private async validateNativeMentions(nativeMentions: unknown, sessionId: string): Promise<void> {
+    if (nativeMentions === undefined) return;
+    if (!Array.isArray(nativeMentions)) throw new Error('Invalid ZCode native mentions');
+    if (nativeMentions.length === 0) return;
+    const effective = await this.getRuntimeMentionCandidates(sessionId);
+    for (const value of nativeMentions) {
+      const selected = value as Partial<NativePromptMention> | null;
+      if (!selected || typeof selected !== 'object') throw new Error('Invalid ZCode native mention');
+      if (!effective.some((entry) => selected.backend === 'zcode' && entry.kind === selected.kind
+        && entry.id === selected.id && entry.nativePath === selected.nativePath)) {
+        throw new Error(`ZCode mention is no longer available: ${String(selected.label ?? '')}`);
+      }
     }
   }
 

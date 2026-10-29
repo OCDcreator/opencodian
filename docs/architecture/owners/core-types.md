@@ -1,4 +1,6 @@
 # Owner: core.types
+
+2026-10-29：增加 Vault 范围内的版本化 `PromptReference`、原生 mention 与会话快照契约。目的消息持有 `promptReferences` 稳定身份及 `sessionReferences` 实际捕获证据，可读正文与请求展开分离；类型层不负责目录发现、读取或原生执行。
 > 2026-10-24（DSH）：增加会话级 opaque 模型/逐模型推理覆盖、stdio/HTTP MCP 声明和 aggregate context 标记；配置与回读继续分别归原 owner 所有。
 > 2026-10-02（T02）：inline-edit/completion 模型覆盖 allowlist 补入 `opencode2`，保存归一化与重载保留独立 provider/model；ZCode 的编辑边界和 effort allowlist 保持原限制。归一化函数体不扩展运行时责任；native 模型回读另行验收。
 > 2026-09-30 (Codex 0.159 types)：

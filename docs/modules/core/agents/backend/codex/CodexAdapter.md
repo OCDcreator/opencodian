@@ -137,3 +137,8 @@ Codex CLI account/model fallback reads snapshot the current provider-domain envi
 - 源码位置：`src/core/agents/backend/codex/CodexAdapter.ts`。
 - 原位置：`src/core/agents/backend/CodexAdapter.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/core/agents/backend/codex/CodexAppServerClient.ts`、`src/core/agents/backend/codex/CodexAppServerClientNormalization.ts`、`src/core/agents/backend/codex/CodexAppServerStreamMapper.ts`、`src/core/agents/backend/codex/CodexAppServerTransport.ts`、`src/core/agents/backend/codex/CodexCliResolver.ts`、`src/core/agents/backend/codex/CodexElicitationBridge.ts`、`src/core/agents/backend/codex/CodexStreamNormalizer.ts`。
+## 2026-10-29：原生插件引用
+
+`getRuntimeMentionCandidates()` 从当前 Vault `cwds` 的 `plugin/installed` 读取可引用目录，只返回 installed、enabled 且未被策略禁用的插件稳定 ID。选中项经 `nativeMentions` 传到发送边界，再次核对当前目录并构造 `turn/start.input` 的 `mention` 项；不把插件显示名当作身份。失效、跨后端或 SDK 回退路径均拒绝原生插件引用，避免只展示标签却未调用插件。
+
+引用读取专用 `getPromptReferenceMessages` 经 `thread/read` 严格核对返回 ID 与 turns，不恢复或启动来源；不可用返回 null，成功读取的空线程返回空数组，避免把读取失败错误标为完整空历史。

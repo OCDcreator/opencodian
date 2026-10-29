@@ -20,6 +20,8 @@ export interface RenderModelListOptions {
   filterQuery: string;
   currentSelection: ModelSelectorSelection | null;
   highlightedValue?: string | null;
+  collapsedProviders?: ReadonlySet<string>;
+  onToggleProvider?: (providerId: string) => void;
   previousStickyHeadersCleanup?: (() => void) | null;
   texts: ModelSelectorRenderTexts;
   onSelect: (provider: string, model: string) => void;
@@ -43,6 +45,8 @@ export function renderModelList({
   filterQuery,
   currentSelection,
   highlightedValue = null,
+  collapsedProviders,
+  onToggleProvider,
   previousStickyHeadersCleanup = null,
   texts,
   onSelect,
@@ -96,6 +100,8 @@ export function renderModelList({
 
   for (const provider of filteredProviders) {
     const providerLabelId = buildModelOptionId(optionIdPrefix, provider.id) + '-label';
+    const optionsId = buildModelOptionId(optionIdPrefix, provider.id) + '-models';
+    const collapsed = collapsedProviders?.has(provider.id) === true;
     const groupEl = groupsContainer.createDiv({
       cls: 'opencodian-model-group',
       attr: {
@@ -104,9 +110,20 @@ export function renderModelList({
       },
     });
 
-    const header = groupEl.createDiv({
+    const header = groupEl.createEl('button', {
       cls: 'opencodian-model-provider-header',
+      attr: { type: 'button', 'data-provider-id': provider.id,
+        'aria-expanded': String(!collapsed), 'aria-controls': optionsId, title: provider.name },
     });
+    header.addEventListener('mousedown', (event) => event.preventDefault());
+    header.addEventListener('click', (event) => {
+      event.stopPropagation();
+      onToggleProvider?.(provider.id);
+    });
+    const chevron = header.createSpan({
+      cls: 'opencodian-model-provider-chevron', attr: { 'aria-hidden': 'true' },
+    });
+    setIcon(chevron, collapsed ? 'chevron-right' : 'chevron-down');
 
     const iconEl = ProviderIconService.createIconElement(app, provider.id, 14);
     if (iconEl) {
@@ -122,11 +139,16 @@ export function renderModelList({
       attr: { id: providerLabelId },
     });
     headerText.setText(provider.name);
+    header.createSpan({ cls: 'opencodian-model-provider-count', text: String(provider.models.length),
+      attr: { 'aria-hidden': 'true' } });
     headers.push(header);
 
     const optionsEl = groupEl.createDiv({
       cls: 'opencodian-model-group-options',
+      attr: { id: optionsId },
     });
+    optionsEl.hidden = collapsed;
+    if (collapsed) continue;
 
     for (const model of provider.models) {
       const modelValue = buildModelOptionValue(provider.id, model.id);

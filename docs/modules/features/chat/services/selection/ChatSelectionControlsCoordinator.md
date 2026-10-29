@@ -1,5 +1,7 @@
 # ChatSelectionControlsCoordinator
 
+2026-10-29：模型弹框的提供商折叠状态归本协调器持有，在当前 Chat view 内重开弹框和刷新目录后保留，不写入模型配置。非空模型名／提供商名搜索会展开匹配分组，空查询及未匹配提供商保留状态；同一查询下仍可手动折叠。重绘后同步 combobox active-descendant、滚动位置及分类按钮键盘焦点，并重新计算弹框锚点。
+
 > 2026-10-09（selection wrapper 所属会话）：`wrapHostForCodex` 的既有 preserve/catalog/default/availability/override/custom 分支优先读取 `host.getOwnConversation()?.backend`，仅无所属 backend 时沿用 active leaf/global fallback。这样本地 Claude toolbar 不会读取另一叶子的 Codex/OpenCode 2 模型，反向本地 Codex 仍保留严格选择、provider 过滤与 Custom prompt；legacy 无 owner host 保持既有行为。参数仅窄增既有可选 `getOwnConversation` 类型，不新增 helper、constructor 或 generic runtime 策略。
 
 > 2026-10-09（Codex requested model）：wrapHostForCodex 通过已有 preserveRequestedModel hook 保留请求模型，缺失项沿用既有可用性校验拒绝而非静默首行替换，空全局模型为未配置。selectModel 的 Codex 菜单入口在 prompt 前捕获 conversation，Custom prompt 一次且 cancel/blank 零写入；解析后的字符串交给未修改的 persistCodexModelOverride 单次保存，跳过同样会保存的 direct host setter。成功/失败显示和 context 同步仅刷新仍属于原 conversation 的视图；失败不调用后来 active B 的 setter 回滚。非 Codex switch 路径与 catalog/auth 决策保留。

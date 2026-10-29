@@ -23,10 +23,12 @@
  * fire only after the view has destructured the result) is read via host.X so it resolves live.
  */
 
-import { Notice } from 'obsidian';
+import { type App, Notice } from 'obsidian';
 
 import { AgentCapability, hasCapability } from '../../../core/agents';
 import { getConversationChatBackendService } from '../../../core/agents/backend/AgentBackendRouting';
+import type { AgentMentionCapability } from '../../../core/agents/backend/AgentMentionCapability';
+import type { AgentSessionCapability } from '../../../core/agents/backend/AgentService';
 import type { MemoryRuntimePort } from '../../../core/memory';
 import { OpenCodeService } from '../../../core/opencode';
 import type {
@@ -37,6 +39,7 @@ import type {
   PromptContextItem,
 } from '../../../core/types';
 import { getConversationBackendSessionId, getTurnDiffNoticeMeta } from '../../../core/types';
+import type { AgentBackendKind } from '../../../core/types/chat';
 import { t } from '../../../i18n';
 import { getVaultBasePath } from '../../../shared';
 import type { BackgroundTaskCompletionNoticeServiceHost } from '../services/background/BackgroundTaskCompletionNoticeService';
@@ -54,6 +57,7 @@ import type { ComposerInputShellCoordinatorHost } from '../services/composer/Com
 import { ComposerInputShellCoordinator } from '../services/composer/ComposerInputShellCoordinator';
 import type { ActiveTabContextUsageCoordinatorHost } from '../services/context/ActiveTabContextUsageCoordinator';
 import { ActiveTabContextUsageCoordinator } from '../services/context/ActiveTabContextUsageCoordinator';
+import { type PromptReferenceOptions, PromptReferenceService } from '../services/context/PromptReferenceService';
 import { ServerReferenceContextService } from '../services/context/ServerReferenceContextService';
 import type { ChildSessionGraphCoordinatorHost } from '../services/conversation/ChildSessionGraphCoordinator';
 import { ChildSessionGraphCoordinator } from '../services/conversation/ChildSessionGraphCoordinator';
@@ -373,7 +377,8 @@ export interface ChatRuntimeCompositionHost {
     };
     readonly opencodeConfigManager: unknown;
     loadConversations(): unknown;
-    getConversations(): unknown;
+    getConversations(): Conversation[];
+    getConversationById?(id: string): Promise<Conversation | undefined>;
     createConversation(): unknown;
     createConversationFromSession(sessionId: string, initial: unknown): unknown;
     deleteConversation(conversationId: string): unknown;
@@ -536,6 +541,7 @@ export class ChatRuntimeComposition {
    * so all three consumers run the identical processor seam.
    */
   private assistantAutoInternalLinkService: AssistantAutoInternalLinkService | null = null;
+  private promptReferenceService: PromptReferenceService | null = null;
 
   constructor(private readonly host: ChatRuntimeCompositionHost) {}
 
@@ -546,6 +552,14 @@ export class ChatRuntimeComposition {
       );
     }
     return this.assistantAutoInternalLinkService;
+  }
+
+  private getPromptReferenceOptions(conversation = this.host.currentConversation): PromptReferenceOptions {
+    return {
+      targetBackend: (conversation?.backend ?? this.host.plugin.settings.activeBackend) as AgentBackendKind,
+      currentConversationId: conversation?.id,
+      targetSessionId: conversation ? getConversationBackendSessionId(conversation) || undefined : undefined,
+    };
   }
 
   compose(): ChatRuntime {
@@ -620,6 +634,54 @@ export class ChatRuntimeComposition {
       // R-C4: lazily resolved PDF engine for one-shot PDF text attach.
       loadPdfEngine: () => host.plugin.pdfEngineLoader!.load(),
     });
+    const app = host.app as App;
+    const promptReferenceService = new PromptReferenceService({
+      getVaultPath: () => getVaultBasePath(app) ?? '',
+      listFiles: async () => (app.vault.getAllLoadedFiles?.() ?? []).map((entry) => ({
+        kind: 'children' in entry ? 'folder' as const : 'file' as const,
+        path: entry.path,
+        label: entry.name,
+      })),
+      listConversations: async () => (host.plugin.getConversations?.() ?? []).map((value) => ({
+        ...value, messageCount: value.messages?.length ?? 0,
+      })),
+      // The plugin loader reads full persisted messages; catalog metadata cannot
+      // stand in for the source transcript when its backend is unavailable.
+      loadConversation: async (id) => await host.plugin.getConversationById?.(id) ?? null,
+      readSessionMessages: async (backend, sessionId) => {
+        const service = host.plugin.agentServiceRegistry?.get(backend) as (Partial<AgentSessionCapability> & {
+          getPromptReferenceMessages?(id: string): Promise<unknown[] | null>;
+        }) | undefined;
+        if (service?.getPromptReferenceMessages) {
+          const messages = await service.getPromptReferenceMessages(sessionId);
+          return messages ? { messages, complete: true } : null;
+        }
+        // These readers only address an explicit source identity. ZCode/Pi's
+        // generic history methods may activate that source, so cached visible
+        // history remains the explicitly attributed fallback for those backends.
+        if (backend === 'zcode' || backend === 'pi') return null;
+        if (!service?.getSessionMessages) return null;
+        const messages = await service.getSessionMessages(sessionId);
+        // Codex's compatibility reader uses [] for unavailable readback too.
+        if (backend === 'codex' && !messages.length) return null;
+        return { messages, complete: true };
+      },
+      getRuntimeMentionCandidates: async (backend, sessionId) => {
+        const service = host.plugin.agentServiceRegistry?.get(backend) as Partial<AgentMentionCapability> | undefined;
+        return await service?.getRuntimeMentionCandidates?.(sessionId) ?? [];
+      },
+      prepareNativeSessionReference: async (backend, sourceId, targetId) => {
+        const service = host.plugin.agentServiceRegistry?.get(backend) as Partial<AgentMentionCapability> | undefined;
+        return await service?.prepareNativeSessionReference?.(sourceId, targetId) ?? null;
+      },
+      resolveFileContext: async (path, kind) => {
+        const entry = app.vault.getAbstractFileByPath(path);
+        if (!entry || ('children' in entry) !== (kind === 'folder')) return null;
+        if (kind === 'folder') return { id: `reference-folder:${path}`, kind, path, label: entry.name, mime: 'application/x-directory' };
+        return (await composerContextViewFacade.sendContext.resolvePersistentContextItems([path]))[0] ?? null;
+      },
+    });
+    this.promptReferenceService = promptReferenceService;
     // R-C1: composer-side retrieval candidates. The coordinator is dormant
     // unless `vaultRetrievalEnabled` turns on; with the index service absent
     // (never attached) it stays a full no-op. R-C4: the opt-in PDF index
@@ -668,6 +730,10 @@ export class ChatRuntimeComposition {
       ),
       composerInputShellCoordinator: new ComposerInputShellCoordinator({
         ...host.createComposerInputShellCoordinatorHost(),
+        loadPromptReferenceCandidates: (query = '') => promptReferenceService.listCandidates(query, this.getPromptReferenceOptions()),
+        getPromptReferenceContextKey: () => [getVaultBasePath(app), host.plugin.settings.activeBackend,
+          host.currentConversation?.id, host.currentConversation?.backend,
+          host.currentConversation ? getConversationBackendSessionId(host.currentConversation) : ''].join(':'),
         onComposerInputChanged: (value: string) =>
           vaultRetrievalComposerCoordinator.onComposerInputChanged(value),
         onComposerSubmitted: () => vaultRetrievalComposerCoordinator.onComposerSubmitted(),
@@ -1128,19 +1194,16 @@ export class ChatRuntimeComposition {
       } as never),
       assistantAutoInternalLinkService,
     );
-    // R-E1: shared URL context fetch service (composer chips + send path).
     const urlContextFetchService = new UrlContextFetchService();
     const messageSendPreparationService = new MessageSendPreparationService(
       createMessageSendPreparationHost({
-        planMemoryInjection: async (conversation: Conversation, latestUserText: string) => (
-          host.plugin.memoryRuntime
-            ? host.plugin.memoryRuntime.planInjection({
-              conversationId: conversation.id,
-              messages: conversation.messages ?? [],
-              latestUserText,
-            })
-            : null
-        ),
+        preparePromptReferences: (content: string, target: Conversation) => this.promptReferenceService!.prepare(content, this.getPromptReferenceOptions(target)),
+        planMemoryInjection: async (conversation: Conversation, latestUserText: string) =>
+          host.plugin.memoryRuntime?.planInjection({
+            conversationId: conversation.id,
+            messages: conversation.messages ?? [],
+            latestUserText,
+          }) ?? null,
         planObsidianToolingInjection: async (conversation: Conversation) => (
           host.plugin.obsidianToolingRuntime
             ? host.plugin.obsidianToolingRuntime.planInjection({

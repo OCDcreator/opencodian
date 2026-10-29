@@ -3,6 +3,8 @@
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 
 # Owner: feature.chat-ui
+
+2026-10-29：ModelSelectorRenderer 将提供商分组绘制为带数量的 disclosure，折叠状态由 feature.chat-services 的选择协调器传入；折叠分组不生成模型 option，保留图标、ARIA 关联和 sticky header cleanup。
 > 2026-10-26（DSH UI 修复）：EffortSelector 持有菜单焦点、单选语义、展开状态和保存反馈，支持方向键、Home/End、Enter/Space、Escape 与 Tab。保存由既有 host 执行；重复保存受控，失败保留选项和反馈，成功后仅在焦点仍位于菜单时回到入口，保存期间离开或卸载不抢焦。默认/显式 Off 及生效边界文案由 host 提供，组件不解析后端协议。
 > 2026-10-24（DSH）：ContextDetailModal 显示原生占用总量；当 tokenBreakdownAvailable 为 false 时隐藏未知分类和费用计算，压缩入口继续遵守后端能力。
 > 2026-09-30 (Codex 0.159 integration)：

@@ -98,6 +98,23 @@ afterEach(() => {
     jest.clearAllMocks();
 });
 
+describe('ChatHeaderPresenter backend icon reuse', () => {
+  it('keeps the decoded backend icon through status refreshes and replaces it only on a backend change', async () => {
+    const fixture = createFixture();
+    const icon = fixture.headerEl.querySelector('.opencodian-agent-switcher-lobehub-icon');
+    await fixture.presenter.refreshServerStatusBadge();
+    fixture.presenter.refreshBackendChrome();
+    await fixture.presenter.refreshServerStatusBadge();
+    expect(fixture.headerEl.querySelector('.opencodian-agent-switcher-lobehub-icon')).toBe(icon);
+
+    fixture.setOpenCodeBackend(false);
+    await fixture.presenter.refreshServerStatusBadge();
+    const next = fixture.headerEl.querySelector<HTMLElement>('.opencodian-agent-switcher-lobehub-icon');
+    expect(next).not.toBe(icon);
+    expect(next?.dataset.lobehubIcon).toBe('claudecode');
+  });
+});
+
 describe('ChatHeaderPresenter header shell and actions', () => {
     it('builds the header shell and routes header actions through host callbacks', () => {
       const fixture = createFixture();
@@ -108,7 +125,8 @@ describe('ChatHeaderPresenter header shell and actions', () => {
 
     expect(fixture.presenter.getTabBarSlotEl()).toBe(tabBarSlotEl);
     expect(fixture.host.registerCssChangeListener).toHaveBeenCalledTimes(1);
-    expect(actionButtons).toHaveLength(6);
+    expect(actionButtons).toHaveLength(5);
+    expect(fixture.headerEl.querySelector('[data-action="settings"]')).toBeNull();
     expect(statusBadgeEl?.getAttribute('data-tooltip')).toBe(t('chat.serverStatus.openSettings'));
 
     statusBadgeEl?.click();
@@ -117,14 +135,13 @@ describe('ChatHeaderPresenter header shell and actions', () => {
     actionButtons[2]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     actionButtons[3]?.click();
     actionButtons[4]?.click();
-    actionButtons[5]?.click();
 
     expect(fixture.host.openServerSettings).toHaveBeenCalledTimes(1);
     expect(fixture.host.createConversationInNewTab).toHaveBeenCalledTimes(1);
     expect(fixture.host.createConversationInCurrentTab).toHaveBeenCalledTimes(1);
     expect(fixture.host.showConversationHistory).toHaveBeenCalledTimes(1);
     expect(fixture.host.openConversationSessionSettings).toHaveBeenCalledTimes(1);
-    expect(fixture.host.openSettings).toHaveBeenCalledTimes(1);
+    expect(fixture.host.openSettings).not.toHaveBeenCalled();
   });
 
   it('uses backend settings language for the status badge outside OpenCode mode', async () => {
@@ -181,7 +198,6 @@ describe('ChatHeaderPresenter header shell and actions', () => {
       ['new-current-tab', t('chat.tab.newCurrentTooltip')],
       ['history', t('chat.history.open')],
       ['session-settings', t('chat.sessionSettings.open')],
-      ['settings', t('chat.settings.open')],
     ];
 
     for (const [action, label] of expectedActions) {
@@ -214,7 +230,7 @@ describe('ChatHeaderPresenter header shell and actions', () => {
     expect(
       Array.from(configGroup?.querySelectorAll<HTMLElement>('.opencodian-header-btn') ?? [])
         .map((button) => button.dataset.action),
-    ).toEqual(['session-settings', 'opencode-diagnostics', 'settings']);
+    ).toEqual(['session-settings', 'opencode-diagnostics']);
   });
 
   it.each(['armed', 'capturing', 'warning', 'critical'] as const)(
@@ -281,10 +297,10 @@ describe('ChatHeaderPresenter header shell and actions', () => {
     expect(claudeCodeIconEl?.dataset.lobehubIcon).toBe('claudecode');
     expect(
       claudeCodeIconEl?.querySelector<HTMLImageElement>('.opencodian-agent-switcher-lobehub-img--light')?.src,
-    ).toBe('https://unpkg.com/@lobehub/icons-static-webp@latest/light/claudecode-color.webp');
+    ).toMatch(/^data:image\/svg\+xml/);
     expect(
       claudeCodeIconEl?.querySelector<HTMLImageElement>('.opencodian-agent-switcher-lobehub-img--dark')?.src,
-    ).toBe('https://unpkg.com/@lobehub/icons-static-webp@latest/dark/claudecode-color.webp');
+    ).toMatch(/^data:image\/svg\+xml/);
 
     fixture.host.getActiveBackendKind.mockReturnValue('codex');
     await fixture.presenter.refreshServerStatusBadge();
@@ -306,7 +322,7 @@ describe('ChatHeaderPresenter header shell and actions', () => {
     const actionButtons = fixture.headerEl.querySelectorAll<HTMLElement>('.opencodian-header-btn');
     const newTabButton = fixture.headerEl.querySelector<HTMLElement>('.opencodian-header-btn--new-tab');
 
-    expect(actionButtons).toHaveLength(6);
+    expect(actionButtons).toHaveLength(5);
     expect(newTabButton).toBe(actionButtons[1]);
   });
 

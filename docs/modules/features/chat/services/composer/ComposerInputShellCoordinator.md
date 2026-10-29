@@ -15,7 +15,7 @@
 > **源码**: `src/features/chat/services/composer/ComposerInputShellCoordinator.ts`
 > **状态**: [REVIEW]
 
-> **新增（Codex）**: host 可选 `isCodexBackendActive?()`、`onCodexAgentMentionUnavailable?()` 与 `onCodexSkillsEmpty?()`；`refreshComposerSuggestionMenu` 将 Codex `$skill-name` 作为**一等触发**（与 `/` 同级优先）——检测到 `getCodexSkillMenuQuery` 非 null 即路由 `refreshSlashCommandMenu`，任何中间 agent/command/input-reset 逻辑都不会清空 textarea 或隐藏菜单。`onCodexAgentMentionUnavailable` 在 `@` 时触发；`onCodexSkillsEmpty` 在 skill 选择器无 skills 时触发。
+> **新增（Codex）**: host 可选 `isCodexBackendActive?()`、`onCodexAgentMentionUnavailable?()` 与 `onCodexSkillsEmpty?()`；`refreshComposerSuggestionMenu` 将 Codex `$skill-name` 作为**一等触发**（与 `/` 同级优先）——检测到 `getCodexSkillMenuQuery` 非 null 即路由 `refreshSlashCommandMenu`，任何中间 agent/command/input-reset 逻辑都不会清空 textarea 或隐藏菜单。`onCodexAgentMentionUnavailable` 仅在未接入统一引用 loader 的兼容宿主输入 `@` 时触发；`onCodexSkillsEmpty` 在 skill 选择器无 skills 时触发。
 
 ## 概述
 
@@ -176,6 +176,14 @@ export class ComposerInputShellCoordinator {
 ## 2026-10-26 Composer 可访问名称
 
 Textarea 使用独立、每实例唯一的 visually-hidden 本地化标签，通过 aria-labelledby 关联；视觉 placeholder 继续 aria-hidden 且可随草稿隐藏。名称不会随输入消失，applyLocaleTexts 同步标签文本；不引入会触发宿主原生 tooltip 的 aria-label/title。发送、草稿和跨 tab 所有权不变。
+
+## 2026-10-29 统一 @ 引用
+
+可选 host `loadPromptReferenceCandidates(query)` 与 `getPromptReferenceContextKey()` 将当前后端/Vault/会话的文件、文件夹、会话及有效原生插件能力接入同一个菜单。原生 agent dispatch 能力关闭时，引用菜单仍然可用；Codex 在统一引用入口下不再弹出旧的「不支持 @agent」提示。插件能力是否显示由 host 的有效目录决定。
+
+稳定引用从草稿解析为带 kind/label 的 CodeMirror 原子标签；镜像层使用同一标签。重叠高亮先过滤再交给编辑器，避免文件名中的 slash 技能名破坏引用装饰。鼠标选择通过 host textarea port 插入，不依赖 CodeMirror 内部焦点节点。发送保留稳定身份，引用准备由 send owner 执行。
+
+`ComposerInputShellCoordinator.agentMention.test.ts` 增加原生 agent 能力关闭时的引用菜单和 Codex notice 抑制覆盖；原有 agent intent、slash 菜单、手写文字和删除行为继续回归测试。
 
 ## 2026-10-27 单轨 Composer（权限、Agent、模型 · 思考强度）
 

@@ -148,6 +148,25 @@ afterEach(() => {
 });
 
 describe('ZCodeAdapter — live model catalog and boundaries', () => {
+  it('loads workspace models before any chat and keeps the workspace default separate from a session', async () => {
+    await startAdapter();
+    const request = (adapter as unknown as { transport: { request: jest.Mock<(method: string, params?: Record<string, unknown>) => Promise<unknown>> } }).transport.request;
+    const original = request.getMockImplementation()!;
+    request.mockImplementation(async (method, params) => {
+      if (method === 'session/create') return { session: { sessionId: params?.['sessionId'] }, settings: snapshotSettings };
+      if (method === 'session/close') return { closed: true };
+      return original(method, params);
+    });
+    const result = await adapter.getWorkspaceModelCatalog();
+    expect(result.models).toHaveLength(2);
+    expect(result.defaultModel).toEqual({ provider: 'opencode-go', model: 'grok-4.5' });
+    expect(adapter.getObservedModel()).toBeNull();
+    expect(calls.map((entry) => entry.method)).toEqual(['runtime/capabilities']);
+    await adapter.getWorkspaceModelCatalog();
+    expect(request.mock.calls.filter(([method]) => method === 'session/create')).toHaveLength(1);
+    expect(request.mock.calls.some(([method]) => method === 'session/send' || method === 'session/setModel')).toBe(false);
+  });
+
   it('loads native workspace commands before creating any session', async () => {
     await startAdapter();
     const request = (adapter as unknown as { transport: { request: jest.Mock<(method: string, params?: Record<string, unknown>) => Promise<unknown>> } }).transport.request;

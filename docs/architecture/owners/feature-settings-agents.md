@@ -1,4 +1,6 @@
 # Owner: feature.settings-agents
+> 2026-10-29（固定图标复用）：后端导航沿用同一套 LobeHub/Pi/ZCode/DSH 图形，固定 LobeHub SVG 现内置为模块级 light/dark data URL，设置页与聊天共用，取消 CDN 与 lazy 首显依赖。用户 provider 图标缓存仍归原 owner。
+> 2026-10-29（独立设置窗口残留浮栏）：floating rail 只在锚点连接后挂到实际 ownerDocument.body；设置页跨 document adopt 时迁移 portal 并重绑全部窗口监听与观察器，锚点断开或 owner pagehide 时幂等清理。预渲染阶段不得把浮栏留在主窗口；后端选择状态与 owner 边界不变。
 > 2026-10-26（DSH UI 修复）：浮动 backend 轨的 resize 监听与 ResizeObserver/MutationObserver 绑定到容器所属 document.defaultView，清理时使用同一窗口。独立设置窗口真实缩放时重新测量容器边缘，避免沿用主窗口坐标；不新增设置或后端选择状态。
 > 2026-09-28：OpenCode 2 设置包含原生 MCP 连接状态、API 密钥/OAuth 认证、凭据切换与运行目录。原生配置覆盖层和 OpenCode 1 配置互相独立。
 > 2026-09-24 (票 06)：SettingsZCodeSection 新增三项持久化默认字段与重连时的斜杠目录失效调用。

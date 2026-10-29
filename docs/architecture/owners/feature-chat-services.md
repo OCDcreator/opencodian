@@ -9,6 +9,18 @@
 > 2026-09-20 (advantage-parity R-D1)：ConversationHistoryActionsCoordinator 每条会话新增「导出为 Markdown 笔记」按钮（可选 host 方法，未提供不渲染）。
 
 # Owner: feature.chat-services
+
+2026-10-29：ChatHeaderPresenter 移除重复全局设置按钮并沿用 backend/server badge 的设置入口；同后端状态刷新保留现有图标节点，后端变化才切换共享内置资源。品牌文字的容器查询归既有 core.css，未扩展 OpenCodianView 的运行时职责。
+
+2026-10-29：ZCode 选择绑定在无会话时消费工作区原生目录及默认模型，已有会话仍消费同 sessionId 的当前模型；目录 bootstrap 与临时草稿生命周期归 core.backend，不在 UI 层造目录或创建持久会话。
+
+2026-10-29：ChatSelectionControlsCoordinator 持有模型弹框的提供商折叠状态和匹配搜索展开行为，并维护重绘后的滚动、按钮焦点及 combobox active-descendant；目录、模型可用性和选择写回继续委托既有 ModelSelectionRuntime。
+
+2026-10-29：SlashCommandMenuCoordinator 持有 `/` 的命令／技能折叠状态，菜单渲染与 `@` 复用同一 disclosure anatomy；两种菜单在非空搜索加载后展开有匹配项的分类，空搜索及未匹配分类保留当前折叠状态。原生技能序列化、目录与 `$` 专用浏览行为保持各自现有 owner。
+
+2026-10-29：引用菜单的分类折叠状态归既有 AgentMentionComposerController 持有，renderer 只绘制 disclosure 和候选；方向键及插入共用展开状态，不新增设置或后端状态。
+
+2026-10-29：PromptReferenceService 拥有统一 `@` 的身份、Vault 边界和有预算／来源标记的历史准备；composer 负责分组候选与原子显示，send preparation 保存引用元数据。权威历史合并保留本地引用证据及可读名称，原生插件可用性与历史身份继续由 backend owner 提供，服务不借用全局原生会话目录。
 > 2026-10-26（DSH UI 修复）：ComposerInputShellCoordinator 为输入框持有独立的本地化隐藏 label；ChatSelectionControlsCoordinator 补模型入口键盘打开行为，并仅按完整 provider/model 身份查询目录显示名。这些 DOM 与查询职责沿用现有 owner，不增加第二份模型选择状态。
 > 2026-10-24（DSH）：selection coordinator 消费原生目录并绑定发起选择的会话；生产发送 host 把模型/推理覆盖送入 preparation 与 adapter；命令目录、权限模式与上下文读取按后端隔离。DSH 的 aggregate occupancy 不补用 OpenCode 数据。
 > 2026-10-02（reviewed continuation，用户已授权）：会话单删/批删的失败和 pending 不被渲染成整体成功；只清理已确认成功项的标签页，失败项保留选择、会话与可重试状态，并在必要时恢复有效 active tab。删除命令由 host 转发，服务不建立第二套 native deletion 真值，也不越过 backend 的 admission/readback 判定。

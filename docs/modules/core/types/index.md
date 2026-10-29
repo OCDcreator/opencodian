@@ -215,3 +215,6 @@ Settings exports now include `SandboxFilesystemConfig`, `SandboxNetworkConfig`, 
 > 2026-09-18 (R-C3)：barrel 新增导出 `INLINE_COMPLETION_MAX_CHARS_DEFAULT/MIN/MAX` 与 `normalizeInlineCompletionMaxChars`。
 
 > 2026-09-19 (R-C3 补全专用模型覆盖)：barrel 新增导出 `normalizeInlineCompletionModelOverrides`（R-C3 `inlineCompletionModelOverrides` 设置的保存期归一化）。
+# 2026-10-29: Composer reference contracts
+
+Re-exports the backend-neutral prompt reference, candidate, native mention, session snapshot and prepared-reference contracts from chat.ts.

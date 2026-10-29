@@ -14,3 +14,6 @@
 2026-10-02（T07最小协议slice）：两个新增读取位于独立 `PI_OPTIONAL_RPC_COMMANDS`，未扩大 `get()` 的必需握手集合，旧SDK缺少可选方法时仍可启动。`PiSessionRuntime.test.ts` 新增可选目录存在/缺失均通过握手、缺少必需操作仍拒绝的离线检查。源码继续使用既有必需握手集合，无需扩大 `get()` 的能力要求。支持目录及unavailable由独立SDK服务根据实际方法返回，运行时不自行宣称旧SDK支持。首批验证仅覆盖协议/服务。2026-10-02 用户明确允许 reviewed continuation 后，PiCommandName 与 PiAdapter 公共 allowlist 已接通两项可选读取，公共 typed dispatch 通过真实 commands.mjs handler 的离线回归。PiSessionRuntime 源码及 mandatory handshake 保持原样；公共接线、实装 SDK 内存读、完整服务握手和真实模型/UI 是独立证据，后两者仍待验收。
 
 OAuth URL notices retain a request-ID scoped abort lifetime without a protocol response. Native login settlement cancels oauth-link, hides the authorization link, and releases its listener; ordinary timed notifications are unchanged.
+## 2026-10-29：不创建来源的引用读取
+
+`getExisting(sessionId)` 只查看现有连接并等待其既有握手，连接已替换、关闭、dispose 或握手失败时返回 null；不调用 `get()`，不会创建 RPC 服务。供会话引用读取使用，保留每会话 runtime 独立性。

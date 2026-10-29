@@ -1,5 +1,7 @@
 # ZCodeModelCatalog
 
+2026-10-29：`getWorkspaceModelCatalog` 在无聊天会话时使用原生 deferred 草稿读取完整目录／默认模型，再以同 id 和 expectedPersistence 关闭；工具目录与 MCP 关闭，不发送模型回合。并发加载去重、成功缓存按 transport 隔离；清理未确认、无效快照和迟到 transport 均拒绝发布且允许重试。工作区默认模型与真实会话 catalog 分开保存，不能借用临时草稿冒充会话模型。
+
 > 2026-09-26（Plan 独立状态修复）：`session/read.settings.mode.current` 可能保留 `build`、`edit`、`yolo` 或 `auto` 基础模式；任何有效基础模式都不能直接否定已受理的 Plan 请求。`classifyZCodeModeReadback` 对这些基础投影返回“Plan 需独立事件读回”，无值或非模式值仍拒绝。实际生效仍由 adapter 的同会话 `session/events.planEnabled` 证明。FA880 真正聊天 `/plan` 暴露了此前只特殊处理 `build` 时对 `yolo` 的误报失败。
 
 > 2026-09-25 (FA880): `session/read` remains a base-mode projection. The adapter now pairs it with native `session/events` to confirm independent `planEnabled:true` for the same session; this catalog module still classifies the snapshot-only result conservatively.

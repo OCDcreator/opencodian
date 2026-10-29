@@ -517,23 +517,14 @@ export class SlashCommandMenuCatalogCache {
       if (isClaudeBackend) {
         // Claude backend: use Claude runtime agents only; skip OpenCode runtime/project agents
         const claudeAgents = normalizeClaudeRuntimeAgents(claudeRuntimeAgentsResult);
-        agentMentionCandidates = Promise.resolve(
-          claudeAgents.map((agent) => ({
-            id: agent.name,
-            displayName: agent.name,
-            description: agent.description ?? '',
-            mode: 'all' as const,
-            hidden: false,
-          })),
-        );
-        agentSelectionCandidates = Promise.resolve(
-          claudeAgents.map((agent) => ({
-            id: agent.name,
-            displayName: agent.name,
-            description: agent.description ?? '',
-            mode: 'all' as const,
-          })),
-        );
+        const projectedAgents = claudeAgents.map((agent) => ({
+          id: agent.name,
+          displayName: agent.name,
+          description: agent.description ?? '',
+          mode: 'all' as const,
+        }));
+        agentMentionCandidates = Promise.resolve(projectedAgents.map((agent) => ({ ...agent, hidden: false })));
+        agentSelectionCandidates = Promise.resolve(projectedAgents);
       } else {
         // OpenCode backend: use OpenCode runtime agents + project agents
         const runtimeAgentsResult = Promise.resolve(getAttachedOpenCodeAppAgents(runtimeSkillsResult) ?? [])

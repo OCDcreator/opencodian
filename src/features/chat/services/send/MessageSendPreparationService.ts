@@ -20,6 +20,8 @@ import type {
   ChatMessage,
   Conversation,
   ImageAttachment,
+  NativePromptMention,
+  PreparedPromptReferences,
   PromptContextItem,
 } from '../../../../core/types';
 import { getConversationBackendSessionId } from '../../../../core/types';
@@ -29,6 +31,7 @@ import { getPromptContextTargetKey, partitionExistingContextItems } from '../../
 import type { SendPipelineStreamElements } from '../../runtime/send/SendPipelineTypes';
 import type { TabId } from '../../tabs';
 import type { ComposerSendContextPort } from '../composer/ComposerContextViewFacade';
+import { parsePromptReferences } from '../context/PromptReferenceService';
 import type { ConversationWriteTicket } from '../conversation/ConversationWriteSerializationService';
 import type { WritableTabSessionPhase } from '../conversation/TabSessionPhase';
 
@@ -50,6 +53,8 @@ export interface SendMessageModelOptions {
   codexOptions?: Record<string, unknown>;
   /** One-shot structured-output schema for Claude Code `/json` trigger. Not persisted. */
   outputFormat?: Record<string, unknown>;
+  /** Runtime-validated native plugin/app/resource selections for this turn. */
+  nativeMentions?: NativePromptMention[];
 }
 
 export type ComposerInputMode = 'prompt' | 'shell';
@@ -118,6 +123,8 @@ export interface PreparedMessageSend {
   userMessage: ChatMessage;
   resolvedAgentInvocation?: ResolvedAgentInvocation;
   images?: ImageAttachment[];
+  /** Prepared backend text, distinct from the persisted readable user echo. */
+  requestContent?: string;
 }
 
 export interface BuildOptimisticUserMessageOptions {
@@ -149,6 +156,7 @@ export function buildOptimisticUserMessage(
 
 export interface MessageSendPreparationHost {
   ensureConversationReady(): Promise<Conversation | null>;
+  preparePromptReferences?(content: string, conversation: Conversation): Promise<PreparedPromptReferences>;
   /**
    * Plan the backend-neutral memory injection for this turn (per context
    * epoch). Optional and fail-soft: null when the memory backend is off.
@@ -266,6 +274,7 @@ export interface MessageSendPreparationHost {
 
 export interface MessageSendPreparationHostDependencies {
   getCurrentConversation: () => Conversation | null;
+  preparePromptReferences?: (content: string, conversation: Conversation) => Promise<PreparedPromptReferences>;
   createNewConversation: () => Promise<Conversation | null>;
   createConversationWriteTicket: (conversationId: string) => ConversationWriteTicket;
   commitConversationWrite: (
@@ -489,9 +498,26 @@ export class MessageSendPreparationService {
     if (options.outputFormat) {
       modelOptions.outputFormat = options.outputFormat;
     }
+    let references: PreparedPromptReferences | undefined;
+    try {
+      references = await this.host.preparePromptReferences?.(options.content, conversation);
+    } catch (error) {
+      new Notice(error instanceof Error ? error.message : String(error));
+      this.resetPreparingLifecycle(tabId);
+      this.notifyPreparationOutcome(options, 'rejected');
+      return null;
+    }
+    if (!this.isTargetTabActive(tabId)) {
+      this.resetPreparingLifecycle(tabId);
+      this.notifyPreparationOutcome(options, 'rejected');
+      return null;
+    }
+    const displayContent = references?.displayContent ?? options.content;
+    const preparedContent = references?.content ?? options.content;
+    if (references?.nativeMentions.length) modelOptions.nativeMentions = references.nativeMentions;
     // Backend-neutral memory injection rides the options bag to each
     // adapter seam (opencode: synthetic part; others: prompt prefix).
-    const memoryInjection = await this.planTurnMemoryInjection(conversation, options.content);
+    const memoryInjection = await this.planTurnMemoryInjection(conversation, displayContent);
     if (memoryInjection) {
       (modelOptions as Record<string, unknown>).memoryInjection = memoryInjection;
     }
@@ -503,7 +529,8 @@ export class MessageSendPreparationService {
     }
     const activeModelId = this.host.formatModelId(modelOptions);
     const persistentContextItems = await this.composerSendContext.resolvePersistentContextItems(conversation.externalContextPaths);
-    let mergedContextItems = this.mergeContextItems(persistentContextItems, draftContextItems);
+    let mergedContextItems = this.mergeContextItems(persistentContextItems,
+      this.mergeContextItems(draftContextItems, references?.contextItems ?? []));
     // R-E1: pending URL chips fetch now (send-time, local, SSRF-guarded).
     // Failures stay in the context list with status failed — the injected
     // tag reports them honestly; a fetch failure never blocks the turn.
@@ -545,8 +572,8 @@ export class MessageSendPreparationService {
     // Claude processes @agent natively; OpenCode strips mentions into invocationParts.
     const isClaudeBackend = (conversation.backend ?? 'opencode') === 'claude-code';
     const requestContent = isClaudeBackend
-      ? options.content
-      : this.agentInvocationService.removeMentionFallbackText(options.content, resolvedAgentInvocation);
+      ? preparedContent
+      : this.agentInvocationService.removeMentionFallbackText(preparedContent, resolvedAgentInvocation);
     const skillExpansion = conversation.backend && conversation.backend !== 'opencode'
       ? { syntheticParts: [] }
       : await this.skillContentExpander.expand(requestContent);
@@ -570,12 +597,15 @@ export class MessageSendPreparationService {
       ...(!isClaudeBackend && resolvedAgentInvocation.invocationParts.length > 0 ? { invocationParts: resolvedAgentInvocation.invocationParts } : {}),
     });
     const userMessage = buildOptimisticUserMessage({
-      content: options.content,
+      content: displayContent,
       contextItems,
       now: Date.now(),
       structuredSend: { optimisticUserParts: structuredSend.optimisticUserParts },
       images: options.images,
     });
+    if (references?.sessionReferences.length) userMessage.sessionReferences = references.sessionReferences;
+    const promptReferences = parsePromptReferences(options.content).map((span) => span.reference);
+    if (promptReferences.length) userMessage.promptReferences = promptReferences;
     const writeTicket = this.host.createConversationWriteTicket(conversation.id);
     let messageRecorded = false;
     const writeApplied = await this.host.commitConversationWrite(
@@ -611,13 +641,13 @@ export class MessageSendPreparationService {
     const shouldBootstrapTitle = this.isFirstUserMessage(conversation)
       && (conversationBackend === 'opencode' || conversationBackend === 'opencode2' || conversationBackend === 'claude-code');
     if (shouldBootstrapTitle) {
-      await this.host.applyFallbackConversationTitle(conversation.id, options.content);
+      await this.host.applyFallbackConversationTitle(conversation.id, displayContent);
       const shouldGenerateAiTitle = this.host.shouldGenerateAiTitle(conversation);
       if (conversationBackend === 'claude-code' && shouldGenerateAiTitle) {
         await this.markConversationTitleGenerationPending(conversation);
       }
       if (shouldGenerateAiTitle) {
-        this.host.startAiConversationTitleGeneration(conversation.id, options.content, modelOptions);
+        this.host.startAiConversationTitleGeneration(conversation.id, displayContent, modelOptions);
       }
     }
     this.notifyPreparationOutcome(options, 'accepted');
@@ -627,6 +657,7 @@ export class MessageSendPreparationService {
       draftContextItems, contextItems, modelOptions, activeModelId, userMessage,
       resolvedAgentInvocation: resolvedAgentInvocation.invocationParts.length > 0 || resolvedAgentInvocation.agent ? resolvedAgentInvocation : undefined,
       images: options.images,
+      ...(references && preparedContent !== options.content ? { requestContent } : {}),
     };
   }
 
@@ -946,6 +977,7 @@ export function createMessageSendPreparationHost(
       if (!deps.getCurrentConversation()) await deps.createNewConversation();
       return deps.getCurrentConversation();
     },
+    ...(deps.preparePromptReferences ? { preparePromptReferences: deps.preparePromptReferences } : {}),
     getActiveTabId: () => deps.getActiveTabId(),
     ensureTabRuntime: (tabId) => Boolean(tabId && deps.ensureTabRuntimeState(tabId)),
     isTabForegroundBusy: (tabId) => (tabId ? deps.isTabForegroundBusy(tabId) : false),

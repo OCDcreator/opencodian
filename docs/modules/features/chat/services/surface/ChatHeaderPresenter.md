@@ -1,5 +1,7 @@
 # ChatHeaderPresenter
 
+2026-10-29：移除重复的聊天全局设置齿轮，保留 backend/server 状态图标的原设置跳转，以及会话设置／诊断操作。后端身份未变且图标节点存在时复用 DOM，不因状态轮询重建图片；后端改变或图标丢失时才重渲染。固定图标使用共享内置 SVG，无外网等待。品牌图形保持固定尺寸，文字图形由 core.css 按 Chat 容器宽度控制显示，窄栏不压缩。
+
 > 2026-07-29: The configuration group includes an OpenCode-only diagnostics button with stable state attributes.
 > 2026-07-30: The diagnostics button is now backend-routed. Host gains optional `showCodexDiagnostics(event, tabId)`, `getCodexDiagnosticsState(tabId)` and `getActiveDiagnosticsTabId()`. `refreshBackendChrome()` shows the button for OpenCode or Codex (when a Codex host is wired) and writes `data-trace-state` from the matching state getter; `routeDiagnosticsClick` dispatches to the Codex path for the active codex backend and falls back to OpenCode otherwise. Non-trace backends keep the button hidden.
 > 2026-07-30: Claude Code is now a third backend-routed diagnostics surface. The host may provide `showClaudeDiagnostics(event, tabId)` and `getClaudeDiagnosticsState(tabId)`; when the active backend is `claude-code`, the presenter writes the Claude state to the shared badge and dispatches clicks to `ClaudeDiagnosticsHostAdapter`. Missing or throwing trace callbacks keep the button conservative and do not affect the rest of header chrome.

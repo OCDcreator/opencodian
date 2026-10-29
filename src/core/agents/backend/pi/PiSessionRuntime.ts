@@ -56,6 +56,14 @@ export class PiSessionRuntime {
     return connection.client;
   }
 
+  /** Read-only callers may use an existing slot, without creating a source runtime. */
+  async getExisting(sessionId: string): Promise<PiRpcPort | null> {
+    const connection = this.connections.get(sessionId);
+    if (!connection || this.disposed) return null;
+    try { await connection.ready; } catch { return null; }
+    return this.connections.get(sessionId) === connection && !connection.abort.signal.aborted ? connection.client : null;
+  }
+
   close(sessionId: string): void {
     const connection = this.connections.get(sessionId);
     if (!connection) return;

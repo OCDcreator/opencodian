@@ -9,6 +9,8 @@
  * before any native request is sent (unsupported values never reach the wire).
  */
 
+import { randomUUID } from 'node:crypto';
+
 /** Permission mode values accepted by `session/setMode` (native `$j` enum). */
 export const ZCODE_MODES = ['plan', 'build', 'edit', 'yolo', 'auto'] as const;
 export type ZCodeMode = (typeof ZCODE_MODES)[number];
@@ -308,6 +310,49 @@ export interface ZCodeCatalogTransport {
 export class ZCodeModelSurface {
   private catalog: ZCodeModelCatalog | null = null;
   private catalogSettingsBase: unknown = null;
+  private workspaceCatalog: { transport: ZCodeCatalogTransport; catalog: ZCodeModelCatalog } | null = null;
+  private workspaceCatalogLoad: { transport: ZCodeCatalogTransport; promise: Promise<ZCodeModelCatalog> } | null = null;
+
+  /** Read native workspace defaults before a conversation exists, without a persisted chat or model turn. */
+  async getWorkspaceModelCatalog(
+    transport: ZCodeCatalogTransport,
+    workspacePath: string,
+    isCurrentTransport: () => boolean,
+  ): Promise<ZCodeModelCatalog> {
+    if (!workspacePath) throw new Error('ZCode workspace model discovery requires a vault path.');
+    if (this.workspaceCatalog?.transport === transport) return this.workspaceCatalog.catalog;
+    if (this.workspaceCatalogLoad?.transport === transport) return this.workspaceCatalogLoad.promise;
+    const promise = (async () => {
+      const sessionId = `sess_${randomUUID()}`;
+      let snapshot: unknown;
+      let parsed: ZCodeModelCatalog | null = null;
+      let closed = false;
+      try {
+        snapshot = await transport.request('session/create', {
+          sessionId, workspace: { workspaceKey: workspacePath, workspacePath },
+          persistence: 'deferred', titleGenerationEnabled: false,
+          mcpServers: [], toolAllowlist: [], dynamicWorkflowEnabled: false,
+        });
+        if (asRecord(asRecord(snapshot)['session'])['sessionId'] !== sessionId) {
+          throw new Error('ZCode workspace discovery returned an unexpected draft identity.');
+        }
+        parsed = parseZCodeCatalogSnapshot(asRecord(snapshot)['settings']);
+        if (!parsed) throw new Error('ZCode workspace model catalog was unavailable.');
+      } finally {
+        closed = asRecord(await transport.request('session/close', { sessionId, expectedPersistence: 'deferred' }))['closed'] === true;
+      }
+      if (!closed) throw new Error('ZCode workspace discovery draft did not close.');
+      if (!isCurrentTransport()) throw new Error('ZCode workspace model discovery was superseded.');
+      this.workspaceCatalog = { transport, catalog: parsed };
+      return parsed;
+    })();
+    this.workspaceCatalogLoad = { transport, promise };
+    try {
+      return await promise;
+    } finally {
+      if (this.workspaceCatalogLoad?.promise === promise) this.workspaceCatalogLoad = null;
+    }
+  }
 
   /** Latest live catalog observed from the runtime (null = unobserved). */
   getAvailableModelCatalog(): ZCodeModelCatalog | null {

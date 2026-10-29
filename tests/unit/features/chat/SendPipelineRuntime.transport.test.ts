@@ -22,6 +22,22 @@ describe('SendPipelineRuntime transport payload and local notices', () => {
     expect(shouldRefreshOpenCodeDiagnosticsHeader('tab-target', null)).toBe(false);
   });
 
+  it('forwards prepared reference content and native selections without replacing the readable user echo', async () => {
+    const preparedSend = createPreparedSend();
+    preparedSend.requestContent = 'native reference and bounded transcript';
+    preparedSend.userMessage.content = 'Compare @prior';
+    preparedSend.modelOptions.nativeMentions = [{ backend: 'codex', kind: 'plugin', id: 'plugin-a', label: 'Plugin A', nativePath: 'plugin://a' }];
+    const runtimeState = createTabRuntime();
+    const host = createHost(runtimeState, createStreamController(), [], {
+      sendStreamMessage: jest.fn().mockImplementation(() => createAsyncStream([{ type: 'message_stop' }])),
+    });
+    const runtime = new SendPipelineRuntime(host, createPreparationPort(preparedSend), createFinalizationPort());
+    await runtime.sendMessage('encoded draft identity');
+    expect(host.sendStreamMessage).toHaveBeenCalledWith(preparedSend.conversation, preparedSend.requestContent,
+      expect.objectContaining({ nativeMentions: preparedSend.modelOptions.nativeMentions }));
+    expect(preparedSend.userMessage.content).toBe('Compare @prior');
+  });
+
   it('sends the merged prepared context items instead of only draft items', async () => {
     const contextItem = {
       id: 'context-1',

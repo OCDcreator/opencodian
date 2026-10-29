@@ -551,6 +551,7 @@ body[data-opencodian-provider-icon-mode="color"] {
 
 .opencodian-title {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 8px;
   font-weight: 800;
@@ -587,6 +588,7 @@ body[data-opencodian-provider-icon-mode="color"] {
 
 .opencodian-title-text {
   display: block;
+  flex-shrink: 0;
   width: auto;
   height: 16px;
   object-fit: contain;
@@ -996,6 +998,13 @@ body[data-opencodian-provider-icon-mode="color"] {
   flex: 1;
   min-width: 0;
   margin: 0 12px;
+}
+
+/* The brand name appears only when the chat pane has room for it at full size. */
+@container (max-width: 480px) {
+  .opencodian-header .opencodian-title-text {
+    display: none;
+  }
 }
 
 @container (max-width: 400px) {

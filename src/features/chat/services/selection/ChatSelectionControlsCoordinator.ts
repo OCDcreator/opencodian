@@ -413,6 +413,7 @@ export class ChatSelectionControlsCoordinator {
   private disposeModelSelectorStickyHeaders: (() => void) | null = null;
   private isModelDropdownOpen = false;
   private modelFilterQuery = '';
+  private readonly collapsedModelProviders = new Set<string>();
   private modelDropdownClickOutsideHandler: ((event: MouseEvent) => void) | null = null;
   private currentModelTriggerIconUrl: string | null = null;
   private modelSelectorIconRequestId = 0;
@@ -1056,6 +1057,14 @@ export class ChatSelectionControlsCoordinator {
 
     this.modelSelectorSearchInput.addEventListener('input', (event) => {
       this.modelFilterQuery = (event.target as HTMLInputElement).value.toLowerCase();
+      if (this.modelFilterQuery.trim()) {
+        for (const provider of this.getAvailableProviders()) {
+          if (provider.name.toLowerCase().includes(this.modelFilterQuery)
+            || provider.models.some((model) => model.name.toLowerCase().includes(this.modelFilterQuery))) {
+            this.collapsedModelProviders.delete(provider.id);
+          }
+        }
+      }
       this.renderModelList();
     });
 
@@ -1194,6 +1203,20 @@ export class ChatSelectionControlsCoordinator {
       filterQuery: this.modelFilterQuery,
       currentSelection: this.getCurrentSessionModel(),
       highlightedValue,
+      collapsedProviders: this.collapsedModelProviders,
+      onToggleProvider: (providerId) => {
+        const restoreFocus = this.modelSelectorScrollContainer?.contains(document.activeElement);
+        const scrollTop = this.modelSelectorScrollContainer?.scrollTop ?? 0;
+        if (this.collapsedModelProviders.has(providerId)) this.collapsedModelProviders.delete(providerId);
+        else this.collapsedModelProviders.add(providerId);
+        this.renderModelList();
+        if (this.modelSelectorScrollContainer) {
+          this.modelSelectorScrollContainer.scrollTop = scrollTop;
+          if (restoreFocus) Array.from(this.modelSelectorScrollContainer.querySelectorAll<HTMLButtonElement>('button[data-provider-id]'))
+            .find((button) => button.dataset.providerId === providerId)?.focus();
+        }
+        this.modelDropdownLayoutController?.sync();
+      },
       previousStickyHeadersCleanup: this.disposeModelSelectorStickyHeaders,
       texts: {
         loading: t('chat.composerPopover.modelLoading'),

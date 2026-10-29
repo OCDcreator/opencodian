@@ -1,5 +1,9 @@
 # Owner: core.backend
 
+2026-10-29：ZCodeModelSurface 继续拥有目录生命周期，补无会话工作区目录加载（deferred 草稿、原生读回、条件关闭、并发去重及 transport 隔离）；adapter 仅暴露工作区 models/default seam，不建立第二个聊天会话 owner。
+
+2026-10-29：原生 mention 目录与发送校验仍归来源适配器所有：Codex 使用有效安装目录与结构化输入，ZCode 使用当前 workspace/session 目录；DSH 仅在 resolver 与两端 Vault 身份已验证时返回原生引用。Codex/ZCode 提供只读引用历史入口，失败返回 unavailable，由 feature 层使用有来源标记的快照回退，不启动来源模型回合。
+
 2026-10-27：OpenCode 2 配置覆盖验证支持 JSONC 注释和尾逗号；解析失败在修改设置/启动服务前返回。原生读回、活动 turn 保护、远程只读和失败恢复仍归适配器持有，设置 UI 不绕过该边界。
 > 2026-10-24：DSH 默认由 DshNativeClient 承载原生运行时扩展，ACP 为兼容选项。原生历史/分叉/命令/问题/MCP 和辅助 LLM 归本 owner；DshAuxQuerySession 校验无 Agent/工具调度/持久化的安全边界，DshQuestionBridge 拥有问题结算。私有 profile 接收启动器写入，用户 SDK 配置只读；assets/dsh 仅为嵌入式插件源码。新增模块分别映射同名模块文档，未新增服务 owner 或 feature 依赖。
 > 2026-10-13（矩阵接力 018）：CodexAppServerTransport.handleMessage 增加非对象帧防护——JSON null/标量/数组帧路由到既有 Unrecognized 告警路径，不再于 `msg.id` 解引用处抛未捕获异常击穿 ws.onmessage；语义对齐 ZCode 解析器的 isPlainObject 加固。修复经 owned loopback WebSocket 实机复测（修复前 null 帧致命、修复后零异常且连接保持），回归用例与全量 verify 落 main。

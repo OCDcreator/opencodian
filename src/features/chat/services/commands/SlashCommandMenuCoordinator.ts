@@ -8,7 +8,12 @@ import {
   type SlashCommandMenuQuery,
 } from '../composer/composerInputParsing';
 import { filterSlashCommandMenuItems } from './slashCommandMenuFilter';
-import { renderSlashCommandMenu, type SlashCommandMenuStatus } from './slashCommandMenuRenderer';
+import {
+  getSlashCommandMenuGroup,
+  renderSlashCommandMenu,
+  type SlashCommandMenuGroup,
+  type SlashCommandMenuStatus,
+} from './slashCommandMenuRenderer';
 
 export interface SlashCommandMenuCoordinatorHost {
   getTextarea(): HTMLTextAreaElement | null;
@@ -43,6 +48,7 @@ export class SlashCommandMenuCoordinator {
   private runId = 0;
   private status: SlashCommandMenuStatus = 'idle';
   private query: (SlashCommandMenuQuery & { trigger?: '/' | '$' }) | null = null;
+  private readonly collapsedGroups = new Set<SlashCommandMenuGroup>();
 
   constructor(private readonly host: SlashCommandMenuCoordinatorHost) {}
 
@@ -67,21 +73,22 @@ export class SlashCommandMenuCoordinator {
       return false;
     }
 
-    if (event.key === 'ArrowDown') {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
-      this.moveSelection(1);
-      return true;
-    }
-
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      this.moveSelection(-1);
+      this.moveSelection(event.key === 'ArrowDown' ? 1 : -1);
       return true;
     }
 
     if (event.key === 'Escape') {
       event.preventDefault();
       this.clear();
+      return true;
+    }
+
+    if (event.key === 'Tab' && event.shiftKey) return false;
+    if (event.key === 'Tab' && this.selectedIndex < 0) {
+      event.preventDefault();
+      this.host.getMenuElement()?.querySelector<HTMLButtonElement>('button[data-group]')?.focus();
       return true;
     }
 
@@ -127,6 +134,9 @@ export class SlashCommandMenuCoordinator {
 
       this.host.setCatalogItems(items);
       this.visibleItems = this.filterItems(items, query);
+      if (query.trigger !== '$' && query.query.trim()) {
+        for (const item of this.visibleItems) this.collapsedGroups.delete(getSlashCommandMenuGroup(item));
+      }
       this.selectedIndex = 0;
       this.status = this.visibleItems.length > 0
         ? 'idle'
@@ -162,12 +172,9 @@ export class SlashCommandMenuCoordinator {
   }
 
   private moveSelection(delta: number): void {
-    if (this.visibleItems.length === 0) {
-      return;
-    }
-
-    const itemCount = this.visibleItems.length;
-    this.selectedIndex = (this.selectedIndex + delta + itemCount) % itemCount;
+    const indexes = this.selectableIndexes();
+    if (!indexes.length) return;
+    this.selectedIndex = indexes[(indexes.indexOf(this.selectedIndex) + delta + indexes.length) % indexes.length];
     this.render();
     this.scrollSelectedItemIntoView();
   }
@@ -236,6 +243,15 @@ export class SlashCommandMenuCoordinator {
       selectedIndex: this.selectedIndex,
       status: this.status,
       isMidText: this.query?.isMidText,
+      grouped: this.query?.trigger !== '$',
+      collapsedGroups: this.collapsedGroups,
+      onToggleGroup: (group) => {
+        const restoreFocus = menuEl.contains(document.activeElement);
+        if (this.collapsedGroups.has(group)) this.collapsedGroups.delete(group);
+        else this.collapsedGroups.add(group);
+        this.render();
+        if (restoreFocus) menuEl.querySelector<HTMLButtonElement>(`button[data-group="${group}"]`)?.focus();
+      },
       onHoverItem: (index) => {
         if (this.selectedIndex === index) {
           return;
@@ -263,10 +279,8 @@ export class SlashCommandMenuCoordinator {
     }
 
     this.visibleItems = this.filterItems(catalogItems, this.query);
-    this.selectedIndex = Math.min(
-      this.selectedIndex,
-      Math.max(0, this.visibleItems.length - 1),
-    );
+    const indexes = this.selectableIndexes();
+    if (!indexes.includes(this.selectedIndex)) this.selectedIndex = indexes.find((index) => index >= this.selectedIndex) ?? indexes[0] ?? -1;
     this.status = this.visibleItems.length > 0
       ? 'idle'
       : this.getEmptyStatus(catalogItems);
@@ -276,13 +290,20 @@ export class SlashCommandMenuCoordinator {
     items: SlashCommandMenuItem[],
     query: SlashCommandMenuQuery & { trigger?: '/' | '$' },
   ): SlashCommandMenuItem[] {
-    return filterSlashCommandMenuItems(items, query.query, {
+    const filtered = filterSlashCommandMenuItems(items, query.query, {
       skillMode: this.host.getSkillMode(),
       trigger: query.trigger,
       skillsCommandDescription: t('slashCommand.skillsCommand.description'),
       isMidText: query.isMidText,
       ...(this.host.isCodexSkillMode?.() ? { codexSkillMode: true } : {}),
     });
+    return query.trigger === '$' ? filtered : filtered.sort((left, right) =>
+      Number(getSlashCommandMenuGroup(left) === 'skills') - Number(getSlashCommandMenuGroup(right) === 'skills'));
+  }
+
+  private selectableIndexes(): number[] {
+    return this.visibleItems.flatMap((item, index) =>
+      this.query?.trigger !== '$' && this.collapsedGroups.has(getSlashCommandMenuGroup(item)) ? [] : [index]);
   }
 
   private getEmptyStatus(items: SlashCommandMenuItem[]): SlashCommandMenuStatus {

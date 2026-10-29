@@ -1,4 +1,6 @@
 # Owner: core.backend-pi
+
+2026-10-29：`getPromptReferenceMessages` 只通过 `PiSessionRuntime.getExisting` 查询已驻留连接的当前有效历史。引用读取不创建或恢复来源会话；未驻留时返回 null，交给聊天引用服务使用明确标记的插件缓存。原生 session 身份与分支投影仍由 Pi runtime 拥有。
 > 2026-10-02（reviewed continuation，用户已授权）：公共 PiCommandName 与 PiAdapter.command allowlist 接通 `get_available_thinking_levels` / `get_entries`；可选操作仍与 mandatory handshake 分离，旧 SDK 的方法缺失返回 unavailable。服务层拥有 actual-SDK feature detection 和原生 entry/since/leaf 身份；Adapter 只路由既有 session/catalog 作用域，不扩大配置或模型执行能力。公共 API 接线和真实模型/UI 验收继续独立记证。
 > 2026-10-02（接入修复 T04/T07）：MCP declaration 摘要按 flag/value 组合脱敏，URL userinfo/query/hash 不进入 endpoint，畸形 URL 不回显原字符串。optional `get_available_thinking_levels`/`get_entries` 经现有 service 查询真实 SDK 方法，缺失返回 unavailable；native entry ID、parent ID 与 leaf ID 保留，不生成数组身份。服务层和独立协议类型已准备；公共 PiAdapter 命令入口的接线因 CodeGraph 跨范围门禁已撤回，待人类 reviewed continuation。installed SDK 内存读测试、模型执行与 UI 验收是独立证据，不提高静态能力声明来假装旧版支持。
 > 2026-09-21 (advantage-parity R-F7)：PiLaunchOptions/PiSessionRuntime/PiAdapter 增 `getExtraEnv` 缝：Pi 服务进程 spawn env 在 PATH 增补后叠加域 env。

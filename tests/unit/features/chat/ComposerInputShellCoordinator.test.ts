@@ -1283,8 +1283,8 @@ describe('ComposerInputShellCoordinator — slash menu core behaviors', () => {
       fixture.container.querySelectorAll<HTMLElement>('.opencodian-slash-command-menu-item'),
     );
     expect(menuItems).toHaveLength(2);
-    expect(menuItems[0]?.textContent).toContain('/analyze');
-    expect(menuItems[1]?.textContent).toContain('/review');
+    expect(menuItems[0]?.textContent).toContain('/review');
+    expect(menuItems[1]?.textContent).toContain('/analyze');
   });
 
   it('does not trigger slash menu for // at start of input', async () => {

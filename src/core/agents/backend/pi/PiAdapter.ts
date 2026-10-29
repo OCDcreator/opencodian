@@ -213,6 +213,15 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
     const result = await this.command(id, 'get_messages');
     return Array.isArray(result.entries) ? result.entries : Array.isArray(result.messages) ? result.messages : [];
   }
+  /** References never create, resume or switch the source runtime. */
+  async getPromptReferenceMessages(id: string): Promise<unknown[] | null> {
+    const client = await this.runtime.getExisting(id);
+    if (!client) return null;
+    try {
+      const result = await client.request({ type: 'get_messages' }, 30000);
+      return Array.isArray(result.entries) ? result.entries : Array.isArray(result.messages) ? result.messages : null;
+    } catch { return null; }
+  }
   async getChatMessages(id: string): Promise<ChatMessage[]> {
     return toPiChatMessages(await this.getSessionMessages(id));
   }

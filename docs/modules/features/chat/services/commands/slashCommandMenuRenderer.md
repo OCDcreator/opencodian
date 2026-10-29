@@ -1,5 +1,9 @@
 # slashCommandMenuRenderer
 
+2026-10-29：`/` 菜单增加本地化命令／技能分类与数量，独立 disclosure 复用 `@` 的原生按钮、箭头、焦点和 hidden 内容规则。`getSlashCommandMenuGroup` 按真实 source 分类；渲染分组保留原候选索引，避免 pointer 回调选错原生条目。`$` 入口保持纯技能列表。
+
+2026-10-29：`@` 分类标题使用原生 disclosure button，带 Lucide 箭头、匹配数量、`aria-expanded` 和 `aria-controls`，折叠内容不渲染可选项。`getAgentMentionMenuGroup` 与控制器共用文件／会话／插件／资源／代理分组映射；键盘切换后恢复标题焦点，指针操作保留 composer 焦点。
+
 2026-09-25 ZCode 原生目录在可见菜单出现 `//goal`：目录项 `displayId` 已带 `/`，渲染器再加前缀。现对已带 `/` 的 displayId 原样显示；未带前缀的普通命令仍补一个 `/`，Codex `$skill` 规则保持不变。
 
 > **源码**: `src/features/chat/services/commands/slashCommandMenuRenderer.ts`
@@ -32,6 +36,7 @@ export function renderAgentMentionMenu(options: RenderAgentMentionMenuOptions): 
 - runtime 返回的普通 slash command badge 显示为 `command`，不再把 command 来源展示成更含糊的“runtime”；skill / override / project 继续使用各自来源文案
 - 内置命令（白名单内如 `init`、`review`、`help` 等）额外显示 `built-in` badge，并支持 i18n 翻译 description；非内置命令保持原始 description
 - 有 agent 候选时输出 `@id` 标题、可选 displayName badge 和 description
+- 统一引用模式使用 `referenceMention.menu.*` 状态文案，并按文件/文件夹、Vault 会话、插件/应用、MCP 资源和 agent 输出本地化分组。引用项使用真实 label、类型图标、完整 title 与可选会话日期，日期显示本地格式并保留完整 tooltip
 - `mouseenter` 与 `click` 只通过回调把 index 交还给调用方，不直接持有 coordinator 状态
 - skill provenance 文案基于 catalog 的 `skillSource` 做多语言映射，不重新推断路径来源
 

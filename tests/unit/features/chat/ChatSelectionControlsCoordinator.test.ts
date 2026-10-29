@@ -188,6 +188,76 @@ async function createFixture(options: FixtureOptions = {}) {
   };
 }
 
+describe('model provider disclosures', () => {
+  beforeEach(() => { HTMLElement.prototype.scrollIntoView = jest.fn(); });
+  afterEach(() => { document.body.empty(); });
+
+  it('collapses one provider and navigates and selects only displayed models', async () => {
+    const fixture = await createFixture();
+    const root = fixture.toolbarEl;
+    root.querySelector<HTMLElement>('.opencodian-model-trigger')!.click();
+    const header = root.querySelector<HTMLButtonElement>('button[data-provider-id="anthropic"]')!;
+    expect(header).not.toBeNull();
+    expect(header.getAttribute('aria-expanded')).toBe('true');
+    expect(header.querySelector('.opencodian-model-provider-count')?.textContent).toBe('1');
+    header.click();
+    const folded = root.querySelector<HTMLButtonElement>('button[data-provider-id="anthropic"]')!;
+    expect(folded.getAttribute('aria-expanded')).toBe('false');
+    expect(document.getElementById(folded.getAttribute('aria-controls')!)?.hidden).toBe(true);
+    expect(root.querySelectorAll('.opencodian-model-option')).toHaveLength(1);
+    expect(fixture.host.setActiveTabModelOverride).not.toHaveBeenCalled();
+    const search = root.querySelector<HTMLInputElement>('.opencodian-model-dropdown-search-input')!;
+    search.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(root.querySelector('.opencodian-model-option.is-highlighted')?.getAttribute('data-value')).toBe('openai::o4-mini');
+    search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(fixture.host.setActiveTabModelOverride).toHaveBeenCalledWith({ provider: 'openai', model: 'o4-mini' });
+    fixture.coordinator.destroy();
+  });
+
+  it('remembers folds on reopen and keeps all-folded headers keyboard reachable', async () => {
+    const fixture = await createFixture();
+    const root = fixture.toolbarEl;
+    const trigger = root.querySelector<HTMLElement>('.opencodian-model-trigger')!;
+    trigger.click();
+    const buttons = root.querySelectorAll<HTMLButtonElement>('button[data-provider-id]');
+    expect(buttons).toHaveLength(2);
+    buttons[0].click();
+    root.querySelector<HTMLButtonElement>('button[data-provider-id="openai"]')!.click();
+    trigger.click(); trigger.click();
+    fixture.coordinator.refreshModelOptions();
+    expect(root.querySelectorAll('.opencodian-model-option')).toHaveLength(0);
+    const search = root.querySelector<HTMLInputElement>('.opencodian-model-dropdown-search-input')!;
+    search.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(fixture.host.setActiveTabModelOverride).not.toHaveBeenCalled();
+    expect(search.hasAttribute('aria-activedescendant')).toBe(false);
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    const header = root.querySelector<HTMLButtonElement>('button[data-provider-id="anthropic"]')!;
+    header.focus(); header.click();
+    const reopened = root.querySelector<HTMLButtonElement>('button[data-provider-id="anthropic"]')!;
+    expect(document.activeElement).toBe(reopened);
+    expect(reopened.getAttribute('aria-expanded')).toBe('true');
+    expect(root.querySelectorAll('.opencodian-model-option')).toHaveLength(1);
+    fixture.coordinator.destroy();
+  });
+
+  it.each(['o4', 'OpenAI'])('expands folded matching providers for %s and preserves unrelated folds', async (query) => {
+    const fixture = await createFixture();
+    const root = fixture.toolbarEl;
+    root.querySelector<HTMLElement>('.opencodian-model-trigger')!.click();
+    root.querySelector<HTMLButtonElement>('button[data-provider-id="anthropic"]')!.click();
+    root.querySelector<HTMLButtonElement>('button[data-provider-id="openai"]')!.click();
+    const search = root.querySelector<HTMLInputElement>('.opencodian-model-dropdown-search-input')!;
+    search.value = query; search.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(root.querySelector('button[data-provider-id="openai"]')?.getAttribute('aria-expanded')).toBe('true');
+    expect(root.querySelectorAll('.opencodian-model-option')).toHaveLength(1);
+    search.value = ''; search.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(root.querySelector('button[data-provider-id="anthropic"]')?.getAttribute('aria-expanded')).toBe('false');
+    expect(root.querySelector('button[data-provider-id="openai"]')?.getAttribute('aria-expanded')).toBe('true');
+    fixture.coordinator.destroy();
+  });
+});
+
 describe('ChatSelectionControlsCoordinator', () => {
   it('distinguishes permission levels by icon shape across backends', () => {
     expect(createOpenCode2PermissionConfig().options.map((option) => option.icon)).toEqual([

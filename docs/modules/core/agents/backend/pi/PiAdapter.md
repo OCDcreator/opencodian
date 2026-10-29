@@ -51,3 +51,6 @@ Bundled Pi service forwards modern ModelRuntime OAuth LoginOptions.getDeviceId f
 ## 2026-10-28：原生命令与技能弹框
 
 原生 slash 命令和 /skill:name 保留首 token 与原始参数，不把 memory/tooling 前缀混入命令参数；普通提示继续注入上下文。get_commands 返回的 extension、prompt 与 skill 来源由聊天目录保留。
+## 2026-10-29：会话引用只读路径
+
+`getPromptReferenceMessages(id)` 使用 `runtime.getExisting(id)`，仅从已经驻留的来源服务读取原生 `get_messages` 有效分支。该入口不会创建服务、恢复／切换来源会话；未驻留或读取不可用时返回 null，统一层可明确记录插件缓存快照的来源。

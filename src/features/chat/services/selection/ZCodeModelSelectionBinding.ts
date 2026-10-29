@@ -12,6 +12,10 @@ interface ZCodeCatalogPort {
   getDefaultModel(): ModelSelectorSelection | null;
   getObservedModel?(): ModelSelectorSelection | null;
   getSession?(sessionId: string): Promise<unknown>;
+  getWorkspaceModelCatalog?(): Promise<{
+    models: Awaited<ReturnType<ZCodeCatalogPort['getAvailableModels']>>;
+    defaultModel: ModelSelectorSelection | null;
+  }>;
 }
 
 /**
@@ -26,6 +30,7 @@ export function bindZCodeModelSelection(
   getSessionId: () => string | null,
 ): ModelSelectionRuntimeHost {
   let providers: ModelSelectorProvider[] = [];
+  let workspaceDefault: ModelSelectorSelection | null = null;
   const observedBySession = new Map<string, ModelSelectorSelection>();
   return {
     ...host,
@@ -49,7 +54,9 @@ export function bindZCodeModelSelection(
         }
         const groups = new Map<string, ModelSelectorProvider>();
         try {
-          const models = await adapter.getAvailableModels();
+          const workspace = sessionId ? null : await adapter.getWorkspaceModelCatalog?.();
+          const models = workspace?.models ?? await adapter.getAvailableModels();
+          if (!sessionId) workspaceDefault = workspace?.defaultModel ?? null;
           for (const model of models) {
             const group = groups.get(model.providerId) ?? { id: model.providerId, name: model.providerLabel, models: [] };
             group.models.push({
@@ -72,7 +79,7 @@ export function bindZCodeModelSelection(
       const adapter = getAdapter();
       if (!adapter) return host.getDefaultModelSelection();
       const sessionId = getSessionId();
-      return sessionId ? observedBySession.get(sessionId) ?? null : null;
+      return sessionId ? observedBySession.get(sessionId) ?? null : workspaceDefault;
     },
     isModelAvailableOnServer(provider, model) {
       if (!getAdapter()) return host.isModelAvailableOnServer(provider, model);

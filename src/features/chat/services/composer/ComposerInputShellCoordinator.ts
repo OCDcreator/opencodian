@@ -10,7 +10,7 @@ import {
   stampPromptSuggestionScope,
 } from '../../../../core/agents/backend/promptSuggestionSink';
 import type { SlashCommandMenuItem } from '../../../../core/config/slashCommandCatalog';
-import type { ImageAttachment, SlashCommandSkillMode } from '../../../../core/types';
+import type { ImageAttachment, PromptReferenceCandidate, SlashCommandSkillMode } from '../../../../core/types';
 import { t } from '../../../../i18n';
 import { createLogger } from '../../../../shared';
 import { openImagePreview } from '../../ui/ImagePreviewOverlay';
@@ -33,7 +33,7 @@ import {
   getSlashCommandMenuQuery,
   isCommandComposerText,
 } from './composerInputParsing';
-import { ComposerInvocationEditor } from './ComposerInvocationEditor';
+import { ComposerInvocationEditor, type InvocationToken } from './ComposerInvocationEditor';
 
 const COMPOSER_TEXTAREA_MAX_HEIGHT = 240;
 let composerInputLabelId = 0;
@@ -58,7 +58,7 @@ const INPUT_HIGHLIGHT_SLASH_REGEX = /(^|\s)(\/skills(?:[ \t]+\S+)?(?=\s|$)|[/$]\
 
 const logger = createLogger('ComposerInputShellCoordinator');
 
-type InputHighlightKind = 'agent' | 'command' | 'skill';
+type InputHighlightKind = InvocationToken['kind'];
 
 interface InputHighlightSpan {
   start: number;
@@ -66,6 +66,7 @@ interface InputHighlightSpan {
   kind: InputHighlightKind;
   agentId?: string;
   value?: string;
+  label?: string;
 }
 
 function readOpenCodianPlugin(): unknown {
@@ -174,6 +175,8 @@ export interface ComposerInputShellCoordinatorHost {
   ): void | Promise<void>;
   loadSlashCommandMenuItems(): Promise<SlashCommandMenuItem[]>;
   loadAgentMentionCandidates?(): Promise<AgentMentionCandidate[]>;
+  loadPromptReferenceCandidates?(query?: string): Promise<PromptReferenceCandidate[]>;
+  getPromptReferenceContextKey?(): string;
   setComposerStackHeight(stackHeight: number): void;
   scheduleSettledScrollToBottomIfNeeded(): void;
   getComposerAvailabilityState?(): {
@@ -302,9 +305,14 @@ export class ComposerInputShellCoordinator {
   constructor(private readonly host: ComposerInputShellCoordinatorHost) {
     this.agentMentionController = new AgentMentionComposerController({
       getComposerInputMode: () => this.host.getComposerInputMode(),
-      loadAgentMentionCandidates: () => loadAgentMentionCandidatesFromComposerCatalog(
+      loadAgentMentionCandidates: () => this.shouldHandleAgentFeatures ? loadAgentMentionCandidatesFromComposerCatalog(
         this.host, this.slashCommandMenuCatalogItems, (items) => { this.slashCommandMenuCatalogItems = items; },
-      ),
+      ) : Promise.resolve([]),
+      ...(this.host.loadPromptReferenceCandidates ? {
+        loadPromptReferenceCandidates: (query?: string) => this.host.loadPromptReferenceCandidates!(query),
+      } : {}),
+      getPromptReferenceContextKey: () => this.host.getPromptReferenceContextKey?.() ?? '',
+      getTextarea: () => this.inputTextareaEl,
       scheduleLayoutSync: () => this.scheduleLayoutSync(),
       onMentionInserted: () => { this.syncTextareaHeight(); this.syncHighlightBackdrop(); },
       onLoadFailed: (error) => { logger.debug('Failed to load agent mention candidates:', error); },
@@ -396,7 +404,7 @@ export class ComposerInputShellCoordinator {
     this.inputTextareaEl.setAttribute('aria-labelledby', inputLabel.id);
     this.inputTextareaEl.addEventListener('input', () => {
       this.syncTextareaHeight();
-      if (this.host.shouldMountAgentSelector?.() !== false) {
+      if (this.shouldHandleAgentFeatures || this.host.loadPromptReferenceCandidates) {
         this.agentMentionController.syncContent(this.inputTextareaEl?.value ?? '');
       }
       this.syncHighlightBackdrop();
@@ -1748,7 +1756,7 @@ export class ComposerInputShellCoordinator {
     // candidates. When the user types `@`, surface an actionable notice once
     // per token (pointing to the Codex resource settings) instead of silently
     // doing nothing.
-    if (this.host.isCodexBackendActive?.() && typeof this.host.onCodexAgentMentionUnavailable === 'function') {
+    if (!this.host.loadPromptReferenceCandidates && this.host.isCodexBackendActive?.() && typeof this.host.onCodexAgentMentionUnavailable === 'function') {
       const codexAgentQuery = this.agentMentionController.getQuery(textarea);
       if (codexAgentQuery) {
         const signature = `${textarea.value.length}:${textarea.selectionStart ?? textarea.value.length}`;
@@ -1770,7 +1778,7 @@ export class ComposerInputShellCoordinator {
     // once a command is chosen and arguments are being typed, @ should trigger
     // agent mentions normally.
     // Skip agent mention queries when the agent feature is disabled.
-    const agentQuery = this.shouldHandleAgentFeatures
+    const agentQuery = (this.shouldHandleAgentFeatures || this.host.loadPromptReferenceCandidates)
       ? this.agentMentionController.getQuery(textarea)
       : null;
     const isSelectingSlashCommand = getSlashCommandMenuQuery(textarea) !== null
@@ -1792,7 +1800,7 @@ export class ComposerInputShellCoordinator {
   }
 
   private tryHandleAgentMentionMenuKeydown(event: KeyboardEvent): boolean {
-    if (!this.shouldHandleAgentFeatures) {
+    if (!this.shouldHandleAgentFeatures && !this.host.loadPromptReferenceCandidates) {
       return false;
     }
     return this.agentMentionController.tryHandleKeydown(
@@ -1852,18 +1860,24 @@ export class ComposerInputShellCoordinator {
       });
     }
 
+    spans.push(...this.agentMentionController.resolveReferencePillSpans(content));
+
     // Sort by position and render
-    spans.sort((a, b) => a.start - b.start);
-    this.invocationEditor?.setTokens(spans);
+    spans.sort((a, b) => a.start - b.start || b.end - a.end);
+    const visibleSpans: InputHighlightSpan[] = [];
+    for (const span of spans) {
+      if (span.start >= (visibleSpans[visibleSpans.length - 1]?.end ?? 0)) visibleSpans.push(span);
+    }
+    this.invocationEditor?.setTokens(visibleSpans);
 
     let html = '';
     let lastIndex = 0;
-    for (const span of spans) {
+    for (const span of visibleSpans) {
       if (span.start < lastIndex) {
         continue;
       }
       html += escapeHtmlContent(content.slice(lastIndex, span.start));
-      html += `<span class="${this.getInputHighlightClassName(span.kind)}"${this.getInputHighlightAttributes(span)}>${escapeHtmlContent(content.slice(span.start, span.end))}</span>`;
+      html += `<span class="${this.getInputHighlightClassName(span.kind)}"${this.getInputHighlightAttributes(span)}>${escapeHtmlContent(span.label ?? content.slice(span.start, span.end))}</span>`;
       lastIndex = span.end;
     }
 

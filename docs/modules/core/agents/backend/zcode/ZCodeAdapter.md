@@ -1,5 +1,7 @@
 # ZCodeAdapter
 
+2026-10-29：新增工作区模型目录 seam `getWorkspaceModelCatalog()`，启动当前 owned transport 后交既有 modelSurface 读取 deferred 原生目录，返回完整模型及工作区默认模型。切换到 ZCode 即可加载，无需用户先创建／恢复聊天；已有会话仍走原 getSession/getAvailableModels 读回。
+
 > 2026-10-29（技能 token 适配）：getRuntimeSkills 保留 referenceCatalog 返回的 path；session/send 前把目录中匹配的 `/name` 或 `$name` 序列化为官方桌面端使用的 `[$name](<path>)` 引用。普通命令与未知 token 原样保留，路径只取自当前后端目录。
 
 > 2026-10-02 T09：增加 `getManagementCatalog` / `setManagedPluginEnabled`，将当前 owned transport 与 workspace 绑定到 ZCodeManagementService。管理读取不隐式 start/session/create/send；断开和无 workspace 时 unavailable；停止/更换 transport 后旧异步响应拒绝。只增加 ZCode 管理接口，不更改 main/chat 消费者。项目插件保存通过 shared revision/archive secure-write，独立 hooks/MCP mutation 不可用；详见 [ZCodeManagementService](ZCodeManagementService.md)。
@@ -89,3 +91,8 @@ Native `permission.resolved` is authoritative for the exact session/request ID. 
 getRuntimeSkills(sessionId?) 对接 skills/referenceCatalog。草稿使用工作区目录；已有会话先恢复 resident session，再按 sessionId 读取会话权威目录，不回退工作区。仅 enabled: true 项进入菜单；旧运行时 MethodNotFound 返回空目录，其余失败交给菜单错误态。
 
 getRuntimeCommands() 读取 workspace/readPresentation 的 slashCommands，使首个新草稿无需创建会话即可展示真实命令。旧运行时缺少该方法时只回退已观察到的会话快照，不硬编码命令目录。
+## 2026-10-29：插件引用目录
+
+`getRuntimeMentionCandidates(sessionId?)` 使用官方 `plugins/referenceCatalog`，沿用 workspace／session 的目录权威，不跨后端复用插件列表。只显示 enabled 且 `conflictingPluginIds` 为空的稳定插件 ID，序列化保留 `plugin://pluginId` Markdown 目标；发送前用目标 session 目录重新验证。缺少 RPC 时返回空目录。未证明目标运行时存在 `ReadSessionContext` 的情况下，不伪造原生会话指针，由统一层使用历史快照。
+
+引用专用 `getPromptReferenceMessages` 直接请求 `session/messages`，只读已驻留来源的有效分支，不调用 start／resume；未驻留、RPC 不可用或响应无效时返回 null，允许统一层明确使用插件缓存快照。

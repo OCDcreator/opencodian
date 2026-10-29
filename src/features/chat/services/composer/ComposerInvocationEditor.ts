@@ -3,16 +3,17 @@ import { Compartment, EditorState, StateEffect, StateField } from '@codemirror/s
 import { Decoration, type DecorationSet, EditorView, keymap, WidgetType } from '@codemirror/view';
 import { setIcon } from 'obsidian';
 
-interface InvocationToken {
+export interface InvocationToken {
   start: number;
   end: number;
-  kind: 'agent' | 'command' | 'skill';
+  kind: 'agent' | 'command' | 'skill' | 'file' | 'folder' | 'session' | 'plugin' | 'app' | 'mcp-resource';
+  label?: string;
 }
 
 class InvocationWidget extends WidgetType {
-  constructor(readonly value: string, readonly kind: InvocationToken['kind']) { super(); }
+  constructor(readonly value: string, readonly kind: InvocationToken['kind'], readonly label?: string) { super(); }
 
-  eq(other: InvocationWidget): boolean { return this.value === other.value && this.kind === other.kind; }
+  eq(other: InvocationWidget): boolean { return this.value === other.value && this.kind === other.kind && this.label === other.label; }
 
   toDOM(): HTMLElement {
     const element = document.createElement('span');
@@ -20,14 +21,17 @@ class InvocationWidget extends WidgetType {
     element.contentEditable = 'false';
     element.dataset.type = this.kind;
     element.dataset.value = this.value;
-    element.title = this.value;
+    element.title = this.label ?? this.value;
     const icon = element.appendChild(document.createElement('span'));
     icon.className = 'opencodian-invocation-token-icon';
     icon.setAttribute('aria-hidden', 'true');
-    setIcon(icon, this.kind === 'skill' ? 'wand-sparkles' : this.kind === 'agent' ? 'bot' : 'square-slash');
+    setIcon(icon, this.kind === 'skill' ? 'wand-sparkles' : this.kind === 'agent' ? 'bot'
+      : this.kind === 'file' ? 'file-text' : this.kind === 'folder' ? 'folder'
+        : this.kind === 'session' ? 'messages-square' : this.kind === 'mcp-resource' ? 'database'
+          : this.kind === 'plugin' || this.kind === 'app' ? 'puzzle' : 'square-slash');
     const label = element.appendChild(document.createElement('span'));
     label.className = 'opencodian-invocation-token-label';
-    label.textContent = this.value.replace(/^\/skills\s+|^\/skill:|^[/@$]/, '');
+    label.textContent = this.label ?? this.value.replace(/^\/skills\s+|^\/skill:|^[/@$]/, '');
     return element;
   }
 
@@ -163,11 +167,11 @@ export class ComposerInvocationEditor {
     if (this.disposed) return;
     this.sync();
     const text = this.view.state.doc.toString();
-    const signature = JSON.stringify(tokens.map((token) => [token.start, token.end, token.kind, text.slice(token.start, token.end)]));
+    const signature = JSON.stringify(tokens.map((token) => [token.start, token.end, token.kind, token.label, text.slice(token.start, token.end)]));
     if (signature === this.tokenSignature) return;
     this.tokenSignature = signature;
     const ranges = tokens.filter((token) => token.start >= 0 && token.end <= text.length && token.end > token.start)
-      .map((token) => Decoration.replace({ widget: new InvocationWidget(text.slice(token.start, token.end), token.kind) })
+      .map((token) => Decoration.replace({ widget: new InvocationWidget(text.slice(token.start, token.end), token.kind, token.label) })
         .range(token.start, token.end));
     // Keep a user's pending edit notification; decoration-only transactions do not replace history.
     this.syncing = true;

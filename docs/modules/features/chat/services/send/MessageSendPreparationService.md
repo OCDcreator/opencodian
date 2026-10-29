@@ -188,3 +188,7 @@ DSH sends skip the legacy OpenCode skill catalog expansion, as Pi, ZCode and Ope
 ## 2026-10-28：原生命令与技能弹框
 
 只有旧 OpenCode 会话使用 SkillContentExpander。其余六后端保留自己的技能调用/附件处理，Claude 和 Codex 不再请求 OpenCode 技能目录或注入其它后端技能正文。
+
+## 2026-10-29：发送前引用校验
+
+发送准备在乐观落盘之前解析并重新验证 @ 引用，合并文件/目录上下文，保存会话快照来源证据及原始 promptReferences，并将有效原生插件/资源标识放入 modelOptions.nativeMentions。用户消息持久化可读显示文本，实际请求使用独立 requestContent；失效引用拒绝发送并保留草稿。忙碌队列保存稳定引用原文，轮到发送时才校验当前可用性。

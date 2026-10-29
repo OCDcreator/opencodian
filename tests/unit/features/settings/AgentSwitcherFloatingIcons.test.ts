@@ -43,12 +43,8 @@ describe('renderAgentSwitcherFloatingIcons', () => {
     ).toBe('0px');
     expect(opencodeIconEl?.dataset.lobehubIcon).toBe('opencode');
     expect(claudeCodeIconEl?.dataset.lobehubIcon).toBe('claudecode');
-    expect(claudeLightIconEl?.getAttribute('src')).toBe(
-      'https://unpkg.com/@lobehub/icons-static-webp@latest/light/claudecode-color.webp',
-    );
-    expect(claudeDarkIconEl?.getAttribute('src')).toBe(
-      'https://unpkg.com/@lobehub/icons-static-webp@latest/dark/claudecode-color.webp',
-    );
+    expect(claudeLightIconEl?.getAttribute('src')).toMatch(/^data:image\/svg\+xml/);
+    expect(claudeDarkIconEl?.getAttribute('src')).toMatch(/^data:image\/svg\+xml/);
     expect(buttons[1]?.getAttribute('aria-pressed')).toBe('true');
 
     buttons[0]?.click();
@@ -202,7 +198,7 @@ describe('renderAgentSwitcherFloatingIcons', () => {
     expect(modalContainerEl.querySelectorAll('.opencodian-agent-switcher-hover-zone')).toHaveLength(1);
   });
 
-  it('keeps the floating rail until an initially detached settings page is connected', async () => {
+  it('waits to portal an initially detached settings page until its anchor connects', async () => {
     const containerEl = document.createElement('div');
 
     renderAgentSwitcherFloatingIcons(containerEl, {
@@ -210,14 +206,13 @@ describe('renderAgentSwitcherFloatingIcons', () => {
       enabledAgents: ['opencode2', 'claude-code'],
       onSelect: jest.fn(),
     });
-    const floatingEl = document.body.querySelector<HTMLElement>('.opencodian-agent-switcher-floating');
-
     await Promise.resolve();
-    expect(floatingEl?.isConnected).toBe(true);
+    expect(document.body.querySelector('.opencodian-agent-switcher-floating')).toBeNull();
 
     document.body.appendChild(containerEl);
     await Promise.resolve();
 
+    const floatingEl = document.body.querySelector<HTMLElement>('.opencodian-agent-switcher-floating');
     expect(floatingEl?.isConnected).toBe(true);
     expect(floatingEl?.style.getPropertyValue('--opencodian-agent-switcher-fixed-left')).toBe('0px');
 
@@ -225,6 +220,86 @@ describe('renderAgentSwitcherFloatingIcons', () => {
     await Promise.resolve();
 
     expect(floatingEl?.isConnected).toBe(false);
+  });
+
+});
+
+describe('renderAgentSwitcherFloatingIcons window adoption', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('portals a pre-rendered page into its adopted window and cleans up when that window closes', async () => {
+    const frame = document.createElement('iframe');
+    document.body.appendChild(frame);
+    const ownerDocument = frame.contentDocument!;
+    const ownerWindow = frame.contentWindow!;
+    const callbacks: Array<() => void> = [];
+    const previousObserver = Object.getOwnPropertyDescriptor(window, 'ResizeObserver');
+    Object.defineProperty(window, 'ResizeObserver', {
+      configurable: true,
+      value: class {
+        constructor(callback: () => void) { callbacks.push(callback); }
+        observe = jest.fn();
+        disconnect = jest.fn();
+      },
+    });
+    const containerEl = document.createElement('div');
+    let left = 250;
+    jest.spyOn(containerEl, 'getBoundingClientRect').mockImplementation(() => ({
+      left, right: left + 396, top: 30, bottom: 866, width: 396, height: 836,
+      x: left, y: 30, toJSON: () => ({}),
+    }));
+    try {
+      renderAgentSwitcherFloatingIcons(containerEl, {
+        selectedAgent: 'opencode2', enabledAgents: ['opencode2', 'claude-code'], onSelect: jest.fn(),
+      });
+      // Obsidian renders before adopting the settings content into its own
+      // BrowserWindow. Layout observation then reports the connected owner.
+      await Promise.resolve();
+      ownerDocument.body.appendChild(containerEl);
+      callbacks[0]!();
+      await Promise.resolve();
+
+      const floatingEl = ownerDocument.querySelector<HTMLElement>('.opencodian-agent-switcher-floating');
+      expect(floatingEl).not.toBeNull();
+      expect(document.querySelector('.opencodian-agent-switcher-floating')).toBeNull();
+      expect(floatingEl?.style.getPropertyValue('--opencodian-agent-switcher-fixed-left')).toBe('250px');
+      left = 312;
+      window.dispatchEvent(new Event('resize'));
+      expect(floatingEl?.style.getPropertyValue('--opencodian-agent-switcher-fixed-left')).toBe('250px');
+      ownerWindow.dispatchEvent(new Event('resize'));
+      expect(floatingEl?.style.getPropertyValue('--opencodian-agent-switcher-fixed-left')).toBe('312px');
+
+      ownerWindow.dispatchEvent(new Event('pagehide'));
+      expect(floatingEl?.isConnected).toBe(false);
+      expect(document.querySelector('.opencodian-agent-switcher-floating')).toBeNull();
+    } finally {
+      containerEl.remove();
+      await Promise.resolve();
+      frame.remove();
+      if (previousObserver) Object.defineProperty(window, 'ResizeObserver', previousObserver);
+      else Reflect.deleteProperty(window, 'ResizeObserver');
+    }
+  });
+
+  it('moves an already connected rail with its owner instead of abandoning it in the first window', async () => {
+    const frame = document.createElement('iframe');
+    document.body.appendChild(frame);
+    const containerEl = document.body.createDiv();
+    renderAgentSwitcherFloatingIcons(containerEl, {
+      selectedAgent: 'opencode2', enabledAgents: ['opencode2', 'claude-code'], onSelect: jest.fn(),
+    });
+    const floatingEl = document.querySelector('.opencodian-agent-switcher-floating');
+    frame.contentDocument!.body.appendChild(containerEl);
+    await Promise.resolve();
+    expect(document.querySelector('.opencodian-agent-switcher-floating')).toBeNull();
+    expect(frame.contentDocument!.querySelector('.opencodian-agent-switcher-floating')).toBe(floatingEl);
+    expect(floatingEl?.isConnected).toBe(true);
+    containerEl.remove();
+    await Promise.resolve();
+    expect(floatingEl?.isConnected).toBe(false);
+    frame.remove();
   });
 });
 
@@ -257,12 +332,8 @@ describe('renderAgentSwitcherHeaderIcons', () => {
     expect(buttons[1]?.getAttribute('aria-pressed')).toBe('true');
     expect(opencodeIconEl?.dataset.lobehubIcon).toBe('opencode');
     expect(claudeCodeIconEl?.dataset.lobehubIcon).toBe('claudecode');
-    expect(claudeLightIconEl?.getAttribute('src')).toBe(
-      'https://unpkg.com/@lobehub/icons-static-webp@latest/light/claudecode-color.webp',
-    );
-    expect(claudeDarkIconEl?.getAttribute('src')).toBe(
-      'https://unpkg.com/@lobehub/icons-static-webp@latest/dark/claudecode-color.webp',
-    );
+    expect(claudeLightIconEl?.getAttribute('src')).toMatch(/^data:image\/svg\+xml/);
+    expect(claudeDarkIconEl?.getAttribute('src')).toMatch(/^data:image\/svg\+xml/);
 
     buttons[0]?.click();
     expect(onSelect).toHaveBeenCalledWith('opencode2' satisfies AgentBackendKind);
@@ -273,6 +344,23 @@ describe('renderAgentSwitcherBackendIcon', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
   });
+
+  it.each(['opencode2', 'claude-code', 'codex', 'copilot'] as const)(
+    'renders %s immediately from the same bundled URLs across surfaces', (backend) => {
+      const first = document.createElement('span');
+      const second = document.createElement('span');
+      renderAgentSwitcherBackendIcon(first, backend);
+      renderAgentSwitcherBackendIcon(second, backend);
+      const images = Array.from(first.querySelectorAll('img'));
+      expect(images).toHaveLength(2);
+      for (const img of images) {
+        expect(img.getAttribute('src')).toMatch(/^data:image\/svg\+xml/);
+        expect(img.getAttribute('loading')).toBe('eager');
+        expect(img.getAttribute('decoding')).toBe('sync');
+      }
+      expect(images.map((img) => img.src)).toEqual(Array.from(second.querySelectorAll('img')).map((img) => img.src));
+    },
+  );
 
   it('drops the stale LobeHub modifier when a reused container falls back to the Pi glyph', () => {
     const iconEl = document.createElement('span');

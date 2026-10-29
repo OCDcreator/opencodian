@@ -86,3 +86,7 @@ Claude Code also refreshes settled user footers after native identity arrives. T
 ## 2026-10-28：原生命令与技能弹框
 
 slash execution host 传入 activeBackend，确保无 conversation 的草稿也按当前后端隔离分派；运行时 ownership 不变。
+
+## 2026-10-29：统一 @ 引用接线
+
+组合层构造共享 PromptReferenceService，同时向输入候选与发送准备提供当前 Vault、目标后端及会话身份。会话候选只来自插件当前 Vault 列表，源正文由 getConversationById 加载完整持久化消息；读取不会改变当前插件后端或会话。优先使用 getPromptReferenceMessages 的现存会话只读接口；ZCode/Pi 缺少安全读取或源不常驻时保守使用明确标注 plugin-cache 的快照，Codex 空兼容回读同样回退缓存。有效原生能力由目标后端运行时目录及显式来源身份提供。

@@ -1,4 +1,5 @@
 import type { SlashCommandMenuItem } from '../../../../src/core/config/slashCommandCatalog';
+import type { PromptReferenceCandidate } from '../../../../src/core/types';
 import {
   attachAgentMentionCandidatesToSlashCommandMenuItems,
   attachAgentSelectionCandidatesToSlashCommandMenuItems,
@@ -60,7 +61,10 @@ function slashItem(id: string, description: string): SlashCommandMenuItem {
   };
 }
 
-function createFixture(options: { slashCommandMenuItems?: SlashCommandMenuItem[] } = {}) {
+function createFixture(options: {
+  slashCommandMenuItems?: SlashCommandMenuItem[];
+  references?: PromptReferenceCandidate[];
+} = {}) {
   let slashCommandMenuItems: SlashCommandMenuItem[] = options.slashCommandMenuItems ?? [];
   let agentMentionCandidates: AgentMentionCandidate[] = [];
 
@@ -84,6 +88,13 @@ function createFixture(options: { slashCommandMenuItems?: SlashCommandMenuItem[]
     submitMessage: jest.fn().mockResolvedValue(undefined),
     loadSlashCommandMenuItems: jest.fn().mockImplementation(async () => slashCommandMenuItems),
     loadAgentMentionCandidates: jest.fn().mockImplementation(async () => agentMentionCandidates),
+    ...(options.references ? {
+      loadPromptReferenceCandidates: jest.fn().mockResolvedValue(options.references),
+      getPromptReferenceContextKey: jest.fn(() => 'codex:/vault:one'),
+      shouldHandleAgentMentions: jest.fn(() => false),
+      isCodexBackendActive: jest.fn(() => true),
+      onCodexAgentMentionUnavailable: jest.fn(),
+    } : {}),
     setComposerStackHeight: jest.fn(),
     scheduleSettledScrollToBottomIfNeeded: jest.fn(),
   };
@@ -182,6 +193,7 @@ describe('ComposerInputShellCoordinator agent mention menu', () => {
     expect(itemText).not.toContain('@build');
     expect(itemText).not.toContain('@secret');
   });
+
 
   it('loads @agent candidates from the shared composer catalog when no direct host loader is present', async () => {
     const fixture = createFixture();
@@ -388,6 +400,21 @@ describe('ComposerInputShellCoordinator agent mentions in slash commands', () =>
 
   afterEach(() => {
     restoreCoordinatorDomMocks(originalResizeObserver);
+  });
+
+  it('keeps unified references available when native agent mentions are unsupported', async () => {
+    const reference = { version: 1 as const, id: 'file:notes.md', kind: 'file' as const,
+      label: 'notes.md', path: 'notes.md', vaultPath: '/vault' };
+    const fixture = createFixture({ references: [{ id: reference.id, kind: reference.kind,
+      label: reference.label, description: reference.path, reference }] });
+    fixture.textarea.value = '@notes';
+    fixture.textarea.setSelectionRange(6, 6);
+    fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAsync();
+    expect(fixture.host.loadPromptReferenceCandidates).toHaveBeenCalledWith('notes');
+    expect(fixture.host.loadAgentMentionCandidates).not.toHaveBeenCalled();
+    expect(fixture.host.onCodexAgentMentionUnavailable).not.toHaveBeenCalled();
+    expect(fixture.container.querySelector('.opencodian-slash-command-menu-item[role="option"]')?.textContent).toContain('notes.md');
   });
 
   it('opens agent suggestions inside slash command arguments', async () => {

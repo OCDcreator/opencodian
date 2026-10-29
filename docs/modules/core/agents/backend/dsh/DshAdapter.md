@@ -33,3 +33,6 @@ ACP fixture 保留生命周期和兼容路径回归。`DshNative.live.test.ts` �
 ## 2026-10-28：原生命令与技能弹框
 
 getRuntimeCommands 保留原生服务返回的 source: skill；目录包含 commands 注册表与当前 agent scope 下允许用户调用的技能，命令重名优先。ACP 兼容传输没有 nativeRequest 时不伪造目录。
+## 2026-10-29：可选原生会话引用
+
+`prepareNativeSessionReference(sourceSessionId, targetSessionId)` 调用 native bridge `session/reference`。桥接只在 `sessionReferenceResolver.prepare` 实际挂载时返回可用，并通过不恢复来源的 `sessionQuery.readSurface` 校验两端身份与真实路径都在当前 Vault 内，防止符号链接逃逸；返回 `dsh-session:` 的 JSON session ID base64url 编码。adapter 再次核对精确 URI。ACP、旧桥接、缺失 resolver 或身份／路径不明时返回 null，交给所属历史快照路径。

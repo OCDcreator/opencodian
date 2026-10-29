@@ -1,5 +1,7 @@
 # ZCodeModelSelectionBinding
 
+2026-10-29：无 sessionId 时调用 adapter 的工作区原生目录，并用其中读回的默认模型初始化选择器；有 sessionId 时维持原会话读回，工作区默认值不覆盖会话选择。切换 ZCode 后模型按钮及提供商目录可直接显示，不再依赖先建聊天或发送。
+
 > 源码: src/features/chat/services/selection/ZCodeModelSelectionBinding.ts
 
 > 2026-09-24 (票 06)：ZCode 专属模型选择策略绑定（与 Pi 绑定同模式，宿主不变）。

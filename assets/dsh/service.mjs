@@ -2,6 +2,8 @@ import { createRequire } from 'node:module';
 import { Writable } from 'node:stream';
 import { pathToFileURL } from 'node:url';
 import { randomUUID, createHash } from 'node:crypto';
+import { realpathSync } from 'node:fs';
+import path from 'node:path';
 import { createAuxiliaryRuntime } from './auxiliary.mjs';
 export { launchNativeRuntime } from './launcher.mjs';
 
@@ -314,6 +316,25 @@ export async function apply(ctx, config) {
         // collapse every session's updated time onto its creation time.
         updatedAt: iso(lastActivity.get(entry.header.id) ?? entry.header.updatedAt ?? entry.header.createdAt)
           ?? iso(entry.header.createdAt) ?? new Date(0).toISOString() })) };
+    },
+    async 'session/reference'(params) {
+      const resolver = ctx.get('sessionReferenceResolver');
+      if (!resolver || typeof resolver.prepare !== 'function' || typeof params.cwd !== 'string'
+        || typeof params.sourceSessionId !== 'string' || typeof params.targetSessionId !== 'string'
+        || params.sourceSessionId === params.targetSessionId) return { available: false };
+      try {
+        const root = realpathSync(params.cwd);
+        const withinVault = (cwd) => {
+          if (typeof cwd !== 'string') return false;
+          const relative = path.relative(root, realpathSync(cwd));
+          return relative === '' || relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+        };
+        const source = await ctx.sessionQuery.readSurface(params.sourceSessionId);
+        const target = await ctx.sessionQuery.readSurface(params.targetSessionId);
+        if (source.session.id !== params.sourceSessionId || target.session.id !== params.targetSessionId
+          || !withinVault(source.session.cwd) || !withinVault(target.session.cwd)) return { available: false };
+        return { available: true, reference: `dsh-session:${Buffer.from(JSON.stringify(params.sourceSessionId), 'utf8').toString('base64url')}` };
+      } catch { return { available: false }; }
     },
     async 'session/close'(params) {
       const record = sessions.get(params.sessionId);

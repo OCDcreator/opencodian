@@ -552,6 +552,7 @@ body[data-opencodian-provider-icon-mode="color"] {
 
 .opencodian-title {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 8px;
   font-weight: 800;
@@ -588,6 +589,7 @@ body[data-opencodian-provider-icon-mode="color"] {
 
 .opencodian-title-text {
   display: block;
+  flex-shrink: 0;
   width: auto;
   height: 16px;
   object-fit: contain;
@@ -997,6 +999,13 @@ body[data-opencodian-provider-icon-mode="color"] {
   flex: 1;
   min-width: 0;
   margin: 0 12px;
+}
+
+/* The brand name appears only when the chat pane has room for it at full size. */
+@container (max-width: 480px) {
+  .opencodian-header .opencodian-title-text {
+    display: none;
+  }
 }
 
 @container (max-width: 400px) {
@@ -3639,14 +3648,20 @@ body.theme-dark .opencodian-agent-switcher-lobehub-img--dark {
  * search placeholder) so the provider label stays legible even in
  * pink/saturated light themes.
  */
-.opencodian-model-provider-header {
+.opencodian-model-provider-header,
+.opencodian-container .opencodian-model-dropdown button.opencodian-model-provider-header {
   position: sticky;
   top: 0;
   z-index: 10;
   display: flex;
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: 6px;
+  box-shadow: none;
   align-items: center;
   gap: 8px;
-  min-height: 26px;
+  min-height: 32px;
   padding: 5px 12px 4px;
   background: var(--background-primary);
   color: var(--text-muted);
@@ -3655,11 +3670,47 @@ body.theme-dark .opencodian-agent-switcher-lobehub-img--dark {
   line-height: 1;
   letter-spacing: 0;
   text-transform: none;
+  text-align: start;
+  cursor: pointer;
+}
+
+.opencodian-model-provider-header:hover,
+.opencodian-container .opencodian-model-dropdown button.opencodian-model-provider-header:hover {
+  background: var(--background-secondary);
+  box-shadow: none;
+}
+
+.opencodian-model-provider-header:focus-visible,
+.opencodian-container .opencodian-model-dropdown button.opencodian-model-provider-header:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+
+.opencodian-model-provider-chevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+}
+
+.opencodian-model-provider-chevron svg {
+  width: 100%;
+  height: 100%;
+}
+
+.opencodian-model-provider-count {
+  margin-inline-start: auto;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .opencodian-model-group-options {
   display: block;
   padding: 0 4px;
+}
+
+.opencodian-model-group-options[hidden] {
+  display: none;
 }
 
 .opencodian-model-provider-header-icon {
@@ -3683,6 +3734,7 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-model-provider-header-text {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -22442,6 +22494,90 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
   .opencodian-runtime-overflow.is-open
 ) {
   z-index: 230;
+}
+
+/* Resource mentions share the composer invocation anatomy. */
+.opencodian-invocation-token--file,
+.opencodian-invocation-token--folder,
+.opencodian-invocation-token--session,
+.opencodian-invocation-token--mcp-resource {
+  color: var(--text-accent);
+}
+
+.opencodian-invocation-token--plugin,
+.opencodian-invocation-token--app {
+  color: var(--opencodian-skill-token-foreground, #7453b0);
+}
+
+.theme-dark .opencodian-invocation-token--plugin,
+.theme-dark .opencodian-invocation-token--app {
+  --opencodian-skill-token-foreground: #bda5e6;
+}
+
+.opencodian-reference-menu-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-family: var(--font-interface);
+  font-size: var(--font-ui-smaller);
+  font-weight: 500;
+  text-align: start;
+  cursor: pointer;
+}
+
+.opencodian-reference-menu-group:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.opencodian-reference-menu-group:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+
+.opencodian-reference-menu-chevron,
+.opencodian-reference-menu-chevron svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+}
+
+.opencodian-reference-menu-count {
+  margin-inline-start: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.opencodian-reference-menu-items:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.opencodian-reference-menu-icon,
+.opencodian-reference-menu-icon svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  color: var(--text-accent);
+}
+
+.opencodian-agent-mention-menu-item .opencodian-slash-command-menu-title {
+  font-family: var(--font-interface);
+}
+
+.opencodian-reference-menu-date {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-variant-numeric: tabular-nums;
 }
 
 

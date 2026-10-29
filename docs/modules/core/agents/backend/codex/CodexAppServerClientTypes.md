@@ -52,3 +52,6 @@
 
 - 源码位置：`src/core/agents/backend/codex/CodexAppServerClientTypes.ts`。
 - 原位置：`src/core/agents/backend/CodexAppServerClientTypes.ts`；文件名、导出接口与业务职责保持不变。
+## 2026-10-29：Mention 输入
+
+`AppServerTurnStartOptions.input` 增加原生 `{ type: 'mention', name, path }`，用于经有效运行时目录验证的 `plugin://…` 或后续已接通的原生身份。技能仍使用独立的 `skill` 输入类型。

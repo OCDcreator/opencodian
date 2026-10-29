@@ -487,6 +487,10 @@ export interface ChatMessage {
   toolCalls?: ToolCallInfo[];
   contentBlocks?: ContentBlock[];
   contextAttachments?: MessageContextAttachment[];
+  /** Vault-scoped historical context captured or natively referenced by this turn. */
+  sessionReferences?: PromptSessionReferenceSnapshot[];
+  /** Stable selected identities retained alongside the readable user text. */
+  promptReferences?: PromptReference[];
   questionResolution?: QuestionResolution;
   omo?: OmoMessageMeta;
   compactionDivider?: CompactionDividerMeta;
@@ -755,6 +759,57 @@ export type StreamChunk =
 
 /** Logical agent backend identity. Determines which adapter owns a session. */
 export type AgentBackendKind = 'opencode' | 'opencode2' | 'claude-code' | 'codex' | 'copilot' | 'pi' | 'zcode' | 'dsh';
+
+/** Stable composer references; the label is presentation, never identity. */
+export type PromptReference = {
+  version: 1;
+  id: string;
+  label: string;
+  vaultPath: string;
+} & (
+  | { kind: 'file' | 'folder'; path: string }
+  | { kind: 'session'; backend: AgentBackendKind; conversationId: string; sessionId?: string }
+  | { kind: 'plugin' | 'app' | 'mcp-resource'; backend: AgentBackendKind; nativePath: string }
+);
+
+export interface PromptReferenceCandidate {
+  id: string;
+  kind: PromptReference['kind'];
+  label: string;
+  description: string;
+  reference: PromptReference;
+  updatedAt?: number;
+}
+
+/** Only effective runtime entries with an exact native invocation identity. */
+export interface NativePromptMention {
+  kind: 'plugin' | 'app' | 'mcp-resource';
+  backend: AgentBackendKind;
+  id: string;
+  label: string;
+  description?: string;
+  nativePath: string;
+}
+
+/** Captured reference evidence belongs to the destination user turn. */
+export interface PromptSessionReferenceSnapshot {
+  reference: Extract<PromptReference, { kind: 'session' }>;
+  strategy: 'native' | 'snapshot';
+  source: 'backend' | 'plugin-cache';
+  capturedAt: number;
+  messageCount: number;
+  omittedMessages: number;
+  truncated: boolean;
+  text?: string;
+}
+
+export interface PreparedPromptReferences {
+  content: string;
+  displayContent: string;
+  contextItems: PromptContextItem[];
+  sessionReferences: PromptSessionReferenceSnapshot[];
+  nativeMentions: NativePromptMention[];
+}
 
 /** Conversation metadata */
 export interface ConversationMeta {

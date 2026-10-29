@@ -370,6 +370,7 @@ describe('SettingsTabbedRenderer', () => {
       activeBackend: 'opencode2',
     });
     const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
     const titleEl = containerEl.createEl('h2', { cls: 'opencodian-settings-panel-title' });
     titleEl.createSpan({ cls: 'opencodian-title', text: 'OpenCodian' });
 
@@ -428,6 +429,7 @@ describe('SettingsTabbedRenderer', () => {
       activeBackend: 'opencode2',
     });
     const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
     const titleEl = containerEl.createEl('h2', { cls: 'opencodian-settings-panel-title' });
     titleEl.createSpan({ cls: 'opencodian-title', text: 'OpenCodian' });
 

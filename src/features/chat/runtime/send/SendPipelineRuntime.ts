@@ -460,7 +460,7 @@ export class SendPipelineRuntime {
         }
       }, undefined);
     }
-    const stream = this.host.sendStreamMessage(preparedSend.conversation, content, {
+    const stream = this.host.sendStreamMessage(preparedSend.conversation, preparedSend.requestContent ?? content, {
       sessionId: backendSessionId,
       ...preparedSend.modelOptions,
       ...(preparedSend.resolvedAgentInvocation?.agent

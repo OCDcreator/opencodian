@@ -690,3 +690,9 @@ Adds `chat.composerMenu.*` keys for the attachment menu (attachment, add file/im
 > 2026-10-27 (second review): adds `settings.dsh.tab.model` and `settings.dsh.model.*` for the DSH inline override page; mirrors zh.
 
 2026-10-28：记忆设置补充六后端模型、逐回合正文召回、跨机身份/别名、代理笔记本及可选向量召回的说明与 JSON 校验文案。
+# 2026-10-29: Composer reference groups
+
+Adds English group labels for files/folders, Vault chats, plugins/apps, MCP resources and agents in the unified @ picker. Groups are shown only for available candidates.
+# 2026-10-29: Slash menu groups
+
+Provides `slashCommand.group.commands` and `.skills` labels for independent composer disclosure controls.

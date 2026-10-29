@@ -329,14 +329,20 @@
  * search placeholder) so the provider label stays legible even in
  * pink/saturated light themes.
  */
-.opencodian-model-provider-header {
+.opencodian-model-provider-header,
+.opencodian-container .opencodian-model-dropdown button.opencodian-model-provider-header {
   position: sticky;
   top: 0;
   z-index: 10;
   display: flex;
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: 6px;
+  box-shadow: none;
   align-items: center;
   gap: 8px;
-  min-height: 26px;
+  min-height: 32px;
   padding: 5px 12px 4px;
   background: var(--background-primary);
   color: var(--text-muted);
@@ -345,11 +351,47 @@
   line-height: 1;
   letter-spacing: 0;
   text-transform: none;
+  text-align: start;
+  cursor: pointer;
+}
+
+.opencodian-model-provider-header:hover,
+.opencodian-container .opencodian-model-dropdown button.opencodian-model-provider-header:hover {
+  background: var(--background-secondary);
+  box-shadow: none;
+}
+
+.opencodian-model-provider-header:focus-visible,
+.opencodian-container .opencodian-model-dropdown button.opencodian-model-provider-header:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+
+.opencodian-model-provider-chevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+}
+
+.opencodian-model-provider-chevron svg {
+  width: 100%;
+  height: 100%;
+}
+
+.opencodian-model-provider-count {
+  margin-inline-start: auto;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .opencodian-model-group-options {
   display: block;
   padding: 0 4px;
+}
+
+.opencodian-model-group-options[hidden] {
+  display: none;
 }
 
 .opencodian-model-provider-header-icon {
@@ -373,6 +415,7 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-model-provider-header-text {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

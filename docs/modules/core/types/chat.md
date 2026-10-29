@@ -252,3 +252,10 @@ ChatMessage 与 user_message_identity 增加可选 Codex sourceTurnId；它与 s
 ## 2026-10-24 DSH 会话覆盖与聚合用量
 
 会话设置增加 `dshModelOverride`、`dshEffortOverrides`，随 conversation 保存/加载，保留 native opaque model value。上下文快照与 TabContextState 增加可选 `tokenBreakdownAvailable`；false 表示只有聚合占用，不能推导分类或本地费用。其他后端缺省值维持既有语义。
+# 2026-10-29: Unified composer reference contracts
+
+`PromptReference` retains a Vault-scoped file/folder, source-session or native runtime mention identity independently of its display label. `PromptReferenceCandidate`, `NativePromptMention`, `PromptSessionReferenceSnapshot` and `PreparedPromptReferences` are backend-neutral contracts shared by composer discovery, send preparation and the owning adapters. Session capture provenance and truncation stay explicit.
+
+# 2026-10-29: Stable prompt references
+
+User messages retain selected file, folder, session and native mention identities in `promptReferences`, with the actual historical payload or native strategy in `sessionReferences`. Readable message text remains separate from backend request expansion.

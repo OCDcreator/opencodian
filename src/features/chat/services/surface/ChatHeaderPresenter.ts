@@ -134,7 +134,6 @@ export class ChatHeaderPresenter {
   private historyBtnEl: HTMLElement | null = null;
   private conversationSessionSettingsBtnEl: HTMLElement | null = null;
   private diagnosticsBtnEl: HTMLElement | null = null;
-  private settingsBtnEl: HTMLElement | null = null;
   private serverStatusIntervalId: number | null = null;
   private lspStatusRefreshCoordinator: LspStatusRefreshCoordinator | null = null;
   private openLspSettingsCallback: (() => void) | null = null;
@@ -218,14 +217,6 @@ export class ChatHeaderPresenter {
       onClick: (event) => this.routeDiagnosticsClick(event),
     });
     this.refreshBackendChrome();
-    this.settingsBtnEl = this.buildActionButton(configGroupEl, {
-      actionId: 'settings',
-      iconName: 'settings',
-      getTooltipLabel: () => t('chat.settings.open'),
-      onClick: () => {
-        this.host.openSettings();
-      },
-    });
 
     this.applyLocaleTexts();
   }
@@ -255,9 +246,6 @@ export class ChatHeaderPresenter {
       this.applyActionLabel(this.conversationSessionSettingsBtnEl, t('chat.sessionSettings.open'));
     }
 
-    if (this.settingsBtnEl) {
-      this.applyActionLabel(this.settingsBtnEl, t('chat.settings.open'));
-    }
     if (this.diagnosticsBtnEl) {
       this.applyActionLabel(this.diagnosticsBtnEl, this.getDiagnosticsTooltipLabel());
     }
@@ -328,7 +316,6 @@ export class ChatHeaderPresenter {
     this.historyBtnEl = null;
     this.conversationSessionSettingsBtnEl = null;
     this.diagnosticsBtnEl = null;
-    this.settingsBtnEl = null;
     this.isRefreshingServerStatus = false;
     this.lastServerAvailability = null;
   }
@@ -529,6 +516,7 @@ export class ChatHeaderPresenter {
 
   private updateServerStatusIcon(kind: AgentBackendKind): void {
     if (!this.serverStatusIconEl) return;
+    if (this.serverStatusIconEl.getAttribute('data-backend-icon') === kind && this.serverStatusIconEl.firstElementChild) return;
 
     this.serverStatusIconEl.setAttribute('data-backend-icon', kind);
     this.serverStatusIconEl.removeClass('has-svg-icon', 'has-inline-brandmark', 'has-lobehub-icon');

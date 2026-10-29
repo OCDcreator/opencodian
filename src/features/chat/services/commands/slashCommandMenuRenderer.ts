@@ -1,4 +1,7 @@
+import { setIcon } from 'obsidian';
+
 import type { SlashCommandMenuItem } from '../../../../core/config/slashCommandCatalog';
+import type { PromptReference } from '../../../../core/types';
 import { t } from '../../../../i18n';
 
 export type SlashCommandMenuStatus =
@@ -19,6 +22,9 @@ interface RenderSlashCommandMenuOptions {
   selectedIndex: number;
   status: SlashCommandMenuStatus;
   isMidText?: boolean;
+  grouped?: boolean;
+  collapsedGroups?: ReadonlySet<SlashCommandMenuGroup>;
+  onToggleGroup?(group: SlashCommandMenuGroup): void;
   onHoverItem(index: number): void;
   onSelectItem(index: number): void;
 }
@@ -27,9 +33,50 @@ export interface AgentMentionMenuItem {
   id: string;
   displayName?: string;
   description?: string;
+  referenceKind?: PromptReference['kind'];
+  updatedAt?: number;
+}
+
+export type AgentMentionMenuGroup = 'files' | 'sessions' | 'plugins' | 'resources' | 'agents';
+export type SlashCommandMenuGroup = 'commands' | 'skills';
+
+export function getSlashCommandMenuGroup(item: SlashCommandMenuItem): SlashCommandMenuGroup {
+  return item.source === 'skill' || item.source === 'codex-skill' || item.source === 'skills-command' ? 'skills' : 'commands';
+}
+
+export function getAgentMentionMenuGroup(item: AgentMentionMenuItem): AgentMentionMenuGroup {
+  return item.referenceKind === 'file' || item.referenceKind === 'folder' ? 'files'
+    : item.referenceKind === 'session' ? 'sessions'
+      : item.referenceKind === 'plugin' || item.referenceKind === 'app' ? 'plugins'
+        : item.referenceKind === 'mcp-resource' ? 'resources' : 'agents';
+}
+
+let mentionMenuSequence = 0;
+
+function renderMenuGroup(menuEl: HTMLElement, options: {
+  group: string; title: string; count: number; collapsed: boolean; toggle(): void;
+}): HTMLElement {
+  const { group, title, count, collapsed, toggle } = options;
+  if (!menuEl.id) menuEl.id = `opencodian-reference-menu-${++mentionMenuSequence}`;
+  const button = menuEl.createEl('button', { cls: 'opencodian-reference-menu-group',
+    attr: { type: 'button', 'data-group': group, id: `${menuEl.id}-${group}-heading`,
+      'aria-expanded': String(!collapsed), 'aria-controls': `${menuEl.id}-${group}-items` } });
+  const chevron = button.createSpan({ cls: 'opencodian-reference-menu-chevron', attr: { 'aria-hidden': 'true' } });
+  setIcon(chevron, collapsed ? 'chevron-right' : 'chevron-down');
+  button.createSpan({ cls: 'opencodian-reference-menu-group-label', text: title });
+  button.createSpan({ cls: 'opencodian-reference-menu-count', text: String(count) });
+  button.addEventListener('mousedown', (event) => event.preventDefault());
+  button.addEventListener('click', toggle);
+  const itemsEl = menuEl.createDiv({ cls: 'opencodian-reference-menu-items',
+    attr: { id: `${menuEl.id}-${group}-items`, role: 'group', 'aria-labelledby': button.id } });
+  itemsEl.hidden = collapsed;
+  return itemsEl;
 }
 
 interface RenderAgentMentionMenuOptions {
+  unified?: boolean;
+  collapsedGroups?: ReadonlySet<AgentMentionMenuGroup>;
+  onToggleGroup?(group: AgentMentionMenuGroup): void;
   menuEl: HTMLElement;
   items: AgentMentionMenuItem[];
   selectedIndex: number;
@@ -77,8 +124,22 @@ export function renderSlashCommandMenu(options: RenderSlashCommandMenuOptions): 
     });
   }
 
-  items.forEach((item, index) => {
-    const itemEl = menuEl.createDiv({
+  let previousGroup = '';
+  let groupItemsEl = menuEl;
+  const entries = items.map((item, index) => ({ item, index }));
+  if (options.grouped !== false) entries.sort((left, right) =>
+    Number(getSlashCommandMenuGroup(left.item) === 'skills') - Number(getSlashCommandMenuGroup(right.item) === 'skills'));
+  entries.forEach(({ item, index }) => {
+    const group = getSlashCommandMenuGroup(item);
+    const collapsed = options.grouped !== false && options.collapsedGroups?.has(group) === true;
+    if (options.grouped !== false && group !== previousGroup) {
+      groupItemsEl = renderMenuGroup(menuEl, { group, title: t(`slashCommand.group.${group}`),
+        count: items.filter((candidate) => getSlashCommandMenuGroup(candidate) === group).length,
+        collapsed, toggle: () => options.onToggleGroup?.(group) });
+      previousGroup = group;
+    }
+    if (collapsed) return;
+    const itemEl = groupItemsEl.createDiv({
       cls: 'opencodian-slash-command-menu-item',
       attr: {
         role: 'option',
@@ -117,7 +178,7 @@ export function renderAgentMentionMenu(options: RenderAgentMentionMenuOptions): 
   menuEl.replaceChildren();
 
   if (items.length === 0) {
-    const stateText = getAgentMentionMenuStateText(status);
+    const stateText = getAgentMentionMenuStateText(status, options.unified);
     if (!stateText) {
       menuEl.addClass('is-hidden');
       return;
@@ -134,8 +195,19 @@ export function renderAgentMentionMenu(options: RenderAgentMentionMenuOptions): 
 
   menuEl.removeClass('is-hidden');
 
+  let previousGroup = '';
+  let groupItemsEl = menuEl;
   items.forEach((item, index) => {
-    const itemEl = menuEl.createDiv({
+    const group = getAgentMentionMenuGroup(item);
+    const collapsed = options.collapsedGroups?.has(group) === true;
+    if (options.unified && group !== previousGroup) {
+      groupItemsEl = renderMenuGroup(menuEl, { group, title: t(`referenceMention.group.${group}`),
+        count: items.filter((candidate) => getAgentMentionMenuGroup(candidate) === group).length,
+        collapsed, toggle: () => options.onToggleGroup?.(group) });
+      previousGroup = group;
+    }
+    if (options.unified && collapsed) return;
+    const itemEl = groupItemsEl.createDiv({
       cls: 'opencodian-slash-command-menu-item opencodian-agent-mention-menu-item',
       attr: {
         role: 'option',
@@ -216,12 +288,23 @@ function renderAgentMentionMenuItem(itemEl: HTMLElement, item: AgentMentionMenuI
   const titleRowEl = itemEl.createDiv({
     cls: 'opencodian-slash-command-menu-title-row',
   });
+  if (item.referenceKind) {
+    const icon = titleRowEl.createSpan({ cls: 'opencodian-reference-menu-icon', attr: { 'aria-hidden': 'true' } });
+    setIcon(icon, item.referenceKind === 'folder' ? 'folder' : item.referenceKind === 'file' ? 'file-text'
+      : item.referenceKind === 'session' ? 'messages-square' : item.referenceKind === 'mcp-resource' ? 'database' : 'puzzle');
+  }
   titleRowEl.createDiv({
     cls: 'opencodian-slash-command-menu-title',
-    text: `@${item.id}`,
+    text: item.referenceKind ? item.displayName ?? item.id : `@${item.id}`,
+    attr: { title: item.displayName ?? item.id },
   });
+  if (item.updatedAt) {
+    const date = new Date(item.updatedAt);
+    if (!Number.isNaN(date.getTime())) titleRowEl.createSpan({ cls: 'opencodian-reference-menu-date',
+      text: date.toLocaleDateString(), attr: { title: date.toLocaleString() } });
+  }
 
-  if (item.displayName && item.displayName !== item.id) {
+  if (!item.referenceKind && item.displayName && item.displayName !== item.id) {
     titleRowEl.createDiv({
       cls: 'opencodian-slash-command-menu-badge opencodian-slash-command-menu-badge--runtime',
       text: item.displayName,
@@ -248,12 +331,12 @@ function getSlashCommandMenuStateText(status: SlashCommandMenuStatus): string | 
   return textKey ? t(textKey) : null;
 }
 
-function getAgentMentionMenuStateText(status: SlashCommandMenuStatus): string | null {
+function getAgentMentionMenuStateText(status: SlashCommandMenuStatus, unified = false): string | null {
   const stateTextKeys: Partial<Record<SlashCommandMenuStatus, Parameters<typeof t>[0]>> = {
-    loading: 'agentMention.menu.loading',
-    emptyCatalog: 'agentMention.menu.empty',
-    noMatches: 'agentMention.menu.noMatches',
-    loadFailed: 'agentMention.menu.loadFailed',
+    loading: unified ? 'referenceMention.menu.loading' : 'agentMention.menu.loading',
+    emptyCatalog: unified ? 'referenceMention.menu.empty' : 'agentMention.menu.empty',
+    noMatches: unified ? 'referenceMention.menu.noMatches' : 'agentMention.menu.noMatches',
+    loadFailed: unified ? 'referenceMention.menu.loadFailed' : 'agentMention.menu.loadFailed',
   };
   const textKey = stateTextKeys[status];
   return textKey ? t(textKey) : null;

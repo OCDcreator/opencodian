@@ -698,3 +698,9 @@ Includes the localized Pi extension-command completion status used only after a 
 > 2026-10-27（二次审查）：新增 `settings.dsh.tab.model` 与 `settings.dsh.model.*`，用于 DSH 行内覆盖页；与 en 同步。
 
 2026-10-28：记忆设置补充六后端模型、逐回合正文召回、跨机身份/别名、代理笔记本及可选向量召回的说明与 JSON 校验文案。
+# 2026-10-29: Composer reference groups
+
+Adds Chinese group labels for files/folders, Vault chats, plugins/apps, MCP resources and agents in the unified @ picker. Groups are shown only for available candidates.
+# 2026-10-29: 斜杠菜单分类
+
+提供 `slashCommand.group.commands`（命令）和 `.skills`（技能）独立折叠标题，与英文键保持一致。

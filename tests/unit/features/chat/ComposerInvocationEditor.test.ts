@@ -1,7 +1,13 @@
+import { TextDecoder, TextEncoder } from 'node:util';
+
 import { redo, undo, undoDepth } from '@codemirror/commands';
 import type { EditorView } from '@codemirror/view';
 
+import { AgentMentionComposerController } from '../../../../src/features/chat/services/composer/AgentMentionComposerController';
 import { ComposerInvocationEditor } from '../../../../src/features/chat/services/composer/ComposerInvocationEditor';
+import { encodePromptReference, parsePromptReferences } from '../../../../src/features/chat/services/context/PromptReferenceService';
+
+Object.assign(globalThis, { TextEncoder, TextDecoder });
 
 describe('composer inline invocation editor', () => {
   const rangeRects = Range.prototype.getClientRects;
@@ -51,6 +57,22 @@ describe('composer inline invocation editor', () => {
     expect(view.state.readOnly).toBe(true);
   });
 
+  it.each(['file', 'folder', 'session', 'plugin', 'app', 'mcp-resource'] as const)(
+    'renders a %s reference label while preserving its stable draft identity', (kind) => {
+      const value = '[@Design notes](opencodian-ref:encoded_identity)';
+      input.value = value;
+      editor.setTokens([{ start: 0, end: value.length, kind, label: '设计笔记' }]);
+      const token = document.querySelector<HTMLElement>('.opencodian-invocation-token');
+      expect(token?.dataset.type).toBe(kind);
+      expect(token?.dataset.value).toBe(value);
+      expect(token?.textContent).toBe('设计笔记');
+      expect(token?.title).toBe('设计笔记');
+      expect(input.value).toBe(value);
+      editor.setTokens([{ start: 0, end: value.length, kind, label: 'Renamed notes' }]);
+      expect(document.querySelector('.opencodian-invocation-token')?.textContent).toBe('Renamed notes');
+    },
+  );
+
   it('preserves editor undo and redo without replacing editable DOM on each input', async () => {
     input.value = '$design ';
     input.setSelectionRange(8, 8);
@@ -68,6 +90,42 @@ describe('composer inline invocation editor', () => {
     expect(input.value).toBe('$design ');
     expect(redo(view)).toBe(true);
     expect(input.value).toBe('$design 正文');
+  });
+
+  it('removes a selected reference with whole-token protection after a rejected submission', async () => {
+    const token = encodePromptReference({ version: 1, id: 'session:pi:one', kind: 'session', label: '设计会话',
+      vaultPath: '/vault', backend: 'pi', conversationId: 'one', sessionId: 'native-session' });
+    const controller = new AgentMentionComposerController({
+      getComposerInputMode: () => 'prompt', scheduleLayoutSync: jest.fn(),
+      onMentionInserted: jest.fn(), onLoadFailed: jest.fn(),
+    });
+    const syncTokens = () => editor.setTokens(controller.resolveReferencePillSpans(input.value));
+    input.addEventListener('input', syncTokens);
+    const submitted = jest.fn();
+    input.addEventListener('keydown', (event) => {
+      if (controller.tryHandleKeydown(event, input, null)) return;
+      if (event.key === 'Enter') { event.preventDefault(); submitted(input.value); }
+    });
+    input.value = `${token} `;
+    input.setSelectionRange(input.value.length, input.value.length);
+    syncTokens();
+    const view = (editor as unknown as { view: EditorView }).view;
+    const press = async (key: string) => {
+      view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', { key, code: key, bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    };
+    await press('Enter');
+    expect(submitted).toHaveBeenCalledWith(`${token} `);
+    expect(input.value).toBe(`${token} `);
+    await press('Backspace');
+    expect(input.value).toBe(token);
+    expect(parsePromptReferences(input.value)).toHaveLength(1);
+    await press('Backspace');
+    expect(input.value).toBe(token);
+    expect([input.selectionStart, input.selectionEnd]).toEqual([0, token.length]);
+    await press('Backspace');
+    expect(input.value).toBe('');
+    expect(document.querySelector('.opencodian-invocation-token')).toBeNull();
   });
 
   it('releases the editor when the composer is detached and restores its native textarea port', async () => {

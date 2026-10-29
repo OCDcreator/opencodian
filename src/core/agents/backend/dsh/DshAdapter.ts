@@ -387,6 +387,23 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
     });
   }
 
+  /** The bridge proves a mounted resolver and both Vault identities without resuming the source. */
+  async prepareNativeSessionReference(sourceSessionId: string, targetSessionId?: string): Promise<string | null> {
+    if (!targetSessionId || sourceSessionId === targetSessionId) return null;
+    const client = await this.ready();
+    if (!client.nativeRequest) return null;
+    try {
+      const result = await client.nativeRequest('session/reference', {
+        sourceSessionId, targetSessionId, cwd: this.resolveWorkingDirectory(),
+      });
+      const expected = `dsh-session:${Buffer.from(JSON.stringify(sourceSessionId), 'utf8').toString('base64url')}`;
+      return result.available === true && result.reference === expected ? expected : null;
+    } catch {
+      // Older native bridges and ACP cannot prove the resolver; callers use an owned history snapshot.
+      return null;
+    }
+  }
+
   async startAuxQuerySession(config: AuxQuerySessionConfig): Promise<AuxQuerySession> {
     return this.createAuxiliarySession(config, false);
   }

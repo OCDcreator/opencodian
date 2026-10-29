@@ -4,6 +4,8 @@
 > 2026-09-21 (advantage-parity R-E1)：ChatRuntimeComposition 组合 UrlContextFetchService 并注入发送准备的 resolveUrlContextItems 缝。
 
 # Owner: feature.chat-runtime
+
+2026-10-29：ChatRuntimeComposition 为统一引用服务注入当前 Vault 文件、插件持久化会话与来源后端只读入口；目录与发送准备共用实例。SendPipelineRuntime 将准备好的后端正文送往目的后端，保留本地可读用户消息，不切换全局活跃后端或恢复来源会话。
 > 2026-10-26（DSH UI 修复）：AssistantShellRenderer 使用 shell 提供的目录查询显示历史消息模型名称；原始 provider/model 身份保留在 data 属性、焦点提示和可访问名称中。找不到目录项时显示原始身份，不借用当前会话模型，也不改写消息记录。
 > 2026-09-25 (FA880): BackgroundTaskInlinePanelRenderer displays native ZCode jobs separately from the foreground tool card, refreshing active jobs and surfacing cancel/failure/interrupted terminal states.
 > The native watch is armed on activation before a task exists and only fetches for the active tab; the renderer owns its timer cleanup.

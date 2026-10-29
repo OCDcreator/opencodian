@@ -24,7 +24,7 @@ import { appendObsidianContextBlocks, createLogger } from '../../../../shared';
 import { prependMemoryInjection } from '../../../memory';
 import { prependObsidianToolingInjection } from '../../../obsidianTooling';
 import type { QuestionRequest } from '../../../types';
-import type { AgentBackendKind, ContextUsageSnapshot, ImageAttachment, StreamChunk } from '../../../types/chat';
+import type { AgentBackendKind, ContextUsageSnapshot, ImageAttachment, NativePromptMention, StreamChunk } from '../../../types/chat';
 import type { CodexApprovalPolicy, CodexReasoningEffort } from '../../../types/settings';
 import { AgentCapability, type BackendCapabilities } from '../../AgentCapability';
 import type {
@@ -1141,6 +1141,22 @@ export class CodexAdapter
       });
       return null;
     }
+  }
+
+  /** Mention identity comes from installed, enabled plugins in this Vault's runtime scope. */
+  async getRuntimeMentionCandidates(): Promise<NativePromptMention[]> {
+    const result = await this.appServerClient?.listInstalledPlugins({ cwds: [this.options.workingDirectory ?? process.cwd()] });
+    const candidates = new Map<string, NativePromptMention>();
+    for (const marketplace of result?.marketplaces ?? []) {
+      for (const plugin of marketplace.plugins) {
+        if (!plugin.installed || !plugin.enabled || !plugin.id || !plugin.name
+          || plugin.disabledReason || plugin.availability && plugin.availability !== 'AVAILABLE') continue;
+        const nativePath = `plugin://${plugin.id}`;
+        candidates.set(nativePath, { kind: 'plugin', backend: 'codex', id: plugin.id,
+          label: plugin.name, nativePath, description: marketplace.interface?.displayName ?? marketplace.name });
+      }
+    }
+    return [...candidates.values()];
   }
 
   /** Settings-facing plugin install (B4 seam): delegates to `plugin/install`. */
@@ -2845,6 +2861,10 @@ export class CodexAdapter
       yield* this.sendMessageViaAppServer(request);
       return;
     }
+    if (Array.isArray(request.options?.nativeMentions) && request.options.nativeMentions.length > 0) {
+      yield { type: 'error', content: 'Codex native mentions require the app-server transport' };
+      return;
+    }
 
     yield* this.sendMessageViaSdk(request);
   }
@@ -3132,7 +3152,7 @@ export class CodexAdapter
         }
       });
 
-      const input = await this.buildAppServerInput(request.content, request.images);
+      const input = await this.buildAppServerInput(request.content, request.images, request.options?.nativeMentions);
       tempDir = input.tempDir;
       if (!this.isCurrentAppServerAttempt(attempt)) return;
       const turnOptions: AppServerTurnStartOptions = {
@@ -3351,11 +3371,26 @@ export class CodexAdapter
   private async buildAppServerInput(
     content: string,
     images: ImageAttachment[] | undefined,
+    nativeMentions: unknown = [],
   ): Promise<{
     payload: AppServerTurnStartOptions['input'];
     tempDir?: string;
   }> {
     const skillInputs: AppServerTurnStartOptions['input'] = [];
+    if (!Array.isArray(nativeMentions)) throw new Error('Invalid Codex native mentions');
+    if (nativeMentions.length) {
+      const effective = await this.getRuntimeMentionCandidates();
+      for (const value of nativeMentions) {
+        const selected = value as Partial<NativePromptMention> | null;
+        if (!selected || typeof selected !== 'object') throw new Error('Invalid Codex native mention');
+        const current = effective.find((entry) => selected.backend === 'codex' && entry.kind === selected.kind
+          && entry.id === selected.id && entry.nativePath === selected.nativePath);
+        if (!current) throw new Error(`Codex mention is no longer available: ${String(selected.label ?? '')}`);
+        if (!skillInputs.some((entry) => entry.type === 'mention' && entry.path === current.nativePath)) {
+          skillInputs.push({ type: 'mention', name: current.label, path: current.nativePath });
+        }
+      }
+    }
     if (/(?:^|\s)\$\S+/.test(content)) {
       const skills = await this.getRuntimeSkills();
       for (const skill of skills ?? []) {
@@ -4185,6 +4220,21 @@ export class CodexAdapter
       });
       return [];
     }
+  }
+
+  /** Exact reference read: unavailable is distinct from a successfully read empty thread. */
+  async getPromptReferenceMessages(sessionId: string): Promise<unknown[] | null> {
+    const threadId = this.resolveThreadId(sessionId);
+    if (!this.appServerClient || !threadId) return null;
+    try {
+      const thread = await this.appServerClient.readThread(threadId, true);
+      if (!thread || thread.id !== threadId || !Array.isArray(thread.turns)) return null;
+      return CodexAppServerClient.normalizeTurnsToPreviewMessages(thread.turns).map((message) => ({
+        role: message.role, content: message.parts,
+        ...(message.sourceMessageId ? { id: message.sourceMessageId, sourceMessageId: message.sourceMessageId } : {}),
+        ...(message.sourceTurnId ? { sourceTurnId: message.sourceTurnId } : {}),
+      }));
+    } catch { return null; }
   }
 
   /**

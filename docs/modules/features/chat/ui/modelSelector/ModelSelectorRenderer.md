@@ -1,5 +1,7 @@
 # ModelSelectorRenderer
 
+2026-10-29：提供商标题改为原生 disclosure button，保留 sticky、不透明底色与提供商图标，显示箭头和匹配模型数量。`collapsedProviders` 和 `onToggleProvider` 由协调器提供；折叠分组保留标题和有稳定 id 的隐藏容器，但不渲染模型 option，键盘导航及提交不会访问隐藏模型。标题的 `aria-expanded` / `aria-controls` 与容器保持同步。
+
 > **源码**: `src/features/chat/ui/modelSelector/ModelSelectorRenderer.ts`
 > **状态**: [REVIEW]
 
