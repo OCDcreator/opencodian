@@ -87,6 +87,15 @@ components:
     textColor: "{colors.accent-slate}"
     rounded: "{rounded.md}"
     padding: "4px 8px"
+  session-tabs:
+    track: "color-mix(in srgb, var(--background-primary) 90%, var(--text-normal))"
+    idleSurface: "var(--background-primary)"
+    idleBorder: "1px solid color-mix(in srgb, var(--text-normal) 55%, var(--background-primary))"
+    selectedSurface: "var(--interactive-accent)"
+    selectedText: "var(--text-on-accent)"
+    selectedFocusAndStreaming: "contrasting selected foreground"
+    statusSignal: "warning icons/dots retain their semantic color on a separate idle surface"
+    geometry: "28px triggers, 6px radius, 8px track radius, 3px padding, 2px gap"
   header-status-chip:
     collapsedSize: "28px"
     icon: "active backend identity; OpenCode reuses the title brandmark SVG"

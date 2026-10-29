@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "9a38d87f2f5df4b9a3cb74dfa71eeb930e41f3ffc99630da96d738abe7621a3f",
+  "digest": "f02302d896d2a5128cb4dd0712f0c6164c439e46cf51718e0a3b293de6433de4",
   "recordCount": 809,
   "records": [
     {
@@ -16,12 +16,12 @@
     {
       "kind": "package",
       "key": "package-lock.json",
-      "sha256": "4ae65f6c7dc58957c4b5285348435787091e9632dc180aafaf3d0e341b4d040c"
+      "sha256": "ac6fd0fa7e9de929c2640704c1bef1e51c9d716e602eb0ecbeb4637c9c5db18c"
     },
     {
       "kind": "package",
       "key": "package.json",
-      "sha256": "91aac393b2f2c8ab5aae44473d44c4491f6bf234a54b12cc42ce16a67fc93ff2"
+      "sha256": "fcff4b0b0954a87068185d722c56bdf5538547fc144a6463abcdae52fbfac2cd"
     },
     {
       "kind": "src",
@@ -3586,7 +3586,7 @@
     {
       "kind": "src",
       "key": "src/style/base/core.css",
-      "sha256": "950b1f114edea33041999409857c6c700f88944687df43a439c0844f2ba4ed99"
+      "sha256": "0f7d327e6e56b9c0ec8ac29b802a238696b14f07d79f071de388903972e4d48d"
     },
     {
       "kind": "src",
@@ -4049,7 +4049,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-29T12:45:21.091Z",
-  "headShaAtGeneration": "73bb30adf5f098e695a63f4d1341692459e344e8",
+  "generatedAt": "2026-10-29T15:35:05.365Z",
+  "headShaAtGeneration": "deea362fb8499814f4a2d056a8825afc0c6631fd",
   "graphifyVersion": "graphify 0.9.31"
 }

@@ -1,5 +1,8 @@
 # Core Styles
 
+2026-10-29：会话标签改用 shadcn/ui 默认 Tabs 分段结构（参考 https://ui.shadcn.com/docs/components/radix/tabs 与官方 apps/v4/registry/new-york-v4/ui/tabs.tsx）：8px 轨道、3px 内边距、2px 间隔、28px 高／6px 圆角的中性色触发器，选中态使用 interactive-accent 实色填充、text-on-accent 前景和加粗字重；普通项使用 background-primary 底色、由 text-normal 混合得到的 1px 边框，轨道使用独立的 10% 墨色混合。避免自定义主题把 background-primary / background-secondary 配成近似值时，当前会话与背景融为一体。选中态键盘焦点和串流圆环使用反差前景，后台／待处理图标保留独立底色和状态色。普通项保持完整可见，不再使用低透明度、模糊或玻璃渐变。header 保留紧凑编号，input/grid 始终展示截断标题，竖排 hover/focus 使用中性色标题浮层。串流圆环、后台三点和待处理图标仍读取现有 tab classes，reduced-motion 下停止动画。未新增组件库依赖或修改 TabBar 的会话生命周期与回调。
+
+
 2026-10-29：聊天标题与文字图形禁止 flex 压缩；Chat 容器宽度不大于 480px 时隐藏 .opencodian-header .opencodian-title-text，仅保留固定尺寸品牌图形。大于 480px 时恢复原比例文字，独立设置页标题不受此规则影响。config group 移除重复 plugin settings 齿轮，保留会话设置与诊断，backend badge 继续提供设置入口。
 > 2026-10-07：同一暂时取消 sticky header 的规则扩展到待回答 permission 卡；已完成或 terminal 卡不匹配，避免长用户消息遮住 Allow/Reject 按钮。CSS 不改变权限回调或 native 请求语义；构建后的 Mac/Windows 鼠标命中及拒写结果单独验收。
 > 2026-10-07：消息区增加基于 `--opencodian-composer-stack-height` 的 `scroll-padding-bottom`，让原生权限卡底部控件可滚动到输入区上方。当前 turn 含 unresolved `.opencodian-question-inline` 时，header 使用普通相对定位并取消局部 z-index，避免长用户消息吸附后覆盖选择项；回答完成后恢复既有 sticky 行为。Windows 可见隔离宿主的 native 长 command 卡已通过 Deny/Submit 鼠标点击；Mac hidden 宿主的 composer 高度测量停滞仍单独记录，不以手动调用测量方法声称生命周期修复。
