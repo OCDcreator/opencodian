@@ -143,7 +143,7 @@ describe('plugin artifact packaging', () => {
     expect(githubCiWorkflow.match(/actions\/setup-node@v7/g)).toHaveLength(3);
     expect(githubCiWorkflow.match(/node-version: 24/g)).toHaveLength(3);
     const desktopJob = githubCiWorkflow.match(/  desktop-tests:\n([\s\S]*?)(?=\n  [a-z][\w-]*:)/)?.[1];
-    expect(desktopJob).toContain('os: [windows-latest, macos-latest]');
+    expect(desktopJob).toContain('os: [windows-latest, macos-26-intel]');
     expect(desktopJob).toContain('runs-on: ${{ matrix.os }}');
     expect(desktopJob).toContain('run: npm test');
     expect(githubWorkflow).toContain('actions/upload-artifact@v7');
