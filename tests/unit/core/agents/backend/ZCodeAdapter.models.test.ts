@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 /**
  * ZCodeAdapter.models.test.ts — live catalog wiring, pre-send validation,
  * session-override-vs-defaults boundaries (ticket 06).
@@ -189,7 +191,7 @@ describe('ZCodeAdapter — live model catalog and boundaries', () => {
       : original(method, params));
     await expect(adapter.getRuntimeSkills()).resolves.toEqual([{ name: 'design', description: 'Design a form', source: 'skill' }]);
     expect(request).toHaveBeenCalledWith('skills/referenceCatalog', {
-      workspace: { workspacePath: '/vault', workspaceKey: '/vault' },
+      workspace: { workspacePath: path.resolve('/vault'), workspaceKey: path.resolve('/vault').replace(/\\/g, '/') },
     });
   });
   it('reports the catalog honestly unavailable until a snapshot is observed', async () => {

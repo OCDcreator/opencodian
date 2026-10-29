@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import type { AgentBackendKind, Conversation, PromptReference } from '../../../../../src/core/types/chat';
 import { encodePromptReference, parsePromptReferences, PromptReferenceService, type PromptReferenceServiceHost } from '../../../../../src/features/chat/services/context/PromptReferenceService';
 
@@ -61,7 +63,7 @@ describe('PromptReferenceService', () => {
     expect(rows.every((row) => row.kind === 'session')).toBe(true);
   });
   it('rejects a file symlink escaping the Vault and resolves safe folder context', async () => {
-    const input = host('pi'); input.realpath = async (value) => value === '/vault/link' ? '/outside' : value;
+    const input = host('pi'); input.realpath = async (value) => value === path.resolve('/vault/link') ? path.resolve('/outside') : value;
     const ref: PromptReference = { version: 1, id: 'f', label: 'link', vaultPath: '/vault', kind: 'file', path: 'link' };
     await expect(new PromptReferenceService(input).prepare(encodePromptReference(ref), { targetBackend: 'pi' })).rejects.toThrow('symlink');
     const result = await new PromptReferenceService(input).prepare(encodePromptReference({ ...ref, kind: 'folder', path: 'notes' }), { targetBackend: 'pi' });

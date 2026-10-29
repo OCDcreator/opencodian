@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import { CodexAdapter } from '../../../../../src/core/agents/backend/codex/CodexAdapter';
 import { DshAdapter } from '../../../../../src/core/agents/backend/dsh/DshAdapter';
 import { PiAdapter } from '../../../../../src/core/agents/backend/pi/PiAdapter';
@@ -45,7 +47,7 @@ describe('backend native mention boundaries', () => {
       { kind: 'plugin', backend: 'zcode', id: 'ready@market', label: 'Ready', nativePath: 'plugin://ready@market' },
     ]);
     expect(request).toHaveBeenCalledWith('plugins/referenceCatalog', {
-      workspace: { workspacePath: '/vault', workspaceKey: '/vault' }, sessionId: 'session-a',
+      workspace: { workspacePath: path.resolve('/vault'), workspaceKey: path.resolve('/vault').replace(/\\/g, '/') }, sessionId: 'session-a',
     });
   });
 

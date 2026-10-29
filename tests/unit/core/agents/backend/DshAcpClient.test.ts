@@ -90,7 +90,9 @@ function clientFor(handler: string, options: Partial<DshAcpClientOptions> = {}):
   return new DshAcpClient({
     cwd: process.cwd(),
     launch: { command: process.execPath, args: ['-e', fixtureScript(handler)], env: {} },
-    requestTimeoutMs: 250,
+    // A real Node child needs startup headroom on shared Windows CI runners.
+    // Timeout-specific cases keep their explicit shorter budgets below.
+    requestTimeoutMs: 2_000,
     promptTimeoutMs: 500,
     ...options,
   });
