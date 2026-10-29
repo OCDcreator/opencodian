@@ -16,7 +16,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        # Use the Intel pool while macOS ARM capacity leaves jobs unassigned.
+        os: [windows-latest, macos-26-intel]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout

@@ -24,18 +24,11 @@
 
 ### CI 门禁 (`.github/workflows/ci.yml`)
 
-仓库现在有两个 CI 门禁 job，都会在 `push` 和 `pull_request` 上运行：
+CI 在 `push` 和 `pull_request` 上运行三类 job：
 
-1. `owner-guard`
-2. `verify`
-
-`owner-guard` job：
-
-1. `actions/checkout@v7` with `fetch-depth: 0`
-2. `npm ci`
-3. `npm run check:owner-guard`
-
-该 job 单独存在是为了尽早失败，并确保 owner guard 拿到足够的 git 历史来计算 PR diff range。
+1. `desktop-tests`：Windows 与 macOS 分别安装依赖并执行完整 `npm test`。2026-10-30 将 macOS runner 固定到官方标准 `macos-26-intel`，避开 `macos-latest` ARM 容量不足导致长时间排队后取消的实际故障；保留完整 macOS 测试，不使用 continue-on-error 或跳过断言。
+2. `architecture`：完整历史、Node.js 24 和固定 Graphify 版本，执行 `npm run verify:architecture` 与 `npm run check:module-doc-owner-impact`。
+3. `verify`：文档、Graphify、日志、lint、类型、测试和生产产物检查。
 
 `verify` job：
 
@@ -50,7 +43,7 @@
 9. `npm run build`
 10. `git diff --exit-code -- styles.css`
 
-由于 `npm run verify` 现已内嵌 `check:owner-guard`，`verify` job 也保留完整历史和统一的 owner-guard diff-range 环境变量，避免独立命令与聚合命令的范围判定不一致。
+`architecture` 和 `verify` 共用基于事件 before commit／PR base 的 `VERIFY_BASE_REF`；`npm run verify` 也使用统一 change-scope 门禁，避免 main push 的范围退化为空。
 
 最后一步的意义是：确保提交中的 `src/style/**` 改动已经同步刷新到根目录 `styles.css`，避免 CI 通过但仓库产物滞后。
 
