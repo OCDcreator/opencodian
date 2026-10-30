@@ -101,6 +101,7 @@ describe('OpenCodianPlugin.getConversationById', () => {
         updatedAt: 2,
         lastResponseAt: 3,
         titleGenerationStatus: 'success',
+        titleState: { source: 'manual', revision: 7 },
         openCodeSessionId: 'session-1',
       },
     ]);
@@ -120,6 +121,7 @@ describe('OpenCodianPlugin.getConversationById', () => {
         id: 'conv-1',
         title: '标题',
         openCodeSessionId: 'session-1',
+        titleState: { source: 'manual', revision: 7 },
       }),
     ]);
   });

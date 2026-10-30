@@ -78,3 +78,7 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 > 2026-10-27（UI 验收修复）：会话标题备份模型按钮创建时同步设置当前模型或 followCurrent 标签；异步加载/不可用/保存语义不变。
 
 2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `feature.settings-plugin` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。
+
+## 2026-10-30 会话标题
+
+现有会话设置显示页补齐非 OpenCode 后端标题控制；OpenCode 2 标题目录由所属 adapter 读取。

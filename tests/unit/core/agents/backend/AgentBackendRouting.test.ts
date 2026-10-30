@@ -428,7 +428,7 @@ describe('readBackendSessionTitle', () => {
       expect(result).toBe('Hello World');
     });
 
-    it('returns null for backends without an explicit title mapping', async () => {
+    it('reads Codex titles through the same native routing seam', async () => {
       const adapter = createMockSessionAdapter('codex', new Set([
         AgentCapability.Chat,
         AgentCapability.Sessions,
@@ -437,7 +437,7 @@ describe('readBackendSessionTitle', () => {
       });
       const registry = createMockRegistry(new Map([['codex', adapter]]));
       const result = await readBackendSessionTitle(registry, { backend: 'codex' }, 'ses-1');
-      expect(result).toBeNull();
+      expect(result).toBe('Codex Session');
     });
 
     it('returns null when getSession throws an error', async () => {

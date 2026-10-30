@@ -85,6 +85,7 @@ function createFixture(options: {
     getTabContextUsage: jest.fn(() => options.tabContextUsage ?? null),
   };
   const ports: jest.Mocked<ConversationTabRuntimeCoordinatorPorts> = {
+    createConversationInNewTab: jest.fn().mockResolvedValue(undefined),
     activateTab: jest.fn().mockResolvedValue(undefined),
     closeTabAndRecover: jest.fn().mockResolvedValue(undefined),
     initializeFirstTab: jest.fn().mockResolvedValue(undefined),

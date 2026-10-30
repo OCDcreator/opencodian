@@ -62,6 +62,42 @@ describe('ConversationTabOpenCoordinator', () => {
     jest.clearAllMocks();
   });
 
+  it('coalesces rapid creation and removes a conversation if capacity changed while awaiting it', async () => {
+    let finish!: (value: ReturnType<typeof createConversation>) => void;
+    const manager = new TabManager('New chat', { getMaxTabs: () => 1 });
+    const host = createHost({ getTabManager: jest.fn(() => manager), createConversation: jest.fn(() => new Promise((resolve) => { finish = resolve; })) });
+    const port = createPort();
+    const coordinator = new ConversationTabOpenCoordinator(host, port);
+    const pending = coordinator.createConversationInNewTab();
+    const duplicate = coordinator.createConversationInNewTab();
+    expect(host.createConversation).toHaveBeenCalledTimes(1);
+    manager.createTab(createConversation('other'));
+    finish(createConversation('created'));
+    await Promise.all([pending, duplicate]);
+    expect(manager.getTabCount()).toBe(1);
+    expect(host.deleteConversation).toHaveBeenCalledWith('created');
+    expect(host.showNotice).not.toHaveBeenCalledWith(t('chat.tab.created'));
+    expect(port.activateTab).not.toHaveBeenCalled();
+  });
+
+  it('discards an awaited creation when its backend tab manager has been replaced', async () => {
+    let finish!: (value: ReturnType<typeof createConversation>) => void;
+    const oldManager = new TabManager('New chat', { getMaxTabs: () => 5 });
+    const newManager = new TabManager('New chat', { getMaxTabs: () => 5 });
+    let manager = oldManager;
+    const host = createHost({ getTabManager: jest.fn(() => manager), createConversation: jest.fn(() => new Promise((resolve) => { finish = resolve; })) });
+    const port = createPort();
+    const coordinator = new ConversationTabOpenCoordinator(host, port);
+    const pending = coordinator.createConversationInNewTab();
+    manager = newManager;
+    finish(createConversation('old-backend'));
+    await pending;
+    expect(oldManager.getTabCount()).toBe(0);
+    expect(newManager.getTabCount()).toBe(0);
+    expect(host.deleteConversation).toHaveBeenCalledWith('old-backend');
+    expect(port.activateTab).not.toHaveBeenCalled();
+  });
+
   it('creates, activates, and announces a new tab conversation', async () => {
     const conversation = createConversation('new-tab');
     const tabManager = new TabManager('New chat', {

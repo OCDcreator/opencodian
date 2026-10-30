@@ -129,7 +129,6 @@ export class ChatHeaderPresenter {
   private headerActionsEl: HTMLElement | null = null;
   private headerStatusGroupEl: HTMLElement | null = null;
   private lspStatusIndicator: LspStatusIndicator | null = null;
-  private newConversationBtnEl: HTMLElement | null = null;
   private newConversationCurrentTabBtnEl: HTMLElement | null = null;
   private historyBtnEl: HTMLElement | null = null;
   private conversationSessionSettingsBtnEl: HTMLElement | null = null;
@@ -185,15 +184,6 @@ export class ChatHeaderPresenter {
         void this.host.createConversationInCurrentTab();
       },
     });
-    this.newConversationBtnEl = this.buildActionButton(conversationGroupEl, {
-      actionId: 'new-tab',
-      iconName: 'opencodian-circle-plus',
-      getTooltipLabel: () => t('chat.tab.newTooltip'),
-      onClick: () => {
-        void this.host.createConversationInNewTab();
-      },
-    });
-    this.newConversationBtnEl.addClass('opencodian-header-btn--new-tab');
     this.historyBtnEl = this.buildActionButton(conversationGroupEl, {
       actionId: 'history',
       iconName: 'history',
@@ -228,10 +218,6 @@ export class ChatHeaderPresenter {
   applyLocaleTexts(): void {
     if (this.serverStatusBadgeEl) {
       this.host.setTooltipLabel(this.serverStatusBadgeEl, this.getStatusSettingsTooltip(), 'bottom');
-    }
-
-    if (this.newConversationBtnEl) {
-      this.applyActionLabel(this.newConversationBtnEl, t('chat.tab.newTooltip'));
     }
 
     if (this.newConversationCurrentTabBtnEl) {
@@ -311,7 +297,6 @@ export class ChatHeaderPresenter {
     this.headerStatusGroupEl = null;
     this.lspStatusIndicator?.unload();
     this.lspStatusIndicator = null;
-    this.newConversationBtnEl = null;
     this.newConversationCurrentTabBtnEl = null;
     this.historyBtnEl = null;
     this.conversationSessionSettingsBtnEl = null;

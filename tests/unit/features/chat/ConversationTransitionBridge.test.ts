@@ -59,16 +59,16 @@ describe('ConversationTransitionBridge', () => {
     jest.clearAllMocks();
   });
 
-  it('cleans up the previous loaded conversation before switching', async () => {
+  it('keeps conversation-owned title generation running when switching tabs', async () => {
     const host = createHost();
     const hydrationRenderBridge = createHydrationRenderBridge();
     const bridge = new ConversationTransitionBridge(host, hydrationRenderBridge);
 
     await bridge.prepareLoadedConversationTransition('next-conversation');
 
-    expect(host.cancelTitleGeneration).toHaveBeenCalledWith('previous-conversation');
+    expect(host.cancelTitleGeneration).not.toHaveBeenCalled();
     expect(host.resetBackgroundTaskIndicator).toHaveBeenCalledTimes(1);
-    expect(host.clearPendingTitleGenerationStatus).toHaveBeenCalledWith('previous-conversation');
+    expect(host.clearPendingTitleGenerationStatus).not.toHaveBeenCalled();
   });
 
   it('runs the loaded-conversation shell cleanup in bridge order', () => {

@@ -178,7 +178,7 @@ describe('TitleGenerationService', () => {
       expect(backend).toBe('claude-code');
     });
 
-    it('falls back to opencode when conversation lookup fails', async () => {
+    it('fails closed when conversation ownership cannot be resolved', async () => {
       const plugin = createMockPlugin();
       plugin.getConversationById = jest.fn().mockRejectedValue(new Error('Not found'));
       const service = new TitleGenerationService(plugin);
@@ -187,8 +187,7 @@ describe('TitleGenerationService', () => {
         .resolveConversationBackend as (conversationId: string) => Promise<AgentBackendKind>)
         .bind(service);
 
-      const backend = await resolveConversationBackend('conv-1');
-      expect(backend).toBe('opencode');
+      await expect(resolveConversationBackend('conv-1')).rejects.toThrow('Not found');
     });
   });
 });

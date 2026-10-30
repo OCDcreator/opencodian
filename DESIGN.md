@@ -88,14 +88,16 @@ components:
     rounded: "{rounded.md}"
     padding: "4px 8px"
   session-tabs:
-    track: "color-mix(in srgb, var(--background-primary) 90%, var(--text-normal))"
-    idleSurface: "var(--background-primary)"
-    idleBorder: "1px solid color-mix(in srgb, var(--text-normal) 55%, var(--background-primary))"
-    selectedSurface: "var(--interactive-accent)"
-    selectedText: "var(--text-on-accent)"
-    selectedFocusAndStreaming: "contrasting selected foreground"
+    accentSource: "--opencodian-tab-accent resolves --interactive-accent on body before the chat palette overrides it"
+    track: "color-mix(in srgb, var(--background-primary) 65%, var(--background-secondary))"
+    idleSurface: "transparent; hover uses var(--background-modifier-hover)"
+    idleBorder: "transparent; one shared track border uses var(--background-modifier-border)"
+    selectedSurface: "10% host accent mixed into background-primary; 15% on hover"
+    selectedBorder: "28% host accent mixed into background-modifier-border"
+    selectedText: "var(--text-normal); inactive numerals use var(--text-muted)"
+    selectedFocusAndStreaming: "host accent focus outline; contrasting selected foreground for streaming"
     statusSignal: "warning icons/dots retain their semantic color on a separate idle surface"
-    geometry: "28px triggers, 6px radius, 8px track radius, 3px padding, 2px gap"
+    geometry: "24px triggers, 4px radius, 6px track radius, 1px padding, 1px track border, 2px gap; total track height 28px matches header actions"
   header-status-chip:
     collapsedSize: "28px"
     icon: "active backend identity; OpenCode reuses the title brandmark SVG"
@@ -248,6 +250,7 @@ OpenCodian uses a hybrid elevation system. Default Obsidian surfaces are mostly 
 - **Primary:** use `var(--interactive-accent)` or a status color only when an action is decisive.
 - **Hover / Focus:** hover should change color, opacity, or tonal background within 150ms. Focus-visible uses a 2px accent outline with offset.
 - **Ghost controls:** model, agent, permission, and sidebar controls default to transparent backgrounds and become visible through hover, open, or selected state.
+- **History footer actions:** use a two-column grid with 32px minimum action height, 13px labels, 14px icons, and 4px radius. Four actions occupy two rows; an unmatched final action spans both columns. Longer localized labels wrap within their column while the history list retains its own scroll region.
 
 ### Chips
 
@@ -449,7 +452,7 @@ Settings dropdown menus may be wider than their trigger when option labels need 
 
 - **Settings backend rail:** the capsule belongs to the connected Settings surface and its actual window. Pre-rendering, adopting content into a detached window, closing Settings, and reopening must never leave a rail over the vault file explorer. Preserve its existing hover expansion and backend controls; position and lifetime follow the owning surface.
 - **Sidebar:** low-opacity by default, reveals on hover or focus, icon-only 28px controls, 6px radius, glass background.
-- **Tabs:** preserve per-tab runtime identity. Do not visually imply a single global stream when multiple conversations can be active.
+- **Tabs:** the session tab bar owns its trailing plus action; never duplicate new-tab creation in the header. Use 24px segments inside a 28px track in every position. Show at most four header tabs or five other tabs, reduce the count to fit available width, keep the active tab visible, and place remaining tabs in the counted overflow menu. Creation is disabled while pending or at the configured limit; existing tabs survive a reduced limit on reload. Preserve per-tab runtime identity. Do not visually imply a single global stream when multiple conversations can be active.
 - **Dropdowns:** bottom-aligned near the composer, 14px radius, max-height with internal scrolling, sticky provider headers where needed.
 
 ### Chat Messages
@@ -459,7 +462,7 @@ Settings dropdown menus may be wider than their trigger when option labels need 
 - **Streaming and tools:** use inline rows, monospace tool names, muted summaries, and status icons. Structural rails are acceptable for tool/thinking content, but do not use colored side stripes as a generic card accent.
 - **Notices:** use cards for actual status or recovery needs, not for decorative grouping.
 - **Functional metadata:** timestamps, recorded model identity, and backend state badges have an 11px minimum. Keep metadata readable at rest instead of fading the entire row; derive secondary/status colors from host foreground tokens. Historical model labels resolve only from that message's recorded reference, with the exact reference available on keyboard focus and hover.
-- **Narrow header:** below a 400px Chat container, the brand occupies its own row; tab identity and header actions share the next row with at least 44px reserved for the tab track. The container width, not the desktop window width, selects this layout.
+- **Narrow header:** below a 400px Chat container, the brand occupies its own row; tab identity and header actions share the next row with at least 104px reserved for the tab track. The container width, not the desktop window width, selects this layout.
 - **Effort:** the trigger exposes expanded state and controls a keyboard radio menu. Next-send/default-inheritance guidance belongs inside the open menu; option tooltips must not cover choices. DSH model-default and explicit Off remain distinct selections.
 
 ## 6. Do's and Don'ts

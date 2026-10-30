@@ -192,3 +192,7 @@ DSH sends skip the legacy OpenCode skill catalog expansion, as Pi, ZCode and Ope
 ## 2026-10-29：发送前引用校验
 
 发送准备在乐观落盘之前解析并重新验证 @ 引用，合并文件/目录上下文，保存会话快照来源证据及原始 promptReferences，并将有效原生插件/资源标识放入 modelOptions.nativeMentions。用户消息持久化可读显示文本，实际请求使用独立 requestContent；失效引用拒绝发送并保留草稿。忙碌队列保存稳定引用原文，轮到发送时才校验当前可用性。
+
+## 2026-10-30 六后端标题生命周期
+
+移除首条标题的三后端白名单，六后端都执行本地规则 bootstrap；有图片无文字使用附件标签。Claude autoTitle 与其他后端 titleMode 决定辅助生成，统一 pending，人工/已有 native 来源不触发覆盖。

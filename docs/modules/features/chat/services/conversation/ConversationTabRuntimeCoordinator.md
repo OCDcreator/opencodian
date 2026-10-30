@@ -1,4 +1,6 @@
 # ConversationTabRuntimeCoordinator
+
+2026-10-30：标签创建端口 createConversationInNewTab 由既有 view 创建流程注入；initializeTabSystem 将它和实时 canCreateTab/getMaxTabs 回调交给 TabBar，所有四种布局均在标签栏末尾提供新增入口，禁用标签 UI 时不暴露该入口。
 > 2026-09-21 (advantage-parity R-F1)：一槽 queuedFollowUpSend 升级为多条 FIFO queuedFollowUpSends（get/remove 访问器；队列在 tab 运行时态，取消轮次天然保留）。
 
 > **源码**: `src/features/chat/services/conversation/ConversationTabRuntimeCoordinator.ts`

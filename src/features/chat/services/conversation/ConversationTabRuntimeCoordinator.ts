@@ -72,6 +72,7 @@ export interface ConversationTabRuntimeCoordinatorHost {
   getTabContextUsage(tabId: TabId | null): TabContextState | null;
 }
 export interface ConversationTabRuntimeCoordinatorPorts {
+  createConversationInNewTab(): Promise<void>;
   activateTab(tabId: TabId): Promise<void>;
   closeTabAndRecover(tabId: TabId): Promise<void>;
   initializeFirstTab(): Promise<void>;
@@ -157,6 +158,7 @@ export function createConversationTabRuntimeCoordinatorHost(
 }
 
 export interface ConversationTabRuntimeCoordinatorPortDependencies {
+  createConversationInNewTab(): Promise<void>;
   loadRecoveryCoordinator: {
     activateTab(tabId: TabId): Promise<void>;
     initializeFirstTab(): Promise<void>;
@@ -182,6 +184,7 @@ export function createConversationTabRuntimeCoordinator<
 >(deps: ConversationTabRuntimeCoordinatorDependencies<Runtime>): ConversationTabRuntimeCoordinator<Runtime> {
   const host = createConversationTabRuntimeCoordinatorHost(deps);
   return new ConversationTabRuntimeCoordinator(host, deps.paneCoordinator, {
+    createConversationInNewTab: () => deps.createConversationInNewTab(),
     activateTab: (tabId) => deps.loadRecoveryCoordinator.activateTab(tabId),
     closeTabAndRecover: (tabId) =>
       deps.lifecycleRecoveryCoordinator.closeTabAndRecover(tabId),
@@ -215,6 +218,9 @@ export class ConversationTabRuntimeCoordinator<
       new TabBar(tabBarMountEl, {
         onTabClick: (tabId) => { void this.handleTabSwitch(tabId); },
         onTabClose: (tabId) => { void this.handleTabClose(tabId); },
+        onNewTab: () => this.ports.createConversationInNewTab(),
+        canCreateTab: () => this.host.getTabManager()?.canCreateTab() ?? false,
+        getMaxTabs: () => this.host.getMaxTabs(),
       }),
     );
     this.host.setTabManager(this.createTabManager());

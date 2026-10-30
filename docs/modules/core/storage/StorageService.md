@@ -317,3 +317,7 @@ These are persisted in `settings.ui.json` alongside existing UI state (tab state
 ### Capability settings backup
 
 `snapshotRawCapabilitySettings(raw)` writes the unmodified raw capability settings envelope to `settings.capabilities.json.bak` before non-trivial migration. The backup preserves `schemaVersion`, `updatedAt`, `source: 'settings.core'`, and `kind: 'opencodeCapabilities.rawPreMigration'`. Write failures are logged and swallowed so they never block persisting the normalized envelope. Called by `main.ts` when `migrateOpenCodeCapabilitySettings` reports `requiresBackup: true`.
+
+## 2026-10-30 六后端标题生命周期
+
+完整会话记录和 metadata sidecar 均保存 titleState（来源/revision/请求模型/source/error），保留原有完整消息防覆盖逻辑，不在存储层调用模型或原生 rename。

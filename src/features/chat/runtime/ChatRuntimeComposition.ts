@@ -199,7 +199,7 @@ import type { SessionTodoCoordinator } from '../services/questions/SessionTodoHo
 import type { SessionTodoViewHost } from '../services/questions/SessionTodoHostAdapter';
 import { createSessionTodoCoordinator } from '../services/questions/SessionTodoHostAdapter';
 import { createDebugLogCallbacks } from '../services/sync/trailingAssistantPatchDebug';
-import { TitleGenerationService } from '../services/title/TitleGenerationService';
+import { type ConversationTitleUpdate, TitleGenerationService } from '../services/title/TitleGenerationService';
 import type { TabId } from '../tabs/types';
 
 /** Local alias relocated from OpenCodianView (pre-Task-15 line 389). */
@@ -460,6 +460,7 @@ export interface ChatRuntimeCompositionHost {
   updateModelSelectorDisplay(): void;
   applyFallbackConversationTitle(conversationId: string, firstMessage: unknown): void;
   startAiConversationTitleGeneration(conversationId: string, firstMessage: unknown, modelOptions: unknown): void;
+  updateConversationTitleState?(conversationId: string, update: ConversationTitleUpdate): Promise<void>;
   createNewConversation(): Promise<void>;
   createConversationWriteTicket(conversationId: string): unknown;
   commitConversationWrite(conversation: Conversation, ticket: unknown, reason: string, write: () => void | Promise<void>): Promise<boolean>;
@@ -696,7 +697,7 @@ export class ChatRuntimeComposition {
       getSettings: () => host.plugin.settings,
       getActiveTabId: () => host.getActiveTabId(),
     });
-    const titleGenerationService = new TitleGenerationService(host.plugin as never);
+    const titleGenerationService = new TitleGenerationService(host.plugin as never, getVaultBasePath(app) ?? '');
     const questionDockSlotCoordinator = new QuestionDockSlotCoordinator(
       {
         shouldUseAboveInputQuestionDock: () => host.plugin.settings.questionCardPosition === 'above_input',
@@ -1065,6 +1066,7 @@ export class ChatRuntimeComposition {
       conversationTabLifecycleRecoveryCoordinator,
     } = loadRecoveryAssembly;
     const conversationTabRuntimeCoordinator = assembleConversationTabRuntime({
+      createConversationInNewTab: () => host.createNewConversation(),
       tabBarState: host.createTabBarMutableState(),
       settings: host.plugin.settings as never,
       plugin: host.plugin as never,
@@ -1384,6 +1386,10 @@ export class ChatRuntimeComposition {
         backend: string;
       }) => {
         host.plugin.memoryRuntime?.onTurnSettled(info);
+        // Title readback follows the owning conversation even when its tab is hidden.
+        void surface.titleGenerationService?.readNativeTitleUpdate?.(info.conversationId)
+          .then((update) => update ? host.updateConversationTitleState?.(info.conversationId, update) : undefined)
+          .catch(() => undefined);
         // User identity arrives after the optimistic footer was drawn. Refresh
         // only this settled, visible conversation's footer, preserving its body.
         if ((info.backend === 'codex' || info.backend === 'claude-code') && host.getActiveTabId() === info.tabId

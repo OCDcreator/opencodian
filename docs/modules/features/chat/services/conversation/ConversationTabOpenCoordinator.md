@@ -1,5 +1,7 @@
 # ConversationTabOpenCoordinator
 
+2026-10-30：同一协调器创建新标签期间拒绝重复请求；异步创建完成后重新核对 tab manager 身份、enableTabs 与容量。后端切换或容量改变时删除本次刚创建但无法挂载的空会话，不错误提示创建成功；finally 解除创建锁。
+
 > **源码**: `src/features/chat/services/conversation/ConversationTabOpenCoordinator.ts`
 > **状态**: [REVIEW]
 

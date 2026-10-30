@@ -4150,9 +4150,10 @@ export class CodexAdapter
   }
 
   async getSession(sessionId: string): Promise<unknown | null> {
-    // Check in-memory first
+    // Live entries only bind provisional/native IDs. Read title metadata from
+    // the app-server even for an in-memory session, so renames are observable.
     const entry = this.resolveSession(sessionId);
-    if (entry) {
+    if (entry && (!entry.threadId || !this.appServerClient)) {
       return {
         id: entry.threadId ?? entry.provisionalId,
         provisionalId: entry.provisionalId,
@@ -4163,13 +4164,14 @@ export class CodexAdapter
     // Fall back to app-server for persisted threads
     if (this.appServerClient) {
       try {
-        const thread = await this.appServerClient.readThread(sessionId, false);
+        const thread = await this.appServerClient.readThread(entry?.threadId ?? sessionId, false);
         if (thread) {
           return {
             id: thread.id,
             title: thread.name ?? thread.preview.slice(0, 80) ?? '(untitled)',
+            titleSource: thread.name ? 'native' : 'first_input',
             updatedAt: thread.updatedAt ? thread.updatedAt * 1000 : null,
-            provisionalId: null,
+            provisionalId: entry?.provisionalId ?? null,
             threadId: thread.id,
           };
         }
@@ -4181,7 +4183,7 @@ export class CodexAdapter
       }
     }
 
-    return null;
+    return entry ? { id: entry.threadId ?? entry.provisionalId, provisionalId: entry.provisionalId, threadId: entry.threadId } : null;
   }
 
   /**

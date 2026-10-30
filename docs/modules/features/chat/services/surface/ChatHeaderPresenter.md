@@ -1,5 +1,7 @@
 # ChatHeaderPresenter
 
+2026-10-30：移除 header 独立的 new-tab 圆形加号及其元素状态；新增标签统一由标签栏负责。头部仍保留当前标签内新建会话、历史、会话设置和后端状态／诊断入口。
+
 2026-10-29：移除重复的聊天全局设置齿轮，保留 backend/server 状态图标的原设置跳转，以及会话设置／诊断操作。后端身份未变且图标节点存在时复用 DOM，不因状态轮询重建图片；后端改变或图标丢失时才重渲染。固定图标使用共享内置 SVG，无外网等待。品牌图形保持固定尺寸，文字图形由 core.css 按 Chat 容器宽度控制显示，窄栏不压缩。
 
 > 2026-07-29: The configuration group includes an OpenCode-only diagnostics button with stable state attributes.

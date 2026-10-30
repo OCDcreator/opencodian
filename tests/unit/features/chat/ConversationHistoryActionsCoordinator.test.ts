@@ -143,6 +143,20 @@ describe('ConversationHistoryActionsCoordinator', () => {
     fixture.coordinator.destroy();
   });
 
+  it('offers explicit retry only for a failed automatic rule title', () => {
+    const retryConversationTitleGeneration = jest.fn().mockResolvedValue(undefined);
+    const fixture = createFixture({ retryConversationTitleGeneration });
+    Object.assign(fixture.conversations[0], { titleGenerationStatus: 'failed', titleState: { source: 'rule', revision: 1 } });
+    fixture.coordinator.show(createHistoryEvent(fixture.anchorEl));
+    const button = Array.from(document.querySelectorAll<HTMLButtonElement>('button'))
+      .find((element) => element.getAttribute('aria-label') === t('chat.history.titleGeneration.retry'));
+    expect(button).toBeDefined();
+    button?.click();
+    expect(retryConversationTitleGeneration).toHaveBeenCalledWith('conv-1');
+    expect(document.querySelector('.opencodian-history-dropdown')).toBeNull();
+    fixture.coordinator.destroy();
+  });
+
   it('routes delete-all confirmation through the reset host path', async () => {
     jest.useFakeTimers();
     const fixture = createFixture();

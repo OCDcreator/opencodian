@@ -3883,6 +3883,8 @@ export interface OpenCodianSettings {
   questionCardPosition: QuestionCardPosition;
   showAnsweredQuestionCards: boolean;
   aiTitleModel: string;
+  /** Owning-backend model IDs; legacy aiTitleModel remains the OpenCode override. */
+  aiTitleModelOverrides: Partial<Record<AgentBackendKind, string>>;
   disabledModelRefs: string[];
   disabledPluginSpecs: string[];
   renderUserMarkupAsCodeBlocks: boolean;
@@ -4406,6 +4408,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   questionCardPosition: 'inline',
   showAnsweredQuestionCards: true,
   aiTitleModel: '',
+  aiTitleModelOverrides: {},
   disabledModelRefs: [],
   disabledPluginSpecs: [],
   renderUserMarkupAsCodeBlocks: true,
@@ -4526,10 +4529,21 @@ export function normalizeQuestionCardSettings(
   };
 }
 
+export function normalizeTitleModelOverrides(value: unknown): Partial<Record<AgentBackendKind, string>> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const result: Partial<Record<AgentBackendKind, string>> = {};
+  for (const backend of ['claude-code', 'codex', 'pi', 'zcode', 'dsh'] as const) {
+    const model = (value as Record<string, unknown>)[backend];
+    if (typeof model === 'string' && model.trim()) result[backend] = model.trim();
+  }
+  return result;
+}
+
 export function normalizeModelProviderPluginDebugSettings(
   value?: (Partial<Pick<
     OpenCodianSettings,
     | 'aiTitleModel'
+    | 'aiTitleModelOverrides'
     | 'disabledModelRefs'
     | 'disabledPluginSpecs'
     | 'renderUserMarkupAsCodeBlocks'
@@ -4550,6 +4564,7 @@ export function normalizeModelProviderPluginDebugSettings(
 ): Pick<
   OpenCodianSettings,
   | 'aiTitleModel'
+  | 'aiTitleModelOverrides'
   | 'disabledModelRefs'
   | 'disabledPluginSpecs'
   | 'renderUserMarkupAsCodeBlocks'
@@ -4583,6 +4598,7 @@ export function normalizeModelProviderPluginDebugSettings(
 
   return {
     aiTitleModel: typeof value?.aiTitleModel === 'string' ? value.aiTitleModel.trim() : '',
+    aiTitleModelOverrides: normalizeTitleModelOverrides(value?.aiTitleModelOverrides),
     disabledModelRefs: normalizeDisabledModelRefs(value?.disabledModelRefs),
     disabledPluginSpecs: normalizeDisabledPluginSpecs(value?.disabledPluginSpecs),
     renderUserMarkupAsCodeBlocks: normalizeBoolean(

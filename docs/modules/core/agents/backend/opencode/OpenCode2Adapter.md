@@ -72,3 +72,7 @@ After owned process stop, cleanup resolves and checks the created scope realpath
 
 - 源码位置：`src/core/agents/backend/opencode/OpenCode2Adapter.ts`。
 - 原位置：`src/core/agents/backend/OpenCode2Adapter.ts`；文件名、导出接口与业务职责保持不变。
+
+## 2026-10-30 六后端标题生命周期
+
+generateTitle 继续走无聊天 session 的 generate.text，新增 AbortSignal 透传至 RequestOptions；请求预算和选模由标题服务拥有。

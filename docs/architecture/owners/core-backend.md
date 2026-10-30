@@ -174,3 +174,7 @@ CodexAdapter 的 `mcpServer/elicitation/request` 路由注册不再以 elicitati
 DshAdapter 在既有 owner 内维护逐会话配置、原生目录/推理选择和 aggregate usage；DshProtocolCodec 集中隔离 MCP 进程/HTTP 声明准入、握手与多模态内容编码。无新的服务 owner，未使用桌面私有 Web host。图片声明遵循当前握手；aux/inline 不以提示词限制替代运行时只读证明。配置 timeout、旧生成器收尾和 dispose 均维护自有 client/turn 归属。
 
 2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `core.backend` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。
+
+## 2026-10-30 会话标题
+
+六后端原生标题读取保留来源；Codex 活跃条目读取 name；OpenCode 2 生成接口透传取消。标题生命周期仍属于 feature.chat-services。

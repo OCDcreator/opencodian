@@ -96,3 +96,7 @@ OpenCode 2 has a separate backend identity and normalized connection settings; p
 > 2026-10-27（二次审查）：`INLINE_EDIT_BACKENDS` 加入 `dsh`，使 DSH 行内编辑覆盖在保存/重载后仍保留；仅设置归一化允许集，未改协议。
 
 2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `core.types` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。
+
+## 2026-10-30 会话标题
+
+ConversationTitleState 表达 rule/native/ai/manual 与 revision；aiTitleModelOverrides 隔离五后端模型设置，原 aiTitleModel 保留 OpenCode 兼容。

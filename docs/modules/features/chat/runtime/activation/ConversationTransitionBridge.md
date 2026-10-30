@@ -59,3 +59,7 @@ export interface ConversationTransitionPort {
 - 源码位置：`src/features/chat/runtime/activation/ConversationTransitionBridge.ts`。
 - 原位置：`src/features/chat/runtime/ConversationTransitionBridge.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/features/chat/runtime/activation/ConversationHydrationRenderBridge.ts`。
+
+## 2026-10-30 六后端标题生命周期
+
+切换到其他 conversation 时仅重置可见背景指示器，不再取消前一会话标题任务或清除 pending；任务归 conversation 所有，允许后台标签生成完成。

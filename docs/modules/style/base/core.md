@@ -1,5 +1,9 @@
 # Core Styles
 
+2026-10-30 标签机制补齐：新增按钮位于轨道末尾，24px 控件和 14px plus SVG，与数字项同高；溢出按钮按内容宽度容纳多位计数。窄 header 为标签至少预留 104px，以容纳当前项、溢出和新增三个入口，头部独立 new-tab 按钮已移除。is-compact 在父会话面包屑加长标题仍无法容纳时隐藏标题文字、保留返回图标和会话编号。
+
+2026-10-30：会话编号采用 daisyUI Pagination 风格的紧凑圆角分段组。轨道统一 1px 宿主边框、1px 内边距、6px 圆角和 2px 间隔；数字项 24px 高／4px 圆角、16px 徽章，整组外高 28px，与相邻 header 工具按钮齐高；普通项透明、使用次级文字色，选中项使用正文色与 600 字重，底色仅混入 10% 宿主强调色（hover 15%，边框 28%）。`body` 上的 `--opencodian-tab-accent` 在聊天容器覆盖强调色前解析 Obsidian 配色，让 shadcn 容器中的标签也能随宿主粉色／深色主题变化。键盘焦点使用宿主强调色，串流圆环与后台／待处理信号独立保留；四种布局、溢出与会话切换回调沿用现有实现。该规则替代下述 2026-10-29 的实色选中项配色。
+
 2026-10-29：会话标签改用 shadcn/ui 默认 Tabs 分段结构（参考 https://ui.shadcn.com/docs/components/radix/tabs 与官方 apps/v4/registry/new-york-v4/ui/tabs.tsx）：8px 轨道、3px 内边距、2px 间隔、28px 高／6px 圆角的中性色触发器，选中态使用 interactive-accent 实色填充、text-on-accent 前景和加粗字重；普通项使用 background-primary 底色、由 text-normal 混合得到的 1px 边框，轨道使用独立的 10% 墨色混合。避免自定义主题把 background-primary / background-secondary 配成近似值时，当前会话与背景融为一体。选中态键盘焦点和串流圆环使用反差前景，后台／待处理图标保留独立底色和状态色。普通项保持完整可见，不再使用低透明度、模糊或玻璃渐变。header 保留紧凑编号，input/grid 始终展示截断标题，竖排 hover/focus 使用中性色标题浮层。串流圆环、后台三点和待处理图标仍读取现有 tab classes，reduced-motion 下停止动画。未新增组件库依赖或修改 TabBar 的会话生命周期与回调。
 
 

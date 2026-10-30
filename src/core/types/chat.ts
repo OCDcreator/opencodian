@@ -811,6 +811,15 @@ export interface PreparedPromptReferences {
   nativeMentions: NativePromptMention[];
 }
 
+/** Persisted provenance and compare-and-set token for automatic titles. */
+export interface ConversationTitleState {
+  source: 'rule' | 'native' | 'ai' | 'manual';
+  revision: number;
+  model?: { provider: string; model: string };
+  modelSource?: 'configured' | 'lightweight' | 'current';
+  error?: string;
+}
+
 /** Conversation metadata */
 export interface ConversationMeta {
   id: string;
@@ -819,6 +828,7 @@ export interface ConversationMeta {
   updatedAt: number;
   lastResponseAt?: number;
   titleGenerationStatus?: 'pending' | 'success' | 'failed';
+  titleState?: ConversationTitleState;
   messageCount: number;
   openCodeSessionId?: string;
   backendSessionId?: string;
@@ -848,6 +858,7 @@ export interface Conversation {
   updatedAt: number;
   lastResponseAt?: number;
   titleGenerationStatus?: 'pending' | 'success' | 'failed';
+  titleState?: ConversationTitleState;
   openCodeSessionId?: string;
   backendSessionId?: string;
   backendAgentId?: string;

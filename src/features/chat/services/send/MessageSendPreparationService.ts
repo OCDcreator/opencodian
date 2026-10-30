@@ -637,13 +637,13 @@ export class MessageSendPreparationService {
     // An accepted background turn stays persisted; its next activation renders it.
     if (this.isTargetTabActive(tabId)) await this.host.renderMessage(userMessage);
     this.host.scrollToBottom({ tabId, enableAutoScroll: true });
-    const conversationBackend = conversation.backend ?? 'opencode';
-    const shouldBootstrapTitle = this.isFirstUserMessage(conversation)
-      && (conversationBackend === 'opencode' || conversationBackend === 'opencode2' || conversationBackend === 'claude-code');
+    const shouldBootstrapTitle = this.isFirstUserMessage(conversation);
     if (shouldBootstrapTitle) {
-      await this.host.applyFallbackConversationTitle(conversation.id, displayContent);
-      const shouldGenerateAiTitle = this.host.shouldGenerateAiTitle(conversation);
-      if (conversationBackend === 'claude-code' && shouldGenerateAiTitle) {
+      const titleInput = displayContent.trim() || (options.images?.length ? t('chat.image.untitledImage') : displayContent);
+      await this.host.applyFallbackConversationTitle(conversation.id, titleInput);
+      const shouldGenerateAiTitle = this.host.shouldGenerateAiTitle(conversation)
+        && (!conversation.titleState || conversation.titleState.source === 'rule');
+      if (shouldGenerateAiTitle) {
         await this.markConversationTitleGenerationPending(conversation);
       }
       if (shouldGenerateAiTitle) {
@@ -694,7 +694,7 @@ export class MessageSendPreparationService {
     await this.host.commitConversationWrite(
       conversation,
       writeTicket,
-      'claude-title-generation-pending',
+      'conversation-title-generation-pending',
       () => {
         conversation.titleGenerationStatus = 'pending';
       },
@@ -1038,7 +1038,7 @@ export function createMessageSendPreparationHost(
       if (backend === 'claude-code') {
         return deps.getClaudeAutoTitle();
       }
-      return (backend === 'opencode' || backend === 'opencode2') && deps.getTitleMode() === 'ai';
+      return deps.getTitleMode() === 'ai';
     },
     startAiConversationTitleGeneration: (conversationId, firstMessage, modelOptions) => deps.startAiConversationTitleGeneration(conversationId, firstMessage, modelOptions),
     setStreaming: (tabId, value) => tabRuntime.setStreaming(tabId, value),

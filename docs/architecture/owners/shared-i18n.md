@@ -132,3 +132,11 @@ English and Chinese copy describe executable snapshot/restart boundaries and exp
 > 2026-10-27（二次审查）：新增 DSH 模型/行内覆盖标签与说明，en/zh 同步。
 
 2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `shared.i18n` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。
+
+## 会话标签机制核对（2026-10-30）
+
+会话标签的 closeHint 同步英中语言，说明右键、中键和 Delete 关闭；仍由既有 locale key 类型与翻译入口提供文案。 owner manifest 的职责、边界及依赖许可保持原定义。
+
+## 2026-10-30 会话标题
+
+六后端标题与重试说明保持双语一致，轻量选模不声称价格或原生 AI 来源。

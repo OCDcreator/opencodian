@@ -44,13 +44,14 @@ describe('Task 14 TitleGenerationService plugin-port characterization', () => {
     expect(callback).toHaveBeenCalledWith('conversation-1', {
       success: true,
       title: 'Official lifecycle title',
+      source: 'native',
     });
     expect(openCodeService.createSession).not.toHaveBeenCalled();
     expect(openCodeService.requestAssistantResponse).not.toHaveBeenCalled();
     expect(openCodeService.deleteSession).not.toHaveBeenCalled();
   });
 
-  it('uses the non-OpenCode default-title callback path without touching OpenCode', async () => {
+  it('reports missing auxiliary capability without borrowing OpenCode or claiming rule fallback as AI success', async () => {
     const events: string[] = [];
     const openCodeService = {
       createSession: jest.fn(() => { events.push('create'); }),
@@ -80,17 +81,17 @@ describe('Task 14 TitleGenerationService plugin-port characterization', () => {
       { officialPollAttempts: 1, officialPollIntervalMs: 0 },
     );
 
-    expect(events).toEqual(['conversation', 'conversation', 'default', 'callback']);
+    expect(events).toEqual(['conversation', 'conversation', 'callback', 'conversation']);
     expect(callback).toHaveBeenCalledWith('conversation-2', {
-      success: true,
-      title: 'Default: A Claude message',
+      success: false,
+      error: 'Title backend has no read-only auxiliary query capability',
     });
     expect(openCodeService.createSession).not.toHaveBeenCalled();
     expect(openCodeService.requestAssistantResponse).not.toHaveBeenCalled();
     expect(openCodeService.deleteSession).not.toHaveBeenCalled();
   });
 
-  it('creates, requests, reports, then deletes a temporary OpenCode title session', async () => {
+  it('cleans up the legacy temporary title session before reporting its AI result', async () => {
     const events: string[] = [];
     const openCodeService = {
       createSession: jest.fn(async () => {
@@ -107,7 +108,7 @@ describe('Task 14 TitleGenerationService plugin-port characterization', () => {
       settings: { ...DEFAULT_SETTINGS, locale: 'en', aiTitleModel: '' },
       getConversationById: jest.fn(async () => {
         events.push('conversation');
-        return null;
+        return { backend: 'opencode' };
       }),
       agentServiceRegistry: { get: jest.fn(() => undefined) },
       openCodeService,
@@ -123,12 +124,13 @@ describe('Task 14 TitleGenerationService plugin-port characterization', () => {
       { officialPollAttempts: 1, officialPollIntervalMs: 0 },
     );
 
-    expect(events.slice(-4)).toEqual(['create', 'request', 'callback', 'delete']);
+    expect(events.filter((event) => ['create', 'request', 'callback', 'delete'].includes(event))).toEqual(['create', 'request', 'delete', 'callback']);
     expect(openCodeService.createSession).toHaveBeenCalledWith('Title Generation', { setCurrent: false });
     expect(openCodeService.deleteSession).toHaveBeenCalledWith('temporary-title-session');
     expect(callback).toHaveBeenCalledWith('conversation-3', {
       success: true,
       title: 'Temporary session title',
+      source: 'ai', model: { provider: 'openai', model: 'gpt-5' }, modelSource: 'current',
     });
   });
 });

@@ -1068,10 +1068,21 @@ describe('SettingsConversationSection', () => {
     expect(plugin.openCodeService.start).toHaveBeenCalledTimes(1);
   });
 
-  it('explains that smart title generation waits for OpenCode before using an independent backup model', () => {
+  it('explains native priority, backend ownership and failure/manual title behavior', () => {
     expect(t('settings.titleGeneration.groupDesc')).toBe(
-      'Choose first-message titles or smart titles. Smart titles wait for the official OpenCode title first; the backup title model only runs when OpenCode does not produce one, and it is independent from OpenCode `small_model`.',
+      'Show a first-message rule title immediately. Smart mode prefers native results, then generates through the owning backend. Failures keep the rule title; manual names take priority. Lightweight selection uses model names, not live prices.',
     );
+  });
+
+  it.each(['codex', 'claude-code', 'pi', 'zcode', 'dsh'] as const)('persists %s title model choices in the owning backend override', async (backend) => {
+    const plugin = createPlugin({ activeBackend: backend, enabledBackends: [backend], aiTitleModel: 'opencode/old', aiTitleModelOverrides: {} });
+    createSection(plugin);
+    const model = findText(t('settings.titleGeneration.model.name'));
+    expect(model).toBeDefined();
+    await model?.onChange?.(backend === 'codex' || backend === 'claude-code' ? 'native-model' : 'provider/model');
+    expect(plugin.settings.aiTitleModelOverrides[backend]).toBe(backend === 'codex' || backend === 'claude-code' ? 'native-model' : 'provider/model');
+    expect(plugin.settings.aiTitleModel).toBe('opencode/old');
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
   });
 
   it('renders conversation settings as grouped blocks instead of a flat list', () => {

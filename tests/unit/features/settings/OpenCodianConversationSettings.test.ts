@@ -282,7 +282,7 @@ describe('OpenCodian conversation settings', () => {
     expect(renderUserMarkup?.control.setValue).toHaveBeenCalledWith(true);
   });
 
-  it('keeps backend-specific title controls out of the shared conversation settings', () => {
+  it('exposes the owning Claude title control in conversation settings', () => {
     renderConversationSettings({
       activeBackend: 'claude-code',
       enabledBackends: ['opencode2', 'claude-code'],
@@ -290,7 +290,7 @@ describe('OpenCodian conversation settings', () => {
 
     expect(
       toggleRecords.find((record) => record.name === t('settings.titleGeneration.claudeAutoTitle.name')),
-    ).toBeUndefined();
+    ).toBeDefined();
     expect(dropdownRecords.find((record) => record.name === t('settings.titleGeneration.mode.name'))).toBeUndefined();
     expect(buttonRecords.find((record) => record.name === t('settings.titleGeneration.model.name'))).toBeUndefined();
     // Shared question UI is backend-neutral and remains reachable.
@@ -479,7 +479,8 @@ describe('OpenCodian conversation settings', () => {
 
     expect(plugin.settings.aiTitleModel).toBe('openai/gpt-4.1');
     expect(plugin.saveSettings).not.toHaveBeenCalled();
-    expect(titleModelButton?.control.setButtonText).toHaveBeenLastCalledWith('OpenAI / GPT-4.1');
+    expect(titleModelButton?.control.setButtonText).toHaveBeenLastCalledWith('openai/gpt-4.1');
+    expect(modelConfigService.getCatalogs).not.toHaveBeenCalled();
     expect(titleModelWarningButton?.control.extraSettingsEl.style.display).toBe('');
 
     await titleModelWarningButton?.onClick?.();

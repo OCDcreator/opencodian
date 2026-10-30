@@ -1,5 +1,7 @@
 # TabManager
 
+2026-10-30：maxTabs 仅限制新建；恢复已有工作区时保留全部有效标签（包含超出普通上限的子会话），降低上限不会在重载时静默截断。选中、模型覆盖与运行／后台／待处理状态仍按 tab id 独立持有。
+
 > **源码**: `src/features/chat/tabs/TabManager.ts`
 > **状态**: [REVIEW]
 

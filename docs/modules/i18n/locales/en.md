@@ -1,4 +1,6 @@
 # English Locale
+
+2026-10-30：新增 chat.tab.closeHint，说明右键／中键／Delete 关闭会话标签。
 > 2026-10-27: OpenCode 2 has eight functional subpages and `settings.opencode2.workspace.*` copy for automatic catalogs, source overrides, configuration drafts, authentication, and separate apply/save feedback.
 > 2026-10-27: added `chat.effort.disabledShort` (`Off`) for the narrow Composer trigger; the full `chat.effort.disabled` label remains in the model popover.
 `modifiedFiles.statsUnavailable` and `modifiedFiles.statusUnavailable` label file-hint records that have no authoritative native snapshot statistics or change status.
@@ -696,3 +698,7 @@ Adds English group labels for files/folders, Vault chats, plugins/apps, MCP reso
 # 2026-10-29: Slash menu groups
 
 Provides `slashCommand.group.commands` and `.skills` labels for independent composer disclosure controls.
+
+## 2026-10-30 六后端标题生命周期
+
+六后端标题模式、轻量选模与 failure/manual 优先级说明；新增 backendModelDesc 和 titleGeneration.retry，明确轻量不代表实时价格保证。

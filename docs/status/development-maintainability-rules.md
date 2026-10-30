@@ -67,3 +67,7 @@ Pi持久配置不能用工作台命令数量代表覆盖。新增后端必须注
 DSH 协议准入/内容编码放在复用的 DshProtocolCodec；adapter 保留会话与生命周期真值。完整 DSH 设置区独立于后端总开关组合层，通过窄 host 连接；OpenCodianView 只转发会话保存/回读。测试将故障可控的 transport fixture 与生命周期/功能场景分开。不得为开启 aux/inline 而移除 fail-closed 只读证明，也不得将关闭会话当作删除历史。
 
 2026-10-28：memory 的真实文件系统适配器及只读辅助能力绑定属于 app.memory-runtime；core.memory 只依赖 FS/model/embedding 端口。Read/Edit/Write 提取的高风险边界集中在 memoryAgentExtraction；新增后端不得复制一套记忆存储或回退到活动后端。
+
+## 2026-10-30 标题所有权
+
+标题生命周期、取消、revision、保存顺序和原生同步归 TitleGenerationService；TitleModelResolver 是六类模型目录/provider 边界的高风险依赖隔离。OpenCodianView 只组装模型快照和刷新标签/rail；禁止各后端偷偷借旧 OpenCode 生成标题。

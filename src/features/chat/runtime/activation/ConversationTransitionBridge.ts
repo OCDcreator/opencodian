@@ -45,12 +45,8 @@ export class ConversationTransitionBridge implements ConversationTransitionPort 
       return Promise.resolve();
     }
 
-    const previousConversationId = currentConversation.id;
-    this.host.cancelTitleGeneration(previousConversationId);
+    // Title tasks belong to conversations and must finish for background tabs.
     this.host.resetBackgroundTaskIndicator();
-    if (currentConversation.titleGenerationStatus === 'pending') {
-      void this.host.clearPendingTitleGenerationStatus(previousConversationId);
-    }
 
     return Promise.resolve();
   }

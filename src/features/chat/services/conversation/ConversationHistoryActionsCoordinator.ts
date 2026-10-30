@@ -16,6 +16,7 @@ export interface ConversationHistoryActionsHost {
   getConversationById(conversationId: string): Promise<Conversation | null>;
   cancelConversationTitleGeneration(conversationId: string): void;
   updateConversationTitle(conversationId: string, title: string): Promise<void>;
+  retryConversationTitleGeneration?(conversationId: string): Promise<void>;
   deleteConversationsAndCleanupTabs(conversationIds: string[]): Promise<void>;
   deleteAllConversationsAndReset(conversationIds: string[]): Promise<void>;
   /** Explicit Codex local cleanup; preserves native history. */
@@ -131,6 +132,7 @@ export class ConversationHistoryActionsCoordinator {
       }
 
       const controlsEl = itemEl.createDiv({ cls: 'opencodian-history-item-controls' });
+      this.renderTitleRetryControl(controlsEl, conversation);
       const renameBtn = controlsEl.createEl('button', {
         cls: 'opencodian-history-item-edit',
         attr: {
@@ -447,13 +449,27 @@ export class ConversationHistoryActionsCoordinator {
     }
   }
 
+  private renderTitleRetryControl(container: HTMLElement, conversation: Conversation): void {
+    if (conversation.titleGenerationStatus !== 'failed' || conversation.titleState?.source !== 'rule'
+      || !this.host.retryConversationTitleGeneration) return;
+    const retryBtn = container.createEl('button', {
+      cls: 'opencodian-history-item-edit',
+      attr: { type: 'button', title: t('chat.history.titleGeneration.retry'), 'aria-label': t('chat.history.titleGeneration.retry') },
+    });
+    setIcon(retryBtn, 'refresh-cw');
+    retryBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      this.closeHistoryDropdown();
+      void this.host.retryConversationTitleGeneration?.(conversation.id);
+    });
+  }
+
   private async renameConversation(conversationId: string): Promise<void> {
     const conversation = await this.host.getConversationById(conversationId);
     if (!conversation) {
       return;
     }
 
-    this.host.cancelConversationTitleGeneration(conversationId);
     const initialValue = conversation.title || t('chat.history.untitled');
     const nextTitle = await this.dialogService.showRenameConversationDialog(initialValue);
     if (nextTitle === null) {
@@ -467,6 +483,7 @@ export class ConversationHistoryActionsCoordinator {
     }
 
     try {
+      this.host.cancelConversationTitleGeneration(conversationId);
       await this.host.updateConversationTitle(conversationId, trimmedTitle);
       this.host.showNotice(t('chat.history.renameSuccess'));
       this.closeHistoryDropdown();

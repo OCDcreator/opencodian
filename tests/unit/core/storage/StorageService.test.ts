@@ -93,6 +93,7 @@ describe('StorageService conversation persistence - saveConversation', () => {
       const conversation = {
         id: 'conv-meta',
         title: 'Meta conversation',
+        titleState: { source: 'manual', revision: 7 },
         createdAt: 1234567890,
         updatedAt: 1234567999,
         openCodeSessionId: 'session-meta',
@@ -120,6 +121,11 @@ describe('StorageService conversation persistence - saveConversation', () => {
         '.opencodian/session-metas/conv-meta.json',
         expect.stringContaining('"backendSessionId": "session-meta"'),
       );
+      const writes = mockAdapter.write.mock.calls.filter(([path]) => path.includes('conv-meta.json'));
+      expect(writes).toHaveLength(2);
+      expect(writes.map(([, content]) => { const record = JSON.parse(content); return (record.data ?? record).titleState; })).toEqual([
+        { source: 'manual', revision: 7 }, { source: 'manual', revision: 7 },
+      ]);
   });
 
   it('normalizes and persists a linked note in both the session record and metadata sidecar', async () => {

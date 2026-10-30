@@ -17,7 +17,7 @@
   - `is-selected`：中性高亮背景，复选框提供主视觉信号。
   - `is-active.is-selected`：组合上述两者。
 - `.opencodian-history-item-status.is-pending|is-failed`：标题生成状态标记（小药丸样式，含背景和边框）。
-- `.opencodian-history-footer`、`.opencodian-history-action`：底部操作区（删除目标/删除全部等）。
+- `.opencodian-history-footer`、`.opencodian-history-actions`、`.opencodian-history-action`：底部操作区采用等宽两列，四项操作排为两行；每项最小高度 32px、图标 14px。长文案按需换行，奇数末项横跨两列（包括 Codex 的“仅忘记本地记录”），保留固定 footer 与独立列表滚动。
 
 ## 关联 TS 组件
 

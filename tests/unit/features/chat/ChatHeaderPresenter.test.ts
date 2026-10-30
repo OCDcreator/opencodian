@@ -125,7 +125,7 @@ describe('ChatHeaderPresenter header shell and actions', () => {
 
     expect(fixture.presenter.getTabBarSlotEl()).toBe(tabBarSlotEl);
     expect(fixture.host.registerCssChangeListener).toHaveBeenCalledTimes(1);
-    expect(actionButtons).toHaveLength(5);
+    expect(actionButtons).toHaveLength(4);
     expect(fixture.headerEl.querySelector('[data-action="settings"]')).toBeNull();
     expect(statusBadgeEl?.getAttribute('data-tooltip')).toBe(t('chat.serverStatus.openSettings'));
 
@@ -134,10 +134,9 @@ describe('ChatHeaderPresenter header shell and actions', () => {
     actionButtons[1]?.click();
     actionButtons[2]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     actionButtons[3]?.click();
-    actionButtons[4]?.click();
 
     expect(fixture.host.openServerSettings).toHaveBeenCalledTimes(1);
-    expect(fixture.host.createConversationInNewTab).toHaveBeenCalledTimes(1);
+    expect(fixture.host.createConversationInNewTab).not.toHaveBeenCalled();
     expect(fixture.host.createConversationInCurrentTab).toHaveBeenCalledTimes(1);
     expect(fixture.host.showConversationHistory).toHaveBeenCalledTimes(1);
     expect(fixture.host.openConversationSessionSettings).toHaveBeenCalledTimes(1);
@@ -194,7 +193,6 @@ describe('ChatHeaderPresenter header shell and actions', () => {
     const fixture = createFixture();
 
     const expectedActions = [
-      ['new-tab', t('chat.tab.newTooltip')],
       ['new-current-tab', t('chat.tab.newCurrentTooltip')],
       ['history', t('chat.history.open')],
       ['session-settings', t('chat.sessionSettings.open')],
@@ -226,7 +224,7 @@ describe('ChatHeaderPresenter header shell and actions', () => {
     expect(
       Array.from(conversationGroup?.querySelectorAll<HTMLElement>('.opencodian-header-btn') ?? [])
         .map((button) => button.dataset.action),
-    ).toEqual(['new-current-tab', 'new-tab', 'history']);
+    ).toEqual(['new-current-tab', 'history']);
     expect(
       Array.from(configGroup?.querySelectorAll<HTMLElement>('.opencodian-header-btn') ?? [])
         .map((button) => button.dataset.action),
@@ -316,14 +314,14 @@ describe('ChatHeaderPresenter header shell and actions', () => {
 
   });
 
-  it('marks the new-tab action for tab-disabled container CSS', () => {
+  it('leaves tab creation to the session tab bar', () => {
     const fixture = createFixture();
 
     const actionButtons = fixture.headerEl.querySelectorAll<HTMLElement>('.opencodian-header-btn');
     const newTabButton = fixture.headerEl.querySelector<HTMLElement>('.opencodian-header-btn--new-tab');
 
-    expect(actionButtons).toHaveLength(5);
-    expect(newTabButton).toBe(actionButtons[1]);
+    expect(actionButtons).toHaveLength(4);
+    expect(newTabButton).toBeNull();
   });
 
   it('refreshes status classes and relabels status when server mode changes', async () => {

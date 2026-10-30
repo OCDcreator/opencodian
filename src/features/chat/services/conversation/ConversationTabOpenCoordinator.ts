@@ -35,12 +35,14 @@ export interface ConversationTabOpenPort {
 }
 
 export class ConversationTabOpenCoordinator {
+  private isCreatingNewTab = false;
   constructor(
     private readonly host: ConversationTabOpenHost,
     private readonly port: ConversationTabOpenPort,
   ) {}
 
   async createConversationInNewTab(): Promise<void> {
+    if (this.isCreatingNewTab) return;
     const tabManager = this.host.getTabManager();
     if (!this.areTabsEnabled(tabManager)) {
       await this.createConversationInCurrentTab();
@@ -58,15 +60,25 @@ export class ConversationTabOpenCoordinator {
       return;
     }
 
+    this.isCreatingNewTab = true;
     try {
       const conversation = await this.host.createConversation();
-      const tab = tabManager.createTab(conversation);
-      if (tab) {
-        await this.port.activateTab(tab.id);
+      if (this.host.getTabManager() !== tabManager || !this.areTabsEnabled(tabManager)) {
+        await this.host.deleteConversation(conversation.id);
+        return;
       }
+      const tab = tabManager.createTab(conversation);
+      if (!tab) {
+        await this.host.deleteConversation(conversation.id);
+        this.host.showNotice(t('chat.tab.maxReached', { count: String(this.host.getMaxTabs()) }));
+        return;
+      }
+      await this.port.activateTab(tab.id);
       this.host.showNotice(t('chat.tab.created'));
     } catch (error) {
       this.host.showNotice(this.getErrorMessage(error));
+    } finally {
+      this.isCreatingNewTab = false;
     }
   }
 

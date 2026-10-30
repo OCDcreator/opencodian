@@ -1,5 +1,7 @@
 # ConversationLoadRecoveryCoordinator
 
+2026-10-30：按当前后端过滤保存的标签后，以原 active 标签对象重新计算活动索引；失效或其他后端条目排除时，不再把原数组索引错套到过滤后的数组。六后端统一使用该恢复入口。
+
 > **源码**: `src/features/chat/services/conversation/ConversationLoadRecoveryCoordinator.ts`
 > **状态**: [REVIEW]
 

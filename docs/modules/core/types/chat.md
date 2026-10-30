@@ -259,3 +259,7 @@ ChatMessage 与 user_message_identity 增加可选 Codex sourceTurnId；它与 s
 # 2026-10-29: Stable prompt references
 
 User messages retain selected file, folder, session and native mention identities in `promptReferences`, with the actual historical payload or native strategy in `sessionReferences`. Readable message text remains separate from backend request expansion.
+
+## 2026-10-30 六后端标题生命周期
+
+新增 ConversationTitleState，并用于 Conversation / ConversationMeta.titleState：rule/native/ai/manual 来源、revision、请求选模/source 和 error。native 不等同于已证明 AI；模型字段不冒充原生最终模型读回。

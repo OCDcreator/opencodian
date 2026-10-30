@@ -55,7 +55,7 @@ describe('TitleGenerationService', () => {
       openCodeService,
       agentServiceRegistry,
       modelConfigService,
-      getConversationById: jest.fn().mockResolvedValue(null),
+      getConversationById: jest.fn().mockResolvedValue({ backend: 'opencode' }),
       generateDefaultTitle: jest.fn((firstMessage: string) => firstMessage.substring(0, 50).trim()),
     };
     const service = new TitleGenerationService(plugin as unknown as OpenCodianPlugin);
@@ -95,6 +95,9 @@ describe('TitleGenerationService', () => {
     expect(callback).toHaveBeenCalledWith('conversation-1', {
       success: true,
       title: 'Build a robust OpenCodian title generation work...',
+      source: 'ai',
+      model: { provider: 'openai', model: 'gpt-5' },
+      modelSource: 'current',
     });
   });
 
@@ -114,6 +117,7 @@ describe('TitleGenerationService', () => {
     expect(callback).toHaveBeenCalledWith('conversation-official', {
       success: true,
       title: 'Official SDK title',
+      source: 'native',
     });
   });
 
@@ -137,6 +141,9 @@ describe('TitleGenerationService', () => {
     expect(callback).toHaveBeenCalledWith('conversation-local-fallback', {
       success: true,
       title: 'Local fallback title',
+      source: 'ai',
+      model: { provider: 'openai', model: 'gpt-5' },
+      modelSource: 'current',
     });
   });
 
@@ -170,8 +177,8 @@ describe('TitleGenerationService', () => {
     expect(openCodeService.requestAssistantResponse).not.toHaveBeenCalled();
     expect(openCodeService.deleteSession).not.toHaveBeenCalled();
     expect(callback).toHaveBeenCalledWith('conversation-claude', {
-      success: true,
-      title: 'Help me keep Claude title routing honest',
+      success: false,
+      error: 'Title backend has no read-only auxiliary query capability',
     });
   });
 
@@ -204,6 +211,7 @@ describe('TitleGenerationService', () => {
     expect(callback).toHaveBeenCalledWith('conversation-from-cache', {
       success: true,
       title: 'Official title from conversation session',
+      source: 'native',
     });
   });
 
@@ -226,6 +234,9 @@ describe('TitleGenerationService', () => {
     expect(callback).toHaveBeenCalledWith('conversation-2', {
       success: true,
       title: 'Reliable fallback title',
+      source: 'ai',
+      model: { provider: 'openai', model: 'gpt-5' },
+      modelSource: 'current',
     });
   });
 

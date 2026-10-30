@@ -3,123 +3,44 @@
 > **源码**: `src/features/chat/services/title/TitleGenerationService.ts`
 > **状态**: [REVIEW]
 
-## 概述
+## 职责
 
-`TitleGenerationService` 负责“首条用户消息后异步生成会话标题”。它不直接修改 conversation，而是把结果通过回调交回 `OpenCodianView`。
+拥有六后端会话标题生命周期、来源、生成取消、限时、提交校验和标题写入顺序。视图仅组装调用并刷新标签和 rail，不再自行拥有模型执行、原生同步或标题优先级。
 
-最近这块逻辑的关键变化有两点：
+## 流程
 
-- 标题请求现在优先等待 backend 官方 session title；官方标题仍保持默认值或读取失败时，只有 OpenCode 会话才进入 OpenCode AI 兜底生成，非 OpenCode 会话回落到首条消息本地标题，避免跨 backend 偷跑临时 OpenCode session
-- 标题请求现在优先走结构化输出 `json_schema`
-- `aiTitleModel` 不再盲信配置值，而是会结合模型目录和 `disabledModelRefs` 做 availability-aware 拦截
+1. 首条消息以本地规则标题立即展示；已有人工／导入标题保留。图片首发无文本使用附件标签。规则标题不写回原生，避免把未命名会话提前改成 custom、抑制原生标题生成。
+2. AI 开关开启时先读取所属后端 session 标题。OpenCode 2／Claude／ZCode／DSH 等最多轮询 12 次、间隔 1.5 秒；每次读回有 2 秒预算，Pi／Codex 没有已接入的原生自动生成入口，只读一次。
+3. `readBackendSessionTitleSnapshot` 保留原生 generated/custom/native/unknown 来源；first_input、默认占位与未知来源的首条输入预览不算生成完成。消费原生显示标题不声称它一定由 AI 生成。
+4. 原生不可用时调用 `TitleModelResolver`；OpenCode 2 走无聊天会话的 `generate.text`，其他五后端走所属适配器的隔离只读 `startAuxQuerySession`。旧 OpenCode 只保留已有会话兼容路径，不是其他后端的回退服务。
+5. 辅助模型选择、启动和查询合计 45 秒预算，aux 单轮 30 秒；传递取消信号并检查 runtime safety proof 和 observed tool calls。写类工具、MCP、空结果、超时和调用错误都失败关闭，保持规则标题。
+6. 优先解析 JSON `title`，兼容纯文本首行，清理前缀、引号、末尾标点并按 Unicode 码点限长。输入最多 600 码点。模型响应是数据，不执行响应中的工具指令。
+7. 成功提交前再读取一次原生标题；失败后有有限的迟到原生读回窗口，仍为 rule 来源时可更新。人工标题始终优先。
 
-## 核心类型
+## 状态和并发
 
-```typescript
-export type TitleGenerationResult =
-  | { success: true; title: string }
-  | { success: false; error: string };
+`Conversation.titleState` 和 metadata sidecar 持久化 `source`（rule/native/ai/manual）、`revision`、请求选模及选模来源、失败原因。native 只表示来自原生读回；它与可证明的 AI 生成来源分开。
 
-export type TitleGenerationCallback = (
-  conversationId: string,
-  result: TitleGenerationResult
-) => Promise<void>;
+- `createFallbackUpdate` / `createGeneratedUpdate` / `createRetryUpdate` 生成带 revision 的更新。
+- `persistUpdate` 提交前再次核对 revision；即使人工标题与规则标题文字完全相同，代次也会阻止迟到结果覆盖。
+- 本地保存和原生重命名分别按会话排队，避免慢保存／慢 rename 反向覆盖人工改名。规则与原生读回结果不再调用 rename。
+- AI 辅助结果和普通人工标题先本地保存、刷新，再 best-effort 原生同步。ZCode 人工 rename 保留先原生确认、后本地保存的契约。
+- 活动任务按 conversation ID 隔离；切换标签不取消，关闭视图仍 `cancelAll`。旧任务 finally 只能移除自己的 controller，不能移除后继任务。
+- 历史记录失败项提供明确的重试入口；重试推进 revision 并沿用该会话记录的模型。
+- 重载时 `recoverPending` 先读一次原生标题，未完成则标记 failed、保留规则标题，允许显式重试，不自动重复付费请求。
+- 失去 conversation/backend 所有权时直接失败，不默认借用旧 OpenCode。
+- 请求模型记录为选择／请求信息；backend 未提供最终模型读回时不把它描述为已证明的实际模型或价格。
 
-export interface TitleGenerationOptions {
-  sessionId?: string;
-  officialPollAttempts?: number;
-  officialPollIntervalMs?: number;
-}
-```
+## 依赖与边界
 
-构造函数接收 consumer-owned `TitleGenerationPort`。该端口只提供标题流程需要的 settings、backend registry、最小化的 OpenCode/model-config 能力、会话 ID 查询和默认标题生成器；它没有 runtime/state/lifecycle，也不是 service locator 或 forwarding adapter。详见 [`TitleGenerationPort`](TitleGenerationPort.md)。
+- `TitleGenerationPort`：标题设置、registry、conversation 读写、规则标题；旧 OpenCode 最小兼容依赖。
+- `TitleModelResolver`：六种模型目录与 provider 边界的高风险依赖隔离。
+- `AgentBackendRouting`：六后端原生标题与来源读取。
+- `MessageSendPreparationService`：六后端首条消息入口；Claude 使用已有 autoTitle，其他后端使用 titleMode。
+- `OpenCodianView`：转发更新、标签/rail 刷新、重试与重载恢复挂载。
 
-内部状态仍然很简单：
+## 验证
 
-```typescript
-private readonly activeGenerations = new Map<string, AbortController>();
-```
+见 `tests/unit/features/chat/services/TitleGenerationService.backends.test.ts`、`TitleModelResolver.test.ts`、旧服务契约测试、send-preparation、storage、Codex 活跃会话标题测试，以及 `docs/status/session-title-refactor-2026-10-30.md`。
 
-## 关键行为
-
-### 生成流程
-
-`generateTitle()` 的顺序是：
-
-1. 取消同一 conversation 已存在的标题任务
-2. 建立新的 `AbortController`
-3. 通过 `conversationId` 解析 backend 和 `backendSessionId`；调用 `readBackendSessionTitle()` 路由 helper，通过 registry 获取 backend adapter 的 `getSession(sessionId)` 读取官方标题；等待官方后台 `ensureTitle()` 把默认标题改成真实标题
-4. 如果拿到非默认官方标题，直接回调成功，不创建本地临时 session
-5. 官方标题仍是默认值、读取失败或超时后，如果 conversation backend 不是 OpenCode，直接回调 `generateDefaultTitle(userMessage)`，不创建 OpenCode 临时 session
-6. OpenCode 会话才进入 AI 兜底：通过 `resolveModel()` 解析标题模型
-7. 按 locale 构建标题 prompt 与 system prompt
-8. 截断用户首条消息到 600 字符
-9. 创建临时 session：`createSession('Title Generation', { setCurrent: false })`
-10. 调用 `requestAssistantResponse(...)`
-11. 优先从 `response.structured.title` 提取标题，失败时再回退到文本首行解析
-12. 通过回调把结果交回调用方
-13. 在 `finally` 中删除活动记录并 best-effort 清理临时 session
-
-官方标题识别规则与 OpenCode upstream 对齐：`"New session - <ISO>"` 与 `"Child session - <ISO>"` 仍视为默认标题，不会作为成功标题返回。只有官方和本地兜底都无法产出标题时，调用方才会收到 `success: false` 并展示标题生成失败状态。
-
-### 标题模型解析
-
-`resolveModel()` 的行为比旧文档更严格：
-
-- 未配置 `aiTitleModel`：直接沿用当前会话模型
-- 配置了非法模型引用：回退到当前会话模型
-- 配置了合法引用但当前模型目录不可用：直接让标题生成失败，不再偷偷回退到当前会话模型
-
-这里会显式调用：
-
-- `modelConfigService.getCatalogs(modelSourceMode, disabledModelRefs)`
-- `resolveModelSelection(baseEffective, effective, provider, model)`
-
-所以标题生成会尊重：
-
-- 当前 `modelSourceMode`
-- provider 级禁用
-- `disabledModelRefs`
-
-### 标题提取
-
-提取顺序现在是：
-
-1. `extractStructuredTitle(response?.structured)`
-2. `parseTitle(response?.content ?? '')`
-
-`normalizeTitleCandidate()` 会统一处理：
-
-- `title:` 前缀
-- 首尾引号
-- 列表标记
-- 尾部中英文标点
-- 50 字符上限截断
-
-## 与其他模块的交互
-
-- `OpenCodianView`: 发起标题生成并接收结果回调
-- `TitleGenerationPort`: 由消费者组装并注入最小依赖面
-- `AgentBackendRouting.readBackendSessionTitle()`: backend-aware session 标题读取路由，通过 `getSession()` 获取 session 详情并提取标题
-- `OpenCodeService`: 仅 OpenCode conversation 在官方标题失败后创建临时 session、发送非流式请求、删除临时 session（AI 标题生成路径保持 OpenCode-only；Claude / 非 OpenCode 不借用 OpenCode 兜底）
-- `core/prompts/titleGeneration.ts`: 提供 locale-aware prompt 和 system prompt
-- `ModelConfigService`: 用于 availability-aware 标题模型解析
-
-## 注意事项
-
-- `cancelConversation()` / `cancelAll()` 仍然只是本地忽略结果，不会强制中断服务端请求；官方标题轮询会在 abort 后停止等待。
-- 官方标题读取虽然已经走共享 `readBackendSessionTitle()` seam，并且对 `opencode.title` / `claude-code.summary` 有 runtime proof，但这不等于 `getSession()` 已经成为稳定的通用 backend-neutral session detail contract。
-- 非 OpenCode 会话没有官方标题时不会调用 `openCodeService.createSession()` / `requestAssistantResponse()`；当前策略是保留 first-message local title，而不是把 Claude 会话压到 OpenCode fallback title agent。
-- 结构化输出不是唯一来源；如果模型没返回 `structured.title`，仍会回退到纯文本解析。
-- 设置页会保留不可用的 `aiTitleModel` 并显示警告按钮，提醒用户该功能当前不会生效。
-- 只有在“无法读取可用性信息”这类解析异常时，才会回退到当前会话模型。
-
-### 2026-09-28 parity continuation
-
-OpenCode 2 fallback title generation uses its standalone native generate.text endpoint with the selected model; official session title polling remains first.
-
-## 目录定位（2026-10-23）
-
-- 源码位置：`src/features/chat/services/title/TitleGenerationService.ts`。
-- 原位置：`src/features/chat/services/TitleGenerationService.ts`；文件名、导出接口与业务职责保持不变。
-- 随目录调整更新的依赖：`src/features/chat/services/title/TitleGenerationPort.ts`。
+原生回合 settled 触发 readNativeTitleUpdate；重载/激活也可读回 failed 的 rule 标题。每次仅查询原生，未开启 AI 的规则模式不会被这些观察覆盖；原生更新仍通过 revision 提交。

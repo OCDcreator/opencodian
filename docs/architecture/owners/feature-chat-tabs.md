@@ -54,3 +54,7 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。
 
 2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `feature.chat-tabs` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。
+
+## 会话标签机制核对（2026-10-30）
+
+会话标签组维护栏内新增动作、实时容量禁用、按可用宽度收纳的 +N 菜单和键盘焦点；保留既有 TabManager 单一状态源。maxTabs 限制新建而不截断已保存的工作区。 owner manifest 的职责、边界及依赖许可保持原定义。

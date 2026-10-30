@@ -121,6 +121,7 @@ function createFixture(options: {
     getTabContextUsage: jest.fn(() => options.tabContextUsage ?? null),
   };
   const ports: jest.Mocked<ConversationTabRuntimeCoordinatorPorts> = {
+    createConversationInNewTab: jest.fn().mockResolvedValue(undefined),
     activateTab: jest.fn().mockResolvedValue(undefined),
     closeTabAndRecover: jest.fn().mockResolvedValue(undefined),
     initializeFirstTab: jest.fn().mockResolvedValue(undefined),
@@ -150,6 +151,28 @@ function createFixture(options: {
 describe('ConversationTabRuntimeCoordinator', () => {
   afterEach(() => {
     document.body.empty();
+  });
+
+  it.each([
+    ['header', 'grid'], ['input', 'grid'], ['below-header', 'grid'], ['below-header', 'vertical'],
+  ] as const)('mounts a single working add action at %s/%s', async (tabBarPosition, belowHeaderTabBarLayout) => {
+    const fixture = createFixture({ tabBarPosition, belowHeaderTabBarLayout });
+    fixture.coordinator.initializeTabSystem();
+    const manager = fixture.getTabManager()!;
+    manager.createTab({ id: 'one', title: 'One' });
+    const mount = fixture.getTabBarMountEl()!;
+    expect(mount.parentElement?.classList.contains('is-active-slot')).toBe(true);
+    const add = mount.querySelector<HTMLButtonElement>('.opencodian-tab-bar-new')!;
+    expect(add.disabled).toBe(false);
+    add.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(fixture.ports.createConversationInNewTab).toHaveBeenCalledTimes(1);
+    for (let i = 0; i < 3; i++) manager.createTab({ id: `extra-${i}`, title: 'Extra' });
+    expect(mount.querySelector<HTMLButtonElement>('.opencodian-tab-bar-new')?.disabled).toBe(true);
+    manager.closeTab(manager.getActiveTab()!.id);
+    expect(mount.querySelector<HTMLButtonElement>('.opencodian-tab-bar-new')?.disabled).toBe(false);
+    fixture.coordinator.destroyTabSystem();
   });
 
   it('owns tab manager setup, layout, render, and persisted state writes', () => {
@@ -535,7 +558,7 @@ describe('createConversationTabRuntimeCoordinator top-level factory', () => {
       },
     };
     return {
-      deps: { ...hostSource, paneCoordinator: pane.coordinator, loadRecoveryCoordinator, lifecycleRecoveryCoordinator, runtimeStateBridge },
+      deps: { ...hostSource, createConversationInNewTab: jest.fn().mockResolvedValue(undefined), paneCoordinator: pane.coordinator, loadRecoveryCoordinator, lifecycleRecoveryCoordinator, runtimeStateBridge },
       pane, tabBarState, loadRecoveryCoordinator, lifecycleRecoveryCoordinator, runtimeStateBridge,
     };
   }

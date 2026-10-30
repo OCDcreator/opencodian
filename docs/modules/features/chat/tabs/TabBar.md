@@ -1,5 +1,7 @@
 # TabBar
 
+2026-10-30：标签栏自带末尾新增按钮（含创建中／上限禁用），不再依赖头部工具按钮。宽度变化由 ResizeObserver 触发重排：header 最多 4 项，其余位置最多 5 项；空间不足逐项收入 +N 菜单，始终保留 active 项。新增、溢出菜单与各布局共享 24px 控件／28px 轨道。保留右键关闭，增加中键与 Delete；方向键／Home／End 移动焦点，重渲染按 tab id 恢复焦点，菜单支持键盘和 detached-window 视口约束。串流状态重渲染时保留已打开的溢出菜单及其焦点；父子会话在窄栏中自动切换为编号和返回图标，避免长面包屑挤住 active 项。
+
 > **源码**: `src/features/chat/tabs/TabBar.ts`
 > **状态**: [REVIEW]
 
@@ -35,6 +37,8 @@ interface TabBarCallbacks {
 
 ### 标签按钮
 每个标签按钮显示序号徽章、标题文本和状态指示器。支持 CSS class 标记（`is-active`, `is-streaming`, `has-background-task`, `needs-attention`）。左键点击切换标签，右键点击关闭标签。非 `below-header-vertical` 布局会在 render 时确保 `TooltipLayerController` 已注册，让 tab tooltip 统一走 body-level overlay；竖排布局仍故意禁用 tooltip 以避免窄栏拥挤。
+
+样式由 `src/style/base/core.css` 统一维护：参考 daisyUI Pagination 的分段按钮组，使用一个轻描边轨道、透明未选中项和圆角淡色选中项。轨道外高为 28px，与 header 工具按钮一致；内部数字项为 24px、徽章为 16px。`body` 上的 `--opencodian-tab-accent` 先解析宿主 Obsidian 强调色，再继承到标签栏，避免聊天容器的内部黑色强调色覆盖宿主配色。选中底色仅混入 10% 宿主强调色（hover 为 15%），数字使用主题正文色，未选中数字使用次级文字色；选中态同时通过边框和 600 字重识别，避免黑色或高饱和强调色铺满按钮。四种布局共享配色，键盘焦点保留宿主强调色 outline，运行与告警信号独立于选中底色。
 
 ### 父会话返回
 当激活标签的 `parentTabId` 指向当前 tab 列表中的父标签时，`render()` 会在标签按钮前渲染 `opencodian-tab-bar-parent-breadcrumb`。点击面包屑复用 `onTabClick(parentTabId)` 切回父 tab，不内联渲染子会话内容。`renderParentNavigation()` 会只渲染父会话面包屑和关闭当前子 tab 的 `opencodian-tab-bar-parent-close` 图标按钮，不渲染标签按钮或溢出菜单，供禁用可见标签 UI 后的隐藏子会话返回与清理入口使用。若父 tab 已缺失但 active child 仍有 `parentTabId`，则省略返回面包屑并保留 close-only 图标，方便清理孤儿隐藏子会话。

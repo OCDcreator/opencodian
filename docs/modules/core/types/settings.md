@@ -518,3 +518,7 @@ Focused regression tests cover the settings callbacks' saved JSON snapshots, the
 > 2026-10-27（二次审查）：`INLINE_EDIT_BACKENDS` 加入 `dsh`（DSH 适配器实现 aux query 与 inline completion）；此前 DSH 覆盖 UI 可见但保存时被规范化丢弃。未修改后端协议。
 
 2026-10-28：memory 设置增加 workspaceIdentity/pathAliases、六后端独立模型与 selector 模型、agent notebooks/root、embedding 开关；字段分别归一化，未知模型后端键被丢弃，原开关、共享根、Git remote 和提取模型保留。
+
+## 2026-10-30 六后端标题生命周期
+
+aiTitleModel 保留 OpenCode 兼容设置；aiTitleModelOverrides 按 Claude/Codex/Pi/ZCode/DSH 保存各自 native 模型 ID。normalizeTitleModelOverrides 剔除未知键和非字符串，设置归一化入口统一消费，不把其他后端 override 串到旧 OpenCode。

@@ -1,5 +1,7 @@
 # ChatRuntimeComposition
 
+2026-10-30：assembleConversationTabRuntime 注入 createConversationInNewTab → host.createNewConversation，复用原 view 的完整会话创建后处理（包括 ZCode 目录刷新、文件变更和 session rail 刷新），没有另建后端专属标签管理器。
+
 > 2026-10-09（Codex preaccepted guard）：既有 interaction wiring 把 MessageSendPreparationService 的 Codex preflight 口接到当前 registry 的 CodexAdapter `getSendMessagePreflightError`，透传 sending conversation 已捕获的 per-turn codexOptions。adapter/guard 缺失返回非空 unavailable reason，production fail-closed；composition 不复制 approval policy 判定、不启动后端、不改模型/档位、普通 accepted 或 queued 语义。后端发送边界复用同一 guard 复检。
 
 The slash execution host receives a narrow `refreshSessionChangeSidebar` callback. It is invoked after undo/redo's visible sync and delegated to the view, where the modified-files coordinator performs the native OpenCode 2 diff read.
@@ -90,3 +92,9 @@ slash execution host 传入 activeBackend，确保无 conversation 的草稿也�
 ## 2026-10-29：统一 @ 引用接线
 
 组合层构造共享 PromptReferenceService，同时向输入候选与发送准备提供当前 Vault、目标后端及会话身份。会话候选只来自插件当前 Vault 列表，源正文由 getConversationById 加载完整持久化消息；读取不会改变当前插件后端或会话。优先使用 getPromptReferenceMessages 的现存会话只读接口；ZCode/Pi 缺少安全读取或源不常驻时保守使用明确标注 plugin-cache 的快照，Codex 空兼容回读同样回退缓存。有效原生能力由目标后端运行时目录及显式来源身份提供。
+
+## 2026-10-30 六后端标题生命周期
+
+TitleGenerationService 构造额外注入当前 vault workingDirectory，供六后端隔离 aux query 使用；保持 UI runtime 仅负责装配。
+
+原生回合 settled 后按 conversation ID 请求 readNativeTitleUpdate；结果通过 view 的窄标题更新端口提交，后台标签同样接收；不阻塞发送流，也不以当前活动后端代替所属后端。

@@ -300,6 +300,7 @@ export class SettingsConversationSection {
     this.markSettingsTarget(this.renderMemoryBlock(containerEl), 'memory');
     this.renderQuestionsBlock(questionBodyEl);
     this.renderRenderingBlock(renderingBodyEl);
+    this.renderAuxiliaryTitleSettings(containerEl);
     this.renderExportBlock(containerEl);
 
     this.finishAttach();
@@ -613,6 +614,35 @@ export class SettingsConversationSection {
   private renderDisplayTabBlock(containerEl: HTMLElement): void {
     this.renderDisplayBlock(containerEl);
     this.renderRenderingBlock(containerEl);
+    this.renderAuxiliaryTitleSettings(containerEl);
+  }
+
+  private renderAuxiliaryTitleSettings(containerEl: HTMLElement): void {
+    const backend = this.getActiveBackend();
+    if (!backend || this.isOpenCode2TitleConsumerActive()) return;
+    const blockEl = this.createSettingsBlock(containerEl, {
+      title: t('settings.titleGeneration.title'), description: t('settings.titleGeneration.groupDesc'), defaultOpen: true,
+    });
+    if (backend === 'claude-code') {
+      new Setting(blockEl).setName(t('settings.titleGeneration.claudeAutoTitle.name'))
+        .setDesc(t('settings.titleGeneration.claudeAutoTitle.desc')).addToggle((toggle) => {
+          toggle.setValue(this.plugin.settings.backendSettings.claudeCode.autoTitle).onChange(async (value) => {
+            this.plugin.settings.backendSettings.claudeCode.autoTitle = value;
+            await this.plugin.saveSettings();
+          });
+        });
+    } else {
+      this.addTitleModeSetting(blockEl);
+    }
+    new Setting(blockEl).setName(t('settings.titleGeneration.model.name'))
+      .setDesc(t('settings.titleGeneration.backendModelDesc')).addText((text) => {
+        text.setPlaceholder(backend === 'claude-code' || backend === 'codex' ? 'model' : 'provider/model')
+          .setValue(this.plugin.settings.aiTitleModelOverrides?.[backend] ?? '').onChange(async (value) => {
+            this.plugin.settings.aiTitleModelOverrides ??= {};
+            this.plugin.settings.aiTitleModelOverrides[backend] = value.trim();
+            await this.plugin.saveSettings();
+          });
+      });
   }
 
   /** advantage-parity R-D3: turn-completion chime (off by default). */
@@ -771,7 +801,12 @@ export class SettingsConversationSection {
     let showUnavailableWarning = false;
 
     try {
-      if (this.plugin.modelConfigService) {
+      if (this.getActiveBackend() === 'opencode2') {
+        this.titleModelGroups = await this.loadNativeTitleModelGroups();
+        const selected = findModelPickerOptionByRef(this.titleModelGroups, normalizedSelectedValue);
+        selectedLabel = selected ? `${selected.providerName} / ${selected.modelName}` : normalizedSelectedValue;
+        showUnavailableWarning = Boolean(normalizedSelectedValue && !selected);
+      } else if (this.plugin.modelConfigService) {
         const catalogs = await this.plugin.modelConfigService.getCatalogs(
           this.plugin.settings.modelSourceMode,
           this.plugin.settings.disabledModelRefs,
@@ -801,6 +836,7 @@ export class SettingsConversationSection {
       logger.error('Failed to load AI title models:', error);
       this.titleModelGroups = [];
       selectedLabel = normalizedSelectedValue;
+      showUnavailableWarning = Boolean(normalizedSelectedValue);
     }
 
     if (this.titleModelButton) {
@@ -816,6 +852,23 @@ export class SettingsConversationSection {
     }
 
     this.updateTitleModelSettingVisibility();
+  }
+
+  private async loadNativeTitleModelGroups(): Promise<ModelPickerGroup[]> {
+    const adapter = this.plugin.agentServiceRegistry?.get('opencode2') as unknown as {
+      getModelSelectorProviders?(): Promise<Array<{ id: string; name: string; models: Array<{ id: string; name: string; contextWindow?: number }> }>>;
+    } | undefined;
+    const providers = await adapter?.getModelSelectorProviders?.() ?? [];
+    return providers.map((provider) => ({
+      providerId: provider.id, providerName: provider.name, source: 'server' as const,
+      searchText: `${provider.id} ${provider.name}`.toLowerCase(),
+      options: provider.models.filter((model) => !this.plugin.settings.disabledModelRefs.includes(`${provider.id}/${model.id}`))
+        .map((model) => ({
+          ref: `${provider.id}/${model.id}`, providerId: provider.id, providerName: provider.name,
+          modelId: model.id, modelName: model.name, contextWindow: model.contextWindow, source: 'server' as const,
+          searchText: `${provider.id} ${provider.name} ${model.id} ${model.name}`.toLowerCase(),
+        })),
+    })).filter((group) => group.options.length > 0);
   }
 
   private addTitleModeSetting(containerEl: HTMLElement): void {

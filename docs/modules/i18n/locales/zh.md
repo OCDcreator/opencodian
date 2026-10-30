@@ -1,4 +1,6 @@
 # Chinese Locale
+
+2026-10-30：新增 chat.tab.closeHint，说明右键／中键／Delete 关闭会话标签。
 > 2026-10-27：OpenCode 2 新增八个功能子页及 `settings.opencode2.workspace.*` 文案，说明自动目录同步、覆盖来源、配置草稿、认证及应用/保存反馈。
 > 2026-10-27：新增 `chat.effort.disabledShort`（关闭），供窄 Composer 的 effort 短标签使用；完整 `chat.effort.disabled` 仍在模型弹层展示。
 `modifiedFiles.statsUnavailable` 与 `modifiedFiles.statusUnavailable` 用于只有工具文件提示、没有权威原生快照统计和变更状态的记录。
@@ -704,3 +706,7 @@ Adds Chinese group labels for files/folders, Vault chats, plugins/apps, MCP reso
 # 2026-10-29: 斜杠菜单分类
 
 提供 `slashCommand.group.commands`（命令）和 `.skills`（技能）独立折叠标题，与英文键保持一致。
+
+## 2026-10-30 六后端标题生命周期
+
+六后端标题模式、轻量选模与失败/人工优先级说明；新增 backendModelDesc 和 titleGeneration.retry，明确轻量不代表实时价格保证。

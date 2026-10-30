@@ -331,7 +331,7 @@ import {
   logAssistantFinalizationDebug,
   previewLogText,
 } from './services/sync/trailingAssistantPatchDebug';
-import type { TitleGenerationService } from './services/title/TitleGenerationService';
+import type { ConversationTitleUpdate, TitleGenerationService } from './services/title/TitleGenerationService';
 import type { TabBar, TabId, TabManager } from './tabs';
 import { type BackendSessionBrowserHost,BackendSessionBrowserModal } from './ui/BackendSessionBrowserModal';
 import { ContextDetailModal } from './ui/ContextDetailModal';
@@ -907,6 +907,15 @@ export class OpenCodianView extends ItemView {
           title,
           titleGenerationStatus: undefined,
         }, true),
+      retryConversationTitleGeneration: async (conversationId) => {
+        const conversation = await this.plugin.getConversationById(conversationId);
+        if (!conversation) return;
+        const firstMessage = conversation.messages.find((message) => message.role === 'user')?.content;
+        const update = titleGenerationService.createRetryUpdate(conversation);
+        if (!firstMessage || !update) return;
+        await this.updateConversationTitleState(conversationId, update);
+        void this.startAiConversationTitleGeneration(conversationId, firstMessage, this.getSendMessageOptions());
+      },
       deleteConversationsAndCleanupTabs: (conversationIds) =>
         this.deleteConversationsAndCleanupTabs(conversationIds),
       deleteAllConversationsAndReset: (conversationIds) =>
@@ -2851,6 +2860,11 @@ export class OpenCodianView extends ItemView {
       },
       reapplyConversationSessionVisualState: (conversation) => {
         this.conversationSessionSettingsCoordinator.applyConversationVisualState(conversation);
+        void this.titleGenerationService.recoverPending(conversation).then((updated) => {
+          if (!updated) return;
+          this.tabManager?.syncConversationTitle(updated.id, updated.title);
+          this.conversationSessionRailCoordinator.refresh(this.messagesShellEl);
+        }).catch((error) => logger.warn('Failed to recover conversation title:', error));
       },
       renderMessages: (messages, options) => conversationRenderService.renderMessages(messages, options),
       getCurrentConversation: () => this.currentConversation,
@@ -4537,11 +4551,10 @@ export class OpenCodianView extends ItemView {
   }
 
   private async applyFallbackConversationTitle(conversationId: string, firstMessage: string): Promise<void> {
-    const fallbackTitle = this.plugin.generateDefaultTitle(firstMessage);
-    await this.updateConversationTitleState(conversationId, {
-      title: fallbackTitle,
-      titleGenerationStatus: this.plugin.settings.titleMode === 'ai' ? 'pending' : undefined,
-    });
+    const conversation = await this.plugin.getConversationById(conversationId, { preferCache: true });
+    if (!conversation) return;
+    const update = this.titleGenerationService.createFallbackUpdate(conversation, firstMessage);
+    if (update) await this.updateConversationTitleState(conversationId, update);
   }
 
   private async startAiConversationTitleGeneration(
@@ -4549,14 +4562,28 @@ export class OpenCodianView extends ItemView {
     firstMessage: string,
     modelOptions: { provider?: string; model?: string },
   ): Promise<void> {
-    const expectedFallbackTitle = this.plugin.generateDefaultTitle(firstMessage);
+    const initial = await this.plugin.getConversationById(conversationId, { preferCache: true });
+    if (initial?.titleState?.source !== 'rule') return;
+    const revision = initial.titleState.revision;
+    const backend = initial.backend ?? 'opencode';
+    const storedModel = initial.titleState.model;
+    const sessionSettings = initial.sessionSettings;
+    const scopedModel = backend === 'claude-code' ? sessionSettings?.claudeModelOverride
+      : backend === 'pi' ? sessionSettings?.piModelOverride
+        : backend === 'zcode' ? sessionSettings?.zcodeModelOverride
+          : backend === 'dsh' ? sessionSettings?.dshModelOverride : null;
+    const currentModel = storedModel ?? scopedModel ?? (backend === 'claude-code'
+      ? { provider: 'claude-code', model: modelOptions.model ?? this.plugin.settings.backendSettings.claudeCode.model }
+      : backend === 'codex'
+        ? { provider: 'codex', model: sessionSettings?.codexModelOverride || modelOptions.model || this.plugin.settings.backendSettings.codex.model }
+        : { provider: modelOptions.provider ?? this.plugin.settings.defaultProvider, model: modelOptions.model ?? this.plugin.settings.defaultModel });
+    await this.updateConversationTitleState(conversationId, {
+      titleState: { ...initial.titleState, model: currentModel }, titleGenerationStatus: 'pending', expectedTitleRevision: revision,
+    });
     await this.titleGenerationService.generateTitle(
       conversationId,
       firstMessage,
-      {
-        provider: modelOptions.provider ?? this.plugin.settings.defaultProvider,
-        model: modelOptions.model ?? this.plugin.settings.defaultModel,
-      },
+      currentModel,
       async (generatedConversationId, result) => {
         const conversation = await this.plugin.getConversationById(
           generatedConversationId,
@@ -4566,78 +4593,22 @@ export class OpenCodianView extends ItemView {
           return;
         }
 
-        if (conversation.title !== expectedFallbackTitle || conversation.titleGenerationStatus !== 'pending') {
-          return;
-        }
-
-        if (result.success) {
-          await this.updateConversationTitleState(generatedConversationId, {
-            title: result.title,
-            titleGenerationStatus: 'success',
-          });
-          return;
-        }
-
-        await this.updateConversationTitleState(generatedConversationId, {
-          titleGenerationStatus: 'failed',
-        });
+        const update = this.titleGenerationService.createGeneratedUpdate(conversation, revision, result);
+        if (update) await this.updateConversationTitleState(generatedConversationId, update);
       },
     );
   }
 
   private async updateConversationTitleState(
     conversationId: string,
-    update: {
-      title?: string;
-      titleGenerationStatus?: 'pending' | 'success' | 'failed';
-    },
+    update: ConversationTitleUpdate,
     requireNativeReadback = false,
   ): Promise<void> {
-    const conversation = await this.plugin.getConversationById(conversationId, {
-      preferCache: true,
-    });
-    if (!conversation) {
-      return;
-    }
-
-    const backendSessionId = typeof update.title === 'string'
-      ? getConversationBackendSessionId(conversation)
-      : null;
-    const backend = backendSessionId && this.plugin.agentServiceRegistry
-      ? getConversationSessionBackendService(this.plugin.agentServiceRegistry, conversation)
-      : null;
-    if (requireNativeReadback && conversation.backend === 'zcode') {
-      if (!backendSessionId || !backend) {
-        throw new Error('ZCode session rename requires an active native session.');
-      }
-      await backend.updateSessionTitle(backendSessionId, update.title ?? '');
-    }
-
-    if (typeof update.title === 'string') {
-      conversation.title = update.title;
-    }
-    conversation.titleGenerationStatus = update.titleGenerationStatus;
-    conversation.updatedAt = Date.now();
-    await this.plugin.saveConversation(conversation);
-
-    if (this.currentConversation?.id === conversationId) {
-      this.currentConversation = conversation;
-    }
-
-    if (typeof update.title === 'string') {
-      this.tabManager?.syncConversationTitle(conversationId, conversation.title);
-    }
+    const conversation = await this.titleGenerationService.persistUpdate(conversationId, update, requireNativeReadback);
+    if (!conversation) return;
+    if (this.currentConversation?.id === conversationId) this.currentConversation = conversation;
+    if (typeof update.title === 'string') this.tabManager?.syncConversationTitle(conversationId, conversation.title);
     this.conversationSessionRailCoordinator.refresh(this.messagesShellEl);
-
-    if (typeof update.title === 'string') {
-      if (backendSessionId && backend && !(requireNativeReadback && conversation.backend === 'zcode')) {
-        try {
-          await backend.updateSessionTitle(backendSessionId, conversation.title);
-        } catch (error) {
-          logger.warn('Failed to sync conversation title to server:', error);
-        }
-      }
-    }
   }
 
   /** Canonical display scope shared by history actions and the R-F5 rail. */

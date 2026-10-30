@@ -3,45 +3,14 @@
 > **源码**: `src/features/chat/services/title/TitleGenerationPort.ts`
 > **状态**: [REVIEW]
 
-## 概述
+标题服务的 consumer-owned 端口；没有运行时状态或 UI 依赖。
 
-`TitleGenerationPort` 是 `TitleGenerationService` 的 consumer-owned 类型端口。它只描述标题生成所需的最小依赖面，不拥有 runtime、可变 state 或 lifecycle，也不负责查找或转发依赖。
+- settings 仅含 aiTitleModel、aiTitleModelOverrides、disabledModelRefs、locale、modelSourceMode。
+- registry 用 conversation backend 解析所属后端，不能使用当前激活后端代替。
+- getConversationById / saveConversation 提供标题来源、revision 与完整 conversation 保存；StorageService 保持原有完整消息防覆盖策略。
+- generateDefaultTitle 提供本地确定性规则。
+- modelConfigService 仅供旧 OpenCode 会话兼容；六个可选后端的模型目录从自身适配器读取。
+- openCodeService 仅暴露旧 OpenCode 临时 session 的创建、请求、删除。其他后端不调用它。
+- 构造服务时单独注入 workingDirectory，沿用 vault 作用域而不让服务依赖 App 或 main.ts。
 
-该端口消除了 `TitleGenerationService` 对 `src/main.ts` 的 type-only 依赖；它不是 service locator，也不是 forwarding adapter。消费者在组装服务时提供这些依赖。
-
-## 依赖面
-
-```typescript
-export interface TitleGenerationPort {
-  readonly settings: Readonly<Pick<
-    OpenCodianSettings,
-    'aiTitleModel' | 'disabledModelRefs' | 'locale' | 'modelSourceMode'
-  >>;
-  readonly openCodeService: Pick<
-    OpenCodeService,
-    'createSession' | 'deleteSession' | 'requestAssistantResponse'
-  >;
-  readonly modelConfigService: Pick<ModelConfigService, 'getCatalogs'> | null;
-  readonly agentServiceRegistry: AgentServiceRegistry;
-  getConversationById(id: string, options?: { preferCache?: boolean }): Promise<
-    TitleGenerationConversation | undefined
-  >;
-  generateDefaultTitle(firstMessage: string): string;
-}
-```
-
-- `settings` 只读取 `aiTitleModel`、`disabledModelRefs`、`locale` 和 `modelSourceMode`。
-- `openCodeService` 只暴露创建/删除临时 session 与请求 assistant response 的能力。
-- `modelConfigService` 只需要 `getCatalogs`，并允许为 `null`；服务在没有目录服务时仍可解析显式标题模型引用。
-- `agentServiceRegistry` 保持具体 `AgentServiceRegistry` 类型，因为 `readBackendSessionTitle` 的 nominal 类型要求该 registry。
-- `getConversationById` 只返回标题流程所需的 backend 与 session IDs（`backendSessionId`、`openCodeSessionId`、`acpSessionId`），而不是完整 conversation。
-- `generateDefaultTitle` 提供首条消息的本地默认标题生成能力。
-
-## 边界
-
-端口没有自己的缓存、取消控制器、请求生命周期或 UI 回调。标题任务的活动 map、轮询、取消、临时 session 清理和结果回调仍由 `TitleGenerationService` 负责；消费者只负责提供端口实现。
-
-## 目录定位（2026-10-23）
-
-- 源码位置：`src/features/chat/services/title/TitleGenerationPort.ts`。
-- 原位置：`src/features/chat/services/TitleGenerationPort.ts`；文件名、导出接口与业务职责保持不变。
+生命周期、限时、安全检查、更新代次与原生写入由 TitleGenerationService 拥有；端口本身不缓存、转发或调度。

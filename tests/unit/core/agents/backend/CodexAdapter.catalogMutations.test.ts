@@ -56,6 +56,22 @@ const mutations = [
   },
 ];
 
+describe('live Codex session title readback', () => {
+  it('reads app-server names even when the session already has a local entry', async () => {
+    const { adapter, client } = createFixture();
+    await adapter.start();
+    const { localId } = await ownThread(adapter);
+    const readThread = jest.spyOn(client, 'readThread').mockResolvedValue({
+      id: 'native-thread', name: 'Native generated name', preview: 'First prompt', updatedAt: 2,
+    } as never);
+    await expect(adapter.getSession(localId)).resolves.toMatchObject({
+      title: 'Native generated name', titleSource: 'native', threadId: 'native-thread', provisionalId: localId,
+    });
+    expect(readThread).toHaveBeenCalledWith('native-thread', false);
+    await adapter.stop();
+  });
+});
+
 describe.each(mutations)('$operation native mutation results', (mutation) => {
   it('treats the native empty ACK as admission and retains the boolean API', async () => {
     const { client, request } = createFixture();

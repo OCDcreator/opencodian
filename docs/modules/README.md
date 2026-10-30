@@ -112,3 +112,5 @@
 - [DshAuxQuerySession](core/agents/backend/dsh/DshAuxQuerySession.md)
 - [DshQuestionBridge](core/agents/backend/dsh/DshQuestionBridge.md)
 - [SettingsDshSection](features/settings/backends/dsh/SettingsDshSection.md)
+
+- [TitleModelResolver](features/chat/services/title/TitleModelResolver.md)：六后端标题模型目录/provider 边界。

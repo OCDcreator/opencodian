@@ -135,8 +135,9 @@ export class TabManager {
     this.tabs.length = 0;
     this.activeTabId = null;
 
-    const maxTabs = this.areTabsEnabled() ? this.options.getMaxTabs() : items.length;
-    const limitedItems = items.slice(0, Math.max(1, maxTabs));
+    // The limit gates new tabs; restoring an existing workspace must not discard
+    // overflow/child tabs or lose its active tab when the setting is reduced.
+    const limitedItems = items;
     let restoredActiveIndex: number | null = null;
     const restoredIdMap = new Map<TabId, TabId>();
     const pendingParentLinks: Array<{ tab: Tab; parentTabId: TabId }> = [];

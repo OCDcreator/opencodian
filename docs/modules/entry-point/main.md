@@ -420,3 +420,7 @@ The plugin composition supplies Pi extension-command completion localization thr
 - 随目录调整更新的依赖：`src/features/chat/services/integrations/PiExtensionUiHost.ts`、`src/core/agents/backend/claude/ClaudeCodeAdapter.ts`、`src/core/agents/backend/claude/ClaudeCodeElicitationBridge.ts`、`src/core/agents/backend/claude/ClaudeCodeMcpConfigAdapter.ts`、`src/core/agents/backend/claude/ClaudeCodeDefaultPermissionHost.ts`、`src/core/agents/backend/claude/ClaudeCodePermissionBridge.ts`、`src/core/agents/backend/claude/ClaudeCodeSdkLoader.ts`、`src/core/agents/backend/codex/CodexAdapter.ts`、`src/core/agents/backend/codex/CodexDefaultApprovalHost.ts`、`src/core/agents/backend/codex/CodexElicitationBridge.ts`、`src/features/chat/services/integrations/PdfChatIntegration.ts`、`src/features/chat/services/context/ContextFileCatalogIndex.ts`、`src/features/chat/services/send/TurnCompletionSoundService.ts`、`src/features/chat/services/context/WebViewerContextService.ts`、`src/features/chat/retrieval/RelevantNotesView.ts`、`src/features/chat/services/integrations/ImageGenerationChatController.ts`、`src/features/chat/services/diagnostics/ChatDiagnosticsCoordinator.ts`、`src/features/chat/services/context/ContextAttachmentBuilder.ts`。
 
 2026-10-28：memory runtime 不再接收休眠 OpenCodeService，改注入 registry 和持久化会话上下文 getter；可选向量端口复用语义检索 provider/model，缓存键覆盖 endpoint/provider/model。其他后端生命周期和聊天发送接线保留。
+
+## 2026-10-30 六后端标题生命周期
+
+会话 metadata 冷启动和 createConversationFromSession 透传 titleState。generateDefaultTitle 支持中文句末分隔并按 Unicode 码点截取，避免 emoji 半个 surrogate。标题执行仍归标题服务。

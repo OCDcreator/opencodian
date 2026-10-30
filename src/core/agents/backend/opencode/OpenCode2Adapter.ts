@@ -444,9 +444,9 @@ export class OpenCode2Adapter implements AgentService, AgentChatCapability, Agen
     await client.session.command({ sessionID: sessionId, name: command, text: args });
   }
 
-  async generateTitle(prompt: string, provider: string, model: string): Promise<string> {
+  async generateTitle(prompt: string, provider: string, model: string, signal?: AbortSignal): Promise<string> {
     const client = await this.ready();
-    const response = await client.generate.text({ prompt, model: { providerID: provider, id: model } });
+    const response = await client.generate.text({ prompt, model: { providerID: provider, id: model } }, { signal });
     return response.text;
   }
 

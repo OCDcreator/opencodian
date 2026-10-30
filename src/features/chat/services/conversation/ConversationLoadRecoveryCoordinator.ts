@@ -400,6 +400,7 @@ export class ConversationLoadRecoveryCoordinator {
       activeConversations.map((conversation) => [conversation.id, conversation] as const),
     );
     const activeConversationIds = new Set(conversationMap.keys());
+    const savedActiveTab = savedState.tabs[savedState.activeTabIndex];
     const filteredTabs = (savedState.tabs as RestoredTabState[]).filter(
       (tab) => tab.conversationId && activeConversationIds.has(tab.conversationId),
     );
@@ -410,7 +411,7 @@ export class ConversationLoadRecoveryCoordinator {
     }
     const restoredTab = tabManager.restoreTabs(
       filteredTabs,
-      savedState.activeTabIndex,
+      Math.max(0, filteredTabs.indexOf(savedActiveTab as RestoredTabState)),
       conversationMap,
     );
 

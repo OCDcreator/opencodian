@@ -122,3 +122,7 @@ OpenCodianView 只转发 Codex 目录恢复到插件既有桥，保持 view/runt
 2026-10-27 单轨 Composer：OpenCodianView 只调整 host 装配，把 `modelContainer` 转交 selection controls，并让 effort 由 selection host 内联到模型弹层；发送/停止、草稿、per-tab streaming、IME、附件与多标签状态仍由原 runtime owner 持有。状态栏移到 composer shell 之外，ContextRing 位置变化不改变 modal 或 context usage 数据流。
 
 2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `feature.chat-shell` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。
+
+## 2026-10-30 会话标题
+
+OpenCodianView 标题状态更新委托标题服务，只装配当前会话模型、更新标签/rail、挂载重试和恢复。

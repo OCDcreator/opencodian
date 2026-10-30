@@ -119,6 +119,7 @@ export function buildConversationMetaFromStoredRecord(
     updatedAt: data.updatedAt,
     lastResponseAt,
     titleGenerationStatus,
+    titleState: data.titleState,
     messageCount,
     openCodeSessionId: typeof data.openCodeSessionId === 'string' ? data.openCodeSessionId : undefined,
     backendSessionId: typeof data.backendSessionId === 'string'

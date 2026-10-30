@@ -7,6 +7,9 @@ import type { TabBarItem, TabBarLayoutMode, TabId } from './types';
 export interface TabBarCallbacks {
   onTabClick: (tabId: TabId) => void;
   onTabClose: (tabId: TabId) => void;
+  onNewTab?: () => void | Promise<void>;
+  canCreateTab?: () => boolean;
+  getMaxTabs?: () => number;
 }
 
 const HEADER_MAX_VISIBLE_TABS = 4;
@@ -17,6 +20,12 @@ export class TabBar {
   private static tooltipLabelId = 0;
   private overflowMenuEl: HTMLDivElement | null = null;
   private overflowMenuCleanup: (() => void) | null = null;
+  private items: TabBarItem[] = [];
+  private layout: TabBarLayoutMode | null = null;
+  private isCreating = false;
+  private resizeObserver: ResizeObserver | null = null;
+  private observedParent: HTMLElement | null = null;
+  private observedWidth = 0;
 
   constructor(
     private readonly containerEl: HTMLElement,
@@ -26,26 +35,44 @@ export class TabBar {
   }
 
   render(items: TabBarItem[], layout: TabBarLayoutMode): void {
+    const focused = this.containerEl.ownerDocument.activeElement as HTMLElement | null;
+    const reopenMenu = this.layout === layout && Boolean(this.overflowMenuEl);
+    const menuFocusId = focused && this.overflowMenuEl?.contains(focused) ? focused.dataset.tabId : null;
+    const focusKey = focused && this.containerEl.contains(focused)
+      ? focused.dataset.tabId ?? focused.dataset.action : menuFocusId;
+    this.items = items;
+    this.layout = layout;
     this.closeOverflowMenu();
-    this.containerEl.empty();
+    this.containerEl.removeClass('is-compact');
     this.containerEl.setAttribute('data-layout', layout);
+    this.containerEl.setAttribute('role', 'group');
     if (layout !== 'below-header-vertical') {
       TooltipLayerController.ensureForElement(this.containerEl);
     }
 
-    const { visibleItems, overflowItems } = this.partitionItems(items, layout);
-    this.renderParentBreadcrumb(items, layout);
-
-    for (const item of visibleItems) {
-      this.renderTabItem(item, layout);
-    }
-
-    if (overflowItems.length > 0) {
-      this.renderOverflowButton(overflowItems, layout);
-    }
+    let limit = this.getMaxVisibleTabs(layout);
+    do {
+      this.containerEl.empty();
+      const { visibleItems, overflowItems } = this.partitionItems(items, layout, limit);
+      this.renderParentBreadcrumb(items, layout);
+      for (const item of visibleItems) this.renderTabItem(item, layout);
+      if (overflowItems.length > 0) this.renderOverflowButton(overflowItems, layout);
+      this.renderNewButton(layout);
+      if (layout === 'below-header-vertical' || !this.containerEl.clientWidth
+        || this.containerEl.scrollWidth <= this.containerEl.clientWidth + 1 || limit <= 1) break;
+      limit -= 1;
+    } while (limit > 0);
+    this.containerEl.toggleClass('is-compact', layout !== 'below-header-vertical'
+      && this.containerEl.clientWidth > 0 && this.containerEl.scrollWidth > this.containerEl.clientWidth + 1);
+    this.restoreInteractionState(focusKey, menuFocusId, reopenMenu);
+    this.observeAvailableWidth();
   }
 
   renderParentNavigation(items: TabBarItem[], layout: TabBarLayoutMode): void {
+    this.layout = null;
+    this.resizeObserver?.disconnect();
+    this.observedParent = null;
+    this.containerEl.removeClass('is-compact');
     this.closeOverflowMenu();
     this.containerEl.empty();
     this.containerEl.setAttribute('data-layout', layout);
@@ -56,16 +83,20 @@ export class TabBar {
   }
 
   destroy(): void {
+    this.layout = null;
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
+    this.observedParent = null;
     this.closeOverflowMenu();
     this.containerEl.empty();
     this.containerEl.removeClass('opencodian-tab-bar');
   }
 
-  private partitionItems(items: TabBarItem[], layout: TabBarLayoutMode): {
+  private partitionItems(items: TabBarItem[], layout: TabBarLayoutMode, limit = this.getMaxVisibleTabs(layout)): {
     visibleItems: TabBarItem[];
     overflowItems: TabBarItem[];
   } {
-    const maxVisibleTabs = this.getMaxVisibleTabs(layout);
+    const maxVisibleTabs = limit;
 
     if (items.length <= maxVisibleTabs) {
       return {
@@ -124,21 +155,7 @@ export class TabBar {
 
   private renderParentBackButton(parentItem: TabBarItem, layout: TabBarLayoutMode): void {
     const label = t('chat.tab.backToParent', { title: parentItem.title });
-    const useTooltip = layout !== 'below-header-vertical';
-    const breadcrumbEl = this.containerEl.createEl('button', {
-      cls: useTooltip
-        ? 'opencodian-tab-bar-parent-breadcrumb opencodian-tooltip-trigger'
-        : 'opencodian-tab-bar-parent-breadcrumb',
-      attr: useTooltip
-        ? {
-            type: 'button',
-            'data-tooltip': label,
-          }
-        : {
-            type: 'button',
-          },
-    });
-    this.attachTooltipLabel(breadcrumbEl, label);
+    const breadcrumbEl = this.createButton('opencodian-tab-bar-parent-breadcrumb', label, layout);
 
     const iconEl = breadcrumbEl.createSpan({ cls: 'opencodian-tab-bar-parent-breadcrumb-icon' });
     iconEl.setAttribute('aria-hidden', 'true');
@@ -156,21 +173,7 @@ export class TabBar {
 
   private renderParentCloseButton(item: TabBarItem, layout: TabBarLayoutMode): void {
     const label = t('chat.tab.close');
-    const useTooltip = layout !== 'below-header-vertical';
-    const closeEl = this.containerEl.createEl('button', {
-      cls: useTooltip
-        ? 'opencodian-tab-bar-parent-close opencodian-tooltip-trigger'
-        : 'opencodian-tab-bar-parent-close',
-      attr: useTooltip
-        ? {
-            type: 'button',
-            'data-tooltip': label,
-          }
-        : {
-            type: 'button',
-          },
-    });
-    this.attachTooltipLabel(closeEl, label);
+    const closeEl = this.createButton('opencodian-tab-bar-parent-close', label, layout);
 
     const iconEl = closeEl.createSpan({ cls: 'opencodian-tab-bar-parent-close-icon' });
     iconEl.setAttribute('aria-hidden', 'true');
@@ -184,22 +187,11 @@ export class TabBar {
   }
 
   private renderTabItem(item: TabBarItem, layout: TabBarLayoutMode): void {
-    const tooltip = `${item.title}${item.canClose ? ` · ${t('chat.tab.close')}` : ''}`;
-    const useTooltip = layout !== 'below-header-vertical';
-    const tabEl = this.containerEl.createEl('button', {
-      cls: useTooltip
-        ? 'opencodian-tab-bar-item opencodian-tooltip-trigger'
-        : 'opencodian-tab-bar-item',
-      attr: useTooltip
-        ? {
-            type: 'button',
-            'data-tooltip': tooltip,
-          }
-        : {
-            type: 'button',
-          },
-    });
-    this.attachTooltipLabel(tabEl, tooltip);
+    const tooltip = `${item.title}${item.canClose ? ` · ${t('chat.tab.closeHint')}` : ''}`;
+    const tabEl = this.createButton('opencodian-tab-bar-item', tooltip, layout);
+    tabEl.dataset.tabId = item.id;
+    tabEl.setAttribute('aria-pressed', String(item.isActive));
+    tabEl.addEventListener('keydown', (event) => this.onTabKeyDown(event, item, layout));
 
     if (item.isActive) {
       tabEl.addClass('is-active');
@@ -245,29 +237,26 @@ export class TabBar {
         event.preventDefault();
         this.callbacks.onTabClose(item.id);
       });
+      tabEl.addEventListener('auxclick', (event) => {
+        if (event.button !== 1) return;
+        event.preventDefault();
+        this.callbacks.onTabClose(item.id);
+      });
     }
   }
 
   private renderOverflowButton(items: TabBarItem[], layout: TabBarLayoutMode): void {
     const tooltip = t('chat.tab.moreMenu', { count: items.length });
-    const useTooltip = layout !== 'below-header-vertical';
-    const overflowEl = this.containerEl.createEl('button', {
-      cls: useTooltip
-        ? 'opencodian-tab-bar-overflow opencodian-tooltip-trigger'
-        : 'opencodian-tab-bar-overflow',
-      text: t('chat.tab.more', { count: items.length }),
-      attr: useTooltip
-        ? {
-            type: 'button',
-            'aria-haspopup': 'menu',
-            'data-tooltip': tooltip,
-          }
-        : {
-            type: 'button',
-            'aria-haspopup': 'menu',
-          },
+    const overflowEl = this.createButton('opencodian-tab-bar-overflow', tooltip, layout);
+    overflowEl.setAttribute('aria-haspopup', 'menu');
+    overflowEl.createSpan({ text: t('chat.tab.more', { count: items.length }) });
+    overflowEl.dataset.action = 'tab-overflow';
+    overflowEl.setAttribute('aria-expanded', 'false');
+    overflowEl.addEventListener('keydown', (event) => {
+      if (event.key !== 'ArrowDown') return;
+      event.preventDefault();
+      this.openOverflowMenu(overflowEl, items);
     });
-    this.attachTooltipLabel(overflowEl, tooltip);
 
     overflowEl.addEventListener('click', (event) => {
       event.preventDefault();
@@ -288,12 +277,20 @@ export class TabBar {
     const menuEl = doc.createElement('div');
     menuEl.className = 'opencodian-tab-overflow-menu';
     menuEl.setAttribute('role', 'menu');
+    anchorEl.setAttribute('aria-expanded', 'true');
 
     for (const item of items) {
       const itemEl = doc.createElement('button');
       itemEl.className = 'opencodian-tab-overflow-menu-item';
       itemEl.type = 'button';
       itemEl.setAttribute('role', 'menuitem');
+      itemEl.dataset.tabId = item.id;
+      itemEl.addEventListener('keydown', (event) => this.onTabKeyDown(event, item, this.layout ?? 'header'));
+      if (item.canClose) itemEl.addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+        this.closeOverflowMenu();
+        this.callbacks.onTabClose(item.id);
+      });
       if (item.isActive) {
         itemEl.classList.add('is-active');
       }
@@ -347,10 +344,10 @@ export class TabBar {
 
     const closeOnPointerDown = (event: MouseEvent) => {
       const target = event.target;
-      if (!(target instanceof Node)) {
+      if (!target || !('nodeType' in target)) {
         return;
       }
-      if (menuEl.contains(target) || anchorEl.contains(target)) {
+      if (menuEl.contains(target as Node) || anchorEl.contains(target as Node)) {
         return;
       }
       this.closeOverflowMenu();
@@ -358,28 +355,50 @@ export class TabBar {
 
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        event.preventDefault();
         this.closeOverflowMenu();
         anchorEl.focus();
+      }
+      const buttons = Array.from(menuEl.querySelectorAll<HTMLButtonElement>('button'));
+      const index = buttons.indexOf(doc.activeElement as HTMLButtonElement);
+      const next = event.key === 'ArrowDown' ? (index + 1) % buttons.length
+        : event.key === 'ArrowUp' ? (index - 1 + buttons.length) % buttons.length
+        : event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : -1;
+      if (next >= 0) {
+        event.preventDefault();
+        buttons[next]?.focus();
       }
     };
 
     doc.addEventListener('mousedown', closeOnPointerDown, true);
     doc.addEventListener('keydown', closeOnEscape, true);
+    const win = doc.defaultView;
+    const closeOnLayoutChange = (event: Event) => {
+      if (event.target && 'nodeType' in event.target && menuEl.contains(event.target as Node)) return;
+      this.closeOverflowMenu();
+    };
+    win?.addEventListener('resize', closeOnLayoutChange);
+    win?.addEventListener('scroll', closeOnLayoutChange, true);
 
     this.overflowMenuEl = menuEl;
     this.overflowMenuCleanup = () => {
+      anchorEl.setAttribute('aria-expanded', 'false');
+      win?.removeEventListener('resize', closeOnLayoutChange);
+      win?.removeEventListener('scroll', closeOnLayoutChange, true);
       doc.removeEventListener('mousedown', closeOnPointerDown, true);
       doc.removeEventListener('keydown', closeOnEscape, true);
       menuEl.remove();
     };
+    menuEl.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
   }
 
   private positionOverflowMenu(anchorEl: HTMLElement, menuEl: HTMLDivElement): void {
     const rect = anchorEl.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    const menuWidth = Math.max(220, rect.width + 160);
+    const win = anchorEl.ownerDocument.defaultView ?? window;
+    const viewportWidth = win.innerWidth;
+    const viewportHeight = win.innerHeight;
     const margin = 12;
+    const menuWidth = Math.min(Math.max(220, rect.width + 160), Math.max(0, viewportWidth - 2 * margin));
     const spacing = 8;
     const left = Math.min(
       Math.max(margin, rect.right - menuWidth),
@@ -397,7 +416,7 @@ export class TabBar {
       ? (spaceAbove >= 120 || spaceAbove >= spaceBelow)
       : !(spaceBelow >= 120 || spaceBelow >= spaceAbove);
 
-    const maxHeight = Math.max(120, openAbove ? spaceAbove : spaceBelow);
+    const maxHeight = Math.max(0, openAbove ? spaceAbove : spaceBelow);
     const top = openAbove
       ? Math.max(margin, rect.top - Math.min(menuHeight, maxHeight) - spacing)
       : rect.bottom + spacing;
@@ -416,6 +435,78 @@ export class TabBar {
     this.overflowMenuEl = null;
   }
 
+  private restoreInteractionState(focusKey: string | null | undefined, menuFocusId: string | null | undefined, reopenMenu: boolean): void {
+    if (focusKey) {
+      const next = Array.from(this.containerEl.querySelectorAll<HTMLButtonElement>('button'))
+        .find((button) => (button.dataset.tabId ?? button.dataset.action) === focusKey);
+      (next ?? this.containerEl.querySelector<HTMLButtonElement>('.is-active'))?.focus({ preventScroll: true });
+    }
+    const anchor = this.containerEl.querySelector<HTMLButtonElement>('.opencodian-tab-bar-overflow');
+    if (reopenMenu && anchor) {
+      const visibleIds = new Set(Array.from(this.containerEl.querySelectorAll<HTMLElement>('[data-tab-id]')).map(el => el.dataset.tabId));
+      this.openOverflowMenu(anchor, this.items.filter(item => !visibleIds.has(item.id)));
+      if (menuFocusId) Array.from(this.overflowMenuEl?.querySelectorAll<HTMLButtonElement>('button') ?? [])
+        .find(button => button.dataset.tabId === menuFocusId)?.focus({ preventScroll: true });
+    }
+  }
+
+  private renderNewButton(layout: TabBarLayoutMode): void {
+    if (!this.callbacks.onNewTab) return;
+    const allowed = this.callbacks.canCreateTab?.() ?? true;
+    const label = allowed ? t('chat.tab.newTooltip')
+      : t('chat.tab.maxReached', { count: String(this.callbacks.getMaxTabs?.() ?? this.items.length) });
+    const button = this.createButton('opencodian-tab-bar-new', label, layout);
+    button.dataset.action = 'new-tab';
+    const icon = button.createSpan();
+    icon.setAttribute('aria-hidden', 'true');
+    setIcon(icon, 'plus');
+    button.disabled = !allowed || this.isCreating;
+    button.setAttribute('aria-busy', String(this.isCreating));
+    button.addEventListener('click', async () => {
+      if (this.isCreating || !(this.callbacks.canCreateTab?.() ?? true)) return;
+      this.isCreating = true;
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      try { await this.callbacks.onNewTab?.(); }
+      finally {
+        this.isCreating = false;
+        if (this.layout) this.render(this.items, this.layout);
+      }
+    });
+  }
+
+  private observeAvailableWidth(): void {
+    const parent = this.containerEl.parentElement;
+    const Observer = this.containerEl.ownerDocument.defaultView?.ResizeObserver;
+    if (!parent || !Observer || this.observedParent === parent) return;
+    this.resizeObserver?.disconnect();
+    this.observedParent = parent;
+    this.observedWidth = parent.clientWidth;
+    this.resizeObserver = new Observer(() => {
+      if (!this.layout || parent.clientWidth === this.observedWidth) return;
+      this.observedWidth = parent.clientWidth;
+      this.render(this.items, this.layout);
+    });
+    this.resizeObserver.observe(parent);
+  }
+
+  private onTabKeyDown(event: KeyboardEvent, item: TabBarItem, layout: TabBarLayoutMode): void {
+    if (event.key === 'Delete' && item.canClose) {
+      event.preventDefault();
+      this.closeOverflowMenu();
+      this.callbacks.onTabClose(item.id);
+      return;
+    }
+    if (this.overflowMenuEl) return;
+    const buttons = Array.from(this.containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-tab-bar-item'));
+    const index = buttons.indexOf(event.currentTarget as HTMLButtonElement);
+    const vertical = layout === 'below-header-vertical';
+    const next = event.key === (vertical ? 'ArrowDown' : 'ArrowRight') ? (index + 1) % buttons.length
+      : event.key === (vertical ? 'ArrowUp' : 'ArrowLeft') ? (index - 1 + buttons.length) % buttons.length
+      : event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : -1;
+    if (next >= 0) { event.preventDefault(); buttons[next]?.focus(); }
+  }
+
   private renderBackgroundTaskState(containerEl: HTMLElement): void {
     containerEl.empty();
     containerEl.addClass('is-background-task');
@@ -424,6 +515,16 @@ export class TabBar {
     for (let index = 0; index < 3; index += 1) {
       dotsEl.createSpan({ cls: 'opencodian-tab-activity-dot' });
     }
+  }
+
+  private createButton(cls: string, label: string, layout: TabBarLayoutMode): HTMLButtonElement {
+    const button = this.containerEl.createEl('button', { cls, attr: { type: 'button' } });
+    if (layout !== 'below-header-vertical') {
+      button.addClass('opencodian-tooltip-trigger');
+      button.dataset.tooltip = label;
+    }
+    this.attachTooltipLabel(button, label);
+    return button;
   }
 
   private attachTooltipLabel(element: HTMLElement, label: string): void {

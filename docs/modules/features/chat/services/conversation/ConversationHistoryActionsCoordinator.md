@@ -65,3 +65,7 @@ Codex history 新增独立 `[data-codex-forget-local]` 按钮：无勾选时当�
 - 源码位置：`src/features/chat/services/conversation/ConversationHistoryActionsCoordinator.ts`。
 - 原位置：`src/features/chat/services/ConversationHistoryActionsCoordinator.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/features/chat/services/conversation/ConversationHistoryDialogService.ts`。
+
+## 2026-10-30 六后端标题生命周期
+
+失败且仍为 rule 来源的历史项提供 refresh-cw 重试按钮；复用现有紧凑 icon 控件。人工改名取消任务推迟到确认保存，取消对话框不影响原生成。

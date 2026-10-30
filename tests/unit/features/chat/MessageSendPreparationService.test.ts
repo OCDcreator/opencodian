@@ -265,6 +265,7 @@ describe('MessageSendPreparationService optimistic preparation', () => {
       'renderMessage',
       'scrollToBottom',
       'applyFallbackConversationTitle',
+      'saveConversation',
       'startAiConversationTitleGeneration',
     ]);
   });

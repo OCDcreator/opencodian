@@ -32,12 +32,114 @@ function renderTabBar(
   return containerEl;
 }
 
-describe('TabBar', () => {
-  afterEach(() => {
-    TooltipLayerController.ensureForDocument(document).destroy();
-    document.body.innerHTML = '';
+afterEach(() => {
+  TooltipLayerController.ensureForDocument(document).destroy();
+  document.body.innerHTML = '';
+});
+
+describe('TabBar creation and interaction', () => {
+  it.each(['header', 'input', 'below-header-grid', 'below-header-vertical'] as const)(
+    'keeps a single create button inside the %s bar, including the empty state', async (layout) => {
+      const onNewTab = jest.fn().mockResolvedValue(undefined);
+      const container = renderTabBar([], layout, { onNewTab });
+      const button = container.querySelector<HTMLButtonElement>('.opencodian-tab-bar-new');
+      expect(button).not.toBeNull();
+      expect(button?.disabled).toBe(false);
+      button?.click();
+      await Promise.resolve();
+      expect(onNewTab).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('disables creation while pending and at the tab limit, then recovers', async () => {
+    let finish!: () => void;
+    let canCreate = true;
+    const onNewTab = jest.fn(() => new Promise<void>((resolve) => { finish = resolve; }));
+    const container = document.createElement('div');
+    const bar = new TabBar(container, { onTabClick: jest.fn(), onTabClose: jest.fn(), onNewTab, canCreateTab: () => canCreate });
+    bar.render(createItems(2), 'header');
+    container.querySelector<HTMLButtonElement>('.opencodian-tab-bar-new')!.click();
+    container.querySelector<HTMLButtonElement>('.opencodian-tab-bar-new')!.click();
+    expect(onNewTab).toHaveBeenCalledTimes(1);
+    expect(container.querySelector<HTMLButtonElement>('.opencodian-tab-bar-new')!.disabled).toBe(true);
+    finish();
+    await Promise.resolve();
+    await Promise.resolve();
+    canCreate = false;
+    bar.render(createItems(2), 'header');
+    expect(container.querySelector<HTMLButtonElement>('.opencodian-tab-bar-new')!.disabled).toBe(true);
+    canCreate = true;
+    bar.render(createItems(1), 'header');
+    expect(container.querySelector<HTMLButtonElement>('.opencodian-tab-bar-new')!.disabled).toBe(false);
+    bar.destroy();
   });
 
+  it('fits a narrow bar without hiding the active tab, overflow, or create action', () => {
+    const container = document.createElement('div');
+    Object.defineProperty(container, 'clientWidth', { value: 104 });
+    Object.defineProperty(container, 'scrollWidth', { get: () => container.querySelectorAll('.opencodian-tab-bar-item').length * 26 + 60 });
+    const bar = new TabBar(container, { onTabClick: jest.fn(), onTabClose: jest.fn(), onNewTab: jest.fn() });
+    bar.render(createItems(12, 11), 'header');
+    expect(container.querySelectorAll('.opencodian-tab-bar-item')).toHaveLength(1);
+    expect(container.querySelector('.is-active .opencodian-tab-bar-badge')?.textContent).toBe('12');
+    expect(container.querySelector('.opencodian-tab-bar-overflow')?.textContent).toContain('+11');
+    expect(container.lastElementChild?.classList.contains('opencodian-tab-bar-new')).toBe(true);
+    bar.destroy();
+  });
+
+  it('falls back to compact parent navigation when a child title cannot fit', () => {
+    const container = document.createElement('div');
+    Object.defineProperty(container, 'clientWidth', { value: 150 });
+    Object.defineProperty(container, 'scrollWidth', { get: () => container.classList.contains('is-compact') ? 132 : 420 });
+    const items = createItems(7, 6);
+    items[6].parentTabId = items[0].id;
+    const bar = new TabBar(container, { onTabClick: jest.fn(), onTabClose: jest.fn(), onNewTab: jest.fn() });
+    bar.render(items, 'input');
+    expect(container.classList.contains('is-compact')).toBe(true);
+    expect(container.querySelector('[data-tab-id="tab-7"]')).not.toBeNull();
+    expect(container.querySelector('.opencodian-tab-bar-parent-breadcrumb')).not.toBeNull();
+    expect(container.querySelector('.opencodian-tab-bar-new')).not.toBeNull();
+    bar.destroy();
+  });
+
+  it('keeps the overflow menu and its focus while stream status refreshes', () => {
+    const container = document.body.createDiv();
+    const bar = new TabBar(container, { onTabClick: jest.fn(), onTabClose: jest.fn() });
+    const items = createItems(9);
+    bar.render(items, 'header');
+    container.querySelector<HTMLButtonElement>('.opencodian-tab-bar-overflow')!.click();
+    const buttons = document.querySelectorAll<HTMLButtonElement>('.opencodian-tab-overflow-menu-item');
+    buttons[2].focus();
+    const focusedId = buttons[2].dataset.tabId;
+    items[1].isStreaming = true;
+    bar.render(items, 'header');
+    expect(document.querySelector('.opencodian-tab-overflow-menu')).not.toBeNull();
+    expect((document.activeElement as HTMLElement).dataset.tabId).toBe(focusedId);
+    expect(container.querySelector('.opencodian-tab-bar-overflow')?.getAttribute('aria-expanded')).toBe('true');
+    bar.destroy();
+    expect(document.querySelector('.opencodian-tab-overflow-menu')).toBeNull();
+  });
+
+  it('preserves keyboard focus across status rerenders and supports Delete and middle-click closing', () => {
+    const onTabClose = jest.fn();
+    const container = document.body.createDiv();
+    const items = createItems(3);
+    const bar = new TabBar(container, { onTabClick: jest.fn(), onTabClose });
+    bar.render(items, 'header');
+    (container.querySelectorAll('.opencodian-tab-bar-item')[1] as HTMLElement).focus();
+    items[1].isStreaming = true;
+    bar.render(items, 'header');
+    expect(document.activeElement?.getAttribute('data-tab-id')).toBe('tab-2');
+    document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
+    expect(onTabClose).toHaveBeenCalledWith('tab-2');
+    container.querySelector('.opencodian-tab-bar-item')!.dispatchEvent(new MouseEvent('auxclick', { button: 1, bubbles: true }));
+    expect(onTabClose).toHaveBeenCalledWith('tab-1');
+    bar.destroy();
+  });
+
+});
+
+describe('TabBar rendering', () => {
   it('limits header layout to four visible tabs plus overflow', () => {
     const containerEl = renderTabBar(createItems(6, 5), 'header');
 

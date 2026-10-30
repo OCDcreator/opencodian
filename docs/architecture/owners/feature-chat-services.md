@@ -145,3 +145,11 @@ DSH 发送跳过 OpenCode 1 专属技能目录展开，保留通用上下文和�
 ComposerInputShellCoordinator 拥有新的单行底栏（附件 / permission / Agent / 模型·effort / send）与 composer 外状态栏；permission 与 Agent 使用独立 slots，Agent 仅在 capability 允许时挂载且不显示图标。selection controls 通过可选 `modelContainer` 分栏挂载，effort 由 ChatSelectionControlsCoordinator 在模型弹层内挂载。ContextRing 只换宿主位置，ContextDetailModal、context usage 数据与状态栏计数仍走既有 services。
 
 2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `feature.chat-services` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。
+
+## 会话标签机制核对（2026-10-30）
+
+标签运行时接收完整创建端口，并在所有布局接入栏内新增；创建协调器处理重复请求和后端／容量竞态，恢复协调器按过滤后的条目重定位 active。头部独立 new-tab 入口移除。 owner manifest 的职责、边界及依赖许可保持原定义。
+
+## 2026-10-30 会话标题
+
+TitleGenerationService 统一六后端生命周期、代次校验、本地/原生串行写入、隔离 aux 和重试。TitleModelResolver 隔离六种高风险目录格式与 provider 边界，不新增薄转发层。

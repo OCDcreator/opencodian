@@ -2450,6 +2450,7 @@ export default class OpenCodianPlugin extends Plugin {
           updatedAt: meta.updatedAt,
           lastResponseAt: meta.lastResponseAt,
           titleGenerationStatus: meta.titleGenerationStatus,
+          titleState: meta.titleState,
           backend: meta.backend,
           openCodeSessionId: meta.openCodeSessionId ?? meta.id,
           backendSessionId: meta.backendSessionId ?? meta.openCodeSessionId ?? meta.id,
@@ -2561,6 +2562,7 @@ export default class OpenCodianPlugin extends Plugin {
       sessionSettings: initial?.sessionSettings ? JSON.parse(JSON.stringify(initial.sessionSettings)) as Conversation['sessionSettings'] : undefined,
       lastResponseAt: initial?.lastResponseAt,
       titleGenerationStatus: initial?.titleGenerationStatus,
+      titleState: initial?.titleState,
     };
 
     this.conversations.unshift(conversation);
@@ -2859,19 +2861,21 @@ export default class OpenCodianPlugin extends Plugin {
     }
 
     const firstSentence = normalizedMessage
-      .split(/[.!?\n]/)[0]
+      .split(/[.!?。！？\n]/u).find((part) => part.trim()) ?? '';
+    const normalizedSentence = firstSentence
       .replace(/\s+/g, ' ')
       .trim();
-    if (!firstSentence) {
+    if (!normalizedSentence) {
       return t('chat.history.untitled');
     }
 
-    const title = firstSentence.substring(0, 50).trim();
+    const characters = Array.from(normalizedSentence);
+    const title = characters.slice(0, 50).join('').trim();
     if (!title) {
       return t('chat.history.untitled');
     }
 
-    return title + (firstSentence.length > 50 ? '...' : '');
+    return title + (characters.length > 50 ? '...' : '');
   }
 
   private handleModelsLoaded(): void {

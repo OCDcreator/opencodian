@@ -908,3 +908,7 @@ selection host 新增 `getEffortDisplayLabel()`，组合 trigger 只读取当前
 ## 2026-10-28：原生命令与技能弹框
 
 六个可选后端均独立加载命令/技能目录，无需 OpenCode 1 配置管理器。DSH 不再回落旧后端；ZCode 技能目录绑定当前 backendSessionId；预载走相同可用性入口，缓存 key 包含当前会话身份。
+
+## 2026-10-30 六后端标题生命周期
+
+标题生成/保存/原生写入委托 TitleGenerationService；view 只提供 conversation/model snapshot、刷新所有匹配标签及 rail。首条规则标题不写回原生；人工 rename 走 revision，ZCode 保留原生先确认。失败重试沿用会话模型；hydrate 调用 recoverPending，不自动重发模型请求。本节取代下文早期的 OpenCode-only/fallback 字符串相等/切换取消描述。

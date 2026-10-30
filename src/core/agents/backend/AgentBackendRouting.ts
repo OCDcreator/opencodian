@@ -181,9 +181,8 @@ export function getActiveSessionHistoryService(
  *
  * Routes through the registry and calls `getSession(sessionId)` on the
  * backend adapter, then extracts the backend-specific title field for
- * the currently productized backends:
- * - OpenCode: `.title`
- * - Claude Code: `.summary`
+ * all selectable backends (Claude uses `.summary`, the others `.title`).
+ * This is a display readback, not evidence that AI generated the title.
  *
  * Returns `null` when no session service is available, `getSession` is not
  * implemented, the session is not found, the backend has not been mapped
@@ -194,6 +193,20 @@ export async function readBackendSessionTitle(
   conversation: Pick<Conversation, 'backend'> | null,
   sessionId: string | null,
 ): Promise<string | null> {
+  return (await readBackendSessionTitleSnapshot(registry, conversation, sessionId))?.title ?? null;
+}
+
+export interface BackendSessionTitleSnapshot {
+  title: string;
+  source: 'generated' | 'custom' | 'native' | 'unknown';
+}
+
+/** Native provenance is optional; unknown never means AI-generated. */
+export async function readBackendSessionTitleSnapshot(
+  registry: AgentServiceRegistry | null | undefined,
+  conversation: Pick<Conversation, 'backend'> | null,
+  sessionId: string | null,
+): Promise<BackendSessionTitleSnapshot | null> {
   if (!sessionId) {
     return null;
   }
@@ -215,25 +228,14 @@ export async function readBackendSessionTitle(
   }
 
   const record = session as Record<string, unknown>;
+  // A first-input preview is useful in catalogs but is not a completed title.
+  if (record.titleSource === 'first_input') return null;
 
-  if (backend === 'opencode') {
-    const title = record.title;
-    return typeof title === 'string' && title.trim() ? title.trim() : null;
-  }
-
-  if (backend === 'dsh') {
-    // Harness title snapshots flow through the session catalog the same way;
-    // DshAdapter.getSession returns the catalog row with `.title`.
-    const title = record.title;
-    return typeof title === 'string' && title.trim() ? title.trim() : null;
-  }
-
-  if (backend === 'claude-code') {
-    const summary = record.summary;
-    return typeof summary === 'string' && summary.trim() ? summary.trim() : null;
-  }
-
-  return null;
+  const title = backend === 'claude-code' ? record.summary : record.title;
+  if (typeof title !== 'string' || !title.trim()) return null;
+  const source = record.titleSource === 'generated' || record.titleSource === 'custom' || record.titleSource === 'native'
+    ? record.titleSource : typeof record.customTitle === 'string' && record.customTitle.trim() ? 'custom' : 'unknown';
+  return { title: title.trim(), source };
 }
 
 // ---------------------------------------------------------------------------

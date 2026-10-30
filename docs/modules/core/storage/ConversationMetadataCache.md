@@ -92,3 +92,7 @@ class ConversationMetadataCache {
 - sidecar 是性能缓存，不是唯一真值；不能因为 sidecar 失败就让历史列表彻底不可用。
 - sidecar 写入失败时会尽量删除可能已过期的旧 sidecar，避免未来读到陈旧 metadata。
 - 当前只负责单条会话 metadata sidecar，不负责完整会话正文、设置文件或背景图资产。
+
+## 2026-10-30 六后端标题生命周期
+
+buildConversationMetaFromStoredRecord 把 titleState 写入轻量 metadata，标题来源/代次在冷启动 metadata-only 列表与完整加载之间保持一致；缺省旧记录仍兼容。

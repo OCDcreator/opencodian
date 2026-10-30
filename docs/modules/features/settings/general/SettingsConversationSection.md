@@ -20,9 +20,11 @@ R-C4：vault 检索块之后新增 `pdf-index` 块（`renderPdfIndexBlock`）：
 
 它必须按当前 active backend 过滤能力：聊天字体大小与 user markup 渲染是通用显示设置，Claude Code 和 OpenCode 都可以显示；项目级 compaction、会话分享与问答卡片当前都依赖 OpenCode 机制，只有 active backend 为 `opencode` 时才装配、加载模型目录或监听 `.opencode/opencode.json`。
 
-会话标题分组现在对所有 backend 可见，但内容按 backend 切换：
-- OpenCode active 时：title mode dropdown（first-message / smart）+ 备用 AI 标题模型 picker
-- Claude Code active 时："Let Claude auto-generate titles" toggle（默认开启），控制新 Claude 会话是否让 SDK 自动生成摘要标题；关闭时固定使用 "New Claude Code chat" 作为显式标题
+会话标题分组按当前 backend 装配，六个可选后端都有实际消费者：
+
+- OpenCode 2 工作区通过 `attachTitleBlock()` 装配 title mode dropdown（first-message / smart）与备用 AI 标题模型 picker，保留 `aiTitleModel`。
+- Claude Code 在现有会话显示页保留 "Let Claude auto-generate titles" toggle（默认开启），并提供 `aiTitleModelOverrides['claude-code']` 文本输入。关闭时不启动智能标题流程，本地首条消息规则标题仍可使用。
+- Codex、Pi、ZCode、DSH 在现有会话显示页提供 title mode 与所属后端 `aiTitleModelOverrides[backend]` 文本输入。Claude/Codex 输入原生模型 ID，其余输入 provider/model。
 
 当前 conversation section 不再把不同职责的设置平铺成单层列表，而是复用主设置页的 `settings block` 语言拆成六个二级分组：
 
@@ -42,7 +44,7 @@ R-C4：vault 检索块之后新增 `pdf-index` 块（`renderPdfIndexBlock`）：
 这个 owner 的职责边界刻意保持在"**conversation section 装配 + title-model refresh orchestration**"：
 
 - 持有 conversation section 级别的 DOM 组装与设置写回
-- 维护备用标题模型 `aiTitleModel` 的 availability-aware 标签解析与 warning action；智能标题会先等待 OpenCode 官方标题，只有未产出时才使用该备用模型
+- 维护 OpenCode 2 备用标题模型 `aiTitleModel` 的 availability-aware 标签解析与 warning action，以及其他后端隔离的 `aiTitleModelOverrides` 输入；执行与选择优先级由标题服务拥有
 - 维护项目级 compaction 配置的读取、展示、输入校验与 `.opencode/opencode.json` 写入
 - 维护项目级 `share` 配置的读取、展示与 `.opencode/opencode.json` 写入
 - 维护 global chat font size 的输入校验、设置写回，以及保存后的当前聊天运行时重应用
@@ -65,13 +67,13 @@ R-C4：vault 检索块之后新增 `pdf-index` 块（`renderPdfIndexBlock`）：
 - 在“消息渲染”块装配 user markup 渲染 toggle
 - 注册首次与后续模型目录变化时复用的 title-model refresh callback
 
-这样 `OpenCodianSettings` 不再直接持有 conversation section 的 DOM/state/model-picker wiring，只保留 owner 创建、block 样式 seam 与 callback bridge。Claude Code active 时，classic 和 tabbed layout 都只显示显示/渲染类通用分组，不会启动 OpenCode title-model refresh、project config listener 或 share/compaction load。
+这样 `OpenCodianSettings` 不再直接持有 conversation section 的 DOM/state/model-picker wiring，只保留 owner 创建、block 样式 seam 与 callback bridge。非 OpenCode 后端在 classic 和 tabbed layout 的会话显示页使用自己的标题控件；不会启动 OpenCode title-model refresh、project config listener 或 share/compaction load。
 
 ### title-model refresh orchestration
 
 owner 内部把 AI 标题模型的刷新链路集中起来：
 
-- 读取 `ModelConfigService.getCatalogs()` 的 `baseEffective` / `effective`
+- OpenCode 2 读取所属 adapter 的 `getModelSelectorProviders()`；仅旧 OpenCode 兼容路径读取 `ModelConfigService.getCatalogs()` 的 `baseEffective` / `effective`
 - 用 `buildModelPickerGroups()` 构建 picker group
 - 用 `resolveModelSelection()` 保留“当前已选但已不可用”的标签与 warning 状态
 - 在模型不可用时保留当前选中值，并继续展示 warning action，而不是静默清空
@@ -186,3 +188,7 @@ The classic `attach()` method remains the full-list owner, but both classic and 
 > 2026-10-27（UI 验收修复）：`addTitleModelSetting` 创建按钮时同步写入当前 `aiTitleModel`；为空时使用 followCurrent 文案。异步目录加载完成、不可用提示和保存语义保持不变，避免加载期间出现 28px 无标签按钮。
 
 2026-10-28：工作区记忆控件增加后端模型选择（与活动后端切换无关）、召回筛选模型、跨机身份/路径别名、代理笔记本和向量召回；JSON 别名输入非法时保留原值并设置原生校验/aria-invalid。身份/目录改变会使旧后台任务失效。复用原 Setting 行布局，不新增滚动容器。
+
+## 2026-10-30 六后端标题生命周期
+
+非 OpenCode 后端在现有会话显示页提供标题模式/Claude autoTitle 与所属后端备用模型文本入口，classic/tabbed 均可用；按 aiTitleModelOverrides 保存。OpenCode 2 保留原有模型选择器，但目录读取 getModelSelectorProviders，不借旧 OpenCode ModelConfigService。
