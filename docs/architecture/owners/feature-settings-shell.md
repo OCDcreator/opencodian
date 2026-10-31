@@ -96,3 +96,7 @@ SettingsPiSection owns the Pi settings surface through a narrow host. Credential
 > 2026-10-27（UI 验收修复）：DSH renderTab 增加标准 section-body wrapper；标题备份模型按钮在创建时有可读初始标签。
 
 2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `feature.settings-shell` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。
+
+## Goal 与会话工作台（2026-10-30）
+
+Pi 工作台列出具名目标读取/控制命令；会话设置中的 Codex Goal 与聊天工作台消费同一 adapter 状态。设置 UI 对失败保留卡片和输入，不以操作 ACK 当作目标清除成功。

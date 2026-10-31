@@ -5,7 +5,7 @@ import { isAbsolute, join, relative, sep } from 'node:path';
 import type { SessionStore } from '@anthropic-ai/claude-agent-sdk';
 
 import { ClaudeCodeAdapter, type ClaudeCodeSdkFacade } from '../../../../../src/core/agents/backend/claude/ClaudeCodeAdapter';
-import { scopeClaudeSessionCatalog } from '../../../../../src/core/agents/backend/claude/ClaudeCodeScopedSessionStore';
+import { projectClaudePersistedGoal, readClaudePersistedGoal, scopeClaudeSessionCatalog } from '../../../../../src/core/agents/backend/claude/ClaudeCodeScopedSessionStore';
 import { getDefaultClaudeCodeBackendSettings } from '../../../../../src/core/types';
 
 const ID = '12345678-1234-1234-1234-123456789abc';
@@ -47,6 +47,20 @@ describe('Claude scoped native session catalog', () => {
     expect(await store.listSessions!(PROJECT)).toEqual([{ sessionId: ID, mtime: expect.any(Number) }]);
     expect(process.env.CLAUDE_CONFIG_DIR).toBe(before);
     expect(scopeClaudeSessionCatalog(sdk, root).query).toBe(sdk.query);
+  });
+
+  it('reads native Goal facts through the SDK path and scoped store without parsing assistant text', async () => {
+    const entries = [
+      {type:'attachment',sessionId:ID,uuid:'goal1',timestamp:'2026-10-30T14:00:00Z',attachment:{type:'goal_status',sentinel:true,met:false,condition:'Exact native condition'}},
+      {type:'assistant',sessionId:ID,message:{content:'Goal complete'}},
+      {type:'attachment',sessionId:ID,timestamp:'2026-10-30T14:00:01Z',attachment:{type:'goal_status',met:true,condition:'Exact native condition',iterations:2,reason:'Verified',tokens:100,durationMs:1500}},
+    ];
+    writeFileSync(join(root,'projects',PROJECT,`${ID}.jsonl`),entries.map(entry=>JSON.stringify(entry)).join('\n')+'\n');
+    expect(await readClaudePersistedGoal(sdk,{configDir:root,sessionId:ID,dir:'/owned'})).toMatchObject({goal:{
+      condition:'Exact native condition',status:'complete',iterations:2,last_reason:'Verified',tokensUsed:100,timeUsedSeconds:1.5,
+    }});
+    expect(projectClaudePersistedGoal(entries.slice(0,2)).goal?.status).toBe('active');
+    expect(projectClaudePersistedGoal([...entries,{type:'system',commandRun:{command:'goal',args:'clear'}}]).goal).toBeNull();
   });
 
   it('keeps absent scoped transcripts absent without falling back to the global catalog', async () => {

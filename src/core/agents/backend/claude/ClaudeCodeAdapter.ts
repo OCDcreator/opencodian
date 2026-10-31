@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- Claude Code adapter owns SDK query lifecycle, session identity, permissions, MCP refresh, and model catalog wiring for the same backend boundary. */
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import type {
@@ -48,6 +48,9 @@ import {
   type WarmableAuxSession,
   WarmInlineCompletionSession,
 } from '../auxiliary/WarmInlineCompletionSession';
+import { type AgentGoalCommand, type AgentGoalControlResult, type AgentGoalEvent, type AgentGoalReadback,
+  BackendGoalRuntime, confirmGoalCommand, validateGoalCommand } from '../BackendGoalRuntime';
+import { backendSessionMessagesToChat } from '../BackendSessionMessages';
 import type {
   ClaudeDiagnosticRunToken,
   ClaudeTraceContext,
@@ -92,7 +95,7 @@ import {
   isTurnBoundaryMessage,
   readConversationResetId,
 } from './ClaudeCodeQueue';
-import { scopeClaudeSessionCatalog } from './ClaudeCodeScopedSessionStore';
+import { readClaudePersistedGoal, scopeClaudeSessionCatalog } from './ClaudeCodeScopedSessionStore';
 import type { WarmQueryHandle } from './ClaudeCodeSdkLoader';
 import { ClaudeCodeStreamNormalizer } from './ClaudeCodeStreamNormalizer';
 import {
@@ -1051,6 +1054,7 @@ function resolveComparableSessionIds(sessionInfo: ClaudeCodeSdkSessionInfo): str
 const CLAUDE_CODE_PHASE1_CAPABILITIES: BackendCapabilities = Object.freeze(
   new Set<AgentCapability>([
     AgentCapability.Chat,
+    AgentCapability.Goal,
     AgentCapability.Sessions,
     AgentCapability.Fork,
     AgentCapability.Models,
@@ -1427,6 +1431,7 @@ interface ClaudeCodeSessionState {
   sdkSessionId?: string;
   resumeValidationRequired?: boolean;
   runtime?: ClaudeCodeSessionRuntime;
+  nativeAgentTasks?: Map<string, import('../AgentService').AgentSessionChild & { runId?: string }>;
 }
 
 export class ClaudeCodeRuntimeAbortController {
@@ -1451,6 +1456,12 @@ export class ClaudeCodeAdapter
   readonly displayName = 'Claude Code';
   readonly description = 'Claude Code official Agent SDK backend';
   readonly capabilities = CLAUDE_CODE_PHASE1_CAPABILITIES;
+  private readonly goals = new BackendGoalRuntime('claude-code', {
+    source: 'native', driver: 'claude.native-goal', actions: ['set', 'edit', 'pause', 'resume', 'clear'],
+    pauseMode: 'execution', editMode: 'replace', budgets: [],
+  });
+  private readonly goalChatReaders = new Set<string>();
+  private readonly runtimeCompletions = new WeakMap<ClaudeCodeSessionRuntime, Promise<void>>();
 
   private statusValue: AgentConnectionStatus = 'disconnected';
   private readonly statusChangeHandlers = new Set<StatusChangeHandler>();
@@ -2062,6 +2073,51 @@ export class ClaudeCodeAdapter
       dir: this.options.vaultPath,
       ...(options?.sessionStore ? { sessionStore: options.sessionStore } : {}),
     });
+  }
+
+  async readSessionInformation(sessionId: string): Promise<import('../AgentService').AgentSessionInformation> {
+    const state = this.sessions.get(sessionId) ?? [...this.sessions.values()].find((session) => session.sdkSessionId === sessionId);
+    const query = state?.runtime?.query as Partial<Pick<Query,
+      'usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET' | 'mcpServerStatus' | 'getContextUsage'>> | undefined;
+    const [usage, mcp, agents, context] = await Promise.allSettled([
+      query?.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET?.({ skipBehaviors: true }),
+      query?.mcpServerStatus?.(), this.listSubagents(sessionId),
+      query?.getContextUsage?.({ detail: 'summary' }),
+    ]);
+    const nativeUsage = usage.status === 'fulfilled' ? usage.value : undefined;
+    const modelUsage = Object.values(nativeUsage?.session.model_usage ?? {});
+    const occupancy = context.status === 'fulfilled' ? context.value : undefined;
+    return {
+      sessionId, observedAt: Date.now(),
+      quota: nativeUsage?.rate_limits_available && nativeUsage.rate_limits ? {
+        ...(nativeUsage.subscription_type ? { plan: nativeUsage.subscription_type } : {}),
+        windows: Object.entries(nativeUsage.rate_limits).flatMap(([label, value]) => {
+          if (!value || Array.isArray(value) || !('resets_at' in value) || typeof value.utilization !== 'number' || !Number.isFinite(value.utilization)) return [];
+          const resetsAt = value.resets_at ? Date.parse(value.resets_at) : NaN;
+          return [{ label, usedPercent: value.utilization, ...(Number.isFinite(resetsAt) ? { resetsAt } : {}) }];
+        }),
+      } : null,
+      mcp: mcp.status === 'fulfilled' && Array.isArray(mcp.value) ? { scope: 'session', servers: mcp.value.flatMap((value) => {
+        const server = normalizeMcpServerRuntimeStatus(value);
+        return server ? [{ name: server.name, status: server.status }] : [];
+      }) } : null,
+      agents: agents.status === 'fulfilled' ? agents.value.map((id) => ({
+        id, title: id, status: 'unknown' as const, ...state?.nativeAgentTasks?.get(id), readable: true,
+      })) : null,
+      ...(occupancy && occupancy.maxTokens > 0 ? {
+        context: { tokens: occupancy.totalTokens, window: occupancy.maxTokens },
+        sources: occupancy.memoryFiles.map((file) => ({ label: file.path, path: file.path, detail: file.type })),
+      } : {}),
+      ...(nativeUsage ? { usage: {
+        inputTokens: modelUsage.reduce((sum, model) => sum + model.inputTokens + model.cacheReadInputTokens + model.cacheCreationInputTokens, 0),
+        outputTokens: modelUsage.reduce((sum, model) => sum + model.outputTokens, 0), cost: nativeUsage.session.total_cost_usd,
+      } } : {}),
+    };
+  }
+
+  async readChildSessionMessages(parentSessionId: string, childId: string) {
+    if (!(await this.listSubagents(parentSessionId)).includes(childId)) throw new Error('Child session is unavailable');
+    return backendSessionMessagesToChat('claude-code', await this.getSubagentMessages(parentSessionId, childId));
   }
 
   async getSubagentMessages(
@@ -4894,7 +4950,110 @@ export class ClaudeCodeAdapter
     return resultingSessionId;
   }
 
+  getGoalCapabilities() { return this.goals.capabilities; }
+
+  async getChatMessages(sessionId: string) { return backendSessionMessagesToChat('claude-code', await this.getSessionMessages(sessionId)); }
+
+  subscribeToGoalEvents(handler: (event: AgentGoalEvent) => void): Disposable { return this.goals.subscribe(handler); }
+
+  async readSessionGoal(sessionId: string): Promise<AgentGoalReadback> {
+    const session = this.getOrRestoreSession(sessionId);
+    const key = session.id;
+    if (!session.sdkSessionId && !session.runtime) return this.goals.observe(key, null);
+    const cached = this.goals.get(key);
+    try {
+      const version = this.goals.version(key);
+      const persisted = await this.readPersistedGoal(session);
+      if (persisted) return this.goals.observeRead(key, persisted.goal, version);
+      if (cached.status === 'ready' && session.runtime && !session.runtime.closed || this.goalChatReaders.has(session.id)) return cached;
+      return await this.runNativeGoalCommand(session, '/goal');
+    }
+    catch (error) { return this.goals.fail(key, error); }
+  }
+
+  private async readPersistedGoal(session: ClaudeCodeSessionState) {
+    if (!session.sdkSessionId) return null;
+    const env = { ...process.env, ...this.options.processEnv, ...this.getDomainEnvironment(), ...this.options.settings.env };
+    const configDir = env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude');
+    return readClaudePersistedGoal(await this.getSdk(), { configDir, projectDirName: env.CLAUDE_CODE_PROJECT_DIR_NAME,
+      sessionId: session.sdkSessionId, dir: this.options.vaultPath });
+  }
+
+  async controlSessionGoal(sessionId: string, command: AgentGoalCommand): Promise<AgentGoalControlResult> {
+    const session = this.getOrRestoreSession(sessionId);
+    const key = session.id;
+    return this.goals.control(key, async () => {
+      try {
+        validateGoalCommand(command, this.goals.capabilities);
+        if (command.action === 'pause') {
+          await this.stopGoalExecution(session);
+          return { status: 'accepted', readback: this.goals.get(key) };
+        }
+        if (command.action === 'resume') {
+          const runtime = await this.getOrStartRuntime(session);
+          runtime.input.push(createUserPrompt('Continue working toward the existing active goal.'));
+          return { status: 'accepted', readback: this.goals.get(key) };
+        }
+        const content = command.action === 'clear' ? '/goal clear' : `/goal ${command.objective}`;
+        if (command.action === 'clear') await this.stopGoalExecution(session);
+        if (command.action !== 'clear' && /^(clear|stop|off|reset|none|cancel)$/i.test(command.objective?.trim() ?? ''))
+          throw new Error('This objective is a reserved native Goal control word; use a complete completion condition');
+        return confirmGoalCommand(command, await this.runNativeGoalCommand(session, content));
+      } catch (error) { return { status: 'failed', readback: this.goals.fail(key, error) }; }
+    });
+  }
+
+  private async stopGoalExecution(session: ClaudeCodeSessionState): Promise<void> {
+    const runtime = session.runtime;
+    this.cancelStream(session.id);
+    const completion = runtime && this.runtimeCompletions.get(runtime);
+    if (completion) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([completion, new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('Claude runtime has not stopped yet')), 5000);
+        })]);
+      } finally { clearTimeout(timer); }
+    }
+    this.goals.activity(session.id, 'stopped');
+  }
+
+  private async runNativeGoalCommand(session: ClaudeCodeSessionState, content: string): Promise<AgentGoalReadback> {
+    const runtime = await this.getOrStartRuntime(session);
+    const key = session.id;
+    const version = this.goals.version(key);
+    const submittedAt = Date.now();
+    runtime.input.push(createUserPrompt(content));
+    const deadline = Date.now() + 30000;
+    while (Date.now() < deadline) {
+      if (this.goals.version(key) > version) return this.goals.get(key);
+      const persisted = await this.readPersistedGoal(session);
+      if (persisted && (content === '/goal' || persisted.updatedAt >= submittedAt)) return this.goals.observe(key, persisted.goal);
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+    return { ...this.goals.get(key), status: 'stale', reason: 'Native Goal confirmation has not arrived' };
+  }
+
   async *sendMessage(rawRequest: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
+    const session = this.getOrRestoreSession(rawRequest.sessionId);
+    this.goalChatReaders.add(session.id);
+    try { yield* this.sendNativeMessage(rawRequest); }
+    finally { this.goalChatReaders.delete(session.id); }
+  }
+
+  private async *sendNativeMessage(rawRequest: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
+    const request = this.prepareNativeGoalRequest(rawRequest);
+    yield* this.streamNativeMessage(request);
+  }
+
+  private prepareNativeGoalRequest(rawRequest: AgentChatSendRequest): AgentChatSendRequest {
+    const goalObjective = rawRequest.options?.goalObjective;
+    if (typeof goalObjective === 'string') validateGoalCommand({ action: 'set', objective: goalObjective }, this.goals.capabilities);
+    if (typeof goalObjective === 'string' && /^(clear|stop|off|reset|none|cancel)$/i.test(goalObjective.trim()))
+      throw new Error('This objective is a reserved native Goal control word; use a complete completion condition');
+    const goalSystemContext = typeof goalObjective === 'string'
+      ? appendObsidianContextBlocks(prependObsidianToolingInjection(prependMemoryInjection('', rawRequest.options), rawRequest.options), rawRequest.options)
+      : undefined;
     // Claude's per-turn options expose no system-prompt override; the
     // backend-neutral memory injection rides at the front of the message
     // text (its runtime systemPrompt append stays a settings-level seam).
@@ -4903,9 +5062,10 @@ export class ClaudeCodeAdapter
     // per-epoch injection prefix and after the user text, rendered by the
     // shared backend-neutral serializer so Claude receives the same
     // <obsidian_context> text OpenCode/Pi deliver.
-    const request: AgentChatSendRequest = {
+    return {
       ...rawRequest,
-      content: appendObsidianContextBlocks(
+      ...(goalSystemContext !== undefined ? { options: { ...rawRequest.options, goalSystemContext } } : {}),
+      content: typeof goalObjective === 'string' ? `/goal ${goalObjective}` : appendObsidianContextBlocks(
         prependObsidianToolingInjection(
           prependMemoryInjection(rawRequest.content, rawRequest.options),
           rawRequest.options,
@@ -4913,6 +5073,9 @@ export class ClaudeCodeAdapter
         rawRequest.options,
       ),
     };
+  }
+
+  private async *streamNativeMessage(request: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
     const session = this.getOrRestoreSession(request.sessionId);
     runtimeLogger.debug('sendMessage start', {
       sessionId: request.sessionId,
@@ -5067,6 +5230,7 @@ export class ClaudeCodeAdapter
     runtimeLogger.debug('close runtime', { sessionId, reason: 'cancelStream' });
     this.cancelledSessions.add(sessionId);
     const session = this.sessions.get(sessionId);
+    this.goals.activity(session?.id ?? sessionId, 'stopping');
     const traceContext = this.traceContextForSession(session ?? sessionId);
     this.trace((port) => port.recordTurnEvent(traceContext, 'turn.cancelled', 'info', {
       sessionId,
@@ -5239,6 +5403,9 @@ export class ClaudeCodeAdapter
       vaultPath: this.options.vaultPath,
       settings: {
         ...this.options.settings,
+        ...(typeof sendOptions?.goalSystemContext === 'string' ? {
+          systemPrompt: [this.options.settings.systemPrompt ?? '', sendOptions.goalSystemContext].filter(Boolean).join('\n\n'),
+        } : {}),
         ...(overrides.model ? { model: overrides.model } : {}),
         ...(overrides.effort ? { effort: overrides.effort } : {}),
       },
@@ -5816,6 +5983,9 @@ export class ClaudeCodeAdapter
     sendOptions?: Record<string, unknown>,
   ): Promise<ClaudeCodeSessionRuntime> {
     const overrides = resolveSendOptionOverrides(sendOptions);
+    // Goal attachments/context belong in the runtime prompt, outside the
+    // completion condition. Restart only for an explicit new Goal send.
+    if (typeof sendOptions?.goalObjective === 'string' && session.runtime) this.closeRuntime(session);
     if (session.runtime && !session.runtime.closed) {
       const nextEffort = overrides.effort ?? this.options.settings.effort;
       if (nextEffort !== session.runtime.effort) {
@@ -5884,7 +6054,7 @@ export class ClaudeCodeAdapter
       sdkSessionId: session.sdkSessionId,
     }));
     session.runtime = runtime;
-    void this.pumpRuntimeOutput(session, runtime);
+    this.runtimeCompletions.set(runtime, this.pumpRuntimeOutput(session, runtime));
     return runtime;
   }
 
@@ -6250,6 +6420,7 @@ export class ClaudeCodeAdapter
   ): Promise<void> {
     try {
       for await (const message of runtime.query ?? []) {
+        if (!this.observeRuntimeGoalMessage(session, runtime, message)) break;
         // conversation_reset (SDK >= 0.3.2xx): remap the session identity BEFORE
         // the message reaches the streaming consumer, so captureSdkSessionId's
         // resume validation does not see a mismatched session id on the
@@ -6264,7 +6435,10 @@ export class ClaudeCodeAdapter
           runtimeLogger.debug('commands changed signal', { sessionId: session.id });
           this.notifyCommandsChanged();
         }
-        runtime.output.push({ type: 'message', message });
+        // Native automatic Goal turns keep being observed after a foreground send
+        // finishes. Their transcript is loaded through the session sync path; do
+        // not retain an unbounded queue for a consumer that has already returned.
+        if (this.goalChatReaders.has(session.id)) runtime.output.push({ type: 'message', message });
         // Post-result prompt suggestions bypass the normal streaming consumer
         // (sendMessage returns at the turn boundary) and are delivered through
         // the dedicated post-result callback channel.
@@ -6288,6 +6462,7 @@ export class ClaudeCodeAdapter
       runtime.output.push({ type: 'error', error });
     } finally {
       runtime.closed = true;
+      if (session.runtime === runtime) this.goals.activity(session.id, 'stopped');
       runtime.input.close();
       runtime.output.close();
       if (session.runtime === runtime) {
@@ -6304,6 +6479,39 @@ export class ClaudeCodeAdapter
         reason: 'pump-finally',
       }));
     }
+  }
+
+  private observeRuntimeGoalMessage(session: ClaudeCodeSessionState, runtime: ClaudeCodeSessionRuntime, message: unknown): boolean {
+    if (runtime.closed || session.runtime !== runtime) return false;
+    const goalMessage = message && typeof message === 'object' ? message as Record<string, unknown> : null;
+    this.observeSessionAgentMessage(session, goalMessage);
+    const key = session.id;
+    if (!this.goalChatReaders.has(key) && !isConversationResetMessage(message)) this.captureSdkSessionId(session, message, []);
+    if (goalMessage?.type === 'active_goal') this.goals.observe(key, goalMessage.value);
+    if (goalMessage?.type === 'assistant' || goalMessage?.type === 'stream_event') this.goals.activity(key, 'running');
+    if (isTurnBoundaryMessage(message)) this.goals.activity(key, this.goals.get(key).goal?.status === 'active' ? 'evaluating' : 'idle');
+    return true;
+  }
+
+  private observeSessionAgentMessage(session: ClaudeCodeSessionState, message: Record<string, unknown> | null): void {
+    if (message?.type !== 'system' || typeof message.task_id !== 'string') return;
+    const id = message.task_id;
+    const current = session.nativeAgentTasks?.get(id);
+    if (!current && (message.subtype !== 'task_started' || message.task_type !== 'local_agent')) return;
+    const runId = typeof message.run_id === 'string' ? message.run_id : undefined;
+    if (current?.runId && (!runId || runId < current.runId)) return;
+    const previous = current ?? { id, title: id, status: 'unknown' as const, detail: undefined };
+    const patch = message.patch && typeof message.patch === 'object' ? message.patch as Record<string, unknown> : {};
+    const nativeStatus = String(patch.status ?? message.status ?? message.subtype);
+    const statuses: Record<string, import('../AgentService').AgentSessionChild['status']> = {
+      pending: 'pending', running: 'running', completed: 'completed', failed: 'failed', stopped: 'failed', killed: 'failed',
+      task_started: 'running', task_progress: 'running',
+    };
+    session.nativeAgentTasks ??= new Map();
+    session.nativeAgentTasks.set(id, { id, title: String(message.description ?? patch.description ?? previous.title),
+      status: statuses[nativeStatus] ?? previous.status, readable: false, runId,
+      detail: typeof message.summary === 'string' ? message.summary : previous.detail,
+    });
   }
 
   private closeRuntime(session: ClaudeCodeSessionState): void {

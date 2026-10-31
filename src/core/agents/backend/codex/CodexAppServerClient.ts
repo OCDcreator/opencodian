@@ -1440,12 +1440,15 @@ export class CodexAppServerClient extends CodexAppServerTransport {
     }
   }
 
-  async getThreadGoal(threadId: string): Promise<AppServerThreadGoal | null> {
+  async getThreadGoal(threadId: string, options?: { strict?: boolean }): Promise<AppServerThreadGoal | null> {
     await this.start();
     try {
       const result = (await this.request('thread/goal/get', { threadId })) as { goal: AppServerThreadGoal | null } | undefined;
+      if (options?.strict && (!result || !Object.prototype.hasOwnProperty.call(result, 'goal')))
+        throw new Error('Codex returned no Goal readback');
       return result?.goal ?? null;
     } catch (err) {
+      if (options?.strict) throw err;
       logger.warn('Failed to read thread goal from app-server', {
         threadId,
         error: err instanceof Error ? err.message : String(err),

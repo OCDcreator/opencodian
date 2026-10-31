@@ -48,3 +48,7 @@
 
 - 源码位置：`src/core/agents/backend/opencode/OpenCodeAdapter.ts`。
 - 原位置：`src/core/agents/backend/OpenCodeAdapter.ts`；文件名、导出接口与业务职责保持不变。
+
+## Goal 与会话工作台（2026-10-30）
+
+已退役的 OpenCode 1 适配器显式排除 Goal 和 TurnSteering；不因共享枚举新增而误报支持。

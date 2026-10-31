@@ -702,3 +702,13 @@ Provides `slashCommand.group.commands` and `.skills` labels for independent comp
 ## 2026-10-30 六后端标题生命周期
 
 六后端标题模式、轻量选模与 failure/manual 优先级说明；新增 backendModelDesc 和 titleGeneration.retry，明确轻量不代表实时价格保证。
+
+## Goal 与会话工作台（2026-10-30）
+
+新增会话工作台、Goal 生命周期、证据状态、终端/浏览器/Git/资源、主工作区视图文案；与中文键对齐。
+
+## 会话信息面板（2026-10-31）
+
+新增 workbench.info.*：套餐窗口、当前上下文/累计消耗、上下文来源、MCP 作用域、智能体状态及返回主会话文案。
+
+目标控制补充：返回会话信息、关闭已完成提示栏、关闭后仍可查看的说明，以及移除已完成目标；原生暂停/恢复与执行停止/继续使用不同翻译键。

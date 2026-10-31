@@ -91,3 +91,7 @@ Failed app-server negotiation stops the owned client before SDK fallback. Before
 - 源码位置：`src/core/agents/backend/codex/CodexAppServerClient.ts`。
 - 原位置：`src/core/agents/backend/CodexAppServerClient.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/core/agents/backend/codex/CodexAppServerClientNormalization.ts`、`src/core/agents/backend/codex/CodexAppServerClientTypes.ts`、`src/core/agents/backend/codex/CodexAppServerTransport.ts`、`src/core/agents/backend/configuration/ProjectResourceSecureWrite.ts`。
+
+## Goal 与会话工作台（2026-10-30）
+
+getThreadGoal 新增 strict 选项：严格读取向调用方传播 RPC 错误，兼容旧调用默认行为。前端目标管理使用严格读取，避免失败显示无目标。

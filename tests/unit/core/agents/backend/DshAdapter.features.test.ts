@@ -23,8 +23,8 @@ describe('DshAdapter native configuration and media', () => {
     try {
       const history = await adapter.getSessionMessages('native-session');
       expect(history).toEqual([
-        messages[0], messages[3], expect.objectContaining({ id: 'tool', info: { id: 'tool', role: 'activity' },
-          parts: [{ type: 'text', text: 'Tool c result:\nActual tool result' }] }),
+        messages[0], messages[3], expect.objectContaining({ id: 'tool', role:'tool',
+          content: [{ type:'tool_result',toolCallId:'c',isError:undefined,content:'Actual tool result' }] }),
       ]);
       expect(JSON.stringify(history)).not.toContain('PRIVATE_');
     } finally { await adapter.stop(); }

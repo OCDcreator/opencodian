@@ -55,3 +55,7 @@
 ## 2026-10-29：Mention 输入
 
 `AppServerTurnStartOptions.input` 增加原生 `{ type: 'mention', name, path }`，用于经有效运行时目录验证的 `plugin://…` 或后续已接通的原生身份。技能仍使用独立的 `skill` 输入类型。
+
+## Goal 与会话工作台（2026-10-30）
+
+对齐 thread goal 设置契约：tokenBudget 允许 null 表示移除原生硬预算，保持状态和计量的字段语义。

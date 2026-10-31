@@ -137,3 +137,7 @@ Compaction config is now project-scoped (`.opencode/opencode.json`). Ownership f
 
 - 源码位置：`src/features/chat/ui/ConversationSessionSettingsModal.ts`。
 - 随目录调整更新的依赖：`src/core/agents/backend/codex/CodexAdapter.ts`、`src/core/agents/backend/codex/CodexAppServerClient.ts`、`src/features/settings/controls/SettingsDropdownControl.ts`。
+
+## Goal 与会话工作台（2026-10-30）
+
+Codex 目标设置失败保留输入并提示；清除失败保留旧目标卡。只有后端确认成功才移除旧状态，避免误报无目标。

@@ -33,3 +33,7 @@
 
 - 源码位置：`src/core/agents/backend/claude/ClaudeCodeScopedSessionStore.ts`。
 - 原位置：`src/core/agents/backend/ClaudeCodeScopedSessionStore.ts`；文件名、导出接口与业务职责保持不变。
+
+## Goal 与会话工作台（2026-10-30）
+
+新增 projectClaudePersistedGoal / readClaudePersistedGoal。通过 SDK getSessionInfo 的 SessionStore 接缝定位当前 config 根和会话文件，仅投影 typed goal_status 附件及显式 goal 清除命令，不匹配 assistant prose。保留 active/complete、iterations/reason/token/duration，禁止读回路径 append。

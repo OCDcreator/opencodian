@@ -48,3 +48,7 @@ An entry marked `statsUnavailable` displays unavailable status and line statisti
 
 - 源码位置：`src/features/chat/ui/ModifiedFilesSidebar.ts`。
 - 随目录调整更新的依赖：`src/features/chat/services/rendering/ConversationRenderService.ts`。
+
+## Goal 与会话工作台（2026-10-30）
+
+新增 attachToWorkbench 复用原文件列表和回退动作；隐藏旧触发条，内联布局由专属 CSS 控制。不以仓库 Git 状态替代本次会话变更。

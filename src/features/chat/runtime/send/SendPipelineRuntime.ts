@@ -80,7 +80,8 @@ const STRUCTURED_OUTPUT_FIXED_SCHEMA: Record<string, unknown> = {
  * Returns the stripped content and a fixed outputFormat when the prefix is present.
  * This is intentionally narrow: one fixed schema, one message at a time.
  */
-function extractStructuredOutputTrigger(content: string): { cleanContent: string; outputFormat: Record<string, unknown> } | null {
+function extractStructuredOutputTrigger(content: string, goalObjective?: string): { cleanContent: string; outputFormat: Record<string, unknown> } | null {
+  if (goalObjective !== undefined) return null;
   const trimmed = content.trimStart();
   const triggerPattern = /^\/json\s+/i;
   if (!triggerPattern.test(trimmed)) {
@@ -253,7 +254,7 @@ export class SendPipelineRuntime {
     let content = preparationOptions.content;
 
     // Detect and strip the `/json ` structured-output trigger before any further processing.
-    const structuredTrigger = extractStructuredOutputTrigger(content);
+    const structuredTrigger = extractStructuredOutputTrigger(content, preparationOptions.goalObjective);
     if (structuredTrigger) {
       content = structuredTrigger.cleanContent;
       preparationOptions = { ...preparationOptions, content, outputFormat: structuredTrigger.outputFormat };

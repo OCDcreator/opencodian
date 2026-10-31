@@ -61,7 +61,10 @@ import {
   type WarmableAuxSession,
   WarmInlineCompletionSession,
 } from '../auxiliary/WarmInlineCompletionSession';
+import { type AgentGoalCommand, type AgentGoalControlResult, type AgentGoalEvent, type AgentGoalReadback,
+  BackendGoalRuntime, confirmGoalCommand, validateGoalCommand } from '../BackendGoalRuntime';
 import { CODEX_EFFORT_VARIANTS } from '../BackendModelCatalog';
+import { backendSessionMessagesToChat } from '../BackendSessionMessages';
 import type { CodexTraceContext, CodexTracePort } from '../diagnostics/types';
 import {
   type AppServerAccountRateLimitsResult,
@@ -119,6 +122,7 @@ import {
   normalizeTurnsPageToPreviewMessages,
 } from './CodexAppServerClientNormalization';
 import {
+  type AppServerContextUsageSnapshot,
   type AppServerStreamState,
   mapAppServerNotification,
   readAppServerTurnError,
@@ -461,6 +465,7 @@ function readCommandString(command: unknown): string {
 const CODEX_CAPABILITIES: BackendCapabilities = Object.freeze(
   new Set<AgentCapability>([
     AgentCapability.Chat,      // thread.runStreamed()
+    AgentCapability.Goal,
     AgentCapability.Sessions,  // codex.startThread() / resumeThread()
     AgentCapability.Fork,      // app-server thread/fork
     AgentCapability.Thinking,  // reasoning items
@@ -498,6 +503,10 @@ export class CodexAdapter
   readonly kind: AgentBackendKind = 'codex';
   readonly displayName = 'Codex';
   readonly description = 'OpenAI Codex coding agent';
+  private readonly goals = new BackendGoalRuntime('codex', {
+    source: 'native', driver: 'codex.thread-goal', actions: ['set', 'edit', 'pause', 'resume', 'clear', 'budget'],
+    pauseMode: 'goal', editMode: 'replace', objectiveLimit: 4000, budgets: ['tokens'],
+  });
   private readonly capabilitySet = new Set<AgentCapability>(CODEX_CAPABILITIES);
   get capabilities(): BackendCapabilities { return this.capabilitySet; }
 
@@ -515,7 +524,7 @@ export class CodexAdapter
    * Cleared alongside `activeAppServerTurns`.
    */
   private lastTurnContextBySession = new Map<string, CodexTraceContext>();
-  private appServerContextSnapshots = new Map<string, ContextUsageSnapshot>();
+  private appServerContextSnapshots = new Map<string, AppServerContextUsageSnapshot>();
   /** Independent from per-turn stream subscriptions; one foreground compaction per logical session. */
   private pendingForegroundCompactions = new Map<string, PendingForegroundCompaction>();
   /** Separate from turn-attempt epochs so compaction never invalidates a live stream. */
@@ -1070,6 +1079,61 @@ export class CodexAdapter
     }
   }
 
+  async readSessionInformation(sessionId: string): Promise<import('../AgentService').AgentSessionInformation> {
+    const [limits, mcp, agents] = await Promise.allSettled([
+      this.getAccountRateLimits(), this.getMcpServerStatusCatalog(), this.readInformationAgents(sessionId),
+    ]);
+    const rateLimits = limits.status === 'fulfilled' ? limits.value.rateLimits?.rateLimits : null;
+    const windows: NonNullable<import('../AgentService').AgentSessionInformation['quota']>['windows'] = [];
+    for (const label of ['primary', 'secondary']) {
+      const value = rateLimits?.[label] as Record<string, unknown> | null | undefined;
+      if (typeof value?.usedPercent !== 'number' || !Number.isFinite(value.usedPercent)) continue;
+      windows.push({ label: typeof value.windowDurationMins === 'number' ? `${value.windowDurationMins} min` : label,
+        usedPercent: value.usedPercent,
+        ...(typeof value.resetsAt === 'number' ? { resetsAt: value.resetsAt * 1000 } : {}),
+      });
+    }
+    const threadId = this.resolveThreadId(sessionId);
+    const snapshot = threadId ? this.appServerContextSnapshots.get(threadId) : undefined;
+    return { sessionId, observedAt: Date.now(), quota: rateLimits ? { windows,
+      ...(typeof rateLimits.planType === 'string' ? { plan: rateLimits.planType } : {}) } : null,
+      mcp: mcp.status === 'fulfilled' && mcp.value.status === 'complete' ? {
+        scope: 'workspace', servers: mcp.value.data.map((server) => ({ name: server.name,
+          status: 'catalog', toolCount: Object.keys(server.tools ?? {}).length })),
+      } : null,
+      agents: agents.status === 'fulfilled' ? agents.value : null,
+      ...(snapshot?.currentContext ? { context: snapshot.currentContext } : {}),
+      ...(snapshot ? { usage: { inputTokens: snapshot.inputTokens, outputTokens: snapshot.outputTokens, totalTokens: snapshot.totalTokens } } : {}),
+    };
+  }
+
+  private async readInformationAgents(sessionId: string): Promise<import('../AgentService').AgentSessionChild[] | null> {
+    const threadId = this.resolveThreadId(sessionId);
+    if (!this.appServerClient || !threadId) return null;
+    const thread = await this.appServerClient.readThread(threadId, true);
+    if (!thread || thread.id !== threadId || !Array.isArray(thread.turns)) return null;
+    const agents = new Map<string, import('../AgentService').AgentSessionChild>();
+    const statuses: Record<string, import('../AgentService').AgentSessionChild['status']> = {
+      started: 'running', interacted: 'running', completed: 'completed', interrupted: 'failed',
+    };
+    for (const turn of thread.turns) for (const item of turn.items ?? []) {
+      if (item.type !== 'subAgentActivity' || typeof item.agentThreadId !== 'string' || !item.agentThreadId) continue;
+      const previous = agents.get(item.agentThreadId);
+      agents.set(item.agentThreadId, { id: item.agentThreadId,
+        title: typeof item.agentPath === 'string' && item.agentPath ? item.agentPath : previous?.title ?? item.agentThreadId,
+        status: statuses[String(item.kind)] ?? 'unknown', readable: true,
+      });
+    }
+    return [...agents.values()];
+  }
+
+  async readChildSessionMessages(parentSessionId: string, childId: string) {
+    if (!(await this.readInformationAgents(parentSessionId))?.some((agent) => agent.id === childId)) throw new Error('Child thread is unavailable');
+    const messages = await this.getPromptReferenceMessages(childId);
+    if (!messages) throw new Error('Child thread is unavailable');
+    return backendSessionMessagesToChat('codex', messages);
+  }
+
   /**
    * Read-only account usage readback via the app-server adjunct client.
    *
@@ -1355,19 +1419,78 @@ export class CodexAdapter
     }
   }
 
-  async getThreadGoal(backendSessionId: string): Promise<AppServerThreadGoal | null> {
+  async getThreadGoal(backendSessionId: string, options?: { strict?: boolean }): Promise<AppServerThreadGoal | null> {
     if (!this.appServerClient) {
       return null;
     }
     try {
-      return await this.appServerClient.getThreadGoal(backendSessionId);
+      const goal = await this.appServerClient.getThreadGoal(backendSessionId, options);
+      this.goals.observe(backendSessionId, goal);
+      return goal;
     } catch (err) {
       logger.warn('Failed to read thread goal', {
         backendSessionId,
         error: err instanceof Error ? err.message : String(err),
       });
+      this.goals.fail(backendSessionId, err);
+      if (options?.strict) throw err;
       return null;
     }
+  }
+
+  getGoalCapabilities() { return this.goals.capabilities; }
+
+  async getChatMessages(sessionId: string) {
+    const client = this.appServerClient;
+    if (!client) throw new Error('Codex app-server is unavailable');
+    const threadId = this.resolveThreadId(sessionId) ?? sessionId;
+    const thread = await client.readThread(threadId, true);
+    if (!thread || thread.id !== threadId || !Array.isArray(thread.turns)) throw new Error('Codex returned no authoritative transcript');
+    return backendSessionMessagesToChat('codex', thread.turns.flatMap((turn) => (turn.items ?? []).map((item) => ({
+      id: item.id, sourceTurnId: turn.id, role: item.type === 'userMessage' ? 'user' : 'assistant',
+      content: item.type === 'userMessage' ? item.content : [item],
+    }))));
+  }
+
+  subscribeToGoalEvents(handler: (event: AgentGoalEvent) => void): Disposable { return this.goals.subscribe(handler); }
+
+  async readSessionGoal(sessionId: string): Promise<AgentGoalReadback> {
+    const threadId = this.resolveThreadId(sessionId) ?? sessionId;
+    if (!this.appServerClient) return this.goals.fail(threadId, 'Codex app-server is unavailable', true);
+    const version = this.goals.version(threadId);
+    try {
+      return this.goals.observeRead(threadId, await this.appServerClient.getThreadGoal(threadId, { strict: true }), version);
+    } catch (error) { return this.goals.fail(threadId, error); }
+  }
+
+  async controlSessionGoal(sessionId: string, command: AgentGoalCommand): Promise<AgentGoalControlResult> {
+    const threadId = this.resolveThreadId(sessionId) ?? sessionId;
+    return this.goals.control(threadId, async () => {
+      try {
+        validateGoalCommand(command, this.goals.capabilities);
+        const client = this.appServerClient;
+        if (!client) return { status: 'unavailable', readback: this.goals.fail(threadId, 'Codex app-server is unavailable', true) };
+        if (command.action === 'clear') {
+          if (!await client.clearThreadGoal(threadId)) throw new Error('Codex did not confirm Goal removal');
+        } else {
+          const goal = await client.setThreadGoal(threadId,
+            command.action === 'set' || command.action === 'edit' ? command.objective : undefined, {
+              ...(command.action === 'pause' ? { status: 'paused' as const } : {}),
+              ...(command.action === 'resume' || command.action === 'set' ? { status: 'active' as const } : {}),
+              ...(command.tokenBudget !== undefined ? { tokenBudget: command.tokenBudget } : {}),
+            });
+          if (!goal) throw new Error('Codex did not confirm the Goal command');
+          this.goals.observe(threadId, goal);
+        }
+        if (command.action === 'pause' || command.action === 'clear') {
+          this.goals.activity(threadId, 'stopping');
+          this.cancelStream(sessionId);
+          const turnId = this.activeTurnIdByThread.get(threadId);
+          if (turnId) await client.interruptTurn(threadId, turnId);
+        }
+        return confirmGoalCommand(command, await this.readSessionGoal(threadId));
+      } catch (error) { return { status: 'failed', readback: this.goals.fail(threadId, error) }; }
+    });
   }
 
   /**
@@ -1383,7 +1506,9 @@ export class CodexAdapter
       return null;
     }
     try {
-      return await this.appServerClient.setThreadGoal(backendSessionId, objective, options);
+      const goal = await this.appServerClient.setThreadGoal(backendSessionId, objective, options);
+      if (goal) this.goals.observe(backendSessionId, goal);
+      return goal;
     } catch (err) {
       logger.warn('Failed to set thread goal', {
         backendSessionId,
@@ -1416,6 +1541,7 @@ export class CodexAdapter
       const goal = await client.setThreadGoal(threadId, undefined, { status });
       if (goal) {
         this.threadGoalByThread.set(threadId, goal);
+        this.goals.observe(threadId, goal);
       }
       return goal;
     } catch (err) {
@@ -1433,7 +1559,13 @@ export class CodexAdapter
       return false;
     }
     try {
-      return await this.appServerClient.clearThreadGoal(backendSessionId);
+      const cleared = await this.appServerClient.clearThreadGoal(backendSessionId);
+      if (cleared) {
+        this.goals.observe(backendSessionId, null);
+        const turnId = this.activeTurnIdByThread.get(backendSessionId);
+        if (turnId) await this.appServerClient.interruptTurn(backendSessionId, turnId);
+      }
+      return cleared;
     } catch (err) {
       logger.warn('Failed to clear thread goal', {
         backendSessionId,
@@ -2557,6 +2689,7 @@ export class CodexAdapter
       const ids = readThreadAndTurnId(params);
       if (ids) {
         this.activeTurnIdByThread.set(ids.threadId, ids.turnId);
+        this.goals.activity(ids.threadId, 'running', ids.turnId);
       }
     };
     const completedListener = (params: unknown): void => {
@@ -2565,17 +2698,34 @@ export class CodexAdapter
       // a straggler completion for an older turn must not drop the new one.
       if (ids && this.activeTurnIdByThread.get(ids.threadId) === ids.turnId) {
         this.activeTurnIdByThread.delete(ids.threadId);
+        this.goals.activity(ids.threadId, this.goals.get(ids.threadId).goal?.status === 'active' ? 'evaluating' : 'idle', ids.turnId);
       }
     };
     client.addNotificationHandler('turn/started', startedListener);
     client.addNotificationHandler('turn/completed', completedListener);
+    const goalUpdated = (params: unknown): void => {
+      if (!isRecordLike(params) || typeof params.threadId !== 'string') return;
+      const goal = this.readTrackedGoal(params.goal);
+      if (goal) this.threadGoalByThread.set(params.threadId, goal);
+      this.goals.observe(params.threadId, params.goal);
+    };
+    const goalCleared = (params: unknown): void => {
+      if (!isRecordLike(params) || typeof params.threadId !== 'string') return;
+      this.threadGoalByThread.delete(params.threadId);
+      this.goals.observe(params.threadId, null);
+    };
+    client.addNotificationHandler('thread/goal/updated', goalUpdated);
+    client.addNotificationHandler('thread/goal/cleared', goalCleared);
     this.turnTrackingUnsubscribe = () => {
       client.removeNotificationHandler('turn/started', startedListener);
       client.removeNotificationHandler('turn/completed', completedListener);
+      client.removeNotificationHandler('thread/goal/updated', goalUpdated);
+      client.removeNotificationHandler('thread/goal/cleared', goalCleared);
     };
   }
 
   private unsubscribeFromTurnTracking(): void {
+    this.goals.invalidate('Codex Goal subscription disconnected');
     if (this.turnTrackingUnsubscribe) {
       try {
         this.turnTrackingUnsubscribe();
@@ -3160,6 +3310,13 @@ export class CodexAdapter
         input: input.payload,
         ...this.buildAppServerTurnOptions(attempt.options, outputSchema),
       };
+      if (typeof request.options?.goalObjective === 'string') {
+        const command: AgentGoalCommand = { action: 'set', objective: request.options.goalObjective };
+        validateGoalCommand(command, this.goals.capabilities);
+        const goal = await client.setThreadGoal(thread.id, command.objective, { status: 'active' });
+        if (!goal) throw new Error('Codex did not confirm Goal creation; the message was not started');
+        this.goals.observe(thread.id, goal);
+      }
       const turn = await client.startTurn(turnOptions);
       if (!this.isCurrentAppServerAttempt(attempt)) {
         if (turn?.id) {

@@ -94,6 +94,7 @@ function readActiveBackendDisplayNameFromPlugin(): string {
 export { buildComposerInputSubmission } from './composerInputParsing';
 
 export interface ComposerInputShellCoordinatorHost {
+  isGoalComposerArmed?(): boolean;
   attachSessionTodo(container: HTMLElement): void;
   attachQuestionDock(container: HTMLElement): void;
   /** R-F1: the queued follow-up bar host element (rendered above the chips). */
@@ -715,6 +716,7 @@ export class ComposerInputShellCoordinator {
     this.composerContextUsageSlotEl = this.composerStatusBarEl.createDiv({
       cls: 'opencodian-composer-context-slot',
     });
+    this.composerStatusBarEl.createDiv({ cls: 'opencodian-composer-goal-slot' });
     this.composerStatusBarEl.createDiv({ cls: 'opencodian-composer-status-middle' });
     this.composerCountsEl = this.composerStatusBarEl.createSpan({
       cls: 'opencodian-composer-counts is-hidden',
@@ -953,6 +955,24 @@ export class ComposerInputShellCoordinator {
     return this.inputWrapperEl;
   }
 
+  getGoalSlotEl(): HTMLElement | null {
+    return this.composerStatusBarEl?.querySelector<HTMLElement>('.opencodian-composer-goal-slot') ?? null;
+  }
+
+  getGoalSummaryMountEl(): HTMLElement | null { return this.composerShellEl?.parentElement ?? null; }
+
+  attachImage(image: ImageAttachment): void {
+    this.attachedImages.push(image);
+    this.renderImageChips();
+    this.scheduleLayoutSync();
+  }
+
+  insertDraft(text: string): void {
+    const previous = this.inputTextareaEl?.value ?? '';
+    this.replaceComposerInputValue(previous ? `${previous}\n\n${text}` : text);
+    this.focusInput();
+  }
+
   focusInput(): void {
     this.inputTextareaEl?.focus();
   }
@@ -1009,7 +1029,9 @@ export class ComposerInputShellCoordinator {
     setIcon(this.sendBtnEl, 'send');
     this.sendBtnEl.addClass('opencodian-send-btn');
     this.sendBtnEl.removeClass('opencodian-stop-btn');
-    this.host.setTooltipLabel(this.sendBtnEl, t('chat.input.sendMessage'), 'top');
+    const label = t(this.host.isGoalComposerArmed?.() ? 'workbench.goal.send' : 'chat.input.sendMessage');
+    this.sendBtnEl.setAttribute('aria-label', label);
+    this.host.setTooltipLabel(this.sendBtnEl, label, 'top');
   }
 
   /**
@@ -1368,6 +1390,7 @@ export class ComposerInputShellCoordinator {
     if (submission === null) {
       return;
     }
+    if (this.host.isGoalComposerArmed?.() && rawContent.trim()) submission = { kind: 'prompt', content: rawContent };
     if (submission.kind === 'command' && this.extractKnownSlashHighlightMatches(rawContent)
       .some((span) => span.kind === 'skill' && rawContent.slice(0, span.start).trim() === '')) {
       submission = { kind: 'prompt', content: rawContent.trim() };

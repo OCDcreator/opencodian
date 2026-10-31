@@ -136,7 +136,7 @@ function mapServerStatus(status: string): AgentConnectionStatus {
  */
 const OPENCODE_LEGACY_CAPABILITIES: BackendCapabilities = Object.freeze(
   new Set<AgentCapability>(
-    [...OPENCODE_FULL_CAPABILITIES].filter((cap) => cap !== AgentCapability.TurnSteering),
+    [...OPENCODE_FULL_CAPABILITIES].filter((cap) => cap !== AgentCapability.TurnSteering && cap !== AgentCapability.Goal),
   ),
 );
 

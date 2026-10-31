@@ -23,6 +23,56 @@ const SEGMENT = /^[a-z0-9_-]+$/i;
 const PROJECT_ALIAS = /^[a-z0-9_-]{1,64}$/i;
 const RESERVED_PROJECT_ALIAS = /^(?:con|prn|aux|nul|com[0-9]|lpt[0-9])$/i;
 
+export interface ClaudePersistedGoal {
+  goal: Record<string, unknown> | null;
+  updatedAt: number;
+}
+
+/** The CLI also persists Goal facts as typed attachments when SDK events are absent. */
+export function projectClaudePersistedGoal(entries: readonly SessionStoreEntry[]): ClaudePersistedGoal {
+  let goal: Record<string, unknown> | null = null;
+  let updatedAt = 0;
+  for (const entry of entries) {
+    if (entry.isSidechain === true) continue;
+    const attachment = entry.attachment as Record<string, unknown> | undefined;
+    const command = entry.commandRun as Record<string, unknown> | undefined;
+    if (entry.type === 'attachment' && attachment?.type === 'goal_status' && typeof attachment.condition === 'string') {
+      const previous = goal as Record<string, unknown> | null;
+      updatedAt = Date.parse(String(entry.timestamp)) || updatedAt;
+      goal = { condition: attachment.condition, status: attachment.met === true ? 'complete' : 'active',
+        id: attachment.sentinel === true ? entry.uuid : previous?.id,
+        iterations: attachment.iterations ?? previous?.iterations ?? 0,
+        last_reason: attachment.reason, updatedAt,
+        ...(typeof attachment.tokens === 'number' ? { tokensUsed: attachment.tokens } : {}),
+        ...(typeof attachment.durationMs === 'number' ? { timeUsedSeconds: attachment.durationMs / 1000 } : {}),
+      };
+    } else if (entry.type === 'system' && command?.command === 'goal' && typeof command.args === 'string'
+      && /^(clear|stop|off|reset|none|cancel)$/i.test(command.args.trim())) {
+      goal = null; updatedAt = Date.parse(String(entry.timestamp)) || updatedAt;
+    }
+  }
+  return { goal, updatedAt };
+}
+
+/** Resolve the transcript through the SDK's native path selection and the scoped store. */
+export async function readClaudePersistedGoal(sdk: ScopedClaudeCatalogSdk, options: {
+  configDir: string; projectDirName?: string; sessionId: string; dir: string;
+}): Promise<ClaudePersistedGoal | null> {
+  if (!sdk.getSessionInfo) return null;
+  const projectAlias = options.projectDirName && PROJECT_ALIAS.test(options.projectDirName)
+    && !RESERVED_PROJECT_ALIAS.test(options.projectDirName) ? options.projectDirName : undefined;
+  const store = new ScopedNativeSessionStore(options.configDir.normalize('NFC'), projectAlias);
+  let entries: SessionStoreEntry[] | null = null;
+  await sdk.getSessionInfo(options.sessionId, { dir: options.dir, sessionStore: {
+    append: async () => { throw new Error('Goal readback cannot write a transcript'); },
+    load: async (key: SessionKey) => {
+      if (key.sessionId !== options.sessionId || key.subpath) throw new Error('Claude Goal transcript identity mismatch');
+      entries = await store.load(key); return entries;
+    },
+  } satisfies SessionStore });
+  return entries ? projectClaudePersistedGoal(entries) : null;
+}
+
 function missing(error: unknown): boolean {
   return (error as NodeJS.ErrnoException).code === 'ENOENT';
 }

@@ -36,3 +36,15 @@ getRuntimeCommands 保留原生服务返回的 source: skill；目录包含 comm
 ## 2026-10-29：可选原生会话引用
 
 `prepareNativeSessionReference(sourceSessionId, targetSessionId)` 调用 native bridge `session/reference`。桥接只在 `sessionReferenceResolver.prepare` 实际挂载时返回可用，并通过不恢复来源的 `sessionQuery.readSurface` 校验两端身份与真实路径都在当前 Vault 内，防止符号链接逃逸；返回 `dsh-session:` 的 JSON session ID base64url 编码。adapter 再次核对精确 URI。ACP、旧桥接、缺失 resolver 或身份／路径不明时返回 null，交给所属历史快照路径。
+
+## Goal 与会话工作台（2026-10-30）
+
+通过 native session/goal 提供 durable Goal + activation 的权威投影和控制。goalObjective 直接进入目标协议，原生服务等待跨自动轮 activity；自动轮 history 使用稳定 native ID。ACP 无此契约时显示不可用，不伪造目标。
+
+## 会话信息面板（2026-10-31）
+
+native session/information 查询只读取已驻留 session 的实际 MCP 挂载 Map，不调用 idle 或修改配置，执行期间同样可读。ACP 或旧服务未提供该能力时保持不可用；不从 MCP 声明推断已加载状态。
+
+原生父子目录使用 subagents.listChildren 和 subagentTiming 精确观察（active/lastTurnCompleted），不将闲置当作完成。读回释放 observation lease。历史父会话不必驻留即可读取目录，但冷会话的 MCP 未知。子会话历史由 session/child-history 验证父子关系后复用正常转录规范化，不启动 Agent。
+
+当前占用只来自本会话已观察的 native context meter（used / size）；没有该测量时不以模型容量或累计值填零。

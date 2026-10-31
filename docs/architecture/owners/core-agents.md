@@ -59,3 +59,7 @@ The new core.backend-pi owner isolates the external Pi process service. core.age
 目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。
 
 2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `core.agents` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。
+
+## Goal 与会话工作台（2026-10-30）
+
+Goal 为独立 capability；统一 AgentGoalCapability/BackendGoalRuntime 仅定义 native/具名 extension 的投影与控制，不拥有自动循环。后端 runtime 继续是目标与执行事实来源。

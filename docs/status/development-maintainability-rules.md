@@ -71,3 +71,14 @@ DSH 协议准入/内容编码放在复用的 DshProtocolCodec；adapter 保留�
 ## 2026-10-30 标题所有权
 
 标题生命周期、取消、revision、保存顺序和原生同步归 TitleGenerationService；TitleModelResolver 是六类模型目录/provider 边界的高风险依赖隔离。OpenCodianView 只组装模型快照和刷新标签/rail；禁止各后端偷偷借旧 OpenCode 生成标题。
+
+## 会话工作台边界（2026-10-30）
+
+- 后端 Goal 状态与自动续跑属于所选 native/具名 extension；共享缓存只投影，不调度。
+- 会话工作台 coordinator 持有临时预备/确认、tab 身份和订阅；OpenCodianView 只装配。
+- 宿主 PTY/Git 属于 WorkbenchHostRuntime，关闭工具视图不终止任务；主区域工具复用同一实例。
+- 会话文件变更复用既有回退 owner，仓库状态独立；提交与创建 worktree 必须经用户明确操作。
+
+## 会话信息 owner（2026-10-31）
+
+原生只读接口归各 adapter；SessionInformationCoordinator 隔离多后端读取与身份竞态，SessionWorkbenchInformation 隔离 Markdown 子会话渲染生命周期。两者是状态/原生依赖和渲染边界，不是转发薄层。禁止将轮询、套餐/上下文口径或子会话状态放回 OpenCodianView。

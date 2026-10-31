@@ -76,6 +76,7 @@ describe('backend capability sets', () => {
     expect(adapter.kind).toBe('opencode2');
     expectCapabilitySet(adapter.capabilities, [
       AgentCapability.Chat,
+      AgentCapability.Goal,
       AgentCapability.Sessions,
       AgentCapability.Models,
       AgentCapability.Images,
@@ -127,6 +128,7 @@ describe('backend capability sets', () => {
     expect(adapter.kind).toBe('zcode');
     expectCapabilitySet(adapter.capabilities, [
       AgentCapability.Chat,
+      AgentCapability.Goal,
       AgentCapability.Sessions,
       AgentCapability.Fork,
       AgentCapability.Compaction,

@@ -4,6 +4,9 @@
  * Main sidebar view for the OpenCodian chat interface.
  */
 
+import { homedir } from 'node:os';
+import path from 'node:path';
+
 import type { Editor, EventRef, WorkspaceLeaf } from 'obsidian';
 import { addIcon, Component, ItemView, MarkdownView, Menu, normalizePath, Notice, Scope } from 'obsidian';
 
@@ -19,6 +22,7 @@ import {
   loadBackendSessionMessages,
 } from '../../core/agents/backend/AgentBackendRouting';
 import type { AgentConnectionStatus, AgentQuestionCapability } from '../../core/agents/backend/AgentService';
+import { preserveGoalIntentMessages } from '../../core/agents/backend/BackendSessionMessages';
 import {
   buildClaudeCodeModelSelectorProviders,
   CLAUDE_CODE_EFFORT_VARIANTS,
@@ -37,6 +41,7 @@ import type { NativeSlashCommand, SlashCommandMenuItem } from '../../core/config
 import {
   type SessionActivityStatus,
 } from '../../core/opencode';
+import { WorkbenchHostRuntime } from '../../core/runtime/WorkbenchHostRuntime';
 import {
   type ChatMessage,
   type ContextUsageSnapshot,
@@ -217,6 +222,7 @@ import {
   type ConversationWriteTicket,
 } from './services/conversation/ConversationWriteSerializationService';
 import { ModifiedFilesSidebarCoordinator } from './services/conversation/ModifiedFilesSidebarCoordinator';
+import { SessionWorkbenchCoordinator, type WorkbenchSession } from './services/conversation/SessionWorkbenchCoordinator';
 import {
   type TabActivationRuntimeHostProviderHost,
 } from './services/conversation/TabActivationRuntimeHostProvider';
@@ -343,6 +349,8 @@ import type {
 } from './ui/modelSelector/types';
 import { NavigationSidebar } from './ui/NavigationSidebar';
 import { OpenCodeExperimentalActionModal } from './ui/OpenCodeExperimentalActionModal';
+import type { WorkbenchResource } from './ui/SessionWorkbench';
+import { SessionWorkbenchTools } from './ui/SessionWorkbenchTools';
 
 
 const logger = createLogger('OpenCodianView');
@@ -443,6 +451,9 @@ const CAPABILITY_CHANGE_REFRESH_CAPABILITIES: readonly AgentCapability[] = [
 ];
 
 export class OpenCodianView extends ItemView {
+  private sessionWorkbench?: SessionWorkbenchCoordinator;
+  private workbenchTools?: SessionWorkbenchTools;
+  private workbenchHostRuntime?: WorkbenchHostRuntime;
   private plugin: ChatPluginPort;
   private chatContainerEl: HTMLElement | null = null;
   private messagesShellEl: HTMLElement | null = null;
@@ -962,6 +973,7 @@ export class OpenCodianView extends ItemView {
 
   private createComposerInputShellCoordinatorHost(): ComposerInputShellCoordinatorHost {
     return {
+      isGoalComposerArmed: () => this.sessionWorkbench?.isArmed() ?? false,
       registerEscapeHandler: (handler) => {
         this.escapeHandlers.push(handler);
       },
@@ -1230,10 +1242,10 @@ export class OpenCodianView extends ItemView {
     return this.currentConversation;
   }
 
-  private handleComposerInputSubmission(
+  private async handleComposerInputSubmission(
     submission: ComposerInputSubmission,
     onPreparationOutcome?: (outcome: import('./services/send/MessageSendPreparationService').MessageSendPreparationOutcome) => void,
-  ): Promise<void> | void {
+  ): Promise<void> {
     // Codex app-server exposes actions as methods, not slash prompt syntax.
     if (submission.kind === 'command' && (this.isCodexConversationActive()
       || (this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'pi')) {
@@ -1250,6 +1262,14 @@ export class OpenCodianView extends ItemView {
     }
 
     if (submission.kind === 'prompt') {
+      const tabId = this.getActiveTabId();
+      const goalObjective = this.sessionWorkbench?.prepareGoalSend(submission.content, onPreparationOutcome);
+      if (goalObjective !== undefined && tabId) {
+        return this.sendPipelineRuntime.sendMessage({
+          ...submission, goalObjective, skipSlashCommand: true, targetTabId: tabId,
+          onPreparationOutcome: (outcome) => this.sessionWorkbench?.onSendPreparation(tabId, outcome),
+        }).finally(() => this.sessionWorkbench?.finishGoalSend(tabId));
+      }
       return this.sendPipelineRuntime.sendMessage({
         content: submission.content,
         ...(submission.syntheticTextParts ? { syntheticTextParts: submission.syntheticTextParts } : {}),
@@ -3260,6 +3280,9 @@ export class OpenCodianView extends ItemView {
   }
 
   async onClose() {
+    this.sessionWorkbench?.destroy();
+    this.workbenchTools?.destroy();
+    this.workbenchHostRuntime?.dispose();
     releasePiUiView(this.app, this.containerEl);
     this.activeTabContextUsageCoordinator.dispose();
     this.backgroundTaskInlinePanelRenderer.disposeNativeTaskWatch();
@@ -3434,7 +3457,93 @@ export class OpenCodianView extends ItemView {
       },
     );
     this.modifiedFilesSidebarCoordinator.mountSidebar(outerMountEl as HTMLElement, this.app);
+    this.mountSessionWorkbench(outerMountEl as HTMLElement);
     this.refreshModifiedFilesSidebar();
+  }
+
+  private workbenchSession(tabId: string): WorkbenchSession {
+    const conversation = this.getConversationForTab(tabId);
+    const runtime = this.getTabRuntimeState(tabId);
+    const completed = runtime?.backgroundTaskCompletedTasks;
+    return {
+      tabId, conversation, backend: conversation?.backend ?? this.plugin.settings.activeBackend ?? 'opencode2',
+      streaming: runtime?.isStreaming ?? false, todos: runtime?.sessionTodos ?? [],
+      contextUsage: this.tabManager?.getTabContextUsage(tabId) ?? null,
+      backgroundTasks: [...(runtime?.backgroundTaskLaunches.values() ?? [])].map((task) => ({
+        id: task.taskId ?? task.launchId, title: task.description,
+        status: completed?.has(task.taskId ?? task.launchId) ? t('workbench.goal.status.complete') : t('workbench.goal.status.active'),
+      })),
+      resources: (runtime?.draftContextItems ?? []).map((item) => ({
+        label: item.label, detail: item.kind, ...('path' in item && typeof item.path === 'string' ? { path: item.path } : {}),
+      })),
+    };
+  }
+
+  private mountSessionWorkbench(boundary: HTMLElement): void {
+    const vault = getVaultBasePath(this.app) ?? '';
+    const pluginDir = this.plugin.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.plugin.manifest.id}`;
+    this.workbenchHostRuntime ??= new WorkbenchHostRuntime(path.join(vault, pluginDir, 'assets/workbench'));
+    const openResource = (resource: WorkbenchResource) => {
+      if (resource.path) void this.app.workspace.openLinkText(resource.path, '', true);
+      else if (resource.command) this.composerInputShellCoordinator.insertDraft(resource.command);
+    };
+    this.workbenchTools ??= new SessionWorkbenchTools({
+      runtime: this.workbenchHostRuntime, workingDirectory: () => this.currentConversation?.backend === 'dsh'
+        ? this.plugin.settings.backendSettings.dsh.workingDirectory || vault : vault,
+      openResource, openBrowser: async (url) => {
+        await this.app.workspace.getLeaf('tab').setViewState({ type: 'webviewer', state: { url }, active: true });
+      },
+      attachUrl: (url) => { this.composerContextViewFacade.attachBuiltContextItem(buildPendingUrlContextItem(url)); },
+      attachImage: (image) => this.composerInputShellCoordinator.attachImage(image),
+      openSettings: () => this.openPluginSettingsAtActiveBackendRuntimeSection(),
+      openMemory: () => {
+        this.plugin.settingsTab?.prepareScrollToConversationOnNextOpen('memory');
+        this.openPluginSettingsPreservingScroll();
+      },
+      setDraft: (text) => this.composerInputShellCoordinator.insertDraft(text),
+      openDesktop: async () => { await this.workbenchTools?.openDesktop(this.app); },
+      loadResources: async () => {
+        const commands = (await this.loadSlashCommandMenuItems()).map((item) => ({
+          label: item.displayId ?? item.id, detail: `${item.source} · ${item.description}`,
+          command: item.insertText ?? `/${item.id}`,
+        }));
+        const backend = this.currentConversation?.backend ?? this.plugin.settings.activeBackend ?? 'opencode2';
+        const service = this.plugin.agentServiceRegistry.get(backend) as import('../../core/agents/backend/AgentService').AgentMcpCapability | undefined;
+        const mcp = service?.getMcpServerSnapshot?.();
+        return [...commands, ...(mcp && typeof mcp === 'object' && !Array.isArray(mcp)
+          ? Object.keys(mcp).map((name) => ({label: `MCP · ${name}`,detail:backend})) : [])];
+      },
+      defaultWorktreeDirectory: () => path.join(homedir(), 'opencodian-worktrees', 'new-worktree'),
+    });
+    this.sessionWorkbench ??= new SessionWorkbenchCoordinator({
+      app: this.app,
+      getActiveSession: () => this.workbenchSession(this.getActiveTabId() ?? ''),
+      getSessions: () => (this.tabManager?.getAllTabs() ?? []).map((tab) => this.workbenchSession(tab.id)),
+      getRegistry: () => this.plugin.agentServiceRegistry,
+      getGoalSlot: () => this.composerInputShellCoordinator.getGoalSlotEl(),
+      getSummaryMount: () => this.composerInputShellCoordinator.getGoalSummaryMountEl(),
+      getComposerShell: () => this.composerInputShellCoordinator.getComposerShellEl(),
+      attachFiles: (parent) => this.modifiedFilesSidebarCoordinator.attachToWorkbench(parent),
+      mountTools: (parent) => this.workbenchTools?.mount(parent),
+      openTool: (tool) => this.workbenchTools?.openTool(tool),
+      setDraft: (text) => this.composerInputShellCoordinator.insertDraft(text),
+      updateTools: (state) => this.workbenchTools?.update(state),
+      syncTranscript: async (session) => {
+        if (!session.conversation || this.getTabRuntimeState(session.tabId)?.isStreaming) return;
+        const before = [...session.conversation.messages];
+        const result = await this.syncConversationMessagesFromServer(session.conversation, session.tabId, 'goal-workbench');
+        if (result.changed && session.tabId === this.getActiveTabId())
+          await this.conversationRenderService.applySyncedConversationUpdate(before, result.messages);
+      },
+      focusComposer: () => this.composerInputShellCoordinator.focusInput(),
+      openMessage: (id) => {
+        const element = [...(this.messagesContainer?.querySelectorAll<HTMLElement>('[data-message-id]') ?? [])]
+          .find((node) => node.dataset.messageId === id);
+        element?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      },
+      openResource, notify: (message) => { new Notice(message); },
+    });
+    this.sessionWorkbench.mount(boundary);
   }
 
   refreshSessionChangeSidebar(): void {
@@ -3442,6 +3551,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private refreshModifiedFilesSidebar(): void {
+    this.sessionWorkbench?.refresh();
     const conversation = this.currentConversation;
     const backend = conversation?.backend ?? 'opencode';
     // Session diff is OpenCode-only.  Claude's rewind/diff surface is not
@@ -4290,13 +4400,18 @@ export class OpenCodianView extends ItemView {
   }
 
   /** Cancel streaming */
-  private cancelStreaming() {
+  private async cancelStreaming(): Promise<void> {
     logger.debug('cancelStreaming called, isStreaming:', this.isStreaming);
-    if (!this.isActiveTabStreaming()) {
+    const tabId = this.getActiveTabId();
+    const currentConversation = this.currentConversation;
+    const controller = this.getTabRuntimeState(tabId)?.streamController;
+    // Pause the backend's continuation driver before interrupting its foreground turn.
+    const stopping = this.sessionWorkbench?.stopActiveGoal();
+    if (stopping) await stopping;
+    if (!this.getTabRuntimeState(tabId)?.isStreaming) {
       return;
     }
 
-    const currentConversation = this.currentConversation;
     const backendSessionId = currentConversation
       ? getConversationBackendSessionId(currentConversation)
       : null;
@@ -4306,9 +4421,9 @@ export class OpenCodianView extends ItemView {
     }
 
     // Update local state
-    this.conversationTabRuntimeCoordinator.setStreaming(this.getActiveTabId(), false);
-    this.streamController?.cancelStream();
-    this.syncActiveTabStreamLikeState();
+    this.conversationTabRuntimeCoordinator.setStreaming(tabId, false);
+    controller?.cancelStream();
+    if (this.getActiveTabId() === tabId) this.syncActiveTabStreamLikeState();
     logger.debug('isStreaming set to false');
 
     new Notice(t('chat.stream.cancelledToast'));
@@ -4438,7 +4553,7 @@ export class OpenCodianView extends ItemView {
     revertState: ConversationRevertState | null;
   }> {
     const backend = conversation.backend;
-    if (backend === 'opencode2' || backend === 'pi') {
+    if (backend && ['opencode2', 'pi', 'claude-code', 'codex', 'zcode', 'dsh'].includes(backend)) {
       const sessionId = getConversationBackendSessionId(conversation);
       const adapter = this.plugin.agentServiceRegistry?.get(backend) as {
         getChatMessages?(id: string): Promise<ChatMessage[]>;
@@ -4449,6 +4564,8 @@ export class OpenCodianView extends ItemView {
           fingerprint: this.conversationIdentityRuntime.getConversationSyncFingerprint(conversation.messages), revertState: null };
       }
       const serverMessages = await adapter.getChatMessages(sessionId);
+      if (!serverMessages.length && conversation.messages.length)
+        throw new Error(`${backend} returned an empty transcript for a populated conversation`);
       const revertState = await adapter.getSessionRevertState?.(sessionId) ?? null;
       const revertBoundary = revertState
         ? serverMessages.findIndex((message) => message.sourceMessageId === revertState.messageID)
@@ -4460,7 +4577,7 @@ export class OpenCodianView extends ItemView {
       const bySourceId = new Map(previousMessages.filter((message) => message.sourceMessageId)
         .map((message) => [message.sourceMessageId, message]));
       const unmatched = previousMessages.filter((message) => !message.sourceMessageId);
-      const merged = backend === 'pi' ? mergePiNativeConversationMessages(previous, visibleServerMessages) : visibleServerMessages.map((message) => {
+      const nativeMerged = backend === 'pi' ? mergePiNativeConversationMessages(previous, visibleServerMessages) : visibleServerMessages.map((message) => {
         const existing = bySourceId.get(message.sourceMessageId) ?? unmatched.find((candidate) =>
           candidate.role === message.role && (candidate.content === message.content
             || (candidate.role === 'user' && message.content.includes(candidate.content))));
@@ -4473,11 +4590,12 @@ export class OpenCodianView extends ItemView {
           content: message.role === 'user' ? existing.content : message.content,
           images: existing.images,
           contextAttachments: existing.contextAttachments,
-          contentBlocks: existing.contentBlocks,
+          contentBlocks: message.contentBlocks ?? (existing.content === message.content ? existing.contentBlocks : undefined),
           questionResolution: existing.questionResolution,
           toolCalls: message.toolCalls ?? existing.toolCalls,
         };
       });
+      const merged = preserveGoalIntentMessages(previous, nativeMerged);
       if (backend !== 'pi') merged.push(...notices);
       const before = this.conversationIdentityRuntime.getConversationSyncFingerprint(previous);
       const after = this.conversationIdentityRuntime.getConversationSyncFingerprint(merged);

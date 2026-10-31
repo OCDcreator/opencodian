@@ -25,6 +25,11 @@ export const PI_WORKBENCH_GROUPS: Record<string, PiWorkbenchAction[]> = {
     { id: 'label_entry', label: '标记历史节点 / Label entry', fields: [entry, { key: 'label', label: '标签（留空清除） / Label' }] },
   ],
   '运行与队列 / Run': [
+    { id: 'get_goal', label: '目标状态 / Goal state' },
+    { id: 'control_goal', label: '控制目标 / Control goal', fields: [
+      { key: 'action', label: '动作 / Action', options: ['set', 'edit', 'pause', 'resume', 'clear'] },
+      { key: 'objective', label: '完整目标条件（仅设置/编辑） / Completion condition (set/edit)' },
+    ] },
     { id: 'prompt', label: '发送消息 / Send', fields: [message] },
     { id: 'steer', label: '运行中纠偏 / Steer', fields: [message] }, { id: 'follow_up', label: '排队后续消息 / Follow up', fields: [message] },
     { id: 'get_queue', label: '查看队列 / Queue' }, { id: 'clear_queue', label: '清空队列 / Clear queue' },

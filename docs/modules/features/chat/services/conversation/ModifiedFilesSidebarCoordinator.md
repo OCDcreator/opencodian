@@ -40,3 +40,7 @@ export class ModifiedFilesSidebarCoordinator {
 
 - 源码位置：`src/features/chat/services/conversation/ModifiedFilesSidebarCoordinator.ts`。
 - 原位置：`src/features/chat/services/ModifiedFilesSidebarCoordinator.ts`；文件名、导出接口与业务职责保持不变。
+
+## Goal 与会话工作台（2026-10-30）
+
+提供 attachToWorkbench 将原有文件侧栏搬入工作台文件页；数据、来源与回退仍由既有 coordinator 管理。

@@ -71,3 +71,11 @@ Modern AuthInteraction text input forwards the entered string, including empty s
 目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。
 
 2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `core.backend-pi` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。
+
+## Goal 与会话工作台（2026-10-30）
+
+Pi 目标能力通过 @narumitw/pi-goal 0.54.x 的命令身份与 branch goal-state 明确探测。get_goal/control_goal 与边界事件属于 Pi 独立服务；未加载扩展不可预备目标，不安装用户全局扩展。
+
+## 会话信息（2026-10-31）
+
+PiAdapter 只将 get_resources 的实际 AGENTS 文件标为已加载来源；扩展能力无原生读回时保持未报告。

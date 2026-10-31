@@ -233,3 +233,15 @@ Editing executable settings leaves existing persistent queries running with thei
 ## 2026-10-28：原生命令与技能弹框
 
 运行时命令目录保留 SDK 的 builtin 标记：true 为 Claude 自带命令，未标记行为用户、项目或插件技能。聊天目录据此分组；不扫描或借用 OpenCode 技能。
+
+## Goal 与会话工作台（2026-10-30）
+
+Goal 停止/清除先中断并等待该 runtime 的输出泵退出，防止旧进程的迟到事件覆盖已恢复运行的状态。清除再启动原生 `/goal clear`，确认窗口覆盖 CLI 恢复启动时间；未确认时保留缓存并返回 partial/stale。
+
+使用 BackendGoalRuntime 投影原生目标。发送 goalObjective 走原生 /goal；完整条件与引用上下文分别传递。active_goal 事件持续接收；CLI 未发该事件时经 SDK 路径解析原生 goal_status 附件读回，保留完成原因、轮数和计量。暂停表示停止执行并保留目标，恢复使用既有会话；读失败不擦除缓存。
+
+## 会话信息面板（2026-10-31）
+
+会话信息只读取精确匹配的运行中 Query：实验 usage 接口使用 skipBehaviors，套餐额度与 session.model_usage 累计用量分开，MCP 来自该 Query。listSubagents/getSubagentMessages 使用 SDK 原生 ID。local_agent 事件按 run_id 防止旧轮次回写；local_bash 不成为智能体，无法证明运行状态的历史子会话标为 unknown。
+
+精确 Query 的 getContextUsage({detail: summary}) 读回当前窗口和 memoryFiles 来源，不创建另一探针 Query，也不触发默认 full 分类 token-count 调用。原生来源路径作为只读说明，外部记忆文件不自动通过 Vault 链接打开。

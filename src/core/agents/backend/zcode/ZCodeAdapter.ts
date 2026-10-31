@@ -17,6 +17,7 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 
+import { appendObsidianContextBlocks } from '../../../../shared/obsidianContext';
 import { prependMemoryInjection } from '../../../memory';
 import { prependObsidianToolingInjection } from '../../../obsidianTooling';
 import type { PermissionReply, PermissionRequest, QuestionRequest } from '../../../types';
@@ -45,6 +46,9 @@ import type {
   Disposable,
   StatusChangeHandler,
 } from '../AgentService';
+import { type AgentGoalCommand, type AgentGoalControlResult, type AgentGoalEvent, type AgentGoalReadback,
+  BackendGoalRuntime, confirmGoalCommand, validateGoalCommand } from '../BackendGoalRuntime';
+import { backendSessionMessagesToChat } from '../BackendSessionMessages';
 import type { FileRevision } from '../configuration/ProjectResourceSecureWrite';
 import {
   normalizeZCodeHandshakeFailure,
@@ -227,10 +231,17 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
   readonly kind = 'zcode' as const;
   readonly displayName = 'ZCode';
   readonly description = 'Official ZCode runtime · OpenCodian-owned app-server';
+  private readonly goals = new BackendGoalRuntime('zcode', {
+    source: 'native', driver: 'zcode.native-goal', actions: ['set', 'edit', 'pause', 'resume', 'clear'],
+    pauseMode: 'goal', editMode: 'replace', objectiveLimit: 4000, budgets: [],
+  });
+  private readonly goalSessions = new Set<string>();
+  private readonly goalReads = new Map<string, Promise<AgentGoalReadback>>();
 
   /** Chat + native sessions + fork/compaction are wired; tools/permissions/models land in their own tickets. */
   readonly capabilities: BackendCapabilities = new Set<AgentCapability>([
     AgentCapability.Chat,
+    AgentCapability.Goal,
     AgentCapability.Sessions,
     AgentCapability.Fork,
     AgentCapability.Compaction,
@@ -457,8 +468,13 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
   async *sendMessage(rawRequest: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
     const id = rawRequest.sessionId;
     await this.stoppingSessions.get(id);
+    const goalObjective = rawRequest.options?.goalObjective;
+    const goalCreation = typeof goalObjective === 'string';
+    if (goalCreation) validateGoalCommand({ action: 'set', objective: goalObjective }, this.goals.capabilities);
     const slash = /^\/(goal|compact|plan)(?:\s+([\s\S]*))?$/i.exec(rawRequest.content.trim());
-    const slashName = slash?.[1]?.toLowerCase();
+    const slashName = goalCreation ? 'goal' : slash?.[1]?.toLowerCase();
+    if (goalCreation && (rawRequest.images?.length || this.goalCreationContext(rawRequest)))
+      throw new Error('This ZCode Goal control cannot carry images or injected context. Send reference material before setting the goal.');
     if (slashName && rawRequest.images?.length) {
       yield { type: 'error', content: 'ZCode native control commands cannot carry image attachments.' };
       return;
@@ -496,7 +512,7 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
         }
       }
       if (run.cancelled) return;
-      const control = await this.prepareNativeControlCommand(transport, {
+      const control = goalCreation ? await this.prepareGoalCommand(transport, id, undefined, goalObjective) : await this.prepareNativeControlCommand(transport, {
         sessionId: id, content: rawRequest.content, slashName, rawArgument: slash?.[2],
       });
       for (const chunk of control.terminalChunks ?? []) yield chunk;
@@ -601,13 +617,13 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
   }
 
   private async prepareGoalCommand(
-    transport: ZCodeAppServerTransport, sessionId: string, rawArgument?: string,
+    transport: ZCodeAppServerTransport, sessionId: string, rawArgument?: string, explicitObjective?: string,
   ): Promise<ZCodeControlCommandResult> {
     const argument = rawArgument?.trim() ?? '';
-    const command = /^(pause|clear|show|resume)$/i.exec(argument)?.[1]?.toLowerCase();
+    const command = argument ? /^(pause|clear|show|resume)$/i.exec(argument)?.[1]?.toLowerCase() : 'show';
     const replace = /^replace\s+([\s\S]+)$/i.exec(argument);
-    const action = command ?? (replace ? 'replace' : 'set');
-    const objective = replace?.[1]?.trim() ?? argument;
+    const action = explicitObjective !== undefined ? 'set' : command ?? (replace ? 'replace' : 'set');
+    const objective = explicitObjective ?? replace?.[1]?.trim() ?? argument;
     if ((action === 'set' || action === 'replace') && !objective) {
       return { promptText: '', goalTargetId: null,
         terminalChunks: [{ type: 'error', content: 'ZCode /goal requires an objective.' }] };
@@ -620,6 +636,8 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
     const projection = asRecordValue(readback['projection']);
     const target = asRecordValue(projection['target']);
     this.assertGoalReadback({ sessionId, action, objective, projection, target });
+    this.goalSessions.add(sessionId);
+    this.goals.observe(sessionId, projection['target']);
     if (goalResult['startedTurn'] !== true) {
       const response = goalResult['response'];
       return { promptText: '', goalTargetId: null, terminalChunks: [
@@ -633,6 +651,10 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
       throw new Error('ZCode goal readback returned no target identity.');
     }
     return { promptText: '', goalTargetId: target['targetId'], terminalChunks: null };
+  }
+
+  private goalCreationContext(request: AgentChatSendRequest): string {
+    return appendObsidianContextBlocks(prependObsidianToolingInjection(prependMemoryInjection('', request.options), request.options), request.options);
   }
 
   private assertGoalReadback(input: {
@@ -653,6 +675,54 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
     if (action === 'resume' && (target['sessionId'] !== sessionId || target['status'] !== 'active')) {
       throw new Error('ZCode goal resume was not confirmed by native readback.');
     }
+  }
+
+  getGoalCapabilities() { return this.goals.capabilities; }
+
+  async getChatMessages(sessionId: string) { return backendSessionMessagesToChat('zcode', await this.getSessionMessages(sessionId)); }
+
+  subscribeToGoalEvents(handler: (event: AgentGoalEvent) => void): Disposable { return this.goals.subscribe(handler); }
+
+  async readSessionGoal(sessionId: string): Promise<AgentGoalReadback> {
+    const pending = this.goalReads.get(sessionId);
+    if (pending) return pending;
+    this.goalSessions.add(sessionId);
+    const version = this.goals.version(sessionId);
+    const reading = (async () => {
+      try {
+        await this.start();
+        const transport = this.requireTransport();
+        await this.ensureSessionActive(transport, sessionId);
+        const readback = asRecordValue(await transport.request('session/read', { sessionId }));
+        const projection = asRecordValue(readback['projection']);
+        if (!Object.prototype.hasOwnProperty.call(projection, 'target'))
+          throw new Error('ZCode runtime returned no Goal projection');
+        const target = projection['target'];
+        if (target !== null && asRecordValue(target)['sessionId'] !== sessionId)
+          throw new Error('ZCode Goal belongs to a different session');
+        return this.goals.observeRead(sessionId, target, version);
+      } catch (error) { return this.goals.fail(sessionId, error); }
+    })();
+    this.goalReads.set(sessionId, reading);
+    try { return await reading; }
+    finally { if (this.goalReads.get(sessionId) === reading) this.goalReads.delete(sessionId); }
+  }
+
+  async controlSessionGoal(sessionId: string, command: AgentGoalCommand): Promise<AgentGoalControlResult> {
+    return this.goals.control(sessionId, async () => {
+      try {
+        validateGoalCommand(command, this.goals.capabilities);
+        await this.start();
+        const transport = this.requireTransport();
+        await this.ensureSessionActive(transport, sessionId);
+        await transport.request('session/goal', { sessionId,
+          action: command.action === 'edit' ? 'replace' : command.action,
+          ...(command.objective !== undefined ? { objective: command.objective } : {}),
+        });
+        if (command.action === 'pause' || command.action === 'clear') await this.cancelStream(sessionId);
+        return confirmGoalCommand(command, await this.readSessionGoal(sessionId));
+      } catch (error) { return { status: 'failed', readback: this.goals.fail(sessionId, error) }; }
+    });
   }
 
   /** A cancelled iterator's delayed finally cannot release its replacement run. */
@@ -809,6 +879,43 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
    * and pass through unchanged (no local synthesis).
    */
   async getSessionSubagents(sessionId: string): Promise<Record<string, unknown>> { const transport = this.requireTransport(); await this.ensureSessionActive(transport, sessionId); return asRecordValue(await transport.request('session/subagents', { sessionId })); }
+
+  async readSessionInformation(sessionId: string): Promise<import('../AgentService').AgentSessionInformation> {
+    const transport = this.requireTransport();
+    const [children, catalog] = await Promise.allSettled([
+      transport.request('session/subagents', { sessionId }), this.getManagementCatalog(),
+    ]);
+    const linkage = children.status === 'fulfilled' ? asRecordValue(children.value) : null;
+    const running = new Map((Array.isArray(linkage?.running) ? linkage.running : []).map((value) => {
+      const child = asRecordValue(value); return [String(child.sessionId ?? ''), child];
+    }));
+    const ended = asRecordValue(linkage?.ended).items;
+    const endings = new Map((Array.isArray(ended) ? ended : []).map((value) => {
+      const child = asRecordValue(value); return [String(child.sessionId ?? ''), child];
+    }));
+    const mcp = catalog.status === 'fulfilled' ? catalog.value?.mcp : null;
+    return { sessionId, observedAt: Date.now(), quota: null,
+      mcp: mcp?.state === 'available' && mcp.entries ? { scope: 'workspace', servers: mcp.entries.map((server) => ({
+        name: server.id, status: server.status, ...(server.toolCount !== null ? { toolCount: server.toolCount } : {}),
+      })) } : null,
+      agents: linkage && Array.isArray(linkage.childSessionIds) ? linkage.childSessionIds.flatMap((id) => {
+        if (typeof id !== 'string') return [];
+        const native = running.get(id) ?? endings.get(id);
+        const status = String(native?.status ?? '');
+        return [{ id, title: String(native?.description ?? native?.title ?? id), readable: true,
+          status: running.has(id) ? 'running' as const : endings.has(id)
+            ? ['failed', 'error', 'cancelled'].includes(status) ? 'failed' as const : 'completed' as const : 'unknown' as const }];
+      }) : null,
+    };
+  }
+
+  async readChildSessionMessages(parentSessionId: string, childId: string) {
+    const info = await this.readSessionInformation(parentSessionId);
+    if (!info.agents?.some((agent) => agent.id === childId)) throw new Error('Child session is unavailable');
+    const messages = await this.getPromptReferenceMessages(childId);
+    if (!messages) throw new Error('Child session is unavailable');
+    return backendSessionMessagesToChat('zcode', messages);
+  }
 
   /** Native background task IDs and terminal states for the visible chat panel. */
   async getBackgroundTasks(sessionId: string): Promise<Array<{ taskId: string; status: string; description: string; cancellable: boolean }>> {
@@ -1412,6 +1519,7 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
     if (!event?.sessionId) {
       return;
     }
+    this.observeGoalActivity({ ...event, sessionId: event.sessionId });
     if (event.type === 'permission.resolved' && typeof event.payload['requestId'] === 'string') {
       this.interactions.settleNativeResolvedRequest(event.sessionId, event.payload['requestId']);
     }
@@ -1446,6 +1554,15 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
     run.queue.push(event);
     run.wake?.();
     run.wake = null;
+  }
+
+  private observeGoalActivity(event: { sessionId: string; type: string; turnId?: string }): void {
+    if (!this.goalSessions.has(event.sessionId)) return;
+    if (event.type === 'turn.started') this.goals.activity(event.sessionId, 'running', event.turnId);
+    if (event.type === 'turn.completed' || event.type === 'turn.failed') {
+      this.goals.activity(event.sessionId, this.goals.get(event.sessionId).goal?.status === 'active' ? 'evaluating' : 'idle', event.turnId);
+      void this.readSessionGoal(event.sessionId);
+    }
   }
 
   private closeAllRuns(): void {

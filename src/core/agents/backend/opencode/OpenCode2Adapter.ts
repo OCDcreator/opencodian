@@ -32,9 +32,18 @@ import type {
   StatusChangeHandler,
 } from '../AgentService';
 import { WarmInlineCompletionSession } from '../auxiliary/WarmInlineCompletionSession';
+import { type AgentGoalCommand, type AgentGoalControlResult, type AgentGoalEvent, type AgentGoalReadback,
+  BackendGoalRuntime, confirmGoalCommand, validateGoalCommand } from '../BackendGoalRuntime';
+
+// The installed 2.2.0 client predates Goal's schema export, but supports
+// portable plugin RPC definitions. Payload validation remains in the store.
+const goalRpcValue = { '~standard': { version: 1 as const, vendor: 'opencodian', validate: (value: unknown) => ({ value }) } };
+const goalRpcDefinition = { id: 'opencode.goal', methods: { get: { input: goalRpcValue, output: goalRpcValue } },
+  events: { changed: { schema: { type: 'object', properties: { sessionID: { type: 'string' }, goal: {} } } } } } as const;
 
 const CAPABILITIES: BackendCapabilities = Object.freeze(new Set([
   AgentCapability.Chat,
+  AgentCapability.Goal,
   AgentCapability.Sessions,
   AgentCapability.Models,
   AgentCapability.Images,
@@ -84,6 +93,12 @@ export class OpenCode2Adapter implements AgentService, AgentChatCapability, Agen
   private readonly questionSessions = new Map<string, string>();
   private defaultModel: { provider: string; model: string } | null = null;
   private connectionKey: string | null = null;
+  private readonly goals = new BackendGoalRuntime('opencode2', {
+    source: 'native', driver: 'opencode.goal', actions: ['set', 'edit', 'pause', 'resume', 'clear'],
+    pauseMode: 'goal', editMode: 'replace', objectiveLimit: 4000, budgets: [],
+  });
+  private goalObserver: AbortController | null = null;
+  private readonly goalSessions = new Set<string>();
 
   constructor(private readonly options: OpenCode2AdapterOptions) {}
 
@@ -187,6 +202,9 @@ export class OpenCode2Adapter implements AgentService, AgentChatCapability, Agen
   }
 
   async stop(): Promise<void> {
+    this.goalObserver?.abort();
+    this.goalObserver = null;
+    this.goals.invalidate('OpenCode 2 connection closed');
     await Promise.allSettled([...this.turns.keys()].map((id) => this.cancelStream(id)));
     for (const turn of this.turns.values()) {
       turn.events.push({ type: 'session.execution.interrupted' });
@@ -332,6 +350,76 @@ export class OpenCode2Adapter implements AgentService, AgentChatCapability, Agen
     return result.data;
   }
 
+  async readSessionInformation(sessionId: string): Promise<import('../AgentService').AgentSessionInformation> {
+    const client = await this.ready();
+    const [children, mcp, session, messages] = await Promise.allSettled([
+      this.getSessionChildren(sessionId), client.mcp.list({ location: { directory: this.options.workingDirectory } }),
+      Promise.resolve().then(() => client.session.get({ sessionID: sessionId })),
+      this.listAllMessages(client, sessionId),
+    ]);
+    const context = messages.status === 'fulfilled' ? await this.readInformationContext(client, messages.value).catch(() => undefined) : undefined;
+    return {
+      sessionId, observedAt: Date.now(), quota: null,
+      mcp: mcp.status === 'fulfilled' ? { scope: 'workspace', servers: mcp.value.data.map((server) => ({
+        name: server.name, status: server.status.status,
+      })) } : null,
+      agents: children.status === 'fulfilled' && messages.status === 'fulfilled'
+        ? this.projectInformationAgents(children.value, messages.value) : null,
+      ...(session.status === 'fulfilled' ? { usage: {
+        inputTokens: session.value.tokens.input, outputTokens: session.value.tokens.output,
+        totalTokens: session.value.tokens.input + session.value.tokens.output + session.value.tokens.reasoning
+          + session.value.tokens.cache.read + session.value.tokens.cache.write,
+        ...(typeof session.value.cost === 'number' ? { cost: session.value.cost } : {}),
+      } } : {}),
+      ...(context ? { context } : {}),
+    };
+  }
+
+  private async readInformationContext(client: OpenCodeClient, messages: Awaited<ReturnType<OpenCode2Adapter['listAllMessages']>>) {
+    const assistant = [...messages].reverse().find((message) => message.type === 'assistant' && message.tokens
+      && message.tokens.input + message.tokens.output + message.tokens.reasoning + message.tokens.cache.read + message.tokens.cache.write > 0);
+    if (!assistant || assistant.type !== 'assistant' || !assistant.tokens) return undefined;
+    const models = await client.model.list({ location: { directory: this.options.workingDirectory } });
+    const model = models.data.find((entry) => entry.providerID === assistant.model.providerID && entry.id === assistant.model.id);
+    if (!model || model.limit.context <= 0) return undefined;
+    const tokens = assistant.tokens;
+    return { tokens: tokens.input + tokens.output + tokens.reasoning + tokens.cache.read + tokens.cache.write, window: model.limit.context };
+  }
+
+  private projectInformationAgents(children: unknown[], messages: Awaited<ReturnType<OpenCode2Adapter['listAllMessages']>>): import('../AgentService').AgentSessionChild[] {
+    const linked = new Map<string, { title: string; status: import('../AgentService').AgentSessionChild['status'] }>();
+    for (const message of messages) {
+      if (message.type !== 'assistant') continue;
+      for (const part of message.content) {
+        if (part.type !== 'tool' || part.name !== 'subagent' || part.state.status === 'streaming') continue;
+        const state = part.state;
+        const id = state.metadata?.sessionID ?? state.input.sessionID;
+        if (typeof id !== 'string' || !id) continue;
+        const statuses: Record<string, import('../AgentService').AgentSessionChild['status']> = {
+          pending: 'pending', running: 'running', error: 'failed', failed: 'failed', interrupted: 'failed',
+        };
+        const status = String(state.metadata?.status ?? state.status);
+        linked.set(id, { title: typeof state.input.description === 'string' ? state.input.description : id,
+          status: statuses[status] ?? 'unknown' });
+      }
+    }
+    const outcomes: Record<string, import('../AgentService').AgentSessionChild['status']> = {
+      succeeded: 'completed', failed: 'failed', interrupted: 'failed', error: 'failed',
+    };
+    return children.flatMap((value) => {
+      const child = value as { id?: string; title?: string; outcome?: string };
+      const tool = child.id ? linked.get(child.id) : undefined;
+      return child.id && tool ? [{ id: child.id, title: child.title || tool.title, readable: true,
+        status: outcomes[child.outcome ?? ''] ?? tool.status }] : [];
+    });
+  }
+
+  async readChildSessionMessages(parentSessionId: string, childId: string): Promise<ChatMessage[]> {
+    const children = await this.getSessionChildren(parentSessionId) as Array<{ id: string }>;
+    if (!children.some((child) => child.id === childId)) throw new Error('Child session is unavailable');
+    return this.getChatMessages(childId);
+  }
+
   async getBackgroundTasks(sessionId: string): Promise<Array<{ taskId: string; status: string; description: string; cancellable: boolean }>> {
     const client = await this.ready();
     const [children, messages] = await Promise.all([
@@ -442,6 +530,64 @@ export class OpenCode2Adapter implements AgentService, AgentChatCapability, Agen
   async runSessionCommand(sessionId: string, command: string, args: string): Promise<void> {
     const client = await this.ready();
     await client.session.command({ sessionID: sessionId, name: command, text: args });
+  }
+
+  getGoalCapabilities() { return this.goals.capabilities; }
+
+  subscribeToGoalEvents(handler: (event: AgentGoalEvent) => void): Disposable { return this.goals.subscribe(handler); }
+
+  async readSessionGoal(sessionId: string): Promise<AgentGoalReadback> {
+    this.goalSessions.add(sessionId);
+    const version = this.goals.version(sessionId);
+    try {
+      const client = await this.ready();
+      this.ensureGoalObserver(client);
+      const goal = await client.rpc(goalRpcDefinition).get({ sessionID: sessionId }, {
+        location: { directory: this.options.workingDirectory }, signal: AbortSignal.timeout(10000),
+      });
+      return this.goals.observeRead(sessionId, goal, version);
+    } catch (error) { return this.goals.fail(sessionId, error); }
+  }
+
+  async controlSessionGoal(sessionId: string, command: AgentGoalCommand): Promise<AgentGoalControlResult> {
+    return this.goals.control(sessionId, async () => {
+      try {
+        validateGoalCommand(command, this.goals.capabilities);
+        const client = await this.ready();
+        this.goalSessions.add(sessionId); this.ensureGoalObserver(client);
+        const text = command.action === 'set' || command.action === 'edit'
+          ? JSON.stringify(command.objective) : command.action;
+        await client.session.command({ sessionID: sessionId, name: 'goal', text });
+        if (command.action === 'pause' || command.action === 'clear') await this.cancelStream(sessionId);
+        return confirmGoalCommand(command, await this.readSessionGoal(sessionId));
+      } catch (error) { return { status: 'failed', readback: this.goals.fail(sessionId, error) }; }
+    });
+  }
+
+  private ensureGoalObserver(client: OpenCodeClient): void {
+    if (this.goalObserver) return;
+    const controller = new AbortController();
+    this.goalObserver = controller;
+    void (async () => {
+      try {
+        for await (const event of client.event.subscribe({ signal: controller.signal })) {
+          if (controller.signal.aborted) break;
+          const raw = event as { type: string; data?: Record<string, unknown> };
+          const sessionId = raw.data?.sessionID;
+          if (typeof sessionId !== 'string' || !this.goalSessions.has(sessionId)) continue;
+          if (raw.type === 'rpc.opencode.goal.changed') this.goals.observe(sessionId, raw.data?.goal);
+          else if (raw.type === 'session.execution.started') this.goals.activity(sessionId, 'running');
+          else if (raw.type === 'session.execution.succeeded') this.goals.activity(sessionId,
+            this.goals.get(sessionId).goal?.status === 'active' ? 'evaluating' : 'idle');
+          else if (raw.type === 'session.execution.interrupted' || raw.type === 'session.execution.failed')
+            this.goals.activity(sessionId, 'stopped');
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) this.goals.invalidate(error instanceof Error ? error.message : String(error));
+      } finally {
+        if (this.goalObserver === controller) this.goalObserver = null;
+      }
+    })();
   }
 
   async generateTitle(prompt: string, provider: string, model: string, signal?: AbortSignal): Promise<string> {
@@ -1052,7 +1198,25 @@ export class OpenCode2Adapter implements AgentService, AgentChatCapability, Agen
         prependObsidianToolingInjection(prependMemoryInjection(request.content, request.options), request.options),
         request.options,
       );
-      const admitted = await client.session.prompt({ sessionID: sessionId, text: content,
+      let admitted: { id?: string };
+      if (typeof request.options?.goalObjective === 'string') {
+        const objective = request.options.goalObjective;
+        validateGoalCommand({ action: 'set', objective }, this.goals.capabilities);
+        const referenceContext = appendObsidianContextBlocks(
+          prependObsidianToolingInjection(prependMemoryInjection('', request.options), request.options), request.options,
+        );
+        if (referenceContext) await client.session.instructions.entry.put({
+          sessionID: sessionId, key: 'opencodian.goal.references', value: referenceContext,
+        });
+        this.goalSessions.add(sessionId); this.ensureGoalObserver(client);
+        await client.session.command({ sessionID: sessionId, name: 'goal', text: JSON.stringify(objective),
+          ...(files?.length ? { files } : {}),
+          ...(mentionedAgents.length ? { agents: mentionedAgents } : {}),
+          ...(mentionedSkills.length ? { skills: mentionedSkills } : {}),
+        });
+        admitted = {};
+        await this.readSessionGoal(sessionId);
+      } else admitted = await client.session.prompt({ sessionID: sessionId, text: content,
         ...(files?.length ? { files } : {}),
         ...(mentionedAgents.length ? { agents: mentionedAgents } : {}),
         ...(mentionedSkills.length ? { skills: mentionedSkills } : {}),

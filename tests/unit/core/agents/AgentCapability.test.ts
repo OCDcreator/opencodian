@@ -10,7 +10,7 @@ import {
 describe('AgentCapability', () => {
   it('should define all backend capabilities', () => {
     const expected: string[] = [
-      'chat', 'sessions',
+      'chat', 'sessions', 'goal',
       'tools', 'mcp', 'permissions', 'fork', 'branching', 'todos', 'questions',
       'models', 'subagents', 'context', 'providers', 'compaction',
       'cost-tracking', 'thinking', 'hooks', 'config', 'file-ops', 'shell',

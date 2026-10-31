@@ -535,11 +535,11 @@ export class ConversationSessionSettingsCoordinator {
     const registry = this.host.agentServiceRegistry;
     if (!registry) return undefined;
     const adapter = registry.get('codex') as {
-      getThreadGoal?: (id: string) => Promise<AppServerThreadGoal | null>;
+      getThreadGoal?: (id: string, options?: { strict?: boolean }) => Promise<AppServerThreadGoal | null>;
     } | null;
     if (typeof adapter?.getThreadGoal !== 'function') return undefined;
     try {
-      return await adapter.getThreadGoal(sessionId);
+      return await adapter.getThreadGoal(sessionId, { strict: true });
     } catch {
       return undefined;
     }

@@ -151,6 +151,30 @@ describe('ClaudeCodeAdapter', () => {
     clearRecentLogs();
   });
 
+  it('waits for the interrupted Goal runtime to drain and ignores its late state', async () => {
+    const output=createAsyncQueue<unknown>();
+    const sdk=createSdk([]);
+    const close=jest.fn();
+    sdk.query.mockReturnValue(Object.assign(output,{close,interrupt:jest.fn().mockResolvedValue({})}));
+    const adapter=new ClaudeCodeAdapter({vaultPath:'/vault',settings:getDefaultClaudeCodeBackendSettings(),sdk});
+    const sessionId=await adapter.createSession();
+    let observedObjective='';
+    adapter.subscribeToGoalEvents(event=>{if(event.type==='state')observedObjective=event.readback.goal?.objective??'';});
+    const sending=collectAsync(adapter.sendMessage({sessionId,content:'Run the bounded task'}));
+    await waitForExpect(()=>expect(sdk.query).toHaveBeenCalledTimes(1));
+    output.push({type:'active_goal',value:{objective:'Keep this objective',status:'active'}});
+    await waitForExpect(()=>expect(observedObjective).toBe('Keep this objective'));
+    let stopped=false;
+    const stopping=adapter.controlSessionGoal(sessionId,{action:'pause'}).then(result=>{stopped=true;return result;});
+    await waitForExpect(()=>expect(close).toHaveBeenCalled());
+    expect(stopped).toBe(false);
+    output.push({type:'active_goal',value:{objective:'Late stale objective',status:'active'}});
+    output.close();
+    const result=await stopping;
+    expect(result.readback.goal).toMatchObject({objective:'Keep this objective',execution:'stopped'});
+    await sending; await adapter.stop();
+  });
+
   it('starts and stops without spawning a real Claude process', async () => {
     const sdk = createSdk([]);
     const adapter = new ClaudeCodeAdapter({
@@ -204,6 +228,7 @@ describe('ClaudeCodeAdapter', () => {
     // has no native steer seam — and the adapter exposes no steerTurn method.
     const expected = [
       AgentCapability.Chat,
+      AgentCapability.Goal,
       AgentCapability.Sessions,
       AgentCapability.Fork,
       AgentCapability.Models,

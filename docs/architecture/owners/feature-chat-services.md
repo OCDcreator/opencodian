@@ -153,3 +153,7 @@ ComposerInputShellCoordinator 拥有新的单行底栏（附件 / permission / A
 ## 2026-10-30 会话标题
 
 TitleGenerationService 统一六后端生命周期、代次校验、本地/原生串行写入、隔离 aux 和重试。TitleModelResolver 隔离六种高风险目录格式与 provider 边界，不新增薄转发层。
+
+## 会话信息（2026-10-31）
+
+SessionInformationCoordinator 独立持有六后端信息缓存、来源/统计投影和子会话只读检查，复用 ContextUsageDisplayService。SessionWorkbenchCoordinator 只转发，不增加 OpenCodianView 状态所有权。

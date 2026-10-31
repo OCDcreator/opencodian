@@ -96,3 +96,11 @@ getRuntimeCommands() 读取 workspace/readPresentation 的 slashCommands，使�
 `getRuntimeMentionCandidates(sessionId?)` 使用官方 `plugins/referenceCatalog`，沿用 workspace／session 的目录权威，不跨后端复用插件列表。只显示 enabled 且 `conflictingPluginIds` 为空的稳定插件 ID，序列化保留 `plugin://pluginId` Markdown 目标；发送前用目标 session 目录重新验证。缺少 RPC 时返回空目录。未证明目标运行时存在 `ReadSessionContext` 的情况下，不伪造原生会话指针，由统一层使用历史快照。
 
 引用专用 `getPromptReferenceMessages` 直接请求 `session/messages`，只读已驻留来源的有效分支，不调用 start／resume；未驻留、RPC 不可用或响应无效时返回 null，允许统一层明确使用插件缓存快照。
+
+## Goal 与会话工作台（2026-10-30）
+
+Goal set/edit/pause/resume/clear 经过 session/goal 与 session/read.projection.target 对账；裸 /goal 为查询。显式 goalObjective 绕过控制词歧义，无法携带的附加上下文在变更前拒绝并保留草稿。持续事件不绑定首轮 iterator。
+
+## 会话信息面板（2026-10-31）
+
+只读 session/subagents 原生 childSessionIds/running/ended 投影与 management MCP catalog 供信息面板使用。不会为了读取而调用 session 激活；打开子会话验证原生父子关联并读取既有消息。未知账户额度保持 null。

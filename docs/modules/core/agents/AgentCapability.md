@@ -25,3 +25,7 @@
 - 2026-09-15: 新增 `AgentCapability.AuxQuery`（`aux-query`），用于 backend 无关的一次性只读辅助查询（inline edit）。能力接口见 `AgentAuxQueryCapability`。
 
 > 2026-09-18 (R-C3)：新增 `InlineCompletion: 'inline-completion'` 能力标识（Alt 一键补全的预热只读会话通道，`AgentInlineCompletionCapability`）。四后端均声明该能力；OpenCode 经穷举集 `OPENCODE_FULL_CAPABILITIES` 天然覆盖。
+
+## Goal 与会话工作台（2026-10-30）
+
+新增 Goal 能力标记。仅声明兼容目标控制的后端暴露；已退役的 OpenCode 1 显式排除 Goal。Pi 是否加载扩展还须运行时探测，枚举不是可用性证明。

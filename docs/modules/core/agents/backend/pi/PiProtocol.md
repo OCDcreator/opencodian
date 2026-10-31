@@ -20,3 +20,7 @@
 ## 2026-10-05 current SDK model levels
 
 `PiModelInfo.thinkingLevels?` 是安装 SDK 的 `getSupportedThinkingLevels(model)` 返回的模型专属档位。Pi service 沿该安装的 Node module 搜索路径读取 pi-ai 的公开 exports/import 入口，支持只有 ESM import 条件的 models 导出；不通过 CommonJS resolve 猜测这个入口。读取模型目录不调用 set_model、不改 native session 或 global settings。helper 不可用时不猜测档位，既有当前会话 typed read 保持其原边界。
+
+## Goal 与会话工作台（2026-10-30）
+
+SDK 工作台白名单加入 get_goal/control_goal，仍只允许命名协议，不反射任意 SDK 方法。

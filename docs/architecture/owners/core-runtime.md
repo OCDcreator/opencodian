@@ -58,3 +58,7 @@ The new core.backend-pi owner isolates the external Pi process service. core.run
 目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。
 
 2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `core.runtime` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。
+
+## Goal 与会话工作台（2026-10-30）
+
+WorkbenchHostRuntime 拥有插件启动的宿主 PTY 和显式 Git 操作；每会话身份隔离、输出环缓存、输入/resize/stop 统一。关闭浮层只关闭 UI；runtime dispose 仅清理自己创建的进程。macOS Python PTY / Windows ConPTY 是宿主能力，不归属于六后端。

@@ -54,3 +54,13 @@ Bundled Pi service forwards modern ModelRuntime OAuth LoginOptions.getDeviceId f
 ## 2026-10-29：会话引用只读路径
 
 `getPromptReferenceMessages(id)` 使用 `runtime.getExisting(id)`，仅从已经驻留的来源服务读取原生 `get_messages` 有效分支。该入口不会创建服务、恢复／切换来源会话；未驻留或读取不可用时返回 null，统一层可明确记录插件缓存快照的来源。
+
+## Goal 与会话工作台（2026-10-30）
+
+统一 Goal 接口由具名 @narumitw/pi-goal 0.54.x 桥驱动，catalog runtime 先探测是否实际加载；未加载扩展不可预备新目标。get_goal/control_goal 和 goal_update 边界持续读回，不安装或启用用户扩展。
+
+## 会话信息面板（2026-10-31）
+
+get_resources 的实际 agentsFiles 作为后端已加载上下文来源，仅返回路径/标签，不暴露提示词全文，也不把可用 skill 目录当作已注入来源。未有标准扩展读回的套餐、MCP、子智能体保持未报告。
+
+get_session_stats 同时提供原生 tokens.total（累计，包含缓存类别）和 contextUsage（当前窗口）；两组数独立返回，不能将累计数写入 context。

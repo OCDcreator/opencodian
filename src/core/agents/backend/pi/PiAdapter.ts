@@ -10,6 +10,8 @@ import type { AgentInlineCompletionCapability, InlineCompletionSession, InlineCo
 import { INLINE_COMPLETION_TURN_TIMEOUT_MS } from '../AgentInlineCompletionCapability';
 import type { AgentChatCapability, AgentChatSendRequest, AgentConnectionStatus, AgentForkCapability, AgentModelCapability, AgentSessionCapability, AgentTurnSteeringCapability, Disposable, StatusChangeHandler } from '../AgentService';
 import { type WarmableAuxSession,WarmInlineCompletionSession } from '../auxiliary/WarmInlineCompletionSession';
+import { type AgentGoalCommand, type AgentGoalControlResult, type AgentGoalEvent, type AgentGoalReadback,
+  BackendGoalRuntime, confirmGoalCommand, validateGoalCommand } from '../BackendGoalRuntime';
 import { PiAuxQuerySession } from './PiAuxQuerySession';
 import { PI_CONFIG_COMMANDS, PI_OPTIONAL_RPC_COMMANDS, PI_RPC_COMMANDS, PI_SDK_COMMANDS, type PiAvailableThinkingLevelsResult, type PiCommandName, type PiEntriesResult, type PiExtensionStatusSnapshot, type PiModelInfo, type PiServiceEvent, type PiUiHandler,type PiUnavailableCommandResult } from './PiProtocol';
 import { type PiLaunchOptions, type PiRecord, piRecord, type PiRpcPort } from './PiRpcClient';
@@ -35,6 +37,11 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
   readonly kind = 'pi' as const;
   readonly displayName = 'Pi';
   readonly description = 'Official Pi SDK · independent local service';
+  private readonly goals = new BackendGoalRuntime('pi', {
+    source: 'extension', driver: '@narumitw/pi-goal', actions: ['set', 'edit', 'pause', 'resume', 'clear'],
+    pauseMode: 'goal', editMode: 'edit', objectiveLimit: 4000, budgets: ['tokens'],
+  });
+  private goalListening = false;
   readonly capabilities: BackendCapabilities = new Set([
     AgentCapability.Chat, AgentCapability.Sessions, AgentCapability.Tools, AgentCapability.Models,
     AgentCapability.FileOps, AgentCapability.Shell, AgentCapability.Images, AgentCapability.CostTracking,
@@ -97,6 +104,49 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
   }
   onEvent(handler: (sessionId: string, event: PiServiceEvent) => void): Disposable {
     return { dispose: this.runtime.onEvent(handler) };
+  }
+
+  getGoalCapabilities() { return this.goals.capabilities; }
+
+  async probeGoalAvailability(): Promise<{ available: boolean; reason?: string }> {
+    try {
+      const result = await this.command(undefined, 'get_goal');
+      return { available: result.available === true, ...(typeof result.reason === 'string' ? { reason: result.reason } : {}) };
+    } catch (error) { return { available: false, reason: error instanceof Error ? error.message : String(error) }; }
+  }
+
+  subscribeToGoalEvents(handler: (event: AgentGoalEvent) => void): Disposable {
+    if (!this.goalListening) {
+      this.goalListening = true;
+      this.runtime.onEvent((sessionId, event) => {
+        if (event.type === 'goal_update' && event.available === true) this.goals.observe(sessionId, event.goal);
+        else if (event.type === 'goal_error') this.goals.fail(sessionId, event.error);
+        else if (event.type === 'agent_start') this.goals.activity(sessionId, 'running');
+        else if (event.type === 'agent_settled') this.goals.activity(sessionId, 'idle');
+        else if (event.type === 'transport_error') this.goals.fail(sessionId, event.error);
+      });
+    }
+    return this.goals.subscribe(handler);
+  }
+
+  async readSessionGoal(sessionId: string): Promise<AgentGoalReadback> {
+    const version = this.goals.version(sessionId);
+    try {
+      const result = await this.command(sessionId, 'get_goal');
+      if (result.available !== true) return this.goals.fail(sessionId, result.reason ?? 'A compatible pi-goal extension is unavailable', true);
+      return this.goals.observeRead(sessionId, result.goal, version);
+    } catch (error) { return this.goals.fail(sessionId, error); }
+  }
+
+  async controlSessionGoal(sessionId: string, command: AgentGoalCommand): Promise<AgentGoalControlResult> {
+    return this.goals.control(sessionId, async () => {
+      try {
+        validateGoalCommand(command, this.goals.capabilities);
+        const result = await this.command(sessionId, 'control_goal', { ...command });
+        if (result.available !== true) throw new Error(String(result.reason ?? 'pi-goal did not confirm the command'));
+        return confirmGoalCommand(command, this.goals.observe(sessionId, result.goal));
+      } catch (error) { return { status: 'failed', readback: this.goals.fail(sessionId, error) }; }
+    });
   }
   async start(): Promise<void> {
     if (this.startPromise) return this.startPromise;
@@ -270,6 +320,26 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
     const [stats, state] = await Promise.all([this.command(id, 'get_session_stats'), this.command(id, 'get_state')]);
     return buildPiUsageSnapshot(id, stats, state);
   }
+
+  async readSessionInformation(sessionId: string): Promise<import('../AgentService').AgentSessionInformation> {
+    const [resources, stats] = await Promise.all([this.command(sessionId, 'get_resources'), this.command(sessionId, 'get_session_stats')]);
+    const context = piRecord(resources.context);
+    const files = Array.isArray(context.agentsFiles) ? context.agentsFiles : [];
+    const tokens = piRecord(stats.tokens);
+    const occupancy = piRecord(stats.contextUsage);
+    return { sessionId, observedAt: Date.now(), quota: null, mcp: null, agents: null,
+      ...(typeof occupancy.tokens === 'number' && typeof occupancy.contextWindow === 'number' && occupancy.contextWindow > 0
+        ? { context: { tokens: occupancy.tokens, window: occupancy.contextWindow } } : {}),
+      ...(typeof tokens.input === 'number' && typeof tokens.output === 'number' && typeof tokens.total === 'number' ? { usage: {
+        inputTokens: tokens.input, outputTokens: tokens.output, totalTokens: tokens.total,
+        ...(typeof stats.cost === 'number' ? { cost: stats.cost } : {}),
+      } } : {}),
+      sources: files.flatMap((value) => {
+        const file = piRecord(value);
+        return typeof file.path === 'string' ? [{ label: path.basename(file.path), path: file.path, detail: 'Pi context' }] : [];
+      }),
+    };
+  }
   async compactSession(id: string, customInstructions?: string): Promise<boolean> {
     await this.command(id, 'compact', { customInstructions }); return true;
   }
@@ -374,7 +444,9 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
     const unsubscribe = client.subscribe(enqueue);
     let completed = false;
     let failure: Error | undefined;
-    const pending = client.request(buildPiPrompt(request), 0).catch((error) => { failure = error instanceof Error ? error : new Error(String(error)); })
+    const prompt = buildPiPrompt(request);
+    this.applyGoalIntent(prompt, request);
+    const pending = client.request(prompt, 0).catch((error) => { failure = error instanceof Error ? error : new Error(String(error)); })
       .finally(() => { completed = true; wake?.(); });
     try {
       while (!completed || queue.length) {
@@ -397,6 +469,13 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
         finally { clearTimeout(forceClose); }
       }
     }
+  }
+
+  private applyGoalIntent(prompt: PiRecord, request: AgentChatSendRequest): void {
+    const objective = request.options?.goalObjective;
+    if (typeof objective !== 'string') return;
+    validateGoalCommand({ action: 'set', objective }, this.goals.capabilities);
+    prompt.goalObjective = objective;
   }
   private async readExtensionCommand(client: PiRpcPort, content: string): Promise<string | null> {
     const name = content.trim().match(/^\/([^\s]+)(?:\s|$)/)?.[1];

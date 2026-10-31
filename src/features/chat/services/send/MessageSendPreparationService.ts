@@ -46,6 +46,8 @@ export type SendPreparationServerAvailability =
   | 'external';
 
 export interface SendMessageModelOptions {
+  /** Explicit one-shot Goal creation intent; never inferred from ordinary follow-up messages. */
+  goalObjective?: string;
   provider?: string;
   model?: string;
   variant?: string;
@@ -91,6 +93,7 @@ export type ComposerInputSubmission =
   | ShellComposerSubmission;
 
 export interface PrepareMessageSendOptions {
+  goalObjective?: string;
   content: string;
   syntheticTextParts?: PromptSyntheticTextPartInput[];
   invocationIntent?: SurfaceInvocationIntent;
@@ -129,6 +132,7 @@ export interface PreparedMessageSend {
 
 export interface BuildOptimisticUserMessageOptions {
   content: string;
+  goalObjective?: string;
   contextItems: PromptContextItem[];
   now?: number;
   structuredSend?: {
@@ -149,7 +153,10 @@ export function buildOptimisticUserMessage(
     content,
     timestamp: now,
     contextAttachments: contextAttachments.length > 0 ? contextAttachments : undefined,
-    ...(structuredSend?.optimisticUserParts ? { parts: structuredSend.optimisticUserParts } : {}),
+    ...(structuredSend?.optimisticUserParts || options.goalObjective !== undefined ? { parts: [
+      ...(structuredSend?.optimisticUserParts ?? []),
+      ...(options.goalObjective !== undefined ? [{ type: 'opencodian_goal_intent' }] : []),
+    ] } : {}),
     ...(images && images.length > 0 ? { images } : {}),
   };
 }
@@ -498,6 +505,7 @@ export class MessageSendPreparationService {
     if (options.outputFormat) {
       modelOptions.outputFormat = options.outputFormat;
     }
+    if (options.goalObjective !== undefined) modelOptions.goalObjective = options.goalObjective;
     let references: PreparedPromptReferences | undefined;
     try {
       references = await this.host.preparePromptReferences?.(options.content, conversation);
@@ -598,6 +606,7 @@ export class MessageSendPreparationService {
     });
     const userMessage = buildOptimisticUserMessage({
       content: displayContent,
+      goalObjective: options.goalObjective,
       contextItems,
       now: Date.now(),
       structuredSend: { optimisticUserParts: structuredSend.optimisticUserParts },

@@ -86,16 +86,17 @@ describe('OpenCodeAdapter', () => {
     expect(adapter.description).toBeTruthy();
   });
 
-  it('has full OpenCode capabilities except TurnSteering', () => {
+  it('keeps retired OpenCode free of Goal and TurnSteering', () => {
     const adapter = new OpenCodeAdapter(createMockOpenCodeService());
-    expect(adapter.capabilities.size).toBe(OPENCODE_FULL_CAPABILITIES.size - 1);
+    expect(adapter.capabilities.size).toBe(OPENCODE_FULL_CAPABILITIES.size - 2);
+    expect(adapter.hasCapability(AgentCapability.Goal)).toBe(false);
     expect(adapter.hasCapability(AgentCapability.TurnSteering)).toBe(false);
   });
 
-  it('hasCapability returns true for all known capabilities except TurnSteering', () => {
+  it('excludes unsupported Goal and TurnSteering from the legacy adapter', () => {
     const adapter = new OpenCodeAdapter(createMockOpenCodeService());
     for (const cap of Object.values(AgentCapability)) {
-      expect(adapter.hasCapability(cap)).toBe(cap !== AgentCapability.TurnSteering);
+      expect(adapter.hasCapability(cap)).toBe(cap !== AgentCapability.TurnSteering && cap !== AgentCapability.Goal);
     }
   });
 
@@ -248,7 +249,7 @@ describe('OpenCodeAdapter', () => {
     const info = adapter.getInfo();
     expect(info.kind).toBe('opencode');
     expect(info.displayName).toBe('OpenCode');
-    expect(info.capabilities.size).toBe(OPENCODE_FULL_CAPABILITIES.size - 1);
+    expect(info.capabilities.size).toBe(OPENCODE_FULL_CAPABILITIES.size - 2);
     expect(info.capabilities.has(AgentCapability.TurnSteering)).toBe(false);
     expect(info.status).toBe('connected');
   });

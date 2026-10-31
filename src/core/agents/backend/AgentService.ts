@@ -14,6 +14,7 @@
 import type { AgentBackendKind, ImageAttachment, StreamChunk } from '../../types/chat';
 import type { SessionDiffEntry } from '../../types/chat';
 import type { AgentCapability, BackendCapabilities } from '../AgentCapability';
+import type { AgentGoalCapabilities, AgentGoalCommand, AgentGoalControlResult, AgentGoalEvent, AgentGoalReadback } from './BackendGoalRuntime';
 
 // ---------------------------------------------------------------------------
 // Shared types
@@ -44,6 +45,34 @@ export interface AgentServiceInfo {
   readonly description: string;
   readonly status: AgentConnectionStatus;
   readonly capabilities: BackendCapabilities;
+}
+
+/** Native readbacks for the session information panel. Null means unreported, never zero. */
+export interface AgentSessionInformation {
+  sessionId: string;
+  observedAt: number;
+  quota: {
+    plan?: string;
+    windows: Array<{ label: string; usedPercent: number; resetsAt?: number }>;
+  } | null;
+  mcp: {
+    scope: 'session' | 'workspace';
+    servers: Array<{ name: string; status: string; toolCount?: number }>;
+  } | null;
+  agents: AgentSessionChild[] | null;
+  /** Last measured model context occupancy, never a sum of session requests. */
+  context?: { tokens: number; window: number };
+  /** Native cumulative session usage; independent of current context occupancy. */
+  usage?: { inputTokens: number; outputTokens: number; totalTokens?: number; cost?: number };
+  sources?: Array<{ label: string; path?: string; detail?: string }>;
+}
+
+export interface AgentSessionChild {
+  id: string;
+  title: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'unknown';
+  detail?: string;
+  readable: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -95,6 +124,10 @@ export interface AgentService {
    * backends (Codex app-server) use this to let composer slots refresh.
    */
   onCapabilitiesChange?(handler: CapabilityChangeHandler): Disposable;
+
+  /** Reads this backend's runtime, without sending a prompt or switching the active session. */
+  readSessionInformation?(sessionId: string): Promise<AgentSessionInformation>;
+  readChildSessionMessages?(parentSessionId: string, childId: string): Promise<import('../../types/chat').ChatMessage[]>;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,6 +154,14 @@ export interface AgentChatSendRequest {
 export interface AgentChatCapability extends AgentService {
   sendMessage(request: AgentChatSendRequest): AsyncGenerator<StreamChunk>;
   cancelStream(sessionId: string): Promise<void> | void;
+}
+
+/** Native or explicitly selected extension Goal control. State outlives one chat send. */
+export interface AgentGoalCapability extends AgentService {
+  getGoalCapabilities(): AgentGoalCapabilities;
+  readSessionGoal(sessionId: string): Promise<AgentGoalReadback>;
+  controlSessionGoal(sessionId: string, command: AgentGoalCommand): Promise<AgentGoalControlResult>;
+  subscribeToGoalEvents(handler: (event: AgentGoalEvent) => void): Disposable;
 }
 
 /** Sessions: create, delete, retitle, and read backend-owned sessions. */

@@ -314,7 +314,8 @@ export interface AppServerThreadGoal {
  */
 export interface AppServerSetThreadGoalOptions {
   status?: AppServerThreadGoalStatus;
-  tokenBudget?: number;
+  /** Codex 0.165.0's generated ThreadGoalSetParams accepts explicit null. */
+  tokenBudget?: number | null;
 }
 
 /** Fork result shape from app-server thread/fork. */

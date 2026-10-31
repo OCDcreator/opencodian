@@ -1,10 +1,12 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
+import { controlPiGoal, readPiGoal } from './goals.mjs';
 
 /** Public SDK business operations. No eval and no arbitrary method invocation. */
 export const RPC_COMMANDS = ['prompt', 'steer', 'follow_up', 'abort', 'new_session', 'get_state', 'set_model', 'cycle_model', 'get_available_models', 'set_thinking_level', 'cycle_thinking_level', 'get_available_thinking_levels', 'set_steering_mode', 'set_follow_up_mode', 'compact', 'set_auto_compaction', 'set_auto_retry', 'abort_retry', 'bash', 'abort_bash', 'get_session_stats', 'export_html', 'switch_session', 'fork', 'clone', 'get_fork_messages', 'get_entries', 'get_last_assistant_text', 'set_session_name', 'get_messages', 'get_commands'];
 export const SDK_COMMANDS = ['get_tree', 'navigate_tree', 'label_entry', 'list_sessions', 'import_session', 'export_jsonl', 'get_tools', 'set_tools', 'get_resources', 'reload', 'clear_queue', 'get_queue', 'abort_compaction', 'abort_branch_summary', 'get_auth', 'set_api_key', 'login', 'logout', 'get_packages', 'install_package', 'remove_package', 'update_package', 'set_scoped_models'];
 export const CONFIG_COMMANDS = ['get_configuration', 'save_configuration', 'get_model_configuration', 'save_model_configuration'];
+export const GOAL_COMMANDS = ['get_goal', 'control_goal'];
 export const BUSY_ALLOWED = new Set(['get_state', 'get_messages', 'get_session_stats', 'get_commands', 'get_tree', 'get_fork_messages', 'get_last_assistant_text', 'get_tools', 'get_resources', 'get_queue', 'get_auth', 'get_packages', 'get_available_models', 'get_available_thinking_levels', 'get_entries', 'steer', 'follow_up', 'abort', 'abort_retry', 'abort_bash', 'abort_compaction', 'abort_branch_summary', 'clear_queue']);
 
 const required = (value, name) => {
@@ -71,8 +73,10 @@ export async function executeCommand(host, c) {
   const registry = s.modelRegistry ?? (host.modelRuntime ? new host.sdk.ModelRegistry(host.modelRuntime) : undefined);
   host.auth.reload?.();
   switch (c.type) {
+    case 'get_goal': return readPiGoal(s);
+    case 'control_goal': return controlPiGoal(s, c);
     case 'get_state': return { ...sessionState(s), serviceProtocol: 1, sdkVersion: host.sdk.VERSION,
-      commands: [...RPC_COMMANDS, ...SDK_COMMANDS, ...CONFIG_COMMANDS].filter((name) => capabilities[name]?.status !== 'unavailable'), capabilities };
+      commands: [...RPC_COMMANDS, ...SDK_COMMANDS, ...CONFIG_COMMANDS, ...GOAL_COMMANDS].filter((name) => capabilities[name]?.status !== 'unavailable'), capabilities };
     case 'get_configuration': return host.configuration.getSettings();
     case 'save_configuration': return host.configuration.saveSettings(c);
     case 'get_model_configuration': return host.configuration.getModels();
@@ -80,7 +84,11 @@ export async function executeCommand(host, c) {
     case 'prompt': await s.prompt(required(c.message, 'Message'), { images: await host.prepareImages(c.images), streamingBehavior: c.streamingBehavior, source: 'rpc' }); await s.agent.waitForIdle(); return {};
     case 'steer': await s.steer(required(c.message, 'Message'), await host.prepareImages(c.images)); return {};
     case 'follow_up': await s.followUp(required(c.message, 'Message'), await host.prepareImages(c.images)); return {};
-    case 'abort': host.ui.cancelAll(); s.abortCompaction(); s.abortBranchSummary(); s.abortBash(); host.loginAbort?.abort(); await s.abort(); return {};
+    case 'abort': {
+      const goal = readPiGoal(s);
+      if (goal.available && goal.goal?.status === 'active') await controlPiGoal(s, { action: 'pause' });
+      host.ui.cancelAll(); s.abortCompaction(); s.abortBranchSummary(); s.abortBash(); host.loginAbort?.abort(); await s.abort(); return {};
+    }
     case 'new_session': return host.runtime.newSession({ parentSession: c.parentSession });
     case 'get_available_models': return { models: registry.getAvailable().map(model => ({
       ...model,

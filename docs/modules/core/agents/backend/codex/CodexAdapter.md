@@ -146,3 +146,15 @@ Codex CLI account/model fallback reads snapshot the current provider-domain envi
 ## 2026-10-30 六后端标题生命周期
 
 getSession 对已有本地映射且已绑定 threadId 的活跃会话也读 app-server thread name；保留 provisionalId，标记 titleSource=native/first_input。避免内存条目遮蔽原生标题更新。
+
+## Goal 与会话工作台（2026-10-30）
+
+统一 Goal 接缝复用 thread goal API，持续 goal/turn 通知投影。strict 读失败与无目标分离；清除成功后才移除缓存，并中断该 thread 的当前 turn。getChatMessages 从 thread 原生 items 保留自动轮、工具与 reasoning，避免 preview 丢弃命令活动。
+
+## 会话信息面板（2026-10-31）
+
+会话信息通过 account/rateLimits/read 和完整 MCP catalog 读取真实账户/工作区数据；空完整目录和失败/不可用不同。子线程通过原生 readThread 的历史读取入口投影，不恢复或启动线程。
+
+MCP authStatus 不充当连接状态；工作区目录返回仅标记“目录可见”及工具数，避免把 unsupported OAuth 误报成服务不可用。
+
+历史父线程的 subAgentActivity 直接重建原生子线程列表和最新状态，子会话读取先验证同一父线程的原生链接。现有快照缓存额外保留来自 tokenUsage.last 的 currentContext，信息面板不将累计 total 充当窗口占用。

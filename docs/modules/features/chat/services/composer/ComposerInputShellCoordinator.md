@@ -200,3 +200,7 @@ Composer 正文重新收束为「上下文 chips → textarea」两层；发送�
 `mountSelectionControls(toolbar, options)` 的 options 增加可选 `modelContainer`，permission 挂在独立 toolbar，model selector 挂到模型 slot。shell 不直接调用 `mountEffortSelector`；effort 由 `ChatSelectionControlsCoordinator` 挂在模型弹层下半部。capability hint 留在独立辅助弹层，不影响主控件顺序。
 
 菜单向上展开。窄于 500px 时通过 container query 收紧 permission、Agent 和模型间距，并使用独立 full/short 文本节点显示 effort 短标签（例如「关闭思考」→「关闭」），避免 CSS 伪元素导致读屏重复。
+
+## Goal 与会话工作台（2026-10-30）
+
+上下文圈环右侧增加独立 Goal slot。已预备目标按普通文本提交并保留原文；发送按钮 aria-label 表达目标动作。新增附图和插入草稿公共方法供工作台使用。

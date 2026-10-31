@@ -644,6 +644,12 @@ export class ClaudeCodeStreamNormalizer {
     }
 
     const chunks: StreamChunk[] = [];
+    if (record.type === 'active_goal') {
+      chunks.push({ type: 'backend_event', source: 'claude-code',
+        event: record.value === null ? 'goal_cleared' : 'goal_updated',
+        metadata: { sessionId, goal: record.value } });
+      return chunks;
+    }
     this.appendLifecycleChunks(record, chunks, sessionId);
     this.appendDeltaChunk(record, chunks);
     if (this.appendMessageErrorChunk(record, chunks)) {

@@ -424,3 +424,7 @@ The plugin composition supplies Pi extension-command completion localization thr
 ## 2026-10-30 六后端标题生命周期
 
 会话 metadata 冷启动和 createConversationFromSession 透传 titleState。generateDefaultTitle 支持中文句末分隔并按 Unicode 码点截取，避免 emoji 半个 surrogate。标题执行仍归标题服务。
+
+## Goal 与会话工作台（2026-10-30）
+
+注册 opencodian-workbench 主工作区视图。仅构造 SessionWorkbenchDesktopView，终端、工具与会话资源所有权仍在对应宿主 runtime / UI owner。

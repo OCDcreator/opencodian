@@ -180,3 +180,7 @@ chunk router 现在由 `runtime/StreamChunkRouter.ts` 承接，并继续下钻�
 ## 2026-10-29：引用请求与回显分离
 
 传输优先使用 preparedSend.requestContent，并完整转发 modelOptions.nativeMentions。会话快照与后端原生引用进入真实请求，持久化用户消息仍保留可读回显；队列消费继续走同一发送准备与验证路径。
+
+## Goal 与会话工作台（2026-10-30）
+
+goalObjective 在发送中保留完整原文；目标输入不被 /json 结构输出语法剥离。普通补充消息沿用既有发送流程，不修改目标。

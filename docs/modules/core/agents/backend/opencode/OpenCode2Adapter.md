@@ -76,3 +76,13 @@ After owned process stop, cleanup resolves and checks the created scope realpath
 ## 2026-10-30 六后端标题生命周期
 
 generateTitle 继续走无聊天 session 的 generate.text，新增 AbortSignal 透传至 RequestOptions；请求预算和选模由标题服务拥有。
+
+## Goal 与会话工作台（2026-10-30）
+
+通过 RPC opencode.goal 的 get/changed 读取和订阅原生 Goal，session.command 执行 set/pause/resume/clear。goalObjective 原文编码，引用文本写入独立 session instructions entry。后台任务读取消继续使用当前 native session ID。
+
+## 会话信息面板（2026-10-31）
+
+readSessionInformation 使用目录作用域 mcp.list 和 parentID 原生子会话列表；succeeded/failed/interrupted 保留语义。子会话读取先验证 parent-child 关联，再读取真实消息。
+
+子智能体列表必须同时存在 parentID 关系及父消息 subagent 工具的原生链接，普通 fork 不进入列表。后台启动工具已完成但 metadata.status 仍 running 时保持运行中，终态由原生 child.outcome 覆盖。当前上下文来自最近已报告用量的 assistant 消息与该消息模型的窗口；累计来自 session.tokens，各自都计入原生独立缓存类别。

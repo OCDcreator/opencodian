@@ -25,6 +25,7 @@ export const PI_SDK_COMMANDS = [
   'get_tree', 'navigate_tree', 'label_entry', 'list_sessions', 'import_session', 'export_jsonl', 'get_tools', 'set_tools',
   'get_resources', 'reload', 'clear_queue', 'get_queue', 'abort_compaction', 'abort_branch_summary',
   'get_auth', 'set_api_key', 'login', 'logout', 'get_packages', 'install_package', 'remove_package', 'update_package', 'set_scoped_models',
+  'get_goal', 'control_goal',
 ] as const;
 export const PI_CONFIG_COMMANDS = ['get_configuration', 'save_configuration', 'get_model_configuration', 'save_model_configuration'] as const;
 export type PiCommandName = typeof PI_RPC_COMMANDS[number] | PiOptionalCommandName | typeof PI_SDK_COMMANDS[number] | typeof PI_CONFIG_COMMANDS[number];

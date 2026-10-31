@@ -114,3 +114,13 @@
 - [SettingsDshSection](features/settings/backends/dsh/SettingsDshSection.md)
 
 - [TitleModelResolver](features/chat/services/title/TitleModelResolver.md)：六后端标题模型目录/provider 边界。
+
+## 会话工作台（2026-10-30）
+
+- [Goal 后端契约](core/agents/backend/BackendGoalRuntime.md)
+- [会话信息与子会话](features/chat/services/conversation/SessionInformationCoordinator.md)
+- [信息面板渲染](features/chat/ui/SessionWorkbenchInformation.md)
+- [工作台投影](features/chat/services/conversation/SessionWorkbenchCoordinator.md)
+- [工作台 UI](features/chat/ui/SessionWorkbench.md)
+- [桌面工具](features/chat/ui/SessionWorkbenchTools.md)
+- [宿主运行时](core/runtime/WorkbenchHostRuntime.md)

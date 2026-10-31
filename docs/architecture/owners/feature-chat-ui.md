@@ -96,3 +96,11 @@ Codex 会话浏览器从结构化目录结果保留权限拒绝分类，现有 s
 2026-10-27 思考强度胶囊样式：EffortSelector 在原生 range 外增加局部 control 容器，装饰圆点按真实 variants 的数量对齐 thumb 中心，当前圆点跟随预览和回读隐藏。header 与 aria-valuetext 继续显示完整档位名，保存、default/inherit/off 及生效边界由原有 host callbacks 决定；未改变 owner 依赖或后端配置职责。
 
 2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `feature.chat-ui` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。
+
+## Goal 与会话工作台（2026-10-30）
+
+SessionWorkbench 为 320px 状态胶囊/分组浮层，展开后提供任务、文件和工具详情。SessionWorkbenchTools 与主区域 DesktopView 共享宿主 runtime；工具视图不启动后端自动轮，不把 Git 工作区当成会话修改记录。原生状态、迟到响应和目标输入确认由 SessionWorkbenchCoordinator 负责。
+
+## 会话信息（2026-10-31）
+
+SessionWorkbenchInformation 定义面板 DTO 并渲染信息及子会话，SessionWorkbench 只管理容器、折叠、滚动与 Goal；二者保持单向依赖。

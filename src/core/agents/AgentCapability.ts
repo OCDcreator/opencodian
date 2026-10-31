@@ -36,6 +36,7 @@ export const AgentCapability = {
   AuxQuery: 'aux-query',
   InlineCompletion: 'inline-completion',
   TurnSteering: 'turn-steering',
+  Goal: 'goal',
 } as const;
 
 export type AgentCapability = (typeof AgentCapability)[keyof typeof AgentCapability];

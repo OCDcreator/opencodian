@@ -1,8 +1,6 @@
 /**
  * ModifiedFilesSidebar - compact, clickable summary of the active session diff.
- *
- * The entries are supplied by the chat runtime; this component never requests
- * Git state or renders patch content.
+ * The chat runtime supplies entries; Git state belongs to the workbench tools.
  */
 
 import { App, Component, setIcon } from 'obsidian';
@@ -155,9 +153,7 @@ export class ModifiedFilesSidebar extends Component {
 
   setVisible(enabled: boolean): void {
     this.wrapperEl.classList.toggle('is-disabled', !enabled);
-    if (!enabled) {
-      this.setExpanded(false);
-    }
+    if (!enabled) this.setExpanded(false);
   }
 
   private setExpanded(expanded: boolean): void {
@@ -167,6 +163,8 @@ export class ModifiedFilesSidebar extends Component {
     this.containerEl.classList.toggle('is-expanded', this.expanded);
     this.hostEl.setAttribute('aria-expanded', String(this.expanded));
   }
+
+  attachToWorkbench(parentEl: HTMLElement): void { parentEl.appendChild(this.wrapperEl).addClass('is-workbench-inline'); this.hostEl.hidden = true; }
 
   private updateSummary(): void {
     const showingRevert = this.hasRevertEntries();

@@ -109,3 +109,7 @@ host 可选提供 `canOpenExperimentalActions()` 与 `openExperimentalActions()`
 - 源码位置：`src/features/chat/services/conversation/ConversationSessionSettingsCoordinator.ts`。
 - 原位置：`src/features/chat/services/ConversationSessionSettingsCoordinator.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/core/agents/backend/codex/CodexAdapter.ts`、`src/core/agents/backend/codex/CodexAppServerClient.ts`。
+
+## Goal 与会话工作台（2026-10-30）
+
+Codex 目标读取采用 strict 模式，RPC 失败与 null 目标分离；统一 Goal 状态由 adapter 维护。

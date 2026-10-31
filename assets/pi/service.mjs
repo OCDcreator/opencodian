@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { BUSY_ALLOWED, executeCommand, persistNativeBranch } from './commands.mjs';
 import { createConfigurationService, startConfigurationTransport } from './configuration.mjs';
 import { createExtensionUi } from './extension-ui.mjs';
+import { controlPiGoal, readPiGoal } from './goals.mjs';
 
 /** Resolve the installed package's public ESM export, including import-only exports. */
 export async function loadModelThinkingLevels(sdkPath) {
@@ -139,7 +140,14 @@ export async function startPiService(sdkPath, options, streams = process) {
       switchSession: (file, o) => host.runtime.switchSession(file, { ...o, cwdOverride: cwd }), reload: () => session.reload(),
     }, onError: (error) => write({ type: 'extension_error', ...error }), shutdownHandler: () => shutdown() });
     unsubscribeAgent = session.agent.subscribe((event) => { if (event.type === 'agent_end') rawEnds++; });
-    unsubscribe = session.subscribe((event) => { if (event.type === 'agent_end') processedEnds++; write({ ...event, requestToken }); });
+    unsubscribe = session.subscribe((event) => {
+      if (event.type === 'agent_end') processedEnds++;
+      write({ ...event, requestToken });
+      if (['agent_end', 'agent_settled', 'turn_end'].includes(event.type)) {
+        try { write({ type: 'goal_update', ...readPiGoal(session) }); }
+        catch (error) { write({ type: 'goal_error', error: error.message }); }
+      }
+    });
   };
   host.runtime.setRebindSession(bind);
   let ready = Promise.resolve();
@@ -149,7 +157,8 @@ export async function startPiService(sdkPath, options, streams = process) {
     // SDK event processing can yield in extension hooks. Observe public state after the
     // awaited prompt and each event-loop checkpoint; no silence-based completion guess.
     await new Promise(setImmediate);
-    while (processedEnds < rawEnds || host.runtime.session.isStreaming || host.runtime.session.isRetrying || host.runtime.session.isCompacting) {
+    while (processedEnds < rawEnds || host.runtime.session.isStreaming || host.runtime.session.isRetrying || host.runtime.session.isCompacting
+      || readPiGoal(host.runtime.session).goal?.status === 'active') {
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
     await host.runtime.session.agent.waitForIdle();
@@ -163,13 +172,25 @@ export async function startPiService(sdkPath, options, streams = process) {
       catch (error) { write({ type: 'response', id: c.id, command: c.type, success: false, error: String(error?.message ?? error) }); }
       return;
     }
-    const mutation = !BUSY_ALLOWED.has(c.type);
+    const mutation = !BUSY_ALLOWED.has(c.type) && !['get_goal', 'control_goal'].includes(c.type);
     if (busy && mutation) { write({ type: 'response', id: c.id, command: c.type, success: false, error: 'Pi session is busy.' }); return; }
     if (mutation) busy = true;
     if (c.type === 'prompt') requestToken = c.id;
     try {
       await ready;
+      if (c.type === 'prompt' && typeof c.goalObjective === 'string') {
+        // This extension's public slash command cannot carry RPC image payloads.
+        // Refuse before setting the objective; the composer retains the draft.
+        if (c.images?.length || c.message !== c.goalObjective)
+          throw new Error('This pi-goal version cannot carry images or injected context on Goal creation. Send reference material before setting the goal.');
+        const result = await controlPiGoal(host.runtime.session, { action: 'set', objective: c.goalObjective, tokenBudget: c.tokenBudget });
+        write({ type: 'goal_update', ...result });
+        await settlePrompt();
+        write({ type: 'response', id: c.id, command: c.type, success: true, data: result });
+        return;
+      }
       const data = await executeCommand(host, c);
+      if (c.type === 'control_goal') write({ type: 'goal_update', ...data });
       if (c.type === 'prompt') await settlePrompt();
       write({ type: 'response', id: c.id, command: c.type, success: true, data });
     } catch (error) {

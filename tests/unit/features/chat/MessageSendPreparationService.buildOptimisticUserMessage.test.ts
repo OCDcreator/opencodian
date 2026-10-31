@@ -9,6 +9,12 @@ import {
 } from './MessageSendPreparationService.testSupport';
 
 describe('buildOptimisticUserMessage', () => {
+  it('marks an explicit Goal intent without adding it to ordinary follow-ups', () => {
+    const options = { content: 'Complete the checks', contextItems: [], now: 123 };
+    expect(buildOptimisticUserMessage({ ...options, goalObjective: options.content }).parts)
+      .toEqual([{ type: 'opencodian_goal_intent' }]);
+    expect(buildOptimisticUserMessage(options).parts).toBeUndefined();
+  });
   it('builds a user message with context attachments', () => {
     const contextItem = createPromptContextItem();
     const optimisticUserParts: PromptRequestPart[] = [

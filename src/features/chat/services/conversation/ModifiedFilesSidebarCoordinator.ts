@@ -101,6 +101,8 @@ export class ModifiedFilesSidebarCoordinator {
     this.sidebar?.setVisible(enabled);
   }
 
+  attachToWorkbench(parentEl: HTMLElement): void { this.sidebar?.attachToWorkbench(parentEl); }
+
   destroy(): void {
     this.refreshRevision += 1;
     this.sidebar?.destroy();

@@ -32,7 +32,7 @@ describe('Pi backend isolation contract', () => {
     // for its config files, so reading those files means reading them the same
     // way; it stays an external package here and never pulls in another
     // backend implementation.
-    const allowed = ['../AgentService', '../AgentAuxQueryCapability', '../AgentInlineCompletionCapability', '../auxiliary/WarmInlineCompletionSession', '../../AgentCapability', '../../../types/chat', '../../../types/settings', '../../../memory', '../../../obsidianTooling', '../../../../shared/logger', 'jsonc-parser'];
+    const allowed = ['../AgentService', '../BackendGoalRuntime', '../AgentAuxQueryCapability', '../AgentInlineCompletionCapability', '../auxiliary/WarmInlineCompletionSession', '../../AgentCapability', '../../../types/chat', '../../../types/settings', '../../../memory', '../../../obsidianTooling', '../../../../shared/logger', 'jsonc-parser'];
     expect(imports.filter((specifier) => !specifier.startsWith('node:') && !specifier.startsWith('./') && !allowed.includes(specifier))).toEqual([]);
   });
 

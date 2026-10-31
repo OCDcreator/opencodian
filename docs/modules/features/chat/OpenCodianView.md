@@ -912,3 +912,11 @@ selection host 新增 `getEffortDisplayLabel()`，组合 trigger 只读取当前
 ## 2026-10-30 六后端标题生命周期
 
 标题生成/保存/原生写入委托 TitleGenerationService；view 只提供 conversation/model snapshot、刷新所有匹配标签及 rail。首条规则标题不写回原生；人工 rename 走 revision，ZCode 保留原生先确认。失败重试沿用会话模型；hydrate 调用 recoverPending，不自动重发模型请求。本节取代下文早期的 OpenCode-only/fallback 字符串相等/切换取消描述。
+
+## Goal 与会话工作台（2026-10-30）
+
+装配 SessionWorkbenchCoordinator、SessionWorkbenchTools 和 WorkbenchHostRuntime。靶心意图绑定原始 tab，原生确认后清空输入；停止先处理原 tab 的目标再中断其 stream。六后端自动轮通过原生 transcript 继续对账，保留滚动与来源。工作台不实现自动续跑循环。
+
+## 会话信息面板（2026-10-31）
+
+workbenchSession 只转发当前 tab 的 contextUsage 给信息 owner；六后端读取与子会话轮询均不增加 View 运行时所有权。

@@ -26,6 +26,9 @@ import type {
   StatusChangeHandler,
 } from '../AgentService';
 import { WarmInlineCompletionSession } from '../auxiliary/WarmInlineCompletionSession';
+import { type AgentGoalCommand, type AgentGoalControlResult, type AgentGoalEvent, type AgentGoalReadback,
+  BackendGoalRuntime, confirmGoalCommand, validateGoalCommand } from '../BackendGoalRuntime';
+import { backendSessionMessagesToChat } from '../BackendSessionMessages';
 import {
   DshAcpClient,
   type DshAcpClientOptions,
@@ -87,6 +90,10 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
   readonly kind = 'dsh' as const;
   readonly displayName = 'DeepSeek Harness';
   readonly description = 'DeepSeek Harness native runtime';
+  private readonly goals = new BackendGoalRuntime('dsh', {
+    source: 'native', driver: 'dsh.native-goal', actions: ['set', 'edit', 'pause', 'resume', 'clear'],
+    pauseMode: 'goal', editMode: 'edit', budgets: [],
+  });
   private readonly auxiliaryText = new Map<string, (text: string) => void>();
   private toolCatalog: unknown[] = [];
   private readonly questions = new DshQuestionBridge((sessionId, chunk) => {
@@ -136,12 +143,13 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
       // construction still requires the native runtime proof before a query.
       ...(handshake?.nativeProtocol === 'opencodian.dsh-native/1' || handshake === null && this.options.getSettings().transport !== 'acp'
         ? [AgentCapability.AuxQuery, AgentCapability.InlineCompletion, AgentCapability.Questions,
-          AgentCapability.Fork, AgentCapability.TurnSteering, AgentCapability.Tools, AgentCapability.Compaction] : []),
+          AgentCapability.Fork, AgentCapability.TurnSteering, AgentCapability.Tools, AgentCapability.Compaction, AgentCapability.Goal] : []),
     ]));
     for (const handler of this.capabilityHandlers) handler(this.capabilitiesValue);
   }
 
   private clearSessionRuntime(): void {
+    this.goals.invalidate('Harness runtime closed');
     this.sessions.clear();
     this.resumePromises.clear();
     this.configurations.clear();
@@ -361,19 +369,21 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
     await client.nativeRequest('session/title', { sessionId, title });
   }
 
-  async getSessionMessages(sessionId: string): Promise<unknown[]> {
+  async getSessionMessages(sessionId: string, options?: Record<string, unknown>): Promise<unknown[]> {
     const client = await this.ready();
     if (!client.nativeRequest) throw new Error('DSH ACP does not expose session history');
-    const result = await client.nativeRequest('session/history', { sessionId });
+    const parentSessionId = options?.parentSessionId;
+    const result = typeof parentSessionId === 'string'
+      ? await client.nativeRequest('session/child-history', { sessionId: parentSessionId, childId: sessionId })
+      : await client.nativeRequest('session/history', { sessionId });
     if (!Array.isArray(result.messages)) throw new Error('Harness returned an invalid transcript');
     return result.messages.flatMap<unknown>((value) => {
       const message = asRecord(value);
       if (!message || !Array.isArray(message.content)) throw new Error('Harness returned an invalid transcript message');
       if (message.role === 'user' && message.sourceKind && message.sourceKind !== 'user') return [];
       if (message.role === 'tool') {
-        return [{ id: message.id, info: { id: message.id, role: 'activity' }, parts: [{ type: 'text',
-          text: `Tool ${String(message.toolCallId ?? '')}${message.isError ? ' failed' : ' result'}:\n`
-            + message.content.map((block) => dshContentBlockText(asRecord(block))).filter(Boolean).join('\n') }] }];
+        return [{ ...message, content: [{type:'tool_result',toolCallId:message.toolCallId,isError:message.isError,
+          content:message.content.map((block) => dshContentBlockText(asRecord(block))).filter(Boolean).join('\n')}] }];
       }
       return [{ ...message, content: message.content.map((block) => {
         const content = asRecord(block);
@@ -452,6 +462,33 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
     return [...this.toolCatalog];
   }
   getToolCatalogSnapshot(): unknown { return [...this.toolCatalog]; }
+
+  async readSessionInformation(sessionId: string): Promise<import('../AgentService').AgentSessionInformation> {
+    const client = await this.ready();
+    const snapshot = client.nativeRequest ? await client.nativeRequest('session/information', { sessionId }) : null;
+    const servers = snapshot?.servers;
+    const context = this.contextUsage.get(sessionId);
+    return { sessionId, observedAt: Date.now(), quota: null,
+      ...(context ? { context: { tokens: context.totalTokens, window: context.contextWindow } } : {}),
+      agents: Array.isArray(snapshot?.agents) ? snapshot.agents.flatMap((value) => {
+        const agent = asRecord(value);
+        if (typeof agent?.id !== 'string') return [];
+        const statuses: Record<string, import('../AgentService').AgentSessionChild['status']> = {
+          running: 'running', pending: 'pending', completed: 'completed', failed: 'failed', unknown: 'unknown',
+        };
+        return [{ id: agent.id, title: String(agent.title ?? agent.id), readable: agent.readable === true,
+          status: statuses[String(agent.status)] ?? 'unknown' }];
+      }) : null,
+      mcp: Array.isArray(servers) ? { scope: 'session', servers: servers.flatMap((value) => {
+        const server = asRecord(value);
+        return typeof server?.name === 'string' ? [{ name: server.name, status: 'connected' }] : [];
+      }) } : null,
+    };
+  }
+
+  async readChildSessionMessages(parentSessionId: string, childId: string) {
+    return backendSessionMessagesToChat('dsh', await this.getSessionMessages(childId, { parentSessionId }));
+  }
   getCapabilitySnapshot(): unknown { return { backend: this.kind, capabilities: [...this.capabilities] }; }
   async refreshToolIds(): Promise<string[]> {
     return (await this.listTools('', '')).map((tool) => String((tool as Record<string, unknown>).name ?? '')).filter(Boolean);
@@ -583,9 +620,44 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
   }
 
   private submitPrompt(client: DshClientPort, request: AgentChatSendRequest, prompt: DshJsonObject[]): Promise<DshJsonObject> {
-    return client.nativeRequest && request.content.trimStart().startsWith('/')
-      ? client.nativeRequest('session/prompt', { sessionId: request.sessionId, prompt, rawText: request.content }, 10 * 60_000)
+    if (typeof request.options?.goalObjective === 'string') validateGoalCommand({ action: 'set', objective: request.options.goalObjective }, this.goals.capabilities);
+    return client.nativeRequest && (request.content.trimStart().startsWith('/') || typeof request.options?.goalObjective === 'string')
+      ? client.nativeRequest('session/prompt', { sessionId: request.sessionId, prompt, rawText: request.content,
+        ...(typeof request.options?.goalObjective === 'string' ? { goalObjective: request.options.goalObjective } : {}) }, 24 * 60 * 60_000)
       : client.prompt(request.sessionId, prompt);
+  }
+
+  getGoalCapabilities() { return this.goals.capabilities; }
+
+  async getChatMessages(sessionId: string) { return backendSessionMessagesToChat('dsh', await this.getSessionMessages(sessionId)); }
+
+  subscribeToGoalEvents(handler: (event: AgentGoalEvent) => void): Disposable { return this.goals.subscribe(handler); }
+
+  async readSessionGoal(sessionId: string): Promise<AgentGoalReadback> {
+    const version = this.goals.version(sessionId);
+    try {
+      const client = await this.ready();
+      if (!client.nativeRequest) return this.goals.fail(sessionId, 'Goal control requires the Harness native transport', true);
+      await this.ensureSessionActive(client, sessionId);
+      const result = await client.nativeRequest('session/goal', { sessionId, action: 'get' });
+      if (!Object.prototype.hasOwnProperty.call(result, 'goal')) throw new Error('Harness returned no Goal readback');
+      return this.goals.observeRead(sessionId, result.goal, version);
+    } catch (error) { return this.goals.fail(sessionId, error); }
+  }
+
+  async controlSessionGoal(sessionId: string, command: AgentGoalCommand): Promise<AgentGoalControlResult> {
+    return this.goals.control(sessionId, async () => {
+      try {
+        validateGoalCommand(command, this.goals.capabilities);
+        const client = await this.ready();
+        if (!client.nativeRequest) return { status: 'unavailable', readback: this.goals.fail(sessionId, 'Native Goal service unavailable', true) };
+        await this.ensureSessionActive(client, sessionId);
+        const result = await client.nativeRequest('session/goal', { sessionId, ...command });
+        const readback = this.goals.observe(sessionId, result.goal);
+        if (command.action === 'pause' || command.action === 'clear') await this.cancelStream(sessionId);
+        return confirmGoalCommand(command, readback);
+      } catch (error) { return { status: 'failed', readback: this.goals.fail(sessionId, error) }; }
+    });
   }
 
   async cancelStream(sessionId: string): Promise<void> {
@@ -718,6 +790,7 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
   }
 
   private handleUpdate(update: DshAcpUpdate): void {
+    if (update.update.sessionUpdate === 'goal_update') { this.goals.observe(update.sessionId, update.update.goal); return; }
     const auxiliary = this.auxiliaryText.get(update.sessionId);
     if (auxiliary) { auxiliary(dshContentBlockText(asRecord(update.update.content))); return; }
     if (update.update.sessionUpdate === 'native_question_closed' && typeof update.update.requestId === 'string') {
@@ -729,6 +802,8 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
       return;
     }
     const state = this.turns.get(update.sessionId);
+    if (update.update.sessionUpdate === 'agent_message_chunk' || update.update.sessionUpdate === 'tool_call')
+      this.goals.activity(update.sessionId, 'running');
     if (!state || state.cancelled || state.generation !== this.turnGenerations.get(update.sessionId)) return;
     if (update.update.sessionUpdate === 'usage_update') {
       const snapshot = this.acceptContextUsage(update.sessionId, update.update);

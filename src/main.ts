@@ -6,6 +6,7 @@ import { addIcon, MarkdownView, Notice, normalizePath, Plugin, TFile, TFolder } 
 import * as path from 'path';
 import { presentPiUiRequest } from './features/chat/services/integrations/PiExtensionUiHost';
 import { OPENCODIAN_APP_ICON_ID } from './shared/brandingWordmark';
+import { SESSION_WORKBENCH_VIEW, SessionWorkbenchDesktopView } from './features/chat/ui/SessionWorkbenchTools';
 
 import { ModelConfigService, ModelPricingService, OpencodeConfigManager } from './core/config';
 import { setAgentServiceRegistry } from './core/agents/AgentCapability';
@@ -1448,6 +1449,7 @@ export default class OpenCodianPlugin extends Plugin {
   }
 
   private registerWorkspaceIntegration(): void {
+    this.registerView(SESSION_WORKBENCH_VIEW, (leaf) => new SessionWorkbenchDesktopView(leaf));
     this.registerView(
       VIEW_TYPE_OPENCODIAN,
       (leaf) => new OpenCodianView(leaf, this, createChatDiagnosticsCoordinatorFactory({

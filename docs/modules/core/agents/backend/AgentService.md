@@ -35,3 +35,13 @@
 - `listSessions()` / `getSession()` 返回值保持 `unknown` 是刻意的：不同 backend 的 session metadata 不同，调用方必须在具体 backend/capability 已确认后再解释 payload。
 - 调整方法签名时需要同步 adapter、registry、功能门控测试以及 multi-agent foundation 规格文档
 - 2026-09-08：`AgentPermissionCapability` 删除无生产调用方的旧 `respondToSessionPermission`，权限应答统一为 OpenCode SDK 的 `permission.reply(requestID, reply, message)` 语义。
+
+## Goal 与会话工作台（2026-10-30）
+
+新增 AgentGoalCapability：能力、权威读回、控制结果和持续订阅。状态独立于一次 send iterator，控制结果区分 confirmed/accepted/partial/failed/unavailable。
+
+## 会话信息面板（2026-10-31）
+
+新增可选 readSessionInformation / readChildSessionMessages 只读契约。额度窗口、MCP 作用域、AgentSessionChild 原生身份与状态、累计 usage、实际加载资源分别建模；null 明确表示未报告。
+
+AgentSessionInformation.context 只承载当前窗口占用，usage.totalTokens 承载原生累计总量；两者不得互相填充。

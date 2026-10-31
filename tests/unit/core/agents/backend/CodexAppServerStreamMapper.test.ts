@@ -27,6 +27,16 @@ function map(
 }
 
 describe('Codex native user item identity', () => {
+  it('retains cumulative usage separately from the latest model context occupancy', () => {
+    const result = map('thread/tokenUsage/updated', { threadId: 'thread-1', tokenUsage: {
+      total: { totalTokens: 90000, inputTokens: 80000, outputTokens: 10000 },
+      last: { totalTokens: 12000 }, modelContextWindow: 200000,
+    } });
+    expect(result.contextUsageSnapshot?.totalTokens).toBe(90000);
+    expect(result.contextUsageSnapshot?.currentContext).toEqual({ tokens: 12000, window: 200000 });
+    expect(map('thread/tokenUsage/updated', { tokenUsage: { total: { totalTokens: 90000 }, modelContextWindow: 200000 } })
+      .contextUsageSnapshot?.currentContext).toBeUndefined();
+  });
   it('keeps a willRetry notification nonterminal and preserves a definitive error', () => {
     const params = { error: { message: 'Reconnecting... 1/5' }, willRetry: true, threadId: 'thread-1', turnId: 'turn-1' };
     expect(map('error', params).chunks).toEqual([{ type: 'backend_event', source: 'codex', event: 'informational', status: 'retrying', content: 'Reconnecting... 1/5', metadata: { willRetry: true } }]);

@@ -25,9 +25,14 @@ interface AppServerStreamMapInput {
   threadId: string;
 }
 
+export interface AppServerContextUsageSnapshot extends ContextUsageSnapshot {
+  /** Current model request occupancy; `totalTokens` above remains cumulative. */
+  currentContext?: { tokens: number; window: number };
+}
+
 export interface AppServerStreamMapResult {
   chunks: StreamChunk[];
-  contextUsageSnapshot?: ContextUsageSnapshot;
+  contextUsageSnapshot?: AppServerContextUsageSnapshot;
 }
 
 export function mapAppServerNotification({
@@ -89,7 +94,7 @@ function mapTokenUsageNotification(
   if (Object.keys(total).length === 0) {
     return { chunks: [] };
   }
-  const snapshot: ContextUsageSnapshot = {
+  const snapshot: AppServerContextUsageSnapshot = {
     sessionId: threadId,
     sessionTitle: '',
     createdAt: Date.now(),
@@ -114,6 +119,9 @@ function mapTokenUsageNotification(
       : null,
     totalCost: null,
   };
+  const last = asRecord(tokenUsage.last);
+  if (typeof last.totalTokens === 'number' && Number.isFinite(last.totalTokens) && last.totalTokens >= 0
+    && snapshot.contextWindow > 0) snapshot.currentContext = { tokens: last.totalTokens, window: snapshot.contextWindow };
   return {
     chunks: [{ type: 'context_usage', snapshot }],
     contextUsageSnapshot: snapshot,
@@ -582,9 +590,7 @@ function mapSubAgentActivityItem(item: Record<string, unknown>): StreamChunk[] {
     return [];
   }
   const agentPath = typeof item.agentPath === 'string' ? item.agentPath : '';
-  const agentThreadId = typeof item.agentThreadId === 'string' && item.agentThreadId
-    ? item.agentThreadId
-    : String(item.id ?? '');
+  const agentThreadId = typeof item.agentThreadId === 'string' ? item.agentThreadId : '';
   if (!agentThreadId) {
     return [];
   }

@@ -71,6 +71,57 @@ export async function apply(ctx, config) {
   function idle(record) {
     if (record.busy || record.handle.agent.status !== 'idle') throw new Error('Harness operation requires an idle session');
   }
+  function goalState(record) {
+    const goals = ctx.get('goals');
+    if (!goals?.get) throw new Error('This Harness profile does not provide the native Goal service');
+    const goal = goals.get(record.handle.agent);
+    return goal ? { ...goal, status: goal.phase, rounds: goal.roundsStarted, maxRounds: goal.maxGoalRounds,
+      armed: goal.activation === 'armed', reason: goal.blockedReason?.message } : null;
+  }
+  function publishGoal(sessionId) {
+    const record = sessions.get(sessionId);
+    if (!record) return;
+    enqueue(record, async () => update(sessionId, { sessionUpdate: 'goal_update', goal: goalState(record) }));
+  }
+  ctx.on('goal/changed', ({ agent }) => { publishGoal(agent.session.id); });
+  ctx.on('goal/activation-changed', ({ sessionId }) => { publishGoal(sessionId); });
+  async function controlGoal(params) {
+    const record = requireSession(params.sessionId);
+    const goals = ctx.get('goals');
+    const current = goalState(record);
+    if (params.action === 'get') return { goal: current };
+    if (params.expectedRevision !== undefined && current?.revision !== params.expectedRevision)
+      throw new Error('Goal changed; refresh it before applying this action');
+    const ref = current ? { id: current.id, revision: current.revision } : undefined;
+    const agent = record.handle.agent;
+    if (params.action === 'set') goals.create(agent, { objective: params.objective });
+    else {
+      if (!ref) throw new Error('No native Goal is set');
+      if (params.action === 'edit') goals.edit(agent, ref, { objective: params.objective });
+      else if (params.action === 'pause') goals.pause(agent, ref);
+      else if (params.action === 'resume') goals.resume(agent, ref);
+      else if (params.action === 'clear') goals.clear(agent, ref);
+      else throw new Error('Unsupported native Goal action');
+    }
+    if (params.action === 'pause' || params.action === 'clear') {
+      record.admission?.abort();
+      agent.cancel({ kind: 'user' });
+    }
+    return { goal: goalState(record) };
+  }
+  async function settleActivity(record) {
+    for (;;) {
+      await record.handle.agent.whenIdle();
+      const seq = record.handle.agent.session.seq;
+      const children = await ctx.get('subagents')?.waitForChildren(record.handle.agent);
+      const goal = ctx.get('goals')?.get(record.handle.agent);
+      if (!children && record.handle.agent.status === 'idle' && record.handle.agent.session.seq === seq
+        && !(goal?.phase === 'active' && goal.activation === 'armed')) break;
+      // Wait for the native round driver; the bridge observes activity and
+      // never supplies a continuation prompt of its own.
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
   async function mountServers(agentCtx, servers, cwd) {
     const mounted = new Map();
     try {
@@ -211,6 +262,17 @@ export async function apply(ctx, config) {
     const controller = new AbortController(); record.admission = controller;
     try {
       const plain = params.rawText ?? params.prompt.filter((block) => block.type === 'text').map((block) => block.text).join('\n');
+      if (typeof params.goalObjective === 'string') {
+        const references = await contentBlocks(params.prompt, record.selection.current);
+        if (references.length) record.handle.agent.followup(createUserMessage({
+          content: [...references, { type: 'text', text: 'Reference material for the separately stored goal objective.' }], source: { kind: 'user' },
+        }));
+        await controlGoal({ sessionId: params.sessionId, action: 'set', objective: params.goalObjective });
+        await settleActivity(record);
+        await record.tail;
+        if (record.failure) throw record.failure;
+        return { stopReason: 'end_turn' };
+      }
       if (/^\s*\//.test(plain)) {
         const commandName = /^\/([a-z][a-z0-9_-]*)/.exec(plain.trim())?.[1];
         const known = commandName && ctx.get('commands')?.find(record.handle.agent, commandName);
@@ -223,18 +285,14 @@ export async function apply(ctx, config) {
           await record.tail;
           if (executed.result.kind === 'error') throw new Error(executed.result.text ?? 'Native command failed');
           if (executed.result.text) await update(params.sessionId, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: executed.result.text } });
+          if (commandName === 'goal') await settleActivity(record);
           return { stopReason: 'end_turn' };
         }
       }
       const content = await contentBlocks(params.prompt, record.selection.current);
       controller.signal.throwIfAborted();
       record.handle.agent.followup(createUserMessage({ content, source: { kind: 'user' } }));
-      for (;;) {
-        await record.handle.agent.whenIdle();
-        const seq = record.handle.agent.session.seq;
-        const children = await ctx.get('subagents')?.waitForChildren(record.handle.agent);
-        if (!children && record.handle.agent.status === 'idle' && record.handle.agent.session.seq === seq) break;
-      }
+      await settleActivity(record);
       await record.tail;
       if (record.failure) throw record.failure;
       if (record.endReason?.kind === 'error' || record.endReason?.kind === 'blocked')
@@ -256,6 +314,28 @@ export async function apply(ctx, config) {
         isError: message.isError === true, content, timestamp: event.time ?? surface.session.createdAt });
     }
     return { messages, capturedThroughSeq: surface.capturedThroughSeq, nativeSession: surface.session };
+  }
+  async function sessionChildren(parentId) {
+    const subagents = ctx.get('subagents');
+    if (typeof subagents?.listChildren !== 'function') return null;
+    const children = await subagents.listChildren(parentId);
+    const rows = [];
+    for (const child of children) {
+      const row = { id: child.id, title: child.label || child.id, status: 'unknown', readable: child.mode !== 'external' };
+      if (row.readable) {
+        let observation;
+        try {
+          observation = await ctx.sessionQuery.observeSession(child.id);
+          const timing = observation.projections?.values?.subagentTiming;
+          if (timing?.active) row.status = 'running';
+          else if (timing?.lastTurnCompleted === true) row.status = 'completed';
+          else if (timing?.lastTurnCompleted === false) row.status = 'failed';
+        } catch { row.readable = false; }
+        finally { observation?.[Symbol.dispose](); }
+      }
+      rows.push(row);
+    }
+    return rows;
   }
   async function runAux(params) {
     const record = auxiliary.get(params.queryId);
@@ -356,6 +436,7 @@ export async function apply(ctx, config) {
       } finally { record.busy = false; }
     },
     'session/prompt': prompt,
+    'session/goal': controlGoal,
     'session/history': (params) => history(params.sessionId),
     async 'session/compact'(params) {
       // Same seam the native /compact command rides; manual compaction errors
@@ -390,6 +471,17 @@ export async function apply(ctx, config) {
       const service = ctx.get('sessionTitle');
       if (!service) throw new Error('Native session title service unavailable');
       service.rename(record.handle.agent.session, params.title); return {};
+    },
+    async 'session/information'(params) {
+      const agents = await sessionChildren(params.sessionId);
+      const record = sessions.get(params.sessionId);
+      return { sessionId: params.sessionId,
+        agents, servers: record && !record.closing ? [...record.mcp.values()].map(({ declaration }) => ({ name: declaration.name })) : null };
+    },
+    async 'session/child-history'(params) {
+      const children = await ctx.get('subagents')?.listChildren(params.sessionId);
+      if (!children?.some((child) => child.id === params.childId && child.mode !== 'external')) throw new Error('Child session is unavailable');
+      return history(params.childId);
     },
     async 'session/mcp'(params) {
       const record = requireSession(params.sessionId); idle(record);
@@ -469,7 +561,15 @@ export async function apply(ctx, config) {
     return methods[method](params);
   });
   transport.onNotification((method, params) => {
-    if (method === 'session/cancel') { const record = sessions.get(params.sessionId); record?.admission?.abort(); record?.handle.agent.cancel({ kind: 'user' }); }
+    if (method === 'session/cancel') {
+      const record = sessions.get(params.sessionId);
+      if (record) {
+        const goals = ctx.get('goals');
+        const goal = goals?.get(record.handle.agent);
+        if (goal?.phase === 'active') goals.pause(record.handle.agent, { id: goal.id, revision: goal.revision });
+        record.admission?.abort(); record.handle.agent.cancel({ kind: 'user' });
+      }
+    }
     if (method === 'aux/cancel') auxiliary.get(params.queryId)?.controller?.abort();
   });
   ctx.effect(() => {

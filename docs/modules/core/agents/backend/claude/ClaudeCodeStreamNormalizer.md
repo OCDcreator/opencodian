@@ -45,3 +45,7 @@
 
 - 源码位置：`src/core/agents/backend/claude/ClaudeCodeStreamNormalizer.ts`。
 - 原位置：`src/core/agents/backend/ClaudeCodeStreamNormalizer.ts`；文件名、导出接口与业务职责保持不变。
+
+## Goal 与会话工作台（2026-10-30）
+
+识别顶层 active_goal，转发 goal_updated / goal_cleared backend_event，保持原生完整条件、计量、原因和 session_id。null 是明确清除，不是读失败。

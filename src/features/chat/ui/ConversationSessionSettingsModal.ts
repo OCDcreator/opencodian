@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- This modal owns the session settings form, inherited-global summary, and settings deep-link behavior together. */
 import type { App } from 'obsidian';
-import { Modal } from 'obsidian';
+import { Modal, Notice } from 'obsidian';
 
 import type { CodexModelSummary } from '../../../core/agents/backend/codex/CodexAdapter';
 import type { AppServerReviewResult, AppServerReviewTarget, AppServerThreadGoal } from '../../../core/agents/backend/codex/CodexAppServerClient';
@@ -808,6 +808,7 @@ export class ConversationSessionSettingsModal extends Modal {
         const budget = budgetRaw !== '' ? Number(budgetRaw) : undefined;
         const result = await this.options.onSetThreadGoal!(objective, budget !== undefined && !isNaN(budget) && budget > 0 ? { tokenBudget: budget } : undefined);
         setBtn.disabled = false;
+        if (!result) { new Notice(t('workbench.evidence.failed')); return; }
         if (result && this.codexGoalReadbackEl) {
           this.renderGoalReadback(result);
           this.codexGoalReadbackEl.style.display = '';
@@ -833,6 +834,7 @@ export class ConversationSessionSettingsModal extends Modal {
     btn.addEventListener('click', async () => {
       btn.disabled = true;
       const cleared = await this.options.onClearThreadGoal!();
+      if (!cleared) { btn.disabled = false; new Notice(t('workbench.evidence.failed')); return; }
       if (cleared && this.codexGoalReadbackEl) {
         this.codexGoalReadbackEl.style.display = 'none';
         this.codexGoalReadbackEl.empty();

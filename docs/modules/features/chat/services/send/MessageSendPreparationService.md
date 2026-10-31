@@ -196,3 +196,8 @@ DSH sends skip the legacy OpenCode skill catalog expansion, as Pi, ZCode and Ope
 ## 2026-10-30 六后端标题生命周期
 
 移除首条标题的三后端白名单，六后端都执行本地规则 bootstrap；有图片无文字使用附件标签。Claude autoTitle 与其他后端 titleMode 决定辅助生成，统一 pending，人工/已有 native 来源不触发覆盖。
+
+## Goal 与会话工作台（2026-10-30）
+
+PrepareMessageSendOptions 透传 goalObjective：只表达用户明确的一次目标创建意图，不改变普通消息的目标条件。
+乐观用户消息通过 parts 中的 `opencodian_goal_intent` 标记保留该意图；普通补充消息不带此标记。标记只用于本地历史对账，不进入后端 prompt。

@@ -38,3 +38,9 @@ completed userMessage 仅在非空 item.id/threadId/turnId 下输出 user_messag
 - 源码位置：`src/core/agents/backend/codex/CodexAppServerStreamMapper.ts`。
 - 原位置：`src/core/agents/backend/CodexAppServerStreamMapper.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/core/agents/backend/codex/CodexAppServerClient.ts`。
+
+## 会话信息面板（2026-10-31）
+
+subAgentActivity 仅接受明确 agentThreadId；缺少原生子线程 ID 时不能将活动 item.id 合成为会话链接。
+
+AppServerContextUsageSnapshot 在原有累计快照上保存可选 currentContext，来源仅是 tokenUsage.last.totalTokens 与 modelContextWindow；缺少 last 保持未知。该字段供 backend 信息读回使用，不改变现有累计 token 字段语义。
