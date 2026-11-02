@@ -23,13 +23,14 @@ export class SessionWorkbench {
   private readonly panel: HTMLElement;
   private readonly title: HTMLElement;
   private readonly identity: HTMLElement;
-  private readonly tabs = new Map<WorkbenchPage, HTMLButtonElement>();
+  private readonly back: HTMLButtonElement;
   private readonly pages = new Map<WorkbenchPage, HTMLElement>();
   private readonly observer: ResizeObserver | null;
   private readonly keyboardScope: Scope | null;
   private scopePushed = false;
   private state: SessionWorkbenchState | null = null;
   private page: WorkbenchPage = 'overview';
+  private tool = 'terminal';
   private open = false;
   private docked = false;
   private expanded = false;
@@ -42,7 +43,7 @@ export class SessionWorkbench {
   private readonly revealedGoals = new Set<string>();
   private readonly informationView: SessionWorkbenchInformation;
   private readonly transcriptScroll = new Map<string, number>();
-  private readonly preferences = new Map<string, { page: WorkbenchPage; docked: boolean; expanded: boolean }>();
+  private readonly preferences = new Map<string, { page: WorkbenchPage; tool: string; docked: boolean; expanded: boolean }>();
   private focusOrigin: HTMLElement | null = null;
   private readonly restoreFocus = () => {
     const target = this.focusOrigin?.isConnected ? this.focusOrigin
@@ -70,41 +71,32 @@ export class SessionWorkbench {
     this.keyboardScope?.register([], 'Escape', (event) => { this.onKeydown(event); return false; });
     const id = `opencodian-workbench-${++nextWorkbenchId}`;
     this.root = boundary.createDiv({ cls: 'opencodian-workbench-host is-overview' });
-    this.trigger = this.button(this.root, t('workbench.title'), 'panels-top-left', () => {
-      this.goalFocused = false; this.renderOverview(); this.setOpen(!this.open);
+    this.trigger = this.button(this.root, t('workbench.information'), 'info', () => {
+      this.setPage('overview'); this.renderOverview(); this.setOpen(!this.open);
     });
     this.trigger.addClass('opencodian-workbench-trigger');
     this.trigger.lastElementChild?.remove();
     this.trigger.setAttribute('aria-controls', id);
     this.trigger.setAttribute('aria-expanded', 'false');
-    this.panel = this.root.createDiv({ cls: 'opencodian-workbench-panel', attr: { id, role: 'region', 'aria-label': t('workbench.title') } });
+    this.panel = this.root.createDiv({ cls: 'opencodian-workbench-panel', attr: { id, role: 'region', 'aria-label': t('workbench.information') } });
     this.panel.hidden = true;
     const header = this.panel.createDiv({ cls: 'opencodian-workbench-header' });
+    this.back = this.iconButton(header, t('workbench.goal.backToInformation'), 'arrow-left', () => this.setPage('overview'));
+    this.back.hidden = true;
     const heading = header.createDiv({ cls: 'opencodian-workbench-heading' });
     this.title = heading.createDiv({ cls: 'opencodian-workbench-session' });
-    this.title.setText(t('workbench.title'));
+    this.title.setText(t('workbench.information'));
     const controls = header.createDiv({ cls: 'opencodian-workbench-actions' });
     this.iconButton(controls, t('workbench.refresh'), 'refresh-cw', () => actions.refresh());
     this.iconButton(controls, t('workbench.dock'), 'panel-right', () => { this.docked = !this.docked; this.syncLayout(); });
     this.iconButton(controls, t('workbench.expand'), 'maximize-2', () => { this.expanded = !this.expanded; this.syncLayout(); });
     this.iconButton(controls, t('workbench.close'), 'minimize-2', () => this.setOpen(false));
     this.identity = this.panel.createDiv({ cls: 'opencodian-workbench-identity' });
-    const rail = this.panel.createDiv({ cls: 'opencodian-workbench-tabs', attr: { role: 'tablist', 'aria-label': t('workbench.title') } });
     const body = this.panel.createDiv({ cls: 'opencodian-workbench-body' });
-    const names = { overview: t('workbench.overview'), tasks: t('workbench.tasks'), files: t('workbench.files'), tools: t('workbench.tools') };
+    const names = { overview: t('workbench.information'), tasks: t('workbench.tasks'), files: t('workbench.files'), tools: t('workbench.tools') };
     for (const name of Object.keys(names) as WorkbenchPage[]) {
-      const tab = rail.createEl('button', { text: names[name], attr: { type: 'button', role: 'tab', id: `${id}-${name}-tab`,
-        'aria-controls': `${id}-${name}`, 'aria-selected': String(name === this.page), tabindex: name === this.page ? '0' : '-1' } });
-      this.tabs.set(name, tab);
-      tab.addEventListener('click', () => this.setPage(name));
-      tab.addEventListener('keydown', (event) => {
-        const list = [...this.tabs.keys()]; const index = list.indexOf(name);
-        const next = event.key === 'ArrowRight' ? (index + 1) % list.length : event.key === 'ArrowLeft' ? (index + list.length - 1) % list.length
-          : event.key === 'Home' ? 0 : event.key === 'End' ? list.length - 1 : null;
-        if (next !== null) { event.preventDefault(); this.setPage(list[next]); this.tabs.get(list[next])?.focus(); }
-      });
       const page = body.createDiv({ cls: `opencodian-workbench-page opencodian-workbench-${name}`, attr: {
-        id: `${id}-${name}`, role: 'tabpanel', 'aria-labelledby': `${id}-${name}-tab`,
+        id: `${id}-${name}`, role: 'region', 'aria-label': names[name], tabindex: '-1',
       } });
       page.hidden = name !== this.page; this.pages.set(name, page);
     }
@@ -126,21 +118,23 @@ export class SessionWorkbench {
     if (this.state && this.page === 'overview') this.transcriptScroll.set(
       `${this.state.identity}:${this.state.child?.agent.id ?? 'main'}`, body.scrollTop);
     if (this.state?.identity !== state.identity) {
-      if (this.state) this.preferences.set(this.state.identity, { page: this.page, docked: this.docked, expanded: this.expanded });
+      if (this.state) this.preferences.set(this.state.identity, { page: this.page, tool: this.tool, docked: this.docked, expanded: this.expanded });
       const preference = this.preferences.get(state.identity);
       this.docked = preference?.docked ?? false; this.expanded = preference?.expanded ?? false;
+      this.tool = preference?.tool ?? 'terminal';
       this.setPage(preference?.page ?? 'overview'); this.syncLayout();
+      if (this.page === 'tools') this.actions.openTool?.(this.tool);
       this.editing = false; this.goalFocused = false; this.editor = null; this.budget = null; this.fingerprint = '';
     }
     this.state = state;
-    this.title.setText(t(this.goalFocused ? 'workbench.goal.title' : 'workbench.title'));
+    this.syncHeading();
     this.title.title = state.title;
     this.identity.setText([state.backend, state.sessionId].filter(Boolean).join(' · '));
     const goal = state.goal.goal;
     const active = state.todos.find((todo) => todo.status === 'in_progress');
     const summary = goal ? this.goalLabel(goal) : state.armed ? t('workbench.goal.armed')
-      : active?.content ?? (state.tasks.length ? `${t('workbench.tasks')} · ${state.tasks.length}` : t('workbench.title'));
-    this.trigger.setAttribute('aria-label', `${t('workbench.title')}: ${summary}`);
+      : active?.content ?? (state.tasks.length ? `${t('workbench.tasks')} · ${state.tasks.length}` : t('workbench.information'));
+    this.trigger.setAttribute('aria-label', `${t('workbench.information')}: ${summary}`);
     this.trigger.setAttribute('title', `${summary} · ${state.tasks.length} ${t('workbench.tasks')}`);
     this.trigger.querySelector('.opencodian-workbench-trigger-state')?.remove();
     this.trigger.createSpan({ cls: 'opencodian-workbench-trigger-state', text: summary });
@@ -167,12 +161,40 @@ export class SessionWorkbench {
   }
 
   setPage(page: WorkbenchPage): void {
+    const focused = document.activeElement;
+    const moveFocus = this.open && focused instanceof HTMLElement
+      && (focused === this.back || this.pages.get(this.page)?.contains(focused));
     if (this.goalFocused) { this.goalFocused = false; this.editing = false; this.renderOverview(); }
     this.page = page;
     this.root.toggleClass('is-overview', page === 'overview');
-    for (const [key, tab] of this.tabs) { tab.setAttribute('aria-selected', String(key === page)); tab.tabIndex = key === page ? 0 : -1; }
     for (const [key, element] of this.pages) element.hidden = key !== page;
+    this.syncHeading();
+    if (moveFocus) {
+      const content = this.pages.get(page)!;
+      const target = page === 'overview'
+        ? content.querySelector<HTMLElement>('button:not(:disabled), summary, input, textarea, [tabindex="0"]') ?? content : this.back;
+      target.focus();
+    }
     this.actions.onPageChange?.(page);
+  }
+
+  openTool(tool: string): void {
+    if (!['terminal', 'git', 'browser', 'context'].includes(tool)) return;
+    this.tool = tool;
+    this.setPage('tools');
+    this.actions.openTool?.(tool);
+    this.setOpen(true);
+  }
+
+  private syncHeading(): void {
+    const tools = { terminal: 'workbench.terminal', git: 'workbench.git', browser: 'workbench.browser', context: 'workbench.resources' } as const;
+    const label = this.goalFocused ? t('workbench.goal.title') : this.page === 'overview' ? t('workbench.information')
+      : this.page === 'tasks' ? t('workbench.tasks') : this.page === 'files' ? t('workbench.files')
+      : t(tools[this.tool as keyof typeof tools] ?? 'workbench.tools');
+    this.title.setText(label);
+    this.panel.setAttribute('aria-label', label);
+    this.pages.get(this.page)?.setAttribute('aria-label', label);
+    this.back.hidden = this.page === 'overview';
   }
 
   private setOpen(open: boolean): void {
@@ -191,20 +213,30 @@ export class SessionWorkbench {
     if (open) {
       const target = [...this.panel.querySelectorAll<HTMLElement>('button, summary, [tabindex="0"]')]
         .find((element) => element.getClientRects().length > 0);
-      (target ?? this.tabs.get(this.page))?.focus();
+      target?.focus();
     } else this.restoreFocus();
   }
 
   private syncLayout(): void {
     const bounds=this.boundary.getBoundingClientRect(); const width=bounds.width;
     const input=this.boundary.querySelector('.opencodian-input-area')?.getBoundingClientRect();
+    const composer=this.boundary.querySelector('.opencodian-composer-shell')?.getBoundingClientRect();
     const bottom=input?.height ? Math.max(12,bounds.bottom-input.top+8) : 160;
     this.root.style.setProperty('--workbench-bottom',`${bottom}px`);
+    const dockBottom=Math.max(12,bounds.bottom-(composer?.bottom ?? input?.bottom ?? bounds.bottom));
+    this.root.style.setProperty('--workbench-dock-bottom',`${dockBottom}px`);
     this.root.toggleClass('is-narrow', width < 640);
     this.root.toggleClass('is-expanded', this.expanded);
     this.panel.setAttribute('role',this.expanded?'dialog':'region');
     if(this.expanded) this.panel.setAttribute('aria-modal','true'); else this.panel.removeAttribute('aria-modal');
-    const docked = this.open && this.docked && !this.expanded && width >= 960;
+    const canDock = width >= 960 && !this.expanded;
+    const docked = this.open && this.docked && canDock;
+    const dockButton = [...this.panel.querySelectorAll<HTMLButtonElement>('.opencodian-workbench-actions > button')]
+      .find((button) => button.getAttribute('aria-label') === t('workbench.dock'));
+    if (dockButton) {
+      dockButton.hidden = !canDock;
+      dockButton.setAttribute('aria-pressed', String(docked));
+    }
     this.root.toggleClass('is-docked', docked);
     this.boundary.toggleClass('has-workbench-docked', docked);
   }
@@ -215,7 +247,7 @@ export class SessionWorkbench {
     parent.empty();
     const state = this.state;
     if (!state) return;
-    this.title.setText(t(this.goalFocused ? 'workbench.goal.title' : 'workbench.title'));
+    this.syncHeading();
     this.informationView.destroy();
     if (state.child) { this.informationView.renderChild(parent, state.child); parent.scrollTop = scrollTop; return; }
     if (this.goalFocused) this.button(parent, t('workbench.goal.backToInformation'), 'arrow-left', () => {
@@ -245,11 +277,13 @@ export class SessionWorkbench {
     }
     const files = this.disclosure(parent, 'files', t('workbench.files'), { icon: 'files', count: '' });
     this.button(files, t('workbench.info.openFiles'), 'file-diff', () => this.setPage('files'));
-    const shortcuts = parent.createDiv({ cls: 'opencodian-workbench-shortcuts' });
-    for (const [tool, icon, label] of [['terminal', 'terminal', t('workbench.terminal')], ['git', 'git-branch', t('workbench.git')],
-      ['browser', 'globe', t('workbench.browser')], ['context', 'layers', t('workbench.resources')]]) {
-      const button = this.button(shortcuts, label, icon, () => { this.setPage('tools'); this.actions.openTool?.(tool); });
+    const shortcuts = parent.createDiv({ cls: 'opencodian-workbench-shortcuts', attr: { role: 'group', 'aria-label': t('workbench.tools') } });
+    for (const [tool, icon, label] of [['tasks', 'list-checks', t('workbench.tasks')], ['terminal', 'terminal', t('workbench.terminal')],
+      ['git', 'git-branch', t('workbench.git')], ['browser', 'globe', t('workbench.browser')], ['context', 'blocks', t('workbench.resources')]]) {
+      const button = this.button(shortcuts, label, icon, () => tool === 'tasks' ? this.setPage('tasks') : this.openTool(tool));
       button.addClass('opencodian-workbench-shortcut');
+      const arrow = button.createSpan({ cls: 'opencodian-workbench-chevron', attr: { 'aria-hidden': 'true' } });
+      setIcon(arrow, 'chevron-right');
     }
     parent.scrollTop = scrollTop;
   }

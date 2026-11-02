@@ -9052,6 +9052,7 @@ button.opencodian-edit-revert-preview-confirm.is-conflict {
    Layout uses surface tokens; all colors and typography come from Obsidian. */
 .opencodian-workbench-host {
   --workbench-width: 320px; --workbench-inset: 12px; --workbench-top: 80px; --workbench-row: 32px;
+  --workbench-item-gap: 4px; --workbench-group-gap: 16px;
   position: absolute; inset: 0; z-index: 221; pointer-events: none;
   color: var(--text-normal); font-family: var(--font-interface); font-size: 13px; line-height: 1.5;
 }
@@ -9082,27 +9083,23 @@ button.opencodian-edit-revert-preview-confirm.is-conflict {
   border-radius: 16px; box-shadow: 0 8px 24px var(--background-modifier-box-shadow); overflow: hidden;
 }
 .opencodian-workbench-panel[hidden], .opencodian-workbench-page[hidden], .opencodian-workbench-tools-shell [hidden], .opencodian-composer-goal-summary[hidden] { display: none; }
-.opencodian-workbench-header { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; min-height: 38px; gap: 4px; padding: 4px 8px 0 14px; }
-.opencodian-workbench-heading { min-width: 0; }
-.opencodian-workbench-session { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+.opencodian-workbench-actions > button[hidden] { display: none; }
+.opencodian-workbench-actions > button[aria-pressed="true"] { background: var(--background-modifier-hover); color: var(--text-accent); }
+.opencodian-workbench-header { display: flex; flex: 0 0 auto; align-items: center; min-height: 40px; gap: 4px; padding: 6px 8px 4px; }
+.opencodian-workbench-header > [hidden] { display: none; }
+.opencodian-workbench-heading { flex: 1; min-width: 0; }
+.opencodian-workbench-heading { padding-left: 8px; }
+.opencodian-workbench-session { font-size: 13px; font-weight: 600; color: var(--text-normal); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .opencodian-workbench-header .opencodian-workbench-actions { display: flex; flex-wrap: nowrap; gap: 0; margin: 0; }
 .opencodian-workbench-header .opencodian-workbench-button { width: 26px; min-height: 26px; padding: 5px; color: var(--text-muted); }
-.opencodian-workbench-host.is-overview:not(.is-expanded):not(.is-docked) .opencodian-workbench-header { position: absolute; top: 5px; right: 5px; min-height: 26px; padding: 0; z-index: 1; }
-.opencodian-workbench-host.is-overview:not(.is-expanded):not(.is-docked) .opencodian-workbench-heading,
-.opencodian-workbench-host.is-overview:not(.is-expanded):not(.is-docked) .opencodian-workbench-header .opencodian-workbench-button:nth-child(-n+2),
-.opencodian-workbench-host.is-overview:not(.is-expanded):not(.is-docked) .opencodian-workbench-tabs { display: none; }
-.opencodian-workbench-host.is-overview:not(.is-expanded):not(.is-docked) .opencodian-workbench-overview { padding-top: 3px; }
-.opencodian-workbench-host.is-overview:not(.is-expanded):not(.is-docked) .opencodian-workbench-overview > .opencodian-workbench-section:first-child > summary { padding-right: 58px; }
 .opencodian-workbench-identity { display: none; }
-.opencodian-workbench-tabs { display: flex; flex: 0 0 auto; gap: 2px; padding: 4px 8px 6px; }
-.opencodian-workbench-tabs button { flex: 1; min-width: 0; height: 28px; padding: 3px 6px; border: 0; border-radius: 6px; box-shadow: none; background: transparent; color: var(--text-muted); font: inherit; font-size: 12px; }
-.opencodian-workbench-tabs button:hover, .opencodian-workbench-tabs button[aria-selected='true'] { color: var(--text-normal); background: var(--background-modifier-hover); }
-.opencodian-workbench-tabs button[aria-selected='true'] { font-weight: 500; }
 .opencodian-workbench-body { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
-.opencodian-workbench-page { min-height: 0; padding: 0 8px 8px; box-sizing: border-box; }
-.opencodian-workbench-section { margin: 0; padding: 6px 0; border: 0; }
-.opencodian-workbench-section + .opencodian-workbench-section, .opencodian-workbench-shortcuts { border-top: 1px solid var(--background-modifier-border); }
-.opencodian-workbench-section-heading { display: flex; align-items: center; gap: 8px; min-height: var(--workbench-row); padding: 4px 8px; border-radius: 8px; color: var(--text-muted); cursor: pointer; list-style: none; box-sizing: border-box; }
+.opencodian-workbench-page { min-height: 0; padding: 4px 8px 12px; box-sizing: border-box; }
+.opencodian-workbench-section { margin: 0; padding: 0; border: 0; }
+.opencodian-workbench-section + .opencodian-workbench-section { margin-top: var(--workbench-item-gap); }
+.opencodian-workbench-section-heading { display: flex; align-items: center; gap: 8px; min-height: var(--workbench-row); padding: 6px 8px; border: 0; border-radius: 8px; color: var(--text-normal); cursor: pointer; list-style: none; box-sizing: border-box; }
+.opencodian-workbench-section-heading > span:nth-child(2) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.opencodian-workbench-section-icon { color: var(--text-muted); }
 .opencodian-workbench-section-heading::-webkit-details-marker { display: none; }
 .opencodian-workbench-section-heading:hover { background: var(--background-modifier-hover); }
 .opencodian-workbench-row-meta { margin-left: auto; color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -9150,10 +9147,12 @@ button.opencodian-edit-revert-preview-confirm.is-conflict {
 .opencodian-workbench-task summary { cursor: pointer; overflow-wrap: anywhere; }
 .opencodian-workbench-task summary > span + span { margin-left: 8px; }
 .opencodian-workbench-page pre { max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
-.opencodian-workbench-shortcuts { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 8px 0 0; }
-.opencodian-workbench-host .opencodian-workbench-shortcut { justify-content: flex-start; height: 32px; font-size: 12px; color: var(--text-muted); }
-.opencodian-workbench-tool-picker { display: flex; align-items: center; gap: 8px; margin: 8px; font-size: 12px; }
-.opencodian-workbench-tool-picker select { flex: 1; min-width: 0; }
+.opencodian-workbench-shortcuts { display: flex; flex-direction: column; gap: var(--workbench-item-gap); margin-top: var(--workbench-group-gap); padding: 0; border: 0; }
+.opencodian-workbench-host .opencodian-workbench-shortcut { display: flex; width: 100%; justify-content: flex-start; min-height: var(--workbench-row); padding: 6px 8px; box-sizing: border-box; text-align: left; color: var(--text-normal); }
+.opencodian-workbench-shortcut > span:nth-child(2) { flex: 1; }
+.opencodian-workbench-shortcut > span:first-child { color: var(--text-muted); }
+.opencodian-workbench-shortcut > .opencodian-workbench-chevron { margin-left: auto; }
+.opencodian-workbench-tool-actions { display: flex; justify-content: flex-end; margin: 4px 0; font-size: 12px; }
 .opencodian-workbench-terminal { height: 280px; min-height: 160px; overflow: hidden; background: var(--background-secondary); border-radius: 6px; }
 .opencodian-workbench-browser { display: flex; width: 100%; height: 320px; border: 0; }
 .opencodian-workbench-resource { padding: 4px 0; overflow-wrap: anywhere; }
@@ -9163,7 +9162,7 @@ button.opencodian-edit-revert-preview-confirm.is-conflict {
 .opencodian-workbench-desktop .opencodian-workbench-browser { height: min(70vh, 900px); }
 .opencodian-workbench-desktop-heading h3 { margin: 0 0 4px; font-size: 14px; }
 .opencodian-workbench-host.is-expanded .opencodian-workbench-panel { inset: var(--workbench-top) var(--workbench-inset) var(--workbench-bottom, 160px); width: auto; max-height: none; }
-.opencodian-workbench-host.is-docked .opencodian-workbench-panel { width: 360px; max-height: none; bottom: var(--workbench-bottom, 160px); }
+.opencodian-workbench-host.is-docked .opencodian-workbench-panel { width: 360px; max-height: none; bottom: var(--workbench-dock-bottom, var(--workbench-inset)); }
 .has-workbench-docked .opencodian-container { margin-right: 384px; }
 .opencodian-workbench-files .opencodian-modified-files-sidebar-host.is-workbench-inline, .opencodian-workbench-files .is-workbench-inline .opencodian-modified-files-hover-zone { position: static; width: auto; height: auto; pointer-events: auto; }
 .opencodian-workbench-files .is-workbench-inline .opencodian-modified-files-trigger-strip, .opencodian-workbench-files .is-workbench-inline .opencodian-modified-files-sidebar-collapse { display: none; }

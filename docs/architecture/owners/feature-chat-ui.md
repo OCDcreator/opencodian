@@ -4,6 +4,9 @@
 
 # Owner: feature.chat-ui
 
+2026-11-01：会话信息胶囊保留信息与功能入口；SessionWorkbench 点击任务、文件或工具后直接展示对应标题的卡片，移除四页签导航。SessionWorkbenchTools 移除嵌套工具下拉框，主区域视图也使用当前工具名称。容器仍负责每会话卡片/工具偏好、返回与焦点，底层会话状态和 PTY 生命周期继续由既有 owners 提供。
+同日视觉整理：标题/控件保持独立行；信息分组依靠间距区分，任务与工具入口统一单列整行。当前“会话引用”（附件及后端加载来源）与“命令与资源”工具保留各自含义，不把目录入口误称为当前材料列表。
+
 2026-10-29：ModelSelectorRenderer 将提供商分组绘制为带数量的 disclosure，折叠状态由 feature.chat-services 的选择协调器传入；折叠分组不生成模型 option，保留图标、ARIA 关联和 sticky header cleanup。
 > 2026-10-26（DSH UI 修复）：EffortSelector 持有菜单焦点、单选语义、展开状态和保存反馈，支持方向键、Home/End、Enter/Space、Escape 与 Tab。保存由既有 host 执行；重复保存受控，失败保留选项和反馈，成功后仅在焦点仍位于菜单时回到入口，保存期间离开或卸载不抢焦。默认/显式 Off 及生效边界文案由 host 提供，组件不解析后端协议。
 > 2026-10-24（DSH）：ContextDetailModal 显示原生占用总量；当 tokenBreakdownAvailable 为 false 时隐藏未知分类和费用计算，压缩入口继续遵守后端能力。

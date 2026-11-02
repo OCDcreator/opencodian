@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "c6c41ab02b6eb4476ad7615f12a2850f7a0dd79d6717242783509e0d814b63a2",
+  "digest": "a06b26de2fe7dcb9aedbdb021e94f2af600cf845e5dc2c15db6bc8cfcc71afbe",
   "recordCount": 819,
   "records": [
     {
@@ -2701,7 +2701,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/ui/SessionWorkbench.ts",
-      "sha256": "a888d68728c3100fd903d2a5c38010b94297ed956c5db33b4e6d2f94257073de"
+      "sha256": "771218662ceb5446cf42caf0754d66375239b9fec9d27a06fb9ee5244a321fda"
     },
     {
       "kind": "src",
@@ -2711,7 +2711,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/ui/SessionWorkbenchTools.ts",
-      "sha256": "a4bccc609109332b3b6a60f7e2251e7c7430680f3d56f9f3130f1324a47efa75"
+      "sha256": "e99e0f59300e75288341641271ea2c6553942df2b43440a8041b39f6a3c374eb"
     },
     {
       "kind": "src",
@@ -3496,7 +3496,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "167e1544ac4e149fd636bfa32ff397700f9d17d3f46c54334e4655bb540730f5"
+      "sha256": "c6226e97bc7cd65d7901cf34c55ca06315d5498a3909b17c25ecfee7750b54aa"
     },
     {
       "kind": "src",
@@ -3506,7 +3506,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "c94a2fb324fce314d82a3caf00d37f0d8c1cf1b07da46a3514159d3a209135bb"
+      "sha256": "7249bd9ac387fbcae102b15eacaca01544cd4c1e71559c6ca91e4ffe41600324"
     },
     {
       "kind": "src",
@@ -3721,7 +3721,7 @@
     {
       "kind": "src",
       "key": "src/style/components/session-workbench.css",
-      "sha256": "dbe0b5b3229aa4cab20172856fb19e6ea280f4ba2441961feab45b6eb904b9c8"
+      "sha256": "ac3803ee6dc68884065c50d11b26f4071de7a0a8798209b549bf4b8532e9db19"
     },
     {
       "kind": "src",
@@ -4099,7 +4099,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-10-31T14:03:50.659Z",
-  "headShaAtGeneration": "2cf6f67b13585347fafb9d8f57e472dd440d417d",
+  "generatedAt": "2026-11-01T14:15:25.125Z",
+  "headShaAtGeneration": "ed5964fb825115947f2986776fb6e1133cbe5e84",
   "graphifyVersion": "graphify 0.9.31"
 }

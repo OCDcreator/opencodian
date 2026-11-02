@@ -1,5 +1,8 @@
 # English Locale
 
+2026-11-01: adds `workbench.information` for the session information entry. Direct cards reuse terminal/repository/browser/resources and task/file labels instead of displaying the generic workbench title or tab navigation.
+The information source group is “Session references”, while the resource tool is “Commands and resources”, distinguishing current attachments/backend-loaded sources from catalogs and resource actions.
+
 2026-10-30：新增 chat.tab.closeHint，说明右键／中键／Delete 关闭会话标签。
 > 2026-10-27: OpenCode 2 has eight functional subpages and `settings.opencode2.workspace.*` copy for automatic catalogs, source overrides, configuration drafts, authentication, and separate apply/save feedback.
 > 2026-10-27: added `chat.effort.disabledShort` (`Off`) for the narrow Composer trigger; the full `chat.effort.disabled` label remains in the model popover.

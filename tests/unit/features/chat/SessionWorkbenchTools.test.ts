@@ -1,6 +1,8 @@
+import type { WorkspaceLeaf } from 'obsidian';
+
 import type { WorkbenchHostRuntime } from '../../../../src/core/runtime/WorkbenchHostRuntime';
 import type { SessionWorkbenchState } from '../../../../src/features/chat/ui/SessionWorkbench';
-import { SessionWorkbenchTools } from '../../../../src/features/chat/ui/SessionWorkbenchTools';
+import { SessionWorkbenchDesktopView, SessionWorkbenchTools } from '../../../../src/features/chat/ui/SessionWorkbenchTools';
 import { t } from '../../../../src/i18n';
 
 const state = (identity: string): SessionWorkbenchState => ({identity,title:identity,backend:'codex',sessionId:identity,
@@ -17,6 +19,30 @@ describe('workbench browser session ownership', () => {
     tools.mount(root); tools.update(state('first')); tools.openTool('browser');
   });
   afterEach(()=>{tools.destroy();root.remove();jest.clearAllMocks();});
+
+  it('shows the chosen tool directly without a second tool selector', () => {
+    expect(root.querySelector('select')).toBeNull();
+    expect(root.querySelector('.opencodian-workbench-tool-picker')).toBeNull();
+    expect(root.querySelector('.opencodian-workbench-tool-browser')?.hasAttribute('hidden')).toBe(false);
+    expect(root.querySelector('.opencodian-workbench-tool-terminal')?.hasAttribute('hidden')).toBe(true);
+    tools.openTool('context');
+    expect(root.querySelector('.opencodian-workbench-tool-context')?.hasAttribute('hidden')).toBe(false);
+    expect(root.querySelector('.opencodian-workbench-tool-browser')?.hasAttribute('hidden')).toBe(true);
+  });
+
+  it('names the main-area view after its selected tool', async () => {
+    const view = new SessionWorkbenchDesktopView({} as WorkspaceLeaf);
+    try {
+      view.bind({runtime:{listTerminals:()=>[],getTerminal:()=>null} as unknown as WorkbenchHostRuntime,
+        workingDirectory:()=>'/owned',openResource:jest.fn(),openBrowser:jest.fn(),attachUrl:jest.fn(),attachImage,
+        openSettings:jest.fn(),openMemory:jest.fn(),setDraft:jest.fn(),defaultWorktreeDirectory:()=>'/worktrees'},
+      ()=>state('first'),'browser');
+      expect(view.getDisplayText()).toBe(t('workbench.browser'));
+      expect(view.contentEl.querySelector('h3')?.textContent).toBe(t('workbench.browser'));
+      expect(view.contentEl.querySelector('select')).toBeNull();
+      expect(view.contentEl.textContent).not.toContain(t('workbench.title'));
+    } finally { await view.onClose(); }
+  });
 
   it('clears another session’s preview and restores only its own URL on return', () => {
     const old=root.querySelector('webview')!;

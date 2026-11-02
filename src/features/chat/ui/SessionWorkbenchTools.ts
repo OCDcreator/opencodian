@@ -33,17 +33,20 @@ export const SESSION_WORKBENCH_VIEW = 'opencodian-workbench';
 /** A larger, session-bound view of the same runtime. Closing it only detaches UI. */
 export class SessionWorkbenchDesktopView extends ItemView {
   private tools: SessionWorkbenchTools | null = null;
+  private toolLabel: string | null = null;
   private tick: ReturnType<typeof setInterval> | null = null;
   getViewType(): string { return SESSION_WORKBENCH_VIEW; }
-  getDisplayText(): string { return t('workbench.title'); }
+  getDisplayText(): string { return this.toolLabel ?? t('workbench.title'); }
   getIcon(): string { return 'panels-top-left'; }
   constructor(leaf: WorkspaceLeaf) { super(leaf); }
   async onOpen(): Promise<void> { this.contentEl.setText(t('workbench.desktop.empty')); }
   bind(host: SessionWorkbenchToolsHost, state: () => SessionWorkbenchState, tool: string): void {
     this.release(); this.contentEl.empty(); this.contentEl.addClass('opencodian-workbench-desktop');
     const heading = this.contentEl.createDiv({ cls:'opencodian-workbench-desktop-heading' });
-    const snapshot = state(); heading.createEl('h3', {text:snapshot.title});
-    heading.createDiv({cls:'opencodian-workbench-muted',text:[snapshot.backend,snapshot.sessionId,host.workingDirectory()].filter(Boolean).join(' · ')});
+    const labels = { terminal: t('workbench.terminal'), git: t('workbench.git'), browser: t('workbench.browser'), context: t('workbench.resources') };
+    this.toolLabel = labels[tool as keyof typeof labels] ?? t('workbench.title');
+    const snapshot = state(); heading.createEl('h3', {text:this.toolLabel});
+    heading.createDiv({cls:'opencodian-workbench-muted',text:[snapshot.title,snapshot.backend,snapshot.sessionId,host.workingDirectory()].filter(Boolean).join(' · ')});
     this.tools = new SessionWorkbenchTools(host); this.tools.mount(this.contentEl); this.tools.update(snapshot); this.tools.openTool(tool);
     this.tick = setInterval(()=>this.tools?.update(state()),1000);
   }
@@ -84,7 +87,6 @@ export class SessionWorkbenchTools {
   openTool(tool: string): void {
     if (!this.panels.has(tool)) return;
     this.activeTool = tool;
-    const select = this.root?.querySelector('select'); if (select) select.value = tool;
     this.showTool();
   }
 
@@ -103,13 +105,10 @@ export class SessionWorkbenchTools {
   mount(parent: HTMLElement): void {
     this.detach();
     this.root = parent.createDiv({ cls: 'opencodian-workbench-tools-shell' });
-    const label = this.root.createEl('label', { cls: 'opencodian-workbench-tool-picker', text: t('workbench.tools') });
-    const select = label.createEl('select', { attr: { 'aria-label': t('workbench.tools') } });
-    for (const [value, name] of [['terminal', t('workbench.terminal')], ['browser', t('workbench.browser')], ['git', t('workbench.git')], ['context', t('workbench.resources')]])
-      select.createEl('option', { value, text: name });
-    select.value = this.activeTool;
-    if (this.host.openDesktop) this.button(label,t('workbench.desktop.open'),'external-link',()=>this.host.openDesktop!(this.activeTool));
-    select.addEventListener('change', () => { this.activeTool = select.value; this.showTool(); });
+    if (this.host.openDesktop) {
+      const controls = this.root.createDiv({ cls: 'opencodian-workbench-tool-actions' });
+      this.button(controls,t('workbench.desktop.open'),'external-link',()=>this.host.openDesktop!(this.activeTool));
+    }
     this.error = this.root.createDiv({ cls: 'opencodian-workbench-error', attr: { role: 'alert' } }); this.error.hidden = true;
     for (const key of ['terminal', 'browser', 'git', 'context']) this.panels.set(key, this.root.createDiv({ cls: `opencodian-workbench-tool-${key}` }));
     this.mountTerminal(); this.renderGit(); this.renderResources();
@@ -126,6 +125,7 @@ export class SessionWorkbenchTools {
       this.panels.get('browser')?.empty();
       if (this.activeTool === 'browser') this.mountBrowser();
       this.renderGit();
+      this.showTool();
       if (this.host.runtime.getTerminal(state.identity)) void this.connectTerminal(false);
     }
     const fingerprint = JSON.stringify([state.identity, state.resources]);

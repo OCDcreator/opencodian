@@ -1,5 +1,8 @@
 # Chinese Locale
 
+2026-11-01：新增 `workbench.information`（会话信息）入口文案；任务、文件及终端/仓库/浏览器/资源卡片复用各自功能名称，不再显示“会话工作台”或页签导航。
+`workbench.info.sources` 使用“会话引用”，包含当前附件及后端加载来源；资源工具 `workbench.resources` 使用“命令与资源”，区分当前会话材料和可加载的目录及资源操作。
+
 2026-10-30：新增 chat.tab.closeHint，说明右键／中键／Delete 关闭会话标签。
 > 2026-10-27：OpenCode 2 新增八个功能子页及 `settings.opencode2.workspace.*` 文案，说明自动目录同步、覆盖来源、配置草稿、认证及应用/保存反馈。
 > 2026-10-27：新增 `chat.effort.disabledShort`（关闭），供窄 Composer 的 effort 短标签使用；完整 `chat.effort.disabled` 仍在模型弹层展示。

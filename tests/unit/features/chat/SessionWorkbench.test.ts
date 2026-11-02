@@ -15,11 +15,13 @@ describe('session workbench surface', () => {
   let boundary: HTMLElement;
   let surface: SessionWorkbench;
   const controlGoal = jest.fn(async () => {});
+  const openTool = jest.fn();
+  const mountTools = jest.fn();
   beforeEach(() => {
     boundary = document.createElement('div'); document.body.appendChild(boundary);
     boundary.getBoundingClientRect = () => ({ width: 400 }) as DOMRect;
     surface = new SessionWorkbench(boundary, { armGoal: jest.fn(), controlGoal, refresh: jest.fn(),
-      openMessage: jest.fn(), openResource: jest.fn(), stopTask: jest.fn(), mountTools: jest.fn() });
+      openMessage: jest.fn(), openResource: jest.fn(), stopTask: jest.fn(), mountTools, openTool });
   });
   afterEach(() => { surface.destroy(); boundary.remove(); jest.clearAllMocks(); });
 
@@ -49,16 +51,25 @@ describe('session workbench surface', () => {
     register.mockRestore();
   });
 
-  it('uses one bounded narrow surface and keyboard tab navigation', () => {
-    surface.setState(state()); surface.openGoal();
+  it('opens a specific card directly without a workbench tab rail', async () => {
+    surface.setState(state());
+    const entry = boundary.querySelector<HTMLButtonElement>('.opencodian-workbench-trigger')!;
+    entry.click();
+    await Promise.resolve();
     expect(boundary.querySelector('.opencodian-workbench-host')?.classList.contains('is-narrow')).toBe(true);
-    const tabs = boundary.querySelectorAll<HTMLButtonElement>('[role=tab]');
-    tabs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
-    expect(tabs[1].getAttribute('aria-selected')).toBe('true');
-    expect(boundary.querySelector('.opencodian-workbench-tasks')?.hasAttribute('hidden')).toBe(false);
-    tabs[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    const repository = [...boundary.querySelectorAll<HTMLButtonElement>('.opencodian-workbench-shortcut')]
+      .find((button) => button.textContent === t('workbench.git'))!;
+    repository.click();
+    await Promise.resolve();
+    expect(boundary.querySelector('.opencodian-workbench-tools')?.hasAttribute('hidden')).toBe(false);
+    expect(boundary.querySelector('.opencodian-workbench-session')?.textContent).toBe(t('workbench.git'));
+    expect(boundary.querySelector('[role=tablist]')).toBeNull();
+    expect(boundary.querySelector('[role=tab]')).toBeNull();
+    expect(boundary.querySelector('select')).toBeNull();
+    expect(boundary.textContent).not.toContain(t('workbench.title'));
+    boundary.querySelector('.opencodian-workbench-panel')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(boundary.querySelector('.opencodian-workbench-panel')?.hasAttribute('hidden')).toBe(true);
-    expect(document.activeElement).toBe(boundary.querySelector('.opencodian-workbench-trigger'));
+    expect(document.activeElement).toBe(entry);
   });
 
   it('keeps cached objectives readable on a failed authoritative read and disables control', () => {
@@ -70,12 +81,41 @@ describe('session workbench surface', () => {
     expect(pause?.disabled).toBe(true);
   });
 
-  it('restores each session page without remounting the tools', () => {
-    surface.setState(state()); surface.setPage('tools');
+  it('restores each session card and selected tool without remounting the tools', () => {
+    surface.setState(state()); surface.openTool('git');
     surface.setState(state({ identity: 'codex:c2', sessionId: 'thread2' }));
-    expect(boundary.querySelector('[role=tab][aria-selected=true]')?.textContent).toBe(t('workbench.overview'));
+    expect(boundary.querySelector('.opencodian-workbench-overview')?.hasAttribute('hidden')).toBe(false);
+    surface.openTool('browser');
+    expect(boundary.querySelector('.opencodian-workbench-session')?.textContent).toBe(t('workbench.browser'));
     surface.setState(state());
-    expect(boundary.querySelector('[role=tab][aria-selected=true]')?.textContent).toBe(t('workbench.tools'));
+    expect(boundary.querySelector('.opencodian-workbench-tools')?.hasAttribute('hidden')).toBe(false);
+    expect(boundary.querySelector('.opencodian-workbench-session')?.textContent).toBe(t('workbench.git'));
+    expect(openTool).toHaveBeenLastCalledWith('git');
+    expect(mountTools).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['terminal', 'workbench.terminal'], ['git', 'workbench.git'],
+    ['browser', 'workbench.browser'], ['context', 'workbench.resources'],
+  ] as const)('opens the %s shortcut as its own card', async (tool, label) => {
+    surface.setState(state());
+    boundary.querySelector<HTMLButtonElement>('.opencodian-workbench-trigger')!.click();
+    await Promise.resolve();
+    [...boundary.querySelectorAll<HTMLButtonElement>('.opencodian-workbench-shortcut')]
+      .find((button) => button.textContent === t(label))!.click();
+    await Promise.resolve();
+    expect(openTool).toHaveBeenLastCalledWith(tool);
+    expect(boundary.querySelector('.opencodian-workbench-session')?.textContent).toBe(t(label));
+    expect(boundary.querySelector('.opencodian-workbench-tools')?.hasAttribute('hidden')).toBe(false);
+    surface.setState(state({ statistics: { rounds: 1, messages: 2, tools: 0 } }));
+    expect(boundary.querySelector('.opencodian-workbench-session')?.textContent).toBe(t(label));
+    const back = boundary.querySelector<HTMLButtonElement>(`.opencodian-workbench-header button[aria-label="${t('workbench.goal.backToInformation')}"]`)!;
+    back.focus();
+    back.click();
+    await Promise.resolve();
+    expect(boundary.querySelector('.opencodian-workbench-overview')?.hasAttribute('hidden')).toBe(false);
+    expect(boundary.querySelector('.opencodian-workbench-session')?.textContent).toBe(t('workbench.information'));
+    expect(boundary.querySelector('.opencodian-workbench-overview')?.contains(document.activeElement)).toBe(true);
   });
 
   it('shows information without requiring a Goal and keeps every disclosure independent', () => {
@@ -182,3 +222,107 @@ describe('session workbench surface', () => {
     expect(boundary.querySelector('[role=alert]')?.textContent).toBe('Native write rejected');
   });
 });
+
+describe('session card focus across content refresh', () => {
+  it.each([['tasks', 'workbench.tasks'], ['files', 'workbench.files']] as const)(
+    'keeps focus on the stable header when %s content is replaced', (page, label) => {
+      const boundary = document.body.createDiv();
+      const surface = new SessionWorkbench(boundary, { armGoal: jest.fn(), controlGoal: jest.fn(), refresh: jest.fn(),
+        openMessage: jest.fn(), openResource: jest.fn(), stopTask: jest.fn(), mountTools: jest.fn() });
+      try {
+        surface.setState(state()); surface.openGoal(); surface.setPage(page);
+        const back = boundary.querySelector<HTMLButtonElement>(`.opencodian-workbench-header button[aria-label="${t('workbench.goal.backToInformation')}"]`)!;
+        expect(document.activeElement).toBe(back);
+        boundary.querySelector(`.opencodian-workbench-${page}`)!.replaceChildren(document.createElement('button'));
+        surface.setState(state({ statistics: { rounds: 1, messages: 2, tools: 0 } }));
+        expect(document.activeElement).toBe(back);
+        expect(boundary.querySelector('.opencodian-workbench-session')?.textContent).toBe(t(label));
+      } finally { surface.destroy(); boundary.remove(); }
+    });
+});
+
+describe('session information entry structure', () => {
+  it('keeps controls above information and gives task/tool entries consistent navigation', async () => {
+    const boundary = document.body.createDiv();
+    const surface = new SessionWorkbench(boundary, { armGoal: jest.fn(), controlGoal: jest.fn(), refresh: jest.fn(),
+      openMessage: jest.fn(), openResource: jest.fn(), stopTask: jest.fn(), mountTools: jest.fn() });
+    try {
+      surface.setState(state({ contextSources: [{ label: 'Attached note', path: 'note.md' }] }));
+      boundary.querySelector<HTMLButtonElement>('.opencodian-workbench-trigger')!.click();
+      await Promise.resolve();
+      const panel = boundary.querySelector('.opencodian-workbench-panel')!;
+      const header = panel.querySelector('.opencodian-workbench-header')!;
+      const overview = panel.querySelector('.opencodian-workbench-overview')!;
+      expect(header.parentElement).toBe(panel);
+      expect(overview.contains(header)).toBe(false);
+      expect(header.textContent).toContain(t('workbench.information'));
+      expect(overview.querySelector('summary')?.contains(header)).toBe(false);
+      const entries = [...overview.querySelectorAll<HTMLButtonElement>('.opencodian-workbench-shortcuts > button')];
+      expect(entries.map((button) => button.textContent)).toEqual([
+        t('workbench.tasks'), t('workbench.terminal'), t('workbench.git'), t('workbench.browser'), t('workbench.resources'),
+      ]);
+      for (const entry of entries) {
+        expect(entry.classList.contains('opencodian-workbench-shortcut')).toBe(true);
+        expect(entry.querySelector('svg[data-icon="chevron-right"]')).not.toBeNull();
+      }
+      expect(overview.textContent).toContain(t('workbench.info.sources'));
+      expect(t('workbench.info.sources')).not.toBe(t('workbench.resources'));
+      entries[0].focus(); entries[0].click(); await Promise.resolve();
+      expect(panel.querySelector('.opencodian-workbench-tasks')?.hasAttribute('hidden')).toBe(false);
+      expect(panel.querySelector('.opencodian-workbench-session')?.textContent).toBe(t('workbench.tasks'));
+      expect(document.activeElement).toBe(header.querySelector(`button[aria-label="${t('workbench.goal.backToInformation')}"]`));
+    } finally { surface.destroy(); boundary.remove(); }
+  });
+});
+
+it('aligns docked cards with the visible composer above its status footer', () => {
+  const boundary = document.body.createDiv();
+  boundary.getBoundingClientRect = () => ({ width: 1000, bottom: 900 }) as DOMRect;
+  const input = boundary.createDiv({ cls: 'opencodian-input-area' });
+  input.getBoundingClientRect = () => ({ height: 200, top: 680, bottom: 880 }) as DOMRect;
+  const composer = input.createDiv({ cls: 'opencodian-composer-shell' });
+  composer.getBoundingClientRect = () => ({ height: 140, bottom: 840 }) as DOMRect;
+  const surface = new SessionWorkbench(boundary, { armGoal: jest.fn(), controlGoal: jest.fn(), refresh: jest.fn(),
+    openMessage: jest.fn(), openResource: jest.fn(), stopTask: jest.fn(), mountTools: jest.fn() });
+  try {
+    surface.setState(state()); surface.openGoal();
+    const host = boundary.querySelector<HTMLElement>('.opencodian-workbench-host')!;
+    expect(host.style.getPropertyValue('--workbench-dock-bottom')).toBe('60px');
+    expect(host.style.getPropertyValue('--workbench-bottom')).toBe('228px');
+    composer.getBoundingClientRect = () => ({ height: 140, bottom: 810 }) as DOMRect;
+    surface.openGoal();
+    expect(host.style.getPropertyValue('--workbench-dock-bottom')).toBe('90px');
+    composer.remove(); surface.openGoal();
+    expect(host.style.getPropertyValue('--workbench-dock-bottom')).toBe('20px');
+  } finally { surface.destroy(); boundary.remove(); }
+});
+
+  it('offers docking only when the pane can reserve room, and restores it after resizing', async () => {
+    const boundary = document.body.createDiv();
+    boundary.getBoundingClientRect = () => ({ width: 400 }) as DOMRect;
+    const surface = new SessionWorkbench(boundary, { armGoal: jest.fn(), controlGoal: jest.fn(), refresh: jest.fn(),
+      openMessage: jest.fn(), openResource: jest.fn(), stopTask: jest.fn(), mountTools: jest.fn() });
+    try {
+    surface.setState(state()); surface.openGoal();
+    const dock = [...boundary.querySelectorAll<HTMLButtonElement>('button')].find(button => button.title === t('workbench.dock'))!;
+    expect(dock.hidden).toBe(true);
+    boundary.getBoundingClientRect = () => ({ width: 1000 }) as DOMRect;
+    surface.openGoal();
+    expect(dock.hidden).toBe(false);
+    expect(dock.getAttribute('aria-pressed')).toBe('false');
+    dock.click(); await Promise.resolve();
+    expect(dock.getAttribute('aria-pressed')).toBe('true');
+    expect(boundary.classList.contains('has-workbench-docked')).toBe(true);
+    boundary.getBoundingClientRect = () => ({ width: 400 }) as DOMRect;
+    surface.openGoal();
+    expect(dock.hidden).toBe(true);
+    expect(boundary.classList.contains('has-workbench-docked')).toBe(false);
+    boundary.getBoundingClientRect = () => ({ width: 1000 }) as DOMRect;
+    surface.openGoal();
+    expect(dock.hidden).toBe(false);
+    expect(boundary.classList.contains('has-workbench-docked')).toBe(true);
+    dock.click(); await Promise.resolve();
+    expect(dock.getAttribute('aria-pressed')).toBe('false');
+    expect(boundary.classList.contains('has-workbench-docked')).toBe(false);
+    } finally { surface.destroy(); boundary.remove(); }
+  });
