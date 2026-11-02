@@ -45,15 +45,18 @@ const config: InlineCompletionSessionConfig = {
 describe('ZCodeAdapter inline completion', () => {
   let adapter: ZCodeAdapter;
   let calls: Array<{ method: string; params?: Record<string, unknown> }>;
+  let closeConfirmed: boolean;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     calls = [];
+    closeConfirmed = true;
     const transport = {
       start: jest.fn(async () => {}),
       request: jest.fn(async (method: string, params?: Record<string, unknown>) => {
         calls.push({ method, ...(params ? { params } : {}) });
         if (method === 'runtime/capabilities') return { independentPlanState: true };
-        if (method === 'session/create') return { session: { sessionId: 'sess-chat' }, settings };
+        if (method === 'session/create') return { session: { sessionId: params?.sessionId ?? 'sess-chat' }, settings };
+        if (method === 'session/close') return { closed: closeConfirmed };
         if (method === 'workspace/generateText') return { text: 'suggestion', toolCalls: [] };
         return {};
       }),
@@ -66,7 +69,6 @@ describe('ZCodeAdapter inline completion', () => {
       discoverProviderConfig: () => providerConfig,
       createTransport: () => transport as unknown as ZCodeAppServerTransport,
     });
-    await adapter.start();
   });
 
   afterEach(() => { adapter.dispose(); jest.restoreAllMocks(); });
@@ -76,12 +78,51 @@ describe('ZCodeAdapter inline completion', () => {
     expect(adapter.hasCapability(AgentCapability.AuxQuery)).toBe(true);
   });
 
-  it('requires a catalog before opening a direct completion path', async () => {
-    await expect(adapter.startInlineCompletionSession(config)).rejects.toThrow('observed native model catalog');
-    expect(calls.map((call) => call.method)).toEqual(['runtime/capabilities']);
+  it('starts completion with the native workspace default before any chat has been opened', async () => {
+    const session = await adapter.startInlineCompletionSession({
+      systemPrompt: config.systemPrompt, workingDirectory: config.workingDirectory,
+    });
+
+    expect(calls.map((call) => call.method)).toEqual(['runtime/capabilities', 'session/create', 'session/close']);
+    expect(calls[1].params).toMatchObject({
+      workspace: { workspaceKey: '/vault', workspacePath: '/vault' },
+      persistence: 'deferred', titleGenerationEnabled: false,
+      mcpServers: [], toolAllowlist: [], dynamicWorkflowEnabled: false,
+    });
+    expect(calls[2].params).toEqual({ sessionId: calls[1].params?.sessionId, expectedPersistence: 'deferred' });
+
+    await expect(session.complete({ prefix: 'A', suffix: 'B', maxChars: 20 })).resolves.toEqual({
+      ok: true, text: 'suggestion', toolCalls: [],
+    });
+    expect(calls).toContainEqual(expect.objectContaining({
+      method: 'workspace/generateText',
+      params: expect.objectContaining({
+        selection: { providerId: 'krill', modelId: 'gpt-6-sol', options: { reasoningLevel: 'none' } },
+        tools: [],
+      }),
+    }));
+    await session.dispose();
+  });
+
+  it('shares workspace discovery across simultaneous cold completion starts', async () => {
+    const sessions = await Promise.all([
+      adapter.startInlineCompletionSession(config),
+      adapter.startInlineCompletionSession(config),
+    ]);
+
+    expect(calls.map((call) => call.method)).toEqual(['runtime/capabilities', 'session/create', 'session/close']);
+    await Promise.all(sessions.map((session) => session.dispose()));
+  });
+
+  it('refuses completion when the native discovery draft cannot be confirmed closed', async () => {
+    closeConfirmed = false;
+
+    await expect(adapter.startInlineCompletionSession(config)).rejects.toThrow('did not close');
+    expect(calls.map((call) => call.method)).toEqual(['runtime/capabilities', 'session/create', 'session/close']);
   });
 
   it('uses the current native reasoning readback and never creates a completion session', async () => {
+    await adapter.start();
     await adapter.createSession();
     const session = await adapter.startInlineCompletionSession(config);
 
@@ -99,6 +140,7 @@ describe('ZCodeAdapter inline completion', () => {
   });
 
   it('rejects a non-ZCode completion model before the direct request', async () => {
+    await adapter.start();
     await adapter.createSession();
     await expect(adapter.startInlineCompletionSession({
       ...config,

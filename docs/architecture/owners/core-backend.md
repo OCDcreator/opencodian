@@ -1,5 +1,7 @@
 # Owner: core.backend
 
+2026-11-02：ZCode 行内补全入口在本 owner 内自动启动运行时并复用已有工作区模型目录发现，消除“先手动打开／恢复聊天”的前置要求。目录缓存、并发去重、deferred 草稿清理和 transport 校验仍由 ZCodeModelSurface 持有；真实聊天模型读回优先，未新增会话 owner 或 feature/app 依赖。
+
 2026-10-29：ZCodeModelSurface 继续拥有目录生命周期，补无会话工作区目录加载（deferred 草稿、原生读回、条件关闭、并发去重及 transport 隔离）；adapter 仅暴露工作区 models/default seam，不建立第二个聊天会话 owner。
 
 2026-10-29：原生 mention 目录与发送校验仍归来源适配器所有：Codex 使用有效安装目录与结构化输入，ZCode 使用当前 workspace/session 目录；DSH 仅在 resolver 与两端 Vault 身份已验证时返回原生引用。Codex/ZCode 提供只读引用历史入口，失败返回 unavailable，由 feature 层使用有来源标记的快照回退，不启动来源模型回合。

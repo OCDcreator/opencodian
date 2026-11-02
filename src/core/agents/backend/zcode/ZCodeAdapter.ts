@@ -1037,23 +1037,26 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
   /**
    * Build the sessionless text-completion channel. Its native request has an
    * empty tool list and a four-second cancellation budget; slower providers
-   * may time out without creating a chat session.
+   * may time out without creating a chat session. Cold starts discover the
+   * native workspace catalog automatically, without requiring an open chat.
    */
   async startInlineCompletionSession(config: InlineCompletionSessionConfig): Promise<InlineCompletionSession> {
-    const catalog = this.modelSurface.getAvailableModelCatalog();
-    if (!catalog) {
-      throw new Error('ZCode inline completion requires an observed native model catalog. Start or restore a ZCode chat first.');
-    }
-    const model = resolveZCodeInlineCompletionModel(config.model, catalog.currentModel);
-    if (!model) {
-      throw new Error('ZCode inline completion requires a selected native model.');
-    }
     const workingDirectory = config.workingDirectory.trim();
     if (!workingDirectory) {
       throw new Error('ZCode inline completion requires a vault workspace path.');
     }
+    await this.start();
+    const transport = this.requireTransport();
+    const catalog = this.modelSurface.getAvailableModelCatalog()
+      ?? await this.modelSurface.getWorkspaceModelCatalog(
+        transport, this.options.workingDirectory ?? workingDirectory, () => this.transport === transport,
+      );
+    const model = resolveZCodeInlineCompletionModel(config.model, catalog.currentModel);
+    if (!model) {
+      throw new Error('ZCode inline completion requires a selected native model.');
+    }
     return ZCodeInlineCompletionSession.create({
-      transport: this.requireTransport(),
+      transport,
       catalog,
       model,
       workingDirectory,

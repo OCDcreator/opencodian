@@ -1,5 +1,7 @@
 # ZCodeAdapter
 
+2026-11-02：`startInlineCompletionSession()` 自动启动 owned runtime；尚未观测聊天模型目录时，复用 `ZCodeModelSurface.getWorkspaceModelCatalog()` 读取原生工作区模型和推理默认值，完成 deferred 草稿关闭确认后再开放无会话文本补全。无需用户先打开／恢复聊天或重新开关补全。并发冷启动复用同一目录读取；已有聊天仍优先使用实际会话的模型读回。初始化不发送模型回合，也不留下持久聊天；目录读取、草稿关闭确认或 transport 代际校验失败时保持拒绝。`ZCodeAdapter.inlineCompletion.test.ts` 覆盖无聊天冷启动、原生默认模型／推理选择、并发去重和草稿未确认关闭时拒绝补全。
+
 2026-10-29：新增工作区模型目录 seam `getWorkspaceModelCatalog()`，启动当前 owned transport 后交既有 modelSurface 读取 deferred 原生目录，返回完整模型及工作区默认模型。切换到 ZCode 即可加载，无需用户先创建／恢复聊天；已有会话仍走原 getSession/getAvailableModels 读回。
 
 > 2026-10-29（技能 token 适配）：getRuntimeSkills 保留 referenceCatalog 返回的 path；session/send 前把目录中匹配的 `/name` 或 `$name` 序列化为官方桌面端使用的 `[$name](<path>)` 引用。普通命令与未知 token 原样保留，路径只取自当前后端目录。
