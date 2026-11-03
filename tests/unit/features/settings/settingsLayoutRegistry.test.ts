@@ -14,6 +14,13 @@ import {
 } from '../../../../src/features/settings/settingsLayoutRegistry';
 
 describe('SETTINGS_PRIMARY_TABS', () => {
+  it('defaults ZCode to chat and maps every previous subtab without losing saved routes', () => {
+    expect(getActiveSecondaryTabId('zcode', {})).toBe('chat');
+    expect(getActiveSecondaryTabId('zcode', { zcode: 'connection' })).toBe('installation');
+    expect(getActiveSecondaryTabId('zcode', { zcode: 'model' })).toBe('chat');
+    expect(getActiveSecondaryTabId('zcode', { zcode: 'management' })).toBe('tools');
+    expect(getActiveSecondaryTabId('zcode', { zcode: 'tools' })).toBe('tools');
+  });
   it('defines general with basic and agents secondary tabs', () => {
     const generalTab = getPrimaryTabDefinition('general');
     expect(generalTab).toBeDefined();

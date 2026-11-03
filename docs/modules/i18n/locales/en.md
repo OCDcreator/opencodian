@@ -1,5 +1,7 @@
 # English Locale
 
+2026-11-03: adds `commands.memory.syncFailed` for deduplicated shared-memory Git failure notices, including the failure detail and status command.
+
 2026-11-01: adds `workbench.information` for the session information entry. Direct cards reuse terminal/repository/browser/resources and task/file labels instead of displaying the generic workbench title or tab navigation.
 The information source group is “Session references”, while the resource tool is “Commands and resources”, distinguishing current attachments/backend-loaded sources from catalogs and resource actions.
 
@@ -715,3 +717,15 @@ Provides `slashCommand.group.commands` and `.skills` labels for independent comp
 新增 workbench.info.*：套餐窗口、当前上下文/累计消耗、上下文来源、MCP 作用域、智能体状态及返回主会话文案。
 
 目标控制补充：返回会话信息、关闭已完成提示栏、关闭后仍可查看的说明，以及移除已完成目标；原生暂停/恢复与执行停止/继续使用不同翻译键。
+
+## 2026-11-02 ZCode task settings
+
+新增 ZCode 三任务页、官方账号隔离、共享 API 表单、原生目录/旧值恢复、登录状态和保存冲突双语文案；auto 仅内部保留值。
+
+ZCode 补全文案明确 Alt/快捷键触发，与统一开关保持一致；未单独选模型时沿用统一补全解析规则，避免误称输入时自动触发或固定跟随聊天。
+
+零匹配时仅公告修改搜索词的恢复指引，不展示键盘选择动作；共享配置读取失败有专属文件读取与未写入说明。
+
+API 表单保存成功后保留禁用的“已保存”状态，将“取消”改为“关闭”并聚焦该按钮；关闭表单不撤销共享配置写入。
+
+API 服务摘要新增地址与模型数量、查看模型及带服务名的可访问标签；完整模型 ID 经原生展开区查看。

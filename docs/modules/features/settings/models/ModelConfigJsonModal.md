@@ -1,5 +1,7 @@
 # ModelConfigJsonModal
 
+2026-11-02：打开时先标记 `opencodian-model-config-json-modal` 根，使配置服务不可用的早退提示与正常编辑器都采用共享界面排版；JSON 校验、保存、关闭保护与服务器重启语义不变。
+
 > **源码**: `src/features/settings/models/ModelConfigJsonModal.ts`
 > **状态**: [REVIEW]
 

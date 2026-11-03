@@ -1,5 +1,7 @@
 # SettingsRemoteControlSection
 
+2026-11-02：确认与一次性令牌展示 modal 分别标记 `opencodian-remote-control-confirm-modal` / `opencodian-remote-control-token-modal`，接入全插件共享界面排版；确认／取消、令牌显隐、复制与权限逻辑不变。
+
 > **源码**: `src/features/settings/general/SettingsRemoteControlSection.ts`
 > **状态**: [REVIEW]
 

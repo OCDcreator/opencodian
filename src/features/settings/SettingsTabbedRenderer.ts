@@ -187,7 +187,7 @@ export class SettingsTabbedRenderer {
       },
     });
     if (activePrimaryId === 'pi') new SettingsPiSection(this.deps.plugin).attachTabbed(contentEl, activeSecondaryId);
-    else if (activePrimaryId === 'zcode') new SettingsZCodeSection(this.deps.plugin).attachTabbed(contentEl, activeSecondaryId);
+    else if (activePrimaryId === 'zcode') new SettingsZCodeSection(this.deps.plugin, () => this.openCompletionSettings(contentEl.ownerDocument)).attachTabbed(contentEl, activeSecondaryId);
     else this.renderContent(contentEl, activePrimaryId, activeSecondaryId);
   }
 
@@ -207,6 +207,21 @@ export class SettingsTabbedRenderer {
     };
     void this.deps.plugin.saveSettings();
     this.deps.requestDisplayRefresh();
+  }
+
+  private openCompletionSettings(ownerDocument: Document): void {
+    this.switchToPrimaryTab('conversation', 'inline-edit');
+    const ownerWindow = ownerDocument.defaultView;
+    ownerWindow?.requestAnimationFrame(() => ownerWindow.requestAnimationFrame(() => {
+      const settings = this.deps.plugin.settings;
+      if (settings.settingsTabbedPrimaryTab !== 'conversation'
+        || settings.settingsTabbedSecondaryTabByPrimary.conversation !== 'inline-edit') return;
+      const row = Array.from(ownerDocument.querySelectorAll<HTMLElement>('.setting-item')).find((element) =>
+        element.querySelector('.setting-item-name')?.textContent === t('settings.inlineCompletion.enabled.name')
+        && element.getClientRects().length > 0);
+      row?.scrollIntoView({ block: 'center', behavior: 'instant' });
+      row?.querySelector<HTMLElement>('[role="switch"], input[type="checkbox"], .checkbox-container')?.focus({ preventScroll: true });
+    }));
   }
 
   /** Align the tabbed settings route with the active backend without refreshing or persisting it. */
@@ -463,7 +478,7 @@ export class SettingsTabbedRenderer {
         new SettingsPiSection(this.deps.plugin).attachTabbed(containerEl, secondaryTabId);
         return;
       case 'zcode':
-        new SettingsZCodeSection(this.deps.plugin).attachTabbed(containerEl, secondaryTabId);
+        new SettingsZCodeSection(this.deps.plugin, () => this.openCompletionSettings(containerEl.ownerDocument)).attachTabbed(containerEl, secondaryTabId);
         return;
       case 'dsh':
         createSettingsDshSection(this.deps.plugin).attachTabbed(containerEl, secondaryTabId);

@@ -50,6 +50,7 @@ import { type AgentGoalCommand, type AgentGoalControlResult, type AgentGoalEvent
   BackendGoalRuntime, confirmGoalCommand, validateGoalCommand } from '../BackendGoalRuntime';
 import { backendSessionMessagesToChat } from '../BackendSessionMessages';
 import type { FileRevision } from '../configuration/ProjectResourceSecureWrite';
+import { ZCodeAccountService } from './ZCodeAccountService';
 import {
   normalizeZCodeHandshakeFailure,
   ZCodeAppServerTransport,
@@ -65,13 +66,15 @@ import {
   type ZCodeInteractionReply,
 } from './ZCodeInteractionBridge';
 import { type ZCodeManagementCatalog, type ZCodeManagementMutationResult, ZCodeManagementService } from './ZCodeManagementService';
+import type { ZCodeWorkspaceCatalogOptions } from './ZCodeModelCatalog';
 import {
   parseZCodeDefaultModel,
   type ZCodeModelCatalog,
   ZCodeModelSurface,
   type ZCodeSlashCommandEntry,
 } from './ZCodeModelCatalog';
-import { asRecordValue, redactZCodeDiagnosticText } from './ZCodeProtocolTypes';
+import { ZCodePersonalConfigService } from './ZCodePersonalConfigService';
+import { asRecordValue, redactZCodeDiagnosticText, ZCodeProtocolErrorCode } from './ZCodeProtocolTypes';
 import {
   parseZCodeRuntimeCapabilities,
   type ZCodeRuntimeCapabilities,
@@ -228,6 +231,18 @@ function readBackgroundEnding(value: unknown, sessionId: string): ZCodeBackgroun
 }
 
 export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSessionCapability, AgentForkCapability, AgentQuestionCapability, AgentPermissionCapability, AgentAuxQueryCapability, AgentInlineCompletionCapability {
+  readonly accounts = new ZCodeAccountService({
+    getLaunch: () => {
+      const resolution = (this.options.resolveRuntime ?? resolveZCodeRuntime)({ executablePath: this.options.getSettings?.().executablePath });
+      if (resolution.mode !== 'ready') throw new Error('zcode-login-runtime-unavailable');
+      return resolution.launch;
+    },
+    getEnvironment: () => ({
+      ...(this.providerConfig ?? (this.options.discoverProviderConfig ?? discoverZCodeProviderConfig)({})).env,
+      ...(this.options.getExtraEnv?.() ?? {}),
+    }),
+  });
+  private accountRevision: string | null = null;
   readonly kind = 'zcode' as const;
   readonly displayName = 'ZCode';
   readonly description = 'Official ZCode runtime · OpenCodian-owned app-server';
@@ -329,6 +344,11 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
    * capability handshake. Failure paths leave no orphan process.
    */
   async start(): Promise<void> {
+    const revision = this.accounts.revision();
+    if (this.accountRevision !== null && revision !== this.accountRevision && this.transport) {
+      throw new Error('ZCode account changed. Finish active tasks, then reconnect under Installation and connection.');
+    }
+    this.accountRevision = revision;
     if (this.startPromise) {
       return this.startPromise;
     }
@@ -363,7 +383,7 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
     const createTransport = this.options.createTransport ?? ((options) => new ZCodeAppServerTransport(options));
     const transport = createTransport({
       launch: resolution.launch as ZCodeRuntimeLaunch,
-      extraEnv: { ...providerConfig.env, ...(this.options.getExtraEnv?.() ?? {}) },
+      extraEnv: { ...providerConfig.env, ...this.accounts.getEnvironment(), ZCODE_PERSONAL_PROVIDER_CONFIG_FILE: providerConfig.configPath },
       ...(this.options.workingDirectory ? { workingDirectory: this.options.workingDirectory } : {}),
       requestTimeoutMs: this.handshakeTimeoutMs,
       onExit: () => {
@@ -436,6 +456,7 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
   /** Stop the owned app-server process. Idempotent; other backends are unaffected. */
   async stop(): Promise<void> {
     this.startPromise = null;
+    this.modelSurface.reset();
     const transport = this.transport;
     this.transport = null;
     this.closeAllRuns();
@@ -448,6 +469,7 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
 
   dispose(): void {
     this.startPromise = null;
+    this.modelSurface.reset();
     this.closeAllRuns();
     this.stoppingSessions.clear();
     this.interactions.settlePendingForTeardown();
@@ -466,6 +488,7 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
    * always closes with the finalization boundary (`message_stop`).
    */
   async *sendMessage(rawRequest: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
+    await this.start();
     const id = rawRequest.sessionId;
     await this.stoppingSessions.get(id);
     const goalObjective = rawRequest.options?.goalObjective;
@@ -1021,9 +1044,11 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
     if (!workingDirectory) throw new Error('ZCode auxiliary session requires a workspace path.');
     const createTransport = this.options.createTransport
       ?? ((transportOptions: ConstructorParameters<typeof ZCodeAppServerTransport>[0]) => new ZCodeAppServerTransport(transportOptions));
+    const accountEnvironment = this.accounts.getEnvironment();
     const auxOptions = {
       launch: resolution.launch,
-      providerConfigEnv: providerConfig.env,
+      providerConfigEnv: { ...providerConfig.env, ...this.accounts.getEnvironment(), ZCODE_PERSONAL_PROVIDER_CONFIG_FILE: providerConfig.configPath },
+      accountEnv: { ZCODE_DATA_BASE_DIR: this.accounts.rootPath, ZCODE_CREDENTIAL_SECRET: accountEnvironment.ZCODE_CREDENTIAL_SECRET },
       workingDirectory,
       systemPrompt: config.systemPrompt,
       ...(config.model ? { model: config.model } : {}),
@@ -1329,16 +1354,45 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
   }
 
   /** Workspace-owned native catalog/default, available before the first conversation is created. */
-  async getWorkspaceModelCatalog(): Promise<{
+  async getWorkspaceModelCatalog(options: ZCodeWorkspaceCatalogOptions = {}): Promise<{
     models: ZCodeModelCatalog['models']; defaultModel: { provider: string; model: string } | null;
+    thoughtLevels: ZCodeModelCatalog['thoughtLevels']; thoughtLevelEnabled: boolean | null;
   }> {
     await this.start();
     const transport = this.requireTransport();
     const catalog = await this.modelSurface.getWorkspaceModelCatalog(
-      transport, this.options.workingDirectory ?? '', () => this.transport === transport,
+      transport, this.options.workingDirectory ?? '', () => this.transport === transport, options,
     );
-    const current = catalog.currentModel;
-    return { models: catalog.models, defaultModel: current ? { provider: current.providerId, model: current.modelId } : null };
+    const current = catalog.defaultModel;
+    return { models: catalog.models, defaultModel: current ? { provider: current.providerId, model: current.modelId } : null,
+      thoughtLevels: catalog.thoughtLevels, thoughtLevelEnabled: catalog.thoughtLevelEnabled };
+  }
+
+  /** Shared personal API file; independent account data never changes its path. */
+  getPersonalConfigService(): ZCodePersonalConfigService {
+    const provider = this.providerConfig ?? (this.options.discoverProviderConfig ?? discoverZCodeProviderConfig)({});
+    return new ZCodePersonalConfigService(provider.configPath, path.join(this.accounts.rootPath, 'provider-archive'));
+  }
+
+  async refreshConfiguration(): Promise<{ needsReconnect: boolean }> {
+    if (this.transport && this.accounts.revision() !== this.accountRevision) return { needsReconnect: true };
+    await this.start();
+    try {
+      await this.requireTransport().request('provider/refreshRegistry', { reason: 'opencodian-settings' });
+      await this.getWorkspaceModelCatalog({ forceRefresh: true });
+      return { needsReconnect: false };
+    } catch (error) {
+      if (error instanceof ZCodeRemoteRequestError && error.code === ZCodeProtocolErrorCode.MethodNotFound) return { needsReconnect: true };
+      throw error;
+    }
+  }
+
+  /** Settings never tear down a foreground run to apply configuration. */
+  async reconnectFromSettings(): Promise<boolean> {
+    if (this.sessionRuns.size) return false;
+    await this.stop();
+    await this.start();
+    return true;
   }
 
   getObservedModel(): { provider: string; model: string } | null {

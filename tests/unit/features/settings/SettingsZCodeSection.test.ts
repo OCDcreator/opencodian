@@ -1,181 +1,218 @@
-import { type DropdownComponent, Setting, type TextComponent } from 'obsidian';
+import { type ButtonComponent, type DropdownComponent, Setting, type TextAreaComponent, type TextComponent } from 'obsidian';
 
-import type { ZCodeBackendSettings } from '../../../../src/core/types/settings';
+import { SettingsZCodeAccounts } from '../../../../src/features/settings/backends/zcode/SettingsZCodeAccounts';
+import type { ZCodeSettingsModelCatalog } from '../../../../src/features/settings/backends/zcode/SettingsZCodeModelControls';
 import { type SettingsZCodeHost, SettingsZCodeSection } from '../../../../src/features/settings/backends/zcode/SettingsZCodeSection';
 
-type ChangeHandler = (value: string) => Promise<void>;
-type Field = keyof ZCodeBackendSettings;
-interface CapturedControl {
-  value: string;
-  change: ChangeHandler;
-}
-
-const initialSettings: ZCodeBackendSettings = {
-  executablePath: 'C:/zcode/original.js',
-  model: 'provider/original',
-  thinkingLevel: 'low',
-  mode: 'plan',
+const catalog: ZCodeSettingsModelCatalog = {
+  models: [
+    { providerId: 'native', modelId: 'one', label: 'One', providerLabel: 'Native', reasoningLevels: [] },
+    { providerId: 'other', modelId: 'two', label: 'Two', providerLabel: 'Other', reasoningLevels: [] },
+  ], defaultModel: { provider: 'native', model: 'one' },
+  thoughtLevels: [{ value: 'high', label: 'High' }], thoughtLevelEnabled: true,
 };
 
-function createHost(): SettingsZCodeHost {
-  return {
-    settings: { backendSettings: { zcode: { ...initialSettings } } },
-    saveSettings: jest.fn().mockResolvedValue(undefined),
-  };
-}
-
-function captureControl() {
-  const control: CapturedControl = {
-    value: '',
-    change: async () => { throw new Error('Change handler was not attached'); },
-  };
-  const component = {
-    setPlaceholder: () => component,
-    addOption: () => component,
-    setValue: (value: string) => { control.value = value; return component; },
-    onChange: (handler: (value: string) => void) => {
-      control.change = handler as ChangeHandler;
-      return component;
-    },
-  };
-  return { control, component };
-}
-
-function mount(host: SettingsZCodeHost, layout: 'classic' | 'tabbed'): Record<Field, CapturedControl> {
-  const textControls: CapturedControl[] = [];
-  let modeControl: CapturedControl | undefined;
-  jest.spyOn(Setting.prototype, 'addText').mockImplementation(function (this: Setting, configure) {
-    const { control, component } = captureControl();
-    textControls.push(control);
-    configure(component as unknown as TextComponent);
-    return this;
+function installControls(): void {
+  jest.spyOn(Setting.prototype, 'setName').mockImplementation(function (this: Setting, text) {
+    this.settingEl.createDiv({ cls: 'setting-item-name', text: String(text) }); return this;
+  });
+  jest.spyOn(Setting.prototype, 'setDesc').mockImplementation(function (this: Setting, text) {
+    let description = this.settingEl.querySelector<HTMLElement>('.setting-item-description');
+    description ??= this.settingEl.createDiv({ cls: 'setting-item-description' });
+    description.textContent = String(text); return this;
+  });
+  jest.spyOn(Setting.prototype, 'addButton').mockImplementation(function (this: Setting, configure) {
+    const buttonEl = this.controlEl.createEl('button');
+    const control = { buttonEl,
+      setButtonText: (text: string) => { buttonEl.textContent = text; return control; },
+      setDisabled: (disabled: boolean) => { buttonEl.disabled = disabled; return control; },
+      onClick: (handler: () => void) => { buttonEl.addEventListener('click', handler); return control; },
+    };
+    configure(control as unknown as ButtonComponent); return this;
   });
   jest.spyOn(Setting.prototype, 'addDropdown').mockImplementation(function (this: Setting, configure) {
-    const { control, component } = captureControl();
-    modeControl = control;
-    configure(component as unknown as DropdownComponent);
-    return this;
+    const selectEl = this.controlEl.createEl('select');
+    const control = { selectEl,
+      addOption: (value: string, text: string) => { const option = selectEl.createEl('option', { text }); option.value = value; return control; },
+      setValue: (value: string) => { selectEl.value = value; return control; },
+      onChange: (handler: (value: string) => void) => { selectEl.addEventListener('change', () => handler(selectEl.value)); return control; },
+    };
+    configure(control as unknown as DropdownComponent); return this;
   });
-
-  const section = new SettingsZCodeSection(host);
-  const container = document.body.createDiv();
-  if (layout === 'classic') section.attach(container);
-  else {
-    section.attachTabbed(container, 'connection');
-    section.attachTabbed(container, 'model');
-  }
-
-  expect(textControls).toHaveLength(3);
-  expect(modeControl).toBeDefined();
-  return {
-    executablePath: textControls[0],
-    model: textControls[1],
-    thinkingLevel: textControls[2],
-    mode: modeControl!,
-  };
+  jest.spyOn(Setting.prototype, 'addText').mockImplementation(function (this: Setting, configure) {
+    const inputEl = this.controlEl.createEl('input');
+    const control = { inputEl,
+      setPlaceholder: (value: string) => { inputEl.placeholder = value; return control; },
+      setValue: (value: string) => { inputEl.value = value; return control; },
+      onChange: (handler: (value: string) => void) => { inputEl.addEventListener('input', () => handler(inputEl.value)); return control; },
+    };
+    configure(control as unknown as TextComponent); return this;
+  });
+  jest.spyOn(Setting.prototype, 'addTextArea').mockImplementation(function (this: Setting, configure) {
+    const inputEl = this.controlEl.createEl('textarea');
+    const control = { inputEl, setValue: (value: string) => { inputEl.value = value; return control; },
+      onChange: (handler: (value: string) => void) => { inputEl.addEventListener('input', () => handler(inputEl.value)); return control; } };
+    configure(control as unknown as TextAreaComponent); return this;
+  });
 }
 
-describe.each(['classic', 'tabbed'] as const)('ZCode settings changes (%s layout)', (layout) => {
-  beforeEach(() => { document.body.innerHTML = ''; });
-  afterEach(() => { jest.restoreAllMocks(); });
+async function flush(): Promise<void> { for (let index = 0; index < 12; index++) await Promise.resolve(); }
 
-  it('preserves consecutive model, thinking, mode and executable changes on the same rendered surface', async () => {
-    const host = createHost();
-    const controls = mount(host, layout);
-    expect(Object.fromEntries(Object.entries(controls).map(([key, control]) => [key, control.value])))
-      .toEqual(initialSettings);
+function fixture() {
+  const getCatalog = jest.fn().mockResolvedValue(catalog);
+  const host: SettingsZCodeHost = {
+    settings: { backendSettings: { zcode: { executablePath: '', model: '', thinkingLevel: '', mode: '' } } },
+    saveSettings: jest.fn().mockResolvedValue(undefined),
+    agentServiceRegistry: { get: () => ({ start: jest.fn(), stop: jest.fn(), getWorkspaceModelCatalog: getCatalog }) },
+  };
+  const container = document.body.createDiv();
+  return { host, container, getCatalog, section: new SettingsZCodeSection(host) };
+}
 
-    await controls.model.change('provider/new');
-    await controls.thinkingLevel.change('high');
-    expect(host.settings.backendSettings.zcode).toEqual({ ...initialSettings, model: 'provider/new', thinkingLevel: 'high' });
-    await controls.mode.change('build');
-    await controls.executablePath.change('C:/zcode/new.js');
+function change(select: HTMLSelectElement, value: string): void { select.value = value; select.dispatchEvent(new Event('change')); }
 
-    expect(host.settings.backendSettings.zcode).toEqual({
-      executablePath: 'C:/zcode/new.js', model: 'provider/new', thinkingLevel: 'high', mode: 'build',
-    });
-    expect(host.saveSettings).toHaveBeenCalledTimes(4);
-  });
+beforeEach(() => { document.body.innerHTML = ''; installControls(); });
+afterEach(() => { jest.restoreAllMocks(); });
 
-  it.each<[Field, string]>([
-    ['executablePath', 'C:/zcode/new.js'],
-    ['model', 'provider/new'],
-    ['thinkingLevel', 'high'],
-    ['mode', 'edit'],
-  ])('merges %s into the latest normalized host state after the settings object is replaced', async (field, value) => {
-    const host = createHost();
-    const controls = mount(host, layout);
-    host.settings = {
-      backendSettings: {
-        zcode: {
-          executablePath: ' C:/zcode/external.js ', model: ' provider/external ', thinkingLevel: ' medium ', mode: ' build ',
-        } as ZCodeBackendSettings,
-      },
-    };
+it.each(['classic', 'tabbed'] as const)('saves native searchable models, thinking and mode against latest host state (%s)', async (layout) => {
+  const { host, container, section } = fixture();
+  if (layout === 'classic') section.attach(container); else section.attachTabbed(container, 'model');
+  await flush();
+  container.querySelector<HTMLButtonElement>('[data-zcode-field="model"] button')!.click();
+  const search = container.querySelector<HTMLInputElement>('input[type="search"]')!;
+  search.value = 'two'; search.dispatchEvent(new Event('input'));
+  expect(container.querySelectorAll('[role="option"]')).toHaveLength(1);
+  expect(container.querySelector('[role="group"]')?.getAttribute('aria-label')).toBe('Other');
+  container.querySelector<HTMLButtonElement>('[role="option"]')!.click();
+  await flush();
+  expect(host.settings.backendSettings.zcode?.model).toBe('other/two');
+  host.settings.backendSettings.zcode = { executablePath: '/external', model: 'other/two', thinkingLevel: '', mode: '' };
+  const [thinking, mode] = Array.from(container.querySelectorAll<HTMLSelectElement>('select'));
+  change(thinking, 'high'); change(mode, 'build'); await flush();
+  expect(host.settings.backendSettings.zcode).toEqual({ executablePath: '/external', model: 'other/two', thinkingLevel: 'high', mode: 'build' });
+  expect(host.saveSettings).toHaveBeenCalledTimes(3);
+});
 
-    await controls[field].change(` ${value} `);
+it('preserves invalid saved choices and exposes explicit reset when the catalog fails', async () => {
+  const { host, getCatalog, container, section } = fixture();
+  host.settings.backendSettings.zcode = { executablePath: '', model: 'legacy/missing', thinkingLevel: 'legacy', mode: 'auto' };
+  getCatalog.mockRejectedValue(new Error('offline'));
+  section.attachTabbed(container, 'chat'); await flush();
+  expect(host.saveSettings).not.toHaveBeenCalled();
+  expect(container.textContent).toContain('legacy/missing');
+  expect(container.querySelector<HTMLDetailsElement>('[data-zcode-group="accounts-models"]')?.open).toBe(true);
+  expect(container.querySelector<HTMLOptionElement>('option[value="auto"]')?.disabled).toBe(true);
+  const buttons = container.querySelectorAll<HTMLButtonElement>('[data-zcode-field="model"] button');
+  expect(buttons[0].disabled).toBe(true);
+  buttons[1].click(); await flush();
+  expect(host.settings.backendSettings.zcode?.model).toBe('');
+});
 
-    expect(host.settings.backendSettings.zcode).toEqual({
-      executablePath: 'C:/zcode/external.js', model: 'provider/external', thinkingLevel: 'medium', mode: 'build',
-      [field]: value,
-    });
-    expect(host.saveSettings).toHaveBeenCalledTimes(1);
-  });
+it('discards late catalog responses and recovers through an explicit retry', async () => {
+  const { getCatalog, container, section } = fixture();
+  let resolveFirst!: (value: ZCodeSettingsModelCatalog) => void;
+  getCatalog.mockReturnValueOnce(new Promise<ZCodeSettingsModelCatalog>((resolve) => { resolveFirst = resolve; }));
+  section.attachTabbed(container, 'chat');
+  container.querySelector<HTMLButtonElement>('[data-zcode-group="chat-defaults"] > .opencodian-zcode-actions button')!.click();
+  await flush();
+  resolveFirst({ ...catalog, models: [] }); await flush();
+  expect(container.querySelector<HTMLButtonElement>('[data-zcode-field="model"] button')!.disabled).toBe(false);
+  expect(getCatalog).toHaveBeenLastCalledWith({ forceRefresh: true });
+});
 
-  it.each([
-    ['input order', [0, 1, 2, 3, 4, 5, 6]],
-    ['reverse order', [6, 5, 4, 3, 2, 1, 0]],
-  ] as const)('keeps rapid edits and clearing while asynchronous saves complete in %s', async (_label, order) => {
-    const host = createHost();
-    const snapshots: ZCodeBackendSettings[] = [];
-    const finishSaves: Array<() => void> = [];
-    host.saveSettings = jest.fn(() => {
-      snapshots.push({ ...host.settings.backendSettings.zcode! });
-      return new Promise<void>((resolve) => { finishSaves.push(resolve); });
-    });
-    const controls = mount(host, layout);
+it('keeps the completion enable switch separate, and stores only its model override', async () => {
+  const { host, container } = fixture();
+  const open = jest.fn();
+  new SettingsZCodeSection(host, open).attachTabbed(container, 'chat'); await flush();
+  container.querySelector<HTMLButtonElement>('[data-zcode-field="completion-model"] button')!.click();
+  container.querySelector<HTMLButtonElement>('[role="option"]')!.click(); await flush();
+  expect(host.settings.inlineCompletionModelOverrides).toEqual({ zcode: 'native/one' });
+  expect(host.settings.inlineCompletionEnabled).toBeUndefined();
+  expect(host.settings.backendSettings.zcode?.model).toBe('');
+  container.querySelector<HTMLButtonElement>('.opencodian-zcode-completion-status button')!.click();
+  expect(open).toHaveBeenCalledTimes(1);
+});
 
-    const edits = [
-      controls.model.change('provider/n'),
-      controls.model.change('provider/new'),
-      controls.thinkingLevel.change(' high '),
-      controls.model.change(' provider/final '),
-      controls.mode.change('build'),
-      controls.executablePath.change(' C:/zcode/new.js '),
-      controls.model.change('   '),
-    ];
-    const expected: ZCodeBackendSettings = {
-      executablePath: 'C:/zcode/new.js', model: '', thinkingLevel: 'high', mode: 'build',
-    };
+it('keeps the picker open on save failure and supports Escape focus recovery', async () => {
+  const { host, container, section } = fixture();
+  host.saveSettings = jest.fn().mockRejectedValue(new Error('disk full'));
+  section.attachTabbed(container, 'chat'); await flush();
+  const open = container.querySelector<HTMLButtonElement>('[data-zcode-field="model"] button')!;
+  open.click(); container.querySelector<HTMLButtonElement>('[role="option"]')!.click(); await flush();
+  expect(container.querySelector('[role="listbox"]')).not.toBeNull();
+  expect(host.settings.backendSettings.zcode?.model).toBe('');
+  expect(container.querySelector('.opencodian-zcode-feedback')?.textContent).toContain('save');
+  container.querySelector<HTMLInputElement>('input[type="search"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  expect(container.querySelector('[role="listbox"]')).toBeNull();
+  expect(document.activeElement).toBe(open);
+  expect(open.getAttribute('aria-expanded')).toBe('false');
+  expect(open.hasAttribute('aria-controls')).toBe(false);
+});
 
-    // Every callback publishes its normalized state before invoking saveSettings or awaiting it.
-    expect(host.saveSettings).toHaveBeenCalledTimes(7);
-    expect(snapshots.map((snapshot) => snapshot.model))
-      .toEqual(['provider/n', 'provider/new', 'provider/new', 'provider/final', 'provider/final', 'provider/final', '']);
-    expect(snapshots.map((snapshot) => snapshot.thinkingLevel))
-      .toEqual(['low', 'low', 'high', 'high', 'high', 'high', 'high']);
-    expect(snapshots.map((snapshot) => snapshot.mode))
-      .toEqual(['plan', 'plan', 'plan', 'plan', 'build', 'build', 'build']);
-    expect(snapshots.map((snapshot) => snapshot.executablePath))
-      .toEqual(Array(5).fill('C:/zcode/original.js').concat(['C:/zcode/new.js', 'C:/zcode/new.js']));
-    expect(host.settings.backendSettings.zcode).toEqual(expected);
+it('retains current settings when only the executable override changes', async () => {
+  const { host, container, section } = fixture();
+  section.attachTabbed(container, 'connection');
+  host.settings.backendSettings.zcode = { executablePath: '', model: 'native/one', thinkingLevel: 'high', mode: 'plan' };
+  const input = container.querySelector<HTMLInputElement>('input')!;
+  input.value = ' /new/zcode.cjs '; input.dispatchEvent(new Event('input')); await flush();
+  expect(host.settings.backendSettings.zcode).toEqual({ executablePath: '/new/zcode.cjs', model: 'native/one', thinkingLevel: 'high', mode: 'plan' });
+});
 
-    for (const index of order) {
-      finishSaves[index]();
-      await edits[index];
-      expect(host.settings.backendSettings.zcode).toEqual(expected);
-    }
-  });
+it('recovers a provider conflict next to the draft and prevents duplicate creates after successful save', async () => {
+  const read = jest.fn().mockResolvedValue({ path: '/fixture/provider_config.json', revision: null, providers: [] });
+  const save = jest.fn().mockResolvedValueOnce({ status: 'conflict', expected: null, current: null })
+    .mockResolvedValue({ status: 'success', revision: null });
+  const container = document.body.createDiv();
+  new SettingsZCodeAccounts({
+    accounts: { read: jest.fn().mockResolvedValue({ state: 'signed-out', accounts: [] }), login: jest.fn(), logout: jest.fn(), cancelLogin: jest.fn(), openDesktop: jest.fn() },
+    getPersonalConfigService: () => ({ read, save, remove: jest.fn() }), refreshConfiguration: jest.fn().mockResolvedValue({ needsReconnect: false }),
+  }, jest.fn().mockResolvedValue(undefined)).attach(container);
+  await flush();
+  container.querySelector<HTMLDetailsElement>('details')!.open = true;
+  const click = (text: RegExp) => Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find((button) => text.test(button.textContent ?? ''))!.click();
+  click(/Add API service here/);
+  const inputs = Array.from(container.querySelectorAll<HTMLInputElement>('.opencodian-zcode-provider-form input'));
+  ['Draft name', 'https://example.invalid/v1', 'fixture-secret'].forEach((value, index) => { inputs[index].value = value; inputs[index].dispatchEvent(new Event('input')); });
+  const models = container.querySelector<HTMLTextAreaElement>('textarea')!;
+  models.value = 'test-model'; models.dispatchEvent(new Event('input'));
+  click(/Save shared configuration/); await flush();
+  expect(save).toHaveBeenCalledTimes(1);
+  const reload = container.querySelector<HTMLButtonElement>('.opencodian-zcode-provider-form .opencodian-zcode-feedback button')!;
+  expect(reload).not.toBeNull(); reload.click(); await flush();
+  expect(read).toHaveBeenCalledTimes(2);
+  expect(inputs[0].value).toBe('Draft name');
+  expect(models.value).toBe('test-model');
+  click(/Save my draft to the latest configuration/); await flush();
+  const saved = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find((button) => button.textContent === 'Saved')!;
+  expect(saved.disabled).toBe(true); saved.click();
+  expect(save).toHaveBeenCalledTimes(2);
+  expect(inputs[2].value).toBe('');
+  const close = Array.from(container.querySelectorAll<HTMLButtonElement>('.opencodian-zcode-provider-form button')).find((button) => button.textContent === 'Close')!;
+  expect(close.disabled).toBe(false);
+  expect(document.activeElement).toBe(close);
+});
 
-  it('uses normalized defaults when the latest ZCode state is absent', async () => {
-    const host = createHost();
-    const controls = mount(host, layout);
-    host.settings.backendSettings.zcode = undefined;
-
-    await controls.model.change(' provider/new ');
-
-    expect(host.settings.backendSettings.zcode).toEqual({
-      executablePath: '', model: 'provider/new', thinkingLevel: '', mode: '',
-    });
-  });
+it('keeps a large provider catalog collapsed without truncating the model IDs passed to editing', async () => {
+  const models = Array.from({ length: 180 }, (_, index) => `provider-model-${index}`);
+  const read = jest.fn().mockResolvedValue({ path: '/fixture/provider_config.json', revision: null, providers: [
+    { id: 'large', name: 'Large service', protocol: 'openai-chat-completions', baseUrl: 'https://example.invalid/v1', hasApiKey: true, models, editable: true },
+    { id: 'next', name: 'Next service', protocol: 'openai-chat-completions', baseUrl: 'https://next.invalid/v1', hasApiKey: true, models: ['next-model'], editable: true },
+  ] });
+  const container = document.body.createDiv();
+  new SettingsZCodeAccounts({
+    accounts: { read: jest.fn().mockResolvedValue({ state: 'signed-out', accounts: [] }), login: jest.fn(), logout: jest.fn(), cancelLogin: jest.fn(), openDesktop: jest.fn() },
+    getPersonalConfigService: () => ({ read, save: jest.fn(), remove: jest.fn() }), refreshConfiguration: jest.fn(),
+  }, jest.fn()).attach(container);
+  await flush();
+  const list = container.querySelector<HTMLElement>('.opencodian-zcode-provider-list')!;
+  const disclosure = list.querySelector<HTMLDetailsElement>('details')!;
+  expect(disclosure.open).toBe(false);
+  expect(disclosure.querySelector('summary')?.getAttribute('aria-label')).toBe('Models for Large service');
+  const description = list.querySelector('.setting-item-description')!.cloneNode(true) as HTMLElement;
+  description.querySelector('details')!.remove();
+  expect(description.textContent).toBe('https://example.invalid/v1 · Models: 180');
+  expect(Array.from(disclosure.querySelectorAll('li'), (item) => item.textContent)).toEqual(models);
+  expect(list.textContent).toContain('Next service');
+  list.querySelector<HTMLButtonElement>('button[aria-label="Edit service: Large service"]')!.click();
+  expect(container.querySelector<HTMLTextAreaElement>('textarea')!.value.split('\n')).toEqual(models);
 });

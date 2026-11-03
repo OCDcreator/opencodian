@@ -22,6 +22,7 @@ export class ModelConfigJsonModal extends Modal {
   }
 
   async onOpen() {
+    this.modalEl.addClass('opencodian-model-config-json-modal');
     const { contentEl } = this;
     contentEl.empty();
 

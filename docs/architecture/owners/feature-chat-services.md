@@ -10,6 +10,9 @@
 
 # Owner: feature.chat-services
 
+2026-11-02：Pi 扩展 dialog 只补充插件 modal 根标记以采用共享排版，RPC 完成／取消与连接生命周期仍由现有 PiExtensionUiHost 管理，未引入新服务或状态。
+
+
 2026-10-29：ChatHeaderPresenter 移除重复全局设置按钮并沿用 backend/server badge 的设置入口；同后端状态刷新保留现有图标节点，后端变化才切换共享内置资源。品牌文字的容器查询归既有 core.css，未扩展 OpenCodianView 的运行时职责。
 
 2026-10-29：ZCode 选择绑定在无会话时消费工作区原生目录及默认模型，已有会话仍消费同 sessionId 的当前模型；目录 bootstrap 与临时草稿生命周期归 core.backend，不在 UI 层造目录或创建持久会话。

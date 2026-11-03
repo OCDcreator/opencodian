@@ -29,6 +29,7 @@ src/style/
 │   ├── navigation-sidebar.css            # 侧边栏导航样式
 │   ├── effort-selector.css               # “努力程度”调节器样式
 │   ├── settings-dropdown.css             # 设置界面跨平台自绘下拉样式
+│   ├── ui-readback.css                   # 全插件状态、摘要、路径和辅助说明排版
 │   └── settings-layout-contract.css      # 设置界面布局契约与共享 surface token
 ├── modals/                                 # 各种弹窗、设置项覆盖面板的样式
 │   ├── provider-icon-cache.css           # 图标缓存管理与内置图标选择弹窗样式
@@ -70,3 +71,9 @@ CSS 依赖加载顺序以确保后加载的样式能正确覆盖前方的样式�
 
 ## 待补充
 - [ ] 考虑后续集成 PostCSS / CSS Modules / Sass 来提供 CSS 的嵌套语法支持和更高级的编译检查。
+
+## 2026-11-02 ZCode task settings
+
+ZCode 任务页局部布局在 components/settings-zcode.css；复用统一设置 tokens、原生表单与有界模型列表。
+
+API 服务摘要后的完整模型清单默认收起，展开列表同样复用共享 ScrollArea，并限制展开高度、保留选择复制和长 ID 换行。

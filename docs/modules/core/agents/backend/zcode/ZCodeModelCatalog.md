@@ -31,3 +31,9 @@ tests/unit/core/agents/backend/ZCodeModelCatalog.test.ts：全量解析、无目
 ## 2026-10-07 state.updated 当前模型投影
 
 原生 state.updated 的 model.available 也可能仅含 current 那一项；这不是完整模型目录。此时复用已有 captureCatalogSnapshot 合并路径，更新 current/options/mode/thought 状态并保留 create/resume 学到的目录。非当前模型投影仍按原 state patch 替换，未知模型和档位的拒绝规则不变。实机复现 64/65 项降为 1，合法 Luna 原生直接切换成功，插件的两会话复测验证此修复。
+
+## 2026-11-02 ZCode task settings
+
+兼容扩展 workspace catalog：forceRefresh 清缓存并通过 epoch 拒绝旧响应；model 选项在 deferred draft 设置模型读取 thoughtLevels，并始终关闭草稿。defaultModel 保留选择前原生默认，与 currentModel 和真实会话目录分离。
+
+reset 在进程停止/释放时清空会话和工作区目录并递增 epoch，退出或账号变化不能沿用已认证目录；迟到草稿不再发布。

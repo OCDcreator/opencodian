@@ -302,6 +302,7 @@ class RemoteControlConfirmModal extends Modal {
   }
 
   onOpen(): void {
+    this.modalEl.addClass('opencodian-remote-control-confirm-modal');
     this.contentEl.createEl('h3', { text: this.options.title });
     this.contentEl.createEl('p', { text: this.options.body });
     const actionsEl = this.contentEl.createDiv();
@@ -338,6 +339,7 @@ class RemoteControlTokenRevealModal extends Modal {
   }
 
   onOpen(): void {
+    this.modalEl.addClass('opencodian-remote-control-token-modal');
     this.contentEl.createEl('h3', { text: t('settings.remoteControl.tokenModal.title') });
     this.contentEl.createEl('p', { text: t('settings.remoteControl.tokenModal.body') });
     const codeEl = this.contentEl.createEl('code', {

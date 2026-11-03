@@ -13,3 +13,7 @@ ZCode 后端包的导出边界：官方 ZCode 运行时 `app-server --stdio` 结
 ## 验证
 
 经由各子模块的聚焦测试（tests/unit/core/agents/backend/ZCode*.test.ts）与接线契约测试 ZCodeAdapterWiring.test.ts。
+
+## 2026-11-02 ZCode task settings
+
+新增内部模块：[ZCodeAccountService](ZCodeAccountService.md)、[ZCodeNativeStore](ZCodeNativeStore.md)、[ZCodePersonalConfigService](ZCodePersonalConfigService.md)。通过 adapter 窄接口调用，不扩大公共 credentials surface。

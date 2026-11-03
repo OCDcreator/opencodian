@@ -82,3 +82,7 @@ DSH 协议准入/内容编码放在复用的 DshProtocolCodec；adapter 保留�
 ## 会话信息 owner（2026-10-31）
 
 原生只读接口归各 adapter；SessionInformationCoordinator 隔离多后端读取与身份竞态，SessionWorkbenchInformation 隔离 Markdown 子会话渲染生命周期。两者是状态/原生依赖和渲染边界，不是转发薄层。禁止将轮询、套餐/上下文口径或子会话状态放回 OpenCodianView。
+
+## 2026-11-02 ZCode task settings
+
+ZCode 设置 UI 不实现 OAuth 或直接读写个人配置；账号 owner 与 API 配置 owner 分离。凭据独立、本机多库共享；API 与原生应用共享。新增展示组件必须复用 Setting/surface tokens 与现有目录，不镜像原生模型。

@@ -321,6 +321,7 @@ const matrix012Setup = async () => {
     counts.fakeHandshakeRequests++; return { independentPlanState: true };
   }), onNotification: jest.fn(() => ({ dispose: jest.fn() })), onServerRequest: jest.fn((method: string, handler: (params: Record<string, unknown>) => unknown) => { handlers.set(method, handler); return { dispose: jest.fn() }; }) };
   const adapter = new ZCodeAdapter({ resolveRuntime: () => readyResolution, discoverProviderConfig: () => ({ ...providerConfig, dataRoot: '/FAKE_MATRIX012_data', configPath: '/FAKE_MATRIX012_config', builtinConfigPath: '/FAKE_MATRIX012_builtin', env: {} }), createTransport: () => fake as unknown as ZCodeAppServerTransport });
+  jest.spyOn(adapter.accounts, 'revision').mockReturnValue('FAKE_MATRIX012_account_revision');
   await adapter.start();
   const bridge = (adapter as unknown as { interactions: import('../../../../../src/core/agents/backend/zcode/ZCodeInteractionBridge').ZCodeInteractionBridge }).interactions;
   const runs = (adapter as unknown as { sessionRuns: Map<string, { chunks: StreamChunk[]; closed: boolean; cancelled: boolean; wake: null }> }).sessionRuns;

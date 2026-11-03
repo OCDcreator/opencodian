@@ -215,6 +215,7 @@ class PiDialog extends Modal {
   private completed = false;
   constructor(app: App, private readonly request: PiServiceEvent, private readonly finish: (result: Record<string, unknown>) => void) { super(app); }
   onOpen(): void {
+    this.modalEl.addClass('opencodian-pi-dialog-modal');
     this.titleEl.setText(String(this.request.title ?? 'Pi'));
     if (this.request.message) this.contentEl.createEl('p', { text: String(this.request.message) });
     const method = String(this.request.method);

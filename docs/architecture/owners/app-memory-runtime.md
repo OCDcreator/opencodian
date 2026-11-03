@@ -37,7 +37,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 - Every entry point is fail-soft: a memory failure must never surface in or block a user turn. Injection planning, extraction, reflection and metrics writes all swallow-and-log.
 - The coordinator is the only place allowed to bind `core.memory` ports to concrete infrastructure (Obsidian vault adapter filesystem, owning-backend AgentAuxQueryCapability invoker).
 - The vault filesystem port consumes Obsidian's `DataAdapter.list()` as `ListedFiles` (plain full-path strings, not TFile objects); `listFiles` maps entries to basenames before returning.
-- Shared-store mode routes buckets to `<root>/projects/<slug>-<hash16>/memory` (the opencode-zmem / ZCode workspace-memory layout) through `ExternalMemoryFileSystem`; the metrics journal always stays in the vault, and a root switch resets per-conversation epoch state.
+- Shared-store mode routes buckets to `<root>/projects/<slug>-<hash16>/memory` (the opencode-zmem / ZCode workspace-memory layout) through `ExternalMemoryFileSystem`; extraction/recall metrics stay in the vault, and a root switch resets per-conversation epoch state. Git-cycle traces are separate local-only, gitignored records at the shared tree root.
 - Git sync is fail-soft and lock-serialized with opencode-zmem on the same tree; per-machine diagnostics (`.last-injection.json`, `metrics.jsonl`) never enter the repository.
 - The model invoker uses isolated read-only auxiliary sessions, audits effective tools and observed calls, then disposes in finally; no chat send or active-session mutation occurs.
 - Metrics (`metrics.jsonl`) are append-only diagnostics under the store root; they are never cleaned automatically.
@@ -55,3 +55,5 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 目录整理沿用本 owner 的职责、状态和依赖约束；路径导航见[源码目录说明](../source-layout.md)。
 
 2026-10-28：app.memory-runtime 允许依赖 core.backend 的通用辅助能力、registry 与共享 PathConfinement，禁止具体后端反向导入。VaultMemoryFileSystem 拆为独立复用适配器。main.ts 仅传端口，后台任务以持久化会话 backend 为 owner；无有效只读能力时报告失败，不改发活动后端。Git 同步仍独立于 backend。
+
+2026-11-03：Git 同步按 zmem 规则比较 origin，拒绝静默改址；采用 fetch + merge 保留提交历史。共享树根增加本机 JSONL，同一错误只通知一次，状态命令保留最近结果。未改变 owner 或依赖边界。

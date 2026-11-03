@@ -40,3 +40,7 @@ marker、realpath、父目录直系关系和保留前缀，仅删除这个专属
 ## 2026-10-07 Hook 隔离边界
 
 空原生工具表不能约束 hook 子进程。辅助进程现使用自身 HOME/USERPROFILE、数据目录与 workspace；自建 `.git` 停止继承项目发现，私有 `.zcode/config.json` 禁用 hooks 并逐项禁用原生插件。两次 plugins/list 必须是完整、唯一、同一 ID 集合，第二次每项 enabled=false；缺失、未知、重复、仍启用均在 session/create 前拒绝。真实提供者文件仍通过绝对只读引用传入，不改用户配置或凭据。辅助 workspace 不再指向真实笔记库；选区文本与图片仍走原请求，工具表和每轮事件审计不变。
+
+## 2026-11-02 ZCode task settings
+
+可选 accountEnv 只穿过插件凭据根和原生 cipher secret；HOME/workspace/storage/session DB 仍为私有 scope，空工具与 hooks/MCP 限制保持原有 fail-closed。不会因登录而扩大工具权限。

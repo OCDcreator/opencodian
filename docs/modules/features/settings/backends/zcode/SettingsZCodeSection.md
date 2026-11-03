@@ -47,3 +47,9 @@ ZCode 后端的设置面（经典布局与页签布局共用）：可选运行�
 - 随目录调整更新的依赖：`src/core/agents/backend/configuration/ProjectResourceSecureWrite.ts`。
 
 > 2026-10-27：ZCode 从单一“连接”页拆为连接、模型与模式、插件与 MCP 三个二级页；补全模型覆盖只在模型页显示，不扩大 aux-edit 边界。
+
+## 2026-11-02 ZCode task settings
+
+当前入口为聊天设置、工具与插件、安装与连接；首次默认聊天，旧 connection/model/management 映射 installation/chat/tools。聊天模型/续写由 SettingsZCodeModelControls，账号/API 表单由 SettingsZCodeAccounts 展示。工具页保留项目插件开关与 MCP 状态，技术信息默认收起；安装检测失败自动突出位置设置。经典、标签和编辑器宿主共用同一 section。
+
+Kimi 复审后：工具加载显示 busy/失败与刷新禁用，插件目录复用共享 ScrollArea；安装摘要直接显示未找到/路径错误/不兼容。平面字段移除嵌套卡片。

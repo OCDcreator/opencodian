@@ -364,6 +364,14 @@ Formatter/LSP builtin rows, custom formatter rows, and similar catalog-like sett
 - **Advanced JSON editors:** Formatter and LSP JSON editors use a single editor panel plus a transparent ButtonGroup footer. The description is plain muted copy, not a `Setting` card, and the footer must not contain a nested `.setting-item`.
 - **Exclusions:** true failures, destructive confirmations, warning notices, runtime error output, and permission prompts may still use Alert styling.
 
+### Status, Readback, and Supporting Copy
+
+Settings and plugin-owned modals share the 13px interface baseline. Feedback and supporting copy use `--opencodian-ui-meta-size` (12px), compact metadata uses `--opencodian-ui-caption-size` (11px), and both use a 1.5 line height. These rules live in `ui-readback.css`; a new status class must inherit an established text surface or provide an explicit style.
+
+- **Structured readback:** labels and values align in separate columns with an 8px gap. Long paths and identifiers stay selectable and wrap inside the value column. At a Settings container width of 420px or less, each label sits above its value.
+- **Flat supporting surfaces:** status text, native readback paragraphs, empty/loading feedback, and configuration summaries reuse the same typography and spacing without another bordered card. Empty live regions remain mounted without reserving a layout gap.
+- **Meaning before decoration:** retain warning/error/success semantics; neutral connection and configuration details stay muted. Use monospace for exact paths, code and values, never for an entire prose status merely because it is technical. Chat message bodies, Markdown previews and editor fonts remain under their existing owners.
+
 ### Settings Extension Control Surface
 
 Skills, Tools, and ACP Agents extend the Agent Management settings vocabulary without sharing the Agents-only stylesheet. Their shared contract lives in `settings-layout-contract.css` and borrows shadcn/Radix Card, Badge, Button, Select, Switch, ScrollArea, Alert, and Separator structure through Obsidian DOM + CSS only.
@@ -484,3 +492,11 @@ Settings dropdown menus may be wider than their trigger when option labels need 
 - Do not hide permission or server risk behind low-contrast styling.
 - Do not collapse concurrent tab/session/background behavior into one global stream metaphor.
 - Do not introduce broad new visual abstractions when an existing chat, settings, theme, or component owner can carry the change.
+
+### ZCode Task Settings
+
+ZCode settings are an Operate surface with three task pages: Chat settings, Tools and plugins, Installation and connection. Begin with new-chat defaults and completion status; keep account/API management in a native disclosure, automatically revealed when no models are available. Official login is local to OpenCodian; personal API services are shared with ZCode. Say both scopes before the corresponding actions. Use native Setting rows, shared text/spacing tokens, searchable provider groups and a bounded model list. Preserve unknown saved values and show retry/reset recovery. Technical readback stays in disclosures; installed-path controls expand when automatic detection fails. Settings uses its actual owner document in classic, tabbed, and editor hosts.
+
+API service rows summarize the address and model count. Full model IDs belong in a collapsed native “View models” disclosure with a bounded, selectable list; long catalogs must not push later services and their edit/delete controls behind a wall of IDs. Fixture status values must match the native catalog contract: a connected MCP server does not establish that authentication is unnecessary.
+
+The shared API save action uses the paired `text-normal` and `background-primary` tokens in reverse so its label remains readable when a host theme's accent foreground is inconsistent. Field validation appears once beside the affected control and is announced there.

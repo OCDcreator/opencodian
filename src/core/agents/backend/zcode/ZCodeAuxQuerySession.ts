@@ -56,6 +56,8 @@ export interface ZCodeAuxTransport {
 export interface ZCodeAuxQuerySessionOptions {
   readonly launch: ZCodeRuntimeLaunch;
   readonly providerConfigEnv?: Readonly<Record<string, string>>;
+  /** Only the plugin-owned credential store crosses the private HOME boundary. */
+  readonly accountEnv?: Readonly<{ ZCODE_DATA_BASE_DIR: string; ZCODE_CREDENTIAL_SECRET: string }>;
   readonly workingDirectory: string;
   readonly systemPrompt: string;
   readonly model?: AuxQuerySessionConfig['model'];
@@ -237,6 +239,7 @@ export class ZCodeAuxQuerySession implements AuxQuerySession {
           HOME: scope.root,
           USERPROFILE: scope.root,
           ZCODE_DATA_BASE_DIR: path.join(scope.root, 'data-base'),
+          ...(options.accountEnv ?? {}),
           ZCODE_STORAGE_DIR: scope.storage,
           ZCODE_SESSION_DB_PATH: path.join(scope.storage, 'session.sqlite'),
           ZCODE_SESSION_DB: path.join(scope.storage, 'session.sqlite'),

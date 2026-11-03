@@ -126,12 +126,12 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     id: 'zcode',
     labelKey: 'settings.zcode.title',
     icon: 'opencodian-zcode',
-    defaultSecondaryTabId: 'connection',
+    defaultSecondaryTabId: 'chat',
     backendRequired: 'zcode',
     secondaryTabs: [
-      { id: 'connection', labelKey: 'settings.zcode.tab.connection' },
-      { id: 'model', labelKey: 'settings.zcode.tab.model' },
-      { id: 'management', labelKey: 'settings.zcode.tab.management' },
+      { id: 'chat', labelKey: 'settings.zcode.tab.chat' },
+      { id: 'tools', labelKey: 'settings.zcode.tab.tools' },
+      { id: 'installation', labelKey: 'settings.zcode.tab.installation' },
     ],
   },
   {
@@ -337,6 +337,7 @@ const LEGACY_PRIMARY_TAB_ID_MAP: Record<string, string> = {
   language: 'general',
 };
 const LEGACY_SECONDARY_TAB_ID_MAP: Record<string, Record<string, string>> = {
+  zcode: { model: 'chat', management: 'tools', connection: 'installation' },
   general: {
     language: 'basic',
     backend: 'agents',

@@ -67,6 +67,16 @@ describe('ZCode workspace catalog before the first conversation', () => {
     expect(second.request.mock.calls.map(([method]) => method)).toEqual(['session/create', 'session/close']);
   });
 
+  it('clears authenticated session and workspace caches when the process is stopped', async () => {
+    const { surface, request, transport } = fixture();
+    surface.captureCatalogSnapshot({ settings }, true);
+    await surface.getWorkspaceModelCatalog(transport, '/vault', () => true);
+    surface.reset();
+    expect(surface.getAvailableModelCatalog()).toBeNull();
+    await surface.getWorkspaceModelCatalog(transport, '/vault', () => true);
+    expect(request.mock.calls.filter(([method]) => method === 'session/create')).toHaveLength(2);
+  });
+
   it('retains a real session snapshot that arrives during workspace bootstrap', async () => {
     const { surface, request, transport } = fixture();
     const original = request.getMockImplementation()!;
@@ -79,5 +89,34 @@ describe('ZCode workspace catalog before the first conversation', () => {
     const workspace = await surface.getWorkspaceModelCatalog(transport, '/vault', () => true);
     expect(surface.getAvailableModelCatalog()?.currentModel?.providerId).toBe('session');
     expect(workspace.currentModel).toMatchObject({ providerId: 'native', modelId: 'one' });
+  });
+
+  it('rejects an older in-flight catalog after an explicit refresh', async () => {
+    const { surface, request, transport } = fixture();
+    let first!: (value: unknown) => void;
+    request.mockReturnValueOnce(new Promise((resolve) => { first = resolve; }));
+    const old = surface.getWorkspaceModelCatalog(transport, '/vault', () => true);
+    const rejected = old.then(() => null, (error: unknown) => error);
+    const refreshed = await surface.getWorkspaceModelCatalog(transport, '/vault', () => true, { forceRefresh: true });
+    first({ session: { sessionId: request.mock.calls[0][1]?.sessionId }, settings }); expect(await rejected).toMatchObject({ message: expect.stringContaining('superseded') });
+    expect(await surface.getWorkspaceModelCatalog(transport, '/vault', () => true)).toBe(refreshed);
+    expect(request.mock.calls.filter(([method]) => method === 'session/close')).toHaveLength(2);
+  });
+
+  it('inspects a selected model in a closed draft while preserving the default and real session state', async () => {
+    const { surface, request, transport } = fixture();
+    const original = request.getMockImplementation()!;
+    const expanded = { model: { ...settings.model, available: [...settings.model.available, { ref: { providerId: 'native', modelId: 'two' }, label: 'Two', providerLabel: 'Native' }] } };
+    request.mockImplementation(async (method, params) => {
+      if (method === 'session/create') return { session: { sessionId: params?.sessionId }, settings: expanded };
+      if (method === 'session/setModel') return { settings: { model: { current: { providerId: 'native', modelId: 'two' } }, thoughtLevel: { enabled: true, available: [{ value: 'high', label: 'High' }], current: 'high' } } };
+      return original(method, params);
+    });
+    const selected = await surface.getWorkspaceModelCatalog(transport, '/vault', () => true, { model: { providerId: 'native', modelId: 'two' } });
+    expect(selected.currentModel?.modelId).toBe('two');
+    expect(selected.defaultModel?.modelId).toBe('one');
+    expect(surface.getAvailableModelCatalog()).toBeNull();
+    expect(request.mock.calls.map(([method]) => method)).toEqual(['session/create', 'session/setModel', 'session/close']);
+    expect(request.mock.calls.some(([method]) => method === 'session/send')).toBe(false);
   });
 });

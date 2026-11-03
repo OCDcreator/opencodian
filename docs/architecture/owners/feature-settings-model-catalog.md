@@ -1,4 +1,7 @@
 # Owner: feature.settings-model-catalog
+
+2026-11-02：JSON 编辑 modal 补齐插件根标记，保证配置服务不可用时的早退提示仍受共享排版约束；配置目录、编辑器与保存行为的 owner 和状态均未改变。
+
 > 2026-09-21 (advantage-parity R-F8)：模型通用 tab 新增「模型上下文窗口声明」行（管理声明 → ContextWindowOverrideModal）。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 

@@ -96,3 +96,11 @@ configuration editor.
 | "the setting works" | **Configuration Evidence**: state which axis is verified vs unavailable |
 | "settings map" / "settings overview" | **Capability Navigation** (when it answers where-to-edit) |
 | per-file settings scatter | **Source Grouping** (group by what a setting controls) |
+
+### OpenCodian Official Login
+
+The official ZCode account authorized for OpenCodian on one machine. All local vaults share this login; it is independent of the ZCode desktop account. Signing out affects OpenCodian vaults on that machine.
+
+### Shared Personal API Configuration
+
+Personal model services and API models used by both OpenCodian and ZCode. Editing them affects both products. This shared configuration does not imply a shared official login.

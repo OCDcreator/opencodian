@@ -1,8 +1,12 @@
+import { execFileSync } from 'node:child_process';
 import * as nodeFs from 'node:fs';
 import * as nodeOs from 'node:os';
 import * as nodePath from 'node:path';
 
+import { capturedNotices, clearCapturedNotices } from 'obsidian';
+
 import {
+  MemoryGitSyncService,
   MemoryRuntimeCoordinator,
   VaultMemoryFileSystem,
 } from '../../../../src/app/memory';
@@ -113,6 +117,60 @@ function makeCoordinator(over: {
 function flushMicrotasks(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 5));
 }
+
+describe('MemoryRuntimeCoordinator sync failure visibility', () => {
+  it('shows a real origin refusal once, then allows a new notification after recovery', async () => {
+    const work = nodeFs.mkdtempSync(nodePath.join(process.cwd(), '.memory-sync-notice-test-'));
+    const tree = nodePath.join(work, 'tree');
+    const originA = nodePath.join(work, 'a.git');
+    const originB = nodePath.join(work, 'b.git');
+    const services: MemoryGitSyncService[] = [];
+    const start = jest.spyOn(MemoryGitSyncService.prototype, 'start')
+      .mockImplementation(function (this: MemoryGitSyncService) { services.push(this); });
+    let coordinator: MemoryRuntimeCoordinator | undefined;
+    clearCapturedNotices();
+    try {
+      nodeFs.mkdirSync(nodePath.join(tree, 'projects'), { recursive: true });
+      execFileSync('git', ['init', '-b', 'main', tree], { stdio: 'pipe' });
+      execFileSync('git', ['init', '--bare', '-b', 'main', originA], { stdio: 'pipe' });
+      execFileSync('git', ['init', '--bare', '-b', 'main', originB], { stdio: 'pipe' });
+      execFileSync('git', ['-C', tree, 'remote', 'add', 'origin', originA], { stdio: 'pipe' });
+      coordinator = new MemoryRuntimeCoordinator({
+        app: createFakeApp().app,
+        registry: fakeOpenCodeService('{}').service,
+        getConversationContext: async () => null,
+        getConversationMessages: async () => null,
+        getSettings: () => settings({ memoryExternalRoot: tree, memorySyncRemoteUrl: originB }),
+      });
+      const sync = services[0];
+      expect(sync).toBeDefined();
+
+      expect(await sync.runCycle()).toMatchObject({ ok: false });
+      expect(capturedNotices).toHaveLength(1);
+      expect(capturedNotices[0]).toContain('refusing to re-point');
+      expect(capturedNotices[0]).toContain(originA);
+      expect(capturedNotices[0]).toContain(originB);
+      expect(await sync.runCycle()).toMatchObject({ ok: false });
+      expect(capturedNotices).toHaveLength(1);
+
+      // Explicit migration is confined to this fixture repository.
+      execFileSync('git', ['-C', tree, 'remote', 'set-url', 'origin', originB], { stdio: 'pipe' });
+      expect(await sync.runCycle()).toMatchObject({ ok: true, pushed: true });
+      expect(capturedNotices).toHaveLength(1);
+      execFileSync('git', ['-C', tree, 'remote', 'set-url', 'origin', originA], { stdio: 'pipe' });
+      expect(await sync.runCycle()).toMatchObject({ ok: false });
+      expect(capturedNotices).toHaveLength(2);
+    } finally {
+      coordinator?.dispose();
+      start.mockRestore();
+      clearCapturedNotices();
+      expect(nodeFs.realpathSync(work).startsWith(
+        `${nodeFs.realpathSync(process.cwd())}${nodePath.sep}.memory-sync-notice-test-`,
+      )).toBe(true);
+      nodeFs.rmSync(work, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('VaultMemoryFileSystem', () => {
   it('reads and writes through normalizePath-style vault paths with parents', async () => {

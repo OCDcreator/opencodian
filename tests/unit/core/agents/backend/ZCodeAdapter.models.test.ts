@@ -346,7 +346,10 @@ describe('ZCodeAdapter — native readback and turn boundaries', () => {
         options: { provider: 'opencode-go', model: 'mimo-v2.6-pro', variant: 'enabled' },
       })) { void _chunk; }
     })();
-    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    const deadline = Date.now() + 2_000;
+    while (!calls.some((call) => call.method === 'session/setModel') && Date.now() < deadline) {
+      await new Promise((resolve) => { setTimeout(resolve, 5); });
+    }
     const setModel = calls.find((call) => call.method === 'session/setModel');
     expect(setModel?.params?.['model']).toMatchObject({
       providerId: 'opencode-go', modelId: 'mimo-v2.6-pro', options: { reasoningLevel: 'enabled' },

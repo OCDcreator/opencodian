@@ -22,3 +22,7 @@ app.memory-runtime 的组合入口。将通用 core.memory 绑定到 Vault/外�
 存储保留 vault-local 路径；共享模式使用 zmem 的 projects/<bucket>/memory，workspaceIdentity 优先于 workspacePathAliases。代理笔记本位于 agent-memory/<sanitized-key>，可显式指定独立根以共享 ZCode 用户级目录，使用长版 Persistent Agent Memory 协议。状态/体检/遗忘命令默认作用于项目桶。
 
 Git 同步独立于任何聊天后端，覆盖 memoryExternalRoot 整棵树；成功写入/遗忘后 scheduleSync。独立 agent 根位于该树外时不被此同步覆盖。设置和会话内容未被后台调用修改。接口模拟不等于原生/UI验收；各后端辅助通道仍受本机配置和运行时只读能力约束。
+
+Git 周期的结果回调接入现有 `Notice`：失败时显示 detail 与状态命令入口；相同原因连续失败只提示一次，实际成功（不含 locked no-op）或 root/remote 配置切换后重新允许提示。最近结果仍由“记忆：工作区记忆状态”命令读取。通知故障与已卸载服务的迟到结果不会影响聊天。同步轨迹位于共享树根的本机 gitignored `metrics.jsonl`；提取/召回指标继续保留在 vault。
+
+`MemoryRuntimeCoordinator.test.ts` 用临时真实 Git 树验证 origin 拒绝可见、重复失败不刷屏以及恢复后再次失败重新通知。

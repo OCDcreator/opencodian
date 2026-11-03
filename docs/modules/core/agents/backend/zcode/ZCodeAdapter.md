@@ -106,3 +106,13 @@ Goal set/edit/pause/resume/clear 经过 session/goal 与 session/read.projection
 ## 会话信息面板（2026-10-31）
 
 只读 session/subagents 原生 childSessionIds/running/ended 投影与 management MCP catalog 供信息面板使用。不会为了读取而调用 session 激活；打开子会话验证原生父子关联并读取既有消息。未知账户额度保持 null。
+
+## 2026-11-02 ZCode task settings
+
+账号环境由 ZCodeAccountService 持有并注入聊天、标题、补全与辅助查询。保留 provider config 与 storage 路径；每次连接检查账号 revision，活动任务不被设置重连打断。公开个人 API 服务、原生目录刷新与安全重连接口。工作区目录兼容扩展 thoughtLevels、forceRefresh 与所选模型 draft 查询，不改原 models/default 消费者。
+
+账号 CLI 同样接收已发现的 BUILTIN/PERSONAL provider 配置环境，登录仍把 PERSONAL 覆盖为私有 stage 文件。Windows 打包 CLI 的默认相对查找不能代替此配置对；真实登录取消探针覆盖该路径。
+
+检测到其他笔记库或登录操作改变凭据时，已有 transport 不会在 start/send 中静默重启；设置刷新明确返回 needsReconnect，用户结束任务后执行重连。新进程启动时才记录新的凭据 revision。
+
+stop/dispose 清理 modelSurface 缓存；账号 revision 改变要求显式重连，不在默认启动路径偷偷重启。

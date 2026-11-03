@@ -34,6 +34,8 @@
 @import 'components/settings-claude-providers.css';
 @import 'components/settings-model-pricing.css';
 @import 'components/settings-plugin-update.css';
+@import 'components/ui-readback.css';
+@import 'components/settings-zcode.css';
 @import 'features/chat-user.css';
 @import 'features/chat-assistant.css';
 @import 'features/inline-edit.css';

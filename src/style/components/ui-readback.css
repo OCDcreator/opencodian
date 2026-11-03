@@ -1,0 +1,255 @@
+/* Shared typography for plugin-owned feedback. These are flat text surfaces,
+   not another card layer. Owner-specific headings, editors and state colors win. */
+:is(.opencodian-settings, .modal[class*="opencodian-"], .opencodian-container,
+    .opencodian-modal-shell, .opencodian-help-modal-shell, .opencodian-pi-workbench,
+    .opencodian-claude-provider-config-modal) {
+  --opencodian-ui-body-size: 13px;
+  --opencodian-ui-meta-size: 12px;
+  --opencodian-ui-caption-size: 11px;
+  --opencodian-ui-copy-line-height: 1.5;
+  --opencodian-ui-group-gap: var(--opencodian-settings-space-lg, 12px);
+  --opencodian-ui-item-gap: var(--opencodian-settings-space-md, 8px);
+}
+
+.opencodian-settings,
+.modal[class*="opencodian-"],
+.opencodian-modal-shell,
+.opencodian-help-modal-shell,
+.opencodian-pi-workbench,
+.opencodian-claude-provider-config-modal {
+  font-family: var(--font-interface);
+  font-size: var(--opencodian-ui-body-size);
+  line-height: var(--opencodian-ui-copy-line-height);
+}
+
+.opencodian-settings :where(p:not([class]):not(.markdown-rendered p):not(.cm-content p)) {
+  font-size: var(--opencodian-ui-meta-size);
+  line-height: var(--opencodian-ui-copy-line-height);
+  overflow-wrap: anywhere;
+}
+
+/* A live region may contain a short message or several readback rows. Do not
+   impose a layout, color or monospace face on all of its descendants. */
+.opencodian-settings :where([role="status"], [role="alert"]) {
+  min-width: 0;
+  max-width: 100%;
+  font-size: var(--opencodian-ui-meta-size);
+  line-height: var(--opencodian-ui-copy-line-height);
+  overflow-wrap: anywhere;
+}
+
+:where(.opencodian-settings) :is(
+  .opencodian-settings-inline-notice,
+  .opencodian-pi-config-status,
+  .opencodian-codex-plugins-status,
+  .opencodian-codex-project-config-status,
+  .opencodian-codex-runtime-skill-groups-status,
+  .opencodian-shared-session-preview-loading,
+  .opencodian-capability-lab-readback-note,
+  .opencodian-capability-lab-info,
+  .opencodian-claude-configuration-section-description,
+  .opencodian-claude-configuration-history-empty,
+  .opencodian-codex-hooks-readback-desc
+),
+:is(
+  .opencodian-context-file-server-hint,
+  .opencodian-experimental-action-notice,
+  .opencodian-experimental-action-description,
+  .opencodian-experimental-action-status,
+  .opencodian-experimental-background-status,
+  .opencodian-model-config-readonly-summary,
+  .opencodian-inline-edit-confirm-message,
+  .streaming-task-field
+) {
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  color: var(--text-muted);
+  font-family: var(--font-interface);
+  font-size: var(--opencodian-ui-meta-size, 12px);
+  line-height: var(--opencodian-ui-copy-line-height, 1.5);
+  overflow-wrap: anywhere;
+}
+
+/* Pi's runtime readback is intentionally verbatim text, with native newlines. */
+.opencodian-settings .opencodian-pi-config-status {
+  white-space: pre-line;
+}
+
+/* Keep empty live regions mounted for announcements, without a phantom gap. */
+.opencodian-settings :where([role="status"]):empty,
+:is(.opencodian-codex-plugins-status, .opencodian-experimental-action-status):empty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  border: 0;
+}
+
+/* ZCode connection and management share the same label / readback anatomy. */
+.opencodian-zcode-config-status {
+  display: grid;
+  gap: var(--opencodian-ui-item-gap, 8px);
+  min-width: 0;
+  padding-block: var(--opencodian-settings-space-sm, 6px);
+}
+
+.opencodian-zcode-config-status-row {
+  display: grid;
+  grid-template-columns: minmax(0, min(108px, 30%)) minmax(0, 1fr);
+  gap: var(--opencodian-ui-item-gap, 8px);
+  align-items: baseline;
+  min-width: 0;
+  font-size: var(--opencodian-ui-meta-size, 12px);
+  line-height: var(--opencodian-ui-copy-line-height, 1.5);
+}
+
+.opencodian-zcode-config-status-label {
+  min-width: 0;
+  color: var(--text-normal);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-zcode-config-status-detail {
+  min-width: 0;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+  user-select: text;
+}
+
+/* Summary/readback containers own their rhythm, including bare native p tags. */
+:is(.opencodian-model-config-readonly-summary, .opencodian-settings-readback,
+    .opencodian-experimental-action-section, .streaming-task-details) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-ui-item-gap, 8px);
+  min-width: 0;
+}
+
+:is(.opencodian-model-config-readonly-summary, .opencodian-settings-readback) > p {
+  margin: 0;
+  font-size: var(--opencodian-ui-meta-size, 12px);
+  line-height: var(--opencodian-ui-copy-line-height, 1.5);
+  overflow-wrap: anywhere;
+}
+
+:is(.opencodian-codex-hooks-readback-title,
+    .opencodian-context-file-groups-heading,
+    .opencodian-inline-edit-picker-groups-heading) {
+  margin: 0;
+  color: var(--text-normal);
+  font-size: var(--opencodian-ui-meta-size, 12px);
+  font-weight: 600;
+  line-height: var(--opencodian-ui-copy-line-height, 1.5);
+}
+
+/* Compact metadata keeps a single hierarchy across configuration and previews. */
+:is(.opencodian-codex-plugin-version,
+    .opencodian-codex-project-config-history-entry-kind,
+    .opencodian-codex-project-config-history-entry-date,
+    .opencodian-edit-revert-preview-lines-label,
+    .opencodian-edit-revert-preview-lines-separator,
+    .opencodian-edit-revert-preview-action) {
+  color: var(--text-muted);
+  font-size: var(--opencodian-ui-caption-size, 11px);
+  line-height: var(--opencodian-ui-copy-line-height, 1.5);
+  overflow-wrap: anywhere;
+}
+
+:is(.opencodian-experimental-action-scope,
+    .opencodian-backend-session-browser-detail-part-content,
+    .opencodian-edit-revert-preview-lines-value) {
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: var(--opencodian-ui-meta-size, 12px);
+  line-height: var(--opencodian-ui-copy-line-height, 1.5);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Preserve the meaning of real warnings/errors; neutral feedback is not an alert. */
+:is(.opencodian-capability-lab-warning, .opencodian-codex-hooks-warning,
+    .opencodian-experimental-action-status[data-experimental-status="unsupported"],
+    .opencodian-experimental-action-status[data-experimental-status="invalid"]) {
+  color: var(--opencodian-status-warning, var(--text-warning, var(--text-normal)));
+}
+
+:is(.opencodian-codex-plugins-marketplace-error, .opencodian-codex-hooks-error,
+    .opencodian-experimental-action-status[data-experimental-status="failed"]) {
+  color: var(--opencodian-status-error, var(--text-error));
+}
+
+:is(.opencodian-capability-lab-warning, .opencodian-capability-lab-success,
+    .opencodian-codex-plugins-marketplace-error) {
+  margin: 0;
+  font-size: var(--opencodian-ui-meta-size, 12px);
+  line-height: var(--opencodian-ui-copy-line-height, 1.5);
+  overflow-wrap: anywhere;
+}
+
+:is(.opencodian-capability-lab-success,
+    .opencodian-experimental-action-status[data-experimental-status="completed"]) {
+  color: var(--opencodian-status-success, var(--text-success, var(--text-normal)));
+}
+
+/* Plugin catalogs already use resource rows; add the missing toolbar/badge layer. */
+:is(.opencodian-codex-plugins, .opencodian-codex-plugins-marketplace-errors) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-ui-group-gap, 12px);
+  min-width: 0;
+}
+
+.opencodian-codex-plugins-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--opencodian-ui-item-gap, 8px);
+}
+
+.opencodian-settings .opencodian-codex-trace-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--opencodian-settings-space-sm, 6px);
+  min-width: 0;
+}
+
+:is(.opencodian-codex-plugin-policy, .opencodian-codex-plugin-installed-badge,
+    .opencodian-codex-plugin-enabled-badge) {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--opencodian-settings-radius-inline, 6px);
+  color: var(--text-muted);
+  font-size: var(--opencodian-ui-caption-size, 11px);
+  font-weight: 500;
+  line-height: var(--opencodian-ui-copy-line-height, 1.5);
+  overflow-wrap: anywhere;
+}
+
+.opencodian-experimental-action-modal .modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-modal-section-gap, 20px);
+}
+
+.opencodian-experimental-action-section h3 {
+  margin: 0;
+  font-size: var(--opencodian-ui-body-size, 13px);
+  font-weight: 600;
+}
+
+@container opencodian-settings-pane (max-width: 420px) {
+  .opencodian-zcode-config-status-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--opencodian-settings-space-xs, 4px);
+  }
+}

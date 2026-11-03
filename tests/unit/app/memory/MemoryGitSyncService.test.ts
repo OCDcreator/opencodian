@@ -10,6 +10,7 @@ import {
   MemoryGitSyncService,
   syncMemoryTree,
 } from '../../../../src/app/memory';
+import { normalizeRemoteUrl } from '../../../../src/app/memory/MemoryGitSyncService';
 
 function sh(cwd: string, ...args: string[]): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8' });
@@ -29,7 +30,7 @@ let tree: string;
 let remote: string;
 
 beforeEach(() => {
-  work = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), 'opencodian-memsync-'));
+  work = nodeFs.mkdtempSync(nodePath.join(process.cwd(), '.memory-git-sync-test-'));
   tree = nodePath.join(work, 'tree');
   remote = nodePath.join(work, 'remote.git');
   nodeFs.mkdirSync(nodePath.join(tree, 'projects', 'demo', 'memory'), { recursive: true });
@@ -37,6 +38,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  const resolved = nodeFs.realpathSync(work);
+  if (!resolved.startsWith(`${nodeFs.realpathSync(process.cwd())}${nodePath.sep}.memory-git-sync-test-`)) {
+    throw new Error(`Refusing to remove a fixture outside the worktree: ${resolved}`);
+  }
   nodeFs.rmSync(work, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
@@ -52,6 +57,80 @@ describe('git memory sync (shared protocol with zmem)', () => {
     expect(sh(tree, 'remote', 'get-url', 'origin').trim()).toBe(remote);
     await ensureMemorySyncRepo(tree, remote, 'test-host');
     expect(sh(tree, 'remote').trim()).toBe('origin');
+  });
+
+  it('refuses a different existing origin before it can commit, push, or repoint it', async () => {
+    const otherRemote = nodePath.join(work, 'other.git');
+    execFileSync('git', ['init', '--bare', '-b', 'main', otherRemote], { encoding: 'utf8' });
+    nodeFs.writeFileSync(nodePath.join(tree, 'projects', 'demo', 'memory', 'seed.md'), 'seed');
+    expect((await syncMemoryTree(tree, remote, { host: 'guard-host' })).ok).toBe(true);
+    sh(tree, 'remote', 'set-url', 'origin', otherRemote);
+    const headBefore = sh(tree, 'rev-parse', 'HEAD').trim();
+    const remoteBefore = sh(tree, 'ls-remote', remote, 'refs/heads/main').trim();
+    const ignoreBefore = nodeFs.readFileSync(nodePath.join(tree, '.gitignore'), 'utf8');
+    const attributesBefore = nodeFs.readFileSync(nodePath.join(tree, '.gitattributes'), 'utf8');
+    nodeFs.writeFileSync(nodePath.join(tree, 'projects', 'demo', 'memory', 'not-pushed.md'), 'local only');
+
+    const result = await syncMemoryTree(tree, remote, { host: 'guard-host' });
+
+    expect(result).toMatchObject({ ok: false, committed: false, pulled: false, pushed: false });
+    expect(result.detail).toBe(
+      `origin points at ${otherRemote} but config says ${remote}; refusing to re-point. ` +
+      `To migrate on purpose: git -C ${tree} remote set-url origin ${remote}`,
+    );
+    expect(sh(tree, 'config', '--get', 'remote.origin.url').trim()).toBe(otherRemote);
+    expect(sh(tree, 'rev-parse', 'HEAD').trim()).toBe(headBefore);
+    expect(sh(tree, 'ls-remote', remote, 'refs/heads/main').trim()).toBe(remoteBefore);
+    expect(nodeFs.readFileSync(nodePath.join(tree, '.gitignore'), 'utf8')).toBe(ignoreBefore);
+    expect(nodeFs.readFileSync(nodePath.join(tree, '.gitattributes'), 'utf8')).toBe(attributesBefore);
+    expect(sh(tree, 'status', '--porcelain')).toContain('not-pushed.md');
+  });
+
+  it('keeps the index intact and the refusal trace ignored without existing ignore rules', async () => {
+    sh(tree, 'init', '-b', 'main');
+    sh(tree, 'remote', 'add', 'origin', remote);
+    const note = nodePath.join(tree, 'projects', 'demo', 'memory', 'staged.md');
+    nodeFs.writeFileSync(note, 'staged local draft');
+    sh(tree, 'add', '-A');
+    const indexBefore = nodeFs.readFileSync(nodePath.join(tree, '.git', 'index'));
+    const statusBefore = sh(tree, 'status', '--porcelain');
+    const result = await syncMemoryTree(tree, `${remote}.different`, { host: 'guard-host' });
+
+    expect(result).toMatchObject({ ok: false, committed: false, pulled: false, pushed: false });
+    expect(sh(tree, 'config', '--get', 'remote.origin.url').trim()).toBe(remote);
+    expect(nodeFs.readFileSync(nodePath.join(tree, '.git', 'index'))).toEqual(indexBefore);
+    expect(sh(tree, 'status', '--porcelain')).toBe(statusBefore);
+    expect(sh(tree, 'check-ignore', 'metrics.jsonl').trim()).toBe('metrics.jsonl');
+    const trace = JSON.parse(nodeFs.readFileSync(nodePath.join(tree, 'metrics.jsonl'), 'utf8').trim());
+    expect(trace).toEqual({
+      t: expect.any(String), ok: false, committed: false, pulled: false, pushed: false,
+      blockedSecrets: [], detail: result.detail,
+    });
+    expect(nodeFs.existsSync(nodePath.join(tree, '.gitignore'))).toBe(false);
+    expect(nodeFs.existsSync(nodePath.join(tree, '.gitattributes'))).toBe(false);
+  });
+
+  it('keeps an equivalent SSH origin spelling and syncs through a local transport rewrite', async () => {
+    const storedOrigin = 'git@MEM-SYNC.test:owner/zmem-memories.git/';
+    const configuredOrigin = 'ssh://git@mem-sync.TEST:13022/owner/zmem-memories';
+    const localTransport = `file://${remote}`;
+    sh(tree, 'init', '-b', 'main');
+    sh(tree, 'config', `url.${localTransport}.insteadOf`, storedOrigin);
+
+    await ensureMemorySyncRepo(tree, storedOrigin, 'equivalence-host');
+    await ensureMemorySyncRepo(tree, configuredOrigin, 'equivalence-host');
+    expect(normalizeRemoteUrl(storedOrigin)).toBe(normalizeRemoteUrl(configuredOrigin));
+    // `remote get-url` expands insteadOf, so inspect the stored config to
+    // prove equivalent configurations never rewrite the user's spelling.
+    expect(sh(tree, 'config', '--get', 'remote.origin.url').trim()).toBe(storedOrigin);
+
+    nodeFs.writeFileSync(nodePath.join(tree, 'projects', 'demo', 'memory', 'equivalent.md'), 'synced');
+    const result = await syncMemoryTree(tree, configuredOrigin, { host: 'equivalence-host' });
+    expect(result).toMatchObject({ ok: true, committed: true, pushed: true });
+    const clone = nodePath.join(work, 'equivalent-clone');
+    execFileSync('git', ['clone', remote, clone], { encoding: 'utf8' });
+    expect(nodeFs.readFileSync(nodePath.join(clone, 'projects', 'demo', 'memory', 'equivalent.md'), 'utf8'))
+      .toBe('synced');
   });
 
   it('commits memory changes, pushes, and a clone sees them; ignore rules hold', async () => {
@@ -89,9 +168,120 @@ describe('git memory sync (shared protocol with zmem)', () => {
     nodeFs.writeFileSync(nodePath.join(tree, 'projects', 'demo', 'memory', 'from-a.md'), 'a body');
     const r = await syncMemoryTree(tree, remote, { host: 'host-a' });
     expect(r.ok).toBe(true);
+    expect(r.pulled).toBe(true);
     expect(nodeFs.existsSync(nodePath.join(tree, 'projects', 'demo', 'memory', 'from-b.md'))).toBe(true);
   });
 
+});
+
+describe('memory sync merge preservation', () => {
+  it('fast-forwards a behind tree without rewriting or adding commits', async () => {
+    nodeFs.writeFileSync(nodePath.join(tree, 'projects', 'demo', 'memory', 'seed.md'), 'seed');
+    await syncMemoryTree(tree, remote, { host: 'host-a' });
+    const clone = nodePath.join(work, 'behind-clone');
+    execFileSync('git', ['clone', remote, clone], { encoding: 'utf8' });
+    nodeFs.writeFileSync(nodePath.join(clone, 'projects', 'demo', 'memory', 'remote.md'), 'remote edit');
+    sh(clone, 'add', '-A');
+    sh(clone, '-c', 'user.name=b', '-c', 'user.email=b@b', 'commit', '-m', 'remote');
+    sh(clone, 'push', 'origin', 'main');
+    const remoteTip = sh(clone, 'rev-parse', 'HEAD').trim();
+
+    expect(await syncMemoryTree(tree, remote, { host: 'host-a' }))
+      .toMatchObject({ ok: true, committed: false, pulled: true, pushed: true });
+    expect(sh(tree, 'rev-parse', 'HEAD').trim()).toBe(remoteTip);
+    expect(nodeFs.readFileSync(nodePath.join(tree, 'projects', 'demo', 'memory', 'remote.md'), 'utf8'))
+      .toBe('remote edit');
+  });
+
+  it('merges divergence while preserving both original commit IDs', async () => {
+    nodeFs.writeFileSync(nodePath.join(tree, 'projects', 'demo', 'memory', 'seed.md'), 'seed');
+    await syncMemoryTree(tree, remote, { host: 'host-a' });
+    const clone = nodePath.join(work, 'diverged-clone');
+    execFileSync('git', ['clone', remote, clone], { encoding: 'utf8' });
+    nodeFs.writeFileSync(nodePath.join(clone, 'projects', 'demo', 'memory', 'remote.md'), 'remote');
+    sh(clone, 'add', '-A');
+    sh(clone, '-c', 'user.name=b', '-c', 'user.email=b@b', 'commit', '-m', 'remote');
+    sh(clone, 'push', 'origin', 'main');
+    const remoteTip = sh(clone, 'rev-parse', 'HEAD').trim();
+    nodeFs.writeFileSync(nodePath.join(tree, 'projects', 'demo', 'memory', 'local.md'), 'local');
+    sh(tree, 'add', '-A');
+    sh(tree, '-c', 'user.name=a', '-c', 'user.email=a@a', 'commit', '-m', 'local');
+    const localTip = sh(tree, 'rev-parse', 'HEAD').trim();
+
+    expect(await syncMemoryTree(tree, remote, { host: 'host-a' }))
+      .toMatchObject({ ok: true, committed: false, pulled: true, pushed: true });
+    expect(sh(tree, 'rev-list', '--parents', '-n', '1', 'HEAD').trim().split(' ').slice(1))
+      .toEqual([localTip, remoteTip]);
+  });
+
+  it('aborts a real merge conflict and preserves local files, commits, and the remote', async () => {
+    const note = nodePath.join(tree, 'projects', 'demo', 'memory', 'conflict.md');
+    nodeFs.writeFileSync(note, 'base\n');
+    await syncMemoryTree(tree, remote, { host: 'host-a' });
+    const clone = nodePath.join(work, 'conflict-clone');
+    execFileSync('git', ['clone', remote, clone], { encoding: 'utf8' });
+    nodeFs.writeFileSync(nodePath.join(clone, 'projects', 'demo', 'memory', 'conflict.md'), 'remote\n');
+    sh(clone, 'add', '-A');
+    sh(clone, '-c', 'user.name=b', '-c', 'user.email=b@b', 'commit', '-m', 'remote');
+    sh(clone, 'push', 'origin', 'main');
+    const remoteTip = sh(clone, 'rev-parse', 'HEAD').trim();
+    nodeFs.writeFileSync(note, 'local\n');
+    sh(tree, 'add', '-A');
+    sh(tree, '-c', 'user.name=a', '-c', 'user.email=a@a', 'commit', '-m', 'local');
+    const localTip = sh(tree, 'rev-parse', 'HEAD').trim();
+
+    const result = await syncMemoryTree(tree, remote, { host: 'host-a' });
+    expect(result).toMatchObject({ ok: false, committed: false, pulled: false, pushed: false });
+    expect(result.detail).toMatch(/^merge:/);
+    expect(sh(tree, 'rev-parse', 'HEAD').trim()).toBe(localTip);
+    expect(sh(tree, 'ls-remote', remote, 'refs/heads/main').trim().split(/\s/u)[0]).toBe(remoteTip);
+    expect(nodeFs.readFileSync(note, 'utf8')).toBe('local\n');
+    expect(sh(tree, 'status', '--porcelain').trim()).toBe('');
+    expect(sh(tree, 'ls-files', '-u').trim()).toBe('');
+    expect(nodeFs.existsSync(nodePath.join(tree, '.git', 'MERGE_HEAD'))).toBe(false);
+    expect(nodeFs.existsSync(nodePath.join(tree, '.git', 'rebase-merge'))).toBe(false);
+  });
+
+  it('refuses push and the next commit when a real autostash restoration conflicts', async () => {
+    const note = nodePath.join(tree, 'projects', 'demo', 'memory', 'conflict.md');
+    nodeFs.writeFileSync(note, 'base\n');
+    await syncMemoryTree(tree, remote, { host: 'host-a' });
+    const clone = nodePath.join(work, 'autostash-clone');
+    execFileSync('git', ['clone', remote, clone], { encoding: 'utf8' });
+    nodeFs.writeFileSync(nodePath.join(clone, 'projects', 'demo', 'memory', 'conflict.md'), 'remote\n');
+    sh(clone, 'add', '-A');
+    sh(clone, '-c', 'user.name=b', '-c', 'user.email=b@b', 'commit', '-m', 'remote');
+    sh(clone, 'push', 'origin', 'main');
+    const remoteTip = sh(clone, 'rev-parse', 'HEAD').trim();
+    // A real git hook deterministically simulates another memory writer
+    // between this cycle's commit and merge. It runs only once.
+    const hook = nodePath.join(tree, '.git', 'hooks', 'post-commit');
+    nodeFs.writeFileSync(hook,
+      '#!/bin/sh\n' +
+      'if test -f .git/autostash-fixture-done; then exit 0; fi\n' +
+      "printf 'local unstaged draft\\n' > projects/demo/memory/conflict.md\n" +
+      ': > .git/autostash-fixture-done\n',
+    );
+    nodeFs.chmodSync(hook, 0o755);
+    nodeFs.writeFileSync(nodePath.join(tree, 'projects', 'demo', 'memory', 'trigger.md'), 'trigger commit');
+
+    const result = await syncMemoryTree(tree, remote, { host: 'host-a' });
+    expect(result).toMatchObject({ ok: false, committed: true, pulled: true, pushed: false });
+    expect(result.detail).toMatch(/autostash/);
+    expect(sh(tree, 'ls-files', '-u').trim().length).toBeGreaterThan(0);
+    expect(nodeFs.readFileSync(note, 'utf8')).toContain('local unstaged draft');
+    expect(sh(tree, 'show', 'stash:projects/demo/memory/conflict.md')).toBe('local unstaged draft\n');
+    expect(sh(tree, 'ls-remote', remote, 'refs/heads/main').trim().split(/\s/u)[0]).toBe(remoteTip);
+    const head = sh(tree, 'rev-parse', 'HEAD').trim();
+    const next = await syncMemoryTree(tree, remote, { host: 'host-a' });
+    expect(next).toMatchObject({ ok: false, committed: false, pulled: false, pushed: false });
+    expect(next.detail).toMatch(/unresolved merge entries/);
+    expect(sh(tree, 'rev-parse', 'HEAD').trim()).toBe(head);
+  });
+
+});
+
+describe('memory sync bootstrap and lifecycle', () => {
   it('an unborn local tree adopts existing remote history', async () => {
     nodeFs.writeFileSync(nodePath.join(tree, 'projects', 'demo', 'memory', 'seed.md'), 'seed');
     await syncMemoryTree(tree, remote, { host: 'host-a' });
@@ -101,6 +291,25 @@ describe('git memory sync (shared protocol with zmem)', () => {
     const r = await syncMemoryTree(treeB, remote, { host: 'host-b' });
     expect(r.ok).toBe(true);
     expect(nodeFs.existsSync(nodePath.join(treeB, 'projects', 'demo', 'memory', 'seed.md'))).toBe(true);
+  });
+
+  it('refuses unborn adoption that would overwrite even an ignored local file', async () => {
+    nodeFs.writeFileSync(nodePath.join(tree, 'projects', 'demo', 'memory', 'seed.md'), 'remote memory');
+    await syncMemoryTree(tree, remote, { host: 'host-a' });
+    const treeB = nodePath.join(work, 'treeB');
+    const noteB = nodePath.join(treeB, 'projects', 'demo', 'memory', 'seed.md');
+    nodeFs.mkdirSync(nodePath.dirname(noteB), { recursive: true });
+    nodeFs.writeFileSync(noteB, 'local draft must survive');
+    sh(treeB, 'init', '-b', 'main');
+    nodeFs.appendFileSync(nodePath.join(treeB, '.git', 'info', 'exclude'), 'projects/\n');
+    const remoteTip = sh(tree, 'rev-parse', 'HEAD').trim();
+
+    const result = await syncMemoryTree(treeB, remote, { host: 'host-b' });
+    expect(result).toMatchObject({ ok: false, committed: false, pulled: false, pushed: false });
+    expect(result.detail).toMatch(/overwrite untracked/);
+    expect(nodeFs.readFileSync(noteB, 'utf8')).toBe('local draft must survive');
+    expect(sh(treeB, 'ls-files').trim()).toBe('');
+    expect(sh(tree, 'ls-remote', remote, 'refs/heads/main').trim().split(/\s/u)[0]).toBe(remoteTip);
   });
 
   it('leaves no lock residue and the runtime wrapper gates on root/url', async () => {
@@ -123,6 +332,18 @@ describe('git memory sync (shared protocol with zmem)', () => {
     expect(cycle?.ok).toBe(true);
     expect(cycle?.committed).toBe(true);
     svc.dispose();
+  });
+
+  it('contains notification errors and suppresses results after disposal', async () => {
+    const observer = jest.fn(() => { throw new Error('notification unavailable'); });
+    const svc = new MemoryGitSyncService(() => tree, () => remote, 'observer-host', observer);
+    const result = await svc.runCycle();
+    expect(result).toMatchObject({ ok: true, pushed: true });
+    expect(observer).toHaveBeenCalledWith(result);
+    const pending = svc.runCycle();
+    svc.dispose();
+    expect(await pending).toMatchObject({ ok: true });
+    expect(observer).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -148,6 +369,7 @@ describe('sync safety rails', () => {
     expect(refused.ok).toBe(false);
     expect(refused.detail).toMatch(/non-empty directory/);
     expect(nodeFs.existsSync(nodePath.join(populated, '.git'))).toBe(false);
+    expect(nodeFs.readdirSync(populated)).toEqual(['notes.txt']);
   });
 
   it('a held lock no-ops the cycle; a stale lock is taken over', async () => {
@@ -160,6 +382,7 @@ describe('sync safety rails', () => {
     expect(held.detail).toBe('locked');
     expect(held.committed).toBe(false);
     expect(nodeFs.existsSync(nodePath.join(tree, '.git'))).toBe(false);
+    expect(nodeFs.existsSync(nodePath.join(tree, 'metrics.jsonl'))).toBe(false);
 
     // Wedged holder: older than the 5-minute stale age → takeover.
     const stale = new Date(Date.now() - 6 * 60_000);

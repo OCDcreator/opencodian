@@ -63,6 +63,16 @@ export interface ZCodeModelCatalog {
   readonly observedAt: number;
 }
 
+export interface ZCodeWorkspaceCatalog extends ZCodeModelCatalog {
+  /** The workspace default before an optional settings-only draft selection. */
+  readonly defaultModel: ZCodeModelCatalog['currentModel'];
+}
+
+export interface ZCodeWorkspaceCatalogOptions {
+  readonly forceRefresh?: boolean;
+  readonly model?: { readonly providerId: string; readonly modelId: string };
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -310,22 +320,40 @@ export interface ZCodeCatalogTransport {
 export class ZCodeModelSurface {
   private catalog: ZCodeModelCatalog | null = null;
   private catalogSettingsBase: unknown = null;
-  private workspaceCatalog: { transport: ZCodeCatalogTransport; catalog: ZCodeModelCatalog } | null = null;
-  private workspaceCatalogLoad: { transport: ZCodeCatalogTransport; promise: Promise<ZCodeModelCatalog> } | null = null;
+  private workspaceCatalog: { transport: ZCodeCatalogTransport; catalog: ZCodeWorkspaceCatalog } | null = null;
+  private workspaceCatalogLoad: { transport: ZCodeCatalogTransport; promise: Promise<ZCodeWorkspaceCatalog> } | null = null;
+  private workspaceCatalogEpoch = 0;
+
+  /** Account changes and process teardown cannot retain an authenticated catalog. */
+  reset(): void {
+    this.catalog = null;
+    this.catalogSettingsBase = null;
+    this.workspaceCatalog = null;
+    this.workspaceCatalogLoad = null;
+    this.workspaceCatalogEpoch++;
+  }
 
   /** Read native workspace defaults before a conversation exists, without a persisted chat or model turn. */
   async getWorkspaceModelCatalog(
     transport: ZCodeCatalogTransport,
     workspacePath: string,
     isCurrentTransport: () => boolean,
-  ): Promise<ZCodeModelCatalog> {
+    options: ZCodeWorkspaceCatalogOptions = {},
+  ): Promise<ZCodeWorkspaceCatalog> {
     if (!workspacePath) throw new Error('ZCode workspace model discovery requires a vault path.');
-    if (this.workspaceCatalog?.transport === transport) return this.workspaceCatalog.catalog;
-    if (this.workspaceCatalogLoad?.transport === transport) return this.workspaceCatalogLoad.promise;
+    if (options.forceRefresh) {
+      this.workspaceCatalogEpoch++;
+      this.workspaceCatalog = null;
+      this.workspaceCatalogLoad = null;
+    }
+    if (!options.model && this.workspaceCatalog?.transport === transport) return this.workspaceCatalog.catalog;
+    if (!options.model && this.workspaceCatalogLoad?.transport === transport) return this.workspaceCatalogLoad.promise;
+    const epoch = this.workspaceCatalogEpoch;
     const promise = (async () => {
       const sessionId = `sess_${randomUUID()}`;
       let snapshot: unknown;
       let parsed: ZCodeModelCatalog | null = null;
+      let defaultModel: ZCodeModelCatalog['currentModel'] = null;
       let closed = false;
       try {
         snapshot = await transport.request('session/create', {
@@ -338,15 +366,28 @@ export class ZCodeModelSurface {
         }
         parsed = parseZCodeCatalogSnapshot(asRecord(snapshot)['settings']);
         if (!parsed) throw new Error('ZCode workspace model catalog was unavailable.');
+        defaultModel = parsed.currentModel;
+        if (options.model) {
+          const validation = validateZCodeModelSelection(parsed, options.model);
+          if (!validation.ok) throw new Error(validation.detail);
+          const result = await transport.request('session/setModel', {
+            sessionId, model: { ...options.model, ...(validation.reasoningLevel ? { options: { reasoningLevel: validation.reasoningLevel } } : {}) },
+          });
+          parsed = parseZCodeCatalogSnapshot(mergeCatalogSettingsBase(asRecord(snapshot)['settings'], asRecord(result)['settings']));
+          if (!parsed || parsed.currentModel?.providerId !== options.model.providerId || parsed.currentModel?.modelId !== options.model.modelId) {
+            throw new Error('ZCode settings draft did not confirm the selected model.');
+          }
+        }
       } finally {
         closed = asRecord(await transport.request('session/close', { sessionId, expectedPersistence: 'deferred' }))['closed'] === true;
       }
       if (!closed) throw new Error('ZCode workspace discovery draft did not close.');
-      if (!isCurrentTransport()) throw new Error('ZCode workspace model discovery was superseded.');
-      this.workspaceCatalog = { transport, catalog: parsed };
-      return parsed;
+      if (!isCurrentTransport() || epoch !== this.workspaceCatalogEpoch) throw new Error('ZCode workspace model discovery was superseded.');
+      const catalog: ZCodeWorkspaceCatalog = { ...parsed, defaultModel };
+      if (!options.model) this.workspaceCatalog = { transport, catalog };
+      return catalog;
     })();
-    this.workspaceCatalogLoad = { transport, promise };
+    if (!options.model) this.workspaceCatalogLoad = { transport, promise };
     try {
       return await promise;
     } finally {

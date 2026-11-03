@@ -184,3 +184,7 @@ DshAdapter 在既有 owner 内维护逐会话配置、原生目录/推理选择�
 ## 会话信息（2026-10-31）
 
 AgentService 的会话信息契约及各 adapter 拥有只读运行时投影；账户额度、会话累计与上下文窗口分开，子会话必须使用原生身份。
+
+## 2026-11-02 ZCode task settings
+
+ZCode 官方账号生命周期与个人 API 配置事务分别由 ZCodeAccountService / ZCodePersonalConfigService 持有；ZCodeNativeStore 隔离高风险原生文件锁依赖。设置页只接收摘要/命令，不持有凭据。辅助查询账户环境与私有工具隔离分开。

@@ -112,6 +112,7 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
   private sync: MemoryGitSyncService | null = null;
   /** Identity the sync service was built for (root + remote url). */
   private syncKey = '__unset__';
+  private syncFailureDetail: string | null = null;
   private readonly sessions = new Set<AuxQuerySession>();
   private readonly recalled = new Map<string, { epoch: number; paths: string[]; characters: number }>();
   private readonly timers = new Map<string, number>();
@@ -184,11 +185,23 @@ export class MemoryRuntimeCoordinator implements MemoryRuntimePort {
     const key = `${rawRoot};;${remoteUrl}`;
     if (this.syncKey === key) return;
     this.sync?.dispose();
+    this.syncFailureDetail = null;
     if (rawRoot && remoteUrl) {
       const expandedRoot = expandHomeDir(rawRoot);
       this.sync = new MemoryGitSyncService(
         () => expandedRoot,
         () => (this.settings().memorySyncRemoteUrl ?? ''),
+        undefined,
+        (result) => {
+          if (result.ok) {
+            if (result.detail !== 'locked') this.syncFailureDetail = null;
+            return;
+          }
+          const detail = result.detail ?? 'unknown';
+          if (detail === this.syncFailureDetail) return;
+          this.syncFailureDetail = detail;
+          new Notice(t('commands.memory.syncFailed', { detail }), 15_000);
+        },
       );
       this.sync.start();
     } else {

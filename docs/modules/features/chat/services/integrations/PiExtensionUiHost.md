@@ -1,5 +1,7 @@
 # PiExtensionUiHost
 
+2026-11-02：PiDialog 使用 `opencodian-pi-dialog-modal` 根标记，复用共享 modal 字号、字体与行高；四种 dialog 的响应／取消／AbortSignal 语义不变。
+
 > 源码: src/features/chat/services/integrations/PiExtensionUiHost.ts
 
 ## 职责

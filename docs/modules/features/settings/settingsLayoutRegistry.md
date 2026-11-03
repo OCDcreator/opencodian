@@ -94,3 +94,7 @@ Pi主标签使用用户SVG注册图标opencodian-pi，与后端状态和切换�
 > 2026-10-27：新增 `opencode2`/`dsh` 工作区、Codex/ZCode 拆分标签与 Claude/Codex debug 标签；移除通用 title 与通用调试中的后端 trace 标签；新增 `getBackendWorkspaceTab`/`getVisibleBackendWorkspaces` 供两个宿主共用可见性。
 
 > 2026-10-27（二次审查）：DSH 工作区增加 `model` 二级页（连接 / 模型与行内 / MCP / 原生默认值）；classic 与 tabbed 均通过 registry 消费该顺序。
+
+## 2026-11-02 ZCode task settings
+
+ZCode 默认子标签为 chat；旧 model→chat、management→tools、connection→installation，已选新标签保持。双语标签与三个任务页面一致。

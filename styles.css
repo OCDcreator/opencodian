@@ -18193,6 +18193,351 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
 }
 
 
+/* components/ui-readback.css */
+/* Shared typography for plugin-owned feedback. These are flat text surfaces,
+   not another card layer. Owner-specific headings, editors and state colors win. */
+:is(.opencodian-settings, .modal[class*="opencodian-"], .opencodian-container,
+    .opencodian-modal-shell, .opencodian-help-modal-shell, .opencodian-pi-workbench,
+    .opencodian-claude-provider-config-modal) {
+  --opencodian-ui-body-size: 13px;
+  --opencodian-ui-meta-size: 12px;
+  --opencodian-ui-caption-size: 11px;
+  --opencodian-ui-copy-line-height: 1.5;
+  --opencodian-ui-group-gap: var(--opencodian-settings-space-lg, 12px);
+  --opencodian-ui-item-gap: var(--opencodian-settings-space-md, 8px);
+}
+
+.opencodian-settings,
+.modal[class*="opencodian-"],
+.opencodian-modal-shell,
+.opencodian-help-modal-shell,
+.opencodian-pi-workbench,
+.opencodian-claude-provider-config-modal {
+  font-family: var(--font-interface);
+  font-size: var(--opencodian-ui-body-size);
+  line-height: var(--opencodian-ui-copy-line-height);
+}
+
+.opencodian-settings :where(p:not([class]):not(.markdown-rendered p):not(.cm-content p)) {
+  font-size: var(--opencodian-ui-meta-size);
+  line-height: var(--opencodian-ui-copy-line-height);
+  overflow-wrap: anywhere;
+}
+
+/* A live region may contain a short message or several readback rows. Do not
+   impose a layout, color or monospace face on all of its descendants. */
+.opencodian-settings :where([role="status"], [role="alert"]) {
+  min-width: 0;
+  max-width: 100%;
+  font-size: var(--opencodian-ui-meta-size);
+  line-height: var(--opencodian-ui-copy-line-height);
+  overflow-wrap: anywhere;
+}
+
+:where(.opencodian-settings) :is(
+  .opencodian-settings-inline-notice,
+  .opencodian-pi-config-status,
+  .opencodian-codex-plugins-status,
+  .opencodian-codex-project-config-status,
+  .opencodian-codex-runtime-skill-groups-status,
+  .opencodian-shared-session-preview-loading,
+  .opencodian-capability-lab-readback-note,
+  .opencodian-capability-lab-info,
+  .opencodian-claude-configuration-section-description,
+  .opencodian-claude-configuration-history-empty,
+  .opencodian-codex-hooks-readback-desc
+),
+:is(
+  .opencodian-context-file-server-hint,
+  .opencodian-experimental-action-notice,
+  .opencodian-experimental-action-description,
+  .opencodian-experimental-action-status,
+  .opencodian-experimental-background-status,
+  .opencodian-model-config-readonly-summary,
+  .opencodian-inline-edit-confirm-message,
+  .streaming-task-field
+) {
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  color: var(--text-muted);
+  font-family: var(--font-interface);
+  font-size: var(--opencodian-ui-meta-size, 12px);
+  line-height: var(--opencodian-ui-copy-line-height, 1.5);
+  overflow-wrap: anywhere;
+}
+
+/* Pi's runtime readback is intentionally verbatim text, with native newlines. */
+.opencodian-settings .opencodian-pi-config-status {
+  white-space: pre-line;
+}
+
+/* Keep empty live regions mounted for announcements, without a phantom gap. */
+.opencodian-settings :where([role="status"]):empty,
+:is(.opencodian-codex-plugins-status, .opencodian-experimental-action-status):empty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  border: 0;
+}
+
+/* ZCode connection and management share the same label / readback anatomy. */
+.opencodian-zcode-config-status {
+  display: grid;
+  gap: var(--opencodian-ui-item-gap, 8px);
+  min-width: 0;
+  padding-block: var(--opencodian-settings-space-sm, 6px);
+}
+
+.opencodian-zcode-config-status-row {
+  display: grid;
+  grid-template-columns: minmax(0, min(108px, 30%)) minmax(0, 1fr);
+  gap: var(--opencodian-ui-item-gap, 8px);
+  align-items: baseline;
+  min-width: 0;
+  font-size: var(--opencodian-ui-meta-size, 12px);
+  line-height: var(--opencodian-ui-copy-line-height, 1.5);
+}
+
+.opencodian-zcode-config-status-label {
+  min-width: 0;
+  color: var(--text-normal);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-zcode-config-status-detail {
+  min-width: 0;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+  user-select: text;
+}
+
+/* Summary/readback containers own their rhythm, including bare native p tags. */
+:is(.opencodian-model-config-readonly-summary, .opencodian-settings-readback,
+    .opencodian-experimental-action-section, .streaming-task-details) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-ui-item-gap, 8px);
+  min-width: 0;
+}
+
+:is(.opencodian-model-config-readonly-summary, .opencodian-settings-readback) > p {
+  margin: 0;
+  font-size: var(--opencodian-ui-meta-size, 12px);
+  line-height: var(--opencodian-ui-copy-line-height, 1.5);
+  overflow-wrap: anywhere;
+}
+
+:is(.opencodian-codex-hooks-readback-title,
+    .opencodian-context-file-groups-heading,
+    .opencodian-inline-edit-picker-groups-heading) {
+  margin: 0;
+  color: var(--text-normal);
+  font-size: var(--opencodian-ui-meta-size, 12px);
+  font-weight: 600;
+  line-height: var(--opencodian-ui-copy-line-height, 1.5);
+}
+
+/* Compact metadata keeps a single hierarchy across configuration and previews. */
+:is(.opencodian-codex-plugin-version,
+    .opencodian-codex-project-config-history-entry-kind,
+    .opencodian-codex-project-config-history-entry-date,
+    .opencodian-edit-revert-preview-lines-label,
+    .opencodian-edit-revert-preview-lines-separator,
+    .opencodian-edit-revert-preview-action) {
+  color: var(--text-muted);
+  font-size: var(--opencodian-ui-caption-size, 11px);
+  line-height: var(--opencodian-ui-copy-line-height, 1.5);
+  overflow-wrap: anywhere;
+}
+
+:is(.opencodian-experimental-action-scope,
+    .opencodian-backend-session-browser-detail-part-content,
+    .opencodian-edit-revert-preview-lines-value) {
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: var(--opencodian-ui-meta-size, 12px);
+  line-height: var(--opencodian-ui-copy-line-height, 1.5);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Preserve the meaning of real warnings/errors; neutral feedback is not an alert. */
+:is(.opencodian-capability-lab-warning, .opencodian-codex-hooks-warning,
+    .opencodian-experimental-action-status[data-experimental-status="unsupported"],
+    .opencodian-experimental-action-status[data-experimental-status="invalid"]) {
+  color: var(--opencodian-status-warning, var(--text-warning, var(--text-normal)));
+}
+
+:is(.opencodian-codex-plugins-marketplace-error, .opencodian-codex-hooks-error,
+    .opencodian-experimental-action-status[data-experimental-status="failed"]) {
+  color: var(--opencodian-status-error, var(--text-error));
+}
+
+:is(.opencodian-capability-lab-warning, .opencodian-capability-lab-success,
+    .opencodian-codex-plugins-marketplace-error) {
+  margin: 0;
+  font-size: var(--opencodian-ui-meta-size, 12px);
+  line-height: var(--opencodian-ui-copy-line-height, 1.5);
+  overflow-wrap: anywhere;
+}
+
+:is(.opencodian-capability-lab-success,
+    .opencodian-experimental-action-status[data-experimental-status="completed"]) {
+  color: var(--opencodian-status-success, var(--text-success, var(--text-normal)));
+}
+
+/* Plugin catalogs already use resource rows; add the missing toolbar/badge layer. */
+:is(.opencodian-codex-plugins, .opencodian-codex-plugins-marketplace-errors) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-ui-group-gap, 12px);
+  min-width: 0;
+}
+
+.opencodian-codex-plugins-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--opencodian-ui-item-gap, 8px);
+}
+
+.opencodian-settings .opencodian-codex-trace-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--opencodian-settings-space-sm, 6px);
+  min-width: 0;
+}
+
+:is(.opencodian-codex-plugin-policy, .opencodian-codex-plugin-installed-badge,
+    .opencodian-codex-plugin-enabled-badge) {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--opencodian-settings-radius-inline, 6px);
+  color: var(--text-muted);
+  font-size: var(--opencodian-ui-caption-size, 11px);
+  font-weight: 500;
+  line-height: var(--opencodian-ui-copy-line-height, 1.5);
+  overflow-wrap: anywhere;
+}
+
+.opencodian-experimental-action-modal .modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-modal-section-gap, 20px);
+}
+
+.opencodian-experimental-action-section h3 {
+  margin: 0;
+  font-size: var(--opencodian-ui-body-size, 13px);
+  font-weight: 600;
+}
+
+@container opencodian-settings-pane (max-width: 420px) {
+  .opencodian-zcode-config-status-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--opencodian-settings-space-xs, 4px);
+  }
+}
+
+
+/* components/settings-zcode.css */
+/* Task-oriented ZCode settings. Existing Settings tokens own all surfaces. */
+.opencodian-zcode-settings .opencodian-settings-section-body,
+.opencodian-zcode-group,
+.opencodian-zcode-disclosure-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-xl, 12px);
+  min-width: 0;
+}
+
+.opencodian-zcode-settings :is(h3, h4, h5, p) { margin: 0; padding-inline-start: 0; }
+.opencodian-zcode-settings h3 { font-size: 14px; }
+.opencodian-zcode-settings :is(h4, h5) { font-size: 13px; }
+.opencodian-zcode-group + .opencodian-zcode-group { margin-top: var(--opencodian-settings-space-xl, 12px); }
+.opencodian-zcode-disclosure { min-width: 0; padding-block: var(--opencodian-settings-space-md, 8px); }
+.opencodian-zcode-disclosure > summary { cursor: pointer; font-size: 13px; font-weight: 600; line-height: 1.5; width: fit-content; max-width: 100%; }
+.opencodian-zcode-disclosure[open] > summary { margin-bottom: var(--opencodian-settings-space-xl, 12px); }
+.opencodian-zcode-settings :is(summary, button, a, input, textarea, select):focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.opencodian-zcode-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--opencodian-settings-space-md, 8px); }
+.opencodian-zcode-actions > p { flex-basis: 100%; }
+.opencodian-zcode-actions :is(button, a),
+.opencodian-zcode-completion-status button { min-height: 30px; max-width: 100%; white-space: normal; height: auto; overflow-wrap: anywhere; }
+.opencodian-zcode-feedback,
+.opencodian-zcode-supporting,
+.opencodian-zcode-provider-list,
+.opencodian-zcode-connection-summary { font-size: var(--opencodian-ui-meta-size, 12px); line-height: 1.5; color: var(--text-muted); overflow-wrap: anywhere; }
+.opencodian-zcode-feedback:empty,
+.opencodian-zcode-supporting:empty,
+.opencodian-zcode-editor-host:empty { display: none; }
+.opencodian-zcode-feedback.is-error { color: color-mix(in srgb, var(--text-error) 80%, var(--text-normal)); }
+.opencodian-zcode-feedback button { display: block; margin-top: var(--opencodian-settings-space-md, 8px); }
+.opencodian-zcode-settings .setting-item-description { display: block; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; -webkit-line-clamp: unset; max-height: none; }
+.opencodian-zcode-settings :is(input, textarea)::placeholder { color: var(--text-muted); opacity: 1; }
+.opencodian-zcode-connection-summary { color: var(--text-normal); font-weight: 600; }
+.opencodian-zcode-provider-form { display: flex; flex-direction: column; gap: var(--opencodian-settings-space-xl, 12px); padding-block: var(--opencodian-settings-space-xl, 12px); border-top: 1px solid var(--background-modifier-border); }
+.opencodian-zcode-provider-form button.mod-cta { background: var(--text-normal); color: var(--background-primary); }
+.opencodian-zcode-provider-form button.mod-cta:hover:not(:disabled) { background: color-mix(in srgb, var(--text-normal) 90%, var(--background-primary)); }
+.opencodian-settings .opencodian-zcode-settings[data-settings-surface="section"] .setting-item { background: transparent; border: 0; box-shadow: none; padding-inline: 0; }
+.opencodian-zcode-settings [data-zcode-field] { flex-wrap: wrap; }
+.opencodian-zcode-settings [data-zcode-field] .setting-item-control > button:first-child { max-width: 260px; }
+.opencodian-zcode-model-picker { flex: 1 0 100%; display: flex; flex-direction: column; min-width: 0; gap: 8px; margin-top: 8px; }
+.opencodian-zcode-search { width: 100%; }
+.opencodian-zcode-model-list { max-height: 280px; overflow: auto; padding: 4px; }
+.opencodian-zcode-model-list h5 { padding: 8px; color: var(--text-muted); font-weight: 600; }
+.opencodian-zcode-model-list .opencodian-zcode-model-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  height: auto;
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-normal);
+  box-shadow: none;
+  text-align: start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.opencodian-zcode-model-option:hover,
+.opencodian-zcode-model-option.is-active,
+.opencodian-zcode-model-option[aria-selected="true"] { background: var(--background-modifier-hover); }
+.opencodian-zcode-model-option small { color: var(--text-muted); font-size: 11px; font-family: var(--font-monospace); }
+.opencodian-zcode-completion-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.opencodian-zcode-completion-status p { flex: 1 1 240px; }
+.opencodian-zcode-plugin-scrollarea > .opencodian-settings-scrollarea-viewport { max-height: min(55vh, 480px); }
+.opencodian-zcode-plugin-scrollarea .opencodian-settings-scrollarea-content { display: flex; flex-direction: column; gap: var(--opencodian-settings-space-xl, 12px); }
+.opencodian-zcode-provider-list > .setting-item { align-items: flex-start; }
+.opencodian-zcode-provider-models { margin-top: var(--opencodian-settings-space-md, 8px); padding-block: 0; }
+.opencodian-zcode-provider-models-scrollarea > .opencodian-settings-scrollarea-viewport { max-height: min(40vh, 280px); }
+.opencodian-zcode-provider-models ul { margin: 0; padding: 4px 8px 4px 24px; }
+.opencodian-zcode-provider-models li { overflow-wrap: anywhere; user-select: text; }
+.opencodian-zcode-field-error { flex-basis: 100%; color: color-mix(in srgb, var(--text-error) 80%, var(--text-normal)); font-size: var(--opencodian-ui-meta-size, 12px); }
+.opencodian-zcode-provider-form .setting-item-control:has(.opencodian-zcode-field-error) { flex-wrap: wrap; }
+@container (max-width: 720px) {
+  .opencodian-zcode-settings [data-zcode-field] .setting-item-control > button:first-child { max-width: 100%; }
+  .opencodian-zcode-provider-form .setting-item-control > :is(input, select, textarea) { width: 100%; }
+}
+
+@container opencodian-settings-pane (max-width: 720px) {
+  .opencodian-settings--classic:has(.opencodian-zcode-settings) .opencodian-settings-quick-nav { position: static; }
+}
+
+
 /* features/chat-user.css */
 /* ============================================================
    User Message - Push-Up Sticky Header

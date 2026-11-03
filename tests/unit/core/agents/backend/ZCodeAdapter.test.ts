@@ -33,7 +33,7 @@ const providerConfig: ZCodeProviderConfigSnapshot = {
   state: 'validated',
   providerCount: 3,
   detail: null,
-  env: { ZCODE_STORAGE_DIR: '/home/tester/.zcode' },
+  env: { ZCODE_STORAGE_DIR: '/home/tester/.zcode', ZCODE_BUILTIN_PROVIDER_CONFIG_FILE: '/runtime/provider/zcode-builtin.json' },
 };
 
 interface FakeTransport {
@@ -101,12 +101,31 @@ describe('ZCodeAdapter — start, handshake, failure, cleanup', () => {
 
   it('injects the discovered provider configuration env into the owned process', async () => {
     const adapter = createAdapter();
+    // Login can run before the first chat/start, including packaged Windows CLIs.
+    expect(adapter.accounts.getEnvironment().ZCODE_BUILTIN_PROVIDER_CONFIG_FILE).toBe('/runtime/provider/zcode-builtin.json');
     await adapter.start();
-    expect(capturedTransportOptions?.extraEnv).toEqual({
+    expect(capturedTransportOptions?.extraEnv).toMatchObject({
       ZCODE_STORAGE_DIR: '/home/tester/.zcode',
+      ZCODE_DATA_BASE_DIR: adapter.accounts.rootPath,
+      ZCODE_PERSONAL_PROVIDER_CONFIG_FILE: '/home/tester/.zcode/cli/config.json',
     });
+    expect(typeof capturedTransportOptions?.extraEnv?.ZCODE_CREDENTIAL_SECRET).toBe('string');
     expect(capturedTransportOptions?.workingDirectory).toBe('/vault');
     expect(adapter.getRuntimeDiagnostics().providerConfig?.state).toBe('validated');
+  });
+
+  it('requires an explicit reconnect after another vault changes the account and keeps the running process intact', async () => {
+    const adapter = createAdapter();
+    const revision = jest.spyOn(adapter.accounts, 'revision').mockReturnValueOnce('before').mockReturnValue('after');
+    await adapter.start();
+    await expect(adapter.refreshConfiguration()).resolves.toEqual({ needsReconnect: true });
+    await expect(adapter.start()).rejects.toThrow('reconnect');
+    expect(fakeTransport.dispose).not.toHaveBeenCalled();
+    expect(fakeTransport.start).toHaveBeenCalledTimes(1);
+    expect(revision).toHaveBeenCalledTimes(3);
+    expect(await adapter.reconnectFromSettings()).toBe(true);
+    expect(fakeTransport.dispose).toHaveBeenCalledTimes(1);
+    expect(fakeTransport.start).toHaveBeenCalledTimes(2);
   });
 
   it('fails honestly and actionably when the runtime is missing', async () => {
