@@ -74,10 +74,9 @@ describe('git memory sync (shared protocol with zmem)', () => {
     const result = await syncMemoryTree(tree, remote, { host: 'guard-host' });
 
     expect(result).toMatchObject({ ok: false, committed: false, pulled: false, pushed: false });
-    expect(result.detail).toBe(
-      `origin points at ${otherRemote} but config says ${remote}; refusing to re-point. ` +
-      `To migrate on purpose: git -C ${tree} remote set-url origin ${remote}`,
-    );
+    expect(result.detail).toContain(`origin points at ${otherRemote} (resolves to ${otherRemote})`);
+    expect(result.detail).toContain('refusing to re-point');
+    expect(result.detail).toContain(`remote set-url origin ${remote}`);
     expect(sh(tree, 'config', '--get', 'remote.origin.url').trim()).toBe(otherRemote);
     expect(sh(tree, 'rev-parse', 'HEAD').trim()).toBe(headBefore);
     expect(sh(tree, 'ls-remote', remote, 'refs/heads/main').trim()).toBe(remoteBefore);
@@ -116,6 +115,9 @@ describe('git memory sync (shared protocol with zmem)', () => {
     const localTransport = `file://${remote}`;
     sh(tree, 'init', '-b', 'main');
     sh(tree, 'config', `url.${localTransport}.insteadOf`, storedOrigin);
+    // The configured spelling must resolve to the same transport too: the
+    // comparison is on expanded endpoints, not on the raw strings.
+    sh(tree, 'config', '--add', `url.${localTransport}.insteadOf`, configuredOrigin);
 
     await ensureMemorySyncRepo(tree, storedOrigin, 'equivalence-host');
     await ensureMemorySyncRepo(tree, configuredOrigin, 'equivalence-host');

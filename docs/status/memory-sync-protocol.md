@@ -16,12 +16,18 @@ version implements the same checks.
 - Remote name: `origin`; the URL comes from plugin settings
   (`memorySyncRemoteUrl` / `syncRemoteUrl`). A missing origin is added; an existing
   origin is compared and **never silently rewritten**.
-- Comparison uses the zmem normalization rules: scp SSH and `ssh://` forms match;
-  username, numeric port, case, trailing slashes and `.git` suffix are ignored.
-  The raw stored URL is preserved when equivalent, including transport aliases.
+- Comparison is on the **expanded endpoint**: `git ls-remote --get-url` applies
+  `insteadOf` aliases to both the stored origin and the configured URL, so the two
+  plugins cannot disagree about where git will actually connect. User, case, trailing
+  slash and `.git` suffix are ignored; a missing SSH port is a wildcard (the scp form),
+  but two **different explicit ports** are different services and refuse. The raw
+  stored URL is preserved when equivalent, including transport aliases.
+- Every `remote.origin.url` and `remote.origin.pushurl` value is checked too: a
+  matching fetch URL must not hide a different push destination.
 - A mismatch refuses the cycle before worktree metadata, staging, commit, fetch or
-  push, without changing origin, index or HEAD. The result detail is:
-  `origin points at X but config says Y; refusing to re-point. To migrate on purpose: git -C <root> remote set-url origin <Y>`.
+  push, without changing origin, index or HEAD. Both raw and expanded URLs are shown
+  with credentials redacted. The result detail is:
+  `origin points at X (resolves to X') but config says Y (resolves to Y'); refusing to re-point. To migrate on purpose: git -C <root> remote set-url origin <Y>`.
   That command is guidance for an intentional migration; the service does not run it.
 - Commit identity is injected per command (`git -c user.name=... -c user.email=...`),
   never from global config: `<plugin>-memory@<hostname>` +
@@ -56,23 +62,28 @@ version implements the same checks.
    This MUST run before `add -A`, because staging would clear the unmerged evidence
    and commit conflict markers.
 7. `git add -A`.
-8. **Secrets gate** — for every staged `*.md` (added/copied/modified/renamed), run the
-   credential heuristic (`scanForSecrets`); unstage hits (`restore --staged` when HEAD
-   exists, `rm --cached` on an unborn branch) and report them as `blockedSecrets`.
-   Fail-closed: if the unstage command fails, the cycle aborts instead of committing.
+8. **Secrets gate** — for **every staged file** (added/copied/modified/renamed, not
+   only `.md`), read the **staged blob** (`git show :<path>`; never the mutable
+   working-tree file) and run the credential heuristic (`scanForSecrets`). Unstage
+   hits (`restore --staged` when HEAD exists, `rm --cached -f` on an unborn branch)
+   and report them as `blockedSecrets`. Fail-closed: an unreadable staged blob or a
+   failed unstage aborts the cycle instead of committing. Per-machine diagnostics
+   (`metrics.jsonl`, `.last-injection.json`, the lock, OS junk) and editor scratch
+   files (`*.tmp`, `~$*`, `.tmpdir/`) are unstaged even if an old tree tracks them.
 9. Staged diff non-empty → `git commit -m "memory(<host>): <N> change(s)"`.
    Unstaged withheld secrets do not trigger an empty commit.
 10. HEAD exists → `git fetch origin main`:
    - `couldn't find remote ref` (empty remote) → tolerated;
    - any other failure → report `ok: false`;
    - when `HEAD..origin/main` has commits, run
-     `git merge --autostash --no-edit origin/main`;
+     `git merge --autostash --no-edit --no-overwrite-ignore origin/main`;
    - merge failure → attempt `git merge --abort`, report `ok: false`, never push;
    - re-check `git ls-files -u` after a successful merge: autostash restoration can
      leave conflicts despite exit code 0. Refuse push and retain evidence for repair.
 11. HEAD exists and all gates passed → `git push -u origin main`.
 12. Release the lock. Record the local cycle result when the root is safe and this
-    was not a held-lock no-op.
+    was not a held-lock no-op. The trace redacts URL credentials and is skipped when
+    `metrics.jsonl` is already tracked (ignore rules do not protect tracked paths).
 
 ## Git metadata files
 

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "e9190a23f93e7b5ac7a0f6e15c65a16efb59b96c6fef70dbae03165a7ccd5eb8",
+  "digest": "a99aca247c368b564efaab6c99c15348b4aa67d9eadc7fb451d10b0000a8fee2",
   "recordCount": 826,
   "records": [
     {
@@ -66,7 +66,7 @@
     {
       "kind": "src",
       "key": "src/app/memory/MemoryGitSyncService.ts",
-      "sha256": "a591df2e36853a27270b000ed98d17d62a5e0bf816884a22bfb7c91ff2fccc80"
+      "sha256": "f4956d1fd75824e155e6c75a80616d3cb930fb34db27ea946ebe3e86dd9d1463"
     },
     {
       "kind": "src",
@@ -4134,7 +4134,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-11-03T04:35:52.246Z",
-  "headShaAtGeneration": "e0cd68f0fa295eeab85d5933633c2851056638c9",
+  "generatedAt": "2026-11-03T08:10:21.344Z",
+  "headShaAtGeneration": "fa093a38bd5f9786c199f06cf4af6e101df3d3a5",
   "graphifyVersion": "graphify 0.9.31"
 }

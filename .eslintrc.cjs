@@ -1,4 +1,9 @@
 const justifiedMaxLinesFiles = [
+  // One atomic shared-sync protocol: origin identity, merge integration,
+  // credential gate and per-cycle trace. The steps interlock and must stay
+  // byte-for-byte aligned with the zmem twin; splitting the safety rails
+  // would scatter one sequence across modules and invite drift.
+  'src/app/memory/MemoryGitSyncService.ts',
   // Cohesive multi-stage modal: configure -> preview -> running, plus the
   // revert confirmation. Splitting it would scatter one DOM contract across
   // files; its size comes from the three stages, not from unrelated duties.

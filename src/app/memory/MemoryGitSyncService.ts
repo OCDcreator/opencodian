@@ -181,40 +181,82 @@ function recoverStaleIndexLock(treeRoot: string, gitError: string): boolean {
 }
 
 /**
- * Unstage staged memory files whose content trips the credential heuristic
- * and report them. Files stay on disk locally; they just never travel.
+ * Paths the memory tree must never commit: per-machine diagnostics and
+ * editor scratch files. They are gitignored for new checkouts, but an old
+ * tree may already track them, where ordinary ignores no longer apply.
  */
-async function unstageSecretFiles(treeRoot: string, host: string): Promise<string[]> {
+function isNeverCommitPath(rel: string): boolean {
+  const base = rel.split('/').pop() ?? rel;
+  return (
+    base === 'metrics.jsonl' ||
+    base === '.last-injection.json' ||
+    base === '.memory-sync.lock' ||
+    base === '.DS_Store' ||
+    base === 'Thumbs.db' ||
+    base.startsWith('~$') ||
+    base.endsWith('.tmp') ||
+    rel.includes('.tmpdir/')
+  );
+}
+
+/** Remove one path from the index without touching the working tree. */
+async function unstagePath(
+  treeRoot: string,
+  rel: string,
+  headExists: boolean,
+  host: string,
+): Promise<void> {
+  if (headExists) {
+    await git(treeRoot, ['restore', '--staged', '--', rel], host);
+  } else {
+    // -f: the worktree may differ from the index (that is exactly the race
+    // this gate defends against), and plain `rm --cached` refuses then.
+    await git(treeRoot, ['rm', '--cached', '-q', '-f', '--', rel], host);
+  }
+}
+
+/**
+ * Unstage staged files whose content trips the credential heuristic and
+ * report them. The staged blob (not the working-tree file) is scanned: a
+ * concurrent memory writer can rewrite the worktree after `add -A`, and
+ * scanning that would let the still-staged secret through. Every staged
+ * file is scanned — a `.txt`/`.tmp` rename must not bypass the gate — and
+ * an unreadable staged blob aborts the cycle instead of being skipped.
+ *
+ * Exported for the focused tests; not part of the plugin API.
+ */
+export async function unstageSecretFiles(treeRoot: string, host: string): Promise<string[]> {
   const stagedRaw = await git(
     treeRoot,
     ['diff', '--cached', '--name-only', '-z', '--diff-filter=ACMR'],
     host,
   );
-  const staged = stagedRaw
-    .split('\0')
-    .filter((p) => p.length > 0 && p.toLowerCase().endsWith('.md'));
+  const staged = stagedRaw.split('\0').filter((p) => p.length > 0);
   if (staged.length === 0) return [];
   const headExists = await git(treeRoot, ['rev-parse', '--verify', 'HEAD'], host)
     .then(() => true)
     .catch(() => false);
   const blocked: string[] = [];
   for (const rel of staged) {
+    if (isNeverCommitPath(rel)) {
+      await unstagePath(treeRoot, rel, headExists, host);
+      continue;
+    }
     let content: string;
     try {
-      content = nodeFs.readFileSync(nodePath.join(treeRoot, rel), 'utf8');
-    } catch {
-      continue;
+      content = await git(treeRoot, ['show', `:${rel}`], host);
+    } catch (error) {
+      // Fail-closed: an unreadable staged blob must not be committed blind.
+      throw new Error(
+        `secret scan failed for ${rel}: ${(error as Error).message.slice(0, 120)}`,
+      );
     }
     if (!scanForSecrets(content).hit) continue;
     // Fail-closed: if the unstage itself fails the cycle aborts (outer
     // catch) rather than committing a credential. `restore --staged` needs
     // a HEAD to restore into the index; on an unborn branch only
     // `rm --cached` can drop the new entry.
-    if (headExists) {
-      await git(treeRoot, ['restore', '--staged', '--', rel], host);
-    } else {
-      await git(treeRoot, ['rm', '--cached', '-q', '--', rel], host);
-    }
+    await unstagePath(treeRoot, rel, headExists, host);
     blocked.push(rel);
   }
   return blocked;
@@ -240,8 +282,9 @@ function ensureGitFileLines(
 
 /**
  * Normalize a remote URL for comparison while keeping the user's configured
- * spelling intact. A port, user, case, trailing slash, or `.git` suffix does
- * not identify a different repository for the shared-memory protocol.
+ * spelling intact. User, case, trailing slash, and `.git` do not identify a
+ * different repository. Ports are stripped here on purpose (the scp form has
+ * none); `sameRemoteEndpoint` checks two explicit ports separately.
  */
 export function normalizeRemoteUrl(url: string): string {
   let normalized = url.trim();
@@ -254,10 +297,60 @@ export function normalizeRemoteUrl(url: string): string {
   return normalized.toLowerCase();
 }
 
+/** Explicit port in an ssh-style URL, or null when the spelling omits it. */
+function explicitPort(url: string): string | null {
+  const match = /^[a-z+]+:\/\/[^/]+:(\d+)\//iu.exec(url.trim());
+  return match?.[1] ?? null;
+}
+
+/**
+ * Compare two remote spellings as ENDPOINTS. The scp form carries no port,
+ * so a missing port is a wildcard; two different explicit ports are
+ * different services and must never compare equal.
+ */
+export function sameRemoteEndpoint(a: string, b: string): boolean {
+  if (normalizeRemoteUrl(a) !== normalizeRemoteUrl(b)) return false;
+  const portA = explicitPort(a);
+  const portB = explicitPort(b);
+  return portA === null || portB === null || portA === portB;
+}
+
+/** Hide userinfo so a credential-bearing URL never reaches logs or notices. */
+export function redactRemoteUrl(url: string): string {
+  const trimmed = url.trim();
+  const scp = /^([^@/]+)@([^:]+):(.+)$/u.exec(trimmed);
+  if (scp) return `***@${scp[2]}:${scp[3]}`;
+  return trimmed.replace(/^([a-z+]+:\/\/)[^@/]+@/iu, '$1***@');
+}
+
+/** Redact URL credentials anywhere in a free-form sync detail. */
+export function redactSyncDetail(detail: string): string {
+  return detail
+    .replace(/([a-z+]+:\/\/)[^@/\s]+@/giu, '$1***@')
+    .replace(/(^|[\s(])([^@\s/:]+)@([\w.-]+):/gu, '$1***@$3:');
+}
+
+/** Resolve `insteadOf` aliases the way git will actually connect. */
+async function expandRemoteUrl(
+  treeRoot: string,
+  url: string,
+  host: string,
+): Promise<string> {
+  try {
+    const expanded = (await git(treeRoot, ['ls-remote', '--get-url', url], host)).trim();
+    return expanded || url;
+  } catch {
+    return url;
+  }
+}
+
 /**
  * Initialize the repository and validate/add its origin without touching
  * worktree metadata. The separate phase lets an unborn repository first
  * adopt existing remote history without creating an unrelated root commit.
+ *
+ * The comparison is on the EXPANDED endpoint (insteadOf aliases applied) so
+ * this side and zmem cannot disagree about what the URL actually means.
  */
 async function ensureMemorySyncRemote(
   treeRoot: string,
@@ -272,12 +365,30 @@ async function ensureMemorySyncRemote(
     await git(treeRoot, ['remote', 'add', 'origin', remoteUrl], host);
     return null;
   }
-  // Read the configured value, not `remote get-url`: the latter expands
-  // `insteadOf` aliases and cannot prove we preserved the user's spelling.
+  // Keep the stored spelling; compare what git will actually connect to.
   const current = (await git(treeRoot, ['config', '--get', 'remote.origin.url'], host)).trim();
-  if (normalizeRemoteUrl(current) !== normalizeRemoteUrl(remoteUrl)) {
-    return `origin points at ${current} but config says ${remoteUrl}; refusing to re-point. ` +
-      `To migrate on purpose: git -C ${treeRoot} remote set-url origin ${remoteUrl}`;
+  const expandedCurrent = await expandRemoteUrl(treeRoot, current, host);
+  const expandedConfigured = await expandRemoteUrl(treeRoot, remoteUrl, host);
+  if (!sameRemoteEndpoint(expandedCurrent, expandedConfigured)) {
+    return `origin points at ${redactRemoteUrl(current)} (resolves to ${redactRemoteUrl(expandedCurrent)}) ` +
+      `but config says ${redactRemoteUrl(remoteUrl)} (resolves to ${redactRemoteUrl(expandedConfigured)}); ` +
+      `refusing to re-point. To migrate on purpose: git -C ${treeRoot} remote set-url origin ${redactRemoteUrl(remoteUrl)}`;
+  }
+  // A matching fetch URL must not hide a different push destination.
+  const allUrls = await git(treeRoot, ['config', '--get-all', 'remote.origin.url'], host)
+    .catch(() => '');
+  const pushUrls = await git(treeRoot, ['config', '--get-all', 'remote.origin.pushurl'], host)
+    .catch(() => '');
+  const endpoints = [...allUrls.split(/\r?\n/), ...pushUrls.split(/\r?\n/)]
+    .map((value) => value.trim())
+    .filter(Boolean);
+  for (const endpoint of endpoints) {
+    const expanded = await expandRemoteUrl(treeRoot, endpoint, host);
+    if (!sameRemoteEndpoint(expanded, expandedConfigured)) {
+      return `origin has an additional endpoint ${redactRemoteUrl(endpoint)} ` +
+        `(resolves to ${redactRemoteUrl(expanded)}) that differs from config ` +
+        `${redactRemoteUrl(remoteUrl)}; refusing to sync through an unexpected destination`;
+    }
   }
   return null;
 }
@@ -337,7 +448,11 @@ async function mergeMemorySyncRemote(
   if (Number.parseInt(behind.trim(), 10) === 0) return { pulled: false };
   let mergeOut: string;
   try {
-    mergeOut = await git(treeRoot, ['merge', '--autostash', '--no-edit', 'origin/main'], host);
+    mergeOut = await git(
+      treeRoot,
+      ['merge', '--autostash', '--no-edit', '--no-overwrite-ignore', 'origin/main'],
+      host,
+    );
   } catch (error) {
     await git(treeRoot, ['merge', '--abort'], host).catch(() => undefined);
     throw new Error(`merge: ${(error as Error).message}`);
@@ -354,6 +469,13 @@ async function mergeMemorySyncRemote(
 /** Append one gitignored, local-only result for post-mortem visibility. */
 async function appendSyncTrace(treeRoot: string, result: MemorySyncResult, host: string): Promise<void> {
   try {
+    // Never mutate a diagnostic file that is already tracked: `.gitignore`
+    // does not protect tracked paths, and `add -A` would carry it to the
+    // remote on the next cycle.
+    const tracked = await git(treeRoot, ['ls-files', '--error-unmatch', '--', 'metrics.jsonl'], host)
+      .then(() => true)
+      .catch(() => false);
+    if (tracked) return;
     // Origin refusal happens before worktree metadata may be completed. Keep
     // its trace local even when .gitignore does not exist, without staging or
     // changing that file (or the user's index) on a refused cycle.
@@ -372,7 +494,7 @@ async function appendSyncTrace(treeRoot: string, result: MemorySyncResult, host:
         pulled: result.pulled,
         pushed: result.pushed,
         blockedSecrets: result.blockedSecrets ?? [],
-        detail: result.detail ?? null,
+        detail: result.detail ? redactSyncDetail(result.detail) : null,
       })}\n`,
       'utf8',
     );
@@ -420,7 +542,7 @@ async function runMemorySyncCycle(
   const failure = (detail: string): MemorySyncResult => ({
     ok: false, committed, pulled, pushed,
     ...(blockedSecrets.length > 0 ? { blockedSecrets } : {}),
-    detail,
+    detail: redactSyncDetail(detail),
   });
   try {
     // Refuse before metadata writes or staging: another plugin must never
