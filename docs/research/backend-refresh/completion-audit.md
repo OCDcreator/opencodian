@@ -55,7 +55,7 @@ this directory. Each disposition describes only the demonstrated scope.
 | OpenCode 2 | Client/CLI/native server **2.2.6** | `aux-audit-final-opencode2-226.json` **10/10**, text `magpie/opencode-go-gw/deepseek-v4.1-flash`, image `magpie/kimi-code/k3.1-pro`, exit 0, active auxiliary-directory residue `[]`. Earlier server-2.2.5 report remains historical |
 | Pi | Official CLI **1.5.0** | `aux-audit-final-cpi.json` Pi **8/8**, recorded selection `deepseek/deepseek-flash`; SDK anchor checks intact |
 | ZCode | Desktop **3.17.2**, handshake-based native runtime | `aux-audit-final-zcode-verifier-fix.json` **12/12** after proof/verifier fixes; selection `kimi-for-coding/kimi-for-coding-highspeed`, reasoning enabled; this is not the Kimi review route |
-| DSH | CLI **0.2.2-rc.1** | `aux-audit-dsh-real.json` **8/8** after launcher compatibility fix; native readback `deepseek-official/deepseek-flash`, reasoning off |
+| DSH | CLI **0.2.2-rc.1** | `aux-audit-dsh-real.json` **8/8** after launcher compatibility fix (macOS/POSIX host; Windows managed-profile writes fail closed — see the 2026-11-11 qualification below); native readback `deepseek-official/deepseek-flash`, reasoning off |
 
 All audit JSONs above live in `.tmp/backend-refresh-api/`. Registry currency is the 2026-11-06/07
 research snapshot. No blanket claim is made that every later upstream release, every model, all runtime
@@ -131,7 +131,7 @@ Known bounds, rather than unrecorded passes:
 - Nine-Tab focus and sampled contrast do not establish every keyboard path or full accessibility compliance.
 - Codex narrow image shows model loading; it proves that state layout only. Special captures may omit a
   middle band on content exceeding two viewport heights.
-- Cross-platform behavior and Windows ACL equivalence were not validated by the macOS/POSIX evidence.
+- Cross-platform behavior and Windows ACL equivalence were not validated by the macOS/POSIX evidence; a later CI Windows run has since demonstrated this concretely for DSH managed-profile writes (fail-closed, not parity — see the 2026-11-11 qualification below).
 - CodeGraph task index is uninitialized; post-edit affected evidence is unavailable, not passed. Graphify
   is a distinct gate and did pass. No caller/blast-radius figures are fabricated.
 
@@ -140,3 +140,31 @@ explicitly recorded OC2 audit supplement, safe cleanup and final packaging check
 tests, package files, assets, styles and the original checkout stayed unchanged after 0229. No commit,
 push, release, new product build/full-test run, detector run or GUI control accompanied this closeout.
 Final git state and archive identity are recorded separately in the delivery artifacts.
+
+## DSH managed-profile platform qualification (2026-11-11)
+
+All findings, verdicts and bounds recorded above stand unchanged; this section only qualifies their
+platform coverage after CI Windows exposed actual runtime evidence the macOS/POSIX passes did not cover.
+`assets/dsh/control.mjs` `managedProfileProof` (owned() checks, lines 79-102) applies its POSIX-style
+mode predicate unconditionally — `(stat.mode & 0o022) === 0`, with no win32 branch — while the uid check
+participates only when `process.getuid` exists; Windows `stat.mode` is synthesized, and the currently
+supported path — a launcher-created writable managed profile (default permissions, complete marker,
+canonical, non-symlink fixture) — reports synthesized writable bits there, so that path's proof fails
+closed; manually applied ACL/readonly combinations were not exhaustively verified, and no broader
+guarantee is claimed. `assets/dsh/launcher.mjs`
+(mode guard in `ownedPath`/`privateFile`, lines 23/41) explicitly exempts win32, producing a
+launcher/control asymmetry; no Windows ACL replacement exists or is delivered as part of this work.
+Consequences, all intentional fail-closed current behavior: `config/describe` reports
+`profile.managed=false`; `profile.writable` is raw native-service metadata (`service.writable === true`,
+control.mjs line 518), independent of the proof — it can still read true on Windows and is not permission
+to mutate; effective admission stays closed with every form's `writable=false` and
+`extensionSettings.mutate=false`; `control/capabilities` disables `extensions.managedProfile`
+and every write action (enablePlugin/enableBundle/install/update/remove/cancel/exempt) plus
+`extensionSettings.mutate`; the isolated persistent terminal registry binding refuses adoption when the
+proof fails (the direct terminal provider is a separate resolution path and stays available); read-only
+`config/describe` and extensions `list`/`inspect`/`versions` remain usable; `SettingsDshExtensionSettings`
+hides edit controls unless positive capability, writable, managed-profile persistence source and a
+revision are all present. DSH managed-profile, extension-write and isolated-terminal claims in this audit
+and in [backend-fields-dsh.md](backend-fields-dsh.md) are therefore POSIX-scoped; no Windows parity is
+claimed and no ACL-equivalent fix is invented. Tests are being aligned to assert the Windows negative
+surface plus POSIX positive cases; production security is not being weakened to green CI.

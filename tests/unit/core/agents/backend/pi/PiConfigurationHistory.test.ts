@@ -10,7 +10,10 @@ it('persists bounded configuration history across reload with CAS restore, secre
   // CI exports NODE_OPTIONS=--test-reporter=tap; the child must not inherit a second reporter.
   env: { ...process.env, NODE_OPTIONS: '' } });
   expect(output).toContain('# fail 0');
-  expect(output).toContain('# pass 7');
+  // The POSIX-only symlink-confinement subtest (PiConfigurationHistory.test.mjs
+  // `if (POSIX)`) never registers on Windows, so the positive count is asserted
+  // against the platform-actual suite size; zero failures holds everywhere.
+  expect(output).toContain(process.platform === 'win32' ? '# pass 6' : '# pass 7');
 }, 60000);
 
 it('transport advertises the optional history commands for feature detection (PI history)', () => {

@@ -222,11 +222,16 @@ describe('OpenCode 2 saved configuration recovery', () => {
     expect(store.read(identity, RECOVERY_KEY, entries[0].index)?.raw).toBe(PREVIOUS); // byte-identical, comments included
 
     const directory = join(base, identity);
-    expect(statSync(directory).mode & 0o777).toBe(0o700);
     const slotFiles = readdirSync(directory).filter((name) => name.endsWith('.json'));
     expect(slotFiles).toHaveLength(1);
-    expect(statSync(join(directory, slotFiles[0])).mode & 0o777).toBe(0o600);
-    expect(readFileSync(join(directory, slotFiles[0]), 'utf8')).toContain(SECRET); // secret lives only in the machine-local archive
+    const slotPath = join(directory, slotFiles[0]);
+    expect(readFileSync(slotPath, 'utf8')).toContain(SECRET); // secret lives only in the machine-local archive
+    // POSIX asserts its real least-privilege bits (0o700/0o600). Windows has no
+    // POSIX mode bits: Node emulates 0o666 for writable entries there (CI proof:
+    // directory reported 438), so each platform asserts its own actual state.
+    const posix = process.platform !== 'win32';
+    expect(statSync(directory).mode & 0o777).toBe(posix ? 0o700 : 0o666);
+    expect(statSync(slotPath).mode & 0o777).toBe(posix ? 0o600 : 0o666);
   });
 
   it('restores a previous saved version through the section UI on a remounted host and archives the displaced state', async () => {

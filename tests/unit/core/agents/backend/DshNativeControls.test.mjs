@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync } from 'node:fs';
+import { lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync, symlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { createControlRuntime, managedProfileProof, mcpClientConfig } from '../../../../../assets/dsh/control.mjs';
 
 const root = fileURLToPath(new URL('../../../../../', import.meta.url));
 const fixtureRoot = path.join(root, '.impeccable', 'dsh-control-test-fixtures');
+const posixProofSkip = process.platform === 'win32' && 'Managed profile proof requires POSIX mode bits; Windows has no ACL proof';
 mkdirSync(fixtureRoot, { recursive: true, mode: 0o700 });
 // Deliberately retained: this repository forbids test cleanup by deletion.
 function profile() {
@@ -166,7 +167,7 @@ test('configuration describes native redacted forms without reading raw document
   assert.equal(value.forms[0].valueSource, 'effective'); assert.equal(value.forms[0].baseSource, 'resolved');
   assert.equal(value.forms[0].writable, false);
   assert.deepEqual(value.forms[0].value, { timeout: 12, apiKeyEnv: 'DSH_KEY' });
-  assert.deepEqual(value.profile, { managed: true, writable: true, hasDocument: true });
+  assert.deepEqual(value.profile, { managed: process.platform !== 'win32', writable: true, hasDocument: true });
   assert.equal(JSON.stringify(value).includes('SECRET'), false);
   assert.equal(JSON.stringify(value).includes(p.profileContext.dir), false);
   await f.runtime.dispose();
@@ -189,7 +190,7 @@ function extensionMutationFixture(before, after) {
     } }, p.config);
 }
 
-test('extension unset refuses a stale user override and unrelated concurrent revision even when effective matches', async () => {
+test('extension unset refuses a stale user override and unrelated concurrent revision even when effective matches', { skip: posixProofSkip }, async () => {
   const before = { revision: 4, value: { label: 'override', inherited: 'override', sibling: 'keep' },
     base: { inherited: 'fallback' }, user: { label: 'override', inherited: 'override', sibling: 'keep' } };
   for (const after of [
@@ -206,7 +207,7 @@ test('extension unset refuses a stale user override and unrelated concurrent rev
   }
 });
 
-test('extension unset verifies removed user override against inherited effective fallback and whole snapshot', async () => {
+test('extension unset verifies removed user override against inherited effective fallback and whole snapshot', { skip: posixProofSkip }, async () => {
   const before = { revision: 4, value: { inherited: 'override', sibling: 'keep' }, base: { inherited: 'fallback' }, user: { inherited: 'override', sibling: 'keep' } };
   for (const [after, status] of [
     [{ revision: 5, value: { inherited: 'fallback', sibling: 'keep' }, base: before.base, user: { sibling: 'keep' } }, 'verified'],
@@ -222,7 +223,7 @@ test('extension unset verifies removed user override against inherited effective
   }
 });
 
-test('extension array index edits preserve native array containers and inherited siblings', async () => {
+test('extension array index edits preserve native array containers and inherited siblings', { skip: posixProofSkip }, async () => {
   const before = { revision: 4, value: { items: ['base-a', 'base-b'], sibling: 'inherited', group: { items: ['nested-a', 'nested-b'], sibling: 'nested-inherited' } },
     base: { items: ['base-a', 'base-b'], sibling: 'inherited', group: { items: ['nested-a', 'nested-b'], sibling: 'nested-inherited' } }, user: {} };
   const cases = [
@@ -279,7 +280,7 @@ test('live capability readback observes service composition changes instead of r
   await f.runtime.dispose();
 });
 
-test('extension persistence acknowledgement survives unavailable readback without claiming application', async () => {
+test('extension persistence acknowledgement survives unavailable readback without claiming application', { skip: posixProofSkip }, async () => {
   const before = { revision: 4, value: { label: 'override' }, base: {}, user: { label: 'override' } };
   const f = extensionMutationFixture(before, { revision: 5, value: {}, base: {}, user: {} });
   const describe = f.services.settings.describe;
@@ -458,7 +459,7 @@ test('terminal operations use exact Agent identity, typed native observations, a
   await f.runtime.dispose();
 });
 
-test('isolated terminal resolution requires the official active loader group and class, and fences remounts', async () => {
+test('isolated terminal resolution requires the official active loader group and class, and fences remounts', { skip: posixProofSkip }, async () => {
   const p = profile();
   class NativeTerminals {
     listBackends() { return ['fixture']; }
@@ -527,30 +528,132 @@ test('subagent inactive activity requires a matched native released epoch and is
   await f.runtime.dispose();
 });
 
-test('managed profile proof rejects missing marker, symlink dependency directory, and symlink mutable files', () => {
+test('managed profile proof rejects missing configuration and a missing marker', () => {
   const p = profile();
   const ctx = { get: () => p.profileContext };
-  assert.equal(managedProfileProof(ctx, p.config), true);
+  assert.equal(managedProfileProof(ctx, p.config), process.platform !== 'win32');
   assert.equal(managedProfileProof(ctx, {}), false);
   const missing = mkdtempSync(path.join(fixtureRoot, 'missing-'));
   mkdirSync(path.join(missing, 'node_modules'), { mode: 0o700 });
   assert.equal(managedProfileProof({ get: () => ({ dir: missing, patchPath: path.join(missing, 'cordis.patch.yml') }) }, { managedProfileRoot: missing }), false);
+});
+
+test('managed profile proof rejects symlink dependency directories and mutable files', { skip: posixProofSkip }, () => {
+  const p = profile();
+  const ctx = { get: () => p.profileContext };
+  assert.equal(managedProfileProof(ctx, p.config), true);
   const link = mkdtempSync(path.join(fixtureRoot, 'linked-'));
+  writeFileSync(path.join(link, '.opencodian-dsh-profile.json'), readFileSync(path.join(p.profileContext.dir, '.opencodian-dsh-profile.json')), { mode: 0o600 });
   symlinkSync(path.join(p.profileContext.dir, 'node_modules'), path.join(link, 'node_modules'), 'dir');
   assert.equal(managedProfileProof({ get: () => ({ dir: link, patchPath: path.join(link, 'cordis.patch.yml') }) }, { managedProfileRoot: link }), false);
   symlinkSync(path.join(p.profileContext.dir, '.opencodian-dsh-profile.json'), path.join(p.profileContext.dir, 'package.json'));
   assert.equal(managedProfileProof(ctx, p.config), false);
 });
 
-test('extension writes require proof, preserve builtins and reserved dependencies, and demand explicit exemption acceptance', async () => {
+test('Windows synthetic mode bits keep managed extension writes and isolated terminal binding unavailable',
+  { skip: process.platform !== 'win32' && 'Windows synthetic mode contract requires Windows' }, async (t) => {
+    const p = profile();
+    const dir = realpathSync(p.profileContext.dir);
+    p.profileContext.dir = dir;
+    p.profileContext.patchPath = path.join(dir, 'cordis.patch.yml');
+    p.config.managedProfileRoot = dir;
+    const markerPath = path.join(dir, '.opencodian-dsh-profile.json');
+    const marker = readFileSync(markerPath);
+    assert.deepEqual(JSON.parse(marker), { version: 1, owner: 'opencodian.dsh', vaultHash: 'a'.repeat(64), profile: 'sdk' });
+    assert.equal(path.resolve(dir), dir);
+    for (const [target, kind] of [[dir, 'isDirectory'], [path.join(dir, 'node_modules'), 'isDirectory'], [markerPath, 'isFile']]) {
+      const stat = lstatSync(target);
+      assert.equal(stat.isSymbolicLink(), false); assert.equal(stat[kind](), true);
+    }
+    assert.notEqual(lstatSync(dir).mode & 0o022, 0);
+    assert.equal(managedProfileProof({ get: () => p.profileContext }, p.config), false);
+    const originalEntries = readdirSync(dir).sort();
+
+    const writes = []; const terminalCalls = [];
+    const entry = { id: 'include:sample-extension', options: { id: 'sample-extension', name: 'sample-extension' },
+      fiber: { state: 2, runtime: { Config: { type: 'object', meta: {}, dict: {
+        label: { type: 'string', meta: { volatile: true } },
+      }, toJSON: () => ({}) } } } };
+    const settings = { writable: true, documentPath: p.profileContext.patchPath,
+      describe: () => [{ ns: 'sample-extension', schema: {}, revision: 1, value: { label: 'before' }, base: {}, user: {}, secrets: [] }],
+      mutate: () => { writes.push('settings.mutate'); } };
+    const pluginManager = { listPlugins: async () => [{ entryId: entry.id }], listBundles: async () => [],
+      inspect: async () => ({}), listVersions: async () => [],
+      ...Object.fromEntries(['setPluginEnabled', 'setBundleEnabled', 'installBundle', 'updateBundle', 'removeBundle', 'cancelInstall', 'setVersionExemption']
+        .map((method) => [method, () => { writes.push(method); }])) };
+    class WindowsTerminalFixture {
+      listBackends() { terminalCalls.push('listBackends'); return ['fixture']; }
+      list() { terminalCalls.push('list'); return []; }
+      hasOwnerActivity() { terminalCalls.push('hasOwnerActivity'); return false; }
+      spawn() { terminalCalls.push('spawn'); }
+    }
+    const terminal = new WindowsTerminalFixture(); const agents = {};
+    const group = { options: { id: 'optional-persistent-terminals', group: true, isolate: { terminals: true } }, fiber: { state: 2 } };
+    const parent = { ctx: { fiber: { entry: group } } }; group.subgroup = parent;
+    const terminalEntry = { options: { id: 'optional-terminal-registry', name: '@deepseek-ai/dsh-terminal' },
+      moduleNamespace: { default: WindowsTerminalFixture }, fiber: { state: 2, runtime: { callback: WindowsTerminalFixture } }, parent,
+      context: { get: (name) => name === 'terminals' ? terminal : name === 'agents' ? agents : name === 'profileContext' ? p.profileContext : undefined } };
+    const f = fixture({ profileContext: p.profileContext, settings, pluginManager, agents,
+      configEditor: { documentPath: p.profileContext.patchPath, entries: () => [entry] },
+      loader: { entries: () => [group, terminalEntry] } }, p.config, { terminalServiceClass: WindowsTerminalFixture });
+    t.after(() => f.runtime.dispose());
+
+    const caps = f.runtime.capabilities();
+    assert.equal(caps.configurationCapabilities.describe, true);
+    assert.deepEqual(caps.configurationCapabilities.extensionSettings, { mutate: false });
+    const extensions = caps.configurationCapabilities.extensions;
+    assert.equal(extensions.list, true); assert.equal(extensions.inspect, true); assert.equal(extensions.versions, true);
+    for (const key of ['managedProfile', 'enablePlugin', 'enableBundle', 'install', 'update', 'remove', 'cancel', 'exempt', 'progress'])
+      assert.equal(extensions[key], false, key);
+    const described = await f.rpc('config/describe', { namespaces: ['sample-extension'] });
+    assert.deepEqual(described.profile, { managed: false, writable: true, hasDocument: true });
+    assert.equal(described.forms[0].writable, false);
+    settings.writable = false;
+    const readOnly = await f.rpc('config/describe', { namespaces: ['sample-extension'] });
+    assert.deepEqual(readOnly.profile, { managed: false, writable: false, hasDocument: true });
+    assert.equal(readOnly.forms[0].writable, false);
+    settings.writable = true;
+    assert.equal((await f.rpc('config/extensions', { action: 'list' })).managed, false);
+    await assert.rejects(f.rpc('config/extension-settings', { action: 'mutate', ns: 'sample-extension', expectedRevision: 1,
+      ops: [{ op: 'set', path: ['label'], value: 'after' }] }), /unavailable or protected/);
+    for (const params of [
+      { action: 'enable-plugin', id: 'custom', enabled: true },
+      { action: 'enable-plugin', id: 'builtin', enabled: false },
+      { action: 'enable-bundle', name: 'custom', enabled: true },
+      { action: 'install', spec: 'custom-package', operationId: 'owned-op' },
+      { action: 'update', name: 'custom', version: '1.0.0' },
+      { action: 'remove', name: 'custom' },
+      { action: 'remove', name: '@opencodian/dsh-inherited-profile' },
+      { action: 'cancel', operationId: 'owned-op' },
+      { action: 'exempt', packageVersion: 'custom@1.0.0', runtimeVersion: '0.2.2', enabled: true },
+      { action: 'exempt', packageVersion: 'custom@1.0.0', runtimeVersion: '0.2.2', enabled: true, acceptRisk: true },
+    ]) await assert.rejects(f.rpc('config/extensions', params), /owned managed profile/);
+
+    const isolated = (await f.rpc('control/capabilities', {})).controlCapabilities.terminal;
+    assert.equal(isolated.present, true);
+    for (const key of ['availability', 'list', 'activity', 'spawn', 'read', 'send', 'signal', 'kill']) assert.equal(isolated[key], false, key);
+    assert.deepEqual(await f.rpc('session/terminal', { sessionId: 'parent', action: 'availability' }), { available: false, backends: [] });
+    await assert.rejects(f.rpc('session/terminal', { sessionId: 'parent', action: 'list' }), /unavailable/);
+    await assert.rejects(f.rpc('session/terminal', { sessionId: 'parent', action: 'spawn', type: 'fixture' }), /backend is unavailable/);
+    assert.deepEqual(writes, []); assert.deepEqual(terminalCalls, []); assert.deepEqual(f.notifications, []);
+    assert.deepEqual(readdirSync(dir).sort(), originalEntries);
+    assert.deepEqual(readdirSync(path.join(dir, 'node_modules')), []);
+    assert.deepEqual(readFileSync(markerPath), marker);
+  });
+
+test('extension writes reject an unproven profile before invoking the native manager', async () => {
+  let calls = 0;
+  const f = fixture({ pluginManager: { setPluginEnabled: async () => { calls++; } } });
+  await assert.rejects(f.rpc('config/extensions', { action: 'enable-plugin', id: 'custom', enabled: false }), /owned managed profile/);
+  assert.equal(calls, 0); await f.runtime.dispose();
+});
+
+test('proven extension writes preserve protected dependencies and demand explicit exemption acceptance', { skip: posixProofSkip }, async () => {
   let calls = 0;
   const manager = { async listPlugins() { return [{ entryId: 'builtin', readOnlyReason: 'management-required' },
     { entryId: 'tools-alias', moduleName: '@deepseek-ai/dsh-tools' }, { entryId: 'hmr-alias', moduleName: '@deepseek-ai/dsh-hmr' }]; },
     async listBundles() { return [{ name: 'builtin', removable: false, updatable: false }]; },
     async setPluginEnabled() { calls++; }, async removeBundle() { calls++; }, async setVersionExemption() { calls++; return { changed: true, application: 'applied' }; } };
-  const f = fixture({ pluginManager: manager });
-  await assert.rejects(f.rpc('config/extensions', { action: 'enable-plugin', id: 'custom', enabled: false }), /owned managed profile/);
-  assert.equal(calls, 0); await f.runtime.dispose();
   const p = profile();
   const g = fixture({ pluginManager: manager, profileContext: p.profileContext }, p.config);
   await assert.rejects(g.rpc('config/extensions', { action: 'enable-plugin', id: 'builtin', enabled: false }), /protected/);
@@ -565,7 +668,7 @@ test('extension writes require proof, preserve builtins and reserved dependencie
   await g.runtime.dispose();
 });
 
-test('extension progress belongs to admitted operations, redacts split logs, tracks cancellation and bounds output', async () => {
+test('extension progress belongs to admitted operations, redacts split logs, tracks cancellation and bounds output', { skip: posixProofSkip }, async () => {
   const p = profile();
   let finish;
   const f = fixture({ profileContext: p.profileContext, pluginManager: {
