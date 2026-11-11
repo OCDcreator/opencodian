@@ -109,7 +109,7 @@ Pi runtime is delegated to [core.backend-pi](core-backend-pi.md). This owner ret
 
 ## 2026-09-27 OpenCode 2 compatibility
 
-OpenCode2Adapter owns the separate OpenCode 2 CLI/client protocol, session lifecycle, event mapping, and native approvals/forms.
+OpenCode2Adapter owns the separate OpenCode 2 CLI/client protocol, session lifecycle, event mapping, and native approvals/forms. Its local launch boundary resolves explicit executable paths or searches inherited PATH plus standard V2 installation directories when a GUI host has a minimal environment. Discovery and child PATH do not mutate the renderer environment; auxiliary HOME/XDG isolation remains authoritative. Windows npm discovery uses the native binary, and automatic selection never falls back to the retired `opencode` command. Remote mode bypasses local executable lookup.
 
 ## 2026-10-05 Codex 消息前分支与恢复
 

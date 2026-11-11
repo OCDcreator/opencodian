@@ -164,7 +164,7 @@ function applyButton(container: HTMLElement): HTMLButtonElement {
 }
 
 function applyDraftFrom(container: HTMLElement): void {
-  edit(container, '[data-config-path="compaction.auto"] select', 'false');
+  edit(container, '[data-config-path="experimental.subagent_depth"] input', '2');
   applyButton(container).click();
 }
 
@@ -362,7 +362,7 @@ describe('OpenCode 2 recovery failure semantics and isolation', () => {
     expect(host.saveSettings).toHaveBeenCalledTimes(1); // the configuration itself was persisted
     const applied = host.settings.backendSettings.opencode2.configContent;
     expect(applied).not.toBe(PREVIOUS); // the new value stays in memory, not rolled back
-    expect(applied).toContain('"auto": false');
+    expect(applied).toContain('"subagent_depth": 2');
     const status = advanced.querySelector('.opencodian-opencode2-save-status')?.textContent ?? '';
     expect(status).toContain(t('settings.opencode2.workspace.applied')); // the apply itself succeeded
     expect(status).toContain(t('settings.backend.recovery.historyUnavailable')); // saved, but the backup failed
@@ -418,7 +418,7 @@ describe('OpenCode 2 recovery failure semantics and isolation', () => {
     applyDraftFrom(advanced);
     await settle();
     const applied = first.host.settings.backendSettings.opencode2.configContent;
-    expect(applied).toContain('"auto": false');
+    expect(applied).toContain('"subagent_depth": 2');
 
     const store = storeFor(base);
     expect(store.list(identity, RECOVERY_KEY)).toHaveLength(1);

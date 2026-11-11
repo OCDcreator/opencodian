@@ -1,5 +1,7 @@
 # Owner: shared.i18n
 
+2026-11-11（OpenCode 2 设置工作区）：双语工作区文案从六页扩为九页（连接/模型与服务商/智能体/权限/上下文/工具/MCP/配置与扩展/高级）：新增 `tab.tools`/`tab.configuration`，收紧 connection/permissions/mcp/advanced 标签，`intro.context` 对齐已批准原型并新增 `intro.tools`/`intro.configuration`；围绕条目集合、字段来源状态与校验、模型与预留空间、预热、JSON 合并、权限规则、键值条目、MCP 连接提示等新增并改写一批 `settings.opencode2.workspace.*` 键（数量随评审修订持续增长，以 locale 文件为准），旧键全部保留。评审修订后的关键文案边界：覆盖状态明确为「当前库覆盖」（区别于远程服务语境的「服务」），草稿预览为「查看当前库覆盖草稿」；预热文案区分 OpenCode 原生预热（发真实模型请求、消耗 token/费用/速率配额）与插件设置里的会话预热选项（相互独立）；否定布尔键用「隐藏/显示」「停用/启用」语义选项并配专属说明（隐藏 ≠ 停用）；预留空间文案与原生值域一致（百分比 1–99 可小数、Token 非负整数）；MCP 传输方式必填（未声明为 "Not set" 占位）、引用字符串速记说明编辑保持该形态、来源/忽略列表按行编辑（复杂结构留高级 JSON）、工具页有「前往权限设置」快捷入口文案。继承类文案只描述配置语义，不声称运行时已确认值；翻译层只提供名称/状态/动作文案，不判断目录真值或保存结果。中英文键集合与插值占位符保持一致。
+
 2026-11-11（工作台层级与工具反馈）：双语区分“待办计划”、独立 Plan 模式、“工作区终端”与原生“会话终端”；文件变更使用直接入口，命令与技能使用可搜索内联目录，相关设置单独命名。补齐终端启动／退出／失败、仓库不可用／非仓库／读取失败、差异、浏览器加载及截图条件、目录加载／空列表／无匹配／失败文案。浏览器文案按参考稿 `session-workbench-secondary-v2.html` 修正：附加页面改用专用短键 `workbench.browser.attachPage`（附加页面 / Attach page），不再复用全局 attach 标签；新增平静空态说明 `workbench.browser.emptyDescription` 与 `loading`/`captureWait`/`captureFailed`，与进错误区的 `invalidUrl`、`openFallback` 分开；`workbench.browser.external`（在 Obsidian 中打开）保留为仅图标操作的可访问名。翻译层不推断能力、任务终态或权威文件计数；两侧键名与插值保持一致，旧目录键保留以兼容现有消费方。
 
 2026-11-10（DSH 官方权限名称）：新增 `chat.dsh.permission.*` 四项双语名称，仅供共享权限菜单展示内置预设。自动审查文案不代表后端已启用实验扩展；可用项与选中值由原生目录和会话状态决定，custom host 名称保留。
@@ -163,3 +165,7 @@ English and Chinese copy describe executable snapshot/restart boundaries and exp
 六后端标题与重试说明保持双语一致，轻量选模不声称价格或原生 AI 来源。
 
 2026-11-03：ZCode API 服务数量摘要、查看模型和带服务名的可访问标签保持双语一致；认证文案继续只对应原生支持的 required / failed / unknown。
+
+## 2026-11-11 OpenCode 2 设置工作区文案
+
+中英文同步补齐 `settings.opencode2.workspace.*` 文案：九页工作区标签与简介、条目集合状态、字段继承状态与校验、模型与预留空间、预热、JSON 合并、权限规则、键值条目、MCP 连接提示、配置来源三态、否定式开关专属标签、引用摘要与草稿入口；`override` 改为“当前库覆盖”，`bufferInvalid` 按官方 Schema 表述，`warmingCost` 说明与插件会话预热选项相互独立。二轮评审后新增 `collectionNoDescription`（zh “尚未填写用途” / en “No description yet”），作为无 description 条目的列表摘要通用回退，不再以运行目录冒充描述。仅为文案层同步，不含运行时验收结论。
