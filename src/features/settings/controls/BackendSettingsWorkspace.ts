@@ -267,3 +267,17 @@ export function renderBackendTaskHeading(container: HTMLElement, taskLabel?: str
   const missing = container.querySelector(':scope > [data-backend-installation]');
   if (missing) container.insertBefore(header, missing);
 }
+
+export function finalizeBackendTaskWorkspace(container: HTMLElement, secondaryTabId: string): void {
+  if (!container.classList.contains('opencodian-backend-task-workspace')) return;
+  const recovery = container.querySelector(':scope > .opencodian-backend-workspace-bar');
+  if (recovery) {
+    if (secondaryTabId === 'connection' || secondaryTabId === 'installation') container.append(recovery);
+    else recovery.remove();
+  }
+  const taskLabel = container.querySelector(':scope > .opencodian-backend-task-header > .opencodian-backend-task-title')?.textContent?.trim();
+  if (!taskLabel) return;
+  for (const heading of container.querySelectorAll<HTMLElement>('h3, h4')) {
+    if (heading.textContent?.trim() === taskLabel) heading.remove();
+  }
+}

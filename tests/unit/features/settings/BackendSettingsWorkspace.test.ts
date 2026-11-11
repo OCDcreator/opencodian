@@ -1,6 +1,7 @@
 import { getDefaultBackendSettings, type OpenCodianSettings } from '../../../../src/core/types/settings';
 import {
   captureBackendRecoveryPoint,
+  finalizeBackendTaskWorkspace,
   readBackendRecoveryPoint,
   renderBackendSettingsWorkspace,
   renderBackendTaskHeading,
@@ -153,6 +154,56 @@ it('scopes the DSH A task layout and heading to the four refactored backends onl
     expect(container.classList.contains('opencodian-backend-task-workspace')).toBe(false);
     expect(container.querySelector('.opencodian-backend-task-title')).toBeNull();
   }
+});
+
+it.each([
+  ['claude-code', 'conversation', 'connection'],
+  ['codex', 'conversation', 'connection'],
+  ['pi', 'model', 'connection'],
+  ['zcode', 'chat', 'installation'],
+] as const)('puts %s recovery after its connection content and starts other tasks with their title', (backend, task, connection) => {
+  const host = fixture();
+  for (const [taskId, hasRecovery] of [[task, false], [connection, true]] as const) {
+    const container = document.body.createDiv();
+    renderBackendSettingsWorkspace(container, backend, host, jest.fn());
+    const bar = container.querySelector('.opencodian-backend-workspace-bar')!;
+    renderBackendTaskHeading(container, 'Task title');
+    const section = container.createDiv({ cls: 'backend-section-content' });
+    section.createEl('h3', { text: 'Task title' });
+    section.createEl('h4', { text: 'Task title' });
+    section.createEl('h4', { text: 'Distinct field group' });
+
+    finalizeBackendTaskWorkspace(container, taskId);
+
+    expect(container.classList.contains('opencodian-backend-task-workspace')).toBe(true);
+    expect(container.firstElementChild).toBe(container.querySelector('.opencodian-backend-task-header'));
+    expect(container.querySelector('.backend-section-content > h4')?.textContent).toBe('Distinct field group');
+    expect(Array.from(container.querySelectorAll('h3, h4')).filter(heading => heading.textContent === 'Task title')).toHaveLength(0);
+    expect(container.querySelector('.opencodian-backend-workspace-bar')).toBe(hasRecovery ? bar : null);
+    expect(container.lastElementChild === bar).toBe(hasRecovery);
+  }
+});
+
+it('preserves classic headings and the OpenCode 2 / DSH workspace chrome', () => {
+  const host = fixture();
+  for (const backend of ['opencode2', 'dsh'] as const) {
+    const container = document.body.createDiv();
+    renderBackendSettingsWorkspace(container, backend, host, jest.fn());
+    const bar = container.querySelector('.opencodian-backend-workspace-bar');
+    const content = container.createDiv();
+    content.createEl('h3', { text: 'Task title' });
+    content.createEl('h4', { text: 'Task title' });
+    finalizeBackendTaskWorkspace(container, 'conversation');
+    expect(container.firstElementChild).toBe(bar);
+    expect(content.querySelectorAll('h3, h4')).toHaveLength(2);
+  }
+
+  const classic = document.body.createDiv();
+  renderBackendSettingsWorkspace(classic, 'pi', host, jest.fn());
+  classic.createDiv().createEl('h3', { text: 'Classic task title' });
+  finalizeBackendTaskWorkspace(classic, 'model');
+  expect(classic.classList.contains('opencodian-backend-task-workspace')).toBe(true);
+  expect(classic.querySelector('h3')?.textContent).toBe('Classic task title');
 });
 
 describe('DSH connection backup component', () => {

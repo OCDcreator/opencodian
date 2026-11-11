@@ -12,6 +12,7 @@ import { SettingsOpenCode2Section } from '../../../../src/features/settings/back
 import { SettingsCommandsSection } from '../../../../src/features/settings/backends/opencode/SettingsCommandsSection';
 import { SettingsServerSection } from '../../../../src/features/settings/backends/opencode/SettingsServerSection';
 import { SettingsPiSection } from '../../../../src/features/settings/backends/pi/SettingsPiSection';
+import { SettingsZCodeSection } from '../../../../src/features/settings/backends/zcode/SettingsZCodeSection';
 import { SettingsDebugSection } from '../../../../src/features/settings/debug/SettingsDebugSection';
 import { SettingsConversationSection } from '../../../../src/features/settings/general/SettingsConversationSection';
 import { SettingsFormatterSection } from '../../../../src/features/settings/general/SettingsFormatterSection';
@@ -557,6 +558,42 @@ describe('SettingsTabbedRenderer', () => {
 
     expectSingleContentShell(containerEl, 'claude-code', 'connection');
     expect(containerEl.querySelector('.claude-code-tab-marker')).not.toBeNull();
+  });
+
+  it('finalizes recovery and duplicate task headings after every four-backend section mount', () => {
+    const appendOwnerHeadings = (containerEl: HTMLElement): void => {
+      const taskTitle = containerEl.querySelector('.opencodian-backend-task-title')?.textContent ?? '';
+      const section = containerEl.createDiv({ cls: 'owner-task-content' });
+      section.createEl('h3', { text: taskTitle });
+      section.createEl('h4', { text: taskTitle });
+      section.createEl('h4', { text: 'Distinct field group' });
+    };
+    jest.spyOn(SettingsClaudeCodeSection.prototype, 'attachTabbed').mockImplementation(appendOwnerHeadings);
+    jest.spyOn(SettingsCodexSection.prototype, 'attachTabbed').mockImplementation(appendOwnerHeadings);
+    jest.spyOn(SettingsPiSection.prototype, 'attachTabbed').mockImplementation(appendOwnerHeadings);
+    jest.spyOn(SettingsZCodeSection.prototype, 'attachTabbed').mockImplementation(appendOwnerHeadings);
+    const { renderer } = createRendererState();
+
+    for (const [backend, task, connection] of [
+      ['claude-code', 'conversation', 'connection'],
+      ['codex', 'conversation', 'connection'],
+      ['pi', 'model', 'connection'],
+      ['zcode', 'chat', 'installation'],
+    ] as const) {
+      const taskContainer = document.body.createDiv();
+      renderer.renderBackendWorkspaceTab(taskContainer, backend, task);
+      expect(taskContainer.classList.contains('opencodian-backend-task-workspace')).toBe(true);
+      expect(taskContainer.firstElementChild).toBe(taskContainer.querySelector('.opencodian-backend-task-header'));
+      expect(taskContainer.querySelector('.opencodian-backend-workspace-bar')).toBeNull();
+      expect(taskContainer.querySelectorAll('h3')).toHaveLength(0);
+      expect(taskContainer.querySelector('.owner-task-content > h4')?.textContent).toBe('Distinct field group');
+
+      const connectionContainer = document.body.createDiv();
+      renderer.renderBackendWorkspaceTab(connectionContainer, backend, connection);
+      expect(connectionContainer.firstElementChild).toBe(connectionContainer.querySelector('.opencodian-backend-task-header'));
+      expect(connectionContainer.lastElementChild).toBe(connectionContainer.querySelector('.opencodian-backend-workspace-bar'));
+      expect(connectionContainer.querySelector('.opencodian-backend-recovery')).not.toBeNull();
+    }
   });
 });
 

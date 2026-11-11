@@ -21,7 +21,7 @@ import { SettingsServerSection } from './backends/opencode/SettingsServerSection
 import { SettingsPiSection } from './backends/pi/SettingsPiSection';
 import { SettingsZCodeSection } from './backends/zcode/SettingsZCodeSection';
 import { SettingsCapabilityLabSection } from './capabilities/SettingsCapabilityLabSection';
-import { renderBackendSettingsWorkspace, renderBackendTaskHeading } from './controls/BackendSettingsWorkspace';
+import { finalizeBackendTaskWorkspace, renderBackendSettingsWorkspace, renderBackendTaskHeading } from './controls/BackendSettingsWorkspace';
 import { SettingsDebugSection } from './debug/SettingsDebugSection';
 import { createClaudeTraceDiagnosticsPort, createCodexTraceDiagnosticsPort, createOpenCodeTraceDiagnosticsPort } from './debug/types';
 import { SettingsConversationSection } from './general/SettingsConversationSection';
@@ -491,50 +491,54 @@ export class SettingsTabbedRenderer {
       this.deps.requestDisplayRefresh();
     });
     renderBackendTaskHeading(containerEl, taskLabel ? t(taskLabel) : undefined);
-    if ((backend === 'claude-code' || backend === 'codex') && secondaryTabId === 'debug') {
-      this.createDebugSection().attachBackendTabbed(containerEl, backend);
-      return;
-    }
-    switch (backend) {
-      case 'opencode2': {
-        new SettingsOpenCode2Section({
-          plugin: this.deps.plugin,
-          vaultPath: getVaultBasePath(this.deps.app) ?? undefined,
-          requestDisplayRefresh: () => { this.deps.requestDisplayRefresh(); },
-          renderTitleSettings: (hostEl) => { this.deps.renderConversationTitleSettings(hostEl); },
-        }).attachTabbed(containerEl, secondaryTabId);
+    try {
+      if ((backend === 'claude-code' || backend === 'codex') && secondaryTabId === 'debug') {
+        this.createDebugSection().attachBackendTabbed(containerEl, backend);
         return;
       }
-      case 'claude-code':
-        new SettingsClaudeCodeSection({
-          plugin: this.deps.plugin,
-          createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
-        }).attachTabbed(containerEl, secondaryTabId);
-        return;
-      case 'codex': {
-        const codexSection = new SettingsCodexSection({
-          plugin: this.deps.plugin,
-          createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
-        });
-        this.activeCodexSection = codexSection;
-        this.deps.setCodexSection(codexSection);
-        codexSection.attachTabbed(containerEl, secondaryTabId);
-        return;
+      switch (backend) {
+        case 'opencode2': {
+          new SettingsOpenCode2Section({
+            plugin: this.deps.plugin,
+            vaultPath: getVaultBasePath(this.deps.app) ?? undefined,
+            requestDisplayRefresh: () => { this.deps.requestDisplayRefresh(); },
+            renderTitleSettings: (hostEl) => { this.deps.renderConversationTitleSettings(hostEl); },
+          }).attachTabbed(containerEl, secondaryTabId);
+          return;
+        }
+        case 'claude-code':
+          new SettingsClaudeCodeSection({
+            plugin: this.deps.plugin,
+            createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
+          }).attachTabbed(containerEl, secondaryTabId);
+          return;
+        case 'codex': {
+          const codexSection = new SettingsCodexSection({
+            plugin: this.deps.plugin,
+            createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
+          });
+          this.activeCodexSection = codexSection;
+          this.deps.setCodexSection(codexSection);
+          codexSection.attachTabbed(containerEl, secondaryTabId);
+          return;
+        }
+        case 'pi':
+          new SettingsPiSection(this.deps.plugin).attachTabbed(containerEl, secondaryTabId);
+          return;
+        case 'zcode':
+          new SettingsZCodeSection(this.deps.plugin, () => this.openCompletionSettings(containerEl.ownerDocument)).attachTabbed(containerEl, secondaryTabId);
+          return;
+        case 'dsh': {
+          const section = createSettingsDshSection(this.deps.plugin);
+          this.activeDshSection = section;
+          section.attachTabbed(containerEl, secondaryTabId, (task) => this.switchToPrimaryTab('dsh', task));
+          return;
+        }
+        default:
+          return;
       }
-      case 'pi':
-        new SettingsPiSection(this.deps.plugin).attachTabbed(containerEl, secondaryTabId);
-        return;
-      case 'zcode':
-        new SettingsZCodeSection(this.deps.plugin, () => this.openCompletionSettings(containerEl.ownerDocument)).attachTabbed(containerEl, secondaryTabId);
-        return;
-      case 'dsh': {
-        const section = createSettingsDshSection(this.deps.plugin);
-        this.activeDshSection = section;
-        section.attachTabbed(containerEl, secondaryTabId, (task) => this.switchToPrimaryTab('dsh', task));
-        return;
-      }
-      default:
-        return;
+    } finally {
+      finalizeBackendTaskWorkspace(containerEl, resolvedTaskId);
     }
   }
 

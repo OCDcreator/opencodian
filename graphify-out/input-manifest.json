@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "fdc12db0d3454806e9dc7cdf1987ebcb2e3ae4fbf68050f1a683acc5ddda5ef7",
+  "digest": "eb09dd5981ce628cdac89bc368ff47537ca396024d41a5e34cfb864efcfc232f",
   "recordCount": 847,
   "records": [
     {
@@ -3266,7 +3266,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/controls/BackendSettingsWorkspace.ts",
-      "sha256": "ba2ef7f53187b46955cd8ef48f37f5e4932e86624bec9eb2421c1ff250182864"
+      "sha256": "f165544cd9860578d214f0c99c3fe66f7d70de786ac5140bb3199da71c2b9a71"
     },
     {
       "kind": "src",
@@ -3606,7 +3606,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsTabbedRenderer.ts",
-      "sha256": "72012619c206c2232bb108766c88d472e3820a1b88750cf4c4929a67ec47b7ce"
+      "sha256": "fb3b27da4ff21708e8bec3b5197dcb914ef39a10805204bad78e92df571956a1"
     },
     {
       "kind": "src",
@@ -4239,7 +4239,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-11-11T16:37:53.541Z",
-  "headShaAtGeneration": "24f2695587255e9a9b815db893379cdc216ff436",
+  "generatedAt": "2026-11-11T21:45:22.461Z",
+  "headShaAtGeneration": "87b376e53e132c0fb81b8d2bddc268480600dbab",
   "graphifyVersion": "graphify 0.9.97"
 }

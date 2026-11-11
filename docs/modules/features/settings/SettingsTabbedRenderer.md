@@ -2,7 +2,7 @@
 
 ## 2026-11-12 Four-backend task headings
 
-`renderBackendWorkspaceTab` resolves the requested secondary route through the registry and forwards its localized label to `renderBackendTaskHeading` after the unchanged four-parameter workspace mount. The shared workspace therefore renders the current task heading before owner content in both tabbed and classic single-page mounts. This is presentation-only: debug dispatch, section disposal, Codex recovery replay and OpenCode/DSH mounts keep their existing behavior.
+`renderBackendWorkspaceTab` resolves the requested secondary route through the registry and forwards its localized label to `renderBackendTaskHeading` after the unchanged four-parameter workspace mount. The shared workspace therefore renders the current task heading before owner content in both tabbed and classic single-page mounts. Once the section has mounted, `finalizeBackendTaskWorkspace` moves the four-backend recovery bar below Connection/Installation or removes it from other tasks; it also removes only section H3/H4 headings that exactly duplicate the shared H2. Different field-group headings and classic/direct mounts without that H2 keep their meaningful titles. This is presentation-only: recovery fields/actions, debug dispatch, section disposal, Codex recovery replay and OpenCode/DSH mounts keep their existing behavior.
 
 ## 2026-11-09 DSH workspace navigation seam
 
