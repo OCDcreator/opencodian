@@ -378,11 +378,15 @@ test('shared positive control runs the active OpenCode 2 contract without the re
 test('AUDIT_CLAUDE_BIN selects the explicit absolute CLI; invalid explicit fails with no candidate fallback', () => {
   const fixtureHome = fs.mkdtempSync(path.join(scratch, 'claude-home-'));
   fs.mkdirSync(path.join(fixtureHome, '.local', 'bin'), { recursive: true });
-  const candidateCli = path.join(fixtureHome, '.local', 'bin', 'claude');
+  // Windows candidates probe claude.exe and resolve home via USERPROFILE, not
+  // HOME; the fixture mirrors that shape and both overrides stay inside this
+  // spawned child process. No real HOME/USERPROFILE or system config is touched.
+  const candidateCli = path.join(fixtureHome, '.local', 'bin', process.platform === 'win32' ? 'claude.exe' : 'claude');
   fs.writeFileSync(candidateCli, 'fixture candidate, never executable');
   const missingCli = path.join(scratch, 'missing-claude-cli');
   const result = evaluate(`
     process.env.HOME = ${JSON.stringify(fixtureHome)};
+    ${process.platform === 'win32' ? `process.env.USERPROFILE = ${JSON.stringify(fixtureHome)};` : ''}
     const sentinelPath = ${JSON.stringify(sentinel)};
     const resolve = () => audit.resolveClaudeExecutable();
     const cases = {};

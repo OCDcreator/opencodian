@@ -220,6 +220,8 @@ describe('memory sync merge preservation', () => {
     const note = nodePath.join(tree, 'projects', 'demo', 'memory', 'conflict.md');
     nodeFs.writeFileSync(note, 'base\n');
     await syncMemoryTree(tree, remote, { host: 'host-a' });
+    // This fixture asserts exact LF bytes, independent of the runner's checkout policy.
+    sh(tree, 'config', 'core.autocrlf', 'false');
     const clone = nodePath.join(work, 'conflict-clone');
     execFileSync('git', ['clone', remote, clone], { encoding: 'utf8' });
     nodeFs.writeFileSync(nodePath.join(clone, 'projects', 'demo', 'memory', 'conflict.md'), 'remote\n');
