@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "eb09dd5981ce628cdac89bc368ff47537ca396024d41a5e34cfb864efcfc232f",
+  "digest": "a5e42e0f56a8d91547b5143bc087d3d445cb5b4d78becbe48df622d4d9a76453",
   "recordCount": 847,
   "records": [
     {
@@ -3856,7 +3856,7 @@
     {
       "kind": "src",
       "key": "src/style/components/settings-backend-workspace.css",
-      "sha256": "2aa31c7da1630c61ef0816f2197d8c576fda27b28d94f3cbe753293fa36764d8"
+      "sha256": "e9c6ba053162581b80e071eb6d8c1db1dc067f77ed81a9643a504a507d5d35a7"
     },
     {
       "kind": "src",
@@ -4239,7 +4239,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-11-11T21:45:22.461Z",
-  "headShaAtGeneration": "87b376e53e132c0fb81b8d2bddc268480600dbab",
+  "generatedAt": "2026-11-11T21:51:32.520Z",
+  "headShaAtGeneration": "82a8de3de28e77e9d4e6da93ab6525af1c2c4d3c",
   "graphifyVersion": "graphify 0.9.97"
 }

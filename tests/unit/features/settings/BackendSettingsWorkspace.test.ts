@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { getDefaultBackendSettings, type OpenCodianSettings } from '../../../../src/core/types/settings';
 import {
   captureBackendRecoveryPoint,
@@ -204,6 +207,44 @@ it('preserves classic headings and the OpenCode 2 / DSH workspace chrome', () =>
   finalizeBackendTaskWorkspace(classic, 'model');
   expect(classic.classList.contains('opencodian-backend-task-workspace')).toBe(true);
   expect(classic.querySelector('h3')?.textContent).toBe('Classic task title');
+});
+
+it('wins the shared 13px/700 cascade only inside the four-backend task workspace', () => {
+  const readRule = (file: string, selector: string): string => {
+    const css = readFileSync(join(process.cwd(), 'src/style', file), 'utf8');
+    const start = css.indexOf(`${selector} {`);
+    expect(start).toBeGreaterThanOrEqual(0);
+    return css.slice(start, css.indexOf('}', start) + 1);
+  };
+  const hostRule = readRule(
+    'components/settings-layout-contract.css',
+    '.opencodian-settings .opencodian-settings-content-shell .setting-item .setting-item-name',
+  );
+  const taskRule = readRule(
+    'components/settings-backend-workspace.css',
+    '.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace .setting-item-name',
+  );
+  expect(taskRule).toContain('font-size: 15px;');
+  expect(taskRule).toContain('font-weight: 600;');
+  expect(taskRule).not.toContain('!important');
+  const style = document.head.createEl('style', { text: `${hostRule}\n${taskRule}` });
+  try {
+    const renderName = (taskWorkspace: boolean): HTMLElement => {
+      const host = document.body.createDiv({ cls: 'opencodian-settings' });
+      const shell = host.createDiv({ cls: 'opencodian-settings-content-shell' });
+      const workspace = shell.createDiv({ cls: 'opencodian-backend-workspace' });
+      workspace.classList.toggle('opencodian-backend-task-workspace', taskWorkspace);
+      return workspace.createDiv({ cls: 'setting-item' }).createDiv({ cls: 'setting-item-name' });
+    };
+    const taskName = renderName(true);
+    const otherBackendName = renderName(false);
+    expect(getComputedStyle(taskName).fontSize).toBe('15px');
+    expect(getComputedStyle(taskName).fontWeight).toBe('600');
+    expect(getComputedStyle(otherBackendName).fontSize).toBe('13px');
+    expect(getComputedStyle(otherBackendName).fontWeight).toBe('700');
+  } finally {
+    style.remove();
+  }
 });
 
 describe('DSH connection backup component', () => {

@@ -20034,7 +20034,7 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
   padding: 0;
 }
 
-.opencodian-settings .opencodian-backend-task-workspace .setting-item-name {
+.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace .setting-item-name {
   margin: 0;
   color: var(--text-normal);
   font-size: 15px;
