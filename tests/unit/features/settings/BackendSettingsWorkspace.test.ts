@@ -247,6 +247,52 @@ it('wins the shared 13px/700 cascade only inside the four-backend task workspace
   }
 });
 
+it('keeps dropdown height intrinsic in four-backend columns without changing horizontal workspaces', () => {
+  const readRule = (file: string, selector: string): string => {
+    const css = readFileSync(join(process.cwd(), 'src/style', file), 'utf8');
+    const start = css.indexOf(`${selector} {`);
+    expect(start).toBeGreaterThanOrEqual(0);
+    return css.slice(start, css.indexOf('}', start) + 1);
+  };
+  const hostRule = readRule(
+    'components/settings-dropdown.css',
+    '.setting-item-control > .opencodian-settings-dropdown',
+  );
+  const columnRule = readRule(
+    'components/settings-backend-workspace.css',
+    '.opencodian-settings .opencodian-backend-task-workspace .setting-item-control',
+  );
+  const taskRule = readRule(
+    'components/settings-backend-workspace.css',
+    '.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace .setting-item-control > .opencodian-settings-dropdown',
+  );
+  expect(taskRule).not.toContain('!important');
+  const style = document.head.createEl('style', { text: `${hostRule}\n${columnRule}\n${taskRule}` });
+  try {
+    const renderDropdown = (taskWorkspace: boolean): { control: HTMLElement; dropdown: HTMLElement; trigger: HTMLElement } => {
+      const host = document.body.createDiv({ cls: 'opencodian-settings' });
+      const workspace = host.createDiv({ cls: 'opencodian-backend-workspace' });
+      workspace.classList.toggle('opencodian-backend-task-workspace', taskWorkspace);
+      const control = workspace.createDiv({ cls: 'setting-item-control' });
+      const dropdown = control.createDiv({ cls: 'opencodian-settings-dropdown' });
+      const trigger = dropdown.createEl('button', { cls: 'opencodian-settings-dropdown-trigger' });
+      return { control, dropdown, trigger };
+    };
+    const task = renderDropdown(true);
+    const other = renderDropdown(false);
+    expect(getComputedStyle(task.control).flexDirection).toBe('column');
+    expect(getComputedStyle(task.dropdown).flexBasis).toBe('auto');
+    expect(getComputedStyle(task.dropdown).flexGrow).toBe('0');
+    expect(getComputedStyle(task.dropdown).flexShrink).toBe('0');
+    const unstyledDirection = getComputedStyle(document.createElement('div')).flexDirection;
+    expect(getComputedStyle(other.control).flexDirection).toBe(unstyledDirection);
+    expect(getComputedStyle(other.dropdown).flexBasis).toBe('240px');
+    expect(getComputedStyle(other.dropdown).flexShrink).toBe('1');
+  } finally {
+    style.remove();
+  }
+});
+
 describe('DSH connection backup component', () => {
   it('names its purpose, exposes its exact scope and disables restore until a backup exists', () => {
     const host = fixture();

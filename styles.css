@@ -20064,6 +20064,10 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
   text-align: start;
 }
 
+.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace .setting-item-control > .opencodian-settings-dropdown {
+  flex: none;
+}
+
 .opencodian-settings .opencodian-backend-task-workspace .setting-item-control:has(> button):not(:has(input, textarea, select, .opencodian-settings-dropdown, .opencodian-backend-choice-group)) {
   flex-direction: row;
   align-items: center;
