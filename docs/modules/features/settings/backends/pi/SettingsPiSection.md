@@ -4,6 +4,10 @@
 
 > 源码: src/features/settings/backends/pi/SettingsPiSection.ts
 
+## 2026-11-12 八任务 DSH A 布局
+
+任务为 `connection`、`providers`、`model`、`execution`、`resources`、`account`、`mcp`、`sessions`。旧 `advanced` 路由到 `sessions`；`resources` 不再是会话别名。执行页只保留 execution 组；会话页同时承载 Workbench、原生会话和 advanced/raw/history；资源页由 `SettingsPiConfigurationSection.attachResources()` 如实标注 raw editor only。旧版 provider/model/thinking 仍是兼容入口，原生 settings/models 编辑器继续拥有真实写入，MCP 合并声明与扩展状态保持只读。
+
 ## 职责
 
 Pi路径、默认模型/提供商、思考和连接检查，以及独立工作台入口。toPiChatMessages保留原生ID/工具/思考，已有loadBackendSessionConversation回调负责激活聊天视图。

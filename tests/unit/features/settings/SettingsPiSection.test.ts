@@ -19,7 +19,7 @@ describe('Pi native settings integration', () => {
   it('owns a backend tab with dedicated secondary pages and remembers the selected page', () => {
     const pi = getPrimaryTabDefinition('pi');
     expect(pi?.backendRequired).toBe('pi');
-    expect(pi?.secondaryTabs.map(tab => tab.id)).toEqual(['connection', 'providers', 'model', 'execution', 'account', 'mcp', 'sessions']);
+    expect(pi?.secondaryTabs.map(tab => tab.id)).toEqual(['connection', 'providers', 'model', 'execution', 'resources', 'account', 'mcp', 'sessions']);
     expect(getActiveSecondaryTabId('pi', { pi: 'providers' })).toBe('providers');
     expect(getPrimaryTabDefinition('codex')?.defaultSecondaryTabId).toBe('connection');
   });
@@ -34,10 +34,10 @@ describe('Pi native settings integration', () => {
   it('resolves legacy tab aliases to the merged task tabs', () => {
     const container = document.body.createDiv();
     new SettingsPiSection({ settings: { backendSettings: {} }, saveSettings: async () => {} }).attachTabbed(container, 'advanced');
-    expect(container.querySelector('[data-pi-section="execution"]')).not.toBeNull();
-    const sessions = document.body.createDiv();
-    new SettingsPiSection({ settings: { backendSettings: {} }, saveSettings: async () => {} }).attachTabbed(sessions, 'resources');
-    expect(sessions.querySelector('[data-pi-section="sessions"]')).not.toBeNull();
+    expect(container.querySelector('[data-pi-section="sessions"]')).not.toBeNull();
+    const resources = document.body.createDiv();
+    new SettingsPiSection({ settings: { backendSettings: {} }, saveSettings: async () => {} }).attachTabbed(resources, 'resources');
+    expect(resources.querySelector('[data-pi-section="resources"]')).not.toBeNull();
   });
   it('keeps the shared workspace bar untouched when a subtab mounts (append-only)', () => {
     const container = document.body.createDiv();
@@ -131,13 +131,30 @@ describe('Pi task tab surfaces', () => {
     expect(field?.getAttribute('data-backend-risk')).toBe('high');
     expect(container.querySelectorAll('input[type="radio"]').length).toBeGreaterThanOrEqual(2);
   });
+  it('keeps resource schema read-only while the raw settings editor saves with its revision', async () => {
+    const snapshot = { scopes: { global: { path: '/global/settings.json', revision: 'g', value: {} }, project: { path: '/project/settings.json', revision: 'p1', value: { packages: ['@fixture/package'] } } }, fields: [{ path: 'packages', group: 'resources', kind: 'json', label: { zh: '扩展包', en: 'Packages' } }], sdkVersion: '0.73.1' };
+    const command = jest.fn(async () => snapshot); const saveButtons: Array<() => Promise<void>> = [];
+    jest.spyOn(Setting.prototype, 'addButton').mockImplementation(function (callback) {
+      const button = { setButtonText: () => button, setDisabled: () => button, onClick: (cb: () => Promise<void>) => { saveButtons.push(cb); return button; } };
+      callback(button as never); return this;
+    });
+    const container = document.body.createDiv();
+    new SettingsPiConfigurationSection({ command } as unknown as PiAdapter, async () => {}, async () => {}).attachResources(container);
+    await Promise.resolve(); await Promise.resolve();
+    const resource = container.querySelector('[data-pi-resource-field="packages"]');
+    expect(resource).not.toBeNull(); expect(resource?.querySelector('input, textarea, select')).toBeNull(); expect(resource?.getAttribute('data-backend-effect')).toBe('new-session');
+    const editor = container.querySelector<HTMLTextAreaElement>('textarea[aria-label="settings.json"]');
+    expect(editor).not.toBeNull(); editor!.value = '{"packages":[],"skills":["/fixture/skill"]}';
+    await saveButtons[saveButtons.length - 1]();
+    expect(command).toHaveBeenCalledWith(undefined, 'save_configuration', { scope: 'project', revision: 'p1', value: { packages: [], skills: ['/fixture/skill'] } });
+  });
   it('keeps the advanced native editor as a separate high-risk disclosure, not part of the model page', async () => {
     const snapshot = { scopes: { global: { path: '/global', revision: 'g', value: {} }, project: { path: '/project', revision: 'p', value: {} } }, fields: [], sdkVersion: '0.73.1' };
     const command = jest.fn(async () => snapshot);
-    const adapter = { command } as unknown as PiAdapter;
+    const adapter = { command, listSessions: jest.fn().mockResolvedValue([]) } as unknown as PiAdapter;
     const container = document.body.createDiv();
     const section = new SettingsPiSection({ settings: { backendSettings: {} }, saveSettings: async () => {}, agentServiceRegistry: { get: () => adapter } });
-    section.attachTabbed(container, 'execution');
+    section.attachTabbed(container, 'sessions');
     await Promise.resolve(); await Promise.resolve();
     const advanced = container.querySelector('[data-pi-section="advanced"]');
     expect(advanced).not.toBeNull();
@@ -276,6 +293,7 @@ describe('Pi task tab surfaces', () => {
       supportsConfigurationHistory: async () => true,
       getConfigurationHistory: jest.fn(async () => ({ models: { entries: [] }, settings: { global: { entries: [] }, project: { entries: [entry] } } })),
       restoreConfiguration,
+      listSessions: jest.fn().mockResolvedValue([]),
     } as unknown as PiAdapter;
     const restoreButtons: Array<{ text: string; click(): void }> = [];
     jest.spyOn(Setting.prototype, 'addButton').mockImplementation(function (callback) {
@@ -284,7 +302,7 @@ describe('Pi task tab surfaces', () => {
     });
     const container = document.body.createDiv();
     const section = new SettingsPiSection({ settings: { backendSettings: {} }, saveSettings: async () => {}, agentServiceRegistry: { get: () => adapter } });
-    section.attachTabbed(container, 'execution');
+    section.attachTabbed(container, 'sessions');
     await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
     const advanced = container.querySelector<HTMLDetailsElement>('[data-pi-section="advanced"]');
     expect(advanced).not.toBeNull();

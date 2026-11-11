@@ -167,9 +167,8 @@ const piSettingsTarget = (settings: PiRecord, scope: 'global' | 'project'): { en
 
 /**
  * Native global/project settings forms; file persistence stays inside the Pi
- * service. One instance can render several field groups in order (for example
- * the execution page renders the `execution` group and then hosts the
- * advanced high-risk disclosure from {@link attachAdvanced}).
+ * service. Guided groups, raw-only resources and the advanced disclosure share
+ * the same revision-checked snapshot without becoming a second runtime store.
  */
 export class SettingsPiConfigurationSection {
   private scope: 'global' | 'project' = 'project';
@@ -212,6 +211,40 @@ export class SettingsPiConfigurationSection {
     };
     void load();
     advanced.addEventListener('toggle', () => { if (advanced.open && !inner.childElementCount) void load(); });
+  }
+
+  attachResources(container: HTMLElement): void {
+    container.createEl('p', { cls: 'setting-item-description', text: t('settings.pi.resources.rawOnly') });
+    const status = container.createDiv({ cls: 'opencodian-pi-config-status', text: t('settings.pi.loading'), attr: { role: 'status' } });
+    const body = container.createDiv();
+    const load = async (): Promise<void> => {
+      try {
+        this.snapshot = await this.adapter.command(undefined, 'get_configuration') as unknown as PiConfigurationSnapshot;
+        status.setText(''); this.renderResources(body);
+      } catch (error) { status.setText(String(error)); }
+    };
+    new Setting(container).setName(t('settings.pi.refresh')).addButton(button => button.setButtonText(t('settings.pi.refresh')).onClick(() => { void load(); }));
+    void load();
+  }
+
+  private renderResources(body: HTMLElement): void {
+    if (!this.snapshot) return;
+    body.empty(); body.addClass('opencodian-settings-form-stack');
+    const document = this.snapshot.scopes[this.scope];
+    new Setting(body).setName(t('settings.pi.scope')).setDesc(document.path).addDropdown(dropdown => {
+      dropdown.addOption('project', t('settings.pi.scope.project')).addOption('global', t('settings.pi.scope.global')).setValue(this.scope)
+        .onChange(value => { this.scope = value as 'global' | 'project'; this.renderResources(body); });
+    });
+    body.createEl('p', { cls: 'setting-item-description', text: t('settings.pi.scope.help') });
+    const fields = this.snapshot.fields.filter(field => field.group === 'resources');
+    if (!fields.length) body.createEl('p', { text: t('settings.pi.fieldsUnavailable'), cls: 'setting-item-description' });
+    for (const field of fields) {
+      const row = new Setting(body).setName(fieldLabel(field)).setDesc(field.path);
+      row.settingEl.setAttribute('data-pi-resource-field', field.path);
+      const risk = field.path === 'packages' || field.path === 'extensions' ? 'high' : field.path === 'npmCommand' || field.path === 'skills' ? 'medium' : 'low';
+      describeBackendSetting(row, { key: `pi-resource-${field.path}`, scope: this.scope, effect: 'new-session', risk, source: t('settings.pi.resources.rawOnlyShort') });
+    }
+    this.renderRawEditor(body);
   }
 
   private render(body: HTMLElement, groups: readonly string[]): void {

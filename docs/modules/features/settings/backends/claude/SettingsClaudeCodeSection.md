@@ -1,5 +1,9 @@
 # SettingsClaudeCodeSection
 
+## 2026-11-12 四后端 DSH A 重构
+
+Claude Code 任务顺序固定为 `connection` → `conversation` → `providers` → `tools-context` → `permissions-safety` → `resources` → `debug`；默认页改为连接。字段仍由原 section/provider/configuration/resource/debug owners 渲染：模型、备用模型、思考/预算、提示行为、provider presets、settingSources、工具策略、只读 MCP、完整 sandbox/预算、资源 CRUD、原生 settings.json + hooks 与追踪诊断均未改换持久化或运行时路径。共享 workspace 只增加 DSH A 布局标记和当前任务标题，不新增运行时状态。
+
 > 2026-07-29: Backend fallback initialization preserves sibling OpenCode trace settings.
 
 > **源码**: `src/features/settings/backends/claude/SettingsClaudeCodeSection.ts`

@@ -2,7 +2,9 @@
 
 Source: `src/features/settings/controls/BackendSettingsWorkspace.ts`
 Owner: `feature.settings-shell`
-Updated: 2026-11-09
+Updated: 2026-11-12
+
+Claude Code, Codex, Pi and ZCode receive the `opencodian-backend-task-workspace` marker. The separate `renderBackendTaskHeading` helper accepts the resolved label and renders a 25px serif heading only for that marker, ahead of missing-installation guidance; OpenCode 2 and DSH receive neither. This keeps the recovery renderer's existing four-parameter contract. The marker scopes the transparent DSH A form and framed recovery disclosure. Recovery persistence and missing-executable behavior are unchanged.
 
 Shared workspace chrome for all six selectable backends. It explains that plugin defaults belong to the current vault and that save success does not prove runtime application. `renderBackendSettingsWorkspace` retains the source/application strip and native recovery disclosure for the five other backends. DSH uses a purpose-named `Connection backup and restore` variant; `SettingsDshSection.renderTab` keeps it only below Connection and removes the repeated bar on the other three subtabs. Workspace markers and the separately mounted missing-program guidance remain on all pages.
 

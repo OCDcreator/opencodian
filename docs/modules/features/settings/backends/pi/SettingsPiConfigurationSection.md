@@ -2,6 +2,10 @@
 
 > 源码: src/features/settings/backends/pi/SettingsPiConfigurationSection.ts
 
+## 2026-11-12 原生工作区任务归属
+
+`attachResources()` 在独立资源任务中读取同一 `get_configuration` 快照，允许项目/全局切换，列出 resources 组 schema，但不生成结构化输入；唯一修改入口是既有完整 settings.json raw editor，保存继续携带当前 revision。`attachAdvanced()` 现在由“会话 / 高级”任务调用，保留 advanced 字段、raw editor 和原生/内存历史。模型与执行组仍由 `attach()` 差量保存；51 字段的 scope、继承、生效和 raw 覆盖不变。
+
 Pi 原生 settings.json 表单，按项目/全局作用域读取51项官方字段schema。作用域、原始文件路径、继承值、SDK/终端/导出范围明确展示。字段变更收集为patch，保存携带revision，由独立配置服务验证/备份/冲突检测。高级JSON支持未知字段。
 
 保存只持久化；重连按钮由用户执行，停止Pi操作后重建服务。切换作用域保留当前表单草稿；未编辑字段不写回默认。错误保留输入并显示，不假装已应用。

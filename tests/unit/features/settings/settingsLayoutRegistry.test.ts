@@ -14,8 +14,8 @@ import {
 } from '../../../../src/features/settings/settingsLayoutRegistry';
 
 describe('SETTINGS_PRIMARY_TABS', () => {
-  it('defaults ZCode to chat and maps every previous subtab without losing saved routes', () => {
-    expect(getActiveSecondaryTabId('zcode', {})).toBe('chat');
+  it('defaults ZCode to installation and maps every previous subtab without losing saved routes', () => {
+    expect(getActiveSecondaryTabId('zcode', {})).toBe('installation');
     expect(getActiveSecondaryTabId('zcode', { zcode: 'connection' })).toBe('installation');
     expect(getActiveSecondaryTabId('zcode', { zcode: 'model' })).toBe('chat');
     expect(getActiveSecondaryTabId('zcode', { zcode: 'management' })).toBe('tools');
@@ -166,14 +166,14 @@ describe('SETTINGS_PRIMARY_TABS', () => {
 
     expect(claudeTab).toBeDefined();
     expect(claudeTab!.labelKey).toBe('settings.claudeCode.title');
-    expect(claudeTab!.defaultSecondaryTabId).toBe('conversation');
+    expect(claudeTab!.defaultSecondaryTabId).toBe('connection');
     expect(claudeTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual([
+      'connection',
       'conversation',
       'providers',
       'tools-context',
       'permissions-safety',
       'resources',
-      'connection',
       'debug',
     ]);
     expect(claudeTab!.secondaryTabs.some((secondaryTab) => secondaryTab.id === 'resources')).toBe(true);
@@ -249,8 +249,8 @@ describe('resolveSecondaryTabId', () => {
     expect(resolveSecondaryTabId('codex', 'model')).toBe('conversation');
     expect(resolveSecondaryTabId('codex', 'permissions')).toBe('permissions-safety');
     expect(resolveSecondaryTabId('codex', 'project-config')).toBe('connection');
-    expect(resolveSecondaryTabId('pi', 'advanced')).toBe('execution');
-    expect(resolveSecondaryTabId('pi', 'resources')).toBe('sessions');
+    expect(resolveSecondaryTabId('pi', 'advanced')).toBe('sessions');
+    expect(resolveSecondaryTabId('pi', 'resources')).toBe('resources');
     expect(resolveSecondaryTabId('dsh', 'extensions')).toBe('configuration');
     expect(resolveSecondaryTabId('dsh', 'terminal')).toBe('advanced');
     expect(resolveSecondaryTabId('dsh', 'configuration')).toBe('configuration');

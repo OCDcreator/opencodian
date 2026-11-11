@@ -1,7 +1,11 @@
 # settings-backend-workspace.css
 
 Source: `src/style/components/settings-backend-workspace.css`
-Updated: 2026-11-09
+Updated: 2026-11-12
+
+## Four-backend DSH A layout
+
+Only `.opencodian-backend-task-workspace` (Claude Code, Codex, Pi, ZCode) opts into the shared A treatment: transparent 1030px workspace, horizontal existing task rails, unboxed two-column rows with a 220–300px control track, 15px/600 field names, 12px explanations, 16px row padding and 24px group gaps. Radio choices become compact host-themed segments, controls center against the complete left copy, and native details/recovery use one thin frame with a full-width summary and right chevron. Nested details do not add another frame. At a 660px settings container rows stack without losing labels or controls; forced colors retain selected borders and visible chevrons, and reduced motion removes transitions. OpenCode 2 and DSH do not receive the marker, so their existing surfaces are unchanged. The stylesheet is still imported last to override backend-specific row-card rules.
 
 The shared backend settings surface combines shadcn Field/Tabs/Alert hierarchy with Mantine SegmentedControl/Radio.Card/Slider treatments using existing Obsidian DOM. It introduces no React, Tailwind or component runtime. Attribution and reference URLs are recorded in `docs/research/backend-refresh/acceptance-plan.md`.
 

@@ -21,7 +21,7 @@ import { SettingsServerSection } from './backends/opencode/SettingsServerSection
 import { SettingsPiSection } from './backends/pi/SettingsPiSection';
 import { SettingsZCodeSection } from './backends/zcode/SettingsZCodeSection';
 import { SettingsCapabilityLabSection } from './capabilities/SettingsCapabilityLabSection';
-import { renderBackendSettingsWorkspace } from './controls/BackendSettingsWorkspace';
+import { renderBackendSettingsWorkspace, renderBackendTaskHeading } from './controls/BackendSettingsWorkspace';
 import { SettingsDebugSection } from './debug/SettingsDebugSection';
 import { createClaudeTraceDiagnosticsPort, createCodexTraceDiagnosticsPort, createOpenCodeTraceDiagnosticsPort } from './debug/types';
 import { SettingsConversationSection } from './general/SettingsConversationSection';
@@ -484,10 +484,13 @@ export class SettingsTabbedRenderer {
     // Any backend subpage switch (including Codex account -> debug) must release
     // the previous Codex section before the old DOM is discarded.
     this.disposeActiveBackendSections();
+    const resolvedTaskId = resolveSecondaryTabId(backend, secondaryTabId);
+    const taskLabel = getBackendWorkspaceTab(backend)?.secondaryTabs.find((tab) => tab.id === resolvedTaskId)?.labelKey;
     renderBackendSettingsWorkspace(containerEl, backend, this.deps.plugin, () => {
       this.activeCodexSection?.reapplyRuntimeUpdates();
       this.deps.requestDisplayRefresh();
     });
+    renderBackendTaskHeading(containerEl, taskLabel ? t(taskLabel) : undefined);
     if ((backend === 'claude-code' || backend === 'codex') && secondaryTabId === 'debug') {
       this.createDebugSection().attachBackendTabbed(containerEl, backend);
       return;

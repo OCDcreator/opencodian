@@ -165,6 +165,7 @@ export function renderBackendSettingsWorkspace(
   if (!kind) return;
   container.classList.add('opencodian-backend-workspace');
   container.dataset.backendWorkspace = backend;
+  container.classList.toggle('opencodian-backend-task-workspace', kind === 'claude-code' || kind === 'codex' || kind === 'pi' || kind === 'zcode');
   const connectionBackup = kind === 'dsh';
   const bar = container.createDiv({ cls: 'opencodian-backend-workspace-bar' });
   if (connectionBackup) bar.addClass('opencodian-dsh-connection-backup');
@@ -257,4 +258,12 @@ export function renderBackendSettingsWorkspace(
   save.addEventListener('click', () => { void run('save'); });
   restore.addEventListener('click', () => { void run('restore'); });
   renderMissingExecutable(container, kind, host, onRestore);
+}
+
+export function renderBackendTaskHeading(container: HTMLElement, taskLabel?: string): void {
+  if (!taskLabel || !container.classList.contains('opencodian-backend-task-workspace')) return;
+  const header = container.createDiv({ cls: 'opencodian-backend-task-header' });
+  header.createEl('h2', { cls: 'opencodian-backend-task-title', text: taskLabel });
+  const missing = container.querySelector(':scope > [data-backend-installation]');
+  if (missing) container.insertBefore(header, missing);
 }

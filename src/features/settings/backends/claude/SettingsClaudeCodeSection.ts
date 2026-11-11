@@ -304,11 +304,11 @@ const CLAUDE_ACCOUNT_INFO_SECRET_KEY_PATTERN = /(?:^env$|api[_-]?key|secret|pass
  * deep links, and the parent registry keep working during the transition.
  */
 const CLAUDE_TASK_TABS = [
+  'connection',
   'conversation',
   'providers',
   'tools-context',
   'permissions-safety',
-  'connection',
   'resources',
 ] as const;
 

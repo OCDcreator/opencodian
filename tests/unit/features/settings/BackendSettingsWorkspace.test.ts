@@ -3,6 +3,7 @@ import {
   captureBackendRecoveryPoint,
   readBackendRecoveryPoint,
   renderBackendSettingsWorkspace,
+  renderBackendTaskHeading,
   restoreBackendRecoveryPoint,
   saveBackendRecoveryPoint,
 } from '../../../../src/features/settings/controls/BackendSettingsWorkspace';
@@ -134,6 +135,24 @@ it('does not expose a recovery UI for retired or unsupported backends', () => {
   renderBackendSettingsWorkspace(container, 'opencode', host, jest.fn());
   expect(container.childElementCount).toBe(0);
   expect(captureBackendRecoveryPoint(host.settings, 'copilot')).toBeUndefined();
+});
+
+it('scopes the DSH A task layout and heading to the four refactored backends only', () => {
+  const host = fixture();
+  for (const backend of ['claude-code', 'codex', 'pi', 'zcode'] as const) {
+    const container = document.body.createDiv();
+    renderBackendSettingsWorkspace(container, backend, host, jest.fn());
+    renderBackendTaskHeading(container, 'Task title');
+    expect(container.classList.contains('opencodian-backend-task-workspace')).toBe(true);
+    expect(container.querySelector('.opencodian-backend-task-title')?.textContent).toBe('Task title');
+  }
+  for (const backend of ['opencode2', 'dsh'] as const) {
+    const container = document.body.createDiv();
+    renderBackendSettingsWorkspace(container, backend, host, jest.fn());
+    renderBackendTaskHeading(container, 'Task title');
+    expect(container.classList.contains('opencodian-backend-task-workspace')).toBe(false);
+    expect(container.querySelector('.opencodian-backend-task-title')).toBeNull();
+  }
 });
 
 describe('DSH connection backup component', () => {

@@ -17,13 +17,12 @@ import { SettingsPiConfigurationSection } from './SettingsPiConfigurationSection
 import { SettingsPiProvidersSection } from './SettingsPiProvidersSection';
 
 /**
- * Task subtabs. `execution` keeps the native execution fields and hosts the
- * advanced native editor as a clearly separate high-risk disclosure; legacy
- * ids keep resolving through {@link SettingsPiSection.attachTabbed}.
+ * Task subtabs. Resources use the native raw editor only; sessions own the
+ * advanced native editor and history. Legacy ids resolve through attachTabbed.
  */
-const PI_TABS = ['connection', 'providers', 'model', 'execution', 'account', 'mcp', 'sessions'] as const;
+const PI_TABS = ['connection', 'providers', 'model', 'execution', 'resources', 'account', 'mcp', 'sessions'] as const;
 type PiSettingsTab = (typeof PI_TABS)[number];
-const PI_TAB_ALIASES: Record<string, PiSettingsTab> = { resources: 'sessions', advanced: 'execution' };
+const PI_TAB_ALIASES: Record<string, PiSettingsTab> = { advanced: 'sessions' };
 
 /** Config paths are shown for orientation only; the home prefix is the noisy part. */
 function shortenConfigPath(filePath: string): string {
@@ -88,6 +87,7 @@ export class SettingsPiSection {
     if (tab === 'mcp') { this.mcp(body, adapter); return; }
     if (!adapter) { body.createEl('p', { text: t('settings.pi.unavailable') }); return; }
     if (tab === 'providers') { new SettingsPiProvidersSection(adapter, () => this.reconnect()).attach(body); return; }
+    if (tab === 'resources') { new SettingsPiConfigurationSection(adapter, keys => this.clearLegacyDefaults(keys), () => this.reconnect()).attachResources(body); return; }
     if (tab === 'account') { this.account(body, adapter); return; }
     if (tab === 'sessions') { this.sessions(body, adapter); return; }
     if (tab === 'execution') { this.execution(body, adapter); return; }
@@ -248,16 +248,11 @@ export class SettingsPiSection {
     stack.createEl('p', { cls: 'setting-item-description', text: t('settings.pi.legacyDefaults.help') });
   }
 
-  /**
-   * Native execution settings (tools, extensions, commands) and the advanced
-   * native editor. The advanced block is a separate, clearly labeled
-   * high-risk disclosure — never absorbed into the ordinary model page.
-   */
+  /** Native execution fields stay separate from model and advanced tasks. */
   private execution(body: HTMLElement, adapter: PiAdapter): void {
     body.createEl('p', { text: t('settings.pi.execution.help'), cls: 'setting-item-description' });
     const configuration = new SettingsPiConfigurationSection(adapter, keys => this.clearLegacyDefaults(keys), () => this.reconnect());
     configuration.attach(body, ['execution']);
-    configuration.attachAdvanced(body);
   }
 
   private async saveLegacyDefault(key: 'provider' | 'model' | 'thinkingLevel', value: string): Promise<boolean> {
@@ -368,5 +363,6 @@ export class SettingsPiSection {
       for (const session of sessions) new Setting(body).setName(session.title).setDesc(new Date(session.updatedAt).toLocaleString())
         .addButton(button => button.setButtonText(t('settings.pi.openChat')).onClick(() => { void this.openChat(session.id).catch(error => new Notice(String(error))); }));
     }).catch(error => body.setText(String(error)));
+    new SettingsPiConfigurationSection(adapter, keys => this.clearLegacyDefaults(keys), () => this.reconnect()).attachAdvanced(container);
   }
 }

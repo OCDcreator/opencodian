@@ -71,6 +71,45 @@ it('shows unavailable runtime and never renders an optimistic mutation control',
   expect(container.textContent).toContain('Declaration counts do not prove execution.');
 });
 
+it('keeps native resources read-only and mounts runtime diagnostics separately from installation', async () => {
+  const read = jest.fn().mockResolvedValue(catalog);
+  const host: SettingsZCodeHost = {
+    settings: { backendSettings: {} }, saveSettings: jest.fn(),
+    agentServiceRegistry: { get: () => ({
+      start: jest.fn(), stop: jest.fn(), getManagementCatalog: read,
+      getRuntimeDiagnostics: () => ({
+        resolution: { mode: 'ready', launch: { entryPath: '/Applications/ZCode.app/zcode-agent', source: 'official' } },
+        providerConfig: { state: 'validated', configPath: '/vault/.zcode/provider_config.json', providerCount: null },
+        handshake: 'ready',
+      }) as never,
+    }) },
+  };
+  const names: string[] = [];
+  jest.spyOn(Setting.prototype, 'setName').mockImplementation(function (name) {
+    names.push(String(name));
+    return this;
+  });
+  const toggle = jest.spyOn(Setting.prototype, 'addToggle');
+  const section = new SettingsZCodeSection(host);
+  const resources = document.body.createDiv();
+  section.attachTabbed(resources, 'resources');
+  await flush();
+
+  expect(resources.querySelector('[data-zcode-resources="workspace"]')).not.toBeNull();
+  expect(names).toContain('fixture@local');
+  expect(resources.textContent).toContain('Declaration counts do not prove execution.');
+  expect(toggle).not.toHaveBeenCalled();
+  expect(host.saveSettings).not.toHaveBeenCalled();
+
+  const installation = document.body.createDiv();
+  section.attachTabbed(installation, 'installation');
+  expect(installation.querySelector('[data-zcode-group="connection-details"]')).toBeNull();
+  const diagnostics = document.body.createDiv();
+  section.attachTabbed(diagnostics, 'diagnostics');
+  expect(diagnostics.querySelector('[data-zcode-group="diagnostics"]')).not.toBeNull();
+  expect(diagnostics.textContent).toContain('provider count unavailable');
+});
+
 it('disables plugin changes when native mutation or secure source is unavailable', async () => {
   const read = jest.fn().mockResolvedValue({ ...catalog, configuration: { ...catalog.configuration, state: 'failed' }, mutation: { ...catalog.mutation, plugins: 'unavailable' } });
   const host: SettingsZCodeHost = { settings: { backendSettings: {} }, saveSettings: jest.fn(), agentServiceRegistry: { get: () => ({ start: jest.fn(), stop: jest.fn(), getManagementCatalog: read }) } };

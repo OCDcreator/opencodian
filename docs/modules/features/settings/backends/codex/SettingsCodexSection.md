@@ -1,3 +1,7 @@
+## 2026-11-12 四后端 DSH A 重构
+
+Codex 任务顺序固定为 `connection` → `conversation` → `permissions-safety` → `account` → `resources` → `debug`，连接保持默认。plugin camelCase 默认值与项目 `.codex/config.toml` 的 snake_case 七键白名单仍走各自既有事务；旧版 apiKey 仍仅显示状态/确认后清除，MCP 与账号/能力仍为只读回读。样式变化不改变 `applyCodexRuntimeUpdates`、CAS 或插件/资源 mutation。
+
 > **Updated**: 2026-09-30 — adds a seventh `plugins` secondary tab delegated to `SettingsCodexPluginsSection` (Codex plugin browser: marketplace/installed lists, install/uninstall with confirm → reconcile → reload, honest unavailable states); resource/plugin mutations now share `invalidateCodexRuntimeCatalogs()`.
 > **Updated**: 2026-09-30 — the approval-policy dropdown no longer offers `untrusted` (retired by Codex CLI 0.15x in 2026-08); the load-time normalizer migrates persisted `untrusted` to `on-request`, and the dropdown mirrors that fallback for raw values.
 > **Updated**: 2026-07-28 — adds Project configuration secondary tab (project-config) delegated to SettingsCodexProjectConfigSection.

@@ -1,5 +1,9 @@
 # Owner: feature.settings-shell
 
+## 2026-11-12 Four-backend settings refactor
+
+Claude Code, Codex, Pi and ZCode now share the DSH A task-form anatomy through the opt-in `opencodian-backend-task-workspace` marker. `SettingsTabbedRenderer` resolves and forwards the localized task label; `BackendSettingsWorkspace` owns only the marker, heading and existing recovery behavior. The registry orders the actual eight/seven/six-task surfaces without changing OpenCode 2 or DSH. Pi resources use raw native settings only, and ZCode resources/diagnostics remain read-only views over existing adapter contracts. No runtime ownership moves into the shell or chat view.
+
 ## 2026-11-09 DSH configuration & extensions placement, navigation seam and honest native evidence
 
 Extension management now mounts on the approved "Configuration & extensions" task (`SettingsDshNativeWorkspace` renders readback, session defaults and the extensions workspace there); `advanced` keeps only the audited no-public-field policy groups plus content-sized cross-task links rendered solely when the tabbed host wired `navigateTask` — they target the single provider editor (request reliability/streaming timeouts/per-provider image budgets) and the configuration task's optional official terminal bundles. `SettingsDshSection.attachTabbed` carries the optional navigate callback into a mutable `nativeHost.navigateTask`, `attach()` clears it (no dead links on the stacked surface), and `SettingsTabbedRenderer` supplies `(task) => switchToPrimaryTab('dsh', task)`, so navigation stays inside the existing tab shell while the stable draft owner preserves unsaved edits. The registry's legacy `dsh.extensions` alias resolves to `configuration`; `dsh.terminal` stays `advanced`; the eight horizontal tabs and the accepted bounded 1030 themed layout are untouched.

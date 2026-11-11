@@ -1,4 +1,6 @@
 # Owner: feature.settings-codex
+
+2026-11-12: Codex tasks are Connection, Conversation, Permissions and limits, Account, Resources, Diagnostics. Plugin camelCase fields and the native project TOML snake_case seven-key allowlist remain distinct. Legacy credential status/clear, read-only MCP, runtime mutators, resource/plugin actions and trace ownership are unchanged by the DSH A visual rollout.
 > 2026-10-07：本 owner 的 Codex 显式重载操作等待设置保存后调用宿主 reload 接口；缺少 reloadPlugin 时使用顺序 unloadPlugin/loadPlugin，保留 enabled 状态并将保存失败和 false load 作为失败。没有把宿主生命周期责任迁移到 main 或 backend。
 > 2026-09-30 (Codex 0.159 integration)：
 > - 新增 `SettingsCodexPluginsSection`（插件市场/已安装浏览器，install/uninstall/reconcile，backend 不可用时诚实状态），注册为第 7 个 tab。

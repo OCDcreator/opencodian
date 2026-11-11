@@ -1,5 +1,9 @@
 # SettingsTabbedRenderer
 
+## 2026-11-12 Four-backend task headings
+
+`renderBackendWorkspaceTab` resolves the requested secondary route through the registry and forwards its localized label to `renderBackendTaskHeading` after the unchanged four-parameter workspace mount. The shared workspace therefore renders the current task heading before owner content in both tabbed and classic single-page mounts. This is presentation-only: debug dispatch, section disposal, Codex recovery replay and OpenCode/DSH mounts keep their existing behavior.
+
 ## 2026-11-09 DSH workspace navigation seam
 
 The DSH mount passes a navigation callback to `SettingsDshSection.attachTabbed`: `(task) => this.switchToPrimaryTab('dsh', task)`. Native advanced-task links (provider reliability/image budgets, optional official terminal bundles) therefore stay inside the existing tab shell and persistence path — no new sidebar, palette or layout. Other backends keep the two-argument mount.

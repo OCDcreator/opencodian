@@ -1,5 +1,7 @@
 # Owner: shared.i18n
 
+2026-11-12（四后端设置重构）：中英文同步精简 Connection/Resources 任务标签，新增 Pi 资源组 raw-only 说明，以及 ZCode 对话、资源、诊断的只读/刷新文案。个人 API 共享配置与 OpenCodian 独立官方登录继续分别陈述作用域；locale 不持有凭据、不伪造 readback，也不把保存成功当作运行时应用证明。两侧键集合一致。
+
 2026-11-11（工作台层级与工具反馈）：双语区分“待办计划”、独立 Plan 模式、“工作区终端”与原生“会话终端”；文件变更使用直接入口，命令与技能使用可搜索内联目录，相关设置单独命名。补齐终端启动／退出／失败、仓库不可用／非仓库／读取失败、差异、浏览器加载及截图条件、目录加载／空列表／无匹配／失败文案。浏览器文案按参考稿 `session-workbench-secondary-v2.html` 修正：附加页面改用专用短键 `workbench.browser.attachPage`（附加页面 / Attach page），不再复用全局 attach 标签；新增平静空态说明 `workbench.browser.emptyDescription` 与 `loading`/`captureWait`/`captureFailed`，与进错误区的 `invalidUrl`、`openFallback` 分开；`workbench.browser.external`（在 Obsidian 中打开）保留为仅图标操作的可访问名。翻译层不推断能力、任务终态或权威文件计数；两侧键名与插值保持一致，旧目录键保留以兼容现有消费方。
 
 2026-11-10（DSH 官方权限名称）：新增 `chat.dsh.permission.*` 四项双语名称，仅供共享权限菜单展示内置预设。自动审查文案不代表后端已启用实验扩展；可用项与选中值由原生目录和会话状态决定，custom host 名称保留。

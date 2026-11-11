@@ -206,7 +206,7 @@ describe('SettingsTabbedRenderer', () => {
     renderer.renderDisplay(container);
     expect(container.querySelector('.opencodian-settings-tabs-primary [data-tab-id="pi"]')).not.toBeNull();
     expect(container.querySelector('.opencodian-settings-tabs-primary [data-tab-id="codex"]')).toBeNull();
-    expect(container.querySelector('.opencodian-settings-tabs-secondary')?.children).toHaveLength(7);
+    expect(container.querySelector('.opencodian-settings-tabs-secondary')?.children).toHaveLength(8);
     expect(renderPi).toHaveBeenCalledWith(expect.any(HTMLElement), 'providers');
   });
   beforeEach(() => {
@@ -983,7 +983,7 @@ describe('classic backend workspace navigation', () => {
     debugButton!.click();
 
     expect(debug).toHaveBeenCalledWith(expect.any(HTMLElement), 'claude-code');
-    expect(claudeMount).toHaveBeenCalledWith(expect.any(HTMLElement), 'conversation');
+    expect(claudeMount).toHaveBeenCalledWith(expect.any(HTMLElement), 'connection');
     expect(claudeMount).not.toHaveBeenCalledWith(expect.any(HTMLElement), 'debug');
   });
 

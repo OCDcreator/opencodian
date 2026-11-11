@@ -67,11 +67,11 @@ export interface SettingsCodexSectionOptions {
  * CODEX_LEGACY_TAB_ROUTES) so existing layouts and deep links keep working.
  */
 const CODEX_TASK_TABS = [
+  'connection',
   'conversation',
   'permissions-safety',
   'account',
   'resources',
-  'connection',
 ] as const;
 
 type CodexTaskTabId = (typeof CODEX_TASK_TABS)[number];

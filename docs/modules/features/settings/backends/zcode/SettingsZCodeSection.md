@@ -6,6 +6,10 @@
 
 > 源码: src/features/settings/backends/zcode/SettingsZCodeSection.ts
 
+## 2026-11-12 八任务 DSH A 布局
+
+任务顺序为 `installation`、`chat`、`providers`、`account`、`tools`、`permissions-safety`、`resources`、`diagnostics`，默认安装与连接。资源页只读显示现有 `ZCodeManagementCatalog` 的原生插件/MCP/hooks 声明，并提供显式刷新；只有工具页既有插件启停可以写原生配置，MCP/hooks 不出现编辑器。经典堆叠宿主不自动读取资源目录，tabbed/classic 单页挂载会读取。诊断页独立展示运行时解析、共享 provider 配置和握手快照，安装页不再重复技术详情。官方登录仍是 OpenCodian 本机独立账户，个人 API 编辑仍与 ZCode 桌面共享；没有新增密钥存储或运行时 owner。
+
 ## 职责
 
 ZCode 后端的设置面（经典布局与页签布局共用）：可选运行时覆盖路径（留空=自动发现官方安装）+ 诚实的 ready / unavailable / failed 诊断三行（运行时解析、provider 配置、连接/能力握手），以及重连按钮（stop→start，仅影响 OpenCodian 自有 app-server 进程）。

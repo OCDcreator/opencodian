@@ -42,15 +42,17 @@ function shortenPath(filePath: string): string {
  * Task subtabs; legacy ids (model/management/connection) keep resolving through
  * {@link SettingsZCodeSection.attachTabbed} and the shared legacy tab map.
  */
-const ZCODE_TABS = ['chat', 'providers', 'account', 'tools', 'permissions-safety', 'installation'] as const;
+const ZCODE_TABS = ['installation', 'chat', 'providers', 'account', 'tools', 'permissions-safety', 'resources', 'diagnostics'] as const;
 type ZCodeSettingsTab = (typeof ZCODE_TABS)[number];
 const ZCODE_TAB_LABEL_KEYS: Record<ZCodeSettingsTab, Parameters<typeof t>[0]> = {
+  installation: 'settings.zcode.ui.installation',
   chat: 'settings.zcode.ui.chat',
   providers: 'settings.zcode.tab.providers',
   account: 'settings.zcode.tab.account',
   tools: 'settings.zcode.ui.tools',
   'permissions-safety': 'settings.zcode.tab.permissionsSafety',
-  installation: 'settings.zcode.ui.installation',
+  resources: 'settings.zcode.tab.resources',
+  diagnostics: 'settings.backend.tabs.debug',
 };
 
 /** Parent supplies locale entries; keep the surface usable until that handoff lands. */
@@ -60,9 +62,9 @@ function managementText(key: string, fallback: string): string {
 }
 
 /**
- * Owns the ZCode runtime surface only: chat defaults, shared API services,
- * the machine-local official login, tools management, permission mode, and
- * honest installation state. Native session state stays in the adapter.
+ * Owns the ZCode settings surface: installation, chat defaults, shared API
+ * services, isolated official login, tools, permissions, read-only resources
+ * and diagnostics. Native session and runtime state stay in the adapter.
  */
 export class SettingsZCodeSection {
   constructor(private readonly host: SettingsZCodeHost, private readonly openCompletionSettings: () => void = () => {}) {}
@@ -106,13 +108,16 @@ export class SettingsZCodeSection {
       this.renderAccount(body);
     } else if (tab === 'providers') {
       this.renderProviders(body);
+    } else if (tab === 'resources') {
+      this.attachResources(body, !showSubheading);
+    } else if (tab === 'diagnostics') {
+      this.renderDiagnosticsTab(body);
     } else {
       this.attachManagement(body);
     }
   }
 
   private renderConnection(body: HTMLElement): void {
-    body.createEl('h3', { text: t('settings.zcode.ui.installation') });
     body.createEl('p', { text: t('settings.zcode.ui.installHelp'), cls: 'setting-item-description' });
     const diagnostics = this.adapter?.getRuntimeDiagnostics?.();
     const summary = body.createDiv({ cls: 'opencodian-zcode-connection-summary', attr: { role: 'status', 'data-zcode-group': 'connection' } });
@@ -136,7 +141,7 @@ export class SettingsZCodeSection {
           this.host.invalidateSlashCommandCatalog?.();
           feedback.setText('');
         } catch (error) { feedback.setText(zcodeSettingsError(error)); }
-        finally { if (body.isConnected) { syncSummary(); this.renderDiagnostics(status); button.setDisabled(!this.adapter); } }
+        finally { if (body.isConnected) { syncSummary(); button.setDisabled(!this.adapter); } }
       });
     });
     const location = body.createEl('details', { cls: 'opencodian-zcode-disclosure', attr: { 'data-zcode-group': 'installation-location' } });
@@ -176,10 +181,6 @@ export class SettingsZCodeSection {
         });
       text.inputEl.setAttribute('aria-label', t('settings.zcode.executable'));
     });
-    const technical = body.createEl('details', { cls: 'opencodian-zcode-disclosure', attr: { 'data-zcode-group': 'connection-details' } });
-    technical.createEl('summary', { text: t('settings.zcode.ui.technical') });
-    const status = technical.createDiv({ cls: 'opencodian-zcode-config-status opencodian-zcode-disclosure-body' });
-    this.renderDiagnostics(status);
   }
 
   private renderModel(body: HTMLElement): void {
@@ -269,6 +270,97 @@ export class SettingsZCodeSection {
     } : undefined;
     if (!backend) return undefined;
     return new SettingsZCodeAccounts(backend, async () => { this.host.invalidateSlashCommandCatalog?.(); });
+  }
+
+  private attachResources(body: HTMLElement, loadImmediately: boolean): void {
+    const container = body.createDiv({ attr: { 'data-zcode-resources': 'workspace' } });
+    container.createEl('p', { cls: 'setting-item-description', text: t('settings.zcode.resources.help') });
+    const outcome = container.createDiv({ cls: 'opencodian-zcode-feedback', attr: { role: 'status' } });
+    const catalogEl = container.createDiv({ cls: 'opencodian-settings-form-stack' });
+    let refreshEpoch = 0;
+    let refreshButton: { setDisabled(value: boolean): unknown } | undefined;
+    const refresh = async (): Promise<void> => {
+      refreshButton?.setDisabled(true);
+      outcome.setText(t('settings.zcode.ui.toolsLoading'));
+      const epoch = ++refreshEpoch;
+      try {
+        await this.adapter?.start();
+        const snapshot = await this.adapter?.getManagementCatalog?.() ?? null;
+        if (epoch === refreshEpoch && container.isConnected) {
+          this.renderResources(catalogEl, snapshot);
+          outcome.setText('');
+        }
+      } catch {
+        if (epoch === refreshEpoch && container.isConnected) outcome.setText(t('settings.zcode.ui.toolsFailed'));
+      } finally { refreshButton?.setDisabled(!this.adapter); }
+    };
+    const refreshRow = new Setting(container).setName(t('settings.zcode.resources.refresh'));
+    describeBackendSetting(refreshRow, {
+      key: 'zcode-resources-refresh',
+      scope: 'project',
+      effect: 'immediate',
+      risk: 'low',
+      source: t('settings.zcode.resources.source'),
+    });
+    refreshRow.addButton(button => {
+      refreshButton = button;
+      button.setButtonText(t('settings.zcode.resources.refresh')).setDisabled(!this.adapter).onClick(() => { void refresh(); });
+    });
+    if (loadImmediately) void refresh();
+  }
+
+  private renderResources(container: HTMLElement, catalog: ZCodeManagementCatalog | null): void {
+    container.empty();
+    if (!catalog) {
+      this.addStateRow(container, t('settings.zcode.tab.resources'), managementText('settings.zcode.management.unavailable', 'Unavailable for this runtime or workspace.'));
+      return;
+    }
+    this.addStateRow(container, managementText('settings.zcode.management.declarations', 'Workspace declarations'),
+      catalog.configuration.state === 'available'
+        ? t('settings.zcode.management.declarationCounts', {
+            path: shortenPath(catalog.configuration.targetPath), plugins: catalog.configuration.pluginOverrideCount ?? '?',
+            mcp: catalog.configuration.mcpDeclarationCount ?? '?', hooks: catalog.configuration.hookDeclarationCount ?? '?',
+          })
+        : managementText('settings.zcode.management.failed', 'Readback failed; effective values are unknown.'));
+    container.createEl('h4', { text: t('settings.zcode.ui.plugins') });
+    if (!catalog.plugins.entries?.length) {
+      container.createEl('p', { cls: 'setting-item-description', text: catalog.plugins.state === 'available' ? t('settings.zcode.ui.noPlugins') : managementText(`settings.zcode.management.${catalog.plugins.state}`, catalog.plugins.state) });
+    }
+    for (const plugin of catalog.plugins.entries ?? []) {
+      new Setting(container).setName(plugin.id).setDesc(t('settings.zcode.management.pluginDetails', {
+        source: managementText(`settings.zcode.management.sourceValue.${plugin.enabledSource ?? 'unknown'}`, plugin.enabledSource ?? 'unknown'),
+        mcp: plugin.mcpCount ?? '?', hooks: plugin.hookCount ?? '?',
+        missing: plugin.packageMissing ? t('settings.zcode.management.packageMissing') : '',
+      }));
+    }
+    container.createEl('h4', { text: t('settings.zcode.ui.externalTools') });
+    if (!catalog.mcp.entries?.length) {
+      container.createEl('p', { cls: 'setting-item-description', text: catalog.mcp.state === 'available' ? t('settings.zcode.ui.noMcp') : managementText(`settings.zcode.management.${catalog.mcp.state}`, catalog.mcp.state) });
+    }
+    for (const server of catalog.mcp.entries ?? []) {
+      this.addStateRow(container, server.id, t('settings.zcode.management.mcpDetails', {
+        status: managementText(`settings.zcode.management.mcpStatus.${server.status}`, server.status),
+        tools: server.toolCount ?? '?',
+        authentication: managementText(`settings.zcode.management.authValue.${server.authentication}`, server.authentication),
+      }));
+    }
+    this.addStateRow(container, managementText('settings.zcode.management.hooks', 'Effective hooks'), managementText('settings.zcode.management.hooksUnavailable', 'Unavailable: this protocol has no independent hook configuration readback. Declaration counts do not prove execution.'));
+    this.addStateRow(container, managementText('settings.zcode.management.mutations', 'MCP and hook changes'), managementText('settings.zcode.management.mutationsUnavailable', 'Unavailable: this runtime has no supported management mutation contract.'));
+  }
+
+  private renderDiagnosticsTab(body: HTMLElement): void {
+    body.createEl('p', { cls: 'setting-item-description', text: t('settings.zcode.diagnostics.help') });
+    const status = body.createDiv({ cls: 'opencodian-zcode-config-status', attr: { 'data-zcode-group': 'diagnostics' } });
+    this.renderDiagnostics(status);
+    const refresh = new Setting(body).setName(t('settings.zcode.diagnostics.refresh'));
+    describeBackendSetting(refresh, {
+      key: 'zcode-diagnostics-refresh',
+      scope: 'global',
+      effect: 'immediate',
+      risk: 'low',
+      source: t('settings.zcode.diagnostics.source'),
+    });
+    refresh.addButton(button => button.setButtonText(t('settings.zcode.diagnostics.refresh')).onClick(() => this.renderDiagnostics(status)));
   }
 
   private attachManagement(body: HTMLElement): void {
