@@ -70,6 +70,8 @@ describe('memory sync security and endpoint hardening', () => {
 
     const clone = nodePath.join(work, 'ignored-clone');
     execFileSync('git', ['clone', remote, clone], { encoding: 'utf8' });
+    sh(clone, 'config', 'user.name', 'OpenCodian Test');
+    sh(clone, 'config', 'user.email', 'opencodian-test@example.invalid');
     nodeFs.writeFileSync(nodePath.join(clone, 'projects', 'demo', 'memory', 'ignored-draft.md'), 'remote draft');
     sh(clone, 'add', '-f', 'projects/demo/memory/ignored-draft.md');
     sh(clone, 'commit', '-m', 'remote adds ignored path');
