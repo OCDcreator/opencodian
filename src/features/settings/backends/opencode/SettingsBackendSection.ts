@@ -496,6 +496,14 @@ export class SettingsOpenCode2Section {
     const mount = { root, tab };
     this.mounts.push(mount);
     this.renderMount(mount);
+    // The allowlisted snapshot covers connection/default-permission fields,
+    // not the configuration edited on the other task pages. Keep it after the
+    // connection form, outside the root that catalog repaints replace.
+    const backup = containerEl.querySelector(':scope > .opencodian-opencode2-connection-backup');
+    if (backup) {
+      if (tab === 'connection') root.after(backup);
+      else if (!containerEl.querySelector('[data-settings-target="opencode2-connection"]')) backup.remove();
+    }
     void this.loadCatalog().then(() => this.repaint());
   }
 
@@ -545,9 +553,9 @@ export class SettingsOpenCode2Section {
     status.createSpan({ text: this.state.loading ? oc2('loading') : this.state.failure ? oc2(this.catalog ? 'cached' : 'notConnected') : oc2(this.catalog ? 'synced' : 'loading') });
     this.button(status, oc2('refresh'), async () => { await this.loadCatalog(true); this.repaint(); }, !!this.state.loading);
     const scope = root.createDiv({ cls: 'opencodian-opencode2-scope' });
-    scope.createSpan({ text: oc2('scopeLabel'), cls: 'opencodian-opencode2-badge' });
+    scope.setAttribute('aria-label', oc2('scopeLabel'));
     scope.createSpan({ text: oc2(this.local() ? 'localScope' : 'remoteScope') });
-    if (this.state.summary) scope.createSpan({ text: `OpenCode ${this.state.summary.version}`, cls: 'opencodian-opencode2-badge' });
+    if (this.state.summary) scope.createSpan({ text: `OpenCode ${this.state.summary.version}` });
     if (this.state.failure) this.notice(root, this.state.failure);
     if (!this.local()) this.notice(root, oc2('remoteReadOnly'));
     if (this.conflict()) this.notice(root, oc2('conflict'));
@@ -687,7 +695,9 @@ export class SettingsOpenCode2Section {
     } });
     const info = row.createDiv({ cls: 'setting-item-info' });
     const title = info.createDiv({ cls: 'setting-item-name', text: label });
-    title.createSpan({ cls: 'opencodian-opencode2-badge', text: this.fieldSource(path, this.value(path) !== undefined) });
+    const source = this.fieldSource(path, this.value(path) !== undefined);
+    const badge = title.createSpan({ cls: 'opencodian-opencode2-badge', text: source });
+    badge.hidden = source === oc2('inherited');
     if (description) info.createDiv({ cls: 'setting-item-description', text: description });
     const host = row.createDiv({ cls: 'setting-item-control' });
     if (path[0] === 'mcp' && path.length === 4 && ['type', 'command', 'url'].includes(path[3])) return host;
@@ -854,6 +864,29 @@ export class SettingsOpenCode2Section {
     });
   }
 
+  /** Keep choice labels compact; explanations belong below the button group. */
+  private choice(parent: HTMLElement, options: Parameters<typeof addBackendChoiceSetting>[1]): Setting {
+    const setting = addBackendChoiceSetting(parent, {
+      ...options,
+      options: options.options.map((option) => ({ ...option, description: undefined, recommended: false })),
+      onChange: async (value) => {
+        await options.onChange(value);
+        hint.setText(options.options.find((option) => option.value === value)?.description ?? '');
+      },
+    });
+    setting.settingEl.addClass('opencodian-opencode2-choice-setting');
+    const group = setting.controlEl.querySelector<HTMLElement>('.opencodian-backend-choice-group')!;
+    const hint = setting.controlEl.createEl('p', { cls: 'opencodian-opencode2-choice-hint', text: options.options.find((option) => option.value === options.value)?.description ?? '', attr: { role: 'status', 'aria-live': 'polite' } });
+    hint.id = `${group.getAttribute('aria-labelledby')}-hint`;
+    group.setAttribute('aria-describedby', hint.id);
+    group.after(hint);
+    for (const input of Array.from(group.querySelectorAll<HTMLInputElement>('input'))) {
+      const description = options.options.find((option) => option.value === input.value)?.description;
+      if (description) input.setAttribute('aria-description', description);
+    }
+    return setting;
+  }
+
   private modelReference(value: unknown): string {
     if (typeof value === 'string') return value;
     if (!value || typeof value !== 'object') return '';
@@ -863,14 +896,14 @@ export class SettingsOpenCode2Section {
 
   private renderConnection(parent: HTMLElement): void {
     const settings = this.plugin.settings.backendSettings.opencode2;
-    const group = this.group(parent, oc2('connectionMode'), oc2('connectionDesc'));
-    addBackendChoiceSetting(group, {
+    const group = this.group(parent, oc2('connectionMode'));
+    this.choice(group, {
       key: 'mode',
       name: t('settings.agent.opencode2.mode'),
       description: oc2('connectionDesc'),
       value: settings.mode === 'remote' ? 'remote' : 'local',
       options: [
-        { value: 'local', label: t('settings.server.mode.local'), description: oc2('modeLocalDesc'), recommended: true },
+        { value: 'local', label: t('settings.server.mode.local'), description: oc2('modeLocalDesc') },
         { value: 'remote', label: t('settings.server.mode.remote'), description: oc2('modeRemoteDesc') },
       ],
       onChange: async (value) => {
@@ -911,13 +944,13 @@ export class SettingsOpenCode2Section {
           { key: 'executablePath', scope: 'vault', effect: 'reconnect', risk: 'medium', defaultLabel: oc2('executableAuto') },
         );
       };
-      addBackendChoiceSetting(group, {
+      this.choice(group, {
         key: 'executablePath',
         name: t('settings.agent.opencode2.executable'),
         description: t('settings.agent.opencode2.executable.desc'),
         value: settings.executablePath ? 'custom' : 'auto',
         options: [
-          { value: 'auto', label: oc2('executableAuto'), description: oc2('executableAutoDesc'), recommended: true },
+          { value: 'auto', label: oc2('executableAuto'), description: oc2('executableAutoDesc') },
           { value: 'custom', label: oc2('executableCustom'), description: oc2('executableCustomDesc') },
         ],
         onChange: async (value) => {
@@ -1235,8 +1268,8 @@ export class SettingsOpenCode2Section {
 
   private renderPermissions(parent: HTMLElement): void {
     const settings = this.plugin.settings.backendSettings.opencode2;
-    const modeGroup = this.group(parent, t('settings.agent.opencode2.permissionMode'), t('settings.agent.opencode2.permissionMode.desc'));
-    addBackendChoiceSetting(modeGroup, {
+    const modeGroup = parent.createEl('section', { cls: 'opencodian-opencode2-group' });
+    this.choice(modeGroup, {
       key: 'permissionMode',
       name: t('settings.agent.opencode2.permissionMode'),
       description: t('settings.agent.opencode2.permissionMode.desc'),
@@ -1824,6 +1857,7 @@ export class SettingsOpenCode2Section {
     const invalid = errors.length > 0 || [...this.state.buffers.values()].some((buffer) => buffer.invalid);
     for (const { root } of this.mounts) {
       root.querySelector('[data-draft-preview]')?.setText(this.state.draft);
+      root.querySelector('.opencodian-opencode2-footer')?.setAttribute('data-draft-state', this.state.saving ? 'saving' : dirty || this.conflict() ? 'pending' : 'clean');
       root.querySelector('.opencodian-opencode2-save-status')?.setText(this.state.saving ? oc2('applying') : this.state.feedback || (raw ? rc2('rawPending') : invalid ? errors[0]?.message ?? rc2('collectionInvalid') : oc2(dirty ? 'unsaved' : 'unchanged')));
       const apply = root.querySelector<HTMLButtonElement>('[data-action="apply"]');
       if (apply) apply.disabled = !dirty || invalid || !this.editable();
@@ -1867,7 +1901,9 @@ export class SettingsOpenCode2Section {
       const key = row.dataset.configKey!;
       const path = JSON.parse(key) as ConfigPath;
       const present = this.value(path) !== undefined || this.state.buffers.has(key);
-      row.querySelector('.setting-item-name > .opencodian-opencode2-badge')?.setText(this.fieldSource(path, present));
+      const source = this.fieldSource(path, present);
+      const badge = row.querySelector<HTMLElement>('.setting-item-name > .opencodian-opencode2-badge');
+      if (badge) { badge.setText(source); badge.hidden = source === oc2('inherited'); }
       const reset = row.querySelector<HTMLButtonElement>(':scope > .setting-item-control > [data-config-action="reset"]');
       if (reset) { reset.hidden = !present; reset.disabled = !present || !this.editable(); }
       const error = errors.find((error) => JSON.stringify(error.path) === key);

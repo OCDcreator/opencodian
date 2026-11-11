@@ -2,6 +2,7 @@ import { Setting } from 'obsidian';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { SettingsOpenCode2Section } from '../../../../src/features/settings/backends/opencode/SettingsBackendSection';
+import { renderBackendSettingsWorkspace } from '../../../../src/features/settings/controls/BackendSettingsWorkspace';
 import { getPrimaryTabDefinition, resolveSecondaryTabId } from '../../../../src/features/settings/settingsLayoutRegistry';
 import { setLocale } from '../../../../src/i18n';
 
@@ -48,6 +49,63 @@ function choose(container: HTMLElement, key: string, value: string): HTMLInputEl
   radio!.dispatchEvent(new Event('change', { bubbles: true }));
   return radio!;
 }
+
+describe('OpenCode 2 task presentation', () => {
+  beforeEach(() => { document.body.innerHTML = ''; setLocale('en'); });
+  afterEach(() => { jest.restoreAllMocks(); });
+
+  it.each(['connection', 'model', 'agents', 'permissions', 'context', 'tools', 'mcp', 'configuration', 'advanced'])(
+    'places the scoped backup after Connection and omits it from the %s page header', async (tab) => {
+      const { host } = createHost();
+      const container = document.body.createDiv();
+      renderBackendSettingsWorkspace(container, 'opencode2', host, jest.fn());
+      new SettingsOpenCode2Section({ plugin: host, requestDisplayRefresh: jest.fn(), renderTitleSettings: jest.fn() })
+        .attachTabbed(container, tab);
+      await settle();
+      const root = container.querySelector('.opencodian-opencode2-settings')!;
+      expect(container.firstElementChild).toBe(root);
+      expect(root.querySelector('h3')).not.toBeNull();
+      expect(container.querySelector('.opencodian-backend-workspace-context')).toBeNull();
+      const backup = container.querySelector('.opencodian-opencode2-connection-backup');
+      expect(container.querySelectorAll('.opencodian-opencode2-connection-backup')).toHaveLength(tab === 'connection' ? 1 : 0);
+      expect(backup?.previousElementSibling ?? null).toBe(tab === 'connection' ? root : null);
+      expect(backup?.querySelector('details')?.open ?? false).toBe(false);
+    },
+  );
+
+  it('keeps the classic layout backup immediately after the connection form across catalog repaints', async () => {
+    const { host } = createHost();
+    const container = document.body.createDiv();
+    renderBackendSettingsWorkspace(container, 'opencode2', host, jest.fn());
+    new SettingsOpenCode2Section({ plugin: host, requestDisplayRefresh: jest.fn(), renderTitleSettings: jest.fn() }).attach(container);
+    await settle();
+    const connection = container.querySelector('[data-settings-target="opencode2-connection"]')!;
+    expect(connection.nextElementSibling).toBe(container.querySelector('.opencodian-opencode2-connection-backup'));
+    expect(container.querySelectorAll('.opencodian-opencode2-connection-backup')).toHaveLength(1);
+  });
+
+  it('shows pending actions across tabs and clears their emphasis after discard', async () => {
+    const { host } = createHost();
+    const context = mount(host, 'context');
+    await settle();
+    expect(context.querySelector('.opencodian-opencode2-footer')?.getAttribute('data-draft-state')).toBe('clean');
+    const source = context.querySelector<HTMLElement>('[data-config-path="compaction.auto"] .opencodian-opencode2-badge')!;
+    expect(source.hidden).toBe(true);
+    edit(context, '[data-config-path="compaction.auto"] select', 'false');
+    expect(source.hidden).toBe(false);
+    expect(context.querySelector('.opencodian-opencode2-footer')?.getAttribute('data-draft-state')).toBe('pending');
+    context.remove();
+    const model = mount(host, 'model');
+    expect(model.querySelector('.opencodian-opencode2-footer')?.getAttribute('data-draft-state')).toBe('pending');
+    model.querySelector<HTMLButtonElement>('[data-action="discard"]')!.click();
+    expect(model.querySelector('.opencodian-opencode2-footer')?.getAttribute('data-draft-state')).toBe('clean');
+    model.remove();
+    const restored = mount(host, 'context');
+    expect(restored.querySelector<HTMLElement>('[data-config-path="compaction.auto"] .opencodian-opencode2-badge')!.hidden).toBe(true);
+    expect(host.saveSettings).not.toHaveBeenCalled();
+  });
+
+});
 
 describe('OpenCode 2 functional settings workspace', () => {
   beforeEach(() => { document.body.innerHTML = ''; setLocale('en'); });
@@ -242,11 +300,31 @@ describe('OpenCode 2 connection surface', () => {
     expect(group?.getAttribute('role')).toBe('radiogroup');
     const inherit = group!.querySelector<HTMLInputElement>('input[value="inherit"]')!;
     expect(inherit.checked).toBe(true);
+    expect(group!.querySelector('.opencodian-backend-choice-desc')).toBeNull();
+    const hint = permissions.querySelector<HTMLElement>('.opencodian-opencode2-choice-hint')!;
+    expect(group!.nextElementSibling).toBe(hint);
+    expect(group!.getAttribute('aria-describedby')).toBe(hint.id);
     choose(permissions, 'permissionMode', 'yolo');
     await settle();
     expect(host.settings.backendSettings.opencode2.permissionMode).toBe('yolo');
+    expect(hint.textContent).toBe(group!.querySelector('input[value="yolo"]')!.getAttribute('aria-description'));
     expect(host.saveSettings).toHaveBeenCalledTimes(1);
     expect(permissions.querySelector('[data-backend-effect="next-turn"]')).not.toBeNull();
+  });
+
+  it('restores both the choice and its external explanation when saving is rejected', async () => {
+    const { host } = createHost();
+    const connection = mount(host, 'connection');
+    await settle();
+    const group = connection.querySelector<HTMLElement>('.opencodian-backend-choice-group[data-backend-key="mode"]')!;
+    const hint = group.nextElementSibling!;
+    const initial = hint.textContent;
+    host.saveSettings.mockRejectedValueOnce(new Error('save rejected'));
+    choose(connection, 'mode', 'remote');
+    await settle();
+    expect(group.querySelector<HTMLInputElement>('input[value="local"]')!.checked).toBe(true);
+    expect(hint.textContent).toBe(initial);
+    expect(group.querySelectorAll('.opencodian-backend-choice-desc')).toHaveLength(0);
   });
 
   it('reveals the custom executable input only after choosing custom', async () => {

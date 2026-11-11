@@ -165,9 +165,11 @@ export function renderBackendSettingsWorkspace(
   if (!kind) return;
   container.classList.add('opencodian-backend-workspace');
   container.dataset.backendWorkspace = backend;
-  const connectionBackup = kind === 'dsh';
+  const connectionBackup = kind === 'dsh' || kind === 'opencode2';
+  const backupPrefix = kind === 'dsh' ? 'settings.dsh.backup' : 'settings.opencode2.backup';
+  const backupClass = kind === 'dsh' ? 'opencodian-dsh-backup' : 'opencodian-opencode2-backup';
   const bar = container.createDiv({ cls: 'opencodian-backend-workspace-bar' });
-  if (connectionBackup) bar.addClass('opencodian-dsh-connection-backup');
+  if (connectionBackup) bar.addClass(kind === 'dsh' ? 'opencodian-dsh-connection-backup' : 'opencodian-opencode2-connection-backup');
   else {
     const copy = bar.createDiv({ cls: 'opencodian-backend-workspace-context' });
     copy.createEl('p', { cls: 'opencodian-backend-workspace-scope', text: t('settings.backend.workspace.scope') });
@@ -176,32 +178,32 @@ export function renderBackendSettingsWorkspace(
   const recovery = bar.createEl('details', { cls: 'opencodian-backend-recovery' });
   const summary = recovery.createEl('summary');
   const summaryCopy = connectionBackup
-    ? summary.createSpan({ cls: 'opencodian-dsh-backup-summary-copy' })
+    ? summary.createSpan({ cls: `${backupClass}-summary-copy` })
     : summary;
   summaryCopy.createSpan({
-    cls: connectionBackup ? 'opencodian-dsh-backup-title' : undefined,
-    text: t(connectionBackup ? 'settings.dsh.backup.title' : 'settings.backend.recovery.title'),
+    cls: connectionBackup ? `${backupClass}-title` : undefined,
+    text: connectionBackup ? t(`${backupPrefix}.title`) : t('settings.backend.recovery.title'),
   });
   const point = readBackendRecoveryPoint(host.settings, backend);
   const backupStatus = connectionBackup
-    ? summaryCopy.createSpan({ cls: 'opencodian-dsh-backup-status' })
+    ? summaryCopy.createSpan({ cls: `${backupClass}-status` })
     : undefined;
   const body = recovery.createDiv({ cls: 'opencodian-backend-recovery-body' });
   body.createEl('p', {
     cls: 'opencodian-backend-workspace-help',
     text: connectionBackup
-      ? t('settings.dsh.backup.description')
+      ? t(`${backupPrefix}.description`)
       : point
         ? t('settings.backend.recovery.savedAt', { date: new Date(point.savedAt).toLocaleString() })
         : t('settings.backend.recovery.empty'),
   });
   body.createEl('p', {
     cls: 'opencodian-backend-workspace-help',
-    text: t(connectionBackup ? 'settings.dsh.backup.scope' : 'settings.backend.recovery.scope'),
+    text: connectionBackup ? t(`${backupPrefix}.scope`) : t('settings.backend.recovery.scope'),
   });
   if (connectionBackup) body.createEl('p', {
-    cls: 'opencodian-backend-workspace-help opencodian-dsh-backup-storage',
-    text: t('settings.dsh.backup.storage'),
+    cls: `opencodian-backend-workspace-help ${backupClass}-storage`,
+    text: t(`${backupPrefix}.storage`),
   });
   const legacyFeedback = connectionBackup ? undefined : body.createEl('p', {
     cls: 'opencodian-backend-recovery-feedback', attr: { role: 'status', 'aria-live': 'polite' },
@@ -209,12 +211,12 @@ export function renderBackendSettingsWorkspace(
   const actions = body.createDiv({ cls: 'opencodian-backend-recovery-actions' });
   const save = actions.createEl('button', { text: t('settings.backend.recovery.save'), attr: { type: 'button' } });
   const restore = actions.createEl('button', {
-    text: t(connectionBackup ? 'settings.dsh.backup.restore' : 'settings.backend.recovery.restore'),
+    text: connectionBackup ? t(`${backupPrefix}.restore`) : t('settings.backend.recovery.restore'),
     attr: { type: 'button' },
   });
   if (connectionBackup) body.createEl('p', {
-    cls: 'opencodian-backend-workspace-help opencodian-dsh-backup-effect',
-    text: t('settings.dsh.backup.effect'),
+    cls: `opencodian-backend-workspace-help ${backupClass}-effect`,
+    text: t(`${backupPrefix}.effect`),
   });
   const feedback = legacyFeedback ?? body.createEl('p', {
     cls: 'opencodian-backend-recovery-feedback', attr: { role: 'status', 'aria-live': 'polite' },
@@ -223,10 +225,10 @@ export function renderBackendSettingsWorkspace(
     const current = readBackendRecoveryPoint(host.settings, backend);
     restore.disabled = !current;
     if (!connectionBackup) return;
-    save.setText(t(current ? 'settings.dsh.backup.update' : 'settings.dsh.backup.save'));
+    save.setText(t(current ? `${backupPrefix}.update` : `${backupPrefix}.save`));
     backupStatus?.setText(current
-      ? t('settings.dsh.backup.savedAt', { date: new Date(current.savedAt).toLocaleString() })
-      : t('settings.dsh.backup.empty'));
+      ? t(`${backupPrefix}.savedAt`, { date: new Date(current.savedAt).toLocaleString() })
+      : t(`${backupPrefix}.empty`));
   };
   refreshBackupState();
   const run = async (action: 'save' | 'restore'): Promise<void> => {
@@ -234,13 +236,13 @@ export function renderBackendSettingsWorkspace(
     restore.disabled = true;
     feedback.dataset.state = 'busy';
     feedback.setText(t(connectionBackup
-      ? action === 'save' ? 'settings.dsh.backup.saving' : 'settings.dsh.backup.restoring'
+      ? action === 'save' ? `${backupPrefix}.saving` : `${backupPrefix}.restoring`
       : 'settings.backend.recovery.busy'));
     try {
       if (action === 'save') await saveBackendRecoveryPoint(host, backend);
       else await restoreBackendRecoveryPoint(host, backend);
       const success = t(connectionBackup
-        ? action === 'save' ? 'settings.dsh.backup.saved' : 'settings.dsh.backup.restored'
+        ? action === 'save' ? `${backupPrefix}.saved` : `${backupPrefix}.restored`
         : action === 'save' ? 'settings.backend.recovery.saved' : 'settings.backend.recovery.restored');
       feedback.dataset.state = 'saved';
       feedback.setText(success);
@@ -248,7 +250,7 @@ export function renderBackendSettingsWorkspace(
       if (action === 'restore') onRestore();
     } catch {
       feedback.dataset.state = 'error';
-      feedback.setText(t(connectionBackup ? 'settings.dsh.backup.failed' : 'settings.backend.recovery.failed'));
+      feedback.setText(connectionBackup ? t(`${backupPrefix}.failed`) : t('settings.backend.recovery.failed'));
     } finally {
       save.disabled = false;
       refreshBackupState();

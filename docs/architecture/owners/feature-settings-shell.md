@@ -1,5 +1,7 @@
 # Owner: feature.settings-shell
 
+2026-11-11 OpenCode 2 polish: the existing recovery renderer adds a scoped connection/default-permission backup variant with exact three-field scope, empty/saved timestamp and shared rollback/pending behavior. OpenCode 2's section moves that DOM after Connection and omits it from other pages; the shared top source/application strip remains only for the four unchanged backend variants. No allowlist, persisted schema, snapshot store or missing-installation behavior changes.
+
 ## 2026-11-11 OpenCode 2 nine-task registry
 
 `settingsLayoutRegistry` expands the OpenCode 2 workspace from six to nine task pages — `connection`, `model`, `agents`, `permissions`, `context`, `tools`, `mcp`, `configuration`, `advanced` — following the approved revision-2 prototype. `context` becomes a real page (its old alias override is removed). Legacy stored-id migrations: `resources` and `extensions` resolve to `configuration`, `catalog` stays `advanced`, and `auth`/`integrations`/`models` stay `model`; `resolveSecondaryTabId` still normalizes unknown ids to the default secondary tab. The registry keeps owning layout orchestration only — no save logic, no new canonical state; default secondary tab, `backendRequired`, the other backends, and the classic/tabbed shared mount seam are unchanged. Page content is owned by `feature.settings-opencode` (`SettingsOpenCode2Section.attachTabbed` mirrors the same merged-page destinations).

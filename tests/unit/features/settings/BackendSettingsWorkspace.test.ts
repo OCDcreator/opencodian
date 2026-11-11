@@ -136,6 +136,41 @@ it('does not expose a recovery UI for retired or unsupported backends', () => {
   expect(captureBackendRecoveryPoint(host.settings, 'copilot')).toBeUndefined();
 });
 
+it('scopes the OpenCode backup to connection and default permissions without restoring configuration or credentials', async () => {
+  const host = fixture();
+  const container = document.body.createDiv();
+  const refresh = jest.fn();
+  renderBackendSettingsWorkspace(container, 'opencode2', host, refresh);
+  expect(container.querySelector('.opencodian-backend-workspace-context')).toBeNull();
+  expect(container.querySelector('.opencodian-opencode2-backup-title')?.textContent).toBe(t('settings.opencode2.backup.title'));
+  expect(container.textContent).toContain(t('settings.opencode2.backup.scope'));
+  const [save, restore] = Array.from(container.querySelectorAll<HTMLButtonElement>('button'));
+  expect(restore.disabled).toBe(true);
+  save.click();
+  for (let i = 0; i < 8; i++) await Promise.resolve();
+  const point = readBackendRecoveryPoint(host.settings, 'opencode2')!;
+  expect(Object.keys(point.values).sort()).toEqual(['executablePath', 'mode', 'permissionMode']);
+  expect(save.textContent).toBe(t('settings.opencode2.backup.update'));
+  expect(container.querySelector('.opencodian-opencode2-backup-status')?.textContent).toBe(t('settings.opencode2.backup.savedAt', {
+    date: new Date(point.savedAt).toLocaleString(),
+  }));
+  const settings = host.settings.backendSettings.opencode2;
+  settings.mode = 'remote';
+  settings.permissionMode = 'yolo';
+  settings.configContent = '{"model":"keep-current-model"}';
+  settings.baseUrl = 'https://keep.example.com';
+  settings.password = 'keep-password';
+  const retainedPassword = settings.password;
+  restore.click();
+  for (let i = 0; i < 8; i++) await Promise.resolve();
+  expect(settings.mode).toBe(point.values.mode);
+  expect(settings.permissionMode).toBe(point.values.permissionMode);
+  expect(settings.configContent).toBe('{"model":"keep-current-model"}');
+  expect(settings.baseUrl).toBe('https://keep.example.com');
+  expect(settings.password).toBe(retainedPassword);
+  expect(refresh).toHaveBeenCalledTimes(1);
+});
+
 describe('DSH connection backup component', () => {
   it('names its purpose, exposes its exact scope and disables restore until a backup exists', () => {
     const host = fixture();

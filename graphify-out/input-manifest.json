@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "fba0a64f09893a5147cc770265be811fb231be64fad3ba586694e972720ee16a",
+  "digest": "be23a1cbe27ecdff68d84a1a7f9609036bd19d2e3f2567bf2c5f01adf9cf0f88",
   "recordCount": 847,
   "records": [
     {
@@ -3176,7 +3176,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/backends/opencode/SettingsBackendSection.ts",
-      "sha256": "a59a763da1105a5e8519ba25b880cbe0e3ecb19676e7eb9598b3c2e97493b358"
+      "sha256": "ab48b4e32455fb4f8a5eef08ee7c54cbd713141ffb1dfe169bfb73857723f839"
     },
     {
       "kind": "src",
@@ -3266,7 +3266,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/controls/BackendSettingsWorkspace.ts",
-      "sha256": "4174dd6ff0f7300e72cbeac20a0f6718b8cd33a7ba4b83f697ebee40299a0ca1"
+      "sha256": "2d1c43899dff8a1165608dbd48a5812ba32d2223618bdb3b5f90638bb309e7eb"
     },
     {
       "kind": "src",
@@ -3621,7 +3621,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "f195b2297cef476cfd70de1f78f0de9bd86a000e2cb7bc491d7ddafdc4753c7a"
+      "sha256": "062e54e5010014fe7aec06c662d1d423bcc692aa4df48124c06962da4d5af33d"
     },
     {
       "kind": "src",
@@ -3631,7 +3631,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "e96a9a77fbdb7bf39ae793034a024febbc4cac0948472a85a1121b2e9e63ad8b"
+      "sha256": "1f7f6e05181ffcea5687e08f2df4b95832c27d5eb0f381097b2afdb0c067b650"
     },
     {
       "kind": "src",
@@ -3911,7 +3911,7 @@
     {
       "kind": "src",
       "key": "src/style/components/settings-opencode2.css",
-      "sha256": "9d97ee59b359813c08a6b0d4568b3f97034a8f31c3c0daa7e2065d63c498fe0a"
+      "sha256": "7f9267e8ed044b3e6f163b75505644774e410d26058b88a92a2b2106e6e54004"
     },
     {
       "kind": "src",
@@ -4239,7 +4239,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-11-11T14:34:06.835Z",
-  "headShaAtGeneration": "24f2695587255e9a9b815db893379cdc216ff436",
+  "generatedAt": "2026-11-11T16:10:27.136Z",
+  "headShaAtGeneration": "c560c0101b264a54c76b40fad5f12ae473f04662",
   "graphifyVersion": "graphify 0.9.31"
 }

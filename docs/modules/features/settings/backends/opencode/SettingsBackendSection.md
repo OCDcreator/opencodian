@@ -14,7 +14,8 @@
 
 - tabbed 宿主（`SettingsTabbedRenderer`）按二级 tab 调用 `attachTabbed(root, secondaryTabId)`：先匹配九个真实 tab id，再查合并页别名，未知 id 回退 `connection`；`attach()` 按序挂载全部九页（堆叠面）。合并页别名（registry `LEGACY_SECONDARY_TAB_ID_MAP` 对已存 id 保持权威，本文件只镜像合并页去向）：`resources`/`extensions` → `configuration`，`catalog` → `advanced`，`auth`/`integrations`/`models` → `model`；`context` 是真实页面，不再有别名。
 - 宿主注入 `renderTitleSettings`（标题生成等真实 OpenCode 2 消费者共用的控件渲染器）与稳定 vault 绝对路径（机器本地恢复身份使用）。
-- 页面头部：标题/简介、目录同步状态（`data-catalog-state` loading/failed/complete/idle，配缓存/已同步文案）、刷新按钮、范围徽章（本地/远程 + OpenCode 版本）。远程模式显示只读声明；检测到外部 `configContent` 变更显示冲突提示。
+- 页面头部直接显示标题/简介、服务信息读取状态（`data-catalog-state` loading/failed/complete/idle）和刷新服务信息按钮；本地/远程范围与版本用轻量文字呈现，不再叠加“配置范围”徽章。目录读取成功不表示草稿已保存或配置已应用。远程模式显示只读声明；检测到外部 `configContent` 变更显示冲突提示。
+- 公共三字段备份（mode/executablePath/permissionMode）仅保留在 Connection 表单后，移动已有 DOM 以保留按钮事件；不放入 catalog 重绘会替换的 root。其他 task 页不重复展示，classic 堆叠布局仍只在 Connection 后出现一次。完整 JSONC 恢复历史保留原入口与校验。
 
 ### 目录同步
 
@@ -36,7 +37,9 @@
 
 ### 字段系统
 
-- 每个字段行：来源徽章（覆盖时显示"当前库覆盖"；未覆盖显示"继承"；MCP 已有记录内未声明的子字段显示 "Not set" 占位）+ 字段级错误状态。
+- 选择按钮只显示简短名称。连接模式、执行路径来源、默认权限模式复用本类 `choice` 渲染：当前选项说明放在按钮组下方的独立 live hint；每个 radio 的 `aria-description` 保留对应解释。连接/权限只在字段层保留一份说明，权限模式不再重复同名分组标题。保存失败时按钮回退到原选项，外部说明同样保留原内容；不改变共享控件或其他后端布局。
+
+- 每个字段行保留来源语义与字段级错误状态。来源徽章只突出覆盖和 MCP 子字段的 "Not set" 状态；普通继承徽章隐藏，继承选项与真实读回仍保留。编辑、还原和跨页刷新同步更新徽章可见性。
 - 字段级还原按钮默认提供（未覆盖时隐藏），两类例外不提供：MCP 必需的 `type`/`command`/`url` 字段，以及直接绑定记录根路径的字段（如 MCP 完整声明 JSON、references 记录）——整记录移除统一走条目页脚的确认流程。
 - 布尔字段按键语义命名选项：`hidden` 用"隐藏/显示"，`disabled` 用"停用/启用"（否定键不复用通用"启用/关闭"），并接入各自专属说明（隐藏 ≠ 停用）。
 - 继承值读回（`inheritedValue`）只使用真实运行时目录值（agent 目录条目字段（`permissions` 除外）与 provider 模型显示名）；其余字段显示"继承/未知"占位，从不伪造配置默认值。
@@ -64,7 +67,7 @@
 
 ### 校验与应用
 
-- 页脚（connection 除外）：live 保存状态区 + Discard（以存储设置重新对齐基线并清空全部 buffer/暂存）+ Apply，以及只读的当前覆盖草稿 JSON 预览 disclosure（查看将提交的完整草稿）。
+- 页脚（connection 除外）：live 保存状态区 + Discard（以存储设置重新对齐基线并清空全部 buffer/暂存）+ Apply，以及只读的当前覆盖草稿 JSON 预览 disclosure（查看将提交的完整草稿）。`data-draft-state` 区分 clean/pending/saving；无修改时收起操作按钮，草稿、冲突或保存中突出操作。各页共用文件级草稿与现有校验门，仍可从任一配置页提交/放弃全部草稿。
 - Apply 门：`draftErrors()` 为空且无 invalid buffer。draftErrors 覆盖：权限规则形状（顶层数组 + 每个 agent 的 `permissions`）、agent steps 整数 ≥ 1、command template 必填、MCP 记录（type 必填；local 的 command 为非空字符串数组且首参非空；remote 的 url 必填）、compaction buffer 非负安全整数 Token 或 1 ≤ x < 100 百分比字符串（可小数，与页内输入校验一致）。
 - Apply 路径：`adapter.validateConfigContent(draft)` → `plugin.saveSettings()` → 采用存储的规范化文本为新基线（避免首尾空白被误判为外部修改）→ 把被顶替的旧 SAVED 值归档到机器本地恢复 → 强制目录重载。验证或保存失败保留草稿并回滚存储值，反馈如实报告；验证+保存成功但归档 IO 失败时保留新值并附加 history-unavailable 提示，不回滚、不谎报 apply 失败。
 

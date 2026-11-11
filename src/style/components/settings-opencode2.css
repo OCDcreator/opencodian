@@ -5,7 +5,12 @@
  * Spacing is centralized in the token block below; the approved prototype
  * rhythm is: collection header 16/18, list rail 12, editor 20/22, field rows
  * 16 (page) / 13 (editor), subsections 18/16, record footer 22/14, page
- * footer 32/18. Container queries measure real available width (named
+ * footer 20/12 (a draft-state aware bar: actions collapse while the shared
+ * draft is clean). Two-option bounded choices render as the compact radio
+ * segment; dropdown triggers, the scope strip and the selection tint are
+ * flattened to the DSH family's host-theme baseline. The connection backup
+ * lives on the workspace bar outside this section and is styled with raw
+ * theme variables. Container queries measure real available width (named
  * containers), not the viewport. Containment is limited to these settings
  * containers; visible dropdown menus portal to the document body, while their
  * hidden native selects remain 1px and do not participate in layout. */
@@ -35,7 +40,7 @@
   --oc2-subsection-margin: 18px;      /* subsections 16-20 */
   --oc2-subsection-pad: 16px;
   --oc2-record-footer-margin: 22px;   /* record footer 20-24 */
-  --oc2-page-footer-margin: 32px;     /* page footer 28-32 */
+  --oc2-page-footer-margin: 20px;     /* page footer: light draft bar, draft-state aware */
   --oc2-collection-gap: 24px;         /* body rhythm (prototype group 28 / collection 24) */
   --oc2-group-gap: 28px;
   --oc2-disclosure-gap: 24px;
@@ -86,9 +91,12 @@
   display: none !important;
 }
 
-/* This navigation belongs to the OpenCode 2 workspace but sits above its section. */
+/* This navigation belongs to the OpenCode 2 workspace but sits above its section.
+   The backend workspace stylesheet would otherwise pin the rail to its 6px gap;
+   the shared category navigation geometry is 12px (DSH correction). */
 .opencodian-settings.opencodian-settings-tabbed:has(.opencodian-backend-workspace[data-backend-workspace="opencode2"]) .opencodian-settings-tabs-secondary {
   flex-wrap: wrap;
+  gap: 12px;
   overflow: visible;
   min-height: 0;
   padding: 6px 0;
@@ -98,10 +106,11 @@
 
 .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px 16px;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-header > div:first-child { min-width: 0; }
@@ -117,7 +126,10 @@
 
 .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-header .setting-item-description {
   margin: 8px 0 0;
-  max-width: 65ch;
+  color: var(--oc2-muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
 }
 
 .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-sync {
@@ -131,15 +143,35 @@
   font-size: 11px;
 }
 
+/* Catalog refresh is a quiet utility, with explicit geometry so the host's
+   fixed button height cannot turn it into a second primary action. */
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-sync > button {
+  height: 28px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-normal);
+  box-shadow: none;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-sync > button:hover {
+  border-color: var(--oc2-border);
+  background: var(--oc2-hover);
+}
+
 .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-scope {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px 8px;
-  margin: 0 0 16px;
+  gap: 4px 12px;
+  margin: 0 0 24px;
   color: var(--oc2-muted);
   font-size: 11px;
-  line-height: 1.7;
+  font-weight: 400;
+  line-height: 1.5;
 }
 
 .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-badge {
@@ -157,8 +189,12 @@
   white-space: nowrap;
 }
 
+/* Scope readback reads as quiet text, not a pill: the strip repeats on every
+   page and bordered chips made it the loudest element under the title. */
 .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-scope .opencodian-opencode2-badge {
   margin-inline-start: 0;
+  padding: 0;
+  border: 0;
 }
 
 /* -------------------------------------------------------- body page rhythm */
@@ -192,13 +228,39 @@
 
 .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-group > .setting-item-description {
   margin: 0;
-  max-width: 65ch;
 }
 
 /* The collection element is itself a `.opencodian-opencode2-group`: neutralize
    the generic group title spacing inside the frame. */
 .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-collection > h4,
 .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-collection > .setting-item-description {
+  margin: 0;
+}
+
+/* A status/action task uses the same trailing-action alignment as the header.
+   Below the page breakpoint its action follows the copy with a real gap. */
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section[data-workspace-tab="connection"] .opencodian-opencode2-body > .opencodian-opencode2-group:has(> button) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 16px;
+  align-items: center;
+}
+
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section[data-workspace-tab="connection"] .opencodian-opencode2-body > .opencodian-opencode2-group:has(> button) > :is(h4, p) {
+  grid-column: 1;
+  margin: 0;
+}
+
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section[data-workspace-tab="connection"] .opencodian-opencode2-body > .opencodian-opencode2-group:has(> button) > p {
+  color: var(--oc2-muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section[data-workspace-tab="connection"] .opencodian-opencode2-body > .opencodian-opencode2-group:has(> button) > button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  justify-self: end;
   margin: 0;
 }
 
@@ -226,7 +288,9 @@
 
 .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .setting-item-info { min-width: 0; min-height: 0; margin: 0; }
 
-.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-field {
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-field,
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-choice-setting,
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section[data-workspace-tab="connection"] .setting-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(min(220px, 50%), 300px);
   gap: var(--oc2-field-col-page);
@@ -234,27 +298,65 @@
   min-width: 0;
 }
 
-.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-field .setting-item-name {
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-field .setting-item-name,
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-choice-setting .setting-item-name,
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section[data-workspace-tab="connection"] .setting-item-name {
   font-size: 15px;
   font-weight: 600;
   line-height: 1.4;
 }
 
-.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-field .setting-item-description {
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-field .setting-item-description,
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-choice-setting .setting-item-description,
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section[data-workspace-tab="connection"] .setting-item .setting-item-description {
   margin-top: var(--oc2-desc-gap);
   font-size: 12px;
   line-height: 1.7;
   overflow-wrap: anywhere;
 }
 
-.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-field .setting-item-control {
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-field .setting-item-control,
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-choice-setting > .setting-item-control,
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section[data-workspace-tab="connection"] .setting-item > .setting-item-control {
   display: flex;
   flex-direction: column;
+  flex-wrap: nowrap;
   align-items: stretch;
   gap: 8px;
   align-self: center;
+  width: 100%;
   min-width: 0;
+  max-width: 100%;
   justify-content: flex-start;
+}
+
+/* Button and external hint are one stack. Using a margin and a flex gap at
+   once doubled the gap; content-sized row flexing also shifted each origin. */
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-choice-setting.setting-item > .setting-item-control {
+  gap: 6px;
+}
+
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-choice-setting .opencodian-backend-field-meta,
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section[data-workspace-tab="connection"] .opencodian-backend-field-meta {
+  gap: 4px 12px;
+  margin-top: 8px;
+  color: var(--oc2-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-choice-setting .opencodian-backend-field-badge,
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section[data-workspace-tab="connection"] .opencodian-backend-field-badge {
+  gap: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-choice-setting .opencodian-backend-field-badge-axis,
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section[data-workspace-tab="connection"] .opencodian-backend-field-badge-axis {
+  color: var(--oc2-muted);
+  font-weight: 400;
 }
 
 /* The shared enhancement uses a horizontal 240px flex basis. In these
@@ -264,6 +366,129 @@
   order: 0;
   width: 100%;
   min-width: 0;
+}
+
+/* Enhanced dropdown trigger: flatten the shared chrome to the DSH family's
+   host-themed form control — 37px/7px radius/12px on the flat field surface,
+   no gradient or drop shadow in any state (rest, hover, open). Keyboard focus
+   keeps the accent outline below. */
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-settings-dropdown-trigger {
+  min-height: 37px;
+  padding: 8px 11px;
+  border: 1px solid var(--oc2-border);
+  border-radius: 7px;
+  background: var(--background-modifier-form-field, var(--background-primary));
+  color: var(--text-normal);
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: none;
+}
+
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-settings-dropdown-trigger:hover,
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-settings-dropdown.is-open .opencodian-settings-dropdown-trigger {
+  border-color: var(--background-modifier-border-hover, var(--oc2-border));
+  background: var(--background-modifier-form-field, var(--background-primary));
+  box-shadow: none;
+}
+
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-settings-dropdown-trigger:focus-visible {
+  outline: 2px solid var(--oc2-accent);
+  outline-offset: 2px;
+}
+
+/* Choice buttons contain labels only. Their selected consequence is a separate
+   hint below the group; native radio semantics and focus rings stay intact. */
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-choice-setting .opencodian-backend-choice-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 3px;
+  width: 100%;
+  padding: 3px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--oc2-secondary);
+}
+
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-choice-setting .opencodian-backend-choice-group .opencodian-backend-choice {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  min-height: 31px;
+  margin: 0;
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--oc2-muted);
+  text-align: center;
+}
+
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-choice-setting .opencodian-backend-choice-group .opencodian-backend-choice:hover {
+  background: var(--oc2-hover);
+}
+
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-choice-setting .opencodian-backend-choice-group .opencodian-backend-choice:has(input:checked) {
+  border-color: var(--background-modifier-border-hover, var(--oc2-border));
+  background: var(--oc2-surface);
+  color: var(--text-normal);
+}
+
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-choice-setting .opencodian-backend-choice-group .opencodian-backend-choice input[type="radio"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 1px;
+  margin: 0;
+  opacity: 0;
+}
+
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-choice-setting .opencodian-backend-choice-group .opencodian-backend-choice .opencodian-backend-choice-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-choice-setting .opencodian-backend-choice-group .opencodian-backend-choice .opencodian-backend-choice-label {
+  color: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-choice-setting .opencodian-backend-choice-group .opencodian-backend-choice .opencodian-backend-choice-badge {
+  display: none;
+}
+
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-choice-setting .opencodian-backend-choice-group .opencodian-backend-choice .opencodian-backend-choice-desc {
+  display: none;
+  margin: 0;
+  color: var(--oc2-muted);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-choice-hint {
+  width: 100%;
+  margin: 0;
+  color: var(--oc2-muted);
+  font-size: 12px;
+  line-height: 1.7;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-choice-hint:empty {
+  display: none;
 }
 
 .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-field select.opencodian-settings-native-select {
@@ -1037,7 +1262,7 @@
 
 .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-kv-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
   gap: 8px;
   align-items: end;
   min-width: 0;
@@ -1055,16 +1280,20 @@
   justify-items: start;
 }
 
+/* Key/value pairs match the DSH pair-row metrics: equal columns, 34px inputs
+   and native buttons with readable 12px labels (responsive stacking is owned
+   by the editor container queries below). */
 .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-kv-row :is(input, select) {
   width: 100%;
   min-width: 0;
+  min-height: 34px;
   font-size: 12px;
 }
 
 .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-kv-row button {
-  min-height: 36px;
-  padding: 6px 9px;
-  font-size: 11px;
+  min-height: 34px;
+  padding: 6px 12px;
+  font-size: 12px;
 }
 
 .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-kv-row .opencodian-opencode2-field-error {
@@ -1242,6 +1471,22 @@
   padding: 0 0 12px;
 }
 
+/* Inside a record editor the bound-rule collection flattens to a top rule: the
+   editor column is already a child of the collection frame, and a second
+   border there would nest a frame inside a frame. The top-level Permissions
+   page keeps the framed collection above. */
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-editor .opencodian-opencode2-rule-collection {
+  margin-top: 16px;
+  padding: 0;
+  border: 0;
+  border-top: 1px solid var(--oc2-border);
+  border-radius: 0;
+}
+
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-editor .opencodian-opencode2-rule-collection-header {
+  padding-top: 10px;
+}
+
 /* ------------------------------------------- legacy resource/advanced slots */
 
 .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-notice {
@@ -1355,7 +1600,7 @@
   flex-wrap: wrap;
   gap: 12px 16px;
   margin-top: var(--oc2-page-footer-margin);
-  padding-top: 18px;
+  padding-top: 12px;
   border-top: 1px solid var(--oc2-border);
 }
 
@@ -1371,6 +1616,14 @@
 .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-save-status:empty { display: none; }
 
 .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-footer button { font-size: 12px; }
+
+/* Draft-state footer (one shared cross-tab draft): a clean draft collapses the
+   direct actions and keeps only the quiet status line; pending or saving shows
+   Discard/Apply again. The thin top rule stays in both states as the task
+   separator, so clean pages do not carry an empty action bar. */
+.opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-footer[data-draft-state="clean"] > button {
+  display: none;
+}
 
 /* Apply uses normal-text-foreground-reverse for contrast instead of the
    accent, per the approved direction. */
@@ -1437,8 +1690,153 @@
 }
 
 .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section ::selection {
-  background: var(--oc2-accent);
-  color: var(--oc2-on-accent);
+  background: color-mix(in srgb, var(--oc2-accent) 26%, transparent);
+  color: var(--text-normal);
+}
+
+/* ------------------------------------------ connection backup (workspace bar) */
+
+/* Connection-only backup/restore footer. It lives on the workspace bar, one
+   level above the oc2 section, so the oc2 tokens are not in scope here: every
+   value reads the host theme directly. Styled as the DSH single-frame native
+   disclosure — full width, collapsed by default, no external bar border or
+   copy, 15px title over a quiet 12px status, 34px wrapping actions. */
+.opencodian-settings .opencodian-backend-workspace[data-backend-workspace="opencode2"] > .opencodian-backend-workspace-bar.opencodian-opencode2-connection-backup {
+  display: block;
+  margin-top: 24px;
+  padding: 0;
+  border: 0;
+}
+
+.opencodian-settings .opencodian-backend-workspace[data-backend-workspace="opencode2"] .opencodian-opencode2-connection-backup .opencodian-backend-recovery {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: transparent;
+}
+
+.opencodian-settings .opencodian-backend-workspace[data-backend-workspace="opencode2"] .opencodian-opencode2-connection-backup .opencodian-backend-recovery > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 70px;
+  width: 100%;
+  margin: 0;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-normal);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+  list-style: none;
+}
+
+.opencodian-settings .opencodian-backend-workspace[data-backend-workspace="opencode2"] .opencodian-opencode2-connection-backup .opencodian-backend-recovery > summary::-webkit-details-marker {
+  display: none;
+}
+
+.opencodian-settings .opencodian-backend-workspace[data-backend-workspace="opencode2"] .opencodian-opencode2-connection-backup .opencodian-backend-recovery > summary:hover {
+  background: var(--background-modifier-hover);
+}
+
+.opencodian-settings .opencodian-backend-workspace[data-backend-workspace="opencode2"] .opencodian-opencode2-connection-backup .opencodian-backend-recovery[open] > summary {
+  border-radius: 7px 7px 0 0;
+}
+
+.opencodian-settings .opencodian-backend-workspace[data-backend-workspace="opencode2"] .opencodian-opencode2-connection-backup .opencodian-backend-recovery > summary::after {
+  content: "";
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  background: var(--text-muted);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-width='1.7' d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center/16px no-repeat;
+  pointer-events: none;
+}
+
+.opencodian-settings .opencodian-backend-workspace[data-backend-workspace="opencode2"] .opencodian-opencode2-connection-backup .opencodian-backend-recovery[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+.opencodian-settings .opencodian-backend-workspace[data-backend-workspace="opencode2"] .opencodian-opencode2-connection-backup .opencodian-opencode2-backup-summary-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  text-align: start;
+}
+
+.opencodian-settings .opencodian-backend-workspace[data-backend-workspace="opencode2"] .opencodian-opencode2-connection-backup .opencodian-opencode2-backup-title {
+  color: var(--text-normal);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.opencodian-settings .opencodian-backend-workspace[data-backend-workspace="opencode2"] .opencodian-opencode2-connection-backup .opencodian-opencode2-backup-status,
+.opencodian-settings .opencodian-backend-workspace[data-backend-workspace="opencode2"] .opencodian-opencode2-connection-backup .opencodian-opencode2-backup-summary-copy > span:not(.opencodian-opencode2-backup-title) {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-settings .opencodian-backend-workspace[data-backend-workspace="opencode2"] .opencodian-opencode2-connection-backup .opencodian-backend-recovery-body {
+  gap: 12px;
+  margin-top: 0;
+  padding: 0 16px 16px;
+  border: 0;
+  background: transparent;
+}
+
+.opencodian-settings .opencodian-backend-workspace[data-backend-workspace="opencode2"] .opencodian-opencode2-connection-backup .opencodian-backend-workspace-help {
+  margin: 0;
+  max-width: none;
+  line-height: 1.7;
+}
+
+.opencodian-settings .opencodian-backend-workspace[data-backend-workspace="opencode2"] .opencodian-opencode2-connection-backup .opencodian-backend-recovery-actions {
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.opencodian-settings .opencodian-backend-workspace[data-backend-workspace="opencode2"] .opencodian-opencode2-connection-backup .opencodian-backend-recovery-actions > button {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 34px;
+  max-width: 100%;
+  padding: 6px 12px;
+  white-space: normal;
+}
+
+.opencodian-settings .opencodian-backend-workspace[data-backend-workspace="opencode2"] .opencodian-opencode2-connection-backup .opencodian-backend-recovery-feedback {
+  margin: 0;
+  color: var(--text-normal);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.opencodian-settings .opencodian-backend-workspace[data-backend-workspace="opencode2"] .opencodian-opencode2-connection-backup .opencodian-backend-recovery-feedback[data-state="error"] {
+  color: var(--text-error);
+}
+
+@media (forced-colors: active) {
+  .opencodian-settings .opencodian-backend-workspace[data-backend-workspace="opencode2"] .opencodian-opencode2-connection-backup .opencodian-backend-recovery > summary::after {
+    background: CanvasText;
+    forced-color-adjust: none;
+  }
+
+  .opencodian-settings .opencodian-backend-workspace[data-backend-workspace="opencode2"] .opencodian-opencode2-connection-backup .opencodian-backend-recovery {
+    border-color: ButtonText;
+  }
 }
 
 /* ------------------------------------------------------- container queries */
@@ -1448,17 +1846,33 @@
   .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-header {
     flex-direction: column;
     gap: 12px;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
   }
 
-  .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-field {
+  .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-field,
+  .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-choice-setting,
+  .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section[data-workspace-tab="connection"] .setting-item {
     grid-template-columns: minmax(0, 1fr);
     gap: 12px;
   }
 
-  .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-field .setting-item-control {
+  .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-field .setting-item-control,
+  .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section .opencodian-opencode2-choice-setting > .setting-item-control,
+  .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section[data-workspace-tab="connection"] .setting-item > .setting-item-control {
     align-self: auto;
     width: 100%;
+  }
+
+  .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section[data-workspace-tab="connection"] .opencodian-opencode2-body > .opencodian-opencode2-group:has(> button) {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 8px;
+  }
+
+  .opencodian-settings .opencodian-opencode2-settings.opencodian-settings-section[data-workspace-tab="connection"] .opencodian-opencode2-body > .opencodian-opencode2-group:has(> button) > button {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: start;
+    margin-top: 4px;
   }
 
 }
