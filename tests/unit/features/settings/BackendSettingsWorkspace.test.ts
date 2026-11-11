@@ -293,6 +293,52 @@ it('keeps dropdown height intrinsic in four-backend columns without changing hor
   }
 });
 
+it('wraps task choices at readable content widths without changing other backends', () => {
+  const readRule = (selector: string): string => {
+    const css = readFileSync(join(process.cwd(), 'src/style/components/settings-backend-workspace.css'), 'utf8');
+    const start = css.indexOf(`${selector} {`);
+    expect(start).toBeGreaterThanOrEqual(0);
+    return css.slice(start, css.indexOf('}', start) + 1);
+  };
+  const style = document.head.createEl('style', { text: [
+    '.opencodian-backend-choice-group',
+    '.opencodian-backend-choice',
+    '.opencodian-backend-choice :is(span, small)',
+    '.opencodian-settings .opencodian-backend-task-workspace .opencodian-backend-choice-group',
+    '.opencodian-settings .opencodian-backend-task-workspace .opencodian-backend-choice',
+    '.opencodian-settings .opencodian-backend-task-workspace .opencodian-backend-choice-label',
+  ].map(readRule).join('\n') });
+  try {
+    const renderChoice = (taskWorkspace: boolean) => {
+      const host = document.body.createDiv({ cls: 'opencodian-settings' });
+      const workspace = host.createDiv({ cls: 'opencodian-backend-workspace' });
+      workspace.classList.toggle('opencodian-backend-task-workspace', taskWorkspace);
+      const group = workspace.createDiv({ cls: 'opencodian-backend-choice-group' });
+      const choice = group.createEl('label', { cls: 'opencodian-backend-choice' });
+      const text = choice.createSpan({ cls: 'opencodian-backend-choice-text' });
+      const label = text.createSpan({ cls: 'opencodian-backend-choice-label', text: 'medium' });
+      const description = text.createSpan({ cls: 'opencodian-backend-choice-desc', text: 'A longer explanation' });
+      return { group, choice, label, description };
+    };
+    const task = renderChoice(true);
+    const other = renderChoice(false);
+    expect(getComputedStyle(task.group).flexWrap).toBe('wrap');
+    expect(getComputedStyle(task.choice).flexBasis).toBe('auto');
+    expect(getComputedStyle(task.choice).minWidth).toBe('min-content');
+    expect(getComputedStyle(task.choice).maxWidth).toBe('100%');
+    expect(getComputedStyle(task.choice).boxSizing).toBe('border-box');
+    expect(getComputedStyle(task.label).whiteSpace).toBe('nowrap');
+    expect(getComputedStyle(task.label).overflowWrap).toBe('normal');
+    expect(getComputedStyle(task.description).overflowWrap).toBe('anywhere');
+    expect(getComputedStyle(other.group).display).toBe('grid');
+    expect(getComputedStyle(other.choice).flexBasis).toBe('92px');
+    expect(getComputedStyle(other.choice).minWidth).toBe('0');
+    expect(getComputedStyle(other.label).overflowWrap).toBe('anywhere');
+  } finally {
+    style.remove();
+  }
+});
+
 describe('DSH connection backup component', () => {
   it('names its purpose, exposes its exact scope and disables restore until a backup exists', () => {
     const host = fixture();

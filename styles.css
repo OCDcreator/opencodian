@@ -20103,6 +20103,7 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
 
 .opencodian-settings .opencodian-backend-task-workspace .opencodian-backend-choice-group {
   display: flex;
+  flex-wrap: wrap;
   align-items: stretch;
   gap: 3px;
   width: 100%;
@@ -20116,10 +20117,13 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
 .opencodian-settings .opencodian-backend-task-workspace .opencodian-backend-choice {
   position: relative;
   display: flex;
-  flex: 1 1 0;
+  box-sizing: border-box;
+  flex: 1 1 auto;
   align-items: center;
   justify-content: center;
   gap: 0;
+  min-width: min-content;
+  max-width: 100%;
   min-height: 31px;
   margin: 0;
   padding: 5px 10px;
@@ -20149,6 +20153,8 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
   color: inherit;
   font-size: 12px;
   font-weight: 500;
+  white-space: nowrap;
+  overflow-wrap: normal;
 }
 
 .opencodian-settings .opencodian-backend-task-workspace .setting-item:has(.opencodian-backend-choice-group) {

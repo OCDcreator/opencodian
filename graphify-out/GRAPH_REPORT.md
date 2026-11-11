@@ -11,9 +11,9 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Source digest: `332f55f9ca394eeec2ed77c237364dc10ad871f3a55edd6e53d8884cb8f1dc6e`
-- Generated at: 2026-11-11T22:04:08.137Z
-- HEAD at generation: `d1a4ee1b3799f750e1f70b90ebc49828decf9490` (informational only; the content digest is the correctness signal)
+- Source digest: `089fffaf086047a9acedf9189a3fe1ca3d7e50eb88fece5ed555fd40697f2ad8`
+- Generated at: 2026-11-11T22:16:47.844Z
+- HEAD at generation: `556d72dac9a302460af367ec17c8e919101c0f42` (informational only; the content digest is the correctness signal)
 - Run `npm run graphify:update:src` after `src/`, tsconfig, package/lock, ignore rules, wrapper or Graphify version changes.
 ## Community Hubs (Navigation)
 - types/index.ts
