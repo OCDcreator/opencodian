@@ -26,7 +26,7 @@
 
 CI 在 `push` 和 `pull_request` 上运行三类 job：
 
-1. `desktop-tests`：Windows 与 macOS 分别安装依赖并执行完整 `npm test`。2026-10-30 将 macOS runner 固定到官方标准 `macos-26-intel`，避开 `macos-latest` ARM 容量不足导致长时间排队后取消的实际故障；保留完整 macOS 测试，不使用 continue-on-error 或跳过断言。
+1. `desktop-tests`：Windows 安装依赖并执行完整 `npm test`。2026-11-11 按用户决定移除 `macos-26-intel`，不再为旧 Intel Mac 运行独立 CI 作业；本机 Apple Silicon 验证单独记录，不冒充远端 macOS CI。Windows 与 Ubuntu 的完整测试和断言保持原有门禁。
 2. `architecture`：完整历史、Node.js 24 和固定 Graphify 版本，执行 `npm run verify:architecture` 与 `npm run check:module-doc-owner-impact`。
 3. `verify`：文档、Graphify、日志、lint、类型、测试和生产产物检查。
 

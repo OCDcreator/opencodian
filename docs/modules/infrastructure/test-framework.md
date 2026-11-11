@@ -15,7 +15,7 @@
 
 ## Windows 与异步价格回归（2026-09-10）
 
-- CI 增加 Windows/macOS、Node 24 全量测试矩阵；Ubuntu 原有验证链保留。远端执行结果须以实际 CI run 为准。
+- CI 最初增加 Windows/macOS、Node 24 全量测试矩阵；2026-11-11 按用户决定移除 macOS Intel 作业，保留 Windows 全量测试与 Ubuntu 原有验证链。本机 Apple Silicon 验证与远端 CI 结果分别记录，远端执行结果须以实际 CI run 为准。
 - 模拟平台的 CLI resolver 测试同时选择对应的 path API；原生路径断言使用 `path.join`，进程边界以 mock 提供 Node/Pi 路径与 taskkill 完成事件。
 - 权限失败通过文件系统调用注入 EACCES/EPERM，避免依赖 Windows 不支持的 POSIX chmod 行为或 root 权限差异。配置测试使用隔离临时 vault/home。
 - Windows runner 的 `RUNNER~1` 短路径必须通过 `fs.realpathSync.native` 生成与异步生产 I/O 一致的 canonical fixture；工作流文本断言先统一 LF，CLI 夹具按平台选择 `.cmd`，不依赖已安装 CLI。
