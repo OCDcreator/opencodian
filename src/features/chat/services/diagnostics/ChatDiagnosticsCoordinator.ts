@@ -1,6 +1,8 @@
 import type { Menu } from 'obsidian';
 
 import type { ClaudeSessionTraceService } from '../../../../core/agents/backend/diagnostics/ClaudeSessionTraceService';
+import type { DshSessionTraceService } from '../../../../core/agents/backend/diagnostics/DshSessionTraceService';
+import type { DshTraceLedgerSnapshot } from '../../../../core/agents/backend/diagnostics/types';
 import type {
   OpenCodeSessionTraceService,
   OpenCodeSessionTraceSettings,
@@ -86,6 +88,9 @@ export interface ChatDiagnosticsCoordinatorViewHost {
   showNotice(message: string): void;
 }
 
+/** DSH wire-trace ledger port; narrow on purpose (per-session ledger reads only). */
+export type DshTraceLedgerPort = Pick<DshSessionTraceService, 'readSessionLedger' | 'resolveTraceId'>;
+
 /**
  * App-composition trace ports. The explicit backend getters prevent a generic
  * backend lookup or merged diagnostics state from leaking into the chat view.
@@ -94,6 +99,7 @@ export interface ChatDiagnosticsBackendPorts {
   getOpenCodeTraceService(): OpenCodeTraceServicePort | undefined;
   getCodexTraceService(): ReturnType<CodexDiagnosticsHostAdapterHost['getCodexTraceService']>;
   getClaudeTraceService(): ClaudeSessionTraceService | undefined;
+  getDshTraceService(): DshTraceLedgerPort | undefined;
 }
 
 /** Opaque assembly seam injected by app composition into OpenCodianView. */
@@ -105,7 +111,21 @@ const noTraceBackendPorts: ChatDiagnosticsBackendPorts = {
   getOpenCodeTraceService: () => undefined,
   getCodexTraceService: () => undefined,
   getClaudeTraceService: () => undefined,
+  getDshTraceService: () => undefined,
 };
+
+/** Fail-closed DSH ledger host used before app composition injects the port. */
+function createFailClosedDshDiagnosticsHost(): DshDiagnosticsHost {
+  return { getDshTraceService: () => undefined };
+}
+
+/**
+ * Narrow DSH ledger host. Unlike Codex/Claude there is no capture surface this
+ * round: the only chat-facing DSH diagnostic is the per-session ledger read.
+ */
+export interface DshDiagnosticsHost {
+  getDshTraceService(): DshTraceLedgerPort | undefined;
+}
 
 function createFailClosedCodexDiagnosticsHost(): CodexDiagnosticsHostAdapterHost {
   return {
@@ -162,6 +182,8 @@ export function createChatDiagnosticsCoordinatorFactory(
         refreshHeaderChrome: () => viewHost.refreshHeaderChrome(),
         createMenu: () => viewHost.createBackendDiagnosticsMenu(),
         showNotice: (message) => viewHost.showNotice(message),
+      }, {
+        getDshTraceService: () => ports.getDshTraceService(),
       });
     },
   };
@@ -186,9 +208,29 @@ export class ChatDiagnosticsCoordinator {
     private readonly host: ChatDiagnosticsCoordinatorHost,
     codexDiagnosticsHost: CodexDiagnosticsHostAdapterHost = createFailClosedCodexDiagnosticsHost(),
     claudeDiagnosticsHost: ClaudeDiagnosticsHostAdapterHost = createFailClosedClaudeDiagnosticsHost(),
+    private readonly dshDiagnosticsHost: DshDiagnosticsHost = createFailClosedDshDiagnosticsHost(),
   ) {
     this.codexDiagnosticsAdapter = new CodexDiagnosticsHostAdapter(codexDiagnosticsHost);
     this.claudeDiagnosticsAdapter = new ClaudeDiagnosticsHostAdapter(claudeDiagnosticsHost);
+  }
+
+  /**
+   * Reads the DSH event ledger for exactly one backend session id. The id is
+   * supplied by the caller (captured when the context modal opens) so a later
+   * tab switch can never bleed another session's events into an open modal,
+   * and auxiliary/subagent sessions never merge into their parent's ledger.
+   * Any trace failure resolves to null: diagnostics never break the chat UI.
+   */
+  async getDshTraceLedger(sessionId: string): Promise<DshTraceLedgerSnapshot | null> {
+    try {
+      const id = sessionId.trim();
+      if (!id) return null;
+      const service = this.dshDiagnosticsHost.getDshTraceService();
+      if (!service) return null;
+      return await service.readSessionLedger(id);
+    } catch {
+      return null;
+    }
   }
 
   getOpenCodeDiagnosticsState(): OpenCodeDiagnosticsState {

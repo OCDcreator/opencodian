@@ -38,6 +38,7 @@ import type {
 } from '../../ui/modelSelector/types';
 import { AdditionalDirectoriesConfigBadgeCoordinator } from './AdditionalDirectoriesConfigBadgeCoordinator';
 import { CodexRuntimeDefaultsBadgeCoordinator } from './CodexRuntimeDefaultsBadgeCoordinator';
+import { DshNativeSessionControls } from './DshNativeSessionControls';
 import {
   ModelSelectionRuntime,
   type ModelSelectionRuntimeHost,
@@ -125,6 +126,7 @@ interface LiveOpenCodianPlugin {
       opencode2?: { permissionMode?: 'inherit' | PermissionMode };
       claudeCode?: { permissionMode?: ClaudeCodePermissionMode; model?: string };
       codex?: { sandboxMode?: CodexSandboxMode; model?: string };
+      dsh?: { transport?: 'native' | 'acp' };
     };
   };
   saveSettings?: () => Promise<void>;
@@ -240,7 +242,21 @@ function wrapHostForCodex(
     async loadModelCatalogData() {
       if ((host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'dsh') {
         const adapter = readOpenCodianPlugin()?.agentServiceRegistry?.get?.('dsh') as DshAdapter | undefined;
-        return { catalogBundle: null, providers: await adapter?.getModelSelectorProviders(host.getOwnConversation?.()?.backendSessionId) ?? [] };
+        const sessionId = host.getOwnConversation?.()?.backendSessionId;
+        // Absent own session: keep the catalog honestly empty instead of
+        // borrowing another live session as the authoritative current catalog.
+        if (!sessionId) return { catalogBundle: null, providers: [] };
+        const adapterAfter = () => readOpenCodianPlugin()?.agentServiceRegistry?.get?.('dsh') as DshAdapter | undefined;
+        const scope = () => `${host.getOwnConversation?.()?.backendSessionId ?? ''}|${readOpenCodianPlugin()?.settings?.backendSettings?.dsh?.transport ?? ''}`;
+        const scopeBefore = scope();
+        const providers = await adapter?.getModelSelectorProviders(sessionId) ?? [];
+        // The owned session may have switched while this cached read was in
+        // flight: drop the result (unavailable) rather than publish another
+        // session's catalog into the current scope.
+        if (scope() !== scopeBefore || adapterAfter() !== adapter) {
+          return { catalogBundle: null, providers: [] };
+        }
+        return { catalogBundle: null, providers };
       }
       if ((host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'opencode2') {
         const adapter = readOpenCodianPlugin()?.agentServiceRegistry?.get?.('opencode2') as OpenCode2Adapter | undefined;
@@ -392,6 +408,8 @@ export class ChatSelectionControlsCoordinator {
    */
   private readonly zcodeModeBySession = new Map<string, string>();
   private dshModelSelectionGeneration = 0;
+  /** Non-rendering native preset owner behind the generic permission selector (native DSH only). */
+  private dshPresets: DshNativeSessionControls | null = null;
   private readonly additionalDirectoriesBadge: AdditionalDirectoriesConfigBadgeCoordinator;
   private additionalDirectoriesBadgeContainer: HTMLElement | null = null;
   private readonly sandboxBadge: SandboxConfigBadgeCoordinator;
@@ -534,6 +552,14 @@ export class ChatSelectionControlsCoordinator {
     provider: string | undefined,
     model: string | undefined,
   ): Promise<boolean> {
+    // The DSH catalog is a synchronous cached read of the owned session's
+    // configuration, so every send decision reloads it: a snapshot taken for
+    // another live session, transport or adapter generation must never answer
+    // availability even when non-empty. Other backends keep the empty-only
+    // guard below.
+    if ((this.host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'dsh') {
+      await this.reloadModelCatalog();
+    }
     // A startup or restored-session probe can complete before the native
     // backend exposes its catalog. Treat an empty snapshot as retryable at
     // send time instead of making the first empty result permanent.
@@ -624,9 +650,12 @@ export class ChatSelectionControlsCoordinator {
     if (effortEl) {
       effortEl.empty();
       effortEl.createSpan({ cls: 'opencodian-model-trigger-effort-full', text: label });
+      // The compact layout hides the full span below 500px container width, so
+      // the short span must never be empty while a full label exists — an
+      // empty abbreviation would hide the whole effort suffix (2026-11-10).
       effortEl.createSpan({
         cls: 'opencodian-model-trigger-effort-short',
-        text: label === t('chat.effort.disabled') ? t('chat.effort.disabledShort') : '',
+        text: label === t('chat.effort.disabled') ? t('chat.effort.disabledShort') : label,
       });
       effortEl.setAttribute('title', label);
     }
@@ -647,6 +676,7 @@ export class ChatSelectionControlsCoordinator {
   }
 
   updatePermissionTriggerDisplay(): void {
+    this.dshPresets?.update();
     this.permissionSelector?.updateTriggerDisplay();
     if (this.getSelectionBackend() === 'zcode') {
       const sessionId = this.getZCodeSessionId();
@@ -658,6 +688,7 @@ export class ChatSelectionControlsCoordinator {
   }
 
   applyLocaleTexts(): void {
+    this.dshPresets?.update();
     this.modelPopoverFrame?.refresh(this.getModelPopoverFrameTexts());
     this.modelSelectorSearchInput?.setAttribute('placeholder', t('chat.composerPopover.modelSearchPlaceholder'));
     this.refreshModelOptions();
@@ -670,6 +701,8 @@ export class ChatSelectionControlsCoordinator {
 
   destroy(): void {
     ++this.dshModelSelectionGeneration;
+    this.dshPresets?.destroy();
+    this.dshPresets = null;
     this.closeModelDropdown();
     this.destroyRuntimeOverflow();
     this.permissionSelector?.destroy();
@@ -1149,8 +1182,12 @@ export class ChatSelectionControlsCoordinator {
       this.modelSelectorSearchInput.value = '';
     }
     // A startup CLI fallback may finish before native model/list is ready.
+    // DSH additionally reloads on every open: its catalog is a cached read of
+    // the owned session, so a non-empty snapshot from another session or an
+    // older adapter generation must never be presented as current.
     if (!this.modelSelectionRuntime.hasLoadedModelCatalog()
-      || this.modelSelectionRuntime.getAvailableProviders().length === 0) {
+      || this.modelSelectionRuntime.getAvailableProviders().length === 0
+      || (this.host.getOwnConversation?.()?.backend ?? readActiveBackendFromPlugin()) === 'dsh') {
       void this.reloadModelCatalog();
     }
     this.renderModelList();
@@ -1519,10 +1556,38 @@ export class ChatSelectionControlsCoordinator {
    */
   private buildBackendPermissionSelector(containerEl: HTMLElement): void {
     const activeBackend = this.getSelectionBackend();
+    this.dshPresets?.destroy();
+    this.dshPresets = null;
     if (activeBackend === 'dsh') {
-      // Permission requests are supported; ACP does not expose a permission-mode mutation.
       this.permissionSelector?.destroy();
       this.permissionSelector = null;
+      // ACP exposes permission requests but no preset mutation: keep the baseline empty slot.
+      if (readOpenCodianPlugin()?.settings?.backendSettings?.dsh?.transport === 'acp') return;
+      // Native: the same generic selector as other backends, bound to the session's native preset.
+      const presets = this.dshPresets = new DshNativeSessionControls({
+        getSessionId: () => {
+          const conversation = this.host.getOwnConversation?.();
+          return conversation?.backend === 'dsh' ? conversation.backendSessionId ?? null : null;
+        },
+        getService: () => {
+          const service = readOpenCodianPlugin()?.agentServiceRegistry?.get?.('dsh') as DshAdapter | undefined;
+          return typeof service?.getNativeControlCapabilities === 'function' ? service : null;
+        },
+        isAcp: () => readOpenCodianPlugin()?.settings?.backendSettings?.dsh?.transport === 'acp',
+        isStreaming: () => this.host.isActiveTabStreaming?.() ?? false,
+        onChange: () => {
+          // applyLocaleTexts() is the selector's existing repaint from its (live) config.
+          this.permissionSelector?.applyLocaleTexts();
+          this.toolbarEl?.querySelector('.opencodian-permission-trigger[data-permission-backend="dsh"]')?.setAttribute('title', presets.hint());
+        },
+      });
+      this.permissionSelector = new PermissionModeSelectorCoordinator({
+        getPermissionMode: () => presets.getPermissionMode(),
+        switchPermissionMode: (mode) => presets.switchPermissionMode(mode),
+        restoreInputFocus: () => this.host.restoreComposerInputFocus(),
+      }, presets.config);
+      this.permissionSelector.mount(containerEl);
+      presets.update();
       return;
     }
 

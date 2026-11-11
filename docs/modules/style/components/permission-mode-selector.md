@@ -5,6 +5,8 @@
 
 ## 职责
 
+2026-11-11（补齐既有 DSH 权限样式文档）：`.opencodian-permission-option-heading` 对齐选项名称与实验标记；`.opencodian-permission-badge` 使用主题边界、10px 字号及不收缩的 EXP 标记。DSH trigger 仅在真实选中实验项时通过 `--experimental` variant 保留至少 64px 宽度，使 icon-only 布局仍能显示图标与 EXP。本次仅同步已存在样式的说明，不改变权限目录、实验项准入、选择值或样式实现。
+
 定义聊天工具栏权限模式选择器的紧凑 trigger 与 backend-specific 行内内容，并提供选中态的风险语义色。三种 backend 都使用共享 `composer-popover-frame.css` 的平面卡片、header/footer、row geometry、hover 和 focus；OpenCode 使用 `yolo` / `normal` / `plan`，Claude Code 使用 `default` / `acceptEdits` / `plan` / `bypassPermissions`，Codex 使用 `read-only` / `workspace-write` / `danger-full-access`。输入工具栏内的 trigger 使用统一 control height 和低视觉权重 runtime-chip 几何，与 Agent / model / effort selector 保持同一横向节奏。
 
 ## 关键类名 / CSS 变量

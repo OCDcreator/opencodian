@@ -13,6 +13,7 @@
  */
 import type { ClaudeSessionTraceService } from '../../core/agents/backend/diagnostics/ClaudeSessionTraceService';
 import type { CodexSessionTraceService } from '../../core/agents/backend/diagnostics/CodexSessionTraceService';
+import type { DshSessionTraceService } from '../../core/agents/backend/diagnostics/DshSessionTraceService';
 import type { OpenCodeSessionTraceService } from '../../core/opencode/diagnostics/OpenCodeSessionTraceService';
 
 /**
@@ -25,6 +26,7 @@ export interface DiagnosticsBackendPorts {
   readonly openCode: OpenCodeSessionTraceService;
   readonly codex: CodexSessionTraceService;
   readonly claude: ClaudeSessionTraceService;
+  readonly dsh: DshSessionTraceService;
 }
 
 /**
@@ -60,6 +62,20 @@ export interface DiagnosticsRuntimeInputs {
   codexRuntimeMetadata: () => Record<string, unknown>;
   /** Claude runtime-metadata getter. */
   claudeRuntimeMetadata: () => Record<string, unknown>;
+  /**
+   * DSH wire-trace settings getter. Optional and fail-closed: when omitted the
+   * DSH trace port still exists but both transport gates stay off, so no DSH
+   * event is recorded and no storage initializes.
+   */
+  dshSettings?: () => import('../../core/agents/backend/diagnostics/types').DshSessionTraceSettings;
+  /**
+   * DSH known-secrets getter used only as a redaction dictionary. Must reuse an
+   * existing safe runtime getter (for example values already held in loaded
+   * plugin settings); this coordinator never reads secrets itself.
+   */
+  dshKnownSecrets?: () => readonly string[];
+  /** DSH runtime-metadata getter (optional). */
+  dshRuntimeMetadata?: () => Record<string, unknown>;
   /**
    * Logger used for per-backend dispose warnings. Injected so the caller
    * (main.ts) controls the console/export logger scope — preserving the prior

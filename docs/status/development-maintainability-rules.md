@@ -32,6 +32,10 @@
 - For style-settings work, extend `settingsStyleControls.ts` / `SettingsStylePresetSection.ts` / the existing background or input subsection owners before regrowing `SettingsStyleSection.ts`.
 - `.opencodian-container` carries `container-type: inline-size` (R-F5), so it is a containing block for `position: fixed` descendants: a fixed child would be positioned against that container instead of the viewport. **This is a registered latent constraint, not a fixed bug** — as of 2026-09-21 the plugin owns no fixed-position descendant of that container. Every fixed overlay is mounted at `document.body` (`.opencodian-tooltip-layer` in `shared/TooltipLayerController.ts`, `.opencodian-image-preview-backdrop` in `features/chat/ui/ImagePreviewOverlay.ts`, `.opencodian-tab-overflow-menu` in `features/chat/tabs/TabBar.ts`, the portaled `.opencodian-settings-dropdown-menu`) or lives in the settings window (`.opencodian-agent-switcher-floating`). Before adding a fixed-position element inside the chat container, either mount it at `document.body` (the established pattern) or move the container-query anchor deliberately — do not assume viewport coordinates. Do not "narrow" the anchor casually: `src/style/base/core.css` currently has two unnamed container queries on this anchor: `@container (min-width: 640px)` drives the R-F5 session rail's visibility breakpoint, and `@container (max-width: 400px)` reflows the narrow Chat header into brand and tab/actions rows. Re-anchoring them to the messages shell would change when these layouts appear while moving the containment hazard one level down into a subtree that has more descendants.
 
+## Backend settings boundary (2026-11-08)
+
+`BackendSettingsControls` is shared by all six backend settings surfaces, and `BackendSettingsWorkspace` owns only non-secret, user-marked default snapshots. They do not own native backend state or replace configuration-file mutation services. The source/application metadata must reflect the backend's actual turn/session/reconnect boundary. Native archive restoration stays revision-checked; failed restore leaves the file unchanged. Plugin-default snapshots must not copy credentials, environment variables or raw native configuration into a second vault store. Task tabs and their legacy aliases remain in `settingsLayoutRegistry` rather than a parallel navigation registry.
+
 ## Feature Work Checklist
 
 1. Identify the owner before coding: UI, runtime, OpenCode service, settings, storage, theme, or tests.
@@ -66,6 +70,10 @@ Pi持久配置不能用工作台命令数量代表覆盖。新增后端必须注
 
 DSH 协议准入/内容编码放在复用的 DshProtocolCodec；adapter 保留会话与生命周期真值。完整 DSH 设置区独立于后端总开关组合层，通过窄 host 连接；OpenCodianView 只转发会话保存/回读。测试将故障可控的 transport fixture 与生命周期/功能场景分开。不得为开启 aux/inline 而移除 fail-closed 只读证明，也不得将关闭会话当作删除历史。
 
+2026-11-09：库级非敏感稀疏覆盖由类型化配置边界校验；启动合并真实继承 entry 后再物化全行 patch，保留逻辑插件名、命名 assertion 和相对 include 来源。按库隔离的本机 managed profile 持有扩展依赖和原生扩展字段，不写用户 SDK profile、全局安装或共享软链接目录。NativeControls 持有逐方法能力、session/client-generation fence 与有界脱敏输出；任务输出分页必须在源字节游标和跨块秘密脱敏之间保持一致。重连需要原生活动终态证据，idle 不等于无排队子任务。Todo 投影、Jobs 生命周期、Plan 状态与权限预设分别建模。设置 renderer 释放订阅；聊天视图仅补组合端口，原生任务生命周期归相邻 SessionInformationCoordinator。
+
+DSH 重连必须先读同一 client/generation 的实时控制能力与 composition revision，再核对每个会话的 Goal、Jobs、子代理和终端活动；未提供方法不等于服务缺席，只有实时明确缺席才可跳过。官方可选终端 bundle 的隔离作用域保持原样，仅从已验证类身份、加载条目、所属组及 managed profile 解析其服务。新会话默认 Plan 是插件策略，只在首次发布新建或预留会话时应用并回读，不覆盖恢复或 fork。扩展字段取消覆盖要同时核对继承、有效值、用户层和严格修订变化；扩展操作结果必须保留 applied/restart-required/overridden/failed/cancelled 与更新恢复的差别。ACP 0.2.2-rc.1 忽略高级 MCP 逐服务参数，其编辑入口应标明仅 Native 生效，保留基础 ACP 声明。
+
 2026-10-28：memory 的真实文件系统适配器及只读辅助能力绑定属于 app.memory-runtime；core.memory 只依赖 FS/model/embedding 端口。Read/Edit/Write 提取的高风险边界集中在 memoryAgentExtraction；新增后端不得复制一套记忆存储或回退到活动后端。
 
 ## 2026-10-30 标题所有权
@@ -78,6 +86,7 @@ DSH 协议准入/内容编码放在复用的 DshProtocolCodec；adapter 保留�
 - 会话工作台 coordinator 持有临时预备/确认、tab 身份和订阅；OpenCodianView 只装配。
 - 宿主 PTY/Git 属于 WorkbenchHostRuntime，关闭工具视图不终止任务；主区域工具复用同一实例。
 - 会话文件变更复用既有回退 owner，仓库状态独立；提交与创建 worktree 必须经用户明确操作。
+- 2026-11-11：`SessionWorkbenchRepository` 在既有 feature.chat-ui owner 内完整隔离仓库表单、暂存／提交／工作树写入口及 snapshot／diff 的读取代际；`SessionWorkbenchTools` 单向组合它。该模块隔离会写仓库的高风险流程，不是转发薄层；不复制 Git 状态、不回依赖 Tools、不调整 lint 豁免。关闭视图使迟到读取失效；新一代刷新须补读尚未完成的差异。
 
 ## 会话信息 owner（2026-10-31）
 

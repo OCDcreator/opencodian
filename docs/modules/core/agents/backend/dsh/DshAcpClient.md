@@ -14,4 +14,12 @@ prompt 超时是空闲间隔而非回合总时长：`session/prompt` 的 pending
 
 停止关闭本 client 激活的会话、结清 pending 请求，并等待自有子进程实际退出。close/flush/进程退出失败向上传播；不删除持久历史。无效帧、EPIPE、进程退出和协议错误走同一故障/清理路径，旧子进程的迟到回调不能影响新连接。
 
+2026-11-09：`DshAcpClientOptions` 增加 `nativeConfig`、原始 `vaultPath`、受允许的持久目录父路径 `managedProfileRoot`，以及进程级 `onControlUpdate`。当 ACP 传入 default configuration 时，共享 `DshManagedProfile` helper 准备受控 `--patch` composition 并保持 `acp` profile；不插入 Native bridge，不伪造 Native 配置管理 capability。未传配置的旧 ACP 直接 launch 维持原行为。Native 子类已有独立准备，不二次包裹 ACP。准备期间 stop 带 generation 取消，重启创建新桥接文件，持久 profile 不参与清理。
+
+ACP launcher 将保存的 `agent-default-model.provider/model` 同步映射到实际 `acp` profile 行，因为上游 `agentOptions` 显式传入该行的 provider/model；只映射这两个字段，保留其他继承配置，reset 后恢复实际 ACP 默认。ACP 原生 `agentOptions` 不支持 reasoningEffort；新会话默认 effort 由 adapter 创建会话后通过原生 config option 设定与回读，恢复会话不能重放默认值。独立安装集成 `DshAcpDefaults.live.test.ts` 使用真实客户端/adapter 和无模型调用的 synthetic provider 验证这些边界。
+
+`config/extensions/update` 通知只接收 object params，经当前 child 身份检查转发 `onControlUpdate`，不添加伪 sessionId，不进入 session/update 路径。旧进程通知不能污染新连接；adapter 仍负责上层连接 generation fence。
+
+2026-11-10（wire trace 注入缝——实施机制已冻结，独立复核/宿主验收待完成）：`DshAcpClientOptions.trace?: DshClientTraceHook`（observer + transport 标签）为可选项，缺省时每个 hook 是零行为变化的 no-op。`observe()` 把白名单 wire 记录转发给注入的 observer，observer 异常在此吸收，trace 永不影响聊天传输。`extractDshSessionUpdateDetail` 是字段级元数据白名单：sessionUpdate 名、截断并擦除凭据形态的 toolCallId/messageId、仅枚举集合内的 kind/status、数值 token 用量与 backendTimeMs；`rawInput`/`content`/`arguments` 等载荷与 title/reason 等自由文本不在白名单内。每个 client 实例持有一个 `sourceId`（UUID），每次 start 递增 generation，`observe()` 转发的记录带该身份；错误记录只含固定分类 + 数值 `errorCode` + 严格 `stopReason` 枚举，不含 raw error 文本。wire 记录/observer/hook 类型真值在 `../diagnostics/types.ts`，本文件仅 re-export 保持传输公共表面兼容；本轮 trace 不采集 stderr（client 自有的 stderrTail 错误包装路径与 trace 无关）。
+
 `resolveDshLaunch` 继续支持显式 CLI、PATH `dsh`、macOS DeepSeek Harness.app 的 Electron-as-Node 载体。固定使用 ACP profile；Windows 仅接受原生 dsh.exe，不通过 shell 执行 .cmd/.bat。未连接桌面私有 Web host。

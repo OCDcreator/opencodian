@@ -5,8 +5,9 @@ import { Setting } from 'obsidian';
 import type { FileRevision } from '../../../../core/agents/backend/configuration/ProjectResourceSecureWrite';
 import type { ZCodeAdapter, ZCodeAdapterRuntimeDiagnostics, ZCodeManagementCatalog, ZCodeManagementMutationResult } from '../../../../core/agents/backend/zcode';
 import type { ZCodeWorkspaceCatalogOptions } from '../../../../core/agents/backend/zcode/ZCodeModelCatalog';
-import { normalizeZCodeBackendSettings } from '../../../../core/types/settings';
+import { normalizeZCodeBackendSettings, type ZCodeBackendSettings } from '../../../../core/types/settings';
 import { t } from '../../../../i18n';
+import { addBackendChoiceSetting, describeBackendSetting } from '../../controls/BackendSettingsControls';
 import { SettingsZCodeAccounts, type ZCodeAccountsBackend, zcodeSettingsError } from './SettingsZCodeAccounts';
 import { SettingsZCodeModelControls, type ZCodeModelSettingsHost, type ZCodeSettingsModelCatalog } from './SettingsZCodeModelControls';
 
@@ -37,10 +38,18 @@ function shortenPath(filePath: string): string {
   return normalized.startsWith(`${normalizedHome}/`) ? `~/${normalized.slice(normalizedHome.length + 1)}` : filePath;
 }
 
-const ZCODE_TABS = ['chat', 'tools', 'installation'] as const;
-const ZCODE_TAB_LABEL_KEYS: Record<(typeof ZCODE_TABS)[number], Parameters<typeof t>[0]> = {
+/**
+ * Task subtabs; legacy ids (model/management/connection) keep resolving through
+ * {@link SettingsZCodeSection.attachTabbed} and the shared legacy tab map.
+ */
+const ZCODE_TABS = ['chat', 'providers', 'account', 'tools', 'permissions-safety', 'installation'] as const;
+type ZCodeSettingsTab = (typeof ZCODE_TABS)[number];
+const ZCODE_TAB_LABEL_KEYS: Record<ZCodeSettingsTab, Parameters<typeof t>[0]> = {
   chat: 'settings.zcode.ui.chat',
+  providers: 'settings.zcode.tab.providers',
+  account: 'settings.zcode.tab.account',
   tools: 'settings.zcode.ui.tools',
+  'permissions-safety': 'settings.zcode.tab.permissionsSafety',
   installation: 'settings.zcode.ui.installation',
 };
 
@@ -51,9 +60,9 @@ function managementText(key: string, fallback: string): string {
 }
 
 /**
- * Owns the ZCode runtime surface only: executable override plus an honest
- * ready / unavailable / failed state for discovery, provider configuration,
- * and the capability handshake. Native session state stays in the adapter.
+ * Owns the ZCode runtime surface only: chat defaults, shared API services,
+ * the machine-local official login, tools management, permission mode, and
+ * honest installation state. Native session state stays in the adapter.
  */
 export class SettingsZCodeSection {
   constructor(private readonly host: SettingsZCodeHost, private readonly openCompletionSettings: () => void = () => {}) {}
@@ -65,15 +74,17 @@ export class SettingsZCodeSection {
 
   attachTabbed(container: HTMLElement, requested: string): void {
     const mapped = ({ connection: 'installation', model: 'chat', management: 'tools' } as Record<string, string>)[requested] ?? requested;
-    const tab = ZCODE_TABS.includes(mapped as (typeof ZCODE_TABS)[number]) ? mapped as (typeof ZCODE_TABS)[number] : 'chat';
+    const tab = ZCODE_TABS.includes(mapped as ZCodeSettingsTab) ? mapped as ZCodeSettingsTab : 'chat';
     this.renderTab(container, tab, false);
   }
 
   private renderTab(
     container: HTMLElement,
-    tab: (typeof ZCODE_TABS)[number],
+    tab: ZCodeSettingsTab,
     showSubheading = true,
   ): void {
+    // Append-only: the shared backend workspace bar may already live in the
+    // container; this section never empties or reorders host content.
     const section = container.createDiv({
       cls: 'opencodian-settings-block opencodian-settings-section opencodian-zcode-settings',
       attr: { 'data-settings-surface': 'section', 'data-settings-target': `zcode-${tab}` },
@@ -89,6 +100,12 @@ export class SettingsZCodeSection {
       this.renderConnection(body);
     } else if (tab === 'chat') {
       this.renderModel(body);
+    } else if (tab === 'permissions-safety') {
+      this.renderPermissions(body);
+    } else if (tab === 'account') {
+      this.renderAccount(body);
+    } else if (tab === 'providers') {
+      this.renderProviders(body);
     } else {
       this.attachManagement(body);
     }
@@ -129,28 +146,36 @@ export class SettingsZCodeSection {
 
     // Initial values are a render snapshot; change handlers merge the latest host state.
     const settings = normalizeZCodeBackendSettings(this.host.settings.backendSettings.zcode);
-    new Setting(locationBody)
+    const executableSetting = new Setting(locationBody)
       .setName(t('settings.zcode.executable'))
-      .setDesc(t('settings.zcode.ui.locationHelp'))
-      .addText((text) => {
-        text
-          .setPlaceholder(t('settings.zcode.executable.auto'))
-          .setValue(settings.executablePath)
-          .onChange(async (value) => {
-            const previous = normalizeZCodeBackendSettings(this.host.settings.backendSettings.zcode).executablePath;
-            this.host.settings.backendSettings.zcode = normalizeZCodeBackendSettings({
-              ...normalizeZCodeBackendSettings(this.host.settings.backendSettings.zcode),
-              executablePath: value,
-            });
-            try { await this.host.saveSettings(); feedback.setText(t('settings.zcode.ui.reconnectNeeded')); }
-            catch {
-              const current = normalizeZCodeBackendSettings(this.host.settings.backendSettings.zcode);
-              if (current.executablePath === value.trim()) this.host.settings.backendSettings.zcode = { ...current, executablePath: previous };
-              text.setValue(previous); feedback.setText(t('settings.zcode.ui.saveFailed'));
-            }
+      .setDesc(t('settings.zcode.ui.locationHelp'));
+    describeBackendSetting(executableSetting, {
+      key: 'zcode-executable-path',
+      scope: 'vault',
+      effect: 'new-session',
+      risk: 'medium',
+      defaultLabel: t('settings.zcode.executable.auto'),
+      source: t('settings.zcode.status.discoverySource'),
+    });
+    executableSetting.addText((text) => {
+      text
+        .setPlaceholder(t('settings.zcode.executable.auto'))
+        .setValue(settings.executablePath)
+        .onChange(async (value) => {
+          const previous = normalizeZCodeBackendSettings(this.host.settings.backendSettings.zcode).executablePath;
+          this.host.settings.backendSettings.zcode = normalizeZCodeBackendSettings({
+            ...normalizeZCodeBackendSettings(this.host.settings.backendSettings.zcode),
+            executablePath: value,
           });
-        text.inputEl.setAttribute('aria-label', t('settings.zcode.executable'));
-      });
+          try { await this.host.saveSettings(); feedback.setText(t('settings.zcode.ui.reconnectNeeded')); }
+          catch {
+            const current = normalizeZCodeBackendSettings(this.host.settings.backendSettings.zcode);
+            if (current.executablePath === value.trim()) this.host.settings.backendSettings.zcode = { ...current, executablePath: previous };
+            text.setValue(previous); feedback.setText(t('settings.zcode.ui.saveFailed'));
+          }
+        });
+      text.inputEl.setAttribute('aria-label', t('settings.zcode.executable'));
+    });
     const technical = body.createEl('details', { cls: 'opencodian-zcode-disclosure', attr: { 'data-zcode-group': 'connection-details' } });
     technical.createEl('summary', { text: t('settings.zcode.ui.technical') });
     const status = technical.createDiv({ cls: 'opencodian-zcode-config-status opencodian-zcode-disclosure-body' });
@@ -158,23 +183,92 @@ export class SettingsZCodeSection {
   }
 
   private renderModel(body: HTMLElement): void {
+    const unavailableHint = body.createDiv({
+      cls: 'opencodian-zcode-feedback',
+      attr: { role: 'status', 'data-zcode-group': 'catalog-unavailable' },
+    });
     const controls = new SettingsZCodeModelControls(this.host, {
       getCatalog: async (options) => {
         const adapter = this.adapter;
         if (!adapter?.getWorkspaceModelCatalog) throw new Error('zcode-models-unavailable');
         return adapter.getWorkspaceModelCatalog(options);
       },
-      onCatalogUnavailable: () => accounts.reveal(),
+      // Chat and account/model services are separate tabs now; point at them
+      // honestly instead of pretending to reveal hidden controls.
+      onCatalogUnavailable: () => {
+        if (unavailableHint.isConnected) unavailableHint.setText(t('settings.zcode.ui.catalogUnavailableHint'));
+      },
       openCompletionSettings: this.openCompletionSettings,
     });
     controls.attach(body);
+  }
+
+  /**
+   * Permission mode lives on its own high-risk page, physically separate from
+   * the ordinary chat defaults. The persisted default is applied once at
+   * session materialization; live conversations switch through setSessionMode.
+   */
+  private renderPermissions(body: HTMLElement): void {
+    body.createEl('p', { text: t('settings.zcode.permissions.help'), cls: 'setting-item-description' });
+    const settings = normalizeZCodeBackendSettings(this.host.settings.backendSettings.zcode);
+    const stack = body.createDiv({ cls: 'opencodian-settings-form-stack' });
+    addBackendChoiceSetting(stack, {
+      key: 'zcode-default-mode',
+      name: t('settings.zcode.ui.mode'),
+      description: t('settings.zcode.permissions.modeHelp'),
+      value: settings.mode,
+      options: [
+        { value: '', label: t('settings.zcode.ui.inherit'), description: t('settings.zcode.permissions.inheritHelp'), recommended: true },
+        { value: 'plan', label: t('settings.zcode.ui.mode.plan'), description: t('settings.zcode.ui.mode.planHelp') },
+        { value: 'build', label: t('settings.zcode.ui.mode.build'), description: t('settings.zcode.ui.mode.buildHelp') },
+        { value: 'edit', label: t('settings.zcode.ui.mode.edit'), description: t('settings.zcode.ui.mode.editHelp') },
+        { value: 'yolo', label: t('settings.zcode.ui.mode.yolo'), description: t('settings.zcode.ui.mode.yoloHelp') },
+      ],
+      onChange: async (value) => {
+        if (!await this.saveBackendField('mode', value)) throw new Error('zcode-mode-save-failed');
+      },
+      presentation: {
+        key: 'zcode-default-mode',
+        scope: 'vault',
+        effect: 'new-session',
+        risk: 'high',
+        defaultLabel: t('settings.zcode.ui.inherit'),
+        source: t('settings.zcode.permissions.source'),
+      },
+    });
+    const notes = body.createDiv({ cls: 'opencodian-zcode-supporting', attr: { 'data-zcode-group': 'permissions-notes' } });
+    notes.createEl('p', { cls: 'setting-item-description', text: t('settings.zcode.permissions.timingHelp') });
+    notes.createEl('p', { cls: 'setting-item-description', text: t('settings.zcode.permissions.planQuirk') });
+    notes.createEl('p', { cls: 'setting-item-description', text: t('settings.zcode.permissions.notSandboxHelp') });
+  }
+
+  private renderAccount(body: HTMLElement): void {
+    const accounts = this.createAccounts();
+    if (!accounts) {
+      body.createEl('p', { text: t('settings.zcode.ui.connectionIdle'), cls: 'setting-item-description' });
+      return;
+    }
+    accounts.attachAccount(body);
+  }
+
+  private renderProviders(body: HTMLElement): void {
+    const accounts = this.createAccounts();
+    if (!accounts) {
+      body.createEl('p', { text: t('settings.zcode.ui.connectionIdle'), cls: 'setting-item-description' });
+      return;
+    }
+    accounts.attachProviders(body);
+    void accounts.loadProvidersForExternalCaller();
+  }
+
+  private createAccounts(): SettingsZCodeAccounts | undefined {
     const adapter = this.adapter;
     const backend = adapter?.accounts && adapter.getPersonalConfigService && adapter.refreshConfiguration ? {
       accounts: adapter.accounts, getPersonalConfigService: () => adapter.getPersonalConfigService!(),
       refreshConfiguration: () => adapter.refreshConfiguration!(),
     } : undefined;
-    const accounts = new SettingsZCodeAccounts(backend, async () => { this.host.invalidateSlashCommandCatalog?.(); await controls.refresh(true); });
-    accounts.attach(body);
+    if (!backend) return undefined;
+    return new SettingsZCodeAccounts(backend, async () => { this.host.invalidateSlashCommandCatalog?.(); });
   }
 
   private attachManagement(body: HTMLElement): void {
@@ -288,6 +382,21 @@ export class SettingsZCodeSection {
 
   private get adapter(): ReturnType<NonNullable<SettingsZCodeHost['agentServiceRegistry']>['get']> {
     return this.host.agentServiceRegistry?.get('zcode');
+  }
+
+  /** Persist one plugin field; on save failure roll back to the previous value. */
+  private async saveBackendField(field: keyof ZCodeBackendSettings, value: string): Promise<boolean> {
+    const previous = normalizeZCodeBackendSettings(this.host.settings.backendSettings.zcode);
+    const next = normalizeZCodeBackendSettings({ ...previous, [field]: value });
+    this.host.settings.backendSettings.zcode = next;
+    try {
+      await this.host.saveSettings();
+      return true;
+    } catch {
+      const current = normalizeZCodeBackendSettings(this.host.settings.backendSettings.zcode);
+      if (current[field] === next[field]) this.host.settings.backendSettings.zcode = { ...current, [field]: previous[field] };
+      return false;
+    }
   }
 
   private renderDiagnostics(status: HTMLElement): void {

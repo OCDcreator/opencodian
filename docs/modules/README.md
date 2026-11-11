@@ -1,4 +1,9 @@
 # OpenCodian 模块功能文档
+
+- 2026-11-09：[DshNativeControls](core/agents/backend/dsh/DshNativeControls.md) 隔离 Native 控制 DTO、逐方法能力证据、代际/owner 校验与事件；[DshAdapter](core/agents/backend/dsh/DshAdapter.md) 保留生命周期和显式空闲重连。
+- DSH 持久配置：[共享类型](core/types/dshConfiguration.md)、[校验与稀疏 patch](core/agents/backend/configuration/DshNativeConfiguration.md)、[隔离 profile](core/agents/backend/configuration/DshManagedProfile.md)。
+- DSH 设置：[任务工作区](features/settings/backends/dsh/SettingsDshNativeWorkspace.md)、[字段表单](features/settings/backends/dsh/SettingsDshNativeFields.md)、[恢复预览](features/settings/backends/dsh/SettingsDshNativeHistory.md)、[扩展管理](features/settings/backends/dsh/SettingsDshExtensionsWorkspace.md)、[原生扩展字段](features/settings/backends/dsh/SettingsDshExtensionSettings.md)、[MCP 控件](features/settings/backends/dsh/SettingsDshMcpServerControls.md)。
+- DSH 会话：原生能力只经既有共享控件与会话工作台接入（2026-11-10 起 composer 不再挂载 DSH 专属控件条）。以下两个文件已解除接线、保留待清理决策：[DshNativeSessionControls（dormant）](features/chat/services/selection/DshNativeSessionControls.md)、[DshSessionWorkbenchModal（dormant）](features/chat/ui/DshSessionWorkbenchModal.md)。
 > 2026-10-07 增量：[ClaudeCodeScopedSessionStore](core/agents/backend/claude/ClaudeCodeScopedSessionStore.md) 记录 Claude 域 config 根的原生目录接缝和文件边界。
 
 > 按源码模块组织的项目文档群。`module-docs.config.json` 定义源码到文档的一对一映射，`src/**/*.ts(x)` 与 `src/style/**/*.css` 原则上都应在 `docs/modules/` 下拥有一篇对应文档。
@@ -120,7 +125,9 @@
 - [Goal 后端契约](core/agents/backend/BackendGoalRuntime.md)
 - [会话信息与子会话](features/chat/services/conversation/SessionInformationCoordinator.md)
 - [信息面板渲染](features/chat/ui/SessionWorkbenchInformation.md)
+- [子会话转录与续接视图](features/chat/ui/SessionWorkbenchChildView.md)
 - [工作台投影](features/chat/services/conversation/SessionWorkbenchCoordinator.md)
 - [工作台 UI](features/chat/ui/SessionWorkbench.md)
 - [桌面工具](features/chat/ui/SessionWorkbenchTools.md)
+- [仓库工作面](features/chat/ui/SessionWorkbenchRepository.md)
 - [宿主运行时](core/runtime/WorkbenchHostRuntime.md)

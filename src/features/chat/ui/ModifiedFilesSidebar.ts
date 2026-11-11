@@ -12,7 +12,12 @@ import { getFilePathBasename, toVaultRelativePath } from '../../../shared';
 import { ConversationRenderService } from '../services/rendering/ConversationRenderService';
 import { EditRevertPreviewModal } from './EditRevertPreviewModal';
 
-export type ModifiedFilesSidebarAvailability = 'ready' | 'unavailable';
+const EMPTY_LABELS = {
+  ready: { short: 'modifiedFiles.readyShort', full: 'modifiedFiles.empty' },
+  loading: { short: 'modifiedFiles.loadingShort', full: 'modifiedFiles.loading' },
+  unavailable: { short: 'modifiedFiles.unavailableShort', full: 'modifiedFiles.unavailable' },
+} as const;
+export type ModifiedFilesSidebarAvailability = keyof typeof EMPTY_LABELS;
 
 export interface ModifiedFilesRevertActions {
   getRevertPreview(paths?: readonly string[]): Promise<EditRevertPreview>;
@@ -164,7 +169,10 @@ export class ModifiedFilesSidebar extends Component {
     this.hostEl.setAttribute('aria-expanded', String(this.expanded));
   }
 
-  attachToWorkbench(parentEl: HTMLElement): void { parentEl.appendChild(this.wrapperEl).addClass('is-workbench-inline'); this.hostEl.hidden = true; }
+  attachToWorkbench(parentEl: HTMLElement): void { parentEl.appendChild(this.wrapperEl).addClass('is-workbench-inline'); this.hostEl.hidden = true; this.containerEl.setAttribute('role', 'region'); this.containerEl.removeAttribute('aria-modal'); }
+
+  /** Read-only projection of this owner's authoritative session-change/revert summary. */
+  getWorkbenchSummaryText(): string { return this.summaryEl?.textContent ?? ''; }
 
   private updateSummary(): void {
     const showingRevert = this.hasRevertEntries();
@@ -185,20 +193,14 @@ export class ModifiedFilesSidebar extends Component {
       if (showingRevert) {
         this.summaryEl.textContent = `${revertCount} · ${t('editRevert.revertibleShort', { count: revertibleCount })}`;
       } else {
-        this.summaryEl.textContent = hasEntries
-          ? `${this.entries.length} · ${summary}`
-          : this.availability === 'ready'
-            ? t('modifiedFiles.readyShort')
-            : t('modifiedFiles.unavailableShort');
+        this.summaryEl.textContent = hasEntries ? `${this.entries.length} · ${summary}` : t(EMPTY_LABELS[this.availability].short);
       }
     }
     const tooltip = hasEntries
       ? showingRevert
         ? `${t('editRevert.sectionTitle')}: ${revertCount}`
         : `${t('modifiedFiles.title')}: ${this.entries.length}, ${summary}`
-      : this.availability === 'ready'
-        ? t('modifiedFiles.empty')
-        : t('modifiedFiles.unavailable');
+      : t(EMPTY_LABELS[this.availability].full);
     ConversationRenderService.setTooltipLabel(
       this.hostEl,
       tooltip,
@@ -231,7 +233,7 @@ export class ModifiedFilesSidebar extends Component {
     if (this.entries.length === 0) {
       this.listEl.createDiv({
         cls: `opencodian-modified-files-sidebar-empty is-${this.availability}`,
-        text: this.availability === 'ready' ? t('modifiedFiles.empty') : t('modifiedFiles.unavailable'),
+        text: t(EMPTY_LABELS[this.availability].full),
       });
     } else {
       this.renderChangeRows();

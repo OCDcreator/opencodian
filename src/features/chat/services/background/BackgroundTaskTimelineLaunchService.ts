@@ -1,11 +1,45 @@
-import type { ChatMessage } from '../../../../core/types';
+import type { DshJobView } from '../../../../core/agents/backend/dsh/DshNativeControls';
+import type { ChatMessage, Conversation } from '../../../../core/types';
 import { t } from '../../../../i18n';
+import { sanitizeDiagnosticReport } from '../../../../shared/diagnosticSecretSanitizer';
 import type { BackgroundTaskLiveSignalLaunchInfo } from './BackgroundTaskLiveSignalCoordinator';
-import type { BackgroundTaskCompletionInfo } from './BackgroundTaskNoticeStateService';
+import type { BackgroundTaskCompletionEvent, BackgroundTaskCompletionInfo } from './BackgroundTaskNoticeStateService';
 
-export type BackgroundTaskLaunchInfo = BackgroundTaskLiveSignalLaunchInfo;
+export type BackgroundTaskLaunchInfo = BackgroundTaskLiveSignalLaunchInfo & { nativeStatus?: DshJobView['status'] };
 
 export class BackgroundTaskTimelineLaunchService {
+  /** A native job belongs to its actual parent and the user turn preceding its start. */
+  static groupNativeJobs(conversation: Conversation, jobs: readonly DshJobView[]): Map<ChatMessage, DshJobView[]> {
+    const groups = new Map<ChatMessage, DshJobView[]>();
+    const users = conversation.messages.filter(message => message.role === 'user')
+      .sort((left, right) => left.timestamp - right.timestamp);
+    for (const job of jobs) {
+      if (job.owner !== conversation.backendSessionId || !Number.isFinite(job.startedAt)) continue;
+      const anchor = [...users].reverse().find(message => message.timestamp <= job.startedAt);
+      if (!anchor) continue; // Hydration has not supplied an authoritative turn anchor yet.
+      const group = groups.get(anchor) ?? []; group.push(job); groups.set(anchor, group);
+    }
+    return groups;
+  }
+
+  static nativeJobIdentity(job: Pick<DshJobView, 'owner' | 'id'>): string {
+    return `dsh-job:${encodeURIComponent(job.owner)}:${encodeURIComponent(job.id)}`;
+  }
+
+  static nativeJobLaunch(job: DshJobView): BackgroundTaskLaunchInfo {
+    const identity = this.nativeJobIdentity(job);
+    return { launchId: identity, taskId: identity, nativeStatus: job.status,
+      description: sanitizeDiagnosticReport(job.label, { urlPolicy: 'strict' }) };
+  }
+
+  static nativeJobCompletion(job: DshJobView, isCurrent: () => boolean): BackgroundTaskCompletionEvent | null {
+    if (job.status !== 'completed' && job.status !== 'failed' && job.status !== 'killed') return null;
+    const identity = this.nativeJobIdentity(job);
+    return { reminderMessageId: identity, reminderType: 'background-task-completed',
+      tasks: [{ taskId: identity, description: this.nativeJobLaunch(job).description, nativeStatus: job.status }],
+      timestamp: job.finishedAt ?? job.startedAt, nativeJob: true, isCurrent };
+  }
+
   static upsertLaunch(
     toolCall: {
       id: string;

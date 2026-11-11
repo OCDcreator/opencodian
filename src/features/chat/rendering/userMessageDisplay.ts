@@ -1,3 +1,9 @@
+import { USER_MESSAGE_SECRET_MASK_TEXT } from './userMessageSecretMask';
+
+// Credential display masking lives in ./userMessageSecretMask (same owner);
+// this module re-exports its public surface for the renderer contract.
+export { maskUserMessageSecretsForDisplay, USER_MESSAGE_SECRET_MASK_TEXT } from './userMessageSecretMask';
+
 const MARKDOWN_CODE_SEGMENT_REGEX = /```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\r\n]+`/g;
 const STYLE_BLOCK_REGEX = /<style\b[^>]*>([\s\S]*?)<\/style>/gi;
 const SCRIPT_BLOCK_REGEX = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
@@ -11,7 +17,7 @@ const MARKUP_TOKEN_REGEX =
   /<\?[\s\S]*?\?>|<!DOCTYPE[\s\S]*?>|<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\/?[A-Za-z][\w:-]*(?:\s[^>\n]*)?>|<!--|<!\[CDATA\[|<\?[A-Za-z][\w:-]*/gi;
 
 export interface UserMessageTextHighlightSpan {
-  kind: 'agent' | 'command' | 'skill';
+  kind: 'agent' | 'command' | 'skill' | 'secret';
   value: string;
   start: number;
   end: number;
@@ -20,6 +26,9 @@ export interface UserMessageTextHighlightSpan {
 // Keep slash-token matching aligned with the composer backdrop so sent user
 // messages preserve the same visual command and skill cues after render.
 const USER_MESSAGE_SLASH_HIGHLIGHT_REGEX = /(^|\s)(\/(?:skills|skill)(?:\s+\S+)?|\/\S+)/g;
+
+// Mask glyph runs produced by the credential masker (see userMessageSecretMask).
+const USER_MESSAGE_SECRET_MASK_RUN_REGEX = /•{4,}/g;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object');
@@ -152,6 +161,25 @@ function extractUserMessageAgentHighlightSpans(
   return spans;
 }
 
+function extractUserMessageSecretMaskSpans(visibleText: string): UserMessageTextHighlightSpan[] {
+  if (!visibleText || !visibleText.includes(USER_MESSAGE_SECRET_MASK_TEXT.charAt(0))) {
+    return [];
+  }
+
+  const spans: UserMessageTextHighlightSpan[] = [];
+  for (const match of visibleText.matchAll(USER_MESSAGE_SECRET_MASK_RUN_REGEX)) {
+    const start = match.index ?? 0;
+    // `value` is the mask glyph run itself, never the original credential.
+    spans.push({
+      kind: 'secret',
+      value: match[0],
+      start,
+      end: start + match[0].length,
+    });
+  }
+  return spans;
+}
+
 export function extractUserMessageTextHighlightSpans(
   visibleText: string,
   parts: unknown,
@@ -159,6 +187,7 @@ export function extractUserMessageTextHighlightSpans(
   const spans = [
     ...extractUserMessageCommandHighlightSpans(visibleText, parts),
     ...extractUserMessageAgentHighlightSpans(visibleText, parts),
+    ...extractUserMessageSecretMaskSpans(visibleText),
   ];
   let lastEnd = -1;
   return spans
@@ -231,6 +260,8 @@ function getHighlightClassName(kind: UserMessageTextHighlightSpan['kind']): stri
       return 'opencodian-message-highlight-skill';
     case 'agent':
       return 'opencodian-message-highlight-agent';
+    case 'secret':
+      return 'opencodian-message-highlight-secret';
   }
   const exhaustiveKind: never = kind;
   return exhaustiveKind;

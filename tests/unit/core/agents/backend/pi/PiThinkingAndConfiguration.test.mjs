@@ -23,7 +23,8 @@ function fixture() {
   const value = { defaultThinkingLevel: 'max', futureTop: { values: ['opaque', 42], flag: true }, compaction: { reserveTokens: 10, futureNested: { extra: 'preserve' } }, retry: { provider: { futureProvider: { allow: true } } } };
   writeFileSync(files.project, JSON.stringify(value) + '\n');
   writeFileSync(files.global, '{"futureGlobal":{"untouched":true}}\n');
-  return { config: createConfigurationService({ FileSettingsStorage, VERSION: 'offline-schema-fixture' }, cwd, agentDir), value, files };
+  const historyRoot = join(dir, 'history-root');
+  return { config: createConfigurationService({ FileSettingsStorage, VERSION: 'offline-schema-fixture' }, cwd, agentDir, { historyRoot }), value, files };
 }
 
 test('max is accepted by the dispatch validator and returned as the actual session level', async () => {

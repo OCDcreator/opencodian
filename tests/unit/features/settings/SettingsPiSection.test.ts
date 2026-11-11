@@ -8,6 +8,7 @@ import { type App, Setting } from 'obsidian';
 import type { PiAdapter } from '../../../../src/core/agents/backend/pi/PiAdapter';
 import { PiMcpConfigService } from '../../../../src/core/agents/backend/pi/PiMcpConfigService';
 import { SettingsPiConfigurationSection } from '../../../../src/features/settings/backends/pi/SettingsPiConfigurationSection';
+import { SettingsPiProvidersSection } from '../../../../src/features/settings/backends/pi/SettingsPiProvidersSection';
 import { SettingsPiSection } from '../../../../src/features/settings/backends/pi/SettingsPiSection';
 import { getActiveSecondaryTabId,getPrimaryTabDefinition } from '../../../../src/features/settings/settingsLayoutRegistry';
 import { setLocale } from '../../../../src/i18n';
@@ -18,10 +19,9 @@ describe('Pi native settings integration', () => {
   it('owns a backend tab with dedicated secondary pages and remembers the selected page', () => {
     const pi = getPrimaryTabDefinition('pi');
     expect(pi?.backendRequired).toBe('pi');
-    expect(pi?.secondaryTabs.map(tab => tab.id)).toEqual(['connection', 'providers', 'model', 'execution', 'mcp', 'resources', 'account', 'sessions', 'advanced']);
+    expect(pi?.secondaryTabs.map(tab => tab.id)).toEqual(['connection', 'providers', 'model', 'execution', 'account', 'mcp', 'sessions']);
     expect(getActiveSecondaryTabId('pi', { pi: 'providers' })).toBe('providers');
     expect(getPrimaryTabDefinition('codex')?.defaultSecondaryTabId).toBe('connection');
-    expect(getPrimaryTabDefinition('claude-code')?.defaultSecondaryTabId).toBe('runtime');
   });
   it('renders the connection surface using the same section shell contract as existing backends', () => {
     const container = document.body.createDiv();
@@ -30,6 +30,22 @@ describe('Pi native settings integration', () => {
     expect(container.querySelector('[data-settings-surface="section-body"]')).not.toBeNull();
     expect(container.textContent).toContain('连接');
     expect(container.textContent).not.toContain('settings.pi.');
+  });
+  it('resolves legacy tab aliases to the merged task tabs', () => {
+    const container = document.body.createDiv();
+    new SettingsPiSection({ settings: { backendSettings: {} }, saveSettings: async () => {} }).attachTabbed(container, 'advanced');
+    expect(container.querySelector('[data-pi-section="execution"]')).not.toBeNull();
+    const sessions = document.body.createDiv();
+    new SettingsPiSection({ settings: { backendSettings: {} }, saveSettings: async () => {} }).attachTabbed(sessions, 'resources');
+    expect(sessions.querySelector('[data-pi-section="sessions"]')).not.toBeNull();
+  });
+  it('keeps the shared workspace bar untouched when a subtab mounts (append-only)', () => {
+    const container = document.body.createDiv();
+    const workspaceBar = container.createDiv({ cls: 'opencodian-backend-workspace-bar', attr: { 'data-workspace-fixture': '' } });
+    new SettingsPiSection({ settings: { backendSettings: {} }, saveSettings: async () => {} }).attachTabbed(container, 'connection');
+    expect(workspaceBar.parentElement).toBe(container);
+    expect(container.firstElementChild).toBe(workspaceBar);
+    expect(container.querySelector('[data-pi-section="connection"]')).not.toBeNull();
   });
   it('lists declared MCP servers with the last extension status, without write actions', () => {
     const rows: Array<{ name: string; desc: string }> = [];
@@ -97,6 +113,193 @@ describe('Pi native settings integration', () => {
     await buttonCallbacks[1]();
     expect(command).toHaveBeenCalledWith(undefined, 'save_configuration', { scope: 'project', revision: 'p', changes: { 'compaction.reserveTokens': 456 } });
     expect(saved).toHaveBeenCalledWith(['compaction.reserveTokens']);
+  });
+});
+
+describe('Pi task tab surfaces', () => {
+  beforeEach(() => { setLocale('zh'); document.body.innerHTML = ''; });
+  afterEach(() => jest.restoreAllMocks());
+  it('renders every native field with its actual scope, effect, and execution risk badges', async () => {
+    const snapshot = { scopes: { global: { path: '/global', revision: 'g', value: {} }, project: { path: '/project', revision: 'p', value: {} } }, fields: [{ path: 'tools.enabled', group: 'execution', kind: 'boolean', label: { zh: '启用工具', en: 'Tools' } }], sdkVersion: '0.73.1' };
+    const command = jest.fn(async () => snapshot);
+    const container = document.body.createDiv();
+    new SettingsPiConfigurationSection({ command } as unknown as PiAdapter, async () => {}, async () => {}).attach(container, ['execution']);
+    await Promise.resolve(); await Promise.resolve();
+    const field = container.querySelector('[data-pi-setting="tools.enabled"]');
+    expect(field?.getAttribute('data-backend-scope')).toBe('project');
+    expect(field?.getAttribute('data-backend-effect')).toBe('new-session');
+    expect(field?.getAttribute('data-backend-risk')).toBe('high');
+    expect(container.querySelectorAll('input[type="radio"]').length).toBeGreaterThanOrEqual(2);
+  });
+  it('keeps the advanced native editor as a separate high-risk disclosure, not part of the model page', async () => {
+    const snapshot = { scopes: { global: { path: '/global', revision: 'g', value: {} }, project: { path: '/project', revision: 'p', value: {} } }, fields: [], sdkVersion: '0.73.1' };
+    const command = jest.fn(async () => snapshot);
+    const adapter = { command } as unknown as PiAdapter;
+    const container = document.body.createDiv();
+    const section = new SettingsPiSection({ settings: { backendSettings: {} }, saveSettings: async () => {}, agentServiceRegistry: { get: () => adapter } });
+    section.attachTabbed(container, 'execution');
+    await Promise.resolve(); await Promise.resolve();
+    const advanced = container.querySelector('[data-pi-section="advanced"]');
+    expect(advanced).not.toBeNull();
+    expect(advanced?.getAttribute('data-backend-risk')).toBe('high');
+    expect(advanced?.textContent).toContain('高风险');
+    expect(advanced?.querySelector('textarea[aria-label="settings.json"]')).not.toBeNull();
+    // The ordinary model page never hosts the advanced editor.
+    const model = document.body.createDiv();
+    section.attachTabbed(model, 'model');
+    await Promise.resolve(); await Promise.resolve();
+    expect(model.querySelector('[data-pi-section="advanced"]')).toBeNull();
+    expect(model.querySelector('textarea[aria-label="settings.json"]')).toBeNull();
+  });
+  it('shows the default thinking level as a native radio choice that preserves inherit', () => {
+    const container = document.body.createDiv();
+    const adapter = { command: jest.fn() } as unknown as PiAdapter;
+    new SettingsPiSection({
+      settings: { backendSettings: { pi: { executablePath: '', provider: '', model: '', thinkingLevel: 'high' } } },
+      saveSettings: async () => {},
+      agentServiceRegistry: { get: () => adapter },
+    }).attachTabbed(container, 'model');
+    const radios = Array.from(container.querySelectorAll<HTMLInputElement>('input[type="radio"]'));
+    expect(radios.length).toBeGreaterThanOrEqual(8);
+    expect(radios.find(radio => radio.value === 'high')?.checked).toBe(true);
+    expect(radios.find(radio => radio.value === '')).toBeDefined();
+    const row = container.querySelector('[data-backend-key="pi-default-thinking-level"]');
+    expect(row?.getAttribute('data-backend-scope')).toBe('vault');
+    expect(row?.getAttribute('data-backend-effect')).toBe('new-session');
+  });
+  it('reports an empty auth provider list honestly instead of claiming broken authentication', async () => {
+    const adapter = { command: jest.fn(async (_session: string | undefined, type: string) => type === 'get_auth' ? { providers: [], oauthProviders: [] } : {}) } as unknown as PiAdapter;
+    const container = document.body.createDiv();
+    new SettingsPiSection({ settings: { backendSettings: {} }, saveSettings: async () => {}, agentServiceRegistry: { get: () => adapter } }).attachTabbed(container, 'account');
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    expect(container.querySelector('[data-pi-auth="empty"]')).not.toBeNull();
+    expect(container.textContent).not.toContain('未配置');
+  });
+  it('captures a memory-only version history on save and restores through the revision-guarded save', async () => {
+    const document0 = { path: '~/.pi/agent/models.json', revision: 'r0', value: { providers: { alpha: { baseUrl: 'https://alpha.test', models: [{ id: 'a1' }] } } } };
+    let current = document0;
+    let revisionSeq = 0;
+    const savedWith: Array<{ revision?: string }> = [];
+    const command = jest.fn(async (_session: string | undefined, type: string, input: { revision?: string; value?: unknown }) => {
+      if (type === 'get_model_configuration') return current;
+      if (type === 'save_model_configuration') {
+        savedWith.push({ revision: input.revision });
+        revisionSeq += 1;
+        current = { path: current.path, revision: `r${revisionSeq}`, value: input.value as Record<string, unknown> };
+        return current;
+      }
+      return {};
+    });
+    const adapter = { command } as unknown as PiAdapter;
+    const buttons: Array<{ text: string; click(): void }> = [];
+    jest.spyOn(Setting.prototype, 'addButton').mockImplementation(function (callback) {
+      const button = { text: '', setButtonText(text: string) { this.text = text; return button; }, setCta() { return button; }, setDisabled() { return button; }, onClick(cb: () => void) { button.click = cb; return button; } };
+      callback(button as never); buttons.push(button); return this;
+    });
+    const textChanges: Array<(value: string) => void> = [];
+    jest.spyOn(Setting.prototype, 'addText').mockImplementation(function (callback) {
+      const input = { inputEl: document.createElement('input'), setValue: () => input, setPlaceholder: () => input, setDisabled: () => input, onChange: (cb: (value: string) => void) => { textChanges.push(cb); return input; } };
+      callback(input as never); return this;
+    });
+    const section = new SettingsPiProvidersSection(adapter, async () => {});
+    const container = document.body.createDiv();
+    section.attach(container);
+    await Promise.resolve(); await Promise.resolve();
+    // addText order in the editor: providerId, displayName, baseUrl.
+    expect(textChanges.length).toBeGreaterThanOrEqual(3);
+    textChanges[2]('https://changed.test');
+    // Drive the real editor save.
+    const save = buttons.find(button => button.text === '保存提供商');
+    expect(save).toBeDefined();
+    await save!.click();
+    await Promise.resolve(); await Promise.resolve();
+    expect((current.value.providers as Record<string, unknown>).alpha).toEqual({ baseUrl: 'https://changed.test', models: [{ id: 'a1' }] });
+    // The history disclosure exists, opens, lists the previous version, restores it in three clicks.
+    const history = container.querySelector<HTMLDetailsElement>('[data-pi-history]');
+    expect(history).not.toBeNull();
+    expect(container.textContent).toContain('仅本会话');
+    history!.open = true;
+    history!.dispatchEvent(new Event('toggle'));
+    await Promise.resolve(); await Promise.resolve();
+    const restore = buttons.filter(button => button.text === '恢复').pop();
+    expect(restore).toBeDefined();
+    restore!.click();
+    await Promise.resolve(); await Promise.resolve();
+    const confirm = container.querySelector<HTMLButtonElement>('[data-pi-history-confirm] button');
+    expect(confirm).not.toBeNull();
+    const revisionBefore = current.revision;
+    confirm!.click();
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    expect(savedWith.length).toBe(2);
+    expect(savedWith[savedWith.length - 1]?.revision).toBe(revisionBefore);
+    expect((current.value.providers as Record<string, unknown>).alpha).toEqual({ baseUrl: 'https://alpha.test', models: [{ id: 'a1' }] });
+  });
+  it('prefers the persistent native archive for models.json restore when the adapter ships it', async () => {
+    const current = { path: '~/.pi/agent/models.json', revision: 'live', value: { providers: { alpha: { baseUrl: 'https://alpha.test', models: [{ id: 'a1' }] } } } };
+    const entry = { index: 2, savedAt: Date.parse('2026-11-01T10:00:00Z'), revision: 'arch-abc', bytes: 512 };
+    const restoreConfiguration = jest.fn(async () => ({ ...current, revision: 'restored' }));
+    const getConfigurationHistory = jest.fn(async () => ({ models: { path: current.path, key: 'models', entries: [entry] }, settings: { global: { entries: [] }, project: { entries: [] } } }));
+    const adapter = {
+      command: jest.fn(async (_session: string | undefined, type: string) => type === 'get_model_configuration' ? current : {}),
+      supportsConfigurationHistory: async () => true,
+      getConfigurationHistory,
+      restoreConfiguration,
+    } as unknown as PiAdapter;
+    const restoreButtons: Array<{ text: string; click(): void }> = [];
+    jest.spyOn(Setting.prototype, 'addButton').mockImplementation(function (callback) {
+      const button = { text: '', setButtonText(text: string) { this.text = text; return button; }, setCta() { return button; }, setDisabled() { return button; }, onClick(cb: () => void) { button.click = cb; return button; } };
+      callback(button as never); restoreButtons.push(button); return this;
+    });
+    const container = document.body.createDiv();
+    new SettingsPiProvidersSection(adapter, async () => {}).attach(container);
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    const history = container.querySelector<HTMLDetailsElement>('[data-pi-history]');
+    expect(history).not.toBeNull();
+    history!.open = true; history!.dispatchEvent(new Event('toggle'));
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    expect(getConfigurationHistory).toHaveBeenCalledTimes(1);
+    const restoreButton = restoreButtons.filter(button => button.text === '恢复').pop();
+    expect(restoreButton).toBeDefined();
+    restoreButton!.click();
+    await Promise.resolve(); await Promise.resolve();
+    container.querySelector<HTMLButtonElement>('[data-pi-history-confirm] button')!.click();
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    expect(restoreConfiguration).toHaveBeenCalledWith(expect.objectContaining({ target: 'models', index: 2, archivedRevision: 'arch-abc', revision: 'live' }));
+  });
+  it('offers settings.json scope history in the advanced context and restores through the native contract', async () => {
+    const snapshot = { scopes: { global: { path: '/global/settings.json', revision: 'g1', value: { theme: 'dark' } }, project: { path: '/project/settings.json', revision: 'p1', value: {} } }, fields: [], sdkVersion: '0.73.1' };
+    const current = snapshot;
+    const entry = { index: 1, savedAt: Date.parse('2026-11-02T09:00:00Z'), revision: 'set-xyz', bytes: 128 };
+    const restoreConfiguration = jest.fn(async () => ({ ...current }));
+    const adapter = {
+      command: jest.fn(async (_session: string | undefined, type: string) => type === 'get_configuration' ? current : {}),
+      supportsConfigurationHistory: async () => true,
+      getConfigurationHistory: jest.fn(async () => ({ models: { entries: [] }, settings: { global: { entries: [] }, project: { entries: [entry] } } })),
+      restoreConfiguration,
+    } as unknown as PiAdapter;
+    const restoreButtons: Array<{ text: string; click(): void }> = [];
+    jest.spyOn(Setting.prototype, 'addButton').mockImplementation(function (callback) {
+      const button = { text: '', setButtonText(text: string) { this.text = text; return button; }, setCta() { return button; }, setDisabled() { return button; }, onClick(cb: () => void) { button.click = cb; return button; } };
+      callback(button as never); restoreButtons.push(button); return this;
+    });
+    const container = document.body.createDiv();
+    const section = new SettingsPiSection({ settings: { backendSettings: {} }, saveSettings: async () => {}, agentServiceRegistry: { get: () => adapter } });
+    section.attachTabbed(container, 'execution');
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    const advanced = container.querySelector<HTMLDetailsElement>('[data-pi-section="advanced"]');
+    expect(advanced).not.toBeNull();
+    advanced!.open = true;
+    const history = container.querySelector<HTMLDetailsElement>('[data-pi-settings-history]');
+    expect(history).not.toBeNull();
+    history!.open = true; history!.dispatchEvent(new Event('toggle'));
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    const restoreButton = restoreButtons.filter(button => button.text === '恢复').pop();
+    expect(restoreButton).toBeDefined();
+    restoreButton!.click();
+    await Promise.resolve(); await Promise.resolve();
+    container.querySelector<HTMLButtonElement>('[data-pi-settings-history-confirm] button')!.click();
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    expect(restoreConfiguration).toHaveBeenCalledWith(expect.objectContaining({ target: 'settings', scope: 'project', index: 1, archivedRevision: 'set-xyz', revision: 'p1' }));
   });
 });
 

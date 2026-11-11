@@ -21,7 +21,7 @@ import {
   getConversationSessionBackendService,
   loadBackendSessionMessages,
 } from '../../core/agents/backend/AgentBackendRouting';
-import type { AgentConnectionStatus, AgentQuestionCapability } from '../../core/agents/backend/AgentService';
+import type { AgentConnectionStatus, AgentQuestionCapability, AgentTodoCapability } from '../../core/agents/backend/AgentService';
 import { preserveGoalIntentMessages } from '../../core/agents/backend/BackendSessionMessages';
 import {
   buildClaudeCodeModelSelectorProviders,
@@ -447,6 +447,7 @@ const CAPABILITY_CHANGE_REFRESH_CAPABILITIES: readonly AgentCapability[] = [
   AgentCapability.Thinking,
   AgentCapability.Models,
   AgentCapability.Permissions,
+  AgentCapability.Todos,
   AgentCapability.Subagents,
 ];
 
@@ -1205,12 +1206,18 @@ export class OpenCodianView extends ItemView {
         if (this.currentConversation?.backend === 'dsh') {
           const adapter = this.plugin.agentServiceRegistry?.get('dsh') as { getDefaultReasoningEffort?(sessionId?: string): string | undefined } | undefined;
           const effort = adapter?.getDefaultReasoningEffort?.(this.currentConversation.backendSessionId);
-          return effort ? t('chat.dsh.reasoning.modelDefault', { effort: effort.charAt(0).toUpperCase() + effort.slice(1) })
-            : t('chat.dsh.reasoning.inherit');
+          // Name the inherited level only when DSH actually reported one.
+          return effort ? t('chat.dsh.reasoning.modelDefault', {
+            effort: effort === 'off' ? t('chat.effort.disabledShort') : effort.charAt(0).toUpperCase() + effort.slice(1),
+          }) : t('chat.dsh.reasoning.inherit');
         }
         return this.currentConversation?.backend === 'zcode' ? t('chat.zcode.reasoning.modelDefault')
           : this.currentConversation?.backend === 'pi' ? t('chat.effort.inherit.pi') : t('chat.effort.disabled');
       },
+      // DSH exposes inherit (undefined) and an explicit `off` level as separate
+      // choices; only the label differs here, the stored variant stays `off`.
+      getVariantLabel: (variant: string) =>
+        this.currentConversation?.backend === 'dsh' && variant === 'off' ? t('chat.effort.disabled') : undefined,
       getBoundaryHint: () =>
         this.isCodexConversationActive() ? t('chat.effort.boundaryHint.codex')
           : this.currentConversation?.backend === 'zcode' ? t('chat.zcode.reasoning.boundaryHint')
@@ -1317,6 +1324,7 @@ export class OpenCodianView extends ItemView {
     }
 
     this.slashCommandMenuCatalogCache.invalidate();
+    this.workbenchTools?.invalidateCatalog();
   }
 
   public invalidateSlashCommandMenuCatalog(options: { preload?: boolean } = {}): void {
@@ -2334,6 +2342,14 @@ export class OpenCodianView extends ItemView {
         tone: ChatMessage['noticeTone'];
         isCurrent?: () => boolean;
       }) => this.persistentAssistantNoticeService.appendMessage(options),
+      getTodoCapability: (backend) => {
+        const service = this.plugin.agentServiceRegistry?.get(backend);
+        const candidate = service as Partial<AgentTodoCapability> | undefined;
+        return service?.hasCapability(AgentCapability.Todos)
+          && typeof candidate?.getSessionTodos === 'function'
+          && typeof candidate.subscribeToSessionTodoUpdates === 'function'
+          ? candidate as AgentTodoCapability : null;
+      },
       getSessionTodos: (sessionId) => this.plugin.openCodeService.getSessionTodos(sessionId),
       getSessionStatuses: () => this.plugin.openCodeService.getSessionStatuses(),
       reconcileBackgroundTaskLiveSignals: (tabId, options) => {
@@ -2607,8 +2623,13 @@ export class OpenCodianView extends ItemView {
       getActiveTabId: () => this.getActiveTabId(),
       openContextUsageDetailsModal: (contextState) => {
         const detailTabId = this.getActiveTabId();
+        const detailConversation = this.currentConversation;
+        const ledgerSessionId = detailConversation?.backend === 'dsh'
+          ? getConversationBackendSessionId(detailConversation) : undefined;
         new ContextDetailModal(this.app, {
-          conversation: this.currentConversation,
+          conversation: detailConversation,
+          dshTraceLedgerLoader: ledgerSessionId
+            ? () => this.chatDiagnosticsCoordinator.getDshTraceLedger(ledgerSessionId) : undefined,
           contextState,
           priceSnapshotCost: (state) => this.activeTabContextUsageCoordinator.priceSnapshotCost(detailTabId, state),
           subscribeToPricingUpdates: (listener) => this.activeTabContextUsageCoordinator.onPricingUpdated((tabId, state) => {
@@ -3480,6 +3501,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private mountSessionWorkbench(boundary: HTMLElement): void {
+    this.modifiedFilesSidebarCoordinator.setWorkbenchSummaryListener(() => this.sessionWorkbench?.refresh());
     const vault = getVaultBasePath(this.app) ?? '';
     const pluginDir = this.plugin.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.plugin.manifest.id}`;
     this.workbenchHostRuntime ??= new WorkbenchHostRuntime(path.join(vault, pluginDir, 'assets/workbench'));
@@ -3524,10 +3546,19 @@ export class OpenCodianView extends ItemView {
       getSummaryMount: () => this.composerInputShellCoordinator.getGoalSummaryMountEl(),
       getComposerShell: () => this.composerInputShellCoordinator.getComposerShellEl(),
       attachFiles: (parent) => this.modifiedFilesSidebarCoordinator.attachToWorkbench(parent),
+      getFilesSummary: () => this.modifiedFilesSidebarCoordinator.getWorkbenchSummaryText(this.currentConversation?.id ?? this.getActiveTabId() ?? ''),
       mountTools: (parent) => this.workbenchTools?.mount(parent),
+      mountResources: (parent) => this.workbenchTools?.mountResources(parent),
       openTool: (tool) => this.workbenchTools?.openTool(tool),
       setDraft: (text) => this.composerInputShellCoordinator.insertDraft(text),
       updateTools: (state) => this.workbenchTools?.update(state),
+      onNativeJobs: (session, snapshot) => session.conversation
+        ? this.backgroundTaskIndicatorCoordinator.acceptNativeJobs(session.conversation, session.tabId, snapshot)
+        : Promise.resolve(),
+      openBackendSettings: (backend) => {
+        if (backend === 'dsh') this.plugin.settingsTab?.prepareScrollToDsh('advanced');
+        this.openPluginSettingsPreservingScroll();
+      },
       syncTranscript: async (session) => {
         if (!session.conversation || this.getTabRuntimeState(session.tabId)?.isStreaming) return;
         const before = [...session.conversation.messages];
@@ -3551,8 +3582,8 @@ export class OpenCodianView extends ItemView {
   }
 
   private refreshModifiedFilesSidebar(): void {
-    this.sessionWorkbench?.refresh();
     const conversation = this.currentConversation;
+    this.modifiedFilesSidebarCoordinator.setWorkbenchIdentity(conversation?.id ?? this.getActiveTabId() ?? '');
     const backend = conversation?.backend ?? 'opencode';
     // Session diff is OpenCode-only.  Claude's rewind/diff surface is not
     // stable-complete — see status doc §"What Exists But Must Not Be Described As Stable Completion".
@@ -3657,7 +3688,7 @@ export class OpenCodianView extends ItemView {
 
   private async initializeFirstTab(): Promise<void> {
     await this.conversationTabRuntimeCoordinator.initializeFirstTab();
-    await this.refreshZCodeCatalogForCurrentConversation();
+    await this.refreshSessionCatalogForCurrentConversation();
     this.refreshModifiedFilesSidebar();
   }
 
@@ -3699,7 +3730,7 @@ export class OpenCodianView extends ItemView {
 
   private async handleTabSwitch(tabId: string): Promise<void> {
     await this.conversationTabRuntimeCoordinator.handleTabSwitch(tabId);
-    await this.refreshZCodeCatalogForCurrentConversation();
+    await this.refreshSessionCatalogForCurrentConversation();
     this.refreshModifiedFilesSidebar();
   }
 
@@ -4162,7 +4193,7 @@ export class OpenCodianView extends ItemView {
       ? getConversationBackendSessionId(this.currentConversation)
       : undefined;
     await this.conversationLoadRecoveryCoordinator.createConversationInNewTab();
-    await this.refreshZCodeCatalogForCurrentConversation();
+    await this.refreshSessionCatalogForCurrentConversation();
     const currentSessionId = this.currentConversation
       ? getConversationBackendSessionId(this.currentConversation)
       : undefined;
@@ -4182,7 +4213,7 @@ export class OpenCodianView extends ItemView {
       ? getConversationBackendSessionId(this.currentConversation)
       : undefined;
     await this.conversationLoadRecoveryCoordinator.createConversationInCurrentTab();
-    await this.refreshZCodeCatalogForCurrentConversation();
+    await this.refreshSessionCatalogForCurrentConversation();
     const currentSessionId = this.currentConversation
       ? getConversationBackendSessionId(this.currentConversation)
       : undefined;
@@ -4226,13 +4257,24 @@ export class OpenCodianView extends ItemView {
     }
 
     await this.conversationLoadRecoveryCoordinator.loadConversation(id, options);
-    await this.refreshZCodeCatalogForCurrentConversation();
+    await this.refreshSessionCatalogForCurrentConversation();
     this.refreshModifiedFilesSidebar();
     this.conversationSessionRailCoordinator.refresh(this.messagesShellEl);
     await this.childSessionGraphCoordinator.refreshGraph();
   }
 
-  private async refreshZCodeCatalogForCurrentConversation(): Promise<void> {
+  private async refreshSessionCatalogForCurrentConversation(): Promise<void> {
+    // DSH's selector catalog is a cached read of the owned session, so a
+    // restored conversation must re-read it once its surface is current — the
+    // mount-time reload runs before restore and only ever saw an empty
+    // snapshot, which left recorded historical labels unresolved. The reload
+    // already chains the historical-label refresh; an unavailable runtime
+    // keeps labels honestly raw until the next natural reload.
+    if (this.currentConversation?.backend === 'dsh') {
+      if (!getConversationBackendSessionId(this.currentConversation)) return;
+      await this.chatSelectionControlsCoordinator.reloadModelCatalog();
+      return;
+    }
     if (this.currentConversation?.backend !== 'zcode' || !getConversationBackendSessionId(this.currentConversation)) return;
     try {
       await recoverEmptyZCodeConversationSession({
@@ -4577,10 +4619,29 @@ export class OpenCodianView extends ItemView {
       const bySourceId = new Map(previousMessages.filter((message) => message.sourceMessageId)
         .map((message) => [message.sourceMessageId, message]));
       const unmatched = previousMessages.filter((message) => !message.sourceMessageId);
+      const uniqueDshMatches = (() => {
+        const matches = new Map<string, ChatMessage | null>();
+        if (backend === 'dsh') {
+          for (const candidate of unmatched) {
+            const key = JSON.stringify([candidate.role, candidate.content]);
+            matches.set(key, matches.has(key) ? null : candidate);
+          }
+          const serverKeys = new Set<string>();
+          for (const message of visibleServerMessages) {
+            const key = JSON.stringify([message.role, message.content]);
+            if (serverKeys.has(key)) matches.set(key, null);
+            serverKeys.add(key);
+          }
+        }
+        return matches;
+      })();
       const nativeMerged = backend === 'pi' ? mergePiNativeConversationMessages(previous, visibleServerMessages) : visibleServerMessages.map((message) => {
-        const existing = bySourceId.get(message.sourceMessageId) ?? unmatched.find((candidate) =>
-          candidate.role === message.role && (candidate.content === message.content
-            || (candidate.role === 'user' && message.content.includes(candidate.content))));
+        const matchKey = JSON.stringify([message.role, message.content]);
+        const existing = bySourceId.get(message.sourceMessageId) ?? (backend === 'dsh'
+          ? uniqueDshMatches.get(matchKey)
+          : unmatched.find((candidate) => candidate.role === message.role && (candidate.content === message.content
+            || (candidate.role === 'user' && message.content.includes(candidate.content)))));
+        if (backend === 'dsh' && existing) uniqueDshMatches.delete(matchKey);
         if (!existing) return message;
         const index = unmatched.indexOf(existing);
         if (index >= 0) unmatched.splice(index, 1);
@@ -4588,13 +4649,21 @@ export class OpenCodianView extends ItemView {
           ...existing, ...message,
           id: existing.id,
           content: message.role === 'user' ? existing.content : message.content,
-          images: existing.images,
+          images: backend === 'dsh' && !existing.images?.length ? message.images ?? existing.images : existing.images,
           contextAttachments: existing.contextAttachments,
           contentBlocks: message.contentBlocks ?? (existing.content === message.content ? existing.contentBlocks : undefined),
           questionResolution: existing.questionResolution,
           toolCalls: message.toolCalls ?? existing.toolCalls,
         };
       });
+      if (backend === 'dsh' && unmatched.length > 0) {
+        // A prefix, repeated text or a legacy image projection is not proof of
+        // message identity. Keep the local transcript rather than overwrite it
+        // or borrow attachments from a different native message.
+        logger.debug('DSH history sync kept local messages with unconfirmed identities', { count: unmatched.length });
+        return { messages: previous, changed: false,
+          fingerprint: this.conversationIdentityRuntime.getConversationSyncFingerprint(previous), revertState };
+      }
       const merged = preserveGoalIntentMessages(previous, nativeMerged);
       if (backend !== 'pi') merged.push(...notices);
       const before = this.conversationIdentityRuntime.getConversationSyncFingerprint(previous);

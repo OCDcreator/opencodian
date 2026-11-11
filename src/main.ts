@@ -125,6 +125,7 @@ import {
   normalizeProviderIconColorMode,
   VIEW_TYPE_OPENCODIAN,
 } from './core/types';
+import { getDefaultDshSessionTraceSettings } from './core/types/settings';
 import { prepareLoadedSettingsBootstrapState } from './core/types/settingsLoadNormalization';
 import { OpenCodianView } from './features/chat/OpenCodianView';
 import { createChatDiagnosticsCoordinatorFactory } from './features/chat/services/diagnostics/ChatDiagnosticsCoordinator';
@@ -559,14 +560,17 @@ export default class OpenCodianPlugin extends Plugin {
     });
 
     await this.startupCoordinator.measureStartupStep('constructOpenCodeService', () => {
-      // The DiagnosticsRuntimeCoordinator owns construction of all three backend
-      // trace services (OpenCode → Codex → Claude, pinned order) plus their
+      // The DiagnosticsRuntimeCoordinator owns construction of all four backend
+      // trace services (OpenCode → Codex → Claude → DSH, pinned order) plus their
       // flush/dispose lifecycle. main.ts no longer constructs any trace service
       // directly (Phase 3 Task 11). The per-backend getters above delegate to it.
       this.diagnosticsCoordinator = new DiagnosticsRuntimeCoordinator({
         openCodeSettings: () => this.settings.backendSettings.opencode.sessionTrace,
         codexSettings: () => this.settings.backendSettings.codex.sessionTrace,
         claudeSettings: () => this.settings.backendSettings.claudeCode.sessionTrace,
+        dshSettings: () => this.settings.backendSettings.dsh.sessionTrace ?? getDefaultDshSessionTraceSettings(),
+        dshKnownSecrets: () => Object.values(this.settings.backendSettings.dsh.env ?? {}),
+        dshRuntimeMetadata: () => ({ transport: this.settings.backendSettings.dsh.transport ?? 'native' }),
         vaultPath: getVaultBasePath(this.app) ?? undefined,
         buildIdentity: () => this.getDebugBuildIdentityText(),
         openCodeKnownSecrets: () => [
@@ -658,6 +662,7 @@ export default class OpenCodianPlugin extends Plugin {
         formatPiCommandCompleted: (command) => t('chat.pi.commandCompleted', { command }),
         getZCodeSettings: () => this.settings.backendSettings.zcode,
         getDshSettings: () => this.settings.backendSettings.dsh,
+        dshTracePort: this.diagnosticsCoordinator?.dsh,
         getOpenCode2Settings: () => this.settings.backendSettings.opencode2,
         getCodexExtraEnv: () => this.getDomainEnvFor('codex'),
         getPiExtraEnv: () => this.getDomainEnvFor('pi'),
@@ -1456,6 +1461,7 @@ export default class OpenCodianPlugin extends Plugin {
         getOpenCodeTraceService: () => this.diagnosticsCoordinator?.openCode,
         getCodexTraceService: () => this.diagnosticsCoordinator?.codex,
         getClaudeTraceService: () => this.diagnosticsCoordinator?.claude,
+        getDshTraceService: () => this.diagnosticsCoordinator?.dsh,
       }))
     );
 

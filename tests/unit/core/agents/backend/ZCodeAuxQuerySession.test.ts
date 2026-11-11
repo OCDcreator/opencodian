@@ -32,7 +32,7 @@ class FakeAuxTransport implements ZCodeAuxTransport {
   readonly requests: Array<{ method: string; params?: Record<string, unknown> }> = [];
   private readonly handlers = new Map<string, (params: Record<string, unknown>) => void>();
   private readonly onExit: (() => void) | undefined;
-  private readonly mode: 'success' | 'tools' | 'events' | 'event-no-name' | 'count-missing' | 'stale-followup' | 'malformed-user-id' | 'hang';
+  private readonly mode: 'success' | 'tools' | 'events' | 'event-no-name' | 'count-missing' | 'stale-followup' | 'malformed-user-id' | 'hang' | 'synthetic-reminders' | 'synthetic-then-prompt' | 'two-prompts' | 'unexplained-user';
   private messages: unknown[] = [];
   private sentTurns = 0;
 
@@ -53,41 +53,75 @@ class FakeAuxTransport implements ZCodeAuxTransport {
     if (method === 'session/messages') return { messages: this.messages } as T;
     if (method === 'session/send') {
       this.sentTurns += 1;
-      const tools = this.mode === 'tools' ? { Read: true } : {};
-      if (!(this.mode === 'stale-followup' && this.sentTurns > 1)) {
-        this.messages.push({ info: {
-          role: 'user',
-          ...(this.mode === 'malformed-user-id' ? {} : { messageId: `user-${this.sentTurns}` }),
-          tools,
-        }, parts: [] });
-      }
-      if (this.mode === 'success' || (this.mode === 'stale-followup' && this.sentTurns === 1)) {
-        queueMicrotask(() => this.emit('session/event', {
-          type: 'turn.completed', sessionId: 'aux-session', payload: { response: 'AUX_OK', toolCallCount: 0 },
-        }));
-      } else if (this.mode === 'events') {
-        queueMicrotask(() => {
-          this.emit('session/event', { type: 'tool.updated', sessionId: 'aux-session', payload: { toolName: 'Read' } });
-          this.emit('session/event', {
-            type: 'turn.completed', sessionId: 'aux-session', payload: { response: 'AUX_OK', toolCallCount: 1 },
-          });
-        });
-      } else if (this.mode === 'event-no-name') {
-        queueMicrotask(() => {
-          this.emit('session/event', { type: 'tool.updated', sessionId: 'aux-session', payload: {} });
-          this.emit('session/event', {
-            type: 'turn.completed', sessionId: 'aux-session', payload: { response: 'AUX_OK', toolCallCount: 0 },
-          });
-        });
-      } else if (this.mode === 'count-missing') {
-        queueMicrotask(() => this.emit('session/event', {
-          type: 'turn.completed', sessionId: 'aux-session', payload: { response: 'AUX_OK' },
-        }));
-      }
+      this.pushTurnMessages();
+      this.emitTurnEvents();
       return { accepted: true } as T;
     }
     if (method === 'session/stop') return { stopped: true } as T;
     return {} as T;
+  }
+
+  /** Runtime 3.17+ writes synthetic `system_reminder` user rows beside the real
+   * prompt; the fake reproduces the observed page shapes per mode. */
+  private pushTurnMessages(): void {
+    const turn = this.sentTurns;
+    const tools = this.mode === 'tools' ? { Read: true } : {};
+    const syntheticRow = (index: number) => ({ info: {
+      role: 'user', messageId: `synthetic-${turn}-${index}`, synthetic: true, visibility: 'model-only',
+    }, parts: [] });
+    if (this.mode === 'synthetic-reminders' || this.mode === 'synthetic-then-prompt') {
+      for (let index = 0; index < 3; index += 1) this.messages.push(syntheticRow(index));
+    }
+    if (this.mode === 'synthetic-then-prompt') {
+      // Land the real prompt after one poll cycle so the gate must tolerate
+      // a synthetic-only page without accepting it as emptiness.
+      setTimeout(() => this.messages.push({ info: {
+        role: 'user', messageId: `user-${turn}`, tools: {},
+      }, parts: [] }), 80);
+      return;
+    }
+    if (this.mode === 'two-prompts') {
+      this.messages.push({ info: { role: 'user', messageId: `prompt-a-${turn}`, tools: {} }, parts: [] });
+      this.messages.push({ info: { role: 'user', messageId: `prompt-b-${turn}`, tools: {} }, parts: [] });
+      return;
+    }
+    if (this.mode === 'unexplained-user') {
+      this.messages.push({ info: { role: 'user', messageId: `unexplained-${turn}` }, parts: [] });
+      return;
+    }
+    if (!(this.mode === 'stale-followup' && turn > 1)) {
+      this.messages.push({ info: {
+        role: 'user',
+        ...(this.mode === 'malformed-user-id' ? {} : { messageId: `user-${turn}` }),
+        tools,
+      }, parts: [] });
+    }
+  }
+
+  private emitTurnEvents(): void {
+    const completed = (delayMs = 0, payload: Record<string, unknown> = { response: 'AUX_OK', toolCallCount: 0 }) => {
+      const emitCompleted = () => this.emit('session/event', { type: 'turn.completed', sessionId: 'aux-session', payload });
+      if (delayMs > 0) setTimeout(emitCompleted, delayMs);
+      else queueMicrotask(emitCompleted);
+    };
+    if (this.mode === 'success' || this.mode === 'synthetic-reminders'
+      || (this.mode === 'stale-followup' && this.sentTurns === 1)) {
+      completed();
+    } else if (this.mode === 'synthetic-then-prompt') {
+      completed(100);
+    } else if (this.mode === 'events') {
+      queueMicrotask(() => {
+        this.emit('session/event', { type: 'tool.updated', sessionId: 'aux-session', payload: { toolName: 'Read' } });
+        completed(0, { response: 'AUX_OK', toolCallCount: 1 });
+      });
+    } else if (this.mode === 'event-no-name') {
+      queueMicrotask(() => {
+        this.emit('session/event', { type: 'tool.updated', sessionId: 'aux-session', payload: {} });
+        completed();
+      });
+    } else if (this.mode === 'count-missing') {
+      completed(0, { response: 'AUX_OK' });
+    }
   }
 
   onNotification(method: string, handler: (params: Record<string, unknown>) => void): { dispose(): void } {
@@ -324,6 +358,96 @@ describe('ZCodeAuxQuerySession', () => {
     expect(auxRoots()).toEqual(before);
   });
 
+});
+
+// Runtime 3.17+ persists runtime-written synthetic `system_reminder` user rows
+// beside the real prompt. The authoritative empty-tools proof stays the real
+// prompt's `info.tools` echo; synthetic rows never substitute for it and an
+// unexplained user row still fails closed.
+describe('ZCodeAuxQuerySession runtime 3.17 readback page shapes', () => {
+  const tempParent = fs.mkdtempSync(path.join(process.cwd(), '.tmp', 'zcode-aux-shape-unit-'));
+  let lastShapeTransport: FakeAuxTransport | null = null;
+  function auxRoots(): string[] {
+    return fs.readdirSync(tempParent).filter((name) => name.startsWith('opencodian-zcode-aux-'));
+  }
+  function create(mode: FakeAuxTransport['mode']): Promise<ZCodeAuxQuerySession> {
+    return ZCodeAuxQuerySession.create({
+      launch,
+      workingDirectory: '/vault', systemPrompt: 'Read only.',
+      model: { kind: 'zcode', provider: 'krill', model: 'gpt-6-sol', reasoningLevel: 'none' },
+      tempParent,
+      createTransport: (options) => {
+        lastShapeTransport = new HookFreeAuxTransport(options, mode);
+        return lastShapeTransport;
+      },
+    });
+  }
+  afterEach(() => { jest.restoreAllMocks(); });
+  afterAll(() => { fs.rmdirSync(tempParent); });
+
+  it('proves the empty tool readback from the real prompt beside synthetic system reminders', async () => {
+    const before = auxRoots();
+    const session = await create('synthetic-reminders');
+    await expect(session.query({ prompt: 'read' })).resolves.toEqual({
+      success: true, text: 'AUX_OK', toolCalls: [],
+    });
+    expect(session.safety.effectiveTools).toEqual([]);
+    await session.dispose();
+    expect(auxRoots()).toEqual(before);
+  });
+
+  it('keeps polling a synthetic-only page until the real prompt readback lands', async () => {
+    const session = await create('synthetic-then-prompt');
+    await expect(session.query({ prompt: 'read' })).resolves.toEqual({
+      success: true, text: 'AUX_OK', toolCalls: [],
+    });
+    expect(session.safety.effectiveTools).toEqual([]);
+    await session.dispose();
+  });
+
+  it('fails closed when two new prompt readbacks cannot be attributed', async () => {
+    const before = auxRoots();
+    const session = await create('two-prompts');
+    await expect(session.query({ prompt: 'read' })).resolves.toEqual({
+      success: false,
+      error: 'ZCode auxiliary session could not prove an empty native tool set.',
+    });
+    await session.dispose();
+    expect(auxRoots()).toEqual(before);
+  });
+
+  it('fails closed on a new user message that is neither the prompt nor runtime-synthetic', async () => {
+    const before = auxRoots();
+    const session = await create('unexplained-user');
+    await expect(session.query({ prompt: 'read' })).resolves.toEqual({
+      success: false,
+      error: 'ZCode auxiliary session could not prove an empty native tool set.',
+    });
+    await session.dispose();
+    expect(auxRoots()).toEqual(before);
+  });
+
+  it('still fails closed when a widened prompt echo lands after synthetic-only pages', async () => {
+    const session = await create('synthetic-then-prompt');
+    const fake = lastShapeTransport as FakeAuxTransport;
+    const nativeRequest = fake.request.bind(fake);
+    fake.request = async (method, params) => {
+      if (method === 'session/send') {
+        setTimeout(() => {
+          fake.messages.push({ info: { role: 'user', messageId: 'late-widened', tools: { Read: true } }, parts: [] });
+        }, 30);
+      }
+      return nativeRequest(method, params);
+    };
+    try {
+      await expect(session.query({ prompt: 'read' })).resolves.toEqual({
+        success: false,
+        error: 'ZCode auxiliary session could not prove an empty native tool set.',
+      });
+    } finally {
+      await session.dispose();
+    }
+  });
 });
 
 

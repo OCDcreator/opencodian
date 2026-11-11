@@ -1,4 +1,6 @@
 /* eslint-disable max-lines -- DSH session lifecycle, ACP mapping, and fail-closed recovery stay in one adapter boundary. */
+import { createHash } from 'node:crypto';
+
 import { appendObsidianContextBlocks } from '../../../../shared/obsidianContext';
 import { backendSessionCatalogFailure, BackendSessionCatalogReadError } from '../../../../shared/sessionCatalogReadback';
 import { prependMemoryInjection } from '../../../memory';
@@ -19,6 +21,7 @@ import type {
   AgentQuestionCapability,
   AgentService,
   AgentSessionCapability,
+  AgentTodoCapability,
   AgentToolCapability,
   AgentTurnSteeringCapability,
   CapabilityChangeHandler,
@@ -29,6 +32,7 @@ import { WarmInlineCompletionSession } from '../auxiliary/WarmInlineCompletionSe
 import { type AgentGoalCommand, type AgentGoalControlResult, type AgentGoalEvent, type AgentGoalReadback,
   BackendGoalRuntime, confirmGoalCommand, validateGoalCommand } from '../BackendGoalRuntime';
 import { backendSessionMessagesToChat } from '../BackendSessionMessages';
+import { dshNativeConfigurationRevision, validateDshNativeConfiguration } from '../configuration/DshNativeConfiguration';
 import {
   DshAcpClient,
   type DshAcpClientOptions,
@@ -41,7 +45,15 @@ import {
 } from './DshAcpClient';
 import { DshAuxQuerySession } from './DshAuxQuerySession';
 import { DshNativeClient } from './DshNativeClient';
-import { dshContentBlockText, prepareDshPromptBlocks } from './DshProtocolCodec';
+import {
+  dshNativeControlCapabilities,
+  DshNativeControlError,
+  type DshNativeControlLease,
+  DshNativeControls,
+  type DshNativeControlUpdate,
+  readDshNativeControlCapabilities,
+} from './DshNativeControls';
+import { dshContentBlockText, dshImageBlock, prepareDshPromptBlocks } from './DshProtocolCodec';
 import { DshQuestionBridge } from './DshQuestionBridge';
 
 const CAPABILITIES: BackendCapabilities = Object.freeze(new Set([
@@ -86,7 +98,7 @@ export interface DshAdapterOptions {
 }
 
 /** First-class DeepSeek Harness backend over the documented ACP stdio profile. */
-export class DshAdapter implements AgentService, AgentChatCapability, AgentSessionCapability, AgentPermissionCapability, AgentModelCapability, AgentAuxQueryCapability, AgentInlineCompletionCapability, AgentQuestionCapability, AgentForkCapability, AgentTurnSteeringCapability, AgentToolCapability {
+export class DshAdapter implements AgentService, AgentChatCapability, AgentSessionCapability, AgentPermissionCapability, AgentModelCapability, AgentAuxQueryCapability, AgentInlineCompletionCapability, AgentQuestionCapability, AgentForkCapability, AgentTurnSteeringCapability, AgentToolCapability, AgentTodoCapability {
   readonly kind = 'dsh' as const;
   readonly displayName = 'DeepSeek Harness';
   readonly description = 'DeepSeek Harness native runtime';
@@ -120,8 +132,162 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
   private lifecycleGeneration = 0;
   private nextPermissionId = 1;
   private disposed = false;
+  private reconnecting = false;
+  private nativeCapabilitySnapshot: { client: DshClientPort; generation: number; capabilities: DshNativeControlLease['capabilities'] } | null = null;
+  private readonly nativeControls = new DshNativeControls({ acquire: sessionId => this.acquireNativeControl(sessionId) });
 
   constructor(private readonly options: DshAdapterOptions) { this.refreshCapabilities(null); }
+
+  getNativeControlCapabilities() {
+    const snapshot = this.nativeCapabilitySnapshot;
+    if (this.client?.isStarted && this.connectionKey !== null && snapshot?.client === this.client && snapshot.generation === this.lifecycleGeneration)
+      return snapshot.capabilities;
+    return dshNativeControlCapabilities(this.client?.handshake ?? null,
+      !!this.client?.nativeRequest && this.client.isStarted && this.connectionKey !== null);
+  }
+  refreshNativeControlCapabilities(): Promise<DshNativeControlLease['capabilities']> { return this.nativeControls.refreshCapabilities(); }
+  subscribeToNativeControlUpdates(handler: (update: DshNativeControlUpdate) => void): Disposable { return this.nativeControls.subscribe(handler); }
+  subscribeToSessionTodoUpdates(handler: (update: unknown) => void): Disposable { return this.nativeControls.subscribeTodos(handler); }
+  getNativeConfiguration: DshNativeControls['getNativeConfiguration'] = (...args) => this.nativeControls.getNativeConfiguration(...args);
+  getNativeCredentialDescriptors: DshNativeControls['getNativeCredentialDescriptors'] = (...args) => this.nativeControls.getNativeCredentialDescriptors(...args);
+  setNativeCredential: DshNativeControls['setNativeCredential'] = (...args) => this.nativeControls.setNativeCredential(...args);
+  unsetNativeCredential: DshNativeControls['unsetNativeCredential'] = (...args) => this.nativeControls.unsetNativeCredential(...args);
+  listNativeExtensions: DshNativeControls['listNativeExtensions'] = (...args) => this.nativeControls.listNativeExtensions(...args);
+  inspectNativeExtension: DshNativeControls['inspectNativeExtension'] = (...args) => this.nativeControls.inspectNativeExtension(...args);
+  getNativeExtensionVersions: DshNativeControls['getNativeExtensionVersions'] = (...args) => this.nativeControls.getNativeExtensionVersions(...args);
+  mutateNativeExtension: DshNativeControls['mutateNativeExtension'] = (...args) => this.nativeControls.mutateNativeExtension(...args);
+  mutateNativeExtensionSettings: DshNativeControls['mutateNativeExtensionSettings'] = (...args) => this.nativeControls.mutateNativeExtensionSettings(...args);
+  getSessionPermissionPreset: DshNativeControls['getSessionPermissionPreset'] = (...args) => this.nativeControls.getSessionPermissionPreset(...args);
+  setSessionPermissionPreset: DshNativeControls['setSessionPermissionPreset'] = (...args) => this.nativeControls.setSessionPermissionPreset(...args);
+  getSessionPlanState: DshNativeControls['getSessionPlanState'] = (...args) => this.nativeControls.getSessionPlanState(...args);
+  setSessionPlanState: DshNativeControls['setSessionPlanState'] = (...args) => this.nativeControls.setSessionPlanState(...args);
+  getSessionTodos: DshNativeControls['getSessionTodos'] = (...args) => this.nativeControls.getSessionTodos(...args);
+  listSessionJobs: DshNativeControls['listSessionJobs'] = (...args) => this.nativeControls.listSessionJobs(...args);
+  getSessionJob: DshNativeControls['getSessionJob'] = (...args) => this.nativeControls.getSessionJob(...args);
+  readSessionJob: DshNativeControls['readSessionJob'] = (...args) => this.nativeControls.readSessionJob(...args);
+  readSessionJobAt: DshNativeControls['readSessionJobAt'] = (...args) => this.nativeControls.readSessionJobAt(...args);
+  waitForSessionJob: DshNativeControls['waitForSessionJob'] = (...args) => this.nativeControls.waitForSessionJob(...args);
+  killSessionJob: DshNativeControls['killSessionJob'] = (...args) => this.nativeControls.killSessionJob(...args);
+  getSessionTerminalAvailability: DshNativeControls['getSessionTerminalAvailability'] = (...args) => this.nativeControls.getSessionTerminalAvailability(...args);
+  listSessionTerminals: DshNativeControls['listSessionTerminals'] = (...args) => this.nativeControls.listSessionTerminals(...args);
+  spawnSessionTerminal: DshNativeControls['spawnSessionTerminal'] = (...args) => this.nativeControls.spawnSessionTerminal(...args);
+  readSessionTerminal: DshNativeControls['readSessionTerminal'] = (...args) => this.nativeControls.readSessionTerminal(...args);
+  sendSessionTerminal: DshNativeControls['sendSessionTerminal'] = (...args) => this.nativeControls.sendSessionTerminal(...args);
+  signalSessionTerminal: DshNativeControls['signalSessionTerminal'] = (...args) => this.nativeControls.signalSessionTerminal(...args);
+  killSessionTerminal: DshNativeControls['killSessionTerminal'] = (...args) => this.nativeControls.killSessionTerminal(...args);
+  listSessionSubagents: DshNativeControls['listSessionSubagents'] = (...args) => this.nativeControls.listSessionSubagents(...args);
+  getSessionSubagent: DshNativeControls['getSessionSubagent'] = (...args) => this.nativeControls.getSessionSubagent(...args);
+  cancelSessionSubagent: DshNativeControls['cancelSessionSubagent'] = (...args) => this.nativeControls.cancelSessionSubagent(...args);
+  canContinueChildSession: DshNativeControls['canContinueSessionSubagent'] = (...args) => this.nativeControls.canContinueSessionSubagent(...args);
+  continueChildSession(parentSessionId: string, childSessionId: string, content: string,
+    options?: { delivery?: 'queue' | 'steer' }): Promise<{ messageId: string }> {
+    return this.nativeControls.continueSessionSubagent(parentSessionId, childSessionId, content, options?.delivery ?? 'queue');
+  }
+
+  async getSessionMcpStatus(sessionId?: string) {
+    try {
+      const id = sessionId ?? this.reservedSession?.id ?? [...this.sessions][0] ?? await this.ensureConfigurationSession();
+      return await this.nativeControls.getSessionMcpStatus(id);
+    } catch (error) {
+      if (error instanceof DshNativeControlError) throw error;
+      throw new DshNativeControlError('failed', 'Harness MCP runtime state is unavailable');
+    }
+  }
+
+  private async acquireNativeControl(sessionId?: string, reconnectProbe = false): Promise<DshNativeControlLease> {
+    if (this.reconnecting && !reconnectProbe) throw new DshNativeControlError('busy', 'Harness configuration is reconnecting');
+    const client = this.client?.isStarted && this.statusValue === 'connected' ? this.client : await this.ready();
+    const generation = this.lifecycleGeneration;
+    const capabilities = dshNativeControlCapabilities(client.handshake, !!client.nativeRequest);
+    if (!capabilities.native || !client.nativeRequest) throw new DshNativeControlError('unavailable', 'This control requires the Harness native transport');
+    const assertCurrent = () => {
+      if (this.disposed || this.client !== client || generation !== this.lifecycleGeneration || !client.isStarted
+        || sessionId !== undefined && !this.sessions.has(sessionId))
+        throw new DshNativeControlError('superseded', 'Harness control was superseded by a new connection');
+    };
+    if (sessionId !== undefined) {
+      if (!sessionId.trim()) throw new DshNativeControlError('unavailable', 'Harness control requires an owned session');
+      await this.ensureSessionActive(client, sessionId);
+    }
+    assertCurrent();
+    const request = client.nativeRequest.bind(client);
+    const refreshCapabilities = async () => {
+      try {
+        const refreshed = await readDshNativeControlCapabilities({ request, assertCurrent, capabilities });
+        assertCurrent();
+        this.nativeCapabilitySnapshot = { client, generation, capabilities: refreshed };
+        return refreshed;
+      } catch (error) {
+        assertCurrent();
+        this.nativeCapabilitySnapshot = { client, generation, capabilities: {
+          ...capabilities, controls: dshNativeControlCapabilities(null, false).controls,
+        } };
+        throw error;
+      }
+    };
+    const refreshed = await refreshCapabilities();
+    assertCurrent();
+    return { request, assertCurrent, capabilities: refreshed, capabilitiesCurrent: capabilities.controls.readback, refreshCapabilities };
+  }
+
+  private connectionDescriptor() {
+    const settings = this.options.getSettings();
+    const workingDirectory = settings.workingDirectory || this.options.workingDirectory;
+    const nativeConfig = validateDshNativeConfiguration(settings.nativeConfig);
+    const revision = dshNativeConfigurationRevision(nativeConfig);
+    const launch = resolveDshLaunch(settings, this.options.getExtraEnv?.() ?? {});
+    const digest = createHash('sha256').update(JSON.stringify([settings.transport ?? 'native', workingDirectory,
+      launch.command, launch.args, Object.entries(launch.env).sort(([left], [right]) => left.localeCompare(right)), revision])).digest('hex');
+    return { workingDirectory, launch, nativeConfig, transport: settings.transport, connectionKey: `${revision}:${digest}` };
+  }
+
+  /** Explicitly replace idle cached runtimes; persisted sessions are resumed lazily. */
+  async reconnectNativeConfiguration() {
+    if (this.reconnecting) throw new DshNativeControlError('busy', 'Harness configuration is already reconnecting');
+    // Fail closed before any idle assert, quiescence probe, stop or start:
+    // reconnect returns the Native configuration readback, which ACP can never
+    // satisfy. This holds even when settings just switched to Native — the
+    // running ACP client's handshake is the only transport proof, and stopping
+    // it here would restart the host runtime without Native control evidence.
+    // ACP startup overrides already apply on the next process launch instead.
+    const configuredTransport = this.options.getSettings().transport ?? 'native';
+    const current = this.client;
+    const currentProvesNative = !!current?.isStarted
+      && dshNativeControlCapabilities(current.handshake, !!current.nativeRequest).native;
+    if (configuredTransport !== 'native' || (!!current?.isStarted && !currentProvesNative))
+      throw new DshNativeControlError('unavailable', 'Harness configuration reconnect requires the native transport');
+    this.assertReconnectIdle();
+    this.reconnecting = true;
+    try {
+      const descriptor = this.connectionDescriptor();
+      const previous = this.client;
+      const generation = this.lifecycleGeneration;
+      if (previous?.isStarted) {
+        const probe = new DshNativeControls({ acquire: sessionId => this.acquireNativeControl(sessionId, true) });
+        for (const sessionId of this.sessions) await probe.assertSessionCanReconnect(sessionId);
+        if (this.client !== previous || generation !== this.lifecycleGeneration)
+          throw new DshNativeControlError('superseded', 'Harness connection changed during reconnect checks');
+        this.assertReconnectIdle();
+      }
+      const nextGeneration = ++this.lifecycleGeneration;
+      this.client = null; this.connectionKey = null;
+      this.clearSessionRuntime();
+      if (previous) await previous.stop();
+      await this.startClient(nextGeneration, descriptor.connectionKey, descriptor.workingDirectory, descriptor);
+    } catch (error) {
+      if (!this.client) this.setStatus('error');
+      if (error instanceof DshNativeControlError) throw error;
+      throw new DshNativeControlError('failed', 'Harness configuration reconnect failed; retry after checking the runtime');
+    } finally { this.reconnecting = false; }
+    return this.getNativeConfiguration();
+  }
+
+  private assertReconnectIdle(): void {
+    if (this.disposed) throw new DshNativeControlError('unavailable', 'DeepSeek Harness backend is disposed');
+    if (this.starting || this.startingClient || this.turns.size || this.cancellationPromises.size || this.resumePromises.size
+      || this.catalogPromise || this.nativeControls.inFlight || this.auxiliaryText.size)
+      throw new DshNativeControlError('busy', 'Wait for Harness turns and active operations before reconnecting configuration');
+  }
 
   get status(): AgentConnectionStatus { return this.statusValue; } hasCapability(cap: AgentCapability): boolean { return this.capabilities.has(cap); }
 
@@ -137,7 +303,11 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
   private refreshCapabilities(handshake: DshJsonObject | null): void {
     const caps = asRecord(handshake?.agentCapabilities);
     const prompt = asRecord(caps?.promptCapabilities);
+    const nativeControls = dshNativeControlCapabilities(handshake, !!this.client?.nativeRequest);
+    const supportsTodos = handshake === null ? this.options.getSettings().transport !== 'acp'
+      : nativeControls.controls.todos.list && nativeControls.controls.todos.updates;
     this.capabilitiesValue = Object.freeze(new Set([
+      ...(supportsTodos ? [AgentCapability.Todos] : []),
       ...CAPABILITIES, ...(prompt?.image === true ? [AgentCapability.Images] : []),
       // Logical native features remain startable before connection; each aux
       // construction still requires the native runtime proof before a query.
@@ -149,6 +319,8 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
   }
 
   private clearSessionRuntime(): void {
+    this.nativeCapabilitySnapshot = null;
+    this.nativeControls.invalidate();
     this.goals.invalidate('Harness runtime closed');
     this.sessions.clear();
     this.resumePromises.clear();
@@ -164,17 +336,16 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
 
   async start(): Promise<void> {
     if (this.disposed) throw new Error('DeepSeek Harness backend is disposed');
+    if (this.reconnecting) throw new DshNativeControlError('busy', 'Harness configuration is reconnecting');
     if (this.starting) return this.starting;
-    const settings = this.options.getSettings();
-    const workingDirectory = settings.workingDirectory || this.options.workingDirectory;
-    const launch = resolveDshLaunch(settings, this.options.getExtraEnv?.() ?? {});
-    const connectionKey = JSON.stringify([settings.transport ?? 'native', workingDirectory, launch.command, launch.args, Object.entries(launch.env).sort(([left], [right]) => left.localeCompare(right))]);
+    const descriptor = this.connectionDescriptor();
+    const { workingDirectory, connectionKey } = descriptor;
     if (this.client?.isStarted && this.connectionKey === connectionKey) return;
     if (this.client && this.connectionKey !== connectionKey && (this.sessions.size > 0 || this.turns.size > 0)) {
       throw new Error('DeepSeek Harness settings changed; stop the backend before reconnecting active sessions');
     }
     const generation = ++this.lifecycleGeneration;
-    const starting = this.startClient(generation, connectionKey, workingDirectory, launch);
+    const starting = this.startClient(generation, connectionKey, workingDirectory, descriptor);
     this.starting = starting;
     try { await starting; } finally { if (this.starting === starting) this.starting = null; }
   }
@@ -183,7 +354,7 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
     generation: number,
     connectionKey: string,
     workingDirectory: string,
-    launch: ReturnType<typeof resolveDshLaunch>,
+    descriptor: ReturnType<DshAdapter['connectionDescriptor']>,
   ): Promise<void> {
     if (this.client) {
       const previous = this.client;
@@ -191,19 +362,27 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
       this.connectionKey = null;
       await previous.stop();
     }
+    if (generation !== this.lifecycleGeneration || this.disposed)
+      throw new DshNativeControlError('superseded', 'Harness start was superseded by a new lifecycle');
     this.setStatus('connecting');
-    const factory = this.options.createClient ?? ((clientOptions: DshAcpClientOptions) => this.options.getSettings().transport === 'acp'
+    const factory = this.options.createClient ?? ((clientOptions: DshAcpClientOptions) => descriptor.transport === 'acp'
       ? new DshAcpClient(clientOptions) : new DshNativeClient(clientOptions));
     const client: DshClientPort = factory({
       cwd: workingDirectory,
-      launch,
-      onUpdate: (update) => { if (this.client === client) this.handleUpdate(update); },
-      onPermissionRequest: (request) => this.client === client
+      launch: descriptor.launch,
+      nativeConfig: descriptor.nativeConfig,
+      vaultPath: this.options.workingDirectory,
+      onUpdate: (update) => { if (this.client === client && generation === this.lifecycleGeneration) this.handleUpdate(update); },
+      onControlUpdate: (event) => {
+        if (this.client === client && generation === this.lifecycleGeneration && this.getNativeControlCapabilities().native)
+          this.nativeControls.acceptControlUpdate(event, this.getNativeControlCapabilities());
+      },
+      onPermissionRequest: (request) => this.client === client && generation === this.lifecycleGeneration
         ? this.handlePermissionRequest(request)
         : Promise.resolve({ outcome: { outcome: 'cancelled' } }),
-      onQuestionRequest: (request) => this.client === client ? this.questions.request(request) : Promise.resolve({ cancelled: true }),
+      onQuestionRequest: (request) => this.client === client && generation === this.lifecycleGeneration ? this.questions.request(request) : Promise.resolve({ cancelled: true }),
       onProtocolError: (error) => {
-        if (this.client === client || this.startingClient === client) this.setStatusError(error);
+        if (generation === this.lifecycleGeneration && (this.client === client || this.startingClient === client)) this.setStatusError(error);
       },
     });
     this.startingClient = client;
@@ -249,11 +428,14 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
 
   dispose(): void {
     this.disposed = true;
+    this.nativeControls.dispose();
     void this.stop().catch(() => undefined);
     this.capabilityHandlers.clear();
     this.statusHandlers.clear(); }
 
   async createSession(_title?: string, options?: Record<string, unknown>): Promise<string> {
+    const settings = this.options.getSettings();
+    const defaultPlanMode = settings.transport === 'acp' ? undefined : settings.defaultPlanMode;
     const client = await this.ready();
     const generation = this.lifecycleGeneration;
     const workingDirectory = this.resolveWorkingDirectory(options);
@@ -270,15 +452,35 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
     if (reserved && reserved.cwd === workingDirectory && reserved.mcpKey === JSON.stringify(this.getMcpServers())) {
       this.assertCurrentClient(client, generation);
       this.reservedSession = null;
-      return reserved.id;
+      return this.publishNewSession(client, reserved.id, { generation, defaultPlanMode });
     }
-    const response = await client.newSession(workingDirectory, this.getMcpServers());
-    this.assertCurrentClient(client, generation);
-    const sessionId = typeof response.sessionId === 'string' ? response.sessionId.trim() : '';
-    if (!sessionId) throw new Error('DSH ACP session response did not include a session id');
-    this.sessions.add(sessionId);
-    this.rememberConfiguration(sessionId, response, true);
-    return sessionId;
+    const id = await this.materializeNewSession(client, workingDirectory, this.getMcpServers());
+    return this.publishNewSession(client, id, { generation, defaultPlanMode });
+  }
+
+  /** A catalog draft becomes a chat only here; library policy is captured at publication, never on resume. */
+  private async publishNewSession(client: DshClientPort, sessionId: string, policy: { generation: number; defaultPlanMode?: boolean }): Promise<string> {
+    this.assertCurrentClient(client, policy.generation);
+    if (policy.defaultPlanMode === undefined) return sessionId;
+    if (this.turns.has(sessionId) || this.cancellationPromises.has(sessionId))
+      throw new DshNativeControlError('busy', 'Harness new-session Plan default requires an idle draft');
+    try {
+      const changed = await this.nativeControls.setSessionPlanState(sessionId, policy.defaultPlanMode);
+      this.assertCurrentClient(client, policy.generation);
+      if (changed.active !== policy.defaultPlanMode || changed.pending !== undefined || changed.disposition === 'queued' || changed.disposition === 'cancelled')
+        throw new DshNativeControlError('invalid-response', 'Harness did not confirm the new-session Plan default');
+      const observed = await this.nativeControls.getSessionPlanState(sessionId);
+      this.assertCurrentClient(client, policy.generation);
+      if (observed.active !== policy.defaultPlanMode || observed.pending !== undefined)
+        throw new DshNativeControlError('invalid-response', 'Harness did not confirm the new-session Plan default');
+      return sessionId;
+    } catch {
+      if (this.client === client && this.lifecycleGeneration === policy.generation && this.sessions.has(sessionId) && !this.turns.has(sessionId)) {
+        this.sessions.delete(sessionId); this.configurations.delete(sessionId); this.reasoningDefaults.delete(sessionId);
+        try { await client.closeSession(sessionId); } catch { /* Do not stop other published sessions after a failed draft default. */ }
+      }
+      throw new DshNativeControlError('failed', 'Harness could not confirm the Plan default for the new session');
+    }
   }
 
   async listSessions(): Promise<unknown[]> {
@@ -382,17 +584,34 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
       if (!message || !Array.isArray(message.content)) throw new Error('Harness returned an invalid transcript message');
       if (message.role === 'user' && message.sourceKind && message.sourceKind !== 'user') return [];
       if (message.role === 'tool') {
+        const blocks = message.content.map((block) => asRecord(block)).filter(Boolean) as DshJsonObject[];
+        // A single store-backed image keeps the bare data URI form so the
+        // existing tool renderer shows a real image; mixed or unavailable
+        // content falls back to per-block text projection.
+        const singleImage = blocks.length === 1 && blocks[0].type === 'image' ? dshImageDataUri(blocks[0]) : null;
         return [{ ...message, content: [{type:'tool_result',toolCallId:message.toolCallId,isError:message.isError,
-          content:message.content.map((block) => dshContentBlockText(asRecord(block))).filter(Boolean).join('\n')}] }];
+          content: singleImage ?? blocks.map((block) => dshImageProjectionText(block)).filter(Boolean).join('\n')}] }];
       }
-      return [{ ...message, content: message.content.map((block) => {
+      const recordedModelId = encodeDshRecordedModelId(message);
+      return [{ ...message, ...(recordedModelId ? { recordedModelId } : {}), content: message.content.map((block) => {
         const content = asRecord(block);
         if (content?.type === 'tool-call') {
           let input: DshJsonObject = {};
           try { input = asRecord(typeof content.arguments === 'string' ? JSON.parse(content.arguments) : content.arguments) ?? {}; } catch { input = { rawInput: String(content.arguments ?? '') }; }
           return { type: 'tool_use', id: String(content.id ?? content.callId ?? ''), name: String(content.name ?? 'tool'), input };
         }
-        return content?.type === 'image' ? { type: 'text', text: dshContentBlockText(content) } : content;
+        if (content?.type === 'image') {
+          // Store-backed user images pass through so the shared projection
+          // fills ChatMessage.images and the existing gallery renders them;
+          // admission (canonical base64, size, declared-magic agreement) is
+          // re-checked here so oversized or fake payloads degrade to text.
+          // Assistant images keep the streamed markdown text form (the live
+          // path uses the same shape); references the store cannot verify
+          // degrade to an honest placeholder without fabricating image data.
+          if (message.role === 'user' && dshVerifiedImage(content)) return content;
+          return { type: 'text', text: dshImageProjectionText(content) };
+        }
+        return content;
       }) }];
     });
   }
@@ -465,7 +684,9 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
 
   async readSessionInformation(sessionId: string): Promise<import('../AgentService').AgentSessionInformation> {
     const client = await this.ready();
+    const generation = this.lifecycleGeneration;
     const snapshot = client.nativeRequest ? await client.nativeRequest('session/information', { sessionId }) : null;
+    this.assertCurrentClient(client, generation);
     const servers = snapshot?.servers;
     const context = this.contextUsage.get(sessionId);
     return { sessionId, observedAt: Date.now(), quota: null,
@@ -476,12 +697,18 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
         const statuses: Record<string, import('../AgentService').AgentSessionChild['status']> = {
           running: 'running', pending: 'pending', completed: 'completed', failed: 'failed', unknown: 'unknown',
         };
-        return [{ id: agent.id, title: String(agent.title ?? agent.id), readable: agent.readable === true,
+        const mode: import('../AgentService').AgentSessionChild['mode'] = agent.mode === 'one-shot' || agent.mode === 'continuable' || agent.mode === 'external'
+          ? agent.mode : 'unknown';
+        return [{ id: agent.id, title: String(agent.title ?? agent.id), readable: agent.readable === true, mode,
           status: statuses[String(agent.status)] ?? 'unknown' }];
       }) : null,
       mcp: Array.isArray(servers) ? { scope: 'session', servers: servers.flatMap((value) => {
         const server = asRecord(value);
-        return typeof server?.name === 'string' ? [{ name: server.name, status: 'connected' }] : [];
+        if (typeof server?.name !== 'string') return [];
+        const status = server.connected === true ? 'connected' : server.connected === false ? 'disconnected'
+          : typeof server.state === 'string' ? server.state : typeof server.status === 'string' ? server.status : 'unknown';
+        return [{ name: server.name, status,
+          ...(typeof server.toolCount === 'number' && Number.isFinite(server.toolCount) && server.toolCount >= 0 ? { toolCount: server.toolCount } : {}) }];
       }) } : null,
     };
   }
@@ -508,25 +735,31 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
   }
 
   async applyMcpConfiguration(): Promise<number> {
-    const client = await this.ready();
-    if (!client.nativeRequest) throw new Error('Live MCP updates require the native Harness transport');
-    if (this.turns.size) throw new Error('Wait for all Harness turns to finish before applying MCP configuration');
-    const servers = this.getMcpServers();
-    const ids = [...this.sessions];
-    try {
-      for (const sessionId of ids) await client.nativeRequest('session/mcp', { sessionId, replace: servers }, 60_000);
-    } catch (error) {
-      if (error instanceof Error && /timed out/.test(error.message)) await this.recoverFromStuckCancellation();
-      throw error;
-    }
-    return ids.length;
+    if (this.turns.size || this.cancellationPromises.size || this.nativeControls.inFlight)
+      throw new DshNativeControlError('busy', 'Wait for all Harness turns and control operations before applying MCP configuration');
+    this.assertNotReconnecting();
+    const lease = await this.acquireNativeControl();
+    this.assertNotReconnecting();
+    lease.assertCurrent();
+    if (this.turns.size || this.cancellationPromises.size)
+      throw new DshNativeControlError('busy', 'Wait for all Harness turns before applying MCP configuration');
+    if (!this.getNativeControlCapabilities().controls.mcp.apply)
+      throw new DshNativeControlError('unavailable', 'This Harness connection does not support applying MCP configuration');
+    return this.nativeControls.applyMcpConfiguration([...this.sessions], this.getMcpServers());
+  }
+
+  private assertNotReconnecting(): void {
+    if (this.reconnecting) throw new DshNativeControlError('busy', 'Harness configuration is reconnecting');
   }
 
   async *sendMessage(request: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
     const client = await this.ready();
+    const lifecycle = this.lifecycleGeneration;
     if (request.images?.length && !this.hasCapability(AgentCapability.Images))
       throw new Error('DeepSeek Harness did not advertise image prompts for this connection');
     await this.cancellationPromises.get(request.sessionId);
+    this.assertNotReconnecting();
+    this.assertCurrentClient(client, lifecycle);
     if (this.turns.has(request.sessionId)) throw new Error('DSH ACP allows only one prompt per session');
     const generation = (this.turnGenerations.get(request.sessionId) ?? 0) + 1;
     this.turnGenerations.set(request.sessionId, generation);
@@ -547,6 +780,7 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
       error: null,
     };
     this.turns.set(request.sessionId, state);
+    this.nativeControls.busy(request.sessionId, true);
     try {
       const prompt = await prepareDshPromptBlocks(request, {
         prefix: prependObsidianToolingInjection(prependMemoryInjection('', request.options), request.options),
@@ -615,7 +849,10 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
       }
     } finally {
       if (!state.promptStarted) state.settleNative();
-      if (this.turns.get(state.sessionId) === state) this.turns.delete(state.sessionId);
+      if (this.turns.get(state.sessionId) === state) {
+        this.turns.delete(state.sessionId);
+        this.nativeControls.busy(state.sessionId, false);
+      }
     }
   }
 
@@ -690,13 +927,17 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
     if (state) {
       const settled = await settlesWithin(state.nativeSettled, this.options.cancelTimeoutMs ?? 5000);
       if (!settled) await this.recoverFromStuckCancellation();
-      if (this.turns.get(sessionId) === state) this.turns.delete(sessionId);
+      if (this.turns.get(sessionId) === state) {
+        this.turns.delete(sessionId);
+        this.nativeControls.busy(sessionId, false);
+      }
     }
   }
 
   private async recoverFromStuckCancellation(): Promise<void> {
     const client = this.client;
     if (!client) return;
+    ++this.lifecycleGeneration;
     this.client = null;
     this.connectionKey = null;
     this.clearSessionRuntime();
@@ -790,9 +1031,14 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
   }
 
   private handleUpdate(update: DshAcpUpdate): void {
+    if (this.sessions.has(update.sessionId) && this.nativeControls.acceptSessionUpdate(update, this.getNativeControlCapabilities())) return;
     if (update.update.sessionUpdate === 'goal_update') { this.goals.observe(update.sessionId, update.update.goal); return; }
     const auxiliary = this.auxiliaryText.get(update.sessionId);
-    if (auxiliary) { auxiliary(dshContentBlockText(asRecord(update.update.content))); return; }
+    if (auxiliary) {
+      const block = asRecord(update.update.content);
+      auxiliary(block?.type === 'image' ? dshImageProjectionText(block) : dshContentBlockText(block));
+      return;
+    }
     if (update.update.sessionUpdate === 'native_question_closed' && typeof update.update.requestId === 'string') {
       this.questions.reject(`dsh-question-${update.sessionId}-${update.update.requestId}`); return;
     }
@@ -870,6 +1116,42 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
     }
   }
 
+  /** ACP agentOptions carries provider/model only; set a saved effort once before publishing a fresh session. */
+  private async materializeNewSession(client: DshClientPort, cwd: string, mcpServers: ReturnType<DshAdapter['getMcpServers']>): Promise<string> {
+    const generation = this.lifecycleGeneration;
+    const settings = this.options.getSettings();
+    const defaultEffort = settings.transport === 'acp'
+      ? validateDshNativeConfiguration(settings.nativeConfig).overrides['agent-default-model']?.reasoningEffort : undefined;
+    this.assertCurrentClient(client, generation);
+    this.assertNotReconnecting();
+    const response = await client.newSession(cwd, mcpServers);
+    this.assertCurrentClient(client, generation);
+    const sessionId = typeof response.sessionId === 'string' ? response.sessionId.trim() : '';
+    if (!sessionId) throw new Error('DSH session response did not include a session id');
+    this.sessions.add(sessionId);
+    try {
+      this.rememberConfiguration(sessionId, response);
+      if (defaultEffort !== undefined) {
+        const option = this.configurations.get(sessionId)?.find(entry => entry.id === 'reasoning_effort');
+        if (!dshSelectChoices(option).some(choice => choice.value === defaultEffort))
+          throw new Error('DSH ACP default reasoning effort is not in the session catalog');
+        await this.applyConfigOption(client, sessionId, 'reasoning_effort', defaultEffort);
+      }
+      this.assertCurrentClient(client, generation);
+      if (!this.sessions.has(sessionId)) throw new Error('DSH new session activation was superseded');
+      this.rememberConfiguration(sessionId, { configOptions: this.configurations.get(sessionId) ?? [] }, true);
+      return sessionId;
+    } catch (error) {
+      if (this.client === client && this.lifecycleGeneration === generation && this.sessions.has(sessionId)) {
+        this.sessions.delete(sessionId); this.configurations.delete(sessionId); this.reasoningDefaults.delete(sessionId);
+        try { await client.closeSession(sessionId); } catch { /* Only the unpublished idle session is released; never stop other work. */ }
+      }
+      if (defaultEffort !== undefined)
+        throw new Error('DSH ACP did not confirm the saved default reasoning effort; check the session catalog before retrying');
+      throw error;
+    }
+  }
+
   /** The catalog needs a native session. Reserve one draft and hand that same session to the next chat. */
   private async ensureConfigurationSession(sessionId?: string): Promise<string> {
     const client = await this.ready();
@@ -889,12 +1171,8 @@ export class DshAdapter implements AgentService, AgentChatCapability, AgentSessi
         this.configurations.delete(existing.id);
         this.reservedSession = null;
       }
-      const response = await client.newSession(cwd, mcpServers);
+      const id = await this.materializeNewSession(client, cwd, mcpServers);
       this.assertCurrentClient(client, generation);
-      const id = typeof response.sessionId === 'string' ? response.sessionId.trim() : '';
-      if (!id) throw new Error('DSH catalog session response has no session id');
-      this.rememberConfiguration(id, response, true);
-      this.sessions.add(id);
       this.reservedSession = { id, cwd, mcpKey };
       return id;
     })();
@@ -1051,7 +1329,10 @@ function translateDshUpdate(update: DshJsonObject): StreamChunk | null {
   const type = typeof update.sessionUpdate === 'string' ? update.sessionUpdate : '';
   if (type === 'agent_message_chunk' || type === 'agent_thought_chunk') {
     const content = asRecord(update.content);
-    const text = dshContentBlockText(content);
+    // Live assistant images go through the same admission gate as history:
+    // verified payloads keep the streamed markdown form, everything else
+    // degrades to a placeholder without producing a data URI.
+    const text = content?.type === 'image' ? dshImageProjectionText(content) : dshContentBlockText(content);
     if (!text) return null;
     return type === 'agent_thought_chunk'
       ? { type: 'thinking', content: text, ...(typeof update.messageId === 'string' ? { partId: update.messageId } : {}) }
@@ -1073,7 +1354,17 @@ function translateDshUpdate(update: DshJsonObject): StreamChunk | null {
       content: Array.isArray(update.content)
         ? update.content.map((value) => {
           const item = asRecord(value);
-          return dshContentBlockText(asRecord(item?.content) ?? item);
+          const block = asRecord(item?.content) ?? item;
+          if (block?.type === 'image') {
+            // Single verified images stay bare so the tool renderer's
+            // data-image branch can display them; every other image shape
+            // (unavailable, fake, mismatched, oversized) falls through the
+            // unified placeholder gate instead of the codec's data-URI text.
+            const dataUri = dshImageDataUri(block);
+            if (dataUri) return dataUri;
+            return dshImageProjectionText(block);
+          }
+          return dshContentBlockText(block);
         }).filter(Boolean).join('\n') || contentText(update.content)
         : contentText(update.content),
       isError: update.status === 'failed',
@@ -1105,6 +1396,26 @@ function decodeDshOpaqueModel(value: unknown): string | null {
   }
 }
 
+/**
+ * Historical assistant messages record the model route that produced them
+ * (bridge-relayed `sourceProvider`/`sourceModel`, present only when the native
+ * message source kind is 'model'). Encode them with the same tuple contract the
+ * session catalog uses — the opaque selection is `JSON.stringify([provider.id,
+ * item.id])` and a live turn records `${provider}/${opaqueSelection}` via
+ * formatModelId — so hydrated labels resolve display names and merge
+ * comparisons exactly like live-turn metadata. Core cannot import the
+ * feature-layer formatter; this is the same contract, not a divergent format.
+ * Messages without recorded provenance get no field at all, which lets the
+ * native merge keep a locally known modelId instead of erasing it.
+ */
+function encodeDshRecordedModelId(message: DshJsonObject): string | null {
+  if (message.role !== 'assistant' || message.sourceKind !== 'model') return null;
+  const provider = message.sourceProvider;
+  const model = message.sourceModel;
+  if (typeof provider !== 'string' || !provider.trim() || typeof model !== 'string' || !model.trim()) return null;
+  return `${provider}/${JSON.stringify([provider, model])}`;
+}
+
 function contentText(value: unknown): string {
   if (typeof value === 'string') return value;
   if (!Array.isArray(value)) return '';
@@ -1114,6 +1425,60 @@ function contentText(value: unknown): string {
     if (content?.type === 'image' || nested?.type === 'image') return '[DeepSeek Harness tool returned image content that this adapter cannot render]';
     return typeof nested?.text === 'string' ? nested.text : typeof content?.text === 'string' ? content.text : '';
   }).filter(Boolean).join('\n');
+}
+
+/**
+ * Admission for adapter-surfaced images that are NOT Harness-store-owned
+ * (ACP/live relays, replayed history payloads): canonical base64 + size via
+ * the codec's `dshImageBlock`, then a bounded magic-byte read proving the
+ * decoded payload agrees with the declared media type. Anything that fails
+ * admission degrades to the honest text placeholder instead of producing a
+ * data URI from unverified bytes.
+ */
+function dshVerifiedImage(content: DshJsonObject): { mimeType: string; data: string } | null {
+  const mimeType = content.mimeType;
+  const data = content.data;
+  if (typeof mimeType !== 'string' || typeof data !== 'string' || data.length === 0) return null;
+  try {
+    dshImageBlock(mimeType, data);
+    const header = Buffer.from(data.slice(0, 24), 'base64').toString('latin1');
+    const magic = mimeType === 'image/png' ? header.startsWith('\x89PNG')
+      : mimeType === 'image/jpeg' ? header.startsWith('\xFF\xD8\xFF')
+      : mimeType === 'image/gif' ? header.startsWith('GIF87a') || header.startsWith('GIF89a')
+      : header.startsWith('RIFF') && header.slice(8, 12) === 'WEBP';
+    return magic ? { mimeType, data } : null;
+  } catch { return null; }
+}
+
+/**
+ * Bare data URI for store-backed image blocks. The shared tool renderer
+ * renders a tool result that starts with `data:image/` as a real image, so
+ * tool-result images must keep this exact unwrapped form (markdown wrapping
+ * would degrade to truncated text lines).
+ */
+function dshImageDataUri(content: DshJsonObject): string | null {
+  const verified = dshVerifiedImage(content);
+  return verified ? `data:${verified.mimeType};base64,${verified.data}` : null;
+}
+
+/**
+ * Unified text fallback for image blocks that are not surfaced as owned
+ * images. Unavailable references (missing, expired, corrupt, unreadable in
+ * the Harness attachment store) keep their explicit placeholder; blocks that
+ * pass `dshVerifiedImage` admission keep the streamed markdown form from
+ * `dshContentBlockText`; anything failing admission degrades to the invalid
+ * placeholder — never back to a codec path that could produce a data URI from
+ * unverified bytes. Non-image blocks delegate unchanged.
+ */
+function dshImageProjectionText(content: DshJsonObject | null): string {
+  if (content?.unavailable === true) {
+    const reason = typeof content.reason === 'string' && content.reason ? ` (${content.reason})` : '';
+    return `[DeepSeek Harness image is no longer available${reason}]`;
+  }
+  if (content?.type === 'image' && !dshVerifiedImage(content)) {
+    return '[DeepSeek Harness returned an invalid or unsupported image]';
+  }
+  return dshContentBlockText(content);
 }
 
 async function settlesWithin(promise: Promise<void>, timeoutMs: number): Promise<boolean> {

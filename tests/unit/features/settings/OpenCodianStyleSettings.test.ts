@@ -541,7 +541,14 @@ describe('OpenCodian style settings slider and draft controls', () => {
     numberInput!.dispatchEvent(new Event('input', { bubbles: true }));
 
     expect(currentValue).toBe(5);
-    expect(numberInput!.value).toBe('8.');
+    // The unfinished draft "8." is not a valid floating-point number, so the
+    // spec value-sanitization algorithm for <input type=number> reduces the IDL
+    // value to '' before the source input handler runs (proven for jsdom 26 via
+    // the .value setter; jsdom cannot retain the raw text on this control type).
+    // The contract stays observable in strict IDL terms: the draft is not
+    // committed (assertion above) and is not snapped back by renderValue —
+    // a snap-back rewrite would surface as '5' instead of the sanitized ''.
+    expect(numberInput!.value).toBe('');
 
     numberInput!.value = '8.3';
     numberInput!.dispatchEvent(new Event('input', { bubbles: true }));

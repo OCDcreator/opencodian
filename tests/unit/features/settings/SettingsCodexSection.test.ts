@@ -150,40 +150,29 @@ function mockSettingPrototype(): void {
   jest.spyOn(Setting.prototype, 'then').mockReturnThis();
 }
 
-type DropdownControlCapture = {
-  addOption: jest.Mock;
-  setValue: jest.Mock;
-  onChange: jest.Mock;
-};
 
-function createDropdownControlCapture(): DropdownControlCapture {
-  return {
-    addOption: jest.fn().mockReturnThis(),
-    setValue: jest.fn().mockReturnThis(),
-    onChange: jest.fn().mockReturnThis(),
-  };
-}
 
 /**
  * Find the onChange handler of the SettingsCodexSection dropdown that offers
  * `optionValue` as one of its options, mirroring a real user dropdown selection.
  * Throws when no matching dropdown was registered (i.e. the control vanished).
  */
-function findCodexDropdownHandler(optionValue: string): (value: string) => Promise<void> {
-  const calls = (Setting.prototype.addDropdown as jest.Mock).mock.calls as Array<
-    [(control: DropdownControlCapture) => unknown]
-  >;
-  const match = calls.find(([cb]) => {
-    const probe = createDropdownControlCapture();
-    cb(probe);
-    return probe.addOption.mock.calls.some(([value]) => value === optionValue);
-  });
-  if (!match) {
-    throw new Error(`No codex dropdown offering "${optionValue}" was registered`);
-  }
-  const captured = createDropdownControlCapture();
-  match[0](captured);
-  return captured.onChange.mock.calls[0][0] as (value: string) => Promise<void>;
+
+function findCodexChoiceRadios(containerEl: HTMLElement, backendKey: string): HTMLInputElement[] {
+  return Array.from(containerEl.querySelectorAll<HTMLInputElement>(
+    `[role="radiogroup"][data-backend-key="${backendKey}"] input[type="radio"]`,
+  ));
+}
+
+/** Clicks a backend choice radio and lets the async commit settle. */
+async function chooseCodexRadio(containerEl: HTMLElement, backendKey: string, value: string): Promise<void> {
+  const input = findCodexChoiceRadios(containerEl, backendKey).find((candidate) => candidate.value === value);
+  expect(input).toBeDefined();
+  // jsdom does not synthesize `change` from radio clicks; a real browser fires
+  // it when the checked radio changes, so dispatch it explicitly.
+  input!.checked = true;
+  input!.dispatchEvent(new Event('change', { bubbles: true }));
+  await new Promise<void>((resolve) => { setTimeout(resolve, 0); });
 }
 
 describe('SettingsCodexSection stable surface', () => {
@@ -360,7 +349,7 @@ describe('SettingsCodexSection stable surface', () => {
     expect(settingNames).toContain(t('settings.codex.sandbox.name'));
   });
 
-  it('assigns accessible names to the real Approval Policy and Sandbox Mode selects', () => {
+  it('gives the Approval Policy and Sandbox Mode radio groups accessible names and honest metadata', () => {
     const plugin = createPlugin();
     const section = new SettingsCodexSection({
       plugin: plugin as never,
@@ -369,36 +358,24 @@ describe('SettingsCodexSection stable surface', () => {
     const containerEl = document.createElement('div');
     section.attachTabbed(containerEl, 'permissions');
 
-    const dropdownCalls = (Setting.prototype.addDropdown as jest.Mock).mock.calls as Array<[(control: {
-      addOption: jest.Mock;
-      setValue: jest.Mock;
-      onChange: jest.Mock;
-      selectEl: HTMLSelectElement;
-    }) => unknown]>;
-    const selectFor = (optionValue: string): HTMLSelectElement => {
-      const match = dropdownCalls.find(([callback]) => {
-        const control = {
-          selectEl: document.createElement('select'),
-          addOption: jest.fn().mockReturnThis(),
-          setValue: jest.fn().mockReturnThis(),
-          onChange: jest.fn().mockReturnThis(),
-        };
-        callback(control);
-        return control.addOption.mock.calls.some(([value]) => value === optionValue);
-      });
-      if (!match) throw new Error(`Dropdown ${optionValue} was not registered`);
-      const control = {
-        selectEl: document.createElement('select'),
-        addOption: jest.fn().mockReturnThis(),
-        setValue: jest.fn().mockReturnThis(),
-        onChange: jest.fn().mockReturnThis(),
-      };
-      match[0](control);
-      return control.selectEl;
-    };
-
-    expect(selectFor('inherit').getAttribute('aria-label')).toBe(t('settings.codex.approvalPolicy.name'));
-    expect(selectFor('danger-full-access').getAttribute('aria-label')).toBe(t('settings.codex.sandbox.name'));
+    for (const backendKey of ['codex.approvalPolicy', 'codex.sandboxMode']) {
+      const groupEl = containerEl.querySelector<HTMLElement>(`[role="radiogroup"][data-backend-key="${backendKey}"]`);
+      expect(groupEl).toBeTruthy();
+      // Accessible name via a resolved label element or the direct fallback.
+      const nameId = groupEl?.getAttribute('aria-labelledby');
+      const hasAccessibleName = (nameId && containerEl.querySelector(`#${nameId}`)?.textContent)
+        || groupEl?.getAttribute('aria-label');
+      expect(hasAccessibleName).toBeTruthy();
+      const settingEl = containerEl.querySelector<HTMLElement>(`[data-backend-key="${backendKey}"]`);
+      // Codex thread-scoped values apply at the next thread boundary, not
+      // mid-conversation — the badge must not say "next turn".
+      expect(settingEl?.dataset.backendEffect).toBe('new-session');
+    }
+    // Both are high-risk physical-safety choices on the separated page.
+    const approvalSettingEl = containerEl.querySelector<HTMLElement>('[data-backend-key="codex.approvalPolicy"]');
+    const sandboxSettingEl = containerEl.querySelector<HTMLElement>('[data-backend-key="codex.sandboxMode"]');
+    expect(approvalSettingEl?.dataset.backendRisk).toBe('high');
+    expect(sandboxSettingEl?.dataset.backendRisk).toBe('high');
   });
 
   it('renders modelReasoningEffort control', () => {
@@ -547,14 +524,19 @@ describe('SettingsCodexSection stable surface', () => {
     const containerEl = document.createElement('div');
     section.attachTabbed(containerEl, 'resume-inspect');
 
-    expect(settingNames).toEqual([
+    // The resources page merges resume/inspect readbacks with skills/agents
+    // resources and plugins; the readback rows all remain present.
+    const expectedReadbackNames = [
       t('settings.codex.sessionBrowser.launchName'),
       t('settings.codex.contextUsage.name'),
       t('settings.codex.modelList.name'),
       t('settings.codex.permissionProfiles.name'),
       t('settings.codex.mcpServers.name'),
       t('settings.codex.loadedThreads.name'),
-    ]);
+    ];
+    for (const name of expectedReadbackNames) {
+      expect(settingNames).toContain(name);
+    }
     expect(containerEl.querySelector('[data-codex-session-browser-info]')).toBeTruthy();
   });
 
@@ -772,8 +754,7 @@ describe('SettingsCodexSection permissions tab', () => {
     const containerEl = document.createElement('div');
     section.attachTabbed(containerEl, 'permissions');
 
-    const handler = findCodexDropdownHandler('inherit');
-    await handler('never');
+    await chooseCodexRadio(containerEl, 'codex.approvalPolicy', 'never');
 
     expect(plugin.settings.backendSettings.codex.approvalPolicy).toBe('never');
     expect(plugin.saveSettings).toHaveBeenCalled();
@@ -792,13 +773,12 @@ describe('SettingsCodexSection permissions tab', () => {
     const containerEl = document.createElement('div');
     section.attachTabbed(containerEl, 'permissions');
 
-    const handler = findCodexDropdownHandler('inherit');
-    await handler('on-request');
+    await chooseCodexRadio(containerEl, 'codex.approvalPolicy', 'on-request');
 
     expect(updateApprovalPolicy).toHaveBeenCalledWith('on-request');
   });
 
-  it('no longer offers the retired untrusted option in the approval-policy dropdown', () => {
+  it('offers only guided approval choices: inherit, on-request, never', () => {
     const plugin = createPlugin();
     const section = new SettingsCodexSection({
       plugin: plugin as never,
@@ -807,22 +787,49 @@ describe('SettingsCodexSection permissions tab', () => {
     const containerEl = document.createElement('div');
     section.attachTabbed(containerEl, 'permissions');
 
-    const calls = (Setting.prototype.addDropdown as jest.Mock).mock.calls as Array<
-      [(control: { addOption: jest.Mock; setValue: jest.Mock; onChange: jest.Mock }) => unknown]
-    >;
-    const approvalCall = calls.find(([cb]) => {
-      const probe = createDropdownControlCapture();
-      cb(probe);
-      return probe.addOption.mock.calls.some(([value]) => value === 'inherit');
-    });
-    expect(approvalCall).toBeTruthy();
-    const captured = createDropdownControlCapture();
-    (approvalCall as [jest.Mock])[0](captured);
-    const optionValues = captured.addOption.mock.calls.map(([value]) => value);
+    const optionValues = findCodexChoiceRadios(containerEl, 'codex.approvalPolicy')
+      .map((input) => input.value);
     expect(optionValues).toEqual(['inherit', 'on-request', 'never']);
   });
 
-  it('displays migrated on-request when a raw persisted untrusted value reaches the dropdown', () => {
+  it.each([
+    ['codex.approvalPolicy', 'never', 'approvalPolicy', 'inherit'],
+    ['codex.sandboxMode', 'read-only', 'sandboxMode', 'workspace-write'],
+    ['codex.modelReasoningEffort', 'low', 'modelReasoningEffort', 'medium'],
+    ['codex.webSearchMode', 'live', 'webSearchMode', 'cached'],
+  ])('rolls back %s on failed persistence and skips runtime apply', async (backendKey, nextValue, field, initial) => {
+    const updateSpies = {
+      updateApprovalPolicy: jest.fn(),
+      updateSandboxMode: jest.fn(),
+      updateModelReasoningEffort: jest.fn(),
+      updateWebSearchMode: jest.fn(),
+    };
+    const plugin = createPlugin();
+    plugin.agentServiceRegistry.get = jest.fn((backend: string) =>
+      backend === 'codex' ? updateSpies : null,
+    );
+    plugin.saveSettings.mockRejectedValueOnce(new Error('disk full'));
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    // Full attach: approval/sandbox live on permissions-safety while effort/
+    // web search live on conversation — one render covers all four radios.
+    section.attach(containerEl);
+
+    await chooseCodexRadio(containerEl, backendKey, nextValue);
+
+    // Memory rolls back to the committed value AND the shared control
+    // repaints it; the runtime apply mutators never see the failed change.
+    expect(plugin.settings.backendSettings.codex[field as keyof typeof plugin.settings.backendSettings.codex]).toBe(initial);
+    expect(findCodexChoiceRadios(containerEl, backendKey).find((input) => input.checked)?.value).toBe(initial);
+    for (const spy of Object.values(updateSpies)) {
+      expect(spy).not.toHaveBeenCalled();
+    }
+  });
+
+  it('displays migrated on-request when a raw persisted untrusted value reaches the choices', () => {
     const plugin = createPlugin();
     (plugin.settings.backendSettings.codex as { approvalPolicy: string }).approvalPolicy = 'untrusted';
     const section = new SettingsCodexSection({
@@ -832,18 +839,9 @@ describe('SettingsCodexSection permissions tab', () => {
     const containerEl = document.createElement('div');
     section.attachTabbed(containerEl, 'permissions');
 
-    const calls = (Setting.prototype.addDropdown as jest.Mock).mock.calls as Array<
-      [(control: { addOption: jest.Mock; setValue: jest.Mock; onChange: jest.Mock }) => unknown]
-    >;
-    const approvalCall = calls.find(([cb]) => {
-      const probe = createDropdownControlCapture();
-      cb(probe);
-      return probe.addOption.mock.calls.some(([value]) => value === 'inherit');
-    });
-    expect(approvalCall).toBeTruthy();
-    const captured = createDropdownControlCapture();
-    (approvalCall as [jest.Mock])[0](captured);
-    expect(captured.setValue).toHaveBeenCalledWith('on-request');
+    const checked = findCodexChoiceRadios(containerEl, 'codex.approvalPolicy')
+      .find((input) => input.checked);
+    expect(checked?.value).toBe('on-request');
   });
 });
 
@@ -868,9 +866,7 @@ describe('SettingsCodexSection sandbox mode', () => {
     const containerEl = document.createElement('div');
     section.attachTabbed(containerEl, 'permissions');
 
-    const handler = findCodexDropdownHandler('read-only');
-
-    await handler('danger-full-access');
+    await chooseCodexRadio(containerEl, 'codex.sandboxMode', 'danger-full-access');
 
     expect(plugin.settings.backendSettings.codex.sandboxMode).toBe('danger-full-access');
     expect(plugin.saveSettings).toHaveBeenCalled();
@@ -889,9 +885,7 @@ describe('SettingsCodexSection sandbox mode', () => {
     const containerEl = document.createElement('div');
     section.attachTabbed(containerEl, 'permissions');
 
-    const handler = findCodexDropdownHandler('read-only');
-
-    await handler('read-only');
+    await chooseCodexRadio(containerEl, 'codex.sandboxMode', 'read-only');
 
     expect(updateSandboxMode).toHaveBeenCalledWith('read-only');
   });
@@ -918,9 +912,7 @@ describe('SettingsCodexSection model reasoning effort', () => {
     const containerEl = document.createElement('div');
     section.attach(containerEl);
 
-    const handler = findCodexDropdownHandler('minimal');
-
-    await handler('high');
+    await chooseCodexRadio(containerEl, 'codex.modelReasoningEffort', 'high');
 
     expect(plugin.settings.backendSettings.codex.modelReasoningEffort).toBe('high');
     expect(plugin.saveSettings).toHaveBeenCalled();
@@ -939,9 +931,7 @@ describe('SettingsCodexSection model reasoning effort', () => {
     const containerEl = document.createElement('div');
     section.attach(containerEl);
 
-    const handler = findCodexDropdownHandler('minimal');
-
-    await handler('max');
+    await chooseCodexRadio(containerEl, 'codex.modelReasoningEffort', 'max');
 
     expect(updateModelReasoningEffort).toHaveBeenCalledWith('max');
   });
@@ -968,9 +958,7 @@ describe('SettingsCodexSection web search mode', () => {
     const containerEl = document.createElement('div');
     section.attach(containerEl);
 
-    const handler = findCodexDropdownHandler('cached');
-
-    await handler('live');
+    await chooseCodexRadio(containerEl, 'codex.webSearchMode', 'live');
 
     expect(plugin.settings.backendSettings.codex.webSearchMode).toBe('live');
     expect(plugin.saveSettings).toHaveBeenCalled();
@@ -989,9 +977,7 @@ describe('SettingsCodexSection web search mode', () => {
     const containerEl = document.createElement('div');
     section.attach(containerEl);
 
-    const handler = findCodexDropdownHandler('cached');
-
-    await handler('live');
+    await chooseCodexRadio(containerEl, 'codex.webSearchMode', 'live');
 
     expect(updateWebSearchMode).toHaveBeenCalledWith('live');
   });

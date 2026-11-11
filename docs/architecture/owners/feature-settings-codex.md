@@ -5,6 +5,8 @@
 > - `SettingsCodexAccountSurface` 增加 usage 分析卡片（全 null 空态）；approval 下拉不再含 `untrusted`。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 
+> **2026-11-08 (backend settings refresh)**: SettingsCodexSection 重构为任务型二级页（conversation / permissions-safety / account / resources / connection；旧 tab id 在 section 内路由直达）。消费共享控件 `src/features/settings/controls/BackendSettingsControls.ts`（feature.settings-shell 拥有；未改动 manifest）。语义不变式：线程级设置 effect 元数据统一 new-session（下一线程边界，非 next-turn）；高风险（approvalPolicy / sandboxMode / networkAccess / additionalDirectories）物理隔离在 permissions-safety 页；CLI 路径覆盖与凭据留在 connection 页与对话默认分离；model 选择器 inherit-first 且未知已保存 id 保留为标记选项；公开 `reapplyRuntimeUpdates()` 供公共恢复壳按既有 update* mutators 顺序重放线程级设置；CodexProjectConfigFormModel 将 approval_policy 拆为 guided（never/on-request）与 preserved（CLI 已退役 untrusted / 未引导 on-failure），无关表单保存不再改写外部文件字节。
+
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
 - 2026-09-13 (universal memory backend): owner manifest gained `core.memory` and `app.memory-runtime`; this owner's boundary itself is unchanged (no source touched, allowlist untouched).
 

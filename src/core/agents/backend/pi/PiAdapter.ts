@@ -13,7 +13,7 @@ import { type WarmableAuxSession,WarmInlineCompletionSession } from '../auxiliar
 import { type AgentGoalCommand, type AgentGoalControlResult, type AgentGoalEvent, type AgentGoalReadback,
   BackendGoalRuntime, confirmGoalCommand, validateGoalCommand } from '../BackendGoalRuntime';
 import { PiAuxQuerySession } from './PiAuxQuerySession';
-import { PI_CONFIG_COMMANDS, PI_OPTIONAL_RPC_COMMANDS, PI_RPC_COMMANDS, PI_SDK_COMMANDS, type PiAvailableThinkingLevelsResult, type PiCommandName, type PiEntriesResult, type PiExtensionStatusSnapshot, type PiModelInfo, type PiServiceEvent, type PiUiHandler,type PiUnavailableCommandResult } from './PiProtocol';
+import { PI_CONFIG_COMMANDS, PI_OPTIONAL_CONFIG_COMMANDS, PI_OPTIONAL_RPC_COMMANDS, PI_RPC_COMMANDS, PI_SDK_COMMANDS, type PiAvailableThinkingLevelsResult, type PiCommandName, type PiConfigurationHistory, type PiConfigurationRestoreRequest, type PiEntriesResult, type PiExtensionStatusSnapshot, type PiModelInfo, type PiServiceEvent, type PiUiHandler,type PiUnavailableCommandResult } from './PiProtocol';
 import { type PiLaunchOptions, type PiRecord, piRecord, type PiRpcPort } from './PiRpcClient';
 import { PiSessionRuntime } from './PiSessionRuntime';
 import { type PiSessionInfo, PiSessionStore } from './PiSessionStore';
@@ -215,9 +215,9 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
 
   /** Allowlisted SDK operations used by the Pi workbench, never arbitrary method reflection. */
   async command(sessionId: string | undefined, type: PiCommandName, input: PiRecord = {}): Promise<PiRecord> {
-    if (![...PI_RPC_COMMANDS, ...PI_OPTIONAL_RPC_COMMANDS, ...PI_SDK_COMMANDS, ...PI_CONFIG_COMMANDS].includes(type)) throw new Error('Unknown Pi operation.');
+    if (![...PI_RPC_COMMANDS, ...PI_OPTIONAL_RPC_COMMANDS, ...PI_SDK_COMMANDS, ...PI_CONFIG_COMMANDS, ...PI_OPTIONAL_CONFIG_COMMANDS].includes(type)) throw new Error('Unknown Pi operation.');
     const info = sessionId ? await this.requireSession(sessionId) : undefined;
-    const isConfiguration = (PI_CONFIG_COMMANDS as readonly string[]).includes(type);
+    const isConfiguration = (PI_CONFIG_COMMANDS as readonly string[]).includes(type) || (PI_OPTIONAL_CONFIG_COMMANDS as readonly string[]).includes(type);
     const client = await this.runtime.get(isConfiguration ? 'configuration' : sessionId ?? 'catalog', info ? this.nativePath(info) : undefined);
     if (type === 'switch_session') input = { ...input, sessionPath: this.store.validateNativePath(String(input.sessionPath)) };
     const result = await client.request({ ...input, type }, ['compact', 'prompt', 'login', 'bash', 'navigate_tree', 'install_package', 'update_package', 'remove_package', 'reload', 'new_session', 'switch_session', 'import_session', 'fork', 'clone', 'set_model', 'cycle_model'].includes(type) ? 0 : 30000);
@@ -258,6 +258,32 @@ export class PiAdapter implements AgentChatCapability, AgentSessionCapability, A
       return typeof record.id !== 'string' || typeof record.type !== 'string' || (record.parentId !== null && typeof record.parentId !== 'string');
     }) || (result.leafId !== null && typeof result.leafId !== 'string')) throw new Error('Invalid Pi entries response.');
     return result as unknown as PiEntriesResult;
+  }
+  /** True when the live configuration service advertises the persistent history
+   *  commands (newer bundled assets). Older assets keep the UI on its
+   *  memory-only fallback, so this is a feature check, never an assumption. */
+  async supportsConfigurationHistory(): Promise<boolean> {
+    await this.runtime.get('configuration', undefined);
+    const commands = await this.runtime.getAdvertisedCommands('configuration');
+    return commands !== null && (PI_OPTIONAL_CONFIG_COMMANDS as readonly string[]).every(name => commands.includes(name));
+  }
+  /** Bounded pre-save snapshot metadata for models.json and both settings scopes. */
+  async getConfigurationHistory(): Promise<PiConfigurationHistory> {
+    if (!(await this.supportsConfigurationHistory())) throw new Error('Pi service does not support configuration history. Update the bundled Pi service assets.');
+    const result = await this.command(undefined, 'get_configuration_history');
+    const settings = piRecord(result.settings);
+    for (const target of [result.models, settings.global, settings.project]) {
+      const record = piRecord(target);
+      if (!Array.isArray(record.entries)) throw new Error('Invalid Pi configuration history response.');
+    }
+    return result as unknown as PiConfigurationHistory;
+  }
+  /** Restore an archived snapshot. `revision` is the CAS guard against the
+   *  current target; `archivedRevision` pins the requested snapshot against
+   *  rotation races. The native service revalidates through its save paths. */
+  async restoreConfiguration(request: PiConfigurationRestoreRequest): Promise<PiRecord> {
+    if (!(await this.supportsConfigurationHistory())) throw new Error('Pi service does not support configuration history. Update the bundled Pi service assets.');
+    return this.command(undefined, 'restore_configuration', piRecord({ ...request }));
   }
   async getSessionMessages(id: string): Promise<unknown[]> {
     const result = await this.command(id, 'get_messages');

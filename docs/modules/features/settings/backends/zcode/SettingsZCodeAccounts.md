@@ -15,3 +15,9 @@ Kimi 复审后：冲突绑定编辑开始时 revision，读取最新仅展示公
 API 表单保存成功后保留禁用的“已保存”状态，将“取消”改为“关闭”并聚焦该按钮；关闭表单不撤销共享配置写入。
 
 API 服务行默认只显示地址与模型数量；原生“查看模型”details 默认收起，展开后用共享有界 ScrollArea 展示全部可选择复制的模型 ID。长 ID 换行，模型数组不截断，也不改变编辑表单或持久化数据。
+
+## 2026-11-08 账号/共享 API 分页 + 归档历史恢复
+
+`attach` 保留为经典布局的组合 disclosure；页签布局改用 `attachAccount`（官方登录页）与 `attachProviders`（共享个人 API 服务页）分别挂接。两页均新增显式范围声明：账号=机器级 OpenCodian 自有登录（ADR-0003，与桌面账号互不影响）；API 服务=与 ZCode 桌面共享同一份配置，编辑同时影响两个产品。行级 `describeBackendSetting` 徽章：账号 scope=global/effect=immediate/risk=medium，provider 行 scope=shared/effect=new-session/risk=high。
+
+providers 区在 `getPersonalConfigService()` 具备 `listPersonalConfigHistory`/`restorePersonalConfigEntry`（core 已落地：allowlist=配置目录、archive backend='zcode' kind='personal-providers'）时渲染“版本历史” disclosure：懒加载条目（identity/timestamp/size），恢复流程为 打开→Restore→Confirm 三击；经 `safeRestoreArchivedEntry` 带 expectedRevision CAS，conflict 提供“读取最新后重试”，成功后 refreshConfiguration + 重载列表。契约缺失时整个区块不渲染——绝不渲染死按钮或虚构历史。归档位于配置旁（~/.opencodian 下，0700，不入仓库）。

@@ -4,6 +4,8 @@
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
 - 2026-09-13 (universal memory backend): owner manifest gained `core.memory` and `app.memory-runtime`; this owner's boundary itself is unchanged (no source touched, allowlist untouched).
 
+2026-11-10（DSH trace 账本只读消费——实施机制已冻结，独立复核/宿主验收待完成）：`ChatDiagnosticsCoordinator` 经窄 port（`Pick<DshSessionTraceService, 'readSessionLedger' | 'resolveTraceId'>`）消费 DSH 会话账本并转发给上下文弹窗；缺省 host fail-closed，不引入专用 `DshDiagnosticsHostAdapter` 文件；`getDshTraceLedger` 对空 id、缺失服务与读取异常一律返回 null，由弹窗呈现 unavailable／empty／limited 三态。DSH 本轮无 capture token、深度捕获或徽标操作面，claim/show/cancel 仍仅 OpenCode/Codex/Claude；账本内容契约（metadata-only、client-observed 时间、无官方执行时长）归 core.backend-diagnostics，本 owner 不复制第二份 trace 真值，trace 失败继续收纳在聊天路径之外。
+
 - **Layer:** `feature` (may import layers: shared, core, feature)
 - **Risk:** high
 - **Include:** `src/features/chat/services/diagnostics/ClaudeDiagnosticsHostAdapter.ts`, `src/features/chat/services/diagnostics/CodexDiagnosticsHostAdapter.ts`, `src/features/chat/services/diagnostics/ChatDiagnosticsCoordinator.ts`

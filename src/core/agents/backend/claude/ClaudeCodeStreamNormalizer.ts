@@ -541,6 +541,32 @@ function appendSdkSignalChunk(
     return true;
   }
 
+  // claude-agent-sdk >= 0.3.313 emits `session_writes_lost` (SDKSessionWritesLostMessage)
+  // at most once, as the CLI exits, when transcript lines and/or ~/.claude.json changes
+  // could not be persisted (disk full / quota). Before this branch existed the event was
+  // silently dropped, so the chat surface had no way to learn that resume may miss turns.
+  if (subtype === 'session_writes_lost') {
+    const errorCode = readNonEmptyString(record.error_code) ?? 'unknown';
+    const lost = readArray(record.lost)
+      .map((entry) => readNonEmptyString(entry))
+      .filter((entry): entry is string => entry !== undefined);
+    const transcriptSessionIds = readArray(record.transcript_session_ids)
+      .map((entry) => readNonEmptyString(entry))
+      .filter((entry): entry is string => entry !== undefined);
+    chunks.push({
+      ...base,
+      event: 'informational',
+      status: 'error',
+      content: `Claude Code could not save session data (${errorCode}): ${lost.length > 0 ? lost.join(', ') : 'unknown data'}. Results already received stand; resuming may miss part of the conversation.`,
+      metadata: {
+        errorCode,
+        lost,
+        transcriptSessionIds,
+      },
+    });
+    return true;
+  }
+
   return false;
 }
 

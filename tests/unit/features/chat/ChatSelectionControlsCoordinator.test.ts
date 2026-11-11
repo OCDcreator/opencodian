@@ -1704,7 +1704,11 @@ describe('ChatSelectionControlsCoordinator combined model · effort trigger', ()
 
     expect(trigger?.querySelector('.opencodian-model-trigger-text')?.textContent).toBe('Claude 3.7 Sonnet');
     expect(separator?.classList.contains('is-hidden')).toBe(false);
-    expect(effort?.textContent).toBe('Medium');
+    // Both spans carry the label; the compact span stays CSS-hidden in the
+    // wide layout but must never be empty (it replaces the full span at
+    // narrow container widths).
+    expect(effort?.querySelector('.opencodian-model-trigger-effort-full')?.textContent).toBe('Medium');
+    expect(effort?.querySelector('.opencodian-model-trigger-effort-short')?.textContent).toBe('Medium');
     expect(effort?.classList.contains('is-hidden')).toBe(false);
     expect(trigger?.querySelector('.opencodian-model-trigger-chevron')).not.toBeNull();
     expect(fixture.host.mountEffortSelector).toHaveBeenCalledTimes(1);
@@ -1722,6 +1726,46 @@ describe('ChatSelectionControlsCoordinator combined model · effort trigger', ()
     const trigger = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-trigger');
     expect(trigger?.querySelector<HTMLElement>('.opencodian-model-trigger-separator')?.classList.contains('is-hidden')).toBe(true);
     expect(trigger?.querySelector<HTMLElement>('.opencodian-model-trigger-effort')?.classList.contains('is-hidden')).toBe(true);
+  });
+
+  // The compact layout (container <= 500px) hides the full span and shows the
+  // short one, so an empty short span removes the suffix from the trigger.
+  it.each([
+    ['Max'],
+    ['High'],
+    ['Xhigh'],
+    ['Custom-tier'],
+    [t('chat.dsh.reasoning.modelDefault', { effort: t('chat.effort.disabledShort') })],
+    [t('chat.dsh.reasoning.inherit')],
+  ])('keeps the compact effort suffix "%s" visible instead of blanking it', async (label) => {
+    const fixture = await createFixture();
+    fixture.host.getEffortDisplayLabel.mockReturnValue(label);
+
+    fixture.coordinator.updateModelSelectorEffortDisplay();
+
+    const trigger = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-trigger');
+    const effort = trigger?.querySelector<HTMLElement>('.opencodian-model-trigger-effort');
+    expect(effort?.querySelectorAll('.opencodian-model-trigger-effort-full')).toHaveLength(1);
+    expect(effort?.querySelectorAll('.opencodian-model-trigger-effort-short')).toHaveLength(1);
+    expect(effort?.querySelector('.opencodian-model-trigger-effort-full')?.textContent).toBe(label);
+    expect(effort?.querySelector('.opencodian-model-trigger-effort-short')?.textContent).toBe(label);
+    expect(effort?.getAttribute('title')).toBe(label);
+    expect(effort?.classList.contains('is-hidden')).toBe(false);
+    expect(trigger?.querySelector<HTMLElement>('.opencodian-model-trigger-separator')?.classList.contains('is-hidden')).toBe(false);
+  });
+
+  it('abbreviates only the generic disabled label and keeps the full text for assistive tooltips', async () => {
+    const fixture = await createFixture();
+    const disabled = t('chat.effort.disabled');
+    fixture.host.getEffortDisplayLabel.mockReturnValue(disabled);
+
+    fixture.coordinator.updateModelSelectorEffortDisplay();
+
+    const effort = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-trigger-effort');
+    expect(effort?.querySelector('.opencodian-model-trigger-effort-full')?.textContent).toBe(disabled);
+    expect(effort?.querySelector('.opencodian-model-trigger-effort-short')?.textContent).toBe(t('chat.effort.disabledShort'));
+    expect(t('chat.effort.disabledShort').trim()).not.toBe('');
+    expect(effort?.getAttribute('title')).toBe(disabled);
   });
 
   it('routes the model selector into modelContainer while keeping permission in the supplied toolbar', async () => {

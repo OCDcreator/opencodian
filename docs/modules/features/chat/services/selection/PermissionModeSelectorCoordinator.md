@@ -80,6 +80,17 @@ export class PermissionModeSelectorCoordinator {
 
 The backend label union includes opencode2 so its selector has a distinct DOM identity.
 
+## DSH phase2（2026-11-10）
+
+本 coordinator 仍是唯一通用 permission selector owner；DSH 不新增任何专属 selector 控件。`backendLabel` 联合扩展 `'dsh'`（trigger 带 `data-permission-backend="dsh"`）。
+
+- Native DSH：`ChatSelectionControlsCoordinator` 把 selector 绑定到非渲染 preset owner `DshNativeSessionControls` 的 **live config**（`backendLabel: 'dsh'`，options/displayMap 由原生目录动态发布，option id 携带 owner generation）。`getPermissionMode` / `switchPermissionMode` 直接走 owner 的读取与 set→read 确认；repaint 复用既有 `applyLocaleTexts()` 路径。`dsh-checking` / `dsh-unavailable` 是 config 自带的 class-safe 状态 class（经 `modeCssClasses` 生效）。
+- DSH ACP：selector 完全不挂载，保留基线空权限槽；不提供 DSH 专属 fallback 菜单。
+- 静态工厂（OpenCode / Claude Code / Codex / opencode2）不变；DSH 由调用方传入动态 config，原生目录和权限修改真值仍归 `DshNativeSessionControls`。
+- DSH 官方名称对齐：展示层仅识别精确的 `preset-<generation>-read-only|workspace-write|danger-full-access|auto` ID。前三项的原始 slug 或精确官方英文别名映射为「仅可查看／工作区内修改／完全权限」，自定义 host 名称与描述原样保留，目录顺序与 source config 不变。四种图标复用 Obsidian Lucide；机读 ID、current、选择回调及原生 set→独立 readback 不变。
+- `auto` 必须已在真实目录注册才显示为「自动审查」和 `EXP`；菜单及当前 auto 触发器均带徽标，无障碍名称也包含 EXP。窄 Composer 仅对当前 auto 触发器放宽到能容纳图标和徽标；离开 auto 后清除徽标与样式类。不启用官方可选实验 bundle，不向目录补条目，不修改会话权限。未知／custom 当前值继续只作状态展示。
+- DSH 空描述不创建占位行，locale 刷新重新投影展示名称；其他后端继续使用既有 labels、缩写和 DOM。覆盖测试：`tests/unit/features/chat/dshPermissionModeSelector.test.ts`。
+
 ## 目录定位（2026-10-23）
 
 - 源码位置：`src/features/chat/services/selection/PermissionModeSelectorCoordinator.ts`。

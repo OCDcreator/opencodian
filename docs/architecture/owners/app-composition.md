@@ -1,4 +1,7 @@
 # Owner: app.composition
+
+2026-11-10：main 的诊断组合扩展 DSH 元数据 trace port，读取现有 normalized settings 与内存中的脱敏字典，沿 `wireHiddenAdapters` 和聊天 diagnostics factory 注入同一 coordinator 实例；不构造第二个 wire observer owner、不读新凭据、不把 raw prompt/config 交给 trace。实际构造、flush/dispose 和缓冲属于 app.diagnostics-runtime／core.backend-diagnostics。
+
 > 2026-10-24：行内模型目录组合增加 DSH 适配器 getModelSelectorProviders 分支；只将原生目录投影为共享选项。DSH 进程、私有 profile、辅助查询和安全证明仍归 core.backend，没有在 main.ts 新增运行时 owner。
 > 2026-10-07：Claude MCP loader 可能在 configureVaultScopedServices 之前调用；组合读取使用现有 manager，尚未装配时从当前 vault 创建同类 project config reader。避免启动阶段把暂未准备的 manager 缓存为有效空 MCP 配置；不启动额外 OpenCode 服务。
 > 2026-10-02（reviewed continuation，用户已授权）：Codex conversation 删除消费 native mutation 结果；failed/unavailable 或仅 admitted 时保留 storage、conversation 与 cache，原生 verified 后才提交本地删除。显式 local forget 与无 native thread 的本地草稿另行区分。main 在 native/storage await 后按 conversation ID 重查本地提交位置，避免并发删除或同 ID 重复完成误删邻项；只拥有删除流程的组合与本地提交，native ID/alias、原生回读和重试状态仍属于 Codex backend。

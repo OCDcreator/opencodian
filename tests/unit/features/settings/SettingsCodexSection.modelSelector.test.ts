@@ -6,7 +6,7 @@ import {
   getDefaultCodexBackendSettings,
 } from '../../../../src/core/types';
 import { SettingsCodexSection } from '../../../../src/features/settings/backends/codex/SettingsCodexSection';
-import { setLocale } from '../../../../src/i18n';
+import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 
 type TestPlugin = {
@@ -189,6 +189,37 @@ async function flushPromises(): Promise<void> {
   await new Promise((resolve) => { window.setTimeout(resolve, 0); });
 }
 
+interface ModelSelectorFixture {
+  section: SettingsCodexSection;
+  containerEl: HTMLElement;
+  selectEl: HTMLSelectElement | null;
+  customInputEl: HTMLInputElement | null;
+}
+
+/** Renders the full section and resolves the async model catalog population. */
+async function renderModelSelector(
+  pluginOptions: Record<string, unknown> = {},
+  savedModel?: string,
+): Promise<ModelSelectorFixture> {
+  const plugin = createPlugin(pluginOptions as never);
+  if (savedModel !== undefined) {
+    plugin.settings.backendSettings.codex.model = savedModel;
+  }
+  const section = new SettingsCodexSection({
+    plugin: plugin as never,
+    createSectionHeading,
+  });
+  const containerEl = document.createElement('div');
+  section.attach(containerEl);
+  await flushPromises();
+  return {
+    section,
+    containerEl,
+    selectEl: containerEl.querySelector<HTMLSelectElement>('[data-setting="codex-model"]'),
+    customInputEl: containerEl.querySelector<HTMLInputElement>('[data-setting="codex-model-custom"]'),
+  };
+}
+
 describe('SettingsCodexSection model selector', () => {
   beforeEach(() => {
     setLocale('en');
@@ -200,23 +231,26 @@ describe('SettingsCodexSection model selector', () => {
   });
 
   it('renders model dropdown and custom input', async () => {
-    const plugin = createPlugin();
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
-    const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    const { containerEl, selectEl, customInputEl } = await renderModelSelector();
 
-    await flushPromises();
+    expect(containerEl.querySelector('[data-setting="codex-model"]')).toBeTruthy();
+    expect(containerEl.querySelector('[data-setting="codex-model-custom"]')).toBeTruthy();
+    // Unknown saved ids are preserved as a marked option, never masked by the
+    // custom placeholder.
+    expect(selectEl!.value).toBe('codex-mini-latest');
+    expect(selectEl!.querySelector('option[value="codex-mini-latest"]')?.textContent)
+      .toBe(t('settings.codex.model.unlistedOption', { value: 'codex-mini-latest' }));
+    expect(customInputEl!.style.display).toBe('none');
+    expect(customInputEl!.value).toBe('codex-mini-latest');
+  });
 
-    const selectEl = containerEl.querySelector<HTMLSelectElement>('[data-setting="codex-model"]');
-    const customInputEl = containerEl.querySelector<HTMLInputElement>('[data-setting="codex-model-custom"]');
+  it('selects inherit first when no model is saved', async () => {
+    const { selectEl } = await renderModelSelector({}, '');
 
     expect(selectEl).toBeTruthy();
-    expect(customInputEl).toBeTruthy();
-    expect(selectEl!.value).toBe('__custom__');
-    expect(customInputEl!.value).toBe('codex-mini-latest');
+    expect(selectEl!.querySelector('option[value=""]')?.textContent)
+      .toBe(t('settings.codex.model.inheritOption'));
+    expect(selectEl!.value).toBe('');
   });
 
   it('populates dropdown from adapter getModelList and selects current known model', async () => {
@@ -246,7 +280,7 @@ describe('SettingsCodexSection model selector', () => {
     expect(customInputEl!.style.display).toBe('none');
   });
 
-  it('falls back to custom input when current model is not in returned catalog', async () => {
+  it('preserves an unknown saved model when it is not in returned catalog', async () => {
     const plugin = createPlugin({
       getModelList: jest.fn().mockResolvedValue([
         modelSummary('gpt-5.5', 'GPT-5.5'),
@@ -264,12 +298,14 @@ describe('SettingsCodexSection model selector', () => {
     const selectEl = containerEl.querySelector<HTMLSelectElement>('[data-setting="codex-model"]');
     const customInputEl = containerEl.querySelector<HTMLInputElement>('[data-setting="codex-model-custom"]');
 
-    expect(selectEl!.value).toBe('__custom__');
+    expect(selectEl!.value).toBe('codex-mini-latest');
+    expect(selectEl!.querySelector('option[value="codex-mini-latest"]')?.textContent)
+      .toBe(t('settings.codex.model.unlistedOption', { value: 'codex-mini-latest' }));
+    expect(customInputEl!.style.display).toBe('none');
     expect(customInputEl!.value).toBe('codex-mini-latest');
-    expect(customInputEl!.style.display).not.toBe('none');
   });
 
-  it('falls back to custom input when adapter has no getModelList', async () => {
+  it('preserves the saved model when adapter has no getModelList', async () => {
     const plugin = createPlugin({});
     const section = new SettingsCodexSection({
       plugin: plugin as never,
@@ -283,7 +319,7 @@ describe('SettingsCodexSection model selector', () => {
     const selectEl = containerEl.querySelector<HTMLSelectElement>('[data-setting="codex-model"]');
     const customInputEl = containerEl.querySelector<HTMLInputElement>('[data-setting="codex-model-custom"]');
 
-    expect(selectEl!.value).toBe('__custom__');
+    expect(selectEl!.value).toBe('codex-mini-latest');
     expect(selectEl!.querySelector('option[value="__custom__"]')).toBeTruthy();
     expect(customInputEl!.value).toBe('codex-mini-latest');
   });
@@ -375,7 +411,7 @@ describe('SettingsCodexSection model selector', () => {
     expect(customInputEl!.style.display).toBe('none');
   });
 
-  it('falls back to custom input when getModelList returns null', async () => {
+  it('preserves the saved model when getModelList returns null', async () => {
     const plugin = createPlugin({
       getModelList: jest.fn().mockResolvedValue(null),
     });
@@ -391,12 +427,12 @@ describe('SettingsCodexSection model selector', () => {
     const selectEl = containerEl.querySelector<HTMLSelectElement>('[data-setting="codex-model"]');
     const customInputEl = containerEl.querySelector<HTMLInputElement>('[data-setting="codex-model-custom"]');
 
-    expect(selectEl!.value).toBe('__custom__');
+    expect(selectEl!.value).toBe('codex-mini-latest');
     expect(selectEl!.querySelector('option[value="__custom__"]')).toBeTruthy();
     expect(customInputEl!.value).toBe('codex-mini-latest');
   });
 
-  it('falls back to custom input when getModelList throws', async () => {
+  it('preserves the saved model when getModelList throws', async () => {
     const plugin = createPlugin({
       getModelList: jest.fn().mockRejectedValue(new Error('CLI not found')),
     });
@@ -412,7 +448,7 @@ describe('SettingsCodexSection model selector', () => {
     const selectEl = containerEl.querySelector<HTMLSelectElement>('[data-setting="codex-model"]');
     const customInputEl = containerEl.querySelector<HTMLInputElement>('[data-setting="codex-model-custom"]');
 
-    expect(selectEl!.value).toBe('__custom__');
+    expect(selectEl!.value).toBe('codex-mini-latest');
     expect(customInputEl!.value).toBe('codex-mini-latest');
   });
 });

@@ -177,6 +177,7 @@ export interface ComposerInputShellCoordinatorHost {
   loadSlashCommandMenuItems(): Promise<SlashCommandMenuItem[]>;
   loadAgentMentionCandidates?(): Promise<AgentMentionCandidate[]>;
   loadPromptReferenceCandidates?(query?: string): Promise<PromptReferenceCandidate[]>;
+  loadSubagentMentionCandidates?(): Promise<AgentMentionCandidate[]>;
   getPromptReferenceContextKey?(): string;
   setComposerStackHeight(stackHeight: number): void;
   scheduleSettledScrollToBottomIfNeeded(): void;
@@ -311,6 +312,9 @@ export class ComposerInputShellCoordinator {
       ) : Promise.resolve([]),
       ...(this.host.loadPromptReferenceCandidates ? {
         loadPromptReferenceCandidates: (query?: string) => this.host.loadPromptReferenceCandidates!(query),
+      } : {}),
+      ...(this.host.loadSubagentMentionCandidates ? {
+        loadSubagentMentionCandidates: () => this.host.loadSubagentMentionCandidates!(),
       } : {}),
       getPromptReferenceContextKey: () => this.host.getPromptReferenceContextKey?.() ?? '',
       getTextarea: () => this.inputTextareaEl,

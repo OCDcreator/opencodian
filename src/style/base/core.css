@@ -523,7 +523,10 @@ body[data-opencodian-provider-icon-mode="color"] {
   margin: 10px 12px 0;
 }
 
-.opencodian-container.opencodian-theme-shadcn .opencodian-composer-shell:focus-within {
+/* The ring tracks composer focus, not focus inside the model/effort popover,
+   which is a DOM descendant of the shell: its search field and effort slider
+   keep their own focus indicators and must not light the whole card. */
+.opencodian-container.opencodian-theme-shadcn .opencodian-composer-shell:focus-within:not(:has(.opencodian-model-dropdown :focus)) {
   border-color: color-mix(in srgb, var(--opencodian-accent) 42%, var(--opencodian-shadcn-border));
   box-shadow: 0 0 0 3px var(--opencodian-shadcn-ring), var(--opencodian-shadcn-shadow-sm);
 }

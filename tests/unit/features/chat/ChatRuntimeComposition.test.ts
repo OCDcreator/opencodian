@@ -3,6 +3,7 @@ import { WorkspaceLeaf } from 'obsidian';
 import { CodexAdapter } from '../../../../src/core/agents/backend/codex/CodexAdapter';
 import { type Conversation, DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
+import { USER_MESSAGE_SECRET_MASK_TEXT } from '../../../../src/features/chat/rendering/userMessageDisplay';
 import { encodePromptReference } from '../../../../src/features/chat/services/context/PromptReferenceService';
 import type { MessageSendPreparationHost } from '../../../../src/features/chat/services/send/MessageSendPreparationService';
 
@@ -114,7 +115,11 @@ describe('ChatRuntimeComposition owner', () => {
       .toBe('Codex send preflight is unavailable. Start the Codex backend before sending.');
   });
 
-  it.each(['codex', 'claude-code'] as const)('refreshes the visible settled %s footer after native identity without replacing the message body', (backend) => {
+  it.each([
+    ['codex', false], ['claude-code', false], ['codex', true], ['claude-code', true],
+  ] as const)('refreshes the visible settled %s footer (OMO=%s) without replacing the message body', (backend, withOmo) => {
+    const rawContent = 'api_key=sk-' + 'A1b2C3d4'.repeat(4);
+    const originalText = 'Visible request api_key=sk-' + 'T8a4B2v6'.repeat(4);
     const view = constructView();
     const v = view as unknown as {
       currentConversation: Conversation;
@@ -124,7 +129,8 @@ describe('ChatRuntimeComposition owner', () => {
       sendPipelineRuntime: { host: { onTurnSettled(info: { backend: string; conversationId: string; sessionId: string; tabId: string }): void } };
     };
     v.currentConversation = { id: 'cx-owned', title: 'owned', backend, backendSessionId: 'native-thread', createdAt: 1, updatedAt: 1,
-      messages: [{ id: 'local-user', role: 'user', content: 'owned', timestamp: 1, sourceMessageId: 'native-user', sourceTurnId: 'native-turn' }] };
+      messages: [{ id: 'local-user', role: 'user', content: rawContent, timestamp: 1, sourceMessageId: 'native-user', sourceTurnId: 'native-turn',
+        ...(withOmo ? { omo: { kind: 'user-injection' as const, originalText, injectedPrompt: rawContent, modeTag: 'search-mode', headline: 'Synthetic injected context' } } : {}) }] };
     v.messagesContainer = document.createElement('div');
     v.messagesContainer.innerHTML = '<div class="opencodian-message" data-message-id="local-user"><span class="body">owned body</span><div class="opencodian-user-message-footer">Copy only</div></div>';
     const body = v.messagesContainer.querySelector('.body');
@@ -137,6 +143,14 @@ describe('ChatRuntimeComposition owner', () => {
     expect(footer).not.toHaveBeenCalled();
     v.sendPipelineRuntime.host.onTurnSettled(info);
     expect(footer).toHaveBeenCalledTimes(1);
+    const copiedDisplay = footer.mock.calls[0][2];
+    expect(copiedDisplay).toBe((withOmo ? 'Visible request api_key=' : 'api_key=') + USER_MESSAGE_SECRET_MASK_TEXT);
+    expect(copiedDisplay).not.toContain(rawContent.slice('api_key='.length));
+    expect(copiedDisplay).not.toContain(originalText.slice('Visible request api_key='.length));
+    expect(v.currentConversation.messages[0].content).toBe(rawContent);
+    const originalOmoText = v.currentConversation.messages[0].omo?.kind === 'user-injection'
+      ? v.currentConversation.messages[0].omo.originalText : undefined;
+    expect(originalOmoText).toBe(withOmo ? originalText : undefined);
     expect(v.messagesContainer.querySelector('.body')).toBe(body);
     expect(v.messagesContainer.querySelectorAll('.opencodian-user-message-footer')).toHaveLength(1);
     expect(v.messagesContainer.querySelector<HTMLElement>('.opencodian-message')?.dataset.sourceMessageId).toBe('native-user');

@@ -1,4 +1,18 @@
 # Settings Types and Defaults
+
+## 2026-11-09 DSH native configuration envelope
+
+`DshBackendSettings.nativeConfig?: DshNativeConfiguration` references the sibling `core/types/dshConfiguration.ts` DTO. It stores a version-1 partial namespace map of non-secret native overrides; absence or empty overrides means inherit. `normalizeDshBackendSettings` keeps the field absent for older settings and preserves supplied values, including invalid persisted envelopes, so the dedicated validator and UI can explain the original problem. It never prunes an invalid configuration into a successful-looking empty one. Existing executable/path/args/env/profile/transport/MCP normalization remains unchanged.
+
+`DshMcpServerOptions` adds optional `toolCallTimeoutMs`, `failOnStartupError`, `maxInstructionBytes`, and `reconnect` (`enabled`, `initialDelayMs`, `maxDelayMs`, `maxAttempts`). Stdio declarations additionally accept `cwd`; HTTP declarations retain their original shape. Validation and transport-specific support belong to the DSH protocol/runtime boundary, and invalid persisted declarations remain visible instead of being silently removed.
+
+`DshBackendSettings.defaultPlanMode?: boolean` is plugin-owned new-Native-session policy, separate from upstream `nativeConfig` and permission presets. `undefined` inherits the runtime state, `true`/`false` requests on/off; normalization preserves explicit booleans and leaves absent/invalid values inherited. It does not enter the process connection key. The adapter applies and independently reads back the policy only when publishing a fresh chat session (including a previously reserved catalog draft); resume/fork and ACP remain unchanged. `DshAdapter.planDefaults.test.ts` covers policy persistence and the new-session boundary.
+
+Focused persistence coverage: `tests/unit/core/types/dshBackendSettings.test.ts`. Native schema/metadata/patch validation: `tests/unit/core/agents/backend/configuration/DshNativeConfiguration.test.ts`. The settings module imports only the shared type, not backend validation implementation.
+
+## 2026-11-07 Working backend defaults
+
+`BackendSettingsRecoveryPoint` adds a versioned timestamp and a non-secret value map. Optional `OpenCodianSettings.backendSettingsRecoveryPoints` holds one user-marked working point per backend key; older settings need no migration or eager default allocation. The settings workspace validates the persisted map at read/restore time and applies a backend-specific allowlist before normalization. A recovery point does not contain authentication, environment values or raw native configuration and does not claim backend readback. Canonical defaults/normalizers remain the source of truth for restored values.
 > 2026-09-30 (A2 untrusted-migration): Codex CLI 0.15x（2026-08）移除了 `approval_policy = "untrusted"`（config load 直接报错 `approval_policy = "untrusted" is no longer supported; remove this setting` 并拒绝启动）。`normalizeCodexBackendSettings` 在加载期把持久化的 `'untrusted'` 迁移为 `'on-request'`（最接近的受支持语义：模型请求升级时询问），缺失/未知值仍回退 `'inherit'`；normalizer 永不输出 `'untrusted'`。类型 `CodexApprovalPolicy` 暂保留 `'untrusted'` 字面量（CodexAdapter 等 runtime 代码仍引用，由并行包清理），设置 UI 审批策略下拉不再提供该选项，i18n `settings.codex.approvalPolicy.untrusted` 键已删除。
 > 2026-09-21 (advantage-parity R-F6 质量修复)：新增 `applyChatVimNavigationKey(current, slot, raw)` 与 `normalizeChatVimNavigationKey(raw, fallback)`。整表 `normalizeChatVimNavigationKeys` 保持原有 fail-closed 语义（持久化配置含重复键即整体回退默认 `w`/`s`/`i`），这是 load 边界该有的行为；但交互式单槽位编辑不再复用整表回退——冲突的候选被拒绝并返回原三元组（`rejected: true`），因此不会静默抹掉其他两个合法自定义键。单槽位路径在构造上不可能产出重复三元组（属性测试覆盖）。
 > 2026-09-21 (advantage-parity R-F5/R-F6)：新增双栏会话 rail 与 Vim 导航五字段；两个开关默认关闭，三键归一化为互不重复的单字符（默认 `w`/`s`/`i`），坏值 fail-closed。
@@ -504,6 +518,10 @@ Focused regression tests cover the settings callbacks' saved JSON snapshots, the
 
 2026-10-02 T07：仅 PiBackendSettings.thinkingLevel 与 normalizePiBackendSettings 新增 max 持久化允许值，保留既有 xhigh 等历史值。PiAdapter.uiReads.test.ts 验证 max 不被 normalization 清空；此 allowlist 仅保障设置 roundtrip，模型支持列表必须来自当前 Pi session SDK readback。
 
+
+## 2026-11-10 DSH sessionTrace settings
+
+`DshBackendSettings.sessionTrace`（类型形状归 `core/agents/backend/diagnostics/types.ts` 的 `DshSessionTraceSettings`，本模块持有持久化契约与归一化）：`nativeEnabled` 与 `acpEnabled` 两个相互独立的 wire-trace 门（非 `false` 归 true）、`consolePreset`（仅 `'full'` 保留，其余归默认 `'standard'`）、按 `DSH_TRACE_CHANNEL_IDS` 重建的 `consoleChannels`（非 `false` 归 true）与 `storageDirectory`（字符串 trim，非字符串归空）。`normalizeDshBackendSettings` 始终填充默认值，持久化设置不会看到 undefined；consolePreset/channels/store 目录已被运行时实际消费但暂无设置 UI。设置层不解析凭据、不执行 trace、不推导运行时采集状态。
 
 ## 2026-10-23 DSH backend
 

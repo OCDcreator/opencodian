@@ -1,10 +1,12 @@
 /** Chat defaults and searchable native model choices. Owns only presentation;
- * the adapter remains the catalog/default application authority. */
+ * the adapter remains the catalog/default application authority. Permission
+ * mode lives on the separate permissions tab (SettingsZCodeSection). */
 import { Setting } from 'obsidian';
 
 import type { ZCodeModelCatalog, ZCodeWorkspaceCatalogOptions } from '../../../../core/agents/backend/zcode/ZCodeModelCatalog';
 import { normalizeZCodeBackendSettings, type ZCodeBackendSettings } from '../../../../core/types/settings';
 import { t } from '../../../../i18n';
+import { describeBackendSetting } from '../../controls/BackendSettingsControls';
 
 export interface ZCodeSettingsModelCatalog {
   models: ZCodeModelCatalog['models'];
@@ -36,7 +38,7 @@ export class SettingsZCodeModelControls {
   constructor(private readonly host: ZCodeModelSettingsHost, private readonly options: ModelControlsOptions) {}
 
   attach(container: HTMLElement): void {
-    this.root = container.createDiv({ cls: 'opencodian-zcode-group', attr: { 'data-zcode-group': 'chat-defaults' } });
+    this.root = container.createDiv({ cls: 'opencodian-zcode-group', attr: { 'data-zcode-group': 'chat-defaults', 'data-zcode-catalog-state': 'loading' } });
     this.root.createEl('h3', { text: t('settings.zcode.ui.chat') });
     this.root.createEl('p', { cls: 'setting-item-description', text: t('settings.zcode.ui.chatHelp') });
     this.status = this.root.createDiv({ cls: 'opencodian-zcode-feedback', attr: { role: 'status' } });
@@ -48,20 +50,32 @@ export class SettingsZCodeModelControls {
     void this.refresh();
   }
 
+  /** Terminal catalog states only; 'ready' also covers an honestly empty catalog. */
+  private setCatalogState(state: 'loading' | 'ready' | 'failed'): void {
+    if (this.root?.isConnected) this.root.dataset.zcodeCatalogState = state;
+  }
+
+  private get catalogPending(): boolean {
+    return !this.catalog && this.root?.dataset.zcodeCatalogState !== 'failed';
+  }
+
   async refresh(forceRefresh = false): Promise<void> {
     const epoch = ++this.epoch;
+    this.setCatalogState('loading');
     this.status.setText(t('settings.zcode.ui.loading'));
     this.status.removeClass('is-error');
     try {
       const catalog = await this.options.getCatalog({ forceRefresh });
       if (epoch !== this.epoch || !this.root.isConnected) return;
       this.catalog = catalog;
+      this.setCatalogState('ready');
       this.status.setText(catalog.models.length ? '' : t('settings.zcode.ui.noModels'));
       this.renderChoices();
       if (!catalog.models.length) this.options.onCatalogUnavailable();
       else await this.refreshThinking();
     } catch {
       if (epoch !== this.epoch || !this.root.isConnected) return;
+      this.setCatalogState('failed');
       this.status.setText(t('settings.zcode.ui.catalogFailed'));
       this.status.addClass('is-error');
       this.options.onCatalogUnavailable();
@@ -73,29 +87,6 @@ export class SettingsZCodeModelControls {
     this.modelRow(this.choices, false);
     const thinking = this.choices.createDiv({ cls: 'opencodian-zcode-thinking' });
     this.renderThinking(thinking, this.catalog);
-    const settings = normalizeZCodeBackendSettings(this.host.settings.backendSettings.zcode);
-    const mode = new Setting(this.choices).setName(t('settings.zcode.ui.mode')).setDesc(t('settings.zcode.ui.modeHelp'));
-    const explanation = this.choices.createDiv({ cls: 'opencodian-zcode-supporting' });
-    const updateExplanation = (value: string) => {
-      explanation.setText(value ? t(`settings.zcode.ui.mode.${value}Help` as Parameters<typeof t>[0]) : '');
-    };
-    mode.addDropdown((control) => {
-      control.addOption('', t('settings.zcode.ui.inherit'));
-      for (const value of ['plan', 'build', 'edit', 'yolo'] as const) control.addOption(value, t(`settings.zcode.ui.mode.${value}`));
-      if (settings.mode === 'auto') {
-        control.addOption('auto', t('settings.zcode.ui.mode.auto'));
-        control.selectEl.querySelector<HTMLOptionElement>('option[value="auto"]')?.setAttribute('disabled', '');
-      }
-      control.selectEl.setAttribute('aria-label', t('settings.zcode.ui.mode'));
-      control.setValue(settings.mode).onChange(async (value) => {
-        if (await this.saveField('mode', value)) updateExplanation(value);
-        else {
-          const current = normalizeZCodeBackendSettings(this.host.settings.backendSettings.zcode).mode;
-          control.setValue(current); control.selectEl.setAttribute('value', current);
-        }
-      });
-    });
-    updateExplanation(settings.mode);
     const completion = this.choices.createDiv({ cls: 'opencodian-zcode-group', attr: { 'data-zcode-group': 'completion' } });
     completion.createEl('h4', { text: t('settings.zcode.ui.completion') });
     completion.createEl('p', { cls: 'setting-item-description', text: t('settings.zcode.ui.completionHelp') });
@@ -112,7 +103,20 @@ export class SettingsZCodeModelControls {
     const value = completion ? this.host.settings.inlineCompletionModelOverrides?.zcode ?? ''
       : normalizeZCodeBackendSettings(this.host.settings.backendSettings.zcode).model;
     const entry = this.catalog?.models.find((model) => `${model.providerId}/${model.modelId}` === value);
-    const row = new Setting(container).setName(title).setDesc(value ? (entry ? `${entry.providerLabel} · ${value}` : t('settings.zcode.ui.savedUnknown', { value })) : inherit);
+    // While the catalog is pending (or failed) the saved value is NOT judged
+    // unknown: only an authoritative ready catalog can make that claim.
+    const pending = this.catalogPending;
+    const sourceLabel = this.catalog?.models.length ? t('settings.zcode.ui.catalogSource') : undefined;
+    const row = new Setting(container).setName(title).setDesc(pending ? t('settings.zcode.ui.loading')
+      : value ? (entry ? `${entry.providerLabel} · ${value}` : t('settings.zcode.ui.savedUnknown', { value })) : inherit);
+    describeBackendSetting(row, {
+      key: completion ? 'zcode-completion-model' : 'zcode-default-model',
+      scope: 'vault',
+      effect: 'new-session',
+      risk: 'low',
+      defaultLabel: inherit,
+      ...(sourceLabel ? { source: sourceLabel } : {}),
+    });
     row.settingEl.dataset.zcodeField = completion ? 'completion-model' : 'model';
     let picker: HTMLElement | null = null;
     let resetControl: { setDisabled(value: boolean): unknown } | undefined;
@@ -226,9 +230,21 @@ export class SettingsZCodeModelControls {
     container.empty();
     const current = normalizeZCodeBackendSettings(this.host.settings.backendSettings.zcode).thinkingLevel;
     const levels = catalog?.thoughtLevelEnabled === false ? [] : catalog?.thoughtLevels ?? [];
+    // Pending or failed: no unknown-value judgement and no readback claims.
+    const pending = this.catalogPending;
+    const sourceLabel = this.catalog ? t('settings.zcode.ui.catalogSource') : undefined;
     const setting = new Setting(container).setName(t('settings.zcode.ui.thinking'))
-      .setDesc(current && !levels.some((level) => level.value === current) ? t('settings.zcode.ui.savedUnknown', { value: current })
-        : t(levels.length ? 'settings.zcode.ui.thinkingHelp' : 'settings.zcode.ui.thinkingUnavailable'));
+      .setDesc(pending ? t('settings.zcode.ui.loading')
+        : current && catalog && !levels.some((level) => level.value === current) ? t('settings.zcode.ui.savedUnknown', { value: current })
+          : t(levels.length ? 'settings.zcode.ui.thinkingHelp' : 'settings.zcode.ui.thinkingUnavailable'));
+    describeBackendSetting(setting, {
+      key: 'zcode-default-thinking',
+      scope: 'vault',
+      effect: 'new-session',
+      risk: 'low',
+      defaultLabel: t('settings.zcode.ui.inherit'),
+      ...(sourceLabel ? { source: sourceLabel } : {}),
+    });
     setting.addDropdown((control) => {
       control.addOption('', t('settings.zcode.ui.inherit'));
       for (const level of levels) control.addOption(level.value, level.label);

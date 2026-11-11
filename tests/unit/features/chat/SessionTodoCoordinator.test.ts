@@ -1,3 +1,4 @@
+import type { AgentTodoCapability } from '../../../../src/core/agents/backend/AgentService';
 import type { SessionActivityStatus } from '../../../../src/core/opencode';
 import type {
   ChatMessage,
@@ -118,6 +119,56 @@ function createFixture(options: {
 describe('SessionTodoCoordinator', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('reads native DSH todos and applies owned push updates ahead of an older read', async () => {
+    const { coordinator, host, runtime } = createFixture({ conversation: { backend: 'dsh' } as Conversation });
+    let listener!: (update: unknown) => void;
+    let release!: (todos: SessionTodo[]) => void;
+    const dispose = jest.fn();
+    const service = {
+      getSessionTodos: jest.fn(() => new Promise<SessionTodo[]>((resolve) => { release = resolve; })),
+      subscribeToSessionTodoUpdates: jest.fn((handler: (update: unknown) => void) => { listener = handler; return { dispose }; }),
+    } as unknown as AgentTodoCapability;
+    host.getTodoCapability = jest.fn(() => service);
+    const reading = coordinator.refreshTabSessionTodos('tab-1', 'session-1');
+    listener({ sessionID: 'session-2', todos: [createTodo('foreign')] }); expect(runtime?.sessionTodos).toEqual([]);
+    listener({ sessionID: 'session-1', todos: [createTodo('pushed')] });
+    release([createTodo('older')]); await reading;
+    expect(runtime?.sessionTodos).toEqual([createTodo('pushed')]); expect(host.getSessionTodos).not.toHaveBeenCalled();
+    coordinator.destroy(); expect(dispose).toHaveBeenCalledTimes(1);
+    listener({ sessionID: 'session-1', todos: [createTodo('late')] }); expect(runtime?.sessionTodos).toEqual([createTodo('pushed')]);
+  });
+
+  it('keeps native todo subscriptions isolated across background tabs', async () => {
+    const { coordinator, host, runtime } = createFixture({ conversation: { backend: 'dsh' } as Conversation });
+    const second = createRuntime({ sessionTodoSessionId: 'session-2' });
+    const listeners = new Set<(update: unknown) => void>();
+    const service = { getSessionTodos: jest.fn(async () => []), subscribeToSessionTodoUpdates: (handler: (update: unknown) => void) => {
+      listeners.add(handler); return { dispose: () => listeners.delete(handler) };
+    } } as unknown as AgentTodoCapability;
+    host.getTodoCapability = jest.fn(() => service);
+    host.getTabRuntimeState.mockImplementation((tabId) => tabId === 'tab-1' ? runtime : second);
+    host.getSessionIdForTab.mockImplementation((tabId) => tabId === 'tab-1' ? 'session-1' : 'session-2');
+    await coordinator.refreshTabSessionTodos('tab-1', 'session-1'); await coordinator.refreshTabSessionTodos('tab-2', 'session-2');
+    for (const listener of listeners) listener({ sessionID: 'session-2', todos: [createTodo('background')] });
+    expect(runtime?.sessionTodos).toEqual([]); expect(second.sessionTodos).toEqual([createTodo('background')]);
+    host.getConversationForTab.mockReturnValue({ backend: 'claude-code' } as Conversation);
+    for (const listener of listeners) listener({ sessionID: 'session-2', todos: [createTodo('wrong-backend')] });
+    expect(second.sessionTodos).toEqual([createTodo('background')]); coordinator.destroy();
+  });
+
+  it('discards native todo reads when the adapter is replaced and keeps ACP unavailable', async () => {
+    const { coordinator, host, runtime } = createFixture({ conversation: { backend: 'dsh' } as Conversation });
+    let release!: (todos: SessionTodo[]) => void;
+    const service = { getSessionTodos: jest.fn(() => new Promise<SessionTodo[]>((resolve) => { release = resolve; })),
+      subscribeToSessionTodoUpdates: jest.fn(() => ({ dispose: jest.fn() })) } as unknown as AgentTodoCapability;
+    host.getTodoCapability = jest.fn(() => service);
+    const reading = coordinator.refreshTabSessionTodos('tab-1', 'session-1');
+    host.getTodoCapability = jest.fn(() => null); release([createTodo('stale')]); await reading;
+    expect(runtime?.sessionTodos).toEqual([]);
+    await coordinator.refreshTabSessionTodos('tab-1', 'session-1'); expect(host.getSessionTodos).not.toHaveBeenCalled();
+    expect(service.getSessionTodos).toHaveBeenCalledTimes(1); coordinator.destroy();
   });
 
   it('applies streaming todowrite snapshots through the shared state path', () => {

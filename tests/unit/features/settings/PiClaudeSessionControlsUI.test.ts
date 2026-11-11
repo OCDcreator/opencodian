@@ -54,7 +54,9 @@ function claudeFixture(adapter: unknown, kind: 'styles' | 'mcp') {
   };
   const container = document.body.createDiv();
   const section = new SettingsClaudeCodeSection({ plugin: plugin as unknown as OpenCodianPlugin, createSectionHeading: (parent, title) => parent.createEl('h2', { text: title }) });
-  section.renderTabContent(container, kind === 'mcp' ? 'mcp' : 'runtime');
+  // Styles session controls live on the conversation page (output style row);
+  // MCP session controls stay in the tools-context page's MCP runtime group.
+  section.renderTabContent(container, kind === 'mcp' ? 'mcp' : 'conversation');
   const area = container.querySelector<HTMLElement>('[data-claude-session-controls="' + kind + '"]') as HTMLElement;
   const button = controls.find(control => control.settingEl.closest('[data-claude-session-controls]') === area && control.click);
   if (!button) throw new Error('Missing session control button');
@@ -201,9 +203,23 @@ it('keeps max stored outside a legacy schema choice and sends only the changed k
     { path: 'defaultModel', group: 'model', kind: 'string', label: { en: 'Default model', zh: '默认模型' } },
   ], scopes: { global: { path: '/fixture/global', revision: 'g', value: {} }, project: { path: '/fixture/project', revision: 'p', value: { defaultThinkingLevel: 'max', future: { opaque: [1, 2, 3] } } } } };
   const command = jest.fn(async () => snapshot); const onSaved = jest.fn(async () => {});
-  new SettingsPiConfigurationSection({ command } as unknown as PiAdapter, onSaved, async () => {}).attach(document.body.createDiv(), 'model'); await flush();
-  expect(lastControl('Thinking').options).toHaveProperty('max'); expect(lastControl('Thinking').value).toBe('max');
-  await lastControl('Default model').change?.('fixture-model');
+  const container = document.body.createDiv();
+  new SettingsPiConfigurationSection({ command } as unknown as PiAdapter, onSaved, async () => {}).attach(container, 'model'); await flush();
+  // Choice fields render as native radios; the saved-but-unlisted 'max' is
+  // retained as the checked, disabled "current (unlisted)" option instead of
+  // being silently replaced by a known choice.
+  const thinking = container.querySelector<HTMLElement>('[data-pi-setting="defaultThinkingLevel"]');
+  expect(thinking).not.toBeNull();
+  const unlisted = thinking!.querySelector<HTMLInputElement>('input[type="radio"][value="max"]');
+  expect(unlisted).not.toBeNull();
+  expect(unlisted!.checked).toBe(true);
+  expect(unlisted!.disabled).toBe(true);
+  expect(thinking!.querySelector('input[type="radio"]:checked')).toBe(unlisted);
+  // Field labels come from the locale map (merged separately); route by the
+  // stable field-path marker instead of display text.
+  const modelControl = controls.find(control => control.settingEl.dataset.piSetting === 'defaultModel' && control.change);
+  expect(modelControl).toBeDefined();
+  await modelControl!.change?.('fixture-model');
   await controls.find(control => control.name === t('settings.pi.saveSettings') && control.label === t('settings.pi.save'))?.click?.();
   expect(command).toHaveBeenLastCalledWith(undefined, 'save_configuration', { scope: 'project', revision: 'p', changes: { defaultModel: 'fixture-model' } });
   expect(snapshot.scopes.project.value.future).toEqual({ opaque: [1, 2, 3] });

@@ -217,4 +217,40 @@ describe('Goal composer ownership and confirmation', () => {
     expect(coordinator.isArmed()).toBe(false);
   });
 });
+
+describe('Workbench presentation ports', () => {
+  let root: HTMLElement, coordinator: SessionWorkbenchCoordinator, host: SessionWorkbenchHost;
+  beforeEach(() => {
+    root = document.body.createDiv();
+    const current = session('ports-tab', 'ports-conversation');
+    host = {
+      getActiveSession: () => current, getSessions: () => [current], getRegistry: () => null,
+      getGoalSlot: () => null, getSummaryMount: () => null, getComposerShell: () => null,
+      attachFiles: jest.fn(), mountTools: jest.fn(), updateTools: jest.fn(),
+      syncTranscript: async () => {}, focusComposer: jest.fn(), openMessage: jest.fn(), openResource: jest.fn(), notify: jest.fn(),
+    };
+    coordinator = new SessionWorkbenchCoordinator(host);
+  });
+  afterEach(() => { coordinator.destroy(); root.remove(); });
+
+  it('refreshes the file entry from its read-only summary projection', () => {
+    let files = '2 · +4 -1';
+    host.getFilesSummary = () => files;
+    coordinator.mount(root);
+    expect(root.querySelector('.opencodian-workbench-files-nav')?.textContent).toContain(files);
+    files = t('modifiedFiles.unavailableShort'); coordinator.refresh();
+    expect(root.querySelector('.opencodian-workbench-files-nav')?.textContent).toContain(files);
+    expect(root.querySelector('.opencodian-workbench-files-nav')?.textContent).not.toContain('2 · +4 -1');
+  });
+
+  it('mounts the inline catalog once and retains its DOM through state refreshes', () => {
+    let sentinel: HTMLElement | undefined;
+    const mount = jest.fn((parent: HTMLElement) => { sentinel = parent.createDiv({ text: 'catalog sentinel' }); });
+    host.mountResources = mount; coordinator.mount(root);
+    coordinator.refresh(); coordinator.refresh();
+    expect(mount).toHaveBeenCalledTimes(1);
+    expect(sentinel?.isConnected).toBe(true);
+    expect(root.querySelectorAll('.opencodian-workbench-inline-resources')).toHaveLength(1);
+  });
+});
 import { type App, Scope } from 'obsidian';

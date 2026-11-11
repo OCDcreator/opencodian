@@ -77,9 +77,67 @@ describe('native continuation transcript projection', () => {
     expect(messages[1].content).toBe('Visible');
   });
 
+  it('carries harness image display names as filenames and leaves nameless blocks untouched', () => {
+    const messages = backendSessionMessagesToChat('dsh', [
+      { id: 'u1', role: 'user', sourceKind: 'user',
+        content: [{ type: 'image', mimeType: 'image/webp', data: 'aW1n', name: 'shot.webp' }] },
+      { id: 'u2', role: 'user', sourceKind: 'user',
+        content: [{ type: 'image', mimeType: 'image/gif', data: 'Z2lm' }] },
+    ]);
+    expect(messages[0].images).toEqual([{ data: 'aW1n', mediaType: 'image/webp', filename: 'shot.webp' }]);
+    expect(messages[1].images).toEqual([{ data: 'Z2lm', mediaType: 'image/gif' }]);
+  });
+
   it('keeps Codex native activity text when its preview has no tool-call identity', () => {
     expect(backendSessionMessagesToChat('codex', [{ id: 'activity', role: 'activity', sourceTurnId: 'turn2',
       content: [{ type: 'tool_call', text: 'Shell: npm test' }, { type: 'file_change', text: 'a.ts (update)' }],
     }])[0]).toMatchObject({ sourceMessageId: 'activity', sourceTurnId: 'turn2', content: 'Shell: npm test\na.ts (update)' });
+  });
+});
+
+describe('recorded per-message model provenance projection', () => {
+  it('keeps each assistant message labeled with its own recorded model through projection', () => {
+    const messages = backendSessionMessagesToChat('dsh', [
+      { id: 'a1', role: 'assistant', sourceKind: 'model', sourceProvider: 'deepseek-official', sourceModel: 'deepseek-chat',
+        recordedModelId: 'deepseek-official/["deepseek-official","deepseek-chat"]',
+        content: [{ type: 'text', text: 'Blue' }], timestamp: 1 },
+      { id: 'a2', role: 'assistant', sourceKind: 'model', sourceProvider: 'deepseek-official', sourceModel: 'deepseek-reasoner',
+        recordedModelId: 'deepseek-official/["deepseek-official","deepseek-reasoner"]',
+        content: [{ type: 'text', text: 'Marker' }], timestamp: 2 },
+    ]);
+    expect(messages.map((message) => message.modelId)).toEqual([
+      'deepseek-official/["deepseek-official","deepseek-chat"]',
+      'deepseek-official/["deepseek-official","deepseek-reasoner"]',
+    ]);
+    expect(messages.map((message) => message.id)).toEqual(['native-dsh-a1', 'native-dsh-a2']);
+  });
+
+  it('leaves messages without recorded provenance unlabeled instead of inheriting another message model', () => {
+    const messages = backendSessionMessagesToChat('dsh', [
+      { id: 'a1', role: 'assistant', sourceKind: 'model', sourceProvider: 'p', sourceModel: 'm',
+        recordedModelId: 'p/["p","m"]', content: [{ type: 'text', text: 'Labeled' }], timestamp: 1 },
+      { id: 'a2', role: 'assistant', content: [{ type: 'text', text: 'Sparse history' }], timestamp: 2 },
+      { id: 'a3', role: 'assistant', recordedModelId: '   ',
+        content: [{ type: 'text', text: 'Blank provenance' }], timestamp: 3 },
+    ]);
+    expect(messages).toHaveLength(3);
+    // The key must be absent entirely: the native merge spreads the projection
+    // over the locally persisted message, so a present-but-undefined modelId
+    // would erase the locally known label while a missing key preserves it.
+    for (const index of [1, 2]) expect('modelId' in messages[index]).toBe(false);
+    expect({ id: 'local', modelId: 'p/["p","m"]', ...messages[1] }.modelId).toBe('p/["p","m"]');
+  });
+
+  it('stamps only genuine assistant messages, never tool, activity or user transcripts', () => {
+    const explicit = { recordedModelId: 'p/["p","m"]', content: [{ type: 'text', text: 'Explicit ref' }], timestamp: 1 };
+    const messages = backendSessionMessagesToChat('dsh', [
+      { id: 'assistant', role: 'assistant', ...explicit },
+      { id: 'tool', role: 'tool', ...explicit },
+      { id: 'activity', role: 'activity', ...explicit },
+      { id: 'user', role: 'user', ...explicit },
+    ]);
+    expect(messages).toHaveLength(4);
+    expect(messages[0].modelId).toBe('p/["p","m"]');
+    for (const index of [1, 2, 3]) expect('modelId' in messages[index]).toBe(false);
   });
 });

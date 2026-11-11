@@ -462,3 +462,115 @@ describe('UserMessageContentRenderer.renderUserMessageContent OMO handling', () 
     expect(host.scheduleActiveSettledScrollToBottomIfNeeded).not.toHaveBeenCalled();
   });
 });
+
+describe('UserMessageContentRenderer credential display masking', () => {
+  // Synthetic credential shape; every character is invented.
+  const SYNTHETIC_KEY = 'SYNTHKEY0123456789';
+
+  let container: HTMLDivElement;
+  let host: ReturnType<typeof createRenderer>['host'];
+  let renderer: UserMessageContentRenderer;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    const created = createRenderer();
+    host = created.host;
+    renderer = created.renderer;
+  });
+
+  afterEach(() => {
+    container.remove();
+  });
+
+  it('renders and returns masked text for display and default copy', async () => {
+    const message = {
+      id: 'msg-1',
+      role: 'user' as const,
+      content: `api_key=${SYNTHETIC_KEY}`,
+      timestamp: 1,
+    };
+
+    const copyContent = await renderer.renderUserMessageContent(container, message);
+
+    expect(host.renderMarkdownInto).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      `api_key=${'•'.repeat(8)}`,
+    );
+    expect(copyContent).toBe(`api_key=${'•'.repeat(8)}`);
+    expect(copyContent).not.toContain(SYNTHETIC_KEY);
+    // The persisted message object keeps the raw text untouched.
+    expect(message.content).toBe(`api_key=${SYNTHETIC_KEY}`);
+  });
+
+  it('masks the OMO injected raw block and headline but keeps originalText source intact', async () => {
+    const message = {
+      id: 'msg-1',
+      role: 'user' as const,
+      content: 'test',
+      timestamp: 1,
+      omo: {
+        kind: 'user-injection' as const,
+        modeTag: 'analyze-mode',
+        originalText: 'original',
+        injectedPrompt: `injected with api_key=${SYNTHETIC_KEY}`,
+        headline: `Headline api_key=${SYNTHETIC_KEY}`,
+      },
+    };
+
+    await renderer.renderUserMessageContent(container, message);
+
+    const rawEl = container.querySelector('.opencodian-omo-raw-content');
+    expect(rawEl?.textContent).toBe(`injected with api_key=${'•'.repeat(8)}`);
+    expect(message.omo.injectedPrompt).toBe(`injected with api_key=${SYNTHETIC_KEY}`);
+    expect(host.renderMarkdownInto).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      expect.stringContaining(`Headline api_key=${'•'.repeat(8)}`),
+    );
+  });
+
+  it('masks credential text in context chip label, title, and aria-label but keeps the raw URL target', async () => {
+    const rawUrl = `https://example.com/?token=${SYNTHETIC_KEY}`;
+    const message = {
+      id: 'msg-1',
+      role: 'user' as const,
+      content: 'see the page',
+      timestamp: 1,
+      contextAttachments: [
+        {
+          kind: 'url' as const,
+          path: rawUrl,
+          label: rawUrl,
+          mime: 'text/html',
+          url: { href: rawUrl, status: 'ok' as const },
+        },
+        {
+          kind: 'file' as const,
+          path: 'notes/ideas.md',
+          label: 'notes/ideas.md',
+          mime: 'text/markdown',
+        },
+      ],
+    };
+
+    await renderer.renderUserMessageContent(container, message);
+
+    const maskedRun = '•'.repeat(8);
+    const chips = container.querySelectorAll<HTMLElement>('.opencodian-user-context-chip');
+    expect(chips).toHaveLength(2);
+
+    const urlChip = chips[0];
+    expect(urlChip.textContent).not.toContain(SYNTHETIC_KEY);
+    expect(urlChip.getAttribute('title')).toBe(`https://example.com/?token=${maskedRun}`);
+    expect(urlChip.getAttribute('aria-label')).toBe(`Webpage: https://example.com/?token=${maskedRun}`);
+    // The raw URL survives on the persisted object for the click target and is
+    // never re-inserted into any attribute.
+    expect(message.contextAttachments[0].url?.href).toBe(rawUrl);
+    expect(urlChip.getAttribute('data-href')).toBeNull();
+    expect(urlChip.innerHTML).not.toContain(rawUrl);
+
+    // Ordinary file labels stay readable without false masking.
+    const fileChip = chips[1];
+    expect(fileChip.getAttribute('title')).toBe('notes/ideas.md');
+    expect(fileChip.textContent).toBe('notes/ideas.md');
+  });
+});

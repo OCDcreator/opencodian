@@ -1,10 +1,13 @@
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { DshAdapter } from '../../../../../src/core/agents/backend/dsh/DshAdapter';
+import { DshNativeClient } from '../../../../../src/core/agents/backend/dsh/DshNativeClient';
 import type { DshBackendSettings } from '../../../../../src/core/types/settings';
 
 const live = process.env.RUN_DSH_NATIVE_LIVE === '1' ? describe : describe.skip;
@@ -26,6 +29,30 @@ function seedCredentials(root: string): void {
   if (existsSync(llmStore)) cpSync(llmStore, path.join(root, '.dsh', 'llm-deepseek'), { recursive: true });
 }
 
+/** A public LlmAdapter fixture advertises metadata and refuses every model dispatch. */
+function createOfflineProvider(root: string): string {
+  const plugin = path.join(root, 'offline-provider.mjs');
+  const patch = path.join(root, 'offline-provider.patch.yml');
+  const installation = process.env.DSH_PUBLIC_INSTALL;
+  if (!installation) throw new Error('Offline installed-runtime fixture requires DSH_PUBLIC_INSTALL');
+  const llmModule = pathToFileURL(createRequire(path.join(installation, 'package.json')).resolve('@deepseek-ai/dsh-llm')).href;
+  writeFileSync(plugin, `import { LlmAdapter } from ${JSON.stringify(llmModule)};
+    class OfflineAdapter extends LlmAdapter {
+      async listModels(provider) { return [{provider,id:'offline',name:'Offline metadata fixture',inputModalities:['text','image']}]; }
+      async resolveModel(provider, model) { return {provider,id:model,name:'Offline metadata fixture',inputModalities:['text','image'],context:{contextWindow:32000}}; }
+      async *stream() { throw new Error('Offline fixture forbids model requests'); }
+    }
+    export const inject=['llm']; export async function apply(ctx) {
+      ctx.llm.registerAdapter(['offline-fixture'], new OfflineAdapter());
+    }`, { mode: 0o600 });
+  writeFileSync(patch, JSON.stringify([
+    { id: 'llm-deepseek', disabled: true }, { id: 'llm-pi-ai', disabled: true },
+    { insert: [{ id: 'owned-offline-provider', name: plugin, inject: ['llm'] }] },
+    { id: 'agent-default-model', config: { provider: 'offline-fixture', model: 'offline' } },
+  ]), { mode: 0o600 });
+  return patch;
+}
+
 live('installed Harness native protocol (zero model requests)', () => {
   beforeAll(() => {
     const source = execFileSync(process.execPath, ['--input-type=module', '-e',
@@ -36,10 +63,14 @@ live('installed Harness native protocol (zero model requests)', () => {
 
   function fixture(args: string[] = []) {
     const root = mkdtempSync(path.join(os.tmpdir(), 'opencodian-dsh-native-test-'));
-    seedCredentials(root);
-    const current: DshBackendSettings = { executablePath: '', workingDirectory: root, args, env: {}, profile: 'acp', transport: 'native', mcpServers: [] };
+    const offline = process.env.DSH_NATIVE_LIVE_OFFLINE === '1';
+    if (!offline) seedCredentials(root);
+    const launchArgs = offline ? [...args, '--patch', createOfflineProvider(root)] : args;
+    const profiles = mkdtempSync(path.join(os.tmpdir(), 'opencodian-dsh-native-profiles-'));
+    const current: DshBackendSettings = { executablePath: '', workingDirectory: root, args: launchArgs, env: {}, profile: 'acp', transport: 'native', mcpServers: [] };
     const adapter = new DshAdapter({ workingDirectory: root, getSettings: () => current,
-      getExtraEnv: () => ({ HOME: root, DSH_HOME: path.join(root, '.dsh'), XDG_CONFIG_HOME: path.join(root, '.config'), XDG_DATA_HOME: path.join(root, '.local/share') }) });
+      createClient: (options) => new DshNativeClient({ ...options, managedProfileRoot: profiles }),
+      getExtraEnv: () => ({ HOME: root, DSH_HOME: path.join(root, '.dsh'), DSH_TELEMETRY_DISABLED: '1', XDG_CONFIG_HOME: path.join(root, '.config'), XDG_DATA_HOME: path.join(root, '.local/share') }) });
     return { root, current, adapter };
   }
 
@@ -54,6 +85,11 @@ live('installed Harness native protocol (zero model requests)', () => {
       const commands = await adapter.getRuntimeCommands();
       expect(commands).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'owned-visible', source: 'skill' })]));
       expect(commands.some((command) => command.name === 'owned-hidden')).toBe(false);
+      const extensions = await adapter.listNativeExtensions();
+      expect(extensions.plugins).toEqual(expect.arrayContaining([
+        expect.objectContaining({ moduleName: '@deepseek-ai/dsh-tools', readOnlyReason: 'management-required' }),
+        expect.objectContaining({ moduleName: '@deepseek-ai/dsh-hmr', readOnlyReason: 'management-required' }),
+      ]));
     } finally { await adapter.stop(); }
   }, 45_000);
 

@@ -44,6 +44,12 @@ typography:
     fontWeight: 700
     lineHeight: 1.4
     letterSpacing: "0.02em"
+  settings-field-title:
+    fontFamily: "var(--font-interface), -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+    fontSize: "15px"
+    fontWeight: 600
+    lineHeight: 1.4
+    letterSpacing: "normal"
   mono:
     fontFamily: "var(--font-monospace), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
     fontSize: "12px"
@@ -385,6 +391,10 @@ Skills, Tools, and ACP Agents extend the Agent Management settings vocabulary wi
 - **ACP editor rows:** command, args, cwd, and name remain inline FieldGroup fields inside the same flat row-card group. ACP does not introduce a Sheet/Drawer or replace the existing modal/file workflows.
 - **Responsive:** below `720px`, toolbars, permission rows, row actions, and ACP field grids collapse to one column with controls aligned left.
 
+### Settings Content Width
+
+The full OpenCodian Settings surface responds to its native window's available width. Only a host pane containing `.opencodian-settings` replaces Obsidian's700px group cap with1160px, giving ordinary content approximately1120px after the root's40px horizontal padding. Preserve the DSH form's1030px maximum. Recompute the host centering offset at the same element and use16–32px minimum side gutters, keeping the surface centered above the cap and fluid below it. Existing container queries choose row wrapping; avoid new fixed label widths or alignment slots. Other Obsidian settings pages retain native sizing. This follows the user's new shared-width repair request after the earlier DSH width experiments were withdrawn.
+
 ### Settings ScrollArea Alignment
 
 Settings scroll lists use the shadcn/Radix ScrollArea structure without installing React, Radix, Tailwind, or new runtime dependencies. The root owns the visible width, the viewport owns scrolling, and the content track owns row-card layout.
@@ -492,6 +502,38 @@ Settings dropdown menus may be wider than their trigger when option labels need 
 - Do not hide permission or server risk behind low-contrast styling.
 - Do not collapse concurrent tab/session/background behavior into one global stream metaphor.
 - Do not introduce broad new visual abstractions when an existing chat, settings, theme, or component owner can carry the change.
+
+### Backend task settings
+
+All six selectable backend workspaces share the existing Obsidian DOM surface. shadcn Field/FieldSet/Tabs/Alert anatomy organizes labels, choice controls and validation; Mantine SegmentedControl/Radio.Card/Slider patterns make bounded decisions selectable. This is a local settings extension, with no React or component-library runtime. The supplied Anthropic/Claude references contribute a quiet warm ground and restrained coral selection inside host-themed light/dark surfaces. Interface typography remains compact and readable.
+
+- Ordinary enum decisions use native radio labels with an explicit inherited or recommended option. Choice cards form a responsive grid with a 160px preferred minimum and stack in narrow panes; descriptions stay short and left-aligned. Long catalogs retain searchable selection. Paths, endpoints, keys and authored text remain free-form only where that value genuinely requires it.
+- Scope and application boundary appear together below each field. A persisted value is never shown as backend confirmation. Model-dependent or saved unknown choices remain visible until the user explicitly replaces them; pending catalogs do not imply a saved value is missing.
+- The backend workspace begins with a flat source/application strip and a `Working configuration` disclosure. User-marked non-secret plugin defaults restore from that same surface; native files use revision-checked history. Keys and native file contents are not copied into the vault-default snapshot.
+- Permissions, sandbox access, process-launch overrides and credential administration have dedicated task groups. A high-risk label explains the specific command/write/account effect instead of tinting a whole ordinary row.
+- Section wrappers stay flat when child Field rows already own a border. Tabs keep local horizontal scrolling, manual keyboard activation and linked tabpanel names. Supporting text derives from foreground colors; focus and selection work in light, dark, reduced-motion and forced-color modes.
+
+The field inventory and mapping are in `docs/research/backend-refresh/`. Runtime screenshot evidence must identify the current Test Vault build and cover choice/default, source, timing, restore, high-risk and unavailable-installation/credential states.
+
+### DSH A layout — user-selected 2026-11-09
+
+DSH uses the A prototype's horizontal subtabs and unboxed aligned settings rows. Group ordinary fields through proximity and 16px row padding, with 24px space between tasks, rather than a horizontal rule after every option. Keep action buttons content-sized and adjacent when they belong to one task, including nested env/header add/remove actions; allow wrapping at narrow widths. Pure task/action rows stack below 740px so explanations can use the reading width. Give a selected MCP server a stronger label, indent its editor fields and leave a deliberate gap before page-level actions, instead of adding another card. Page introductions use the available reading width and wrap only when space requires it, without a fixed character cap or forced single-line behavior. A compact radio segment chooses native/ACP; path and directory choices use the plugin's own enhanced dropdown component, with inline inputs revealed only for custom values. Keep one short consequence sentence with the label and one scope/application line for the connection page. Put the connection-backup disclosure only after the Connection form as a full-width secondary footer, collapsed by default; other DSH subtabs do not repeat it. Its title and empty/saved status explain the task before expansion, with no external source line or extra horizontal rule. Recovery must never precede or push down the page heading. Use the user's selected shadcn-style single-frame disclosure: title and content share one thin theme border and modest radius. The full-width clickable header has a right-aligned chevron; its body uses matching horizontal padding, quieter child labels and tighter row spacing. Keep the body transparent, without a second card or a left-side guide. Keep environment actions inside the environment field; an add action must not precede unrelated launch arguments. Apply the same framed disclosure to all four DSH kinds, including raw MCP JSON. That editor uses label/description above a full-width code field instead of the ordinary two-column preference row. Do not use giant choice cards, nested borders, repeated recommendation badges or a new sidebar. The restrained serif subsection title, spacing and flat form carry the Claude-inspired direction. The user rejected the prototype's fixed cream/charcoal panel as disconnected from the active theme: the canvas is transparent and text, borders, control surfaces, selection and focus colors inherit Obsidian's current theme tokens. Keep the form visually continuous with the surrounding plugin. At the user's explicit restore request, retain the original 1338 left/right format: a centered 1030px content-shell maximum and normal host Settings sizing. Fluid-width,1200px host-group and paired-column trials are withdrawn; do not resume layout experiments or HTML work without a new user request. The DSH attribute guard limits this pilot to that backend. The subsequent user-requested navigation correction makes both DSH tab rails inherit the shared category navigation geometry: no backend-only 6px block inset or 42px minimum, the same 12px rail separation, and the same responsive wrapping as General/Conversation. Keep this navigation exception separate from the restored form layout. Preserve automatic persistence and honest next-connection timing rather than adding a decorative save button.
+
+### DSH complete configuration tasks
+
+Extend the accepted form to horizontal Connection, Model, Permissions, Context, Tools, MCP, Configuration and Advanced tasks. Keep one actionable consequence sentence per decision; display inheritance, actual base values, units and save timing as supporting information. Standalone confirmed changes auto-save; related records use group transactions. A dirty advanced JSON draft locks guided changes/reset/history until explicit save or discard. Preserve the plugin dropdown and owner-window keyboard/portal lifecycle. Distinguish current-session selection readback from effective defaults; saved revision alone does not confirm runtime application. Configuration recovery excludes secrets, and the original four-field connection backup remains connection-only. Expanded provider/array entries stay flat; nested disclosures get no second border. Prove theme stability and computed contrast before judging alternate-theme captures.
+
+### DSH connection backup and restore
+
+Place this task only below the Connection form. One full-width native disclosure has a15px title and a quiet12px empty/saved timestamp line. Its body explains why to save a backup, the four connection fields included, exclusions, current-vault/single-backup replacement and the application boundary. Use compact wrapping Save/Update and Restore actions plus local polite progress/error feedback. Saving never claims to test the connection. Remove the external source label and horizontal divider; the title/body share one host-themed frame. Model, MCP and native-default pages do not repeat this component. Preserve the existing snapshot allowlist/store and other backend layouts.
+
+### DSH right-column alignment
+
+Center the right-hand control group against the complete left-hand title and explanation using the control grid item's `align-self:center`. Remove the former5px top padding on the info block. Keep the row grid top-aligned so multiline editors retain a top-anchored label; keep stacked narrow controls below the text and left-aligned. This follows the user's explicit button-centering refinement and preserves the established responsive form.
+
+### DSH configuration titles — local Claude reference
+
+For the user's field-title prominence request, consult `my-skills/external/anthropics-skills/{brand-guidelines,frontend-design}/SKILL.md` and the reference-tier `external/awesome-design-md/claude/DESIGN.md`. The official brand resource targets artifacts, and the unofficial Claude analysis targets marketing pages; neither is an official app settings-label specification. Apply the coordinated typography principle to this existing Operate surface: ordinary configuration names15px/600/1.4, muted explanations12px/400 with6px separation, framed disclosure headers14px/600 and child names13px/600. Selected MCP server names use16px/600. Retain the25px serif page title, host text colors, transparent canvas, established widths and row grids. This makes the configuration name a clear reading anchor through size and proximity as well as weight.
 
 ### ZCode Task Settings
 

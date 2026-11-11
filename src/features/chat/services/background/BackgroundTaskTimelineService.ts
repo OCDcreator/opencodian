@@ -1,3 +1,4 @@
+import type { DshJobView } from '../../../../core/agents/backend/dsh/DshNativeControls';
 import { type BackgroundTaskActiveAnchorMetadata, type ChatMessage, type Conversation,getConversationBackendSessionId } from '../../../../core/types';
 import { t } from '../../../../i18n';
 import { createLogger } from '../../../../shared';
@@ -11,6 +12,7 @@ import {
   BackgroundTaskTimelineAssemblyService,
   type BackgroundTaskTimelineRuntime,
 } from './BackgroundTaskTimelineAssemblyService';
+import { BackgroundTaskTimelineLaunchService } from './BackgroundTaskTimelineLaunchService';
 
 const logger = createLogger('BackgroundTaskTimelineService');
 
@@ -49,6 +51,9 @@ export interface BackgroundTaskTimelineServiceHost extends BackgroundTaskTimelin
 
 export class BackgroundTaskTimelineService {
   private readonly assemblyService: BackgroundTaskTimelineAssemblyService;
+  private readonly nativeJobs = new WeakMap<BackgroundTaskTimelineRuntime, {
+    conversationId: string; sessionId: string; jobs: readonly DshJobView[]; isCurrent: () => boolean;
+  }>();
 
   constructor(
     private readonly host: BackgroundTaskTimelineServiceHost,
@@ -128,10 +133,41 @@ export class BackgroundTaskTimelineService {
     return this.assemblyService.collectSegments(messages, tabId);
   }
 
+  acceptNativeJobs(conversation: Conversation, tabId: TabId | null, snapshot: {
+    jobs: readonly DshJobView[] | null; isCurrent: () => boolean;
+  }): void {
+    const runtime = this.host.getTabRuntimeState(tabId);
+    if (!runtime || conversation.backend !== 'dsh' || !conversation.backendSessionId) return;
+    if (snapshot.jobs === null) { this.nativeJobs.delete(runtime); return; }
+    if (!snapshot.isCurrent()) return;
+    this.nativeJobs.set(runtime, { conversationId: conversation.id, sessionId: conversation.backendSessionId,
+      jobs: snapshot.jobs.map(job => ({ ...job })), isCurrent: snapshot.isCurrent });
+  }
+
+  collectNativeJobSegments(conversation: Conversation, tabId: TabId | null): BackgroundTaskSegment[] {
+    const runtime = this.host.getTabRuntimeState(tabId);
+    const snapshot = runtime ? this.nativeJobs.get(runtime) : undefined;
+    if (!snapshot || snapshot.conversationId !== conversation.id || snapshot.sessionId !== conversation.backendSessionId
+      || !snapshot.isCurrent()) return [];
+    return [...BackgroundTaskTimelineLaunchService.groupNativeJobs(conversation, snapshot.jobs)].map(([anchor, jobs]) => {
+      const completionEvents = jobs.flatMap(job => {
+        const event = BackgroundTaskTimelineLaunchService.nativeJobCompletion(job, snapshot.isCurrent);
+        return event ? [event] : [];
+      });
+      const launches = jobs.map(job => BackgroundTaskTimelineLaunchService.nativeJobLaunch(job));
+      const completed = completionEvents.flatMap(event => event.tasks);
+      const pending = jobs.filter(job => job.status === 'running' || job.status === 'stopping')
+        .map(job => BackgroundTaskTimelineLaunchService.nativeJobLaunch(job));
+      return { anchorKey: this.host.getMessageAnchorKey(anchor), anchorTimestamp: anchor.timestamp, modeTag: null,
+        launches, completed, pending, sawAllTasksComplete: pending.length === 0, waitingForFollowUp: false, completionEvents };
+    });
+  }
+
   collectInlineSegments(
     conversation: Conversation | null = null,
     tabId: TabId | null = this.host.getActiveTabId(),
   ): BackgroundTaskSegment[] {
+    if (conversation?.backend === 'dsh') return this.collectNativeJobSegments(conversation, tabId).filter(segment => segment.pending.length > 0);
     return this.collectSegments(conversation?.messages ?? [], tabId).filter((segment) =>
       this.shouldRenderInlineSegment(segment)
       && this.shouldRenderPreparingInlineSegment(segment, tabId)
@@ -148,7 +184,9 @@ export class BackgroundTaskTimelineService {
       return;
     }
 
-    if (!conversation) {
+    if (!conversation || conversation.backend === 'dsh') {
+      // DSH job lifecycle comes only from its authoritative native list, never
+      // from foreground status, OMO reminders or a tool merely named task.
       this.host.syncTabStreamLikeState(tabId);
       return;
     }
@@ -459,12 +497,13 @@ export class BackgroundTaskTimelineService {
     lines.push(`**${t('chat.backgroundTask.taskListLabel')}**`);
 
     for (const task of segment.completed) {
-      lines.push(`- ${t('chat.backgroundTask.taskStatusCompleted')} · \`${task.taskId}\`: ${task.description}`);
+      const status = task.nativeStatus ? t(`chat.dsh.jobs.status.${task.nativeStatus}`) : t('chat.backgroundTask.taskStatusCompleted');
+      lines.push(`- ${status} · \`${task.taskId}\`: ${task.description}`);
     }
 
     for (const task of segment.pending) {
       lines.push(
-        `- ${t('chat.backgroundTask.taskStatusRunning')} · \`${this.getLaunchDisplayId(task)}\`: ${task.description}`,
+        `- ${task.nativeStatus ? t(`chat.dsh.jobs.status.${task.nativeStatus}`) : t('chat.backgroundTask.taskStatusRunning')} · \`${this.getLaunchDisplayId(task)}\`: ${task.description}`,
       );
     }
 

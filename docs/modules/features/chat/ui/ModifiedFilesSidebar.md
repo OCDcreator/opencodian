@@ -1,4 +1,6 @@
 # ModifiedFilesSidebar
+
+2026-11-11（共享工作台层级）：`getWorkbenchSummaryText()` 只读返回本 owner 已有的会话变更／回退摘要，不触发原生或 Git 读取，不建立另一份计数状态。工作台一级文件入口复用该摘要，保留未知统计、读取中、不可用与有效空列表的区别；空状态的正文／摘要／tooltip 通过同一文案表投影，原生读取挂起不会冒充 unavailable。`attachToWorkbench` 将内联面板设为 `region`，避免在工作台内嵌套 dialog；内联 CSS 隐藏重复标题而保留摘要与原有文件操作。
 An entry marked `statsUnavailable` displays unavailable status and line statistics. The summary also avoids a fabricated `+0/-0` total when any file lacks native statistics.
 > 2026-09-21 (advantage-parity R-F2 视觉复核跟进 2)：视觉验收确认轮发现两个由本批次引入的真实回归，已修：(1) diff 模式下独立分区作为固定兄弟节点抢占了列表高度（列表 clientHeight 87 / scrollHeight 120），第二行变更的 `+1 -0` 被裁在可视区外，看起来像"这一行没有统计"；现在 diff 模式把分区渲染在滚动列表**内部**，列表恢复满高（182），两行统计完整可见——revert 模式仍是 revert 列表的兄弟节点（既有已验收布局）。(2) 绑定行用 `<button>` 承载 `.opencodian-modified-files-sidebar-path`，宿主把按钮设为 flex 容器并给固定输入高度，`text-overflow: ellipsis` 对 flex 容器的匿名 item 无效 → 路径被硬裁在字形中间且没有省略号；该规则新增 `display: block; height: auto`，按钮与 span 两种承载都能正确省略（实测 scrollWidth 424 / clientWidth 176，chip 高度 30→17）。回归测试新增 `scrolls the binding section with the change list so the rows keep the panel height` 与 `keeps the binding section a sibling of the revert list in revert mode`。
 > 2026-09-21 (advantage-parity R-F2 视觉复核跟进)：绑定笔记行补 `title`（完整路径）。该行路径在窄面板下按既有 `.opencodian-modified-files-sidebar-path` 规则省略号截断，而兄弟变更行都会把完整路径写进 `title`；绑定行是唯一丢掉完整路径的行。视觉验收代理把它列为 minor 后修复，行为测试见 `linked-note section placement` 分组中的 `keeps the full binding path reachable when the panel ellipsises it`。
@@ -23,7 +25,7 @@ An entry marked `statsUnavailable` displays unavailable status and line statisti
 
 - constructor 创建 `opencodian-modified-files-sidebar-host`、48px × 40px 边缘感知区、按悬浮或键盘焦点淡入的 32px outline icon button、带数量的 badge 和 `opencodian-modified-files-sidebar`，随后加载 Obsidian `Component` lifecycle。
 - 面板复用 chat 既有的 `opencodian-composer-popover-frame` / header / title 样式，保持和模型、智能体、权限弹层一致的 shadcn Popover 语法；触发器下方 40px 锚定面板，面板宽度限制为 `min(288px, calc(100% - 16px))`，在窄 workspace leaf 中保持右侧 8px 安全边界。
-- `updateEntries(entries, availability)` 复制传入的 `SessionDiffEntry[]`，并保留 `ready` / `unavailable` 状态，避免 UI 层持有可变服务缓存引用。
+- `updateEntries(entries, availability)` 复制传入的 `SessionDiffEntry[]`，并保留 `ready` / `loading` / `unavailable` 状态，避免 UI 层持有可变服务缓存引用。
 - 入口使用 shadcn `Button variant=outline, size=icon` 对应的 32px 图标按钮：默认透明，仅在指针进入右缘 48px × 40px 区域、键盘聚焦或面板展开时淡入；仅在有变更时显示 `Badge` 文件数，未就绪用低权重状态点，不再把计数和状态纵向堆进“竖条”。点击切换 `is-expanded`，空/未就绪状态也可打开。头部关闭按钮会阻止冒泡、立即收起并将焦点还给入口，Escape 也会收起且恢复入口焦点；展开后的面板不会因失焦、鼠标移开或刷新条目自动关闭。
 - CSS 由 `is-expanded` 状态负责右侧滑入/淡出；hover/focus 不再是展开的唯一机制，并提供 `prefers-reduced-motion` 和 `:focus-visible` 规则。
 - `render()` 在 ready 空状态显示 `modifiedFiles.empty`，在不可用状态显示 `modifiedFiles.unavailable`；头部摘要使用短的 `modifiedFiles.readyShort` / `modifiedFiles.unavailableShort`，并通过省略号适配窄 pane，完整说明只留在正文；有内容时渲染默认展开、原生 `<details>` 可折叠的逐文件条目，摘要显示可点击路径，内容显示 `+N`/`-N` 统计和状态 badge；列表项使用随 DOM 替换一起释放的元素级 click listener，避免重复 render 积累 Component 级事件注册。

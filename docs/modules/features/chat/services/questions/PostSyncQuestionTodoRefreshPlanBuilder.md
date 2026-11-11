@@ -10,7 +10,7 @@
 - 为 visible conversation sync 生成 `QuestionTodoStatusRefreshCoordinator.refreshAfterPostSync()` 所需的 question/todo session 配对
 - 为 signal sync 的 background conversation refresh 选择 conversation session，并把 `tabHasBackgroundTask` 映射成 todo/status force-refresh 标记
 - 为 background-tab sync 的 background conversation refresh 选择 conversation session，并固定强制刷新 todo/status live state
-- 对非 OpenCode 后端 conversation 返回 `null` plan，跳过整个 question/todo 刷新链（question/todo 是 OpenCode-only feature）
+- 为 OpenCode 与 DSH conversation 生成 background refresh plan；其他后端继续返回 `null`。DSH todo 是否可读由下游真实 AgentTodoCapability 检查，question/status 保留独立 gate。
 - 通过 `getConversationBackendSessionId()` 解析 session identity，而非直接访问 `openCodeSessionId`
 - 让 `PostSyncQuestionTodoRefreshFacade` 专注执行 refresh/writeback 顺序，而不再同时持有 session-id 与 policy 选择规则
 - 让 `BackgroundConversationPostSyncRefreshExecutor` 只按 sync 来源调用 source-specific refresh method，而不再构造低层 todo/status refresh policy
@@ -32,7 +32,7 @@ export class PostSyncQuestionTodoRefreshPlanBuilder {
 - visible sync 的 pending-question refresh 继续使用发起同步时传入的 `questionSessionId`，todo/status refresh 则使用 host 返回的当前 conversation session
 - signal sync 的 background conversation refresh 同时使用 conversation 的 `getConversationBackendSessionId()` 解析的 session 刷新 pending questions 与 todo/status，并只在 `tabHasBackgroundTask` 为真时强制 todo/status refresh
 - background-tab refresh 同样使用 `getConversationBackendSessionId()` 解析的 session，但始终把 `forceTodoStatusRefresh` 设为 `true`
-- **Backend gate**: 当 `conversation.backend` 不是 `'opencode'` 时，background plan 方法返回 `null`，表示跳过 question/todo 刷新。question/todo 是 OpenCode server 独有的 API，不是跨后端通用 contract
+- **Backend gate**: background plan 接受 `'opencode'` 与 `'dsh'`；DSH 的原生 Todos 通过能力契约读回，不借用 OpenCode server API，不改变 Subagents 门控。
 - builder 返回的 plan 不包含 `afterPendingQuestionRefresh` hook；runtime rebuild 与 completion writeback 顺序仍留在 `PostSyncQuestionTodoRefreshFacade`
 - the resulting refresh plan may carry a captured `isCurrent` lease; every awaited refresh stage must re-check it before invoking the next side effect
 

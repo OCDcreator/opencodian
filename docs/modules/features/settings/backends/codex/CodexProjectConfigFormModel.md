@@ -5,6 +5,8 @@
 > **Updated**: 2026-07-28 — strict value-shape validation (invalid-shape diagnostics for wrong types/enums/nested tables); surgical scalar edits preserve trailing inline comments; additional_directories fail-closed on multiline/commented formatting.
 > **Updated**: 2026-07-28 — adds network_access and web_search boolean keys to allowed set, strict shape validation, parse/build, and UI.
 
+> **2026-11-08 approval_policy 修复**: 导出 `CODEX_PROJECT_APPROVAL_POLICY_SUPPORTED`（guided 面仅 `never`/`on-request`）与 `isGuidedCodexProjectApprovalPolicy` / `isCliRetiredCodexProjectApprovalPolicy`。高级编辑器校验枚举为 `never`/`on-request`/`on-failure`（on-failure 仍是 CLI 合法值，仅不在插件引导面）；`untrusted`（Codex CLI 0.15x 已移除，配置加载硬失败）触发专用诊断 `settings.codex.projectConfig.diagnostic.retiredApprovalPolicy`。`buildProjectConfigEdits` 跳过非 guided 的 approval_policy 编辑：无关表单保存不再悄悄回写/清除该行，修复仅在用户显式选择受支持值（或 inherit）时发生，外部文件字节保持不动。
+
 ## 概述
 
 Form model, allowlist validation, and surgical TOML editing for the vault-level `<vault-root>/.codex/config.toml`. Defines exactly which project-level keys are safe, validates TOML against that allowlist, and applies surgical edits that preserve comments and formatting.

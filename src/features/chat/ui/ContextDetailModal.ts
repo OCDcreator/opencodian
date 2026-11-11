@@ -15,6 +15,34 @@ export interface ContextRawMessageItem {
   payload: string;
 }
 
+/**
+ * Structural ledger row supplied by the chat diagnostics coordinator (the
+ * canonical shape lives in the DSH trace owner; this modal reads it
+ * structurally, like ContextRawMessageItem). Metadata only — no raw prompt or
+ * tool content ever reaches this surface.
+ */
+export interface ContextDshLedgerItem {
+  timestamp: string;
+  timeSource?: 'backend' | 'client';
+  name: string;
+  detail?: string;
+  durationMs?: number;
+  durationKind?: 'client-round-trip' | 'transport' | 'observed-tool-span';
+  severity?: string;
+}
+
+export interface ContextDshLedger {
+  entries: ContextDshLedgerItem[];
+  /** True when the trace hit its capture budget and later events were not recorded. */
+  limited?: boolean;
+  timing: {
+    lastTurnClientRoundTripMs?: number;
+    observedTurnCount: number;
+    eventCount: number;
+    lastEventAt?: string;
+  };
+}
+
 export type { ContextDetailModalCompactionCoordinator } from './ContextCompactionActionController';
 type SnapshotCost = Pick<ContextUsageSnapshot, 'totalCost' | 'costDetails'>;
 
@@ -30,6 +58,13 @@ export class ContextDetailModal extends Modal {
       contextState: TabContextState | null;
       systemPrompt?: string | null;
       rawMessageLoader?: () => Promise<ContextRawMessageItem[]>;
+      /**
+       * DSH-only ledger loader. The caller captures the backend session id at
+       * open time and returns a function, so a later tab switch can never
+       * bleed another session's events into this modal. Omitted for every
+       * non-DSH backend; any read failure renders the honest empty state.
+       */
+      dshTraceLedgerLoader?: () => Promise<ContextDshLedger | null>;
       compactionCoordinator?: ContextDetailModalCompactionCoordinator;
       subscribeToPricingUpdates?: (listener: (state: TabContextState) => void) => { dispose(): void };
       priceSnapshotCost?: (state: TabContextState) => SnapshotCost | null;
@@ -40,6 +75,7 @@ export class ContextDetailModal extends Modal {
     this.contextState = options.contextState;
     this.systemPrompt = options.systemPrompt;
     this.rawMessageLoader = options.rawMessageLoader;
+    this.dshTraceLedgerLoader = options.dshTraceLedgerLoader;
     this.subscribeToPricingUpdates = options.subscribeToPricingUpdates;
     this.priceSnapshotCost = options.priceSnapshotCost;
     this.compactionController = options.compactionCoordinator
@@ -56,6 +92,7 @@ export class ContextDetailModal extends Modal {
   private costSourceEl: HTMLElement | null = null;
   private readonly systemPrompt?: string | null;
   private readonly rawMessageLoader?: () => Promise<ContextRawMessageItem[]>;
+  private readonly dshTraceLedgerLoader?: () => Promise<ContextDshLedger | null>;
   private readonly compactionController?: ContextCompactionActionController;
 
   onOpen(): void {
@@ -88,7 +125,8 @@ export class ContextDetailModal extends Modal {
     contentEl.empty();
     contentEl.createEl('h2', { text: t('context.usage.title') });
 
-    if (summary.isUnavailable && !this.hasSessionDetails()) {
+    // Never early-return past the DSH ledger section when a loader exists.
+    if (summary.isUnavailable && !this.hasSessionDetails() && !this.dshTraceLedgerLoader) {
       contentEl.createDiv({
         cls: 'opencodian-context-modal-empty',
         text: t('context.usage.noData'),
@@ -108,6 +146,10 @@ export class ContextDetailModal extends Modal {
 
     if (breakdown.length > 0) {
       this.renderBreakdown(contentEl, breakdown);
+    }
+
+    if (this.dshTraceLedgerLoader) {
+      this.renderDshLedgerSection(contentEl);
     }
 
     this.renderRawMessagesSection(contentEl);
@@ -178,6 +220,108 @@ export class ContextDetailModal extends Modal {
     this.costSourceEl = this.renderRow(gridEl, t('context.usage.costSource'), this.formatCostDetails());
     this.renderRow(gridEl, t('context.usage.createdAt'), this.formatTimestamp(options.createdAt));
     this.renderRow(gridEl, t('context.usage.lastActivity'), this.formatTimestamp(options.updatedAt));
+  }
+
+  /**
+   * Renders the DSH event ledger section. The loader is captured for the
+   * session open at modal-open time; the section fills in place with three
+   * honest terminal states: failed/unreadable → "unavailable", valid but
+   * empty → "empty", budget-limited → an extra "limited" note. Reuses the
+   * raw-messages classes for styling.
+   */
+  private renderDshLedgerSection(contentEl: HTMLElement): void {
+    const sectionEl = contentEl.createDiv({ cls: 'opencodian-context-raw-messages opencodian-context-dsh-ledger' });
+    sectionEl.createDiv({
+      cls: 'opencodian-context-raw-messages-title',
+      text: t('context.dshLedger.title'),
+    });
+    const bodyEl = sectionEl.createDiv({ cls: 'opencodian-context-raw-messages-body' });
+    bodyEl.createDiv({
+      cls: 'opencodian-context-raw-messages-state is-loading',
+      text: t('context.rawMessages.loading'),
+    });
+    void this.loadDshLedger(bodyEl);
+  }
+
+  private async loadDshLedger(containerEl: HTMLElement): Promise<void> {
+    let ledger: ContextDshLedger | null = null;
+    try {
+      ledger = (await this.dshTraceLedgerLoader?.()) ?? null;
+    } catch {
+      ledger = null;
+    }
+    if (this.isClosed) return;
+    this.renderDshLedger(containerEl, ledger);
+  }
+
+  private renderDshLedger(containerEl: HTMLElement, ledger: ContextDshLedger | null): void {
+    containerEl.empty();
+    if (ledger?.limited) {
+      containerEl.createDiv({
+        cls: 'opencodian-context-modal-note',
+        text: t('context.dshLedger.limited'),
+      });
+    }
+    if (!ledger || ledger.entries.length === 0) {
+      // A null read means nothing could be read at all — not "no events yet".
+      containerEl.createDiv({
+        cls: 'opencodian-context-raw-messages-state is-empty',
+        text: t(ledger ? 'context.dshLedger.empty' : 'context.dshLedger.unavailable'),
+      });
+      return;
+    }
+    const timingEl = containerEl.createDiv({ cls: 'opencodian-context-modal-grid opencodian-context-dsh-ledger-timing' });
+    for (const [label, value] of [
+      [t('context.dshLedger.timing.turns'), ContextUsageService.formatNumber(ledger.timing.observedTurnCount)],
+      [t('context.dshLedger.timing.lastRoundTrip'), ledger.timing.lastTurnClientRoundTripMs !== undefined
+        ? `${this.formatDuration(ledger.timing.lastTurnClientRoundTripMs)} · ${t('context.dshLedger.roundTrip')}`
+        : '-'],
+      [t('context.dshLedger.timing.lastEvent'), this.formatIsoTimestamp(ledger.timing.lastEventAt)],
+    ]) this.renderRow(timingEl, label, value);
+    for (const entry of ledger.entries) {
+      this.createMessageContent(
+        containerEl,
+        `${this.formatIsoTimestamp(entry.timestamp)} · ${entry.name}`,
+        this.describeLedgerEntry(entry),
+        'opencodian-context-raw-message opencodian-context-dsh-ledger-row',
+      ).createDiv({
+        cls: 'opencodian-context-raw-message-pre',
+        text: [entry.detail, this.durationText(entry), this.timeSourceText(entry)].filter(Boolean).join('\n') || '-',
+      });
+    }
+    containerEl.createDiv({
+      cls: 'opencodian-context-modal-note',
+      text: t('context.dshLedger.note'),
+    });
+  }
+
+  private describeLedgerEntry(entry: ContextDshLedgerItem): string {
+    const parts = [entry.detail, this.durationText(entry)].filter(Boolean);
+    return parts.join(' · ') || this.timeSourceText(entry) || '';
+  }
+
+  private durationText(entry: ContextDshLedgerItem): string {
+    if (typeof entry.durationMs !== 'number' || !Number.isFinite(entry.durationMs)) return '';
+    const kindLabel = entry.durationKind === 'observed-tool-span'
+      ? t('context.dshLedger.toolSpan')
+      : t('context.dshLedger.roundTrip');
+    return `${this.formatDuration(entry.durationMs)} (${kindLabel})`;
+  }
+
+  private timeSourceText(entry: ContextDshLedgerItem): string {
+    return entry.timeSource === 'backend' ? t('context.dshLedger.time.backend') : t('context.dshLedger.time.client');
+  }
+
+  private formatDuration(value: number): string {
+    if (value >= 1000) return `${(value / 1000).toFixed(value >= 10_000 ? 0 : 1)}s`;
+    return `${Math.round(value)}ms`;
+  }
+
+  private formatIsoTimestamp(value: string | undefined): string {
+    if (!value) return '-';
+    const parsed = Date.parse(value);
+    if (Number.isNaN(parsed)) return value;
+    return this.formatTimestamp(parsed);
   }
 
   private renderRawMessagesSection(contentEl: HTMLElement): void {
@@ -368,21 +512,11 @@ export class ContextDetailModal extends Modal {
 
     try {
       const items = await this.rawMessageLoader();
-      if (this.isClosed) {
-        return;
-      }
-
-      if (items.length === 0) {
-        this.renderRawMessageState(containerEl, 'empty');
-        return;
-      }
-
-      this.renderRawMessages(containerEl, items);
+      if (this.isClosed) return;
+      if (items.length === 0) this.renderRawMessageState(containerEl, 'empty');
+      else this.renderRawMessages(containerEl, items);
     } catch {
-      if (this.isClosed) {
-        return;
-      }
-      this.renderRawMessageState(containerEl, 'error');
+      if (!this.isClosed) this.renderRawMessageState(containerEl, 'error');
     }
   }
 
@@ -390,32 +524,24 @@ export class ContextDetailModal extends Modal {
     containerEl.empty();
 
     for (const item of items) {
-      const detailsEl = containerEl.createEl('details', {
-        cls: 'opencodian-context-raw-message',
-      });
-      const summaryEl = detailsEl.createEl('summary', {
-        cls: 'opencodian-context-raw-message-summary',
-      });
-      summaryEl.createDiv({
-        cls: 'opencodian-context-raw-message-summary-main',
-        text: `${item.role} • ${item.id}`,
-      });
-      summaryEl.createDiv({
-        cls: 'opencodian-context-raw-message-summary-time',
-        text: this.formatTimestamp(item.createdAt),
-      });
-
-      const contentEl = detailsEl.createDiv({
-        cls: 'opencodian-context-raw-message-content',
-      });
-      const preEl = contentEl.createEl('pre', {
-        cls: 'opencodian-context-raw-message-pre',
-      });
-      preEl.createEl('code', {
-        cls: 'opencodian-context-raw-message-code',
-        text: item.payload,
-      });
+      const preEl = this.createMessageContent(
+        containerEl, `${item.role} • ${item.id}`, this.formatTimestamp(item.createdAt),
+      ).createEl('pre', { cls: 'opencodian-context-raw-message-pre' });
+      preEl.createEl('code', { cls: 'opencodian-context-raw-message-code', text: item.payload });
     }
+  }
+
+  private createMessageContent(
+    containerEl: HTMLElement,
+    mainText: string,
+    timeText: string,
+    rowClass = 'opencodian-context-raw-message',
+  ): HTMLElement {
+    const detailsEl = containerEl.createEl('details', { cls: rowClass });
+    const summaryEl = detailsEl.createEl('summary', { cls: 'opencodian-context-raw-message-summary' });
+    summaryEl.createDiv({ cls: 'opencodian-context-raw-message-summary-main', text: mainText });
+    summaryEl.createDiv({ cls: 'opencodian-context-raw-message-summary-time', text: timeText });
+    return detailsEl.createDiv({ cls: 'opencodian-context-raw-message-content' });
   }
 
   private renderRawMessageState(containerEl: HTMLElement, state: 'empty' | 'error'): void {

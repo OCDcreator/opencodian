@@ -10,12 +10,20 @@ import { normalizePiBackendSettings } from '../../../../core/types/settings';
 import { t } from '../../../../i18n';
 import { getVaultBasePath } from '../../../../shared';
 import { sanitizeDiagnosticReport } from '../../../../shared/diagnosticSecretSanitizer';
+import { addBackendChoiceSetting, describeBackendSetting } from '../../controls/BackendSettingsControls';
 import { SettingsInlineEditSection } from '../../general/SettingsInlineEditSection';
 import { PiWorkbenchModal } from './PiWorkbenchModal';
 import { SettingsPiConfigurationSection } from './SettingsPiConfigurationSection';
 import { SettingsPiProvidersSection } from './SettingsPiProvidersSection';
 
-const PI_TABS = ['connection', 'providers', 'model', 'execution', 'mcp', 'resources', 'account', 'sessions', 'advanced'] as const;
+/**
+ * Task subtabs. `execution` keeps the native execution fields and hosts the
+ * advanced native editor as a clearly separate high-risk disclosure; legacy
+ * ids keep resolving through {@link SettingsPiSection.attachTabbed}.
+ */
+const PI_TABS = ['connection', 'providers', 'model', 'execution', 'account', 'mcp', 'sessions'] as const;
+type PiSettingsTab = (typeof PI_TABS)[number];
+const PI_TAB_ALIASES: Record<string, PiSettingsTab> = { resources: 'sessions', advanced: 'execution' };
 
 /** Config paths are shown for orientation only; the home prefix is the noisy part. */
 function shortenConfigPath(filePath: string): string {
@@ -33,6 +41,21 @@ export interface SettingsPiHost {
   settings: { backendSettings: { pi?: PiBackendSettings } };
   saveSettings(): Promise<void>;
   agentServiceRegistry?: { get(kind: 'pi'): { start(): Promise<void> } | undefined };
+}
+
+/**
+ * Credential-free installation failure classes. The resolver throws a fixed
+ * set of messages; anything unclassifiable renders the generic recovery copy
+ * instead of surfacing raw CLI/provider error text (which can embed
+ * credentials or URLs) in the settings DOM.
+ */
+type PiInstallFailure = 'missing' | 'incompatible' | 'permission' | 'unknown';
+function classifyPiInstallFailure(error: unknown): PiInstallFailure {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/^Pi CLI not found\./.test(message)) return 'missing';
+  if (/^Pi (?:shim does not reference|executable must belong|SDK entry is missing|requires an external Node)/.test(message)) return 'incompatible';
+  if (/(?:EACCES|EPERM|permission denied)/i.test(message)) return 'permission';
+  return 'unknown';
 }
 
 /** Owns Pi settings only; auth, providers and extensions remain managed by the external Pi installation. */
@@ -54,7 +77,9 @@ export class SettingsPiSection {
   }
 
   attachTabbed(container: HTMLElement, requested: string): void {
-    const tab = PI_TABS.find(id => id === requested) ?? 'connection';
+    // Append-only: the shared backend workspace bar may already live in the
+    // container; this section never empties or reorders host content.
+    const tab = PI_TAB_ALIASES[requested] ?? (PI_TABS.find(id => id === requested) as PiSettingsTab | undefined) ?? 'connection';
     const section = container.createDiv({ cls: 'opencodian-settings-block opencodian-settings-section opencodian-pi-settings', attr: { 'data-settings-surface': 'section', 'data-settings-target': `pi-${tab}`, 'data-pi-section': tab } });
     const body = section.createDiv({ cls: 'opencodian-settings-block-body opencodian-settings-section-body', attr: { 'data-settings-surface': 'section-body' } });
     body.createEl('h3', { text: t(`settings.pi.tab.${tab}`) });
@@ -65,11 +90,11 @@ export class SettingsPiSection {
     if (tab === 'providers') { new SettingsPiProvidersSection(adapter, () => this.reconnect()).attach(body); return; }
     if (tab === 'account') { this.account(body, adapter); return; }
     if (tab === 'sessions') { this.sessions(body, adapter); return; }
-    new SettingsPiConfigurationSection(adapter, keys => this.clearLegacyDefaults(keys), () => this.reconnect()).attach(body, tab);
+    if (tab === 'execution') { this.execution(body, adapter); return; }
+    this.model(body, adapter);
     if (tab === 'model') {
       SettingsInlineEditSection.renderBackendModelOverrides(body, 'pi', this.host as unknown as Parameters<typeof SettingsInlineEditSection.renderBackendModelOverrides>[2]);
     }
-    if (tab === 'resources') this.workbench(body);
   }
 
   private get adapter(): PiAdapter | undefined { return this.host.agentServiceRegistry?.get('pi') as PiAdapter | undefined; }
@@ -104,15 +129,59 @@ export class SettingsPiSection {
   private connection(section: HTMLElement): void {
     section.createEl('p', { text: t('settings.pi.description'), cls: 'setting-item-description' });
     const settings = normalizePiBackendSettings(this.host.settings.backendSettings.pi);
-    this.addText(section, 'executablePath', settings, [t('settings.pi.executable'), t('settings.pi.executable.desc')]);
     const status = section.createDiv({ cls: 'opencodian-pi-config-status', attr: { role: 'status' } });
+    // Real detection: the resolver either launches the CLI or reports exactly
+    // why it cannot (missing install, wrong path, incompatible package). A
+    // registered adapter alone is never treated as a working installation.
+    let detecting = false;
+    const detectRuntime = async (): Promise<void> => {
+      if (detecting) return;
+      detecting = true;
+      status.empty();
+      status.setText(t('settings.pi.status.detecting'));
+      try {
+        const adapter = this.adapter;
+        if (!adapter) throw new Error(t('settings.pi.unavailable'));
+        await adapter.start();
+        if (status.isConnected) status.setText(t('settings.pi.status.runtimeFound'));
+      } catch (error) {
+        if (status.isConnected) {
+          status.setText(t(`settings.pi.status.runtimeMissing.${classifyPiInstallFailure(error)}` as Parameters<typeof t>[0]));
+        }
+      } finally { detecting = false; }
+    };
+    void detectRuntime();
+    const executable = new Setting(section).setName(t('settings.pi.executable')).setDesc(t('settings.pi.executable.desc'));
+    describeBackendSetting(executable, {
+      key: 'pi-executable-path',
+      scope: 'vault',
+      effect: 'new-session',
+      risk: 'medium',
+      defaultLabel: t('settings.pi.executable.auto'),
+      source: t('settings.pi.status.packageGuard'),
+    });
+    executable.addText((text) => {
+      text.setPlaceholder(t('settings.pi.executable.auto')).setValue(settings.executablePath).onChange(async (value) => {
+        const previous = normalizePiBackendSettings(this.host.settings.backendSettings.pi).executablePath;
+        const next = normalizePiBackendSettings({ ...normalizePiBackendSettings(this.host.settings.backendSettings.pi), executablePath: value });
+        this.host.settings.backendSettings.pi = next;
+        try { await this.host.saveSettings(); }
+        catch {
+          const current = normalizePiBackendSettings(this.host.settings.backendSettings.pi);
+          if (current.executablePath === value.trim()) this.host.settings.backendSettings.pi = { ...current, executablePath: previous };
+          text.setValue(previous); status.setText(t('settings.pi.saveFailed'));
+        }
+      });
+      text.inputEl.setAttribute('aria-label', t('settings.pi.executable'));
+    });
+    const feedback = section.createDiv({ cls: 'opencodian-pi-config-status', attr: { role: 'status' } });
     new Setting(section).setName(t('settings.pi.reconnect')).setDesc(t('settings.pi.reconnect.help')).addButton(button => button.setButtonText(t('settings.pi.reconnect')).onClick(async () => {
       button.setDisabled(true);
-      try { await this.reconnect(); status.setText(t('settings.pi.connected')); } catch (error) { status.setText(String(error)); }
+      try { await this.reconnect(); feedback.setText(t('settings.pi.connected')); void detectRuntime(); } catch (error) { feedback.setText(String(error)); }
       finally { button.setDisabled(false); }
     }));
     if (settings.provider || settings.model || settings.thinkingLevel) new Setting(section).setName(t('settings.pi.legacyDefaults')).setDesc(`${settings.provider}/${settings.model} · ${settings.thinkingLevel}`)
-      .addButton(button => button.setButtonText(t('settings.pi.useNativeDefaults')).onClick(async () => { await this.clearLegacyDefaults(['defaultProvider', 'defaultModel', 'defaultThinkingLevel']); status.setText(t('settings.pi.saved')); }));
+      .addButton(button => button.setButtonText(t('settings.pi.useNativeDefaults')).onClick(async () => { await this.clearLegacyDefaults(['defaultProvider', 'defaultModel', 'defaultThinkingLevel']); feedback.setText(t('settings.pi.saved')); }));
     this.workbench(section);
     new Setting(section).setName(t('settings.pi.storage')).setDesc(t('settings.pi.storage.help'));
     new Setting(section).setName(t('settings.pi.check')).setDesc(t('settings.pi.check.desc')).addButton((button) => {
@@ -123,10 +192,87 @@ export class SettingsPiSection {
           if (!adapter) throw new Error(t('settings.pi.unavailable'));
           await adapter.start();
           new Notice(t('settings.pi.connected'));
-        } catch (error) { new Notice(error instanceof Error ? error.message : String(error)); }
+          void detectRuntime();
+        } catch (error) {
+          new Notice(error instanceof Error ? error.message : String(error));
+          void detectRuntime();
+        }
         finally { button.setDisabled(false); }
       });
     });
+  }
+
+  /**
+   * Native model-default configuration first (the live authority for new
+   * sessions); legacy plugin defaults demoted into an explicitly labeled
+   * advanced disclosure below, never the first screen.
+   */
+  private model(body: HTMLElement, adapter: PiAdapter): void {
+    new SettingsPiConfigurationSection(adapter, keys => this.clearLegacyDefaults(keys), () => this.reconnect()).attach(body, ['model']);
+    const settings = normalizePiBackendSettings(this.host.settings.backendSettings.pi);
+    const legacy = body.createEl('details', { cls: 'opencodian-pi-config-advanced', attr: { 'data-pi-section': 'legacy-defaults' } });
+    legacy.createEl('summary', { text: t('settings.pi.legacyDefaults.title') });
+    const stack = legacy.createDiv({ cls: 'opencodian-settings-form-stack' });
+    addBackendChoiceSetting(stack, {
+      key: 'pi-default-thinking-level',
+      name: t('settings.pi.thinking'),
+      description: t('settings.pi.thinking.desc'),
+      value: settings.thinkingLevel,
+      options: [
+        { value: '', label: t('settings.pi.inherit'), description: t('settings.pi.thinking.inheritShort'), recommended: true },
+        ...(['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const).map(level => ({
+          value: level,
+          label: t(`settings.pi.thinking.level.${level}` as Parameters<typeof t>[0]),
+        })),
+      ],
+      onChange: async (value) => {
+        if (!await this.saveLegacyDefault('thinkingLevel', value)) throw new Error('pi-default-save-failed');
+      },
+      presentation: {
+        key: 'pi-default-thinking-level',
+        scope: 'vault',
+        effect: 'new-session',
+        risk: 'low',
+        defaultLabel: t('settings.pi.inherit'),
+        source: t('settings.pi.status.legacyDefaults'),
+      },
+    });
+    const providerRow = new Setting(stack).setName(t('settings.pi.provider')).setDesc(t('settings.pi.provider.desc'));
+    describeBackendSetting(providerRow, { key: 'pi-default-provider', scope: 'vault', effect: 'new-session', risk: 'low', defaultLabel: t('settings.pi.inherit'), source: t('settings.pi.status.legacyDefaults') });
+    providerRow.addText(text => text.setValue(settings.provider).onChange(async (value) => { await this.saveLegacyDefault('provider', value.trim()); }));
+    const modelRow = new Setting(stack).setName(t('settings.pi.model')).setDesc(t('settings.pi.model.desc'));
+    describeBackendSetting(modelRow, { key: 'pi-default-model', scope: 'vault', effect: 'new-session', risk: 'low', defaultLabel: t('settings.pi.inherit'), source: t('settings.pi.status.legacyDefaults') });
+    modelRow.addText(text => text.setValue(settings.model).onChange(async (value) => { await this.saveLegacyDefault('model', value.trim()); }));
+    // Migration context stays outside the choice options; one behavior
+    // sentence per option, the full legacy story here.
+    stack.createEl('p', { cls: 'setting-item-description', text: t('settings.pi.legacyDefaults.help') });
+  }
+
+  /**
+   * Native execution settings (tools, extensions, commands) and the advanced
+   * native editor. The advanced block is a separate, clearly labeled
+   * high-risk disclosure — never absorbed into the ordinary model page.
+   */
+  private execution(body: HTMLElement, adapter: PiAdapter): void {
+    body.createEl('p', { text: t('settings.pi.execution.help'), cls: 'setting-item-description' });
+    const configuration = new SettingsPiConfigurationSection(adapter, keys => this.clearLegacyDefaults(keys), () => this.reconnect());
+    configuration.attach(body, ['execution']);
+    configuration.attachAdvanced(body);
+  }
+
+  private async saveLegacyDefault(key: 'provider' | 'model' | 'thinkingLevel', value: string): Promise<boolean> {
+    const previous = normalizePiBackendSettings(this.host.settings.backendSettings.pi);
+    const next = normalizePiBackendSettings({ ...previous, [key]: value });
+    this.host.settings.backendSettings.pi = next;
+    try {
+      await this.host.saveSettings();
+      this.host.invalidateSlashCommandCatalog?.();
+      return true;
+    } catch {
+      const current = normalizePiBackendSettings(this.host.settings.backendSettings.pi);
+      if (current[key] === next[key]) this.host.settings.backendSettings.pi = { ...current, [key]: previous[key] };
+      return false;
+    }
   }
 
   private account(container: HTMLElement, adapter: PiAdapter): void {
@@ -134,13 +280,17 @@ export class SettingsPiSection {
     const body = container.createDiv({ cls: 'opencodian-settings-form-stack' });
     void adapter.command(undefined, 'get_auth').then(result => {
       status.setText(t('settings.pi.account.help'));
-      for (const record of result.providers as Array<{ provider: string; configured: boolean }>) {
+      const records = (result.providers ?? []) as Array<{ provider: string; configured: boolean }>;
+      // An empty provider list means the Pi installation exposes no auth
+      // records yet — it is NOT proof that authentication is missing.
+      if (!records.length) body.createEl('p', { text: t('settings.pi.account.empty'), cls: 'setting-item-description', attr: { 'data-pi-auth': 'empty' } });
+      for (const record of records) {
         new Setting(body).setName(record.provider).setDesc(record.configured ? t('settings.pi.authConfigured') : t('settings.pi.authMissing'));
       }
       let provider = '';
       new Setting(body).setName(t('settings.pi.oauthProvider')).addDropdown(dropdown => {
         dropdown.addOption('', t('settings.pi.selectProvider'));
-        for (const item of result.oauthProviders as Array<{ id: string; name: string }>) dropdown.addOption(item.id, item.name);
+        for (const item of (result.oauthProviders ?? []) as Array<{ id: string; name: string }>) dropdown.addOption(item.id, item.name);
         dropdown.onChange(value => { provider = value; });
       }).addButton(button => button.setButtonText(t('settings.pi.login')).onClick(async () => {
         button.setDisabled(true);
@@ -218,15 +368,5 @@ export class SettingsPiSection {
       for (const session of sessions) new Setting(body).setName(session.title).setDesc(new Date(session.updatedAt).toLocaleString())
         .addButton(button => button.setButtonText(t('settings.pi.openChat')).onClick(() => { void this.openChat(session.id).catch(error => new Notice(String(error))); }));
     }).catch(error => body.setText(String(error)));
-  }
-
-  private addText(container: HTMLElement, key: 'executablePath' | 'provider' | 'model', settings: PiBackendSettings, [name, description]: [string, string]): void {
-    new Setting(container).setName(name).setDesc(description).addText((text) => {
-      text.setValue(settings[key]).onChange(async (value) => {
-        settings[key] = value.trim();
-        this.host.settings.backendSettings.pi = { ...settings };
-        await this.host.saveSettings();
-      });
-    });
   }
 }

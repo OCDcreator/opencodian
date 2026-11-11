@@ -2,13 +2,16 @@
  * an existing API key is represented only by a presence flag. */
 import { Setting } from 'obsidian';
 
+import type { ArchiveHistoryEntrySummary } from '../../../../core/agents/backend/configuration/ProjectResourceSecureWrite';
 import type { ZCodeAccountFamily,ZCodeAccountService } from '../../../../core/agents/backend/zcode/ZCodeAccountService';
 import type { ZCodePersonalConfigService, ZCodePersonalConfigSnapshot, ZCodePersonalProvider, ZCodeProviderDraft } from '../../../../core/agents/backend/zcode/ZCodePersonalConfigService';
 import { t } from '../../../../i18n';
+import { describeBackendSetting } from '../../controls/BackendSettingsControls';
 
 export interface ZCodeAccountsBackend {
   accounts: Pick<ZCodeAccountService, 'read' | 'login' | 'logout' | 'cancelLogin' | 'openDesktop'>;
-  getPersonalConfigService(): Pick<ZCodePersonalConfigService, 'read' | 'save' | 'remove'>;
+  /** History/restore are feature-detected on the service (present when the adapter ships the archive contract). */
+  getPersonalConfigService(): Pick<ZCodePersonalConfigService, 'read' | 'save' | 'remove' | 'listPersonalConfigHistory' | 'restorePersonalConfigEntry'>;
   refreshConfiguration(): Promise<{ needsReconnect: boolean }>;
 }
 
@@ -19,37 +22,70 @@ export function zcodeSettingsError(error: unknown): string {
   return translated === key ? t('settings.zcode.ui.operationFailed') : translated;
 }
 
+/**
+ * Account sign-in (machine-local official login) and the shared personal API
+ * configuration editor. `attach` renders both inside one disclosure for the
+ * stacked layout; the tabbed layout mounts `attachAccount` and
+ * `attachProviders` on separate high-risk task tabs.
+ */
 export class SettingsZCodeAccounts {
   private root!: HTMLDetailsElement;
   private account!: HTMLElement;
   private accountFeedback!: HTMLElement;
   private providerList!: HTMLElement;
   private editor!: HTMLElement;
+  private historyList: HTMLElement | null = null;
   private snapshot: ZCodePersonalConfigSnapshot | null = null;
   private loadEpoch = 0;
+  private historyEpoch = 0;
 
   constructor(private readonly backend: ZCodeAccountsBackend | undefined, private readonly onChanged: () => Promise<void>) {}
 
+  /** Stacked layout: one disclosure holding account and model services. */
   attach(container: HTMLElement): void {
     this.root = container.createEl('details', { cls: 'opencodian-zcode-disclosure', attr: { 'data-zcode-group': 'accounts-models' } });
     this.root.createEl('summary', { text: t('settings.zcode.ui.manage') });
     const content = this.root.createDiv({ cls: 'opencodian-zcode-disclosure-body' });
     content.createEl('p', { cls: 'setting-item-description', text: t('settings.zcode.ui.manageHelp') });
-    const accountGroup = content.createDiv({ cls: 'opencodian-zcode-group', attr: { 'data-zcode-group': 'official-accounts' } });
+    this.attachAccount(content);
+    this.attachProviders(content);
+  }
+
+  reveal(): void { this.root.open = true; }
+
+  /** Official login tab. Scope is per machine (ADR-0003): one login shared by every OpenCodian vault. */
+  attachAccount(container: HTMLElement): void {
+    const accountGroup = container.createDiv({ cls: 'opencodian-zcode-group', attr: { 'data-zcode-group': 'official-accounts' } });
     accountGroup.createEl('h4', { text: t('settings.zcode.ui.account') });
     accountGroup.createEl('p', { cls: 'setting-item-description', text: t('settings.zcode.ui.accountHelp') });
+    const scopeNote = accountGroup.createEl('p', { cls: 'setting-item-description opencodian-zcode-supporting', attr: { 'data-zcode-group': 'account-scope' } });
+    scopeNote.setText(t('settings.zcode.ui.accountScope'));
     this.account = accountGroup.createDiv();
     this.accountFeedback = accountGroup.createDiv({ cls: 'opencodian-zcode-feedback', attr: { role: 'status' } });
-    const external = new Setting(content).setName(t('settings.zcode.ui.desktop')).setDesc(t('settings.zcode.ui.desktopHelp'));
+    const external = new Setting(accountGroup).setName(t('settings.zcode.ui.desktop')).setDesc(t('settings.zcode.ui.desktopHelp'));
+    describeBackendSetting(external, {
+      key: 'zcode-desktop-open',
+      scope: 'global',
+      effect: 'immediate',
+      risk: 'medium',
+      source: t('settings.zcode.ui.accountSource'),
+    });
     external.addButton((button) => button.setButtonText(t('settings.zcode.ui.desktop')).setDisabled(!this.backend).onClick(async () => {
       button.setDisabled(true);
       try { await this.backend?.accounts.openDesktop(); this.accountFeedback.setText(t('settings.zcode.ui.desktopOpened')); }
       catch (error) { this.accountFeedback.setText(zcodeSettingsError(error)); }
       finally { button.setDisabled(!this.backend); }
     }));
-    const providers = content.createDiv({ cls: 'opencodian-zcode-group', attr: { 'data-zcode-group': 'api-services' } });
+    void this.loadAccounts();
+  }
+
+  /** Shared personal API configuration tab; edits affect OpenCodian AND ZCode desktop. */
+  attachProviders(container: HTMLElement): void {
+    const providers = container.createDiv({ cls: 'opencodian-zcode-group', attr: { 'data-zcode-group': 'api-services' } });
     providers.createEl('h4', { text: t('settings.zcode.ui.providers') });
     providers.createEl('p', { cls: 'setting-item-description', text: t('settings.zcode.ui.providerHelp') });
+    const sharedNote = providers.createEl('p', { cls: 'setting-item-description opencodian-zcode-supporting', attr: { 'data-zcode-group': 'providers-scope' } });
+    sharedNote.setText(t('settings.zcode.ui.providersScope'));
     const actions = providers.createDiv({ cls: 'opencodian-zcode-actions' });
     const add = actions.createEl('button', { text: t('settings.zcode.ui.addProvider'), attr: { type: 'button' } });
     add.disabled = !this.backend;
@@ -60,13 +96,115 @@ export class SettingsZCodeAccounts {
     reload.addEventListener('click', () => { void this.loadProviders(); });
     this.providerList = providers.createDiv({ cls: 'opencodian-zcode-provider-list' });
     this.editor = providers.createDiv({ cls: 'opencodian-zcode-editor-host' });
-    void this.loadAccounts();
+    this.attachHistory(providers);
     void this.loadProviders();
   }
 
-  reveal(): void { this.root.open = true; }
+  /** The tabbed providers tab mounts outside attach(); the section triggers the first load. */
+  loadProvidersForExternalCaller(): Promise<boolean> {
+    return this.loadProviders();
+  }
+
+  /**
+   * Archive-backed version history for the shared configuration file. The
+   * archive lives beside the native config (never in the vault); restore is
+   * revision-guarded and reachable in three clicks: open -> pick -> confirm.
+   * Hidden entirely when the adapter does not expose the history contract.
+   */
+  private attachHistory(container: HTMLElement): void {
+    const service = this.backend?.getPersonalConfigService();
+    if (!service?.listPersonalConfigHistory || !service.restorePersonalConfigEntry) return;
+    const history = container.createEl('details', { cls: 'opencodian-zcode-disclosure', attr: { 'data-zcode-group': 'providers-history' } });
+    history.createEl('summary', { text: t('settings.zcode.ui.history.title') });
+    const body = history.createDiv({ cls: 'opencodian-zcode-disclosure-body' });
+    body.createEl('p', { cls: 'setting-item-description', text: t('settings.zcode.ui.history.help') });
+    this.historyList = body.createDiv({ cls: 'opencodian-zcode-provider-list', attr: { 'data-zcode-group': 'providers-history-list' } });
+    history.addEventListener('toggle', () => {
+      if (history.open && this.historyList && !this.historyList.childElementCount) void this.loadHistory();
+    });
+  }
+
+  private async loadHistory(): Promise<void> {
+    const list = this.historyList;
+    const service = this.backend?.getPersonalConfigService();
+    if (!list || !service?.listPersonalConfigHistory) return;
+    const epoch = ++this.historyEpoch;
+    list.setText(t('settings.zcode.ui.history.loading'));
+    try {
+      const entries = await service.listPersonalConfigHistory();
+      if (epoch !== this.historyEpoch || !list.isConnected) return;
+      list.empty();
+      if (!entries?.length) {
+        list.createEl('p', { cls: 'setting-item-description', text: t('settings.zcode.ui.history.empty') });
+        return;
+      }
+      for (const entry of entries) this.historyRow(entry);
+    } catch {
+      if (epoch === this.historyEpoch && list.isConnected) list.setText(t('settings.zcode.ui.history.failed'));
+    }
+  }
+
+  private historyRow(entry: ArchiveHistoryEntrySummary): void {
+    const list = this.historyList as HTMLElement;
+    const row = new Setting(list)
+      .setName(t('settings.zcode.ui.history.entryName', { date: new Date(entry.timestamp).toLocaleString() }))
+      .setDesc(t('settings.zcode.ui.history.entryDetail', { size: String(entry.size) }));
+    row.addButton((button) => {
+      button.setButtonText(t('settings.zcode.ui.history.restore')).onClick(() => {
+        this.confirmHistoryRestore(entry, button.buttonEl);
+      });
+    });
+  }
+
+  /** Three clicks total: disclosure open, Restore, Confirm restore. */
+  private confirmHistoryRestore(entry: ArchiveHistoryEntrySummary, trigger: HTMLButtonElement): void {
+    const list = this.historyList;
+    if (!list || !this.backend?.getPersonalConfigService().restorePersonalConfigEntry) return;
+    const confirmHost = list.createDiv({ cls: 'opencodian-zcode-editor-host', attr: { 'data-zcode-group': 'providers-history-confirm' } });
+    confirmHost.createEl('p', { cls: 'setting-item-description', text: t('settings.zcode.ui.history.confirmHelp') });
+    const actions = confirmHost.createDiv({ cls: 'opencodian-zcode-actions' });
+    const confirm = actions.createEl('button', { cls: 'mod-cta', text: t('settings.zcode.ui.history.confirmRestore'), attr: { type: 'button' } });
+    const cancel = actions.createEl('button', { text: t('settings.zcode.ui.cancel'), attr: { type: 'button' } });
+    cancel.addEventListener('click', () => { confirmHost.empty(); trigger.focus(); });
+    confirm.addEventListener('click', () => {
+      confirm.disabled = true; cancel.disabled = true;
+      void this.restoreHistoryEntry(entry, confirmHost).finally(() => {
+        if (confirmHost.isConnected) { confirm.disabled = false; cancel.disabled = false; }
+      });
+    });
+    confirm.focus();
+  }
+
+  private async restoreHistoryEntry(entry: ArchiveHistoryEntrySummary, confirmHost: HTMLElement): Promise<void> {
+    const service = this.backend?.getPersonalConfigService();
+    if (!service?.restorePersonalConfigEntry) return;
+    const expected = this.snapshot?.revision ?? null;
+    try {
+      const result = await service.restorePersonalConfigEntry(entry.identity, expected);
+      if (!confirmHost.isConnected) return;
+      if (result.status !== 'success') {
+        const message = confirmHost.createEl('p', { text: result.status === 'conflict' ? t('settings.zcode.ui.conflict') : t('settings.zcode.ui.history.failed'), attr: { role: 'alert' } });
+        if (result.status === 'conflict') {
+          const reload = message.createEl('button', { text: t('settings.zcode.ui.history.reloadAndRetry'), attr: { type: 'button' } });
+          reload.addEventListener('click', () => {
+            reload.disabled = true;
+            void this.loadProviders().then(() => this.loadHistory());
+          });
+        }
+        return;
+      }
+      confirmHost.createEl('p', { cls: 'setting-item-description', text: t('settings.zcode.ui.history.restored'), attr: { role: 'status' } });
+      const outcome = await this.applyChanges();
+      if (confirmHost.isConnected && outcome !== 'applied') confirmHost.createEl('p', { cls: 'setting-item-description', text: t('settings.zcode.ui.reconnectNeeded') });
+      await this.loadProviders();
+      await this.loadHistory();
+    } catch (error) {
+      if (confirmHost.isConnected) confirmHost.createEl('p', { text: zcodeSettingsError(error), attr: { role: 'alert' } });
+    }
+  }
 
   private async loadAccounts(): Promise<void> {
+    if (!this.account?.isConnected) return;
     if (!this.backend) { this.account.setText(t('settings.zcode.ui.connectionIdle')); return; }
     const snapshot = await this.backend.accounts.read();
     if (!this.account.isConnected) return;
@@ -148,6 +286,7 @@ export class SettingsZCodeAccounts {
   }
 
   private async loadProviders(): Promise<boolean> {
+    if (!this.providerList?.isConnected) return false;
     const epoch = ++this.loadEpoch;
     this.providerList.setText(t('settings.zcode.ui.providerLoading'));
     try {
@@ -168,6 +307,13 @@ export class SettingsZCodeAccounts {
   private providerRow(provider: ZCodePersonalProvider): void {
     const row = new Setting(this.providerList).setName(provider.name)
       .setDesc(provider.editable ? t('settings.zcode.ui.providerModelCount', { baseUrl: provider.baseUrl, count: provider.models.length }) : t('settings.zcode.ui.providerReadonly'));
+    describeBackendSetting(row, {
+      key: `zcode-provider-${provider.id}`,
+      scope: 'shared',
+      effect: 'new-session',
+      risk: 'high',
+      source: t('settings.zcode.ui.providerSource'),
+    });
     if (!provider.editable) return;
     const description = row.settingEl.querySelector<HTMLElement>('.setting-item-description');
     if (provider.models.length && description) {
@@ -209,14 +355,14 @@ export class SettingsZCodeAccounts {
         this.editor.createEl('p', { text: t(result.status === 'conflict' ? 'settings.zcode.ui.conflict' : 'settings.zcode.ui.operationFailed'), attr: { role: 'alert' } });
         if (result.status === 'conflict') {
           const reload = this.editor.createEl('button', { text: t('settings.zcode.ui.reloadBeforeRemove'), attr: { type: 'button' } });
-          reload.addEventListener('click', () => { void this.loadProviders().then((loaded) => { if (loaded) { this.editor.empty(); this.root.querySelector<HTMLButtonElement>('[data-zcode-action=add]')?.focus(); } }); });
+          reload.addEventListener('click', () => { void this.loadProviders().then((loaded) => { if (loaded) { this.editor.empty(); this.root?.querySelector<HTMLButtonElement>('[data-zcode-action=add]')?.focus(); } }); });
         }
         return;
       }
       this.editor.empty();
       await this.loadProviders();
       await this.applyChanges();
-      this.root.querySelector<HTMLButtonElement>('[data-zcode-action=add]')?.focus();
+      this.root?.querySelector<HTMLButtonElement>('[data-zcode-action=add]')?.focus();
     } catch (error) { if (this.editor.isConnected) this.editor.createEl('p', { text: zcodeSettingsError(error), attr: { role: 'alert' } }); }
   }
 
@@ -225,6 +371,7 @@ export class SettingsZCodeAccounts {
     const form = this.editor.createDiv({ cls: 'opencodian-zcode-provider-form', attr: { 'data-zcode-group': 'api-editor' } });
     form.createEl('h5', { text: provider ? `${t('settings.zcode.ui.editProvider')} · ${provider.name}` : t('settings.zcode.ui.addProvider') });
     form.createEl('p', { cls: 'setting-item-description', text: t('settings.zcode.ui.providerHelp') });
+    form.createEl('p', { cls: 'setting-item-description opencodian-zcode-supporting', text: t('settings.zcode.ui.providersScope') });
     let name = provider?.name ?? '', protocol = (provider?.protocol ?? 'openai-chat-completions') as ZCodeProviderDraft['protocol'];
     let baseUrl = provider?.baseUrl ?? '', key = '', models = provider?.models.join('\n') ?? '';
     const initialRevision = this.snapshot?.revision ?? null;
@@ -256,7 +403,7 @@ export class SettingsZCodeAccounts {
     const actions = form.createDiv({ cls: 'opencodian-zcode-actions' });
     const save = actions.createEl('button', { cls: 'mod-cta', text: t('settings.zcode.ui.saveShared'), attr: { type: 'button' } });
     const cancel = actions.createEl('button', { text: t('settings.zcode.ui.cancel'), attr: { type: 'button' } });
-    cancel.addEventListener('click', () => { this.editor.empty(); (trigger?.isConnected ? trigger : this.root.querySelector<HTMLButtonElement>('[data-zcode-action=add]'))?.focus(); });
+    cancel.addEventListener('click', () => { this.editor.empty(); (trigger?.isConnected ? trigger : this.root?.querySelector<HTMLButtonElement>('[data-zcode-action=add]'))?.focus(); });
     const submit = async (expected: ZCodePersonalConfigSnapshot['revision']) => {
       const draft: ZCodeProviderDraft = { id: provider?.id, name, protocol, baseUrl, models: models.split('\n'), ...(key || !provider?.hasApiKey ? { apiKey: key } : {}) };
       const controls = Array.from(form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | HTMLButtonElement>('input, select, textarea, button'));

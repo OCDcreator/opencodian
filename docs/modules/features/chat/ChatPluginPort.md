@@ -1,5 +1,6 @@
 # ChatPluginPort
 
+> 2026-11-10（DSH workbench 设置导航）：settingsTab Pick 恢复 `prepareScrollToDsh`（phase1 批准的 scoped 视觉/导航范围）。view 的 workbench `openBackendSettings` host callback 在 DSH 后端经该窄缝定位到既有 DSH advanced 设置页后再打开插件设置；组合根（settingsTab）拥有实现，view 只转发，无新增 runtime ownership。
 > 2026-10-08：Codex approval context 的窄 Pick 增加可选 getTabIdForSession，只供 view 转发既有 tab/session 映射；无新增状态或 runtime ownership。
 > 2026-09-21 (advantage-parity R-F5/R-F6)：chat settings pick now includes the opt-in session rail/Vim navigation toggles and normalized key fields consumed by the view coordinators.
 > 2026-09-20 (advantage-parity R-D1)：port 新增 `exportConversationMarkdownById(conversationId)`，历史菜单导出按钮经该缝触达插件层。

@@ -1,3 +1,4 @@
+import type { DshJobView } from '../../../../core/agents/backend/dsh/DshNativeControls';
 import type { Conversation } from '../../../../core/types';
 import type { BackgroundTaskLiveSignalCoordinator } from '../../services/background/BackgroundTaskLiveSignalCoordinator';
 import type { BackgroundTaskNoticeStateService } from '../../services/background/BackgroundTaskNoticeStateService';
@@ -10,7 +11,8 @@ import type {
 } from './BackgroundTaskInlinePanelRenderer';
 
 type BackgroundTaskIndicatorInlinePanelPort = Pick<BackgroundTaskInlinePanelRenderer, 'render'>;
-type BackgroundTaskIndicatorTimelinePort = Pick<BackgroundTaskTimelineService, 'collectSegments'>;
+type BackgroundTaskIndicatorTimelinePort = Pick<BackgroundTaskTimelineService, 'collectSegments'>
+  & Partial<Pick<BackgroundTaskTimelineService, 'acceptNativeJobs' | 'collectNativeJobSegments'>>;
 type BackgroundTaskIndicatorLiveSignalPort = Pick<
   BackgroundTaskLiveSignalCoordinator,
   'reconcileStateFromLiveSignals'
@@ -60,6 +62,17 @@ export class BackgroundTaskIndicatorCoordinator {
     this.liveSignalCoordinator = liveSignalCoordinator;
     this.tabRuntimeStateBridge = tabRuntimeStateBridge;
     this.host = host;
+  }
+
+  /** Native jobs use the existing inline and persisted-notice owners without a foreground status signal. */
+  async acceptNativeJobs(conversation: Conversation, tabId: TabId, snapshot: {
+    jobs: readonly DshJobView[] | null; isCurrent: () => boolean;
+  }): Promise<void> {
+    if (conversation.backend !== 'dsh' || !this.host.hasTabRuntime(tabId)) return;
+    this.timelineService.acceptNativeJobs?.(conversation, tabId, snapshot);
+    if (snapshot.jobs === null || !snapshot.isCurrent()) return;
+    await this.inlinePanelRenderer.render(conversation, tabId, { isCurrent: snapshot.isCurrent });
+    if (snapshot.isCurrent()) await this.queueAndFlushCompletionNotices(tabId, conversation, { isCurrent: snapshot.isCurrent });
   }
 
   async renderIfNeeded(
@@ -121,7 +134,8 @@ export class BackgroundTaskIndicatorCoordinator {
     }
 
     this.completionNoticeService.queueNotices(
-      this.timelineService.collectSegments(conversation.messages, tabId),
+      conversation.backend === 'dsh' ? this.timelineService.collectNativeJobSegments?.(conversation, tabId) ?? []
+        : this.timelineService.collectSegments(conversation.messages, tabId),
       tabId,
       conversation,
     );

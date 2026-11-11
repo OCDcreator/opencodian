@@ -1,4 +1,7 @@
 # OpenCodianSettings
+
+2026-11-09：新增 `prepareScrollToDsh(secondary = 'advanced')` 深链，允许聊天打开 DSH advanced/configuration 任务；经典模式也保留对应子页记忆并定位 DSH。`hide()` 调用 renderer `disposeActiveBackendSections()` 释放 DSH/Codex 原生订阅，不影响持久化的组草稿。
+
 > 2026-09-21 (advantage-parity R-F7)：经典面 General 合并块渲染环境变量行（tabbed deps 同步传入）。
 > 2026-09-20 (advantage-parity R-D2)：通用分区新增「密钥存入 Obsidian 钥匙串」开关行（classic 与 tabbed 通用/基础两路径，实现下沉 SettingsPanelChrome 共享）。
 > 2026-09-18 (R-C6): 经典布局在 `addSecuritySettings()` 之后新增 `addRemoteControlSettings()`，渲染 `SettingsRemoteControlSection`（远程驱动设置面：主开关/状态/绑定地址/令牌/审计）。

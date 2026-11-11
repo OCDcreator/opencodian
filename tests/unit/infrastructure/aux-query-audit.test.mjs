@@ -96,18 +96,62 @@ test('generic ZCode model selection requires provider/model and never uses sessi
   expect(source).not.toMatch(/startInlineCompletionSession|ZCodeInlineCompletionSession|sessionlessCompletion/);
 });
 
-test('zero-tool proof needs fresh native message, empty object, zero count and no native tool event', () => {
+test('zero-tool proof needs exactly one real tools row, all other new rows synthetic model-only with stable ids', () => {
   const result = evaluate(`
     const proof = {backend:'zcode',enforcedPolicy:'none',effectiveTools:[],deniedCapabilities:['write'],mechanism:'fixture'};
+    const real = (id) => ({id, role:'user', tools:{}, semantics:{kind:'user_prompt', origin:'real_user'}});
+    const synthetic = (id, extra = {}) => ({id, role:'user', semantics:{kind:'system_reminder'},
+      synthetic:true, visibility:'model-only', ...extra});
     const record = {sessionId:'fixture',storage:'fixture',exited:false,priorUserIds:new Set(['old']),lastUsers:[],
-      currentUsers:[{id:'new',tools:{}}],toolEvents:[],toolCallCount:0};
-    const records = [record, {...record,currentUsers:[]}, {...record,currentUsers:[{id:'old',tools:{}}]},
-      {...record,currentUsers:[{id:'new'}]}, {...record,currentUsers:[{id:'new',tools:[]}]},
-      {...record,currentUsers:[{id:'new',tools:{Write:true}}]}, {...record,currentUsers:[{id:'new',tools:{Write:false}}]},
-      {...record,toolCallCount:undefined}, {...record,toolCallCount:1}, {...record,toolEvents:['tool.started']}];
+      currentUsers:[real('new'), synthetic('s1'), synthetic('s2')],toolEvents:[],toolCallCount:0};
+    const records = [
+      record,
+      {...record,currentUsers:[real('f2')]},
+      {...record,currentUsers:[real('new'), real('new2'), synthetic('s1')]},
+      {...record,currentUsers:[synthetic('sX',{tools:{}})]},
+      {...record,currentUsers:[{id:'arb', role:'user', semantics:{kind:'user_prompt', origin:'real_user'}}]},
+      {...record,currentUsers:[real('new'), synthetic('s1',{tools:{}})]},
+      {...record,currentUsers:[{id:'new', role:'user', tools:{Read:true}, semantics:{kind:'user_prompt', origin:'real_user'}}]},
+      {...record,toolCallCount:1},
+      {...record,toolEvents:['tool.started']},
+      {...record,currentUsers:[real('old'), synthetic('s1')]},
+      {...record,currentUsers:[{role:'user', tools:{}}, synthetic('s1')]},
+      {...record,currentUsers:[real('new'), {id:'s9', synthetic:true, semantics:{kind:'system_reminder'}}]},
+      {...record,currentUsers:[{...real('new'), semantics:{kind:'user_prompt', origin:'agent_runtime'}}, synthetic('s1')]},
+      {...record,currentUsers:[{...real('new'), synthetic:true}, synthetic('s1')]},
+      {...record,currentUsers:[]},
+    ];
     console.log(JSON.stringify(records.map(value => audit.verifyZCodeNativeReadback(value, proof).ok)));
   `, bundle);
-  expect(result).toEqual([true, false, false, false, false, false, false, false, false, false]);
+  expect(result).toEqual([true, true, false, false, false, false, false, false, false, false, false, false, false, false, false]);
+});
+
+test('hook trust digest mirrors the runtime workspace-hook-declaration v1 canonical form', () => {
+  const result = evaluate(`
+    const crypto = (await import('node:crypto')).default;
+    const inputs = { hookSource: 'project.workspace-hook-0-UserPromptSubmit-0-0',
+      command: "'node' 'owned-hook.mjs'", resolvedTimeoutMs: 20000, resolvedMaxOutputBytes: 32768 };
+    const digest = audit.zcodeHookDeclarationDigestFromObservation(inputs);
+    const canonical = JSON.stringify(['workspace-hook-declaration', 1, '.zcode/config.json', 0,
+      'UserPromptSubmit', null, 0, 0, ['command', inputs.command, false, ['unset']],
+      inputs.resolvedTimeoutMs, inputs.resolvedMaxOutputBytes]);
+    console.log(JSON.stringify({digest,
+      expected: crypto.createHash('sha256').update(canonical).digest('hex'),
+      deterministic: digest === audit.zcodeHookDeclarationDigestFromObservation(inputs),
+      timeoutSensitive: audit.zcodeHookDeclarationDigestFromObservation({...inputs, resolvedTimeoutMs: 6000}) !== digest,
+      sourceSensitive: audit.zcodeHookDeclarationDigestFromObservation({...inputs, hookSource: 'project.workspace-hook-1-UserPromptSubmit-0-0'}) !== digest}));
+  `, bundle);
+  expect(result).toEqual({digest: result.expected, expected: result.digest, deterministic: true, timeoutSensitive: true, sourceSensitive: true});
+});
+
+test('zcode hook control uses the native project-config source, runtime trust grant and owned-sentinel cleanup', () => {
+  const source = fs.readFileSync(path.join(repo, 'scripts/audit/aux-query-audit.entry.ts'), 'utf8');
+  expect(source).toContain("'workspace/hooks/trustGrant'");
+  expect(source).toContain("'workspace-hook-declaration'");
+  expect(source).toContain("hooks: { enabled: true, maxOutputBytes: 32768");
+  expect(source).toContain("zcodeHookDeclarationDigestFromObservation");
+  expect(source).not.toContain("enabledPlugins");
+  expect(source).toMatch(/finally \{[\s\S]{0,200}fs\.unlinkSync\(target\)/);
 });
 
 test('byte snapshot includes hidden/node_modules and empty directories; unreadable root rejects', () => {
@@ -165,7 +209,7 @@ beforeAll(() => {
       name:'offline-lifecycle-and-control-seams',
       setup(build) {
         build.onLoad({ filter:/aux-query-audit[.]entry[.]ts$/ }, args => ({
-          contents: fs.readFileSync(args.path,'utf8') + String.fromCharCode(10) + 'export {createCodexHarness,runWriteInducementControl};', loader:'ts'
+          contents: fs.readFileSync(args.path,'utf8') + String.fromCharCode(10) + 'export {createCodexHarness};', loader:'ts'
         }));
         build.onResolve({ filter:/CodexAppServerClient$/ }, args => args.importer === ${JSON.stringify(entry)}
           ? {path:'client',namespace:'offline-audit'} : undefined);
@@ -174,11 +218,39 @@ beforeAll(() => {
         build.onLoad({ filter:/^client$/,namespace:'offline-audit' }, () => ({ contents:
           'export class CodexAppServerClient { constructor() { return globalThis.__offlineCatalogClient; } }'
         }));
-        build.onResolve({ filter:/.*/,namespace:'offline-audit' }, args => ({path:args.path,namespace:'file'}));
         build.onLoad({ filter:/^scope$/,namespace:'offline-audit' }, () => ({ contents:
-          'export {killProcessTree,OPENCODE_AUX_AGENT,OpenCodeAuxScope,scopeUrl} from ' + ${JSON.stringify(JSON.stringify(scope))} + ';'
+          'export {OPENCODE_AUX_AGENT,OpenCodeAuxScope} from ' + ${JSON.stringify(JSON.stringify(scope))} + ';'
           + 'export function resolveOpenCodeExecutable(){return {path:"offline-non-executable",shell:false};}'
         }));
+        build.onResolve({ filter:/OpenCode2Adapter$/ }, args => args.importer === ${JSON.stringify(entry)}
+          ? {path:'adapter',namespace:'offline-audit'} : undefined);
+        build.onLoad({ filter:/^adapter$/,namespace:'offline-audit' }, () => ({ contents:
+          'export class OpenCode2Adapter {'
+          + '  constructor(options) { this.options = options; globalThis.__controlCalls.push(["constructor"]); }'
+          + '  async start() { globalThis.__controlCalls.push(["start"]);'
+          + '    if (globalThis.__controlAdapter?.failStart) throw new Error("synthetic start failure"); }'
+          + '  async createSession(title) { globalThis.__controlCalls.push(["createSession", title]); return "fixture-control-session"; }'
+          + '  async applyPermissionMode(sessionId, mode) { globalThis.__controlCalls.push(["applyPermissionMode", sessionId, mode]); }'
+          + '  async *sendMessage(request) {'
+          + '    const adapter = globalThis.__controlAdapter;'
+          + '    globalThis.__controlCalls.push(["sendMessage", request.options.provider, request.options.model]);'
+          + '    if (adapter?.writeBytes !== undefined) {'
+          + '      const require = (await import("node:module")).createRequire(import.meta.url);'
+          + '      const path = require("node:path");'
+          + '      require("node:fs").writeFileSync(path.join(this.options.workingDirectory, "aux-control-escape.md"), adapter.writeBytes);'
+          + '    }'
+          + '    for (const chunk of adapter?.chunks ?? []) {'
+          + '      if (chunk.error) yield { type: "error", content: chunk.error };'
+          + '      else yield { type: "tool_use", name: chunk.name };'
+          + '    }'
+          + '  }'
+          + '  async deleteSession(sessionId) { globalThis.__controlCalls.push(["deleteSession", sessionId]); }'
+          + '  async cancelStream(sessionId) { globalThis.__controlCalls.push(["cancelStream", sessionId]); }'
+          + '  async stop() { globalThis.__controlCalls.push(["stop"]); }'
+          + '}'
+        }));
+        build.onResolve({ filter:/.*/,namespace:'offline-audit' }, args => args.path.startsWith('/') || /^[A-Za-z]:/.test(args.path)
+          ? ({path:args.path,namespace:'file'}) : undefined);
       }
     }] });
     console.log(JSON.stringify({compiled:true}));
@@ -221,7 +293,7 @@ test.each([
   ['explicit wins', 'opencode', 'chosen-provider/chosen-model', 'fallback-provider/fallback-model', '', 'explicit-control', {providerID:'chosen-provider',modelID:'chosen-model'}],
   ['OpenCode backend fallback', 'opencode', null, 'fallback-provider/fallback-model', '', 'opencode-model-fallback', {providerID:'fallback-provider',modelID:'fallback-model'}],
   ['OpenCode global fallback', 'opencode', null, null, 'global-provider/global-model', 'opencode-model-fallback', {providerID:'global-provider',modelID:'global-model'}],
-])('shared control sends the preflight-approved request model: %s', (...fixture) => {
+])('shared control selection resolves the preflight-approved request model: %s', (...fixture) => {
   const [, backend, control, backendModel, globalModel, modelSource, expectedModel] = fixture;
   const result = evaluate(`
     delete process.env.AUDIT_AUX_CONTROL_MODEL;
@@ -232,38 +304,118 @@ test.each([
     if (backendModel !== null) process.env.AUDIT_AUX_MODEL_OPENCODE = backendModel;
     process.env.AUDIT_AUX_MODEL = ${JSON.stringify(globalModel)};
     process.env.AUDIT_AUX_VISION_MODEL = 'fixture/vision';
-    const cp = (await import('node:child_process')).default;
-    const net = (await import('node:net')).default;
-    let spawned = 0, listened = 0; const requests = [];
-    cp.spawn = () => {spawned++;return {stdout:{on(){}},stderr:{on(){}},pid:undefined};};
-    net.createServer = () => ({once(){},listen(_port,_host,callback){listened++;callback();},
-      address(){return {port:43210};},close(callback){callback();}});
-    (await import('node:module')).syncBuiltinESMExports();
-    const fs = await import('node:fs'); const path = await import('node:path');
-    globalThis.fetch = async (url, options = {}) => {
-      const route = new URL(url).pathname;
-      const body = options.body ? JSON.parse(options.body) : null;
-      requests.push({route,body});
-      if (route === '/config') return {ok:true};
-      if (route === '/session') return {json:async () => ({id:'fixture-control'})};
-      if (route === '/session/fixture-control/message') {
-        fs.writeFileSync(path.join(${JSON.stringify(scratch)},'aux-control-escape.md'),'fixture');
-        return {ok:true};
-      }
-      throw new Error('unexpected synthetic route');
-    };
+    const selection = audit.resolveWriteControlModel(${JSON.stringify(backend)});
     const preflight = audit.auditPreflight(${JSON.stringify(backend)});
-    const outcome = await audit.runWriteInducementControl({vault:${JSON.stringify(scratch)},notePath:'fixture',noteBody:'fixture'},${JSON.stringify(backend)});
-    let evidence; try {evidence = JSON.parse(outcome.detail);} catch {evidence = {};}
-    const model = requests.find(value => value.route.endsWith('/message'))?.body.model;
-    const hash = (await import('node:crypto')).createHash('sha256').update(JSON.stringify(model)).digest('hex');
-    console.log(JSON.stringify({ok:outcome.ok,spawned,listened,model,modelSource:evidence.modelSource,
-      profileMatchesRequest:evidence.modelProfileSha256 === hash,
-      preflightControlAccepted:!preflight.some(value => value.includes('AUDIT_AUX_CONTROL_MODEL')),
-      rawModelInReport:outcome.detail.includes(model.providerID)||outcome.detail.includes(model.modelID)}));
+    console.log(JSON.stringify({modelSource: selection?.modelSource ?? null,
+      requestModel: selection?.requestModel ?? null,
+      preflightControlAccepted:!preflight.some(value => value.includes('AUDIT_AUX_CONTROL_MODEL'))}));
   `, lifecycleBundle);
-  expect(result).toEqual({ok:true,spawned:1,listened:1,model:expectedModel,modelSource,
-    profileMatchesRequest:true,preflightControlAccepted:true,rawModelInReport:false});
+  expect(result).toEqual({modelSource, requestModel: expectedModel, preflightControlAccepted:true});
+});
+
+test.each([
+  ['exact sentinel bytes with a write tool pass', 'OC_AUX_CONTROL_WRITE\n', [{name:'write'}], 'pass'],
+  ['mutated sentinel bytes fail even with a write tool', 'tampered', [{name:'write'}], 'exactBytes'],
+  ['exact bytes without a write-class tool fail', 'OC_AUX_CONTROL_WRITE\n', [{name:'read'}], 'writeTool'],
+  ['missing outcome file fails', undefined, [{name:'write'}], 'fileCreated'],
+  ['native error chunk fails with withheld detail', undefined, [{error:'synthetic refusal'}], 'withheld'],
+])('shared control judges the actual sentinel outcome file and native tool evidence: %s', (...fixture) => {
+  const [, writeBytes, chunks, expectation] = fixture;
+  const result = evaluate(`
+    process.env.AUDIT_AUX_CONTROL_MODEL = 'chosen-provider/chosen-model';
+    process.env.AUDIT_AUX_MODEL_OPENCODE = 'unused-fallback/unused-model';
+    const fs = (await import('node:fs')).default;
+    const crypto = (await import('node:crypto')).default;
+    const cp = (await import('node:child_process')).default;
+    cp.spawn = () => { throw new Error('offline boundary: no native process'); };
+    (await import('node:module')).syncBuiltinESMExports();
+    globalThis.__controlCalls = [];
+    globalThis.__controlAdapter = { writeBytes: ${JSON.stringify(writeBytes)}, chunks: ${JSON.stringify(chunks)} };
+    const vault = fs.mkdtempSync(${JSON.stringify(path.join(scratch, 'control-evidence-'))});
+    const outcome = await audit.runWriteInducementControl({vault, notePath:'fixture', noteBody:'fixture'}, 'claude-code');
+    let evidence; try { evidence = JSON.parse(outcome.detail); } catch { evidence = null; }
+    const request = { providerID: 'chosen-provider', modelID: 'chosen-model' };
+    console.log(JSON.stringify({ok: outcome.ok, evidence, detail: outcome.detail, calls: globalThis.__controlCalls,
+      sentinelCleanedUp: !fs.existsSync(vault + '/aux-control-escape.md'),
+      profileMatchesRequest: evidence ? evidence.modelProfileSha256 === crypto.createHash('sha256').update(JSON.stringify(request)).digest('hex') : false}));
+  `, lifecycleBundle);
+  expect(result.calls.map((call) => call[0])).toEqual(
+    ['constructor', 'start', 'createSession', 'applyPermissionMode', 'sendMessage', 'deleteSession', 'stop']);
+  expect(result.calls[3]).toEqual(['applyPermissionMode', 'fixture-control-session', 'yolo']);
+  expect(result.calls[4].slice(1)).toEqual(['chosen-provider', 'chosen-model']);
+  expect(result.sentinelCleanedUp).toBe(true);
+  if (expectation === 'withheld') {
+    expect(result.ok).toBe(false);
+    expect(result.evidence).toBe(null);
+    expect(result.detail).toBe('control failed: audit operation failed; raw runtime details withheld');
+    return;
+  }
+  expect(result.profileMatchesRequest).toBe(true);
+  expect(result.evidence.modelSource).toBe('explicit-control');
+  expect(result.evidence.contract).toBe('opencode2');
+  expect(result.evidence.expectedBytes).toBe(21);
+  if (expectation === 'pass') {
+    expect(result.ok).toBe(true);
+    expect(result.evidence).toMatchObject({toolCalls: ['write'], fileCreated: true, exactBytes: true});
+  } else {
+    expect(result.ok).toBe(false);
+    expect(result.evidence.exactBytes).toBe(expectation === 'pass' || expectation === 'writeTool');
+    expect(result.evidence.fileCreated).toBe(expectation !== 'fileCreated');
+    expect(result.evidence.toolCalls).toEqual(expectation === 'writeTool' ? ['read'] : ['write']);
+  }
+});
+
+test('shared positive control runs the active OpenCode 2 contract without the retired 1.x HTTP surface', () => {
+  const source = fs.readFileSync(path.join(repo, 'scripts/audit/aux-query-audit.entry.ts'), 'utf8');
+  expect(source).toContain('new OpenCode2Adapter(');
+  expect(source).toContain("applyPermissionMode(controlSessionId, 'yolo')");
+  expect(source).toContain("'OC_AUX_CONTROL_WRITE\\n'");
+  expect(source).toContain('evaluateWriteControlEvidence(');
+  expect(source).not.toMatch(/scopeUrl\(|reservePort\(|killProcessTree\(|\/session\/\$\{|'serve', '--port'/);
+  expect(source).not.toMatch(/console\.(log|error)\([^)]*process\.env/);
+});
+
+test('AUDIT_CLAUDE_BIN selects the explicit absolute CLI; invalid explicit fails with no candidate fallback', () => {
+  const fixtureHome = fs.mkdtempSync(path.join(scratch, 'claude-home-'));
+  fs.mkdirSync(path.join(fixtureHome, '.local', 'bin'), { recursive: true });
+  const candidateCli = path.join(fixtureHome, '.local', 'bin', 'claude');
+  fs.writeFileSync(candidateCli, 'fixture candidate, never executable');
+  const missingCli = path.join(scratch, 'missing-claude-cli');
+  const result = evaluate(`
+    process.env.HOME = ${JSON.stringify(fixtureHome)};
+    const sentinelPath = ${JSON.stringify(sentinel)};
+    const resolve = () => audit.resolveClaudeExecutable();
+    const cases = {};
+    delete process.env.AUDIT_CLAUDE_BIN; delete process.env.CLAUDE_BIN;
+    cases.fallbackCandidate = resolve();
+    process.env.AUDIT_CLAUDE_BIN = sentinelPath;
+    cases.selectedExplicit = resolve();
+    cases.preflightSelectedAccepted = !audit.auditPreflight('claude-code').some(value => value.includes('Claude CLI unavailable'));
+    process.env.AUDIT_CLAUDE_BIN = ${JSON.stringify(missingCli)};
+    cases.invalidExplicitNoFallback = resolve();
+    cases.preflightInvalid = audit.auditPreflight('claude-code').some(value => value.includes('Claude CLI unavailable'));
+    process.env.AUDIT_CLAUDE_BIN = 'relative/claude';
+    cases.relativeExplicitRejected = resolve();
+    process.env.AUDIT_CLAUDE_BIN = '';
+    cases.emptyCountsAsUnset = resolve();
+    process.env.CLAUDE_BIN = sentinelPath;
+    delete process.env.AUDIT_CLAUDE_BIN;
+    cases.genericCLAUDE_BIN = resolve();
+    process.env.AUDIT_CLAUDE_BIN = sentinelPath;
+    cases.auditOverrideWinsOverCLAUDE_BIN = resolve() === sentinelPath;
+    console.log(JSON.stringify(cases));
+  `, lifecycleBundle);
+  expect(result).toEqual({
+    fallbackCandidate: candidateCli,
+    selectedExplicit: sentinel,
+    preflightSelectedAccepted: true,
+    invalidExplicitNoFallback: null,
+    preflightInvalid: true,
+    relativeExplicitRejected: null,
+    emptyCountsAsUnset: candidateCli,
+    genericCLAUDE_BIN: sentinel,
+    auditOverrideWinsOverCLAUDE_BIN: true,
+  });
 });
 
 test('another backend cannot reuse the OpenCode model fallback; invalid explicit control cannot silently fallback', () => {

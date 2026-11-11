@@ -1,14 +1,31 @@
 /* eslint-disable max-lines -- bounded transport owner: launch resolution, frame parsing, idle-gap timers, stderr diagnostics, and reverse-request handling stay in one adapter boundary (mirrors DshAdapter). */
 import { type ChildProcessWithoutNullStreams, spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { accessSync, constants, existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import type { DshNativeConfiguration } from '../../../types/dshConfiguration';
 import type { DshBackendSettings, DshMcpServer } from '../../../types/settings';
+import { prepareDshManagedLaunch, releaseDshLaunchScope } from '../configuration/DshManagedProfile';
+import {
+  DSH_STOP_REASON_VALUES,
+  DSH_TOOL_KIND_VALUES,
+  DSH_TOOL_STATUS_VALUES,
+  type DshClientTraceHook,
+  type DshTransportId,
+  type DshWireRecord,
+} from '../diagnostics/types';
 import { DSH_ACP_PROTOCOL_VERSION as ACP_PROTOCOL_VERSION, type DshJsonObject, type DshJsonValue, parseDshRpcId, validateDshHandshake,validateDshMcpServers } from './DshProtocolCodec';
 
 export type { DshJsonObject, DshJsonValue } from './DshProtocolCodec';
 export { validateDshMcpServers } from './DshProtocolCodec';
+
+const TRACE_TOOL_KINDS = new Set<string>(DSH_TOOL_KIND_VALUES);
+const TRACE_TOOL_STATUSES = new Set<string>(DSH_TOOL_STATUS_VALUES);
+const TRACE_STOP_REASONS = new Set<string>(DSH_STOP_REASON_VALUES);
+/** Hard cap for bounded identifier-shaped trace strings (ids, discriminators). */
+const TRACE_ID_MAX_CHARS = 128;
 
 export interface DshLaunchSpec {
   command: string;
@@ -31,9 +48,57 @@ export interface DshAcpPermissionResponse {
   outcome: { outcome: 'selected'; optionId: string } | { outcome: 'cancelled' };
 }
 
+// Keep the transport's public type surface compatible without coupling the
+// diagnostics settings types back to this runtime client.
+export type { DshAcpWireObserver, DshClientTraceHook, DshTransportId, DshWireRecord } from '../diagnostics/types';
+
+/**
+ * Extracts ONLY whitelisted session-update metadata for trace records.
+ * `rawInput`, `content`, `arguments`, `title`, `reason`, and every other
+ * free-form payload field are deliberately omitted — redaction cannot be
+ * trusted to guess credentials out of arbitrary text. `kind`/`status` are
+ * accepted only as strict protocol enums, and remaining identifiers are
+ * bounded and scrubbed so no free text can reach a trace buffer from here.
+ */
+export function extractDshSessionUpdateDetail(update: DshJsonObject): Record<string, unknown> {
+  const detail: Record<string, unknown> = {
+    sessionUpdate: typeof update.sessionUpdate === 'string' ? update.sessionUpdate : '',
+  };
+  if (typeof update.toolCallId === 'string' && update.toolCallId.length > 0) {
+    detail.toolCallId = scrubCredentialShapes(update.toolCallId.slice(0, TRACE_ID_MAX_CHARS));
+  }
+  if (typeof update.messageId === 'string' && update.messageId.length > 0) {
+    detail.messageId = scrubCredentialShapes(update.messageId.slice(0, TRACE_ID_MAX_CHARS));
+  }
+  if (typeof update.kind === 'string' && TRACE_TOOL_KINDS.has(update.kind)) detail.kind = update.kind;
+  if (typeof update.status === 'string' && TRACE_TOOL_STATUSES.has(update.status)) detail.status = update.status;
+  if (typeof update.used === 'number' && Number.isFinite(update.used)) detail.usedTokens = update.used;
+  if (typeof update.size === 'number' && Number.isFinite(update.size)) detail.contextWindow = update.size;
+  if (typeof update.inputTokens === 'number' && Number.isFinite(update.inputTokens)) detail.inputTokens = update.inputTokens;
+  if (typeof update.outputTokens === 'number' && Number.isFinite(update.outputTokens)) detail.outputTokens = update.outputTokens;
+  if (typeof update.time === 'number' && Number.isFinite(update.time)) detail.backendTimeMs = update.time;
+  return detail;
+}
+
+/** Collapse credential-shaped runs (keys, bearer tokens, JWTs) before metadata enters a trace. */
+function scrubCredentialShapes(text: string): string {
+  return text
+    .replace(/\b(bearer\s+)[^\s'",;]{8,}/gi, '$1[redacted]')
+    .replace(/\bsk-[A-Za-z0-9_-]{8,}/g, '[redacted]')
+    .replace(/\beyJ[A-Za-z0-9_-]{7,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\b/g, '[redacted]');
+}
+
 export interface DshAcpClientOptions {
   readonly launch: DshLaunchSpec;
   readonly cwd: string;
+  readonly nativeConfig?: DshNativeConfiguration;
+  /** Original vault identity, independent of the configurable process working directory. */
+  readonly vaultPath?: string;
+  /** Explicit allowlisted parent for managed profiles; primarily useful for isolated hosts/tests. */
+  readonly managedProfileRoot?: string;
+  /** Optional wire-trace injection; when absent every hook is a no-op with zero behavior change. */
+  readonly trace?: DshClientTraceHook;
+  readonly onControlUpdate?: (event: DshJsonObject) => void;
   readonly onUpdate?: (update: DshAcpUpdate) => void;
   readonly onPermissionRequest?: (request: DshAcpPermissionRequest) => Promise<DshAcpPermissionResponse>;
   readonly onQuestionRequest?: (request: DshJsonObject) => Promise<DshJsonObject>;
@@ -48,6 +113,8 @@ interface PendingRequest {
   /** Present for session-scoped requests whose streamed updates prove the turn is alive. */
   readonly sessionId?: string;
   readonly timeoutMs: number;
+  /** Client write timestamp used to observe the response round trip. */
+  readonly startedAt: number;
   readonly resolve: (value: DshJsonValue) => void;
   readonly reject: (error: Error) => void;
   timeout: ReturnType<typeof setTimeout>;
@@ -170,11 +237,27 @@ export class DshAcpClient {
   private starting: Promise<void> | null = null;
   private stopping: Promise<void> | null = null;
   private transportCleanup: Promise<void> | null = null;
+  private configurationScope: string | null = null;
+  private configurationPreparing: Promise<void> | null = null;
+  private configurationBaseLaunch: DshLaunchSpec | null = null;
+  private launchGeneration = 0;
+  /**
+   * Unique per-instance wire source identity. Threaded through every trace
+   * record together with the launch generation so two concurrent clients
+   * (main + aux, or an old and a new client) can never collide on shared
+   * request ids, and a restarted instance is a fresh trace generation.
+   */
+  private readonly wireSourceId = randomUUID();
 
   constructor(private readonly options: DshAcpClientOptions) {}
 
   get isStarted(): boolean { return this.started; }
   get handshake(): DshJsonObject | null { return this.handshakeValue; }
+
+  /** Instance identity fields attached to every observed wire record. */
+  private wireSourceFields(): { sourceId: string; generation: number } {
+    return { sourceId: this.wireSourceId, generation: this.launchGeneration };
+  }
 
   async start(): Promise<void> {
     if (this.started && this.child) return;
@@ -185,8 +268,31 @@ export class DshAcpClient {
     try { await starting; } finally { if (this.starting === starting) this.starting = null; }
   }
 
+  protected async prepareConfigurationLaunch(): Promise<void> {
+    if (this.options.nativeConfig === undefined || this.configurationScope) return;
+    this.configurationBaseLaunch ??= { ...this.options.launch, args: [...this.options.launch.args] };
+    this.configurationPreparing = prepareDshManagedLaunch(this.options, this.configurationBaseLaunch,
+      'acp', (scope) => { this.configurationScope = scope; });
+    try { await this.configurationPreparing; }
+    catch (error) { await this.releaseConfigurationLaunch(); throw error; }
+    finally { this.configurationPreparing = null; }
+  }
+
+  private async releaseConfigurationLaunch(): Promise<void> {
+    if (!this.configurationScope) return;
+    const scope = this.configurationScope;
+    this.configurationScope = null;
+    await releaseDshLaunchScope(scope);
+  }
+
   private async startInternal(): Promise<void> {
+    // Every start — including a same-instance restart — is a fresh trace
+    // generation: pending/lifecycle/tool pairing state is keyed by this pair.
+    const generation = ++this.launchGeneration;
+    await this.prepareConfigurationLaunch();
+    if (generation !== this.launchGeneration) throw new Error('DSH ACP start was cancelled');
     this.handshakeValue = null;
+    this.observe({ direction: 'out', kind: 'connection', method: 'starting', bytes: 0, transport: this.transportId(), ...this.wireSourceFields() });
     const child = spawn(this.options.launch.command, this.options.launch.args, {
       cwd: this.options.cwd,
       env: { ...process.env, ...this.options.launch.env },
@@ -222,8 +328,18 @@ export class DshAcpClient {
       if (this.child !== child || child.exitCode !== null) throw new Error('DSH ACP start was cancelled');
       this.handshakeValue = handshake;
       this.started = true;
+      this.observe({
+        direction: 'in',
+        kind: 'connection',
+        method: 'connected',
+        bytes: byteSize(handshake),
+        transport: this.transportId(),
+        ...this.wireSourceFields(),
+        detail: typeof handshake.nativeProtocol === 'string' ? { nativeProtocol: handshake.nativeProtocol } : undefined,
+      });
     } catch (error) {
       await this.stopChild(child);
+      await this.releaseConfigurationLaunch();
       throw error;
     }
   }
@@ -236,6 +352,8 @@ export class DshAcpClient {
   }
 
   private async stopInternal(): Promise<void> {
+    ++this.launchGeneration;
+    if (this.configurationPreparing) await this.configurationPreparing.catch(() => undefined);
     this.started = false;
     this.handshakeValue = null;
     const child = this.child;
@@ -253,6 +371,7 @@ export class DshAcpClient {
     } catch (error) {
       failure = error;
     }
+    await this.releaseConfigurationLaunch();
     if (failure) throw failure instanceof Error ? failure : new Error(String(failure));
   }
 
@@ -319,9 +438,22 @@ export class DshAcpClient {
       // idle gap: streamed session updates re-arm it while the turn is alive.
       const sessionId = method === 'session/prompt' && typeof params.sessionId === 'string' ? params.sessionId : undefined;
       const timeout = this.makeRequestTimeout(id, method, timeoutMs, reject);
-      this.pending.set(id, { method, sessionId, timeoutMs, resolve, reject, timeout });
+      this.pending.set(id, { method, sessionId, timeoutMs, startedAt: Date.now(), resolve, reject, timeout });
     });
-    child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
+    const frame = `${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`;
+    // Trace-only session extraction is wider than the pending map's prompt-only
+    // gap so control reads stay attributable without changing re-arm behavior.
+    this.observe({
+      direction: 'out',
+      kind: 'request',
+      method,
+      requestId: id,
+      sessionId: typeof params.sessionId === 'string' ? params.sessionId : undefined,
+      bytes: Buffer.byteLength(frame, 'utf8'),
+      transport: this.transportId(),
+      ...this.wireSourceFields(),
+    });
+    child.stdin.write(frame);
     return promise;
   }
 
@@ -332,7 +464,23 @@ export class DshAcpClient {
     reject: (error: Error) => void,
   ): ReturnType<typeof setTimeout> {
     return setTimeout(() => {
-      if (!this.pending.delete(id)) return;
+      const pending = this.pending.get(id);
+      if (!pending || !this.pending.delete(id)) return;
+      this.observe({
+        direction: 'in',
+        kind: 'response',
+        method,
+        requestId: id,
+        sessionId: pending.sessionId,
+        ok: false,
+        durationMs: Date.now() - pending.startedAt,
+        bytes: 0,
+        transport: this.transportId(),
+        ...this.wireSourceFields(),
+        // Metadata-only contract: a fixed classification token instead of the
+        // descriptive message, which can embed method/config fragments.
+        error: 'timeout',
+      });
       reject(new Error(`DSH ACP ${method} timed out`));
     }, timeoutMs);
   }
@@ -349,6 +497,15 @@ export class DshAcpClient {
   private notify(method: string, params: DshJsonObject): void {
     const child = this.child;
     if (!child || child.stdin.destroyed) return;
+    this.observe({
+      direction: 'out',
+      kind: 'client-notification',
+      method,
+      sessionId: typeof params.sessionId === 'string' ? params.sessionId : undefined,
+      bytes: byteSize(params),
+      transport: this.transportId(),
+      ...this.wireSourceFields(),
+    });
     child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method, params })}\n`);
   }
 
@@ -404,6 +561,28 @@ export class DshAcpClient {
       this.protocolFailure(child, new Error('DSH ACP emitted an unrecognized JSON-RPC frame'));
       return;
     }
+    this.handleNotification(child, method, message);
+  }
+
+  private handleNotification(child: ChildProcessWithoutNullStreams, method: string, message: JsonRpcMessage): void {
+    if (method === 'config/extensions/update') {
+      if (this.child !== child) return;
+      if (!isRecord(message.params)) {
+        this.protocolFailure(child, new Error('DSH emitted an invalid configuration update notification'));
+        return;
+      }
+      this.observe({
+        direction: 'in',
+        kind: 'notification',
+        method,
+        bytes: byteSize(message.params),
+        transport: this.transportId(),
+        ...this.wireSourceFields(),
+        detail: { keys: Object.keys(message.params).slice(0, 12) },
+      });
+      this.options.onControlUpdate?.(message.params as DshJsonObject);
+      return;
+    }
     if (method !== 'session/update') return;
     const params = isRecord(message.params) ? message.params : null;
     const update = isRecord(params?.update) ? params.update : null;
@@ -411,6 +590,18 @@ export class DshAcpClient {
       this.protocolFailure(child, new Error('DSH ACP emitted an invalid session/update notification'));
       return;
     }
+    this.observe({
+      direction: 'in',
+      kind: 'notification',
+      method,
+      sessionId: params.sessionId,
+      sessionUpdate: typeof update.sessionUpdate === 'string' ? update.sessionUpdate : undefined,
+      bytes: byteSize(message.params),
+      transport: this.transportId(),
+      ...this.wireSourceFields(),
+      backendTimeMs: typeof update.time === 'number' && Number.isFinite(update.time) ? update.time : undefined,
+      detail: extractDshSessionUpdateDetail(update as DshJsonObject),
+    });
     this.refreshSessionActivity(params.sessionId);
     this.options.onUpdate?.({ sessionId: params.sessionId, update: update as DshJsonObject });
   }
@@ -432,13 +623,70 @@ export class DshAcpClient {
         pending.reject(new Error(`DSH ACP ${pending.method} returned an invalid error`));
         return;
       }
-      pending.reject(new Error(`DSH ACP request failed (${String(error.code ?? 'unknown')}): ${String(error.message ?? 'unknown error')}`));
+      const failure = `DSH ACP request failed (${String(error.code ?? 'unknown')}): ${String(error.message ?? 'unknown error')}`;
+      this.observe({
+        direction: 'in',
+        kind: 'response',
+        method: pending.method,
+        requestId: id,
+        sessionId: pending.sessionId,
+        ok: false,
+        durationMs: Date.now() - pending.startedAt,
+        bytes: byteSize(error),
+        transport: this.transportId(),
+        ...this.wireSourceFields(),
+        // Metadata-only contract: the raw message text (which can embed
+        // prompt/config fragments) stays on the user-facing rejection only;
+        // the trace gets a fixed classification token plus the numeric code.
+        error: 'rpc-error',
+        ...(typeof error.code === 'number' && Number.isFinite(error.code) ? { errorCode: error.code } : {}),
+      });
+      pending.reject(new Error(failure));
       return;
     }
+    this.observe({
+      direction: 'in',
+      kind: 'response',
+      method: pending.method,
+      requestId: id,
+      // Trace-only attribution: session/new|resume results carry the session id
+      // the pending map never sees (its gap-rearm extraction is prompt-only).
+      sessionId: pending.sessionId ?? sessionIdOfResult(message.result),
+      ok: true,
+      durationMs: Date.now() - pending.startedAt,
+      bytes: byteSize(message.result),
+      transport: this.transportId(),
+      ...this.wireSourceFields(),
+      // Strict stopReason enum: an RPC-ok envelope is a receipt, and only the
+      // harness-reported reason can say how the turn actually ended.
+      ...(stopReasonOfResult(message.result) !== undefined ? { stopReason: stopReasonOfResult(message.result) } : {}),
+    });
     pending.resolve((message.result ?? null) as DshJsonValue);
   }
 
+  private observeServerRequest(id: number | string, method: string, params: unknown): void {
+    if (isRecord(params)) {
+      this.observe({
+        direction: 'in',
+        kind: 'server-request',
+        method,
+        requestId: id,
+        sessionId: typeof params.sessionId === 'string' ? params.sessionId : undefined,
+        bytes: byteSize(params),
+        transport: this.transportId(),
+        ...this.wireSourceFields(),
+        // Metadata only: option counts and question counts, never tool input.
+        detail: method === 'session/request_permission' && Array.isArray(params.options)
+          ? { optionCount: params.options.length }
+          : method === 'session/request_question' && Array.isArray(params.questions)
+            ? { questionCount: params.questions.length }
+            : undefined,
+      });
+    }
+  }
+
   private async handleServerRequest(child: ChildProcessWithoutNullStreams, id: number | string, method: string, params: unknown): Promise<void> {
+    this.observeServerRequest(id, method, params);
     if (method === 'session/request_question' && this.options.onQuestionRequest && isRecord(params)) {
       try { this.writeResponse(child, id, await this.options.onQuestionRequest(params as DshJsonObject)); }
       catch (error) { this.writeResponse(child, id, undefined, { code: -32602, message: error instanceof Error ? error.message : 'Invalid Harness question' }); }
@@ -484,12 +732,35 @@ export class DshAcpClient {
     error?: { code: number; message: string },
   ): void {
     if (this.child !== child || child.stdin.destroyed) return;
+    this.observe({
+      direction: 'out',
+      kind: 'server-reply',
+      requestId: id,
+      ok: !error,
+      bytes: 0,
+      transport: this.transportId(),
+      ...this.wireSourceFields(),
+      // Metadata-only contract: handler error text stays on the wire reply to
+      // the harness; the trace gets a fixed token plus the numeric code.
+      ...(error ? { error: 'server-reply-error', errorCode: error.code } : {}),
+    });
     child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, ...(error ? { error } : { result }) })}\n`);
   }
 
   private protocolFailure(child: ChildProcessWithoutNullStreams, error: Error): void {
     if (this.child !== child) return;
     const surfaced = this.withStderrTail(error);
+    this.observe({
+      direction: 'in',
+      kind: 'connection',
+      method: 'error',
+      bytes: 0,
+      transport: this.transportId(),
+      ...this.wireSourceFields(),
+      // The surfaced message (which embeds the stderr tail) stays on the
+      // user-facing onProtocolError path; the trace records a fixed token.
+      error: 'protocol-failure',
+    });
     this.options.onProtocolError?.(surfaced);
     // Pending rejections carry the tail too: startup failures surface through
     // the initialize rejection, and the suffix cannot break the prefix-anchored
@@ -511,6 +782,17 @@ export class DshAcpClient {
     this.started = false;
     this.activeSessions.clear();
     const surfaced = this.withStderrTail(error);
+    this.observe({
+      direction: 'in',
+      kind: 'connection',
+      method: 'closed',
+      bytes: 0,
+      transport: this.transportId(),
+      ...this.wireSourceFields(),
+      // Same split as protocolFailure: full diagnostic text only for the
+      // user-facing path; the trace keeps a fixed classification token.
+      error: 'transport-closed',
+    });
     this.failAll(surfaced);
     this.options.onProtocolError?.(surfaced);
   }
@@ -518,6 +800,23 @@ export class DshAcpClient {
   /** Last captured stderr lines, secret-shaped runs redacted. */
   get recentStderr(): string {
     return redactSecrets(this.stderrTail);
+  }
+
+  /**
+   * Forwards a whitelisted wire record to the injected trace observer. Every
+   * observer failure is absorbed here: tracing must never affect the chat
+   * transport, and an absent hook keeps this a no-op.
+   */
+  private observe(record: DshWireRecord): void {
+    try {
+      this.options.trace?.observer.recordWireEvent(record);
+    } catch {
+      // Trace sink failures are diagnostics-only.
+    }
+  }
+
+  private transportId(): DshTransportId {
+    return this.options.trace?.transport ?? 'acp';
   }
 
   private withStderrTail(error: Error): Error {
@@ -602,6 +901,33 @@ function isPermissionResponse(value: unknown, optionIds: ReadonlySet<string>): v
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/** Trace-only session attribution for RPC results that confirm a session id. */
+function sessionIdOfResult(result: unknown): string | undefined {
+  if (!isRecord(result)) return undefined;
+  return typeof result.sessionId === 'string' && result.sessionId ? result.sessionId : undefined;
+}
+
+/**
+ * Trace-only strict stopReason extraction for session/prompt results. Values
+ * outside the ACP enum are omitted so arbitrary result text cannot enter a
+ * trace, and the service never has to guess execution completion from `ok`.
+ */
+function stopReasonOfResult(result: unknown): string | undefined {
+  if (!isRecord(result)) return undefined;
+  const stopReason = result.stopReason;
+  return typeof stopReason === 'string' && TRACE_STOP_REASONS.has(stopReason) ? stopReason : undefined;
+}
+
+/** Wire-frame byte size for trace records; malformed values count as zero. */
+function byteSize(value: unknown): number {
+  if (value === undefined) return 0;
+  try {
+    return Buffer.byteLength(JSON.stringify(value) ?? '', 'utf8');
+  } catch {
+    return 0;
+  }
 }
 
 /** Collapse credential-shaped runs before stderr text is surfaced in errors. */

@@ -42,23 +42,68 @@ export function validateDshMcpServers(value: unknown): DshMcpServer[] {
       throw new Error('Invalid DSH MCP server name');
     if (names.has(entry.name)) throw new Error('Duplicate DSH MCP server name');
     names.add(entry.name);
+    const advanced = validateDshMcpServerOptions(entry);
+    const workingDirectory = validateDshMcpWorkingDirectory(entry.cwd, entry.type === 'http');
     if (entry.type === 'http') {
       let url: URL;
       try { url = new URL(String(entry.url)); } catch { throw new Error('Invalid DSH MCP HTTP URL'); }
       if (!['http:', 'https:'].includes(url.protocol) || typeof entry.url !== 'string' || /[\r\n\0]/.test(entry.url))
         throw new Error('DSH MCP requires an absolute HTTP(S) URL');
-      return { type: 'http', name: entry.name, url: entry.url, headers: strings(entry.headers ?? [], true) };
+      return { type: 'http', name: entry.name, url: entry.url, headers: strings(entry.headers ?? [], true), ...advanced };
     }
     if (entry.type !== undefined && entry.type !== 'stdio') throw new Error('Unsupported DSH MCP transport');
     if (typeof entry.command !== 'string' || !path.isAbsolute(entry.command) || /[\r\n\0]/.test(entry.command))
       throw new Error('DSH MCP command must be an absolute executable path');
     if (!Array.isArray(entry.args) || !entry.args.every((arg) => typeof arg === 'string' && !arg.includes('\0')))
       throw new Error('DSH MCP arguments must be strings');
-    return { name: entry.name, command: entry.command, args: [...entry.args] as string[], env: strings(entry.env ?? []) };
+    return { name: entry.name, command: entry.command, args: [...entry.args] as string[], env: strings(entry.env ?? []),
+      ...workingDirectory, ...advanced };
   });
 }
 
-function dshImageBlock(mediaType: unknown, data: unknown): DshJsonObject {
+function validateDshMcpWorkingDirectory(value: unknown, http: boolean): { cwd?: string } {
+  if (value === undefined) return {};
+  if (http) throw new Error('DSH MCP HTTP servers cannot set a process working directory');
+  if (typeof value !== 'string' || !path.isAbsolute(value) || /[\r\n\0]/.test(value))
+    throw new Error('DSH MCP working directory must be an absolute path');
+  return { cwd: value };
+}
+
+function validateDshMcpServerOptions(entry: Record<string, unknown>): Pick<DshMcpServer,
+  'toolCallTimeoutMs' | 'failOnStartupError' | 'maxInstructionBytes' | 'reconnect'> {
+  const integer = (value: unknown, field: string, maximum = Number.MAX_SAFE_INTEGER): number => {
+    if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1 || value > maximum)
+      throw new Error(`Invalid DSH MCP ${field}`);
+    return value;
+  };
+  const timer = (value: unknown, field: string): number => {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value > 2_147_483_647)
+      throw new Error(`Invalid DSH MCP ${field}`);
+    return value;
+  };
+  const boolean = (value: unknown, field: string): boolean => {
+    if (typeof value !== 'boolean') throw new Error(`Invalid DSH MCP ${field}`);
+    return value;
+  };
+  const result: Pick<DshMcpServer, 'toolCallTimeoutMs' | 'failOnStartupError' | 'maxInstructionBytes' | 'reconnect'> = {};
+  if (entry.toolCallTimeoutMs !== undefined) result.toolCallTimeoutMs = timer(entry.toolCallTimeoutMs, 'toolCallTimeoutMs');
+  if (entry.maxInstructionBytes !== undefined) result.maxInstructionBytes = integer(entry.maxInstructionBytes, 'maxInstructionBytes');
+  if (entry.failOnStartupError !== undefined) result.failOnStartupError = boolean(entry.failOnStartupError, 'failOnStartupError');
+  if (entry.reconnect !== undefined) {
+    if (!isRecord(entry.reconnect) || Object.keys(entry.reconnect).some((key) => !['enabled', 'initialDelayMs', 'maxDelayMs', 'maxAttempts'].includes(key)))
+      throw new Error('Invalid DSH MCP reconnect policy');
+    const reconnect: NonNullable<DshMcpServer['reconnect']> = {};
+    if (entry.reconnect.enabled !== undefined) reconnect.enabled = boolean(entry.reconnect.enabled, 'reconnect.enabled');
+    if (entry.reconnect.initialDelayMs !== undefined) reconnect.initialDelayMs = timer(entry.reconnect.initialDelayMs, 'reconnect.initialDelayMs');
+    if (entry.reconnect.maxDelayMs !== undefined) reconnect.maxDelayMs = timer(entry.reconnect.maxDelayMs, 'reconnect.maxDelayMs');
+    if (entry.reconnect.maxAttempts !== undefined) reconnect.maxAttempts = integer(entry.reconnect.maxAttempts, 'reconnect.maxAttempts');
+    if ((reconnect.initialDelayMs ?? 500) > (reconnect.maxDelayMs ?? 30_000)) throw new Error('Invalid DSH MCP reconnect delay bounds');
+    result.reconnect = reconnect;
+  }
+  return result;
+}
+
+export function dshImageBlock(mediaType: unknown, data: unknown): DshJsonObject {
   if (typeof mediaType !== 'string' || !['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(mediaType)
     || typeof data !== 'string' || !data.length || data.length > 28 * 1024 * 1024
     || data.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data)

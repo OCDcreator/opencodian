@@ -68,7 +68,7 @@ describe('SETTINGS_PRIMARY_TABS', () => {
   it('has valid i18n keys for every secondary tab label', () => {
     for (const tab of SETTINGS_PRIMARY_TABS) {
       for (const secondary of tab.secondaryTabs) {
-        expect(secondary.labelKey).toMatch(/^settings\.\w+\.tab\.\w+$/);
+        expect(secondary.labelKey).toMatch(/^settings\.\w+\.(?:tab|tabs)\.\w+$/);
       }
     }
   });
@@ -117,8 +117,6 @@ describe('SETTINGS_PRIMARY_TABS', () => {
       'agents',
       'permissions',
       'mcp',
-      'resources',
-      'context',
       'advanced',
     ]);
     expect(getPrimaryTabDefinition('conversation')!.secondaryTabs.some((tab) => tab.id === 'title')).toBe(false);
@@ -130,8 +128,12 @@ describe('SETTINGS_PRIMARY_TABS', () => {
     expect(dshTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual([
       'connection',
       'model',
+      'permissions',
+      'context',
+      'tools',
       'mcp',
       'configuration',
+      'advanced',
     ]);
   });
 
@@ -164,20 +166,17 @@ describe('SETTINGS_PRIMARY_TABS', () => {
 
     expect(claudeTab).toBeDefined();
     expect(claudeTab!.labelKey).toBe('settings.claudeCode.title');
-    expect(claudeTab!.defaultSecondaryTabId).toBe('runtime');
+    expect(claudeTab!.defaultSecondaryTabId).toBe('conversation');
     expect(claudeTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual([
-      'runtime',
+      'conversation',
       'providers',
-      'model-thinking',
-      'permissions',
-      'context-sources',
-      'tools',
-      'mcp',
-      'skills-commands',
-      'agents',
+      'tools-context',
+      'permissions-safety',
+      'resources',
+      'connection',
       'debug',
     ]);
-    expect(claudeTab!.secondaryTabs.some((secondaryTab) => secondaryTab.id === 'resources')).toBe(false);
+    expect(claudeTab!.secondaryTabs.some((secondaryTab) => secondaryTab.id === 'resources')).toBe(true);
   });
 
   it('splits formatter settings into formatter and language server secondary tabs', () => {
@@ -242,9 +241,21 @@ describe('resolveSecondaryTabId', () => {
     expect(resolveSecondaryTabId('general', 'backend')).toBe('agents');
     expect(resolveSecondaryTabId('conversation', 'rendering')).toBe('display');
     expect(resolveSecondaryTabId('security', 'permissions')).toBe('config');
-    expect(resolveSecondaryTabId('claude-code', 'mcp-advanced')).toBe('mcp');
-    expect(resolveSecondaryTabId('claude-code', 'limits')).toBe('runtime');
-    expect(resolveSecondaryTabId('claude-code', 'resources')).toBe('skills-commands');
+    expect(resolveSecondaryTabId('claude-code', 'mcp-advanced')).toBe('tools-context');
+    expect(resolveSecondaryTabId('claude-code', 'limits')).toBe('permissions-safety');
+    expect(resolveSecondaryTabId('claude-code', 'resources')).toBe('resources');
+    expect(resolveSecondaryTabId('claude-code', 'model-thinking')).toBe('conversation');
+    expect(resolveSecondaryTabId('claude-code', 'runtime')).toBe('connection');
+    expect(resolveSecondaryTabId('codex', 'model')).toBe('conversation');
+    expect(resolveSecondaryTabId('codex', 'permissions')).toBe('permissions-safety');
+    expect(resolveSecondaryTabId('codex', 'project-config')).toBe('connection');
+    expect(resolveSecondaryTabId('pi', 'advanced')).toBe('execution');
+    expect(resolveSecondaryTabId('pi', 'resources')).toBe('sessions');
+    expect(resolveSecondaryTabId('dsh', 'extensions')).toBe('configuration');
+    expect(resolveSecondaryTabId('dsh', 'terminal')).toBe('advanced');
+    expect(resolveSecondaryTabId('dsh', 'configuration')).toBe('configuration');
+    expect(resolveSecondaryTabId('opencode2', 'resources')).toBe('advanced');
+    expect(resolveSecondaryTabId('opencode2', 'context')).toBe('advanced');
     expect(resolveSecondaryTabId('debug', 'general')).toBe('plugin');
     expect(resolveSecondaryTabId('debug', 'modules')).toBe('plugin');
     expect(resolveSecondaryTabId('debug', 'logs')).toBe('export');
@@ -301,10 +312,10 @@ describe('getActiveSecondaryTabId', () => {
     expect(getActiveSecondaryTabId('server', { ...saved, model: 'tools' })).toBe('auth');
   });
 
-  it('regression: persisted limits selection migrates to runtime', () => {
+  it('regression: persisted limits selection stays with the current permissions and limits task', () => {
     const saved = { 'claude-code': 'limits' };
     const result = getActiveSecondaryTabId('claude-code', saved);
-    expect(result).toBe('runtime');
+    expect(result).toBe('permissions-safety');
   });
 });
 

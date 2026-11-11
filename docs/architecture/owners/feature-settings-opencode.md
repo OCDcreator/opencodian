@@ -31,6 +31,7 @@ Pricing readiness (2026-09-10): CostEstimateSettingsRow can refresh backend-spec
 ## Focused tests
 - `tests/unit/features/settings/**Opencode*`
 - `tests/unit/features/settings/**Server*`
+- `tests/unit/features/settings/SettingsOpenCode2Recovery.test.ts`（saved configContent 恢复历史：真实 store + 真实 fs fixtures）
 
 ## Required gates
 Run before merge: `npm run typecheck`, `npm run module-docs`.
@@ -70,3 +71,14 @@ Settings expose OpenCode 1 and 2 separately and provide local executable or remo
 > 2026-10-27：`SettingsBackendSection` 只保留默认后端、启用开关与预热策略；OpenCode 2 连接/认证/MCP/资源工作区同 owner 托管（避免新增 settings SCC 成员）；catalog 失败使用固定脱敏分类。
 
 2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `feature.settings-opencode` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。
+
+## 2026-11-08 saved configContent 恢复历史（机器本地应用历史）
+
+高级页新增 saved `configContent` 恢复披露；owner 边界不变——本 owner 只组装 UI 与保存编排，durable 副本全部委托给 `core.agents.backend.configuration.BackendConfigRecoveryStore`（core.backend configuration 家族）。非显然约束：
+
+- **保存源 vs 应用历史**：vault 内插件设置的 `configContent` 是唯一保存源（随 vault 同步）；机器本地归档是密钥敏感的应用历史，仅用于本机恢复，两者永不混写。
+- **身份与隔离**：`backendRecoveryIdentity(vaultPath, 'opencode2:configContent')` = sha256(`resolve(vaultPath)\nkind`)，要求绝对 vaultPath；无稳定 vault 路径 → 恢复不可用（fail-closed，不写不列）；不同 vault 不共享命名空间。
+- **私有性限制**：机器本地根 `~/.opencodian/backend-config-recovery`，目录 0700 / 文件 0600，每目标 5 槽位、最旧由 rename 顶替（无递归删除）；symlink 或权限放宽的路径在列表与写入时都拒绝；写入走 `wx`+uuid 临时文件原子 rename。
+- **revision CAS**：`revision` = 归档字节 sha256；列表元数据（时间/字节，"contents hidden"）只读，密钥不进 UI；打开列表时锁定当前保存源的 revision，Confirm 与变更同一同步点复检，stale 时拒绝且不 save、不 adapter apply、不归档。恢复确认保持保存基线为当前值、仅草稿采用快照，重进 `validateConfigContent` 验证路径；applyDraft 在保存成功后归档被顶替值（undo-of-undo，含空 overlay）。
+- **失败语义**：save 失败 → 不归档；validate+save 成功但归档 IO 失败 → 保留新值并报 saved-but-history-unavailable，不回滚、不谎报 apply 失败；列表读取失败（unsafe base）→ 历史降级为 `settings.backend.recovery.unavailable`，advanced tab 保持可用。
+- 恢复文案已并入 en/zh locales（22 个 recovery 键 + 通用 unavailable/applyFailed，parent humanized + merged）；验证测试为 `tests/unit/features/settings/SettingsOpenCode2Recovery.test.ts`（9 用例全绿），fixtures 为任务创建、保留于 worktree `node_modules/.cache/` 下的真实 fs 目录。

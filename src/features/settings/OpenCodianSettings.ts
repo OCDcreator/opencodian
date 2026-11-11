@@ -239,6 +239,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.sectionCoordinator.prepareScrollToSectionOnNextOpen(t('settings.claudeCode.title'));
   }
 
+  prepareScrollToDsh(secondary: 'advanced' | 'configuration' = 'advanced'): void {
+    this.getOrCreateTabbedRenderer().switchToPrimaryTab('dsh', secondary);
+    if (this.plugin.settings.settingsLayoutMode !== 'tabbed') {
+      this.sectionCoordinator.prepareScrollToSectionOnNextOpen(t('settings.dsh.title'));
+    }
+  }
+
   prepareScrollToLspOnNextOpen(): void {
     if (this.plugin.settings.settingsLayoutMode === 'tabbed') {
       this.getOrCreateTabbedRenderer().switchToPrimaryTab('formatter', 'lsp');
@@ -769,6 +776,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   // ─── Shared helpers ────────────────────────────────────────────────
 
   hide(): void {
+    this.tabbedRenderer?.disposeActiveBackendSections();
     this.pluginUpdateSection?.dispose();
     this.pluginUpdateSection = null;
     this.pricingSubscription?.dispose();

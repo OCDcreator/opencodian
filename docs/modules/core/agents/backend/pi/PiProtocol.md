@@ -24,3 +24,7 @@
 ## Goal 与会话工作台（2026-10-30）
 
 SDK 工作台白名单加入 get_goal/control_goal，仍只允许命名协议，不反射任意 SDK 方法。
+
+## 持久化配置历史（2026-11-08）
+
+新增可选配置命令 `PI_OPTIONAL_CONFIG_COMMANDS = ['get_configuration_history', 'restore_configuration']`（assets/pi/configuration.mjs 同步实现）。关键约束：二者**不加入** `PI_CONFIG_COMMANDS`——运行时握手要求必需命令全部出现在 get_state.commands，因此加入会使旧打包资产启动失败；新命令只进入 `PiCommandName` 公共 union，由 `PiSessionRuntime.getAdvertisedCommands` 做特性探测。`PiConfigurationHistoryEntry{index,savedAt,revision,bytes}` / `PiConfigurationHistoryTarget{path,key,entries}` / `PiConfigurationHistory{models,settings:{global,project}}` / `PiConfigurationRestoreRequest{target,scope?,index,archivedRevision,revision}` 为稳定 UI 契约（恢复身份 = 归档字节 sha256 + 当前 revision CAS，索引单独不足以防轮转竞态）。列表响应永不含配置值，密钥不进插件内存。`PiConfigurationHistorySupport.test.ts` 校验握手最小集不变、新旧资产双向兼容、adapter 对旧资产的诚实降级与畸形 payload 拒绝。

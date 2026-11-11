@@ -1,3 +1,5 @@
+import { Setting } from 'obsidian';
+
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { SettingsOpenCode2Section } from '../../../../src/features/settings/backends/opencode/SettingsBackendSection';
 import { getPrimaryTabDefinition, resolveSecondaryTabId } from '../../../../src/features/settings/settingsLayoutRegistry';
@@ -36,15 +38,32 @@ function edit(container: HTMLElement, selector: string, value: string) {
   input.dispatchEvent(new Event(input.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));
 }
 
+/** Drives one native radio card from the shared backend choice control. */
+function choose(container: HTMLElement, key: string, value: string): HTMLInputElement {
+  const radio = container.querySelector<HTMLInputElement>(
+    `.opencodian-backend-choice-group[data-backend-key="${key}"] input[value="${value}"]`,
+  );
+  expect(radio).not.toBeNull();
+  radio!.checked = true;
+  radio!.dispatchEvent(new Event('change', { bubbles: true }));
+  return radio!;
+}
+
 describe('OpenCode 2 functional settings workspace', () => {
   beforeEach(() => { document.body.innerHTML = ''; setLocale('en'); });
+  afterEach(() => { jest.restoreAllMocks(); });
 
-  it('defines all eight pages, embedded branding, and migration of old authentication links', () => {
+  it('defines six pages, embedded branding, and migration of retired secondary tabs', () => {
     const tab = getPrimaryTabDefinition('opencode2')!;
     expect(tab.icon).toBe('opencodian-opencode2');
-    expect(tab.secondaryTabs.map(({ id }) => id)).toEqual(['connection', 'model', 'agents', 'permissions', 'mcp', 'resources', 'context', 'advanced']);
+    expect(tab.secondaryTabs.map(({ id }) => id)).toEqual(['connection', 'model', 'agents', 'permissions', 'mcp', 'advanced']);
     expect(resolveSecondaryTabId('opencode2', 'auth')).toBe('model');
     expect(resolveSecondaryTabId('opencode2', 'integrations')).toBe('model');
+    expect(resolveSecondaryTabId('opencode2', 'models')).toBe('model');
+    expect(resolveSecondaryTabId('opencode2', 'extensions')).toBe('mcp');
+    expect(resolveSecondaryTabId('opencode2', 'resources')).toBe('advanced');
+    expect(resolveSecondaryTabId('opencode2', 'context')).toBe('advanced');
+    expect(resolveSecondaryTabId('opencode2', 'catalog')).toBe('advanced');
   });
 
   it('automatically reads and shares the native catalog across page instances', async () => {
@@ -64,7 +83,7 @@ describe('OpenCode 2 functional settings workspace', () => {
     let finish!: (value: unknown) => void;
     adapter.readManagementCatalog.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
     const first = mount(host, 'model');
-    const second = mount(host, 'context');
+    const second = mount(host, 'advanced');
     expect(adapter.readManagementCatalog).toHaveBeenCalledTimes(1);
     finish({ integrations: [], mcp: [], agents: [], skills: [], commands: [], plugins: [] });
     await settle();
@@ -79,9 +98,9 @@ describe('OpenCode 2 functional settings workspace', () => {
     edit(models, '[data-config-path="model"] select', 'openai/model-b');
     expect(host.saveSettings).not.toHaveBeenCalled();
     models.remove();
-    const context = mount(host, 'context');
-    edit(context, '[data-config-path="compaction.auto"] select', 'false');
-    context.querySelector<HTMLButtonElement>('[data-action="apply"]')!.click();
+    const advanced = mount(host, 'advanced');
+    edit(advanced, '[data-config-path="compaction.auto"] select', 'false');
+    advanced.querySelector<HTMLButtonElement>('[data-action="apply"]')!.click();
     await settle();
     const applied = adapter.validateConfigContent.mock.calls[0][0];
     expect(applied).toContain('// keep this comment');
@@ -136,15 +155,15 @@ describe('OpenCode 2 functional settings workspace', () => {
   it('keeps the draft on failed application and does not report it as effective', async () => {
     const { host, adapter } = createHost();
     adapter.validateConfigContent.mockRejectedValueOnce(new Error('private token value'));
-    const context = mount(host, 'context');
+    const advanced = mount(host, 'advanced');
     await settle();
-    edit(context, '[data-config-path="compaction.auto"] select', 'false');
-    context.querySelector<HTMLButtonElement>('[data-action="apply"]')!.click();
+    edit(advanced, '[data-config-path="compaction.auto"] select', 'false');
+    advanced.querySelector<HTMLButtonElement>('[data-action="apply"]')!.click();
     await settle();
     expect(host.saveSettings).not.toHaveBeenCalled();
-    expect(context.textContent).not.toContain('private token value');
-    expect(context.textContent).toContain('Apply or save failed');
-    expect(context.querySelector<HTMLSelectElement>('[data-config-path="compaction.auto"] select')!.value).toBe('false');
+    expect(advanced.textContent).not.toContain('private token value');
+    expect(advanced.textContent).toContain('Apply or save failed');
+    expect(advanced.querySelector<HTMLSelectElement>('[data-config-path="compaction.auto"] select')!.value).toBe('false');
   });
 
   it('does not overwrite an externally changed overlay with the page draft', async () => {
@@ -154,9 +173,83 @@ describe('OpenCode 2 functional settings workspace', () => {
     edit(models, '[data-config-path="model"] select', 'openai/model-b');
     host.settings.backendSettings.opencode2.configContent = '{"external":true}';
     models.remove();
-    const next = mount(host, 'context');
+    const next = mount(host, 'advanced');
     expect(next.textContent).toContain('configuration changed elsewhere');
     expect(next.querySelector<HTMLButtonElement>('[data-action="apply"]')!.disabled).toBe(true);
     expect(adapter.validateConfigContent).not.toHaveBeenCalled();
+  });
+
+  it('saves the permission mode plugin choice without touching the overlay', async () => {
+    const { host } = createHost();
+    const permissions = mount(host, 'permissions');
+    await settle();
+    const group = permissions.querySelector('.opencodian-backend-choice-group[data-backend-key="permissionMode"]');
+    expect(group?.getAttribute('role')).toBe('radiogroup');
+    const inherit = group!.querySelector<HTMLInputElement>('input[value="inherit"]')!;
+    expect(inherit.checked).toBe(true);
+    choose(permissions, 'permissionMode', 'yolo');
+    await settle();
+    expect(host.settings.backendSettings.opencode2.permissionMode).toBe('yolo');
+    expect(host.saveSettings).toHaveBeenCalledTimes(1);
+    expect(permissions.querySelector('[data-backend-effect="next-turn"]')).not.toBeNull();
+  });
+
+  it('reveals the custom executable input only after choosing custom', async () => {
+    const { host } = createHost();
+    jest.spyOn(Setting.prototype, 'setName').mockImplementation(function (this: Setting, name: string) {
+      (this as Setting & { __name?: string }).__name = name;
+      return this;
+    });
+    const textHandlers = new Map<string, (value: string) => Promise<void>>();
+    jest.spyOn(Setting.prototype, 'addText').mockImplementation(function (this: Setting, callback) {
+      const inputEl = this.controlEl.createEl('input');
+      const input = {
+        inputEl,
+        setPlaceholder: jest.fn().mockReturnThis(),
+        setValue: jest.fn().mockReturnThis(),
+        onChange: jest.fn((handler: (value: string) => Promise<void>) => {
+          textHandlers.set((this as Setting & { __name?: string }).__name ?? '', handler);
+          return input;
+        }),
+      };
+      callback(input as never);
+      return this;
+    });
+    const connection = mount(host, 'connection');
+    await settle();
+    expect(connection.querySelector('input[aria-label="CLI executable"]')).toBeNull();
+    choose(connection, 'executablePath', 'custom');
+    await settle();
+    expect(connection.querySelector('input[aria-label="CLI executable"]')).not.toBeNull();
+    await textHandlers.get('CLI executable')!('/usr/local/bin/opencode2 ');
+    expect(host.settings.backendSettings.opencode2.executablePath).toBe('/usr/local/bin/opencode2');
+    expect(host.saveSettings).toHaveBeenCalled();
+  });
+
+  it('switches connection mode through choice cards and refreshes the surface', async () => {
+    const { host } = createHost();
+    const requestDisplayRefresh = jest.fn();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    new SettingsOpenCode2Section({ plugin: host, requestDisplayRefresh, renderTitleSettings: jest.fn() })
+      .attachTabbed(container, 'connection');
+    await settle();
+    expect(container.querySelector('[data-backend-key="mode"] input[value="local"]')!.checked).toBe(true);
+    choose(container, 'mode', 'remote');
+    await settle();
+    expect(host.settings.backendSettings.opencode2.mode).toBe('remote');
+    expect(host.saveSettings).toHaveBeenCalled();
+    expect(requestDisplayRefresh).toHaveBeenCalled();
+  });
+
+  it('offers catalog agents as default agent choices with inherit first', async () => {
+    const { host } = createHost();
+    const agents = mount(host, 'agents');
+    await settle();
+    const select = agents.querySelector<HTMLSelectElement>('[data-config-path="default_agent"] select');
+    expect(select).not.toBeNull();
+    expect(select!.options[0].value).toBe('');
+    expect(select!.options[0].textContent).toContain('Inherit');
+    expect(Array.from(select!.options).some((option) => option.value === 'build')).toBe(true);
   });
 });

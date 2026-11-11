@@ -2,6 +2,8 @@
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 - 2026-09-13 (universal memory backend): owner manifest gained `core.memory` and `app.memory-runtime`; this owner's boundary itself is unchanged (no source touched, allowlist untouched).
 
+2026-11-10（第四后端 port `dsh`——DSH wire trace 实施机制已冻结，独立复核/宿主验收待完成）：coordinator 追加构造并持有 `DshSessionTraceService`：构造顺序钉在 OpenCode → Codex → Claude 之后的最后一位，fail-closed（settings getter 未开启任一 transport 门时 store 为 disabled；`dshSettings` 未提供时使用全关缺省 getter）；`ports` 增加 typed property `dsh`（仍无泛型 service map），`dispose()` 以 OpenCode → Codex → Claude → DSH 顺序逐个 await（fail-closed warn，不阻塞 unload）；部分构造失败时对已构造服务 best-effort dispose。事件边界：会话绑定与回合生命周期只从 wire 记录推导，事件仅 metadata/lifecycle/timing——严格字段白名单、无 raw prompt/credential/config、无 content capture、stderr 不采集，事件带 `source@generation` 身份、时长一律 client-observed，不表述为官方执行时长。observer 注入边界：本 owner 只构造、持有并以 typed port 暴露该 service；wire observer 由组合层（main.ts）经 `AgentAdapterWiring` 的 `dshTracePort` 注入 adapter 的 client 工厂，本 owner 不直接接触 DSH adapter/client，也不依赖 chat/settings 消费者；settings/knownSecrets/runtimeMetadata getter 由组合层惰性提供，本 owner 不解析凭据、不合并第四后端的事件 schema 或内部状态。
+
 > **Layer:** app
 > **Risk:** high
 > **Required gates:** diagnostics-safety, typecheck, module-docs

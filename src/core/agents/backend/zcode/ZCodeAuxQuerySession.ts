@@ -10,8 +10,12 @@
  * a private `ZCODE_STORAGE_DIR` for its whole lifetime.
  *
  * Read-only is proved by the runtime, not by the prompt: the create/send
- * requests use an empty native tool allowlist, then the first persisted user
- * message is read back and its `info.tools` object must be empty.  Every turn
+ * requests use an empty native tool allowlist, then the persisted real-prompt
+ * user message — the only new user message carrying the `info.tools` allowlist
+ * echo — is read back and that object must be empty.  Runtimes since 3.17 also
+ * persist runtime-written synthetic `system_reminder` user messages
+ * (`synthetic: true`, no `tools` field); they never substitute for the proof
+ * and an unexplained tools-less user message still fails closed.  Every turn
  * also audits native tool events and the turn tool count.  A missing or
  * widening readback tears down the session immediately.
  */
@@ -102,6 +106,17 @@ function asString(value: unknown): string {
 function messageIdentity(info: Record<string, unknown>): NativeMessageIdentity | null {
   const id = asString(info['id']) || asString(info['messageId']);
   return id || null;
+}
+
+/**
+ * Only the runtime's own synthetic marker tolerates a tools-less user message:
+ * the host cannot set `synthetic` (it arrives on runtime-written
+ * `system_reminder` rows, `visibility: 'model-only'`). The marker alone is
+ * deliberately not read as emptiness — it only explains a tools-less row while
+ * the authoritative `info.tools` echo of the real prompt is still pending.
+ */
+function isRuntimeSyntheticUserMessage(info: Record<string, unknown>): boolean {
+  return info['synthetic'] === true;
 }
 
 function createOwnedScope(tempParent?: string): OwnedScope {
@@ -508,16 +523,27 @@ export class ZCodeAuxQuerySession implements AuxQuerySession {
           const id = messageIdentity(info);
           return info['role'] === 'user' && id !== null && !priorUserMessageIds.has(id);
         });
-      // A stable current-turn identity prevents a follow-up from accepting the
-      // previous turn's empty tool readback while the new message persists.
-      if (newUsers.length > 1) return null;
-      const user = newUsers[0];
-      const info = asRecord(user?.['info']);
-      if (user && Object.prototype.hasOwnProperty.call(info, 'tools')) {
-        const tools = readToolNames(info['tools']);
-        return tools ? { tools, observed: true } : null;
+      // The real prompt message is the only new user message that carries the
+      // authoritative `info.tools` allowlist echo. Current runtimes additionally
+      // persist runtime-written synthetic `system_reminder` user messages that
+      // never carry it; a page holding only those means the prompt readback has
+      // not landed yet. A stable per-turn prompt identity prevents a follow-up
+      // from accepting the previous turn's empty tool readback.
+      const promptCandidates = newUsers.filter((message) => Object.prototype.hasOwnProperty.call(asRecord(message['info']), 'tools'));
+      // Two simultaneous prompt readbacks cannot be attributed — fail closed.
+      if (promptCandidates.length > 1) return null;
+      const prompt = promptCandidates[0];
+      if (!prompt) {
+        // Any new user message that is neither the runtime-marked synthetic
+        // reminder nor the tools-carrying prompt keeps the turn unprovable.
+        const unexplained = newUsers.filter((message) => !isRuntimeSyntheticUserMessage(asRecord(message['info'])));
+        if (unexplained.length > 0) return null;
+        await wait(READBACK_POLL_MS);
+        continue;
       }
-      await wait(READBACK_POLL_MS);
+      const info = asRecord(prompt['info']);
+      const tools = readToolNames(info['tools']);
+      return tools ? { tools, observed: true } : null;
     }
     return null;
   }

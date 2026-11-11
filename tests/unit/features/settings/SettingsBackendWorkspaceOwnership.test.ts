@@ -86,16 +86,24 @@ describe('OpenCode 2 workspace ownership', () => {
 
   it('writes connection mode into OpenCode 2 settings, never the retired OpenCode 1 server settings', async () => {
     const plugin = createPlugin();
-    const controls = captureSettingControls();
+    captureSettingControls();
     const container = document.createElement('div');
+    document.body.appendChild(container);
     new SettingsOpenCode2Section({
       plugin: plugin as never,
       requestDisplayRefresh: jest.fn(),
       renderTitleSettings: jest.fn(),
     }).attachTabbed(container, 'connection');
+    for (let i = 0; i < 12; i++) await Promise.resolve();
 
     expect(plugin.settings.backendSettings.opencode2.mode).toBe('local');
-    await controls.getDropdown()?.change('remote');
+    const remote = container.querySelector<HTMLInputElement>(
+      '.opencodian-backend-choice-group[data-backend-key="mode"] input[value="remote"]',
+    );
+    expect(remote).not.toBeNull();
+    remote!.checked = true;
+    remote!.dispatchEvent(new Event('change', { bubbles: true }));
+    for (let i = 0; i < 12; i++) await Promise.resolve();
     expect(plugin.settings.backendSettings.opencode2.mode).toBe('remote');
     expect(plugin.settings.backendSettings.opencode.mode).toBeUndefined();
     expect(plugin.saveSettings).toHaveBeenCalledTimes(1);

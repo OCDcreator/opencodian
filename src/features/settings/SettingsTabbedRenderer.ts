@@ -9,16 +9,19 @@ import { type App, setIcon, Setting } from 'obsidian';
 import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
+import { getVaultBasePath } from '../../shared/vault';
 import { SettingsStyleSection } from './appearance/SettingsStyleSection';
 import { SettingsAcpSection } from './backends/acp/SettingsAcpSection';
 import { SettingsClaudeCodeSection } from './backends/claude/SettingsClaudeCodeSection';
 import { SettingsCodexSection } from './backends/codex/SettingsCodexSection';
+import type { SettingsDshSection } from './backends/dsh/SettingsDshSection';
 import { createSettingsDshSection, SettingsBackendSection, SettingsOpenCode2Section } from './backends/opencode/SettingsBackendSection';
 import { SettingsCommandsSection } from './backends/opencode/SettingsCommandsSection';
 import { SettingsServerSection } from './backends/opencode/SettingsServerSection';
 import { SettingsPiSection } from './backends/pi/SettingsPiSection';
 import { SettingsZCodeSection } from './backends/zcode/SettingsZCodeSection';
 import { SettingsCapabilityLabSection } from './capabilities/SettingsCapabilityLabSection';
+import { renderBackendSettingsWorkspace } from './controls/BackendSettingsWorkspace';
 import { SettingsDebugSection } from './debug/SettingsDebugSection';
 import { createClaudeTraceDiagnosticsPort, createCodexTraceDiagnosticsPort, createOpenCodeTraceDiagnosticsPort } from './debug/types';
 import { SettingsConversationSection } from './general/SettingsConversationSection';
@@ -61,6 +64,21 @@ interface SettingsBlockOptions {
 }
 
 type ServerStatus = ReturnType<OpenCodianPlugin['openCodeService']['getServerStatus']>;
+let settingsPanelSequence = 0;
+
+function enableManualTabNavigation(tablist: HTMLElement): void {
+  tablist.addEventListener('keydown', (event) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const tabs = Array.from(tablist.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+    const index = tabs.findIndex((tab) => tab === tablist.ownerDocument.activeElement);
+    if (index < 0 || !tabs.length) return;
+    event.preventDefault();
+    const target = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1
+      : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+    tabs[target].focus();
+    tabs[target].scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  });
+}
 
 export interface TabRendererDependencies {
   app: App;
@@ -100,6 +118,7 @@ export interface TabRendererDependencies {
 export class SettingsTabbedRenderer {
   private readonly deps: TabRendererDependencies;
   private activeCodexSection: SettingsCodexSection | null = null;
+  private activeDshSection: SettingsDshSection | null = null;
 
   constructor(deps: TabRendererDependencies) { this.deps = deps; }
 
@@ -143,14 +162,23 @@ export class SettingsTabbedRenderer {
       onSelect: (agent) => { this.switchAgent(agent); },
     });
 
-    // Primary tab bar
-    const primaryBarEl = containerEl.createDiv({ cls: 'opencodian-settings-tabs-primary' });
+    const panelId = `opencodian-settings-panel-${++settingsPanelSequence}`;
+    const primaryBarEl = containerEl.createDiv({
+      cls: 'opencodian-settings-tabs-primary',
+      attr: { role: 'tablist', 'aria-label': t('settings.backend.navigation.sections') },
+    });
+    enableManualTabNavigation(primaryBarEl);
     for (const primaryTab of visibleTabs) {
       const tabEl = primaryBarEl.createEl('button', {
         cls: `opencodian-settings-tab-primary${primaryTab.id === activePrimaryId ? ' opencodian-settings-tab-active' : ''}`,
       });
       tabEl.type = 'button';
       tabEl.dataset.tabId = primaryTab.id;
+      tabEl.id = `${panelId}-primary-${primaryTab.id}`;
+      tabEl.setAttribute('role', 'tab');
+      tabEl.setAttribute('aria-controls', panelId);
+      tabEl.setAttribute('aria-selected', String(primaryTab.id === activePrimaryId));
+      tabEl.tabIndex = primaryTab.id === activePrimaryId ? 0 : -1;
       const iconEl = tabEl.createSpan({ cls: 'opencodian-settings-tab-primary-icon' });
       setIcon(iconEl, primaryTab.icon);
       tabEl.createSpan({
@@ -164,7 +192,11 @@ export class SettingsTabbedRenderer {
 
     // Secondary tab bar
     if (primaryDef && visibleSecondaryTabs.length > 1) {
-      const secondaryBarEl = containerEl.createDiv({ cls: 'opencodian-settings-tabs-secondary' });
+      const secondaryBarEl = containerEl.createDiv({
+        cls: 'opencodian-settings-tabs-secondary',
+        attr: { role: 'tablist', 'aria-label': t('settings.backend.navigation.tasks') },
+      });
+      enableManualTabNavigation(secondaryBarEl);
       for (const secondaryTab of visibleSecondaryTabs) {
         const tabEl = secondaryBarEl.createEl('button', {
           cls: `opencodian-settings-tab-secondary${secondaryTab.id === activeSecondaryId ? ' opencodian-settings-tab-active' : ''}`,
@@ -172,6 +204,11 @@ export class SettingsTabbedRenderer {
         });
         tabEl.type = 'button';
         tabEl.dataset.tabId = secondaryTab.id;
+        tabEl.id = `${panelId}-secondary-${secondaryTab.id}`;
+        tabEl.setAttribute('role', 'tab');
+        tabEl.setAttribute('aria-controls', panelId);
+        tabEl.setAttribute('aria-selected', String(secondaryTab.id === activeSecondaryId));
+        tabEl.tabIndex = secondaryTab.id === activeSecondaryId ? 0 : -1;
         tabEl.addEventListener('click', () => {
           this.switchSecondaryTab(activePrimaryId, secondaryTab.id);
         });
@@ -182,13 +219,14 @@ export class SettingsTabbedRenderer {
     const contentEl = containerEl.createDiv({
       cls: 'opencodian-settings-content-shell',
       attr: {
+        id: panelId,
+        role: 'tabpanel',
+        'aria-labelledby': `${panelId}-primary-${activePrimaryId}${visibleSecondaryTabs.length > 1 ? ` ${panelId}-secondary-${activeSecondaryId}` : ''}`,
         'data-primary-tab': activePrimaryId,
         'data-secondary-tab': activeSecondaryId,
       },
     });
-    if (activePrimaryId === 'pi') new SettingsPiSection(this.deps.plugin).attachTabbed(contentEl, activeSecondaryId);
-    else if (activePrimaryId === 'zcode') new SettingsZCodeSection(this.deps.plugin, () => this.openCompletionSettings(contentEl.ownerDocument)).attachTabbed(contentEl, activeSecondaryId);
-    else this.renderContent(contentEl, activePrimaryId, activeSecondaryId);
+    this.renderContent(contentEl, activePrimaryId, activeSecondaryId);
   }
 
   switchToPrimaryTab(primaryTabId: string, secondaryTabId?: string): void {
@@ -295,6 +333,7 @@ export class SettingsTabbedRenderer {
     containerEl: HTMLElement, primaryTabId: string,
     secondaryTabId: string,
   ): void {
+    this.disposeActiveBackendSections();
     switch (primaryTabId) {
       case 'general':
         this.renderGeneralContent(containerEl, secondaryTabId);
@@ -444,7 +483,11 @@ export class SettingsTabbedRenderer {
   ): void {
     // Any backend subpage switch (including Codex account -> debug) must release
     // the previous Codex section before the old DOM is discarded.
-    this.disposeActiveCodexSection();
+    this.disposeActiveBackendSections();
+    renderBackendSettingsWorkspace(containerEl, backend, this.deps.plugin, () => {
+      this.activeCodexSection?.reapplyRuntimeUpdates();
+      this.deps.requestDisplayRefresh();
+    });
     if ((backend === 'claude-code' || backend === 'codex') && secondaryTabId === 'debug') {
       this.createDebugSection().attachBackendTabbed(containerEl, backend);
       return;
@@ -453,6 +496,7 @@ export class SettingsTabbedRenderer {
       case 'opencode2': {
         new SettingsOpenCode2Section({
           plugin: this.deps.plugin,
+          vaultPath: getVaultBasePath(this.deps.app) ?? undefined,
           requestDisplayRefresh: () => { this.deps.requestDisplayRefresh(); },
           renderTitleSettings: (hostEl) => { this.deps.renderConversationTitleSettings(hostEl); },
         }).attachTabbed(containerEl, secondaryTabId);
@@ -480,9 +524,12 @@ export class SettingsTabbedRenderer {
       case 'zcode':
         new SettingsZCodeSection(this.deps.plugin, () => this.openCompletionSettings(containerEl.ownerDocument)).attachTabbed(containerEl, secondaryTabId);
         return;
-      case 'dsh':
-        createSettingsDshSection(this.deps.plugin).attachTabbed(containerEl, secondaryTabId);
+      case 'dsh': {
+        const section = createSettingsDshSection(this.deps.plugin);
+        this.activeDshSection = section;
+        section.attachTabbed(containerEl, secondaryTabId, (task) => this.switchToPrimaryTab('dsh', task));
         return;
+      }
       default:
         return;
     }
@@ -497,7 +544,9 @@ export class SettingsTabbedRenderer {
     }).attach(containerEl);
   }
 
-  private disposeActiveCodexSection(): void {
+  disposeActiveBackendSections(): void {
+    this.activeDshSection?.dispose();
+    this.activeDshSection = null;
     const previous = this.activeCodexSection;
     this.activeCodexSection = null;
     this.deps.setCodexSection(null);
@@ -516,11 +565,15 @@ export class SettingsTabbedRenderer {
       if (!definition) continue;
       this.deps.createHeading(containerEl, t(definition.labelKey));
 
+      const panelId = `opencodian-settings-panel-${++settingsPanelSequence}`;
       const navEl = containerEl.createDiv({
         cls: 'opencodian-settings-tabs-secondary opencodian-settings-classic-backend-tabs',
+        attr: { role: 'tablist', 'aria-label': t('settings.backend.navigation.tasks') },
       });
+      enableManualTabNavigation(navEl);
       const bodyEl = containerEl.createDiv({
         cls: 'opencodian-settings-classic-backend-body',
+        attr: { id: panelId, role: 'tabpanel' },
       });
       const saved = this.deps.plugin.settings.settingsTabbedSecondaryTabByPrimary[definition.id];
       let activeSecondary = resolveSecondaryTabId(definition.id, saved ?? definition.defaultSecondaryTabId);
@@ -533,7 +586,7 @@ export class SettingsTabbedRenderer {
         if (previousTitleTab) {
           this.deps.setRefreshTitleModelsCallback(undefined);
         }
-        this.disposeActiveCodexSection();
+        this.disposeActiveBackendSections();
         bodyEl.empty();
         this.renderBackendWorkspaceTab(bodyEl, backend, activeSecondary);
         previousTitleTab = backend === 'opencode2' && activeSecondary === 'model';
@@ -542,14 +595,23 @@ export class SettingsTabbedRenderer {
             'opencodian-settings-tab-active',
             button.dataset.tabId === activeSecondary,
           );
+          button.setAttribute('aria-selected', String(button.dataset.tabId === activeSecondary));
+          button.tabIndex = button.dataset.tabId === activeSecondary ? 0 : -1;
         }
+        bodyEl.setAttribute('aria-labelledby', `${panelId}-secondary-${activeSecondary}`);
       };
 
       for (const secondaryTab of definition.secondaryTabs) {
         const button = navEl.createEl('button', {
           cls: 'opencodian-settings-tab-secondary',
           text: t(secondaryTab.labelKey),
-          attr: { type: 'button', 'data-tab-id': secondaryTab.id },
+          attr: {
+            id: `${panelId}-secondary-${secondaryTab.id}`,
+            type: 'button',
+            role: 'tab',
+            'aria-controls': panelId,
+            'data-tab-id': secondaryTab.id,
+          },
         });
         button.addEventListener('click', () => {
           activeSecondary = secondaryTab.id;

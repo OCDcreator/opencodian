@@ -6,6 +6,7 @@ import {
   extractUserMessageTextHighlightSpans,
   prepareUserMessageMarkdownForDisplay,
 } from '../../rendering/userMessageDisplay';
+import { maskUserMessageSecretsForDisplay } from '../../rendering/userMessageDisplay';
 import { openImagePreview } from '../../ui/ImagePreviewOverlay';
 
 export interface UserMessageContentRendererHost {
@@ -145,12 +146,17 @@ export class UserMessageContentRenderer {
     const listEl = container.createDiv({ cls: 'opencodian-user-context-list' });
 
     for (const attachment of attachments) {
+      // Display-only masking: visible label, title, and aria-label never carry
+      // credential text; the raw path/URL stays on the object for the click
+      // targets below and is never re-inserted into an attribute.
+      const displayLabel = maskUserMessageSecretsForDisplay(attachment.label);
+      const displayTitle = maskUserMessageSecretsForDisplay(attachment.path);
       const openBtn = listEl.createEl('button', {
         cls: 'opencodian-user-context-chip opencodian-composer-context-chip is-attached',
         attr: {
           type: 'button',
-          title: attachment.path,
-          'aria-label': `${this.getContextKindLabel(attachment.kind)}: ${attachment.label}`,
+          title: displayTitle,
+          'aria-label': `${this.getContextKindLabel(attachment.kind)}: ${displayLabel}`,
         },
       });
       if (attachment.origin === 'vault-retrieval') {
@@ -170,7 +176,7 @@ export class UserMessageContentRenderer {
         const badgeEl = openBtn.createSpan({ cls: 'opencodian-context-chip-origin-badge' });
         badgeEl.textContent = t('chat.context.url.failedBadge');
       }
-      openBtn.createSpan({ text: attachment.label });
+      openBtn.createSpan({ text: displayLabel });
       openBtn.dataset.contextKind = attachment.kind;
       if (attachment.kind === 'selection') {
         openBtn.addClass('is-selection');
@@ -214,7 +220,7 @@ export class UserMessageContentRenderer {
     });
     const rawContentEl = rawWrapperEl.createEl('pre', {
       cls: 'opencodian-omo-raw-content',
-      text: message.omo.injectedPrompt,
+      text: maskUserMessageSecretsForDisplay(message.omo.injectedPrompt),
     });
     const rawToggleEl = rawWrapperEl.createEl('button');
     const rawState: CollapsibleState = {
@@ -236,9 +242,12 @@ export class UserMessageContentRenderer {
   }
 
   private getVisibleUserMessageText(message: ChatMessage): string {
-    return message.omo?.kind === 'user-injection'
+    // Display and default copy show credential-masked text; the persisted
+    // message, model input, rewind/fork/edit sources stay untouched.
+    const rawText = message.omo?.kind === 'user-injection'
       ? message.omo.originalText
       : message.content;
+    return maskUserMessageSecretsForDisplay(rawText);
   }
 
   private getContextKindLabel(kind: NonNullable<ChatMessage['contextAttachments']>[number]['kind']): string {
@@ -277,6 +286,6 @@ export class UserMessageContentRenderer {
     }
 
     const headline = message.omo.headline || t('chat.omo.injected.defaultHeadline');
-    return t('chat.omo.injected.summary', { headline });
+    return t('chat.omo.injected.summary', { headline: maskUserMessageSecretsForDisplay(headline) });
   }
 }

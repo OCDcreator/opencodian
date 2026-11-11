@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join, resolve } from 'node:path';
 
 // One schema owns the complete official 0.73.1 Settings surface and its host scope.
 const field = (path, group, kind, zh, en, extra = {}) => ({ path, group, kind, label: { zh, en }, ...extra });
@@ -60,6 +61,82 @@ export const SETTINGS_FIELDS = [
 ];
 
 const hash = raw => createHash('sha256').update(raw ?? '').digest('hex');
+
+// Persistent configuration history: bounded per-target snapshot slots written
+// beside the machine-global home (never inside a vault), even when
+// PI_CODING_AGENT_DIR is customized into a vault. Dirs 0700, files 0600.
+const HISTORY_LIMIT = 5;
+const HISTORY_DIRECTORY_MODE = 0o700;
+const HISTORY_FILE_MODE = 0o600;
+const HISTORY_KEYS = { models: 'models', 'settings-global': 'settings-global', 'settings-project': 'settings-project' };
+
+const canonicalRootPath = root => { try { return realpathSync(root); } catch { return resolve(root); } };
+
+/** Resolve (and optionally create) a confined history directory anchored at the history base.
+ *  Every component must resolve back to the anchored realpath; a swapped symlink escapes as null. */
+function historyDirectory(baseInput, root, create) {
+  let base;
+  if (create) {
+    mkdirSync(baseInput, { recursive: true, mode: HISTORY_DIRECTORY_MODE });
+    base = realpathSync(baseInput);
+  } else {
+    try { base = realpathSync(baseInput); } catch { return null; }
+  }
+  const directory = join(base, createHash('sha256').update(canonicalRootPath(root)).digest('hex'));
+  if (create) mkdirSync(directory, { recursive: true, mode: HISTORY_DIRECTORY_MODE });
+  else if (!existsSync(directory)) return null;
+  const resolved = realpathSync(directory);
+  if (resolved !== directory) return null;
+  return directory;
+}
+
+function readHistorySlotAt(directory, key, index) {
+  if (!Number.isInteger(index) || index < 1 || index > HISTORY_LIMIT) return null;
+  const file = join(directory, `${key}-${index}.json`);
+  let stats;
+  try { stats = lstatSync(file); } catch { return null; }
+  if (!stats.isFile()) return null;
+  let raw;
+  try { raw = readFileSync(file, 'utf8'); } catch { return null; }
+  try { if (realpathSync(file) !== file) return null; } catch { return null; }
+  return { index, raw, revision: hash(raw), bytes: Buffer.byteLength(raw), savedAt: stats.mtimeMs };
+}
+
+function readHistorySlot(base, root, key, index) {
+  const directory = historyDirectory(base, root, false);
+  return directory ? readHistorySlotAt(directory, key, index) : null;
+}
+
+function listHistorySlots(base, root, key) {
+  const directory = historyDirectory(base, root, false);
+  if (!directory) return [];
+  const entries = [];
+  for (let index = 1; index <= HISTORY_LIMIT; index += 1) {
+    const entry = readHistorySlotAt(directory, key, index);
+    if (entry) entries.push({ index: entry.index, savedAt: entry.savedAt, revision: entry.revision, bytes: entry.bytes });
+  }
+  return entries;
+}
+
+function writeHistorySlot(directory, key, raw) {
+  const temporary = join(directory, `${key}-${randomUUID()}.tmp`);
+  try {
+    writeFileSync(temporary, raw, { mode: HISTORY_FILE_MODE });
+    renameSync(temporary, join(directory, `${key}-1.json`));
+  } finally { rmSync(temporary, { force: true }); }
+}
+
+/** Bounded rotation: each existing slot moves to index+1, slot 1 is the fresh snapshot.
+ *  Oldest entries are displaced by overwriting slot 5 — no recursive deletion, ever. */
+function archiveHistory(base, root, key, raw) {
+  if (raw === undefined) return;
+  const directory = historyDirectory(base, root, true);
+  for (let index = HISTORY_LIMIT; index >= 2; index -= 1) {
+    try { renameSync(join(directory, `${key}-${index - 1}.json`), join(directory, `${key}-${index}.json`)); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
+  writeHistorySlot(directory, key, raw);
+}
 const read = file => { try { return readFileSync(file, 'utf8'); } catch (error) { if (error.code === 'ENOENT') return undefined; throw error; } };
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const parse = raw => { const value = JSON.parse(raw || '{}'); if (!object(value)) throw new Error('Configuration must be a JSON object.'); return value; };
@@ -104,11 +181,22 @@ function applyChanges(value, changes) {
 }
 
 /** Persistent file operations isolated from per-session SettingsManager overlays. */
-export function createConfigurationService(sdk, cwd, agentDir) {
+export function createConfigurationService(sdk, cwd, agentDir, options = {}) {
   const storage = new sdk.FileSettingsStorage(cwd, agentDir);
   const settingsPath = scope => scope === 'global' ? join(agentDir, 'settings.json') : join(cwd, '.pi', 'settings.json');
   const scopeOf = scope => { if (!['global', 'project'].includes(scope)) throw new Error('Choose global or project scope.'); return scope; };
   const modelFile = join(agentDir, 'models.json');
+  // History always lives under the machine-global home so a vault-synced agent
+  // dir never drags secret-bearing snapshots into synchronization.
+  const historyBase = options.historyRoot ?? join(homedir(), '.opencodian', 'pi-configuration-history');
+  const settingsHistoryKey = scope => scope === 'global' ? HISTORY_KEYS['settings-global'] : HISTORY_KEYS['settings-project'];
+  const historyRootFor = scope => scope === 'global' ? agentDir : cwd;
+  const validateModelsFile = async candidate => {
+    const registry = sdk.ModelRuntime
+      ? await sdk.ModelRuntime.create({ modelsPath: candidate, refreshOnCreate: false, credentials: { read: async () => undefined, list: async () => [], modify: async () => { throw new Error('Validation cannot change credentials.'); }, delete: async () => { throw new Error('Validation cannot change credentials.'); } } })
+      : sdk.ModelRegistry.create(sdk.AuthStorage.inMemory(), candidate);
+    const error = registry.getError(); if (error) throw new Error(error);
+  };
   return {
     getSettings() {
       const scopes = {};
@@ -121,8 +209,37 @@ export function createConfigurationService(sdk, cwd, agentDir) {
         if (command.revision !== hash(raw)) throw new Error('Configuration changed on disk. Reload before saving.');
         const value = command.value === undefined ? applyChanges(parse(raw), command.changes ?? {}) : command.value;
         validateSettings(value, parse(raw));
-        if (raw !== undefined) writeFileSync(`${settingsPath(scope)}.opencodian.bak`, raw, { mode: 0o600 });
+        if (raw !== undefined) {
+          writeFileSync(`${settingsPath(scope)}.opencodian.bak`, raw, { mode: 0o600 });
+          archiveHistory(historyBase, historyRootFor(scope), settingsHistoryKey(scope), raw);
+        }
         return JSON.stringify(value, null, 2) + '\n';
+      });
+      return this.getSettings();
+    },
+    getConfigurationHistory() {
+      const target = (root, key, path) => ({ path, key, entries: listHistorySlots(historyBase, root, key) });
+      return {
+        models: target(agentDir, HISTORY_KEYS.models, modelFile),
+        settings: {
+          global: target(agentDir, HISTORY_KEYS['settings-global'], settingsPath('global')),
+          project: target(cwd, HISTORY_KEYS['settings-project'], settingsPath('project')),
+        },
+      };
+    },
+    restoreConfiguration(command) {
+      if (!['models', 'settings'].includes(command.target)) throw new Error('Choose models or settings.');
+      if (command.target === 'models') return this.restoreModels(command);
+      const scope = scopeOf(command.scope);
+      storage.withLock(scope, raw => {
+        if (command.revision !== hash(raw)) throw new Error('Configuration changed on disk. Reload before saving.');
+        const entry = readHistorySlot(historyBase, historyRootFor(scope), settingsHistoryKey(scope), command.index);
+        if (!entry) throw new Error('Choose a stored history slot.');
+        if (command.archivedRevision !== entry.revision) throw new Error('Archived snapshot no longer matches. Refresh history before restoring.');
+        const value = parse(entry.raw);
+        validateSettings(value, parse(raw));
+        archiveHistory(historyBase, historyRootFor(scope), settingsHistoryKey(scope), raw);
+        return entry.raw;
       });
       return this.getSettings();
     },
@@ -138,12 +255,31 @@ export function createConfigurationService(sdk, cwd, agentDir) {
         const raw = read(modelFile);
         if (command.revision !== hash(raw)) throw new Error('Model configuration changed on disk. Reload before saving.');
         writeFileSync(temporary, JSON.stringify(command.value, null, 2) + '\n', { mode: 0o600 });
-        const registry = sdk.ModelRuntime
-          ? await sdk.ModelRuntime.create({ modelsPath: temporary, refreshOnCreate: false, credentials: { read: async () => undefined, list: async () => [], modify: async () => { throw new Error('Validation cannot change credentials.'); }, delete: async () => { throw new Error('Validation cannot change credentials.'); } } })
-          : sdk.ModelRegistry.create(sdk.AuthStorage.inMemory(), temporary);
-        const error = registry.getError(); if (error) throw new Error(error);
+        await validateModelsFile(temporary);
         if (read(modelFile) !== raw) throw new Error('Model configuration changed during validation. Reload before saving.');
-        if (raw !== undefined) writeFileSync(`${modelFile}.opencodian.bak`, raw, { mode: 0o600 });
+        if (raw !== undefined) {
+          writeFileSync(`${modelFile}.opencodian.bak`, raw, { mode: 0o600 });
+          archiveHistory(historyBase, agentDir, HISTORY_KEYS.models, raw);
+        }
+        renameSync(temporary, modelFile);
+      } finally { rmSync(temporary, { force: true }); rmSync(lock, { recursive: true, force: true }); }
+      return this.getModels();
+    },
+    async restoreModels(command) {
+      mkdirSync(agentDir, { recursive: true });
+      const lock = `${modelFile}.opencodian.lock`;
+      try { mkdirSync(lock); } catch (error) { if (error.code === 'EEXIST') throw new Error('Model configuration is being saved. Retry shortly.'); throw error; }
+      const temporary = `${modelFile}.${randomUUID()}.tmp`;
+      try {
+        const raw = read(modelFile);
+        if (command.revision !== hash(raw)) throw new Error('Model configuration changed on disk. Reload before saving.');
+        const entry = readHistorySlot(historyBase, agentDir, HISTORY_KEYS.models, command.index);
+        if (!entry) throw new Error('Choose a stored history slot.');
+        if (command.archivedRevision !== entry.revision) throw new Error('Archived snapshot no longer matches. Refresh history before restoring.');
+        writeFileSync(temporary, entry.raw, { mode: 0o600 });
+        await validateModelsFile(temporary);
+        if (read(modelFile) !== raw) throw new Error('Model configuration changed during validation. Reload before saving.');
+        archiveHistory(historyBase, agentDir, HISTORY_KEYS.models, raw);
         renameSync(temporary, modelFile);
       } finally { rmSync(temporary, { force: true }); rmSync(lock, { recursive: true, force: true }); }
       return this.getModels();
@@ -153,7 +289,16 @@ export function createConfigurationService(sdk, cwd, agentDir) {
 
 /** Configuration has its own process path, so bad model defaults or extensions cannot block repair. */
 export function startConfigurationTransport(configuration, sdkVersion, streams) {
-  const commands = { get_configuration: () => configuration.getSettings(), save_configuration: command => configuration.saveSettings(command), get_model_configuration: () => configuration.getModels(), save_model_configuration: command => configuration.saveModels(command) };
+  const commands = {
+    get_configuration: () => configuration.getSettings(),
+    save_configuration: command => configuration.saveSettings(command),
+    get_model_configuration: () => configuration.getModels(),
+    save_model_configuration: command => configuration.saveModels(command),
+    // Optional additive commands: older plugin bundles subset-check get_state,
+    // so these only surface on hosts that feature-detect them.
+    get_configuration_history: () => configuration.getConfigurationHistory(),
+    restore_configuration: command => configuration.restoreConfiguration(command),
+  };
   const send = message => streams.stdout.write(`${JSON.stringify(message)}\n`);
   let pending = Promise.resolve();
   let buffer = '';

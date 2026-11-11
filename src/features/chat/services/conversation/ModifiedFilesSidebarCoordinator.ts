@@ -20,9 +20,22 @@ export interface LinkedNoteSidebarState {
 export class ModifiedFilesSidebarCoordinator {
   private sidebar: ModifiedFilesSidebar | null = null;
   private refreshRevision = 0;
+  private summaryIdentity: string | null = null;
+  private onSummaryChange: (() => void) | null = null;
+
+  setWorkbenchSummaryListener(listener: (() => void) | null): void { this.onSummaryChange = listener; }
+
+  /** The identity is a presentation fence, not a second file-state store. */
+  setWorkbenchIdentity(identity: string): void {
+    if (identity === this.summaryIdentity) return;
+    this.refreshRevision += 1; this.summaryIdentity = identity;
+    this.sidebar?.updateRevertState(null, null);
+    this.sidebar?.updateEntries([], 'loading');
+    this.onSummaryChange?.();
+  }
 
   mountSidebar(parentEl: HTMLElement, app: App): void {
-    this.refreshRevision += 1;
+    this.refreshRevision += 1; this.summaryIdentity = null;
     this.sidebar?.destroy();
     const boundaryEl = parentEl.matches('.opencodian-container')
       ? parentEl
@@ -46,7 +59,7 @@ export class ModifiedFilesSidebarCoordinator {
       // example, after session revert). Persisted turn snapshots cannot stand
       // in for the current session state while that read is in flight.
       const sidebar = this.sidebar;
-      sidebar?.updateEntries([], 'unavailable', linkedNote);
+      sidebar?.updateEntries([], 'loading', linkedNote); this.onSummaryChange?.();
       void canonicalEntries.then((entries) => {
         if (revision === this.refreshRevision && sidebar === this.sidebar) {
           const canonical = entries ?? this.getPersistedTurnDiffEntries(persistedMessages);
@@ -59,11 +72,11 @@ export class ModifiedFilesSidebarCoordinator {
             if (!meta?.taskIds?.length) continue;
             for (const entry of meta.entries) merged.set(entry.file, { ...entry });
           }
-          sidebar?.updateEntries([...merged.values()], 'ready', linkedNote);
+          sidebar?.updateEntries([...merged.values()], 'ready', linkedNote); this.onSummaryChange?.();
         }
       }).catch(() => {
         if (revision === this.refreshRevision && sidebar === this.sidebar) {
-          sidebar?.updateEntries([], 'unavailable', linkedNote);
+          sidebar?.updateEntries([], 'unavailable', linkedNote); this.onSummaryChange?.();
         }
       });
       return;
@@ -73,7 +86,7 @@ export class ModifiedFilesSidebarCoordinator {
       : canReadSessionChanges
         ? this.getPersistedTurnDiffEntries(persistedMessages)
         : [];
-    this.sidebar?.updateEntries(entries, availability, linkedNote);
+    this.sidebar?.updateEntries(entries, availability, linkedNote); this.onSummaryChange?.();
   }
 
   /** R-B3: backend-neutral revert state + actions for the active conversation. */
@@ -81,7 +94,7 @@ export class ModifiedFilesSidebarCoordinator {
     model: EditRevertSidebarModel | null,
     actions: ModifiedFilesRevertActions | null,
   ): void {
-    this.sidebar?.updateRevertState(model, actions);
+    this.sidebar?.updateRevertState(model, actions); this.onSummaryChange?.();
   }
 
   private getPersistedTurnDiffEntries(
@@ -103,8 +116,12 @@ export class ModifiedFilesSidebarCoordinator {
 
   attachToWorkbench(parentEl: HTMLElement): void { this.sidebar?.attachToWorkbench(parentEl); }
 
+  getWorkbenchSummaryText(identity?: string): string {
+    return identity !== undefined && identity !== this.summaryIdentity ? '' : this.sidebar?.getWorkbenchSummaryText() ?? '';
+  }
+
   destroy(): void {
-    this.refreshRevision += 1;
+    this.refreshRevision += 1; this.summaryIdentity = null; this.onSummaryChange = null;
     this.sidebar?.destroy();
     this.sidebar = null;
   }

@@ -156,6 +156,7 @@ export interface ChatPluginPort extends TabRuntimePluginSource {
     | 'prepareRestoreScrollOnNextOpen'
     | 'prepareScrollToClaudeCodeOnNextOpen'
     | 'prepareScrollToConversationOnNextOpen'
+    | 'prepareScrollToDsh'
     | 'prepareScrollToLspOnNextOpen'
     | 'prepareScrollToServerOnNextOpen'
     | 'refreshServerStatusDisplay'

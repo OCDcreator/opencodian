@@ -65,11 +65,10 @@ export class PostSyncQuestionTodoRefreshPlanBuilder {
     conversation: Conversation,
     forceTodoStatusRefresh: boolean,
   ): PostSyncQuestionTodoStatusRefreshOptions | null {
-    // Backend gate: question/todo refresh is an OpenCode-only feature.
-    // Non-OpenCode conversations have no server-side question or todo API;
-    // skip the entire refresh plan rather than calling with wrong session identity.
+    // DSH has a native todo contract. The downstream coordinator checks its
+    // live capability; question/status calls keep their separate backend gates.
     const backend = conversation.backend ?? 'opencode';
-    if (backend !== 'opencode') {
+    if (backend !== 'opencode' && backend !== 'dsh') {
       return null;
     }
 

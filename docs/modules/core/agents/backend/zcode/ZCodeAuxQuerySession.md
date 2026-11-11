@@ -15,9 +15,21 @@
 
 创建请求关闭 MCP、动态工作流和后台工具，并把 `toolAllowlist` 设为空、
 `toolDenylist` 覆盖写入/壳/子代理类工具。每一回合在继续读取事件前轮询
-`session/messages`，要求最新用户消息的 `info.tools` 是原生读回的空对象；任意
-缺失、未知、工具事件或非零 `toolCallCount` 都 fail closed。图片使用官方
+`session/messages`，要求本轮真实用户提示消息的 `info.tools` 是原生读回的空对象；
+任意缺失、未知、工具事件或非零 `toolCallCount` 都 fail closed。图片使用官方
 `{kind, filename, mimeType, sizeBytes, dataBase64}` 附件形状，不降级为文字。
+
+## 2026-11-08 runtime 3.17 synthetic 提醒行
+
+ZCode 3.17 起 runtime 会在真实用户提示旁写入合成的 `system_reminder` 用户行
+（runtime 自带 `synthetic: true`、`visibility: 'model-only'`，无 `tools` 字段）。
+单一"新用户消息"假设因此失效；`waitForEffectiveTools` 改为按形状归位：本轮新
+用户行中恰有一行携带 `info.tools`（真实提示）即以它为权威证明；仅含合成行的
+页面继续轮询等待提示读回落地；两行同时携带 `tools`（无法归属）、存在既非提示
+又非 runtime 合成标记的新用户行、`tools` 非空或形状非法，一律照旧 fail closed。
+合成标记本身永远不作为"空工具"证据——host 不可伪造该标记。真实 CLI + 真实
+模型验证在私有根与真实 `~/.zcode` 根两种环境均通过（见
+`docs/research/backend-refresh/api-refresh-implementation-results.md`）。
 
 `dispose()` 先停止回合、等待自有 transport 的进程退出，再校验本轮创建的
 marker、realpath、父目录直系关系和保留前缀，仅删除这个专属临时根；未确认退出
@@ -27,7 +39,9 @@ marker、realpath、父目录直系关系和保留前缀，仅删除这个专属
 ## 验证
 
 `tests/unit/core/agents/backend/ZCodeAuxQuerySession.test.ts` 覆盖空工具原生读回、
-官方图片形状、工具读回扩大、工具事件违规、取消、超时与专属临时根清理。
+官方图片形状、工具读回扩大、工具事件违规、取消、超时与专属临时根清理；runtime 3.17
+形状套件覆盖合成提醒行共存、合成页等待提示落地、双提示归属失败、非合成未解释用户行
+fail closed、以及提示落地后变宽读回仍 fail closed。
 2026-09-24 的真实 Test Vault/`krill/gpt-6-sol` 审计已以 32×32 红色 PNG
 完成：原生当前回合读回 `info.tools:{}`、`turn.completed.toolCallCount=0`、
 模型回复 `RED`；普通会话列表数、personal provider-config 哈希及 OS 临时根

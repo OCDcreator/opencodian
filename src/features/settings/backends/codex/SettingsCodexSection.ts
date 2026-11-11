@@ -1,10 +1,23 @@
 /**
  * SettingsCodexSection — Codex backend settings panel.
  *
- * Organizes Codex configuration into three product-grade groups:
- *   1. Connection & runtime defaults — genuinely wired SDK options.
- *   2. Resume & inspect — session browser (action) and diagnostic readbacks.
- *   3. Account & provider status — live read-only account/capability cards.
+ * Task-oriented subtabs (backend settings refresh; legacy tab ids route):
+ *   - conversation: model (live catalog), reasoning effort, web search,
+ *     per-backend model overrides — the per-conversation defaults
+ *   - permissions-safety: sandbox mode, approval policy, network access,
+ *     additional writable directories (physically separated high-risk surface)
+ *   - account: auth source, account/usage surfaces, cost estimate row
+ *   - resources: session resume/inspect readbacks, skills/agents resources,
+ *     plugins
+ *   - connection: connection summary, CLI path override (high-risk, separated
+ *     from model settings), legacy credential control, and the project
+ *     config.toml workbench with protected archive history
+ *
+ * Legacy secondary tab ids (model, permissions, project-config,
+ * resume-inspect, plugins) route onto the task pages above so saved layouts
+ * and deep links keep working. Every editable row carries honest
+ * scope/effect/risk metadata; thread-scoped values apply at the NEXT thread
+ * boundary (adapter mutators), and executablePath/apiKey need a plugin reload.
  *
  * The old disabled "Authentication" setting is replaced by a lightweight
  * connection summary and the Account surface auth-source row, so the UI never
@@ -25,9 +38,17 @@ import {
 } from '../../../../core/types/settings';
 import { t, type TranslationKey } from '../../../../i18n';
 import type OpenCodianPlugin from '../../../../main';
+import {
+  addBackendChoiceSetting,
+  describeBackendSetting,
+} from '../../controls/BackendSettingsControls';
 import { SettingsInlineEditSection } from '../../general/SettingsInlineEditSection';
 import { renderCostEstimateSettingsRow } from '../opencode/CostEstimateSettingsRow';
-import type { CodexProjectConfigTomlDiagnostic } from './CodexProjectConfigFormModel';
+import {
+  type CodexProjectConfigTomlDiagnostic,
+  isCliRetiredCodexProjectApprovalPolicy,
+  isGuidedCodexProjectApprovalPolicy,
+} from './CodexProjectConfigFormModel';
 import { parseProjectConfigFormValues } from './CodexProjectConfigFormModel';
 import { SettingsCodexAccountSurface } from './SettingsCodexAccountSurface';
 import { SettingsCodexLegacyCredentialControl } from './SettingsCodexLegacyCredentialControl';
@@ -41,27 +62,46 @@ export interface SettingsCodexSectionOptions {
   createSectionHeading: (containerEl: HTMLElement, title: string, tooltip?: string) => HTMLHeadingElement;
 }
 
-const CODEX_CLASSIC_TABS = [
-  'connection',
-  'model',
-  'permissions',
-  'project-config',
-  'resume-inspect',
+/**
+ * Task-oriented subtab ids; legacy ids route onto these pages (see
+ * CODEX_LEGACY_TAB_ROUTES) so existing layouts and deep links keep working.
+ */
+const CODEX_TASK_TABS = [
+  'conversation',
+  'permissions-safety',
   'account',
   'resources',
-  'plugins',
+  'connection',
 ] as const;
 
-const CODEX_TAB_LABEL_KEYS: Record<(typeof CODEX_CLASSIC_TABS)[number], TranslationKey> = {
-  connection: 'settings.codex.tab.connection',
-  model: 'settings.codex.tab.model',
-  permissions: 'settings.codex.tab.permissions',
-  'project-config': 'settings.codex.tab.projectConfig',
-  'resume-inspect': 'settings.codex.tab.resumeInspect',
+type CodexTaskTabId = (typeof CODEX_TASK_TABS)[number];
+
+const CODEX_TASK_TAB_LABEL_KEYS: Record<CodexTaskTabId, TranslationKey> = {
+  conversation: 'settings.backend.tabs.conversation',
+  'permissions-safety': 'settings.backend.tabs.permissionsSafety',
   account: 'settings.codex.tab.account',
-  resources: 'settings.codex.tab.resources',
-  plugins: 'settings.codex.tab.plugins',
+  resources: 'settings.backend.tabs.resources',
+  connection: 'settings.backend.tabs.connection',
 };
+
+/**
+ * Legacy secondary tab id → task page. Preserved via routes so an old saved
+ * tab id still renders the same capabilities on the reorganized page.
+ */
+const CODEX_LEGACY_TAB_ROUTES: Record<string, CodexTaskTabId> = {
+  model: 'conversation',
+  permissions: 'permissions-safety',
+  'project-config': 'connection',
+  'resume-inspect': 'resources',
+  plugins: 'resources',
+};
+
+function resolveCodexTaskTabId(candidate: string): CodexTaskTabId {
+  if ((CODEX_TASK_TABS as readonly string[]).includes(candidate)) {
+    return candidate as CodexTaskTabId;
+  }
+  return CODEX_LEGACY_TAB_ROUTES[candidate] ?? 'connection';
+}
 
 export class SettingsCodexSection {
   private readonly plugin: OpenCodianPlugin;
@@ -130,10 +170,10 @@ export class SettingsCodexSection {
       t('settings.codex.title'),
       t('settings.codex.connection.desc'),
     );
-    for (const tabId of CODEX_CLASSIC_TABS) {
+    for (const tabId of CODEX_TASK_TABS) {
       containerEl.createEl('h3', {
         cls: 'opencodian-settings-subheading',
-        text: t(CODEX_TAB_LABEL_KEYS[tabId]),
+        text: t(CODEX_TASK_TAB_LABEL_KEYS[tabId]),
       });
       this.renderTabContent(containerEl, tabId);
     }
@@ -147,38 +187,38 @@ export class SettingsCodexSection {
   // ─── Tab content ────────────────────────────────────────────────
 
   private renderTabContent(containerEl: HTMLElement, secondaryTabId: string): void {
-    const resolvedTabId = secondaryTabId || 'connection';
+    const requestedTabId = secondaryTabId || 'connection';
+    const resolvedTabId = resolveCodexTaskTabId(requestedTabId);
 
     // Ensure codex settings object exists
     this.plugin.settings.backendSettings ??= getDefaultBackendSettings();
     this.plugin.settings.backendSettings.codex ??= getDefaultCodexBackendSettings();
 
-    // Resources renders as independent per-type cards (skills / agents) with no
+    // Resources and plugins render as independent per-group cards with no
     // enclosing section card, keeping global-readonly / project-editable /
     // empty-state semantics. A borderless host preserves settings targeting.
     if (resolvedTabId === 'resources') {
       const resourcesHost = containerEl.createDiv({
         attr: {
           'data-settings-surface': 'section',
-          'data-settings-target': `codex-${resolvedTabId}`,
+          'data-settings-target': `codex-${requestedTabId}`,
           'data-codex-section': resolvedTabId,
         },
       });
-      this.resourcesSurface.render(resourcesHost);
-      return;
-    }
-
-    // Plugins renders as independent per-group cards (marketplace / installed)
-    // with the same borderless host contract as resources; the section owns
-    // its unavailable/empty semantics per group.
-    if (resolvedTabId === 'plugins') {
-      const pluginsHost = containerEl.createDiv({
-        attr: {
-          'data-settings-surface': 'section',
-          'data-settings-target': `codex-${resolvedTabId}`,
-          'data-codex-section': resolvedTabId,
-        },
+      // The resources page merges what used to be three tabs. Each surface
+      // owns its host exclusively (they empty() their host on every render and
+      // refresh), so they get dedicated sub-hosts and never wipe each other.
+      const inspectHost = resourcesHost.createDiv({
+        attr: { 'data-codex-resources-page-area': 'resume-inspect' },
       });
+      const skillsHost = resourcesHost.createDiv({
+        attr: { 'data-codex-resources-page-area': 'resources' },
+      });
+      const pluginsHost = resourcesHost.createDiv({
+        attr: { 'data-codex-resources-page-area': 'plugins' },
+      });
+      this.renderResumeAndInspectGroup(inspectHost);
+      this.resourcesSurface.render(skillsHost);
       this.pluginsSurface.render(pluginsHost);
       return;
     }
@@ -187,7 +227,7 @@ export class SettingsCodexSection {
       cls: 'opencodian-settings-block opencodian-settings-section opencodian-settings-codex-block',
       attr: {
         'data-settings-surface': 'section',
-        'data-settings-target': `codex-${resolvedTabId}`,
+        'data-settings-target': `codex-${requestedTabId}`,
         'data-codex-section': resolvedTabId,
       },
     });
@@ -197,18 +237,8 @@ export class SettingsCodexSection {
       attr: { 'data-settings-surface': 'section-body' },
     });
 
-    if (resolvedTabId === 'resume-inspect') {
-      this.renderResumeAndInspectGroup(bodyEl);
-      return;
-    }
-
-    if (resolvedTabId === 'permissions') {
+    if (resolvedTabId === 'permissions-safety') {
       this.renderPermissionsGroup(bodyEl);
-      return;
-    }
-
-    if (resolvedTabId === 'project-config') {
-      this.renderProjectConfigGroup(bodyEl);
       return;
     }
 
@@ -217,16 +247,18 @@ export class SettingsCodexSection {
       return;
     }
 
-    if (resolvedTabId === 'model') {
-      this.renderRuntimeDefaultsGroup(bodyEl);
-      SettingsInlineEditSection.renderBackendModelOverrides(bodyEl, 'codex', this.plugin);
+    if (resolvedTabId === 'conversation') {
+      this.renderConversationTab(bodyEl);
       return;
     }
 
-    // Default / 'connection'
+    // Default / 'connection': connection summary + CLI path override (high
+    // risk, physically separated from model settings) + credentials + the
+    // project config.toml workbench with its protected archive history.
     this.renderConnectionSummary(bodyEl);
     this.renderCliLifecycleControls(bodyEl);
     this.legacyCredentialControl.render(bodyEl);
+    this.renderProjectConfigGroup(bodyEl);
   }
 
   private renderConnectionSummary(bodyEl: HTMLElement): void {
@@ -256,7 +288,7 @@ export class SettingsCodexSection {
   }
 
   private renderCliLifecycleControls(bodyEl: HTMLElement): void {
-    new Setting(bodyEl)
+    const executableSetting = new Setting(bodyEl)
       .setName(t('settings.codex.executablePath.name'))
       .setDesc(t('settings.codex.executablePath.desc'))
       .addText((text) => text
@@ -266,6 +298,17 @@ export class SettingsCodexSection {
           this.plugin.settings.backendSettings.codex.executablePath = value.trim();
           await this.plugin.saveSettings();
         }));
+    // CLI path overrides are resolved once at adapter start: changes need a
+    // plugin reload, and the field deliberately lives on the connection page,
+    // never next to conversation model settings.
+    describeBackendSetting(executableSetting, {
+      key: 'codex.executablePath',
+      scope: 'vault',
+      effect: 'restart',
+      risk: 'medium',
+      defaultLabel: t('settings.backendRefresh.default.autoDiscover'),
+      source: t('settings.backendRefresh.source.pluginVaultSetting'),
+    });
 
     new Setting(bodyEl)
       .setName(t('settings.codex.reload.name'))
@@ -308,7 +351,12 @@ export class SettingsCodexSection {
     }
   }
 
-  private renderRuntimeDefaultsGroup(bodyEl: HTMLElement): void {
+  /**
+   * Conversation defaults page: live-catalog model picker, reasoning effort,
+   * web search, and the per-backend inline-edit/completion model overrides.
+   * All thread-scoped values apply at the next thread boundary.
+   */
+  private renderConversationTab(bodyEl: HTMLElement): void {
     const groupEl = bodyEl.createDiv({
       cls: 'opencodian-settings-codex-group opencodian-settings-codex-group--runtime',
       attr: { 'data-codex-group': 'runtime-defaults' },
@@ -319,11 +367,11 @@ export class SettingsCodexSection {
     });
     headerTextEl.createEl('h4', {
       cls: 'opencodian-settings-codex-group-title',
-      text: t('settings.codex.groups.runtimeDefaults'),
+      text: t('settings.codex.groups.conversationDefaults'),
     });
     headerTextEl.createDiv({
       cls: 'opencodian-settings-codex-group-desc',
-      text: t('settings.codex.groups.runtimeDefaultsDesc'),
+      text: t('settings.codex.groups.conversationDefaultsDesc'),
     });
 
     const controlsEl = groupEl.createDiv({
@@ -334,6 +382,7 @@ export class SettingsCodexSection {
     this.renderModelSetting(controlsEl);
     this.renderReasoningSetting(controlsEl);
     this.renderWebSearchSetting(controlsEl);
+    SettingsInlineEditSection.renderBackendModelOverrides(bodyEl, 'codex', this.plugin);
   }
 
   /**
@@ -342,8 +391,18 @@ export class SettingsCodexSection {
    * ProjectResourceSecureWrite for CAS, archive, and conflict detection.
    */
   private renderProjectConfigGroup(bodyEl: HTMLElement): void {
-    bodyEl.empty();
-    const groupEl = bodyEl.createDiv({
+    // A dedicated host keeps the project-config workbench self-contained: the
+    // connection page renders the summary/CLI/credential rows into the same
+    // body first, so refreshes must empty ONLY this host, never the page body.
+    let configHost = bodyEl.querySelector<HTMLElement>('[data-codex-project-config-host]');
+    if (!configHost) {
+      configHost = bodyEl.createDiv({
+        cls: 'opencodian-settings-codex-project-config-host',
+        attr: { 'data-codex-project-config-host': 'true' },
+      });
+    }
+    configHost.empty();
+    const groupEl = configHost.createDiv({
       cls: 'opencodian-settings-codex-group opencodian-settings-codex-group--project-config',
       attr: { 'data-codex-group': 'project-config' },
     });
@@ -364,7 +423,66 @@ export class SettingsCodexSection {
       cls: 'opencodian-settings-codex-group-controls opencodian-settings-codex-group-stack',
     });
 
-    void this.renderProjectConfigForm(stackEl, bodyEl);
+    void this.renderProjectConfigForm(stackEl, configHost);
+  }
+
+  /**
+   * Guided approval_policy field for the project config form. Offers only the
+   * supported policies plus inherit; a legacy value already in the file (the
+   * CLI-retired 'untrusted', or a CLI-valid policy outside the plugin bridge
+   * such as 'on-failure') is preserved verbatim: it appears as a marked option
+   * and the form save never rewrites it — repair requires an explicit pick.
+   * `state.value` mirrors the form's mutable value ('' is the inherit
+   * sentinel, matching the initial parse).
+   */
+  private renderProjectConfigApprovalField(formEl: HTMLElement, state: { value: string }): void {
+    const approvalPreservedEl = formEl.createDiv({
+      cls: 'opencodian-codex-project-config-approval-preserved',
+      attr: { 'data-project-config-approval-preserved': 'true', role: 'status' },
+    });
+    const renderApprovalPreservedNotice = (): void => {
+      approvalPreservedEl.empty();
+      // '' is the inherit sentinel in this form (matches the initial parse).
+      if (state.value === '') {
+        return;
+      }
+      if (isGuidedCodexProjectApprovalPolicy(state.value)) {
+        return;
+      }
+      const retired = isCliRetiredCodexProjectApprovalPolicy(state.value || null);
+      approvalPreservedEl.createEl('p', {
+        cls: 'opencodian-codex-project-config-approval-preserved-text',
+        // Keys ship in .tmp/backend-refresh-ui/claude-codex-locales.json;
+        // cast until the i18n union lands (pending-key contract with parent).
+        text: t((retired
+          ? 'settings.codex.projectConfig.approvalPolicy.retiredNotice'
+          : 'settings.codex.projectConfig.approvalPolicy.unguidedNotice') as TranslationKey, { value: state.value }),
+      });
+    };
+
+    new Setting(formEl)
+      .setName(t('settings.codex.projectConfig.fieldApprovalPolicy'))
+      .setDesc(t('settings.codex.projectConfig.fieldApprovalPolicyDesc'))
+      .addDropdown((dropdown) => {
+        dropdown.addOption('', t('settings.codex.projectConfig.inherit'));
+        dropdown.addOption('never', 'never');
+        dropdown.addOption('on-request', 'on-request');
+        // Preserve a non-guided value read from the file as a marked option
+        // instead of silently snapping the dropdown to a default.
+        const guidedValues = ['', 'never', 'on-request'];
+        if (!guidedValues.includes(state.value)) {
+          const suffixKey = isCliRetiredCodexProjectApprovalPolicy(state.value || null)
+            ? 'settings.codex.projectConfig.approvalPolicy.retiredOptionSuffix'
+            : 'settings.codex.projectConfig.approvalPolicy.unguidedOptionSuffix';
+          dropdown.addOption(state.value, t(suffixKey, { value: state.value }));
+        }
+        dropdown.setValue(state.value);
+        dropdown.onChange((v) => {
+          state.value = v;
+          renderApprovalPreservedNotice();
+        });
+      });
+    renderApprovalPreservedNotice();
   }
 
   /** Clear and re-render the project config tab (Fix 8: no duplicate controls). */
@@ -449,7 +567,7 @@ export class SettingsCodexSection {
     let model = values.model ?? '';
     let reasoningEffort = values.modelReasoningEffort ?? '';
     let sandboxMode = values.sandboxMode ?? '';
-    let approvalPolicy = values.approvalPolicy ?? '';
+    const approvalState = { value: values.approvalPolicy ?? '' };
     let additionalDirs = (values.additionalDirectories ?? []).join('\n');
     let networkAccess = values.networkAccess;
     let webSearch = values.webSearch;
@@ -489,17 +607,7 @@ export class SettingsCodexSection {
         dropdown.onChange((v) => { sandboxMode = v; });
       });
 
-    new Setting(formEl)
-      .setName(t('settings.codex.projectConfig.fieldApprovalPolicy'))
-      .setDesc(t('settings.codex.projectConfig.fieldApprovalPolicyDesc'))
-      .addDropdown((dropdown) => {
-        dropdown.addOption('', t('settings.codex.projectConfig.inherit'));
-        for (const policy of ['never', 'on-request', 'on-failure', 'untrusted']) {
-          dropdown.addOption(policy, policy);
-        }
-        dropdown.setValue(approvalPolicy);
-        dropdown      .onChange((v) => { approvalPolicy = v; });
-      });
+    this.renderProjectConfigApprovalField(formEl, approvalState);
 
     new Setting(formEl)
       .setName(t('settings.codex.projectConfig.fieldNetworkAccess'))
@@ -576,7 +684,7 @@ export class SettingsCodexSection {
             model: model.trim() || null,
             modelReasoningEffort: reasoningEffort || null,
             sandboxMode: sandboxMode || null,
-            approvalPolicy: approvalPolicy || null,
+            approvalPolicy: approvalState.value || null,
             networkAccess,
             webSearch,
             additionalDirectories: dirs.length > 0 ? dirs : null,
@@ -771,28 +879,54 @@ export class SettingsCodexSection {
     // The load-time normalizer migrates retired 'untrusted' to 'on-request';
     // mirror that here so a raw persisted value still displays sanely.
     const effectivePolicy: CodexApprovalPolicy = rawPolicy === 'untrusted' ? 'on-request' : rawPolicy;
-    new Setting(bodyEl)
-      .setName(t('settings.codex.approvalPolicy.name'))
-      .setDesc(t('settings.codex.approvalPolicy.desc'))
-      .addDropdown((dropdown) => {
-        dropdown.selectEl?.setAttribute('aria-label', t('settings.codex.approvalPolicy.name'));
-        return dropdown
-          .addOption('inherit', t('settings.codex.approvalPolicy.inherit'))
-          .addOption('on-request', t('settings.codex.approvalPolicy.onRequest'))
-          .addOption('never', t('settings.codex.approvalPolicy.never'))
-          .setValue(effectivePolicy)
-          .onChange(async (value) => {
-            this.plugin.settings.backendSettings.codex.approvalPolicy = value as CodexApprovalPolicy;
-            await this.plugin.saveSettings();
-            this.applyCodexRuntimeUpdates();
-          });
-      });
+    addBackendChoiceSetting(bodyEl, {
+      key: 'codex.approvalPolicy',
+      name: t('settings.codex.approvalPolicy.name'),
+      description: t('settings.codex.approvalPolicy.desc'),
+      value: effectivePolicy,
+      options: [
+        { value: 'inherit', label: t('settings.codex.approvalPolicy.inherit'), recommended: true },
+        { value: 'on-request', label: t('settings.codex.approvalPolicy.onRequest') },
+        { value: 'never', label: t('settings.codex.approvalPolicy.never') },
+      ],
+      onChange: async (value) => {
+        const previous = this.plugin.settings.backendSettings.codex.approvalPolicy;
+        this.plugin.settings.backendSettings.codex.approvalPolicy = value as CodexApprovalPolicy;
+        try {
+          await this.plugin.saveSettings();
+        } catch (error) {
+          this.plugin.settings.backendSettings.codex.approvalPolicy = previous;
+          throw error;
+        }
+        // Runtime apply runs only after a successful save; the shared choice
+        // control repaints the committed value when persistence fails.
+        this.applyCodexRuntimeUpdates();
+      },
+      presentation: {
+        scope: 'vault',
+        effect: 'new-session',
+        risk: 'high',
+        defaultLabel: t('settings.codex.approvalPolicy.inherit'),
+        source: t('settings.backendRefresh.source.pluginVaultSetting'),
+      },
+    });
   }
 
   private renderModelSetting(bodyEl: HTMLElement): void {
     const modelSetting = new Setting(bodyEl)
       .setName(t('settings.codex.model.name'))
       .setDesc(t('settings.codex.model.desc'));
+    // The searchable dropdown is populated from the live adapter catalog
+    // (getModelList); a saved id absent from today's catalog falls back to the
+    // custom text input so unknown values stay visible and preserved.
+    describeBackendSetting(modelSetting, {
+      key: 'codex.model',
+      scope: 'vault',
+      effect: 'new-session',
+      risk: 'medium',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+      source: t('settings.backendRefresh.source.pluginVaultSetting'),
+    });
 
     let modelDropdown: DropdownComponent | null = null;
     let modelCustomInputEl: HTMLInputElement | null = null;
@@ -844,49 +978,81 @@ export class SettingsCodexSection {
   }
 
   private renderSandboxSetting(bodyEl: HTMLElement): void {
-    new Setting(bodyEl)
-      .setName(t('settings.codex.sandbox.name'))
-      .setDesc(t('settings.codex.sandbox.desc'))
-      .addDropdown((dropdown) => {
-        dropdown.selectEl?.setAttribute('aria-label', t('settings.codex.sandbox.name'));
-        return dropdown
-          .addOption('read-only', t('settings.codex.sandbox.readOnly'))
-          .addOption('workspace-write', t('settings.codex.sandbox.workspaceWrite'))
-          .addOption('danger-full-access', t('settings.codex.sandbox.dangerFullAccess'))
-          .setValue(this.plugin.settings.backendSettings.codex.sandboxMode)
-          .onChange(async (value) => {
-            this.plugin.settings.backendSettings.codex.sandboxMode = value as 'read-only' | 'workspace-write' | 'danger-full-access';
-            await this.plugin.saveSettings();
-            this.applyCodexRuntimeUpdates();
-          });
-      });
+    addBackendChoiceSetting(bodyEl, {
+      key: 'codex.sandboxMode',
+      name: t('settings.codex.sandbox.name'),
+      description: t('settings.codex.sandbox.desc'),
+      value: this.plugin.settings.backendSettings.codex.sandboxMode,
+      options: [
+        { value: 'read-only', label: t('settings.codex.sandbox.readOnly') },
+        { value: 'workspace-write', label: t('settings.codex.sandbox.workspaceWrite'), recommended: true },
+        { value: 'danger-full-access', label: t('settings.codex.sandbox.dangerFullAccess') },
+      ],
+      onChange: async (value) => {
+        const previous = this.plugin.settings.backendSettings.codex.sandboxMode;
+        this.plugin.settings.backendSettings.codex.sandboxMode = value as 'read-only' | 'workspace-write' | 'danger-full-access';
+        try {
+          await this.plugin.saveSettings();
+        } catch (error) {
+          this.plugin.settings.backendSettings.codex.sandboxMode = previous;
+          throw error;
+        }
+        this.applyCodexRuntimeUpdates();
+      },
+      presentation: {
+        scope: 'vault',
+        effect: 'new-session',
+        risk: 'high',
+        defaultLabel: t('settings.codex.sandbox.workspaceWrite'),
+        source: t('settings.backendRefresh.source.pluginVaultSetting'),
+      },
+    });
   }
 
   private renderReasoningSetting(bodyEl: HTMLElement): void {
-    new Setting(bodyEl)
-      .setName(t('settings.codex.reasoning.name'))
-      .setDesc(t('settings.codex.reasoning.desc'))
-      .addDropdown((dropdown) =>
-        dropdown
-          .addOption('minimal', t('settings.codex.reasoning.minimal'))
-          .addOption('low', t('settings.codex.reasoning.low'))
-          .addOption('medium', t('settings.codex.reasoning.medium'))
-          .addOption('high', t('settings.codex.reasoning.high'))
-          .addOption('xhigh', t('settings.codex.reasoning.xhigh'))
-          .addOption('max', t('settings.codex.reasoning.max'))
-          .addOption('ultra', t('settings.codex.reasoning.ultra'))
-          .addOption('persistent', t('settings.codex.reasoning.persistent'))
-          .setValue(this.plugin.settings.backendSettings.codex.modelReasoningEffort)
-          .onChange(async (value) => {
-            this.plugin.settings.backendSettings.codex.modelReasoningEffort = value as CodexReasoningEffort;
-            await this.plugin.saveSettings();
-            this.applyCodexRuntimeUpdates();
-          }),
-      );
+    const efforts: Array<{ id: CodexReasoningEffort; labelKey: TranslationKey }> = [
+      { id: 'minimal', labelKey: 'settings.codex.reasoning.minimal' },
+      { id: 'low', labelKey: 'settings.codex.reasoning.low' },
+      { id: 'medium', labelKey: 'settings.codex.reasoning.medium' },
+      { id: 'high', labelKey: 'settings.codex.reasoning.high' },
+      { id: 'xhigh', labelKey: 'settings.codex.reasoning.xhigh' },
+      { id: 'max', labelKey: 'settings.codex.reasoning.max' },
+      { id: 'ultra', labelKey: 'settings.codex.reasoning.ultra' },
+      { id: 'persistent', labelKey: 'settings.codex.reasoning.persistent' },
+    ];
+    addBackendChoiceSetting(bodyEl, {
+      key: 'codex.modelReasoningEffort',
+      name: t('settings.codex.reasoning.name'),
+      description: t('settings.codex.reasoning.desc'),
+      value: this.plugin.settings.backendSettings.codex.modelReasoningEffort,
+      options: efforts.map((effort) => ({
+        value: effort.id,
+        label: t(effort.labelKey),
+        recommended: effort.id === 'medium',
+      })),
+      onChange: async (value) => {
+        const previous = this.plugin.settings.backendSettings.codex.modelReasoningEffort;
+        this.plugin.settings.backendSettings.codex.modelReasoningEffort = value as CodexReasoningEffort;
+        try {
+          await this.plugin.saveSettings();
+        } catch (error) {
+          this.plugin.settings.backendSettings.codex.modelReasoningEffort = previous;
+          throw error;
+        }
+        this.applyCodexRuntimeUpdates();
+      },
+      presentation: {
+        scope: 'vault',
+        effect: 'new-session',
+        risk: 'low',
+        defaultLabel: t('settings.codex.reasoning.medium'),
+        source: t('settings.backendRefresh.source.pluginVaultSetting'),
+      },
+    });
   }
 
   private renderAdditionalDirectoriesSetting(bodyEl: HTMLElement): void {
-    new Setting(bodyEl)
+    const setting = new Setting(bodyEl)
       .setName(t('settings.codex.additionalDirs.name'))
       .setDesc(t('settings.codex.additionalDirs.desc'))
       .addTextArea((text) =>
@@ -899,10 +1065,18 @@ export class SettingsCodexSection {
             this.applyCodexRuntimeUpdates();
           }),
       );
+    describeBackendSetting(setting, {
+      key: 'codex.additionalDirectories',
+      scope: 'vault',
+      effect: 'new-session',
+      risk: 'medium',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+      source: t('settings.backendRefresh.source.pluginVaultSetting'),
+    });
   }
 
   private renderNetworkAccessSetting(bodyEl: HTMLElement): void {
-    new Setting(bodyEl)
+    const setting = new Setting(bodyEl)
       .setName(t('settings.codex.network.name'))
       .setDesc(t('settings.codex.network.desc'))
       .addToggle((toggle) =>
@@ -914,24 +1088,46 @@ export class SettingsCodexSection {
             this.applyCodexRuntimeUpdates();
           }),
       );
+    describeBackendSetting(setting, {
+      key: 'codex.networkAccessEnabled',
+      scope: 'vault',
+      effect: 'new-session',
+      risk: 'medium',
+      defaultLabel: t('settings.backendRefresh.default.off'),
+      source: t('settings.backendRefresh.source.pluginVaultSetting'),
+    });
   }
 
   private renderWebSearchSetting(bodyEl: HTMLElement): void {
-    new Setting(bodyEl)
-      .setName(t('settings.codex.webSearch.name'))
-      .setDesc(t('settings.codex.webSearch.desc'))
-      .addDropdown((dropdown) =>
-        dropdown
-          .addOption('disabled', t('settings.codex.webSearch.disabled'))
-          .addOption('cached', t('settings.codex.webSearch.cached'))
-          .addOption('live', t('settings.codex.webSearch.live'))
-          .setValue(this.plugin.settings.backendSettings.codex.webSearchMode)
-          .onChange(async (value) => {
-            this.plugin.settings.backendSettings.codex.webSearchMode = value as CodexWebSearchMode;
-            await this.plugin.saveSettings();
-            this.applyCodexRuntimeUpdates();
-          }),
-      );
+    addBackendChoiceSetting(bodyEl, {
+      key: 'codex.webSearchMode',
+      name: t('settings.codex.webSearch.name'),
+      description: t('settings.codex.webSearch.desc'),
+      value: this.plugin.settings.backendSettings.codex.webSearchMode,
+      options: [
+        { value: 'disabled', label: t('settings.codex.webSearch.disabled') },
+        { value: 'cached', label: t('settings.codex.webSearch.cached'), recommended: true },
+        { value: 'live', label: t('settings.codex.webSearch.live') },
+      ],
+      onChange: async (value) => {
+        const previous = this.plugin.settings.backendSettings.codex.webSearchMode;
+        this.plugin.settings.backendSettings.codex.webSearchMode = value as CodexWebSearchMode;
+        try {
+          await this.plugin.saveSettings();
+        } catch (error) {
+          this.plugin.settings.backendSettings.codex.webSearchMode = previous;
+          throw error;
+        }
+        this.applyCodexRuntimeUpdates();
+      },
+      presentation: {
+        scope: 'vault',
+        effect: 'new-session',
+        risk: 'low',
+        defaultLabel: t('settings.codex.webSearch.cached'),
+        source: t('settings.backendRefresh.source.pluginVaultSetting'),
+      },
+    });
   }
 
   private renderResumeAndInspectGroup(bodyEl: HTMLElement): void {
@@ -1020,6 +1216,19 @@ export class SettingsCodexSection {
     renderCostEstimateSettingsRow(costControlsEl, this.plugin, 'codex');
   }
 
+  /**
+   * Public reapply hook for the common recovery shell: after the parent
+   * Object.assigns restored defaults onto the live backendSettings.codex
+   * object (identity preserved), this pushes the thread-scoped values into
+   * the running adapter via the existing update* mutators, in the save-time
+   * application order. Takes effect at the NEXT thread start/resume; cached
+   * threads are not retroactively affected. executablePath/apiKey are NOT
+   * runtime-updatable — the shell must label those as requiring reload.
+   */
+  reapplyRuntimeUpdates(): void {
+    this.applyCodexRuntimeUpdates();
+  }
+
   private applyCodexRuntimeUpdates(): void {
     const adapter = this.plugin.agentServiceRegistry?.get('codex');
     if (!adapter) {
@@ -1081,6 +1290,10 @@ export class SettingsCodexSection {
 
     dropdown.selectEl.empty();
 
+    // Inherit is the explicit first choice: an empty saved model means the
+    // Codex CLI picks its own default, and the selector must show that.
+    dropdown.addOption('', t('settings.codex.model.inheritOption' as TranslationKey));
+
     if (models && models.length > 0) {
       for (const model of models) {
         dropdown.addOption(model.slug, model.display_name || model.slug);
@@ -1089,12 +1302,24 @@ export class SettingsCodexSection {
 
     dropdown.addOption('__custom__', t('settings.codex.model.customOption'));
 
+    // Preserve an unknown saved id: it stays selectable as a marked option so
+    // the saved value is never silently replaced by the custom placeholder.
     const isKnownModel = models?.some((m) => m.slug === currentModel) ?? false;
-    if (isKnownModel) {
+    const isPreservedUnknown = currentModel !== ''
+      && currentModel !== '__custom__'
+      && !isKnownModel;
+    if (isPreservedUnknown) {
+      dropdown.addOption(
+        currentModel,
+        t('settings.codex.model.unlistedOption' as TranslationKey, { value: currentModel }),
+      );
+    }
+
+    if (currentModel === '' || isKnownModel || isPreservedUnknown) {
       dropdown.setValue(currentModel);
       if (customInputEl) {
         customInputEl.style.display = 'none';
-        customInputEl.value = '';
+        customInputEl.value = isPreservedUnknown ? currentModel : '';
       }
     } else {
       dropdown.setValue('__custom__');

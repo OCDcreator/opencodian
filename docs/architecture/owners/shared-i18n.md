@@ -1,5 +1,21 @@
 # Owner: shared.i18n
 
+2026-11-11（工作台层级与工具反馈）：双语区分“待办计划”、独立 Plan 模式、“工作区终端”与原生“会话终端”；文件变更使用直接入口，命令与技能使用可搜索内联目录，相关设置单独命名。补齐终端启动／退出／失败、仓库不可用／非仓库／读取失败、差异、浏览器加载及截图条件、目录加载／空列表／无匹配／失败文案。浏览器文案按参考稿 `session-workbench-secondary-v2.html` 修正：附加页面改用专用短键 `workbench.browser.attachPage`（附加页面 / Attach page），不再复用全局 attach 标签；新增平静空态说明 `workbench.browser.emptyDescription` 与 `loading`/`captureWait`/`captureFailed`，与进错误区的 `invalidUrl`、`openFallback` 分开；`workbench.browser.external`（在 Obsidian 中打开）保留为仅图标操作的可访问名。翻译层不推断能力、任务终态或权威文件计数；两侧键名与插值保持一致，旧目录键保留以兼容现有消费方。
+
+2026-11-10（DSH 官方权限名称）：新增 `chat.dsh.permission.*` 四项双语名称，仅供共享权限菜单展示内置预设。自动审查文案不代表后端已启用实验扩展；可用项与选中值由原生目录和会话状态决定，custom host 名称保留。
+
+2026-11-10（DSH 会话后续）：双语补子会话 queue／steer、只读与续接能力、明确拒绝和未确认投递、@subagent 分组、DSH 事件账本时间来源，以及超过图片展示数量的提示。翻译层不把 inbox 接受称为执行完成，也不把传输失败称为确定未发送；保持 messageId／number 等插值名一致。
+
+2026-11-10（DSH 思考档位标签）：`chat.dsh.reasoning.modelDefault` → “继承默认（{effort}）” / "Inherit default ({effort})"；boundaryHint 双语说明继承跟随 DSH 默认强度，`chat.effort.disabled`（关闭思考 / Thinking disabled）为显式关闭、不随默认变化。未新增 key，双语 key 集合与占位符一致。
+
+2026-11-10（DSH 共享工作台 phase2）：双语新增 `workbench.planMode.*` 与 `workbench.nativeTerminal.*`，扩展 `chat.dsh.controls.*` / `chat.dsh.workbench.*`，覆盖共享工作台的独立 Plan toggle、终端 spawn 表单、终端/子会话/job 行操作与非渲染 preset owner 的诚实状态（ACP 不可用／检查中／忙碌／失败）。翻译层只命名状态与动作，不判断运行时真值；中英文 key 集合经 hash 校验一致。
+
+2026-11-09（连接备份组件）：DSH专用 `settings.dsh.backup.*` 同步双语任务名称、空／已备份时间、单份覆盖、字段范围与排除项，以及保存／恢复进度、失败回滚和生效边界。时间沿用 `{{date}}` 占位符。只描述设置owner提供的快照事实，不把备份成功表述为连接测试通过；其他后端共享文案保持。
+
+2026-11-09（DSH A）：双语同步精简连接说明与状态文案，沿用现有横向子标签和插件下拉控件。`settings.agent.dsh.connection.{application,saved}` 明确自动保存到当前库、下次连接时生效；`settings.agent.dsh.path.required` 提示填写空自定义路径或恢复自动查找／当前库。保存反馈与当前连接的应用、运行时确认保持区分，后端状态仍由对应 owner 提供。
+
+2026-11-07：六后端任务页共享保存位置、生效边界、默认值和回退消息，并补齐各后端的选项后果与无 CLI/无账户提示。语言层仅展示 owner 提供的事实，不推断凭据有效、后端已确认或权限隔离强度。未知旧值保留为明确的当前选项，技术标识与数值占位符在双语改写中保持不变。
+
 2026-11-02：ZCode 任务设置页补齐账号隔离、共享 API、登录生命周期、模型目录恢复和配置冲突的中英文文案。子标签迁移保留原配置；状态文案区分文件保存、目录读取与重连后的生效。
 
 2026-11-01：中英文新增 `workbench.information`，以会话信息命名入口；具体功能卡片复用任务、文件、终端、仓库、浏览器和资源标签。翻译层继续只提供名称，不参与卡片选择或后端运行状态判断。

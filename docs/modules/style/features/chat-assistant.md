@@ -1,5 +1,7 @@
 # Chat Assistant Styles
 
+2026-11-10：已发送用户消息的 `.opencodian-message-highlight-secret` 仅为定长凭据遮罩提供主题前景／hover 底色、3px 圆角和2px inline padding；限定在插件容器及用户消息内，不影响编辑器、其他 Obsidian 内容或原始记录。未添加 reveal 控件、tooltip 或原始凭据 attribute。此文件 owner inspector 仍 unresolved；保持既有模块映射，不编造 manifest owner。
+
 2026-10-29：引用分类使用全宽 32px disclosure 行，继承界面字体与字号，提供箭头、数量、主题 hover 和可见焦点。展开内容维持原候选的 4px 节奏；折叠容器保留原生 hidden 行为。
 
 > 2026-10-29：富文本输入区使用 ZCode 桌面端的图标+名称 token。技能/命令前景色采用 ZCode 的 light/dark 语义色；CodeMirror 内容区继承现有 composer 字体、内边距与高度上限。textarea 镜像仅作为无布局能力环境的 fallback。

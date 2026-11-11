@@ -73,6 +73,14 @@ export interface AgentSessionChild {
   status: 'pending' | 'running' | 'completed' | 'failed' | 'unknown';
   detail?: string;
   readable: boolean;
+  /**
+   * Durable child conversation mode from the backend's own subagent catalog
+   * (DSH `subagentCatalog`): `continuable` children accept follow-up prompts,
+   * `one-shot` children are terminal read-only records, `external` entries
+   * have no local session, and `unknown` modes stay read-only until child
+   * history resolves them. Absent for backends without a subagent catalog.
+   */
+  mode?: 'one-shot' | 'continuable' | 'external' | 'unknown';
 }
 
 // ---------------------------------------------------------------------------
@@ -286,4 +294,28 @@ export interface AgentAuthCapability extends AgentService {
   getProviderAuthMethods(): Promise<unknown>;
   authorizeProviderOAuth(providerID: string): Promise<unknown>;
   completeProviderOAuth(providerID: string, code: string, method?: number): Promise<unknown>;
+}
+
+/**
+ * Continuation routing into a backend's own child/subagent sessions
+ * (DSH native `session/subagents` prompt seam). Absence means the backend has
+ * no continuable child delivery; callers must never fall back to sending a
+ * continuation through the parent conversation.
+ */
+export interface AgentChildSessionContinuationCapability extends AgentService {
+  /**
+   * Prove the current connection can deliver continuations for this parent
+   * session. Resolves `false` when the backend bridge predates the seam;
+   * rejects when the capability read itself fails — callers must show an
+   * unknown/retryable state, never treat a rejection as "unsupported".
+   */
+  canContinueChildSession?(parentSessionId: string): Promise<boolean>;
+  /**
+   * Deliver one human message to a direct continuable child session. Resolves
+   * with the inbox message id the child accepted (queueing is admission, not
+   * completion). Rejections carry the backend's stable failure code (e.g.
+   * `subagent/parent-unavailable`) and must be surfaced verbatim to the user.
+   */
+  continueChildSession?(parentSessionId: string, childId: string, content: string,
+    options?: { delivery?: 'queue' | 'steer' }): Promise<{ messageId: string }>;
 }

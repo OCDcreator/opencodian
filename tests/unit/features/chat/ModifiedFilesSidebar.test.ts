@@ -84,6 +84,77 @@ describe('ModifiedFilesSidebar', () => {
     document.body.innerHTML = '';
   });
 
+  it('scopes the workbench summary and publishes loading and completion without a timer tick', async () => {
+    const parent = document.body.createDiv({ cls: 'opencodian-container' });
+    const coordinator = new ModifiedFilesSidebarCoordinator();
+    coordinator.mountSidebar(parent, { workspace: { openLinkText: jest.fn() } } as unknown as App);
+    let identity = 'conversation-a';
+    const summaries: string[] = [];
+    coordinator.setWorkbenchSummaryListener(() => summaries.push(coordinator.getWorkbenchSummaryText(identity)));
+    coordinator.setWorkbenchIdentity(identity);
+    coordinator.refresh('native-a', () => [{ file: 'a.md', additions: 3, deletions: 1 }]);
+    expect(coordinator.getWorkbenchSummaryText(identity)).toBe('1 · +3 -1');
+    identity = 'conversation-b';
+    expect(coordinator.getWorkbenchSummaryText(identity)).toBe('');
+    coordinator.setWorkbenchIdentity(identity);
+    expect(coordinator.getWorkbenchSummaryText(identity)).toBe(t('modifiedFiles.loadingShort'));
+    let resolve!: (entries: SessionDiffEntry[]) => void;
+    coordinator.refresh('native-b', () => new Promise<SessionDiffEntry[]>(done => { resolve = done; }));
+    expect(parent.textContent).toContain(t('modifiedFiles.loading'));
+    resolve([{ file: 'b.md', additions: 8, deletions: 2 }]);
+    await Promise.resolve();
+    expect(summaries.at(-1)).toBe('1 · +8 -2');
+    expect(coordinator.getWorkbenchSummaryText('conversation-a')).toBe('');
+    coordinator.destroy();
+  });
+
+  it('does not publish a late summary from the previous identity', async () => {
+    const parent = document.body.createDiv({ cls: 'opencodian-container' });
+    const coordinator = new ModifiedFilesSidebarCoordinator();
+    coordinator.mountSidebar(parent, { workspace: { openLinkText: jest.fn() } } as unknown as App);
+    const changed = jest.fn(); coordinator.setWorkbenchSummaryListener(changed);
+    coordinator.setWorkbenchIdentity('a');
+    let resolve!: (entries: SessionDiffEntry[]) => void;
+    coordinator.refresh('native-a', () => new Promise<SessionDiffEntry[]>(done => { resolve = done; }));
+    coordinator.setWorkbenchIdentity('b');
+    coordinator.refresh('native-b', () => [{ file: 'b.md', additions: 2, deletions: 0 }]);
+    changed.mockClear();
+    resolve([{ file: 'a.md', additions: 99, deletions: 0 }]); await Promise.resolve();
+    expect(changed).not.toHaveBeenCalled();
+    expect(coordinator.getWorkbenchSummaryText('b')).toBe('1 · +2 -0');
+    coordinator.destroy();
+  });
+
+  it('projects the existing file summary without extra reads and clears it when unavailable', () => {
+    const parent = document.body.createDiv({ cls: 'opencodian-container' });
+    const coordinator = new ModifiedFilesSidebarCoordinator();
+    expect(coordinator.getWorkbenchSummaryText()).toBe('');
+    coordinator.mountSidebar(parent, { workspace: { openLinkText: jest.fn() } } as unknown as App);
+    const getEntries = jest.fn().mockReturnValue([{ file: 'note.md', additions: 3, deletions: 1 }]);
+    coordinator.refresh('session-a', getEntries, 'ready');
+    expect(coordinator.getWorkbenchSummaryText()).toBe('1 · +3 -1');
+    expect(coordinator.getWorkbenchSummaryText()).toBe('1 · +3 -1');
+    expect(getEntries).toHaveBeenCalledTimes(1);
+    coordinator.refresh(null, getEntries, 'unavailable');
+    expect(coordinator.getWorkbenchSummaryText()).toBe(t('modifiedFiles.unavailableShort'));
+    expect(getEntries).toHaveBeenCalledTimes(1);
+    coordinator.destroy();
+  });
+
+  it('uses a region when embedded in the workbench and retains the authoritative summary', () => {
+    const parent = document.body.createDiv({ cls: 'opencodian-container' });
+    const target = document.body.createDiv();
+    const sidebar = new ModifiedFilesSidebar({ workspace: { openLinkText: jest.fn() } } as unknown as App, parent);
+    sidebar.updateEntries([{ file: 'note.md', additions: 3, deletions: 1 }], 'ready');
+    sidebar.attachToWorkbench(target);
+    expect(target.querySelector('.opencodian-modified-files-sidebar')?.getAttribute('role')).toBe('region');
+    expect(target.querySelector('[role="dialog"]')).toBeNull();
+    expect(target.querySelector<HTMLButtonElement>('.opencodian-modified-files-trigger-strip')?.hidden).toBe(true);
+    expect(sidebar.getWorkbenchSummaryText()).toBe('1 · +3 -1');
+    expect(target.querySelector('.opencodian-modified-files-sidebar-summary')?.textContent).toBe('1 · +3 -1');
+    sidebar.destroy();
+  });
+
   it('uses an accessible hidden tooltip label instead of aria-label on the collapse button', () => {
     const parentEl = document.createElement('div') as ObsidianLikeElement;
     document.body.appendChild(parentEl);

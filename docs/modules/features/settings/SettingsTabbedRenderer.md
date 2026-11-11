@@ -1,4 +1,21 @@
 # SettingsTabbedRenderer
+
+## 2026-11-09 DSH workspace navigation seam
+
+The DSH mount passes a navigation callback to `SettingsDshSection.attachTabbed`: `(task) => this.switchToPrimaryTab('dsh', task)`. Native advanced-task links (provider reliability/image budgets, optional official terminal bundles) therefore stay inside the existing tab shell and persistence path — no new sidebar, palette or layout. Other backends keep the two-argument mount.
+
+## 2026-11-09 DSH native lifecycle
+
+The renderer retains the active `SettingsDshSection` and exposes `disposeActiveBackendSections()`. Both Codex and DSH sections are disposed before backend task remounts, classic task changes, and non-backend content transitions; native settings hide and editor view onClose call the same method. DSH configuration and extension notifications therefore cannot retain a closed task DOM. Stable host identities preserve unsaved DSH drafts separately from these disposable views.
+
+
+## 2026-11-07 Backend settings refresh
+
+Every selectable backend now enters through `renderBackendWorkspaceTab`, including Pi and ZCode. Both classic and tabbed hosts receive the same vault-default scope/application note and `BackendSettingsWorkspace` recovery disclosure. There is no Pi/ZCode shortcut around that shared mount. Recovery mutates only the selected backend's allowlisted defaults while preserving its live settings object identity; Codex replay uses the section's `reapplyRuntimeUpdates` hook before refresh. Credentials and native files retain their original stores and revision-safe histories.
+
+The renderer passes the actual desktop vault base path as a separate OpenCode 2 section option for machine-local configuration history. It preserves the plugin host identity used by the cross-tab draft cache; missing filesystem identity leaves recovery unavailable rather than sharing another vault's snapshots.
+
+The task-based subtab registry preserves legacy routes. Backend sections continue to own their controls, native configuration mutations and readbacks. A saved recovery point is user-marked working configuration, not a fabricated runtime verification. The wrapper does not start or stop another backend and leaves active Codex section disposal unchanged.
 > 2026-09-21 (advantage-parity R-F7)：deps 新增 `renderEnvironmentVariablesSetting`；General 合并块在 keychain 行之后渲染环境变量行。
 > 2026-09-20 (advantage-parity R-D2)：通用/基础二级 tab 渲染序列加入钥匙串开关行（deps 新增 renderSecretsKeychainSetting）。
 > 2026-09-18 (R-C6): `renderSecurityContent()` 对二级 tab `remote` 分派到 `SettingsRemoteControlSection`；其余二级 tab 仍渲染 `SettingsSecuritySection`。

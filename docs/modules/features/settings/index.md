@@ -49,6 +49,23 @@ export { OpenCodianSettingTab } from './OpenCodianSettings';
 
 - 若后续需要从设置目录公开更多组件，应先确认是否应该继续保持“单主入口”设计
 
+## Shared backend settings controls
+
+- [BackendSettingsControls](controls/BackendSettingsControls.md): native choice cards and sliders with accessible labels, scope/effect metadata and failed-save rollback.
+- [BackendSettingsWorkspace](controls/BackendSettingsWorkspace.md): the shared source/application strip and allowlisted working-default recovery point for the six backend workspaces.
+- [settingsLayoutRegistry](settingsLayoutRegistry.md): current backend task groups and persisted legacy-route migration.
+
+## DSH 配置工作区
+
+- [SettingsDshSection](backends/dsh/SettingsDshSection.md)：保留横向任务标签与连接备份作用域，装配各配置领域。
+- [SettingsDshNativeWorkspace](backends/dsh/SettingsDshNativeWorkspace.md)：当前库稀疏覆盖、分组事务、配置修订、恢复和真实有效值回读。
+- [SettingsDshNativeFields](backends/dsh/SettingsDshNativeFields.md)：声明式字段的继承与结构化条目表单。
+- [SettingsDshNativeHistory](backends/dsh/SettingsDshNativeHistory.md)：非敏感快照验证、恢复差异预览、取消和最终写入 CAS。
+- [SettingsDshExtensionsWorkspace](backends/dsh/SettingsDshExtensionsWorkspace.md)：本机隔离 profile 的扩展操作与进度。
+- [SettingsDshExtensionSettings](backends/dsh/SettingsDshExtensionSettings.md)：真实已加载扩展 schema 的受限编辑与 CAS。
+- [SettingsDshMcpWorkspace](backends/dsh/SettingsDshMcpWorkspace.md)：MCP 声明草稿、验证与持久恢复。
+- [SettingsDshMcpServerControls](backends/dsh/SettingsDshMcpServerControls.md)：复用的掩码名值行、高级参数和证据状态控件。
+
 ## 补充说明
 
 - `OpenCodianSettingTab` 的唯一消费方是 `main.ts` 中的 `this.addSettingTab(new OpenCodianSettingTab(...))` 调用，无其他外部消费方

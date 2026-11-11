@@ -114,7 +114,11 @@ export class SettingsClaudeConfigurationSection {
 
   render(bodyEl: HTMLElement): void {
     clearChildren(bodyEl);
-    const vaultPath = getVaultBasePath(this.options.plugin.app);
+    // Host environments without a vault handle (bare test fixtures, detached
+    // views) degrade to the existing unavailable state instead of throwing.
+    const vaultPath = this.options.plugin.app
+      ? getVaultBasePath(this.options.plugin.app)
+      : null;
     if (!vaultPath) {
       const note = document.createElement('p');
       note.textContent = t('settings.claudeCode.configuration.unavailable');

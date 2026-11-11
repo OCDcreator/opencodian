@@ -1,8 +1,30 @@
 import {
   applyUserMessageTextHighlightSpans,
   extractUserMessageTextHighlightSpans,
+  maskUserMessageSecretsForDisplay,
   prepareUserMessageMarkdownForDisplay,
+  USER_MESSAGE_SECRET_MASK_TEXT,
 } from '../../../../src/features/chat/rendering/userMessageDisplay';
+
+// Synthetic credential fixtures only. Shapes mirror common provider token
+// formats so the detectors are exercised, but every character is invented.
+// Never replace these with real keys.
+const SYNTHETIC = {
+  anthropicKey: 'sk-ant-api03-SYNTH0000EXAMPLE00',
+  openAiKey: 'sk-synth0123456789abcdefghij',
+  githubToken: 'ghp_synth0123456789abcdefgh',
+  slackToken: 'xoxb-synth-0123456789abc',
+  awsAccessKeyId: 'AKIASYNTHETICEXAMPLE',
+  googleApiKey: `AIza${'q'.repeat(35)}`,
+  jwt: 'eyJhbGciOiSynthetic123456.SyntheticSignature123.Sig123',
+  zhipuStyleKey: '0123456789abcdef0123456789abcdef.Zyxwvu0123456789',
+  pemBlock: '-----BEGIN PRIVATE KEY-----\nSYNTHETIC-KEY-MATERIAL\n-----END PRIVATE KEY-----',
+  genericValue: 'SYNTHKEY0123456789',
+  bearerToken: 'SYNTHTOKEN0123456789',
+  queryToken: 'SYNTH0123456789',
+  urlPassword: 'syntheticpass',
+  envValue: 'hunter2hunter',
+};
 
 describe('prepareUserMessageMarkdownForDisplay', () => {
   it('converts raw style blocks into css code fences', () => {
@@ -347,5 +369,57 @@ describe('applyUserMessageTextHighlightSpans', () => {
       },
     ])).toBe(false);
     expect(container.querySelector('.opencodian-message-highlight-agent')).toBeNull();
+  });
+});
+
+describe('userMessage secret mask spans', () => {
+  it('projects mask glyph runs into secret highlight spans', () => {
+    const masked = maskUserMessageSecretsForDisplay(`api_key=${SYNTHETIC.genericValue} 谢谢`);
+
+    expect(extractUserMessageTextHighlightSpans(masked, [])).toEqual([
+      {
+        kind: 'secret',
+        value: USER_MESSAGE_SECRET_MASK_TEXT,
+        start: 8,
+        end: 16,
+      },
+    ]);
+  });
+
+  it('drops stale agent spans instead of misplacing them on masked text', () => {
+    const masked = maskUserMessageSecretsForDisplay(`api_key=${SYNTHETIC.genericValue} 谢谢`);
+
+    expect(extractUserMessageTextHighlightSpans(masked, [
+      {
+        type: 'agent',
+        source: {
+          value: '@reviewer',
+          start: 16,
+          end: 25,
+        },
+      },
+    ])).toEqual([
+      {
+        kind: 'secret',
+        value: USER_MESSAGE_SECRET_MASK_TEXT,
+        start: 8,
+        end: 16,
+      },
+    ]);
+  });
+
+  it('wraps masked runs without title or aria attributes that could leak', () => {
+    const masked = maskUserMessageSecretsForDisplay(`db_password: ${SYNTHETIC.envValue}`);
+    const container = document.createElement('div');
+    container.textContent = masked;
+
+    expect(applyUserMessageTextHighlightSpans(container, masked, extractUserMessageTextHighlightSpans(masked, [])))
+      .toBe(true);
+
+    const highlight = container.querySelector<HTMLElement>('.opencodian-message-highlight-secret');
+    expect(highlight?.textContent).toBe(USER_MESSAGE_SECRET_MASK_TEXT);
+    expect(highlight?.dataset.highlight).toBe('secret');
+    expect(highlight?.hasAttribute('title')).toBe(false);
+    expect(highlight?.getAttribute('aria-label')).toBeNull();
   });
 });

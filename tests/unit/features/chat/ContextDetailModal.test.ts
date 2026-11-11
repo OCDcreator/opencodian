@@ -272,6 +272,30 @@ describe('ContextDetailModal', () => {
     modal.onClose();
   });
 
+  it.each([false, true])('shows the capture limit for an empty DSH ledger only when limited=%s', async (limited) => {
+    const loader = jest.fn().mockResolvedValue({
+      entries: [],
+      limited,
+      timing: { observedTurnCount: 0, eventCount: 0 },
+    });
+    const modal = new ContextDetailModal({} as App, {
+      conversation: null,
+      contextState: null,
+      dshTraceLedgerLoader: loader,
+    });
+
+    modal.onOpen();
+    await Promise.resolve();
+
+    const ledgerEl = modal.contentEl.querySelector('.opencodian-context-dsh-ledger');
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(ledgerEl?.querySelector('.opencodian-context-raw-messages-state.is-empty')?.textContent)
+      .toBe('尚未观察到 DSH 事件。');
+    expect(ledgerEl?.querySelector('.opencodian-context-modal-note')?.textContent ?? null)
+      .toBe(limited ? '已达到采集上限，部分事件未记录。' : null);
+    modal.onClose();
+  });
+
   it('shows empty state when raw message loader returns empty array', async () => {
     const { contextState, conversation } = createValidContext();
 

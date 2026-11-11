@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 
 import {
@@ -333,6 +334,23 @@ function expectGroupOrder(containerEl: HTMLElement, expectedGroups: string[]): v
   expect(actualGroups).toEqual(expectedGroups);
 }
 
+function findChoiceRadios(containerEl: HTMLElement, backendKey: string): HTMLInputElement[] {
+  return Array.from(containerEl.querySelectorAll<HTMLInputElement>(
+    `[role="radiogroup"][data-backend-key="${backendKey}"] input[type="radio"]`,
+  ));
+}
+
+/** Clicks a backend choice radio and lets the async commit settle. */
+async function chooseRadio(containerEl: HTMLElement, backendKey: string, value: string): Promise<void> {
+  const input = findChoiceRadios(containerEl, backendKey).find((candidate) => candidate.value === value);
+  expect(input).toBeDefined();
+  // jsdom does not synthesize `change` from radio clicks; a real browser fires
+  // it when the checked radio changes, so dispatch it explicitly.
+  input!.checked = true;
+  input!.dispatchEvent(new Event('change', { bubbles: true }));
+  await new Promise<void>((resolve) => { setTimeout(resolve, 0); });
+}
+
 function expectClaudeCodeGroupChrome(containerEl: HTMLElement): void {
   for (const groupEl of Array.from(containerEl.querySelectorAll<HTMLElement>('[data-claude-code-group]'))) {
     expect(groupEl.querySelector(':scope > .opencodian-claude-code-group-header')).toBeTruthy();
@@ -382,27 +400,39 @@ describe('SettingsClaudeCodeSection', () => {
       .toHaveBeenCalledWith(true);
     expect(findButton(t('settings.claudeCode.diagnostics.button'))).toBeDefined();
 
-    expect(textRecords.some((record) => record.name === t('settings.claudeCode.model.name'))).toBe(false);
-    expect(textRecords.some((record) => record.name === t('settings.claudeCode.fallbackModel.name'))).toBe(false);
-    expect(findDropdown(t('settings.claudeCode.thinking.name'))).toBeDefined();
-    expect(findDropdown(t('settings.claudeCode.permissionMode.name'))).toBeDefined();
+    // Model rows are choice-first: inherit-first dropdowns with the saved
+    // value preserved (marked option) instead of bare text inputs.
+    const modelDropdown = findDropdown(t('settings.claudeCode.model.name'));
+    expect(modelDropdown.control.setValue).toHaveBeenCalledWith('claude-sonnet-4-5');
+    expect(modelDropdown.control.addOption).toHaveBeenCalledWith('', t('settings.backendRefresh.default.empty'));
+    expect(modelDropdown.control.addOption).toHaveBeenCalledWith(
+      'claude-sonnet-4-5',
+      t('settings.claudeCode.modelId.unlistedOption', { value: 'claude-sonnet-4-5' }),
+    );
+    expect(findDropdown(t('settings.claudeCode.fallbackModel.name')).control.setValue).toHaveBeenCalledWith('');
+    // Verified CLI aliases are real choices; no unverified alias (haiku) is
+    // invented, and inherit/custom stay unaffected.
+    const modelOptionValues = modelDropdown.control.addOption.mock.calls.map(([value]) => value);
+    expect(modelOptionValues).toEqual(
+      expect.arrayContaining(['', 'fable', 'opus', 'sonnet', '__custom__', 'claude-sonnet-4-5']),
+    );
+    expect(modelOptionValues).not.toContain('haiku');
+    expect(findChoiceRadios(containerEl, 'claude.thinking')).toHaveLength(3);
+    expect(findChoiceRadios(containerEl, 'claude.permissionMode')).toHaveLength(4);
     expect(findToggle(t('settings.claudeCode.settingSources.project'))).toBeDefined();
     expect(findTextArea(t('settings.claudeCode.additionalDirectories.name'))).toBeDefined();
-    expect(containerEl.querySelector('[data-settings-surface="tab-body"][data-claude-code-section="runtime"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-settings-surface="tab-body"][data-claude-code-section="connection"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-claude-code-group="models"]')).toBeDefined();
     expect(containerEl.querySelector('[data-claude-code-group="connection-runtime"]')).toBeDefined();
     expect(containerEl.querySelector('[data-claude-code-group="runtime-ecosystem"]')).toBeDefined();
     expect(containerEl.querySelector('[data-claude-code-group="project-files"]')).toBeDefined();
     expect(containerEl.querySelector('[data-claude-code-group="runtime-inspection"]')).toBeDefined();
     expect(containerEl.querySelector('[data-claude-code-group="diagnostics-logs"]')).toBeDefined();
-    expect(containerEl.querySelector('[data-claude-code-section="model-thinking"]')).toBeDefined();
-    expect(containerEl.querySelector('[data-claude-code-section="permissions"]')).toBeDefined();
-    expect(containerEl.querySelector('[data-claude-code-section="context-sources"]')).toBeDefined();
-    expect(containerEl.querySelector('[data-claude-code-section="tools"]')).toBeDefined();
-    expect(containerEl.querySelector('[data-claude-code-section="mcp"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-claude-code-section="conversation"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-claude-code-section="permissions-safety"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-claude-code-section="tools-context"]')).toBeDefined();
     expect(containerEl.querySelector('[data-claude-code-section="providers"]')).toBeDefined();
-    expect(containerEl.querySelector('[data-claude-code-section="skills-commands"]')).toBeDefined();
-    expect(containerEl.querySelector('[data-claude-code-section="agents"]')).toBeDefined();
-    expect(containerEl.querySelector('[data-claude-code-section="resources"]')).toBeNull();
+    expect(containerEl.querySelector('[data-claude-code-section="resources"]')).toBeDefined();
     expectClaudeCodeGroupChrome(containerEl);
 
     const runtimeReadback = containerEl.querySelector('[data-claude-code-runtime-ecosystem="true"]');
@@ -537,12 +567,18 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       });
       section.attachTabbed(containerEl, 'model-thinking');
 
-      expectGroupOrder(containerEl, ['thinking-effort', 'title-inline-overrides']);
+      expectGroupOrder(containerEl, [
+        'models',
+        'thinking-effort',
+        'prompt-behavior',
+        'title-inline-overrides',
+        'question-ux',
+      ]);
       expectClaudeCodeGroupChrome(containerEl);
-      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(2);
+      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(5);
     });
 
-    it('keeps only thinking and effort controls; provider models are not SDK settings', () => {
+    it('renders conversation defaults with restored model fields and choice controls', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
@@ -551,12 +587,201 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       });
       section.attachTabbed(containerEl, 'model-thinking');
 
-      expect(findDropdown(t('settings.claudeCode.thinking.name'))).toBeDefined();
-      expect(findDropdown(t('settings.claudeCode.effort.name'))).toBeDefined();
-      expect(textRecords.some((record) => record.name === t('settings.claudeCode.model.name'))).toBe(false);
-      expect(textRecords.some((record) => record.name === t('settings.claudeCode.fallbackModel.name'))).toBe(false);
+      // Choice-first: thinking (3 shapes) and effort (5 levels) are radios.
+      expect(findChoiceRadios(containerEl, 'claude.thinking')).toHaveLength(3);
+      expect(findChoiceRadios(containerEl, 'claude.effort')).toHaveLength(5);
+      // Restored capability: main/fallback model are inherit-first dropdowns
+      // with the verified CLI alias choices.
+      const mainModelDropdown = findDropdown(t('settings.claudeCode.model.name'));
+      const mainModelOptions = mainModelDropdown.control.addOption.mock.calls.map(([value]) => value);
+      expect(mainModelOptions.slice(0, 5)).toEqual(['', 'fable', 'opus', 'sonnet', '__custom__']);
+      const fallbackModelOptions = findDropdown(t('settings.claudeCode.fallbackModel.name')).control.addOption.mock.calls.map(([value]) => value);
+      expect(fallbackModelOptions.slice(0, 5)).toEqual(['', 'fable', 'opus', 'sonnet', '__custom__']);
+      // Guardrails stay on the permissions-safety page.
       expect(textRecords.some((record) => record.name === t('settings.claudeCode.maxTurns.name'))).toBe(false);
-      expect(toggleRecords.some((record) => record.name === t('settings.claudeCode.promptSuggestions.name'))).toBe(false);
+      expect(toggleRecords.some((record) => record.name === t('settings.claudeCode.promptSuggestions.name'))).toBe(true);
+    });
+
+    it('persists model choice changes and preserves unknown saved ids', async () => {
+      const plugin = createPlugin();
+      plugin.settings.backendSettings.claudeCode.model = 'claude-opus-4-6';
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      // Unknown saved id stays selectable (marked), not replaced by default.
+      const modelDropdown = findDropdown(t('settings.claudeCode.model.name'));
+      expect(modelDropdown.control.addOption).toHaveBeenCalledWith(
+        'claude-opus-4-6',
+        t('settings.claudeCode.modelId.unlistedOption', { value: 'claude-opus-4-6' }),
+      );
+
+      await modelDropdown.onChange?.('' as never);
+      expect(plugin.settings.backendSettings.claudeCode.model).toBe('');
+      expect(plugin.saveSettings).toHaveBeenCalled();
+
+      // An official CLI alias is a first-class choice.
+      await modelDropdown.onChange?.('sonnet' as never);
+      expect(plugin.settings.backendSettings.claudeCode.model).toBe('sonnet');
+    });
+
+    it('shows the custom input on the explicit custom choice without saving', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const modelDropdown = findDropdown(t('settings.claudeCode.model.name'));
+      await modelDropdown.onChange?.('__custom__' as never);
+
+      const customInput = containerEl.querySelector<HTMLInputElement>('[data-setting="claude-model-custom"]');
+      expect(customInput).toBeTruthy();
+      expect(customInput!.style.display).toBe('block');
+      // Custom choice only reveals the input; nothing is persisted until the
+      // user commits a value from it.
+      expect(plugin.saveSettings).not.toHaveBeenCalled();
+    });
+
+    it('reveals and hides the budget row on native thinking radio changes without remounting the page', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      // Canary: a node rendered before the change must survive it (no remount).
+      const canaryBefore = containerEl.querySelector('[data-claude-code-group="models"]');
+      const effortRadiosBefore = findChoiceRadios(containerEl, 'claude.effort');
+      expect(containerEl.querySelector('[data-setting="claude-thinking-budget-custom"]')).toBeNull();
+
+      await chooseRadio(containerEl, 'claude.thinking', 'fixed');
+
+      // The dropdown's data-setting attr lives on the mocked select (absent in
+      // tests); the revealed row's real marker is its custom input.
+      expect(containerEl.querySelector('[data-setting="claude-thinking-budget-custom"]')).toBeTruthy();
+      expect(containerEl.querySelector('[data-claude-budget-holder="true"]')).toBeTruthy();
+      expect(containerEl.querySelector('[data-claude-code-group="models"]')).toBe(canaryBefore);
+      expect(findChoiceRadios(containerEl, 'claude.effort')).toEqual(effortRadiosBefore);
+
+      await chooseRadio(containerEl, 'claude.thinking', 'adaptive');
+
+      expect(containerEl.querySelector('[data-setting="claude-thinking-budget-custom"]')).toBeNull();
+      expect(containerEl.querySelector('[data-claude-code-group="models"]')).toBe(canaryBefore);
+      expect(plugin.settings.backendSettings.claudeCode.thinking).toEqual({ type: 'adaptive' });
+    });
+
+    it('keeps thinking and budget holder unchanged when saving the type fails', async () => {
+      const plugin = createPlugin();
+      plugin.saveSettings.mockRejectedValueOnce(new Error('disk full'));
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      await chooseRadio(containerEl, 'claude.thinking', 'fixed');
+
+      // Settings stay on the committed value AND the radios repaint it.
+      expect(plugin.settings.backendSettings.claudeCode.thinking).toEqual({ type: 'adaptive' });
+      expect(findChoiceRadios(containerEl, 'claude.thinking').find((input) => input.checked)?.value).toBe('adaptive');
+      expect(containerEl.querySelector('[data-setting="claude-thinking-budget"]')).toBeNull();
+    });
+
+    it('restores the previous effort and repaints the committed radio on save failure', async () => {
+      const plugin = createPlugin();
+      plugin.saveSettings.mockRejectedValueOnce(new Error('disk full'));
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      await chooseRadio(containerEl, 'claude.effort', 'high');
+
+      expect(plugin.settings.backendSettings.claudeCode.effort).toBe('medium');
+      expect(findChoiceRadios(containerEl, 'claude.effort').find((input) => input.checked)?.value).toBe('medium');
+    });
+
+    it('restores jsRuntime on save failure', async () => {
+      const plugin = createPlugin();
+      plugin.saveSettings.mockRejectedValueOnce(new Error('disk full'));
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'connection');
+
+      await chooseRadio(containerEl, 'claude.jsRuntime', 'bun');
+
+      expect(plugin.settings.backendSettings.claudeCode.jsRuntime).toBe('');
+      expect(findChoiceRadios(containerEl, 'claude.jsRuntime').find((input) => input.checked)?.value).toBe('');
+    });
+
+    it('restores askUserQuestionPreviewFormat on save failure', async () => {
+      const plugin = createPlugin();
+      plugin.saveSettings.mockRejectedValueOnce(new Error('disk full'));
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      await chooseRadio(containerEl, 'claude.askUserQuestionPreviewFormat', 'markdown');
+
+      expect(plugin.settings.backendSettings.claudeCode.askUserQuestionPreviewFormat).toBe('');
+      expect(findChoiceRadios(containerEl, 'claude.askUserQuestionPreviewFormat').find((input) => input.checked)?.value).toBe('');
+    });
+
+    it('permission mode: failed persistence rolls back and never calls the adapter', async () => {
+      const claudeAdapter = { setPermissionMode: jest.fn().mockResolvedValue(undefined) };
+      const plugin = createPlugin({ claudeAdapter });
+      plugin.saveSettings.mockRejectedValueOnce(new Error('disk full'));
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'permissions-safety');
+
+      await chooseRadio(containerEl, 'claude.permissionMode', 'plan');
+
+      expect(plugin.settings.backendSettings.claudeCode.permissionMode).toBe('default');
+      expect(claudeAdapter.setPermissionMode).not.toHaveBeenCalled();
+      expect(findChoiceRadios(containerEl, 'claude.permissionMode').find((input) => input.checked)?.value).toBe('default');
+    });
+
+    it('permission mode: failed runtime apply after a successful save keeps the persisted value', async () => {
+      const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+      const claudeAdapter = { setPermissionMode: jest.fn().mockRejectedValue(new Error('sdk busy')) };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'permissions-safety');
+
+      await chooseRadio(containerEl, 'claude.permissionMode', 'plan');
+
+      // Persisted value stays; the shared control must NOT repaint the old one.
+      expect(plugin.settings.backendSettings.claudeCode.permissionMode).toBe('plan');
+      expect(findChoiceRadios(containerEl, 'claude.permissionMode').find((input) => input.checked)?.value).toBe('plan');
+      expect(claudeAdapter.setPermissionMode).toHaveBeenCalledWith('plan');
+      expect(plugin.saveSettings).toHaveBeenCalled();
+      expect(noticeSpy).toHaveBeenCalled();
+      noticeSpy.mockRestore();
     });
 
     it('gives every Claude Code custom-tooltip trigger one accessible non-native label source', () => {
@@ -604,10 +829,53 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       });
       section.attachTabbed(containerEl, 'model-thinking');
 
-      expect(findText(t('settings.claudeCode.thinkingBudget.name')).control.setValue)
-        .toHaveBeenCalledWith('8192');
-      await findDropdown(t('settings.claudeCode.thinking.name')).onChange?.('fixed' as never);
+      const budgetDropdown = findDropdown(t('settings.claudeCode.thinkingBudget.name'));
+      // Saved 8192 is a preset: selected directly, never rewritten on render.
+      expect(budgetDropdown.control.setValue).toHaveBeenCalledWith('8192');
+      const optionValues = budgetDropdown.control.addOption.mock.calls.map(([value]) => value);
+      expect(optionValues).toEqual(['1024', '4096', '8192', '16384', '__custom__']);
+
+      await chooseRadio(containerEl, 'claude.thinking', 'fixed');
       expect(plugin.settings.backendSettings.claudeCode.thinking).toEqual({ type: 'fixed', budgetTokens: 8192 });
+    });
+
+    it('keeps an out-of-preset thinking budget as the selected custom value', () => {
+      const plugin = createPlugin();
+      plugin.settings.backendSettings.claudeCode.thinking = { type: 'fixed', budgetTokens: 30000 };
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const budgetDropdown = findDropdown(t('settings.claudeCode.thinkingBudget.name'));
+      expect(budgetDropdown.control.setValue).toHaveBeenCalledWith('__custom__');
+      const customInput = containerEl.querySelector<HTMLInputElement>('[data-setting="claude-thinking-budget-custom"]');
+      expect(customInput).toBeTruthy();
+      expect(customInput!.style.display).toBe('block');
+      expect(customInput!.value).toBe('30000');
+    });
+
+    it('rejects malformed thinking budget input instead of partial parsing', async () => {
+      const plugin = createPlugin();
+      plugin.settings.backendSettings.claudeCode.thinking = { type: 'fixed', budgetTokens: 8192 };
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const customInput = containerEl.querySelector<HTMLInputElement>('[data-setting="claude-thinking-budget-custom"]');
+      expect(customInput).toBeTruthy();
+      customInput!.value = '4096abc';
+      customInput!.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise<void>((resolve) => { setTimeout(resolve, 0); });
+
+      // "4096abc" must NOT become 4096: whole-string parse or reject.
+      expect(plugin.settings.backendSettings.claudeCode.thinking).toEqual({ type: 'fixed', budgetTokens: 8192 });
+      expect(plugin.saveSettings).not.toHaveBeenCalled();
     });
 
     it('persists effort changes from Model & Thinking tab', async () => {
@@ -619,7 +887,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       });
       section.attachTabbed(containerEl, 'model-thinking');
 
-      await findDropdown(t('settings.claudeCode.effort.name')).onChange?.('high' as never);
+      await chooseRadio(containerEl, 'claude.effort', 'high');
       expect(plugin.settings.backendSettings.claudeCode.effort).toBe('high');
       expect(plugin.saveSettings).toHaveBeenCalled();
     });
@@ -650,24 +918,29 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       section.attachTabbed(containerEl, 'model-thinking');
 
       // Switch to fixed — should set default budgetTokens
-      await findDropdown(t('settings.claudeCode.thinking.name')).onChange?.('fixed' as never);
+      await chooseRadio(containerEl, 'claude.thinking', 'fixed');
       expect(plugin.settings.backendSettings.claudeCode.thinking).toEqual({ type: 'fixed', budgetTokens: 4096 });
 
       // Switch to disabled
-      await findDropdown(t('settings.claudeCode.thinking.name')).onChange?.('disabled' as never);
+      await chooseRadio(containerEl, 'claude.thinking', 'disabled');
       expect(plugin.settings.backendSettings.claudeCode.thinking).toEqual({ type: 'disabled' });
     });
 
-    it('renders Permissions tab with permission mode dropdown', () => {
+    it('renders permission mode as a high-risk radio choice with honest metadata', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'permissions');
+      section.attachTabbed(containerEl, 'permissions-safety');
 
-      expect(findDropdown(t('settings.claudeCode.permissionMode.name'))).toBeDefined();
+      expect(findChoiceRadios(containerEl, 'claude.permissionMode')).toHaveLength(4);
+      const settingEl = containerEl.querySelector<HTMLElement>('[data-backend-key="claude.permissionMode"]');
+      expect(settingEl?.dataset.backendScope).toBe('vault');
+      expect(settingEl?.dataset.backendEffect).toBe('next-turn');
+      expect(settingEl?.dataset.backendRisk).toBe('high');
+      expect(settingEl?.getAttribute('data-claude-code-high-risk')).toBe('permission-mode');
     });
 
     it('persists permission mode changes from Permissions tab', async () => {
@@ -678,9 +951,9 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'permissions');
+      section.attachTabbed(containerEl, 'permissions-safety');
 
-      await findDropdown(t('settings.claudeCode.permissionMode.name')).onChange?.('plan' as never);
+      await chooseRadio(containerEl, 'claude.permissionMode', 'plan');
       expect(plugin.settings.backendSettings.claudeCode.permissionMode).toBe('plan');
       expect(claudeAdapter.setPermissionMode).toHaveBeenCalledWith('plan');
       expect(plugin.saveSettings).toHaveBeenCalled();
@@ -694,9 +967,9 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'permissions');
+      section.attachTabbed(containerEl, 'permissions-safety');
 
-      await findDropdown(t('settings.claudeCode.permissionMode.name')).onChange?.('plan' as never);
+      await chooseRadio(containerEl, 'claude.permissionMode', 'plan');
 
       expect(plugin.settings.backendSettings.claudeCode.permissionMode).toBe('plan');
       expect(claudeAdapter.setPermissionMode).toHaveBeenCalledWith('plan');
@@ -719,8 +992,10 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         'project-source-files',
         'claude-configuration',
         'additional-context',
+        'tool-policy',
+        'mcp-runtime',
       ]);
-      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(4);
+      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(6);
     });
 
     it('renders Context & Sources tab with setting source toggles and directories textarea', () => {
@@ -893,15 +1168,13 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
 
       expectGroupOrder(containerEl, [
         'connection-runtime',
-        'limits-budget',
-        'prompt-behavior',
         'runtime-ecosystem',
         'project-files',
         'runtime-inspection',
         'diagnostics-logs',
       ]);
       expectClaudeCodeGroupChrome(containerEl);
-      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(7);
+      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(5);
     });
 
     it('marks lifecycle notices with the Claude Code lifecycle class', () => {
@@ -1568,14 +1841,18 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       section.attachTabbed(containerEl, 'tools');
 
       expectGroupOrder(containerEl, [
+        'source-activation',
+        'project-source-files',
+        'claude-configuration',
+        'additional-context',
         'tool-policy',
-        'question-ux',
+        'mcp-runtime',
       ]);
       expectClaudeCodeGroupChrome(containerEl);
-      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(2);
+      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(6);
     });
 
-    it('keeps MCP runtime controls out of the tools tab', () => {
+    it('groups MCP runtime controls with the tool policy on the tools-context page', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
@@ -1584,8 +1861,8 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       });
       section.attachTabbed(containerEl, 'tools');
 
-      expect(containerEl.querySelector('[data-claude-code-mcp-runtime="true"]')).toBeNull();
-      expect(toggleRecords.some((record) => record.name === t('settings.claudeCode.strictMcpConfig.name'))).toBe(false);
+      expect(containerEl.querySelector('[data-claude-code-mcp-runtime="true"]')).toBeTruthy();
+      expect(toggleRecords.some((record) => record.name === t('settings.claudeCode.strictMcpConfig.name'))).toBe(true);
     });
 
     it('renders and persists tool allow/block lists', async () => {
@@ -1769,24 +2046,22 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(lifecycleEl!.textContent).toContain(t('settings.claudeCode.toolAliases.lifecycleNotice'));
     });
 
-    it('renders AskUserQuestion preview format dropdown and persists changes', async () => {
+    it('renders AskUserQuestion preview format choices and persists changes', async () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'tools');
+      section.attachTabbed(containerEl, 'model-thinking');
 
-      const dropdown = findDropdown(t('settings.claudeCode.askUserQuestionPreviewFormat.name'));
-      expect(dropdown).toBeDefined();
-      expect(dropdown?.control.setValue).toHaveBeenCalledWith('');
+      expect(findChoiceRadios(containerEl, 'claude.askUserQuestionPreviewFormat')).toHaveLength(3);
 
-      await dropdown?.onChange?.('markdown' as never);
+      await chooseRadio(containerEl, 'claude.askUserQuestionPreviewFormat', 'markdown');
       expect(plugin.settings.backendSettings.claudeCode.askUserQuestionPreviewFormat).toBe('markdown');
       expect(plugin.saveSettings).toHaveBeenCalled();
 
-      await dropdown?.onChange?.('html' as never);
+      await chooseRadio(containerEl, 'claude.askUserQuestionPreviewFormat', 'html');
       expect(plugin.settings.backendSettings.claudeCode.askUserQuestionPreviewFormat).toBe('html');
     });
 
@@ -1797,7 +2072,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'tools');
+      section.attachTabbed(containerEl, 'model-thinking');
 
       const boundaryEl = containerEl.querySelector('[data-claude-code-ask-user-question-preview-format-boundary="true"]');
       expect(boundaryEl).toBeTruthy();
@@ -2140,86 +2415,129 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
   });
 
   describe('runtime query limits', () => {
-    it('renders turn and budget limit controls in runtime tab', async () => {
+    /** Change a numeric-preset custom input and let the commit settle. */
+    async function changeNumericInput(
+      containerEl: HTMLElement,
+      dataSetting: string,
+      value: string,
+    ): Promise<void> {
+      const input = containerEl.querySelector<HTMLInputElement>(`[data-setting="${dataSetting}"]`);
+      expect(input).toBeDefined();
+      input!.value = value;
+      input!.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise<void>((resolve) => { setTimeout(resolve, 0); });
+    }
+
+    function numericDropdown(name: string): ControlRecord<MockDropdownControl> {
+      return findDropdown(name);
+    }
+
+    it('renders limit preset dropdowns with inherit first in the permissions-safety tab', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'runtime');
+      section.attachTabbed(containerEl, 'permissions-safety');
 
-      expect(findText(t('settings.claudeCode.maxTurns.name'))).toBeDefined();
-      expect(findText(t('settings.claudeCode.maxBudgetUsd.name'))).toBeDefined();
-      expect(findText(t('settings.claudeCode.taskBudget.name'))).toBeDefined();
+      // Defaults are null (unlimited): inherit selected, never fabricated.
+      expect(numericDropdown(t('settings.claudeCode.maxTurns.name')).control.setValue).toHaveBeenCalledWith('');
+      expect(numericDropdown(t('settings.claudeCode.maxBudgetUsd.name')).control.setValue).toHaveBeenCalledWith('');
+      expect(numericDropdown(t('settings.claudeCode.taskBudget.name')).control.setValue).toHaveBeenCalledWith('');
+      const turnOptions = numericDropdown(t('settings.claudeCode.maxTurns.name')).control.addOption.mock.calls.map(([value]) => value);
+      expect(turnOptions).toEqual(['', '10', '25', '50', '100', '__custom__']);
+      const budgetOptions = numericDropdown(t('settings.claudeCode.maxBudgetUsd.name')).control.addOption.mock.calls.map(([value]) => value);
+      expect(budgetOptions).toEqual(['', '1', '5', '20', '100', '__custom__']);
+      const taskOptions = numericDropdown(t('settings.claudeCode.taskBudget.name')).control.addOption.mock.calls.map(([value]) => value);
+      expect(taskOptions).toEqual(['', '50000', '100000', '500000', '1000000', '__custom__']);
+      // Metadata stays on the numeric rows.
+      const turnSettingEl = containerEl.querySelector<HTMLElement>('[data-backend-key="claude.maxTurns"]');
+      expect(turnSettingEl?.dataset.backendEffect).toBe('next-turn');
+    });
 
-      await findText(t('settings.claudeCode.maxTurns.name')).onChange?.('12' as never);
-      expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBe(12);
+    it('persists preset and custom values through the guided dropdowns', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'permissions-safety');
+
+      await numericDropdown(t('settings.claudeCode.maxTurns.name')).onChange?.('25' as never);
+      expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBe(25);
       expect(plugin.saveSettings).toHaveBeenCalled();
 
-      await findText(t('settings.claudeCode.taskBudget.name')).onChange?.('50000' as never);
+      await changeNumericInput(containerEl, 'claude-task-budget-custom', '50000');
       expect(plugin.settings.backendSettings.claudeCode.taskBudget).toBe(50000);
       expect(plugin.saveSettings).toHaveBeenCalledTimes(2);
     });
 
-    it('rejects partially numeric turn and budget limit input', async () => {
+    it('rejects malformed numeric input instead of partial parsing', async () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'runtime');
+      section.attachTabbed(containerEl, 'permissions-safety');
 
-      await findText(t('settings.claudeCode.maxTurns.name')).onChange?.('12abc' as never);
-      await findText(t('settings.claudeCode.maxBudgetUsd.name')).onChange?.('5usd' as never);
-      await findText(t('settings.claudeCode.taskBudget.name')).onChange?.('50k' as never);
+      await numericDropdown(t('settings.claudeCode.maxTurns.name')).onChange?.('25' as never);
+      const turnsBefore = plugin.settings.backendSettings.claudeCode.maxTurns;
 
-      expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBeNull();
+      await changeNumericInput(containerEl, 'claude-max-turns-custom', '12abc');
+      await changeNumericInput(containerEl, 'claude-max-budget-custom', '5usd');
+      await changeNumericInput(containerEl, 'claude-task-budget-custom', '50k');
+
+      expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBe(turnsBefore);
       expect(plugin.settings.backendSettings.claudeCode.maxBudgetUsd).toBeNull();
       expect(plugin.settings.backendSettings.claudeCode.taskBudget).toBeNull();
-      expect(plugin.saveSettings).toHaveBeenCalled();
+      expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
     });
 
-    it('rejects negative and zero turn and budget limits', async () => {
+    it('rejects negative and zero numeric input', async () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'runtime');
+      section.attachTabbed(containerEl, 'permissions-safety');
 
-      await findText(t('settings.claudeCode.maxTurns.name')).onChange?.('-5' as never);
-      await findText(t('settings.claudeCode.maxBudgetUsd.name')).onChange?.('0' as never);
-      await findText(t('settings.claudeCode.taskBudget.name')).onChange?.('0' as never);
+      await numericDropdown(t('settings.claudeCode.maxTurns.name')).onChange?.('25' as never);
+      await numericDropdown(t('settings.claudeCode.maxBudgetUsd.name')).onChange?.('5' as never);
 
-      expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBeNull();
-      expect(plugin.settings.backendSettings.claudeCode.maxBudgetUsd).toBeNull();
+      await changeNumericInput(containerEl, 'claude-max-turns-custom', '-5');
+      await changeNumericInput(containerEl, 'claude-max-budget-custom', '0');
+      await changeNumericInput(containerEl, 'claude-task-budget-custom', '0');
+
+      expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBe(25);
+      expect(plugin.settings.backendSettings.claudeCode.maxBudgetUsd).toBe(5);
       expect(plugin.settings.backendSettings.claudeCode.taskBudget).toBeNull();
     });
 
-    it('accepts decimal budget but rejects decimal turns', async () => {
+    it('accepts decimal budgets but rejects decimal turns', async () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'runtime');
+      section.attachTabbed(containerEl, 'permissions-safety');
 
-      await findText(t('settings.claudeCode.maxTurns.name')).onChange?.('12.5' as never);
-      await findText(t('settings.claudeCode.maxBudgetUsd.name')).onChange?.('12.5' as never);
-      await findText(t('settings.claudeCode.taskBudget.name')).onChange?.('12.5' as never);
+      await changeNumericInput(containerEl, 'claude-max-turns-custom', '12.5');
+      await changeNumericInput(containerEl, 'claude-max-budget-custom', '12.5');
+      await changeNumericInput(containerEl, 'claude-task-budget-custom', '12.5');
 
       expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBeNull();
       expect(plugin.settings.backendSettings.claudeCode.maxBudgetUsd).toBe(12.5);
       expect(plugin.settings.backendSettings.claudeCode.taskBudget).toBeNull();
     });
 
-    it('clears limits when empty string is provided', async () => {
+    it('clears limits through the inherit option and restores on save failure', async () => {
       const plugin = createPlugin();
-      plugin.settings.backendSettings.claudeCode.maxTurns = 50;
+      plugin.settings.backendSettings.claudeCode.maxTurns = 7;
       plugin.settings.backendSettings.claudeCode.maxBudgetUsd = 5;
       plugin.settings.backendSettings.claudeCode.taskBudget = 100;
       const containerEl = document.createElement('div');
@@ -2227,27 +2545,42 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'runtime');
+      section.attachTabbed(containerEl, 'permissions-safety');
 
-      await findText(t('settings.claudeCode.maxTurns.name')).onChange?.('' as never);
-      await findText(t('settings.claudeCode.maxBudgetUsd.name')).onChange?.('' as never);
-      await findText(t('settings.claudeCode.taskBudget.name')).onChange?.('' as never);
+      // A saved non-preset value renders as selected custom with the same
+      // value — never clamped or rewritten on render.
+      const turnsDropdown = numericDropdown(t('settings.claudeCode.maxTurns.name'));
+      expect(turnsDropdown.control.setValue).toHaveBeenCalledWith('__custom__');
+      const turnsInput = containerEl.querySelector<HTMLInputElement>('[data-setting="claude-max-turns-custom"]');
+      expect(turnsInput!.value).toBe('7');
+      expect(turnsInput!.style.display).toBe('block');
+
+      await turnsDropdown.onChange?.('' as never);
+      await numericDropdown(t('settings.claudeCode.maxBudgetUsd.name')).onChange?.('' as never);
+      await numericDropdown(t('settings.claudeCode.taskBudget.name')).onChange?.('' as never);
 
       expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBeNull();
       expect(plugin.settings.backendSettings.claudeCode.maxBudgetUsd).toBeNull();
       expect(plugin.settings.backendSettings.claudeCode.taskBudget).toBeNull();
+
+      // Save failure restores the previous setting and reverts the control.
+      plugin.saveSettings.mockRejectedValueOnce(new Error('disk full'));
+      const budgetDropdown = numericDropdown(t('settings.claudeCode.maxBudgetUsd.name'));
+      await budgetDropdown.onChange?.('20' as never).catch(() => undefined);
+      expect(plugin.settings.backendSettings.claudeCode.maxBudgetUsd).toBeNull();
+      expect(budgetDropdown.control.setValue).toHaveBeenLastCalledWith('');
     });
   });
 
   describe('runtime prompt behavior', () => {
-    it('renders systemPrompt text area in runtime tab', () => {
+    it('renders systemPrompt text area on the conversation page', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'runtime');
+      section.attachTabbed(containerEl, 'conversation');
 
       const record = textAreaRecords.find((r) => r.name === t('settings.claudeCode.systemPrompt.name'));
       expect(record).toBeDefined();
@@ -2262,7 +2595,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'runtime');
+      section.attachTabbed(containerEl, 'conversation');
 
       const record = textAreaRecords.find((r) => r.name === t('settings.claudeCode.systemPrompt.name'));
       expect(record).toBeDefined();
@@ -2279,7 +2612,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'runtime');
+      section.attachTabbed(containerEl, 'conversation');
 
       const record = textAreaRecords.find((r) => r.name === t('settings.claudeCode.systemPrompt.name'));
       expect(record).toBeDefined();
@@ -2295,7 +2628,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'runtime');
+      section.attachTabbed(containerEl, 'conversation');
 
       const boundaryEl = containerEl.querySelector('[data-claude-code-system-prompt-boundary="true"]');
       expect(boundaryEl).toBeTruthy();
@@ -2309,21 +2642,21 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'runtime');
+      section.attachTabbed(containerEl, 'conversation');
 
       const lifecycleEl = containerEl.querySelector('[data-claude-code-system-prompt-lifecycle="true"]');
       expect(lifecycleEl).toBeTruthy();
       expect(containerEl.textContent).toContain(t('settings.claudeCode.systemPrompt.lifecycleNotice'));
     });
 
-    it('renders outputStyle text input in runtime tab', () => {
+    it('renders outputStyle text input on the conversation page', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'runtime');
+      section.attachTabbed(containerEl, 'conversation');
 
       const record = textRecords.find((r) => r.name === t('settings.claudeCode.outputStyle.name'));
       expect(record).toBeDefined();
@@ -2338,7 +2671,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'runtime');
+      section.attachTabbed(containerEl, 'conversation');
 
       const record = textRecords.find((r) => r.name === t('settings.claudeCode.outputStyle.name'));
       expect(record).toBeDefined();
@@ -2355,7 +2688,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'runtime');
+      section.attachTabbed(containerEl, 'conversation');
 
       const record = textRecords.find((r) => r.name === t('settings.claudeCode.outputStyle.name'));
       expect(record).toBeDefined();
@@ -2371,7 +2704,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'runtime');
+      section.attachTabbed(containerEl, 'conversation');
 
       const boundaryEl = containerEl.querySelector('[data-claude-code-output-style-boundary="true"]');
       expect(boundaryEl).toBeTruthy();
@@ -2385,7 +2718,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'runtime');
+      section.attachTabbed(containerEl, 'conversation');
 
       const lifecycleEl = containerEl.querySelector('[data-claude-code-output-style-lifecycle="true"]');
       expect(lifecycleEl).toBeTruthy();
@@ -2399,7 +2732,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'runtime');
+      section.attachTabbed(containerEl, 'permissions-safety');
 
       const boundaryEl = containerEl.querySelector('[data-claude-code-task-budget-boundary="true"]');
       expect(boundaryEl).toBeTruthy();
@@ -2413,7 +2746,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'runtime');
+      section.attachTabbed(containerEl, 'permissions-safety');
 
       const lifecycleEl = containerEl.querySelector('[data-claude-code-task-budget-lifecycle="true"]');
       expect(lifecycleEl).toBeTruthy();
@@ -2436,8 +2769,9 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         'plan-mode',
         'sandbox-core',
         'sandbox-advanced',
+        'limits-budget',
       ]);
-      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(4);
+      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(5);
     });
 
     it('renders sandbox boundary notice explaining this is not a permission editor', () => {

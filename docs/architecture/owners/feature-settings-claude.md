@@ -1,6 +1,8 @@
 # Owner: feature.settings-claude
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 
+> **2026-11-08 (backend settings refresh)**: SettingsClaudeCodeSection 重构为任务型二级页（conversation / providers / tools-context / permissions-safety / connection / resources；旧 tab id 在 section 内路由直达）。新增对共享控件 owner 的运行时依赖：`src/features/settings/controls/BackendSettingsControls.ts`（`describeBackendSetting` / `addBackendChoiceSetting`，由 feature.settings-shell 拥有，属现有 adjacent shell 边界内消费，未改动 manifest）。语义不变式：高风险面（permissionMode、sandbox 全树、查询护栏）物理隔离在 permissions-safety 页；CLI 命令/路径覆盖只出现在 connection 页；conversation 页恢复 main/fallback model 的 inherit-first 选择器（未知已保存值保留为标记选项，无虚构别名）；全部行挂 scope/effect/risk 元数据（Claude 默认 next-turn；outputStyle/autoTitle=new-session；executablePath=restart）。
+
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
 - 2026-09-13 (universal memory backend): owner manifest gained `core.memory` and `app.memory-runtime`; this owner's boundary itself is unchanged (no source touched, allowlist untouched).
 

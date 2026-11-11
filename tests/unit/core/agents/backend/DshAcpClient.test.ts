@@ -18,6 +18,22 @@ const HANDSHAKE = {
 };
 
 describe('DSH ACP MCP admission', () => {
+  it.each([
+    { cwd: './relative' }, { cwd: '/tmp/invalid\npath' }, { toolCallTimeoutMs: 0 }, { toolCallTimeoutMs: Number.POSITIVE_INFINITY },
+    { toolCallTimeoutMs: 2_147_483_648 }, { failOnStartupError: 'true' }, { maxInstructionBytes: -1 },
+    { reconnect: { enabled: 'false' } }, { reconnect: { maxAttempts: 0 } }, { reconnect: { initialDelayMs: 50_000 } },
+    { reconnect: { initialDelayMs: 100, maxDelayMs: 50 } }, { reconnect: { unknown: true } },
+  ])('rejects invalid advanced MCP options before transport: %o', (advanced) => {
+    expect(() => validateDshMcpServers([{ name: 'invalid', command: path.resolve('node'), args: [], env: [], ...advanced }])).toThrow();
+  });
+
+  it('accepts HTTP reconnect options but rejects stdio-only working directories', () => {
+    const server = { type: 'http', name: 'remote', url: 'https://example.test/mcp', headers: [],
+      toolCallTimeoutMs: 1_000.5, failOnStartupError: false, maxInstructionBytes: 128, reconnect: { enabled: false, initialDelayMs: 1.5 } };
+    expect(validateDshMcpServers([server])).toEqual([server]);
+    expect(() => validateDshMcpServers([{ ...server, cwd: process.cwd() }])).toThrow('working directory');
+  });
+
   it('preserves exact stdio and HTTP declaration values and rejects unsafe or duplicate declarations', () => {
     const local = { name: 'local', command: path.resolve('node'), args: ['--stdio'], env: [{ name: 'TOKEN', value: ' exact ' }] };
     const http = { type: 'http', name: 'remote', url: 'https://example.test/mcp', headers: [{ name: 'Authorization', value: 'Bearer fixture' }] };
@@ -31,7 +47,50 @@ describe('DSH ACP MCP admission', () => {
   });
 });
 
+describe('DSH process control notifications', () => {
+  it('ignores configuration updates from a prior process generation', async () => {
+    const spawned = jest.spyOn(childProcess, 'spawn');
+    const onControlUpdate = jest.fn();
+    const client = clientFor('(message, {respond}) => respond(message, {})', { onControlUpdate });
+    try {
+      await client.start();
+      const previous = spawned.mock.results[0].value as ChildProcessWithoutNullStreams;
+      await client.stop();
+      await client.start();
+      previous.stdout.emit('data', JSON.stringify({ jsonrpc: '2.0', method: 'config/extensions/update', params: { operationId: 'stale' } }) + '\n');
+      expect(onControlUpdate).not.toHaveBeenCalled();
+    } finally { await client.stop(); spawned.mockRestore(); }
+  });
+
+  it('rejects non-object configuration notifications without fabricating a session update', async () => {
+    const onControlUpdate = jest.fn();
+    const onUpdate = jest.fn();
+    const client = clientFor(`(message, {send}) => send({jsonrpc:'2.0',method:'config/extensions/update',params:[]})`, { onControlUpdate, onUpdate });
+    try {
+      await client.start();
+      await expect(client.prompt('fixture', 'test')).rejects.toThrow('configuration update');
+      expect(onControlUpdate).not.toHaveBeenCalled();
+      expect(onUpdate).not.toHaveBeenCalled();
+    } finally { await client.stop(); }
+  });
+});
+
 describe('DSH ACP structured prompts', () => {
+  it('preserves advanced MCP fields on both session creation and resume', async () => {
+    const client = clientFor(`(message, {respond}) => {
+      if (message.method === 'session/new' || message.method === 'session/resume') respond(message, {sessionId:'advanced', received:message.params.mcpServers});
+      else respond(message, {});
+    }`);
+    const servers = [{ name: 'advanced', command: path.resolve('node'), cwd: path.resolve('workspace'), args: [], env: [],
+      toolCallTimeoutMs: 90_000, failOnStartupError: false, maxInstructionBytes: 40_000,
+      reconnect: { enabled: false, initialDelayMs: 250, maxDelayMs: 2_000, maxAttempts: 3 } }];
+    try {
+      await client.start();
+      await expect(client.newSession(process.cwd(), servers)).resolves.toMatchObject({ received: servers });
+      await expect(client.resumeSession('advanced', process.cwd(), servers)).resolves.toMatchObject({ received: servers });
+    } finally { await client.stop(); }
+  });
+
   it('sends the exact MCP and content-block arrays through the native wire methods', async () => {
     const client = clientFor(`(message, {respond}) => {
       if (message.method === 'session/new') respond(message, {sessionId:'wire', received:message.params.mcpServers});

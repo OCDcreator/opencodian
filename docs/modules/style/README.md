@@ -3,6 +3,10 @@
 > **源码**: `src/style/`
 > **状态**: [FINAL]
 
+## 2026-11-07 Backend choices
+
+`components/settings-backend-workspace.css` styles the six backend workspaces with shared shadcn Field/Tabs/Alert and Mantine radio/slider patterns. It is imported after backend-local sheets and before chat feature sheets. Scope/effect metadata, working-default recovery, native choice groups, slider readouts and responsive wrapping share this one layer; the rest of the plugin retains its existing typography and tokens.
+
 ## 概述
 
 `src/style/` 目录包含了项目的全局 CSS 和组件级 CSS。为了解决单文件 `styles.css` 过大带来的维护痛点，我们对 CSS 进行了工程化拆分。

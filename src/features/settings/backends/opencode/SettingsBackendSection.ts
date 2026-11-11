@@ -4,12 +4,15 @@ import { addIcon, Notice, Setting } from 'obsidian';
 
 import { IMPLEMENTED_AGENT_BACKENDS } from '../../../../core/agents/backend';
 import { backendSessionCatalogFailure } from '../../../../core/agents/backend/AgentBackendRouting';
+import { type BackendConfigRecoveryStore,backendRecoveryIdentity, createBackendConfigRecoveryStore, recoveryRevision } from '../../../../core/agents/backend/configuration/BackendConfigRecoveryStore';
 import type { DshAdapter } from '../../../../core/agents/backend/dsh/DshAdapter';
 import { validateDshMcpServers } from '../../../../core/agents/backend/dsh/DshProtocolCodec';
 import type { OpenCodianSettings } from '../../../../core/types';
 import type { AgentBackendKind } from '../../../../core/types/chat';
 import { t, type TranslationKey } from '../../../../i18n';
 import type OpenCodianPlugin from '../../../../main';
+import { getVaultBasePath } from '../../../../shared/vault';
+import { addBackendChoiceSetting, describeBackendSetting } from '../../controls/BackendSettingsControls';
 import { SettingsInlineEditSection } from '../../general/SettingsInlineEditSection';
 import { SettingsDshSection } from '../dsh/SettingsDshSection';
 
@@ -62,6 +65,7 @@ export function createSettingsDshSection(plugin: OpenCodianPlugin): SettingsDshS
     validateMcpServers: validateDshMcpServers,
     saveSettings: () => plugin.saveSettings(),
     modelOverridesHost: plugin,
+    vaultPath: plugin.app ? getVaultBasePath(plugin.app) ?? undefined : undefined,
   });
 }
 
@@ -340,13 +344,24 @@ export interface SettingsOpenCode2Host {
   settings: Pick<OpenCodianSettings, 'backendSettings' | 'inlineEditModelOverrides' | 'inlineCompletionModelOverrides'>;
   saveSettings(): Promise<unknown>;
   agentServiceRegistry?: { get(kind: 'opencode2'): unknown };
+  /** Stable absolute vault base path; scopes recovery snapshots per vault. */
+  vaultPath?: string;
+  /** Test/fixture seam: redirects the machine-local recovery store. */
+  recoveryBaseDir?: string;
 }
+
+// Durable machine-local recovery for the secret-bearing saved configContent:
+// previous SAVED configurations snapshotted outside the vault at 0700/0600,
+// listed as metadata only, restored through the validated apply path.
+const OC2_RECOVERY_KEY = 'opencode2-config-content';
 
 interface SettingsOpenCode2SectionOptions {
   plugin: SettingsOpenCode2Host;
   requestDisplayRefresh: () => void;
   /** Shared title-generation controls for the real OpenCode 2 consumers. */
   renderTitleSettings: (containerEl: HTMLElement) => void;
+  /** Stable absolute vault base path for machine-local recovery snapshots. */
+  vaultPath?: string;
 }
 
 
@@ -356,7 +371,11 @@ function oc2(key: OpenCode2Copy): string {
   return t(`settings.opencode2.workspace.${key}` as TranslationKey);
 }
 
-type OpenCode2Tab = 'connection' | 'model' | 'agents' | 'permissions' | 'mcp' | 'resources' | 'context' | 'advanced';
+type OpenCode2Tab = 'connection' | 'model' | 'agents' | 'permissions' | 'mcp' | 'advanced';
+/** Recovery copy keys land with the next locales drop; cast until then. */
+function rc2(key: string, params?: Record<string, string | number>): string {
+  return t(`settings.opencode2.workspace.${key}` as TranslationKey, params);
+}
 type ConfigPath = string[];
 type ModelProvider = { id: string; name: string; models: Array<{ id: string; name: string; variants?: string[] }> };
 type CatalogSummary = Awaited<ReturnType<OpenCode2AdapterPort['readConfigurationSummary']>>;
@@ -378,12 +397,16 @@ interface OpenCode2WorkspaceState {
 }
 interface OpenCode2Mount { root: HTMLElement; tab: OpenCode2Tab }
 const OPENCODE2_WORKSPACES = new WeakMap<SettingsOpenCode2Host, OpenCode2WorkspaceState>();
-const OPENCODE2_TABS: readonly OpenCode2Tab[] = ['connection', 'model', 'agents', 'permissions', 'mcp', 'resources', 'context', 'advanced'];
+const OPENCODE2_TABS: readonly OpenCode2Tab[] = ['connection', 'model', 'agents', 'permissions', 'mcp', 'advanced'];
 const OPENCODE2_TAB_LABELS: Record<OpenCode2Tab, TranslationKey> = {
   connection: 'settings.opencode2.tab.connection', model: 'settings.opencode2.tab.model',
   agents: 'settings.opencode2.tab.agents', permissions: 'settings.opencode2.tab.permissions',
-  mcp: 'settings.opencode2.tab.mcp', resources: 'settings.opencode2.tab.resources',
-  context: 'settings.opencode2.tab.context', advanced: 'settings.opencode2.tab.advanced',
+  mcp: 'settings.opencode2.tab.mcp', advanced: 'settings.opencode2.tab.advanced',
+};
+/** Merged-page destinations for retired secondary-tab ids; the registry alias map stays authoritative. */
+const OPENCODE2_TAB_ALIASES: Readonly<Record<string, OpenCode2Tab>> = {
+  resources: 'advanced', context: 'advanced', catalog: 'advanced',
+  auth: 'model', integrations: 'model', models: 'model', extensions: 'mcp',
 };
 
 /** OpenCode 2-only settings draft and native catalog surface. No global-file writer. */
@@ -393,10 +416,19 @@ export class SettingsOpenCode2Section {
   private readonly renderTitleSettings: (containerEl: HTMLElement) => void;
   private readonly state: OpenCode2WorkspaceState;
   private readonly mounts: OpenCode2Mount[] = [];
+  private readonly recovery: BackendConfigRecoveryStore;
+  private readonly vaultPath: string | undefined;
+  /** Per-vault, per-target identity; null (recovery unavailable) without a
+   *  stable vault path, so vaults never share a synthetic snapshot namespace. */
+  private configRecoveryIdentity(): string | null {
+    return backendRecoveryIdentity(this.vaultPath, 'opencode2:configContent');
+  }
 
   constructor(options: SettingsOpenCode2SectionOptions) {
     this.plugin = options.plugin;
     this.requestDisplayRefresh = options.requestDisplayRefresh;
+    this.vaultPath = options.vaultPath ?? options.plugin.vaultPath;
+    this.recovery = createBackendConfigRecoveryStore({ baseDir: options.plugin.recoveryBaseDir });
     this.renderTitleSettings = options.renderTitleSettings;
     const key = this.connectionKey();
     const saved = this.plugin.settings.backendSettings.opencode2.configContent ?? '';
@@ -421,8 +453,9 @@ export class SettingsOpenCode2Section {
   }
 
   attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {
-    const legacy = secondaryTabId === 'auth' ? 'model' : secondaryTabId;
-    this.mount(containerEl, OPENCODE2_TABS.find((tab) => tab === legacy) ?? 'connection');
+    const tab = OPENCODE2_TABS.find((candidate) => candidate === secondaryTabId)
+      ?? OPENCODE2_TAB_ALIASES[secondaryTabId] ?? 'connection';
+    this.mount(containerEl, tab);
   }
 
   private connectionKey(): string {
@@ -505,8 +538,6 @@ export class SettingsOpenCode2Section {
       case 'agents': this.renderAgents(body); break;
       case 'permissions': this.renderPermissions(body); break;
       case 'mcp': this.renderExtensions(body); break;
-      case 'resources': this.renderResources(body); break;
-      case 'context': this.renderContext(body); break;
       case 'advanced': this.renderAdvanced(body); break;
     }
   }
@@ -652,27 +683,108 @@ export class SettingsOpenCode2Section {
   private renderConnection(parent: HTMLElement): void {
     const settings = this.plugin.settings.backendSettings.opencode2;
     const group = this.group(parent, oc2('connectionMode'), oc2('connectionDesc'));
-    new Setting(group).setName(t('settings.agent.opencode2.mode')).addDropdown((input) => input
-      .addOption('local', t('settings.server.mode.local')).addOption('remote', t('settings.server.mode.remote'))
-      .setValue(settings.mode).onChange(async (value) => {
-        if (this.state.saving) return;
+    addBackendChoiceSetting(group, {
+      key: 'mode',
+      name: t('settings.agent.opencode2.mode'),
+      description: oc2('connectionDesc'),
+      value: settings.mode === 'remote' ? 'remote' : 'local',
+      options: [
+        { value: 'local', label: t('settings.server.mode.local'), description: oc2('modeLocalDesc'), recommended: true },
+        { value: 'remote', label: t('settings.server.mode.remote'), description: oc2('modeRemoteDesc') },
+      ],
+      onChange: async (value) => {
+        if (this.state.saving) throw new Error(oc2('applying'));
+        const previous = settings.mode;
         settings.mode = value === 'remote' ? 'remote' : 'local';
-        await this.plugin.saveSettings(); this.requestDisplayRefresh();
-      }));
+        try {
+          await this.plugin.saveSettings();
+        } catch (error) {
+          settings.mode = previous;
+          throw error;
+        }
+        this.requestDisplayRefresh();
+      },
+      presentation: { key: 'mode', scope: 'vault', effect: 'reconnect', risk: 'low', defaultLabel: t('settings.server.mode.local') },
+    });
     if (this.local()) {
-      new Setting(group).setName(t('settings.agent.opencode2.executable')).setDesc(t('settings.agent.opencode2.executable.desc'))
-        .addText((input) => input.setPlaceholder('opencode2').setValue(settings.executablePath).onChange(async (value) => {
-          settings.executablePath = value.trim(); await this.plugin.saveSettings();
-        }));
-    } else {
-      new Setting(group).setName(t('settings.agent.opencode2.url')).addText((input) => input
-        .setPlaceholder('http://127.0.0.1:4096').setValue(settings.baseUrl).onChange(async (value) => {
-          settings.baseUrl = value.trim(); await this.plugin.saveSettings();
-        }));
-      new Setting(group).setName(t('settings.agent.opencode2.password')).addText((input) => {
-        input.inputEl.type = 'password';
-        input.setValue(settings.password).onChange(async (value) => { settings.password = value; await this.plugin.saveSettings(); });
+      const renderExecutablePath = (force = false): void => {
+        pathHolder.empty();
+        if (!force && !settings.executablePath) return;
+        describeBackendSetting(
+          new Setting(pathHolder)
+            .setName(t('settings.agent.opencode2.executable'))
+            .setDesc(t('settings.agent.opencode2.executable.desc'))
+            .addText((input) => {
+              input.inputEl.setAttribute('aria-label', t('settings.agent.opencode2.executable'));
+              input.setPlaceholder('opencode2').setValue(settings.executablePath).onChange(async (value) => {
+                const previous = settings.executablePath;
+                settings.executablePath = value.trim();
+                try {
+                  await this.plugin.saveSettings();
+                } catch (error) {
+                  settings.executablePath = previous;
+                  throw error;
+                }
+              });
+            }),
+          { key: 'executablePath', scope: 'vault', effect: 'reconnect', risk: 'medium', defaultLabel: oc2('executableAuto') },
+        );
+      };
+      addBackendChoiceSetting(group, {
+        key: 'executablePath',
+        name: t('settings.agent.opencode2.executable'),
+        description: t('settings.agent.opencode2.executable.desc'),
+        value: settings.executablePath ? 'custom' : 'auto',
+        options: [
+          { value: 'auto', label: oc2('executableAuto'), description: oc2('executableAutoDesc'), recommended: true },
+          { value: 'custom', label: oc2('executableCustom'), description: oc2('executableCustomDesc') },
+        ],
+        onChange: async (value) => {
+          const previous = settings.executablePath;
+          settings.executablePath = value === 'custom' ? previous : '';
+          try {
+            await this.plugin.saveSettings();
+          } catch (error) {
+            settings.executablePath = previous;
+            throw error;
+          }
+          renderExecutablePath(value === 'custom');
+        },
+        presentation: { key: 'executablePath', scope: 'vault', effect: 'reconnect', risk: 'medium', defaultLabel: oc2('executableAuto') },
       });
+      const pathHolder = group.createDiv({ cls: 'opencodian-opencode2-custom-executable' });
+      renderExecutablePath();
+    } else {
+      describeBackendSetting(
+        new Setting(group).setName(t('settings.agent.opencode2.url')).addText((input) => input
+          .setPlaceholder('http://127.0.0.1:4096').setValue(settings.baseUrl).onChange(async (value) => {
+            const previous = settings.baseUrl;
+            settings.baseUrl = value.trim();
+            try {
+              await this.plugin.saveSettings();
+            } catch (error) {
+              settings.baseUrl = previous;
+              throw error;
+            }
+          })),
+        { key: 'baseUrl', scope: 'vault', effect: 'reconnect', risk: 'medium' },
+      );
+      describeBackendSetting(
+        new Setting(group).setName(t('settings.agent.opencode2.password')).addText((input) => {
+          input.inputEl.type = 'password';
+          input.setValue(settings.password).onChange(async (value) => {
+            const previous = settings.password;
+            settings.password = value;
+            try {
+              await this.plugin.saveSettings();
+            } catch (error) {
+              settings.password = previous;
+              throw error;
+            }
+          });
+        }),
+        { key: 'password', scope: 'vault', effect: 'reconnect', risk: 'medium' },
+      );
     }
     const connection = this.group(parent, oc2('connectionStatus'));
     this.notice(connection, this.state.summary ? oc2('connectionReady') : oc2('connectionPending'));
@@ -688,13 +800,6 @@ export class SettingsOpenCode2Section {
     const group = this.group(parent, oc2('defaultModel'));
     if (this.state.models.length) this.selectField(group, ['model'], oc2('chatModel'), { values: this.modelOptions(), description: oc2('chatModelDesc') });
     else this.textField(group, ['model'], oc2('chatModel'), { description: oc2('modelReference') });
-    const providers = this.group(parent, oc2('providers'), oc2('providersDesc'));
-    this.renderMapEditor(providers, 'providers', { catalog: [], fields: (editor, path) => {
-      this.textField(editor, [...path, 'package'], oc2('providerPackage'), { description: oc2('providerPackageDesc') });
-      this.textField(editor, [...path, 'settings', 'baseURL'], oc2('baseUrl'));
-      this.jsonField(this.disclosure(editor, oc2('modelParameters')), [...path, 'models'], oc2('modelsConfig'), { kind: 'object', description: oc2('modelsConfigDesc') });
-      this.jsonField(this.disclosure(editor, oc2('providerAdvanced')), [...path, 'settings'], oc2('providerSettings'), { kind: 'object', description: oc2('credentialsHint') });
-    } });
     const auth = this.group(parent, oc2('authentication'), oc2('authenticationDesc'));
     if (this.catalog) this.renderAuthCatalog(auth, this.catalog); else this.notice(auth, oc2('catalogPending'));
     const auxiliary = this.group(parent, t('settings.opencode2.model.title'), t('settings.opencode2.model.desc'));
@@ -741,7 +846,17 @@ export class SettingsOpenCode2Section {
 
   private renderAgents(parent: HTMLElement): void {
     const defaults = this.group(parent, oc2('agentDefaults'));
-    this.textField(defaults, ['default_agent'], oc2('defaultAgent'), { description: oc2('defaultAgentDesc') });
+    const catalogAgents = (this.catalog?.agents ?? [])
+      .map((entry) => entry.id ?? entry.name ?? '')
+      .filter((id): id is string => Boolean(id));
+    if (catalogAgents.length) {
+      this.selectField(defaults, ['default_agent'], oc2('defaultAgent'), {
+        values: catalogAgents.map((id): [string, string] => [id, id]),
+        description: oc2('defaultAgentDesc'),
+      });
+    } else {
+      this.textField(defaults, ['default_agent'], oc2('defaultAgent'), { description: oc2('defaultAgentDesc') });
+    }
     const group = this.group(parent, oc2('agents'), oc2('agentsDesc'));
     this.renderMapEditor(group, 'agents', { catalog: this.catalog?.agents ?? [], fields: (editor, path) => {
       this.textField(editor, [...path, 'description'], oc2('description'));
@@ -757,6 +872,31 @@ export class SettingsOpenCode2Section {
   }
 
   private renderPermissions(parent: HTMLElement): void {
+    const settings = this.plugin.settings.backendSettings.opencode2;
+    const modeGroup = this.group(parent, t('settings.agent.opencode2.permissionMode'), t('settings.agent.opencode2.permissionMode.desc'));
+    addBackendChoiceSetting(modeGroup, {
+      key: 'permissionMode',
+      name: t('settings.agent.opencode2.permissionMode'),
+      description: t('settings.agent.opencode2.permissionMode.desc'),
+      value: settings.permissionMode ?? 'inherit',
+      options: [
+        { value: 'inherit', label: t('settings.agent.opencode2.permissionMode.inherit'), description: t('settings.agent.opencode2.permissionMode.inherit.desc'), recommended: true },
+        { value: 'normal', label: t('settings.agent.opencode2.permissionMode.normal'), description: t('settings.agent.opencode2.permissionMode.normal.desc') },
+        { value: 'plan', label: t('settings.agent.opencode2.permissionMode.plan'), description: t('settings.agent.opencode2.permissionMode.plan.desc') },
+        { value: 'yolo', label: t('settings.agent.opencode2.permissionMode.yolo'), description: t('settings.agent.opencode2.permissionMode.yolo.desc') },
+      ],
+      onChange: async (value) => {
+        const previous = settings.permissionMode;
+        settings.permissionMode = value === 'normal' || value === 'yolo' || value === 'plan' ? value : 'inherit';
+        try {
+          await this.plugin.saveSettings();
+        } catch (error) {
+          settings.permissionMode = previous;
+          throw error;
+        }
+      },
+      presentation: { key: 'permissionMode', scope: 'vault', effect: 'next-turn', risk: settings.permissionMode === 'yolo' ? 'high' : 'medium' },
+    });
     const group = this.group(parent, oc2('permissionRules'), oc2('permissionRulesDesc'));
     this.jsonField(group, ['permissions'], oc2('orderedPermissions'), { kind: 'array', description: oc2('permissionsFormat') });
     const rules = this.value(['permissions']);
@@ -780,7 +920,6 @@ export class SettingsOpenCode2Section {
     this.button(presets, oc2('appendRule'), () => {
       this.setValue(['permissions'], [...(Array.isArray(rules) ? rules : []), { action: action.value, resource: resource.value, effect: effect.value }]); this.repaint();
     }, !this.local());
-    this.jsonField(this.disclosure(parent, oc2('managedPolicies')), ['policies'], oc2('policies'), { kind: 'array', description: oc2('policiesDesc') });
   }
 
   private renderExtensions(parent: HTMLElement): void {
@@ -877,13 +1016,26 @@ export class SettingsOpenCode2Section {
   }
 
   private renderAdvanced(parent: HTMLElement): void {
-    const files = this.group(parent, oc2('filesAndFormatting'));
+    const sources = this.group(parent, oc2('advancedSources'));
+    this.renderResources(sources);
+    const context = this.group(parent, oc2('advancedContext'));
+    this.renderContext(context);
+    const providers = this.group(parent, oc2('providers'), oc2('providersMoved'));
+    this.renderMapEditor(providers, 'providers', { catalog: [], fields: (editor, path) => {
+      this.textField(editor, [...path, 'package'], oc2('providerPackage'), { description: oc2('providerPackageDesc') });
+      this.textField(editor, [...path, 'settings', 'baseURL'], oc2('baseUrl'));
+      this.jsonField(this.disclosure(editor, oc2('modelParameters')), [...path, 'models'], oc2('modelsConfig'), { kind: 'object', description: oc2('modelsConfigDesc') });
+      this.jsonField(this.disclosure(editor, oc2('providerAdvanced')), [...path, 'settings'], oc2('providerSettings'), { kind: 'object', description: oc2('credentialsHint') });
+    } });
+    const files = this.group(parent, oc2('advancedRuntime'));
     this.jsonField(files, ['watcher', 'ignore'], oc2('watcherIgnore'), { kind: 'array', description: oc2('watcherIgnoreDesc') });
     this.jsonField(this.disclosure(files, oc2('formatters')), ['formatter'], oc2('formatterConfig'), { kind: 'object', description: oc2('formatterConfigDesc') });
     const execution = this.group(parent, oc2('execution'));
     this.textField(execution, ['shell'], oc2('shell'), { description: oc2('shellDesc') });
     this.textField(execution, ['worktree', 'directory'], oc2('worktreeDirectory'), { description: oc2('worktreeDirectoryDesc') });
     this.jsonField(this.disclosure(execution, oc2('websearch')), ['websearch'], oc2('websearchConfig'), { kind: 'object' });
+    const policies = this.group(parent, oc2('advancedPolicies'), oc2('policiesDesc'));
+    this.jsonField(policies, ['policies'], oc2('policies'), { kind: 'array', description: oc2('policiesDesc') });
     const experiments = this.disclosure(parent, oc2('experimental'));
     this.booleanField(experiments, ['experimental', 'todo'], oc2('todo'));
     this.numberField(experiments, ['experimental', 'subagent_depth'], oc2('subagentDepth'));
@@ -895,6 +1047,106 @@ export class SettingsOpenCode2Section {
     input.disabled = !this.local() || this.state.saving;
     input.addEventListener('input', () => { this.state.draft = input.value; this.state.buffers.clear(); this.state.feedback = ''; this.updateFooters(); });
     this.notice(parent, oc2('excludedSettings'));
+    this.renderConfigRecovery(parent);
+  }
+
+  /** Durable machine-local recovery disclosure for previous SAVED
+   *  configContent. Metadata-only list; three actions to restore (open ->
+   *  Restore -> Confirm); CAS re-checked immediately before the mutation, and
+   *  the restore re-enters the validated apply path. */
+  private renderConfigRecovery(parent: HTMLElement): void {
+    const disclosure = parent.createEl('details', { cls: 'opencodian-opencode2-recovery' });
+    disclosure.createEl('summary', { text: rc2('recovery') });
+    const body = disclosure.createDiv({ cls: 'opencodian-opencode2-recovery-body' });
+    body.createEl('p', { cls: 'setting-item-description', text: rc2('recoveryDesc') });
+    const listHost = body.createDiv({ cls: 'opencodian-opencode2-recovery-list' });
+    const feedback = body.createDiv({ cls: 'setting-item-description', attr: { role: 'status', 'aria-live': 'polite' } });
+    const renderList = (): void => {
+      listHost.empty();
+      if (!this.local()) {
+        listHost.createEl('p', { cls: 'setting-item-description', text: oc2('remoteReadOnly') });
+        return;
+      }
+      const identity = this.configRecoveryIdentity();
+      if (!identity) {
+        listHost.createEl('p', { cls: 'setting-item-description', text: rc2('recoveryEmpty') });
+        return;
+      }
+      let entries;
+      try { entries = this.recovery.list(identity, OC2_RECOVERY_KEY); }
+      catch {
+        feedback.setText(t('settings.backend.recovery.unavailable' as TranslationKey));
+        return;
+      }
+      if (!entries.length) {
+        listHost.createEl('p', { cls: 'setting-item-description', text: rc2('recoveryEmpty') });
+        return;
+      }
+      // CAS snapshot: configContent must not change while this list is open.
+      const listedCurrentRevision = recoveryRevision(this.plugin.settings.backendSettings.opencode2.configContent ?? '');
+      for (const entry of entries) {
+        const row = new Setting(listHost)
+          .setName(rc2('recoveryEntry', { date: new Date(entry.savedAt).toLocaleString() }))
+          .setDesc(rc2('recoveryEntryDetail', { bytes: entry.bytes }));
+        row.addButton((button) => button.setButtonText(rc2('recoveryRestore')).onClick(() => {
+          this.confirmConfigRecovery({ identity, listHost, entry, listedCurrentRevision, feedback, renderList });
+        }));
+      }
+    };
+    renderList();
+    disclosure.addEventListener('toggle', () => {
+      if (disclosure.open) renderList();
+    });
+  }
+
+  /** Inline confirm (third action). CAS re-checked synchronously with the
+   *  mutation; the snapshot is applied through applyDraft, so backend
+   *  validation and catalog reload keep their existing honest semantics. */
+  private confirmConfigRecovery(context: {
+    identity: string;
+    listHost: HTMLElement;
+    entry: { index: number; revision: string };
+    listedCurrentRevision: string;
+    feedback: HTMLElement;
+    renderList: () => void;
+  }): void {
+    const { identity, listHost, entry, listedCurrentRevision, feedback, renderList } = context;
+    feedback.setText('');
+    const confirmHost = listHost.createDiv({ cls: 'opencodian-opencode2-recovery-confirm' });
+    confirmHost.createEl('p', { cls: 'setting-item-description', text: rc2('recoveryConfirmHelp') });
+    const confirm = confirmHost.createEl('button', { text: rc2('recoveryConfirm'), attr: { type: 'button' } });
+    const cancel = confirmHost.createEl('button', { text: rc2('recoveryCancel'), attr: { type: 'button' } });
+    cancel.addEventListener('click', () => confirmHost.remove());
+    confirm.addEventListener('click', () => {
+      confirm.disabled = true;
+      cancel.disabled = true;
+      void (async () => {
+        const currentRaw = this.plugin.settings.backendSettings.opencode2.configContent ?? '';
+        if (recoveryRevision(currentRaw) !== listedCurrentRevision) {
+          feedback.setText(t('settings.backend.recovery.stale' as TranslationKey));
+          renderList();
+          return;
+        }
+        const snapshot = this.recovery.read(identity, OC2_RECOVERY_KEY, entry.index);
+        if (!snapshot || snapshot.revision !== entry.revision) {
+          feedback.setText(t('settings.backend.recovery.stale' as TranslationKey));
+          renderList();
+          return;
+        }
+        // Keep the actual saved revision as the conflict baseline. Only the
+        // draft adopts the snapshot; applyDraft validates and saves it before
+        // archiving the displaced value, including an empty initial overlay.
+        this.state.saved = currentRaw;
+        this.state.draft = snapshot.raw;
+        this.state.buffers.clear();
+        await this.applyDraft();
+      })().catch(() => {
+        feedback.setText(t('settings.backend.recovery.failed'));
+        confirm.disabled = false;
+        cancel.disabled = false;
+      });
+    });
+    confirm.focus();
   }
 
   private renderFooter(parent: HTMLElement): void {
@@ -936,7 +1188,17 @@ export class SettingsOpenCode2Section {
       this.state.saved = this.plugin.settings.backendSettings.opencode2.configContent ?? '';
       this.state.draft = this.state.saved;
       this.state.buffers.clear();
-      this.state.feedback = oc2('applied');
+      // The previous SAVED configuration is snapshotted machine-locally after
+      // the successful apply; a recovery-write failure never claims the apply
+      // failed, because the saved state is already authoritative.
+      let historyUnavailable = false;
+      const identity = this.configRecoveryIdentity();
+      if (identity && previous !== submitted) {
+        try {
+          this.recovery.archive(identity, OC2_RECOVERY_KEY, previous);
+        } catch { historyUnavailable = true; }
+      }
+      this.state.feedback = oc2('applied') + (historyUnavailable ? ` ${t('settings.backend.recovery.historyUnavailable' as TranslationKey)}` : '');
       this.state.updatedAt = 0;
       await this.loadCatalog(true);
     } catch {

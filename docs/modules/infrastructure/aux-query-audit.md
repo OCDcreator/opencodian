@@ -14,9 +14,9 @@
 
 `node scripts/audit/run-aux-query-audit.mjs --preflight` 编译并启动审计用 Node 子进程，只读取路径和配置。它不启动后端 CLI、不握手 app-server、不发送模型请求，因此没有模型调用成本。配置齐全时依然返回 blocked / exit 2，说明真实验收尚未执行。聚焦测试通过 preload 拦截器禁止后端进程、fetch 和 HTTP/network 调用；仅允许编译器和审计 Node 子进程。
 
-没有 offline flag 才是 real-model 模式，必须单独获得真实模型测试授权。模型和 vision 模型必须显式配置，支持 `AUDIT_AUX_MODEL_<BACKEND>` / `AUDIT_AUX_VISION_MODEL_<BACKEND>`，backend 后缀大写，连字符换为下划线；兼容无后缀变量。OpenCode / OpenCode 2 / Pi / ZCode 使用 provider/model；Claude Code / Codex 使用裸 model id。OpenCode 2、Pi 可配置 `OPENCODE2_BIN` / `PI_BIN`，ZCode 使用 `ZCODE_BIN` 经现有 resolver 解析，Codex 使用现有 resolver 的 `CODEX_BIN`。
+没有 offline flag 才是 real-model 模式，必须单独获得真实模型测试授权。模型和 vision 模型必须显式配置，支持 `AUDIT_AUX_MODEL_<BACKEND>` / `AUDIT_AUX_VISION_MODEL_<BACKEND>`，backend 后缀大写，连字符换为下划线；兼容无后缀变量。OpenCode / OpenCode 2 / Pi / ZCode 使用 provider/model；Claude Code / Codex 使用裸 model id。OpenCode 2、Pi 可配置 `OPENCODE2_BIN` / `PI_BIN`，ZCode 使用 `ZCODE_BIN` 经现有 resolver 解析，Codex 使用现有 resolver 的 `CODEX_BIN`。Claude Code harness 的实际 CLI 由 `AUDIT_CLAUDE_BIN`（优先）或 `CLAUDE_BIN` 显式覆盖：提供的值必须是存在的绝对文件路径（含指向文件的 symlink）；提供但无效（相对路径、不存在、非文件）一律 fail closed 且绝不回退固定候选，避免静默审计过期 CLI；空/空白值视为未设置。未设置时保持原固定候选顺序。
 
-四个原通用后端保留 OpenCode 的共享诱导写入正控，使用显式 `AUDIT_AUX_CONTROL_MODEL`（仅 OpenCode 可回退自身已显式配置的 model）；preflight 与实际 HTTP 请求复用同一选择规则。显式 control 设置优先；无效显式值不得静默 fallback，其他后端不得借用 OpenCode model fallback。请求发送实际选定的 providerID/modelID，报告记录 `modelSource` 与该请求 model JSON 的 `modelProfileSha256`，不输出原始模型选择字符串。各后端的安全证明仍单独来自其 native 路径。ZCode 和 OpenCode 2 有自己的 native 正控。正控成功不能替代任一后端安全读回、工具事件审计或字节检查。
+四个原通用后端保留 OpenCode 的共享诱导写入正控，使用显式 `AUDIT_AUX_CONTROL_MODEL`（仅 OpenCode 可回退自身已显式配置的 model）；preflight 与实际正控请求复用同一选择规则（`resolveWriteControlModel`）。显式 control 设置优先；无效显式值不得静默 fallback，其他后端不得借用 OpenCode model fallback。报告记录 `modelSource` 与该请求 model JSON 的 `modelProfileSha256`，不输出原始模型选择字符串。各后端的安全证明仍单独来自其 native 路径。ZCode 和 OpenCode 2 有自己的 native 正控。正控成功不能替代任一后端安全读回、工具事件审计或字节检查。
 
 ## 独立安全证据
 
@@ -59,7 +59,7 @@ child exit 0 自身不能成为 pass。backend 不一致、execution 不明、pa
 
 测试 scratch 默认使用 `path.join(os.tmpdir(), 'opencodian-aux-contract')`，可通过 `AUDIT_TEST_SCRATCH_ROOT` 显式覆盖为本机非同步 evidence 目录；测试源码不写死用户或机器路径。
 
-测试覆盖六后端默认/混合调度、未知 backend、互斥 offline flag、failed/blocked precedence、负向 report schema、ZCode provider/model 和 generic/sessionless 区别、当前回合 native 读回负向样例、严格字节快照、带禁止 native/network 拦截器的六后端 preflight、OpenCode 2 native 验收保留。追加回归覆盖 Codex start 成功后 active/archived 分别拒绝、stop 恰好一次且必须等待、stop 自身拒绝仍保留原错误，以及显式 control/OpenCode 专属 fallback 的实际 HTTP 请求 JSON 与配置摘要匹配。测试 bundle 只在测试中暴露审计函数并注入 client/process/HTTP seams，不改变运行入口或启动真实 CLI。测试中的合成结构只证明契约逻辑，不能作为 real-model pass 的证据。
+测试覆盖六后端默认/混合调度、未知 backend、互斥 offline flag、failed/blocked precedence、负向 report schema、ZCode provider/model 和 generic/sessionless 区别、当前回合 native 读回负向样例、严格字节快照、带禁止 native/network 拦截器的六后端 preflight、OpenCode 2 native 验收保留。追加回归覆盖 Codex start 成功后 active/archived 分别拒绝、stop 恰好一次且必须等待、stop 自身拒绝仍保留原错误，以及共享正控的 `resolveWriteControlModel` 选择规则（显式优先、OpenCode 专属 fallback）与 `runWriteInducementControl` 的 OpenCode2 adapter seam 行为：stub adapter 实际写出的 outcome 文件加真实工具事件经 `evaluateWriteControlEvidence` 判定——精确 21 字节 + write 类工具才 pass，字节篡改、缺文件、仅只读工具、error chunk 均失败且 detail withheld，调用序列固定为 constructor/start/createSession/applyPermissionMode(yolo)/sendMessage/deleteSession/stop 且 sentinel 被清理。测试 bundle 只在测试中暴露审计函数并注入 client/process/adapter seams，不改变运行入口或启动真实 CLI。测试中的合成结构只证明契约逻辑，不能作为 real-model pass 的证据。
 
 2026-10-02 T06 本轮只执行 offline bundle/preflight、聚焦契约及入口类型检查；六后端真实模型 gate 均未运行。
 
@@ -77,3 +77,25 @@ The ordered-deny suffix audit uses a reverse index loop compatible with the repo
 
 
 2026-10-08：Windows Codex native stop 后 cwd 的短时 EBUSY 由最终 audit cleanup 的最多 2 秒重试处理；只重试最初已验证为空的 owned vault 非递归 rmdir，每次重查空目录，新增 residue 或持续失败仍 audit failed。权限/拒写/字节/ephemeral/session 残留门禁保持不变。
+
+## ZCode 3.17.2 严格行选择与原生 hook 正控（2026-11-08）
+
+2026-11-08：ZCode 原生读回验证升级为严格行选择（配合 src 侧 3.17.2 authoritative info.tools 修复）：每个回合的 CURRENT 行中，恰好一行可携带权威 `info.tools`（必须为真实 prompt 行：非 synthetic、`semantics.kind=user_prompt`、`semantics.origin=real_user`、tools 对象为空）；其余所有新行必须 `synthetic=true`、`visibility=model-only`、无 tools 且拥有未出现过的新 id；出现无法识别 id 的行、重复 prior id 的行、任意形态的行（例如第二行带 tools、synthetic 行缺 visibility）一律 fail。toolCallCount=0、无 tool 事件与全部 proof 门禁不变。
+
+正控 hook 迁移到 3.17.2 原生路径：workspace hook 从审计 vault 自己的 `.zcode/config.json` `hooks.events.UserPromptSubmit` 声明（精确匹配运行时 strict schema；旧 plugin-dir/enabledPlugins 路线在 3.17.2 不被发现，已移除）。首轮真实 Write 诱导后，通过运行时自己的 `workspace/hooks/trustGrant` 授予信任，输入全部来自运行时事件（review 事件的 bundleDigest/workspaceIdentity、blocked 事件的 hookSource 与 descriptor.timeoutMs），digest 按运行时 workspace-hook-declaration v1 规范数组计算（`zcodeHookDeclarationDigestFromObservation`）；digest 错误只会让 hook 保持 blocked、正控以 hookExecuted=false 失败，不可能虚绿。第二回合（无工具短 prompt）证明 hook 真实执行。sentinel 清理移入 finally，失败也不遗留（修复上一轮 zcode-control-escape.md 残留）。订阅中的事件信封为 params.event 嵌套，控制 transport 捕获已按同一 unwrap 处理。
+
+已知边界：hook 信任记录由运行时写入其全局 security store（`~/.zcode/security/workspace-hook-trust-v1.json`），无 env 可重定向；每次真实 zcode 审计在该 store 增加一条以本次任务 scratch vault 路径为 key 的记录（运行时自管、含完整性锁，不手工编辑），vault 清理后该记录 inert（digest 校验只对该路径的当前声明生效）。aux 会话继续私有 HOME/workspace + 私有 `hooks.enabled:false` 配置 + plugin 全禁读回，与正控 grant（按 vault workspaceIdentity 授予）互不可达；aux 执行任何 hook 仍直接 fail。
+
+实测：2026-11-08 ZCode 3.17.2 真实完整审计 12/12 全绿（exit 0，`aux-audit-final-zcode-verifier-fix.json`）：正控 native Write + 精确 27 字节 + hookExecuted=true + trustGrant accepted=true；1c/1d/5b 严格行选择读回全过；vault 字节/残留为空。
+
+## 共享正控迁移到 OpenCode 2 契约（2026-11-08）
+
+## Claude Code CLI 覆盖（2026-11-08）
+
+2026-11-08：Claude Code 审计增加任务级 CLI 覆盖 `AUDIT_CLAUDE_BIN` / `CLAUDE_BIN`（`resolveClaudeExecutable` 实际 resolve seam）：显式值必须是存在的绝对文件路径，无效显式值 fail closed 不回退固定候选（2.1.312 固定候选不再能掩盖更新的任务级 CLI），空值视为未设置。覆盖只作用于本次审计进程环境，不写任何全局配置。安全门禁保持不变：readonly allowlist proof、工具读回、字节快照、正控全部原样；ZCode 的 baseline 与 isolated-storage 两类正控证据区分不变，本轮未触碰 ZCode 门禁。
+
+2026-11-08：用 `AUDIT_CLAUDE_BIN` 指向任务级 CLI 2.1.319（`.tmp/backend-refresh-api/runtime/node_modules/.bin/claude`）、模型 `claude-haiku-4-5` 的真实 claude-code 完整审计 8/8 全绿（exit 0，`aux-audit-final-claude-319.json`）：正控 opencode2 契约 write 工具 + 精确 21 字节、只读 allowlist 与 CLI system/init 读回一致（Read/Grep/Glob/WebSearch/WebFetch，native readback Read/WebFetch/WebSearch 与 proof 完全匹配）、诱导写入零 write-class、vault 字节不变、图片回合、dispose 残留与最终 vault 残留均为空。
+
+## 共享正控迁移到 OpenCode 2 契约（2026-11-08）
+
+2026-11-08：共享诱导写入正控改为 ACTIVE OpenCode CLI 契约：复用项目已验证的 `OpenCode2Adapter`（本地 `serve --stdio` 临时端口 + 随机 `OPENCODE_PASSWORD`，不接管 4096 managed server），`createSession` 后按会话 `applyPermissionMode('yolo')`，再以 `sendMessage` options `{provider, model}` 发送实际选定模型。退休的 1.x `GET /config` readiness + `POST /config`/`POST /session` HTTP 面与 `OPENCODE_CONFIG` 正控 agent 覆盖一并移除；`reservePort`/`killProcessTree`/`scopeUrl` 不再被 entry 使用。判定升级为与 OpenCode 2 native 正控一致的字节级规则：sentinel `OC_AUX_CONTROL_WRITE` + LF（21 字节）必须逐字节写入审计 vault 内 `aux-control-escape.md`，且必须观察到 write/edit/patch 类 native 工具调用（`evaluateWriteControlEvidence` 纯函数）。回合受 180 秒 deadline 保护，超时 `cancelStream` 后按失败收口。清理只删除该 sentinel 与正控会话并 `stop` 自有 server；意外残留保留为证据并由最终 vault 字节检查 fail closed。失败 detail 保持 withheld，不输出 env/provider 凭证。选择规则与 profile hash 语义不变；CLI 非 2.x 时 adapter 版本门禁使正控失败。真实一次探针（claude-code 通道，模型 `magpie/opencode-go-gw/deepseek-v4.1-flash`，CLI 2.2.6）确认：native `write` 工具调用、精确 21 字节 sentinel、清理后 vault 残留为空。该正控运行本身不等价于任何后端完整审计；各后端安全腿仍须各自真实运行。

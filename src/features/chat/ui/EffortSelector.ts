@@ -33,6 +33,14 @@ export interface EffortSelectorCallbacks {
   /** Label used when no explicit variant is selected. */
   getDefaultOptionLabel?: () => string;
   /**
+   * Optional per-variant display label. Returning undefined keeps the
+   * built-in capitalization. Purely presentational: the variant identifier
+   * passed back to `onVariantChange` and persisted in overrides is never
+   * relabeled, so `undefined` (inherit) and explicit values like `off`
+   * stay distinct regardless of their labels.
+   */
+  getVariantLabel?: (variant: string) => string | undefined;
+  /**
    * Returns a short boundary hint explaining when the selected effort
    * takes effect (e.g. "Applies to next turn"). Returning undefined or
    * an empty string hides the hint.
@@ -145,7 +153,7 @@ export class EffortSelector {
     const currentVariant = this.callbacks.getVariant();
     const allowDefaultOption = this.callbacks.allowDefaultOption?.() ?? true;
     const defaultLabel = this.callbacks.getDefaultOptionLabel?.() ?? t('chat.effort.disabled');
-    const currentLabel = currentVariant ? formatVariantLabel(currentVariant) : defaultLabel;
+    const currentLabel = currentVariant ? this.labelForVariant(currentVariant) : defaultLabel;
 
     // Current value display
     const currentEl = this.gearsEl.createDiv({ cls: 'opencodian-effort-current' });
@@ -194,7 +202,7 @@ export class EffortSelector {
 
     const choices: Array<{ variant: string | undefined; label: string }> = [
       ...(allowDefaultOption ? [{ variant: undefined, label: defaultLabel }] : []),
-      ...[...variants].reverse().map((variant) => ({ variant, label: formatVariantLabel(variant) })),
+      ...[...variants].reverse().map((variant) => ({ variant, label: this.labelForVariant(variant) })),
     ];
     for (const { variant, label } of choices) {
       const selected = variant === currentVariant || variant === undefined && !currentVariant;
@@ -361,7 +369,7 @@ export class EffortSelector {
     const defaultLabel = this.callbacks.getDefaultOptionLabel?.() ?? t('chat.effort.disabled');
     const choices: InlineEffortChoice[] = [
       ...(allowDefaultOption ? [{ variant: undefined, label: defaultLabel }] : []),
-      ...variants.map((variant) => ({ variant, label: formatVariantLabel(variant) })),
+      ...variants.map((variant) => ({ variant, label: this.labelForVariant(variant) })),
     ];
     this.inlineChoices = choices;
 
@@ -387,7 +395,9 @@ export class EffortSelector {
     slider.max = String(maxIndex);
     slider.step = '1';
     slider.value = String(selectedIndex);
-    slider.disabled = this.isSaving || choices.length <= 1;
+    // Native `disabled` only for a genuinely inert single-choice control. A
+    // pending save must not disable the slider (that would blur it).
+    slider.disabled = choices.length <= 1;
     slider.setAttribute('aria-valuetext', selected.label);
     slider.toggleClass('is-highest', choices.length > 1 && selectedIndex === maxIndex);
     output.setText(selected.label);
@@ -409,7 +419,12 @@ export class EffortSelector {
       this.inlineHintEl.setText(hint ?? '');
       this.inlineHintEl.toggleClass('is-hidden', !hint);
     }
-    panel.removeAttribute('aria-busy');
+    // A resync that runs while a save is still pending must keep announcing
+    // the busy state; only an idle render clears it.
+    if (!this.isSaving) {
+      panel.removeAttribute('aria-busy');
+      slider.removeAttribute('aria-disabled');
+    }
   }
 
   private buildInlinePanel(): void {
@@ -431,6 +446,9 @@ export class EffortSelector {
     });
     this.inlineSliderEl = slider;
     slider.addEventListener('input', () => {
+      // No optimistic preview while a save is pending: the follow-up `change`
+      // resyncs the thumb to the committed value.
+      if (this.isSaving) return;
       const index = Number(slider.value);
       const choice = this.inlineChoices[index];
       if (!choice) return;
@@ -459,12 +477,19 @@ export class EffortSelector {
     const slider = this.inlineSliderEl;
     if (!slider) return;
     const maxIndex = Math.max(1, choiceCount - 1);
-    const progress = choiceCount <= 1 ? 100 : (index / maxIndex) * 100;
-    slider.style.setProperty('--opencodian-effort-progress', `${progress}%`);
+    const raw = choiceCount <= 1 ? 1 : index / maxIndex;
+    const progress = Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0;
+    slider.style.setProperty('--opencodian-effort-progress', progress.toFixed(4));
   }
 
   private async selectInlineVariant(index: number): Promise<void> {
-    if (this.isSaving) return;
+    if (this.isSaving) {
+      // A change landed while a save is in flight: snap the slider back to the
+      // committed readback instead of starting a second save or leaving an
+      // unsaved preview on screen.
+      this.renderInline();
+      return;
+    }
     const choice = this.inlineChoices[index];
     if (!choice) return;
     if (choice.variant === this.callbacks.getVariant()) {
@@ -475,18 +500,23 @@ export class EffortSelector {
     this.isSaving = true;
     this.inlineFeedbackEl?.setText('');
     this.inlinePanelEl?.setAttribute('aria-busy', 'true');
-    if (this.inlineSliderEl) this.inlineSliderEl.disabled = true;
+    // Busy is announced with aria-disabled, never the native `disabled`
+    // property: disabling a focused range makes the browser blur it to
+    // <body>, which drops keyboard focus and toggles every ancestor
+    // :focus-within style (the composer ring) on each effort change.
+    this.inlineSliderEl?.setAttribute('aria-disabled', 'true');
     try {
       await this.callbacks.onVariantChange(choice.variant);
-      this.updateDisplay();
     } catch {
       this.inlineFeedbackEl?.setText(t('chat.effort.saveFailed'));
-      this.updateDisplay();
     } finally {
       this.isSaving = false;
       this.inlinePanelEl?.removeAttribute('aria-busy');
-      if (this.inlineSliderEl) this.inlineSliderEl.disabled = false;
+      this.inlineSliderEl?.removeAttribute('aria-disabled');
     }
+    // One render for both outcomes, after the busy flag clears, so the slider
+    // settles on the real persisted value (rolled back on failure).
+    this.updateDisplay();
   }
 
   private mountDropdownLayoutController(optionsEl: HTMLElement): void {
@@ -512,9 +542,19 @@ export class EffortSelector {
   private getCurrentDisplayLabel(): string {
     const currentVariant = this.callbacks.getVariant();
     if (currentVariant) {
-      return formatVariantLabel(currentVariant);
+      return this.labelForVariant(currentVariant);
     }
     return this.callbacks.getDefaultOptionLabel?.() ?? t('chat.effort.disabled');
+  }
+
+  /**
+   * Single label source for every display path (popover current value, menu
+   * items, inline slider steps and the embedding trigger). A blank host label
+   * falls back to the built-in formatter so an option can never render empty.
+   */
+  private labelForVariant(variant: string): string {
+    const hostLabel = this.callbacks.getVariantLabel?.(variant)?.trim();
+    return hostLabel || formatVariantLabel(variant);
   }
 
   private syncAccessibleLabel(currentLabel: string): void {

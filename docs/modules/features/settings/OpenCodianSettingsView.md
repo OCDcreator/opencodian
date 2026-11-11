@@ -1,4 +1,7 @@
 # OpenCodianSettingsView
+
+2026-11-09：编辑器设置视图在 `onClose()` 调用 renderer `disposeActiveBackendSections()`，与原生设置 hide 共享 DSH/Codex 订阅释放路径，防止后台原生更新写入已关闭的任务 DOM。
+
 > 2026-09-21 (advantage-parity R-F7)：编辑器区面 General 合并块渲染环境变量行（tabbed deps 同步传入，直连共享实现）。
 > 2026-09-20 (advantage-parity R-D2)：编辑区设置面同享钥匙串开关行与编辑区设置行（均委托 SettingsPanelChrome，消除与模态设置页的重复实现）。
 

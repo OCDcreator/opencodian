@@ -9,6 +9,12 @@
 
 本轮之后，它不再通过 `OpenCodianView` callback bridge 转发 foreground live-signal reconcile 或 stream-like UI sync，而是直接组合 `BackgroundTaskLiveSignalCoordinator` 与 `TabRuntimeStateBridge`。
 
+## DSH Jobs 更新入口（2026-11-09）
+
+`acceptNativeJobs(conversation, tabId, snapshot)` 消费原生权威列表与 lease，交给 TimelineService，再调用既有 InlinePanelRenderer 和 completion queue/flush。此入口刻意不调用 legacy live-signal reconcile 或 stream-like state 同步：后台 Jobs 完成与 foreground session.status 独立。DSH completion 收集只使用 `collectNativeJobSegments`，不从工具字符串或 OMO 伪通知生成事件。
+
+SessionInformationCoordinator 的初始读、jobs_update 后再读与现有五秒 polling 均能进入该入口，后台标签也会处理。streaming 时完成提示延迟，foreground 停止后的下一次权威读或既有 finalize flush 才持久化。没有新增模型调度或全局订阅。
+
 ## 公开接口
 
 ```typescript

@@ -158,8 +158,8 @@ it('reads Harness mounted MCP and durable children and authorizes child history 
   });
   try {
     const data = await adapter.readSessionInformation('native-parent');
-    expect(data.mcp).toEqual({ scope: 'session', servers: [{ name: 'actual-mounted', status: 'connected' }] });
-    expect(data.agents?.[0]).toEqual({ id: 'native-child', title: 'Review', status: 'completed', readable: true });
+    expect(data.mcp).toEqual({ scope: 'session', servers: [{ name: 'actual-mounted', status: 'unknown' }] });
+    expect(data.agents?.[0]).toEqual({ id: 'native-child', title: 'Review', status: 'completed', readable: true, mode: 'unknown' });
     const messages = await adapter.readChildSessionMessages('native-parent', 'native-child');
     expect(nativeRequest.mock.calls).toEqual([
       ['session/information', { sessionId: 'native-parent' }], ['session/child-history', { sessionId: 'native-parent', childId: 'native-child' }],

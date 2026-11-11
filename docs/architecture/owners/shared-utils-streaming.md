@@ -4,6 +4,8 @@
 > - streaming 类型 kind union 扩展；新增 `ToolCallRenderer.image.test`。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 
+2026-11-10（DSH 工具结果图片渲染）：`ToolCallRenderer` 新增混合结果图片分支——工具结果内的 store 恢复图片经有界 data-URI 检测（`data:image/(png|jpeg|webp|gif);base64,` 精确前缀 + canonical base64 尾位校验 + 前 18 字节 magic 证明 + 字符数上限）按出现顺序交错渲染为既有 `.streaming-tool-image` 与行块；每条结果最多 4 张，超出折叠为本地化标记，不把 base64 dump 进可见文本，原始 result 字符串不改动。SVG / `file://` / http(s) / `javascript:` / 伪 payload 一律保持字面文本，不开放任何协议自动加载；无命中路径与旧行为逐字节一致；image-kind 旧「整条 result 恰一条白名单 URI」分支为历史兼容保留，其无 magic 强校验的不对称如实存在。kind/icon 语义不变。该分支已列入 2026-11-10 图片/续接独立审查冻结报告（`.impeccable/review/dsh-chat-followups-20261110/images-controls-independent-review.md`）范围并按其发现修复复测，另经 custom+Kimi 静态复审无阻塞（2026-11-10 通报）；超界标记的 locale 键接入归主代理集中项。
+
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
 - 2026-09-13 (universal memory backend): owner manifest gained `core.memory` and `app.memory-runtime`; this owner's boundary itself is unchanged (no source touched, allowlist untouched).
 

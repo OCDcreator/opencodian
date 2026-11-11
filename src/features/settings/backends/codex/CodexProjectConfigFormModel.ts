@@ -114,12 +114,42 @@ export interface CodexProjectConfigValidationResult {
   diagnostics: CodexProjectConfigTomlDiagnostic[];
 }
 
+/**
+ * Approval policies the guided form offers. The adapter's approval bridge
+ * covers on-request/never plus inherit (no override); `untrusted` was removed
+ * by Codex CLI 0.15x (2026-08) and the plugin never emits it, `on-failure`
+ * remains a CLI-side policy the plugin simply does not guide toward.
+ */
+export const CODEX_PROJECT_APPROVAL_POLICY_SUPPORTED = ['never', 'on-request'] as const;
+/** Full CLI-valid enum for value-shape validation of the advanced editor. */
+const CODEX_PROJECT_APPROVAL_POLICY_ENUM = ['never', 'on-request', 'on-failure'] as const;
+/** Removed by Codex CLI 0.15x: config load HARD-FAILS while it is present. */
+const CODEX_PROJECT_APPROVAL_POLICY_CLI_RETIRED = ['untrusted'] as const;
+
+/**
+ * True when the guided form may write this approval_policy value: inherit
+ * (null, removes the key) or one of {@link CODEX_PROJECT_APPROVAL_POLICY_SUPPORTED}.
+ * Anything else (retired `untrusted`, unguided `on-failure`, unknown strings)
+ * is preserved verbatim and never written back — see {@link buildProjectConfigEdits}.
+ */
+export function isGuidedCodexProjectApprovalPolicy(value: string | null): boolean {
+  return value === null || (CODEX_PROJECT_APPROVAL_POLICY_SUPPORTED as readonly string[]).includes(value);
+}
+
+/** True for values Codex CLI 0.15x+ rejects outright (`untrusted`). */
+export function isCliRetiredCodexProjectApprovalPolicy(value: string | null): boolean {
+  return value !== null && (CODEX_PROJECT_APPROVAL_POLICY_CLI_RETIRED as readonly string[]).includes(value);
+}
+
 // Strict value-shape policy for allowed keys.
 const SCALAR_STRING_KEYS = new Set(['model']);
 const SCALAR_ENUM_KEYS: Record<string, readonly string[]> = {
   model_reasoning_effort: ['minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra', 'persistent'],
   sandbox_mode: ['read-only', 'workspace-write', 'danger-full-access'],
-  approval_policy: ['never', 'on-request', 'on-failure', 'untrusted'],
+  // CLI-retired 'untrusted' is intentionally absent from the enum: Codex CLI
+  // 0.15x hard-fails config load while it is present, so validateAllowedKeyValueShape
+  // reports the dedicated retired-approval diagnostic instead of accepting it.
+  approval_policy: CODEX_PROJECT_APPROVAL_POLICY_ENUM,
   web_search: ['disabled', 'cached', 'live'],
 };
 const SCALAR_BOOLEAN_KEYS = new Set(['network_access']);
@@ -202,6 +232,14 @@ function validateAllowedKeyValueShape(
       };
     }
     if (!enumValues.includes(value)) {
+      // Codex CLI 0.15x removed 'untrusted': a present value hard-fails config
+      // load, so name that outcome instead of a generic enum mismatch.
+      if (key === 'approval_policy' && isCliRetiredCodexProjectApprovalPolicy(value)) {
+        return {
+          reasonKey: 'settings.codex.projectConfig.diagnostic.retiredApprovalPolicy',
+          params: { key, value, allowed: CODEX_PROJECT_APPROVAL_POLICY_SUPPORTED.join(', ') },
+        };
+      }
       return {
         reasonKey: 'settings.codex.projectConfig.diagnostic.invalidShape.invalidEnum',
         params: { key, allowed: enumValues.join(', '), value },
@@ -478,15 +516,25 @@ function escapeRegex(s: string): string {
 export function buildProjectConfigEdits(
   values: CodexProjectConfigFormValues,
 ): TomlScalarEdit[] {
-  return [
+  const edits: TomlScalarEdit[] = [
     { key: 'model', value: values.model?.trim() || null },
     { key: 'model_reasoning_effort', value: values.modelReasoningEffort || null },
     { key: 'sandbox_mode', value: values.sandboxMode || null },
-    { key: 'approval_policy', value: values.approvalPolicy || null },
+  ];
+  // A non-guided approval_policy (retired 'untrusted', CLI-valid 'on-failure',
+  // or an unknown string) is preserved verbatim: the surgical edit list skips
+  // the key so an unrelated form save can never silently rewrite or drop it.
+  // Repair happens only when the user explicitly picks a listed policy
+  // (or inherit) in the guided form, or edits the advanced TOML directly.
+  if (isGuidedCodexProjectApprovalPolicy(values.approvalPolicy)) {
+    edits.push({ key: 'approval_policy', value: values.approvalPolicy ?? null });
+  }
+  edits.push(
     { key: 'network_access', value: values.networkAccess === null ? null : String(values.networkAccess), bare: true },
     { key: 'web_search', value: values.webSearch || null },
     // additional_directories is handled separately as an array.
-  ];
+  );
+  return edits;
 }
 
 /**

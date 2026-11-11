@@ -15,6 +15,8 @@ export interface AgentMentionCandidate extends AgentMentionMenuItem {
   mode: AgentMentionMode;
   hidden?: boolean;
   reference?: PromptReference;
+  /** Literal `@label ` only: no pill, no reference span, no continuation authority. */
+  literalOnly?: boolean;
 }
 
 interface AgentMentionQuery {
@@ -41,6 +43,7 @@ export interface AgentMentionComposerControllerHost {
   getComposerInputMode(): 'prompt' | 'shell';
   loadAgentMentionCandidates?(): Promise<AgentMentionCandidate[]>;
   loadPromptReferenceCandidates?(query?: string): Promise<PromptReferenceCandidate[]>;
+  loadSubagentMentionCandidates?(): Promise<AgentMentionCandidate[]>; // literal-text labels only
   getPromptReferenceContextKey?(): string;
   getTextarea?(): HTMLTextAreaElement | null;
   scheduleLayoutSync(): void;
@@ -113,7 +116,7 @@ export class AgentMentionComposerController {
     menuEl: HTMLElement | null,
   ): Promise<void> {
     this.syncReferenceContext();
-    if (!this.host.loadAgentMentionCandidates && !this.host.loadPromptReferenceCandidates) {
+    if (!this.host.loadAgentMentionCandidates && !this.host.loadPromptReferenceCandidates && !this.host.loadSubagentMentionCandidates) {
       this.clear(menuEl);
       return;
     }
@@ -129,20 +132,11 @@ export class AgentMentionComposerController {
     this.render(menuEl);
 
     try {
-      const results = await Promise.allSettled([
-        this.host.loadAgentMentionCandidates?.() ?? Promise.resolve([]),
-        this.host.loadPromptReferenceCandidates?.(query.query) ?? Promise.resolve([]),
-      ]);
+      const results = await Promise.allSettled([this.host.loadAgentMentionCandidates?.() ?? Promise.resolve([]),
+        this.host.loadPromptReferenceCandidates?.(query.query) ?? Promise.resolve([]), this.host.loadSubagentMentionCandidates?.() ?? Promise.resolve([])]);
       if (currentRunId !== this.runId || contextKey !== this.host.getPromptReferenceContextKey?.()) return;
 
-      const agents = results[0].status === 'fulfilled' ? results[0].value : [];
-      const references = results[1].status === 'fulfilled' ? results[1].value : [];
-      const candidates: AgentMentionCandidate[] = [
-        ...references.map((candidate) => ({ id: candidate.id, displayName: candidate.label,
-          description: candidate.description, mode: null, reference: candidate.reference,
-          referenceKind: candidate.kind, updatedAt: candidate.updatedAt })),
-        ...agents,
-      ];
+      const candidates = mergeMentionCandidateSources(results);
       for (const result of results) if (result.status === 'rejected') this.host.onLoadFailed(result.reason);
       if (candidates.length === 0 && results.some((result) => result.status === 'rejected')) {
         throw new Error('Reference candidates could not be loaded');
@@ -301,7 +295,7 @@ export class AgentMentionComposerController {
     textarea.value = nextValue;
     textarea.focus();
     textarea.setSelectionRange(nextCursor, nextCursor);
-    if (!item.reference) this.trackedMentions.push({
+    if (!item.reference && !item.literalOnly) this.trackedMentions.push({
       agentId: item.id,
       value: mentionValue,
       start: query.start,
@@ -430,12 +424,23 @@ export class AgentMentionComposerController {
   }
 }
 
+/** Merge order fixes the menu group order: references, subagent labels, then native agents. */
+function mergeMentionCandidateSources(results: readonly PromiseSettledResult<readonly (AgentMentionCandidate | PromptReferenceCandidate)[]>[]): AgentMentionCandidate[] {
+  const value = <T>(index: number): T[] => { const result = results[index]; return (result.status === 'fulfilled' ? result.value : []) as T[]; };
+  return [
+    ...value<PromptReferenceCandidate>(1).map((candidate) => ({ id: candidate.id, displayName: candidate.label, description: candidate.description,
+      mode: null, reference: candidate.reference, referenceKind: candidate.kind, updatedAt: candidate.updatedAt })),
+    ...value<AgentMentionCandidate>(2).map((candidate) => ({ ...candidate, mode: null, reference: undefined, menuGroup: 'subagents' as const, literalOnly: true })),
+    ...value<AgentMentionCandidate>(0),
+  ];
+}
+
 export function filterAgentMentionCandidates(
   candidates: AgentMentionCandidate[],
   query: string,
 ): AgentMentionCandidate[] {
   const visibleCandidates = candidates.filter((candidate) =>
-    !candidate.hidden && (candidate.reference || candidate.mode === 'subagent' || candidate.mode === 'all'));
+    !candidate.hidden && (candidate.reference || candidate.literalOnly || candidate.mode === 'subagent' || candidate.mode === 'all'));
   const normalizedQuery = query.trim().toLowerCase();
   return visibleCandidates
     .map((candidate) => ({
@@ -444,11 +449,11 @@ export function filterAgentMentionCandidates(
     }))
     .filter((entry) => entry.score > 0)
     .sort((left, right) => {
-      const groups: Record<PromptReference['kind'] | 'agent', number> = {
-        file: 0, folder: 0, session: 1, plugin: 2, app: 2, 'mcp-resource': 3, agent: 4,
+      const groups: Record<PromptReference['kind'] | 'agent' | 'subagents', number> = {
+        file: 0, folder: 0, session: 1, plugin: 2, app: 2, 'mcp-resource': 3, subagents: 4, agent: 5,
       };
-      return groups[left.candidate.reference?.kind ?? 'agent']
-        - groups[right.candidate.reference?.kind ?? 'agent'] || right.score - left.score;
+      const rank = (candidate: AgentMentionCandidate): number => candidate.menuGroup === 'subagents' ? 4 : groups[candidate.reference?.kind ?? 'agent'];
+      return rank(left.candidate) - rank(right.candidate) || right.score - left.score;
     })
     .map((entry) => entry.candidate);
 }

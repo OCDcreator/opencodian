@@ -7,6 +7,16 @@
 > 2026-09-20 (advantage-parity R-D1)：OpenCodianView 的历史菜单 host 新增 exportConversationMarkdown 转发方法（导出逻辑不进视图）。
 
 # Owner: feature.chat-shell
+
+2026-11-11（共享工作台展示接线）：`mountSessionWorkbench` 转发文件摘要与变化通知、内联资源挂载；摘要 getter 带当前会话身份，sidebar 刷新前先交接展示归属，异步完成后由既有 coordinator 通知重投影，避免新会话暂显旧计数。视图内 `clearSlashCommandMenuPreload` 将已有目录失效信号转发 tools，不建立第二订阅。视图不持有目录缓存、工具草稿或文件统计；新一级布局与独立工具视图仍由 feature.chat-ui 实现。
+
+2026-11-10：DSH 历史图片恢复仅在既有 native message merge 中补缺失／空 images 字段；同源由 sourceMessageId 或双边唯一的完整正文＋角色确认，不用短文字 includes 猜图像归属。未确认本地消息存在时保留整个 previous，不做有损提交，当前批次新更新也暂不采纳。已有附件、原文、ID、模型与上下文不被替换，图片-only 变化经原有 fingerprint/write ticket 持久化。上下文详情只按打开时捕获的 DSH sessionId 转发账本 loader，view 不持有 trace 或附件第二缓存。其它后端合并规则不变。
+
+2026-11-10：DSH effort 标签只在 `mountChatEffortSelector` 的展示回调内重命名（`off`→关闭思考、继承项“继承默认（{effort}）”）；原始 variant、发送解析与持久化（undefined→null / 'off'→'off'）一字未动，view 不新增运行时所有权。
+
+2026-11-10：会话入口目录刷新钩子更名 `refreshSessionCatalogForCurrentConversation` 并加 DSH 早分支——有 owned 会话的 DSH 恢复后自动重读自有会话目录（复用 `reloadModelCatalog` 的 fence 与历史模型标签刷新链），挂载期早跑导致的历史气泡原始引用问题由此修复；无 owned 会话保持空目录不借用。ZCode 恢复/会话状态/任务观察仍严格 gated ZCode，其他后端零变化；view 不新增运行时所有权。
+
+2026-11-09：DSH 原生会话控制只增加窄 host 组合：Todo capability 查询／刷新和当前 adapter 读取。2026-11-10 起 selector host 不再提供 DSH 设置深链钩子（selector host 恢复基线）；同日 workbench 组合面新增窄 host callback `openBackendSettings`，DSH 后端经恢复的 `ChatPluginPort` settingsTab Pick 成员 `prepareScrollToDsh` 定位既有 DSH advanced 设置页（phase1 批准的 scoped 范围，实现归 settingsTab 组合根）。权限／Plan、任务与 PTY 的请求／事件／状态保留在相邻 coordinator、UI 与 backend owner，OpenCodianView 不持有第二份运行时状态。
 > 2026-10-26（DSH UI 修复）：视图把 DSH 显式 effort 覆盖、原生默认显示值和下一轮生效说明交给既有 EffortSelector，并向消息 renderer 转发按历史模型身份查找显示名的只读方法。发送采用的有效值仍走原链路，视图不新增模型目录或协议状态。
 > 2026-10-24（DSH）：视图转发会话模型/推理持久化与后端独立 diff 读取；保存恢复和原生配置仍由 selection coordinator / adapter 承担，不引入视图内会话运行时。
 > 2026-09-30 (Codex 0.159 integration)：

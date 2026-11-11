@@ -32,6 +32,8 @@
 - 上游：`OpenCodeSessionTraceService` 的窄 service/store/reportBuilder port、`CodexDiagnosticsHostAdapter`、`ClaudeDiagnosticsHostAdapter`、三个 backend 的 session-trace settings，以及 app-composition 的显式 ports。
 - 下游：`ChatHeaderPresenter` 的 backend-specific badge/menu routes、`SendPipelineRuntime` 的 backend-specific token claims，以及 `ConversationTabLifecycleRecoveryCoordinator` 的 backend-specific cleanup cancellations。
 
+2026-11-10（DSH trace 账本只读消费——实施机制已冻结，独立复核/宿主验收待完成）：coordinator 增加窄 port `DshTraceLedgerPort = Pick<DshSessionTraceService, 'readSessionLedger' | 'resolveTraceId'>`，经 `dshDiagnosticsHost`（缺省 `createFailClosedDshDiagnosticsHost()` 的内联 fail-closed host，无专用 host adapter 文件）取得 DSH trace service，对外暴露 `getDshTraceLedger(sessionId)`；view 侧打开上下文弹窗时按 `backend==='dsh'` 的当前会话注入 loader（装配缝在 view，本 coordinator 只提供服务读取；空 id、缺失服务与读取异常一律返回 null）。DSH 无 capture token/深度捕获/徽标操作面，state/show/claim/cancel 仍仅 OpenCode/Codex/Claude 三条 backend 路由；账本内容契约归 core.backend-diagnostics，coordinator 不复制第二份 trace 状态，trace 失败继续收纳在聊天路径之外。
+
 ## 目录定位（2026-10-23）
 
 - 源码位置：`src/features/chat/services/diagnostics/ChatDiagnosticsCoordinator.ts`。

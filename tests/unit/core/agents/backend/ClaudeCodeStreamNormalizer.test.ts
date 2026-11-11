@@ -495,6 +495,60 @@ describe('ClaudeCodeStreamNormalizer', () => {
     })]);
   });
 
+  // claude-agent-sdk 0.3.319 added SDKSessionWritesLostMessage (system/session_writes_lost):
+  // emitted at most once as the CLI exits when transcript lines and/or ~/.claude.json
+  // changes could not be persisted (ENOSPC disk full / EDQUOT quota). The normalizer must
+  // surface it as an honest informational backend event instead of dropping it silently.
+  it('normalizes session_writes_lost (SDK 0.3.319) into an error informational backend event', () => {
+    const normalizer = createClaudeCodeStreamNormalizer({ sessionId: 'sess-writes-lost' });
+
+    expect(normalizer.transformSDKMessage({
+      type: 'system',
+      subtype: 'session_writes_lost',
+      error_code: 'ENOSPC',
+      lost: ['transcript', 'global_config'],
+      transcript_session_ids: ['sess-writes-lost', 'sess-earlier'],
+      uuid: 'lost-1',
+      session_id: 'sess-writes-lost',
+    })).toEqual([{
+      type: 'backend_event',
+      source: 'claude-code',
+      event: 'informational',
+      status: 'error',
+      content: 'Claude Code could not save session data (ENOSPC): transcript, global_config. Results already received stand; resuming may miss part of the conversation.',
+      metadata: {
+        errorCode: 'ENOSPC',
+        lost: ['transcript', 'global_config'],
+        transcriptSessionIds: ['sess-writes-lost', 'sess-earlier'],
+      },
+      sessionId: 'sess-writes-lost',
+    }]);
+  });
+
+  it('normalizes session_writes_lost without transcript session ids into empty transcriptSessionIds', () => {
+    const normalizer = createClaudeCodeStreamNormalizer({ sessionId: 'sess-config-lost' });
+
+    expect(normalizer.transformSDKMessage({
+      type: 'system',
+      subtype: 'session_writes_lost',
+      error_code: 'EDQUOT',
+      lost: ['global_config'],
+      uuid: 'lost-2',
+      session_id: 'sess-config-lost',
+    })).toEqual([expect.objectContaining({
+      type: 'backend_event',
+      source: 'claude-code',
+      event: 'informational',
+      status: 'error',
+      metadata: {
+        errorCode: 'EDQUOT',
+        lost: ['global_config'],
+        transcriptSessionIds: [],
+      },
+      sessionId: 'sess-config-lost',
+    })]);
+  });
+
   it('preserves refusal fallback metadata without rendering stale retracted text', () => {
     const normalizer = createClaudeCodeStreamNormalizer({ sessionId: 'sess-refusal' });
 

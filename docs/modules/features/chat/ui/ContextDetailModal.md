@@ -11,6 +11,8 @@ Obsidian Modal，展示当前会话的上下文使用详情。包括会话元信
 
 当后端没有报告 cache-write 或 cost 时，modal 将它们显示为 `-`。OpenCode 遵循 desktop 双口径：total/input/output/reasoning/cache/cost 来自 `session.tokens` / `session.cost`，而 Usage、context limit 与 breakdown 来自最后一条有效 assistant message；因此当前上下文缺失但累计数据仍存在时，modal 保持网格，Usage/Limit/Breakdown 显示不可用。Claude/Codex 的本地数值不是订阅账单。Codex 的 total/context window 均来自 app-server 的 thread token-usage 通知，不混入账号日/周用量。
 
+2026-11-10（DSH 事件账本区段）：可选 `dshTraceLedgerLoader`（DSH-only；view 按 `backend==='dsh'` 的当前会话经 `ChatDiagnosticsCoordinator.getDshTraceLedger` 注入）存在时渲染 DSH 账本区段：timing 概览行（观测回合数、最近 client round trip——文案明确标注为往返而非执行时长、最近事件时间）加白名单事件行（折叠 `<details>`，显示时间·名称·detail·时长·timeSource），区段在 loader 存在时即渲染、不依赖 usage 数据；loader 返回 null（缺失/读取失败）显示 unavailable，有效但为空的快照显示 empty，预算受限快照即使为空也额外标注 limited（locale 归主代理）。账本行时间恒为 client 观测，RPC 成功只是 `response-received` 客户端收据。账本内容与白名单机制归 core.backend-diagnostics（metadata-only、client-observed；实施机制已冻结，独立复核/宿主验收待完成）；modal 不持有 trace 状态，不做来源推断，不把 token 用量当作 timeline。
+
 ## 导入关系
 上游: `obsidian`（Modal）、`Conversation`/`TabContextState`/`ContextBreakdownSegment`（core/types）、`i18n`、`ContextUsageService`
 下游: 被 `OpenCodianView` 或 `ContextRing` 的点击回调打开

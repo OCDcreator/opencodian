@@ -115,6 +115,7 @@ export class OpenCodianSettingsView extends ItemView {
   }
 
   async onClose(): Promise<void> {
+    this.tabbedRenderer?.disposeActiveBackendSections();
     this.pluginUpdateExpanded = false;
     this.disposeSections();
     this.dropdownsEnhancer?.destroy();

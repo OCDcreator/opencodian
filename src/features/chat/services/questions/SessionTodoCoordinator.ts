@@ -1,5 +1,6 @@
 import { Notice } from 'obsidian';
 
+import type { AgentTodoCapability, Disposable } from '../../../../core/agents/backend/AgentService';
 import type { SessionActivityStatus } from '../../../../core/opencode';
 import type {
   ChatMessage,
@@ -77,6 +78,7 @@ export interface SessionTodoCoordinatorHost {
   ): boolean;
   appendPersistentAssistantNoticeMessage(options: SessionTodoNoticeMessageOptions): Promise<void>;
   getSessionTodos(sessionId: string): Promise<SessionTodo[]>;
+  getTodoCapability?(backend: NonNullable<Conversation['backend']>): AgentTodoCapability | null;
   getSessionStatuses(): Promise<Record<string, SessionActivityStatus>>;
   reconcileBackgroundTaskLiveSignals(
     tabId: TabId | null,
@@ -94,6 +96,10 @@ export class SessionTodoCoordinator {
    * Entries are removed when their session is reset.
    */
   private readonly claudeTaskSessionStates = new Map<string, ClaudeTaskSessionState>();
+  private readonly todoSubscriptions = new Map<TabId | null, {
+    service: AgentTodoCapability; sessionId: string; dispose: Disposable;
+  }>();
+  private disposed = false;
 
   constructor(private readonly host: SessionTodoCoordinatorHost) {
     this.stateService = new SessionTodoStateService({
@@ -136,7 +142,41 @@ export class SessionTodoCoordinator {
   }
 
   destroy(): void {
+    this.disposed = true;
+    for (const subscription of this.todoSubscriptions.values()) subscription.dispose.dispose();
+    this.todoSubscriptions.clear();
     this.dockCoordinator.destroy();
+  }
+
+  private bindTodoCapability(tabId: TabId | null, sessionId: string, service: AgentTodoCapability | null): void {
+    const previous = this.todoSubscriptions.get(tabId);
+    if (previous?.service === service && previous.sessionId === sessionId) return;
+    previous?.dispose.dispose();
+    this.todoSubscriptions.delete(tabId);
+    if (!service) return;
+    const backend = this.host.getConversationForTab(tabId)?.backend ?? 'opencode';
+    const dispose = service.subscribeToSessionTodoUpdates((raw) => {
+      if (this.disposed || this.host.getSessionIdForTab(tabId) !== sessionId
+        || this.host.getConversationForTab(tabId)?.backend !== backend
+        || this.host.getTodoCapability?.(backend) !== service) return;
+      const update = raw as { sessionID?: string; sessionId?: string; todos?: unknown[] } | null;
+      if ((update?.sessionID ?? update?.sessionId) !== sessionId || !Array.isArray(update?.todos)) return;
+      const runtime = this.host.getTabRuntimeState(tabId);
+      if (!runtime) return;
+      ++runtime.todoRequestId; // A push is newer than any in-flight initial read.
+      this.applySessionTodoUpdate(tabId, sessionId, this.normalizeNativeTodos(update.todos));
+    });
+    this.todoSubscriptions.set(tabId, { service, sessionId, dispose });
+  }
+
+  private normalizeNativeTodos(values: unknown[]): SessionTodo[] {
+    return values.flatMap((value) => {
+      const todo = value as Partial<SessionTodo> | null;
+      return todo && typeof todo.id === 'string' && typeof todo.content === 'string'
+        && ['pending', 'in_progress', 'completed', 'cancelled'].includes(todo.status ?? '')
+        ? [{ id: todo.id, content: todo.content, status: todo.status!, ...(typeof todo.priority === 'string' ? { priority: todo.priority } : {}) }]
+        : [];
+    });
   }
 
   getTabSessionTodos(
@@ -186,13 +226,12 @@ export class SessionTodoCoordinator {
       return [];
     }
 
-    // Backend gate: getSessionTodos() is an OpenCode-only server API.
-    // Claude Code sessions derive todo snapshots purely from stream tool calls
-    // (applyStreamingTodoSnapshotFromTool); this refresh path is intentionally
-    // skipped for non-OpenCode backends.
     const conversation = this.host.getConversationForTab(tabId);
     const backend = conversation?.backend ?? 'opencode';
-    if (backend !== 'opencode') {
+    const service = this.host.getTodoCapability?.(backend) ?? null;
+    this.bindTodoCapability(tabId, sessionId, service);
+    // Backends with no native todo contract keep their existing tool-derived state.
+    if (backend !== 'opencode' && !service) {
       this.render(tabId);
       return [];
     }
@@ -201,8 +240,9 @@ export class SessionTodoCoordinator {
     runtime.todoRequestId = requestId;
 
     try {
-      const todos = await this.host.getSessionTodos(sessionId);
-      if (options.isCurrent && !options.isCurrent()) {
+      const todos = service ? this.normalizeNativeTodos(await service.getSessionTodos(sessionId))
+        : await this.host.getSessionTodos(sessionId);
+      if (!this.isTodoReadCurrent({ tabId, sessionId, backend, service }) || options.isCurrent && !options.isCurrent()) {
         return this.getTabSessionTodos(tabId);
       }
       const latestRuntime = this.host.getTabRuntimeState(tabId);
@@ -224,6 +264,12 @@ export class SessionTodoCoordinator {
       }
       return this.getTabSessionTodos(tabId);
     }
+  }
+
+  private isTodoReadCurrent(read: { tabId: TabId | null; sessionId: string; backend: NonNullable<Conversation['backend']>; service: AgentTodoCapability | null }): boolean {
+    return !this.disposed && (this.host.getConversationForTab(read.tabId)?.backend ?? 'opencode') === read.backend
+      && (!read.service || this.host.getSessionIdForTab(read.tabId) === read.sessionId
+        && this.host.getTodoCapability?.(read.backend) === read.service);
   }
 
   async refreshTabSessionStatus(
@@ -551,6 +597,10 @@ export class SessionTodoCoordinator {
   }
 
   resetTabSessionState(tabId: TabId | null, sessionId: string | null): void {
+    this.todoSubscriptions.get(tabId)?.dispose.dispose();
+    this.todoSubscriptions.delete(tabId);
+    const runtime = this.host.getTabRuntimeState(tabId);
+    if (runtime) ++runtime.todoRequestId;
     if (sessionId) {
       this.claudeTaskSessionStates.delete(sessionId);
     }

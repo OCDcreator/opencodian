@@ -4,7 +4,17 @@ import { randomUUID } from 'node:crypto';
 import { chmod, mkdir } from 'node:fs/promises';
 import * as path from 'node:path';
 
-import { type FileRevision, type SafeFileMutationResult,safeWriteFile } from '../configuration/ProjectResourceSecureWrite';
+import {
+  type ArchiveHistoryEntryIdentity,
+  type ArchiveHistoryEntrySummary,
+  type ConfigurationAllowlist,
+  type ConfigurationArchiveOptions,
+  type FileRevision,
+  listConfigurationArchiveHistory,
+  type SafeFileMutationResult,
+  safeRestoreArchivedEntry,
+  safeWriteFile,
+} from '../configuration/ProjectResourceSecureWrite';
 import { readZCodeJson, withZCodeFileLock, zcodeRecord } from './ZCodeNativeStore';
 
 export const ZCODE_API_PROTOCOLS = ['openai-chat-completions', 'openai-responses', 'anthropic-messages'] as const;
@@ -110,6 +120,50 @@ export class ZCodePersonalConfigService {
     });
   }
 
+  /**
+   * Validated archive history for this personal configuration target.
+   * Returns `null` when the target is outside this service's allowlist (the
+   * caller must never see another path's history). Archive failures throw so
+   * a broken manifest surfaces instead of masquerading as "no history".
+   */
+  async listPersonalConfigHistory(): Promise<readonly ArchiveHistoryEntrySummary[] | null> {
+    const result = await listConfigurationArchiveHistory({
+      targetPath: this.targetPath,
+      allowlist: this.allowlist(),
+      archive: this.archiveOptions(),
+    });
+    if (result.status === 'invalid-path') return null;
+    if (result.status === 'archive-failed') throw new Error(`zcode-archive-history-unavailable: ${result.cause}`);
+    return result.targets[0]?.entries ?? [];
+  }
+
+  /**
+   * Restore one caller-selected archive entry through the canonical secure
+   * restore path (identity validation, allowlist re-check, revision conflict
+   * gate, archive-before-replace, shared mutation lock). No ad-hoc writes.
+   */
+  restorePersonalConfigEntry(entryIdentity: ArchiveHistoryEntryIdentity, expectedRevision: FileRevision | null): Promise<SafeFileMutationResult> {
+    return safeRestoreArchivedEntry({
+      entryIdentity,
+      expectedRevision,
+      allowlist: this.allowlist(),
+      ...(this.archiveRootPath ? { archiveRootPath: this.archiveRootPath } : {}),
+    });
+  }
+
+  private allowlist(): ConfigurationAllowlist {
+    return [{ scope: 'global', rootPath: path.dirname(this.targetPath) }];
+  }
+
+  private archiveOptions(): ConfigurationArchiveOptions {
+    return {
+      backend: 'zcode',
+      kind: 'personal-providers',
+      format: 'json',
+      ...(this.archiveRootPath ? { archiveRootPath: this.archiveRootPath } : {}),
+    };
+  }
+
   private removeDeletedModelReferences(document: Record<string, unknown>, id: string, models: readonly string[]): void {
     const config = zcodeRecord(document.config), modelRules = zcodeRecord(config.modelConfigRules);
     for (const key of ['providerModelRules', 'manualProviderModelRules']) {
@@ -137,8 +191,8 @@ export class ZCodePersonalConfigService {
       update(document, rules);
       const result = await safeWriteFile({
         targetPath: this.targetPath, content: JSON.stringify(document, null, 2) + '\n', expectedRevision: expected,
-        allowlist: [{ scope: 'global', rootPath: path.dirname(this.targetPath) }], format: 'json',
-        archive: { backend: 'zcode', kind: 'personal-providers', format: 'json', ...(this.archiveRootPath ? { archiveRootPath: this.archiveRootPath } : {}) },
+        allowlist: this.allowlist(), format: 'json',
+        archive: this.archiveOptions(),
       });
       if (result.status === 'success' && process.platform !== 'win32') await chmod(this.targetPath, 0o600);
       return result;

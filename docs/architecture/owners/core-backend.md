@@ -1,5 +1,15 @@
 # Owner: core.backend
 
+2026-11-10：子会话续接沿既有 `DshNativeControls`／`assets/dsh/control.mjs` 边界扩展。能力采用当前 client lease 的专用 `subagents.prompt` 读回，不修改共享能力解析形状。Native 只允许直属 catalog 中 mode 为 continuable 的孩子接收 text-only queue／steer，客户端 UUID 与 inbox receipt 保留真实身份；accepted 仅为 inbox 入队收据、不代表执行结束。one-shot／external／unknown 与 foreign child 拒绝；域失败只转白名单 code，不将原生异常内容带回；无 failureCode 的未知结果（超时/传输中断/代际过期）不推断成败、不自动重发。只读子会话目录（`listSessionSubagents`）仅作 @label 来源与工作台投影，不授予任何写权限。ACP 无同等原生控制即不可用。现有子会话中断、后台活动与重连安全证据规则保持。
+
+2026-11-10（DSH 历史图片恢复）：`assets/dsh/service.mjs` 的 `resolveImageBlock` 只经公开 `ctx.attachments.readImage` 归属读取（内容完整性校验），单块失败降级为仅含稳定 AttachmentError 码的 unavailable 占位，不再令整段 history/live 失败；协议不存在 path/URL 图片引用字段，桥接与 adapter 均不接受路径形状引用。`DshAdapter` 对 history user/assistant/tool 与 live assistant/thought/tool 各路径实行统一 image admission：任何 image block 须过 `dshVerifiedImage`（canonical base64、声明 MIME↔magic 一致、尺寸上限）才可产出 user 透传块 / tool 裸 data URI / assistant markdown；未过一律输出稳定占位文本，不回退到能产 data URI 的 codec；`BackendSessionMessages.consumeImage` 仅加性透传 `filename`。审查结论见 `.impeccable/review/dsh-chat-followups-20261110/images-controls-independent-review.md`（冻结：指定范围内无未解决阻塞；实机像素验收仍待 Test Vault 目检）。
+
+2026-11-10：原生历史助手气泡的逐回合模型标签归本 owner。桥接 `assets/dsh/service.mjs` 的 `session/history` 只为 source kind 为 `model` 的助手消息转发 `sourceProvider`/`sourceModel` 两个字符串身份（replayState 与 source blob 绝不过桥）；`DshAdapter.getSessionMessages` 按实时回合同一 opaque 元组合同编码 `recordedModelId`；共享投影 `BackendSessionMessages` 仅在 wire role `assistant` 且值非空白时输出 `modelId`，键缺席合同保证权威合并保留本地已知值。无记录来源的历史保持无标签，不从当前会话选择或相邻消息回填。安装版 dsh-llm 助手消息的 required `source`（`{kind:'model', provider, model}`）是历史标签的真实数据来源，恢复属于读取已记录事实而非推断。
+
+2026-11-09：DSH 完整配置接入的运行边界仍归本 owner。`configuration/DshNativeConfiguration` 校验库级非敏感稀疏覆盖并生成声明式 entry；`DshManagedProfile` 与 Native/ACP client 持有按真实库路径隔离的本机持久 profile 和启动快照，保留原 SDK／home patch 的解析位置与继承值。用户安装、SDK profile 和共享依赖目录不能成为扩展包操作目标。配置修订属于连接身份，运行实例确认与保存值分开；`DshNativeControls` 持有功能探测、类型化 RPC、错误脱敏和 client generation fence，Todo／Plan／权限／Jobs／子代理／终端保持会话所有权。凭据只经原生服务读状态或单向写入；header 引用仅在可信启动解析器内存中物化。动态扩展设置仅在受控持久 profile 上通过原生 schema/CAS 写入；已知核心配置仍使用库级覆盖。安全辅助会话不继承可写工具授权。
+
+2026-11-08：`configuration/BackendConfigRecoveryStore` 持有含密钥插件配置的本机历史，不持有第二份可写后端设置。绝对库路径与目标类别组成 SHA-256 命名空间；所有目录组件先检查再解析，拒绝符号链接、非法 key 与路径穿越。专用目录 0700、快照 0600、独占临时文件写入后才轮换五个槽位；空覆盖也是可恢复状态。列表只给元数据，恢复前的当前值／快照 revision 比较和正常验证保存仍归设置 owner；保存与运行时确认保持分开。测试只在任务工作树内创建并保留隔离目录，不运行清理删除。
+
 2026-11-02：ZCode 行内补全入口在本 owner 内自动启动运行时并复用已有工作区模型目录发现，消除“先手动打开／恢复聊天”的前置要求。目录缓存、并发去重、deferred 草稿清理和 transport 校验仍由 ZCodeModelSurface 持有；真实聊天模型读回优先，未新增会话 owner 或 feature/app 依赖。
 
 2026-10-29：ZCodeModelSurface 继续拥有目录生命周期，补无会话工作区目录加载（deferred 草稿、原生读回、条件关闭、并发去重及 transport 隔离）；adapter 仅暴露工作区 models/default seam，不建立第二个聊天会话 owner。
@@ -188,3 +198,11 @@ AgentService 的会话信息契约及各 adapter 拥有只读运行时投影；�
 ## 2026-11-02 ZCode task settings
 
 ZCode 官方账号生命周期与个人 API 配置事务分别由 ZCodeAccountService / ZCodePersonalConfigService 持有；ZCodeNativeStore 隔离高风险原生文件锁依赖。设置页只接收摘要/命令，不持有凭据。辅助查询账户环境与私有工具隔离分开。
+
+## 2026-11-08 backend version refresh (core API)
+
+SDK 版本刷新与本 owner 内的真实不兼容修复：`@anthropic-ai/claude-agent-sdk` 0.3.312→0.3.319（新增 `session_writes_lost` 系统消息，ClaudeCodeStreamNormalizer 的 `appendSdkSignalChunk` 以 `informational`/`error` backend_event 诚实上报，不静默丢弃；`SDKMessage` 其余变化均为增量，loader 门面保持 feature-detect）；`@openai/codex-sdk` 0.165.0→0.167.0（SDK dist 逐字节一致，仅 vendored CLI 变化，app-server 协议增量兼容，客户端对未知通知保持忽略）；`@opencode/client` 2.2.0→2.2.6（协议增量；OpenCode 1 保持退役，`@opencode-ai/sdk` 不动）。`assets/dsh/launcher.mjs`：dsh 0.2.2-rc.1 将 `PROFILE_TEMPLATES` 从 `@deepseek-ai/dsh-app-boot` 迁至 `@deepseek-ai/dsh-official-bundles`，launcher 先新包后旧导出回退，六后端实时审计通过。ZCodePersonalConfigService 新增 revision-safe 历史 API（`listPersonalConfigHistory` / `restorePersonalConfigEntry`），完全委托 canonical `listConfigurationArchiveHistory` / `safeRestoreArchivedEntry`，allowlist 收窄到 `dirname(targetPath)`，无 ad-hoc 写；owner 状态与依赖规则不变。六后端真实模型审计与证据见 `docs/research/backend-refresh/api-refresh-implementation-results.md`（本地研究目录）。
+
+## 2026-11-08 ZCode aux proof gate (runtime 3.17)
+
+ZCodeAuxQuerySession 的空工具证明按 runtime 3.17 实测协议形状归位：真实提示用户行是唯一携带 `info.tools` 回显的新用户行，合成 `system_reminder` 行（runtime `synthetic: true`）只在提示读回落地前被容忍，双提示、未解释用户行、非空/非法 `info.tools` 仍 fail closed；`session/create` 空 `toolAllowlist`、工具事件审计与 `toolCallCount` 门槛不变。fail-closed 未削弱。真实 CLI + 真实模型在私有根与真实根均验证通过。

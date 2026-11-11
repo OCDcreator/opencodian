@@ -1,5 +1,25 @@
 # Chinese Locale
 
+2026-11-11（工作台层级）：区分待办计划、独立 Plan 模式、工作区终端与原生会话终端；文件变更使用直接入口，命令与技能目录按需展开、可搜索，相关设置单独成组。补齐终端生命周期、仓库／目录／Git 失败、暂存提交校验、有界差异、浏览器加载／截图条件、目录加载／空列表／无匹配／失败反馈。`modifiedFiles.loadingShort`／`modifiedFiles.loading` 区分原生读取挂起与变更不可用。会话范围帮助仅作 tooltip，“用户任务”仅作无冗余标题的无障碍分组名。双语键名和插值一致，文案不推断运行时能力，也不用 Git 状态代替会话文件变更。
+
+2026-11-10（DSH 官方权限菜单）：新增 `chat.dsh.permission.*` 四个名称：仅可查看、工作区内修改、完全权限、自动审查。配置预设的 host 自定义名称保留；auto 使用官方特定译名，只有真实目录注册后才显示 EXP。翻译不启用实验扩展、不改变权限值，中英文键一致。
+
+2026-11-10（DSH 会话后续接入）：新增 `workbench.info.child*` 子会话投递／接收／拒绝状态、`referenceMention.group.subagents` 分组、`context.dshLedger.*` 事件账本与时间来源文案，以及有界图片结果提示。收件箱接受不代表执行完成；响应丢失时保持“未能确认投递结果”，保留草稿并提示先刷新。本轮计时统一标为客户端观测，不编造模型执行耗时；文案说明只展示已采集事件，并区分有效空账本、当前不可读与采集达到限额。中英文键及插值名一致。
+
+2026-11-10（DSH 共享工作台 phase2）：新增 `workbench.planMode.*` 命名独立 Plan toggle 行（on/off 取值、范围说明、排队开/关、已取消、不可设置），`workbench.nativeTerminal.*` 命名折叠的终端 spawn 表单（打开、backend 下拉、名称、目录、不可用原因与设置导航）。`chat.dsh.controls.*` 与 `chat.dsh.workbench.*` 覆盖非渲染 preset owner 的诚实状态（ACP 不可用、检查中、忙碌、失败、会话预设范围）和共享 Tasks 行（终端输入/发送/信号/历史输出、子会话详情/取消、job 详情/等待/读取位置、有界输出与行区间反馈）。翻译层只命名状态与动作，运行时真值归各 coordinator。中英文 key 集合一致（key-set hash 校验）。
+
+2026-11-10（DSH 思考档位标签）：`chat.dsh.reasoning.modelDefault` 改为“继承默认（{effort}）”，与显式 `chat.effort.disabled`（关闭思考）区分继承与固定关闭；`chat.dsh.reasoning.boundaryHint` 同步说明默认项跟随 DSH 返回强度、「关闭思考」不随默认变化。key 集合与占位符未增减。
+
+2026-11-09（DSH 配置与扩展归属）：`settings.dsh.tab.configuration` 与 `settings.dsh.native.task.configuration` 改为“配置与扩展”；`task.advanced` 去掉扩展表述，新增 `settings.dsh.native.taskLinks.*` 命名高级页的跨任务链接。`application.acp` 如实说明 ACP 启动应用边界、原生生效值／状态／静默期 RPC 不可用，以及“先结束会话与后台任务再经标准宿主重载”的下一步。新增 `settings.dsh.native.credential.{shared,source,source.unknown,writable,readOnly}` 覆盖仅元数据回读与本机共享存储作用域；`readback.unknown` 指向新的扩展管理位置。中英文 key 保持一致。
+
+2026-11-09（DSH 完整接入）：`settings.dsh.native.*` 覆盖按任务分组的默认值、继承／结构化条目、修订冲突、保存／应用／回读三轴、本机凭据状态、隔离 profile 扩展操作和真实已加载扩展 schema 编辑。`settings.dsh.mcpAdvanced.*` 命名逐服务器工作目录、超时、启动失败／重试和“已挂载但连接状态未知”。`chat.dsh.*` 增加独立权限／Plan 控制、任务／终端／子代理会话工具，以及不可用／待应用／失败反馈和有界输出。旧模型与能力限制说明同步新的默认值编辑和终端入口，不宣称存在原生会话删除。中英文 key 与占位符保持一致。
+
+2026-11-09（DSH 连接备份）：新增 `settings.dsh.backup.*`，直接命名“连接配置备份与恢复”，区分尚无备份／备份时间、保存／更新／恢复动作与各自进度。明确四字段范围、排除项、当前库单份替换及下次连接／路径变更重载边界；保存备份不会测试连接，失败保留原配置与原备份。其他后端的共享“可用配置”文案未改。
+
+2026-11-09（DSH A）：精简连接文案，沿用现有横向子标签与插件下拉控件。`settings.agent.dsh.connection.{desc,application,saved}` 区分启动方式／工作目录选择、自动保存到当前库与下次连接时生效；保存反馈不表示运行时已确认。`settings.agent.dsh.path.required` 提示空自定义路径应填写，或恢复自动查找／当前库。中英文键保持一致。
+
+2026-11-07：补充六后端任务标签、单选卡片与滑块的保存位置/生效时间/默认值说明、保存失败回退、可用默认值恢复、自动/自定义安装路径、DSH 结构化 MCP 表单，以及 Pi/ZCode 的来源、空状态和历史恢复文案。保存成功与运行时确认使用不同表述；不把未知状态写成已生效。英文键与中文保持一致，humanize 文案语料与保真检查见 `docs/research/backend-refresh/`。
+
 2026-11-03：新增 `commands.memory.syncFailed`，用于共享记忆 Git 周期失败的去重通知；保留具体拒绝原因及状态命令入口。
 
 2026-11-01：新增 `workbench.information`（会话信息）入口文案；任务、文件及终端/仓库/浏览器/资源卡片复用各自功能名称，不再显示“会话工作台”或页签导航。

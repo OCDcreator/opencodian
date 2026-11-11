@@ -76,6 +76,20 @@ export class ModelSelectionRuntime {
 
 目录加载以递增 generation 归属当前请求；reset（控件重建/后端切换）和较新 refresh 都会使旧异步结果失效。旧结果不覆盖当前目录，也不更新当前 tab 的 context 身份。
 
+## 会话作用域 catalog 契约（2026-11-10，已实现并冻结）
+
+实际缺陷（工程师 8c43 现场诊断）：DSH ACP 新会话的默认模型（v4-flash）存在于权威目录 112 项中，但 runtime `hasLoaded` 的目录精确等于上一个会话（4888）的 111 项；无 override、无 disabled 过滤参与。发送前 server availability 校验因此在首次模型调用之前就拒绝新会话默认模型。
+
+已冻结实现（diff SHA `eecfc522e97ea22c3afe3a9e064d0a757feffa4bfe9dac2120d8fd5f09a972f5`）：**`ModelSelectionRuntime` 无任何改动**，本页不声明新的 runtime 作用域实现。修复全部位于 `ChatSelectionControlsCoordinator`，仅复用本页既有通用契约：
+
+- **既有通用契约不变，也是保护机制**：`reloadModelCatalog()` 的递增 load generation 归属当前请求——正是它保护已加载代际不被并发/迟到的旧异步加载覆盖；`reset()` 清空已加载状态。本 runtime 不感知会话作用域。
+- Coordinator 侧作用域 fence：wrapDSH host 要求**显式自有会话**，无会话即发布空 providers；发布前后捕获 session / transport / adapter 对象，任一变化即改发空——绝不借用其他活跃会话/用户的目录。
+- 每个 DSH 发送门（`ensureSelectedModelAvailable`）无条件触发既有 reload（读缓存 providers，无 RPC），dropdown 打开同理；由此新会话的第一门即重建成新目录。非 DSH 的空目录 guard 保持不变。
+- **scope unknown ≠ actual unavailable**：fence 判定作用域已变后目录按 *unknown* 处理（发布空、不显示旧作用域列表）；只有当前作用域的权威应答才能得出 *unavailable*（CONTEXT.md 证据轴：跨作用域目录不是证据）。
+- **strict availability 保留**：发送前校验仍按当前作用域权威目录拒绝未知模型；不放宽校验，无其他模型 workaround，无 UI/CSS 变化。
+
+主线报告单元结果：新增 3 用例 RED→GREEN（共 8 用例），9 套件 191 通过，tsc/lint 0。ACP 实际模型验收已在 0427 完成并记录（`phase2-final-acceptance-0427` / `acceptance-0427.md`）：新会话默认 `deepseek-v4-flash` 经普通 Send 一次真实回显成功，发送门前 stale 111 项 unavailable → 门后自有 112 项 available，override 与 D0 不变。本页只声称该已记录案例；其他模型/分支的 live 行为不在本页验收范围内。
+
 ## 目录定位（2026-10-23）
 
 - 源码位置：`src/features/chat/services/selection/ModelSelectionRuntime.ts`。

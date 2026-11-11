@@ -203,7 +203,14 @@
 }
 
 input[type='range'].opencodian-effort-slider {
-  --opencodian-effort-progress: 0%;
+  --opencodian-effort-progress: 0;
+  /* The painted fill must end on the native thumb center: the thumb travels
+     the inset range [thumb/2, width - thumb/2], so resolve the progress
+     fraction in that same inset coordinate space instead of raw track %. */
+  --opencodian-effort-progress-pos: calc(
+    var(--opencodian-effort-thumb-size) / 2
+    + (100% - var(--opencodian-effort-thumb-size)) * var(--opencodian-effort-progress)
+  );
   --slider-thumb-y: 0px;
   --slider-thumb-y-active: 0px;
   --slider-thumb-width: var(--opencodian-effort-thumb-size);
@@ -233,8 +240,8 @@ input[type='range'].opencodian-effort-slider::-webkit-slider-runnable-track {
   background:
     linear-gradient(
       to right,
-      transparent var(--opencodian-effort-progress),
-      var(--opencodian-effort-track) var(--opencodian-effort-progress)
+      transparent var(--opencodian-effort-progress-pos),
+      var(--opencodian-effort-track) var(--opencodian-effort-progress-pos)
     ),
     linear-gradient(to right, var(--opencodian-effort-fill-start), var(--opencodian-effort-fill-end));
 }

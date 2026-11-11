@@ -236,6 +236,47 @@ describe('unified @ reference composer', () => {
   });
 });
 
+describe('unified @ subagent label source', () => {
+  afterEach(() => { document.body.replaceChildren(); });
+
+  const subagentLabel = { id: 'deep-review', displayName: 'deep-review', description: 'child-session-1',
+    mode: null, menuGroup: 'subagents' as const, literalOnly: true };
+
+  it('inserts a literal running-child label with no pill, no reference span and no continuation authority', async () => {
+    const view = fixture();
+    view.host.loadSubagentMentionCandidates = jest.fn().mockResolvedValue([{ ...subagentLabel }]);
+    await view.controller.refresh(view.query('check @deep')!, view.menu);
+    view.controller.tryHandleKeydown(new KeyboardEvent('keydown', { key: 'Tab', cancelable: true }), view.textarea, view.menu);
+    expect(view.textarea.value).toBe('check @deep-review ');
+    expect(view.controller.resolveMentionIntents(view.textarea.value)).toEqual([]);
+    expect(view.controller.resolveReferencePillSpans(view.textarea.value)).toEqual([]);
+    expect(parsePromptReferences(view.textarea.value)).toEqual([]);
+    expect(view.host.onMentionInserted).toHaveBeenCalledTimes(1);
+  });
+
+  it('groups subagent labels between references and native agents and keeps them searchable', async () => {
+    const view = fixture();
+    view.host.loadPromptReferenceCandidates.mockResolvedValue([candidate(fileReference())]);
+    view.host.loadSubagentMentionCandidates = jest.fn().mockResolvedValue([{ ...subagentLabel }]);
+    view.host.loadAgentMentionCandidates.mockResolvedValue([{ id: 'reviewer', mode: 'subagent' }]);
+    await view.controller.refresh(view.query('@')!, view.menu);
+    const headings = Array.from(view.menu.querySelectorAll('.opencodian-reference-menu-group-label'), (el) => el.textContent);
+    expect(headings).toEqual([t('referenceMention.group.files'), t('referenceMention.group.subagents'), t('referenceMention.group.agents')]);
+    for (const button of view.menu.querySelectorAll<HTMLButtonElement>('button[data-group]')) button.click();
+    await view.controller.refresh(view.query('@deep')!, view.menu);
+    expect(view.menu.querySelector('button[data-group="subagents"]')?.getAttribute('aria-expanded')).toBe('true');
+    expect(view.menu.querySelector('[role="option"].is-selected')?.textContent).toContain('deep-review');
+  });
+
+  it('keeps the menu usable when only the subagent source is empty', async () => {
+    const view = fixture();
+    view.host.loadSubagentMentionCandidates = jest.fn().mockResolvedValue([]);
+    await view.controller.refresh(view.query('@')!, view.menu);
+    expect(view.menu.querySelectorAll('[role="option"]')).toHaveLength(1);
+    expect(view.menu.querySelector('button[data-group="subagents"]')).toBeNull();
+  });
+});
+
 describe('unified @ search expansion', () => {
   afterEach(() => { document.body.replaceChildren(); });
 

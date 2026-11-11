@@ -2,7 +2,7 @@ import type { PiBackendSettings } from '../../../types/settings';
 import { PI_CONFIG_COMMANDS, PI_RPC_COMMANDS, PI_SDK_COMMANDS, type PiServiceEvent, type PiUiHandler } from './PiProtocol';
 import { type PiLaunchOptions, type PiRecord, piRecord, PiRpcClient, type PiRpcPort } from './PiRpcClient';
 
-interface RuntimeConnection { client: PiRpcPort; abort: AbortController; dialogs: Map<string, AbortController>; ready: Promise<void> }
+interface RuntimeConnection { client: PiRpcPort; abort: AbortController; dialogs: Map<string, AbortController>; ready: Promise<void>; commands: string[] }
 export interface PiSessionRuntimeOptions {
   workingDirectory: string;
   sessionDirectory: string;
@@ -40,7 +40,7 @@ export class PiSessionRuntime {
       };
       const client = this.options.createClient?.(launch) ?? new PiRpcClient(launch);
       const abort = new AbortController();
-      const created: RuntimeConnection = { client, abort, dialogs: new Map(), ready: Promise.resolve() };
+      const created: RuntimeConnection = { client, abort, dialogs: new Map(), ready: Promise.resolve(), commands: [] };
       this.connections.set(sessionId, created);
       client.subscribe((event) => this.receive(sessionId, created, event));
       created.ready = client.request({ type: 'get_state' }, 0).then((state) => {
@@ -48,6 +48,7 @@ export class PiSessionRuntime {
         if (state.serviceProtocol !== 1 || !Array.isArray(state.commands) || expected.some((name) => !(state.commands as unknown[]).includes(name))) {
           throw new Error('Pi service protocol mismatch. Update the complete plugin service assets.');
         }
+        created.commands = (state.commands as unknown[]).map(String);
       }).catch((error) => { this.close(sessionId); throw error; });
       connection = created;
     }
@@ -62,6 +63,16 @@ export class PiSessionRuntime {
     if (!connection || this.disposed) return null;
     try { await connection.ready; } catch { return null; }
     return this.connections.get(sessionId) === connection && !connection.abort.signal.aborted ? connection.client : null;
+  }
+
+  /** Commands the live service advertised at handshake; null when no live connection.
+   *  Optional commands (PI_OPTIONAL_RPC_COMMANDS, PI_OPTIONAL_CONFIG_COMMANDS) are
+   *  feature-detected against this list, never assumed. */
+  async getAdvertisedCommands(sessionId: string): Promise<readonly string[] | null> {
+    const connection = this.connections.get(sessionId);
+    if (!connection || this.disposed) return null;
+    try { await connection.ready; } catch { return null; }
+    return this.connections.get(sessionId) === connection && !connection.abort.signal.aborted ? connection.commands : null;
   }
 
   close(sessionId: string): void {

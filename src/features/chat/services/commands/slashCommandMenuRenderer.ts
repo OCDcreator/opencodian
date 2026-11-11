@@ -35,9 +35,11 @@ export interface AgentMentionMenuItem {
   description?: string;
   referenceKind?: PromptReference['kind'];
   updatedAt?: number;
+  /** Literal-text sources outside the reference pipeline (e.g. running DSH subagent labels). */
+  menuGroup?: 'subagents';
 }
 
-export type AgentMentionMenuGroup = 'files' | 'sessions' | 'plugins' | 'resources' | 'agents';
+export type AgentMentionMenuGroup = 'files' | 'sessions' | 'plugins' | 'resources' | 'agents' | 'subagents';
 export type SlashCommandMenuGroup = 'commands' | 'skills';
 
 export function getSlashCommandMenuGroup(item: SlashCommandMenuItem): SlashCommandMenuGroup {
@@ -45,10 +47,11 @@ export function getSlashCommandMenuGroup(item: SlashCommandMenuItem): SlashComma
 }
 
 export function getAgentMentionMenuGroup(item: AgentMentionMenuItem): AgentMentionMenuGroup {
-  return item.referenceKind === 'file' || item.referenceKind === 'folder' ? 'files'
-    : item.referenceKind === 'session' ? 'sessions'
-      : item.referenceKind === 'plugin' || item.referenceKind === 'app' ? 'plugins'
-        : item.referenceKind === 'mcp-resource' ? 'resources' : 'agents';
+  return item.menuGroup === 'subagents' ? 'subagents'
+    : item.referenceKind === 'file' || item.referenceKind === 'folder' ? 'files'
+      : item.referenceKind === 'session' ? 'sessions'
+        : item.referenceKind === 'plugin' || item.referenceKind === 'app' ? 'plugins'
+          : item.referenceKind === 'mcp-resource' ? 'resources' : 'agents';
 }
 
 let mentionMenuSequence = 0;

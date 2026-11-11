@@ -1,7 +1,8 @@
 /**
- * The Codex settings panel exposes plugin management as its own secondary tab.
- * The tab is registered in the layout registry and routed to the
- * SettingsCodexPluginsSection surface by SettingsCodexSection.
+ * The Codex settings panel mounts plugin management inside the merged
+ * resources task page (legacy `plugins` tab id routes onto it). The registry
+ * lists the `resources` tab; SettingsCodexSection gives each merged surface a
+ * dedicated sub-host so their host-emptying renders never wipe each other.
  */
 import {
   DEFAULT_SETTINGS,
@@ -55,10 +56,10 @@ describe('SettingsCodexSection — plugins secondary tab', () => {
     setLocale('en');
   });
 
-  it('registers the plugins secondary tab in the layout registry', () => {
+  it('registers the resources task tab (hosting plugins) in the layout registry', () => {
     const codexTab = getPrimaryTabDefinition('codex');
     expect(codexTab).toBeDefined();
-    expect(codexTab!.secondaryTabs.map((tab) => tab.id)).toContain('plugins');
+    expect(codexTab!.secondaryTabs.map((tab) => tab.id)).toContain('resources');
   });
 
   it('routes the plugins tab id to the plugin browser surface', async () => {
@@ -72,12 +73,15 @@ describe('SettingsCodexSection — plugins secondary tab', () => {
     section.attachTabbed(containerEl, 'plugins');
     await flush();
 
-    const hostEl = containerEl.querySelector('[data-codex-section="plugins"]')!;
+    // Legacy `plugins` id routes onto the resources task page; the plugin
+    // browser surface mounts inside its dedicated sub-host and honestly
+    // reports the adapter-less backend as unavailable.
+    const hostEl = containerEl.querySelector('[data-codex-section="resources"]')!;
     expect(hostEl).toBeTruthy();
     expect(hostEl.getAttribute('data-settings-surface')).toBe('section');
-    // The plugin browser surface mounts inside the tab host and honestly
-    // reports the adapter-less backend as unavailable.
-    const pluginsEl = hostEl.querySelector('[data-codex-plugins]')!;
+    const pluginsAreaEl = hostEl.querySelector('[data-codex-resources-page-area="plugins"]')!;
+    expect(pluginsAreaEl).toBeTruthy();
+    const pluginsEl = pluginsAreaEl.querySelector('[data-codex-plugins]')!;
     expect(pluginsEl).toBeTruthy();
     expect(pluginsEl.getAttribute('data-codex-plugins-state')).toBe('unavailable');
 
@@ -92,10 +96,11 @@ describe('SettingsCodexSection — plugins secondary tab', () => {
     });
     const containerEl = document.createElement('div');
 
-    section.attachTabbed(containerEl, 'resources');
-    const hostEl = containerEl.querySelector('[data-codex-section="resources"]')!;
+    section.attachTabbed(containerEl, 'account');
+    const hostEl = containerEl.querySelector('[data-codex-section="account"]')!;
     expect(hostEl).toBeTruthy();
-    // Resources host does not accidentally mount the plugins surface.
+    // The account page never mounts the plugins surface; on the resources
+    // page plugins live only inside their dedicated sub-host.
     expect(hostEl.querySelector('[data-codex-plugins]')).toBeNull();
 
     section.dispose();

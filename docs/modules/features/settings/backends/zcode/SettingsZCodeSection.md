@@ -53,3 +53,7 @@ ZCode 后端的设置面（经典布局与页签布局共用）：可选运行�
 当前入口为聊天设置、工具与插件、安装与连接；首次默认聊天，旧 connection/model/management 映射 installation/chat/tools。聊天模型/续写由 SettingsZCodeModelControls，账号/API 表单由 SettingsZCodeAccounts 展示。工具页保留项目插件开关与 MCP 状态，技术信息默认收起；安装检测失败自动突出位置设置。经典、标签和编辑器宿主共用同一 section。
 
 Kimi 复审后：工具加载显示 busy/失败与刷新禁用，插件目录复用共享 ScrollArea；安装摘要直接显示未找到/路径错误/不兼容。平面字段移除嵌套卡片。
+
+## 2026-11-08 后端设置刷新（6 任务页）
+
+二级页扩为 `[chat, providers, account, tools, permissions-safety, installation]`（默认 chat）；attachTabbed 旧别名 model→chat、management→tools、connection→installation 不变。权限模式从聊天页物理分离到 permissions-safety 高风险页：`addBackendChoiceSetting` 原生 radio（''/plan/build/edit/yolo），遗留 'auto' 由共享 helper 渲染为勾选但禁用的 unlisted 项；页面文案声明作用域（仓库）、生效时机（新会话物化一次，运行中对话走 setSessionMode 下一轮生效）、plan 原生回读 quirk 与“非操作系统沙箱（yolo 跳过常规确认）”后果。聊天页只保留模型/思考/续写，目录失败时在 `[data-zcode-group="catalog-unavailable"]` 显示指向官方账号/个人 API 服务页的提示（不再假装展开隐藏控件）。account/providers 页由 SettingsZCodeAccounts 的 attachAccount/attachProviders 分开挂接。attachTabbed 保持 append-only：共享 backend workspace bar（恢复检查点）已存在时不受影响，永不 empty/reorder 宿主容器。providers 页在 service 具备 `listPersonalConfigHistory`/`restorePersonalConfigEntry` 时渲染归档版本历史（三次点击内恢复），缺失时整个 affordance 不渲染。

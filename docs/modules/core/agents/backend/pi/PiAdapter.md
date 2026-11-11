@@ -64,3 +64,7 @@ Bundled Pi service forwards modern ModelRuntime OAuth LoginOptions.getDeviceId f
 get_resources 的实际 agentsFiles 作为后端已加载上下文来源，仅返回路径/标签，不暴露提示词全文，也不把可用 skill 目录当作已注入来源。未有标准扩展读回的套餐、MCP、子智能体保持未报告。
 
 get_session_stats 同时提供原生 tokens.total（累计，包含缓存类别）和 contextUsage（当前窗口）；两组数独立返回，不能将累计数写入 context。
+
+## 配置历史 API（2026-11-08）
+
+三个新增方法，全部走既有 `command()` 白名单 + configuration 专用进程路由：`supportsConfigurationHistory()`（get('configuration') 建链后按已通告命令判断，旧资产 false）、`getConfigurationHistory(): Promise<PiConfigurationHistory>`（仅元数据）、`restoreConfiguration(request: PiConfigurationRestoreRequest)`（CAS：`revision` = 当前目标 revision，`archivedRevision` = 归档字节身份）。不支持时抛出固定诚实错误 "Pi service does not support configuration history. Update the bundled Pi service assets."，UI 据此回落到内存级 undo；畸形 history payload 在 adapter 层拒绝，不透传 UI。归档文件本体由 assets/pi 服务持有（机器全局 home 下 0700/0600），插件从不写 pi 配置文件。

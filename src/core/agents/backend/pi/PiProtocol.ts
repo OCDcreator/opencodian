@@ -28,7 +28,31 @@ export const PI_SDK_COMMANDS = [
   'get_goal', 'control_goal',
 ] as const;
 export const PI_CONFIG_COMMANDS = ['get_configuration', 'save_configuration', 'get_model_configuration', 'save_model_configuration'] as const;
-export type PiCommandName = typeof PI_RPC_COMMANDS[number] | PiOptionalCommandName | typeof PI_SDK_COMMANDS[number] | typeof PI_CONFIG_COMMANDS[number];
+/** Persistent configuration history: advertised by newer service assets only.
+ *  Deliberately NOT part of PI_CONFIG_COMMANDS — the runtime handshake requires
+ *  every required command to be advertised, so stale bundled assets must keep
+ *  booting. Callers feature-detect via PiSessionRuntime.getAdvertisedCommands. */
+export const PI_OPTIONAL_CONFIG_COMMANDS = ['get_configuration_history', 'restore_configuration'] as const;
+export type PiOptionalConfigCommandName = typeof PI_OPTIONAL_CONFIG_COMMANDS[number];
+export type PiCommandName = typeof PI_RPC_COMMANDS[number] | PiOptionalCommandName | typeof PI_SDK_COMMANDS[number] | typeof PI_CONFIG_COMMANDS[number] | PiOptionalConfigCommandName;
+/** One archived pre-save snapshot. `revision` is the restore identity (sha256 of
+ *  the archived bytes); values are never included in history listings. */
+export interface PiConfigurationHistoryEntry { index: number; savedAt: number; revision: string; bytes: number }
+export interface PiConfigurationHistoryTarget { path: string; key: string; entries: PiConfigurationHistoryEntry[] }
+export interface PiConfigurationHistory {
+  models: PiConfigurationHistoryTarget;
+  settings: { global: PiConfigurationHistoryTarget; project: PiConfigurationHistoryTarget };
+}
+export interface PiConfigurationRestoreRequest {
+  target: 'models' | 'settings';
+  /** Required when target is 'settings'. */
+  scope?: 'global' | 'project';
+  index: number;
+  /** sha256 of the archived bytes being restored; guards rotation races. */
+  archivedRevision: string;
+  /** Expected current target revision (CAS), same format as save revisions. */
+  revision: string;
+}
 export interface PiSettingField {
   path: string; group: string; kind: 'string' | 'number' | 'boolean' | 'choice' | 'list' | 'json';
   label: { zh: string; en: string }; options?: string[]; min?: number; max?: number;

@@ -185,6 +185,10 @@ Textarea 使用独立、每实例唯一的 visually-hidden 本地化标签，通
 
 `ComposerInputShellCoordinator.agentMention.test.ts` 增加原生 agent 能力关闭时的引用菜单和 Codex notice 抑制覆盖；原有 agent intent、slash 菜单、手写文字和删除行为继续回归测试。
 
+## 2026-11-10 子代理字面量 @ 来源
+
+可选 host `loadSubagentMentionCandidates()` 原样透传给 `AgentMentionComposerController`（第三个并行候选源）。来源可用时菜单即使没有 agent/引用目录也会打开；DSH 之外后端由 host 返回空数组。选中插入纯文本、无 pill、无 intent——本模块不新增状态，也不把该来源当作 agent dispatch 能力。
+
 ## 2026-10-27 单轨 Composer（权限、Agent、模型 · 思考强度）
 
 Composer 正文重新收束为「上下文 chips → textarea」两层；发送上方只有一条底栏，视觉顺序固定为：

@@ -43,6 +43,10 @@ function applyCreateElOptions<T extends Element>(element: T, options?: CreateElO
     }
   }
 
+  // Obsidian's DomElementInfo supports a top-level `type` for input elements;
+  // tests assert masking (type="password") through this polyfill.
+  if (options.type) element.setAttribute('type', options.type);
+
   return element;
 }
 

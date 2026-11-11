@@ -4,9 +4,9 @@ import { addIcon, Scope, setIcon } from 'obsidian';
 import type { AgentGoalCommand, AgentGoalSnapshot } from '../../../core/agents/backend/BackendGoalRuntime';
 import type { SessionTodo } from '../../../core/types';
 import { t } from '../../../i18n';
-import { type SessionWorkbenchActions, SessionWorkbenchInformation, type SessionWorkbenchState, type WorkbenchPage } from './SessionWorkbenchInformation';
+import { type SessionWorkbenchActions, SessionWorkbenchInformation, type SessionWorkbenchState, type WorkbenchDraft, type WorkbenchPage, type WorkbenchSettlement } from './SessionWorkbenchInformation';
 
-export type { SessionWorkbenchActions, SessionWorkbenchState, WorkbenchPage, WorkbenchResource,WorkbenchTask } from './SessionWorkbenchInformation';
+export type { SessionWorkbenchActions, SessionWorkbenchState, WorkbenchPage, WorkbenchResource,WorkbenchTask, WorkbenchTaskAction } from './SessionWorkbenchInformation';
 
 let nextWorkbenchId = 0;
 export const GOAL_ICON = 'opencodian-goal-target';
@@ -39,10 +39,26 @@ export class SessionWorkbench {
   private editor: HTMLTextAreaElement | null = null;
   private budget: HTMLInputElement | null = null;
   private fingerprint = '';
+  /** Identity whose task rows the overview currently shows; gates draft capture and live-input lookup. */
+  private overviewIdentity = '';
+  /** Whether the overview DOM currently holds the inline rows (false while a child transcript or the goal detail replaces them). */
+  private overviewRows = false;
+  /** Last drafts of the inline rows per session identity: kept while those rows are not rendered, so A→B→A restores them. */
+  private readonly overviewDrafts = new Map<string, Map<string, WorkbenchDraft>>();
+  /** Stable host for the tools-owned inline command catalog: detached and reappended across overview rebuilds, never emptied. */
+  private readonly resourceMount: HTMLElement;
+  /** The catalog editor detached by the last rebuild: refocused only when focus was actually dropped. */
+  private mountFocus: { element: HTMLElement; range: readonly [number, number] | null } | null = null;
+  /** Pending native row operations keyed by workbench identity + task id; owned by the long-lived surface. */
+  private readonly taskPendings = new Map<string, number>();
+  /** Native row results that settled while their row was hidden, projected by that row's next render. */
+  private readonly taskSettlements = new Map<string, WorkbenchSettlement>();
   private readonly disclosureState = new Map<string, boolean>();
   private readonly revealedGoals = new Set<string>();
   private readonly informationView: SessionWorkbenchInformation;
   private readonly transcriptScroll = new Map<string, number>();
+  /** The overview control that opened another card, per scroll key, so back navigation returns to the right origin. */
+  private readonly overviewOrigins = new Map<string, string>();
   private readonly preferences = new Map<string, { page: WorkbenchPage; tool: string; docked: boolean; expanded: boolean }>();
   private focusOrigin: HTMLElement | null = null;
   private readonly restoreFocus = () => {
@@ -50,29 +66,55 @@ export class SessionWorkbench {
       : this.boundary.querySelector<HTMLElement>('.opencodian-composer-goal-button') ?? this.trigger;
     target.focus();
   };
-  private readonly onKeydown = (event: KeyboardEvent) => {
+  /**
+   * Handles panel Escape and the expanded focus trap. Returns whether the surface
+   * handled the key: a native-keys host (the tools xterm mount) owns its own
+   * Escape (vi mode, running commands), so the workbench neither closes nor
+   * prevents default there.
+   */
+  private readonly onKeydown = (event: KeyboardEvent): boolean => {
     if (event.key === 'Tab' && this.open && this.expanded) {
-      const elements = [...this.panel.querySelectorAll<HTMLElement>('button:not(:disabled), input, textarea, select, summary, [tabindex="0"]')]
-        .filter((element) => element.getClientRects().length > 0);
+      const elements = this.reachable('button:not(:disabled), input, textarea, select, summary, [tabindex="0"]');
       const first=elements[0]; const last=elements.at(-1);
       if (event.shiftKey && document.activeElement===first) {event.preventDefault();last?.focus();}
       else if (!event.shiftKey && document.activeElement===last) {event.preventDefault();first?.focus();}
-      return;
+      return true;
     }
-    if (event.key !== 'Escape' || !this.open) return;
+    if (event.key !== 'Escape' || !this.open) return false;
+    if (event.target instanceof Element && event.target.closest('[data-workbench-native-keys], .xterm')) return false;
     event.preventDefault(); event.stopPropagation();
     if (this.editing) { this.editing = false; this.renderOverview(); }
     else this.setOpen(false);
+    return true;
   };
 
   constructor(private readonly boundary: HTMLElement, private readonly actions: SessionWorkbenchActions) {
     this.informationView = new SessionWorkbenchInformation(actions, (...args) => this.disclosure(...args), (...args) => this.button(...args));
+    // Pending native operations are keyed by the workbench identity so a rerender
+    // of the same session rebuilds rows locked and settlements unlock the live row.
+    this.informationView.lockKey = (task) => `${this.state?.identity ?? ''}:${task.id}`;
+    this.informationView.rowLookup = (task) => {
+      // Only rows of the CURRENT workbench identity are live targets: a stale
+      // operation from another conversation must never find one here.
+      if (!this.state || this.state.identity !== this.overviewIdentity) return null;
+      // Attribute match avoids CSS.escape (unavailable in the test DOM): task ids are our own
+      // `terminal:`/`child:`/`job:` prefixed strings, so an exact quoted value cannot cross-match.
+      return this.pages.get('overview')?.querySelector<HTMLElement>(`details[data-task="${task.id}"]`) ?? null;
+    };
+    this.informationView.inputLookup = (task) =>
+      this.informationView.rowLookup?.(task)?.querySelector<HTMLInputElement>(`input[data-draft="input:${task.id}"]`) ?? null;
+    this.informationView.authorityLookup = (task) => this.state?.tasks.find((item) => item.id === task.id)?.output || null;
     this.keyboardScope = actions.app ? new Scope(actions.app.scope) : null;
-    this.keyboardScope?.register([], 'Escape', (event) => { this.onKeydown(event); return false; });
+    // A scope handler swallows the key by returning false. Only a HANDLED Escape
+    // does that; an Escape owned by a native-keys host (xterm) passes through.
+    this.keyboardScope?.register([], 'Escape', (event) => !this.onKeydown(event));
     const id = `opencodian-workbench-${++nextWorkbenchId}`;
     this.root = boundary.createDiv({ cls: 'opencodian-workbench-host is-overview' });
     this.trigger = this.button(this.root, t('workbench.information'), 'info', () => {
-      this.setPage('overview'); this.renderOverview(); this.setOpen(!this.open);
+      // Re-project BEFORE rendering: this.state is a stale snapshot after
+      // silent coordinator updates, and reopening on it would resurface an
+      // old draft over the newest one.
+      this.actions.refresh(); this.setPage('overview'); this.renderOverview(); this.setOpen(!this.open);
     });
     this.trigger.addClass('opencodian-workbench-trigger');
     this.trigger.lastElementChild?.remove();
@@ -93,18 +135,26 @@ export class SessionWorkbench {
     this.iconButton(controls, t('workbench.close'), 'minimize-2', () => this.setOpen(false));
     this.identity = this.panel.createDiv({ cls: 'opencodian-workbench-identity' });
     const body = this.panel.createDiv({ cls: 'opencodian-workbench-body' });
-    const names = { overview: t('workbench.information'), tasks: t('workbench.tasks'), files: t('workbench.files'), tools: t('workbench.tools') };
-    for (const name of Object.keys(names) as WorkbenchPage[]) {
+    // The legacy generic 'tasks' category page is retired: its rows live inline in
+    // the overview activity, and setPage('tasks') redirects there.
+    const names = { overview: t('workbench.information'), files: t('workbench.files'), tools: t('workbench.tools') };
+    for (const name of Object.keys(names) as (keyof typeof names)[]) {
       const page = body.createDiv({ cls: `opencodian-workbench-page opencodian-workbench-${name}`, attr: {
         id: `${id}-${name}`, role: 'region', 'aria-label': names[name], tabindex: '-1',
       } });
       page.hidden = name !== this.page; this.pages.set(name, page);
     }
+    this.pages.get('overview')!.title = t('workbench.scopeHelp');
     actions.mountTools(this.pages.get('tools')!);
+    // The tools instance exists at this point: mount the tools-owned inline
+    // command catalog ONCE into a stable host that survives overview rebuilds.
+    this.resourceMount = document.createElement('div'); this.resourceMount.addClass('opencodian-workbench-inline-resources');
+    actions.mountResources?.(this.resourceMount);
     this.panel.addEventListener('keydown', this.onKeydown);
     this.observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => this.syncLayout());
     this.observer?.observe(boundary);
     const input=boundary.querySelector('.opencodian-input-area'); if(input) this.observer?.observe(input);
+    const shell=boundary.querySelector('.opencodian-messages-shell'); if(shell) this.observer?.observe(shell);
     this.syncLayout();
   }
 
@@ -115,17 +165,10 @@ export class SessionWorkbench {
 
   setState(state: SessionWorkbenchState): void {
     const body = this.pages.get('overview')!.parentElement!;
-    if (this.state && this.page === 'overview') this.transcriptScroll.set(
-      `${this.state.identity}:${this.state.child?.agent.id ?? 'main'}`, body.scrollTop);
-    if (this.state?.identity !== state.identity) {
-      if (this.state) this.preferences.set(this.state.identity, { page: this.page, tool: this.tool, docked: this.docked, expanded: this.expanded });
-      const preference = this.preferences.get(state.identity);
-      this.docked = preference?.docked ?? false; this.expanded = preference?.expanded ?? false;
-      this.tool = preference?.tool ?? 'terminal';
-      this.setPage(preference?.page ?? 'overview'); this.syncLayout();
-      if (this.page === 'tools') this.actions.openTool?.(this.tool);
-      this.editing = false; this.goalFocused = false; this.editor = null; this.budget = null; this.fingerprint = '';
-    }
+    if (this.state && this.page === 'overview') this.transcriptScroll.set(this.scrollKey(), body.scrollTop);
+    // A session switch shows the new card first but defers focus: the overview
+    // still holds the previous session until it is rebuilt below.
+    const refocus = this.state?.identity !== state.identity && this.switchSession(state.identity);
     this.state = state;
     this.syncHeading();
     this.title.title = state.title;
@@ -142,55 +185,122 @@ export class SessionWorkbench {
     if (fingerprint !== this.fingerprint) {
       this.fingerprint = fingerprint;
       if (!this.editing) this.renderOverview();
-      this.renderTasks();
-      if (this.page === 'overview') body.scrollTop = this.transcriptScroll.get(`${state.identity}:${state.child?.agent.id ?? 'main'}`) ?? 0;
+      if (this.page === 'overview') body.scrollTop = this.transcriptScroll.get(this.scrollKey()) ?? 0;
     }
+    if (refocus) this.refocusCard();
+  }
+
+  /** Saves the outgoing session's card preference and applies the incoming one; returns whether focus must follow. */
+  private switchSession(identity: string): boolean {
+    const refocus = this.panelHoldsFocus();
+    if (this.state) this.preferences.set(this.state.identity, { page: this.page, tool: this.tool, docked: this.docked, expanded: this.expanded });
+    const preference = this.preferences.get(identity);
+    this.docked = preference?.docked ?? false; this.expanded = preference?.expanded ?? false; this.tool = preference?.tool ?? 'terminal';
+    this.showPage(preference?.page ?? 'overview', false); this.syncLayout();
+    if (this.page === 'tools') this.actions.openTool?.(this.tool);
+    this.editing = false; this.goalFocused = false; this.editor = null; this.budget = null; this.fingerprint = '';
+    return refocus;
   }
 
   openGoal(): void {
     if (this.state?.child) this.actions.returnToParent?.();
     if (this.state) this.revealedGoals.add(this.state.identity);
     this.setPage('overview'); this.goalFocused = true; this.renderOverview(); this.setOpen(true);
-    const section = this.pages.get('overview')!.querySelector<HTMLDetailsElement>('[data-section="goal"]');
-    if (section) {
-      section.open = true;
-      const body = this.pages.get('overview')!.parentElement!;
-      body.scrollTop += section.getBoundingClientRect().top - body.getBoundingClientRect().top;
-      section.querySelector<HTMLElement>('summary')?.focus({ preventScroll: true });
-    }
+    this.revealSection('goal');
   }
 
-  setPage(page: WorkbenchPage): void {
-    const focused = document.activeElement;
-    const moveFocus = this.open && focused instanceof HTMLElement
-      && (focused === this.back || this.pages.get(this.page)?.contains(focused));
+  setPage(page: WorkbenchPage): void { this.showPage(page, true); }
+
+  /**
+   * `settle` is false while a session switch is in flight: the overview still
+   * shows the previous session, so `setState` applies scroll and focus once the
+   * new session's overview exists instead of landing on a node about to be removed.
+   */
+  private showPage(page: WorkbenchPage, settle: boolean): void {
+    // The legacy generic 'tasks' category page is retired: redirect into the
+    // inline overview activity and focus the relevant disclosure as useful.
+    if (page === 'tasks') { this.showPage('overview', settle); this.revealSection('activity', 'terminals'); return; }
+    const moveFocus = settle && this.panelHoldsFocus();
     if (this.goalFocused) { this.goalFocused = false; this.editing = false; this.renderOverview(); }
+    // Every card shares one scrolling body. Leaving the overview remembers its
+    // scroll and the control that opened the other card, per session; returning
+    // restores that exact origin instead of a generic top-of-overview reset.
+    const returning = settle && this.page !== 'overview' && page === 'overview';
+    if (this.page === 'overview' && page !== 'overview') this.rememberOverview(document.activeElement);
     this.page = page;
     this.root.toggleClass('is-overview', page === 'overview');
     for (const [key, element] of this.pages) element.hidden = key !== page;
     this.syncHeading();
-    if (moveFocus) {
-      const content = this.pages.get(page)!;
-      const target = page === 'overview'
-        ? content.querySelector<HTMLElement>('button:not(:disabled), summary, input, textarea, [tabindex="0"]') ?? content : this.back;
-      target.focus();
-    }
+    if (returning) this.pages.get('overview')!.parentElement!.scrollTop = this.transcriptScroll.get(this.scrollKey()) ?? 0;
+    if (moveFocus) (page === 'overview' ? this.overviewFocusTarget() : this.back).focus({ preventScroll: returning });
     this.actions.onPageChange?.(page);
+  }
+
+  /** Whether focus sits in the visible card or on its back button, i.e. navigation should carry it along. */
+  private panelHoldsFocus(): boolean {
+    const focused = document.activeElement;
+    return this.open && focused instanceof HTMLElement && (focused === this.back || Boolean(this.pages.get(this.page)?.contains(focused)));
+  }
+
+  /** After a session switch: focus the new card, unless its rebuild already focused something inside it. */
+  private refocusCard(): void {
+    const held = document.activeElement;
+    if (held instanceof HTMLElement && this.pages.get(this.page)?.contains(held)) return;
+    (this.page === 'overview' ? this.overviewFocusTarget() : this.back).focus({ preventScroll: true });
+  }
+
+  /** One body scrolls every card; the key also separates a child transcript from its parent overview. */
+  private scrollKey(): string {
+    return this.state ? `${this.state.identity}:${this.state.child?.agent.id ?? 'main'}` : '';
+  }
+
+  /** Leaving the overview: remember its scroll and the label of the control that opened the other card. */
+  private rememberOverview(focused: Element | null): void {
+    const key = this.scrollKey();
+    const overview = this.pages.get('overview')!;
+    this.transcriptScroll.set(key, overview.parentElement!.scrollTop);
+    const origin = focused instanceof HTMLElement && overview.contains(focused) ? focused.getAttribute('aria-label') : null;
+    if (origin === null) this.overviewOrigins.delete(key); else this.overviewOrigins.set(key, origin);
+  }
+
+  /** Back navigation lands on a reachable control with the origin's name (even when rebuilt), else on the first reachable one. */
+  private overviewFocusTarget(): HTMLElement {
+    const content = this.pages.get('overview')!;
+    const controls = this.reachable('button:not(:disabled), summary, input, textarea, [tabindex="0"]').filter((element) => content.contains(element));
+    return controls.find((element) => element.getAttribute('aria-label') === this.overviewOrigins.get(this.scrollKey())) ?? controls[0] ?? content;
+  }
+
+  /** Opens the first existing overview group among `keys`, scrolls it into view and focuses its heading. */
+  private revealSection(...keys: string[]): void {
+    const overview = this.pages.get('overview')!;
+    const section = keys.map((key) => overview.querySelector<HTMLDetailsElement>(`[data-section="${key}"]`)).find(Boolean);
+    if (!section) return;
+    section.open = true;
+    const body = overview.parentElement!;
+    body.scrollTop += section.getBoundingClientRect().top - body.getBoundingClientRect().top;
+    section.querySelector<HTMLElement>('summary')?.focus({ preventScroll: true });
   }
 
   openTool(tool: string): void {
     if (!['terminal', 'git', 'browser', 'context'].includes(tool)) return;
-    this.tool = tool;
-    this.setPage('tools');
-    this.actions.openTool?.(tool);
-    this.setOpen(true);
+    if (tool === 'context') {
+      // The command catalog is inline: show the overview's stable resource mount
+      // and let the tools surface open and lazy-load it there. The tools page
+      // only holds the three real tools, so it must never be shown blank. The
+      // panel opens first so the catalog's own search focus is the last one set.
+      if (this.state?.child) this.actions.returnToParent?.();
+      this.setPage('overview'); this.setOpen(true); this.actions.openTool?.(tool);
+      const body = this.pages.get('overview')!.parentElement!;
+      body.scrollTop += this.resourceMount.getBoundingClientRect().top - body.getBoundingClientRect().top;
+      return;
+    }
+    this.tool = tool; this.setPage('tools'); this.actions.openTool?.(tool); this.setOpen(true);
   }
 
   private syncHeading(): void {
-    const tools = { terminal: 'workbench.terminal', git: 'workbench.git', browser: 'workbench.browser', context: 'workbench.resources' } as const;
+    const tools = { terminal: 'workbench.terminal', git: 'workbench.git', browser: 'workbench.browser' } as const;
     const label = this.goalFocused ? t('workbench.goal.title') : this.page === 'overview' ? t('workbench.information')
-      : this.page === 'tasks' ? t('workbench.tasks') : this.page === 'files' ? t('workbench.files')
-      : t(tools[this.tool as keyof typeof tools] ?? 'workbench.tools');
+      : this.page === 'files' ? t('workbench.files') : t(tools[this.tool as keyof typeof tools] ?? 'workbench.tools');
     this.title.setText(label);
     this.panel.setAttribute('aria-label', label);
     this.pages.get(this.page)?.setAttribute('aria-label', label);
@@ -210,17 +320,31 @@ export class SessionWorkbench {
     this.panel.hidden = !open;
     this.trigger.setAttribute('aria-expanded', String(open));
     this.syncLayout();
-    if (open) {
-      const target = [...this.panel.querySelectorAll<HTMLElement>('button, summary, [tabindex="0"]')]
-        .find((element) => element.getClientRects().length > 0);
-      target?.focus();
-    } else this.restoreFocus();
+    if (open) this.reachable('button, summary, [tabindex="0"]')[0]?.focus(); else this.restoreFocus();
+  }
+
+  /**
+   * Controls that can really take focus: rendered, and not inside a closed
+   * group. Chromium still reports rects for the content of a closed `<details>`,
+   * so that content is excluded explicitly; only its own summary stays reachable.
+   */
+  private reachable(selector: string): HTMLElement[] {
+    return [...this.panel.querySelectorAll<HTMLElement>(selector)].filter((element) => {
+      if (!element.getClientRects().length) return false;
+      for (let closed = element.closest('details:not([open])'); closed; closed = closed.parentElement?.closest('details:not([open])') ?? null)
+        if (element.parentElement !== closed || element.tagName !== 'SUMMARY') return false;
+      return true;
+    });
   }
 
   private syncLayout(): void {
     const bounds=this.boundary.getBoundingClientRect(); const width=bounds.width;
     const input=this.boundary.querySelector('.opencodian-input-area')?.getBoundingClientRect();
     const composer=this.boundary.querySelector('.opencodian-composer-shell')?.getBoundingClientRect();
+    // Trigger and panel hang below the actual chat chrome bottom (the messages
+    // shell top: wrapped header, optional below-header tab bar) with the incumbent 15px gap.
+    const chrome=this.boundary.querySelector('.opencodian-messages-shell')?.getBoundingClientRect();
+    if(chrome?.height) this.root.style.setProperty('--workbench-top',`${Math.max(12,chrome.top-bounds.top+15)}px`);
     const bottom=input?.height ? Math.max(12,bounds.bottom-input.top+8) : 160;
     this.root.style.setProperty('--workbench-bottom',`${bottom}px`);
     const dockBottom=Math.max(12,bounds.bottom-(composer?.bottom ?? input?.bottom ?? bounds.bottom));
@@ -244,16 +368,17 @@ export class SessionWorkbench {
   private renderOverview(): void {
     const parent = this.pages.get('overview')!;
     const scrollTop = parent.scrollTop;
+    this.stashDrafts(parent);
     parent.empty();
     const state = this.state;
     if (!state) return;
+    this.overviewIdentity = state.identity;
     this.syncHeading();
     this.informationView.destroy();
     if (state.child) { this.informationView.renderChild(parent, state.child); parent.scrollTop = scrollTop; return; }
     if (this.goalFocused) this.button(parent, t('workbench.goal.backToInformation'), 'arrow-left', () => {
       this.goalFocused = false; this.editing = false; this.renderOverview();
     });
-    else this.informationView.renderInformation(parent, state);
     const readback = state.goal;
     const showGoal = Boolean(readback.goal || state.armed || this.revealedGoals.has(state.identity));
     if (showGoal && readback.status !== 'ready') {
@@ -265,27 +390,64 @@ export class SessionWorkbench {
     if (state.error) parent.createDiv({ cls: 'opencodian-workbench-error', text: state.error, attr: { role: 'alert' } });
     if (showGoal) this.renderGoal(parent, state);
     if (this.goalFocused) { parent.scrollTop = 0; return; }
-    if (state.todos.length) this.renderPlan(parent, state.todos, true);
+    // First level belongs to the session's own objects: plan mode, file changes, then its activity.
+    this.informationView.renderPlanMode(parent, state);
+    // One files nav row with the authoritative summary; an absent summary stays neutral, never inferred.
+    this.navRow(parent, { label: t('workbench.files'), icon: 'file-diff', meta: state.filesSummary ?? t('workbench.info.openFiles') }, () => this.setPage('files'))
+      .addClass('opencodian-workbench-files-nav');
+    if (state.todos.length) this.renderPlan(parent, state.todos);
     this.informationView.renderAgents(parent, state.agents ?? []);
-    if (state.tasks.length) {
-      const tasks = this.disclosure(parent, 'activity', t('workbench.background'), { icon: 'bot', count: String(state.tasks.length) });
-      for (const task of state.tasks.slice(-3)) {
-        const row = this.button(tasks, task.title, 'circle-dot', () => this.setPage('tasks'));
-        row.addClass('opencodian-workbench-list-row');
-        row.createSpan({ cls: 'opencodian-workbench-row-meta', text: task.status });
-      }
-    }
-    const files = this.disclosure(parent, 'files', t('workbench.files'), { icon: 'files', count: '' });
-    this.button(files, t('workbench.info.openFiles'), 'file-diff', () => this.setPage('files'));
-    const shortcuts = parent.createDiv({ cls: 'opencodian-workbench-shortcuts', attr: { role: 'group', 'aria-label': t('workbench.tools') } });
-    for (const [tool, icon, label] of [['tasks', 'list-checks', t('workbench.tasks')], ['terminal', 'terminal', t('workbench.terminal')],
-      ['git', 'git-branch', t('workbench.git')], ['browser', 'globe', t('workbench.browser')], ['context', 'blocks', t('workbench.resources')]]) {
-      const button = this.button(shortcuts, label, icon, () => tool === 'tasks' ? this.setPage('tasks') : this.openTool(tool));
-      button.addClass('opencodian-workbench-shortcut');
-      const arrow = button.createSpan({ cls: 'opencodian-workbench-chevron', attr: { 'aria-hidden': 'true' } });
-      setIcon(arrow, 'chevron-right');
-    }
+    this.informationView.renderActivity(parent, state, { pendings: this.taskPendings, settlements: this.taskSettlements });
+    // Session references and the composer catalog belong together; low-frequency readbacks and workspace tools follow.
+    this.informationView.renderInformation(parent, state, this.resourceMount);
+    const tools = parent.createDiv({ cls: 'opencodian-workbench-shortcuts', attr: { role: 'group', 'aria-label': t('workbench.tools') } });
+    tools.createDiv({ cls: 'opencodian-workbench-group-label', text: t('workbench.tools') });
+    const entries = [['terminal', 'terminal', t('workbench.terminal')], ['git', 'git-branch', t('workbench.git')], ['browser', 'globe', t('workbench.browser')]];
+    for (const [tool, icon, label] of entries) this.navRow(tools, { label, icon }, () => this.openTool(tool));
+    const drafts = this.overviewDrafts.get(state.identity); if (drafts) this.informationView.restoreDrafts(parent, drafts);
+    this.overviewRows = true;
+    this.restoreMountFocus();
     parent.scrollTop = scrollTop;
+  }
+
+  /**
+   * Saves the drafts of the rows on screen under THEIR session before a rebuild.
+   * A view without rows (child transcript, goal detail) keeps the last drafts
+   * instead of an empty capture, and another session never overwrites them.
+   * The tools catalog editor rides the stable mount, so it is remembered here
+   * too — and forgotten whenever the mount is not part of this render.
+   */
+  private stashDrafts(parent: HTMLElement): void {
+    if (this.overviewRows) this.overviewDrafts.set(this.overviewIdentity, this.informationView.captureDrafts(parent));
+    this.overviewRows = false;
+    // Rows that are not rendered next must not pull focus back when they return.
+    if (this.overviewIdentity !== this.state?.identity || this.state?.child || this.goalFocused)
+      for (const draft of this.overviewDrafts.get(this.overviewIdentity)?.values() ?? []) draft.focused = false;
+    const active = document.activeElement;
+    const focused = active instanceof HTMLElement && this.resourceMount.contains(active) ? active : null;
+    const editor = focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement ? focused : null;
+    const range = editor && editor.selectionStart !== null ? [editor.selectionStart, editor.selectionEnd ?? editor.selectionStart] as const : null;
+    this.mountFocus = focused ? { element: focused, range } : null;
+  }
+
+  /** Refocuses the catalog editor detached by the rebuild — only when focus was actually dropped, never over a user choice. */
+  private restoreMountFocus(): void {
+    const captured = this.mountFocus; this.mountFocus = null;
+    const active = document.activeElement;
+    if (!captured || !captured.element.isConnected) return;
+    if (active !== null && active !== document.body && !this.resourceMount.contains(active)) return;
+    captured.element.focus({ preventScroll: true });
+    const editor = captured.element instanceof HTMLInputElement || captured.element instanceof HTMLTextAreaElement ? captured.element : null;
+    if (captured.range) editor?.setSelectionRange(captured.range[0], captured.range[1]);
+  }
+
+  /** A row that navigates into a separate card: static right chevron, optional trailing summary. */
+  private navRow(parent: HTMLElement, entry: { label: string; icon: string; meta?: string }, action: () => void): HTMLButtonElement {
+    const row = this.button(parent, entry.label, entry.icon, action);
+    row.addClass('opencodian-workbench-shortcut');
+    if (entry.meta !== undefined) row.createSpan({ cls: 'opencodian-workbench-row-meta', text: entry.meta });
+    setIcon(row.createSpan({ cls: 'opencodian-workbench-chevron', attr: { 'aria-hidden': 'true' } }), 'chevron-right');
+    return row;
   }
 
   private renderGoal(parent: HTMLElement, state: SessionWorkbenchState): void {
@@ -385,57 +547,36 @@ export class SessionWorkbench {
     this.button(actions, t('workbench.cancel'), 'x', () => { this.editing = false; this.renderOverview(); });
   }
 
-  private renderPlan(parent: HTMLElement, todos: readonly SessionTodo[], compact = false): void {
-    const section = this.disclosure(parent, 'plan', t('workbench.plan'), { icon: 'list-checks', count: `${todos.filter((todo) => todo.status === 'completed').length} / ${todos.length}` });
+  /** The todo plan (distinct from native Plan mode) is shown once, in full, inside the overview. */
+  private renderPlan(parent: HTMLElement, todos: readonly SessionTodo[]): void {
+    const section = this.disclosure(parent, 'plan', t('workbench.todoPlan'), { icon: 'list-checks', count: `${todos.filter((todo) => todo.status === 'completed').length} / ${todos.length}` });
     if (!todos.length) { section.createEl('p', { cls: 'opencodian-workbench-muted', text: t('workbench.plan.empty') }); return; }
-    for (const todo of compact ? todos.slice(0, 5) : todos) {
+    for (const todo of todos) {
       const row = section.createDiv({ cls: 'opencodian-workbench-todo' });
       row.dataset.status = todo.status;
       const icon = row.createSpan(); setIcon(icon, todo.status === 'completed' ? 'circle-check' : todo.status === 'in_progress' ? 'circle-dot' : 'circle');
       row.createSpan({ text: todo.content });
       row.setAttribute('aria-label', `${todo.content} · ${todo.status}`);
     }
-    if (compact) this.button(section, t('workbench.plan.open'), 'list-checks', () => this.setPage('tasks'));
-    else if (this.actions.usePlanAsGoal) this.button(section, t('workbench.plan.asGoal'), GOAL_ICON, () => this.actions.usePlanAsGoal?.(todos.map((todo) => `- ${todo.content}`).join('\n')));
+    if (this.actions.usePlanAsGoal) this.button(section, t('workbench.plan.asGoal'), GOAL_ICON, () => this.actions.usePlanAsGoal?.(todos.map((todo) => `- ${todo.content}`).join('\n')));
   }
 
-  private disclosure(parent: HTMLElement, key: string, title: string, options: { icon: string; count: string }): HTMLElement {
+  private disclosure(parent: HTMLElement, key: string, title: string, options: { icon: string; count: string; collapsed?: boolean }): HTMLElement {
     const identity = `${this.state?.identity}:${key}`;
     const section = parent.createEl('details', { cls: 'opencodian-workbench-section', attr: { 'data-section': key } });
-    section.open = this.disclosureState.get(identity) ?? true;
+    // An explicit user choice always wins. `collapsed` only seeds the default for
+    // low-frequency information and empty groups, so the first screen keeps the
+    // plan, files entry and activity visible without resetting on refresh.
+    section.open = this.disclosureState.get(identity) ?? !options.collapsed;
     section.addEventListener('toggle', () => { if (section.isConnected) this.disclosureState.set(identity, section.open); });
     const heading = section.createEl('summary', { cls: 'opencodian-workbench-section-heading' });
     const glyph = heading.createSpan({ cls: 'opencodian-workbench-section-icon' }); setIcon(glyph, options.icon);
     heading.createSpan({ text: title });
     heading.createSpan({ cls: 'opencodian-workbench-row-meta', text: options.count, attr: { title: options.count } });
-    const arrow = heading.createSpan({ cls: 'opencodian-workbench-chevron' }); setIcon(arrow, 'chevron-right');
+    // Foldable groups use a down chevron (CSS rotates it when open); the static
+    // right chevron is reserved for rows that navigate into a separate view.
+    const arrow = heading.createSpan({ cls: 'opencodian-workbench-chevron' }); setIcon(arrow, 'chevron-down');
     return section.createDiv({ cls: 'opencodian-workbench-section-body' });
-  }
-
-  private renderTasks(): void {
-    const parent = this.pages.get('tasks')!;
-    const scrollTop = parent.scrollTop; parent.empty();
-    if (!this.state) return;
-    if (this.state.todos.length) this.renderPlan(parent, this.state.todos);
-    this.informationView.renderAgents(parent, this.state.agents ?? []);
-    const section = this.disclosure(parent, 'tasks', t('workbench.background'), { icon: 'bot', count: String(this.state.tasks.length) });
-    if (!this.state.tasks.length) section.createEl('p', { cls: 'opencodian-workbench-muted', text: t('workbench.tasks.empty') });
-    for (const task of this.state.tasks) {
-      const row = section.createEl('details', { cls: 'opencodian-workbench-task' });
-      const summary = row.createEl('summary');
-      summary.createSpan({ text: task.title });
-      summary.createSpan({ cls: 'opencodian-workbench-muted', text: task.status });
-      if (task.output) row.createEl('pre', { text: task.output });
-      else if (this.actions.readTaskOutput) row.addEventListener('toggle', () => {
-        if (!row.open || row.querySelector('pre')) return;
-        const output = row.createEl('pre', { text: t('workbench.tasks.loading') });
-        void this.actions.readTaskOutput!(task).then((text) => output.setText(text)).catch((error) => output.setText(String(error)));
-      });
-      const actions = row.createDiv({ cls: 'opencodian-workbench-actions' });
-      if (task.messageId) this.button(actions, t('workbench.tasks.locate'), 'message-square', () => this.actions.openMessage(task.messageId!));
-      if (task.canStop) this.button(actions, t('workbench.goal.stop'), 'square', () => this.actions.stopTask(task));
-    }
-    parent.scrollTop = scrollTop;
   }
 
   private actionButton(parent: HTMLElement, label: string, icon: string, command: AgentGoalCommand): void {

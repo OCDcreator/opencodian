@@ -17,3 +17,7 @@ OAuth URL notices retain a request-ID scoped abort lifetime without a protocol r
 ## 2026-10-29：不创建来源的引用读取
 
 `getExisting(sessionId)` 只查看现有连接并等待其既有握手，连接已替换、关闭、dispose 或握手失败时返回 null；不调用 `get()`，不会创建 RPC 服务。供会话引用读取使用，保留每会话 runtime 独立性。
+
+## 已通告命令记录（2026-11-08）
+
+`RuntimeConnection` 在握手 get_state 后记录 `commands: string[]`，新增 `getAdvertisedCommands(sessionId): Promise<readonly string[] | null>`（无活连接/已释放/握手失败 → null）。这是可选命令（`PI_OPTIONAL_RPC_COMMANDS`、`PI_OPTIONAL_CONFIG_COMMANDS`）的唯一特性探测通道；必需握手集合未变，旧资产照常启动。命令列表只来自服务自报，不做任何猜测。

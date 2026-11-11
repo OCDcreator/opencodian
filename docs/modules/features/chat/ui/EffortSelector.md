@@ -54,10 +54,18 @@ OpenCode 模式下，variants 来自当前 provider model catalog 的 `models[mo
 - `allowDefaultOption()` 为 true 时，default/inherit/off 是第 0 步，并映射回 `onVariantChange(undefined)`；后续步按 backend variants 的真实顺序排列（不再像 popover 那样反向展示）。
 - `allowDefaultOption()` 为 false（Claude Code / Codex）时不提供 off 步，只显示真实 variants。
 - slider 的 `aria-valuetext`、header output 与 tick 标签都使用真实选项名（`formatVariantLabel` 或 backend default label），不创建「低/标准/高/最高」这类固定假档位。
-- 变更走同一个 `onVariantChange`；保存期间禁用 slider 并防重复提交，失败显示 `chat.effort.saveFailed` 并回读当前值。boundary hint 仍通过 `getBoundaryHint()` 显示在面板内。
+- 变更走同一个 `onVariantChange`；保存期间的忙态用 `aria-busy`（panel）与 `aria-disabled`（slider）标记，不再写原生 `disabled`——Chromium 会把被禁用的已聚焦 range 强制 blur 到 body，丢失键盘焦点并翻转 composer 的祖先 `:focus-within` 环。`isSaving` 同时拦截 input 预览与 change：挂起期间的 change 只回读当前值、不二次保存，也不留下未保存的假预览；原生 `disabled` 仅用于单选项的物理禁用。保存结束后统一一次 `updateDisplay()`（成功/失败同路），失败显示 `chat.effort.saveFailed` 并回读当前值，焦点全程不迁移。boundary hint 仍通过 `getBoundaryHint()` 显示在面板内。
 - `getDisplayLabel()` 供组合 trigger 读取当前 effort 标签；模型无 variants 或无 model 时返回空字符串，并给容器加 `is-hidden`。
 - 新增可选 `onDisplayChange`，在 `updateDisplay()` 完成后通知 embedding trigger 刷新「模型 · effort」文案；该回调不得反向调用 `updateDisplay()`，避免递归。
 
 滑块采用 Codex / ZCode 截图中的胶囊式结构，并参考 Radix Slider 的 track / range / thumb 分层：28px 粗轨道、主题色填充、白色圆形 thumb、轨道内离散圆点。`opencodian-effort-control` 包含原生 range input 和不接收指针事件的装饰刻度层；刻度按真实选项数量等分，左右缩进半个 thumb，保证圆点与原生 thumb 的档位中心对齐。当前圆点隐藏在 thumb 下，input 预览和回读同时更新 `is-active` / `is-selected`。完整选项名仍由 header 与 `aria-valuetext` 提供，不把装饰圆点变成第二组可聚焦控件。WebKit / Firefox 分别实现；不引入第三方运行时依赖，不改变真实 variant 数量、保存或默认语义。
 
 最高真实档位（选项数大于 1 且位于最后一步）在 input 预览与回读时同步 `is-highest`，触发流动彩色轨道；退出最高档或保存失败回读后移除。`prefers-reduced-motion` 保留静态彩色轨道。组件覆盖宿主 slider thumb 的 top 和 active 尺寸变量，保持 thumb 圆心与轨道垂直中心一致。
+
+## 2026-11-10 填充进度改为单位无关系数
+
+`syncInlineProgress()` 通过 `--opencodian-effort-progress` 输出 clamp 到 [0,1]、四舍五入到 4 位小数的无单位系数（单选项时为 1，保持满填充），不再输出百分比字符串；WebKit 轨道用 `--opencodian-effort-progress-pos: calc(thumb/2 + (100% - thumb) * 系数)` 求出填充终点，使填充右缘在任意轨道宽度、任意档位都精确落在原生 thumb 圆心上，消除 28px thumb 下第 2/4 档 ±7px 的竖直错位缝。回归约束：不得把该系数改回轨道百分比（会使 calc 失效并复现错位缝），不得绕过 `syncInlineProgress` 直接写样式。Firefox 的 `::-moz-range-progress` 原生即与 thumb 对齐，保持不读该系数。几何验证与测量语义见 `.impeccable/review/chat-ui-regressions-20261110/`。
+
+## 2026-11-10 主机变体标签（getVariantLabel）
+
+新增可选 `getVariantLabel(variant)`：只重命名展示，永不改写传回 `onVariantChange` 或持久化的原始 variant（`undefined` 继承与显式 `off` 仍是两个不同值）。`labelForVariant()` 是唯一标签出口，覆盖 popover 当前值、菜单项、内联滑块的步/输出/`aria-valuetext` 与 `getDisplayLabel()` 组合按钮；主机返回空白或未提供时回退内置首字母大写，任何路径都不渲染空标签。DSH host 用它把显式 `off` 显示为 `chat.effort.disabled`（关闭思考 / Thinking disabled），其他后端不映射；继承项文案仍由 `getDefaultOptionLabel` 提供，与显式关闭项 visibly 不同。

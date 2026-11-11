@@ -102,6 +102,13 @@
   font-size: calc(var(--opencodian-chat-font-size) + 2px);
 }
 
+.opencodian-container .opencodian-message--user .opencodian-message-highlight-secret {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
 .opencodian-message--user .opencodian-message-highlight-agent {
   color: var(--text-warning);
   font-weight: 700;

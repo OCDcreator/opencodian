@@ -17,6 +17,14 @@
 
 它不直接拥有 task launch identity parsing、completion→pending matching 或 persisted message timeline assembly；这些分别下沉到 `BackgroundTaskTimelineLaunchService` 与 `BackgroundTaskTimelineAssemblyService`。
 
+## DSH 原生 Jobs 投影（2026-11-09）
+
+`acceptNativeJobs` 接收 SessionInformationCoordinator 已校验的完整 Jobs 列表与原 client-generation/conversation/tab lease；按 runtime WeakMap 持有只读 snapshot，null 表示失效而非任务停止。`collectNativeJobSegments` 通过既有 LaunchService 将实际 job owner/start time 关联到原始 user turn；只有权威列表和真实锚点同时存在才返回 segment。初次加载/恢复/重连失败不会把任务降级为 stale、cancelled 或 completed。
+
+DSH `collectInlineSegments` 只渲染原生 pending 段，复用既有逐回合 InlinePanelRenderer；终态进入本地 completion events。失败/停止状态在 task markdown 中明确标注。`syncStateFromConversation` 不为 DSH 从 task-shaped tool、OMO reminder 或 foreground session.status 推断生命周期。该 lane 不写旧 backgroundTaskStartedAt/launch maps 或 stream-like state。
+
+验证：`DshBackgroundCompletion.test.ts` 使用真实 timeline/renderer/notice/persistence owners，覆盖 foreground 结束后完成、恢复去重、多 session、代际失效与初始权威读取。
+
 ## 公开接口
 
 ```typescript

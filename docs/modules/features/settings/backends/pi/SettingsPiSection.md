@@ -42,3 +42,11 @@ MATRIX008 typed status → 实际 mcpStatus → JSDOM 控制及新增多条状�
 - 随目录调整更新的依赖：`src/features/settings/backends/pi/PiWorkbenchModal.ts`、`src/features/settings/backends/pi/SettingsPiConfigurationSection.ts`、`src/features/settings/backends/pi/SettingsPiProvidersSection.ts`。
 
 > 2026-10-27：Pi 模型页追加 Pi 专属的行内编辑/补全模型覆盖；原有连接、执行、MCP、资源与高级分类不变。
+
+## 2026-11-08 后端设置刷新（7 任务页）
+
+二级页收敛为 `[connection, providers, model, execution, account, mcp, sessions]`（默认 connection）；attachTabbed 别名 advanced→execution、resources→sessions，旧 9 页 id 全部可达。connection 页的运行时状态改为真实探测：异步 `adapter.start()`（resolvePiSdkCli 真实解析），失败按分类渲染（missing/incompatible/permission/unknown，`classifyPiInstallFailure`），不把原始 CLI 错误文本带入 DOM；注册了 adapter 不等于安装可用。executablePath 保留文本输入（自由路径）+ vault/new-session/medium 徽章。model 页 = 插件旧默认（thinkingLevel 原生 radio choice + provider/model 文本）+ 原生 model 组字段（global/project 作用域选择器保留）；写原生默认时自动清空旧默认的迁移行为不变。execution 页 = 原生 execution 组字段 + **独立高风险 disclosure**（`attachAdvanced`：advanced 组字段 + 原始 settings.json 编辑器，data-backend-risk=high），不并入普通模型页。account 页对 `get_auth` 空 providers 列表如实显示“未记录认证提供方”，不伪造认证缺失。attachTabbed append-only，共享 workspace bar 不受影响。
+
+## 2026-11-08b 模型页重排 + 本地化思考级别
+
+model 页改为原生 model 组字段在前（实时权威），旧版 provider/model/thinkingLevel 降级到显式标注的「旧版插件默认值（高级）」disclosure 内，不再是首屏普通行；thinking 的 inherit 选项描述缩为一句行为说明，旧默认迁移说明移出选项列表放在 disclosure 末尾；级别选项全部经 `settings.pi.thinking.level.*` 本地化（关/最低/低/中/高/极高/最大），不再出现未翻译枚举。原生枚举字段保持 radio choice 语义。

@@ -45,3 +45,9 @@
 新增可选 readSessionInformation / readChildSessionMessages 只读契约。额度窗口、MCP 作用域、AgentSessionChild 原生身份与状态、累计 usage、实际加载资源分别建模；null 明确表示未报告。
 
 AgentSessionInformation.context 只承载当前窗口占用，usage.totalTokens 承载原生累计总量；两者不得互相填充。
+
+## 子会话续接契约（2026-11-10）
+
+`AgentSessionChild.mode?` 区分 `one-shot`、`continuable`、`external` 与 `unknown`，缺失或未知模式不得推断为可写。可选 `AgentChildSessionContinuationCapability` 提供当前直属父会话的 `canContinueChildSession(parentSessionId)` 探测，以及 text-only `continueChildSession(parentSessionId, childSessionId, content, {delivery})`；`delivery` 为 `queue` 或 `steer`，返回 `{messageId}` 只表示收件箱接受，不能作为执行完成证据。
+
+调用方须绑定当前服务实例、父子身份和标签页；模式为 continuable 且能力明确为 true 才开放输入。失去响应时保留草稿，不自动重发或回退到父会话发送。`@subagent` 标签来源是另一条纯文字提及路径，不授予此续接能力。

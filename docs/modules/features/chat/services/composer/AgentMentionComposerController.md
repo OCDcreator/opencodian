@@ -23,6 +23,8 @@ export interface AgentMentionCandidate {
   mode: 'primary' | 'subagent' | 'all' | null;
   hidden?: boolean;
   reference?: PromptReference;
+  menuGroup?: 'subagents';
+  literalOnly?: boolean;
 }
 
 export interface AgentMentionPillSpan {
@@ -55,6 +57,7 @@ export class AgentMentionComposerController {
 - 对 tracked agent mention 和稳定引用执行原子编辑保护：光标位于 pill 内、Backspace/Delete 会修改 pill 边界字符，或选区只覆盖 pill 一部分时，先阻止本次编辑并选中整个 token；用户可整体删除 selected mention
 - submit 前只使用仍位于 tracked source span 的 selected mention，生成 `source: { value, start, end }`；后续输入会把 span 安全平移，覆盖 mention 本体的外部编辑仍会让该 intent 失效
 - 用户手写但没有从候选选中的 `@name` 不会被静默提升为 agent intent
+- 字面量来源（2026-11-10）：host 可提供 `loadSubagentMentionCandidates()`（DSH 运行中子代理标签，`menuGroup:'subagents'` + `literalOnly:true`）。选中后只插入纯文本 `@label `：不编码引用 span、不创建 tracked agent pill、不产生 `AgentMentionIntent`，因此不授予续接权限也不解析成路由地址（对齐官方 DSH `@` 来源语义）。该来源失败或为空时其他候选不受影响；分组排序在 MCP 资源之后、原生 agent 之前
 
 ## 边界
 

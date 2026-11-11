@@ -4,6 +4,28 @@
 
 # Owner: feature.chat-ui
 
+2026-11-11（二级面板 v2）：终端启动主操作进入空状态，真实 PTY/xterm 生命周期不变；浏览器地址、预览与操作区分离，截图门禁不变，并按参考稿 `session-workbench-secondary-v2.html` 修正呈现：附加页面按钮换用专用短键 `workbench.browser.attachPage`（不复用全局 attach 标签），空状态平静说明与 `invalidUrl` 错误分区，Open 为填充主操作（`:is` 宿主作用域修特异性），32px 圆角地址输入，预览 210px 且状态层绝对覆盖、内容居中，附加/截图为同行 28px 描边按钮，Obsidian 打开与主工作区入口为地址旁仅图标操作且保留 aria 可访问名——均为展示层，运行时契约不变；仓库仅在有快照时显示分支工具头，非 Git/加载/失败状态使用单一路径的状态块。目录计数右对齐，终端 spawn 去掉重复上边框，概览级刷新只在概览显示，所有变化仍属展示层。
+
+2026-11-11（会话工作台展开与仓库打磨）：命令目录稳定挂载到会话引用之后、低频信息之前；信息分组与目录使用单框 disclosure，搜索图标与 32px 输入框固定对齐。仓库头部采用分支/操作与独立路径的两行网格，文件路径仅在展示层拆成文件名和父目录，原始 path、Git 操作与草稿语义不变。`SessionWorkbenchChildView` 隔离子会话转录及续接 composer 的 MarkdownRenderer/Component 生命周期，`SessionWorkbenchInformation.renderChild` 公开入口不变，owner 与原生状态归属不变。
+
+2026-11-11（共享工作台层级重设计）：一级承担单行 Plan 控制、会话文件变更入口、活动／会话终端／引用及内联命令目录；取消重复的任务与命令资源分类跳页。工作区 PTY、仓库及浏览器仍保留独立工作视图，回到一级恢复发起行、展开状态、滚动和焦点。`SessionWorkbenchTools` 持有工具展示草稿、就近错误与延迟目录加载，单向组合 `SessionWorkbenchRepository`，后者完整隔离仓库表单、diff／snapshot 读取代际及暂存／提交／工作树写入口；两者仍在同一 owner 内，不成为任务、权限或仓库状态的第二真值。异步读取按工具及会话身份隔离，目录复用既有 slash 失效信号，关闭视图使迟到读取失效。`ModifiedFilesSidebar` 仅暴露已有权威摘要的只读投影，嵌入工作台时使用 region 语义；会话文件变更不替代为 Git 统计。宿主 PTY 命名为“工作区终端”，原生后台终端命名为“会话终端”。原生操作与子会话续接契约仍由既有 owner 持有。
+
+2026-11-10（工作台子会话续接视图）：`SessionWorkbenchInformation.renderChild` 按 child `mode` 门控——仅 `continuable` 且 capability/probe 允许时挂载内嵌续接 composer（queue/steer 分段 radiogroup 投递选择），one-shot/external/unknown 恒为只读记录并显示只读说明；composer 的值/焦点/光标与投递选择跨面板重绘重建保留，发送中闭包禁用、失败保留草稿；子转录 user 行可见文本复用同一 mask 显示投影（渲染副本脱敏，message 对象与只读转录数据不变，assistant/tool 走上游策略）。子会话视图不提供独立 Stop 按钮且不支持图片续接（content 仅文本）。跨重绘竞态修复已由主代理落地并经 custom+Kimi 复核闭合（真实用例修复前 FAIL、修复后 34 PASS，2026-11-10 通报）：面板 refresh 动作先同步重投影 composer 编辑、再后台权威读取，读取挂起期间新草稿/caret 不丢；续接门与租约复检归 feature.chat-services 协调器，本 owner 只负责视图门控与值/焦点/光标恢复。
+
+2026-11-10（effort 保存焦点局部化）：inline `EffortSelector.selectInlineVariant` 保存期间不再置原生 `disabled`（会触发 Chromium 对已聚焦 range 的强制 blur，丢焦点并翻转 composer `:focus-within` 环），忙态改为 `aria-busy`/`aria-disabled`，`isSaving` 同时拦截 input 预览与 change（挂起期 change 仅回读、不二次保存），保存结束后单次 `updateDisplay()`；单选项保留原生 `disabled`。配套把 shadcn composer focus ring 收窄为 `:focus-within:not(:has(.opencodian-model-dropdown :focus))`（`src/style/base/core.css`），popover 内部焦点不再点亮整卡环。owner 边界与依赖未变。见 `docs/modules/features/chat/ui/EffortSelector.md` 与 `docs/modules/style/base/core.md`。
+
+2026-11-10（effort 标签主机回调）：`EffortSelector` 新增可选 `getVariantLabel`，`labelForVariant()` 收束全部展示路径并在空白时回退内置格式化，任何路径不渲染空标签；仅重命名展示，variant 值与保存语义不变。见 `docs/modules/features/chat/ui/EffortSelector.md`。
+
+2026-11-10（effort 内联滑块填充对齐）：`EffortSelector.syncInlineProgress` 改为输出无单位 clamp 系数，`effort-selector.css` 的 WebKit 填充终点以 `calc(thumb/2 + (100% - thumb) * 系数)` 落在原生 thumb 圆心，修复 28px thumb 下中间档位 ±7px 竖直缝；交互、刻度、is-highest/reduced-motion/forced-colors 契约不变，见 `docs/modules/features/chat/ui/EffortSelector.md` 与 `docs/modules/style/components/effort-selector.md`。
+
+2026-11-10（会话工作台顶边实测）：SessionWorkbench 触发胶囊与打开面板不再用固定 80px 顶边猜测：`syncLayout` 测量 `.opencodian-messages-shell` 上缘（真实 chat chrome 底——换行表头或表头下方页签条）并保留既有 15px 间距写入 `--workbench-top`，宽窄一致；ResizeObserver 同时观察消息区，缺锚点时回退 CSS 默认 80px。
+
+2026-11-10（DSH composer 布局恢复 + phase2 定案）：`DshSessionWorkbenchModal` 已解除接线（dormant）。其唯一入口是用户否决的 DSH composer 按钮条，该按钮条不再挂载，因此运行时没有路径打开此 Modal；文件保留待清理决策。DSH Jobs、子会话、终端 spawn 与独立 Plan 只经既有共享会话工作台呈现——Overview 增加一行 Plan toggle（排队只作 note，从不显示为 active），Tasks 承载终端/子会话通用行、job 操作与折叠 spawn 表单；pending 行操作按 workbench identity + task id 由 surface 计数锁定，重绘重建锁定行、settlement 解锁当前承载同一 task 的行。不提供第二个 DSH 专属界面、侧栏或 CSS family。以下两段仅描述该未接线类（其 pending 发送/草稿契约与共享工作台 phase2 契约一致；跨重绘修复正在落地，暂不作 PASS 记录）。
+
+2026-11-09：`DshSessionWorkbenchModal` 提供当前 Native 会话的 Jobs 输出／等待／停止、受 owner 约束的终端操作、子会话历史和取消入口。所有操作由真实 adapter 能力 gate，异步结果绑定原会话／adapter／请求代际；忙碌、空状态、失败、不可用和待确认均有本地化反馈。输出有界脱敏，终端输入掩码且发送后清空；UI 不把取消请求当作原生终态，不替代 SessionInformationCoordinator 的任务生命周期。
+
+每次刷新先等待可选 `refreshNativeControlCapabilities()`，再消费 adapter 同步当前能力并发送读取；等待后重验原会话／generation，终端扩展重新挂载可通过刷新发现。能力发现未决／失败禁用原生操作，保留本地刷新／设置入口、输出和终端草稿；既有按钮通过动态 predicate 追踪新能力，不重建行、不保留初建时的能力布尔值。此处只持有发现是否成功的 UI 状态，能力真值仍在 adapter。终端发送在清空输入前检查该终端的 send 操作锁；前次发送未决时的新草稿不会因重复点击丢失，signal / kill 保持各自独立操作锁。
+
 2026-11-01：会话信息胶囊保留信息与功能入口；SessionWorkbench 点击任务、文件或工具后直接展示对应标题的卡片，移除四页签导航。SessionWorkbenchTools 移除嵌套工具下拉框，主区域视图也使用当前工具名称。容器仍负责每会话卡片/工具偏好、返回与焦点，底层会话状态和 PTY 生命周期继续由既有 owners 提供。
 同日视觉整理：标题/控件保持独立行；信息分组依靠间距区分，任务与工具入口统一单列整行。当前“会话引用”（附件及后端加载来源）与“命令与资源”工具保留各自含义，不把目录入口误称为当前材料列表。
 
@@ -106,4 +128,4 @@ SessionWorkbench 为 320px 状态胶囊/分组浮层，展开后提供任务、�
 
 ## 会话信息（2026-10-31）
 
-SessionWorkbenchInformation 定义面板 DTO 并渲染信息及子会话，SessionWorkbench 只管理容器、折叠、滚动与 Goal；二者保持单向依赖。
+SessionWorkbenchInformation 定义面板 DTO 并渲染信息，子会话转录与续接由同 owner 的 SessionWorkbenchChildView 承担；SessionWorkbench 只管理容器、折叠、滚动与 Goal，依赖保持单向。

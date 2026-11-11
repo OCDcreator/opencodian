@@ -49,6 +49,8 @@ The plugin composition supplies Pi extension-command completion localization thr
 
 `wireHiddenAdapters` 在存在 vault 路径时惰性注册 `DshAdapter`，注入 `getDshSettings` 和 `getDshExtraEnv`。注册不启动进程；选择后端或测试连接时才启动本地 ACP 子进程，工作目录默认取当前 vault。
 
+2026-11-10（DSH wire trace 注入——实施机制已冻结，独立复核/宿主验收待完成）：options 新增 `dshTracePort?: DshAcpWireObserver`。注入经 adapter 自有的 `createClient` 工厂完成（本模块不触碰 DshAdapter 业务面）：按 `getDshSettings().transport` 构造 `DshAcpClient` 或 `DshNativeClient` 并附加 `trace: { observer, transport: 'acp' | 'native' }`；未提供 port 时 client 保持零 trace 行为不变。
+
 ## 目录定位（2026-10-23）
 
 - 源码位置：`src/core/agents/backend/AgentAdapterWiring.ts`。

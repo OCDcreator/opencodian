@@ -74,7 +74,7 @@ function change(select: HTMLSelectElement, value: string): void { select.value =
 beforeEach(() => { document.body.innerHTML = ''; installControls(); });
 afterEach(() => { jest.restoreAllMocks(); });
 
-it.each(['classic', 'tabbed'] as const)('saves native searchable models, thinking and mode against latest host state (%s)', async (layout) => {
+it.each(['classic', 'tabbed'] as const)('saves native searchable models and thinking against latest host state (%s)', async (layout) => {
   const { host, container, section } = fixture();
   if (layout === 'classic') section.attach(container); else section.attachTabbed(container, 'model');
   await flush();
@@ -87,25 +87,83 @@ it.each(['classic', 'tabbed'] as const)('saves native searchable models, thinkin
   await flush();
   expect(host.settings.backendSettings.zcode?.model).toBe('other/two');
   host.settings.backendSettings.zcode = { executablePath: '/external', model: 'other/two', thinkingLevel: '', mode: '' };
-  const [thinking, mode] = Array.from(container.querySelectorAll<HTMLSelectElement>('select'));
-  change(thinking, 'high'); change(mode, 'build'); await flush();
-  expect(host.settings.backendSettings.zcode).toEqual({ executablePath: '/external', model: 'other/two', thinkingLevel: 'high', mode: 'build' });
-  expect(host.saveSettings).toHaveBeenCalledTimes(3);
+  const [thinking] = Array.from(container.querySelectorAll<HTMLSelectElement>('select'));
+  change(thinking, 'high'); await flush();
+  expect(host.settings.backendSettings.zcode).toEqual({ executablePath: '/external', model: 'other/two', thinkingLevel: 'high', mode: '' });
+  expect(host.saveSettings).toHaveBeenCalledTimes(2);
 });
 
-it('preserves invalid saved choices and exposes explicit reset when the catalog fails', async () => {
+it('keeps the permission mode on its own high-risk page with per-choice consequences', async () => {
+  const { host, container, section } = fixture();
+  section.attachTabbed(container, 'permissions-safety'); await flush();
+  expect(container.querySelector('[data-settings-target="zcode-permissions-safety"]')).not.toBeNull();
+  const radios = Array.from(container.querySelectorAll<HTMLInputElement>('input[type="radio"]'));
+  const values = radios.map(radio => radio.value);
+  expect(values).toEqual(expect.arrayContaining(['', 'plan', 'build', 'edit', 'yolo']));
+  // Chat defaults page hosts no mode control at all.
+  const chat = document.body.createDiv();
+  section.attachTabbed(chat, 'chat'); await flush();
+  expect(chat.querySelectorAll('input[type="radio"]')).toHaveLength(0);
+  expect(chat.querySelector('[data-settings-target="zcode-chat"] [data-backend-key="zcode-default-mode"]')).toBeNull();
+  // Persisted default applies at session materialization; badges say so.
+  const modeRow = container.querySelector('[data-backend-key="zcode-default-mode"]');
+  expect(modeRow?.getAttribute('data-backend-scope')).toBe('vault');
+  expect(modeRow?.getAttribute('data-backend-effect')).toBe('new-session');
+  expect(modeRow?.getAttribute('data-backend-risk')).toBe('high');
+  const yolo = radios.find(radio => radio.value === 'yolo')!;
+  yolo.click(); await flush();
+  expect(host.settings.backendSettings.zcode?.mode).toBe('yolo');
+  expect(host.saveSettings).toHaveBeenCalledTimes(1);
+});
+
+it('rolls the permission mode back to the committed value when saving fails, preserving legacy auto', async () => {
+  const { host, container, section } = fixture();
+  host.settings.backendSettings.zcode = { executablePath: '', model: '', thinkingLevel: '', mode: 'auto' };
+  host.saveSettings = jest.fn().mockRejectedValue(new Error('disk full'));
+  section.attachTabbed(container, 'permissions-safety'); await flush();
+  // 'auto' is no longer selectable: it renders as an unlisted checked-disabled radio.
+  const auto = container.querySelector<HTMLInputElement>('input[type="radio"][value="auto"]');
+  expect(auto?.disabled).toBe(true);
+  expect(auto?.checked).toBe(true);
+  const edit = container.querySelector<HTMLInputElement>('input[type="radio"][value="edit"]')!;
+  edit.click(); await flush();
+  expect(host.settings.backendSettings.zcode?.mode).toBe('auto');
+  expect(edit.checked).toBe(false);
+  expect(auto!.checked).toBe(true);
+  expect(container.querySelector('.opencodian-backend-choice-error')?.textContent).not.toBe('');
+});
+
+it('preserves invalid saved choices and points at the account tabs when the catalog fails', async () => {
   const { host, getCatalog, container, section } = fixture();
   host.settings.backendSettings.zcode = { executablePath: '', model: 'legacy/missing', thinkingLevel: 'legacy', mode: 'auto' };
   getCatalog.mockRejectedValue(new Error('offline'));
   section.attachTabbed(container, 'chat'); await flush();
   expect(host.saveSettings).not.toHaveBeenCalled();
   expect(container.textContent).toContain('legacy/missing');
-  expect(container.querySelector<HTMLDetailsElement>('[data-zcode-group="accounts-models"]')?.open).toBe(true);
-  expect(container.querySelector<HTMLOptionElement>('option[value="auto"]')?.disabled).toBe(true);
+  // Pending catalog never claims the saved choice is unknown.
+  const root = container.querySelector('[data-zcode-group="chat-defaults"]');
+  expect(root?.getAttribute('data-zcode-catalog-state')).toBe('failed');
+  expect(container.querySelector('[data-zcode-group="catalog-unavailable"]')?.textContent).not.toBe('');
   const buttons = container.querySelectorAll<HTMLButtonElement>('[data-zcode-field="model"] button');
   expect(buttons[0].disabled).toBe(true);
   buttons[1].click(); await flush();
   expect(host.settings.backendSettings.zcode?.model).toBe('');
+});
+
+it('keeps the saved value unjudged and the state honest while the catalog is loading', async () => {
+  const { host, getCatalog, container, section } = fixture();
+  host.settings.backendSettings.zcode = { executablePath: '', model: 'legacy/missing', thinkingLevel: '', mode: '' };
+  let resolveCatalog!: (value: ZCodeSettingsModelCatalog) => void;
+  getCatalog.mockReturnValueOnce(new Promise<ZCodeSettingsModelCatalog>((resolve) => { resolveCatalog = resolve; }));
+  section.attachTabbed(container, 'chat');
+  const root = container.querySelector('[data-zcode-group="chat-defaults"]');
+  expect(root?.getAttribute('data-zcode-catalog-state')).toBe('loading');
+  // The saved ref stays visible but is never called "not in the current list" while pending.
+  expect(root?.textContent).toContain('legacy/missing');
+  expect(root?.textContent).not.toContain('not in the current list');
+  resolveCatalog(catalog); await flush();
+  expect(root?.getAttribute('data-zcode-catalog-state')).toBe('ready');
+  expect(root?.textContent).toContain('not in the current list');
 });
 
 it('discards late catalog responses and recovers through an explicit retry', async () => {
@@ -141,7 +199,7 @@ it('keeps the picker open on save failure and supports Escape focus recovery', a
   open.click(); container.querySelector<HTMLButtonElement>('[role="option"]')!.click(); await flush();
   expect(container.querySelector('[role="listbox"]')).not.toBeNull();
   expect(host.settings.backendSettings.zcode?.model).toBe('');
-  expect(container.querySelector('.opencodian-zcode-feedback')?.textContent).toContain('save');
+  expect(container.querySelector('[data-zcode-group="chat-defaults"] .opencodian-zcode-feedback')?.textContent).toContain('save');
   container.querySelector<HTMLInputElement>('input[type="search"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   expect(container.querySelector('[role="listbox"]')).toBeNull();
   expect(document.activeElement).toBe(open);
@@ -210,9 +268,44 @@ it('keeps a large provider catalog collapsed without truncating the model IDs pa
   expect(disclosure.querySelector('summary')?.getAttribute('aria-label')).toBe('Models for Large service');
   const description = list.querySelector('.setting-item-description')!.cloneNode(true) as HTMLElement;
   description.querySelector('details')!.remove();
+  description.querySelector('.opencodian-backend-field-meta')!.remove();
   expect(description.textContent).toBe('https://example.invalid/v1 · Models: 180');
   expect(Array.from(disclosure.querySelectorAll('li'), (item) => item.textContent)).toEqual(models);
   expect(list.textContent).toContain('Next service');
   list.querySelector<HTMLButtonElement>('button[aria-label="Edit service: Large service"]')!.click();
   expect(container.querySelector<HTMLTextAreaElement>('textarea')!.value.split('\n')).toEqual(models);
+});
+
+it('exposes archive version history with a three-click restore, and nothing when the adapter lacks the contract', async () => {
+  const identity = 'entry-fixture' as unknown as import('../../../../src/core/agents/backend/configuration/ConfigurationArchiveService').ArchiveHistoryEntryIdentity;
+  const listHistory = jest.fn().mockResolvedValue([{ identity, archiveKind: 'version', timestamp: Date.parse('2026-11-01T10:00:00Z'), size: 512 }]);
+  const restore = jest.fn().mockResolvedValue({ status: 'success', revision: null });
+  const container = document.body.createDiv();
+  new SettingsZCodeAccounts({
+    accounts: { read: jest.fn().mockResolvedValue({ state: 'signed-out', accounts: [] }), login: jest.fn(), logout: jest.fn(), cancelLogin: jest.fn(), openDesktop: jest.fn() },
+    getPersonalConfigService: () => ({ read: jest.fn().mockResolvedValue({ path: '/fixture/provider_config.json', revision: null, providers: [] }), save: jest.fn(), remove: jest.fn(), listPersonalConfigHistory: listHistory, restorePersonalConfigEntry: restore }),
+    refreshConfiguration: jest.fn().mockResolvedValue({ needsReconnect: false }),
+  }, jest.fn().mockResolvedValue(undefined)).attach(container);
+  await flush();
+  const history = container.querySelector<HTMLDetailsElement>('[data-zcode-group="providers-history"]');
+  expect(history).not.toBeNull();
+  history!.open = true; history!.dispatchEvent(new Event('toggle'));
+  await flush();
+  expect(listHistory).toHaveBeenCalledTimes(1);
+  const restoreButton = container.querySelector<HTMLButtonElement>('[data-zcode-group="providers-history-list"] button')!;
+  expect(restoreButton).not.toBeNull();
+  restoreButton.click();
+  const confirm = container.querySelector<HTMLButtonElement>('[data-zcode-group="providers-history-confirm"] button')!;
+  expect(confirm).not.toBeNull();
+  confirm.click(); await flush();
+  expect(restore).toHaveBeenCalledWith(identity, null);
+  // Without the archive contract the whole affordance stays absent — no dead buttons.
+  const plain = document.body.createDiv();
+  new SettingsZCodeAccounts({
+    accounts: { read: jest.fn().mockResolvedValue({ state: 'signed-out', accounts: [] }), login: jest.fn(), logout: jest.fn(), cancelLogin: jest.fn(), openDesktop: jest.fn() },
+    getPersonalConfigService: () => ({ read: jest.fn().mockResolvedValue({ path: '/fixture/provider_config.json', revision: null, providers: [] }), save: jest.fn(), remove: jest.fn() }),
+    refreshConfiguration: jest.fn(),
+  }, jest.fn()).attach(plain);
+  await flush();
+  expect(plain.querySelector('[data-zcode-group="providers-history"]')).toBeNull();
 });

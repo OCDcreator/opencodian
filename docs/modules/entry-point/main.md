@@ -1,4 +1,6 @@
 # Plugin Entry Point (main.ts)
+
+> 2026-11-10（DSH trace 组合）：`DiagnosticsRuntimeCoordinator` 在原 OpenCode→Codex→Claude 顺序后组合 DSH 元数据 trace；main 只传 DSH normalized settings、已载入 env 值的脱敏字典和非敏感 transport metadata，不读取额外凭据。`wireHiddenAdapters` 注入同一 DSH trace port，聊天 factory 用 lazy getter 取同一实例，生命周期仍由 diagnostics owner 管理；不在 main 新建 wire buffer、请求追踪或 UI 状态。
 > 2026-10-24：行内模型目录读取增加 dsh 分支，通过已注册适配器 getModelSelectorProviders 获取其原生目录；不访问 OpenCode 服务，也不在组合根新增 DSH 运行时职责。
 > 2026-10-21（OpenCode 1 退役）：bootstrap 不再构造/注册 `OpenCodeAdapter`——`OpenCodeService` 仍休眠构造（供 memory runtime 与 legacy 只读引用，本地 server 自启动已有 active-backend 门控、永不触发），`AgentServiceRegistry` 中不存在 `opencode` adapter，routing 把存量 `opencode` conversation 视为不可用后端；`handleOpenCodeServerStatusChange` 移除 registry 转发。默认后端经 settings 归一化为 `opencode2`，由 wiring 层注册 `OpenCode2Adapter`。
 > 2026-10-07：readClaudeMcpServers 在 vault-scoped services 尚未组合时，按当前 vault 创建同类 OpencodeConfigManager 读取 project MCP，避免 active Claude 的提前 start 缓存空配置。配置来源及 adaptMcpConfigForClaude 规则保持一致，不启动 OpenCode 服务。

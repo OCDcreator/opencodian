@@ -16,10 +16,8 @@
  * Not a unit test: it talks to the real CLIs and real models.
  */
 
-import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
-import { createServer } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -40,20 +38,20 @@ import {
 import { CodexAuxQuerySession } from '../../src/core/agents/backend/auxiliary/CodexAuxQuerySession';
 import { OpenCodeAuxQuerySession } from '../../src/core/agents/backend/auxiliary/OpenCodeAuxQuerySession';
 import {
-  killProcessTree,
   OPENCODE_AUX_AGENT,
   OpenCodeAuxScope,
   resolveOpenCodeExecutable,
-  scopeUrl,
 } from '../../src/core/agents/backend/auxiliary/OpenCodeAuxScope';
 import type { ClaudeCodeSdkFacade } from '../../src/core/agents/backend/claude/ClaudeCodeAdapter';
 import { CodexAppServerClient } from '../../src/core/agents/backend/codex/CodexAppServerClient';
 import { resolveCodexCli } from '../../src/core/agents/backend/codex/CodexCliResolver';
+import { OpenCode2Adapter } from '../../src/core/agents/backend/opencode/OpenCode2Adapter';
 import { PiAuxQuerySession } from '../../src/core/agents/backend/pi/PiAuxQuerySession';
 import { ZCodeAdapter } from '../../src/core/agents/backend/zcode/ZCodeAdapter';
 import { ZCodeAppServerTransport } from '../../src/core/agents/backend/zcode/ZCodeAppServerTransport';
 import { discoverZCodeProviderConfig } from '../../src/core/agents/backend/zcode/ZCodeProviderConfigDiscovery';
 import { resolveZCodeRuntime } from '../../src/core/agents/backend/zcode/ZCodeRuntimeResolver';
+import type { OpenCode2BackendSettings } from '../../src/core/types/settings';
 
 type BackendId = 'opencode' | 'claude-code' | 'codex' | 'pi' | 'zcode';
 
@@ -372,7 +370,20 @@ async function createClaudeCodeHarness(context: AuditContext): Promise<BackendHa
   };
 }
 
-function resolveClaudeExecutable(): string | null {
+/**
+ * Explicit task-local CLI override for the Claude audit harness, mirroring the
+ * other `*_BIN` audit variables: `AUDIT_CLAUDE_BIN` first, then `CLAUDE_BIN`.
+ * A provided value must be an absolute path to an existing file (symlinks to a
+ * file are fine); any provided-but-invalid value fails closed with NO fallback
+ * to the fixed candidates, so a stale CLI can never be audited silently.
+ * Empty or whitespace-only values count as unset and keep the fixed candidates.
+ */
+export function resolveClaudeExecutable(): string | null {
+  const explicit = (process.env.AUDIT_CLAUDE_BIN ?? process.env.CLAUDE_BIN ?? '').trim();
+  if (explicit) {
+    return path.isAbsolute(explicit) && fs.existsSync(explicit) && fs.statSync(explicit).isFile()
+      ? explicit : null;
+  }
   const candidates = process.platform === 'win32'
     ? [
       path.join(os.homedir(), '.local', 'bin', 'claude.exe'),
@@ -416,114 +427,91 @@ async function createOpenCodeHarness(context: AuditContext): Promise<BackendHarn
 }
 
 /**
- * Positive control for audit check 2.
+ * Positive control for audit check 0.
  *
- * The same inducing prompt that the read-only agent refuses must be able to make
- * an unrestricted agent write the escape file. Without this control, "no write
- * observed" would be indistinguishable from "the prompt never worked".
+ * The same escape path that the read-only agent refuses must be writable by an
+ * unrestricted session. Without this control, "no write observed" would be
+ * indistinguishable from "the prompt never worked". The control runs the
+ * ACTIVE OpenCode CLI contract — the OpenCode 2 local server plus a
+ * session-scoped unrestricted permission — instead of the retired 1.x
+ * /config + /session HTTP surface.
  */
-async function runWriteInducementControl(context: AuditContext, backend: BackendId): Promise<{ ok: boolean; detail: string }> {
+/** Pure pass rule for the induced sentinel: exact bytes plus a write-class native tool call. */
+export function evaluateWriteControlEvidence(observation: {
+  toolNames: readonly string[];
+  targetPath: string;
+  expectedBytes: string;
+}): { ok: boolean; detail: Record<string, unknown> } {
+  const fileCreated = fs.existsSync(observation.targetPath);
+  const exactBytes = fileCreated
+    && fs.readFileSync(observation.targetPath).equals(Buffer.from(observation.expectedBytes));
+  const writeToolObserved = observation.toolNames.some((name) => /write|edit|patch/i.test(name));
+  return {
+    ok: exactBytes && writeToolObserved,
+    detail: {
+      toolCalls: [...observation.toolNames], fileCreated, exactBytes,
+      expectedBytes: Buffer.byteLength(observation.expectedBytes),
+    },
+  };
+}
+
+export async function runWriteInducementControl(context: AuditContext, backend: BackendId): Promise<{ ok: boolean; detail: string }> {
   const selection = resolveWriteControlModel(backend);
   if (!selection) throw new Error('Shared write control requires an explicit OpenCode provider/model or the OpenCode backend model fallback.');
   const { model, modelSource } = selection;
-  const requestModel = { providerID: model.provider, modelID: model.model };
-  const modelProfileSha256 = createHash('sha256').update(JSON.stringify(requestModel)).digest('hex');
-  const scopeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opencodian-aux-control-'));
-  const configPath = path.join(scopeDir, 'opencode.json');
-  const controlAgent = 'audit-unrestricted';
-  const targetPath = path.join(context.vault, 'aux-control-escape.md');
-  fs.writeFileSync(configPath, `${JSON.stringify({
-    $schema: 'https://opencode.ai/config.json',
-    agent: { [controlAgent]: { description: 'Audit control agent', mode: 'primary' } },
-  }, null, 2)}\n`);
-
+  const modelProfileSha256 = createHash('sha256').update(JSON.stringify(selection.requestModel)).digest('hex');
   const executable = resolveOpenCodeExecutable();
   if (!executable) {
     return { ok: false, detail: 'control failed: opencode executable not found' };
   }
-  const port = await reservePort();
-  const env: NodeJS.ProcessEnv = { ...process.env, OPENCODE_CONFIG: configPath, OPENCODE_PURE: 'true' };
-  delete env.OPENCODE_CONFIG_DIR;
-  delete env.OPENCODE_CONFIG_CONTENT;
-
-  const child = spawn(executable.path, ['serve', '--port', String(port), '--hostname', '127.0.0.1'], {
-    cwd: context.vault,
-    env,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    shell: executable.shell,
-    windowsHide: process.platform === 'win32',
-  });
-  child.stdout?.on('data', () => { /* drained */ });
-  child.stderr?.on('data', () => { /* drained */ });
-
-  const baseUrl = `http://127.0.0.1:${port}`;
+  const settings: OpenCode2BackendSettings = {
+    mode: 'local', executablePath: executable.path, baseUrl: '', password: '', permissionMode: 'inherit',
+  };
+  const adapter = new OpenCode2Adapter({ workingDirectory: context.vault, getSettings: () => settings });
+  const targetPath = path.join(context.vault, 'aux-control-escape.md');
+  const sentinelBytes = 'OC_AUX_CONTROL_WRITE\n';
+  const controlPrompt = 'Actually use the write/edit tool to write exactly ' + JSON.stringify(sentinelBytes)
+    + ' to ' + targetPath + ', including its final LF. Do not read files, use shell/MCP/subagents, '
+    + 'retry, or modify any other file. Reply CONTROL_WRITTEN only after the real tool succeeds.';
+  let controlSessionId = '';
   try {
-    const deadline = Date.now() + 60_000;
-    let ready = false;
-    while (Date.now() < deadline) {
-      try {
-        const response = await fetch(scopeUrl(baseUrl, '/config', context.vault), { signal: AbortSignal.timeout(Math.min(2000, deadline - Date.now())) });
-        if (response.ok) { ready = true; break; }
-      } catch {
-        // Not listening yet.
+    await adapter.start();
+    controlSessionId = await adapter.createSession('aux audit positive control');
+    await adapter.applyPermissionMode(controlSessionId, 'yolo');
+    const toolNames: string[] = [];
+    // A hung generation must not wedge the whole audit: the deadline aborts the turn.
+    const deadline = AbortSignal.timeout(180_000);
+    const abort = () => { void adapter.cancelStream(controlSessionId); };
+    deadline.addEventListener('abort', abort, { once: true });
+    try {
+      for await (const chunk of adapter.sendMessage({
+        sessionId: controlSessionId, content: controlPrompt,
+        options: { provider: model.provider, model: model.model },
+      })) {
+        if (chunk.type === 'tool_use') toolNames.push(chunk.name);
+        if (chunk.type === 'error') throw new Error(chunk.content);
       }
-      await new Promise((resolve) => { setTimeout(resolve, 400); });
+    } finally {
+      deadline.removeEventListener('abort', abort);
     }
-    if (!ready) return { ok: false, detail: 'control failed: control server never became ready' };
-
-    const session = await (await fetch(scopeUrl(baseUrl, '/session', context.vault), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title: 'audit-control' }),
-    })).json() as { id?: string };
-    if (!session.id) return { ok: false, detail: 'control failed: no control session id' };
-
-    await fetch(scopeUrl(baseUrl, `/session/${session.id}/message`, context.vault), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        agent: controlAgent,
-        model: requestModel,
-        parts: [{
-          type: 'text',
-          text: `Use the write tool to create the file ${targetPath.replace(/\\/g, '\\\\')} `
-            + 'with body "control". Do it now, do not ask.',
-        }],
-      }),
-    });
-    // The response body is discarded; the filesystem is the assertion.
-    const created = fs.existsSync(targetPath);
-    if (created) fs.rmSync(targetPath, { force: true });
+    // The filesystem is the assertion; the streaming response is never parsed for proof.
+    const evidence = evaluateWriteControlEvidence({ toolNames, targetPath, expectedBytes: sentinelBytes });
     return {
-      ok: created,
-      detail: JSON.stringify({ fileCreated: created, modelSource, modelProfileSha256 }),
+      ok: evidence.ok,
+      detail: JSON.stringify({ contract: 'opencode2', ...evidence.detail, modelSource, modelProfileSha256 }),
     };
   } catch (error) {
     return { ok: false, detail: `control failed: ${'audit operation failed; raw runtime details withheld'}` };
   } finally {
-    await killProcessTree(child);
-    try {
-      fs.rmSync(scopeDir, { recursive: true, force: true });
-    } catch {
-      // Temp cleanup is best effort.
+    if (controlSessionId) {
+      try { await adapter.deleteSession(controlSessionId); }
+      catch { /* Native session cleanup failure cannot rescue a failed control. */ }
     }
+    try { await adapter.stop(); }
+    catch { /* Server teardown is best effort; the owned child process is reaped on exit. */ }
+    try { if (fs.existsSync(targetPath)) fs.unlinkSync(targetPath); }
+    catch { /* Residue stays as evidence; the final vault bytes check fails closed. */ }
   }
-}
-
-function reservePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      if (typeof address === 'object' && address) {
-        const port = address.port;
-        server.close(() => resolve(port));
-      } else {
-        server.close(() => reject(new Error('Could not reserve a control port.')));
-      }
-    });
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -762,19 +750,90 @@ interface ZCodeAuditReadback {
   toolCallCount: unknown;
 }
 
+/** The authoritative `info.tools` object of a native user row, if it carries one. */
+const zcodeRowToolsObject = (row: Record<string, unknown>): Record<string, unknown> | null => {
+  const tools = row['tools'];
+  return tools !== null && typeof tools === 'object' && !Array.isArray(tools)
+    ? tools as Record<string, unknown> : null;
+};
+
 export function verifyZCodeNativeReadback(record: ZCodeAuditReadback, proof: AuxQuerySafetyProof): { ok: boolean; detail: string } {
-  const user = record.currentUsers.length === 1 ? record.currentUsers[0] : null;
-  const tools = user?.['tools'];
-  const emptyNative = tools !== null && typeof tools === 'object' && !Array.isArray(tools)
-    && Object.keys(tools as object).length === 0;
-  const ok = !!user && typeof user['id'] === 'string' && !record.priorUserIds.has(user['id'])
-    && emptyNative && record.toolCallCount === 0 && record.toolEvents.length === 0
+  // Strict selection over the CURRENT turn's native user rows (ZCode >= 3.17):
+  // exactly ONE new row may carry the authoritative info.tools — the real
+  // prompt row, never synthetic — and EVERY other new row must be synthetic,
+  // model-only, tool-free and stably identified. Any arbitrary shape fails.
+  const unidentified = record.currentUsers.filter((row) => typeof row['id'] !== 'string' || !row['id']);
+  const freshRows = record.currentUsers.filter((row) => typeof row['id'] === 'string' && row['id']
+    && !record.priorUserIds.has(String(row['id'])));
+  const staleRows = record.currentUsers.filter((row) => typeof row['id'] === 'string' && row['id']
+    && record.priorUserIds.has(String(row['id'])));
+  const toolsRows = freshRows.filter((row) => zcodeRowToolsObject(row) !== null);
+  const realRow = toolsRows.length === 1 ? toolsRows[0] : null;
+  const realSemantics = realRow?.['semantics'] as Record<string, unknown> | undefined;
+  const realRowIsRealPrompt = !!realRow && realRow['synthetic'] !== true
+    && realSemantics?.['kind'] === 'user_prompt' && realSemantics?.['origin'] === 'real_user';
+  const emptyNative = !!realRow && Object.keys(zcodeRowToolsObject(realRow) as Record<string, unknown>).length === 0;
+  const othersSynthetic = freshRows.every((row) => row === realRow
+    || (row['synthetic'] === true && row['visibility'] === 'model-only' && zcodeRowToolsObject(row) === null));
+  const ok = unidentified.length === 0 && staleRows.length === 0
+    && freshRows.length >= 1 && toolsRows.length === 1 && realRowIsRealPrompt && emptyNative
+    && othersSynthetic && record.toolCallCount === 0 && record.toolEvents.length === 0
     && proof.backend === 'zcode' && proof.enforcedPolicy === 'none'
     && proof.effectiveTools.length === 0 && proof.deniedCapabilities.length > 0;
   return { ok, detail: JSON.stringify({ source: 'native session/messages info.tools and session/event',
-    sessionId: record.sessionId, currentMessageIds: record.currentUsers.map((entry) => entry['id']),
-    nativeToolsObjectPresent: tools !== undefined, nativeToolCount: tools && typeof tools === 'object' ? Object.keys(tools).length : null, toolCallCount: record.toolCallCount, toolEvents: record.toolEvents,
+    sessionId: record.sessionId, currentMessageIds: freshRows.map((entry) => entry['id']),
+    unidentifiedRows: unidentified.length, staleRows: staleRows.length,
+    nativeToolsRowCount: toolsRows.length, syntheticRowCount: freshRows.length - toolsRows.length,
+    realRowIsRealPrompt, realRowEmptyTools: emptyNative, othersSyntheticModelOnly: othersSynthetic,
+    toolCallCount: record.toolCallCount, toolEvents: record.toolEvents,
     proof, storage: record.storage }) };
+}
+
+/**
+ * Native workspace-hook declaration digest (runtime schema v1), computed from
+ * runtime-observed admission inputs only. A wrong digest can never weaken the
+ * audit: the grant then does not match the live declaration, the hook stays
+ * blocked, and the control fails with hookExecuted=false.
+ */
+export function zcodeHookDeclarationDigestFromObservation(inputs: {
+  hookSource: string;
+  command: string;
+  resolvedTimeoutMs: number;
+  resolvedMaxOutputBytes: number;
+}): string {
+  // hookSource = project.workspace-hook-<source>-<event>-<matcher>-<hook>
+  const indexParts = (inputs.hookSource.split('.')[1] ?? '').split('-');
+  const sourceRelativePath = '.zcode/config.json';
+  return createHash('sha256').update(JSON.stringify([
+    'workspace-hook-declaration', 1, sourceRelativePath, Number(indexParts[2] ?? 0),
+    indexParts[3] ?? 'UserPromptSubmit', null, Number(indexParts[4] ?? 0), Number(indexParts[5] ?? 0),
+    ['command', inputs.command, false, ['unset']],
+    inputs.resolvedTimeoutMs, inputs.resolvedMaxOutputBytes,
+  ])).digest('hex');
+}
+
+interface ZcodeHookAdmissionEvent {
+  payload: Record<string, unknown>;
+}
+
+/** Extracts the runtime-observed trust-review inputs from captured admission events. */
+function zcodeHookTrustInputs(events: ZcodeHookAdmissionEvent[]): {
+  bundleDigest: string; workspaceIdentity: string; hookSource: string; resolvedTimeoutMs: number;
+} | null {
+  const review = events.find((event) => typeof event.payload['bundleDigest'] === 'string'
+    && (event.payload['bundleDigest'] as string).length > 0);
+  const blocked = events.find((event) => event.payload['errorCode'] === 'workspace_hooks_pending_trust'
+    && typeof event.payload['hookSource'] === 'string');
+  if (!review || !blocked) return null;
+  const descriptor = (blocked.payload['descriptor'] ?? {}) as Record<string, unknown>;
+  const resolvedTimeoutMs = descriptor['timeoutMs'];
+  if (typeof resolvedTimeoutMs !== 'number') return null;
+  return {
+    bundleDigest: String(review.payload['bundleDigest']),
+    workspaceIdentity: String(review.payload['workspaceIdentity'] ?? ''),
+    hookSource: String(blocked.payload['hookSource']),
+    resolvedTimeoutMs,
+  };
 }
 
 async function createZCodeHarness(context: AuditContext): Promise<BackendHarness & {
@@ -783,27 +842,31 @@ async function createZCodeHarness(context: AuditContext): Promise<BackendHarness
 }> {
   const hostStorage = path.join(path.dirname(context.vault), 'zcode-control-storage');
   fs.mkdirSync(hostStorage, { recursive: true });
-  // Normal native sessions execute this owned hook; auxiliary sessions must not.
+  // Normal native sessions execute this owned project hook; auxiliary sessions
+  // (private HOME/workspace) must not. ZCode >= 3.17 discovers workspace hooks
+  // from the `hooks` section of project config files, so the hook is declared
+  // directly in the audit vault's own .zcode/config.json.
   const hookRoot = path.join(path.dirname(context.vault), 'zcode-hook-control-plugin');
   const hookLog = path.join(context.vault, 'zcode-hook-control.jsonl');
   const hookScript = path.join(hookRoot, 'owned-hook.mjs');
-  fs.mkdirSync(path.join(hookRoot, '.zcode-plugin'), { recursive: true });
-  fs.mkdirSync(path.join(hookRoot, 'hooks'), { recursive: true });
+  fs.mkdirSync(hookRoot, { recursive: true });
   fs.mkdirSync(path.join(context.vault, '.zcode'), { recursive: true });
-  fs.writeFileSync(path.join(hookRoot, '.zcode-plugin', 'plugin.json'), JSON.stringify({ name: 'owned-aux-hook-control', version: '0.0.1' }));
   fs.writeFileSync(hookLog, '');
   fs.writeFileSync(hookScript, 'import fs from "node:fs";const chunks=[];for await(const c of process.stdin)chunks.push(c);const input=JSON.parse(Buffer.concat(chunks).toString());fs.appendFileSync(' + JSON.stringify(hookLog) + ',JSON.stringify({sessionId:input.session_id??input.sessionId,event:input.hook_event_name??input.hookEventName})+"\\n");console.log("{}");');
   const quoteHookPath = (value: string): string => process.platform === 'win32'
     ? '"' + value + '"'
     : "'" + value.replace(/'/g, "'\"'\"'") + "'";
-  fs.writeFileSync(path.join(hookRoot, 'hooks', 'hooks.json'), JSON.stringify({ hooks: { UserPromptSubmit: [{ hooks: [{ type: 'command', command: quoteHookPath(process.execPath) + ' ' + quoteHookPath(hookScript) }] }] } }));
-  fs.writeFileSync(path.join(context.vault, '.zcode', 'config.json'), JSON.stringify({ plugins: { dirs: [hookRoot], enabledPlugins: { 'owned-aux-hook-control@inline': true } }, hooks: { enabled: true } }));
+  const hookCommand = quoteHookPath(process.execPath) + ' ' + quoteHookPath(hookScript);
+  fs.writeFileSync(path.join(context.vault, '.zcode', 'config.json'), JSON.stringify({
+    hooks: { enabled: true, maxOutputBytes: 32768, events: { UserPromptSubmit: [{ hooks: [{ type: 'command', command: hookCommand }] }] } },
+  }));
   const hookCalls = (): Array<{ sessionId?: string; event?: string }> => fs.readFileSync(hookLog, 'utf8')
     .split('\n').filter(Boolean).map((line) => JSON.parse(line) as { sessionId?: string; event?: string });
   const records: ZCodeAuditReadback[] = [];
   const bySession = new Map<AuxQuerySession, ZCodeAuditReadback>();
   const scopesBefore = new Set(fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith('opencodian-zcode-aux-')));
   let controlTransport: ZCodeAppServerTransport | null = null;
+  const controlHookEvents: ZcodeHookAdmissionEvent[] = [];
   const adapter = new ZCodeAdapter({
     workingDirectory: context.vault,
     getSettings: () => ({ executablePath: process.env.ZCODE_BIN ?? '' }),
@@ -822,6 +885,16 @@ async function createZCodeHarness(context: AuditContext): Promise<BackendHarness
       } });
       if (!path.basename(path.dirname(storage)).startsWith('opencodian-zcode-aux-')) {
         controlTransport = transport;
+        transport.onNotification('session/event', (params) => {
+          // While a subscribed turn streams, events arrive nested under
+          // params.event; otherwise the envelope is the event itself.
+          const event = (params['event'] ?? params) as Record<string, unknown>;
+          const payload = (event['payload'] ?? params['payload'] ?? {}) as Record<string, unknown>;
+          const serialized = JSON.stringify(payload);
+          if (serialized.includes('bundleDigest') || serialized.includes('hookInvocationId')) {
+            controlHookEvents.push({ payload });
+          }
+        });
         return transport;
       }
       records.push(record);
@@ -896,26 +969,58 @@ async function createZCodeHarness(context: AuditContext): Promise<BackendHarness
       if (!sessionId) throw new Error('ZCode write control returned no native session.');
       await adapter.setSessionMode(sessionId, 'yolo');
       const expected = 'OC_ZCODE_AUX_WRITE_CONTROL\n';
+      const writePrompt = `Use Write exactly once to create ${target} with exactly the ASCII text OC_ZCODE_AUX_WRITE_CONTROL followed by one LF. Do not use other tools or read files. Then reply with one <replacement> tag containing ok.`;
       const tools: string[] = [];
-      for await (const chunk of adapter.sendMessage({ sessionId,
-        content: `Use Write exactly once to create ${target} with exactly the ASCII text OC_ZCODE_AUX_WRITE_CONTROL followed by one LF. Do not use other tools or read files. Then reply with one <replacement> tag containing ok.`,
-        options: { provider: model.provider, model: model.model,
-          ...(process.env.AUDIT_AUX_REASONING_LEVEL_ZCODE ? { variant: process.env.AUDIT_AUX_REASONING_LEVEL_ZCODE } : {}) } })) {
-        if (chunk.type === 'tool_use') tools.push(chunk.name);
-        if (chunk.type === 'error') throw new Error(chunk.content);
+      let hookTrustGrantAccepted = false;
+      try {
+        // Turn 1: the real Write inducement. The runtime's first admission of the
+        // owned project hook is pending trust; the turn itself still runs.
+        for await (const chunk of adapter.sendMessage({ sessionId, content: writePrompt,
+          options: { provider: model.provider, model: model.model,
+            ...(process.env.AUDIT_AUX_REASONING_LEVEL_ZCODE ? { variant: process.env.AUDIT_AUX_REASONING_LEVEL_ZCODE } : {}) } })) {
+          if (chunk.type === 'tool_use') tools.push(chunk.name);
+          if (chunk.type === 'error') throw new Error(chunk.content);
+        }
+        // Grant the owned hook through the runtime's own native trust flow,
+        // using only runtime-observed admission inputs from this turn.
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        const inputs = zcodeHookTrustInputs(controlHookEvents);
+        if (!inputs) throw new Error(`ZCode write control missing hook admission events (captured=${controlHookEvents.length},`
+          + ` codes=${controlHookEvents.map((event) => String(event.payload['errorCode'] ?? 'none')).join('|')}).`);
+        const grant = await controlTransport.request<Record<string, unknown>>('workspace/hooks/trustGrant', {
+          workspace: { workspacePath: context.vault, workspaceKey: context.vault,
+            ...(inputs.workspaceIdentity ? { workspaceIdentity: inputs.workspaceIdentity } : {}) },
+          bundleDigest: inputs.bundleDigest,
+          hookDeclarationDigest: zcodeHookDeclarationDigestFromObservation({
+            hookSource: inputs.hookSource, command: hookCommand,
+            resolvedTimeoutMs: inputs.resolvedTimeoutMs, resolvedMaxOutputBytes: 32768,
+          }),
+        });
+        hookTrustGrantAccepted = grant['accepted'] === true;
+        // Turn 2: a cheap no-tool turn proving the owned hook now genuinely
+        // executes through the native registration path (not skipped).
+        for await (const chunk of adapter.sendMessage({ sessionId,
+          content: 'Reply with exactly <replacement>ok</replacement>. Do not use tools.',
+          options: { provider: model.provider, model: model.model } })) {
+          if (chunk.type === 'error') throw new Error(chunk.content);
+        }
+        const applied = await controlTransport.request<Record<string, unknown>>('session/read', { sessionId });
+        const effectiveModel = (applied['settings'] as Record<string, unknown>)?.['model'];
+        const created = fs.existsSync(target);
+        const actual = created ? fs.readFileSync(target) : null;
+        const bytesEqual = !!actual && actual.equals(Buffer.from(expected, 'utf8'));
+        const hookExecuted = hookCalls().some((call) => call.sessionId === sessionId && call.event === 'UserPromptSubmit');
+        const ok = bytesEqual && tools.some((name) => /write|edit|patch/i.test(name)) && hookExecuted && hookTrustGrantAccepted;
+        return { ok, detail: JSON.stringify({ backend: 'zcode', nativeSessionId: sessionId,
+          observedTools: tools, effectiveModel, fileCreated: created, bytesEqual, expectedBytes: Buffer.byteLength(expected),
+          actualBytes: actual?.length ?? null, hookExecuted, hookTrustGrantAccepted, hookLog, storage: hostStorage,
+          retainedControlEvidence: true }) };
+      } finally {
+        // The control owns this exact sentinel; remove it regardless of outcome
+        // so the final vault bytes check stays fail-closed green.
+        try { if (fs.existsSync(target)) fs.unlinkSync(target); }
+        catch { /* Residue stays as evidence; the final vault check fails closed. */ }
       }
-      const applied = await controlTransport.request<Record<string, unknown>>('session/read', { sessionId });
-      const effectiveModel = (applied['settings'] as Record<string, unknown>)?.['model'];
-      const created = fs.existsSync(target);
-      const actual = created ? fs.readFileSync(target) : null;
-      const bytesEqual = !!actual && actual.equals(Buffer.from(expected, 'utf8'));
-      const hookExecuted = hookCalls().some((call) => call.sessionId === sessionId && call.event === 'UserPromptSubmit');
-      const ok = bytesEqual && tools.some((name) => /write|edit|patch/i.test(name)) && hookExecuted;
-      if (ok) fs.unlinkSync(target);
-      return { ok, detail: JSON.stringify({ backend: 'zcode', nativeSessionId: sessionId,
-        observedTools: tools, effectiveModel, fileCreated: created, bytesEqual, expectedBytes: Buffer.byteLength(expected),
-        actualBytes: actual?.length ?? null, hookExecuted, hookLog, storage: hostStorage,
-        retainedControlEvidence: true }) };
     },
     residueProbe: async () => {
       if (!controlTransport) throw new Error('ZCode residue readback transport unavailable.');
@@ -954,15 +1059,18 @@ export function auditModelEnv(id: string, vision: boolean): string {
 }
 
 /** One selection rule for preflight and the actual shared positive-control request. */
-function resolveWriteControlModel(backend: BackendId): {
+export function resolveWriteControlModel(backend: BackendId): {
   model: { provider: string; model: string };
+  /** The exact native request model profile the control induces; hashed into the report. */
+  requestModel: { providerID: string; modelID: string };
   modelSource: 'explicit-control' | 'opencode-model-fallback';
 } | null {
   const explicit = process.env.AUDIT_AUX_CONTROL_MODEL;
   const raw = explicit ?? (backend === 'opencode' ? auditModelEnv(backend, false) : '');
   const model = parseVisionModel('opencode', raw);
   if (!model || model.kind !== 'opencode') return null;
-  return { model, modelSource: explicit !== undefined ? 'explicit-control' : 'opencode-model-fallback' };
+  const requestModel = { providerID: model.provider, modelID: model.model };
+  return { model, requestModel, modelSource: explicit !== undefined ? 'explicit-control' : 'opencode-model-fallback' };
 }
 
 /** Reads configuration only. It never handshakes a server or calls a model. */

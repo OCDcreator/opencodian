@@ -15,6 +15,12 @@
 - 根据 task id 优先、description 次之的规则匹配 completion 与 launch
 - 返回仍 pending 的 launch 列表
 
+## DSH 原生 Jobs（2026-11-09）
+
+`groupNativeJobs` 仅接受 `job.owner === conversation.backendSessionId` 的权威列表，把 native `startedAt` 之前最近的真实 user message 作为回合锚点。历史未 hydration 到对应 user anchor 时不猜测、也不生成完成提示。身份使用 URI 编码的 `dsh-job:<session>:<job>`；同名描述或不同 session 的相同 job ID 不合并。
+
+`nativeJobLaunch` 保存原生 running/stopping 状态并脱敏标题；`nativeJobCompletion` 只接受 completed/failed/killed，生成本地事件和 client-generation lease。该事件只传给既有 notice queue，不插入 OMO reminder 或模型输入。DSH pending 由 native status 精确判定，不使用旧 description fallback。
+
 ## 公开接口
 
 ```typescript

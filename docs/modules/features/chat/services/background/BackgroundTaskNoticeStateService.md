@@ -52,7 +52,11 @@ export class BackgroundTaskNoticeStateService {
 
 ### completion notice queue / flush
 
-- `queueNotices()` 以 `anchorKey` 为粒度合并 completion reminder，把多个 source reminder 和 task 列表折叠进同一个 queued notice
+2026-11-09：DSH native job terminal events 复用同一 completion queue。`sourceReminderIds` 使用稳定 session+job identity，重建 owner/加载持久化 conversation 后仍去重；其 nativeStatus 区分 completed/failed/killed，文案使用 `chat.dsh.jobs.*`。事件携带的本地 `isCurrent` 不持久化，flush 与 PersistentAssistantNoticeService 保存前后都检查旧 client-generation/conversation lease。原生 job 完成不发送模型消息，也不改 foreground session.status。
+
+flush 按 conversation 串行，保存中的 queued snapshot 与可继续接收新事件的 live queue 分开；只移除已处理事件，保留 await 期间新增的 job。并发 tab/重复事件按 source fingerprint 去重。保存失败保留队列重试；streaming 期间不落盘，保存中重新 streaming 时不确认完成。失效代际队列丢弃，等待新连接的权威列表重建。
+
+- `queueNotices()` 以 `conversationId + anchorKey` 为粒度合并 completion reminder，把多个 source reminder 和 task 列表折叠进同一个 queued notice；tab runtime 被复用时不把原会话的队列写入新会话。
 - queued state 继续挂在 service 内部的 runtime-keyed `WeakMap` 上，不重新放回 `OpenCodianView` 或 `TabRuntimeState`
 - `flushQueuedNotices()` 只在 tab 不再 streaming 时落盘，保持 primary stream 期间不插入额外 notice 的既有顺序
 - flush 可携带 `isCurrent` lease，在每个 notice await 前后校验，避免旧 conversation 的 notice 落入新 tab。

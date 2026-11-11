@@ -36,6 +36,7 @@
 @import 'components/settings-plugin-update.css';
 @import 'components/ui-readback.css';
 @import 'components/settings-zcode.css';
+@import 'components/settings-backend-workspace.css';
 @import 'features/chat-user.css';
 @import 'features/chat-assistant.css';
 @import 'features/inline-edit.css';

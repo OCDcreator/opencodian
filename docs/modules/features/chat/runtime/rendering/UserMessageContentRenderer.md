@@ -58,3 +58,13 @@ R-C4：`getContextKindLabel` 增加 `pdf_document` / `pdf_selection` 标签（`c
 - 源码位置：`src/features/chat/runtime/rendering/UserMessageContentRenderer.ts`。
 - 原位置：`src/features/chat/runtime/UserMessageContentRenderer.ts`；文件名、导出接口与业务职责保持不变。
 - 随目录调整更新的依赖：`src/features/chat/rendering/userMessageDisplay.ts`。
+
+## 凭据展示遮罩接线（2026-11-10）
+
+`renderUserMessageContent()` 的三个纯展示 hook 现在统一经过 `maskUserMessageSecretsForDisplay()`（owner：`feature.chat-rendering` 的 `userMessageDisplay.ts`）：
+
+1. `getVisibleUserMessageText()`：气泡可见文本与返回的 copy content 均为遮罩后文本（默认复制=所见）；
+2. OMO user-injection 的原始注入块（`.opencodian-omo-raw-content`）文本遮罩；
+3. OMO 注入 summary 的 headline 遮罩。
+
+只改展示与默认复制输出；持久化 `ChatMessage`、模型输入、rewind/fork/编辑源保持原文。消息对象不变，所以 `ConversationAuthoritativeSyncCoordinator` 的原文对比逻辑不受影响。附件 chip 的 `title`/`aria-label` 目前承载路径/标签而非消息正文，本轮未改。

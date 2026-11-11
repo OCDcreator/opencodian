@@ -1,5 +1,21 @@
 # OpenCodianView
 
+> 2026-11-11（共享工作台层级装配）：`mountSessionWorkbench` 通过 `getFilesSummary` 读取带当前会话身份的既有摘要、通过 `mountResources` 挂载稳定内联目录，并订阅 sidebar coordinator 的展示变化通知。`refreshModifiedFilesSidebar` 先交接摘要归属，再刷新 diff／回退，异步完成会即时重投影，避免新会话短暂显示旧摘要。视图内 `clearSlashCommandMenuPreload` 将既有失效信号转发 `workbenchTools.invalidateCatalog()`；目录缓存、读取代际和焦点仍归工具 UI。view 不复制目录／文件／终端真值，不改变权限或原生操作语义；会话文件摘要不使用 Git 状态替代。
+
+> 2026-11-10（DSH 历史图片回填）：`syncConversationMessagesFromServer` 的既有 native merge 只在 DSH 且本地同源消息 `images` 缺失／空数组时采用权威历史 `message.images`。DSH 优先按 sourceMessageId，缺失来源仅接受角色＋完整正文在双方均唯一的对应；上下文前后缀／重复文字／旧图片序列化不作身份推断。若仍有未确认本地消息，保留整个 previous、changed=false，不做有损提交。已有本地图片、正文、ID、上下文和旧模型来源保持；歧义情况下同批新更新也暂不采纳。图片变化参与既有 fingerprint／write ticket，重复同步不重复写。其他 backend 合并行为不变。`OpenCodianView.dshHistoryImages.test.ts` 覆盖恢复、跨轮隔离、重复／带前后缀的本地保护、旧附件和非 DSH 保留。
+
+> 2026-11-10（DSH trace 入口）：上下文详情打开时捕获 conversation／backendSessionId，仅 DSH 注入 `dshTraceLedgerLoader`，异步读取固定会话的 ChatDiagnosticsCoordinator 账本。切换标签不会改变已打开详情的 trace owner；view 不持有第二份 trace buffer 或计时状态。
+
+> 2026-11-10（DSH effort 标签语义）：`mountChatEffortSelector` 的 DSH 分支新增可选 `getVariantLabel`（仅 `off` → `chat.effort.disabled`）并把继承项参数改为 'off' 用 `chat.effort.disabledShort` 命名。展示层重命名：`getVariant()` 原始 override ?? undefined、`getCurrentEffortVariant()`（override ?? 原生默认）发送语义、`dshEffortOverrides` undefined→null / 'off'→'off' 持久化均未变。适配器未上报默认时保持 `chat.dsh.reasoning.inherit`（模型默认）。
+
+> 2026-11-10（会话目录自动刷新）：会话入口私有的目录刷新钩子更名 `refreshSessionCatalogForCurrentConversation`（原 `refreshZCodeCatalogForCurrentConversation`，同 5 个调用点：initializeFirstTab、handleTabSwitch、createNewConversation、createConversationInCurrentTab、loadConversation）。新增 DSH 早分支：有 owned backendSessionId 的 DSH 会话在入口处 await 既有 `ChatSelectionControlsCoordinator.reloadModelCatalog()`（内部 try/catch + generation fence，并已链式调用历史模型标签刷新），解决"挂载期一次目录加载早于恢复完成，历史助手气泡记录的模型引用解析不到显示名"的问题；无 owned 会话保持目录为空，不借用其他会话。ZCode 分支（recoverEmptyZCodeConversationSession/refreshZCodeSessionState/watchNativeTasks）保持原 gated 行为一字未改；其他后端不受影响。无新视图运行时状态、无 UI/CSS 变更。
+
+> 2026-11-10（DSH workbench 设置导航 + 原生能力接入面）：`mountSessionWorkbench` 组合面新增 `openBackendSettings` host callback——DSH 后端经 `plugin.settingsTab.prepareScrollToDsh('advanced')` 定位既有 DSH advanced 设置页后保持滚动打开插件设置；view 只转发，实现归 settingsTab（组合根）。同日 phase2 定案：DSH composer 权限槽在 Native 复用同一通用 permission selector（绑非渲染 preset owner）、ACP 不挂载 selector；Plan 在共享工作台 Overview、终端/子会话/任务操作与 spawn 在共享 Tasks；无 DSH 专属 strip/modal/sidebar/CSS family，`DshSessionWorkbenchModal` 保留磁盘但无运行时入口。view 不持有原生会话真值。
+
+> 2026-11-09（Jobs 完成提示）：`mountSessionWorkbench` 只新增 `onNativeJobs` composition callback，将所属会话的权威 jobs snapshot/lease 交给现有 BackgroundTaskIndicatorCoordinator；逐回合 inline 与延迟 persisted notice 由 background owners 完成。无 view runtime 状态、新模型通知或 Subagents 门控变更。
+
+> 2026-11-09：DSH chat 仅增加 composition seams：todo host 从 registry 按 backend 的 Todos capability 提供 `AgentTodoCapability`；`Todos` 纳入 capability-change composer signature 以处理原生连接能力变化。view 不新增 runtime 真值；Subagents flag 未扩张。2026-11-10 起 selector host 不再提供 DSH 设置深链钩子，DSH composer 不挂载专属控件条，原生能力只经既有共享控件与会话工作台接入。
+
 > 2026-10-29：Codex composer 的 new/compact 分别转到现有 createNewConversation 与 activeTabContextUsageCoordinator.compactForegroundThread，不把不受 app-server 支持的 slash 文本发给模型。其余后端继续按原生目录与现有发送链路执行。
 
 > 2026-10-09（Claude History model restore）：Claude selection host captures its owning conversation and saves `sessionSettings.claudeModelOverride` through the existing `plugin.saveConversation` path. History restores the persisted model before considering the legacy tab cache; explicit `null` inherits and prevents a stale tab choice from returning, while explicit `default` remains a requested model. A failed save restores that conversation's prior settings/timestamp only if the failed write still owns the pending settings reference, and refreshes the selector only when that conversation is still active. No global setting or temporary tab is written. Existing availability and SDK model/effort handling remain in effect; focused storage/selector tests do not establish native runtime acceptance.

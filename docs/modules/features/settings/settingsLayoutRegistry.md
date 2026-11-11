@@ -1,5 +1,20 @@
 # settingsLayoutRegistry
 
+## Current backend tasks (2026-11-07)
+
+| Backend | Task subtabs |
+| --- | --- |
+| OpenCode 2 | `connection`, `model`, `agents`, `permissions`, `mcp`, `advanced` |
+| Claude Code | `conversation`, `providers`, `tools-context`, `permissions-safety`, `resources`, `connection`, `debug` |
+| Codex | `conversation`, `permissions-safety`, `account`, `resources`, `connection`, `debug` |
+| Pi | `connection`, `providers`, `model`, `execution`, `account`, `mcp`, `sessions` |
+| ZCode | `chat`, `providers`, `account`, `tools`, `permissions-safety`, `installation` |
+| DSH | `connection`, `model`, `permissions`, `context`, `tools`, `mcp`, `configuration`, `advanced` |
+
+2026-11-09 DSH preserves the four existing IDs and adds task-specific pages. DSH aliases `providers`/`models` resolve to `model`, `permissions-safety` to `permissions`, `context-sources` to `context`, `extensions` to `configuration` (extension management moved to the approved "Configuration & extensions" task), and `terminal` to `advanced`. Native horizontal navigation and the accepted 1642 form layout remain shared by both settings hosts.
+
+The field tables in `docs/research/backend-refresh/` determine these groups. Permissions, sandbox and executable overrides are separated from ordinary conversation choices. Existing stored subtab ids map directly to their current task, including Claude `mcp`/`tools` → `tools-context`, Codex `model` → `conversation`, Pi `advanced` → `execution`, and OpenCode 2 `resources`/`context` → `advanced`. Classic and tabbed hosts use the same workspace registry. Earlier dated notes below describe the previous arrangement.
+
 2026-10-27：OpenCode 2 使用本地品牌图标 `opencodian-opencode2`，子标签为 connection/model/agents/permissions/mcp/resources/context/advanced。旧 auth/integrations 路由到 model，models/extensions 别名分别路由到 model/mcp；其他后端保持原定义。
 > 2026-09-30 (B4): Codex primary tab 新增 `plugins` 二级 tab（`settings.codex.tab.plugins`），排在 `resources` 之后，承载 `SettingsCodexPluginsSection` 插件浏览器。
 > 2026-09-20 (advantage-parity R-D1): conversation 主 tab 的 secondary tabs 在 `vault-retrieval` 后新增 `export`（backend 无关）。

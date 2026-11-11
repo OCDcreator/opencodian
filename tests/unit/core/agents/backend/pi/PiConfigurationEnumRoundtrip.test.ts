@@ -6,5 +6,5 @@ it('roundtrips unchanged stored Pi enums while rejecting new or changed unsuppor
   // CI exports NODE_OPTIONS=--test-reporter=tap; the child must not inherit a second reporter.
   env: { ...process.env, NODE_OPTIONS: '' } });
   expect(output).toContain('# fail 0');
-  expect(output).toContain('# pass 9');
+  expect(output).toContain('# pass 10');
 }, 30000);

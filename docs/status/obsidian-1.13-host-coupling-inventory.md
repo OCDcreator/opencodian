@@ -130,6 +130,14 @@ Authoritative references:
   CSS z-index notes in `settings-dropdown.css:134`, `agent-switcher.css:40`. Phase B:
   confirm modal portal z-index still clears the (now windowed) Settings.
 
+### DSH fluid width — 2026-11-09 / Obsidian 1.15.0
+
+The actual detached Test Vault Settings target still exposes `.vertical-tab-content` and `.setting-group`. Its native `.modal.mod-settings .vertical-tab-content:not(.setting-page)` rule centers groups through `--setting-group-max-width:700px` and `padding-inline:max(var(--size-4-8),var(--setting-group-center-offset))`; at a1920px window this produced485px side gutters and a660px DSH root. This is host coupling, not a plugin preference setting.
+
+A DSH-scoped host variable/padding override was tried for fluid sizing and then a1200px content maximum. These trials were explicitly withdrawn when the user requested restoration of the original left/right format. The1501 restoration matched1338 fingerprints;1523 then corrected only DSH navigation spacing. Those historical native resize captures retain their original build identities.
+
+The user's subsequent second issue explicitly asks for the entire OpenCodian content area to respond to window width. The new shared rule lives in `settings-layout-contract.css`, scoped to `.vertical-tab-content` panes containing `.opencodian-settings`, rather than the DSH stylesheet. It sets a1160px group cap (about1120px ordinary content), recomputes the inherited centering offset that otherwise stays bound to700px, and uses16–32px minimum side gutters. The modal variant includes `:not(.setting-page):has(.opencodian-settings)` to beat the native padding specificity. DSH retains its own1030px maximum. This is a new authorized global sizing correction, not a continuation of the withdrawn column trials; other native Settings pages must keep their original700px behavior.
+
 ## 4. `app.setting.open` / `openTabById` — **当前兼容 (1.13.4 已验证)**
 
 - Evidence: `rg "app\.setting|\.setting\.(open|openTabById)" src/` → **no matches**.

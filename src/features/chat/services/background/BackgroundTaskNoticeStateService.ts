@@ -25,6 +25,7 @@ export interface BackgroundTaskNoticeLaunchInfo {
 export interface BackgroundTaskCompletionInfo {
   taskId: string;
   description: string;
+  nativeStatus?: 'completed' | 'failed' | 'killed';
 }
 
 export interface BackgroundTaskCompletionEvent {
@@ -32,6 +33,9 @@ export interface BackgroundTaskCompletionEvent {
   reminderType: 'background-task-completed' | 'all-background-tasks-complete';
   tasks: BackgroundTaskCompletionInfo[];
   timestamp: number;
+  nativeJob?: boolean;
+  /** Local observer lease only; never persisted or sent to a model. */
+  isCurrent?: () => boolean;
 }
 
 export interface BackgroundTaskCompletionNoticeSegment {
@@ -41,6 +45,9 @@ export interface BackgroundTaskCompletionNoticeSegment {
 
 export interface QueuedBackgroundTaskCompletionNotice {
   anchorKey: string;
+  conversationId?: string;
+  nativeJob?: boolean;
+  isCurrent?: () => boolean;
   allComplete: boolean;
   sourceReminderIds: Set<string>;
   tasks: Map<string, BackgroundTaskCompletionInfo>;
@@ -68,6 +75,7 @@ export interface BackgroundTaskNoticeStateServiceHost {
 }
 
 export class BackgroundTaskNoticeStateService {
+  private readonly flushing = new Map<string, Promise<void>>();
   private readonly queuedNoticesByRuntime = new WeakMap<
     BackgroundTaskNoticeStateRuntime,
     Map<string, QueuedBackgroundTaskCompletionNotice>
@@ -153,20 +161,24 @@ export class BackgroundTaskNoticeStateService {
     for (const segment of segments) {
       for (const event of segment.completionEvents) {
         const reminderFingerprint = `source:${event.reminderMessageId}`;
-        if (persisted.has(reminderFingerprint)) {
+        if (persisted.has(reminderFingerprint) || event.isCurrent && !event.isCurrent()) {
           continue;
         }
 
-        let queued = queuedNotices.get(segment.anchorKey);
-        if (!queued) {
+        const queueKey = `${conversation.id}\0${segment.anchorKey}`;
+        let queued = queuedNotices.get(queueKey);
+        if (!queued || queued.isCurrent && !queued.isCurrent()) {
           queued = {
             anchorKey: segment.anchorKey,
+            conversationId: conversation.id,
+            nativeJob: event.nativeJob,
+            isCurrent: event.isCurrent,
             allComplete: false,
             sourceReminderIds: new Set(),
             tasks: new Map(),
             latestTimestamp: event.timestamp,
           };
-          queuedNotices.set(segment.anchorKey, queued);
+          queuedNotices.set(queueKey, queued);
         }
 
         queued.latestTimestamp = Math.max(queued.latestTimestamp, event.timestamp);
@@ -189,55 +201,66 @@ export class BackgroundTaskNoticeStateService {
       return;
     }
 
+    const pending = this.flushing.get(conversation.id);
+    if (pending) { await pending; return this.flushQueuedNotices(tabId, conversation, options); }
+    const flush = Promise.resolve().then(() => this.flushReadyNotices(tabId, conversation, options));
+    this.flushing.set(conversation.id, flush);
+    try { await flush; }
+    finally { if (this.flushing.get(conversation.id) === flush) this.flushing.delete(conversation.id); }
+  }
+
+  private async flushReadyNotices(tabId: TabId | null, conversation: Conversation, options: { isCurrent?: () => boolean }): Promise<void> {
+    const runtime = this.host.getTabRuntimeState(tabId);
+    if (!runtime || runtime.isStreaming) return;
     const queuedNotices = this.getQueuedNotices(runtime);
     const persisted = this.getPersistedBackgroundTaskCompletionNoticeFingerprints(conversation);
-
-    for (const [anchorKey, queued] of [...queuedNotices.entries()]) {
-      if (options.isCurrent && !options.isCurrent()) {
-        return;
-      }
+    for (const [queueKey, live] of [...queuedNotices.entries()]) {
+      if (options.isCurrent && !options.isCurrent() || runtime.isStreaming) return;
+      if (live.conversationId !== conversation.id) continue;
+      if (live.isCurrent && !live.isCurrent()) { queuedNotices.delete(queueKey); continue; }
+      const queued = { ...live, tasks: new Map(live.tasks), sourceReminderIds: new Set(live.sourceReminderIds) };
+      this.removePersistedNativeJobs(queued, live, persisted);
       const taskIds = [...queued.tasks.keys()].sort();
-      const fingerprint = this.getBackgroundTaskCompletionNoticeFingerprint({
-        anchorKey,
-        allComplete: queued.allComplete,
-        taskIds,
-      });
-      if (persisted.has(fingerprint)) {
-        queuedNotices.delete(anchorKey);
-        continue;
+      const fingerprint = this.getBackgroundTaskCompletionNoticeFingerprint({ anchorKey: queued.anchorKey, allComplete: queued.allComplete, taskIds });
+      if (persisted.has(fingerprint) || [...queued.sourceReminderIds].every(id => persisted.has(`source:${id}`))) {
+        queuedNotices.delete(queueKey); continue;
       }
-
-      await this.host.appendPersistentAssistantNoticeMessage({
-        title: queued.allComplete
-          ? t('chat.omo.system.allCompleted')
-          : t('chat.omo.system.backgroundCompleted'),
-        content: this.buildBackgroundTaskCompletionNoticeContent(queued),
-        tone: 'info',
-        conversation,
-        tabId,
-        timestamp: queued.latestTimestamp,
-        noticeMeta: {
-          kind: 'background-task-completion',
-          conversationId: conversation.id,
-          anchorKey,
-          sourceReminderIds: [...queued.sourceReminderIds].sort(),
-          allComplete: queued.allComplete,
-          taskIds,
-        },
-        isCurrent: options.isCurrent,
-      });
-      if (options.isCurrent && !options.isCurrent()) {
-        return;
-      }
-      logger.debug('Background task completion notice persisted', {
-        tabId,
-        anchorKey,
-        allComplete: queued.allComplete,
-        taskCount: taskIds.length,
-        reminderCount: queued.sourceReminderIds.size,
-      });
-      queuedNotices.delete(anchorKey);
+      await this.appendQueuedNotice({ queued, conversation, tabId, isCurrent: queued.nativeJob
+        ? () => !runtime.isStreaming && (!options.isCurrent || options.isCurrent()) : options.isCurrent });
+      if (!this.isNativeNoticeCurrent(runtime, queued, options.isCurrent)) return;
+      for (const id of queued.sourceReminderIds) { live.sourceReminderIds.delete(id); persisted.add(`source:${id}`); }
+      for (const id of taskIds) live.tasks.delete(id);
+      persisted.add(fingerprint);
+      if (!live.sourceReminderIds.size) queuedNotices.delete(queueKey);
     }
+  }
+
+  private isNativeNoticeCurrent(runtime: BackgroundTaskNoticeStateRuntime, queued: QueuedBackgroundTaskCompletionNotice, isCurrent?: () => boolean): boolean {
+    return !runtime.isStreaming && (!isCurrent || isCurrent()) && (!queued.isCurrent || queued.isCurrent());
+  }
+
+  private removePersistedNativeJobs(queued: QueuedBackgroundTaskCompletionNotice, live: QueuedBackgroundTaskCompletionNotice, persisted: Set<string>): void {
+    if (!queued.nativeJob) return;
+    for (const id of queued.sourceReminderIds) if (persisted.has(`source:${id}`)) {
+      queued.sourceReminderIds.delete(id); queued.tasks.delete(id); live.sourceReminderIds.delete(id); live.tasks.delete(id);
+    }
+  }
+
+  private async appendQueuedNotice(input: {
+    queued: QueuedBackgroundTaskCompletionNotice; conversation: Conversation; tabId: TabId | null; isCurrent?: () => boolean;
+  }): Promise<void> {
+    const { queued, conversation, tabId } = input;
+    const taskIds = [...queued.tasks.keys()].sort();
+    await this.host.appendPersistentAssistantNoticeMessage({
+      title: queued.nativeJob ? t('chat.dsh.jobs.finishedTitle') : queued.allComplete
+        ? t('chat.omo.system.allCompleted') : t('chat.omo.system.backgroundCompleted'),
+      content: this.buildBackgroundTaskCompletionNoticeContent(queued), tone: 'info', conversation, tabId,
+      timestamp: queued.latestTimestamp,
+      noticeMeta: { kind: 'background-task-completion', conversationId: conversation.id, anchorKey: queued.anchorKey,
+        sourceReminderIds: [...queued.sourceReminderIds].sort(), allComplete: queued.allComplete, taskIds },
+      isCurrent: queued.isCurrent ? () => queued.isCurrent!() && (!input.isCurrent || input.isCurrent()) : input.isCurrent,
+    });
+    logger.debug('Background task completion notice persisted', { tabId, anchorKey: queued.anchorKey, taskCount: taskIds.length });
   }
 
   private async appendStoppedNoticeIfPossible(
@@ -362,14 +385,15 @@ export class BackgroundTaskNoticeStateService {
     const tasks = [...queued.tasks.values()].sort((left, right) =>
       left.taskId.localeCompare(right.taskId) || left.description.localeCompare(right.description),
     );
-    const lines = queued.allComplete
+    const lines = queued.nativeJob ? [t('chat.dsh.jobs.finishedSummary')] : queued.allComplete
       ? [t('chat.omo.system.allCompletedSummary')]
       : [t('chat.omo.system.backgroundCompletedSummary')];
 
     if (tasks.length > 0) {
       lines.push('', `**${t('chat.backgroundTask.taskListLabel')}**`);
       for (const task of tasks) {
-        lines.push(`- \`${task.taskId}\`: ${task.description}`);
+        const status = task.nativeStatus ? `${t(`chat.dsh.jobs.status.${task.nativeStatus}`)} · ` : '';
+        lines.push(`- ${status}\`${task.taskId}\`: ${task.description}`);
       }
     }
 

@@ -169,7 +169,7 @@ describe('OpenCodianView capability-change seam (A3)', () => {
       AgentCapability.Permissions,
       AgentCapability.Subagents,
       AgentCapability.Thinking,
-      AgentCapability.Todos,
+      AgentCapability.Questions,
       AgentCapability.Compaction,
     ]);
     const { registry, capabilitiesListener } = createRegistry(capabilities);
@@ -189,16 +189,48 @@ describe('OpenCodianView capability-change seam (A3)', () => {
       listener?.('opencode');
       expect(toolbarSpy).toHaveBeenCalledTimes(1);
 
-      // Todos/Questions/Compaction gates are read lazily by their own owners
-      // (docks at shell build, session settings modal, message footer) — the
-      // capability-change refresh path does not re-evaluate them, so a delta
-      // confined to those capabilities must not rebuild the composer.
-      capabilities.delete(AgentCapability.Todos);
+      // Questions and Compaction are still read lazily by their own owners.
+      // Todos now participates in the refresh path for native reconnects, so
+      // the ignored-capability case intentionally excludes Todos.
+      capabilities.delete(AgentCapability.Questions);
       capabilities.delete(AgentCapability.Compaction);
       listener?.('opencode');
       expect(toolbarSpy).toHaveBeenCalledTimes(1);
       expect(queueBarSpy).toHaveBeenCalledTimes(1);
       expect(sidebarSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      sidebarSpy.mockRestore();
+      queueBarSpy.mockRestore();
+      toolbarSpy.mockRestore();
+    }
+  });
+
+  it('refreshes once when native Todos capability appears or disappears', () => {
+    const capabilities = new Set<AgentCapability>([AgentCapability.Chat]);
+    const { registry, capabilitiesListener } = createRegistry(capabilities);
+    const view = new OpenCodianView(new WorkspaceLeaf(), createPlugin(registry) as never);
+    const runtime = view as unknown as ViewRuntime;
+    runtime.currentConversation = {
+      id: 'conv-dsh', backend: 'opencode', backendSessionId: 'session-dsh', messages: [],
+    };
+    const toolbarSpy = jest.spyOn(runtime, 'refreshComposerToolbarForActiveBackend').mockImplementation();
+    const queueBarSpy = jest.spyOn(runtime, 'refreshQueuedFollowUpBar').mockImplementation();
+    const sidebarSpy = jest.spyOn(runtime, 'refreshModifiedFilesSidebar').mockImplementation();
+    try {
+      runtime.wireBackendSurfaceSwitch();
+      const listener = capabilitiesListener();
+      listener?.('opencode');
+      expect(toolbarSpy).toHaveBeenCalledTimes(1);
+      capabilities.add(AgentCapability.Todos);
+      listener?.('opencode');
+      expect(toolbarSpy).toHaveBeenCalledTimes(2);
+      listener?.('opencode');
+      expect(toolbarSpy).toHaveBeenCalledTimes(2);
+      capabilities.delete(AgentCapability.Todos);
+      listener?.('opencode');
+      expect(toolbarSpy).toHaveBeenCalledTimes(3);
+      expect(queueBarSpy).toHaveBeenCalledTimes(3);
+      expect(sidebarSpy).toHaveBeenCalledTimes(3);
     } finally {
       sidebarSpy.mockRestore();
       queueBarSpy.mockRestore();

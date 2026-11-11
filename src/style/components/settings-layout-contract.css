@@ -18,6 +18,15 @@
   scrollbar-gutter: auto;
 }
 
+/* Let the plugin use a wider native Settings pane without changing other pages.
+   Recompute centering here: the inherited host offset was resolved against 700px. */
+.modal.mod-settings .vertical-tab-content:not(.setting-page):has(.opencodian-settings),
+.vertical-tab-content:has(.opencodian-settings) {
+  --setting-group-max-width: 1160px;
+  --setting-group-center-offset: calc((100% - var(--setting-group-max-width)) / 2);
+  padding-inline: max(clamp(16px, 2vw, 32px), var(--setting-group-center-offset));
+}
+
 .opencodian-settings {
   container: opencodian-settings-pane / inline-size;
   --opencodian-settings-section-bg:

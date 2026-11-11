@@ -16,7 +16,9 @@ import type { AgentServiceRegistry } from './AgentServiceRegistry';
 import { CodexAdapter } from './codex/CodexAdapter';
 import { resolveCodexCli } from './codex/CodexCliResolver';
 import type { CodexTracePort } from './diagnostics/types';
+import { DshAcpClient, type DshAcpClientOptions, type DshAcpWireObserver } from './dsh/DshAcpClient';
 import { DshAdapter } from './dsh/DshAdapter';
+import { DshNativeClient } from './dsh/DshNativeClient';
 import { OpenCode2Adapter } from './opencode/OpenCode2Adapter';
 import { PiAdapter } from './pi/PiAdapter';
 import type { PiUiHandler } from './pi/PiProtocol';
@@ -47,6 +49,13 @@ export interface WireHiddenAdaptersOptions {
   /** ZCode-specific settings from plugin configuration. */
   getZCodeSettings?: () => ZCodeBackendSettings;
   getDshSettings?: () => DshBackendSettings;
+  /**
+   * DSH wire-trace observer (the DshSessionTraceService port). When present,
+   * the DSH adapter's client factory injects it into every constructed client,
+   * keyed by the transport the settings select. Optional for backwards
+   * compatibility; without it the clients keep their zero-trace behavior.
+   */
+  dshTracePort?: DshAcpWireObserver;
   /** R-F7: resolved domain env injected into spawned Pi service processes. */
   getPiExtraEnv?: () => Record<string, string>;
   /** R-F7: resolved domain env injected into Codex CLI / app-server processes. */
@@ -125,9 +134,18 @@ function registerDshAdapter(
   vaultPath: string,
   options: WireHiddenAdaptersOptions,
 ): void {
+  const tracePort = options.dshTracePort;
   registry.register(new DshAdapter({
     workingDirectory: vaultPath,
     getSettings: options.getDshSettings ?? (() => ({ executablePath: '', workingDirectory: '', args: [], env: {}, profile: 'acp' })),
     ...(options.getDshExtraEnv ? { getExtraEnv: options.getDshExtraEnv } : {}),
+    // Trace injection rides the adapter's own client factory so DshAdapter.ts
+    // stays untouched: the transport tag and client class must agree with the
+    // adapter's connectionDescriptor (settings.transport at start time).
+    ...(tracePort ? {
+      createClient: (clientOptions: DshAcpClientOptions) => (options.getDshSettings?.().transport === 'acp'
+        ? new DshAcpClient({ ...clientOptions, trace: { observer: tracePort, transport: 'acp' } })
+        : new DshNativeClient({ ...clientOptions, trace: { observer: tracePort, transport: 'native' } })),
+    } : {}),
   }));
 }

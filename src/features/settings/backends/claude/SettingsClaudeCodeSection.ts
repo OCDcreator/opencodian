@@ -1,23 +1,35 @@
 /**
  * Claude Code settings section.
  *
- * Renders backend-specific settings across multiple secondary tabs:
- *   - Runtime: executable path, query limits/prompt behavior, environment hint, diagnostics
- *   - Providers: project-scoped Anthropic-compatible provider presets
- *   - Model & Thinking: thinking type/budget and effort only
- *   - Permissions: permission mode
- *   - Context & Sources: setting sources, additional directories
- *   - Tools: allowed/disallowed tool names
+ * Task-oriented subtabs (backend settings refresh; legacy tab ids route):
+ *   - conversation: model/fallback model, thinking, effort, prompt behavior,
+ *     output style, titles — the per-conversation defaults
+ *   - providers: project-scoped Anthropic-compatible provider presets + account
+ *   - tools-context: setting sources, additional directories, tool policy,
+ *     tool aliases, MCP runtime
+ *   - permissions-safety: permission mode, plan mode, sandbox, query guardrails
+ *     (physically separated high-risk surface)
+ *   - connection: executable path/runtime overrides, diagnostics, debug,
+ *     runtime readbacks and inspection
+ *   - resources: skills/commands/agents resource management
  *
- * Query limits and prompt behavior include the next-query/restart boundary
- * notice because those options only take effect on a newly created query.
+ * Legacy secondary tab ids (runtime, model-thinking, permissions,
+ * context-sources, tools, mcp, skills-commands, agents) are routed onto the
+ * task pages above so saved layouts and deep links keep working.
+ *
+ * Every editable row carries honest scope/effect/risk metadata via
+ * describeBackendSetting; ordinary single-choice settings use
+ * addBackendChoiceSetting. Effect boundary default for this backend is
+ * "next query/turn" (the adapter holds a live settings reference and rebuilds
+ * SDK options at every query spawn); documented exceptions are annotated per
+ * row (outputStyle/autoTitle = next new session, executablePath = restart).
  *
  * Only controls backed by real adapter wiring and focused tests are exposed
  * as editable. Unverified capabilities remain hidden or read-only.
  */
 /* eslint-disable max-lines -- Claude Code settings keeps cross-layout tab rendering and persistence controls co-located for auditability. */
 
-import { Notice, setIcon, Setting } from 'obsidian';
+import { type DropdownComponent, Notice, setIcon, Setting } from 'obsidian';
 
 import {
   type ClaudeCodeProcessResolution,
@@ -38,6 +50,10 @@ import {
 import { t, type TranslationKey } from '../../../../i18n';
 import type OpenCodianPlugin from '../../../../main';
 import { BackendSessionBrowserModal } from '../../../chat/ui/BackendSessionBrowserModal';
+import {
+  addBackendChoiceSetting,
+  describeBackendSetting,
+} from '../../controls/BackendSettingsControls';
 import { SettingsTooltipController } from '../../controls/SettingsTooltipController';
 import { TextareaSizeMemory } from '../../controls/TextareaSizeMemory';
 import { SettingsInlineEditSection } from '../../general/SettingsInlineEditSection';
@@ -136,6 +152,16 @@ const CLAUDE_EFFORT_LEVELS: Array<{ id: ClaudeCodeEffort; labelKey: TranslationK
   { id: 'max', labelKey: 'settings.claudeCode.effort.max' },
 ];
 
+/**
+ * Official `--model` aliases verified from the Claude CLI's own help output
+ * (CLI 2.1.319): "Provide an alias for the latest model (e.g. fable, opus,
+ * or sonnet) or a model's full name." Each alias follows the official latest
+ * of its family at runtime; a third-party provider resolves it through its
+ * own service and may not map it — in that case a custom model id can be
+ * entered. No other aliases (e.g. haiku) are claimed without evidence.
+ */
+const CLAUDE_MODEL_CLI_ALIASES = ['fable', 'opus', 'sonnet'] as const;
+
 const CLAUDE_PROJECT_SOURCE_FILES = [
   'CLAUDE.md',
   '.claude/settings.json',
@@ -149,6 +175,7 @@ type ClaudeCodeGroupId =
   | 'project-files'
   | 'runtime-inspection'
   | 'diagnostics-logs'
+  | 'models'
   | 'thinking-effort'
   | 'title-inline-overrides'
   | 'limits-budget'
@@ -203,6 +230,10 @@ const CLAUDE_CODE_GROUP_COPY: Record<ClaudeCodeGroupId, { titleKey: TranslationK
   'diagnostics-logs': {
     titleKey: 'settings.claudeCode.groups.diagnosticsLogs.title',
     descKey: 'settings.claudeCode.groups.diagnosticsLogs.desc',
+  },
+  models: {
+    titleKey: 'settings.claudeCode.groups.models.title',
+    descKey: 'settings.claudeCode.groups.models.desc',
   },
   'thinking-effort': {
     titleKey: 'settings.claudeCode.groups.thinkingEffort.title',
@@ -267,29 +298,74 @@ const CLAUDE_CODE_GROUP_COPY: Record<ClaudeCodeGroupId, { titleKey: TranslationK
 };
 const CLAUDE_ACCOUNT_INFO_SECRET_KEY_PATTERN = /(?:^env$|api[_-]?key|secret|password|credential|authorization|oauth|(?:access|refresh|session|auth)?[_-]?token|token[_-]?source)/i;
 
-const CLAUDE_CLASSIC_TABS = [
-  'runtime',
+/**
+ * Task-oriented subtab ids. Each id answers one user question; legacy tab ids
+ * route onto these pages (see CLAUDE_LEGACY_TAB_ROUTES) so existing layouts,
+ * deep links, and the parent registry keep working during the transition.
+ */
+const CLAUDE_TASK_TABS = [
+  'conversation',
   'providers',
-  'model-thinking',
-  'permissions',
-  'context-sources',
-  'tools',
-  'mcp',
-  'skills-commands',
-  'agents',
+  'tools-context',
+  'permissions-safety',
+  'connection',
+  'resources',
 ] as const;
 
-const CLAUDE_TAB_LABEL_KEYS: Record<typeof CLAUDE_CLASSIC_TABS[number], TranslationKey> = {
-  runtime: 'settings.claudeCode.tab.runtime',
-  providers: 'settings.claudeCode.tab.providers',
-  'model-thinking': 'settings.claudeCode.tab.modelThinking',
-  permissions: 'settings.claudeCode.tab.permissions',
-  'context-sources': 'settings.claudeCode.tab.contextSources',
-  tools: 'settings.claudeCode.tab.tools',
-  mcp: 'settings.claudeCode.tab.mcp',
-  'skills-commands': 'settings.claudeCode.tab.skillsCommands',
-  agents: 'settings.claudeCode.tab.agents',
+type ClaudeTaskTabId = (typeof CLAUDE_TASK_TABS)[number];
+
+const CLAUDE_TASK_TAB_LABEL_KEYS: Record<ClaudeTaskTabId, TranslationKey> = {
+  conversation: 'settings.backend.tabs.conversation',
+  providers: 'settings.backend.tabs.providers',
+  'tools-context': 'settings.backend.tabs.toolsContext',
+  'permissions-safety': 'settings.backend.tabs.permissionsSafety',
+  connection: 'settings.backend.tabs.connection',
+  resources: 'settings.backend.tabs.resources',
 };
+
+/**
+ * Legacy secondary tab id → task page. Preserved via routes so an old saved
+ * tab id still renders the same capabilities on the reorganized page.
+ */
+const CLAUDE_LEGACY_TAB_ROUTES: Record<string, ClaudeTaskTabId> = {
+  runtime: 'connection',
+  'model-thinking': 'conversation',
+  permissions: 'permissions-safety',
+  'context-sources': 'tools-context',
+  tools: 'tools-context',
+  mcp: 'tools-context',
+  'skills-commands': 'resources',
+  agents: 'resources',
+};
+
+/**
+ * Strict numeric parsing for numeric-preset custom inputs: the whole string
+ * must match, so "12abc" is rejected instead of parseInt's partial "12".
+ */
+function parseStrictPositiveInteger(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    return null;
+  }
+  const parsed = Number.parseInt(trimmed, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseStrictPositiveNumber(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(trimmed)) {
+    return null;
+  }
+  const parsed = Number.parseFloat(trimmed);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function resolveClaudeTaskTabId(candidate: string): ClaudeTaskTabId {
+  if ((CLAUDE_TASK_TABS as readonly string[]).includes(candidate)) {
+    return candidate as ClaudeTaskTabId;
+  }
+  return CLAUDE_LEGACY_TAB_ROUTES[candidate] ?? 'conversation';
+}
 
 export class SettingsClaudeCodeSection {
   private readonly plugin: OpenCodianPlugin;
@@ -311,7 +387,7 @@ export class SettingsClaudeCodeSection {
       t('settings.claudeCode.title'),
       t('settings.claudeCode.desc'),
     );
-    for (const tabId of CLAUDE_CLASSIC_TABS) {
+    for (const tabId of CLAUDE_TASK_TABS) {
       this.renderTabContent(containerEl, tabId, { showSubheading: true });
     }
     return headingEl;
@@ -325,25 +401,29 @@ export class SettingsClaudeCodeSection {
 
   private renderTabContent(
     containerEl: HTMLElement,
-    tabId: string,
+    requestedTabId: string,
     options: { showSubheading?: boolean } = {},
   ): void {
     // Activate the shared tooltip controller so the group help buttons'
     // data-settings-tooltip attributes render real hover/focus bubbles.
     SettingsTooltipController.ensureForDocument(containerEl.ownerDocument);
 
+    const tabId = resolveClaudeTaskTabId(requestedTabId);
+
     // Resources render as independent per-type cards with no enclosing section card, keeping global-readonly /
     // project-editable / empty-state semantics. A borderless host preserves
     // settings targeting.
-    if (tabId === 'skills-commands' || tabId === 'agents') {
+    if (tabId === 'resources') {
+      const resourcesKind: readonly ('skill' | 'command' | 'agent')[] =
+        requestedTabId === 'agents' ? ['agent'] : ['skill', 'command'];
       const resourcesHost = containerEl.createDiv({
         attr: {
           'data-settings-surface': 'section',
-          'data-settings-target': `claude-code-${tabId}`,
+          'data-settings-target': `claude-code-${requestedTabId}`,
           'data-claude-code-section': tabId,
         },
       });
-      this.renderResourcesTab(resourcesHost, tabId === 'skills-commands' ? ['skill', 'command'] : ['agent']);
+      this.renderResourcesTab(resourcesHost, resourcesKind);
       return;
     }
 
@@ -351,14 +431,15 @@ export class SettingsClaudeCodeSection {
       cls: 'opencodian-settings-block opencodian-settings-section opencodian-settings-claude-code-block',
       attr: {
         'data-settings-surface': 'section',
-        'data-settings-target': `claude-code-${tabId}`,
+        'data-settings-target': `claude-code-${requestedTabId}`,
         'data-claude-code-section': tabId,
       },
     });
-    if (options.showSubheading && this.isKnownClaudeTabId(tabId)) {
+    if (options.showSubheading) {
+      const subheadingKey = CLAUDE_TASK_TAB_LABEL_KEYS[tabId];
       blockEl.createEl('h3', {
         cls: 'opencodian-settings-subheading',
-        text: t(CLAUDE_TAB_LABEL_KEYS[tabId]),
+        text: t(subheadingKey),
       });
     }
     const bodyEl = blockEl.createDiv({
@@ -370,26 +451,22 @@ export class SettingsClaudeCodeSection {
     });
 
     switch (tabId) {
+      case 'conversation':
+        this.renderConversationTab(bodyEl);
+        break;
       case 'providers':
         this.renderProvidersTab(bodyEl);
         break;
-      case 'model-thinking':
-        this.renderModelThinkingTab(bodyEl);
+      case 'tools-context':
+        this.renderToolsContextTab(bodyEl);
         break;
-      case 'permissions':
-        this.renderPermissionsTab(bodyEl);
+      case 'permissions-safety':
+        this.renderPermissionsSafetyTab(bodyEl);
         break;
-      case 'context-sources':
-        this.renderContextSourcesTab(bodyEl);
-        break;
-      case 'tools':
-        this.renderToolsTab(bodyEl);
-        break;
-      case 'mcp':
-        this.renderMcpTab(bodyEl);
+      case 'connection':
+        this.renderConnectionTab(bodyEl);
         break;
       default:
-        this.renderRuntimeTab(bodyEl);
         break;
     }
   }
@@ -646,27 +723,22 @@ export class SettingsClaudeCodeSection {
     void chip;
   }
 
-  // ─── Runtime tab ──────────────────────────────────────────────────
+  // ─── Connection & advanced tab ────────────────────────────────────
 
-  private renderRuntimeTab(containerEl: HTMLElement): void {
+  /**
+   * Connection & advanced page: CLI command/path overrides, runtime
+   * diagnostics, debug, and readback/inspection surfaces. Executable path
+   * overrides deliberately live here — physically separated from the
+   * conversation defaults page — so high-risk command overrides never sit
+   * next to ordinary model settings.
+   */
+  private renderConnectionTab(containerEl: HTMLElement): void {
     const connectionEl = this.createClaudeCodeGroup(containerEl, { id: 'connection-runtime' });
     this.renderRuntimeBoundaryNotice(connectionEl);
     this.renderExecutableSetting(connectionEl);
     this.renderJsRuntimeSetting(connectionEl);
     this.renderLoadTimeoutMsSetting(connectionEl);
     this.renderEnvironmentHint(connectionEl);
-
-    const queryBehaviorEl = this.createClaudeCodeGroup(containerEl, { id: 'limits-budget' });
-    this.renderLimitsBoundaryNotice(queryBehaviorEl);
-    this.renderMaxTurnsSetting(queryBehaviorEl);
-    this.renderMaxBudgetSetting(queryBehaviorEl);
-    this.renderTaskBudgetSetting(queryBehaviorEl);
-
-    const promptEl = this.createClaudeCodeGroup(containerEl, { id: 'prompt-behavior' });
-    this.renderSystemPromptSetting(promptEl);
-    this.renderOutputStyleSetting(promptEl);
-    this.renderPromptSuggestionsSetting(promptEl);
-    this.renderEnableContext1mBetaSetting(promptEl);
 
     const ecosystemEl = this.createClaudeCodeGroup(containerEl, { id: 'runtime-ecosystem' });
     this.renderRuntimeEcosystemSummary(ecosystemEl);
@@ -694,7 +766,7 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderExecutableSetting(containerEl: HTMLElement): void {
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.executablePath.name'))
       .setDesc(t('settings.claudeCode.executablePath.desc'))
       .addText((text) => {
@@ -706,24 +778,45 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    describeBackendSetting(setting, {
+      key: 'claude.executablePath',
+      scope: 'vault',
+      effect: 'restart',
+      risk: 'medium',
+      defaultLabel: t('settings.backendRefresh.default.autoDiscover'),
+      source: t('settings.backendRefresh.source.pluginVaultSetting'),
+    });
   }
 
   private renderJsRuntimeSetting(containerEl: HTMLElement): void {
-    const setting = new Setting(containerEl)
-      .setName(t('settings.claudeCode.jsRuntime.name'))
-      .setDesc(t('settings.claudeCode.jsRuntime.desc'))
-      .addDropdown((dropdown) => {
-        dropdown
-          .addOption('', t('settings.claudeCode.jsRuntime.auto'))
-          .addOption('node', 'Node.js')
-          .addOption('bun', 'Bun')
-          .addOption('deno', 'Deno')
-          .setValue(this.settings.jsRuntime)
-          .onChange(async (value) => {
-            this.settings.jsRuntime = value as 'node' | 'bun' | 'deno' | '';
-            await this.saveSettings();
-          });
-      });
+    const setting = addBackendChoiceSetting(containerEl, {
+      key: 'claude.jsRuntime',
+      name: t('settings.claudeCode.jsRuntime.name'),
+      description: t('settings.claudeCode.jsRuntime.desc'),
+      value: this.settings.jsRuntime,
+      options: [
+        { value: '', label: t('settings.claudeCode.jsRuntime.auto'), recommended: true },
+        { value: 'node', label: 'Node.js' },
+        { value: 'bun', label: 'Bun' },
+        { value: 'deno', label: 'Deno' },
+      ],
+      onChange: async (value) => {
+        const previous = this.settings.jsRuntime;
+        this.settings.jsRuntime = value as 'node' | 'bun' | 'deno' | '';
+        try {
+          await this.saveSettings();
+        } catch (error) {
+          this.settings.jsRuntime = previous;
+          throw error;
+        }
+      },
+      presentation: {
+        scope: 'vault',
+        effect: 'next-turn',
+        risk: 'low',
+        source: t('settings.backendRefresh.source.readbackOnly'),
+      },
+    });
     this.attachSettingHelp(setting, {
       boundaryAttr: 'data-claude-code-js-runtime-boundary',
       lifecycleAttr: 'data-claude-code-js-runtime-lifecycle',
@@ -746,6 +839,14 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    describeBackendSetting(setting, {
+      key: 'claude.loadTimeoutMs',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'low',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
     this.attachSettingHelp(setting, {
       boundaryAttr: 'data-claude-code-load-timeout-ms-boundary',
       lifecycleAttr: 'data-claude-code-load-timeout-ms-lifecycle',
@@ -797,6 +898,14 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    describeBackendSetting(setting, {
+      key: 'claude.debug',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'low',
+      defaultLabel: t('settings.backendRefresh.default.off'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
     this.attachSettingHelp(setting, {
       boundaryAttr: 'data-claude-code-debug-boundary',
       lifecycleAttr: 'data-claude-code-debug-lifecycle',
@@ -819,6 +928,13 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    describeBackendSetting(setting, {
+      key: 'claude.debugFile',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'medium',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+    });
     this.attachSettingHelp(setting, {
       boundaryAttr: 'data-claude-code-debug-file-boundary',
       lifecycleAttr: 'data-claude-code-debug-file-lifecycle',
@@ -1619,18 +1735,287 @@ export class SettingsClaudeCodeSection {
     return this.getRuntimeFileReadbackRecord(readback)?.truncated === true;
   }
 
-  // ─── Model & Thinking tab ─────────────────────────────────────────
+  // ─── Conversation tab ─────────────────────────────────────────────
 
-  private renderModelThinkingTab(containerEl: HTMLElement): void {
+  /**
+   * Conversation defaults page: model, thinking, effort, prompt behavior,
+   * output style, and titles. Ordinary single-choice settings use
+   * addBackendChoiceSetting; nullable/unbounded numerics stay text inputs so
+   * saved unknown values are never clamped away.
+   */
+  private renderConversationTab(containerEl: HTMLElement): void {
+    const modelsEl = this.createClaudeCodeGroup(containerEl, { id: 'models' });
+    this.renderMainModelSetting(modelsEl);
+    this.renderFallbackModelSetting(modelsEl);
+
     const thinkingEl = this.createClaudeCodeGroup(containerEl, { id: 'thinking-effort' });
-    this.renderThinkingSetting(thinkingEl);
+    const budgetHolderEl = thinkingEl.createDiv({
+      attr: { 'data-claude-budget-holder': 'true' },
+    });
+    this.renderThinkingSetting(thinkingEl, (nextType) => {
+      // Synchronized only after a SUCCESSFUL thinking-type save; reveal/hide
+      // swaps the holder contents so no other row remounts and no input
+      // loses focus.
+      const hasBudgetRow = budgetHolderEl.querySelector('.setting-item') !== null;
+      if (nextType === 'fixed' && !hasBudgetRow) {
+        this.renderThinkingBudgetSetting(budgetHolderEl);
+      } else if (nextType !== 'fixed' && hasBudgetRow) {
+        budgetHolderEl.empty();
+      }
+    });
     if (this.settings.thinking.type === 'fixed') {
-      this.renderThinkingBudgetSetting(thinkingEl);
+      this.renderThinkingBudgetSetting(budgetHolderEl);
     }
     this.renderEffortSetting(thinkingEl);
 
+    const promptEl = this.createClaudeCodeGroup(containerEl, { id: 'prompt-behavior' });
+    this.renderSystemPromptSetting(promptEl);
+    this.renderOutputStyleSetting(promptEl);
+    this.renderPromptSuggestionsSetting(promptEl);
+    this.renderEnableContext1mBetaSetting(promptEl);
+
     const titleAndModelsEl = this.createClaudeCodeGroup(containerEl, { id: 'title-inline-overrides' });
-    new Setting(titleAndModelsEl)
+    this.renderAutoTitleSetting(titleAndModelsEl);
+    SettingsInlineEditSection.renderBackendModelOverrides(titleAndModelsEl, 'claude-code', this.plugin);
+
+    const questionEl = this.createClaudeCodeGroup(containerEl, { id: 'question-ux' });
+    this.renderAskUserQuestionPreviewFormatSetting(questionEl);
+  }
+
+  /**
+   * Choice-first model row. Choices come from evidence, not invention:
+   * inherit first, then the official CLI aliases (fable/opus/sonnet, verified
+   * from `claude --help`), then the saved value preserved as a marked option
+   * even when it is unknown today, and a custom text field revealed only on
+   * demand.
+   */
+  private renderMainModelSetting(containerEl: HTMLElement): void {
+    const setting = new Setting(containerEl)
+      .setName(t('settings.claudeCode.model.name'))
+      .setDesc(t('settings.claudeCode.model.desc'));
+    describeBackendSetting(setting, {
+      key: 'claude.model',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'medium',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+      source: t('settings.claudeCode.modelId.cliAliasDesc' as TranslationKey),
+    });
+    this.attachModelChoiceDropdown(setting, { dataSetting: 'claude-model', customDataSetting: 'claude-model-custom' }, this.settings.model, async (value) => {
+      this.settings.model = value;
+      await this.saveSettings();
+    });
+    this.attachProofChip(setting, 'main-model', 'pass', t('settings.claudeCode.proofStatus.mainModel'));
+  }
+
+  /**
+   * Fallback model row with the same verified-alias choice shape plus its
+   * readback-only boundary: option wiring and same-model validation are
+   * proven; automatic fallback switching is not locally provable (needs a
+   * real HTTP 529 overload), so the badge says so.
+   */
+  private renderFallbackModelSetting(containerEl: HTMLElement): void {
+    const setting = new Setting(containerEl)
+      .setName(t('settings.claudeCode.fallbackModel.name'))
+      .setDesc(t('settings.claudeCode.fallbackModel.desc'));
+    describeBackendSetting(setting, {
+      key: 'claude.fallbackModel',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'low',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+      source: t('settings.claudeCode.modelId.cliAliasDesc' as TranslationKey),
+    });
+    this.attachModelChoiceDropdown(setting, { dataSetting: 'claude-fallback-model', customDataSetting: 'claude-fallback-model-custom' }, this.settings.fallbackModel, async (value) => {
+      if (value && value === this.settings.model) {
+        new Notice(t('settings.claudeCode.fallbackModel.sameModelWarning'));
+        return;
+      }
+      this.settings.fallbackModel = value;
+      await this.saveSettings();
+    });
+    this.attachSettingHelp(setting, {
+      boundaryAttr: 'data-claude-code-fallback-model-boundary',
+      boundaryText: t('settings.claudeCode.fallbackModel.boundaryNotice'),
+      helpTitle: t('settings.claudeCode.fallbackModel.name'),
+    });
+    this.attachProofChip(setting, 'fallback-model', 'readback', t('settings.claudeCode.proofStatus.fallbackModel'));
+  }
+
+  /**
+   * Shared choice shape for the model rows: inherit first, verified CLI
+   * aliases, preserved unknown saved value, and a hidden custom input
+   * revealed by the explicit custom choice. `onCommit` receives both guided
+   * picks and the custom input's trimmed value; rejection semantics stay
+   * with the caller (same-model warning for the fallback row).
+   */
+  private attachModelChoiceDropdown(
+    setting: Setting,
+    hooks: { dataSetting: string; customDataSetting: string },
+    currentModel: string,
+    onCommit: (value: string) => Promise<void>,
+  ): void {
+    let customInputEl: HTMLInputElement | null = null;
+    setting.addDropdown((dropdown: DropdownComponent) => {
+      dropdown.selectEl?.setAttribute('data-setting', hooks.dataSetting);
+      dropdown.addOption('', t('settings.backendRefresh.default.empty'));
+      for (const alias of CLAUDE_MODEL_CLI_ALIASES) {
+        dropdown.addOption(alias, t('settings.claudeCode.modelId.cliAliasOption' as TranslationKey, { model: alias }));
+      }
+      dropdown.addOption('__custom__', t('settings.claudeCode.modelId.customOption' as TranslationKey));
+      const isKnownChoice = currentModel === ''
+        || (CLAUDE_MODEL_CLI_ALIASES as readonly string[]).includes(currentModel);
+      if (!isKnownChoice && currentModel !== '__custom__') {
+        dropdown.addOption(currentModel, t('settings.claudeCode.modelId.unlistedOption' as TranslationKey, { value: currentModel }));
+      }
+      dropdown.setValue(currentModel);
+      dropdown.onChange(async (value) => {
+        if (value === '__custom__') {
+          if (customInputEl) {
+            customInputEl.style.display = 'block';
+            customInputEl.focus();
+          }
+          return;
+        }
+        if (customInputEl) {
+          customInputEl.style.display = 'none';
+          customInputEl.value = '';
+        }
+        await onCommit(value);
+      });
+    });
+    const preservedUnknown = currentModel !== '' && currentModel !== '__custom__';
+    customInputEl = setting.controlEl.createEl('input', {
+      cls: 'opencodian-settings-text-input',
+      attr: {
+        type: 'text',
+        placeholder: t('settings.claudeCode.model.placeholder'),
+        'data-setting': hooks.customDataSetting,
+      },
+    });
+    customInputEl.value = preservedUnknown ? currentModel : '';
+    customInputEl.style.display = 'none';
+    customInputEl.addEventListener('change', async () => {
+      await onCommit((customInputEl?.value ?? '').trim());
+    });
+  }
+
+  /**
+   * Shared choice shape for bounded-preset numeric rows: a short dropdown of
+   * named presets (plus inherit/unlimited when `null` is a valid value) and a
+   * custom text input for everything else. Contract:
+   * - A committed value outside the presets renders as the selected custom
+   *   option with the input holding the exact saved value — rendering never
+   *   clamps or rewrites it.
+   * - The custom input parses strictly (whole-string match via `parseInput`);
+   *   malformed input is rejected with a notice and the previous value kept.
+   * - `onCommit` owns the settings field and must restore it and rethrow on
+   *   persistence failure; this helper then reverts the dropdown/input to the
+   *   committed value so the UI never shows an unsaved change as applied.
+   * - Metadata (scope/effect/risk badges, proof chips) stays with the caller.
+   */
+  private attachNumericPresetDropdown(
+    setting: Setting,
+    hooks: { dataSetting: string; customDataSetting: string },
+    options: {
+      presets: Array<{ value: number | null; label: string }>;
+      committed: number | null;
+      parseInput: (raw: string) => number | null;
+      formatValue: (value: number) => string;
+      onCommit: (value: number | null) => Promise<void>;
+    },
+  ): void {
+    let dropdownComponent: DropdownComponent | null = null;
+    let customInputEl: HTMLInputElement | null = null;
+    let committed = options.committed;
+    let pending = false;
+
+    const keyFor = (value: number | null): string => (value === null ? '' : String(value));
+    const findPreset = (value: number | null): { value: number | null; label: string } | undefined =>
+      options.presets.find((preset) => preset.value === value);
+    const isPresetValue = (value: number | null): boolean =>
+      value === null || findPreset(value) !== undefined;
+
+    const paintCommitted = (): void => {
+      const key = isPresetValue(committed) ? keyFor(committed) : '__custom__';
+      dropdownComponent?.setValue(key);
+      if (customInputEl) {
+        const showCustom = !isPresetValue(committed);
+        customInputEl.style.display = showCustom ? 'block' : 'none';
+        customInputEl.value = committed === null ? '' : options.formatValue(committed);
+      }
+    };
+
+    const commit = async (next: number | null): Promise<void> => {
+      if (pending) {
+        paintCommitted();
+        return;
+      }
+      pending = true;
+      try {
+        await options.onCommit(next);
+        committed = next;
+        paintCommitted();
+      } catch (error) {
+        paintCommitted();
+        throw error;
+      } finally {
+        pending = false;
+      }
+    };
+
+    setting.addDropdown((dropdown: DropdownComponent) => {
+      dropdownComponent = dropdown;
+      dropdown.selectEl?.setAttribute('data-setting', hooks.dataSetting);
+      for (const preset of options.presets) {
+        dropdown.addOption(keyFor(preset.value), preset.label);
+      }
+      dropdown.addOption('__custom__', t('settings.claudeCode.numeric.customOption' as TranslationKey));
+      paintCommitted();
+      dropdown.onChange(async (value) => {
+        if (value === '__custom__') {
+          if (customInputEl) {
+            customInputEl.style.display = 'block';
+            customInputEl.value = committed === null ? '' : options.formatValue(committed);
+            customInputEl.focus();
+          }
+          return;
+        }
+        if (customInputEl) {
+          customInputEl.style.display = 'none';
+        }
+        await commit(value === '' ? null : options.parseInput(value));
+      });
+    });
+    customInputEl = setting.controlEl.createEl('input', {
+      cls: 'opencodian-settings-text-input',
+      attr: {
+        type: 'text',
+        inputmode: 'decimal',
+        placeholder: t('settings.claudeCode.numeric.customPlaceholder' as TranslationKey),
+        'data-setting': hooks.customDataSetting,
+      },
+    });
+    customInputEl.addEventListener('change', async () => {
+      const raw = (customInputEl?.value ?? '').trim();
+      if (raw === '' && findPreset(null) !== undefined) {
+        customInputEl!.value = '';
+        await commit(null);
+        return;
+      }
+      const parsed = options.parseInput(raw);
+      if (parsed === null) {
+        new Notice(t('settings.claudeCode.numeric.invalid' as TranslationKey));
+        paintCommitted();
+        return;
+      }
+      await commit(parsed);
+    });
+    paintCommitted();
+  }
+
+  private renderAutoTitleSetting(containerEl: HTMLElement): void {
+    const setting = new Setting(containerEl)
       .setName(t('settings.titleGeneration.claudeAutoTitle.name'))
       .setDesc(t('settings.titleGeneration.claudeAutoTitle.desc'))
       .addToggle((toggle) => toggle
@@ -1639,78 +2024,147 @@ export class SettingsClaudeCodeSection {
           this.settings.autoTitle = value;
           await this.saveSettings();
         }));
-    SettingsInlineEditSection.renderBackendModelOverrides(titleAndModelsEl, 'claude-code', this.plugin);
+    describeBackendSetting(setting, {
+      key: 'claude.autoTitle',
+      scope: 'vault',
+      effect: 'new-session',
+      risk: 'low',
+      defaultLabel: t('settings.backendRefresh.default.on'),
+    });
   }
 
-  private renderThinkingSetting(containerEl: HTMLElement): void {
-    new Setting(containerEl)
-      .setName(t('settings.claudeCode.thinking.name'))
-      .setDesc(t('settings.claudeCode.thinking.desc'))
-      .addDropdown((dropdown) => {
-        for (const opt of CLAUDE_THINKING_TYPES) {
-          dropdown.addOption(opt.id, t(opt.labelKey));
+  private renderThinkingSetting(
+    containerEl: HTMLElement,
+    onTypeCommitted?: (nextType: ClaudeCodeThinking['type']) => void,
+  ): void {
+    addBackendChoiceSetting(containerEl, {
+      key: 'claude.thinking',
+      name: t('settings.claudeCode.thinking.name'),
+      description: t('settings.claudeCode.thinking.desc'),
+      value: this.settings.thinking.type,
+      options: CLAUDE_THINKING_TYPES.map((opt) => ({
+        value: opt.id,
+        label: t(opt.labelKey),
+        recommended: opt.id === 'adaptive',
+      })),
+      onChange: async (value) => {
+        const thinkingType = value as ClaudeCodeThinking['type'];
+        const previous = this.settings.thinking;
+        if (thinkingType === 'fixed') {
+          const budgetTokens = previous.type === 'fixed' && 'budgetTokens' in previous
+            ? previous.budgetTokens
+            : 4096;
+          this.settings.thinking = { type: 'fixed', budgetTokens };
+        } else {
+          this.settings.thinking = { type: thinkingType };
         }
-        dropdown
-          .setValue(this.settings.thinking.type)
-          .onChange(async (value) => {
-            const thinkingType = value as ClaudeCodeThinking['type'];
-            if (thinkingType === 'fixed') {
-              const budgetTokens = this.settings.thinking.type === 'fixed'
-                ? this.settings.thinking.budgetTokens
-                : 4096;
-              this.settings.thinking = { type: 'fixed', budgetTokens };
-            } else {
-              this.settings.thinking = { type: thinkingType };
-            }
-            await this.saveSettings();
-          });
-      });
+        try {
+          await this.saveSettings();
+        } catch (error) {
+          this.settings.thinking = previous;
+          throw error;
+        }
+        onTypeCommitted?.(thinkingType);
+      },
+      presentation: {
+        scope: 'vault',
+        effect: 'next-turn',
+        risk: 'low',
+        defaultLabel: t('settings.claudeCode.thinking.adaptive'),
+        source: t('settings.backendRefresh.source.pluginVaultSetting'),
+      },
+    });
   }
 
   private renderThinkingBudgetSetting(containerEl: HTMLElement): void {
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.thinkingBudget.name'))
-      .setDesc(t('settings.claudeCode.thinkingBudget.desc'))
-      .addText((text) => {
-        text
-          .setPlaceholder(t('settings.claudeCode.thinkingBudget.placeholder'))
-          .setValue(
-            this.settings.thinking.type === 'fixed' && 'budgetTokens' in this.settings.thinking
-              ? String(this.settings.thinking.budgetTokens)
-              : '',
-          )
-          .onChange(async (value) => {
-            if (this.settings.thinking.type === 'fixed') {
-              const parsed = parseInt(value, 10);
-              this.settings.thinking = Number.isNaN(parsed) || parsed <= 0
-                ? { type: 'fixed', budgetTokens: 4096 }
-                : { type: 'fixed', budgetTokens: parsed };
-              await this.saveSettings();
-            }
-          });
-      });
+      .setDesc(t('settings.claudeCode.thinkingBudget.desc'));
+    // Choice-first numeric presets; budgetTokens stays unbounded, so a saved
+    // out-of-range value survives the round trip as the selected custom value.
+    this.attachNumericPresetDropdown(
+      setting,
+      { dataSetting: 'claude-thinking-budget', customDataSetting: 'claude-thinking-budget-custom' },
+      {
+        presets: [
+          { value: 1024, label: '1024' },
+          { value: 4096, label: `4096 — ${t('settings.backend.meta.default')}` },
+          { value: 8192, label: '8192' },
+          { value: 16384, label: '16384' },
+        ],
+        committed: this.settings.thinking.type === 'fixed' && 'budgetTokens' in this.settings.thinking
+          ? this.settings.thinking.budgetTokens
+          : 4096,
+        parseInput: parseStrictPositiveInteger,
+        formatValue: (value) => String(value),
+        onCommit: async (value) => {
+          if (value === null) {
+            return;
+          }
+          const previous = this.settings.thinking;
+          this.settings.thinking = { type: 'fixed', budgetTokens: value };
+          try {
+            await this.saveSettings();
+          } catch (error) {
+            this.settings.thinking = previous;
+            throw error;
+          }
+        },
+      },
+    );
+    // Deliberately a dropdown + custom input, not a slider: budgetTokens is
+    // unbounded and a saved out-of-range value must survive unclamped.
+    describeBackendSetting(setting, {
+      key: 'claude.thinking.budgetTokens',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'low',
+      defaultLabel: '4096',
+      source: t('settings.backendRefresh.source.pluginVaultSetting'),
+    });
   }
 
   private renderEffortSetting(containerEl: HTMLElement): void {
-    new Setting(containerEl)
-      .setName(t('settings.claudeCode.effort.name'))
-      .setDesc(t('settings.claudeCode.effort.desc'))
-      .addDropdown((dropdown) => {
-        for (const opt of CLAUDE_EFFORT_LEVELS) {
-          dropdown.addOption(opt.id, t(opt.labelKey));
+    addBackendChoiceSetting(containerEl, {
+      key: 'claude.effort',
+      name: t('settings.claudeCode.effort.name'),
+      description: t('settings.claudeCode.effort.desc'),
+      value: this.settings.effort,
+      options: CLAUDE_EFFORT_LEVELS.map((opt) => ({
+        value: opt.id,
+        label: t(opt.labelKey),
+        recommended: opt.id === 'medium',
+      })),
+      onChange: async (value) => {
+        const previous = this.settings.effort;
+        this.settings.effort = value as ClaudeCodeEffort;
+        try {
+          await this.saveSettings();
+        } catch (error) {
+          this.settings.effort = previous;
+          throw error;
         }
-        dropdown
-          .setValue(this.settings.effort)
-          .onChange(async (value) => {
-            this.settings.effort = value as ClaudeCodeEffort;
-            await this.saveSettings();
-          });
-      });
+      },
+      presentation: {
+        scope: 'vault',
+        effect: 'next-turn',
+        risk: 'low',
+        defaultLabel: t('settings.claudeCode.effort.medium'),
+        source: t('settings.backendRefresh.source.pluginVaultSetting'),
+      },
+    });
   }
 
-  // ─── Permissions tab ──────────────────────────────────────────────
+  // ─── Permissions & safety tab ─────────────────────────────────────
 
-  private renderPermissionsTab(containerEl: HTMLElement): void {
+  /**
+   * Permissions & safety page — the deliberately separated high-risk surface.
+   * Permission mode (including bypassPermissions), the sandbox policy tree,
+   * and query guardrails (max turns / budget) live here, physically apart
+   * from the conversation and connection pages, so an accidental high-risk
+   * change cannot happen while tuning ordinary preferences.
+   */
+  private renderPermissionsSafetyTab(containerEl: HTMLElement): void {
     const permissionEl = this.createClaudeCodeGroup(containerEl, { id: 'permission-mode' });
     this.renderPermissionModeSetting(permissionEl);
 
@@ -1718,24 +2172,54 @@ export class SettingsClaudeCodeSection {
     this.renderPlanModeInstructionsSetting(planModeEl);
 
     this.renderSandboxSettings(containerEl);
+
+    const guardrailsEl = this.createClaudeCodeGroup(containerEl, { id: 'limits-budget' });
+    this.renderLimitsBoundaryNotice(guardrailsEl);
+    this.renderMaxTurnsSetting(guardrailsEl);
+    this.renderMaxBudgetSetting(guardrailsEl);
+    this.renderTaskBudgetSetting(guardrailsEl);
   }
 
   private renderPermissionModeSetting(containerEl: HTMLElement): void {
-    new Setting(containerEl)
-      .setName(t('settings.claudeCode.permissionMode.name'))
-      .setDesc(t('settings.claudeCode.permissionMode.desc'))
-      .addDropdown((dropdown) => {
-        for (const opt of CLAUDE_PERMISSION_MODES) {
-          dropdown.addOption(opt.id, t(opt.labelKey));
+    const setting = addBackendChoiceSetting(containerEl, {
+      key: 'claude.permissionMode',
+      name: t('settings.claudeCode.permissionMode.name'),
+      description: t('settings.claudeCode.permissionMode.desc'),
+      value: this.settings.permissionMode,
+      options: CLAUDE_PERMISSION_MODES.map((opt) => ({
+        value: opt.id,
+        label: t(opt.labelKey),
+        recommended: opt.id === 'default',
+        description: opt.id === 'bypassPermissions'
+          ? t('settings.claudeCode.permissionMode.bypassPermissions.desc')
+          : undefined,
+      })),
+      onChange: async (value) => {
+        const previous = this.settings.permissionMode;
+        this.settings.permissionMode = value as ClaudeCodePermissionMode;
+        // Transaction boundary: persistence is the commit point. A failed
+        // save rolls the field back and the shared choice control repaints;
+        // a failed post-save runtime apply keeps the persisted value and
+        // only surfaces evidence (never a raw error).
+        try {
+          await this.saveSettings();
+        } catch (error) {
+          this.settings.permissionMode = previous;
+          throw error;
         }
-        dropdown
-          .setValue(this.settings.permissionMode)
-          .onChange(async (value) => {
-            this.settings.permissionMode = value as ClaudeCodePermissionMode;
-            await this.applyClaudePermissionMode(this.settings.permissionMode).catch(() => undefined);
-            await this.saveSettings();
-          });
-      });
+        await this.applyClaudePermissionMode(this.settings.permissionMode).catch(() => {
+          new Notice(t('settings.backend.permissionMode.applyFailed' as TranslationKey));
+        });
+      },
+      presentation: {
+        scope: 'vault',
+        effect: 'next-turn',
+        risk: 'high',
+        defaultLabel: t('settings.claudeCode.permissionMode.default'),
+        source: t('settings.backendRefresh.source.pluginVaultSetting'),
+      },
+    });
+    setting.settingEl.setAttribute('data-claude-code-high-risk', 'permission-mode');
   }
 
   private renderPlanModeInstructionsSetting(containerEl: HTMLElement): void {
@@ -1752,6 +2236,14 @@ export class SettingsClaudeCodeSection {
           });
         TextareaSizeMemory.attach(textArea.inputEl, 'claude-code-instructions');
       });
+    describeBackendSetting(setting, {
+      key: 'claude.planModeInstructions',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'medium',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
     this.attachSettingHelp(setting, {
       boundaryAttr: 'data-claude-code-plan-mode-instructions-boundary',
       lifecycleAttr: 'data-claude-code-plan-mode-instructions-lifecycle',
@@ -1764,6 +2256,12 @@ export class SettingsClaudeCodeSection {
   // ─── Sandbox settings (Permissions tab) ─────────────────────────
 
   private renderSandboxSettings(containerEl: HTMLElement): void {
+    this.renderSandboxCoreSettings(containerEl);
+    this.renderSandboxAdvancedSettings(containerEl);
+  }
+
+  /** Sandbox core switches: OS sandbox on/off, fail-closed, Bash auto-allow. */
+  private renderSandboxCoreSettings(containerEl: HTMLElement): void {
     const coreEl = this.createClaudeCodeGroup(containerEl, { id: 'sandbox-core' });
 
     const enabledSetting = new Setting(coreEl)
@@ -1777,6 +2275,14 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    describeBackendSetting(enabledSetting, {
+      key: 'claude.sandbox.enabled',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'high',
+      defaultLabel: t('settings.backendRefresh.default.off'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
     // Sandbox boundary + lifecycle both anchor on the `enabled` toggle's help
     // button. The data-claude-code-sandbox-lifecycle attribute is mirrored onto
     // the setting-item (not the lifecycle notice element), and the
@@ -1790,7 +2296,7 @@ export class SettingsClaudeCodeSection {
       helpTitle: t('settings.claudeCode.sandbox.enabled.name'),
     });
 
-    new Setting(coreEl)
+    const failIfUnavailableSetting = new Setting(coreEl)
       .setName(t('settings.claudeCode.sandbox.failIfUnavailable.name'))
       .setDesc(t('settings.claudeCode.sandbox.failIfUnavailable.desc'))
       .addToggle((toggle) => {
@@ -1801,8 +2307,16 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    describeBackendSetting(failIfUnavailableSetting, {
+      key: 'claude.sandbox.failIfUnavailable',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'high',
+      defaultLabel: t('settings.backendRefresh.default.off'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
 
-    new Setting(coreEl)
+    const autoAllowBashSetting = new Setting(coreEl)
       .setName(t('settings.claudeCode.sandbox.autoAllowBashIfSandboxed.name'))
       .setDesc(t('settings.claudeCode.sandbox.autoAllowBashIfSandboxed.desc'))
       .addToggle((toggle) => {
@@ -1813,8 +2327,22 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    describeBackendSetting(autoAllowBashSetting, {
+      key: 'claude.sandbox.autoAllowBashIfSandboxed',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'medium',
+      defaultLabel: t('settings.backendRefresh.default.off'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
+  }
 
-    // ── Advanced sandbox sub-policies ───────────────────────────────────
+  /**
+   * Advanced sandbox sub-policies behind the advanced disclosure group:
+   * escape hatches, filesystem/network policies, weaker-sandbox toggles, and
+   * custom ripgrep.
+   */
+  private renderSandboxAdvancedSettings(containerEl: HTMLElement): void {
     const advancedEl = this.createClaudeCodeAdvancedGroup(containerEl, { id: 'sandbox-advanced' });
 
     // excludedCommands — also carries the "unexposed fields" note in its help.
@@ -1830,6 +2358,14 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    describeBackendSetting(excludedCommandsSetting, {
+      key: 'claude.sandbox.excludedCommands',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'high',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
     this.attachSettingHelp(excludedCommandsSetting, {
       boundaryAttr: 'data-claude-code-sandbox-unexposed',
       boundaryText: t('settings.claudeCode.sandbox.unexposedNotice'),
@@ -1837,7 +2373,7 @@ export class SettingsClaudeCodeSection {
     });
 
     // allowUnsandboxedCommands
-    new Setting(advancedEl)
+    const allowUnsandboxedSetting = new Setting(advancedEl)
       .setName(t('settings.claudeCode.sandbox.allowUnsandboxedCommands.name'))
       .setDesc(t('settings.claudeCode.sandbox.allowUnsandboxedCommands.desc'))
       .addToggle((toggle) => {
@@ -1848,9 +2384,25 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    describeBackendSetting(allowUnsandboxedSetting, {
+      key: 'claude.sandbox.allowUnsandboxedCommands',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'high',
+      defaultLabel: t('settings.backendRefresh.default.on'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
+
+    this.renderSandboxSubPolicies(advancedEl);
+  }
+
+  /** Filesystem, network, weaker-sandbox, and custom ripgrep sub-policies. */
+  private renderSandboxSubPolicies(advancedEl: HTMLElement): void {
+    // Receives the sandbox-advanced group created by renderSandboxAdvancedSettings
+    // so the page exposes exactly one advanced sandbox group.
 
     // Filesystem sub-policy
-    new Setting(advancedEl)
+    const fsAllowWriteSetting = new Setting(advancedEl)
       .setName(t('settings.claudeCode.sandbox.filesystem.allowWrite.name'))
       .setDesc(t('settings.claudeCode.sandbox.filesystem.allowWrite.desc'))
       .addTextArea((textArea) => {
@@ -1862,8 +2414,16 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    describeBackendSetting(fsAllowWriteSetting, {
+      key: 'claude.sandbox.filesystem.allowWrite',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'medium',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
 
-    new Setting(advancedEl)
+    const fsDenyWriteSetting = new Setting(advancedEl)
       .setName(t('settings.claudeCode.sandbox.filesystem.denyWrite.name'))
       .setDesc(t('settings.claudeCode.sandbox.filesystem.denyWrite.desc'))
       .addTextArea((textArea) => {
@@ -1875,8 +2435,16 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    describeBackendSetting(fsDenyWriteSetting, {
+      key: 'claude.sandbox.filesystem.denyWrite',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'medium',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
 
-    new Setting(advancedEl)
+    const fsDenyReadSetting = new Setting(advancedEl)
       .setName(t('settings.claudeCode.sandbox.filesystem.denyRead.name'))
       .setDesc(t('settings.claudeCode.sandbox.filesystem.denyRead.desc'))
       .addTextArea((textArea) => {
@@ -1888,9 +2456,17 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    describeBackendSetting(fsDenyReadSetting, {
+      key: 'claude.sandbox.filesystem.denyRead',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'medium',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
 
     // Network sub-policy
-    new Setting(advancedEl)
+    const netAllowedDomainsSetting = new Setting(advancedEl)
       .setName(t('settings.claudeCode.sandbox.network.allowedDomains.name'))
       .setDesc(t('settings.claudeCode.sandbox.network.allowedDomains.desc'))
       .addTextArea((textArea) => {
@@ -1902,8 +2478,16 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    describeBackendSetting(netAllowedDomainsSetting, {
+      key: 'claude.sandbox.network.allowedDomains',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'medium',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
 
-    new Setting(advancedEl)
+    const netDeniedDomainsSetting = new Setting(advancedEl)
       .setName(t('settings.claudeCode.sandbox.network.deniedDomains.name'))
       .setDesc(t('settings.claudeCode.sandbox.network.deniedDomains.desc'))
       .addTextArea((textArea) => {
@@ -1915,9 +2499,17 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    describeBackendSetting(netDeniedDomainsSetting, {
+      key: 'claude.sandbox.network.deniedDomains',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'medium',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
 
     // Weaker sandbox toggles
-    new Setting(advancedEl)
+    const weakerNestedSandboxSetting = new Setting(advancedEl)
       .setName(t('settings.claudeCode.sandbox.enableWeakerNestedSandbox.name'))
       .setDesc(t('settings.claudeCode.sandbox.enableWeakerNestedSandbox.desc'))
       .addToggle((toggle) => {
@@ -1928,8 +2520,16 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    describeBackendSetting(weakerNestedSandboxSetting, {
+      key: 'claude.sandbox.enableWeakerNestedSandbox',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'high',
+      defaultLabel: t('settings.backendRefresh.default.off'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
 
-    new Setting(advancedEl)
+    const weakerNetworkIsolationSetting = new Setting(advancedEl)
       .setName(t('settings.claudeCode.sandbox.enableWeakerNetworkIsolation.name'))
       .setDesc(t('settings.claudeCode.sandbox.enableWeakerNetworkIsolation.desc'))
       .addToggle((toggle) => {
@@ -1940,9 +2540,17 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    describeBackendSetting(weakerNetworkIsolationSetting, {
+      key: 'claude.sandbox.enableWeakerNetworkIsolation',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'high',
+      defaultLabel: t('settings.backendRefresh.default.off'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
 
     // Custom ripgrep
-    new Setting(advancedEl)
+    const ripgrepCommandSetting = new Setting(advancedEl)
       .setName(t('settings.claudeCode.sandbox.ripgrep.command.name'))
       .setDesc(t('settings.claudeCode.sandbox.ripgrep.command.desc'))
       .addText((text) => {
@@ -1954,8 +2562,16 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    describeBackendSetting(ripgrepCommandSetting, {
+      key: 'claude.sandbox.ripgrep.command',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'low',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
 
-    new Setting(advancedEl)
+    const ripgrepArgsSetting = new Setting(advancedEl)
       .setName(t('settings.claudeCode.sandbox.ripgrep.args.name'))
       .setDesc(t('settings.claudeCode.sandbox.ripgrep.args.desc'))
       .addTextArea((textArea) => {
@@ -1967,11 +2583,24 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    describeBackendSetting(ripgrepArgsSetting, {
+      key: 'claude.sandbox.ripgrep.args',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'low',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
   }
 
-  // ─── Context & Sources tab ────────────────────────────────────────
+  // ─── Tools & context tab ──────────────────────────────────────────
 
-  private renderContextSourcesTab(containerEl: HTMLElement): void {
+  /**
+   * Tools & context page: which settings files the CLI reads, extra
+   * directories, the external settings-file workbench (with its inline
+   * archive history), tool policy, tool aliases, and MCP runtime.
+   */
+  private renderToolsContextTab(containerEl: HTMLElement): void {
     const activationEl = this.createClaudeCodeGroup(containerEl, { id: 'source-activation' });
     this.renderRuntimeBoundaryNotice(activationEl);
     this.renderSettingSources(activationEl);
@@ -1984,6 +2613,16 @@ export class SettingsClaudeCodeSection {
 
     const additionalContextEl = this.createClaudeCodeGroup(containerEl, { id: 'additional-context' });
     this.renderAdditionalDirectories(additionalContextEl);
+
+    const toolPolicyEl = this.createClaudeCodeGroup(containerEl, { id: 'tool-policy' });
+    this.renderAllowedToolsSetting(toolPolicyEl);
+    this.renderDisallowedToolsSetting(toolPolicyEl);
+    this.renderRestrictedBuiltinToolsSetting(toolPolicyEl);
+    this.renderToolAliasesSetting(toolPolicyEl);
+
+    const mcpEl = this.createClaudeCodeGroup(containerEl, { id: 'mcp-runtime' });
+    this.renderMcpRuntimeControls(mcpEl);
+    this.renderStrictMcpConfigSetting(mcpEl);
   }
 
   private renderConfigurationWorkbench(containerEl: HTMLElement): void {
@@ -2112,7 +2751,7 @@ export class SettingsClaudeCodeSection {
 
   private renderSettingSources(containerEl: HTMLElement): void {
     const currentSources = new Set(this.settings.settingSources);
-    new Setting(containerEl)
+    const projectSourceSetting = new Setting(containerEl)
       .setName(t('settings.claudeCode.settingSources.name'))
       .setDesc(t('settings.claudeCode.settingSources.project.desc'))
       .addToggle((toggle) => {
@@ -2123,7 +2762,14 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
-    new Setting(containerEl)
+    describeBackendSetting(projectSourceSetting, {
+      key: 'claude.settingSources.project',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'medium',
+      defaultLabel: t('settings.backendRefresh.default.on'),
+    });
+    const userSourceSetting = new Setting(containerEl)
       .setName(t('settings.claudeCode.settingSources.user'))
       .setDesc(t('settings.claudeCode.settingSources.user.desc'))
       .addToggle((toggle) => {
@@ -2134,7 +2780,14 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
-    new Setting(containerEl)
+    describeBackendSetting(userSourceSetting, {
+      key: 'claude.settingSources.user',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'medium',
+      defaultLabel: t('settings.backendRefresh.default.off'),
+    });
+    const localSourceSetting = new Setting(containerEl)
       .setName(t('settings.claudeCode.settingSources.local'))
       .setDesc(t('settings.claudeCode.settingSources.local.desc'))
       .addToggle((toggle) => {
@@ -2145,6 +2798,13 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    describeBackendSetting(localSourceSetting, {
+      key: 'claude.settingSources.local',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'medium',
+      defaultLabel: t('settings.backendRefresh.default.off'),
+    });
   }
 
   private updateSettingSource(source: ClaudeCodeSettingSource, enabled: boolean): void {
@@ -2204,7 +2864,7 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderAdditionalDirectories(containerEl: HTMLElement): void {
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.additionalDirectories.name'))
       .setDesc(t('settings.claudeCode.additionalDirectories.desc'))
       .addTextArea((textArea) => {
@@ -2220,28 +2880,16 @@ export class SettingsClaudeCodeSection {
           });
         TextareaSizeMemory.attach(textArea.inputEl, 'claude-code-mcp-json');
       });
+    describeBackendSetting(setting, {
+      key: 'claude.additionalDirectories',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'medium',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+    });
   }
 
-  // ─── Tools tab ───────────────────────────────────────────────────
-
-  private renderToolsTab(containerEl: HTMLElement): void {
-    const toolPolicyEl = this.createClaudeCodeGroup(containerEl, { id: 'tool-policy' });
-    this.renderAllowedToolsSetting(toolPolicyEl);
-    this.renderDisallowedToolsSetting(toolPolicyEl);
-    this.renderRestrictedBuiltinToolsSetting(toolPolicyEl);
-
-    this.renderToolAliasesSetting(toolPolicyEl);
-
-    const previewEl = this.createClaudeCodeGroup(containerEl, { id: 'question-ux' });
-    this.renderAskUserQuestionPreviewFormatSetting(previewEl);
-  }
-
-  private renderMcpTab(containerEl: HTMLElement): void {
-    const mcpEl = this.createClaudeCodeGroup(containerEl, { id: 'mcp-runtime' });
-    this.renderRuntimeBoundaryNotice(mcpEl);
-    this.renderMcpRuntimeControls(mcpEl);
-    this.renderStrictMcpConfigSetting(mcpEl);
-  }
+  // ─── Tools & context rows ─────────────────────────────────────────
 
   private renderMcpRuntimeControls(containerEl: HTMLElement): void {
     this.renderNativeSessionControls(containerEl, 'mcp');
@@ -2303,6 +2951,14 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    describeBackendSetting(setting, {
+      key: 'claude.strictMcpConfig',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'low',
+      defaultLabel: t('settings.backendRefresh.default.off'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
     this.attachSettingHelp(setting, {
       boundaryAttr: 'data-claude-code-strict-mcp-config-boundary',
       lifecycleAttr: 'data-claude-code-strict-mcp-config-lifecycle',
@@ -2408,6 +3064,14 @@ export class SettingsClaudeCodeSection {
           });
         TextareaSizeMemory.attach(textArea.inputEl, 'claude-code-hooks-pre');
       });
+    describeBackendSetting(setting, {
+      key: 'claude.allowedTools',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'high',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
     this.attachSettingHelp(setting, {
       boundaryAttr: 'data-claude-code-allowed-tools-boundary',
       boundaryText: t('settings.claudeCode.allowedTools.boundaryNotice'),
@@ -2423,7 +3087,7 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderDisallowedToolsSetting(containerEl: HTMLElement): void {
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.disallowedTools.name'))
       .setDesc(t('settings.claudeCode.disallowedTools.desc'))
       .addTextArea((textArea) => {
@@ -2436,6 +3100,13 @@ export class SettingsClaudeCodeSection {
           });
         TextareaSizeMemory.attach(textArea.inputEl, 'claude-code-hooks-post');
       });
+    describeBackendSetting(setting, {
+      key: 'claude.disallowedTools',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'medium',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+    });
   }
 
   private renderRestrictedBuiltinToolsSetting(containerEl: HTMLElement): void {
@@ -2452,6 +3123,13 @@ export class SettingsClaudeCodeSection {
           });
         TextareaSizeMemory.attach(textArea.inputEl, 'claude-code-hooks-stop');
       });
+    describeBackendSetting(setting, {
+      key: 'claude.restrictedBuiltinTools',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'high',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+    });
     this.attachProofChip(
       setting,
       'restricted-builtin-tools',
@@ -2498,6 +3176,14 @@ export class SettingsClaudeCodeSection {
           });
         TextareaSizeMemory.attach(textArea.inputEl, 'claude-code-hooks-subagent');
       });
+    describeBackendSetting(setting, {
+      key: 'claude.toolAliases',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'medium',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
     this.attachSettingHelp(setting, {
       boundaryAttr: 'data-claude-code-tool-aliases-boundary',
       lifecycleAttr: 'data-claude-code-tool-aliases-lifecycle',
@@ -2508,20 +3194,34 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderAskUserQuestionPreviewFormatSetting(containerEl: HTMLElement): void {
-    const setting = new Setting(containerEl)
-      .setName(t('settings.claudeCode.askUserQuestionPreviewFormat.name'))
-      .setDesc(t('settings.claudeCode.askUserQuestionPreviewFormat.desc'))
-      .addDropdown((dropdown) => {
-        dropdown
-          .addOption('', t('settings.claudeCode.askUserQuestionPreviewFormat.none'))
-          .addOption('markdown', t('settings.claudeCode.askUserQuestionPreviewFormat.markdown'))
-          .addOption('html', t('settings.claudeCode.askUserQuestionPreviewFormat.html'))
-          .setValue(this.settings.askUserQuestionPreviewFormat)
-          .onChange(async (value) => {
-            this.settings.askUserQuestionPreviewFormat = value as 'markdown' | 'html' | '';
-            await this.saveSettings();
-          });
-      });
+    const setting = addBackendChoiceSetting(containerEl, {
+      key: 'claude.askUserQuestionPreviewFormat',
+      name: t('settings.claudeCode.askUserQuestionPreviewFormat.name'),
+      description: t('settings.claudeCode.askUserQuestionPreviewFormat.desc'),
+      value: this.settings.askUserQuestionPreviewFormat,
+      options: [
+        { value: '', label: t('settings.claudeCode.askUserQuestionPreviewFormat.none'), recommended: true },
+        { value: 'markdown', label: t('settings.claudeCode.askUserQuestionPreviewFormat.markdown') },
+        { value: 'html', label: t('settings.claudeCode.askUserQuestionPreviewFormat.html') },
+      ],
+      onChange: async (value) => {
+        const previous = this.settings.askUserQuestionPreviewFormat;
+        this.settings.askUserQuestionPreviewFormat = value as 'markdown' | 'html' | '';
+        try {
+          await this.saveSettings();
+        } catch (error) {
+          this.settings.askUserQuestionPreviewFormat = previous;
+          throw error;
+        }
+      },
+      presentation: {
+        scope: 'vault',
+        effect: 'next-turn',
+        risk: 'low',
+        defaultLabel: t('settings.claudeCode.askUserQuestionPreviewFormat.none'),
+        source: t('settings.backendRefresh.source.readbackOnly'),
+      },
+    });
     this.attachSettingHelp(setting, {
       boundaryAttr: 'data-claude-code-ask-user-question-preview-format-boundary',
       lifecycleAttr: 'data-claude-code-ask-user-question-preview-format-lifecycle',
@@ -2551,15 +3251,39 @@ export class SettingsClaudeCodeSection {
     const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.maxTurns.name'))
       .setDesc(t('settings.claudeCode.maxTurns.desc'))
-      .addText((text) => {
-        text
-          .setPlaceholder(t('settings.claudeCode.maxTurns.placeholder'))
-          .setValue(this.settings.maxTurns === null ? '' : String(this.settings.maxTurns))
-          .onChange(async (value) => {
-            this.settings.maxTurns = this.parseNullablePositiveInteger(value);
+    this.attachNumericPresetDropdown(
+      setting,
+      { dataSetting: 'claude-max-turns', customDataSetting: 'claude-max-turns-custom' },
+      {
+        presets: [
+          { value: null, label: t('settings.backendRefresh.default.unlimited') },
+          { value: 10, label: '10' },
+          { value: 25, label: '25' },
+          { value: 50, label: '50' },
+          { value: 100, label: '100' },
+        ],
+        committed: this.settings.maxTurns,
+        parseInput: parseStrictPositiveInteger,
+        formatValue: (value) => String(value),
+        onCommit: async (value) => {
+          const previous = this.settings.maxTurns;
+          this.settings.maxTurns = value;
+          try {
             await this.saveSettings();
-          });
-      });
+          } catch (error) {
+            this.settings.maxTurns = previous;
+            throw error;
+          }
+        },
+      },
+    );
+    describeBackendSetting(setting, {
+      key: 'claude.maxTurns',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'low',
+      defaultLabel: t('settings.backendRefresh.default.unlimited'),
+    });
     // The limits proof covers maxTurns + maxBudgetUsd enforcement; attach it
     // as a chip on maxTurns (the first limits control).
     this.attachProofChip(
@@ -2571,33 +3295,82 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderMaxBudgetSetting(containerEl: HTMLElement): void {
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.maxBudgetUsd.name'))
       .setDesc(t('settings.claudeCode.maxBudgetUsd.desc'))
-      .addText((text) => {
-        text
-          .setPlaceholder(t('settings.claudeCode.maxBudgetUsd.placeholder'))
-          .setValue(this.settings.maxBudgetUsd === null ? '' : String(this.settings.maxBudgetUsd))
-          .onChange(async (value) => {
-            this.settings.maxBudgetUsd = this.parseNullablePositiveNumber(value);
+    this.attachNumericPresetDropdown(
+      setting,
+      { dataSetting: 'claude-max-budget', customDataSetting: 'claude-max-budget-custom' },
+      {
+        presets: [
+          { value: null, label: t('settings.backendRefresh.default.unlimited') },
+          { value: 1, label: '$1' },
+          { value: 5, label: '$5' },
+          { value: 20, label: '$20' },
+          { value: 100, label: '$100' },
+        ],
+        committed: this.settings.maxBudgetUsd,
+        parseInput: parseStrictPositiveNumber,
+        formatValue: (value) => String(value),
+        onCommit: async (value) => {
+          const previous = this.settings.maxBudgetUsd;
+          this.settings.maxBudgetUsd = value;
+          try {
             await this.saveSettings();
-          });
-      });
+          } catch (error) {
+            this.settings.maxBudgetUsd = previous;
+            throw error;
+          }
+        },
+      },
+    );
+    describeBackendSetting(setting, {
+      key: 'claude.maxBudgetUsd',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'low',
+      defaultLabel: t('settings.backendRefresh.default.unlimited'),
+    });
   }
 
   private renderTaskBudgetSetting(containerEl: HTMLElement): void {
     const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.taskBudget.name'))
       .setDesc(t('settings.claudeCode.taskBudget.desc'))
-      .addText((text) => {
-        text
-          .setPlaceholder(t('settings.claudeCode.taskBudget.placeholder'))
-          .setValue(this.settings.taskBudget === null ? '' : String(this.settings.taskBudget))
-          .onChange(async (value) => {
-            this.settings.taskBudget = this.parseNullablePositiveInteger(value);
+    this.attachNumericPresetDropdown(
+      setting,
+      { dataSetting: 'claude-task-budget', customDataSetting: 'claude-task-budget-custom' },
+      {
+        presets: [
+          { value: null, label: t('settings.backendRefresh.default.unlimited') },
+          { value: 50000, label: '50k' },
+          { value: 100000, label: '100k' },
+          { value: 500000, label: '500k' },
+          { value: 1000000, label: '1M' },
+        ],
+        committed: this.settings.taskBudget,
+        parseInput: parseStrictPositiveInteger,
+        formatValue: (value) => String(value),
+        onCommit: async (value) => {
+          const previous = this.settings.taskBudget;
+          this.settings.taskBudget = value;
+          try {
             await this.saveSettings();
-          });
-      });
+          } catch (error) {
+            this.settings.taskBudget = previous;
+            throw error;
+          }
+        },
+      },
+    );
+    describeBackendSetting(setting, {
+      key: 'claude.taskBudget',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'low',
+      defaultLabel: t('settings.backendRefresh.default.unlimited'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
     this.attachSettingHelp(setting, {
       boundaryAttr: 'data-claude-code-task-budget-boundary',
       lifecycleAttr: 'data-claude-code-task-budget-lifecycle',
@@ -2621,6 +3394,14 @@ export class SettingsClaudeCodeSection {
           });
         TextareaSizeMemory.attach(textArea.inputEl, 'claude-code-env-json');
       });
+    describeBackendSetting(setting, {
+      key: 'claude.systemPrompt',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'medium',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+      source: t('settings.backendRefresh.source.pluginVaultSetting'),
+    });
     this.attachSettingHelp(setting, {
       boundaryAttr: 'data-claude-code-system-prompt-boundary',
       lifecycleAttr: 'data-claude-code-system-prompt-lifecycle',
@@ -2644,6 +3425,16 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    // Output styles are read at session start (official docs): the honest
+    // effect boundary is a new conversation, not the next turn.
+    describeBackendSetting(setting, {
+      key: 'claude.outputStyle',
+      scope: 'vault',
+      effect: 'new-session',
+      risk: 'low',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
     this.attachSettingHelp(setting, {
       boundaryAttr: 'data-claude-code-output-style-boundary',
       lifecycleAttr: 'data-claude-code-output-style-lifecycle',
@@ -2665,6 +3456,14 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    describeBackendSetting(setting, {
+      key: 'claude.promptSuggestions',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'low',
+      defaultLabel: t('settings.backendRefresh.default.off'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
     this.attachSettingHelp(setting, {
       lifecycleAttr: 'data-claude-code-prompt-suggestions-lifecycle',
       lifecycleText: t('settings.claudeCode.promptSuggestions.lifecycleNotice'),
@@ -2684,6 +3483,14 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    describeBackendSetting(setting, {
+      key: 'claude.enableContext1mBeta',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'low',
+      defaultLabel: t('settings.backendRefresh.default.off'),
+      source: t('settings.backendRefresh.source.readbackOnly'),
+    });
     this.attachSettingHelp(setting, {
       boundaryAttr: 'data-claude-code-enable-context-1m-beta-boundary',
       lifecycleAttr: 'data-claude-code-enable-context-1m-beta-lifecycle',
@@ -2707,6 +3514,13 @@ export class SettingsClaudeCodeSection {
           });
         TextareaSizeMemory.attach(textArea.inputEl, 'claude-code-permissions-json');
       });
+    describeBackendSetting(setting, {
+      key: 'claude.env',
+      scope: 'vault',
+      effect: 'next-turn',
+      risk: 'high',
+      defaultLabel: t('settings.backendRefresh.default.empty'),
+    });
     this.attachProofChip(
       setting,
       'env',
@@ -2765,8 +3579,8 @@ export class SettingsClaudeCodeSection {
     await adapter?.reloadMcpServers?.();
   }
 
-  private isKnownClaudeTabId(tabId: string): tabId is typeof CLAUDE_CLASSIC_TABS[number] {
-    return (CLAUDE_CLASSIC_TABS as readonly string[]).includes(tabId);
+  private isKnownClaudeTabId(tabId: string): tabId is ClaudeTaskTabId {
+    return (CLAUDE_TASK_TABS as readonly string[]).includes(tabId);
   }
 
   private parseLineList(value: string): string[] {

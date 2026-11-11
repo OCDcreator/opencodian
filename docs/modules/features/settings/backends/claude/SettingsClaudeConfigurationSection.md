@@ -3,6 +3,8 @@
 > **源码**: `src/features/settings/backends/claude/SettingsClaudeConfigurationSection.ts`
 > **状态**: [ACTIVE]
 
+> **2026-11-08**: `render()` 对缺失 `plugin.app` 的宿主环境（bare 测试 fixture、脱离 vault 的视图）降级为既有 unavailable 状态，不再在 `getVaultBasePath` 处抛错；vault 存在时的 scope/CAS/archive 行为不变。
+
 ## 概述
 
 Claude Code `context-sources` 下的 configuration workbench。它把 Project/Local/Global 三个可编辑 scope 与 managed read-only inventory 放在一个界面中，用“常用表单 + 高级严格 JSON + Hooks builder”共享同一 raw draft。Project 是安全默认；Global 只有显式选择才会成为目标；managed 永远不可写。

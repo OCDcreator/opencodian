@@ -11,6 +11,8 @@
 
 > **更新**: `renderSlashCommandMenuItem` 标题为源感知——直接 Codex skill 候选(`source:'codex-skill'` 且 `displayId` 以 `$` 开头)原样显示 `$skill-name`(不再误加 `/` 前缀);经 `/skills` 前缀到达的 codex skill 仍显示 `/skills <name>`;普通 slash 命令不变。`buildSourceBadge` 将 `codex-skill` 归类为 Skill 徽章(非 Command)。
 
+> **更新(2026-11-10)**: `AgentMentionMenuItem` 增可选 `menuGroup?: 'subagents'`，`AgentMentionMenuGroup` 增 `'subagents'`；`getAgentMentionMenuGroup` 优先识别该字段。统一引用菜单据 `referenceMention.group.subagents` 渲染 DSH 运行中子代理标签分组（组序：files → sessions → plugins → resources → subagents → agents）。
+
 ## 概述
 
 `slashCommandMenuRenderer.ts` 是聊天输入区 autocomplete overlay 的纯渲染 helper。它把 slash menu 的状态行、badge、skill 来源文案、menu item DOM，以及 `@agent` 候选 item DOM 从 `ComposerInputShellCoordinator` 中抽离，避免输入区 shell owner 因菜单展示细节继续膨胀。

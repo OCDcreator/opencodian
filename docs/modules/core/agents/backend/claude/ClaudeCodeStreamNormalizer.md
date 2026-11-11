@@ -49,3 +49,7 @@
 ## Goal 与会话工作台（2026-10-30）
 
 识别顶层 active_goal，转发 goal_updated / goal_cleared backend_event，保持原生完整条件、计量、原因和 session_id。null 是明确清除，不是读失败。
+
+## SDK 0.3.319 session_writes_lost（2026-11-08）
+
+claude-agent-sdk 0.3.313+ 新增 `SDKSessionWritesLostMessage`（`type: 'system'`, `subtype: 'session_writes_lost'`）：CLI 退出前至多发送一次，报告磁盘满（ENOSPC）或配额（EDQUOT）导致 transcript 行和/或 `~/.claude.json` 变更未能持久化；已收到的 result 仍然有效。0.3.312 时代该 subtype 不存在；升级 SDK 后若不处理会被静默丢弃，聊天层无法得知 resume 可能缺回合。`appendSdkSignalChunk` 现在把它映射为 `event: 'informational'`、`status: 'error'` 的诚实 backend_event，metadata 携带 `errorCode`、`lost`、`transcriptSessionIds`。fixture 测试覆盖有/无 `transcript_session_ids` 两种形状。

@@ -28,6 +28,10 @@
 
 ## 核心逻辑
 
+### 结果图片呈现（2026-11-10，DSH 历史恢复配套；review P2 修复后合同）
+
+`defaultRenderExpandedContent` 与 image-kind 分支在渲染前经 `collectResultImageDataUris` 做有界检测，每项验证（`isVerifiedResultImageDataUri`）：按 match 实际前缀解析声明 MIME（`RESULT_IMAGE_BASE64_PREFIX`，不固定 PNG 长度）→ canonical charset + 长度%4==0 + padding 尾 sextet 低位零校验（`hasCanonicalBase64Tail`，阻住改尾字符同解码不同重编码的非规范输入）+ ≤30,000,000 chars + `atob` 前 18 字节 magic 与**声明 MIME 一致**（PNG/JPEG/GIF87a|89a/WebP-RIFF；PNG 字节声明 jpeg 即拒绝）。命中时 `renderResultWithImages` 按出现顺序交错渲染：文本段复用既有 20 行截断行块（`appendResultTextLines`），图片段复用既有 `.streaming-tool-image` 类 `<img>`（`appendResultImage`，CSS 零新增）；每结果最多 4 张，超出由 `collapseOverflowImages` 折叠为 `t('chat.toolCard.image.notRendered', { number })` 本地化标记（原始 result 字符串不改动、巨量 base64 永不进入可见文本）。SVG、file://、http(s)、javascript:、截断/伪 payload/MIME-mismatch 一律保持字面文本，不开放任何远程/协议自动加载。无命中时与旧行为逐字节相同（文本/代码契约不变）；kind/icon 语义不变。image-kind 卡片：旧裸图分支收紧为 `SINGLE_RESULT_IMAGE_URI_PATTERN`——仅整条 result（trim 后）恰为一条白名单 data URI 时保留旧 `<img>` 契约（该形状不做 magic 校验的历史不对称如实保留）；首图+尾文、多图、混合一律走有界交错路径；error 与纯路径分支不变。测试：`ToolCallRenderer.image.test.ts`（裸图/混合/重复 URI/超界本地化标记/伪 payload/纯文本/image-kind 混合/真实 JPEG-GIF-WebP/MIME-mismatch/非规范 padding/单图+尾文不吞/单裸图 legacy）。
+
 ### 工具摘要生成
 
 `defaultGetToolSummary` 为每种工具类型实现专门的摘要逻辑：

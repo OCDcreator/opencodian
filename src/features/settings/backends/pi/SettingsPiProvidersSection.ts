@@ -4,12 +4,38 @@ import type { PiAdapter } from '../../../../core/agents/backend/pi/PiAdapter';
 import type { PiConfigurationDocument } from '../../../../core/agents/backend/pi/PiProtocol';
 import { type PiRecord, piRecord } from '../../../../core/agents/backend/pi/PiRpcClient';
 import { t } from '../../../../i18n';
+import { describeBackendSetting } from '../../controls/BackendSettingsControls';
+
+/**
+ * Optional native archive contract on PiAdapter (core-owned). When absent the
+ * editor falls back to the memory-only session undo below.
+ */
+export interface PiConfigurationHistoryBackend {
+  supportsConfigurationHistory(): Promise<boolean>;
+  getConfigurationHistory(): Promise<PiRecord>;
+  restoreConfiguration(input: PiRecord): Promise<PiRecord>;
+}
+interface PiArchiveEntry { index: number; savedAt: number; revision: string; bytes?: number }
+
+/**
+ * Session-scoped undo for the native models.json editor. While the adapter
+ * lacks the native archive, history lives only in a plugin-lifetime WeakMap
+ * keyed by the adapter: it survives tab rerenders, is never persisted and
+ * never written to the vault (the file embeds API-key expressions), and is
+ * intentionally lost on plugin reload. Secrets stay out of vault storage.
+ */
+interface PiDocumentVersion { savedAt: number; revision: string; value: PiRecord }
+const PI_DOCUMENT_HISTORY_LIMIT = 5;
+const documentHistory = new WeakMap<PiAdapter, PiDocumentVersion[]>();
 
 /** Structured models.json editor, with lossless native JSON for provider-specific extensions. */
 export class SettingsPiProvidersSection {
   private document?: PiConfigurationDocument;
   private selected = '';
   private editors: Array<() => void> = [];
+  private historyList?: HTMLElement;
+  private historyEpoch = 0;
+  private nativeHistory: boolean | null = null;
   constructor(private readonly adapter: PiAdapter, private readonly reconnect: () => Promise<void>) {}
 
   attach(container: HTMLElement): void {
@@ -18,7 +44,24 @@ export class SettingsPiProvidersSection {
     const body = container.createDiv();
     void this.adapter.command(undefined, 'get_model_configuration').then(result => {
       this.document = result as unknown as PiConfigurationDocument; status.setText(this.document.path); this.render(body);
+      // Mounted outside the editor body so editor re-renders keep the history.
+      this.renderHistory(container);
     }).catch(error => status.setText(String(error)));
+    void this.probeNativeHistory();
+  }
+
+  private get historyBackend(): PiConfigurationHistoryBackend | undefined {
+    const candidate = this.adapter as unknown as Partial<PiConfigurationHistoryBackend>;
+    return typeof candidate.supportsConfigurationHistory === 'function'
+      && typeof candidate.getConfigurationHistory === 'function'
+      && typeof candidate.restoreConfiguration === 'function' ? candidate as PiConfigurationHistoryBackend : undefined;
+  }
+
+  private async probeNativeHistory(): Promise<void> {
+    const backend = this.historyBackend;
+    if (!backend) { this.nativeHistory = false; return; }
+    try { this.nativeHistory = await backend.supportsConfigurationHistory(); }
+    catch { this.nativeHistory = false; }
   }
 
   private render(body: HTMLElement): void {
@@ -27,7 +70,16 @@ export class SettingsPiProvidersSection {
     const document = this.document as PiConfigurationDocument;
     const providers = piRecord(document.value.providers);
     this.selected ||= Object.keys(providers)[0] ?? '';
-    new Setting(body).setName(t('settings.pi.selectProvider')).addDropdown(dropdown => {
+    const select = new Setting(body).setName(t('settings.pi.selectProvider'));
+    describeBackendSetting(select, {
+      key: 'pi-provider-select',
+      scope: 'global',
+      effect: 'new-session',
+      risk: 'high',
+      defaultLabel: t('settings.pi.newProvider'),
+      source: document.path,
+    });
+    select.addDropdown(dropdown => {
       dropdown.addOption('', t('settings.pi.newProvider'));
       for (const name of Object.keys(providers)) dropdown.addOption(name, name);
       dropdown.setValue(this.selected).onChange(value => { this.selected = value; this.renderEditor(editor, providers); });
@@ -135,9 +187,174 @@ export class SettingsPiProvidersSection {
     input.rows = 4; input.value = value[key] === undefined ? '' : JSON.stringify(value[key], null, 2);
     this.editors.push(() => { if (!input.isConnected) return; if (input.value.trim()) value[key] = JSON.parse(input.value); else delete value[key]; });
   }
+
+  /** Every successful write archives the previous document (memory only). */
   private async save(value: PiRecord): Promise<void> {
-    this.document = await this.adapter.command(undefined, 'save_model_configuration', { revision: (this.document as PiConfigurationDocument).revision, value }) as unknown as PiConfigurationDocument;
+    const previous = this.document;
+    const next = await this.adapter.command(undefined, 'save_model_configuration', { revision: (this.document as PiConfigurationDocument).revision, value }) as unknown as PiConfigurationDocument;
+    if (previous) this.pushHistory(previous);
+    this.document = next;
+    this.renderHistoryEntries();
   }
+
+  private pushHistory(document: PiConfigurationDocument): void {
+    const history = documentHistory.get(this.adapter) ?? [];
+    history.unshift({ savedAt: Date.now(), revision: document.revision, value: document.value });
+    documentHistory.set(this.adapter, history.slice(0, PI_DOCUMENT_HISTORY_LIMIT));
+  }
+
+  private peekHistory(): PiDocumentVersion[] {
+    return documentHistory.get(this.adapter) ?? [];
+  }
+
+  /**
+   * Version history for models.json. Native persistent archive (survives
+   * reload) when the adapter exposes the contract; memory-only session undo
+   * otherwise, honestly labeled. Restore is always revision-guarded and
+   * reachable in three clicks: open disclosure -> Restore -> Confirm.
+   */
+  private renderHistory(container: HTMLElement): void {
+    const details = container.createEl('details', { cls: 'opencodian-pi-config-advanced opencodian-pi-config-history', attr: { 'data-pi-history': '', 'data-backend-risk': 'medium' } });
+    details.createEl('summary', { text: t('settings.pi.history.title') });
+    const body = details.createDiv({ cls: 'opencodian-zcode-disclosure-body' });
+    this.historyHelp = body.createEl('p', { cls: 'setting-item-description' });
+    this.historyList = body.createDiv({ cls: 'opencodian-settings-form-stack', attr: { 'data-pi-history-list': '' } });
+    details.addEventListener('toggle', () => { if (details.open) void this.renderHistoryEntries(); });
+  }
+
+  private historyHelp?: HTMLElement;
+
+  private renderHistoryEntries(): void {
+    const list = this.historyList;
+    if (!list?.isConnected) return;
+    const epoch = ++this.historyEpoch;
+    list.empty();
+    if (this.nativeHistory === true) {
+      this.historyHelp?.setText(t('settings.pi.history.nativeHelp'));
+      void this.renderNativeEntries(epoch);
+      return;
+    }
+    this.historyHelp?.setText(t('settings.pi.history.help'));
+    const entries = this.peekHistory();
+    if (!entries.length) {
+      list.createEl('p', { text: t('settings.pi.history.empty'), cls: 'setting-item-description' });
+      return;
+    }
+    for (const entry of entries) {
+      const row = new Setting(list)
+        .setName(t('settings.pi.history.entry', { time: new Date(entry.savedAt).toLocaleString() }))
+        .setDesc(t('settings.pi.history.entryDetail', { time: new Date(entry.savedAt).toLocaleTimeString() }));
+      describeBackendSetting(row, {
+        key: 'pi-history-memory-entry',
+        scope: 'vault',
+        effect: 'immediate',
+        source: t('settings.pi.history.memorySource'),
+      });
+      row.addButton(button => button.setButtonText(t('settings.pi.history.restore')).onClick(() => {
+        this.confirmMemoryRestore(entry, row.settingEl, epoch);
+      }));
+    }
+  }
+
+  /** Three clicks: open disclosure -> Restore -> Confirm (memory fallback). */
+  private confirmMemoryRestore(entry: PiDocumentVersion, row: HTMLElement, epoch: number): void {
+    const list = this.historyList;
+    if (!list?.isConnected) return;
+    const confirmHost = list.createDiv({ cls: 'opencodian-pi-config-history-confirm', attr: { 'data-pi-history-confirm': '' } });
+    confirmHost.createEl('p', { text: t('settings.pi.history.confirmHelp'), cls: 'setting-item-description' });
+    const confirm = confirmHost.createEl('button', { text: t('settings.pi.history.confirm'), attr: { type: 'button' } });
+    const cancel = confirmHost.createEl('button', { text: t('settings.pi.cancel'), attr: { type: 'button' } });
+    cancel.addEventListener('click', () => { confirmHost.empty(); row.querySelector<HTMLButtonElement>('button')?.focus(); });
+    confirm.addEventListener('click', () => {
+      confirm.disabled = true; cancel.disabled = true;
+      void (async () => {
+        await this.save(entry.value);
+        if (epoch !== this.historyEpoch || !list.isConnected) return;
+        new Notice(t('settings.pi.history.restored'));
+        this.renderHistoryEntries();
+      })().catch(() => {
+        if (!confirmHost.isConnected) return;
+        // Stale view never overwrites; classified copy only, never raw errors.
+        confirmHost.empty();
+        const stale = confirmHost.createEl('p', { text: t('settings.pi.history.stale'), cls: 'setting-item-description', attr: { role: 'alert' } });
+        const reload = stale.createEl('button', { text: t('settings.pi.history.refresh'), attr: { type: 'button' } });
+        reload.addEventListener('click', () => { reload.disabled = true; this.renderHistoryEntries(); });
+      })
+        .finally(() => { if (confirmHost.isConnected) { confirm.disabled = false; cancel.disabled = false; } });
+    });
+    confirm.focus();
+  }
+
+  private async renderNativeEntries(epoch: number): Promise<void> {
+    const list = this.historyList;
+    const backend = this.historyBackend;
+    if (!list?.isConnected || !backend || this.nativeHistory !== true) return;
+    if (!list.childElementCount) list.setText(t('settings.pi.history.loading'));
+    let entries: PiArchiveEntry[] = [];
+    try {
+      const snapshot = await backend.getConfigurationHistory();
+      const models = piRecord(snapshot.models);
+      entries = Array.isArray(models.entries) ? models.entries as PiArchiveEntry[] : [];
+    } catch {
+      if (epoch === this.historyEpoch && list.isConnected) list.setText(t('settings.pi.history.failed'));
+      return;
+    }
+    if (epoch !== this.historyEpoch || !list.isConnected) return;
+    list.empty();
+    if (!entries.length) {
+      list.createEl('p', { text: t('settings.pi.history.nativeEmpty'), cls: 'setting-item-description' });
+      return;
+    }
+    for (const entry of entries) {
+      const row = new Setting(list)
+        .setName(t('settings.pi.history.nativeEntry', { index: String(entry.index), time: new Date(entry.savedAt).toLocaleString() }))
+        .setDesc(t('settings.pi.history.nativeDetail', { size: String(entry.bytes ?? '?'), revision: String(entry.revision).slice(0, 12) }));
+      describeBackendSetting(row, {
+        key: `pi-history-native-${entry.index}`,
+        scope: 'global',
+        effect: 'immediate',
+        source: t('settings.pi.history.nativeSource'),
+      });
+      row.addButton(button => button.setButtonText(t('settings.pi.history.restore')).onClick(() => {
+        this.confirmNativeRestore(entry, row.settingEl, epoch);
+      }));
+    }
+  }
+
+  /** Three clicks: open disclosure -> Restore -> Confirm restore. */
+  private confirmNativeRestore(entry: PiArchiveEntry, row: HTMLElement, epoch: number): void {
+    const list = this.historyList;
+    if (!list?.isConnected) return;
+    const confirmHost = list.createDiv({ cls: 'opencodian-pi-config-history-confirm', attr: { 'data-pi-history-confirm': '' } });
+    confirmHost.createEl('p', { text: t('settings.pi.history.confirmHelp'), cls: 'setting-item-description' });
+    const confirm = confirmHost.createEl('button', { text: t('settings.pi.history.confirm'), attr: { type: 'button' } });
+    const cancel = confirmHost.createEl('button', { text: t('settings.pi.cancel'), attr: { type: 'button' } });
+    cancel.addEventListener('click', () => { confirmHost.empty(); row.querySelector<HTMLButtonElement>('button')?.focus(); });
+    confirm.addEventListener('click', () => {
+      confirm.disabled = true; cancel.disabled = true;
+      void (async () => {
+        const backend = this.historyBackend;
+        if (!backend) throw new Error('Pi history backend is unavailable.');
+        const next = await backend.restoreConfiguration({
+          target: 'models', index: entry.index, archivedRevision: entry.revision, revision: (this.document as PiConfigurationDocument).revision,
+        });
+        this.document = next as unknown as PiConfigurationDocument;
+        if (epoch !== this.historyEpoch || !list.isConnected) return;
+        new Notice(t('settings.pi.history.restored'));
+        await this.renderNativeEntries(epoch);
+      })().catch(() => {
+        if (!confirmHost.isConnected) return;
+        // A stale view never overwrites: surface refresh, never raw CLI text.
+        confirmHost.empty();
+        const stale = confirmHost.createEl('p', { text: t('settings.pi.history.stale'), cls: 'setting-item-description', attr: { role: 'alert' } });
+        const reload = stale.createEl('button', { text: t('settings.pi.history.refresh'), attr: { type: 'button' } });
+        reload.addEventListener('click', () => { reload.disabled = true; void this.renderNativeEntries(++this.historyEpoch); });
+      })
+        .finally(() => { if (confirmHost.isConnected) { confirm.disabled = false; cancel.disabled = false; } });
+    });
+    confirm.focus();
+  }
+
   private renderNative(container: HTMLElement): void {
     const details = container.createEl('details', { cls: 'opencodian-pi-config-advanced' });
     details.createEl('summary', { text: t('settings.pi.nativeModels') });

@@ -79,4 +79,57 @@ describe('ZCode personal API configuration transactions', () => {
     await expect(linked.read()).rejects.toThrow();
     expect(await readFile(other, 'utf8')).toBe('{"keep":true}');
   });
+
+  it('lists archive history and restores an overwrite entry through the canonical secure path', async () => {
+    const { service, target } = await fixture();
+    // No writes yet: history exists but has no entries.
+    expect(await service.listPersonalConfigHistory()).toEqual([]);
+    await service.save(draft, null);
+    const beforeSecond = await service.read();
+    await service.save({ ...draft, id: beforeSecond.providers[0]!.id, name: 'Renamed', apiKey: undefined }, beforeSecond.revision);
+
+    const history = await service.listPersonalConfigHistory();
+    expect(history !== null && history.length > 0).toBe(true);
+    const entry = history![history!.length - 1]!;
+    expect(entry.archiveKind).toBe('overwrite');
+
+    // Restoring without expecting the target present must conflict, never blind-write.
+    const blindConflict = await service.restorePersonalConfigEntry(entry.identity, null);
+    expect(blindConflict.status).toBe('conflict');
+
+    // Stale expected revision must conflict too.
+    const stale = await service.restorePersonalConfigEntry(entry.identity, beforeSecond.revision);
+    expect(stale.status).toBe('conflict');
+
+    // Correct revision: archive current content, restore archived content.
+    const current = await service.read();
+    const restored = await service.restorePersonalConfigEntry(entry.identity, current.revision);
+    expect(restored.status).toBe('success');
+    const document = JSON.parse(await readFile(target, 'utf8'));
+    const restoredRule = document.config.providerConfigRules.providerRules[0];
+    expect(restoredRule.providerName).toBe('Test API');
+    expect(restoredRule.config.access.apiKey).toBe('fixture-key');
+    // Restore re-archives the replaced content: history grows.
+    const historyAfter = await service.listPersonalConfigHistory();
+    expect(historyAfter !== null && historyAfter.length > history!.length).toBe(true);
+  });
+
+  it('hides other targets from a differently-rooted service and rejects foreign identities', async () => {
+    const { service, target, root } = await fixture();
+    await service.save(draft, null);
+    const snapshotForEdit = await service.read();
+    await service.save({ ...draft, id: snapshotForEdit.providers[0]!.id, name: 'Renamed', apiKey: undefined }, snapshotForEdit.revision);
+    // The allowlist root must exist for containment checks; create the foreign root first.
+    await mkdir(path.join(root, 'other-dir'), { recursive: true });
+    const foreign = new ZCodePersonalConfigService(path.join(root, 'other-dir', 'provider_config.json'), path.join(root, 'other-archive'));
+    expect(await foreign.listPersonalConfigHistory()).toEqual([]);
+
+    const history = await service.listPersonalConfigHistory();
+    expect(history !== null && history.length > 0).toBe(true);
+    const foreignResult = await foreign.restorePersonalConfigEntry(history![0]!.identity, null);
+    expect(foreignResult.status === 'invalid-path' || foreignResult.status === 'archive-failed' || foreignResult.status === 'not-found').toBe(true);
+    // The original target survives the rejected foreign restore untouched.
+    const document = JSON.parse(await readFile(target, 'utf8'));
+    expect(document.config.providerConfigRules.providerRules[0].providerName).toBe('Renamed');
+  });
 });

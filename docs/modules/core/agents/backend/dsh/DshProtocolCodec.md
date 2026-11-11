@@ -7,7 +7,7 @@
 这是无会话状态的 ACP 内容与配置准入模块，隔离可信控制器挂载外部进程/HTTP MCP 以及多模态序列化的风险。由传输层、适配器和设置组合层共用，不另建运行时 owner。
 
 - 集中定义 ACP v1、JSON 值类型和握手校验；DshAcpClient 保留兼容类型/校验导出。
-- `validateDshMcpServers` 整批验证名称唯一性、绝对 stdio command、字符串参数和环境名值，或绝对 HTTP(S) URL/headers；拒绝换行头、非法键、重复条目与不支持的传输。只验证和复制数据，不执行命令或请求 URL。
+- `validateDshMcpServers` 整批验证名称唯一性、绝对 stdio command、字符串参数和环境名值，或绝对 HTTP(S) URL/headers；拒绝换行头、非法键、重复条目与不支持的传输。高级字段保留 `toolCallTimeoutMs`、`failOnStartupError`、`maxInstructionBytes`、`reconnect.enabled/initialDelayMs/maxDelayMs/maxAttempts`；stdio 额外接受绝对 `cwd`，HTTP 不接受进程 cwd。次数和字节要求正的安全整数，timer 要求正有限数且不超过 2^31-1，重连初始延迟不得超过上限（含省略字段的原生默认值）；拒绝未知 reconnect 字段与非法布尔值。只验证和复制数据，不执行命令或请求 URL；new/resume 的 wire 测试验证高级字段不丢失。
 - `buildDshPromptBlocks` 保留结构化文本、文件内容、图片和资源链接顺序；只消除 requestParts 与 images 对同一附件的重复表示，保留同一表示内有意重复的图片。未知结构化内容和未获握手许可的图片明确失败。
 - 光栅图片仅接受 PNG/JPEG/WebP/GIF 的规范 base64，带大小上限。输出图片转换为受限 data:image Markdown；不接收 SVG 或任意 scheme。
 - 文本快照优先于资源链接，避免把选区附件扩展为整个文件。Memory/tooling 前缀与 Obsidian context 后缀由调用方提供，编码器不导入项目/聊天运行时。

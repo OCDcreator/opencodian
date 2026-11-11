@@ -95,13 +95,12 @@ describe('session workbench surface', () => {
   });
 
   it.each([
-    ['terminal', 'workbench.terminal'], ['git', 'workbench.git'],
-    ['browser', 'workbench.browser'], ['context', 'workbench.resources'],
+    ['terminal', 'workbench.terminal'], ['git', 'workbench.git'], ['browser', 'workbench.browser'],
   ] as const)('opens the %s shortcut as its own card', async (tool, label) => {
     surface.setState(state());
     boundary.querySelector<HTMLButtonElement>('.opencodian-workbench-trigger')!.click();
     await Promise.resolve();
-    [...boundary.querySelectorAll<HTMLButtonElement>('.opencodian-workbench-shortcut')]
+    [...boundary.querySelectorAll<HTMLButtonElement>('.opencodian-workbench-shortcuts > .opencodian-workbench-shortcut')]
       .find((button) => button.textContent === t(label))!.click();
     await Promise.resolve();
     expect(openTool).toHaveBeenLastCalledWith(tool);
@@ -126,15 +125,18 @@ describe('session workbench surface', () => {
     const section = (title: string) => [...boundary.querySelectorAll<HTMLDetailsElement>('.opencodian-workbench-overview > details')]
       .find((element) => element.querySelector('summary')?.textContent?.includes(title))!;
     expect(section(t('workbench.goal.title'))).toBeUndefined();
+    // Low-frequency information groups are closed by default so plan, files and activity lead the panel.
     const quota = section(t('workbench.info.quota'));
-    quota.open = false; quota.dispatchEvent(new Event('toggle'));
+    expect(quota.open).toBe(false); expect(section(t('workbench.info.mcp')).open).toBe(false);
+    // An explicit user choice is remembered independently of every other group.
+    quota.open = true; quota.dispatchEvent(new Event('toggle'));
     surface.setState({ ...data, statistics: { rounds: 3, messages: 6, tools: 4 } });
-    expect(section(t('workbench.info.quota')).open).toBe(false);
+    expect(section(t('workbench.info.quota')).open).toBe(true);
     expect(section(t('workbench.info.quota')).querySelector('summary')?.textContent).toContain('33%');
-    expect(section(t('workbench.info.mcp')).open).toBe(true);
+    expect(section(t('workbench.info.mcp')).open).toBe(false); expect(section(t('workbench.info.statistics')).open).toBe(false);
     surface.setState(state({ identity: 'codex:c2', sessionId: 'thread2' }));
     surface.setState(data);
-    expect(section(t('workbench.info.quota')).open).toBe(false);
+    expect(section(t('workbench.info.quota')).open).toBe(true); expect(section(t('workbench.info.mcp')).open).toBe(false);
   });
 
   it('keeps unreported quotas distinct from zero and restores parent panel scroll after inspecting a child', () => {
@@ -223,54 +225,89 @@ describe('session workbench surface', () => {
   });
 });
 
-describe('session card focus across content refresh', () => {
-  it.each([['tasks', 'workbench.tasks'], ['files', 'workbench.files']] as const)(
-    'keeps focus on the stable header when %s content is replaced', (page, label) => {
-      const boundary = document.body.createDiv();
-      const surface = new SessionWorkbench(boundary, { armGoal: jest.fn(), controlGoal: jest.fn(), refresh: jest.fn(),
-        openMessage: jest.fn(), openResource: jest.fn(), stopTask: jest.fn(), mountTools: jest.fn() });
-      try {
-        surface.setState(state()); surface.openGoal(); surface.setPage(page);
-        const back = boundary.querySelector<HTMLButtonElement>(`.opencodian-workbench-header button[aria-label="${t('workbench.goal.backToInformation')}"]`)!;
-        expect(document.activeElement).toBe(back);
-        boundary.querySelector(`.opencodian-workbench-${page}`)!.replaceChildren(document.createElement('button'));
-        surface.setState(state({ statistics: { rounds: 1, messages: 2, tools: 0 } }));
-        expect(document.activeElement).toBe(back);
-        expect(boundary.querySelector('.opencodian-workbench-session')?.textContent).toBe(t(label));
-      } finally { surface.destroy(); boundary.remove(); }
-    });
+describe('child continuation surface', () => {
+  let boundary: HTMLElement;
+  let surface: SessionWorkbench;
+  const controlGoal = jest.fn(async () => {});
+  beforeEach(() => {
+    boundary = document.createElement('div'); document.body.appendChild(boundary);
+    boundary.getBoundingClientRect = () => ({ width: 400 }) as DOMRect;
+    surface = new SessionWorkbench(boundary, { armGoal: jest.fn(), controlGoal, refresh: jest.fn(),
+      openMessage: jest.fn(), openResource: jest.fn(), stopTask: jest.fn(), mountTools: jest.fn() });
+  });
+  afterEach(() => { surface.destroy(); boundary.remove(); jest.clearAllMocks(); });
+
+  it('keeps the child continuation draft and focus across rebuilds and keeps non-continuable children read-only', () => {
+  const onChildComposerInput = jest.fn(); const onChildComposerDelivery = jest.fn(); const onChildComposerFocus = jest.fn();
+  surface.destroy();
+  surface = new SessionWorkbench(boundary, { armGoal: jest.fn(), controlGoal, refresh: jest.fn(), openMessage: jest.fn(),
+    openResource: jest.fn(), stopTask: jest.fn(), mountTools: jest.fn(),
+    continueChild: jest.fn(async () => t('workbench.info.childSendAccepted', { messageId: 'm1' })),
+    onChildComposerInput, onChildComposerDelivery, onChildComposerFocus });
+  const continuableChild = { agent: { id: 'child-1', title: 'Review', status: 'inactive' as const, readable: true, mode: 'continuable' as const },
+    messages: [], loading: false, canContinue: true as const, draft: '', delivery: 'queue' as const, composerFocused: false };
+  surface.setState(state({ identity: 'dsh:c1', backend: 'DSH', child: continuableChild }));
+  const input = boundary.querySelector<HTMLTextAreaElement>('.opencodian-workbench-child-input')!;
+  input.value = 'please review'; input.dispatchEvent(new Event('input'));
+  input.focus();
+  expect(onChildComposerInput).toHaveBeenCalledWith('please review', 13);
+  // A same-identity content refresh (tasklist tick) must not lose the in-progress draft or focus.
+  surface.setState(state({ identity: 'dsh:c1', backend: 'DSH',
+    child: { ...continuableChild, draft: 'please review', composerFocused: true } }));
+  const rebuilt = boundary.querySelector<HTMLTextAreaElement>('.opencodian-workbench-child-input')!;
+  expect(rebuilt.value).toBe('please review');
+  expect(document.activeElement).toBe(rebuilt);
+  // Delivery is a segmented control persisted in coordinator state, not a native select.
+  const options = [...boundary.querySelectorAll<HTMLButtonElement>('.opencodian-workbench-child-delivery-option')];
+  expect(options.map((option) => option.getAttribute('aria-checked'))).toEqual(['true', 'false']);
+  options[1]!.click();
+  expect(onChildComposerDelivery).toHaveBeenCalledWith('steer');
+  surface.setState(state({ identity: 'dsh:c1', backend: 'DSH',
+    child: { ...continuableChild, draft: 'please review', delivery: 'steer', composerFocused: true } }));
+  expect([...boundary.querySelectorAll<HTMLButtonElement>('.opencodian-workbench-child-delivery-option')]
+    .map((option) => option.getAttribute('aria-checked'))).toEqual(['false', 'true']);
+  // One-shot records stay read-only: no composer, explicit note.
+  surface.setState(state({ identity: 'dsh:c1', backend: 'DSH', child: { agent: { id: 'child-2', title: 'Once',
+    status: 'completed', readable: true, mode: 'one-shot' }, messages: [], loading: false } }));
+  expect(boundary.querySelector('.opencodian-workbench-child-composer')).toBeNull();
+  expect(boundary.textContent).toContain(t('workbench.info.childReadOnly'));
 });
 
-describe('session information entry structure', () => {
-  it('keeps controls above information and gives task/tool entries consistent navigation', async () => {
+it('masks user text in the child transcript for display only and keeps the projected message original', () => {
+  surface.destroy();
+  surface = new SessionWorkbench(boundary, { armGoal: jest.fn(), controlGoal, refresh: jest.fn(), openMessage: jest.fn(),
+    openResource: jest.fn(), stopTask: jest.fn(), mountTools: jest.fn() });
+  const original = { id: 'u1', role: 'user' as const, timestamp: 1, content: 'KEY=sk-ant-api03-synthetic-token-value please continue' };
+  const assistant = { id: 'a1', role: 'assistant' as const, timestamp: 2, content: 'plain assistant output' };
+  const messages = [original, assistant];
+  surface.setState(state({ identity: 'dsh:c1', backend: 'DSH', child: { agent: { id: 'child-3', title: 'Review',
+    status: 'inactive', readable: true, mode: 'continuable' }, messages, loading: false, canContinue: false } }));
+  const transcript = boundary.querySelector('.opencodian-workbench-overview')?.textContent ?? boundary.textContent ?? '';
+  expect(transcript).toContain('KEY=');
+  expect(transcript).not.toContain('sk-ant-api03-synthetic-token-value');
+  expect(transcript).toContain('plain assistant output');
+  // Display projection only: the projected message object stays original.
+  expect(messages[0]!.content).toContain('sk-ant-api03-synthetic-token-value');
+});
+
+describe('session card focus across content refresh', () => {
+  const mount = () => {
     const boundary = document.body.createDiv();
     const surface = new SessionWorkbench(boundary, { armGoal: jest.fn(), controlGoal: jest.fn(), refresh: jest.fn(),
       openMessage: jest.fn(), openResource: jest.fn(), stopTask: jest.fn(), mountTools: jest.fn() });
+    return { boundary, surface };
+  };
+
+  it('keeps focus on the stable header when files content is replaced', () => {
+    const { boundary, surface } = mount();
     try {
-      surface.setState(state({ contextSources: [{ label: 'Attached note', path: 'note.md' }] }));
-      boundary.querySelector<HTMLButtonElement>('.opencodian-workbench-trigger')!.click();
-      await Promise.resolve();
-      const panel = boundary.querySelector('.opencodian-workbench-panel')!;
-      const header = panel.querySelector('.opencodian-workbench-header')!;
-      const overview = panel.querySelector('.opencodian-workbench-overview')!;
-      expect(header.parentElement).toBe(panel);
-      expect(overview.contains(header)).toBe(false);
-      expect(header.textContent).toContain(t('workbench.information'));
-      expect(overview.querySelector('summary')?.contains(header)).toBe(false);
-      const entries = [...overview.querySelectorAll<HTMLButtonElement>('.opencodian-workbench-shortcuts > button')];
-      expect(entries.map((button) => button.textContent)).toEqual([
-        t('workbench.tasks'), t('workbench.terminal'), t('workbench.git'), t('workbench.browser'), t('workbench.resources'),
-      ]);
-      for (const entry of entries) {
-        expect(entry.classList.contains('opencodian-workbench-shortcut')).toBe(true);
-        expect(entry.querySelector('svg[data-icon="chevron-right"]')).not.toBeNull();
-      }
-      expect(overview.textContent).toContain(t('workbench.info.sources'));
-      expect(t('workbench.info.sources')).not.toBe(t('workbench.resources'));
-      entries[0].focus(); entries[0].click(); await Promise.resolve();
-      expect(panel.querySelector('.opencodian-workbench-tasks')?.hasAttribute('hidden')).toBe(false);
-      expect(panel.querySelector('.opencodian-workbench-session')?.textContent).toBe(t('workbench.tasks'));
-      expect(document.activeElement).toBe(header.querySelector(`button[aria-label="${t('workbench.goal.backToInformation')}"]`));
+      surface.setState(state()); surface.openGoal(); surface.setPage('files');
+      const back = boundary.querySelector<HTMLButtonElement>(`.opencodian-workbench-header button[aria-label="${t('workbench.goal.backToInformation')}"]`)!;
+      expect(document.activeElement).toBe(back);
+      boundary.querySelector('.opencodian-workbench-files')!.replaceChildren(document.createElement('button'));
+      surface.setState(state({ statistics: { rounds: 1, messages: 2, tools: 0 } }));
+      expect(document.activeElement).toBe(back);
+      expect(boundary.querySelector('.opencodian-workbench-session')?.textContent).toBe(t('workbench.files'));
     } finally { surface.destroy(); boundary.remove(); }
   });
 });
@@ -294,6 +331,25 @@ it('aligns docked cards with the visible composer above its status footer', () =
     expect(host.style.getPropertyValue('--workbench-dock-bottom')).toBe('90px');
     composer.remove(); surface.openGoal();
     expect(host.style.getPropertyValue('--workbench-dock-bottom')).toBe('20px');
+  } finally { surface.destroy(); boundary.remove(); }
+});
+
+it('hangs the trigger and open panel below the actual wrapped chat chrome with the incumbent gap', () => {
+  const boundary = document.body.createDiv();
+  boundary.getBoundingClientRect = () => ({ width: 400, top: 49 }) as DOMRect;
+  const container = boundary.createDiv({ cls: 'opencodian-container' });
+  container.createDiv({ cls: 'opencodian-header' }).getBoundingClientRect = () => ({ height: 53, top: 61, bottom: 114 }) as DOMRect;
+  const shell = container.createDiv({ cls: 'opencodian-messages-shell' });
+  shell.getBoundingClientRect = () => ({ height: 533, top: 114, bottom: 647 }) as DOMRect;
+  const surface = new SessionWorkbench(boundary, { armGoal: jest.fn(), controlGoal: jest.fn(), refresh: jest.fn(),
+    openMessage: jest.fn(), openResource: jest.fn(), stopTask: jest.fn(), mountTools: jest.fn() });
+  try {
+    const host = boundary.querySelector<HTMLElement>('.opencodian-workbench-host')!;
+    expect(host.style.getPropertyValue('--workbench-top')).toBe('80px');
+    shell.getBoundingClientRect = () => ({ height: 500, top: 147, bottom: 647 }) as DOMRect;
+    surface.openGoal();
+    expect(host.style.getPropertyValue('--workbench-top')).toBe('113px');
+    expect(boundary.querySelector<HTMLElement>('.opencodian-workbench-trigger')!.style.top).toBe('');
   } finally { surface.destroy(); boundary.remove(); }
 });
 
@@ -326,3 +382,4 @@ it('aligns docked cards with the visible composer above its status footer', () =
     expect(boundary.classList.contains('has-workbench-docked')).toBe(false);
     } finally { surface.destroy(); boundary.remove(); }
   });
+});

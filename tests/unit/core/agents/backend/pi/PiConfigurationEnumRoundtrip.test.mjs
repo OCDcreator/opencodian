@@ -22,6 +22,7 @@ function fixture(project = {}, global = {}) {
   mkdirSync(base, { recursive: true });
   const directory = mkdtempSync(join(base, 'pi-PC1-'));
   const cwd = join(directory, 'project'); const agentDir = join(directory, 'agent-fixture');
+  const historyRoot = join(directory, 'history-root');
   mkdirSync(join(cwd, '.pi'), { recursive: true }); mkdirSync(agentDir, { recursive: true });
   // Service reads/writes use in-memory locks; backup writes are confined to this owned fixture.
   const raw = { project: JSON.stringify(project), global: JSON.stringify(global) };
@@ -32,7 +33,7 @@ function fixture(project = {}, global = {}) {
       if (typeof result === 'string') { raw[scope] = result; writes.push({ scope, raw: result }); }
     }
   }
-  const config = createConfigurationService({ FileSettingsStorage, VERSION: 'PC1-offline-fixture' }, cwd, agentDir);
+  const config = createConfigurationService({ FileSettingsStorage, VERSION: 'PC1-offline-fixture' }, cwd, agentDir, { historyRoot });
   const save = (scope, mode, changes) => {
     const snapshot = config.getSettings();
     const command = { scope, revision: snapshot.scopes[scope].revision };
@@ -123,6 +124,20 @@ test('unsafe nested keys remain fail closed while an enum is unchanged', () => {
   const value = JSON.parse('{"defaultThinkingLevel":"future-sdk-level","future":{"__proto__":{"polluted":true}}}');
   assert.throws(() => f.config.saveSettings({ scope: 'project', revision: snapshot.scopes.project.revision, value }), /Unsafe configuration key/);
   assert.equal(f.writes.length, 0); assert.equal({}.polluted, undefined);
+});
+test('PC2 inherit truth: project overrides write, null-clear falls back to untouched global', () => {
+  const f = fixture({}, { steeringMode: 'one-at-a-time', compaction: { enabled: true } });
+  let snapshot = f.config.getSettings();
+  snapshot = f.config.saveSettings({ scope: 'project', revision: snapshot.scopes.project.revision, changes: { steeringMode: 'all', 'compaction.enabled': false } });
+  assert.equal(snapshot.scopes.project.value.steeringMode, 'all');
+  assert.equal(snapshot.scopes.project.value.compaction.enabled, false);
+  assert.equal(snapshot.scopes.global.value.steeringMode, 'one-at-a-time');
+  snapshot = f.config.saveSettings({ scope: 'project', revision: snapshot.scopes.project.revision, changes: { steeringMode: null, 'compaction.enabled': null } });
+  assert.equal(Object.hasOwn(snapshot.scopes.project.value, 'steeringMode'), false);
+  assert.equal(Object.hasOwn(snapshot.scopes.project.value, 'compaction.enabled'), false);
+  assert.equal(snapshot.scopes.global.value.steeringMode, 'one-at-a-time');
+  assert.equal(snapshot.scopes.global.value.compaction.enabled, true);
+  assert.equal(f.raw.project.includes('steeringMode'), false);
 });
 test('deleting an unknown stored enum and adding a supported one succeeds', () => {
   const f = fixture({ defaultThinkingLevel: unknown });

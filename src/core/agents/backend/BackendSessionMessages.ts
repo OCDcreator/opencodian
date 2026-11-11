@@ -100,7 +100,10 @@ function consumeImage(part: Record<string, unknown>, images: ImageAttachment[]):
   const mediaType = source.media_type ?? part.mimeType ?? part.mediaType;
   const data = source.data ?? part.data;
   if (typeof data === 'string' && ['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(String(mediaType)))
-    images.push({ data, mediaType: mediaType as ImageAttachment['mediaType'] });
+    images.push({ data, mediaType: mediaType as ImageAttachment['mediaType'],
+      // Harness history carries the original display name as `name`; Claude
+      // source blocks have no name field, so this stays additive.
+      ...(typeof part.name === 'string' && part.name ? { filename: part.name } : {}) });
 }
 
 function nativeMessage(backend: AgentBackendKind, value: unknown, tools: Map<string, ToolCallInfo>): ChatMessage | null {
@@ -115,6 +118,20 @@ function nativeMessage(backend: AgentBackendKind, value: unknown, tools: Map<str
 
 interface MessageIdentity { backend: AgentBackendKind; raw: Record<string, unknown>; info: Record<string, unknown>; nested: Record<string, unknown>; role: string; id: string }
 
+/**
+ * Opt-in per-message model provenance: adapters set `recordedModelId` only
+ * from the message's own recorded assistant route, never from the session's
+ * current selection. Only genuine assistant messages qualify — tool/activity
+ * transcripts must not look model-generated. When absent (or blank) the field
+ * stays absent entirely, so authoritative merges that spread the projection
+ * over a local message keep the locally known modelId instead of erasing it.
+ */
+function resolveRecordedModelField(raw: Record<string, unknown>, role: string): { modelId: string } | Record<string, never> {
+  const recordedModelId = typeof raw.recordedModelId === 'string' && raw.recordedModelId.trim()
+    ? raw.recordedModelId : null;
+  return recordedModelId && role === 'assistant' ? { modelId: recordedModelId } : {};
+}
+
 function projectMessage(identity: MessageIdentity, tools: Map<string, ToolCallInfo>): ChatMessage | null {
   const { backend, raw, info, nested, role, id } = identity;
   const content = nested.content ?? raw.content ?? raw.parts;
@@ -126,6 +143,7 @@ function projectMessage(identity: MessageIdentity, tools: Map<string, ToolCallIn
   const timestamp = typeof raw.timestamp === 'number' ? raw.timestamp : typeof raw.timestamp === 'string' ? Date.parse(raw.timestamp) : Number(time.created ?? 0);
   return { id: `native-${backend}-${id}`, sourceMessageId: id,
     ...(typeof raw.sourceTurnId === 'string' ? { sourceTurnId: raw.sourceTurnId } : {}),
+    ...resolveRecordedModelField(raw, role),
     role: role === 'user' ? 'user' : 'assistant', content: parts.texts.join('\n'), timestamp: Number.isFinite(timestamp) ? timestamp : 0,
     contentBlocks: parts.thinking.length ? [
       ...parts.thinking.map((thinking) => ({ type: 'thinking' as const, thinking })),

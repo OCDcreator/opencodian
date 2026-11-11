@@ -5,6 +5,10 @@
 
 # Owner: feature.chat-runtime
 
+2026-11-10（@subagent 候选来源 + 用户文字遮罩展示）：`ChatRuntimeComposition.loadSubagentMentionCandidates` 仅在 `backend==='dsh'` 且存在 native session 时经 adapter 只读子会话目录取 active children，按 sessionId 3s TTL 缓存；候选一律 literalOnly（label ?? id，description 为子会话 id），RPC 失败返回空数组，不伪造候选、不授予续接权限（可写续接唯一通道见 feature.chat-services 协调器，能力真值归 core.backend）。`UserMessageContentRenderer` 的三处展示钩子（可见文本与默认复制内容、OMO injected raw、OMO headline）与 context chip 的 label/title/aria 经同一 `maskUserMessageSecretsForDisplay` 显示投影：仅展示层，持久化 `ChatMessage`、模型输入、rewind/fork/编辑恢复保持原文；URL chip 点击目标仍取对象原始 path/URL，原始 URL 不写入任何 DOM attribute；`ChatRuntimeComposition.onTurnSettled` 的 codex/claude-code footer copy content 同样改走遮罩投影。mask v4 与默认 copy 集成（19 用例通过）经 custom+Kimi 静态 review 无阻塞（2026-11-10 通报）；宿主渲染/视觉验收仍归主代理管线。
+
+2026-11-09（DSH Jobs）：BackgroundTaskIndicatorCoordinator 的 native snapshot 入口复用既有逐回合 InlinePanelRenderer 与延迟持久化 completion queue。它不调用 foreground live-signal reconcile 或 stream-like status 同步，Jobs 与 Todos/session.status 保持独立。Native 任务获取/订阅/代际由 SessionInformationCoordinator 持有；view 只装配回调。所有 DSH 标签的有界轮询确保 foreground 已结束或切换标签后仍能完成提示。实际宿主验收必须检验回合位置、延迟时机与恢复后的去重；组合 owner 单测不冒充真实模型运行。
+
 2026-10-29：ChatRuntimeComposition 为统一引用服务注入当前 Vault 文件、插件持久化会话与来源后端只读入口；目录与发送准备共用实例。SendPipelineRuntime 将准备好的后端正文送往目的后端，保留本地可读用户消息，不切换全局活跃后端或恢复来源会话。
 > 2026-10-26（DSH UI 修复）：AssistantShellRenderer 使用 shell 提供的目录查询显示历史消息模型名称；原始 provider/model 身份保留在 data 属性、焦点提示和可访问名称中。找不到目录项时显示原始身份，不借用当前会话模型，也不改写消息记录。
 > 2026-09-25 (FA880): BackgroundTaskInlinePanelRenderer displays native ZCode jobs separately from the foreground tool card, refreshing active jobs and surfacing cancel/failure/interrupted terminal states.

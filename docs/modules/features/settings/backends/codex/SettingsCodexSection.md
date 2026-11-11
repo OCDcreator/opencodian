@@ -15,6 +15,8 @@
 > **更新**: 2026-07-28 — Connection tab adds a persisted user CLI executable path and explicit plugin-reload action. Saving never touches an active session; reload warns that it terminates active Codex turns.
 > **更新**: 2026-07-29 — Main Codex page/group headings share the Account rhythm: `4px` title-to-description and `16px` description-to-controls; the cost estimate group uses `16px` title-to-controls. Classic top-level ribbons remain an intentional host exception.
 
+> **2026-11-08 后端设置重塑（backend settings refresh）**: 二级 tab 重构为任务型 5 页：`conversation` / `permissions-safety` / `account` / `resources` / `connection`。旧 id（model、permissions、project-config、resume-inspect、plugins）经 `CODEX_LEGACY_TAB_ROUTES` 直达新页。`resources` 页合并 resume-inspect 读回 + skills/agents 资源 + plugins，三块各自持有专属 sub-host（`data-codex-resources-page-area`），因为各 surface 会 `empty()` 自身宿主；`connection` 页合并连接摘要 + CLI 路径覆盖（高风险，restart）+ 凭据 + project config workbench（独立 `data-codex-project-config-host`，刷新只清空自身，不再清掉连接页行）。approvalPolicy / sandboxMode / modelReasoningEffort / webSearchMode 改为 `addBackendChoiceSetting` 单选卡，effect 元数据统一 `new-session`（线程边界语义，不再误标 next-turn）。model 下拉 inherit-first：空值显式选中「默认（Codex CLI 自动选择）」，未知已保存 id 保留为标记选项而非落回 custom 占位。新增公开 `reapplyRuntimeUpdates()`：按 save 时顺序把线程级设置经既有 update* mutators 推入运行中 adapter（下一线程边界生效；executablePath/apiKey 仍需 reload）。project config 表单 approval_policy 仅引导 inherit/never/on-request；已存在的 retired `untrusted` 与未引导 `on-failure` 原样保留为标记选项 + 修复提示，表单保存永不改写该行。
+
 ## Purpose
 
 Codex backend settings panel. Uses seven secondary tabs under the Codex primary tab to avoid piling unrelated settings into a single flat card stack, grouped by *what* a setting controls (Source Grouping, see `CONTEXT.md`):

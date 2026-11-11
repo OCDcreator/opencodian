@@ -1,6 +1,6 @@
 # SettingsBackendSection
 
-OpenCode 2 renders eight functional pages: connection/runtime, models/providers, agents, ordered tool permissions, MCP/plugins, instruction/skill/command/reference sources, context, and advanced JSONC. Native authentication and MCP connections remain backed by the adapter.
+OpenCode 2 renders six merged functional pages: connection/runtime, model (retired auth/integrations/models tabs merged in), agents, ordered tool permissions, mcp (retired extensions merged in), and advanced (retired resources/context/catalog plus sources, raw JSONC, and the machine-local recovery disclosure). Native authentication and MCP connections remain backed by the adapter.
 
 ## 2026-10-27 OpenCode 2 工作区
 
@@ -12,6 +12,16 @@ OpenCode 2 renders eight functional pages: connection/runtime, models/providers,
 - permissions/policies 按 v2 有序数组保存；compaction/media/tool_output/snapshots、watcher/formatter/shell/worktree 及选定实验字段使用当前 v2 字段形状。
 - 官方 OpenCode SVG 本地注册；宿主主题下的 Card/Field/Badge/Alert/ScrollArea 样式限定在 `.opencodian-opencode2-settings`，720px/480px 容器宽度收起表单列和列表列。
 - 聚焦测试：`SettingsOpenCode2Workspace.test.ts`；认证继续支持 API Key/OAuth/环境变量，密钥不保存到草稿。
+
+## 2026-11-08 高级页恢复历史（saved configContent recovery）
+
+- 高级页底部新增恢复披露 `details.opencodian-opencode2-recovery`（列表 `.opencodian-opencode2-recovery-list`、内联确认 `.opencodian-opencode2-recovery-confirm`、反馈 `role="status"`）：记录上一份 SAVED `opencode2.configContent`。成功 apply（`validateConfigContent` 通过且插件设置已保存）后由 applyDraft 把被顶替的旧值归档（含空 overlay）；save 失败不归档；validate+save 成功但归档 IO 失败时保留新值并报告 saved-but-history-unavailable，不回滚、不谎报 apply 失败。列表读取失败（base 为普通文件/symlink/权限放宽）时降级为 `settings.backend.recovery.unavailable` 提示，不中断 advanced tab 渲染；重开 disclosure 不清除既有反馈，只有新的恢复尝试清空。
+- 存储：`core.agents.backend.configuration.BackendConfigRecoveryStore`，默认机器本地根目录 `~/.opencodian/backend-config-recovery`（绝不写入 vault、不参与同步）。目录 0700、文件 0600；每个目标固定 5 个槽位，最旧槽位由 rename 顶替（无递归删除、无 unlink 清理命令）；写入用 `wx`+uuid 临时文件后原子 rename；base/祖先路径出现 symlink 或已有目录权限放宽即拒绝（列表时同样拒绝）。
+- 每 vault 身份：`backendRecoveryIdentity(vaultPath, 'opencode2:configContent')` = sha256(`resolve(vaultPath)\nkind`) 的 64-hex，要求绝对 vaultPath；无稳定 vault 路径时恢复不可用（不写不列，fail-closed），不同 vault 永不共享快照命名空间，槽位 key 为 `opencode2-config-content`。
+- `revision` 是归档字节的 sha256，即恢复身份。打开列表时对当前 `configContent` 的 revision 做 CAS 快照；Confirm 点击与变更在同一同步点重新校验：当前值已变、或快照 revision 与列表不符 → stale 反馈，不 save、不 adapter apply、不归档。恢复确认保持保存基线为当前值、仅草稿采用快照（`conflict()` 门不会误判），随后重进 `validateConfigContent` 验证路径落盘；applyDraft 在保存成功后归档被顶替的当前值（undo-of-undo，含空 overlay），不归档恢复值本身。
+- 保存源与应用历史分离：vault 内插件设置的 `configContent` 是唯一保存源（随 vault 同步）；机器本地归档是密钥敏感的应用历史，仅本机恢复使用。列表只渲染元数据（时间、字节，"contents hidden"），永不渲染内容预览，密钥只存在于 0600 归档文件中。
+- 恢复文案已并入 en/zh locales（22 个 recovery 键 + 通用 `settings.backend.recovery.unavailable` 等，parent humanized + merged）。
+- 聚焦测试：`SettingsOpenCode2Recovery.test.ts`——fixture host 提供 `vaultPath`+`recoveryBaseDir`，adapter `validateConfigContent` 按真实契约应用配置；真实 store + 真实 fs（fixtures 保留在 worktree `node_modules/.cache/opencodian-oc2-recovery-fixture/`，测试无任何清理/删除命令）。
 
 > **源码**: `src/features/settings/backends/opencode/SettingsBackendSection.ts`
 > **状态**: [REVIEW]

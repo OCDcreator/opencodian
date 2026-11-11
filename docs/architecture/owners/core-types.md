@@ -1,5 +1,11 @@
 # Owner: core.types
 
+2026-11-10（DSH sessionTrace 设置契约）：`BackendSettings.dsh.sessionTrace` 增加持久化形状——`nativeEnabled` 与 `acpEnabled` 两个相互独立的 wire-trace 门（非 `false` 归 true）、`consolePreset`（仅 `'full'` 保留，其余归默认 `'standard'`）、按 `DSH_TRACE_CHANNEL_IDS` 重建的 `consoleChannels`（非 `false` 归 true）与 `storageDirectory`；`normalizeDshBackendSettings` 合流点始终填充默认值，持久化设置不会看到 undefined。trace 事件/端口/设置类型本身归 core.backend-diagnostics（diagnostics/types），本 owner 只持有设置持久化契约与归一化；consolePreset/channels/store 目录已被运行时实际消费但暂无设置 UI。类型层不解析凭据、不执行 trace、不推导运行时采集状态。
+
+2026-11-09：`dshConfiguration.ts` 定义版本化、JSON 形状的 DSH 稀疏覆盖和字段描述元数据；`DshBackendSettings.nativeConfig` 使用同 owner 的类型，不反向依赖后端实现。归一化保留非法持久化意图供 UI／启动校验报告，避免静默删除后冒充保存成功。MCP 高级声明类型增加 stdio cwd、超时、启动失败策略、指令预算与 reconnect 可选字段。类型层不解析凭据、不执行 patch，也不推导运行时确认。
+
+2026-11-07: `BackendSettingsRecoveryPoint` and optional `backendSettingsRecoveryPoints` describe a user-marked non-secret working default set. Validation and per-backend writable keys remain in the shared settings workspace; backend defaults and normalizers stay canonical. The type does not carry credentials or runtime verification and does not change existing settings defaults.
+
 2026-10-29：增加 Vault 范围内的版本化 `PromptReference`、原生 mention 与会话快照契约。目的消息持有 `promptReferences` 稳定身份及 `sessionReferences` 实际捕获证据，可读正文与请求展开分离；类型层不负责目录发现、读取或原生执行。
 > 2026-10-24（DSH）：增加会话级 opaque 模型/逐模型推理覆盖、stdio/HTTP MCP 声明和 aggregate context 标记；配置与回读继续分别归原 owner 所有。
 > 2026-10-02（T02）：inline-edit/completion 模型覆盖 allowlist 补入 `opencode2`，保存归一化与重载保留独立 provider/model；ZCode 的编辑边界和 effort allowlist 保持原限制。归一化函数体不扩展运行时责任；native 模型回读另行验收。

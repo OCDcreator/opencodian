@@ -22,6 +22,9 @@ import {
   CODEX_TRACE_CHANNEL_IDS,
   type CodexSessionTraceSettings,
   type CodexTraceChannelId,
+  DSH_TRACE_CHANNEL_IDS,
+  type DshSessionTraceSettings,
+  type DshTraceChannelId,
 } from '../agents/backend/diagnostics/types';
 import { type EnvironmentVariablesDomains } from '../agents/BackendEnvironment';
 import {
@@ -32,6 +35,7 @@ import {
 import type { OpenCodeCapabilitySettings } from '../opencode/OpenCodeCapabilitySettingsMigration';
 import type { PluginUpdatePersistedState } from '../update/PluginUpdateService';
 import type { AgentBackendKind } from './chat';
+import type { DshNativeConfiguration } from './dshConfiguration';
 import type { ModelPricingOverride } from './pricing';
 
 /** Permission mode for tool execution */
@@ -1087,11 +1091,19 @@ export function normalizeZCodeBackendSettings(value: unknown): ZCodeBackendSetti
   };
 }
 
-/** Local DeepSeek Harness ACP backend settings. Desktop attach is intentionally deferred. */
-/** ACP session-scoped MCP declarations. Commands are native absolute executable paths. */
-export type DshMcpServer =
-  | { name: string; command: string; args: string[]; env: Array<{ name: string; value: string }> }
-  | { type: 'http'; name: string; url: string; headers: Array<{ name: string; value: string }> };
+/** Native DSH MCP options; ACP support is reported separately by the transport. */
+export type DshMcpServerOptions = {
+  toolCallTimeoutMs?: number;
+  failOnStartupError?: boolean;
+  maxInstructionBytes?: number;
+  reconnect?: { enabled?: boolean; initialDelayMs?: number; maxDelayMs?: number; maxAttempts?: number };
+};
+
+/** Session-scoped MCP declarations. Commands are native absolute executable paths. */
+export type DshMcpServer = DshMcpServerOptions & (
+  | { name: string; command: string; args: string[]; env: Array<{ name: string; value: string }>; cwd?: string }
+  | { type: 'http'; name: string; url: string; headers: Array<{ name: string; value: string }> }
+);
 
 export interface DshBackendSettings {
   /** Optional user-installed `dsh` CLI or bundled Electron-as-Node launcher. */
@@ -1108,6 +1120,47 @@ export interface DshBackendSettings {
   transport?: 'native' | 'acp';
   /** Applied when creating or resuming a native session, never hot-swapped into a running turn. */
   mcpServers?: DshMcpServer[];
+  /** Versioned non-secret defaults. Missing or empty overrides inherit the native profile. */
+  nativeConfig?: DshNativeConfiguration;
+  /** Plugin policy for new Native chat sessions only; undefined inherits runtime Plan state. */
+  defaultPlanMode?: boolean;
+  /**
+   * Wire-trace (diagnostics) settings; native and ACP transports are gated
+   * independently. Optional for direct constructors; `normalizeDshBackendSettings`
+   * always fills the defaults so persisted settings never see undefined.
+   */
+  sessionTrace?: DshSessionTraceSettings;
+}
+
+export function getDefaultDshSessionTraceSettings(): DshSessionTraceSettings {
+  return {
+    nativeEnabled: true,
+    acpEnabled: true,
+    consolePreset: 'standard',
+    consoleChannels: Object.fromEntries(
+      DSH_TRACE_CHANNEL_IDS.map((channelId) => [channelId, true]),
+    ) as Record<DshTraceChannelId, boolean>,
+    storageDirectory: '',
+  };
+}
+
+function normalizeDshSessionTraceSettings(value: unknown): DshSessionTraceSettings {
+  const source = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Partial<DshSessionTraceSettings>
+    : {};
+  const defaults = getDefaultDshSessionTraceSettings();
+  const consoleChannels = Object.fromEntries(
+    DSH_TRACE_CHANNEL_IDS.map((channelId) => [channelId, source.consoleChannels?.[channelId] !== false]),
+  ) as Record<DshTraceChannelId, boolean>;
+  return {
+    nativeEnabled: source.nativeEnabled !== false,
+    acpEnabled: source.acpEnabled !== false,
+    consolePreset: source.consolePreset === 'full' ? 'full' : defaults.consolePreset,
+    consoleChannels,
+    storageDirectory: typeof source.storageDirectory === 'string'
+      ? source.storageDirectory.trim()
+      : defaults.storageDirectory,
+  };
 }
 
 export function normalizeDshBackendSettings(value: unknown): DshBackendSettings {
@@ -1135,7 +1188,19 @@ export function normalizeDshBackendSettings(value: unknown): DshBackendSettings 
     // Preserve invalid persisted declarations for the runtime/UI validator to reject;
     // silently dropping a declaration would report a different configuration as saved.
     mcpServers: source.mcpServers === undefined ? [] : source.mcpServers as DshMcpServer[],
+    // Keep invalid persisted intent so validation/UI can explain it; never replace it with
+    // an empty successful-looking configuration during settings load.
+    ...(source.nativeConfig === undefined ? {} : { nativeConfig: source.nativeConfig as DshNativeConfiguration }),
+    ...(typeof source.defaultPlanMode === 'boolean' ? { defaultPlanMode: source.defaultPlanMode } : {}),
+    sessionTrace: normalizeDshSessionTraceSettings(source.sessionTrace),
   };
+}
+
+/** A user-marked working set of non-secret backend defaults. Native files keep their own archive history. */
+export interface BackendSettingsRecoveryPoint {
+  version: 1;
+  savedAt: number;
+  values: Record<string, unknown>;
 }
 
 export interface BackendSettings {
@@ -3863,6 +3928,8 @@ export interface OpenCodianSettings {
 
   /** Backend-specific settings that should not be flattened into OpenCode fields. */
   backendSettings: BackendSettings;
+  /** User-marked working defaults; read and restored through the backend-specific non-secret allowlist. */
+  backendSettingsRecoveryPoints?: Partial<Record<keyof BackendSettings, BackendSettingsRecoveryPoint>>;
 
   // Server configuration
   server: ServerConfig;

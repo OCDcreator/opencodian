@@ -148,6 +148,27 @@ function expectSingleContentShell(
 }
 
 describe('SettingsTabbedRenderer', () => {
+  it('exposes labelled tab panels and moves keyboard focus without activating another task', () => {
+    const { plugin, renderer } = createRendererState();
+    const container = document.body.createDiv();
+    renderer.renderDisplay(container);
+    const lists = container.querySelectorAll<HTMLElement>('[role="tablist"]');
+    expect(lists.length).toBeGreaterThanOrEqual(2);
+    const secondary = container.querySelector<HTMLElement>('.opencodian-settings-tabs-secondary')!;
+    const tabs = secondary.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+    expect(tabs[0].getAttribute('aria-selected')).toBe('true');
+    expect(tabs[1].tabIndex).toBe(-1);
+    tabs[0].focus();
+    tabs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(document.activeElement).toBe(tabs[1]);
+    expect(plugin.settings.settingsTabbedSecondaryTabByPrimary.general).toBe('basic');
+    const panel = container.querySelector<HTMLElement>('[role="tabpanel"]')!;
+    expect(tabs[0].getAttribute('aria-controls')).toBe(panel.id);
+    expect(panel.getAttribute('aria-labelledby')?.split(' ').every((id) => !!document.getElementById(id))).toBe(true);
+    tabs[1].click();
+    expect(plugin.settings.settingsTabbedSecondaryTabByPrimary.general).toBe('agents');
+  });
+
   it('notifies the R-F4 warm pool when the tabbed agent switcher changes backend', () => {
     const { plugin, renderer } = createRendererState({
       enabledBackends: ['opencode', 'codex'],
@@ -185,7 +206,7 @@ describe('SettingsTabbedRenderer', () => {
     renderer.renderDisplay(container);
     expect(container.querySelector('.opencodian-settings-tabs-primary [data-tab-id="pi"]')).not.toBeNull();
     expect(container.querySelector('.opencodian-settings-tabs-primary [data-tab-id="codex"]')).toBeNull();
-    expect(container.querySelector('.opencodian-settings-tabs-secondary')?.children).toHaveLength(9);
+    expect(container.querySelector('.opencodian-settings-tabs-secondary')?.children).toHaveLength(7);
     expect(renderPi).toHaveBeenCalledWith(expect.any(HTMLElement), 'providers');
   });
   beforeEach(() => {
@@ -534,7 +555,7 @@ describe('SettingsTabbedRenderer', () => {
 
     renderer.renderDisplay(containerEl);
 
-    expectSingleContentShell(containerEl, 'claude-code', 'runtime');
+    expectSingleContentShell(containerEl, 'claude-code', 'connection');
     expect(containerEl.querySelector('.claude-code-tab-marker')).not.toBeNull();
   });
 });
@@ -881,7 +902,9 @@ describe('backend workspace reachability', () => {
       .map((element) => element.textContent?.trim());
     expect(labels).toContain('DeepSeek Harness');
     expect(labels).not.toContain('OpenCode 2');
-    expect(mount).toHaveBeenCalledWith(expect.any(HTMLElement), 'mcp');
+    // The third argument is the workspace navigation callback the renderer
+    // supplies for native cross-task links.
+    expect(mount).toHaveBeenCalledWith(expect.any(HTMLElement), 'mcp', expect.any(Function));
   });
 
   it('classic layout consumes the same registry visibility and mounts only the active workspace', () => {
@@ -960,7 +983,7 @@ describe('classic backend workspace navigation', () => {
     debugButton!.click();
 
     expect(debug).toHaveBeenCalledWith(expect.any(HTMLElement), 'claude-code');
-    expect(claudeMount).toHaveBeenCalledWith(expect.any(HTMLElement), 'runtime');
+    expect(claudeMount).toHaveBeenCalledWith(expect.any(HTMLElement), 'conversation');
     expect(claudeMount).not.toHaveBeenCalledWith(expect.any(HTMLElement), 'debug');
   });
 
@@ -977,7 +1000,7 @@ describe('classic backend workspace navigation', () => {
     expect(modelButton).not.toBeNull();
     modelButton!.click();
 
-    expect(mount).toHaveBeenCalledWith(expect.any(HTMLElement), 'model');
+    expect(mount).toHaveBeenCalledWith(expect.any(HTMLElement), 'model', expect.any(Function));
   });
 
   it('disposes the Codex account section before switching to the debug subpage', () => {
@@ -1022,7 +1045,7 @@ describe('classic backend workspace navigation', () => {
     renderer['deps'].plugin.settings.enabledBackends = ['opencode2', 'codex'];
     const codexContainer = document.createElement('div');
     renderer.renderClassicBackendWorkspaces(codexContainer);
-    const modelTab = codexContainer.querySelector<HTMLButtonElement>('button[data-tab-id="model"]');
+    const modelTab = codexContainer.querySelector<HTMLButtonElement>('button[data-tab-id="conversation"]');
     const connectionTab = codexContainer.querySelector<HTMLButtonElement>('button[data-tab-id="connection"]');
     modelTab!.click();
     connectionTab!.click();

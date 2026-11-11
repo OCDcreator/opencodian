@@ -5,12 +5,30 @@ import { randomUUID, createHash } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import path from 'node:path';
 import { createAuxiliaryRuntime } from './auxiliary.mjs';
+import { BRIDGE_DEPENDENCY_MODULES, createControlRuntime, mcpClientConfig } from './control.mjs';
 export { launchNativeRuntime } from './launcher.mjs';
 
 // This plugin is mounted in the user's installed Harness, using a per-launch
 // overlay. All native imports belong to that installation, never this bundle.
 export const name = 'opencodian-native';
 export const inject = ['agents', 'llm', 'sessions', 'sessionQuery', 'tools', 'attachments', 'skills', 'workingDirectory'];
+// History and live relays resolve image blocks only through the owned public
+// attachment store: `readImage` verifies the durable reference and returns
+// verified bytes, so no persisted path/URL is ever treated as a readable file.
+// A reference that is missing, expired, corrupt or unreadable degrades this
+// one block to an explicit unavailable marker; it must never fail the whole
+// history projection or a live turn, and it never fabricates image data.
+export async function resolveImageBlock(attachments, block) {
+  if (block?.type !== 'image') return block;
+  try {
+    const stored = await attachments.readImage(block.attachment);
+    const name = typeof stored.ref?.name === 'string' && stored.ref.name ? { name: stored.ref.name } : {};
+    return { type: 'image', mimeType: stored.ref.mediaType, data: Buffer.from(stored.data).toString('base64'), ...name };
+  } catch (error) {
+    const reason = typeof error?.code === 'string' && /^[A-Z][A-Z0-9_]*$/.test(error.code) ? error.code : 'unavailable';
+    return { type: 'image', unavailable: true, reason };
+  }
+}
 export async function apply(ctx, config) {
   const requireNative = createRequire(config.nativeAnchor);
   const load = async (name) => import(pathToFileURL(requireNative.resolve(name)).href);
@@ -21,6 +39,13 @@ export async function apply(ctx, config) {
   const { UserQuestionError } = await load('@deepseek-ai/dsh-user-questions');
   const { admitEncodedImages } = await load('@deepseek-ai/dsh-attachment');
   const McpClient = await load('@deepseek-ai/dsh-mcp-client');
+  const { symbols: cordisSymbols } = await load('@deepseek-ai/cordis');
+  // Cordis creates scoped tracing proxies on service reads. Use its exported
+  // identity symbol only for trusted ctx.get results, never caller payloads.
+  const serviceIdentity = (service) => service?.[cordisSymbols.original] ?? service;
+  let terminalServiceClass;
+  try { ({ TerminalSessionService: terminalServiceClass } = await load('@deepseek-ai/dsh-terminal')); }
+  catch { /* Optional terminal registry is absent on older installations. */ }
   // The JSON-RPC channel owns stdout; any in-process console logging from the
   // host (e.g. `[llm-deepseek] ...` once credentials make providers load) is
   // rerouted to stderr, because the line framing would otherwise reject it as
@@ -37,6 +62,26 @@ export async function apply(ctx, config) {
   let closing = false;
   let defaultRoute;
   const update = (id, value) => transport.notify('session/update', { sessionId: id, update: value });
+  let redactSecrets; let isVolatile;
+  try {
+    ({ redactSecrets } = await load('@deepseek-ai/dsh-settings'));
+    ({ isVolatile } = await load('@deepseek-ai/cosmokit'));
+  } catch { /* Full effective-config observations stay unavailable on older installations. */ }
+  const plainConfig = (value, depth = 0) => {
+    if (depth > 24) throw new Error('Native configuration nesting exceeds the observation bound');
+    if (isVolatile?.(value)) return plainConfig(value.get(), depth + 1);
+    if (Array.isArray(value)) return value.map((item) => plainConfig(item, depth + 1));
+    if (value !== null && typeof value === 'object') return Object.fromEntries(Object.entries(value)
+      .filter(([key]) => !['__proto__', 'constructor', 'prototype'].includes(key)).map(([key, item]) => [key, plainConfig(item, depth + 1)]));
+    return value;
+  };
+  const protectedModules = [...BRIDGE_DEPENDENCY_MODULES];
+  try { protectedModules.push(...(await load('@deepseek-ai/dsh-official-bundles')).PROTECTED_PLUGINS); } catch { /* older runtime */ }
+  for (const module of [...protectedModules]) {
+    try { protectedModules.push(realpathSync(requireNative.resolve(module))); } catch { /* not installed */ }
+  }
+  const controls = createControlRuntime(ctx, config, { sessions, requireSession, update, redactSecrets, plainConfig, protectedModules, serviceIdentity, terminalServiceClass,
+    notify: (method, params) => transport.notify(method, params) });
 
   async function catalog() {
     return Promise.all(ctx.llm.listProviders().map(async (provider) => ({
@@ -126,11 +171,7 @@ export async function apply(ctx, config) {
     const mounted = new Map();
     try {
       for (const server of servers) {
-        const clientConfig = server.type === 'http'
-          ? { transport: 'streamable-http', serverName: server.name, url: server.url,
-            headers: Object.fromEntries(server.headers.map((entry) => [entry.name, entry.value])), failOnStartupError: true }
-          : { transport: 'stdio', serverName: server.name, command: server.command, args: server.args,
-            env: Object.fromEntries(server.env.map((entry) => [entry.name, entry.value])), cwd, failOnStartupError: true };
+        const clientConfig = await mcpClientConfig(ctx, server, cwd);
         const fiber = agentCtx.plugin(McpClient, McpClient.Config(clientConfig));
         mounted.set(server.name, { fiber, declaration: server });
         await fiber;
@@ -138,7 +179,7 @@ export async function apply(ctx, config) {
       return mounted;
     } catch (error) {
       await Promise.allSettled([...mounted.values()].map(({ fiber }) => fiber.dispose()));
-      throw error;
+      throw new Error('Native MCP mount failed; sensitive diagnostics withheld');
     }
   }
   async function open(params, resume = false) {
@@ -186,9 +227,7 @@ export async function apply(ctx, config) {
     return output;
   }
   async function wireBlock(block) {
-    if (block.type !== 'image') return block;
-    const stored = await ctx.attachments.readImage(block.attachment);
-    return { type: 'image', mimeType: stored.ref.mediaType, data: Buffer.from(stored.data).toString('base64') };
+    return resolveImageBlock(ctx.attachments, block);
   }
   function enqueue(record, callback) {
     record.tail = record.tail.then(callback).catch((error) => { record.failure ??= error; });
@@ -310,8 +349,17 @@ export async function apply(ctx, config) {
       for (const block of message.content) {
         content.push(await wireBlock(block));
       }
+      // Assistant messages carry the model route that produced them as a
+      // required `source` ({kind:'model', provider, model}). Relay only the two
+      // recorded identity strings so chat history can label each answer with
+      // its own model; never the adapter-private replayState or source blob.
+      const source = message.source;
+      const modelSource = message.role === 'assistant' && source?.kind === 'model'
+        && typeof source.provider === 'string' && source.provider.trim()
+        && typeof source.model === 'string' && source.model.trim()
+        ? { sourceProvider: source.provider, sourceModel: source.model } : {};
       messages.push({ id: message.id, role: message.role, sourceKind: message.source?.kind, toolCallId: message.toolCallId,
-        isError: message.isError === true, content, timestamp: event.time ?? surface.session.createdAt });
+        isError: message.isError === true, content, timestamp: event.time ?? surface.session.createdAt, ...modelSource });
     }
     return { messages, capturedThroughSeq: surface.capturedThroughSeq, nativeSession: surface.session };
   }
@@ -321,7 +369,8 @@ export async function apply(ctx, config) {
     const children = await subagents.listChildren(parentId);
     const rows = [];
     for (const child of children) {
-      const row = { id: child.id, title: child.label || child.id, status: 'unknown', readable: child.mode !== 'external' };
+      const mode = ['one-shot', 'continuable', 'external'].includes(child.mode) ? child.mode : 'unknown';
+      const row = { id: child.id, title: child.label || child.id, status: 'unknown', mode, readable: mode !== 'external' };
       if (row.readable) {
         let observation;
         try {
@@ -370,6 +419,7 @@ export async function apply(ctx, config) {
     } finally { record.controller = undefined; completion.resolve(); }
   }
   const methods = {
+    ...controls.methods,
     async initialize() {
       await ctx.get('loader')?.await();
       const providers = await catalog();
@@ -381,7 +431,7 @@ export async function apply(ctx, config) {
       catch { defaultRoute = (await resolveRoute({ provider: provider.id, model: model.id })).route; }
       return { protocolVersion: 1, nativeProtocol: 'opencodian.dsh-native/1', agentInfo: { name, version: '1' }, authMethods: [],
         agentCapabilities: { promptCapabilities: { image: providers.some((entry) => entry.models.some((item) => item.inputModalities?.includes('image'))) },
-          mcpCapabilities: { http: true }, nativeHistory: true, auxiliaryQueries: true }, providers };
+          mcpCapabilities: { http: true }, nativeHistory: true, auxiliaryQueries: true }, providers, ...controls.capabilities() };
     },
     'session/new': (params) => open(params),
     'session/resume': (params) => open(params, true),
@@ -419,7 +469,7 @@ export async function apply(ctx, config) {
     async 'session/close'(params) {
       const record = sessions.get(params.sessionId);
       if (!record) return {};
-      record.closing = true; record.admission?.abort(); record.handle.agent.cancel({ kind: 'user' });
+      record.closing = true; controls.closeSession(params.sessionId); record.admission?.abort(); record.handle.agent.cancel({ kind: 'user' });
       await record.handle.dispose(); await record.tail; sessions.delete(params.sessionId); return {};
     },
     async 'session/set_config_option'(params) {
@@ -484,7 +534,10 @@ export async function apply(ctx, config) {
       return history(params.childId);
     },
     async 'session/mcp'(params) {
-      const record = requireSession(params.sessionId); idle(record);
+      const record = requireSession(params.sessionId);
+      if (params.action === 'status') return controls.mcpStatus(record);
+      if (params.action !== undefined && params.action !== 'apply') throw new Error('Unsupported native MCP action');
+      idle(record);
       if (params.replace) {
         record.busy = true;
         const previous = [...record.mcp.values()].map(({ declaration }) => declaration);
@@ -509,8 +562,7 @@ export async function apply(ctx, config) {
         const added = await mountServers(record.agentCtx, params.servers, record.cwd);
         for (const [key, value] of added) record.mcp.set(key, value);
       }
-      return { servers: [...record.mcp.values()].map(({ declaration }) => ({ name: declaration.name, connected: true })),
-        tools: ctx.tools.schemas(record.handle.agent).map((tool) => tool.name) };
+      return controls.mcpStatus(record);
     },
     async 'session/commands'(params) {
       const agent = requireSession(params.sessionId).handle.agent;
@@ -576,6 +628,8 @@ export async function apply(ctx, config) {
     transport.start();
     return async () => {
       closing = true;
+      for (const [id, record] of sessions) { record.closing = true; controls.closeSession(id); }
+      await controls.dispose();
       for (const record of auxiliary.values()) record.controller?.abort();
       await Promise.allSettled([...auxiliary.values()].map((record) => record.completion));
       for (const record of auxiliary.values()) record.runtime.clear(); auxiliary.clear();

@@ -1,5 +1,7 @@
 # SessionWorkbenchCoordinator
 
+2026-11-11（工作台信息架构）：host 新增可选 `mountResources` 与 `getFilesSummary`。前者将同一个工具 owner 的稳定目录 DOM 挂入一级面板，后者只读投影文件 owner 已有摘要到 `state.filesSummary`，使真实摘要变化参与既有 state fingerprint；不新增原生读取或 Git 扫描。目录创建在工具挂载之后，展示控件不接管后端操作状态。既有 Goal、Plan、Jobs、子会话回执、权限与刷新节流保持所属 owner。
+
 > 源码：`src/features/chat/services/conversation/SessionWorkbenchCoordinator.ts`
 > Owner：feature.chat-services
 
@@ -19,6 +21,12 @@ composer 图标使用 SessionWorkbench 注册的 OpenChamber target / target-fil
 
 聚焦测试、类型检查、lint、模块文档与图刷新均为修改期门禁。真实模型/宿主行为验收见 `.scratch/goal-agent-workbench-20261030/evidence/`；未验收能力不得由单测替代。
 
+2026-11-09 Jobs 完成链路：将 `onNativeJobs` host 原样转发给 SessionInformationCoordinator，再由 view composition 接入现有 BackgroundTaskIndicatorCoordinator。既有 tick 对所有 DSH 标签执行有五秒限频的原生列表对账，即使标签非活动、foreground 已结束或尚无 legacy backgroundTasks，也能收到完成并刷新延迟提示。Jobs polling 不调度模型续跑。
+
+2026-11-10 DSH 原生工作台：工作台 actions 的 `runTaskAction` / `setPlanMode` / `spawnTerminal` 原样转发进 SessionInformationCoordinator（其内部即 `DshNativeWorkbenchControls`），本模块不持有原生操作状态或第二份真值；Plan toggle、终端/子会话行与 spawn 表单全部渲染共享 `SessionWorkbenchState`，不新增 DSH 专属界面。
+
+2026-11-10 子会话续接装配：`continueChild` 与 composer 状态回调（`onChildComposerInput` / `onChildComposerDelivery` / `onChildComposerFocus`）原样转发进 SessionInformationCoordinator；composer 草稿/投递/焦点的真值在该 coordinator 的 children map，本模块无第二份状态，也不因这些回调调度 onChange 重建。工作台 `actions.refresh` 先同步执行本地 `refresh()` 重投影，再启动权威读取；即使信息和子历史请求均挂起，trigger 重开也使用最新草稿与 caret，不依赖后台请求及时返回。
+
 ## 会话信息面板（2026-10-31）
 
-会话信息读取、统计、来源和子会话检查交由 SessionInformationCoordinator；本模块保留 Goal、composer、后台任务与工作台装配。后台任务输出只有原生子会话关联被确认时才调用子会话读取，禁止把任务 ID 猜成 session ID。
+会话信息读取、统计、来源和子会话检查交由 SessionInformationCoordinator；本模块保留 Goal、composer、任务投影与工作台装配。2026-11-09 起，原生任务读取/订阅/输出/停止生命周期也由既有 SessionInformationCoordinator 持有，本模块只转发，避免继续增长。DSH Jobs 通过可选原生能力显示在既有任务列表；`nativeJobId` 与 `nativeBackend` 保留独立身份，Jobs 不转成 Todos。其它后台任务只有原生子会话关联被确认时才调用子会话读取，禁止把任务 ID 猜成 session ID。

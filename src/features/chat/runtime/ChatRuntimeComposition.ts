@@ -29,6 +29,7 @@ import { AgentCapability, hasCapability } from '../../../core/agents';
 import { getConversationChatBackendService } from '../../../core/agents/backend/AgentBackendRouting';
 import type { AgentMentionCapability } from '../../../core/agents/backend/AgentMentionCapability';
 import type { AgentSessionCapability } from '../../../core/agents/backend/AgentService';
+import type { DshSubagentView } from '../../../core/agents/backend/dsh/DshNativeControls';
 import type { MemoryRuntimePort } from '../../../core/memory';
 import { OpenCodeService } from '../../../core/opencode';
 import type {
@@ -42,6 +43,7 @@ import { getConversationBackendSessionId, getTurnDiffNoticeMeta } from '../../..
 import type { AgentBackendKind } from '../../../core/types/chat';
 import { t } from '../../../i18n';
 import { getVaultBasePath } from '../../../shared';
+import { maskUserMessageSecretsForDisplay } from '../rendering/userMessageDisplay';
 import type { BackgroundTaskCompletionNoticeServiceHost } from '../services/background/BackgroundTaskCompletionNoticeService';
 import { BackgroundTaskCompletionNoticeService } from '../services/background/BackgroundTaskCompletionNoticeService';
 import type { BackgroundTaskLiveSignalCoordinatorHostBuilderHost } from '../services/background/BackgroundTaskLiveSignalCoordinator';
@@ -51,6 +53,7 @@ import { BackgroundTaskNoticeStateService } from '../services/background/Backgro
 import type { BackgroundTaskViewHost } from '../services/background/BackgroundTaskTimelineService';
 import type { BackgroundTaskTimelineServiceHost } from '../services/background/BackgroundTaskTimelineService';
 import { BackgroundTaskTimelineService, createBackgroundTaskViewHost } from '../services/background/BackgroundTaskTimelineService';
+import type { AgentMentionCandidate } from '../services/composer/AgentMentionComposerController';
 import type { ComposerContextViewHost, FocusContextPreviewWritebackHost, FocusContextRuntimeViewHost } from '../services/composer/ComposerContextViewFacade';
 import { ComposerContextViewFacade } from '../services/composer/ComposerContextViewFacade';
 import type { ComposerInputShellCoordinatorHost } from '../services/composer/ComposerInputShellCoordinator';
@@ -543,6 +546,8 @@ export class ChatRuntimeComposition {
    */
   private assistantAutoInternalLinkService: AssistantAutoInternalLinkService | null = null;
   private promptReferenceService: PromptReferenceService | null = null;
+  /** Bounded-cache for the DSH running-children `@` source; the official source is zero-RPC per keystroke. */
+  private subagentMentionCache: { sessionId: string; at: number; candidates: AgentMentionCandidate[] } | null = null;
 
   constructor(private readonly host: ChatRuntimeCompositionHost) {}
 
@@ -561,6 +566,34 @@ export class ChatRuntimeComposition {
       currentConversationId: conversation?.id,
       targetSessionId: conversation ? getConversationBackendSessionId(conversation) || undefined : undefined,
     };
+  }
+
+  /**
+   * Literal-text `@` source for the DSH parent conversation: running child
+   * labels only. Picking one inserts plain `@label ` text with no reference
+   * span and no agent pill, so it grants no continuation authority — the
+   * official source's exact semantics.
+   */
+  private async loadSubagentMentionCandidates(): Promise<AgentMentionCandidate[]> {
+    const conversation = this.host.currentConversation;
+    const sessionId = conversation ? getConversationBackendSessionId(conversation) : null;
+    if (conversation?.backend !== 'dsh' || !sessionId) return [];
+    if (this.subagentMentionCache && this.subagentMentionCache.sessionId === sessionId
+      && Date.now() - this.subagentMentionCache.at < 3000) return this.subagentMentionCache.candidates;
+    const service = this.host.plugin.agentServiceRegistry?.get('dsh') as
+      { listSessionSubagents?(sessionId: string): Promise<DshSubagentView[]> } | undefined;
+    if (!service?.listSessionSubagents) return [];
+    const children = await service.listSessionSubagents(sessionId).catch(() => [] as DshSubagentView[]);
+    const candidates: AgentMentionCandidate[] = children.filter((child) => child.activity === 'active').map((child) => ({
+      id: child.label ?? child.id,
+      displayName: child.label ?? child.id,
+      ...(child.label ? { description: child.id } : {}),
+      mode: null,
+      menuGroup: 'subagents',
+      literalOnly: true,
+    }));
+    this.subagentMentionCache = { sessionId, at: Date.now(), candidates };
+    return candidates;
   }
 
   compose(): ChatRuntime {
@@ -732,6 +765,7 @@ export class ChatRuntimeComposition {
       composerInputShellCoordinator: new ComposerInputShellCoordinator({
         ...host.createComposerInputShellCoordinatorHost(),
         loadPromptReferenceCandidates: (query = '') => promptReferenceService.listCandidates(query, this.getPromptReferenceOptions()),
+        loadSubagentMentionCandidates: () => this.loadSubagentMentionCandidates(),
         getPromptReferenceContextKey: () => [getVaultBasePath(app), host.plugin.settings.activeBackend,
           host.currentConversation?.id, host.currentConversation?.backend,
           host.currentConversation ? getConversationBackendSessionId(host.currentConversation) : ''].join(':'),
@@ -1403,7 +1437,8 @@ export class ChatRuntimeComposition {
             if (!message) continue;
             element.dataset.sourceMessageId = message.sourceMessageId;
             element.querySelector('.opencodian-user-message-footer')?.remove();
-            host.addUserMessageFooter(element, message, message.content);
+            const visibleText = message.omo?.kind === 'user-injection' ? message.omo.originalText : message.content;
+            host.addUserMessageFooter(element, message, maskUserMessageSecretsForDisplay(visibleText));
           }
         }
         // Slash /plan reaches the native session through the chat send path.

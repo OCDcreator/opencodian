@@ -19,6 +19,7 @@
  */
 import { ClaudeSessionTraceService } from '../../core/agents/backend/diagnostics/ClaudeSessionTraceService';
 import { CodexSessionTraceService } from '../../core/agents/backend/diagnostics/CodexSessionTraceService';
+import { DshSessionTraceService } from '../../core/agents/backend/diagnostics/DshSessionTraceService';
 import { OpenCodeSessionTraceService } from '../../core/opencode/diagnostics/OpenCodeSessionTraceService';
 import type { Logger } from '../../shared/logger';
 import { createLogger } from '../../shared/logger';
@@ -28,6 +29,7 @@ export class DiagnosticsRuntimeCoordinator {
   readonly openCode: OpenCodeSessionTraceService;
   readonly codex: CodexSessionTraceService;
   readonly claude: ClaudeSessionTraceService;
+  readonly dsh: DshSessionTraceService;
   private readonly logger: Logger;
 
   constructor(inputs: DiagnosticsRuntimeInputs) {
@@ -65,6 +67,24 @@ export class DiagnosticsRuntimeCoordinator {
         runtimeMetadata: inputs.claudeRuntimeMetadata,
       });
       constructed.push(this.claude);
+      // DSH last: the pinned construction order stays OpenCode → Codex → Claude;
+      // the DSH wire-trace service is fail-closed (store disabled until its
+      // settings getter reports a transport gate on) and optional inputs mean
+      // the port exists even before main.ts passes live DSH settings.
+      this.dsh = new DshSessionTraceService({
+        settings: inputs.dshSettings ?? (() => ({
+          nativeEnabled: false,
+          acpEnabled: false,
+          consolePreset: 'standard',
+          consoleChannels: { lifecycle: true, transport: true, 'stream-sync': true, 'tool-interaction': true },
+          storageDirectory: '',
+        })),
+        vaultPath: inputs.vaultPath,
+        buildIdentity: inputs.buildIdentity,
+        knownSecrets: inputs.dshKnownSecrets,
+        runtimeMetadata: inputs.dshRuntimeMetadata,
+      });
+      constructed.push(this.dsh);
     } catch (error) {
       // Best-effort disposal of any partially-constructed services.
       for (const service of constructed) {
@@ -76,7 +96,7 @@ export class DiagnosticsRuntimeCoordinator {
 
   /** Typed backend ports — one property per backend, no service-locator map. */
   get ports(): DiagnosticsBackendPorts {
-    return { openCode: this.openCode, codex: this.codex, claude: this.claude };
+    return { openCode: this.openCode, codex: this.codex, claude: this.claude, dsh: this.dsh };
   }
 
   /**
@@ -97,6 +117,9 @@ export class DiagnosticsRuntimeCoordinator {
     });
     await this.claude.dispose().catch(() => {
       this.logger.warn('Failed to flush Claude trace service during unload');
+    });
+    await this.dsh.dispose().catch(() => {
+      this.logger.warn('Failed to flush DSH trace service during unload');
     });
   }
 }

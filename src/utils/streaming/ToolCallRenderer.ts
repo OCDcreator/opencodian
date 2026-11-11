@@ -37,6 +37,75 @@ const MCP_TOOL_ICON_SVG = `
 
 addIcon(MCP_TOOL_ICON_ID, MCP_TOOL_ICON_SVG);
 
+/**
+ * Bounded data-URI image contract for tool results. Only exact
+ * `data:image/<whitelist>;base64,` strings with canonical base64 charset,
+ * 4-aligned length, bounded size and verified magic bytes become `<img>`
+ * elements; anything else (SVG, file://, http(s), javascript:, truncated or
+ * fake payloads) stays literal text. No remote or protocol URL is ever loaded.
+ * Bounds keep mixed/multi-image results cheap: at most four images per result
+ * and per-segment text lines stay under the existing truncation cap.
+ */
+const RESULT_IMAGE_MEDIA_TYPES_PATTERN = /data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+={0,2}/g;
+const RESULT_IMAGE_BASE64_PREFIX = /^data:image\/(png|jpeg|webp|gif);base64,/;
+/** Legacy single-image contract: the ENTIRE result is exactly one whitelisted
+ *  data URI (no leading/trailing text, no second image). Anything else with
+ *  verified images goes through the bounded interleaved path instead. */
+const SINGLE_RESULT_IMAGE_URI_PATTERN = /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/;
+const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+const MAX_RESULT_IMAGES = 4;
+const MAX_RESULT_IMAGE_URI_CHARS = 30_000_000;
+const RESULT_TEXT_LINES_PER_SEGMENT = 20;
+
+/** Canonical-base64 padding proof without a full decode: in the final group
+ *  the unused low bits of the last data sextet must be zero ('XY==' needs the
+ *  low 4 bits zero, 'XYZ=' the low 2 bits), otherwise a mutated tail decodes
+ *  to the same bytes while re-encoding to a different string. */
+function hasCanonicalBase64Tail(base64: string): boolean {
+  const padStart = base64.indexOf('=');
+  if (padStart < 0) return true;
+  const value = BASE64_ALPHABET.indexOf(base64[padStart - 1]);
+  const padCount = base64.length - padStart;
+  if (padCount === 2) return (value & 0b1111) === 0;
+  if (padCount === 1) return (value & 0b11) === 0;
+  return false;
+}
+
+/** Verify that a matched data URI declares a whitelisted raster type and that
+ *  the decoded bytes carry the matching magic signature: declared type and
+ *  actual payload must agree, so a PNG payload labeled `image/jpeg` stays
+ *  literal text. The base64 slice follows each match's real prefix length, and
+ *  only the first 18 decoded bytes are read for the proof. */
+function isVerifiedResultImageDataUri(match: string): boolean {
+  const declared = RESULT_IMAGE_BASE64_PREFIX.exec(match)?.[1];
+  if (!declared) return false;
+  const base64 = match.slice(match.indexOf(';base64,') + ';base64,'.length);
+  if (!base64.length || base64.length > MAX_RESULT_IMAGE_URI_CHARS || base64.length % 4 !== 0) return false;
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(base64)) return false;
+  if (!hasCanonicalBase64Tail(base64)) return false;
+  try {
+    const header = atob(base64.slice(0, 24));
+    if (declared === 'png') return header.startsWith('\x89PNG');
+    if (declared === 'jpeg') return header.startsWith('\xFF\xD8\xFF');
+    if (declared === 'gif') return header.startsWith('GIF87a') || header.startsWith('GIF89a');
+    if (declared === 'webp') return header.startsWith('RIFF') && header.slice(8, 12) === 'WEBP';
+    return false;
+  } catch { /* undecodable payloads stay literal text */ }
+  return false;
+}
+
+interface ResultImageOccurrence { uri: string; index: number }
+
+function collectResultImageDataUris(result: string): ResultImageOccurrence[] {
+  const found: ResultImageOccurrence[] = [];
+  for (const match of result.matchAll(RESULT_IMAGE_MEDIA_TYPES_PATTERN)) {
+    if (found.length >= MAX_RESULT_IMAGES) break;
+    if (isVerifiedResultImageDataUri(match[0])) found.push({ uri: match[0], index: match.index ?? 0 });
+  }
+  RESULT_IMAGE_MEDIA_TYPES_PATTERN.lastIndex = 0;
+  return found;
+}
+
 export class ToolCallRenderer {
   private options: ToolRendererOptions;
 
@@ -121,10 +190,53 @@ export class ToolCallRenderer {
       return;
     }
 
-    const lines = result.split(/\r?\n/);
-    const maxLines = 20;
-    const truncated = lines.length > maxLines;
-    const displayLines = truncated ? lines.slice(0, maxLines) : lines;
+    const images = collectResultImageDataUris(result);
+    if (images.length) {
+      this.renderResultWithImages(container, result, images);
+      return;
+    }
+    this.appendResultTextLines(container, result);
+  };
+
+  /** Interleave bounded verified data-URI images with the surrounding text so
+   *  store-restored tool results render real images in any tool card without
+   *  reclassifying the tool or dumping megabytes of base64 as text lines. The
+   *  original result string is never mutated. */
+  private renderResultWithImages(container: HTMLElement, result: string, images: ResultImageOccurrence[]): void {
+    let cursor = 0;
+    for (const image of images) {
+      const index = image.index;
+      if (index > cursor) this.appendResultTextLines(container, result.slice(cursor, index));
+      this.appendResultImage(container, image.uri);
+      cursor = index + image.uri.length;
+    }
+    const tail = result.slice(cursor);
+    if (tail.trim()) this.appendResultTextLines(container, this.collapseOverflowImages(tail, images.length));
+  }
+
+  /** Replace over-cap image payloads in trailing text with a bounded marker;
+   *  raw base64 of unrendered images never becomes visible text. */
+  private collapseOverflowImages(text: string, renderedCount: number): string {
+    let extra = 0;
+    const collapsed = text.replace(RESULT_IMAGE_MEDIA_TYPES_PATTERN, (match) => {
+      if (!isVerifiedResultImageDataUri(match)) return match;
+      extra += 1;
+      return `\n${t('chat.toolCard.image.notRendered', { number: renderedCount + extra })}\n`;
+    });
+    RESULT_IMAGE_MEDIA_TYPES_PATTERN.lastIndex = 0;
+    return collapsed;
+  }
+
+  private appendResultImage(container: HTMLElement, uri: string): void {
+    const imageEl = container.createEl('img', { cls: 'streaming-tool-image' });
+    imageEl.setAttribute('src', uri);
+    imageEl.setAttribute('alt', t('chat.toolCard.image.statusCompleted'));
+  }
+
+  private appendResultTextLines(container: HTMLElement, text: string): void {
+    const lines = text.split(/\r?\n/);
+    const truncated = lines.length > RESULT_TEXT_LINES_PER_SEGMENT;
+    const displayLines = truncated ? lines.slice(0, RESULT_TEXT_LINES_PER_SEGMENT) : lines;
 
     const linesEl = container.createDiv({ cls: 'streaming-tool-lines' });
     for (const line of displayLines) {
@@ -135,10 +247,10 @@ export class ToolCallRenderer {
     if (truncated) {
       linesEl.createDiv({
         cls: 'streaming-tool-truncated',
-        text: `... ${lines.length - maxLines} more lines`,
+        text: `... ${lines.length - RESULT_TEXT_LINES_PER_SEGMENT} more lines`,
       });
     }
-  };
+  }
 
   private isTaskTool(toolCall: Pick<ToolCallInfo, 'name' | 'kind'>): boolean {
     return toolCall.kind === 'task' || getToolIdentity(toolCall.name).normalizedName === 'task';
@@ -165,12 +277,18 @@ export class ToolCallRenderer {
     const result = typeof toolCall.result === 'string' ? toolCall.result : '';
     if (toolCall.status === 'error' || !result) {
       this.options.renderExpandedContent!(container, toolCall.name, result || undefined);
-    } else if (result.startsWith('data:image/')) {
+    } else if (SINGLE_RESULT_IMAGE_URI_PATTERN.test(result.trim())) {
+      // Legacy contract kept ONLY for the proven-single-image shape: rendering
+      // `result` wholesale here previously swallowed trailing text and extra
+      // images into one img src, so any other composition with verified images
+      // must go through the bounded interleaved path below.
       const imageEl = container.createEl('img', { cls: 'streaming-tool-image' });
       imageEl.setAttribute('src', result);
       imageEl.setAttribute('alt', t('chat.toolCard.image.statusCompleted'));
     } else {
-      container.createDiv({ cls: 'streaming-tool-image-path', text: result });
+      const images = collectResultImageDataUris(result);
+      if (images.length) this.renderResultWithImages(container, result, images);
+      else container.createDiv({ cls: 'streaming-tool-image-path', text: result });
     }
 
     const revisedPrompt = typeof toolCall.input.revisedPrompt === 'string'

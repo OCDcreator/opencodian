@@ -1,11 +1,5 @@
-import { realpathSync } from 'node:fs';
-import { mkdtemp, rmdir, unlink, writeFile } from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
-
+import { prepareDshManagedLaunch, releaseDshLaunchScope } from '../configuration/DshManagedProfile';
 import { DshAcpClient, type DshAcpClientOptions, type DshJsonObject } from './DshAcpClient';
-
-declare const DSH_NATIVE_SERVICE_SOURCE: string;
 
 /** Owns a per-launch Harness extension; the installed application and user profiles stay intact. */
 export class DshNativeClient extends DshAcpClient {
@@ -38,24 +32,13 @@ export class DshNativeClient extends DshAcpClient {
   }
 
   private async prepare(): Promise<void> {
-    const args = [...this.baseArgs];
-    const profile = args.indexOf('--profile');
-    if (profile < 0) throw new Error('Harness launcher is missing its profile argument');
-    const nativeAnchor = profile > 0 ? args[0] : realpathSync(this.baseCommand);
-    const scope = await mkdtemp(path.join(os.tmpdir(), 'opencodian-dsh-'));
-    this.scope = scope;
-    const service = path.join(scope, 'service.mjs');
-    const patch = path.join(scope, 'native.patch.yml');
-    const launcher = path.join(scope, 'launcher.mjs');
-    await writeFile(service, DSH_NATIVE_SERVICE_SOURCE, { mode: 0o600 });
-    await writeFile(patch, `- id: sdk-jsonrpc-server\n  disabled: true\n- insert:\n    - id: opencodian-native\n      name: ${JSON.stringify(service)}\n      inject: [sdkAppStartup, loader]\n      config:\n        nativeAnchor: ${JSON.stringify(nativeAnchor)}\n`, { mode: 0o600 });
-    await writeFile(launcher, `import { launchNativeRuntime } from './service.mjs';\nawait launchNativeRuntime(${JSON.stringify({ nativeAnchor, scope, args: args.slice(profile + 2) })});\n`, { mode: 0o600 });
-    // npm CLIs run under the external Node on PATH. In Obsidian,
-    // process.execPath is the embedding Electron app and cannot host this CLI.
-    this.nativeOptions.launch.command = profile > 0 ? this.baseCommand : 'node';
-    this.nativeOptions.launch.env.ELECTRON_RUN_AS_NODE = '1';
-    this.nativeOptions.launch.args.splice(0, this.nativeOptions.launch.args.length, launcher);
+    await prepareDshManagedLaunch(this.nativeOptions,
+      { command: this.baseCommand, args: this.baseArgs, env: this.nativeOptions.launch.env },
+      'sdk', (scope) => { this.scope = scope; });
   }
+
+  // Native preparation already applies defaults; never wrap it again in an ACP profile.
+  protected override async prepareConfigurationLaunch(): Promise<void> {}
 
   override async stop(): Promise<void> {
     ++this.nativeGeneration;
@@ -70,11 +53,8 @@ export class DshNativeClient extends DshAcpClient {
     try { await super.stop(); } catch (error) { failure = error; }
     const scope = this.scope;
     if (!scope) { if (failure) throw failure; return; }
-    // Only explicit files in this launch's private profile may be removed.
-    for (const file of ['service.mjs', 'native.patch.yml', 'launcher.mjs', 'package.json', 'compatibility.json', 'cordis.yml', 'node_modules']) {
-      await unlink(path.join(scope, file)).catch((error: NodeJS.ErrnoException) => { if (error.code !== 'ENOENT') throw error; });
-    }
-    await rmdir(scope);
+    // Durable profiles are deliberately absent from the private launch-file lifecycle.
+    await releaseDshLaunchScope(scope);
     this.scope = null;
     if (failure) throw failure;
   }

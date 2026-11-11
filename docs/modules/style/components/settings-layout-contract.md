@@ -13,6 +13,14 @@
 
 定义设置界面的本地布局契约与共享 surface token。该文件为 classic 与 tabbed 设置界面提供统一的 section、ordinary setting row、object surface、inline group、半径与间距变量，并把共享设置容器映射到一致的视觉层级。
 
+## 2026-11-09 设置内容宽度自适应
+
+用户要求整个 OpenCodian 设置内容区随窗口变宽。Obsidian 独立 Settings 宿主的700px group上限使1920px与1440px窗口都只能显示660px插件内容。此处仅对包含 `.opencodian-settings` 的 `.vertical-tab-content` 设置1160px group上限，扣除插件左右各20px内边距后普通内容最高约1120px；较窄窗口随可用空间收缩。DSH自身1030px内容上限保留。
+
+宿主居中偏移必须同时在本元素重算：继承的 `--setting-group-center-offset` 已绑定原700px，单改group上限不会自动重算。新的offset按1160px计算，横向padding取该偏移与16–32px响应式最小留白的较大值，宽屏居中、窄屏留出边距。modal选择器沿用宿主 `:not(.setting-page)` 后追加插件 `:has()` 标记，特异性高于宿主规则；另一选择器覆盖相应非modal宿主。规则限定在当前承载插件的pane，不作用于其他Obsidian设置页；编辑区设置已有自己的宽度链。本次不修改表单网格、标签导航或设置值。
+
+Test Vault / Obsidian1.15.0 实机运行1537：1920／1440／1000／800px窗口的普通内容宽度为1120／1092.4／670／528px，DSH为1030／1030／670／528px。八个截图状态中左右留白差不超过1px，内容无横向溢出，General与DSH导航位置和12px栏间距一致。General／Conversation／UI在1440px下具有相同的1132.4px根宽；原生编辑器设置页仍为700px组上限。编辑区设置的1102px根／1006px内容几何与修改前相同。配置哈希、主题、原窗口状态和General／Basic选择恢复。证据在 `.impeccable/review/dsh-style-a/settings-width-{before,after}-runtime.json` 与对应PNG、`settings-width-deployment.json`、`settings-width-validation.json`。
+
 ## Surface Contract
 
 - `.setting-item.opencodian-settings-direct-host:not(.setting-item-heading)`：声明式设置的挂载行必须归零 padding，选择器特异性需覆盖 Obsidian `.setting-group .setting-item:not(.setting-item-heading)`，否则宿主默认上下各 20px 会制造一段多余的外层滚动。直接子级 `.opencodian-settings` 使用自然高度、`overflow: visible` 和 `max-height: none`，整页只由外层 Obsidian viewport 滚动；编辑区设置根仍保留自己的滚动。
@@ -79,7 +87,7 @@ Rule: never apply one hierarchy rule globally across both layout modes. In class
 
 ## Guardrails
 
-- 只在 `.opencodian-settings` / `.opencodian-settings-section` 作用域内影响设置界面，不使用全局 `.setting-item` 或未标记的 `.opencodian-settings-block` 选择器。
+- 表单规则只在 `.opencodian-settings` / `.opencodian-settings-section` 作用域内生效，不使用全局 `.setting-item` 或未标记的 `.opencodian-settings-block` 选择器。宿主宽度是显式的祖先作用域例外，必须通过 `:has(.opencodian-settings)` 锚定当前插件pane，不得使用裸 `.vertical-tab-content` 扩大其他设置页。
 - 共享设置 surface、spacing、row-card、object-card 和 inline group token 归此模块所有；各 section CSS 不应重复定义一套半径、边框、背景或 row-card 间距。
 - 新的视觉迁移应优先复用这些 token，再按 section 的真实职责增加更具体的 object-card、summary、toolbar 或 state 样式。
 - navigation shell 的 hover / focus 只能改变背景、边框或 outline，不应使用会造成布局错觉的 translate 或重 shadow。

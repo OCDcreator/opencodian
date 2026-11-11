@@ -9,7 +9,7 @@ import type { AgentBackendKind } from '../../../../core/types/chat';
 import { t } from '../../../../i18n';
 import { GOAL_ACTIVE_ICON, GOAL_ICON, SessionWorkbench, type SessionWorkbenchState, type WorkbenchResource, type WorkbenchTask } from '../../ui/SessionWorkbench';
 import type { MessageSendPreparationOutcome } from '../send/MessageSendPreparationService';
-import { SessionInformationCoordinator, type WorkbenchSession } from './SessionInformationCoordinator';
+import { type NativeJobTimelineSnapshot, SessionInformationCoordinator, type WorkbenchSession } from './SessionInformationCoordinator';
 export type { WorkbenchSession } from './SessionInformationCoordinator';
 
 export interface SessionWorkbenchHost {
@@ -22,6 +22,8 @@ export interface SessionWorkbenchHost {
   getComposerShell(): HTMLElement | null;
   attachFiles(parent: HTMLElement): void;
   mountTools(parent: HTMLElement): void;
+  mountResources?(parent: HTMLElement): void;
+  getFilesSummary?(): string;
   openTool?(tool: string): void;
   setDraft?(text: string): void;
   updateTools(state: SessionWorkbenchState): void;
@@ -30,6 +32,8 @@ export interface SessionWorkbenchHost {
   openMessage(id: string): void;
   openResource(resource: WorkbenchResource): void;
   notify(message: string): void;
+  onNativeJobs?(session: WorkbenchSession, snapshot: NativeJobTimelineSnapshot): Promise<void>;
+  openBackendSettings?(backend: AgentBackendKind): void;
 }
 
 interface PendingGoalSend {
@@ -38,12 +42,6 @@ interface PendingGoalSend {
   objective: string;
   acknowledge?: (outcome: MessageSendPreparationOutcome) => void;
   submittedAt: number;
-}
-
-interface NativeTaskService extends AgentService {
-  getBackgroundTasks?(sessionId: string): Promise<Array<{ taskId: string; status: string; description: string; cancellable: boolean }>>;
-  cancelBackgroundTask?(sessionId: string, taskId: string): Promise<boolean>;
-  getChatMessages?(sessionId: string): Promise<import('../../../../core/types').ChatMessage[]>;
 }
 
 function goalService(service: AgentService | null | undefined): AgentGoalCapability | null {
@@ -70,8 +68,6 @@ export class SessionWorkbenchCoordinator {
   private readonly errors = new Map<string, string>();
   private readonly syncing = new Set<string>();
   private readonly lastSyncs = new Map<string, number>();
-  private readonly nativeTasks = new Map<string, WorkbenchTask[]>();
-  private readonly taskReads = new Map<string, number>();
   private readonly informationCoordinator: SessionInformationCoordinator;
   private readonly availability = new Map<AgentBackendKind, { available: boolean; reason?: string }>();
   private readonly syncAgain = new Set<string>();
@@ -85,7 +81,8 @@ export class SessionWorkbenchCoordinator {
     this.informationCoordinator = new SessionInformationCoordinator({
       getActiveSession: () => host.getActiveSession(), getSessions: () => host.getSessions(),
       getRegistry: () => host.getRegistry(), onChange: () => this.refresh(),
-      openChildView: () => this.surface?.setPage('overview'),
+      openChildView: () => this.surface?.setPage('overview'), notify: (message) => host.notify(message),
+      onNativeJobs: (session, snapshot) => host.onNativeJobs?.(session, snapshot) ?? Promise.resolve(),
     });
   }
 
@@ -99,6 +96,9 @@ export class SessionWorkbenchCoordinator {
       app: this.host.app,
       armGoal: () => this.toggleGoalArm(true), controlGoal: (command) => this.controlGoal(command),
       refresh: () => {
+        // Re-project silent composer edits synchronously, even if every
+        // authoritative read below stays pending.
+        this.refresh();
         const session = this.host.getActiveSession();
         void this.refreshGoal(session, true); void this.refreshTasks(session, true);
         this.informationCoordinator.refresh(session, true);
@@ -106,11 +106,21 @@ export class SessionWorkbenchCoordinator {
       openMessage: (id) => this.host.openMessage(id), openResource: (resource) => this.host.openResource(resource),
       stopTask: (task) => this.stopTask(task),
       readTaskOutput: (task) => this.readTaskOutput(task),
+      runTaskAction: (task, action, value) => this.informationCoordinator.runTaskAction(task, action, value),
+      setPlanMode: (active) => this.informationCoordinator.setPlanMode(active),
+      spawnTerminal: (options) => this.informationCoordinator.spawnTerminal(options),
+      openBackendSettings: () => this.host.openBackendSettings?.(this.host.getActiveSession().backend),
       mountTools: (parent) => this.host.mountTools(parent),
+      mountResources: (parent) => this.host.mountResources?.(parent),
       openTool: (tool) => this.host.openTool?.(tool),
       usePlanAsGoal: (text) => { this.host.setDraft?.(text); if (!this.isArmed()) this.toggleGoalArm(true); },
       openChild: (agent) => this.informationCoordinator.openChild(agent),
       returnToParent: () => this.informationCoordinator.returnToParent(),
+      continueChild: (text, delivery) => this.informationCoordinator.continueChild(text, delivery),
+      onChildComposerInput: (value, caret) => this.informationCoordinator.setChildComposerState(
+        caret === undefined ? { draft: value } : { draft: value, caret }),
+      onChildComposerDelivery: (delivery) => this.informationCoordinator.setChildComposerState({ delivery }),
+      onChildComposerFocus: (focused) => this.informationCoordinator.setChildComposerState({ composerFocused: focused }),
     });
     this.host.attachFiles(this.surface.getFilesMount());
     this.mountComposer();
@@ -164,6 +174,7 @@ export class SessionWorkbenchCoordinator {
   refresh(): void {
     if (this.disposed) return;
     this.syncSubscriptions();
+    this.informationCoordinator.syncNativeJobSubscriptions();
     const session = this.host.getActiveSession();
     const identity = `${session.backend}:${session.conversation?.id ?? session.tabId}`;
     if (identity !== this.lastIdentity) {
@@ -197,14 +208,14 @@ export class SessionWorkbenchCoordinator {
       backend: this.host.getRegistry()?.get(session.backend)?.displayName ?? session.backend, sessionId, goal,
       capabilities: service?.getGoalCapabilities() ?? null, armed: this.isArmed(),
       busy: this.operations.has(key) || this.pendingSends.has(session.tabId), error: this.errors.get(session.tabId),
-      todos: session.todos, tasks, resources: session.resources,
+      todos: session.todos, tasks, resources: session.resources, filesSummary: this.host.getFilesSummary?.(),
       ...this.informationCoordinator.project(session),
     };
   }
 
   private sessionTasks(session: WorkbenchSession): WorkbenchTask[] {
     const sessionId = session.conversation ? getConversationBackendSessionId(session.conversation) : null;
-    const tasks = [...(this.nativeTasks.get(this.key(session.backend, sessionId)) ?? [])];
+    const tasks = this.informationCoordinator.getNativeTasks(session.backend, sessionId);
     for (const task of session.backgroundTasks) if (!tasks.some((existing) => existing.id === task.id)) tasks.push(task);
     for (const message of session.conversation?.messages ?? []) for (const tool of message.toolCalls ?? []) {
       if (!['task', 'background', 'spawn', 'workflow'].some((word) => tool.name.toLowerCase().includes(word))) continue;
@@ -453,41 +464,9 @@ export class SessionWorkbenchCoordinator {
     if (state.goal.goal && state.goal.goal.status !== 'complete' && state.capabilities?.actions.includes('pause')) await this.controlGoalForSession(session, { action: 'pause' });
   }
 
-  private async refreshTasks(session: WorkbenchSession, force = false): Promise<void> {
-    const sessionId = session.conversation ? getConversationBackendSessionId(session.conversation) : null;
-    const service = this.host.getRegistry()?.get(session.backend) as NativeTaskService | undefined;
-    if (!sessionId || !service?.getBackgroundTasks) return;
-    const key = this.key(session.backend, sessionId);
-    if (!force && Date.now() - (this.taskReads.get(key) ?? 0) < 5000) return;
-    this.taskReads.set(key, Date.now());
-    try {
-      const tasks = await service.getBackgroundTasks(sessionId);
-      if (this.disposed) return;
-      this.nativeTasks.set(key, tasks.map((task) => ({ id: task.taskId, title: task.description, status: task.status,
-        canStop: task.cancellable && typeof service.cancelBackgroundTask === 'function', nativeSessionId: sessionId })));
-      this.refresh();
-    } catch { /* Keep the last observed tasks on transient transport failure. */ }
-  }
-
-  private async stopTask(task: WorkbenchTask): Promise<void> {
-    const session = this.host.getActiveSession();
-    const sessionId = session.conversation ? getConversationBackendSessionId(session.conversation) : null;
-    const service = this.host.getRegistry()?.get(session.backend) as NativeTaskService | undefined;
-    if (!task.canStop || !sessionId || sessionId !== task.nativeSessionId || !service?.cancelBackgroundTask)
-      throw new Error(t('workbench.tool.unavailable'));
-    if (!await service.cancelBackgroundTask(sessionId, task.id)) this.host.notify(t('workbench.tasks.stopUnconfirmed'));
-    await this.refreshTasks(session, true);
-  }
-
-  private async readTaskOutput(task: WorkbenchTask): Promise<string> {
-    if (task.output) return task.output;
-    const session = this.host.getActiveSession();
-    const service = this.host.getRegistry()?.get(session.backend) as NativeTaskService | undefined;
-    const agents = this.informationCoordinator.project(session).agents;
-    if (!task.nativeSessionId || !service?.readChildSessionMessages || !agents?.some((agent) => agent.id === task.id)) return t('workbench.tasks.noOutput');
-    const messages = await service.readChildSessionMessages(task.nativeSessionId, task.id);
-    return messages.map((message) => [message.content, ...(message.toolCalls ?? []).map((tool) => tool.result ?? '')].filter(Boolean).join('\n')).filter(Boolean).join('\n\n') || t('workbench.tasks.noOutput');
-  }
+  private refreshTasks(session: WorkbenchSession, force = false): Promise<void> { return this.informationCoordinator.refreshTasks(session, force); }
+  private stopTask(task: WorkbenchTask): Promise<void> { return this.informationCoordinator.stopTask(task); }
+  private readTaskOutput(task: WorkbenchTask): Promise<string> { return this.informationCoordinator.readTaskOutput(task); }
 
   private scheduleTranscriptSync(session: WorkbenchSession): void {
     const key = session.conversation?.id;
@@ -509,7 +488,7 @@ export class SessionWorkbenchCoordinator {
     for (const session of this.host.getSessions()) {
       const sessionId = session.conversation ? getConversationBackendSessionId(session.conversation) : null;
       const state = sessionId ? this.readbacks.get(this.key(session.backend, sessionId)) : undefined;
-      if (session.tabId === this.host.getActiveSession().tabId || session.backgroundTasks.length) void this.refreshTasks(session);
+      if (session.backend === 'dsh' || session.tabId === this.host.getActiveSession().tabId || session.backgroundTasks.length) void this.refreshTasks(session);
       if (state?.goal || this.pendingSends.has(session.tabId)) {
         void this.refreshGoal(session);
         if (!session.streaming && state?.goal?.status === 'active') this.scheduleTranscriptSync(session);

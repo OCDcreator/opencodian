@@ -1,8 +1,6 @@
 import { setIcon } from 'obsidian';
 
-import type { ClaudeCodePermissionMode } from '../../../../core/types/settings';
-import type { CodexSandboxMode } from '../../../../core/types/settings';
-import type { PermissionMode } from '../../../../core/types/settings';
+import type { ClaudeCodePermissionMode, CodexSandboxMode, PermissionMode } from '../../../../core/types/settings';
 import { t } from '../../../../i18n';
 import { AnchoredOverlayLayoutController } from '../../ui/AnchoredOverlayLayoutController';
 import {
@@ -40,7 +38,7 @@ export interface PermissionModeConfig {
   /** CSS class names for each mode, used on the trigger element. */
   modeCssClasses: readonly string[];
   /** Stable data attribute value identifying the backend system. */
-  backendLabel: 'opencode' | 'opencode2' | 'claude-code' | 'codex' | 'zcode';
+  backendLabel: 'opencode' | 'opencode2' | 'claude-code' | 'codex' | 'zcode' | 'dsh';
   /** Optional visual variant class shared by the container, trigger, and dropdown. */
   variantClass?: string;
   /**
@@ -51,10 +49,25 @@ export interface PermissionModeConfig {
   boundaryHint?: string;
 }
 
-interface PermissionTriggerDisplayState {
-  label: string;
-  modeClass: string;
-  icon: string;
+interface PermissionTriggerDisplayState { label: string; modeClass: string; icon: string; badge?: string; }
+interface PermissionModePresentation extends PermissionModeOption { badge?: string; semanticId?: string; }
+
+const DSH_PERMISSION_PRESENTATIONS = {
+  'read-only': { labelKey: 'chat.dsh.permission.readOnly', alias: 'Read Only', icon: 'shield-check' },
+  'workspace-write': { labelKey: 'chat.dsh.permission.workspaceWrite', alias: 'Workspace Write', icon: 'pencil' },
+  'danger-full-access': { labelKey: 'chat.dsh.permission.fullAccess', alias: 'Full access', icon: 'shield-alert' },
+  auto: { labelKey: 'chat.dsh.permission.auto', alias: 'Auto', icon: 'shield-question' },
+} as const;
+
+/** Presentation only: the generation-protected selector ID remains the write target. */
+function getDshPermissionPresentation(option: PermissionModeOption): PermissionModePresentation {
+  const value = /^preset-\d+-(read-only|workspace-write|danger-full-access|auto)$/.exec(option.id)?.[1];
+  if (!value) return option;
+  const preset = DSH_PERMISSION_PRESENTATIONS[value as keyof typeof DSH_PERMISSION_PRESENTATIONS];
+  const useOfficialLabel = value === 'auto' || option.label === value || option.label === preset.alias;
+  return { ...option, icon: preset.icon, semanticId: value,
+    label: useOfficialLabel ? t(preset.labelKey) : option.label,
+    ...(value === 'auto' ? { badge: 'EXP' } : {}) };
 }
 
 // ─── Factory: OpenCode permission templates (yolo/normal/plan) ────────
@@ -383,10 +396,9 @@ export class PermissionModeSelectorCoordinator {
     const mode = this.host.getPermissionMode();
     const option = this.getPermissionModeOptions().find((candidate) => candidate.id === mode);
     return {
-      label: this.config.displayMap[mode] || mode,
-      modeClass: `mode-${mode}`,
-      icon: option?.icon ?? 'shield',
-    };
+      label: this.config.backendLabel === 'dsh' && option ? option.label : this.config.displayMap[mode] || mode,
+      modeClass: `mode-${mode}`, icon: option?.icon ?? 'shield',
+      ...(option?.badge ? { badge: option.badge } : {}) };
   }
 
   private mountDropdownLayoutController(): void {
@@ -409,66 +421,50 @@ export class PermissionModeSelectorCoordinator {
     this.dropdownLayoutController.observe();
   }
 
-  private applyTriggerDisplay(
-    triggerEl: HTMLElement,
-    displayState: PermissionTriggerDisplayState,
-  ): void {
+  private applyTriggerDisplay(triggerEl: HTMLElement, displayState: PermissionTriggerDisplayState): void {
     const textEl = triggerEl.querySelector('.opencodian-permission-trigger-text');
-    if (textEl) {
-      textEl.textContent = displayState.label;
-    }
-
+    if (textEl) textEl.textContent = displayState.label;
     const iconEl = triggerEl.querySelector<HTMLElement>('.opencodian-permission-trigger-icon');
-    if (iconEl) {
-      setIcon(iconEl, displayState.icon);
+    if (iconEl) setIcon(iconEl, displayState.icon);
+    if (this.config.backendLabel === 'dsh') {
+      triggerEl.querySelector('.opencodian-permission-badge')?.remove();
+      triggerEl.classList.toggle('opencodian-permission-trigger--experimental', !!displayState.badge);
+      if (displayState.badge) {
+        const badge = triggerEl.createSpan({ cls: 'opencodian-permission-badge', text: displayState.badge });
+        triggerEl.insertBefore(badge, triggerEl.querySelector('.opencodian-permission-trigger-chevron'));
+      }
     }
-
-    triggerEl.setAttribute('aria-label', displayState.label);
-    triggerEl.removeClass(...this.config.modeCssClasses);
-    triggerEl.addClass(displayState.modeClass);
+    triggerEl.setAttribute('aria-label', [displayState.label, displayState.badge].filter(Boolean).join(' '));
+    triggerEl.removeClass(...this.config.modeCssClasses); triggerEl.addClass(displayState.modeClass);
   }
 
   private buildDropdown(): void {
-    if (!this.dropdownEl) {
-      return;
-    }
-
+    if (!this.dropdownEl) return;
     this.dropdownEl.empty();
     this.frame = mountComposerPopoverFrame(this.dropdownEl, this.getFrameTexts());
-
     for (const mode of this.getPermissionModeOptions()) {
       const optionEl = this.frame.contentEl.createDiv({
         cls: 'opencodian-permission-option opencodian-composer-popover-option',
         attr: {
-          'data-mode': mode.id,
-          'data-permission-semantic': this.getPermissionSemantic(mode.id),
-          role: 'option',
-          tabindex: '-1',
+          'data-mode': mode.id, role: 'option', tabindex: '-1',
+          'data-permission-semantic': this.getPermissionSemantic(mode.semanticId ?? mode.id),
           'aria-selected': String(mode.id === this.host.getPermissionMode()),
         },
       });
-
-      const iconWrapper = optionEl.createSpan({ cls: 'opencodian-permission-option-icon' });
-      setIcon(iconWrapper, mode.icon ?? 'shield');
-
+      setIcon(optionEl.createSpan({ cls: 'opencodian-permission-option-icon' }), mode.icon ?? 'shield');
       const contentEl = optionEl.createDiv({ cls: 'opencodian-permission-option-content' });
-      contentEl.createDiv({ cls: 'opencodian-permission-option-label', text: mode.label });
-      contentEl.createDiv({ cls: 'opencodian-permission-option-desc', text: mode.description });
-
-      const checkmark = optionEl.createSpan({ cls: 'opencodian-permission-option-check' });
-      setIcon(checkmark, 'check');
-
-      optionEl.addEventListener('click', (event) => {
-        event.stopPropagation();
-        void this.selectPermissionMode(mode.id);
-      });
+      const headingEl = mode.badge ? contentEl.createDiv({ cls: 'opencodian-permission-option-heading' }) : contentEl;
+      headingEl.createDiv({ cls: 'opencodian-permission-option-label', text: mode.label });
+      if (mode.badge) headingEl.createSpan({ cls: 'opencodian-permission-badge', text: mode.badge });
+      if (mode.description || this.config.backendLabel !== 'dsh') contentEl.createDiv({ cls: 'opencodian-permission-option-desc', text: mode.description });
+      setIcon(optionEl.createSpan({ cls: 'opencodian-permission-option-check' }), 'check');
+      optionEl.addEventListener('click', event => { event.stopPropagation(); void this.selectPermissionMode(mode.id); });
     }
-
     this.updateDropdownSelection();
   }
 
-  private getPermissionModeOptions(): PermissionModeOption[] {
-    return this.config.options;
+  private getPermissionModeOptions(): PermissionModePresentation[] {
+    return this.config.backendLabel === 'dsh' ? this.config.options.map(getDshPermissionPresentation) : this.config.options;
   }
 
   private joinClasses(...classes: Array<string | undefined>): string {
