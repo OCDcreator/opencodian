@@ -177,7 +177,8 @@ process.stdin.on('data', (chunk) => {
   return new DshAcpClient({
     cwd: process.cwd(),
     launch: { command: process.execPath, args: ['-e', script], env: {} },
-    requestTimeoutMs: 300,
+    // Match clientFor's real-process startup budget on shared CI runners.
+    requestTimeoutMs: 2_000,
   });
 }
 
