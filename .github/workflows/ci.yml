@@ -16,8 +16,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Use the Intel pool while macOS ARM capacity leaves jobs unassigned.
-        os: [windows-latest, macos-26-intel]
+        # macOS Intel coverage was retired by product decision on 2026-11-11.
+        os: [windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
