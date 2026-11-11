@@ -34,6 +34,8 @@ const DOC = 'alpha beta gamma delta epsilon zeta eta theta';
 interface HarnessOptions {
   /** Overrides the first turn's outcome (defaults to a replacement preview). */
   readonly firstTurnOutcome?: InlineEditOutcome;
+  /** Holds turn completion until the test has checked the streaming state. */
+  readonly firstTurnCompletion?: Promise<void>;
   /**
    * Timed accumulated-text steps: each step waits `awaitMs` (real timers) and
    * then feeds the accumulated text, mirroring how a streaming backend paces
@@ -111,6 +113,7 @@ function makeHarness(options: HarnessOptions = {}): Harness {
             await sleep(step.awaitMs);
             turnOptions?.onTextChunk?.(step.accumulated);
           }
+          await options.firstTurnCompletion;
           return settle;
         })();
       },
@@ -219,21 +222,26 @@ describe('InlineEditController streaming preview growth (R-A3)', () => {
   });
 
   it('does not accept a partial preview on Enter while the turn is still streaming', async () => {
+    let finishTurn!: () => void;
+    const firstTurnCompletion = new Promise<void>((resolve) => { finishTurn = resolve; });
     const h = makeHarness({
+      firstTurnCompletion,
       firstTurnChunkSteps: [
         { awaitMs: 60, accumulated: '<replacement>partial one' },
         { awaitMs: 150, accumulated: '<replacement>partial one and two' },
       ],
     });
-    await submitStreaming(h);
-    // Mid-stream: the partial preview is up, Enter must be a no-op.
-    await sleep(100);
-    expect(h.controller.phase).toBe('generating');
-    expect(previewEls(h.view)).toHaveLength(1);
-    pressKey('Enter');
-    await flush(4);
-    expect(h.controller.phase).toBe('generating');
-    expect(h.writes).toEqual([]);
+    try {
+      await submitStreaming(h);
+      // Hold completion across the Enter assertions even on a busy CI runner.
+      for (let i = 0; i < 300 && previewEls(h.view).length === 0; i += 1) await sleep(15);
+      expect(h.controller.phase).toBe('generating');
+      expect(previewEls(h.view)).toHaveLength(1);
+      pressKey('Enter');
+      await flush(4);
+      expect(h.controller.phase).toBe('generating');
+      expect(h.writes).toEqual([]);
+    } finally { finishTurn(); }
 
     await awaitSettled(h);
     expect(h.controller.phase).toBe('preview');
