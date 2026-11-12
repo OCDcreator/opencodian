@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "089fffaf086047a9acedf9189a3fe1ca3d7e50eb88fece5ed555fd40697f2ad8",
+  "digest": "117353385ad33c3d76502967d24992e7903c46567a368db6768e924ca6aa73a1",
   "recordCount": 847,
   "records": [
     {
@@ -3026,7 +3026,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts",
-      "sha256": "923f963c379b6d3c10124289f71203017acee9262146288d8ae01e7a1b422d1e"
+      "sha256": "c436c08c1cbdac954db6b476ceb62aadc80525644f559b35e11407d2f6f5781b"
     },
     {
       "kind": "src",
@@ -4239,7 +4239,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-11-11T22:16:47.844Z",
-  "headShaAtGeneration": "556d72dac9a302460af367ec17c8e919101c0f42",
+  "generatedAt": "2026-11-12T02:43:42.985Z",
+  "headShaAtGeneration": "278fd32a7b5176666501d825d1b8cd0cf90fb430",
   "graphifyVersion": "graphify 0.9.97"
 }

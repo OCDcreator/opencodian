@@ -200,6 +200,7 @@ interface ClaudeCodeGroupOptions {
   titleKey?: TranslationKey;
   descKey?: TranslationKey;
   extraClasses?: string[];
+  collapsible?: boolean;
 }
 
 interface ClaudeCodeNoticeOptions {
@@ -526,11 +527,16 @@ export class SettingsClaudeCodeSection {
 
   private createClaudeCodeGroup(
     containerEl: HTMLElement,
-    { id, titleKey, descKey, extraClasses = [] }: ClaudeCodeGroupOptions,
+    { id, titleKey, descKey, extraClasses = [], collapsible = false }: ClaudeCodeGroupOptions,
   ): HTMLElement {
     const groupCopy = CLAUDE_CODE_GROUP_COPY[id];
-    const groupEl = containerEl.createDiv({
-      cls: ['opencodian-claude-code-group', 'opencodian-settings-claude-code-group', ...extraClasses].join(' '),
+    const groupEl = containerEl.createEl(collapsible ? 'details' : 'div', {
+      cls: [
+        'opencodian-claude-code-group',
+        'opencodian-settings-claude-code-group',
+        ...(collapsible ? ['opencodian-claude-code-group--collapsible'] : []),
+        ...extraClasses,
+      ].join(' '),
       attr: {
         'data-settings-surface': 'group',
         'data-claude-code-group': id,
@@ -539,6 +545,21 @@ export class SettingsClaudeCodeSection {
 
     if (id === 'sandbox-advanced') {
       groupEl.setAttribute('data-claude-code-advanced-sandbox', 'true');
+    }
+
+    const resolvedDescKey = descKey ?? groupCopy.descKey;
+    if (collapsible) {
+      groupEl.createEl('summary', { text: t(titleKey ?? groupCopy.titleKey) });
+      const body = groupEl.createDiv({
+        cls: 'opencodian-claude-code-stack opencodian-settings-claude-code-group-stack',
+      });
+      if (resolvedDescKey) {
+        body.createEl('p', {
+          cls: 'opencodian-claude-code-group-desc opencodian-settings-claude-code-group-desc',
+          text: t(resolvedDescKey),
+        });
+      }
+      return body;
     }
 
     const headerEl = groupEl.createDiv({
@@ -552,7 +573,6 @@ export class SettingsClaudeCodeSection {
       cls: titleClasses.join(' '),
       text: t(titleKey ?? groupCopy.titleKey),
     });
-    const resolvedDescKey = descKey ?? groupCopy.descKey;
     if (resolvedDescKey) {
       // Group description collapsed from a full-width <p> into a compact
       // help-circle button beside the title. Hover/focus shows the description
@@ -734,35 +754,35 @@ export class SettingsClaudeCodeSection {
    */
   private renderConnectionTab(containerEl: HTMLElement): void {
     const connectionEl = this.createClaudeCodeGroup(containerEl, { id: 'connection-runtime' });
-    this.renderRuntimeBoundaryNotice(connectionEl);
     this.renderExecutableSetting(connectionEl);
     this.renderJsRuntimeSetting(connectionEl);
     this.renderLoadTimeoutMsSetting(connectionEl);
     this.renderEnvironmentHint(connectionEl);
 
-    const ecosystemEl = this.createClaudeCodeGroup(containerEl, { id: 'runtime-ecosystem' });
+    const diagnosticsEl = this.createClaudeCodeGroup(containerEl, { id: 'diagnostics-logs' });
+    this.renderDebugSetting(diagnosticsEl);
+    this.renderDebugFileSetting(diagnosticsEl);
+    this.renderFileCheckpointBoundaryNotice(diagnosticsEl);
+    this.renderEnvironmentVariablesSetting(diagnosticsEl);
+    this.renderDiagnostics(diagnosticsEl);
+    this.renderRuntimeBoundaryNotice(diagnosticsEl);
+
+    const ecosystemEl = this.createClaudeCodeGroup(containerEl, { id: 'runtime-ecosystem', collapsible: true });
     this.renderRuntimeEcosystemSummary(ecosystemEl);
     this.renderBackendSessionBrowserInfo(ecosystemEl);
 
-    const projectFilesEl = this.createClaudeCodeGroup(containerEl, { id: 'project-files' });
+    const projectFilesEl = this.createClaudeCodeGroup(ecosystemEl, { id: 'project-files' });
     projectFilesEl.createEl('p', {
       cls: 'setting-item-description',
       text: t('settings.claudeCode.groups.projectFiles.manageInTabs'),
     });
 
-    const inspectionEl = this.createClaudeCodeGroup(containerEl, { id: 'runtime-inspection' });
+    const inspectionEl = this.createClaudeCodeGroup(ecosystemEl, { id: 'runtime-inspection' });
     this.renderClaudeRuntimeCommandsControls(inspectionEl);
     this.renderRuntimeCatalogReadbackControls(inspectionEl);
     this.renderAccountInfoReadbackControls(inspectionEl);
     this.renderContextUsageReadbackControls(inspectionEl);
     this.renderRuntimeFileReadbackControls(inspectionEl);
-
-    const diagnosticsEl = this.createClaudeCodeGroup(containerEl, { id: 'diagnostics-logs' });
-    this.renderDiagnostics(diagnosticsEl);
-    this.renderDebugSetting(diagnosticsEl);
-    this.renderDebugFileSetting(diagnosticsEl);
-    this.renderFileCheckpointBoundaryNotice(diagnosticsEl);
-    this.renderEnvironmentVariablesSetting(diagnosticsEl);
   }
 
   private renderExecutableSetting(containerEl: HTMLElement): void {

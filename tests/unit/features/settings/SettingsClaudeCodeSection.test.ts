@@ -353,8 +353,13 @@ async function chooseRadio(containerEl: HTMLElement, backendKey: string, value: 
 
 function expectClaudeCodeGroupChrome(containerEl: HTMLElement): void {
   for (const groupEl of Array.from(containerEl.querySelectorAll<HTMLElement>('[data-claude-code-group]'))) {
-    expect(groupEl.querySelector(':scope > .opencodian-claude-code-group-header')).toBeTruthy();
-    expect(groupEl.querySelector(':scope > .opencodian-claude-code-group-header .opencodian-claude-code-group-title')).toBeTruthy();
+    if (groupEl.dataset.claudeCodeGroup === 'runtime-ecosystem') {
+      expect(groupEl.tagName).toBe('DETAILS');
+      expect(groupEl.querySelector(':scope > summary')?.textContent).toBe(t('settings.claudeCode.groups.runtimeEcosystem.title'));
+    } else {
+      expect(groupEl.querySelector(':scope > .opencodian-claude-code-group-header')).toBeTruthy();
+      expect(groupEl.querySelector(':scope > .opencodian-claude-code-group-header .opencodian-claude-code-group-title')).toBeTruthy();
+    }
     expect(groupEl.querySelector(':scope > .opencodian-claude-code-stack')).toBeTruthy();
   }
 }
@@ -1157,24 +1162,47 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(contextContainerEl.querySelector('[data-test-configuration-workbench="true"]')).toBeTruthy();
     });
 
-    it('renders semantic groups in the approved order', () => {
+    it('puts primary connection tasks before one native runtime readback disclosure', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'runtime');
+      section.attachTabbed(containerEl, 'connection');
 
       expectGroupOrder(containerEl, [
         'connection-runtime',
+        'diagnostics-logs',
         'runtime-ecosystem',
         'project-files',
         'runtime-inspection',
+      ]);
+      const body = containerEl.querySelector<HTMLElement>('[data-settings-surface="tab-body"]')!;
+      expect(Array.from(body.children).map(child => (child as HTMLElement).dataset.claudeCodeGroup)).toEqual([
+        'connection-runtime',
         'diagnostics-logs',
+        'runtime-ecosystem',
       ]);
       expectClaudeCodeGroupChrome(containerEl);
       expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(5);
+
+      const disclosure = containerEl.querySelector<HTMLDetailsElement>('[data-claude-code-group="runtime-ecosystem"]')!;
+      expect(disclosure.open).toBe(false);
+      expect(disclosure.querySelector(':scope > .opencodian-claude-code-stack > .opencodian-claude-code-group-desc')?.textContent)
+        .toBe(t('settings.claudeCode.groups.runtimeEcosystem.desc'));
+      for (const id of ['project-files', 'runtime-inspection']) {
+        expect(disclosure.querySelector(`:scope > .opencodian-claude-code-stack > [data-claude-code-group="${id}"]`)).toBeTruthy();
+      }
+      expect(disclosure.querySelector('[data-claude-code-runtime-ecosystem="true"]')).toBeTruthy();
+      expect(body.querySelector(':scope > [data-claude-code-group="connection-runtime"] [data-claude-code-runtime-boundary]')).toBeNull();
+      expect(body.querySelector(':scope > [data-claude-code-group="diagnostics-logs"] [data-claude-code-runtime-boundary]')).toBeTruthy();
+      expect(body.querySelector(':scope > [data-claude-code-group="diagnostics-logs"] [data-backend-key="claude.debug"]')).toBeTruthy();
+      expect(body.querySelector(':scope > [data-claude-code-group="diagnostics-logs"] [data-backend-key="claude.debugFile"]')).toBeTruthy();
+      disclosure.querySelector('summary')!.click();
+      expect(disclosure.open).toBe(true);
+      disclosure.querySelector('summary')!.click();
+      expect(disclosure.open).toBe(false);
     });
 
     it('marks lifecycle notices with the Claude Code lifecycle class', () => {
