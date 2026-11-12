@@ -10450,7 +10450,8 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
   .opencodian-mcp-toolbar-add-setting,
   .opencodian-mcp-overview-actions .setting-item,
   .opencodian-mcp-server-row-actions .setting-item,
-  .opencodian-mcp-server-card-actions .setting-item
+  .opencodian-mcp-server-card-actions .setting-item,
+  .opencodian-backend-task-workspace .setting-item
 )) {
   container: opencodian-setting-row / inline-size;
   min-width: 0;
@@ -13096,7 +13097,8 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
   .opencodian-mcp-toolbar-add-setting,
   .opencodian-mcp-overview-actions .setting-item,
   .opencodian-mcp-server-row-actions .setting-item,
-  .opencodian-mcp-server-card-actions .setting-item
+  .opencodian-mcp-server-card-actions .setting-item,
+  .opencodian-backend-task-workspace .setting-item
 )),
   .opencodian-settings .opencodian-settings-section .setting-item:not(.opencodian-settings-direct-host):not(:is(
   .opencodian-share-policy-setting,
@@ -13110,7 +13112,8 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
   .opencodian-mcp-toolbar-add-setting,
   .opencodian-mcp-overview-actions .setting-item,
   .opencodian-mcp-server-row-actions .setting-item,
-  .opencodian-mcp-server-card-actions .setting-item
+  .opencodian-mcp-server-card-actions .setting-item,
+  .opencodian-backend-task-workspace .setting-item
 )) {
     grid-template-columns: minmax(0, 1fr);
     align-items: stretch;
@@ -13128,7 +13131,8 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
   .opencodian-mcp-toolbar-add-setting,
   .opencodian-mcp-overview-actions .setting-item,
   .opencodian-mcp-server-row-actions .setting-item,
-  .opencodian-mcp-server-card-actions .setting-item
+  .opencodian-mcp-server-card-actions .setting-item,
+  .opencodian-backend-task-workspace .setting-item
 )) > .setting-item-control,
   .opencodian-settings .opencodian-settings-section .setting-item:not(.opencodian-settings-direct-host):not(:is(
   .opencodian-share-policy-setting,
@@ -13142,7 +13146,8 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
   .opencodian-mcp-toolbar-add-setting,
   .opencodian-mcp-overview-actions .setting-item,
   .opencodian-mcp-server-row-actions .setting-item,
-  .opencodian-mcp-server-card-actions .setting-item
+  .opencodian-mcp-server-card-actions .setting-item,
+  .opencodian-backend-task-workspace .setting-item
 )) > .setting-item-control {
     width: 100%;
     justify-content: flex-start;
@@ -13178,7 +13183,8 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
   .opencodian-mcp-toolbar-add-setting,
   .opencodian-mcp-overview-actions .setting-item,
   .opencodian-mcp-server-row-actions .setting-item,
-  .opencodian-mcp-server-card-actions .setting-item
+  .opencodian-mcp-server-card-actions .setting-item,
+  .opencodian-backend-task-workspace .setting-item
 )) > .setting-item-info,
   .opencodian-settings .setting-item:not(.opencodian-settings-direct-host):not(:is(
   .opencodian-share-policy-setting,
@@ -13192,7 +13198,8 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
   .opencodian-mcp-toolbar-add-setting,
   .opencodian-mcp-overview-actions .setting-item,
   .opencodian-mcp-server-row-actions .setting-item,
-  .opencodian-mcp-server-card-actions .setting-item
+  .opencodian-mcp-server-card-actions .setting-item,
+  .opencodian-backend-task-workspace .setting-item
 )) > .setting-item-control {
     grid-column: 1 / -1;
     min-width: 0;
@@ -13210,7 +13217,8 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
   .opencodian-mcp-toolbar-add-setting,
   .opencodian-mcp-overview-actions .setting-item,
   .opencodian-mcp-server-row-actions .setting-item,
-  .opencodian-mcp-server-card-actions .setting-item
+  .opencodian-mcp-server-card-actions .setting-item,
+  .opencodian-backend-task-workspace .setting-item
 )) > .setting-item-info {
     overflow-wrap: anywhere;
   }
@@ -13227,7 +13235,8 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
   .opencodian-mcp-toolbar-add-setting,
   .opencodian-mcp-overview-actions .setting-item,
   .opencodian-mcp-server-row-actions .setting-item,
-  .opencodian-mcp-server-card-actions .setting-item
+  .opencodian-mcp-server-card-actions .setting-item,
+  .opencodian-backend-task-workspace .setting-item
 )) > .setting-item-control {
     width: 100%;
     justify-content: flex-start;
@@ -20007,7 +20016,7 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
   margin-top: 0;
 }
 
-.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace[data-backend-workspace] .setting-item:not(.opencodian-settings-direct-host) {
+.opencodian-settings .opencodian-backend-task-workspace .setting-item:not(.opencodian-settings-direct-host) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
   align-items: start;
@@ -20067,7 +20076,7 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
   line-height: 1.7;
 }
 
-.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace[data-backend-workspace] .setting-item-control {
+.opencodian-settings .opencodian-backend-task-workspace .setting-item-control {
   display: flex;
   align-self: center;
   flex-direction: column;
@@ -20081,17 +20090,17 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
   text-align: start;
 }
 
-.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace[data-backend-workspace] .setting-item-control > .opencodian-settings-dropdown {
+.opencodian-settings .opencodian-backend-task-workspace .setting-item-control > .opencodian-settings-dropdown {
   flex: none;
 }
 
-.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace[data-backend-workspace] .setting-item-control:has(> button):not(:has(input, textarea, select, .opencodian-settings-dropdown, .opencodian-backend-choice-group)) {
+.opencodian-settings .opencodian-backend-task-workspace .setting-item-control:has(> button):not(:has(input, textarea, select, .opencodian-settings-dropdown, .opencodian-backend-choice-group)) {
   flex-direction: row;
   align-items: center;
   flex-wrap: wrap;
 }
 
-.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace[data-backend-workspace] .setting-item-control:has(> .opencodian-claude-code-proof-chip):has(> select, > .opencodian-settings-dropdown) {
+.opencodian-settings .opencodian-backend-task-workspace .setting-item-control:has(> .opencodian-claude-code-proof-chip):has(> select, > .opencodian-settings-dropdown) {
   flex-direction: row;
   align-items: center;
   justify-content: flex-start;
@@ -20103,7 +20112,7 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
   margin-inline-start: 0;
 }
 
-.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace[data-backend-workspace] .setting-item-control:has(> .opencodian-claude-code-proof-chip) > .opencodian-settings-dropdown {
+.opencodian-settings .opencodian-backend-task-workspace .setting-item-control:has(> .opencodian-claude-code-proof-chip) > .opencodian-settings-dropdown {
   flex: 1 1 0;
   min-width: 0;
 }
@@ -20320,7 +20329,7 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
     padding: 24px 0 30px;
   }
 
-  .opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace[data-backend-workspace] .setting-item:not(.opencodian-settings-direct-host),
+  .opencodian-settings .opencodian-backend-task-workspace .setting-item:not(.opencodian-settings-direct-host),
   .opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace .setting-item:has(.opencodian-backend-choice-group) {
     grid-template-columns: minmax(0, 1fr);
     gap: 11px;

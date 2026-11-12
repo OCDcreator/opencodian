@@ -235,7 +235,6 @@ it('wins the shared 13px/700 cascade only inside the four-backend task workspace
       const shell = host.createDiv({ cls: 'opencodian-settings-content-shell' });
       const workspace = shell.createDiv({ cls: 'opencodian-backend-workspace' });
       workspace.classList.toggle('opencodian-backend-task-workspace', taskWorkspace);
-      workspace.dataset.backendWorkspace = 'claude-code';
       return workspace.createDiv({ cls: 'setting-item' }).createDiv({ cls: 'setting-item-name' });
     };
     const taskName = renderName(true);
@@ -262,11 +261,11 @@ it('keeps dropdown height intrinsic in four-backend columns without changing hor
   );
   const columnRule = readRule(
     'components/settings-backend-workspace.css',
-    '.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace[data-backend-workspace] .setting-item-control',
+    '.opencodian-settings .opencodian-backend-task-workspace .setting-item-control',
   );
   const taskRule = readRule(
     'components/settings-backend-workspace.css',
-    '.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace[data-backend-workspace] .setting-item-control > .opencodian-settings-dropdown',
+    '.opencodian-settings .opencodian-backend-task-workspace .setting-item-control > .opencodian-settings-dropdown',
   );
   expect(taskRule).not.toContain('!important');
   const style = document.head.createEl('style', { text: `${hostRule}\n${columnRule}\n${taskRule}` });
@@ -275,7 +274,6 @@ it('keeps dropdown height intrinsic in four-backend columns without changing hor
       const host = document.body.createDiv({ cls: 'opencodian-settings' });
       const workspace = host.createDiv({ cls: 'opencodian-backend-workspace' });
       workspace.classList.toggle('opencodian-backend-task-workspace', taskWorkspace);
-      workspace.dataset.backendWorkspace = 'claude-code';
       const control = workspace.createDiv({ cls: 'setting-item-control' });
       const dropdown = control.createDiv({ cls: 'opencodian-settings-dropdown' });
       const trigger = dropdown.createEl('button', { cls: 'opencodian-settings-dropdown-trigger' });
@@ -316,7 +314,6 @@ it('wraps task choices at readable content widths without changing other backend
       const host = document.body.createDiv({ cls: 'opencodian-settings' });
       const workspace = host.createDiv({ cls: 'opencodian-backend-workspace' });
       workspace.classList.toggle('opencodian-backend-task-workspace', taskWorkspace);
-      workspace.dataset.backendWorkspace = 'claude-code';
       const group = workspace.createDiv({ cls: 'opencodian-backend-choice-group' });
       const choice = group.createEl('label', { cls: 'opencodian-backend-choice' });
       const text = choice.createSpan({ cls: 'opencodian-backend-choice-text' });
@@ -352,11 +349,11 @@ it('keeps task proof indicators beside dropdowns and gives metadata a badge surf
   };
   const style = document.head.createEl('style', { text: [
     readRule('.setting-item-control > .opencodian-settings-dropdown', 'components/settings-dropdown.css'),
-    readRule('.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace[data-backend-workspace] .setting-item-control'),
-    readRule('.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace[data-backend-workspace] .setting-item-control > .opencodian-settings-dropdown'),
-    readRule('.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace[data-backend-workspace] .setting-item-control:has(> .opencodian-claude-code-proof-chip):has(> select, > .opencodian-settings-dropdown)'),
+    readRule('.opencodian-settings .opencodian-backend-task-workspace .setting-item-control'),
+    readRule('.opencodian-settings .opencodian-backend-task-workspace .setting-item-control > .opencodian-settings-dropdown'),
+    readRule('.opencodian-settings .opencodian-backend-task-workspace .setting-item-control:has(> .opencodian-claude-code-proof-chip):has(> select, > .opencodian-settings-dropdown)'),
     readRule('.opencodian-settings .opencodian-backend-task-workspace .setting-item-control > .opencodian-claude-code-proof-chip'),
-    readRule('.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace[data-backend-workspace] .setting-item-control:has(> .opencodian-claude-code-proof-chip) > .opencodian-settings-dropdown'),
+    readRule('.opencodian-settings .opencodian-backend-task-workspace .setting-item-control:has(> .opencodian-claude-code-proof-chip) > .opencodian-settings-dropdown'),
     readRule('.opencodian-settings .opencodian-backend-task-workspace .opencodian-backend-field-meta'),
     readRule('.opencodian-settings .opencodian-backend-task-workspace .opencodian-backend-field-badge'),
     readRule('.opencodian-settings .opencodian-backend-task-workspace .opencodian-backend-field-badge-axis'),
@@ -367,7 +364,6 @@ it('keeps task proof indicators beside dropdowns and gives metadata a badge surf
       const host = document.body.createDiv({ cls: 'opencodian-settings' });
       const workspace = host.createDiv({ cls: 'opencodian-backend-workspace' });
       workspace.classList.toggle('opencodian-backend-task-workspace', taskWorkspace);
-      workspace.dataset.backendWorkspace = 'claude-code';
       const control = workspace.createDiv({ cls: 'setting-item-control' });
       const chip = control.createSpan({ cls: 'opencodian-claude-code-proof-chip' });
       const dropdown = control.createDiv({ cls: 'opencodian-settings-dropdown' });
@@ -407,8 +403,8 @@ it('right-aligns task controls while preserving the unmarked workspace alignment
     return css.slice(start, css.indexOf('}', start) + 1);
   };
   const style = document.head.createEl('style', { text: [
-    '.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace[data-backend-workspace] .setting-item-control',
-    '.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace[data-backend-workspace] .setting-item-control:has(> button):not(:has(input, textarea, select, .opencodian-settings-dropdown, .opencodian-backend-choice-group))',
+    '.opencodian-settings .opencodian-backend-task-workspace .setting-item-control',
+    '.opencodian-settings .opencodian-backend-task-workspace .setting-item-control:has(> button):not(:has(input, textarea, select, .opencodian-settings-dropdown, .opencodian-backend-choice-group))',
     '.opencodian-settings .opencodian-backend-task-workspace .setting-item-control > button:not(.opencodian-settings-dropdown-trigger)',
   ].map(readRule).join('\n') });
   try {
@@ -416,7 +412,6 @@ it('right-aligns task controls while preserving the unmarked workspace alignment
       const host = document.body.createDiv({ cls: 'opencodian-settings' });
       const workspace = host.createDiv({ cls: 'opencodian-backend-workspace' });
       workspace.classList.toggle('opencodian-backend-task-workspace', taskWorkspace);
-      workspace.dataset.backendWorkspace = 'claude-code';
       const control = workspace.createDiv({ cls: 'setting-item-control' });
       const content = button
         ? control.createEl('button', { text: 'Apply' })
@@ -444,7 +439,7 @@ it('stacks four-backend rows only at the readable 600px container boundary', () 
   const css = readFileSync(join(process.cwd(), 'src/style/components/settings-backend-workspace.css'), 'utf8');
   const boundary = css.match(/@container opencodian-settings-pane \(max-width: 600px\) \{([\s\S]*?)\n\}/);
   expect(boundary).not.toBeNull();
-  expect(boundary?.[1]).toContain('.opencodian-backend-task-workspace[data-backend-workspace] .setting-item:not(.opencodian-settings-direct-host)');
+  expect(boundary?.[1]).toContain('.opencodian-backend-task-workspace .setting-item:not(.opencodian-settings-direct-host)');
   expect(boundary?.[1]).toContain('grid-template-columns: minmax(0, 1fr);');
   expect(boundary?.[1]).toContain('gap: 11px;');
   expect(boundary?.[1]).toContain('.opencodian-backend-task-workspace .setting-item-control');
@@ -456,7 +451,7 @@ it('stacks four-backend rows only at the readable 600px container boundary', () 
   const sharedEnd = sharedCss.indexOf('\n  }', sharedStart);
   expect(sharedStart).toBeGreaterThanOrEqual(0);
   const sharedNarrowRule = sharedCss.slice(sharedStart, sharedEnd + 4);
-  const taskSelector = '.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace[data-backend-workspace] .setting-item:not(.opencodian-settings-direct-host)';
+  const taskSelector = '.opencodian-settings .opencodian-backend-task-workspace .setting-item:not(.opencodian-settings-direct-host)';
   const taskStart = css.indexOf(`${taskSelector} {`);
   expect(taskStart).toBeGreaterThanOrEqual(0);
   const taskWideRule = css.slice(taskStart, css.indexOf('}', taskStart) + 1);
@@ -467,7 +462,6 @@ it('stacks four-backend rows only at the readable 600px container boundary', () 
       const shell = host.createDiv({ cls: 'opencodian-settings-content-shell' });
       const workspace = shell.createDiv({ cls: 'opencodian-backend-workspace' });
       workspace.classList.toggle('opencodian-backend-task-workspace', taskWorkspace);
-      workspace.dataset.backendWorkspace = 'claude-code';
       return workspace.createDiv({ cls: 'setting-item' });
     };
     expect(getComputedStyle(renderRow(true)).gridTemplateColumns)

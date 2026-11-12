@@ -389,7 +389,8 @@
   .opencodian-mcp-toolbar-add-setting,
   .opencodian-mcp-overview-actions .setting-item,
   .opencodian-mcp-server-row-actions .setting-item,
-  .opencodian-mcp-server-card-actions .setting-item
+  .opencodian-mcp-server-card-actions .setting-item,
+  .opencodian-backend-task-workspace .setting-item
 )) {
   container: opencodian-setting-row / inline-size;
   min-width: 0;
@@ -3035,7 +3036,8 @@
   .opencodian-mcp-toolbar-add-setting,
   .opencodian-mcp-overview-actions .setting-item,
   .opencodian-mcp-server-row-actions .setting-item,
-  .opencodian-mcp-server-card-actions .setting-item
+  .opencodian-mcp-server-card-actions .setting-item,
+  .opencodian-backend-task-workspace .setting-item
 )),
   .opencodian-settings .opencodian-settings-section .setting-item:not(.opencodian-settings-direct-host):not(:is(
   .opencodian-share-policy-setting,
@@ -3049,7 +3051,8 @@
   .opencodian-mcp-toolbar-add-setting,
   .opencodian-mcp-overview-actions .setting-item,
   .opencodian-mcp-server-row-actions .setting-item,
-  .opencodian-mcp-server-card-actions .setting-item
+  .opencodian-mcp-server-card-actions .setting-item,
+  .opencodian-backend-task-workspace .setting-item
 )) {
     grid-template-columns: minmax(0, 1fr);
     align-items: stretch;
@@ -3067,7 +3070,8 @@
   .opencodian-mcp-toolbar-add-setting,
   .opencodian-mcp-overview-actions .setting-item,
   .opencodian-mcp-server-row-actions .setting-item,
-  .opencodian-mcp-server-card-actions .setting-item
+  .opencodian-mcp-server-card-actions .setting-item,
+  .opencodian-backend-task-workspace .setting-item
 )) > .setting-item-control,
   .opencodian-settings .opencodian-settings-section .setting-item:not(.opencodian-settings-direct-host):not(:is(
   .opencodian-share-policy-setting,
@@ -3081,7 +3085,8 @@
   .opencodian-mcp-toolbar-add-setting,
   .opencodian-mcp-overview-actions .setting-item,
   .opencodian-mcp-server-row-actions .setting-item,
-  .opencodian-mcp-server-card-actions .setting-item
+  .opencodian-mcp-server-card-actions .setting-item,
+  .opencodian-backend-task-workspace .setting-item
 )) > .setting-item-control {
     width: 100%;
     justify-content: flex-start;
@@ -3117,7 +3122,8 @@
   .opencodian-mcp-toolbar-add-setting,
   .opencodian-mcp-overview-actions .setting-item,
   .opencodian-mcp-server-row-actions .setting-item,
-  .opencodian-mcp-server-card-actions .setting-item
+  .opencodian-mcp-server-card-actions .setting-item,
+  .opencodian-backend-task-workspace .setting-item
 )) > .setting-item-info,
   .opencodian-settings .setting-item:not(.opencodian-settings-direct-host):not(:is(
   .opencodian-share-policy-setting,
@@ -3131,7 +3137,8 @@
   .opencodian-mcp-toolbar-add-setting,
   .opencodian-mcp-overview-actions .setting-item,
   .opencodian-mcp-server-row-actions .setting-item,
-  .opencodian-mcp-server-card-actions .setting-item
+  .opencodian-mcp-server-card-actions .setting-item,
+  .opencodian-backend-task-workspace .setting-item
 )) > .setting-item-control {
     grid-column: 1 / -1;
     min-width: 0;
@@ -3149,7 +3156,8 @@
   .opencodian-mcp-toolbar-add-setting,
   .opencodian-mcp-overview-actions .setting-item,
   .opencodian-mcp-server-row-actions .setting-item,
-  .opencodian-mcp-server-card-actions .setting-item
+  .opencodian-mcp-server-card-actions .setting-item,
+  .opencodian-backend-task-workspace .setting-item
 )) > .setting-item-info {
     overflow-wrap: anywhere;
   }
@@ -3166,7 +3174,8 @@
   .opencodian-mcp-toolbar-add-setting,
   .opencodian-mcp-overview-actions .setting-item,
   .opencodian-mcp-server-row-actions .setting-item,
-  .opencodian-mcp-server-card-actions .setting-item
+  .opencodian-mcp-server-card-actions .setting-item,
+  .opencodian-backend-task-workspace .setting-item
 )) > .setting-item-control {
     width: 100%;
     justify-content: flex-start;
