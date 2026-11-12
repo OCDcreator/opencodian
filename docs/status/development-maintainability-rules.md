@@ -36,6 +36,8 @@
 
 `BackendSettingsControls` is shared by all six backend settings surfaces, and `BackendSettingsWorkspace` owns only non-secret, user-marked default snapshots. They do not own native backend state or replace configuration-file mutation services. The source/application metadata must reflect the backend's actual turn/session/reconnect boundary. Native archive restoration stays revision-checked; failed restore leaves the file unchanged. Plugin-default snapshots must not copy credentials, environment variables or raw native configuration into a second vault store. Task tabs and their legacy aliases remain in `settingsLayoutRegistry` rather than a parallel navigation registry.
 
+2026-11-12：Claude provider 的凭据草稿编辑与脱敏配置检查由同一 `feature.settings-claude` owner 下的 `SettingsClaudeProviderModals` 完整隔离；`SettingsClaudeProvidersSection` 继续持有配置快照代际、local revision、CAS 应用和冲突恢复，既有 metadata coordinator 保留部分持久化重试。模态组件不直接读写配置或推定运行时确认；预设选择记录与文件回读保持分离。
+
 ## Feature Work Checklist
 
 1. Identify the owner before coding: UI, runtime, OpenCode service, settings, storage, theme, or tests.
