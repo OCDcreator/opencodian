@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "dfb74efbaeced8543d55e19edeb78889be220224933bd5438df7005879dd817c",
+  "digest": "8c8f7fde64246aa8d15d0ec508ae577a4c9e3122db41601783b04961ee238948",
   "recordCount": 847,
   "records": [
     {
@@ -3026,7 +3026,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts",
-      "sha256": "e99e29658eec2143f14f9768d0ccc628474bf0dd99172976f5d893166df486f8"
+      "sha256": "75df0d4fda344416728c6177d41e8d926670c5aae3a707f102ac8e4463fb2a5d"
     },
     {
       "kind": "src",
@@ -3856,7 +3856,7 @@
     {
       "kind": "src",
       "key": "src/style/components/settings-backend-workspace.css",
-      "sha256": "d11e441c1ab79f9149f8560cbedb7bc0f767475f60ac796104e5e3ab49c841c1"
+      "sha256": "7c4e84fee5784279a0a7dc96d8c1f5aa697140a2d19258a37e050faf78d19e7c"
     },
     {
       "kind": "src",
@@ -4239,7 +4239,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-11-12T03:07:46.475Z",
-  "headShaAtGeneration": "45d438953ecf6c8e5fddf74f8b53f5770869af33",
+  "generatedAt": "2026-11-12T03:34:52.819Z",
+  "headShaAtGeneration": "b82fc38a3d640faa7854db969cb0aefaf7f5d13b",
   "graphifyVersion": "graphify 0.9.97"
 }

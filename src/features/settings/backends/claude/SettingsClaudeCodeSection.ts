@@ -707,6 +707,13 @@ export class SettingsClaudeCodeSection {
         .onClick(() => {
           new ClaudeCodeHelpModal(this.plugin.app, helpContent).open();
         });
+      const nameEl = settingEl.querySelector<HTMLElement>(':scope > .setting-item-info > .setting-item-name');
+      const infoEl = nameEl?.parentElement;
+      if (!nameEl || !infoEl || !settingEl.closest('.opencodian-backend-task-workspace')) return;
+      const headingEl = infoEl.createDiv({ cls: 'opencodian-backend-field-heading' });
+      button.extraSettingsEl.classList.add('opencodian-backend-field-help');
+      headingEl.append(nameEl, button.extraSettingsEl);
+      infoEl.prepend(headingEl);
     });
   }
 

@@ -484,6 +484,47 @@ describe('SettingsClaudeCodeSection', () => {
     }
   });
 
+  it('moves existing help actions into the task field label without replacing their callback', () => {
+    const actions: Array<{ setting: Setting; help: HTMLElement; onClick: jest.Mock }> = [];
+    jest.spyOn(Setting.prototype, 'addExtraButton').mockImplementation(function (this: Setting, configure) {
+      const help = this.controlEl.createEl('a', { cls: 'clickable-icon' });
+      const button = {
+        extraSettingsEl: help,
+        setIcon: jest.fn(),
+        setTooltip: jest.fn(),
+        onClick: jest.fn(),
+      };
+      button.setIcon.mockReturnValue(button);
+      button.setTooltip.mockReturnValue(button);
+      button.onClick.mockReturnValue(button);
+      configure(button as never);
+      actions.push({ setting: this, help, onClick: button.onClick });
+      return this;
+    });
+    const section = new SettingsClaudeCodeSection({
+      plugin: createPlugin() as OpenCodianPlugin,
+      createSectionHeading,
+    });
+    const presenter = section as unknown as {
+      attachSettingHelp(setting: Setting, options: { helpTitle: string; lifecycleText: string }): void;
+    };
+
+    for (const taskWorkspace of [false, true]) {
+      const container = document.body.createDiv();
+      container.classList.toggle('opencodian-backend-task-workspace', taskWorkspace);
+      const setting = new Setting(container);
+      const info = setting.settingEl.createDiv({ cls: 'setting-item-info' });
+      const name = info.createDiv({ cls: 'setting-item-name', text: 'Prompt' });
+      presenter.attachSettingHelp(setting, { helpTitle: 'Prompt help', lifecycleText: 'Next query' });
+      const action = actions[actions.length - 1];
+      const heading = info.querySelector('.opencodian-backend-field-heading');
+      expect(heading?.querySelector('.setting-item-name') === name).toBe(taskWorkspace);
+      expect(action.help.parentElement === heading).toBe(taskWorkspace);
+      expect(setting.controlEl.contains(action.help)).toBe(!taskWorkspace);
+      expect(action.onClick).toHaveBeenCalledWith(expect.any(Function));
+    }
+  });
+
   it('persists Claude Code runtime settings without changing backend enablement', async () => {
     const plugin = createPlugin();
     const containerEl = document.createElement('div');

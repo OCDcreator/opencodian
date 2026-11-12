@@ -1299,6 +1299,23 @@
   line-height: 1.4;
 }
 
+.opencodian-settings .opencodian-backend-task-workspace .setting-item-info > .opencodian-backend-field-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.opencodian-settings .opencodian-backend-task-workspace .opencodian-backend-field-heading > .setting-item-name {
+  min-width: 0;
+}
+
+.opencodian-settings .opencodian-backend-task-workspace .opencodian-backend-field-heading > .opencodian-backend-field-help {
+  flex: 0 0 auto;
+  align-self: center;
+  margin: 0;
+}
+
 .opencodian-settings .opencodian-backend-task-workspace .setting-item-description {
   max-width: none;
   margin-top: 6px;
@@ -1334,6 +1351,7 @@
 .opencodian-settings .opencodian-backend-task-workspace .setting-item-control:has(> .opencodian-claude-code-proof-chip):has(> select, > .opencodian-settings-dropdown) {
   flex-direction: row;
   align-items: center;
+  justify-content: flex-start;
   flex-wrap: wrap;
 }
 
@@ -1343,7 +1361,7 @@
 }
 
 .opencodian-settings .opencodian-backend-task-workspace .setting-item-control:has(> .opencodian-claude-code-proof-chip) > .opencodian-settings-dropdown {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
 }
 

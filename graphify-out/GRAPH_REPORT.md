@@ -1,7 +1,7 @@
 # Graph Report - src  (2026-11-12)
 
 ## Corpus Check
-- 785 files · ~1,141,379 words
+- 785 files · ~1,141,409 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 50 file(s) not represented in the graph (top: .css 50)
 
@@ -11,9 +11,9 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Source digest: `dfb74efbaeced8543d55e19edeb78889be220224933bd5438df7005879dd817c`
-- Generated at: 2026-11-12T03:07:46.475Z
-- HEAD at generation: `45d438953ecf6c8e5fddf74f8b53f5770869af33` (informational only; the content digest is the correctness signal)
+- Source digest: `8c8f7fde64246aa8d15d0ec508ae577a4c9e3122db41601783b04961ee238948`
+- Generated at: 2026-11-12T03:34:52.819Z
+- HEAD at generation: `b82fc38a3d640faa7854db969cb0aefaf7f5d13b` (informational only; the content digest is the correctness signal)
 - Run `npm run graphify:update:src` after `src/`, tsconfig, package/lock, ignore rules, wrapper or Graphify version changes.
 ## Community Hubs (Navigation)
 - types/index.ts

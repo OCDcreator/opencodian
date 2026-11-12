@@ -374,9 +374,10 @@ it('keeps task proof indicators beside dropdowns and gives metadata a badge surf
     const task = renderRow(true);
     const other = renderRow(false);
     expect(getComputedStyle(task.control).flexDirection).toBe('row');
+    expect(getComputedStyle(task.control).justifyContent).toBe('flex-start');
     expect(getComputedStyle(task.chip).flexBasis).toBe('10px');
     expect(getComputedStyle(task.chip).marginInlineStart).toBe('0');
-    expect(getComputedStyle(task.dropdown).flexBasis).toBe('auto');
+    expect(getComputedStyle(task.dropdown).flexBasis).toBe('0px');
     expect(getComputedStyle(task.dropdown).minWidth).toBe('0');
     expect(getComputedStyle(task.badge).border).toBe('1px solid var(--background-modifier-border)');
     expect(getComputedStyle(task.badge).background).toBe('var(--background-secondary)');
