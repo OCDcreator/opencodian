@@ -82,3 +82,4 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 ## 2026-10-30 会话标题
 
 现有会话设置显示页补齐非 OpenCode 后端标题控制；OpenCode 2 标题目录由所属 adapter 读取。
+- 2026-11-12 (claude-provider-clarity) owner manifest 核对：与基线 1d3fa289 对 architecture-owners.config.json 做程序化逐 owner deep-equal 对比，全仓仅 feature.settings-claude 的 include 纯插入新增 `src/features/settings/backends/claude/SettingsClaudeProviderModals.ts`（无删除、无其他字段变化）；本 owner（feature.settings-plugin）的 include、responsibilities、canonical state 与依赖约束逐项对比未变。此为 manifest-diff 核对记录，不构成全量架构评审。

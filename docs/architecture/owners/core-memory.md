@@ -69,3 +69,4 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 2026-10-28：六后端共享同一存储/提取/召回/反思核心；protocol+index 每纪元一次，正文逐回合去重。提取原生通道保持只读，由插件校验并执行直接 Markdown 子文件 Read/Edit/Write，明确拒绝 shell 和任意路径。代理笔记本由有正文的完成任务证据驱动；无正文不构造替代证据。新增的安全写入模块隔离高风险边界，未增加后端依赖。
 
 2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `core.memory` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。
+- 2026-11-12 (claude-provider-clarity) owner manifest 核对：与基线 1d3fa289 对 architecture-owners.config.json 做程序化逐 owner deep-equal 对比，全仓仅 feature.settings-claude 的 include 纯插入新增 `src/features/settings/backends/claude/SettingsClaudeProviderModals.ts`（无删除、无其他字段变化）；本 owner（core.memory）的 include、responsibilities、canonical state 与依赖约束逐项对比未变。此为 manifest-diff 核对记录，不构成全量架构评审。

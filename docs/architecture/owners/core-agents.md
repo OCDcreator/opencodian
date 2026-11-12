@@ -63,3 +63,4 @@ The new core.backend-pi owner isolates the external Pi process service. core.age
 ## Goal 与会话工作台（2026-10-30）
 
 Goal 为独立 capability；统一 AgentGoalCapability/BackendGoalRuntime 仅定义 native/具名 extension 的投影与控制，不拥有自动循环。后端 runtime 继续是目标与执行事实来源。
+- 2026-11-12 (claude-provider-clarity) owner manifest 核对：与基线 1d3fa289 对 architecture-owners.config.json 做程序化逐 owner deep-equal 对比，全仓仅 feature.settings-claude 的 include 纯插入新增 `src/features/settings/backends/claude/SettingsClaudeProviderModals.ts`（无删除、无其他字段变化）；本 owner（core.agents）的 include、responsibilities、canonical state 与依赖约束逐项对比未变。此为 manifest-diff 核对记录，不构成全量架构评审。

@@ -206,3 +206,4 @@ SDK 版本刷新与本 owner 内的真实不兼容修复：`@anthropic-ai/claude
 ## 2026-11-08 ZCode aux proof gate (runtime 3.17)
 
 ZCodeAuxQuerySession 的空工具证明按 runtime 3.17 实测协议形状归位：真实提示用户行是唯一携带 `info.tools` 回显的新用户行，合成 `system_reminder` 行（runtime `synthetic: true`）只在提示读回落地前被容忍，双提示、未解释用户行、非空/非法 `info.tools` 仍 fail closed；`session/create` 空 `toolAllowlist`、工具事件审计与 `toolCallCount` 门槛不变。fail-closed 未削弱。真实 CLI + 真实模型在私有根与真实根均验证通过。
+- 2026-11-12 (claude-provider-clarity) owner manifest 核对：与基线 1d3fa289 对 architecture-owners.config.json 做程序化逐 owner deep-equal 对比，全仓仅 feature.settings-claude 的 include 纯插入新增 `src/features/settings/backends/claude/SettingsClaudeProviderModals.ts`（无删除、无其他字段变化）；本 owner（core.backend）的 include、responsibilities、canonical state 与依赖约束逐项对比未变。此为 manifest-diff 核对记录，不构成全量架构评审。

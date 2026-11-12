@@ -58,3 +58,4 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 ## 会话标签机制核对（2026-10-30）
 
 会话标签组维护栏内新增动作、实时容量禁用、按可用宽度收纳的 +N 菜单和键盘焦点；保留既有 TabManager 单一状态源。maxTabs 限制新建而不截断已保存的工作区。 owner manifest 的职责、边界及依赖许可保持原定义。
+- 2026-11-12 (claude-provider-clarity) owner manifest 核对：与基线 1d3fa289 对 architecture-owners.config.json 做程序化逐 owner deep-equal 对比，全仓仅 feature.settings-claude 的 include 纯插入新增 `src/features/settings/backends/claude/SettingsClaudeProviderModals.ts`（无删除、无其他字段变化）；本 owner（feature.chat-tabs）的 include、responsibilities、canonical state 与依赖约束逐项对比未变。此为 manifest-diff 核对记录，不构成全量架构评审。

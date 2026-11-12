@@ -136,3 +136,4 @@ OpenCodianView 只转发 Codex 目录恢复到插件既有桥，保持 view/runt
 ## 2026-10-30 会话标题
 
 OpenCodianView 标题状态更新委托标题服务，只装配当前会话模型、更新标签/rail、挂载重试和恢复。
+- 2026-11-12 (claude-provider-clarity) owner manifest 核对：与基线 1d3fa289 对 architecture-owners.config.json 做程序化逐 owner deep-equal 对比，全仓仅 feature.settings-claude 的 include 纯插入新增 `src/features/settings/backends/claude/SettingsClaudeProviderModals.ts`（无删除、无其他字段变化）；本 owner（feature.chat-shell）的 include、responsibilities、canonical state 与依赖约束逐项对比未变。此为 manifest-diff 核对记录，不构成全量架构评审。

@@ -106,3 +106,4 @@ OpenCode 2 has a separate backend identity and normalized connection settings; p
 ## 2026-10-30 会话标题
 
 ConversationTitleState 表达 rule/native/ai/manual 与 revision；aiTitleModelOverrides 隔离五后端模型设置，原 aiTitleModel 保留 OpenCode 兼容。
+- 2026-11-12 (claude-provider-clarity) owner manifest 核对：与基线 1d3fa289 对 architecture-owners.config.json 做程序化逐 owner deep-equal 对比，全仓仅 feature.settings-claude 的 include 纯插入新增 `src/features/settings/backends/claude/SettingsClaudeProviderModals.ts`（无删除、无其他字段变化）；本 owner（core.types）的 include、responsibilities、canonical state 与依赖约束逐项对比未变。此为 manifest-diff 核对记录，不构成全量架构评审。

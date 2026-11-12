@@ -73,3 +73,4 @@ The new core.backend-pi owner isolates the external Pi process service. feature.
 > 2026-10-27：通用调试只渲染插件日志、共享导出与 capability lab 入口；Claude/Codex trace 通过 `attachBackendTabbed` 在各自后端工作区渲染，OpenCode 1 legacy trace 不再出现在通用调试导航。
 
 2026-10-28 owner manifest 核对：仅 app.memory-runtime 的模型调用依赖由 core.opencode 改为 core.backend 通用只读辅助能力；本 owner `feature.settings-debug` 的 include、职责、canonical state 与依赖规则逐项对比 HEAD 均未改变。
+- 2026-11-12 (claude-provider-clarity) owner manifest 核对：与基线 1d3fa289 对 architecture-owners.config.json 做程序化逐 owner deep-equal 对比，全仓仅 feature.settings-claude 的 include 纯插入新增 `src/features/settings/backends/claude/SettingsClaudeProviderModals.ts`（无删除、无其他字段变化）；本 owner（feature.settings-debug）的 include、responsibilities、canonical state 与依赖约束逐项对比未变。此为 manifest-diff 核对记录，不构成全量架构评审。

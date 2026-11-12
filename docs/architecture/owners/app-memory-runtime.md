@@ -57,3 +57,4 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 2026-10-28：app.memory-runtime 允许依赖 core.backend 的通用辅助能力、registry 与共享 PathConfinement，禁止具体后端反向导入。VaultMemoryFileSystem 拆为独立复用适配器。main.ts 仅传端口，后台任务以持久化会话 backend 为 owner；无有效只读能力时报告失败，不改发活动后端。Git 同步仍独立于 backend。
 
 2026-11-03：Git 同步按 zmem 规则比较 origin，拒绝静默改址；采用 fetch + merge 保留提交历史。共享树根增加本机 JSONL，同一错误只通知一次，状态命令保留最近结果。未改变 owner 或依赖边界。
+- 2026-11-12 (claude-provider-clarity) owner manifest 核对：与基线 1d3fa289 对 architecture-owners.config.json 做程序化逐 owner deep-equal 对比，全仓仅 feature.settings-claude 的 include 纯插入新增 `src/features/settings/backends/claude/SettingsClaudeProviderModals.ts`（无删除、无其他字段变化）；本 owner（app.memory-runtime）的 include、responsibilities、canonical state 与依赖约束逐项对比未变。此为 manifest-diff 核对记录，不构成全量架构评审。

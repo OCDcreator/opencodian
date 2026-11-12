@@ -129,3 +129,4 @@ SessionWorkbench 为 320px 状态胶囊/分组浮层，展开后提供任务、�
 ## 会话信息（2026-10-31）
 
 SessionWorkbenchInformation 定义面板 DTO 并渲染信息，子会话转录与续接由同 owner 的 SessionWorkbenchChildView 承担；SessionWorkbench 只管理容器、折叠、滚动与 Goal，依赖保持单向。
+- 2026-11-12 (claude-provider-clarity) owner manifest 核对：与基线 1d3fa289 对 architecture-owners.config.json 做程序化逐 owner deep-equal 对比，全仓仅 feature.settings-claude 的 include 纯插入新增 `src/features/settings/backends/claude/SettingsClaudeProviderModals.ts`（无删除、无其他字段变化）；本 owner（feature.chat-ui）的 include、responsibilities、canonical state 与依赖约束逐项对比未变。此为 manifest-diff 核对记录，不构成全量架构评审。

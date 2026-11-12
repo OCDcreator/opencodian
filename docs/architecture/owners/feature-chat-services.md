@@ -182,3 +182,4 @@ TitleGenerationService 统一六后端生命周期、代次校验、本地/原�
 ## 会话信息（2026-10-31）
 
 SessionInformationCoordinator 独立持有六后端信息缓存、来源/统计投影和子会话只读检查，复用 ContextUsageDisplayService。SessionWorkbenchCoordinator 只转发，不增加 OpenCodianView 状态所有权。
+- 2026-11-12 (claude-provider-clarity) owner manifest 核对：与基线 1d3fa289 对 architecture-owners.config.json 做程序化逐 owner deep-equal 对比，全仓仅 feature.settings-claude 的 include 纯插入新增 `src/features/settings/backends/claude/SettingsClaudeProviderModals.ts`（无删除、无其他字段变化）；本 owner（feature.chat-services）的 include、responsibilities、canonical state 与依赖约束逐项对比未变。此为 manifest-diff 核对记录，不构成全量架构评审。

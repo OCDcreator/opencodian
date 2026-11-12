@@ -951,7 +951,7 @@ export const enTranslations = {
   'settings.dsh.backup.restored': 'Connection settings restored for the next connection. Reload the plugin if the program path changed.',
   'settings.dsh.backup.failed': 'The operation failed. Your settings and previous backup are unchanged. Check vault write access and retry.',
   'settings.backend.tabs.conversation': 'Conversation',
-  'settings.backend.tabs.providers': 'Models and accounts',
+  'settings.backend.tabs.providers': 'Service and models',
   'settings.backend.tabs.toolsContext': 'Tools and context',
   'settings.backend.tabs.permissionsSafety': 'Permissions and limits',
   'settings.backend.tabs.connection': 'Connection',

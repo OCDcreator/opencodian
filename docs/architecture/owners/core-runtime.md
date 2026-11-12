@@ -62,3 +62,4 @@ The new core.backend-pi owner isolates the external Pi process service. core.run
 ## Goal 与会话工作台（2026-10-30）
 
 WorkbenchHostRuntime 拥有插件启动的宿主 PTY 和显式 Git 操作；每会话身份隔离、输出环缓存、输入/resize/stop 统一。关闭浮层只关闭 UI；runtime dispose 仅清理自己创建的进程。macOS Python PTY / Windows ConPTY 是宿主能力，不归属于六后端。
+- 2026-11-12 (claude-provider-clarity) owner manifest 核对：与基线 1d3fa289 对 architecture-owners.config.json 做程序化逐 owner deep-equal 对比，全仓仅 feature.settings-claude 的 include 纯插入新增 `src/features/settings/backends/claude/SettingsClaudeProviderModals.ts`（无删除、无其他字段变化）；本 owner（core.runtime）的 include、responsibilities、canonical state 与依赖约束逐项对比未变。此为 manifest-diff 核对记录，不构成全量架构评审。

@@ -145,3 +145,4 @@ Pi 工作台列出具名目标读取/控制命令；会话设置中的 Codex Goa
 ZCode 采用三任务页；SettingsZCodeModelControls 展示原生模型与默认字段，SettingsZCodeAccounts 展示登录和 API 表单。窄后端接口保留 credentials/config 写入的 core.backend 所有权，组件不成为第二个运行时 truth store。
 
 API 服务行只摘要地址与模型数量，完整 ID 通过默认收起的原生展开区和共享有界 ScrollArea 查看；该展示调整不改变编辑数据或后端契约。
+- 2026-11-12 (claude-provider-clarity) owner manifest 核对：与基线 1d3fa289 对 architecture-owners.config.json 做程序化逐 owner deep-equal 对比，全仓仅 feature.settings-claude 的 include 纯插入新增 `src/features/settings/backends/claude/SettingsClaudeProviderModals.ts`（无删除、无其他字段变化）；本 owner（feature.settings-shell）的 include、responsibilities、canonical state 与依赖约束逐项对比未变。此为 manifest-diff 核对记录，不构成全量架构评审。

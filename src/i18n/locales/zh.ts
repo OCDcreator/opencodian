@@ -951,7 +951,7 @@ export const zhTranslations = {
   'settings.dsh.backup.restored': '连接配置已恢复，将用于下次连接；程序路径有变化时需重新加载插件。',
   'settings.dsh.backup.failed': '操作未完成，原有配置和备份均已保留。请确认当前库可写后重试。',
   'settings.backend.tabs.conversation': '对话默认值',
-  'settings.backend.tabs.providers': '模型与账户',
+  'settings.backend.tabs.providers': '服务与模型',
   'settings.backend.tabs.toolsContext': '工具与上下文',
   'settings.backend.tabs.permissionsSafety': '权限与限制',
   'settings.backend.tabs.connection': '连接',
