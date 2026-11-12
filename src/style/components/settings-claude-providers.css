@@ -136,6 +136,18 @@
   white-space: normal;
 }
 
+.opencodian-claude-provider-current button.mod-cta,
+.opencodian-claude-provider-preset-modal button.mod-cta {
+  background: var(--text-normal);
+  color: var(--background-primary);
+}
+
+.opencodian-claude-provider-current button.mod-cta:hover,
+.opencodian-claude-provider-preset-modal button.mod-cta:hover {
+  background: var(--text-normal);
+  color: var(--background-primary);
+}
+
 .opencodian-claude-provider-list-header {
   margin-bottom: 10px;
 }

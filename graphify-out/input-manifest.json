@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "c4e6c95ca40ced07537aa3b6f0114e195b497aca1f9ec900b0c1e8b096070883",
+  "digest": "8a2937df86ce425ee0f0b5068c10c910780d77ba32502296662ea9cd162746b7",
   "recordCount": 848,
   "records": [
     {
@@ -3881,7 +3881,7 @@
     {
       "kind": "src",
       "key": "src/style/components/settings-claude-providers.css",
-      "sha256": "3633779908d9f16addc844639426a22ced156e509270a4c3b70475fbdb5e2469"
+      "sha256": "ee433fd38507b03ea77c786e67d05284fe6d2166c4fbef32e2cb7f34fedf150b"
     },
     {
       "kind": "src",
@@ -4244,7 +4244,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-11-12T07:01:45.754Z",
-  "headShaAtGeneration": "140bedac9de4a64386a7d2ef349607d5ea792c7b",
+  "generatedAt": "2026-11-12T07:07:07.275Z",
+  "headShaAtGeneration": "d5a0e0782d3254306b4d9f1dea754ab0040077b4",
   "graphifyVersion": "graphify 0.9.97"
 }

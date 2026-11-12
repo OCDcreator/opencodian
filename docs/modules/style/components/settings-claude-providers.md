@@ -10,7 +10,7 @@
 ## 约束
 
 - 复用 settings form-row token 的边框、圆角和背景，避免引入另一套卡片体系。只有 current 回读面板、gate 与 config-modal 层保持 framed；preset 行去掉外框，仅用 `border-top` 细线分隔，`min-width: 0` 防止长地址撑破行。
-- gate 使用警告 tonal 背景；仅 `active` badge 使用低饱和 accent。
+- gate 使用警告 tonal 背景；预设的“已选择”badge 使用中性前景和次级背景，表达插件选择记录。current 的配置按钮与 preset modal 的保存应用按钮用 `text-normal` / `background-primary` 反向配对，保持明暗主题的文字对比度，hover 不回退到宿主不匹配的 accent 前景。
 - 回读 dl 栅格（`140px` dt + `minmax(0,1fr)` dd）使用 muted source 小字与低饱和 route chip；`opencodian-claude-provider-exact` 保持等宽字体与 `user-select: text`，secret masking 的可读性边界不得被样式弱化；token 行不渲染明文值。
 - current 面板 footer 与列表头使用可换行 flex（`flex-wrap` + gap），按钮 `min-height: 32px`、`white-space: normal`，长文案允许换行不溢出。
 - details 折叠区为单边框原生 disclosure；内部 `.setting-item` 与 local 状态行重置为无边框透明，summary 有 `focus-visible` outline，current/list/card 按钮同样保留 `focus-visible` outline。

@@ -11,9 +11,9 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Source digest: `c4e6c95ca40ced07537aa3b6f0114e195b497aca1f9ec900b0c1e8b096070883`
-- Generated at: 2026-11-12T07:01:45.754Z
-- HEAD at generation: `140bedac9de4a64386a7d2ef349607d5ea792c7b` (informational only; the content digest is the correctness signal)
+- Source digest: `8a2937df86ce425ee0f0b5068c10c910780d77ba32502296662ea9cd162746b7`
+- Generated at: 2026-11-12T07:07:07.275Z
+- HEAD at generation: `d5a0e0782d3254306b4d9f1dea754ab0040077b4` (informational only; the content digest is the correctness signal)
 - Run `npm run graphify:update:src` after `src/`, tsconfig, package/lock, ignore rules, wrapper or Graphify version changes.
 ## Community Hubs (Navigation)
 - OpenCodianView
