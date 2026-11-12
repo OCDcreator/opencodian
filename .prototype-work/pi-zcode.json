@@ -1,0 +1,744 @@
+[
+  {
+    "id": "pi",
+    "name": "Pi",
+    "description": "外部 Pi CLI 安装的桥接后端：插件只持久化极少字段（可执行路径与旧版默认值），模型默认值、执行参数、提供商与认证均写入 Pi 原生 settings.json / models.json / 认证存储（revision 防并发写入）。MCP 与扩展状态为只读视图。字段 schema 以捆绑的官方 0.73.1 表为准（assets/pi/configuration.mjs），不代表上游最新全覆盖。",
+    "tabs": [
+      {
+        "id": "connection",
+        "label": "连接",
+        "title": "连接",
+        "description": "运行时探测与插件级可执行文件路径。",
+        "note": "真实探测：解析器要么启动 CLI，要么精确报告缺失/路径错误/包不兼容；已注册适配器不等于可用安装。",
+        "groups": [
+          {
+            "title": "运行时检测",
+            "description": "插件对 Pi CLI 安装的实时判定，只读展示。",
+            "fields": [
+              {
+                "key": "pi.runtime.detect",
+                "label": "运行时状态",
+                "description": "探测中 / 已找到运行时 / 未安装 / 已配置路径不存在 / 包不兼容 / 权限不足。以下为示例读回。",
+                "type": "notice",
+                "value": "已找到可用的 Pi 运行时（示例读回）",
+                "origin": "readback",
+                "readonly": true,
+                "source": "src/features/settings/backends/pi/SettingsPiSection.ts:132-153"
+              },
+              {
+                "key": "settings.backendSettings.pi.executablePath",
+                "label": "Pi 可执行文件路径",
+                "description": "自定义 Pi CLI 路径；留空 = 自动探测官方安装。仅接受官方包内真实 CLI（shim / 裸二进制被拒）。",
+                "type": "text",
+                "value": "",
+                "origin": "plugin",
+                "store": "<vault>/.opencodian/settings.core.json → backendSettings.pi.executablePath",
+                "scope": "仓库",
+                "effect": "新会话生效",
+                "source": "src/features/settings/backends/pi/SettingsPiSection.ts:154-176; src/core/types/settings.ts:1046-1061"
+              }
+            ]
+          },
+          {
+            "title": "连接操作",
+            "fields": [
+              {
+                "key": "action:pi.reconnect",
+                "label": "重新连接",
+                "description": "停止并重启 Pi 适配器，随后失效斜杠命令目录缓存。",
+                "type": "action",
+                "value": "",
+                "origin": "action",
+                "button": "重新连接",
+                "source": "src/features/settings/backends/pi/SettingsPiSection.ts:102-105,178-182"
+              },
+              {
+                "key": "action:pi.check",
+                "label": "检测连接",
+                "description": "启动适配器验证安装，成功弹通知并刷新探测状态。",
+                "type": "action",
+                "value": "",
+                "origin": "action",
+                "button": "检测连接",
+                "source": "src/features/settings/backends/pi/SettingsPiSection.ts:187-202"
+              },
+              {
+                "key": "action:pi.useNativeDefaults",
+                "label": "改用原生默认值",
+                "description": "清空旧版插件默认值 provider/model/thinkingLevel（仅在旧值存在时显示）。",
+                "type": "action",
+                "value": "",
+                "origin": "action",
+                "button": "改用原生默认值",
+                "condition": { "key": "settings.backendSettings.pi.provider|model|thinkingLevel", "value": "任一非空" },
+                "source": "src/features/settings/backends/pi/SettingsPiSection.ts:107-112,183-184"
+              },
+              {
+                "key": "action:pi.workbench",
+                "label": "打开 Pi 工作台",
+                "description": "会话 / 运行 / 模型 / 资源 / 账户 RPC 工作台弹窗（设置页的高级操作面，非表单）。",
+                "type": "action",
+                "value": "",
+                "origin": "action",
+                "button": "打开 Pi 工作台",
+                "source": "src/features/settings/backends/pi/SettingsPiSection.ts:114-120,185; src/features/settings/backends/pi/PiWorkbenchActions.ts:11-69"
+              },
+              {
+                "key": "pi.storage",
+                "label": "会话存储",
+                "description": "会话数据由 Pi 安装自有存储管理，插件不落盘会话。",
+                "type": "notice",
+                "value": "Pi 自有会话存储（只读说明）",
+                "origin": "readback",
+                "readonly": true,
+                "source": "src/features/settings/backends/pi/SettingsPiSection.ts:186"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "providers",
+        "label": "提供商",
+        "title": "提供商（原生 models.json）",
+        "description": "结构化编辑 Pi 原生 models.json：提供商与其模型定义。经 RPC get_model_configuration / save_model_configuration 读取与保存（revision 防并发）。",
+        "note": "apiKey 为表达式字段（password 输入）；保存后需重连生效。编辑器含无丧失原样 JSON 兜底。写入的是 Pi 自有文件，插件不复制存储。",
+        "groups": [
+          {
+            "title": "提供商选择",
+            "fields": [
+              {
+                "key": "providers",
+                "label": "选择提供商",
+                "description": "选中已有提供商进入编辑，或新建。以下选项为示例读回。",
+                "type": "select",
+                "value": "",
+                "options": [
+                  { "value": "", "label": "新建提供商" },
+                  { "value": "example-gateway", "label": "example-gateway（示例读回）" }
+                ],
+                "origin": "native",
+                "store": "Pi 原生 models.json：<agentDir>/models.json（agentDir = $PI_CODING_AGENT_DIR 或 ~/.pi/agent）",
+                "scope": "全局",
+                "effect": "保存后重连生效",
+                "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:41-89; assets/pi/configuration.mjs:186-188"
+              }
+            ]
+          },
+          {
+            "title": "提供商字段",
+            "fields": [
+              {
+                "key": "providers.<id>",
+                "label": "提供商 ID",
+                "description": "models.json 的 providers 键名；编辑已有提供商时不可改；拒绝 __proto__ 等危险键。",
+                "type": "text",
+                "value": "",
+                "origin": "native",
+                "store": "Pi 原生 models.json",
+                "effect": "保存后重连生效",
+                "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:97,122-123"
+              },
+              {
+                "key": "providers.<id>.name",
+                "label": "显示名称",
+                "description": "提供商显示名，可留空删除该键。",
+                "type": "text",
+                "value": "",
+                "origin": "native",
+                "store": "Pi 原生 models.json",
+                "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:98,159-164"
+              },
+              {
+                "key": "providers.<id>.baseUrl",
+                "label": "Base URL",
+                "description": "提供商 API 网关地址，可留空删除。",
+                "type": "text",
+                "value": "",
+                "origin": "native",
+                "store": "Pi 原生 models.json",
+                "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:99"
+              },
+              {
+                "key": "providers.<id>.api",
+                "label": "API 协议",
+                "description": "选择 API 适配类型；已保存的非枚举值会保留为额外选项，不被改写。",
+                "type": "select",
+                "value": "",
+                "options": [
+                  { "value": "", "label": "沿用 Pi 默认" },
+                  { "value": "openai-completions", "label": "openai-completions" },
+                  { "value": "openai-responses", "label": "openai-responses" },
+                  { "value": "anthropic-messages", "label": "anthropic-messages" },
+                  { "value": "google-generative-ai", "label": "google-generative-ai" }
+                ],
+                "origin": "native",
+                "store": "Pi 原生 models.json",
+                "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:175-182"
+              },
+              {
+                "key": "providers.<id>.apiKey",
+                "label": "API Key（表达式）",
+                "description": "密钥/表达式，password 输入，永不进入插件存储；留空删除该键。",
+                "type": "password",
+                "value": "",
+                "origin": "native",
+                "store": "Pi 原生 models.json（密钥留在该文件）",
+                "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:101,159-164"
+              },
+              {
+                "key": "providers.<id>.authHeader",
+                "label": "认证头",
+                "description": "三态：留空删除 / 启用 / 禁用。",
+                "type": "select",
+                "value": "",
+                "options": [
+                  { "value": "", "label": "沿用 Pi 默认" },
+                  { "value": "true", "label": "启用" },
+                  { "value": "false", "label": "禁用" }
+                ],
+                "origin": "native",
+                "store": "Pi 原生 models.json",
+                "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:102,171-174"
+              },
+              {
+                "key": "providers.<id>.headers",
+                "label": "自定义请求头",
+                "description": "JSON 对象，折叠高级输入；空值删除该键。",
+                "type": "json",
+                "value": {},
+                "origin": "native",
+                "store": "Pi 原生 models.json",
+                "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:103,183-189"
+              },
+              {
+                "key": "providers.<id>.compat",
+                "label": "兼容性选项",
+                "description": "JSON 对象（提供商兼容开关），折叠高级输入。",
+                "type": "json",
+                "value": {},
+                "origin": "native",
+                "store": "Pi 原生 models.json",
+                "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:103"
+              },
+              {
+                "key": "providers.<id>.modelOverrides",
+                "label": "模型覆盖",
+                "description": "JSON 对象（按模型的字段覆盖），折叠高级输入。",
+                "type": "json",
+                "value": {},
+                "origin": "native",
+                "store": "Pi 原生 models.json",
+                "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:103"
+              }
+            ]
+          },
+          {
+            "title": "自定义模型",
+            "description": "providers.<id>.models[] 逐模型编辑器（折叠卡片，可添加/删除）。",
+            "collapsible": true,
+            "fields": [
+              { "key": "providers.<id>.models[].id", "label": "模型 ID", "description": "模型标识，必填。", "type": "text", "value": "", "origin": "native", "store": "Pi 原生 models.json", "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:147" },
+              { "key": "providers.<id>.models[].name", "label": "显示名称", "description": "模型显示名。", "type": "text", "value": "", "origin": "native", "store": "Pi 原生 models.json", "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:147" },
+              { "key": "providers.<id>.models[].baseUrl", "label": "Base URL", "description": "模型级网关覆盖。", "type": "text", "value": "", "origin": "native", "store": "Pi 原生 models.json", "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:147" },
+              { "key": "providers.<id>.models[].api", "label": "API 协议", "description": "同提供商级协议枚举，模型级覆盖。", "type": "select", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "openai-completions", "label": "openai-completions" }, { "value": "openai-responses", "label": "openai-responses" }, { "value": "anthropic-messages", "label": "anthropic-messages" }, { "value": "google-generative-ai", "label": "google-generative-ai" } ], "origin": "native", "store": "Pi 原生 models.json", "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:148,175-182" },
+              { "key": "providers.<id>.models[].reasoning", "label": "支持推理", "description": "三态：留空删除 / 启用 / 禁用。", "type": "select", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "true", "label": "启用" }, { "value": "false", "label": "禁用" } ], "origin": "native", "store": "Pi 原生 models.json", "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:149" },
+              { "key": "providers.<id>.models[].input", "label": "图像输入", "description": "开关；开 = [\"text\",\"image\"]，关 = [\"text\"]。", "type": "toggle", "value": false, "origin": "native", "store": "Pi 原生 models.json", "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:150" },
+              { "key": "providers.<id>.models[].contextWindow", "label": "上下文窗口", "description": "数值（token 数），0 起步；留空删除。", "type": "number", "value": "", "min": 0, "origin": "native", "store": "Pi 原生 models.json", "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:151,165-170" },
+              { "key": "providers.<id>.models[].maxTokens", "label": "最大输出", "description": "数值（token 数）；留空删除。", "type": "number", "value": "", "min": 0, "origin": "native", "store": "Pi 原生 models.json", "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:151" },
+              { "key": "providers.<id>.models[].cost.input", "label": "费用：输入", "description": "每百万 token 单价类数值；cost 四项全部为空时不写 cost。", "type": "number", "value": "", "min": 0, "origin": "native", "store": "Pi 原生 models.json", "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:152-154" },
+              { "key": "providers.<id>.models[].cost.output", "label": "费用：输出", "description": "同上。", "type": "number", "value": "", "min": 0, "origin": "native", "store": "Pi 原生 models.json", "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:153" },
+              { "key": "providers.<id>.models[].cost.cacheRead", "label": "费用：缓存读", "description": "同上。", "type": "number", "value": "", "min": 0, "origin": "native", "store": "Pi 原生 models.json", "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:153" },
+              { "key": "providers.<id>.models[].cost.cacheWrite", "label": "费用：缓存写", "description": "同上。", "type": "number", "value": "", "min": 0, "origin": "native", "store": "Pi 原生 models.json", "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:153" },
+              { "key": "providers.<id>.models[].thinkingLevelMap", "label": "思考等级映射", "description": "JSON 对象（等级到预算映射），折叠高级输入。", "type": "json", "value": {}, "origin": "native", "store": "Pi 原生 models.json", "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:155" },
+              { "key": "providers.<id>.models[].headers", "label": "自定义请求头（模型级）", "description": "JSON 对象，折叠高级输入。", "type": "json", "value": {}, "origin": "native", "store": "Pi 原生 models.json", "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:155" },
+              { "key": "providers.<id>.models[].compat", "label": "兼容性选项（模型级）", "description": "JSON 对象，折叠高级输入。", "type": "json", "value": {}, "origin": "native", "store": "Pi 原生 models.json", "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:155" },
+              { "key": "action:pi.addModel", "label": "添加模型", "description": "向当前提供商追加一个空模型卡片。", "type": "action", "value": "", "origin": "action", "button": "添加模型", "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:114-117" }
+            ]
+          },
+          {
+            "title": "保存与移除",
+            "fields": [
+              { "key": "action:pi.saveProvider", "label": "保存提供商", "description": "收集全部编辑器草稿并经 revision 校验写入 models.json；成功后归档上一版本。", "type": "action", "value": "", "origin": "action", "button": "保存提供商", "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:119-130,191-204" },
+              { "key": "action:pi.removeProvider", "label": "移除提供商", "description": "先勾选确认再移除（三态确认行）。", "type": "action", "value": "", "origin": "action", "button": "移除", "condition": { "key": "providers", "value": "已选中已有提供商" }, "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:131-140" }
+            ]
+          },
+          {
+            "title": "原样 models.json 与历史",
+            "description": "无损原生 JSON 编辑与版本历史；归档在适配器支持原生契约时持久化，否则为内存级会话撤销（如实标注，永不写入仓库）。",
+            "collapsible": true,
+            "fields": [
+              { "key": "pi.nativeModelsJson", "label": "原生 models.json", "description": "整篇 JSON 原样编辑（约 18 行文本域），保存走同一 revision 通道。", "type": "code", "value": "{\n  \"providers\": {}\n}", "origin": "native", "store": "Pi 原生 models.json", "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:358-367" },
+              { "key": "pi.modelsHistory", "label": "models.json 历史", "description": "最近 5 个归档版本（原生持久或内存撤销），三击恢复：展开 → 恢复 → 确认。以下为示例读回。", "type": "list", "value": [ { "index": 1, "savedAt": "示例时间", "revision": "sha256 前 12 位" } ], "origin": "readback", "readonly": true, "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:216-322; src/core/agents/backend/pi/PiProtocol.ts:31-45" },
+              { "key": "action:pi.modelsRestore", "label": "恢复历史版本", "description": "按归档 revision 防护恢复（target: models）。", "type": "action", "value": "", "origin": "action", "button": "恢复", "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:325-356" },
+              { "key": "action:pi.providersReconnect", "label": "重新连接", "description": "提供商保存后的应用边界：重连 Pi 使新目录生效。", "type": "action", "value": "", "origin": "action", "button": "重新连接", "source": "src/features/settings/backends/pi/SettingsPiProvidersSection.ts:368-370" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "model",
+        "label": "模型与思考",
+        "title": "模型与思考",
+        "description": "原生 settings.json 模型组字段（新会话默认值的权威来源）在前；旧版插件默认值降级为折叠高级披露。",
+        "note": "原生字段按全局/项目作用域下拉切换编辑，revision 防并发保存。",
+        "groups": [
+          {
+            "title": "作用域",
+            "fields": [
+              {
+                "key": "action:pi.settingsScope",
+                "label": "配置作用域",
+                "description": "切换编辑目标文档：项目（<vault>/.pi/settings.json）或全局（<agentDir>/settings.json）。仅视图状态，不持久化。",
+                "type": "segment",
+                "value": "project",
+                "options": [
+                  { "value": "project", "label": "项目" },
+                  { "value": "global", "label": "全局" }
+                ],
+                "origin": "action",
+                "button": "切换作用域",
+                "source": "src/features/settings/backends/pi/SettingsPiConfigurationSection.ts:217-226; assets/pi/configuration.mjs:186"
+              },
+              {
+                "key": "action:pi.refreshConfig",
+                "label": "刷新",
+                "description": "重新拉取 get_configuration 快照。",
+                "type": "action",
+                "value": "",
+                "origin": "action",
+                "button": "刷新",
+                "source": "src/features/settings/backends/pi/SettingsPiConfigurationSection.ts:191-192"
+              }
+            ]
+          },
+          {
+            "title": "原生模型默认值（settings.json · model 组）",
+            "description": "写入 Pi 原生文件，插件不复制存储；保存后需重连应用。",
+            "fields": [
+              { "key": "defaultProvider", "label": "默认提供商", "description": "新会话使用的提供商；留空（写 null）清除覆盖，回到 Pi 默认。", "type": "text", "value": "", "origin": "native", "store": "Pi 原生 settings.json（全局或项目，按作用域下拉）", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:13" },
+              { "key": "defaultModel", "label": "默认模型 ID", "description": "新会话默认模型标识。", "type": "text", "value": "", "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:14" },
+              { "key": "defaultThinkingLevel", "label": "默认思考等级", "description": "新会话思考强度。", "type": "segment", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "off", "label": "off" }, { "value": "minimal", "label": "minimal" }, { "value": "low", "label": "low" }, { "value": "medium", "label": "medium" }, { "value": "high", "label": "high" }, { "value": "xhigh", "label": "xhigh" }, { "value": "max", "label": "max" } ], "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:15" },
+              { "key": "enabledModels", "label": "模型循环范围", "description": "每行一个模型的循环限定模式列表。", "type": "list", "value": [], "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:16" },
+              { "key": "thinkingBudgets.minimal", "label": "minimal 思考预算", "description": "该等级 token 预算，0 起步。", "type": "number", "value": "", "min": 0, "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:17" },
+              { "key": "thinkingBudgets.low", "label": "low 思考预算", "description": "同上。", "type": "number", "value": "", "min": 0, "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:17" },
+              { "key": "thinkingBudgets.medium", "label": "medium 思考预算", "description": "同上。", "type": "number", "value": "", "min": 0, "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:17" },
+              { "key": "thinkingBudgets.high", "label": "high 思考预算", "description": "同上。", "type": "number", "value": "", "min": 0, "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:17" },
+              { "key": "action:pi.saveModelGroup", "label": "保存设置", "description": "收集本组草稿，revision CAS 写入；含重连按钮。", "type": "action", "value": "", "origin": "action", "button": "保存", "source": "src/features/settings/backends/pi/SettingsPiConfigurationSection.ts:239-258" }
+            ]
+          },
+          {
+            "title": "旧版插件默认值",
+            "description": "插件持久化的旧版默认值，会话可覆盖；原生默认值才是权威，此处仅作迁移兜底。",
+            "collapsible": true,
+            "fields": [
+              { "key": "settings.backendSettings.pi.thinkingLevel", "label": "思考等级（旧版）", "description": "归一化丢弃未知值；'' = 继承。", "type": "segment", "value": "", "options": [ { "value": "", "label": "继承" }, { "value": "off", "label": "off" }, { "value": "minimal", "label": "minimal" }, { "value": "low", "label": "low" }, { "value": "medium", "label": "medium" }, { "value": "high", "label": "high" }, { "value": "xhigh", "label": "xhigh" }, { "value": "max", "label": "max" } ], "origin": "plugin", "store": "<vault>/.opencodian/settings.core.json → backendSettings.pi.thinkingLevel", "scope": "仓库", "effect": "新会话生效", "source": "src/features/settings/backends/pi/SettingsPiSection.ts:216-239; src/core/types/settings.ts:1050,1059" },
+              { "key": "settings.backendSettings.pi.provider", "label": "提供商（旧版）", "description": "随原生默认值启用会被清理映射清空。", "type": "text", "value": "", "origin": "plugin", "store": "<vault>/.opencodian/settings.core.json → backendSettings.pi.provider", "scope": "仓库", "effect": "新会话生效", "source": "src/features/settings/backends/pi/SettingsPiSection.ts:240-242,107-112" },
+              { "key": "settings.backendSettings.pi.model", "label": "模型（旧版）", "description": "同上。", "type": "text", "value": "", "origin": "plugin", "store": "<vault>/.opencodian/settings.core.json → backendSettings.pi.model", "scope": "仓库", "effect": "新会话生效", "source": "src/features/settings/backends/pi/SettingsPiSection.ts:243-245" },
+              { "key": "pi.legacyDefaults.help", "label": "迁移说明", "description": "原生默认值启用后旧值被清空；此处整段迁移说明在折叠区内。", "type": "notice", "value": "原生 settings.json 为新会话默认值的权威来源", "origin": "plugin", "readonly": true, "source": "src/features/settings/backends/pi/SettingsPiSection.ts:246-248" }
+            ]
+          },
+          {
+            "title": "行内编辑模型覆盖",
+            "fields": [
+              {
+                "key": "settings.inlineEditModelOverrides.pi",
+                "label": "行内编辑模型",
+                "description": "行内编辑（inline edit）功能对 Pi 后端的模型覆盖；按后端键控的插件字段。",
+                "type": "text",
+                "value": "",
+                "origin": "plugin",
+                "store": "<vault>/.opencodian/settings.core.json → inlineEditModelOverrides.pi",
+                "scope": "仓库",
+                "effect": "新会话生效",
+                "source": "src/features/settings/backends/pi/SettingsPiSection.ts:95-97; src/features/settings/general/SettingsInlineEditSection.ts:255-314; src/core/types/settings.ts:3693"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "execution",
+        "label": "执行与上下文",
+        "title": "执行与上下文",
+        "description": "原生 settings.json 执行组（工具运行、传输、重试、压缩等）在前；高级原生字段为独立高风险披露；资源组字段当前无引导表单，仅可经原样编辑器修改。",
+        "note": "原生执行/高级组在 UI 中标记 data-backend-risk:high；保存统一走 revision CAS。",
+        "groups": [
+          {
+            "title": "原生执行字段（execution 组）",
+            "description": "作用于模型请求、Shell、图片与压缩行为。",
+            "fields": [
+              { "key": "transport", "label": "模型请求传输", "description": "sse / websocket / auto。", "type": "segment", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "sse", "label": "sse" }, { "value": "websocket", "label": "websocket" }, { "value": "auto", "label": "auto" } ], "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:19" },
+              { "key": "steeringMode", "label": "纠偏消息投递", "description": "all / one-at-a-time。", "type": "segment", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "all", "label": "all" }, { "value": "one-at-a-time", "label": "one-at-a-time" } ], "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:20" },
+              { "key": "followUpMode", "label": "后续消息投递", "description": "all / one-at-a-time。", "type": "segment", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "all", "label": "all" }, { "value": "one-at-a-time", "label": "one-at-a-time" } ], "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:21" },
+              { "key": "compaction.enabled", "label": "自动压缩", "description": "上下文自动压缩开关（三态）。", "type": "segment", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "true", "label": "启用" }, { "value": "false", "label": "禁用" } ], "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:22" },
+              { "key": "compaction.reserveTokens", "label": "压缩：预留回复 token", "description": "压缩后为回复保留的 token 数。", "type": "number", "value": "", "min": 0, "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:23" },
+              { "key": "compaction.keepRecentTokens", "label": "压缩：保留近期 token", "description": "压缩时保留的近期 token 数。", "type": "number", "value": "", "min": 0, "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:24" },
+              { "key": "branchSummary.reserveTokens", "label": "分支摘要预留 token", "description": "分支摘要生成的预留预算。", "type": "number", "value": "", "min": 0, "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:25" },
+              { "key": "retry.enabled", "label": "自动重试", "description": "Agent 轮次自动重试开关（三态）。", "type": "segment", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "true", "label": "启用" }, { "value": "false", "label": "禁用" } ], "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:27" },
+              { "key": "retry.maxRetries", "label": "Agent 最大重试次数", "description": "重试上限。", "type": "number", "value": "", "min": 0, "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:28" },
+              { "key": "retry.baseDelayMs", "label": "基础重试间隔（毫秒）", "description": "重试退避基数。", "type": "number", "value": "", "min": 0, "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:29" },
+              { "key": "retry.provider.timeoutMs", "label": "提供商请求超时（毫秒）", "description": "单次提供商请求超时。", "type": "number", "value": "", "min": 0, "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:30" },
+              { "key": "retry.provider.maxRetries", "label": "提供商 SDK 重试次数", "description": "提供商 SDK 层重试上限。", "type": "number", "value": "", "min": 0, "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:31" },
+              { "key": "retry.provider.maxRetryDelayMs", "label": "服务端建议等待上限（毫秒）", "description": "0 = 不限制。", "type": "number", "value": "", "min": 0, "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:32" },
+              { "key": "shellPath", "label": "Shell 可执行路径", "description": "工具执行使用的 Shell。", "type": "text", "value": "", "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:33" },
+              { "key": "shellCommandPrefix", "label": "Shell 命令前缀", "description": "命令前缀串。", "type": "text", "value": "", "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:34" },
+              { "key": "images.autoResize", "label": "自动缩放图片", "description": "附件与工具图片自动缩放（三态）。", "type": "segment", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "true", "label": "启用" }, { "value": "false", "label": "禁用" } ], "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:36" },
+              { "key": "images.blockImages", "label": "禁止向模型发送图片", "description": "屏蔽图片输入（三态）。", "type": "segment", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "true", "label": "启用" }, { "value": "false", "label": "禁用" } ], "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:37" },
+              { "key": "action:pi.saveExecutionGroup", "label": "保存设置", "description": "revision CAS 写入本组草稿；含重连按钮。", "type": "action", "value": "", "origin": "action", "button": "保存", "source": "src/features/settings/backends/pi/SettingsPiSection.ts:256-261; src/features/settings/backends/pi/SettingsPiConfigurationSection.ts:239-258" }
+            ]
+          },
+          {
+            "title": "高级原生字段（高风险披露）",
+            "description": "UI 中的独立高级披露（data-backend-risk:high）：会话目录、主题与终端外观等。",
+            "collapsible": true,
+            "fields": [
+              { "key": "sessionDir", "label": "Pi CLI 会话目录", "description": "会话存储目录（session-directory 作用域）。", "type": "text", "value": "", "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:44" },
+              { "key": "theme", "label": "终端与 HTML 导出主题", "description": "主题名（export 作用域）。", "type": "text", "value": "", "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:45" },
+              { "key": "quietStartup", "label": "隐藏终端启动信息", "description": "终端行为字段。", "type": "segment", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "true", "label": "启用" }, { "value": "false", "label": "禁用" } ], "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目（终端界面）", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:46" },
+              { "key": "hideThinkingBlock", "label": "隐藏思考块", "description": "终端行为字段。", "type": "segment", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "true", "label": "启用" }, { "value": "false", "label": "禁用" } ], "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目（终端界面）", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:18" },
+              { "key": "branchSummary.skipPrompt", "label": "跳过分支摘要询问", "description": "终端行为字段。", "type": "segment", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "true", "label": "启用" }, { "value": "false", "label": "禁用" } ], "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目（终端界面）", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:26" },
+              { "key": "collapseChangelog", "label": "折叠更新日志", "description": "终端行为字段。", "type": "segment", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "true", "label": "启用" }, { "value": "false", "label": "禁用" } ], "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目（终端界面）", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:47" },
+              { "key": "enableInstallTelemetry", "label": "CLI 安装统计", "description": "安装遥测开关。", "type": "segment", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "true", "label": "启用" }, { "value": "false", "label": "禁用" } ], "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目（终端界面）", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:48" },
+              { "key": "terminal.showImages", "label": "终端显示图片", "description": "终端行为字段。", "type": "segment", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "true", "label": "启用" }, { "value": "false", "label": "禁用" } ], "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目（终端界面）", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:49" },
+              { "key": "terminal.imageWidthCells", "label": "终端图片宽度（字符格）", "description": "终端行为字段。", "type": "number", "value": "", "min": 0, "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目（终端界面）", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:50" },
+              { "key": "terminal.clearOnShrink", "label": "终端内容缩小时清空行", "description": "终端行为字段。", "type": "segment", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "true", "label": "启用" }, { "value": "false", "label": "禁用" } ], "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目（终端界面）", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:51" },
+              { "key": "terminal.showTerminalProgress", "label": "终端进度指示", "description": "终端行为字段。", "type": "segment", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "true", "label": "启用" }, { "value": "false", "label": "禁用" } ], "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目（终端界面）", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:52" },
+              { "key": "doubleEscapeAction", "label": "双击 Escape 操作", "description": "fork / tree / none。", "type": "segment", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "fork", "label": "fork" }, { "value": "tree", "label": "tree" }, { "value": "none", "label": "none" } ], "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目（终端界面）", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:53" },
+              { "key": "treeFilterMode", "label": "终端树默认过滤", "description": "default / no-tools / user-only / labeled-only / all。", "type": "segment", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "default", "label": "default" }, { "value": "no-tools", "label": "no-tools" }, { "value": "user-only", "label": "user-only" }, { "value": "labeled-only", "label": "labeled-only" }, { "value": "all", "label": "all" } ], "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目（终端界面）", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:54" },
+              { "key": "editorPaddingX", "label": "终端编辑器水平留白", "description": "0-3。", "type": "number", "value": "", "min": 0, "max": 3, "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目（终端界面）", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:55" },
+              { "key": "autocompleteMaxVisible", "label": "终端补全可见条目", "description": "3-20。", "type": "number", "value": "", "min": 3, "max": 20, "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目（终端界面）", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:56" },
+              { "key": "showHardwareCursor", "label": "显示终端硬件光标", "description": "终端行为字段。", "type": "segment", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "true", "label": "启用" }, { "value": "false", "label": "禁用" } ], "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目（终端界面）", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:57" },
+              { "key": "markdown.codeBlockIndent", "label": "终端代码块缩进", "description": "终端行为字段。", "type": "text", "value": "", "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目（终端界面）", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:58" },
+              { "key": "warnings.anthropicExtraUsage", "label": "终端 Anthropic 额外用量提示", "description": "终端行为字段。", "type": "segment", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "true", "label": "启用" }, { "value": "false", "label": "禁用" } ], "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目（终端界面）", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:59" },
+              { "key": "lastChangelogVersion", "label": "已读更新版本", "description": "schema 只读字段（readOnly），不可编辑。", "type": "text", "value": "", "readonly": true, "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目（终端界面）", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:60" }
+            ]
+          },
+          {
+            "title": "资源路径与扩展包（仅原样编辑器）",
+            "description": "resources 组共 7 个 schema 字段：当前设置页没有任何引导表单渲染该组，只能经下方原样 JSON 编辑器读写。原型必须如实呈现为只读清单，不得虚构表单入口。",
+            "collapsible": true,
+            "fields": [
+              { "key": "npmCommand", "label": "包管理命令参数", "description": "每行一个 argv（list）。仅原样编辑器可改。", "type": "list", "value": [], "readonly": true, "origin": "native", "store": "Pi 原生 settings.json（仅原样编辑器）", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:35" },
+              { "key": "packages", "label": "扩展包及资源过滤规则", "description": "JSON（包声明与过滤）。仅原样编辑器可改。", "type": "json", "value": {}, "readonly": true, "origin": "native", "store": "Pi 原生 settings.json（仅原样编辑器）", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:38" },
+              { "key": "extensions", "label": "扩展路径", "description": "每行一个路径（list）。仅原样编辑器可改。", "type": "list", "value": [], "readonly": true, "origin": "native", "store": "Pi 原生 settings.json（仅原样编辑器）", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:39" },
+              { "key": "skills", "label": "技能路径", "description": "每行一个路径（list）。仅原样编辑器可改。", "type": "list", "value": [], "readonly": true, "origin": "native", "store": "Pi 原生 settings.json（仅原样编辑器）", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:40" },
+              { "key": "prompts", "label": "提示模板路径", "description": "每行一个路径（list）。仅原样编辑器可改。", "type": "list", "value": [], "readonly": true, "origin": "native", "store": "Pi 原生 settings.json（仅原样编辑器）", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:41" },
+              { "key": "themes", "label": "主题资源路径", "description": "每行一个路径（list，export 作用域）。仅原样编辑器可改。", "type": "list", "value": [], "readonly": true, "origin": "native", "store": "Pi 原生 settings.json（仅原样编辑器）", "scope": "全局 / 项目（export）", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:42" },
+              { "key": "enableSkillCommands", "label": "注册技能斜杠命令", "description": "三态开关。仅原样编辑器可改。", "type": "segment", "value": "", "options": [ { "value": "", "label": "沿用 Pi 默认" }, { "value": "true", "label": "启用" }, { "value": "false", "label": "禁用" } ], "readonly": true, "origin": "native", "store": "Pi 原生 settings.json（仅原样编辑器）", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "assets/pi/configuration.mjs:43" }
+            ]
+          },
+          {
+            "title": "原生 settings.json 原样编辑与历史",
+            "description": "整篇 JSON 无损编辑（高风险披露内）与设置版本历史。",
+            "collapsible": true,
+            "fields": [
+              { "key": "pi.nativeSettingsJson", "label": "原生 settings.json", "description": "整篇 JSON 原样编辑（16 行文本域），保存走 revision CAS；支持 global/project 作用域。", "type": "code", "value": "{}", "origin": "native", "store": "Pi 原生 settings.json", "scope": "全局 / 项目", "effect": "保存后重连生效", "source": "src/features/settings/backends/pi/SettingsPiConfigurationSection.ts:513-531" },
+              { "key": "pi.settingsHistory", "label": "settings.json 历史", "description": "按作用域的最近 5 个归档（原生持久或内存撤销，如实标注）；三击恢复。以下为示例读回。", "type": "list", "value": [ { "index": 1, "savedAt": "示例时间", "revision": "sha256 前 12 位", "scope": "project" } ], "origin": "readback", "readonly": true, "source": "src/features/settings/backends/pi/SettingsPiConfigurationSection.ts:289-370; src/core/agents/backend/pi/PiProtocol.ts:40-55" },
+              { "key": "action:pi.restoreSettings", "label": "恢复历史版本", "description": "target: settings + scope + archivedRevision/revision 防护恢复。", "type": "action", "value": "", "origin": "action", "button": "恢复", "source": "src/features/settings/backends/pi/SettingsPiConfigurationSection.ts:330-341" },
+              { "key": "action:pi.saveRawSettings", "label": "保存原样 JSON", "description": "保存后触发旧默认值清理映射（defaultProvider/defaultModel/defaultThinkingLevel）。", "type": "action", "value": "", "origin": "action", "button": "保存", "source": "src/features/settings/backends/pi/SettingsPiConfigurationSection.ts:521-530" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "account",
+        "label": "账户",
+        "title": "账户（Pi 原生认证）",
+        "description": "经 RPC 读取与变更 Pi 安装自有认证：OAuth 登录、API Key 写入、登出。凭据留在 Pi 侧，永不进入插件设置。",
+        "note": "空 provider 列表只代表 Pi 未暴露任何认证记录，不是“未认证”的证明。",
+        "groups": [
+          {
+            "title": "认证状态",
+            "fields": [
+              {
+                "key": "pi.auth.providers",
+                "label": "认证记录",
+                "description": "get_auth 返回的 provider + configured 列表。以下为示例读回。",
+                "type": "list",
+                "value": [ { "provider": "anthropic", "configured": true }, { "provider": "openai", "configured": false } ],
+                "origin": "readback",
+                "readonly": true,
+                "store": "Pi 安装自有认证存储（经 RPC 管理）",
+                "scope": "全局（Pi 侧）",
+                "source": "src/features/settings/backends/pi/SettingsPiSection.ts:278-289"
+              }
+            ]
+          },
+          {
+            "title": "OAuth 登录",
+            "fields": [
+              { "key": "pi.oauth.provider", "label": "OAuth 提供商", "description": "下拉选项来自 get_auth 的 oauthProviders（示例读回）。", "type": "select", "value": "", "options": [ { "value": "", "label": "选择提供商" }, { "value": "example-oauth", "label": "example-oauth（示例读回）" } ], "origin": "readback", "source": "src/features/settings/backends/pi/SettingsPiSection.ts:290-294" },
+              { "key": "action:pi.oauthLogin", "label": "登录", "description": "经 Pi RPC login 发起 OAuth；取消按钮停止会话。", "type": "action", "value": "", "origin": "action", "button": "登录", "source": "src/features/settings/backends/pi/SettingsPiSection.ts:295-300" }
+            ]
+          },
+          {
+            "title": "API Key",
+            "fields": [
+              { "key": "pi.apiKey.provider", "label": "提供商 ID", "description": "要写入密钥的 provider 标识。", "type": "text", "value": "", "origin": "action", "source": "src/features/settings/backends/pi/SettingsPiSection.ts:301-302" },
+              { "key": "pi.apiKey.value", "label": "API Key", "description": "password 输入；set_api_key 保存到 Pi 侧并立即清空输入框。", "type": "password", "value": "", "origin": "action", "source": "src/features/settings/backends/pi/SettingsPiSection.ts:303-307" },
+              { "key": "action:pi.saveApiKey", "label": "保存 API Key", "description": "经 RPC set_api_key 写入 Pi 认证存储。", "type": "action", "value": "", "origin": "action", "button": "保存", "source": "src/features/settings/backends/pi/SettingsPiSection.ts:304-307" }
+            ]
+          },
+          {
+            "title": "登出",
+            "fields": [
+              { "key": "pi.logout.confirm", "label": "确认移除认证", "description": "开关未勾选时点击登出只会提示确认。", "type": "toggle", "value": false, "origin": "action", "source": "src/features/settings/backends/pi/SettingsPiSection.ts:308-313" },
+              { "key": "action:pi.logout", "label": "登出", "description": "经 RPC logout 移除所选提供商认证。", "type": "action", "value": "", "origin": "action", "button": "登出", "condition": { "key": "pi.logout.confirm", "value": true }, "source": "src/features/settings/backends/pi/SettingsPiSection.ts:309-313" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "mcp",
+        "label": "MCP",
+        "title": "MCP（只读视图）",
+        "description": "Pi 的 MCP 支持来自其扩展生态，不在 RPC 协议内：插件只合并读取各配置文件，从不写入。",
+        "note": "合并优先级（后者覆盖同名）：共享全局 → agents 全局 → Pi 全局 → 项目 → 项目 Pi 覆盖。密钥/令牌在展示中一律脱敏。",
+        "groups": [
+          {
+            "title": "已声明的 MCP 服务器",
+            "description": "只读合并视图；每个条目展示传输、端点（脱敏）、禁用、认证与生效来源文件。",
+            "fields": [
+              { "key": "pi.mcp.servers", "label": "MCP 服务器列表", "description": "transport 由 url 推导（http/stdio）；auth 为 oauth/bearer/none。以下为示例读回。", "type": "list", "value": [ { "name": "example-server", "transport": "stdio", "endpoint": "npx example-mcp（参数已脱敏）", "disabled": false, "auth": "none", "source": "~/.agents/mcp.json" } ], "origin": "readback", "readonly": true, "store": "只读合并：~/.config/mcp/mcp.json、~/.agents/mcp.json、~/.agents/mcp/mcp.json、<agentDir>/mcp.json、<vault>/.mcp.json、<vault>/.pi/mcp.json", "scope": "全局 + 项目合并", "source": "src/features/settings/backends/pi/SettingsPiSection.ts:317-341; src/core/agents/backend/pi/PiMcpConfigService.ts:50-135" },
+              { "key": "pi.mcp.exclusive", "label": "独占模式", "description": "PI_MCP_CONFIG_MODE=exclusive 时 Pi 只读自己的全局文件。", "type": "notice", "value": "未启用（示例读回）", "origin": "readback", "readonly": true, "source": "src/core/agents/backend/pi/PiMcpConfigService.ts:54-57" },
+              { "key": "pi.mcp.sources", "label": "已合并来源", "description": "参与合并且实际读到的文件列表（家目录显示为 ~/）。以下为示例读回。", "type": "list", "value": [ "~/.agents/mcp.json", "~/.pi/agent/mcp.json" ], "origin": "readback", "readonly": true, "source": "src/features/settings/backends/pi/SettingsPiSection.ts:336-341" },
+              { "key": "pi.mcp.status", "label": "扩展运行状态", "description": "Pi 扩展推送的状态文本（setStatus/notify），经 URL 严格脱敏展示；这是唯一可观测的运行状态，非结构化数据。以下为示例读回。", "type": "notice", "value": "mcp: 2 servers connected（示例读回）", "origin": "readback", "readonly": true, "source": "src/features/settings/backends/pi/SettingsPiSection.ts:347-361; src/core/agents/backend/pi/PiProtocol.ts:67-75" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "sessions",
+        "label": "会话",
+        "title": "会话",
+        "description": "原生会话目录浏览与 Pi 工作台入口。",
+        "note": "会话与模型/队列设置只作用于选中的 Pi 服务；工作台内的账户与扩展包操作会显式持久化到 Pi。",
+        "groups": [
+          {
+            "title": "工作台",
+            "fields": [
+              { "key": "action:pi.workbenchSessions", "label": "打开 Pi 工作台", "description": "会话管理、分支树、队列、模型、工具与扩展包、账户与导出的 RPC 操作面。", "type": "action", "value": "", "origin": "action", "button": "打开 Pi 工作台", "source": "src/features/settings/backends/pi/SettingsPiSection.ts:114-120,363-364; src/features/settings/backends/pi/PiWorkbenchActions.ts:11-69" }
+            ]
+          },
+          {
+            "title": "原生会话列表",
+            "fields": [
+              { "key": "pi.sessions.list", "label": "会话", "description": "listSessions 读回，附打开为聊天动作。以下为示例读回。", "type": "list", "value": [ { "id": "sess-example", "title": "示例会话", "updatedAt": "示例时间" } ], "origin": "readback", "readonly": true, "store": "Pi 自有会话存储（sessionDir）", "source": "src/features/settings/backends/pi/SettingsPiSection.ts:363-371" },
+              { "key": "action:pi.openChat", "label": "打开为聊天", "description": "把原生会话导入为插件会话（createConversationFromBackendSession）。", "type": "action", "value": "", "origin": "action", "button": "打开聊天", "source": "src/features/settings/backends/pi/SettingsPiSection.ts:122-127,368-370" }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "zcode",
+    "name": "ZCode",
+    "description": "官方 ZCode 运行时后端：聊天默认值与权限模式为插件持久化（经会话物化应用）；官方登录为本机隔离（ADR-0003，凭据永不入插件）；个人 API 服务为与 ZCode 桌面共享的原生配置（revision 防并发 + 归档历史）；插件/MCP 为工作区原生目录，仅插件启停可写。",
+    "tabs": [
+      {
+        "id": "chat",
+        "label": "聊天设置",
+        "title": "聊天设置",
+        "description": "新会话的模型与思考默认值；目录完全来自运行时快照，无硬编码镜像。",
+        "note": "目录等待或失败时不判定已存值为“未知”；已保存的非目录值保留为禁用选项，从不改写。",
+        "groups": [
+          {
+            "title": "聊天默认值",
+            "description": "持久化为 providerId/modelId；会话内覆盖不改写默认。",
+            "fields": [
+              { "key": "zcode.catalog.state", "label": "模型目录状态", "description": "loading / ready / failed（ready 也覆盖“诚实的空目录”）。以下为示例读回。", "type": "notice", "value": "ready · 12 个模型（示例读回）", "origin": "readback", "readonly": true, "source": "src/features/settings/backends/zcode/SettingsZCodeModelControls.ts:41-83" },
+              { "key": "action:zcode.retryCatalog", "label": "重试目录加载", "description": "强制刷新工作区模型目录。", "type": "action", "value": "", "origin": "action", "button": "重试", "source": "src/features/settings/backends/zcode/SettingsZCodeModelControls.ts:46-47" },
+              { "key": "settings.backendSettings.zcode.model", "label": "聊天模型", "description": "可搜索的原生目录选择器（providerId/modelId）；留空 = 使用 ZCode 默认。示例选项为演示读回，实际来自运行时目录。", "type": "select", "value": "", "options": [ { "value": "", "label": "使用 ZCode 默认" }, { "value": "provider-a/model-a", "label": "模型 A（示例目录项）" } ], "origin": "plugin", "store": "<vault>/.opencodian/settings.core.json → backendSettings.zcode.model", "scope": "仓库", "effect": "新会话生效", "source": "src/features/settings/backends/zcode/SettingsZCodeModelControls.ts:100-162; src/core/types/settings.ts:1071-1075" },
+              { "key": "settings.backendSettings.zcode.thinkingLevel", "label": "思考设置", "description": "下拉来自所选模型的 reasoningLevels/thoughtLevels；目录声明 thoughtLevelEnabled=false 时隐藏；未知已存值保留为禁用选项。", "type": "select", "value": "", "options": [ { "value": "", "label": "使用 ZCode 默认" }, { "value": "example-level", "label": "示例思考等级（示例读回）" } ], "origin": "plugin", "store": "<vault>/.opencodian/settings.core.json → backendSettings.zcode.thinkingLevel", "scope": "仓库", "effect": "新会话生效", "source": "src/features/settings/backends/zcode/SettingsZCodeModelControls.ts:229-282; src/core/agents/backend/zcode/ZCodeModelCatalog.ts:55-64" }
+            ]
+          },
+          {
+            "title": "补全",
+            "description": "行内补全的 ZCode 模型覆盖；总开关在补全设置页维护。",
+            "fields": [
+              { "key": "settings.inlineCompletionModelOverrides.zcode", "label": "补全模型", "description": "留空 = 跟随聊天模型（共享补全规则）。", "type": "select", "value": "", "options": [ { "value": "", "label": "使用共享补全模型规则" }, { "value": "provider-a/model-a", "label": "模型 A（示例目录项）" } ], "origin": "plugin", "store": "<vault>/.opencodian/settings.core.json → inlineCompletionModelOverrides.zcode", "scope": "仓库", "effect": "新会话生效", "source": "src/features/settings/backends/zcode/SettingsZCodeModelControls.ts:90-97,284-297; src/core/types/settings.ts:3754" },
+              { "key": "settings.inlineCompletionEnabled", "label": "补全总开关", "description": "此页仅显示开/关状态行；开关本体在补全设置页。", "type": "toggle", "value": false, "readonly": true, "origin": "plugin", "store": "<vault>/.opencodian/settings.core.json → inlineCompletionEnabled", "source": "src/features/settings/backends/zcode/SettingsZCodeModelControls.ts:94-97; src/core/types/settings.ts:3730,4399" },
+              { "key": "action:zcode.openCompletionSettings", "label": "打开补全设置", "description": "跳转到插件的行内补全设置页。", "type": "action", "value": "", "origin": "action", "button": "补全设置", "source": "src/features/settings/backends/zcode/SettingsZCodeModelControls.ts:96-97" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "providers",
+        "label": "个人 API 服务",
+        "title": "个人 API 服务（共享原生配置）",
+        "description": "编辑 OpenCodian 与 ZCode 桌面共用的原生 provider 配置文件（revision 防并发 + 归档历史 + 冲突恢复）。账户凭据与内建提供商定义永不写入此文件。",
+        "note": "scope=shared：编辑会同时影响两个产品。仅 standard-personal 组、api-key 访问、已知协议的规则可编辑；其余如实显示为只读。",
+        "groups": [
+          {
+            "title": "服务列表",
+            "description": "原生规则的只读列表 + 编辑/移除入口。",
+            "fields": [
+              { "key": "zcode.personal.providers", "label": "已配置服务", "description": "名称 · 协议 · Base URL · 模型数；不可编辑规则显示“只读”。以下为示例读回。", "type": "list", "value": [ { "id": "p-example", "name": "示例服务", "protocol": "openai-chat-completions", "baseUrl": "https://api.example.com", "hasApiKey": true, "models": 3, "editable": true } ], "origin": "readback", "readonly": true, "store": "$ZCODE_PERSONAL_PROVIDER_CONFIG_FILE（缺省 <数据目录>/.zcode/v2/provider_config.json），OpenCodian 与 ZCode 桌面共用", "scope": "共享（双产品）", "source": "src/features/settings/backends/zcode/SettingsZCodeAccounts.ts:288-348; src/core/agents/backend/zcode/ZCodePersonalConfigService.ts:21-52,65-80; src/core/agents/backend/zcode/ZCodeProviderConfigDiscovery.ts:211-212" },
+              { "key": "action:zcode.addProvider", "label": "添加服务", "description": "打开下方编辑器新建规则。", "type": "action", "value": "", "origin": "action", "button": "添加服务", "source": "src/features/settings/backends/zcode/SettingsZCodeAccounts.ts:89-93" },
+              { "key": "action:zcode.reloadProviders", "label": "重新加载", "description": "重新读取原生配置快照。", "type": "action", "value": "", "origin": "action", "button": "重新加载", "source": "src/features/settings/backends/zcode/SettingsZCodeAccounts.ts:94-96" }
+            ]
+          },
+          {
+            "title": "服务编辑器",
+            "description": "写入原生 providerRules；密钥占位“保留现有密钥”（hasApiKey 时不回显）。",
+            "fields": [
+              { "key": "config.providerConfigRules.providerRules[].providerId", "label": "规则 ID", "description": "原生主键：新建时自动生成，编辑时不可改。", "type": "text", "value": "", "readonly": true, "origin": "shared", "store": "共享原生 provider_config.json → config.providerConfigRules.providerRules[]", "scope": "共享（双产品）", "source": "src/core/agents/backend/zcode/ZCodePersonalConfigService.ts:74; src/features/settings/backends/zcode/SettingsZCodeAccounts.ts:408" },
+              { "key": "config.providerConfigRules.providerRules[].providerName", "label": "服务名称", "description": "显示名。", "type": "text", "value": "", "origin": "shared", "store": "共享原生 provider_config.json", "scope": "共享（双产品）", "effect": "保存并应用后生效（可能需重连）", "source": "src/features/settings/backends/zcode/SettingsZCodeAccounts.ts:386; src/core/agents/backend/zcode/ZCodePersonalConfigService.ts:75" },
+              { "key": "config.providerConfigRules.providerRules[].config.api.type", "label": "API 格式", "description": "三协议枚举；不在枚举内的原生规则显示为只读。", "type": "select", "value": "openai-chat-completions", "options": [ { "value": "openai-chat-completions", "label": "OpenAI Chat Completions" }, { "value": "openai-responses", "label": "OpenAI Responses" }, { "value": "anthropic-messages", "label": "Anthropic Messages" } ], "origin": "shared", "store": "共享原生 provider_config.json", "scope": "共享（双产品）", "effect": "保存并应用后生效（可能需重连）", "source": "src/features/settings/backends/zcode/SettingsZCodeAccounts.ts:387-392; src/core/agents/backend/zcode/ZCodePersonalConfigService.ts:20" },
+              { "key": "config.providerConfigRules.providerRules[].config.api.baseUrl", "label": "API Base URL", "description": "服务网关地址；非法 URL 报 zcode-provider-url-invalid 并定位字段。", "type": "text", "value": "", "origin": "shared", "store": "共享原生 provider_config.json", "scope": "共享（双产品）", "effect": "保存并应用后生效（可能需重连）", "source": "src/features/settings/backends/zcode/SettingsZCodeAccounts.ts:393,462-474" },
+              { "key": "config.providerConfigRules.providerRules[].config.access.apiKey", "label": "API Key", "description": "password 输入；留空 = 保留原生密钥，显式空串 = 清除；永不进入插件存储或仓库。", "type": "password", "value": "", "origin": "shared", "store": "共享原生 provider_config.json（密钥留在该文件）", "scope": "共享（双产品）", "effect": "保存并应用后生效（可能需重连）", "source": "src/features/settings/backends/zcode/SettingsZCodeAccounts.ts:383-394,408; src/core/agents/backend/zcode/ZCodePersonalConfigService.ts:40-42,78" },
+              { "key": "config.providerConfigRules.providerRules[].config.personalModelIds", "label": "模型名称", "description": "每行一个模型 id；缺模型报 zcode-provider-model-required。", "type": "textarea", "value": "", "origin": "shared", "store": "共享原生 provider_config.json", "scope": "共享（双产品）", "effect": "保存并应用后生效（可能需重连）", "source": "src/features/settings/backends/zcode/SettingsZCodeAccounts.ts:395-401; src/core/agents/backend/zcode/ZCodePersonalConfigService.ts:79" },
+              { "key": "action:zcode.saveProvider", "label": "保存共享配置", "description": "revision CAS 写入；冲突时“重载并保留草稿”+逐字段差异对照+确认覆盖；成功后 refreshConfiguration 应用（applied / 需重连 / 读回失败）。", "type": "action", "value": "", "origin": "action", "button": "保存", "source": "src/features/settings/backends/zcode/SettingsZCodeAccounts.ts:404-423,427-477,479-486" },
+              { "key": "action:zcode.removeProvider", "label": "移除服务", "description": "编辑器内二段确认；冲突时提供“先重载再移除”。", "type": "action", "value": "", "origin": "action", "button": "移除", "condition": { "key": "zcode.personal.providers", "value": "已选中可编辑服务" }, "source": "src/features/settings/backends/zcode/SettingsZCodeAccounts.ts:332-367" }
+            ]
+          },
+          {
+            "title": "配置历史",
+            "description": "归档位于原生配置旁（provider-archive，永不入仓库）；恢复经 revision 防护；适配器未提供契约时整组隐藏。",
+            "collapsible": true,
+            "fields": [
+              { "key": "zcode.personal.history", "label": "历史版本", "description": "时间 + 大小列表；恢复需确认，冲突时“重载并重试”。以下为示例读回。", "type": "list", "value": [ { "timestamp": "示例时间", "size": "2.1 KB" } ], "origin": "readback", "readonly": true, "store": "<accounts.rootPath>/provider-archive（原生配置旁）", "source": "src/features/settings/backends/zcode/SettingsZCodeAccounts.ts:114-204; src/core/agents/backend/zcode/ZCodeAdapter.ts:1372-1374" },
+              { "key": "action:zcode.restoreHistory", "label": "恢复历史版本", "description": "三击恢复（展开 → 恢复 → 确认恢复），随后执行应用步骤。", "type": "action", "value": "", "origin": "action", "button": "恢复", "source": "src/features/settings/backends/zcode/SettingsZCodeAccounts.ts:160-204" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "account",
+        "label": "官方账户",
+        "title": "官方账户（本机隔离登录）",
+        "description": "OpenCodian 在本机的官方 ZCode 登录，所有仓库共享，与 ZCode 桌面账户相互独立（ADR-0003）。OAuth、加密写入与令牌续期全部由官方 CLI 负责。",
+        "note": "凭据（enc:v1 编码）永不进入插件设置、仓库文件、截图或诊断。",
+        "groups": [
+          {
+            "title": "登录状态",
+            "fields": [
+              { "key": "zcode.account.state", "label": "账户", "description": "signed-out / signed-in / signing-in / unreadable；已登录显示 账户族 · 名称 列表。以下为示例读回。", "type": "notice", "value": "智谱 / BigModel · example-account（示例读回）", "origin": "readback", "readonly": true, "store": "ZCode 官方 CLI 凭据存储（本机隔离，enc:v1）", "scope": "本机（所有仓库共享）", "source": "src/features/settings/backends/zcode/SettingsZCodeAccounts.ts:206-238; src/core/agents/backend/zcode/ZCodeAccountService.ts:14-19" },
+              { "key": "action:zcode.login.bigmodel", "label": "登录 BigModel", "description": "官方 CLI OAuth；期间显示授权链接（打开/复制/取消）。", "type": "action", "value": "", "origin": "action", "button": "登录 BigModel", "source": "src/features/settings/backends/zcode/SettingsZCodeAccounts.ts:229-264" },
+              { "key": "action:zcode.login.zai", "label": "登录 Z.AI", "description": "同上，账户族 zai。", "type": "action", "value": "", "origin": "action", "button": "登录 Z.AI", "source": "src/features/settings/backends/zcode/SettingsZCodeAccounts.ts:229-264" },
+              { "key": "action:zcode.cancelLogin", "label": "取消登录", "description": "取消进行中的 OAuth 流程。", "type": "action", "value": "", "origin": "action", "button": "取消登录", "condition": { "key": "zcode.account.state", "value": "signing-in" }, "source": "src/features/settings/backends/zcode/SettingsZCodeAccounts.ts:218-224,244-246" },
+              { "key": "action:zcode.logout", "label": "退出登录", "description": "二段确认（说明 → 确认退出）；登出后执行应用步骤，结果如“已登出/待生效”。", "type": "action", "value": "", "origin": "action", "button": "退出登录", "condition": { "key": "zcode.account.state", "value": "signed-in" }, "source": "src/features/settings/backends/zcode/SettingsZCodeAccounts.ts:234-237,266-286" },
+              { "key": "action:zcode.openDesktop", "label": "打开 ZCode 桌面", "description": "官方桌面入口（scope:global / effect:immediate / risk:medium 徽标）。", "type": "action", "value": "", "origin": "action", "button": "打开 ZCode 桌面", "source": "src/features/settings/backends/zcode/SettingsZCodeAccounts.ts:65-78" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "tools",
+        "label": "工具与插件",
+        "title": "工具与插件",
+        "description": "本工作区的插件启停（唯一受支持的管理写入）与外部工具（MCP）只读状态。",
+        "note": "协议不含独立的 hook 配置读回，也不支持 MCP/hook 管理写入——声明计数不等于执行证明，UI 如实标注 unavailable。",
+        "groups": [
+          {
+            "title": "插件",
+            "description": "启用/禁用写入工作区原生 config.json 的 enabledPlugins 覆盖；写入走共享安全写入器（revision + 归档），证据三轴（持久化/应用/运行时）如实展示。",
+            "fields": [
+              { "key": "action:zcode.refreshTools", "label": "刷新工具目录", "description": "重新读取管理目录；首次进入自动加载。", "type": "action", "value": "", "origin": "action", "button": "刷新", "source": "src/features/settings/backends/zcode/SettingsZCodeSection.ts:286-311" },
+              { "key": "plugins.enabledPlugins.<pluginId>", "label": "插件启停", "description": "按插件逐一启停；包缺失/目录不可用/配置不可写时禁用切换。示例读回见下。", "type": "toggle", "value": true, "origin": "native", "store": "<工作区>/.zcode/config.json → plugins.enabledPlugins.<pluginId>（安全写入，带归档）", "scope": "工作区", "effect": "保存后经目录刷新读回；现有会话保持启动快照", "source": "src/features/settings/backends/zcode/SettingsZCodeSection.ts:338-367; src/core/agents/backend/zcode/ZCodeManagementService.ts:194-222" },
+              { "key": "zcode.management.plugins", "label": "插件列表", "description": "id · 启用来源（user/workspace）· MCP 数 · hook 数 · 包缺失标记。以下为示例读回。", "type": "list", "value": [ { "id": "example-plugin", "enabled": true, "enabledSource": "user", "packageMissing": false, "mcpCount": 2, "hookCount": 1 } ], "origin": "readback", "readonly": true, "store": "<工作区>/.zcode/config.json（声明）+ 运行时目录读回", "scope": "工作区", "source": "src/features/settings/backends/zcode/SettingsZCodeSection.ts:330-337; src/core/agents/backend/zcode/ZCodeManagementService.ts:22-29" }
+            ]
+          },
+          {
+            "title": "外部工具（MCP · 只读）",
+            "description": "状态目录来自运行时；身份标识之外的信息（命令/头/错误文本）不过 UI 边界。",
+            "fields": [
+              { "key": "zcode.management.mcp", "label": "MCP 服务器", "description": "id · 状态（connecting/connected/disabled/disconnected/failed/untrusted/unknown）· 工具数 · 认证（required/failed/unknown）。以下为示例读回。", "type": "list", "value": [ { "id": "example-mcp", "status": "connected", "toolCount": 5, "authentication": "unknown" } ], "origin": "readback", "readonly": true, "source": "src/features/settings/backends/zcode/SettingsZCodeSection.ts:368-377; src/core/agents/backend/zcode/ZCodeManagementService.ts:30-36" },
+              { "key": "zcode.management.hooks", "label": "生效 hooks", "description": "本协议无独立 hook 配置读回——不可用；声明计数不证明执行。", "type": "notice", "value": "unavailable", "origin": "readback", "readonly": true, "source": "src/features/settings/backends/zcode/SettingsZCodeSection.ts:378; src/core/agents/backend/zcode/ZCodeManagementService.ts:48" },
+              { "key": "zcode.management.mutations", "label": "MCP 与 hook 变更", "description": "本运行时无受支持的管理变更契约——不可用；不得虚构 MCP 编辑表单。", "type": "notice", "value": "unavailable", "origin": "readback", "readonly": true, "source": "src/features/settings/backends/zcode/SettingsZCodeSection.ts:379; src/core/agents/backend/zcode/ZCodeManagementService.ts:49" }
+            ]
+          },
+          {
+            "title": "工作区声明（技术细节）",
+            "collapsible": true,
+            "fields": [
+              { "key": "zcode.management.declarations", "label": "工作区声明", "description": "目标路径 + 插件覆盖数 / MCP 声明数 / hook 声明数；读回失败时如实显示“生效值未知”。以下为示例读回。", "type": "kv", "value": { "path": "<工作区>/.zcode/config.json", "plugins": 2, "mcp": 3, "hooks": 0 }, "origin": "readback", "readonly": true, "store": "<工作区>/.zcode/config.json", "source": "src/features/settings/backends/zcode/SettingsZCodeSection.ts:320-329; src/core/agents/backend/zcode/ZCodeManagementService.ts:37-50" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "permissions-safety",
+        "label": "权限",
+        "title": "权限",
+        "description": "持久化的默认权限模式（高风险页，与聊天默认值物理隔离）；会话内切换走运行时 setSessionMode。",
+        "note": "ZCode 无沙箱语义：plan 不是操作系统只读沙箱；持久化默认在会话物化时应用一次，不影响进行中的会话。枚举含内部保留的 auto（归一化接受但 UI 不提供，属旧值）。",
+        "groups": [
+          {
+            "title": "默认权限模式",
+            "fields": [
+              {
+                "key": "settings.backendSettings.zcode.mode",
+                "label": "权限模式",
+                "description": "'' = 使用 ZCode 默认（推荐）。plan=先规划；build=写入前询问；edit=免询问编辑工作区文件；yolo=跳过常规确认。旧值 auto 会被保留显示为“未确认”。",
+                "type": "segment",
+                "value": "",
+                "options": [
+                  { "value": "", "label": "使用 ZCode 默认" },
+                  { "value": "plan", "label": "先规划" },
+                  { "value": "build", "label": "变更前询问" },
+                  { "value": "edit", "label": "免询问编辑" },
+                  { "value": "yolo", "label": "YOLO（跳过常规确认）" }
+                ],
+                "origin": "plugin",
+                "store": "<vault>/.opencodian/settings.core.json → backendSettings.zcode.mode",
+                "scope": "仓库",
+                "effect": "新会话生效",
+                "source": "src/features/settings/backends/zcode/SettingsZCodeSection.ts:211-243; src/core/types/settings.ts:1078-1079,1090; src/core/agents/backend/zcode/ZCodeModelCatalog.ts:14-29"
+              },
+              { "key": "zcode.permissions.notes", "label": "模式说明", "description": "三条如实标注：生效时机（会话物化边界）、plan 在 0.16.9 的读回特性、非沙箱声明。", "type": "notice", "value": "时机：默认值仅在会话物化时应用 · plan 读回：基模式投影 · 非沙箱：无 OS 级隔离", "origin": "plugin", "readonly": true, "source": "src/features/settings/backends/zcode/SettingsZCodeSection.ts:239-242; src/core/agents/backend/zcode/ZCodeModelCatalog.ts:19-29" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "installation",
+        "label": "安装与连接",
+        "title": "安装与连接",
+        "description": "运行时解析、连接握手与插件级可执行文件覆盖。",
+        "note": "覆盖路径接受原生 zcode-agent 二进制、zcode.cjs 包或其所在目录；空 = 自动发现官方安装（设置永不定死机器路径）。",
+        "groups": [
+          {
+            "title": "连接状态",
+            "fields": [
+              { "key": "zcode.connection.summary", "label": "连接摘要", "description": "已连接 / 连接失败 / 连接中 / 未连接 / 未安装 / 已配置路径不存在 / 安装不兼容。以下为示例读回。", "type": "notice", "value": "连接就绪（示例读回）", "origin": "readback", "readonly": true, "source": "src/features/settings/backends/zcode/SettingsZCodeSection.ts:114-127" },
+              { "key": "action:zcode.reconnect", "label": "重新连接", "description": "reconnectFromSettings（忙时如实提示），成功后失效斜杠目录缓存并刷新诊断。", "type": "action", "value": "", "origin": "action", "button": "重新连接", "source": "src/features/settings/backends/zcode/SettingsZCodeSection.ts:128-141" }
+            ]
+          },
+          {
+            "title": "安装位置",
+            "description": "默认折叠；仅在解析非 ready 时展开。",
+            "collapsible": true,
+            "fields": [
+              {
+                "key": "settings.backendSettings.zcode.executablePath",
+                "label": "可执行文件路径",
+                "description": "zcode-agent 原生二进制 / zcode.cjs / 其所在目录；空 = 自动发现官方安装。",
+                "type": "text",
+                "value": "",
+                "origin": "plugin",
+                "store": "<vault>/.opencodian/settings.core.json → backendSettings.zcode.executablePath",
+                "scope": "仓库",
+                "effect": "新会话生效",
+                "source": "src/features/settings/backends/zcode/SettingsZCodeSection.ts:142-178; src/core/types/settings.ts:1063-1070"
+              }
+            ]
+          },
+          {
+            "title": "技术诊断",
+            "description": "三行状态：运行时解析、提供商配置、连接握手。",
+            "collapsible": true,
+            "fields": [
+              { "key": "zcode.diagnostics.runtime", "label": "运行时", "description": "ready（含 entryPath + 发现来源）/ missing / configured-path-not-found / incompatible + 详情。以下为示例读回。", "type": "kv", "value": { "mode": "ready", "entryPath": "/Applications/ZCode.app/.../zcode-agent", "source": "auto-discovery" }, "origin": "readback", "readonly": true, "source": "src/features/settings/backends/zcode/SettingsZCodeSection.ts:402-422" },
+              { "key": "zcode.diagnostics.providerConfig", "label": "提供商配置", "description": "validated（含提供商计数或“计数不可用”）/ missing / unreadable / malformed + 路径。以下为示例读回。", "type": "kv", "value": { "state": "validated", "providerCount": 4, "path": "~/.zcode/v2/provider_config.json" }, "origin": "readback", "readonly": true, "source": "src/features/settings/backends/zcode/SettingsZCodeSection.ts:424-439; src/core/agents/backend/zcode/ZCodeProviderConfigDiscovery.ts:211-264" },
+              { "key": "zcode.diagnostics.handshake", "label": "连接", "description": "ready / failed（含最近错误）/ connecting / idle。以下为示例读回。", "type": "kv", "value": { "handshake": "ready" }, "origin": "readback", "readonly": true, "source": "src/features/settings/backends/zcode/SettingsZCodeSection.ts:441-450" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]
