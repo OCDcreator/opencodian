@@ -11,7 +11,7 @@
 
 当前模块负责：
 
-- 设置页顶部 brand title 渲染（wordmark 内联为 `data:image/svg+xml`，标准三文件安装无需 `assets/` 目录）
+- 设置页顶部 brand title 渲染（wordmark 内联为 `data:image/svg+xml`，标准三文件安装无需 `assets/` 目录）。设置容器不超过 720px 时由共享 layout contract 视觉隐藏词标并保留固定小图标，图标轨道不换行；词标 alt 不移除
 - 通用 setting block 壳层
 - setting name / description 的 inline-code 格式化
 - help button 装配

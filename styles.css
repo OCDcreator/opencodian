@@ -13076,13 +13076,34 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
    content width decide form layout in detached windows and editor panes. */
 @container opencodian-settings-pane (max-width: 720px) {
   .opencodian-settings .opencodian-settings-panel-title {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
   }
 
   .opencodian-settings .opencodian-settings-panel-title-actions,
   .opencodian-settings .opencodian-agent-switcher-header-icons {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     max-width: 100%;
+  }
+
+  .opencodian-settings .opencodian-settings-panel-title-actions {
+    flex-shrink: 1;
+  }
+
+  .opencodian-settings .opencodian-agent-switcher-header-icons {
+    min-width: 0;
+    overflow-x: auto;
+  }
+
+  .opencodian-settings .opencodian-settings-panel-title :is(.opencodian-title-text, .opencodian-settings-panel-title-fallback) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .opencodian-settings .opencodian-settings-content-shell .setting-item:not(.opencodian-settings-direct-host):not(:is(
