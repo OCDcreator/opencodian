@@ -435,6 +435,18 @@ it('right-aligns task controls while preserving the unmarked workspace alignment
   }
 });
 
+it('stacks four-backend rows only at the readable 600px container boundary', () => {
+  const css = readFileSync(join(process.cwd(), 'src/style/components/settings-backend-workspace.css'), 'utf8');
+  const boundary = css.match(/@container opencodian-settings-pane \(max-width: 600px\) \{([\s\S]*?)\n\}/);
+  expect(boundary).not.toBeNull();
+  expect(boundary?.[1]).toContain('.opencodian-backend-task-workspace .setting-item:not(.opencodian-settings-direct-host)');
+  expect(boundary?.[1]).toContain('grid-template-columns: minmax(0, 1fr);');
+  expect(boundary?.[1]).toContain('gap: 11px;');
+  expect(boundary?.[1]).toContain('.opencodian-backend-task-workspace .setting-item-control');
+  expect(boundary?.[1]).toContain('align-self: start;');
+  expect(css).not.toContain('@container opencodian-settings-pane (max-width: 660px)');
+});
+
 describe('DSH connection backup component', () => {
   it('names its purpose, exposes its exact scope and disables restore until a backup exists', () => {
     const host = fixture();

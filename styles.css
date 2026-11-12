@@ -20315,7 +20315,7 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
   background: transparent;
 }
 
-@container opencodian-settings-pane (max-width: 660px) {
+@container opencodian-settings-pane (max-width: 600px) {
   .opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace {
     padding: 24px 0 30px;
   }
