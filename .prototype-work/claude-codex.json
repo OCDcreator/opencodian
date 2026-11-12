@@ -1,0 +1,2411 @@
+[
+  {
+    "id": "claude",
+    "name": "Claude Code",
+    "description": "配置 Claude Code SDK 后端、认证环境、权限和运行时诊断。设置来源与作用域遵循 Claude 官方 settings.json 体系。",
+    "tabs": [
+      {
+        "id": "connection",
+        "label": "连接",
+        "title": "连接与高级设置",
+        "description": "可执行文件、JS 运行时、加载超时、CLI 诊断与调试日志。更改在下一次 Claude Code query 或重启持久会话后生效。",
+        "note": "认证使用官方 SDK + 用户已安装的 Claude Code CLI + 本地登录；本页无凭据字段（settings.claudeCode.environment）。",
+        "groups": [
+          {
+            "title": "连接与运行时",
+            "description": "下一次 Claude Code query 使用的可执行文件、运行时与加载超时。",
+            "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:735-857",
+            "fields": [
+              {
+                "key": "settings.backendSettings.claudeCode.executablePath",
+                "label": "Claude Code 可执行文件",
+                "description": "外部 Claude Code CLI 路径。留空时搜索 PATH 和常见 Claude/npm 安装位置。无效路径会被拒绝。",
+                "type": "text",
+                "value": "",
+                "placeholder": "claude 或 /opt/homebrew/bin/claude",
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.executablePath",
+                "scope": "vault（插件私有）",
+                "effect": "重启后生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:768-789"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.jsRuntime",
+                "label": "JavaScript 运行时",
+                "description": "要求 SDK 为 Claude Code 子进程使用指定 JS 运行时。自动 = 交给 SDK 选择。Readback only。",
+                "type": "select",
+                "value": "",
+                "options": [
+                  { "value": "", "label": "自动（SDK 默认）" },
+                  { "value": "node", "label": "Node.js" },
+                  { "value": "bun", "label": "Bun" },
+                  { "value": "deno", "label": "Deno" }
+                ],
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.jsRuntime",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:791-827; src/core/types/settings.ts:1003"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.loadTimeoutMs",
+                "label": "加载超时（毫秒）",
+                "description": "sessionStore resume/continue 材料化的最大超时。留空使用 SDK 默认。@alpha，仅 readback。",
+                "type": "number",
+                "value": null,
+                "min": 1,
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.loadTimeoutMs",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:829-857; src/core/types/settings.ts:1012"
+              }
+            ]
+          },
+          {
+            "title": "诊断与日志",
+            "description": "CLI 诊断、调试日志、调试文件与环境变量。",
+            "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:760-765,870-949,3503-3530",
+            "fields": [
+              {
+                "key": "settings.backendSettings.claudeCode.debug",
+                "label": "CLI 调试日志",
+                "description": "要求 SDK 在查询执行期间发出 CLI 调试日志。除非同时设置调试文件，否则输出会被静默丢弃。",
+                "type": "toggle",
+                "value": false,
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.debug",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:889-916"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.debugFile",
+                "label": "调试文件路径",
+                "description": "要求 SDK 将 CLI 调试日志写入指定文件。设置后即使调试开关关闭也会隐式启用调试日志。",
+                "type": "text",
+                "value": "",
+                "placeholder": "/path/to/claude-debug.log",
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.debugFile",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:918-949"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.env",
+                "label": "环境变量",
+                "description": "传给 Claude Code 进程的环境变量，每行 KEY=value。已验证会传播进 Claude/Bash 子进程。",
+                "type": "kv",
+                "value": {},
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.env",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:3503-3530; src/core/types/settings.ts:878"
+              },
+              {
+                "key": "action.claude.diagnostics",
+                "label": "运行 CLI 诊断",
+                "description": "解析当前 Claude 进程（外部 CLI 路径或缺失诊断）。",
+                "type": "action",
+                "value": null,
+                "button": "诊断",
+                "origin": "action",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:870-887"
+              },
+              {
+                "key": "action.claude.restartSession",
+                "label": "重启 Claude Code 会话",
+                "description": "关闭正在运行的持久 query，让下一次发送重新加载设置来源、目录、环境、工具和限制。",
+                "type": "action",
+                "value": null,
+                "button": "重启会话",
+                "origin": "action",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2658-2682"
+              }
+            ]
+          },
+          {
+            "title": "运行时生态（只读）",
+            "description": "只读查看 runtime plugin、skill、agent 与后端会话发现状态；运行时命令/目录/账号信息/上下文用量/文件回读均为只读检查。",
+            "collapsible": true,
+            "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:743-758,951-982",
+            "fields": [
+              {
+                "key": "readback.claude.runtimeEcosystem",
+                "label": "运行时生态摘要",
+                "description": "当前 adapter 已接入的 runtime plugins / skills / agent definitions 摘要，不提供 authoring。",
+                "type": "notice",
+                "value": null,
+                "origin": "readback",
+                "readonly": true,
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:951-982"
+              },
+              {
+                "key": "readback.claude.runtimeInspection",
+                "label": "运行时检查",
+                "description": "运行时命令与目录、账号信息（掩码）、上下文用量、文件回读按钮；不写配置。",
+                "type": "action",
+                "value": null,
+                "button": "检查",
+                "origin": "readback",
+                "readonly": true,
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:1223-1733"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "conversation",
+        "label": "对话",
+        "title": "对话默认值",
+        "description": "模型、思考方式与强度、行为指令、标题与行内模型覆盖、问题卡片体验。",
+        "note": "除 autoTitle（新会话）与 outputStyle（会话启动时读取）外，均在下一次 query 生效。",
+        "groups": [
+          {
+            "title": "模型",
+            "description": "选择主模型与备用模型。别名来自官方 CLI help（CLI 2.1.319）；未知已存值会被保留为标记选项。",
+            "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:1747-1749,1792-1901,163",
+            "fields": [
+              {
+                "key": "settings.backendSettings.claudeCode.model",
+                "label": "模型",
+                "description": "Claude Code 会话主模型。留空继承默认；活跃持久查询支持 setModel() 时实时生效。",
+                "type": "select",
+                "value": "",
+                "options": [
+                  { "value": "", "label": "继承（SDK 默认）" },
+                  { "value": "fable", "label": "fable（CLI 别名）" },
+                  { "value": "opus", "label": "opus（CLI 别名）" },
+                  { "value": "sonnet", "label": "sonnet（CLI 别名）" },
+                  { "value": "__custom__", "label": "自定义..." }
+                ],
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.model",
+                "scope": "vault（插件私有）",
+                "effect": "活跃查询实时 / 其余下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:1792-1809"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.fallbackModel",
+                "label": "备用模型",
+                "description": "主模型不可用时使用。不能与主模型相同（SDK 会拒绝）。自动回退切换未本地验证（readback only）。",
+                "type": "select",
+                "value": "",
+                "options": [
+                  { "value": "", "label": "继承（SDK 默认）" },
+                  { "value": "fable", "label": "fable（CLI 别名）" },
+                  { "value": "opus", "label": "opus（CLI 别名）" },
+                  { "value": "sonnet", "label": "sonnet（CLI 别名）" },
+                  { "value": "__custom__", "label": "自定义..." }
+                ],
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.fallbackModel",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query / 重启会话生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:1817-1843"
+              }
+            ]
+          },
+          {
+            "title": "思考方式与强度",
+            "description": "Thinking 模式、固定预算与新任务 effort 默认值。",
+            "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:1751-1769,2036-2156",
+            "fields": [
+              {
+                "key": "settings.backendSettings.claudeCode.thinking.type",
+                "label": "思考方式",
+                "description": "控制回答前的思考量，取决于所选模型是否支持。",
+                "type": "segment",
+                "value": "adaptive",
+                "options": [
+                  { "value": "adaptive", "label": "自适应" },
+                  { "value": "disabled", "label": "关闭" },
+                  { "value": "fixed", "label": "固定预算" }
+                ],
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.thinking.type",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2036-2077"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.thinking.budgetTokens",
+                "label": "思考用量上限",
+                "description": "固定预算下限制思考 token 数。预设 + 自定义输入；保存值不会被钳制。",
+                "type": "select",
+                "value": 4096,
+                "options": [
+                  { "value": "1024", "label": "1024" },
+                  { "value": "4096", "label": "4096（默认）" },
+                  { "value": "8192", "label": "8192" },
+                  { "value": "16384", "label": "16384" },
+                  { "value": "__custom__", "label": "自定义..." }
+                ],
+                "condition": { "key": "settings.backendSettings.claudeCode.thinking.type", "value": "fixed" },
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.thinking.budgetTokens",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2079-2125"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.effort",
+                "label": "思考强度",
+                "description": "每轮任务投入的思考强度默认值。",
+                "type": "segment",
+                "value": "medium",
+                "options": [
+                  { "value": "low", "label": "低" },
+                  { "value": "medium", "label": "中" },
+                  { "value": "high", "label": "高" },
+                  { "value": "xhigh", "label": "特高" },
+                  { "value": "max", "label": "最大" }
+                ],
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.effort",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2127-2156"
+              }
+            ]
+          },
+          {
+            "title": "行为",
+            "description": "附加指令、输出样式、提示建议与 1M 上下文 beta。",
+            "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:1771-1775,3383-3501",
+            "fields": [
+              {
+                "key": "settings.backendSettings.claudeCode.systemPrompt",
+                "label": "Claude Code 附加指令",
+                "description": "追加到官方预设系统提示词之后（preset-with-append），不替换预设。",
+                "type": "textarea",
+                "value": "",
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.systemPrompt",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query / 重启会话生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:3383-3412"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.outputStyle",
+                "label": "输出样式",
+                "description": "输出样式名称，修改系统提示词。内置 Default/Proactive/Explanatory/Learning；自定义放 .claude/output-styles。",
+                "type": "text",
+                "value": "",
+                "placeholder": "例如 Explanatory",
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.outputStyle → SDK settings.outputStyle",
+                "scope": "vault（插件私有）",
+                "effect": "新会话生效（/clear 或新会话后）",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:3414-3445"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.promptSuggestions",
+                "label": "提示建议",
+                "description": "每次回复后可能发出一个预测后续提示；仅插入输入框，不自动发送。",
+                "type": "toggle",
+                "value": false,
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.promptSuggestions",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:3447-3472"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.enableContext1mBeta",
+                "label": "1M 上下文 Beta",
+                "description": "请求 context-1m-2025-08-07 beta header。实际可用性取决于模型与 Anthropic 侧。",
+                "type": "toggle",
+                "value": false,
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.enableContext1mBeta → SDK betas",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:3474-3501"
+              }
+            ]
+          },
+          {
+            "title": "标题与行内模型",
+            "description": "Claude 自动标题行为与本后端的行内编辑/补全模型覆盖。",
+            "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:1777-1779,2017-2034; src/features/settings/general/SettingsInlineEditSection.ts:255-268",
+            "fields": [
+              {
+                "key": "settings.backendSettings.claudeCode.autoTitle",
+                "label": "自动标题",
+                "description": "开启时新会话不传显式标题，由 Claude 自动生成摘要标题。",
+                "type": "toggle",
+                "value": true,
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.autoTitle",
+                "scope": "vault（插件私有）",
+                "effect": "新会话生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2017-2034"
+              },
+              {
+                "key": "settings.inlineEditModelOverrides[\"claude-code\"]",
+                "label": "行内编辑模型覆盖",
+                "description": "本后端行内编辑使用的模型覆盖（如 claude:haiku）。",
+                "type": "text",
+                "value": "",
+                "origin": "shared",
+                "store": "plugin data → settings.inlineEditModelOverrides[\"claude-code\"]",
+                "scope": "vault（插件私有）",
+                "effect": "下一次行内编辑生效",
+                "source": "src/features/settings/general/SettingsInlineEditSection.ts:255-268"
+              },
+              {
+                "key": "settings.inlineCompletionModelOverrides[\"claude-code\"]",
+                "label": "行内补全模型覆盖",
+                "description": "本后端行内补全使用的模型覆盖。",
+                "type": "text",
+                "value": "",
+                "origin": "shared",
+                "store": "plugin data → settings.inlineCompletionModelOverrides[\"claude-code\"]",
+                "scope": "vault（插件私有）",
+                "effect": "下一次补全生效",
+                "source": "src/features/settings/general/SettingsInlineEditSection.ts:255-268"
+              }
+            ]
+          },
+          {
+            "title": "问题体验",
+            "description": "Chat 问题卡片中的 AskUserQuestion 预览行为。",
+            "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:1781-1782,3196-3232",
+            "fields": [
+              {
+                "key": "settings.backendSettings.claudeCode.askUserQuestionPreviewFormat",
+                "label": "AskUserQuestion 预览格式",
+                "description": "请求 SDK 为每个选项附带预览文本；为安全起见 HTML 以纯文本显示。",
+                "type": "segment",
+                "value": "",
+                "options": [
+                  { "value": "", "label": "无（SDK 默认）" },
+                  { "value": "markdown", "label": "Markdown" },
+                  { "value": "html", "label": "HTML（纯文本显示）" }
+                ],
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.askUserQuestionPreviewFormat → SDK toolConfig.askUserQuestion.previewFormat",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:3196-3232"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "providers",
+        "label": "账户",
+        "title": "模型与账户（项目 Provider）",
+        "description": "项目级 Anthropic 兼容 Provider 预设；全局 Claude 文件始终只读。",
+        "note": "需先启用本机（local）设置来源。激活时仅向当前 vault 的 .claude/settings.local.json 写入受管键 ANTHROPIC_BASE_URL / ANTHROPIC_AUTH_TOKEN / ANTHROPIC_DEFAULT_HAIKU_MODEL。",
+        "groups": [
+          {
+            "title": "Provider 预设编辑器",
+            "description": "预设保存在插件设置中；激活时只写入当前 vault 的受管键。字段为预设编辑弹窗内的逐项键。",
+            "source": "src/features/settings/backends/claude/SettingsClaudeProvidersSection.ts:95-160; src/core/types/settings.ts:670-719",
+            "fields": [
+              {
+                "key": "providers.presets[].name",
+                "label": "预设名称",
+                "description": "本地显示名称，必填。",
+                "type": "text",
+                "value": "",
+                "origin": "plugin",
+                "store": "preset editor → settings.backendSettings.claudeCode.providers.presets[]",
+                "source": "src/features/settings/backends/claude/SettingsClaudeProvidersSection.ts:108"
+              },
+              {
+                "key": "providers.presets[].baseUrl",
+                "label": "Base URL",
+                "description": "兼容 Anthropic Messages API 的端点，不能以 /v1 结尾。",
+                "type": "text",
+                "value": "",
+                "origin": "plugin",
+                "store": "preset editor → settings.backendSettings.claudeCode.providers.presets[]；激活写入 <vault>/.claude/settings.local.json env.ANTHROPIC_BASE_URL",
+                "source": "src/features/settings/backends/claude/SettingsClaudeProvidersSection.ts:109"
+              },
+              {
+                "key": "providers.presets[].authToken",
+                "label": "认证 Token",
+                "description": "保存在插件设置，激活时作为不带 Bearer 前缀的 ANTHROPIC_AUTH_TOKEN 写入；立即优先于 claude.ai 登录。",
+                "type": "password",
+                "value": "",
+                "origin": "plugin",
+                "store": "preset editor → settings.backendSettings.claudeCode.providers.presets[]；激活写入 env.ANTHROPIC_AUTH_TOKEN",
+                "source": "src/features/settings/backends/claude/SettingsClaudeProvidersSection.ts:110,150-158"
+              },
+              {
+                "key": "providers.presets[].model",
+                "label": "主模型",
+                "description": "写入项目本机 Claude 设置文件。",
+                "type": "text",
+                "value": "",
+                "origin": "plugin",
+                "store": "preset editor → settings.backendSettings.claudeCode.providers.presets[]",
+                "source": "src/features/settings/backends/claude/SettingsClaudeProvidersSection.ts:111"
+              },
+              {
+                "key": "providers.presets[].fallbackModel",
+                "label": "备用模型",
+                "description": "可选；以单元素 fallbackModel 数组写入。",
+                "type": "text",
+                "value": "",
+                "origin": "plugin",
+                "store": "preset editor → settings.backendSettings.claudeCode.providers.presets[]",
+                "source": "src/features/settings/backends/claude/SettingsClaudeProvidersSection.ts:112"
+              },
+              {
+                "key": "providers.presets[].haikuModel",
+                "label": "Haiku 层级模型",
+                "description": "写入 ANTHROPIC_DEFAULT_HAIKU_MODEL。",
+                "type": "text",
+                "value": "",
+                "origin": "plugin",
+                "store": "preset editor → settings.backendSettings.claudeCode.providers.presets[]；激活写入 env.ANTHROPIC_DEFAULT_HAIKU_MODEL",
+                "source": "src/features/settings/backends/claude/SettingsClaudeProvidersSection.ts:113"
+              },
+              {
+                "key": "providers.presets[].extraEnv",
+                "label": "额外环境变量",
+                "description": "每行 KEY=value；受管 Anthropic 键不可在此填写。",
+                "type": "kv",
+                "value": {},
+                "origin": "plugin",
+                "store": "preset editor → settings.backendSettings.claudeCode.providers.presets[]",
+                "source": "src/features/settings/backends/claude/SettingsClaudeProvidersSection.ts:114-123"
+              }
+            ]
+          },
+          {
+            "title": "激活与迁移",
+            "description": "内置 Anthropic Official 预设为不可变恢复目标；激活写入按文件修订版本做 CAS 冲突保护。",
+            "source": "src/features/settings/backends/claude/SettingsClaudeProvidersSection.ts:162-215; src/core/types/settings.ts:700-719",
+            "fields": [
+              {
+                "key": "settings.backendSettings.claudeCode.providers.activePresetId",
+                "label": "当前生效预设",
+                "description": "通过预设卡片上的「激活」按钮切换；默认内置 official（Anthropic Official）。",
+                "type": "select",
+                "value": "official",
+                "options": [
+                  { "value": "official", "label": "Anthropic 官方" },
+                  { "value": "<preset-id>", "label": "自定义预设（按 presets[] 动态）" }
+                ],
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.providers.activePresetId",
+                "source": "src/core/types/settings.ts:686; src/features/settings/backends/claude/SettingsClaudeProvidersSection.ts:370-407"
+              },
+              {
+                "key": "action.claude.addPreset",
+                "label": "新增 Provider 预设",
+                "description": "打开预设编辑弹窗，保存到本地插件设置。",
+                "type": "action",
+                "value": null,
+                "button": "新增预设",
+                "origin": "action",
+                "source": "src/features/settings/backends/claude/SettingsClaudeProvidersSection.ts:209-215"
+              },
+              {
+                "key": "action.claude.migrateModels",
+                "label": "迁移旧模型设置",
+                "description": "可选的一次性迁移：将旧插件模型字段写入项目配置（modelMigrationDone 守卫）。",
+                "type": "action",
+                "value": null,
+                "button": "立即迁移",
+                "origin": "action",
+                "source": "src/features/settings/backends/claude/SettingsClaudeProvidersSection.ts:256-281"
+              },
+              {
+                "key": "notice.claude.providerLayers",
+                "label": "配置层检查",
+                "description": "查看掩码后的用户/项目/本机/shell 配置层（只读）。lastAppliedManagedEnvKeys 记录上次成功应用拥有的受管键。",
+                "type": "notice",
+                "value": null,
+                "origin": "readback",
+                "readonly": true,
+                "source": "src/features/settings/backends/claude/SettingsClaudeProvidersSection.ts:63-93; src/core/types/settings.ts:687-690"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "tools-context",
+        "label": "工具与上下文",
+        "title": "工具与上下文",
+        "description": "设置来源、额外目录、外部 settings 文件工作台、工具策略与 MCP 运行时。",
+        "note": "这里的更改在下一次 query 或重启后的持久会话中生效。",
+        "groups": [
+          {
+            "title": "运行时范围（设置来源）",
+            "description": "选择下一次 query 启动时读取哪些 Claude 设置作用域（UI 为三个独立开关，持久化为数组）。",
+            "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2604-2606,2752-2820",
+            "fields": [
+              {
+                "key": "settings.backendSettings.claudeCode.settingSources",
+                "label": "设置来源",
+                "description": "user=用户设置（~/.claude）；project=项目设置（vault 工作区）；local=本机设置（.claude/settings.local.json）。Provider 页需要 local。",
+                "type": "list",
+                "value": ["project"],
+                "options": [
+                  { "value": "user", "label": "用户设置" },
+                  { "value": "project", "label": "项目设置" },
+                  { "value": "local", "label": "本机设置" }
+                ],
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.settingSources",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2752-2820; src/core/types/settings.ts:845,1273"
+              }
+            ]
+          },
+          {
+            "title": "项目可见性（只读）",
+            "description": "检查 CLAUDE.md、.claude/settings.json、.claude/settings.local.json 是否能从当前 vault 工作区看到。",
+            "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:165-169,2822-2864",
+            "fields": [
+              {
+                "key": "readback.claude.projectSources",
+                "label": "项目来源文件",
+                "description": "逐文件显示 已找到/未找到；只读检查。",
+                "type": "notice",
+                "value": null,
+                "origin": "readback",
+                "readonly": true,
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2822-2864"
+              }
+            ]
+          },
+          {
+            "title": "额外上下文根目录",
+            "description": "传给 Claude Code 用于上下文发现的额外目录。",
+            "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2614-2615,2866-2890",
+            "fields": [
+              {
+                "key": "settings.backendSettings.claudeCode.additionalDirectories",
+                "label": "额外目录",
+                "description": "每行一个外部上下文目录。",
+                "type": "list",
+                "value": [],
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.additionalDirectories → SDK additionalDirectories",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2866-2890"
+              }
+            ]
+          },
+          {
+            "title": "工具策略",
+            "description": "Allowed / disallowed / restricted built-in tools 与工具别名。名称为 PascalCase 字母数字。",
+            "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2617-2621,3053-3194",
+            "fields": [
+              {
+                "key": "settings.backendSettings.claudeCode.allowedTools",
+                "label": "允许的工具",
+                "description": "预允许（auto-approve）快捷方式，每行一个。运行时证据确认零强制：init catalog 始终未过滤。",
+                "type": "list",
+                "value": [],
+                "placeholder": "Read\nGrep",
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.allowedTools → SDK allowedTools",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:3053-3087"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.disallowedTools",
+                "label": "禁用的工具",
+                "description": "从上下文移除的工具名，每行一个；init catalog 过滤已验证。",
+                "type": "list",
+                "value": [],
+                "placeholder": "Bash",
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.disallowedTools → SDK disallowedTools",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:3089-3110"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.restrictedBuiltinTools",
+                "label": "受限内置工具",
+                "description": "非空时仅列表内内置工具提供给模型（SDK tools 选项）；MCP 工具始终透传。留空 = 默认全部。",
+                "type": "list",
+                "value": [],
+                "placeholder": "Read\nGrep\nEdit",
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.restrictedBuiltinTools → SDK tools",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:3112-3139"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.toolAliases",
+                "label": "工具别名",
+                "description": "将模型发出的工具名映射到规范名。每行 key=value（例如 Fetch=Read）。Readback only。",
+                "type": "kv",
+                "value": {},
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.toolAliases → SDK toolAliases",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query / 重启会话生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:3161-3194"
+              }
+            ]
+          },
+          {
+            "title": "MCP 运行时（只读 + 严格校验）",
+            "description": "MCP 服务器由原生 .claude/mcp.json / MCP adapter 提供；本页不写 .claude/mcp.json，仅刷新与检查运行时状态。",
+            "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2623-2625,2894-2969",
+            "fields": [
+              {
+                "key": "notice.claude.mcpReadonly",
+                "label": "MCP 配置为只读",
+                "description": "当前 adapter 加载的 MCP 服务器数量与名称为只读回读；编辑请使用原生 .claude/mcp.json 或 MCP 配置入口。",
+                "type": "notice",
+                "value": null,
+                "origin": "readback",
+                "readonly": true,
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2971-2985"
+              },
+              {
+                "key": "action.claude.mcpReload",
+                "label": "刷新 MCP 运行时",
+                "description": "从当前 OpenCodian MCP adapter 重新加载 MCP 配置。",
+                "type": "action",
+                "value": null,
+                "button": "刷新 MCP 运行时",
+                "origin": "action",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2918-2939"
+              },
+              {
+                "key": "action.claude.mcpInspect",
+                "label": "检查运行时状态",
+                "description": "回读每个服务器的连接状态、作用域与工具名。",
+                "type": "action",
+                "value": null,
+                "button": "检查运行时状态",
+                "origin": "readback",
+                "readonly": true,
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2987-3051"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.strictMcpConfig",
+                "label": "严格 MCP 配置",
+                "description": "要求 SDK 将无效 MCP 配置视为错误（--strict-mcp-config）。Readback only。",
+                "type": "toggle",
+                "value": false,
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.strictMcpConfig → SDK strictMcpConfig",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2942-2969"
+              }
+            ]
+          },
+          {
+            "title": "配置工作台（原生 settings.json）",
+            "description": "编辑 Claude settings.json：作用域（项目/本机/全局）、9 个常用字段表单 + 高级原始 JSON。strict JSON 校验、CAS 修订与归档历史；托管来源只读。",
+            "collapsible": true,
+            "source": "src/features/settings/backends/claude/SettingsClaudeConfigurationSection.ts:30-56,115-135,215-251; src/core/agents/backend/claude/ClaudeSettingsCommonFieldModel.ts:27-37",
+            "fields": [
+              {
+                "key": "native.claude.scope",
+                "label": "配置作用域",
+                "description": "选择要编辑的 settings 文件。全局根仅在允许列表契约下可写；托管/非 JSON 来源自动只读。",
+                "type": "select",
+                "value": "project",
+                "options": [
+                  { "value": "project", "label": "项目 .claude/settings.json" },
+                  { "value": "local", "label": "本机 .claude/settings.local.json" },
+                  { "value": "global", "label": "全局 ~/.claude/settings.json" }
+                ],
+                "origin": "native",
+                "store": "<vault>/.claude/settings.json | <vault>/.claude/settings.local.json | ~/.claude/settings.json（按作用域）",
+                "scope": "项目 / 本机 / 全局",
+                "source": "src/features/settings/backends/claude/SettingsClaudeConfigurationSection.ts:30"
+              },
+              {
+                "key": "native.claude.model",
+                "label": "model",
+                "description": "原生 settings.json 顶层 model（SDK 0.3.145 / CLI 2.1.204 依据）。",
+                "type": "text",
+                "value": "",
+                "origin": "native",
+                "store": "所选作用域 settings 文件 → model",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsCommonFieldModel.ts:28"
+              },
+              {
+                "key": "native.claude.permissions.defaultMode",
+                "label": "permissions.defaultMode",
+                "description": "原生默认权限模式枚举。",
+                "type": "select",
+                "value": "",
+                "options": [
+                  { "value": "", "label": "继承（移除字段）" },
+                  { "value": "acceptEdits", "label": "acceptEdits" },
+                  { "value": "auto", "label": "auto" },
+                  { "value": "bypassPermissions", "label": "bypassPermissions" },
+                  { "value": "default", "label": "default" },
+                  { "value": "dontAsk", "label": "dontAsk" },
+                  { "value": "plan", "label": "plan" }
+                ],
+                "origin": "native",
+                "store": "所选作用域 settings 文件 → permissions.defaultMode",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsCommonFieldModel.ts:29"
+              },
+              {
+                "key": "native.claude.permissions.allow",
+                "label": "permissions.allow",
+                "description": "原生允许规则数组（JSON 字符串数组）。",
+                "type": "list",
+                "value": [],
+                "origin": "native",
+                "store": "所选作用域 settings 文件 → permissions.allow",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsCommonFieldModel.ts:30"
+              },
+              {
+                "key": "native.claude.permissions.ask",
+                "label": "permissions.ask",
+                "description": "原生需确认规则数组。",
+                "type": "list",
+                "value": [],
+                "origin": "native",
+                "store": "所选作用域 settings 文件 → permissions.ask",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsCommonFieldModel.ts:31"
+              },
+              {
+                "key": "native.claude.permissions.deny",
+                "label": "permissions.deny",
+                "description": "原生拒绝规则数组。",
+                "type": "list",
+                "value": [],
+                "origin": "native",
+                "store": "所选作用域 settings 文件 → permissions.deny",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsCommonFieldModel.ts:32"
+              },
+              {
+                "key": "native.claude.env",
+                "label": "env",
+                "description": "原生环境变量记录（{[k:string]:string}）。",
+                "type": "kv",
+                "value": {},
+                "origin": "native",
+                "store": "所选作用域 settings 文件 → env",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsCommonFieldModel.ts:33"
+              },
+              {
+                "key": "native.claude.cleanupPeriodDays",
+                "label": "cleanupPeriodDays",
+                "description": "会话清理保留天数，最小 1。",
+                "type": "number",
+                "value": null,
+                "min": 1,
+                "origin": "native",
+                "store": "所选作用域 settings 文件 → cleanupPeriodDays",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsCommonFieldModel.ts:34"
+              },
+              {
+                "key": "native.claude.respectGitignore",
+                "label": "respectGitignore",
+                "description": "是否遵守 .gitignore（布尔，可继承）。",
+                "type": "select",
+                "value": "",
+                "options": [
+                  { "value": "", "label": "继承（移除字段）" },
+                  { "value": "true", "label": "true" },
+                  { "value": "false", "label": "false" }
+                ],
+                "origin": "native",
+                "store": "所选作用域 settings 文件 → respectGitignore",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsCommonFieldModel.ts:35"
+              },
+              {
+                "key": "native.claude.includeGitInstructions",
+                "label": "includeGitInstructions",
+                "description": "是否在系统提示中包含 Git 指引（布尔，可继承）。",
+                "type": "select",
+                "value": "",
+                "options": [
+                  { "value": "", "label": "继承（移除字段）" },
+                  { "value": "true", "label": "true" },
+                  { "value": "false", "label": "false" }
+                ],
+                "origin": "native",
+                "store": "所选作用域 settings 文件 → includeGitInstructions",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsCommonFieldModel.ts:36"
+              },
+              {
+                "key": "native.claude.rawDraft",
+                "label": "高级原始 JSON",
+                "description": "整个 settings 文件的原始草稿编辑器；strict JSON 校验，保存保留未知字段与格式。",
+                "type": "json",
+                "value": "{}",
+                "origin": "native",
+                "store": "所选作用域 settings 文件（整文件）",
+                "source": "src/features/settings/backends/claude/SettingsClaudeConfigurationSection.ts:253-280,498-518"
+              },
+              {
+                "key": "action.claude.configSave",
+                "label": "保存 / 重新加载 / 对比 / 删除 / 历史",
+                "description": "CAS 修订保存、外部变更对比、删除（先归档）与归档历史恢复。",
+                "type": "action",
+                "value": null,
+                "button": "保存",
+                "origin": "action",
+                "source": "src/features/settings/backends/claude/SettingsClaudeConfigurationSection.ts:296-336"
+              }
+            ]
+          },
+          {
+            "title": "Hooks 构建器（原生 hooks schema）",
+            "description": "Claude Code settings 文件 hooks 的结构化构建：30 个事件 + 5 种处理器类型。固定到 CLI 2.1.204 / SDK 0.3.145。",
+            "collapsible": true,
+            "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:17-137; src/features/settings/backends/claude/ClaudeSettingsHooksBuilder.ts:111-152",
+            "fields": [
+              {
+                "key": "native.claude.hooks.event",
+                "label": "Hook 事件",
+                "description": "事件选择（含过滤搜索）；部分事件支持 matcher（tool/enum/free/file-list/error-type），其余恒触发。",
+                "type": "select",
+                "value": "PreToolUse",
+                "options": [
+                  { "value": "PreToolUse", "label": "PreToolUse" },
+                  { "value": "PostToolUse", "label": "PostToolUse" },
+                  { "value": "PostToolUseFailure", "label": "PostToolUseFailure" },
+                  { "value": "PermissionRequest", "label": "PermissionRequest" },
+                  { "value": "PermissionDenied", "label": "PermissionDenied" },
+                  { "value": "UserPromptSubmit", "label": "UserPromptSubmit" },
+                  { "value": "PostToolBatch", "label": "PostToolBatch" },
+                  { "value": "Stop", "label": "Stop" },
+                  { "value": "StopFailure", "label": "StopFailure" },
+                  { "value": "SessionStart", "label": "SessionStart" },
+                  { "value": "SessionEnd", "label": "SessionEnd" },
+                  { "value": "Setup", "label": "Setup" },
+                  { "value": "Notification", "label": "Notification" },
+                  { "value": "SubagentStart", "label": "SubagentStart" },
+                  { "value": "SubagentStop", "label": "SubagentStop" },
+                  { "value": "PreCompact", "label": "PreCompact" },
+                  { "value": "PostCompact", "label": "PostCompact" },
+                  { "value": "ConfigChange", "label": "ConfigChange" },
+                  { "value": "FileChanged", "label": "FileChanged" },
+                  { "value": "InstructionsLoaded", "label": "InstructionsLoaded" },
+                  { "value": "UserPromptExpansion", "label": "UserPromptExpansion" },
+                  { "value": "Elicitation", "label": "Elicitation" },
+                  { "value": "ElicitationResult", "label": "ElicitationResult" },
+                  { "value": "TeammateIdle", "label": "TeammateIdle" },
+                  { "value": "TaskCreated", "label": "TaskCreated" },
+                  { "value": "TaskCompleted", "label": "TaskCompleted" },
+                  { "value": "WorktreeCreate", "label": "WorktreeCreate" },
+                  { "value": "WorktreeRemove", "label": "WorktreeRemove" },
+                  { "value": "MessageDisplay", "label": "MessageDisplay" },
+                  { "value": "CwdChanged", "label": "CwdChanged" }
+                ],
+                "origin": "native",
+                "store": "所选作用域 settings 文件 → hooks",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:17-28"
+              },
+              {
+                "key": "native.claude.hooks.matcher",
+                "label": "Matcher",
+                "description": "按事件类型提供：tool_name（Pre/PostToolUse 等）、枚举建议（SessionStart: startup/resume/clear/compact 等）、自由文本或文件列表；不支持 matcher 的事件恒触发。",
+                "type": "text",
+                "value": "",
+                "origin": "native",
+                "store": "所选作用域 settings 文件 → hooks.<event>.matcher",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:49-80"
+              },
+              {
+                "key": "native.claude.hooks.type",
+                "label": "处理器类型",
+                "description": "type 判别字段，决定下方出现的结构化字段组。",
+                "type": "select",
+                "value": "command",
+                "options": [
+                  { "value": "command", "label": "command" },
+                  { "value": "http", "label": "http" },
+                  { "value": "mcp_tool", "label": "mcp_tool" },
+                  { "value": "prompt", "label": "prompt" },
+                  { "value": "agent", "label": "agent" }
+                ],
+                "origin": "native",
+                "store": "所选作用域 settings 文件 → hooks.<event>.hooks[].type",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:86-88"
+              },
+              {
+                "key": "native.claude.hooks.command",
+                "label": "command.command",
+                "description": "command 处理器必填命令。",
+                "type": "text",
+                "value": "",
+                "condition": { "key": "native.claude.hooks.type", "value": "command" },
+                "origin": "native",
+                "store": "hooks.<event>.hooks[]（command）",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:111-117"
+              },
+              {
+                "key": "native.claude.hooks.command.args",
+                "label": "command.args",
+                "description": "命令参数数组。",
+                "type": "list",
+                "value": [],
+                "condition": { "key": "native.claude.hooks.type", "value": "command" },
+                "origin": "native",
+                "store": "hooks.<event>.hooks[]（command.args）",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:113"
+              },
+              {
+                "key": "native.claude.hooks.command.async",
+                "label": "command.async",
+                "description": "异步执行。",
+                "type": "toggle",
+                "value": false,
+                "condition": { "key": "native.claude.hooks.type", "value": "command" },
+                "origin": "native",
+                "store": "hooks.<event>.hooks[]（command.async）",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:114"
+              },
+              {
+                "key": "native.claude.hooks.command.asyncRewake",
+                "label": "command.asyncRewake",
+                "description": "异步完成后唤醒。",
+                "type": "toggle",
+                "value": false,
+                "condition": { "key": "native.claude.hooks.type", "value": "command" },
+                "origin": "native",
+                "store": "hooks.<event>.hooks[]（command.asyncRewake）",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:115"
+              },
+              {
+                "key": "native.claude.hooks.command.shell",
+                "label": "command.shell",
+                "description": "shell 选择，枚举 bash / powershell。",
+                "type": "select",
+                "value": "",
+                "options": [
+                  { "value": "", "label": "继承（不设置）" },
+                  { "value": "bash", "label": "bash" },
+                  { "value": "powershell", "label": "powershell" }
+                ],
+                "condition": { "key": "native.claude.hooks.type", "value": "command" },
+                "origin": "native",
+                "store": "hooks.<event>.hooks[]（command.shell）",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:116"
+              },
+              {
+                "key": "native.claude.hooks.http.url",
+                "label": "http.url",
+                "description": "http 处理器必填 URL。",
+                "type": "text",
+                "value": "",
+                "condition": { "key": "native.claude.hooks.type", "value": "http" },
+                "origin": "native",
+                "store": "hooks.<event>.hooks[]（http.url）",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:118-122"
+              },
+              {
+                "key": "native.claude.hooks.http.headers",
+                "label": "http.headers",
+                "description": "HTTP 头记录。",
+                "type": "kv",
+                "value": {},
+                "condition": { "key": "native.claude.hooks.type", "value": "http" },
+                "origin": "native",
+                "store": "hooks.<event>.hooks[]（http.headers）",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:120"
+              },
+              {
+                "key": "native.claude.hooks.http.allowedEnvVars",
+                "label": "http.allowedEnvVars",
+                "description": "允许注入的环境变量名数组。",
+                "type": "list",
+                "value": [],
+                "condition": { "key": "native.claude.hooks.type", "value": "http" },
+                "origin": "native",
+                "store": "hooks.<event>.hooks[]（http.allowedEnvVars）",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:121"
+              },
+              {
+                "key": "native.claude.hooks.mcp.server",
+                "label": "mcp_tool.server",
+                "description": "MCP 服务器名（必填）。",
+                "type": "text",
+                "value": "",
+                "condition": { "key": "native.claude.hooks.type", "value": "mcp_tool" },
+                "origin": "native",
+                "store": "hooks.<event>.hooks[]（mcp_tool.server）",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:123-127"
+              },
+              {
+                "key": "native.claude.hooks.mcp.tool",
+                "label": "mcp_tool.tool",
+                "description": "MCP 工具名（必填）。",
+                "type": "text",
+                "value": "",
+                "condition": { "key": "native.claude.hooks.type", "value": "mcp_tool" },
+                "origin": "native",
+                "store": "hooks.<event>.hooks[]（mcp_tool.tool）",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:124"
+              },
+              {
+                "key": "native.claude.hooks.mcp.input",
+                "label": "mcp_tool.input",
+                "description": "工具输入 JSON 对象（可选）。",
+                "type": "json",
+                "value": {},
+                "condition": { "key": "native.claude.hooks.type", "value": "mcp_tool" },
+                "origin": "native",
+                "store": "hooks.<event>.hooks[]（mcp_tool.input）",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:126"
+              },
+              {
+                "key": "native.claude.hooks.prompt.prompt",
+                "label": "prompt.prompt",
+                "description": "prompt 处理器必填提示词。",
+                "type": "textarea",
+                "value": "",
+                "condition": { "key": "native.claude.hooks.type", "value": "prompt" },
+                "origin": "native",
+                "store": "hooks.<event>.hooks[]（prompt.prompt）",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:128-132"
+              },
+              {
+                "key": "native.claude.hooks.prompt.model",
+                "label": "prompt.model",
+                "description": "可选模型。",
+                "type": "text",
+                "value": "",
+                "condition": { "key": "native.claude.hooks.type", "value": "prompt" },
+                "origin": "native",
+                "store": "hooks.<event>.hooks[]（prompt.model）",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:130"
+              },
+              {
+                "key": "native.claude.hooks.prompt.continueOnBlock",
+                "label": "prompt.continueOnBlock",
+                "description": "阻断时继续（可选布尔）。",
+                "type": "toggle",
+                "value": false,
+                "condition": { "key": "native.claude.hooks.type", "value": "prompt" },
+                "origin": "native",
+                "store": "hooks.<event>.hooks[]（prompt.continueOnBlock）",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:131"
+              },
+              {
+                "key": "native.claude.hooks.agent.prompt",
+                "label": "agent.prompt",
+                "description": "agent 处理器必填提示词。",
+                "type": "textarea",
+                "value": "",
+                "condition": { "key": "native.claude.hooks.type", "value": "agent" },
+                "origin": "native",
+                "store": "hooks.<event>.hooks[]（agent.prompt）",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:133-136"
+              },
+              {
+                "key": "native.claude.hooks.agent.model",
+                "label": "agent.model",
+                "description": "可选模型。",
+                "type": "text",
+                "value": "",
+                "condition": { "key": "native.claude.hooks.type", "value": "agent" },
+                "origin": "native",
+                "store": "hooks.<event>.hooks[]（agent.model）",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:135"
+              },
+              {
+                "key": "native.claude.hooks.if",
+                "label": "if（公共）",
+                "description": "条件表达式（所有处理器类型共用，可选）。",
+                "type": "text",
+                "value": "",
+                "origin": "native",
+                "store": "hooks.<event>.hooks[]（if）",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:102-107"
+              },
+              {
+                "key": "native.claude.hooks.timeout",
+                "label": "timeout（公共）",
+                "description": "超时秒数（数字，可选）。",
+                "type": "number",
+                "value": null,
+                "origin": "native",
+                "store": "hooks.<event>.hooks[]（timeout）",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:105"
+              },
+              {
+                "key": "native.claude.hooks.statusMessage",
+                "label": "statusMessage（公共）",
+                "description": "执行时显示的状态消息（可选）。",
+                "type": "text",
+                "value": "",
+                "origin": "native",
+                "store": "hooks.<event>.hooks[]（statusMessage）",
+                "source": "src/core/agents/backend/claude/ClaudeSettingsHookSchema.ts:106"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "permissions-safety",
+        "label": "权限",
+        "title": "权限与限制",
+        "description": "权限模式、计划指令、沙箱策略树与查询护栏（轮数/费用/任务预算），与普通偏好物理分离。",
+        "note": "高风险区：完全访问与沙箱逃逸通道在此页。",
+        "groups": [
+          {
+            "title": "权限模式",
+            "description": "Claude Code 工具调用和编辑的默认批准模式。",
+            "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2168-2169,2183-2223",
+            "fields": [
+              {
+                "key": "settings.backendSettings.claudeCode.permissionMode",
+                "label": "权限模式",
+                "description": "bypassPermissions 映射为 SDK allowDangerouslySkipPermissions。高风险。",
+                "type": "select",
+                "value": "default",
+                "options": [
+                  { "value": "default", "label": "变更前确认" },
+                  { "value": "acceptEdits", "label": "自动编辑" },
+                  { "value": "bypassPermissions", "label": "完全访问" },
+                  { "value": "plan", "label": "计划模式" }
+                ],
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.permissionMode → SDK permissionMode",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效（保存后尝试应用到活跃查询）",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2183-2223; src/core/agents/backend/claude/ClaudeCodeOptionsBuilder.ts:240-246"
+              }
+            ]
+          },
+          {
+            "title": "计划指令",
+            "description": "仅在计划权限模式下启用的自定义指令。",
+            "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2171-2172,2225-2254",
+            "fields": [
+              {
+                "key": "settings.backendSettings.claudeCode.planModeInstructions",
+                "label": "计划模式指令",
+                "description": "替换默认计划工作流正文；SDK 只读前言与 ExitPlanMode 协议仍保留。",
+                "type": "textarea",
+                "value": "",
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.planModeInstructions → SDK planModeInstructions",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query / 重启会话生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2225-2254"
+              }
+            ]
+          },
+          {
+            "title": "沙箱基础",
+            "description": "常用沙箱开关，与高级操作系统/网络策略分开。",
+            "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2263-2338",
+            "fields": [
+              {
+                "key": "settings.backendSettings.claudeCode.sandbox.enabled",
+                "label": "启用沙箱",
+                "description": "在操作系统级沙箱中运行子进程。SDK 侧强制，插件无法独立验证（readback）。",
+                "type": "toggle",
+                "value": false,
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.sandbox.enabled → SDK sandbox.enabled",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2267-2297"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.sandbox.failIfUnavailable",
+                "label": "沙箱不可用时失败",
+                "description": "无法建立沙箱时查询失败；禁用时无沙箱继续。",
+                "type": "toggle",
+                "value": false,
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.sandbox.failIfUnavailable",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2299-2317"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.sandbox.autoAllowBashIfSandboxed",
+                "label": "沙箱内自动允许 Bash",
+                "description": "沙箱激活时自动批准 Bash 工具调用。",
+                "type": "toggle",
+                "value": false,
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.sandbox.autoAllowBashIfSandboxed",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2319-2337"
+              }
+            ]
+          },
+          {
+            "title": "高级沙箱",
+            "description": "命令例外、文件系统、网络与 ripgrep 覆盖策略。",
+            "collapsible": true,
+            "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2345-2594; src/core/types/settings.ts:744-762",
+            "fields": [
+              {
+                "key": "settings.backendSettings.claudeCode.sandbox.excludedCommands",
+                "label": "排除命令",
+                "description": "始终绕过沙箱的命令模式，每行一个（如 docker *）。",
+                "type": "list",
+                "value": [],
+                "origin": "plugin",
+                "store": "plugin data → …sandbox.excludedCommands → SDK sandbox.excludedCommands",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2349-2373"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.sandbox.allowUnsandboxedCommands",
+                "label": "允许非沙箱命令请求",
+                "description": "关闭后完全封锁 dangerouslyDisableSandbox 逃逸通道。SDK 默认 true。",
+                "type": "toggle",
+                "value": true,
+                "origin": "plugin",
+                "store": "plugin data → …sandbox.allowUnsandboxedCommands",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2376-2394"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.sandbox.filesystem.allowWrite",
+                "label": "允许写入路径",
+                "description": "沙箱内可额外写入的路径，每行一个；支持 /、~/、./ 前缀。",
+                "type": "list",
+                "value": [],
+                "origin": "plugin",
+                "store": "plugin data → …sandbox.filesystem.allowWrite",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2405-2424"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.sandbox.filesystem.denyWrite",
+                "label": "禁止写入路径",
+                "description": "沙箱内不可写入的路径，每行一个。",
+                "type": "list",
+                "value": [],
+                "origin": "plugin",
+                "store": "plugin data → …sandbox.filesystem.denyWrite",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2426-2445"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.sandbox.filesystem.denyRead",
+                "label": "禁止读取路径",
+                "description": "沙箱内不可读取的路径，用于保护敏感文件。",
+                "type": "list",
+                "value": [],
+                "origin": "plugin",
+                "store": "plugin data → …sandbox.filesystem.denyRead",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2447-2466"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.sandbox.network.allowedDomains",
+                "label": "允许的域名",
+                "description": "沙箱内进程可访问的出站域名，支持通配符。",
+                "type": "list",
+                "value": [],
+                "origin": "plugin",
+                "store": "plugin data → …sandbox.network.allowedDomains",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2469-2488"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.sandbox.network.deniedDomains",
+                "label": "禁止的域名",
+                "description": "优先级高于允许域名。",
+                "type": "list",
+                "value": [],
+                "origin": "plugin",
+                "store": "plugin data → …sandbox.network.deniedDomains",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2490-2509"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.sandbox.enableWeakerNestedSandbox",
+                "label": "弱嵌套沙箱",
+                "description": "非特权 Docker 环境用（仅 Linux/WSL2），降低安全性。",
+                "type": "toggle",
+                "value": false,
+                "origin": "plugin",
+                "store": "plugin data → …sandbox.enableWeakerNestedSandbox",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2512-2530"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.sandbox.enableWeakerNetworkIsolation",
+                "label": "弱网络隔离",
+                "description": "允许访问 macOS TLS 信任服务（Go 工具 + MITM 代理需要），仅 macOS，降低安全性。",
+                "type": "toggle",
+                "value": false,
+                "origin": "plugin",
+                "store": "plugin data → …sandbox.enableWeakerNetworkIsolation",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2532-2550"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.sandbox.ripgrep.command",
+                "label": "自定义 ripgrep 路径",
+                "description": "沙箱环境自定义 rg 二进制绝对路径，留空自动检测。",
+                "type": "text",
+                "value": "",
+                "origin": "plugin",
+                "store": "plugin data → …sandbox.ripgrep.command",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2553-2572"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.sandbox.ripgrep.args",
+                "label": "自定义 ripgrep 参数",
+                "description": "额外参数，每行一个。",
+                "type": "list",
+                "value": [],
+                "origin": "plugin",
+                "store": "plugin data → …sandbox.ripgrep.args",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2574-2593"
+              },
+              {
+                "key": "notice.claude.sandboxUnexposed",
+                "label": "未暴露的 SDK 沙箱字段",
+                "description": "allowUnixSockets、allowAllUnixSockets、allowLocalBinding、allowMachLookup、httpProxyPort、socksProxyPort、allowManagedDomainsOnly、allowManagedReadPathsOnly、allowAllManagedReadPathsOnly、filesystem.allowRead、ignoreViolations、bwrapPath、socatPath 未在插件暴露；需要时经 .claude/settings.json 配置。",
+                "type": "notice",
+                "value": null,
+                "origin": "plugin",
+                "readonly": true,
+                "source": "src/core/types/settings.ts:910-933; src/i18n/locales/zh.ts:5793"
+              }
+            ]
+          },
+          {
+            "title": "限制",
+            "description": "轮数、费用与任务预算。maxTurns/maxBudgetUsd 有运行时强制证明（error_max_turns / error_max_budget_usd）。",
+            "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:2176-2180,3250-3381",
+            "fields": [
+              {
+                "key": "settings.backendSettings.claudeCode.maxTurns",
+                "label": "最大轮数",
+                "description": "正整数轮数限制；预设 + 自定义输入。空 = 不限（SDK 默认）。",
+                "type": "select",
+                "value": null,
+                "options": [
+                  { "value": "", "label": "不限（SDK 默认）" },
+                  { "value": "10", "label": "10" },
+                  { "value": "25", "label": "25" },
+                  { "value": "50", "label": "50" },
+                  { "value": "100", "label": "100" },
+                  { "value": "__custom__", "label": "自定义..." }
+                ],
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.maxTurns → SDK maxTurns",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:3250-3295"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.maxBudgetUsd",
+                "label": "最大预算 USD",
+                "description": "正数费用限制（USD）；预设 + 自定义输入。空 = 不限。",
+                "type": "select",
+                "value": null,
+                "options": [
+                  { "value": "", "label": "不限（SDK 默认）" },
+                  { "value": "1", "label": "$1" },
+                  { "value": "5", "label": "$5" },
+                  { "value": "20", "label": "$20" },
+                  { "value": "100", "label": "$100" },
+                  { "value": "__custom__", "label": "自定义..." }
+                ],
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.maxBudgetUsd → SDK maxBudgetUsd",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:3297-3334"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.taskBudget",
+                "label": "任务预算（token）",
+                "description": "taskBudget.total，@alpha；模型将其作为 pacing 提示而非硬性截止（readback only）。",
+                "type": "select",
+                "value": null,
+                "options": [
+                  { "value": "", "label": "不限（SDK 默认）" },
+                  { "value": "50000", "label": "50k" },
+                  { "value": "100000", "label": "100k" },
+                  { "value": "500000", "label": "500k" },
+                  { "value": "1000000", "label": "1M" },
+                  { "value": "__custom__", "label": "自定义..." }
+                ],
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.taskBudget → SDK taskBudget{total}",
+                "scope": "vault（插件私有）",
+                "effect": "下一次 query 生效",
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:3336-3381"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "resources",
+        "label": "资源",
+        "title": "资源与会话",
+        "description": "项目级与全局作用域的 Claude 命令、技能与 Agent CRUD（含归档历史与恢复）。",
+        "note": "全局资源同样可编辑并安全持久化；是否被运行时应用取决于「用户设置」来源。后端会话浏览器在此页浏览/检查会话。",
+        "groups": [
+          {
+            "title": "命令（.claude/commands/*.md）",
+            "description": "自定义斜杠命令，发送时以原始文本传递。",
+            "source": "src/features/settings/backends/claude/SettingsClaudeResourcesSection.ts:55,130-136,176-215",
+            "fields": [
+              {
+                "key": "resource.claude.commands",
+                "label": "命令资源",
+                "description": "新建/编辑/预览/删除（先归档）/历史恢复；作用域：项目 / 全局。",
+                "type": "action",
+                "value": null,
+                "button": "新建命令",
+                "origin": "action",
+                "store": "资源文件（.claude/commands/<name>.md 等，按作用域）",
+                "scope": "项目 / 全局",
+                "source": "src/features/settings/backends/claude/SettingsClaudeResourcesSection.ts:130-136"
+              }
+            ]
+          },
+          {
+            "title": "技能（.claude/skills/*/SKILL.md）",
+            "description": "项目与全局技能；保存后触发 reloadSkills 或持久查询重启以即时生效。",
+            "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:490-516; src/features/settings/backends/claude/SettingsClaudeResourcesSection.ts:130-136",
+            "fields": [
+              {
+                "key": "resource.claude.skills",
+                "label": "技能资源",
+                "description": "新建/编辑/删除/历史；作用域选择。",
+                "type": "action",
+                "value": null,
+                "button": "新建技能",
+                "origin": "action",
+                "store": "资源文件（.claude/skills/<name>/SKILL.md 等，按作用域）",
+                "scope": "项目 / 全局",
+                "source": "src/features/settings/backends/claude/SettingsClaudeResourcesSection.ts:132-136"
+              }
+            ]
+          },
+          {
+            "title": "Agent",
+            "description": "Agent 定义资源卡，同样支持归档历史。",
+            "source": "src/features/settings/backends/claude/SettingsClaudeResourcesSection.ts:176-186",
+            "fields": [
+              {
+                "key": "resource.claude.agents",
+                "label": "Agent 资源",
+                "description": "新建/编辑/删除/历史；作用域选择。",
+                "type": "action",
+                "value": null,
+                "button": "新建 Agent",
+                "origin": "action",
+                "store": "资源文件（.claude/agents，按作用域）",
+                "scope": "项目 / 全局",
+                "source": "src/features/settings/backends/claude/SettingsClaudeResourcesSection.ts:176-186"
+              }
+            ]
+          },
+          {
+            "title": "会话浏览器（只读）",
+            "description": "浏览和检查后端会话、会话元数据与完整转录；恢复聊天需要激活的聊天视图。",
+            "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:1102-1139; src/i18n/locales/zh.ts:4637-4640",
+            "fields": [
+              {
+                "key": "readback.claude.sessionBrowser",
+                "label": "后端会话浏览器",
+                "description": "只读浏览会话详情。",
+                "type": "action",
+                "value": null,
+                "button": "浏览会话",
+                "origin": "readback",
+                "readonly": true,
+                "source": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts:1102-1139"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "debug",
+        "label": "诊断",
+        "title": "诊断（会话追踪与调试通道）",
+        "description": "Claude session trace 与产品调试通道；诊断流开关已迁移至 调试 → 能力实验室。",
+        "note": "诊断 readback 不影响稳定聊天界面。",
+        "groups": [
+          {
+            "title": "会话追踪（session trace）",
+            "description": "独立于 debugChannels 的 Claude 会话追踪。",
+            "source": "src/features/settings/debug/ClaudeCodeDebugPanel.ts:98-136,161-207; src/core/types/settings.ts:1324-1333",
+            "fields": [
+              {
+                "key": "settings.backendSettings.claudeCode.sessionTrace.enabled",
+                "label": "启用会话追踪",
+                "description": "捕获 Claude Code 会话 trace。",
+                "type": "toggle",
+                "value": true,
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.sessionTrace.enabled",
+                "scope": "vault（插件私有）",
+                "source": "src/core/types/settings.ts:1324-1333"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.sessionTrace.consolePreset",
+                "label": "控制台预设",
+                "description": "标准 / 完整 / 关闭。",
+                "type": "select",
+                "value": "standard",
+                "options": [
+                  { "value": "standard", "label": "标准" },
+                  { "value": "full", "label": "完整" },
+                  { "value": "off", "label": "关闭" }
+                ],
+                "origin": "plugin",
+                "store": "plugin data → …sessionTrace.consolePreset",
+                "scope": "vault（插件私有）",
+                "source": "src/features/settings/debug/ClaudeCodeDebugPanel.ts:205-207"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.sessionTrace.consoleChannels",
+                "label": "控制台通道",
+                "description": "每通道布尔开关；默认全部启用。",
+                "type": "kv",
+                "value": {},
+                "origin": "plugin",
+                "store": "plugin data → …sessionTrace.consoleChannels",
+                "scope": "vault（插件私有）",
+                "source": "src/core/types/settings.ts:1328-1330"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.sessionTrace.storageDirectory",
+                "label": "存储目录",
+                "description": "trace 存储目录，留空使用默认目录。",
+                "type": "text",
+                "value": "",
+                "origin": "plugin",
+                "store": "plugin data → …sessionTrace.storageDirectory",
+                "scope": "vault（插件私有）",
+                "source": "src/features/settings/debug/ClaudeCodeDebugPanel.ts:161-168"
+              }
+            ]
+          },
+          {
+            "title": "产品调试通道",
+            "description": "Claude Code 工作台调试通道（独立于 trace）。",
+            "source": "src/features/settings/debug/SettingsDebugSection.ts:462-475",
+            "fields": [
+              {
+                "key": "settings.backendSettings.claudeCode.debugChannels",
+                "label": "调试通道",
+                "description": "每通道布尔开关；缺省全部启用。",
+                "type": "kv",
+                "value": {},
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.claudeCode.debugChannels",
+                "scope": "vault（插件私有）",
+                "source": "src/features/settings/debug/SettingsDebugSection.ts:462-475"
+              }
+            ]
+          },
+          {
+            "title": "诊断流开关（已迁移）",
+            "description": "这些开关仍持久化于插件设置，但控件位于 调试 → 能力实验室；仅影响诊断流捕获。",
+            "source": "src/i18n/locales/zh.ts:5924-5933; src/core/agents/backend/claude/ClaudeCodeOptionsBuilder.ts:353-367",
+            "fields": [
+              {
+                "key": "settings.backendSettings.claudeCode.includeHookEvents",
+                "label": "Hook 事件流",
+                "description": "将 hook 生命周期事件纳入诊断 stream 日志；不控制 hook 激活。",
+                "type": "toggle",
+                "value": false,
+                "origin": "plugin",
+                "store": "plugin data → …includeHookEvents → SDK includeHookEvents",
+                "scope": "vault（插件私有）",
+                "source": "src/core/types/settings.ts:881-882"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.forwardSubagentText",
+                "label": "转发子代理 transcript",
+                "description": "转发子代理文本/thinking 到诊断事件流。",
+                "type": "toggle",
+                "value": false,
+                "origin": "plugin",
+                "store": "plugin data → …forwardSubagentText → SDK forwardSubagentText",
+                "scope": "vault（插件私有）",
+                "source": "src/core/types/settings.ts:883-884"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.agentProgressSummaries",
+                "label": "子代理进度摘要",
+                "description": "周期性子代理进度摘要到诊断流。",
+                "type": "toggle",
+                "value": false,
+                "origin": "plugin",
+                "store": "plugin data → …agentProgressSummaries → SDK agentProgressSummaries",
+                "scope": "vault（插件私有）",
+                "source": "src/core/types/settings.ts:885-886"
+              },
+              {
+                "key": "settings.backendSettings.claudeCode.enableFileCheckpointing",
+                "label": "文件 checkpoint",
+                "description": "@experimental：SDK query() 模式当前不产生可用快照（上游 bug #236）；开关与 dry-run 预览在能力实验室。",
+                "type": "toggle",
+                "value": false,
+                "origin": "plugin",
+                "store": "plugin data → …enableFileCheckpointing → SDK enableFileCheckpointing",
+                "scope": "vault（插件私有）",
+                "source": "src/core/types/settings.ts:879-880"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "codex",
+    "name": "Codex",
+    "description": "通过 OpenAI Codex CLI / app-server 驱动的后端。会话级覆盖仅作用于下一次新建线程；可执行文件与凭据需重载插件。",
+    "tabs": [
+      {
+        "id": "connection",
+        "label": "连接",
+        "title": "连接",
+        "description": "认证来源摘要、CLI 路径覆盖、旧版凭据状态与项目 config.toml 工作台。",
+        "note": "Codex 使用 OpenAI Codex CLI 认证：无插件凭据时回退 OPENAI_API_KEY 环境变量或 ChatGPT 登录会话；原生 Provider 配置由 Codex 管理。",
+        "groups": [
+          {
+            "title": "连接与 CLI",
+            "description": "CLI 可执行路径在 adapter 启动时解析一次，更改需重载插件。",
+            "source": "src/features/settings/backends/codex/SettingsCodexSection.ts:255-261,264-352",
+            "fields": [
+              {
+                "key": "settings.backendSettings.codex.executablePath",
+                "label": "Codex 可执行文件路径",
+                "description": "可选用户自装 CLI 路径；留空从 GUI 可见 PATH 自动识别（Windows 含 npm codex.cmd shim）。保存不中断当前会话。",
+                "type": "text",
+                "value": "",
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.codex.executablePath",
+                "scope": "vault（插件私有）",
+                "effect": "重启插件后生效",
+                "source": "src/features/settings/backends/codex/SettingsCodexSection.ts:290-311"
+              },
+              {
+                "key": "action.codex.reload",
+                "label": "重载 OpenCodian",
+                "description": "重载插件以应用已保存的 CLI 路径；会终止正在运行的 Codex 回合。",
+                "type": "action",
+                "value": null,
+                "button": "重载 OpenCodian",
+                "origin": "action",
+                "source": "src/features/settings/backends/codex/SettingsCodexSection.ts:313-318,321-352"
+              },
+              {
+                "key": "settings.backendSettings.codex.apiKey",
+                "label": "旧版插件凭据",
+                "description": "值已隐藏，不可在此编辑；仅显示状态与清除。当前 Provider 认证请使用 Codex 登录、环境变量或原生配置。",
+                "type": "password",
+                "value": "",
+                "readonly": true,
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.codex.apiKey",
+                "scope": "vault（插件私有）",
+                "source": "src/features/settings/backends/codex/SettingsCodexLegacyCredentialControl.ts:34-98"
+              },
+              {
+                "key": "action.codex.clearApiKey",
+                "label": "清除旧版凭据",
+                "description": "确认后从插件设置移除已保存的旧版凭据；值永不显示。",
+                "type": "action",
+                "value": null,
+                "button": "清除旧版凭据",
+                "origin": "action",
+                "source": "src/features/settings/backends/codex/SettingsCodexLegacyCredentialControl.ts:105-135"
+              }
+            ]
+          },
+          {
+            "title": "项目 Codex 配置（原生 config.toml）",
+            "description": "管理 <vault>/.codex/config.toml：7 个白名单安全键的表单 + 高级原始 TOML（白名单校验、拒绝键诊断、CAS 归档历史与恢复）。留空字段继承全局默认。",
+            "collapsible": true,
+            "source": "src/features/settings/backends/codex/SettingsCodexSection.ts:393-744; src/features/settings/backends/codex/CodexProjectConfigFormModel.ts:19-156",
+            "fields": [
+              {
+                "key": "native.codex.model",
+                "label": "model",
+                "description": "原生 config.toml 键：传递给 Codex 的模型名。留空继承全局默认。",
+                "type": "text",
+                "value": "",
+                "origin": "native",
+                "store": "<vault>/.codex/config.toml → model",
+                "scope": "项目（vault）",
+                "source": "src/features/settings/backends/codex/CodexProjectConfigFormModel.ts:22-23"
+              },
+              {
+                "key": "native.codex.model_reasoning_effort",
+                "label": "model_reasoning_effort",
+                "description": "推理深度。枚举 minimal/low/medium/high/xhigh/max/ultra/persistent。",
+                "type": "select",
+                "value": "",
+                "options": [
+                  { "value": "", "label": "继承全局默认" },
+                  { "value": "minimal", "label": "minimal" },
+                  { "value": "low", "label": "low" },
+                  { "value": "medium", "label": "medium" },
+                  { "value": "high", "label": "high" },
+                  { "value": "xhigh", "label": "xhigh" },
+                  { "value": "max", "label": "max" },
+                  { "value": "ultra", "label": "ultra" },
+                  { "value": "persistent", "label": "persistent" }
+                ],
+                "origin": "native",
+                "store": "<vault>/.codex/config.toml → model_reasoning_effort",
+                "scope": "项目（vault）",
+                "source": "src/features/settings/backends/codex/CodexProjectConfigFormModel.ts:147"
+              },
+              {
+                "key": "native.codex.sandbox_mode",
+                "label": "sandbox_mode",
+                "description": "Codex CLI 允许执行的操作。",
+                "type": "select",
+                "value": "",
+                "options": [
+                  { "value": "", "label": "继承全局默认" },
+                  { "value": "read-only", "label": "read-only" },
+                  { "value": "workspace-write", "label": "workspace-write" },
+                  { "value": "danger-full-access", "label": "danger-full-access" }
+                ],
+                "origin": "native",
+                "store": "<vault>/.codex/config.toml → sandbox_mode",
+                "scope": "项目（vault）",
+                "source": "src/features/settings/backends/codex/CodexProjectConfigFormModel.ts:148"
+              },
+              {
+                "key": "native.codex.approval_policy",
+                "label": "approval_policy",
+                "description": "审批策略。引导枚举 never / on-request + 继承；CLI 已退役的 untrusted 或其他 CLI 有效值按原样保留为标记选项，需显式选择才会改写。",
+                "type": "select",
+                "value": "",
+                "options": [
+                  { "value": "", "label": "继承全局默认" },
+                  { "value": "never", "label": "never" },
+                  { "value": "on-request", "label": "on-request" }
+                ],
+                "origin": "native",
+                "store": "<vault>/.codex/config.toml → approval_policy",
+                "scope": "项目（vault）",
+                "source": "src/features/settings/backends/codex/CodexProjectConfigFormModel.ts:123,152; src/features/settings/backends/codex/SettingsCodexSection.ts:438-486"
+              },
+              {
+                "key": "native.codex.network_access",
+                "label": "network_access",
+                "description": "允许 Codex 发起网络请求（布尔，可继承）。",
+                "type": "select",
+                "value": "",
+                "options": [
+                  { "value": "", "label": "继承全局默认" },
+                  { "value": "true", "label": "启用" },
+                  { "value": "false", "label": "禁用" }
+                ],
+                "origin": "native",
+                "store": "<vault>/.codex/config.toml → network_access",
+                "scope": "项目（vault）",
+                "source": "src/features/settings/backends/codex/CodexProjectConfigFormModel.ts:27,155"
+              },
+              {
+                "key": "native.codex.web_search",
+                "label": "web_search",
+                "description": "内置 web_search 工具模式。",
+                "type": "select",
+                "value": "",
+                "options": [
+                  { "value": "", "label": "继承全局默认" },
+                  { "value": "disabled", "label": "disabled" },
+                  { "value": "cached", "label": "cached" },
+                  { "value": "live", "label": "live" }
+                ],
+                "origin": "native",
+                "store": "<vault>/.codex/config.toml → web_search",
+                "scope": "项目（vault）",
+                "source": "src/features/settings/backends/codex/CodexProjectConfigFormModel.ts:153"
+              },
+              {
+                "key": "native.codex.additional_directories",
+                "label": "additional_directories",
+                "description": "Codex 可访问的额外目录，每行一个绝对路径；库外路径保存前需确认（realpath 包含性检查）。",
+                "type": "list",
+                "value": [],
+                "origin": "native",
+                "store": "<vault>/.codex/config.toml → additional_directories",
+                "scope": "项目（vault）",
+                "source": "src/features/settings/backends/codex/CodexProjectConfigFormModel.ts:31-33; src/features/settings/backends/codex/SettingsCodexSection.ts:498-532"
+              },
+              {
+                "key": "native.codex.rawToml",
+                "label": "高级 TOML",
+                "description": "原始 config.toml 编辑器；仅接受白名单安全键。model_provider / [model_providers] / auth / telemetry 等禁止键会阻止保存并给出诊断。",
+                "type": "code",
+                "value": "",
+                "origin": "native",
+                "store": "<vault>/.codex/config.toml（整文件）",
+                "scope": "项目（vault）",
+                "source": "src/features/settings/backends/codex/SettingsCodexSection.ts:643-658; src/features/settings/backends/codex/CodexProjectConfigFormModel.ts:50-56"
+              },
+              {
+                "key": "action.codex.configSave",
+                "label": "保存表单 / 保存高级 TOML / 历史",
+                "description": "CAS 保存、白名单校验诊断、归档历史查看与受 CAS 保护的恢复。",
+                "type": "action",
+                "value": null,
+                "button": "保存表单",
+                "origin": "action",
+                "source": "src/features/settings/backends/codex/SettingsCodexSection.ts:660-744,786-842"
+              },
+              {
+                "key": "notice.codex.globalReadonly",
+                "label": "全局 config.toml 只读",
+                "description": "~/.codex/config.toml（含 providers 与声明默认模型）在「账号」页只读展示；provider/auth 只能在全局原生配置中管理。",
+                "type": "notice",
+                "value": null,
+                "origin": "readback",
+                "readonly": true,
+                "source": "src/features/settings/backends/codex/SettingsCodexAccountSurface.ts:241-371"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "conversation",
+        "label": "对话",
+        "title": "对话默认值",
+        "description": "新对话使用的模型、推理强度与网页搜索方式；对话工具栏中的选择只对当前对话生效。",
+        "note": "会话级覆盖仅作用于下一次新建 Codex 线程，不改变正在运行的线程。",
+        "groups": [
+          {
+            "title": "运行默认项",
+            "description": "模型下拉由官方模型目录实时填充；未知已存值保留为自定义输入。",
+            "source": "src/features/settings/backends/codex/SettingsCodexSection.ts:359-386,915-1052,1101-1131",
+            "fields": [
+              {
+                "key": "settings.backendSettings.codex.model",
+                "label": "模型",
+                "description": "传递给 Codex CLI 的模型（ThreadOptions.model → --model）。空 = SDK 默认。",
+                "type": "select",
+                "value": "",
+                "options": [
+                  { "value": "", "label": "SDK 默认" },
+                  { "value": "<live-catalog>", "label": "模型目录（运行时加载）" },
+                  { "value": "__custom__", "label": "自定义..." }
+                ],
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.codex.model",
+                "scope": "vault（插件私有）",
+                "effect": "下一个新线程生效",
+                "source": "src/features/settings/backends/codex/SettingsCodexSection.ts:915-978; src/core/agents/backend/codex/CodexAdapter.ts:1835-1839"
+              },
+              {
+                "key": "settings.backendSettings.codex.modelReasoningEffort",
+                "label": "推理强度",
+                "description": "回答前推理深度；更高更详尽但更慢（→ --config）。",
+                "type": "segment",
+                "value": "medium",
+                "options": [
+                  { "value": "minimal", "label": "最低" },
+                  { "value": "low", "label": "低" },
+                  { "value": "medium", "label": "中" },
+                  { "value": "high", "label": "高" },
+                  { "value": "xhigh", "label": "极高" },
+                  { "value": "max", "label": "最大" },
+                  { "value": "ultra", "label": "超高" },
+                  { "value": "persistent", "label": "持续" }
+                ],
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.codex.modelReasoningEffort",
+                "scope": "vault（插件私有）",
+                "effect": "下一个新线程生效",
+                "source": "src/features/settings/backends/codex/SettingsCodexSection.ts:1012-1052; src/core/types/settings.ts:774-782"
+              },
+              {
+                "key": "settings.backendSettings.codex.webSearchMode",
+                "label": "网页搜索",
+                "description": "内置 web_search 工具：禁用关闭；缓存与实时均启用，实际行为取决于 CLI 版本与 provider。",
+                "type": "segment",
+                "value": "cached",
+                "options": [
+                  { "value": "disabled", "label": "禁用" },
+                  { "value": "cached", "label": "缓存" },
+                  { "value": "live", "label": "实时" }
+                ],
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.codex.webSearchMode → --config",
+                "scope": "vault（插件私有）",
+                "effect": "下一个新线程生效",
+                "source": "src/features/settings/backends/codex/SettingsCodexSection.ts:1101-1131"
+              }
+            ]
+          },
+          {
+            "title": "行内模型覆盖",
+            "description": "本后端的行内编辑/补全模型覆盖。",
+            "source": "src/features/settings/general/SettingsInlineEditSection.ts:255-268; src/features/settings/backends/codex/SettingsCodexSection.ts:385",
+            "fields": [
+              {
+                "key": "settings.inlineEditModelOverrides[\"codex\"]",
+                "label": "行内编辑模型覆盖",
+                "description": "本后端行内编辑模型覆盖。",
+                "type": "text",
+                "value": "",
+                "origin": "shared",
+                "store": "plugin data → settings.inlineEditModelOverrides[\"codex\"]",
+                "scope": "vault（插件私有）",
+                "effect": "下一次行内编辑生效",
+                "source": "src/features/settings/general/SettingsInlineEditSection.ts:255-268"
+              },
+              {
+                "key": "settings.inlineCompletionModelOverrides[\"codex\"]",
+                "label": "行内补全模型覆盖",
+                "description": "本后端行内补全模型覆盖。",
+                "type": "text",
+                "value": "",
+                "origin": "shared",
+                "store": "plugin data → settings.inlineCompletionModelOverrides[\"codex\"]",
+                "scope": "vault（插件私有）",
+                "effect": "下一次补全生效",
+                "source": "src/features/settings/general/SettingsInlineEditSection.ts:255-268"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "permissions-safety",
+        "label": "权限",
+        "title": "权限与限制（权限与沙箱）",
+        "description": "审批策略、沙箱、网络访问与附加目录。仅作用于下一次新建 Codex 线程。",
+        "note": "「按需」审批需要 Codex app-server 与审批桥接，缺失时 fail-closed。",
+        "groups": [
+          {
+            "title": "权限与沙箱",
+            "description": "这些设置仅作用于下一次新建线程。",
+            "source": "src/features/settings/backends/codex/SettingsCodexSection.ts:848-1099",
+            "fields": [
+              {
+                "key": "settings.backendSettings.codex.approvalPolicy",
+                "label": "审批策略",
+                "description": "继承=不发送覆盖使用后端默认；按需=需要 app-server + 审批桥接；从不=永不询问。已退役 untrusted 在加载时迁移为 on-request。",
+                "type": "select",
+                "value": "inherit",
+                "options": [
+                  { "value": "inherit", "label": "继承（后端默认，不覆盖）" },
+                  { "value": "on-request", "label": "按需" },
+                  { "value": "never", "label": "从不" }
+                ],
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.codex.approvalPolicy → app-server/SDK 覆盖",
+                "scope": "vault（插件私有）",
+                "effect": "下一个新线程生效",
+                "source": "src/features/settings/backends/codex/SettingsCodexSection.ts:877-913; src/core/types/settings.ts:787-807"
+              },
+              {
+                "key": "settings.backendSettings.codex.sandboxMode",
+                "label": "沙盒模式",
+                "description": "控制 Codex CLI 允许执行的操作（→ --sandbox）。",
+                "type": "select",
+                "value": "workspace-write",
+                "options": [
+                  { "value": "read-only", "label": "只读" },
+                  { "value": "workspace-write", "label": "工作区写入" },
+                  { "value": "danger-full-access", "label": "危险：完全访问" }
+                ],
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.codex.sandboxMode",
+                "scope": "vault（插件私有）",
+                "effect": "下一个新线程生效",
+                "source": "src/features/settings/backends/codex/SettingsCodexSection.ts:980-1010"
+              },
+              {
+                "key": "settings.backendSettings.codex.networkAccessEnabled",
+                "label": "网络访问",
+                "description": "允许 Codex CLI 访问网络；仅在工作区写入沙盒模式下有效（→ --config）。",
+                "type": "toggle",
+                "value": false,
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.codex.networkAccessEnabled",
+                "scope": "vault（插件私有）",
+                "effect": "下一个新线程生效",
+                "source": "src/features/settings/backends/codex/SettingsCodexSection.ts:1078-1099"
+              },
+              {
+                "key": "settings.backendSettings.codex.additionalDirectories",
+                "label": "额外目录",
+                "description": "Codex CLI 可访问的额外目录（→ --add-dir 每路径一行）。库目录始终包含。",
+                "type": "textarea",
+                "value": "",
+                "placeholder": "/path/to/project\n/another/path",
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.codex.additionalDirectories（换行分隔字符串）",
+                "scope": "vault（插件私有）",
+                "effect": "下一个新线程生效",
+                "source": "src/features/settings/backends/codex/SettingsCodexSection.ts:1054-1076; src/core/types/settings.ts:827-829"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "account",
+        "label": "账号",
+        "title": "账号",
+        "description": "Codex 账号与能力的实时只读视图，以及费用估算元数据。",
+        "note": "使用量与速率限制仅在 ChatGPT 登录状态下返回；API 密钥鉴权下不可用。",
+        "groups": [
+          {
+            "title": "费用估算",
+            "description": "费用费率元数据，只用于计价，不改变连接与流量。",
+            "source": "src/features/settings/backends/codex/SettingsCodexSection.ts:1204-1216; src/core/types/settings.ts:816-822",
+            "fields": [
+              {
+                "key": "settings.backendSettings.codex.pricingProviderId",
+                "label": "计价 Provider 别名",
+                "description": "自定义 Codex 模型 provider 的计价别名；连接配置仍在 config.toml。",
+                "type": "text",
+                "value": "",
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.codex.pricingProviderId",
+                "scope": "vault（插件私有）",
+                "source": "src/core/types/settings.ts:816-820"
+              },
+              {
+                "key": "settings.backendSettings.codex.pricingEndpoint",
+                "label": "计价端点标识",
+                "description": "Codex 代理/转售商的计价端点标识；不改变流量走向。",
+                "type": "text",
+                "value": "",
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.codex.pricingEndpoint",
+                "scope": "vault（插件私有）",
+                "source": "src/core/types/settings.ts:821-822"
+              }
+            ]
+          },
+          {
+            "title": "账号与能力（只读）",
+            "description": "实时卡片：身份、Token 使用量、速率限制、Provider 能力、Provider 配置摘要与全局 config 只读表。",
+            "source": "src/features/settings/backends/codex/SettingsCodexSection.ts:1167-1202; src/features/settings/backends/codex/SettingsCodexAccountSurface.ts:103-250",
+            "fields": [
+              {
+                "key": "readback.codex.identity",
+                "label": "身份",
+                "description": "当前认证模式（ChatGPT / API 密钥 / 未知）与认证来源。",
+                "type": "notice",
+                "value": null,
+                "origin": "readback",
+                "readonly": true,
+                "source": "src/features/settings/backends/codex/SettingsCodexAccountSurface.ts:103-111,558-566"
+              },
+              {
+                "key": "readback.codex.usage",
+                "label": "Token 使用量",
+                "description": "累计 token、单日峰值、最长回合、连续使用（ChatGPT 登录时）。",
+                "type": "notice",
+                "value": null,
+                "origin": "readback",
+                "readonly": true,
+                "source": "src/features/settings/backends/codex/SettingsCodexAccountSurface.ts:112-119,686-706"
+              },
+              {
+                "key": "readback.codex.rateLimits",
+                "label": "速率限制",
+                "description": "账号速率限制（仅 ChatGPT 登录）。",
+                "type": "notice",
+                "value": null,
+                "origin": "readback",
+                "readonly": true,
+                "source": "src/features/settings/backends/codex/SettingsCodexAccountSurface.ts:121-129"
+              },
+              {
+                "key": "readback.codex.capabilities",
+                "label": "Provider 能力",
+                "description": "网页搜索 / 图像生成 / 命名空间工具能力旗标；不是开关。",
+                "type": "notice",
+                "value": null,
+                "origin": "readback",
+                "readonly": true,
+                "source": "src/features/settings/backends/codex/SettingsCodexAccountSurface.ts:130-137"
+              },
+              {
+                "key": "readback.codex.globalConfig",
+                "label": "全局配置（只读）",
+                "description": "~/.codex/config.toml 的 providers 表与声明默认模型；只读。",
+                "type": "notice",
+                "value": null,
+                "origin": "readback",
+                "readonly": true,
+                "source": "src/features/settings/backends/codex/SettingsCodexAccountSurface.ts:241-371"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "resources",
+        "label": "资源",
+        "title": "资源与会话",
+        "description": "恢复与检查（只读）、技能与 Agent CRUD、插件市场管理。",
+        "note": "插件变更仅对后续 Codex 会话生效。",
+        "groups": [
+          {
+            "title": "恢复与检查（只读）",
+            "description": "实时运行信息回读，不写配置。",
+            "source": "src/features/settings/backends/codex/SettingsCodexSection.ts:1133-1165; src/features/settings/backends/codex/SettingsCodexReadbackControls.ts:232-466",
+            "fields": [
+              {
+                "key": "readback.codex.modelList",
+                "label": "模型目录",
+                "description": "Codex CLI 返回的模型列表；后端实时视图，不是选择器。",
+                "type": "action",
+                "value": null,
+                "button": "查看模型",
+                "origin": "readback",
+                "readonly": true,
+                "source": "src/features/settings/backends/codex/SettingsCodexReadbackControls.ts:232-321"
+              },
+              {
+                "key": "readback.codex.permissionProfiles",
+                "label": "权限配置文件",
+                "description": "app-server 返回的权限配置文件；对应沙盒模式，只读。",
+                "type": "action",
+                "value": null,
+                "button": "查看配置文件",
+                "origin": "readback",
+                "readonly": true,
+                "source": "src/features/settings/backends/codex/SettingsCodexReadbackControls.ts:322-397"
+              },
+              {
+                "key": "readback.codex.mcpServers",
+                "label": "MCP 服务器（只读）",
+                "description": "已连接 MCP 服务器的详情、工具 schema、资源与认证状态；修改 MCP 配置请使用设置或 Codex CLI。支持 OAuth 认证发起与 MCP 配置刷新。",
+                "type": "notice",
+                "value": null,
+                "origin": "readback",
+                "readonly": true,
+                "source": "src/features/settings/backends/codex/SettingsCodexReadbackControls.ts:398-452; src/features/settings/backends/codex/CodexMcpServerDetailModal.ts:374-378"
+              },
+              {
+                "key": "action.codex.mcpReload",
+                "label": "刷新 MCP 配置",
+                "description": "请求 app-server 重新加载 MCP 配置（只读刷新，非编辑）。",
+                "type": "action",
+                "value": null,
+                "button": "刷新 MCP 配置",
+                "origin": "action",
+                "source": "src/features/settings/backends/codex/SettingsCodexReadbackControls.ts:408-450"
+              },
+              {
+                "key": "readback.codex.threads",
+                "label": "已加载线程",
+                "description": "当前加载线程回读。",
+                "type": "action",
+                "value": null,
+                "button": "查看线程",
+                "origin": "readback",
+                "readonly": true,
+                "source": "src/features/settings/backends/codex/SettingsCodexReadbackControls.ts:453-465"
+              },
+              {
+                "key": "readback.codex.hooks",
+                "label": "Hooks",
+                "description": "hooks 回读。",
+                "type": "action",
+                "value": null,
+                "button": "查看 Hooks",
+                "origin": "readback",
+                "readonly": true,
+                "source": "src/features/settings/backends/codex/SettingsCodexReadbackControls.ts:466"
+              },
+              {
+                "key": "action.codex.sessionBrowser",
+                "label": "后端会话浏览器",
+                "description": "浏览并恢复 Codex 会话；内存中会话始终可用，app-server 可用时也发现持久化线程。",
+                "type": "action",
+                "value": null,
+                "button": "浏览并恢复会话",
+                "origin": "action",
+                "source": "src/i18n/locales/zh.ts:1561-1565"
+              }
+            ]
+          },
+          {
+            "title": "技能与 Agent（CRUD）",
+            "description": "项目级与全局作用域的 Codex 技能和 Agent，经安全作用域 CRUD 与版本冲突检查。",
+            "source": "src/features/settings/backends/codex/SettingsCodexResourcesSection.ts:45,82-83,111-136,211-289",
+            "fields": [
+              {
+                "key": "resource.codex.skills",
+                "label": "技能",
+                "description": "新建/编辑/删除/历史；运行时技能分组回读（按 cwd）。",
+                "type": "action",
+                "value": null,
+                "button": "新建",
+                "origin": "action",
+                "store": "资源文件（.agents/skills/<name>/SKILL.md，按作用域）",
+                "scope": "项目 / 全局",
+                "source": "src/features/settings/backends/codex/SettingsCodexResourcesSection.ts:82,153-208"
+              },
+              {
+                "key": "resource.codex.agents",
+                "label": "Agent",
+                "description": "TOML agent 定义；更改仅对后续会话生效（agentReloadBoundary 提示）。",
+                "type": "action",
+                "value": null,
+                "button": "新建",
+                "origin": "action",
+                "store": "资源文件（.codex/agents/<name>.toml，按作用域）",
+                "scope": "项目 / 全局",
+                "source": "src/features/settings/backends/codex/SettingsCodexResourcesSection.ts:83,116-136"
+              }
+            ]
+          },
+          {
+            "title": "插件（app-server 管理）",
+            "description": "浏览 Codex 插件市场并管理已安装插件；含对账同步与授权提示。",
+            "source": "src/features/settings/backends/codex/SettingsCodexPluginsSection.ts:74-104,149-169,247-465",
+            "fields": [
+              {
+                "key": "action.codex.pluginsInstall",
+                "label": "安装插件",
+                "description": "从市场安装；安装后仍需授权的应用会在对账时提示。",
+                "type": "action",
+                "value": null,
+                "button": "安装",
+                "origin": "action",
+                "source": "src/features/settings/backends/codex/SettingsCodexPluginsSection.ts:319-345"
+              },
+              {
+                "key": "action.codex.pluginsUninstall",
+                "label": "卸载插件",
+                "description": "卸载已安装插件。",
+                "type": "action",
+                "value": null,
+                "button": "卸载",
+                "origin": "action",
+                "source": "src/features/settings/backends/codex/SettingsCodexPluginsSection.ts:367-385"
+              },
+              {
+                "key": "action.codex.pluginsReconcile",
+                "label": "对账同步",
+                "description": "针对插件来源重新执行 plugin/reconcile 并刷新列表。",
+                "type": "action",
+                "value": null,
+                "button": "对账同步",
+                "origin": "action",
+                "source": "src/features/settings/backends/codex/SettingsCodexPluginsSection.ts:92-99,399-416"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "debug",
+        "label": "诊断",
+        "title": "诊断（Codex 会话追踪）",
+        "description": "Codex session trace 工作台与能力实验室入口。",
+        "note": "追踪为诊断用途，不影响聊天路径。",
+        "groups": [
+          {
+            "title": "会话追踪（session trace）",
+            "description": "Codex 追踪捕获与导出。",
+            "source": "src/features/settings/debug/CodexDebugPanel.ts:46-136,234-236; src/core/types/settings.ts:1349-1359",
+            "fields": [
+              {
+                "key": "settings.backendSettings.codex.sessionTrace.enabled",
+                "label": "启用会话追踪",
+                "description": "捕获 Codex 会话 trace。",
+                "type": "toggle",
+                "value": true,
+                "origin": "plugin",
+                "store": "plugin data → settings.backendSettings.codex.sessionTrace.enabled",
+                "scope": "vault（插件私有）",
+                "source": "src/core/types/settings.ts:1349-1359"
+              },
+              {
+                "key": "settings.backendSettings.codex.sessionTrace.consolePreset",
+                "label": "控制台预设",
+                "description": "标准 / 完整。",
+                "type": "select",
+                "value": "standard",
+                "options": [
+                  { "value": "standard", "label": "标准" },
+                  { "value": "full", "label": "完整" }
+                ],
+                "origin": "plugin",
+                "store": "plugin data → …sessionTrace.consolePreset",
+                "scope": "vault（插件私有）",
+                "source": "src/features/settings/debug/CodexDebugPanel.ts:88-90"
+              },
+              {
+                "key": "settings.backendSettings.codex.sessionTrace.consoleChannels",
+                "label": "控制台通道",
+                "description": "每通道布尔开关；默认全部启用。",
+                "type": "kv",
+                "value": {},
+                "origin": "plugin",
+                "store": "plugin data → …sessionTrace.consoleChannels",
+                "scope": "vault（插件私有）",
+                "source": "src/core/types/settings.ts:1352-1355"
+              },
+              {
+                "key": "settings.backendSettings.codex.sessionTrace.storageDirectory",
+                "label": "存储目录",
+                "description": "trace 存储目录，留空使用默认；支持目录选择器。",
+                "type": "text",
+                "value": "",
+                "origin": "plugin",
+                "store": "plugin data → …sessionTrace.storageDirectory",
+                "scope": "vault（插件私有）",
+                "source": "src/features/settings/debug/CodexDebugPanel.ts:100-118"
+              },
+              {
+                "key": "settings.backendSettings.codex.sessionTrace.captureContent",
+                "label": "捕获内容",
+                "description": "trace 中捕获消息内容（Codex 独有字段）。",
+                "type": "toggle",
+                "value": true,
+                "origin": "plugin",
+                "store": "plugin data → …sessionTrace.captureContent",
+                "scope": "vault（插件私有）",
+                "source": "src/features/settings/debug/CodexDebugPanel.ts:131-136"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]
