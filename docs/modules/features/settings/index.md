@@ -75,3 +75,9 @@ export { OpenCodianSettingTab } from './OpenCodianSettings';
 
 - [SettingsPiConfigurationSection](backends/pi/SettingsPiConfigurationSection.md)：51项原生设置。
 - [SettingsPiProvidersSection](backends/pi/SettingsPiProvidersSection.md)：完整自定义provider/models配置。
+
+## Claude 设置模块
+
+- [SettingsClaudeProvidersSection](backends/claude/SettingsClaudeProvidersSection.md)：服务与模型页，当前配置回读、preset 行列表与 CAS 应用/迁移。
+- [SettingsClaudeProviderModals](backends/claude/SettingsClaudeProviderModals.md)：preset 凭据编辑（仅保存/保存并应用）与脱敏配置检查 modal。
+- [SettingsClaudeProviderMetadataPersistenceCoordinator](backends/claude/SettingsClaudeProviderMetadataPersistenceCoordinator.md)：source 写入后的 plugin metadata 持久化与重试恢复。

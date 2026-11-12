@@ -1,5 +1,7 @@
 # Chinese Locale
 
+2026-11-12（Claude 服务与模型清晰化）：Providers 页标题改为“服务与模型”，active 徽标改称“已选择”，激活按钮改称“应用到当前库”。内置官方 preset 命名为“继承已有 Claude 配置”，说明明确这不是账户或登录状态；新增 `settings.claudeCode.providers.{currentTitle,inherit,inheritDesc,inheritedCurrentDesc,localConfig,localConfigDesc,configureLocal,useInherited,presetsTitle,detailsTitle}` 命名当前配置回读面板、继承／本库单独配置两种模式与 details 折叠区。新增 `readback.*` 键：token 行只陈述“已设置 · 内容隐藏／未读取到 Token”，并固定部分来源不可读与运行时未确认说明；`route.*` 为清洗后地址分类（本地代理／Anthropic 地址／自定义地址／路由未确认），`source.*` 命名每个回读值的配置来源。编辑器区分“仅保存预设”与“保存并应用到当前库”，新增保存中／保存失败状态与继承优先的字段说明。回读值是配置来源事实，不等于已选择的 preset 元数据或运行时证明。中英文键名与插值一致。
+
 2026-11-12（四后端任务设置）：共享“连接／资源”标签精简，ZCode 使用“对话／资源”任务名。Pi 新增资源组“仅 raw editor”说明；ZCode 资源／诊断文案区分只读工作区声明、刷新动作与运行时证据。个人 API 共享配置与独立官方登录继续分别说明作用域。中英文键集合一致；没有把凭据值或演示回读写成持久配置。
 
 2026-11-11（工作台层级）：区分待办计划、独立 Plan 模式、工作区终端与原生会话终端；文件变更使用直接入口，命令与技能目录按需展开、可搜索，相关设置单独成组。补齐终端生命周期、仓库／目录／Git 失败、暂存提交校验、有界差异、浏览器加载／截图条件、目录加载／空列表／无匹配／失败反馈。`modifiedFiles.loadingShort`／`modifiedFiles.loading` 区分原生读取挂起与变更不可用。会话范围帮助仅作 tooltip，“用户任务”仅作无冗余标题的无障碍分组名。双语键名和插值一致，文案不推断运行时能力，也不用 Git 状态代替会话文件变更。

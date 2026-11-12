@@ -443,7 +443,7 @@ describe('SettingsClaudeProvidersSection migration and snapshot status', () => {
     section.render(containerEl);
     await flush();
 
-    containerEl.querySelector<HTMLButtonElement>(`button`)!.click();
+    Array.from(containerEl.querySelectorAll('button')).find(button => button.textContent === t('settings.claudeCode.providers.migrationAction.button'))!.click();
     await flush();
     const partial = containerEl.querySelector('[data-claude-provider-partial-persistence="true"]') as HTMLElement;
     partial.querySelector<HTMLButtonElement>('button')!.click();

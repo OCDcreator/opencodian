@@ -1,5 +1,6 @@
 # OpenCodian 模块功能文档
 
+- 2026-11-12：[SettingsClaudeProviderModals](features/settings/backends/claude/SettingsClaudeProviderModals.md) 从 Providers section 拆出 preset 凭据编辑（仅保存/保存并应用）与脱敏配置检查；[SettingsClaudeProvidersSection](features/settings/backends/claude/SettingsClaudeProvidersSection.md) 更新为“服务与模型”页（当前配置回读面板、preset 行列表、details 折叠区）。
 - 2026-11-09：[DshNativeControls](core/agents/backend/dsh/DshNativeControls.md) 隔离 Native 控制 DTO、逐方法能力证据、代际/owner 校验与事件；[DshAdapter](core/agents/backend/dsh/DshAdapter.md) 保留生命周期和显式空闲重连。
 - DSH 持久配置：[共享类型](core/types/dshConfiguration.md)、[校验与稀疏 patch](core/agents/backend/configuration/DshNativeConfiguration.md)、[隔离 profile](core/agents/backend/configuration/DshManagedProfile.md)。
 - DSH 设置：[任务工作区](features/settings/backends/dsh/SettingsDshNativeWorkspace.md)、[字段表单](features/settings/backends/dsh/SettingsDshNativeFields.md)、[恢复预览](features/settings/backends/dsh/SettingsDshNativeHistory.md)、[扩展管理](features/settings/backends/dsh/SettingsDshExtensionsWorkspace.md)、[原生扩展字段](features/settings/backends/dsh/SettingsDshExtensionSettings.md)、[MCP 控件](features/settings/backends/dsh/SettingsDshMcpServerControls.md)。

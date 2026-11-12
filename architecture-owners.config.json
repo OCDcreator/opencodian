@@ -2240,6 +2240,7 @@
         "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts",
         "src/features/settings/backends/claude/SettingsClaudeConfigurationSection.ts",
         "src/features/settings/backends/claude/SettingsClaudeProviderMetadataPersistenceCoordinator.ts",
+        "src/features/settings/backends/claude/SettingsClaudeProviderModals.ts",
         "src/features/settings/backends/claude/SettingsClaudeProvidersSection.ts",
         "src/features/settings/backends/claude/SettingsClaudeResourcesSection.ts",
         "src/features/settings/backends/claude/ClaudeCodeHelpModal.ts",

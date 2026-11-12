@@ -1,6 +1,6 @@
 /* Project-scoped Claude provider configuration. */
 .opencodian-claude-provider-gate,
-.opencodian-claude-provider-card,
+.opencodian-claude-provider-current,
 .opencodian-claude-provider-config-layer {
   border: 1px solid var(--opencodian-settings-form-row-border, var(--background-modifier-border));
   border-radius: var(--opencodian-settings-form-row-radius, 10px);
@@ -20,12 +20,171 @@
 
 .opencodian-claude-provider-list {
   display: grid;
-  gap: 10px;
-  margin: 12px 0;
+  gap: 0;
+  margin: 0 0 24px;
 }
 
 .opencodian-claude-provider-card {
+  padding: 14px 0;
+  border-top: 1px solid var(--background-modifier-border);
+  min-width: 0;
+}
+
+.opencodian-claude-provider-current {
+  padding: 18px 20px;
+  margin: 8px 0 24px;
+}
+
+.opencodian-claude-provider-current h4,
+.opencodian-claude-provider-list-header h4 {
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.opencodian-claude-provider-current h4 {
+  margin-bottom: 12px;
+}
+
+.opencodian-claude-provider-mode {
+  color: var(--text-normal);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.opencodian-claude-provider-info {
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.opencodian-claude-provider-values {
+  display: grid;
+  gap: 14px;
+  margin: 6px 0;
+}
+
+.opencodian-claude-provider-value {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.opencodian-claude-provider-value dt {
+  color: var(--text-muted);
+}
+
+.opencodian-claude-provider-value dd {
+  color: var(--text-normal);
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-claude-provider-exact {
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  user-select: text;
+}
+
+.opencodian-claude-provider-source {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.opencodian-claude-provider-route {
+  display: inline-block;
+  margin-inline-start: 8px;
+  padding: 1px 6px;
+  border-radius: var(--radius-s, 4px);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-size: 11px;
+}
+
+.opencodian-claude-provider-current-footer,
+.opencodian-claude-provider-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.opencodian-claude-provider-current-footer {
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: 14px;
+  margin-top: 14px;
+}
+
+.opencodian-claude-provider-current-footer p {
+  flex: 1 1 280px;
+}
+
+.opencodian-claude-provider-current button,
+.opencodian-claude-provider-list-header button,
+.opencodian-claude-provider-modal-actions button {
+  height: auto;
+  min-height: 32px;
+  max-width: 100%;
+  white-space: normal;
+}
+
+.opencodian-claude-provider-list-header {
+  margin-bottom: 10px;
+}
+
+.opencodian-claude-provider-details {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  margin: 16px 0;
+}
+
+.opencodian-claude-provider-details > summary {
   padding: 12px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.opencodian-claude-provider-details-body {
+  padding: 0 14px 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.opencodian-claude-provider-details .setting-item,
+.opencodian-claude-provider-details .opencodian-claude-provider-local-status {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+}
+
+.opencodian-claude-provider-details summary:focus-visible,
+.opencodian-claude-provider-current button:focus-visible,
+.opencodian-claude-provider-card button:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 3px;
+}
+
+@container opencodian-settings-pane (max-width: 600px) {
+  .opencodian-claude-provider-current {
+    padding: 14px;
+  }
+
+  .opencodian-claude-provider-value {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
 }
 
 .opencodian-claude-provider-card-heading,
@@ -48,8 +207,8 @@
 .opencodian-claude-provider-active-badge {
   padding: 2px 6px;
   border-radius: var(--radius-s, 4px);
-  color: var(--text-accent);
-  background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
+  color: var(--text-normal);
+  background: var(--background-secondary);
   font-size: var(--font-ui-smaller);
 }
 
@@ -93,8 +252,8 @@
 
 .opencodian-claude-provider-global-summary {
   display: grid;
-  gap: 3px;
-  margin-top: 10px;
+  gap: 10px;
+  margin-top: 0;
 }
 
 .opencodian-claude-provider-config-modal .opencodian-claude-provider-config-layer {
@@ -112,8 +271,15 @@
   font-size: 11px;
 }
 
+.opencodian-claude-provider-editor-status {
+  color: var(--text-normal);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .opencodian-claude-provider-modal-actions {
   justify-content: flex-end;
+  flex-wrap: wrap;
   margin-top: 16px;
 }
 
