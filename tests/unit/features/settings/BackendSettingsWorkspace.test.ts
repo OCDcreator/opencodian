@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Shared recovery and task-control cascade regressions use one DOM fixture family. */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -389,6 +390,46 @@ it('keeps task proof indicators beside dropdowns and gives metadata a badge surf
     expect(getComputedStyle(other.dropdown).flexBasis).toBe('240px');
     expect(getComputedStyle(other.badge).border).not.toBe('1px solid var(--background-modifier-border)');
     expect(getComputedStyle(other.value).fontWeight).not.toBe('600');
+  } finally {
+    style.remove();
+  }
+});
+
+it('right-aligns task controls while preserving the unmarked workspace alignment', () => {
+  const css = readFileSync(join(process.cwd(), 'src/style/components/settings-backend-workspace.css'), 'utf8');
+  const readRule = (selector: string): string => {
+    const start = css.indexOf(`${selector} {`);
+    expect(start).toBeGreaterThanOrEqual(0);
+    return css.slice(start, css.indexOf('}', start) + 1);
+  };
+  const style = document.head.createEl('style', { text: [
+    '.opencodian-settings .opencodian-backend-task-workspace .setting-item-control',
+    '.opencodian-settings .opencodian-backend-task-workspace .setting-item-control:has(> button):not(:has(input, textarea, select, .opencodian-settings-dropdown, .opencodian-backend-choice-group))',
+    '.opencodian-settings .opencodian-backend-task-workspace .setting-item-control > button:not(.opencodian-settings-dropdown-trigger)',
+  ].map(readRule).join('\n') });
+  try {
+    const renderControl = (taskWorkspace: boolean, button = false) => {
+      const host = document.body.createDiv({ cls: 'opencodian-settings' });
+      const workspace = host.createDiv({ cls: 'opencodian-backend-workspace' });
+      workspace.classList.toggle('opencodian-backend-task-workspace', taskWorkspace);
+      const control = workspace.createDiv({ cls: 'setting-item-control' });
+      const content = button
+        ? control.createEl('button', { text: 'Apply' })
+        : control.createDiv({ cls: 'checkbox-container' });
+      return { control, content };
+    };
+    const taskToggle = renderControl(true);
+    const otherToggle = renderControl(false);
+    const taskButton = renderControl(true, true);
+    const otherButton = renderControl(false, true);
+    expect(getComputedStyle(taskToggle.control).alignItems).toBe('flex-end');
+    expect(getComputedStyle(taskToggle.control).justifyContent).toBe('flex-end');
+    expect(getComputedStyle(taskButton.control).flexDirection).toBe('row');
+    expect(getComputedStyle(taskButton.control).justifyContent).toBe('flex-end');
+    expect(getComputedStyle(taskButton.content).alignSelf).toBe('flex-end');
+    expect(getComputedStyle(otherToggle.control).alignItems).not.toBe('flex-end');
+    expect(getComputedStyle(otherToggle.control).justifyContent).not.toBe('flex-end');
+    expect(getComputedStyle(otherButton.content).alignSelf).not.toBe('flex-end');
   } finally {
     style.remove();
   }

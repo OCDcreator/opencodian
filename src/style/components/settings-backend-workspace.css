@@ -1328,8 +1328,8 @@
   display: flex;
   align-self: center;
   flex-direction: column;
-  align-items: stretch;
-  justify-content: flex-start;
+  align-items: flex-end;
+  justify-content: flex-end;
   flex-wrap: nowrap;
   gap: 8px;
   width: 100%;
@@ -1367,7 +1367,7 @@
 
 .opencodian-settings .opencodian-backend-task-workspace .setting-item-control > button:not(.opencodian-settings-dropdown-trigger) {
   flex: 0 0 auto;
-  align-self: flex-start;
+  align-self: flex-end;
   width: auto;
   min-height: 34px;
   padding: 6px 12px;
