@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "8a2937df86ce425ee0f0b5068c10c910780d77ba32502296662ea9cd162746b7",
+  "digest": "733c8f015c73b745d33b16398e8e83ec2cf002ba8dfc98a4a1527e49ec134dc1",
   "recordCount": 848,
   "records": [
     {
@@ -526,7 +526,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/opencode/OpenCode2Adapter.ts",
-      "sha256": "0cde21947d74c1093a986f85743814945baf0d09e18876cf88cc916a56f5c1f5"
+      "sha256": "b50ba13fa19d8328a6331d0ec92f96de1aa974222ea3de2632a4817e4d5578d1"
     },
     {
       "kind": "src",
@@ -3181,7 +3181,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/backends/opencode/SettingsBackendSection.ts",
-      "sha256": "6af5c35c9159a110efe854fabc63b9c5ecfad25840a3c137b1ad6ca635e02513"
+      "sha256": "ab48b4e32455fb4f8a5eef08ee7c54cbd713141ffb1dfe169bfb73857723f839"
     },
     {
       "kind": "src",
@@ -3271,7 +3271,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/controls/BackendSettingsWorkspace.ts",
-      "sha256": "f165544cd9860578d214f0c99c3fe66f7d70de786ac5140bb3199da71c2b9a71"
+      "sha256": "33bc32490bb01df62fbd117b55335100517338b166dd527bfb53c2e9a969c616"
     },
     {
       "kind": "src",
@@ -3591,7 +3591,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/settingsLayoutRegistry.ts",
-      "sha256": "b7e8d8caf7c953a62152d3c96597d86bcc2abd0af7fc571366658edc5f4b0121"
+      "sha256": "93ed502173a075ed9c98199caa5742e1570aa913521cb0dab014a751fa4b1382"
     },
     {
       "kind": "src",
@@ -3626,7 +3626,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "e89aef2edfc47bd4c245863d3db4f520bf732897aeb88c84513e8683e8c26cab"
+      "sha256": "c8011170bca92178b3b43540ccfbd25ecfd41520d90cefe31d96663910f1d231"
     },
     {
       "kind": "src",
@@ -3636,7 +3636,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "d9eb449185253cd909adb66032a8b18a983669bc0f62ccacefa5a2b38d7cf0a5"
+      "sha256": "4e2cb558d615deaa722785f991b574a3a56e5e6b807537f8201eeccac6504620"
     },
     {
       "kind": "src",
@@ -3916,7 +3916,7 @@
     {
       "kind": "src",
       "key": "src/style/components/settings-opencode2.css",
-      "sha256": "f1c8a2f0ea4be89ca46920567f655acdf049f037f60175daed743f2f8b3a3921"
+      "sha256": "7f9267e8ed044b3e6f163b75505644774e410d26058b88a92a2b2106e6e54004"
     },
     {
       "kind": "src",
@@ -4244,7 +4244,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-11-12T07:07:07.275Z",
-  "headShaAtGeneration": "d5a0e0782d3254306b4d9f1dea754ab0040077b4",
+  "generatedAt": "2026-11-12T07:26:08.432Z",
+  "headShaAtGeneration": "9e6db5e9e4e1bd931b9cd9179d21cdba0f30923a",
   "graphifyVersion": "graphify 0.9.97"
 }

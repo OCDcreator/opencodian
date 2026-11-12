@@ -116,7 +116,10 @@ describe('SETTINGS_PRIMARY_TABS', () => {
       'model',
       'agents',
       'permissions',
+      'context',
+      'tools',
       'mcp',
+      'configuration',
       'advanced',
     ]);
     expect(getPrimaryTabDefinition('conversation')!.secondaryTabs.some((tab) => tab.id === 'title')).toBe(false);
@@ -254,8 +257,13 @@ describe('resolveSecondaryTabId', () => {
     expect(resolveSecondaryTabId('dsh', 'extensions')).toBe('configuration');
     expect(resolveSecondaryTabId('dsh', 'terminal')).toBe('advanced');
     expect(resolveSecondaryTabId('dsh', 'configuration')).toBe('configuration');
-    expect(resolveSecondaryTabId('opencode2', 'resources')).toBe('advanced');
-    expect(resolveSecondaryTabId('opencode2', 'context')).toBe('advanced');
+    expect(resolveSecondaryTabId('opencode2', 'resources')).toBe('configuration');
+    expect(resolveSecondaryTabId('opencode2', 'extensions')).toBe('configuration');
+    expect(resolveSecondaryTabId('opencode2', 'catalog')).toBe('advanced');
+    expect(resolveSecondaryTabId('opencode2', 'auth')).toBe('model');
+    expect(resolveSecondaryTabId('opencode2', 'integrations')).toBe('model');
+    expect(resolveSecondaryTabId('opencode2', 'models')).toBe('model');
+    expect(resolveSecondaryTabId('opencode2', 'context')).toBe('context');
     expect(resolveSecondaryTabId('debug', 'general')).toBe('plugin');
     expect(resolveSecondaryTabId('debug', 'modules')).toBe('plugin');
     expect(resolveSecondaryTabId('debug', 'logs')).toBe('export');

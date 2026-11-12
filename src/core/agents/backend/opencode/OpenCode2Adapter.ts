@@ -2,6 +2,7 @@
 /** OpenCode 2 transport boundary. V2 has a separate CLI, HTTP API and event schema. */
 import { type ChildProcessWithoutNullStreams,spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
+import { accessSync, constants, statSync } from 'node:fs';
 import { mkdtemp, realpath, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -142,12 +143,13 @@ export class OpenCode2Adapter implements AgentService, AgentChatCapability, Agen
     const password = settings.mode === 'local' ? randomBytes(32).toString('base64url') : settings.password;
     let baseUrl = settings.baseUrl.trim();
     if (settings.mode === 'local') {
-      const executable = settings.executablePath.trim() || 'opencode2';
+      const { executable, env } = this.resolveLocalLaunch(settings.executablePath);
       const child = spawn(executable, ['serve', '--stdio', '--hostname', '127.0.0.1', '--port', '0', '--cors', 'app://obsidian.md'], {
         cwd: this.options.workingDirectory,
-        env: { ...process.env,
-          ...(settings.configContent?.trim() ? { OPENCODE_CONFIG_CONTENT: settings.configContent } : {}),
-          ...this.options.extraEnv, OPENCODE_PASSWORD: password },
+        env: { ...env,
+          ...(settings.configContent?.trim() && this.options.extraEnv?.OPENCODE_CONFIG_CONTENT === undefined
+            ? { OPENCODE_CONFIG_CONTENT: settings.configContent } : {}),
+          OPENCODE_PASSWORD: password },
         stdio: ['pipe', 'pipe', 'pipe'],
         windowsHide: true,
       });
@@ -199,6 +201,46 @@ export class OpenCode2Adapter implements AgentService, AgentChatCapability, Agen
     const info = await client.server.info();
     if (!info.version.startsWith('2.')) throw new Error(`Expected OpenCode 2 server, got ${info.version}`);
     this.client = client;
+  }
+
+  /** GUI hosts inherit a minimal PATH. Discover the external V2 install without
+   * sourcing shell profiles or changing the renderer/auxiliary environment. */
+  private resolveLocalLaunch(configuredPath: string): { executable: string; env: NodeJS.ProcessEnv } {
+    const windows = process.platform === 'win32';
+    const paths = windows ? path.win32 : path.posix;
+    const delimiter = windows ? ';' : ':';
+    // Auxiliary HOME/XDG values isolate backend data, not the host CLI install.
+    const home = process.env.HOME || process.env.USERPROFILE || os.homedir();
+    const env = { ...process.env, ...this.options.extraEnv };
+    const inherited = (env.PATH || env.Path || env.path || '').split(delimiter).filter(Boolean);
+    const fallbacks = windows ? [
+      paths.join(home, '.opencode', 'bin'),
+      process.env.APPDATA ? paths.join(process.env.APPDATA, 'npm') : '',
+      process.env.LOCALAPPDATA ? paths.join(process.env.LOCALAPPDATA, 'npm') : '',
+    ] : [
+      paths.join(home, '.opencode', 'bin'), paths.join(home, '.local', 'bin'),
+      paths.join(home, '.npm-global', 'bin'), paths.join(home, '.nvm', 'current', 'bin'),
+      '/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin',
+    ];
+    const directories = [...new Set([...inherited, ...fallbacks].filter(Boolean))];
+    delete env.Path; delete env.path;
+    env.PATH = directories.join(delimiter);
+    const requested = configuredPath.trim();
+    const command = /^~[/\\]/.test(requested) ? paths.join(home, requested.slice(2)) : requested;
+    if (command && paths.isAbsolute(command)) return { executable: command, env };
+    const names = command ? [command] : windows ? ['opencode2.exe', 'opencode2'] : ['opencode2'];
+    const candidates = directories.flatMap((directory) => names.map((name) => paths.join(directory, name)));
+    if (windows && !command) candidates.push(...directories.map((directory) => paths.join(directory, 'node_modules', '@opencode', 'cli', 'bin', 'opencode.exe')));
+    const executable = candidates.find((candidate) => {
+      try {
+        accessSync(candidate, windows ? constants.F_OK : constants.X_OK);
+        return statSync(candidate).isFile();
+      } catch { return false; }
+    });
+    if (executable) return { executable, env };
+    // An explicit selection never silently switches to a different installation.
+    if (command) return { executable: command, env };
+    throw new Error('OpenCode 2 CLI was not found. Install opencode2 or configure its executable path in OpenCode 2 connection settings.');
   }
 
   async stop(): Promise<void> {

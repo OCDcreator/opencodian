@@ -4,16 +4,18 @@
 
 | Backend | Task subtabs |
 | --- | --- |
-| OpenCode 2 | `connection`, `model`, `agents`, `permissions`, `mcp`, `advanced` |
+| OpenCode 2 | `connection`, `model`, `agents`, `permissions`, `context`, `tools`, `mcp`, `configuration`, `advanced` |
 | Claude Code | `connection`, `conversation`, `providers`, `tools-context`, `permissions-safety`, `resources`, `debug` |
 | Codex | `connection`, `conversation`, `permissions-safety`, `account`, `resources`, `debug` |
 | Pi | `connection`, `providers`, `model`, `execution`, `resources`, `account`, `mcp`, `sessions` |
 | ZCode | `installation`, `chat`, `providers`, `account`, `tools`, `permissions-safety`, `resources`, `diagnostics` |
 | DSH | `connection`, `model`, `permissions`, `context`, `tools`, `mcp`, `configuration`, `advanced` |
 
-Claude defaults to `connection`; ZCode defaults to `installation`; Codex/Pi retain their connection defaults. Pi `advanced` resolves to `sessions`, while `resources` is now a real raw-only task. ZCode's previous `model`/`management`/`connection` routes still resolve to chat/tools/installation. OpenCode 2 and DSH registry entries are unchanged.
+Claude defaults to `connection`; ZCode defaults to `installation`; Codex/Pi retain their connection defaults. Pi `advanced` resolves to `sessions`, while `resources` is now a real raw-only task. ZCode's previous `model`/`management`/`connection` routes still resolve to chat/tools/installation. OpenCode 2 includes its nine-task redesign; DSH retains its existing task registry.
 
-The field tables in `docs/research/backend-refresh/` determine these groups. Permissions, sandbox and executable overrides stay separate from ordinary conversation choices. Classic and tabbed hosts use the same workspace registry. Earlier dated notes below describe previous arrangements.
+2026-11-11 OpenCode 2 expands from six to nine task pages following the approved revision-2 prototype: `connection`, `model`, `agents`, `permissions`, `context`, `tools`, `mcp`, `configuration`, `advanced` (labels 连接/模型与服务商/智能体/权限/上下文/工具/MCP/配置与扩展/高级). `context` is now a real page, so its old alias override is removed. Retired-id migrations: `resources` → `configuration` and `extensions` → `configuration` (extension management moved to the approved "Configuration & extensions" page), `catalog` stays `advanced`, and `auth`/`integrations`/`models` stay `model`. Default secondary tab, `backendRequired` and the generic resolve functions remain unchanged.
+
+The field tables in `docs/research/backend-refresh/` determine these groups. Permissions, sandbox and executable overrides stay separate from ordinary conversation choices. Stored subtab ids retain their backend-specific migrations, including Claude `mcp`/`tools` → `tools-context`, Codex `model` → `conversation`, Pi `advanced` → `sessions`, and OpenCode 2 `resources` → `configuration`. Classic and tabbed hosts use the same workspace registry. Earlier dated notes below describe previous arrangements.
 
 2026-10-27：OpenCode 2 使用本地品牌图标 `opencodian-opencode2`，子标签为 connection/model/agents/permissions/mcp/resources/context/advanced。旧 auth/integrations 路由到 model，models/extensions 别名分别路由到 model/mcp；其他后端保持原定义。
 > 2026-09-30 (B4): Codex primary tab 新增 `plugins` 二级 tab（`settings.codex.tab.plugins`），排在 `resources` 之后，承载 `SettingsCodexPluginsSection` 插件浏览器。

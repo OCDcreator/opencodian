@@ -17,7 +17,7 @@ Config readback recognizes native normalized `provider/model#variant` references
 
 Owns the OpenCode 2.x transport boundary. OpenCode 2 uses `@opencode/client` and a separate `@opencode/cli` process with the `/api` protocol; it must not pass its session IDs into OpenCode 1's `OpenCodeService`.
 
-Local mode starts the user selected executable with a random process password, a loopback ephemeral port and Obsidian CORS origin. Remote mode uses the configured URL/password. The server version must start with `2.`. A changed connection setting triggers a reconnect before the next operation.
+Local mode starts the external OpenCode 2 executable with a random process password, a loopback ephemeral port and Obsidian CORS origin. Explicit executable selections take precedence (including `~/` expansion). Automatic discovery searches inherited PATH before standard V2 installation directories such as `~/.opencode/bin`, local/npm/Homebrew bins; on Windows it also checks the native `@opencode/cli/bin/opencode.exe` below npm directories without running shell shims. Files must be regular and executable on POSIX. No automatic fallback selects the retired `opencode` command. The augmented PATH belongs to the child only; auxiliary HOME/XDG/data overrides remain isolated while CLI discovery uses the host install location. Remote mode uses the configured URL/password and skips executable discovery. The server version must start with `2.`. A changed connection setting triggers a reconnect before the next operation. Focused launch regression: `OpenCode2Adapter.launch.test.ts`.
 
 ## API and stream
 
