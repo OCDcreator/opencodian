@@ -20007,7 +20007,7 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
   margin-top: 0;
 }
 
-.opencodian-settings .opencodian-backend-task-workspace .setting-item:not(.opencodian-settings-direct-host) {
+.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace .setting-item:not(.opencodian-settings-direct-host) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
   align-items: start;
@@ -20067,7 +20067,7 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
   line-height: 1.7;
 }
 
-.opencodian-settings .opencodian-backend-task-workspace .setting-item-control {
+.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace .setting-item-control {
   display: flex;
   align-self: center;
   flex-direction: column;
@@ -20320,8 +20320,8 @@ input[type='range'].opencodian-effort-slider:disabled + .opencodian-effort-ticks
     padding: 24px 0 30px;
   }
 
-  .opencodian-settings .opencodian-backend-task-workspace .setting-item:not(.opencodian-settings-direct-host),
-  .opencodian-settings .opencodian-backend-task-workspace .setting-item:has(.opencodian-backend-choice-group) {
+  .opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace .setting-item:not(.opencodian-settings-direct-host),
+  .opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace .setting-item:has(.opencodian-backend-choice-group) {
     grid-template-columns: minmax(0, 1fr);
     gap: 11px;
   }

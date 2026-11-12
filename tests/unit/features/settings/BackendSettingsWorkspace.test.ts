@@ -261,7 +261,7 @@ it('keeps dropdown height intrinsic in four-backend columns without changing hor
   );
   const columnRule = readRule(
     'components/settings-backend-workspace.css',
-    '.opencodian-settings .opencodian-backend-task-workspace .setting-item-control',
+    '.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace .setting-item-control',
   );
   const taskRule = readRule(
     'components/settings-backend-workspace.css',
@@ -349,7 +349,7 @@ it('keeps task proof indicators beside dropdowns and gives metadata a badge surf
   };
   const style = document.head.createEl('style', { text: [
     readRule('.setting-item-control > .opencodian-settings-dropdown', 'components/settings-dropdown.css'),
-    readRule('.opencodian-settings .opencodian-backend-task-workspace .setting-item-control'),
+    readRule('.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace .setting-item-control'),
     readRule('.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace .setting-item-control > .opencodian-settings-dropdown'),
     readRule('.opencodian-settings .opencodian-backend-task-workspace .setting-item-control:has(> .opencodian-claude-code-proof-chip):has(> select, > .opencodian-settings-dropdown)'),
     readRule('.opencodian-settings .opencodian-backend-task-workspace .setting-item-control > .opencodian-claude-code-proof-chip'),
@@ -403,7 +403,7 @@ it('right-aligns task controls while preserving the unmarked workspace alignment
     return css.slice(start, css.indexOf('}', start) + 1);
   };
   const style = document.head.createEl('style', { text: [
-    '.opencodian-settings .opencodian-backend-task-workspace .setting-item-control',
+    '.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace .setting-item-control',
     '.opencodian-settings .opencodian-backend-task-workspace .setting-item-control:has(> button):not(:has(input, textarea, select, .opencodian-settings-dropdown, .opencodian-backend-choice-group))',
     '.opencodian-settings .opencodian-backend-task-workspace .setting-item-control > button:not(.opencodian-settings-dropdown-trigger)',
   ].map(readRule).join('\n') });
@@ -445,6 +445,31 @@ it('stacks four-backend rows only at the readable 600px container boundary', () 
   expect(boundary?.[1]).toContain('.opencodian-backend-task-workspace .setting-item-control');
   expect(boundary?.[1]).toContain('align-self: start;');
   expect(css).not.toContain('@container opencodian-settings-pane (max-width: 660px)');
+
+  const sharedCss = readFileSync(join(process.cwd(), 'src/style/components/settings-layout-contract.css'), 'utf8');
+  const sharedStart = sharedCss.indexOf('  .opencodian-settings .opencodian-settings-content-shell .setting-item:not(.opencodian-settings-direct-host):not(:is(');
+  const sharedEnd = sharedCss.indexOf('\n  }', sharedStart);
+  expect(sharedStart).toBeGreaterThanOrEqual(0);
+  const sharedNarrowRule = sharedCss.slice(sharedStart, sharedEnd + 4);
+  const taskSelector = '.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace .setting-item:not(.opencodian-settings-direct-host)';
+  const taskStart = css.indexOf(`${taskSelector} {`);
+  expect(taskStart).toBeGreaterThanOrEqual(0);
+  const taskWideRule = css.slice(taskStart, css.indexOf('}', taskStart) + 1);
+  const style = document.head.createEl('style', { text: `${sharedNarrowRule}\n${taskWideRule}` });
+  try {
+    const renderRow = (taskWorkspace: boolean): HTMLElement => {
+      const host = document.body.createDiv({ cls: 'opencodian-settings' });
+      const shell = host.createDiv({ cls: 'opencodian-settings-content-shell' });
+      const workspace = shell.createDiv({ cls: 'opencodian-backend-workspace' });
+      workspace.classList.toggle('opencodian-backend-task-workspace', taskWorkspace);
+      return workspace.createDiv({ cls: 'setting-item' });
+    };
+    expect(getComputedStyle(renderRow(true)).gridTemplateColumns)
+      .toBe('minmax(0, 1fr) minmax(220px, 300px)');
+    expect(getComputedStyle(renderRow(false)).gridTemplateColumns).toBe('minmax(0, 1fr)');
+  } finally {
+    style.remove();
+  }
 });
 
 describe('DSH connection backup component', () => {
