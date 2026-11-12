@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "117353385ad33c3d76502967d24992e7903c46567a368db6768e924ca6aa73a1",
+  "digest": "dfb74efbaeced8543d55e19edeb78889be220224933bd5438df7005879dd817c",
   "recordCount": 847,
   "records": [
     {
@@ -3026,7 +3026,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/backends/claude/SettingsClaudeCodeSection.ts",
-      "sha256": "c436c08c1cbdac954db6b476ceb62aadc80525644f559b35e11407d2f6f5781b"
+      "sha256": "e99e29658eec2143f14f9768d0ccc628474bf0dd99172976f5d893166df486f8"
     },
     {
       "kind": "src",
@@ -3621,7 +3621,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "242e0d9e9c32155e5c9b0a2a4409584f104b82cd5aff440e4494928fc7958a92"
+      "sha256": "9c2eb26fd7b051d83f3007588f8429bcdc6cccc3f8242eec6fd0cceac738709b"
     },
     {
       "kind": "src",
@@ -3631,7 +3631,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "09e42f0377bbdd787b295bf3d04ddfb3334d599659094926df8bad8eba6c3d9c"
+      "sha256": "23dc2646dad7ae9424e633e28f1327e195551258a329498b0f2a1994548674be"
     },
     {
       "kind": "src",
@@ -3856,7 +3856,7 @@
     {
       "kind": "src",
       "key": "src/style/components/settings-backend-workspace.css",
-      "sha256": "41ed56bd2cc8b429c0b79cac32dd95154ca52162d8354b6dbd98c9f85e0aec78"
+      "sha256": "d11e441c1ab79f9149f8560cbedb7bc0f767475f60ac796104e5e3ab49c841c1"
     },
     {
       "kind": "src",
@@ -4239,7 +4239,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-11-12T02:43:42.985Z",
-  "headShaAtGeneration": "278fd32a7b5176666501d825d1b8cd0cf90fb430",
+  "generatedAt": "2026-11-12T03:07:46.475Z",
+  "headShaAtGeneration": "45d438953ecf6c8e5fddf74f8b53f5770869af33",
   "graphifyVersion": "graphify 0.9.97"
 }

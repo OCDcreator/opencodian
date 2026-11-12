@@ -462,6 +462,28 @@ describe('SettingsClaudeCodeSection', () => {
     expect(renderedNamesLower).not.toContain('jsonl');
   });
 
+  it('distinguishes the main-model field and leads its proof chip only in a task workspace', () => {
+    for (const taskWorkspace of [false, true]) {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      containerEl.classList.toggle('opencodian-backend-task-workspace', taskWorkspace);
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'conversation');
+
+      expect(containerEl.querySelector('[data-claude-code-group="models"] .opencodian-claude-code-group-title')?.textContent)
+        .not.toBe(t('settings.claudeCode.model.name'));
+      const chip = containerEl.querySelector<HTMLElement>('[data-claude-code-proof-status="main-model"]')!;
+      expect(chip.dataset.proofState).toBe('pass');
+      expect(chip.parentElement?.classList.contains('setting-item-control')).toBe(true);
+      expect(chip.parentElement?.firstElementChild === chip).toBe(taskWorkspace);
+      expect(containerEl.querySelector(`#${chip.getAttribute('aria-labelledby')}`)?.textContent)
+        .toBe(t('settings.claudeCode.proofStatus.mainModel'));
+    }
+  });
+
   it('persists Claude Code runtime settings without changing backend enablement', async () => {
     const plugin = createPlugin();
     const containerEl = document.createElement('div');

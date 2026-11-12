@@ -5834,7 +5834,7 @@ export const enTranslations = {
   'settings.claudeCode.outputStyle.placeholder': 'e.g. Explanatory',
   'settings.claudeCode.outputStyle.boundaryNotice': 'Live verified for fresh diagnostic queries: Capability Lab creates a temporary custom output style file, selects it through the SDK settings.outputStyle path, and passes only when the model recalls a nonce that was not in the user prompt. This does not prove active-session live mutation or validate the currently saved style name.',
   'settings.claudeCode.outputStyle.lifecycleNotice': 'Claude Code reads output style at session start. Per official docs, changes apply after /clear or a new Claude Code session; existing active or resumed sessions may keep their previous prompt.',
-  'settings.claudeCode.model.name': 'Model',
+  'settings.claudeCode.model.name': 'Main model',
   'settings.claudeCode.model.desc': 'Main model used for Claude Code sessions. Changes apply live to active queries when possible. Leave blank to inherit Claude Code defaults. Use the quick-select dropdown below to choose from discovered models.',
   'settings.claudeCode.model.placeholder': 'claude-sonnet-4-5',
   'settings.claudeCode.model.quickSelectName': 'Quick select model',

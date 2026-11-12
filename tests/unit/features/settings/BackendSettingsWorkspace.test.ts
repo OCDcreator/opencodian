@@ -339,6 +339,60 @@ it('wraps task choices at readable content widths without changing other backend
   }
 });
 
+it('keeps task proof indicators beside dropdowns and gives metadata a badge surface', () => {
+  const readRule = (selector: string, file = 'components/settings-backend-workspace.css'): string => {
+    const css = readFileSync(join(process.cwd(), 'src/style', file), 'utf8');
+    const start = css.indexOf(`${selector} {`);
+    expect(start).toBeGreaterThanOrEqual(0);
+    return css.slice(start, css.indexOf('}', start) + 1);
+  };
+  const style = document.head.createEl('style', { text: [
+    readRule('.setting-item-control > .opencodian-settings-dropdown', 'components/settings-dropdown.css'),
+    readRule('.opencodian-settings .opencodian-backend-task-workspace .setting-item-control'),
+    readRule('.opencodian-settings .opencodian-backend-workspace.opencodian-backend-task-workspace .setting-item-control > .opencodian-settings-dropdown'),
+    readRule('.opencodian-settings .opencodian-backend-task-workspace .setting-item-control:has(> .opencodian-claude-code-proof-chip):has(> select, > .opencodian-settings-dropdown)'),
+    readRule('.opencodian-settings .opencodian-backend-task-workspace .setting-item-control > .opencodian-claude-code-proof-chip'),
+    readRule('.opencodian-settings .opencodian-backend-task-workspace .setting-item-control:has(> .opencodian-claude-code-proof-chip) > .opencodian-settings-dropdown'),
+    readRule('.opencodian-settings .opencodian-backend-task-workspace .opencodian-backend-field-meta'),
+    readRule('.opencodian-settings .opencodian-backend-task-workspace .opencodian-backend-field-badge'),
+    readRule('.opencodian-settings .opencodian-backend-task-workspace .opencodian-backend-field-badge-axis'),
+    readRule('.opencodian-settings .opencodian-backend-task-workspace .opencodian-backend-field-badge-value'),
+  ].join('\n') });
+  try {
+    const renderRow = (taskWorkspace: boolean) => {
+      const host = document.body.createDiv({ cls: 'opencodian-settings' });
+      const workspace = host.createDiv({ cls: 'opencodian-backend-workspace' });
+      workspace.classList.toggle('opencodian-backend-task-workspace', taskWorkspace);
+      const control = workspace.createDiv({ cls: 'setting-item-control' });
+      const chip = control.createSpan({ cls: 'opencodian-claude-code-proof-chip' });
+      const dropdown = control.createDiv({ cls: 'opencodian-settings-dropdown' });
+      const badge = workspace.createSpan({ cls: 'opencodian-backend-field-badge' });
+      const axis = badge.createSpan({ cls: 'opencodian-backend-field-badge-axis' });
+      const value = badge.createSpan({ cls: 'opencodian-backend-field-badge-value' });
+      return { control, chip, dropdown, badge, axis, value };
+    };
+    const task = renderRow(true);
+    const other = renderRow(false);
+    expect(getComputedStyle(task.control).flexDirection).toBe('row');
+    expect(getComputedStyle(task.chip).flexBasis).toBe('10px');
+    expect(getComputedStyle(task.chip).marginInlineStart).toBe('0');
+    expect(getComputedStyle(task.dropdown).flexBasis).toBe('auto');
+    expect(getComputedStyle(task.dropdown).minWidth).toBe('0');
+    expect(getComputedStyle(task.badge).border).toBe('1px solid var(--background-modifier-border)');
+    expect(getComputedStyle(task.badge).background).toBe('var(--background-secondary)');
+    expect(getComputedStyle(task.badge).borderRadius).toBe('5px');
+    expect(getComputedStyle(task.badge).minHeight).toBe('22px');
+    expect(getComputedStyle(task.axis).fontWeight).toBe('400');
+    expect(getComputedStyle(task.value).fontWeight).toBe('600');
+    expect(getComputedStyle(task.value).overflowWrap).toBe('anywhere');
+    expect(getComputedStyle(other.dropdown).flexBasis).toBe('240px');
+    expect(getComputedStyle(other.badge).border).not.toBe('1px solid var(--background-modifier-border)');
+    expect(getComputedStyle(other.value).fontWeight).not.toBe('600');
+  } finally {
+    style.remove();
+  }
+});
+
 describe('DSH connection backup component', () => {
   it('names its purpose, exposes its exact scope and disables restore until a backup exists', () => {
     const host = fixture();

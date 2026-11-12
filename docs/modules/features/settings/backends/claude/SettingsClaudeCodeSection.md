@@ -2,7 +2,7 @@
 
 ## 2026-11-12 四后端 DSH A 重构
 
-Claude Code 任务顺序固定为 `connection` → `conversation` → `providers` → `tools-context` → `permissions-safety` → `resources` → `debug`；默认页改为连接。Connection 顶层按 `connection-runtime` → `diagnostics-logs` → `runtime-ecosystem` 排列：启动路径、JS 运行时、超时与认证边界先行；debug、debugFile、环境变量、CLI 诊断及重启操作随后；项目文件导航、只读生态摘要和运行时检查保留原组 ID，收进默认收起的单层原生 disclosure。`createClaudeCodeGroup` 的可选 `collapsible` 分支只在该生态组启用，其他组继续使用原 header/help/stack 结构。字段仍由原 section/provider/configuration/resource/debug owners 渲染：模型、备用模型、思考/预算、提示行为、provider presets、settingSources、工具策略、只读 MCP、完整 sandbox/预算、资源 CRUD、原生 settings.json + hooks 与追踪诊断均未改换持久化或运行时路径。共享 workspace 只增加 DSH A 布局标记和当前任务标题，不新增运行时状态。
+Claude Code 任务顺序固定为 `connection` → `conversation` → `providers` → `tools-context` → `permissions-safety` → `resources` → `debug`；默认页改为连接。Connection 顶层按 `connection-runtime` → `diagnostics-logs` → `runtime-ecosystem` 排列：启动路径、JS 运行时、超时与认证边界先行；debug、debugFile、环境变量、CLI 诊断及重启操作随后；项目文件导航、只读生态摘要和运行时检查保留原组 ID，收进默认收起的单层原生 disclosure。`createClaudeCodeGroup` 的可选 `collapsible` 分支只在该生态组启用，其他组继续使用原 header/help/stack 结构。Conversation 的 `models` 组保留组标题，主模型行改用明确的 `主模型` / `Main model` 名称，避免同名重复。主模型/备用模型的 proof chip 保留原 `data-proof-state`、tooltip 与 ARIA 文案；在四后端 task workspace 中由现有模型行调用点将返回的 chip 移到控件首位，配合局部横向 flex 放在下拉框左侧，其他入口与其他证明行仍使用原尾随位置。字段仍由原 section/provider/configuration/resource/debug owners 渲染：模型、备用模型、思考/预算、提示行为、provider presets、settingSources、工具策略、只读 MCP、完整 sandbox/预算、资源 CRUD、原生 settings.json + hooks 与追踪诊断均未改换持久化或运行时路径。共享 workspace 只增加 DSH A 布局标记和当前任务标题，不新增运行时状态。
 
 > 2026-07-29: Backend fallback initialization preserves sibling OpenCode trace settings.
 

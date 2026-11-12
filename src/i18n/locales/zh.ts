@@ -5834,7 +5834,7 @@ export const zhTranslations = {
   'settings.claudeCode.outputStyle.placeholder': '例如 Explanatory',
   'settings.claudeCode.outputStyle.boundaryNotice': '已对新的诊断查询完成实时验证：Capability Lab 会创建临时自定义输出样式文件，通过 SDK settings.outputStyle 路径选择它，并且只有模型回忆出未出现在用户 prompt 中的 nonce 时才算通过。这不证明活跃会话实时变更，也不验证当前已保存的样式名称是否有效。',
   'settings.claudeCode.outputStyle.lifecycleNotice': 'Claude Code 会在会话启动时读取输出样式。根据官方文档，修改会在 /clear 或新的 Claude Code 会话后生效；已有的活动或恢复会话可能继续使用原先的系统提示词。',
-  'settings.claudeCode.model.name': '模型',
+  'settings.claudeCode.model.name': '主模型',
   'settings.claudeCode.model.desc': 'Claude Code 会话使用的主模型。尽可能实时应用到当前活动查询。留空则继承 Claude Code 默认值。使用下方的快速选择下拉框从发现的模型中选择。',
   'settings.claudeCode.model.placeholder': 'claude-sonnet-4-5',
   'settings.claudeCode.model.quickSelectName': '快速选择模型',

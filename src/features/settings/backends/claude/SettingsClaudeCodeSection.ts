@@ -721,7 +721,7 @@ export class SettingsClaudeCodeSection {
     proofId: string,
     state: ClaudeCodeProofState,
     text: string,
-  ): void {
+  ): HTMLElement {
     const controlEl = setting.controlEl;
     const labelId = `opencodian-claude-code-proof-${proofId}-label`;
     const chip = controlEl.createSpan({
@@ -738,9 +738,7 @@ export class SettingsClaudeCodeSection {
     // Visually-hidden text carrier for textContent-based assertions.
     const labelCarrier = setting.settingEl.createSpan({ cls: 'opencodian-claude-code-notice-text', text });
     labelCarrier.id = labelId;
-    // Ensure the tooltip controller is active for this document so the
-    // data-settings-tooltip attribute renders a real bubble.
-    void chip;
+    return chip;
   }
 
   // ─── Connection & advanced tab ────────────────────────────────────
@@ -1825,7 +1823,8 @@ export class SettingsClaudeCodeSection {
       this.settings.model = value;
       await this.saveSettings();
     });
-    this.attachProofChip(setting, 'main-model', 'pass', t('settings.claudeCode.proofStatus.mainModel'));
+    const proofChip = this.attachProofChip(setting, 'main-model', 'pass', t('settings.claudeCode.proofStatus.mainModel'));
+    if (setting.settingEl.closest('.opencodian-backend-task-workspace')) setting.controlEl.prepend(proofChip);
   }
 
   /**
@@ -1859,7 +1858,8 @@ export class SettingsClaudeCodeSection {
       boundaryText: t('settings.claudeCode.fallbackModel.boundaryNotice'),
       helpTitle: t('settings.claudeCode.fallbackModel.name'),
     });
-    this.attachProofChip(setting, 'fallback-model', 'readback', t('settings.claudeCode.proofStatus.fallbackModel'));
+    const proofChip = this.attachProofChip(setting, 'fallback-model', 'readback', t('settings.claudeCode.proofStatus.fallbackModel'));
+    if (setting.settingEl.closest('.opencodian-backend-task-workspace')) setting.controlEl.prepend(proofChip);
   }
 
   /**
