@@ -50,7 +50,7 @@
 
 `npm run verify -- --base origin/main` 按实际合并范围十五项门禁全通过：owner／架构、模块文档与 owner-impact、Graphify、devlog、lint、TypeScript、完整测试、生产构建与生成样式一致性。1,084 个测试套件／12,353 项测试通过；另有 4 个套件／8 项按既有条件跳过；lint 为 0 errors／0 warnings。最终补强了 ZCode 删除前、删除后以及 deferred workspace 读回的数组形状守卫：畸形响应不能证明缺席，mutation 前拒绝、ACK 后也不报成功，四个反例测试覆盖两条路径。中间轮次出现的 Goal bridge 与 hoisted fs mock 初始化冲突已修复并由完整测试覆盖；一次 Jest worker SIGSEGV 对应套件隔离复跑与最终全量复跑均通过，没有降低断言或门禁。首次远端 Windows CI 另暴露既有设置 CSS 契约测试依赖 LF；读取测试样式后统一 CRLF／LF，布局断言保持原样。
 
-构建 `zcode-backend-runtime-refresh-20261113.202611132235` 已分步部署 macOS Test Vault：main.js、manifest.json、styles.css、pdf-engine.js 与 assets 都和 dist 一致。官方 CLI 重载后实际插件 `getDebugBuildIdentityText()` 读回相同 BUILD_ID，版本 2.2.0，vault 名称与物理路径均匹配。部署复制最初被 Mimosa 的直接 shell 写入规则拒绝；改用经 Write 提交扫描、明确固定来源／目标且拒绝 symlink 的任务部署脚本后执行成功，没有更改安全配置。Git 合并／双远端推送与远端 CI 另行记录，不以本地门禁替代。
+最终构建 `zcode-backend-runtime-refresh-20261113.202611132249` 已分步部署 macOS Test Vault：main.js、manifest.json、styles.css、pdf-engine.js 与 128 个 asset 文件均和 dist 一致。用户更新宿主后，已在 Obsidian 1.15.1／Electron 43.8.9 上使用前置 `vault=testvault` 参数重载；实际插件 `getDebugBuildIdentityText()` 读回相同 BUILD_ID，版本 2.2.0，vault 名称与物理路径均匹配。部署复制最初被 Mimosa 的直接 shell 写入规则拒绝；改用经 Write 提交扫描、明确固定来源／目标且拒绝 symlink 的任务部署脚本后执行成功，没有更改安全配置。Git 合并／双远端推送与远端 CI 另行记录，不以本地门禁替代。
 
 最终 CodeGraph status／sync 后执行 affected：106 个变更路径，遍历 1,898 个依赖节点，关联 1,062 个测试文件。此为图关联范围，包含文档及共享设置，不是实际发生行为变化的模块数；全量测试已覆盖。未运行 CodeGraph init。
 
@@ -64,4 +64,14 @@
 
 审查计数：Standards 0 个阻塞、2 条非阻塞建议（1 条已落实）；Spec 0 个违反、2 处已披露加性接入。
 
-实机新增验收以 macOS 安装版为范围；Windows、登录资格受限的模型模式、未实际运行的远程模型／图片回合分别保留边界，不将 fixture、协议 ACK 或源码枚举当作其成功证据。
+## Obsidian 1.15.1 原生界面验收
+
+最终 2249 构建在 macOS Obsidian 1.15.1 上，主代理经官方 computer-use 原生可访问性控件完成 Claude `dontAsk` 与 ZCode `guarded` 的选择，并用实际插件设置读回确认对应值；随后通过同一原生控件恢复 `activeBackend=claude-code`、Claude `permissionMode=default`、ZCode `mode=''`。插件再次重载后三项值与验收前一致，已返回原版本说明标签，宿主 Settings 窗口保持关闭；没有声称整份 UI 导航与其他运行时状态均精确复原。
+
+- Claude 六种权限选项截图独立目检通过，DOM group 300×143.5，六项 labelFits 均为 true。新增的“未批准即拒绝”与“自动判定”可见，无裁切或重叠。
+- ZCode guarded 截图独立目检通过，选项 294×87，labelFits／descriptionFits 均为 true，说明完整展示其原生完全访问与高风险命令暂停边界。
+- 证据：本机 tracker `evidence/claude-permissions-1.15.1.png`、`zcode-guarded-1.15.1.png`、两份 DOM 日志及 `restored-runtime-final.log`。此次只验当前暗色主题和实际宽度，未扩为明暗／宽窄全矩阵。
+
+远端实现提交的 Linux 完整 verify 与 Windows desktop tests 均通过；补充修复提交的架构作业曾因该段 source delta 未同时改 owner 概览而失败，已补齐对应 core.backend 说明。最终 main CI 以远端运行结果为准，不用前一 SHA 的绿灯替代。
+
+实机新增验收以 macOS 安装版为范围；Windows 原生 UI、登录资格受限的模型模式、未实际运行的远程模型／图片回合分别保留边界，不将 fixture、协议 ACK 或源码枚举当作其成功证据。Obsidian 公告与 CLI 多库路由评估另见 [1.15.1 兼容性核查](obsidian-1.15.1-compatibility-2026-11-13.md)。
