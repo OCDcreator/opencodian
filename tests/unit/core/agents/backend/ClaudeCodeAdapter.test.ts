@@ -5615,4 +5615,78 @@ describe('Claude message-before fork boundary', () => {
     await expect(adapter.forkSession(id, 'target')).rejects.toThrow('owned history failed');
     expect(sdk.forkSession).not.toHaveBeenCalled();
   });
+
+  describe('native lifecycle deletion', () => {
+    function createNativeDeleteSdk(overrides: Partial<ClaudeCodeSdkFacade> = {}): ClaudeCodeSdkFacade & {
+      deleteSession: jest.Mock;
+      getSessionInfo: jest.Mock;
+    } {
+      return {
+        query: jest.fn(() => Object.assign((async function* () {})(), { close: jest.fn() })),
+        listSessions: jest.fn().mockResolvedValue([]),
+        getSessionInfo: jest.fn().mockResolvedValue(undefined),
+        getSessionMessages: jest.fn().mockResolvedValue([]),
+        listSubagents: jest.fn().mockResolvedValue([]),
+        getSubagentMessages: jest.fn().mockResolvedValue([]),
+        importSessionToStore: jest.fn().mockResolvedValue(undefined),
+        forkSession: jest.fn().mockResolvedValue({ sessionId: 'sdk-fork' }),
+        renameSession: jest.fn().mockResolvedValue(undefined),
+        deleteSession: jest.fn(async () => undefined),
+        ...overrides,
+      } as ClaudeCodeSdkFacade & { deleteSession: jest.Mock; getSessionInfo: jest.Mock };
+    }
+
+    it('deletes a bare native session through the SDK and verifies absence by readback', async () => {
+      const sdk = createNativeDeleteSdk();
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+
+      await expect(adapter.deleteSession('sdk-native-1')).resolves.toBeUndefined();
+      expect(sdk.deleteSession).toHaveBeenCalledWith('sdk-native-1', { dir: '/vault' });
+      expect(sdk.getSessionInfo).toHaveBeenCalledWith('sdk-native-1', { dir: '/vault' });
+    });
+
+    it('does not attempt native deletion for OpenCodian-local ids without a bound SDK session', async () => {
+      const sdk = createNativeDeleteSdk();
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+
+      const localId = await adapter.createSession('Local chat');
+      await expect(adapter.deleteSession(localId)).resolves.toBeUndefined();
+      expect(sdk.deleteSession).not.toHaveBeenCalled();
+      expect(sdk.getSessionInfo).not.toHaveBeenCalled();
+    });
+
+    it('rejects when the readback still finds the native session after deleteSession', async () => {
+      const sdk = createNativeDeleteSdk({
+        getSessionInfo: jest.fn().mockResolvedValue({ sessionId: 'sdk-native-2' }),
+      });
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+
+      await expect(adapter.deleteSession('sdk-native-2')).rejects.toThrow('still readable after deleteSession');
+    });
+
+    it('keeps local-only cleanup when the injected SDK lacks deleteSession', async () => {
+      const sdk = createNativeDeleteSdk();
+      delete (sdk as Partial<ClaudeCodeSdkFacade>).deleteSession;
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+
+      await expect(adapter.deleteSession('sdk-native-3')).resolves.toBeUndefined();
+      expect(sdk.getSessionInfo).not.toHaveBeenCalled();
+    });
+  });
 });

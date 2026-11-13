@@ -1,5 +1,7 @@
 # Owner: shared.i18n
 
+2026-11-13：中英文同步新增 Claude dontAsk／auto 和 ZCode guarded 的设置及聊天权限标签。dontAsk 明确未预授权则拒绝，auto 明确由原生分类器决定，guarded 只说明识别危险 shell 命令后的暂停；不把这些值翻译成 bypassPermissions，也不声称具有操作系统沙箱隔离。模式 ID、键集合和占位符在双语中保持一致。
+
 2026-11-12（Claude 服务与模型文案）：中英文同步把 Providers 页改称“服务与模型”，active 徽标为“已选择”，激活动作为“应用到当前库”；内置官方 preset 以“继承已有 Claude 配置”呈现并明确不是账户/登录状态。新增 `settings.claudeCode.providers.{currentTitle,inherit*,localConfig*,configureLocal,useInherited,presetsTitle,detailsTitle}`、`readback.*`（token 只陈述已设置/未读取、部分来源不可读、运行时未确认）、`route.*` 与 `source.*` 键；编辑器新增“仅保存预设”与“保存并应用到当前库”及保存中/失败状态。回读值只表述配置来源事实，不表述已选 preset 元数据或运行时证明；token 值永不进入文案或插值。两侧键集合与插值名一致。
 
 2026-11-12（四后端设置重构）：中英文同步精简 Connection/Resources 任务标签，新增 Pi 资源组 raw-only 说明，以及 ZCode 对话、资源、诊断的只读/刷新文案。个人 API 共享配置与 OpenCodian 独立官方登录继续分别陈述作用域；locale 不持有凭据、不伪造 readback，也不把保存成功当作运行时应用证明。两侧键集合一致。

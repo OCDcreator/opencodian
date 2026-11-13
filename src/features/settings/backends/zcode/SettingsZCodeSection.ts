@@ -223,6 +223,7 @@ export class SettingsZCodeSection {
         { value: 'plan', label: t('settings.zcode.ui.mode.plan'), description: t('settings.zcode.ui.mode.planHelp') },
         { value: 'build', label: t('settings.zcode.ui.mode.build'), description: t('settings.zcode.ui.mode.buildHelp') },
         { value: 'edit', label: t('settings.zcode.ui.mode.edit'), description: t('settings.zcode.ui.mode.editHelp') },
+        { value: 'guarded', label: t('settings.zcode.ui.mode.guarded'), description: t('settings.zcode.ui.mode.guardedHelp') },
         { value: 'yolo', label: t('settings.zcode.ui.mode.yolo'), description: t('settings.zcode.ui.mode.yoloHelp') },
       ],
       onChange: async (value) => {

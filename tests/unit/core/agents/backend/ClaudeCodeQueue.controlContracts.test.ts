@@ -16,7 +16,7 @@ type Equal<T, U> = (<V>() => V extends T ? 1 : 2) extends (<V>() => V extends U 
 
 // The explicit noEmit semantic check below validates these type assertions and
 // negative compile cases even when Jest uses isolatedModules transpilation.
-describe('Claude SDK 0.3.319 control source/type contracts', () => {
+describe('Claude SDK 0.3.323 control source/type contracts', () => {
   it('keeps the two optional runtime methods exactly equal to the official Query methods', () => {
     const exactContracts: [
       Equal<NonNullable<RuntimeQuery['setMcpPermissionModeOverride']>, Query['setMcpPermissionModeOverride']>,
@@ -135,6 +135,28 @@ describe('Claude SDK 0.3.319 control source/type contracts', () => {
     const packagePath = resolve(process.cwd(), 'node_modules/@anthropic-ai/claude-agent-sdk/package.json');
     const sdkPackage = JSON.parse(readFileSync(packagePath, 'utf8')) as { version: string };
 
-    expect(sdkPackage.version).toBe('0.3.319');
+    expect(sdkPackage.version).toBe('0.3.323');
+  });
+
+  it('keeps the installed declarations surface-compatible with the audited 0.3.319 baseline', () => {
+    // Audited against the published 0.3.319 tarball (2026-11-13): the top-level
+    // Options surface is unchanged at 69 members and PermissionMode keeps all
+    // six native modes. 0.3.320-0.3.323 additions (matchDeniedModels,
+    // machinePolicy.didNotLoad, managed_settings_not_delivered) are additive
+    // and unused by the plugin; this audit re-reads the installed declarations
+    // so a future surface change fails here instead of silently drifting.
+    const dtsPath = resolve(process.cwd(), 'node_modules/@anthropic-ai/claude-agent-sdk/sdk.d.ts');
+    const dts = readFileSync(dtsPath, 'utf8');
+
+    const optionsMatch = /export declare type Options = \{([\s\S]*?)\n\};/.exec(dts);
+    expect(optionsMatch).not.toBeNull();
+    const optionFields = [...optionsMatch![1].matchAll(/\n {4}(\w+)\??:/g)].map((match) => match[1]);
+    expect(optionFields).toHaveLength(69);
+
+    const permissionModeMatch = /export declare type PermissionMode = ([^;]+);/.exec(dts);
+    expect(permissionModeMatch).not.toBeNull();
+    for (const mode of ['default', 'acceptEdits', 'bypassPermissions', 'plan', 'dontAsk', 'auto']) {
+      expect(permissionModeMatch![1]).toContain(`'${mode}'`);
+    }
   });
 });

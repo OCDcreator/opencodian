@@ -24,10 +24,13 @@ export {
   parseZCodeRuntimeCapabilities,
   serializeZCodeRequest,
   serializeZCodeServerRequestReply,
+  ZCODE_IMPLEMENTED_HOST_CAPABILITIES,
+  type ZCodeHostCapabilities,
   type ZCodeInboundMessage,
   type ZCodeProtocolError,
   ZCodeProtocolErrorCode,
   type ZCodeRuntimeCapabilities,
+  zcodeRuntimeCapabilitiesRequestParams,
 } from './ZCodeProtocolTypes';
 export {
   discoverZCodeProviderConfig,

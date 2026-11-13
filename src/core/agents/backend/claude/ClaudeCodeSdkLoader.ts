@@ -20,6 +20,8 @@ export interface ClaudeAgentSdkModule {
   importSessionToStore?: NonNullable<ClaudeCodeSdkFacade['importSessionToStore']>;
   forkSession?: NonNullable<ClaudeCodeSdkFacade['forkSession']>;
   renameSession?: NonNullable<ClaudeCodeSdkFacade['renameSession']>;
+  /** Official native lifecycle deletion (sdk.d.ts: "The SDK never deletes from your store unless you call deleteSession()"). */
+  deleteSession?: NonNullable<ClaudeCodeSdkFacade['deleteSession']>;
   startup?: (params?: { options?: unknown; initializeTimeoutMs?: number }) => Promise<WarmQueryHandle>;
 }
 
@@ -56,6 +58,7 @@ export async function loadClaudeCodeSdk(
     ...(sdk.importSessionToStore ? { importSessionToStore: sdk.importSessionToStore } : {}),
     ...(sdk.forkSession ? { forkSession: sdk.forkSession } : {}),
     ...(sdk.renameSession ? { renameSession: sdk.renameSession } : {}),
+    ...(sdk.deleteSession ? { deleteSession: sdk.deleteSession } : {}),
     ...(sdk.startup ? { startup: sdk.startup } : {}),
   };
 }

@@ -15,7 +15,7 @@
 - 始终启用 `includePartialMessages: true`
 - 始终使用官方 Claude Code preset system prompt 与默认 built-in tools，避免 SDK 默认 minimal prompt / empty tool set 让真实 coding session 缺失 Read/Edit/Bash 等能力；`ClaudeCodeSdkOptionsShape.tools` 类型已拓宽为 `string[] | { type: 'preset'; preset: 'claude_code' }`，支持诊断路径用 `string[]` 覆盖默认 preset 进行工具可用性限制测试，但普通 runtime 始终使用 preset
 - 映射 Claude 专属 `permissionMode`、`thinking`、`effort`
-- 当 `permissionMode === 'bypassPermissions'` 时显式写入 SDK 要求的 `allowDangerouslySkipPermissions: true`
+- 当 `permissionMode === 'bypassPermissions'` 时显式写入 SDK 要求的 `allowDangerouslySkipPermissions: true`；这是唯一的 skip-permissions 门。2026-11-13 backend refresh 后 `ClaudeCodePermissionMode` 覆盖全部六个原生 SDK 模式（default/acceptEdits/bypassPermissions/plan/dontAsk/auto）：`dontAsk`（未预批准即拒绝）与 `auto`（模型分类器批准/拒绝）原样透传且绝不写 `allowDangerouslySkipPermissions`，因此任何映射回归都无法把限制性模式放大成跳过权限
 - 将 OpenCodian UI 中的 `thinking.type === 'fixed'` 映射为官方 SDK `thinking: { type: 'enabled', budgetTokens }`
 - 只在用户显式配置时写入 `model`、`fallbackModel`、`additionalDirectories`、`canUseTool`、`mcpServers`；`pathToClaudeCodeExecutable` 只接受 resolver/adapter 注入的已验证 external CLI path，不直接信任 `settings.executablePath` 原始值；`ClaudeCodeOptionsBuilderInput` 现在接受可选 `fallbackModel?: string` 字段，该覆盖值优先级高于 `settings.fallbackModel`；同时接受可选 `model?: string` 字段，该诊断级覆盖值优先级高于 `settings.model`，用于 Capability Lab 的 fallback behavior proof
 - 只在 runtime resolver 或用户显式配置时写入 `env`，先合并 `processEnv`（例如增强后的 PATH），再用 `{ ...settings.env }` 覆盖/补充用户环境变量；调用者在构建后修改 `settings.env` 不会泄漏到 SDK options 快照

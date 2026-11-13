@@ -7,6 +7,7 @@ import {
   normalizeClaudeCodeEnv,
   normalizeClaudeCodeNullablePositiveInt,
   normalizeClaudeCodeNullablePositiveNumber,
+  normalizeClaudeCodePermissionMode,
   normalizeClaudeCodeStringArray,
 } from '../../../../src/core/types';
 
@@ -723,5 +724,53 @@ describe('normalizeClaudeCodeBackendSettings outputStyle', () => {
   it('falls non-string values back to empty string', () => {
     const result = normalizeClaudeCodeBackendSettings({ outputStyle: 42 as unknown as string });
     expect(result.outputStyle).toBe('');
+  });
+});
+
+describe('normalizeClaudeCodePermissionMode', () => {
+  // Regression guard for the 2026-11-13 backend refresh: raw legacy values
+  // must never be loosened. The pre-refresh normalizer mapped dontAsk (native
+  // "deny anything not pre-approved") to bypassPermissions (skip all checks),
+  // which is the semantically opposite mode, and degraded auto to default.
+  it('passes every native SDK permission mode through unchanged', () => {
+    expect(normalizeClaudeCodePermissionMode('default')).toBe('default');
+    expect(normalizeClaudeCodePermissionMode('acceptEdits')).toBe('acceptEdits');
+    expect(normalizeClaudeCodePermissionMode('bypassPermissions')).toBe('bypassPermissions');
+    expect(normalizeClaudeCodePermissionMode('plan')).toBe('plan');
+  });
+
+  it('keeps native dontAsk semantics instead of loosening it to bypassPermissions', () => {
+    expect(normalizeClaudeCodePermissionMode('dontAsk')).toBe('dontAsk');
+    expect(normalizeClaudeCodePermissionMode('dontAsk')).not.toBe('bypassPermissions');
+  });
+
+  it('keeps native auto classifier semantics instead of degrading to default', () => {
+    expect(normalizeClaudeCodePermissionMode('auto')).toBe('auto');
+    expect(normalizeClaudeCodePermissionMode('auto')).not.toBe('default');
+  });
+
+  it('maps the legacy normal alias and unknown values to default', () => {
+    expect(normalizeClaudeCodePermissionMode('normal')).toBe('default');
+    expect(normalizeClaudeCodePermissionMode('turbo')).toBe('default');
+    expect(normalizeClaudeCodePermissionMode(undefined)).toBe('default');
+    expect(normalizeClaudeCodePermissionMode(42)).toBe('default');
+  });
+
+  it('round-trips raw imported values through normalizeClaudeCodeBackendSettings persistence', () => {
+    // A hand-edited or imported settings file carrying raw dontAsk/auto must
+    // survive load normalization with its native semantics intact.
+    const loaded = normalizeClaudeCodeBackendSettings({
+      permissionMode: 'dontAsk',
+    });
+    expect(loaded.permissionMode).toBe('dontAsk');
+
+    const loadedAuto = normalizeClaudeCodeBackendSettings({
+      permissionMode: 'auto',
+    });
+    expect(loadedAuto.permissionMode).toBe('auto');
+
+    expect(normalizeClaudeCodeBackendSettings({ permissionMode: 'junk' }).permissionMode).toBe('default');
+    expect(normalizeClaudeCodeBackendSettings({}).permissionMode).toBe('default');
+    expect(normalizeClaudeCodeBackendSettings(undefined).permissionMode).toBe('default');
   });
 });

@@ -41,3 +41,23 @@ describe('ClaudeCodeSdkLoader', () => {
     expect(sdk.renameSession).toBe(renameSession);
   });
 });
+
+describe('ClaudeCodeSdkLoader deleteSession forwarding', () => {
+  it('forwards the official native deleteSession when the SDK module exposes it', async () => {
+    const query = jest.fn();
+    const deleteSession = jest.fn(async () => undefined);
+    const importer = jest.fn(async () => ({ query, deleteSession }));
+    const sdk = await loadClaudeCodeSdk({ importer });
+
+    expect(sdk.deleteSession).toBe(deleteSession);
+    await sdk.deleteSession?.('sdk-session-1', { dir: '/vault' });
+    expect(deleteSession).toHaveBeenCalledWith('sdk-session-1', { dir: '/vault' });
+  });
+
+  it('omits deleteSession when the SDK module does not declare it', async () => {
+    const importer = jest.fn(async () => ({ query: jest.fn() }));
+    const sdk = await loadClaudeCodeSdk({ importer });
+
+    expect(sdk.deleteSession).toBeUndefined();
+  });
+});

@@ -179,7 +179,13 @@ export async function executeCommand(host, c) {
         return { providers: [...new Set([...stored.map(item => item.providerId), ...host.modelRuntime.getProviders().map(p => p.id)])].map(provider => ({ provider, ...host.modelRuntime.getProviderAuthStatus(provider) })),
           oauthProviders: host.modelRuntime.getProviders().filter(p => p.auth?.oauth).map(p => ({ id: p.id, name: p.name })) };
       }
-      return { providers: [...new Set([...host.auth.list(), ...registry.getAll().map((m) => m.provider)])].map((provider) => ({ provider, ...host.auth.getAuthStatus(provider) })), oauthProviders: host.auth.getOAuthProviders().map((p) => ({ id: p.id, name: p.name })) };
+      // Pre-ModelRuntime runtimes keep the full legacy readback, including their
+      // AuthStorage.getOAuthProviders. Current SDKs (1.5.2+) removed that method
+      // from AuthStorage, so it is feature-detected: a runtime without it still
+      // gets an honest empty OAuth list instead of a failed auth command.
+      const oauthProviders = typeof host.auth.getOAuthProviders === 'function'
+        ? host.auth.getOAuthProviders().map((p) => ({ id: p.id, name: p.name })) : [];
+      return { providers: [...new Set([...host.auth.list(), ...registry.getAll().map((m) => m.provider)])].map((provider) => ({ provider, ...host.auth.getAuthStatus(provider) })), oauthProviders };
     }
     case 'set_api_key': {
       const provider = required(c.provider, 'Provider'), key = required(c.apiKey, 'API key');

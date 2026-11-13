@@ -1,5 +1,7 @@
 # CodexAdapter
 
+> 2026-11-13（Codex 0.169.0 适配）：`AppServerStreamState` 构造点补齐 `streamedReasoningSummaryItemIds`（主 turn 流与压缩观察器各一处，mapper 去重契约见 `CodexAppServerStreamMapper` 文档）。`thread/compacted` 经上游源码核实为**已废弃且 v2 事件路径不发送**（app-server `bespoke_event_handling.rs` 明确 v2 客户端只收 `contextCompaction` item），前景压缩的完成证据保持现有的 item/started+item/completed 绑定 + ACK 永不等于成功；`account/rateLimits/read` 的 ChatGPT 登录门槛为条件不可用，`errorReason`（含 "chatgpt authentication required to read rate limits"）已透传至设置账户面板，不伪造配额。`forkSession`/`beforeTurnId` 实验分叉路径（`experimentalApi: true` 协商）保持原样未动。
+
 > 2026-10-29（技能 token 适配）：app-server 发起 turn 前，匹配当前 skills/list 目录中的已启用 `$name`，并附加显式 `{type:'skill',name,path}` 输入项。未知名字、禁用技能与无路径条目不生成技能输入；界面 token 文字不参与传输反推。
 
 > 2026-10-21（elicitation host-wiring race）：`registerElicitationHandlers` 不再以 host 已接线为注册前提——app-server client 可用即注册 `mcpServer/elicitation/request` 路由（`typeof` guard 保留），消除「帧先到、host 后接线」时落入 transport -32601 的窗口。host 缺失时合法帧进入 `pendingElicitations` 挂起：绑定该请求的 combined request/turn AbortSignal 与 60s（`ELICITATION_HOST_WAIT_TIMEOUT_MS`，对齐 turn watchdog）超时；abort/超时/stop 均按既有语义 settle 为 `{action:'cancel'}`（trace `elicitation.pending` / `elicitation.pending.settled`），绝不悬挂、绝不伪造回答。`setElicitationHost` 接线后立即 `flushPendingElicitations` 按原始 wire params 派发挂起帧（combined signal 保持武装，turn 取消仍可中途 settle）。`handleMcpElicitation` 的 mode dispatch/schema admission 抽出为 `runElicitation`/`dispatchElicitation` 供直接路径与 flush 复用；approval 桥注册条件不变。回归见 `CodexElicitationBridge.test.ts` host-wiring race 组。

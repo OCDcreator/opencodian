@@ -404,6 +404,8 @@ export interface ClaudeCodeSdkFacade {
   importSessionToStore?(sessionId: string, store: unknown, options?: { dir?: string; includeSubagents?: boolean; batchSize?: number }): Promise<void>;
   forkSession?(sessionId: string, options?: { dir?: string; upToMessageId?: string; title?: string; sessionStore?: unknown }): Promise<{ sessionId: string }>;
   renameSession?(sessionId: string, title: string, options?: { dir?: string; sessionStore?: unknown }): Promise<void>;
+  /** Official native lifecycle deletion (declared since SDK 0.3.312). */
+  deleteSession?(sessionId: string, options?: { dir?: string; sessionStore?: unknown }): Promise<void>;
   startup?(params?: { options?: unknown; initializeTimeoutMs?: number }): Promise<WarmQueryHandle>;
 }
 
@@ -1722,13 +1724,63 @@ export class ClaudeCodeAdapter
     this.cancelledSessions.add(sessionId);
     this.invalidatedSessions.add(sessionId);
     const session = this.sessions.get(sessionId);
-    this.trace((port) => port.recordPersistence(this.traceContextForSession(sessionId), 'delete', { sessionId }));
+    // Native identity: live sessions carry the SDK-side id; a bare native id
+    // (restored conversations) is its own native id. OpenCodian-local ids that
+    // never sent a message have no native counterpart to delete.
+    const nativeSessionId = session?.sdkSessionId
+      ?? (isOpenCodianLocalClaudeSessionId(sessionId) ? undefined : sessionId);
+    this.trace((port) => port.recordPersistence(this.traceContextForSession(sessionId), 'delete', {
+      sessionId,
+      nativeSessionId,
+    }));
     if (session) {
       this.finishTraceTurn(session, 'cancelled', { reason: 'session-delete' });
       this.closeRuntime(session);
     }
+    if (nativeSessionId) {
+      // Stop streaming first, then use the official lifecycle deletion instead
+      // of duplicating transcript-file logic plugin-side. A failure throws so
+      // callers can observe it; local adapter state is retained for retry.
+      await this.deleteNativeSdkSession(nativeSessionId);
+    }
     this.sessions.delete(sessionId);
     this.clearTraceContext(sessionId, session?.sdkSessionId);
+  }
+
+  /**
+   * Delete the persisted native session through the SDK's own `deleteSession`
+   * (sdk.d.ts: "The SDK never deletes from your store unless you call
+   * deleteSession()"). Scoped to this vault via `dir`; the runtime-only
+   * sessionStore overrides the filesystem when present. When the SDK exposes
+   * `getSessionInfo`, a readback verifies absence — an accepted call is not
+   * treated as proof on its own. SDKs without `deleteSession` degrade to the
+   * previous local-only cleanup (logged, not an error).
+   */
+  private async deleteNativeSdkSession(nativeSessionId: string): Promise<void> {
+    const sdk = await this.getSdk();
+    if (typeof sdk.deleteSession !== 'function') {
+      sessionLogger.debug('native session deletion unavailable in this SDK; local cleanup only', {
+        nativeSessionId,
+      });
+      return;
+    }
+    await sdk.deleteSession(nativeSessionId, {
+      dir: this.options.vaultPath,
+      ...(this.options.sessionStore ? { sessionStore: this.options.sessionStore } : {}),
+    });
+    if (typeof sdk.getSessionInfo === 'function') {
+      const readback = await sdk.getSessionInfo(nativeSessionId, {
+        dir: this.options.vaultPath,
+        ...(this.options.sessionStore ? { sessionStore: this.options.sessionStore } : {}),
+      });
+      if (readback) {
+        throw new Error(
+          `Claude Code native session ${nativeSessionId} is still readable after deleteSession; ` +
+          'the persisted transcript was not confirmed deleted.',
+        );
+      }
+    }
+    sessionLogger.debug('native session deletion verified absent', { nativeSessionId });
   }
 
   async updateSessionTitle(sessionId: string, title: string): Promise<void> {

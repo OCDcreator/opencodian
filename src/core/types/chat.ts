@@ -727,7 +727,11 @@ export type StreamChunk =
         | 'goal_updated'
         | 'goal_cleared'
         | 'thread_deleted'
-        | 'deprecation_notice';
+        | 'deprecation_notice'
+        | 'compaction'
+        | 'permission_denied'
+        | 'auth_status'
+        | 'rate_limit';
       status?: string;
       id?: string;
       name?: string;

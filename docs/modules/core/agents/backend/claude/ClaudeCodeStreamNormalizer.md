@@ -53,3 +53,14 @@
 ## SDK 0.3.319 session_writes_lost（2026-11-08）
 
 claude-agent-sdk 0.3.313+ 新增 `SDKSessionWritesLostMessage`（`type: 'system'`, `subtype: 'session_writes_lost'`）：CLI 退出前至多发送一次，报告磁盘满（ENOSPC）或配额（EDQUOT）导致 transcript 行和/或 `~/.claude.json` 变更未能持久化；已收到的 result 仍然有效。0.3.312 时代该 subtype 不存在；升级 SDK 后若不处理会被静默丢弃，聊天层无法得知 resume 可能缺回合。`appendSdkSignalChunk` 现在把它映射为 `event: 'informational'`、`status: 'error'` 的诚实 backend_event，metadata 携带 `errorCode`、`lost`、`transcriptSessionIds`。fixture 测试覆盖有/无 `transcript_session_ids` 两种形状。
+
+## SDK 0.3.323 compaction / permission / auth / rate-limit 信号（2026-11-13）
+
+此前静默丢弃的四类原生消息现在进入类型化 `backend_event` 诊断通道（fixture 测试覆盖每种形状）：
+
+- `compact_boundary`（`type: 'system'`，`SDKCompactBoundaryMessage`）→ `event: 'compaction'`，`status` 取 `compact_metadata.trigger`（manual/auto），metadata 携带 `preTokens` / `postTokens` / `durationMs`。**故意不合成 `usage` chunk**：上下文用量的 delta 记账（`ContextUsageService.applyUsageChunk`）无法表达向下修正，下一次权威 result usage 仍是修正点；因此这里只提供压缩证据，不声称上下文显示已即时校正。
+- `permission_denied`（`SDKPermissionDeniedMessage`）→ `event: 'permission_denied'`，`id`/`name` 为被拒工具调用标识，metadata 携带 `agentId` / `decisionReasonType`。SDK 文档明确这是 best-effort 提示（dontAsk/auto 分类器/deny 规则/headless 自动拒绝的短路拒绝），`result.permission_denials` 才是权威记录。
+- `auth_status`（顶层 type，`SDKAuthStatusMessage`）→ `event: 'auth_status'`，`status` 为 `authenticating` / `ok` / `error`。带 `error` 字段的消息同时会按既有通用语义产出 `error` chunk。
+- `rate_limit_event`（顶层 type，`SDKRateLimitEvent`）→ `event: 'rate_limit'`，`status` 取 `rate_limit_info.status`（allowed/allowed_warning/rejected），metadata 携带 `rateLimitType` / `utilization` / `resetsAt` / overage 字段。仅 claude.ai 订阅会话会收到；API key/Bedrock/Vertex 会话不发此事件属预期。
+
+当前消费方：adapter 的 `resolveDiagnosticSessionId`（trace 会话绑定）、会话 trace、`SendPipelineDebugSummaries`。聊天视图不渲染 `backend_event`（`OpenCodianView` 的 chunk 转换返回 null），因此这些事件目前是诊断流证据，不是用户可见的状态 UI；不要据此声称压缩/限流已有界面提示。

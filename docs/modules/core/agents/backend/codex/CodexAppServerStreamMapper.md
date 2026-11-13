@@ -1,5 +1,7 @@
 # CodexAppServerStreamMapper
 
+> 2026-11-13（Codex 0.169.0）：**推理 summary 流式渲染 + 原生 turn diff 只作 seam**。新增映射：`item/reasoning/summaryTextDelta`（{threadId,turnId,itemId,delta,summaryIndex}）→ `thinking` chunk，`partId` 按 summary part 细分为 `<itemId>:s<summaryIndex>`（每 part 独立渲染块）；`item/reasoning/summaryPartAdded`（{threadId,turnId,itemId,summaryIndex}）→ 无 chunk（无内容；分块由 delta 的 per-part partId 完成）。`AppServerStreamState` 新增 `streamedReasoningSummaryItemIds`。**去重规则（first flavor wins per item）**：summary delta 已流出后丢弃同 item 的 raw `item/reasoning/textDelta`；raw 已流出后丢弃 summary delta；`item/completed` 的 reasoning 全量 `content` 在任一 flavor 已流出时不再重放（三种路径互斥，绝不重复渲染同一推理）。`turn/diff/updated`（{threadId,turnId,diff}）映射为显式无 chunk：Turn Change Record 是 chat 层从 `file_edited` 流构建的本地不可变历史，后端 diff 只经 trace port 留痕，绝不接管/替换记录所有权。
+
 > **源码**: `src/core/agents/backend/codex/CodexAppServerStreamMapper.ts`
 > **状态**: [RUNTIME_ADJUNCT]
 > **Updated**: 2026-09-30 — 0.159.0 item/notification rendering（imageGeneration、subAgentActivity、thread lifecycle 通知）

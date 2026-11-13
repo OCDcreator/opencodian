@@ -15,6 +15,11 @@
  * Protocol: JSON-RPC 2.0 over WebSocket (shapes verified against Codex 0.159.0).
  * Lifecycle: spawns `codex app-server --listen ws://127.0.0.1:0`, parses the
  *   emitted ws:// URL from stdout, connects, initializes, then makes requests.
+ * Hardening (Codex 0.169.0): the loopback socket is spawn-time authenticated
+ *   with `--ws-auth capability-token --ws-token-sha256 <digest>`; the bearer
+ *   token lives only in memory and travels only in the upgrade header. Older
+ *   CLIs that exit on the unknown flags fall back once to a plain
+ *   unauthenticated socket (logged).
  */
 
 import { spawn } from 'node:child_process';
@@ -23,6 +28,13 @@ import WebSocket from 'ws';
 
 import { createLogger } from '../../../../shared';
 import type { AppServerServerRequestHandler, CodexAppServerWireObserver } from './CodexAppServerClientTypes';
+import {
+  buildAppServerSpawnArgs,
+  capabilityTokenAuthorizationHeader,
+  generateWsCapabilityToken,
+  isUnsupportedFlagExit,
+  waitForAppServerWsUrl,
+} from './CodexAppServerSpawnSupport';
 
 const logger = createLogger('CodexAppServerClient');
 
@@ -88,6 +100,16 @@ export class CodexAppServerTransport {
   protected serverUserAgent: string | null = null;
   protected initPromise: Promise<void> | null = null;
   protected wsUrl: string | null = null;
+
+  /**
+   * Capability token for the owned app-server's WebSocket upgrade (Codex
+   * 0.169.0). The raw token lives ONLY here and in the upgrade header
+   * (helpers in `CodexAppServerSpawnSupport` keep it out of argv/env/logs/disk).
+   * Cleared by stop(); a CLI whose argument parser REJECTED the auth flags
+   * (proven from its own stderr, never from a bare exit code) falls back to an
+   * unauthenticated loopback socket exactly once, logged.
+   */
+  protected wsAuthToken: string | null = null;
 
   /** Absolute path to the Codex CLI binary (optional). */
   protected codexPathOverride?: string;
@@ -200,14 +222,28 @@ export class CodexAppServerTransport {
     return this.initPromise;
   }
 
-  private async doStart(): Promise<void> {
+  /**
+   * Spawn the owned app-server and connect. Hardened with the Codex 0.169.0
+   * capability-token flags so only the in-memory token holder can complete the
+   * loopback upgrade; when the CLI's argument parser PROVES it rejected those
+   * flags (its own stderr carries a parser-rejection line naming them), retry
+   * exactly once unauthenticated. Bare non-zero exits (config/permission
+   * failures, crashes), spawn errors, and timeouts are hard failures with no
+   * downgrade.
+   */
+  private async doStart(isAuthFallbackRetry = false): Promise<void> {
     this.stopRequested = false;
     const codexPath = this.codexPathOverride ?? 'codex';
-    logger.info('Starting Codex app-server', { codexPath, cwd: this.workingDirectory ?? '(inherited)' });
+    this.wsAuthToken = isAuthFallbackRetry ? null : generateWsCapabilityToken();
+    logger.info('Starting Codex app-server', {
+      codexPath,
+      cwd: this.workingDirectory ?? '(inherited)',
+      wsAuth: this.wsAuthToken ? 'capability-token' : 'none (unauthenticated loopback)',
+    });
     this.notifyObserver(() => this.wireObserver?.onConnection?.({ state: 'starting' }));
 
     const extraEnv = this.getExtraEnv?.() ?? {};
-    this.process = spawn(codexPath, ['app-server', '--listen', 'ws://127.0.0.1:0'], {
+    this.process = spawn(codexPath, buildAppServerSpawnArgs(this.wsAuthToken), {
       stdio: ['ignore', 'pipe', 'pipe'],
       // Spawn the owned app-server inside the active vault so project-scoped
       // resources (.agents/skills, .codex/agents) resolve correctly. Omit cwd
@@ -219,7 +255,23 @@ export class CodexAppServerTransport {
     });
 
     // Parse the WebSocket URL from stdout
-    const wsUrl = await this.waitForWsUrl(this.process);
+    let wsUrl: string;
+    try {
+      wsUrl = await this.waitForWsUrl(this.process);
+    } catch (err) {
+      if (this.wsAuthToken && isUnsupportedFlagExit(err)) {
+        // Older CLI: its argument parser printed a rejection line naming the
+        // auth flags before exiting (evidence attached by
+        // waitForAppServerWsUrl). Drop the token (never logged) and retry once
+        // unauthenticated; the retry cannot recurse because wsAuthToken is
+        // already null on that path.
+        this.wsAuthToken = null;
+        this.disposeSpawnedProcess();
+        logger.warn('Codex CLI rejected websocket-auth flags; falling back to an unauthenticated loopback app-server');
+        return this.doStart(true);
+      }
+      throw err;
+    }
     this.wsUrl = wsUrl;
     logger.info('App-server WebSocket URL', { wsUrl });
     this.notifyObserver(() => this.wireObserver?.onConnection?.({ state: 'ws-url', detail: wsUrl }));
@@ -229,6 +281,18 @@ export class CodexAppServerTransport {
     await this.connectAndInitialize(wsUrl);
   }
 
+  /** Kill a leftover spawn attempt before the auth-fallback retry. */
+  private disposeSpawnedProcess(): void {
+    if (this.process) {
+      try {
+        this.process.kill();
+      } catch {
+        // Best-effort; the process already exited in the fallback path.
+      }
+      this.process = null;
+    }
+  }
+
   /**
    * Open a WebSocket to `wsUrl`, attach the JSON-RPC handlers, and re-run the
    * initialize handshake (the `initialized` notification). Shared by the
@@ -236,7 +300,18 @@ export class CodexAppServerTransport {
    * the handshake request; the initial start keeps the legacy unbounded wait.
    */
   private async connectAndInitialize(wsUrl: string, initializeTimeoutMs?: number): Promise<void> {
-    const ws = new WebSocket(wsUrl);
+    // Capability-token mode (Codex 0.169.0): the bearer token authenticates the
+    // HTTP upgrade itself; it travels only in this header and is never logged.
+    // The ambient `ws` shim declares the single-argument constructor only, so
+    // the two-argument (upgrade headers) form is typed locally here — the
+    // runtime `ws` client accepts ClientOptions with `headers`.
+    type WebSocketWithUpgradeHeaders = new (
+      url: string,
+      options?: { headers?: Record<string, string> },
+    ) => WebSocket;
+    const ws = this.wsAuthToken
+      ? new (WebSocket as unknown as WebSocketWithUpgradeHeaders)(wsUrl, { headers: { Authorization: capabilityTokenAuthorizationHeader(this.wsAuthToken) } })
+      : new WebSocket(wsUrl);
     this.ws = ws;
 
     await new Promise<void>((resolve, reject) => {
@@ -380,70 +455,33 @@ export class CodexAppServerTransport {
     }
   }
 
+  /**
+   * Listening-URL discovery now lives in `CodexAppServerSpawnSupport`; this
+   * adapter preserves the exact observer-availability semantics (a THROWING
+   * property access counts as available) and forwards service output through
+   * the guarded `notifyServiceOutput` wrapper.
+   */
   private waitForWsUrl(proc: ReturnType<typeof spawn>): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('App-server start timeout')), 15000);
-      let buffer = '';
-
-      const onData = (chunk: Buffer) => {
-        buffer += chunk.toString();
-        const match = buffer.match(/ws:\/\/127\.0\.0\.1:\d+/);
-        if (match) {
-          clearTimeout(timeout);
-          proc.stdout?.off('data', onData);
-          proc.stderr?.off('data', onData);
-          resolve(match[0]);
-        }
-      };
-
-      // The Codex app-server emits the listening URL on stderr (not stdout),
-      // so we must scan both streams to find the WebSocket address.
-      proc.stdout?.on('data', onData);
-      proc.stderr?.on('data', onData);
-      let hasServiceOutputObserver = false;
-      try {
-        hasServiceOutputObserver = typeof this.wireObserver?.onServiceOutput === 'function';
-      } catch {
-        // Accessing an observer property is untrusted code too.
-        logger.warn('wire service-output observer threw');
-        hasServiceOutputObserver = true;
-      }
-      if (hasServiceOutputObserver) {
-        proc.stderr?.on('data', (chunk: Buffer) => {
-          const text = chunk.toString();
-          const outcome = this.notifyServiceOutput({ stream: 'stderr', text });
-          if (!text.includes('Error:')) return;
-          if (outcome === 'declined') logger.warn('App-server stderr', { text: text.trim() });
-          else logger.warn('App-server stderr received (see trace store for redacted text)');
-        });
-        proc.stdout?.on('data', (chunk: Buffer) => {
-          this.notifyServiceOutput({ stream: 'stdout', text: chunk.toString() });
-        });
-      } else {
-        // Preserve legacy no-observer behavior for existing callers.
-        proc.stderr?.on('data', (chunk: Buffer) => {
-          const text = chunk.toString();
-          if (text.includes('Error:')) logger.warn('App-server stderr', { text: text.trim() });
-        });
-      }
-
-      proc.on('error', (err) => {
-        clearTimeout(timeout);
-        reject(err);
-      });
-
-      proc.on('exit', (code) => {
-        if (code !== 0 && code !== null) {
-          clearTimeout(timeout);
-          reject(new Error(`App-server exited with code ${code}`));
-        }
-      });
+    let observerAvailable = false;
+    try {
+      observerAvailable = typeof this.wireObserver?.onServiceOutput === 'function';
+    } catch {
+      // Accessing an observer property is untrusted code too.
+      logger.warn('wire service-output observer threw');
+      observerAvailable = true;
+    }
+    return waitForAppServerWsUrl(proc, {
+      observerAvailable,
+      onServiceOutput: (input) => this.notifyServiceOutput(input),
     });
   }
 
   stop(): void {
     logger.info('Stopping Codex app-server client');
     this.stopRequested = true;
+    // The capability token is per-process; a later start() spawns a fresh
+    // app-server and generates a fresh token.
+    this.wsAuthToken = null;
     if (this.reconnectSleepTimer) {
       clearTimeout(this.reconnectSleepTimer);
       this.reconnectSleepTimer = null;

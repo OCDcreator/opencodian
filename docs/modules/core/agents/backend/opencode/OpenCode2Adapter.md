@@ -86,3 +86,7 @@ generateTitle 继续走无聊天 session 的 generate.text，新增 AbortSignal 
 readSessionInformation 使用目录作用域 mcp.list 和 parentID 原生子会话列表；succeeded/failed/interrupted 保留语义。子会话读取先验证 parent-child 关联，再读取真实消息。
 
 子智能体列表必须同时存在 parentID 关系及父消息 subagent 工具的原生链接，普通 fork 不进入列表。后台启动工具已完成但 metadata.status 仍 running 时保持运行中，终态由原生 child.outcome 覆盖。当前上下文来自最近已报告用量的 assistant 消息与该消息模型的窗口；累计来自 session.tokens，各自都计入原生独立缓存类别。
+
+## Goal 官方 schema（2026-11-13）
+
+`readSessionGoal` 改用官方 `@opencode/schema/goal` 的 `Goal.Definition`（直接依赖，2.3.0），替换 2.2.0 陈旧安装期手工拼装的 passthrough RPC shim。线上契约不变：id `opencode.goal`、`get`/`changed` 名称一致，`ensureGoalObserver` 仍按原始事件 `rpc.opencode.goal.changed` 过滤。输入/输出校验由服务端执行（`rpc.invalid_input`/`rpc.invalid_output`）；Promise 客户端不做客户端侧再校验，因此 `BackendGoalRuntime` 的 normalize 仍是本地防御，畸形输出继续以 `failed` readback 呈现而不是抛出。存储语义、事件与读回行为保持不变；目标长度上限 4000 字符镜像上游 `/goal` 插件 `MAX_OBJECTIVE` 默认值。Focused regression：`OpenCode2Adapter.goal.test.ts`。注意 jest 下 ESM-only 的 schema 包经 `tests/__mocks__/opencode-schema-goal.ts` loader bridge 加载真实安装包（非 mock），由 `jest.config.js` 的 `^@opencode/schema/goal$` 映射接入。

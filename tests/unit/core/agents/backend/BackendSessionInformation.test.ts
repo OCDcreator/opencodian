@@ -62,7 +62,7 @@ it('reconstructs Codex agents from native history and authorizes the exact paren
   const mapping = mapAppServerNotification({ event: { method: 'thread/tokenUsage/updated', params: { tokenUsage: {
     total: { totalTokens: 90000, inputTokens: 80000, outputTokens: 10000 }, last: { totalTokens: 12000 }, modelContextWindow: 200000,
   } } }, threadId: 'parent', sessionId: 'parent', modelId: 'm',
-    streamState: { streamedAgentMessageItemIds: new Set(), streamedReasoningItemIds: new Set(), startedTodoItemIds: new Set(), outputSchema: undefined },
+    streamState: { streamedAgentMessageItemIds: new Set(), streamedReasoningItemIds: new Set(), streamedReasoningSummaryItemIds: new Set(), startedTodoItemIds: new Set(), outputSchema: undefined },
   });
   Object.assign(adapter, { appServerClient: { readThread }, appServerContextSnapshots: new Map([['parent', mapping.contextUsageSnapshot]]) });
   jest.spyOn(adapter, 'getAccountRateLimits').mockResolvedValue({ rateLimits: null });

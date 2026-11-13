@@ -5,6 +5,8 @@
 
 # Owner: core.opencode
 
+2026-11-13：SDK 来源注释改为官方仓库 v1.19.5 固定路径，替代已不存在的 reference-projects/opencode 副本。此处仍是已退役 OpenCode 1 的历史 facade／存量会话边界；@opencode/client 2.x 的运行时由 core.backend/OpenCode2Adapter 拥有，不因同属一个上游仓库就混用两条协议或恢复旧后端选择入口。
+
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
 - 2026-09-13 (universal memory backend): owner manifest gained `core.memory` and `app.memory-runtime`; this owner's boundary itself is unchanged (no source touched, allowlist untouched).
 

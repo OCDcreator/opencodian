@@ -1,5 +1,7 @@
 # ZCodeModelCatalog
 
+2026-11-13：原生模式校验接入 `guarded`，与已有 `plan/build/edit/yolo/auto` 一起走持久默认应用、`session/setMode` 和同会话 `session/read` 读回。错误中的支持列表直接来自同一模式常量，避免 UI 已提供但请求仍拒绝。guarded 仍是原生权限模式，不是文件系统沙箱；旧运行时拒绝时保留原生失败。`ZCodeAdapter.models.test.ts` 覆盖 guarded 默认、会话切换与实际模式读回。
+
 2026-10-29：`getWorkspaceModelCatalog` 在无聊天会话时使用原生 deferred 草稿读取完整目录／默认模型，再以同 id 和 expectedPersistence 关闭；工具目录与 MCP 关闭，不发送模型回合。并发加载去重、成功缓存按 transport 隔离；清理未确认、无效快照和迟到 transport 均拒绝发布且允许重试。工作区默认模型与真实会话 catalog 分开保存，不能借用临时草稿冒充会话模型。
 
 > 2026-09-26（Plan 独立状态修复）：`session/read.settings.mode.current` 可能保留 `build`、`edit`、`yolo` 或 `auto` 基础模式；任何有效基础模式都不能直接否定已受理的 Plan 请求。`classifyZCodeModeReadback` 对这些基础投影返回“Plan 需独立事件读回”，无值或非模式值仍拒绝。实际生效仍由 adapter 的同会话 `session/events.planEnabled` 证明。FA880 真正聊天 `/plan` 暴露了此前只特殊处理 `build` 时对 `yolo` 的误报失败。
@@ -18,7 +20,7 @@
 
 2026-09-24 原生快照纠错：`session/create` 与 `session/resume` 返回完整实时目录，本机探针观察到 66 个模型；`session/read`、`session/setModel` 等读回常只投影当前模型（1 个）。目录以 create/resume 为权威，窄读回只更新当前模型、模式与思考状态，不再覆盖完整列表。恢复会话时 adapter 捕获 resume 快照。模型图像输入能力从同一条模型元数据读出，发送图片前再核对当前会话的原生模型读回。
 
-从运行时负载（会话快照 `settings`、`state.updated` 广播 patch）解析出规范化目录：模型条目（providerId/modelId/label/providerLabel/contextWindow/maxOutputTokens/reasoningLevels/defaultReasoningLevel/supportsImageInput）、currentModel、thoughtLevels、currentThoughtLevel、currentMode、slashCommands（name/description/inputHint/source）。**绝不硬编码镜像**——payload 无目录时返回 null（调用方如实报不可用）。`patchZCodeCatalogSettings` 负责把广播 patch 叠在基准 settings 上。校验器：`validateZCodeModelSelection`（目录内模型才放行；reasoningLevel 需在该模型 levels 内、缺省取 defaultLevel、必需未给或档位不支持一律发送前拒绝）、`validateZCodeThoughtLevel`、`validateZCodeMode`（plan/build/edit/yolo/auto 枚举）。
+从运行时负载（会话快照 `settings`、`state.updated` 广播 patch）解析出规范化目录：模型条目（providerId/modelId/label/providerLabel/contextWindow/maxOutputTokens/reasoningLevels/defaultReasoningLevel/supportsImageInput）、currentModel、thoughtLevels、currentThoughtLevel、currentMode、slashCommands（name/description/inputHint/source）。**绝不硬编码镜像**——payload 无目录时返回 null（调用方如实报不可用）。`patchZCodeCatalogSettings` 负责把广播 patch 叠在基准 settings 上。校验器：`validateZCodeModelSelection`（目录内模型才放行；reasoningLevel 需在该模型 levels 内、缺省取 defaultLevel、必需未给或档位不支持一律发送前拒绝）、`validateZCodeThoughtLevel`、`validateZCodeMode`（plan/build/edit/yolo/guarded/auto 枚举）。
 
 每模型 `reasoningLevel` 经 `session/setModel.model.options` 写入并从同会话 `session/read.settings.model.current.options` 核验；独立 `thoughtLevel` 经 `session/setThoughtLevel` 写入后，也必须从同会话 `session/read.settings.thoughtLevel.current` 核验。不匹配时抛错，不能把请求受理当作生效。
 

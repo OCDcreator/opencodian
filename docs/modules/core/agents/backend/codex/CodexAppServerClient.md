@@ -1,5 +1,7 @@
 # CodexAppServerClient
 
+> 2026-11-13（Codex 0.169.0）：**skills/list 参数改为 `cwds: string[]`**。`listSkills` 与 `listSkillGroups` 现在把 `options.cwd` 序列化为 `cwds: [cwd]`（保留 `forceReload` 与分组/错误透传）。0.169.0 起单数 `cwd` 字段被 serde 静默丢弃，旧写法会把作用域悄悄解析到 app-server spawn cwd（spawn cwd 即 vault 时被掩盖；显式跨目录读取会读错来源）。分组 readback 里服务端返回的 group `cwd` 即运行时作用域证据。`subscribeToThreadNotifications` 新增订阅 `item/reasoning/summaryTextDelta`、`item/reasoning/summaryPartAdded`、`turn/diff/updated`；明确不订阅已废弃且 v2 事件路径不再发送的 `thread/compacted`（压缩完成证据是 `contextCompaction` item 的 started/completed 对，由 CodexAdapter 逐请求绑定）。live 探针（隔离 CODEX_HOME、无模型回合，CLI 0.169.0）证实：单数 `cwd` 请求返回 spawn 工作区分组，`cwds:[requested]` 返回 requested 工作区分组。
+
 > 2026-10-08：五条 typed server-request 注册透传可选请求取消 signal，旧的无 signal 调用契约保持。signal 生命周期来自 transport 的逐请求控制器。
 
 > **源码**: `src/core/agents/backend/codex/CodexAppServerClient.ts`

@@ -1,5 +1,7 @@
 # CodexAuxQuerySession
 
+> 2026-11-13：`AppServerStreamState` 构造点补齐 `streamedReasoningSummaryItemIds`（mapper 新增的 summary/raw 推理去重契约）；aux 回合只消费 `text`/`tool_use` chunk，新增的 summary thinking chunk 对 aux 结果无影响。
+
 > **源码**: `src/core/agents/backend/auxiliary/CodexAuxQuerySession.ts`
 > **状态**: [REVIEW]
 

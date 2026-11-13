@@ -27,20 +27,57 @@ export interface ZCodeAccountServiceOptions {
   readonly timeoutMs?: number;
 }
 
-/** Read only the profile summary using the official enc:v1 codec (a60ba6a7).
- * Access/refresh tokens never cross this service's public interface. */
+/** Official system cipher primitives (native systemCredentialCipher.ts, snapshot fec975905, v3.18.2):
+ * key = sha256(secret utf8) digest, fingerprint = sha256(key bytes).hex.slice(0, 24),
+ * sealed payload = base64url(iv).base64url(tag).base64url(ciphertext) AES-256-GCM.
+ * The official codec lives inside the runtime bundle (no importable package), so the
+ * byte shape is mirrored here instead of loading the bundle into the plugin process. */
+function credentialDigest(value: string | Buffer): Buffer { return createHash('sha256').update(value).digest(); }
+
+/** Same resolution order as the pinned account environment, so login, aux queries and
+ * summary reads always agree on one key. Secret files are never read here. */
+function resolveCredentialSecret(env: Readonly<Record<string, string | undefined>>): string {
+  let username = 'unknown';
+  try { username = os.userInfo().username; } catch { /* Match the native fallback. */ }
+  return env.ZCODE_CREDENTIAL_SECRET?.trim()
+    || `zcode-credential-fallback:${os.platform()}:${os.homedir()}:${username}`;
+}
+
+/** Shared aes-256-gcm open for the native sealed payload used by v1 and v2 envelopes. */
+function openSealedPayload(parts: readonly string[], key: Buffer): string {
+  if (parts.length !== 3 || parts.some((part) => !/^[A-Za-z0-9_-]*$/.test(part))) throw new Error('zcode-credentials-invalid');
+  const [iv, tag, ciphertext] = parts.map((part) => Buffer.from(part, 'base64url'));
+  if (iv.length !== 12 || tag.length !== 16 || ciphertext.length === 0) throw new Error('zcode-credentials-invalid');
+  try {
+    const decipher = createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(tag);
+    return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
+  } catch { throw new Error('zcode-credentials-invalid'); }
+}
+
+/** Read only the profile summary using the official credential codecs (snapshot fec975905):
+ * the legacy `enc:v1:` envelope and the system `enc:v2:{os|env}:<fingerprint24>:`
+ * envelope that current runtimes write (including their automatic in-place v1→v2
+ * migration, which would otherwise flip a signed-in account to unreadable). Only the
+ * env (managed-secret) source is decodable in-process; os values use an OS keychain
+ * key, stay unreadable by design, and never touch the keychain. Access/refresh
+ * tokens never cross this service's public interface. */
 function decodeProfile(value: string, env: Record<string, string>): Record<string, unknown> {
   let text = value;
   if (value.startsWith('enc:v1:')) {
-    const parts = value.slice(7).split('.');
-    if (parts.length !== 3) throw new Error('zcode-credentials-invalid');
-    const [iv, tag, ciphertext] = parts.map((part) => Buffer.from(part, 'base64url'));
-    if (iv.length !== 12 || tag.length !== 16) throw new Error('zcode-credentials-invalid');
-    const secret = env.ZCODE_CREDENTIAL_SECRET?.trim()
-      || `zcode-credential-fallback:${os.platform()}:${os.homedir()}:${os.userInfo().username}`;
-    const decipher = createDecipheriv('aes-256-gcm', createHash('sha256').update(secret).digest(), iv);
-    decipher.setAuthTag(tag);
-    text = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
+    text = openSealedPayload(value.slice(7).split('.'), credentialDigest(resolveCredentialSecret(env)));
+  } else if (value.startsWith('enc:v2:')) {
+    const [source, fingerprint, sealed, ...unexpected] = value.slice(7).split(':');
+    if (unexpected.length > 0 || source !== 'env' || !sealed || !/^[a-f0-9]{24}$/.test(fingerprint ?? '')) {
+      throw new Error('zcode-credentials-invalid');
+    }
+    const key = credentialDigest(resolveCredentialSecret(env));
+    // Mirror the native fingerprint gate: a mismatch means the key material changed,
+    // so refuse up front instead of degrading into an opaque auth failure.
+    if (credentialDigest(key).toString('hex').slice(0, 24) !== fingerprint) throw new Error('zcode-credentials-invalid');
+    text = openSealedPayload(sealed.split('.'), key);
+  } else if (value.startsWith('enc:')) {
+    throw new Error('zcode-credentials-invalid');
   }
   return zcodeRecord(JSON.parse(text));
 }
@@ -62,11 +99,20 @@ export class ZCodeAccountService {
     const configured = this.options.getEnvironment?.() ?? {};
     // Aux queries deliberately replace HOME. Pin the official cipher's normal
     // local-user key so that they can read the same plugin credentials.
-    let username = 'unknown';
-    try { username = os.userInfo().username; } catch { /* Match the native fallback. */ }
-    const secret = configured.ZCODE_CREDENTIAL_SECRET?.trim() || process.env.ZCODE_CREDENTIAL_SECRET?.trim()
-      || `zcode-credential-fallback:${os.platform()}:${os.homedir()}:${username}`;
-    return { ...configured, ZCODE_DATA_BASE_DIR: this.rootPath, ZCODE_CREDENTIAL_SECRET: secret };
+    const secret = resolveCredentialSecret({
+      ZCODE_CREDENTIAL_SECRET: configured.ZCODE_CREDENTIAL_SECRET?.trim() || process.env.ZCODE_CREDENTIAL_SECRET,
+    });
+    return {
+      ...configured,
+      ZCODE_DATA_BASE_DIR: this.rootPath,
+      ZCODE_CREDENTIAL_SECRET: secret,
+      // The plugin owns this account secret, so children must never see a competing
+      // managed-secret file (inherited or configured): the official cipher refuses
+      // when both sources are set. Empty string keeps the pinned env source exclusive
+      // without reading any user secret file. Applies to login/logout, the app-server
+      // child, and aux sessions because they all merge this record last.
+      ZCODE_CREDENTIAL_SECRET_FILE: '',
+    };
   }
 
   revision(): string {

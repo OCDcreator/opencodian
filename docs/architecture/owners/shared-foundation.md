@@ -8,6 +8,8 @@
 > 2026-09-18 (R-B3 编辑回退): 新增 `src/shared/editRevertPlan.ts` 归属本 owner —— 编辑回退的纯规划核心（写工具分类、路径/候选提取、保留淘汰规划、侧栏视图模型）。零 Obsidian 依赖，禁止引入 core/feature/app import；单测在 `tests/unit/shared/editRevertPlan.test.ts`。
 
 # Owner: shared.foundation
+
+2026-11-13：toolIdentity 的同一内置字典同步当前 Claude 工具名称；Agent 复用 task 类型，PowerShell、工作流、监控、工作树、定时和消息工具使用明确的 builtin 显示身份。MCP 前缀和 custom/unknown 回退保持原语义；该字典不拥有工具授权、调度或后台任务生命周期，不因名称命中就扩大执行权限。
 > 2026-09-30 (Codex 0.159 integration)：toolIdentity.ts 新增 `'image'` 的 `ToolIdentityKind` 与 registry 条目（`image_generation`，icon `image`）。
 > 2026-09-21 (advantage-parity R-F3 质量修复)：editRevertPlan 新增 `EDIT_REVERT_POST_BASELINE_BUDGET_MS` 常量（post baseline 冻结墙钟预算）并经 index barrel 导出；仍是零 Obsidian 依赖的纯规划面。
 > 2026-09-21 (advantage-parity R-F3)：editRevertPlan 的纯规划面新增/导出回退预览行数与冲突相关计算契约；继续零 Obsidian 依赖，实际文件读取、blob 保留及写回仍归 core.storage。

@@ -1,5 +1,7 @@
 # SettingsZCodeSection
 
+2026-11-13：权限页增加原生 `guarded` 选择，双语说明只在运行时识别到危险 shell 命令时暂停；默认值仍经过同一规范化、仓库保存与新会话物化边界，运行中会话仍由原生模式选择器控制。不把该模式描述成系统沙箱，也不自动改写用户已保存的模式。
+
 > 2026-09-22（二轮核查修复）：provider 计数为 null 时改显示「provider 数量不可用」（`settings.zcode.status.providerValidatedNoCount`），不再把未知折成 0。
 
 > 2026-09-24 (票 06)：新增默认模型/思考级别/模式三项持久化默认字段；重连按钮追加 invalidateSlashCommandCatalog（设置/运行时变化后斜杠目录即时失效而非等 120s TTL）。

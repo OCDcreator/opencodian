@@ -65,3 +65,4 @@ interface ToolIdentity {
 - `StructuredOutput` / `structured_output` 仍会被归一到同一规范名，保证内部过滤逻辑不回归。
 - 2026-06-07 新增 6 个 Claude Code Task* 工具定义：`task_create`（Task Create）、`task_update`（Task Update）、`task_list`（Task List）、`task_get`（Task Get）、`task_output`（Task Output）、`task_stop`（Task Stop）。这些是 Claude Code 运行时实际可用的任务管理工具（非 TodoWrite），全部归类为 `builtin`、使用 `list-checks` 或 `wrench` 图标。
 - 2026-09-30：`ToolIdentityKind` 新增 `'image'`；builtin 表新增 `image_generation`（normalizedName `image_generation`，显示名 `Image Generation`，图标 `image`）。仅 Codex app-server mapper 发出该 kind（`imageGeneration` / `image_generation_call` item），其它后端不受影响。
+- 2026-11-13：同步当前 Claude 内置名称：`Agent` 归一到既有 `task` 类型和子任务图标；PowerShell、Workflow、Monitor、SendMessage/SubagentHandback、EnterWorktree/ExitWorktree、CronCreate/Delete/List、ScheduleWakeup、RemoteTrigger、ToolSearch 使用明确的 builtin 图标。既有 Task* 字典继续复用，MCP 前缀与未知外部工具仍按原规则识别；这里只管理显示身份，不决定权限、调度或是否允许工具执行。

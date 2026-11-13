@@ -98,6 +98,13 @@ export interface ClaudeCodeSdkOptionsShape {
   systemPrompt: { type: 'preset'; preset: 'claude_code'; append?: string; snapshot?: boolean };
   tools: string[] | { type: 'preset'; preset: 'claude_code' };
   settingSources: ClaudeCodeSettingSource[];
+  /**
+   * Native SDK permission mode (default/acceptEdits/bypassPermissions/plan/
+   * dontAsk/auto). Only `bypassPermissions` may pair with
+   * `allowDangerouslySkipPermissions` — the builder sets that flag for
+   * `bypassPermissions` and for no other mode, so a mapping bug cannot loosen
+   * dontAsk/plan/default into a skip-permissions session.
+   */
   permissionMode?: ClaudeCodePermissionMode;
   allowDangerouslySkipPermissions?: boolean;
   thinking?: ClaudeCodeSdkThinking;

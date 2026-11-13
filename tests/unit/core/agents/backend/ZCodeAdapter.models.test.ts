@@ -301,6 +301,18 @@ describe('ZCodeAdapter — native readback and turn boundaries', () => {
     expect(calls.at(-1)?.method).toBe('session/read');
   });
 
+  it('applies a guarded default and confirms guarded again after a live session change', async () => {
+    await startAdapter({ mode: 'guarded' });
+    await adapter.createSession();
+    expect(await adapter.readSessionMode('sess_a')).toBe('guarded');
+    await adapter.setSessionMode('sess_a', 'build');
+    expect(await adapter.readSessionMode('sess_a')).toBe('build');
+    await adapter.setSessionMode('sess_a', 'guarded');
+    expect(await adapter.readSessionMode('sess_a')).toBe('guarded');
+    expect(calls.filter((call) => call.method === 'session/setMode').map((call) => call.params?.['mode']))
+      .toEqual(['guarded', 'build', 'guarded']);
+  });
+
   it('confirms independent plan state only from the native session event readback', async () => {
     await startAdapter();
     await adapter.createSession();

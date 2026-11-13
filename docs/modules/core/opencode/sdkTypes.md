@@ -84,3 +84,7 @@ graph LR
 - 该文件不负责把 SDK message/session/event 转成插件内部 `ChatMessage` / `StreamChunk`；真正的归一化逻辑在 `OpenCodeService.ts`。
 - 当前升级到 `@opencode-ai/sdk@1.4.1` 后，SDK v2 的 import path 仍保持稳定；像 `session.diff()` 这类 `1.4.x` payload 形状变化继续由 service 层兼容，不直接泄漏到 UI。
 - 如果 SDK v2 升级导致类型名或 import path 变化，应优先更新这里，再处理调用方编译错误。
+
+## 2026-11-13 来源注释修正
+
+文件头 "Source of truth" 此前引用不存在的 `reference-projects/opencode` 检出，现改为官方 `anomalyco/opencode` `v1.19.5` 标签（`v1` 分支）`packages/sdk/js/src/v2` 的固定 URL。类型桥接行为与导出未变。

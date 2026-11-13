@@ -18,6 +18,7 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 
 import { appendObsidianContextBlocks } from '../../../../shared/obsidianContext';
+import { BackendSessionCatalogReadError } from '../../../../shared/sessionCatalogReadback';
 import { prependMemoryInjection } from '../../../memory';
 import { prependObsidianToolingInjection } from '../../../obsidianTooling';
 import type { PermissionReply, PermissionRequest, QuestionRequest } from '../../../types';
@@ -58,7 +59,6 @@ import {
   ZCodeTransportError,
 } from './ZCodeAppServerTransport';
 import { ZCodeAuxQuerySession } from './ZCodeAuxQuerySession';
-import { openZCodeDesktopTaskIndex, type ZCodeDesktopTaskIndex } from './ZCodeDesktopTaskIndex';
 import { hasInvalidZCodeImageAttachment, toZCodeImageInput, verifyZCodeImageModelForSend, zCodeImageModelUnavailableChunk, zCodeImageRejectionChunk } from './ZCodeImageAttachment';
 import { ZCodeInlineCompletionSession } from './ZCodeInlineCompletionSession';
 import {
@@ -78,6 +78,7 @@ import { asRecordValue, redactZCodeDiagnosticText, ZCodeProtocolErrorCode } from
 import {
   parseZCodeRuntimeCapabilities,
   type ZCodeRuntimeCapabilities,
+  zcodeRuntimeCapabilitiesRequestParams,
 } from './ZCodeProtocolTypes';
 import type { ZCodeProviderConfigSnapshot } from './ZCodeProviderConfigDiscovery';
 import {
@@ -86,7 +87,6 @@ import {
 } from './ZCodeProviderConfigDiscovery';
 import {
   getZCodeRuntimeErrorMessage,
-  resolveOfficialZCodeDesktopBundle,
   resolveZCodeRuntime,
   type ZCodeRuntimeLaunch,
   type ZCodeRuntimeResolution,
@@ -96,6 +96,14 @@ import { readZCodeContextUsage, toZCodeSessionEvent, type ZCodeSessionEvent, ZCo
 
 /** Honest handshake state for the settings/status surface. */
 export type ZCodeHandshakeState = 'idle' | 'connecting' | 'ready' | 'failed';
+
+/**
+ * Page size for the native history catalog. The official `session/list`
+ * supports a positive-int `limit` (default 50) and has NO cursor, so no
+ * fixed value can prove completeness: a full page is reported as partial,
+ * never silently presented as the whole history.
+ */
+export const ZCODE_SESSION_HISTORY_LIMIT = 200;
 
 /** One in-flight foreground turn: its event queue and cancellation flag. */
 interface ZCodeActiveRun {
@@ -158,7 +166,6 @@ export interface ZCodeAdapterOptions {
   resolveRuntime?: (options: ZCodeRuntimeResolverOptions) => ZCodeRuntimeResolution;
   discoverProviderConfig?: (options: ZCodeProviderConfigDiscoveryOptions) => ZCodeProviderConfigSnapshot;
   createTransport?: (options: ConstructorParameters<typeof ZCodeAppServerTransport>[0]) => ZCodeAppServerTransport;
-  openTaskIndex?: (entryPath: string, dataRoot: string) => ZCodeDesktopTaskIndex;
   handshakeTimeoutMs?: number;
 }
 
@@ -253,7 +260,7 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
   private readonly goalSessions = new Set<string>();
   private readonly goalReads = new Map<string, Promise<AgentGoalReadback>>();
 
-  /** Chat + native sessions + fork/compaction are wired; tools/permissions/models land in their own tickets. */
+  /** Wired backend-neutral surfaces; native admission alone never proves turn steering. */
   readonly capabilities: BackendCapabilities = new Set<AgentCapability>([
     AgentCapability.Chat,
     AgentCapability.Goal,
@@ -439,7 +446,11 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
     }
 
     try {
-      const result = await transport.request('runtime/capabilities', {});
+      // Host capabilities are advertised only when actually implemented
+      // (currently none): unimplemented flags stay omitted so the runtime
+      // keeps its fail-closed defaults instead of trusting us with
+      // directorySessionId computation or workspace-lineage routing.
+      const result = await transport.request('runtime/capabilities', zcodeRuntimeCapabilitiesRequestParams());
       this.capabilitiesReadback = parseZCodeRuntimeCapabilities(result);
       this.handshake = 'ready';
       this.setStatus('connected');
@@ -833,24 +844,37 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
   }
 
   /**
-   * List native sessions as raw records; the routing layer normalizes rows
-   * (`sessionId`/`title`/`updatedAt`) per backend kind.
+   * List this vault's native sessions as raw records; the routing layer
+   * normalizes rows (`sessionId`/`title`/`updatedAt`) per backend kind.
+   *
+   * Scoped to the adapter workspace and filtered server-side: the native
+   * catalog omits `time.deleted` tombstones itself, so no desktop-index
+   * bridge participates. The official `session/list` has no cursor and its
+   * default limit is 50; requesting a raised page still cannot prove
+   * completeness, so a full page throws `BackendSessionCatalogReadError`
+   * with the admitted rows as honestly partial instead of fabricating
+   * completion or a cursor.
    */
   async listSessions(): Promise<unknown[]> {
     const transport = this.requireTransport();
-    const result = await transport.request('session/list', {});
+    const workspacePath = this.options.workingDirectory ?? '';
+    const result = await transport.request('session/list', {
+      ...(workspacePath ? { workspace: { workspacePath, workspaceKey: workspacePath } } : {}),
+      limit: ZCODE_SESSION_HISTORY_LIMIT,
+    });
     const sessions = asRecordValue(result)['sessions'];
-    if (!Array.isArray(sessions)) return [];
-    const resolution = this.resolution;
-    if (resolution?.mode !== 'ready' || path.basename(resolution.launch.entryPath) !== 'zcode.cjs' || !this.options.workingDirectory) return sessions;
-    const repo = this.openTaskIndex();
-    try {
-      const workspacePath = this.options.workingDirectory ?? '';
-      const deleted = new Set(await repo.listDeletedTaskIds({ workspacePath, provider: 'glm' }));
-      return sessions.filter((session) => !deleted.has(asRecordValue(session)['sessionId'] as string));
-    } finally {
-      repo.close();
+    if (!Array.isArray(sessions)) {
+      throw new BackendSessionCatalogReadError({
+        status: 'failed', data: [], nextCursor: null, errorReason: 'Invalid session catalog response',
+      });
     }
+    if (sessions.length >= ZCODE_SESSION_HISTORY_LIMIT) {
+      throw new BackendSessionCatalogReadError({
+        status: 'partial', data: sessions, nextCursor: null,
+        errorReason: 'ZCode native history reached the configured page limit; older sessions may be hidden.',
+      });
+    }
+    return sessions;
   }
 
   /**
@@ -1024,12 +1048,10 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
   // -------------------------------------------------------------------------
 
   /**
-   * Rejects fail-closed until a dedicated scope has completed the required
-   * audit. The official protocol has real allow/deny enforcement and native
-   * message tool readback, but this adapter currently shares user storage and
-   * has not proven an isolated lifecycle, image turn, no-write snapshot, and
-   * cleanup. No generic auxiliary session is started — never a degraded unsafe
-   * mode.
+   * Open an audited auxiliary scope with its own app-server, HOME and native
+   * session database. Only the plugin-owned credential environment crosses
+   * that boundary; the scope verifies an empty native tool set on every turn
+   * and fails closed on missing readback or tool activity.
    */
   async startAuxQuerySession(config: AuxQuerySessionConfig): Promise<AuxQuerySession> {
     const resolution = this.resolution;
@@ -1089,7 +1111,16 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
     });
   }
 
-  /** Apply the official desktop task-index tombstone, never V4 handle close. */
+  /**
+   * Persistently delete one native session through the official V4
+   * `deleteSession` command: the runtime soft-deletes the persisted record
+   * first (`time.deleted` tombstone, honored by native `session/list` /
+   * `session/resume`), then closes its handle. The target is validated
+   * before any mutation (same native ID, `interactive` kind, current vault
+   * workspace), and success requires the same-ID catalog readback to stop
+   * returning the session — an accepted ACK alone is never treated as
+   * deletion.
+   */
   async deleteSession(sessionId: string): Promise<void> {
     const workspacePath = this.options.workingDirectory ?? '';
     if (!sessionId || !workspacePath) throw new Error('ZCode session deletion requires a session ID and workspace.');
@@ -1097,8 +1128,8 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
     const native = asRecordValue(await transport.request('session/list', { sessionIds: [sessionId] }));
     const row = (Array.isArray(native['sessions']) ? native['sessions'] : [])
       .map(asRecordValue).find((session) => session['sessionId'] === sessionId);
-    // A deferred empty session has no persisted index row; the official V4
-    // command merely disposes that in-process draft.
+    // A deferred empty session has no persisted row; the official V4
+    // command disposes that in-process draft.
     if (!row) {
       return this.deleteDeferredSession(transport, sessionId);
     }
@@ -1106,69 +1137,40 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
     if (workspace['workspacePath'] !== workspacePath || row['sessionKind'] !== 'interactive') {
       throw new Error('ZCode session deletion rejected a workspace or session-kind mismatch.');
     }
-    const repo = this.openTaskIndex();
-    try {
-      const scope = { workspacePath, provider: 'glm' as const };
-      const before = new Set(await repo.listDeletedTaskIds(scope));
-      if (before.has(sessionId)) return;
-      const meta = {
-        taskId: sessionId,
-        traceId: String(row['traceId'] ?? `zcode-${sessionId}`),
-        title: String(row['title'] ?? ''),
-        titleOverridden: row['titleSource'] === 'custom',
-        workspacePath,
-        createdAt: Number(row['createdAt']),
-        updatedAt: Number(row['updatedAt']),
-        mode: 'default',
-        provider: 'glm' as const,
-        status: 'completed',
-      };
-      if (!Number.isFinite(meta.createdAt) || !Number.isFinite(meta.updatedAt)) {
-        throw new Error('ZCode session deletion requires native timestamps.');
-      }
-      const seeded = await repo.seedTaskMetaIfMissing(meta);
-      if (seeded.taskId !== sessionId) throw new Error('ZCode task-index seed returned the wrong session.');
-      const changed = await repo.updateTaskState({ workspacePath, taskId: sessionId, patch: { deleted: true } });
-      if (changed.taskId !== sessionId) throw new Error('ZCode task-index deletion returned the wrong session.');
-      const after = new Set(await repo.listDeletedTaskIds(scope));
-      if (!after.has(sessionId) || after.size !== before.size + 1
-        || [...before].some((id) => !after.has(id))) {
-        throw new Error('ZCode task-index deletion was not confirmed for the selected session only.');
-      }
-    } finally {
-      repo.close();
-    }
+    await this.deleteNativeSession(transport, sessionId);
   }
 
-  private async deleteDeferredSession(transport: ZCodeAppServerTransport, sessionId: string): Promise<void> {
-    const raw = asRecordValue(await transport.request('session/list', {}));
-    if (Array.isArray(raw['sessions']) && raw['sessions'].some((session) => asRecordValue(session)['sessionId'] === sessionId)) {
-      throw new Error('ZCode session deletion rejected a session outside this workspace.');
-    }
-    await this.ensureSessionActive(transport, sessionId);
+  /**
+   * Shared native delete: V4 `deleteSession` command, then the authoritative
+   * same-ID readback. Because `session/list` filters tombstoned records
+   * server-side, a session that survives the readback proves the persisted
+   * delete did not happen (e.g. an older runtime whose V4 delete only closed
+   * the handle) and must surface as a failure, not as success.
+   */
+  private async deleteNativeSession(transport: ZCodeAppServerTransport, sessionId: string): Promise<void> {
     const ack = asRecordValue(await transport.request('v4/command', {
       commandId: randomUUID(), clientId: 'opencodian', sessionId,
       type: 'deleteSession', payload: {}, issuedAt: Date.now(),
     }));
     if (ack['status'] !== 'accepted' && ack['status'] !== 'noop') {
-      throw new Error('ZCode deferred session deletion was rejected.');
+      throw new Error('ZCode session deletion was rejected by the native V4 command.');
     }
     const after = asRecordValue(await transport.request('session/list', { sessionIds: [sessionId] }));
     if (Array.isArray(after['sessions']) && after['sessions'].length > 0) {
-      throw new Error('ZCode deferred session deletion was not confirmed.');
+      throw new Error('ZCode session deletion was not confirmed by the native catalog readback.');
     }
   }
 
-  private openTaskIndex(): ZCodeDesktopTaskIndex {
-    const resolution = this.resolution;
-    const config = this.providerConfig;
-    if (resolution?.mode !== 'ready' || !config) throw new Error('ZCode desktop task index is unavailable.');
-    // 本地源码 CLI 可以承载新协议，但桌面任务列表仍由已安装桌面包的官方索引拥有。
-    // 两个入口分别解析，避免将 CLI 覆盖路径误当作 TaskIndexRepo 的来源。
-    const entryPath = this.options.openTaskIndex
-      ? resolution.launch.entryPath
-      : resolveOfficialZCodeDesktopBundle() ?? resolution.launch.entryPath;
-    return (this.options.openTaskIndex ?? openZCodeDesktopTaskIndex)(entryPath, config.dataRoot);
+  private async deleteDeferredSession(transport: ZCodeAppServerTransport, sessionId: string): Promise<void> {
+    const workspacePath = this.options.workingDirectory ?? '';
+    const raw = asRecordValue(await transport.request('session/list', {
+      ...(workspacePath ? { workspace: { workspacePath, workspaceKey: workspacePath } } : {}),
+    }));
+    if (Array.isArray(raw['sessions']) && raw['sessions'].some((session) => asRecordValue(session)['sessionId'] === sessionId)) {
+      throw new Error('ZCode session deletion rejected a session outside this workspace.');
+    }
+    await this.ensureSessionActive(transport, sessionId);
+    await this.deleteNativeSession(transport, sessionId);
   }
 
   /** Official desktop V4 rename; success requires two same-ID native reads. */
@@ -1523,7 +1525,7 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
     await this.modelSurface.setSessionThoughtLevel(transport, (sid) => this.ensureSessionActive(transport, sid), sessionId, level);
   }
 
-  /** Set a session's mode (plan/build/edit/yolo/auto) after enum validation. */
+  /** Set a native session mode after the shared model surface validates it. */
   async setSessionMode(sessionId: string, mode: string): Promise<void> {
     const transport = this.requireTransport();
     await this.modelSurface.setSessionMode(transport, (sid) => this.ensureSessionActive(transport, sid), sessionId, mode);
@@ -1577,8 +1579,19 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
       return;
     }
     this.observeGoalActivity({ ...event, sessionId: event.sessionId });
-    if (event.type === 'permission.resolved' && typeof event.payload['requestId'] === 'string') {
-      this.interactions.settleNativeResolvedRequest(event.sessionId, event.payload['requestId']);
+    // Native-side resolution must retire the pending surface ask with the
+    // same sessionId+requestId identity: `permission.resolved` (decided
+    // elsewhere) and `userInput.resolved` (question answered elsewhere, or
+    // the official AskUserQuestion auto-resolution). Both are ignored for
+    // unknown request IDs, and a settled ask can never be settled twice;
+    // late plugin answers reject through the exactly-once bridge. Ordinary
+    // permission asks are never auto-resolved upstream — only questions.
+    const resolvedRequestId = (event.type === 'permission.resolved' || event.type === 'userInput.resolved')
+      && typeof event.payload['requestId'] === 'string'
+      ? event.payload['requestId']
+      : null;
+    if (resolvedRequestId) {
+      this.interactions.settleNativeResolvedRequest(event.sessionId, resolvedRequestId);
     }
     if (event.type === 'session.updated') {
       const payload = event.payload;

@@ -23,10 +23,13 @@ describe('Claude Code permission mode selector', () => {
 
       expect(config.backendLabel).toBe('claude-code');
       expect(config.variantClass).toBe('opencodian-permission-selector--claude-code');
+      // Native SDK order with the destructive bypass mode kept last.
       expect(config.options.map((option) => option.id)).toEqual([
         'default',
         'acceptEdits',
         'plan',
+        'dontAsk',
+        'auto',
         'bypassPermissions',
       ]);
     });
@@ -37,11 +40,21 @@ describe('Claude Code permission mode selector', () => {
       expect(config.displayMap.default).toBe('Ask first');
       expect(config.displayMap.acceptEdits).toBe('Auto edit');
       expect(config.displayMap.plan).toBe('Plan mode');
+      expect(config.displayMap.dontAsk).toBe('Deny unapproved');
+      expect(config.displayMap.auto).toBe('Auto classify');
       expect(config.displayMap.bypassPermissions).toBe('Full access');
 
       const bypassOption = config.options.find((option) => option.id === 'bypassPermissions');
       expect(bypassOption?.label).toBe('Full access');
       expect(bypassOption?.description).toContain('bypasses permission checks');
+    });
+
+    it('describes the restrictive dontAsk mode as deny-not-preapproved, never as bypass', () => {
+      const config = createClaudeCodePermissionConfig();
+
+      const dontAskOption = config.options.find((option) => option.id === 'dontAsk');
+      expect(dontAskOption?.description).toContain('denied');
+      expect(dontAskOption?.description.toLowerCase()).not.toContain('bypass');
     });
 
     it('assigns distinct Claude mode icons instead of a single generic shield', () => {
@@ -51,6 +64,8 @@ describe('Claude Code permission mode selector', () => {
         'hand',
         'shield-check',
         'clipboard-list',
+        'shield-off',
+        'sparkles',
         'shield-alert',
       ]);
     });
@@ -104,6 +119,8 @@ describe('Claude Code permission mode selector', () => {
         'default',
         'acceptEdits',
         'plan',
+        'dontAsk',
+        'auto',
         'bypassPermissions',
       ]);
       expect(options.map((option) =>
@@ -112,6 +129,8 @@ describe('Claude Code permission mode selector', () => {
         'hand',
         'shield-check',
         'clipboard-list',
+        'shield-off',
+        'sparkles',
         'shield-alert',
       ]);
 
@@ -170,7 +189,8 @@ describe('Claude Code permission mode selector', () => {
       await Promise.resolve();
       await Promise.resolve();
 
-      expect(currentMode).toBe('plan');
+      // ArrowUp from the last option (bypassPermissions) lands on auto.
+      expect(currentMode).toBe('auto');
       expect(trigger?.getAttribute('aria-expanded')).toBe('false');
       expect(host.restoreInputFocus).toHaveBeenCalledTimes(1);
 

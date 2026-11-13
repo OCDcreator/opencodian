@@ -1,5 +1,15 @@
 # Settings Types and Defaults
 
+## 2026-11-13 Backend runtime refresh: native Claude permission modes and ZCode guarded
+
+`ClaudeCodePermissionMode` now covers all six native Claude Agent SDK modes: `default`, `acceptEdits`, `bypassPermissions`, `plan`, `dontAsk`, `auto` (declarations byte-identical in SDK 0.3.312 through 0.3.323). `normalizeClaudeCodePermissionMode` passes all six through unchanged; the legacy alias `normal` still maps to `default`, and unknown values fall back to `default`.
+
+Migration note (reviewed, tighten-only): before this change a raw stored `dontAsk` normalized to `bypassPermissions` — the semantically opposite mode (native `dontAsk` denies anything not pre-approved; `bypassPermissions` skips permission checks) — and raw `auto` degraded to `default`. Raw `dontAsk` values now keep native `dontAsk` semantics, which only tightens relative to the old buggy readback and never loosens a saved permission. The ordinary settings UI never offered `dontAsk`/`auto` before, so only hand-edited/imported values were affected. Persistence: `normalizeClaudeCodeBackendSettings` keeps `dontAsk`/`auto` through load normalization. Application: `buildClaudeCodeOptions` forwards the mode verbatim and gates `allowDangerouslySkipPermissions` strictly on `bypassPermissions`. Runtime readback of `auto` eligibility is not proven: availability depends on the CLI/model classifier (`supportsAutoMode`); a rejected live switch surfaces as a failed apply, never a silent fallback claim.
+
+`ZCodeBackendSettings.mode` adds `guarded` (the native ZCode full-access grant mode where recognized risky shell commands pause for confirmation; present in the runtime config schema since 3.18.x). `normalizeZCodeBackendSettings` accepts `plan`/`build`/`edit`/`yolo`/`guarded`/`auto` and still collapses anything else to the empty runtime default. The settings UI and live `ZCODE_MODES` validation are owned by the ZCode settings/catalog modules; this module only owns the persisted schema.
+
+Focused coverage: `tests/unit/core/types/claudeCodeBackendSettingsNormalization.test.ts` (`normalizeClaudeCodePermissionMode` pass-through, the dontAsk-never-loosens regression, alias/unknown fallback, load round-trip) and `tests/unit/core/types/zcodeBackendSettings.test.ts` (guarded acceptance and `normalizeBackendSettings` round-trip).
+
 ## 2026-11-09 DSH native configuration envelope
 
 `DshBackendSettings.nativeConfig?: DshNativeConfiguration` references the sibling `core/types/dshConfiguration.ts` DTO. It stores a version-1 partial namespace map of non-secret native overrides; absence or empty overrides means inherit. `normalizeDshBackendSettings` keeps the field absent for older settings and preserves supplied values, including invalid persisted envelopes, so the dedicated validator and UI can explain the original problem. It never prunes an invalid configuration into a successful-looking empty one. Existing executable/path/args/env/profile/transport/MCP normalization remains unchanged.

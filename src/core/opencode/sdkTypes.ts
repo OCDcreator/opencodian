@@ -1,8 +1,9 @@
 /**
  * OpenCode JS SDK v2 type bridge.
  *
- * Source of truth:
- * - `reference-projects/opencode/packages/sdk/js/src/v2`
+ * Source of truth (official upstream, pinned to the plugin's `@opencode-ai/sdk`
+ * 1.19.5 tag on the legacy `v1` branch):
+ * - https://github.com/anomalyco/opencode/blob/v1.19.5/packages/sdk/js/src/v2
  */
 
 import type {

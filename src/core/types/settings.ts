@@ -651,7 +651,27 @@ export function normalizeInlineEditPresetPrompts(value: unknown): InlineEditPres
 export type ThinkingBudget = 0 | 1024 | 4096 | 8192 | 16384;
 
 export type ClaudeCodeSettingSource = 'user' | 'project' | 'local';
-export type ClaudeCodePermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
+/**
+ * Native Claude Agent SDK permission modes (SDK >= 0.3.312 declarations,
+ * byte-identical through 0.3.323 `PermissionMode`):
+ * - `default` — standard behavior; prompts for dangerous operations.
+ * - `acceptEdits` — auto-accept file edit operations.
+ * - `bypassPermissions` — bypass all permission checks; the options builder
+ *   must also send `allowDangerouslySkipPermissions: true` for this one.
+ * - `plan` — planning mode; no tool execution.
+ * - `dontAsk` — never prompt; deny any tool not pre-approved (restrictive).
+ * - `auto` — model classifier approves/denies each call, prompting through
+ *   `canUseTool` when it cannot decide. Availability depends on the CLI/model
+ *   (`supportsAutoMode`); where unavailable the runtime falls back, and the
+ *   chat switch path rolls back on a rejected live update.
+ */
+export type ClaudeCodePermissionMode =
+  | 'default'
+  | 'acceptEdits'
+  | 'bypassPermissions'
+  | 'plan'
+  | 'dontAsk'
+  | 'auto';
 export type ClaudeCodeEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 export type ClaudeCodeThinking =
   | { type: 'adaptive' }
@@ -843,6 +863,14 @@ export interface CodexBackendSettings {
 export interface ClaudeCodeBackendSettings {
   executablePath: string;
   settingSources: ClaudeCodeSettingSource[];
+  /**
+   * Persisted default permission mode (all six native SDK modes are valid).
+   * `bypassPermissions` is the only mode that additionally sends
+   * `allowDangerouslySkipPermissions` at spawn. `dontAsk` is restrictive
+   * (deny unless pre-approved) and `auto` availability depends on the
+   * CLI/model classifier; the chat selector applies a rejected live switch
+   * nowhere and keeps the previous value.
+   */
   permissionMode: ClaudeCodePermissionMode;
   thinking: ClaudeCodeThinking;
   effort: ClaudeCodeEffort;
@@ -1075,8 +1103,12 @@ export interface ZCodeBackendSettings {
   model: string;
   /** Persisted default thinking level (validated against the live catalog before use). */
   thinkingLevel: string;
-  /** Persisted default mode (plan/build/edit/yolo/auto). Empty = runtime default. */
-  mode: '' | 'plan' | 'build' | 'edit' | 'yolo' | 'auto';
+  /**
+   * Persisted default mode. `guarded` is the native ZCode full-access-with-
+   * permission-pauses mode added in runtime 3.18.x (validated against the
+   * live runtime before use). Empty = runtime default.
+   */
+  mode: '' | 'plan' | 'build' | 'edit' | 'yolo' | 'guarded' | 'auto';
 }
 
 export function normalizeZCodeBackendSettings(value: unknown): ZCodeBackendSettings {
@@ -1087,7 +1119,7 @@ export function normalizeZCodeBackendSettings(value: unknown): ZCodeBackendSetti
     executablePath: text('executablePath'),
     model: text('model'),
     thinkingLevel: text('thinkingLevel'),
-    mode: ['plan', 'build', 'edit', 'yolo', 'auto'].includes(mode) ? mode as ZCodeBackendSettings['mode'] : '',
+    mode: ['plan', 'build', 'edit', 'yolo', 'guarded', 'auto'].includes(mode) ? mode as ZCodeBackendSettings['mode'] : '',
   };
 }
 
@@ -1391,18 +1423,31 @@ export function normalizeClaudeCodeSettingSources(value: unknown): ClaudeCodeSet
   return [...new Set(normalized)];
 }
 
+/**
+ * Normalize a stored or imported Claude Code permission mode.
+ *
+ * All six native SDK modes pass through unchanged (2026-11-13 backend refresh).
+ * Legacy aliases: `normal` (pre-native surface) still means `default`.
+ *
+ * Migration note for raw `dontAsk` values: before this change the normalizer
+ * mapped `dontAsk` to `bypassPermissions`, which is the semantically opposite
+ * mode (native `dontAsk` denies anything not pre-approved; `bypassPermissions`
+ * skips permission checks entirely). Stored raw `dontAsk` values now keep
+ * native `dontAsk` semantics. This only ever tightens relative to the old
+ * buggy readback — never loosens. Raw `auto` values likewise keep native
+ * classifier semantics instead of silently degrading to `default`.
+ */
 export function normalizeClaudeCodePermissionMode(value: unknown): ClaudeCodePermissionMode {
   switch (value) {
     case 'acceptEdits':
     case 'bypassPermissions':
     case 'plan':
+    case 'dontAsk':
+    case 'auto':
     case 'default':
       return value;
-    case 'auto':
     case 'normal':
       return 'default';
-    case 'dontAsk':
-      return 'bypassPermissions';
     default:
       return 'default';
   }

@@ -160,12 +160,55 @@ export function serializeZCodeServerRequestReply(reply: ZCodeProtocolServerReque
 }
 
 /**
+ * Host capabilities this plugin can actually honor in the
+ * `runtime/capabilities` request. The official runtime treats an omitted or
+ * disabled flag as fail-closed: `sessionDirectorySource` gates native
+ * `directorySessionId` computation and workspace-lineage validation, and
+ * `sessionWorkspaceRouting` gates workspace routing promises. A flag may
+ * appear in {@link ZCODE_IMPLEMENTED_HOST_CAPABILITIES} only after the
+ * plugin really implements the feature end to end; advertising an
+ * unimplemented host capability would make the runtime emit data or accept
+ * routing this adapter does not handle.
+ */
+export interface ZCodeHostCapabilities {
+  readonly sessionDirectorySource?: boolean;
+  readonly sessionWorkspaceRouting?: boolean;
+}
+
+/**
+ * The host capabilities actually implemented by this adapter, today none.
+ * Do not add a flag here for a capability that is only partially wired:
+ * the closed loop (declare → handle → readback) must be proven first.
+ */
+export const ZCODE_IMPLEMENTED_HOST_CAPABILITIES: ZCodeHostCapabilities = {};
+
+/**
+ * Build the `runtime/capabilities` request params. Implemented host flags
+ * are advertised as `true`; when nothing is implemented the params stay
+ * empty so the runtime keeps its fail-closed defaults.
+ */
+export function zcodeRuntimeCapabilitiesRequestParams(
+  implemented: ZCodeHostCapabilities = ZCODE_IMPLEMENTED_HOST_CAPABILITIES,
+): Record<string, unknown> {
+  const enabled = Object.entries(implemented)
+    .filter(([, value]) => value === true)
+    .map(([key]) => key);
+  return enabled.length > 0 ? { hostCapabilities: Object.fromEntries(enabled.map((key) => [key, true])) } : {};
+}
+
+/**
  * Result of the `runtime/capabilities` capability negotiation. Known flags
  * are surfaced explicitly; anything the runtime reported beyond them is kept
  * in `raw` so version drift stays visible instead of being discarded.
  */
 export interface ZCodeRuntimeCapabilities {
   readonly independentPlanState: boolean | null;
+  /** Server flag: native directory-session sources (`directorySessionId` lineage). */
+  readonly sessionDirectorySource: boolean | null;
+  /** Server flag: native workspace routing support. */
+  readonly sessionWorkspaceRouting: boolean | null;
+  /** Server flag: history-first session delivery. */
+  readonly historyFirst: boolean | null;
   readonly raw: Record<string, unknown>;
 }
 
@@ -175,10 +218,15 @@ export interface ZCodeRuntimeCapabilities {
  */
 export function parseZCodeRuntimeCapabilities(result: unknown): ZCodeRuntimeCapabilities {
   const raw = isPlainObject(result) ? result : {};
-  const independentPlanState = typeof raw['independentPlanState'] === 'boolean'
-    ? raw['independentPlanState']
-    : null;
-  return { independentPlanState, raw };
+  const flag = (key: string): boolean | null =>
+    typeof raw[key] === 'boolean' ? raw[key] as boolean : null;
+  return {
+    independentPlanState: flag('independentPlanState'),
+    sessionDirectorySource: flag('sessionDirectorySource'),
+    sessionWorkspaceRouting: flag('sessionWorkspaceRouting'),
+    historyFirst: flag('historyFirst'),
+    raw,
+  };
 }
 
 /** Startup/storage notification payload (agent → host), validated loosely. */

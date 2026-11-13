@@ -42,6 +42,10 @@ module.exports = {
         '^@/(.*)$': '<rootDir>/src/$1',
         '^obsidian$': '<rootDir>/tests/__mocks__/obsidian.ts',
         '^@opencode-ai/sdk$': '<rootDir>/tests/__mocks__/opencode-sdk.ts',
+        // Loader bridge (not a mock): the official @opencode/schema/goal dist is
+        // ESM-only with import-only export conditions, which jest's CJS runtime
+        // cannot evaluate. See tests/__mocks__/opencode-schema-goal.ts.
+        '^@opencode/schema/goal$': '<rootDir>/tests/__mocks__/opencode-schema-goal.ts',
       },
       setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
     },
@@ -61,6 +65,8 @@ module.exports = {
       },
       moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/src/$1',
+        // Loader bridge (not a mock): see tests/__mocks__/opencode-schema-goal.ts.
+        '^@opencode/schema/goal$': '<rootDir>/tests/__mocks__/opencode-schema-goal.ts',
       },
     },
     {

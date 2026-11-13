@@ -32,8 +32,20 @@ describe('CodexAppServerClient — listSkills()', () => {
 
     const skills = await client.listSkills({ cwd: '/vault' });
 
-    expect((client as any).request).toHaveBeenCalledWith('skills/list', { cwd: '/vault' });
+    expect((client as any).request).toHaveBeenCalledWith('skills/list', { cwds: ['/vault'] });
     expect(skills).toEqual([{ name: 'code-review', description: 'Review code', enabled: true, scope: 'project' }]);
+  });
+
+  it('never sends the silently-dropped singular cwd param (Codex 0.169.0 cwds binding)', async () => {
+    const client = createClientWithMocks({
+      request: jest.fn().mockResolvedValue({ data: [] }),
+    } as any);
+
+    await client.listSkills({ cwd: '/vault' });
+
+    const [[, params]] = (client as any).request.mock.calls as [[string, Record<string, unknown>]];
+    expect(params).toEqual({ cwds: ['/vault'] });
+    expect('cwd' in params).toBe(false);
   });
 
   it('passes forceReload when requested', async () => {
@@ -43,7 +55,7 @@ describe('CodexAppServerClient — listSkills()', () => {
 
     await client.listSkills({ cwd: '/vault', forceReload: true });
 
-    expect((client as any).request).toHaveBeenCalledWith('skills/list', { cwd: '/vault', forceReload: true });
+    expect((client as any).request).toHaveBeenCalledWith('skills/list', { cwds: ['/vault'], forceReload: true });
   });
 
   it('omits params entirely when no options are given', async () => {
@@ -91,7 +103,7 @@ describe('CodexAppServerClient — listSkillGroups()', () => {
 
     const groups = await client.listSkillGroups({ cwd: '/vault' });
 
-    expect((client as any).request).toHaveBeenCalledWith('skills/list', { cwd: '/vault' });
+    expect((client as any).request).toHaveBeenCalledWith('skills/list', { cwds: ['/vault'] });
     expect(groups).toEqual([{
       cwd: '/vault',
       skills: [{ name: 'code-review', source: 'repo' }],

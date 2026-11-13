@@ -43,7 +43,7 @@ R-C4 组合：`pdfEngineLoader`（懒加载引擎，启动零成本；`getPlugin
 R-C5 组合：`canvasGenerationFlow`（生成流程，`pickNotes` 端口 = R-A7 picker + R-B2 主题组一键行，`resolveAuxTarget` 端口 = 行内编辑 host 适配器的只读会话切片）与 `canvasIntegration`（Canvas 视图桥，attach/detach + 运行时确认门）与命令 `canvas-generate-from-notes` / `canvas-ai-edit-node`；插件写归属会话改用 `resolvePluginWriteConversationId()`（R-C2 语义改名，行为不变）。Canvas 行为逻辑分别在 `core.canvas` 与 `feature.canvas-integration`，main.ts 只组合、注册命令与注入 Notice 沉降。
 
 
-`main.ts` 定义 `OpenCodianPlugin`，是 Obsidian 侧的总装配点。ZCode 会话删除在本地移除前必须等待其 adapter 对官方桌面 task-index tombstone 的按 ID 读回；失败保留本地会话并向调用方抛错。Codex 默认删除同样 fail closed：native `verified`（或没有 native thread 的本地草稿）才清 storage、conversation 和 full-message cache；ACK-only `admitted` 以可重试 pending 错误传播，SDK native 删除 unavailable 或失败不做本地清理。其他后端保留原有 best-effort session cleanup。它负责：
+`main.ts` 定义 `OpenCodianPlugin`，是 Obsidian 侧的总装配点。ZCode 会话删除在本地移除前必须等待其 adapter 对官方原生软删除结果按 ID 读回；失败保留本地会话并向调用方抛错。Codex 默认删除同样 fail closed：native `verified`（或没有 native thread 的本地草稿）才清 storage、conversation 和 full-message cache；ACK-only `admitted` 以可重试 pending 错误传播，SDK native 删除 unavailable 或失败不做本地清理。其他后端保留原有 best-effort session cleanup。它负责：
 
 - 初始化 `StorageService`，并通过 `src/core/types/settingsLoadNormalization.ts` 加载/迁移持久化设置
 - 创建 `OpenCodeService`、`OpencodeConfigManager`、`ModelConfigService`、`ModelPricingService`

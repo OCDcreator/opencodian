@@ -153,3 +153,7 @@ DSH 的模型值保持不透明。推理 variants 仅来自该原生会话已观
 - `host.mountEffortSelector(container)` 由本 coordinator 在 `buildModelDropdown()` 内调用：effort 控件挂在现有 search + provider/model list 之下，形成同一个向上弹层。模型搜索、provider 分组、sticky headers、键盘导航、focus restore、disabledModelRefs / configured-only 过滤、streaming disabled 判断与原有 model 选择回调均未改。
 - 新增可选 `host.getEffortDisplayLabel()`；返回空串时 trigger 隐藏分隔符与 effort，保持无 effort 模型/后端只显示模型名。
 - model dropdown 仍通过 `AnchoredOverlayLayoutController` 按 `.opencodian-container` 边界定位；effort slot 位于列表下方，列表自身保持 280px 滚动视口。
+
+## 2026-11-13 Backend runtime refresh：Claude 原生权限模式
+
+`CLAUDE_CODE_PERMISSION_MODES` 现在包含六个原生模式（新增 `dontAsk`、`auto`），因此 `readClaudeCodePermissionModeFromPlugin()` 不再把已保存的 `dontAsk` / `auto` 归一回 `default`，`switchClaudeCodePermissionModeInPlugin()` 可以持久化并下发这两个模式。写入事务不变：先保存设置，再调用 adapter `setPermissionMode()`；任何一步抛错都会恢复到上一个模式并返回 `false`，selector 保持打开且不改变选中项。`auto` 的运行时可用性取决于 CLI/模型，拒绝时即走这条回滚路径。

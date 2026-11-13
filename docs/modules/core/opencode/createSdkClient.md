@@ -104,3 +104,7 @@ graph LR
 - `directory` 会直接透传给 SDK，因此 `OpenCodeService.setVaultPath()` 之后创建的客户端才能感知 vault 级 `.opencode` 配置。
 - `experimentalWorkspaceId` 在这里仅做字段改名，当前 Worker 1 范围内没有其他模块直接消费它。
 - 模块本身不做客户端缓存或复用；是否复用由上层决定。
+
+## 2026-11-13 来源注释修正
+
+文件头注释此前引用的 `reference-projects/opencode/packages/sdk/js/...` 检出已不存在；现改为官方上游 `anomalyco/opencode` 仓库 `v1.19.5` 标签（`v1` 分支）的固定 URL。该 v2-generation client 仍面向 v1 服务器的 `/api/*` 路由。行为、导入与导出均未变化。

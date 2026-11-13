@@ -1,5 +1,7 @@
 # Owner: core.backend-pi
 
+2026-11-13：官方 Pi 1.5.2 的现代 ModelRuntime auth 目录继续是主路径；旧 AuthStorage 分支只在真实方法存在时调用 getOAuthProviders，避免已移除的方法击穿其余认证状态读取。包名迁移、工具 allowlist 和 session JSONL 所有权不变。当前安装版经本地 fixture provider 验证配置保存、消息流、持久化、克隆与重载；这不替代远程提供商凭据／真实模型验收。
+
 2026-10-29：`getPromptReferenceMessages` 只通过 `PiSessionRuntime.getExisting` 查询已驻留连接的当前有效历史。引用读取不创建或恢复来源会话；未驻留时返回 null，交给聊天引用服务使用明确标记的插件缓存。原生 session 身份与分支投影仍由 Pi runtime 拥有。
 > 2026-10-02（reviewed continuation，用户已授权）：公共 PiCommandName 与 PiAdapter.command allowlist 接通 `get_available_thinking_levels` / `get_entries`；可选操作仍与 mandatory handshake 分离，旧 SDK 的方法缺失返回 unavailable。服务层拥有 actual-SDK feature detection 和原生 entry/since/leaf 身份；Adapter 只路由既有 session/catalog 作用域，不扩大配置或模型执行能力。公共 API 接线和真实模型/UI 验收继续独立记证。
 > 2026-10-02（接入修复 T04/T07）：MCP declaration 摘要按 flag/value 组合脱敏，URL userinfo/query/hash 不进入 endpoint，畸形 URL 不回显原字符串。optional `get_available_thinking_levels`/`get_entries` 经现有 service 查询真实 SDK 方法，缺失返回 unavailable；native entry ID、parent ID 与 leaf ID 保留，不生成数组身份。服务层和独立协议类型已准备；公共 PiAdapter 命令入口的接线因 CodeGraph 跨范围门禁已撤回，待人类 reviewed continuation。installed SDK 内存读测试、模型执行与 UI 验收是独立证据，不提高静态能力声明来假装旧版支持。

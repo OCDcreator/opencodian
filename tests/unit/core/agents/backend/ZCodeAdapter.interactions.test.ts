@@ -74,6 +74,7 @@ const questionAskParams = {
   turnId: 'turn_1',
 };
 
+// eslint-disable-next-line max-lines-per-function -- The interaction loop scenarios share one transport fixture.
 describe('ZCodeAdapter — permission and question interaction loop', () => {
   let serverHandlers: Map<string, (params: Record<string, unknown>) => unknown>;
   let sessionEventHandler: ((params: Record<string, unknown>) => void) | null;
@@ -297,6 +298,83 @@ describe('ZCodeAdapter — permission and question interaction loop', () => {
     await adapter.stop();
     await expect(nativeReply as Promise<unknown>).resolves.toMatchObject({ action: 'cancel' });
     expect(await adapter.getPendingQuestions()).toHaveLength(0);
+    await done;
+  });
+
+  it('settles a pending question when the native userInput.resolved event arrives (AskUserQuestion auto-resolution)', async () => {
+    await startAdapter();
+    const { done } = await openStream();
+    const nativeReply = serverHandlers.get('interaction/requestUserInput')?.(questionAskParams);
+    await tick();
+    expect(await adapter.getPendingQuestions()).toHaveLength(1);
+    // The official runtime auto-resolves stale AskUserQuestion interactions
+    // (~300s, empty answers) and emits this event with the same identity.
+    sessionEventHandler?.({
+      sessionId: 'sess_a', type: 'userInput.resolved', seq: 5,
+      payload: { requestId: 'perm_q1', value: { answers: {} } },
+    });
+    await tick();
+    await expect(nativeReply as Promise<unknown>).resolves.toMatchObject({
+      action: 'cancel',
+      reason: 'Request already resolved by the ZCode runtime.',
+    });
+    expect(await adapter.getPendingQuestions()).toHaveLength(0);
+    // A late plugin answer must reject instead of re-replying to the runtime.
+    await expect(adapter.replyToQuestion('perm_q1', [['red']])).rejects.toThrow('not pending');
+    // A duplicate resolved event is ignored (nothing left to settle).
+    expect(() => sessionEventHandler?.({
+      sessionId: 'sess_a', type: 'userInput.resolved', seq: 6,
+      payload: { requestId: 'perm_q1', cancelled: true },
+    })).not.toThrow();
+    finishTurn();
+    await done;
+  });
+
+  it('ignores userInput.resolved events from another session or without a request ID', async () => {
+    await startAdapter();
+    const { done } = await openStream();
+    const nativeReply = serverHandlers.get('interaction/requestUserInput')?.(questionAskParams);
+    await tick();
+    // Same request ID but a different session envelope: the owning card stays.
+    sessionEventHandler?.({
+      sessionId: 'sess_other', type: 'userInput.resolved', seq: 5,
+      payload: { requestId: 'perm_q1', cancelled: true },
+    });
+    await tick();
+    expect(await adapter.getPendingQuestions()).toHaveLength(1);
+    // Missing/invalid requestId payload: cannot bind an ask, stays pending.
+    sessionEventHandler?.({
+      sessionId: 'sess_a', type: 'userInput.resolved', seq: 6, payload: {},
+    });
+    await tick();
+    expect(await adapter.getPendingQuestions()).toHaveLength(1);
+    // The ask is still legitimately answerable by this host.
+    adapter.replyToQuestion('perm_q1', [['green']]);
+    await expect(nativeReply as Promise<unknown>).resolves.toEqual({
+      action: 'accept',
+      content: { answers: { 'Favorite color?': ['green'] } },
+    });
+    finishTurn();
+    await done;
+  });
+
+  it('still settles permission asks through permission.resolved (paths stay separate)', async () => {
+    await startAdapter();
+    const { done } = await openStream();
+    const nativeReply = serverHandlers.get('interaction/requestPermission')?.(permissionAskParams);
+    await tick();
+    sessionEventHandler?.({
+      sessionId: 'sess_a', type: 'permission.resolved', seq: 7,
+      payload: { requestId: 'perm_1', decision: 'deny' },
+    });
+    await tick();
+    await expect(nativeReply as Promise<unknown>).resolves.toMatchObject({
+      decision: 'deny',
+      reason: 'Request already resolved by the ZCode runtime.',
+    });
+    expect(await adapter.getPendingPermissions()).toHaveLength(0);
+    await expect(adapter.respondToPermission('perm_1', 'once')).rejects.toThrow('not pending');
+    finishTurn();
     await done;
   });
 });

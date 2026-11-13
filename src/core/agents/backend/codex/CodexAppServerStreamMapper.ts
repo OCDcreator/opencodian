@@ -13,6 +13,14 @@ import type { AppServerThreadNotification } from './CodexAppServerClient';
 export interface AppServerStreamState {
   streamedAgentMessageItemIds: Set<string>;
   streamedReasoningItemIds: Set<string>;
+  /**
+   * Reasoning items whose human-readable SUMMARY (`item/reasoning/
+   * summaryTextDelta`) already streamed. First flavor wins per item: once
+   * summary deltas streamed, raw `item/reasoning/textDelta` and the
+   * completed item's full raw content are suppressed (and vice versa), so the
+   * same reasoning never renders twice.
+   */
+  streamedReasoningSummaryItemIds: Set<string>;
   startedTodoItemIds: Set<string>;
   outputSchema: unknown;
 }
@@ -50,6 +58,18 @@ export function mapAppServerNotification({
       return mapAgentMessageDelta(params, streamState);
     case 'item/reasoning/textDelta':
       return mapReasoningDelta(params, streamState);
+    case 'item/reasoning/summaryTextDelta':
+      return mapReasoningSummaryDelta(params, streamState);
+    case 'item/reasoning/summaryPartAdded':
+      return mapReasoningSummaryPartAdded(params);
+    case 'turn/diff/updated':
+      // Native per-turn unified diff ({ threadId, turnId, diff }). Deliberately
+      // mapped to NO chunks: Turn Change Records are immutable, locally owned
+      // history built from the `file_edited` stream in the chat layer, and a
+      // backend diff must never replace them. Subscribing keeps the payload on
+      // the trace port (every subscribed notification is recorded) without
+      // taking over record ownership.
+      return { chunks: [] };
     case 'item/mcpToolCall/progress':
       return mapToolProgress(params, sessionId);
     case 'item/fileChange/patchUpdated':
@@ -150,9 +170,53 @@ function mapReasoningDelta(
   }
   const itemId = typeof params.itemId === 'string' ? params.itemId : undefined;
   if (itemId) {
+    // First flavor wins per item: once summary deltas streamed for this item,
+    // raw deltas would duplicate the same reasoning in a second form.
+    if (streamState.streamedReasoningSummaryItemIds.has(itemId)) {
+      return { chunks: [] };
+    }
     streamState.streamedReasoningItemIds.add(itemId);
   }
   return { chunks: [{ type: 'thinking', content: params.delta, partId: itemId }] };
+}
+
+/**
+ * Map `item/reasoning/summaryTextDelta` ({ threadId, turnId, itemId, delta,
+ * summaryIndex } on Codex 0.169.0) into thinking chunks, one block per summary
+ * part (`partId` = `<itemId>:s<summaryIndex>`). Marks the item as
+ * summary-streamed so raw deltas and the completed item's full raw content
+ * never duplicate it.
+ */
+function mapReasoningSummaryDelta(
+  params: Record<string, unknown>,
+  streamState: AppServerStreamState,
+): AppServerStreamMapResult {
+  if (typeof params.delta !== 'string') {
+    return { chunks: [] };
+  }
+  const itemId = typeof params.itemId === 'string' ? params.itemId : undefined;
+  if (itemId) {
+    // Raw content streamed first for this item: keep the raw rendering and
+    // drop the summary flavor instead of showing both.
+    if (streamState.streamedReasoningItemIds.has(itemId)) {
+      return { chunks: [] };
+    }
+    streamState.streamedReasoningSummaryItemIds.add(itemId);
+  }
+  const partId = typeof params.summaryIndex === 'number' && Number.isFinite(params.summaryIndex) && itemId
+    ? `${itemId}:s${params.summaryIndex}`
+    : itemId;
+  return { chunks: [{ type: 'thinking', content: params.delta, partId }] };
+}
+
+/**
+ * Map `item/reasoning/summaryPartAdded` ({ threadId, turnId, itemId,
+ * summaryIndex }): a new summary part begins. It carries no content, so it
+ * maps to no chunk — the first summaryTextDelta of the part carries the
+ * per-part `partId` that segments the rendered thinking blocks.
+ */
+function mapReasoningSummaryPartAdded(_params: Record<string, unknown>): AppServerStreamMapResult {
+  return { chunks: [] };
 }
 
 function mapToolProgress(params: Record<string, unknown>, sessionId: string): AppServerStreamMapResult {
@@ -430,7 +494,15 @@ function mapReasoningItem(
   streamState: AppServerStreamState,
 ): StreamChunk[] {
   const id = String(item.id);
-  if (!completed || !Array.isArray(item.content) || streamState.streamedReasoningItemIds.has(id)) {
+  // The completed item's full RAW content is only emitted when neither delta
+  // flavor streamed for this item; replaying it over streamed raw or summary
+  // deltas would duplicate the same reasoning.
+  if (
+    !completed
+    || !Array.isArray(item.content)
+    || streamState.streamedReasoningItemIds.has(id)
+    || streamState.streamedReasoningSummaryItemIds.has(id)
+  ) {
     return [];
   }
   return [{

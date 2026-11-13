@@ -1,5 +1,7 @@
 # Owner: app.composition
 
+2026-11-13：更新 ZCode 删除组合注释与模块说明，反映 adapter 已改用官方原生软删除和同 ID 缺席读回；main 的调用及本地提交行为保持既有边界，不再把退休的桌面私有 TaskIndex 当作前置条件。
+
 2026-11-10：main 的诊断组合扩展 DSH 元数据 trace port，读取现有 normalized settings 与内存中的脱敏字典，沿 `wireHiddenAdapters` 和聊天 diagnostics factory 注入同一 coordinator 实例；不构造第二个 wire observer owner、不读新凭据、不把 raw prompt/config 交给 trace。实际构造、flush/dispose 和缓冲属于 app.diagnostics-runtime／core.backend-diagnostics。
 
 > 2026-10-24：行内模型目录组合增加 DSH 适配器 getModelSelectorProviders 分支；只将原生目录投影为共享选项。DSH 进程、私有 profile、辅助查询和安全证明仍归 core.backend，没有在 main.ts 新增运行时 owner。

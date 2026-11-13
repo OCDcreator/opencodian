@@ -1,5 +1,9 @@
 # Owner: core.backend
 
+2026-11-13（后端运行时刷新）：Claude SDK 0.3.323、Codex SDK 0.169.0、OpenCode 2 client/schema 2.3.0 分别跟随各自原有 transport owner；OpenCode 1 仍退役。OpenCode 2 Goal 改用公开 `@opencode/schema/goal` 定义，原生 RPC 与 `BackendGoalRuntime` 本地验证各保留职责，不把 Promise client 的类型定义当作已执行的客户端校验。Codex 技能目录显式发送 `cwds`，作用域与原生分组身份一致；reasoning summary 与 compact 完成事件保持 thread/turn 归属，不能用 ACK 推断完成。
+
+ZCode 账号摘要支持原生 env-source `enc:v2`，密钥与指纹派生经官方 codec/migration 交叉验证；独立账号根、凭据修订、锁与事务继续归账号 owner，不访问桌面 keychain。历史与持久删除使用原生会话存储，退休依赖已变化的桌面内部 TaskIndexRepo；删除前核对 workspace/kind，删除后核对同 ID 原生缺席。目录到达读取上限时保留 partial 证据；问题原生 `userInput.resolved` 按 session/request 身份收口并拒绝迟到回答。guarded 复用现有 catalog/setMode/readback 边界，不新增 feature 层运行时真值。
+
 2026-11-10：子会话续接沿既有 `DshNativeControls`／`assets/dsh/control.mjs` 边界扩展。能力采用当前 client lease 的专用 `subagents.prompt` 读回，不修改共享能力解析形状。Native 只允许直属 catalog 中 mode 为 continuable 的孩子接收 text-only queue／steer，客户端 UUID 与 inbox receipt 保留真实身份；accepted 仅为 inbox 入队收据、不代表执行结束。one-shot／external／unknown 与 foreign child 拒绝；域失败只转白名单 code，不将原生异常内容带回；无 failureCode 的未知结果（超时/传输中断/代际过期）不推断成败、不自动重发。只读子会话目录（`listSessionSubagents`）仅作 @label 来源与工作台投影，不授予任何写权限。ACP 无同等原生控制即不可用。现有子会话中断、后台活动与重连安全证据规则保持。
 
 2026-11-10（DSH 历史图片恢复）：`assets/dsh/service.mjs` 的 `resolveImageBlock` 只经公开 `ctx.attachments.readImage` 归属读取（内容完整性校验），单块失败降级为仅含稳定 AttachmentError 码的 unavailable 占位，不再令整段 history/live 失败；协议不存在 path/URL 图片引用字段，桥接与 adapter 均不接受路径形状引用。`DshAdapter` 对 history user/assistant/tool 与 live assistant/thought/tool 各路径实行统一 image admission：任何 image block 须过 `dshVerifiedImage`（canonical base64、声明 MIME↔magic 一致、尺寸上限）才可产出 user 透传块 / tool 裸 data URI / assistant markdown；未过一律输出稳定占位文本，不回退到能产 data URI 的 codec；`BackendSessionMessages.consumeImage` 仅加性透传 `filename`。审查结论见 `.impeccable/review/dsh-chat-followups-20261110/images-controls-independent-review.md`（冻结：指定范围内无未解决阻塞；实机像素验收仍待 Test Vault 目检）。

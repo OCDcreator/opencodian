@@ -5,7 +5,7 @@
 
 ## 概述
 
-`PermissionModeSelectorCoordinator` 承接聊天工具栏 permission selector 的 DOM 与 dropdown lifecycle。它现在是多后端 selector owner：OpenCode backend 显示 `yolo` / `normal` / `plan` permission templates，Claude Code backend 显示 SDK permission modes，Codex backend 显示 sandbox modes，ZCode backend 显示原生 `plan` / `build` / `edit` / `yolo` / `auto` 会话模式。
+`PermissionModeSelectorCoordinator` 承接聊天工具栏 permission selector 的 DOM 与 dropdown lifecycle。它现在是多后端 selector owner：OpenCode backend 显示 `yolo` / `normal` / `plan` permission templates，Claude Code backend 显示六个原生 SDK permission modes（`default` / `acceptEdits` / `plan` / `dontAsk` / `auto` / `bypassPermissions`，破坏性最大的 bypass 排最后），Codex backend 显示 sandbox modes，ZCode backend 显示原生 `plan` / `build` / `edit` / `guarded` / `yolo` / `auto` 会话模式。
 
 - trigger icon/text/class 渲染
 - permission mode option list 构建与 selected state 刷新
@@ -58,9 +58,9 @@ export class PermissionModeSelectorCoordinator {
 - `createOpenCodePermissionConfig()` 构建 OpenCode `yolo` / `normal` / `plan` selector；`createClaudeCodePermissionConfig()` 构建 Claude Code `default` / `acceptEdits` / `plan` / `bypassPermissions` selector；`createCodexSandboxConfig()` 构建 Codex `read-only` / `workspace-write` / `danger-full-access` sandbox selector
 - `PermissionModeConfig` 与 `PermissionModeOption` 已导出，供 build-time selector 选择和测试复用
 - host seam 使用 `string` 而不是 OpenCode-only `PermissionMode`，避免把两套 backend permission mode 类型混在同一个 UI owner 中
-- trigger 文案按 active backend 映射：OpenCode 继续显示 `YOLO` / `ASK` / `PLAN`，Claude Code 显示完整紧凑标签（`Ask first` / `Auto edit` / `Plan mode` / `Full access`，中文为 `变更前确认` / `自动编辑` / `计划模式` / `完全访问`），Codex 显示 `RO` / `WS` / `FULL`，并保留 `mode-*` class
+- trigger 文案按 active backend 映射：OpenCode 继续显示 `YOLO` / `ASK` / `PLAN`，Claude Code 显示完整紧凑标签（`Ask first` / `Auto edit` / `Plan mode` / `Deny unapproved` / `Auto classify` / `Full access`，中文为 `变更前确认` / `自动编辑` / `计划模式` / `未批准即拒绝` / `自动判定` / `完全访问`），Codex 显示 `RO` / `WS` / `FULL`，并保留 `mode-*` class
 - trigger 携带 `data-permission-backend="opencode|claude-code|codex"`，用于运行时验证当前 selector 属于哪个 backend
-- `icon` 为每个 backend/mode 提供 lucide 图标。询问使用 `hand`，计划使用 `clipboard-list`，受控自动使用 `shield-check`，完全访问或高风险自动使用 `shield-alert`；Codex read-only 保留 `shield`，ZCode edit 使用 `pencil`。trigger 与菜单 option 共用同一图标映射，权限不只依赖颜色区分。窄 Composer 隐藏 trigger 文本和 Chevron，仅保留该权限图标，点击仍打开原菜单
+- `icon` 为每个 backend/mode 提供 lucide 图标。询问使用 `hand`，计划使用 `clipboard-list`，受控自动使用 `shield-check`，完全访问或高风险自动使用 `shield-alert`；Codex read-only 保留 `shield`，ZCode edit 使用 `pencil`，ZCode guarded 使用 `shield-half`；Claude `dontAsk` 使用 `shield-off`、`auto` 使用 `sparkles`。trigger 与菜单 option 共用同一图标映射，权限不只依赖颜色区分。窄 Composer 隐藏 trigger 文本和 Chevron，仅保留该权限图标，点击仍打开原菜单
 - 三种 backend 都把各自的内容挂入共享 `ComposerPopoverFrame`：统一的本地化标题、Esc keycap 与 Arrow / Enter / Esc footer 只负责呈现，backend mode catalog 与写回责任仍留在本 coordinator / host seam
 - `boundaryHint` 可选属性：若 config 提供了 `boundaryHint`，则 mount 时将其写入 trigger 的 `title` 属性，用于传达 selector 只影响后续 thread 创建的边界语义（Codex sandbox selector 默认启用此 hint）
 - option labels/descriptions 按 config 提供，OpenCode 仍复用 `settings.security.permissionMode.*` locale keys 与 fallback 文案；Claude Code 复用 `settings.claudeCode.permissionMode.*` labels 与 `chat.claudeCode.permissionMode.*` descriptions，其中 `bypassPermissions` 的 UI 可显示为 `完全访问` / `Full access`，但 description 必须保留它会绕过权限检查的语义；Codex 复用 `settings.codex.sandbox.*` labels 与 `chat.codex.sandboxMode.*` description locale keys
@@ -69,7 +69,7 @@ export class PermissionModeSelectorCoordinator {
 - click-outside listener 只在 dropdown open 时注册，close/destroy 时移除
 - dropdown 使用 `AnchoredOverlayLayoutController` 按最近的 `.opencodian-container` 计算 280px 首选宽度、220px 最小宽度和左右 8px 安全区；侧栏 resize 时仅在菜单打开状态重新同步
 - trigger 保留 `role="button"`、`tabindex="0"`、`aria-haspopup="listbox"` 与准确的 `aria-expanded`；每个实际 mode row 使用 `role="option"`、`aria-selected` 和 roving `tabIndex`。键盘打开时聚焦当前 mode，ArrowUp / ArrowDown 首尾循环，Enter 复用既有选择路径，Escape 关闭并把焦点还给 trigger
-- mode row 写入 `data-permission-semantic="danger|safe|neutral"`。danger（YOLO / bypassPermissions / danger-full-access）和 safe（plan / read-only）统一覆盖 selected row、icon 与 checkmark 的 error/success 语义色；neutral 保持产品 accent/default，描述文本继续给出明确风险提示
+- mode row 写入 `data-permission-semantic="danger|safe|neutral"`。danger（YOLO / bypassPermissions / danger-full-access）和 safe（plan / read-only / dontAsk——原生 dontAsk 是未预批准即拒绝的限制性模式）统一覆盖 selected row、icon 与 checkmark 的 error/success 语义色；neutral 保持产品 accent/default，描述文本继续给出明确风险提示
 
 ## 与 `ChatSelectionControlsCoordinator` 的边界
 
@@ -95,3 +95,9 @@ The backend label union includes opencode2 so its selector has a distinct DOM id
 
 - 源码位置：`src/features/chat/services/selection/PermissionModeSelectorCoordinator.ts`。
 - 原位置：`src/features/chat/services/PermissionModeSelectorCoordinator.ts`；文件名、导出接口与业务职责保持不变。
+
+## 2026-11-13 Backend runtime refresh：原生 dontAsk / auto / guarded
+
+- `createClaudeCodePermissionConfig()` 新增 `dontAsk`（locale `settings.claudeCode.permissionMode.dontAsk` + `chat.claudeCode.permissionMode.dontAsk.description`）与 `auto`（`...permissionMode.auto` + `...auto.description`）。`dontAsk` 的描述必须表达"未预批准即拒绝"，不得出现 bypass 语义；`auto` 的描述必须注明可用性取决于 CLI 与模型。选择仍经 host seam 写回：`switchClaudeCodePermissionModeInPlugin` 先持久化、再调用 adapter `setPermissionMode`，运行时拒绝会抛错并回滚到上一个值，因此不存在"UI 显示 auto 但实际未生效"的静默状态。
+- `createZCodeModeConfig()` 新增 `guarded`（locale `chat.zcode.mode.guarded` + `chat.zcode.mode.guarded.description`，trigger 显示 `GUARDED`，class `mode-guarded`）。文案语义：原生 guarded 是完全访问授权，日常工具不再逐次询问，但识别出的高风险 Shell 命令会暂停确认；不得暗示沙箱或"所有危险工具都受保护"。写回仍走既有 `setSessionMode` + `readSessionMode` 原生读回确认，未确认时保留旧模式。
+- 聚焦回归：`tests/unit/features/chat/claudePermissionModeSelector.test.ts`（六模式顺序、标签、图标、dontAsk 语义文案）、`tests/unit/features/chat/ChatSelectionControlsCoordinator.test.ts`（跨后端图标形状含 guarded）。

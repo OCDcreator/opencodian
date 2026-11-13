@@ -104,3 +104,7 @@ graph TD
 - 现在 `sdkQuestions` 已经跟随其他 rollout 开关一起默认开启，questions 相关接口的主路径已经切到 SDK。
 - 这个文件只定义布尔开关，不维护“迁移完成度”或“最终计划”之类的元数据。
 - 即便 rollout 默认值已全开，legacy 路径依然是代码中的有效回滚路径。
+
+## 2026-11-13 来源注释修正
+
+文件头引用的 `reference-projects/opencode/packages/sdk/js` 检出已不存在，现改为官方 `anomalyco/opencode` `v1.19.5` 标签（`v1` 分支）的固定 URL。开关定义、默认值与 `resolveSdkFeatureFlags` 行为未变。

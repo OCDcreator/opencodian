@@ -1,4 +1,4 @@
-# ZCodeProtocolTypes
+> 2026-11-13（host 能力诚实协商）：新增 `ZCodeHostCapabilities`/`ZCODE_IMPLEMENTED_HOST_CAPABILITIES`（当前为空）与 `zcodeRuntimeCapabilitiesRequestParams()`——只有真正端到端实现的能力才会以 `true` 进 `runtime/capabilities` 请求；空实现发送空 params，运行时保持 fail-closed 默认（`sessionDirectorySource` 关闭则原生不计算 `directorySessionId`、不启用 workspace lineage 校验）。`parseZCodeRuntimeCapabilities` 显式解析服务端旗标 `sessionDirectorySource`/`sessionWorkspaceRouting`/`historyFirst`（缺失或非布尔保持 `null`，原始字段仍在 `raw`）。测试补充：空实现 → `{}`；仅已实现旗标 → `{hostCapabilities:{...}}`；false 值不声明。
 
 > 2026-09-24（续做）：`redactZCodeDiagnosticText` 对任意不可信远端错误只返回固定安全分类；短 token、提示词、路径、附件内容和嵌套异常都不会因截断阈值而漏进诊断面。
 

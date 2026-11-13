@@ -423,7 +423,9 @@ describe('SettingsClaudeCodeSection', () => {
     );
     expect(modelOptionValues).not.toContain('haiku');
     expect(findChoiceRadios(containerEl, 'claude.thinking')).toHaveLength(3);
-    expect(findChoiceRadios(containerEl, 'claude.permissionMode')).toHaveLength(4);
+    expect(findChoiceRadios(containerEl, 'claude.permissionMode')).toHaveLength(6);
+    expect(findChoiceRadios(containerEl, 'claude.permissionMode').map((radio) => (radio as HTMLInputElement).value))
+      .toEqual(['default', 'acceptEdits', 'bypassPermissions', 'plan', 'dontAsk', 'auto']);
     expect(findToggle(t('settings.claudeCode.settingSources.project'))).toBeDefined();
     expect(findTextArea(t('settings.claudeCode.additionalDirectories.name'))).toBeDefined();
     expect(containerEl.querySelector('[data-settings-surface="tab-body"][data-claude-code-section="connection"]')).toBeDefined();
@@ -1003,7 +1005,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       });
       section.attachTabbed(containerEl, 'permissions-safety');
 
-      expect(findChoiceRadios(containerEl, 'claude.permissionMode')).toHaveLength(4);
+      expect(findChoiceRadios(containerEl, 'claude.permissionMode')).toHaveLength(6);
       const settingEl = containerEl.querySelector<HTMLElement>('[data-backend-key="claude.permissionMode"]');
       expect(settingEl?.dataset.backendScope).toBe('vault');
       expect(settingEl?.dataset.backendEffect).toBe('next-turn');

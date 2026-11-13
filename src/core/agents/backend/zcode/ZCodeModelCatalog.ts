@@ -12,7 +12,7 @@
 import { randomUUID } from 'node:crypto';
 
 /** Permission mode values accepted by `session/setMode` (native `$j` enum). */
-export const ZCODE_MODES = ['plan', 'build', 'edit', 'yolo', 'auto'] as const;
+export const ZCODE_MODES = ['plan', 'build', 'edit', 'yolo', 'guarded', 'auto'] as const;
 export type ZCodeMode = (typeof ZCODE_MODES)[number];
 
 /** How much the official runtime actually confirmed after a mode mutation. */
@@ -541,7 +541,7 @@ export class ZCodeModelSurface {
     mode: string,
   ): Promise<ZCodeModeReadback> {
     if (!validateZCodeMode(mode)) {
-      throw new Error(`ZCode mode "${mode}" is not supported; supported: plan, build, edit, yolo, auto.`);
+      throw new Error(`ZCode mode "${mode}" is not supported; supported: ${ZCODE_MODES.join(', ')}.`);
     }
     await ensureActive(sessionId);
     const result = await transport.request('session/setMode', { sessionId, mode });

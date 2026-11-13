@@ -556,7 +556,11 @@ export interface AppServerHooksReadbackResult {
 
 /** Params accepted by `CodexAppServerClient.listSkills()`. */
 export interface AppServerListSkillsOptions {
-  /** Working directory to scope the skill query (the current vault cwd). */
+  /**
+   * Working directory to scope the skill query (the current vault cwd).
+   * Serialized on the wire as `cwds: [cwd]` (Codex 0.169.0 binding; the old
+   * singular `cwd` field is silently ignored by newer servers).
+   */
   cwd?: string;
   /** Bypass any server-side cache and force a fresh read. */
   forceReload?: boolean;

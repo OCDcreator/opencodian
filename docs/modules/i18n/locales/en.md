@@ -757,3 +757,5 @@ ZCode 补全文案明确 Alt/快捷键触发，与统一开关保持一致；未
 API 表单保存成功后保留禁用的“已保存”状态，将“取消”改为“关闭”并聚焦该按钮；关闭表单不撤销共享配置写入。
 
 API 服务摘要新增地址与模型数量、查看模型及带服务名的可访问标签；完整模型 ID 经原生展开区查看。
+
+2026-11-13 backend runtime refresh 新增 8 个键：Claude 原生权限模式 `settings.claudeCode.permissionMode.dontAsk`、`settings.claudeCode.permissionMode.auto`、`chat.claudeCode.permissionMode.dontAsk.description`、`chat.claudeCode.permissionMode.auto.description`；ZCode guarded 模式 `chat.zcode.mode.guarded`、`chat.zcode.mode.guarded.description`、`settings.zcode.ui.mode.guarded`、`settings.zcode.ui.mode.guardedHelp`。dontAsk 文案表达"未预批准即拒绝"而非 bypass；guarded 文案说明仅识别出的高风险 Shell 命令会暂停，不暗示沙箱。

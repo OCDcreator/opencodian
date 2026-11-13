@@ -12,6 +12,8 @@ import {
   parseZCodeRuntimeCapabilities,
   serializeZCodeRequest,
   serializeZCodeServerRequestReply,
+  ZCODE_IMPLEMENTED_HOST_CAPABILITIES,
+  zcodeRuntimeCapabilitiesRequestParams,
 } from '../../../../../src/core/agents/backend/zcode/ZCodeProtocolTypes';
 
 describe('parseZCodeInboundMessage', () => {
@@ -114,15 +116,44 @@ describe('serializeZCodeRequest', () => {
 
 describe('parseZCodeRuntimeCapabilities', () => {
   it('surfaces known flags and preserves raw for drift analysis', () => {
-    const capabilities = parseZCodeRuntimeCapabilities({ independentPlanState: true, futureFlag: 'x' });
+    const capabilities = parseZCodeRuntimeCapabilities({
+      independentPlanState: true, sessionDirectorySource: true, sessionWorkspaceRouting: true, historyFirst: true,
+      futureFlag: 'x',
+    });
     expect(capabilities.independentPlanState).toBe(true);
-    expect(capabilities.raw).toEqual({ independentPlanState: true, futureFlag: 'x' });
+    expect(capabilities.sessionDirectorySource).toBe(true);
+    expect(capabilities.sessionWorkspaceRouting).toBe(true);
+    expect(capabilities.historyFirst).toBe(true);
+    expect(capabilities.raw).toEqual({
+      independentPlanState: true, sessionDirectorySource: true, sessionWorkspaceRouting: true, historyFirst: true,
+      futureFlag: 'x',
+    });
   });
 
   it('keeps absent or non-boolean known flags unavailable (null), never fabricated', () => {
     expect(parseZCodeRuntimeCapabilities({}).independentPlanState).toBeNull();
     expect(parseZCodeRuntimeCapabilities({ independentPlanState: 'yes' }).independentPlanState).toBeNull();
+    expect(parseZCodeRuntimeCapabilities({}).sessionDirectorySource).toBeNull();
+    expect(parseZCodeRuntimeCapabilities({ sessionWorkspaceRouting: 1 }).sessionWorkspaceRouting).toBeNull();
+    expect(parseZCodeRuntimeCapabilities({ historyFirst: 'yes' }).historyFirst).toBeNull();
     expect(parseZCodeRuntimeCapabilities(null).independentPlanState).toBeNull();
     expect(parseZCodeRuntimeCapabilities('junk').raw).toEqual({});
+  });
+});
+
+describe('zcodeRuntimeCapabilitiesRequestParams', () => {
+  it('advertises no host capabilities while none are implemented (fail-closed runtime defaults)', () => {
+    // The adapter does not implement directory-session sources or workspace
+    // routing; the runtime must keep directorySessionId computation and
+    // workspace-lineage validation disabled instead of trusting us.
+    expect(ZCODE_IMPLEMENTED_HOST_CAPABILITIES).toEqual({});
+    expect(zcodeRuntimeCapabilitiesRequestParams()).toEqual({});
+  });
+
+  it('includes only implemented flags as true once a host feature is actually supported', () => {
+    expect(zcodeRuntimeCapabilitiesRequestParams({ sessionDirectorySource: true }))
+      .toEqual({ hostCapabilities: { sessionDirectorySource: true } });
+    // A false flag is not implemented behavior and stays omitted.
+    expect(zcodeRuntimeCapabilitiesRequestParams({ sessionDirectorySource: false })).toEqual({});
   });
 });

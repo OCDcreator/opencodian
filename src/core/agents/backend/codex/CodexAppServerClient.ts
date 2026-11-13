@@ -1038,6 +1038,13 @@ export class CodexAppServerClient extends CodexAppServerTransport {
    * Subscribe to notifications belonging to one thread. The app-server sends
    * all streaming output on this socket, so filtering at this boundary keeps
    * concurrent Codex conversations isolated.
+   *
+   * Deliberately absent: `thread/compacted`. It is deprecated upstream
+   * ("Deprecated: Use `ContextCompaction` item type instead",
+   * app-server-protocol common.rs) and the 0.169.0 v2 event path explicitly
+   * does NOT send it to v2 clients — compaction completion evidence is the
+   * canonical `contextCompaction` item/started + item/completed pair, which
+   * `CodexAdapter` already binds per request.
    */
   subscribeToThreadNotifications(
     threadId: string,
@@ -1050,6 +1057,9 @@ export class CodexAppServerClient extends CodexAppServerTransport {
       'item/completed',
       'item/agentMessage/delta',
       'item/reasoning/textDelta',
+      'item/reasoning/summaryTextDelta',
+      'item/reasoning/summaryPartAdded',
+      'turn/diff/updated',
       'item/commandExecution/outputDelta',
       'item/fileChange/patchUpdated',
       'item/mcpToolCall/progress',
@@ -1176,9 +1186,12 @@ export class CodexAppServerClient extends CodexAppServerTransport {
   /**
    * List skills exposed by the Codex app-server via the `skills/list` route.
    *
-   * Params: `{ cwd?, forceReload? }`. `cwd` scopes the query to the current
-   * vault working directory (Codex resolves project-scoped skills relative to
-   * it); `forceReload` asks the server to bypass its cache. Returns
+   * Params: `{ cwds: [cwd], forceReload? }` on the wire. Codex 0.169.0 renamed
+   * the singular `cwd` param to `cwds: string[]` (`plugin.rs`); the old
+   * singular field is silently DROPPED by serde, which made a scoped request
+   * silently resolve to the app-server spawn cwd instead of the requested
+   * directory. `options.cwd` scopes the query to the current vault working
+   * directory; `forceReload` asks the server to bypass its cache. Returns
    * `AppServerSkill[]` (name/description/path/enabled/scope) or an empty array
    * when the route is unreachable on the current Codex version.
    *
@@ -1192,7 +1205,7 @@ export class CodexAppServerClient extends CodexAppServerTransport {
     try {
       const params: Record<string, unknown> = {};
       if (options?.cwd) {
-        params.cwd = options.cwd;
+        params.cwds = [options.cwd];
       }
       if (options?.forceReload) {
         params.forceReload = true;
@@ -1209,13 +1222,18 @@ export class CodexAppServerClient extends CodexAppServerTransport {
    * List skills while preserving each server-provided cwd group and its
    * discovery errors. This is an additive settings readback API; `listSkills`
    * remains the flat chat/catalog compatibility path.
+   *
+   * The request serializes as `cwds: [cwd]` (0.169.0 binding). Each returned
+   * group carries the server-resolved cwd, so the grouped readback doubles as
+   * the runtime scope evidence: a group cwd that differs from the requested
+   * directory is visible instead of being masked by the spawn default.
    */
   async listSkillGroups(options?: AppServerListSkillsOptions): Promise<AppServerSkillGroup[] | null> {
     await this.start();
     try {
       const params: Record<string, unknown> = {};
       if (options?.cwd) {
-        params.cwd = options.cwd;
+        params.cwds = [options.cwd];
       }
       if (options?.forceReload) {
         params.forceReload = true;

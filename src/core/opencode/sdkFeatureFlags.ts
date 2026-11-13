@@ -1,9 +1,10 @@
 /**
  * Internal rollout controls for the OpenCode JS SDK v2 migration.
  *
- * Reference source paths:
- * - `reference-projects/opencode/packages/sdk/js`
- * - `reference-projects/opencode/packages/sdk/js/src/v2`
+ * Reference source (official upstream, pinned to the plugin's `@opencode-ai/sdk`
+ * 1.19.5 tag on the legacy `v1` branch):
+ * - https://github.com/anomalyco/opencode/blob/v1.19.5/packages/sdk/js
+ * - https://github.com/anomalyco/opencode/blob/v1.19.5/packages/sdk/js/src/v2
  */
 
 export interface SdkFeatureFlags {

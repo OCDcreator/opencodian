@@ -113,7 +113,7 @@ const MODEL_DROPDOWN_MINIMUM_WIDTH = 280;
 const MODEL_DROPDOWN_SAFE_INSET = 8;
 let modelSelectorInstanceSequence = 0;
 const CLAUDE_CODE_PERMISSION_MODES: readonly ClaudeCodePermissionMode[] = [
-  'default', 'acceptEdits', 'bypassPermissions', 'plan',
+  'default', 'acceptEdits', 'bypassPermissions', 'plan', 'dontAsk', 'auto',
 ];
 const ZCODE_PLAN_READBACK_UNAVAILABLE = 'plan-requested-readback-unavailable';
 

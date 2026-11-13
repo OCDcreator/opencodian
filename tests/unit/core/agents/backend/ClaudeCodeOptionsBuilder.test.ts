@@ -120,6 +120,24 @@ describe('ClaudeCodeOptionsBuilder', () => {
     expect(bypassOptions.allowDangerouslySkipPermissions).toBe(true);
   });
 
+  it('requests native dontAsk and auto modes verbatim without the skip-permissions acknowledgement', () => {
+    // The requested permission mode must arrive as the effective SDK option
+    // unchanged, and neither native mode may be paired with
+    // allowDangerouslySkipPermissions — dontAsk is restrictive (deny unless
+    // pre-approved) and auto defers to the model classifier.
+    for (const mode of ['dontAsk', 'auto'] as const) {
+      const options = buildClaudeCodeOptions({
+        vaultPath: '/vault/project',
+        settings: {
+          ...getDefaultClaudeCodeBackendSettings(),
+          permissionMode: mode,
+        },
+      });
+      expect(options.permissionMode).toBe(mode);
+      expect(options).not.toHaveProperty('allowDangerouslySkipPermissions');
+    }
+  });
+
   it('declares permission prompt ownership explicitly and allows a deliberate override', () => {
     const canUseTool = jest.fn();
     expect(buildClaudeCodeOptions({

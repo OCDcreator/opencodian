@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import type { OpenCodeClient } from '@opencode/client';
+import { Goal } from '@opencode/schema/goal';
 import { parse, type ParseError } from 'jsonc-parser';
 
 import { appendObsidianContextBlocks } from '../../../../shared/obsidianContext';
@@ -36,11 +37,13 @@ import { WarmInlineCompletionSession } from '../auxiliary/WarmInlineCompletionSe
 import { type AgentGoalCommand, type AgentGoalControlResult, type AgentGoalEvent, type AgentGoalReadback,
   BackendGoalRuntime, confirmGoalCommand, validateGoalCommand } from '../BackendGoalRuntime';
 
-// The installed 2.2.0 client predates Goal's schema export, but supports
-// portable plugin RPC definitions. Payload validation remains in the store.
-const goalRpcValue = { '~standard': { version: 1 as const, vendor: 'opencodian', validate: (value: unknown) => ({ value }) } };
-const goalRpcDefinition = { id: 'opencode.goal', methods: { get: { input: goalRpcValue, output: goalRpcValue } },
-  events: { changed: { schema: { type: 'object', properties: { sessionID: { type: 'string' }, goal: {} } } } } } as const;
+// Official Goal RPC schema (`@opencode/schema/goal`, direct dependency). It
+// carries the same wire contract the retired shim hand-rolled (`opencode.goal`
+// get/changed), while the server now validates payloads (`rpc.invalid_input` /
+// `rpc.invalid_output`). The promise client performs no client-side re-validation,
+// so BackendGoalRuntime normalization stays the local defense against malformed
+// native Goal output. The 4000-character objective bound mirrors the upstream
+// plugin's MAX_OBJECTIVE default.
 
 const CAPABILITIES: BackendCapabilities = Object.freeze(new Set([
   AgentCapability.Chat,
@@ -584,7 +587,7 @@ export class OpenCode2Adapter implements AgentService, AgentChatCapability, Agen
     try {
       const client = await this.ready();
       this.ensureGoalObserver(client);
-      const goal = await client.rpc(goalRpcDefinition).get({ sessionID: sessionId }, {
+      const goal = await client.rpc(Goal.Definition).get({ sessionID: sessionId }, {
         location: { directory: this.options.workingDirectory }, signal: AbortSignal.timeout(10000),
       });
       return this.goals.observeRead(sessionId, goal, version);

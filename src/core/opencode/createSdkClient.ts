@@ -17,9 +17,11 @@ export interface CreateSdkClientOptions {
 /**
  * Create an OpenCode JS SDK v2 client for the plugin runtime.
  *
- * Reference source paths:
- * - `reference-projects/opencode/packages/sdk/js/src/v2/client.ts`
- * - `reference-projects/opencode/packages/sdk/js/src/v2/gen/sdk.gen.ts`
+ * Reference source (official upstream, pinned to the plugin's `@opencode-ai/sdk`
+ * 1.19.5 tag on the legacy `v1` branch; this v2-generation client still targets
+ * the v1 server's `/api/*` routes):
+ * - https://github.com/anomalyco/opencode/blob/v1.19.5/packages/sdk/js/src/v2/client.ts
+ * - https://github.com/anomalyco/opencode/blob/v1.19.5/packages/sdk/js/src/v2/gen/sdk.gen.ts
  */
 export function createSdkClient(options: CreateSdkClientOptions): SdkOpencodeClient {
   const config: SdkOpencodeClientConfig & {

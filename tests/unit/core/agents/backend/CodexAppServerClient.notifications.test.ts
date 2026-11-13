@@ -194,3 +194,56 @@ describe('CodexAppServerClient notification handlers', () => {
     expect(handler).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('CodexAppServerClient.subscribeToThreadNotifications — 0.169.0 methods + isolation', () => {
+  it('delivers real summary/turn-diff wire frames to the owning thread handler only', async () => {
+    const client = await createInitializedClient();
+    const eventsA: Array<{ method: string; params: unknown }> = [];
+    const eventsB: Array<{ method: string; params: unknown }> = [];
+    client.subscribeToThreadNotifications('thread-A', (event) => eventsA.push(event));
+    client.subscribeToThreadNotifications('thread-B', (event) => eventsB.push(event));
+
+    const frames: Array<{ method: string; params: Record<string, unknown> }> = [
+      { method: 'item/reasoning/summaryTextDelta', params: { threadId: 'thread-A', turnId: 'turn-A', itemId: 'rs-1', delta: 'step one', summaryIndex: 0 } },
+      { method: 'item/reasoning/summaryPartAdded', params: { threadId: 'thread-A', turnId: 'turn-A', itemId: 'rs-1', summaryIndex: 1 } },
+      { method: 'turn/diff/updated', params: { threadId: 'thread-B', turnId: 'turn-B', diff: '--- a\n+++ b\n' } },
+    ];
+    for (const frame of frames) {
+      mockWsInstance.onmessage?.({ data: JSON.stringify({ jsonrpc: '2.0', method: frame.method, params: frame.params }) });
+    }
+
+    expect(eventsA.map((event) => event.method)).toEqual(['item/reasoning/summaryTextDelta', 'item/reasoning/summaryPartAdded']);
+    expect(eventsB.map((event) => event.method)).toEqual(['turn/diff/updated']);
+    expect((eventsA[0].params as { delta?: string }).delta).toBe('step one');
+  });
+
+  it('never subscribes the deprecated-and-v2-unsent thread/compacted notification', async () => {
+    const client = await createInitializedClient();
+    const handler = jest.fn();
+    client.subscribeToThreadNotifications('thread-A', handler);
+
+    mockWsInstance.onmessage?.({ data: JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'thread/compacted',
+      params: { threadId: 'thread-A', turnId: 'turn-A' },
+    }) });
+
+    expect(handler).not.toHaveBeenCalled();
+    expect(mockWsInstance.onmessage).toBeDefined();
+  });
+
+  it('stops delivering after dispose so concurrent sessions do not leak events', async () => {
+    const client = await createInitializedClient();
+    const handler = jest.fn();
+    const subscription = client.subscribeToThreadNotifications('thread-A', handler);
+    subscription.dispose();
+
+    mockWsInstance.onmessage?.({ data: JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'item/reasoning/summaryTextDelta',
+      params: { threadId: 'thread-A', turnId: 'turn-A', itemId: 'rs-1', delta: 'late', summaryIndex: 0 },
+    }) });
+
+    expect(handler).not.toHaveBeenCalled();
+  });
+});

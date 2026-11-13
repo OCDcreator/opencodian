@@ -7,6 +7,7 @@ function streamState(): AppServerStreamState {
   return {
     streamedAgentMessageItemIds: new Set(),
     streamedReasoningItemIds: new Set(),
+    streamedReasoningSummaryItemIds: new Set(),
     startedTodoItemIds: new Set(),
     outputSchema: undefined,
   };
@@ -320,5 +321,93 @@ describe('CodexAppServerStreamMapper thread lifecycle notifications', () => {
 
   it('ignores deprecationNotice without a summary', () => {
     expect(map('deprecationNotice', { details: 'orphan' }).chunks).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Codex 0.169.0 reasoning summary streaming + native turn diff seam
+//
+// Upstream payloads (app-server-protocol v2, item.rs / turn.rs):
+//   item/reasoning/summaryTextDelta { threadId, turnId, itemId, delta, summaryIndex }
+//   item/reasoning/summaryPartAdded { threadId, turnId, itemId, summaryIndex }
+//   item/reasoning/textDelta        { threadId, turnId, itemId, delta, contentIndex }
+//   turn/diff/updated               { threadId, turnId, diff }
+// ---------------------------------------------------------------------------
+
+describe('CodexAppServerStreamMapper reasoning summary streaming', () => {
+  it('maps summaryTextDelta deltas to thinking chunks segmented per summary part', () => {
+    const state = streamState();
+    const first = mapAppServerNotification({
+      event: { method: 'item/reasoning/summaryTextDelta', params: { threadId: 'thread-1', turnId: 'turn-1', itemId: 'rs-1', delta: 'step one', summaryIndex: 0 } },
+      modelId: 'gpt-5.3-codex', sessionId: 'session-1', threadId: 'thread-1', streamState: state,
+    });
+    const second = mapAppServerNotification({
+      event: { method: 'item/reasoning/summaryTextDelta', params: { threadId: 'thread-1', turnId: 'turn-1', itemId: 'rs-1', delta: 'step two', summaryIndex: 1 } },
+      modelId: 'gpt-5.3-codex', sessionId: 'session-1', threadId: 'thread-1', streamState: state,
+    });
+    expect(first.chunks).toEqual([{ type: 'thinking', content: 'step one', partId: 'rs-1:s0' }]);
+    expect(second.chunks).toEqual([{ type: 'thinking', content: 'step two', partId: 'rs-1:s1' }]);
+    expect(state.streamedReasoningSummaryItemIds.has('rs-1')).toBe(true);
+  });
+
+  it('maps summaryPartAdded to no chunk (no content; per-part partIds segment the render)', () => {
+    expect(map('item/reasoning/summaryPartAdded', { threadId: 'thread-1', turnId: 'turn-1', itemId: 'rs-1', summaryIndex: 1 }).chunks).toEqual([]);
+  });
+
+  it('never replays the completed reasoning item full raw content after summary deltas streamed', () => {
+    const state = streamState();
+    mapAppServerNotification({
+      event: { method: 'item/reasoning/summaryTextDelta', params: { threadId: 'thread-1', turnId: 'turn-1', itemId: 'rs-1', delta: 'summary only', summaryIndex: 0 } },
+      modelId: 'gpt-5.3-codex', sessionId: 'session-1', threadId: 'thread-1', streamState: state,
+    });
+    const completed = mapAppServerNotification({
+      event: { method: 'item/completed', params: { threadId: 'thread-1', turnId: 'turn-1', item: { id: 'rs-1', type: 'reasoning', content: ['raw', 'thinking'], summary: ['summary only'] } } },
+      modelId: 'gpt-5.3-codex', sessionId: 'session-1', threadId: 'thread-1', streamState: state,
+    });
+    expect(completed.chunks).toEqual([]);
+  });
+
+  it('drops raw textDelta once summary deltas streamed for the same item (first flavor wins)', () => {
+    const state = streamState();
+    mapAppServerNotification({
+      event: { method: 'item/reasoning/summaryTextDelta', params: { threadId: 'thread-1', turnId: 'turn-1', itemId: 'rs-1', delta: 'summary', summaryIndex: 0 } },
+      modelId: 'gpt-5.3-codex', sessionId: 'session-1', threadId: 'thread-1', streamState: state,
+    });
+    const raw = mapAppServerNotification({
+      event: { method: 'item/reasoning/textDelta', params: { threadId: 'thread-1', turnId: 'turn-1', itemId: 'rs-1', delta: 'raw duplicate', contentIndex: 0 } },
+      modelId: 'gpt-5.3-codex', sessionId: 'session-1', threadId: 'thread-1', streamState: state,
+    });
+    expect(raw.chunks).toEqual([]);
+  });
+
+  it('drops summary deltas once raw textDelta streamed for the same item', () => {
+    const state = streamState();
+    mapAppServerNotification({
+      event: { method: 'item/reasoning/textDelta', params: { threadId: 'thread-1', turnId: 'turn-1', itemId: 'rs-1', delta: 'raw first', contentIndex: 0 } },
+      modelId: 'gpt-5.3-codex', sessionId: 'session-1', threadId: 'thread-1', streamState: state,
+    });
+    const summary = mapAppServerNotification({
+      event: { method: 'item/reasoning/summaryTextDelta', params: { threadId: 'thread-1', turnId: 'turn-1', itemId: 'rs-1', delta: 'summary duplicate', summaryIndex: 0 } },
+      modelId: 'gpt-5.3-codex', sessionId: 'session-1', threadId: 'thread-1', streamState: state,
+    });
+    expect(summary.chunks).toEqual([]);
+    expect(state.streamedReasoningSummaryItemIds.has('rs-1')).toBe(false);
+  });
+
+  it('keeps the legacy full-content emission when neither delta flavor streamed', () => {
+    const completed = map('item/completed', { threadId: 'thread-1', turnId: 'turn-1', item: { id: 'rs-legacy', type: 'reasoning', content: ['a', 'b'] } });
+    expect(completed.chunks).toEqual([{ type: 'thinking', content: 'ab', partId: 'rs-legacy' }]);
+  });
+
+  it('ignores malformed summary deltas (non-string delta)', () => {
+    expect(map('item/reasoning/summaryTextDelta', { threadId: 'thread-1', itemId: 'rs-1', delta: 42 }).chunks).toEqual([]);
+  });
+});
+
+describe('CodexAppServerStreamMapper native turn diff seam', () => {
+  it('maps turn/diff/updated to no chunk: Turn Change Records stay chat-owned from file_edited', () => {
+    const result = map('turn/diff/updated', { threadId: 'thread-1', turnId: 'turn-1', diff: '--- a\n+++ b\n' });
+    expect(result.chunks).toEqual([]);
+    expect(result.contextUsageSnapshot).toBeUndefined();
   });
 });

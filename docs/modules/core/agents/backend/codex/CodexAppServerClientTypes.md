@@ -1,5 +1,7 @@
 # CodexAppServerClientTypes
 
+> 2026-11-13：`AppServerListSkillsOptions.cwd` 的 wire 序列化文档更新为 `cwds: [cwd]`（Codex 0.169.0 binding；单数 `cwd` 字段被新服务端静默忽略）。调用方选项形状不变，序列化在 client 内完成。
+
 > 2026-10-29：AppServerUserInput 增补官方 UserInput 的 skill 分支（name/path），用于选中技能的显式 turn/start 调用。
 
 > 2026-10-08：AppServerServerRequestHandler 增加可选第二个 AbortSignal 参数，由 transport 在 native request 已解决或连接结束时取消。旧的一参 handler 仍可注册。

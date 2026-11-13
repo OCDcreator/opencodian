@@ -3155,6 +3155,7 @@ export class CodexAdapter
     const streamState: AppServerStreamState = {
       streamedAgentMessageItemIds,
       streamedReasoningItemIds,
+      streamedReasoningSummaryItemIds: new Set<string>(),
       startedTodoItemIds: new Set<string>(),
       outputSchema,
     };
@@ -3823,7 +3824,7 @@ export class CodexAdapter
         modelId: this.options.model ?? null,
         sessionId: pending.sessionId,
         threadId: pending.threadId,
-        streamState: { streamedAgentMessageItemIds: new Set(), streamedReasoningItemIds: new Set(), startedTodoItemIds: new Set(), outputSchema: undefined },
+        streamState: { streamedAgentMessageItemIds: new Set(), streamedReasoningItemIds: new Set(), streamedReasoningSummaryItemIds: new Set(), startedTodoItemIds: new Set(), outputSchema: undefined },
       });
       if (mapping.contextUsageSnapshot) {
         this.appServerContextSnapshots.set(pending.threadId, mapping.contextUsageSnapshot);

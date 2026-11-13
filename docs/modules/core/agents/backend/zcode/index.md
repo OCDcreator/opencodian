@@ -4,7 +4,7 @@
 
 ## 职责
 
-ZCode 后端包的导出边界：官方 ZCode 运行时 `app-server --stdio` 结构化协议的独立 adapter/transport 边界。运行时状态不进入通用聊天视图；包内子模块为 ZCodeAdapter（AgentService 门面）、ZCodeAppServerTransport（进程所有权+协议管道）、ZCodeProtocolTypes（边界校验）、ZCodeRuntimeResolver（运行时发现）、ZCodeProviderConfigDiscovery（provider 配置只读发现）、ZCodeDesktopTaskIndex（加载官方桌面 TaskIndexRepo 软删除路径）、ZCodeAuxQuerySession（专属临时存储、原生空工具读回与图片回合）与 ZCodeInlineCompletionSession（无 native 会话的 text-only `workspace/generateText` 补全）。
+ZCode 后端包的导出边界：官方 ZCode 运行时 `app-server --stdio` 结构化协议的独立 adapter/transport 边界。运行时状态不进入通用聊天视图；包内子模块为 ZCodeAdapter（AgentService 门面）、ZCodeAppServerTransport（进程所有权+协议管道）、ZCodeProtocolTypes（边界校验）、ZCodeRuntimeResolver（运行时发现）、ZCodeProviderConfigDiscovery（provider 配置只读发现）、ZCodeAuxQuerySession（专属临时存储、原生空工具读回与图片回合）与 ZCodeInlineCompletionSession（无 native 会话的 text-only `workspace/generateText` 补全）。ZCodeDesktopTaskIndex 已于 2026-11-13 退役：桌面 3.18.2 的 TaskIndexRepo API 已变（`seedTaskMetaIfMissing` 消失），历史列表/删除改用原生 `session/list` 服务端 tombstone 过滤与 V4 `deleteSession` 持久软删除（见 ZCodeAdapter）。
 
 ## T09 管理导出
 

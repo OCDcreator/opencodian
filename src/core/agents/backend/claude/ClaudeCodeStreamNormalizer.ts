@@ -567,6 +567,48 @@ function appendSdkSignalChunk(
     return true;
   }
 
+  // claude-agent-sdk compact_boundary (SDKCompactBoundaryMessage): the CLI
+  // compacted the conversation. Emitted as a diagnostic backend_event so the
+  // trace/stream surface records compaction evidence that previously fell
+  // through silently. Deliberately NOT synthesized into a `usage` chunk: the
+  // context-usage delta accounting cannot represent a downward token
+  // correction (applyUsageChunk ignores drops), so the next authoritative
+  // result usage remains the correction point.
+  if (subtype === 'compact_boundary') {
+    const metadata = readRecord(record.compact_metadata);
+    chunks.push({
+      ...base,
+      event: 'compaction',
+      status: readNonEmptyString(metadata?.trigger) ?? 'unknown',
+      metadata: {
+        trigger: readNonEmptyString(metadata?.trigger) ?? null,
+        preTokens: readNumber(metadata?.pre_tokens) ?? null,
+        postTokens: readNumber(metadata?.post_tokens) ?? null,
+        durationMs: readNumber(metadata?.duration_ms) ?? null,
+      },
+    });
+    return true;
+  }
+
+  // SDKPermissionDeniedMessage: best-effort advisory that a tool call was
+  // auto-denied without an interactive prompt (dontAsk/auto classifier, deny
+  // rule, headless auto-deny). result.permission_denials stays the
+  // authoritative record; this only makes the denial visible in the stream.
+  if (subtype === 'permission_denied') {
+    chunks.push({
+      ...base,
+      event: 'permission_denied',
+      status: 'denied',
+      id: readNonEmptyString(record.tool_use_id),
+      name: readNonEmptyString(record.tool_name),
+      metadata: {
+        agentId: readNonEmptyString(record.agent_id) ?? null,
+        decisionReasonType: readNonEmptyString(record.decision_reason_type) ?? null,
+      },
+    });
+    return true;
+  }
+
   return false;
 }
 
@@ -677,6 +719,7 @@ export class ClaudeCodeStreamNormalizer {
       return chunks;
     }
     this.appendLifecycleChunks(record, chunks, sessionId);
+    this.appendAuthAndRateLimitChunks(record, chunks, sessionId);
     this.appendDeltaChunk(record, chunks);
     if (this.appendMessageErrorChunk(record, chunks)) {
       appendUsageChunk(record, chunks, sessionId);
@@ -768,6 +811,66 @@ export class ClaudeCodeStreamNormalizer {
         ...(sessionId ? { sessionId } : {}),
       });
       return;
+    }
+  }
+
+  /**
+   * claude-agent-sdk auth/rate-limit signals (SDKAuthStatusMessage,
+   * SDKRateLimitEvent — top-level types, not `system` subtypes). Both were
+   * silently dropped before; they now surface as diagnostic backend_events.
+   * Rate-limit data only exists for claude.ai subscription sessions — API
+   * key/Bedrock/Vertex sessions never emit the event, so absence is expected.
+   */
+  private appendAuthAndRateLimitChunks(
+    record: JsonRecord,
+    chunks: StreamChunk[],
+    sessionId: string | undefined,
+  ): void {
+    const type = readString(record.type);
+    const base = {
+      type: 'backend_event' as const,
+      source: 'claude-code' as const,
+      ...(sessionId ? { sessionId } : {}),
+    };
+
+    if (type === 'auth_status') {
+      const isAuthenticating = readBoolean(record.is_authenticating) ?? false;
+      const error = readNonEmptyString(record.error);
+      const output = readArray(record.output)
+        .map((entry) => readNonEmptyString(entry))
+        .filter((entry): entry is string => entry !== undefined);
+      chunks.push({
+        ...base,
+        event: 'auth_status',
+        status: error ? 'error' : isAuthenticating ? 'authenticating' : 'ok',
+        content: error ?? (output.length > 0 ? output.join('\n') : undefined),
+        metadata: {
+          isAuthenticating,
+          output,
+          error: error ?? null,
+        },
+      });
+      return;
+    }
+
+    if (type === 'rate_limit_event') {
+      const info = readRecord(record.rate_limit_info);
+      const status = readNonEmptyString(info?.status) ?? 'unknown';
+      chunks.push({
+        ...base,
+        event: 'rate_limit',
+        status,
+        content: status === 'rejected'
+          ? 'Claude Code reports the request was rejected by rate limiting.'
+          : undefined,
+        metadata: {
+          rateLimitType: readNonEmptyString(info?.rateLimitType) ?? null,
+          utilization: readNumber(info?.utilization) ?? null,
+          resetsAt: readNumber(info?.resetsAt) ?? null,
+          overageStatus: readNonEmptyString(info?.overageStatus) ?? null,
+          overageResetsAt: readNumber(info?.overageResetsAt) ?? null,
+        },
+      });
     }
   }
 

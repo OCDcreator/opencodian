@@ -2788,8 +2788,8 @@ export default class OpenCodianPlugin extends Plugin {
     }
     if (backendSessionId && sessionBackend && conversation.backend !== 'codex') {
       if (conversation.backend === 'zcode') {
-        // ZCode's desktop task-index tombstone must be confirmed before the
-        // local copy disappears. Other backends retain their existing cleanup.
+        // ZCode native soft-delete must be confirmed before the local copy
+        // disappears. Other backends retain their existing cleanup.
         await sessionBackend.deleteSession(backendSessionId);
       } else {
         try {

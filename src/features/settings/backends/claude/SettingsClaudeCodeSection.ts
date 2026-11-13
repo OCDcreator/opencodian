@@ -136,6 +136,8 @@ const CLAUDE_PERMISSION_MODES: Array<{ id: ClaudeCodePermissionMode; labelKey: T
   { id: 'acceptEdits', labelKey: 'settings.claudeCode.permissionMode.acceptEdits' },
   { id: 'bypassPermissions', labelKey: 'settings.claudeCode.permissionMode.bypassPermissions' },
   { id: 'plan', labelKey: 'settings.claudeCode.permissionMode.plan' },
+  { id: 'dontAsk', labelKey: 'settings.claudeCode.permissionMode.dontAsk' },
+  { id: 'auto', labelKey: 'settings.claudeCode.permissionMode.auto' },
 ];
 
 const CLAUDE_THINKING_TYPES: Array<{ id: ClaudeCodeThinking['type']; labelKey: TranslationKey }> = [

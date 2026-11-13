@@ -38,6 +38,12 @@
 
 2026-11-12：Claude provider 的凭据草稿编辑与脱敏配置检查由同一 `feature.settings-claude` owner 下的 `SettingsClaudeProviderModals` 完整隔离；`SettingsClaudeProvidersSection` 继续持有配置快照代际、local revision、CAS 应用和冲突恢复，既有 metadata coordinator 保留部分持久化重试。模态组件不直接读写配置或推定运行时确认；预设选择记录与文件回读保持分离。
 
+## 后端版本适配边界（2026-11-13）
+
+ZCode 的历史与持久删除使用官方 session store 协议，不再加载桌面内部 TaskIndexRepo；删除须保留 workspace／会话身份守卫并按同 ID 读回缺席，达到原生目录读取上限时报告 partial。凭据 codec 只支持插件自有 env 密钥，os 源保持不可读，子进程不得同时继承竞争的 secret-file 来源。原生 guide 尚无 current-turn-only 原子前置条件，不能凭入队 ACK 开放 turn steering。
+
+Codex 的独立 app-server 启动、WebSocket 凭据和就绪探测由 `CodexAppServerTransport` 与同 owner 的 `CodexAppServerSpawnSupport` 隔离；该模块承担会接触令牌与进程的高风险边界，不是通用转发层。原始令牌仅在内存与 upgrade header 内，argv 只带 digest；只有明确不支持鉴权参数的旧 CLI 才能进入有记录的兼容降级，其他启动失败仍是失败。Claude 权限模式保留原生语义：dontAsk 不得放宽为 bypassPermissions，auto 的运行时资格由 CLI 判断。新增 backend_event 只进入已有诊断消费者，不据此宣称已有状态 UI 或上下文用量修正。
+
 ## Feature Work Checklist
 
 1. Identify the owner before coding: UI, runtime, OpenCode service, settings, storage, theme, or tests.

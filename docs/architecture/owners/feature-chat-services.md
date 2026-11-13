@@ -10,6 +10,8 @@
 
 # Owner: feature.chat-services
 
+2026-11-13：权限选择器展示 Claude 原生 dontAsk／auto 与 ZCode guarded，模式 ID 不再借用其他值的语义；同会话应用和原生读回继续委托已有 backend 绑定。权限选择协调器不拥有模型权限判断、Claude 分类器或危险命令识别，也不从 UI 选择值推断已经生效。后端切换、未知模式和未确认模式仍沿既有代际／会话 fence 处理。
+
 2026-11-11（共享工作台展示端口）：`SessionWorkbenchCoordinator` 将现有文件摘要纳入展示 state 指纹，并一次性转发稳定的内联资源挂载端口；`ModifiedFilesSidebarCoordinator` 只读转发 sidebar 已计算的摘要，通过会话身份 fence 拒绝旧归属；当前代际同步更新／异步完成后通知重投影，读取中保留 loading。它不新增 Git/native 读取或计数缓存。任务、Plan、子会话及 capability 的权威投影和操作租约保持在 `SessionInformationCoordinator` 与 backend owner，一级活动布局不建立第二任务生命周期。目录数据继续复用共享 slash catalog 来源，面板 DOM 稳定性由 feature.chat-ui 承担。
 
 2026-11-10（DSH 官方权限菜单展示）：`PermissionModeSelectorCoordinator` 仅在 DSH 分支识别 generation ID 的四种内置预设，投影官方双语名称与图标；host 自定义名称、目录顺序、选中 ID 与写回参数不变。`auto` 仅在真实目录存在时带 EXP，窄 trigger 与 aria-label 保留实验标记，离开 auto 清除。权限读取／修改／独立确认与代际隔离继续由 `DshNativeSessionControls` 持有，展示层不启用扩展、不扩大权限；其他后端复用回归覆盖。

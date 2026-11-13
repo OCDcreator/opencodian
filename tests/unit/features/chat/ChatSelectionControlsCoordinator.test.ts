@@ -270,7 +270,7 @@ describe('ChatSelectionControlsCoordinator', () => {
       'shield', 'shield-check', 'shield-alert',
     ]);
     expect(createZCodeModeConfig().options.map((option) => option.icon)).toEqual([
-      'clipboard-list', 'shield-check', 'pencil', 'shield-alert', 'shield-alert',
+      'clipboard-list', 'shield-check', 'pencil', 'shield-half', 'shield-alert', 'shield-alert',
     ]);
   });
 

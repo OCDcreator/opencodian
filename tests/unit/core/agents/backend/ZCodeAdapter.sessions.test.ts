@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Native session lifecycle coverage keeps the scoped catalog, native delete contract, and background-task fixtures in one file. */
 /**
  * ZCodeAdapter.sessions.test.ts — native session lifecycle slice (ticket 03).
  *
@@ -7,12 +8,11 @@
  */
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 
-import { ZCodeAdapter } from '../../../../../src/core/agents/backend/zcode/ZCodeAdapter';
+import { ZCODE_SESSION_HISTORY_LIMIT,ZCodeAdapter } from '../../../../../src/core/agents/backend/zcode/ZCodeAdapter';
 import {
   type ZCodeAppServerTransport,
   ZCodeRemoteRequestError,
 } from '../../../../../src/core/agents/backend/zcode/ZCodeAppServerTransport';
-import type { ZCodeDesktopTaskIndex } from '../../../../../src/core/agents/backend/zcode/ZCodeDesktopTaskIndex';
 import type { ZCodeProviderConfigSnapshot } from '../../../../../src/core/agents/backend/zcode/ZCodeProviderConfigDiscovery';
 import type { ZCodeRuntimeResolution } from '../../../../../src/core/agents/backend/zcode/ZCodeRuntimeResolver';
 
@@ -50,20 +50,11 @@ describe('ZCodeAdapter — native session lifecycle', () => {
   let notificationHandlers: Map<string, (params: Record<string, unknown>) => void>;
   let onRequest: ((method: string) => void) | null;
   let adapter: ZCodeAdapter;
-  let deletedIds: Set<string>;
-  let taskIndex: ZCodeDesktopTaskIndex;
 
   async function startAdapter(): Promise<void> {
     calls = [];
     notificationHandlers = new Map();
     onRequest = null;
-    deletedIds = new Set();
-    taskIndex = {
-      seedTaskMetaIfMissing: jest.fn(async (meta) => ({ taskId: meta.taskId })),
-      updateTaskState: jest.fn(async (input) => { deletedIds.add(input.taskId); return { taskId: input.taskId }; }),
-      listDeletedTaskIds: jest.fn(async () => [...deletedIds]),
-      close: jest.fn(),
-    };
     responses = {
       'runtime/capabilities': { independentPlanState: true },
       'session/list': { sessions: [{ sessionId: 'sess_a', title: 'A', updatedAt: 5 }, { sessionId: 'sess_b', title: 'B' }] },
@@ -93,7 +84,6 @@ describe('ZCodeAdapter — native session lifecycle', () => {
       resolveRuntime: () => readyResolution,
       discoverProviderConfig: () => providerConfig,
       createTransport: () => fake as unknown as ZCodeAppServerTransport,
-      openTaskIndex: () => taskIndex,
     });
     await adapter.start();
   }
@@ -107,9 +97,16 @@ describe('ZCodeAdapter — native session lifecycle', () => {
     return calls.map((c) => c.method);
   }
 
-  it('lists sessions as raw records and resumes before reading a session', async () => {
+  it('lists sessions as raw records through the scoped native catalog and resumes before reading a session', async () => {
     await startAdapter();
     await expect(adapter.listSessions()).resolves.toHaveLength(2);
+    // The native list is workspace-scoped with an explicit raised limit; the
+    // desktop task-index bridge no longer participates in history listing.
+    const listCall = calls.find((call) => call.method === 'session/list');
+    expect(listCall?.params).toEqual({
+      workspace: { workspacePath: '/vault', workspaceKey: '/vault' },
+      limit: ZCODE_SESSION_HISTORY_LIMIT,
+    });
 
     const session = await adapter.getSession('sess_a');
     expect(session).toMatchObject({ sessionId: 'sess_a', title: 'A' });
@@ -118,6 +115,40 @@ describe('ZCodeAdapter — native session lifecycle', () => {
     const resumeIndex = methodsCalled().indexOf('session/resume');
     expect(resumeIndex).toBeGreaterThanOrEqual(0);
     expect(resumeIndex).toBeLessThan(readIndex);
+  });
+
+  it('returns history beyond the native default 50 as complete when under the page limit', async () => {
+    await startAdapter();
+    const sessions = Array.from({ length: 60 }, (_, index) => ({ sessionId: `sess_${index}`, title: `S${index}` }));
+    responses['session/list'] = { sessions };
+    await expect(adapter.listSessions()).resolves.toHaveLength(60);
+    expect(calls.find((call) => call.method === 'session/list')?.params).toMatchObject({ limit: ZCODE_SESSION_HISTORY_LIMIT });
+  });
+
+  it('reports a full history page as honest partial instead of fabricating completeness', async () => {
+    await startAdapter();
+    const sessions = Array.from({ length: ZCODE_SESSION_HISTORY_LIMIT }, (_, index) => ({
+      sessionId: `sess_${index}`, title: `S${index}`,
+    }));
+    responses['session/list'] = { sessions };
+    await expect(adapter.listSessions()).rejects.toMatchObject({
+      name: 'BackendSessionCatalogReadError',
+      result: {
+        status: 'partial',
+        data: sessions,
+        nextCursor: null,
+        errorReason: expect.stringContaining('older sessions may be hidden'),
+      },
+    });
+  });
+
+  it('reports an invalid native list shape as failed instead of an empty success', async () => {
+    await startAdapter();
+    responses['session/list'] = { sessions: 'not-an-array' };
+    await expect(adapter.listSessions()).rejects.toMatchObject({
+      name: 'BackendSessionCatalogReadError',
+      result: { status: 'failed', data: [], nextCursor: null },
+    });
   });
 
   it('maps message pagination options and returns raw { info, parts } records', async () => {
@@ -168,7 +199,6 @@ describe('ZCodeAdapter — native session lifecycle', () => {
       workingDirectory: '/vault', resolveRuntime: () => readyResolution,
       discoverProviderConfig: () => providerConfig,
       createTransport: () => fake as unknown as ZCodeAppServerTransport,
-      openTaskIndex: () => taskIndex,
     });
     await adapter.start();
     const taskId = 'exec_66666666-6666-4666-8666-666666666666';
@@ -360,40 +390,106 @@ describe('ZCodeAdapter — native session lifecycle', () => {
     expect(methodsCalled()).not.toContain('session/create');
   });
 
-  it('soft-deletes only the selected persisted session through the official desktop index', async () => {
+  it('soft-deletes only the selected persisted session through the native V4 command with a same-ID readback', async () => {
     await startAdapter();
-    responses['session/list'] = { sessions: [
-      { sessionId: 'sess_a', sessionKind: 'interactive', title: 'A', traceId: 'trace_a',
-        createdAt: 1, updatedAt: 5, workspace: { workspacePath: '/vault' } },
-      { sessionId: 'sess_b', sessionKind: 'interactive', title: 'B', traceId: 'trace_b',
-        createdAt: 2, updatedAt: 6, workspace: { workspacePath: '/vault' } },
-    ] };
+    const rowA = { sessionId: 'sess_a', sessionKind: 'interactive', title: 'A',
+      createdAt: 1, updatedAt: 5, workspace: { workspacePath: '/vault' } };
+    const rowB = { sessionId: 'sess_b', sessionKind: 'interactive', title: 'B',
+      createdAt: 2, updatedAt: 6, workspace: { workspacePath: '/vault' } };
+    responses['v4/command'] = { status: 'accepted', commandId: 'delete_0', revisionAtDecision: 1 };
+    let sameIdLookups = 0;
+    onRequest = (method) => {
+      if (method !== 'session/list') return;
+      const params = calls.at(-1)?.params ?? {};
+      if (!Array.isArray(params['sessionIds'])) return;
+      sameIdLookups += 1;
+      // First same-ID lookup = pre-delete guard; second = post-delete readback
+      // (native sessionIds queries return only matching rows, and the fresh
+      // tombstone filters sess_a out entirely).
+      responses['session/list'] = sameIdLookups === 1
+        ? { sessions: [rowA, rowB] }
+        : { sessions: [] };
+    };
     await expect(adapter.deleteSession('sess_a')).resolves.toBeUndefined();
-    expect(taskIndex.seedTaskMetaIfMissing).toHaveBeenCalledWith(expect.objectContaining({
-      taskId: 'sess_a', workspacePath: '/vault', provider: 'glm',
-    }));
-    expect(taskIndex.updateTaskState).toHaveBeenCalledWith({
-      workspacePath: '/vault', taskId: 'sess_a', patch: { deleted: true },
-    });
-    expect(deletedIds.has('sess_a')).toBe(true);
-    expect(deletedIds.has('sess_b')).toBe(false);
-    expect(methodsCalled()).not.toContain('v4/command');
+    // Pre-delete identity guard used the same-ID lookup (bypasses workspace
+    // filtering), and the post-delete readback proves the tombstone.
+    const sameIdLookupsCalls = calls.filter((call) => call.method === 'session/list'
+      && Array.isArray(call.params?.['sessionIds']));
+    expect(sameIdLookupsCalls).toHaveLength(2);
+    const deleteCommand = calls.find((call) => call.method === 'v4/command');
+    expect(deleteCommand?.params).toMatchObject({ sessionId: 'sess_a', type: 'deleteSession', payload: {} });
+    expect(deleteCommand?.params?.['commandId']).toEqual(expect.any(String));
+    // Same-ID readback after the ACK: authoritative confirmation, not ACK-only.
+    expect(sameIdLookupsCalls[1]?.params).toEqual({ sessionIds: ['sess_a'] });
+    // The deleted session disappears from the native catalog on reload.
+    responses['session/list'] = { sessions: [rowB] };
+    await expect(adapter.listSessions()).resolves.toEqual([rowB]);
   });
 
-  it('rejects a cross-workspace target before touching the desktop index', async () => {
+  it('rejects a cross-workspace target before any delete mutation', async () => {
     await startAdapter();
     responses['session/list'] = { sessions: [{ sessionId: 'sess_a', sessionKind: 'interactive',
       workspace: { workspacePath: '/other-vault' } }] };
     await expect(adapter.deleteSession('sess_a')).rejects.toThrow('workspace or session-kind mismatch');
-    expect(taskIndex.updateTaskState).not.toHaveBeenCalled();
+    expect(methodsCalled()).not.toContain('v4/command');
   });
 
-  it('keeps the target undeleted when official index readback omits the tombstone', async () => {
+  it('rejects a non-interactive target before any delete mutation', async () => {
+    await startAdapter();
+    responses['session/list'] = { sessions: [{ sessionId: 'sess_a', sessionKind: 'background',
+      workspace: { workspacePath: '/vault' } }] };
+    await expect(adapter.deleteSession('sess_a')).rejects.toThrow('workspace or session-kind mismatch');
+    expect(methodsCalled()).not.toContain('v4/command');
+  });
+
+  it('rejects a rejected V4 delete ACK without claiming success', async () => {
     await startAdapter();
     responses['session/list'] = { sessions: [{ sessionId: 'sess_a', sessionKind: 'interactive',
       title: 'A', createdAt: 1, updatedAt: 2, workspace: { workspacePath: '/vault' } }] };
-    taskIndex.listDeletedTaskIds = jest.fn(async () => []);
-    await expect(adapter.deleteSession('sess_a')).rejects.toThrow('not confirmed');
+    responses['v4/command'] = { status: 'rejected', reasonCode: 'proto.invalidPayload',
+      commandId: 'delete_1', message: 'invalid', revisionAtDecision: 1 };
+    await expect(adapter.deleteSession('sess_a')).rejects.toThrow('rejected by the native V4 command');
+    // A rejected ACK must not even be followed by a confirmation readback.
+    expect(methodsCalled().filter((method) => method === 'v4/command')).toHaveLength(1);
+  });
+
+  it('fails honestly when the native catalog still returns the session after an accepted ACK', async () => {
+    await startAdapter();
+    // Old-runtime shape: V4 delete only closed the handle, the persisted
+    // record survived. The same-ID readback still returns the session, so
+    // the adapter must refuse to report deletion.
+    responses['session/list'] = { sessions: [{ sessionId: 'sess_a', sessionKind: 'interactive',
+      title: 'A', createdAt: 1, updatedAt: 2, workspace: { workspacePath: '/vault' } }] };
+    responses['v4/command'] = { status: 'accepted', commandId: 'delete_2', revisionAtDecision: 2 };
+    await expect(adapter.deleteSession('sess_a')).rejects.toThrow('not confirmed by the native catalog readback');
+    expect(responses['v4/command']).toMatchObject({ status: 'accepted' });
+  });
+
+  it('deletes a deferred draft only after the outside-workspace guard and the same-ID readback', async () => {
+    await startAdapter();
+    // No persisted row for the target id anywhere in the same-ID catalog.
+    responses['session/list'] = { sessions: [] };
+    responses['v4/command'] = { status: 'accepted', commandId: 'delete_3', revisionAtDecision: 3 };
+    await expect(adapter.deleteSession('sess_deferred')).resolves.toBeUndefined();
+    expect(calls.find((call) => call.method === 'v4/command')?.params)
+      .toMatchObject({ sessionId: 'sess_deferred', type: 'deleteSession', payload: {} });
+    expect(methodsCalled()).toContain('session/resume');
+  });
+
+  it('refuses a deferred delete when the visible catalog still contains the session', async () => {
+    await startAdapter();
+    // Same-ID lookup reports no persisted row, yet the workspace-scoped
+    // visible catalog still lists the session: refuse instead of treating it
+    // as an in-process draft.
+    onRequest = (method) => {
+      if (method !== 'session/list') return;
+      const params = calls.at(-1)?.params ?? {};
+      responses['session/list'] = Array.isArray(params['sessionIds'])
+        ? { sessions: [] }
+        : { sessions: [{ sessionId: 'sess_a', sessionKind: 'interactive', workspace: { workspacePath: '/vault' } }] };
+    };
+    await expect(adapter.deleteSession('sess_a')).rejects.toThrow('outside this workspace');
+    expect(methodsCalled()).not.toContain('v4/command');
   });
 
   it('renames through the official V4 command and verifies the native session title', async () => {

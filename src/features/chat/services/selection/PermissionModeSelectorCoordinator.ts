@@ -129,68 +129,55 @@ export function createZCodeModeConfig(): PermissionModeConfig {
     plan: 'clipboard-list',
     build: 'shield-check',
     edit: 'pencil',
+    guarded: 'shield-half',
     yolo: 'shield-alert',
     auto: 'shield-alert',
   } as const;
   return {
     backendLabel: 'zcode',
-    options: (['plan', 'build', 'edit', 'yolo', 'auto'] as const).map((id) => ({
+    options: (['plan', 'build', 'edit', 'guarded', 'yolo', 'auto'] as const).map((id) => ({
       id,
       label: t(`chat.zcode.mode.${id}`),
       description: t(`chat.zcode.mode.${id}.description`),
       icon: icons[id],
     })),
     displayMap: {
-      plan: 'PLAN', build: 'BUILD', edit: 'EDIT', yolo: 'YOLO', auto: 'AUTO',
+      plan: 'PLAN', build: 'BUILD', edit: 'EDIT', guarded: 'GUARDED', yolo: 'YOLO', auto: 'AUTO',
       unknown: t('chat.zcode.mode.unknown'),
       checking: t('chat.zcode.mode.checking'),
     },
-    modeCssClasses: ['mode-plan', 'mode-build', 'mode-edit', 'mode-yolo', 'mode-auto', 'mode-unknown', 'mode-checking'],
+    modeCssClasses: ['mode-plan', 'mode-build', 'mode-edit', 'mode-guarded', 'mode-yolo', 'mode-auto', 'mode-unknown', 'mode-checking'],
   };
 }
 
 // ─── Factory: Claude Code permission modes ───────────────────────────
 
+/**
+ * Native Claude Agent SDK permission modes in menu order; the destructive
+ * bypass mode stays last. `fallback` covers a missing description locale.
+ */
+const CLAUDE_CODE_PERMISSION_OPTIONS = [
+  { id: 'default', icon: 'hand', fallback: 'Default permission prompts' },
+  { id: 'acceptEdits', icon: 'shield-check', fallback: 'Auto-accept file edits' },
+  { id: 'plan', icon: 'clipboard-list', fallback: 'Plan mode — review before executing' },
+  { id: 'dontAsk', icon: 'shield-off', fallback: 'Never prompt; deny tools that are not pre-approved' },
+  { id: 'auto', icon: 'sparkles', fallback: 'A model classifier approves or denies each call' },
+  { id: 'bypassPermissions', icon: 'shield-alert', fallback: 'Reduce confirmations; bypasses permission checks' },
+] as const satisfies ReadonlyArray<{ id: ClaudeCodePermissionMode; icon: string; fallback: string }>;
+
 export function createClaudeCodePermissionConfig(): PermissionModeConfig {
   return {
     backendLabel: 'claude-code',
-    options: [
-      {
-        id: 'default',
-        label: t('settings.claudeCode.permissionMode.default'),
-        description: t('chat.claudeCode.permissionMode.default.description')
-          || 'Default permission prompts',
-        icon: 'hand',
-      },
-      {
-        id: 'acceptEdits',
-        label: t('settings.claudeCode.permissionMode.acceptEdits'),
-        description: t('chat.claudeCode.permissionMode.acceptEdits.description')
-          || 'Auto-accept file edits',
-        icon: 'shield-check',
-      },
-      {
-        id: 'plan',
-        label: t('settings.claudeCode.permissionMode.plan'),
-        description: t('chat.claudeCode.permissionMode.plan.description')
-          || 'Plan mode — review before executing',
-        icon: 'clipboard-list',
-      },
-      {
-        id: 'bypassPermissions',
-        label: t('settings.claudeCode.permissionMode.bypassPermissions'),
-        description: t('chat.claudeCode.permissionMode.bypassPermissions.description')
-          || 'Reduce confirmations; bypasses permission checks',
-        icon: 'shield-alert',
-      },
-    ],
-    displayMap: {
-      default: t('settings.claudeCode.permissionMode.default'),
-      acceptEdits: t('settings.claudeCode.permissionMode.acceptEdits'),
-      bypassPermissions: t('settings.claudeCode.permissionMode.bypassPermissions'),
-      plan: t('settings.claudeCode.permissionMode.plan'),
-    } as Record<ClaudeCodePermissionMode, string>,
-    modeCssClasses: ['mode-default', 'mode-acceptEdits', 'mode-bypassPermissions', 'mode-plan'] as const,
+    options: CLAUDE_CODE_PERMISSION_OPTIONS.map(({ id, icon, fallback }) => ({
+      id,
+      label: t(`settings.claudeCode.permissionMode.${id}`),
+      description: t(`chat.claudeCode.permissionMode.${id}.description`) || fallback,
+      icon,
+    })),
+    displayMap: Object.fromEntries(CLAUDE_CODE_PERMISSION_OPTIONS.map(({ id }) => (
+      [id, t(`settings.claudeCode.permissionMode.${id}`)]
+    ))),
+    modeCssClasses: CLAUDE_CODE_PERMISSION_OPTIONS.map(({ id }) => `mode-${id}`),
     variantClass: 'opencodian-permission-selector--claude-code',
   };
 }
@@ -504,7 +491,7 @@ export class PermissionModeSelectorCoordinator {
     if (mode === 'yolo' || mode === 'bypassPermissions' || mode === 'danger-full-access') {
       return 'danger';
     }
-    if (mode === 'plan' || mode === 'read-only') {
+    if (mode === 'plan' || mode === 'read-only' || mode === 'dontAsk') {
       return 'safe';
     }
     return 'neutral';

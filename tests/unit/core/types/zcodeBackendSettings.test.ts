@@ -32,6 +32,22 @@ describe('normalizeZCodeBackendSettings', () => {
     expect(getDefaultBackendSettings().zcode).toEqual({ executablePath: '', model: '', thinkingLevel: '', mode: '' });
   });
 
+  it('accepts the native guarded mode and keeps it through persistence normalization', () => {
+    // guarded is the native ZCode full-access-with-pauses mode added in
+    // runtime 3.18.x; a stored value must survive load normalization instead
+    // of being silently reset to the runtime default.
+    expect(normalizeZCodeBackendSettings({ mode: '  guarded  ' }).mode).toBe('guarded');
+    expect(normalizeZCodeBackendSettings({
+      executablePath: '/x/zcode.cjs',
+      model: 'p/m',
+      thinkingLevel: 'high',
+      mode: 'guarded',
+    })).toEqual({ executablePath: '/x/zcode.cjs', model: 'p/m', thinkingLevel: 'high', mode: 'guarded' });
+
+    const roundTripped = normalizeBackendSettings({ zcode: { mode: 'guarded' } });
+    expect(roundTripped.zcode.mode).toBe('guarded');
+  });
+
   it('trims the executable override and drops invalid types', () => {
     expect(normalizeZCodeBackendSettings({ executablePath: '  /opt/zcode-agent  ' }))
       .toEqual({ executablePath: '/opt/zcode-agent', model: '', thinkingLevel: '', mode: '' });

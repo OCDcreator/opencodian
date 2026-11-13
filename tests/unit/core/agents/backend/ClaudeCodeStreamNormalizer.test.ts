@@ -990,4 +990,154 @@ describe('Claude human prompt identity', () => {
       message: { role: 'user', content: 'A real follow-up' } });
     expect(following).toContainEqual({ type: 'user_message_identity', uuid: 'next-human', sessionId: 'owned-native' });
   });
+
+  it('normalizes compact_boundary into a compaction backend_event with metadata', () => {
+    const normalizer = createClaudeCodeStreamNormalizer();
+
+    expect(normalizer.transformSDKMessage({
+      type: 'system',
+      subtype: 'compact_boundary',
+      session_id: 'claude-compact-1',
+      compact_metadata: {
+        trigger: 'auto',
+        pre_tokens: 150000,
+        post_tokens: 42000,
+        duration_ms: 3120,
+      },
+    })).toEqual([{
+      type: 'backend_event',
+      source: 'claude-code',
+      event: 'compaction',
+      status: 'auto',
+      sessionId: 'claude-compact-1',
+      metadata: {
+        trigger: 'auto',
+        preTokens: 150000,
+        postTokens: 42000,
+        durationMs: 3120,
+      },
+    }]);
+  });
+
+  it('normalizes permission_denied into a diagnostic backend_event with tool identity', () => {
+    const normalizer = createClaudeCodeStreamNormalizer();
+
+    expect(normalizer.transformSDKMessage({
+      type: 'system',
+      subtype: 'permission_denied',
+      session_id: 'claude-deny-1',
+      tool_name: 'Bash',
+      tool_use_id: 'toolu-deny-1',
+      agent_id: 'agent-7',
+      decision_reason_type: 'classifier',
+    })).toEqual([{
+      type: 'backend_event',
+      source: 'claude-code',
+      event: 'permission_denied',
+      status: 'denied',
+      id: 'toolu-deny-1',
+      name: 'Bash',
+      sessionId: 'claude-deny-1',
+      metadata: {
+        agentId: 'agent-7',
+        decisionReasonType: 'classifier',
+      },
+    }]);
+  });
+
+  it('normalizes auth_status progress and errors into backend_events', () => {
+    const normalizer = createClaudeCodeStreamNormalizer();
+
+    expect(normalizer.transformSDKMessage({
+      type: 'auth_status',
+      session_id: 'claude-auth-1',
+      is_authenticating: true,
+      output: ['Waiting for authorization...'],
+    })).toEqual([{
+      type: 'backend_event',
+      source: 'claude-code',
+      event: 'auth_status',
+      status: 'authenticating',
+      content: 'Waiting for authorization...',
+      sessionId: 'claude-auth-1',
+      metadata: {
+        isAuthenticating: true,
+        output: ['Waiting for authorization...'],
+        error: null,
+      },
+    }]);
+
+    expect(normalizer.transformSDKMessage({
+      type: 'auth_status',
+      session_id: 'claude-auth-1',
+      is_authenticating: false,
+      output: [],
+      error: 'credential expired',
+    })).toEqual([{
+      type: 'backend_event',
+      source: 'claude-code',
+      event: 'auth_status',
+      status: 'error',
+      content: 'credential expired',
+      sessionId: 'claude-auth-1',
+      metadata: {
+        isAuthenticating: false,
+        output: [],
+        error: 'credential expired',
+      },
+    }, {
+      // Pre-existing generic semantics: any non-result message carrying an
+      // error string also surfaces an error chunk for the chat stream.
+      type: 'error',
+      content: 'credential expired',
+    }]);
+  });
+
+  it('normalizes rate_limit_event levels into backend_events with rate-limit metadata', () => {
+    const normalizer = createClaudeCodeStreamNormalizer();
+
+    expect(normalizer.transformSDKMessage({
+      type: 'rate_limit_event',
+      session_id: 'claude-rate-1',
+      rate_limit_info: {
+        status: 'rejected',
+        rateLimitType: 'five_hour',
+        utilization: 1,
+        resetsAt: 1710000000,
+      },
+    })).toEqual([{
+      type: 'backend_event',
+      source: 'claude-code',
+      event: 'rate_limit',
+      status: 'rejected',
+      content: 'Claude Code reports the request was rejected by rate limiting.',
+      sessionId: 'claude-rate-1',
+      metadata: {
+        rateLimitType: 'five_hour',
+        utilization: 1,
+        resetsAt: 1710000000,
+        overageStatus: null,
+        overageResetsAt: null,
+      },
+    }]);
+
+    expect(normalizer.transformSDKMessage({
+      type: 'rate_limit_event',
+      session_id: 'claude-rate-1',
+      rate_limit_info: { status: 'allowed' },
+    })).toEqual([{
+      type: 'backend_event',
+      source: 'claude-code',
+      event: 'rate_limit',
+      status: 'allowed',
+      sessionId: 'claude-rate-1',
+      metadata: {
+        rateLimitType: null,
+        utilization: null,
+        resetsAt: null,
+        overageStatus: null,
+        overageResetsAt: null,
+      },
+    }]);
+  });
 });

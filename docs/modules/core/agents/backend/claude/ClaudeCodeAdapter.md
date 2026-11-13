@@ -245,3 +245,14 @@ Goal 停止/清除先中断并等待该 runtime 的输出泵退出，防止旧�
 会话信息只读取精确匹配的运行中 Query：实验 usage 接口使用 skipBehaviors，套餐额度与 session.model_usage 累计用量分开，MCP 来自该 Query。listSubagents/getSubagentMessages 使用 SDK 原生 ID。local_agent 事件按 run_id 防止旧轮次回写；local_bash 不成为智能体，无法证明运行状态的历史子会话标为 unknown。
 
 精确 Query 的 getContextUsage({detail: summary}) 读回当前窗口和 memoryFiles 来源，不创建另一探针 Query，也不触发默认 full 分类 token-count 调用。原生来源路径作为只读说明，外部记忆文件不自动通过 Vault 链接打开。
+
+## 2026-11-13 Backend runtime refresh：原生会话删除与权限模式
+
+- `ClaudeCodeSdkFacade` 新增可选 `deleteSession(sessionId, { dir, sessionStore })`（官方 SDK ≥0.3.312 声明，loader 透传）。`deleteSession()` 现在在关闭 runtime 之后调用私有 `deleteNativeSdkSession()`，用官方原生生命周期删除持久化会话，而不是在插件侧重复实现 transcript 文件删除。
+- 身份规则：有活跃 session state 时使用其 `sdkSessionId`；传入的 id 本身是原生 id（非 `claude-code-*` 本地 handle）时直接使用该 id；从未发送过消息的本地 handle 没有原生对应物，跳过原生删除且不触碰 SDK（保持旧行为，SDK 不可用时仍能删除本地草稿）。
+- 作用域与验证：删除固定传 `dir: vaultPath`，存在 runtime-only `sessionStore` 时一并传入；SDK 提供 `getSessionInfo` 时做读回，仍能读到则抛错（"still readable after deleteSession"）——接受调用不等于已删除。SDK 不提供 `deleteSession` 时降级为原有本地清理并记录 debug 日志。
+- 失败语义：原生删除或读回失败会抛错，且本地 adapter state 保留以便重试（session 已进入 cancelled/invalidated，不会被继续使用）。`main.ts` 对 Claude 的删除调用目前忽略错误并继续删除本地会话记录，因此失败不会阻塞 UI，但不会被呈现给用户——这是既有宿主行为，未在本次改动范围内调整。
+- 证据局限：单测使用注入的 fake SDK 验证调用参数、读回验证与降级路径；未对真实 CLI 会话执行删除端到端验证。
+- `setPermissionMode()` 的入参类型随 `ClaudeCodePermissionMode` 拓宽到六个原生模式；live 切换失败由调用方回滚（见 `ChatSelectionControlsCoordinator` / `SettingsClaudeCodeSection`）。
+
+改前 CodeGraph（depth=1，官方 SDK gate）：`ClaudeCodeAdapter::deleteSession` 定义 1 处，直接 function/method 调用者 0（经 agent service registry 动态分发），blast radius 2 nodes / 3 edges。

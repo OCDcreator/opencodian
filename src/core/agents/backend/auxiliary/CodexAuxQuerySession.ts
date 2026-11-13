@@ -266,6 +266,7 @@ export class CodexAuxQuerySession implements AuxQuerySession {
     const streamState: AppServerStreamState = {
       streamedAgentMessageItemIds: new Set<string>(),
       streamedReasoningItemIds: new Set<string>(),
+      streamedReasoningSummaryItemIds: new Set<string>(),
       startedTodoItemIds: new Set<string>(),
       outputSchema: null,
     };

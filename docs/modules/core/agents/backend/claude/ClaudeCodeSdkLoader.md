@@ -10,7 +10,7 @@
 ## 职责
 
 - 通过 literal dynamic `import('@anthropic-ai/claude-agent-sdk')` 加载官方 SDK，让生产 bundle 能解析并打包 SDK 主包
-- 暴露 `query({ prompt, options })`，并在当前 SDK 提供时透传 `listSessions()`、`getSessionInfo()`、`getSessionMessages()`、`listSubagents()`、`getSubagentMessages()`、`importSessionToStore()`、`forkSession()`、`renameSession()`、`startup()`
+- 暴露 `query({ prompt, options })`，并在当前 SDK 提供时透传 `listSessions()`、`getSessionInfo()`、`getSessionMessages()`、`listSubagents()`、`getSubagentMessages()`、`importSessionToStore()`、`forkSession()`、`renameSession()`、`deleteSession()`（官方原生生命周期删除，SDK ≥0.3.312 声明）、`startup()`
 - `WarmQueryHandle` 接口描述 SDK `startup()` 返回的 WarmQuery 形状（`query(prompt)` + `close()`），供 adapter 和测试使用
 - 避免 `ClaudeCodeAdapter` 直接依赖第三方 SDK 模块形状，保留测试注入 seam
 

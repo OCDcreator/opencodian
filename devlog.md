@@ -11,6 +11,13 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-11-13 六后端运行时更新适配
+
+- 修复 ZCode env:v2 账号摘要兼容、旧桌面 TaskIndex 失效、原生问题结束收口和历史目录完整性；持久删除采用官方软删除并按同 ID 确认，满页历史标记 partial。补齐 guarded 模式的设置、聊天、原生应用和双语文案。
+- Claude dontAsk／auto 保留原生语义，dontAsk 不再错误放宽成 bypassPermissions；对齐 SDK 0.3.323 的分叉／历史修复，接通官方会话删除与既有诊断信号。Codex 对齐 0.169.0，skills/list 使用 cwds，独立 app-server 采用能力令牌鉴权，并仅在有明确参数不支持证据时兼容旧 CLI；推理摘要流去重。
+- OpenCode 2 client／schema 对齐 2.3.0，Goal 使用官方定义；Pi 旧 auth 分支特性检测，旧 OpenCode 来源注释和当前工具名显示同步整理。保持 OpenCode 1 退役、DSH 原生通道及辅助查询只读门禁。ZCode guide 缺少当前轮原子前置条件，保留插件本地队列，不误报原生 steering 已接入。
+- 真实 ZCode 隔离持久删除、Codex 作用域／鉴权、Claude CLI 两种模式及 SDK 隔离删除、Pi 安装版 fixture provider 和 DSH 原生控制均保留独立证据；完整门禁、部署及实机范围见 [运行时适配验收记录](docs/status/backend-runtime-refresh-2026-11-13.md)。本次插件版本保持 2.2.0。
+
 ## 2026-11-11 v2.2.0：后端设置重设计与共享工作台整理
 
 - 汇总六后端 SDK／API 兼容更新与后端配置字段梳理，按用户任务组织设置子页，补齐默认值、作用域、生效方式、能力限制和配置恢复入口；DSH 权限选项与原生接口保持一致。
