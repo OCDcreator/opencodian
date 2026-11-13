@@ -492,6 +492,73 @@ describe('ZCodeAdapter — native session lifecycle', () => {
     expect(methodsCalled()).not.toContain('v4/command');
   });
 
+  it('refuses a malformed pre-mutation same-ID listing without sending any mutation', async () => {
+    await startAdapter();
+    // A missing or non-array `sessions` field can neither prove a persisted
+    // row nor a draft; the delete must fail closed before any mutation.
+    for (const malformed of [{}, { sessions: 'malformed' }, { sessions: null }]) {
+      responses['session/list'] = malformed;
+      await expect(adapter.deleteSession('sess_a')).rejects.toThrow('malformed native listing');
+    }
+    expect(methodsCalled()).not.toContain('v4/command');
+    expect(methodsCalled()).not.toContain('session/resume');
+  });
+
+  it('refuses a deferred delete when the workspace listing readback is malformed (no mutation)', async () => {
+    await startAdapter();
+    // Same-ID lookup is a valid empty array, but the workspace-scoped visible
+    // catalog is malformed: absence cannot be proven, so refuse the draft
+    // disposal.
+    onRequest = (method) => {
+      if (method !== 'session/list') return;
+      const params = calls.at(-1)?.params ?? {};
+      responses['session/list'] = Array.isArray(params['sessionIds'])
+        ? { sessions: [] }
+        : { sessions: 'malformed' };
+    };
+    await expect(adapter.deleteSession('sess_a')).rejects.toThrow('malformed workspace listing');
+    expect(methodsCalled()).not.toContain('v4/command');
+    expect(methodsCalled()).not.toContain('session/resume');
+  });
+
+  it('never claims success when the persistent delete readback is malformed after an accepted ACK', async () => {
+    await startAdapter();
+    const rowA = { sessionId: 'sess_a', sessionKind: 'interactive', title: 'A', workspace: { workspacePath: '/vault' } };
+    responses['v4/command'] = { status: 'accepted', commandId: 'delete_malformed_p', revisionAtDecision: 1 };
+    let sameIdLookups = 0;
+    onRequest = (method) => {
+      if (method !== 'session/list') return;
+      const params = calls.at(-1)?.params ?? {};
+      if (!Array.isArray(params['sessionIds'])) return;
+      sameIdLookups += 1;
+      // Pre-mutation guard sees the row; the post-ACK readback is malformed
+      // (missing `sessions` array), which cannot prove the tombstone.
+      responses['session/list'] = sameIdLookups === 1 ? { sessions: [rowA] } : {};
+    };
+    await expect(adapter.deleteSession('sess_a')).rejects.toThrow('readback was malformed');
+    expect(methodsCalled().filter((method) => method === 'v4/command')).toHaveLength(1);
+  });
+
+  it('never claims success when the deferred delete readback is malformed after an accepted ACK', async () => {
+    await startAdapter();
+    responses['v4/command'] = { status: 'accepted', commandId: 'delete_malformed_d', revisionAtDecision: 1 };
+    onRequest = (method) => {
+      if (method !== 'session/list') return;
+      const params = calls.at(-1)?.params ?? {};
+      // Same-ID lookups (pre-guard and post-ACK readback) and the workspace
+      // scope-read all start from this table; the workspace read must be a
+      // valid empty array while the final readback is malformed.
+      responses['session/list'] = Array.isArray(params['sessionIds'])
+        ? (calls.filter((call) => call.method === 'session/list' && Array.isArray(call.params?.['sessionIds'])).length >= 2
+          ? { sessions: 'malformed' }
+          : { sessions: [] })
+        : { sessions: [] };
+    };
+    await expect(adapter.deleteSession('sess_deferred')).rejects.toThrow('readback was malformed');
+    expect(methodsCalled().filter((method) => method === 'v4/command')).toHaveLength(1);
+    expect(methodsCalled()).toContain('session/resume');
+  });
+
   it('renames through the official V4 command and verifies the native session title', async () => {
     await startAdapter();
     responses['v4/command'] = { status: 'accepted', commandId: 'rename_1', revisionAtDecision: 1 };

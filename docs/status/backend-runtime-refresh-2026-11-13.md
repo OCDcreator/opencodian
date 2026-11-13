@@ -48,11 +48,11 @@
 
 ## 收口结果
 
-`npm run verify -- --base 0a38dbe9b3ee8e106afe1c696f360e020504672d` 十五项门禁全通过：owner／架构、模块文档与 owner-impact、Graphify、devlog、lint、TypeScript、完整测试、生产构建与生成样式一致性。1,084 个测试套件／12,349 项测试通过；另有 4 个套件／8 项按既有条件跳过；lint 为 0 errors／0 warnings。中间轮次出现的 Goal bridge 与 hoisted fs mock 初始化冲突已修复并由完整测试覆盖；一次 Jest worker SIGSEGV 对应套件隔离复跑与最终全量复跑均通过，没有降低断言或门禁。
+`npm run verify -- --base origin/main` 按实际合并范围十五项门禁全通过：owner／架构、模块文档与 owner-impact、Graphify、devlog、lint、TypeScript、完整测试、生产构建与生成样式一致性。1,084 个测试套件／12,353 项测试通过；另有 4 个套件／8 项按既有条件跳过；lint 为 0 errors／0 warnings。最终补强了 ZCode 删除前、删除后以及 deferred workspace 读回的数组形状守卫：畸形响应不能证明缺席，mutation 前拒绝、ACK 后也不报成功，四个反例测试覆盖两条路径。中间轮次出现的 Goal bridge 与 hoisted fs mock 初始化冲突已修复并由完整测试覆盖；一次 Jest worker SIGSEGV 对应套件隔离复跑与最终全量复跑均通过，没有降低断言或门禁。首次远端 Windows CI 另暴露既有设置 CSS 契约测试依赖 LF；读取测试样式后统一 CRLF／LF，布局断言保持原样。
 
 构建 `zcode-backend-runtime-refresh-20261113.202611132235` 已分步部署 macOS Test Vault：main.js、manifest.json、styles.css、pdf-engine.js 与 assets 都和 dist 一致。官方 CLI 重载后实际插件 `getDebugBuildIdentityText()` 读回相同 BUILD_ID，版本 2.2.0，vault 名称与物理路径均匹配。部署复制最初被 Mimosa 的直接 shell 写入规则拒绝；改用经 Write 提交扫描、明确固定来源／目标且拒绝 symlink 的任务部署脚本后执行成功，没有更改安全配置。Git 合并／双远端推送与远端 CI 另行记录，不以本地门禁替代。
 
-最终 CodeGraph status／sync 后执行 affected：104 个变更路径，遍历 1,898 个依赖节点，关联 1,062 个测试文件。此为图关联范围，包含文档及共享设置，不是实际发生行为变化的模块数；全量测试已覆盖。未运行 CodeGraph init。
+最终 CodeGraph status／sync 后执行 affected：106 个变更路径，遍历 1,898 个依赖节点，关联 1,062 个测试文件。此为图关联范围，包含文档及共享设置，不是实际发生行为变化的模块数；全量测试已覆盖。未运行 CodeGraph init。
 
 ### Standards 独立审查
 

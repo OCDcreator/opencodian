@@ -64,7 +64,7 @@ describe('SettingsPanelChrome', () => {
   });
 
   it('reclaims the narrow-header wordmark without wrapping or hiding the icon rail', () => {
-    const css = readFileSync(join(process.cwd(), 'src/style/components/settings-layout-contract.css'), 'utf8');
+    const css = readFileSync(join(process.cwd(), 'src/style/components/settings-layout-contract.css'), 'utf8').replace(/\r\n/g, '\n');
     const readRule = (selector: string): string => {
       const start = css.lastIndexOf(`${selector} {`);
       expect(start).toBeGreaterThanOrEqual(0);

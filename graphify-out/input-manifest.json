@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "1779098ba6e1122f6461ab42821d703fd1009a62b0657667f817c3b24d18619d",
+  "digest": "36dfa643043e9b6c849525e8d9eeb1c1af8963379ba2a2690ce7b510efa2d02b",
   "recordCount": 848,
   "records": [
     {
@@ -596,7 +596,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/zcode/ZCodeAdapter.ts",
-      "sha256": "10cecd1e98bcd287007c39d30bc2e5d070e968b9a7c1bca68769f670186c3333"
+      "sha256": "5619ee9b28b88c58c81c2d8c43e6d583fc9f20ffebb5c518842a5d4a49d97bfb"
     },
     {
       "kind": "src",
@@ -4244,7 +4244,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-11-13T14:33:14.573Z",
-  "headShaAtGeneration": "0a38dbe9b3ee8e106afe1c696f360e020504672d",
+  "generatedAt": "2026-11-13T14:46:57.313Z",
+  "headShaAtGeneration": "4563ab7f33b290dba93952a4cdc39b5a430dcf66",
   "graphifyVersion": "graphify 0.9.31"
 }

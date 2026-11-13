@@ -1126,7 +1126,13 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
     if (!sessionId || !workspacePath) throw new Error('ZCode session deletion requires a session ID and workspace.');
     const transport = this.requireTransport();
     const native = asRecordValue(await transport.request('session/list', { sessionIds: [sessionId] }));
-    const row = (Array.isArray(native['sessions']) ? native['sessions'] : [])
+    // Fail-closed: the pre-mutation identity guard requires a well-formed
+    // same-ID listing. A missing/malformed `sessions` array can neither
+    // prove a persisted row nor a draft, so no mutation may be sent.
+    if (!Array.isArray(native['sessions'])) {
+      throw new Error('ZCode session deletion rejected a malformed native listing before mutation.');
+    }
+    const row = native['sessions']
       .map(asRecordValue).find((session) => session['sessionId'] === sessionId);
     // A deferred empty session has no persisted row; the official V4
     // command disposes that in-process draft.
@@ -1143,9 +1149,11 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
   /**
    * Shared native delete: V4 `deleteSession` command, then the authoritative
    * same-ID readback. Because `session/list` filters tombstoned records
-   * server-side, a session that survives the readback proves the persisted
-   * delete did not happen (e.g. an older runtime whose V4 delete only closed
-   * the handle) and must surface as a failure, not as success.
+   * server-side, success requires a well-formed EMPTY same-ID listing: a
+   * surviving session proves the persisted delete did not happen (e.g. an
+   * older runtime whose V4 delete only closed the handle), and a malformed
+   * readback cannot prove anything — both must surface as failures, never
+   * as silent success.
    */
   private async deleteNativeSession(transport: ZCodeAppServerTransport, sessionId: string): Promise<void> {
     const ack = asRecordValue(await transport.request('v4/command', {
@@ -1156,7 +1164,10 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
       throw new Error('ZCode session deletion was rejected by the native V4 command.');
     }
     const after = asRecordValue(await transport.request('session/list', { sessionIds: [sessionId] }));
-    if (Array.isArray(after['sessions']) && after['sessions'].length > 0) {
+    if (!Array.isArray(after['sessions'])) {
+      throw new Error('ZCode session deletion readback was malformed; deletion cannot be confirmed.');
+    }
+    if (after['sessions'].length > 0) {
       throw new Error('ZCode session deletion was not confirmed by the native catalog readback.');
     }
   }
@@ -1166,7 +1177,12 @@ export class ZCodeAdapter implements AgentService, AgentChatCapability, AgentSes
     const raw = asRecordValue(await transport.request('session/list', {
       ...(workspacePath ? { workspace: { workspacePath, workspaceKey: workspacePath } } : {}),
     }));
-    if (Array.isArray(raw['sessions']) && raw['sessions'].some((session) => asRecordValue(session)['sessionId'] === sessionId)) {
+    // Fail-closed: a malformed visible listing cannot prove the target is a
+    // draft outside this workspace, so the draft disposal must be refused.
+    if (!Array.isArray(raw['sessions'])) {
+      throw new Error('ZCode session deletion rejected a malformed workspace listing.');
+    }
+    if (raw['sessions'].some((session) => asRecordValue(session)['sessionId'] === sessionId)) {
       throw new Error('ZCode session deletion rejected a session outside this workspace.');
     }
     await this.ensureSessionActive(transport, sessionId);
