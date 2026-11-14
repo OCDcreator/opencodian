@@ -1,4 +1,6 @@
 # Owner: core.obsidian-tooling
+
+2026-11-14：门控继续拥有唯一 CLI argv 验证入口，在命令分类／确认请求前拒绝后置、重复、空的 vault 选择器，并要求库相关命令显式前置目标；help／version／vaults 保持全局查询。注入块给出前置示例及目标名称／路径核验要求。合法 argv 原样进入既有分类与确认流程，不在 shell 内自动重排或绕过用户批准；也不宣称语法验证已证明原生库身份。生成脚本由现有 app coordinator 按 applySettings 重新下发，owner 边界与状态归属保持原定义。
 > 2026-09-21 (advantage-parity R-E6)：owner manifest 刷新——shared.foundation 的 include 新增 `src/shared/tokenEstimate.ts`（token 估算启发式）；本 owner 的边界与职责未变。
 
 > The manifest (`architecture-owners.config.json`) is the canonical truth source; this page narrates the model and records hard-to-automate rationale.

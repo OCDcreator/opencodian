@@ -48,9 +48,12 @@ export function buildGateScript(input: GateScriptInput = {}): string {
 # obsidian-gate — OpenCodian confirmation gate for the Obsidian desktop CLI (R-B4).
 # GENERATED FILE: owned and rewritten by the OpenCodian plugin. Do not edit.
 #
-# Usage: obsidian-gate <subcommand> [args...]        (same argv as ${cliCommand})
+# Usage: obsidian-gate vault=<name> <subcommand> [args...] (same argv as ${cliCommand})
 #
 # Contract:
+#   - vault-scoped commands require exactly one non-empty vault=<name> BEFORE
+#     the subcommand. Invalid routing exits 2 before execution or a request.
+#     help/version/vaults are global discovery and may omit the vault.
 #   - read / navigation / vault-write subcommands execute directly. Vault
 #     writes surface as normal Obsidian vault events and appear in the
 #     OpenCodian edit-revert sidebar.
@@ -78,23 +81,47 @@ CLI_BIN=\${OBSIDIAN_OPENCODIAN_CLI_BIN:-${cliCommand}}
 WAIT_SECONDS=\${OBSIDIAN_OPENCODIAN_GATE_WAIT:-${waitSeconds}}
 
 if [ "$#" -lt 1 ]; then
-  printf 'obsidian-gate: usage: obsidian-gate <subcommand> [args...]\\n' >&2
+  printf 'obsidian-gate: usage: obsidian-gate vault=<name> <subcommand> [args...]\\n' >&2
   exit 2
 fi
 
-# The subcommand is the first argument that is neither a -flag nor a key=value
-# global option (for example vault=<name>).
+# Find the subcommand, but inspect the ENTIRE argv before any execution or
+# confirmation request. The native CLI can ignore a vault= after the command
+# and silently use the active vault instead. Never reorder approved arguments.
 SUBCOMMAND=""
+HAS_VAULT=0
 for arg in "$@"; do
   case "$arg" in
-    -*) continue ;;
-    *=*) continue ;;
-    *) SUBCOMMAND="$arg"; break ;;
+    vault=*)
+      if [ -n "$SUBCOMMAND" ] || [ "$HAS_VAULT" -ne 0 ]; then
+        printf 'obsidian-gate: supply exactly one vault=<name> BEFORE the subcommand; refusing to execute\\n' >&2
+        exit 2
+      fi
+      case "\${arg#vault=}" in
+        *[![:space:]]*) HAS_VAULT=1 ;;
+        *)
+          printf 'obsidian-gate: vault=<name> must not be empty; refusing to execute\\n' >&2
+          exit 2
+          ;;
+      esac
+      ;;
+    -*) ;;
+    *=*) ;;
+    *) if [ -z "$SUBCOMMAND" ]; then SUBCOMMAND="$arg"; fi ;;
   esac
 done
 if [ -z "$SUBCOMMAND" ]; then
   printf 'obsidian-gate: no subcommand found in argv; refusing to execute\\n' >&2
   exit 2
+fi
+if [ "$HAS_VAULT" -eq 0 ]; then
+  case "$SUBCOMMAND" in
+    help|version|vaults) ;; # Global discovery does not target a vault.
+    *)
+      printf 'obsidian-gate: vault=<name> is required BEFORE the subcommand; active-vault fallback is disabled\\n' >&2
+      exit 2
+      ;;
+  esac
 fi
 
 # --- classification ---------------------------------------------------------

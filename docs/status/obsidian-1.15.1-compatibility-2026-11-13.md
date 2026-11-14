@@ -35,7 +35,9 @@ obsidian vault=testvault eval code=...       → testvault（名称／物理路�
 
 这是**当前版本已实测的路由／封装边界**；没有旧 CLI 的受控对照，不将其定性为本次版本引入的回归，也不臆测官方是否承诺支持 trailing 写法。
 
-CodeGraph 仅用于后续改造范围评估：两个符号均为唯一定义、各 1 个直接函数／方法调用方（排除 file 节点）；impact depth=2，buildGateScript 为 7 个符号，buildObsidianToolingBlock 为 8 个符号。后者涉及聊天组合入口，当前核查没有修改这些函数或越过该边界。
+初轮 CodeGraph 仅用于改造范围评估：两个符号均为唯一定义、各 1 个直接函数／方法调用方（排除 file 节点）；impact depth=2，buildGateScript 为 7 个符号，buildObsidianToolingBlock 为 8 个符号。后者涉及聊天组合入口，初轮核查没有修改这些函数或越过该边界。
+
+2026-11-14 用户授权加固后的处置：已在既有门控内拒绝后置／重复／空的 vault 参数，并要求库相关命令显式前置目标；help／version／vaults 保留全局查询。提示词与共享调试技能同步前置示例和目标身份核验要求。合法 argv 仍原样传递，原高影响确认流程保留；参数校验本身不冒充宿主目标身份的权威读回。
 
 ## PDF 与实证边界
 

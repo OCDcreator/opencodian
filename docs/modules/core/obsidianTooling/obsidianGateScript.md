@@ -7,6 +7,10 @@
 
 生成 POSIX sh 包装脚本 `obsidian-gate`（本里程碑仅 macOS/Linux），这是高影响确认要求的**机制**而非提示词：agent 被告知（注入块）经包装脚本调用 CLI；包装脚本对 high-impact 子命令写入 `requests/<id>.request.json` 并轮询等待插件写入的 `<id>.decision.json`。无决策 → 不执行（exit 4）；拒绝 → exit 3；决策文件不可读 → exit 5（fail-closed）；允许 → 以**完全相同的原始 argv** exec 真实 CLI。未知子命令一律按 high-impact 处理。
 
+2026-11-14：先扫描完整 argv，再分类或创建确认请求。库相关命令必须有且只有一个非空、位于子命令前的 `vault=<name>`；后置、重复、空值或缺目标以 exit 2 拒绝，CLI 不启动，也不留下待批准请求。`help`／`version`／`vaults` 作为全局查询允许省略。合法 argv 不自动重排：带空格、中文库名、参数中的 `content=vault=literal` 原样传递；未知命令在目标合法时仍进入原确认流程。目标名称／物理路径核验由调用者完成，门控不宣称仅凭参数正确就已证明宿主命中。
+
+验证使用真实 POSIX sh＋记录 argv 的假 CLI，覆盖无执行／无请求反例、全局查询与原确认超时；fixture 只清理自己创建的显式文件和空目录，不递归删除临时根。
+
 ## 关键导出
 
 | 导出 | 说明 |
